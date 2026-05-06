@@ -41,10 +41,10 @@ MLN_RENDER_BACKEND = "{% if os() == 'macos' %}metal{% else %}vulkan{% endif %}"
 
 # The following are lazy loaded to allow the profile to set values before expansion
 MLN_BUILD_FLAVOR = { value = "$MLN_TARGET_OS-$MLN_TARGET_ARCH-$MLN_RENDER_BACKEND", tools = true }
-MLN_BUILD_DIR = { value = "{{ config_root }}/build/$MLN_BUILD_FLAVOR", tools = true }
-DYLD_LIBRARY_PATH = { value = "{{ config_root }}/build/$MLN_BUILD_FLAVOR", tools = true }
-LD_LIBRARY_PATH = { value = "{{ config_root }}/build/$MLN_BUILD_FLAVOR", tools = true }
-PKG_CONFIG_PATH = { value = "{{ config_root }}/build/$MLN_BUILD_FLAVOR/pkgconfig", tools = true }
+MLN_BUILD_DIR = { value = "{{ config_root }}/build/$MLN_TARGET_OS-$MLN_TARGET_ARCH-$MLN_RENDER_BACKEND", tools = true }
+DYLD_LIBRARY_PATH = { value = "{{ config_root }}/build/$MLN_TARGET_OS-$MLN_TARGET_ARCH-$MLN_RENDER_BACKEND", tools = true }
+LD_LIBRARY_PATH = { value = "{{ config_root }}/build/$MLN_TARGET_OS-$MLN_TARGET_ARCH-$MLN_RENDER_BACKEND", tools = true }
+PKG_CONFIG_PATH = { value = "{{ config_root }}/build/$MLN_TARGET_OS-$MLN_TARGET_ARCH-$MLN_RENDER_BACKEND/pkgconfig", tools = true }
 
 [tasks.build]
 depends = ["//:configure"]
