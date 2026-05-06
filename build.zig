@@ -3,30 +3,8 @@ const std = @import("std");
 const BuildOptions = struct {
     target: std.Build.ResolvedTarget,
     optimize: std.builtin.OptimizeMode,
-    cmake_artifact_dir: std.Build.LazyPath,
     render_backend: []const u8,
 };
-
-fn linkMapLibreC(b: *std.Build, module: *std.Build.Module, cmake_artifact_dir: std.Build.LazyPath) void {
-    module.addIncludePath(b.path("include"));
-    module.addLibraryPath(cmake_artifact_dir);
-    module.addRPath(cmake_artifact_dir);
-    module.linkSystemLibrary("maplibre-native-c", .{});
-    module.link_libc = true;
-}
-
-fn cmakeArtifactDir(b: *std.Build) std.Build.LazyPath {
-    const path = b.option(
-        []const u8,
-        "cmake-artifact-dir",
-        "Directory containing the CMake-built maplibre-native-c library",
-    ) orelse "unknown";
-
-    if (std.fs.path.isAbsolute(path)) {
-        return .{ .cwd_relative = path };
-    }
-    return b.path(path);
-}
 
 fn addCTests(b: *std.Build, options: BuildOptions) *std.Build.Step.Compile {
     const build_options = b.addOptions();
@@ -41,7 +19,8 @@ fn addCTests(b: *std.Build, options: BuildOptions) *std.Build.Step.Compile {
     });
     c_tests.root_module.addOptions("build_options", build_options);
 
-    linkMapLibreC(b, c_tests.root_module, options.cmake_artifact_dir);
+    c_tests.root_module.linkSystemLibrary("maplibre-native-c", .{ .use_pkg_config = .force });
+    c_tests.root_module.link_libc = true;
     if (options.target.result.os.tag == .macos) {
         c_tests.root_module.addCSourceFile(.{ .file = b.path("tests/c/metal_support_macos.m") });
         c_tests.root_module.linkFramework("AppKit", .{});
@@ -72,7 +51,6 @@ pub fn build(b: *std.Build) void {
     const options = BuildOptions{
         .target = b.standardTargetOptions(.{}),
         .optimize = b.standardOptimizeOption(.{}),
-        .cmake_artifact_dir = cmakeArtifactDir(b),
         .render_backend = render_backend,
     };
 

@@ -1,6 +1,5 @@
-prefix=@MLN_PC_PREFIX@
 includedir=@MLN_PC_INCLUDEDIR@
-libdir=@MLN_PC_LIBDIR@
+libdir=${pcfiledir}/..
 
 Name: maplibre-native-c
 Description: C ABI for MapLibre Native

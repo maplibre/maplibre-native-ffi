@@ -58,7 +58,7 @@ run = "rm -rf build"
 [tasks.test]
 depends = ["//:build"]
 run = '''
-zig build test --summary all -Dcmake-artifact-dir="${MLN_BUILD_DIR}" -Drender-backend="${MLN_RENDER_BACKEND}"
+zig build test --summary all -Drender-backend="${MLN_RENDER_BACKEND}"
 '''
 
 [tasks.check]
