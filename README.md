@@ -29,10 +29,10 @@ returns `0`.
 Read the documentation site for concepts, usage guides, the generated C API
 reference, and contributor notes.
 
-- [Concepts](https://code.sargunv.dev/maplibre-native-ffi/concepts/)
-- [Usage guides](https://code.sargunv.dev/maplibre-native-ffi/guides/)
-- [C API reference](https://code.sargunv.dev/maplibre-native-ffi/reference/c/)
-- [Development overview](https://code.sargunv.dev/maplibre-native-ffi/development/overview/)
+- [Concepts](https://maplibre.org/maplibre-native-ffi/concepts/)
+- [Usage guides](https://maplibre.org/maplibre-native-ffi/guides/installation/)
+- [Reference](https://maplibre.org/maplibre-native-ffi/reference/c/)
+- [Development overview](https://maplibre.org/maplibre-native-ffi/development/overview/)
 
 ## Status
 

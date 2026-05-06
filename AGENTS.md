@@ -17,7 +17,7 @@ whether the documentation is a Tutorial, Guide, Reference, or Explanation,
 according to the
 [Diátaxis Framework](https://raw.githubusercontent.com/evildmp/diataxis-documentation-framework/refs/heads/main/start-here.rst).
 State your audience and category determination to the user, then load and follow
-the appropriate skill before making changes:
+the appropriate framework before making changes:
 
 - [Reference](https://raw.githubusercontent.com/evildmp/diataxis-documentation-framework/refs/heads/main/reference.rst)
   usually covers comments attached to source code (e.g., Doxygen).
@@ -49,5 +49,5 @@ Read these docs before changing related code:
   threading, events, rendering targets, and host integration boundaries.
 - [C API](docs/src/content/docs/development/c-api.md) before changing public C
   headers, C ABI behavior, callbacks, diagnostics, or render target contracts.
-- [Bindings](docs/src/content/docs/development/bindings/) before changing a
-  language binding or its generated reference docs.
+- [Bindings](docs/src/content/docs/development/) before changing a language
+  binding or its generated reference docs.

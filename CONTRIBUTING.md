@@ -6,12 +6,12 @@ Discuss changes in `#maplibre` on the
 ## Before Making Changes
 
 See the
-[development overview](https://code.sargunv.dev/maplibre-native-ffi/development/overview/)
+[development overview](https://maplibre.org/maplibre-native-ffi/development/)
 for platform setup, pinned tools, local commands, tests, and examples.
 
-Read [concepts](https://code.sargunv.dev/maplibre-native-ffi/concepts/) before
+Read [concepts](https://maplibre.org/maplibre-native-ffi/concepts/) before
 changing behavior. Read the
-[C API development guide](https://code.sargunv.dev/maplibre-native-ffi/development/c-api/)
+[C API development guide](https://maplibre.org/maplibre-native-ffi/development/c-api/)
 before changing public C interfaces or C ABI behavior.
 
 Keep pull requests focused on one reviewable change. The reviewer should be able

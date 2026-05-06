@@ -8,7 +8,7 @@ import starlightLlmsTxt from "starlight-llms-txt";
 
 // https://astro.build/config
 export default defineConfig({
-  site: "https://code.sargunv.dev",
+  site: "https://maplibre.org",
   base: "/maplibre-native-ffi",
   integrations: [
     starlight({
@@ -43,7 +43,7 @@ export default defineConfig({
         },
         {
           label: "Reference",
-          items: [{ label: "C API", slug: "reference/c" }],
+          autogenerate: { directory: "reference" },
         },
         {
           label: "Development",
