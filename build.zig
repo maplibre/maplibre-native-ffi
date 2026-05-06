@@ -4,6 +4,7 @@ const BuildOptions = struct {
     target: std.Build.ResolvedTarget,
     optimize: std.builtin.OptimizeMode,
     cmake_artifact_dir: std.Build.LazyPath,
+    render_backend: []const u8,
 };
 
 fn linkMapLibreC(b: *std.Build, module: *std.Build.Module, cmake_artifact_dir: std.Build.LazyPath) void {
@@ -19,7 +20,7 @@ fn cmakeArtifactDir(b: *std.Build) std.Build.LazyPath {
         []const u8,
         "cmake-artifact-dir",
         "Directory containing the CMake-built maplibre-native-c library",
-    ) orelse "build";
+    ) orelse "unknown";
 
     if (std.fs.path.isAbsolute(path)) {
         return .{ .cwd_relative = path };
@@ -28,6 +29,9 @@ fn cmakeArtifactDir(b: *std.Build) std.Build.LazyPath {
 }
 
 fn addCTests(b: *std.Build, options: BuildOptions) *std.Build.Step.Compile {
+    const build_options = b.addOptions();
+    build_options.addOption([]const u8, "render_backend", options.render_backend);
+
     const c_tests = b.addTest(.{
         .root_module = b.createModule(.{
             .root_source_file = b.path("tests/c/main.zig"),
@@ -35,6 +39,7 @@ fn addCTests(b: *std.Build, options: BuildOptions) *std.Build.Step.Compile {
             .optimize = options.optimize,
         }),
     });
+    c_tests.root_module.addOptions("build_options", build_options);
 
     linkMapLibreC(b, c_tests.root_module, options.cmake_artifact_dir);
     if (options.target.result.os.tag == .macos) {
@@ -42,7 +47,8 @@ fn addCTests(b: *std.Build, options: BuildOptions) *std.Build.Step.Compile {
         c_tests.root_module.linkFramework("AppKit", .{});
         c_tests.root_module.linkFramework("Metal", .{});
         c_tests.root_module.linkFramework("QuartzCore", .{});
-    } else if (options.target.result.os.tag == .linux) {
+    }
+    if (std.mem.eql(u8, options.render_backend, "vulkan")) {
         c_tests.root_module.addIncludePath(b.path("third_party/maplibre-native/vendor/Vulkan-Headers/include"));
         c_tests.root_module.addLibraryPath(b.path(".pixi/envs/default/lib"));
         c_tests.root_module.addRPath(b.path(".pixi/envs/default/lib"));
@@ -52,10 +58,22 @@ fn addCTests(b: *std.Build, options: BuildOptions) *std.Build.Step.Compile {
 }
 
 pub fn build(b: *std.Build) void {
+    const render_backend = b.option(
+        []const u8,
+        "render-backend",
+        "Render backend: metal or vulkan",
+    ) orelse "unknown";
+    if (!std.mem.eql(u8, render_backend, "metal") and
+        !std.mem.eql(u8, render_backend, "vulkan"))
+    {
+        @panic("render-backend must be 'metal' or 'vulkan'");
+    }
+
     const options = BuildOptions{
         .target = b.standardTargetOptions(.{}),
         .optimize = b.standardOptimizeOption(.{}),
         .cmake_artifact_dir = cmakeArtifactDir(b),
+        .render_backend = render_backend,
     };
 
     const c_tests = addCTests(b, options);

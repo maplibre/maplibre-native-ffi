@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+rm -rf ci-artifact
+mkdir -p "ci-artifact/build/${MLN_BUILD_FLAVOR}/pkgconfig"
+mkdir -p ci-artifact/third_party/maplibre-native/vendor/Vulkan-Headers
+
+cp "${MLN_BUILD_DIR}"/libmaplibre-native-c.* "ci-artifact/build/${MLN_BUILD_FLAVOR}"
+cp cmake/maplibre-native-c.ci-artifact.pc "ci-artifact/build/${MLN_BUILD_FLAVOR}/pkgconfig/maplibre-native-c.pc"
+cp -R third_party/maplibre-native/vendor/Vulkan-Headers/include ci-artifact/third_party/maplibre-native/vendor/Vulkan-Headers/include

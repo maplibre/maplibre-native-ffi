@@ -1,4 +1,7 @@
 build*/
+.miserc.toml
+mise.local.toml
+mise.*.local.toml
 docs/api/c/gen/
 docs/src/content/docs/api/c.md
 docs/src/content/docs/reference/c.md

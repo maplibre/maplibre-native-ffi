@@ -307,6 +307,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/osx-64/llvm-tools-22-22.1.4-hc181bea_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-64/llvm-tools-22.1.4-h1637cdf_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-64/llvmdev-22.1.4-hc181bea_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/osx-64/moltenvk-1.4.1-hbb43c5c_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-64/ncurses-6.6-hcc0dc9a_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-64/ninja-1.13.2-hfc0b2d5_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-64/openssl-3.6.2-hc881268_0.conda
@@ -317,6 +318,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/osx-64/sigtool-codesign-0.1.3-hc0f2934_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-64/spirv-tools-2026.1-h06b67a2_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-64/tapi-1600.0.11.8-h8d8e812_2.conda
+      - conda: https://conda.anaconda.org/conda-forge/osx-64/vulkan-tools-1.4.341.0-h991f03e_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-64/zlib-1.3.2-hbb4bfdb_2.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-64/zstd-1.5.7-h3eecb57_6.conda
       osx-arm64:
@@ -384,6 +386,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/llvm-tools-22-22.1.4-hb545844_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/llvm-tools-22.1.4-hd34ed20_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/llvmdev-22.1.4-hb545844_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/osx-arm64/moltenvk-1.4.1-h407b865_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/ncurses-6.6-h1d4f5a5_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/ninja-1.13.2-h49c215f_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/openssl-3.6.2-hd24854e_0.conda
@@ -394,6 +397,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/sigtool-codesign-0.1.3-h98dc951_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/spirv-tools-2026.1-h4ddebb9_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/tapi-1600.0.11.8-h997e182_2.conda
+      - conda: https://conda.anaconda.org/conda-forge/osx-arm64/vulkan-tools-1.4.341.0-hf6b4638_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/zlib-1.3.2-h8088a28_2.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/zstd-1.5.7-hbf9d68e_6.conda
 packages:
@@ -3944,6 +3948,26 @@ packages:
   license_family: MIT
   size: 2876962
   timestamp: 1773867973610
+- conda: https://conda.anaconda.org/conda-forge/osx-64/moltenvk-1.4.1-hbb43c5c_0.conda
+  sha256: f1813c5d3bac758a057e0b4173c3783ce71e13499ef6c397db29d149439e4fe9
+  md5: ba7482124d80505cc93c03d752e3d2ae
+  depends:
+  - libcxx >=19
+  - __osx >=14.0
+  license: Apache-2.0
+  license_family: APACHE
+  size: 1493789
+  timestamp: 1777627308334
+- conda: https://conda.anaconda.org/conda-forge/osx-arm64/moltenvk-1.4.1-h407b865_0.conda
+  sha256: 30711fccc6deaa556e8d691f92cabea8ef0bb33d5a577aad3512429bada7be77
+  md5: 9801f6018bf7d682e4ee0bff62027aa3
+  depends:
+  - libcxx >=19
+  - __osx >=14.0
+  license: Apache-2.0
+  license_family: APACHE
+  size: 1380005
+  timestamp: 1777643484676
 - conda: https://conda.anaconda.org/conda-forge/linux-64/mpg123-1.32.9-hc50e24c_0.conda
   sha256: 39c4700fb3fbe403a77d8cc27352fa72ba744db487559d5d44bf8411bb4ea200
   md5: c7f302fd11eeb0987a6a5e1f3aed6a21
@@ -4490,6 +4514,30 @@ packages:
   license_family: Apache
   size: 409348
   timestamp: 1770084117819
+- conda: https://conda.anaconda.org/conda-forge/osx-64/vulkan-tools-1.4.341.0-h991f03e_0.conda
+  sha256: c5121c88e0612f435425d6dc662d4ee2534014a3c32b60d7b4f588e6d48603c6
+  md5: 204d50ce7683e3f7b9f1cf694420bc10
+  depends:
+  - __osx >=10.13
+  - libcxx >=19
+  - libvulkan-loader 1.4.341.0.*
+  - libvulkan-loader >=1.4.341.0,<2.0a0
+  license: Apache-2.0
+  license_family: Apache
+  size: 586757
+  timestamp: 1770176079064
+- conda: https://conda.anaconda.org/conda-forge/osx-arm64/vulkan-tools-1.4.341.0-hf6b4638_0.conda
+  sha256: 499437643b98650add165218693f3c4d4e8c8b19b7e8f3d40e8e062e3b6b8246
+  md5: d416090065765466a27fec530b31ef27
+  depends:
+  - __osx >=11.0
+  - libcxx >=19
+  - libvulkan-loader 1.4.341.0.*
+  - libvulkan-loader >=1.4.341.0,<2.0a0
+  license: Apache-2.0
+  license_family: Apache
+  size: 579739
+  timestamp: 1770176150277
 - conda: https://conda.anaconda.org/conda-forge/linux-64/wayland-1.25.0-hd6090a7_0.conda
   sha256: ea374d57a8fcda281a0a89af0ee49a2c2e99cc4ac97cf2e2db7064e74e764bdb
   md5: 996583ea9c796e5b915f7d7580b51ea6

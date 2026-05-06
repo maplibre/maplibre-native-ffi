@@ -1,20 +1,25 @@
-# https://mise.jdx.dev
-# Mise is the contributor entrypoint: it pins tools, installs hooks, and runs
-# repository tasks.
-
 experimental_monorepo_root = true
 
 [settings]
 pin = true
 experimental = true
+env_shell_expand = true
 
 [monorepo]
 config_roots = ["examples/*", "docs"]
+
+[hooks]
+postinstall = [
+  "hk install --mise",
+  "pixi install --locked",
+  "cd docs && pnpm install",
+]
 
 [tools]
 hk = "1.40.0"
 pkl = "0.31.0"
 dprint = "0.53.2"
+jq = "1.8.1"
 "github:sargunv/jvl" = "2026.04.29"
 pixi = "0.67.2"
 "github:cmakefmt/cmakefmt" = "1.3.0"
@@ -25,28 +30,36 @@ pnpm = "10.33.2"
 node = "24.11.0"
 usage = "3.3.0"
 
-[hooks]
-postinstall = [
-  "hk install --mise",
-  "pixi install --locked",
-  "cd docs && pnpm install",
-]
+[env]
+PKG_CONFIG = "{{ config_root }}/.pixi/envs/default/bin/pkg-config"
+XDG_DATA_DIRS = "{{config_root}}/.pixi/envs/default/share"
 
-[tasks.configure]
-env = { CC = "clang", CXX = "clang++" }
-run = "pixi run cmake -S . -B build -G Ninja"
+# Overridden by the profile (e.g, `MISE_ENV=linux-x64-vulkan`)
+MLN_TARGET_OS = "{{ os() }}"
+MLN_TARGET_ARCH = "{{ arch() }}"
+MLN_RENDER_BACKEND = "{% if os() == 'macos' %}metal{% else %}vulkan{% endif %}"
+
+# The following are lazy loaded to allow the profile to set values before expansion
+MLN_BUILD_FLAVOR = { value = "$MLN_TARGET_OS-$MLN_TARGET_ARCH-$MLN_RENDER_BACKEND", tools = true }
+MLN_BUILD_DIR = { value = "{{ config_root }}/build/$MLN_BUILD_FLAVOR", tools = true }
+DYLD_LIBRARY_PATH = { value = "{{ config_root }}/build/$MLN_BUILD_FLAVOR", tools = true }
+LD_LIBRARY_PATH = { value = "{{ config_root }}/build/$MLN_BUILD_FLAVOR", tools = true }
+PKG_CONFIG_PATH = { value = "{{ config_root }}/build/$MLN_BUILD_FLAVOR/pkgconfig", tools = true }
 
 [tasks.build]
 depends = ["//:configure"]
-run = "pixi run cmake --build build --parallel"
+run = '''
+pixi run --locked cmake --build "${MLN_BUILD_DIR}" --parallel
+'''
 
 [tasks.clean]
 run = "rm -rf build"
 
 [tasks.test]
 depends = ["//:build"]
-env = { XDG_DATA_DIRS = "{{config_root}}/.pixi/envs/default/share" }
-run = "zig build test --summary all"
+run = '''
+zig build test --summary all -Dcmake-artifact-dir="${MLN_BUILD_DIR}" -Drender-backend="${MLN_RENDER_BACKEND}"
+'''
 
 [tasks.check]
 run = "hk check --all"

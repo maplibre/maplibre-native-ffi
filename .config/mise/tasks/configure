@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cmake_args=(-S . -B "${MLN_BUILD_DIR}" -G Ninja)
+if [[ "${MLN_TARGET_OS}" == "macos" ]]; then
+  cmake_args+=(-DMLN_MACOS_RENDER_BACKEND="${MLN_RENDER_BACKEND}")
+fi
+
+CC=clang CXX=clang++ pixi run --locked cmake "${cmake_args[@]}"
+
+shopt -s nullglob
+compile_databases=(build/"${MLN_TARGET_OS}"-"${MLN_TARGET_ARCH}"-*/compile_commands.json)
+if (( ${#compile_databases[@]} == 0 )); then
+  echo "missing compile_commands.json for configured targets" >&2
+  exit 1
+fi
+
+tmp="$(mktemp "${TMPDIR:-/tmp}/compile_commands.XXXXXX")"
+jq -s 'add | reverse | unique_by(.file) | reverse' "${compile_databases[@]}" > "${tmp}"
+mv "${tmp}" build/compile_commands.json

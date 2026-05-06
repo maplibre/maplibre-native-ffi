@@ -28,11 +28,20 @@ Install the platform toolchain:
 - On macOS, install a recent version of Xcode.
 - On Windows, install a recent version of Visual Studio Community with the
   `Desktop development with C++` workload.
+- On all platforms, install [`mise`](https://mise.jdx.dev/).
 
-Install [`mise`](https://mise.jdx.dev/), then install the pinned project tools:
+Then install the pinned project tools:
 
 ```bash
 mise install
+```
+
+By default, mise selects the host-native target. To choose another target, set
+`MISE_ENV` to one of the targets listed at `ls .config/mise/config.*-*-*.toml`:
+
+```bash
+export MISE_ENV=macos-arm64-vulkan
+mise run test
 ```
 
 Run the Zig map example as a smoke test:

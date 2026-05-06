@@ -5,11 +5,6 @@ const BuildOptions = struct {
     optimize: std.builtin.OptimizeMode,
 };
 
-fn linkMapLibreC(module: *std.Build.Module) void {
-    module.linkSystemLibrary("maplibre-native-c", .{ .use_pkg_config = .force });
-    module.link_libc = true;
-}
-
 fn addReadbackExample(b: *std.Build, options: BuildOptions) *std.Build.Step.Compile {
     const example = b.addExecutable(.{
         .name = "zig-readback",
@@ -20,7 +15,8 @@ fn addReadbackExample(b: *std.Build, options: BuildOptions) *std.Build.Step.Comp
         }),
     });
 
-    linkMapLibreC(example.root_module);
+    example.root_module.linkSystemLibrary("maplibre-native-c", .{ .use_pkg_config = .force });
+    example.root_module.link_libc = true;
     example.root_module.addLibraryPath(b.path("../../.pixi/envs/default/lib"));
     example.root_module.addRPath(b.path("../../.pixi/envs/default/lib"));
     b.installArtifact(example);

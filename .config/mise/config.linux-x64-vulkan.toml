@@ -1,0 +1,4 @@
+[env]
+MLN_TARGET_OS = "linux"
+MLN_TARGET_ARCH = "x64"
+MLN_RENDER_BACKEND = "vulkan"

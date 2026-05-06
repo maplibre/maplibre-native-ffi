@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+#USAGE arg "<profile>" help="Lint profile" {
+#USAGE   choices "common" "native"
+#USAGE }
+
+hk fix --all --profile "ci-${usage_profile?}"
+git update-index -q --refresh
+git diff --exit-code
+git diff --cached --exit-code

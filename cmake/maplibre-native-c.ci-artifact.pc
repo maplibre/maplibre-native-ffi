@@ -1,6 +1,6 @@
-prefix=${pcfiledir}/../..
+prefix=${pcfiledir}/../../..
 includedir=${prefix}/include
-libdir=${prefix}/build
+libdir=${pcfiledir}/..
 
 Name: maplibre-native-c
 Description: C ABI for MapLibre Native

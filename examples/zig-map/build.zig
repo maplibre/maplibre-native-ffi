@@ -5,11 +5,6 @@ const BuildOptions = struct {
     optimize: std.builtin.OptimizeMode,
 };
 
-fn linkMapLibreC(module: *std.Build.Module) void {
-    module.linkSystemLibrary("maplibre-native-c", .{ .use_pkg_config = .force });
-    module.link_libc = true;
-}
-
 fn isSupportedTarget(target: std.Build.ResolvedTarget) bool {
     return target.result.os.tag == .macos or target.result.os.tag == .linux;
 }
@@ -28,7 +23,8 @@ fn addZigMapExample(b: *std.Build, options: BuildOptions) *std.Build.Step.Compil
         }),
     });
 
-    linkMapLibreC(example.root_module);
+    example.root_module.linkSystemLibrary("maplibre-native-c", .{ .use_pkg_config = .force });
+    example.root_module.link_libc = true;
     example.root_module.addIncludePath(b.path("../../.pixi/envs/default/include"));
     example.root_module.addLibraryPath(b.path("../../.pixi/envs/default/lib"));
     example.root_module.addRPath(b.path("../../.pixi/envs/default/lib"));

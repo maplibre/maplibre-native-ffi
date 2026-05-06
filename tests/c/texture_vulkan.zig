@@ -5,7 +5,8 @@ const support = @import("support.zig");
 const common = @import("texture.zig");
 const c = support.c;
 
-const vk = if (builtin.os.tag == .linux) @cImport({
+const vk = if (support.is_vulkan_backend) @cImport({
+    @cDefine("VK_ENABLE_BETA_EXTENSIONS", "1");
     @cInclude("vulkan/vulkan.h");
 }) else struct {};
 
@@ -35,6 +36,12 @@ const Backend = struct {
             var instance_info = std.mem.zeroes(vk.VkInstanceCreateInfo);
             instance_info.sType = vk.VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
             instance_info.pApplicationInfo = &app_info;
+            if (builtin.os.tag == .macos) {
+                const instance_extensions = [_][*c]const u8{vk.VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME};
+                instance_info.flags = vk.VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
+                instance_info.enabledExtensionCount = instance_extensions.len;
+                instance_info.ppEnabledExtensionNames = instance_extensions[0..].ptr;
+            }
 
             var instance: vk.VkInstance = null;
             try expectVk(vk.vkCreateInstance(&instance_info, null, &instance));
@@ -67,16 +74,29 @@ const Backend = struct {
                     queue_info.queueCount = 1;
                     queue_info.pQueuePriorities = &priority;
 
+                    var supported_features = std.mem.zeroes(vk.VkPhysicalDeviceFeatures);
+                    vk.vkGetPhysicalDeviceFeatures(physical_device, &supported_features);
                     var features = std.mem.zeroes(vk.VkPhysicalDeviceFeatures);
-                    features.samplerAnisotropy = vk.VK_TRUE;
-                    features.wideLines = vk.VK_TRUE;
+                    features.samplerAnisotropy = supported_features.samplerAnisotropy;
+                    features.wideLines = supported_features.wideLines;
+
+                    var device_extensions: [8][*c]const u8 = undefined;
+                    var device_extension_count: usize = 0;
+                    for (required_extensions) |extension| {
+                        device_extensions[device_extension_count] = extension;
+                        device_extension_count += 1;
+                    }
+                    if (builtin.os.tag == .macos) {
+                        device_extensions[device_extension_count] = vk.VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME;
+                        device_extension_count += 1;
+                    }
 
                     var device_info = std.mem.zeroes(vk.VkDeviceCreateInfo);
                     device_info.sType = vk.VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
                     device_info.queueCreateInfoCount = 1;
                     device_info.pQueueCreateInfos = &queue_info;
-                    device_info.enabledExtensionCount = @intCast(required_extensions.len);
-                    device_info.ppEnabledExtensionNames = if (required_extensions.len == 0) null else required_extensions.ptr;
+                    device_info.enabledExtensionCount = @intCast(device_extension_count);
+                    device_info.ppEnabledExtensionNames = if (device_extension_count == 0) null else device_extensions[0..device_extension_count].ptr;
                     device_info.pEnabledFeatures = &features;
 
                     var device: vk.VkDevice = null;
@@ -321,7 +341,7 @@ const BorrowedImage = struct {
 };
 
 test "Vulkan texture unsupported backend validates arguments" {
-    if (builtin.os.tag != .macos) return error.SkipZigTest;
+    if (support.is_vulkan_backend) return error.SkipZigTest;
 
     const runtime = try support.createRuntime();
     defer support.destroyRuntime(runtime);
@@ -363,32 +383,32 @@ fn findMemoryType(physical_device: vk.VkPhysicalDevice, type_filter: u32, proper
 }
 
 test "Vulkan texture attach rejects invalid arguments" {
-    if (builtin.os.tag != .linux) return error.SkipZigTest;
+    if (!support.is_vulkan_backend) return error.SkipZigTest;
     try common.expectAttachRejectsInvalidArguments(Backend);
 }
 
 test "Vulkan texture lifecycle enforces active session and stale handles" {
-    if (builtin.os.tag != .linux) return error.SkipZigTest;
+    if (!support.is_vulkan_backend) return error.SkipZigTest;
     try common.expectLifecycleEnforcesActiveSessionAndStaleHandles(Backend);
 }
 
 test "Vulkan texture rejects wrong-thread calls" {
-    if (builtin.os.tag != .linux) return error.SkipZigTest;
+    if (!support.is_vulkan_backend) return error.SkipZigTest;
     try common.expectWrongThreadCallsRejected(Backend);
 }
 
 test "Vulkan texture render acquire release and resize generation" {
-    if (builtin.os.tag != .linux) return error.SkipZigTest;
+    if (!support.is_vulkan_backend) return error.SkipZigTest;
     try common.expectRenderAcquireReleaseAndResizeGeneration(Backend);
 }
 
 test "Vulkan owned texture supports readback" {
-    if (builtin.os.tag != .linux) return error.SkipZigTest;
+    if (!support.is_vulkan_backend) return error.SkipZigTest;
     try common.expectOwnedTextureReadback(Backend);
 }
 
 test "Vulkan borrowed texture renders into caller image" {
-    if (builtin.os.tag != .linux) return error.SkipZigTest;
+    if (!support.is_vulkan_backend) return error.SkipZigTest;
     try support.suppressLogs();
     defer support.restoreLogs();
 
@@ -429,18 +449,18 @@ test "Vulkan borrowed texture renders into caller image" {
 }
 
 test "Vulkan texture render emits observer events" {
-    if (builtin.os.tag != .linux) return error.SkipZigTest;
+    if (!support.is_vulkan_backend) return error.SkipZigTest;
     try common.expectRenderObserverEvents(Backend);
 }
 
 test "Vulkan texture still modes render requested still images" {
-    if (builtin.os.tag != .linux) return error.SkipZigTest;
+    if (!support.is_vulkan_backend) return error.SkipZigTest;
     inline for (.{ c.MLN_MAP_MODE_STATIC, c.MLN_MAP_MODE_TILE }) |map_mode| {
         try common.expectStillModeStillImageRequest(Backend, map_mode);
     }
 }
 
 test "Vulkan texture detach leaves handle live but unusable for rendering" {
-    if (builtin.os.tag != .linux) return error.SkipZigTest;
+    if (!support.is_vulkan_backend) return error.SkipZigTest;
     try common.expectDetachLeavesHandleLiveButUnusable(Backend);
 }

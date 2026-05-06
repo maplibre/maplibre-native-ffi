@@ -9,9 +9,6 @@ on:
 permissions:
   contents: read
 
-env:
-  MISE_ENV: ci
-
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: false
@@ -43,12 +40,16 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - target: linux-x64
+          - target: linux-x64-vulkan
             runner: ubuntu-latest
-          - target: linux-arm64
+          - target: linux-arm64-vulkan
             runner: ubuntu-24.04-arm
-          - target: macos-arm64
+          - target: macos-arm64-metal
             runner: macos-latest
+          - target: macos-arm64-vulkan
+            runner: macos-latest
+    env:
+      MISE_ENV: ${{ matrix.target }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - uses: ./.github/actions/setup-ci-deps
@@ -73,22 +74,24 @@ jobs:
     runs-on: ${{ matrix.runner }}
     needs: native
     timeout-minutes: 60
+    env:
+      MISE_ENV: ${{ matrix.target }}
     strategy:
       fail-fast: false
       matrix:
         example: [zig-map, zig-readback, swift-map]
-        target: [linux-x64, linux-arm64, macos-arm64]
+        target: [linux-x64-vulkan, linux-arm64-vulkan, macos-arm64-metal]
         exclude:
           - example: swift-map
-            target: linux-x64
+            target: linux-x64-vulkan
           - example: swift-map
-            target: linux-arm64
+            target: linux-arm64-vulkan
         include:
-          - target: linux-x64
+          - target: linux-x64-vulkan
             runner: ubuntu-latest
-          - target: linux-arm64
+          - target: linux-arm64-vulkan
             runner: ubuntu-24.04-arm
-          - target: macos-arm64
+          - target: macos-arm64-metal
             runner: macos-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2

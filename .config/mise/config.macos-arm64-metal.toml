@@ -1,0 +1,4 @@
+[env]
+MLN_TARGET_OS = "macos"
+MLN_TARGET_ARCH = "arm64"
+MLN_RENDER_BACKEND = "metal"

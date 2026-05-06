@@ -1,5 +1,12 @@
 const std = @import("std");
+const builtin = @import("builtin");
+const build_options = @import("build_options");
 const testing = std.testing;
+
+const render_backend = build_options.render_backend;
+
+pub const is_metal_backend = std.mem.eql(u8, render_backend, "metal");
+pub const is_vulkan_backend = std.mem.eql(u8, render_backend, "vulkan");
 
 pub const c = @cImport({
     @cInclude("maplibre_native_c.h");

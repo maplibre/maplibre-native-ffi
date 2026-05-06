@@ -22,7 +22,25 @@ set(MLN_WITH_GLFW OFF CACHE BOOL "Disable MapLibre Native GLFW platform" FORCE)
 set(MLN_WITH_PMTILES ON
     CACHE BOOL "Build MapLibre Native PMTiles support" FORCE)
 if(APPLE)
-  set(MLN_WITH_METAL ON CACHE BOOL "Build MapLibre Native Metal backend" FORCE)
+  set(MLN_MACOS_RENDER_BACKEND "metal"
+      CACHE STRING "macOS render backend: metal or vulkan")
+  set_property(CACHE MLN_MACOS_RENDER_BACKEND PROPERTY STRINGS metal vulkan)
+  if(NOT MLN_MACOS_RENDER_BACKEND MATCHES "^(metal|vulkan)$")
+    message(
+      FATAL_ERROR
+        "MLN_MACOS_RENDER_BACKEND must be 'metal' or 'vulkan', got '${MLN_MACOS_RENDER_BACKEND}'")
+  endif()
+  if(MLN_MACOS_RENDER_BACKEND STREQUAL "metal")
+    set(MLN_WITH_METAL ON
+        CACHE BOOL "Build MapLibre Native Metal backend" FORCE)
+    set(MLN_WITH_VULKAN OFF
+        CACHE BOOL "Build MapLibre Native Vulkan backend" FORCE)
+  else()
+    set(MLN_WITH_METAL OFF
+        CACHE BOOL "Build MapLibre Native Metal backend" FORCE)
+    set(MLN_WITH_VULKAN ON
+        CACHE BOOL "Build MapLibre Native Vulkan backend" FORCE)
+  endif()
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
   set(MLN_WITH_VULKAN ON
       CACHE BOOL "Build MapLibre Native Vulkan backend" FORCE)
@@ -30,15 +48,35 @@ endif()
 set(MLN_WITH_WERROR OFF
     CACHE BOOL "Do not fail wrapper builds on MapLibre Native warnings" FORCE)
 
+if(MLN_WITH_METAL)
+  set(MLN_RENDER_BACKEND_LABEL metal)
+elseif(MLN_WITH_VULKAN)
+  set(MLN_RENDER_BACKEND_LABEL vulkan)
+else()
+  set(MLN_RENDER_BACKEND_LABEL none)
+endif()
+if(DEFINED ENV{MLN_BUILD_FLAVOR}
+   AND NOT "$ENV{MLN_BUILD_FLAVOR}" STREQUAL "")
+  set(MLN_BUILD_VARIANT "$ENV{MLN_BUILD_FLAVOR}")
+else()
+  set(MLN_BUILD_VARIANT
+      "${CMAKE_SYSTEM_NAME}-${CMAKE_SYSTEM_PROCESSOR}-${MLN_RENDER_BACKEND_LABEL}")
+endif()
+message(STATUS "Configuring maplibre-native-c variant: ${MLN_BUILD_VARIANT}")
+
 # MLN_SOURCE_DIR can be set externally to point at a local MapLibre Native
 # checkout (useful for development against an unreleased branch). When unset,
 # FetchContent manages third_party/maplibre-native and keeps it at MLN_GIT_TAG.
 if(DEFINED MLN_SOURCE_DIR
    AND NOT MLN_SOURCE_DIR STREQUAL "")
+  message(STATUS "Using MapLibre Native source: ${MLN_SOURCE_DIR}")
   add_subdirectory("${MLN_SOURCE_DIR}" "${PROJECT_BINARY_DIR}/maplibre-native")
 else()
   include(FetchContent)
-  message(STATUS "Fetching MapLibre Native ${MLN_GIT_TAG}")
+  set(FETCHCONTENT_QUIET OFF)
+  message(
+    STATUS
+      "Preparing MapLibre Native ${MLN_GIT_TAG} in third_party/maplibre-native")
   fetchcontent_declare(
     maplibre_native
     GIT_REPOSITORY
@@ -46,6 +84,8 @@ else()
     GIT_TAG
     ${MLN_GIT_TAG}
     GIT_SHALLOW
+    TRUE
+    GIT_PROGRESS
     TRUE
     GIT_SUBMODULES_RECURSE
     TRUE
@@ -99,10 +139,14 @@ set(MLN_PLATFORM_SUPPORT_LIBRARIES)
 if(APPLE)
   enable_language(OBJC)
   enable_language(OBJCXX)
+  if(MLN_WITH_VULKAN)
+    find_library(MLN_VULKAN_LOADER_LIBRARY NAMES vulkan REQUIRED)
+  endif()
   list(
     APPEND
     MLN_PLATFORM_SUPPORT_SOURCES
-    ${MLN_SOURCE_DIR}/platform/default/src/mbgl/mtl/headless_backend.cpp
+    $<$<BOOL:${MLN_WITH_METAL}>:${MLN_SOURCE_DIR}/platform/default/src/mbgl/mtl/headless_backend.cpp>
+    $<$<BOOL:${MLN_WITH_VULKAN}>:${MLN_SOURCE_DIR}/platform/default/src/mbgl/vulkan/headless_backend.cpp>
     ${MLN_SOURCE_DIR}/platform/qt/src/mbgl/bidi.cpp
     ${MLN_SOURCE_DIR}/platform/darwin/core/async_task.cpp
     ${MLN_SOURCE_DIR}/platform/darwin/core/collator.mm
@@ -124,10 +168,17 @@ if(APPLE)
     "-framework Foundation"
     "-framework ImageIO"
     "-framework Metal"
-    "-framework QuartzCore")
-  set(MLN_TEXTURE_SESSION_SOURCE src/render/metal/metal_texture_session.mm
-      src/render/metal/metal_texture_backend.mm)
-  set(MLN_SURFACE_SESSION_SOURCE src/render/metal/metal_surface_session.mm)
+    "-framework QuartzCore"
+    $<$<BOOL:${MLN_WITH_VULKAN}>:${MLN_VULKAN_LOADER_LIBRARY}>)
+  if(MLN_WITH_METAL)
+    set(MLN_TEXTURE_SESSION_SOURCE src/render/metal/metal_texture_session.mm
+        src/render/metal/metal_texture_backend.mm)
+    set(MLN_SURFACE_SESSION_SOURCE src/render/metal/metal_surface_session.mm)
+  else()
+    set(MLN_TEXTURE_SESSION_SOURCE src/render/vulkan/vulkan_texture_session.cpp
+        src/render/vulkan/vulkan_texture_backend.cpp)
+    set(MLN_SURFACE_SESSION_SOURCE src/render/vulkan/vulkan_surface_session.cpp)
+  endif()
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
   find_package(CURL REQUIRED)
   find_package(JPEG REQUIRED)
@@ -242,7 +293,7 @@ target_link_libraries(
     mbgl-vendor-pmtiles
     mbgl-vendor-sqlite
     z
-    $<$<BOOL:${APPLE}>:mbgl-vendor-metal-cpp>
+    $<$<BOOL:${MLN_WITH_METAL}>:mbgl-vendor-metal-cpp>
     ${MLN_PLATFORM_SUPPORT_LIBRARIES})
 target_compile_options(
   maplibre_native_c
