@@ -26,10 +26,7 @@ function(mln_configure_linux_platform target)
       ${MLN_SOURCE_DIR}/platform/default/src/mbgl/util/timer.cpp
       ${MLN_SOURCE_DIR}/platform/default/src/mbgl/util/webp_reader.cpp)
 
-  target_sources(${target} PRIVATE ${MLN_FFI_VENDOR_LINUX_SOURCES})
-  foreach(source IN LISTS MLN_FFI_VENDOR_LINUX_SOURCES)
-    mln_configure_vendor_source(${source})
-  endforeach()
+  mln_target_vendor_sources(${target} ${MLN_FFI_VENDOR_LINUX_SOURCES})
 
   target_include_directories(
     ${target}

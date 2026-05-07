@@ -8,15 +8,8 @@ function(mln_configure_vulkan_backend target)
       ${PROJECT_SOURCE_DIR}/src/render/vulkan/vulkan_texture_backend.cpp
       ${PROJECT_SOURCE_DIR}/src/render/vulkan/vulkan_surface_session.cpp)
 
-  target_sources(
-    ${target}
-    PRIVATE ${MLN_FFI_VENDOR_VULKAN_SOURCES} ${MLN_FFI_VULKAN_SOURCES})
-  foreach(source IN LISTS MLN_FFI_VENDOR_VULKAN_SOURCES)
-    mln_configure_vendor_source(${source})
-  endforeach()
-  foreach(source IN LISTS MLN_FFI_VULKAN_SOURCES)
-    mln_configure_project_source(${source})
-  endforeach()
+  mln_target_vendor_sources(${target} ${MLN_FFI_VENDOR_VULKAN_SOURCES})
+  mln_target_project_sources(${target} ${MLN_FFI_VULKAN_SOURCES})
 
   target_link_libraries(${target} PRIVATE ${MLN_VULKAN_LOADER_LIBRARY})
 endfunction()

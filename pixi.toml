@@ -12,7 +12,7 @@ macos = "14.0"
 [dependencies]
 clang-tools = ">=22,<23"
 glslang = "*"
-cmake = "*"
+cmake = ">=4,<5"
 icu = "*"
 libcurl = "*"
 libjpeg-turbo = "*"

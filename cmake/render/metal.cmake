@@ -6,15 +6,8 @@ function(mln_configure_metal_backend target)
       ${PROJECT_SOURCE_DIR}/src/render/metal/metal_texture_backend.mm
       ${PROJECT_SOURCE_DIR}/src/render/metal/metal_surface_session.mm)
 
-  target_sources(
-    ${target}
-    PRIVATE ${MLN_FFI_VENDOR_METAL_SOURCES} ${MLN_FFI_METAL_SOURCES})
-  foreach(source IN LISTS MLN_FFI_VENDOR_METAL_SOURCES)
-    mln_configure_vendor_source(${source})
-  endforeach()
-  foreach(source IN LISTS MLN_FFI_METAL_SOURCES)
-    mln_configure_project_source(${source})
-  endforeach()
+  mln_target_vendor_sources(${target} ${MLN_FFI_VENDOR_METAL_SOURCES})
+  mln_target_project_sources(${target} ${MLN_FFI_METAL_SOURCES})
 
   target_link_libraries(
     ${target}

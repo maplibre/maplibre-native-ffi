@@ -3,10 +3,7 @@ function(mln_configure_source_linting target)
     return()
   endif()
 
-  find_program(MLN_FFI_CLANG_TIDY clang-tidy)
-  if(NOT MLN_FFI_CLANG_TIDY)
-    message(FATAL_ERROR "clang-tidy is required to build ${target}")
-  endif()
+  find_program(MLN_FFI_CLANG_TIDY clang-tidy REQUIRED)
 
   set(MLN_FFI_CLANG_TIDY_COMMAND ${MLN_FFI_CLANG_TIDY} --quiet
       --config-file=${PROJECT_SOURCE_DIR}/.clang-tidy)
@@ -46,6 +43,14 @@ function(mln_configure_project_source source)
     PROPERTIES COMPILE_OPTIONS "${MLN_FFI_WARNINGS}")
 endfunction()
 
-function(mln_configure_vendor_source source)
-  set_source_files_properties(${source} PROPERTIES SKIP_LINTING TRUE)
+function(mln_target_project_sources target)
+  target_sources(${target} PRIVATE ${ARGN})
+  foreach(source IN LISTS ARGN)
+    mln_configure_project_source(${source})
+  endforeach()
+endfunction()
+
+function(mln_target_vendor_sources target)
+  target_sources(${target} PRIVATE ${ARGN})
+  set_source_files_properties(${ARGN} PROPERTIES SKIP_LINTING TRUE)
 endfunction()

@@ -13,10 +13,7 @@ function(mln_configure_apple_platform target)
       ${MLN_SOURCE_DIR}/platform/darwin/core/string_nsstring.mm
       ${MLN_SOURCE_DIR}/platform/darwin/core/timer.cpp)
 
-  target_sources(${target} PRIVATE ${MLN_FFI_VENDOR_APPLE_SOURCES})
-  foreach(source IN LISTS MLN_FFI_VENDOR_APPLE_SOURCES)
-    mln_configure_vendor_source(${source})
-  endforeach()
+  mln_target_vendor_sources(${target} ${MLN_FFI_VENDOR_APPLE_SOURCES})
 
   target_include_directories(
     ${target}

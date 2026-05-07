@@ -27,10 +27,8 @@ function(mln_add_c_api_library target)
       ${PROJECT_SOURCE_DIR}/src/style/style_value.cpp
       ${PROJECT_SOURCE_DIR}/src/runtime/runtime.cpp)
 
-  add_library(${target} SHARED ${MLN_FFI_C_API_SOURCES})
-  foreach(source IN LISTS MLN_FFI_C_API_SOURCES)
-    mln_configure_project_source(${source})
-  endforeach()
+  add_library(${target} SHARED)
+  mln_target_project_sources(${target} ${MLN_FFI_C_API_SOURCES})
 
   target_include_directories(
     ${target}
