@@ -7,4 +7,4 @@ This planned contributor note covers Java (FFM) binding design, implementation,
 tests, and reference generation.
 
 Tracking issue:
-[Add Java (FFM) bindings](https://github.com/sargunv/maplibre-native-ffi/issues/45).
+[Add Java (FFM) bindings](https://github.com/maplibre/maplibre-native-ffi/issues/45).

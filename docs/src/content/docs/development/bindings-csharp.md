@@ -7,4 +7,4 @@ This planned contributor note covers C# binding design, implementation, tests,
 and reference generation.
 
 Tracking issue:
-[Add C# bindings](https://github.com/sargunv/maplibre-native-ffi/issues/48).
+[Add C# bindings](https://github.com/maplibre/maplibre-native-ffi/issues/48).

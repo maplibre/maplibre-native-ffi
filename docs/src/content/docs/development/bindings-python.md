@@ -7,4 +7,4 @@ This planned contributor note covers Python binding design, implementation,
 tests, and reference generation.
 
 Tracking issue:
-[Add Python bindings](https://github.com/sargunv/maplibre-native-ffi/issues/49).
+[Add Python bindings](https://github.com/maplibre/maplibre-native-ffi/issues/49).

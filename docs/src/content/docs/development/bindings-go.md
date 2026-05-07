@@ -7,4 +7,4 @@ This planned contributor note covers Go binding design, implementation, tests,
 and reference generation.
 
 Tracking issue:
-[Add Go bindings](https://github.com/sargunv/maplibre-native-ffi/issues/43).
+[Add Go bindings](https://github.com/maplibre/maplibre-native-ffi/issues/43).

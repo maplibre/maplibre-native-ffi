@@ -39,8 +39,9 @@ reference, and contributor notes.
 The C API covers most of the MapLibre Native API surface. Advanced extension
 APIs, including custom layers and shader registry access, are not yet included.
 
-Current CI-backed render targets include Vulkan on Linux and Metal on macOS. See
-the documentation site for full platform status.
+Platform support is still filling in -- see the
+[Overview](https://maplibre.org/maplibre-native-ffi/#status) page for full
+platform status.
 
 ## License
 

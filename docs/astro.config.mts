@@ -19,7 +19,7 @@ export default defineConfig({
       },
       editLink: {
         baseUrl:
-          "https://github.com/sargunv/maplibre-native-ffi/edit/main/docs/",
+          "https://github.com/maplibre/maplibre-native-ffi/edit/main/docs/",
       },
       customCss: ["./src/styles/custom.css"],
       plugins: [
@@ -31,7 +31,7 @@ export default defineConfig({
         {
           icon: "github",
           label: "GitHub",
-          href: "https://github.com/sargunv/maplibre-native-ffi",
+          href: "https://github.com/maplibre/maplibre-native-ffi",
         },
       ],
       sidebar: [

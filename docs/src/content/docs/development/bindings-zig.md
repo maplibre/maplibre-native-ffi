@@ -6,4 +6,4 @@ description: Contributor notes for Zig bindings.
 This planned contributor note covers Zig-specific expectations.
 
 Tracking issue:
-[Add reusable Zig bindings](https://github.com/sargunv/maplibre-native-ffi/issues/42).
+[Add reusable Zig bindings](https://github.com/maplibre/maplibre-native-ffi/issues/42).
