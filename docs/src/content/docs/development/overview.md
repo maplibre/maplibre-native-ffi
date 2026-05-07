@@ -25,25 +25,28 @@ view lifecycle integrations, convenience workflows, or new abstractions.
 
 Install the platform toolchain:
 
-- On macOS, install a recent version of Xcode.
+- On macOS, install the Xcode version listed in `.xcode-version`, or a recent
+  compatible Xcode. Run the pinned
+  [`xcodes`](https://github.com/XcodesOrg/xcodes) tool with `xcodes select` to
+  switch to the repository version.
 - On Windows, install a recent version of Visual Studio Community with the
   `Desktop development with C++` workload.
 
-Install [`mise`](https://mise.jdx.dev/), then install the pinned project tools:
+Install [`mise`](https://mise.jdx.dev/), then install pinned project tools and
+run repository setup hooks:
 
 ```bash
 mise install
 ```
+
+The setup hooks install project dependencies and initialize the MapLibre Native
+submodule at `third_party/maplibre-native`.
 
 Run the Zig map example as a smoke test:
 
 ```bash
 mise run //examples/zig-map:run
 ```
-
-The first build configures CMake and fetches MapLibre Native into
-`third_party/maplibre-native`. To use a separate MapLibre Native checkout, set
-`MLN_SOURCE_DIR` before configuring or running builds.
 
 Set `MISE_ENV=<variant>` before `mise run ...` to build, test, or run examples
 for a specific platform and render backend.
@@ -86,27 +89,35 @@ mise run ci:matrix examples --pretty
 
 ## How Tools Fit Together
 
-[`mise`](https://mise.jdx.dev/) is the contributor entrypoint. It pins tools,
-installs Git hooks, and runs repository tasks. Use `mise run ...` for the tasks
-defined by the repository, such as build, test, check, and example tasks. Use
-`mise exec -- ...` for one-off commands that need the pinned tools and
-environment, or activate mise to run tools such as `pixi` and `dprint` directly
-from the project directory.
+This repository spans native code, language bindings, examples, tests, and
+documentation. Each tool owns the layer where it has the clearest dependency
+model.
 
-[`pixi`](https://pixi.sh/) supplies native packages from
-[`conda-forge`](https://conda-forge.org/). Pixi runs CMake so the repository
-declares C and C++ dependencies in one place.
+[`mise`](https://mise.jdx.dev/) is the contributor entrypoint. It pins top-level
+tools, installs Git hooks, and runs repository tasks. Use `mise run ...` for
+common workflows: build, test, check, fix, and examples. Mise also provides
+ecosystem entrypoints such as Pixi, Zig, Python, uv, Node, and pnpm.
 
-[`hk`](https://github.com/jdx/hk) decides which checks run for pre-commit,
+[`pixi`](https://pixi.sh/) owns the C and C++ native build environment. It
+supplies native packages from [`conda-forge`](https://conda-forge.org/):
+libraries, C/C++ tooling, and build tools that participate in CMake
+configuration or native package discovery. CMake, Ninja, pkg-config, shader
+tools, and clang tooling live in Pixi for that reason. Pixi runs
+[CMake](https://cmake.org/), and CMake builds the native C/C++ library.
+
+Language package managers own dependencies inside their ecosystems. For example,
+`uv` owns Python package dependencies, `pnpm` owns Node package dependencies,
+Gradle owns Java and Kotlin dependencies, and Cargo owns Rust dependencies.
+Language-specific formatters, linters, analyzers, test frameworks, and code
+generators usually live with the language package graph they serve.
+
+[`hk`](https://github.com/jdx/hk) orchestrates repository checks for pre-commit,
 `mise run check`, and `mise run fix`. [`dprint`](https://dprint.dev/) owns
-formatter selection and formatting defaults. Language-specific formatter and
-linter configs tune the tools that those entry points invoke.
+repository-wide formatting defaults.
 
-[`CMake`](https://cmake.org/) builds the native C/C++ library.
-[`Zig`](https://ziglang.org/) consumes the CMake-built library for C ABI tests.
-
-Astro and Starlight build the documentation site. Generated reference
-documentation is exported as Markdown into `docs/src/content/docs/reference/`.
+[Astro](https://astro.build/) and [Starlight](https://starlight.astro.build/)
+build the documentation site. Generated reference documentation is exported as
+Markdown into `docs/src/content/docs/reference/`.
 
 ## Tests And Examples
 
