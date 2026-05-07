@@ -55,6 +55,9 @@ pub fn main(init_args: std.process.Init) !void {
 
     var map = try map_state.MapState.init(current_viewport, &backend);
     defer map.deinit();
+    defer backend.finishFrame() catch |err| {
+        std.debug.print("failed to finish final frame: {s}\n", .{@errorName(err)});
+    };
 
     var running = true;
     var has_presented_frame = false;

@@ -3,7 +3,10 @@
 ## Workflow
 
 Use `mise run test` to build and test. Use `mise run fix` to run formatters and
-linters. Run examples only when useful, with a brief timeout because most are
+linters. Read the
+[development overview](docs/src/content/docs/development/overview.md) for
+contributor setup, workflow commands, examples, and platform/render backend
+variants. Run examples only when useful, with a brief timeout because most are
 GUI apps, not one-shot tests.
 
 Feature changes need tests through the C ABI when practical.
