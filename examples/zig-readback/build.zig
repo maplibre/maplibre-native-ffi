@@ -5,8 +5,11 @@ const BuildOptions = struct {
     optimize: std.builtin.OptimizeMode,
 };
 
-fn linkMapLibreC(module: *std.Build.Module) void {
-    module.linkSystemLibrary("maplibre-native-c", .{ .use_pkg_config = .force });
+fn linkMapLibreC(b: *std.Build, module: *std.Build.Module) void {
+    module.addIncludePath(b.path("../../include"));
+    module.addLibraryPath(b.path("../../build"));
+    module.addRPath(b.path("../../build"));
+    module.linkSystemLibrary("maplibre-native-c", .{});
     module.link_libc = true;
 }
 
@@ -20,7 +23,7 @@ fn addReadbackExample(b: *std.Build, options: BuildOptions) *std.Build.Step.Comp
         }),
     });
 
-    linkMapLibreC(example.root_module);
+    linkMapLibreC(b, example.root_module);
     example.root_module.addLibraryPath(b.path("../../.pixi/envs/default/lib"));
     example.root_module.addRPath(b.path("../../.pixi/envs/default/lib"));
     b.installArtifact(example);

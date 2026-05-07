@@ -9,14 +9,6 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 include(${CMAKE_CURRENT_LIST_DIR}/cmake/mln_version.cmake)
 
-set(MLN_PC_PREFIX "${PROJECT_SOURCE_DIR}")
-set(MLN_PC_INCLUDEDIR "${PROJECT_SOURCE_DIR}/include")
-set(MLN_PC_LIBDIR "${PROJECT_BINARY_DIR}")
-configure_file(
-  "${PROJECT_SOURCE_DIR}/cmake/maplibre-native-c.pc.in"
-  "${PROJECT_BINARY_DIR}/pkgconfig/maplibre-native-c.pc"
-  @ONLY)
-
 set(MLN_WITH_CORE_ONLY ON CACHE BOOL "Build only MapLibre Native core" FORCE)
 set(MLN_WITH_GLFW OFF CACHE BOOL "Disable MapLibre Native GLFW platform" FORCE)
 set(MLN_WITH_PMTILES ON

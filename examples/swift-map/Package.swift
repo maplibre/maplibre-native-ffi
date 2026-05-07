@@ -10,13 +10,13 @@ let package = Package(
   ],
   targets: [
     .systemLibrary(
-      name: "CMapLibreNativeC",
-      pkgConfig: "maplibre-native-c"
+      name: "CMapLibreNativeC"
     ),
     .executableTarget(
       name: "SwiftMap",
       dependencies: ["CMapLibreNativeC"],
       linkerSettings: [
+        .unsafeFlags(["-L../../build", "-lmaplibre-native-c"]),
         .linkedFramework("AppKit"),
         .linkedFramework("Metal"),
         .linkedFramework("QuartzCore"),

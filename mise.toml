@@ -25,6 +25,11 @@ pnpm = "10.33.2"
 node = "24.11.0"
 usage = "3.3.0"
 
+[env]
+DYLD_LIBRARY_PATH = "{{config_root}}/build"
+LD_LIBRARY_PATH = "{{config_root}}/build"
+XDG_DATA_DIRS = "{{config_root}}/.pixi/envs/default/share:{{env.XDG_DATA_DIRS | default(value=\"/usr/local/share:/usr/share\")}}"
+
 [hooks]
 postinstall = [
   "hk install --mise",
@@ -45,7 +50,6 @@ run = "rm -rf build"
 
 [tasks.test]
 depends = ["//:build"]
-env = { XDG_DATA_DIRS = "{{config_root}}/.pixi/envs/default/share" }
 run = "zig build test --summary all"
 
 [tasks.check]
