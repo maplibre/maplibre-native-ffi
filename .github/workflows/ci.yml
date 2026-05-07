@@ -28,24 +28,31 @@ jobs:
       - uses: ./.github/actions/setup-ci-deps
       - run: mise run //docs:build
 
+  prepare-matrices:
+    name: prepare matrices
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      native: ${{ steps.matrix.outputs.native }}
+      examples: ${{ steps.matrix.outputs.examples }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: ./.github/actions/setup-ci-deps
+      - id: matrix
+        run: |
+          echo "native=$(mise run -q ci:matrix native)" >> "$GITHUB_OUTPUT"
+          echo "examples=$(mise run -q ci:matrix examples)" >> "$GITHUB_OUTPUT"
+
   native:
     name: native / ${{ matrix.variant }}
     runs-on: ${{ matrix.runner }}
+    needs: prepare-matrices
     timeout-minutes: 60
     env:
       MISE_ENV: ${{ matrix.variant }}
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - variant: linux-x64-vulkan
-            runner: ubuntu-latest
-          - variant: linux-arm64-vulkan
-            runner: ubuntu-24.04-arm
-          - variant: macos-arm64-metal
-            runner: macos-latest
-          - variant: macos-arm64-vulkan
-            runner: macos-latest
+      matrix: ${{ fromJson(needs.prepare-matrices.outputs.native) }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - name: Cache MapLibre Native source
@@ -70,41 +77,15 @@ jobs:
   examples:
     name: examples / ${{ matrix.example }} / ${{ matrix.variant }}
     runs-on: ${{ matrix.runner }}
-    needs: native
+    needs:
+      - native
+      - prepare-matrices
     timeout-minutes: 60
     env:
       MISE_ENV: ${{ matrix.variant }}
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - example: zig-map
-            variant: linux-x64-vulkan
-            runner: ubuntu-latest
-          - example: zig-map
-            variant: linux-arm64-vulkan
-            runner: ubuntu-24.04-arm
-          - example: zig-map
-            variant: macos-arm64-metal
-            runner: macos-latest
-          - example: zig-map
-            variant: macos-arm64-vulkan
-            runner: macos-latest
-          - example: zig-readback
-            variant: linux-x64-vulkan
-            runner: ubuntu-latest
-          - example: zig-readback
-            variant: linux-arm64-vulkan
-            runner: ubuntu-24.04-arm
-          - example: zig-readback
-            variant: macos-arm64-metal
-            runner: macos-latest
-          - example: zig-readback
-            variant: macos-arm64-vulkan
-            runner: macos-latest
-          - example: swift-map
-            variant: macos-arm64-metal
-            runner: macos-latest
+      matrix: ${{ fromJson(needs.prepare-matrices.outputs.examples) }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - uses: ./.github/actions/setup-ci-deps
@@ -112,7 +93,7 @@ jobs:
         with:
           name: native-${{ matrix.variant }}
           path: .
-      - run: mise run //examples/${{ matrix.example }}:ci
+      - run: mise run "${{ matrix.task }}"
 
   required:
     name: ci-required
@@ -122,6 +103,7 @@ jobs:
     needs:
       - hygiene
       - docs
+      - prepare-matrices
       - native
       - examples
     steps:

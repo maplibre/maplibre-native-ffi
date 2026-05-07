@@ -54,3 +54,22 @@ Read these docs before changing related code:
   headers, C ABI behavior, callbacks, diagnostics, or render target contracts.
 - [Bindings](docs/src/content/docs/development/) before changing a language
   binding or its generated reference docs.
+
+## External Docs
+
+Read these docs for related tooling:
+
+- [mise settings](https://mise.jdx.dev/configuration/settings.html) when
+  changing `[settings]` entries in `mise.toml`.
+- [mise task configuration](https://mise.jdx.dev/tasks/task-configuration.html)
+  when changing mise task metadata.
+- [mise file tasks](https://mise.jdx.dev/tasks/file-tasks.html) when changing
+  `.mise/tasks/**` task files.
+- [mise task arguments](https://mise.jdx.dev/tasks/task-arguments.html) when
+  changing `usage` specs or task CLI arguments.
+- [mise Python](https://mise.jdx.dev/lang/python.html) when changing Python, uv,
+  or virtual environment integration.
+- [hk configuration](https://hk.jdx.dev/configuration.html) when changing
+  `hk.pkl`.
+- [dprint configuration](https://dprint.dev/config/) when changing
+  `dprint.jsonc`.

@@ -3,6 +3,7 @@ docs/api/c/gen/
 docs/src/content/docs/reference/c.md
 .zig-cache/
 .ruff_cache/
+__pycache__/
 .venv/
 zig-out/
 zig-pkg/

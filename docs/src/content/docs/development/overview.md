@@ -67,6 +67,23 @@ mise run //examples/zig-map:run
 mise run //docs:build
 ```
 
+## CI Variant Matrix
+
+GitHub Actions builds native artifacts and examples for the variants described
+by the mise profiles, such as `mise.linux-x64-vulkan.toml` and
+`mise.macos-arm64-metal.toml`. The CI matrix generator reads each profile's
+platform, architecture, and render backend metadata.
+
+Use `.github/config/variants.toml` to configure CI matrix policy: runner
+selection, example tasks, compatibility requirements, and explicit exclusions.
+
+Preview the generated matrices locally:
+
+```bash
+mise run ci:matrix native --pretty
+mise run ci:matrix examples --pretty
+```
+
 ## How Tools Fit Together
 
 [`mise`](https://mise.jdx.dev/) is the contributor entrypoint. It pins tools,
