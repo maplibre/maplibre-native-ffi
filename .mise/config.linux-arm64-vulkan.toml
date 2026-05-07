@@ -1,4 +1,6 @@
 [env]
+CC = "clang"
+CXX = "clang++"
 MLN_FFI_VARIANT = "linux-arm64-vulkan"
 MLN_FFI_TARGET_TRIPLE = "linux-arm64"
 MLN_FFI_RENDER_BACKEND = "vulkan"

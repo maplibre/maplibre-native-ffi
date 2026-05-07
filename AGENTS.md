@@ -67,6 +67,10 @@ Read these docs for related tooling:
   `.mise/tasks/**` task files.
 - [mise task arguments](https://mise.jdx.dev/tasks/task-arguments.html) when
   changing `usage` specs or task CLI arguments.
+- [mise task templates](https://mise.jdx.dev/tasks/templates.html) when changing
+  task template expressions.
+- [mise environments](https://mise.jdx.dev/environments/) when changing `[env]`,
+  environment files, environment scripts, or mise profiles.
 - [mise Python](https://mise.jdx.dev/lang/python.html) when changing Python, uv,
   or virtual environment integration.
 - [hk configuration](https://hk.jdx.dev/configuration.html) when changing
