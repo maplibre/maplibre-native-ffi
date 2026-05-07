@@ -28,40 +28,31 @@ jobs:
       - uses: ./.github/actions/setup-ci-deps
       - run: mise run //docs:build
 
-  prepare-native-matrix:
-    name: prepare native matrix
+  prepare-matrices:
+    name: prepare matrices
     runs-on: ubuntu-latest
     timeout-minutes: 10
     outputs:
-      matrix: ${{ steps.matrix.outputs.matrix }}
+      native: ${{ steps.matrix.outputs.native }}
+      examples: ${{ steps.matrix.outputs.examples }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - uses: ./.github/actions/setup-ci-deps
       - id: matrix
-        run: echo "matrix=$(mise run -q ci:matrix native)" >> "$GITHUB_OUTPUT"
-
-  prepare-example-matrix:
-    name: prepare example matrix
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    outputs:
-      matrix: ${{ steps.matrix.outputs.matrix }}
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - uses: ./.github/actions/setup-ci-deps
-      - id: matrix
-        run: echo "matrix=$(mise run -q ci:matrix examples)" >> "$GITHUB_OUTPUT"
+        run: |
+          echo "native=$(mise run -q ci:matrix native)" >> "$GITHUB_OUTPUT"
+          echo "examples=$(mise run -q ci:matrix examples)" >> "$GITHUB_OUTPUT"
 
   native:
     name: native / ${{ matrix.variant }}
     runs-on: ${{ matrix.runner }}
-    needs: prepare-native-matrix
+    needs: prepare-matrices
     timeout-minutes: 60
     env:
       MISE_ENV: ${{ matrix.variant }}
     strategy:
       fail-fast: false
-      matrix: ${{ fromJson(needs.prepare-native-matrix.outputs.matrix) }}
+      matrix: ${{ fromJson(needs.prepare-matrices.outputs.native) }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - uses: ./.github/actions/setup-ci-deps
@@ -86,13 +77,13 @@ jobs:
     runs-on: ${{ matrix.runner }}
     needs:
       - native
-      - prepare-example-matrix
+      - prepare-matrices
     timeout-minutes: 60
     env:
       MISE_ENV: ${{ matrix.variant }}
     strategy:
       fail-fast: false
-      matrix: ${{ fromJson(needs.prepare-example-matrix.outputs.matrix) }}
+      matrix: ${{ fromJson(needs.prepare-matrices.outputs.examples) }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - uses: ./.github/actions/setup-ci-deps
@@ -110,8 +101,7 @@ jobs:
     needs:
       - hygiene
       - docs
-      - prepare-native-matrix
-      - prepare-example-matrix
+      - prepare-matrices
       - native
       - examples
     steps:
