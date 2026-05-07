@@ -1,6 +1,3 @@
-[tasks.ci]
-run = ["mise run :build"]
-
 [tasks.build]
 depends = ["//:ensure-native-library"]
 run = '''

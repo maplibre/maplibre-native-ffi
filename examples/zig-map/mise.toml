@@ -1,6 +1,3 @@
-[tasks.ci]
-run = ["mise run :build"]
-
 [tasks.build]
 depends = ["//:ensure-native-library", ":compile-shaders"]
 run = "zig build --prefix \"zig-out/${MLN_FFI_VARIANT:-host}\" -Dcmake-artifact-dir=\"$MLN_FFI_BUILD_DIR\" ${MLN_FFI_RENDER_BACKEND:+-Drender-backend=$MLN_FFI_RENDER_BACKEND}"

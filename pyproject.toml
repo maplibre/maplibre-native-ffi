@@ -1,0 +1,11 @@
+[project]
+name = "maplibre-native-ffi"
+version = "0.0.0"
+requires-python = ">=3.14"
+dependencies = []
+
+[dependency-groups]
+dev = [
+  "ruff==0.15.12",
+  "ty==0.0.34",
+]

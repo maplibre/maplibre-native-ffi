@@ -28,6 +28,17 @@ local commonSteps = new Mapping<String, Step> {
     check = "pnpm --dir docs exec vp check --no-fmt"
     fix = "pnpm --dir docs exec vp check --no-fmt --fix"
   }
+  ["ruff"] {
+    glob = List("**/*.py")
+    profiles = commonProfiles
+    check = "uv run ruff check {{files}} && uv run ruff format --check {{files}}"
+    fix = "uv run ruff check --fix {{files}} && uv run ruff format {{files}}"
+  }
+  ["ty"] {
+    glob = List("**/*.py")
+    profiles = commonProfiles
+    check = "uv run ty check --error-on-warning ."
+  }
   ["zig-ast-check"] {
     glob = List("**/*.zig")
     profiles = commonProfiles

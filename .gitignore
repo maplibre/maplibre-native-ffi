@@ -6,6 +6,8 @@ docs/src/content/docs/reference/c.md
 zig-out/
 zig-pkg/
 *.spv
+__pycache__/
+.venv/
 
 # Fetched on demand by CMake (see cmake/mln_version.cmake) when
 # MLN_SOURCE_DIR is not set externally.

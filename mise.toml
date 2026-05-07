@@ -7,6 +7,7 @@ experimental_monorepo_root = true
 [settings]
 pin = true
 experimental = true
+python.uv_venv_auto = "create|source"
 
 [monorepo]
 config_roots = ["examples/*", "docs"]
@@ -23,9 +24,12 @@ zig = "0.16.0"
 actionlint = "1.7.8"
 pnpm = "10.33.2"
 node = "24.11.0"
+python = "3.14.4"
+uv = "0.11.11"
 usage = "3.3.0"
 
 [env]
+UV_PYTHON = { value = "{{ tools.python.path }}", tools = true }
 MLN_FFI_VARIANT = "{{env.MLN_FFI_VARIANT | default(value=\"host\")}}"
 MLN_FFI_TARGET_TRIPLE = "{{env.MLN_FFI_TARGET_TRIPLE | default(value=\"host\")}}"
 MLN_FFI_RENDER_BACKEND = "{{env.MLN_FFI_RENDER_BACKEND | default(value=\"\")}}"
@@ -38,6 +42,7 @@ XDG_DATA_DIRS = "{{config_root}}/.pixi/envs/default/share:{{env.XDG_DATA_DIRS | 
 postinstall = [
   "hk install --mise",
   "pixi install --locked",
+  "uv sync --locked",
   "cd docs && pnpm install",
 ]
 
