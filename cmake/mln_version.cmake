@@ -1,5 +1,4 @@
-# Pinned release tag of MapLibre Native to fetch when no local checkout is
-# provided.
-# The CI cache key for the fetched source tree is derived from this file, so
-# bumping this tag here is what invalidates the cache.
+# Pinned release tag of the MapLibre Native submodule.
+# The CI cache key for the submodule checkout is derived from this file, so
+# bumping the submodule should bump this tag too.
 set(MLN_GIT_TAG "android-v13.1.0")
