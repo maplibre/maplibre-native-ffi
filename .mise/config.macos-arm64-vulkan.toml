@@ -1,7 +1,6 @@
 [env]
 CC = "{{ exec(command='xcodebuild -find clang') }}"
 CXX = "{{ exec(command='xcodebuild -find clang++') }}"
-MLN_FFI_CLANG_TIDY_EXTRA_ARGS = "--extra-arg=-resource-dir={{ exec(command='$(xcodebuild -find clang) -print-resource-dir') }}"
 MLN_FFI_VARIANT = "macos-arm64-vulkan"
 MLN_FFI_TARGET_TRIPLE = "macos-arm64"
 MLN_FFI_RENDER_BACKEND = "vulkan"

@@ -9,9 +9,7 @@ function(mln_configure_linux_platform target)
   pkg_search_module(ICUUC icu-uc REQUIRED)
   pkg_search_module(ICUI18N icu-i18n REQUIRED)
 
-  target_sources(
-    ${target}
-    PRIVATE
+  set(MLN_FFI_VENDOR_LINUX_SOURCES
       ${MLN_SOURCE_DIR}/platform/default/src/mbgl/i18n/collator.cpp
       ${MLN_SOURCE_DIR}/platform/default/src/mbgl/i18n/number_format.cpp
       ${MLN_SOURCE_DIR}/platform/default/src/mbgl/storage/http_file_source.cpp
@@ -27,6 +25,11 @@ function(mln_configure_linux_platform target)
       ${MLN_SOURCE_DIR}/platform/default/src/mbgl/util/thread.cpp
       ${MLN_SOURCE_DIR}/platform/default/src/mbgl/util/timer.cpp
       ${MLN_SOURCE_DIR}/platform/default/src/mbgl/util/webp_reader.cpp)
+
+  target_sources(${target} PRIVATE ${MLN_FFI_VENDOR_LINUX_SOURCES})
+  foreach(source IN LISTS MLN_FFI_VENDOR_LINUX_SOURCES)
+    mln_configure_vendor_source(${source})
+  endforeach()
 
   target_include_directories(
     ${target}

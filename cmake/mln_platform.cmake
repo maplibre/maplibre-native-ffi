@@ -4,9 +4,7 @@ if(APPLE)
 endif()
 
 function(mln_configure_platform_support target)
-  target_sources(
-    ${target}
-    PRIVATE
+  set(MLN_FFI_VENDOR_PLATFORM_SOURCES
       ${MLN_SOURCE_DIR}/platform/default/src/mbgl/util/logging_stderr.cpp
       ${MLN_SOURCE_DIR}/platform/default/src/mbgl/util/monotonic_timer.cpp
       ${MLN_SOURCE_DIR}/platform/default/src/mbgl/util/thread_local.cpp
@@ -23,7 +21,7 @@ function(mln_configure_platform_support target)
       ${MLN_SOURCE_DIR}/platform/default/src/mbgl/storage/offline_database.cpp
       ${MLN_SOURCE_DIR}/platform/default/src/mbgl/storage/offline_download.cpp
       ${MLN_SOURCE_DIR}/platform/default/src/mbgl/storage/online_file_source.cpp
-      ${MLN_SOURCE_DIR}/platform/default/src/mbgl/storage/$<IF:$<BOOL:${MLN_WITH_PMTILES}>,pmtiles_file_source.cpp,pmtiles_file_source_stub.cpp>
+      ${MLN_SOURCE_DIR}/platform/default/src/mbgl/storage/pmtiles_file_source.cpp
       ${MLN_SOURCE_DIR}/platform/default/src/mbgl/storage/sqlite3.cpp
       ${MLN_SOURCE_DIR}/platform/default/src/mbgl/platform/time.cpp
       ${MLN_SOURCE_DIR}/platform/default/src/mbgl/util/compression.cpp
@@ -44,6 +42,11 @@ function(mln_configure_platform_support target)
       ${MLN_SOURCE_DIR}/src/mbgl/layermanager/location_indicator_layer_factory.cpp
       ${MLN_SOURCE_DIR}/src/mbgl/layermanager/raster_layer_factory.cpp
       ${MLN_SOURCE_DIR}/src/mbgl/layermanager/symbol_layer_factory.cpp)
+
+  target_sources(${target} PRIVATE ${MLN_FFI_VENDOR_PLATFORM_SOURCES})
+  foreach(source IN LISTS MLN_FFI_VENDOR_PLATFORM_SOURCES)
+    mln_configure_vendor_source(${source})
+  endforeach()
 
   target_include_directories(
     ${target}

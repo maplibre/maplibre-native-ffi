@@ -1,10 +1,9 @@
+include(mln_lint)
 include(mln_platform)
 include(mln_render_backend)
 
 function(mln_add_c_api_library target)
-  add_library(
-    ${target}
-    SHARED
+  set(MLN_FFI_C_API_SOURCES
       ${PROJECT_SOURCE_DIR}/src/c_api/diagnostics.cpp
       ${PROJECT_SOURCE_DIR}/src/c_api/logging.cpp
       ${PROJECT_SOURCE_DIR}/src/c_api/map.cpp
@@ -27,6 +26,11 @@ function(mln_add_c_api_library target)
       ${PROJECT_SOURCE_DIR}/src/resources/resource_loader.cpp
       ${PROJECT_SOURCE_DIR}/src/style/style_value.cpp
       ${PROJECT_SOURCE_DIR}/src/runtime/runtime.cpp)
+
+  add_library(${target} SHARED ${MLN_FFI_C_API_SOURCES})
+  foreach(source IN LISTS MLN_FFI_C_API_SOURCES)
+    mln_configure_project_source(${source})
+  endforeach()
 
   target_include_directories(
     ${target}
@@ -74,6 +78,7 @@ function(mln_add_c_api_library target)
       OUTPUT_NAME
       maplibre-native-c)
 
+  mln_configure_source_linting(${target})
   mln_configure_platform_support(${target})
   mln_configure_render_backend(${target})
 endfunction()

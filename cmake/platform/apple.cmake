@@ -1,7 +1,5 @@
 function(mln_configure_apple_platform target)
-  target_sources(
-    ${target}
-    PRIVATE
+  set(MLN_FFI_VENDOR_APPLE_SOURCES
       ${MLN_SOURCE_DIR}/platform/qt/src/mbgl/bidi.cpp
       ${MLN_SOURCE_DIR}/platform/darwin/core/async_task.cpp
       ${MLN_SOURCE_DIR}/platform/darwin/core/collator.mm
@@ -14,6 +12,11 @@ function(mln_configure_apple_platform target)
       ${MLN_SOURCE_DIR}/platform/darwin/core/run_loop.cpp
       ${MLN_SOURCE_DIR}/platform/darwin/core/string_nsstring.mm
       ${MLN_SOURCE_DIR}/platform/darwin/core/timer.cpp)
+
+  target_sources(${target} PRIVATE ${MLN_FFI_VENDOR_APPLE_SOURCES})
+  foreach(source IN LISTS MLN_FFI_VENDOR_APPLE_SOURCES)
+    mln_configure_vendor_source(${source})
+  endforeach()
 
   target_include_directories(
     ${target}
