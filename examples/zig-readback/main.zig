@@ -1,4 +1,5 @@
 const std = @import("std");
+const build_options = @import("build_options");
 
 const c = @import("c.zig").c;
 
@@ -15,6 +16,7 @@ pub fn main(init_args: std.process.Init) !void {
 
     _ = c.mln_log_set_async_severity_mask(0);
     defer _ = c.mln_log_set_async_severity_mask(c.MLN_LOG_SEVERITY_MASK_DEFAULT);
+    try logAndValidateNativeRenderBackend();
 
     var runtime: ?*c.mln_runtime = null;
     var runtime_options = c.mln_runtime_options_default();
@@ -55,6 +57,28 @@ pub fn main(init_args: std.process.Init) !void {
     try check(c.mln_texture_read_premultiplied_rgba8(texture.?, rgba.ptr, rgba.len, &info), "texture readback failed");
     try writePpm(init_args.io, allocator, output_path, rgba, info);
     std.debug.print("wrote {s} ({d}x{d})\n", .{ output_path, info.width, info.height });
+}
+
+fn logAndValidateNativeRenderBackend() !void {
+    const mask = c.mln_supported_render_backend_mask();
+    const expected = expectedNativeRenderBackend();
+    std.debug.print("native render backends: {s}\n", .{renderBackendMaskLabel(mask)});
+    if (mask & expected == 0) return error.NativeRenderBackendMismatch;
+}
+
+fn expectedNativeRenderBackend() u32 {
+    if (build_options.supports_metal) return c.MLN_RENDER_BACKEND_FLAG_METAL;
+    if (build_options.supports_vulkan) return c.MLN_RENDER_BACKEND_FLAG_VULKAN;
+    return 0;
+}
+
+fn renderBackendMaskLabel(mask: u32) []const u8 {
+    const supports_metal = mask & c.MLN_RENDER_BACKEND_FLAG_METAL != 0;
+    const supports_vulkan = mask & c.MLN_RENDER_BACKEND_FLAG_VULKAN != 0;
+    if (supports_metal and supports_vulkan) return "metal,vulkan";
+    if (supports_metal) return "metal";
+    if (supports_vulkan) return "vulkan";
+    return "none";
 }
 
 fn setInitialCamera(map: *c.mln_map) !void {

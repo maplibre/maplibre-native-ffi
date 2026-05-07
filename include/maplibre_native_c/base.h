@@ -49,6 +49,12 @@ typedef enum mln_status : int32_t {
   MLN_STATUS_NATIVE_ERROR = -5,
 } mln_status;
 
+/** Render backend support flags reported by this native library build. */
+typedef enum mln_render_backend_flag : uint32_t {
+  MLN_RENDER_BACKEND_FLAG_METAL = 1u << 0u,
+  MLN_RENDER_BACKEND_FLAG_VULKAN = 1u << 1u,
+} mln_render_backend_flag;
+
 typedef struct mln_runtime mln_runtime;
 typedef struct mln_map mln_map;
 typedef struct mln_map_projection mln_map_projection;
@@ -63,6 +69,13 @@ typedef struct mln_render_session mln_render_session;
  * and will increment on each SemVer major release.
  */
 MLN_API uint32_t mln_c_version(void) MLN_NOEXCEPT;
+
+/**
+ * Reports the render backends available in this native library build.
+ *
+ * The return value is a mask of mln_render_backend_flag values.
+ */
+MLN_API uint32_t mln_supported_render_backend_mask(void) MLN_NOEXCEPT;
 
 #ifdef __cplusplus
 }

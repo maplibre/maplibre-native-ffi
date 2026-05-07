@@ -9,6 +9,7 @@ struct mln_render_session;
 
 namespace mln::core {
 
+auto supported_render_backend_mask() noexcept -> uint32_t;
 auto owned_texture_descriptor_default() noexcept
   -> mln_owned_texture_descriptor;
 auto metal_owned_texture_descriptor_default() noexcept

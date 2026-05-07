@@ -272,6 +272,10 @@ class VulkanTextureSessionBackend final
 
 namespace mln::core {
 
+auto supported_render_backend_mask() noexcept -> uint32_t {
+  return MLN_RENDER_BACKEND_FLAG_VULKAN;
+}
+
 auto vulkan_owned_texture_descriptor_default() noexcept
   -> mln_vulkan_owned_texture_descriptor {
   return mln_vulkan_owned_texture_descriptor{

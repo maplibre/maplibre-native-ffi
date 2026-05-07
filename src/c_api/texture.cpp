@@ -36,6 +36,10 @@ auto mln_texture_image_info_default(void) noexcept -> mln_texture_image_info {
   return mln::core::texture_image_info_default();
 }
 
+auto mln_supported_render_backend_mask(void) noexcept -> uint32_t {
+  return mln::core::supported_render_backend_mask();
+}
+
 auto mln_owned_texture_attach(
   mln_map* map, const mln_owned_texture_descriptor* descriptor,
   mln_render_session** out_session

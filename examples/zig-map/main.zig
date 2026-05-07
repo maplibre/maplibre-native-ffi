@@ -15,6 +15,7 @@ const Backend = render.Backend;
 pub fn main(init_args: std.process.Init) !void {
     const target_mode = (try parseRenderTargetMode(init_args)) orelse return;
     std.debug.print("render target: {s}\n", .{target_mode.label()});
+    try logAndValidateNativeRenderBackend();
 
     _ = c.mln_log_set_callback(diagnostics.logCallback, null);
     defer _ = c.mln_log_clear_callback();
@@ -120,6 +121,28 @@ pub fn main(init_args: std.process.Init) !void {
 
         if (!did_work) c.SDL_Delay(if (has_presented_frame) 8 else 1);
     }
+}
+
+fn logAndValidateNativeRenderBackend() !void {
+    const mask = c.mln_supported_render_backend_mask();
+    const expected = expectedNativeRenderBackend();
+    std.debug.print("native render backends: {s}\n", .{renderBackendMaskLabel(mask)});
+    if (mask & expected == 0) return error.NativeRenderBackendMismatch;
+}
+
+fn expectedNativeRenderBackend() u32 {
+    if (build_options.supports_metal) return c.MLN_RENDER_BACKEND_FLAG_METAL;
+    if (build_options.supports_vulkan) return c.MLN_RENDER_BACKEND_FLAG_VULKAN;
+    return 0;
+}
+
+fn renderBackendMaskLabel(mask: u32) []const u8 {
+    const supports_metal = mask & c.MLN_RENDER_BACKEND_FLAG_METAL != 0;
+    const supports_vulkan = mask & c.MLN_RENDER_BACKEND_FLAG_VULKAN != 0;
+    if (supports_metal and supports_vulkan) return "metal,vulkan";
+    if (supports_metal) return "metal";
+    if (supports_vulkan) return "vulkan";
+    return "none";
 }
 
 fn parseRenderTargetMode(init_args: std.process.Init) !?types.RenderTargetMode {
