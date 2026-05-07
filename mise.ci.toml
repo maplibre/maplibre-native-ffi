@@ -17,6 +17,7 @@ run = [
 [tasks."ci:prepare-native-artifact"]
 run = [
   "rm -rf ci-artifact",
+  "mkdir -p ci-artifact/build",
   "mkdir -p ci-artifact/third_party/maplibre-native/vendor/Vulkan-Headers",
   "cp build/libmaplibre-native-c.* ci-artifact/build",
   "cp -R third_party/maplibre-native/vendor/Vulkan-Headers/include ci-artifact/third_party/maplibre-native/vendor/Vulkan-Headers/include",
