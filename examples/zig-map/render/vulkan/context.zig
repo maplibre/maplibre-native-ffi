@@ -52,10 +52,20 @@ pub const Context = struct {
     }
 
     fn createInstance(self: *Context) !void {
-        var extension_count: u32 = 0;
-        const extensions = c.SDL_Vulkan_GetInstanceExtensions(&extension_count);
-        if (extensions == null or extension_count == 0) {
+        var sdl_extension_count: u32 = 0;
+        const sdl_extensions = c.SDL_Vulkan_GetInstanceExtensions(&sdl_extension_count);
+        if (sdl_extensions == null or sdl_extension_count == 0) {
             return types.AppError.BackendSetupFailed;
+        }
+        const needs_portability = try self.hasInstanceExtension(c.VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
+
+        var extensions = try self.allocator.alloc([*c]const u8, sdl_extension_count + @intFromBool(needs_portability));
+        defer self.allocator.free(extensions);
+        for (extensions[0..sdl_extension_count], 0..) |*extension, index| {
+            extension.* = sdl_extensions[index];
+        }
+        if (needs_portability) {
+            extensions[sdl_extension_count] = c.VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME;
         }
 
         const app_info = c.VkApplicationInfo{
@@ -70,14 +80,30 @@ pub const Context = struct {
         const create_info = c.VkInstanceCreateInfo{
             .sType = c.VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
             .pNext = null,
-            .flags = 0,
+            .flags = if (needs_portability) c.VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR else 0,
             .pApplicationInfo = &app_info,
             .enabledLayerCount = 0,
             .ppEnabledLayerNames = null,
-            .enabledExtensionCount = extension_count,
-            .ppEnabledExtensionNames = extensions,
+            .enabledExtensionCount = @intCast(extensions.len),
+            .ppEnabledExtensionNames = extensions.ptr,
         };
         try util.expectVk(c.vkCreateInstance(&create_info, null, &self.instance));
+    }
+
+    fn hasInstanceExtension(self: *Context, name: [*c]const u8) !bool {
+        var count: u32 = 0;
+        try util.expectVk(c.vkEnumerateInstanceExtensionProperties(null, &count, null));
+        const properties = try self.allocator.alloc(c.VkExtensionProperties, count);
+        defer self.allocator.free(properties);
+        try util.expectVk(c.vkEnumerateInstanceExtensionProperties(null, &count, properties.ptr));
+
+        const expected = std.mem.span(name);
+        for (properties) |property| {
+            if (std.mem.eql(u8, std.mem.span(@as([*:0]const u8, @ptrCast(&property.extensionName))), expected)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     fn pickDevice(self: *Context) !void {

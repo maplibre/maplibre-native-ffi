@@ -40,19 +40,19 @@ local nativeSteps = new Mapping<String, Step> {
     glob = List("**/*.cpp", "**/*.cc", "**/*.cxx", "**/*.hpp")
     exclude = List("src/render/metal/**", "src/render/vulkan/**")
     profiles = nativeProfiles
-    check = "pixi run clang-tidy --quiet --config-file=.clang-tidy -p build {{files}}"
+    check = "pixi run clang-tidy --quiet --config-file=.clang-tidy -p \"$MLN_FFI_BUILD_DIR\" {{files}}"
   }
-  ["clang-tidy-macos"] {
+  ["clang-tidy-metal"] {
     glob = List("src/render/metal/**/*.mm")
     profiles = nativeProfiles
-    step_condition = "exec('test \"$(uname -s)\" = Darwin && printf true || printf false') == 'true'"
-    check = "pixi run clang-tidy --quiet --config-file=.clang-tidy -p build {{files}}"
+    step_condition = "exec('test \"${MLN_FFI_RENDER_BACKEND:-}\" = metal && printf true || printf false') == 'true'"
+    check = "pixi run clang-tidy --quiet --config-file=.clang-tidy -p \"$MLN_FFI_BUILD_DIR\" {{files}}"
   }
-  ["clang-tidy-linux"] {
+  ["clang-tidy-vulkan"] {
     glob = List("src/render/vulkan/**/*.cpp", "src/render/vulkan/**/*.hpp")
     profiles = nativeProfiles
-    step_condition = "exec('test \"$(uname -s)\" = Linux && printf true || printf false') == 'true'"
-    check = "pixi run clang-tidy --quiet --config-file=.clang-tidy -p build {{files}}"
+    step_condition = "exec('test \"${MLN_FFI_RENDER_BACKEND:-}\" = vulkan && printf true || printf false') == 'true'"
+    check = "pixi run clang-tidy --quiet --config-file=.clang-tidy -p \"$MLN_FFI_BUILD_DIR\" {{files}}"
   }
 }
 

@@ -45,6 +45,9 @@ The first build configures CMake and fetches MapLibre Native into
 `third_party/maplibre-native`. To use a separate MapLibre Native checkout, set
 `MLN_SOURCE_DIR` before configuring or running builds.
 
+Set `MISE_ENV=<variant>` before `mise run ...` to build, test, or run examples
+for a specific platform and render backend.
+
 ## Common Commands
 
 ```bash
