@@ -110,7 +110,7 @@ def load_variants(repo_root: Path, schema: TomlTable) -> dict[str, TomlTable]:
     """Load variants from mise environment profiles."""
     runners = as_table(schema.get("runners"))
     variants: dict[str, TomlTable] = {}
-    for profile_path in repo_root.glob("mise.*.toml"):
+    for profile_path in repo_root.glob(".mise/config.*.toml"):
         variant_name, variant = variant_from_profile(profile_path, runners)
         variants[variant_name] = variant
     return dict(sorted(variants.items()))
