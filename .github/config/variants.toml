@@ -1,3 +1,7 @@
+# CI variant matrix configuration.
+# Platform/backend variants come from mise environments; example entries map each
+# example task to the variants that support it.
+
 [runners]
 linux-arm64 = "ubuntu-24.04-arm"
 linux-x64 = "ubuntu-latest"
