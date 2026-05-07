@@ -384,6 +384,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/llvm-tools-22-22.1.4-hb545844_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/llvm-tools-22.1.4-hd34ed20_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/llvmdev-22.1.4-hb545844_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/osx-arm64/moltenvk-1.4.1-h407b865_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/ncurses-6.6-h1d4f5a5_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/ninja-1.13.2-h49c215f_0.conda
       - conda: https://conda.anaconda.org/conda-forge/osx-arm64/openssl-3.6.2-hd24854e_0.conda
@@ -3944,6 +3945,16 @@ packages:
   license_family: MIT
   size: 2876962
   timestamp: 1773867973610
+- conda: https://conda.anaconda.org/conda-forge/osx-arm64/moltenvk-1.4.1-h407b865_0.conda
+  sha256: 30711fccc6deaa556e8d691f92cabea8ef0bb33d5a577aad3512429bada7be77
+  md5: 9801f6018bf7d682e4ee0bff62027aa3
+  depends:
+  - libcxx >=19
+  - __osx >=14.0
+  license: Apache-2.0
+  license_family: APACHE
+  size: 1380005
+  timestamp: 1777643484676
 - conda: https://conda.anaconda.org/conda-forge/linux-64/mpg123-1.32.9-hc50e24c_0.conda
   sha256: 39c4700fb3fbe403a77d8cc27352fa72ba744db487559d5d44bf8411bb4ea200
   md5: c7f302fd11eeb0987a6a5e1f3aed6a21

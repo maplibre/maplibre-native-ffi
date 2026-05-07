@@ -1,5 +1,5 @@
 const std = @import("std");
-const builtin = @import("builtin");
+const build_options = @import("build_options");
 const testing = std.testing;
 const support = @import("support.zig");
 const metal_support = @import("metal_support.zig");
@@ -142,7 +142,7 @@ fn expectPixelApprox(actual: [4]u8, expected: [4]u8, tolerance: u8) !void {
 }
 
 test "Metal texture unsupported backend validates arguments" {
-    if (builtin.os.tag == .macos) return error.SkipZigTest;
+    if (build_options.supports_metal) return error.SkipZigTest;
 
     const runtime = try support.createRuntime();
     defer support.destroyRuntime(runtime);
@@ -163,32 +163,32 @@ test "Metal texture unsupported backend validates arguments" {
 }
 
 test "Metal texture attach rejects invalid arguments" {
-    if (builtin.os.tag != .macos) return error.SkipZigTest;
+    if (!build_options.supports_metal) return error.SkipZigTest;
     try common.expectAttachRejectsInvalidArguments(Backend);
 }
 
 test "Metal texture lifecycle enforces active session and stale handles" {
-    if (builtin.os.tag != .macos) return error.SkipZigTest;
+    if (!build_options.supports_metal) return error.SkipZigTest;
     try common.expectLifecycleEnforcesActiveSessionAndStaleHandles(Backend);
 }
 
 test "Metal texture rejects wrong-thread calls" {
-    if (builtin.os.tag != .macos) return error.SkipZigTest;
+    if (!build_options.supports_metal) return error.SkipZigTest;
     try common.expectWrongThreadCallsRejected(Backend);
 }
 
 test "Metal texture render acquire release and resize generation" {
-    if (builtin.os.tag != .macos) return error.SkipZigTest;
+    if (!build_options.supports_metal) return error.SkipZigTest;
     try common.expectRenderAcquireReleaseAndResizeGeneration(Backend);
 }
 
 test "Metal owned texture supports readback" {
-    if (builtin.os.tag != .macos) return error.SkipZigTest;
+    if (!build_options.supports_metal) return error.SkipZigTest;
     try common.expectOwnedTextureReadback(Backend);
 }
 
 test "Metal borrowed texture renders into caller texture" {
-    if (builtin.os.tag != .macos) return error.SkipZigTest;
+    if (!build_options.supports_metal) return error.SkipZigTest;
     try support.suppressLogs();
     defer support.restoreLogs();
 
@@ -234,18 +234,18 @@ test "Metal borrowed texture renders into caller texture" {
 }
 
 test "Metal texture render emits observer events" {
-    if (builtin.os.tag != .macos) return error.SkipZigTest;
+    if (!build_options.supports_metal) return error.SkipZigTest;
     try common.expectRenderObserverEvents(Backend);
 }
 
 test "Metal texture still modes render requested still images" {
-    if (builtin.os.tag != .macos) return error.SkipZigTest;
+    if (!build_options.supports_metal) return error.SkipZigTest;
     inline for (.{ c.MLN_MAP_MODE_STATIC, c.MLN_MAP_MODE_TILE }) |map_mode| {
         try common.expectStillModeStillImageRequest(Backend, map_mode);
     }
 }
 
 test "Metal texture detach leaves handle live but unusable for rendering" {
-    if (builtin.os.tag != .macos) return error.SkipZigTest;
+    if (!build_options.supports_metal) return error.SkipZigTest;
     try common.expectDetachLeavesHandleLiveButUnusable(Backend);
 }

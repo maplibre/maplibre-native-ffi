@@ -1,5 +1,5 @@
 const std = @import("std");
-const builtin = @import("builtin");
+const build_options = @import("build_options");
 const testing = std.testing;
 const metal_support = @import("metal_support.zig");
 const support = @import("support.zig");
@@ -27,7 +27,7 @@ test "surface descriptors expose defaults" {
 }
 
 test "Metal surface attach rejects invalid arguments" {
-    if (builtin.os.tag != .macos) return error.SkipZigTest;
+    if (!build_options.supports_metal) return error.SkipZigTest;
 
     const runtime = try support.createRuntime();
     defer support.destroyRuntime(runtime);
@@ -66,7 +66,7 @@ test "Metal surface attach rejects invalid arguments" {
 }
 
 test "Metal surface lifecycle and render update" {
-    if (builtin.os.tag != .macos) return error.SkipZigTest;
+    if (!build_options.supports_metal) return error.SkipZigTest;
     try support.suppressLogs();
     defer support.restoreLogs();
 
@@ -100,7 +100,7 @@ test "Metal surface lifecycle and render update" {
 }
 
 test "Metal surface renders to window-attached layer under autorelease pool" {
-    if (builtin.os.tag != .macos) return error.SkipZigTest;
+    if (!build_options.supports_metal) return error.SkipZigTest;
     try support.suppressLogs();
     defer support.restoreLogs();
 
@@ -130,7 +130,7 @@ test "Metal surface renders to window-attached layer under autorelease pool" {
 }
 
 test "Metal surface render acquires one drawable per frame" {
-    if (builtin.os.tag != .macos) return error.SkipZigTest;
+    if (!build_options.supports_metal) return error.SkipZigTest;
     try support.suppressLogs();
     defer support.restoreLogs();
 
@@ -162,7 +162,7 @@ test "Metal surface render acquires one drawable per frame" {
 }
 
 test "Vulkan surface unsupported backend validates arguments" {
-    if (builtin.os.tag == .linux) return error.SkipZigTest;
+    if (build_options.supports_vulkan) return error.SkipZigTest;
 
     const runtime = try support.createRuntime();
     defer support.destroyRuntime(runtime);
@@ -186,7 +186,7 @@ test "Vulkan surface unsupported backend validates arguments" {
 }
 
 test "Vulkan surface attach rejects invalid arguments" {
-    if (builtin.os.tag != .linux) return error.SkipZigTest;
+    if (!build_options.supports_vulkan) return error.SkipZigTest;
 
     const runtime = try support.createRuntime();
     defer support.destroyRuntime(runtime);
@@ -233,7 +233,7 @@ test "Vulkan surface attach rejects invalid arguments" {
 }
 
 test "Metal surface unsupported backend validates arguments" {
-    if (builtin.os.tag == .macos) return error.SkipZigTest;
+    if (build_options.supports_metal) return error.SkipZigTest;
 
     const runtime = try support.createRuntime();
     defer support.destroyRuntime(runtime);

@@ -13,14 +13,35 @@ set(MLN_WITH_CORE_ONLY ON CACHE BOOL "Build only MapLibre Native core" FORCE)
 set(MLN_WITH_GLFW OFF CACHE BOOL "Disable MapLibre Native GLFW platform" FORCE)
 set(MLN_WITH_PMTILES ON
     CACHE BOOL "Build MapLibre Native PMTiles support" FORCE)
-if(APPLE)
+set(MLN_FFI_RENDER_BACKEND ""
+    CACHE STRING "Render backend for this wrapper build: metal or vulkan")
+set_property(CACHE MLN_FFI_RENDER_BACKEND PROPERTY STRINGS metal vulkan)
+if(NOT MLN_FFI_RENDER_BACKEND)
+  if(APPLE)
+    set(MLN_FFI_RENDER_BACKEND "metal")
+  elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    set(MLN_FFI_RENDER_BACKEND "vulkan")
+  endif()
+endif()
+string(TOLOWER "${MLN_FFI_RENDER_BACKEND}" MLN_FFI_RENDER_BACKEND)
+if(NOT MLN_FFI_RENDER_BACKEND MATCHES "^(metal|vulkan)$")
+  message(FATAL_ERROR "Unsupported render backend: ${MLN_FFI_RENDER_BACKEND}")
+endif()
+if(MLN_FFI_RENDER_BACKEND STREQUAL "metal" AND NOT APPLE)
+  message(FATAL_ERROR "Metal builds require an Apple platform")
+endif()
+set(MLN_WITH_METAL OFF CACHE BOOL "Build MapLibre Native Metal backend" FORCE)
+set(MLN_WITH_VULKAN OFF CACHE BOOL "Build MapLibre Native Vulkan backend" FORCE)
+if(MLN_FFI_RENDER_BACKEND STREQUAL "metal")
   set(MLN_WITH_METAL ON CACHE BOOL "Build MapLibre Native Metal backend" FORCE)
-elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+elseif(MLN_FFI_RENDER_BACKEND STREQUAL "vulkan")
   set(MLN_WITH_VULKAN ON
       CACHE BOOL "Build MapLibre Native Vulkan backend" FORCE)
 endif()
 set(MLN_WITH_WERROR OFF
     CACHE BOOL "Do not fail wrapper builds on MapLibre Native warnings" FORCE)
+message(
+  STATUS "Configuring maplibre-native-c ${MLN_FFI_RENDER_BACKEND} backend")
 
 # MLN_SOURCE_DIR can be set externally to point at a local MapLibre Native
 # checkout (useful for development against an unreleased branch). When unset,
@@ -94,7 +115,6 @@ if(APPLE)
   list(
     APPEND
     MLN_PLATFORM_SUPPORT_SOURCES
-    ${MLN_SOURCE_DIR}/platform/default/src/mbgl/mtl/headless_backend.cpp
     ${MLN_SOURCE_DIR}/platform/qt/src/mbgl/bidi.cpp
     ${MLN_SOURCE_DIR}/platform/darwin/core/async_task.cpp
     ${MLN_SOURCE_DIR}/platform/darwin/core/collator.mm
@@ -114,12 +134,7 @@ if(APPLE)
     "-framework CoreGraphics"
     "-framework CoreText"
     "-framework Foundation"
-    "-framework ImageIO"
-    "-framework Metal"
-    "-framework QuartzCore")
-  set(MLN_TEXTURE_SESSION_SOURCE src/render/metal/metal_texture_session.mm
-      src/render/metal/metal_texture_backend.mm)
-  set(MLN_SURFACE_SESSION_SOURCE src/render/metal/metal_surface_session.mm)
+    "-framework ImageIO")
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
   find_package(CURL REQUIRED)
   find_package(JPEG REQUIRED)
@@ -130,13 +145,9 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
   pkg_search_module(LIBUV libuv REQUIRED)
   pkg_search_module(ICUUC icu-uc REQUIRED)
   pkg_search_module(ICUI18N icu-i18n REQUIRED)
-  if(MLN_WITH_VULKAN)
-    find_library(MLN_VULKAN_LOADER_LIBRARY NAMES vulkan REQUIRED)
-  endif()
   list(
     APPEND
     MLN_PLATFORM_SUPPORT_SOURCES
-    ${MLN_SOURCE_DIR}/platform/default/src/mbgl/vulkan/headless_backend.cpp
     ${MLN_SOURCE_DIR}/platform/default/src/mbgl/i18n/collator.cpp
     ${MLN_SOURCE_DIR}/platform/default/src/mbgl/i18n/number_format.cpp
     ${MLN_SOURCE_DIR}/platform/default/src/mbgl/storage/http_file_source.cpp
@@ -161,14 +172,28 @@ elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     ${WEBP_LIBRARIES}
     ${ICUUC_LIBRARIES}
     ${ICUI18N_LIBRARIES}
-    $<$<BOOL:${MLN_WITH_VULKAN}>:${MLN_VULKAN_LOADER_LIBRARY}>
     PNG::PNG
     Threads::Threads)
+else()
+  message(FATAL_ERROR "Unsupported platform: ${CMAKE_SYSTEM_NAME}")
+endif()
+
+if(MLN_FFI_RENDER_BACKEND STREQUAL "metal")
+  list(APPEND MLN_PLATFORM_SUPPORT_SOURCES
+       ${MLN_SOURCE_DIR}/platform/default/src/mbgl/mtl/headless_backend.cpp)
+  list(APPEND MLN_PLATFORM_SUPPORT_LIBRARIES "-framework Metal"
+       "-framework QuartzCore")
+  set(MLN_TEXTURE_SESSION_SOURCE src/render/metal/metal_texture_session.mm
+      src/render/metal/metal_texture_backend.mm)
+  set(MLN_SURFACE_SESSION_SOURCE src/render/metal/metal_surface_session.mm)
+elseif(MLN_FFI_RENDER_BACKEND STREQUAL "vulkan")
+  find_library(MLN_VULKAN_LOADER_LIBRARY NAMES vulkan REQUIRED)
+  list(APPEND MLN_PLATFORM_SUPPORT_SOURCES
+       ${MLN_SOURCE_DIR}/platform/default/src/mbgl/vulkan/headless_backend.cpp)
+  list(APPEND MLN_PLATFORM_SUPPORT_LIBRARIES ${MLN_VULKAN_LOADER_LIBRARY})
   set(MLN_TEXTURE_SESSION_SOURCE src/render/vulkan/vulkan_texture_session.cpp
       src/render/vulkan/vulkan_texture_backend.cpp)
   set(MLN_SURFACE_SESSION_SOURCE src/render/vulkan/vulkan_surface_session.cpp)
-else()
-  message(FATAL_ERROR "Unsupported platform: ${CMAKE_SYSTEM_NAME}")
 endif()
 
 add_library(

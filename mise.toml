@@ -26,8 +26,12 @@ node = "24.11.0"
 usage = "3.3.0"
 
 [env]
-DYLD_LIBRARY_PATH = "{{config_root}}/build"
-LD_LIBRARY_PATH = "{{config_root}}/build"
+MLN_FFI_VARIANT = "{{env.MLN_FFI_VARIANT | default(value=\"host\")}}"
+MLN_FFI_TARGET_TRIPLE = "{{env.MLN_FFI_TARGET_TRIPLE | default(value=\"host\")}}"
+MLN_FFI_RENDER_BACKEND = "{{env.MLN_FFI_RENDER_BACKEND | default(value=\"\")}}"
+MLN_FFI_BUILD_DIR = "{{env.MLN_FFI_BUILD_DIR | default(value=config_root ~ \"/build/\" ~ env.MLN_FFI_VARIANT | default(value=\"host\"))}}"
+DYLD_LIBRARY_PATH = "{{env.MLN_FFI_BUILD_DIR | default(value=config_root ~ \"/build/host\")}}"
+LD_LIBRARY_PATH = "{{env.MLN_FFI_BUILD_DIR | default(value=config_root ~ \"/build/host\")}}"
 XDG_DATA_DIRS = "{{config_root}}/.pixi/envs/default/share:{{env.XDG_DATA_DIRS | default(value=\"/usr/local/share:/usr/share\")}}"
 
 [hooks]
@@ -39,21 +43,42 @@ postinstall = [
 
 [tasks.configure]
 env = { CC = "clang", CXX = "clang++" }
-run = "pixi run cmake -S . -B build -G Ninja"
+run = "pixi run cmake -S . -B \"$MLN_FFI_BUILD_DIR\" -G Ninja ${MLN_FFI_RENDER_BACKEND:+-DMLN_FFI_RENDER_BACKEND=$MLN_FFI_RENDER_BACKEND}"
 
 [tasks.build]
 depends = ["//:configure"]
-run = "pixi run cmake --build build --parallel"
+run = "pixi run cmake --build \"$MLN_FFI_BUILD_DIR\" --parallel"
 
 [tasks.clean]
-run = "rm -rf build"
+run = "rm -rf \"$MLN_FFI_BUILD_DIR\""
 
 [tasks.test]
 depends = ["//:build"]
-run = "zig build test --summary all"
+run = "zig build test --summary all -Dcmake-artifact-dir=\"$MLN_FFI_BUILD_DIR\" ${MLN_FFI_RENDER_BACKEND:+-Drender-backend=$MLN_FFI_RENDER_BACKEND}"
 
 [tasks.check]
 run = "hk check --all"
 
 [tasks.fix]
 run = "hk fix --all"
+
+[tasks."ci:lint"]
+usage = '''
+arg "<profile>" help="Lint profile" {
+  choices "common" "native"
+}
+'''
+run = [
+  "hk fix --all --profile \"ci-${usage_profile?}\"",
+  "git update-index -q --refresh",
+  "git diff --exit-code",
+  "git diff --cached --exit-code",
+]
+
+[tasks."ci:prepare-native-artifact"]
+run = [
+  "rm -rf ci-artifact",
+  "mkdir -p \"ci-artifact/build/${MLN_FFI_VARIANT:-host}\" ci-artifact/third_party/maplibre-native/vendor/Vulkan-Headers",
+  "cp \"$MLN_FFI_BUILD_DIR\"/libmaplibre-native-c.* \"ci-artifact/build/${MLN_FFI_VARIANT:-host}\"",
+  "cp -R third_party/maplibre-native/vendor/Vulkan-Headers/include ci-artifact/third_party/maplibre-native/vendor/Vulkan-Headers/include",
+]

@@ -6,7 +6,7 @@ if [[ "${CI:-}" != "true" ]]; then
 fi
 
 found=false
-for lib in build/libmaplibre-native-c.*; do
+for lib in "${MLN_FFI_BUILD_DIR:-build/host}"/libmaplibre-native-c.* build/libmaplibre-native-c.*; do
   if [[ -f "$lib" ]]; then
     found=true
     break
@@ -14,6 +14,6 @@ for lib in build/libmaplibre-native-c.*; do
 done
 
 if [[ "$found" != "true" ]]; then
-  echo "missing build/libmaplibre-native-c.*; native artifact was not downloaded" >&2
+  echo "missing ${MLN_FFI_BUILD_DIR:-build/host}/libmaplibre-native-c.*; native artifact was not downloaded" >&2
   exit 1
 fi

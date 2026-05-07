@@ -1,7 +1,8 @@
-const builtin = @import("builtin");
+const build_options = @import("build_options");
 
-pub const Backend = switch (builtin.os.tag) {
-    .macos => @import("metal/mod.zig").MetalBackend,
-    .linux => @import("vulkan/mod.zig").VulkanBackend,
-    else => @compileError("zig-map currently supports macOS Metal and Linux Vulkan"),
-};
+pub const Backend = if (build_options.supports_metal)
+    @import("metal/mod.zig").MetalBackend
+else if (build_options.supports_vulkan)
+    @import("vulkan/mod.zig").VulkanBackend
+else
+    @compileError("zig-map currently supports Metal and Vulkan variants");

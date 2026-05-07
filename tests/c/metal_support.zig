@@ -1,10 +1,10 @@
-const builtin = @import("builtin");
+const build_options = @import("build_options");
 
 pub const AutoreleasePool = struct {
     token: *anyopaque,
 
     pub fn init() !AutoreleasePool {
-        if (builtin.os.tag != .macos) return error.SkipZigTest;
+        if (!build_options.supports_metal) return error.SkipZigTest;
         return .{ .token = mln_test_autorelease_pool_push() orelse return error.AutoreleasePoolUnavailable };
     }
 
@@ -35,24 +35,24 @@ extern "c" fn mln_test_metal_layer_next_drawable_count(layer: *anyopaque) u32;
 extern "c" fn mln_test_destroy_window_metal_layer(window_layer: *WindowLayer) void;
 
 pub fn createLayer() !*anyopaque {
-    if (builtin.os.tag != .macos) return error.SkipZigTest;
+    if (!build_options.supports_metal) return error.SkipZigTest;
     return mln_test_create_metal_layer() orelse return error.MetalLayerUnavailable;
 }
 
 pub fn createTexture(device: *anyopaque, width: u32, height: u32) !*anyopaque {
-    if (builtin.os.tag != .macos) return error.SkipZigTest;
+    if (!build_options.supports_metal) return error.SkipZigTest;
     return mln_test_create_metal_texture(device, width, height) orelse return error.MetalTextureUnavailable;
 }
 
 pub fn clearTextureRGBA8(texture: *anyopaque, rgba: [4]u8) !void {
-    if (builtin.os.tag != .macos) return error.SkipZigTest;
+    if (!build_options.supports_metal) return error.SkipZigTest;
     if (!mln_test_metal_texture_clear_rgba8(texture, rgba[0], rgba[1], rgba[2], rgba[3])) {
         return error.MetalTextureClearFailed;
     }
 }
 
 pub fn readTexturePixelRGBA8(texture: *anyopaque, x: u32, y: u32) ![4]u8 {
-    if (builtin.os.tag != .macos) return error.SkipZigTest;
+    if (!build_options.supports_metal) return error.SkipZigTest;
     var rgba: [4]u8 = undefined;
     if (!mln_test_metal_texture_read_pixel_rgba8(texture, x, y, rgba[0..].ptr)) {
         return error.MetalTextureReadFailed;
@@ -65,7 +65,7 @@ pub fn releaseObject(object: *anyopaque) void {
 }
 
 pub fn createWindowLayer(width: u32, height: u32) !WindowLayer {
-    if (builtin.os.tag != .macos) return error.SkipZigTest;
+    if (!build_options.supports_metal) return error.SkipZigTest;
     var window_layer = WindowLayer{ .window = null, .layer = null };
     if (!mln_test_create_window_metal_layer(width, height, &window_layer) or window_layer.layer == null) {
         return error.MetalWindowUnavailable;
@@ -74,7 +74,7 @@ pub fn createWindowLayer(width: u32, height: u32) !WindowLayer {
 }
 
 pub fn createCountingWindowLayer(width: u32, height: u32) !WindowLayer {
-    if (builtin.os.tag != .macos) return error.SkipZigTest;
+    if (!build_options.supports_metal) return error.SkipZigTest;
     var window_layer = WindowLayer{ .window = null, .layer = null };
     if (!mln_test_create_counting_window_metal_layer(width, height, &window_layer) or window_layer.layer == null) {
         return error.MetalWindowUnavailable;

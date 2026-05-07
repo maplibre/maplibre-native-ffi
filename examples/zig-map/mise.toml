@@ -3,20 +3,20 @@ run = ["mise run :build"]
 
 [tasks.build]
 depends = ["//:ensure-native-library", ":compile-shaders"]
-run = "zig build"
+run = "zig build --prefix \"zig-out/${MLN_FFI_VARIANT:-host}\" -Dcmake-artifact-dir=\"$MLN_FFI_BUILD_DIR\" ${MLN_FFI_RENDER_BACKEND:+-Drender-backend=$MLN_FFI_RENDER_BACKEND}"
 
 [tasks.run]
 depends = ["//:ensure-native-library", ":compile-shaders"]
-run = "zig build run -- --render-target=owned-texture"
+run = "zig build --prefix \"zig-out/${MLN_FFI_VARIANT:-host}\" run -Dcmake-artifact-dir=\"$MLN_FFI_BUILD_DIR\" ${MLN_FFI_RENDER_BACKEND:+-Drender-backend=$MLN_FFI_RENDER_BACKEND} -- --render-target=owned-texture"
 
 [tasks."run:owned-texture"]
 depends = ["//:ensure-native-library", ":compile-shaders"]
-run = "zig build run -- --render-target=owned-texture"
+run = "zig build --prefix \"zig-out/${MLN_FFI_VARIANT:-host}\" run -Dcmake-artifact-dir=\"$MLN_FFI_BUILD_DIR\" ${MLN_FFI_RENDER_BACKEND:+-Drender-backend=$MLN_FFI_RENDER_BACKEND} -- --render-target=owned-texture"
 
 [tasks."run:borrowed-texture"]
 depends = ["//:ensure-native-library", ":compile-shaders"]
-run = "zig build run -- --render-target=borrowed-texture"
+run = "zig build --prefix \"zig-out/${MLN_FFI_VARIANT:-host}\" run -Dcmake-artifact-dir=\"$MLN_FFI_BUILD_DIR\" ${MLN_FFI_RENDER_BACKEND:+-Drender-backend=$MLN_FFI_RENDER_BACKEND} -- --render-target=borrowed-texture"
 
 [tasks."run:native-surface"]
 depends = ["//:ensure-native-library", ":compile-shaders"]
-run = "zig build run -- --render-target=native-surface"
+run = "zig build --prefix \"zig-out/${MLN_FFI_VARIANT:-host}\" run -Dcmake-artifact-dir=\"$MLN_FFI_BUILD_DIR\" ${MLN_FFI_RENDER_BACKEND:+-Drender-backend=$MLN_FFI_RENDER_BACKEND} -- --render-target=native-surface"

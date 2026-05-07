@@ -31,7 +31,11 @@
 namespace {
 
 auto vulkan_loader_library_name() noexcept -> const char* {
+#if defined(__APPLE__)
+  return "libvulkan.dylib";
+#else
   return "libvulkan.so.1";
+#endif
 }
 
 }  // namespace

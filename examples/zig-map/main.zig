@@ -1,6 +1,6 @@
 const std = @import("std");
-const builtin = @import("builtin");
-const objc = if (builtin.os.tag == .macos) @import("objc") else struct {};
+const build_options = @import("build_options");
+const objc = if (build_options.supports_metal) @import("objc") else struct {};
 
 const c = @import("c.zig").c;
 const diagnostics = @import("diagnostics.zig");
@@ -60,8 +60,8 @@ pub fn main(init_args: std.process.Init) !void {
     var render_pending = true;
     var input_controller = input.Controller{};
     while (running) {
-        const pool = if (builtin.os.tag == .macos) objc.AutoreleasePool.init() else {};
-        defer if (builtin.os.tag == .macos) pool.deinit();
+        const pool = if (build_options.supports_metal) objc.AutoreleasePool.init() else {};
+        defer if (build_options.supports_metal) pool.deinit();
 
         var did_work = false;
         var event: c.SDL_Event = undefined;

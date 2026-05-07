@@ -3,8 +3,8 @@ run = ["mise run :run"]
 
 [tasks.build]
 depends = ["//:ensure-native-library"]
-run = "zig build"
+run = "zig build --prefix \"zig-out/${MLN_FFI_VARIANT:-host}\" -Dcmake-artifact-dir=\"$MLN_FFI_BUILD_DIR\" ${MLN_FFI_RENDER_BACKEND:+-Drender-backend=$MLN_FFI_RENDER_BACKEND}"
 
 [tasks.run]
 depends = ["//:ensure-native-library"]
-run = "mkdir -p zig-out && zig build run -- zig-out/zig-readback.ppm"
+run = "mkdir -p \"zig-out/${MLN_FFI_VARIANT:-host}\" && zig build --prefix \"zig-out/${MLN_FFI_VARIANT:-host}\" run -Dcmake-artifact-dir=\"$MLN_FFI_BUILD_DIR\" ${MLN_FFI_RENDER_BACKEND:+-Drender-backend=$MLN_FFI_RENDER_BACKEND} -- \"zig-out/${MLN_FFI_VARIANT:-host}/zig-readback.ppm\""
