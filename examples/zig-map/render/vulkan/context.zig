@@ -98,7 +98,7 @@ pub const Context = struct {
         try util.expectVk(c.vkEnumerateInstanceExtensionProperties(null, &count, properties.ptr));
 
         const expected = std.mem.span(name);
-        for (properties) |property| {
+        for (properties[0..@intCast(count)]) |property| {
             if (std.mem.eql(u8, std.mem.span(@as([*:0]const u8, @ptrCast(&property.extensionName))), expected)) {
                 return true;
             }
