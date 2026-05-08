@@ -11,7 +11,7 @@ for platform setup, pinned tools, local commands, tests, and examples.
 
 Read [concepts](https://maplibre.org/maplibre-native-ffi/concepts/) before
 changing behavior. Read the
-[C API development guide](https://maplibre.org/maplibre-native-ffi/development/c-api/)
+[C API development guide](https://maplibre.org/maplibre-native-ffi/development/c-conventions/)
 before changing public C interfaces or C ABI behavior.
 
 Keep pull requests focused on one reviewable change. The reviewer should be able

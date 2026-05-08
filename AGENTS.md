@@ -50,8 +50,9 @@ Read these docs before changing related code:
 
 - [Concepts](docs/src/content/docs/concepts.md) for project scope, ownership,
   threading, events, rendering targets, and host integration boundaries.
-- [C API](docs/src/content/docs/development/c-api.md) before changing public C
-  headers, C ABI behavior, callbacks, diagnostics, or render target contracts.
+- [C API](docs/src/content/docs/development/c-conventions.md) before changing
+  public C headers, C ABI behavior, callbacks, diagnostics, or render target
+  contracts.
 - [Bindings](docs/src/content/docs/development/) before changing a language
   binding or its generated reference docs.
 

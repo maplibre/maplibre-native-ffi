@@ -289,7 +289,7 @@ copied Java values unless the API exposes a view object tied to the snapshot's
 lifetime. The Java API does not expose free-floating borrowed views.
 
 Backend-native handles returned from acquired texture frames are callback-scoped
-borrows represented as `NativePointer` values..
+borrows represented as `NativePointer` values.
 
 ## Events
 
