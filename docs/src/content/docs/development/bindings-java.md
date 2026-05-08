@@ -389,25 +389,28 @@ representations where forward compatibility matters.
 
 ## Testing
 
-Test Java adaptation, not the entire C API behavior already covered by C ABI
-tests.
+Test the Java adaptation layer rather than duplicating the full C ABI test
+suite. C ABI tests prove native behavior. Java tests prove that generated FFM
+bindings, handwritten wrappers, Java ownership, copying, callbacks, and
+exceptions preserve that behavior at the JVM boundary.
 
-Cover:
+Binding tests should cover each Java rule that adds behavior above the C API:
+status-to-exception conversion, immediate diagnostic extraction, generated
+symbol loading, descriptor materialization, `AutoCloseable` ownership,
+parent-child reachability, debug leak reporting, copied event payloads,
+callback-scoped texture frame release, Java callback exception conversion, and
+resource request wrapper state.
 
-- generated FFM binding as part of the build;
-- library loading through the generated symbols;
-- status-to-exception mapping and immediate diagnostic extraction;
-- `AutoCloseable` close behavior and parent-child reachability;
-- cleaner leak diagnostics in debug mode;
-- descriptor-to-native `size` field initialization and field-mask encoding;
-- copied runtime event payloads across repeated polls;
-- snapshot copy behavior and snapshot-scoped view invalidation when views exist;
-- FFM upcall lifetime and Java exception conversion;
-- resource provider Java wrapper rules: pass-through, one-shot completion,
-  asynchronous completion, cancellation, and release;
-- texture frame callback acquisition and guaranteed release after normal return
-  and exceptions;
-- Java array, `ByteBuffer`, and explicit native-buffer readback paths.
+Prefer small adaptation tests around real C calls. Use fake Java objects only
+when they isolate wrapper behavior that cannot be reached through a practical C
+scenario. When a C ABI test already covers native validation, the Java test only
+needs to show that the corresponding Java method propagates the native status,
+diagnostic, or copied output correctly.
+
+Add regression tests when the Java layer owns a lifetime or threading invariant
+that the generated FFM layer cannot express, such as releasing a texture frame
+after a throwing callback or preserving parent handles while child handles are
+reachable.
 
 ## Design Boundary
 
