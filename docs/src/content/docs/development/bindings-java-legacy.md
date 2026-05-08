@@ -8,8 +8,8 @@ sidebar:
 ## Scope
 
 The Java JNI binding is a safe low-level binding over the public C API. It
-exposes the C API's runtime, map, render session, event, callback, and render
-target model with Java ownership, error, memory, and thread-safety conventions.
+exposes MapLibre Native functionality with Java ownership, error, memory, and
+thread-safety conventions.
 
 Higher-level Java and Kotlin adapters like MapLibre Compose and Android UI
 integrations should be able to build on this layer. Such integrations will own
@@ -20,9 +20,7 @@ The binding uses the
 [Java Native Interface](https://docs.oracle.com/en/java/javase/25/docs/specs/jni/index.html).
 It targets Android and other JVMs where the
 [Java Foreign Function & Memory API](https://docs.oracle.com/en/java/javase/25/core/foreign-function-and-memory-api.html)
-is unavailable, unavailable at the required Java language level, or undesirable
-for packaging. Modern desktop and server JVMs with final FFM support are covered
-by the separate
+is unavailable. Modern JVMs with FFM support are covered by the separate
 [Java FFM binding](/maplibre-native-ffi/development/bindings-java/).
 
 Keep the public API shape aligned with the Java FFM binding where the underlying
@@ -64,43 +62,28 @@ Separate JNI access from the safe public binding.
 
 ```text
 org.maplibre.nativekit.jni.internal.c
-  Generated or generated-assisted native-method declarations and JNI bridge
+  Generated native-method declarations and JNI bridge
   entry points that call the public C API.
 
 org.maplibre.nativekit.jni.internal
-  Status conversion, diagnostics, handle state, native library loading, local
-  and global reference management, direct buffers, and callback bridging.
+  Status conversion, diagnostics, handle state, native library loading, direct
+  buffers, and callback bridging.
 
 org.maplibre.nativekit.jni
   Safe low-level Java API.
 ```
 
-Generate or generate-assist the internal C layer from the public C headers when
-the header shape fully describes the call boundary. Evaluate JavaCPP and SWIG
-for this layer. Treat successful generation and compilation as the header
+Generate the internal C layer from the public C headers. Evaluate JavaCPP and
+SWIG for this layer. Treat successful generation and compilation as the header
 bindability check for this path. The public Java layer is handwritten and wraps
 the generated layer with stable names, ownership rules, diagnostics, and
 lifetime control.
-
-Use handwritten JNI adapters where C declarations do not encode enough
-semantics, such as callbacks, callback-scoped borrows, Android platform handles,
-direct-buffer paths, ownership, lifetime, or thread attachment.
 
 Keep JNI types internal. Public APIs do not expose `JNIEnv`, `jobject`, JNI
 reference handles, generated C layout classes, or raw `long` pointers.
 Backend-native handles that cross the public API use a small opaque
 `NativePointer` value type. The JNI layer converts that value to the pointer
 representation required by the C API.
-
-## Java Version
-
-Target the Java language level required by supported Android builds and Kotlin
-Multiplatform consumers. Keep the public API source-compatible with the Android
-toolchain baseline chosen for the artifact.
-
-Modern JVM support with JDK 22 or newer belongs in the separate FFM binding
-path. The JNI binding may also run on desktop JVMs when Android-compatible
-packaging or an older Java baseline is required.
 
 ## Status And Diagnostics
 
@@ -392,11 +375,6 @@ Surface descriptors and caller-owned texture descriptors contain backend-native
 handles. The Java binding treats those handles as borrowed. The caller keeps
 backend objects valid and synchronized for the lifetime documented by the C API.
 
-Android render targets use the same public API model as other platforms while
-mapping platform handles through `NativePointer` or Android-specific descriptor
-fields. The JNI bridge converts those values to the C API's opaque backend
-handles.
-
 Session-owned texture targets expose rendered backend objects through
 callback-scoped frame access. CPU readback APIs copy into Java arrays,
 `ByteBuffer`, or explicit native buffers and return copied `TextureImageInfo`
@@ -441,10 +419,6 @@ Prefer small adaptation tests around real C calls. When a C ABI test already
 covers native validation, the Java test only needs to show that the
 corresponding Java method propagates the native status, diagnostic, or copied
 output correctly.
-
-Add Android coverage for native library loading, artifact packaging, callback
-thread attachment, direct-buffer paths, and basic runtime/map/session creation
-on supported Android ABIs.
 
 Add regression tests when the Java layer owns a lifetime or threading invariant
 that the JNI layer cannot express, such as releasing a texture frame after a

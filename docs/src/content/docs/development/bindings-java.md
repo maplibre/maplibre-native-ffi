@@ -8,8 +8,8 @@ sidebar:
 ## Scope
 
 The Java binding is a safe low-level binding over the public C API. It exposes
-the C API's runtime, map, render session, event, callback, and render target
-model with Java ownership, error, memory, and thread-safety conventions.
+MapLibre Native functionality with Java ownership, error, memory, and
+thread-safety conventions.
 
 Higher-level Java and Kotlin adapters like MapLibre Compose (and JavaFX, LWJGL,
 etc) should be able to build on this layer. Such integrations will own UI
@@ -21,6 +21,10 @@ The binding uses the
 It targets the final FFM API available in modern JDKs. Android and other JVMs
 where FFM is unavailable or undesirable are covered by the separate
 [Java JNI binding](/maplibre-native-ffi/development/bindings-java-legacy/).
+
+Keep the public API shape aligned with the Java JNI binding where the underlying
+C API semantics match. API parity is required for future Kotlin Multiplatform
+commonization.
 
 ## Package And API Shape
 
