@@ -20,7 +20,7 @@ The binding uses the
 [Java Foreign Function & Memory API](https://docs.oracle.com/en/java/javase/25/core/foreign-function-and-memory-api.html).
 It targets the final FFM API available in modern JDKs. Android and other JVMs
 where FFM is unavailable or undesirable are covered by the separate
-[Java JNI binding](./bindings-java-legacy/).
+[Java JNI binding](/maplibre-native-ffi/development/bindings-java-legacy/).
 
 ## Package And API Shape
 
