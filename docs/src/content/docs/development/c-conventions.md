@@ -1,5 +1,5 @@
 ---
-title: C API
+title: C API Conventions
 description: C ABI contract and C/C++ implementation rules for contributors.
 sidebar:
   order: 2

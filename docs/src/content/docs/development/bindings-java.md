@@ -1,5 +1,5 @@
 ---
-title: Java Bindings
+title: Java FFM Bindings
 description: Design rules for safe low-level Java FFM bindings.
 sidebar:
   order: 3
@@ -11,29 +11,25 @@ The Java binding is a safe low-level binding over the public C API. It exposes
 the C API's runtime, map, render session, event, callback, and render target
 model with Java ownership, error, memory, and thread-safety conventions.
 
-Higher-level Java and Kotlin adapters build on this layer. JavaFX, Compose,
-LWJGL, Skija, and other integrations can own UI lifecycle, dispatch, rendering
-policy, and application-level map objects while delegating native calls to this
-binding.
+Higher-level Java and Kotlin adapters like MapLibre Compose (and JavaFX, LWJGL,
+etc) should be able to build on this layer. Such integrations will own UI
+lifecycle, dispatch, rendering policy, and application-level map objects while
+delegating native calls to this binding.
 
-The binding uses the Java Foreign Function & Memory API. It targets the final
-FFM API available in modern JDKs. Android and other JVMs where FFM is
-unavailable or undesirable are covered by the separate
-[Java Android binding](./bindings-java-android/) and its
-[JNI tracking issue](https://github.com/maplibre/maplibre-native-ffi/issues/47).
-The modern Java FFM work is tracked in
-[issue 45](https://github.com/maplibre/maplibre-native-ffi/issues/45).
+The binding uses the
+[Java Foreign Function & Memory API](https://docs.oracle.com/en/java/javase/25/core/foreign-function-and-memory-api.html).
+It targets the final FFM API available in modern JDKs. Android and other JVMs
+where FFM is unavailable or undesirable are covered by the separate
+[Java JNI binding](./bindings-java-legacy/).
 
 ## Package And API Shape
-
-Packages provide project context. Class names describe the C concept they wrap.
 
 Owned long-lived native objects use a `Handle` suffix:
 
 ```text
-org.maplibre.ffi.RuntimeHandle
-org.maplibre.ffi.MapHandle
-org.maplibre.ffi.RenderSessionHandle
+org.maplibre.native.ffm.RuntimeHandle
+org.maplibre.native.ffm.MapHandle
+org.maplibre.native.ffm.RenderSessionHandle
 ```
 
 `Handle` means the object wraps a closeable native object with an identity used
@@ -50,7 +46,6 @@ ResourceResponse
 RuntimeEvent
 JsonSnapshot
 OfflineRegionSnapshot
-OfflineRegionList
 ```
 
 Keep public Java names close to the C concepts. Rename where Java readability or
@@ -61,13 +56,13 @@ namespace clarity benefits.
 Separate generated FFM access from the safe public binding.
 
 ```text
-org.maplibre.ffi.internal.c
+org.maplibre.native.ffm.internal.c
   Generated FFM bindings from the public C headers.
 
-org.maplibre.ffi.internal
+org.maplibre.native.ffm.internal
   Status conversion, diagnostics, handle state, arenas, and callback bridging.
 
-org.maplibre.ffi
+org.maplibre.native.ffm
   Safe low-level Java API.
 ```
 
@@ -76,10 +71,11 @@ the header bindability check. The public Java layer is handwritten and wraps the
 generated layer with stable names, ownership rules, diagnostics, and lifetime
 control.
 
-The public API keeps `Arena`, `MethodHandle`, and generated C layout classes
-internal. It exposes `MemorySegment` only through explicitly unsafe accessors for
-backend-native handles already exposed by the C API, such as
-`textureUnsafe()` or `deviceUnsafe()` on a callback-scoped texture frame.
+Keep FFM types internal. Public APIs do not expose `Arena`, `MemorySegment`,
+`MethodHandle`, or generated C layout classes. Backend-native handles that cross
+the public API use a small opaque `NativePointer` value type. The generated FFM
+layer converts that value to the pointer representation required for downcalls
+and upcalls.
 
 ## Java Version
 
@@ -105,8 +101,8 @@ MapLibreFfiException
 ```
 
 When a native call returns a non-OK status, read the C thread-local diagnostic
-immediately on the same thread and include it in the exception. Another C call on
-that thread may replace the diagnostic.
+immediately on the same thread and include it in the exception. Another C call
+on that thread may replace the diagnostic.
 
 Let the C API validate native arguments and native state. The Java layer checks
 Java-owned state such as closed wrappers, active callback-scoped borrows, and
@@ -164,9 +160,10 @@ MapHandle           map owner thread in C
 RenderSessionHandle session owner thread in C
 ```
 
-This leaves room for a future C API that exposes render sessions owned by a
-render thread distinct from the map owner thread. If Java needs to inspect owner
-threads directly, add a C getter instead of maintaining a second source of truth.
+This leaves room for
+[a future C API](https://github.com/maplibre/maplibre-native-ffi/issues/121)
+that exposes render sessions owned by a render thread distinct from the runtime
+owner thread. If Java needs to inspect owner threads directly, add a C getter.
 
 Resource provider request completion follows the C API and may run from any
 thread.
@@ -243,6 +240,20 @@ A Java heap array works well when C writes caller-provided storage during one
 call and Java owns the result. An explicit native buffer works well when the
 caller needs a stable native address or wants to reuse large off-heap storage.
 
+## Native Pointers
+
+`NativePointer` represents an opaque backend-native address that the Java
+binding does not own. It is a value object, not an FFM memory view.
+
+Use `NativePointer` for C `void*` fields that represent host-owned backend
+objects, such as Metal devices, Metal textures, Vulkan devices, Vulkan queues,
+Vulkan images, and native surfaces. Passing a `NativePointer` transfers no
+ownership and grants no memory access.
+
+Public APIs accept or return `NativePointer` only where the C API already
+accepts or returns an opaque backend-native handle. The binding converts between
+`NativePointer` and internal FFM pointer values at the generated layer boundary.
+
 ## Callback-Scoped Borrows
 
 A callback-scoped borrow is native data exposed only during a Java callback. The
@@ -253,8 +264,8 @@ Owned texture frames use callback-scoped access:
 
 ```java
 session.withMetalOwnedTextureFrame(frame -> {
-    MemorySegment texture = frame.textureUnsafe();
-    MemorySegment device = frame.deviceUnsafe();
+    NativePointer texture = frame.textureUnsafe();
+    NativePointer device = frame.deviceUnsafe();
 });
 ```
 
@@ -277,8 +288,8 @@ Snapshot objects own native snapshot storage. Values read from a snapshot become
 copied Java values unless the API exposes a view object tied to the snapshot's
 lifetime. The Java API does not expose free-floating borrowed views.
 
-Backend-native handles returned from acquired texture frames are
-callback-scoped borrows.
+Backend-native handles returned from acquired texture frames are callback-scoped
+borrows represented as `NativePointer` values..
 
 ## Events
 
@@ -297,10 +308,10 @@ runtime.drainEvents(consumer);
 Events remain runtime-owned in the C API. Java event objects are independent of
 the next native poll.
 
-`RuntimeHandle` keeps a registry of live `MapHandle` wrappers keyed by native map
-pointer. When a map-originated event contains a source pointer, the binding can
-attach the matching `MapHandle` to the copied Java event. If no wrapper is live,
-the event carries only copied source kind and native identity metadata for
+`RuntimeHandle` keeps a registry of live `MapHandle` wrappers keyed by native
+map pointer. When a map-originated event contains a source pointer, the binding
+can attach the matching `MapHandle` to the copied Java event. If no wrapper is
+live, the event carries only copied source kind and native identity metadata for
 diagnostics.
 
 The low-level binding preserves event names and payload categories close to the
@@ -312,10 +323,10 @@ to adapters above this layer.
 Keep callback lifetimes explicit and runtime-scoped.
 
 A Java callback is a Java interface implementation stored by the binding. The
-binding creates an FFM upcall stub for a static adapter method. Native code calls
-the stub as a C function pointer. The adapter receives raw FFM arguments, copies
-or wraps them according to this document, invokes the Java interface method, and
-converts the result back to C data.
+binding creates an FFM upcall stub for a static adapter method. Native code
+calls the stub as a C function pointer. The adapter receives raw FFM arguments,
+copies or wraps them according to this document, invokes the Java interface
+method, and converts the result back to C data.
 
 Resource transforms and resource providers store Java callback implementations
 strongly for the lifetime required by the C API. Their upcall stubs live in a
@@ -368,18 +379,18 @@ Unsafe accessors are limited to those APIs.
 Name those accessors with an `Unsafe` suffix:
 
 ```java
-MemorySegment textureUnsafe();
-MemorySegment imageUnsafe();
-MemorySegment deviceUnsafe();
+NativePointer textureUnsafe();
+NativePointer imageUnsafe();
+NativePointer deviceUnsafe();
 ```
 
 Unsafe accessors document the scope in which the returned native handle is
-valid. They do not transfer ownership.
+valid. They do not transfer ownership or expose FFM memory access.
 
 ## Constants And Enums
 
-Expose C enum domains as Java enums when the domain is closed and type-safe.
-Map values explicitly. Java enum ordinals are not ABI values.
+Expose C enum domains as Java enums when the domain is closed and type-safe. Map
+values explicitly. Java enum ordinals are not ABI values.
 
 Expose C bit masks as `EnumSet` values in the public Java API. The generated
 internal FFM layer keeps raw integer constants internal.
@@ -394,26 +405,12 @@ suite. C ABI tests prove native behavior. Java tests prove that generated FFM
 bindings, handwritten wrappers, Java ownership, copying, callbacks, and
 exceptions preserve that behavior at the JVM boundary.
 
-Binding tests should cover each Java rule that adds behavior above the C API:
-status-to-exception conversion, immediate diagnostic extraction, generated
-symbol loading, descriptor materialization, `AutoCloseable` ownership,
-parent-child reachability, debug leak reporting, copied event payloads,
-callback-scoped texture frame release, Java callback exception conversion, and
-resource request wrapper state.
-
-Prefer small adaptation tests around real C calls. Use fake Java objects only
-when they isolate wrapper behavior that cannot be reached through a practical C
-scenario. When a C ABI test already covers native validation, the Java test only
-needs to show that the corresponding Java method propagates the native status,
-diagnostic, or copied output correctly.
+Prefer small adaptation tests around real C calls. When a C ABI test already
+covers native validation, the Java test only needs to show that the
+corresponding Java method propagates the native status, diagnostic, or copied
+output correctly.
 
 Add regression tests when the Java layer owns a lifetime or threading invariant
 that the generated FFM layer cannot express, such as releasing a texture frame
 after a throwing callback or preserving parent handles while child handles are
 reachable.
-
-## Design Boundary
-
-This layer owns native handle lifetimes, memory safety, diagnostics, event
-copying, and callback bridging. Adapter projects own UI lifecycle, dispatch,
-render loop policy, and application-level map abstractions.

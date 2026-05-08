@@ -1,9 +1,9 @@
 ---
-title: Java (Android) Bindings
-description: Contributor notes for Java (Android) bindings.
+title: Java JNI Bindings
+description: Contributor notes for Java JNI bindings.
 ---
 
-This planned contributor note covers Java (JNI) binding design, Android
+This planned contributor note covers Java JNI binding design, Android
 integration, implementation, tests, and reference generation.
 
 Tracking issue:
