@@ -1,8 +1,6 @@
 ---
 title: Java FFM Bindings
 description: Design rules for safe low-level Java FFM bindings.
-sidebar:
-  order: 3
 ---
 
 ## Scope

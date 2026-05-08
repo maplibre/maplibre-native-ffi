@@ -1,8 +1,6 @@
 ---
 title: Java JNI Bindings
 description: Design rules for safe low-level Java JNI bindings.
-sidebar:
-  order: 4
 ---
 
 ## Scope
