@@ -3,14 +3,33 @@ name: Native Windows
 on:
   workflow_call:
 
+# ARM runners require Node 24 for JavaScript actions.
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 permissions:
   contents: read
 
 jobs:
   build:
-    name: native / windows-x64-opengl
-    runs-on: windows-latest
+    name: native / windows-${{ matrix.arch }}-opengl
+    runs-on: ${{ matrix.runs-on }}
     timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [x64, arm64]
+        include:
+          - arch: x64
+            runs-on: windows-latest
+            vcpkg-triplet: x64-windows
+            msvc-arch: x64
+            vs-arch: x64
+          - arch: arm64
+            runs-on: windows-11-arm
+            vcpkg-triplet: arm64-windows
+            msvc-arch: arm64
+            vs-arch: ARM64
 
     steps:
       - name: Enable Git long paths
@@ -39,7 +58,7 @@ jobs:
       - name: Set up MSVC developer tools
         uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
         with:
-          arch: x64
+          arch: ${{ matrix.msvc-arch }}
 
       - name: Get vcpkg commit ID
         id: vcpkg-id
@@ -52,7 +71,7 @@ jobs:
         uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
           path: third_party/maplibre-native/platform/windows/vendor/vcpkg/archives
-          key: vcpkg-x64-windows-opengl-${{ steps.vcpkg-id.outputs.commit_id }}
+          key: vcpkg-${{ matrix.vcpkg-triplet }}-opengl-${{ steps.vcpkg-id.outputs.commit_id }}
 
       - name: Bootstrap vcpkg
         shell: cmd
@@ -65,7 +84,7 @@ jobs:
         run: |
           powershell -ExecutionPolicy Bypass `
             -File third_party/maplibre-native/platform/windows/Get-VendorPackages.ps1 `
-            -Triplet x64-windows `
+            -Triplet ${{ matrix.vcpkg-triplet }} `
             -Renderer OpenGL
 
       - name: Install Zig
@@ -93,7 +112,7 @@ jobs:
           for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
             Write-Host "CMake configure attempt $attempt of $maxAttempts"
             cmake -B build `
-              -G "Visual Studio 17 2022" -A x64 `
+              -G "Visual Studio 17 2022" -A ${{ matrix.vs-arch }} `
               -DCMAKE_TOOLCHAIN_FILE="third_party/maplibre-native/platform/windows/custom-toolchain.cmake" `
               -DMLN_FFI_RENDER_BACKEND=opengl `
               -DCMAKE_C_COMPILER_LAUNCHER=sccache `
@@ -121,15 +140,16 @@ jobs:
       - name: Prepare artifact
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force -Path ci-artifact\build\windows-x64-opengl
-          Copy-Item build\Release\maplibre_native_c.dll ci-artifact\build\windows-x64-opengl\
+          New-Item -ItemType Directory -Force -Path ci-artifact\build\windows-${{ matrix.arch }}-opengl
+          Copy-Item build\Release\maplibre_native_c.dll ci-artifact\build\windows-${{ matrix.arch }}-opengl\
           # Import library (.lib) needed for linking by downstream consumers.
           $lib = Get-ChildItem build -Recurse -Filter maplibre_native_c.lib | Select-Object -First 1
-          if ($lib) { Copy-Item $lib.FullName ci-artifact\build\windows-x64-opengl\ }
+          if ($lib) { Copy-Item $lib.FullName ci-artifact\build\windows-${{ matrix.arch }}-opengl\ }
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: native-windows-x64-opengl
+          name: native-windows-${{ matrix.arch }}-opengl
           path: ci-artifact
           if-no-files-found: error
           retention-days: 14
+
