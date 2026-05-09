@@ -10,7 +10,7 @@ experimental = true
 python.uv_venv_auto = "create|source"
 
 [monorepo]
-config_roots = ["examples/*", "docs"]
+config_roots = ["bindings/*", "examples/*", "docs"]
 
 [tools]
 hk = "1.40.0"

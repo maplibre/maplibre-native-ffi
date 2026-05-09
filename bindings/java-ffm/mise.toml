@@ -1,0 +1,6 @@
+[tasks.build]
+run = "../../gradlew :bindings:java-ffm:assemble"
+
+[tasks.test]
+depends = ["//:ensure-native-library"]
+run = "../../gradlew :bindings:java-ffm:test"
