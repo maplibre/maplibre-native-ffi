@@ -7,7 +7,9 @@ function(mln_configure_platform_support target)
   set(MLN_FFI_VENDOR_PLATFORM_SOURCES
       ${MLN_SOURCE_DIR}/platform/default/src/mbgl/util/logging_stderr.cpp
       ${MLN_SOURCE_DIR}/platform/default/src/mbgl/util/monotonic_timer.cpp
-      ${MLN_SOURCE_DIR}/platform/default/src/mbgl/util/thread_local.cpp
+      # thread_local.cpp is platform-specific: the default uses pthreads (Linux/
+      # macOS/Android), but Windows needs the Win32 TLS implementation. The
+      # platform-specific entry is appended below in the per-platform block.
       ${MLN_SOURCE_DIR}/platform/default/src/mbgl/gfx/headless_backend.cpp
       ${MLN_SOURCE_DIR}/platform/default/src/mbgl/layermanager/layer_manager.cpp
       ${MLN_SOURCE_DIR}/platform/default/src/mbgl/storage/asset_file_source.cpp
@@ -48,6 +50,16 @@ function(mln_configure_platform_support target)
   else()
     list(APPEND MLN_FFI_VENDOR_PLATFORM_SOURCES
          ${MLN_SOURCE_DIR}/platform/default/src/mbgl/storage/pmtiles_file_source_stub.cpp)
+  endif()
+
+  # Resolve platform-specific thread_local before registering vendor sources.
+  # The default implementation uses pthreads; Windows uses Win32 TLS instead.
+  if(WIN32)
+    list(APPEND MLN_FFI_VENDOR_PLATFORM_SOURCES
+         ${MLN_SOURCE_DIR}/platform/windows/src/thread_local.cpp)
+  else()
+    list(APPEND MLN_FFI_VENDOR_PLATFORM_SOURCES
+         ${MLN_SOURCE_DIR}/platform/default/src/mbgl/util/thread_local.cpp)
   endif()
 
   mln_target_vendor_sources(${target} ${MLN_FFI_VENDOR_PLATFORM_SOURCES})

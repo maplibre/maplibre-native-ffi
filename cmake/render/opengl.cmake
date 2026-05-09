@@ -33,14 +33,13 @@ function(mln_configure_opengl_backend target)
       set(MLN_FFI_OPENGL_LIBS EGL)
     else()
       # Linux: apt libegl-dev installs EGL/egl.h to /usr/include/EGL/egl.h.
-      # Pixi's clang reports /usr/include as an implicit include directory, so
-      # CMake silently strips it from target_include_directories. To actually
-      # pass -isystem /usr/include in the compile command we go through
-      # target_compile_options, which CMake does not filter for implicit paths.
+      # We must add /usr/include to the compiler search path for that one file.
+      # target_compile_options would apply to ALL source files in the target,
+      # causing glibc header conflicts (bits/timesize.h not found via conda
+      # sysroot) for every other file. Instead we scope the flag to only
+      # egl_surface_session.cpp via set_source_files_properties (below, after
+      # the source is registered with the target).
       set(MLN_FFI_OPENGL_LIBS EGL)
-      target_compile_options(
-        ${target} PRIVATE
-        "SHELL:-isystem /usr/include")
     endif()
   else()
     message(
@@ -58,6 +57,18 @@ function(mln_configure_opengl_backend target)
   mln_target_project_sources(${target} ${MLN_FFI_OPENGL_SOURCES})
   target_link_libraries(
     ${target} PRIVATE ${MLN_FFI_OPENGL_LIBS} mbgl-vendor-unique_resource)
+
+  # Linux EGL: scope -isystem /usr/include to egl_surface_session.cpp only.
+  # Using set_source_files_properties avoids contaminating the other ~30 source
+  # files in maplibre_native_c with /usr/include, which would break glibc
+  # header lookup against the conda sysroot (bits/timesize.h not found).
+  if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND MLN_FFI_RENDER_BACKEND STREQUAL
+     "opengl")
+    set_source_files_properties(
+      ${PROJECT_SOURCE_DIR}/src/render/opengl/egl_surface_session.cpp
+      TARGET_DIRECTORY ${target}
+      PROPERTIES COMPILE_OPTIONS "-isystem;/usr/include")
+  endif()
 
   # MapLibre Native GL backend compile flags
   target_compile_definitions(

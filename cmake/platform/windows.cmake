@@ -32,7 +32,14 @@ function(mln_configure_windows_platform target)
   target_include_directories(
     ${target}
     SYSTEM
-    PRIVATE ${CURL_INCLUDE_DIRS} ${JPEG_INCLUDE_DIRS})
+    PRIVATE
+      ${CURL_INCLUDE_DIRS}
+      ${JPEG_INCLUDE_DIRS}
+      # Windows thread_local.cpp includes thread.h from here.
+      ${MLN_SOURCE_DIR}/platform/windows/include)
+
+  # MSVC does not define M_PI by default; this enables the math constants.
+  target_compile_definitions(${target} PRIVATE _USE_MATH_DEFINES)
 
   target_link_libraries(
     ${target}
