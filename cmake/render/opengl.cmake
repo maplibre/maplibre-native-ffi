@@ -17,6 +17,10 @@ function(mln_configure_opengl_backend target)
   set(MLN_FFI_VENDOR_OPENGL_SOURCES
       ${MLN_SOURCE_DIR}/platform/default/src/mbgl/gl/headless_backend.cpp)
 
+  # opengl_support.cpp is platform-independent and always compiled.
+  set(MLN_FFI_OPENGL_COMMON_SOURCES
+      ${PROJECT_SOURCE_DIR}/src/render/opengl/opengl_support.cpp)
+
   if(WIN32)
     set(MLN_FFI_OPENGL_SOURCES
         ${PROJECT_SOURCE_DIR}/src/render/opengl/wgl_surface_session.cpp)
@@ -35,6 +39,7 @@ function(mln_configure_opengl_backend target)
   endif()
 
   mln_target_vendor_sources(${target} ${MLN_FFI_VENDOR_OPENGL_SOURCES})
+  mln_target_project_sources(${target} ${MLN_FFI_OPENGL_COMMON_SOURCES})
   mln_target_project_sources(${target} ${MLN_FFI_OPENGL_SOURCES})
   target_link_libraries(${target} PRIVATE ${MLN_FFI_OPENGL_LIBS})
 

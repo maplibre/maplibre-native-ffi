@@ -10,20 +10,23 @@ const BuildOptions = struct {
 const RenderBackend = enum {
     metal,
     vulkan,
+    opengl,
 };
 
 fn renderBackend(b: *std.Build, target: std.Build.ResolvedTarget) RenderBackend {
     const value = b.option(
         []const u8,
         "render-backend",
-        "Render backend built into the CMake artifact: metal or vulkan",
+        "Render backend built into the CMake artifact: metal, vulkan, or opengl",
     ) orelse switch (target.result.os.tag) {
         .macos, .ios => "metal",
+        .windows => "opengl",
         else => "vulkan",
     };
 
     if (std.mem.eql(u8, value, "metal")) return .metal;
     if (std.mem.eql(u8, value, "vulkan")) return .vulkan;
+    if (std.mem.eql(u8, value, "opengl")) return .opengl;
     std.debug.panic("unsupported render backend: {s}", .{value});
 }
 
@@ -52,6 +55,7 @@ fn addCTests(b: *std.Build, options: BuildOptions) *std.Build.Step.Compile {
     const build_options = b.addOptions();
     build_options.addOption(bool, "supports_metal", options.render_backend == .metal);
     build_options.addOption(bool, "supports_vulkan", options.render_backend == .vulkan);
+    build_options.addOption(bool, "supports_opengl", options.render_backend == .opengl);
 
     const c_tests = b.addTest(.{
         .root_module = b.createModule(.{
@@ -73,6 +77,19 @@ fn addCTests(b: *std.Build, options: BuildOptions) *std.Build.Step.Compile {
         c_tests.root_module.addLibraryPath(b.path(".pixi/envs/default/lib"));
         c_tests.root_module.addRPath(b.path(".pixi/envs/default/lib"));
         c_tests.root_module.linkSystemLibrary("vulkan", .{});
+    } else if (options.render_backend == .opengl) {
+        switch (options.target.result.os.tag) {
+            .windows => {
+                c_tests.root_module.linkSystemLibrary("OpenGL32", .{});
+            },
+            else => {
+                // EGL and GLESv2 are provided by Mesa on the CI runner (pixi mesalib).
+                c_tests.root_module.addLibraryPath(b.path(".pixi/envs/default/lib"));
+                c_tests.root_module.addRPath(b.path(".pixi/envs/default/lib"));
+                c_tests.root_module.linkSystemLibrary("EGL", .{});
+                c_tests.root_module.linkSystemLibrary("GLESv2", .{});
+            },
+        }
     }
     return c_tests;
 }

@@ -53,6 +53,7 @@ typedef enum mln_status : int32_t {
 typedef enum mln_render_backend_flag : uint32_t {
   MLN_RENDER_BACKEND_FLAG_METAL = 1u << 0u,
   MLN_RENDER_BACKEND_FLAG_VULKAN = 1u << 1u,
+  MLN_RENDER_BACKEND_FLAG_OPENGL = 1u << 2u,
 } mln_render_backend_flag;
 
 typedef struct mln_runtime mln_runtime;

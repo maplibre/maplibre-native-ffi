@@ -17,6 +17,7 @@ comptime {
     _ = @import("surface.zig");
     _ = @import("surface_metal.zig");
     _ = @import("surface_vulkan.zig");
+    _ = @import("surface_opengl.zig");
     _ = @import("texture.zig");
     _ = @import("texture_owned.zig");
     _ = @import("texture_metal.zig");
