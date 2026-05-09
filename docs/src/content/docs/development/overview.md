@@ -21,6 +21,9 @@ events, threading, and event draining in the target language. They preserve the
 C API's concepts. Higher-level adapters may provide full SDKs, async models,
 view lifecycle integrations, convenience workflows, or new abstractions.
 
+Read the [Binding Conventions](/maplibre-native-ffi/development/bindings/)
+before implementing or reviewing a binding.
+
 ## Getting Set Up
 
 Install the platform toolchain:

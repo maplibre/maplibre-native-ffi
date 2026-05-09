@@ -1,10 +1,12 @@
 ---
-title: Go Bindings
-description: Contributor notes for Go bindings.
+title: Go Binding Notes
+description: Language-specific implementation notes for Go bindings.
 ---
 
-This planned contributor note covers Go binding design, implementation, tests,
-and reference generation.
+All bindings follow
+[Binding Conventions](/maplibre-native-ffi/development/bindings/).
 
 Tracking issue:
 [Add Go bindings](https://github.com/maplibre/maplibre-native-ffi/issues/43).
+
+Language-specific implementation notes are pending.

@@ -1,10 +1,12 @@
 ---
-title: C# Bindings
-description: Contributor notes for C# bindings.
+title: "C# Binding Notes"
+description: Language-specific implementation notes for C# bindings.
 ---
 
-This planned contributor note covers C# binding design, implementation, tests,
-and reference generation.
+All bindings follow
+[Binding Conventions](/maplibre-native-ffi/development/bindings/).
 
 Tracking issue:
 [Add C# bindings](https://github.com/maplibre/maplibre-native-ffi/issues/48).
+
+Language-specific implementation notes are pending.

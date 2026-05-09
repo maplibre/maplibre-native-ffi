@@ -116,7 +116,10 @@ work.
 
 Events are copied into runtime-owned storage and drained with C API calls. Event
 payloads use plain data with documented lifetimes. Each event identifies its
-source kind and source handle.
+source kind and source handle. Queued events never outlive the source handle
+they reference: map teardown discards queued events for that map, and runtime
+teardown discards runtime-owned event streams before the runtime handle becomes
+invalid.
 
 Classify each operation as one of:
 

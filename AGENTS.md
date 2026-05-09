@@ -15,9 +15,9 @@ Campsite rules apply: leave anything you touch tidier than when you found it.
 
 ## Documentation
 
-When working on documentation, determine up front who the audience is and
-whether the documentation is a Tutorial, Guide, Reference, or Explanation,
-according to the
+When working on documentation, gather necessary context first, then determine
+who the audience is and whether the documentation is a Tutorial, Guide,
+Reference, or Explanation, according to the
 [Diátaxis Framework](https://raw.githubusercontent.com/evildmp/diataxis-documentation-framework/refs/heads/main/start-here.rst).
 State your audience and category determination to the user, then load and follow
 the appropriate framework before making changes:
@@ -50,10 +50,12 @@ Read these docs before changing related code:
 
 - [Concepts](docs/src/content/docs/concepts.md) for project scope, ownership,
   threading, events, rendering targets, and host integration boundaries.
-- [C API](docs/src/content/docs/development/c-conventions.md) before changing
-  public C headers, C ABI behavior, callbacks, diagnostics, or render target
-  contracts.
-- [Bindings](docs/src/content/docs/development/) before changing a language
+- [C API Conventions](docs/src/content/docs/development/c-conventions.md) before
+  changing public C headers, C ABI behavior, callbacks, diagnostics, or render
+  target contracts.
+- [Binding Conventions](docs/src/content/docs/development/bindings.md) and the
+  relevant language-specific binding note in
+  `docs/src/content/docs/development/bindings-*.md` before changing a language
   binding or its generated reference docs.
 
 ## External Docs

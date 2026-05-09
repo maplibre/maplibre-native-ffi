@@ -1,10 +1,12 @@
 ---
-title: Python Bindings
-description: Contributor notes for Python bindings.
+title: Python Binding Notes
+description: Language-specific implementation notes for Python bindings.
 ---
 
-This planned contributor note covers Python binding design, implementation,
-tests, and reference generation.
+All bindings follow
+[Binding Conventions](/maplibre-native-ffi/development/bindings/).
 
 Tracking issue:
 [Add Python bindings](https://github.com/maplibre/maplibre-native-ffi/issues/49).
+
+Language-specific implementation notes are pending.
