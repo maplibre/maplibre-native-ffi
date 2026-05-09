@@ -58,6 +58,16 @@ jobs:
         shell: cmd
         run: third_party\maplibre-native\platform\windows\vendor\vcpkg\bootstrap-vcpkg.bat -disableMetrics
 
+      - name: Install vcpkg packages
+        shell: pwsh
+        env:
+          VCPKG_BINARY_SOURCES: "clear;files,${{ github.workspace }}\\third_party\\maplibre-native\\platform\\windows\\vendor\\vcpkg\\archives,readwrite"
+        run: |
+          powershell -ExecutionPolicy Bypass `
+            -File third_party/maplibre-native/platform/windows/Get-VendorPackages.ps1 `
+            -Triplet x64-windows `
+            -Renderer OpenGL
+
       - name: Install Zig
         uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2
         with:
