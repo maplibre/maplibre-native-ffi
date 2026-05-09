@@ -40,22 +40,20 @@ function(mln_configure_windows_platform target)
   # MSVC does not define M_PI by default; this enables the math constants.
   target_compile_definitions(${target} PRIVATE _USE_MATH_DEFINES)
 
-  # ICU: number_format.cpp and bidi.cpp (compiled above) need ICU. Reuse the
-  # mbgl-vendor-icu bundled stubs that maplibre-native sets up when system ICU
-  # is not available. Linking PUBLIC include dirs propagates vendor/icu/include
-  # so <unicode/ubidi.h> resolves to the stubs. MBGL_USE_BUILTIN_ICU guards the
-  # full ICU path in number_format.cpp.
-  if(TARGET mbgl-vendor-icu)
-    target_compile_definitions(${target} PRIVATE MBGL_USE_BUILTIN_ICU)
-    target_link_libraries(${target} PRIVATE mbgl-vendor-icu)
-  elseif(ICU_FOUND)
-    target_link_libraries(${target} PRIVATE ICU::i18n ICU::uc)
-  endif()
+  # Always use the bundled ICU stubs: system ICU (e.g. from Windows SDK or a
+  # global vcpkg) may provide DLLs but not development headers. By forcing
+  # MLN_USE_BUILTIN_ICU=ON at configure time (see native-windows.yml) we
+  # guarantee maplibre-native creates mbgl-vendor-icu with stub headers.
+  # Linking here adds vendor/icu/include (PUBLIC) to our target so that
+  # number_format.cpp and bidi.cpp can resolve <unicode/*.h> stubs.
+  target_compile_definitions(${target} PRIVATE MBGL_USE_BUILTIN_ICU)
+  target_link_libraries(${target} PRIVATE mbgl-vendor-icu)
 
-  # C4324: 'structure was padded due to alignment specifier' fires on
-  # mbgl/gfx/gpu_expression.hpp which is a third-party header we cannot
-  # modify. Suppress it to keep /WX (warnings-as-errors) working.
-  target_compile_options(${target} PRIVATE /wd4324)
+  # Third-party headers in mbgl trigger MSVC warnings that are treated as
+  # errors. Suppress the ones we cannot fix (they are in vendor code):
+  #   C4324 — structure padded due to alignment specifier (gpu_expression.hpp)
+  #   C4244 — narrowing int→char16_t conversion (glyph.hpp)
+  target_compile_options(${target} PRIVATE /wd4324 /wd4244)
 
   target_link_libraries(
     ${target}

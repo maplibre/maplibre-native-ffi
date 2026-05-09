@@ -36,10 +36,12 @@ auto set_thread_error(const char* message) noexcept -> void {
 
   const auto length =
     std::min(std::char_traits<char>::length(message), buffer.size() - 1);
-  std::ranges::copy(std::string_view{message, length}, buffer.begin());
-  // Index directly — avoids accessing the .out member, which conflicts with
-  // MSVC's _Out SAL annotation macro (sal.h) on Windows.
-  buffer[length] = '\0';
+  // Use iterator dereference (not subscript) to satisfy
+  // cppcoreguidelines-pro-bounds-* on clang-tidy. Using auto (not auto*)
+  // avoids MSVC C3535 since std::array iterators are not raw pointers.
+  auto out =
+    std::ranges::copy(std::string_view{message, length}, buffer.begin()).out;
+  *out = '\0';
 }
 
 auto set_thread_error(const std::exception& exception) noexcept -> void {
