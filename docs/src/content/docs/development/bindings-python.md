@@ -40,6 +40,7 @@ as thread-independent and infallible.
 
 The Python GIL is separate from the native owner-thread model. Wrappers rely on
 native owner-thread validation and synchronize Python-owned live/released state.
+Python event-loop integration belongs in adapters above this layer.
 
 Represent JSON-like descriptor values with Python values. Reject non-finite
 floats.

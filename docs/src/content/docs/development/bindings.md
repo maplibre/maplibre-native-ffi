@@ -173,9 +173,13 @@ thread distinct from the runtime owner thread. If a binding needs to inspect
 owner threads directly, add a C getter.
 
 Resource provider request completion follows the C API and may run from any
-thread. Cross-thread dispatch, coroutine confinement, and UI-thread handoff
-belong in adapters above this layer unless a language binding explicitly owns a
-small safety helper.
+thread. Cross-thread dispatch, coroutine confinement, UI-thread handoff, and
+framework scheduling belong in adapters above this layer when the target
+language can preserve owner-thread affinity directly. A binding may add a small
+opt-in owner-thread helper when the language scheduler separates logical
+execution from native thread identity. That helper keeps direct handle APIs
+available and stays limited to generic owner-thread execution, runtime pumping,
+and event draining.
 
 ## Options And Transparent Structs
 

@@ -41,6 +41,11 @@ generated method tables and startup validation. Native calls translate C
 statuses and diagnostics into Java exceptions. Rust bridge code catches panics
 before returning through JNI.
 
+Ordinary Java calls execute where they are invoked and report native
+wrong-thread errors. Use an execution context that preserves native thread
+identity across related calls. Java scheduling and UI routing belong in adapters
+above this layer.
+
 The C API expects standard UTF-8 text. The bridge transcodes Java strings
 through UTF-16 or Java UTF-8 byte arrays before passing them to C API text
 fields.

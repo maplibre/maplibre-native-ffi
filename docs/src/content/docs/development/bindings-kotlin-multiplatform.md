@@ -32,6 +32,10 @@ Configure Kotlin/Native `cinterop` against the public umbrella header and expose
 its output only through an internal package. Treat successful cinterop
 compilation as the header bindability check for Kotlin/Native.
 
+Common APIs preserve the owner-thread behavior of their actual implementations.
+Coroutine dispatcher and UI-thread routing belong in adapters above the common
+low-level API.
+
 Kotlin/Native C interop declarations are experimental. Keep
 `@OptIn(ExperimentalForeignApi::class)` in `nativeMain` internals and actual
 implementations. Common public APIs do not expose `kotlinx.cinterop` types,

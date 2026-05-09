@@ -18,9 +18,11 @@ The Go binding targets Go 1.21 or newer. Go 1.21 provides `runtime.Pinner`, the
 interop floor for retained Go pointers. `cgo` gives direct header checking,
 struct layout, callback exports, and C compiler diagnostics.
 
-The binding is a low-level layer. Adapters above it may provide
-goroutine-friendly execution models, such as a locked owner goroutine that pumps
-a runtime.
+The direct handle API is the base layer. Because goroutines and OS threads have
+separate identities, the Go package may also provide a small opt-in owner
+goroutine helper that locks an OS thread, runs owner-thread calls, and pumps
+runtime events. Application scheduling and framework integration stay above that
+helper.
 
 Represent public handles as structs with explicit `Close() error` methods. Use
 Go finalizers for leak reporting. Reserve finalizer cleanup for native resources
