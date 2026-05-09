@@ -20,5 +20,5 @@ task = "//examples/zig-readback:run"
 requires = { platform = ["linux", "macos"], backend = ["metal", "vulkan"] }
 
 [bindings.java-ffm]
-task = "//bindings/java-ffm:test"
+task = "//bindings/java-ffm:build"
 requires = { platform = ["linux", "macos", "windows"] }
