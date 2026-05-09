@@ -51,8 +51,10 @@ Run the Zig map example as a smoke test:
 mise run //examples/zig-map:run
 ```
 
-Set `MISE_ENV=<variant>` before `mise run ...` to build, test, or run examples
-for a specific platform and render backend.
+Mise selects the native build profile that matches your host when one is
+available. Set `MISE_ENV=<variant>` before `mise run ...`, or pass
+`mise -E <variant> run ...`, to build, test, or run examples for another
+platform and render backend.
 
 ## Common Commands
 
@@ -76,9 +78,9 @@ mise run //docs:build
 ## CI Variant Matrix
 
 GitHub Actions builds native artifacts and examples for the variants described
-by the mise profiles, such as `mise.linux-x64-vulkan.toml` and
-`mise.macos-arm64-metal.toml`. The CI matrix generator reads each profile's
-platform, architecture, and render backend metadata.
+by the mise profiles, such as `.mise/config.linux-x64-vulkan.toml` and
+`.mise/config.macos-arm64-metal.toml`. The CI matrix generator reads each
+profile's platform, architecture, and render backend metadata.
 
 Use `.github/config/variants.toml` to configure CI matrix policy: runner
 selection, example tasks, compatibility requirements, and explicit exclusions.
