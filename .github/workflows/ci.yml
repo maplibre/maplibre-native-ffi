@@ -41,9 +41,11 @@ jobs:
       - uses: ./.github/actions/setup-ci-deps
       - id: matrix
         run: |
-          echo "native=$(mise run -q ci:matrix native)" >> "$GITHUB_OUTPUT"
-          echo "examples=$(mise run -q ci:matrix examples)" >> "$GITHUB_OUTPUT"
-          echo "bindings=$(mise run -q ci:matrix bindings)" >> "$GITHUB_OUTPUT"
+          {
+            echo "native=$(mise run -q ci:matrix native)"
+            echo "examples=$(mise run -q ci:matrix examples)"
+            echo "bindings=$(mise run -q ci:matrix bindings)"
+          } >> "$GITHUB_OUTPUT"
 
   native:
     name: native / ${{ matrix.variant }}
