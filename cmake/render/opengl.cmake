@@ -32,19 +32,15 @@ function(mln_configure_opengl_backend target)
       # Android NDK always provides EGL; no find_package needed.
       set(MLN_FFI_OPENGL_LIBS EGL)
     else()
-      # Linux: apt libegl-dev installs EGL/egl.h to /usr/include.
-      # CMake's CMAKE_FIND_ROOT_PATH (conda sysroot) would otherwise rewrite
-      # PATHS to <sysroot>/usr/include before searching — that sysroot has no
-      # EGL headers. NO_CMAKE_FIND_ROOT_PATH bypasses that rewrite so we
-      # actually search the real /usr/include from the apt package.
-      find_path(
-        MLN_EGL_INCLUDE_DIR
-        NAMES EGL/egl.h
-        PATHS /usr/include /usr/local/include
-        NO_CMAKE_FIND_ROOT_PATH
-        REQUIRED)
+      # Linux: apt libegl-dev installs EGL/egl.h to /usr/include/EGL/egl.h.
+      # Pixi's clang reports /usr/include as an implicit include directory, so
+      # CMake silently strips it from target_include_directories. To actually
+      # pass -isystem /usr/include in the compile command we go through
+      # target_compile_options, which CMake does not filter for implicit paths.
       set(MLN_FFI_OPENGL_LIBS EGL)
-      set(MLN_FFI_OPENGL_INCLUDES ${MLN_EGL_INCLUDE_DIR})
+      target_compile_options(
+        ${target} PRIVATE
+        "SHELL:-isystem /usr/include")
     endif()
   else()
     message(
@@ -62,10 +58,6 @@ function(mln_configure_opengl_backend target)
   mln_target_project_sources(${target} ${MLN_FFI_OPENGL_SOURCES})
   target_link_libraries(
     ${target} PRIVATE ${MLN_FFI_OPENGL_LIBS} mbgl-vendor-unique_resource)
-  if(DEFINED MLN_FFI_OPENGL_INCLUDES)
-    target_include_directories(
-      ${target} SYSTEM PRIVATE ${MLN_FFI_OPENGL_INCLUDES})
-  endif()
 
   # MapLibre Native GL backend compile flags
   target_compile_definitions(
