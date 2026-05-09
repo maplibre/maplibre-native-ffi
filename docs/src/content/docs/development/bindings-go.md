@@ -36,10 +36,9 @@ goroutine and return the native wrong-thread error when the call reaches the
 wrong owner thread.
 
 Status-returning calls capture native diagnostics on the same OS thread that
-returned the status. Use per-call C helpers that copy diagnostics before
-returning to Go, or use a short `runtime.LockOSThread` window to keep the C call
-and diagnostic read together. Expose stable Go error categories that work with
-`errors.Is` and include the copied diagnostic message.
+returned the status. Use a short `runtime.LockOSThread` window to keep the C
+call and diagnostic read together. Expose stable Go error categories that work
+with `errors.Is` and include the copied diagnostic message.
 
 Follow cgo pointer rules strictly. Pin Go pointers for the full retention period
 before C stores them. Use `runtime.Pinner` for retained Go memory. Let cgo's
