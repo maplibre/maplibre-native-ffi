@@ -9,18 +9,40 @@ Resources:
   [#119](https://github.com/maplibre/maplibre-native-ffi/issues/119)
 - [Vala manual](https://docs.vala.dev/)
 - [Vala bindings documentation](https://docs.vala.dev/developer-guides/bindings.html)
+- [Generating a VAPI with GObject Introspection](https://docs.vala.dev/developer-guides/bindings/generating-a-vapi-with-gobject-introspection.html)
 - [GObject API reference](https://docs.gtk.org/gobject/)
+- [GObject Introspection](https://gi.readthedocs.io/)
+- [Rust `glib` crate](https://docs.rs/glib/)
 
-The Vala binding exposes a handwritten GLib/GObject-style low-level API over a
-private raw `.vapi` for the public C headers.
+The Vala binding is generated from a low-level GLib/GObject adapter. Vala's
+idiomatic native library boundary is GObject Introspection: the project builds
+an introspectable GLib library, generates GIR and typelib files, then runs
+`vapigen` to produce the Vala API.
 
-Public handle types are `GLib.Object` wrappers. Each stores the native handle
-privately and exposes explicit `close()` methods that throw
-`MapLibreNative.Error`. Use `dispose` to release managed references. Use
-`finalize` for leak reporting. Use them for native cleanup only for resources
-whose release function is documented as thread-independent and infallible.
+This binding targets the GLib ecosystem. The GLib layer preserves the C API's
+runtime, map, render-session, and event model. UI widgets and application
+lifecycle policy belong above this layer.
 
-Define a public errordomain:
+Build the GLib adapter library in Rust with the gtk-rs `glib` crate and GObject
+infrastructure over the shared internal crates defined by the
+[Rust binding conventions](/maplibre-native-ffi/development/bindings-rust/). The
+adapter exports an annotated GObject-style C API for GObject Introspection.
+Treat successful `g-ir-scanner`, typelib generation, `vapigen`, and Vala
+compilation as the bindability check for this path.
+
+The generated GIR and typelib are useful beyond Vala. They can also serve other
+GObject Introspection consumers while still representing the same low-level
+MapLibre Native FFI model.
+
+Public handle types are GObject classes with the `Handle` suffix. Each object
+stores the native C handle privately and exposes an explicit `close()` method.
+`close()` reports native status through `GError`, which Vala presents as a
+thrown error. Use `dispose` to release managed references. Use `finalize` for
+leak reporting. Reserve finalization cleanup for resources whose release
+function is documented as thread-independent and infallible.
+
+Expose a public GLib error domain that maps the C status categories directly.
+Vala sees the same domain as an `errordomain`:
 
 ```vala
 public errordomain MapLibreNative.Error {
@@ -32,17 +54,16 @@ public errordomain MapLibreNative.Error {
 }
 ```
 
-Ordinary low-level calls keep the C API's threading model visible. Higher-level
-adapters can add `GLib.MainContext` dispatch helpers above this layer.
+Use GLib data types for copied buffers, events, snapshots, and other public
+values. Backend-native handles cross the public API as an opaque `NativePointer`
+boxed value. The GLib adapter converts them to `void*`.
 
-Callbacks use Vala delegates backed by C-compatible trampolines. Store callback
-state strongly for the native owner scope, protect shared state for MapLibre
-worker, network, logging, or render-related threads, and convert Vala/GLib
-failures to the documented C callback behavior.
+Ordinary low-level calls preserve the C API's owner-thread model and execute on
+the calling thread. Expose runtime event polling as copied event values. GLib
+signals may be emitted as a convenience while the owner thread drains runtime
+events. Main-loop and UI integration belong in adapters above this layer.
 
-Use `GLib.Bytes` for immutable copied byte data, `uint8[]` or `GLib.ByteArray`
-for mutable buffers, and copied Vala objects for events and snapshots.
-
-Represent backend-native handles with an opaque `NativePointer` value that
-stores a private address integer. Convert it to `void*` only inside the private
-raw C layer.
+Callback adapters store callback state for the native owner scope, protect it
+for calls from native threads, and convert GLib/Vala failures to the documented
+C callback behavior. Handled resource requests expose one-shot completion
+objects and release the C request handle exactly once.
