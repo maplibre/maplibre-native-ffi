@@ -1,6 +1,7 @@
 #define MLN_BUILDING_C
 
 #include "c_api/boundary.hpp"
+#include "diagnostics/diagnostics.hpp"
 #include "maplibre_native_c.h"
 #include "render/surface_session.hpp"
 
@@ -41,7 +42,7 @@ auto mln_egl_surface_attach(
   mln_map* map, const mln_egl_surface_descriptor* descriptor,
   mln_render_session** out_session
 ) noexcept -> mln_status {
-#if defined(MLN_RENDER_BACKEND_OPENGL)
+#ifdef MLN_RENDER_BACKEND_OPENGL
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::egl_surface_attach(map, descriptor, out_session);
   });
