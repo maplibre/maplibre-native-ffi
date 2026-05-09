@@ -32,11 +32,16 @@ function(mln_configure_opengl_backend target)
       # Android NDK always provides EGL; no find_package needed.
       set(MLN_FFI_OPENGL_LIBS EGL)
     else()
-      # Linux: link EGL by name so the linker finds it via its default
-      # library paths. The CI installs libegl-dev (apt) which provides the
-      # /usr/lib/x86_64-linux-gnu/libEGL.so symlink. The pixi mesalib only
-      # ships libEGL.so.1 (no dev symlink), so cmake find_* helpers all fail.
+      # Linux: link EGL by name; libegl-dev (apt) provides the .so symlink.
+      # Pixi's clang uses a conda sysroot and does not search /usr/include,
+      # so we must explicitly find and add the EGL header directory.
+      find_path(
+        MLN_EGL_INCLUDE_DIR
+        NAMES EGL/egl.h
+        PATHS /usr/include /usr/local/include
+        REQUIRED)
       set(MLN_FFI_OPENGL_LIBS EGL)
+      set(MLN_FFI_OPENGL_INCLUDES ${MLN_EGL_INCLUDE_DIR})
     endif()
   else()
     message(
@@ -45,10 +50,19 @@ function(mln_configure_opengl_backend target)
         "Supported platforms are Windows (WGL), Android (EGL), and Linux (EGL).")
   endif()
 
+  # headless_backend.cpp (from maplibre-native) includes <unique_resource.hpp>.
+  # That header is in mbgl-vendor-unique_resource's include directory, which is
+  # a PRIVATE link of mbgl-core — it does not propagate to us automatically.
+  # Link it here so our compilation of headless_backend.cpp can find it.
   mln_target_vendor_sources(${target} ${MLN_FFI_VENDOR_OPENGL_SOURCES})
   mln_target_project_sources(${target} ${MLN_FFI_OPENGL_COMMON_SOURCES})
   mln_target_project_sources(${target} ${MLN_FFI_OPENGL_SOURCES})
-  target_link_libraries(${target} PRIVATE ${MLN_FFI_OPENGL_LIBS})
+  target_link_libraries(
+    ${target} PRIVATE ${MLN_FFI_OPENGL_LIBS} mbgl-vendor-unique_resource)
+  if(DEFINED MLN_FFI_OPENGL_INCLUDES)
+    target_include_directories(
+      ${target} SYSTEM PRIVATE ${MLN_FFI_OPENGL_INCLUDES})
+  endif()
 
   # MapLibre Native GL backend compile flags
   target_compile_definitions(
