@@ -1,22 +1,14 @@
 ---
-title: Java JNI Binding Notes
-description: Language-specific implementation notes for Java JNI bindings.
+title: Java JNI Binding Conventions
+description: Language-specific implementation conventions for Java JNI bindings.
 ---
 
 Tracking issue:
-[Add Java JNI bindings](https://github.com/maplibre/maplibre-native-ffi/issues/46).
+[#46](https://github.com/maplibre/maplibre-native-ffi/issues/46).
 
 The Java JNI binding targets Android and JVMs where FFM is unavailable. Modern
 JVMs with FFM support use the
-[Java FFM notes](/maplibre-native-ffi/development/bindings-java-ffm/).
-
-Package names:
-
-```text
-org.maplibre.nativekit.jni
-org.maplibre.nativekit.jni.internal
-org.maplibre.nativekit.jni.internal.c
-```
+[Java FFM conventions](/maplibre-native-ffi/development/bindings-java-ffm/).
 
 Separate JNI access from the safe public binding. The internal C layer contains
 generated native-method declarations and JNI bridge entry points that call the

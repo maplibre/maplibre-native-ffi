@@ -53,15 +53,15 @@ comment lists its status values and meanings.
 Use these categories consistently:
 
 - `MLN_STATUS_INVALID_ARGUMENT` for null pointers, unknown enum values, unknown
-  flag bits, undersized structs, invalid dimensions, invalid handles, or output
-  handles initialized incorrectly;
-- `MLN_STATUS_INVALID_STATE` when an otherwise valid object is in the wrong
-  lifecycle state;
-- `MLN_STATUS_WRONG_THREAD` when a thread-affine handle is called from the wrong
+  flag bits, undersized structs, invalid dimensions, invalid handles, or
+  incorrectly initialized output handles;
+- `MLN_STATUS_INVALID_STATE` for otherwise valid objects in the wrong lifecycle
+  state;
+- `MLN_STATUS_WRONG_THREAD` for thread-affine handles called from the wrong
   owner thread;
-- `MLN_STATUS_UNSUPPORTED` when a backend, platform, entry point, or requested
-  behavior is unavailable in this build;
-- `MLN_STATUS_NATIVE_ERROR` when a native MapLibre error or C++ exception is
+- `MLN_STATUS_UNSUPPORTED` for backends, platforms, entry points, or requested
+  behavior unavailable in this build;
+- `MLN_STATUS_NATIVE_ERROR` for native MapLibre errors or C++ exceptions
   converted to status.
 
 Every exported `MLN_API` C++ definition must be `noexcept`. Status-returning

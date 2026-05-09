@@ -15,11 +15,11 @@ primitives, texture readback, and low-level extension points such as resource
 providers and URL transforms. It excludes convenience APIs such as snapshotting
 and platform integrations such as gestures and device sensors.
 
-Language bindings sit directly above the C API. They manage C handles, struct
-initialization, scoped lifetimes, status codes, diagnostics, borrowed data,
-events, threading, and event draining in the target language. They preserve the
-C API's concepts. Higher-level adapters may provide full SDKs, async models,
-view lifecycle integrations, convenience workflows, or new abstractions.
+Language bindings sit directly above the C API. In the target language, they
+manage C handles, struct initialization, scoped lifetimes, status codes,
+diagnostics, borrowed data, threading, and event draining. They preserve the C
+API's concepts. Higher-level adapters may provide full SDKs, async models, view
+lifecycle integrations, convenience workflows, or new abstractions.
 
 Read the [Binding Conventions](/maplibre-native-ffi/development/bindings/)
 before implementing or reviewing a binding.
@@ -124,13 +124,13 @@ Markdown into `docs/src/content/docs/reference/`.
 
 ## Tests And Examples
 
-Every feature needs CI coverage through an automated test when practical. Tests
-consume the public C API. Zig tests also check header shape because `@cImport`
-catches C API issues quickly.
+Every feature needs automated CI coverage when practical. Tests consume the
+public C API. Zig tests also check header shape because `@cImport` catches C API
+issues quickly.
 
-Use examples for demos and for behavior that needs manual validation, such as
-visual output, interactive input, or host graphics integration.
+Use examples for demos and behavior that needs manual validation, such as visual
+output, interactive input, or host graphics integration.
 
-Keep examples small. This repository may include low-level language bindings and
+Keep examples small. This repository includes low-level language bindings and
 focused integration examples. Full application SDKs live outside this
 repository.

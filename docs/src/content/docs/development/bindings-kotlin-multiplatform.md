@@ -1,35 +1,26 @@
 ---
-title: Kotlin Multiplatform Binding Notes
-description: Language-specific implementation notes for Kotlin Multiplatform bindings.
+title: Kotlin Multiplatform Binding Conventions
+description: Language-specific implementation conventions for Kotlin Multiplatform bindings.
 ---
 
 Tracking issue:
-[Add Kotlin Multiplatform bindings](https://github.com/maplibre/maplibre-native-ffi/issues/47).
+[#47](https://github.com/maplibre/maplibre-native-ffi/issues/47).
 
 The Kotlin Multiplatform binding exposes one common safe low-level API.
 `jvmMain` delegates to the
-[Java FFM notes](/maplibre-native-ffi/development/bindings-java-ffm/),
+[Java FFM conventions](/maplibre-native-ffi/development/bindings-java-ffm/),
 `androidMain` delegates to the
-[Java JNI notes](/maplibre-native-ffi/development/bindings-java-jni/), and
+[Java JNI conventions](/maplibre-native-ffi/development/bindings-java-jni/), and
 `nativeMain` wraps Kotlin/Native cinterop output. WASM and JS are out of scope
 for now.
 
 Source sets:
 
 ```text
-commonMain
-  org.maplibre.nativekit
-    Common value types, exceptions, descriptors, events, safe low-level APIs,
-    and expect declarations where platform storage differs.
-
-jvmMain
-  Actual implementations that delegate to org.maplibre.nativekit.ffm.
-
-androidMain
-  Actual implementations that delegate to org.maplibre.nativekit.jni.
-
-nativeMain
-  Actual implementations that wrap Kotlin/Native cinterop declarations.
+commonMain   Common values, exceptions, descriptors, events, APIs, and expect declarations.
+jvmMain      Actual implementations backed by the Java FFM binding.
+androidMain  Actual implementations backed by the Java JNI binding.
+nativeMain   Actual implementations backed by Kotlin/Native cinterop.
 ```
 
 Configure Kotlin/Native `cinterop` against the public umbrella header and expose

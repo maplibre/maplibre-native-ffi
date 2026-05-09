@@ -1,23 +1,16 @@
 ---
-title: Java FFM Binding Notes
-description: Language-specific implementation notes for Java FFM bindings.
+title: Java FFM Binding Conventions
+description: Language-specific implementation conventions for Java FFM bindings.
 ---
 
 Tracking issue:
-[Add Java FFM bindings](https://github.com/maplibre/maplibre-native-ffi/issues/45).
+[#45](https://github.com/maplibre/maplibre-native-ffi/issues/45).
 
 The Java FFM binding targets modern desktop/server JVMs with the final
 [Foreign Function & Memory API](https://docs.oracle.com/en/java/javase/25/core/foreign-function-and-memory-api.html).
-Use the [Java JNI notes](/maplibre-native-ffi/development/bindings-java-jni/)
-for Android and other JVMs where FFM is unavailable or undesirable.
-
-Package names:
-
-```text
-org.maplibre.nativekit.ffm
-org.maplibre.nativekit.ffm.internal
-org.maplibre.nativekit.ffm.internal.c
-```
+Use the
+[Java JNI conventions](/maplibre-native-ffi/development/bindings-java-jni/) for
+Android and other JVMs where FFM is unavailable or undesirable.
 
 Target JDK 22 or newer. Earlier JDKs used preview or incubator FFM APIs that
 produce a different binding surface.
