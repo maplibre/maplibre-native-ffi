@@ -56,8 +56,3 @@ Map C enums to Rust enums with explicit conversions. Use `bitflags` for
 user-visible masks and hide C field masks behind option structs, builders, or
 setters. Mark public C-backed enums `#[non_exhaustive]`; add `Unknown(raw)` for
 values read from native output where forward compatibility matters.
-
-The initial Cargo build script may link against the repository artifact in
-`MLN_FFI_BUILD_DIR`. Published packages prefer discovered or bundled
-`libmaplibre-native-c` shared libraries for the target platform. Static linking
-and Cargo-driven native builds can be added later as explicit build modes.
