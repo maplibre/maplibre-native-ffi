@@ -21,6 +21,8 @@
     "**/*-lock.yml",
     "**/*.lock.yml",
     "uv.lock",
+    "gradlew",
+    "gradlew.bat",
   ],
   "json": { "preferSingleLine": true },
   "markdown": { "textWrap": "always" },
