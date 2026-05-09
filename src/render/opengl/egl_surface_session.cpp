@@ -2,7 +2,8 @@
  * egl_surface_session.cpp — EGL surface session for maplibre-native-ffi.
  *
  * Provides mln_egl_surface_attach(), enabling OpenGL ES rendering on
- * Android and Linux platforms through a caller-owned EGL display/context/surface.
+ * Android and Linux platforms through a caller-owned EGL
+ * display/context/surface.
  *
  * Design mirrors vulkan_surface_session.cpp:
  *   - All EGL handles (EGLDisplay, EGLConfig, EGLContext, EGLSurface) are
@@ -25,14 +26,14 @@
 #include <memory>
 #include <stdexcept>
 
-#include <EGL/egl.h>
-
 #include <mbgl/gfx/backend_scope.hpp>
 #include <mbgl/gfx/renderable.hpp>
 #include <mbgl/gl/renderable_resource.hpp>
 #include <mbgl/gl/renderer_backend.hpp>
 #include <mbgl/renderer/renderer.hpp>
 #include <mbgl/util/size.hpp>
+
+#include <EGL/egl.h>
 
 #include "diagnostics/diagnostics.hpp"
 #include "map/map.hpp"
@@ -120,9 +121,7 @@ class EGLSurfaceBackendImpl final : public mbgl::gl::RendererBackend,
 
   void setSize(mbgl::Size size_) { size = size_; }
 
-  void swapBuffers() {
-    eglSwapBuffers(display, surface);
-  }
+  void swapBuffers() { eglSwapBuffers(display, surface); }
 
  protected:
   void activate() override {
@@ -165,12 +164,10 @@ void EGLRenderableResource::bind() {
 
 // ── SurfaceSessionBackend adapter ────────────────────────────────────────────
 
-class EGLSurfaceSessionBackend final
-    : public mln::core::SurfaceSessionBackend {
+class EGLSurfaceSessionBackend final : public mln::core::SurfaceSessionBackend {
  public:
   EGLSurfaceSessionBackend(
-    EGLDisplay display, EGLContext context, EGLSurface surface,
-    mbgl::Size size
+    EGLDisplay display, EGLContext context, EGLSurface surface, mbgl::Size size
   )
       : backend_(display, context, surface, size) {}
 
@@ -205,8 +202,7 @@ auto egl_surface_attach(
     return descriptor_status;
   }
   const auto output_status = validate_attach_output(
-    out_session,
-    "out_session must not be null",
+    out_session, "out_session must not be null",
     "out_session must point to a null handle"
   );
   if (output_status != MLN_STATUS_OK) {

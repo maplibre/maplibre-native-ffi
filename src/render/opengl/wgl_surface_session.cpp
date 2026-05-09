@@ -27,8 +27,6 @@
  */
 
 #define WIN32_LEAN_AND_MEAN
-#include <windows.h>
-
 #include <cmath>
 #include <memory>
 #include <stdexcept>
@@ -39,6 +37,8 @@
 #include <mbgl/gl/renderer_backend.hpp>
 #include <mbgl/renderer/renderer.hpp>
 #include <mbgl/util/size.hpp>
+
+#include <windows.h>
 
 #include "diagnostics/diagnostics.hpp"
 #include "map/map.hpp"
@@ -99,8 +99,8 @@ class WGLSurfaceBackendImpl final : public mbgl::gl::RendererBackend,
         hglrc(hglrc_) {}
 
   WGLSurfaceBackendImpl(const WGLSurfaceBackendImpl&) = delete;
-  auto operator=(const WGLSurfaceBackendImpl&) -> WGLSurfaceBackendImpl& =
-    delete;
+  auto operator=(const WGLSurfaceBackendImpl&)
+    -> WGLSurfaceBackendImpl& = delete;
   WGLSurfaceBackendImpl(WGLSurfaceBackendImpl&&) = delete;
   auto operator=(WGLSurfaceBackendImpl&&) -> WGLSurfaceBackendImpl& = delete;
 
@@ -144,7 +144,7 @@ class WGLSurfaceBackendImpl final : public mbgl::gl::RendererBackend,
   }
 
  private:
-  HDC   hdc;
+  HDC hdc;
   HGLRC hglrc;
 };
 
@@ -155,8 +155,7 @@ void WGLRenderableResource::bind() {
 
 // ── SurfaceSessionBackend adapter ────────────────────────────────────────────
 
-class WGLSurfaceSessionBackend final
-    : public mln::core::SurfaceSessionBackend {
+class WGLSurfaceSessionBackend final : public mln::core::SurfaceSessionBackend {
  public:
   WGLSurfaceSessionBackend(HDC hdc, HGLRC hglrc, mbgl::Size size)
       : backend_(hdc, hglrc, size) {}
@@ -192,8 +191,7 @@ auto wgl_surface_attach(
     return descriptor_status;
   }
   const auto output_status = validate_attach_output(
-    out_session,
-    "out_session must not be null",
+    out_session, "out_session must not be null",
     "out_session must point to a null handle"
   );
   if (output_status != MLN_STATUS_OK) {
@@ -218,8 +216,7 @@ auto wgl_surface_attach(
   session->physical_height =
     physical_dimension(descriptor->height, descriptor->scale_factor);
   session->surface.backend = std::make_unique<WGLSurfaceSessionBackend>(
-    static_cast<HDC>(descriptor->hdc),
-    static_cast<HGLRC>(descriptor->hglrc),
+    static_cast<HDC>(descriptor->hdc), static_cast<HGLRC>(descriptor->hglrc),
     mbgl::Size{session->physical_width, session->physical_height}
   );
 

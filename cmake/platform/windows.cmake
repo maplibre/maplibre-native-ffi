@@ -6,7 +6,7 @@
 # codec library used by maplibre-native on Windows.
 
 function(mln_configure_windows_platform target)
-  find_package(CURL REQUIRED)   # maplibre-native uses CURL for HTTP on Windows
+  find_package(CURL REQUIRED) # maplibre-native uses CURL for HTTP on Windows
   find_package(JPEG REQUIRED)
   find_package(PNG REQUIRED)
   find_package(Threads REQUIRED)

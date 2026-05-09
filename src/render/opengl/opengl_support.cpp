@@ -1,4 +1,5 @@
-// opengl_support.cpp — OpenGL backend support utilities for maplibre-native-ffi.
+// opengl_support.cpp — OpenGL backend support utilities for
+// maplibre-native-ffi.
 //
 // Provides functions that the C API layer calls into but that have no
 // backend-specific implementation (e.g. the render-backend capability mask).

@@ -50,7 +50,8 @@ auto mln_egl_surface_attach(
   (void)descriptor;
   (void)out_session;
   mln::core::set_thread_error(
-    "EGL surface sessions require an OpenGL build (MLN_FFI_RENDER_BACKEND=opengl)"
+    "EGL surface sessions require an OpenGL build "
+    "(MLN_FFI_RENDER_BACKEND=opengl)"
   );
   return MLN_STATUS_UNSUPPORTED;
 #endif
@@ -74,7 +75,8 @@ auto mln_wgl_surface_attach(
   (void)descriptor;
   (void)out_session;
   mln::core::set_thread_error(
-    "WGL surface sessions require an OpenGL build on Windows (MLN_FFI_RENDER_BACKEND=opengl)"
+    "WGL surface sessions require an OpenGL build on Windows "
+    "(MLN_FFI_RENDER_BACKEND=opengl)"
   );
   return MLN_STATUS_UNSUPPORTED;
 #endif

@@ -34,9 +34,5 @@ function(mln_configure_android_platform target)
 
   target_link_libraries(
     ${target}
-    PRIVATE
-      ${ANDROID_LOG_LIB}
-      ${ANDROID_LIB}
-      Threads::Threads
-      z)
+    PRIVATE ${ANDROID_LOG_LIB} ${ANDROID_LIB} Threads::Threads z)
 endfunction()

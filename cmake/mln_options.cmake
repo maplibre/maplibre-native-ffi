@@ -6,8 +6,11 @@ function(mln_configure_options)
       CACHE BOOL "Build MapLibre Native PMTiles support" FORCE)
 
   set(MLN_FFI_RENDER_BACKEND ""
-      CACHE STRING "Render backend for this wrapper build: metal, vulkan, or opengl")
-  set_property(CACHE MLN_FFI_RENDER_BACKEND PROPERTY STRINGS metal vulkan opengl)
+      CACHE
+        STRING "Render backend for this wrapper build: metal, vulkan, or opengl")
+  set_property(
+    CACHE MLN_FFI_RENDER_BACKEND
+    PROPERTY STRINGS metal vulkan opengl)
 
   if(NOT MLN_FFI_RENDER_BACKEND)
     if(APPLE)
@@ -31,8 +34,7 @@ function(mln_configure_options)
   if(MLN_FFI_RENDER_BACKEND STREQUAL "opengl" AND APPLE)
     message(
       FATAL_ERROR
-      "OpenGL backend is not supported on Apple platforms; use metal"
-    )
+        "OpenGL backend is not supported on Apple platforms; use metal")
   endif()
 
   set(MLN_WITH_METAL OFF CACHE BOOL "Build MapLibre Native Metal backend" FORCE)
@@ -57,7 +59,8 @@ function(mln_configure_options)
   option(MLN_FFI_ENABLE_CLANG_TIDY "Run clang-tidy for wrapper sources" ON)
 
   message(
-    STATUS "Configuring maplibre-native-c ${MLN_FFI_RENDER_BACKEND} backend (platform: ${CMAKE_SYSTEM_NAME})")
+    STATUS
+      "Configuring maplibre-native-c ${MLN_FFI_RENDER_BACKEND} backend (platform: ${CMAKE_SYSTEM_NAME})")
 
   set(MLN_FFI_RENDER_BACKEND "${MLN_FFI_RENDER_BACKEND}" PARENT_SCOPE)
 endfunction()

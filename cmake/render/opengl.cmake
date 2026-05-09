@@ -34,8 +34,8 @@ function(mln_configure_opengl_backend target)
   else()
     message(
       FATAL_ERROR
-      "OpenGL backend: unsupported platform '${CMAKE_SYSTEM_NAME}'. "
-      "Supported platforms are Windows (WGL), Android (EGL), and Linux (EGL).")
+        "OpenGL backend: unsupported platform '${CMAKE_SYSTEM_NAME}'. "
+        "Supported platforms are Windows (WGL), Android (EGL), and Linux (EGL).")
   endif()
 
   mln_target_vendor_sources(${target} ${MLN_FFI_VENDOR_OPENGL_SOURCES})
