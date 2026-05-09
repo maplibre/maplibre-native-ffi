@@ -32,13 +32,16 @@ function(mln_configure_opengl_backend target)
       # Android NDK always provides EGL; no find_package needed.
       set(MLN_FFI_OPENGL_LIBS EGL)
     else()
-      # Linux: link EGL by name; libegl-dev (apt) provides the .so symlink.
-      # Pixi's clang uses a conda sysroot and does not search /usr/include,
-      # so we must explicitly find and add the EGL header directory.
+      # Linux: apt libegl-dev installs EGL/egl.h to /usr/include.
+      # CMake's CMAKE_FIND_ROOT_PATH (conda sysroot) would otherwise rewrite
+      # PATHS to <sysroot>/usr/include before searching — that sysroot has no
+      # EGL headers. NO_CMAKE_FIND_ROOT_PATH bypasses that rewrite so we
+      # actually search the real /usr/include from the apt package.
       find_path(
         MLN_EGL_INCLUDE_DIR
         NAMES EGL/egl.h
         PATHS /usr/include /usr/local/include
+        NO_CMAKE_FIND_ROOT_PATH
         REQUIRED)
       set(MLN_FFI_OPENGL_LIBS EGL)
       set(MLN_FFI_OPENGL_INCLUDES ${MLN_EGL_INCLUDE_DIR})
