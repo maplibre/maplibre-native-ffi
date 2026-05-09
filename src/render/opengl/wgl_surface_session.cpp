@@ -54,9 +54,7 @@ auto validate_descriptor(const mln_wgl_surface_descriptor* descriptor)
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   if (descriptor->size < sizeof(mln_wgl_surface_descriptor)) {
-    mln::core::set_thread_error(
-      "mln_wgl_surface_descriptor.size is too small"
-    );
+    mln::core::set_thread_error("mln_wgl_surface_descriptor.size is too small");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   if (

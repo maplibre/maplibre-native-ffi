@@ -29,7 +29,10 @@ function(mln_configure_options)
     message(FATAL_ERROR "Metal builds require an Apple platform")
   endif()
   if(MLN_FFI_RENDER_BACKEND STREQUAL "opengl" AND APPLE)
-    message(FATAL_ERROR "OpenGL backend is not supported on Apple platforms; use metal")
+    message(
+      FATAL_ERROR
+      "OpenGL backend is not supported on Apple platforms; use metal"
+    )
   endif()
 
   set(MLN_WITH_METAL OFF CACHE BOOL "Build MapLibre Native Metal backend" FORCE)
