@@ -32,10 +32,13 @@ function(mln_configure_opengl_backend target)
       # Android NDK always provides EGL; no find_package needed.
       set(MLN_FFI_OPENGL_LIBS EGL)
     else()
-      # Linux: use CMake's FindOpenGL module so it searches CMAKE_PREFIX_PATH
-      # (pixi/conda mesalib environment) in addition to system paths.
-      find_package(OpenGL REQUIRED EGL)
-      set(MLN_FFI_OPENGL_LIBS OpenGL::EGL)
+      # Linux: use pkg-config to find EGL so it searches the pixi/conda
+      # mesalib environment (CMAKE_PREFIX_PATH) via PKG_CONFIG_PATH.
+      # FindOpenGL also requires libOpenGL.so which may not be present in
+      # the pixi env; pkg_search_module only needs libEGL.so.
+      find_package(PkgConfig REQUIRED)
+      pkg_search_module(MLN_EGL egl REQUIRED IMPORTED_TARGET)
+      set(MLN_FFI_OPENGL_LIBS PkgConfig::MLN_EGL)
     endif()
   else()
     message(
