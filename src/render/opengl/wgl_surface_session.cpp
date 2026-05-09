@@ -11,8 +11,9 @@
  *   - WGLSurfaceSessionBackend implements SurfaceSessionBackend, giving the
  *     shared render-session machinery a renderer_backend() and resize().
  *   - WGLBackend extends mbgl::gl::RendererBackend and mbgl::gfx::Renderable,
- *     following the pattern used by the MapLibre Native Qt backend and the
- *     maplibre-maui-ac WGL frontend.
+ *     following the pattern used by the MapLibre Native Qt backend and by
+ *     the WGL frontends in tdcosta100/MaplibreNative.NET (and the
+ *     acalcutt/MaplibreNative.NET fork) and bjtrounson/maplibre-maui.
  *   - activate() / deactivate() call wglMakeCurrent.
  *   - updateAssumedState() re-syncs mbgl's cached GL state, preventing stale
  *     framebuffer/viewport assumptions after the host draws between frames.
@@ -132,11 +133,13 @@ class WGLSurfaceBackendImpl final : public mbgl::gl::RendererBackend,
   }
 
   // Re-sync mbgl's cached GL state to match what is actually current on the
-  // WGL context. The host (C# MAUI handler) may clear or bind framebuffers
-  // between frames. Without re-syncing, mbgl's state cache skips re-binding
-  // and produces missing fills, labels, or draw calls.
-  // Mirrors the pattern used in maplibre-maui-ac's platform_frontend_windows.cpp
-  // and the MapLibre Native Qt backend (updateAssumedState).
+  // WGL context. The host application may clear or bind framebuffers between
+  // frames. Without re-syncing, mbgl's state cache skips re-binding and
+  // produces missing fills, labels, or draw calls.
+  // Mirrors the pattern used in tdcosta100/MaplibreNative.NET (and the
+  // acalcutt/MaplibreNative.NET fork that this is most directly derived
+  // from), bjtrounson/maplibre-maui's Windows frontend, and the MapLibre
+  // Native Qt backend (updateAssumedState).
   void updateAssumedState() override {
     assumeFramebufferBinding(ImplicitFramebufferBinding);
     assumeViewport(0, 0, size);

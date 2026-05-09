@@ -146,8 +146,9 @@ class EGLSurfaceBackendImpl final : public mbgl::gl::RendererBackend,
   // binding / viewport / clear state between frames. Without this, mbgl's
   // internal state cache thinks its bindings are already current and skips
   // re-binding, producing missing fills / labels / draw calls.
-  // Mirrors the pattern used by the Qt GL backend, MaplibreNative.NET-ac WGL
-  // backend, and the GLFW headless backend.
+  // Mirrors the pattern used by the Qt GL backend, the GLFW headless
+  // backend, and the GL backends in tdcosta100/MaplibreNative.NET (and the
+  // acalcutt/MaplibreNative.NET fork) and bjtrounson/maplibre-maui.
   void updateAssumedState() override {
     assumeFramebufferBinding(ImplicitFramebufferBinding);
     assumeViewport(0, 0, size);
