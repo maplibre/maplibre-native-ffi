@@ -33,8 +33,7 @@ function(mln_configure_windows_platform target)
     ${target}
     SYSTEM
     PRIVATE
-      ${CURL_INCLUDE_DIRS}
-      ${JPEG_INCLUDE_DIRS}
+      ${CURL_INCLUDE_DIRS} ${JPEG_INCLUDE_DIRS}
       # Windows thread_local.cpp includes thread.h from here.
       ${MLN_SOURCE_DIR}/platform/windows/include)
 

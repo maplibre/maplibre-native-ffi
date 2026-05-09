@@ -73,15 +73,18 @@ function(mln_configure_opengl_backend target)
   mln_target_project_sources(${target} ${MLN_FFI_OPENGL_COMMON_SOURCES})
   mln_target_project_sources(${target} ${MLN_FFI_OPENGL_SOURCES})
   target_link_libraries(
-    ${target} PRIVATE ${MLN_FFI_OPENGL_LIBS} mbgl-vendor-unique_resource)
+    ${target}
+    PRIVATE ${MLN_FFI_OPENGL_LIBS} mbgl-vendor-unique_resource)
 
   # Linux EGL: add the staged EGL/KHR headers as a SYSTEM include. Because the
   # staging directory lives under the build tree (not /usr/include), CMake will
   # not strip it as an implicit compiler include and it will not shadow the
   # conda/pixi sysroot's system headers.
   if(MLN_LINUX_EGL_INCLUDE_DIR)
-    target_include_directories(${target} SYSTEM PRIVATE
-                               ${MLN_LINUX_EGL_INCLUDE_DIR})
+    target_include_directories(
+      ${target}
+      SYSTEM
+      PRIVATE ${MLN_LINUX_EGL_INCLUDE_DIR})
   endif()
 
   # MapLibre Native GL backend compile flags
