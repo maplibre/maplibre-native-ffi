@@ -70,6 +70,14 @@ Keep C binding-generator types internal. Public APIs expose target-language
 values, descriptors, errors, and handle wrappers rather than raw ABI structs or
 generated layout classes.
 
+Rust-based native-extension bindings may share internal Rust crates. A generated
+`-sys` crate mirrors the C ABI and contains no binding policy. A support crate
+holds shared implementation glue such as status checking, diagnostic copying,
+string and descriptor helpers, memory guards, callback-boundary utilities, and
+native-pointer utilities. The support crate is not the public safety layer;
+public Rust, Python, and Node packages keep their own language-facing ownership,
+errors, callbacks, and packaging.
+
 ## Status And Diagnostics
 
 Status-returning C calls become target-language calls that either complete

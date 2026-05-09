@@ -6,21 +6,31 @@ description: Language-specific implementation notes for Rust bindings.
 Tracking issue:
 [Add Rust bindings and smoke example](https://github.com/maplibre/maplibre-native-ffi/issues/41).
 
-The Rust binding exposes a safe low-level API in one Cargo package while keeping
-generated C declarations private.
+The Rust binding exposes one public safe low-level Cargo package while sharing
+internal Rust crates with native-extension bindings such as Python and Node.
 
-Package and module names:
+Package and crate names:
 
 ```text
-maplibre-native          Cargo package
-maplibre_native          Rust crate
-maplibre_native::sys     private bindgen output
+maplibre-native          public Cargo package
+maplibre_native          public Rust crate
+maplibre-native-sys      internal bindgen crate over the C ABI
+maplibre-native-support  internal shared support crate
 ```
 
-Generate the internal C layer with `bindgen` from the public umbrella header.
+Generate `maplibre-native-sys` with `bindgen` from the public umbrella header.
 Treat successful generation and compilation as the header bindability check for
-this path. Keep bindgen types internal; public APIs expose Rust wrappers and
-values.
+this path. The `sys` crate mirrors the C ABI: raw extern functions, constants, C
+layouts, and opaque pointer types.
+
+`maplibre-native-support` is shared implementation glue above `sys`, not the
+public safety layer. It may provide status checking, diagnostic copying, string
+and descriptor helpers, memory guards, callback-boundary utilities, and
+`NativePointer` utilities. The public Rust crate, Python extension, and Node
+add-on may all depend on `sys` and support. Python and Node do not wrap the
+public Rust crate; each binding keeps its language-facing lifetime, error,
+callback, and packaging behavior. Keep bindgen and support types internal;
+public APIs expose Rust wrappers and values.
 
 The public crate owns native handles through `RuntimeHandle`, `MapHandle`,
 `MapProjectionHandle`, and `RenderSessionHandle`. These owner-thread-affine
