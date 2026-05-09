@@ -28,9 +28,15 @@ function(mln_configure_opengl_backend target)
   elseif(ANDROID OR CMAKE_SYSTEM_NAME STREQUAL "Linux")
     set(MLN_FFI_OPENGL_SOURCES
         ${PROJECT_SOURCE_DIR}/src/render/opengl/egl_surface_session.cpp)
-    find_library(MLN_EGL_LIBRARY NAMES EGL REQUIRED)
-    find_library(MLN_GLES_LIBRARY NAMES GLESv2 GLESv3 REQUIRED)
-    set(MLN_FFI_OPENGL_LIBS ${MLN_EGL_LIBRARY} ${MLN_GLES_LIBRARY})
+    if(ANDROID)
+      # Android NDK always provides EGL; no find_package needed.
+      set(MLN_FFI_OPENGL_LIBS EGL)
+    else()
+      # Linux: use CMake's FindOpenGL module so it searches CMAKE_PREFIX_PATH
+      # (pixi/conda mesalib environment) in addition to system paths.
+      find_package(OpenGL REQUIRED EGL)
+      set(MLN_FFI_OPENGL_LIBS OpenGL::EGL)
+    endif()
   else()
     message(
       FATAL_ERROR

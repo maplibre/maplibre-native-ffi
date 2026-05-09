@@ -63,9 +63,9 @@ jobs:
             .git/modules/third_party/maplibre-native
           key: mln-src-v2-${{ hashFiles('.gitmodules', 'cmake/mln_version.cmake') }}
       - uses: ./.github/actions/setup-ci-deps
-      - name: Install EGL/GLES dev libraries (Linux OpenGL only)
+      - name: Install EGL dev library (Linux OpenGL only)
         if: ${{ contains(matrix.variant, 'opengl') && runner.os == 'Linux' }}
-        run: sudo apt-get install -y libegl-dev libgles2-mesa-dev
+        run: sudo apt-get update -y && sudo apt-get install -y libegl-dev
       - run: mise run configure
       - run: mise run ci:lint native
       - run: mise run test
