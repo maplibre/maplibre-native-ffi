@@ -32,4 +32,28 @@ auto vulkan_surface_descriptor_default() noexcept
   };
 }
 
+auto egl_surface_descriptor_default() noexcept -> mln_egl_surface_descriptor {
+  return mln_egl_surface_descriptor{
+    .size = sizeof(mln_egl_surface_descriptor),
+    .width = 256,
+    .height = 256,
+    .scale_factor = 1.0,
+    .display = nullptr,
+    .config = nullptr,
+    .context = nullptr,
+    .surface = nullptr
+  };
+}
+
+auto wgl_surface_descriptor_default() noexcept -> mln_wgl_surface_descriptor {
+  return mln_wgl_surface_descriptor{
+    .size = sizeof(mln_wgl_surface_descriptor),
+    .width = 256,
+    .height = 256,
+    .scale_factor = 1.0,
+    .hdc = nullptr,
+    .hglrc = nullptr
+  };
+}
+
 }  // namespace mln::core
