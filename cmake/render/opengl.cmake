@@ -28,18 +28,35 @@ function(mln_configure_opengl_backend target)
   elseif(ANDROID OR CMAKE_SYSTEM_NAME STREQUAL "Linux")
     set(MLN_FFI_OPENGL_SOURCES
         ${PROJECT_SOURCE_DIR}/src/render/opengl/egl_surface_session.cpp)
-    if(ANDROID)
-      # Android NDK always provides EGL; no find_package needed.
-      set(MLN_FFI_OPENGL_LIBS EGL)
-    else()
-      # Linux: apt libegl-dev installs EGL/egl.h to /usr/include/EGL/egl.h.
-      # We must add /usr/include to the compiler search path for that one file.
-      # target_compile_options would apply to ALL source files in the target,
-      # causing glibc header conflicts (bits/timesize.h not found via conda
-      # sysroot) for every other file. Instead we scope the flag to only
-      # egl_surface_session.cpp via set_source_files_properties (below, after
-      # the source is registered with the target).
-      set(MLN_FFI_OPENGL_LIBS EGL)
+    set(MLN_FFI_OPENGL_LIBS EGL)
+    if(NOT ANDROID)
+      # Linux: apt libegl-dev installs headers to /usr/include/EGL/ and
+      # /usr/include/KHR/. We can't add /usr/include directly to the compiler
+      # search path because it would shadow the conda/pixi sysroot's glibc
+      # headers (the system features.h references bits/timesize.h which only
+      # exists in the conda sysroot). Even scoping -isystem /usr/include to a
+      # single source file fails, because that file's <cmath> include pulls
+      # libstdc++ → <features.h> from /usr/include.
+      #
+      # Instead, stage just the EGL/ and KHR/ subdirectories into a build-tree
+      # directory via symlinks and add only that as a SYSTEM include. This
+      # exposes the EGL headers without exposing any other system header.
+      set(MLN_EGL_STAGE_DIR ${CMAKE_CURRENT_BINARY_DIR}/linux-egl-headers)
+      file(MAKE_DIRECTORY ${MLN_EGL_STAGE_DIR})
+      foreach(_egl_subdir EGL KHR)
+        if(EXISTS /usr/include/${_egl_subdir}
+           AND NOT EXISTS ${MLN_EGL_STAGE_DIR}/${_egl_subdir})
+          file(CREATE_LINK /usr/include/${_egl_subdir}
+               ${MLN_EGL_STAGE_DIR}/${_egl_subdir} SYMBOLIC)
+        endif()
+      endforeach()
+      if(NOT EXISTS ${MLN_EGL_STAGE_DIR}/EGL/egl.h)
+        message(
+          FATAL_ERROR
+            "EGL headers not found at /usr/include/EGL/egl.h. "
+            "Install them with: sudo apt-get install -y libegl-dev")
+      endif()
+      set(MLN_LINUX_EGL_INCLUDE_DIR ${MLN_EGL_STAGE_DIR})
     endif()
   else()
     message(
@@ -58,16 +75,13 @@ function(mln_configure_opengl_backend target)
   target_link_libraries(
     ${target} PRIVATE ${MLN_FFI_OPENGL_LIBS} mbgl-vendor-unique_resource)
 
-  # Linux EGL: scope -isystem /usr/include to egl_surface_session.cpp only.
-  # Using set_source_files_properties avoids contaminating the other ~30 source
-  # files in maplibre_native_c with /usr/include, which would break glibc
-  # header lookup against the conda sysroot (bits/timesize.h not found).
-  if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND MLN_FFI_RENDER_BACKEND STREQUAL
-     "opengl")
-    set_source_files_properties(
-      ${PROJECT_SOURCE_DIR}/src/render/opengl/egl_surface_session.cpp
-      TARGET_DIRECTORY ${target}
-      PROPERTIES COMPILE_OPTIONS "-isystem;/usr/include")
+  # Linux EGL: add the staged EGL/KHR headers as a SYSTEM include. Because the
+  # staging directory lives under the build tree (not /usr/include), CMake will
+  # not strip it as an implicit compiler include and it will not shadow the
+  # conda/pixi sysroot's system headers.
+  if(MLN_LINUX_EGL_INCLUDE_DIR)
+    target_include_directories(${target} SYSTEM PRIVATE
+                               ${MLN_LINUX_EGL_INCLUDE_DIR})
   endif()
 
   # MapLibre Native GL backend compile flags
