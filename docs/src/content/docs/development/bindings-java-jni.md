@@ -3,9 +3,6 @@ title: Java JNI Binding Notes
 description: Language-specific implementation notes for Java JNI bindings.
 ---
 
-All bindings follow
-[Binding Conventions](/maplibre-native-ffi/development/bindings/).
-
 Tracking issue:
 [Add Java JNI bindings](https://github.com/maplibre/maplibre-native-ffi/issues/46).
 

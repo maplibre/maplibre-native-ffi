@@ -3,9 +3,6 @@ title: Kotlin Multiplatform Binding Notes
 description: Language-specific implementation notes for Kotlin Multiplatform bindings.
 ---
 
-All bindings follow
-[Binding Conventions](/maplibre-native-ffi/development/bindings/).
-
 Tracking issue:
 [Add Kotlin Multiplatform bindings](https://github.com/maplibre/maplibre-native-ffi/issues/47).
 
