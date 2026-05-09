@@ -19,10 +19,9 @@ interop floor for retained Go pointers. `cgo` gives direct header checking,
 struct layout, callback exports, and C compiler diagnostics.
 
 The direct handle API is the base layer. Because goroutines and OS threads have
-separate identities, the Go package may also provide a small opt-in owner
-goroutine helper that locks an OS thread, runs owner-thread calls, and pumps
-runtime events. Application scheduling and framework integration stay above that
-helper.
+separate identities, the Go package also provides a small opt-in owner goroutine
+helper that locks an OS thread, runs owner-thread calls, and pumps runtime
+events. Application scheduling and framework integration stay above that helper.
 
 Represent public handles as structs with explicit `Close() error` methods. Use
 Go finalizers for leak reporting. Reserve finalizer cleanup for native resources
