@@ -1,0 +1,120 @@
+name: Native Windows
+
+on:
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: native / windows-x64-opengl
+    runs-on: windows-latest
+    timeout-minutes: 120
+
+    steps:
+      - name: Enable Git long paths
+        run: git config --global core.longpaths true
+
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      # Mirror the cache key used by the Linux/macOS native jobs so the
+      # MapLibre Native source tree is shared across platforms when possible.
+      - name: Cache MapLibre Native source
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: |
+            third_party/maplibre-native
+            .git/modules/third_party/maplibre-native
+          key: mln-src-v2-${{ hashFiles('.gitmodules', 'cmake/mln_version.cmake') }}
+
+      # Initialize maplibre-native and all its vendor submodules (including
+      # the bundled vcpkg used for Windows dependency management).
+      - name: Init submodules
+        shell: pwsh
+        run: |
+          git submodule update --init --depth 1 third_party/maplibre-native
+          git -C third_party/maplibre-native submodule update --init --recursive --depth 1
+
+      - name: Set up MSVC developer tools
+        uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756 # v1.13.0
+        with:
+          arch: x64
+
+      - name: Get vcpkg commit ID
+        id: vcpkg-id
+        shell: pwsh
+        run: |
+          $id = git -C third_party/maplibre-native/platform/windows/vendor/vcpkg rev-parse HEAD
+          Add-Content -Path $env:GITHUB_OUTPUT -Value "commit_id=$id"
+
+      - name: Cache vcpkg binary cache
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: third_party/maplibre-native/platform/windows/vendor/vcpkg/archives
+          key: vcpkg-x64-windows-opengl-${{ steps.vcpkg-id.outputs.commit_id }}
+
+      - name: Bootstrap vcpkg
+        shell: cmd
+        run: third_party\maplibre-native\platform\windows\vendor\vcpkg\bootstrap-vcpkg.bat -disableMetrics
+
+      - name: Install Zig
+        uses: mlugg/setup-zig@d1434d08867e3ee9daa34448df10607b98908d29 # v2
+        with:
+          version: "0.16.0"
+
+      - name: Install sccache
+        uses: mozilla-actions/sccache-action@1583d6b38d7be47f593cb472781bbb21cab4321e # v0.0.10
+
+      - name: Configure CMake
+        shell: pwsh
+        env:
+          SCCACHE_GHA_ENABLED: "true"
+          CMAKE_C_COMPILER_LAUNCHER: sccache
+          CMAKE_CXX_COMPILER_LAUNCHER: sccache
+          VCPKG_BINARY_SOURCES: "clear;files,${{ github.workspace }}\\third_party\\maplibre-native\\platform\\windows\\vendor\\vcpkg\\archives,readwrite"
+        run: |
+          $maxAttempts = 3
+          for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
+            Write-Host "CMake configure attempt $attempt of $maxAttempts"
+            cmake -B build `
+              -G "Visual Studio 17 2022" -A x64 `
+              -DCMAKE_TOOLCHAIN_FILE="third_party/maplibre-native/platform/windows/custom-toolchain.cmake" `
+              -DMLN_FFI_RENDER_BACKEND=opengl `
+              -DCMAKE_C_COMPILER_LAUNCHER=sccache `
+              -DCMAKE_CXX_COMPILER_LAUNCHER=sccache
+            if ($LASTEXITCODE -eq 0) { break }
+            if ($attempt -lt $maxAttempts) {
+              Write-Host "Attempt $attempt failed (exit $LASTEXITCODE), cleaning and retrying..."
+              Remove-Item -Recurse -Force build -ErrorAction SilentlyContinue
+            } else { exit $LASTEXITCODE }
+          }
+
+      - name: Build
+        run: cmake --build build --target maplibre_native_c --config Release --parallel
+
+      # The DLL must be on PATH so that the zig test runner can load it at
+      # runtime. addRPath in build.zig has no effect on Windows.
+      - name: Run tests
+        shell: pwsh
+        run: |
+          $env:PATH = "${{ github.workspace }}\build\Release;$env:PATH"
+          zig build test --summary all `
+            -Dcmake-artifact-dir="${{ github.workspace }}\build\Release" `
+            -Drender-backend=opengl
+
+      - name: Prepare artifact
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path ci-artifact\build\windows-x64-opengl
+          Copy-Item build\Release\maplibre_native_c.dll ci-artifact\build\windows-x64-opengl\
+          # Import library (.lib) needed for linking by downstream consumers.
+          $lib = Get-ChildItem build -Recurse -Filter maplibre_native_c.lib | Select-Object -First 1
+          if ($lib) { Copy-Item $lib.FullName ci-artifact\build\windows-x64-opengl\ }
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: native-windows-x64-opengl
+          path: ci-artifact
+          if-no-files-found: error
+          retention-days: 14
