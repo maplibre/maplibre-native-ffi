@@ -35,6 +35,7 @@ jobs:
     outputs:
       native: ${{ steps.matrix.outputs.native }}
       examples: ${{ steps.matrix.outputs.examples }}
+      bindings: ${{ steps.matrix.outputs.bindings }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - uses: ./.github/actions/setup-ci-deps
@@ -42,6 +43,7 @@ jobs:
         run: |
           echo "native=$(mise run -q ci:matrix native)" >> "$GITHUB_OUTPUT"
           echo "examples=$(mise run -q ci:matrix examples)" >> "$GITHUB_OUTPUT"
+          echo "bindings=$(mise run -q ci:matrix bindings)" >> "$GITHUB_OUTPUT"
 
   native:
     name: native / ${{ matrix.variant }}
@@ -74,6 +76,27 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  bindings:
+    name: bindings / ${{ matrix.binding }} / ${{ matrix.variant }}
+    runs-on: ${{ matrix.runner }}
+    needs:
+      - native
+      - prepare-matrices
+    timeout-minutes: 60
+    env:
+      MISE_ENV: ${{ matrix.variant }}
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.prepare-matrices.outputs.bindings) }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: ./.github/actions/setup-ci-deps
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: native-${{ matrix.variant }}
+          path: .
+      - run: mise run "${{ matrix.task }}"
+
   examples:
     name: examples / ${{ matrix.example }} / ${{ matrix.variant }}
     runs-on: ${{ matrix.runner }}
@@ -105,6 +128,7 @@ jobs:
       - docs
       - prepare-matrices
       - native
+      - bindings
       - examples
     steps:
       - name: Fail if required jobs failed

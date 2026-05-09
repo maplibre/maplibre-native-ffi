@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # [MISE] description="Generate GitHub Actions matrix JSON"
 # [USAGE] arg "<matrix>" help="Matrix to generate" {
-# [USAGE]   choices "native" "examples"
+# [USAGE]   choices "native" "examples" "bindings"
 # [USAGE] }
 # [USAGE] flag "--schema <schema>" help="Path to the GitHub matrix config"
 # [USAGE] flag "--pretty" help="Print indented JSON for local inspection"
@@ -129,24 +129,39 @@ def native_matrix(variants: dict[str, TomlTable]) -> Matrix:
     }
 
 
-def examples_matrix(schema: TomlTable, variants: dict[str, TomlTable]) -> Matrix:
-    """Generate the examples build matrix."""
-    examples = as_table_map(schema.get("examples"))
+def variant_task_matrix(
+    schema: TomlTable,
+    variants: dict[str, TomlTable],
+    group: str,
+    name_key: str,
+) -> Matrix:
+    """Generate a named task matrix across supported variants."""
+    tasks = as_table_map(schema.get(group))
     include: list[MatrixEntry] = []
 
-    for example_name, example in sorted(examples.items()):
+    for task_name, task in sorted(tasks.items()):
         for variant_name, variant in sorted(variants.items()):
-            if supports(example, variant):
+            if supports(task, variant):
                 include.append(
                     {
-                        "example": example_name,
-                        "task": string_value(example, "task"),
+                        name_key: task_name,
+                        "task": string_value(task, "task"),
                         "variant": variant_name,
                         "runner": string_value(variant, "runner"),
                     }
                 )
 
     return {"include": include}
+
+
+def examples_matrix(schema: TomlTable, variants: dict[str, TomlTable]) -> Matrix:
+    """Generate the examples build matrix."""
+    return variant_task_matrix(schema, variants, "examples", "example")
+
+
+def bindings_matrix(schema: TomlTable, variants: dict[str, TomlTable]) -> Matrix:
+    """Generate the bindings test matrix."""
+    return variant_task_matrix(schema, variants, "bindings", "binding")
 
 
 def main() -> int:
@@ -161,8 +176,13 @@ def main() -> int:
     variants = load_variants(Path.cwd(), schema)
     if matrix_name == "native":
         matrix = native_matrix(variants)
-    else:
+    elif matrix_name == "examples":
         matrix = examples_matrix(schema, variants)
+    elif matrix_name == "bindings":
+        matrix = bindings_matrix(schema, variants)
+    else:
+        message = f"unknown matrix: {matrix_name}"
+        raise ValueError(message)
 
     if pretty:
         matrix_json = json.dumps(matrix, indent=2, sort_keys=True)
