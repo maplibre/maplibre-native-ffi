@@ -36,9 +36,10 @@ auto set_thread_error(const char* message) noexcept -> void {
 
   const auto length =
     std::min(std::char_traits<char>::length(message), buffer.size() - 1);
-  auto* const output =
-    std::ranges::copy(std::string_view{message, length}, buffer.begin()).out;
-  *output = '\0';
+  std::ranges::copy(std::string_view{message, length}, buffer.begin());
+  // Index directly — avoids accessing the .out member, which conflicts with
+  // MSVC's _Out SAL annotation macro (sal.h) on Windows.
+  buffer[length] = '\0';
 }
 
 auto set_thread_error(const std::exception& exception) noexcept -> void {

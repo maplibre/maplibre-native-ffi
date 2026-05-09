@@ -5,6 +5,8 @@
 // backend-specific implementation (e.g. the render-backend capability mask).
 // Compiled only when MLN_FFI_RENDER_BACKEND=opengl.
 
+#include <cstdint>
+
 #include "maplibre_native_c.h"
 #include "render/texture_session.hpp"
 

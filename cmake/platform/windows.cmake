@@ -40,6 +40,23 @@ function(mln_configure_windows_platform target)
   # MSVC does not define M_PI by default; this enables the math constants.
   target_compile_definitions(${target} PRIVATE _USE_MATH_DEFINES)
 
+  # ICU: number_format.cpp and bidi.cpp (compiled above) need ICU. Reuse the
+  # mbgl-vendor-icu bundled stubs that maplibre-native sets up when system ICU
+  # is not available. Linking PUBLIC include dirs propagates vendor/icu/include
+  # so <unicode/ubidi.h> resolves to the stubs. MBGL_USE_BUILTIN_ICU guards the
+  # full ICU path in number_format.cpp.
+  if(TARGET mbgl-vendor-icu)
+    target_compile_definitions(${target} PRIVATE MBGL_USE_BUILTIN_ICU)
+    target_link_libraries(${target} PRIVATE mbgl-vendor-icu)
+  elseif(ICU_FOUND)
+    target_link_libraries(${target} PRIVATE ICU::i18n ICU::uc)
+  endif()
+
+  # C4324: 'structure was padded due to alignment specifier' fires on
+  # mbgl/gfx/gpu_expression.hpp which is a third-party header we cannot
+  # modify. Suppress it to keep /WX (warnings-as-errors) working.
+  target_compile_options(${target} PRIVATE /wd4324)
+
   target_link_libraries(
     ${target}
     PRIVATE
