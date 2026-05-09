@@ -3,8 +3,13 @@ title: Kotlin Multiplatform Binding Conventions
 description: Language-specific implementation conventions for Kotlin Multiplatform bindings.
 ---
 
-Tracking issue:
-[#47](https://github.com/maplibre/maplibre-native-ffi/issues/47).
+Resources:
+
+- Tracking issue:
+  [#47](https://github.com/maplibre/maplibre-native-ffi/issues/47)
+- [Kotlin Multiplatform project structure](https://kotlinlang.org/docs/multiplatform/multiplatform-discover-project.html)
+- [Kotlin/Native C interop](https://kotlinlang.org/docs/native-c-interop.html)
+- [Kotlin/Native definition files](https://kotlinlang.org/docs/native-definition-file.html)
 
 The Kotlin Multiplatform binding exposes one common safe low-level API.
 `jvmMain` delegates to the

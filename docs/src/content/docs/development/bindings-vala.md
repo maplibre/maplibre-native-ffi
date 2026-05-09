@@ -3,8 +3,13 @@ title: Vala Binding Conventions
 description: Language-specific implementation conventions for Vala bindings.
 ---
 
-Tracking issue:
-[#119](https://github.com/maplibre/maplibre-native-ffi/issues/119).
+Resources:
+
+- Tracking issue:
+  [#119](https://github.com/maplibre/maplibre-native-ffi/issues/119)
+- [Vala manual](https://docs.vala.dev/)
+- [Vala bindings documentation](https://docs.vala.dev/developer-guides/bindings.html)
+- [GObject API reference](https://docs.gtk.org/gobject/)
 
 The Vala binding exposes a handwritten GLib/GObject-style low-level API over a
 private raw `.vapi` for the public C headers.

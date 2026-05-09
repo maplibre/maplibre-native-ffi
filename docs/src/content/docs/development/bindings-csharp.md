@@ -3,8 +3,13 @@ title: "C# Binding Conventions"
 description: Language-specific implementation conventions for C# bindings.
 ---
 
-Tracking issue:
-[#48](https://github.com/maplibre/maplibre-native-ffi/issues/48).
+Resources:
+
+- Tracking issue:
+  [#48](https://github.com/maplibre/maplibre-native-ffi/issues/48)
+- [.NET native interoperability](https://learn.microsoft.com/en-us/dotnet/standard/native-interop/)
+- [Source-generated P/Invokes](https://learn.microsoft.com/en-us/dotnet/standard/native-interop/pinvoke-source-generation)
+- [ClangSharp](https://github.com/dotnet/ClangSharp)
 
 The C# binding targets `net10.0` and exposes a low-level .NET API over a
 generated native import layer.

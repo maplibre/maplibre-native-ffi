@@ -3,8 +3,13 @@ title: Rust Binding Conventions
 description: Language-specific implementation conventions for Rust bindings.
 ---
 
-Tracking issue:
-[#41](https://github.com/maplibre/maplibre-native-ffi/issues/41).
+Resources:
+
+- Tracking issue:
+  [#41](https://github.com/maplibre/maplibre-native-ffi/issues/41)
+- [Rust Nomicon: FFI](https://doc.rust-lang.org/nomicon/ffi.html)
+- [`bindgen` user guide](https://rust-lang.github.io/rust-bindgen/)
+- [Rust API Guidelines: FFI](https://rust-lang.github.io/api-guidelines/interoperability.html)
 
 The Rust binding exposes one public safe low-level Cargo package while sharing
 internal Rust crates with native-extension bindings such as Python and Node.

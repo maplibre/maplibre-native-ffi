@@ -3,8 +3,13 @@ title: Java FFM Binding Conventions
 description: Language-specific implementation conventions for Java FFM bindings.
 ---
 
-Tracking issue:
-[#45](https://github.com/maplibre/maplibre-native-ffi/issues/45).
+Resources:
+
+- Tracking issue:
+  [#45](https://github.com/maplibre/maplibre-native-ffi/issues/45)
+- [Foreign Function & Memory API](https://docs.oracle.com/en/java/javase/25/core/foreign-function-and-memory-api.html)
+- [`jextract`](https://jdk.java.net/jextract/)
+- [Java JNI conventions](/maplibre-native-ffi/development/bindings-java-jni/)
 
 The Java FFM binding targets modern desktop/server JVMs with the final
 [Foreign Function & Memory API](https://docs.oracle.com/en/java/javase/25/core/foreign-function-and-memory-api.html).

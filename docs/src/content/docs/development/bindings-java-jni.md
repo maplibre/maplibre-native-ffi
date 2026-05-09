@@ -3,8 +3,15 @@ title: Java JNI Binding Conventions
 description: Language-specific implementation conventions for Java JNI bindings.
 ---
 
-Tracking issue:
-[#46](https://github.com/maplibre/maplibre-native-ffi/issues/46).
+Resources:
+
+- Tracking issue:
+  [#46](https://github.com/maplibre/maplibre-native-ffi/issues/46)
+- [JNI specification](https://docs.oracle.com/en/java/javase/25/docs/specs/jni/)
+- [Android JNI tips](https://developer.android.com/training/articles/perf-jni)
+- [Java FFM conventions](/maplibre-native-ffi/development/bindings-java-ffm/)
+- [JavaCPP](https://github.com/bytedeco/javacpp) and
+  [SWIG](https://www.swig.org/)
 
 The Java JNI binding targets Android and JVMs where FFM is unavailable. Modern
 JVMs with FFM support use the

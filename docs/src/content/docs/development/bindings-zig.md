@@ -3,8 +3,13 @@ title: Zig Binding Conventions
 description: Language-specific implementation conventions for Zig bindings.
 ---
 
-Tracking issue:
-[#42](https://github.com/maplibre/maplibre-native-ffi/issues/42).
+Resources:
+
+- Tracking issue:
+  [#42](https://github.com/maplibre/maplibre-native-ffi/issues/42)
+- [Zig C interop](https://ziglang.org/documentation/master/#C)
+- [Zig `@cImport`](https://ziglang.org/documentation/master/#cImport)
+- [Zig allocators](https://ziglang.org/documentation/master/#Choosing-an-Allocator)
 
 The Zig binding exposes one safe low-level package. Direct C interop stays
 private.

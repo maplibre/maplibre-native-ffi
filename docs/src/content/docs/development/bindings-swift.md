@@ -3,8 +3,13 @@ title: Swift Binding Conventions
 description: Language-specific implementation conventions for Swift bindings.
 ---
 
-Tracking issue:
-[#44](https://github.com/maplibre/maplibre-native-ffi/issues/44).
+Resources:
+
+- Tracking issue:
+  [#44](https://github.com/maplibre/maplibre-native-ffi/issues/44)
+- [Imported C and Objective-C APIs](https://developer.apple.com/documentation/swift/imported-c-and-objective-c-apis)
+- [Using imported C functions in Swift](https://developer.apple.com/documentation/swift/using-imported-c-functions-in-swift)
+- [Swift C interoperability](https://developer.apple.com/documentation/swift/c-interoperability)
 
 The Swift binding uses Swift's C importer over the public C headers, with a
 private C module target and a public Swift target.

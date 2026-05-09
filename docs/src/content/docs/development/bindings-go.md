@@ -3,8 +3,12 @@ title: Go Binding Conventions
 description: Language-specific implementation conventions for Go bindings.
 ---
 
-Tracking issue:
-[#43](https://github.com/maplibre/maplibre-native-ffi/issues/43).
+Resources:
+
+- Tracking issue:
+  [#43](https://github.com/maplibre/maplibre-native-ffi/issues/43)
+- [Go `cgo` documentation](https://pkg.go.dev/cmd/cgo)
+- [`runtime.Pinner`](https://pkg.go.dev/runtime#Pinner)
 
 The Go binding uses `cgo` over the public C headers and keeps raw C declarations
 private.

@@ -3,8 +3,13 @@ title: Node.js Binding Conventions
 description: Language-specific implementation conventions for Node.js bindings.
 ---
 
-Tracking issue:
-[#50](https://github.com/maplibre/maplibre-native-ffi/issues/50).
+Resources:
+
+- Tracking issue:
+  [#50](https://github.com/maplibre/maplibre-native-ffi/issues/50)
+- [Node-API documentation](https://nodejs.org/api/n-api.html)
+- [`napi-rs`](https://napi.rs/)
+- [Node.js worker threads](https://nodejs.org/api/worker_threads.html)
 
 The Node binding targets Node.js 22.14+ and newer with TypeScript declarations
 and a native N-API add-on. Use Node-API v10 as the ABI baseline.

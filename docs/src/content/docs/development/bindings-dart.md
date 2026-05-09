@@ -3,8 +3,12 @@ title: Dart Binding Conventions
 description: Language-specific implementation conventions for Dart bindings.
 ---
 
-Tracking issue:
-[#51](https://github.com/maplibre/maplibre-native-ffi/issues/51).
+Resources:
+
+- Tracking issue:
+  [#51](https://github.com/maplibre/maplibre-native-ffi/issues/51)
+- [Dart C interop using `dart:ffi`](https://dart.dev/interop/c-interop)
+- [`ffigen`](https://pub.dev/packages/ffigen)
 
 The Dart binding uses `dart:ffi` with private `ffigen` output over the public C
 umbrella header.
