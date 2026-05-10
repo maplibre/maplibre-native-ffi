@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, ci-test/opengl-surface-backend]
+    branches: [main]
   pull_request:
     branches: [main]
 
