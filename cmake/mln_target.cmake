@@ -37,16 +37,24 @@ function(mln_add_c_api_library target)
       $<INSTALL_INTERFACE:include>
     PRIVATE ${PROJECT_SOURCE_DIR}/src)
 
+  # zlib: use the imported target (ZLIB::ZLIB) so that CMake resolves the
+  # correct library name on every platform. A bare 'z' works on Linux/macOS
+  # (libz.so) but fails on Windows where conda provides 'zlib.lib', not 'z.lib'.
+  find_package(ZLIB REQUIRED)
+
   target_link_libraries(
     ${target}
     PRIVATE
       Mapbox::Map mbgl-vendor-boost mbgl-vendor-nunicode mbgl-vendor-pmtiles
-      mbgl-vendor-sqlite z)
+      mbgl-vendor-sqlite ZLIB::ZLIB)
 
   target_compile_options(
     ${target}
     PRIVATE
-      $<$<COMPILE_LANGUAGE:CXX,OBJCXX>:-fno-rtti>
+      # Disable RTTI. Use the correct flag per compiler family.
+      $<$<AND:$<COMPILE_LANGUAGE:CXX>,$<NOT:$<CXX_COMPILER_ID:MSVC>>>:-fno-rtti>
+      $<$<AND:$<COMPILE_LANGUAGE:CXX>,$<CXX_COMPILER_ID:MSVC>>:/GR->
+      $<$<COMPILE_LANGUAGE:OBJCXX>:-fno-rtti>
       $<$<COMPILE_LANGUAGE:OBJC,OBJCXX>:-fobjc-arc>)
   target_compile_definitions(
     ${target}

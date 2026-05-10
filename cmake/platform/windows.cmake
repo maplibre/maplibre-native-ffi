@@ -79,6 +79,13 @@ function(mln_configure_windows_platform target)
   # C4702 — unreachable code (vendor/expected-lite/include/nonstd/expected.hpp)
   target_compile_options(${target} PRIVATE /wd4324 /wd4244 /wd4702)
 
+  # LNK4044: LLVM's cmake exports contain '-lpthread' in their
+  # INTERFACE_LINK_LIBRARIES for Linux targets; this leaks onto the Windows
+  # link line as '/lpthreads' which MSVC link.exe does not recognise. The
+  # flag is harmless (it is ignored), but suppress the warning to keep the
+  # build output clean.
+  target_link_options(${target} PRIVATE /ignore:4044)
+
   target_link_libraries(
     ${target}
     PRIVATE
