@@ -65,7 +65,10 @@ jobs:
       - uses: ./.github/actions/setup-ci-deps
       - name: Install EGL/GLES dev libraries (Linux OpenGL only)
         if: ${{ contains(matrix.variant, 'opengl') && runner.os == 'Linux' }}
-        run: sudo apt-get update -y && sudo apt-get install -y libegl-dev libgles2-mesa-dev
+        # --no-install-recommends prevents libgles2-mesa-dev from pulling in
+        # libpng-dev (and other -dev packages) whose system headers would
+        # collide with the libpng version supplied by pixi's conda env.
+        run: sudo apt-get update -y && sudo apt-get install -y --no-install-recommends libegl-dev libgles2-mesa-dev
       - run: mise run configure
       - run: mise run ci:lint native
       - run: mise run test
