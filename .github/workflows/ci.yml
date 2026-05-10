@@ -80,10 +80,16 @@ jobs:
         #                     headless_backend_egl.cpp uses eglGetDisplay(
         #                     EGL_DEFAULT_DISPLAY) which requires an X display;
         #                     without one, eglInitialize() throws and tests ABRT.
+        # libegl-mesa0      — Mesa's EGL vendor ICD (installs 50_mesa.json in
+        #                     /usr/share/glvnd/egl_vendor.d/). pixi ships its
+        #                     own libEGL.so.1.1.0 (GLVND), which dispatches to
+        #                     registered EGL ICDs found via XDG_DATA_DIRS. Without
+        #                     50_mesa.json, GLVND has no software EGL backend,
+        #                     so eglInitialize() fails even with xvfb running.
         # libgl1-mesa-dri   — Mesa DRI drivers including the llvmpipe software
         #                     rasterizer (often pre-installed, listed explicitly
         #                     for reproducibility).
-        run: sudo apt-get update -y && sudo apt-get install -y --no-install-recommends libegl-dev libgles-dev libgles2 xvfb libgl1-mesa-dri
+        run: sudo apt-get update -y && sudo apt-get install -y --no-install-recommends libegl-dev libgles-dev libgles2 xvfb libegl-mesa0 libgl1-mesa-dri
       - run: mise run configure
       - run: mise run ci:lint native
       - name: Run tests (Linux OpenGL — wrapped with xvfb-run)
