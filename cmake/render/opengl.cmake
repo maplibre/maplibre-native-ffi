@@ -46,24 +46,24 @@ function(mln_configure_opengl_backend target)
         MLN_EGL_LIBRARY
         NAMES EGL
         HINTS
-          $ENV{CONDA_PREFIX}/lib
-          /usr/lib/${CMAKE_LIBRARY_ARCHITECTURE}
-          /usr/lib/x86_64-linux-gnu
-          /usr/lib/aarch64-linux-gnu
-          /usr/lib
-        NO_CMAKE_FIND_ROOT_PATH
+          $ENV{CONDA_PREFIX}/lib /usr/lib/${CMAKE_LIBRARY_ARCHITECTURE}
+          /usr/lib/x86_64-linux-gnu /usr/lib/aarch64-linux-gnu /usr/lib
+          NO_CMAKE_FIND_ROOT_PATH
         REQUIRED)
+      # Extend suffixes to also accept versioned .so.2 files: the libgles2
+      # runtime apt package installs libGLESv2.so.2 but not the unversioned
+      # libGLESv2.so symlink (that lives in -dev packages we cannot install).
+      set(_saved_lib_suffixes ${CMAKE_FIND_LIBRARY_SUFFIXES})
+      set(CMAKE_FIND_LIBRARY_SUFFIXES .so .so.2 .a)
       find_library(
         MLN_GLESv2_LIBRARY
         NAMES GLESv2
         HINTS
-          $ENV{CONDA_PREFIX}/lib
-          /usr/lib/${CMAKE_LIBRARY_ARCHITECTURE}
-          /usr/lib/x86_64-linux-gnu
-          /usr/lib/aarch64-linux-gnu
-          /usr/lib
-        NO_CMAKE_FIND_ROOT_PATH
+          $ENV{CONDA_PREFIX}/lib /usr/lib/${CMAKE_LIBRARY_ARCHITECTURE}
+          /usr/lib/x86_64-linux-gnu /usr/lib/aarch64-linux-gnu /usr/lib
+          NO_CMAKE_FIND_ROOT_PATH
         REQUIRED)
+      set(CMAKE_FIND_LIBRARY_SUFFIXES ${_saved_lib_suffixes})
       # gl_functions.cpp defines mbgl::platform::gl* function-pointer variables
       # (e.g. mbgl::platform::glGetFloatv) that bridge mbgl's internal GL calls
       # to the GLES3 implementation at link time.
@@ -91,13 +91,11 @@ function(mln_configure_opengl_backend target)
       foreach(_egl_subdir EGL KHR GLES2 GLES3)
         if(NOT EXISTS ${MLN_EGL_STAGE_DIR}/${_egl_subdir})
           if(EXISTS $ENV{CONDA_PREFIX}/include/${_egl_subdir})
-            file(
-              CREATE_LINK $ENV{CONDA_PREFIX}/include/${_egl_subdir}
-              ${MLN_EGL_STAGE_DIR}/${_egl_subdir} SYMBOLIC)
+            file(CREATE_LINK $ENV{CONDA_PREFIX}/include/${_egl_subdir}
+                 ${MLN_EGL_STAGE_DIR}/${_egl_subdir} SYMBOLIC)
           elseif(EXISTS /usr/include/${_egl_subdir})
-            file(
-              CREATE_LINK /usr/include/${_egl_subdir}
-              ${MLN_EGL_STAGE_DIR}/${_egl_subdir} SYMBOLIC)
+            file(CREATE_LINK /usr/include/${_egl_subdir}
+                 ${MLN_EGL_STAGE_DIR}/${_egl_subdir} SYMBOLIC)
           endif()
         endif()
       endforeach()

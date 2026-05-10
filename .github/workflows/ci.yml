@@ -63,13 +63,16 @@ jobs:
             .git/modules/third_party/maplibre-native
           key: mln-src-v2-${{ hashFiles('.gitmodules', 'cmake/mln_version.cmake') }}
       - uses: ./.github/actions/setup-ci-deps
-      - name: Install EGL dev library (Linux OpenGL only)
+      - name: Install EGL/GLES2 dev libraries (Linux OpenGL only)
         if: ${{ contains(matrix.variant, 'opengl') && runner.os == 'Linux' }}
-        # Only libegl-dev is installed from apt; libGLESv2 comes from pixi's
-        # mesalib package. libgles2-mesa-dev is intentionally omitted because
-        # it has a hard Depends: on libpng-dev, which installs newer libpng
-        # headers that conflict with pixi's libpng.so at runtime.
-        run: sudo apt-get update -y && sudo apt-get install -y --no-install-recommends libegl-dev
+        # libegl-dev   — provides /usr/lib/.../libEGL.so (unversioned symlink)
+        # libgles2      — provides /usr/lib/.../libGLESv2.so.2 (runtime only)
+        # libgles2-mesa-dev is intentionally omitted: it has a hard Depends:
+        # libpng-dev which installs libpng headers newer than pixi's libpng.so,
+        # causing a header/ABI mismatch. The cmake find_library call extends
+        # CMAKE_FIND_LIBRARY_SUFFIXES to also match .so.2 so the versioned
+        # runtime file is accepted for linking.
+        run: sudo apt-get update -y && sudo apt-get install -y --no-install-recommends libegl-dev libgles2
       - run: mise run configure
       - run: mise run ci:lint native
       - run: mise run test
