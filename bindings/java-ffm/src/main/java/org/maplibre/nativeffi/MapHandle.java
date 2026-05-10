@@ -4,8 +4,11 @@ import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
 import java.util.EnumSet;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import org.maplibre.nativeffi.internal.CoreStructs;
 import org.maplibre.nativeffi.internal.HandleState;
@@ -13,16 +16,19 @@ import org.maplibre.nativeffi.internal.MapStructs;
 import org.maplibre.nativeffi.internal.MemoryUtil;
 import org.maplibre.nativeffi.internal.NativeAccess;
 import org.maplibre.nativeffi.internal.Status;
+import org.maplibre.nativeffi.internal.StyleStructs;
 import org.maplibre.nativeffi.internal.ValueStructs;
 import org.maplibre.nativeffi.internal.c.MapLibreNativeC;
 import org.maplibre.nativeffi.internal.c.mln_lat_lng;
 import org.maplibre.nativeffi.internal.c.mln_lat_lng_bounds;
 import org.maplibre.nativeffi.internal.c.mln_screen_point;
+import org.maplibre.nativeffi.internal.c.mln_style_source_info;
 
 /** Owned native map handle. Close it on the map owner thread. */
 public final class MapHandle implements AutoCloseable {
   private final RuntimeHandle runtime;
   private final HandleState state;
+  private final Map<String, CustomGeometrySourceState> customGeometrySources = new HashMap<>();
 
   private MapHandle(RuntimeHandle runtime, MemorySegment handle) {
     this.runtime = runtime;
@@ -60,6 +66,730 @@ public final class MapHandle implements AutoCloseable {
           MapLibreNativeC.mln_map_set_style_json(
               state.requireLive(),
               MemoryUtil.allocateCString(arena, Objects.requireNonNull(json))));
+    }
+  }
+
+  public void addStyleSourceJson(String sourceId, JsonValue sourceJson) {
+    NativeAccess.ensureLoaded();
+    Objects.requireNonNull(sourceJson, "sourceJson");
+    try (var arena = Arena.ofConfined()) {
+      Status.check(
+          MapLibreNativeC.mln_map_add_style_source_json(
+              state.requireLive(),
+              CoreStructs.stringView(Objects.requireNonNull(sourceId, "sourceId"), arena),
+              ValueStructs.jsonValue(sourceJson, arena)));
+    }
+  }
+
+  public boolean removeStyleSource(String sourceId) {
+    NativeAccess.ensureLoaded();
+    try (var arena = Arena.ofConfined()) {
+      var outRemoved = arena.allocate(ValueLayout.JAVA_BOOLEAN);
+      Status.check(
+          MapLibreNativeC.mln_map_remove_style_source(
+              state.requireLive(),
+              CoreStructs.stringView(Objects.requireNonNull(sourceId, "sourceId"), arena),
+              outRemoved));
+      var removed = outRemoved.get(ValueLayout.JAVA_BOOLEAN, 0);
+      if (removed) {
+        closeCustomGeometrySource(sourceId);
+      }
+      return removed;
+    }
+  }
+
+  public boolean styleSourceExists(String sourceId) {
+    NativeAccess.ensureLoaded();
+    try (var arena = Arena.ofConfined()) {
+      var outExists = arena.allocate(ValueLayout.JAVA_BOOLEAN);
+      Status.check(
+          MapLibreNativeC.mln_map_style_source_exists(
+              state.requireLive(),
+              CoreStructs.stringView(Objects.requireNonNull(sourceId, "sourceId"), arena),
+              outExists));
+      return outExists.get(ValueLayout.JAVA_BOOLEAN, 0);
+    }
+  }
+
+  public Optional<StyleSourceType> styleSourceType(String sourceId) {
+    NativeAccess.ensureLoaded();
+    try (var arena = Arena.ofConfined()) {
+      var outType = arena.allocate(ValueLayout.JAVA_INT);
+      var outFound = arena.allocate(ValueLayout.JAVA_BOOLEAN);
+      Status.check(
+          MapLibreNativeC.mln_map_get_style_source_type(
+              state.requireLive(),
+              CoreStructs.stringView(Objects.requireNonNull(sourceId, "sourceId"), arena),
+              outType,
+              outFound));
+      return outFound.get(ValueLayout.JAVA_BOOLEAN, 0)
+          ? Optional.of(StyleSourceType.fromNative(outType.get(ValueLayout.JAVA_INT, 0)))
+          : Optional.empty();
+    }
+  }
+
+  public Optional<StyleSourceInfo> styleSourceInfo(String sourceId) {
+    NativeAccess.ensureLoaded();
+    try (var arena = Arena.ofConfined()) {
+      var sourceIdView =
+          CoreStructs.stringView(Objects.requireNonNull(sourceId, "sourceId"), arena);
+      var outInfo = mln_style_source_info.allocate(arena);
+      mln_style_source_info.size(outInfo, (int) mln_style_source_info.sizeof());
+      var outFound = arena.allocate(ValueLayout.JAVA_BOOLEAN);
+      Status.check(
+          MapLibreNativeC.mln_map_get_style_source_info(
+              state.requireLive(), sourceIdView, outInfo, outFound));
+      if (!outFound.get(ValueLayout.JAVA_BOOLEAN, 0)) {
+        return Optional.empty();
+      }
+      var attribution = Optional.<String>empty();
+      if (mln_style_source_info.has_attribution(outInfo)) {
+        var attributionSize = Math.toIntExact(mln_style_source_info.attribution_size(outInfo));
+        if (attributionSize == 0) {
+          attribution = Optional.of("");
+        } else {
+          var outAttribution = arena.allocate(attributionSize);
+          var outAttributionSize = arena.allocate(ValueLayout.JAVA_LONG);
+          var outAttributionFound = arena.allocate(ValueLayout.JAVA_BOOLEAN);
+          Status.check(
+              MapLibreNativeC.mln_map_copy_style_source_attribution(
+                  state.requireLive(),
+                  sourceIdView,
+                  outAttribution,
+                  attributionSize,
+                  outAttributionSize,
+                  outAttributionFound));
+          if (!outAttributionFound.get(ValueLayout.JAVA_BOOLEAN, 0)) {
+            return Optional.empty();
+          }
+          attribution =
+              Optional.of(
+                  MemoryUtil.copyStringView(
+                      outAttribution, outAttributionSize.get(ValueLayout.JAVA_LONG, 0)));
+        }
+      }
+      return Optional.of(StyleStructs.sourceInfo(outInfo, attribution));
+    }
+  }
+
+  public List<String> styleSourceIds() {
+    NativeAccess.ensureLoaded();
+    try (var arena = Arena.ofConfined()) {
+      var outList = MemoryUtil.allocatePointer(arena);
+      Status.check(MapLibreNativeC.mln_map_list_style_source_ids(state.requireLive(), outList));
+      return StyleStructs.styleIdList(outList.get(ValueLayout.ADDRESS, 0));
+    }
+  }
+
+  public void addGeoJsonSourceUrl(String sourceId, String url) {
+    NativeAccess.ensureLoaded();
+    try (var arena = Arena.ofConfined()) {
+      Status.check(
+          MapLibreNativeC.mln_map_add_geojson_source_url(
+              state.requireLive(),
+              CoreStructs.stringView(Objects.requireNonNull(sourceId, "sourceId"), arena),
+              CoreStructs.stringView(Objects.requireNonNull(url, "url"), arena)));
+    }
+  }
+
+  public void addGeoJsonSourceData(String sourceId, GeoJson data) {
+    NativeAccess.ensureLoaded();
+    Objects.requireNonNull(data, "data");
+    try (var arena = Arena.ofConfined()) {
+      Status.check(
+          MapLibreNativeC.mln_map_add_geojson_source_data(
+              state.requireLive(),
+              CoreStructs.stringView(Objects.requireNonNull(sourceId, "sourceId"), arena),
+              ValueStructs.geoJson(data, arena)));
+    }
+  }
+
+  public void setGeoJsonSourceUrl(String sourceId, String url) {
+    NativeAccess.ensureLoaded();
+    try (var arena = Arena.ofConfined()) {
+      Status.check(
+          MapLibreNativeC.mln_map_set_geojson_source_url(
+              state.requireLive(),
+              CoreStructs.stringView(Objects.requireNonNull(sourceId, "sourceId"), arena),
+              CoreStructs.stringView(Objects.requireNonNull(url, "url"), arena)));
+    }
+  }
+
+  public void setGeoJsonSourceData(String sourceId, GeoJson data) {
+    NativeAccess.ensureLoaded();
+    Objects.requireNonNull(data, "data");
+    try (var arena = Arena.ofConfined()) {
+      Status.check(
+          MapLibreNativeC.mln_map_set_geojson_source_data(
+              state.requireLive(),
+              CoreStructs.stringView(Objects.requireNonNull(sourceId, "sourceId"), arena),
+              ValueStructs.geoJson(data, arena)));
+    }
+  }
+
+  public void addCustomGeometrySource(String sourceId, CustomGeometrySourceOptions options) {
+    NativeAccess.ensureLoaded();
+    var copiedSourceId = Objects.requireNonNull(sourceId, "sourceId");
+    var state = new CustomGeometrySourceState(Objects.requireNonNull(options, "options"));
+    try (var arena = Arena.ofConfined()) {
+      Status.check(
+          MapLibreNativeC.mln_map_add_custom_geometry_source(
+              this.state.requireLive(),
+              CoreStructs.stringView(copiedSourceId, arena),
+              state.descriptor()));
+      closeQuietly(customGeometrySources.put(copiedSourceId, state));
+    } catch (RuntimeException | Error error) {
+      closeQuietly(state);
+      throw error;
+    }
+  }
+
+  public void setCustomGeometrySourceTileData(
+      String sourceId, CanonicalTileId tileId, GeoJson data) {
+    NativeAccess.ensureLoaded();
+    Objects.requireNonNull(tileId, "tileId");
+    Objects.requireNonNull(data, "data");
+    try (var arena = Arena.ofConfined()) {
+      Status.check(
+          MapLibreNativeC.mln_map_set_custom_geometry_source_tile_data(
+              state.requireLive(),
+              CoreStructs.stringView(Objects.requireNonNull(sourceId, "sourceId"), arena),
+              StyleStructs.canonicalTileId(tileId, arena),
+              ValueStructs.geoJson(data, arena)));
+    }
+  }
+
+  public void invalidateCustomGeometrySourceTile(String sourceId, CanonicalTileId tileId) {
+    NativeAccess.ensureLoaded();
+    Objects.requireNonNull(tileId, "tileId");
+    try (var arena = Arena.ofConfined()) {
+      Status.check(
+          MapLibreNativeC.mln_map_invalidate_custom_geometry_source_tile(
+              state.requireLive(),
+              CoreStructs.stringView(Objects.requireNonNull(sourceId, "sourceId"), arena),
+              StyleStructs.canonicalTileId(tileId, arena)));
+    }
+  }
+
+  public void invalidateCustomGeometrySourceRegion(String sourceId, LatLngBounds bounds) {
+    NativeAccess.ensureLoaded();
+    Objects.requireNonNull(bounds, "bounds");
+    try (var arena = Arena.ofConfined()) {
+      Status.check(
+          MapLibreNativeC.mln_map_invalidate_custom_geometry_source_region(
+              state.requireLive(),
+              CoreStructs.stringView(Objects.requireNonNull(sourceId, "sourceId"), arena),
+              CoreStructs.latLngBounds(bounds, arena)));
+    }
+  }
+
+  public void addVectorSourceUrl(String sourceId, String url) {
+    addVectorSourceUrlInternal(sourceId, url, null, false);
+  }
+
+  public void addVectorSourceUrl(String sourceId, String url, StyleTileSourceOptions options) {
+    addVectorSourceUrlInternal(sourceId, url, Objects.requireNonNull(options, "options"), true);
+  }
+
+  public void addVectorSourceTiles(String sourceId, List<String> tiles) {
+    addVectorSourceTilesInternal(sourceId, tiles, null, false);
+  }
+
+  public void addVectorSourceTiles(
+      String sourceId, List<String> tiles, StyleTileSourceOptions options) {
+    addVectorSourceTilesInternal(sourceId, tiles, Objects.requireNonNull(options, "options"), true);
+  }
+
+  public void addRasterSourceUrl(String sourceId, String url) {
+    addRasterSourceUrlInternal(sourceId, url, null, false);
+  }
+
+  public void addRasterSourceUrl(String sourceId, String url, StyleTileSourceOptions options) {
+    addRasterSourceUrlInternal(sourceId, url, Objects.requireNonNull(options, "options"), true);
+  }
+
+  public void addRasterSourceTiles(String sourceId, List<String> tiles) {
+    addRasterSourceTilesInternal(sourceId, tiles, null, false);
+  }
+
+  public void addRasterSourceTiles(
+      String sourceId, List<String> tiles, StyleTileSourceOptions options) {
+    addRasterSourceTilesInternal(sourceId, tiles, Objects.requireNonNull(options, "options"), true);
+  }
+
+  public void addRasterDemSourceUrl(String sourceId, String url) {
+    addRasterDemSourceUrlInternal(sourceId, url, null, false);
+  }
+
+  public void addRasterDemSourceUrl(String sourceId, String url, StyleTileSourceOptions options) {
+    addRasterDemSourceUrlInternal(sourceId, url, Objects.requireNonNull(options, "options"), true);
+  }
+
+  public void addRasterDemSourceTiles(String sourceId, List<String> tiles) {
+    addRasterDemSourceTilesInternal(sourceId, tiles, null, false);
+  }
+
+  public void addRasterDemSourceTiles(
+      String sourceId, List<String> tiles, StyleTileSourceOptions options) {
+    addRasterDemSourceTilesInternal(
+        sourceId, tiles, Objects.requireNonNull(options, "options"), true);
+  }
+
+  public void setStyleImage(String imageId, PremultipliedRgba8Image image) {
+    setStyleImageInternal(imageId, image, null, false);
+  }
+
+  public void setStyleImage(
+      String imageId, PremultipliedRgba8Image image, StyleImageOptions options) {
+    setStyleImageInternal(imageId, image, Objects.requireNonNull(options, "options"), true);
+  }
+
+  public boolean removeStyleImage(String imageId) {
+    NativeAccess.ensureLoaded();
+    try (var arena = Arena.ofConfined()) {
+      var outRemoved = arena.allocate(ValueLayout.JAVA_BOOLEAN);
+      Status.check(
+          MapLibreNativeC.mln_map_remove_style_image(
+              state.requireLive(),
+              CoreStructs.stringView(Objects.requireNonNull(imageId, "imageId"), arena),
+              outRemoved));
+      return outRemoved.get(ValueLayout.JAVA_BOOLEAN, 0);
+    }
+  }
+
+  public boolean styleImageExists(String imageId) {
+    NativeAccess.ensureLoaded();
+    try (var arena = Arena.ofConfined()) {
+      var outExists = arena.allocate(ValueLayout.JAVA_BOOLEAN);
+      Status.check(
+          MapLibreNativeC.mln_map_style_image_exists(
+              state.requireLive(),
+              CoreStructs.stringView(Objects.requireNonNull(imageId, "imageId"), arena),
+              outExists));
+      return outExists.get(ValueLayout.JAVA_BOOLEAN, 0);
+    }
+  }
+
+  public Optional<StyleImageInfo> styleImageInfo(String imageId) {
+    NativeAccess.ensureLoaded();
+    try (var arena = Arena.ofConfined()) {
+      var outInfo = MapLibreNativeC.mln_style_image_info_default(arena);
+      var outFound = arena.allocate(ValueLayout.JAVA_BOOLEAN);
+      Status.check(
+          MapLibreNativeC.mln_map_get_style_image_info(
+              state.requireLive(),
+              CoreStructs.stringView(Objects.requireNonNull(imageId, "imageId"), arena),
+              outInfo,
+              outFound));
+      return outFound.get(ValueLayout.JAVA_BOOLEAN, 0)
+          ? Optional.of(StyleStructs.styleImageInfo(outInfo))
+          : Optional.empty();
+    }
+  }
+
+  public Optional<StyleImage> copyStyleImagePremultipliedRgba8(String imageId) {
+    var info = styleImageInfo(imageId);
+    if (info.isEmpty()) {
+      return Optional.empty();
+    }
+    var imageInfo = info.get();
+    try (var arena = Arena.ofConfined()) {
+      var byteLength = Math.toIntExact(imageInfo.byteLength());
+      var outPixels = byteLength == 0 ? MemorySegment.NULL : arena.allocate(byteLength);
+      var outByteLength = arena.allocate(ValueLayout.JAVA_LONG);
+      var outFound = arena.allocate(ValueLayout.JAVA_BOOLEAN);
+      Status.check(
+          MapLibreNativeC.mln_map_copy_style_image_premultiplied_rgba8(
+              state.requireLive(),
+              CoreStructs.stringView(Objects.requireNonNull(imageId, "imageId"), arena),
+              outPixels,
+              byteLength,
+              outByteLength,
+              outFound));
+      if (!outFound.get(ValueLayout.JAVA_BOOLEAN, 0)) {
+        return Optional.empty();
+      }
+      var pixels = byteLength == 0 ? new byte[0] : outPixels.toArray(ValueLayout.JAVA_BYTE);
+      return Optional.of(
+          new StyleImage(
+              new PremultipliedRgba8Image(
+                  imageInfo.width(), imageInfo.height(), imageInfo.stride(), pixels),
+              imageInfo.pixelRatio(),
+              imageInfo.sdf()));
+    }
+  }
+
+  public void addImageSourceUrl(String sourceId, List<LatLng> coordinates, String url) {
+    NativeAccess.ensureLoaded();
+    var copiedCoordinates = List.copyOf(Objects.requireNonNull(coordinates, "coordinates"));
+    try (var arena = Arena.ofConfined()) {
+      Status.check(
+          MapLibreNativeC.mln_map_add_image_source_url(
+              state.requireLive(),
+              CoreStructs.stringView(Objects.requireNonNull(sourceId, "sourceId"), arena),
+              StyleStructs.imageSourceCoordinates(copiedCoordinates, arena),
+              copiedCoordinates.size(),
+              CoreStructs.stringView(Objects.requireNonNull(url, "url"), arena)));
+    }
+  }
+
+  public void addImageSourceImage(
+      String sourceId, List<LatLng> coordinates, PremultipliedRgba8Image image) {
+    NativeAccess.ensureLoaded();
+    var copiedCoordinates = List.copyOf(Objects.requireNonNull(coordinates, "coordinates"));
+    Objects.requireNonNull(image, "image");
+    try (var arena = Arena.ofConfined()) {
+      Status.check(
+          MapLibreNativeC.mln_map_add_image_source_image(
+              state.requireLive(),
+              CoreStructs.stringView(Objects.requireNonNull(sourceId, "sourceId"), arena),
+              StyleStructs.imageSourceCoordinates(copiedCoordinates, arena),
+              copiedCoordinates.size(),
+              StyleStructs.premultipliedRgba8Image(image, arena)));
+    }
+  }
+
+  public void setImageSourceUrl(String sourceId, String url) {
+    NativeAccess.ensureLoaded();
+    try (var arena = Arena.ofConfined()) {
+      Status.check(
+          MapLibreNativeC.mln_map_set_image_source_url(
+              state.requireLive(),
+              CoreStructs.stringView(Objects.requireNonNull(sourceId, "sourceId"), arena),
+              CoreStructs.stringView(Objects.requireNonNull(url, "url"), arena)));
+    }
+  }
+
+  public void setImageSourceImage(String sourceId, PremultipliedRgba8Image image) {
+    NativeAccess.ensureLoaded();
+    Objects.requireNonNull(image, "image");
+    try (var arena = Arena.ofConfined()) {
+      Status.check(
+          MapLibreNativeC.mln_map_set_image_source_image(
+              state.requireLive(),
+              CoreStructs.stringView(Objects.requireNonNull(sourceId, "sourceId"), arena),
+              StyleStructs.premultipliedRgba8Image(image, arena)));
+    }
+  }
+
+  public void setImageSourceCoordinates(String sourceId, List<LatLng> coordinates) {
+    NativeAccess.ensureLoaded();
+    var copiedCoordinates = List.copyOf(Objects.requireNonNull(coordinates, "coordinates"));
+    try (var arena = Arena.ofConfined()) {
+      Status.check(
+          MapLibreNativeC.mln_map_set_image_source_coordinates(
+              state.requireLive(),
+              CoreStructs.stringView(Objects.requireNonNull(sourceId, "sourceId"), arena),
+              StyleStructs.imageSourceCoordinates(copiedCoordinates, arena),
+              copiedCoordinates.size()));
+    }
+  }
+
+  public Optional<List<LatLng>> imageSourceCoordinates(String sourceId) {
+    NativeAccess.ensureLoaded();
+    try (var arena = Arena.ofConfined()) {
+      var outCoordinates = mln_lat_lng.allocateArray(4, arena);
+      var outCoordinateCount = arena.allocate(ValueLayout.JAVA_LONG);
+      var outFound = arena.allocate(ValueLayout.JAVA_BOOLEAN);
+      Status.check(
+          MapLibreNativeC.mln_map_get_image_source_coordinates(
+              state.requireLive(),
+              CoreStructs.stringView(Objects.requireNonNull(sourceId, "sourceId"), arena),
+              outCoordinates,
+              4,
+              outCoordinateCount,
+              outFound));
+      return outFound.get(ValueLayout.JAVA_BOOLEAN, 0)
+          ? Optional.of(
+              CoreStructs.latLngArray(
+                  outCoordinates,
+                  Math.toIntExact(outCoordinateCount.get(ValueLayout.JAVA_LONG, 0))))
+          : Optional.empty();
+    }
+  }
+
+  public void addStyleLayerJson(JsonValue layerJson) {
+    addStyleLayerJson(layerJson, "");
+  }
+
+  public void addStyleLayerJson(JsonValue layerJson, String beforeLayerId) {
+    NativeAccess.ensureLoaded();
+    Objects.requireNonNull(layerJson, "layerJson");
+    try (var arena = Arena.ofConfined()) {
+      Status.check(
+          MapLibreNativeC.mln_map_add_style_layer_json(
+              state.requireLive(),
+              ValueStructs.jsonValue(layerJson, arena),
+              CoreStructs.stringView(
+                  Objects.requireNonNull(beforeLayerId, "beforeLayerId"), arena)));
+    }
+  }
+
+  public void addHillshadeLayer(String layerId, String sourceId) {
+    addHillshadeLayer(layerId, sourceId, "");
+  }
+
+  public void addHillshadeLayer(String layerId, String sourceId, String beforeLayerId) {
+    NativeAccess.ensureLoaded();
+    try (var arena = Arena.ofConfined()) {
+      Status.check(
+          MapLibreNativeC.mln_map_add_hillshade_layer(
+              state.requireLive(),
+              CoreStructs.stringView(Objects.requireNonNull(layerId, "layerId"), arena),
+              CoreStructs.stringView(Objects.requireNonNull(sourceId, "sourceId"), arena),
+              CoreStructs.stringView(
+                  Objects.requireNonNull(beforeLayerId, "beforeLayerId"), arena)));
+    }
+  }
+
+  public void addColorReliefLayer(String layerId, String sourceId) {
+    addColorReliefLayer(layerId, sourceId, "");
+  }
+
+  public void addColorReliefLayer(String layerId, String sourceId, String beforeLayerId) {
+    NativeAccess.ensureLoaded();
+    try (var arena = Arena.ofConfined()) {
+      Status.check(
+          MapLibreNativeC.mln_map_add_color_relief_layer(
+              state.requireLive(),
+              CoreStructs.stringView(Objects.requireNonNull(layerId, "layerId"), arena),
+              CoreStructs.stringView(Objects.requireNonNull(sourceId, "sourceId"), arena),
+              CoreStructs.stringView(
+                  Objects.requireNonNull(beforeLayerId, "beforeLayerId"), arena)));
+    }
+  }
+
+  public void addLocationIndicatorLayer(String layerId) {
+    addLocationIndicatorLayer(layerId, "");
+  }
+
+  public void addLocationIndicatorLayer(String layerId, String beforeLayerId) {
+    NativeAccess.ensureLoaded();
+    try (var arena = Arena.ofConfined()) {
+      Status.check(
+          MapLibreNativeC.mln_map_add_location_indicator_layer(
+              state.requireLive(),
+              CoreStructs.stringView(Objects.requireNonNull(layerId, "layerId"), arena),
+              CoreStructs.stringView(
+                  Objects.requireNonNull(beforeLayerId, "beforeLayerId"), arena)));
+    }
+  }
+
+  public void setLocationIndicatorLocation(String layerId, LatLng coordinate, double altitude) {
+    NativeAccess.ensureLoaded();
+    Objects.requireNonNull(coordinate, "coordinate");
+    try (var arena = Arena.ofConfined()) {
+      Status.check(
+          MapLibreNativeC.mln_map_set_location_indicator_location(
+              state.requireLive(),
+              CoreStructs.stringView(Objects.requireNonNull(layerId, "layerId"), arena),
+              CoreStructs.latLng(coordinate, arena),
+              altitude));
+    }
+  }
+
+  public void setLocationIndicatorBearing(String layerId, double bearing) {
+    NativeAccess.ensureLoaded();
+    try (var arena = Arena.ofConfined()) {
+      Status.check(
+          MapLibreNativeC.mln_map_set_location_indicator_bearing(
+              state.requireLive(),
+              CoreStructs.stringView(Objects.requireNonNull(layerId, "layerId"), arena),
+              bearing));
+    }
+  }
+
+  public void setLocationIndicatorAccuracyRadius(String layerId, double radius) {
+    NativeAccess.ensureLoaded();
+    try (var arena = Arena.ofConfined()) {
+      Status.check(
+          MapLibreNativeC.mln_map_set_location_indicator_accuracy_radius(
+              state.requireLive(),
+              CoreStructs.stringView(Objects.requireNonNull(layerId, "layerId"), arena),
+              radius));
+    }
+  }
+
+  public void setLocationIndicatorImageName(
+      String layerId, LocationIndicatorImageKind imageKind, String imageId) {
+    NativeAccess.ensureLoaded();
+    Objects.requireNonNull(imageKind, "imageKind");
+    try (var arena = Arena.ofConfined()) {
+      Status.check(
+          MapLibreNativeC.mln_map_set_location_indicator_image_name(
+              state.requireLive(),
+              CoreStructs.stringView(Objects.requireNonNull(layerId, "layerId"), arena),
+              imageKind.nativeValue(),
+              CoreStructs.stringView(Objects.requireNonNull(imageId, "imageId"), arena)));
+    }
+  }
+
+  public boolean removeStyleLayer(String layerId) {
+    NativeAccess.ensureLoaded();
+    try (var arena = Arena.ofConfined()) {
+      var outRemoved = arena.allocate(ValueLayout.JAVA_BOOLEAN);
+      Status.check(
+          MapLibreNativeC.mln_map_remove_style_layer(
+              state.requireLive(),
+              CoreStructs.stringView(Objects.requireNonNull(layerId, "layerId"), arena),
+              outRemoved));
+      return outRemoved.get(ValueLayout.JAVA_BOOLEAN, 0);
+    }
+  }
+
+  public boolean styleLayerExists(String layerId) {
+    NativeAccess.ensureLoaded();
+    try (var arena = Arena.ofConfined()) {
+      var outExists = arena.allocate(ValueLayout.JAVA_BOOLEAN);
+      Status.check(
+          MapLibreNativeC.mln_map_style_layer_exists(
+              state.requireLive(),
+              CoreStructs.stringView(Objects.requireNonNull(layerId, "layerId"), arena),
+              outExists));
+      return outExists.get(ValueLayout.JAVA_BOOLEAN, 0);
+    }
+  }
+
+  public Optional<String> styleLayerType(String layerId) {
+    NativeAccess.ensureLoaded();
+    try (var arena = Arena.ofConfined()) {
+      var outType = org.maplibre.nativeffi.internal.c.mln_string_view.allocate(arena);
+      var outFound = arena.allocate(ValueLayout.JAVA_BOOLEAN);
+      Status.check(
+          MapLibreNativeC.mln_map_get_style_layer_type(
+              state.requireLive(),
+              CoreStructs.stringView(Objects.requireNonNull(layerId, "layerId"), arena),
+              outType,
+              outFound));
+      return outFound.get(ValueLayout.JAVA_BOOLEAN, 0)
+          ? Optional.of(CoreStructs.stringView(outType))
+          : Optional.empty();
+    }
+  }
+
+  public List<String> styleLayerIds() {
+    NativeAccess.ensureLoaded();
+    try (var arena = Arena.ofConfined()) {
+      var outList = MemoryUtil.allocatePointer(arena);
+      Status.check(MapLibreNativeC.mln_map_list_style_layer_ids(state.requireLive(), outList));
+      return StyleStructs.styleIdList(outList.get(ValueLayout.ADDRESS, 0));
+    }
+  }
+
+  public void moveStyleLayer(String layerId) {
+    moveStyleLayer(layerId, "");
+  }
+
+  public void moveStyleLayer(String layerId, String beforeLayerId) {
+    NativeAccess.ensureLoaded();
+    try (var arena = Arena.ofConfined()) {
+      Status.check(
+          MapLibreNativeC.mln_map_move_style_layer(
+              state.requireLive(),
+              CoreStructs.stringView(Objects.requireNonNull(layerId, "layerId"), arena),
+              CoreStructs.stringView(
+                  Objects.requireNonNull(beforeLayerId, "beforeLayerId"), arena)));
+    }
+  }
+
+  public Optional<JsonValue> styleLayerJson(String layerId) {
+    NativeAccess.ensureLoaded();
+    try (var arena = Arena.ofConfined()) {
+      var outLayer = MemoryUtil.allocatePointer(arena);
+      var outFound = arena.allocate(ValueLayout.JAVA_BOOLEAN);
+      Status.check(
+          MapLibreNativeC.mln_map_get_style_layer_json(
+              state.requireLive(),
+              CoreStructs.stringView(Objects.requireNonNull(layerId, "layerId"), arena),
+              outLayer,
+              outFound));
+      if (!outFound.get(ValueLayout.JAVA_BOOLEAN, 0)) {
+        return Optional.empty();
+      }
+      return ValueStructs.jsonSnapshot(outLayer.get(ValueLayout.ADDRESS, 0));
+    }
+  }
+
+  public void setStyleLightJson(JsonValue lightJson) {
+    NativeAccess.ensureLoaded();
+    Objects.requireNonNull(lightJson, "lightJson");
+    try (var arena = Arena.ofConfined()) {
+      Status.check(
+          MapLibreNativeC.mln_map_set_style_light_json(
+              state.requireLive(), ValueStructs.jsonValue(lightJson, arena)));
+    }
+  }
+
+  public void setStyleLightProperty(String propertyName, JsonValue value) {
+    NativeAccess.ensureLoaded();
+    Objects.requireNonNull(value, "value");
+    try (var arena = Arena.ofConfined()) {
+      Status.check(
+          MapLibreNativeC.mln_map_set_style_light_property(
+              state.requireLive(),
+              CoreStructs.stringView(Objects.requireNonNull(propertyName, "propertyName"), arena),
+              ValueStructs.jsonValue(value, arena)));
+    }
+  }
+
+  public Optional<JsonValue> styleLightProperty(String propertyName) {
+    NativeAccess.ensureLoaded();
+    try (var arena = Arena.ofConfined()) {
+      var outValue = MemoryUtil.allocatePointer(arena);
+      Status.check(
+          MapLibreNativeC.mln_map_get_style_light_property(
+              state.requireLive(),
+              CoreStructs.stringView(Objects.requireNonNull(propertyName, "propertyName"), arena),
+              outValue));
+      return ValueStructs.jsonSnapshot(outValue.get(ValueLayout.ADDRESS, 0));
+    }
+  }
+
+  public void setLayerProperty(String layerId, String propertyName, JsonValue value) {
+    NativeAccess.ensureLoaded();
+    Objects.requireNonNull(value, "value");
+    try (var arena = Arena.ofConfined()) {
+      Status.check(
+          MapLibreNativeC.mln_map_set_layer_property(
+              state.requireLive(),
+              CoreStructs.stringView(Objects.requireNonNull(layerId, "layerId"), arena),
+              CoreStructs.stringView(Objects.requireNonNull(propertyName, "propertyName"), arena),
+              ValueStructs.jsonValue(value, arena)));
+    }
+  }
+
+  public Optional<JsonValue> layerProperty(String layerId, String propertyName) {
+    NativeAccess.ensureLoaded();
+    try (var arena = Arena.ofConfined()) {
+      var outValue = MemoryUtil.allocatePointer(arena);
+      Status.check(
+          MapLibreNativeC.mln_map_get_layer_property(
+              state.requireLive(),
+              CoreStructs.stringView(Objects.requireNonNull(layerId, "layerId"), arena),
+              CoreStructs.stringView(Objects.requireNonNull(propertyName, "propertyName"), arena),
+              outValue));
+      return ValueStructs.jsonSnapshot(outValue.get(ValueLayout.ADDRESS, 0));
+    }
+  }
+
+  public void setLayerFilter(String layerId, JsonValue filter) {
+    setLayerFilterInternal(layerId, Objects.requireNonNull(filter, "filter"), true);
+  }
+
+  public void clearLayerFilter(String layerId) {
+    setLayerFilterInternal(layerId, null, false);
+  }
+
+  public Optional<JsonValue> layerFilter(String layerId) {
+    NativeAccess.ensureLoaded();
+    try (var arena = Arena.ofConfined()) {
+      var outFilter = MemoryUtil.allocatePointer(arena);
+      Status.check(
+          MapLibreNativeC.mln_map_get_layer_filter(
+              state.requireLive(),
+              CoreStructs.stringView(Objects.requireNonNull(layerId, "layerId"), arena),
+              outFilter));
+      return ValueStructs.jsonSnapshot(outFilter.get(ValueLayout.ADDRESS, 0));
     }
   }
 
@@ -469,6 +1199,124 @@ public final class MapHandle implements AutoCloseable {
     return MapProjectionHandle.create(this);
   }
 
+  private void addVectorSourceUrlInternal(
+      String sourceId, String url, StyleTileSourceOptions options, boolean hasOptions) {
+    NativeAccess.ensureLoaded();
+    try (var arena = Arena.ofConfined()) {
+      Status.check(
+          MapLibreNativeC.mln_map_add_vector_source_url(
+              state.requireLive(),
+              CoreStructs.stringView(Objects.requireNonNull(sourceId, "sourceId"), arena),
+              CoreStructs.stringView(Objects.requireNonNull(url, "url"), arena),
+              hasOptions ? StyleStructs.tileSourceOptions(options, arena) : MemorySegment.NULL));
+    }
+  }
+
+  private void addVectorSourceTilesInternal(
+      String sourceId, List<String> tiles, StyleTileSourceOptions options, boolean hasOptions) {
+    NativeAccess.ensureLoaded();
+    var copiedTiles = List.copyOf(Objects.requireNonNull(tiles, "tiles"));
+    try (var arena = Arena.ofConfined()) {
+      Status.check(
+          MapLibreNativeC.mln_map_add_vector_source_tiles(
+              state.requireLive(),
+              CoreStructs.stringView(Objects.requireNonNull(sourceId, "sourceId"), arena),
+              copiedTiles.isEmpty()
+                  ? MemorySegment.NULL
+                  : StyleStructs.stringViewArray(copiedTiles, arena),
+              copiedTiles.size(),
+              hasOptions ? StyleStructs.tileSourceOptions(options, arena) : MemorySegment.NULL));
+    }
+  }
+
+  private void addRasterSourceUrlInternal(
+      String sourceId, String url, StyleTileSourceOptions options, boolean hasOptions) {
+    NativeAccess.ensureLoaded();
+    try (var arena = Arena.ofConfined()) {
+      Status.check(
+          MapLibreNativeC.mln_map_add_raster_source_url(
+              state.requireLive(),
+              CoreStructs.stringView(Objects.requireNonNull(sourceId, "sourceId"), arena),
+              CoreStructs.stringView(Objects.requireNonNull(url, "url"), arena),
+              hasOptions ? StyleStructs.tileSourceOptions(options, arena) : MemorySegment.NULL));
+    }
+  }
+
+  private void addRasterSourceTilesInternal(
+      String sourceId, List<String> tiles, StyleTileSourceOptions options, boolean hasOptions) {
+    NativeAccess.ensureLoaded();
+    var copiedTiles = List.copyOf(Objects.requireNonNull(tiles, "tiles"));
+    try (var arena = Arena.ofConfined()) {
+      Status.check(
+          MapLibreNativeC.mln_map_add_raster_source_tiles(
+              state.requireLive(),
+              CoreStructs.stringView(Objects.requireNonNull(sourceId, "sourceId"), arena),
+              copiedTiles.isEmpty()
+                  ? MemorySegment.NULL
+                  : StyleStructs.stringViewArray(copiedTiles, arena),
+              copiedTiles.size(),
+              hasOptions ? StyleStructs.tileSourceOptions(options, arena) : MemorySegment.NULL));
+    }
+  }
+
+  private void addRasterDemSourceUrlInternal(
+      String sourceId, String url, StyleTileSourceOptions options, boolean hasOptions) {
+    NativeAccess.ensureLoaded();
+    try (var arena = Arena.ofConfined()) {
+      Status.check(
+          MapLibreNativeC.mln_map_add_raster_dem_source_url(
+              state.requireLive(),
+              CoreStructs.stringView(Objects.requireNonNull(sourceId, "sourceId"), arena),
+              CoreStructs.stringView(Objects.requireNonNull(url, "url"), arena),
+              hasOptions ? StyleStructs.tileSourceOptions(options, arena) : MemorySegment.NULL));
+    }
+  }
+
+  private void addRasterDemSourceTilesInternal(
+      String sourceId, List<String> tiles, StyleTileSourceOptions options, boolean hasOptions) {
+    NativeAccess.ensureLoaded();
+    var copiedTiles = List.copyOf(Objects.requireNonNull(tiles, "tiles"));
+    try (var arena = Arena.ofConfined()) {
+      Status.check(
+          MapLibreNativeC.mln_map_add_raster_dem_source_tiles(
+              state.requireLive(),
+              CoreStructs.stringView(Objects.requireNonNull(sourceId, "sourceId"), arena),
+              copiedTiles.isEmpty()
+                  ? MemorySegment.NULL
+                  : StyleStructs.stringViewArray(copiedTiles, arena),
+              copiedTiles.size(),
+              hasOptions ? StyleStructs.tileSourceOptions(options, arena) : MemorySegment.NULL));
+    }
+  }
+
+  private void setStyleImageInternal(
+      String imageId,
+      PremultipliedRgba8Image image,
+      StyleImageOptions options,
+      boolean hasOptions) {
+    NativeAccess.ensureLoaded();
+    Objects.requireNonNull(image, "image");
+    try (var arena = Arena.ofConfined()) {
+      Status.check(
+          MapLibreNativeC.mln_map_set_style_image(
+              state.requireLive(),
+              CoreStructs.stringView(Objects.requireNonNull(imageId, "imageId"), arena),
+              StyleStructs.premultipliedRgba8Image(image, arena),
+              hasOptions ? StyleStructs.styleImageOptions(options, arena) : MemorySegment.NULL));
+    }
+  }
+
+  private void setLayerFilterInternal(String layerId, JsonValue filter, boolean hasFilter) {
+    NativeAccess.ensureLoaded();
+    try (var arena = Arena.ofConfined()) {
+      Status.check(
+          MapLibreNativeC.mln_map_set_layer_filter(
+              state.requireLive(),
+              CoreStructs.stringView(Objects.requireNonNull(layerId, "layerId"), arena),
+              hasFilter ? ValueStructs.jsonValue(filter, arena) : MemorySegment.NULL));
+    }
+  }
+
   private void easeToInternal(
       CameraOptions camera, AnimationOptions animation, boolean hasAnimation) {
     NativeAccess.ensureLoaded();
@@ -622,7 +1470,12 @@ public final class MapHandle implements AutoCloseable {
   @Override
   public void close() {
     NativeAccess.ensureLoaded();
-    state.closeOnce(MapLibreNativeC::mln_map_destroy, () -> runtime.unregisterMap(this));
+    state.closeOnce(
+        MapLibreNativeC::mln_map_destroy,
+        () -> {
+          clearCustomGeometrySources();
+          runtime.unregisterMap(this);
+        });
   }
 
   public boolean isClosed() {
@@ -639,6 +1492,26 @@ public final class MapHandle implements AutoCloseable {
 
   long nativeAddress() {
     return state.address();
+  }
+
+  private void closeCustomGeometrySource(String sourceId) {
+    closeQuietly(customGeometrySources.remove(sourceId));
+  }
+
+  private void clearCustomGeometrySources() {
+    customGeometrySources.values().forEach(MapHandle::closeQuietly);
+    customGeometrySources.clear();
+  }
+
+  private static void closeQuietly(AutoCloseable closeable) {
+    if (closeable == null) {
+      return;
+    }
+    try {
+      closeable.close();
+    } catch (Exception ignored) {
+      // Closing callback state is best-effort after native ownership ends.
+    }
   }
 
   private static double requireFinite(double value, String name) {

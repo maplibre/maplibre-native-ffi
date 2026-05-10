@@ -11,6 +11,7 @@ import java.lang.foreign.MemorySegment;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import org.maplibre.nativeffi.Feature;
 import org.maplibre.nativeffi.FeatureIdentifier;
 import org.maplibre.nativeffi.GeoJson;
@@ -71,6 +72,20 @@ public final class ValueStructs {
 
   public static GeoJson geoJson(MemorySegment segment) {
     return readGeoJson(segment.reinterpret(mln_geojson.sizeof()));
+  }
+
+  public static Optional<JsonValue> jsonSnapshot(MemorySegment snapshot) {
+    if (MemoryUtil.isNull(snapshot)) {
+      return Optional.empty();
+    }
+    try (var arena = Arena.ofConfined()) {
+      var outValue = MemoryUtil.allocatePointer(arena);
+      Status.check(MapLibreNativeC.mln_json_snapshot_get(snapshot, outValue));
+      var value = outValue.get(java.lang.foreign.ValueLayout.ADDRESS, 0);
+      return MemoryUtil.isNull(value) ? Optional.empty() : Optional.of(jsonValue(value));
+    } finally {
+      MapLibreNativeC.mln_json_snapshot_destroy(snapshot);
+    }
   }
 
   private static void writeJsonValue(

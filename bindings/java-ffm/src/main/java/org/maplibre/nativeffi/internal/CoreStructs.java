@@ -168,7 +168,7 @@ public final class CoreStructs {
         mln_edge_insets.right(segment));
   }
 
-  static MemorySegment stringView(String value, Arena arena) {
+  public static MemorySegment stringView(String value, Arena arena) {
     var bytes = value.getBytes(StandardCharsets.UTF_8);
     var view = mln_string_view.allocate(arena);
     if (bytes.length > 0) {
@@ -180,7 +180,7 @@ public final class CoreStructs {
     return view;
   }
 
-  static String stringView(MemorySegment view) {
+  public static String stringView(MemorySegment view) {
     return MemoryUtil.copyStringView(mln_string_view.data(view), mln_string_view.size(view));
   }
 
