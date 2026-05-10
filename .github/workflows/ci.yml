@@ -89,15 +89,31 @@ jobs:
         run: sudo apt-get update -y && sudo apt-get install -y --no-install-recommends libegl-dev libgles-dev libgles2 libegl-mesa0 libegl1 xvfb libgl1-mesa-dri
       - run: mise run configure
       - run: mise run ci:lint native
+      - name: Remove pixi's broken libEGL/libGLESv2 (Linux OpenGL)
+        if: ${{ contains(matrix.variant, 'opengl') && runner.os == 'Linux' }}
+        # The shared library has DT_RUNPATH=.pixi/envs/default/lib (set by
+        # CMAKE_BUILD_RPATH so other pixi runtime libs like libuv/libpng
+        # resolve). DT_RUNPATH is searched BEFORE ld.so.cache, so even
+        # though we link against /usr/lib/<multiarch>/libEGL.so at build time,
+        # at runtime DT_NEEDED libEGL.so.1 / libGLESv2.so.2 still resolve to
+        # the pixi conda-forge copies — which are compiled WITHOUT X11 EGL
+        # platform support and cause render_update() to fail.
+        #
+        # Delete pixi's EGL/GLESv2 files so the dynamic linker, after failing
+        # in DT_RUNPATH, falls through to ld.so.cache and picks up the
+        # system X11-capable libEGL.so.1 (GLVND -> libEGL_mesa.so.0) and
+        # libGLESv2.so.2.
+        run: |
+          PIXI_LIB="${{ github.workspace }}/.pixi/envs/default/lib"
+          sudo rm -fv "$PIXI_LIB"/libEGL.so* "$PIXI_LIB"/libGLESv2.so* "$PIXI_LIB"/libGLES.so* "$PIXI_LIB"/libGLESv1_CM.so*
+          echo "After cleanup:"
+          ls -la "$PIXI_LIB"/libEGL* "$PIXI_LIB"/libGL* 2>&1 | head -40 || true
       - name: Run tests (Linux OpenGL — xvfb-run + Mesa software EGL)
         if: ${{ contains(matrix.variant, 'opengl') && runner.os == 'Linux' }}
-        # Mirror maplibre-native's approach: rely on system Mesa packages
-        # (libegl-mesa0 + libgl1-mesa-dri) plus xvfb-run for a virtual X11
-        # display. CMake links the .so against /usr/lib/<multiarch>/libEGL.so.1
-        # (system GLVND) — see cmake/render/opengl.cmake — so the dynamic
-        # linker resolves libEGL via system GLVND, which loads the X11-capable
-        # libEGL_mesa.so.0 ICD. LIBGL_ALWAYS_SOFTWARE=1 forces llvmpipe so no
-        # GPU is required.
+        # xvfb-run gives DISPLAY=:nn so eglGetDisplay(EGL_DEFAULT_DISPLAY)
+        # connects to a virtual X11 display. With pixi's broken EGL/GLESv2
+        # removed (previous step), the dynamic linker resolves the system
+        # X11-capable Mesa EGL ICD. LIBGL_ALWAYS_SOFTWARE=1 forces llvmpipe.
         env:
           LIBGL_ALWAYS_SOFTWARE: "1"
         run: xvfb-run mise run test
