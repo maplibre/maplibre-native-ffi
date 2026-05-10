@@ -1,0 +1,69 @@
+package org.maplibre.nativeffi;
+
+/** Mutable descriptor for axonometric map projection mode options. */
+public final class ProjectionModeOptions {
+  private Boolean axonometric;
+  private Double xSkew;
+  private Double ySkew;
+
+  public boolean hasAxonometric() {
+    return axonometric != null;
+  }
+
+  public Boolean axonometric() {
+    return axonometric;
+  }
+
+  public ProjectionModeOptions setAxonometric(boolean axonometric) {
+    this.axonometric = axonometric;
+    return this;
+  }
+
+  public ProjectionModeOptions clearAxonometric() {
+    axonometric = null;
+    return this;
+  }
+
+  public boolean hasXSkew() {
+    return xSkew != null;
+  }
+
+  public Double xSkew() {
+    return xSkew;
+  }
+
+  public ProjectionModeOptions setXSkew(double xSkew) {
+    this.xSkew = requireFinite(xSkew, "xSkew");
+    return this;
+  }
+
+  public ProjectionModeOptions clearXSkew() {
+    xSkew = null;
+    return this;
+  }
+
+  public boolean hasYSkew() {
+    return ySkew != null;
+  }
+
+  public Double ySkew() {
+    return ySkew;
+  }
+
+  public ProjectionModeOptions setYSkew(double ySkew) {
+    this.ySkew = requireFinite(ySkew, "ySkew");
+    return this;
+  }
+
+  public ProjectionModeOptions clearYSkew() {
+    ySkew = null;
+    return this;
+  }
+
+  private static double requireFinite(double value, String name) {
+    if (!Double.isFinite(value)) {
+      throw new IllegalArgumentException(name + " must be finite");
+    }
+    return value;
+  }
+}

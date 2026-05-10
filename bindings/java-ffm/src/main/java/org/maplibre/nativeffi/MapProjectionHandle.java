@@ -3,6 +3,7 @@ package org.maplibre.nativeffi;
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
+import java.util.List;
 import java.util.Objects;
 import org.maplibre.nativeffi.internal.HandleState;
 import org.maplibre.nativeffi.internal.MemoryUtil;
@@ -28,6 +29,42 @@ public final class MapProjectionHandle implements AutoCloseable {
       var outProjection = MemoryUtil.allocatePointer(arena);
       Status.check(MapLibreNativeC.mln_map_projection_create(map.nativeHandle(), outProjection));
       return new MapProjectionHandle(outProjection.get(ValueLayout.ADDRESS, 0));
+    }
+  }
+
+  public CameraOptions camera() {
+    NativeAccess.ensureLoaded();
+    try (var arena = Arena.ofConfined()) {
+      var outCamera = MapLibreNativeC.mln_camera_options_default(arena);
+      Status.check(MapLibreNativeC.mln_map_projection_get_camera(state.requireLive(), outCamera));
+      return Structs.cameraOptions(outCamera);
+    }
+  }
+
+  public void setCamera(CameraOptions camera) {
+    NativeAccess.ensureLoaded();
+    Objects.requireNonNull(camera, "camera");
+    try (var arena = Arena.ofConfined()) {
+      Status.check(
+          MapLibreNativeC.mln_map_projection_set_camera(
+              state.requireLive(), Structs.cameraOptions(camera, arena)));
+    }
+  }
+
+  public void setVisibleCoordinates(List<LatLng> coordinates, EdgeInsets padding) {
+    NativeAccess.ensureLoaded();
+    var copiedCoordinates = List.copyOf(Objects.requireNonNull(coordinates, "coordinates"));
+    if (copiedCoordinates.isEmpty()) {
+      throw new IllegalArgumentException("coordinates must not be empty");
+    }
+    Objects.requireNonNull(padding, "padding");
+    try (var arena = Arena.ofConfined()) {
+      Status.check(
+          MapLibreNativeC.mln_map_projection_set_visible_coordinates(
+              state.requireLive(),
+              Structs.latLngArray(copiedCoordinates, arena),
+              copiedCoordinates.size(),
+              Structs.edgeInsets(padding, arena)));
     }
   }
 

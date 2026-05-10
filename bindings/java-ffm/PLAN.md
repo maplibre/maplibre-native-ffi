@@ -75,7 +75,10 @@ use the separate JNI binding path.
   operations;
 - runtime resource transform and provider callbacks with copied requests,
   `ResourceResponse` materialization, and one-shot `ResourceRequestHandle`
-  completion/release.
+  completion/release;
+- map lifecycle, style loading, repaint/still-image requests, debug helpers,
+  camera commands, viewport/tile/bounds/free-camera/projection-mode options,
+  projection helpers, and coordinate conversions.
 
 Java release policy: JDK 25 is the temporary development floor because jextract
 25 emits `SymbolLookup.findOrThrow()`, which is unavailable under
@@ -127,9 +130,10 @@ diagnostic string.
 - Initialize C `size` fields in internal materializers. Public callers set only
   semantic fields.
 - Represent C bit masks as `EnumSet<T>` or small purpose-built value types.
-- Use Java enums for closed input domains. For output domains that may grow,
-  preserve the raw native value in the copied Java object so newer C libraries
-  can be diagnosed safely.
+- Use Java enums for closed input domains. Copied event and result records may
+  include raw native values when they are useful for diagnostics across C ABI
+  drift. Mutable descriptor snapshots can use `UNKNOWN` enum sentinels for
+  forward-compatible output fields.
 - Model JSON, geometry, GeoJSON, features, and queried data as Java value trees.
   Define `JsonValue` as a sealed interface with immutable record variants for
   payload values and a singleton variant for JSON null. Record constructors
@@ -175,29 +179,7 @@ Build this support layer before broad API coverage:
 
 ## Milestones
 
-### 1. Map Lifecycle, Camera, And Projection
-
-Implement:
-
-- `MapOptions` and `MapHandle.create(runtime, options)`;
-- map close with parent runtime retention;
-- style URL and style JSON loading;
-- repaint and still-image requests;
-- camera, animation, bounds, viewport, tile, free-camera, and projection-mode
-  descriptors;
-- camera commands and coordinate conversions;
-- `MapProjectionHandle` snapshot helper and Mercator meter helpers.
-
-Tests:
-
-- runtime keeps parent validity while maps are live;
-- runtime close fails while a map is live and succeeds after map close;
-- map options and default descriptors materialize expected `size` and field
-  masks;
-- projection helpers close independently and reject use after release;
-- wrong-thread map and projection calls map to `WrongThreadException`.
-
-### 2. JSON, Geometry, GeoJSON, And Feature Values
+### 1. JSON, Geometry, GeoJSON, And Feature Values
 
 Implement:
 
@@ -217,7 +199,7 @@ Tests:
 - descriptor memory stays alive for the full native call and is released after
   the call.
 
-### 3. Style Sources, Layers, Images, And Custom Geometry
+### 2. Style Sources, Layers, Images, And Custom Geometry
 
 Implement:
 
@@ -238,7 +220,7 @@ Tests:
 - custom geometry callbacks stay strongly reachable until the map drops their
   owner scope.
 
-### 4. Render Sessions And Render Targets
+### 3. Render Sessions And Render Targets
 
 Implement:
 
@@ -259,7 +241,7 @@ Tests:
 - acquired frame callbacks always release the frame after callback success or
   failure.
 
-### 5. Feature State, Queries, Snapshots, And Offline Regions
+### 4. Feature State, Queries, Snapshots, And Offline Regions
 
 Implement:
 
@@ -279,7 +261,7 @@ Tests:
 - feature query and offline APIs propagate native invalid-state and wrong-thread
   statuses through the public exception model.
 
-### 6. Owner-Thread Helper Optional Layer
+### 5. Owner-Thread Helper Optional Layer
 
 The low-level handle APIs stay direct. After direct coverage works, add a small
 optional helper only if tests or examples show a clear need:
