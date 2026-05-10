@@ -793,6 +793,35 @@ public final class MapHandle implements AutoCloseable {
     }
   }
 
+  public RenderSessionHandle attachOwnedTexture(OwnedTextureDescriptor descriptor) {
+    return RenderSessionHandle.attachOwnedTexture(this, descriptor);
+  }
+
+  public RenderSessionHandle attachMetalOwnedTexture(MetalOwnedTextureDescriptor descriptor) {
+    return RenderSessionHandle.attachMetalOwnedTexture(this, descriptor);
+  }
+
+  public RenderSessionHandle attachMetalBorrowedTexture(MetalBorrowedTextureDescriptor descriptor) {
+    return RenderSessionHandle.attachMetalBorrowedTexture(this, descriptor);
+  }
+
+  public RenderSessionHandle attachVulkanOwnedTexture(VulkanOwnedTextureDescriptor descriptor) {
+    return RenderSessionHandle.attachVulkanOwnedTexture(this, descriptor);
+  }
+
+  public RenderSessionHandle attachVulkanBorrowedTexture(
+      VulkanBorrowedTextureDescriptor descriptor) {
+    return RenderSessionHandle.attachVulkanBorrowedTexture(this, descriptor);
+  }
+
+  public RenderSessionHandle attachMetalSurface(MetalSurfaceDescriptor descriptor) {
+    return RenderSessionHandle.attachMetalSurface(this, descriptor);
+  }
+
+  public RenderSessionHandle attachVulkanSurface(VulkanSurfaceDescriptor descriptor) {
+    return RenderSessionHandle.attachVulkanSurface(this, descriptor);
+  }
+
   public void requestRepaint() {
     NativeAccess.ensureLoaded();
     Status.check(MapLibreNativeC.mln_map_request_repaint(state.requireLive()));
