@@ -3,6 +3,8 @@ include(mln_platform)
 include(mln_render_backend)
 
 function(mln_add_c_api_library target)
+  find_package(ZLIB REQUIRED)
+
   set(MLN_FFI_C_API_SOURCES
       ${PROJECT_SOURCE_DIR}/src/c_api/diagnostics.cpp
       ${PROJECT_SOURCE_DIR}/src/c_api/logging.cpp
@@ -41,12 +43,14 @@ function(mln_add_c_api_library target)
     ${target}
     PRIVATE
       Mapbox::Map mbgl-vendor-boost mbgl-vendor-nunicode mbgl-vendor-pmtiles
-      mbgl-vendor-sqlite z)
+      mbgl-vendor-sqlite ZLIB::ZLIB)
 
   target_compile_options(
     ${target}
     PRIVATE
-      $<$<COMPILE_LANGUAGE:CXX,OBJCXX>:-fno-rtti>
+      $<$<AND:$<COMPILE_LANGUAGE:CXX,OBJCXX>,$<NOT:$<CXX_COMPILER_ID:MSVC>>>:-fno-rtti>
+      $<$<AND:$<COMPILE_LANGUAGE:C,CXX>,$<CXX_COMPILER_ID:MSVC>>:/MP>
+      $<$<AND:$<COMPILE_LANGUAGE:CXX>,$<CXX_COMPILER_ID:MSVC>>:/GR->
       $<$<COMPILE_LANGUAGE:OBJC,OBJCXX>:-fobjc-arc>)
   target_compile_definitions(
     ${target}

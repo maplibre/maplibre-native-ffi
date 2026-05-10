@@ -48,6 +48,20 @@ fn linkMapLibreC(b: *std.Build, module: *std.Build.Module, cmake_artifact_dir: s
     module.link_libc = true;
 }
 
+fn pixiLibraryDir(b: *std.Build, target: std.Build.ResolvedTarget) std.Build.LazyPath {
+    return switch (target.result.os.tag) {
+        .windows => b.path("../../.pixi/envs/default/Library/lib"),
+        else => b.path("../../.pixi/envs/default/lib"),
+    };
+}
+
+fn vulkanLibraryName(target: std.Build.ResolvedTarget) []const u8 {
+    return switch (target.result.os.tag) {
+        .windows => "vulkan-1",
+        else => "vulkan",
+    };
+}
+
 fn addReadbackExample(b: *std.Build, options: BuildOptions) *std.Build.Step.Compile {
     const build_options = b.addOptions();
     build_options.addOption(bool, "supports_metal", options.render_backend == .metal);
@@ -64,11 +78,11 @@ fn addReadbackExample(b: *std.Build, options: BuildOptions) *std.Build.Step.Comp
 
     example.root_module.addOptions("build_options", build_options);
     linkMapLibreC(b, example.root_module, options.cmake_artifact_dir);
-    example.root_module.addLibraryPath(b.path("../../.pixi/envs/default/lib"));
-    example.root_module.addRPath(b.path("../../.pixi/envs/default/lib"));
+    example.root_module.addLibraryPath(pixiLibraryDir(b, options.target));
+    example.root_module.addRPath(pixiLibraryDir(b, options.target));
     if (options.render_backend == .vulkan) {
         example.root_module.addIncludePath(b.path("../../third_party/maplibre-native/vendor/Vulkan-Headers/include"));
-        example.root_module.linkSystemLibrary("vulkan", .{});
+        example.root_module.linkSystemLibrary(vulkanLibraryName(options.target), .{});
     } else if (options.render_backend == .metal) {
         example.root_module.linkFramework("Metal", .{});
         example.root_module.linkFramework("QuartzCore", .{});

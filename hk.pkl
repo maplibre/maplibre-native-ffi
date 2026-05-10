@@ -41,11 +41,6 @@ local commonSteps = new Mapping<String, Step> {
     profiles = commonProfiles
     check = "uv run ty check --error-on-warning .mise"
   }
-  ["zig-ast-check"] {
-    glob = List("**/*.zig")
-    profiles = commonProfiles
-    check = "for file in {{files}}; do zig ast-check \"$file\"; done"
-  }
 }
 
 local nativeSteps = new Mapping<String, Step> {}

@@ -32,8 +32,9 @@ Install the platform toolchain:
   compatible Xcode. Run the pinned
   [`xcodes`](https://github.com/XcodesOrg/xcodes) tool with `xcodes select` to
   switch to the repository version.
-- On Windows, install a recent version of Visual Studio Community with the
-  `Desktop development with C++` workload.
+- On Windows, install a recent version of Visual Studio Community (or Build
+  Tools) 2022 with the `Desktop development with C++` workload and
+  `Git for Windows`. We rely on Git Bash to run project scripts.
 
 Install [`mise`](https://mise.jdx.dev/), then install pinned project tools and
 run repository setup hooks:

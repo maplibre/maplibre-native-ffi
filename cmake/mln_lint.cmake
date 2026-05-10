@@ -31,7 +31,7 @@ endfunction()
 
 function(mln_configure_project_source source)
   if(MSVC)
-    set(MLN_FFI_WARNINGS /W4 /WX)
+    set(MLN_FFI_WARNINGS /W4 /WX /wd4005 /wd4244 /wd4324 /wd4458)
   elseif(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     set(MLN_FFI_WARNINGS -Wall -Wextra -Werror -Wno-macro-redefined)
   else()

@@ -1,19 +1,28 @@
-#!/usr/bin/env bash
-set -euo pipefail
+#!/usr/bin/env python
+import glob
+import os
+import subprocess
+import sys
 
-if [[ "${CI:-}" != "true" ]]; then
-  exec mise run //:build
-fi
 
-found=false
-for lib in "${MLN_FFI_BUILD_DIR:-build/host}"/libmaplibre-native-c.* build/libmaplibre-native-c.*; do
-  if [[ -f "$lib" ]]; then
-    found=true
-    break
-  fi
-done
+def main() -> int:
+    build_dir = os.environ.get("MLN_FFI_BUILD_DIR", "build/host")
+    if os.environ.get("CI") != "true":
+        return subprocess.call(["mise", "run", "//:build"])
 
-if [[ "$found" != "true" ]]; then
-  echo "missing ${MLN_FFI_BUILD_DIR:-build/host}/libmaplibre-native-c.*; native artifact was not downloaded" >&2
-  exit 1
-fi
+    patterns = [
+        os.path.join(build_dir, "libmaplibre-native-c.*"),
+        os.path.join("build", "libmaplibre-native-c.*"),
+    ]
+    if any(glob.glob(pattern) for pattern in patterns):
+        return 0
+
+    print(
+        f"missing {build_dir}/libmaplibre-native-c.*; native artifact was not downloaded",
+        file=sys.stderr,
+    )
+    return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

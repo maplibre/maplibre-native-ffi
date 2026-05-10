@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 # [MISE] description="Generate GitHub Actions matrix JSON"
 # [USAGE] arg "<matrix>" help="Matrix to generate" {
 # [USAGE]   choices "native" "examples" "bindings"

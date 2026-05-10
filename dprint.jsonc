@@ -6,7 +6,7 @@
   "lineWidth": 80,
   "indentWidth": 2,
   "useTabs": false,
-  "newLineKind": "lf",
+  "newLineKind": "auto",
   "excludes": [
     "build*/**",
     "third_party/**",

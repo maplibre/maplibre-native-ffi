@@ -41,3 +41,7 @@ vulkan-tools = ">=1.4.341.0,<2"
 
 [target.osx-arm64.dependencies]
 moltenvk = ">=1.4.1,<2"
+
+[target.win-64.dependencies]
+cxx-compiler = "*"
+dlfcn-win32 = "*"
