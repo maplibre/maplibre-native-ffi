@@ -1,5 +1,7 @@
 {
   "editor.formatOnSave": true,
   "editor.defaultFormatter": "dprint.dprint",
-  "git.detectSubmodulesLimit": 0
+  "git.ignoreSubmodules": true,
+  "git.detectSubmodules": false,
+  "python.defaultInterpreterPath": "${workspaceFolder}/.venv"
 }

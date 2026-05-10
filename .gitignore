@@ -1,4 +1,5 @@
 build/
+bindings/*/bin/
 docs/api/c/gen/
 docs/src/content/docs/reference/c.md
 .zig-cache/
