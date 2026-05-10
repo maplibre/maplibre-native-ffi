@@ -49,6 +49,7 @@ final class MapHandleTest {
       map.close();
       var error = assertThrows(InvalidStateException.class, () -> map.setStyleJson("{}"));
       assertTrue(error.diagnostic().contains("MapHandle"));
+      assertThrows(InvalidStateException.class, () -> map.cameraForLatLngs(List.of()));
       assertThrows(InvalidStateException.class, () -> map.pixelsForLatLngs(List.of()));
       assertThrows(InvalidStateException.class, () -> map.latLngsForPixels(List.of()));
     } finally {
@@ -165,6 +166,30 @@ final class MapHandleTest {
   }
 
   @Test
+  void emptyCameraFitCoordinateInputsUseNativeValidation() {
+    var runtime = RuntimeHandle.create();
+    var map = MapHandle.create(runtime, new MapOptions().setSize(128, 128));
+    var projection = map.createProjection();
+    try {
+      var mapError =
+          assertThrows(InvalidArgumentException.class, () -> map.cameraForLatLngs(List.of()));
+      assertEquals(MapLibreStatus.INVALID_ARGUMENT, mapError.status());
+      assertFalse(mapError.diagnostic().isBlank());
+
+      var projectionError =
+          assertThrows(
+              InvalidArgumentException.class,
+              () -> projection.setVisibleCoordinates(List.of(), EdgeInsets.ZERO));
+      assertEquals(MapLibreStatus.INVALID_ARGUMENT, projectionError.status());
+      assertFalse(projectionError.diagnostic().isBlank());
+    } finally {
+      projection.close();
+      map.close();
+      runtime.close();
+    }
+  }
+
+  @Test
   void projectionHelpersCloseIndependently() {
     var runtime = RuntimeHandle.create();
     var map = MapHandle.create(runtime, new MapOptions().setSize(128, 128));
@@ -185,6 +210,9 @@ final class MapHandleTest {
       assertEquals(0.0, coordinate.longitude(), 1e-6);
       projection.close();
       assertThrows(InvalidStateException.class, () -> projection.pixelForLatLng(new LatLng(0, 0)));
+      assertThrows(
+          InvalidStateException.class,
+          () -> projection.setVisibleCoordinates(List.of(), EdgeInsets.ZERO));
     } finally {
       map.close();
       runtime.close();
@@ -197,6 +225,7 @@ final class MapHandleTest {
     var map = MapHandle.create(runtime, new MapOptions().setSize(128, 128));
     try {
       assertWrongThread(runOnOtherThread(map::requestRepaint));
+      assertWrongThread(runOnOtherThread(() -> map.cameraForLatLngs(List.of())));
       assertWrongThread(runOnOtherThread(() -> map.pixelsForLatLngs(List.of())));
       assertWrongThread(runOnOtherThread(() -> map.latLngsForPixels(List.of())));
     } finally {
@@ -212,6 +241,8 @@ final class MapHandleTest {
     var projection = map.createProjection();
     try {
       assertWrongThread(runOnOtherThread(() -> projection.pixelForLatLng(new LatLng(0, 0))));
+      assertWrongThread(
+          runOnOtherThread(() -> projection.setVisibleCoordinates(List.of(), EdgeInsets.ZERO)));
     } finally {
       projection.close();
       map.close();

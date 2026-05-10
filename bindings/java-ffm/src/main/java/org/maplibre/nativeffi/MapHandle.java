@@ -586,15 +586,14 @@ public final class MapHandle implements AutoCloseable {
       List<LatLng> coordinates, CameraFitOptions fitOptions, boolean hasFitOptions) {
     NativeAccess.ensureLoaded();
     var copiedCoordinates = List.copyOf(Objects.requireNonNull(coordinates, "coordinates"));
-    if (copiedCoordinates.isEmpty()) {
-      throw new IllegalArgumentException("coordinates must not be empty");
-    }
     try (var arena = Arena.ofConfined()) {
       var outCamera = MapLibreNativeC.mln_camera_options_default(arena);
       Status.check(
           MapLibreNativeC.mln_map_camera_for_lat_lngs(
               state.requireLive(),
-              Structs.latLngArray(copiedCoordinates, arena),
+              copiedCoordinates.isEmpty()
+                  ? MemorySegment.NULL
+                  : Structs.latLngArray(copiedCoordinates, arena),
               copiedCoordinates.size(),
               hasFitOptions ? Structs.cameraFitOptions(fitOptions, arena) : MemorySegment.NULL,
               outCamera));

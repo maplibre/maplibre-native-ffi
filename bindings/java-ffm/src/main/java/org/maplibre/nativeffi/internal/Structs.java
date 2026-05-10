@@ -623,9 +623,7 @@ public final class Structs {
   }
 
   public static MemorySegment geometry(Geometry geometry, Arena arena) {
-    var segment = mln_geometry.allocate(arena);
-    writeGeometry(segment, geometry, arena, 0);
-    return segment;
+    return geometry(geometry, arena, 0);
   }
 
   public static Geometry geometry(MemorySegment segment) {
@@ -633,9 +631,7 @@ public final class Structs {
   }
 
   public static MemorySegment feature(Feature feature, Arena arena) {
-    var segment = mln_feature.allocate(arena);
-    writeFeature(segment, feature, arena, 0);
-    return segment;
+    return feature(feature, arena, 0);
   }
 
   public static Feature feature(MemorySegment segment) {
@@ -1059,9 +1055,21 @@ public final class Structs {
     return List.copyOf(copied);
   }
 
+  private static MemorySegment geometry(Geometry geometry, Arena arena, int depth) {
+    var segment = mln_geometry.allocate(arena);
+    writeGeometry(segment, geometry, arena, depth);
+    return segment;
+  }
+
+  private static MemorySegment feature(Feature feature, Arena arena, int depth) {
+    var segment = mln_feature.allocate(arena);
+    writeFeature(segment, feature, arena, depth);
+    return segment;
+  }
+
   private static void writeFeature(MemorySegment segment, Feature feature, Arena arena, int depth) {
     mln_feature.size(segment, (int) mln_feature.sizeof());
-    mln_feature.geometry(segment, geometry(feature.geometry(), arena));
+    mln_feature.geometry(segment, geometry(feature.geometry(), arena, depth + 1));
     var properties = feature.properties();
     if (!properties.isEmpty()) {
       mln_feature.properties(segment, jsonMembers(properties, arena, depth + 1));
@@ -1074,7 +1082,7 @@ public final class Structs {
     var geometry =
         readGeometry(
             sizedPointer(mln_feature.geometry(segment), mln_geometry.sizeof(), "feature geometry"),
-            depth);
+            depth + 1);
     var propertyCount = Math.toIntExact(mln_feature.property_count(segment));
     var properties = readJsonMembers(mln_feature.properties(segment), propertyCount, depth + 1);
     return new Feature(geometry, properties, readFeatureIdentifier(segment));
@@ -1134,7 +1142,7 @@ public final class Structs {
       mln_geojson.data.geometry(data, geometry(geometryValue.geometry(), arena));
     } else if (geoJson instanceof GeoJson.FeatureValue featureValue) {
       mln_geojson.type(segment, MapLibreNativeC.MLN_GEOJSON_TYPE_FEATURE());
-      mln_geojson.data.feature(data, feature(featureValue.feature(), arena));
+      mln_geojson.data.feature(data, feature(featureValue.feature(), arena, 0));
     } else if (geoJson instanceof GeoJson.FeatureCollection featureCollection) {
       mln_geojson.type(segment, MapLibreNativeC.MLN_GEOJSON_TYPE_FEATURE_COLLECTION());
       var features = featureCollection.features();
@@ -1142,7 +1150,7 @@ public final class Structs {
       if (!features.isEmpty()) {
         var nativeFeatures = mln_feature.allocateArray(features.size(), arena);
         for (var index = 0; index < features.size(); index++) {
-          writeFeature(mln_feature.asSlice(nativeFeatures, index), features.get(index), arena, 0);
+          writeFeature(mln_feature.asSlice(nativeFeatures, index), features.get(index), arena, 1);
         }
         mln_feature_collection.features(nativeCollection, nativeFeatures);
       }
@@ -1180,7 +1188,7 @@ public final class Structs {
               "GeoJSON feature collection");
       var copied = new ArrayList<Feature>(count);
       for (var index = 0; index < count; index++) {
-        copied.add(readFeature(mln_feature.asSlice(features, index), 0));
+        copied.add(readFeature(mln_feature.asSlice(features, index), 1));
       }
       return GeoJson.featureCollection(copied);
     }

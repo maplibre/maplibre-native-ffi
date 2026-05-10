@@ -68,22 +68,62 @@ final class ValueStructsTest {
 
   @Test
   void descriptorDepthErrorsAreReportedInJava() {
-    JsonValue json = JsonValue.nullValue();
-    for (var index = 0; index < JsonValue.MAX_DESCRIPTOR_DEPTH + 2; index++) {
-      json = JsonValue.array(List.of(json));
-    }
-    var tooDeepJson = json;
+    var tooDeepJson = nestedArray(JsonValue.MAX_DESCRIPTOR_DEPTH + 2);
     try (var arena = Arena.ofConfined()) {
       assertThrows(IllegalArgumentException.class, () -> Structs.jsonValue(tooDeepJson, arena));
     }
 
-    Geometry geometry = Geometry.empty();
-    for (var index = 0; index < Geometry.MAX_COLLECTION_DEPTH + 2; index++) {
-      geometry = Geometry.collection(List.of(geometry));
-    }
-    var tooDeepGeometry = geometry;
+    var tooDeepGeometry = nestedCollection(Geometry.MAX_COLLECTION_DEPTH + 2);
     try (var arena = Arena.ofConfined()) {
       assertThrows(IllegalArgumentException.class, () -> Structs.geometry(tooDeepGeometry, arena));
     }
+  }
+
+  @Test
+  void featureDepthCountsFeatureGeometryBoundary() {
+    var feature = new Feature(nestedCollection(Geometry.MAX_COLLECTION_DEPTH), List.of());
+
+    try (var arena = Arena.ofConfined()) {
+      assertThrows(IllegalArgumentException.class, () -> Structs.feature(feature, arena));
+    }
+  }
+
+  @Test
+  void geoJsonFeatureCollectionDepthCountsFeatureBoundary() {
+    var feature = new Feature(nestedCollection(Geometry.MAX_COLLECTION_DEPTH - 1), List.of());
+    var geoJson = GeoJson.featureCollection(List.of(feature));
+
+    try (var arena = Arena.ofConfined()) {
+      assertThrows(IllegalArgumentException.class, () -> Structs.geoJson(geoJson, arena));
+    }
+  }
+
+  @Test
+  void geoJsonFeatureCollectionDepthCountsPropertyBoundary() {
+    var feature =
+        new Feature(
+            Geometry.empty(),
+            List.of(new JsonValue.Member("deep", nestedArray(JsonValue.MAX_DESCRIPTOR_DEPTH - 1))));
+    var geoJson = GeoJson.featureCollection(List.of(feature));
+
+    try (var arena = Arena.ofConfined()) {
+      assertThrows(IllegalArgumentException.class, () -> Structs.geoJson(geoJson, arena));
+    }
+  }
+
+  private static JsonValue nestedArray(int arrayCount) {
+    JsonValue json = JsonValue.nullValue();
+    for (var index = 0; index < arrayCount; index++) {
+      json = JsonValue.array(List.of(json));
+    }
+    return json;
+  }
+
+  private static Geometry nestedCollection(int collectionCount) {
+    Geometry geometry = Geometry.empty();
+    for (var index = 0; index < collectionCount; index++) {
+      geometry = Geometry.collection(List.of(geometry));
+    }
+    return geometry;
   }
 }

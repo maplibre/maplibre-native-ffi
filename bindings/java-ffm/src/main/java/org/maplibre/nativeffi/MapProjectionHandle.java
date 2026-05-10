@@ -54,15 +54,14 @@ public final class MapProjectionHandle implements AutoCloseable {
   public void setVisibleCoordinates(List<LatLng> coordinates, EdgeInsets padding) {
     NativeAccess.ensureLoaded();
     var copiedCoordinates = List.copyOf(Objects.requireNonNull(coordinates, "coordinates"));
-    if (copiedCoordinates.isEmpty()) {
-      throw new IllegalArgumentException("coordinates must not be empty");
-    }
     Objects.requireNonNull(padding, "padding");
     try (var arena = Arena.ofConfined()) {
       Status.check(
           MapLibreNativeC.mln_map_projection_set_visible_coordinates(
               state.requireLive(),
-              Structs.latLngArray(copiedCoordinates, arena),
+              copiedCoordinates.isEmpty()
+                  ? MemorySegment.NULL
+                  : Structs.latLngArray(copiedCoordinates, arena),
               copiedCoordinates.size(),
               Structs.edgeInsets(padding, arena)));
     }
