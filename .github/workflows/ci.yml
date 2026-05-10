@@ -75,32 +75,52 @@ jobs:
         # causing a header/ABI mismatch. The cmake find_library call extends
         # CMAKE_FIND_LIBRARY_SUFFIXES to also match .so.2 so the versioned
         # runtime file is accepted for linking.
-        # libegl-mesa0      — Mesa's EGL ICD (installs 50_mesa.json) and the
-        #                     libEGL_mesa.so.0 driver. Not strictly necessary
-        #                     when pixi's Mesa is used via EGL_PLATFORM=surfaceless,
-        #                     but keeps the environment consistent.
-        # libgl1-mesa-dri   — Mesa DRI drivers including the llvmpipe software
-        #                     rasterizer (often pre-installed, listed explicitly
-        #                     for reproducibility).
-        run: sudo apt-get update -y && sudo apt-get install -y --no-install-recommends libegl-dev libgles-dev libgles2 libegl-mesa0 libgl1-mesa-dri
+        # libegl-mesa0      — Mesa's EGL ICD: installs 50_mesa.json into
+        #                     /usr/share/glvnd/egl_vendor.d/ and provides
+        #                     libEGL_mesa.so.0 (compiled WITH X11 platform
+        #                     support). The system GLVND dispatcher (libEGL.so.1)
+        #                     loads this ICD when asked for EGL_DEFAULT_DISPLAY.
+        # libegl1           — GLVND EGL dispatcher (libEGL.so.1). Already
+        #                     present on Ubuntu 24.04 but listed for clarity.
+        # xvfb              — Provides Xvfb/xvfb-run so the test process has a
+        #                     virtual X11 display to give to eglGetDisplay().
+        # libgl1-mesa-dri   — Mesa DRI drivers including swrast/llvmpipe CPU
+        #                     rasterizer (often pre-installed; listed for clarity).
+        run: sudo apt-get update -y && sudo apt-get install -y --no-install-recommends libegl-dev libgles-dev libgles2 libegl-mesa0 libegl1 xvfb libgl1-mesa-dri
       - run: mise run configure
       - run: mise run ci:lint native
-      - name: Run tests (Linux OpenGL — EGL surfaceless)
+      - name: Use system GLVND libEGL for Linux OpenGL tests
         if: ${{ contains(matrix.variant, 'opengl') && runner.os == 'Linux' }}
-        # headless_backend_egl.cpp calls eglGetDisplay(EGL_DEFAULT_DISPLAY).
-        # pixi ships conda-forge Mesa's libEGL.so.1 which is compiled WITHOUT
-        # X11 EGL platform support, so using xvfb + X11 never works.
-        # EGL_PLATFORM=surfaceless tells Mesa to use its surfaceless platform
-        # instead of X11: eglGetDisplay(EGL_DEFAULT_DISPLAY) returns a valid
-        # surfaceless display that supports pbuffer surfaces, which is exactly
-        # what the headless texture backend (GenericTextureSessionBackend) uses.
-        # LIBGL_ALWAYS_SOFTWARE=1 forces Mesa's llvmpipe CPU rasterizer so EGL
-        # initializes and renders without a hardware GPU.
-        # No Xvfb is needed — surfaceless EGL has no X11 dependency.
+        # pixi ships conda-forge Mesa's libEGL.so.1 compiled WITHOUT X11 EGL
+        # platform support. The built .so has DT_RUNPATH pointing to
+        # .pixi/envs/default/lib, so the dynamic linker finds pixi's libEGL.so.1
+        # first — making any LD_LIBRARY_PATH workaround ineffective.
+        #
+        # Solution: replace pixi's libEGL files in-place with symlinks to the
+        # system GLVND libEGL. GLVND is a thin dispatcher that:
+        #   1. Does NOT require X11 itself.
+        #   2. Loads /usr/share/glvnd/egl_vendor.d/50_mesa.json → libEGL_mesa.so.0
+        #      which IS compiled with X11 platform support (from libegl-mesa0).
+        #   3. With LIBGL_ALWAYS_SOFTWARE=1 + Xvfb, libEGL_mesa.so.0 initializes
+        #      using llvmpipe (software renderer), giving a working EGL context.
+        #
+        # $(uname -m)-linux-gnu resolves to x86_64-linux-gnu or aarch64-linux-gnu.
+        run: |
+          MULTIARCH="$(uname -m)-linux-gnu"
+          SYSTEM_EGL="/usr/lib/$MULTIARCH/libEGL.so.1"
+          PIXI_LIB="${{ github.workspace }}/.pixi/envs/default/lib"
+          sudo ln -sf "$SYSTEM_EGL" "$PIXI_LIB/libEGL.so.1"
+          sudo ln -sf "$SYSTEM_EGL" "$PIXI_LIB/libEGL.so.1.1.0"
+          echo "Replaced pixi libEGL with system GLVND: $SYSTEM_EGL"
+          ls -la "$PIXI_LIB/libEGL.so.1" "$PIXI_LIB/libEGL.so.1.1.0"
+      - name: Run tests (Linux OpenGL — xvfb + system GLVND EGL)
+        if: ${{ contains(matrix.variant, 'opengl') && runner.os == 'Linux' }}
+        # xvfb-run provides DISPLAY=:nn so eglGetDisplay(EGL_DEFAULT_DISPLAY)
+        # connects to the virtual X11 display and initializes successfully.
+        # LIBGL_ALWAYS_SOFTWARE=1 forces llvmpipe so no real GPU is required.
         env:
-          EGL_PLATFORM: surfaceless
           LIBGL_ALWAYS_SOFTWARE: "1"
-        run: mise run test
+        run: xvfb-run mise run test
       - name: Run tests
         if: ${{ !(contains(matrix.variant, 'opengl') && runner.os == 'Linux') }}
         run: mise run test
