@@ -43,21 +43,15 @@ function(mln_configure_opengl_backend target)
         MLN_EGL_LIBRARY
         NAMES EGL
         HINTS
-          /usr/lib/${CMAKE_LIBRARY_ARCHITECTURE}
-          /usr/lib/x86_64-linux-gnu
-          /usr/lib/aarch64-linux-gnu
-          /usr/lib
-        NO_CMAKE_FIND_ROOT_PATH
+          /usr/lib/${CMAKE_LIBRARY_ARCHITECTURE} /usr/lib/x86_64-linux-gnu
+          /usr/lib/aarch64-linux-gnu /usr/lib NO_CMAKE_FIND_ROOT_PATH
         REQUIRED)
       find_library(
         MLN_GLESv2_LIBRARY
         NAMES GLESv2
         HINTS
-          /usr/lib/${CMAKE_LIBRARY_ARCHITECTURE}
-          /usr/lib/x86_64-linux-gnu
-          /usr/lib/aarch64-linux-gnu
-          /usr/lib
-        NO_CMAKE_FIND_ROOT_PATH
+          /usr/lib/${CMAKE_LIBRARY_ARCHITECTURE} /usr/lib/x86_64-linux-gnu
+          /usr/lib/aarch64-linux-gnu /usr/lib NO_CMAKE_FIND_ROOT_PATH
         REQUIRED)
       # gl_functions.cpp defines mbgl::platform::gl* function-pointer variables
       # (e.g. mbgl::platform::glGetFloatv) that bridge mbgl's internal GL calls
