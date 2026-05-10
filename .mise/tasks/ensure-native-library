@@ -12,13 +12,15 @@ def main() -> int:
 
     patterns = [
         os.path.join(build_dir, "libmaplibre-native-c.*"),
+        os.path.join(build_dir, "maplibre-native-c.*"),
         os.path.join("build", "libmaplibre-native-c.*"),
+        os.path.join("build", "maplibre-native-c.*"),
     ]
     if any(glob.glob(pattern) for pattern in patterns):
         return 0
 
     print(
-        f"missing {build_dir}/libmaplibre-native-c.*; native artifact was not downloaded",
+        f"missing {build_dir}/[lib]maplibre-native-c.*; native artifact was not downloaded",
         file=sys.stderr,
     )
     return 1
