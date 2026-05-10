@@ -2,13 +2,17 @@ package org.maplibre.nativeffi;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.charset.StandardCharsets;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.maplibre.nativeffi.internal.NativeTestSupport;
@@ -29,6 +33,12 @@ final class RuntimeHandleTest {
   @BeforeAll
   static void loadNativeLibrary() {
     NativeTestSupport.loadNativeLibrary();
+  }
+
+  @AfterEach
+  void restoreProcessState() {
+    MapLibre.clearLogCallback();
+    MapLibre.restoreDefaultAsyncLogSeverities();
   }
 
   @Test
@@ -121,32 +131,106 @@ final class RuntimeHandleTest {
   }
 
   @Test
+  void resourceProviderCanCompleteHandledRequestAfterCallbackReturns() throws Exception {
+    var runtime = RuntimeHandle.create();
+    var handledRequest = new AtomicReference<ResourceRequestHandle>();
+    var callbackExited = new CountDownLatch(1);
+    try {
+      runtime.setResourceProvider(
+          (request, handle) -> {
+            if (!"custom://async-style.json".equals(request.url())) {
+              return ResourceProviderDecision.PASS_THROUGH;
+            }
+            try {
+              handledRequest.set(handle);
+              return ResourceProviderDecision.HANDLE;
+            } finally {
+              callbackExited.countDown();
+            }
+          });
+      var map = MapHandle.create(runtime, new MapOptions().setSize(128, 128));
+      try {
+        map.setStyleUrl("custom://async-style.json");
+        assertTrue(callbackExited.await(5, TimeUnit.SECONDS));
+        var handle = handledRequest.get();
+        assertFalse(handle.isCancelled());
+        handle.complete(ResourceResponse.ok(STYLE_JSON.getBytes(StandardCharsets.UTF_8)));
+        assertThrows(InvalidStateException.class, handle::isCancelled);
+        assertThrows(
+            InvalidStateException.class, () -> handle.complete(ResourceResponse.noContent()));
+        handle.close();
+        assertTrue(waitForMapEvent(runtime, map, RuntimeEventType.MAP_STYLE_LOADED));
+      } finally {
+        map.close();
+      }
+    } finally {
+      runtime.close();
+    }
+  }
+
+  @Test
+  void runtimeEventsCopyPayloadAndMessageBeforeNextPoll() throws Exception {
+    var runtime = RuntimeHandle.create();
+    var map = MapHandle.create(runtime, new MapOptions().setSize(64, 64));
+    RenderSessionHandle session = null;
+    try {
+      var failure = assertThrows(NativeErrorException.class, () -> map.setStyleJson("{"));
+      assertFalse(failure.diagnostic().isBlank());
+      var failedEvent = waitForMapEventRecord(runtime, map, RuntimeEventType.MAP_LOADING_FAILED);
+      assertFalse(failedEvent.message().isBlank());
+
+      session = map.attachOwnedTexture(new OwnedTextureDescriptor().setSize(64, 64));
+      map.setStyleJson(STYLE_JSON);
+      waitForMapEvent(runtime, map, RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE);
+      session.renderUpdate();
+      var frameEvent =
+          waitForMapEventRecord(runtime, map, RuntimeEventType.MAP_RENDER_FRAME_FINISHED);
+      var frame = assertInstanceOf(RuntimeEventPayload.RenderFrame.class, frameEvent.payload());
+      var frameCount = frame.stats().frameCount();
+
+      runtime.pollEvent();
+      runtime.runOnce();
+      runtime.pollEvent();
+
+      assertFalse(failedEvent.message().isBlank());
+      assertEquals(frameCount, frame.stats().frameCount());
+    } finally {
+      if (session != null) {
+        session.close();
+      }
+      map.close();
+      runtime.close();
+    }
+  }
+
+  @Test
   void wrongThreadRuntimeCallMapsToWrongThreadException() throws Exception {
     var runtime = RuntimeHandle.create();
     try {
-      var thrown = new AtomicReference<Throwable>();
-      var thread =
-          new Thread(
-              () -> {
-                try {
-                  runtime.runOnce();
-                } catch (Throwable error) {
-                  thrown.set(error);
-                }
-              });
-      thread.start();
-      thread.join();
+      assertWrongThread(runOnOtherThread(runtime::runOnce));
+    } finally {
+      runtime.close();
+    }
+  }
 
-      assertTrue(thrown.get() instanceof WrongThreadException, () -> String.valueOf(thrown.get()));
-      var error = (WrongThreadException) thrown.get();
-      assertEquals(MapLibreStatus.WRONG_THREAD, error.status());
-      assertFalse(error.diagnostic().isBlank());
+  @Test
+  void wrongThreadRuntimeCloseLeavesHandleLive() throws Exception {
+    var runtime = RuntimeHandle.create();
+    try {
+      assertWrongThread(runOnOtherThread(runtime::close));
+      assertFalse(runtime.isClosed());
     } finally {
       runtime.close();
     }
   }
 
   private static boolean waitForMapEvent(
+      RuntimeHandle runtime, MapHandle map, RuntimeEventType eventType)
+      throws InterruptedException {
+    return waitForMapEventRecord(runtime, map, eventType) != null;
+  }
+
+  private static RuntimeEvent waitForMapEventRecord(
       RuntimeHandle runtime, MapHandle map, RuntimeEventType eventType)
       throws InterruptedException {
     for (var attempts = 0; attempts < 1_000; attempts++) {
@@ -156,12 +240,41 @@ final class RuntimeHandleTest {
         if (event.isEmpty()) {
           break;
         }
-        if (event.get().type() == eventType && event.get().mapSource().orElse(null) == map) {
-          return true;
+        var value = event.get();
+        if (value.type() == eventType && value.mapSource().orElse(null) == map) {
+          return value;
         }
       }
       Thread.sleep(1);
     }
-    return false;
+    return null;
+  }
+
+  private static void assertWrongThread(Throwable thrown) {
+    assertTrue(thrown instanceof WrongThreadException, () -> String.valueOf(thrown));
+    var error = (WrongThreadException) thrown;
+    assertEquals(MapLibreStatus.WRONG_THREAD, error.status());
+    assertFalse(error.diagnostic().isBlank());
+  }
+
+  private static Throwable runOnOtherThread(ThrowingRunnable action) throws InterruptedException {
+    var thrown = new AtomicReference<Throwable>();
+    var thread =
+        new Thread(
+            () -> {
+              try {
+                action.run();
+              } catch (Throwable error) {
+                thrown.set(error);
+              }
+            });
+    thread.start();
+    thread.join();
+    return thrown.get();
+  }
+
+  @FunctionalInterface
+  private interface ThrowingRunnable {
+    void run() throws Exception;
   }
 }

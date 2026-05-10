@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
@@ -188,11 +189,12 @@ final class StyleHandleTest {
   }
 
   @Test
-  void imageSourcesAndLocationIndicatorHelpersUsePublicValues() {
+  void imageSourcesAndLocationIndicatorHelpersUsePublicValues() throws Exception {
     var runtime = RuntimeHandle.create();
     var map = MapHandle.create(runtime, new MapOptions().setSize(128, 128));
     try {
       map.setStyleJson(EMPTY_STYLE);
+      drainEvents(runtime);
       var image = new PremultipliedRgba8Image(1, 1, 4, new byte[] {10, 20, 30, 40});
       var coordinates =
           List.of(new LatLng(1, 1), new LatLng(1, 2), new LatLng(0, 2), new LatLng(0, 1));
@@ -222,6 +224,12 @@ final class StyleHandleTest {
           "custom", new LatLngBounds(new LatLng(-1, -1), new LatLng(1, 1)));
       assertTrue(map.removeStyleSource("custom"));
 
+      map.addCustomGeometrySource("temporary-custom", new CustomGeometrySourceOptions(tile -> {}));
+      assertEquals(1, map.customGeometrySourceCountForTesting());
+      map.setStyleJson(EMPTY_STYLE);
+      waitForMapEvent(runtime, map, RuntimeEventType.MAP_STYLE_LOADED);
+      assertEquals(0, map.customGeometrySourceCountForTesting());
+
       map.addLocationIndicatorLayer("location");
       assertTrue(map.styleLayerExists("location"));
       assertEquals(Optional.of("location-indicator"), map.styleLayerType("location"));
@@ -234,5 +242,32 @@ final class StyleHandleTest {
       map.close();
       runtime.close();
     }
+  }
+
+  private static void drainEvents(RuntimeHandle runtime) {
+    runtime.runOnce();
+    while (runtime.pollEvent().isPresent()) {
+      // Drain stale setup events so later style-loaded assertions observe the replacement under
+      // test.
+    }
+  }
+
+  private static void waitForMapEvent(RuntimeHandle runtime, MapHandle map, RuntimeEventType type)
+      throws InterruptedException {
+    for (var attempt = 0; attempt < 1000; attempt++) {
+      runtime.runOnce();
+      while (true) {
+        var event = runtime.pollEvent();
+        if (event.isEmpty()) {
+          break;
+        }
+        var value = event.get();
+        if (value.type() == type && value.mapSource().filter(source -> source == map).isPresent()) {
+          return;
+        }
+      }
+      Thread.sleep(1);
+    }
+    fail("Timed out waiting for " + type);
   }
 }

@@ -10,6 +10,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
 import java.util.EnumSet;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -138,6 +139,22 @@ final class RenderSessionHandleTest {
   }
 
   @Test
+  void wrongThreadSessionCallAndCloseLeaveHandleLive() throws Exception {
+    var runtime = RuntimeHandle.create();
+    var map = MapHandle.create(runtime, new MapOptions().setSize(64, 64));
+    var session = map.attachOwnedTexture(new OwnedTextureDescriptor().setSize(64, 64));
+    try {
+      assertWrongThread(runOnOtherThread(session::renderUpdate));
+      assertWrongThread(runOnOtherThread(session::close));
+      assertFalse(session.isClosed());
+    } finally {
+      session.close();
+      map.close();
+      runtime.close();
+    }
+  }
+
+  @Test
   void nativeBufferOwnsOffHeapBytesUntilClosed() {
     var bytes = new byte[8];
     try (var buffer = NativeBuffer.allocate(bytes.length)) {
@@ -148,6 +165,29 @@ final class RenderSessionHandleTest {
     closed.close();
     assertThrows(IllegalStateException.class, closed::byteLength);
     assertEquals(0, NativePointer.NULL.address());
+  }
+
+  private static void assertWrongThread(Throwable thrown) {
+    assertTrue(thrown instanceof WrongThreadException, () -> String.valueOf(thrown));
+    var error = (WrongThreadException) thrown;
+    assertEquals(MapLibreStatus.WRONG_THREAD, error.status());
+    assertFalse(error.diagnostic().isBlank());
+  }
+
+  private static Throwable runOnOtherThread(ThrowingRunnable action) throws InterruptedException {
+    var thrown = new AtomicReference<Throwable>();
+    var thread =
+        new Thread(
+            () -> {
+              try {
+                action.run();
+              } catch (Throwable error) {
+                thrown.set(error);
+              }
+            });
+    thread.start();
+    thread.join();
+    return thrown.get();
   }
 
   private static void waitForMapEvent(RuntimeHandle runtime, MapHandle map, RuntimeEventType type)
@@ -167,5 +207,10 @@ final class RenderSessionHandleTest {
       Thread.sleep(1);
     }
     fail("Timed out waiting for " + type);
+  }
+
+  @FunctionalInterface
+  private interface ThrowingRunnable {
+    void run() throws Exception;
   }
 }

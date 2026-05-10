@@ -576,7 +576,10 @@ MLN_API mln_status mln_map_add_raster_dem_source_tiles(
  * callback function pointers and user_data pointer are retained by value. The
  * callback functions and user_data must remain valid until the source is
  * removed, the style is replaced, or the map is destroyed, and until any
- * in-flight callback invocation has returned.
+ * in-flight callback invocation has returned. For URL loads, style replacement
+ * occurs when the new style loads, not when the load request is accepted. For
+ * inline JSON loads, style replacement completes before
+ * mln_map_set_style_json() returns successfully.
  *
  * fetch_tile and cancel_tile may run on arbitrary native worker threads, may be
  * concurrent with owner-thread map calls, and must not call thread-affine map
@@ -585,8 +588,8 @@ MLN_API mln_status mln_map_add_raster_dem_source_tiles(
  * Callbacks must not throw, panic, longjmp, or otherwise unwind through the C
  * ABI. cancel_tile is best-effort and may be repeated or race with fetch_tile.
  *
- * Custom geometry sources belong to the current style. Loading another style
- * URL or JSON document drops sources that were added to the previous style.
+ * Custom geometry sources belong to the current style. Replacing the style
+ * drops sources that were added to the previous style.
  *
  * Returns:
  * - MLN_STATUS_OK on success.

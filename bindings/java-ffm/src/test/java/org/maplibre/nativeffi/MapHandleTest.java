@@ -250,6 +250,23 @@ final class MapHandleTest {
     }
   }
 
+  @Test
+  void wrongThreadCloseLeavesMapAndProjectionLive() throws Exception {
+    var runtime = RuntimeHandle.create();
+    var map = MapHandle.create(runtime, new MapOptions().setSize(128, 128));
+    var projection = map.createProjection();
+    try {
+      assertWrongThread(runOnOtherThread(map::close));
+      assertFalse(map.isClosed());
+      assertWrongThread(runOnOtherThread(projection::close));
+      assertFalse(projection.isClosed());
+    } finally {
+      projection.close();
+      map.close();
+      runtime.close();
+    }
+  }
+
   private static void assertWrongThread(Throwable thrown) {
     assertTrue(thrown instanceof WrongThreadException, () -> String.valueOf(thrown));
     var error = (WrongThreadException) thrown;

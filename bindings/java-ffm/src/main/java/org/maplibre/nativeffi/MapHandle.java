@@ -1523,6 +1523,22 @@ public final class MapHandle implements AutoCloseable {
     return state.address();
   }
 
+  void reconcileCustomGeometrySources() {
+    var iterator = customGeometrySources.entrySet().iterator();
+    while (iterator.hasNext()) {
+      var entry = iterator.next();
+      var sourceType = styleSourceType(entry.getKey());
+      if (sourceType.isEmpty() || sourceType.get() != StyleSourceType.CUSTOM_VECTOR) {
+        closeQuietly(entry.getValue());
+        iterator.remove();
+      }
+    }
+  }
+
+  int customGeometrySourceCountForTesting() {
+    return customGeometrySources.size();
+  }
+
   private void closeCustomGeometrySource(String sourceId) {
     closeQuietly(customGeometrySources.remove(sourceId));
   }

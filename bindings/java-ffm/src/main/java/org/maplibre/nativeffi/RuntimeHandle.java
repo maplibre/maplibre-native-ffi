@@ -281,21 +281,27 @@ public final class RuntimeHandle implements AutoCloseable {
             ? Optional.ofNullable(mapFor(source))
             : Optional.<MapHandle>empty();
     var rawPayloadType = mln_runtime_event.payload_type(event);
-    return new RuntimeEvent(
-        RuntimeEventType.fromNative(rawType),
-        rawType,
-        sourceType,
-        rawSourceType,
-        runtimeSource,
-        mapSource,
-        mln_runtime_event.code(event),
-        rawPayloadType,
-        readPayload(
+    var eventType = RuntimeEventType.fromNative(rawType);
+    var copied =
+        new RuntimeEvent(
+            eventType,
+            rawType,
+            sourceType,
+            rawSourceType,
+            runtimeSource,
+            mapSource,
+            mln_runtime_event.code(event),
             rawPayloadType,
-            mln_runtime_event.payload(event),
-            mln_runtime_event.payload_size(event)),
-        MemoryUtil.copyStringView(
-            mln_runtime_event.message(event), mln_runtime_event.message_size(event)));
+            readPayload(
+                rawPayloadType,
+                mln_runtime_event.payload(event),
+                mln_runtime_event.payload_size(event)),
+            MemoryUtil.copyStringView(
+                mln_runtime_event.message(event), mln_runtime_event.message_size(event)));
+    if (eventType == RuntimeEventType.MAP_STYLE_LOADED) {
+      mapSource.ifPresent(MapHandle::reconcileCustomGeometrySources);
+    }
+    return copied;
   }
 
   private RuntimeEventPayload readPayload(
