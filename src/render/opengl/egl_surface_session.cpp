@@ -23,17 +23,22 @@
  */
 
 #include <cmath>
+#include <cstdint>
 #include <memory>
-#include <stdexcept>
+#include <utility>
 
 #include <mbgl/gfx/backend_scope.hpp>
 #include <mbgl/gfx/renderable.hpp>
+#include <mbgl/gfx/renderer_backend.hpp>
 #include <mbgl/gl/renderable_resource.hpp>
 #include <mbgl/gl/renderer_backend.hpp>
 #include <mbgl/renderer/renderer.hpp>
 #include <mbgl/util/size.hpp>
 
 #include <EGL/egl.h>
+
+#include <maplibre_native_c/base.h>
+#include <maplibre_native_c/surface.h>
 
 #include "diagnostics/diagnostics.hpp"
 #include "map/map.hpp"

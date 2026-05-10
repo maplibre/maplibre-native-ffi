@@ -24,7 +24,7 @@ function(mln_configure_windows_platform target)
       ${MLN_SOURCE_DIR}/platform/default/src/mbgl/util/png_writer.cpp
       ${MLN_SOURCE_DIR}/platform/default/src/mbgl/util/run_loop.cpp
       ${MLN_SOURCE_DIR}/platform/default/src/mbgl/util/string_stdlib.cpp
-      ${MLN_SOURCE_DIR}/platform/default/src/mbgl/util/thread.cpp
+      ${MLN_SOURCE_DIR}/platform/windows/src/thread.cpp
       ${MLN_SOURCE_DIR}/platform/default/src/mbgl/util/timer.cpp)
 
   mln_target_vendor_sources(${target} ${MLN_FFI_VENDOR_WINDOWS_SOURCES})
@@ -49,7 +49,9 @@ function(mln_configure_windows_platform target)
   # so that bidi.cpp can resolve its unconditional ICU includes regardless of
   # whether the mbgl-vendor-icu cmake target was created.
   target_include_directories(
-    ${target} SYSTEM PRIVATE ${MLN_SOURCE_DIR}/vendor/icu/include)
+    ${target}
+    SYSTEM
+    PRIVATE ${MLN_SOURCE_DIR}/vendor/icu/include)
 
   if(TARGET mbgl-vendor-icu)
     # maplibre-native chose builtin (vendor) ICU.  Use the same stubs so that
@@ -72,7 +74,7 @@ function(mln_configure_windows_platform target)
   # errors. Suppress the ones we cannot fix (they are in vendor code):
   #   C4324 — structure padded due to alignment specifier (gpu_expression.hpp)
   #   C4244 — narrowing int→char16_t conversion (glyph.hpp)
-  #   C4702 — unreachable code (vendor/expected-lite/include/nonstd/expected.hpp)
+  # C4702 — unreachable code (vendor/expected-lite/include/nonstd/expected.hpp)
   target_compile_options(${target} PRIVATE /wd4324 /wd4244 /wd4702)
 
   target_link_libraries(
