@@ -7,6 +7,15 @@ project(maplibre_native_c VERSION 0.1.0 LANGUAGES C CXX)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
+# When building inside a pixi/conda environment on Linux, embed
+# $CONDA_PREFIX/lib in the build-tree RPATH. Without this, the dynamic linker
+# finds system libraries (e.g. libpng16.so.16 v1.6.43 on ubuntu-24.04) before
+# the conda-managed ones (e.g. libpng 1.6.58 from pixi), causing a header/ABI
+# version mismatch at test runtime.
+if(DEFINED ENV{CONDA_PREFIX} AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  list(APPEND CMAKE_BUILD_RPATH "$ENV{CONDA_PREFIX}/lib")
+endif()
+
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
 
 include(mln_options)
