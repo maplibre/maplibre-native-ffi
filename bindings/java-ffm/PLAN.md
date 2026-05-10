@@ -76,11 +76,18 @@ use the separate JNI binding path.
 - runtime resource transform and provider callbacks with copied requests,
   `ResourceResponse` materialization, and one-shot `ResourceRequestHandle`
   completion/release;
-- map lifecycle, style loading, repaint/still-image requests, debug helpers,
-  camera commands, viewport/tile/bounds/free-camera/projection-mode options,
-  projection helpers, coordinate conversions, and geometry-based camera fitting;
-- JSON, geometry, GeoJSON, and feature value trees with descriptor
-  materializers/readers and Java-side depth checks.
+- map lifecycle, style loading, style sources/layers/images, custom geometry
+  sources, repaint/still-image requests, debug helpers, camera commands,
+  viewport/tile/bounds/free-camera/projection-mode options, projection helpers,
+  coordinate conversions, and geometry-based camera fitting;
+- render session and render target lifecycle wrappers, texture readback, native
+  pointer descriptors, and callback-scoped owned texture frame access;
+- feature state, rendered/source feature queries, feature extension queries, and
+  query result copying;
+- offline region creation, snapshots, lists, status, observation, download
+  state, invalidation, deletion, metadata update, and database merge;
+- JSON, geometry, GeoJSON, feature, and queried-feature value trees with
+  descriptor materializers/readers and Java-side depth checks.
 
 Java release policy: JDK 25 is the temporary development floor because jextract
 25 emits `SymbolLookup.findOrThrow()`, which is unavailable under
@@ -179,71 +186,9 @@ Build this support layer before broad API coverage:
    - Catches `Throwable` inside every upcall and converts it to the documented C
      callback behavior.
 
-## Milestones
+## Remaining Milestone
 
-### 1. Style Sources, Layers, Images, And Custom Geometry
-
-Implement:
-
-- style source JSON add/remove/exists/type/info/list APIs;
-- GeoJSON, vector, raster, raster DEM, image, and custom geometry source APIs;
-- style image set/remove/exists/info/copy APIs;
-- layer add/remove/exists/type/list/move APIs;
-- light, layer property, and layer filter APIs;
-- location indicator helpers;
-- custom geometry source callback state tied to `MapHandle` and source identity.
-
-Tests:
-
-- source and layer list handles copy IDs into Java lists and release native list
-  handles;
-- image copy APIs support size-query then copy flows;
-- style property snapshots copy JSON before native snapshot release;
-- custom geometry callbacks stay strongly reachable until the map drops their
-  owner scope.
-
-### 2. Render Sessions And Render Targets
-
-Implement:
-
-- `RenderSessionHandle` lifecycle, resize, render update, detach, memory
-  maintenance, and debug logs;
-- default owned texture target attach;
-- Metal and Vulkan surface, owned texture, and borrowed texture descriptors;
-- `NativePointer` conversion for backend handles;
-- CPU premultiplied RGBA8 readback into `NativeBuffer` and convenience `byte[]`;
-- callback-scoped frame access for Metal and Vulkan owned textures.
-
-Tests:
-
-- unsupported backend attaches throw `UnsupportedFeatureException` where the
-  current build lacks a backend;
-- session close detaches exactly once and map close requires no live session;
-- readback reports required byte length when the supplied buffer is too small;
-- acquired frame callbacks always release the frame after callback success or
-  failure.
-
-### 3. Feature State, Queries, Snapshots, And Offline Regions
-
-Implement:
-
-- feature-state selector builders;
-- set/get/remove feature state;
-- rendered/source feature query options and query geometry;
-- feature query result copying;
-- feature extension result copying;
-- JSON snapshot copying;
-- offline region descriptors, snapshots, lists, status, observation,
-  download-state, invalidation, deletion, metadata update, and database merge.
-
-Tests:
-
-- snapshot/list handles release after their contents are copied;
-- missing result cases return Java `Optional` or empty values consistently;
-- feature query and offline APIs propagate native invalid-state and wrong-thread
-  statuses through the public exception model.
-
-### 4. Owner-Thread Helper Optional Layer
+### Owner-Thread Helper Optional Layer
 
 The low-level handle APIs stay direct. After direct coverage works, add a small
 optional helper only if tests or examples show a clear need:

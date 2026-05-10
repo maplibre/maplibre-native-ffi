@@ -12,6 +12,10 @@ public enum OfflineRegionDownloadState {
     this.nativeValue = nativeValue;
   }
 
+  public int nativeValue() {
+    return nativeValue;
+  }
+
   public static OfflineRegionDownloadState fromNative(int nativeValue) {
     return switch (nativeValue) {
       case 0 -> INACTIVE;

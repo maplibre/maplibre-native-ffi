@@ -3,12 +3,14 @@ package org.maplibre.nativeffi;
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
+import java.util.List;
 import java.util.Objects;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import org.maplibre.nativeffi.internal.HandleState;
 import org.maplibre.nativeffi.internal.MemoryUtil;
 import org.maplibre.nativeffi.internal.NativeAccess;
+import org.maplibre.nativeffi.internal.QueryStructs;
 import org.maplibre.nativeffi.internal.RenderStructs;
 import org.maplibre.nativeffi.internal.Status;
 import org.maplibre.nativeffi.internal.c.MapLibreNativeC;
@@ -174,6 +176,101 @@ public final class RenderSessionHandle implements AutoCloseable {
     Status.check(MapLibreNativeC.mln_render_session_dump_debug_logs(state.requireLive()));
   }
 
+  public void setFeatureState(FeatureStateSelector selector, JsonValue value) {
+    NativeAccess.ensureLoaded();
+    Objects.requireNonNull(selector, "selector");
+    Objects.requireNonNull(value, "value");
+    if (!(value instanceof JsonValue.ObjectValue)) {
+      throw new IllegalArgumentException("feature state value must be a JSON object");
+    }
+    try (var arena = Arena.ofConfined()) {
+      Status.check(
+          MapLibreNativeC.mln_render_session_set_feature_state(
+              state.requireLive(),
+              QueryStructs.featureStateSelector(selector, arena),
+              org.maplibre.nativeffi.internal.ValueStructs.jsonValue(value, arena)));
+    }
+  }
+
+  public JsonValue getFeatureState(FeatureStateSelector selector) {
+    NativeAccess.ensureLoaded();
+    Objects.requireNonNull(selector, "selector");
+    try (var arena = Arena.ofConfined()) {
+      var outState = MemoryUtil.allocatePointer(arena);
+      Status.check(
+          MapLibreNativeC.mln_render_session_get_feature_state(
+              state.requireLive(), QueryStructs.featureStateSelector(selector, arena), outState));
+      return org.maplibre.nativeffi.internal.ValueStructs.jsonSnapshot(
+              outState.get(ValueLayout.ADDRESS, 0))
+          .orElseGet(() -> JsonValue.object(List.of()));
+    }
+  }
+
+  public void removeFeatureState(FeatureStateSelector selector) {
+    NativeAccess.ensureLoaded();
+    Objects.requireNonNull(selector, "selector");
+    try (var arena = Arena.ofConfined()) {
+      Status.check(
+          MapLibreNativeC.mln_render_session_remove_feature_state(
+              state.requireLive(), QueryStructs.featureStateSelector(selector, arena)));
+    }
+  }
+
+  public List<QueriedFeature> queryRenderedFeatures(RenderedQueryGeometry geometry) {
+    return queryRenderedFeaturesInternal(geometry, null, false);
+  }
+
+  public List<QueriedFeature> queryRenderedFeatures(
+      RenderedQueryGeometry geometry, RenderedFeatureQueryOptions options) {
+    return queryRenderedFeaturesInternal(
+        geometry, Objects.requireNonNull(options, "options"), true);
+  }
+
+  public List<QueriedFeature> querySourceFeatures(String sourceId) {
+    return querySourceFeaturesInternal(sourceId, null, false);
+  }
+
+  public List<QueriedFeature> querySourceFeatures(
+      String sourceId, SourceFeatureQueryOptions options) {
+    return querySourceFeaturesInternal(sourceId, Objects.requireNonNull(options, "options"), true);
+  }
+
+  public FeatureExtensionResult queryFeatureExtension(
+      String sourceId, Feature feature, String extension, String extensionField) {
+    return queryFeatureExtension(sourceId, feature, extension, extensionField, null);
+  }
+
+  public FeatureExtensionResult queryFeatureExtension(
+      String sourceId,
+      Feature feature,
+      String extension,
+      String extensionField,
+      JsonValue arguments) {
+    NativeAccess.ensureLoaded();
+    Objects.requireNonNull(feature, "feature");
+    if (arguments != null && !(arguments instanceof JsonValue.ObjectValue)) {
+      throw new IllegalArgumentException("feature extension arguments must be a JSON object");
+    }
+    try (var arena = Arena.ofConfined()) {
+      var outResult = MemoryUtil.allocatePointer(arena);
+      Status.check(
+          MapLibreNativeC.mln_render_session_query_feature_extensions(
+              state.requireLive(),
+              org.maplibre.nativeffi.internal.CoreStructs.stringView(
+                  Objects.requireNonNull(sourceId, "sourceId"), arena),
+              org.maplibre.nativeffi.internal.ValueStructs.feature(feature, arena),
+              org.maplibre.nativeffi.internal.CoreStructs.stringView(
+                  Objects.requireNonNull(extension, "extension"), arena),
+              org.maplibre.nativeffi.internal.CoreStructs.stringView(
+                  Objects.requireNonNull(extensionField, "extensionField"), arena),
+              arguments == null
+                  ? MemorySegment.NULL
+                  : org.maplibre.nativeffi.internal.ValueStructs.jsonValue(arguments, arena),
+              outResult));
+      return QueryStructs.featureExtensionResult(outResult.get(ValueLayout.ADDRESS, 0));
+    }
+  }
+
   public TextureImageInfo textureImageInfo() {
     NativeAccess.ensureLoaded();
     try (var arena = Arena.ofConfined()) {
@@ -288,6 +385,42 @@ public final class RenderSessionHandle implements AutoCloseable {
           scope.close();
         }
       }
+    }
+  }
+
+  private List<QueriedFeature> queryRenderedFeaturesInternal(
+      RenderedQueryGeometry geometry, RenderedFeatureQueryOptions options, boolean hasOptions) {
+    NativeAccess.ensureLoaded();
+    Objects.requireNonNull(geometry, "geometry");
+    try (var arena = Arena.ofConfined()) {
+      var outResult = MemoryUtil.allocatePointer(arena);
+      Status.check(
+          MapLibreNativeC.mln_render_session_query_rendered_features(
+              state.requireLive(),
+              QueryStructs.renderedQueryGeometry(geometry, arena),
+              hasOptions
+                  ? QueryStructs.renderedFeatureQueryOptions(options, arena)
+                  : MemorySegment.NULL,
+              outResult));
+      return QueryStructs.featureQueryResult(outResult.get(ValueLayout.ADDRESS, 0));
+    }
+  }
+
+  private List<QueriedFeature> querySourceFeaturesInternal(
+      String sourceId, SourceFeatureQueryOptions options, boolean hasOptions) {
+    NativeAccess.ensureLoaded();
+    try (var arena = Arena.ofConfined()) {
+      var outResult = MemoryUtil.allocatePointer(arena);
+      Status.check(
+          MapLibreNativeC.mln_render_session_query_source_features(
+              state.requireLive(),
+              org.maplibre.nativeffi.internal.CoreStructs.stringView(
+                  Objects.requireNonNull(sourceId, "sourceId"), arena),
+              hasOptions
+                  ? QueryStructs.sourceFeatureQueryOptions(options, arena)
+                  : MemorySegment.NULL,
+              outResult));
+      return QueryStructs.featureQueryResult(outResult.get(ValueLayout.ADDRESS, 0));
     }
   }
 
