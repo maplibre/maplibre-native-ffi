@@ -83,11 +83,10 @@ fn addCTests(b: *std.Build, options: BuildOptions) *std.Build.Step.Compile {
                 c_tests.root_module.linkSystemLibrary("OpenGL32", .{});
             },
             else => {
-                // EGL and GLESv2 are provided by Mesa on the CI runner (pixi mesalib).
-                c_tests.root_module.addLibraryPath(b.path(".pixi/envs/default/lib"));
-                c_tests.root_module.addRPath(b.path(".pixi/envs/default/lib"));
+                // EGL is needed for the test binary to link against libmaplibre-native-c.so.
+                // GLESv2 is not needed here: the tests do not call GL functions
+                // directly, and the shared library already encapsulates them.
                 c_tests.root_module.linkSystemLibrary("EGL", .{});
-                c_tests.root_module.linkSystemLibrary("GLESv2", .{});
             },
         }
     }
