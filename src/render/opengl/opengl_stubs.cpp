@@ -18,13 +18,13 @@
 //                  (guarded by _WIN32).
 
 #include <cmath>
-#include <cstdint>
 
 #include <maplibre_native_c/base.h>
 #include <maplibre_native_c/surface.h>
 #include <maplibre_native_c/texture.h>
 
 #include "diagnostics/diagnostics.hpp"
+#include "map/map.hpp"
 #include "render/render_session_common.hpp"
 #include "render/surface_session.hpp"
 #include "render/texture_session.hpp"
