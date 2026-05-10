@@ -186,21 +186,6 @@ Build this support layer before broad API coverage:
    - Catches `Throwable` inside every upcall and converts it to the documented C
      callback behavior.
 
-## Remaining Milestone
-
-### Owner-Thread Helper Optional Layer
-
-The low-level handle APIs stay direct. After direct coverage works, add a small
-optional helper only if tests or examples show a clear need:
-
-- `OwnerThread` owns one platform thread;
-- it can create a runtime, run submitted tasks on that thread, pump `runOnce()`,
-  and drain events;
-- it returns ordinary handles and keeps direct handle APIs available.
-
-Keep UI dispatch, coroutines, listeners, promises, and application scheduling in
-adapters above this low-level binding.
-
 ## Header Coverage Map
 
 | C header           | Java public area                                                                                                                    |
@@ -220,8 +205,8 @@ adapters above this low-level binding.
 
 ## Test Strategy
 
-Add tests with each milestone. Prefer small tests around real C calls, and rely
-on C ABI tests for native validation already covered there.
+Add tests with each feature area. Prefer small tests around real C calls, and
+rely on C ABI tests for native validation already covered there.
 
 Required test categories:
 
