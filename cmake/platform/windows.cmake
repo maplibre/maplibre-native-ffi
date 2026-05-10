@@ -38,7 +38,9 @@ function(mln_configure_windows_platform target)
       ${MLN_SOURCE_DIR}/platform/windows/include)
 
   # MSVC does not define M_PI by default; this enables the math constants.
-  target_compile_definitions(${target} PRIVATE _USE_MATH_DEFINES)
+  # NOMINMAX prevents <windows.h> from defining min/max macros that clash with
+  # std::numeric_limits<T>::max() and std::min/std::max calls.
+  target_compile_definitions(${target} PRIVATE _USE_MATH_DEFINES NOMINMAX)
 
   # ICU handling: maplibre-native's cmake may use vendor (builtin) ICU or system
   # ICU depending on what find_package(ICU) finds at configure time.  We detect
