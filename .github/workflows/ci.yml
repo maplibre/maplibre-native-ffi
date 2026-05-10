@@ -75,7 +75,24 @@ jobs:
         # causing a header/ABI mismatch. The cmake find_library call extends
         # CMAKE_FIND_LIBRARY_SUFFIXES to also match .so.2 so the versioned
         # runtime file is accepted for linking.
-        run: sudo apt-get update -y && sudo apt-get install -y --no-install-recommends libegl-dev libgles-dev libgles2
+        # xvfb              — virtual framebuffer X server for headless EGL.
+        #                     headless_backend_egl.cpp uses eglGetDisplay(
+        #                     EGL_DEFAULT_DISPLAY) which requires an X display;
+        #                     without one, eglInitialize() throws and tests ABRT.
+        # libgl1-mesa-dri   — Mesa DRI drivers including the llvmpipe software
+        #                     rasterizer (often pre-installed, listed explicitly
+        #                     for reproducibility).
+        run: sudo apt-get update -y && sudo apt-get install -y --no-install-recommends libegl-dev libgles-dev libgles2 xvfb libgl1-mesa-dri
+      - name: Start virtual display for headless EGL (Linux OpenGL only)
+        if: ${{ contains(matrix.variant, 'opengl') && runner.os == 'Linux' }}
+        # Start Xvfb on display :99, then export DISPLAY so that subsequent
+        # steps (configure, lint, test) see a valid X11 display.
+        # LIBGL_ALWAYS_SOFTWARE=1 forces Mesa's llvmpipe software rasterizer
+        # so EGL initializes successfully even with no hardware GPU.
+        run: |
+          Xvfb :99 -screen 0 1280x1024x24 &
+          echo "DISPLAY=:99" >> "$GITHUB_ENV"
+          echo "LIBGL_ALWAYS_SOFTWARE=1" >> "$GITHUB_ENV"
       - run: mise run configure
       - run: mise run ci:lint native
       - run: mise run test
