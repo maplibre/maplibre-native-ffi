@@ -33,20 +33,38 @@ function(mln_configure_opengl_backend target)
       # works.
       set(MLN_FFI_OPENGL_LIBS EGL)
     else()
-      # On Linux, libegl-dev installs libEGL.so to the distro multiarch lib dir
-      # (e.g. /usr/lib/x86_64-linux-gnu). The conda/pixi toolchain's ld does not
-      # search that directory, so passing just -lEGL fails. Use find_library
-      # with
-      # explicit system hints and NO_CMAKE_FIND_ROOT_PATH to bypass the conda
-      # sysroot and obtain the full absolute path to libEGL.so.
+      # On Linux, libegl-dev (which pulls in libgles-dev) installs libEGL.so and
+      # libGLESv2.so to the distro multiarch lib dir (e.g.
+      # /usr/lib/x86_64-linux-gnu). The conda/pixi toolchain's ld does not
+      # search that directory, so passing bare -lEGL / -lGLESv2 fails. Use
+      # find_library with explicit system hints and NO_CMAKE_FIND_ROOT_PATH to
+      # bypass the conda sysroot and obtain the full absolute paths.
       find_library(
         MLN_EGL_LIBRARY
         NAMES EGL
         HINTS
-          /usr/lib/${CMAKE_LIBRARY_ARCHITECTURE} /usr/lib/x86_64-linux-gnu
-          /usr/lib/aarch64-linux-gnu /usr/lib NO_CMAKE_FIND_ROOT_PATH
+          /usr/lib/${CMAKE_LIBRARY_ARCHITECTURE}
+          /usr/lib/x86_64-linux-gnu
+          /usr/lib/aarch64-linux-gnu
+          /usr/lib
+        NO_CMAKE_FIND_ROOT_PATH
         REQUIRED)
-      set(MLN_FFI_OPENGL_LIBS ${MLN_EGL_LIBRARY})
+      find_library(
+        MLN_GLESv2_LIBRARY
+        NAMES GLESv2
+        HINTS
+          /usr/lib/${CMAKE_LIBRARY_ARCHITECTURE}
+          /usr/lib/x86_64-linux-gnu
+          /usr/lib/aarch64-linux-gnu
+          /usr/lib
+        NO_CMAKE_FIND_ROOT_PATH
+        REQUIRED)
+      # gl_functions.cpp defines mbgl::platform::gl* function-pointer variables
+      # (e.g. mbgl::platform::glGetFloatv) that bridge mbgl's internal GL calls
+      # to the GLES3 implementation at link time.
+      list(APPEND MLN_FFI_VENDOR_OPENGL_SOURCES
+           ${MLN_SOURCE_DIR}/platform/linux/src/gl_functions.cpp)
+      set(MLN_FFI_OPENGL_LIBS ${MLN_EGL_LIBRARY} ${MLN_GLESv2_LIBRARY})
     endif()
     if(NOT ANDROID)
       # Linux: apt libegl-dev installs headers to /usr/include/EGL/ and
@@ -62,7 +80,7 @@ function(mln_configure_opengl_backend target)
       # exposes the EGL headers without exposing any other system header.
       set(MLN_EGL_STAGE_DIR ${CMAKE_CURRENT_BINARY_DIR}/linux-egl-headers)
       file(MAKE_DIRECTORY ${MLN_EGL_STAGE_DIR})
-      foreach(_egl_subdir EGL KHR)
+      foreach(_egl_subdir EGL KHR GLES2 GLES3)
         if(EXISTS /usr/include/${_egl_subdir}
            AND NOT EXISTS ${MLN_EGL_STAGE_DIR}/${_egl_subdir})
           file(CREATE_LINK /usr/include/${_egl_subdir}
