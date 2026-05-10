@@ -1,11 +1,10 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 #MISE description="Regenerate the jextract symbol include argfile"
 
-from pathlib import Path
 import os
 import re
 import subprocess
-
+from pathlib import Path
 
 IDENTIFIER = r"[A-Za-z_]\w*"
 BLOCK_COMMENT = re.compile(r"/\*.*?\*/", re.DOTALL)
