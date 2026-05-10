@@ -127,10 +127,47 @@ jobs:
       - name: Build
         run: cmake --build build --target maplibre_native_c --config Release --parallel
 
+      # GitHub Actions Windows runners have no GPU and ship only Microsoft's
+      # legacy OpenGL 1.1 software renderer (opengl32.dll), which is far below
+      # what MapLibre Native needs. Download Mesa3D's Windows DLLs (built with
+      # the LLVM-pipe software rasterizer) and place them next to the test
+      # binaries so they're loaded ahead of the system OpenGL.
+      #
+      # Mirrors the approach used by maplibre-native's node-ci.yml:
+      #   x64   — pal1000/mesa-dist-win release archives (mesa3d-*.7z)
+      #   arm64 — mmozeiko/build-mesa releases (mesa-llvmpipe-arm64-*.7z)
+      - name: Download Mesa3D (Windows x64)
+        if: matrix.arch == 'x64'
+        shell: pwsh
+        run: |
+          $headers = @{ Authorization = ('Bearer {0}' -f '${{ secrets.GITHUB_TOKEN }}') }
+          $asset = (Invoke-WebRequest https://api.github.com/repos/pal1000/mesa-dist-win/releases -Headers $headers | ConvertFrom-Json)[0].assets `
+            | Where-Object name -match 'mesa3d-.+-release-msvc\.7z' | Select-Object -First 1
+          Invoke-WebRequest $asset.browser_download_url -OutFile mesa3d.7z
+          & 'C:\Program Files\7-Zip\7z.exe' e -obuild\Release .\mesa3d.7z x64\opengl32.dll x64\libgallium_wgl.dll x64\libGLESv2.dll
+          Get-ChildItem build\Release\opengl32.dll, build\Release\libgallium_wgl.dll, build\Release\libGLESv2.dll
+      - name: Download Mesa3D (Windows arm64)
+        if: matrix.arch == 'arm64'
+        shell: pwsh
+        run: |
+          $headers = @{ Authorization = ('Bearer {0}' -f '${{ secrets.GITHUB_TOKEN }}') }
+          $asset = (Invoke-WebRequest https://api.github.com/repos/mmozeiko/build-mesa/releases -Headers $headers | ConvertFrom-Json)[0].assets `
+            | Where-Object name -match 'mesa-llvmpipe-arm64-.+\.7z' | Select-Object -First 1
+          Invoke-WebRequest $asset.browser_download_url -OutFile mesa3d.7z
+          & 'C:\Program Files\7-Zip\7z.exe' e -obuild\Release .\mesa3d.7z opengl32.dll libGLESv2.dll
+          Get-ChildItem build\Release\opengl32.dll, build\Release\libGLESv2.dll
+
       # The DLL must be on PATH so that the zig test runner can load it at
       # runtime. addRPath in build.zig has no effect on Windows.
       - name: Run tests
         shell: pwsh
+        env:
+          # LIBGL_ALWAYS_SOFTWARE forces Mesa to use the software rasterizer
+          # rather than trying to detect a (non-existent) hardware GPU on the
+          # CI runner. GALLIUM_DRIVER=llvmpipe selects the LLVM-pipe driver
+          # inside Mesa for software rendering.
+          LIBGL_ALWAYS_SOFTWARE: "true"
+          GALLIUM_DRIVER: llvmpipe
         run: |
           $env:PATH = "${{ github.workspace }}\build\Release;$env:PATH"
           zig build test --summary all `

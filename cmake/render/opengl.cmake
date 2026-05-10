@@ -45,17 +45,21 @@ function(mln_configure_opengl_backend target)
       # multiarch lib dir, so bare -lEGL / -lGLESv2 fails. Use find_library
       # with explicit hints and NO_CMAKE_FIND_ROOT_PATH.
       #
-      # Prefer the pixi conda env ($CONDA_PREFIX/lib, set by pixi run) because
-      # it already contains libEGL and libGLESv2 from the mesalib package.
-      # That avoids installing libgles2-mesa-dev from apt, which has a hard
-      # Depends: on libpng-dev — pulling in newer libpng headers that conflict
-      # with pixi's libpng.so at runtime.
+      # Prefer the system /usr/lib/<multiarch> EGL/GLESv2 (from libegl-dev /
+      # libgles-dev) over pixi's conda-forge mesalib build. pixi's libEGL.so.1
+      # is compiled WITHOUT the X11 EGL platform, so at runtime the headless
+      # backend's eglGetDisplay(EGL_DEFAULT_DISPLAY) under xvfb fails to
+      # initialize. Linking against the system libEGL means the .so's
+      # NEEDED entry resolves to GLVND (the system dispatcher) which loads
+      # libEGL_mesa.so.0 from libegl-mesa0 — that one has X11 support and
+      # works with xvfb + LIBGL_ALWAYS_SOFTWARE for headless software EGL.
       find_library(
         MLN_EGL_LIBRARY
         NAMES EGL
         HINTS
-          $ENV{CONDA_PREFIX}/lib /usr/lib/${CMAKE_LIBRARY_ARCHITECTURE}
+          /usr/lib/${CMAKE_LIBRARY_ARCHITECTURE}
           /usr/lib/x86_64-linux-gnu /usr/lib/aarch64-linux-gnu /usr/lib
+          $ENV{CONDA_PREFIX}/lib
           NO_CMAKE_FIND_ROOT_PATH
         REQUIRED)
       # Extend suffixes to also accept versioned .so.2 files: the libgles2
@@ -67,8 +71,9 @@ function(mln_configure_opengl_backend target)
         MLN_GLESv2_LIBRARY
         NAMES GLESv2
         HINTS
-          $ENV{CONDA_PREFIX}/lib /usr/lib/${CMAKE_LIBRARY_ARCHITECTURE}
+          /usr/lib/${CMAKE_LIBRARY_ARCHITECTURE}
           /usr/lib/x86_64-linux-gnu /usr/lib/aarch64-linux-gnu /usr/lib
+          $ENV{CONDA_PREFIX}/lib
           NO_CMAKE_FIND_ROOT_PATH
         REQUIRED)
       set(CMAKE_FIND_LIBRARY_SUFFIXES ${_saved_lib_suffixes})
