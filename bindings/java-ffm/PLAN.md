@@ -125,9 +125,15 @@ diagnostic string.
   preserve the raw native value in the copied Java object so newer C libraries
   can be diagnosed safely.
 - Model JSON, geometry, GeoJSON, features, and queried data as Java value trees.
-  Materialize input trees into temporary native descriptor graphs at the call
-  boundary, and copy native snapshots/result views back into independent Java
-  values before releasing native handles.
+  Define `JsonValue` as a sealed interface with immutable record variants for
+  payload values and a singleton variant for JSON null. Record constructors
+  validate finite doubles, reject null children, and defensively copy
+  list-backed arrays and objects. Preserve object member order with a member
+  record; optional map factories may sit above the low-level shape. Choose the
+  public representation for unsigned 64-bit JSON numbers before stabilizing the
+  API. Materialize input trees into temporary native descriptor graphs at the
+  call boundary, and copy native snapshots/result views back into independent
+  Java values before releasing native handles.
 
 ## Internal Support Layer
 
@@ -264,7 +270,9 @@ Tests:
 
 Implement:
 
-- sealed Java value trees for JSON and GeoJSON concepts;
+- sealed Java value trees for JSON and GeoJSON concepts, including a `JsonValue`
+  sealed interface implemented by immutable record variants and a singleton null
+  variant;
 - materializers for `mln_json_value`, `mln_geometry`, `mln_feature`, and
   `mln_geojson` descriptor graphs;
 - readers that copy native JSON/feature views into Java value trees;

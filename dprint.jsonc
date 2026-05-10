@@ -9,6 +9,9 @@
   "newLineKind": "lf",
   "excludes": [
     "build*/**",
+    "**/build/**",
+    "**/.gradle/**",
+    "**/.kotlin/**",
     "third_party/**",
     "zig-out/**",
     ".zig-cache/**",
@@ -41,6 +44,14 @@
       {
         "command": "cmakefmt --line-width {{line_width}} --tab-size {{indent_width}} -",
         "fileNames": ["cmakelists.txt", "cmakelists.txt.in"],
+      },
+      {
+        "command": "mise run _ktfmt --google-style - --stdin-name={{file_path}}",
+        "exts": ["kt", "kts"],
+      },
+      {
+        "command": "google-java-format - --assume-filename {{file_path}}",
+        "exts": ["java"],
       },
       { "command": "zig fmt --stdin", "exts": ["zig"] },
       { "command": "zig fmt --stdin --zon", "exts": ["zon"] },

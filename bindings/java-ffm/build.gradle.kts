@@ -6,9 +6,7 @@ plugins {
   id("de.infolektuell.jextract") version "1.4.0"
 }
 
-repositories {
-  mavenCentral()
-}
+repositories { mavenCentral() }
 
 jextract.libraries {
   val maplibreNativeC by registering {
@@ -19,9 +17,7 @@ jextract.libraries {
     whitelist.argFile = layout.projectDirectory.file("src/jextract/maplibre-native-c.includes")
   }
 
-  sourceSets.named("main") {
-    jextract.libraries.addLater(maplibreNativeC)
-  }
+  sourceSets.named("main") { jextract.libraries.addLater(maplibreNativeC) }
 }
 
 dependencies {
@@ -30,9 +26,7 @@ dependencies {
   testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
-tasks.withType<JavaCompile>().configureEach {
-  options.release = 25
-}
+tasks.withType<JavaCompile>().configureEach { options.release = 25 }
 
 tasks.withType<Test>().configureEach {
   useJUnitPlatform()

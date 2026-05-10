@@ -32,6 +32,8 @@ config_roots = ["bindings/*", "examples/*", "docs"]
 
 # Java/Kotlin ecosystem
 "core:java" = "temurin-25.0.3+9.0.LTS"
+"aqua:facebook/ktfmt" = "0.62" # Kotlin formatter
+"github:google/google-java-format" = "1.35.0" # Java formatter
 
 # Python ecosystem
 "core:python" = "3.14.4"
@@ -83,6 +85,11 @@ run = "hk check --all"
 
 [tasks.fix]
 run = "hk fix --all"
+
+[tasks._ktfmt]
+description = "Called by dprint.jsonc"
+hide = true
+run = 'java -jar {{ tools["aqua:facebook/ktfmt"].path }}/ktfmt'
 
 [tasks."ci:lint"]
 usage = '''
