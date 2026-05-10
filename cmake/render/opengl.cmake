@@ -19,12 +19,20 @@ function(mln_configure_opengl_backend target)
 
   # opengl_support.cpp is platform-independent and always compiled.
   set(MLN_FFI_OPENGL_COMMON_SOURCES
-      ${PROJECT_SOURCE_DIR}/src/render/opengl/opengl_support.cpp)
+      ${PROJECT_SOURCE_DIR}/src/render/opengl/opengl_support.cpp
+      # opengl_stubs.cpp provides stubs for all non-OpenGL backends (Metal,
+      # Vulkan) so that the C API layer can always resolve every symbol it
+      # references, regardless of which GPU backend was selected at build time.
+      ${PROJECT_SOURCE_DIR}/src/render/opengl/opengl_stubs.cpp)
 
   if(WIN32)
     set(MLN_FFI_OPENGL_SOURCES
         ${PROJECT_SOURCE_DIR}/src/render/opengl/wgl_surface_session.cpp)
     set(MLN_FFI_OPENGL_LIBS OpenGL32)
+    # headless_backend_wgl.cpp provides mbgl::gl::HeadlessBackend::createImpl()
+    # for the WGL (Windows OpenGL) path.
+    list(APPEND MLN_FFI_VENDOR_OPENGL_SOURCES
+         ${MLN_SOURCE_DIR}/platform/windows/src/headless_backend_wgl.cpp)
   elseif(ANDROID OR CMAKE_SYSTEM_NAME STREQUAL "Linux")
     set(MLN_FFI_OPENGL_SOURCES
         ${PROJECT_SOURCE_DIR}/src/render/opengl/egl_surface_session.cpp)
@@ -67,8 +75,12 @@ function(mln_configure_opengl_backend target)
       # gl_functions.cpp defines mbgl::platform::gl* function-pointer variables
       # (e.g. mbgl::platform::glGetFloatv) that bridge mbgl's internal GL calls
       # to the GLES3 implementation at link time.
+      # headless_backend_egl.cpp provides mbgl::gl::HeadlessBackend::createImpl()
+      # for the Linux EGL path. Without it the linker fails with an undefined
+      # reference to that pure-virtual override at runtime.
       list(APPEND MLN_FFI_VENDOR_OPENGL_SOURCES
-           ${MLN_SOURCE_DIR}/platform/linux/src/gl_functions.cpp)
+           ${MLN_SOURCE_DIR}/platform/linux/src/gl_functions.cpp
+           ${MLN_SOURCE_DIR}/platform/linux/src/headless_backend_egl.cpp)
       set(MLN_FFI_OPENGL_LIBS ${MLN_EGL_LIBRARY} ${MLN_GLESv2_LIBRARY})
     endif()
     if(NOT ANDROID)
