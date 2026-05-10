@@ -63,12 +63,13 @@ jobs:
             .git/modules/third_party/maplibre-native
           key: mln-src-v2-${{ hashFiles('.gitmodules', 'cmake/mln_version.cmake') }}
       - uses: ./.github/actions/setup-ci-deps
-      - name: Install EGL/GLES dev libraries (Linux OpenGL only)
+      - name: Install EGL dev library (Linux OpenGL only)
         if: ${{ contains(matrix.variant, 'opengl') && runner.os == 'Linux' }}
-        # --no-install-recommends prevents libgles2-mesa-dev from pulling in
-        # libpng-dev (and other -dev packages) whose system headers would
-        # collide with the libpng version supplied by pixi's conda env.
-        run: sudo apt-get update -y && sudo apt-get install -y --no-install-recommends libegl-dev libgles2-mesa-dev
+        # Only libegl-dev is installed from apt; libGLESv2 comes from pixi's
+        # mesalib package. libgles2-mesa-dev is intentionally omitted because
+        # it has a hard Depends: on libpng-dev, which installs newer libpng
+        # headers that conflict with pixi's libpng.so at runtime.
+        run: sudo apt-get update -y && sudo apt-get install -y --no-install-recommends libegl-dev
       - run: mise run configure
       - run: mise run ci:lint native
       - run: mise run test

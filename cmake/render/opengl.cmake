@@ -33,25 +33,36 @@ function(mln_configure_opengl_backend target)
       # works.
       set(MLN_FFI_OPENGL_LIBS EGL)
     else()
-      # On Linux, libegl-dev (which pulls in libgles-dev) installs libEGL.so and
-      # libGLESv2.so to the distro multiarch lib dir (e.g.
-      # /usr/lib/x86_64-linux-gnu). The conda/pixi toolchain's ld does not
-      # search that directory, so passing bare -lEGL / -lGLESv2 fails. Use
-      # find_library with explicit system hints and NO_CMAKE_FIND_ROOT_PATH to
-      # bypass the conda sysroot and obtain the full absolute paths.
+      # On Linux the conda/pixi toolchain's ld does not search the distro
+      # multiarch lib dir, so bare -lEGL / -lGLESv2 fails. Use find_library
+      # with explicit hints and NO_CMAKE_FIND_ROOT_PATH.
+      #
+      # Prefer the pixi conda env ($CONDA_PREFIX/lib, set by pixi run) because
+      # it already contains libEGL and libGLESv2 from the mesalib package.
+      # That avoids installing libgles2-mesa-dev from apt, which has a hard
+      # Depends: on libpng-dev — pulling in newer libpng headers that conflict
+      # with pixi's libpng.so at runtime.
       find_library(
         MLN_EGL_LIBRARY
         NAMES EGL
         HINTS
-          /usr/lib/${CMAKE_LIBRARY_ARCHITECTURE} /usr/lib/x86_64-linux-gnu
-          /usr/lib/aarch64-linux-gnu /usr/lib NO_CMAKE_FIND_ROOT_PATH
+          $ENV{CONDA_PREFIX}/lib
+          /usr/lib/${CMAKE_LIBRARY_ARCHITECTURE}
+          /usr/lib/x86_64-linux-gnu
+          /usr/lib/aarch64-linux-gnu
+          /usr/lib
+        NO_CMAKE_FIND_ROOT_PATH
         REQUIRED)
       find_library(
         MLN_GLESv2_LIBRARY
         NAMES GLESv2
         HINTS
-          /usr/lib/${CMAKE_LIBRARY_ARCHITECTURE} /usr/lib/x86_64-linux-gnu
-          /usr/lib/aarch64-linux-gnu /usr/lib NO_CMAKE_FIND_ROOT_PATH
+          $ENV{CONDA_PREFIX}/lib
+          /usr/lib/${CMAKE_LIBRARY_ARCHITECTURE}
+          /usr/lib/x86_64-linux-gnu
+          /usr/lib/aarch64-linux-gnu
+          /usr/lib
+        NO_CMAKE_FIND_ROOT_PATH
         REQUIRED)
       # gl_functions.cpp defines mbgl::platform::gl* function-pointer variables
       # (e.g. mbgl::platform::glGetFloatv) that bridge mbgl's internal GL calls
@@ -74,18 +85,27 @@ function(mln_configure_opengl_backend target)
       # exposes the EGL headers without exposing any other system header.
       set(MLN_EGL_STAGE_DIR ${CMAKE_CURRENT_BINARY_DIR}/linux-egl-headers)
       file(MAKE_DIRECTORY ${MLN_EGL_STAGE_DIR})
+      # Stage EGL/KHR/GLES2/GLES3 headers. Check the pixi conda env first
+      # ($CONDA_PREFIX/include) so we pick up pixi's mesalib headers rather
+      # than apt-installed system headers that may conflict with pixi libs.
       foreach(_egl_subdir EGL KHR GLES2 GLES3)
-        if(EXISTS /usr/include/${_egl_subdir}
-           AND NOT EXISTS ${MLN_EGL_STAGE_DIR}/${_egl_subdir})
-          file(CREATE_LINK /usr/include/${_egl_subdir}
-               ${MLN_EGL_STAGE_DIR}/${_egl_subdir} SYMBOLIC)
+        if(NOT EXISTS ${MLN_EGL_STAGE_DIR}/${_egl_subdir})
+          if(EXISTS $ENV{CONDA_PREFIX}/include/${_egl_subdir})
+            file(
+              CREATE_LINK $ENV{CONDA_PREFIX}/include/${_egl_subdir}
+              ${MLN_EGL_STAGE_DIR}/${_egl_subdir} SYMBOLIC)
+          elseif(EXISTS /usr/include/${_egl_subdir})
+            file(
+              CREATE_LINK /usr/include/${_egl_subdir}
+              ${MLN_EGL_STAGE_DIR}/${_egl_subdir} SYMBOLIC)
+          endif()
         endif()
       endforeach()
       if(NOT EXISTS ${MLN_EGL_STAGE_DIR}/EGL/egl.h)
         message(
           FATAL_ERROR
-            "EGL headers not found at /usr/include/EGL/egl.h. "
-            "Install them with: sudo apt-get install -y libegl-dev")
+            "EGL headers not found. Install libegl-dev or ensure pixi mesalib "
+            "provides EGL headers in $CONDA_PREFIX/include/EGL.")
       endif()
       set(MLN_LINUX_EGL_INCLUDE_DIR ${MLN_EGL_STAGE_DIR})
     endif()
