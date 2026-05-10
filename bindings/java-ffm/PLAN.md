@@ -78,7 +78,9 @@ use the separate JNI binding path.
   completion/release;
 - map lifecycle, style loading, repaint/still-image requests, debug helpers,
   camera commands, viewport/tile/bounds/free-camera/projection-mode options,
-  projection helpers, and coordinate conversions.
+  projection helpers, coordinate conversions, and geometry-based camera fitting;
+- JSON, geometry, GeoJSON, and feature value trees with descriptor
+  materializers/readers and Java-side depth checks.
 
 Java release policy: JDK 25 is the temporary development floor because jextract
 25 emits `SymbolLookup.findOrThrow()`, which is unavailable under
@@ -179,27 +181,7 @@ Build this support layer before broad API coverage:
 
 ## Milestones
 
-### 1. JSON, Geometry, GeoJSON, And Feature Values
-
-Implement:
-
-- sealed Java value trees for JSON and GeoJSON concepts, including a `JsonValue`
-  sealed interface implemented by immutable record variants and a singleton null
-  variant;
-- materializers for `mln_json_value`, `mln_geometry`, `mln_feature`, and
-  `mln_geojson` descriptor graphs;
-- readers that copy native JSON/feature views into Java value trees;
-- depth checks or clear Java errors before C rejects overly deep graphs when the
-  binding can diagnose them cheaply.
-
-Tests:
-
-- primitive, array, and object JSON values materialize and copy back correctly;
-- geometry collections, polygons, and feature identifiers materialize correctly;
-- descriptor memory stays alive for the full native call and is released after
-  the call.
-
-### 2. Style Sources, Layers, Images, And Custom Geometry
+### 1. Style Sources, Layers, Images, And Custom Geometry
 
 Implement:
 
@@ -220,7 +202,7 @@ Tests:
 - custom geometry callbacks stay strongly reachable until the map drops their
   owner scope.
 
-### 3. Render Sessions And Render Targets
+### 2. Render Sessions And Render Targets
 
 Implement:
 
@@ -241,7 +223,7 @@ Tests:
 - acquired frame callbacks always release the frame after callback success or
   failure.
 
-### 4. Feature State, Queries, Snapshots, And Offline Regions
+### 3. Feature State, Queries, Snapshots, And Offline Regions
 
 Implement:
 
@@ -261,7 +243,7 @@ Tests:
 - feature query and offline APIs propagate native invalid-state and wrong-thread
   statuses through the public exception model.
 
-### 5. Owner-Thread Helper Optional Layer
+### 4. Owner-Thread Helper Optional Layer
 
 The low-level handle APIs stay direct. After direct coverage works, add a small
 optional helper only if tests or examples show a clear need:

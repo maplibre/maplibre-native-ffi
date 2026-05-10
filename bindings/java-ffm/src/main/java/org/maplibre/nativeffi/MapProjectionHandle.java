@@ -68,6 +68,19 @@ public final class MapProjectionHandle implements AutoCloseable {
     }
   }
 
+  public void setVisibleGeometry(Geometry geometry, EdgeInsets padding) {
+    NativeAccess.ensureLoaded();
+    Objects.requireNonNull(geometry, "geometry");
+    Objects.requireNonNull(padding, "padding");
+    try (var arena = Arena.ofConfined()) {
+      Status.check(
+          MapLibreNativeC.mln_map_projection_set_visible_geometry(
+              state.requireLive(),
+              Structs.geometry(geometry, arena),
+              Structs.edgeInsets(padding, arena)));
+    }
+  }
+
   public ScreenPoint pixelForLatLng(LatLng coordinate) {
     NativeAccess.ensureLoaded();
     Objects.requireNonNull(coordinate, "coordinate");

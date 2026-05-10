@@ -304,6 +304,15 @@ public final class MapHandle implements AutoCloseable {
         coordinates, Objects.requireNonNull(fitOptions, "fitOptions"), true);
   }
 
+  public CameraOptions cameraForGeometry(Geometry geometry) {
+    return cameraForGeometryInternal(geometry, null, false);
+  }
+
+  public CameraOptions cameraForGeometry(Geometry geometry, CameraFitOptions fitOptions) {
+    return cameraForGeometryInternal(
+        geometry, Objects.requireNonNull(fitOptions, "fitOptions"), true);
+  }
+
   public LatLngBounds latLngBoundsForCamera(CameraOptions camera) {
     NativeAccess.ensureLoaded();
     Objects.requireNonNull(camera, "camera");
@@ -587,6 +596,22 @@ public final class MapHandle implements AutoCloseable {
               state.requireLive(),
               Structs.latLngArray(copiedCoordinates, arena),
               copiedCoordinates.size(),
+              hasFitOptions ? Structs.cameraFitOptions(fitOptions, arena) : MemorySegment.NULL,
+              outCamera));
+      return Structs.cameraOptions(outCamera);
+    }
+  }
+
+  private CameraOptions cameraForGeometryInternal(
+      Geometry geometry, CameraFitOptions fitOptions, boolean hasFitOptions) {
+    NativeAccess.ensureLoaded();
+    Objects.requireNonNull(geometry, "geometry");
+    try (var arena = Arena.ofConfined()) {
+      var outCamera = MapLibreNativeC.mln_camera_options_default(arena);
+      Status.check(
+          MapLibreNativeC.mln_map_camera_for_geometry(
+              state.requireLive(),
+              Structs.geometry(geometry, arena),
               hasFitOptions ? Structs.cameraFitOptions(fitOptions, arena) : MemorySegment.NULL,
               outCamera));
       return Structs.cameraOptions(outCamera);

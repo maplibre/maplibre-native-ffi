@@ -151,6 +151,11 @@ final class MapHandleTest {
               new LatLngBounds(new LatLng(-1, -1), new LatLng(1, 1)),
               new CameraFitOptions().setPadding(EdgeInsets.ZERO));
       assertTrue(fitted.hasCenter());
+      var geometryFitted =
+          map.cameraForGeometry(
+              Geometry.multiPoint(List.of(new LatLng(-1, -1), new LatLng(1, 1))),
+              new CameraFitOptions().setPadding(EdgeInsets.ZERO));
+      assertTrue(geometryFitted.hasCenter());
       map.latLngBoundsForCamera(fitted);
       map.latLngBoundsForCameraUnwrapped(fitted);
     } finally {
@@ -172,6 +177,8 @@ final class MapHandleTest {
       assertEquals(2.0, camera.zoom(), 1e-6);
       projection.setVisibleCoordinates(
           List.of(new LatLng(-1, -1), new LatLng(1, 1)), EdgeInsets.ZERO);
+      projection.setVisibleGeometry(
+          Geometry.multiPoint(List.of(new LatLng(-1, -1), new LatLng(1, 1))), EdgeInsets.ZERO);
       var point = projection.pixelForLatLng(new LatLng(0, 0));
       var coordinate = projection.latLngForPixel(point);
       assertEquals(0.0, coordinate.latitude(), 1e-6);
