@@ -29,23 +29,22 @@ function(mln_configure_opengl_backend target)
     set(MLN_FFI_OPENGL_SOURCES
         ${PROJECT_SOURCE_DIR}/src/render/opengl/egl_surface_session.cpp)
     if(ANDROID)
-      # On Android the EGL library lives in the NDK sysroot; CMake's -lEGL works.
+      # On Android the EGL library lives in the NDK sysroot; CMake's -lEGL
+      # works.
       set(MLN_FFI_OPENGL_LIBS EGL)
     else()
       # On Linux, libegl-dev installs libEGL.so to the distro multiarch lib dir
       # (e.g. /usr/lib/x86_64-linux-gnu). The conda/pixi toolchain's ld does not
-      # search that directory, so passing just -lEGL fails. Use find_library with
+      # search that directory, so passing just -lEGL fails. Use find_library
+      # with
       # explicit system hints and NO_CMAKE_FIND_ROOT_PATH to bypass the conda
       # sysroot and obtain the full absolute path to libEGL.so.
       find_library(
         MLN_EGL_LIBRARY
         NAMES EGL
         HINTS
-          /usr/lib/${CMAKE_LIBRARY_ARCHITECTURE}
-          /usr/lib/x86_64-linux-gnu
-          /usr/lib/aarch64-linux-gnu
-          /usr/lib
-        NO_CMAKE_FIND_ROOT_PATH
+          /usr/lib/${CMAKE_LIBRARY_ARCHITECTURE} /usr/lib/x86_64-linux-gnu
+          /usr/lib/aarch64-linux-gnu /usr/lib NO_CMAKE_FIND_ROOT_PATH
         REQUIRED)
       set(MLN_FFI_OPENGL_LIBS ${MLN_EGL_LIBRARY})
     endif()

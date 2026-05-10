@@ -36,7 +36,6 @@
 #include <mbgl/util/size.hpp>
 
 #include <EGL/egl.h>
-
 #include <maplibre_native_c/base.h>
 #include <maplibre_native_c/surface.h>
 
