@@ -3,6 +3,7 @@ const std = @import("std");
 const BuildOptions = struct {
     target: std.Build.ResolvedTarget,
     optimize: std.builtin.OptimizeMode,
+    cmake_artifact_dir_path: []const u8,
     cmake_artifact_dir: std.Build.LazyPath,
     render_backend: RenderBackend,
 };
@@ -38,13 +39,21 @@ fn linkMapLibreC(b: *std.Build, module: *std.Build.Module, cmake_artifact_dir: s
     module.link_libc = true;
 }
 
-fn cmakeArtifactDir(b: *std.Build) std.Build.LazyPath {
-    const path = b.option(
-        []const u8,
-        "cmake-artifact-dir",
-        "Directory containing the CMake-built maplibre-native-c library",
-    ) orelse "build";
+fn pixiLibraryDir(b: *std.Build, target: std.Build.ResolvedTarget) std.Build.LazyPath {
+    return switch (target.result.os.tag) {
+        .windows => b.path(".pixi/envs/default/Library/lib"),
+        else => b.path(".pixi/envs/default/lib"),
+    };
+}
 
+fn vulkanLibraryName(target: std.Build.ResolvedTarget) []const u8 {
+    return switch (target.result.os.tag) {
+        .windows => "vulkan-1",
+        else => "vulkan",
+    };
+}
+
+fn lazyPath(b: *std.Build, path: []const u8) std.Build.LazyPath {
     if (std.fs.path.isAbsolute(path)) {
         return .{ .cwd_relative = path };
     }
@@ -74,9 +83,9 @@ fn addCTests(b: *std.Build, options: BuildOptions) *std.Build.Step.Compile {
         c_tests.root_module.linkFramework("QuartzCore", .{});
     } else if (options.render_backend == .vulkan) {
         c_tests.root_module.addIncludePath(b.path("third_party/maplibre-native/vendor/Vulkan-Headers/include"));
-        c_tests.root_module.addLibraryPath(b.path(".pixi/envs/default/lib"));
-        c_tests.root_module.addRPath(b.path(".pixi/envs/default/lib"));
-        c_tests.root_module.linkSystemLibrary("vulkan", .{});
+        c_tests.root_module.addLibraryPath(pixiLibraryDir(b, options.target));
+        c_tests.root_module.addRPath(pixiLibraryDir(b, options.target));
+        c_tests.root_module.linkSystemLibrary(vulkanLibraryName(options.target), .{});
     } else if (options.render_backend == .opengl) {
         switch (options.target.result.os.tag) {
             .windows => {
@@ -95,16 +104,27 @@ fn addCTests(b: *std.Build, options: BuildOptions) *std.Build.Step.Compile {
 
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
+    const cmake_artifact_dir_path = b.option(
+        []const u8,
+        "cmake-artifact-dir",
+        "Directory containing the CMake-built maplibre-native-c library",
+    ) orelse "build";
     const options = BuildOptions{
         .target = target,
         .optimize = b.standardOptimizeOption(.{}),
-        .cmake_artifact_dir = cmakeArtifactDir(b),
+        .cmake_artifact_dir_path = cmake_artifact_dir_path,
+        .cmake_artifact_dir = lazyPath(b, cmake_artifact_dir_path),
         .render_backend = renderBackend(b, target),
     };
 
     const c_tests = addCTests(b, options);
 
     const run_c_tests = b.addRunArtifact(c_tests);
+    if (target.result.os.tag == .windows) {
+        run_c_tests.addPathDir(options.cmake_artifact_dir_path);
+        run_c_tests.addPathDir(".pixi/envs/default");
+        run_c_tests.addPathDir(".pixi/envs/default/Library/bin");
+    }
     const test_step = b.step("test", "Run Zig C API tests");
     test_step.dependOn(&run_c_tests.step);
 }

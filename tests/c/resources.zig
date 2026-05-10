@@ -254,7 +254,8 @@ fn serveOneHttpStyleInner(state: *HttpServerState) !void {
     defer stream.close(testing.io);
 
     var request_buffer: [1024]u8 = undefined;
-    _ = try std.posix.read(stream.socket.handle, &request_buffer);
+    var reader = stream.reader(testing.io, &request_buffer);
+    _ = try reader.interface.discardDelimiterInclusive('\n');
 
     var header_buffer: [256]u8 = undefined;
     const header = try std.fmt.bufPrint(&header_buffer, "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nCache-Control: public, max-age=3600\r\nETag: \"zig-style\"\r\nContent-Length: {d}\r\nConnection: close\r\n\r\n", .{support.style_json.len});

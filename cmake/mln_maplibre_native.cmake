@@ -1,6 +1,11 @@
 function(mln_add_maplibre_native)
   set(MLN_SOURCE_DIR "${PROJECT_SOURCE_DIR}/third_party/maplibre-native")
 
+  if(WIN32)
+    add_compile_definitions(NOMINMAX GHC_WIN_DISABLE_WSTRING_STORAGE_TYPE
+                            _USE_MATH_DEFINES)
+  endif()
+
   if(NOT EXISTS "${MLN_SOURCE_DIR}/CMakeLists.txt")
     message(
       FATAL_ERROR

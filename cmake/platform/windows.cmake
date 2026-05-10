@@ -1,15 +1,28 @@
-# cmake/platform/windows.cmake
-# Platform support for Windows (MSVC / Clang-CL).
-#
-# Networking: uses Win32 WinHTTP (already part of maplibre-native's Windows
-# platform). Image decoding: WIC (Windows Imaging Component) is the native
-# codec library used by maplibre-native on Windows.
-
 function(mln_configure_windows_platform target)
-  find_package(CURL REQUIRED) # maplibre-native uses CURL for HTTP on Windows
+  find_package(CURL REQUIRED)
+  find_package(dlfcn-win32 REQUIRED)
+  find_package(ICU COMPONENTS i18n uc data REQUIRED)
   find_package(JPEG REQUIRED)
+  find_package(libuv REQUIRED)
   find_package(PNG REQUIRED)
-  find_package(Threads REQUIRED)
+  find_package(WebP REQUIRED)
+
+  get_filename_component(MLN_FFI_ICU_ROOT "${ICU_INCLUDE_DIR}" DIRECTORY)
+  find_library(
+    MLN_FFI_ICU_I18N_LIBRARY
+    NAMES icuin
+    PATHS "${MLN_FFI_ICU_ROOT}/lib"
+    REQUIRED NO_DEFAULT_PATH)
+  find_library(
+    MLN_FFI_ICU_UC_LIBRARY
+    NAMES icuuc
+    PATHS "${MLN_FFI_ICU_ROOT}/lib"
+    REQUIRED NO_DEFAULT_PATH)
+  find_library(
+    MLN_FFI_ICU_DATA_LIBRARY
+    NAMES icudt
+    PATHS "${MLN_FFI_ICU_ROOT}/lib"
+    REQUIRED NO_DEFAULT_PATH)
 
   set(MLN_FFI_VENDOR_WINDOWS_SOURCES
       ${MLN_SOURCE_DIR}/platform/default/src/mbgl/i18n/collator.cpp
@@ -24,8 +37,10 @@ function(mln_configure_windows_platform target)
       ${MLN_SOURCE_DIR}/platform/default/src/mbgl/util/png_writer.cpp
       ${MLN_SOURCE_DIR}/platform/default/src/mbgl/util/run_loop.cpp
       ${MLN_SOURCE_DIR}/platform/default/src/mbgl/util/string_stdlib.cpp
+      ${MLN_SOURCE_DIR}/platform/default/src/mbgl/util/timer.cpp
+      ${MLN_SOURCE_DIR}/platform/default/src/mbgl/util/webp_reader.cpp
       ${MLN_SOURCE_DIR}/platform/windows/src/thread.cpp
-      ${MLN_SOURCE_DIR}/platform/default/src/mbgl/util/timer.cpp)
+      ${MLN_SOURCE_DIR}/platform/windows/src/thread_local.cpp)
 
   mln_target_vendor_sources(${target} ${MLN_FFI_VENDOR_WINDOWS_SOURCES})
 
@@ -33,67 +48,35 @@ function(mln_configure_windows_platform target)
     ${target}
     SYSTEM
     PRIVATE
-      ${CURL_INCLUDE_DIRS} ${JPEG_INCLUDE_DIRS}
-      # Windows thread_local.cpp includes thread.h from here.
-      ${MLN_SOURCE_DIR}/platform/windows/include)
+      ${MLN_SOURCE_DIR}/platform/windows/include ${CURL_INCLUDE_DIRS}
+      ${JPEG_INCLUDE_DIRS} ${WEBP_INCLUDE_DIRS})
 
-  # MSVC does not define M_PI by default; this enables the math constants.
-  # NOMINMAX prevents <windows.h> from defining min/max macros that clash with
-  # std::numeric_limits<T>::max() and std::min/std::max calls.
-  target_compile_definitions(${target} PRIVATE _USE_MATH_DEFINES NOMINMAX)
-
-  # ICU handling: maplibre-native's cmake may use vendor (builtin) ICU or system
-  # ICU depending on what find_package(ICU) finds at configure time.  We detect
-  # which path was taken and mirror it so that bidi.cpp and number_format.cpp
-  # compile correctly in our target too.
-  #
-  # Always add vendor/icu/include directly (it contains ubidi.h and ushape.h)
-  # so that bidi.cpp can resolve its unconditional ICU includes regardless of
-  # whether the mbgl-vendor-icu cmake target was created.
-  target_include_directories(
+  target_compile_definitions(
     ${target}
-    SYSTEM
-    PRIVATE ${MLN_SOURCE_DIR}/vendor/icu/include)
-
-  if(TARGET mbgl-vendor-icu)
-    # maplibre-native chose builtin (vendor) ICU.  Use the same stubs so that
-    # number_format.cpp takes the lightweight builtin path.
-    target_compile_definitions(${target} PRIVATE MBGL_USE_BUILTIN_ICU)
-    target_link_libraries(${target} PRIVATE mbgl-vendor-icu)
-  elseif(TARGET ICU::uc)
-    # System ICU was found and used by maplibre-native.  Link against it so
-    # bidi.cpp and number_format.cpp resolve at link time.
-    target_link_libraries(${target} PRIVATE ICU::i18n ICU::uc)
-  else()
-    # Neither target exists yet (unusual path).  Force vendor ICU creation;
-    # vendor/icu.cmake is idempotent (guards with if(TARGET mbgl-vendor-icu)).
-    include(${MLN_SOURCE_DIR}/vendor/icu.cmake)
-    target_compile_definitions(${target} PRIVATE MBGL_USE_BUILTIN_ICU)
-    target_link_libraries(${target} PRIVATE mbgl-vendor-icu)
-  endif()
+    PRIVATE CURL_STATICLIB NOMINMAX USE_STD_FILESYSTEM _USE_MATH_DEFINES)
 
   # Third-party headers in mbgl trigger MSVC warnings that are treated as
   # errors. Suppress the ones we cannot fix (they are in vendor code):
-  #   C4324 — structure padded due to alignment specifier (gpu_expression.hpp)
-  #   C4244 — narrowing int→char16_t conversion (glyph.hpp)
-  # C4702 — unreachable code (vendor/expected-lite/include/nonstd/expected.hpp)
+  #   C4324 - structure padded due to alignment specifier (gpu_expression.hpp)
+  #   C4244 - narrowing int->char16_t conversion (glyph.hpp)
+  #   C4702 - unreachable code (vendor/expected-lite/include/nonstd/expected.hpp)
   target_compile_options(${target} PRIVATE /wd4324 /wd4244 /wd4702)
 
-  # LNK4044: LLVM's cmake exports contain '-lpthread' in their
-  # INTERFACE_LINK_LIBRARIES for Linux targets; this leaks onto the Windows
-  # link line as '/lpthreads' which MSVC link.exe does not recognise. The
-  # flag is harmless (it is ignored), but suppress the warning to keep the
-  # build output clean.
+  # LNK4044: LLVM cmake exports contain '-lpthread' in INTERFACE_LINK_LIBRARIES
+  # for Linux targets; this leaks onto the Windows link line as '/lpthreads'
+  # which MSVC link.exe does not recognise. Suppress the warning.
   target_link_options(${target} PRIVATE /ignore:4044)
 
   target_link_libraries(
     ${target}
     PRIVATE
       ${CURL_LIBRARIES}
+      dlfcn-win32::dl
       ${JPEG_LIBRARIES}
-      PNG::PNG
-      Threads::Threads
-      # Win32 system libraries used by maplibre-native's Windows platform
-      Ws2_32
-      Winhttp)
+      WebP::webp
+      $<IF:$<TARGET_EXISTS:libuv::uv_a>,libuv::uv_a,libuv::uv>
+      ${MLN_FFI_ICU_I18N_LIBRARY}
+      ${MLN_FFI_ICU_UC_LIBRARY}
+      ${MLN_FFI_ICU_DATA_LIBRARY}
+      PNG::PNG)
 endfunction()

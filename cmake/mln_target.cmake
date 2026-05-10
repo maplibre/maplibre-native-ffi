@@ -51,10 +51,9 @@ function(mln_add_c_api_library target)
   target_compile_options(
     ${target}
     PRIVATE
-      # Disable RTTI. Use the correct flag per compiler family.
-      $<$<AND:$<COMPILE_LANGUAGE:CXX>,$<NOT:$<CXX_COMPILER_ID:MSVC>>>:-fno-rtti>
+      $<$<AND:$<COMPILE_LANGUAGE:CXX,OBJCXX>,$<NOT:$<CXX_COMPILER_ID:MSVC>>>:-fno-rtti>
+      $<$<AND:$<COMPILE_LANGUAGE:C,CXX>,$<CXX_COMPILER_ID:MSVC>>:/MP>
       $<$<AND:$<COMPILE_LANGUAGE:CXX>,$<CXX_COMPILER_ID:MSVC>>:/GR->
-      $<$<COMPILE_LANGUAGE:OBJCXX>:-fno-rtti>
       $<$<COMPILE_LANGUAGE:OBJC,OBJCXX>:-fobjc-arc>)
   target_compile_definitions(
     ${target}
