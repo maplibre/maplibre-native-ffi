@@ -45,21 +45,17 @@ function(mln_configure_opengl_backend target)
       # multiarch lib dir, so bare -lEGL / -lGLESv2 fails. Use find_library
       # with explicit hints and NO_CMAKE_FIND_ROOT_PATH.
       #
-      # Prefer the system /usr/lib/<multiarch> EGL/GLESv2 (from libegl-dev /
-      # libgles-dev) over pixi's conda-forge mesalib build. pixi's libEGL.so.1
-      # is compiled WITHOUT the X11 EGL platform, so at runtime the headless
-      # backend's eglGetDisplay(EGL_DEFAULT_DISPLAY) under xvfb fails to
-      # initialize. Linking against the system libEGL means the .so's
-      # NEEDED entry resolves to GLVND (the system dispatcher) which loads
-      # libEGL_mesa.so.0 from libegl-mesa0 — that one has X11 support and
-      # works with xvfb + LIBGL_ALWAYS_SOFTWARE for headless software EGL.
+      # Prefer pixi's conda-forge mesalib libEGL/libGLESv2 over system libs.
+      # At runtime DT_RUNPATH=.pixi/envs/default/lib causes pixi's libEGL to
+      # be loaded. We use EGL_PLATFORM=surfaceless + LIBGL_ALWAYS_SOFTWARE=1
+      # in CI so pixi's Mesa creates a surfaceless pbuffer display without
+      # needing X11 or a GPU — exactly what the headless backend requires.
       find_library(
         MLN_EGL_LIBRARY
         NAMES EGL
         HINTS
-          /usr/lib/${CMAKE_LIBRARY_ARCHITECTURE}
+          $ENV{CONDA_PREFIX}/lib /usr/lib/${CMAKE_LIBRARY_ARCHITECTURE}
           /usr/lib/x86_64-linux-gnu /usr/lib/aarch64-linux-gnu /usr/lib
-          $ENV{CONDA_PREFIX}/lib
           NO_CMAKE_FIND_ROOT_PATH
         REQUIRED)
       # Extend suffixes to also accept versioned .so.2 files: the libgles2
@@ -71,9 +67,8 @@ function(mln_configure_opengl_backend target)
         MLN_GLESv2_LIBRARY
         NAMES GLESv2
         HINTS
-          /usr/lib/${CMAKE_LIBRARY_ARCHITECTURE}
+          $ENV{CONDA_PREFIX}/lib /usr/lib/${CMAKE_LIBRARY_ARCHITECTURE}
           /usr/lib/x86_64-linux-gnu /usr/lib/aarch64-linux-gnu /usr/lib
-          $ENV{CONDA_PREFIX}/lib
           NO_CMAKE_FIND_ROOT_PATH
         REQUIRED)
       set(CMAKE_FIND_LIBRARY_SUFFIXES ${_saved_lib_suffixes})

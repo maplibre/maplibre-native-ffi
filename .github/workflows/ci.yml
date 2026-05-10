@@ -86,37 +86,22 @@ jobs:
         #                     virtual X11 display to give to eglGetDisplay().
         # libgl1-mesa-dri   — Mesa DRI drivers including swrast/llvmpipe CPU
         #                     rasterizer (often pre-installed; listed for clarity).
-        run: sudo apt-get update -y && sudo apt-get install -y --no-install-recommends libegl-dev libgles-dev libgles2 libegl-mesa0 libegl1 xvfb libgl1-mesa-dri
+        run: sudo apt-get update -y && sudo apt-get install -y --no-install-recommends libegl-dev libgles-dev libgles2 libegl-mesa0 libegl1 libgl1-mesa-dri
       - run: mise run configure
       - run: mise run ci:lint native
-      - name: Remove pixi's broken libEGL/libGLESv2 (Linux OpenGL)
+      - name: Run tests (Linux OpenGL — EGL surfaceless + Mesa llvmpipe)
         if: ${{ contains(matrix.variant, 'opengl') && runner.os == 'Linux' }}
-        # The shared library has DT_RUNPATH=.pixi/envs/default/lib (set by
-        # CMAKE_BUILD_RPATH so other pixi runtime libs like libuv/libpng
-        # resolve). DT_RUNPATH is searched BEFORE ld.so.cache, so even
-        # though we link against /usr/lib/<multiarch>/libEGL.so at build time,
-        # at runtime DT_NEEDED libEGL.so.1 / libGLESv2.so.2 still resolve to
-        # the pixi conda-forge copies — which are compiled WITHOUT X11 EGL
-        # platform support and cause render_update() to fail.
-        #
-        # Delete pixi's EGL/GLESv2 files so the dynamic linker, after failing
-        # in DT_RUNPATH, falls through to ld.so.cache and picks up the
-        # system X11-capable libEGL.so.1 (GLVND -> libEGL_mesa.so.0) and
-        # libGLESv2.so.2.
-        run: |
-          PIXI_LIB="${{ github.workspace }}/.pixi/envs/default/lib"
-          sudo rm -fv "$PIXI_LIB"/libEGL.so* "$PIXI_LIB"/libGLESv2.so* "$PIXI_LIB"/libGLES.so* "$PIXI_LIB"/libGLESv1_CM.so*
-          echo "After cleanup:"
-          ls -la "$PIXI_LIB"/libEGL* "$PIXI_LIB"/libGL* 2>&1 | head -40 || true
-      - name: Run tests (Linux OpenGL — xvfb-run + Mesa software EGL)
-        if: ${{ contains(matrix.variant, 'opengl') && runner.os == 'Linux' }}
-        # xvfb-run gives DISPLAY=:nn so eglGetDisplay(EGL_DEFAULT_DISPLAY)
-        # connects to a virtual X11 display. With pixi's broken EGL/GLESv2
-        # removed (previous step), the dynamic linker resolves the system
-        # X11-capable Mesa EGL ICD. LIBGL_ALWAYS_SOFTWARE=1 forces llvmpipe.
+        # Use EGL_PLATFORM=surfaceless (same approach as maplibre-native's
+        # linux-ci.yml). This tells Mesa's libEGL to create an EGL display
+        # without any windowing system connection (no X11, no Wayland), using
+        # only pbuffer surfaces — which is all the headless backend needs.
+        # LIBGL_ALWAYS_SOFTWARE=1 forces llvmpipe so no GPU is required.
+        # This avoids xvfb-run and the X11/GLVND library-ordering issues that
+        # occur when pixi's LD_LIBRARY_PATH shadows the system EGL stack.
         env:
+          EGL_PLATFORM: surfaceless
           LIBGL_ALWAYS_SOFTWARE: "1"
-        run: xvfb-run mise run test
+        run: mise run test
       - name: Run tests
         if: ${{ !(contains(matrix.variant, 'opengl') && runner.os == 'Linux') }}
         run: mise run test
