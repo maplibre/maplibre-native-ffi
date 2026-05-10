@@ -10,6 +10,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.maplibre.nativeffi.internal.HandleState;
 import org.maplibre.nativeffi.internal.MemoryUtil;
 import org.maplibre.nativeffi.internal.NativeAccess;
+import org.maplibre.nativeffi.internal.ResourceTransformState;
 import org.maplibre.nativeffi.internal.Status;
 import org.maplibre.nativeffi.internal.Structs;
 import org.maplibre.nativeffi.internal.c.MapLibreNativeC;
@@ -27,6 +28,8 @@ public final class RuntimeHandle implements AutoCloseable {
   private final HandleState state;
   private final ConcurrentHashMap<Long, WeakReference<MapHandle>> liveMaps =
       new ConcurrentHashMap<>();
+  private ResourceTransformState resourceTransformState;
+  private ResourceProviderState resourceProviderState;
 
   private RuntimeHandle(MemorySegment handle) {
     this.state = new HandleState("RuntimeHandle", handle);
@@ -59,6 +62,40 @@ public final class RuntimeHandle implements AutoCloseable {
             state.requireLive(), Objects.requireNonNull(operation, "operation").nativeValue()));
   }
 
+  public void setResourceTransform(ResourceTransformCallback callback) {
+    NativeAccess.ensureLoaded();
+    var replacement = new ResourceTransformState(Objects.requireNonNull(callback, "callback"));
+    ResourceTransformState previous;
+    try {
+      Status.check(
+          MapLibreNativeC.mln_runtime_set_resource_transform(
+              state.requireLive(), replacement.descriptor()));
+      previous = resourceTransformState;
+      resourceTransformState = replacement;
+    } catch (RuntimeException | Error error) {
+      closeQuietly(replacement);
+      throw error;
+    }
+    closeQuietly(previous);
+  }
+
+  public void setResourceProvider(ResourceProviderCallback callback) {
+    NativeAccess.ensureLoaded();
+    var replacement = new ResourceProviderState(Objects.requireNonNull(callback, "callback"));
+    ResourceProviderState previous;
+    try {
+      Status.check(
+          MapLibreNativeC.mln_runtime_set_resource_provider(
+              state.requireLive(), replacement.descriptor()));
+      previous = resourceProviderState;
+      resourceProviderState = replacement;
+    } catch (RuntimeException | Error error) {
+      closeQuietly(replacement);
+      throw error;
+    }
+    closeQuietly(previous);
+  }
+
   public Optional<RuntimeEvent> pollEvent() {
     NativeAccess.ensureLoaded();
     try (var arena = Arena.ofConfined()) {
@@ -76,7 +113,7 @@ public final class RuntimeHandle implements AutoCloseable {
   @Override
   public void close() {
     NativeAccess.ensureLoaded();
-    state.closeOnce(MapLibreNativeC::mln_runtime_destroy);
+    state.closeOnce(MapLibreNativeC::mln_runtime_destroy, this::closeResourceCallbacks);
   }
 
   public boolean isClosed() {
@@ -254,5 +291,23 @@ public final class RuntimeHandle implements AutoCloseable {
     return new RuntimeEventPayload.OfflineRegionTileCountLimit(
         mln_runtime_event_offline_region_tile_count_limit.region_id(limit),
         mln_runtime_event_offline_region_tile_count_limit.limit(limit));
+  }
+
+  private void closeResourceCallbacks() {
+    closeQuietly(resourceProviderState);
+    closeQuietly(resourceTransformState);
+    resourceProviderState = null;
+    resourceTransformState = null;
+  }
+
+  private static void closeQuietly(AutoCloseable closeable) {
+    if (closeable == null) {
+      return;
+    }
+    try {
+      closeable.close();
+    } catch (Exception ignored) {
+      // Releasing callback arenas is best-effort after native callbacks are disabled.
+    }
   }
 }

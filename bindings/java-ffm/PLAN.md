@@ -25,7 +25,7 @@ Deliver a low-level Java package for modern desktop/server JVMs that:
   exceptions that preserve the C API model;
 - supports deterministic release for every long-lived native handle;
 - translates C statuses and thread-local diagnostics into Java exceptions;
-- includes a smoke example and binding tests that exercise real C ABI calls.
+- includes binding tests that exercise real C ABI calls.
 
 The binding targets the Java FFM path. Android and JVMs where FFM is unavailable
 use the separate JNI binding path.
@@ -67,7 +67,15 @@ use the separate JNI binding path.
 - `NativeLibrary`, which loads `maplibre-native-c` from an explicit property,
   environment variable, or `java.library.path`;
 - a native-library smoke test that proves generated jextract calls can reach
-  `mln_c_version()`.
+  `mln_c_version()`;
+- process helpers for C version, supported render backends, network status,
+  logging callbacks, async log masks, and projected-meter conversion;
+- runtime options, runtime/map/projection lifecycle wrappers, copied runtime
+  events, live map lookup for map-originated events, and ambient cache
+  operations;
+- runtime resource transform and provider callbacks with copied requests,
+  `ResourceResponse` materialization, and one-shot `ResourceRequestHandle`
+  completion/release.
 
 Java release policy: JDK 25 is the temporary development floor because jextract
 25 emits `SymbolLookup.findOrThrow()`, which is unavailable under
@@ -167,27 +175,7 @@ Build this support layer before broad API coverage:
 
 ## Milestones
 
-### 1. Runtime Handles, Events, And Resource Hooks
-
-Implement:
-
-- `RuntimeOptions` builder and `RuntimeHandle.create(options)`;
-- `RuntimeHandle.runOnce()`, ambient cache operations, and `close()`;
-- copied runtime events with typed payload records;
-- live map registry on `RuntimeHandle` for map-originated events;
-- resource transform callback;
-- resource provider callback with copied requests and `ResourceRequestHandle`
-  one-shot completion/release.
-
-Tests:
-
-- create and close a runtime on one thread;
-- wrong-thread calls throw `WrongThreadException` with the native diagnostic;
-- polling with no events returns empty without leaking arena state;
-- resource request handles enforce exactly-once completion and release where a
-  real provider test is practical.
-
-### 2. Map Lifecycle, Camera, And Projection
+### 1. Map Lifecycle, Camera, And Projection
 
 Implement:
 
@@ -209,7 +197,7 @@ Tests:
 - projection helpers close independently and reject use after release;
 - wrong-thread map and projection calls map to `WrongThreadException`.
 
-### 3. JSON, Geometry, GeoJSON, And Feature Values
+### 2. JSON, Geometry, GeoJSON, And Feature Values
 
 Implement:
 
@@ -229,7 +217,7 @@ Tests:
 - descriptor memory stays alive for the full native call and is released after
   the call.
 
-### 4. Style Sources, Layers, Images, And Custom Geometry
+### 3. Style Sources, Layers, Images, And Custom Geometry
 
 Implement:
 
@@ -250,7 +238,7 @@ Tests:
 - custom geometry callbacks stay strongly reachable until the map drops their
   owner scope.
 
-### 5. Render Sessions And Render Targets
+### 4. Render Sessions And Render Targets
 
 Implement:
 
@@ -271,7 +259,7 @@ Tests:
 - acquired frame callbacks always release the frame after callback success or
   failure.
 
-### 6. Feature State, Queries, Snapshots, And Offline Regions
+### 5. Feature State, Queries, Snapshots, And Offline Regions
 
 Implement:
 
@@ -291,7 +279,7 @@ Tests:
 - feature query and offline APIs propagate native invalid-state and wrong-thread
   statuses through the public exception model.
 
-### 7. Owner-Thread Helper Optional Layer
+### 6. Owner-Thread Helper Optional Layer
 
 The low-level handle APIs stay direct. After direct coverage works, add a small
 optional helper only if tests or examples show a clear need:
@@ -303,48 +291,6 @@ optional helper only if tests or examples show a clear need:
 
 Keep UI dispatch, coroutines, listeners, promises, and application scheduling in
 adapters above this low-level binding.
-
-### 8. Smoke Example And Packaging
-
-Implement:
-
-- a small Java FFM smoke example that loads the native library, creates a
-  runtime and map, loads a style URL or JSON, pumps events, and closes handles;
-- an optional offscreen readback example when the native backend is available;
-- Gradle publication metadata for the Java artifact;
-- clear native-library loading documentation.
-
-Recommended initial packaging:
-
-- publish the Java binding separately from native binaries;
-- require callers to provide the native `maplibre-native-c` library through an
-  exact path or platform library path;
-- add platform classifier artifacts later when CI builds and signs native
-  libraries for each supported variant.
-
-Tests:
-
-- example compiles as part of CI;
-- smoke example exits under a short timeout;
-- build output states the native library path requirement when tests are skipped
-  or fail due missing native artifacts.
-
-### 9. Documentation And Generated Reference
-
-Implement:
-
-- public Javadocs for ownership, owner-thread rules, callback threading, native
-  pointer lifetimes, and buffer lifetimes;
-- docs under `docs/src/content/docs/development/` for Java FFM contributor notes
-  as implementation details evolve;
-- generated or curated reference pages when the public API stabilizes.
-
-Done when:
-
-- public docs name every handle's close rule;
-- callback docs state invocation threads and allowed native calls;
-- render-target docs state borrowed backend object lifetimes;
-- examples stay small and focused.
 
 ## Header Coverage Map
 
@@ -400,5 +346,4 @@ The Java FFM binding is complete when:
 - owner-thread behavior is documented and tested;
 - surface and texture APIs model backend-native handles as borrowed
   `NativePointer` values;
-- tests and the smoke example pass through `mise run test` in supported CI
-  variants.
+- tests pass through `mise run test` in supported CI variants.

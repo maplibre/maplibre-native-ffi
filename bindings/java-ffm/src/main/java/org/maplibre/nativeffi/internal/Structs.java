@@ -2,6 +2,8 @@ package org.maplibre.nativeffi.internal;
 
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
+import java.lang.foreign.ValueLayout;
+import java.util.Optional;
 import org.maplibre.nativeffi.EdgeInsets;
 import org.maplibre.nativeffi.LatLng;
 import org.maplibre.nativeffi.MapOptions;
@@ -9,6 +11,13 @@ import org.maplibre.nativeffi.OfflineRegionDownloadState;
 import org.maplibre.nativeffi.OfflineRegionStatus;
 import org.maplibre.nativeffi.ProjectedMeters;
 import org.maplibre.nativeffi.RenderingStats;
+import org.maplibre.nativeffi.ResourceKind;
+import org.maplibre.nativeffi.ResourceLoadingMethod;
+import org.maplibre.nativeffi.ResourcePriority;
+import org.maplibre.nativeffi.ResourceRequest;
+import org.maplibre.nativeffi.ResourceResponse;
+import org.maplibre.nativeffi.ResourceStoragePolicy;
+import org.maplibre.nativeffi.ResourceUsage;
 import org.maplibre.nativeffi.RuntimeOptions;
 import org.maplibre.nativeffi.ScreenPoint;
 import org.maplibre.nativeffi.TileId;
@@ -19,6 +28,8 @@ import org.maplibre.nativeffi.internal.c.mln_map_options;
 import org.maplibre.nativeffi.internal.c.mln_offline_region_status;
 import org.maplibre.nativeffi.internal.c.mln_projected_meters;
 import org.maplibre.nativeffi.internal.c.mln_rendering_stats;
+import org.maplibre.nativeffi.internal.c.mln_resource_request;
+import org.maplibre.nativeffi.internal.c.mln_resource_response;
 import org.maplibre.nativeffi.internal.c.mln_runtime_options;
 import org.maplibre.nativeffi.internal.c.mln_screen_point;
 import org.maplibre.nativeffi.internal.c.mln_tile_id;
@@ -138,5 +149,100 @@ public final class Structs {
         mln_offline_region_status.required_resource_count(segment),
         mln_offline_region_status.required_resource_count_is_precise(segment),
         mln_offline_region_status.complete(segment));
+  }
+
+  public static ResourceRequest resourceRequest(MemorySegment segment) {
+    var rawKind = mln_resource_request.kind(segment);
+    var rawLoadingMethod = mln_resource_request.loading_method(segment);
+    var rawPriority = mln_resource_request.priority(segment);
+    var rawUsage = mln_resource_request.usage(segment);
+    var rawStoragePolicy = mln_resource_request.storage_policy(segment);
+    return new ResourceRequest(
+        MemoryUtil.copyCString(mln_resource_request.url(segment)),
+        ResourceKind.fromNative(rawKind),
+        rawKind,
+        ResourceLoadingMethod.fromNative(rawLoadingMethod),
+        rawLoadingMethod,
+        ResourcePriority.fromNative(rawPriority),
+        rawPriority,
+        ResourceUsage.fromNative(rawUsage),
+        rawUsage,
+        ResourceStoragePolicy.fromNative(rawStoragePolicy),
+        rawStoragePolicy,
+        resourceRange(segment),
+        optionalLong(
+            mln_resource_request.has_prior_modified(segment),
+            mln_resource_request.prior_modified_unix_ms(segment)),
+        optionalLong(
+            mln_resource_request.has_prior_expires(segment),
+            mln_resource_request.prior_expires_unix_ms(segment)),
+        optionalString(mln_resource_request.prior_etag(segment)),
+        MemoryUtil.copyBytes(
+            mln_resource_request.prior_data(segment),
+            mln_resource_request.prior_data_size(segment)));
+  }
+
+  public static MemorySegment resourceResponse(ResourceResponse response, Arena arena) {
+    var segment = mln_resource_response.allocate(arena);
+    mln_resource_response.size(segment, (int) mln_resource_response.sizeof());
+    mln_resource_response.status(segment, response.status().nativeValue());
+    mln_resource_response.error_reason(segment, response.errorReason().nativeValue());
+    var bytes = response.bytes();
+    if (bytes.length > 0) {
+      var nativeBytes = arena.allocate(bytes.length);
+      MemorySegment.copy(bytes, 0, nativeBytes, ValueLayout.JAVA_BYTE, 0, bytes.length);
+      mln_resource_response.bytes(segment, nativeBytes);
+      mln_resource_response.byte_count(segment, bytes.length);
+    }
+    response
+        .errorMessage()
+        .ifPresent(
+            value ->
+                mln_resource_response.error_message(
+                    segment, MemoryUtil.allocateCString(arena, value)));
+    mln_resource_response.must_revalidate(segment, response.mustRevalidate());
+    response
+        .modifiedUnixMs()
+        .ifPresent(
+            value -> {
+              mln_resource_response.has_modified(segment, true);
+              mln_resource_response.modified_unix_ms(segment, value);
+            });
+    response
+        .expiresUnixMs()
+        .ifPresent(
+            value -> {
+              mln_resource_response.has_expires(segment, true);
+              mln_resource_response.expires_unix_ms(segment, value);
+            });
+    response
+        .etag()
+        .ifPresent(
+            value -> mln_resource_response.etag(segment, MemoryUtil.allocateCString(arena, value)));
+    response
+        .retryAfterUnixMs()
+        .ifPresent(
+            value -> {
+              mln_resource_response.has_retry_after(segment, true);
+              mln_resource_response.retry_after_unix_ms(segment, value);
+            });
+    return segment;
+  }
+
+  private static Optional<ResourceRequest.ByteRange> resourceRange(MemorySegment segment) {
+    if (!mln_resource_request.has_range(segment)) {
+      return Optional.empty();
+    }
+    return Optional.of(
+        new ResourceRequest.ByteRange(
+            mln_resource_request.range_start(segment), mln_resource_request.range_end(segment)));
+  }
+
+  private static Optional<Long> optionalLong(boolean present, long value) {
+    return present ? Optional.of(value) : Optional.empty();
+  }
+
+  private static Optional<String> optionalString(MemorySegment value) {
+    return MemoryUtil.isNull(value) ? Optional.empty() : Optional.of(MemoryUtil.copyCString(value));
   }
 }
