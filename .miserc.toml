@@ -1,0 +1,5 @@
+# Select the native build profile that matches the contributor's host.
+# Set MISE_ENV=<profile> or use `mise -E <profile> ...` to override it.
+env = [
+  '{{ os() }}-{{ arch() }}-{% if os() == "macos" %}metal{% else %}vulkan{% endif %}',
+]

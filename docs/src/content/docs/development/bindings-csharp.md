@@ -28,6 +28,10 @@ status through exceptions. Use finalizers and `SafeHandle` release paths for
 leak reporting. Use them for cleanup only for native resources whose release
 function is documented as thread-independent and infallible.
 
+Ordinary calls execute on the calling .NET thread and translate native
+wrong-thread statuses into exceptions. Managed scheduler and UI dispatch
+policies belong in adapters above this layer.
+
 Callbacks use static unmanaged thunks with binding-owned callback state stored
 through `GCHandle` or a registry. Use `UnmanagedCallersOnly` for C-callable
 static methods when the signature supports it. Callback state stays live for the

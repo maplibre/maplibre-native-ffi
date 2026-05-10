@@ -71,12 +71,31 @@ values, descriptors, errors, and handle wrappers rather than raw ABI structs or
 generated layout classes.
 
 Rust-based native-extension bindings may share internal Rust crates. A generated
-`-sys` crate mirrors the C ABI and contains no binding policy. A support crate
-holds shared implementation glue such as status checking, diagnostic copying,
-string and descriptor helpers, memory guards, callback-boundary utilities, and
-native-pointer utilities. The support crate is not the public safety layer;
-public Rust, Python, and Node packages keep their own language-facing ownership,
-errors, callbacks, and packaging.
+`-sys` crate mirrors the C ABI. A support crate holds shared C ABI adaptation
+helpers. Public packages provide the safety layer and keep their own
+ecosystem-facing ownership, errors, callbacks, and packaging.
+
+## Direct C Imports And Bridge Libraries
+
+Bindings use one of two implementation paths.
+
+Choose a direct C import when the target language can consume C headers and call
+C functions as part of its normal package model. Generate or write the internal
+C declarations from the public headers, then wrap them in the public binding.
+This path keeps the implementation close to the C ABI and uses the language's
+FFI tooling as the package boundary.
+
+Choose a bridge library when the target runtime's package boundary is a native
+extension or native-method entry point. Python, Node.js, and Java JNI use this
+path. Also choose a bridge when the target ecosystem's package boundary is an
+object and introspection ABI; GLib/GObject uses this path for Vala and other
+GObject Introspection consumers. Build the bridge in Rust over the shared `-sys`
+and support crates, then adapt it to the runtime or ecosystem.
+
+Both paths keep raw ABI details internal. The public API uses the host
+ecosystem's values and preserves its lifetime, error, callback, threading, and
+packaging conventions. A bridge library remains a low-level binding layer;
+framework and application adapters stay above it.
 
 ## Status And Diagnostics
 
@@ -154,9 +173,13 @@ thread distinct from the runtime owner thread. If a binding needs to inspect
 owner threads directly, add a C getter.
 
 Resource provider request completion follows the C API and may run from any
-thread. Cross-thread dispatch, coroutine confinement, and UI-thread handoff
-belong in adapters above this layer unless a language binding explicitly owns a
-small safety helper.
+thread. Cross-thread dispatch, coroutine confinement, UI-thread handoff, and
+framework scheduling belong in adapters above this layer when the target
+language can preserve owner-thread affinity directly. A binding may add a small
+opt-in owner-thread helper when the language scheduler separates logical
+execution from native thread identity. That helper keeps direct handle APIs
+available and stays limited to generic owner-thread execution, runtime pumping,
+and event draining.
 
 ## Options And Transparent Structs
 

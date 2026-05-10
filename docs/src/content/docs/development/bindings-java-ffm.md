@@ -30,6 +30,11 @@ Keep FFM types internal. Public APIs do not expose `Arena`, `MemorySegment`,
 public API as `NativePointer` values and convert to FFM pointer values only at
 the generated layer boundary.
 
+Owner-thread-affine calls execute where they are invoked and report native
+wrong-thread errors. Use an execution context that preserves native thread
+identity across related calls. Java scheduling and UI routing belong in adapters
+above this layer.
+
 Use FFM arenas according to lifetime:
 
 - per-call confined arenas for temporary structs, UTF-8 strings, out parameters,

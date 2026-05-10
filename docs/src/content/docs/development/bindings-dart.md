@@ -28,6 +28,9 @@ Use explicit `close()` or `destroy()` methods for native handles. Use
 resources whose release function is documented as thread-independent and
 infallible.
 
+Ordinary calls preserve caller execution and report native wrong-thread errors.
+Isolate coordination and Flutter scheduling belong in adapters above this layer.
+
 Define public descriptor and event types as Dart classes or records. Convert
 descriptors to generated C structs at the FFI boundary, and copy native events
 into Dart values before returning them. Typed-data views over native memory are

@@ -1,6 +1,6 @@
 # CI variant matrix configuration.
-# Platform/backend variants come from mise environments; example entries map each
-# example task to the variants that support it.
+# Platform/backend variants come from mise environments. Example and binding
+# entries map tasks to the variants that support them.
 
 [runners]
 linux-arm64 = "ubuntu-24.04-arm"
@@ -18,3 +18,7 @@ requires = { platform = ["linux", "macos"], backend = ["metal", "vulkan"] }
 [examples.zig-readback]
 task = "//examples/zig-readback:run"
 requires = { platform = ["linux", "macos"], backend = ["metal", "vulkan"] }
+
+[bindings.java-ffm]
+task = "//bindings/java-ffm:build"
+requires = { platform = ["linux", "macos", "windows"] }

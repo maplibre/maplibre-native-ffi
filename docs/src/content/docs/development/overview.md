@@ -51,8 +51,10 @@ Run the Zig map example as a smoke test:
 mise run //examples/zig-map:run
 ```
 
-Set `MISE_ENV=<variant>` before `mise run ...` to build, test, or run examples
-for a specific platform and render backend.
+Mise selects the native build profile that matches your host when one is
+available. Set `MISE_ENV=<variant>` before `mise run ...`, or pass
+`mise -E <variant> run ...`, to build, test, or run examples for another
+platform and render backend.
 
 ## Common Commands
 
@@ -76,9 +78,9 @@ mise run //docs:build
 ## CI Variant Matrix
 
 GitHub Actions builds native artifacts and examples for the variants described
-by the mise profiles, such as `mise.linux-x64-vulkan.toml` and
-`mise.macos-arm64-metal.toml`. The CI matrix generator reads each profile's
-platform, architecture, and render backend metadata.
+by the mise profiles, such as `.mise/config.linux-x64-vulkan.toml` and
+`.mise/config.macos-arm64-metal.toml`. The CI matrix generator reads each
+profile's platform, architecture, and render backend metadata.
 
 Use `.github/config/variants.toml` to configure CI matrix policy: runner
 selection, example tasks, compatibility requirements, and explicit exclusions.
@@ -95,6 +97,11 @@ mise run ci:matrix examples --pretty
 This repository spans native code, language bindings, examples, tests, and
 documentation. Each tool owns the layer where it has the clearest dependency
 model.
+
+Project-managed dependency state keeps builds reproducible. Pixi supplies native
+build dependencies instead of Homebrew, apt, or other machine-global package
+managers. Platform SDKs such as Xcode, Visual Studio, and the Android SDK remain
+pragmatic external exceptions.
 
 [`mise`](https://mise.jdx.dev/) is the contributor entrypoint. It pins top-level
 tools, installs Git hooks, and runs repository tasks. Use `mise run ...` for
