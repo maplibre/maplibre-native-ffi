@@ -113,13 +113,56 @@ jobs:
           sudo ln -sf "$SYSTEM_EGL" "$PIXI_LIB/libEGL.so.1.1.0"
           echo "Replaced pixi libEGL with system GLVND: $SYSTEM_EGL"
           ls -la "$PIXI_LIB/libEGL.so.1" "$PIXI_LIB/libEGL.so.1.1.0"
+      - name: Diagnose EGL initialization (Linux OpenGL)
+        if: ${{ contains(matrix.variant, 'opengl') && runner.os == 'Linux' }}
+        # Compile and run a minimal EGL program that mimics what
+        # headless_backend_egl.cpp does, so we can see exactly what fails.
+        env:
+          LIBGL_ALWAYS_SOFTWARE: "1"
+          EGL_LOG_LEVEL: debug
+          MESA_DEBUG: "1"
+          LIBGL_DEBUG: verbose
+        run: |
+          cat > /tmp/egl_probe.c <<'EOF'
+          #include <EGL/egl.h>
+          #include <stdio.h>
+          #include <stdlib.h>
+          int main(void) {
+              EGLDisplay d = eglGetDisplay(EGL_DEFAULT_DISPLAY);
+              printf("eglGetDisplay -> %p (NO_DISPLAY=%p)\n", (void*)d, (void*)EGL_NO_DISPLAY);
+              if (d == EGL_NO_DISPLAY) { printf("FAIL: no display, eglGetError=0x%x\n", eglGetError()); return 1; }
+              EGLint major=0, minor=0;
+              EGLBoolean ok = eglInitialize(d, &major, &minor);
+              printf("eglInitialize -> %d (err=0x%x), version %d.%d\n", ok, eglGetError(), major, minor);
+              if (!ok) return 2;
+              const char* vendor = eglQueryString(d, EGL_VENDOR);
+              const char* version = eglQueryString(d, EGL_VERSION);
+              const char* exts = eglQueryString(d, EGL_EXTENSIONS);
+              printf("vendor: %s\nversion: %s\nextensions: %s\n", vendor, version, exts);
+              eglTerminate(d);
+              return 0;
+          }
+          EOF
+          MULTIARCH="$(uname -m)-linux-gnu"
+          gcc /tmp/egl_probe.c -o /tmp/egl_probe -lEGL
+          echo "=== Direct invocation (no xvfb) ==="
+          /tmp/egl_probe || echo "exit=$?"
+          echo "=== Under xvfb-run ==="
+          xvfb-run /tmp/egl_probe || echo "exit=$?"
+          echo "=== Under xvfb-run with PIXI_LIB in LD_LIBRARY_PATH ==="
+          PIXI_LIB="${{ github.workspace }}/.pixi/envs/default/lib"
+          LD_LIBRARY_PATH="$PIXI_LIB:$LD_LIBRARY_PATH" xvfb-run /tmp/egl_probe || echo "exit=$?"
       - name: Run tests (Linux OpenGL — xvfb + system GLVND EGL)
         if: ${{ contains(matrix.variant, 'opengl') && runner.os == 'Linux' }}
         # xvfb-run provides DISPLAY=:nn so eglGetDisplay(EGL_DEFAULT_DISPLAY)
-        # connects to the virtual X11 display and initializes successfully.
-        # LIBGL_ALWAYS_SOFTWARE=1 forces llvmpipe so no real GPU is required.
+        # connects to the virtual X11 display. LIBGL_ALWAYS_SOFTWARE=1 forces
+        # llvmpipe so no real GPU is required. EGL_LOG_LEVEL=debug surfaces
+        # any EGL initialization errors on stderr.
         env:
           LIBGL_ALWAYS_SOFTWARE: "1"
+          EGL_LOG_LEVEL: debug
+          MESA_DEBUG: "1"
+          LIBGL_DEBUG: verbose
         run: xvfb-run mise run test
       - name: Run tests
         if: ${{ !(contains(matrix.variant, 'opengl') && runner.os == 'Linux') }}
