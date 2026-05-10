@@ -6,10 +6,10 @@ import java.nio.file.Path;
 import java.util.EnumSet;
 import java.util.Objects;
 import java.util.Set;
+import org.maplibre.nativeffi.internal.CoreStructs;
 import org.maplibre.nativeffi.internal.LogCallbackState;
 import org.maplibre.nativeffi.internal.NativeAccess;
 import org.maplibre.nativeffi.internal.Status;
-import org.maplibre.nativeffi.internal.Structs;
 import org.maplibre.nativeffi.internal.c.MapLibreNativeC;
 import org.maplibre.nativeffi.internal.c.mln_lat_lng;
 import org.maplibre.nativeffi.internal.c.mln_projected_meters;
@@ -97,8 +97,9 @@ public final class MapLibre {
     try (var arena = Arena.ofConfined()) {
       var out = mln_projected_meters.allocate(arena);
       Status.check(
-          MapLibreNativeC.mln_projected_meters_for_lat_lng(Structs.latLng(coordinate, arena), out));
-      return Structs.projectedMeters(out);
+          MapLibreNativeC.mln_projected_meters_for_lat_lng(
+              CoreStructs.latLng(coordinate, arena), out));
+      return CoreStructs.projectedMeters(out);
     }
   }
 
@@ -110,8 +111,8 @@ public final class MapLibre {
       var out = mln_lat_lng.allocate(arena);
       Status.check(
           MapLibreNativeC.mln_lat_lng_for_projected_meters(
-              Structs.projectedMeters(meters, arena), out));
-      return Structs.latLng(out);
+              CoreStructs.projectedMeters(meters, arena), out));
+      return CoreStructs.latLng(out);
     }
   }
 }

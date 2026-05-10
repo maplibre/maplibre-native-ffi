@@ -6,8 +6,8 @@ import java.lang.foreign.ValueLayout;
 import java.util.Objects;
 import org.maplibre.nativeffi.internal.MemoryUtil;
 import org.maplibre.nativeffi.internal.NativeAccess;
+import org.maplibre.nativeffi.internal.ResourceStructs;
 import org.maplibre.nativeffi.internal.Status;
-import org.maplibre.nativeffi.internal.Structs;
 import org.maplibre.nativeffi.internal.c.MapLibreNativeC;
 
 /**
@@ -42,7 +42,7 @@ public final class ResourceRequestHandle implements AutoCloseable {
     try (var arena = Arena.ofConfined()) {
       Status.check(
           MapLibreNativeC.mln_resource_request_complete(
-              handle, Structs.resourceResponse(Objects.requireNonNull(response), arena)));
+              handle, ResourceStructs.resourceResponse(Objects.requireNonNull(response), arena)));
       completed = true;
       closed = true;
       if (decisionFinalized) {

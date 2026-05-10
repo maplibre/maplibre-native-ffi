@@ -2,7 +2,7 @@ package org.maplibre.nativeffi;
 
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
-import org.maplibre.nativeffi.internal.Structs;
+import org.maplibre.nativeffi.internal.ResourceStructs;
 import org.maplibre.nativeffi.internal.c.mln_resource_provider;
 import org.maplibre.nativeffi.internal.c.mln_resource_provider_callback;
 
@@ -33,7 +33,7 @@ final class ResourceProviderState implements AutoCloseable {
     ResourceRequestHandle requestHandle = null;
     try {
       requestHandle = new ResourceRequestHandle(handle);
-      var decision = callback.handle(Structs.resourceRequest(request), requestHandle);
+      var decision = callback.handle(ResourceStructs.resourceRequest(request), requestHandle);
       return requestHandle.finishProviderDecision(decision);
     } catch (Throwable ignored) {
       if (requestHandle != null) {

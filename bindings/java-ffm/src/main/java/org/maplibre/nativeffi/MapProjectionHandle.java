@@ -5,11 +5,13 @@ import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
 import java.util.List;
 import java.util.Objects;
+import org.maplibre.nativeffi.internal.CoreStructs;
 import org.maplibre.nativeffi.internal.HandleState;
+import org.maplibre.nativeffi.internal.MapStructs;
 import org.maplibre.nativeffi.internal.MemoryUtil;
 import org.maplibre.nativeffi.internal.NativeAccess;
 import org.maplibre.nativeffi.internal.Status;
-import org.maplibre.nativeffi.internal.Structs;
+import org.maplibre.nativeffi.internal.ValueStructs;
 import org.maplibre.nativeffi.internal.c.MapLibreNativeC;
 import org.maplibre.nativeffi.internal.c.mln_lat_lng;
 import org.maplibre.nativeffi.internal.c.mln_screen_point;
@@ -37,7 +39,7 @@ public final class MapProjectionHandle implements AutoCloseable {
     try (var arena = Arena.ofConfined()) {
       var outCamera = MapLibreNativeC.mln_camera_options_default(arena);
       Status.check(MapLibreNativeC.mln_map_projection_get_camera(state.requireLive(), outCamera));
-      return Structs.cameraOptions(outCamera);
+      return MapStructs.cameraOptions(outCamera);
     }
   }
 
@@ -47,7 +49,7 @@ public final class MapProjectionHandle implements AutoCloseable {
     try (var arena = Arena.ofConfined()) {
       Status.check(
           MapLibreNativeC.mln_map_projection_set_camera(
-              state.requireLive(), Structs.cameraOptions(camera, arena)));
+              state.requireLive(), MapStructs.cameraOptions(camera, arena)));
     }
   }
 
@@ -61,9 +63,9 @@ public final class MapProjectionHandle implements AutoCloseable {
               state.requireLive(),
               copiedCoordinates.isEmpty()
                   ? MemorySegment.NULL
-                  : Structs.latLngArray(copiedCoordinates, arena),
+                  : CoreStructs.latLngArray(copiedCoordinates, arena),
               copiedCoordinates.size(),
-              Structs.edgeInsets(padding, arena)));
+              CoreStructs.edgeInsets(padding, arena)));
     }
   }
 
@@ -75,8 +77,8 @@ public final class MapProjectionHandle implements AutoCloseable {
       Status.check(
           MapLibreNativeC.mln_map_projection_set_visible_geometry(
               state.requireLive(),
-              Structs.geometry(geometry, arena),
-              Structs.edgeInsets(padding, arena)));
+              ValueStructs.geometry(geometry, arena),
+              CoreStructs.edgeInsets(padding, arena)));
     }
   }
 
@@ -87,8 +89,8 @@ public final class MapProjectionHandle implements AutoCloseable {
       var outPoint = mln_screen_point.allocate(arena);
       Status.check(
           MapLibreNativeC.mln_map_projection_pixel_for_lat_lng(
-              state.requireLive(), Structs.latLng(coordinate, arena), outPoint));
-      return Structs.screenPoint(outPoint);
+              state.requireLive(), CoreStructs.latLng(coordinate, arena), outPoint));
+      return CoreStructs.screenPoint(outPoint);
     }
   }
 
@@ -99,8 +101,8 @@ public final class MapProjectionHandle implements AutoCloseable {
       var outCoordinate = mln_lat_lng.allocate(arena);
       Status.check(
           MapLibreNativeC.mln_map_projection_lat_lng_for_pixel(
-              state.requireLive(), Structs.screenPoint(point, arena), outCoordinate));
-      return Structs.latLng(outCoordinate);
+              state.requireLive(), CoreStructs.screenPoint(point, arena), outCoordinate));
+      return CoreStructs.latLng(outCoordinate);
     }
   }
 

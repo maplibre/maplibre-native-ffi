@@ -32,7 +32,7 @@ final class ValueStructsTest {
 
     JsonValue copied;
     try (var arena = Arena.ofConfined()) {
-      copied = Structs.jsonValue(Structs.jsonValue(value, arena));
+      copied = ValueStructs.jsonValue(ValueStructs.jsonValue(value, arena));
     }
 
     assertEquals(value, copied);
@@ -56,9 +56,9 @@ final class ValueStructsTest {
     Feature copiedFeature;
     Geometry copiedGeometry;
     try (var arena = Arena.ofConfined()) {
-      copiedGeometry = Structs.geometry(Structs.geometry(collection, arena));
-      copiedFeature = Structs.feature(Structs.feature(feature, arena));
-      copiedGeoJson = Structs.geoJson(Structs.geoJson(geoJson, arena));
+      copiedGeometry = ValueStructs.geometry(ValueStructs.geometry(collection, arena));
+      copiedFeature = ValueStructs.feature(ValueStructs.feature(feature, arena));
+      copiedGeoJson = ValueStructs.geoJson(ValueStructs.geoJson(geoJson, arena));
     }
 
     assertEquals(collection, copiedGeometry);
@@ -70,12 +70,14 @@ final class ValueStructsTest {
   void descriptorDepthErrorsAreReportedInJava() {
     var tooDeepJson = nestedArray(JsonValue.MAX_DESCRIPTOR_DEPTH + 2);
     try (var arena = Arena.ofConfined()) {
-      assertThrows(IllegalArgumentException.class, () -> Structs.jsonValue(tooDeepJson, arena));
+      assertThrows(
+          IllegalArgumentException.class, () -> ValueStructs.jsonValue(tooDeepJson, arena));
     }
 
     var tooDeepGeometry = nestedCollection(Geometry.MAX_COLLECTION_DEPTH + 2);
     try (var arena = Arena.ofConfined()) {
-      assertThrows(IllegalArgumentException.class, () -> Structs.geometry(tooDeepGeometry, arena));
+      assertThrows(
+          IllegalArgumentException.class, () -> ValueStructs.geometry(tooDeepGeometry, arena));
     }
   }
 
@@ -84,7 +86,7 @@ final class ValueStructsTest {
     var feature = new Feature(nestedCollection(Geometry.MAX_COLLECTION_DEPTH), List.of());
 
     try (var arena = Arena.ofConfined()) {
-      assertThrows(IllegalArgumentException.class, () -> Structs.feature(feature, arena));
+      assertThrows(IllegalArgumentException.class, () -> ValueStructs.feature(feature, arena));
     }
   }
 
@@ -94,7 +96,7 @@ final class ValueStructsTest {
     var geoJson = GeoJson.featureCollection(List.of(feature));
 
     try (var arena = Arena.ofConfined()) {
-      assertThrows(IllegalArgumentException.class, () -> Structs.geoJson(geoJson, arena));
+      assertThrows(IllegalArgumentException.class, () -> ValueStructs.geoJson(geoJson, arena));
     }
   }
 
@@ -107,7 +109,7 @@ final class ValueStructsTest {
     var geoJson = GeoJson.featureCollection(List.of(feature));
 
     try (var arena = Arena.ofConfined()) {
-      assertThrows(IllegalArgumentException.class, () -> Structs.geoJson(geoJson, arena));
+      assertThrows(IllegalArgumentException.class, () -> ValueStructs.geoJson(geoJson, arena));
     }
   }
 

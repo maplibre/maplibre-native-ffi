@@ -11,8 +11,8 @@ import org.maplibre.nativeffi.internal.HandleState;
 import org.maplibre.nativeffi.internal.MemoryUtil;
 import org.maplibre.nativeffi.internal.NativeAccess;
 import org.maplibre.nativeffi.internal.ResourceTransformState;
+import org.maplibre.nativeffi.internal.RuntimeStructs;
 import org.maplibre.nativeffi.internal.Status;
-import org.maplibre.nativeffi.internal.Structs;
 import org.maplibre.nativeffi.internal.c.MapLibreNativeC;
 import org.maplibre.nativeffi.internal.c.mln_runtime_event;
 import org.maplibre.nativeffi.internal.c.mln_runtime_event_offline_region_response_error;
@@ -45,7 +45,8 @@ public final class RuntimeHandle implements AutoCloseable {
     try (var arena = Arena.ofConfined()) {
       var outRuntime = MemoryUtil.allocatePointer(arena);
       Status.check(
-          MapLibreNativeC.mln_runtime_create(Structs.runtimeOptions(options, arena), outRuntime));
+          MapLibreNativeC.mln_runtime_create(
+              RuntimeStructs.runtimeOptions(options, arena), outRuntime));
       return new RuntimeHandle(outRuntime.get(ValueLayout.ADDRESS, 0));
     }
   }
@@ -238,7 +239,7 @@ public final class RuntimeHandle implements AutoCloseable {
         rawMode,
         mln_runtime_event_render_frame.needs_repaint(frame),
         mln_runtime_event_render_frame.placement_changed(frame),
-        Structs.renderingStats(mln_runtime_event_render_frame.stats(frame)));
+        RuntimeStructs.renderingStats(mln_runtime_event_render_frame.stats(frame)));
   }
 
   private RuntimeEventPayload.RenderMap readRenderMap(MemorySegment payload) {
@@ -261,7 +262,7 @@ public final class RuntimeHandle implements AutoCloseable {
     return new RuntimeEventPayload.TileAction(
         TileOperation.fromNative(rawOperation),
         rawOperation,
-        Structs.tileId(mln_runtime_event_tile_action.tile_id(action)),
+        RuntimeStructs.tileId(mln_runtime_event_tile_action.tile_id(action)),
         MemoryUtil.copyStringView(
             mln_runtime_event_tile_action.source_id(action),
             mln_runtime_event_tile_action.source_id_size(action)));
@@ -272,7 +273,7 @@ public final class RuntimeHandle implements AutoCloseable {
     var status = payload.reinterpret(mln_runtime_event_offline_region_status.sizeof());
     return new RuntimeEventPayload.OfflineRegionStatusChanged(
         mln_runtime_event_offline_region_status.region_id(status),
-        Structs.offlineRegionStatus(mln_runtime_event_offline_region_status.status(status)));
+        RuntimeStructs.offlineRegionStatus(mln_runtime_event_offline_region_status.status(status)));
   }
 
   private RuntimeEventPayload.OfflineRegionResponseError readOfflineRegionResponseError(
