@@ -69,12 +69,10 @@ use the separate JNI binding path.
 - a native-library smoke test that proves generated jextract calls can reach
   `mln_c_version()`.
 
-Before public API work, resolve the Java release policy. The conventions target
-JDK 22 or newer, while the current Gradle task sets `options.release` to 25.
-Preferred outcome: compile the public and generated sources with `--release 22`
-using a jextract version whose output stays on the final FFM API. If jextract 25
-emits JDK 25-only source, keep JDK 25 as a temporary development floor and track
-a follow-up to restore JDK 22 compatibility.
+Java release policy: JDK 25 is the temporary development floor because jextract
+25 emits `SymbolLookup.findOrThrow()`, which is unavailable under
+`--release 22`. Restore JDK 22 compatibility when the generator output can
+target that release while staying on the final FFM API.
 
 ## Public Package Shape
 
@@ -169,62 +167,7 @@ Build this support layer before broad API coverage:
 
 ## Milestones
 
-### 1. Build, Generator, And Native Access
-
-Implement:
-
-- verify `jextract:update-includes` produces a stable argfile from
-  `include/maplibre_native_c/**`;
-- add a Gradle check that fails when the generated include argfile is stale;
-- decide and enforce the Java release target;
-- document test JVM flags for FFM native access;
-- keep generated sources under Gradle output unless the project later chooses to
-  check them in for platform comparison.
-
-Done when:
-
-- `mise run //bindings/java-ffm:jextract:update-includes` is repeatable;
-- `../../gradlew :bindings:java-ffm:build` runs from a clean checkout after the
-  native library is built;
-- tests explain how to set `MLN_FFI_BUILD_DIR` or the explicit library path.
-
-### 2. Exceptions, Status, Strings, And Handles
-
-Implement:
-
-- `MapLibreException` hierarchy and status mapping;
-- immediate diagnostic capture;
-- Java-side released-handle checks;
-- base `AutoCloseable` handle support;
-- UTF-8 helpers for C strings and `mln_string_view`;
-- `NativePointer` and internal pointer conversion.
-
-Tests:
-
-- invalid enum/status call reports the expected exception class and diagnostic;
-- released handles reject later method calls before native dispatch;
-- null-terminated string helpers reject embedded NUL;
-- `NativePointer` round-trips null and non-null addresses internally without
-  exposing `MemorySegment` publicly.
-
-### 3. Process Services
-
-Implement:
-
-- `MapLibre.cVersion()`;
-- `MapLibre.supportedRenderBackends()`;
-- process-global network status get/set;
-- process-global logging callback and async severity mask.
-
-Tests:
-
-- C version and backend mask call through the public wrapper;
-- network status accepts known values and rejects unknown values through status
-  conversion;
-- logging callback state survives until cleared or replaced, and callback
-  exceptions never unwind into native code.
-
-### 4. Runtime Handles, Events, And Resource Hooks
+### 1. Runtime Handles, Events, And Resource Hooks
 
 Implement:
 
@@ -244,7 +187,7 @@ Tests:
 - resource request handles enforce exactly-once completion and release where a
   real provider test is practical.
 
-### 5. Map Lifecycle, Camera, And Projection
+### 2. Map Lifecycle, Camera, And Projection
 
 Implement:
 
@@ -266,7 +209,7 @@ Tests:
 - projection helpers close independently and reject use after release;
 - wrong-thread map and projection calls map to `WrongThreadException`.
 
-### 6. JSON, Geometry, GeoJSON, And Feature Values
+### 3. JSON, Geometry, GeoJSON, And Feature Values
 
 Implement:
 
@@ -286,7 +229,7 @@ Tests:
 - descriptor memory stays alive for the full native call and is released after
   the call.
 
-### 7. Style Sources, Layers, Images, And Custom Geometry
+### 4. Style Sources, Layers, Images, And Custom Geometry
 
 Implement:
 
@@ -307,7 +250,7 @@ Tests:
 - custom geometry callbacks stay strongly reachable until the map drops their
   owner scope.
 
-### 8. Render Sessions And Render Targets
+### 5. Render Sessions And Render Targets
 
 Implement:
 
@@ -328,7 +271,7 @@ Tests:
 - acquired frame callbacks always release the frame after callback success or
   failure.
 
-### 9. Feature State, Queries, Snapshots, And Offline Regions
+### 6. Feature State, Queries, Snapshots, And Offline Regions
 
 Implement:
 
@@ -348,7 +291,7 @@ Tests:
 - feature query and offline APIs propagate native invalid-state and wrong-thread
   statuses through the public exception model.
 
-### 10. Owner-Thread Helper Optional Layer
+### 7. Owner-Thread Helper Optional Layer
 
 The low-level handle APIs stay direct. After direct coverage works, add a small
 optional helper only if tests or examples show a clear need:
@@ -361,7 +304,7 @@ optional helper only if tests or examples show a clear need:
 Keep UI dispatch, coroutines, listeners, promises, and application scheduling in
 adapters above this low-level binding.
 
-### 11. Smoke Example And Packaging
+### 8. Smoke Example And Packaging
 
 Implement:
 
@@ -386,7 +329,7 @@ Tests:
 - build output states the native library path requirement when tests are skipped
   or fail due missing native artifacts.
 
-### 12. Documentation And Generated Reference
+### 9. Documentation And Generated Reference
 
 Implement:
 
