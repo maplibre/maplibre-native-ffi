@@ -14,16 +14,12 @@ const RenderBackend = enum {
     opengl,
 };
 
-fn renderBackend(b: *std.Build, target: std.Build.ResolvedTarget) RenderBackend {
+fn renderBackend(b: *std.Build) RenderBackend {
     const value = b.option(
         []const u8,
         "render-backend",
         "Render backend built into the CMake artifact: metal, vulkan, or opengl",
-    ) orelse switch (target.result.os.tag) {
-        .macos, .ios => "metal",
-        .windows => "opengl",
-        else => "vulkan",
-    };
+    ) orelse @panic("missing required -Drender-backend=metal|vulkan|opengl");
 
     if (std.mem.eql(u8, value, "metal")) return .metal;
     if (std.mem.eql(u8, value, "vulkan")) return .vulkan;
@@ -114,7 +110,7 @@ pub fn build(b: *std.Build) void {
         .optimize = b.standardOptimizeOption(.{}),
         .cmake_artifact_dir_path = cmake_artifact_dir_path,
         .cmake_artifact_dir = lazyPath(b, cmake_artifact_dir_path),
-        .render_backend = renderBackend(b, target),
+        .render_backend = renderBackend(b),
     };
 
     const c_tests = addCTests(b, options);
