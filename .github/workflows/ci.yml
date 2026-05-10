@@ -75,41 +75,32 @@ jobs:
         # causing a header/ABI mismatch. The cmake find_library call extends
         # CMAKE_FIND_LIBRARY_SUFFIXES to also match .so.2 so the versioned
         # runtime file is accepted for linking.
-        # xvfb              — provides xvfb-run, used to wrap the test step so
-        #                     headless_backend_egl.cpp gets a valid X11 display.
-        #                     headless_backend_egl.cpp uses eglGetDisplay(
-        #                     EGL_DEFAULT_DISPLAY) which requires an X display;
-        #                     without one, eglInitialize() throws and tests ABRT.
-        # libegl-mesa0      — Mesa's EGL vendor ICD. Installs 50_mesa.json in
-        #                     /usr/share/glvnd/egl_vendor.d/ AND libEGL_mesa.so.0
-        #                     which is the real Mesa EGL implementation loaded by
-        #                     the system GLVND dispatcher. Without it, GLVND has
-        #                     no software EGL backend (eglInitialize() throws).
+        # libegl-mesa0      — Mesa's EGL ICD (installs 50_mesa.json) and the
+        #                     libEGL_mesa.so.0 driver. Not strictly necessary
+        #                     when pixi's Mesa is used via EGL_PLATFORM=surfaceless,
+        #                     but keeps the environment consistent.
         # libgl1-mesa-dri   — Mesa DRI drivers including the llvmpipe software
         #                     rasterizer (often pre-installed, listed explicitly
         #                     for reproducibility).
-        run: sudo apt-get update -y && sudo apt-get install -y --no-install-recommends libegl-dev libgles-dev libgles2 xvfb libegl-mesa0 libgl1-mesa-dri
+        run: sudo apt-get update -y && sudo apt-get install -y --no-install-recommends libegl-dev libgles-dev libgles2 libegl-mesa0 libgl1-mesa-dri
       - run: mise run configure
       - run: mise run ci:lint native
-      - name: Run tests (Linux OpenGL — wrapped with xvfb-run)
+      - name: Run tests (Linux OpenGL — EGL surfaceless)
         if: ${{ contains(matrix.variant, 'opengl') && runner.os == 'Linux' }}
-        # xvfb-run provides a virtual X11 display (DISPLAY=:nn) so that
-        # headless_backend_egl.cpp's eglGetDisplay(EGL_DEFAULT_DISPLAY) can
-        # connect to an X11 display and initialize EGL successfully.
-        #
-        # LD_LIBRARY_PATH prefix: pixi ships its own libEGL.so.1.1.0 which may
-        # lack X11 EGL platform support. Ubuntu 24.04's linker defaults to
-        # DT_RUNPATH (not DT_RPATH), so LD_LIBRARY_PATH takes precedence over
-        # the baked-in RUNPATH that points to pixi's lib dir. Prepending
-        # /usr/lib/x86_64-linux-gnu ensures the system GLVND libEGL.so.1 is
-        # resolved first; GLVND then loads the Mesa EGL ICD (libegl-mesa0's
-        # 50_mesa.json → libEGL_mesa.so.0) and uses llvmpipe for rendering.
-        #
-        # LIBGL_ALWAYS_SOFTWARE=1 forces Mesa to use the llvmpipe CPU renderer
-        # so EGL initializes without a hardware GPU.
+        # headless_backend_egl.cpp calls eglGetDisplay(EGL_DEFAULT_DISPLAY).
+        # pixi ships conda-forge Mesa's libEGL.so.1 which is compiled WITHOUT
+        # X11 EGL platform support, so using xvfb + X11 never works.
+        # EGL_PLATFORM=surfaceless tells Mesa to use its surfaceless platform
+        # instead of X11: eglGetDisplay(EGL_DEFAULT_DISPLAY) returns a valid
+        # surfaceless display that supports pbuffer surfaces, which is exactly
+        # what the headless texture backend (GenericTextureSessionBackend) uses.
+        # LIBGL_ALWAYS_SOFTWARE=1 forces Mesa's llvmpipe CPU rasterizer so EGL
+        # initializes and renders without a hardware GPU.
+        # No Xvfb is needed — surfaceless EGL has no X11 dependency.
         env:
+          EGL_PLATFORM: surfaceless
           LIBGL_ALWAYS_SOFTWARE: "1"
-        run: LD_LIBRARY_PATH="/usr/lib/x86_64-linux-gnu:$LD_LIBRARY_PATH" xvfb-run mise run test
+        run: mise run test
       - name: Run tests
         if: ${{ !(contains(matrix.variant, 'opengl') && runner.os == 'Linux') }}
         run: mise run test
