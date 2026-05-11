@@ -22,10 +22,13 @@ final class MapHandleTest {
   void createsAndClosesMapBeforeRuntime() {
     var runtime = RuntimeHandle.create();
     var map = MapHandle.create(runtime, new MapOptions().setSize(128, 128));
-    map.requestRepaint();
-    map.close();
-    assertTrue(map.isClosed());
-    runtime.close();
+    try {
+      map.requestRepaint();
+    } finally {
+      map.close();
+      assertTrue(map.isClosed());
+      runtime.close();
+    }
   }
 
   @Test

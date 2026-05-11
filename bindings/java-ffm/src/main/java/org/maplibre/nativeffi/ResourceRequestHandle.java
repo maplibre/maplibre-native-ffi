@@ -28,7 +28,6 @@ public final class ResourceRequestHandle implements AutoCloseable {
   private boolean decisionFinalized;
   private boolean closed;
   private boolean completed;
-  private boolean closeRequested;
 
   ResourceRequestHandle(MemorySegment handle) {
     this(handle, MapLibreNativeC::mln_resource_request_release);
@@ -58,8 +57,6 @@ public final class ResourceRequestHandle implements AutoCloseable {
       closed = true;
       if (decisionFinalized) {
         releaseNative();
-      } else {
-        closeRequested = true;
       }
     }
   }
@@ -79,7 +76,6 @@ public final class ResourceRequestHandle implements AutoCloseable {
     if (closed) {
       return;
     }
-    closeRequested = true;
     closed = true;
     if (decisionFinalized) {
       releaseNative();
@@ -87,10 +83,12 @@ public final class ResourceRequestHandle implements AutoCloseable {
   }
 
   synchronized int finishProviderDecision(ResourceProviderDecision decision) {
+    // Completion before the callback returns makes Java the provider owner even if the callback
+    // returns PASS_THROUGH. The native side must see HANDLE so Java can release its reference.
     if (completed || decision == ResourceProviderDecision.HANDLE) {
       decisionFinalized = true;
       nativeReference.markProviderOwned();
-      if (completed || closeRequested) {
+      if (closed) {
         releaseNative();
       }
       return ResourceProviderDecision.HANDLE.nativeValue();
@@ -130,7 +128,7 @@ public final class ResourceRequestHandle implements AutoCloseable {
     private final MemorySegment handle;
     private final Consumer<MemorySegment> releaser;
     private boolean providerOwned;
-    private boolean released;
+    private boolean releaseAccountedFor;
 
     NativeReference(MemorySegment handle, Consumer<MemorySegment> releaser) {
       this.handle = handle;
@@ -142,14 +140,14 @@ public final class ResourceRequestHandle implements AutoCloseable {
     }
 
     synchronized void markNativeWillRelease() {
-      released = true;
+      releaseAccountedFor = true;
     }
 
     void releaseIfOwned() {
       var shouldRelease = false;
       synchronized (this) {
-        if (!released) {
-          released = true;
+        if (!releaseAccountedFor) {
+          releaseAccountedFor = true;
           shouldRelease = true;
         }
       }
@@ -162,8 +160,8 @@ public final class ResourceRequestHandle implements AutoCloseable {
     public void run() {
       var shouldRelease = false;
       synchronized (this) {
-        if (providerOwned && !released) {
-          released = true;
+        if (providerOwned && !releaseAccountedFor) {
+          releaseAccountedFor = true;
           shouldRelease = true;
         }
       }

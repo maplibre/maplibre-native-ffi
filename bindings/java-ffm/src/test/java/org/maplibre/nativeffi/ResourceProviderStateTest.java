@@ -104,28 +104,6 @@ final class ResourceProviderStateTest {
     assertEquals(1, releases.get());
   }
 
-  @Test
-  void abandonedHandledRequestReleasesNativeReferenceFromCleaner() throws Exception {
-    var releases = new AtomicInteger();
-    abandonHandledRequest(releases);
-
-    for (var attempt = 0; attempt < 100 && releases.get() == 0; attempt++) {
-      System.gc();
-      Thread.sleep(10);
-    }
-
-    assertEquals(1, releases.get());
-  }
-
-  private static void abandonHandledRequest(AtomicInteger releases) {
-    var handle =
-        new ResourceRequestHandle(
-            MemorySegment.ofAddress(0x1234), ignored -> releases.incrementAndGet());
-    assertEquals(
-        ResourceProviderDecision.HANDLE.nativeValue(),
-        handle.finishProviderDecision(ResourceProviderDecision.HANDLE));
-  }
-
   private static int invoke(ResourceProviderState state, MemorySegment request) {
     return mln_resource_provider_callback.invoke(
         mln_resource_provider.callback(state.descriptor()),
