@@ -1,9 +1,7 @@
 [tasks.compile-shaders]
 hide = true
 run = '''
-set -euo pipefail
-
-if [[ "${MLN_FFI_RENDER_BACKEND:-}" != "vulkan" ]]; then
+if [[ "$MLN_FFI_RENDER_BACKEND" != "vulkan" ]]; then
   exit 0
 fi
 pixi run glslangValidator -V render/vulkan/shaders/fullscreen.vert -o render/vulkan/shaders/fullscreen.vert.spv

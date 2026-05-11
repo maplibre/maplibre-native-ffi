@@ -221,7 +221,7 @@ auto texture_read_premultiplied_rgba8(
     return MLN_STATUS_INVALID_STATE;
   }
   auto guard = mbgl::gfx::BackendScope{
-    *renderer_backend, mbgl::gfx::BackendScope::ScopeType::Implicit
+    *renderer_backend, mbgl::gfx::BackendScope::ScopeType::Explicit
   };
   auto image = texture->texture.backend->headless_backend().readStillImage();
   if (!image.valid()) {

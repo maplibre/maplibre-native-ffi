@@ -11,17 +11,19 @@ const BuildOptions = struct {
 const RenderBackend = enum {
     metal,
     vulkan,
+    opengl,
 };
 
 fn renderBackend(b: *std.Build) RenderBackend {
     const value = b.option(
         []const u8,
         "render-backend",
-        "Render backend built into the CMake artifact: metal or vulkan",
-    ) orelse @panic("missing required -Drender-backend=metal|vulkan");
+        "Render backend built into the CMake artifact: metal, vulkan, or opengl",
+    ) orelse @panic("missing required -Drender-backend=metal|vulkan|opengl");
 
     if (std.mem.eql(u8, value, "metal")) return .metal;
     if (std.mem.eql(u8, value, "vulkan")) return .vulkan;
+    if (std.mem.eql(u8, value, "opengl")) return .opengl;
     std.debug.panic("unsupported render backend: {s}", .{value});
 }
 
@@ -58,6 +60,7 @@ fn addCTests(b: *std.Build, options: BuildOptions) *std.Build.Step.Compile {
     const build_options = b.addOptions();
     build_options.addOption(bool, "supports_metal", options.render_backend == .metal);
     build_options.addOption(bool, "supports_vulkan", options.render_backend == .vulkan);
+    build_options.addOption(bool, "supports_opengl", options.render_backend == .opengl);
 
     const c_tests = b.addTest(.{
         .root_module = b.createModule(.{
@@ -79,6 +82,19 @@ fn addCTests(b: *std.Build, options: BuildOptions) *std.Build.Step.Compile {
         c_tests.root_module.addLibraryPath(pixiLibraryDir(b, options.target));
         c_tests.root_module.addRPath(pixiLibraryDir(b, options.target));
         c_tests.root_module.linkSystemLibrary(vulkanLibraryName(options.target), .{});
+    } else if (options.render_backend == .opengl) {
+        switch (options.target.result.os.tag) {
+            .windows => {
+                c_tests.root_module.linkSystemLibrary("OpenGL32", .{});
+            },
+            else => {
+                // The test binary does not call EGL directly; all GL/EGL calls
+                // go through libmaplibre-native-c.so which carries its own
+                // RUNPATH to pixi's libEGL.so. Linking -lEGL here would pull
+                // in the system GLVND dispatcher as a second EGL instance,
+                // splitting EGL state and causing eglMakeCurrent to fail.
+            },
+        }
     }
     return c_tests;
 }

@@ -11,6 +11,8 @@ test "supported render backend mask matches selected build backend" {
         try testing.expectEqual(@as(u32, c.MLN_RENDER_BACKEND_FLAG_METAL), mask);
     } else if (build_options.supports_vulkan) {
         try testing.expectEqual(@as(u32, c.MLN_RENDER_BACKEND_FLAG_VULKAN), mask);
+    } else if (build_options.supports_opengl) {
+        try testing.expectEqual(@as(u32, c.MLN_RENDER_BACKEND_FLAG_OPENGL), mask);
     } else {
         try testing.expectEqual(@as(u32, 0), mask);
     }

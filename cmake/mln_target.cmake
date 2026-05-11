@@ -3,8 +3,6 @@ include(mln_platform)
 include(mln_render_backend)
 
 function(mln_add_c_api_library target)
-  find_package(ZLIB REQUIRED)
-
   set(MLN_FFI_C_API_SOURCES
       ${PROJECT_SOURCE_DIR}/src/c_api/diagnostics.cpp
       ${PROJECT_SOURCE_DIR}/src/c_api/logging.cpp
@@ -38,6 +36,11 @@ function(mln_add_c_api_library target)
       $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
       $<INSTALL_INTERFACE:include>
     PRIVATE ${PROJECT_SOURCE_DIR}/src)
+
+  # zlib: use the imported target (ZLIB::ZLIB) so that CMake resolves the
+  # correct library name on every platform. A bare 'z' works on Linux/macOS
+  # (libz.so) but fails on Windows where conda provides 'zlib.lib', not 'z.lib'.
+  find_package(ZLIB REQUIRED)
 
   target_link_libraries(
     ${target}

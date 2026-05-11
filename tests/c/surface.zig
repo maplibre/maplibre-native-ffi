@@ -26,4 +26,22 @@ test "surface descriptors expose defaults" {
     try testing.expect(vulkan.context.device == null);
     try testing.expect(vulkan.context.graphics_queue == null);
     try testing.expect(vulkan.surface == null);
+
+    const egl = c.mln_egl_surface_descriptor_default();
+    try testing.expectEqual(@as(u32, @sizeOf(c.mln_egl_surface_descriptor)), egl.size);
+    try testing.expect(egl.width > 0);
+    try testing.expect(egl.height > 0);
+    try testing.expect(egl.scale_factor > 0);
+    try testing.expect(egl.display == null);
+    try testing.expect(egl.config == null);
+    try testing.expect(egl.context == null);
+    try testing.expect(egl.surface == null);
+
+    const wgl = c.mln_wgl_surface_descriptor_default();
+    try testing.expectEqual(@as(u32, @sizeOf(c.mln_wgl_surface_descriptor)), wgl.size);
+    try testing.expect(wgl.width > 0);
+    try testing.expect(wgl.height > 0);
+    try testing.expect(wgl.scale_factor > 0);
+    try testing.expect(wgl.hdc == null);
+    try testing.expect(wgl.hglrc == null);
 }

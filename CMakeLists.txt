@@ -7,19 +7,13 @@ project(maplibre_native_c VERSION 0.1.0 LANGUAGES C CXX)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-if(MSVC)
-  # sccache cannot reliably cache MSVC compilations that emit shared compiler
-  # PDBs with /Zi. Embed debug information in objects instead; link.exe may
-  # still produce final PDBs for linked binaries.
-  # See https://github.com/mozilla/sccache/pull/963.
-  set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT
-      "$<$<CONFIG:Debug,RelWithDebInfo>:Embedded>")
-
-  # Ninja may run several cl.exe instances for one target at the same time.
-  # /FS serializes PDB writes and avoids fatal error C1041 when those instances
-  # write to the same target program database.
-  add_compile_options("$<$<COMPILE_LANG_AND_ID:C,MSVC>:/FS>"
-                      "$<$<COMPILE_LANG_AND_ID:CXX,MSVC>:/FS>")
+# When building inside a pixi/conda environment on Linux, embed
+# $CONDA_PREFIX/lib in the build-tree RPATH. Without this, the dynamic linker
+# finds system libraries (e.g. libpng16.so.16 v1.6.43 on ubuntu-24.04) before
+# the conda-managed ones (e.g. libpng 1.6.58 from pixi), causing a header/ABI
+# version mismatch at test runtime.
+if(DEFINED ENV{CONDA_PREFIX} AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  list(APPEND CMAKE_BUILD_RPATH "$ENV{CONDA_PREFIX}/lib")
 endif()
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")

@@ -132,6 +132,16 @@ auto renderer_backend(mln_render_session* session)
   return session->texture.backend->renderer_backend();
 }
 
+// For texture sessions the library owns the headless backend and must
+// activate the GL/Vulkan context via an Explicit scope. Surface sessions
+// borrow a caller-owned context, so the caller activates it (Implicit).
+auto session_scope_type(const mln_render_session* session)
+  -> mbgl::gfx::BackendScope::ScopeType {
+  return (session->kind == mln::core::RenderSessionKind::Texture)
+           ? mbgl::gfx::BackendScope::ScopeType::Explicit
+           : mbgl::gfx::BackendScope::ScopeType::Implicit;
+}
+
 auto validate_renderer_backend(mln_render_session* session)
   -> mbgl::gfx::RendererBackend* {
   if (session->renderer == nullptr) {
@@ -855,7 +865,7 @@ auto render_session_render_update(mln_render_session* session) -> mln_status {
     return MLN_STATUS_INVALID_STATE;
   }
   auto guard = mbgl::gfx::BackendScope{
-    *backend, mbgl::gfx::BackendScope::ScopeType::Implicit
+    *backend, session_scope_type(session)
   };
   map_run_render_jobs(session->map);
   if (session->renderer == nullptr) {
@@ -938,7 +948,7 @@ auto render_session_reduce_memory_use(mln_render_session* session)
     return MLN_STATUS_INVALID_STATE;
   }
   auto guard = mbgl::gfx::BackendScope{
-    *backend, mbgl::gfx::BackendScope::ScopeType::Implicit
+    *backend, session_scope_type(session)
   };
   session->renderer->reduceMemoryUse();
   return MLN_STATUS_OK;
@@ -954,7 +964,7 @@ auto render_session_clear_data(mln_render_session* session) -> mln_status {
     return MLN_STATUS_INVALID_STATE;
   }
   auto guard = mbgl::gfx::BackendScope{
-    *backend, mbgl::gfx::BackendScope::ScopeType::Implicit
+    *backend, session_scope_type(session)
   };
   session->renderer->clearData();
   return MLN_STATUS_OK;
@@ -970,7 +980,7 @@ auto render_session_dump_debug_logs(mln_render_session* session) -> mln_status {
     return MLN_STATUS_INVALID_STATE;
   }
   auto guard = mbgl::gfx::BackendScope{
-    *backend, mbgl::gfx::BackendScope::ScopeType::Implicit
+    *backend, session_scope_type(session)
   };
   session->renderer->dumpDebugLogs();
   return MLN_STATUS_OK;
@@ -1004,7 +1014,7 @@ auto render_session_set_feature_state(
   }
 
   auto guard = mbgl::gfx::BackendScope{
-    *backend, mbgl::gfx::BackendScope::ScopeType::Implicit
+    *backend, session_scope_type(session)
   };
   session->renderer->setFeatureState(
     string_from_view(selector->source_id),
@@ -1036,7 +1046,7 @@ auto render_session_get_feature_state(
 
   auto state = mbgl::FeatureState{};
   auto guard = mbgl::gfx::BackendScope{
-    *backend, mbgl::gfx::BackendScope::ScopeType::Implicit
+    *backend, session_scope_type(session)
   };
   session->renderer->getFeatureState(
     state, string_from_view(selector->source_id),
@@ -1063,7 +1073,7 @@ auto render_session_remove_feature_state(
   }
 
   auto guard = mbgl::gfx::BackendScope{
-    *backend, mbgl::gfx::BackendScope::ScopeType::Implicit
+    *backend, session_scope_type(session)
   };
   session->renderer->removeFeatureState(
     string_from_view(selector->source_id),
@@ -1138,7 +1148,7 @@ auto render_session_query_rendered_features(
   }
 
   auto guard = mbgl::gfx::BackendScope{
-    *backend, mbgl::gfx::BackendScope::ScopeType::Implicit
+    *backend, session_scope_type(session)
   };
   auto features = std::vector<mbgl::Feature>{};
   switch (geometry->type) {
@@ -1201,7 +1211,7 @@ auto render_session_query_source_features(
 
   auto native_source_id = string_from_view(source_id);
   auto guard = mbgl::gfx::BackendScope{
-    *backend, mbgl::gfx::BackendScope::ScopeType::Implicit
+    *backend, session_scope_type(session)
   };
   auto features =
     session->renderer->querySourceFeatures(native_source_id, *native_options);
@@ -1246,7 +1256,7 @@ auto render_session_query_feature_extensions(
 
   auto query_feature = mbgl::Feature{std::move(*native_feature)};
   auto guard = mbgl::gfx::BackendScope{
-    *backend, mbgl::gfx::BackendScope::ScopeType::Implicit
+    *backend, session_scope_type(session)
   };
   auto result = session->renderer->queryFeatureExtensions(
     string_from_view(source_id), query_feature, string_from_view(extension),

@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, ci-test/linux-x64-opengl]
   pull_request:
     branches: [main]
 
@@ -21,7 +21,7 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - uses: ./.github/actions/setup-ci-deps
-      - run: mise run ci:lint
+      - run: mise run ci:lint common
 
   docs:
     name: docs
