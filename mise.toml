@@ -147,13 +147,16 @@ run = [
   "rm -rf ci-artifact",
   "mkdir -p \"ci-artifact/build/${MLN_FFI_VARIANT:-host}\" ci-artifact/third_party/maplibre-native/vendor/Vulkan-Headers",
   '''
-  shopt -s nullglob
-  native_libs=("$MLN_FFI_BUILD_DIR"/libmaplibre-native-c.* "$MLN_FFI_BUILD_DIR"/maplibre-native-c.*)
-  if [[ "${#native_libs[@]}" -eq 0 ]]; then
+  found_native_lib=false
+  for native_lib in "$MLN_FFI_BUILD_DIR"/libmaplibre-native-c.* "$MLN_FFI_BUILD_DIR"/maplibre-native-c.*; do
+    [[ -e "$native_lib" ]] || continue
+    found_native_lib=true
+    cp "$native_lib" "ci-artifact/build/${MLN_FFI_VARIANT:-host}"
+  done
+  if [[ "$found_native_lib" != true ]]; then
     echo "missing $MLN_FFI_BUILD_DIR/[lib]maplibre-native-c.*; native artifact was not built" >&2
     exit 1
   fi
-  cp "${native_libs[@]}" "ci-artifact/build/${MLN_FFI_VARIANT:-host}"
   ''',
   "cp -R third_party/maplibre-native/vendor/Vulkan-Headers/include ci-artifact/third_party/maplibre-native/vendor/Vulkan-Headers/include",
 ]
