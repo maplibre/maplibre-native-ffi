@@ -9,6 +9,7 @@ const BuildOptions = struct {
 
 const RenderBackend = enum {
     metal,
+    opengl,
     vulkan,
 };
 
@@ -16,10 +17,11 @@ fn renderBackend(b: *std.Build) RenderBackend {
     const value = b.option(
         []const u8,
         "render-backend",
-        "Render backend built into the CMake artifact: metal or vulkan",
-    ) orelse @panic("missing required -Drender-backend=metal|vulkan");
+        "Render backend built into the CMake artifact: metal, opengl, or vulkan",
+    ) orelse @panic("missing required -Drender-backend=metal|opengl|vulkan");
 
     if (std.mem.eql(u8, value, "metal")) return .metal;
+    if (std.mem.eql(u8, value, "opengl")) return .opengl;
     if (std.mem.eql(u8, value, "vulkan")) return .vulkan;
     std.debug.panic("unsupported render backend: {s}", .{value});
 }
@@ -62,6 +64,7 @@ fn vulkanLibraryName(target: std.Build.ResolvedTarget) []const u8 {
 fn addReadbackExample(b: *std.Build, options: BuildOptions) *std.Build.Step.Compile {
     const build_options = b.addOptions();
     build_options.addOption(bool, "supports_metal", options.render_backend == .metal);
+    build_options.addOption(bool, "supports_opengl", options.render_backend == .opengl);
     build_options.addOption(bool, "supports_vulkan", options.render_backend == .vulkan);
 
     const example = b.addExecutable(.{
@@ -84,6 +87,8 @@ fn addReadbackExample(b: *std.Build, options: BuildOptions) *std.Build.Step.Comp
         example.root_module.linkFramework("Metal", .{});
         example.root_module.linkFramework("QuartzCore", .{});
     }
+    // OpenGL: EGL and GLES are linked inside libmaplibre-native-c.so; no
+    // additional Zig-side linkage is required.
     b.installArtifact(example);
     return example;
 }

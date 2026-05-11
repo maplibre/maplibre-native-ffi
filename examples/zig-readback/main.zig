@@ -68,15 +68,18 @@ fn logAndValidateNativeRenderBackend() !void {
 
 fn expectedNativeRenderBackend() u32 {
     if (build_options.supports_metal) return c.MLN_RENDER_BACKEND_FLAG_METAL;
+    if (build_options.supports_opengl) return c.MLN_RENDER_BACKEND_FLAG_OPENGL;
     if (build_options.supports_vulkan) return c.MLN_RENDER_BACKEND_FLAG_VULKAN;
     return 0;
 }
 
 fn renderBackendMaskLabel(mask: u32) []const u8 {
     const supports_metal = mask & c.MLN_RENDER_BACKEND_FLAG_METAL != 0;
+    const supports_opengl = mask & c.MLN_RENDER_BACKEND_FLAG_OPENGL != 0;
     const supports_vulkan = mask & c.MLN_RENDER_BACKEND_FLAG_VULKAN != 0;
     if (supports_metal and supports_vulkan) return "metal,vulkan";
     if (supports_metal) return "metal";
+    if (supports_opengl) return "opengl";
     if (supports_vulkan) return "vulkan";
     return "none";
 }
