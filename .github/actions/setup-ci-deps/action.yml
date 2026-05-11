@@ -31,9 +31,9 @@ runs:
       if: ${{ runner.os == 'Windows' }}
       shell: pwsh
       run: |
-        # Pixi's Windows activation goes through cmd.exe and can exceed cmd's
-        # input line limit when it prepends the Pixi environment to the large
-        # default GitHub Actions Path. See prefix-dev/pixi#1108.
+        # Pixi's Windows activation uses cmd.exe and emits a single PATH update
+        # line; the default GitHub Actions Path can make that line exceed cmd's
+        # limit. See https://github.com/prefix-dev/pixi/issues/1108.
         $paths = @(
           "$env:USERPROFILE\AppData\Local\mise\shims",
           "$env:USERPROFILE\AppData\Local\mise\bin",
