@@ -26,7 +26,7 @@ public final class VulkanBorrowedTextureDescriptor {
     return height;
   }
 
-  public VulkanBorrowedTextureDescriptor setSize(int width, int height) {
+  public VulkanBorrowedTextureDescriptor size(int width, int height) {
     this.width = width;
     this.height = height;
     return this;
@@ -36,7 +36,7 @@ public final class VulkanBorrowedTextureDescriptor {
     return scaleFactor;
   }
 
-  public VulkanBorrowedTextureDescriptor setScaleFactor(double scaleFactor) {
+  public VulkanBorrowedTextureDescriptor scaleFactor(double scaleFactor) {
     this.scaleFactor = scaleFactor;
     return this;
   }
@@ -45,7 +45,7 @@ public final class VulkanBorrowedTextureDescriptor {
     return instance;
   }
 
-  public VulkanBorrowedTextureDescriptor setInstance(NativePointer instance) {
+  public VulkanBorrowedTextureDescriptor instance(NativePointer instance) {
     this.instance = Objects.requireNonNull(instance, "instance");
     return this;
   }
@@ -54,7 +54,7 @@ public final class VulkanBorrowedTextureDescriptor {
     return physicalDevice;
   }
 
-  public VulkanBorrowedTextureDescriptor setPhysicalDevice(NativePointer physicalDevice) {
+  public VulkanBorrowedTextureDescriptor physicalDevice(NativePointer physicalDevice) {
     this.physicalDevice = Objects.requireNonNull(physicalDevice, "physicalDevice");
     return this;
   }
@@ -63,7 +63,7 @@ public final class VulkanBorrowedTextureDescriptor {
     return device;
   }
 
-  public VulkanBorrowedTextureDescriptor setDevice(NativePointer device) {
+  public VulkanBorrowedTextureDescriptor device(NativePointer device) {
     this.device = Objects.requireNonNull(device, "device");
     return this;
   }
@@ -72,7 +72,7 @@ public final class VulkanBorrowedTextureDescriptor {
     return graphicsQueue;
   }
 
-  public VulkanBorrowedTextureDescriptor setGraphicsQueue(NativePointer graphicsQueue) {
+  public VulkanBorrowedTextureDescriptor graphicsQueue(NativePointer graphicsQueue) {
     this.graphicsQueue = Objects.requireNonNull(graphicsQueue, "graphicsQueue");
     return this;
   }
@@ -81,7 +81,7 @@ public final class VulkanBorrowedTextureDescriptor {
     return graphicsQueueFamilyIndex;
   }
 
-  public VulkanBorrowedTextureDescriptor setGraphicsQueueFamilyIndex(int index) {
+  public VulkanBorrowedTextureDescriptor graphicsQueueFamilyIndex(int index) {
     this.graphicsQueueFamilyIndex = index;
     return this;
   }
@@ -90,7 +90,7 @@ public final class VulkanBorrowedTextureDescriptor {
     return image;
   }
 
-  public VulkanBorrowedTextureDescriptor setImage(NativePointer image) {
+  public VulkanBorrowedTextureDescriptor image(NativePointer image) {
     this.image = Objects.requireNonNull(image, "image");
     return this;
   }
@@ -99,7 +99,7 @@ public final class VulkanBorrowedTextureDescriptor {
     return imageView;
   }
 
-  public VulkanBorrowedTextureDescriptor setImageView(NativePointer imageView) {
+  public VulkanBorrowedTextureDescriptor imageView(NativePointer imageView) {
     this.imageView = Objects.requireNonNull(imageView, "imageView");
     return this;
   }
@@ -108,7 +108,7 @@ public final class VulkanBorrowedTextureDescriptor {
     return format;
   }
 
-  public VulkanBorrowedTextureDescriptor setFormat(int format) {
+  public VulkanBorrowedTextureDescriptor format(int format) {
     this.format = format;
     return this;
   }
@@ -117,7 +117,7 @@ public final class VulkanBorrowedTextureDescriptor {
     return initialLayout;
   }
 
-  public VulkanBorrowedTextureDescriptor setInitialLayout(int initialLayout) {
+  public VulkanBorrowedTextureDescriptor initialLayout(int initialLayout) {
     this.initialLayout = initialLayout;
     return this;
   }
@@ -130,7 +130,7 @@ public final class VulkanBorrowedTextureDescriptor {
     return finalLayout;
   }
 
-  public VulkanBorrowedTextureDescriptor setFinalLayout(int finalLayout) {
+  public VulkanBorrowedTextureDescriptor finalLayout(int finalLayout) {
     this.finalLayout = finalLayout;
     return this;
   }

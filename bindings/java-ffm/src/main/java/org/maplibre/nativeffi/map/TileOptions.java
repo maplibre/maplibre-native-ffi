@@ -19,7 +19,7 @@ public final class TileOptions {
     return prefetchZoomDelta;
   }
 
-  public TileOptions setPrefetchZoomDelta(int prefetchZoomDelta) {
+  public TileOptions prefetchZoomDelta(int prefetchZoomDelta) {
     this.prefetchZoomDelta = prefetchZoomDelta;
     return this;
   }
@@ -37,7 +37,7 @@ public final class TileOptions {
     return lodMinRadius;
   }
 
-  public TileOptions setLodMinRadius(double lodMinRadius) {
+  public TileOptions lodMinRadius(double lodMinRadius) {
     this.lodMinRadius = lodMinRadius;
     return this;
   }
@@ -55,7 +55,7 @@ public final class TileOptions {
     return lodScale;
   }
 
-  public TileOptions setLodScale(double lodScale) {
+  public TileOptions lodScale(double lodScale) {
     this.lodScale = lodScale;
     return this;
   }
@@ -73,7 +73,7 @@ public final class TileOptions {
     return lodPitchThreshold;
   }
 
-  public TileOptions setLodPitchThreshold(double lodPitchThreshold) {
+  public TileOptions lodPitchThreshold(double lodPitchThreshold) {
     this.lodPitchThreshold = lodPitchThreshold;
     return this;
   }
@@ -91,7 +91,7 @@ public final class TileOptions {
     return lodZoomShift;
   }
 
-  public TileOptions setLodZoomShift(double lodZoomShift) {
+  public TileOptions lodZoomShift(double lodZoomShift) {
     this.lodZoomShift = lodZoomShift;
     return this;
   }
@@ -109,7 +109,7 @@ public final class TileOptions {
     return lodMode;
   }
 
-  public TileOptions setLodMode(TileLodMode lodMode) {
+  public TileOptions lodMode(TileLodMode lodMode) {
     this.lodMode = Objects.requireNonNull(lodMode, "lodMode");
     return this;
   }

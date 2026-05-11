@@ -16,7 +16,7 @@ public final class CameraFitOptions {
     return padding;
   }
 
-  public CameraFitOptions setPadding(EdgeInsets padding) {
+  public CameraFitOptions padding(EdgeInsets padding) {
     this.padding = Objects.requireNonNull(padding, "padding");
     return this;
   }
@@ -34,7 +34,7 @@ public final class CameraFitOptions {
     return bearing;
   }
 
-  public CameraFitOptions setBearing(double bearing) {
+  public CameraFitOptions bearing(double bearing) {
     this.bearing = bearing;
     return this;
   }
@@ -52,7 +52,7 @@ public final class CameraFitOptions {
     return pitch;
   }
 
-  public CameraFitOptions setPitch(double pitch) {
+  public CameraFitOptions pitch(double pitch) {
     this.pitch = pitch;
     return this;
   }

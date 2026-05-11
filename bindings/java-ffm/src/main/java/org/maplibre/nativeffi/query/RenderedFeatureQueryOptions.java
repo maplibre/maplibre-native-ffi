@@ -17,7 +17,7 @@ public final class RenderedFeatureQueryOptions {
     return layerIds;
   }
 
-  public RenderedFeatureQueryOptions setLayerIds(List<String> layerIds) {
+  public RenderedFeatureQueryOptions layerIds(List<String> layerIds) {
     this.layerIds = List.copyOf(Objects.requireNonNull(layerIds, "layerIds"));
     return this;
   }
@@ -35,7 +35,7 @@ public final class RenderedFeatureQueryOptions {
     return filter;
   }
 
-  public RenderedFeatureQueryOptions setFilter(JsonValue filter) {
+  public RenderedFeatureQueryOptions filter(JsonValue filter) {
     this.filter = Objects.requireNonNull(filter, "filter");
     return this;
   }

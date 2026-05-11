@@ -102,32 +102,31 @@ public final class MapStructs {
     var fields = mln_camera_options.fields(segment);
     var options = new CameraOptions();
     if ((fields & MapLibreNativeC.MLN_CAMERA_OPTION_CENTER()) != 0) {
-      options.setCenter(
-          mln_camera_options.latitude(segment), mln_camera_options.longitude(segment));
+      options.center(mln_camera_options.latitude(segment), mln_camera_options.longitude(segment));
     }
     if ((fields & MapLibreNativeC.MLN_CAMERA_OPTION_CENTER_ALTITUDE()) != 0) {
-      options.setCenterAltitude(mln_camera_options.center_altitude(segment));
+      options.centerAltitude(mln_camera_options.center_altitude(segment));
     }
     if ((fields & MapLibreNativeC.MLN_CAMERA_OPTION_PADDING()) != 0) {
-      options.setPadding(edgeInsets(mln_camera_options.padding(segment)));
+      options.padding(edgeInsets(mln_camera_options.padding(segment)));
     }
     if ((fields & MapLibreNativeC.MLN_CAMERA_OPTION_ANCHOR()) != 0) {
-      options.setAnchor(screenPoint(mln_camera_options.anchor(segment)));
+      options.anchor(screenPoint(mln_camera_options.anchor(segment)));
     }
     if ((fields & MapLibreNativeC.MLN_CAMERA_OPTION_ZOOM()) != 0) {
-      options.setZoom(mln_camera_options.zoom(segment));
+      options.zoom(mln_camera_options.zoom(segment));
     }
     if ((fields & MapLibreNativeC.MLN_CAMERA_OPTION_BEARING()) != 0) {
-      options.setBearing(mln_camera_options.bearing(segment));
+      options.bearing(mln_camera_options.bearing(segment));
     }
     if ((fields & MapLibreNativeC.MLN_CAMERA_OPTION_PITCH()) != 0) {
-      options.setPitch(mln_camera_options.pitch(segment));
+      options.pitch(mln_camera_options.pitch(segment));
     }
     if ((fields & MapLibreNativeC.MLN_CAMERA_OPTION_ROLL()) != 0) {
-      options.setRoll(mln_camera_options.roll(segment));
+      options.roll(mln_camera_options.roll(segment));
     }
     if ((fields & MapLibreNativeC.MLN_CAMERA_OPTION_FOV()) != 0) {
-      options.setFieldOfView(mln_camera_options.field_of_view(segment));
+      options.fieldOfView(mln_camera_options.field_of_view(segment));
     }
     return options;
   }
@@ -205,19 +204,19 @@ public final class MapStructs {
     var fields = mln_bound_options.fields(segment);
     var options = new BoundOptions();
     if ((fields & MapLibreNativeC.MLN_BOUND_OPTION_BOUNDS()) != 0) {
-      options.setBounds(latLngBounds(mln_bound_options.bounds(segment)));
+      options.bounds(latLngBounds(mln_bound_options.bounds(segment)));
     }
     if ((fields & MapLibreNativeC.MLN_BOUND_OPTION_MIN_ZOOM()) != 0) {
-      options.setMinZoom(mln_bound_options.min_zoom(segment));
+      options.minZoom(mln_bound_options.min_zoom(segment));
     }
     if ((fields & MapLibreNativeC.MLN_BOUND_OPTION_MAX_ZOOM()) != 0) {
-      options.setMaxZoom(mln_bound_options.max_zoom(segment));
+      options.maxZoom(mln_bound_options.max_zoom(segment));
     }
     if ((fields & MapLibreNativeC.MLN_BOUND_OPTION_MIN_PITCH()) != 0) {
-      options.setMinPitch(mln_bound_options.min_pitch(segment));
+      options.minPitch(mln_bound_options.min_pitch(segment));
     }
     if ((fields & MapLibreNativeC.MLN_BOUND_OPTION_MAX_PITCH()) != 0) {
-      options.setMaxPitch(mln_bound_options.max_pitch(segment));
+      options.maxPitch(mln_bound_options.max_pitch(segment));
     }
     return options;
   }
@@ -249,19 +248,19 @@ public final class MapStructs {
     var fields = mln_map_viewport_options.fields(segment);
     var options = new ViewportOptions();
     if ((fields & MapLibreNativeC.MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION()) != 0) {
-      options.setNorthOrientation(
+      options.northOrientation(
           NorthOrientation.fromNative(mln_map_viewport_options.north_orientation(segment)));
     }
     if ((fields & MapLibreNativeC.MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE()) != 0) {
-      options.setConstrainMode(
+      options.constrainMode(
           ConstrainMode.fromNative(mln_map_viewport_options.constrain_mode(segment)));
     }
     if ((fields & MapLibreNativeC.MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE()) != 0) {
-      options.setViewportMode(
+      options.viewportMode(
           ViewportMode.fromNative(mln_map_viewport_options.viewport_mode(segment)));
     }
     if ((fields & MapLibreNativeC.MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET()) != 0) {
-      options.setFrustumOffset(edgeInsets(mln_map_viewport_options.frustum_offset(segment)));
+      options.frustumOffset(edgeInsets(mln_map_viewport_options.frustum_offset(segment)));
     }
     return options;
   }
@@ -301,22 +300,22 @@ public final class MapStructs {
     var fields = mln_map_tile_options.fields(segment);
     var options = new TileOptions();
     if ((fields & MapLibreNativeC.MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA()) != 0) {
-      options.setPrefetchZoomDelta(mln_map_tile_options.prefetch_zoom_delta(segment));
+      options.prefetchZoomDelta(mln_map_tile_options.prefetch_zoom_delta(segment));
     }
     if ((fields & MapLibreNativeC.MLN_MAP_TILE_OPTION_LOD_MIN_RADIUS()) != 0) {
-      options.setLodMinRadius(mln_map_tile_options.lod_min_radius(segment));
+      options.lodMinRadius(mln_map_tile_options.lod_min_radius(segment));
     }
     if ((fields & MapLibreNativeC.MLN_MAP_TILE_OPTION_LOD_SCALE()) != 0) {
-      options.setLodScale(mln_map_tile_options.lod_scale(segment));
+      options.lodScale(mln_map_tile_options.lod_scale(segment));
     }
     if ((fields & MapLibreNativeC.MLN_MAP_TILE_OPTION_LOD_PITCH_THRESHOLD()) != 0) {
-      options.setLodPitchThreshold(mln_map_tile_options.lod_pitch_threshold(segment));
+      options.lodPitchThreshold(mln_map_tile_options.lod_pitch_threshold(segment));
     }
     if ((fields & MapLibreNativeC.MLN_MAP_TILE_OPTION_LOD_ZOOM_SHIFT()) != 0) {
-      options.setLodZoomShift(mln_map_tile_options.lod_zoom_shift(segment));
+      options.lodZoomShift(mln_map_tile_options.lod_zoom_shift(segment));
     }
     if ((fields & MapLibreNativeC.MLN_MAP_TILE_OPTION_LOD_MODE()) != 0) {
-      options.setLodMode(TileLodMode.fromNative(mln_map_tile_options.lod_mode(segment)));
+      options.lodMode(TileLodMode.fromNative(mln_map_tile_options.lod_mode(segment)));
     }
     return options;
   }
@@ -344,13 +343,13 @@ public final class MapStructs {
     var fields = mln_projection_mode.fields(segment);
     var options = new ProjectionModeOptions();
     if ((fields & MapLibreNativeC.MLN_PROJECTION_MODE_AXONOMETRIC()) != 0) {
-      options.setAxonometric(mln_projection_mode.axonometric(segment));
+      options.axonometric(mln_projection_mode.axonometric(segment));
     }
     if ((fields & MapLibreNativeC.MLN_PROJECTION_MODE_X_SKEW()) != 0) {
-      options.setXSkew(mln_projection_mode.x_skew(segment));
+      options.xSkew(mln_projection_mode.x_skew(segment));
     }
     if ((fields & MapLibreNativeC.MLN_PROJECTION_MODE_Y_SKEW()) != 0) {
-      options.setYSkew(mln_projection_mode.y_skew(segment));
+      options.ySkew(mln_projection_mode.y_skew(segment));
     }
     return options;
   }
@@ -374,10 +373,10 @@ public final class MapStructs {
     var fields = mln_free_camera_options.fields(segment);
     var options = new FreeCameraOptions();
     if ((fields & MapLibreNativeC.MLN_FREE_CAMERA_OPTION_POSITION()) != 0) {
-      options.setPosition(vec3(mln_free_camera_options.position(segment)));
+      options.position(vec3(mln_free_camera_options.position(segment)));
     }
     if ((fields & MapLibreNativeC.MLN_FREE_CAMERA_OPTION_ORIENTATION()) != 0) {
-      options.setOrientation(quaternion(mln_free_camera_options.orientation(segment)));
+      options.orientation(quaternion(mln_free_camera_options.orientation(segment)));
     }
     return options;
   }

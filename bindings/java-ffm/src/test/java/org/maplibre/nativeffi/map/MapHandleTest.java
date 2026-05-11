@@ -34,7 +34,7 @@ final class MapHandleTest {
   @Test
   void createsAndClosesMapBeforeRuntime() {
     var runtime = RuntimeHandle.create();
-    var map = MapHandle.create(runtime, new MapOptions().setSize(128, 128));
+    var map = MapHandle.create(runtime, new MapOptions().size(128, 128));
     try {
       map.requestRepaint();
     } finally {
@@ -51,7 +51,7 @@ final class MapHandleTest {
       var error =
           assertThrows(
               InvalidArgumentException.class,
-              () -> MapHandle.create(runtime, new MapOptions().setSize(0, 128)));
+              () -> MapHandle.create(runtime, new MapOptions().size(0, 128)));
       assertEquals(MaplibreStatus.INVALID_ARGUMENT, error.status());
       assertFalse(error.diagnostic().isBlank());
     } finally {
@@ -62,7 +62,7 @@ final class MapHandleTest {
   @Test
   void runtimeCloseFailsWhileMapIsLive() {
     var runtime = RuntimeHandle.create();
-    var map = MapHandle.create(runtime, new MapOptions().setSize(128, 128));
+    var map = MapHandle.create(runtime, new MapOptions().size(128, 128));
     try {
       var error = assertThrows(InvalidStateException.class, runtime::close);
       assertEquals(MaplibreStatus.INVALID_STATE, error.status());
@@ -76,7 +76,7 @@ final class MapHandleTest {
   void releasedMapRejectsLaterMethodsBeforeNativeDispatch() {
     var runtime = RuntimeHandle.create();
     try {
-      var map = MapHandle.create(runtime, new MapOptions().setSize(128, 128));
+      var map = MapHandle.create(runtime, new MapOptions().size(128, 128));
       map.close();
       var error = assertThrows(InvalidStateException.class, () -> map.setStyleJson("{}"));
       assertTrue(error.diagnostic().contains("MapHandle"));
@@ -91,7 +91,7 @@ final class MapHandleTest {
   @Test
   void publicStyleStringInputsRejectEmbeddedNul() {
     var runtime = RuntimeHandle.create();
-    var map = MapHandle.create(runtime, new MapOptions().setSize(128, 128));
+    var map = MapHandle.create(runtime, new MapOptions().size(128, 128));
     try {
       assertThrows(IllegalArgumentException.class, () -> map.setStyleUrl("custom://a\0b"));
       assertThrows(IllegalArgumentException.class, () -> map.setStyleJson("{\0}"));
@@ -104,7 +104,7 @@ final class MapHandleTest {
   @Test
   void debugAndStateHelpersRoundTrip() {
     var runtime = RuntimeHandle.create();
-    var map = MapHandle.create(runtime, new MapOptions().setSize(128, 128));
+    var map = MapHandle.create(runtime, new MapOptions().size(128, 128));
     try {
       map.setDebugOptions(EnumSet.of(DebugOption.TILE_BORDERS, DebugOption.TIMESTAMPS));
       assertEquals(
@@ -126,32 +126,31 @@ final class MapHandleTest {
   @Test
   void viewportTileBoundsAndProjectionModeOptionsRoundTrip() {
     var runtime = RuntimeHandle.create();
-    var map = MapHandle.create(runtime, new MapOptions().setSize(128, 128));
+    var map = MapHandle.create(runtime, new MapOptions().size(128, 128));
     try {
       map.setViewportOptions(
           new ViewportOptions()
-              .setNorthOrientation(NorthOrientation.UP)
-              .setConstrainMode(ConstrainMode.HEIGHT_ONLY)
-              .setViewportMode(ViewportMode.DEFAULT)
-              .setFrustumOffset(EdgeInsets.ZERO));
+              .northOrientation(NorthOrientation.UP)
+              .constrainMode(ConstrainMode.HEIGHT_ONLY)
+              .viewportMode(ViewportMode.DEFAULT)
+              .frustumOffset(EdgeInsets.ZERO));
       var viewport = map.viewportOptions();
       assertEquals(NorthOrientation.UP, viewport.northOrientation());
       assertEquals(ConstrainMode.HEIGHT_ONLY, viewport.constrainMode());
       assertEquals(ViewportMode.DEFAULT, viewport.viewportMode());
       assertEquals(EdgeInsets.ZERO, viewport.frustumOffset());
 
-      map.setTileOptions(new TileOptions().setPrefetchZoomDelta(2).setLodMode(TileLodMode.DEFAULT));
+      map.setTileOptions(new TileOptions().prefetchZoomDelta(2).lodMode(TileLodMode.DEFAULT));
       var tile = map.tileOptions();
       assertEquals(2, tile.prefetchZoomDelta());
       assertEquals(TileLodMode.DEFAULT, tile.lodMode());
 
-      map.setBounds(new BoundOptions().setMinZoom(0).setMaxZoom(22).setMinPitch(0).setMaxPitch(60));
+      map.setBounds(new BoundOptions().minZoom(0).maxZoom(22).minPitch(0).maxPitch(60));
       var bounds = map.bounds();
       assertEquals(0.0, bounds.minZoom(), 0.0);
       assertEquals(22.0, bounds.maxZoom(), 0.0);
 
-      map.setProjectionMode(
-          new ProjectionModeOptions().setAxonometric(false).setXSkew(0).setYSkew(0));
+      map.setProjectionMode(new ProjectionModeOptions().axonometric(false).xSkew(0).ySkew(0));
       var projectionMode = map.projectionMode();
       assertFalse(projectionMode.axonometric());
       assertEquals(0.0, projectionMode.xSkew(), 0.0);
@@ -165,9 +164,9 @@ final class MapHandleTest {
   @Test
   void cameraCommandsAndCoordinateConversionsUseRealMap() {
     var runtime = RuntimeHandle.create();
-    var map = MapHandle.create(runtime, new MapOptions().setSize(256, 256));
+    var map = MapHandle.create(runtime, new MapOptions().size(256, 256));
     try {
-      map.jumpTo(new CameraOptions().setCenter(37.7749, -122.4194).setZoom(4).setPitch(20));
+      map.jumpTo(new CameraOptions().center(37.7749, -122.4194).zoom(4).pitch(20));
       var camera = map.camera();
       assertEquals(37.7749, camera.center().latitude(), 1e-6);
       assertEquals(-122.4194, camera.center().longitude(), 1e-6);
@@ -193,12 +192,12 @@ final class MapHandleTest {
       var fitted =
           map.cameraForLatLngBounds(
               new LatLngBounds(new LatLng(-1, -1), new LatLng(1, 1)),
-              new CameraFitOptions().setPadding(EdgeInsets.ZERO));
+              new CameraFitOptions().padding(EdgeInsets.ZERO));
       assertTrue(fitted.hasCenter());
       var geometryFitted =
           map.cameraForGeometry(
               Geometry.multiPoint(List.of(new LatLng(-1, -1), new LatLng(1, 1))),
-              new CameraFitOptions().setPadding(EdgeInsets.ZERO));
+              new CameraFitOptions().padding(EdgeInsets.ZERO));
       assertTrue(geometryFitted.hasCenter());
       map.latLngBoundsForCamera(fitted);
       map.latLngBoundsForCameraUnwrapped(fitted);
@@ -211,7 +210,7 @@ final class MapHandleTest {
   @Test
   void emptyCameraFitCoordinateInputsUseNativeValidation() {
     var runtime = RuntimeHandle.create();
-    var map = MapHandle.create(runtime, new MapOptions().setSize(128, 128));
+    var map = MapHandle.create(runtime, new MapOptions().size(128, 128));
     var projection = map.createProjection();
     try {
       var mapError =
@@ -235,10 +234,10 @@ final class MapHandleTest {
   @Test
   void projectionHelpersCloseIndependently() {
     var runtime = RuntimeHandle.create();
-    var map = MapHandle.create(runtime, new MapOptions().setSize(128, 128));
+    var map = MapHandle.create(runtime, new MapOptions().size(128, 128));
     try {
       var projection = map.createProjection();
-      projection.setCamera(new CameraOptions().setCenter(0, 0).setZoom(2));
+      projection.setCamera(new CameraOptions().center(0, 0).zoom(2));
       var camera = projection.camera();
       assertEquals(0.0, camera.center().latitude(), 1e-6);
       assertEquals(0.0, camera.center().longitude(), 1e-6);
@@ -265,7 +264,7 @@ final class MapHandleTest {
   @Test
   void wrongThreadMapCallMapsToWrongThreadException() throws Exception {
     var runtime = RuntimeHandle.create();
-    var map = MapHandle.create(runtime, new MapOptions().setSize(128, 128));
+    var map = MapHandle.create(runtime, new MapOptions().size(128, 128));
     try {
       assertWrongThread(runOnOtherThread(map::requestRepaint));
       assertWrongThread(runOnOtherThread(() -> map.cameraForLatLngs(List.of())));
@@ -280,7 +279,7 @@ final class MapHandleTest {
   @Test
   void wrongThreadProjectionCallMapsToWrongThreadException() throws Exception {
     var runtime = RuntimeHandle.create();
-    var map = MapHandle.create(runtime, new MapOptions().setSize(128, 128));
+    var map = MapHandle.create(runtime, new MapOptions().size(128, 128));
     var projection = map.createProjection();
     try {
       assertWrongThread(runOnOtherThread(() -> projection.pixelForLatLng(new LatLng(0, 0))));
@@ -296,7 +295,7 @@ final class MapHandleTest {
   @Test
   void wrongThreadCloseLeavesMapAndProjectionLive() throws Exception {
     var runtime = RuntimeHandle.create();
-    var map = MapHandle.create(runtime, new MapOptions().setSize(128, 128));
+    var map = MapHandle.create(runtime, new MapOptions().size(128, 128));
     var projection = map.createProjection();
     try {
       assertWrongThread(runOnOtherThread(map::close));

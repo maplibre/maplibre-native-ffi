@@ -22,7 +22,7 @@ public final class TileSourceOptions {
     return minZoom;
   }
 
-  public TileSourceOptions setMinZoom(double minZoom) {
+  public TileSourceOptions minZoom(double minZoom) {
     this.minZoom = minZoom;
     return this;
   }
@@ -40,7 +40,7 @@ public final class TileSourceOptions {
     return maxZoom;
   }
 
-  public TileSourceOptions setMaxZoom(double maxZoom) {
+  public TileSourceOptions maxZoom(double maxZoom) {
     this.maxZoom = maxZoom;
     return this;
   }
@@ -58,7 +58,7 @@ public final class TileSourceOptions {
     return attribution;
   }
 
-  public TileSourceOptions setAttribution(String attribution) {
+  public TileSourceOptions attribution(String attribution) {
     this.attribution = Objects.requireNonNull(attribution, "attribution");
     return this;
   }
@@ -76,7 +76,7 @@ public final class TileSourceOptions {
     return scheme;
   }
 
-  public TileSourceOptions setScheme(TileScheme scheme) {
+  public TileSourceOptions scheme(TileScheme scheme) {
     this.scheme = Objects.requireNonNull(scheme, "scheme");
     return this;
   }
@@ -94,7 +94,7 @@ public final class TileSourceOptions {
     return bounds;
   }
 
-  public TileSourceOptions setBounds(LatLngBounds bounds) {
+  public TileSourceOptions bounds(LatLngBounds bounds) {
     this.bounds = Objects.requireNonNull(bounds, "bounds");
     return this;
   }
@@ -112,7 +112,7 @@ public final class TileSourceOptions {
     return tileSize;
   }
 
-  public TileSourceOptions setTileSize(int tileSize) {
+  public TileSourceOptions tileSize(int tileSize) {
     this.tileSize = tileSize;
     return this;
   }
@@ -130,7 +130,7 @@ public final class TileSourceOptions {
     return vectorEncoding;
   }
 
-  public TileSourceOptions setVectorEncoding(VectorTileEncoding vectorEncoding) {
+  public TileSourceOptions vectorEncoding(VectorTileEncoding vectorEncoding) {
     this.vectorEncoding = Objects.requireNonNull(vectorEncoding, "vectorEncoding");
     return this;
   }
@@ -148,7 +148,7 @@ public final class TileSourceOptions {
     return rasterDemEncoding;
   }
 
-  public TileSourceOptions setRasterDemEncoding(RasterDemEncoding rasterDemEncoding) {
+  public TileSourceOptions rasterDemEncoding(RasterDemEncoding rasterDemEncoding) {
     this.rasterDemEncoding = Objects.requireNonNull(rasterDemEncoding, "rasterDemEncoding");
     return this;
   }

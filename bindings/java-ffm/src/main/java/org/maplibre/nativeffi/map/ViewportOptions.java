@@ -18,7 +18,7 @@ public final class ViewportOptions {
     return northOrientation;
   }
 
-  public ViewportOptions setNorthOrientation(NorthOrientation northOrientation) {
+  public ViewportOptions northOrientation(NorthOrientation northOrientation) {
     this.northOrientation = Objects.requireNonNull(northOrientation, "northOrientation");
     return this;
   }
@@ -36,7 +36,7 @@ public final class ViewportOptions {
     return constrainMode;
   }
 
-  public ViewportOptions setConstrainMode(ConstrainMode constrainMode) {
+  public ViewportOptions constrainMode(ConstrainMode constrainMode) {
     this.constrainMode = Objects.requireNonNull(constrainMode, "constrainMode");
     return this;
   }
@@ -54,7 +54,7 @@ public final class ViewportOptions {
     return viewportMode;
   }
 
-  public ViewportOptions setViewportMode(ViewportMode viewportMode) {
+  public ViewportOptions viewportMode(ViewportMode viewportMode) {
     this.viewportMode = Objects.requireNonNull(viewportMode, "viewportMode");
     return this;
   }
@@ -72,7 +72,7 @@ public final class ViewportOptions {
     return frustumOffset;
   }
 
-  public ViewportOptions setFrustumOffset(EdgeInsets frustumOffset) {
+  public ViewportOptions frustumOffset(EdgeInsets frustumOffset) {
     this.frustumOffset = Objects.requireNonNull(frustumOffset, "frustumOffset");
     return this;
   }

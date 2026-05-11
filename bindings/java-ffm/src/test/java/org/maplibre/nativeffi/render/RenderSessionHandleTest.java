@@ -58,11 +58,10 @@ final class RenderSessionHandleTest {
     Maplibre.setAsyncLogSeverities(EnumSet.noneOf(LogSeverity.class));
 
     var runtime = RuntimeHandle.create();
-    var map = MapHandle.create(runtime, new MapOptions().setSize(64, 64));
+    var map = MapHandle.create(runtime, new MapOptions().size(64, 64));
     RenderSessionHandle session = null;
     try {
-      session =
-          map.attachOwnedTexture(new OwnedTextureDescriptor().setSize(32, 16).setScaleFactor(1.0));
+      session = map.attachOwnedTexture(new OwnedTextureDescriptor().size(32, 16).scaleFactor(1.0));
       var activeSession = session;
       assertSame(map, activeSession.map());
       assertThrows(InvalidStateException.class, activeSession::textureImageInfo);
@@ -116,7 +115,7 @@ final class RenderSessionHandleTest {
     Maplibre.setAsyncLogSeverities(EnumSet.noneOf(LogSeverity.class));
 
     var runtime = RuntimeHandle.create();
-    var map = MapHandle.create(runtime, new MapOptions().setSize(64, 64));
+    var map = MapHandle.create(runtime, new MapOptions().size(64, 64));
     RenderSessionHandle session = null;
     try {
       session = assumeMetalOwnedTextureSession(map);
@@ -154,7 +153,7 @@ final class RenderSessionHandleTest {
     Maplibre.setAsyncLogSeverities(EnumSet.noneOf(LogSeverity.class));
 
     var runtime = RuntimeHandle.create();
-    var map = MapHandle.create(runtime, new MapOptions().setSize(64, 64));
+    var map = MapHandle.create(runtime, new MapOptions().size(64, 64));
     RenderSessionHandle session = null;
     try {
       session = assumeVulkanOwnedTextureSession(map);
@@ -191,7 +190,7 @@ final class RenderSessionHandleTest {
     var vulkanBorrowed = new VulkanBorrowedTextureDescriptor();
     assertFalse(vulkanBorrowed.hasFinalLayout());
     assertNull(vulkanBorrowed.finalLayout());
-    vulkanBorrowed.setFinalLayout(0);
+    vulkanBorrowed.finalLayout(0);
     assertTrue(vulkanBorrowed.hasFinalLayout());
     assertEquals(0, vulkanBorrowed.finalLayout());
     vulkanBorrowed.clearFinalLayout();
@@ -223,8 +222,8 @@ final class RenderSessionHandleTest {
   @Test
   void wrongThreadSessionCallAndCloseLeaveHandleLive() throws Exception {
     var runtime = RuntimeHandle.create();
-    var map = MapHandle.create(runtime, new MapOptions().setSize(64, 64));
-    var session = map.attachOwnedTexture(new OwnedTextureDescriptor().setSize(64, 64));
+    var map = MapHandle.create(runtime, new MapOptions().size(64, 64));
+    var session = map.attachOwnedTexture(new OwnedTextureDescriptor().size(64, 64));
     try {
       assertWrongThread(runOnOtherThread(session::renderUpdate));
       assertWrongThread(runOnOtherThread(session::close));
@@ -258,7 +257,7 @@ final class RenderSessionHandleTest {
 
   private static RenderSessionHandle assumeMetalOwnedTextureSession(MapHandle map) {
     try {
-      return map.attachMetalOwnedTexture(new MetalOwnedTextureDescriptor().setSize(32, 16));
+      return map.attachMetalOwnedTexture(new MetalOwnedTextureDescriptor().size(32, 16));
     } catch (MaplibreException error) {
       Assumptions.assumeTrue(false, "Metal owned texture unavailable: " + error.getMessage());
       throw new AssertionError("unreachable");
@@ -267,7 +266,7 @@ final class RenderSessionHandleTest {
 
   private static RenderSessionHandle assumeVulkanOwnedTextureSession(MapHandle map) {
     try {
-      return map.attachVulkanOwnedTexture(new VulkanOwnedTextureDescriptor().setSize(32, 16));
+      return map.attachVulkanOwnedTexture(new VulkanOwnedTextureDescriptor().size(32, 16));
     } catch (MaplibreException error) {
       Assumptions.assumeTrue(false, "Vulkan owned texture unavailable: " + error.getMessage());
       throw new AssertionError("unreachable");

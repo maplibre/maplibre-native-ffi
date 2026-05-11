@@ -12,7 +12,7 @@ public final class RuntimeOptions {
     return assetPath;
   }
 
-  public RuntimeOptions setAssetPath(String assetPath) {
+  public RuntimeOptions assetPath(String assetPath) {
     this.assetPath = assetPath;
     return this;
   }
@@ -26,7 +26,7 @@ public final class RuntimeOptions {
     return cachePath;
   }
 
-  public RuntimeOptions setCachePath(String cachePath) {
+  public RuntimeOptions cachePath(String cachePath) {
     this.cachePath = cachePath;
     return this;
   }
@@ -44,7 +44,7 @@ public final class RuntimeOptions {
     return maximumCacheSize != null;
   }
 
-  public RuntimeOptions setMaximumCacheSize(long maximumCacheSize) {
+  public RuntimeOptions maximumCacheSize(long maximumCacheSize) {
     this.maximumCacheSize = maximumCacheSize;
     return this;
   }

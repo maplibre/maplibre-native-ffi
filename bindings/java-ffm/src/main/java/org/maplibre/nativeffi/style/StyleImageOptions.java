@@ -13,7 +13,7 @@ public final class StyleImageOptions {
     return pixelRatio;
   }
 
-  public StyleImageOptions setPixelRatio(float pixelRatio) {
+  public StyleImageOptions pixelRatio(float pixelRatio) {
     this.pixelRatio = pixelRatio;
     return this;
   }
@@ -31,7 +31,7 @@ public final class StyleImageOptions {
     return sdf;
   }
 
-  public StyleImageOptions setSdf(boolean sdf) {
+  public StyleImageOptions sdf(boolean sdf) {
     this.sdf = sdf;
     return this;
   }

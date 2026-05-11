@@ -78,7 +78,7 @@ final class RuntimeOfflineTest {
   @Test
   void mergeOfflineRegionsDatabaseCopiesMergedRegionList() {
     var sideCache = temporaryDirectory.resolve("side-offline-cache.db");
-    var sideRuntime = RuntimeHandle.create(new RuntimeOptions().setCachePath(sideCache.toString()));
+    var sideRuntime = RuntimeHandle.create(new RuntimeOptions().cachePath(sideCache.toString()));
     try {
       sideRuntime.createOfflineRegion(tileDefinition(), new byte[] {5, 4, 3});
     } finally {
@@ -145,7 +145,7 @@ final class RuntimeOfflineTest {
 
   private RuntimeHandle runtime(String fileName) {
     return RuntimeHandle.create(
-        new RuntimeOptions().setCachePath(temporaryDirectory.resolve(fileName).toString()));
+        new RuntimeOptions().cachePath(temporaryDirectory.resolve(fileName).toString()));
   }
 
   private static OfflineRegionDefinition.TilePyramid tileDefinition() {

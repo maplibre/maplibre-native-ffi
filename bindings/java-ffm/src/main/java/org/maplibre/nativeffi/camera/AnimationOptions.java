@@ -17,7 +17,7 @@ public final class AnimationOptions {
     return durationMs;
   }
 
-  public AnimationOptions setDurationMs(double durationMs) {
+  public AnimationOptions durationMs(double durationMs) {
     this.durationMs = durationMs;
     return this;
   }
@@ -35,7 +35,7 @@ public final class AnimationOptions {
     return velocity;
   }
 
-  public AnimationOptions setVelocity(double velocity) {
+  public AnimationOptions velocity(double velocity) {
     this.velocity = velocity;
     return this;
   }
@@ -53,7 +53,7 @@ public final class AnimationOptions {
     return minZoom;
   }
 
-  public AnimationOptions setMinZoom(double minZoom) {
+  public AnimationOptions minZoom(double minZoom) {
     this.minZoom = minZoom;
     return this;
   }
@@ -71,7 +71,7 @@ public final class AnimationOptions {
     return easing;
   }
 
-  public AnimationOptions setEasing(UnitBezier easing) {
+  public AnimationOptions easing(UnitBezier easing) {
     this.easing = Objects.requireNonNull(easing, "easing");
     return this;
   }

@@ -87,7 +87,7 @@ final class RuntimeHandleTest {
   @Test
   void resourceCallbacksRejectInstallAfterMapCreation() {
     var runtime = RuntimeHandle.create();
-    var map = MapHandle.create(runtime, new MapOptions().setSize(128, 128));
+    var map = MapHandle.create(runtime, new MapOptions().size(128, 128));
     try {
       assertThrows(
           InvalidStateException.class,
@@ -127,7 +127,7 @@ final class RuntimeHandleTest {
               throw error;
             }
           });
-      var map = MapHandle.create(runtime, new MapOptions().setSize(128, 128));
+      var map = MapHandle.create(runtime, new MapOptions().size(128, 128));
       try {
         map.setStyleUrl("custom://style.json");
         assertTrue(
@@ -161,7 +161,7 @@ final class RuntimeHandleTest {
               callbackExited.countDown();
             }
           });
-      var map = MapHandle.create(runtime, new MapOptions().setSize(128, 128));
+      var map = MapHandle.create(runtime, new MapOptions().size(128, 128));
       try {
         map.setStyleUrl("custom://async-style.json");
         assertTrue(callbackExited.await(5, TimeUnit.SECONDS));
@@ -184,7 +184,7 @@ final class RuntimeHandleTest {
   @Test
   void runtimeEventsCopyPayloadAndMessageBeforeNextPoll() throws Exception {
     var runtime = RuntimeHandle.create();
-    var map = MapHandle.create(runtime, new MapOptions().setSize(64, 64));
+    var map = MapHandle.create(runtime, new MapOptions().size(64, 64));
     RenderSessionHandle session = null;
     try {
       var failure = assertThrows(NativeErrorException.class, () -> map.setStyleJson("{"));
@@ -192,7 +192,7 @@ final class RuntimeHandleTest {
       var failedEvent = waitForMapEventRecord(runtime, map, RuntimeEventType.MAP_LOADING_FAILED);
       assertFalse(failedEvent.message().isBlank());
 
-      session = map.attachOwnedTexture(new OwnedTextureDescriptor().setSize(64, 64));
+      session = map.attachOwnedTexture(new OwnedTextureDescriptor().size(64, 64));
       map.setStyleJson(STYLE_JSON);
       waitForMapEvent(runtime, map, RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE);
       session.renderUpdate();

@@ -25,7 +25,7 @@ public final class FeatureStateSelector {
     return sourceLayerId;
   }
 
-  public FeatureStateSelector setSourceLayerId(String sourceLayerId) {
+  public FeatureStateSelector sourceLayerId(String sourceLayerId) {
     this.sourceLayerId = Objects.requireNonNull(sourceLayerId, "sourceLayerId");
     return this;
   }
@@ -43,7 +43,7 @@ public final class FeatureStateSelector {
     return featureId;
   }
 
-  public FeatureStateSelector setFeatureId(String featureId) {
+  public FeatureStateSelector featureId(String featureId) {
     this.featureId = Objects.requireNonNull(featureId, "featureId");
     return this;
   }
@@ -62,7 +62,7 @@ public final class FeatureStateSelector {
     return stateKey;
   }
 
-  public FeatureStateSelector setStateKey(String stateKey) {
+  public FeatureStateSelector stateKey(String stateKey) {
     if (featureId == null) {
       throw new IllegalStateException("stateKey requires featureId");
     }

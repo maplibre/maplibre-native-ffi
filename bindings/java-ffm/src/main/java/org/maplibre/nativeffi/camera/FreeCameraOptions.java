@@ -17,7 +17,7 @@ public final class FreeCameraOptions {
     return position;
   }
 
-  public FreeCameraOptions setPosition(Vec3 position) {
+  public FreeCameraOptions position(Vec3 position) {
     this.position = Objects.requireNonNull(position, "position");
     return this;
   }
@@ -35,7 +35,7 @@ public final class FreeCameraOptions {
     return orientation;
   }
 
-  public FreeCameraOptions setOrientation(Quaternion orientation) {
+  public FreeCameraOptions orientation(Quaternion orientation) {
     this.orientation = Objects.requireNonNull(orientation, "orientation");
     return this;
   }

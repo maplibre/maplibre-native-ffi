@@ -22,7 +22,7 @@ public final class VulkanSurfaceDescriptor {
     return height;
   }
 
-  public VulkanSurfaceDescriptor setSize(int width, int height) {
+  public VulkanSurfaceDescriptor size(int width, int height) {
     this.width = width;
     this.height = height;
     return this;
@@ -32,7 +32,7 @@ public final class VulkanSurfaceDescriptor {
     return scaleFactor;
   }
 
-  public VulkanSurfaceDescriptor setScaleFactor(double scaleFactor) {
+  public VulkanSurfaceDescriptor scaleFactor(double scaleFactor) {
     this.scaleFactor = scaleFactor;
     return this;
   }
@@ -41,7 +41,7 @@ public final class VulkanSurfaceDescriptor {
     return instance;
   }
 
-  public VulkanSurfaceDescriptor setInstance(NativePointer instance) {
+  public VulkanSurfaceDescriptor instance(NativePointer instance) {
     this.instance = Objects.requireNonNull(instance, "instance");
     return this;
   }
@@ -50,7 +50,7 @@ public final class VulkanSurfaceDescriptor {
     return physicalDevice;
   }
 
-  public VulkanSurfaceDescriptor setPhysicalDevice(NativePointer physicalDevice) {
+  public VulkanSurfaceDescriptor physicalDevice(NativePointer physicalDevice) {
     this.physicalDevice = Objects.requireNonNull(physicalDevice, "physicalDevice");
     return this;
   }
@@ -59,7 +59,7 @@ public final class VulkanSurfaceDescriptor {
     return device;
   }
 
-  public VulkanSurfaceDescriptor setDevice(NativePointer device) {
+  public VulkanSurfaceDescriptor device(NativePointer device) {
     this.device = Objects.requireNonNull(device, "device");
     return this;
   }
@@ -68,7 +68,7 @@ public final class VulkanSurfaceDescriptor {
     return graphicsQueue;
   }
 
-  public VulkanSurfaceDescriptor setGraphicsQueue(NativePointer graphicsQueue) {
+  public VulkanSurfaceDescriptor graphicsQueue(NativePointer graphicsQueue) {
     this.graphicsQueue = Objects.requireNonNull(graphicsQueue, "graphicsQueue");
     return this;
   }
@@ -77,7 +77,7 @@ public final class VulkanSurfaceDescriptor {
     return graphicsQueueFamilyIndex;
   }
 
-  public VulkanSurfaceDescriptor setGraphicsQueueFamilyIndex(int index) {
+  public VulkanSurfaceDescriptor graphicsQueueFamilyIndex(int index) {
     this.graphicsQueueFamilyIndex = index;
     return this;
   }
@@ -86,7 +86,7 @@ public final class VulkanSurfaceDescriptor {
     return surface;
   }
 
-  public VulkanSurfaceDescriptor setSurface(NativePointer surface) {
+  public VulkanSurfaceDescriptor surface(NativePointer surface) {
     this.surface = Objects.requireNonNull(surface, "surface");
     return this;
   }

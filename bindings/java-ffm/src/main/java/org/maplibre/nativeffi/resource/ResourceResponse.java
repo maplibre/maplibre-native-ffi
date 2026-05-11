@@ -20,7 +20,7 @@ public final class ResourceResponse {
   }
 
   public static ResourceResponse ok(byte[] bytes) {
-    return new ResourceResponse(ResourceResponseStatus.OK).setBytes(bytes);
+    return new ResourceResponse(ResourceResponseStatus.OK).bytes(bytes);
   }
 
   public static ResourceResponse noContent() {
@@ -33,8 +33,8 @@ public final class ResourceResponse {
 
   public static ResourceResponse error(ResourceErrorReason reason, String message) {
     return new ResourceResponse(ResourceResponseStatus.ERROR)
-        .setErrorReason(reason)
-        .setErrorMessage(message);
+        .errorReason(reason)
+        .errorMessage(message);
   }
 
   public ResourceResponseStatus status() {
@@ -45,7 +45,7 @@ public final class ResourceResponse {
     return errorReason;
   }
 
-  public ResourceResponse setErrorReason(ResourceErrorReason errorReason) {
+  public ResourceResponse errorReason(ResourceErrorReason errorReason) {
     this.errorReason = Objects.requireNonNull(errorReason, "errorReason");
     return this;
   }
@@ -54,7 +54,7 @@ public final class ResourceResponse {
     return bytes.clone();
   }
 
-  public ResourceResponse setBytes(byte[] bytes) {
+  public ResourceResponse bytes(byte[] bytes) {
     this.bytes = bytes == null ? new byte[0] : bytes.clone();
     return this;
   }
@@ -63,7 +63,7 @@ public final class ResourceResponse {
     return Optional.ofNullable(errorMessage);
   }
 
-  public ResourceResponse setErrorMessage(String errorMessage) {
+  public ResourceResponse errorMessage(String errorMessage) {
     this.errorMessage = errorMessage;
     return this;
   }
@@ -72,7 +72,7 @@ public final class ResourceResponse {
     return mustRevalidate;
   }
 
-  public ResourceResponse setMustRevalidate(boolean mustRevalidate) {
+  public ResourceResponse mustRevalidate(boolean mustRevalidate) {
     this.mustRevalidate = mustRevalidate;
     return this;
   }
@@ -81,7 +81,7 @@ public final class ResourceResponse {
     return Optional.ofNullable(modifiedUnixMs);
   }
 
-  public ResourceResponse setModifiedUnixMs(long modifiedUnixMs) {
+  public ResourceResponse modifiedUnixMs(long modifiedUnixMs) {
     this.modifiedUnixMs = modifiedUnixMs;
     return this;
   }
@@ -90,7 +90,7 @@ public final class ResourceResponse {
     return Optional.ofNullable(expiresUnixMs);
   }
 
-  public ResourceResponse setExpiresUnixMs(long expiresUnixMs) {
+  public ResourceResponse expiresUnixMs(long expiresUnixMs) {
     this.expiresUnixMs = expiresUnixMs;
     return this;
   }
@@ -99,7 +99,7 @@ public final class ResourceResponse {
     return Optional.ofNullable(etag);
   }
 
-  public ResourceResponse setEtag(String etag) {
+  public ResourceResponse etag(String etag) {
     this.etag = etag;
     return this;
   }
@@ -108,7 +108,7 @@ public final class ResourceResponse {
     return Optional.ofNullable(retryAfterUnixMs);
   }
 
-  public ResourceResponse setRetryAfterUnixMs(long retryAfterUnixMs) {
+  public ResourceResponse retryAfterUnixMs(long retryAfterUnixMs) {
     this.retryAfterUnixMs = retryAfterUnixMs;
     return this;
   }

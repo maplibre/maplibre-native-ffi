@@ -106,10 +106,10 @@ final class RenderSessionQueryTest {
     Maplibre.setAsyncLogSeverities(EnumSet.noneOf(LogSeverity.class));
 
     var runtime = RuntimeHandle.create();
-    var map = MapHandle.create(runtime, new MapOptions().setSize(64, 64));
-    var session = map.attachOwnedTexture(new OwnedTextureDescriptor().setSize(64, 64));
+    var map = MapHandle.create(runtime, new MapOptions().size(64, 64));
+    var session = map.attachOwnedTexture(new OwnedTextureDescriptor().size(64, 64));
     try {
-      var selector = new FeatureStateSelector("point").setFeatureId("feature-1");
+      var selector = new FeatureStateSelector("point").featureId("feature-1");
       var state =
           JsonValue.object(
               List.of(
@@ -117,8 +117,7 @@ final class RenderSessionQueryTest {
                   new JsonValue.Member("radius", JsonValue.unsigned(20))));
       assertThrows(InvalidStateException.class, () -> session.setFeatureState(selector, state));
       assertThrows(
-          IllegalStateException.class,
-          () -> new FeatureStateSelector("point").setStateKey("hover"));
+          IllegalStateException.class, () -> new FeatureStateSelector("point").stateKey("hover"));
 
       loadStyleAndRender(runtime, map, session);
       assertThrows(
@@ -130,7 +129,7 @@ final class RenderSessionQueryTest {
       assertEquals(JsonValue.unsigned(20), member(copied, "radius"));
 
       session.removeFeatureState(
-          new FeatureStateSelector("point").setFeatureId("feature-1").setStateKey("hover"));
+          new FeatureStateSelector("point").featureId("feature-1").stateKey("hover"));
       renderIfAvailable(runtime, map, session);
       var afterRemove =
           assertInstanceOf(JsonValue.ObjectValue.class, session.getFeatureState(selector));
@@ -149,8 +148,8 @@ final class RenderSessionQueryTest {
     Maplibre.setAsyncLogSeverities(EnumSet.noneOf(LogSeverity.class));
 
     var runtime = RuntimeHandle.create();
-    var map = MapHandle.create(runtime, new MapOptions().setSize(64, 64));
-    var session = map.attachOwnedTexture(new OwnedTextureDescriptor().setSize(64, 64));
+    var map = MapHandle.create(runtime, new MapOptions().size(64, 64));
+    var session = map.attachOwnedTexture(new OwnedTextureDescriptor().size(64, 64));
     try {
       assertThrows(
           InvalidStateException.class,
@@ -173,15 +172,13 @@ final class RenderSessionQueryTest {
       var rendered =
           session.queryRenderedFeatures(
               geometry,
-              new RenderedFeatureQueryOptions()
-                  .setLayerIds(List.of("point-circle"))
-                  .setFilter(filter));
+              new RenderedFeatureQueryOptions().layerIds(List.of("point-circle")).filter(filter));
       assertEquals(1, rendered.size());
       assertEquals("point", rendered.getFirst().sourceId().orElseThrow());
       assertEquals(JsonValue.of("capital"), member(rendered.getFirst().feature(), "kind"));
 
       var source =
-          session.querySourceFeatures("point", new SourceFeatureQueryOptions().setFilter(filter));
+          session.querySourceFeatures("point", new SourceFeatureQueryOptions().filter(filter));
       assertEquals(1, source.size());
       assertEquals("point", source.getFirst().sourceId().orElseThrow());
       assertEquals(JsonValue.of("capital"), member(source.getFirst().feature(), "kind"));
@@ -198,8 +195,8 @@ final class RenderSessionQueryTest {
     Maplibre.setAsyncLogSeverities(EnumSet.noneOf(LogSeverity.class));
 
     var runtime = RuntimeHandle.create();
-    var map = MapHandle.create(runtime, new MapOptions().setSize(64, 64));
-    var session = map.attachOwnedTexture(new OwnedTextureDescriptor().setSize(64, 64));
+    var map = MapHandle.create(runtime, new MapOptions().size(64, 64));
+    var session = map.attachOwnedTexture(new OwnedTextureDescriptor().size(64, 64));
     try {
       loadClusterStyleAndRender(runtime, map, session);
       var queryPoint = map.pixelForLatLng(new LatLng(0.0, 0.0));
@@ -214,7 +211,7 @@ final class RenderSessionQueryTest {
               map,
               session,
               geometry,
-              new RenderedFeatureQueryOptions().setLayerIds(List.of("cluster-circle")));
+              new RenderedFeatureQueryOptions().layerIds(List.of("cluster-circle")));
 
       var children =
           assertInstanceOf(
@@ -260,7 +257,7 @@ final class RenderSessionQueryTest {
   private static void loadStyleAndRender(
       RuntimeHandle runtime, MapHandle map, RenderSessionHandle session)
       throws InterruptedException {
-    map.jumpTo(new CameraOptions().setCenter(37.7749, -122.4194).setZoom(10.0));
+    map.jumpTo(new CameraOptions().center(37.7749, -122.4194).zoom(10.0));
     map.setStyleJson(QUERY_STYLE_JSON);
     for (var index = 0; index < 5; index++) {
       renderIfAvailable(runtime, map, session);
@@ -270,7 +267,7 @@ final class RenderSessionQueryTest {
   private static void loadClusterStyleAndRender(
       RuntimeHandle runtime, MapHandle map, RenderSessionHandle session)
       throws InterruptedException {
-    map.jumpTo(new CameraOptions().setCenter(0.0, 0.0).setZoom(0.0));
+    map.jumpTo(new CameraOptions().center(0.0, 0.0).zoom(0.0));
     map.setStyleJson(CLUSTER_STYLE_JSON);
     for (var index = 0; index < 5; index++) {
       renderIfAvailable(runtime, map, session);

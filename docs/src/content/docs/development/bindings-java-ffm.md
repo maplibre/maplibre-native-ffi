@@ -53,8 +53,10 @@ native objects follow the shared `Handle` convention and implement
 `AutoCloseable`.
 
 Immutable copied values are records. Mutable descriptor classes represent
-field-mask structs: setters return `this`, `clear…()` clears presence, `has…()`
-reports it. Internal materializers write C `size` fields and masks.
+field-mask structs. They use fluent accessors and mutators: `clip()` reads the
+value, `clip(value)` sets the value and returns `this`, `clearClip()` clears
+presence, and `hasClip()` reports presence. Internal materializers write C
+`size` fields and masks.
 
 C enums map to Java enums. For output that may drift across C ABI versions, the
 enum includes an `UNKNOWN` variant and preserves the raw native value. C bit

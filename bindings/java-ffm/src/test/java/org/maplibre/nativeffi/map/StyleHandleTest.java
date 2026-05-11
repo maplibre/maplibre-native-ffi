@@ -50,7 +50,7 @@ final class StyleHandleTest {
   @Test
   void styleSourceAndLayerApisCopyIdsAndSnapshots() {
     var runtime = RuntimeHandle.create();
-    var map = MapHandle.create(runtime, new MapOptions().setSize(128, 128));
+    var map = MapHandle.create(runtime, new MapOptions().size(128, 128));
     try {
       map.setStyleJson(EMPTY_STYLE);
       map.addGeoJsonSourceData(
@@ -98,19 +98,19 @@ final class StyleHandleTest {
   @Test
   void tileSourceOptionsAndStyleImagesRoundTripThroughNativeMetadata() {
     var runtime = RuntimeHandle.create();
-    var map = MapHandle.create(runtime, new MapOptions().setSize(128, 128));
+    var map = MapHandle.create(runtime, new MapOptions().size(128, 128));
     try {
       map.setStyleJson(EMPTY_STYLE);
       map.addVectorSourceTiles(
           "vector",
           List.of("https://example.com/vector/{z}/{x}/{y}.pbf"),
           new TileSourceOptions()
-              .setMinZoom(0)
-              .setMaxZoom(14)
-              .setAttribution("vector attribution")
-              .setScheme(TileScheme.XYZ)
-              .setTileSize(512)
-              .setVectorEncoding(VectorTileEncoding.MVT));
+              .minZoom(0)
+              .maxZoom(14)
+              .attribution("vector attribution")
+              .scheme(TileScheme.XYZ)
+              .tileSize(512)
+              .vectorEncoding(VectorTileEncoding.MVT));
       assertEquals(Optional.of(SourceType.VECTOR), map.styleSourceType("vector"));
       assertEquals(
           Optional.of("vector attribution"),
@@ -119,15 +119,13 @@ final class StyleHandleTest {
       map.addRasterSourceTiles(
           "raster",
           List.of("https://example.com/raster/{z}/{x}/{y}.png"),
-          new TileSourceOptions().setTileSize(256));
+          new TileSourceOptions().tileSize(256));
       assertEquals(Optional.of(SourceType.RASTER), map.styleSourceType("raster"));
 
       map.addRasterDemSourceTiles(
           "dem",
           List.of("https://example.com/dem/{z}/{x}/{y}.png"),
-          new TileSourceOptions()
-              .setTileSize(512)
-              .setRasterDemEncoding(RasterDemEncoding.TERRARIUM));
+          new TileSourceOptions().tileSize(512).rasterDemEncoding(RasterDemEncoding.TERRARIUM));
       assertEquals(Optional.of(SourceType.RASTER_DEM), map.styleSourceType("dem"));
 
       assertThrows(
@@ -135,7 +133,7 @@ final class StyleHandleTest {
           () -> new PremultipliedRgba8Image(0, 1, 4, new byte[] {1, 2, 3, 4}));
 
       var image = new PremultipliedRgba8Image(1, 1, 4, new byte[] {1, 2, 3, 4});
-      map.setStyleImage("dot", image, new StyleImageOptions().setPixelRatio(2.0f).setSdf(true));
+      map.setStyleImage("dot", image, new StyleImageOptions().pixelRatio(2.0f).sdf(true));
       assertTrue(map.styleImageExists("dot"));
       var info = map.styleImageInfo("dot").orElseThrow();
       assertEquals(1, info.width());
@@ -209,7 +207,7 @@ final class StyleHandleTest {
   @Test
   void imageSourcesAndLocationIndicatorHelpersUsePublicValues() throws Exception {
     var runtime = RuntimeHandle.create();
-    var map = MapHandle.create(runtime, new MapOptions().setSize(128, 128));
+    var map = MapHandle.create(runtime, new MapOptions().size(128, 128));
     try {
       map.setStyleJson(EMPTY_STYLE);
       drainEvents(runtime);
@@ -228,12 +226,12 @@ final class StyleHandleTest {
       map.addCustomGeometrySource(
           "custom",
           new CustomGeometrySourceOptions(tileId -> {})
-              .setMinZoom(0)
-              .setMaxZoom(2)
-              .setTileSize(512)
-              .setBuffer(64)
-              .setClip(true)
-              .setWrap(false));
+              .minZoom(0)
+              .maxZoom(2)
+              .tileSize(512)
+              .buffer(64)
+              .clip(true)
+              .wrap(false));
       assertEquals(Optional.of(SourceType.CUSTOM_VECTOR), map.styleSourceType("custom"));
       var tileId = new CanonicalTileId(0, 0, 0);
       map.setCustomGeometrySourceTileData("custom", tileId, GeoJson.featureCollection(List.of()));

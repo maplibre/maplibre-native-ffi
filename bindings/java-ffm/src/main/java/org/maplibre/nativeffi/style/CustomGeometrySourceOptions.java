@@ -29,7 +29,7 @@ public final class CustomGeometrySourceOptions {
     return minZoom;
   }
 
-  public CustomGeometrySourceOptions setMinZoom(double minZoom) {
+  public CustomGeometrySourceOptions minZoom(double minZoom) {
     this.minZoom = minZoom;
     return this;
   }
@@ -47,7 +47,7 @@ public final class CustomGeometrySourceOptions {
     return maxZoom;
   }
 
-  public CustomGeometrySourceOptions setMaxZoom(double maxZoom) {
+  public CustomGeometrySourceOptions maxZoom(double maxZoom) {
     this.maxZoom = maxZoom;
     return this;
   }
@@ -65,7 +65,7 @@ public final class CustomGeometrySourceOptions {
     return tolerance;
   }
 
-  public CustomGeometrySourceOptions setTolerance(double tolerance) {
+  public CustomGeometrySourceOptions tolerance(double tolerance) {
     this.tolerance = tolerance;
     return this;
   }
@@ -83,7 +83,7 @@ public final class CustomGeometrySourceOptions {
     return tileSize;
   }
 
-  public CustomGeometrySourceOptions setTileSize(int tileSize) {
+  public CustomGeometrySourceOptions tileSize(int tileSize) {
     this.tileSize = tileSize;
     return this;
   }
@@ -101,7 +101,7 @@ public final class CustomGeometrySourceOptions {
     return buffer;
   }
 
-  public CustomGeometrySourceOptions setBuffer(int buffer) {
+  public CustomGeometrySourceOptions buffer(int buffer) {
     this.buffer = buffer;
     return this;
   }
@@ -119,7 +119,7 @@ public final class CustomGeometrySourceOptions {
     return clip;
   }
 
-  public CustomGeometrySourceOptions setClip(boolean clip) {
+  public CustomGeometrySourceOptions clip(boolean clip) {
     this.clip = clip;
     return this;
   }
@@ -137,7 +137,7 @@ public final class CustomGeometrySourceOptions {
     return wrap;
   }
 
-  public CustomGeometrySourceOptions setWrap(boolean wrap) {
+  public CustomGeometrySourceOptions wrap(boolean wrap) {
     this.wrap = wrap;
     return this;
   }

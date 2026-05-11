@@ -19,7 +19,7 @@ public final class BoundOptions {
     return bounds;
   }
 
-  public BoundOptions setBounds(LatLngBounds bounds) {
+  public BoundOptions bounds(LatLngBounds bounds) {
     this.bounds = Objects.requireNonNull(bounds, "bounds");
     return this;
   }
@@ -37,7 +37,7 @@ public final class BoundOptions {
     return minZoom;
   }
 
-  public BoundOptions setMinZoom(double minZoom) {
+  public BoundOptions minZoom(double minZoom) {
     this.minZoom = minZoom;
     return this;
   }
@@ -55,7 +55,7 @@ public final class BoundOptions {
     return maxZoom;
   }
 
-  public BoundOptions setMaxZoom(double maxZoom) {
+  public BoundOptions maxZoom(double maxZoom) {
     this.maxZoom = maxZoom;
     return this;
   }
@@ -73,7 +73,7 @@ public final class BoundOptions {
     return minPitch;
   }
 
-  public BoundOptions setMinPitch(double minPitch) {
+  public BoundOptions minPitch(double minPitch) {
     this.minPitch = minPitch;
     return this;
   }
@@ -91,7 +91,7 @@ public final class BoundOptions {
     return maxPitch;
   }
 
-  public BoundOptions setMaxPitch(double maxPitch) {
+  public BoundOptions maxPitch(double maxPitch) {
     this.maxPitch = maxPitch;
     return this;
   }

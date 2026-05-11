@@ -17,7 +17,7 @@ public final class MetalBorrowedTextureDescriptor {
     return height;
   }
 
-  public MetalBorrowedTextureDescriptor setSize(int width, int height) {
+  public MetalBorrowedTextureDescriptor size(int width, int height) {
     this.width = width;
     this.height = height;
     return this;
@@ -27,7 +27,7 @@ public final class MetalBorrowedTextureDescriptor {
     return scaleFactor;
   }
 
-  public MetalBorrowedTextureDescriptor setScaleFactor(double scaleFactor) {
+  public MetalBorrowedTextureDescriptor scaleFactor(double scaleFactor) {
     this.scaleFactor = scaleFactor;
     return this;
   }
@@ -36,7 +36,7 @@ public final class MetalBorrowedTextureDescriptor {
     return texture;
   }
 
-  public MetalBorrowedTextureDescriptor setTexture(NativePointer texture) {
+  public MetalBorrowedTextureDescriptor texture(NativePointer texture) {
     this.texture = Objects.requireNonNull(texture, "texture");
     return this;
   }

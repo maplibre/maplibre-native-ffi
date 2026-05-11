@@ -14,7 +14,7 @@ public final class OwnedTextureDescriptor {
     return height;
   }
 
-  public OwnedTextureDescriptor setSize(int width, int height) {
+  public OwnedTextureDescriptor size(int width, int height) {
     this.width = width;
     this.height = height;
     return this;
@@ -24,7 +24,7 @@ public final class OwnedTextureDescriptor {
     return scaleFactor;
   }
 
-  public OwnedTextureDescriptor setScaleFactor(double scaleFactor) {
+  public OwnedTextureDescriptor scaleFactor(double scaleFactor) {
     this.scaleFactor = scaleFactor;
     return this;
   }

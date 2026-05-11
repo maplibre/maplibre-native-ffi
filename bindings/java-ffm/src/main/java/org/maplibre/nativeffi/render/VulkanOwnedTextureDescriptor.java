@@ -21,7 +21,7 @@ public final class VulkanOwnedTextureDescriptor {
     return height;
   }
 
-  public VulkanOwnedTextureDescriptor setSize(int width, int height) {
+  public VulkanOwnedTextureDescriptor size(int width, int height) {
     this.width = width;
     this.height = height;
     return this;
@@ -31,7 +31,7 @@ public final class VulkanOwnedTextureDescriptor {
     return scaleFactor;
   }
 
-  public VulkanOwnedTextureDescriptor setScaleFactor(double scaleFactor) {
+  public VulkanOwnedTextureDescriptor scaleFactor(double scaleFactor) {
     this.scaleFactor = scaleFactor;
     return this;
   }
@@ -40,7 +40,7 @@ public final class VulkanOwnedTextureDescriptor {
     return instance;
   }
 
-  public VulkanOwnedTextureDescriptor setInstance(NativePointer instance) {
+  public VulkanOwnedTextureDescriptor instance(NativePointer instance) {
     this.instance = Objects.requireNonNull(instance, "instance");
     return this;
   }
@@ -49,7 +49,7 @@ public final class VulkanOwnedTextureDescriptor {
     return physicalDevice;
   }
 
-  public VulkanOwnedTextureDescriptor setPhysicalDevice(NativePointer physicalDevice) {
+  public VulkanOwnedTextureDescriptor physicalDevice(NativePointer physicalDevice) {
     this.physicalDevice = Objects.requireNonNull(physicalDevice, "physicalDevice");
     return this;
   }
@@ -58,7 +58,7 @@ public final class VulkanOwnedTextureDescriptor {
     return device;
   }
 
-  public VulkanOwnedTextureDescriptor setDevice(NativePointer device) {
+  public VulkanOwnedTextureDescriptor device(NativePointer device) {
     this.device = Objects.requireNonNull(device, "device");
     return this;
   }
@@ -67,7 +67,7 @@ public final class VulkanOwnedTextureDescriptor {
     return graphicsQueue;
   }
 
-  public VulkanOwnedTextureDescriptor setGraphicsQueue(NativePointer graphicsQueue) {
+  public VulkanOwnedTextureDescriptor graphicsQueue(NativePointer graphicsQueue) {
     this.graphicsQueue = Objects.requireNonNull(graphicsQueue, "graphicsQueue");
     return this;
   }
@@ -76,7 +76,7 @@ public final class VulkanOwnedTextureDescriptor {
     return graphicsQueueFamilyIndex;
   }
 
-  public VulkanOwnedTextureDescriptor setGraphicsQueueFamilyIndex(int index) {
+  public VulkanOwnedTextureDescriptor graphicsQueueFamilyIndex(int index) {
     this.graphicsQueueFamilyIndex = index;
     return this;
   }

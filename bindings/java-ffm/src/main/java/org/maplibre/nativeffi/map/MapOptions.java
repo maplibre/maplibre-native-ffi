@@ -17,7 +17,7 @@ public final class MapOptions {
     return height;
   }
 
-  public MapOptions setSize(int width, int height) {
+  public MapOptions size(int width, int height) {
     this.width = width;
     this.height = height;
     return this;
@@ -27,7 +27,7 @@ public final class MapOptions {
     return scaleFactor;
   }
 
-  public MapOptions setScaleFactor(double scaleFactor) {
+  public MapOptions scaleFactor(double scaleFactor) {
     this.scaleFactor = scaleFactor;
     return this;
   }
@@ -41,7 +41,7 @@ public final class MapOptions {
     return mapMode;
   }
 
-  public MapOptions setMapMode(MapMode mapMode) {
+  public MapOptions mapMode(MapMode mapMode) {
     this.mapMode = Objects.requireNonNull(mapMode, "mapMode");
     return this;
   }

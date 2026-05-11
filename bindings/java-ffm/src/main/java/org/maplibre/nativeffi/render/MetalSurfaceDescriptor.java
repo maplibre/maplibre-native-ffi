@@ -18,7 +18,7 @@ public final class MetalSurfaceDescriptor {
     return height;
   }
 
-  public MetalSurfaceDescriptor setSize(int width, int height) {
+  public MetalSurfaceDescriptor size(int width, int height) {
     this.width = width;
     this.height = height;
     return this;
@@ -28,7 +28,7 @@ public final class MetalSurfaceDescriptor {
     return scaleFactor;
   }
 
-  public MetalSurfaceDescriptor setScaleFactor(double scaleFactor) {
+  public MetalSurfaceDescriptor scaleFactor(double scaleFactor) {
     this.scaleFactor = scaleFactor;
     return this;
   }
@@ -37,7 +37,7 @@ public final class MetalSurfaceDescriptor {
     return layer;
   }
 
-  public MetalSurfaceDescriptor setLayer(NativePointer layer) {
+  public MetalSurfaceDescriptor layer(NativePointer layer) {
     this.layer = Objects.requireNonNull(layer, "layer");
     return this;
   }
@@ -46,7 +46,7 @@ public final class MetalSurfaceDescriptor {
     return device;
   }
 
-  public MetalSurfaceDescriptor setDevice(NativePointer device) {
+  public MetalSurfaceDescriptor device(NativePointer device) {
     this.device = Objects.requireNonNull(device, "device");
     return this;
   }

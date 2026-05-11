@@ -24,13 +24,13 @@ public final class CameraOptions {
     return center;
   }
 
-  public CameraOptions setCenter(LatLng center) {
+  public CameraOptions center(LatLng center) {
     this.center = Objects.requireNonNull(center, "center");
     return this;
   }
 
-  public CameraOptions setCenter(double latitude, double longitude) {
-    return setCenter(new LatLng(latitude, longitude));
+  public CameraOptions center(double latitude, double longitude) {
+    return center(new LatLng(latitude, longitude));
   }
 
   public CameraOptions clearCenter() {
@@ -46,7 +46,7 @@ public final class CameraOptions {
     return centerAltitude;
   }
 
-  public CameraOptions setCenterAltitude(double centerAltitude) {
+  public CameraOptions centerAltitude(double centerAltitude) {
     this.centerAltitude = centerAltitude;
     return this;
   }
@@ -64,7 +64,7 @@ public final class CameraOptions {
     return padding;
   }
 
-  public CameraOptions setPadding(EdgeInsets padding) {
+  public CameraOptions padding(EdgeInsets padding) {
     this.padding = Objects.requireNonNull(padding, "padding");
     return this;
   }
@@ -82,7 +82,7 @@ public final class CameraOptions {
     return anchor;
   }
 
-  public CameraOptions setAnchor(ScreenPoint anchor) {
+  public CameraOptions anchor(ScreenPoint anchor) {
     this.anchor = Objects.requireNonNull(anchor, "anchor");
     return this;
   }
@@ -100,7 +100,7 @@ public final class CameraOptions {
     return zoom;
   }
 
-  public CameraOptions setZoom(double zoom) {
+  public CameraOptions zoom(double zoom) {
     this.zoom = zoom;
     return this;
   }
@@ -118,7 +118,7 @@ public final class CameraOptions {
     return bearing;
   }
 
-  public CameraOptions setBearing(double bearing) {
+  public CameraOptions bearing(double bearing) {
     this.bearing = bearing;
     return this;
   }
@@ -136,7 +136,7 @@ public final class CameraOptions {
     return pitch;
   }
 
-  public CameraOptions setPitch(double pitch) {
+  public CameraOptions pitch(double pitch) {
     this.pitch = pitch;
     return this;
   }
@@ -154,7 +154,7 @@ public final class CameraOptions {
     return roll;
   }
 
-  public CameraOptions setRoll(double roll) {
+  public CameraOptions roll(double roll) {
     this.roll = roll;
     return this;
   }
@@ -172,7 +172,7 @@ public final class CameraOptions {
     return fieldOfView;
   }
 
-  public CameraOptions setFieldOfView(double fieldOfView) {
+  public CameraOptions fieldOfView(double fieldOfView) {
     this.fieldOfView = fieldOfView;
     return this;
   }

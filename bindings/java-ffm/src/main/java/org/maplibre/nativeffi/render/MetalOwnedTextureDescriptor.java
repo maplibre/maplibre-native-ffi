@@ -17,7 +17,7 @@ public final class MetalOwnedTextureDescriptor {
     return height;
   }
 
-  public MetalOwnedTextureDescriptor setSize(int width, int height) {
+  public MetalOwnedTextureDescriptor size(int width, int height) {
     this.width = width;
     this.height = height;
     return this;
@@ -27,7 +27,7 @@ public final class MetalOwnedTextureDescriptor {
     return scaleFactor;
   }
 
-  public MetalOwnedTextureDescriptor setScaleFactor(double scaleFactor) {
+  public MetalOwnedTextureDescriptor scaleFactor(double scaleFactor) {
     this.scaleFactor = scaleFactor;
     return this;
   }
@@ -36,7 +36,7 @@ public final class MetalOwnedTextureDescriptor {
     return device;
   }
 
-  public MetalOwnedTextureDescriptor setDevice(NativePointer device) {
+  public MetalOwnedTextureDescriptor device(NativePointer device) {
     this.device = Objects.requireNonNull(device, "device");
     return this;
   }

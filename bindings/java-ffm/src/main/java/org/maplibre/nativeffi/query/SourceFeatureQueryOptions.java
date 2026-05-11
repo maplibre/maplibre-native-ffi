@@ -17,7 +17,7 @@ public final class SourceFeatureQueryOptions {
     return sourceLayerIds;
   }
 
-  public SourceFeatureQueryOptions setSourceLayerIds(List<String> sourceLayerIds) {
+  public SourceFeatureQueryOptions sourceLayerIds(List<String> sourceLayerIds) {
     this.sourceLayerIds = List.copyOf(Objects.requireNonNull(sourceLayerIds, "sourceLayerIds"));
     return this;
   }
@@ -35,7 +35,7 @@ public final class SourceFeatureQueryOptions {
     return filter;
   }
 
-  public SourceFeatureQueryOptions setFilter(JsonValue filter) {
+  public SourceFeatureQueryOptions filter(JsonValue filter) {
     this.filter = Objects.requireNonNull(filter, "filter");
     return this;
   }

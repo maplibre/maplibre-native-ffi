@@ -14,7 +14,7 @@ public final class ProjectionModeOptions {
     return axonometric;
   }
 
-  public ProjectionModeOptions setAxonometric(boolean axonometric) {
+  public ProjectionModeOptions axonometric(boolean axonometric) {
     this.axonometric = axonometric;
     return this;
   }
@@ -32,7 +32,7 @@ public final class ProjectionModeOptions {
     return xSkew;
   }
 
-  public ProjectionModeOptions setXSkew(double xSkew) {
+  public ProjectionModeOptions xSkew(double xSkew) {
     this.xSkew = xSkew;
     return this;
   }
@@ -50,7 +50,7 @@ public final class ProjectionModeOptions {
     return ySkew;
   }
 
-  public ProjectionModeOptions setYSkew(double ySkew) {
+  public ProjectionModeOptions ySkew(double ySkew) {
     this.ySkew = ySkew;
     return this;
   }
