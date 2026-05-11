@@ -17,20 +17,9 @@ public final class NativeTestSupport {
     if (hasText(property)) {
       return Path.of(property);
     }
-
-    var environment = System.getenv(NativeLibrary.LIBRARY_PATH_ENV);
-    if (hasText(environment)) {
-      return Path.of(environment);
-    }
-
-    var buildDirectory = System.getenv("MLN_FFI_BUILD_DIR");
-    if (hasText(buildDirectory)) {
-      return Path.of(buildDirectory).resolve(System.mapLibraryName(NativeLibrary.LIBRARY_NAME));
-    }
-
     throw new IllegalStateException(
-        "Set MLN_FFI_BUILD_DIR, %s, or %s for Java FFM native-library tests."
-            .formatted(NativeLibrary.LIBRARY_PATH_PROPERTY, NativeLibrary.LIBRARY_PATH_ENV));
+        "Set %s to an exact native library path for Java FFM tests."
+            .formatted(NativeLibrary.LIBRARY_PATH_PROPERTY));
   }
 
   public static void resetNativeLibraryLoadedState() {

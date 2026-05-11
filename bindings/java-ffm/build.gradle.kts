@@ -29,26 +29,17 @@ dependencies {
 tasks.withType<JavaCompile>().configureEach { options.release = 25 }
 
 val nativeLibraryPathProperty = "org.maplibre.nativeffi.library.path"
-val nativeLibraryPathEnvironment = "MAPLIBRE_NATIVE_FFI_LIBRARY_PATH"
-val explicitNativeLibraryPath = providers.systemProperty(nativeLibraryPathProperty)
 val nativeBuildDirForTests =
   providers
     .environmentVariable("MLN_FFI_BUILD_DIR")
     .orElse(rootProject.layout.buildDirectory.dir("host").map { it.asFile.absolutePath })
-    .get()
-val nativeLibraryPathForTests =
-  explicitNativeLibraryPath
-    .orElse(providers.environmentVariable(nativeLibraryPathEnvironment))
-    .orElse(
-      providers.provider { "$nativeBuildDirForTests/${System.mapLibraryName("maplibre-native-c")}" }
-    )
-    .get()
+val nativeLibraryPathForTests = nativeBuildDirForTests.map {
+  "$it/${System.mapLibraryName("maplibre-native-c")}"
+}
 
 tasks.withType<Test>().configureEach {
   useJUnitPlatform()
   jvmArgs("--enable-native-access=ALL-UNNAMED")
-  explicitNativeLibraryPath.orNull?.let { systemProperty(nativeLibraryPathProperty, it) }
-  inputs.property("mlnFfiBuildDir", nativeBuildDirForTests)
-  inputs.file(nativeLibraryPathForTests).withPropertyName("maplibreNativeCLibrary").optional()
-  environment("MLN_FFI_BUILD_DIR", nativeBuildDirForTests)
+  systemProperty(nativeLibraryPathProperty, nativeLibraryPathForTests.get())
+  inputs.file(nativeLibraryPathForTests).withPropertyName("maplibreNativeCLibrary")
 }
