@@ -40,7 +40,7 @@ config_roots = ["bindings/*", "examples/*", "docs"]
 "aqua:astral-sh/uv" = "0.11.11"
 
 # Script and config tooling
-"github:sargunv/jvl" = "2026.04.29" # JSON validator
+"github:sargunv/jvl" = "2026.05.03" # JSON validator
 "aqua:rhysd/actionlint" = "1.7.8" # GH Actions linter
 "aqua:koalaman/shellcheck" = "0.11.0" # Shell script linter (used by actionlint)
 
@@ -56,11 +56,11 @@ XDG_DATA_DIRS = "{{config_root}}/.pixi/envs/default/share:{{env.XDG_DATA_DIRS | 
 
 [hooks]
 postinstall = [
-  "hk install --mise",
-  "pixi install --locked",
-  "uv sync --locked",
   "git submodule update --init --recursive --depth 1 third_party/maplibre-native",
-  "cd docs && pnpm install",
+  "hk install --mise --quiet",
+  "pixi install --locked --quiet",
+  "uv sync --locked --quiet",
+  "cd docs && pnpm install --frozen-lockfile --loglevel warn",
 ]
 
 [tasks.configure]
