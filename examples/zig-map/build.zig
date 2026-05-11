@@ -9,6 +9,7 @@ const BuildOptions = struct {
 
 const RenderBackend = enum {
     metal,
+    opengl,
     vulkan,
 };
 
@@ -16,10 +17,11 @@ fn renderBackend(b: *std.Build) RenderBackend {
     const value = b.option(
         []const u8,
         "render-backend",
-        "Render backend built into the CMake artifact: metal or vulkan",
-    ) orelse @panic("missing required -Drender-backend=metal|vulkan");
+        "Render backend built into the CMake artifact: metal, opengl, or vulkan",
+    ) orelse @panic("missing required -Drender-backend=metal|opengl|vulkan");
 
     if (std.mem.eql(u8, value, "metal")) return .metal;
+    if (std.mem.eql(u8, value, "opengl")) return .opengl;
     if (std.mem.eql(u8, value, "vulkan")) return .vulkan;
     std.debug.panic("unsupported render backend: {s}", .{value});
 }
@@ -69,6 +71,7 @@ fn vulkanLibraryName(target: std.Build.ResolvedTarget) []const u8 {
 fn isSupportedTarget(options: BuildOptions) bool {
     return switch (options.render_backend) {
         .metal => options.target.result.os.tag == .macos,
+        .opengl => options.target.result.os.tag == .linux,
         .vulkan => options.target.result.os.tag == .macos or options.target.result.os.tag == .linux or
             options.target.result.os.tag == .windows,
     };
@@ -81,6 +84,7 @@ fn failUnsupportedTarget() noreturn {
 fn addZigMapExample(b: *std.Build, options: BuildOptions) *std.Build.Step.Compile {
     const build_options = b.addOptions();
     build_options.addOption(bool, "supports_metal", options.render_backend == .metal);
+    build_options.addOption(bool, "supports_opengl", options.render_backend == .opengl);
     build_options.addOption(bool, "supports_vulkan", options.render_backend == .vulkan);
 
     const example = b.addExecutable(.{
@@ -110,6 +114,10 @@ fn addZigMapExample(b: *std.Build, options: BuildOptions) *std.Build.Step.Compil
     } else if (options.render_backend == .vulkan) {
         example.root_module.addIncludePath(b.path("../../third_party/maplibre-native/vendor/Vulkan-Headers/include"));
         example.root_module.linkSystemLibrary(vulkanLibraryName(options.target), .{});
+    } else if (options.render_backend == .opengl) {
+        // EGL and GLES are embedded in libmaplibre-native-c.so; the compositor
+        // loads GL function pointers at runtime via SDL_GL_GetProcAddress.
+        // No additional compile-time link targets are needed.
     } else {
         failUnsupportedTarget();
     }

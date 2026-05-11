@@ -14,7 +14,7 @@ requires = { platform = ["macos"], backend = ["metal"] }
 
 [examples.zig-map]
 task = "//examples/zig-map:build"
-requires = { platform = ["linux", "macos", "windows"], backend = ["metal", "vulkan"] }
+requires = { platform = ["linux", "macos", "windows"], backend = ["metal", "opengl", "vulkan"] }
 
 [examples.lwjgl-map]
 task = "//examples/lwjgl-map:build"
