@@ -46,8 +46,8 @@
 
 namespace {
 
-auto validate_descriptor(const mln_egl_surface_descriptor* descriptor
-) -> mln_status {
+auto validate_descriptor(const mln_egl_surface_descriptor* descriptor)
+  -> mln_status {
   if (descriptor == nullptr) {
     mln::core::set_thread_error("EGL surface descriptor must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
@@ -56,16 +56,19 @@ auto validate_descriptor(const mln_egl_surface_descriptor* descriptor
     mln::core::set_thread_error("mln_egl_surface_descriptor.size is too small");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (descriptor->width == 0 || descriptor->height == 0 ||
-      !std::isfinite(descriptor->scale_factor) ||
-      descriptor->scale_factor <= 0.0) {
+  if (
+    descriptor->width == 0 || descriptor->height == 0 ||
+    !std::isfinite(descriptor->scale_factor) || descriptor->scale_factor <= 0.0
+  ) {
     mln::core::set_thread_error(
       "EGL surface dimensions and scale_factor must be positive"
     );
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (descriptor->display == nullptr || descriptor->config == nullptr ||
-      descriptor->context == nullptr || descriptor->surface == nullptr) {
+  if (
+    descriptor->display == nullptr || descriptor->config == nullptr ||
+    descriptor->context == nullptr || descriptor->surface == nullptr
+  ) {
     mln::core::set_thread_error(
       "EGL display, config, context, and surface must not be null"
     );
@@ -104,8 +107,8 @@ class EGLSurfaceBackendImpl final : public mbgl::gl::RendererBackend,
         surface(surface_) {}
 
   EGLSurfaceBackendImpl(const EGLSurfaceBackendImpl&) = delete;
-  auto operator=(const EGLSurfaceBackendImpl&) -> EGLSurfaceBackendImpl& =
-                                                    delete;
+  auto operator=(const EGLSurfaceBackendImpl&)
+    -> EGLSurfaceBackendImpl& = delete;
   EGLSurfaceBackendImpl(EGLSurfaceBackendImpl&&) = delete;
   auto operator=(EGLSurfaceBackendImpl&&) -> EGLSurfaceBackendImpl& = delete;
 
@@ -133,8 +136,8 @@ class EGLSurfaceBackendImpl final : public mbgl::gl::RendererBackend,
     eglMakeCurrent(display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
   }
 
-  auto getExtensionFunctionPointer(const char* name
-  ) -> mbgl::gl::ProcAddress override {
+  auto getExtensionFunctionPointer(const char* name)
+    -> mbgl::gl::ProcAddress override {
     // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
     return reinterpret_cast<mbgl::gl::ProcAddress>(eglGetProcAddress(name));
   }

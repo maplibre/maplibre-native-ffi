@@ -20,8 +20,8 @@ auto mln_log_clear_callback(void) noexcept -> mln_status {
   });
 }
 
-auto mln_log_set_async_severity_mask(std::uint32_t mask
-) noexcept -> mln_status {
+auto mln_log_set_async_severity_mask(std::uint32_t mask) noexcept
+  -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::set_log_async_severity_mask(mask);
   });

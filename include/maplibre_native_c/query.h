@@ -255,7 +255,8 @@ MLN_API mln_status mln_feature_query_result_get(
 ) MLN_NOEXCEPT;
 
 /** Destroys a feature query result handle. Null is accepted as a no-op. */
-MLN_API void mln_feature_query_result_destroy(mln_feature_query_result* result
+MLN_API void mln_feature_query_result_destroy(
+  mln_feature_query_result* result
 ) MLN_NOEXCEPT;
 
 /**

@@ -25,15 +25,15 @@ MLN_API mln_camera_options mln_camera_options_default(void) MLN_NOEXCEPT;
 MLN_API mln_animation_options mln_animation_options_default(void) MLN_NOEXCEPT;
 
 /** Returns empty camera fitting options initialized for this C API version. */
-MLN_API mln_camera_fit_options mln_camera_fit_options_default(void
-) MLN_NOEXCEPT;
+MLN_API mln_camera_fit_options
+mln_camera_fit_options_default(void) MLN_NOEXCEPT;
 
 /** Returns empty map bound options initialized for this C API version. */
 MLN_API mln_bound_options mln_bound_options_default(void) MLN_NOEXCEPT;
 
 /** Returns empty free camera options initialized for this C API version. */
-MLN_API mln_free_camera_options mln_free_camera_options_default(void
-) MLN_NOEXCEPT;
+MLN_API mln_free_camera_options
+mln_free_camera_options_default(void) MLN_NOEXCEPT;
 
 /**
  * Returns empty axonometric rendering options initialized for this C API
@@ -42,8 +42,8 @@ MLN_API mln_free_camera_options mln_free_camera_options_default(void
 MLN_API mln_projection_mode mln_projection_mode_default(void) MLN_NOEXCEPT;
 
 /** Returns empty viewport options initialized for this C API version. */
-MLN_API mln_map_viewport_options mln_map_viewport_options_default(void
-) MLN_NOEXCEPT;
+MLN_API mln_map_viewport_options
+mln_map_viewport_options_default(void) MLN_NOEXCEPT;
 
 /** Returns empty tile tuning options initialized for this C API version. */
 MLN_API mln_map_tile_options mln_map_tile_options_default(void) MLN_NOEXCEPT;
@@ -61,8 +61,8 @@ MLN_API mln_map_tile_options mln_map_tile_options_default(void) MLN_NOEXCEPT;
  *   thread.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_API mln_status mln_map_set_debug_options(mln_map* map, uint32_t options)
-  MLN_NOEXCEPT;
+MLN_API mln_status
+mln_map_set_debug_options(mln_map* map, uint32_t options) MLN_NOEXCEPT;
 
 /**
  * Copies the current MapLibre debug overlay mask bits.
@@ -118,8 +118,8 @@ MLN_API mln_status mln_map_get_rendering_stats_view_enabled(
  *   thread.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_API mln_status mln_map_is_fully_loaded(mln_map* map, bool* out_loaded)
-  MLN_NOEXCEPT;
+MLN_API mln_status
+mln_map_is_fully_loaded(mln_map* map, bool* out_loaded) MLN_NOEXCEPT;
 
 /**
  * Dumps map debug logs through MapLibre Native logging.
@@ -290,8 +290,8 @@ MLN_API mln_status mln_map_fly_to(
  *   thread.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_API mln_status mln_map_move_by(mln_map* map, double delta_x, double delta_y)
-  MLN_NOEXCEPT;
+MLN_API mln_status
+mln_map_move_by(mln_map* map, double delta_x, double delta_y) MLN_NOEXCEPT;
 
 /**
  * Applies an animated screen-space pan command.

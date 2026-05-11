@@ -48,8 +48,8 @@ MLN_API mln_status mln_map_projection_create(
  *   owner thread.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_API mln_status mln_map_projection_destroy(mln_map_projection* projection
-) MLN_NOEXCEPT;
+MLN_API mln_status
+mln_map_projection_destroy(mln_map_projection* projection) MLN_NOEXCEPT;
 
 /**
  * Copies the current camera snapshot from a standalone projection helper.

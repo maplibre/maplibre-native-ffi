@@ -25,14 +25,15 @@
 
 namespace {
 
-auto validate_descriptor(const mln_metal_surface_descriptor* descriptor
-) -> mln_status {
+auto validate_descriptor(const mln_metal_surface_descriptor* descriptor)
+  -> mln_status {
   if (descriptor == nullptr) {
     mln::core::set_thread_error("surface descriptor must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   if (descriptor->size < sizeof(mln_metal_surface_descriptor)) {
-    mln::core::set_thread_error("mln_metal_surface_descriptor.size is too small"
+    mln::core::set_thread_error(
+      "mln_metal_surface_descriptor.size is too small"
     );
     return MLN_STATUS_INVALID_ARGUMENT;
   }
@@ -269,8 +270,8 @@ class MetalSurfaceSessionBackend final
   MetalSurfaceBackend backend_;
 };
 
-auto validate_vulkan_descriptor(const mln_vulkan_surface_descriptor* descriptor
-) -> mln_status {
+auto validate_vulkan_descriptor(const mln_vulkan_surface_descriptor* descriptor)
+  -> mln_status {
   if (descriptor == nullptr) {
     mln::core::set_thread_error("surface descriptor must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;

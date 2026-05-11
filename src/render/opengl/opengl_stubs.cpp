@@ -44,13 +44,15 @@ auto validate_metal_surface_descriptor(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   if (descriptor->size < sizeof(mln_metal_surface_descriptor)) {
-    mln::core::set_thread_error("mln_metal_surface_descriptor.size is too small"
+    mln::core::set_thread_error(
+      "mln_metal_surface_descriptor.size is too small"
     );
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (descriptor->width == 0 || descriptor->height == 0 ||
-      !std::isfinite(descriptor->scale_factor) ||
-      descriptor->scale_factor <= 0.0) {
+  if (
+    descriptor->width == 0 || descriptor->height == 0 ||
+    !std::isfinite(descriptor->scale_factor) || descriptor->scale_factor <= 0.0
+  ) {
     mln::core::set_thread_error(
       "surface dimensions and scale_factor must be positive"
     );
@@ -76,17 +78,20 @@ auto validate_vulkan_surface_descriptor(
     );
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (descriptor->width == 0 || descriptor->height == 0 ||
-      !std::isfinite(descriptor->scale_factor) ||
-      descriptor->scale_factor <= 0.0) {
+  if (
+    descriptor->width == 0 || descriptor->height == 0 ||
+    !std::isfinite(descriptor->scale_factor) || descriptor->scale_factor <= 0.0
+  ) {
     mln::core::set_thread_error(
       "surface dimensions and scale_factor must be positive"
     );
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (descriptor->instance == nullptr ||
-      descriptor->physical_device == nullptr || descriptor->device == nullptr ||
-      descriptor->graphics_queue == nullptr || descriptor->surface == nullptr) {
+  if (
+    descriptor->instance == nullptr || descriptor->physical_device == nullptr ||
+    descriptor->device == nullptr || descriptor->graphics_queue == nullptr ||
+    descriptor->surface == nullptr
+  ) {
     mln::core::set_thread_error("Vulkan surface handles must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
@@ -109,9 +114,10 @@ auto validate_metal_owned_tex(
     );
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (descriptor->width == 0 || descriptor->height == 0 ||
-      !std::isfinite(descriptor->scale_factor) ||
-      descriptor->scale_factor <= 0.0) {
+  if (
+    descriptor->width == 0 || descriptor->height == 0 ||
+    !std::isfinite(descriptor->scale_factor) || descriptor->scale_factor <= 0.0
+  ) {
     mln::core::set_thread_error(
       "texture dimensions and scale_factor must be positive"
     );
@@ -137,9 +143,10 @@ auto validate_metal_borrowed_tex(
     );
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (descriptor->width == 0 || descriptor->height == 0 ||
-      !std::isfinite(descriptor->scale_factor) ||
-      descriptor->scale_factor <= 0.0) {
+  if (
+    descriptor->width == 0 || descriptor->height == 0 ||
+    !std::isfinite(descriptor->scale_factor) || descriptor->scale_factor <= 0.0
+  ) {
     mln::core::set_thread_error(
       "texture dimensions and scale_factor must be positive"
     );
@@ -165,17 +172,19 @@ auto validate_vulkan_owned_tex(
     );
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (descriptor->width == 0 || descriptor->height == 0 ||
-      !std::isfinite(descriptor->scale_factor) ||
-      descriptor->scale_factor <= 0.0) {
+  if (
+    descriptor->width == 0 || descriptor->height == 0 ||
+    !std::isfinite(descriptor->scale_factor) || descriptor->scale_factor <= 0.0
+  ) {
     mln::core::set_thread_error(
       "texture dimensions and scale_factor must be positive"
     );
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (descriptor->instance == nullptr ||
-      descriptor->physical_device == nullptr || descriptor->device == nullptr ||
-      descriptor->graphics_queue == nullptr) {
+  if (
+    descriptor->instance == nullptr || descriptor->physical_device == nullptr ||
+    descriptor->device == nullptr || descriptor->graphics_queue == nullptr
+  ) {
     mln::core::set_thread_error("Vulkan handles must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
@@ -195,18 +204,20 @@ auto validate_vulkan_borrowed_tex(
     );
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (descriptor->width == 0 || descriptor->height == 0 ||
-      !std::isfinite(descriptor->scale_factor) ||
-      descriptor->scale_factor <= 0.0) {
+  if (
+    descriptor->width == 0 || descriptor->height == 0 ||
+    !std::isfinite(descriptor->scale_factor) || descriptor->scale_factor <= 0.0
+  ) {
     mln::core::set_thread_error(
       "texture dimensions and scale_factor must be positive"
     );
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (descriptor->instance == nullptr ||
-      descriptor->physical_device == nullptr || descriptor->device == nullptr ||
-      descriptor->graphics_queue == nullptr || descriptor->image == nullptr ||
-      descriptor->image_view == nullptr) {
+  if (
+    descriptor->instance == nullptr || descriptor->physical_device == nullptr ||
+    descriptor->device == nullptr || descriptor->graphics_queue == nullptr ||
+    descriptor->image == nullptr || descriptor->image_view == nullptr
+  ) {
     mln::core::set_thread_error("Vulkan handles must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
@@ -500,8 +511,10 @@ auto metal_owned_texture_acquire_frame(
   if (status != MLN_STATUS_OK) {
     return status;
   }
-  if (out_frame == nullptr ||
-      out_frame->size < sizeof(mln_metal_owned_texture_frame)) {
+  if (
+    out_frame == nullptr ||
+    out_frame->size < sizeof(mln_metal_owned_texture_frame)
+  ) {
     set_thread_error("out_frame must not be null and must have a valid size");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
@@ -531,8 +544,10 @@ auto vulkan_owned_texture_acquire_frame(
   if (status != MLN_STATUS_OK) {
     return status;
   }
-  if (out_frame == nullptr ||
-      out_frame->size < sizeof(mln_vulkan_owned_texture_frame)) {
+  if (
+    out_frame == nullptr ||
+    out_frame->size < sizeof(mln_vulkan_owned_texture_frame)
+  ) {
     set_thread_error("out_frame must not be null and must have a valid size");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
@@ -547,8 +562,9 @@ auto vulkan_owned_texture_release_frame(
   if (status != MLN_STATUS_OK) {
     return status;
   }
-  if (frame == nullptr ||
-      frame->size < sizeof(mln_vulkan_owned_texture_frame)) {
+  if (
+    frame == nullptr || frame->size < sizeof(mln_vulkan_owned_texture_frame)
+  ) {
     set_thread_error("frame must not be null and must have a valid size");
     return MLN_STATUS_INVALID_ARGUMENT;
   }

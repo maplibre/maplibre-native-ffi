@@ -154,18 +154,21 @@ auto validate_tile_pyramid_definition(
     mln::core::set_thread_error("offline region style_url must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (!valid_coordinate(definition.bounds.southwest) ||
-      !valid_coordinate(definition.bounds.northeast) ||
-      definition.bounds.southwest.latitude >
-        definition.bounds.northeast.latitude ||
-      definition.bounds.southwest.longitude >
-        definition.bounds.northeast.longitude) {
+  if (
+    !valid_coordinate(definition.bounds.southwest) ||
+    !valid_coordinate(definition.bounds.northeast) ||
+    definition.bounds.southwest.latitude >
+      definition.bounds.northeast.latitude ||
+    definition.bounds.southwest.longitude >
+      definition.bounds.northeast.longitude
+  ) {
     mln::core::set_thread_error("offline region bounds are invalid");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (!std::isfinite(definition.min_zoom) || definition.min_zoom < 0.0 ||
-      std::isnan(definition.max_zoom) ||
-      definition.max_zoom < definition.min_zoom) {
+  if (
+    !std::isfinite(definition.min_zoom) || definition.min_zoom < 0.0 ||
+    std::isnan(definition.max_zoom) || definition.max_zoom < definition.min_zoom
+  ) {
     mln::core::set_thread_error("offline region zoom range is invalid");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
@@ -193,9 +196,10 @@ auto validate_geometry_definition(
     mln::core::set_thread_error("offline region geometry must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (!std::isfinite(definition.min_zoom) || definition.min_zoom < 0.0 ||
-      std::isnan(definition.max_zoom) ||
-      definition.max_zoom < definition.min_zoom) {
+  if (
+    !std::isfinite(definition.min_zoom) || definition.min_zoom < 0.0 ||
+    std::isnan(definition.max_zoom) || definition.max_zoom < definition.min_zoom
+  ) {
     mln::core::set_thread_error("offline region zoom range is invalid");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
@@ -291,8 +295,8 @@ auto to_c_download_state(mbgl::OfflineRegionDownloadState state) -> uint32_t {
   return MLN_OFFLINE_REGION_DOWNLOAD_INACTIVE;
 }
 
-auto to_c_status(const mbgl::OfflineRegionStatus& status
-) -> mln_offline_region_status {
+auto to_c_status(const mbgl::OfflineRegionStatus& status)
+  -> mln_offline_region_status {
   return mln_offline_region_status{
     .size = sizeof(mln_offline_region_status),
     .download_state = to_c_download_state(status.downloadState),
@@ -307,8 +311,8 @@ auto to_c_status(const mbgl::OfflineRegionStatus& status
   };
 }
 
-auto to_native_download_state(uint32_t state
-) -> std::optional<mbgl::OfflineRegionDownloadState> {
+auto to_native_download_state(uint32_t state)
+  -> std::optional<mbgl::OfflineRegionDownloadState> {
   switch (state) {
     case MLN_OFFLINE_REGION_DOWNLOAD_INACTIVE:
       return mbgl::OfflineRegionDownloadState::Inactive;
@@ -319,8 +323,8 @@ auto to_native_download_state(uint32_t state
   }
 }
 
-auto to_c_resource_error_reason(mbgl::Response::Error::Reason reason
-) -> uint32_t {
+auto to_c_resource_error_reason(mbgl::Response::Error::Reason reason)
+  -> uint32_t {
   switch (reason) {
     case mbgl::Response::Error::Reason::Success:
       return MLN_RESOURCE_ERROR_REASON_NONE;
@@ -338,8 +342,8 @@ auto to_c_resource_error_reason(mbgl::Response::Error::Reason reason
   return MLN_RESOURCE_ERROR_REASON_OTHER;
 }
 
-auto to_c_region_data(const mbgl::OfflineRegion& region
-) -> std::optional<OfflineRegionData> {
+auto to_c_region_data(const mbgl::OfflineRegion& region)
+  -> std::optional<OfflineRegionData> {
   auto data = OfflineRegionData{
     .id = region.getID(),
     .definition_type = MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID,
@@ -353,19 +357,20 @@ auto to_c_region_data(const mbgl::OfflineRegion& region
     .metadata = region.getMetadata()
   };
 
-  if (const auto* tile = std::get_if<mbgl::OfflineTilePyramidRegionDefinition>(
-        &region.getDefinition()
-      )) {
+  if (
+    const auto* tile = std::get_if<mbgl::OfflineTilePyramidRegionDefinition>(
+      &region.getDefinition()
+    )
+  ) {
     data.style_url = tile->styleURL;
     data.bounds = mln_lat_lng_bounds{
       .southwest =
         mln_lat_lng{
           .latitude = tile->bounds.south(), .longitude = tile->bounds.west()
         },
-      .northeast =
-        mln_lat_lng{
-          .latitude = tile->bounds.north(), .longitude = tile->bounds.east()
-        }
+      .northeast = mln_lat_lng{
+        .latitude = tile->bounds.north(), .longitude = tile->bounds.east()
+      }
     };
     data.min_zoom = tile->minZoom;
     data.max_zoom = tile->maxZoom;
@@ -374,9 +379,11 @@ auto to_c_region_data(const mbgl::OfflineRegion& region
     return data;
   }
 
-  if (const auto* geometry = std::get_if<mbgl::OfflineGeometryRegionDefinition>(
-        &region.getDefinition()
-      )) {
+  if (
+    const auto* geometry = std::get_if<mbgl::OfflineGeometryRegionDefinition>(
+      &region.getDefinition()
+    )
+  ) {
     data.definition_type = MLN_OFFLINE_REGION_DEFINITION_GEOMETRY;
     data.style_url = geometry->styleURL;
     data.min_zoom = geometry->minZoom;
@@ -545,8 +552,8 @@ auto set_offline_region_observed_flag(
   }
 }
 
-auto register_offline_region_snapshot(OfflineRegionData data
-) -> mln_offline_region_snapshot* {
+auto register_offline_region_snapshot(OfflineRegionData data)
+  -> mln_offline_region_snapshot* {
   auto owned = std::make_unique<mln_offline_region_snapshot>();
   owned->data = std::move(data);
   auto* handle = owned.get();
@@ -555,8 +562,8 @@ auto register_offline_region_snapshot(OfflineRegionData data
   return handle;
 }
 
-auto register_offline_region_list(std::vector<OfflineRegionData> regions
-) -> mln_offline_region_list* {
+auto register_offline_region_list(std::vector<OfflineRegionData> regions)
+  -> mln_offline_region_list* {
   auto owned = std::make_unique<mln_offline_region_list>();
   owned->regions = std::move(regions);
   auto* handle = owned.get();
@@ -565,8 +572,8 @@ auto register_offline_region_list(std::vector<OfflineRegionData> regions
   return handle;
 }
 
-auto register_offline_region_list(const mbgl::OfflineRegions& native_regions
-) -> std::optional<mln_offline_region_list*> {
+auto register_offline_region_list(const mbgl::OfflineRegions& native_regions)
+  -> std::optional<mln_offline_region_list*> {
   auto regions = std::vector<OfflineRegionData>{};
   regions.reserve(native_regions.size());
   for (const auto& region : native_regions) {
@@ -594,8 +601,8 @@ auto find_offline_region_snapshot_locked(
   return found->second.get();
 }
 
-auto find_offline_region_list_locked(const mln_offline_region_list* list
-) -> const mln_offline_region_list* {
+auto find_offline_region_list_locked(const mln_offline_region_list* list)
+  -> const mln_offline_region_list* {
   if (list == nullptr) {
     mln::core::set_thread_error("offline region list must not be null");
     return nullptr;
@@ -608,8 +615,8 @@ auto find_offline_region_list_locked(const mln_offline_region_list* list
   return found->second.get();
 }
 
-auto validate_runtime_options(const mln_runtime_options* options
-) -> mln_status {
+auto validate_runtime_options(const mln_runtime_options* options)
+  -> mln_status {
   if (options == nullptr) {
     return MLN_STATUS_OK;
   }
@@ -636,8 +643,8 @@ namespace mln::core {
 
 namespace {
 
-auto database_source_for_runtime(mln_runtime* runtime
-) -> std::shared_ptr<mbgl::DatabaseFileSource> {
+auto database_source_for_runtime(mln_runtime* runtime)
+  -> std::shared_ptr<mbgl::DatabaseFileSource> {
   if (runtime == nullptr) {
     return nullptr;
   }
@@ -703,8 +710,10 @@ auto patch_polled_payload_strings(mln_runtime* runtime, uint32_t payload_type)
 
   switch (payload_type) {
     case MLN_RUNTIME_EVENT_PAYLOAD_STYLE_IMAGE_MISSING:
-      if (runtime->last_polled_event_payload.size() >=
-          sizeof(mln_runtime_event_style_image_missing)) {
+      if (
+        runtime->last_polled_event_payload.size() >=
+        sizeof(mln_runtime_event_style_image_missing)
+      ) {
         auto payload = mln_runtime_event_style_image_missing{};
         std::memcpy(
           &payload, runtime->last_polled_event_payload.data(), sizeof(payload)
@@ -717,8 +726,10 @@ auto patch_polled_payload_strings(mln_runtime* runtime, uint32_t payload_type)
       }
       break;
     case MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION:
-      if (runtime->last_polled_event_payload.size() >=
-          sizeof(mln_runtime_event_tile_action)) {
+      if (
+        runtime->last_polled_event_payload.size() >=
+        sizeof(mln_runtime_event_tile_action)
+      ) {
         auto payload = mln_runtime_event_tile_action{};
         std::memcpy(
           &payload, runtime->last_polled_event_payload.data(), sizeof(payload)
@@ -778,12 +789,14 @@ auto create_runtime(
   const auto owner_thread = std::this_thread::get_id();
   {
     const std::scoped_lock lock(runtime_registry_mutex());
-    if (std::any_of(
-          runtime_registry().begin(), runtime_registry().end(),
-          [&](const auto& entry) -> bool {
-            return entry.second->owner_thread == owner_thread;
-          }
-        )) {
+    if (
+      std::any_of(
+        runtime_registry().begin(), runtime_registry().end(),
+        [&](const auto& entry) -> bool {
+          return entry.second->owner_thread == owner_thread;
+        }
+      )
+    ) {
       set_thread_error("owner thread already has a live runtime");
       return MLN_STATUS_INVALID_STATE;
     }
@@ -846,7 +859,8 @@ auto set_resource_transform(
 
   const std::scoped_lock lock(runtime_registry_mutex());
   if (runtime->live_maps != 0) {
-    set_thread_error("resource transform must be registered before map creation"
+    set_thread_error(
+      "resource transform must be registered before map creation"
     );
     return MLN_STATUS_INVALID_STATE;
   }
@@ -1158,8 +1172,10 @@ auto offline_region_get_status(
   if (runtime_status != MLN_STATUS_OK) {
     return runtime_status;
   }
-  if (out_status == nullptr ||
-      out_status->size < sizeof(mln_offline_region_status)) {
+  if (
+    out_status == nullptr ||
+    out_status->size < sizeof(mln_offline_region_status)
+  ) {
     set_thread_error("out_status must not be null and must have a valid size");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
@@ -1368,7 +1384,8 @@ auto offline_region_snapshot_get(
   return fill_region_info(live_snapshot->data, out_info);
 }
 
-auto offline_region_snapshot_destroy(mln_offline_region_snapshot* snapshot
+auto offline_region_snapshot_destroy(
+  mln_offline_region_snapshot* snapshot
 ) noexcept -> void {
   if (snapshot == nullptr) {
     return;
@@ -1409,8 +1426,8 @@ auto offline_region_list_get(
   return fill_region_info(live_list->regions.at(index), out_info);
 }
 
-auto offline_region_list_destroy(mln_offline_region_list* list
-) noexcept -> void {
+auto offline_region_list_destroy(mln_offline_region_list* list) noexcept
+  -> void {
   if (list == nullptr) {
     return;
   }
@@ -1475,7 +1492,8 @@ auto destroy_runtime(mln_runtime* runtime) -> mln_status {
   }
 
   {
-    const std::scoped_lock state_lock(found->second->offline_event_state->mutex
+    const std::scoped_lock state_lock(
+      found->second->offline_event_state->mutex
     );
     found->second->offline_event_state->alive = false;
     found->second->offline_event_state->runtime = nullptr;
@@ -1507,8 +1525,10 @@ auto poll_runtime_event(
   if (status != MLN_STATUS_OK) {
     return status;
   }
-  if (out_event == nullptr || out_has_event == nullptr ||
-      out_event->size < sizeof(mln_runtime_event)) {
+  if (
+    out_event == nullptr || out_has_event == nullptr ||
+    out_event->size < sizeof(mln_runtime_event)
+  ) {
     set_thread_error(
       "out_event and out_has_event must not be null, and out_event must have a "
       "valid size"
@@ -1582,8 +1602,8 @@ auto release_runtime_map(mln_runtime* runtime) noexcept -> void {
   }
 }
 
-auto resource_options_for_runtime(mln_runtime* runtime
-) -> mbgl::ResourceOptions {
+auto resource_options_for_runtime(mln_runtime* runtime)
+  -> mbgl::ResourceOptions {
   auto options = mbgl::ResourceOptions::Default();
   if (runtime != nullptr) {
     options.withPlatformContext(runtime);
@@ -1600,8 +1620,8 @@ auto resource_options_for_runtime(mln_runtime* runtime
   return options;
 }
 
-auto find_runtime_for_platform_context(void* platform_context
-) noexcept -> mln_runtime* {
+auto find_runtime_for_platform_context(void* platform_context) noexcept
+  -> mln_runtime* {
   if (platform_context == nullptr) {
     return nullptr;
   }
