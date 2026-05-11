@@ -49,8 +49,7 @@ native objects follow the shared `Handle` convention and implement
 
 Immutable copied values are records. Mutable descriptor classes represent
 field-mask structs: setters return `this`, `clear…()` clears presence, `has…()`
-reports it. Internal materializers write C `size` fields and masks so callers
-never touch ABI bookkeeping.
+reports it. Internal materializers write C `size` fields and masks.
 
 C enums map to Java enums. For output that may drift across C ABI versions, the
 enum includes an `UNKNOWN` variant and preserves the raw native value. C bit
@@ -71,16 +70,11 @@ native handle in `finally`.
 
 ## Handle Lifetime
 
-The binding mediates between Java's garbage collector and the C API's
-deterministic, thread-affine handle lifecycle. This is where the binding does
-its hardest work.
-
 Handle state lives in `HandleState`: release state, parent references, leak
-reporting. Successful `close()` releases once; later closes no-op. This matches
-the C API's own double-release safety, but the binding adds parent retention: a
-child holds its parent wrapper strongly while live, because native validity
-depends on it. `MapProjectionHandle` is the exception—it owns a standalone
-transform snapshot after creation and does not depend on its source `MapHandle`.
+reporting. Successful `close()` releases once; later closes no-op. A child holds
+its parent wrapper strongly while live, because native validity depends on it.
+`MapProjectionHandle` is the exception—it owns a standalone transform snapshot
+after creation and does not depend on its source `MapHandle`.
 
 Owner-thread-affine methods run on the calling Java thread. The binding does not
 dispatch internally. Native wrong-thread statuses become `WrongThreadException`.
@@ -92,9 +86,8 @@ one-shot completion, buffer and string shapes—and lets the C API validate nati
 arguments, state, and ranges.
 
 Cleaner callbacks report leaks but do not destroy thread-affine native handles,
-because cleaners run on an arbitrary GC thread. They are a diagnostic tool, not
-a release path. Correct cleanup flows through `AutoCloseable.close()` on the
-owner thread.
+because cleaners run on an arbitrary GC thread. Correct cleanup flows through
+`AutoCloseable.close()` on the owner thread.
 
 ## FFM Memory
 
