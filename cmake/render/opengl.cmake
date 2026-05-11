@@ -46,9 +46,8 @@ function(mln_configure_opengl_backend target)
         MLN_EGL_LIBRARY
         NAMES EGL
         HINTS
-          /usr/lib/${CMAKE_LIBRARY_ARCHITECTURE}
-          /usr/lib/x86_64-linux-gnu /usr/lib/aarch64-linux-gnu /usr/lib
-          NO_CMAKE_FIND_ROOT_PATH
+          /usr/lib/${CMAKE_LIBRARY_ARCHITECTURE} /usr/lib/x86_64-linux-gnu
+          /usr/lib/aarch64-linux-gnu /usr/lib NO_CMAKE_FIND_ROOT_PATH
         REQUIRED)
       # Extend suffixes to also accept versioned .so.2 files: the libgles2
       # runtime apt package installs libGLESv2.so.2 but not the unversioned
@@ -59,9 +58,8 @@ function(mln_configure_opengl_backend target)
         MLN_GLESv2_LIBRARY
         NAMES GLESv2
         HINTS
-          /usr/lib/${CMAKE_LIBRARY_ARCHITECTURE}
-          /usr/lib/x86_64-linux-gnu /usr/lib/aarch64-linux-gnu /usr/lib
-          NO_CMAKE_FIND_ROOT_PATH
+          /usr/lib/${CMAKE_LIBRARY_ARCHITECTURE} /usr/lib/x86_64-linux-gnu
+          /usr/lib/aarch64-linux-gnu /usr/lib NO_CMAKE_FIND_ROOT_PATH
         REQUIRED)
       set(CMAKE_FIND_LIBRARY_SUFFIXES ${_saved_lib_suffixes})
       # gl_functions.cpp defines mbgl::platform::gl* function-pointer variables
