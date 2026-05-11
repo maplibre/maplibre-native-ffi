@@ -6,22 +6,19 @@ sidebar:
 ---
 
 Language bindings sit directly above the public C API. They preserve the C API's
-core model while adding language-appropriate ownership, memory, error, and
-threading rules.
+core model while adapting ownership, memory, error, and threading to the target
+language's conventions.
 
 See the language-specific binding conventions in this section for implementation
 choices in each target language.
-
-Code fragments in this page are representative pseudocode. They show API shape
-while leaving spelling and syntax to each language.
 
 ## Design Model
 
 Bindings balance cross-language consistency with target-language conventions:
 
-1. Protect host programs according to target-language safety conventions. Public
-   APIs manage ownership, validate binding-owned state, and translate C statuses
-   and diagnostics into language-appropriate errors.
+1. Protect host programs. Public APIs manage ownership, validate binding-owned
+   state, and translate C statuses and diagnostics into language-appropriate
+   errors.
 2. Preserve the C API model. Bindings expose the same core concepts and
    operations so docs and examples transfer across languages.
 3. Keep wrappers regular. Prefer generated or mechanically derived code from the
@@ -61,29 +58,14 @@ public binding layer
   control.
 ```
 
-Keep C binding-generator types internal. Generated declarations are build
-outputs; do not hand-edit them. Public APIs expose target-language values,
-descriptors, errors, and handle wrappers rather than raw ABI structs or
-generated layout classes.
-
-Bindings use one of two implementation paths. Choose a direct C import when the
-target language can consume C headers and call C functions as part of its normal
-package model—generate or write the internal C declarations from the public
-headers, then wrap them. Choose a bridge library when the target runtime's
-package boundary is a native extension or native-method entry point (Python,
-Node.js, Java JNI) or an object and introspection ABI (GLib/GObject for Vala and
-other GObject Introspection consumers). Build the bridge in Rust over the shared
-`-sys` and support crates, then adapt it to the runtime or ecosystem.
-
-Both paths keep raw ABI details internal. The public API uses the host
-ecosystem's values and preserves its lifetime, error, callback, threading, and
-packaging conventions. A bridge library remains a low-level binding layer;
-framework and application adapters stay above it.
-
-Rust-based native-extension bindings may share internal Rust crates. A generated
-`-sys` crate mirrors the C ABI. A support crate holds shared C ABI adaptation
-helpers. Public packages provide the safety layer and keep their own
-ecosystem-facing ownership, errors, callbacks, and packaging.
+Bindings use one of two implementation paths. A direct C import generates or
+writes the internal C declarations from the public headers, then wraps them—this
+works when the target language can consume C headers and call C functions as
+part of its normal package model. A bridge library is built in Rust over the
+shared `-sys` and support crates, then adapted to the target runtime—this is
+needed when the package boundary is a native extension or native-method entry
+point (Python, Node.js, Java JNI) or an object and introspection ABI
+(GLib/GObject for Vala). Both paths keep raw ABI details internal.
 
 ## Handle Lifetime
 
@@ -116,47 +98,40 @@ snapshot, and releases with `mln_map_projection_destroy()`. Later map camera or
 projection changes do not update it. It does not depend on the source
 `MapHandle` for native validity after creation.
 
-The C API owner-thread model constrains handle lifecycle. Runtime creation
-records the runtime owner thread in native code. Map creation runs on the
-runtime owner thread and makes that same thread the map owner thread. Projection
-helper creation runs on the map owner thread and returns a projection owned by
-that thread. Surface and texture attachment create render sessions whose session
-owner thread is the map owner thread.
-
-Bindings rely on native owner-thread validation for ordinary calls. Native
-`MLN_STATUS_WRONG_THREAD` results become the language's wrong-thread error.
-Public type boundaries align with C owner concepts:
+The C API owner-thread model constrains handle lifecycle:
 
 ```text
-RuntimeHandle         runtime owner thread in C
-MapHandle             map owner thread in C
-MapProjectionHandle   projection owner thread in C
-RenderSessionHandle   session owner thread in C
+RuntimeHandle         runtime owner thread
+MapHandle             map owner thread
+MapProjectionHandle   projection owner thread
+RenderSessionHandle   session owner thread
 ```
 
-This leaves room for future C APIs that expose render sessions owned by a render
-thread distinct from the runtime owner thread. If a binding needs to inspect
-owner threads directly, add a C getter.
+Runtime creation records the owner thread. Map creation runs on the runtime
+owner thread. Projection helper creation runs on the map owner thread. Surface
+and texture attachment create render sessions whose owner thread is the map
+owner thread. Bindings rely on native owner-thread validation for ordinary
+calls. Native `MLN_STATUS_WRONG_THREAD` results become the language's
+wrong-thread error. If a binding needs to inspect owner threads directly, add a
+C getter.
 
-Resource provider request completion follows the C API and may run from any
-thread. Cross-thread dispatch, coroutine confinement, UI-thread handoff, and
-framework scheduling belong in adapters above this layer. A binding may add a
-small opt-in owner-thread helper when the language scheduler separates logical
-execution from native thread identity. That helper keeps direct handle APIs
-available and stays limited to generic owner-thread execution, runtime pumping,
-and event draining.
+Resource provider request completion may run from any thread. Cross-thread
+dispatch, coroutine confinement, UI-thread handoff, and framework scheduling
+belong in adapters above this layer. A binding may add a small opt-in
+owner-thread helper when the language scheduler separates logical execution from
+native thread identity—limited to generic owner-thread execution, runtime
+pumping, and event draining.
 
 Status-returning C calls either complete normally or report errors through the
 language's ordinary mechanism: exceptions, error values, typed results, or error
 unions. Map each C status category to a stable, idiomatic public error
 representation. When a native call returns a non-OK status, read the C
 thread-local diagnostic immediately on the same thread and include it in the
-reported error—another C call on that thread may replace the diagnostic.
-
-The C API validates native arguments, native state, numeric ranges, enum-domain
-semantics, and MapLibre-specific rules. The binding validates language-owned
-state: released wrappers, active callback-scoped borrows, threading promises
-made by the binding, and one-shot resource request completion.
+reported error—another C call on that thread may replace the diagnostic. The C
+API validates native arguments, state, numeric ranges, enum-domain semantics,
+and MapLibre-specific rules. The binding validates language-owned state:
+released wrappers, active callback-scoped borrows, threading promises, and
+one-shot resource request completion.
 
 ## Type Mapping
 
@@ -165,9 +140,9 @@ methods use explicit setters, builders, or the language's equivalent and update
 any corresponding field mask. Field-mask structs use an empty/default
 constructor plus explicit ways to mark fields present or absent. The binding
 initializes `size` fields and masks internally—callers set semantic fields, not
-ABI bookkeeping fields. A type uses one update style consistently. Mutable
-descriptor types use setters. Immutable value types use copy, withers, builders,
-or the language's equivalent.
+ABI bookkeeping. A type uses one update style consistently: mutable descriptor
+types use setters, immutable value types use copy, withers, builders, or the
+language's equivalent.
 
 Most input descriptors store language fields and materialize native structs at
 the call boundary. Object-owned native memory is used only when the language
@@ -176,10 +151,9 @@ object represents storage that C fills or later consumes.
 C enum domains become language enums when the domain is closed and type-safe.
 Map values explicitly—language enum ordinals are not ABI values. C bit masks
 become enum sets, option sets, purpose-built value types, or the language's
-idiomatic mask wrapper. Keep raw integer constants internal where the language
-can represent the domain safely. Output values that may grow across C API
-versions use stable unknown-value representations. Copied native output may also
-preserve the raw native value alongside the mapped value for diagnostics.
+idiomatic mask wrapper. Output values that may grow across C API versions use
+stable unknown-value representations; copied native output may also preserve the
+raw native value alongside the mapped value for diagnostics.
 
 A `NativePointer`-style value represents an opaque backend-native address that
 the binding does not own. It is a value object, not a memory view. Use it for C
@@ -196,7 +170,7 @@ UTF-8 bytes plus a byte length.
 
 ## Data Ownership
 
-Native storage usually falls into these lifetime categories:
+Native storage falls into four lifetime categories:
 
 ```text
 per-call temporary storage
@@ -217,46 +191,37 @@ scope-owned callback state
   owner scope.
 ```
 
-Temporary pointers live only until their allocation scope exits. Pass them only
+Temporary pointers live only until their allocation scope exits—pass them only
 to C calls that consume or copy them before returning. Use explicit ownership
-for storage whose address must outlive one call, and release it exactly once
-from the owning object.
+for storage whose address must outlive one call, and release it exactly once.
 
 Borrowed C data becomes copied language data unless it is exposed through a
 callback-scoped borrow. Copy event payloads, messages, and strings before their
-C event storage window ends. Copy C strings and string views into
-target-language strings or byte values before their borrow window ends—use the
-byte length supplied by the C API when one is available, and null termination
-only for C fields documented as `const char*`.
+C storage window ends. Copy C strings and string views before their borrow
+window ends—use the byte length from the C API when available, and null
+termination only for fields documented as `const char*`.
 
 Native snapshot, result, and list handles are short-lived implementation
-details. Public snapshot and result objects own copied language data. Internal
-readers release native handles after copying, even when copying fails. If a
-binding exposes a lazy view tied to a native snapshot handle, that view owns and
-releases the native handle and never exposes free-floating borrowed views.
+details. Public objects own copied language data. Internal readers release
+native handles after copying, even when copying fails. A lazy view tied to a
+native snapshot handle owns and releases that handle and never exposes
+free-floating borrowed views.
 
-A callback-scoped borrow is native data exposed only during a language callback.
-The binding acquires the native borrow before invoking the callback and releases
-it with the language's cleanup mechanism after the callback returns or fails.
-Owned texture frames use callback-scoped access: the callback receives a frame
-view whose native handles are valid only during that callback, the frame type is
-not publicly closeable, and unsafe native accessors check that the frame is
-active. The native session rejects nested acquisition, render updates, resize,
-detach, and destroy while a frame is acquired. The binding relies on those
-native checks and always releases the frame after the callback scope ends.
-Backend-native handles returned from acquired texture frames are callback-scoped
-borrows represented as opaque native-pointer values.
+A callback-scoped borrow exposes native data only during a language callback.
+The binding acquires the borrow before invoking the callback and releases it
+after the callback returns or fails. Texture frames use callback-scoped access:
+the frame view is valid only during the callback, the frame type is not publicly
+closeable, and unsafe accessors check that the frame is active. The native
+session rejects nested acquisition, render updates, resize, detach, and destroy
+while a frame is acquired.
 
-Runtime event polling returns copied language values. Events remain
-runtime-owned in the C API; public event objects are independent of the next
-native poll. A runtime wrapper may keep a registry of live map wrappers keyed by
-native map pointer—map-originated events can attach the matching live
-`MapHandle` or carry copied source metadata for diagnostics. The C API discards
-queued events before their source handle becomes invalid, so pointer lookup does
-not match a later object that reused the same native address. The low-level
-binding preserves event names and payload categories close to the C API.
-Translating events into listeners, flows, promises, coroutines, or UI state
-belongs to adapters above this layer.
+Runtime event polling returns copied language values. Public event objects are
+independent of the next native poll. A runtime wrapper may keep a registry of
+live map wrappers keyed by native map pointer—map-originated events can attach
+the matching live `MapHandle` or carry copied source metadata for diagnostics.
+The C API discards queued events before their source handle becomes invalid, so
+pointer lookup does not match a later object that reused the same native
+address.
 
 ## Callbacks
 
@@ -268,13 +233,13 @@ the result back to C data.
 
 Store callbacks strongly for the native lifetime that can invoke them:
 
-- Process-global logging callbacks live outside any `RuntimeHandle`. Their
-  callback state remains live until the callback is replaced or cleared.
+- Process-global logging callbacks live outside any `RuntimeHandle`. Their state
+  remains live until replaced or cleared.
 - Runtime-scoped resource transforms and resource providers live with their
   `RuntimeHandle` and outlive all native requests that can invoke them.
 - Map/style-scoped custom geometry source callbacks live until the source is
   removed, the style is replaced, or the map is closed, and until any in-flight
-  callback invocation has returned.
+  invocation has returned.
 - Handled resource request objects own the provider's reference to the C request
   handle until they complete or release it exactly once.
 
@@ -290,21 +255,18 @@ runtimes cannot safely execute user code on arbitrary native threads keep those
 callbacks internal, use a native shim, or expose only the callback shapes they
 can honor without blocking MapLibre worker, network, logging, or render threads.
 
-Callback documentation carries forward C callback restrictions that remain
-visible to users. Resource provider callbacks may run on worker or network
-threads, so implementations return quickly and avoid map or runtime methods from
-the callback. Custom geometry source callbacks marshal work to the map owner
-thread before calling thread-affine map APIs. Borrowed request fields are copied
-before the callback returns when the binding needs them later.
+Resource provider callbacks may run on worker or network threads—implementations
+return quickly and avoid map or runtime methods from the callback. Custom
+geometry source callbacks marshal work to the map owner thread before calling
+thread-affine map APIs. Borrowed request fields are copied before the callback
+returns when the binding needs them later.
 
 Resource-provider bindings use native-owned routing rules before crossing into
 language code. Non-matching requests return pass-through immediately. Matching
 requests copy request data, own the provider's request handle, and complete
-inline or later according to the language's callback model.
-
-A handled resource request owns the provider's reference to the C request
-handle. It enforces one-shot completion and exactly-once release. Completion and
-cancellation checks may run from any thread when the C API allows it.
+inline or later. A handled resource request enforces one-shot completion and
+exactly-once release; completion and cancellation checks may run from any thread
+when the C API allows it.
 
 ## Rendering
 
@@ -331,9 +293,9 @@ valid. They transfer no ownership and expose no general native memory access.
 ## Testing
 
 Focus binding tests on the language adaptation layer. C ABI tests prove native
-behavior. Binding tests prove generated or handwritten wrappers, ownership,
-copying, callbacks, threading errors, and error mapping preserve that behavior
-at the language boundary.
+behavior. Binding tests prove that wrappers, ownership, copying, callbacks,
+threading errors, and error mapping preserve that behavior at the language
+boundary.
 
 Prefer small adaptation tests around real C calls. When a C ABI test already
 covers native validation, the binding test only needs to show that the
