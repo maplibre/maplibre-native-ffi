@@ -21,11 +21,11 @@ import org.maplibre.nativeffi.internal.c.mln_style_source_info;
 import org.maplibre.nativeffi.internal.c.mln_style_tile_source_options;
 import org.maplibre.nativeffi.internal.status.Status;
 import org.maplibre.nativeffi.render.PremultipliedRgba8Image;
+import org.maplibre.nativeffi.style.SourceInfo;
+import org.maplibre.nativeffi.style.SourceType;
 import org.maplibre.nativeffi.style.StyleImageInfo;
 import org.maplibre.nativeffi.style.StyleImageOptions;
-import org.maplibre.nativeffi.style.StyleSourceInfo;
-import org.maplibre.nativeffi.style.StyleSourceType;
-import org.maplibre.nativeffi.style.StyleTileSourceOptions;
+import org.maplibre.nativeffi.style.TileSourceOptions;
 
 /** Internal materializers and readers for style structs and short-lived handles. */
 public final class StyleStructs {
@@ -56,7 +56,7 @@ public final class StyleStructs {
     }
   }
 
-  public static MemorySegment tileSourceOptions(StyleTileSourceOptions options, Arena arena) {
+  public static MemorySegment tileSourceOptions(TileSourceOptions options, Arena arena) {
     var segment = MapLibreNativeC.mln_style_tile_source_options_default(arena);
     var fields = 0;
     if (options.hasMinZoom()) {
@@ -97,10 +97,10 @@ public final class StyleStructs {
     return segment;
   }
 
-  public static StyleSourceInfo sourceInfo(MemorySegment segment, Optional<String> attribution) {
+  public static SourceInfo sourceInfo(MemorySegment segment, Optional<String> attribution) {
     var nativeType = mln_style_source_info.type(segment);
-    return new StyleSourceInfo(
-        StyleSourceType.fromNative(nativeType),
+    return new SourceInfo(
+        SourceType.fromNative(nativeType),
         nativeType,
         mln_style_source_info.is_volatile(segment),
         attribution);

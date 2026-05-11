@@ -4,7 +4,7 @@ import java.util.Objects;
 import org.maplibre.nativeffi.camera.EdgeInsets;
 
 /** Mutable descriptor for live map viewport and render-transform controls. */
-public final class MapViewportOptions {
+public final class ViewportOptions {
   private NorthOrientation northOrientation;
   private ConstrainMode constrainMode;
   private ViewportMode viewportMode;
@@ -18,12 +18,12 @@ public final class MapViewportOptions {
     return northOrientation;
   }
 
-  public MapViewportOptions setNorthOrientation(NorthOrientation northOrientation) {
+  public ViewportOptions setNorthOrientation(NorthOrientation northOrientation) {
     this.northOrientation = Objects.requireNonNull(northOrientation, "northOrientation");
     return this;
   }
 
-  public MapViewportOptions clearNorthOrientation() {
+  public ViewportOptions clearNorthOrientation() {
     northOrientation = null;
     return this;
   }
@@ -36,12 +36,12 @@ public final class MapViewportOptions {
     return constrainMode;
   }
 
-  public MapViewportOptions setConstrainMode(ConstrainMode constrainMode) {
+  public ViewportOptions setConstrainMode(ConstrainMode constrainMode) {
     this.constrainMode = Objects.requireNonNull(constrainMode, "constrainMode");
     return this;
   }
 
-  public MapViewportOptions clearConstrainMode() {
+  public ViewportOptions clearConstrainMode() {
     constrainMode = null;
     return this;
   }
@@ -54,12 +54,12 @@ public final class MapViewportOptions {
     return viewportMode;
   }
 
-  public MapViewportOptions setViewportMode(ViewportMode viewportMode) {
+  public ViewportOptions setViewportMode(ViewportMode viewportMode) {
     this.viewportMode = Objects.requireNonNull(viewportMode, "viewportMode");
     return this;
   }
 
-  public MapViewportOptions clearViewportMode() {
+  public ViewportOptions clearViewportMode() {
     viewportMode = null;
     return this;
   }
@@ -72,12 +72,12 @@ public final class MapViewportOptions {
     return frustumOffset;
   }
 
-  public MapViewportOptions setFrustumOffset(EdgeInsets frustumOffset) {
+  public ViewportOptions setFrustumOffset(EdgeInsets frustumOffset) {
     this.frustumOffset = Objects.requireNonNull(frustumOffset, "frustumOffset");
     return this;
   }
 
-  public MapViewportOptions clearFrustumOffset() {
+  public ViewportOptions clearFrustumOffset() {
     frustumOffset = null;
     return this;
   }

@@ -106,9 +106,9 @@ final class MapHandleTest {
     var runtime = RuntimeHandle.create();
     var map = MapHandle.create(runtime, new MapOptions().setSize(128, 128));
     try {
-      map.setDebugOptions(EnumSet.of(MapDebugOption.TILE_BORDERS, MapDebugOption.TIMESTAMPS));
+      map.setDebugOptions(EnumSet.of(DebugOption.TILE_BORDERS, DebugOption.TIMESTAMPS));
       assertEquals(
-          EnumSet.of(MapDebugOption.TILE_BORDERS, MapDebugOption.TIMESTAMPS), map.debugOptions());
+          EnumSet.of(DebugOption.TILE_BORDERS, DebugOption.TIMESTAMPS), map.debugOptions());
 
       map.setRenderingStatsViewEnabled(true);
       assertTrue(map.isRenderingStatsViewEnabled());
@@ -129,7 +129,7 @@ final class MapHandleTest {
     var map = MapHandle.create(runtime, new MapOptions().setSize(128, 128));
     try {
       map.setViewportOptions(
-          new MapViewportOptions()
+          new ViewportOptions()
               .setNorthOrientation(NorthOrientation.UP)
               .setConstrainMode(ConstrainMode.HEIGHT_ONLY)
               .setViewportMode(ViewportMode.DEFAULT)
@@ -140,8 +140,7 @@ final class MapHandleTest {
       assertEquals(ViewportMode.DEFAULT, viewport.viewportMode());
       assertEquals(EdgeInsets.ZERO, viewport.frustumOffset());
 
-      map.setTileOptions(
-          new MapTileOptions().setPrefetchZoomDelta(2).setLodMode(TileLodMode.DEFAULT));
+      map.setTileOptions(new TileOptions().setPrefetchZoomDelta(2).setLodMode(TileLodMode.DEFAULT));
       var tile = map.tileOptions();
       assertEquals(2, tile.prefetchZoomDelta());
       assertEquals(TileLodMode.DEFAULT, tile.lodMode());

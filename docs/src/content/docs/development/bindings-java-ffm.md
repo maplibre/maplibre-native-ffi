@@ -84,8 +84,8 @@ after creation and does not depend on its source `MapHandle`.
 Owner-thread-affine methods run on the calling Java thread. The binding does not
 dispatch internally. Native wrong-thread statuses become `WrongThreadException`.
 
-`Status.check(…)` throws unchecked `MapLibreException` subclasses carrying
-`MapLibreStatus`, the raw status code, and the copied diagnostic. The binding
+`Status.check(…)` throws unchecked `MaplibreException` subclasses carrying
+`MaplibreStatus`, the raw status code, and the copied diagnostic. The binding
 validates Java-owned state—wrapper lifetime, callback scope, descriptor depth,
 one-shot completion, buffer and string shapes—and lets the C API validate native
 arguments, state, and ranges.

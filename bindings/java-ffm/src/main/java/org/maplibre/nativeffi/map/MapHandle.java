@@ -48,12 +48,12 @@ import org.maplibre.nativeffi.render.VulkanSurfaceDescriptor;
 import org.maplibre.nativeffi.runtime.RuntimeHandle;
 import org.maplibre.nativeffi.style.CustomGeometrySourceOptions;
 import org.maplibre.nativeffi.style.LocationIndicatorImageKind;
+import org.maplibre.nativeffi.style.SourceInfo;
+import org.maplibre.nativeffi.style.SourceType;
 import org.maplibre.nativeffi.style.StyleImage;
 import org.maplibre.nativeffi.style.StyleImageInfo;
 import org.maplibre.nativeffi.style.StyleImageOptions;
-import org.maplibre.nativeffi.style.StyleSourceInfo;
-import org.maplibre.nativeffi.style.StyleSourceType;
-import org.maplibre.nativeffi.style.StyleTileSourceOptions;
+import org.maplibre.nativeffi.style.TileSourceOptions;
 
 /** Owned native map handle. Close it on the map owner thread. */
 public final class MapHandle implements AutoCloseable {
@@ -144,7 +144,7 @@ public final class MapHandle implements AutoCloseable {
     }
   }
 
-  public Optional<StyleSourceType> styleSourceType(String sourceId) {
+  public Optional<SourceType> styleSourceType(String sourceId) {
     NativeAccess.ensureLoaded();
     try (var arena = Arena.ofConfined()) {
       var outType = arena.allocate(ValueLayout.JAVA_INT);
@@ -156,12 +156,12 @@ public final class MapHandle implements AutoCloseable {
               outType,
               outFound));
       return outFound.get(ValueLayout.JAVA_BOOLEAN, 0)
-          ? Optional.of(StyleSourceType.fromNative(outType.get(ValueLayout.JAVA_INT, 0)))
+          ? Optional.of(SourceType.fromNative(outType.get(ValueLayout.JAVA_INT, 0)))
           : Optional.empty();
     }
   }
 
-  public Optional<StyleSourceInfo> styleSourceInfo(String sourceId) {
+  public Optional<SourceInfo> styleSourceInfo(String sourceId) {
     NativeAccess.ensureLoaded();
     try (var arena = Arena.ofConfined()) {
       var sourceIdView =
@@ -320,7 +320,7 @@ public final class MapHandle implements AutoCloseable {
     addVectorSourceUrlInternal(sourceId, url, null, false);
   }
 
-  public void addVectorSourceUrl(String sourceId, String url, StyleTileSourceOptions options) {
+  public void addVectorSourceUrl(String sourceId, String url, TileSourceOptions options) {
     addVectorSourceUrlInternal(sourceId, url, Objects.requireNonNull(options, "options"), true);
   }
 
@@ -328,8 +328,7 @@ public final class MapHandle implements AutoCloseable {
     addVectorSourceTilesInternal(sourceId, tiles, null, false);
   }
 
-  public void addVectorSourceTiles(
-      String sourceId, List<String> tiles, StyleTileSourceOptions options) {
+  public void addVectorSourceTiles(String sourceId, List<String> tiles, TileSourceOptions options) {
     addVectorSourceTilesInternal(sourceId, tiles, Objects.requireNonNull(options, "options"), true);
   }
 
@@ -337,7 +336,7 @@ public final class MapHandle implements AutoCloseable {
     addRasterSourceUrlInternal(sourceId, url, null, false);
   }
 
-  public void addRasterSourceUrl(String sourceId, String url, StyleTileSourceOptions options) {
+  public void addRasterSourceUrl(String sourceId, String url, TileSourceOptions options) {
     addRasterSourceUrlInternal(sourceId, url, Objects.requireNonNull(options, "options"), true);
   }
 
@@ -345,8 +344,7 @@ public final class MapHandle implements AutoCloseable {
     addRasterSourceTilesInternal(sourceId, tiles, null, false);
   }
 
-  public void addRasterSourceTiles(
-      String sourceId, List<String> tiles, StyleTileSourceOptions options) {
+  public void addRasterSourceTiles(String sourceId, List<String> tiles, TileSourceOptions options) {
     addRasterSourceTilesInternal(sourceId, tiles, Objects.requireNonNull(options, "options"), true);
   }
 
@@ -354,7 +352,7 @@ public final class MapHandle implements AutoCloseable {
     addRasterDemSourceUrlInternal(sourceId, url, null, false);
   }
 
-  public void addRasterDemSourceUrl(String sourceId, String url, StyleTileSourceOptions options) {
+  public void addRasterDemSourceUrl(String sourceId, String url, TileSourceOptions options) {
     addRasterDemSourceUrlInternal(sourceId, url, Objects.requireNonNull(options, "options"), true);
   }
 
@@ -363,7 +361,7 @@ public final class MapHandle implements AutoCloseable {
   }
 
   public void addRasterDemSourceTiles(
-      String sourceId, List<String> tiles, StyleTileSourceOptions options) {
+      String sourceId, List<String> tiles, TileSourceOptions options) {
     addRasterDemSourceTilesInternal(
         sourceId, tiles, Objects.requireNonNull(options, "options"), true);
   }
@@ -865,7 +863,7 @@ public final class MapHandle implements AutoCloseable {
     Status.check(MapLibreNativeC.mln_map_request_still_image(state.requireLive()));
   }
 
-  public void setDebugOptions(Set<MapDebugOption> options) {
+  public void setDebugOptions(Set<DebugOption> options) {
     NativeAccess.ensureLoaded();
     Objects.requireNonNull(options, "options");
     var mask = 0;
@@ -875,14 +873,14 @@ public final class MapHandle implements AutoCloseable {
     Status.check(MapLibreNativeC.mln_map_set_debug_options(state.requireLive(), mask));
   }
 
-  public EnumSet<MapDebugOption> debugOptions() {
+  public EnumSet<DebugOption> debugOptions() {
     NativeAccess.ensureLoaded();
     try (var arena = Arena.ofConfined()) {
       var outOptions = arena.allocate(ValueLayout.JAVA_INT);
       Status.check(MapLibreNativeC.mln_map_get_debug_options(state.requireLive(), outOptions));
       var mask = outOptions.get(ValueLayout.JAVA_INT, 0);
-      var options = EnumSet.noneOf(MapDebugOption.class);
-      for (var option : MapDebugOption.values()) {
+      var options = EnumSet.noneOf(DebugOption.class);
+      for (var option : DebugOption.values()) {
         if ((mask & option.nativeMask()) != 0) {
           options.add(option);
         }
@@ -922,7 +920,7 @@ public final class MapHandle implements AutoCloseable {
     Status.check(MapLibreNativeC.mln_map_dump_debug_logs(state.requireLive()));
   }
 
-  public MapViewportOptions viewportOptions() {
+  public ViewportOptions viewportOptions() {
     NativeAccess.ensureLoaded();
     try (var arena = Arena.ofConfined()) {
       var outOptions = MapLibreNativeC.mln_map_viewport_options_default(arena);
@@ -931,7 +929,7 @@ public final class MapHandle implements AutoCloseable {
     }
   }
 
-  public void setViewportOptions(MapViewportOptions options) {
+  public void setViewportOptions(ViewportOptions options) {
     NativeAccess.ensureLoaded();
     Objects.requireNonNull(options, "options");
     try (var arena = Arena.ofConfined()) {
@@ -941,7 +939,7 @@ public final class MapHandle implements AutoCloseable {
     }
   }
 
-  public MapTileOptions tileOptions() {
+  public TileOptions tileOptions() {
     NativeAccess.ensureLoaded();
     try (var arena = Arena.ofConfined()) {
       var outOptions = MapLibreNativeC.mln_map_tile_options_default(arena);
@@ -950,7 +948,7 @@ public final class MapHandle implements AutoCloseable {
     }
   }
 
-  public void setTileOptions(MapTileOptions options) {
+  public void setTileOptions(TileOptions options) {
     NativeAccess.ensureLoaded();
     Objects.requireNonNull(options, "options");
     try (var arena = Arena.ofConfined()) {
@@ -1259,7 +1257,7 @@ public final class MapHandle implements AutoCloseable {
   }
 
   private void addVectorSourceUrlInternal(
-      String sourceId, String url, StyleTileSourceOptions options, boolean hasOptions) {
+      String sourceId, String url, TileSourceOptions options, boolean hasOptions) {
     NativeAccess.ensureLoaded();
     try (var arena = Arena.ofConfined()) {
       Status.check(
@@ -1272,7 +1270,7 @@ public final class MapHandle implements AutoCloseable {
   }
 
   private void addVectorSourceTilesInternal(
-      String sourceId, List<String> tiles, StyleTileSourceOptions options, boolean hasOptions) {
+      String sourceId, List<String> tiles, TileSourceOptions options, boolean hasOptions) {
     NativeAccess.ensureLoaded();
     var copiedTiles = List.copyOf(Objects.requireNonNull(tiles, "tiles"));
     try (var arena = Arena.ofConfined()) {
@@ -1289,7 +1287,7 @@ public final class MapHandle implements AutoCloseable {
   }
 
   private void addRasterSourceUrlInternal(
-      String sourceId, String url, StyleTileSourceOptions options, boolean hasOptions) {
+      String sourceId, String url, TileSourceOptions options, boolean hasOptions) {
     NativeAccess.ensureLoaded();
     try (var arena = Arena.ofConfined()) {
       Status.check(
@@ -1302,7 +1300,7 @@ public final class MapHandle implements AutoCloseable {
   }
 
   private void addRasterSourceTilesInternal(
-      String sourceId, List<String> tiles, StyleTileSourceOptions options, boolean hasOptions) {
+      String sourceId, List<String> tiles, TileSourceOptions options, boolean hasOptions) {
     NativeAccess.ensureLoaded();
     var copiedTiles = List.copyOf(Objects.requireNonNull(tiles, "tiles"));
     try (var arena = Arena.ofConfined()) {
@@ -1319,7 +1317,7 @@ public final class MapHandle implements AutoCloseable {
   }
 
   private void addRasterDemSourceUrlInternal(
-      String sourceId, String url, StyleTileSourceOptions options, boolean hasOptions) {
+      String sourceId, String url, TileSourceOptions options, boolean hasOptions) {
     NativeAccess.ensureLoaded();
     try (var arena = Arena.ofConfined()) {
       Status.check(
@@ -1332,7 +1330,7 @@ public final class MapHandle implements AutoCloseable {
   }
 
   private void addRasterDemSourceTilesInternal(
-      String sourceId, List<String> tiles, StyleTileSourceOptions options, boolean hasOptions) {
+      String sourceId, List<String> tiles, TileSourceOptions options, boolean hasOptions) {
     NativeAccess.ensureLoaded();
     var copiedTiles = List.copyOf(Objects.requireNonNull(tiles, "tiles"));
     try (var arena = Arena.ofConfined()) {
@@ -1565,7 +1563,7 @@ public final class MapHandle implements AutoCloseable {
     while (iterator.hasNext()) {
       var entry = iterator.next();
       var sourceType = styleSourceType(entry.getKey());
-      if (sourceType.isEmpty() || sourceType.get() != StyleSourceType.CUSTOM_VECTOR) {
+      if (sourceType.isEmpty() || sourceType.get() != SourceType.CUSTOM_VECTOR) {
         closeQuietly(entry.getValue());
         iterator.remove();
       }

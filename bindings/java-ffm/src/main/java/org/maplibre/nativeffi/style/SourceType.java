@@ -1,7 +1,7 @@
 package org.maplibre.nativeffi.style;
 
 /** Style source type values returned by native style source metadata. */
-public enum StyleSourceType {
+public enum SourceType {
   UNKNOWN(0),
   VECTOR(1),
   RASTER(2),
@@ -14,7 +14,7 @@ public enum StyleSourceType {
 
   private final int nativeValue;
 
-  StyleSourceType(int nativeValue) {
+  SourceType(int nativeValue) {
     this.nativeValue = nativeValue;
   }
 
@@ -22,7 +22,7 @@ public enum StyleSourceType {
     return nativeValue;
   }
 
-  public static StyleSourceType fromNative(int nativeValue) {
+  public static SourceType fromNative(int nativeValue) {
     for (var value : values()) {
       if (value.nativeValue == nativeValue) {
         return value;

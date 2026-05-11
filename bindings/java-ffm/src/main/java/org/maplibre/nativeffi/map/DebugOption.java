@@ -1,7 +1,7 @@
 package org.maplibre.nativeffi.map;
 
 /** Map debug overlay options. */
-public enum MapDebugOption {
+public enum DebugOption {
   TILE_BORDERS(1 << 1),
   PARSE_STATUS(1 << 2),
   TIMESTAMPS(1 << 3),
@@ -12,7 +12,7 @@ public enum MapDebugOption {
 
   private final int nativeMask;
 
-  MapDebugOption(int nativeMask) {
+  DebugOption(int nativeMask) {
     this.nativeMask = nativeMask;
   }
 

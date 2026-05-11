@@ -3,7 +3,7 @@ package org.maplibre.nativeffi.map;
 import java.util.Objects;
 
 /** Mutable descriptor for tile prefetch and level-of-detail controls. */
-public final class MapTileOptions {
+public final class TileOptions {
   private Integer prefetchZoomDelta;
   private Double lodMinRadius;
   private Double lodScale;
@@ -19,12 +19,12 @@ public final class MapTileOptions {
     return prefetchZoomDelta;
   }
 
-  public MapTileOptions setPrefetchZoomDelta(int prefetchZoomDelta) {
+  public TileOptions setPrefetchZoomDelta(int prefetchZoomDelta) {
     this.prefetchZoomDelta = prefetchZoomDelta;
     return this;
   }
 
-  public MapTileOptions clearPrefetchZoomDelta() {
+  public TileOptions clearPrefetchZoomDelta() {
     prefetchZoomDelta = null;
     return this;
   }
@@ -37,12 +37,12 @@ public final class MapTileOptions {
     return lodMinRadius;
   }
 
-  public MapTileOptions setLodMinRadius(double lodMinRadius) {
+  public TileOptions setLodMinRadius(double lodMinRadius) {
     this.lodMinRadius = lodMinRadius;
     return this;
   }
 
-  public MapTileOptions clearLodMinRadius() {
+  public TileOptions clearLodMinRadius() {
     lodMinRadius = null;
     return this;
   }
@@ -55,12 +55,12 @@ public final class MapTileOptions {
     return lodScale;
   }
 
-  public MapTileOptions setLodScale(double lodScale) {
+  public TileOptions setLodScale(double lodScale) {
     this.lodScale = lodScale;
     return this;
   }
 
-  public MapTileOptions clearLodScale() {
+  public TileOptions clearLodScale() {
     lodScale = null;
     return this;
   }
@@ -73,12 +73,12 @@ public final class MapTileOptions {
     return lodPitchThreshold;
   }
 
-  public MapTileOptions setLodPitchThreshold(double lodPitchThreshold) {
+  public TileOptions setLodPitchThreshold(double lodPitchThreshold) {
     this.lodPitchThreshold = lodPitchThreshold;
     return this;
   }
 
-  public MapTileOptions clearLodPitchThreshold() {
+  public TileOptions clearLodPitchThreshold() {
     lodPitchThreshold = null;
     return this;
   }
@@ -91,12 +91,12 @@ public final class MapTileOptions {
     return lodZoomShift;
   }
 
-  public MapTileOptions setLodZoomShift(double lodZoomShift) {
+  public TileOptions setLodZoomShift(double lodZoomShift) {
     this.lodZoomShift = lodZoomShift;
     return this;
   }
 
-  public MapTileOptions clearLodZoomShift() {
+  public TileOptions clearLodZoomShift() {
     lodZoomShift = null;
     return this;
   }
@@ -109,12 +109,12 @@ public final class MapTileOptions {
     return lodMode;
   }
 
-  public MapTileOptions setLodMode(TileLodMode lodMode) {
+  public TileOptions setLodMode(TileLodMode lodMode) {
     this.lodMode = Objects.requireNonNull(lodMode, "lodMode");
     return this;
   }
 
-  public MapTileOptions clearLodMode() {
+  public TileOptions clearLodMode() {
     lodMode = null;
     return this;
   }

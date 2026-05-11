@@ -13,7 +13,7 @@ import org.maplibre.nativeffi.log.LogSeverity;
 import org.maplibre.nativeffi.runtime.NetworkStatus;
 import org.maplibre.nativeffi.test.NativeTestSupport;
 
-final class MapLibreTest {
+final class MaplibreTest {
   @BeforeAll
   static void loadNativeLibrary() {
     NativeTestSupport.loadNativeLibrary();

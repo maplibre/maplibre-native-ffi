@@ -31,12 +31,12 @@ import org.maplibre.nativeffi.runtime.RuntimeEventType;
 import org.maplibre.nativeffi.runtime.RuntimeHandle;
 import org.maplibre.nativeffi.style.CustomGeometrySourceOptions;
 import org.maplibre.nativeffi.style.LocationIndicatorImageKind;
+import org.maplibre.nativeffi.style.RasterDemEncoding;
+import org.maplibre.nativeffi.style.SourceType;
 import org.maplibre.nativeffi.style.StyleImageOptions;
-import org.maplibre.nativeffi.style.StyleRasterDemEncoding;
-import org.maplibre.nativeffi.style.StyleSourceType;
-import org.maplibre.nativeffi.style.StyleTileScheme;
-import org.maplibre.nativeffi.style.StyleTileSourceOptions;
-import org.maplibre.nativeffi.style.StyleVectorTileEncoding;
+import org.maplibre.nativeffi.style.TileScheme;
+import org.maplibre.nativeffi.style.TileSourceOptions;
+import org.maplibre.nativeffi.style.VectorTileEncoding;
 import org.maplibre.nativeffi.test.NativeTestSupport;
 
 final class StyleHandleTest {
@@ -62,8 +62,8 @@ final class StyleHandleTest {
                       List.of(new JsonValue.Member("kind", JsonValue.of("park")))))));
 
       assertTrue(map.styleSourceExists("parks"));
-      assertEquals(Optional.of(StyleSourceType.GEOJSON), map.styleSourceType("parks"));
-      assertEquals(StyleSourceType.GEOJSON, map.styleSourceInfo("parks").orElseThrow().type());
+      assertEquals(Optional.of(SourceType.GEOJSON), map.styleSourceType("parks"));
+      assertEquals(SourceType.GEOJSON, map.styleSourceInfo("parks").orElseThrow().type());
       assertTrue(map.styleSourceIds().contains("parks"));
 
       var layerJson =
@@ -104,14 +104,14 @@ final class StyleHandleTest {
       map.addVectorSourceTiles(
           "vector",
           List.of("https://example.com/vector/{z}/{x}/{y}.pbf"),
-          new StyleTileSourceOptions()
+          new TileSourceOptions()
               .setMinZoom(0)
               .setMaxZoom(14)
               .setAttribution("vector attribution")
-              .setScheme(StyleTileScheme.XYZ)
+              .setScheme(TileScheme.XYZ)
               .setTileSize(512)
-              .setVectorEncoding(StyleVectorTileEncoding.MVT));
-      assertEquals(Optional.of(StyleSourceType.VECTOR), map.styleSourceType("vector"));
+              .setVectorEncoding(VectorTileEncoding.MVT));
+      assertEquals(Optional.of(SourceType.VECTOR), map.styleSourceType("vector"));
       assertEquals(
           Optional.of("vector attribution"),
           map.styleSourceInfo("vector").orElseThrow().attribution());
@@ -119,16 +119,16 @@ final class StyleHandleTest {
       map.addRasterSourceTiles(
           "raster",
           List.of("https://example.com/raster/{z}/{x}/{y}.png"),
-          new StyleTileSourceOptions().setTileSize(256));
-      assertEquals(Optional.of(StyleSourceType.RASTER), map.styleSourceType("raster"));
+          new TileSourceOptions().setTileSize(256));
+      assertEquals(Optional.of(SourceType.RASTER), map.styleSourceType("raster"));
 
       map.addRasterDemSourceTiles(
           "dem",
           List.of("https://example.com/dem/{z}/{x}/{y}.png"),
-          new StyleTileSourceOptions()
+          new TileSourceOptions()
               .setTileSize(512)
-              .setRasterDemEncoding(StyleRasterDemEncoding.TERRARIUM));
-      assertEquals(Optional.of(StyleSourceType.RASTER_DEM), map.styleSourceType("dem"));
+              .setRasterDemEncoding(RasterDemEncoding.TERRARIUM));
+      assertEquals(Optional.of(SourceType.RASTER_DEM), map.styleSourceType("dem"));
 
       assertThrows(
           IllegalArgumentException.class,
@@ -217,7 +217,7 @@ final class StyleHandleTest {
       var coordinates =
           List.of(new LatLng(1, 1), new LatLng(1, 2), new LatLng(0, 2), new LatLng(0, 1));
       map.addImageSourceImage("overlay", coordinates, image);
-      assertEquals(Optional.of(StyleSourceType.IMAGE), map.styleSourceType("overlay"));
+      assertEquals(Optional.of(SourceType.IMAGE), map.styleSourceType("overlay"));
       assertEquals(Optional.of(coordinates), map.imageSourceCoordinates("overlay"));
 
       var updatedCoordinates =
@@ -234,7 +234,7 @@ final class StyleHandleTest {
               .setBuffer(64)
               .setClip(true)
               .setWrap(false));
-      assertEquals(Optional.of(StyleSourceType.CUSTOM_VECTOR), map.styleSourceType("custom"));
+      assertEquals(Optional.of(SourceType.CUSTOM_VECTOR), map.styleSourceType("custom"));
       var tileId = new CanonicalTileId(0, 0, 0);
       map.setCustomGeometrySourceTileData("custom", tileId, GeoJson.featureCollection(List.of()));
       map.invalidateCustomGeometrySourceTile("custom", tileId);

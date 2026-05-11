@@ -1,13 +1,13 @@
 package org.maplibre.nativeffi.style;
 
-/** DEM raster encoding for raster DEM style sources. */
-public enum StyleRasterDemEncoding {
-  MAPBOX(0),
-  TERRARIUM(1);
+/** Tile URL coordinate scheme for vector, raster, and raster DEM sources. */
+public enum TileScheme {
+  XYZ(0),
+  TMS(1);
 
   private final int nativeValue;
 
-  StyleRasterDemEncoding(int nativeValue) {
+  TileScheme(int nativeValue) {
     this.nativeValue = nativeValue;
   }
 

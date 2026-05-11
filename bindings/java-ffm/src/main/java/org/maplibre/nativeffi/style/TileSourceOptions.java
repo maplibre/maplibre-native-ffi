@@ -4,15 +4,15 @@ import java.util.Objects;
 import org.maplibre.nativeffi.geo.LatLngBounds;
 
 /** Mutable descriptor for vector, raster, and raster DEM style tile sources. */
-public final class StyleTileSourceOptions {
+public final class TileSourceOptions {
   private Double minZoom;
   private Double maxZoom;
   private String attribution;
-  private StyleTileScheme scheme;
+  private TileScheme scheme;
   private LatLngBounds bounds;
   private Integer tileSize;
-  private StyleVectorTileEncoding vectorEncoding;
-  private StyleRasterDemEncoding rasterDemEncoding;
+  private VectorTileEncoding vectorEncoding;
+  private RasterDemEncoding rasterDemEncoding;
 
   public boolean hasMinZoom() {
     return minZoom != null;
@@ -22,12 +22,12 @@ public final class StyleTileSourceOptions {
     return minZoom;
   }
 
-  public StyleTileSourceOptions setMinZoom(double minZoom) {
+  public TileSourceOptions setMinZoom(double minZoom) {
     this.minZoom = minZoom;
     return this;
   }
 
-  public StyleTileSourceOptions clearMinZoom() {
+  public TileSourceOptions clearMinZoom() {
     minZoom = null;
     return this;
   }
@@ -40,12 +40,12 @@ public final class StyleTileSourceOptions {
     return maxZoom;
   }
 
-  public StyleTileSourceOptions setMaxZoom(double maxZoom) {
+  public TileSourceOptions setMaxZoom(double maxZoom) {
     this.maxZoom = maxZoom;
     return this;
   }
 
-  public StyleTileSourceOptions clearMaxZoom() {
+  public TileSourceOptions clearMaxZoom() {
     maxZoom = null;
     return this;
   }
@@ -58,12 +58,12 @@ public final class StyleTileSourceOptions {
     return attribution;
   }
 
-  public StyleTileSourceOptions setAttribution(String attribution) {
+  public TileSourceOptions setAttribution(String attribution) {
     this.attribution = Objects.requireNonNull(attribution, "attribution");
     return this;
   }
 
-  public StyleTileSourceOptions clearAttribution() {
+  public TileSourceOptions clearAttribution() {
     attribution = null;
     return this;
   }
@@ -72,16 +72,16 @@ public final class StyleTileSourceOptions {
     return scheme != null;
   }
 
-  public StyleTileScheme scheme() {
+  public TileScheme scheme() {
     return scheme;
   }
 
-  public StyleTileSourceOptions setScheme(StyleTileScheme scheme) {
+  public TileSourceOptions setScheme(TileScheme scheme) {
     this.scheme = Objects.requireNonNull(scheme, "scheme");
     return this;
   }
 
-  public StyleTileSourceOptions clearScheme() {
+  public TileSourceOptions clearScheme() {
     scheme = null;
     return this;
   }
@@ -94,12 +94,12 @@ public final class StyleTileSourceOptions {
     return bounds;
   }
 
-  public StyleTileSourceOptions setBounds(LatLngBounds bounds) {
+  public TileSourceOptions setBounds(LatLngBounds bounds) {
     this.bounds = Objects.requireNonNull(bounds, "bounds");
     return this;
   }
 
-  public StyleTileSourceOptions clearBounds() {
+  public TileSourceOptions clearBounds() {
     bounds = null;
     return this;
   }
@@ -112,12 +112,12 @@ public final class StyleTileSourceOptions {
     return tileSize;
   }
 
-  public StyleTileSourceOptions setTileSize(int tileSize) {
+  public TileSourceOptions setTileSize(int tileSize) {
     this.tileSize = tileSize;
     return this;
   }
 
-  public StyleTileSourceOptions clearTileSize() {
+  public TileSourceOptions clearTileSize() {
     tileSize = null;
     return this;
   }
@@ -126,16 +126,16 @@ public final class StyleTileSourceOptions {
     return vectorEncoding != null;
   }
 
-  public StyleVectorTileEncoding vectorEncoding() {
+  public VectorTileEncoding vectorEncoding() {
     return vectorEncoding;
   }
 
-  public StyleTileSourceOptions setVectorEncoding(StyleVectorTileEncoding vectorEncoding) {
+  public TileSourceOptions setVectorEncoding(VectorTileEncoding vectorEncoding) {
     this.vectorEncoding = Objects.requireNonNull(vectorEncoding, "vectorEncoding");
     return this;
   }
 
-  public StyleTileSourceOptions clearVectorEncoding() {
+  public TileSourceOptions clearVectorEncoding() {
     vectorEncoding = null;
     return this;
   }
@@ -144,16 +144,16 @@ public final class StyleTileSourceOptions {
     return rasterDemEncoding != null;
   }
 
-  public StyleRasterDemEncoding rasterDemEncoding() {
+  public RasterDemEncoding rasterDemEncoding() {
     return rasterDemEncoding;
   }
 
-  public StyleTileSourceOptions setRasterDemEncoding(StyleRasterDemEncoding rasterDemEncoding) {
+  public TileSourceOptions setRasterDemEncoding(RasterDemEncoding rasterDemEncoding) {
     this.rasterDemEncoding = Objects.requireNonNull(rasterDemEncoding, "rasterDemEncoding");
     return this;
   }
 
-  public StyleTileSourceOptions clearRasterDemEncoding() {
+  public TileSourceOptions clearRasterDemEncoding() {
     rasterDemEncoding = null;
     return this;
   }

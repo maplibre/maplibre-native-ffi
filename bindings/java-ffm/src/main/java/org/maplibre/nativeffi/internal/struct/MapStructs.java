@@ -26,12 +26,12 @@ import org.maplibre.nativeffi.internal.c.mln_map_viewport_options;
 import org.maplibre.nativeffi.internal.c.mln_projection_mode;
 import org.maplibre.nativeffi.map.ConstrainMode;
 import org.maplibre.nativeffi.map.MapOptions;
-import org.maplibre.nativeffi.map.MapTileOptions;
-import org.maplibre.nativeffi.map.MapViewportOptions;
 import org.maplibre.nativeffi.map.NorthOrientation;
 import org.maplibre.nativeffi.map.ProjectionModeOptions;
 import org.maplibre.nativeffi.map.TileLodMode;
+import org.maplibre.nativeffi.map.TileOptions;
 import org.maplibre.nativeffi.map.ViewportMode;
+import org.maplibre.nativeffi.map.ViewportOptions;
 
 /** Internal materializers and readers for map descriptors. */
 public final class MapStructs {
@@ -222,7 +222,7 @@ public final class MapStructs {
     return options;
   }
 
-  public static MemorySegment viewportOptions(MapViewportOptions options, Arena arena) {
+  public static MemorySegment viewportOptions(ViewportOptions options, Arena arena) {
     var segment = MapLibreNativeC.mln_map_viewport_options_default(arena);
     var fields = 0;
     if (options.hasNorthOrientation()) {
@@ -245,9 +245,9 @@ public final class MapStructs {
     return segment;
   }
 
-  public static MapViewportOptions viewportOptions(MemorySegment segment) {
+  public static ViewportOptions viewportOptions(MemorySegment segment) {
     var fields = mln_map_viewport_options.fields(segment);
-    var options = new MapViewportOptions();
+    var options = new ViewportOptions();
     if ((fields & MapLibreNativeC.MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION()) != 0) {
       options.setNorthOrientation(
           NorthOrientation.fromNative(mln_map_viewport_options.north_orientation(segment)));
@@ -266,7 +266,7 @@ public final class MapStructs {
     return options;
   }
 
-  public static MemorySegment tileOptions(MapTileOptions options, Arena arena) {
+  public static MemorySegment tileOptions(TileOptions options, Arena arena) {
     var segment = MapLibreNativeC.mln_map_tile_options_default(arena);
     var fields = 0;
     if (options.hasPrefetchZoomDelta()) {
@@ -297,9 +297,9 @@ public final class MapStructs {
     return segment;
   }
 
-  public static MapTileOptions tileOptions(MemorySegment segment) {
+  public static TileOptions tileOptions(MemorySegment segment) {
     var fields = mln_map_tile_options.fields(segment);
-    var options = new MapTileOptions();
+    var options = new TileOptions();
     if ((fields & MapLibreNativeC.MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA()) != 0) {
       options.setPrefetchZoomDelta(mln_map_tile_options.prefetch_zoom_delta(segment));
     }
