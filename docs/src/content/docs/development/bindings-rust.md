@@ -11,41 +11,159 @@ Resources:
 - [`bindgen` user guide](https://rust-lang.github.io/rust-bindgen/)
 - [Rust API Guidelines: FFI](https://rust-lang.github.io/api-guidelines/interoperability.html)
 
-The Rust binding exposes one public safe low-level Cargo package while sharing
-internal Rust crates with native-extension bindings such as Python and Node.
+## Architecture
 
-Generate `maplibre-native-sys` with `bindgen` from the public umbrella header.
-Treat successful generation and compilation as the header bindability check for
-this path. The `sys` crate mirrors the C ABI: raw extern functions, constants, C
-layouts, and opaque pointer types.
+The Rust binding serves two roles: a direct low-level Rust API and the shared
+native implementation base for bridge bindings. Bridge bindings depend on
+`maplibre-native-support`, keeping each host runtime's exception types,
+schedulers, and package conventions separate while sharing the C ABI adaptation
+code.
 
-`maplibre-native-support` is shared implementation glue above `sys`, not the
-public safety layer. It provides shared helpers for status checking, diagnostic
-copying, strings, descriptors, memory guards, callback boundaries, and
-`NativePointer` utilities. Keep bindgen and support types internal; public APIs
-expose Rust wrappers and values.
+```text
+maplibre-native-sys
+  Generated unsafe declarations for the public C ABI.
 
-Owner-thread-affine handle types are `!Send` and `!Sync`. Maps retain their
-runtime, render sessions retain their map, and parent state tracks live children
-without strong ownership. With those invariants, `Drop` destroys native handles
-on the owner thread. Explicit `close` or `destroy` methods return `Result<()>`
-when callers want native status and diagnostics.
+maplibre-native-support
+  Shared glue above sys: status conversion, diagnostics, descriptor
+  materializers, callback trampolines, and build/link utilities.
 
-Runtime events use copied source metadata, such as a Rust-assigned `MapId`,
-rather than cloned map handles.
+maplibre-native
+  Public safe Rust crate. Handles, owned values, events, errors,
+  and narrow unsafe backend interop points.
+```
 
-`NativePointer` exposes backend-native addresses through explicit unsafe raw
-pointer conversion. Texture frame access uses a closure-scoped helper that
-acquires the native frame, exposes unsafe backend-pointer accessors only during
-the callback, and releases the frame on scope exit.
+Generate `maplibre-native-sys` with `bindgen` from
+`include/maplibre_native_c.h`. Successful generation, compilation, and layout
+testing doubles as the Rust bindability check for the public C headers. The
+`sys` crate mirrors the ABI: raw `extern "C"` functions, constants, C layouts,
+and opaque handle pointer types. Don't hand-edit generated bindings; refresh
+with the appropriate mise task when the C headers change.
 
-Callback trampolines catch Rust panics and convert them to the documented C
-callback behavior. Callback state is stored strongly for the native owner scope
-and is thread-safe where MapLibre may call from worker, network, logging, or
-render-related threads. Resource provider request wrappers are `Send`, enforce
-one-shot completion, and release the C request handle exactly once.
+FFI details stay below the public crate boundary. Public modules group C API
+concepts (for example, `runtime`, `map`, `render`). Generated types, raw
+pointers, field masks, and callback trampolines stay internal to `sys` or
+`support`.
 
-Map C enums to Rust enums with explicit conversions. Use `bitflags` for
-user-visible masks and hide C field masks behind option structs, builders, or
-setters. Mark public C-backed enums `#[non_exhaustive]`; add `Unknown(raw)` for
-values read from native output where forward compatibility matters.
+## Type Surface
+
+Owned values model copied C data as plain Rust structs. Mutable C option structs
+become Rust structs with `Default` and builder-style setters; C field masks
+derive from `Option<T>` fields or explicit setters and stay internal. Support
+materializers write `size` fields and masks—callers set semantic fields only.
+Native result, snapshot, and list handles stay internal; readers copy into owned
+Rust values before releasing the native handle.
+
+Closed C enum domains map to Rust enums with explicit raw conversions. Public
+C-backed enums are `#[non_exhaustive]`. Unknown future values include
+`Unknown(u32)` or `Unknown(i32)` preserving the raw code. C bit masks become
+`bitflags` types for user-visible masks; C field masks stay behind descriptors.
+
+JSON and GeoJSON model as owned Rust value trees, preserving integer width,
+object member order, and duplicate keys.
+
+Runtime event polling returns owned `RuntimeEvent` values. Events identify
+source maps with copied metadata (a Rust-assigned `MapId`).
+
+## Lifetimes and Threading
+
+Thread-affine handles use `PhantomData<Rc<()>>` to opt out of auto-`Send` and
+auto-`Sync`. Owner-thread assignments follow the shared convention.
+`ResourceRequestHandle` is `Send` because the C API permits completion from any
+thread. `MapProjectionHandle` is still `!Send` despite not retaining its parent
+map—the projection is pinned to the map's owner thread at creation.
+
+No internal dispatch to another thread. Async adapters above this crate own any
+confinement or owner-thread executor policy. `MLN_STATUS_WRONG_THREAD` becomes a
+`WrongThread` error.
+
+Parent retention follows the shared convention. `MapProjectionHandle` follows
+the shared exception: standalone snapshot, no parent retention.
+
+Handle state (released/live, parent reference, leak context) lives in a private
+field on each handle wrapper. Thread-affine handles drop on the owner thread in
+safe Rust. `Drop` calls the C destroy function for still-live handles, records
+diagnostics on failure, and avoids double release. Explicit `close` methods
+return `Result<()>` for deterministic status and diagnostics.
+
+## Status and Diagnostics
+
+```rust
+pub type Result<T> = std::result::Result<T, Error>;
+```
+
+All errors surface through `Result`. The binding never panics on a native
+status; `Result` is the sole error path.
+
+Each C status category maps to a stable Rust error kind (for example,
+`MLN_STATUS_WRONG_THREAD` → `WrongThread`). `Error` stores the mapped kind, raw
+`mln_status`, and the copied thread-local diagnostic. Unknown future values map
+to an `Unknown` kind with the raw code and diagnostic preserved.
+
+The binding validates Rust-owned state before crossing into C—released wrappers,
+active callback-scoped borrows, threading constraints, one-shot request
+completion—and lets the C API validate native arguments, state, and ranges.
+
+Handle-creating functions initialize raw out-pointers to null and wrap only
+successful non-null results. C functions reporting presence through output
+booleans become `Result<Option<T>>` or `Result<bool>`.
+
+## FFI Memory
+
+Public safe methods materialize C inputs at the call boundary. Temporary storage
+uses stack values, `CString`, `Vec<T>`, or support-owned arenas scoped to the C
+call. Object-owned native memory is reserved for storage the C API needs beyond
+one call (callback state, reusable buffers, resource-provider request state).
+
+Descriptor materializers own ABI bookkeeping and backing storage lifetime.
+Snapshot, result, and list handles use internal RAII guards. Readers copy all
+borrowed data, then release the native handle even on copy failure.
+
+`NativePointer` construction and reconversion are `unsafe`, limited to C APIs
+whose contract accepts the relevant opaque backend handle. Public safe APIs are
+free of raw `sys` pointers. Public `unsafe` functions are small, named for the
+native invariant they require, and document caller obligations.
+
+## Callbacks
+
+Trampolines live in `support`. They adapt C function pointers to Rust closures
+or trait objects, copy or wrap callback arguments, catch panics with
+`catch_unwind`, and convert failures to the C callback's documented behavior.
+Panics never unwind through C frames.
+
+Callback scoping follows the shared convention. State for callbacks that may
+arrive on MapLibre worker, network, logging, or render threads requires
+`Send + Sync + 'static`.
+
+When replacing a callback, install the new native descriptor before closing the
+old Rust state. If native installation fails, close the replacement state and
+keep the previous state active.
+
+Resource provider callbacks copy the borrowed `mln_resource_request` into an
+owned `ResourceRequest` before user code can retain it. `ResourceRequestHandle`
+is `Send`, enforces one-shot completion, and releases the C request handle
+exactly once—on `complete`, explicit release, or `Drop`.
+
+## Render Targets
+
+Render target descriptors are Rust value types. Surface and borrowed-texture
+descriptors store backend objects as `NativePointer`.
+
+Attach methods return `RenderSessionHandle`. A session represents one attached
+target for one map and keeps the map alive. Violations of the single-session
+rule surface as `InvalidState` errors.
+
+Texture readback supports two shapes:
+
+- `read_premultiplied_rgba8_into(&mut [u8]) -> Result<TextureImageInfo>` for
+  caller-owned reusable storage.
+- A convenience method returning a copied `PremultipliedRgba8Image`.
+
+Session-owned texture frames use closure-scoped accessors (`with_metal_frame`,
+`with_vulkan_frame`). The helper acquires the native frame, passes a frame view
+tied to a mutable borrow of the session, and releases the frame on return or
+unwind. Frame views expose copied metadata through safe accessors. Backend
+handles use scoped `NativePointer` accessors marked `unsafe`—callers honor
+backend synchronization and lifetime rules.
+
+Safe Rust borrowing prevents reentrant session calls through the same handle
+while a frame is acquired.
