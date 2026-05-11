@@ -7,28 +7,28 @@
 #include "maplibre_native_c.h"
 #include "render/texture_session.hpp"
 
-auto mln_owned_texture_descriptor_default(void) noexcept
-  -> mln_owned_texture_descriptor {
+auto mln_owned_texture_descriptor_default(void
+) noexcept -> mln_owned_texture_descriptor {
   return mln::core::owned_texture_descriptor_default();
 }
 
-auto mln_metal_owned_texture_descriptor_default(void) noexcept
-  -> mln_metal_owned_texture_descriptor {
+auto mln_metal_owned_texture_descriptor_default(void
+) noexcept -> mln_metal_owned_texture_descriptor {
   return mln::core::metal_owned_texture_descriptor_default();
 }
 
-auto mln_metal_borrowed_texture_descriptor_default(void) noexcept
-  -> mln_metal_borrowed_texture_descriptor {
+auto mln_metal_borrowed_texture_descriptor_default(void
+) noexcept -> mln_metal_borrowed_texture_descriptor {
   return mln::core::metal_borrowed_texture_descriptor_default();
 }
 
-auto mln_vulkan_owned_texture_descriptor_default(void) noexcept
-  -> mln_vulkan_owned_texture_descriptor {
+auto mln_vulkan_owned_texture_descriptor_default(void
+) noexcept -> mln_vulkan_owned_texture_descriptor {
   return mln::core::vulkan_owned_texture_descriptor_default();
 }
 
-auto mln_vulkan_borrowed_texture_descriptor_default(void) noexcept
-  -> mln_vulkan_borrowed_texture_descriptor {
+auto mln_vulkan_borrowed_texture_descriptor_default(void
+) noexcept -> mln_vulkan_borrowed_texture_descriptor {
   return mln::core::vulkan_borrowed_texture_descriptor_default();
 }
 

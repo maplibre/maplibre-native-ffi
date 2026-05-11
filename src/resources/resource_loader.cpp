@@ -56,8 +56,8 @@ auto resource_kind_to_abi(mbgl::Resource::Kind kind) -> uint32_t {
   }
 }
 
-auto make_resource_transform(void* platform_context)
-  -> mbgl::ResourceTransform {
+auto make_resource_transform(void* platform_context
+) -> mbgl::ResourceTransform {
   if (platform_context == nullptr) {
     return mbgl::ResourceTransform{};
   }
@@ -68,9 +68,8 @@ auto make_resource_transform(void* platform_context)
       mbgl::ResourceTransform::FinishedCallback finished
     ) -> void {
       const auto* runtime = find_runtime_for_platform_context(platform_context);
-      if (
-        runtime == nullptr || runtime->resource_transform_callback == nullptr
-      ) {
+      if (runtime == nullptr ||
+          runtime->resource_transform_callback == nullptr) {
         finished(url);
         return;
       }
@@ -84,10 +83,8 @@ auto make_resource_transform(void* platform_context)
         const auto status = callback(
           user_data, resource_kind_to_abi(kind), url.c_str(), &response
         );
-        if (
-          status == MLN_STATUS_OK && response.url != nullptr &&
-          *response.url != '\0'
-        ) {
+        if (status == MLN_STATUS_OK && response.url != nullptr &&
+            *response.url != '\0') {
           finished(std::string{response.url});
           return;
         }
@@ -108,11 +105,9 @@ class AbiNetworkFileSource final : public mbgl::FileSource {
   )
       : resource_options_(resource_options.clone()),
         client_options_(client_options.clone()),
-        native_(
-          std::make_unique<mbgl::OnlineFileSource>(
-            resource_options, client_options
-          )
-        ) {
+        native_(std::make_unique<mbgl::OnlineFileSource>(
+          resource_options, client_options
+        )) {
     apply_resource_transform();
   }
 
@@ -134,8 +129,8 @@ class AbiNetworkFileSource final : public mbgl::FileSource {
     return native_->request(resource, std::move(callback));
   }
 
-  [[nodiscard]] auto canRequest(const mbgl::Resource& resource) const
-    -> bool override {
+  [[nodiscard]] auto canRequest(const mbgl::Resource& resource
+  ) const -> bool override {
     const auto has_provider =
       runtime_resource_provider(resource_options_.platformContext())
         .has_value();
@@ -182,8 +177,8 @@ class AbiNetworkFileSource final : public mbgl::FileSource {
   }
 
  private:
-  static auto runtime_resource_provider(void* platform_context)
-    -> std::optional<ResourceProvider> {
+  static auto runtime_resource_provider(void* platform_context
+  ) -> std::optional<ResourceProvider> {
     const auto* runtime = find_runtime_for_platform_context(platform_context);
     if (runtime == nullptr || !runtime->has_resource_provider) {
       return std::nullopt;
@@ -233,7 +228,8 @@ auto make_database_file_source(
       find_runtime_for_platform_context(resource_options.platformContext());
     if (runtime != nullptr && runtime->has_maximum_cache_size) {
       source->setMaximumAmbientCacheSize(
-        runtime->maximum_cache_size, [](std::exception_ptr exception) -> void {
+        runtime->maximum_cache_size,
+        [](std::exception_ptr exception) -> void {
           if (exception != nullptr) {
             mbgl::Log::Error(
               mbgl::Event::Database,

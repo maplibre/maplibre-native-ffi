@@ -30,8 +30,8 @@ auto mln_source_feature_query_options_default() noexcept
   };
 }
 
-auto mln_rendered_query_geometry_point(mln_screen_point point) noexcept
-  -> mln_rendered_query_geometry {
+auto mln_rendered_query_geometry_point(mln_screen_point point
+) noexcept -> mln_rendered_query_geometry {
   return mln_rendered_query_geometry{
     .size = sizeof(mln_rendered_query_geometry),
     .type = MLN_RENDERED_QUERY_GEOMETRY_TYPE_POINT,
@@ -39,8 +39,8 @@ auto mln_rendered_query_geometry_point(mln_screen_point point) noexcept
   };
 }
 
-auto mln_rendered_query_geometry_box(mln_screen_box box) noexcept
-  -> mln_rendered_query_geometry {
+auto mln_rendered_query_geometry_box(mln_screen_box box
+) noexcept -> mln_rendered_query_geometry {
   return mln_rendered_query_geometry{
     .size = sizeof(mln_rendered_query_geometry),
     .type = MLN_RENDERED_QUERY_GEOMETRY_TYPE_BOX,
@@ -69,43 +69,43 @@ auto mln_render_session_resize(
   });
 }
 
-auto mln_render_session_render_update(mln_render_session* session) noexcept
-  -> mln_status {
+auto mln_render_session_render_update(mln_render_session* session
+) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::render_session_render_update(session);
   });
 }
 
-auto mln_render_session_detach(mln_render_session* session) noexcept
-  -> mln_status {
+auto mln_render_session_detach(mln_render_session* session
+) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::render_session_detach(session);
   });
 }
 
-auto mln_render_session_destroy(mln_render_session* session) noexcept
-  -> mln_status {
+auto mln_render_session_destroy(mln_render_session* session
+) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::render_session_destroy(session);
   });
 }
 
-auto mln_render_session_reduce_memory_use(mln_render_session* session) noexcept
-  -> mln_status {
+auto mln_render_session_reduce_memory_use(mln_render_session* session
+) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::render_session_reduce_memory_use(session);
   });
 }
 
-auto mln_render_session_clear_data(mln_render_session* session) noexcept
-  -> mln_status {
+auto mln_render_session_clear_data(mln_render_session* session
+) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::render_session_clear_data(session);
   });
 }
 
-auto mln_render_session_dump_debug_logs(mln_render_session* session) noexcept
-  -> mln_status {
+auto mln_render_session_dump_debug_logs(mln_render_session* session
+) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::render_session_dump_debug_logs(session);
   });
@@ -182,8 +182,8 @@ auto mln_feature_query_result_get(
   });
 }
 
-auto mln_feature_query_result_destroy(mln_feature_query_result* result) noexcept
-  -> void {
+auto mln_feature_query_result_destroy(mln_feature_query_result* result
+) noexcept -> void {
   mln::core::feature_query_result_destroy(result);
 }
 
@@ -210,8 +210,7 @@ auto mln_feature_extension_result_get(
   });
 }
 
-auto mln_feature_extension_result_destroy(
-  mln_feature_extension_result* result
+auto mln_feature_extension_result_destroy(mln_feature_extension_result* result
 ) noexcept -> void {
   mln::core::feature_extension_result_destroy(result);
 }

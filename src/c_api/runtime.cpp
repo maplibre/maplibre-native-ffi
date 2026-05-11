@@ -51,8 +51,8 @@ auto mln_resource_request_cancelled(
   });
 }
 
-auto mln_resource_request_release(mln_resource_request_handle* handle) noexcept
-  -> void {
+auto mln_resource_request_release(mln_resource_request_handle* handle
+) noexcept -> void {
   mln::core::release_resource_request(handle);
 }
 
@@ -148,9 +148,10 @@ auto mln_runtime_offline_region_set_download_state(
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::offline_region_set_download_state(
-      runtime, mln::core::OfflineRegionDownloadStateRequest{
-                 .region_id = region_id, .state = state
-               }
+      runtime,
+      mln::core::OfflineRegionDownloadStateRequest{
+        .region_id = region_id, .state = state
+      }
     );
   });
 }
@@ -179,8 +180,7 @@ auto mln_offline_region_snapshot_get(
   });
 }
 
-auto mln_offline_region_snapshot_destroy(
-  mln_offline_region_snapshot* snapshot
+auto mln_offline_region_snapshot_destroy(mln_offline_region_snapshot* snapshot
 ) noexcept -> void {
   mln::core::offline_region_snapshot_destroy(snapshot);
 }
@@ -202,8 +202,8 @@ auto mln_offline_region_list_get(
   });
 }
 
-auto mln_offline_region_list_destroy(mln_offline_region_list* list) noexcept
-  -> void {
+auto mln_offline_region_list_destroy(mln_offline_region_list* list
+) noexcept -> void {
   mln::core::offline_region_list_destroy(list);
 }
 

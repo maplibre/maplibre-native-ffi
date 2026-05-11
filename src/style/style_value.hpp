@@ -47,10 +47,10 @@ class ConversionTraits<const mln_json_value*> {
   static auto toBool(const mln_json_value* value) -> std::optional<bool>;
   static auto toNumber(const mln_json_value* value) -> std::optional<float>;
   static auto toDouble(const mln_json_value* value) -> std::optional<double>;
-  static auto toString(const mln_json_value* value)
-    -> std::optional<std::string>;
-  static auto toValue(const mln_json_value* value)
-    -> std::optional<mbgl::Value>;
+  static auto toString(const mln_json_value* value
+  ) -> std::optional<std::string>;
+  static auto toValue(const mln_json_value* value
+  ) -> std::optional<mbgl::Value>;
   static auto toGeoJSON(const mln_json_value* value, Error& error)
     -> std::optional<mbgl::GeoJSON>;
 
@@ -64,8 +64,8 @@ namespace mln::core {
 
 auto validate_style_json_value(const mln_json_value* value) -> bool;
 
-auto to_native_style_filter(const mln_json_value* filter)
-  -> std::optional<mbgl::style::Filter>;
+auto to_native_style_filter(const mln_json_value* filter
+) -> std::optional<mbgl::style::Filter>;
 
 auto set_style_conversion_error(
   const char* context, const mbgl::style::conversion::Error& error

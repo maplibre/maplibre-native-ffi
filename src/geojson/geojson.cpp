@@ -45,8 +45,9 @@ auto json_snapshot_mutex() -> std::mutex& {
   return value;
 }
 
-auto json_snapshots() -> std::unordered_map<
-  const mln_json_snapshot*, std::unique_ptr<mln_json_snapshot>>& {
+auto json_snapshots()
+  -> std::unordered_map<
+    const mln_json_snapshot*, std::unique_ptr<mln_json_snapshot>>& {
   static auto value = std::unordered_map<
     const mln_json_snapshot*, std::unique_ptr<mln_json_snapshot>>{};
   return value;
@@ -82,10 +83,8 @@ auto to_string(mln_string_view string) -> std::string {
 }
 
 auto validate_coordinate(mln_lat_lng coordinate) -> bool {
-  if (
-    !std::isfinite(coordinate.latitude) || coordinate.latitude < -90.0 ||
-    coordinate.latitude > 90.0 || !std::isfinite(coordinate.longitude)
-  ) {
+  if (!std::isfinite(coordinate.latitude) || coordinate.latitude < -90.0 ||
+      coordinate.latitude > 90.0 || !std::isfinite(coordinate.longitude)) {
     mln::core::set_thread_error(
       "latitude must be finite and within [-90, 90], and longitude must be "
       "finite"
@@ -103,8 +102,8 @@ auto from_native_point(const mbgl::Point<double>& point) -> mln_lat_lng {
   return mln_lat_lng{.latitude = point.y, .longitude = point.x};
 }
 
-auto convert_coordinate_span(mln_coordinate_span span)
-  -> std::optional<mbgl::LineString<double>> {
+auto convert_coordinate_span(mln_coordinate_span span
+) -> std::optional<mbgl::LineString<double>> {
   if (span.coordinate_count > 0 && span.coordinates == nullptr) {
     mln::core::set_thread_error("coordinates must not be null");
     return std::nullopt;
@@ -122,8 +121,8 @@ auto convert_coordinate_span(mln_coordinate_span span)
   return result;
 }
 
-auto convert_polygon(mln_polygon_geometry polygon)
-  -> std::optional<mbgl::Polygon<double>> {
+auto convert_polygon(mln_polygon_geometry polygon
+) -> std::optional<mbgl::Polygon<double>> {
   if (polygon.ring_count > 0 && polygon.rings == nullptr) {
     mln::core::set_thread_error("polygon rings must not be null");
     return std::nullopt;
@@ -143,8 +142,8 @@ auto convert_polygon(mln_polygon_geometry polygon)
   return result;
 }
 
-auto convert_multi_line(mln_multi_line_geometry multi_line)
-  -> std::optional<mbgl::MultiLineString<double>> {
+auto convert_multi_line(mln_multi_line_geometry multi_line
+) -> std::optional<mbgl::MultiLineString<double>> {
   if (multi_line.line_count > 0 && multi_line.lines == nullptr) {
     mln::core::set_thread_error("multi-line strings must not be null");
     return std::nullopt;
@@ -164,8 +163,8 @@ auto convert_multi_line(mln_multi_line_geometry multi_line)
   return result;
 }
 
-auto convert_multi_polygon(mln_multi_polygon_geometry multi_polygon)
-  -> std::optional<mbgl::MultiPolygon<double>> {
+auto convert_multi_polygon(mln_multi_polygon_geometry multi_polygon
+) -> std::optional<mbgl::MultiPolygon<double>> {
   if (multi_polygon.polygon_count > 0 && multi_polygon.polygons == nullptr) {
     mln::core::set_thread_error("multi-polygons must not be null");
     return std::nullopt;
@@ -360,8 +359,8 @@ auto convert_value(const mln_json_value* value, std::size_t depth)
   }
 }
 
-auto convert_identifier(const mln_feature& feature)
-  -> std::optional<mbgl::FeatureIdentifier> {
+auto convert_identifier(const mln_feature& feature
+) -> std::optional<mbgl::FeatureIdentifier> {
   switch (feature.identifier_type) {
     case MLN_FEATURE_IDENTIFIER_TYPE_NULL:
       return mbgl::FeatureIdentifier{mbgl::NullValue{}};
@@ -379,8 +378,7 @@ auto convert_identifier(const mln_feature& feature)
       if (!validate_string(feature.identifier.string_value)) {
         return std::nullopt;
       }
-      return mbgl::FeatureIdentifier{
-        to_string(feature.identifier.string_value)
+      return mbgl::FeatureIdentifier{to_string(feature.identifier.string_value)
       };
     default:
       mln::core::set_thread_error("feature identifier type is invalid");
@@ -444,8 +442,8 @@ auto to_coordinate_list(const PointList& points) -> std::vector<mln_lat_lng> {
   return result;
 }
 
-auto coordinate_span(const std::vector<mln_lat_lng>& coordinates)
-  -> mln_coordinate_span {
+auto coordinate_span(const std::vector<mln_lat_lng>& coordinates
+) -> mln_coordinate_span {
   return mln_coordinate_span{
     .coordinates = coordinates.empty() ? nullptr : coordinates.data(),
     .coordinate_count = coordinates.size()
@@ -483,8 +481,8 @@ auto make_geometry_descriptor(
   return result;
 }
 
-auto make_polygon_descriptor(const mbgl::Polygon<double>& polygon)
-  -> GeometryDescriptorPtr {
+auto make_polygon_descriptor(const mbgl::Polygon<double>& polygon
+) -> GeometryDescriptorPtr {
   auto result = std::make_unique<mln::core::OwnedGeometryDescriptor>();
   result->coordinate_lists.reserve(polygon.size());
   result->coordinate_spans.reserve(polygon.size());
@@ -497,20 +495,18 @@ auto make_polygon_descriptor(const mbgl::Polygon<double>& polygon)
   result->root = mln_geometry{
     .size = sizeof(mln_geometry),
     .type = MLN_GEOMETRY_TYPE_POLYGON,
-    .data = {
-      .polygon = {
-        .rings = result->coordinate_spans.empty()
-                   ? nullptr
-                   : result->coordinate_spans.data(),
-        .ring_count = result->coordinate_spans.size()
-      }
-    }
+    .data =
+      {.polygon =
+         {.rings = result->coordinate_spans.empty()
+                     ? nullptr
+                     : result->coordinate_spans.data(),
+          .ring_count = result->coordinate_spans.size()}}
   };
   return result;
 }
 
-auto make_multi_line_descriptor(const mbgl::MultiLineString<double>& multi_line)
-  -> GeometryDescriptorPtr {
+auto make_multi_line_descriptor(const mbgl::MultiLineString<double>& multi_line
+) -> GeometryDescriptorPtr {
   auto result = std::make_unique<mln::core::OwnedGeometryDescriptor>();
   result->coordinate_lists.reserve(multi_line.size());
   result->coordinate_spans.reserve(multi_line.size());
@@ -523,14 +519,12 @@ auto make_multi_line_descriptor(const mbgl::MultiLineString<double>& multi_line)
   result->root = mln_geometry{
     .size = sizeof(mln_geometry),
     .type = MLN_GEOMETRY_TYPE_MULTI_LINE_STRING,
-    .data = {
-      .multi_line_string = {
-        .lines = result->coordinate_spans.empty()
-                   ? nullptr
-                   : result->coordinate_spans.data(),
-        .line_count = result->coordinate_spans.size()
-      }
-    }
+    .data =
+      {.multi_line_string =
+         {.lines = result->coordinate_spans.empty()
+                     ? nullptr
+                     : result->coordinate_spans.data(),
+          .line_count = result->coordinate_spans.size()}}
   };
   return result;
 }
@@ -555,25 +549,21 @@ auto make_multi_polygon_descriptor(
         coordinate_span(result->coordinate_lists.back())
       );
     }
-    result->polygons.emplace_back(
-      mln_polygon_geometry{
-        .rings =
-          polygon.empty() ? nullptr : &result->coordinate_spans.at(first_ring),
-        .ring_count = polygon.size()
-      }
-    );
+    result->polygons.emplace_back(mln_polygon_geometry{
+      .rings =
+        polygon.empty() ? nullptr : &result->coordinate_spans.at(first_ring),
+      .ring_count = polygon.size()
+    });
   }
 
   result->root = mln_geometry{
     .size = sizeof(mln_geometry),
     .type = MLN_GEOMETRY_TYPE_MULTI_POLYGON,
-    .data = {
-      .multi_polygon = {
-        .polygons =
-          result->polygons.empty() ? nullptr : result->polygons.data(),
-        .polygon_count = result->polygons.size()
-      }
-    }
+    .data =
+      {.multi_polygon =
+         {.polygons =
+            result->polygons.empty() ? nullptr : result->polygons.data(),
+          .polygon_count = result->polygons.size()}}
   };
   return result;
 }
@@ -582,67 +572,63 @@ auto make_geometry_descriptor(
   const mbgl::Geometry<double>& geometry, std::size_t depth
 ) -> GeometryDescriptorPtr {
   validate_export_depth(depth);
-  return geometry.match(
-    Overloaded{
-      [](const mbgl::EmptyGeometry&) -> GeometryDescriptorPtr {
-        auto result = std::make_unique<mln::core::OwnedGeometryDescriptor>();
-        result->root = mln_geometry{
-          .size = sizeof(mln_geometry),
-          .type = MLN_GEOMETRY_TYPE_EMPTY,
-          .data = {.point = {}}
-        };
-        return result;
-      },
-      [](const mbgl::Point<double>& point) -> GeometryDescriptorPtr {
-        auto result = std::make_unique<mln::core::OwnedGeometryDescriptor>();
-        result->root = mln_geometry{
-          .size = sizeof(mln_geometry),
-          .type = MLN_GEOMETRY_TYPE_POINT,
-          .data = {.point = from_native_point(point)}
-        };
-        return result;
-      },
-      [](const mbgl::LineString<double>& line) -> GeometryDescriptorPtr {
-        auto result = std::make_unique<mln::core::OwnedGeometryDescriptor>();
-        result->coordinate_lists.emplace_back(to_coordinate_list(line));
-        result->root = mln_geometry{
-          .size = sizeof(mln_geometry),
-          .type = MLN_GEOMETRY_TYPE_LINE_STRING,
-          .data = {
-            .line_string = coordinate_span(result->coordinate_lists.front())
-          }
-        };
-        return result;
-      },
-      [](const mbgl::Polygon<double>& polygon) -> GeometryDescriptorPtr {
-        return make_polygon_descriptor(polygon);
-      },
-      [](const mbgl::MultiPoint<double>& points) -> GeometryDescriptorPtr {
-        auto result = std::make_unique<mln::core::OwnedGeometryDescriptor>();
-        result->coordinate_lists.emplace_back(to_coordinate_list(points));
-        result->root = mln_geometry{
-          .size = sizeof(mln_geometry),
-          .type = MLN_GEOMETRY_TYPE_MULTI_POINT,
-          .data = {
-            .multi_point = coordinate_span(result->coordinate_lists.front())
-          }
-        };
-        return result;
-      },
-      [](const mbgl::MultiLineString<double>& multi_line)
-        -> GeometryDescriptorPtr {
-        return make_multi_line_descriptor(multi_line);
-      },
-      [](const mbgl::MultiPolygon<double>& multi_polygon)
-        -> GeometryDescriptorPtr {
-        return make_multi_polygon_descriptor(multi_polygon);
-      },
-      [depth](const mapbox::geometry::geometry_collection<double>& collection)
-        -> GeometryDescriptorPtr {
-        return make_geometry_descriptor(collection, depth);
-      }
+  return geometry.match(Overloaded{
+    [](const mbgl::EmptyGeometry&) -> GeometryDescriptorPtr {
+      auto result = std::make_unique<mln::core::OwnedGeometryDescriptor>();
+      result->root = mln_geometry{
+        .size = sizeof(mln_geometry),
+        .type = MLN_GEOMETRY_TYPE_EMPTY,
+        .data = {.point = {}}
+      };
+      return result;
+    },
+    [](const mbgl::Point<double>& point) -> GeometryDescriptorPtr {
+      auto result = std::make_unique<mln::core::OwnedGeometryDescriptor>();
+      result->root = mln_geometry{
+        .size = sizeof(mln_geometry),
+        .type = MLN_GEOMETRY_TYPE_POINT,
+        .data = {.point = from_native_point(point)}
+      };
+      return result;
+    },
+    [](const mbgl::LineString<double>& line) -> GeometryDescriptorPtr {
+      auto result = std::make_unique<mln::core::OwnedGeometryDescriptor>();
+      result->coordinate_lists.emplace_back(to_coordinate_list(line));
+      result->root = mln_geometry{
+        .size = sizeof(mln_geometry),
+        .type = MLN_GEOMETRY_TYPE_LINE_STRING,
+        .data =
+          {.line_string = coordinate_span(result->coordinate_lists.front())}
+      };
+      return result;
+    },
+    [](const mbgl::Polygon<double>& polygon) -> GeometryDescriptorPtr {
+      return make_polygon_descriptor(polygon);
+    },
+    [](const mbgl::MultiPoint<double>& points) -> GeometryDescriptorPtr {
+      auto result = std::make_unique<mln::core::OwnedGeometryDescriptor>();
+      result->coordinate_lists.emplace_back(to_coordinate_list(points));
+      result->root = mln_geometry{
+        .size = sizeof(mln_geometry),
+        .type = MLN_GEOMETRY_TYPE_MULTI_POINT,
+        .data =
+          {.multi_point = coordinate_span(result->coordinate_lists.front())}
+      };
+      return result;
+    },
+    [](const mbgl::MultiLineString<double>& multi_line
+    ) -> GeometryDescriptorPtr {
+      return make_multi_line_descriptor(multi_line);
+    },
+    [](const mbgl::MultiPolygon<double>& multi_polygon
+    ) -> GeometryDescriptorPtr {
+      return make_multi_polygon_descriptor(multi_polygon);
+    },
+    [depth](const mapbox::geometry::geometry_collection<double>& collection
+    ) -> GeometryDescriptorPtr {
+      return make_geometry_descriptor(collection, depth);
     }
-  );
+  });
 }
 
 auto string_view(const std::string& string) -> mln_string_view {
@@ -670,13 +656,11 @@ auto make_array_json_descriptor(
   result->root = mln_json_value{
     .size = sizeof(mln_json_value),
     .type = MLN_JSON_VALUE_TYPE_ARRAY,
-    .data = {
-      .array_value = {
-        .values =
-          result->child_values.empty() ? nullptr : result->child_values.data(),
-        .value_count = result->child_values.size()
-      }
-    }
+    .data =
+      {.array_value =
+         {.values = result->child_values.empty() ? nullptr
+                                                 : result->child_values.data(),
+          .value_count = result->child_values.size()}}
   };
   return result;
 }
@@ -696,23 +680,19 @@ auto make_object_json_descriptor(
   }
   for (std::size_t index = 0; index < result->children.size(); ++index) {
     result->child_values.emplace_back(result->children.at(index)->root);
-    result->members.emplace_back(
-      mln_json_member{
-        .key = string_view(result->strings.at(index)),
-        .value = &result->child_values.back()
-      }
-    );
+    result->members.emplace_back(mln_json_member{
+      .key = string_view(result->strings.at(index)),
+      .value = &result->child_values.back()
+    });
   }
 
   result->root = mln_json_value{
     .size = sizeof(mln_json_value),
     .type = MLN_JSON_VALUE_TYPE_OBJECT,
-    .data = {
-      .object_value = {
-        .members = result->members.empty() ? nullptr : result->members.data(),
-        .member_count = result->members.size()
-      }
-    }
+    .data =
+      {.object_value =
+         {.members = result->members.empty() ? nullptr : result->members.data(),
+          .member_count = result->members.size()}}
   };
   return result;
 }
@@ -785,23 +765,23 @@ auto make_json_descriptor(const mbgl::Value& value, std::size_t depth)
 
 namespace mln::core {
 
-auto to_native_geometry(const mln_geometry* geometry)
-  -> std::optional<mbgl::Geometry<double>> {
+auto to_native_geometry(const mln_geometry* geometry
+) -> std::optional<mbgl::Geometry<double>> {
   return convert_geometry(geometry, 0);
 }
 
-auto to_c_geometry(const mbgl::Geometry<double>& geometry)
-  -> std::unique_ptr<OwnedGeometryDescriptor> {
+auto to_c_geometry(const mbgl::Geometry<double>& geometry
+) -> std::unique_ptr<OwnedGeometryDescriptor> {
   return make_geometry_descriptor(geometry, 0);
 }
 
-auto to_native_json_value(const mln_json_value* value)
-  -> std::optional<mbgl::Value> {
+auto to_native_json_value(const mln_json_value* value
+) -> std::optional<mbgl::Value> {
   return convert_value(value, 0);
 }
 
-auto to_c_json_value(const mbgl::Value& value)
-  -> std::unique_ptr<OwnedJsonDescriptor> {
+auto to_c_json_value(const mbgl::Value& value
+) -> std::unique_ptr<OwnedJsonDescriptor> {
   return make_json_descriptor(value, 0);
 }
 
@@ -856,13 +836,13 @@ auto json_snapshot_destroy(mln_json_snapshot* snapshot) -> void {
   json_snapshots().erase(snapshot);
 }
 
-auto to_native_feature(const mln_feature* feature)
-  -> std::optional<mbgl::GeoJSONFeature> {
+auto to_native_feature(const mln_feature* feature
+) -> std::optional<mbgl::GeoJSONFeature> {
   return convert_feature(feature, 0);
 }
 
-auto to_native_geojson(const mln_geojson* geojson)
-  -> std::optional<mbgl::GeoJSON> {
+auto to_native_geojson(const mln_geojson* geojson
+) -> std::optional<mbgl::GeoJSON> {
   if (geojson == nullptr) {
     set_thread_error("GeoJSON must not be null");
     return std::nullopt;
@@ -913,8 +893,8 @@ auto to_native_geojson(const mln_geojson* geojson)
   }
 }
 
-auto geometry_lat_lngs(const mbgl::Geometry<double>& geometry)
-  -> std::vector<mbgl::LatLng> {
+auto geometry_lat_lngs(const mbgl::Geometry<double>& geometry
+) -> std::vector<mbgl::LatLng> {
   auto result = std::vector<mbgl::LatLng>{};
   mbgl::forEachPoint(geometry, [&](const mbgl::Point<double>& point) -> void {
     result.emplace_back(point.y, point.x);

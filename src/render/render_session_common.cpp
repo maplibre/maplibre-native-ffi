@@ -70,8 +70,9 @@ auto render_session_mutex() -> std::mutex& {
   return value;
 }
 
-auto render_sessions() -> std::unordered_map<
-  mln_render_session*, std::unique_ptr<mln_render_session>>& {
+auto render_sessions()
+  -> std::unordered_map<
+    mln_render_session*, std::unique_ptr<mln_render_session>>& {
   static auto value = std::unordered_map<
     mln_render_session*, std::unique_ptr<mln_render_session>>{};
   return value;
@@ -83,10 +84,11 @@ auto feature_query_result_mutex() -> std::mutex& {
 }
 
 auto feature_query_results() -> std::unordered_map<
-  const mln_feature_query_result*, std::unique_ptr<mln_feature_query_result>>& {
+                               const mln_feature_query_result*,
+                               std::unique_ptr<mln_feature_query_result>>& {
   static auto value = std::unordered_map<
-    const mln_feature_query_result*,
-    std::unique_ptr<mln_feature_query_result>>{};
+    const mln_feature_query_result*, std::unique_ptr<mln_feature_query_result>>{
+  };
   return value;
 }
 
@@ -95,9 +97,10 @@ auto feature_extension_result_mutex() -> std::mutex& {
   return value;
 }
 
-auto feature_extension_results() -> std::unordered_map<
-  const mln_feature_extension_result*,
-  std::unique_ptr<mln_feature_extension_result>>& {
+auto feature_extension_results()
+  -> std::unordered_map<
+    const mln_feature_extension_result*,
+    std::unique_ptr<mln_feature_extension_result>>& {
   static auto value = std::unordered_map<
     const mln_feature_extension_result*,
     std::unique_ptr<mln_feature_extension_result>>{};
@@ -114,18 +117,16 @@ auto has_backend(const mln_render_session* session) -> bool {
 auto validate_dimensions(
   uint32_t width, uint32_t height, double scale_factor, const char* message
 ) -> mln_status {
-  if (
-    width == 0 || height == 0 || !std::isfinite(scale_factor) ||
-    scale_factor <= 0.0
-  ) {
+  if (width == 0 || height == 0 || !std::isfinite(scale_factor) ||
+      scale_factor <= 0.0) {
     mln::core::set_thread_error(message);
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   return MLN_STATUS_OK;
 }
 
-auto renderer_backend(mln_render_session* session)
-  -> mbgl::gfx::RendererBackend* {
+auto renderer_backend(mln_render_session* session
+) -> mbgl::gfx::RendererBackend* {
   if (session->kind == mln::core::RenderSessionKind::Surface) {
     return &session->surface.backend->renderer_backend();
   }
@@ -135,15 +136,15 @@ auto renderer_backend(mln_render_session* session)
 // For texture sessions the library owns the headless backend and must
 // activate the GL/Vulkan context via an Explicit scope. Surface sessions
 // borrow a caller-owned context, so the caller activates it (Implicit).
-auto session_scope_type(const mln_render_session* session)
-  -> mbgl::gfx::BackendScope::ScopeType {
+auto session_scope_type(const mln_render_session* session
+) -> mbgl::gfx::BackendScope::ScopeType {
   return (session->kind == mln::core::RenderSessionKind::Texture)
            ? mbgl::gfx::BackendScope::ScopeType::Explicit
            : mbgl::gfx::BackendScope::ScopeType::Implicit;
 }
 
-auto validate_renderer_backend(mln_render_session* session)
-  -> mbgl::gfx::RendererBackend* {
+auto validate_renderer_backend(mln_render_session* session
+) -> mbgl::gfx::RendererBackend* {
   if (session->renderer == nullptr) {
     mln::core::set_thread_error("render session renderer is not available");
     return nullptr;
@@ -207,8 +208,8 @@ auto validate_screen_point(mln_screen_point point) -> bool {
   return true;
 }
 
-auto validate_query_result_output(mln_feature_query_result** out_result)
-  -> mln_status {
+auto validate_query_result_output(mln_feature_query_result** out_result
+) -> mln_status {
   if (out_result == nullptr) {
     mln::core::set_thread_error("out_result must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
@@ -220,8 +221,8 @@ auto validate_query_result_output(mln_feature_query_result** out_result)
   return MLN_STATUS_OK;
 }
 
-auto validate_extension_result_output(mln_feature_extension_result** out_result)
-  -> mln_status {
+auto validate_extension_result_output(mln_feature_extension_result** out_result
+) -> mln_status {
   if (out_result == nullptr) {
     mln::core::set_thread_error("out_result must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
@@ -233,8 +234,8 @@ auto validate_extension_result_output(mln_feature_extension_result** out_result)
   return MLN_STATUS_OK;
 }
 
-auto make_string_vector(std::span<const mln_string_view> strings)
-  -> std::vector<std::string> {
+auto make_string_vector(std::span<const mln_string_view> strings
+) -> std::vector<std::string> {
   auto result = std::vector<std::string>{};
   result.reserve(strings.size());
   for (const auto string : strings) {
@@ -271,22 +272,18 @@ auto validate_feature_state_selector(
     mln::core::set_thread_error("feature state source_id must not be empty");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (
-    selector_has_field(*selector, MLN_FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID) &&
-    !validate_string_view(selector->source_layer_id)
-  ) {
+  if (selector_has_field(
+        *selector, MLN_FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID
+      ) &&
+      !validate_string_view(selector->source_layer_id)) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (
-    selector_has_field(*selector, MLN_FEATURE_STATE_SELECTOR_FEATURE_ID) &&
-    !validate_string_view(selector->feature_id)
-  ) {
+  if (selector_has_field(*selector, MLN_FEATURE_STATE_SELECTOR_FEATURE_ID) &&
+      !validate_string_view(selector->feature_id)) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (
-    selector_has_field(*selector, MLN_FEATURE_STATE_SELECTOR_STATE_KEY) &&
-    !validate_string_view(selector->state_key)
-  ) {
+  if (selector_has_field(*selector, MLN_FEATURE_STATE_SELECTOR_STATE_KEY) &&
+      !validate_string_view(selector->state_key)) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
@@ -296,10 +293,8 @@ auto validate_feature_state_selector(
     mln::core::set_thread_error("feature state selector requires feature_id");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (
-    selector_has_field(*selector, MLN_FEATURE_STATE_SELECTOR_STATE_KEY) &&
-    !has_feature_id
-  ) {
+  if (selector_has_field(*selector, MLN_FEATURE_STATE_SELECTOR_STATE_KEY) &&
+      !has_feature_id) {
     mln::core::set_thread_error(
       "feature state selector state_key requires feature_id"
     );
@@ -318,16 +313,15 @@ auto optional_selector_string(
   return string_from_view(value);
 }
 
-auto feature_state_source_layer(const mln_feature_state_selector& selector)
-  -> std::optional<std::string> {
+auto feature_state_source_layer(const mln_feature_state_selector& selector
+) -> std::optional<std::string> {
   return optional_selector_string(
     selector, MLN_FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID,
     selector.source_layer_id
   );
 }
 
-auto to_rendered_query_options(
-  const mln_rendered_feature_query_options* options
+auto to_rendered_query_options(const mln_rendered_feature_query_options* options
 ) -> std::optional<mbgl::RenderedQueryOptions> {
   auto layer_ids = std::optional<std::vector<std::string>>{};
   auto filter = std::optional<mbgl::style::Filter>{};
@@ -368,8 +362,8 @@ auto to_rendered_query_options(
   return mbgl::RenderedQueryOptions{std::move(layer_ids), std::move(filter)};
 }
 
-auto to_source_query_options(const mln_source_feature_query_options* options)
-  -> std::optional<mbgl::SourceQueryOptions> {
+auto to_source_query_options(const mln_source_feature_query_options* options
+) -> std::optional<mbgl::SourceQueryOptions> {
   auto source_layer_ids = std::optional<std::vector<std::string>>{};
   auto filter = std::optional<mbgl::style::Filter>{};
   if (options == nullptr) {
@@ -387,12 +381,10 @@ auto to_source_query_options(const mln_source_feature_query_options* options)
     mln::core::set_thread_error("source feature query has unknown fields");
     return std::nullopt;
   }
-  if (
-    (options->fields & MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS) != 0
-  ) {
-    if (
-      options->source_layer_id_count > 0 && options->source_layer_ids == nullptr
-    ) {
+  if ((options->fields & MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS) !=
+      0) {
+    if (options->source_layer_id_count > 0 &&
+        options->source_layer_ids == nullptr) {
       mln::core::set_thread_error("query source layer IDs must not be null");
       return std::nullopt;
     }
@@ -483,12 +475,10 @@ auto make_queried_feature(
     result->property_value_roots.emplace_back(
       result->property_values.at(index)->root
     );
-    result->properties.emplace_back(
-      mln_json_member{
-        .key = string_view_from_string(result->property_keys.at(index)),
-        .value = &result->property_value_roots.back()
-      }
-    );
+    result->properties.emplace_back(mln_json_member{
+      .key = string_view_from_string(result->property_keys.at(index)),
+      .value = &result->property_value_roots.back()
+    });
   }
 
   result->feature = mln_feature{
@@ -553,8 +543,8 @@ auto create_feature_query_result(
   return MLN_STATUS_OK;
 }
 
-auto find_feature_query_result_locked(const mln_feature_query_result* result)
-  -> const mln_feature_query_result* {
+auto find_feature_query_result_locked(const mln_feature_query_result* result
+) -> const mln_feature_query_result* {
   const auto found = feature_query_results().find(result);
   if (found == feature_query_results().end()) {
     return nullptr;
@@ -575,8 +565,8 @@ auto validate_non_empty_string(mln_string_view string, const char* name)
   return true;
 }
 
-auto to_feature_extension_arguments(const mln_json_value* arguments)
-  -> std::optional<std::optional<std::map<std::string, mbgl::Value>>> {
+auto to_feature_extension_arguments(const mln_json_value* arguments
+) -> std::optional<std::optional<std::map<std::string, mbgl::Value>>> {
   if (arguments == nullptr) {
     return std::optional<std::map<std::string, mbgl::Value>>{std::nullopt};
   }
@@ -642,14 +632,12 @@ auto create_feature_extension_collection_result(
   result->info = mln_feature_extension_result_info{
     .size = sizeof(mln_feature_extension_result_info),
     .type = MLN_FEATURE_EXTENSION_RESULT_TYPE_FEATURE_COLLECTION,
-    .data = {
-      .feature_collection = {
-        .features = result->feature_roots.empty()
-                      ? nullptr
-                      : result->feature_roots.data(),
-        .feature_count = result->feature_roots.size()
-      }
-    }
+    .data =
+      {.feature_collection =
+         {.features = result->feature_roots.empty()
+                        ? nullptr
+                        : result->feature_roots.data(),
+          .feature_count = result->feature_roots.size()}}
   };
   auto* handle = result.get();
   const auto lock = std::scoped_lock{feature_extension_result_mutex()};
@@ -709,8 +697,8 @@ auto validate_render_session(mln_render_session* session) -> mln_status {
   return MLN_STATUS_OK;
 }
 
-auto validate_live_attached_render_session(mln_render_session* session)
-  -> mln_status {
+auto validate_live_attached_render_session(mln_render_session* session
+) -> mln_status {
   const auto status = validate_render_session(session);
   if (status != MLN_STATUS_OK) {
     return status;
@@ -722,8 +710,8 @@ auto validate_live_attached_render_session(mln_render_session* session)
   return MLN_STATUS_OK;
 }
 
-auto erase_render_session(mln_render_session* session)
-  -> std::unique_ptr<mln_render_session> {
+auto erase_render_session(mln_render_session* session
+) -> std::unique_ptr<mln_render_session> {
   const auto lock = std::scoped_lock{render_session_mutex()};
   auto found = render_sessions().find(session);
   if (found == render_sessions().end()) {
@@ -787,16 +775,13 @@ auto render_session_resize(
   if (dimensions_status != MLN_STATUS_OK) {
     return dimensions_status;
   }
-  if (
-    session->kind == RenderSessionKind::Texture && session->texture.acquired
-  ) {
+  if (session->kind == RenderSessionKind::Texture &&
+      session->texture.acquired) {
     set_thread_error("cannot resize while a texture frame is acquired");
     return MLN_STATUS_INVALID_STATE;
   }
-  if (
-    session->kind == RenderSessionKind::Texture &&
-    session->texture.mode == TextureSessionMode::Borrowed
-  ) {
+  if (session->kind == RenderSessionKind::Texture &&
+      session->texture.mode == TextureSessionMode::Borrowed) {
     set_thread_error(
       "borrowed texture sessions cannot be resized; attach a new target"
     );
@@ -843,9 +828,8 @@ auto render_session_render_update(mln_render_session* session) -> mln_status {
   if (status != MLN_STATUS_OK) {
     return status;
   }
-  if (
-    session->kind == RenderSessionKind::Texture && session->texture.acquired
-  ) {
+  if (session->kind == RenderSessionKind::Texture &&
+      session->texture.acquired) {
     set_thread_error("cannot render while a texture frame is acquired");
     return MLN_STATUS_INVALID_STATE;
   }
@@ -864,9 +848,7 @@ auto render_session_render_update(mln_render_session* session) -> mln_status {
     set_thread_error("render session renderer backend is not available");
     return MLN_STATUS_INVALID_STATE;
   }
-  auto guard = mbgl::gfx::BackendScope{
-    *backend, session_scope_type(session)
-  };
+  auto guard = mbgl::gfx::BackendScope{*backend, session_scope_type(session)};
   map_run_render_jobs(session->map);
   if (session->renderer == nullptr) {
     session->renderer = std::make_unique<mbgl::Renderer>(
@@ -891,9 +873,8 @@ auto render_session_detach(mln_render_session* session) -> mln_status {
   if (status != MLN_STATUS_OK) {
     return status;
   }
-  if (
-    session->kind == RenderSessionKind::Texture && session->texture.acquired
-  ) {
+  if (session->kind == RenderSessionKind::Texture &&
+      session->texture.acquired) {
     set_thread_error("cannot detach while a texture frame is acquired");
     return MLN_STATUS_INVALID_STATE;
   }
@@ -920,9 +901,8 @@ auto render_session_destroy(mln_render_session* session) -> mln_status {
   if (status != MLN_STATUS_OK) {
     return status;
   }
-  if (
-    session->kind == RenderSessionKind::Texture && session->texture.acquired
-  ) {
+  if (session->kind == RenderSessionKind::Texture &&
+      session->texture.acquired) {
     set_thread_error("cannot destroy while a texture frame is acquired");
     return MLN_STATUS_INVALID_STATE;
   }
@@ -937,8 +917,8 @@ auto render_session_destroy(mln_render_session* session) -> mln_status {
   return MLN_STATUS_OK;
 }
 
-auto render_session_reduce_memory_use(mln_render_session* session)
-  -> mln_status {
+auto render_session_reduce_memory_use(mln_render_session* session
+) -> mln_status {
   const auto status = validate_live_attached_render_session(session);
   if (status != MLN_STATUS_OK) {
     return status;
@@ -947,9 +927,7 @@ auto render_session_reduce_memory_use(mln_render_session* session)
   if (backend == nullptr) {
     return MLN_STATUS_INVALID_STATE;
   }
-  auto guard = mbgl::gfx::BackendScope{
-    *backend, session_scope_type(session)
-  };
+  auto guard = mbgl::gfx::BackendScope{*backend, session_scope_type(session)};
   session->renderer->reduceMemoryUse();
   return MLN_STATUS_OK;
 }
@@ -963,9 +941,7 @@ auto render_session_clear_data(mln_render_session* session) -> mln_status {
   if (backend == nullptr) {
     return MLN_STATUS_INVALID_STATE;
   }
-  auto guard = mbgl::gfx::BackendScope{
-    *backend, session_scope_type(session)
-  };
+  auto guard = mbgl::gfx::BackendScope{*backend, session_scope_type(session)};
   session->renderer->clearData();
   return MLN_STATUS_OK;
 }
@@ -979,9 +955,7 @@ auto render_session_dump_debug_logs(mln_render_session* session) -> mln_status {
   if (backend == nullptr) {
     return MLN_STATUS_INVALID_STATE;
   }
-  auto guard = mbgl::gfx::BackendScope{
-    *backend, session_scope_type(session)
-  };
+  auto guard = mbgl::gfx::BackendScope{*backend, session_scope_type(session)};
   session->renderer->dumpDebugLogs();
   return MLN_STATUS_OK;
 }
@@ -1013,9 +987,7 @@ auto render_session_set_feature_state(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
-  auto guard = mbgl::gfx::BackendScope{
-    *backend, session_scope_type(session)
-  };
+  auto guard = mbgl::gfx::BackendScope{*backend, session_scope_type(session)};
   session->renderer->setFeatureState(
     string_from_view(selector->source_id),
     feature_state_source_layer(*selector),
@@ -1045,9 +1017,7 @@ auto render_session_get_feature_state(
   }
 
   auto state = mbgl::FeatureState{};
-  auto guard = mbgl::gfx::BackendScope{
-    *backend, session_scope_type(session)
-  };
+  auto guard = mbgl::gfx::BackendScope{*backend, session_scope_type(session)};
   session->renderer->getFeatureState(
     state, string_from_view(selector->source_id),
     feature_state_source_layer(*selector),
@@ -1072,9 +1042,7 @@ auto render_session_remove_feature_state(
     return MLN_STATUS_INVALID_STATE;
   }
 
-  auto guard = mbgl::gfx::BackendScope{
-    *backend, session_scope_type(session)
-  };
+  auto guard = mbgl::gfx::BackendScope{*backend, session_scope_type(session)};
   session->renderer->removeFeatureState(
     string_from_view(selector->source_id),
     feature_state_source_layer(*selector),
@@ -1124,10 +1092,8 @@ auto render_session_query_rendered_features(
       }
       break;
     case MLN_RENDERED_QUERY_GEOMETRY_TYPE_BOX:
-      if (
-        !validate_screen_point(geometry->data.box.min) ||
-        !validate_screen_point(geometry->data.box.max)
-      ) {
+      if (!validate_screen_point(geometry->data.box.min) ||
+          !validate_screen_point(geometry->data.box.max)) {
         return MLN_STATUS_INVALID_ARGUMENT;
       }
       break;
@@ -1147,9 +1113,7 @@ auto render_session_query_rendered_features(
     return MLN_STATUS_INVALID_STATE;
   }
 
-  auto guard = mbgl::gfx::BackendScope{
-    *backend, session_scope_type(session)
-  };
+  auto guard = mbgl::gfx::BackendScope{*backend, session_scope_type(session)};
   auto features = std::vector<mbgl::Feature>{};
   switch (geometry->type) {
     case MLN_RENDERED_QUERY_GEOMETRY_TYPE_POINT:
@@ -1210,9 +1174,7 @@ auto render_session_query_source_features(
   }
 
   auto native_source_id = string_from_view(source_id);
-  auto guard = mbgl::gfx::BackendScope{
-    *backend, session_scope_type(session)
-  };
+  auto guard = mbgl::gfx::BackendScope{*backend, session_scope_type(session)};
   auto features =
     session->renderer->querySourceFeatures(native_source_id, *native_options);
   return create_feature_query_result(
@@ -1234,11 +1196,9 @@ auto render_session_query_feature_extensions(
   if (output_status != MLN_STATUS_OK) {
     return output_status;
   }
-  if (
-    !validate_non_empty_string(source_id, "source_id") ||
-    !validate_non_empty_string(extension, "extension") ||
-    !validate_non_empty_string(extension_field, "extension_field")
-  ) {
+  if (!validate_non_empty_string(source_id, "source_id") ||
+      !validate_non_empty_string(extension, "extension") ||
+      !validate_non_empty_string(extension_field, "extension_field")) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   auto native_feature = to_native_feature(feature);
@@ -1255,9 +1215,7 @@ auto render_session_query_feature_extensions(
   }
 
   auto query_feature = mbgl::Feature{std::move(*native_feature)};
-  auto guard = mbgl::gfx::BackendScope{
-    *backend, session_scope_type(session)
-  };
+  auto guard = mbgl::gfx::BackendScope{*backend, session_scope_type(session)};
   auto result = session->renderer->queryFeatureExtensions(
     string_from_view(source_id), query_feature, string_from_view(extension),
     string_from_view(extension_field), std::move(*native_arguments)
@@ -1353,8 +1311,8 @@ auto feature_extension_result_get(
   return MLN_STATUS_OK;
 }
 
-auto feature_extension_result_destroy(mln_feature_extension_result* result)
-  -> void {
+auto feature_extension_result_destroy(mln_feature_extension_result* result
+) -> void {
   if (result == nullptr) {
     return;
   }

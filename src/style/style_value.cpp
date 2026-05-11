@@ -282,8 +282,7 @@ auto ConversionTraits<const mln_json_value*>::objectMember(
   return std::nullopt;
 }
 
-auto ConversionTraits<const mln_json_value*>::toBool(
-  const mln_json_value* value
+auto ConversionTraits<const mln_json_value*>::toBool(const mln_json_value* value
 ) -> std::optional<bool> {
   if (value->type != MLN_JSON_VALUE_TYPE_BOOL) {
     return std::nullopt;
@@ -384,16 +383,15 @@ auto validate_style_json_value(const mln_json_value* value) -> bool {
   return validate_value(value, 0);
 }
 
-auto to_native_style_filter(const mln_json_value* filter)
-  -> std::optional<mbgl::style::Filter> {
+auto to_native_style_filter(const mln_json_value* filter
+) -> std::optional<mbgl::style::Filter> {
   if (!validate_style_json_value(filter)) {
     return std::nullopt;
   }
 
   auto error = mbgl::style::conversion::Error{};
-  auto converted = mbgl::style::conversion::Converter<mbgl::style::Filter>{}(
-    mbgl::style::conversion::Convertible{filter}, error
-  );
+  auto converted = mbgl::style::conversion::Converter<mbgl::style::Filter>{
+  }(mbgl::style::conversion::Convertible{filter}, error);
   if (!converted) {
     set_style_conversion_error("style filter", error);
     return std::nullopt;

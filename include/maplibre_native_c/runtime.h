@@ -538,8 +538,7 @@ MLN_API mln_status mln_resource_request_cancelled(
  * exactly once after completing the request or deciding not to complete it.
  * Passing null is a no-op. A released handle must not be used again.
  */
-MLN_API void mln_resource_request_release(
-  mln_resource_request_handle* handle
+MLN_API void mln_resource_request_release(mln_resource_request_handle* handle
 ) MLN_NOEXCEPT;
 
 /**

@@ -406,16 +406,15 @@ auto VulkanTextureBackend::readStillImage() -> mbgl::PremultipliedImage {
         getDispatcher()
       );
 
-      const auto region =
-        vk::BufferImageCopy()
-          .setBufferOffset(0)
-          .setBufferRowLength(0)
-          .setBufferImageHeight(0)
-          .setImageSubresource(
-            vk::ImageSubresourceLayers(vk::ImageAspectFlagBits::eColor, 0, 0, 1)
-          )
-          .setImageOffset({0, 0, 0})
-          .setImageExtent({size.width, size.height, 1});
+      const auto region = vk::BufferImageCopy()
+                            .setBufferOffset(0)
+                            .setBufferRowLength(0)
+                            .setBufferImageHeight(0)
+                            .setImageSubresource(vk::ImageSubresourceLayers(
+                              vk::ImageAspectFlagBits::eColor, 0, 0, 1
+                            ))
+                            .setImageOffset({0, 0, 0})
+                            .setImageExtent({size.width, size.height, 1});
       command_buffer->copyImageToBuffer(
         source_image, vk::ImageLayout::eTransferSrcOptimal,
         buffer_allocation.buffer, region, getDispatcher()
@@ -440,11 +439,10 @@ auto VulkanTextureBackend::readStillImage() -> mbgl::PremultipliedImage {
   );
 
   if (buffer_allocation.mappedBuffer == nullptr) {
-    if (
-      vmaMapMemory(
-        allocator, buffer_allocation.allocation, &buffer_allocation.mappedBuffer
-      ) != VK_SUCCESS
-    ) {
+    if (vmaMapMemory(
+          allocator, buffer_allocation.allocation,
+          &buffer_allocation.mappedBuffer
+        ) != VK_SUCCESS) {
       return {};
     }
     std::memcpy(image.data.get(), buffer_allocation.mappedBuffer, image_size);

@@ -154,8 +154,8 @@ typedef struct mln_texture_image_info {
 /**
  * Returns session-owned texture descriptor defaults for this C API version.
  */
-MLN_API mln_owned_texture_descriptor
-mln_owned_texture_descriptor_default(void) MLN_NOEXCEPT;
+MLN_API mln_owned_texture_descriptor mln_owned_texture_descriptor_default(void
+) MLN_NOEXCEPT;
 
 /**
  * Returns Metal owned-texture descriptor defaults for this C API version.
@@ -184,8 +184,8 @@ mln_vulkan_borrowed_texture_descriptor_default(void) MLN_NOEXCEPT;
 /**
  * Returns texture image info defaults for this C API version.
  */
-MLN_API mln_texture_image_info
-mln_texture_image_info_default(void) MLN_NOEXCEPT;
+MLN_API mln_texture_image_info mln_texture_image_info_default(void
+) MLN_NOEXCEPT;
 
 /**
  * Attaches an offscreen texture render target owned by the session to a map.

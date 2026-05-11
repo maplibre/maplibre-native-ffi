@@ -786,8 +786,7 @@ MLN_API mln_status mln_offline_region_list_get(
 ) MLN_NOEXCEPT;
 
 /** Destroys an offline region list handle. Null is accepted as a no-op. */
-MLN_API void mln_offline_region_list_destroy(
-  mln_offline_region_list* list
+MLN_API void mln_offline_region_list_destroy(mln_offline_region_list* list
 ) MLN_NOEXCEPT;
 
 /**
@@ -945,8 +944,8 @@ MLN_API mln_status mln_map_destroy(mln_map* map) MLN_NOEXCEPT;
  * - MLN_STATUS_NATIVE_ERROR when a synchronous native error is reported or an
  *   internal exception is converted to status.
  */
-MLN_API mln_status
-mln_map_set_style_url(mln_map* map, const char* url) MLN_NOEXCEPT;
+MLN_API mln_status mln_map_set_style_url(mln_map* map, const char* url)
+  MLN_NOEXCEPT;
 
 /**
  * Loads inline style JSON through MapLibre Native style APIs.
@@ -964,8 +963,8 @@ mln_map_set_style_url(mln_map* map, const char* url) MLN_NOEXCEPT;
  * - MLN_STATUS_NATIVE_ERROR when a synchronous native error is reported or an
  *   internal exception is converted to status.
  */
-MLN_API mln_status
-mln_map_set_style_json(mln_map* map, const char* json) MLN_NOEXCEPT;
+MLN_API mln_status mln_map_set_style_json(mln_map* map, const char* json)
+  MLN_NOEXCEPT;
 
 #ifdef __cplusplus
 }

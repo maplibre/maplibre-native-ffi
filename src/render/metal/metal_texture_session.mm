@@ -337,10 +337,8 @@ auto metal_owned_texture_acquire_frame(
   if (status != MLN_STATUS_OK) {
     return status;
   }
-  if (
-    out_frame == nullptr ||
-    out_frame->size < sizeof(mln_metal_owned_texture_frame)
-  ) {
+  if (out_frame == nullptr ||
+      out_frame->size < sizeof(mln_metal_owned_texture_frame)) {
     set_thread_error("out_frame must not be null and must have a valid size");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
@@ -352,10 +350,8 @@ auto metal_owned_texture_acquire_frame(
     set_thread_error("no rendered frame is available for this generation");
     return MLN_STATUS_INVALID_STATE;
   }
-  if (
-    texture->texture.mode != TextureSessionMode::Owned ||
-    texture->texture.api_kind != TextureSessionApi::Metal
-  ) {
+  if (texture->texture.mode != TextureSessionMode::Owned ||
+      texture->texture.api_kind != TextureSessionApi::Metal) {
     set_thread_error("texture session cannot expose a Metal texture frame");
     return MLN_STATUS_UNSUPPORTED;
   }
@@ -384,10 +380,8 @@ auto metal_owned_texture_release_frame(
     set_thread_error("frame must not be null and must have a valid size");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (
-    !texture->texture.acquired ||
-    texture->texture.acquired_frame_kind != TextureSessionFrameKind::MetalOwned
-  ) {
+  if (!texture->texture.acquired || texture->texture.acquired_frame_kind !=
+                                      TextureSessionFrameKind::MetalOwned) {
     set_thread_error("no texture frame is currently acquired");
     return MLN_STATUS_INVALID_STATE;
   }
@@ -524,10 +518,8 @@ auto vulkan_owned_texture_acquire_frame(
   if (status != MLN_STATUS_OK) {
     return status;
   }
-  if (
-    out_frame == nullptr ||
-    out_frame->size < sizeof(mln_vulkan_owned_texture_frame)
-  ) {
+  if (out_frame == nullptr ||
+      out_frame->size < sizeof(mln_vulkan_owned_texture_frame)) {
     set_thread_error("out_frame must not be null and must have a valid size");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
@@ -542,9 +534,8 @@ auto vulkan_owned_texture_release_frame(
   if (status != MLN_STATUS_OK) {
     return status;
   }
-  if (
-    frame == nullptr || frame->size < sizeof(mln_vulkan_owned_texture_frame)
-  ) {
+  if (frame == nullptr ||
+      frame->size < sizeof(mln_vulkan_owned_texture_frame)) {
     set_thread_error("frame must not be null and must have a valid size");
     return MLN_STATUS_INVALID_ARGUMENT;
   }

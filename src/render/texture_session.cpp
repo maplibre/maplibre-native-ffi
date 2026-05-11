@@ -20,15 +20,14 @@
 
 namespace {
 
-auto validate_owned_descriptor(const mln_owned_texture_descriptor* descriptor)
-  -> mln_status {
+auto validate_owned_descriptor(const mln_owned_texture_descriptor* descriptor
+) -> mln_status {
   if (descriptor == nullptr) {
     mln::core::set_thread_error("texture descriptor must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   if (descriptor->size < sizeof(mln_owned_texture_descriptor)) {
-    mln::core::set_thread_error(
-      "mln_owned_texture_descriptor.size is too small"
+    mln::core::set_thread_error("mln_owned_texture_descriptor.size is too small"
     );
     return MLN_STATUS_INVALID_ARGUMENT;
   }
@@ -41,12 +40,10 @@ class GenericTextureSessionBackend final
     : public mln::core::TextureSessionBackend {
  public:
   explicit GenericTextureSessionBackend(mbgl::Size size)
-      : backend_(
-          mbgl::gfx::HeadlessBackend::Create(
-            size, mbgl::gfx::Renderable::SwapBehaviour::Flush,
-            mbgl::gfx::ContextMode::Unique
-          )
-        ) {}
+      : backend_(mbgl::gfx::HeadlessBackend::Create(
+          size, mbgl::gfx::Renderable::SwapBehaviour::Flush,
+          mbgl::gfx::ContextMode::Unique
+        )) {}
 
   auto headless_backend() -> mbgl::gfx::HeadlessBackend& override {
     return *backend_;
@@ -192,10 +189,8 @@ auto texture_read_premultiplied_rgba8(
   }
 
   const auto stride = texture->physical_width * 4;
-  if (
-    texture->physical_height != 0 &&
-    stride > std::numeric_limits<size_t>::max() / texture->physical_height
-  ) {
+  if (texture->physical_height != 0 &&
+      stride > std::numeric_limits<size_t>::max() / texture->physical_height) {
     set_thread_error("texture readback byte length is too large");
     return MLN_STATUS_INVALID_STATE;
   }
@@ -228,11 +223,9 @@ auto texture_read_premultiplied_rgba8(
     set_thread_error("texture readback did not produce an image");
     return MLN_STATUS_INVALID_STATE;
   }
-  if (
-    image.size.width != texture->physical_width ||
-    image.size.height != texture->physical_height || image.stride() != stride ||
-    image.bytes() != byte_length
-  ) {
+  if (image.size.width != texture->physical_width ||
+      image.size.height != texture->physical_height ||
+      image.stride() != stride || image.bytes() != byte_length) {
     set_thread_error("texture readback image layout did not match the session");
     return MLN_STATUS_INVALID_STATE;
   }

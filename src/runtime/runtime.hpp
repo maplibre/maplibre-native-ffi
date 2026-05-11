@@ -135,8 +135,7 @@ auto offline_region_delete(
 auto offline_region_snapshot_get(
   const mln_offline_region_snapshot* snapshot, mln_offline_region_info* out_info
 ) -> mln_status;
-auto offline_region_snapshot_destroy(
-  mln_offline_region_snapshot* snapshot
+auto offline_region_snapshot_destroy(mln_offline_region_snapshot* snapshot
 ) noexcept -> void;
 auto offline_region_list_count(
   const mln_offline_region_list* list, size_t* out_count
@@ -145,15 +144,15 @@ auto offline_region_list_get(
   const mln_offline_region_list* list, size_t index,
   mln_offline_region_info* out_info
 ) -> mln_status;
-auto offline_region_list_destroy(mln_offline_region_list* list) noexcept
-  -> void;
+auto offline_region_list_destroy(mln_offline_region_list* list
+) noexcept -> void;
 auto retain_runtime_map(mln_runtime* runtime) -> mln_status;
 auto release_runtime_map(mln_runtime* runtime) noexcept -> void;
 auto validate_runtime(mln_runtime* runtime) -> mln_status;
-auto resource_options_for_runtime(mln_runtime* runtime)
-  -> mbgl::ResourceOptions;
-auto find_runtime_for_platform_context(void* platform_context) noexcept
-  -> mln_runtime*;
+auto resource_options_for_runtime(mln_runtime* runtime
+) -> mbgl::ResourceOptions;
+auto find_runtime_for_platform_context(void* platform_context
+) noexcept -> mln_runtime*;
 auto push_runtime_map_event(
   mln_runtime* runtime, mln_map* map, uint32_t type, int32_t code = 0,
   const char* message = nullptr

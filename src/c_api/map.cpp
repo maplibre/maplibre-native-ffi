@@ -36,8 +36,8 @@ auto mln_projection_mode_default(void) noexcept -> mln_projection_mode {
   return mln::core::projection_mode_default();
 }
 
-auto mln_map_viewport_options_default(void) noexcept
-  -> mln_map_viewport_options {
+auto mln_map_viewport_options_default(void
+) noexcept -> mln_map_viewport_options {
   return mln::core::map_viewport_options_default();
 }
 
@@ -45,18 +45,18 @@ auto mln_map_tile_options_default(void) noexcept -> mln_map_tile_options {
   return mln::core::map_tile_options_default();
 }
 
-auto mln_style_tile_source_options_default(void) noexcept
-  -> mln_style_tile_source_options {
+auto mln_style_tile_source_options_default(void
+) noexcept -> mln_style_tile_source_options {
   return mln::core::style_tile_source_options_default();
 }
 
-auto mln_custom_geometry_source_options_default(void) noexcept
-  -> mln_custom_geometry_source_options {
+auto mln_custom_geometry_source_options_default(void
+) noexcept -> mln_custom_geometry_source_options {
   return mln::core::custom_geometry_source_options_default();
 }
 
-auto mln_premultiplied_rgba8_image_default(void) noexcept
-  -> mln_premultiplied_rgba8_image {
+auto mln_premultiplied_rgba8_image_default(void
+) noexcept -> mln_premultiplied_rgba8_image {
   return mln::core::premultiplied_rgba8_image_default();
 }
 
@@ -810,8 +810,8 @@ auto mln_map_projection_create(
   });
 }
 
-auto mln_map_projection_destroy(mln_map_projection* projection) noexcept
-  -> mln_status {
+auto mln_map_projection_destroy(mln_map_projection* projection
+) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::map_projection_destroy(projection);
   });

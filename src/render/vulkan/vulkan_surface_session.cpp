@@ -31,15 +31,14 @@ auto vulkan_loader_library_name() noexcept -> const char* {
 #endif
 }
 
-auto validate_metal_descriptor(const mln_metal_surface_descriptor* descriptor)
-  -> mln_status {
+auto validate_metal_descriptor(const mln_metal_surface_descriptor* descriptor
+) -> mln_status {
   if (descriptor == nullptr) {
     mln::core::set_thread_error("surface descriptor must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   if (descriptor->size < sizeof(mln_metal_surface_descriptor)) {
-    mln::core::set_thread_error(
-      "mln_metal_surface_descriptor.size is too small"
+    mln::core::set_thread_error("mln_metal_surface_descriptor.size is too small"
     );
     return MLN_STATUS_INVALID_ARGUMENT;
   }
@@ -61,8 +60,8 @@ auto validate_metal_descriptor(const mln_metal_surface_descriptor* descriptor)
   return MLN_STATUS_OK;
 }
 
-auto validate_vulkan_descriptor(const mln_vulkan_surface_descriptor* descriptor)
-  -> mln_status {
+auto validate_vulkan_descriptor(const mln_vulkan_surface_descriptor* descriptor
+) -> mln_status {
   if (descriptor == nullptr) {
     mln::core::set_thread_error("surface descriptor must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
@@ -126,8 +125,7 @@ auto validate_vulkan_handles(const mln_vulkan_surface_descriptor& descriptor)
     }
   }
   if (!found_physical_device) {
-    mln::core::set_thread_error(
-      "Vulkan physical_device must belong to instance"
+    mln::core::set_thread_error("Vulkan physical_device must belong to instance"
     );
     return MLN_STATUS_INVALID_ARGUMENT;
   }
@@ -187,8 +185,7 @@ auto validate_vulkan_handles(const mln_vulkan_surface_descriptor& descriptor)
     return MLN_STATUS_NATIVE_ERROR;
   }
   if (surface_format_count == 0) {
-    mln::core::set_thread_error(
-      "Vulkan surface must expose at least one format"
+    mln::core::set_thread_error("Vulkan surface must expose at least one format"
     );
     return MLN_STATUS_INVALID_ARGUMENT;
   }
@@ -345,9 +342,8 @@ class VulkanSurfaceBackend final : public mbgl::vulkan::RendererBackend,
       static_cast<VkPhysicalDevice>(descriptor_.context.physical_device);
     auto found_physical_device = false;
     for (const auto& candidate : physical_devices) {
-      if (
-        static_cast<VkPhysicalDevice>(candidate) == requested_physical_device
-      ) {
+      if (static_cast<VkPhysicalDevice>(candidate) ==
+          requested_physical_device) {
         physicalDevice = candidate;
         found_physical_device = true;
         break;

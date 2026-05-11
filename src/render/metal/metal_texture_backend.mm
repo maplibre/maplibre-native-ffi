@@ -99,9 +99,8 @@ class MetalTextureBackend::MetalTextureRenderableResource final
       NS::RetainPtr(context.getBackend().getCommandQueue()->commandBuffer());
     renderPassDescriptor =
       NS::TransferPtr(MTL::RenderPassDescriptor::alloc()->init());
-    if (
-      auto* colorTarget = renderPassDescriptor->colorAttachments()->object(0)
-    ) {
+    if (auto* colorTarget =
+          renderPassDescriptor->colorAttachments()->object(0)) {
       colorTarget->setTexture(borrowedTexture);
     }
     if (depthTexture != nullptr) {

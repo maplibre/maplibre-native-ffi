@@ -27,8 +27,8 @@ class SurfaceSessionBackend {
  public:
   SurfaceSessionBackend() = default;
   SurfaceSessionBackend(const SurfaceSessionBackend&) = delete;
-  auto operator=(const SurfaceSessionBackend&)
-    -> SurfaceSessionBackend& = delete;
+  auto operator=(const SurfaceSessionBackend&) -> SurfaceSessionBackend& =
+                                                    delete;
   SurfaceSessionBackend(SurfaceSessionBackend&&) = delete;
   auto operator=(SurfaceSessionBackend&&) -> SurfaceSessionBackend& = delete;
   virtual ~SurfaceSessionBackend() = default;
@@ -41,8 +41,8 @@ class TextureSessionBackend {
  public:
   TextureSessionBackend() = default;
   TextureSessionBackend(const TextureSessionBackend&) = delete;
-  auto operator=(const TextureSessionBackend&)
-    -> TextureSessionBackend& = delete;
+  auto operator=(const TextureSessionBackend&) -> TextureSessionBackend& =
+                                                    delete;
   TextureSessionBackend(TextureSessionBackend&&) = delete;
   auto operator=(TextureSessionBackend&&) -> TextureSessionBackend& = delete;
   virtual ~TextureSessionBackend() = default;
@@ -113,10 +113,10 @@ auto register_render_session(
   mln_render_session* handle, std::unique_ptr<mln_render_session> session
 ) -> void;
 auto validate_render_session(mln_render_session* session) -> mln_status;
-auto validate_live_attached_render_session(mln_render_session* session)
-  -> mln_status;
-auto erase_render_session(mln_render_session* session)
-  -> std::unique_ptr<mln_render_session>;
+auto validate_live_attached_render_session(mln_render_session* session
+) -> mln_status;
+auto erase_render_session(mln_render_session* session
+) -> std::unique_ptr<mln_render_session>;
 
 inline auto validate_attach_output(
   mln_render_session** out_session, const char* null_message,
@@ -204,10 +204,8 @@ inline auto validate_physical_size(
 ) -> mln_status {
   constexpr auto max_dimension =
     static_cast<double>(std::numeric_limits<uint32_t>::max());
-  if (
-    std::ceil(width * scale_factor) > max_dimension ||
-    std::ceil(height * scale_factor) > max_dimension
-  ) {
+  if (std::ceil(width * scale_factor) > max_dimension ||
+      std::ceil(height * scale_factor) > max_dimension) {
     set_thread_error(too_large_message);
     return MLN_STATUS_INVALID_ARGUMENT;
   }
@@ -226,8 +224,8 @@ auto render_session_resize(
 auto render_session_render_update(mln_render_session* session) -> mln_status;
 auto render_session_detach(mln_render_session* session) -> mln_status;
 auto render_session_destroy(mln_render_session* session) -> mln_status;
-auto render_session_reduce_memory_use(mln_render_session* session)
-  -> mln_status;
+auto render_session_reduce_memory_use(mln_render_session* session
+) -> mln_status;
 auto render_session_clear_data(mln_render_session* session) -> mln_status;
 auto render_session_dump_debug_logs(mln_render_session* session) -> mln_status;
 auto render_session_set_feature_state(
@@ -269,7 +267,7 @@ auto feature_extension_result_get(
   const mln_feature_extension_result* result,
   mln_feature_extension_result_info* out_info
 ) -> mln_status;
-auto feature_extension_result_destroy(mln_feature_extension_result* result)
-  -> void;
+auto feature_extension_result_destroy(mln_feature_extension_result* result
+) -> void;
 
 }  // namespace mln::core

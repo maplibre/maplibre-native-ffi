@@ -231,11 +231,9 @@ auto validate_tile_source_zoom_options(
       return status;
     }
   }
-  if (
-    has_tile_source_option(options, MLN_STYLE_TILE_SOURCE_OPTION_MIN_ZOOM) &&
-    has_tile_source_option(options, MLN_STYLE_TILE_SOURCE_OPTION_MAX_ZOOM) &&
-    options.min_zoom > options.max_zoom
-  ) {
+  if (has_tile_source_option(options, MLN_STYLE_TILE_SOURCE_OPTION_MIN_ZOOM) &&
+      has_tile_source_option(options, MLN_STYLE_TILE_SOURCE_OPTION_MAX_ZOOM) &&
+      options.min_zoom > options.max_zoom) {
     mln::core::set_thread_error(
       "min_zoom must be less than or equal to max_zoom"
     );
@@ -336,23 +334,19 @@ auto validate_tile_source_raster_encoding_option(
 auto validate_tile_source_option_kind(
   const mln_style_tile_source_options& options, TileSourceOptionKind kind
 ) -> mln_status {
-  if (
-    kind != TileSourceOptionKind::Vector &&
-    has_tile_source_option(
-      options, MLN_STYLE_TILE_SOURCE_OPTION_VECTOR_ENCODING
-    )
-  ) {
+  if (kind != TileSourceOptionKind::Vector &&
+      has_tile_source_option(
+        options, MLN_STYLE_TILE_SOURCE_OPTION_VECTOR_ENCODING
+      )) {
     mln::core::set_thread_error(
       "vector_encoding is only valid for vector sources"
     );
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (
-    kind != TileSourceOptionKind::RasterDEM &&
-    has_tile_source_option(
-      options, MLN_STYLE_TILE_SOURCE_OPTION_RASTER_ENCODING
-    )
-  ) {
+  if (kind != TileSourceOptionKind::RasterDEM &&
+      has_tile_source_option(
+        options, MLN_STYLE_TILE_SOURCE_OPTION_RASTER_ENCODING
+      )) {
     mln::core::set_thread_error(
       "raster_encoding is only valid for raster DEM sources"
     );
@@ -385,8 +379,8 @@ auto validate_tile_source_options(
   return validate_tile_source_option_kind(*options, kind);
 }
 
-auto effective_tile_source_options(const mln_style_tile_source_options* options)
-  -> mln_style_tile_source_options {
+auto effective_tile_source_options(const mln_style_tile_source_options* options
+) -> mln_style_tile_source_options {
   auto result = mln::core::style_tile_source_options_default();
   if (options == nullptr) {
     return result;
@@ -399,9 +393,9 @@ auto effective_tile_source_options(const mln_style_tile_source_options* options)
   if (has_tile_source_option(*options, MLN_STYLE_TILE_SOURCE_OPTION_MAX_ZOOM)) {
     result.max_zoom = options->max_zoom;
   }
-  if (
-    has_tile_source_option(*options, MLN_STYLE_TILE_SOURCE_OPTION_ATTRIBUTION)
-  ) {
+  if (has_tile_source_option(
+        *options, MLN_STYLE_TILE_SOURCE_OPTION_ATTRIBUTION
+      )) {
     result.attribution = options->attribution;
   }
   if (has_tile_source_option(*options, MLN_STYLE_TILE_SOURCE_OPTION_SCHEME)) {
@@ -410,23 +404,19 @@ auto effective_tile_source_options(const mln_style_tile_source_options* options)
   if (has_tile_source_option(*options, MLN_STYLE_TILE_SOURCE_OPTION_BOUNDS)) {
     result.bounds = options->bounds;
   }
-  if (
-    has_tile_source_option(*options, MLN_STYLE_TILE_SOURCE_OPTION_TILE_SIZE)
-  ) {
+  if (has_tile_source_option(
+        *options, MLN_STYLE_TILE_SOURCE_OPTION_TILE_SIZE
+      )) {
     result.tile_size = options->tile_size;
   }
-  if (
-    has_tile_source_option(
-      *options, MLN_STYLE_TILE_SOURCE_OPTION_VECTOR_ENCODING
-    )
-  ) {
+  if (has_tile_source_option(
+        *options, MLN_STYLE_TILE_SOURCE_OPTION_VECTOR_ENCODING
+      )) {
     result.vector_encoding = options->vector_encoding;
   }
-  if (
-    has_tile_source_option(
-      *options, MLN_STYLE_TILE_SOURCE_OPTION_RASTER_ENCODING
-    )
-  ) {
+  if (has_tile_source_option(
+        *options, MLN_STYLE_TILE_SOURCE_OPTION_RASTER_ENCODING
+      )) {
     result.raster_encoding = options->raster_encoding;
   }
   return result;
@@ -437,15 +427,15 @@ auto to_native_tile_scheme(uint32_t scheme) -> mbgl::Tileset::Scheme {
                                              : mbgl::Tileset::Scheme::XYZ;
 }
 
-auto to_native_vector_encoding(uint32_t encoding)
-  -> mbgl::Tileset::VectorEncoding {
+auto to_native_vector_encoding(uint32_t encoding
+) -> mbgl::Tileset::VectorEncoding {
   return encoding == MLN_STYLE_VECTOR_TILE_ENCODING_MLT
            ? mbgl::Tileset::VectorEncoding::MLT
            : mbgl::Tileset::VectorEncoding::Mapbox;
 }
 
-auto to_native_raster_encoding(uint32_t encoding)
-  -> mbgl::Tileset::RasterEncoding {
+auto to_native_raster_encoding(uint32_t encoding
+) -> mbgl::Tileset::RasterEncoding {
   return encoding == MLN_STYLE_RASTER_DEM_ENCODING_TERRARIUM
            ? mbgl::Tileset::RasterEncoding::Terrarium
            : mbgl::Tileset::RasterEncoding::Mapbox;
@@ -523,10 +513,8 @@ auto has_custom_geometry_source_option(
 
 auto validate_custom_geometry_zoom(double zoom, const char* name)
   -> mln_status {
-  if (
-    !std::isfinite(zoom) || zoom < 0.0 || zoom > 32.0 ||
-    std::floor(zoom) != zoom
-  ) {
+  if (!std::isfinite(zoom) || zoom < 0.0 || zoom > 32.0 ||
+      std::floor(zoom) != zoom) {
     auto message = std::string{name} + " must be an integer within [0, 32]";
     mln::core::set_thread_error(message.c_str());
     return MLN_STATUS_INVALID_ARGUMENT;
@@ -569,22 +557,18 @@ auto validate_custom_geometry_source_options(
     mln::core::set_thread_error("fetch_tile must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (
-    has_custom_geometry_source_option(
-      *options, MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MIN_ZOOM
-    )
-  ) {
+  if (has_custom_geometry_source_option(
+        *options, MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MIN_ZOOM
+      )) {
     const auto status =
       validate_custom_geometry_zoom(options->min_zoom, "min_zoom");
     if (status != MLN_STATUS_OK) {
       return status;
     }
   }
-  if (
-    has_custom_geometry_source_option(
-      *options, MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MAX_ZOOM
-    )
-  ) {
+  if (has_custom_geometry_source_option(
+        *options, MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MAX_ZOOM
+      )) {
     const auto status =
       validate_custom_geometry_zoom(options->max_zoom, "max_zoom");
     if (status != MLN_STATUS_OK) {
@@ -621,60 +605,46 @@ auto effective_custom_geometry_source_options(
   result.fetch_tile = options.fetch_tile;
   result.cancel_tile = options.cancel_tile;
   result.user_data = options.user_data;
-  if (
-    has_custom_geometry_source_option(
-      options, MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MIN_ZOOM
-    )
-  ) {
+  if (has_custom_geometry_source_option(
+        options, MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MIN_ZOOM
+      )) {
     result.min_zoom = options.min_zoom;
   }
-  if (
-    has_custom_geometry_source_option(
-      options, MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MAX_ZOOM
-    )
-  ) {
+  if (has_custom_geometry_source_option(
+        options, MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MAX_ZOOM
+      )) {
     result.max_zoom = options.max_zoom;
   }
-  if (
-    has_custom_geometry_source_option(
-      options, MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TOLERANCE
-    )
-  ) {
+  if (has_custom_geometry_source_option(
+        options, MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TOLERANCE
+      )) {
     result.tolerance = options.tolerance;
   }
-  if (
-    has_custom_geometry_source_option(
-      options, MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TILE_SIZE
-    )
-  ) {
+  if (has_custom_geometry_source_option(
+        options, MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TILE_SIZE
+      )) {
     result.tile_size = options.tile_size;
   }
-  if (
-    has_custom_geometry_source_option(
-      options, MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_BUFFER
-    )
-  ) {
+  if (has_custom_geometry_source_option(
+        options, MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_BUFFER
+      )) {
     result.buffer = options.buffer;
   }
-  if (
-    has_custom_geometry_source_option(
-      options, MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_CLIP
-    )
-  ) {
+  if (has_custom_geometry_source_option(
+        options, MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_CLIP
+      )) {
     result.clip = options.clip;
   }
-  if (
-    has_custom_geometry_source_option(
-      options, MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_WRAP
-    )
-  ) {
+  if (has_custom_geometry_source_option(
+        options, MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_WRAP
+      )) {
     result.wrap = options.wrap;
   }
   return result;
 }
 
-auto to_c_canonical_tile_id(const mbgl::CanonicalTileID& tile_id)
-  -> mln_canonical_tile_id {
+auto to_c_canonical_tile_id(const mbgl::CanonicalTileID& tile_id
+) -> mln_canonical_tile_id {
   return mln_canonical_tile_id{.z = tile_id.z, .x = tile_id.x, .y = tile_id.y};
 }
 
@@ -730,8 +700,8 @@ auto validate_canonical_tile_id(mln_canonical_tile_id tile_id) -> mln_status {
   return MLN_STATUS_OK;
 }
 
-auto to_native_canonical_tile_id(mln_canonical_tile_id tile_id)
-  -> mbgl::CanonicalTileID {
+auto to_native_canonical_tile_id(mln_canonical_tile_id tile_id
+) -> mbgl::CanonicalTileID {
   return mbgl::CanonicalTileID{
     static_cast<uint8_t>(tile_id.z), tile_id.x, tile_id.y
   };
@@ -764,8 +734,8 @@ auto has_style_image_option(
   return (options.fields & field) != 0U;
 }
 
-auto validate_style_image_options(const mln_style_image_options* options)
-  -> mln_status {
+auto validate_style_image_options(const mln_style_image_options* options
+) -> mln_status {
   if (options == nullptr) {
     return MLN_STATUS_OK;
   }
@@ -782,18 +752,16 @@ auto validate_style_image_options(const mln_style_image_options* options)
     );
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (
-    has_style_image_option(*options, MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO) &&
-    (!std::isfinite(options->pixel_ratio) || options->pixel_ratio <= 0.0F)
-  ) {
+  if (has_style_image_option(*options, MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO) &&
+      (!std::isfinite(options->pixel_ratio) || options->pixel_ratio <= 0.0F)) {
     mln::core::set_thread_error("pixel_ratio must be finite and positive");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   return MLN_STATUS_OK;
 }
 
-auto effective_style_image_options(const mln_style_image_options* options)
-  -> mln_style_image_options {
+auto effective_style_image_options(const mln_style_image_options* options
+) -> mln_style_image_options {
   auto result = mln::core::style_image_options_default();
   if (options == nullptr) {
     return result;
@@ -821,10 +789,8 @@ auto required_premultiplied_rgba8_bytes(
   }
   const auto trailing_rows = static_cast<size_t>(height - 1U);
   const auto row_stride = static_cast<size_t>(stride);
-  if (
-    trailing_rows >
-    (std::numeric_limits<size_t>::max() - row_bytes) / row_stride
-  ) {
+  if (trailing_rows >
+      (std::numeric_limits<size_t>::max() - row_bytes) / row_stride) {
     return std::nullopt;
   }
   return (trailing_rows * row_stride) + row_bytes;
@@ -901,8 +867,8 @@ auto validate_image_id(mln_string_view image_id) -> mln_status {
   return MLN_STATUS_OK;
 }
 
-auto style_image_info_from_native(const mbgl::style::Image& image)
-  -> mln_style_image_info {
+auto style_image_info_from_native(const mbgl::style::Image& image
+) -> mln_style_image_info {
   const auto& pixels = image.getImage();
   return mln_style_image_info{
     .size = sizeof(mln_style_image_info),
@@ -942,8 +908,8 @@ auto validate_image_source_coordinates(
   return MLN_STATUS_OK;
 }
 
-auto to_native_image_source_coordinates(const mln_lat_lng* coordinates)
-  -> std::array<mbgl::LatLng, 4> {
+auto to_native_image_source_coordinates(const mln_lat_lng* coordinates
+) -> std::array<mbgl::LatLng, 4> {
   auto result = std::array<mbgl::LatLng, 4>{};
   const auto coordinate_span = std::span<const mln_lat_lng>{coordinates, 4};
   auto index = size_t{0};
@@ -983,8 +949,8 @@ auto create_style_id_list(
   return MLN_STATUS_OK;
 }
 
-auto find_style_id_list_locked(const mln_style_id_list* list)
-  -> const mln_style_id_list* {
+auto find_style_id_list_locked(const mln_style_id_list* list
+) -> const mln_style_id_list* {
   const auto found = style_id_list_registry().find(list);
   if (found == style_id_list_registry().end()) {
     return nullptr;
@@ -1009,8 +975,8 @@ auto to_c_render_mode(mbgl::MapObserver::RenderMode mode) -> uint32_t {
   return MLN_RENDER_MODE_PARTIAL;
 }
 
-auto to_c_rendering_stats(const mbgl::gfx::RenderingStats& stats)
-  -> mln_rendering_stats {
+auto to_c_rendering_stats(const mbgl::gfx::RenderingStats& stats
+) -> mln_rendering_stats {
   return mln_rendering_stats{
     .size = sizeof(mln_rendering_stats),
     .encoding_time = stats.encodingTime,
@@ -1021,8 +987,8 @@ auto to_c_rendering_stats(const mbgl::gfx::RenderingStats& stats)
   };
 }
 
-auto render_frame_payload(const mbgl::MapObserver::RenderFrameStatus& status)
-  -> mln_runtime_event_render_frame {
+auto render_frame_payload(const mbgl::MapObserver::RenderFrameStatus& status
+) -> mln_runtime_event_render_frame {
   return mln_runtime_event_render_frame{
     .size = sizeof(mln_runtime_event_render_frame),
     .mode = to_c_render_mode(status.mode),
@@ -1032,8 +998,8 @@ auto render_frame_payload(const mbgl::MapObserver::RenderFrameStatus& status)
   };
 }
 
-auto render_map_payload(mbgl::MapObserver::RenderMode mode)
-  -> mln_runtime_event_render_map {
+auto render_map_payload(mbgl::MapObserver::RenderMode mode
+) -> mln_runtime_event_render_map {
   return mln_runtime_event_render_map{
     .size = sizeof(mln_runtime_event_render_map), .mode = to_c_render_mode(mode)
   };
@@ -1118,9 +1084,8 @@ class HeadlessObserver final : public mbgl::MapObserver {
     push(MLN_RUNTIME_EVENT_MAP_LOADING_FINISHED);
   }
 
-  void onDidFailLoadingMap(
-    mbgl::MapLoadError error, const std::string& message
-  ) override {
+  void onDidFailLoadingMap(mbgl::MapLoadError error, const std::string& message)
+    override {
     push(
       MLN_RUNTIME_EVENT_MAP_LOADING_FAILED, static_cast<int32_t>(error),
       message.c_str()
@@ -1270,10 +1235,8 @@ auto validate_map_options(const mln_map_options* options) -> mln_status {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
-  if (
-    options->width == 0 || options->height == 0 ||
-    !std::isfinite(options->scale_factor) || options->scale_factor <= 0
-  ) {
+  if (options->width == 0 || options->height == 0 ||
+      !std::isfinite(options->scale_factor) || options->scale_factor <= 0) {
     mln::core::set_thread_error(
       "map dimensions and scale_factor must be positive"
     );
@@ -1357,20 +1320,18 @@ auto validate_camera_options(const mln_camera_options* camera) -> mln_status {
       return status;
     }
   }
-  if (
-    ((camera->fields & MLN_CAMERA_OPTION_CENTER_ALTITUDE) != 0U &&
-     !std::isfinite(camera->center_altitude)) ||
-    ((camera->fields & MLN_CAMERA_OPTION_ZOOM) != 0U &&
-     !std::isfinite(camera->zoom)) ||
-    ((camera->fields & MLN_CAMERA_OPTION_BEARING) != 0U &&
-     !std::isfinite(camera->bearing)) ||
-    ((camera->fields & MLN_CAMERA_OPTION_PITCH) != 0U &&
-     !std::isfinite(camera->pitch)) ||
-    ((camera->fields & MLN_CAMERA_OPTION_ROLL) != 0U &&
-     !std::isfinite(camera->roll)) ||
-    ((camera->fields & MLN_CAMERA_OPTION_FOV) != 0U &&
-     !std::isfinite(camera->field_of_view))
-  ) {
+  if (((camera->fields & MLN_CAMERA_OPTION_CENTER_ALTITUDE) != 0U &&
+       !std::isfinite(camera->center_altitude)) ||
+      ((camera->fields & MLN_CAMERA_OPTION_ZOOM) != 0U &&
+       !std::isfinite(camera->zoom)) ||
+      ((camera->fields & MLN_CAMERA_OPTION_BEARING) != 0U &&
+       !std::isfinite(camera->bearing)) ||
+      ((camera->fields & MLN_CAMERA_OPTION_PITCH) != 0U &&
+       !std::isfinite(camera->pitch)) ||
+      ((camera->fields & MLN_CAMERA_OPTION_ROLL) != 0U &&
+       !std::isfinite(camera->roll)) ||
+      ((camera->fields & MLN_CAMERA_OPTION_FOV) != 0U &&
+       !std::isfinite(camera->field_of_view))) {
     mln::core::set_thread_error("enabled camera numeric fields must be finite");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
@@ -1396,8 +1357,8 @@ auto max_animation_duration_ms() -> double {
     .count();
 }
 
-auto validate_animation_options(const mln_animation_options* animation)
-  -> mln_status {
+auto validate_animation_options(const mln_animation_options* animation
+) -> mln_status {
   if (animation == nullptr) {
     return MLN_STATUS_OK;
   }
@@ -1416,39 +1377,31 @@ auto validate_animation_options(const mln_animation_options* animation)
     );
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (
-    (animation->fields & MLN_ANIMATION_OPTION_DURATION) != 0U &&
-    (!std::isfinite(animation->duration_ms) || animation->duration_ms < 0.0 ||
-     animation->duration_ms > max_animation_duration_ms())
-  ) {
+  if ((animation->fields & MLN_ANIMATION_OPTION_DURATION) != 0U &&
+      (!std::isfinite(animation->duration_ms) || animation->duration_ms < 0.0 ||
+       animation->duration_ms > max_animation_duration_ms())) {
     mln::core::set_thread_error(
       "animation duration_ms must fit the native duration range"
     );
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (
-    (animation->fields & MLN_ANIMATION_OPTION_VELOCITY) != 0U &&
-    (!std::isfinite(animation->velocity) || animation->velocity <= 0.0)
-  ) {
-    mln::core::set_thread_error(
-      "animation velocity must be positive and finite"
+  if ((animation->fields & MLN_ANIMATION_OPTION_VELOCITY) != 0U &&
+      (!std::isfinite(animation->velocity) || animation->velocity <= 0.0)) {
+    mln::core::set_thread_error("animation velocity must be positive and finite"
     );
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (
-    (animation->fields & MLN_ANIMATION_OPTION_MIN_ZOOM) != 0U &&
-    !std::isfinite(animation->min_zoom)
-  ) {
+  if ((animation->fields & MLN_ANIMATION_OPTION_MIN_ZOOM) != 0U &&
+      !std::isfinite(animation->min_zoom)) {
     mln::core::set_thread_error("animation min_zoom must be finite");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   if ((animation->fields & MLN_ANIMATION_OPTION_EASING) != 0U) {
     const auto easing = animation->easing;
-    if (
-      !std::isfinite(easing.x1) || !std::isfinite(easing.y1) ||
-      !std::isfinite(easing.x2) || !std::isfinite(easing.y2) ||
-      easing.x1 < 0.0 || easing.x1 > 1.0 || easing.x2 < 0.0 || easing.x2 > 1.0
-    ) {
+    if (!std::isfinite(easing.x1) || !std::isfinite(easing.y1) ||
+        !std::isfinite(easing.x2) || !std::isfinite(easing.y2) ||
+        easing.x1 < 0.0 || easing.x1 > 1.0 || easing.x2 < 0.0 ||
+        easing.x2 > 1.0) {
       mln::core::set_thread_error(
         "animation easing x values must be within [0, 1] and all easing values "
         "must be finite"
@@ -1459,8 +1412,8 @@ auto validate_animation_options(const mln_animation_options* animation)
   return MLN_STATUS_OK;
 }
 
-auto validate_camera_fit_options(const mln_camera_fit_options* options)
-  -> mln_status {
+auto validate_camera_fit_options(const mln_camera_fit_options* options
+) -> mln_status {
   if (options == nullptr) {
     return MLN_STATUS_OK;
   }
@@ -1484,12 +1437,10 @@ auto validate_camera_fit_options(const mln_camera_fit_options* options)
       return status;
     }
   }
-  if (
-    ((options->fields & MLN_CAMERA_FIT_OPTION_BEARING) != 0U &&
-     !std::isfinite(options->bearing)) ||
-    ((options->fields & MLN_CAMERA_FIT_OPTION_PITCH) != 0U &&
-     !std::isfinite(options->pitch))
-  ) {
+  if (((options->fields & MLN_CAMERA_FIT_OPTION_BEARING) != 0U &&
+       !std::isfinite(options->bearing)) ||
+      ((options->fields & MLN_CAMERA_FIT_OPTION_PITCH) != 0U &&
+       !std::isfinite(options->pitch))) {
     mln::core::set_thread_error("camera fit bearing and pitch must be finite");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
@@ -1511,8 +1462,7 @@ auto validate_bound_options(const mln_bound_options* options) -> mln_status {
     MLN_BOUND_OPTION_MAX_ZOOM | MLN_BOUND_OPTION_MIN_PITCH |
     MLN_BOUND_OPTION_MAX_PITCH;
   if ((options->fields & ~known_fields) != 0U) {
-    mln::core::set_thread_error(
-      "mln_bound_options.fields contains unknown bits"
+    mln::core::set_thread_error("mln_bound_options.fields contains unknown bits"
     );
     return MLN_STATUS_INVALID_ARGUMENT;
   }
@@ -1522,34 +1472,28 @@ auto validate_bound_options(const mln_bound_options* options) -> mln_status {
       return status;
     }
   }
-  if (
-    ((options->fields & MLN_BOUND_OPTION_MIN_ZOOM) != 0U &&
-     !std::isfinite(options->min_zoom)) ||
-    ((options->fields & MLN_BOUND_OPTION_MAX_ZOOM) != 0U &&
-     !std::isfinite(options->max_zoom)) ||
-    ((options->fields & MLN_BOUND_OPTION_MIN_PITCH) != 0U &&
-     !std::isfinite(options->min_pitch)) ||
-    ((options->fields & MLN_BOUND_OPTION_MAX_PITCH) != 0U &&
-     !std::isfinite(options->max_pitch))
-  ) {
+  if (((options->fields & MLN_BOUND_OPTION_MIN_ZOOM) != 0U &&
+       !std::isfinite(options->min_zoom)) ||
+      ((options->fields & MLN_BOUND_OPTION_MAX_ZOOM) != 0U &&
+       !std::isfinite(options->max_zoom)) ||
+      ((options->fields & MLN_BOUND_OPTION_MIN_PITCH) != 0U &&
+       !std::isfinite(options->min_pitch)) ||
+      ((options->fields & MLN_BOUND_OPTION_MAX_PITCH) != 0U &&
+       !std::isfinite(options->max_pitch))) {
     mln::core::set_thread_error("bound numeric fields must be finite");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (
-    (options->fields & MLN_BOUND_OPTION_MIN_ZOOM) != 0U &&
-    (options->fields & MLN_BOUND_OPTION_MAX_ZOOM) != 0U &&
-    options->min_zoom > options->max_zoom
-  ) {
+  if ((options->fields & MLN_BOUND_OPTION_MIN_ZOOM) != 0U &&
+      (options->fields & MLN_BOUND_OPTION_MAX_ZOOM) != 0U &&
+      options->min_zoom > options->max_zoom) {
     mln::core::set_thread_error(
       "min_zoom must be less than or equal to max_zoom"
     );
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (
-    (options->fields & MLN_BOUND_OPTION_MIN_PITCH) != 0U &&
-    (options->fields & MLN_BOUND_OPTION_MAX_PITCH) != 0U &&
-    options->min_pitch > options->max_pitch
-  ) {
+  if ((options->fields & MLN_BOUND_OPTION_MIN_PITCH) != 0U &&
+      (options->fields & MLN_BOUND_OPTION_MAX_PITCH) != 0U &&
+      options->min_pitch > options->max_pitch) {
     mln::core::set_thread_error(
       "min_pitch must be less than or equal to max_pitch"
     );
@@ -1559,10 +1503,8 @@ auto validate_bound_options(const mln_bound_options* options) -> mln_status {
 }
 
 auto validate_vec3(mln_vec3 value, const char* name) -> mln_status {
-  if (
-    !std::isfinite(value.x) || !std::isfinite(value.y) ||
-    !std::isfinite(value.z)
-  ) {
+  if (!std::isfinite(value.x) || !std::isfinite(value.y) ||
+      !std::isfinite(value.z)) {
     mln::core::set_thread_error(name);
     return MLN_STATUS_INVALID_ARGUMENT;
   }
@@ -1570,12 +1512,9 @@ auto validate_vec3(mln_vec3 value, const char* name) -> mln_status {
 }
 
 auto validate_quaternion(mln_quaternion value) -> mln_status {
-  if (
-    !std::isfinite(value.x) || !std::isfinite(value.y) ||
-    !std::isfinite(value.z) || !std::isfinite(value.w)
-  ) {
-    mln::core::set_thread_error(
-      "free camera orientation values must be finite"
+  if (!std::isfinite(value.x) || !std::isfinite(value.y) ||
+      !std::isfinite(value.z) || !std::isfinite(value.w)) {
+    mln::core::set_thread_error("free camera orientation values must be finite"
     );
     return MLN_STATUS_INVALID_ARGUMENT;
   }
@@ -1588,8 +1527,8 @@ auto validate_quaternion(mln_quaternion value) -> mln_status {
   return MLN_STATUS_OK;
 }
 
-auto validate_free_camera_options(const mln_free_camera_options* options)
-  -> mln_status {
+auto validate_free_camera_options(const mln_free_camera_options* options
+) -> mln_status {
   if (options == nullptr) {
     mln::core::set_thread_error("free camera options must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
@@ -1625,8 +1564,8 @@ auto validate_free_camera_options(const mln_free_camera_options* options)
   return MLN_STATUS_OK;
 }
 
-auto validate_projection_mode_options(const mln_projection_mode* mode)
-  -> mln_status {
+auto validate_projection_mode_options(const mln_projection_mode* mode
+) -> mln_status {
   if (mode == nullptr) {
     mln::core::set_thread_error("projection mode must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
@@ -1647,12 +1586,10 @@ auto validate_projection_mode_options(const mln_projection_mode* mode)
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
-  if (
-    ((mode->fields & MLN_PROJECTION_MODE_X_SKEW) != 0U &&
-     !std::isfinite(mode->x_skew)) ||
-    ((mode->fields & MLN_PROJECTION_MODE_Y_SKEW) != 0U &&
-     !std::isfinite(mode->y_skew))
-  ) {
+  if (((mode->fields & MLN_PROJECTION_MODE_X_SKEW) != 0U &&
+       !std::isfinite(mode->x_skew)) ||
+      ((mode->fields & MLN_PROJECTION_MODE_Y_SKEW) != 0U &&
+       !std::isfinite(mode->y_skew))) {
     mln::core::set_thread_error("projection skew values must be finite");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
@@ -1674,17 +1611,13 @@ auto validate_debug_options(uint32_t options) -> mln_status {
 }
 
 auto validate_frustum_offset(mln_edge_insets offset) -> mln_status {
-  if (
-    !std::isfinite(offset.top) || !std::isfinite(offset.left) ||
-    !std::isfinite(offset.bottom) || !std::isfinite(offset.right)
-  ) {
+  if (!std::isfinite(offset.top) || !std::isfinite(offset.left) ||
+      !std::isfinite(offset.bottom) || !std::isfinite(offset.right)) {
     mln::core::set_thread_error("frustum offset values must be finite");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (
-    offset.top < 0.0 || offset.left < 0.0 || offset.bottom < 0.0 ||
-    offset.right < 0.0
-  ) {
+  if (offset.top < 0.0 || offset.left < 0.0 || offset.bottom < 0.0 ||
+      offset.right < 0.0) {
     mln::core::set_thread_error(
       "frustum offset values must be greater than or equal to 0"
     );
@@ -1693,8 +1626,8 @@ auto validate_frustum_offset(mln_edge_insets offset) -> mln_status {
   return MLN_STATUS_OK;
 }
 
-auto validate_viewport_options(const mln_map_viewport_options* options)
-  -> mln_status {
+auto validate_viewport_options(const mln_map_viewport_options* options
+) -> mln_status {
   if (options == nullptr) {
     mln::core::set_thread_error("viewport options must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
@@ -1776,23 +1709,19 @@ auto validate_tile_options(const mln_map_tile_options* options) -> mln_status {
     );
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (
-    (options->fields & MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA) != 0U &&
-    options->prefetch_zoom_delta > std::numeric_limits<uint8_t>::max()
-  ) {
+  if ((options->fields & MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA) != 0U &&
+      options->prefetch_zoom_delta > std::numeric_limits<uint8_t>::max()) {
     mln::core::set_thread_error("prefetch_zoom_delta must be at most 255");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (
-    ((options->fields & MLN_MAP_TILE_OPTION_LOD_MIN_RADIUS) != 0U &&
-     !std::isfinite(options->lod_min_radius)) ||
-    ((options->fields & MLN_MAP_TILE_OPTION_LOD_SCALE) != 0U &&
-     !std::isfinite(options->lod_scale)) ||
-    ((options->fields & MLN_MAP_TILE_OPTION_LOD_PITCH_THRESHOLD) != 0U &&
-     !std::isfinite(options->lod_pitch_threshold)) ||
-    ((options->fields & MLN_MAP_TILE_OPTION_LOD_ZOOM_SHIFT) != 0U &&
-     !std::isfinite(options->lod_zoom_shift))
-  ) {
+  if (((options->fields & MLN_MAP_TILE_OPTION_LOD_MIN_RADIUS) != 0U &&
+       !std::isfinite(options->lod_min_radius)) ||
+      ((options->fields & MLN_MAP_TILE_OPTION_LOD_SCALE) != 0U &&
+       !std::isfinite(options->lod_scale)) ||
+      ((options->fields & MLN_MAP_TILE_OPTION_LOD_PITCH_THRESHOLD) != 0U &&
+       !std::isfinite(options->lod_pitch_threshold)) ||
+      ((options->fields & MLN_MAP_TILE_OPTION_LOD_ZOOM_SHIFT) != 0U &&
+       !std::isfinite(options->lod_zoom_shift))) {
     mln::core::set_thread_error("tile LOD values must be finite");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
@@ -1810,10 +1739,8 @@ auto validate_tile_options(const mln_map_tile_options* options) -> mln_status {
 }
 
 auto validate_lat_lng(mln_lat_lng coordinate) -> mln_status {
-  if (
-    !std::isfinite(coordinate.latitude) || coordinate.latitude < -90.0 ||
-    coordinate.latitude > 90.0 || !std::isfinite(coordinate.longitude)
-  ) {
+  if (!std::isfinite(coordinate.latitude) || coordinate.latitude < -90.0 ||
+      coordinate.latitude > 90.0 || !std::isfinite(coordinate.longitude)) {
     mln::core::set_thread_error(
       "latitude must be finite and within [-90, 90], and longitude must be "
       "finite"
@@ -1832,10 +1759,8 @@ auto validate_lat_lng_bounds(mln_lat_lng_bounds bounds) -> mln_status {
   if (northeast_status != MLN_STATUS_OK) {
     return northeast_status;
   }
-  if (
-    bounds.southwest.latitude > bounds.northeast.latitude ||
-    bounds.southwest.longitude > bounds.northeast.longitude
-  ) {
+  if (bounds.southwest.latitude > bounds.northeast.latitude ||
+      bounds.southwest.longitude > bounds.northeast.longitude) {
     mln::core::set_thread_error(
       "bounds southwest must be less than or equal to northeast"
     );
@@ -1903,12 +1828,10 @@ auto validate_screen_point_array(
 }
 
 auto validate_edge_insets(mln_edge_insets padding) -> mln_status {
-  if (
-    !std::isfinite(padding.top) || !std::isfinite(padding.left) ||
-    !std::isfinite(padding.bottom) || !std::isfinite(padding.right) ||
-    padding.top < 0.0 || padding.left < 0.0 || padding.bottom < 0.0 ||
-    padding.right < 0.0
-  ) {
+  if (!std::isfinite(padding.top) || !std::isfinite(padding.left) ||
+      !std::isfinite(padding.bottom) || !std::isfinite(padding.right) ||
+      padding.top < 0.0 || padding.left < 0.0 || padding.bottom < 0.0 ||
+      padding.right < 0.0) {
     mln::core::set_thread_error(
       "padding values must be finite and greater than or equal to 0"
     );
@@ -1926,8 +1849,8 @@ auto validate_projected_meters(mln_projected_meters meters) -> mln_status {
 }
 
 auto to_native_screen_point(mln_screen_point point) -> mbgl::ScreenCoordinate;
-auto from_native_screen_point(const mbgl::ScreenCoordinate& point)
-  -> mln_screen_point;
+auto from_native_screen_point(const mbgl::ScreenCoordinate& point
+) -> mln_screen_point;
 auto to_native_edge_insets(mln_edge_insets padding) -> mbgl::EdgeInsets;
 auto from_native_edge_insets(const mbgl::EdgeInsets& insets) -> mln_edge_insets;
 
@@ -1963,8 +1886,8 @@ auto to_native_camera(const mln_camera_options& camera) -> mbgl::CameraOptions {
   return result;
 }
 
-auto from_native_camera(const mbgl::CameraOptions& camera)
-  -> mln_camera_options {
+auto from_native_camera(const mbgl::CameraOptions& camera
+) -> mln_camera_options {
   auto result = mln::core::camera_options_default();
   if (camera.center) {
     result.fields |= MLN_CAMERA_OPTION_CENTER;
@@ -2006,8 +1929,8 @@ auto from_native_camera(const mbgl::CameraOptions& camera)
   return result;
 }
 
-auto to_native_animation(const mln_animation_options* animation)
-  -> mbgl::AnimationOptions {
+auto to_native_animation(const mln_animation_options* animation
+) -> mbgl::AnimationOptions {
   auto result = mbgl::AnimationOptions{};
   if (animation == nullptr) {
     return result;
@@ -2030,40 +1953,35 @@ auto to_native_animation(const mln_animation_options* animation)
   return result;
 }
 
-auto camera_fit_padding(const mln_camera_fit_options* options)
-  -> mbgl::EdgeInsets {
-  if (
-    options == nullptr ||
-    (options->fields & MLN_CAMERA_FIT_OPTION_PADDING) == 0U
-  ) {
+auto camera_fit_padding(const mln_camera_fit_options* options
+) -> mbgl::EdgeInsets {
+  if (options == nullptr ||
+      (options->fields & MLN_CAMERA_FIT_OPTION_PADDING) == 0U) {
     return mbgl::EdgeInsets{};
   }
   return to_native_edge_insets(options->padding);
 }
 
-auto camera_fit_bearing(const mln_camera_fit_options* options)
-  -> std::optional<double> {
-  if (
-    options == nullptr ||
-    (options->fields & MLN_CAMERA_FIT_OPTION_BEARING) == 0U
-  ) {
+auto camera_fit_bearing(const mln_camera_fit_options* options
+) -> std::optional<double> {
+  if (options == nullptr ||
+      (options->fields & MLN_CAMERA_FIT_OPTION_BEARING) == 0U) {
     return std::nullopt;
   }
   return options->bearing;
 }
 
-auto camera_fit_pitch(const mln_camera_fit_options* options)
-  -> std::optional<double> {
-  if (
-    options == nullptr || (options->fields & MLN_CAMERA_FIT_OPTION_PITCH) == 0U
-  ) {
+auto camera_fit_pitch(const mln_camera_fit_options* options
+) -> std::optional<double> {
+  if (options == nullptr ||
+      (options->fields & MLN_CAMERA_FIT_OPTION_PITCH) == 0U) {
     return std::nullopt;
   }
   return options->pitch;
 }
 
-auto to_native_projection_mode(const mln_projection_mode& mode)
-  -> mbgl::ProjectionMode {
+auto to_native_projection_mode(const mln_projection_mode& mode
+) -> mbgl::ProjectionMode {
   auto result = mbgl::ProjectionMode{};
   if ((mode.fields & MLN_PROJECTION_MODE_AXONOMETRIC) != 0U) {
     result.withAxonometric(mode.axonometric);
@@ -2085,8 +2003,8 @@ auto from_native_debug_options(mbgl::MapDebugOptions options) -> uint32_t {
   return static_cast<uint32_t>(options);
 }
 
-auto to_native_north_orientation(uint32_t orientation)
-  -> mbgl::NorthOrientation {
+auto to_native_north_orientation(uint32_t orientation
+) -> mbgl::NorthOrientation {
   switch (orientation) {
     case MLN_NORTH_ORIENTATION_RIGHT:
       return mbgl::NorthOrientation::Rightwards;
@@ -2100,8 +2018,8 @@ auto to_native_north_orientation(uint32_t orientation)
   }
 }
 
-auto from_native_north_orientation(mbgl::NorthOrientation orientation)
-  -> uint32_t {
+auto from_native_north_orientation(mbgl::NorthOrientation orientation
+) -> uint32_t {
   switch (orientation) {
     case mbgl::NorthOrientation::Rightwards:
       return MLN_NORTH_ORIENTATION_RIGHT;
@@ -2163,8 +2081,8 @@ auto from_native_viewport_mode(mbgl::ViewportMode mode) -> uint32_t {
   }
 }
 
-auto from_native_edge_insets(const mbgl::EdgeInsets& insets)
-  -> mln_edge_insets {
+auto from_native_edge_insets(const mbgl::EdgeInsets& insets
+) -> mln_edge_insets {
   return mln_edge_insets{
     .top = insets.top(),
     .left = insets.left(),
@@ -2193,8 +2111,8 @@ auto from_native_tile_lod_mode(mbgl::TileLodMode mode) -> uint32_t {
   }
 }
 
-auto from_native_projection_mode(const mbgl::ProjectionMode& mode)
-  -> mln_projection_mode {
+auto from_native_projection_mode(const mbgl::ProjectionMode& mode
+) -> mln_projection_mode {
   auto result = mln::core::projection_mode_default();
   if (mode.axonometric) {
     result.fields |= MLN_PROJECTION_MODE_AXONOMETRIC;
@@ -2227,8 +2145,8 @@ auto to_native_lat_lng_bounds(mln_lat_lng_bounds bounds) -> mbgl::LatLngBounds {
   );
 }
 
-auto from_native_lat_lng_bounds(const mbgl::LatLngBounds& bounds)
-  -> mln_lat_lng_bounds {
+auto from_native_lat_lng_bounds(const mbgl::LatLngBounds& bounds
+) -> mln_lat_lng_bounds {
   return mln_lat_lng_bounds{
     .southwest =
       mln_lat_lng{.latitude = bounds.south(), .longitude = bounds.west()},
@@ -2253,8 +2171,8 @@ auto to_native_screen_point(mln_screen_point point) -> mbgl::ScreenCoordinate {
   return mbgl::ScreenCoordinate{point.x, point.y};
 }
 
-auto from_native_screen_point(const mbgl::ScreenCoordinate& point)
-  -> mln_screen_point {
+auto from_native_screen_point(const mbgl::ScreenCoordinate& point
+) -> mln_screen_point {
   return mln_screen_point{.x = point.x, .y = point.y};
 }
 
@@ -2276,8 +2194,8 @@ auto to_native_edge_insets(mln_edge_insets padding) -> mbgl::EdgeInsets {
   };
 }
 
-auto to_native_bound_options(const mln_bound_options& options)
-  -> mbgl::BoundOptions {
+auto to_native_bound_options(const mln_bound_options& options
+) -> mbgl::BoundOptions {
   auto result = mbgl::BoundOptions{};
   if ((options.fields & MLN_BOUND_OPTION_BOUNDS) != 0U) {
     result.withLatLngBounds(to_native_lat_lng_bounds(options.bounds));
@@ -2297,8 +2215,8 @@ auto to_native_bound_options(const mln_bound_options& options)
   return result;
 }
 
-auto from_native_bound_options(const mbgl::BoundOptions& options)
-  -> mln_bound_options {
+auto from_native_bound_options(const mbgl::BoundOptions& options
+) -> mln_bound_options {
   auto result = mln::core::bound_options_default();
   if (options.bounds) {
     result.fields |= MLN_BOUND_OPTION_BOUNDS;
@@ -2343,8 +2261,8 @@ auto from_native_vec4(const mbgl::vec4& value) -> mln_quaternion {
   };
 }
 
-auto to_native_free_camera(const mln_free_camera_options& options)
-  -> mbgl::FreeCameraOptions {
+auto to_native_free_camera(const mln_free_camera_options& options
+) -> mbgl::FreeCameraOptions {
   auto result = mbgl::FreeCameraOptions{};
   if ((options.fields & MLN_FREE_CAMERA_OPTION_POSITION) != 0U) {
     result.position = to_native_vec3(options.position);
@@ -2355,8 +2273,8 @@ auto to_native_free_camera(const mln_free_camera_options& options)
   return result;
 }
 
-auto from_native_free_camera(const mbgl::FreeCameraOptions& options)
-  -> mln_free_camera_options {
+auto from_native_free_camera(const mbgl::FreeCameraOptions& options
+) -> mln_free_camera_options {
   auto result = mln::core::free_camera_options_default();
   if (options.position) {
     result.fields |= MLN_FREE_CAMERA_OPTION_POSITION;
@@ -2403,8 +2321,8 @@ class RuntimeMapRetainGuard final {
 
   RuntimeMapRetainGuard(const RuntimeMapRetainGuard&) = delete;
   RuntimeMapRetainGuard(RuntimeMapRetainGuard&&) = delete;
-  auto operator=(const RuntimeMapRetainGuard&)
-    -> RuntimeMapRetainGuard& = delete;
+  auto operator=(const RuntimeMapRetainGuard&) -> RuntimeMapRetainGuard& =
+                                                    delete;
   auto operator=(RuntimeMapRetainGuard&&) -> RuntimeMapRetainGuard& = delete;
 
   auto dismiss() noexcept -> void { runtime_ = nullptr; }
@@ -2776,8 +2694,8 @@ auto map_native(mln_map* map) -> mbgl::Map* {
   return map->map.get();
 }
 
-auto map_latest_update(mln_map* map)
-  -> std::shared_ptr<mbgl::UpdateParameters> {
+auto map_latest_update(mln_map* map
+) -> std::shared_ptr<mbgl::UpdateParameters> {
   if (map == nullptr || map->frontend == nullptr) {
     return nullptr;
   }
@@ -3342,35 +3260,29 @@ auto map_add_vector_source_url(
 
   const auto effective = effective_tile_source_options(options);
   auto min_zoom = std::optional<float>{};
-  if (
-    has_tile_source_option(effective, MLN_STYLE_TILE_SOURCE_OPTION_MIN_ZOOM)
-  ) {
+  if (has_tile_source_option(
+        effective, MLN_STYLE_TILE_SOURCE_OPTION_MIN_ZOOM
+      )) {
     min_zoom = static_cast<float>(effective.min_zoom);
   }
   auto max_zoom = std::optional<float>{};
-  if (
-    has_tile_source_option(effective, MLN_STYLE_TILE_SOURCE_OPTION_MAX_ZOOM)
-  ) {
+  if (has_tile_source_option(
+        effective, MLN_STYLE_TILE_SOURCE_OPTION_MAX_ZOOM
+      )) {
     max_zoom = static_cast<float>(effective.max_zoom);
   }
 
-  if (
-    has_tile_source_option(
-      effective, MLN_STYLE_TILE_SOURCE_OPTION_VECTOR_ENCODING
-    )
-  ) {
-    style.addSource(
-      std::make_unique<mbgl::style::VectorSource>(
-        id, string_from_view(url), max_zoom, min_zoom,
-        to_native_vector_encoding(effective.vector_encoding)
-      )
-    );
+  if (has_tile_source_option(
+        effective, MLN_STYLE_TILE_SOURCE_OPTION_VECTOR_ENCODING
+      )) {
+    style.addSource(std::make_unique<mbgl::style::VectorSource>(
+      id, string_from_view(url), max_zoom, min_zoom,
+      to_native_vector_encoding(effective.vector_encoding)
+    ));
   } else {
-    style.addSource(
-      std::make_unique<mbgl::style::VectorSource>(
-        id, string_from_view(url), max_zoom, min_zoom
-      )
-    );
+    style.addSource(std::make_unique<mbgl::style::VectorSource>(
+      id, string_from_view(url), max_zoom, min_zoom
+    ));
   }
   return MLN_STATUS_OK;
 }
@@ -3409,12 +3321,10 @@ auto map_add_vector_source_tiles(
   if (!tileset) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  style.addSource(
-    std::make_unique<mbgl::style::VectorSource>(
-      id, *tileset, std::nullopt, std::nullopt,
-      to_native_vector_encoding(effective.vector_encoding)
-    )
-  );
+  style.addSource(std::make_unique<mbgl::style::VectorSource>(
+    id, *tileset, std::nullopt, std::nullopt,
+    to_native_vector_encoding(effective.vector_encoding)
+  ));
   return MLN_STATUS_OK;
 }
 
@@ -3451,11 +3361,9 @@ auto map_add_raster_source_url(
   }
 
   const auto effective = effective_tile_source_options(options);
-  style.addSource(
-    std::make_unique<mbgl::style::RasterSource>(
-      id, string_from_view(url), static_cast<uint16_t>(effective.tile_size)
-    )
-  );
+  style.addSource(std::make_unique<mbgl::style::RasterSource>(
+    id, string_from_view(url), static_cast<uint16_t>(effective.tile_size)
+  ));
   return MLN_STATUS_OK;
 }
 
@@ -3493,11 +3401,9 @@ auto map_add_raster_source_tiles(
   if (!tileset) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  style.addSource(
-    std::make_unique<mbgl::style::RasterSource>(
-      id, *tileset, static_cast<uint16_t>(effective.tile_size)
-    )
-  );
+  style.addSource(std::make_unique<mbgl::style::RasterSource>(
+    id, *tileset, static_cast<uint16_t>(effective.tile_size)
+  ));
   return MLN_STATUS_OK;
 }
 
@@ -3535,21 +3441,17 @@ auto map_add_raster_dem_source_url(
 
   const auto effective = effective_tile_source_options(options);
   auto source_options = std::optional<mbgl::style::SourceOptions>{};
-  if (
-    has_tile_source_option(
-      effective, MLN_STYLE_TILE_SOURCE_OPTION_RASTER_ENCODING
-    )
-  ) {
+  if (has_tile_source_option(
+        effective, MLN_STYLE_TILE_SOURCE_OPTION_RASTER_ENCODING
+      )) {
     source_options = mbgl::style::SourceOptions{
       .rasterEncoding = to_native_raster_encoding(effective.raster_encoding)
     };
   }
-  style.addSource(
-    std::make_unique<mbgl::style::RasterDEMSource>(
-      id, string_from_view(url), static_cast<uint16_t>(effective.tile_size),
-      source_options
-    )
-  );
+  style.addSource(std::make_unique<mbgl::style::RasterDEMSource>(
+    id, string_from_view(url), static_cast<uint16_t>(effective.tile_size),
+    source_options
+  ));
   return MLN_STATUS_OK;
 }
 
@@ -3587,19 +3489,15 @@ auto map_add_raster_dem_source_tiles(
   if (!tileset) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (
-    has_tile_source_option(
-      effective, MLN_STYLE_TILE_SOURCE_OPTION_RASTER_ENCODING
-    )
-  ) {
+  if (has_tile_source_option(
+        effective, MLN_STYLE_TILE_SOURCE_OPTION_RASTER_ENCODING
+      )) {
     tileset->rasterEncoding =
       to_native_raster_encoding(effective.raster_encoding);
   }
-  style.addSource(
-    std::make_unique<mbgl::style::RasterDEMSource>(
-      id, *tileset, static_cast<uint16_t>(effective.tile_size)
-    )
-  );
+  style.addSource(std::make_unique<mbgl::style::RasterDEMSource>(
+    id, *tileset, static_cast<uint16_t>(effective.tile_size)
+  ));
   return MLN_STATUS_OK;
 }
 
@@ -3628,11 +3526,9 @@ auto map_add_custom_geometry_source(
   }
 
   const auto effective = effective_custom_geometry_source_options(*options);
-  style.addSource(
-    std::make_unique<mbgl::style::CustomGeometrySource>(
-      id, to_native_custom_geometry_source_options(effective)
-    )
-  );
+  style.addSource(std::make_unique<mbgl::style::CustomGeometrySource>(
+    id, to_native_custom_geometry_source_options(effective)
+  ));
   return MLN_STATUS_OK;
 }
 
@@ -3946,11 +3842,9 @@ auto map_add_image_source_image(
   }
 
   auto native_image = to_native_premultiplied_rgba8_image(*image);
-  style.addSource(
-    std::make_unique<mbgl::style::ImageSource>(
-      id, to_native_image_source_coordinates(coordinates)
-    )
-  );
+  style.addSource(std::make_unique<mbgl::style::ImageSource>(
+    id, to_native_image_source_coordinates(coordinates)
+  ));
   auto* added_source = style.getSource(id);
   auto* image_source = added_source == nullptr
                          ? nullptr
@@ -4115,11 +4009,9 @@ auto map_add_hillshade_layer(
   if (status != MLN_STATUS_OK) {
     return status;
   }
-  if (
-    !validate_string_view(layer_id, "layer_id") ||
-    !validate_string_view(source_id, "source_id") ||
-    !validate_string_view(before_layer_id, "before_layer_id")
-  ) {
+  if (!validate_string_view(layer_id, "layer_id") ||
+      !validate_string_view(source_id, "source_id") ||
+      !validate_string_view(before_layer_id, "before_layer_id")) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   if (layer_id.size == 0 || source_id.size == 0) {
@@ -4166,11 +4058,9 @@ auto map_add_color_relief_layer(
   if (status != MLN_STATUS_OK) {
     return status;
   }
-  if (
-    !validate_string_view(layer_id, "layer_id") ||
-    !validate_string_view(source_id, "source_id") ||
-    !validate_string_view(before_layer_id, "before_layer_id")
-  ) {
+  if (!validate_string_view(layer_id, "layer_id") ||
+      !validate_string_view(source_id, "source_id") ||
+      !validate_string_view(before_layer_id, "before_layer_id")) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   if (layer_id.size == 0 || source_id.size == 0) {
@@ -4216,10 +4106,8 @@ auto map_add_location_indicator_layer(
   if (status != MLN_STATUS_OK) {
     return status;
   }
-  if (
-    !validate_string_view(layer_id, "layer_id") ||
-    !validate_string_view(before_layer_id, "before_layer_id")
-  ) {
+  if (!validate_string_view(layer_id, "layer_id") ||
+      !validate_string_view(before_layer_id, "before_layer_id")) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   if (layer_id.size == 0) {
@@ -4269,10 +4157,8 @@ auto validate_location_indicator_layer(mln_map* map, mln_string_view layer_id)
 }
 
 auto validate_float64_to_float32(double value, const char* name) -> mln_status {
-  if (
-    !std::isfinite(value) || value < -std::numeric_limits<float>::max() ||
-    value > std::numeric_limits<float>::max()
-  ) {
+  if (!std::isfinite(value) || value < -std::numeric_limits<float>::max() ||
+      value > std::numeric_limits<float>::max()) {
     const auto message = std::string{name} + " must fit in finite float32";
     set_thread_error(message.c_str());
     return MLN_STATUS_INVALID_ARGUMENT;
@@ -4321,9 +4207,8 @@ auto map_set_location_indicator_location(
   auto location = mln_json_value{
     .size = sizeof(mln_json_value),
     .type = MLN_JSON_VALUE_TYPE_ARRAY,
-    .data = {
-      .array_value = {.values = values.data(), .value_count = values.size()}
-    }
+    .data =
+      {.array_value = {.values = values.data(), .value_count = values.size()}}
   };
   return map_set_layer_property(
     map, layer_id, string_view_from_literal("location"), &location
@@ -4384,8 +4269,8 @@ auto map_set_location_indicator_accuracy_radius(
   );
 }
 
-auto location_indicator_image_property(uint32_t image_kind)
-  -> std::optional<mln_string_view> {
+auto location_indicator_image_property(uint32_t image_kind
+) -> std::optional<mln_string_view> {
   switch (image_kind) {
     case MLN_LOCATION_INDICATOR_IMAGE_KIND_TOP:
       return string_view_from_literal("top-image");
@@ -4470,11 +4355,9 @@ auto map_add_style_layer_json(
     set_thread_error("layer already exists");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (
-    (*layer)->getTypeInfo()->source ==
-      mbgl::style::LayerTypeInfo::Source::Required &&
-    style.getSource((*layer)->getSourceID()) == nullptr
-  ) {
+  if ((*layer)->getTypeInfo()->source ==
+        mbgl::style::LayerTypeInfo::Source::Required &&
+      style.getSource((*layer)->getSourceID()) == nullptr) {
     set_thread_error("layer source does not exist");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
@@ -4581,10 +4464,8 @@ auto map_move_style_layer(
   if (status != MLN_STATUS_OK) {
     return status;
   }
-  if (
-    !validate_string_view(layer_id, "layer_id") ||
-    !validate_string_view(before_layer_id, "before_layer_id")
-  ) {
+  if (!validate_string_view(layer_id, "layer_id") ||
+      !validate_string_view(before_layer_id, "before_layer_id")) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   if (layer_id.size == 0) {
@@ -4748,10 +4629,8 @@ auto map_set_layer_property(
   if (status != MLN_STATUS_OK) {
     return status;
   }
-  if (
-    !validate_string_view(layer_id, "layer_id") ||
-    !validate_string_view(property_name, "property_name")
-  ) {
+  if (!validate_string_view(layer_id, "layer_id") ||
+      !validate_string_view(property_name, "property_name")) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   if (layer_id.size == 0 || property_name.size == 0) {
@@ -4788,10 +4667,8 @@ auto map_get_layer_property(
   if (status != MLN_STATUS_OK) {
     return status;
   }
-  if (
-    !validate_string_view(layer_id, "layer_id") ||
-    !validate_string_view(property_name, "property_name")
-  ) {
+  if (!validate_string_view(layer_id, "layer_id") ||
+      !validate_string_view(property_name, "property_name")) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   if (layer_id.size == 0 || property_name.size == 0) {
@@ -4867,8 +4744,7 @@ auto map_get_layer_filter(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   if (out_filter == nullptr || *out_filter != nullptr) {
-    set_thread_error(
-      "out_filter must not be null and *out_filter must be null"
+    set_thread_error("out_filter must not be null and *out_filter must be null"
     );
     return MLN_STATUS_INVALID_ARGUMENT;
   }
@@ -5060,10 +4936,8 @@ auto map_get_viewport_options(
   if (status != MLN_STATUS_OK) {
     return status;
   }
-  if (
-    out_options == nullptr ||
-    out_options->size < sizeof(mln_map_viewport_options)
-  ) {
+  if (out_options == nullptr ||
+      out_options->size < sizeof(mln_map_viewport_options)) {
     set_thread_error("out_options must not be null and must have a valid size");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
@@ -5102,8 +4976,7 @@ auto map_set_viewport_options(
     );
   }
   if ((options->fields & MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE) != 0U) {
-    map->map->setConstrainMode(
-      to_native_constrain_mode(options->constrain_mode)
+    map->map->setConstrainMode(to_native_constrain_mode(options->constrain_mode)
     );
   }
   if ((options->fields & MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE) != 0U) {
@@ -5121,9 +4994,8 @@ auto map_get_tile_options(mln_map* map, mln_map_tile_options* out_options)
   if (status != MLN_STATUS_OK) {
     return status;
   }
-  if (
-    out_options == nullptr || out_options->size < sizeof(mln_map_tile_options)
-  ) {
+  if (out_options == nullptr ||
+      out_options->size < sizeof(mln_map_tile_options)) {
     set_thread_error("out_options must not be null and must have a valid size");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
@@ -5217,9 +5089,9 @@ auto map_lat_lng_for_pixel(
     return point_status;
   }
 
-  *out_coordinate = from_native_lat_lng(
-    map->map->latLngForPixel(to_native_screen_point(point))
-  );
+  *out_coordinate =
+    from_native_lat_lng(map->map->latLngForPixel(to_native_screen_point(point))
+    );
   return MLN_STATUS_OK;
 }
 
@@ -5500,11 +5372,10 @@ auto lat_lng_for_projected_meters(
     return meters_status;
   }
 
-  *out_coordinate = from_native_lat_lng(
-    mbgl::Projection::latLngForProjectedMeters(
+  *out_coordinate =
+    from_native_lat_lng(mbgl::Projection::latLngForProjectedMeters(
       mbgl::ProjectedMeters{meters.northing, meters.easting}
-    )
-  );
+    ));
   return MLN_STATUS_OK;
 }
 
@@ -5816,10 +5687,8 @@ auto map_get_free_camera_options(
   if (status != MLN_STATUS_OK) {
     return status;
   }
-  if (
-    out_options == nullptr ||
-    out_options->size < sizeof(mln_free_camera_options)
-  ) {
+  if (out_options == nullptr ||
+      out_options->size < sizeof(mln_free_camera_options)) {
     set_thread_error("out_options must not be null and must have a valid size");
     return MLN_STATUS_INVALID_ARGUMENT;
   }

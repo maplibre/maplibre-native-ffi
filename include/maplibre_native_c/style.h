@@ -187,20 +187,20 @@ typedef struct mln_style_image_info {
 } mln_style_image_info;
 
 /** Returns default tile source options. */
-MLN_API mln_style_tile_source_options
-mln_style_tile_source_options_default(void) MLN_NOEXCEPT;
+MLN_API mln_style_tile_source_options mln_style_tile_source_options_default(void
+) MLN_NOEXCEPT;
 
 /** Returns default custom geometry source options. */
 MLN_API mln_custom_geometry_source_options
 mln_custom_geometry_source_options_default(void) MLN_NOEXCEPT;
 
 /** Returns a default premultiplied RGBA8 image descriptor. */
-MLN_API mln_premultiplied_rgba8_image
-mln_premultiplied_rgba8_image_default(void) MLN_NOEXCEPT;
+MLN_API mln_premultiplied_rgba8_image mln_premultiplied_rgba8_image_default(void
+) MLN_NOEXCEPT;
 
 /** Returns default runtime style image options. */
-MLN_API mln_style_image_options
-mln_style_image_options_default(void) MLN_NOEXCEPT;
+MLN_API mln_style_image_options mln_style_image_options_default(void
+) MLN_NOEXCEPT;
 
 /** Returns default runtime style image metadata. */
 MLN_API mln_style_image_info mln_style_image_info_default(void) MLN_NOEXCEPT;

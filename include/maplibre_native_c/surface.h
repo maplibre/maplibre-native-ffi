@@ -101,14 +101,14 @@ typedef struct mln_wgl_surface_descriptor {
 /**
  * Returns Metal surface descriptor defaults for this C API version.
  */
-MLN_API mln_metal_surface_descriptor
-mln_metal_surface_descriptor_default(void) MLN_NOEXCEPT;
+MLN_API mln_metal_surface_descriptor mln_metal_surface_descriptor_default(void
+) MLN_NOEXCEPT;
 
 /**
  * Returns Vulkan surface descriptor defaults for this C API version.
  */
-MLN_API mln_vulkan_surface_descriptor
-mln_vulkan_surface_descriptor_default(void) MLN_NOEXCEPT;
+MLN_API mln_vulkan_surface_descriptor mln_vulkan_surface_descriptor_default(void
+) MLN_NOEXCEPT;
 
 /**
  * Attaches a Metal native surface render target to a map.
@@ -167,8 +167,8 @@ MLN_API mln_status mln_vulkan_surface_attach(
 /**
  * Returns EGL surface descriptor defaults for this C API version.
  */
-MLN_API mln_egl_surface_descriptor
-mln_egl_surface_descriptor_default(void) MLN_NOEXCEPT;
+MLN_API mln_egl_surface_descriptor mln_egl_surface_descriptor_default(void
+) MLN_NOEXCEPT;
 
 /**
  * Attaches an EGL native surface render target to a map (Android / Linux).
@@ -198,8 +198,8 @@ MLN_API mln_status mln_egl_surface_attach(
 /**
  * Returns WGL surface descriptor defaults for this C API version.
  */
-MLN_API mln_wgl_surface_descriptor
-mln_wgl_surface_descriptor_default(void) MLN_NOEXCEPT;
+MLN_API mln_wgl_surface_descriptor mln_wgl_surface_descriptor_default(void
+) MLN_NOEXCEPT;
 
 /**
  * Attaches a WGL native surface render target to a map (Windows).

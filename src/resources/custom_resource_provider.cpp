@@ -84,8 +84,8 @@ auto kind_to_abi(mbgl::Resource::Kind kind) -> std::uint32_t {
   }
 }
 
-auto loading_method_to_abi(mbgl::Resource::LoadingMethod method)
-  -> std::uint32_t {
+auto loading_method_to_abi(mbgl::Resource::LoadingMethod method
+) -> std::uint32_t {
   switch (method) {
     case mbgl::Resource::LoadingMethod::CacheOnly:
       return MLN_RESOURCE_LOADING_METHOD_CACHE_ONLY;
@@ -98,8 +98,8 @@ auto loading_method_to_abi(mbgl::Resource::LoadingMethod method)
   }
 }
 
-auto error_reason_from_abi(std::uint32_t reason)
-  -> mbgl::Response::Error::Reason {
+auto error_reason_from_abi(std::uint32_t reason
+) -> mbgl::Response::Error::Reason {
   switch (reason) {
     case MLN_RESOURCE_ERROR_REASON_NOT_FOUND:
       return mbgl::Response::Error::Reason::NotFound;
@@ -116,8 +116,8 @@ auto error_reason_from_abi(std::uint32_t reason)
   }
 }
 
-auto response_from_abi(const mln_resource_response& provider_response)
-  -> mbgl::Response {
+auto response_from_abi(const mln_resource_response& provider_response
+) -> mbgl::Response {
   if (provider_response.size < sizeof(mln_resource_response)) {
     return error_response(
       "mln_resource_response.size is too small",
@@ -161,10 +161,8 @@ auto response_from_abi(const mln_resource_response& provider_response)
 
   if (provider_response.status == MLN_RESOURCE_RESPONSE_STATUS_ERROR) {
     auto message = std::string{"resource provider failed"};
-    if (
-      provider_response.error_message != nullptr &&
-      *provider_response.error_message != '\0'
-    ) {
+    if (provider_response.error_message != nullptr &&
+        *provider_response.error_message != '\0') {
       message = provider_response.error_message;
     }
     auto retry_after = std::optional<mbgl::Timestamp>{};
@@ -251,8 +249,8 @@ struct CustomProviderInvocation {
   void* user_data = nullptr;
 };
 
-auto invoke_custom_provider(CustomProviderInvocation invocation) noexcept
-  -> bool {
+auto invoke_custom_provider(CustomProviderInvocation invocation
+) noexcept -> bool {
   try {
     auto was_cancelled = false;
     {
@@ -289,8 +287,7 @@ auto invoke_custom_provider(CustomProviderInvocation invocation) noexcept
         .has_retry_after = false,
         .retry_after_unix_ms = 0,
       };
-      static_cast<void>(
-        complete_resource_request(invocation.handle, &response)
+      static_cast<void>(complete_resource_request(invocation.handle, &response)
       );
       release(invocation.handle);
     }
@@ -313,8 +310,7 @@ auto invoke_custom_provider(CustomProviderInvocation invocation) noexcept
       .retry_after_unix_ms = 0,
     };
     try {
-      static_cast<void>(
-        complete_resource_request(invocation.handle, &response)
+      static_cast<void>(complete_resource_request(invocation.handle, &response)
       );
     } catch (...) {
       static_cast<void>(response);
@@ -342,14 +338,12 @@ auto request_custom_resource(
     release(handle);
   });
   try {
-    const auto handled = invoke_custom_provider(
-      CustomProviderInvocation{
-        .handle = handle,
-        .resource = resource,
-        .callback = provider_callback,
-        .user_data = user_data,
-      }
-    );
+    const auto handled = invoke_custom_provider(CustomProviderInvocation{
+      .handle = handle,
+      .resource = resource,
+      .callback = provider_callback,
+      .user_data = user_data,
+    });
     return handled ? std::move(request) : nullptr;
   } catch (...) {
     auto response = mln_resource_response{

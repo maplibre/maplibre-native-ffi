@@ -54,8 +54,8 @@ MLN_API mln_status mln_render_session_resize(
  *   owner thread.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_API mln_status
-mln_render_session_render_update(mln_render_session* session) MLN_NOEXCEPT;
+MLN_API mln_status mln_render_session_render_update(mln_render_session* session
+) MLN_NOEXCEPT;
 
 /**
  * Detaches backend-bound render resources from the map while keeping the
@@ -73,8 +73,8 @@ mln_render_session_render_update(mln_render_session* session) MLN_NOEXCEPT;
  *   owner thread.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_API mln_status
-mln_render_session_detach(mln_render_session* session) MLN_NOEXCEPT;
+MLN_API mln_status mln_render_session_detach(mln_render_session* session
+) MLN_NOEXCEPT;
 
 /**
  * Destroys a render session handle.
@@ -89,8 +89,8 @@ mln_render_session_detach(mln_render_session* session) MLN_NOEXCEPT;
  *   owner thread.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_API mln_status
-mln_render_session_destroy(mln_render_session* session) MLN_NOEXCEPT;
+MLN_API mln_status mln_render_session_destroy(mln_render_session* session
+) MLN_NOEXCEPT;
 
 /**
  * Asks the session renderer to release cached resources where possible.
@@ -119,8 +119,8 @@ mln_render_session_reduce_memory_use(mln_render_session* session) MLN_NOEXCEPT;
  *   owner thread.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_API mln_status
-mln_render_session_clear_data(mln_render_session* session) MLN_NOEXCEPT;
+MLN_API mln_status mln_render_session_clear_data(mln_render_session* session
+) MLN_NOEXCEPT;
 
 /**
  * Dumps renderer debug logs for the session through MapLibre Native logging.
@@ -230,8 +230,7 @@ MLN_API mln_status mln_json_snapshot_get(
 ) MLN_NOEXCEPT;
 
 /** Destroys a JSON snapshot handle. Null is accepted as a no-op. */
-MLN_API void mln_json_snapshot_destroy(
-  mln_json_snapshot* snapshot
+MLN_API void mln_json_snapshot_destroy(mln_json_snapshot* snapshot
 ) MLN_NOEXCEPT;
 
 #ifdef __cplusplus

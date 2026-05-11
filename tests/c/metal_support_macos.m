@@ -94,10 +94,8 @@ bool mln_test_metal_texture_read_pixel_rgba8(
   void* texture, uint32_t x, uint32_t y, uint8_t* out_rgba
 ) {
   id<MTLTexture> metal_texture = (id<MTLTexture>)texture;
-  if (
-    metal_texture == nil || out_rgba == NULL || x >= [metal_texture width] ||
-    y >= [metal_texture height]
-  ) {
+  if (metal_texture == nil || out_rgba == NULL || x >= [metal_texture width] ||
+      y >= [metal_texture height]) {
     return false;
   }
 

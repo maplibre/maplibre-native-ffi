@@ -72,9 +72,8 @@ auto validate_borrowed_descriptor(
     mln::core::set_thread_error("Vulkan handles must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (
-    descriptor->format == VK_FORMAT_UNDEFINED || descriptor->final_layout == 0
-  ) {
+  if (descriptor->format == VK_FORMAT_UNDEFINED ||
+      descriptor->final_layout == 0) {
     mln::core::set_thread_error(
       "Vulkan format and final_layout must be specified"
     );
@@ -165,8 +164,7 @@ auto validate_vulkan_handles(
     }
   }
   if (!found_physical_device) {
-    mln::core::set_thread_error(
-      "Vulkan physical_device must belong to instance"
+    mln::core::set_thread_error("Vulkan physical_device must belong to instance"
     );
     return MLN_STATUS_INVALID_ARGUMENT;
   }
@@ -419,10 +417,8 @@ auto vulkan_owned_texture_acquire_frame(
   if (status != MLN_STATUS_OK) {
     return status;
   }
-  if (
-    out_frame == nullptr ||
-    out_frame->size < sizeof(mln_vulkan_owned_texture_frame)
-  ) {
+  if (out_frame == nullptr ||
+      out_frame->size < sizeof(mln_vulkan_owned_texture_frame)) {
     set_thread_error("out_frame must not be null and must have a valid size");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
@@ -434,10 +430,8 @@ auto vulkan_owned_texture_acquire_frame(
     set_thread_error("no rendered frame is available for this generation");
     return MLN_STATUS_INVALID_STATE;
   }
-  if (
-    texture->texture.mode != TextureSessionMode::Owned ||
-    texture->texture.api_kind != TextureSessionApi::Vulkan
-  ) {
+  if (texture->texture.mode != TextureSessionMode::Owned ||
+      texture->texture.api_kind != TextureSessionApi::Vulkan) {
     set_thread_error("texture session cannot expose a Vulkan texture frame");
     return MLN_STATUS_UNSUPPORTED;
   }
@@ -461,16 +455,13 @@ auto vulkan_owned_texture_release_frame(
   if (status != MLN_STATUS_OK) {
     return status;
   }
-  if (
-    frame == nullptr || frame->size < sizeof(mln_vulkan_owned_texture_frame)
-  ) {
+  if (frame == nullptr ||
+      frame->size < sizeof(mln_vulkan_owned_texture_frame)) {
     set_thread_error("frame must not be null and must have a valid size");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (
-    !texture->texture.acquired ||
-    texture->texture.acquired_frame_kind != TextureSessionFrameKind::VulkanOwned
-  ) {
+  if (!texture->texture.acquired || texture->texture.acquired_frame_kind !=
+                                      TextureSessionFrameKind::VulkanOwned) {
     set_thread_error("no texture frame is currently acquired");
     return MLN_STATUS_INVALID_STATE;
   }
@@ -588,10 +579,8 @@ auto metal_owned_texture_acquire_frame(
   if (status != MLN_STATUS_OK) {
     return status;
   }
-  if (
-    out_frame == nullptr ||
-    out_frame->size < sizeof(mln_metal_owned_texture_frame)
-  ) {
+  if (out_frame == nullptr ||
+      out_frame->size < sizeof(mln_metal_owned_texture_frame)) {
     set_thread_error("out_frame must not be null and must have a valid size");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
