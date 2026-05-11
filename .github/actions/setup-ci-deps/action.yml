@@ -4,6 +4,11 @@ description: Install sccache and mise toolchain
 runs:
   using: composite
   steps:
+    - name: Enable Git long paths
+      if: ${{ runner.os == 'Windows' }}
+      shell: pwsh
+      run: git config --global core.longpaths true
+
     - name: Install sccache
       uses: mozilla-actions/sccache-action@1583d6b38d7be47f593cb472781bbb21cab4321e # v0.0.10
 
@@ -21,3 +26,26 @@ runs:
       with:
         cache: true
         install: true
+
+    - name: Trim Windows PATH before Pixi activation
+      if: ${{ runner.os == 'Windows' }}
+      shell: pwsh
+      run: |
+        # Pixi's Windows activation goes through cmd.exe and can exceed cmd's
+        # input line limit when it prepends the Pixi environment to the large
+        # default GitHub Actions Path. See prefix-dev/pixi#1108.
+        $paths = @(
+          "$env:USERPROFILE\AppData\Local\mise\shims",
+          "$env:USERPROFILE\AppData\Local\mise\bin",
+          $(if ($env:SCCACHE_PATH) { Split-Path -Parent $env:SCCACHE_PATH }),
+          "$env:SystemRoot\System32",
+          "$env:SystemRoot",
+          "$env:SystemRoot\System32\Wbem",
+          "$env:SystemRoot\System32\WindowsPowerShell\v1.0",
+          "C:\Program Files\PowerShell\7",
+          "C:\Program Files\Git\cmd",
+          "C:\Program Files\Git\bin",
+          "C:\Program Files\Git\usr\bin"
+        ) | Where-Object { $_ -and (Test-Path $_) }
+
+        "Path=$($paths -join ';')" >> $env:GITHUB_ENV

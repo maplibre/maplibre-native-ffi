@@ -59,9 +59,6 @@ jobs:
       matrix: ${{ fromJson(needs.prepare-matrices.outputs.native) }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - name: Enable Git long paths
-        if: ${{ runner.os == 'Windows' }}
-        run: git config --global core.longpaths true
       - name: Cache MapLibre Native source
         uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
         with:
@@ -73,6 +70,8 @@ jobs:
       - run: mise run configure
       - run: mise run ci:lint native
       # Windows builds successfully, but native tests/examples are runtime-broken for now.
+      - if: ${{ matrix.variant == 'windows-x64-vulkan' }}
+        run: mise run build
       - if: ${{ matrix.variant != 'windows-x64-vulkan' }}
         run: mise run test
       - run: mise run ci:prepare-native-artifact
