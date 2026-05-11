@@ -43,28 +43,28 @@ const GL_TEXTURE0: GLenum = 0x84C0;
 // ── GL function pointer types ────────────────────────────────────────────────
 
 const PFN = struct {
-    const GenTextures = *const fn (GLsizei, [*]GLuint) callconv(.C) void;
-    const DeleteTextures = *const fn (GLsizei, [*c]const GLuint) callconv(.C) void;
-    const BindTexture = *const fn (GLenum, GLuint) callconv(.C) void;
-    const TexImage2D = *const fn (GLenum, GLint, GLint, GLsizei, GLsizei, GLint, GLenum, GLenum, ?*const anyopaque) callconv(.C) void;
-    const TexParameteri = *const fn (GLenum, GLenum, GLint) callconv(.C) void;
-    const CreateShader = *const fn (GLenum) callconv(.C) GLuint;
-    const ShaderSource = *const fn (GLuint, GLsizei, [*c]const [*c]const GLchar, ?[*c]const GLint) callconv(.C) void;
-    const CompileShader = *const fn (GLuint) callconv(.C) void;
-    const GetShaderiv = *const fn (GLuint, GLenum, *GLint) callconv(.C) void;
-    const DeleteShader = *const fn (GLuint) callconv(.C) void;
-    const CreateProgram = *const fn () callconv(.C) GLuint;
-    const AttachShader = *const fn (GLuint, GLuint) callconv(.C) void;
-    const LinkProgram = *const fn (GLuint) callconv(.C) void;
-    const GetProgramiv = *const fn (GLuint, GLenum, *GLint) callconv(.C) void;
-    const DeleteProgram = *const fn (GLuint) callconv(.C) void;
-    const UseProgram = *const fn (GLuint) callconv(.C) void;
-    const GetUniformLocation = *const fn (GLuint, [*c]const GLchar) callconv(.C) GLint;
-    const Uniform1i = *const fn (GLint, GLint) callconv(.C) void;
-    const ActiveTexture = *const fn (GLenum) callconv(.C) void;
-    const Clear = *const fn (GLenum) callconv(.C) void;
-    const Viewport = *const fn (GLint, GLint, GLsizei, GLsizei) callconv(.C) void;
-    const DrawArrays = *const fn (GLenum, GLint, GLsizei) callconv(.C) void;
+    const GenTextures = *const fn (GLsizei, [*]GLuint) callconv(.c) void;
+    const DeleteTextures = *const fn (GLsizei, [*c]const GLuint) callconv(.c) void;
+    const BindTexture = *const fn (GLenum, GLuint) callconv(.c) void;
+    const TexImage2D = *const fn (GLenum, GLint, GLint, GLsizei, GLsizei, GLint, GLenum, GLenum, ?*const anyopaque) callconv(.c) void;
+    const TexParameteri = *const fn (GLenum, GLenum, GLint) callconv(.c) void;
+    const CreateShader = *const fn (GLenum) callconv(.c) GLuint;
+    const ShaderSource = *const fn (GLuint, GLsizei, [*c]const [*c]const GLchar, ?[*c]const GLint) callconv(.c) void;
+    const CompileShader = *const fn (GLuint) callconv(.c) void;
+    const GetShaderiv = *const fn (GLuint, GLenum, *GLint) callconv(.c) void;
+    const DeleteShader = *const fn (GLuint) callconv(.c) void;
+    const CreateProgram = *const fn () callconv(.c) GLuint;
+    const AttachShader = *const fn (GLuint, GLuint) callconv(.c) void;
+    const LinkProgram = *const fn (GLuint) callconv(.c) void;
+    const GetProgramiv = *const fn (GLuint, GLenum, *GLint) callconv(.c) void;
+    const DeleteProgram = *const fn (GLuint) callconv(.c) void;
+    const UseProgram = *const fn (GLuint) callconv(.c) void;
+    const GetUniformLocation = *const fn (GLuint, [*c]const GLchar) callconv(.c) GLint;
+    const Uniform1i = *const fn (GLint, GLint) callconv(.c) void;
+    const ActiveTexture = *const fn (GLenum) callconv(.c) void;
+    const Clear = *const fn (GLenum) callconv(.c) void;
+    const Viewport = *const fn (GLint, GLint, GLsizei, GLsizei) callconv(.c) void;
+    const DrawArrays = *const fn (GLenum, GLint, GLsizei) callconv(.c) void;
 };
 
 // ── Shaders ───────────────────────────────────────────────────────────────────
