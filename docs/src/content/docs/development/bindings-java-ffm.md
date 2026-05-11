@@ -25,9 +25,8 @@ Keep FFM types internal: `Arena`, `MemorySegment`, `MethodHandle`, and generated
 C layout classes. Pass backend-native handles through public APIs as
 `NativePointer`; convert them at the generated layer boundary.
 
-Generate the internal C layer with `jextract`. Generated Java declarations are
-build outputs, not hand-edited sources. When the C API changes, refresh the
-symbol include argfile, then build:
+Generate the internal C layer with `jextract`. When the C API changes, refresh
+the symbol include argfile, then build:
 
 ```sh
 mise run //bindings/java-ffm:jextract:update-includes
@@ -48,12 +47,11 @@ The lookup order is:
 
 ## Public Java Shape
 
-Use static methods on `MapLibre` for process-global operations. Put
-object-specific behavior on the corresponding `AutoCloseable` handle type.
-Follow the shared `Handle` suffix convention.
+Use static methods on `MapLibre` for process-global operations. Long-lived
+native objects follow the shared `Handle` convention and implement
+`AutoCloseable`.
 
-Use records for immutable copied values. Defensively copy mutable inputs. Leave
-semantic validation to the C API.
+Use records for immutable copied values. Defensively copy mutable inputs.
 
 Use mutable descriptor classes for field-mask structs. Setters return `this`,
 `clear...()` clears presence, and `has...()` reports presence. Internal
@@ -69,26 +67,18 @@ changes, expose the mapped enum and the raw native value; map unknown values to
 exception carries `MapLibreStatus`, the raw status code, and the copied
 diagnostic.
 
-Validate binding-owned state in Java: wrapper lifetime, callback scope, string
-and buffer shape, descriptor depth, and one-shot completion. Let the C layer
-validate native state, owner-thread affinity, numeric ranges, and MapLibre
-semantics.
+Validate Java-owned state in Java: wrapper lifetime, callback scope, descriptor
+depth, one-shot completion, and buffer or string shapes that Java owns.
 
 ## Handles And Owner Threads
 
 Store handle lifecycle in `HandleState`: release state, parent references, and
 leak reporting. Successful `close()` calls release once; later closes no-op.
+Cleaner callbacks report leaks; they do not destroy thread-affine native
+handles.
 
-Destroy functions can report `MLN_STATUS_WRONG_THREAD`, so `close()` can throw.
-If close fails, keep the wrapper live. Cleaner callbacks report leaks; they do
-not destroy thread-affine native handles.
-
-Retain parents according to native validity:
-
-- `MapHandle` retains its `RuntimeHandle`.
-- `RenderSessionHandle` retains its `MapHandle`.
-- `MapProjectionHandle` owns a standalone projection snapshot after creation and
-  does not retain the source map for native validity.
+Retain parent wrappers strongly when native validity depends on them.
+`MapProjectionHandle` is standalone after creation.
 
 Use the runtime's weak map registry to attach live `MapHandle` sources to copied
 map events.
@@ -99,18 +89,15 @@ inside the low-level binding. Native wrong-thread statuses become
 
 ## Native Memory And Strings
 
-Use confined arenas for per-call storage and temporary descriptors; shared
-arenas for callback state and other storage that can outlive one call;
-object-owned arenas for object-owned native storage; and `NativeBuffer` for
-reusable large byte storage.
+Use confined arenas for per-call storage and temporary descriptors. Use shared
+arenas only for callback state or other storage that outlives one call. Use
+`NativeBuffer` for reusable large byte storage.
 
 Initialize pointer out parameters to `MemorySegment.NULL`. Initialize C `size`
 fields through native default constructors or internal materializers.
 
-Use UTF-8 at the boundary. Reject embedded NUL in null-terminated C string
-inputs. Allow embedded NUL in explicit-length `mln_string_view` inputs. Copy
-borrowed native text, bytes, events, snapshots, and list entries before their
-native validity window closes.
+Use `MemoryUtil` and `CoreStructs` for UTF-8 strings, string views, and copied
+borrowed data. Reject embedded NUL in null-terminated C string inputs.
 
 `NativePointer` is a borrowed address value. It grants no memory access and
 transfers no ownership. Keep `MemorySegment.ofAddress()` conversions internal
@@ -134,19 +121,17 @@ materialization.
 
 ## Events And Native Results
 
-Runtime polling returns copied Java events. Include mapped enums plus raw native
-values for drift diagnostics. Represent unknown payloads as
+Runtime polling returns copied Java events. Represent unknown payloads as
 `RuntimeEventPayload.Unknown`.
 
 Keep native result and list handles internal. Internal readers copy their
-contents into Java records or lists, then release the native handle exactly once
-in `finally`.
+contents into Java records or lists, then release the native handle in
+`finally`.
 
 ## Native Callbacks
 
-Store callback state for the native owner scope: process logging until replaced
-or cleared, runtime callbacks until replaced or runtime close, and custom
-geometry until source/style/map teardown and active upcalls finish.
+Store callback objects, upcall stubs, and arenas for the owner scope defined by
+the C API.
 
 Upcall stubs may run on MapLibre worker, network, logging, or render-related
 threads. Use thread-safe callback state. Catch `Throwable` inside every upcall
@@ -175,9 +160,7 @@ Java callbacks that need map methods hand work back to the map owner thread.
 ## Render Targets And Frame Access
 
 Render target descriptors are mutable Java objects. Surface and borrowed-texture
-descriptors treat `NativePointer` values as borrowed host-owned handles; callers
-keep those backend objects valid and synchronized for the native lifetime
-documented by the C API.
+descriptors use `NativePointer` for host-owned backend handles.
 
 `RenderSessionHandle` owns one attached target for one map and keeps the map
 alive. Closing the map while a session is live reports native invalid state.
@@ -190,12 +173,3 @@ native frame, exposes copied metadata and scoped `NativePointer` values,
 releases the frame in `finally`, and invalidates the frame scope after the
 callback returns or fails. Scoped frame values and pointers reject access after
 the callback.
-
-## Testing
-
-Use `mise run //bindings/java-ffm:build` for focused binding iteration and
-`mise run test` before broad changes merge.
-
-Test Java-owned invariants: loading and status mapping, release and wrong-thread
-behavior, descriptor materialization, copied native data, callback lifetime,
-one-shot requests, and frame-scope invalidation.

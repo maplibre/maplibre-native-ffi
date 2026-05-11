@@ -66,8 +66,9 @@ public binding layer
   control.
 ```
 
-Keep C binding-generator types internal. Public APIs expose target-language
-values, descriptors, errors, and handle wrappers rather than raw ABI structs or
+Keep C binding-generator types internal. Generated declarations are build
+outputs; do not hand-edit them. Public APIs expose target-language values,
+descriptors, errors, and handle wrappers rather than raw ABI structs or
 generated layout classes.
 
 Rust-based native-extension bindings may share internal Rust crates. A generated
@@ -109,7 +110,8 @@ callers. When a native call returns a non-OK status, read the C thread-local
 diagnostic immediately on the same thread and include it in the reported error.
 Another C call on that thread may replace the diagnostic.
 
-Let the C API validate native arguments and native state. The binding validates
+Let the C API validate native arguments, native state, numeric ranges,
+enum-domain semantics, and MapLibre-specific rules. The binding validates
 language-owned state such as released wrappers, active callback-scoped borrows,
 threading promises made by the binding, and one-shot resource request
 completion.
@@ -278,9 +280,11 @@ Copy event payloads, messages, and strings before their C event storage window
 ends.
 
 Native snapshot, result, and list handles are short-lived implementation details
-by default. Public snapshot and result objects own copied language data. If a
-binding exposes a lazy view tied to a native snapshot handle, that view owns and
-releases the native handle and never exposes free-floating borrowed views.
+by default. Public snapshot and result objects own copied language data.
+Internal readers release native handles after copying, even when copying fails.
+If a binding exposes a lazy view tied to a native snapshot handle, that view
+owns and releases the native handle and never exposes free-floating borrowed
+views.
 
 Backend-native handles returned from acquired texture frames are callback-scoped
 borrows represented as opaque native-pointer values.
@@ -386,7 +390,8 @@ language's idiomatic mask wrapper. Keep raw integer constants internal where the
 language can represent the domain safely.
 
 Output values that may grow across C API versions use stable unknown-value
-representations where forward compatibility matters.
+representations where forward compatibility matters. Copied native output may
+also preserve the raw native value alongside the mapped value for diagnostics.
 
 ## Testing
 
