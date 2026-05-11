@@ -6,17 +6,23 @@ import java.nio.file.Path;
 import java.util.EnumSet;
 import java.util.Objects;
 import java.util.Set;
-import org.maplibre.nativeffi.internal.CoreStructs;
-import org.maplibre.nativeffi.internal.LogCallbackState;
-import org.maplibre.nativeffi.internal.NativeAccess;
-import org.maplibre.nativeffi.internal.Status;
+import org.maplibre.nativeffi.geo.LatLng;
+import org.maplibre.nativeffi.geo.ProjectedMeters;
 import org.maplibre.nativeffi.internal.c.MapLibreNativeC;
 import org.maplibre.nativeffi.internal.c.mln_lat_lng;
 import org.maplibre.nativeffi.internal.c.mln_projected_meters;
+import org.maplibre.nativeffi.internal.callback.LogCallbackState;
+import org.maplibre.nativeffi.internal.loader.NativeAccess;
+import org.maplibre.nativeffi.internal.status.Status;
+import org.maplibre.nativeffi.internal.struct.CoreStructs;
+import org.maplibre.nativeffi.log.LogCallback;
+import org.maplibre.nativeffi.log.LogSeverity;
+import org.maplibre.nativeffi.render.RenderBackend;
+import org.maplibre.nativeffi.runtime.NetworkStatus;
 
 /** Process-global entry points for the Java FFM binding. */
-public final class MapLibre {
-  private MapLibre() {}
+public final class Maplibre {
+  private Maplibre() {}
 
   /** Loads the native library using the binding's standard lookup order. */
   public static void loadNativeLibrary() {
@@ -40,7 +46,7 @@ public final class MapLibre {
     return RenderBackend.fromMask(MapLibreNativeC.mln_supported_render_backend_mask());
   }
 
-  /** Reads MapLibre Native's process-global network status. */
+  /** Reads Maplibre Native's process-global network status. */
   public static NetworkStatus networkStatus() {
     NativeAccess.ensureLoaded();
     try (var arena = Arena.ofConfined()) {
@@ -50,7 +56,7 @@ public final class MapLibre {
     }
   }
 
-  /** Sets MapLibre Native's process-global network status. */
+  /** Sets Maplibre Native's process-global network status. */
   public static void setNetworkStatus(NetworkStatus status) {
     NativeAccess.ensureLoaded();
     Status.check(

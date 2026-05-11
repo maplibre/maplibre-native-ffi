@@ -13,14 +13,19 @@ Resources:
 
 ## Architecture
 
-The binding layers public API over generated C declarations across three
-packages:
+The binding layers public API over generated C declarations across concept
+packages. The root package contains the process-global `Maplibre` entry point.
+Public subpackages group related concepts, such as `runtime`, `map`, `render`,
+`resource`, `style`, `geo`, and `camera`.
 
-| Package                             | Contents                                        |
-| ----------------------------------- | ----------------------------------------------- |
-| `org.maplibre.nativeffi`            | Public types: `MapLibre`, handles, descriptors. |
-| `org.maplibre.nativeffi.internal`   | Native loading, conversion, adapter logic.      |
-| `org.maplibre.nativeffi.internal.c` | Generated `jextract` declarations only.         |
+Internal packages follow the implementation role: `internal.loader` loads the
+native library, `internal.memory` owns FFM memory helpers, `internal.struct`
+materializes C descriptors and copies native results, and `internal.status`
+converts native status codes. The `internal.c` package contains generated
+`jextract` declarations only.
+
+The `org.maplibre.nativeffi` module exports public concept packages. Internal
+packages remain unexported implementation details.
 
 FFM types (`Arena`, `MemorySegment`, `MethodHandle`, generated layout classes)
 stay internal. Public APIs pass backend-native handles as `NativePointer` and
@@ -43,7 +48,7 @@ classes. The lookup order is:
 
 ## Public Types
 
-Process-global operations live as static methods on `MapLibre`. Long-lived
+Process-global operations live as static methods on `Maplibre`. Long-lived
 native objects follow the shared `Handle` convention and implement
 `AutoCloseable`.
 

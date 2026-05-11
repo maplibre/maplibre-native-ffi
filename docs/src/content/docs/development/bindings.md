@@ -12,6 +12,22 @@ language's conventions.
 See the language-specific binding conventions in this section for implementation
 choices in each target language.
 
+## Naming
+
+Use "MapLibre" when referring to the project or upstream library in prose.
+Inside code identifiers, treat `maplibre` as one word and apply the target
+language's normal casing rules:
+
+```text
+MaplibreMap
+maplibre_map
+maplibreMap
+MAPLIBRE_MAP
+```
+
+Avoid splitting the brand into separate identifier words such as `MapLibreMap`
+or `map_libre_map`.
+
 ## Design Model
 
 Bindings balance cross-language consistency with target-language conventions:
