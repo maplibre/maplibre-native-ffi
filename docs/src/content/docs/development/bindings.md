@@ -156,12 +156,12 @@ stable unknown-value representations; copied native output may also preserve the
 raw native value alongside the mapped value for diagnostics.
 
 A `NativePointer`-style value represents an opaque backend-native address that
-the binding does not own. It is a value object, not a memory view. Use it for C
-`void*` fields that represent host-owned backend objects: Metal devices and
-textures, Vulkan devices, queues, and images, Android native windows, hardware
-buffers, native surfaces. Passing it transfers no ownership and grants no memory
-access. Public APIs accept or return opaque native-pointer values only where the
-C API already accepts or returns an opaque backend-native handle.
+the binding does not own. It is a value object. Use it for C `void*` fields that
+represent host-owned backend objects: Metal devices and textures, Vulkan
+devices, queues, and images, Android native windows, hardware buffers, native
+surfaces. Passing it transfers no ownership and grants no memory access. Public
+APIs accept or return opaque native-pointer values only where the C API already
+accepts or returns an opaque backend-native handle.
 
 Strings encode as standard UTF-8 at the C boundary. The binding rejects strings
 containing embedded `NUL` for null-terminated `const char*` inputs, because C
@@ -210,8 +210,8 @@ free-floating borrowed views.
 A callback-scoped borrow exposes native data only during a language callback.
 The binding acquires the borrow before invoking the callback and releases it
 after the callback returns or fails. Texture frames use callback-scoped access:
-the frame view is valid only during the callback, the frame type is not publicly
-closeable, and unsafe accessors check that the frame is active. The native
+the frame view is valid only during the callback, unsafe accessors check that
+the frame is active, and the frame type has no public close method. The native
 session rejects nested acquisition, render updates, resize, detach, and destroy
 while a frame is acquired.
 
