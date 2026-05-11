@@ -5,7 +5,7 @@ sidebar:
   order: 2
 ---
 
-## Public API Layout
+## API Layout
 
 `include/` is the public C API boundary. Keep implementation-only helpers out of
 public headers. Consumers include `maplibre_native_c.h`; domain headers under
@@ -21,7 +21,7 @@ src/
   <subsystem>/           # implementation semantics
 ```
 
-## ABI Evolution
+## ABI Rules
 
 The ABI is unstable while `mln_c_version()` returns `0`. Do not add
 compatibility shims or version-branching code for changed structs or functions
@@ -32,20 +32,52 @@ fixed-underlying enum syntax: `int32_t` for status values and `uint32_t` for
 non-negative domains and masks unless a native ABI field requires another width.
 
 Shape structs for future ABI stability. Option and output structs that may grow
-use `uint32_t size` fields. Default constructors populate them.
+use `uint32_t size` fields. Default constructors populate them. Use field masks
+or presence booleans for optional values when zero is valid.
 
-Use field masks or presence booleans for optional values when zero is valid.
+Prefer scalar fields, pointers with length fields, structs, unions, and opaque
+handles in public structs—these are friendly to binding generators. Expose
+borrowed ABI-owned text with a length or provide an explicit copy or drain API.
+Backend-native handles are opaque `void*`; document the backend type and
+field-level requirements on the struct field, and ownership and lifetime on the
+function that accepts or returns the struct.
 
-Keep public struct fields friendly to binding generators. Prefer scalar fields,
-pointers with length fields, structs, unions, and opaque handles. Do not use
-fixed-size inline text buffers; expose borrowed ABI-owned text with a length or
-provide an explicit copy or drain API.
+## Ownership And Execution
 
-Keep backend-native handles opaque as `void*`; document the backend type and
-field-level requirements on the struct field. Document ownership and lifetime on
-the function that accepts or returns the struct.
+Make ownership explicit at every boundary.
 
-## Errors And Diagnostics
+Struct definitions describe data shape, required fields, and pointer validity.
+Function comments describe whether input pointers are borrowed, copied,
+retained, or consumed, and when returned views become invalid.
+
+Borrow host-provided strings and buffers for call-duration inputs. Copy
+host-provided strings and buffers that outlive the function or native callback.
+
+Store host-provided callbacks and `user_data` by reference. Document how long
+they must remain valid on the registering function. Document the invalidation
+point for returned borrowed pointers.
+
+Give owned handles and scoped resources explicit destroy or release functions.
+Status-returning functions reject null handles. Void release functions accept
+null as a no-op.
+
+Output handle parameters that create or acquire ownership reject non-null
+`*out_handle` values and preserve live host-owned handles on failure. Document
+when scoped resource ownership begins, when it ends, and whether completion may
+happen inline or later.
+
+The runtime and map use a host-pumped, owner-thread model. Runtime creation
+records the owner thread. Runtime, map, map-projection, and render session calls
+that touch thread-affine state validate the owner thread.
+
+Cross-thread dispatch belongs in public functions designed as enqueueing
+commands. Document that behavior on the function. Higher-level adapters build
+threaded models above the C API.
+
+MapLibre's `RunLoop` is owner-thread scheduler state. Each owner thread may hold
+one live runtime. `mln_runtime_run_once()` pumps that runtime's run loop.
+
+## Status And Diagnostics
 
 Status-returning C API functions return `mln_status`. Each function's public
 comment lists its status values and meanings.
@@ -71,52 +103,19 @@ entry and convert exceptions to `MLN_STATUS_NATIVE_ERROR`.
 Set thread-local diagnostic strings for synchronous non-OK returns. Report
 asynchronous native failures through copied runtime events.
 
-## Ownership And Lifetime
+## Events And Callbacks
 
-Make ownership explicit at every boundary.
+The C API preserves MapLibre Native's imperative, observer-driven model. C API
+calls return status for synchronous acceptance or failure; drained events report
+later native work.
 
-Struct definitions describe data shape, required fields, and pointer validity.
-Function comments describe whether input pointers are borrowed, copied,
-retained, or consumed. They also describe when returned views become invalid.
+Prefer polled events for native-to-host notifications about map state,
+lifecycle, rendering, and errors. Use native callbacks for low-level extension
+points where MapLibre needs a synchronous decision, an asynchronous request
+handle, or process-global integration such as logging.
 
-Borrow host-provided strings and buffers for call-duration inputs. Copy
-host-provided strings and buffers that outlive the function or native callback.
-
-Store host-provided callbacks and `user_data` by reference. Document how long
-they must remain valid on the registering function. Document the invalidation
-point for returned borrowed pointers.
-
-Give owned handles and scoped resources explicit destroy or release functions.
-Status-returning functions reject null handles. Void release functions accept
-null as a no-op.
-
-Output handle parameters reject non-null `*out_handle` values and preserve live
-host-owned handles on failure. Document when scoped resource ownership begins,
-when it ends, and whether completion may happen inline or later.
-
-## Threading
-
-The runtime and map use a host-pumped model. Runtime creation records the owner
-thread. Runtime, map, map-projection, and render session calls that touch
-thread-affine state validate the owner thread and return
-`MLN_STATUS_WRONG_THREAD` for mismatches.
-
-Cross-thread dispatch belongs in public functions designed as enqueueing
-commands. Document that behavior on the function. Higher-level adapters can
-build threaded models above the C API.
-
-MapLibre's `RunLoop` is owner-thread scheduler state. Each owner thread may hold
-one live runtime. `mln_runtime_run_once()` pumps that runtime's run loop.
-
-## Async And Events
-
-Preserve MapLibre Native's imperative, observer-driven model. C API calls return
-status for synchronous acceptance or failure. Drained events report later native
-work.
-
-Events are copied into runtime-owned storage and drained with C API calls. Event
-payloads use plain data with documented lifetimes. Each event identifies its
-source kind and source handle. Queued events never outlive the source handle
+Event payloads use plain data with documented lifetimes. Each event identifies
+its source kind and source handle. Queued events never outlive the source handle
 they reference: map teardown discards queued events for that map, and runtime
 teardown discards runtime-owned event streams before the runtime handle becomes
 invalid.
@@ -130,16 +129,8 @@ Classify each operation as one of:
 - a blocking query, used rarely and documented with deadlock risks;
 - an event stream, where many events are expected over time.
 
-## Native Callbacks
-
-Prefer polled events for native-to-host notifications about map state,
-lifecycle, rendering, and errors. Use native callbacks for low-level extension
-points where MapLibre needs a synchronous decision, an asynchronous request
-handle, or process-global integration such as logging.
-
-Low-level native callbacks can run outside the owner thread. Logging, resource
-transform, and resource provider callbacks may run on MapLibre worker, network,
-logging, or render-related threads.
+Logging, resource transform, and resource provider callbacks may run on MapLibre
+worker, network, logging, or render-related threads.
 
 A callback API documents:
 
@@ -154,18 +145,6 @@ Callbacks must not unwind through the C API. Bindings catch host exceptions,
 panics, and errors inside the callback and convert them to the callback's
 documented return behavior.
 
-## Maps, Render Sessions, And Render Targets
-
-Keep map state separate from render targets. `mln_map` owns style, camera,
-observer events, and render invalidation state. Each map may have one live
-render session. A render session renders that map to one surface or texture
-render target and owns backend-bound resources.
-
-Texture sessions render offscreen into session-owned backend targets or
-caller-owned borrowed backend targets. Surface sessions render and present
-through caller-provided native surfaces. Future target kinds should preserve the
-same separation from `mln_map`.
-
-Render session APIs must document owner thread, render target backend handle
+Render session APIs document owner thread, render target backend handle
 ownership, synchronization, borrowed pointer lifetimes, generation or
 stale-frame behavior, and teardown rules.
