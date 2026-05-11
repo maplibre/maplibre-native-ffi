@@ -2,7 +2,7 @@ package org.maplibre.nativeffi.internal.callback;
 
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
-import java.util.Optional;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import org.maplibre.nativeffi.internal.c.MapLibreNativeC;
 import org.maplibre.nativeffi.internal.c.mln_resource_transform;
@@ -46,9 +46,7 @@ public final class ResourceTransformState implements AutoCloseable {
           callback.transform(
               new ResourceTransformRequest(
                   ResourceKind.fromNative(rawKind), rawKind, MemoryUtil.copyCString(url)));
-      if (replacement == null) {
-        replacement = Optional.empty();
-      }
+      Objects.requireNonNull(replacement, "replacement");
       if (replacement.isPresent() && !replacement.get().isEmpty()) {
         var responseArena = Arena.ofShared();
         responseArenas.put(Thread.currentThread(), responseArena);

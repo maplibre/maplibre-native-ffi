@@ -80,6 +80,14 @@ final class ResourceProviderStateTest {
   }
 
   @Test
+  void nullProviderDecisionProducesProviderErrorDecision() {
+    try (var state = new ResourceProviderState((request, handle) -> null);
+        var arena = Arena.ofConfined()) {
+      assertEquals(ResourceProviderState.UNKNOWN_DECISION, invoke(state, request(arena)));
+    }
+  }
+
+  @Test
   void closedPassThroughHandleDefersReleaseToNativeDecision() {
     try (var state =
             new ResourceProviderState(

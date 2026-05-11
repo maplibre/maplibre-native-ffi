@@ -99,7 +99,8 @@ public final class ResourceRequestHandle implements AutoCloseable {
   synchronized int finishProviderDecision(ResourceProviderDecision decision) {
     // Completion before the callback returns makes Java the provider owner even if the callback
     // returns PASS_THROUGH. The native side must see HANDLE so Java can release its reference.
-    if (completed || decision == ResourceProviderDecision.HANDLE) {
+    if (completed
+        || Objects.requireNonNull(decision, "decision") == ResourceProviderDecision.HANDLE) {
       decisionFinalized = true;
       nativeReference.markProviderOwned();
       if (closed) {

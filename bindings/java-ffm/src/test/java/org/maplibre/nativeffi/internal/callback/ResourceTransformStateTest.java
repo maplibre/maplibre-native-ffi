@@ -83,4 +83,21 @@ final class ResourceTransformStateTest {
       assertEquals(MapLibreNativeC.MLN_STATUS_NATIVE_ERROR(), status);
     }
   }
+
+  @Test
+  void nullCallbackResponseBecomesNativeErrorStatus() {
+    try (var state = new ResourceTransformState(request -> null);
+        var arena = Arena.ofConfined()) {
+      var response = mln_resource_transform_response.allocate(arena);
+      var status =
+          mln_resource_transform_callback.invoke(
+              mln_resource_transform.callback(state.descriptor()),
+              MemorySegment.NULL,
+              ResourceKind.STYLE.nativeValue(),
+              MemoryUtil.allocateCString(arena, "https://example.test/style.json"),
+              response);
+
+      assertEquals(MapLibreNativeC.MLN_STATUS_NATIVE_ERROR(), status);
+    }
+  }
 }
