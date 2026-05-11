@@ -62,6 +62,7 @@ sdl3 = ">=3.4,<4"
 
 [target.win-64.dependencies]
 clang-tools = ">=22,<23"
+cxx-compiler = "*"
 dlfcn-win32 = "*"
 glslang = "*"
 libvulkan-loader = "*"
