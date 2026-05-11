@@ -8,6 +8,13 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 if(MSVC)
+  # sccache cannot reliably cache MSVC compilations that emit shared compiler
+  # PDBs with /Zi. Embed debug information in objects instead; link.exe may
+  # still produce final PDBs for linked binaries.
+  # See https://github.com/mozilla/sccache/pull/963.
+  set(CMAKE_MSVC_DEBUG_INFORMATION_FORMAT
+      "$<$<CONFIG:Debug,RelWithDebInfo>:Embedded>")
+
   # Ninja may run several cl.exe instances for one target at the same time.
   # /FS serializes PDB writes and avoids fatal error C1041 when those instances
   # write to the same target program database.
