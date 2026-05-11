@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -89,12 +90,40 @@ final class ResourceProviderStateTest {
 
   @Test
   void handleDecisionCanRetainHandleAfterCallback() {
-    try (var state =
-            new ResourceProviderState((request, handle) -> ResourceProviderDecision.HANDLE);
-        var arena = Arena.ofConfined()) {
-      assertEquals(
-          MapLibreNativeC.MLN_RESOURCE_PROVIDER_DECISION_HANDLE(), invoke(state, request(arena)));
+    var releases = new AtomicInteger();
+    var handle =
+        new ResourceRequestHandle(
+            MemorySegment.ofAddress(0x1234), ignored -> releases.incrementAndGet());
+
+    assertEquals(
+        ResourceProviderDecision.HANDLE.nativeValue(),
+        handle.finishProviderDecision(ResourceProviderDecision.HANDLE));
+    assertEquals(0, releases.get());
+
+    handle.close();
+    assertEquals(1, releases.get());
+  }
+
+  @Test
+  void abandonedHandledRequestReleasesNativeReferenceFromCleaner() throws Exception {
+    var releases = new AtomicInteger();
+    abandonHandledRequest(releases);
+
+    for (var attempt = 0; attempt < 100 && releases.get() == 0; attempt++) {
+      System.gc();
+      Thread.sleep(10);
     }
+
+    assertEquals(1, releases.get());
+  }
+
+  private static void abandonHandledRequest(AtomicInteger releases) {
+    var handle =
+        new ResourceRequestHandle(
+            MemorySegment.ofAddress(0x1234), ignored -> releases.incrementAndGet());
+    assertEquals(
+        ResourceProviderDecision.HANDLE.nativeValue(),
+        handle.finishProviderDecision(ResourceProviderDecision.HANDLE));
   }
 
   private static int invoke(ResourceProviderState state, MemorySegment request) {

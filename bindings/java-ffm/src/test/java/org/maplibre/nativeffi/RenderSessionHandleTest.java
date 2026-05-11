@@ -11,7 +11,9 @@ import static org.junit.jupiter.api.Assertions.fail;
 
 import java.util.EnumSet;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.maplibre.nativeffi.internal.NativeTestSupport;
@@ -98,6 +100,82 @@ final class RenderSessionHandleTest {
   }
 
   @Test
+  void metalOwnedTextureFrameReleasesAfterCallbackFailure() throws Exception {
+    MapLibre.setLogCallback(record -> true);
+    MapLibre.setAsyncLogSeverities(EnumSet.noneOf(LogSeverity.class));
+
+    var runtime = RuntimeHandle.create();
+    var map = MapHandle.create(runtime, new MapOptions().setSize(64, 64));
+    RenderSessionHandle session = null;
+    try {
+      session = assumeMetalOwnedTextureSession(map);
+      var activeSession = session;
+      map.setStyleJson(STYLE_JSON);
+      waitForMapEvent(runtime, map, RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE);
+      activeSession.renderUpdate();
+
+      var escaped = new AtomicReference<MetalOwnedTextureFrame>();
+      var failure =
+          assertThrows(
+              IllegalStateException.class,
+              () ->
+                  activeSession.withMetalOwnedTextureFrame(
+                      (Consumer<MetalOwnedTextureFrame>)
+                          frame -> {
+                            escaped.set(frame);
+                            throw new IllegalStateException("boom");
+                          }));
+      assertEquals("boom", failure.getMessage());
+      assertThrows(IllegalStateException.class, () -> escaped.get().width());
+      activeSession.renderUpdate();
+    } finally {
+      if (session != null) {
+        session.close();
+      }
+      map.close();
+      runtime.close();
+    }
+  }
+
+  @Test
+  void vulkanOwnedTextureFrameReleasesAfterCallbackFailure() throws Exception {
+    MapLibre.setLogCallback(record -> true);
+    MapLibre.setAsyncLogSeverities(EnumSet.noneOf(LogSeverity.class));
+
+    var runtime = RuntimeHandle.create();
+    var map = MapHandle.create(runtime, new MapOptions().setSize(64, 64));
+    RenderSessionHandle session = null;
+    try {
+      session = assumeVulkanOwnedTextureSession(map);
+      var activeSession = session;
+      map.setStyleJson(STYLE_JSON);
+      waitForMapEvent(runtime, map, RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE);
+      activeSession.renderUpdate();
+
+      var escaped = new AtomicReference<VulkanOwnedTextureFrame>();
+      var failure =
+          assertThrows(
+              IllegalStateException.class,
+              () ->
+                  activeSession.withVulkanOwnedTextureFrame(
+                      (Consumer<VulkanOwnedTextureFrame>)
+                          frame -> {
+                            escaped.set(frame);
+                            throw new IllegalStateException("boom");
+                          }));
+      assertEquals("boom", failure.getMessage());
+      assertThrows(IllegalStateException.class, () -> escaped.get().width());
+      activeSession.renderUpdate();
+    } finally {
+      if (session != null) {
+        session.close();
+      }
+      map.close();
+      runtime.close();
+    }
+  }
+
+  @Test
   void renderTargetDescriptorsTrackOptionalFields() {
     var vulkanBorrowed = new VulkanBorrowedTextureDescriptor();
     assertFalse(vulkanBorrowed.hasFinalLayout());
@@ -165,6 +243,24 @@ final class RenderSessionHandleTest {
     var error = (WrongThreadException) thrown;
     assertEquals(MapLibreStatus.WRONG_THREAD, error.status());
     assertFalse(error.diagnostic().isBlank());
+  }
+
+  private static RenderSessionHandle assumeMetalOwnedTextureSession(MapHandle map) {
+    try {
+      return map.attachMetalOwnedTexture(new MetalOwnedTextureDescriptor().setSize(32, 16));
+    } catch (MapLibreException error) {
+      Assumptions.assumeTrue(false, "Metal owned texture unavailable: " + error.getMessage());
+      throw new AssertionError("unreachable");
+    }
+  }
+
+  private static RenderSessionHandle assumeVulkanOwnedTextureSession(MapHandle map) {
+    try {
+      return map.attachVulkanOwnedTexture(new VulkanOwnedTextureDescriptor().setSize(32, 16));
+    } catch (MapLibreException error) {
+      Assumptions.assumeTrue(false, "Vulkan owned texture unavailable: " + error.getMessage());
+      throw new AssertionError("unreachable");
+    }
   }
 
   private static Throwable runOnOtherThread(ThrowingRunnable action) throws InterruptedException {

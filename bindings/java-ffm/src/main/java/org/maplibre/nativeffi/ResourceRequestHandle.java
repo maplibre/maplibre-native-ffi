@@ -3,7 +3,9 @@ package org.maplibre.nativeffi;
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
+import java.lang.ref.Cleaner;
 import java.util.Objects;
+import java.util.function.Consumer;
 import org.maplibre.nativeffi.internal.MemoryUtil;
 import org.maplibre.nativeffi.internal.NativeAccess;
 import org.maplibre.nativeffi.internal.ResourceStructs;
@@ -18,18 +20,27 @@ import org.maplibre.nativeffi.internal.c.MapLibreNativeC;
  * reference, so a completed handle rejects further use. Closing is harmless after completion.
  */
 public final class ResourceRequestHandle implements AutoCloseable {
+  private static final Cleaner CLEANER = Cleaner.create();
+
   private final MemorySegment handle;
+  private final NativeReference nativeReference;
+  private final Cleaner.Cleanable cleanable;
   private boolean decisionFinalized;
-  private boolean nativeReferenceConsumed;
   private boolean closed;
   private boolean completed;
   private boolean closeRequested;
 
   ResourceRequestHandle(MemorySegment handle) {
+    this(handle, MapLibreNativeC::mln_resource_request_release);
+  }
+
+  ResourceRequestHandle(MemorySegment handle, Consumer<MemorySegment> releaser) {
     this.handle = Objects.requireNonNull(handle, "handle");
     if (MemoryUtil.isNull(handle)) {
       throw new IllegalArgumentException("Resource request handle is null");
     }
+    nativeReference = new NativeReference(handle, releaser);
+    cleanable = CLEANER.register(this, nativeReference);
   }
 
   public synchronized void complete(ResourceResponse response) {
@@ -78,6 +89,7 @@ public final class ResourceRequestHandle implements AutoCloseable {
   synchronized int finishProviderDecision(ResourceProviderDecision decision) {
     if (completed || decision == ResourceProviderDecision.HANDLE) {
       decisionFinalized = true;
+      nativeReference.markProviderOwned();
       if (completed || closeRequested) {
         releaseNative();
       }
@@ -97,21 +109,67 @@ public final class ResourceRequestHandle implements AutoCloseable {
 
   private void markNativeWillRelease() {
     decisionFinalized = true;
-    nativeReferenceConsumed = true;
+    nativeReference.markNativeWillRelease();
+    cleanable.clean();
     closed = true;
   }
 
   private void releaseNative() {
-    if (!nativeReferenceConsumed) {
-      MapLibreNativeC.mln_resource_request_release(handle);
-      nativeReferenceConsumed = true;
-    }
+    nativeReference.releaseIfOwned();
+    cleanable.clean();
     closed = true;
   }
 
   private void requireLive() {
     if (closed) {
       throw Status.released("ResourceRequestHandle");
+    }
+  }
+
+  private static final class NativeReference implements Runnable {
+    private final MemorySegment handle;
+    private final Consumer<MemorySegment> releaser;
+    private boolean providerOwned;
+    private boolean released;
+
+    NativeReference(MemorySegment handle, Consumer<MemorySegment> releaser) {
+      this.handle = handle;
+      this.releaser = Objects.requireNonNull(releaser, "releaser");
+    }
+
+    synchronized void markProviderOwned() {
+      providerOwned = true;
+    }
+
+    synchronized void markNativeWillRelease() {
+      released = true;
+    }
+
+    void releaseIfOwned() {
+      var shouldRelease = false;
+      synchronized (this) {
+        if (!released) {
+          released = true;
+          shouldRelease = true;
+        }
+      }
+      if (shouldRelease) {
+        releaser.accept(handle);
+      }
+    }
+
+    @Override
+    public void run() {
+      var shouldRelease = false;
+      synchronized (this) {
+        if (providerOwned && !released) {
+          released = true;
+          shouldRelease = true;
+        }
+      }
+      if (shouldRelease) {
+        releaser.accept(handle);
+      }
     }
   }
 }

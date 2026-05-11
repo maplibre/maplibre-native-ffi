@@ -73,6 +73,19 @@ final class MapHandleTest {
   }
 
   @Test
+  void publicStyleStringInputsRejectEmbeddedNul() {
+    var runtime = RuntimeHandle.create();
+    var map = MapHandle.create(runtime, new MapOptions().setSize(128, 128));
+    try {
+      assertThrows(IllegalArgumentException.class, () -> map.setStyleUrl("custom://a\0b"));
+      assertThrows(IllegalArgumentException.class, () -> map.setStyleJson("{\0}"));
+    } finally {
+      map.close();
+      runtime.close();
+    }
+  }
+
+  @Test
   void debugAndStateHelpersRoundTrip() {
     var runtime = RuntimeHandle.create();
     var map = MapHandle.create(runtime, new MapOptions().setSize(128, 128));
