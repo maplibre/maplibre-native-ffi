@@ -5,49 +5,32 @@ amends "package://github.com/jdx/hk/releases/download/v1.40.0/hk@1.40.0#/Config.
 
 import "package://github.com/jdx/hk/releases/download/v1.40.0/hk@1.40.0#/Builtins.pkl"
 
-local commonProfiles = List("!ci-native")
-local nativeProfiles = List("!ci-common")
-
-local commonSteps = new Mapping<String, Step> {
-  ["dprint"] = (Builtins.dprint) {
-    profiles = commonProfiles
-  }
+local lintSteps = new Mapping<String, Step> {
+  ["dprint"] = Builtins.dprint
   ["actionlint"] {
     glob = List(".github/workflows/*.yml", ".github/workflows/*.yaml")
-    profiles = commonProfiles
     check = "actionlint {{files}}"
   }
   ["jvl"] {
     glob = List("**/*.json", "**/*.jsonc")
-    profiles = commonProfiles
     check = "jvl check {{files}}"
   }
   ["vp-check"] {
     glob = List("docs/**/*.ts", "docs/**/*.tsx", "docs/**/*.js", "docs/**/*.jsx", "docs/**/*.mjs", "docs/**/*.cjs")
-    profiles = commonProfiles
     check = "pnpm --dir docs exec vp check --no-fmt"
     fix = "pnpm --dir docs exec vp check --no-fmt --fix"
   }
   ["ruff"] {
     glob = List("**/*.py")
     exclude = List("third_party/**")
-    profiles = commonProfiles
     check = "uv run ruff check {{files}} && uv run ruff format --check {{files}}"
     fix = "uv run ruff check --fix {{files}} && uv run ruff format {{files}}"
   }
   ["ty"] {
     glob = List("**/*.py")
     exclude = List("third_party/**")
-    profiles = commonProfiles
     check = "uv run ty check --error-on-warning .mise"
   }
-}
-
-local nativeSteps = new Mapping<String, Step> {}
-
-local allSteps = new Mapping<String, Step> {
-  ...commonSteps
-  ...nativeSteps
 }
 
 hooks {
@@ -55,18 +38,18 @@ hooks {
     fix = true
     stash = "git"
     steps {
-      ...allSteps
+      ...lintSteps
     }
   }
   ["check"] {
     steps {
-      ...allSteps
+      ...lintSteps
     }
   }
   ["fix"] {
     fix = true
     steps {
-      ...allSteps
+      ...lintSteps
     }
   }
 }

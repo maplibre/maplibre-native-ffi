@@ -17,7 +17,7 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - uses: ./.github/actions/setup-ci-deps
-      - run: mise run ci:lint common
+      - run: mise run ci:lint
 
   docs:
     name: docs
@@ -68,7 +68,6 @@ jobs:
           key: mln-src-v2-${{ hashFiles('.gitmodules', 'cmake/mln_version.cmake') }}
       - uses: ./.github/actions/setup-ci-deps
       - run: mise run configure
-      - run: mise run ci:lint native
       # Windows builds successfully, but native tests/examples are runtime-broken for now.
       - if: ${{ matrix.variant == 'windows-x64-vulkan' }}
         run: mise run build

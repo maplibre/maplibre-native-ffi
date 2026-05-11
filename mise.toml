@@ -137,13 +137,8 @@ hide = true
 run = 'java -jar {{ tools["aqua:facebook/ktfmt"].path }}/ktfmt'
 
 [tasks."ci:lint"]
-usage = '''
-arg "<profile>" help="Lint profile" {
-  choices "common" "native"
-}
-'''
 run = [
-  "hk fix --all --profile \"ci-${usage_profile?}\"",
+  "hk fix --all",
   "git update-index -q --refresh",
   "git diff --exit-code",
   "git diff --cached --exit-code",
