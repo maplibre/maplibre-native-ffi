@@ -11,153 +11,140 @@ Resources:
 - [`jextract`](https://jdk.java.net/jextract/)
 - [Java JNI conventions](/maplibre-native-ffi/development/bindings-java-jni/)
 
-## Package Boundaries
+## Architecture
 
-Use three layers:
+The binding layers public API over generated C declarations across three
+packages:
 
-| Package                             | Purpose                                        |
-| ----------------------------------- | ---------------------------------------------- |
-| `org.maplibre.nativeffi`            | Public symbols.                                |
-| `org.maplibre.nativeffi.internal`   | Native loading, conversion, and adapter logic. |
-| `org.maplibre.nativeffi.internal.c` | Generated `jextract` declarations only.        |
+| Package                             | Contents                                        |
+| ----------------------------------- | ----------------------------------------------- |
+| `org.maplibre.nativeffi`            | Public types: `MapLibre`, handles, descriptors. |
+| `org.maplibre.nativeffi.internal`   | Native loading, conversion, adapter logic.      |
+| `org.maplibre.nativeffi.internal.c` | Generated `jextract` declarations only.         |
 
-Keep FFM types internal: `Arena`, `MemorySegment`, `MethodHandle`, and generated
-C layout classes. Pass backend-native handles through public APIs as
-`NativePointer`; convert them at the generated layer boundary.
+FFM types (`Arena`, `MemorySegment`, `MethodHandle`, generated layout classes)
+stay internal. Public APIs pass backend-native handles as `NativePointer` and
+convert at the generated layer boundary.
 
-Generate the internal C layer with `jextract`. When the C API changes, refresh
-the symbol include argfile, then build:
+The internal C layer is entirely `jextract` output—do not hand-edit it. Refresh
+when the C API changes:
 
 ```sh
 mise run //bindings/java-ffm:jextract:update-includes
 mise run //bindings/java-ffm:build
 ```
 
-When wrapping a C function, add internal struct conversion when needed, call
-`Status.check(...)` for native statuses, and test the real C call.
-
-## Native Loading And Access
-
-Call `NativeAccess.ensureLoaded()` before touching generated `jextract` classes.
-The lookup order is:
+The binding calls `NativeAccess.ensureLoaded()` before touching generated
+classes. The lookup order is:
 
 1. exact library file path from `org.maplibre.nativeffi.library.path`;
 2. exact library file path from `MAPLIBRE_NATIVE_FFI_LIBRARY_PATH`;
 3. `System.loadLibrary("maplibre-native-c")` through `java.library.path`.
 
-## Public Java Shape
+## Public Types
 
-Use static methods on `MapLibre` for process-global operations. Long-lived
+Process-global operations live as static methods on `MapLibre`. Long-lived
 native objects follow the shared `Handle` convention and implement
 `AutoCloseable`.
 
-Use records for immutable copied values. Defensively copy mutable inputs.
+Immutable copied values are records. Mutable descriptor classes represent
+field-mask structs: setters return `this`, `clear…()` clears presence, `has…()`
+reports it. Internal materializers write C `size` fields and masks so callers
+never touch ABI bookkeeping.
 
-Use mutable descriptor classes for field-mask structs. Setters return `this`,
-`clear...()` clears presence, and `has...()` reports presence. Internal
-materializers write C `size` fields and masks.
+C enums map to Java enums. For output that may drift across C ABI versions, the
+enum includes an `UNKNOWN` variant and preserves the raw native value. C bit
+masks become `EnumSet<T>`.
 
-Use Java enums for C enums. For native output that may drift across C ABI
-changes, expose the mapped enum and the raw native value; map unknown values to
-`UNKNOWN`. Represent public C bit masks with `EnumSet<T>`.
+JSON and geometry data model as Java value trees: sealed interfaces, immutable
+record variants, singletons for empty or null values. C `uint64_t` values map to
+`long` with the bit pattern preserved. JSON object member order and duplicate
+keys are preserved. Input trees materialize into temporary native descriptor
+graphs at the call boundary; native snapshots and result views copy into
+independent Java values before releasing native handles. Java-side depth limits
+apply before native materialization.
 
-## Status And Validation
+Runtime polling returns copied Java events. Unknown payloads become
+`RuntimeEventPayload.Unknown`. Native result and list handles stay internal;
+internal readers copy contents into Java records or lists, then release the
+native handle in `finally`.
 
-`Status.check(...)` throws unchecked `MapLibreException` subclasses. Each
-exception carries `MapLibreStatus`, the raw status code, and the copied
-diagnostic.
+## Handle Lifetime
 
-Validate Java-owned state in Java: wrapper lifetime, callback scope, descriptor
-depth, one-shot completion, and buffer or string shapes that Java owns.
+The binding mediates between Java's garbage collector and the C API's
+deterministic, thread-affine handle lifecycle. This is where the binding does
+its hardest work.
 
-## Handles And Owner Threads
+Handle state lives in `HandleState`: release state, parent references, leak
+reporting. Successful `close()` releases once; later closes no-op. This matches
+the C API's own double-release safety, but the binding adds parent retention: a
+child holds its parent wrapper strongly while live, because native validity
+depends on it. `MapProjectionHandle` is the exception—it owns a standalone
+transform snapshot after creation and does not depend on its source `MapHandle`.
 
-Store handle lifecycle in `HandleState`: release state, parent references, and
-leak reporting. Successful `close()` calls release once; later closes no-op.
-Cleaner callbacks report leaks; they do not destroy thread-affine native
-handles.
+Owner-thread-affine methods run on the calling Java thread. The binding does not
+dispatch internally. Native wrong-thread statuses become `WrongThreadException`.
 
-Retain parent wrappers strongly when native validity depends on them.
-`MapProjectionHandle` is standalone after creation.
+`Status.check(…)` throws unchecked `MapLibreException` subclasses carrying
+`MapLibreStatus`, the raw status code, and the copied diagnostic. The binding
+validates Java-owned state—wrapper lifetime, callback scope, descriptor depth,
+one-shot completion, buffer and string shapes—and lets the C API validate native
+arguments, state, and ranges.
 
-Use the runtime's weak map registry to attach live `MapHandle` sources to copied
-map events.
+Cleaner callbacks report leaks but do not destroy thread-affine native handles,
+because cleaners run on an arbitrary GC thread. They are a diagnostic tool, not
+a release path. Correct cleanup flows through `AutoCloseable.close()` on the
+owner thread.
 
-Owner-thread-affine methods run on the calling Java thread. Do not dispatch
-inside the low-level binding. Native wrong-thread statuses become
-`WrongThreadException`.
+## FFM Memory
 
-## Native Memory And Strings
+Per-call storage and temporary descriptors use confined arenas. Shared arenas
+are reserved for callback state or reusable buffers that outlive one call.
+Reusable large byte storage uses `NativeBuffer`.
 
-Use confined arenas for per-call storage and temporary descriptors. Use shared
-arenas only for callback state or other storage that outlives one call. Use
-`NativeBuffer` for reusable large byte storage.
+Pointer out-parameters start as `MemorySegment.NULL`. C `size` fields are set
+through native default constructors or internal materializers.
 
-Initialize pointer out parameters to `MemorySegment.NULL`. Initialize C `size`
-fields through native default constructors or internal materializers.
+`MemoryUtil` and `CoreStructs` handle UTF-8 strings, string views, and copied
+borrowed data. Null-terminated C string inputs reject embedded NUL.
 
-Use `MemoryUtil` and `CoreStructs` for UTF-8 strings, string views, and copied
-borrowed data. Reject embedded NUL in null-terminated C string inputs.
-
-`NativePointer` is a borrowed address value. It grants no memory access and
-transfers no ownership. Keep `MemorySegment.ofAddress()` conversions internal
+`NativePointer` is a borrowed address value—it grants no memory access and
+transfers no ownership. `MemorySegment.ofAddress()` conversions stay internal
 and limited to APIs whose C contract accepts opaque host pointers.
 
 `NativeBuffer` owns off-heap bytes until `close()`. Synchronize access while a
 native readback or upload call borrows its segment.
 
-## JSON, GeoJSON, And Feature Values
+## Callbacks
 
-Model JSON and geometry data as Java value trees: sealed interfaces, immutable
-record variants, and singleton variants for empty or null values.
-
-Represent C `uint64_t` values as `long` and preserve the bit pattern. Preserve
-JSON object member order and duplicate keys.
-
-Materialize input trees into temporary native descriptor graphs at the call
-boundary. Copy native snapshots and result views into independent Java values
-before releasing native handles. Apply Java-side depth limits before native
-materialization.
-
-## Events And Native Results
-
-Runtime polling returns copied Java events. Represent unknown payloads as
-`RuntimeEventPayload.Unknown`.
-
-Keep native result and list handles internal. Internal readers copy their
-contents into Java records or lists, then release the native handle in
-`finally`.
-
-## Native Callbacks
-
-Store callback objects, upcall stubs, and arenas for the owner scope defined by
-the C API.
+Callback objects, upcall stubs, and arenas are stored for the owner scope
+defined by the C API.
 
 Upcall stubs may run on MapLibre worker, network, logging, or render-related
-threads. Use thread-safe callback state. Catch `Throwable` inside every upcall
-and convert it to the C callback's documented return behavior.
+threads, so callback state is thread-safe. Each upcall catches `Throwable` and
+converts it to the C callback's documented return behavior.
 
 When replacing a callback, install the new native descriptor before closing the
 old Java state. If native installation fails, close the replacement state and
 keep the previous state active.
 
-Resource transform callbacks copy the request URL before invoking Java. Keep
-response storage that C borrows after the callback alive until native consumes
-it. Close per-thread response scratch storage on the next callback for that
-thread and during runtime teardown.
+Resource transform callbacks copy the request URL before invoking Java. Response
+storage that C borrows after the callback stays alive until native consumes it.
+Per-thread response scratch storage closes on the next callback for that thread
+and during runtime teardown.
 
 Resource provider callbacks copy the request into `ResourceRequest` before user
 code runs. `ResourceRequestHandle` owns the provider's native request reference
-only when Java handles the request or completes it inline. It enforces one-shot
-completion and releases the native request reference exactly once. A handled
-request may complete during the callback or later from another thread when the C
-API allows it.
+only while Java handles the request or completes it inline: it enforces one-shot
+completion and releases the reference exactly once. A handled request may
+complete during the callback or later from another thread when the C API allows
+it.
 
 Custom geometry source callbacks are map/style scoped. They catch user failures,
 track active upcalls, and delay arena release until in-flight callbacks finish.
 Java callbacks that need map methods hand work back to the map owner thread.
 
-## Render Targets And Frame Access
+## Render Targets
 
 Render target descriptors are mutable Java objects. Surface and borrowed-texture
 descriptors use `NativePointer` for host-owned backend handles.
