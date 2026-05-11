@@ -17,10 +17,6 @@ public enum ResourceErrorReason {
   }
 
   public int nativeValue() {
-    if (this == UNKNOWN) {
-      throw new IllegalArgumentException(
-          "UNKNOWN resource error reason cannot be used as an input");
-    }
     return nativeValue;
   }
 

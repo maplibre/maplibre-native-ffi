@@ -4,7 +4,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.lang.foreign.Arena;
-import java.math.BigInteger;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.maplibre.nativeffi.Feature;
@@ -22,8 +21,7 @@ final class ValueStructsTest {
             List.of(
                 new JsonValue.Member("null", JsonValue.nullValue()),
                 new JsonValue.Member("bool", JsonValue.of(true)),
-                new JsonValue.Member(
-                    "uint", JsonValue.unsigned(new BigInteger("18446744073709551615"))),
+                new JsonValue.Member("uint", JsonValue.unsigned(-1L)),
                 new JsonValue.Member("int", JsonValue.of(-7L)),
                 new JsonValue.Member("double", JsonValue.of(1.25)),
                 new JsonValue.Member("string", JsonValue.of("hello\u0000world")),

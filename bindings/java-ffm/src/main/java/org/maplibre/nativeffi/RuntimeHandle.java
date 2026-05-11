@@ -161,9 +161,6 @@ public final class RuntimeHandle implements AutoCloseable {
   public void setOfflineRegionDownloadState(long id, OfflineRegionDownloadState downloadState) {
     NativeAccess.ensureLoaded();
     var stateValue = Objects.requireNonNull(downloadState, "downloadState").nativeValue();
-    if (downloadState == OfflineRegionDownloadState.UNKNOWN) {
-      throw new IllegalArgumentException("downloadState must be ACTIVE or INACTIVE");
-    }
     Status.check(
         MapLibreNativeC.mln_runtime_offline_region_set_download_state(
             state.requireLive(), id, stateValue));

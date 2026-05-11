@@ -14,9 +14,6 @@ public final class StyleImageOptions {
   }
 
   public StyleImageOptions setPixelRatio(float pixelRatio) {
-    if (!Float.isFinite(pixelRatio) || pixelRatio <= 0.0f) {
-      throw new IllegalArgumentException("pixelRatio must be finite and positive");
-    }
     this.pixelRatio = pixelRatio;
     return this;
   }

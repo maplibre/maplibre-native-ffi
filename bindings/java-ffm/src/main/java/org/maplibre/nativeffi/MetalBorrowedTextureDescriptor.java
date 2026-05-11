@@ -18,9 +18,6 @@ public final class MetalBorrowedTextureDescriptor {
   }
 
   public MetalBorrowedTextureDescriptor setSize(int width, int height) {
-    if (width <= 0 || height <= 0) {
-      throw new IllegalArgumentException("width and height must be positive");
-    }
     this.width = width;
     this.height = height;
     return this;
@@ -31,9 +28,6 @@ public final class MetalBorrowedTextureDescriptor {
   }
 
   public MetalBorrowedTextureDescriptor setScaleFactor(double scaleFactor) {
-    if (!Double.isFinite(scaleFactor) || scaleFactor <= 0.0) {
-      throw new IllegalArgumentException("scaleFactor must be finite and positive");
-    }
     this.scaleFactor = scaleFactor;
     return this;
   }

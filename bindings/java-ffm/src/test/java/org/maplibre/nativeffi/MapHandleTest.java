@@ -29,6 +29,21 @@ final class MapHandleTest {
   }
 
   @Test
+  void mapOptionSemanticValidationComesFromNative() {
+    var runtime = RuntimeHandle.create();
+    try {
+      var error =
+          assertThrows(
+              InvalidArgumentException.class,
+              () -> MapHandle.create(runtime, new MapOptions().setSize(0, 128)));
+      assertEquals(MapLibreStatus.INVALID_ARGUMENT, error.status());
+      assertFalse(error.diagnostic().isBlank());
+    } finally {
+      runtime.close();
+    }
+  }
+
+  @Test
   void runtimeCloseFailsWhileMapIsLive() {
     var runtime = RuntimeHandle.create();
     var map = MapHandle.create(runtime, new MapOptions().setSize(128, 128));

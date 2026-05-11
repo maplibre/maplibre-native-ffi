@@ -13,9 +13,6 @@ public enum ViewportMode {
   }
 
   public int nativeValue() {
-    if (this == UNKNOWN) {
-      throw new IllegalArgumentException("UNKNOWN viewport mode cannot be used as an input");
-    }
     return nativeValue;
   }
 

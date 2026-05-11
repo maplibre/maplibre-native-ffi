@@ -964,8 +964,6 @@ public final class MapHandle implements AutoCloseable {
 
   public void moveBy(double deltaX, double deltaY) {
     NativeAccess.ensureLoaded();
-    requireFinite(deltaX, "deltaX");
-    requireFinite(deltaY, "deltaY");
     Status.check(MapLibreNativeC.mln_map_move_by(state.requireLive(), deltaX, deltaY));
   }
 
@@ -1030,7 +1028,6 @@ public final class MapHandle implements AutoCloseable {
 
   public void pitchBy(double pitch) {
     NativeAccess.ensureLoaded();
-    requireFinite(pitch, "pitch");
     Status.check(MapLibreNativeC.mln_map_pitch_by(state.requireLive(), pitch));
   }
 
@@ -1375,8 +1372,6 @@ public final class MapHandle implements AutoCloseable {
   private void moveByAnimatedInternal(
       double deltaX, double deltaY, AnimationOptions animation, boolean hasAnimation) {
     NativeAccess.ensureLoaded();
-    requireFinite(deltaX, "deltaX");
-    requireFinite(deltaY, "deltaY");
     try (var arena = Arena.ofConfined()) {
       Status.check(
           MapLibreNativeC.mln_map_move_by_animated(
@@ -1389,7 +1384,6 @@ public final class MapHandle implements AutoCloseable {
 
   private void scaleByInternal(double scale, ScreenPoint anchor, boolean hasAnchor) {
     NativeAccess.ensureLoaded();
-    requirePositiveFinite(scale, "scale");
     try (var arena = Arena.ofConfined()) {
       Status.check(
           MapLibreNativeC.mln_map_scale_by(
@@ -1406,7 +1400,6 @@ public final class MapHandle implements AutoCloseable {
       AnimationOptions animation,
       boolean hasAnimation) {
     NativeAccess.ensureLoaded();
-    requirePositiveFinite(scale, "scale");
     try (var arena = Arena.ofConfined()) {
       Status.check(
           MapLibreNativeC.mln_map_scale_by_animated(
@@ -1435,7 +1428,6 @@ public final class MapHandle implements AutoCloseable {
   private void pitchByAnimatedInternal(
       double pitch, AnimationOptions animation, boolean hasAnimation) {
     NativeAccess.ensureLoaded();
-    requireFinite(pitch, "pitch");
     try (var arena = Arena.ofConfined()) {
       Status.check(
           MapLibreNativeC.mln_map_pitch_by_animated(
@@ -1557,19 +1549,5 @@ public final class MapHandle implements AutoCloseable {
     } catch (Exception ignored) {
       // Closing callback state is best-effort after native ownership ends.
     }
-  }
-
-  private static double requireFinite(double value, String name) {
-    if (!Double.isFinite(value)) {
-      throw new IllegalArgumentException(name + " must be finite");
-    }
-    return value;
-  }
-
-  private static double requirePositiveFinite(double value, String name) {
-    if (!Double.isFinite(value) || value <= 0) {
-      throw new IllegalArgumentException(name + " must be finite and positive");
-    }
-    return value;
   }
 }

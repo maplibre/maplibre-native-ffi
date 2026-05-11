@@ -23,9 +23,6 @@ public final class VulkanSurfaceDescriptor {
   }
 
   public VulkanSurfaceDescriptor setSize(int width, int height) {
-    if (width <= 0 || height <= 0) {
-      throw new IllegalArgumentException("width and height must be positive");
-    }
     this.width = width;
     this.height = height;
     return this;
@@ -36,9 +33,6 @@ public final class VulkanSurfaceDescriptor {
   }
 
   public VulkanSurfaceDescriptor setScaleFactor(double scaleFactor) {
-    if (!Double.isFinite(scaleFactor) || scaleFactor <= 0.0) {
-      throw new IllegalArgumentException("scaleFactor must be finite and positive");
-    }
     this.scaleFactor = scaleFactor;
     return this;
   }
@@ -84,9 +78,6 @@ public final class VulkanSurfaceDescriptor {
   }
 
   public VulkanSurfaceDescriptor setGraphicsQueueFamilyIndex(int index) {
-    if (index < 0) {
-      throw new IllegalArgumentException("graphicsQueueFamilyIndex must be non-negative");
-    }
     this.graphicsQueueFamilyIndex = index;
     return this;
   }

@@ -97,13 +97,13 @@ final class RenderSessionQueryTest {
                   new JsonValue.Member("radius", JsonValue.unsigned(20))));
       assertThrows(InvalidStateException.class, () -> session.setFeatureState(selector, state));
       assertThrows(
-          IllegalArgumentException.class,
-          () -> session.setFeatureState(selector, JsonValue.array(List.of())));
-      assertThrows(
           IllegalStateException.class,
           () -> new FeatureStateSelector("point").setStateKey("hover"));
 
       loadStyleAndRender(runtime, map, session);
+      assertThrows(
+          InvalidArgumentException.class,
+          () -> session.setFeatureState(selector, JsonValue.array(List.of())));
       session.setFeatureState(selector, state);
       var copied = assertInstanceOf(JsonValue.ObjectValue.class, session.getFeatureState(selector));
       assertEquals(JsonValue.of(true), member(copied, "hover"));
@@ -222,7 +222,7 @@ final class RenderSessionQueryTest {
                   "cluster-source", cluster.feature(), "supercluster", "leaves", leavesArguments));
       assertEquals(1, leaves.features().size());
       assertThrows(
-          IllegalArgumentException.class,
+          InvalidArgumentException.class,
           () ->
               session.queryFeatureExtension(
                   "cluster-source",

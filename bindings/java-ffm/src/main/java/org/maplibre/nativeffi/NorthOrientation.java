@@ -15,9 +15,6 @@ public enum NorthOrientation {
   }
 
   public int nativeValue() {
-    if (this == UNKNOWN) {
-      throw new IllegalArgumentException("UNKNOWN north orientation cannot be used as an input");
-    }
     return nativeValue;
   }
 

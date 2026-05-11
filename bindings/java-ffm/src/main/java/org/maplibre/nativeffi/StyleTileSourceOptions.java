@@ -22,7 +22,7 @@ public final class StyleTileSourceOptions {
   }
 
   public StyleTileSourceOptions setMinZoom(double minZoom) {
-    this.minZoom = requireZoom(minZoom, "minZoom");
+    this.minZoom = minZoom;
     return this;
   }
 
@@ -40,7 +40,7 @@ public final class StyleTileSourceOptions {
   }
 
   public StyleTileSourceOptions setMaxZoom(double maxZoom) {
-    this.maxZoom = requireZoom(maxZoom, "maxZoom");
+    this.maxZoom = maxZoom;
     return this;
   }
 
@@ -112,9 +112,6 @@ public final class StyleTileSourceOptions {
   }
 
   public StyleTileSourceOptions setTileSize(int tileSize) {
-    if (tileSize < 1 || tileSize > 65535) {
-      throw new IllegalArgumentException("tileSize must be in [1, 65535]");
-    }
     this.tileSize = tileSize;
     return this;
   }
@@ -158,12 +155,5 @@ public final class StyleTileSourceOptions {
   public StyleTileSourceOptions clearRasterDemEncoding() {
     rasterDemEncoding = null;
     return this;
-  }
-
-  private static double requireZoom(double value, String name) {
-    if (!Double.isFinite(value) || value < 0.0 || value > 255.0) {
-      throw new IllegalArgumentException(name + " must be finite and in [0, 255]");
-    }
-    return value;
   }
 }

@@ -45,7 +45,7 @@ public final class CameraOptions {
   }
 
   public CameraOptions setCenterAltitude(double centerAltitude) {
-    this.centerAltitude = requireFinite(centerAltitude, "centerAltitude");
+    this.centerAltitude = centerAltitude;
     return this;
   }
 
@@ -99,7 +99,7 @@ public final class CameraOptions {
   }
 
   public CameraOptions setZoom(double zoom) {
-    this.zoom = requireFinite(zoom, "zoom");
+    this.zoom = zoom;
     return this;
   }
 
@@ -117,7 +117,7 @@ public final class CameraOptions {
   }
 
   public CameraOptions setBearing(double bearing) {
-    this.bearing = requireFinite(bearing, "bearing");
+    this.bearing = bearing;
     return this;
   }
 
@@ -135,7 +135,7 @@ public final class CameraOptions {
   }
 
   public CameraOptions setPitch(double pitch) {
-    this.pitch = requireFinite(pitch, "pitch");
+    this.pitch = pitch;
     return this;
   }
 
@@ -153,7 +153,7 @@ public final class CameraOptions {
   }
 
   public CameraOptions setRoll(double roll) {
-    this.roll = requireFinite(roll, "roll");
+    this.roll = roll;
     return this;
   }
 
@@ -171,19 +171,12 @@ public final class CameraOptions {
   }
 
   public CameraOptions setFieldOfView(double fieldOfView) {
-    this.fieldOfView = requireFinite(fieldOfView, "fieldOfView");
+    this.fieldOfView = fieldOfView;
     return this;
   }
 
   public CameraOptions clearFieldOfView() {
     fieldOfView = null;
     return this;
-  }
-
-  private static double requireFinite(double value, String name) {
-    if (!Double.isFinite(value)) {
-      throw new IllegalArgumentException(name + " must be finite");
-    }
-    return value;
   }
 }

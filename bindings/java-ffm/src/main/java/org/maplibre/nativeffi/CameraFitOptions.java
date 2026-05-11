@@ -35,7 +35,7 @@ public final class CameraFitOptions {
   }
 
   public CameraFitOptions setBearing(double bearing) {
-    this.bearing = requireFinite(bearing, "bearing");
+    this.bearing = bearing;
     return this;
   }
 
@@ -53,19 +53,12 @@ public final class CameraFitOptions {
   }
 
   public CameraFitOptions setPitch(double pitch) {
-    this.pitch = requireFinite(pitch, "pitch");
+    this.pitch = pitch;
     return this;
   }
 
   public CameraFitOptions clearPitch() {
     pitch = null;
     return this;
-  }
-
-  private static double requireFinite(double value, String name) {
-    if (!Double.isFinite(value)) {
-      throw new IllegalArgumentException(name + " must be finite");
-    }
-    return value;
   }
 }

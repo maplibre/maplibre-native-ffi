@@ -45,9 +45,6 @@ public final class RuntimeOptions {
   }
 
   public RuntimeOptions setMaximumCacheSize(long maximumCacheSize) {
-    if (maximumCacheSize < 0) {
-      throw new IllegalArgumentException("maximumCacheSize must be non-negative");
-    }
     this.maximumCacheSize = maximumCacheSize;
     return this;
   }

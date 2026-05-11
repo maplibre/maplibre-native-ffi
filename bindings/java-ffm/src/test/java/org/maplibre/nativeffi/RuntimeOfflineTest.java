@@ -50,11 +50,13 @@ final class RuntimeOfflineTest {
       runtime.setOfflineRegionObserved(created.id(), true);
       runtime.setOfflineRegionObserved(created.id(), false);
       runtime.setOfflineRegionDownloadState(created.id(), OfflineRegionDownloadState.INACTIVE);
-      assertThrows(
-          IllegalArgumentException.class,
-          () ->
-              runtime.setOfflineRegionDownloadState(
-                  created.id(), OfflineRegionDownloadState.UNKNOWN));
+      var unknownStateError =
+          assertThrows(
+              InvalidArgumentException.class,
+              () ->
+                  runtime.setOfflineRegionDownloadState(
+                      created.id(), OfflineRegionDownloadState.UNKNOWN));
+      assertEquals(MapLibreStatus.INVALID_ARGUMENT, unknownStateError.status());
       runtime.invalidateOfflineRegion(created.id());
 
       runtime.deleteOfflineRegion(created.id());

@@ -13,9 +13,6 @@ public enum TileLodMode {
   }
 
   public int nativeValue() {
-    if (this == UNKNOWN) {
-      throw new IllegalArgumentException("UNKNOWN tile LOD mode cannot be used as an input");
-    }
     return nativeValue;
   }
 

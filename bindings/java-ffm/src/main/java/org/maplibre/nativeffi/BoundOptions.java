@@ -37,7 +37,7 @@ public final class BoundOptions {
   }
 
   public BoundOptions setMinZoom(double minZoom) {
-    this.minZoom = requireFinite(minZoom, "minZoom");
+    this.minZoom = minZoom;
     return this;
   }
 
@@ -55,7 +55,7 @@ public final class BoundOptions {
   }
 
   public BoundOptions setMaxZoom(double maxZoom) {
-    this.maxZoom = requireFinite(maxZoom, "maxZoom");
+    this.maxZoom = maxZoom;
     return this;
   }
 
@@ -73,7 +73,7 @@ public final class BoundOptions {
   }
 
   public BoundOptions setMinPitch(double minPitch) {
-    this.minPitch = requireFinite(minPitch, "minPitch");
+    this.minPitch = minPitch;
     return this;
   }
 
@@ -91,19 +91,12 @@ public final class BoundOptions {
   }
 
   public BoundOptions setMaxPitch(double maxPitch) {
-    this.maxPitch = requireFinite(maxPitch, "maxPitch");
+    this.maxPitch = maxPitch;
     return this;
   }
 
   public BoundOptions clearMaxPitch() {
     maxPitch = null;
     return this;
-  }
-
-  private static double requireFinite(double value, String name) {
-    if (!Double.isFinite(value)) {
-      throw new IllegalArgumentException(name + " must be finite");
-    }
-    return value;
   }
 }

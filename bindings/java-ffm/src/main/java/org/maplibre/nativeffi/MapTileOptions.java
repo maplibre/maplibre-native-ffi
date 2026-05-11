@@ -20,9 +20,6 @@ public final class MapTileOptions {
   }
 
   public MapTileOptions setPrefetchZoomDelta(int prefetchZoomDelta) {
-    if (prefetchZoomDelta < 0 || prefetchZoomDelta > 255) {
-      throw new IllegalArgumentException("prefetchZoomDelta must be in [0, 255]");
-    }
     this.prefetchZoomDelta = prefetchZoomDelta;
     return this;
   }
@@ -41,7 +38,7 @@ public final class MapTileOptions {
   }
 
   public MapTileOptions setLodMinRadius(double lodMinRadius) {
-    this.lodMinRadius = requireFinite(lodMinRadius, "lodMinRadius");
+    this.lodMinRadius = lodMinRadius;
     return this;
   }
 
@@ -59,7 +56,7 @@ public final class MapTileOptions {
   }
 
   public MapTileOptions setLodScale(double lodScale) {
-    this.lodScale = requireFinite(lodScale, "lodScale");
+    this.lodScale = lodScale;
     return this;
   }
 
@@ -77,7 +74,7 @@ public final class MapTileOptions {
   }
 
   public MapTileOptions setLodPitchThreshold(double lodPitchThreshold) {
-    this.lodPitchThreshold = requireFinite(lodPitchThreshold, "lodPitchThreshold");
+    this.lodPitchThreshold = lodPitchThreshold;
     return this;
   }
 
@@ -95,7 +92,7 @@ public final class MapTileOptions {
   }
 
   public MapTileOptions setLodZoomShift(double lodZoomShift) {
-    this.lodZoomShift = requireFinite(lodZoomShift, "lodZoomShift");
+    this.lodZoomShift = lodZoomShift;
     return this;
   }
 
@@ -120,12 +117,5 @@ public final class MapTileOptions {
   public MapTileOptions clearLodMode() {
     lodMode = null;
     return this;
-  }
-
-  private static double requireFinite(double value, String name) {
-    if (!Double.isFinite(value)) {
-      throw new IllegalArgumentException(name + " must be finite");
-    }
-    return value;
   }
 }

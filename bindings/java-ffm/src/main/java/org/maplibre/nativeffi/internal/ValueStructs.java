@@ -8,7 +8,6 @@ import static org.maplibre.nativeffi.internal.CoreStructs.stringView;
 
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
-import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -102,7 +101,7 @@ public final class ValueStructs {
       mln_json_value.data.bool_value(data, boolValue.value());
     } else if (value instanceof JsonValue.UInt uintValue) {
       mln_json_value.type(segment, MapLibreNativeC.MLN_JSON_VALUE_TYPE_UINT());
-      mln_json_value.data.uint_value(data, uintValue.value().longValue());
+      mln_json_value.data.uint_value(data, uintValue.value());
     } else if (value instanceof JsonValue.Int intValue) {
       mln_json_value.type(segment, MapLibreNativeC.MLN_JSON_VALUE_TYPE_INT());
       mln_json_value.data.int_value(data, intValue.value());
@@ -152,8 +151,7 @@ public final class ValueStructs {
       return JsonValue.of(mln_json_value.data.bool_value(data));
     }
     if (type == MapLibreNativeC.MLN_JSON_VALUE_TYPE_UINT()) {
-      return JsonValue.unsigned(
-          new BigInteger(Long.toUnsignedString(mln_json_value.data.uint_value(data))));
+      return JsonValue.unsigned(mln_json_value.data.uint_value(data));
     }
     if (type == MapLibreNativeC.MLN_JSON_VALUE_TYPE_INT()) {
       return JsonValue.of(mln_json_value.data.int_value(data));
@@ -442,7 +440,7 @@ public final class ValueStructs {
       mln_feature.identifier_type(segment, MapLibreNativeC.MLN_FEATURE_IDENTIFIER_TYPE_NULL());
     } else if (identifier instanceof FeatureIdentifier.UInt value) {
       mln_feature.identifier_type(segment, MapLibreNativeC.MLN_FEATURE_IDENTIFIER_TYPE_UINT());
-      mln_feature.identifier.uint_value(data, value.value().longValue());
+      mln_feature.identifier.uint_value(data, value.value());
     } else if (identifier instanceof FeatureIdentifier.Int value) {
       mln_feature.identifier_type(segment, MapLibreNativeC.MLN_FEATURE_IDENTIFIER_TYPE_INT());
       mln_feature.identifier.int_value(data, value.value());
@@ -465,8 +463,7 @@ public final class ValueStructs {
       return FeatureIdentifier.nullValue();
     }
     if (type == MapLibreNativeC.MLN_FEATURE_IDENTIFIER_TYPE_UINT()) {
-      return FeatureIdentifier.unsigned(
-          new BigInteger(Long.toUnsignedString(mln_feature.identifier.uint_value(data))));
+      return FeatureIdentifier.unsigned(mln_feature.identifier.uint_value(data));
     }
     if (type == MapLibreNativeC.MLN_FEATURE_IDENTIFIER_TYPE_INT()) {
       return FeatureIdentifier.of(mln_feature.identifier.int_value(data));

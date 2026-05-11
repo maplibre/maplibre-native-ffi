@@ -30,7 +30,7 @@ public final class CustomGeometrySourceOptions {
   }
 
   public CustomGeometrySourceOptions setMinZoom(double minZoom) {
-    this.minZoom = requireZoom(minZoom, "minZoom");
+    this.minZoom = minZoom;
     return this;
   }
 
@@ -48,7 +48,7 @@ public final class CustomGeometrySourceOptions {
   }
 
   public CustomGeometrySourceOptions setMaxZoom(double maxZoom) {
-    this.maxZoom = requireZoom(maxZoom, "maxZoom");
+    this.maxZoom = maxZoom;
     return this;
   }
 
@@ -66,9 +66,6 @@ public final class CustomGeometrySourceOptions {
   }
 
   public CustomGeometrySourceOptions setTolerance(double tolerance) {
-    if (!Double.isFinite(tolerance) || tolerance < 0.0) {
-      throw new IllegalArgumentException("tolerance must be finite and non-negative");
-    }
     this.tolerance = tolerance;
     return this;
   }
@@ -87,9 +84,6 @@ public final class CustomGeometrySourceOptions {
   }
 
   public CustomGeometrySourceOptions setTileSize(int tileSize) {
-    if (tileSize < 1 || tileSize > 65535) {
-      throw new IllegalArgumentException("tileSize must be in [1, 65535]");
-    }
     this.tileSize = tileSize;
     return this;
   }
@@ -108,9 +102,6 @@ public final class CustomGeometrySourceOptions {
   }
 
   public CustomGeometrySourceOptions setBuffer(int buffer) {
-    if (buffer < 0 || buffer > 65535) {
-      throw new IllegalArgumentException("buffer must be in [0, 65535]");
-    }
     this.buffer = buffer;
     return this;
   }
@@ -154,12 +145,5 @@ public final class CustomGeometrySourceOptions {
   public CustomGeometrySourceOptions clearWrap() {
     wrap = null;
     return this;
-  }
-
-  private static double requireZoom(double value, String name) {
-    if (!Double.isFinite(value) || value < 0.0 || value > 32.0 || Math.floor(value) != value) {
-      throw new IllegalArgumentException(name + " must be an integer in [0, 32]");
-    }
-    return value;
   }
 }

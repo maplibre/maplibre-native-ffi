@@ -16,8 +16,6 @@ public sealed interface OfflineRegionDefinition
     public TilePyramid {
       Objects.requireNonNull(styleUrl, "styleUrl");
       Objects.requireNonNull(bounds, "bounds");
-      validateZoomRange(minZoom, maxZoom);
-      validatePixelRatio(pixelRatio);
     }
   }
 
@@ -32,20 +30,6 @@ public sealed interface OfflineRegionDefinition
     public GeometryRegion {
       Objects.requireNonNull(styleUrl, "styleUrl");
       Objects.requireNonNull(geometry, "geometry");
-      validateZoomRange(minZoom, maxZoom);
-      validatePixelRatio(pixelRatio);
-    }
-  }
-
-  private static void validateZoomRange(double minZoom, double maxZoom) {
-    if (!Double.isFinite(minZoom) || minZoom < 0.0 || Double.isNaN(maxZoom) || maxZoom < minZoom) {
-      throw new IllegalArgumentException("offline region zoom range is invalid");
-    }
-  }
-
-  private static void validatePixelRatio(float pixelRatio) {
-    if (!Float.isFinite(pixelRatio) || pixelRatio < 0.0f) {
-      throw new IllegalArgumentException("pixelRatio must be finite and non-negative");
     }
   }
 }

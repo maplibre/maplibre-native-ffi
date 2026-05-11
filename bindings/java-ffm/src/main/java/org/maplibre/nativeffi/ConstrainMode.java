@@ -15,9 +15,6 @@ public enum ConstrainMode {
   }
 
   public int nativeValue() {
-    if (this == UNKNOWN) {
-      throw new IllegalArgumentException("UNKNOWN constrain mode cannot be used as an input");
-    }
     return nativeValue;
   }
 

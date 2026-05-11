@@ -18,9 +18,6 @@ public final class AnimationOptions {
   }
 
   public AnimationOptions setDurationMs(double durationMs) {
-    if (!Double.isFinite(durationMs) || durationMs < 0) {
-      throw new IllegalArgumentException("durationMs must be finite and non-negative");
-    }
     this.durationMs = durationMs;
     return this;
   }
@@ -39,9 +36,6 @@ public final class AnimationOptions {
   }
 
   public AnimationOptions setVelocity(double velocity) {
-    if (!Double.isFinite(velocity) || velocity <= 0) {
-      throw new IllegalArgumentException("velocity must be finite and positive");
-    }
     this.velocity = velocity;
     return this;
   }
@@ -60,7 +54,7 @@ public final class AnimationOptions {
   }
 
   public AnimationOptions setMinZoom(double minZoom) {
-    this.minZoom = requireFinite(minZoom, "minZoom");
+    this.minZoom = minZoom;
     return this;
   }
 
@@ -85,12 +79,5 @@ public final class AnimationOptions {
   public AnimationOptions clearEasing() {
     easing = null;
     return this;
-  }
-
-  private static double requireFinite(double value, String name) {
-    if (!Double.isFinite(value)) {
-      throw new IllegalArgumentException(name + " must be finite");
-    }
-    return value;
   }
 }

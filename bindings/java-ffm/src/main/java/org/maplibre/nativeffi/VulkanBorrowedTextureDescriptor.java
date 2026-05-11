@@ -27,9 +27,6 @@ public final class VulkanBorrowedTextureDescriptor {
   }
 
   public VulkanBorrowedTextureDescriptor setSize(int width, int height) {
-    if (width <= 0 || height <= 0) {
-      throw new IllegalArgumentException("width and height must be positive");
-    }
     this.width = width;
     this.height = height;
     return this;
@@ -40,9 +37,6 @@ public final class VulkanBorrowedTextureDescriptor {
   }
 
   public VulkanBorrowedTextureDescriptor setScaleFactor(double scaleFactor) {
-    if (!Double.isFinite(scaleFactor) || scaleFactor <= 0.0) {
-      throw new IllegalArgumentException("scaleFactor must be finite and positive");
-    }
     this.scaleFactor = scaleFactor;
     return this;
   }
@@ -88,9 +82,6 @@ public final class VulkanBorrowedTextureDescriptor {
   }
 
   public VulkanBorrowedTextureDescriptor setGraphicsQueueFamilyIndex(int index) {
-    if (index < 0) {
-      throw new IllegalArgumentException("graphicsQueueFamilyIndex must be non-negative");
-    }
     this.graphicsQueueFamilyIndex = index;
     return this;
   }
@@ -140,9 +131,6 @@ public final class VulkanBorrowedTextureDescriptor {
   }
 
   public VulkanBorrowedTextureDescriptor setFinalLayout(int finalLayout) {
-    if (finalLayout == 0) {
-      throw new IllegalArgumentException("finalLayout must not be VK_IMAGE_LAYOUT_UNDEFINED");
-    }
     this.finalLayout = finalLayout;
     return this;
   }

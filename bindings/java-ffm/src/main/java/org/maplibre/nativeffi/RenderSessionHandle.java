@@ -141,12 +141,6 @@ public final class RenderSessionHandle implements AutoCloseable {
 
   public void resize(int width, int height, double scaleFactor) {
     NativeAccess.ensureLoaded();
-    if (width <= 0 || height <= 0) {
-      throw new IllegalArgumentException("width and height must be positive");
-    }
-    if (!Double.isFinite(scaleFactor) || scaleFactor <= 0.0) {
-      throw new IllegalArgumentException("scaleFactor must be finite and positive");
-    }
     Status.check(
         MapLibreNativeC.mln_render_session_resize(state.requireLive(), width, height, scaleFactor));
   }
@@ -180,9 +174,6 @@ public final class RenderSessionHandle implements AutoCloseable {
     NativeAccess.ensureLoaded();
     Objects.requireNonNull(selector, "selector");
     Objects.requireNonNull(value, "value");
-    if (!(value instanceof JsonValue.ObjectValue)) {
-      throw new IllegalArgumentException("feature state value must be a JSON object");
-    }
     try (var arena = Arena.ofConfined()) {
       Status.check(
           MapLibreNativeC.mln_render_session_set_feature_state(
@@ -248,9 +239,6 @@ public final class RenderSessionHandle implements AutoCloseable {
       JsonValue arguments) {
     NativeAccess.ensureLoaded();
     Objects.requireNonNull(feature, "feature");
-    if (arguments != null && !(arguments instanceof JsonValue.ObjectValue)) {
-      throw new IllegalArgumentException("feature extension arguments must be a JSON object");
-    }
     try (var arena = Arena.ofConfined()) {
       var outResult = MemoryUtil.allocatePointer(arena);
       Status.check(

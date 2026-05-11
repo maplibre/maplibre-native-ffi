@@ -1,6 +1,5 @@
 package org.maplibre.nativeffi;
 
-import java.math.BigInteger;
 import java.util.List;
 import java.util.Objects;
 
@@ -15,7 +14,6 @@ public sealed interface JsonValue
         JsonValue.Array,
         JsonValue.ObjectValue {
   int MAX_DESCRIPTOR_DEPTH = 64;
-  BigInteger MAX_UINT64 = BigInteger.ONE.shiftLeft(64).subtract(BigInteger.ONE);
 
   static Null nullValue() {
     return Null.INSTANCE;
@@ -26,10 +24,6 @@ public sealed interface JsonValue
   }
 
   static UInt unsigned(long value) {
-    return new UInt(new BigInteger(Long.toUnsignedString(value)));
-  }
-
-  static UInt unsigned(BigInteger value) {
     return new UInt(value);
   }
 
@@ -77,24 +71,11 @@ public sealed interface JsonValue
 
   record Bool(boolean value) implements JsonValue {}
 
-  record UInt(BigInteger value) implements JsonValue {
-    public UInt {
-      Objects.requireNonNull(value, "value");
-      if (value.signum() < 0 || value.compareTo(MAX_UINT64) > 0) {
-        throw new IllegalArgumentException("unsigned JSON integer must be in [0, 2^64 - 1]");
-      }
-    }
-  }
+  record UInt(long value) implements JsonValue {}
 
   record Int(long value) implements JsonValue {}
 
-  record DoubleValue(double value) implements JsonValue {
-    public DoubleValue {
-      if (!java.lang.Double.isFinite(value)) {
-        throw new IllegalArgumentException("JSON double must be finite");
-      }
-    }
-  }
+  record DoubleValue(double value) implements JsonValue {}
 
   record StringValue(String value) implements JsonValue {
     public StringValue {

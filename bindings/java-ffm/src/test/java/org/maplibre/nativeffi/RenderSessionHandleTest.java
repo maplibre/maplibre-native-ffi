@@ -98,22 +98,15 @@ final class RenderSessionHandleTest {
   }
 
   @Test
-  void renderTargetDescriptorsValidateJavaOwnedState() {
-    assertThrows(IllegalArgumentException.class, () -> new OwnedTextureDescriptor().setSize(0, 1));
-    assertThrows(
-        IllegalArgumentException.class, () -> new OwnedTextureDescriptor().setScaleFactor(0.0));
-    assertThrows(
-        IllegalArgumentException.class,
-        () -> new MetalSurfaceDescriptor().setScaleFactor(Double.NaN));
-    assertThrows(
-        IllegalArgumentException.class,
-        () -> new VulkanOwnedTextureDescriptor().setGraphicsQueueFamilyIndex(-1));
-    assertThrows(
-        IllegalArgumentException.class,
-        () -> new VulkanBorrowedTextureDescriptor().setFinalLayout(0));
+  void renderTargetDescriptorsTrackOptionalFields() {
     var vulkanBorrowed = new VulkanBorrowedTextureDescriptor();
     assertFalse(vulkanBorrowed.hasFinalLayout());
     assertNull(vulkanBorrowed.finalLayout());
+    vulkanBorrowed.setFinalLayout(0);
+    assertTrue(vulkanBorrowed.hasFinalLayout());
+    assertEquals(0, vulkanBorrowed.finalLayout());
+    vulkanBorrowed.clearFinalLayout();
+    assertFalse(vulkanBorrowed.hasFinalLayout());
   }
 
   @Test

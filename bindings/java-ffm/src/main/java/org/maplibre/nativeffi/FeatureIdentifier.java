@@ -1,6 +1,5 @@
 package org.maplibre.nativeffi;
 
-import java.math.BigInteger;
 import java.util.Objects;
 
 /** GeoJSON feature identifier value. */
@@ -10,17 +9,11 @@ public sealed interface FeatureIdentifier
         FeatureIdentifier.Int,
         FeatureIdentifier.DoubleValue,
         FeatureIdentifier.StringValue {
-  BigInteger MAX_UINT64 = BigInteger.ONE.shiftLeft(64).subtract(BigInteger.ONE);
-
   static Null nullValue() {
     return Null.INSTANCE;
   }
 
   static UInt unsigned(long value) {
-    return new UInt(new BigInteger(Long.toUnsignedString(value)));
-  }
-
-  static UInt unsigned(BigInteger value) {
     return new UInt(value);
   }
 
@@ -58,24 +51,11 @@ public sealed interface FeatureIdentifier
     }
   }
 
-  record UInt(BigInteger value) implements FeatureIdentifier {
-    public UInt {
-      Objects.requireNonNull(value, "value");
-      if (value.signum() < 0 || value.compareTo(MAX_UINT64) > 0) {
-        throw new IllegalArgumentException("unsigned feature identifier must be in [0, 2^64 - 1]");
-      }
-    }
-  }
+  record UInt(long value) implements FeatureIdentifier {}
 
   record Int(long value) implements FeatureIdentifier {}
 
-  record DoubleValue(double value) implements FeatureIdentifier {
-    public DoubleValue {
-      if (!Double.isFinite(value)) {
-        throw new IllegalArgumentException("feature identifier double must be finite");
-      }
-    }
-  }
+  record DoubleValue(double value) implements FeatureIdentifier {}
 
   record StringValue(String value) implements FeatureIdentifier {
     public StringValue {

@@ -33,7 +33,7 @@ public final class ProjectionModeOptions {
   }
 
   public ProjectionModeOptions setXSkew(double xSkew) {
-    this.xSkew = requireFinite(xSkew, "xSkew");
+    this.xSkew = xSkew;
     return this;
   }
 
@@ -51,19 +51,12 @@ public final class ProjectionModeOptions {
   }
 
   public ProjectionModeOptions setYSkew(double ySkew) {
-    this.ySkew = requireFinite(ySkew, "ySkew");
+    this.ySkew = ySkew;
     return this;
   }
 
   public ProjectionModeOptions clearYSkew() {
     ySkew = null;
     return this;
-  }
-
-  private static double requireFinite(double value, String name) {
-    if (!Double.isFinite(value)) {
-      throw new IllegalArgumentException(name + " must be finite");
-    }
-    return value;
   }
 }
