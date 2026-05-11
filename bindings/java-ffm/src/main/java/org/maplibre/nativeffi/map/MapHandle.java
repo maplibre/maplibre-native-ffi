@@ -1539,6 +1539,7 @@ public final class MapHandle implements AutoCloseable {
   }
 
   public MemorySegment nativeHandle(InternalAccess access) {
+    Objects.requireNonNull(access, "access");
     return nativeHandle();
   }
 
@@ -1547,6 +1548,7 @@ public final class MapHandle implements AutoCloseable {
   }
 
   public long nativeAddress(InternalAccess access) {
+    Objects.requireNonNull(access, "access");
     return nativeAddress();
   }
 
@@ -1555,6 +1557,7 @@ public final class MapHandle implements AutoCloseable {
   }
 
   public void reconcileCustomGeometrySources(InternalAccess access) {
+    Objects.requireNonNull(access, "access");
     reconcileCustomGeometrySources();
   }
 

@@ -34,6 +34,7 @@ public final class ResourceRequestHandle implements AutoCloseable {
 
   public ResourceRequestHandle(InternalAccess access, MemorySegment handle) {
     this(handle);
+    Objects.requireNonNull(access, "access");
   }
 
   ResourceRequestHandle(MemorySegment handle) {
@@ -91,6 +92,7 @@ public final class ResourceRequestHandle implements AutoCloseable {
 
   public synchronized int finishProviderDecision(
       InternalAccess access, ResourceProviderDecision decision) {
+    Objects.requireNonNull(access, "access");
     return finishProviderDecision(decision);
   }
 
@@ -110,6 +112,7 @@ public final class ResourceRequestHandle implements AutoCloseable {
   }
 
   public synchronized int finishProviderException(InternalAccess access) {
+    Objects.requireNonNull(access, "access");
     return finishProviderException();
   }
 

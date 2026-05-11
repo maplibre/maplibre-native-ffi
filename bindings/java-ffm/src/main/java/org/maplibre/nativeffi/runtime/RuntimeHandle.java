@@ -246,6 +246,7 @@ public final class RuntimeHandle implements AutoCloseable {
   }
 
   public MemorySegment nativeHandle(InternalAccess access) {
+    Objects.requireNonNull(access, "access");
     return nativeHandle();
   }
 
@@ -258,10 +259,12 @@ public final class RuntimeHandle implements AutoCloseable {
   }
 
   public void registerMap(InternalAccess access, MapHandle map) {
+    Objects.requireNonNull(access, "access");
     liveMaps.put(map.nativeAddress(InternalAccess.INSTANCE), new WeakReference<>(map));
   }
 
   public void unregisterMap(InternalAccess access, MapHandle map) {
+    Objects.requireNonNull(access, "access");
     liveMaps.computeIfPresent(
         map.nativeAddress(InternalAccess.INSTANCE),
         (address, reference) -> reference.get() == map ? null : reference);
