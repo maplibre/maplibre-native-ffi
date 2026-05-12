@@ -3,7 +3,6 @@
 #include <cstddef>
 #include <exception>
 #include <string>
-#include <string_view>
 
 #include "diagnostics/diagnostics.hpp"
 
@@ -36,9 +35,8 @@ auto set_thread_error(const char* message) noexcept -> void {
 
   const auto length =
     std::min(std::char_traits<char>::length(message), buffer.size() - 1);
-  auto* const output =
-    std::ranges::copy(std::string_view{message, length}, buffer.begin()).out;
-  *output = '\0';
+  std::char_traits<char>::copy(buffer.data(), message, length);
+  buffer[length] = '\0';
 }
 
 auto set_thread_error(const std::exception& exception) noexcept -> void {
