@@ -94,13 +94,13 @@ function(mln_configure_opengl_backend target)
         endif()
       endif()
     endforeach()
-      if(NOT EXISTS ${MLN_EGL_STAGE_DIR}/EGL/egl.h)
-        message(
-          FATAL_ERROR
-            "EGL headers not found. Install libegl-dev or ensure pixi mesalib "
-            "provides EGL headers in $CONDA_PREFIX/include/EGL.")
-      endif()
-      set(MLN_LINUX_EGL_INCLUDE_DIR ${MLN_EGL_STAGE_DIR})
+    if(NOT EXISTS ${MLN_EGL_STAGE_DIR}/EGL/egl.h)
+      message(
+        FATAL_ERROR
+          "EGL headers not found. Install libegl-dev or ensure pixi mesalib "
+          "provides EGL headers in $CONDA_PREFIX/include/EGL.")
+    endif()
+    set(MLN_LINUX_EGL_INCLUDE_DIR ${MLN_EGL_STAGE_DIR})
   else()
     message(
       FATAL_ERROR
