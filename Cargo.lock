@@ -107,6 +107,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5e5032e24019045c762d3c0f28f5b6b8bbf38563a65908389bf7978758920897"
 
 [[package]]
+name = "maplibre-native"
+version = "0.0.0"
+dependencies = [
+ "bitflags",
+ "maplibre-native-support",
+ "maplibre-native-sys",
+]
+
+[[package]]
 name = "maplibre-native-support"
 version = "0.0.0"
 dependencies = [
