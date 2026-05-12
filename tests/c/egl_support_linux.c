@@ -24,44 +24,47 @@
 /* Avoids including system EGL headers, which would require -I flags or       */
 /* might resolve to pixi-bundled headers rather than the system headers.      */
 
-typedef void*        EGLDisplay;
-typedef void*        EGLConfig;
-typedef void*        EGLContext;
-typedef void*        EGLSurface;
-typedef int          EGLint;
-typedef int          EGLBoolean;
+typedef void* EGLDisplay;
+typedef void* EGLConfig;
+typedef void* EGLContext;
+typedef void* EGLSurface;
+typedef int EGLint;
+typedef int EGLBoolean;
 
-#define EGL_DEFAULT_DISPLAY         ((void*)0)
-#define EGL_NO_DISPLAY              ((EGLDisplay)0)
-#define EGL_NO_CONTEXT              ((EGLContext)0)
-#define EGL_NO_SURFACE              ((EGLSurface)0)
+#define EGL_DEFAULT_DISPLAY ((void*)0)
+#define EGL_NO_DISPLAY ((EGLDisplay)0)
+#define EGL_NO_CONTEXT ((EGLContext)0)
+#define EGL_NO_SURFACE ((EGLSurface)0)
 
-#define EGL_TRUE                    1
-#define EGL_FALSE                   0
-#define EGL_NONE                    0x3038
+#define EGL_TRUE 1
+#define EGL_FALSE 0
+#define EGL_NONE 0x3038
 
-#define EGL_SURFACE_TYPE            0x3033
-#define EGL_PBUFFER_BIT             0x0001
-#define EGL_RENDERABLE_TYPE         0x3040
-#define EGL_OPENGL_ES2_BIT          0x0004
-#define EGL_RED_SIZE                0x3024
-#define EGL_GREEN_SIZE              0x3023
-#define EGL_BLUE_SIZE               0x3022
-#define EGL_ALPHA_SIZE              0x3021
-#define EGL_CONTEXT_CLIENT_VERSION  0x3098
-#define EGL_WIDTH                   0x3057
-#define EGL_HEIGHT                  0x3056
+#define EGL_SURFACE_TYPE 0x3033
+#define EGL_PBUFFER_BIT 0x0001
+#define EGL_RENDERABLE_TYPE 0x3040
+#define EGL_OPENGL_ES2_BIT 0x0004
+#define EGL_RED_SIZE 0x3024
+#define EGL_GREEN_SIZE 0x3023
+#define EGL_BLUE_SIZE 0x3022
+#define EGL_ALPHA_SIZE 0x3021
+#define EGL_CONTEXT_CLIENT_VERSION 0x3098
+#define EGL_WIDTH 0x3057
+#define EGL_HEIGHT 0x3056
 
 /* ── EGL function pointer types ─────────────────────────────────────────── */
 
 typedef EGLDisplay (*PFN_eglGetDisplay)(void*);
 typedef EGLBoolean (*PFN_eglInitialize)(EGLDisplay, EGLint*, EGLint*);
 typedef EGLBoolean (*PFN_eglChooseConfig)(
-  EGLDisplay, const EGLint*, EGLConfig*, EGLint, EGLint*);
+  EGLDisplay, const EGLint*, EGLConfig*, EGLint, EGLint*
+);
 typedef EGLContext (*PFN_eglCreateContext)(
-  EGLDisplay, EGLConfig, EGLContext, const EGLint*);
+  EGLDisplay, EGLConfig, EGLContext, const EGLint*
+);
 typedef EGLSurface (*PFN_eglCreatePbufferSurface)(
-  EGLDisplay, EGLConfig, const EGLint*);
+  EGLDisplay, EGLConfig, const EGLint*
+);
 typedef EGLBoolean (*PFN_eglDestroyContext)(EGLDisplay, EGLContext);
 typedef EGLBoolean (*PFN_eglDestroySurface)(EGLDisplay, EGLSurface);
 typedef EGLBoolean (*PFN_eglTerminate)(EGLDisplay);
@@ -69,14 +72,14 @@ typedef EGLBoolean (*PFN_eglTerminate)(EGLDisplay);
 /* ── Public context struct (layout must match egl_support.zig) ───────────── */
 
 typedef struct mln_test_egl_context {
-  void*                   egl_lib;
-  EGLDisplay              display;
-  EGLConfig               config;
-  EGLContext              context;
-  EGLSurface              surface;
-  PFN_eglDestroyContext   pfn_destroy_context;
-  PFN_eglDestroySurface   pfn_destroy_surface;
-  PFN_eglTerminate        pfn_terminate;
+  void* egl_lib;
+  EGLDisplay display;
+  EGLConfig config;
+  EGLContext context;
+  EGLSurface surface;
+  PFN_eglDestroyContext pfn_destroy_context;
+  PFN_eglDestroySurface pfn_destroy_surface;
+  PFN_eglTerminate pfn_terminate;
 } mln_test_egl_context;
 
 /* ── mln_test_egl_create ─────────────────────────────────────────────────── */
@@ -113,10 +116,11 @@ bool mln_test_egl_create(
     (PFN_eglDestroySurface)dlsym(lib, "eglDestroySurface");
   out->pfn_terminate = (PFN_eglTerminate)dlsym(lib, "eglTerminate");
 
-  if (!pfn_get_display || !pfn_initialize || !pfn_choose_config ||
-      !pfn_create_context || !pfn_create_pbuffer ||
-      !out->pfn_destroy_context || !out->pfn_destroy_surface ||
-      !out->pfn_terminate) {
+  if (
+    !pfn_get_display || !pfn_initialize || !pfn_choose_config ||
+    !pfn_create_context || !pfn_create_pbuffer || !out->pfn_destroy_context ||
+    !out->pfn_destroy_surface || !out->pfn_terminate
+  ) {
     fprintf(stderr, "egl_support: missing EGL symbols\n");
     return false;
   }
@@ -137,40 +141,47 @@ bool mln_test_egl_create(
 
   /* Request a pbuffer-capable GLES2 config. */
   const EGLint config_attribs[] = {
-    EGL_SURFACE_TYPE,    EGL_PBUFFER_BIT,
-    EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT,
-    EGL_RED_SIZE,        8,
-    EGL_GREEN_SIZE,      8,
-    EGL_BLUE_SIZE,       8,
-    EGL_ALPHA_SIZE,      8,
+    EGL_SURFACE_TYPE,
+    EGL_PBUFFER_BIT,
+    EGL_RENDERABLE_TYPE,
+    EGL_OPENGL_ES2_BIT,
+    EGL_RED_SIZE,
+    8,
+    EGL_GREEN_SIZE,
+    8,
+    EGL_BLUE_SIZE,
+    8,
+    EGL_ALPHA_SIZE,
+    8,
     EGL_NONE,
   };
   EGLint num_configs = 0;
-  if (!pfn_choose_config(
-        out->display, config_attribs, &out->config, 1, &num_configs) ||
-      num_configs == 0) {
+  if (
+    !pfn_choose_config(
+      out->display, config_attribs, &out->config, 1, &num_configs
+    ) ||
+    num_configs == 0
+  ) {
     fprintf(stderr, "egl_support: eglChooseConfig found no suitable config\n");
     return false;
   }
 
   const EGLint ctx_attribs[] = {
-    EGL_CONTEXT_CLIENT_VERSION, 2,
+    EGL_CONTEXT_CLIENT_VERSION,
+    2,
     EGL_NONE,
   };
-  out->context = pfn_create_context(
-    out->display, out->config, EGL_NO_CONTEXT, ctx_attribs);
+  out->context =
+    pfn_create_context(out->display, out->config, EGL_NO_CONTEXT, ctx_attribs);
   if (out->context == EGL_NO_CONTEXT) {
     fprintf(stderr, "egl_support: eglCreateContext failed\n");
     return false;
   }
 
   const EGLint pbuffer_attribs[] = {
-    EGL_WIDTH,  (EGLint)width,
-    EGL_HEIGHT, (EGLint)height,
-    EGL_NONE,
+    EGL_WIDTH, (EGLint)width, EGL_HEIGHT, (EGLint)height, EGL_NONE,
   };
-  out->surface =
-    pfn_create_pbuffer(out->display, out->config, pbuffer_attribs);
+  out->surface = pfn_create_pbuffer(out->display, out->config, pbuffer_attribs);
   if (out->surface == EGL_NO_SURFACE) {
     fprintf(stderr, "egl_support: eglCreatePbufferSurface failed\n");
     return false;
