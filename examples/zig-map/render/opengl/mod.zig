@@ -151,10 +151,10 @@ const OpenGLSurfaceBackend = struct {
         viewport: types.Viewport,
     ) !render_target.Session {
         // SDL3 uses EGL internally on Linux; retrieve the borrowed handles.
-        const egl_display = c.SDL_EGL_GetCurrentEGLDisplay();
-        const egl_config = c.SDL_EGL_GetCurrentEGLConfig();
-        const egl_context = c.SDL_EGL_GetCurrentEGLContext();
-        const egl_surface = c.SDL_EGL_GetWindowEGLSurface(self.window);
+        const egl_display = c.SDL_EGL_GetCurrentDisplay();
+        const egl_config = c.SDL_EGL_GetCurrentConfig();
+        const egl_context = c.eglGetCurrentContext();
+        const egl_surface = c.SDL_EGL_GetWindowSurface(self.window);
 
         if (egl_display == null or egl_config == null or
             egl_context == null or egl_surface == null)
