@@ -38,7 +38,9 @@ class SurfaceSessionBackend {
   virtual void swap_buffers() {}
   // Return true when the backend's activate()/deactivate() must be called
   // around each render. EGL surfaces need this; Vulkan surfaces do not.
-  virtual auto needs_explicit_scope() const -> bool { return false; }
+  [[nodiscard]] virtual auto needs_explicit_scope() const -> bool {
+    return false;
+  }
 };
 
 class TextureSessionBackend {
