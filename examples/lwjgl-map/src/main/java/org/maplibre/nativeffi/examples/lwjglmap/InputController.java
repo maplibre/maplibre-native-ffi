@@ -107,9 +107,9 @@ final class InputController implements AutoCloseable {
   }
 
   private void onScroll(double yOffset) {
-    // GLFW reports OS-adjusted scroll deltas; keep Wayland/natural-scroll behavior intact.
-    var delta = -yOffset;
-    var scale = Math.pow(2.0, delta * 0.25);
+    // GLFW reports OS-adjusted scroll deltas; use them directly so trackpads with natural
+    // scrolling behave like the host platform expects.
+    var scale = Math.pow(2.0, yOffset * 0.25);
     map.scaleBy(scale, new ScreenPoint(cursorX, cursorY));
   }
 
