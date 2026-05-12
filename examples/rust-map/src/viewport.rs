@@ -17,9 +17,9 @@ impl Viewport {
     }
 
     pub fn from_physical_size(physical: PhysicalSize<u32>, scale_factor: f64) -> Self {
-        let physical_width = physical.width.max(1);
-        let physical_height = physical.height.max(1);
-        let safe_scale = if scale_factor > 0.0 {
+        let physical_width = physical.width;
+        let physical_height = physical.height;
+        let safe_scale = if scale_factor.is_finite() && scale_factor > 0.0 {
             scale_factor
         } else {
             1.0
@@ -53,5 +53,43 @@ impl Viewport {
 }
 
 fn scaled_logical_size(physical_size: u32, scale_factor: f64) -> u32 {
-    (f64::from(physical_size) / scale_factor).ceil().max(1.0) as u32
+    if physical_size == 0 {
+        0
+    } else {
+        (f64::from(physical_size) / scale_factor).ceil().max(1.0) as u32
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn zero_physical_extent_stays_empty() {
+        let viewport = Viewport::from_physical_size(PhysicalSize::new(0, 720), 2.0);
+
+        assert!(viewport.is_empty());
+        assert_eq!(viewport.physical_width, 0);
+        assert_eq!(viewport.logical_width, 0);
+        assert_eq!(viewport.physical_height, 720);
+        assert_eq!(viewport.logical_height, 360);
+    }
+
+    #[test]
+    fn nonzero_physical_extent_keeps_at_least_one_logical_pixel() {
+        let viewport = Viewport::from_physical_size(PhysicalSize::new(1, 1), 2.0);
+
+        assert!(!viewport.is_empty());
+        assert_eq!(viewport.logical_width, 1);
+        assert_eq!(viewport.logical_height, 1);
+    }
+
+    #[test]
+    fn invalid_scale_factor_falls_back_to_one() {
+        let viewport = Viewport::from_physical_size(PhysicalSize::new(100, 50), f64::NAN);
+
+        assert_eq!(viewport.scale_factor, 1.0);
+        assert_eq!(viewport.logical_width, 100);
+        assert_eq!(viewport.logical_height, 50);
+    }
 }

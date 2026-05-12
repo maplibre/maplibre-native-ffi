@@ -162,6 +162,16 @@ impl MapHandle {
     /// underlying native handle remains live in the shared state so future child
     /// handles can continue to retain and close the map safely.
     pub fn close(&self) -> Result<()> {
+        if self.inner.is_closed() {
+            return Ok(());
+        }
+        if Rc::strong_count(&self.inner) > 1 {
+            return Err(Error::new(
+                ErrorKind::InvalidState,
+                None,
+                "MapHandle cannot close while child handles are live",
+            ));
+        }
         self.inner.close()
     }
 

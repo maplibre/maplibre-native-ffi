@@ -1,4 +1,4 @@
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
 use std::fmt;
 use std::marker::PhantomData;
 use std::mem;
@@ -407,7 +407,7 @@ impl VulkanBorrowedTextureDescriptor {
 #[derive(Debug)]
 struct RenderSessionState {
     handle: ThreadAffineNativeHandle<sys::mln_render_session>,
-    _map: Rc<MapState>,
+    map: RefCell<Option<Rc<MapState>>>,
     detached: Cell<bool>,
     frame_acquired: Cell<bool>,
 }
@@ -425,7 +425,7 @@ impl RenderSessionState {
         };
         Self {
             handle,
-            _map: map,
+            map: RefCell::new(Some(map)),
             detached: Cell::new(false),
             frame_acquired: Cell::new(false),
         }
@@ -446,6 +446,12 @@ impl RenderSessionState {
         } else {
             Ok(ptr)
         }
+    }
+
+    fn close(&self) -> Result<()> {
+        self.handle.close()?;
+        self.map.borrow_mut().take();
+        Ok(())
     }
 }
 
@@ -789,7 +795,7 @@ impl RenderSessionHandle {
     /// underlying native handle remains live so a later `close` can retry.
     pub fn close(&self) -> Result<()> {
         self.inner.ensure_no_frame_acquired()?;
-        self.inner.handle.close()
+        self.inner.close()
     }
 
     pub fn is_closed(&self) -> bool {
@@ -1120,13 +1126,17 @@ mod tests {
             .unwrap_err();
         assert_eq!(error.kind(), ErrorKind::InvalidState);
 
-        drop(map);
+        let error = map.close().unwrap_err();
+        assert_eq!(error.kind(), ErrorKind::InvalidState);
+        assert!(error.diagnostic().contains("child handles are live"));
+
         drop(runtime);
 
         session.detach().unwrap();
         session.detach().unwrap();
         session.close().unwrap();
         session.close().unwrap();
+        map.close().unwrap();
     }
 
     #[test]

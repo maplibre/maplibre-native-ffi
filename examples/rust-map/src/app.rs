@@ -77,6 +77,13 @@ impl App {
     }
 
     pub fn handle_window_event(&mut self, event: WindowEvent, target: &EventLoopWindowTarget<()>) {
+        if self.closed {
+            if matches!(event, WindowEvent::CloseRequested) {
+                target.exit();
+            }
+            return;
+        }
+
         match event {
             WindowEvent::CloseRequested => self.request_exit(target),
             WindowEvent::Resized(_) | WindowEvent::ScaleFactorChanged { .. } => self.queue_resize(),
