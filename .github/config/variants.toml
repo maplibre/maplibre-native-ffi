@@ -20,6 +20,10 @@ requires = { platform = ["linux", "macos", "windows"], backend = ["metal", "vulk
 task = "//examples/lwjgl-map:build"
 requires = { platform = ["linux", "macos"], backend = ["vulkan"] }
 
+[examples.rust-map]
+task = "//examples/rust-map:build"
+requires = { platform = ["linux"], backend = ["vulkan"] }
+
 [examples.zig-readback]
 task = "//examples/zig-readback:run"
 requires = { platform = ["linux", "macos"], backend = ["metal", "vulkan"] }
