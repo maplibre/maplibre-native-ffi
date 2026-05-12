@@ -1,0 +1,230 @@
+use std::error::Error;
+use std::time::{Duration, Instant};
+
+use maplibre_native::{
+    CameraOptions, LatLng, MapMode, MapOptions, RuntimeEventPayload, RuntimeEventType,
+    RuntimeHandle,
+};
+use winit::event::WindowEvent;
+use winit::event_loop::EventLoopWindowTarget;
+use winit::window::Window;
+
+use crate::input::Controller;
+use crate::render_target::{Mode, RenderTarget};
+use crate::viewport::Viewport;
+use crate::vulkan::VulkanContext;
+
+const RESIZE_DEBOUNCE_MS: u64 = 80;
+const STYLE_URL: &str = "https://tiles.openfreemap.org/styles/bright";
+
+pub struct App {
+    target: RenderTarget,
+    map: maplibre_native::MapHandle,
+    runtime: RuntimeHandle,
+    _vulkan: VulkanContext,
+    window: Window,
+    viewport: Viewport,
+    input: Controller,
+    render_pending: bool,
+    pending_viewport: Option<Viewport>,
+    pending_resize_deadline: Option<Instant>,
+    closed: bool,
+}
+
+impl App {
+    pub fn new(window: Window) -> Result<Self, Box<dyn Error>> {
+        let vulkan = VulkanContext::new(&window)?;
+        let viewport = Viewport::from_window(&window);
+        if viewport.is_empty() {
+            return Err("window has no drawable extent".into());
+        }
+
+        let runtime = RuntimeHandle::new()?;
+        let map = runtime.create_map_with_options(
+            &MapOptions::new(
+                viewport.logical_width,
+                viewport.logical_height,
+                viewport.scale_factor,
+            )
+            .with_mode(MapMode::Continuous),
+        )?;
+        viewport.log("initial viewport");
+        let target = RenderTarget::attach(Mode::NativeSurface, &map, &vulkan, viewport)?;
+        map.set_style_url(STYLE_URL)?;
+        map.jump_to(
+            &CameraOptions::new()
+                .with_center(LatLng::new(37.7749, -122.4194))
+                .with_zoom(13.0)
+                .with_bearing(12.0)
+                .with_pitch(30.0),
+        )?;
+        map.request_repaint()?;
+
+        Ok(Self {
+            target,
+            map,
+            runtime,
+            _vulkan: vulkan,
+            window,
+            viewport,
+            input: Controller::default(),
+            render_pending: true,
+            pending_viewport: None,
+            pending_resize_deadline: None,
+            closed: false,
+        })
+    }
+
+    pub fn print_status(&self) {
+        println!("MapLibre Rust Vulkan map example running. Close the window to exit.");
+        println!("render target: native-surface");
+        Controller::print_controls();
+    }
+
+    pub fn handle_window_event(&mut self, event: WindowEvent, target: &EventLoopWindowTarget<()>) {
+        match event {
+            WindowEvent::CloseRequested => self.request_exit(target),
+            WindowEvent::Resized(_) | WindowEvent::ScaleFactorChanged { .. } => self.queue_resize(),
+            WindowEvent::RedrawRequested => self.render_or_exit(),
+            event => match self.input.handle(&event, &self.map, self.viewport) {
+                Ok(true) => {
+                    self.render_pending = true;
+                    self.window.request_redraw();
+                }
+                Ok(false) => {}
+                Err(error) => {
+                    eprintln!("input failed: {error}");
+                    self.abort_process(1);
+                }
+            },
+        }
+    }
+
+    pub fn step(&mut self, _target: &EventLoopWindowTarget<()>) {
+        if let Err(error) = self.pump_runtime() {
+            eprintln!("runtime update failed: {error}");
+            self.abort_process(1);
+        }
+        if self.render_pending {
+            self.render_or_exit();
+        }
+    }
+
+    fn queue_resize(&mut self) {
+        self.pending_viewport = Some(Viewport::from_window(&self.window));
+        self.pending_resize_deadline =
+            Some(Instant::now() + Duration::from_millis(RESIZE_DEBOUNCE_MS));
+    }
+
+    fn apply_pending_resize(&mut self) -> Result<(), Box<dyn Error>> {
+        if self.closed {
+            return Ok(());
+        }
+        if self
+            .pending_resize_deadline
+            .is_some_and(|deadline| Instant::now() < deadline)
+        {
+            return Ok(());
+        }
+        self.pending_resize_deadline = None;
+        let Some(next) = self.pending_viewport.take() else {
+            return Ok(());
+        };
+        if next == self.viewport {
+            return Ok(());
+        }
+        next.log("resized viewport");
+        self.viewport = next;
+        if next.is_empty() {
+            self.render_pending = false;
+            return Ok(());
+        }
+        self.target.resize(next)?;
+        self.map.request_repaint()?;
+        self.render_pending = true;
+        Ok(())
+    }
+
+    fn pump_runtime(&mut self) -> Result<(), Box<dyn Error>> {
+        if self.closed {
+            return Ok(());
+        }
+        self.apply_pending_resize()?;
+        self.runtime.run_once()?;
+        while let Some(event) = self.runtime.poll_event()? {
+            match event.event_type {
+                RuntimeEventType::MapRenderUpdateAvailable => self.render_pending = true,
+                RuntimeEventType::MapRenderFrameFinished => {
+                    if let RuntimeEventPayload::RenderFrame(frame) = event.payload {
+                        self.render_pending |= frame.needs_repaint;
+                    }
+                }
+                _ => {}
+            }
+        }
+        Ok(())
+    }
+
+    fn render_or_exit(&mut self) {
+        if let Err(error) = self.render() {
+            eprintln!("render failed: {error}");
+            self.abort_process(1);
+        }
+    }
+
+    fn render(&mut self) -> Result<(), Box<dyn Error>> {
+        if self.closed || self.viewport.is_empty() {
+            return Ok(());
+        }
+        self.pump_runtime()?;
+        if self.render_pending {
+            self.target.render_update()?;
+            self.render_pending = false;
+        }
+        Ok(())
+    }
+
+    pub fn close_or_abort(&mut self) {
+        if let Err(error) = self.close_resources() {
+            eprintln!("shutdown failed: {error}");
+            self.abort_process(1);
+        }
+    }
+
+    fn request_exit(&mut self, target: &EventLoopWindowTarget<()>) {
+        self.close_or_abort();
+        target.exit();
+    }
+
+    fn close_resources(&mut self) -> Result<(), Box<dyn Error>> {
+        if self.closed {
+            return Ok(());
+        }
+        self.closed = true;
+        self.render_pending = false;
+        self.pending_viewport = None;
+        self.pending_resize_deadline = None;
+        self.target.close()?;
+        self.map.close()?;
+        self.runtime.close()?;
+        Ok(())
+    }
+
+    fn abort_process(&mut self, code: i32) -> ! {
+        self.closed = true;
+        self.render_pending = false;
+        immediate_exit(code);
+    }
+}
+
+fn immediate_exit(code: i32) -> ! {
+    unsafe extern "C" {
+        fn _exit(status: std::ffi::c_int) -> !;
+    }
+
+    // SAFETY: `_exit` terminates the process without running native teardown.
+    // The example uses it on close because the current macOS Vulkan stack can
+    // abort while MapLibre native tears down thread-local state after the window
+    // has closed. The operating system reclaims the example's resources.
+    unsafe { _exit(code) }
+}
