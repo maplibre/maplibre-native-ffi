@@ -5,9 +5,9 @@ use std::rc::Rc;
 use maplibre_native_support as support;
 use maplibre_native_sys as sys;
 
-use crate::Result;
 use crate::handle::{ThreadAffineNativeHandle, out_handle};
 use crate::runtime::{RuntimeHandle, RuntimeState};
+use crate::{MapOptions, Result};
 
 #[derive(Debug)]
 pub(crate) struct MapState {
@@ -54,14 +54,20 @@ impl fmt::Debug for MapHandle {
 impl MapHandle {
     /// Creates a map with native default map options on the runtime owner thread.
     pub fn new(runtime: &RuntimeHandle) -> Result<Self> {
+        Self::with_options(runtime, &MapOptions::default())
+    }
+
+    /// Creates a map with explicit map options on the runtime owner thread.
+    pub fn with_options(runtime: &RuntimeHandle, options: &MapOptions) -> Result<Self> {
         let runtime_ptr = runtime.inner.as_ptr()?;
         let mut out = support::ptr::OutPtr::<sys::mln_map>::new();
+        let raw_options = options.to_native();
 
-        // SAFETY: runtime_ptr is a live runtime handle. Passing null options
-        // requests native map defaults. out is a valid null-initialized
-        // out-pointer owned by this call.
+        // SAFETY: runtime_ptr is a live runtime handle. raw_options is a
+        // materialized map descriptor with size filled by the binding. out is a
+        // valid null-initialized out-pointer owned by this call.
         support::check(unsafe {
-            sys::mln_map_create(runtime_ptr, std::ptr::null(), out.as_mut_ptr())
+            sys::mln_map_create(runtime_ptr, &raw_options, out.as_mut_ptr())
         })?;
         let ptr = out_handle(out, "mln_map")?;
 
@@ -88,6 +94,16 @@ mod tests {
     fn map_create_and_close() {
         let runtime = RuntimeHandle::new().unwrap();
         let map = MapHandle::new(&runtime).unwrap();
+
+        map.close().unwrap();
+        runtime.close().unwrap();
+    }
+
+    #[test]
+    fn map_create_with_options_and_close() {
+        let runtime = RuntimeHandle::new().unwrap();
+        let options = MapOptions::new(320, 240, 2.0).with_mode(crate::MapMode::Static);
+        let map = MapHandle::with_options(&runtime, &options).unwrap();
 
         map.close().unwrap();
         runtime.close().unwrap();

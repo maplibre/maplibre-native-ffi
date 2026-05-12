@@ -1,15 +1,31 @@
 #![deny(unsafe_op_in_unsafe_fn)]
 
+mod camera;
+mod geometry;
 mod handle;
 mod map;
+mod options;
 mod runtime;
+mod values;
 
 use maplibre_native_support as support;
 use maplibre_native_sys as sys;
 
+pub use camera::{
+    AnimationOptions, BoundOptions, CameraFitOptions, CameraOptions, FreeCameraOptions,
+};
+pub use geometry::Geometry;
 pub use map::MapHandle;
+pub use options::{
+    ConstrainMode, MapDebugOptions, MapMode, MapOptions, MapTileOptions, MapViewportOptions,
+    NorthOrientation, TileLodMode, ViewportMode,
+};
 pub use runtime::RuntimeHandle;
 pub use support::{Error, ErrorKind, Result};
+pub use values::{
+    EdgeInsets, LatLng, LatLngBounds, ProjectedMeters, Quaternion, ScreenBox, ScreenPoint,
+    UnitBezier, Vec3,
+};
 
 bitflags::bitflags! {
     /// Render backends compiled into the linked native library.
@@ -65,6 +81,34 @@ pub fn supported_render_backends() -> RenderBackendMask {
     RenderBackendMask::from_bits_retain(mask)
 }
 
+/// Converts a geographic coordinate to Spherical Mercator projected meters.
+pub fn projected_meters_for_lat_lng(coordinate: LatLng) -> Result<ProjectedMeters> {
+    let mut raw_meters = sys::mln_projected_meters {
+        northing: 0.0,
+        easting: 0.0,
+    };
+    // SAFETY: coordinate is passed by value. out_meters points to valid
+    // writable storage for one projected-meter value.
+    support::check(unsafe {
+        sys::mln_projected_meters_for_lat_lng(coordinate.to_native(), &mut raw_meters)
+    })?;
+    Ok(ProjectedMeters::from_native(raw_meters))
+}
+
+/// Converts Spherical Mercator projected meters to a geographic coordinate.
+pub fn lat_lng_for_projected_meters(meters: ProjectedMeters) -> Result<LatLng> {
+    let mut raw_coordinate = sys::mln_lat_lng {
+        latitude: 0.0,
+        longitude: 0.0,
+    };
+    // SAFETY: meters is passed by value. out_coordinate points to valid
+    // writable storage for one coordinate value.
+    support::check(unsafe {
+        sys::mln_lat_lng_for_projected_meters(meters.to_native(), &mut raw_coordinate)
+    })?;
+    Ok(LatLng::from_native(raw_coordinate))
+}
+
 /// Reads MapLibre Native's process-global network status.
 pub fn network_status() -> Result<NetworkStatus> {
     let mut raw_status = 0;
@@ -112,6 +156,16 @@ mod tests {
         let known_backends = RenderBackendMask::METAL | RenderBackendMask::VULKAN;
 
         assert!(backends.intersects(known_backends));
+    }
+
+    #[test]
+    fn projected_meter_helpers_round_trip() {
+        let coordinate = LatLng::new(45.0, -122.0);
+        let meters = projected_meters_for_lat_lng(coordinate).unwrap();
+        let round_tripped = lat_lng_for_projected_meters(meters).unwrap();
+
+        assert!((round_tripped.latitude - coordinate.latitude).abs() < 1e-9);
+        assert!((round_tripped.longitude - coordinate.longitude).abs() < 1e-9);
     }
 
     #[test]

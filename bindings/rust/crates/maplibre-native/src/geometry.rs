@@ -1,0 +1,312 @@
+use std::ptr;
+
+use maplibre_native_sys as sys;
+
+use crate::LatLng;
+
+/// Owned geometry descriptor.
+#[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
+pub enum Geometry {
+    Empty,
+    Point(LatLng),
+    LineString(Vec<LatLng>),
+    Polygon(Vec<Vec<LatLng>>),
+    MultiPoint(Vec<LatLng>),
+    MultiLineString(Vec<Vec<LatLng>>),
+    MultiPolygon(Vec<Vec<Vec<LatLng>>>),
+    GeometryCollection(Vec<Geometry>),
+}
+
+impl Geometry {
+    #[allow(dead_code)]
+    pub(crate) fn to_native(&self) -> NativeGeometry {
+        NativeGeometry::new(self)
+    }
+}
+
+#[allow(dead_code)]
+pub(crate) struct NativeGeometry {
+    raw: sys::mln_geometry,
+    coordinates: Vec<Box<[sys::mln_lat_lng]>>,
+    spans: Vec<Box<[sys::mln_coordinate_span]>>,
+    polygons: Vec<Box<[sys::mln_polygon_geometry]>>,
+    geometries: Vec<Box<[sys::mln_geometry]>>,
+    children: Vec<NativeGeometry>,
+}
+
+#[allow(dead_code)]
+impl NativeGeometry {
+    fn new(geometry: &Geometry) -> Self {
+        let mut native = Self::empty(sys::MLN_GEOMETRY_TYPE_EMPTY);
+        match geometry {
+            Geometry::Empty => {}
+            Geometry::Point(point) => {
+                native.raw.type_ = sys::MLN_GEOMETRY_TYPE_POINT;
+                native.raw.data = sys::mln_geometry__bindgen_ty_1 {
+                    point: point.to_native(),
+                };
+            }
+            Geometry::LineString(points) => {
+                native.raw.type_ = sys::MLN_GEOMETRY_TYPE_LINE_STRING;
+                let span = native.coordinate_span(points);
+                native.raw.data = sys::mln_geometry__bindgen_ty_1 { line_string: span };
+            }
+            Geometry::Polygon(rings) => {
+                native.raw.type_ = sys::MLN_GEOMETRY_TYPE_POLYGON;
+                let polygon = native.polygon_geometry(rings);
+                native.raw.data = sys::mln_geometry__bindgen_ty_1 { polygon };
+            }
+            Geometry::MultiPoint(points) => {
+                native.raw.type_ = sys::MLN_GEOMETRY_TYPE_MULTI_POINT;
+                let span = native.coordinate_span(points);
+                native.raw.data = sys::mln_geometry__bindgen_ty_1 { multi_point: span };
+            }
+            Geometry::MultiLineString(lines) => {
+                native.raw.type_ = sys::MLN_GEOMETRY_TYPE_MULTI_LINE_STRING;
+                let line_spans = native.coordinate_spans(lines);
+                native.raw.data = sys::mln_geometry__bindgen_ty_1 {
+                    multi_line_string: sys::mln_multi_line_geometry {
+                        lines: ptr_or_null(line_spans.as_ref()),
+                        line_count: line_spans.len(),
+                    },
+                };
+                native.spans.push(line_spans);
+            }
+            Geometry::MultiPolygon(polygons) => {
+                native.raw.type_ = sys::MLN_GEOMETRY_TYPE_MULTI_POLYGON;
+                let polygon_values = polygons
+                    .iter()
+                    .map(|rings| native.polygon_geometry(rings))
+                    .collect::<Vec<_>>()
+                    .into_boxed_slice();
+                native.raw.data = sys::mln_geometry__bindgen_ty_1 {
+                    multi_polygon: sys::mln_multi_polygon_geometry {
+                        polygons: ptr_or_null(polygon_values.as_ref()),
+                        polygon_count: polygon_values.len(),
+                    },
+                };
+                native.polygons.push(polygon_values);
+            }
+            Geometry::GeometryCollection(children) => {
+                native.raw.type_ = sys::MLN_GEOMETRY_TYPE_GEOMETRY_COLLECTION;
+                native.children = children.iter().map(NativeGeometry::new).collect();
+                let raw_children = native
+                    .children
+                    .iter()
+                    .map(|child| child.raw)
+                    .collect::<Vec<_>>()
+                    .into_boxed_slice();
+                native.raw.data = sys::mln_geometry__bindgen_ty_1 {
+                    geometry_collection: sys::mln_geometry_collection {
+                        geometries: ptr_or_null(raw_children.as_ref()),
+                        geometry_count: raw_children.len(),
+                    },
+                };
+                native.geometries.push(raw_children);
+            }
+        }
+        native
+    }
+
+    fn empty(type_: u32) -> Self {
+        Self {
+            raw: sys::mln_geometry {
+                size: std::mem::size_of::<sys::mln_geometry>() as u32,
+                type_,
+                data: sys::mln_geometry__bindgen_ty_1 {
+                    point: sys::mln_lat_lng {
+                        latitude: 0.0,
+                        longitude: 0.0,
+                    },
+                },
+            },
+            coordinates: Vec::new(),
+            spans: Vec::new(),
+            polygons: Vec::new(),
+            geometries: Vec::new(),
+            children: Vec::new(),
+        }
+    }
+
+    pub(crate) fn as_ptr(&self) -> *const sys::mln_geometry {
+        &self.raw
+    }
+
+    pub(crate) fn as_ref(&self) -> &sys::mln_geometry {
+        &self.raw
+    }
+
+    fn coordinate_span(&mut self, points: &[LatLng]) -> sys::mln_coordinate_span {
+        let coordinates = points
+            .iter()
+            .copied()
+            .map(LatLng::to_native)
+            .collect::<Vec<_>>()
+            .into_boxed_slice();
+        let span = sys::mln_coordinate_span {
+            coordinates: ptr_or_null(coordinates.as_ref()),
+            coordinate_count: coordinates.len(),
+        };
+        self.coordinates.push(coordinates);
+        span
+    }
+
+    fn coordinate_spans(&mut self, lines: &[Vec<LatLng>]) -> Box<[sys::mln_coordinate_span]> {
+        lines
+            .iter()
+            .map(|line| self.coordinate_span(line))
+            .collect::<Vec<_>>()
+            .into_boxed_slice()
+    }
+
+    fn polygon_geometry(&mut self, rings: &[Vec<LatLng>]) -> sys::mln_polygon_geometry {
+        let ring_spans = self.coordinate_spans(rings);
+        let polygon = sys::mln_polygon_geometry {
+            rings: ptr_or_null(ring_spans.as_ref()),
+            ring_count: ring_spans.len(),
+        };
+        self.spans.push(ring_spans);
+        polygon
+    }
+}
+
+#[allow(dead_code)]
+fn ptr_or_null<T>(values: &[T]) -> *const T {
+    if values.is_empty() {
+        ptr::null()
+    } else {
+        values.as_ptr()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn empty_geometry_materializes_size_and_type() {
+        let native = Geometry::Empty.to_native();
+
+        assert_eq!(native.as_ref().type_, sys::MLN_GEOMETRY_TYPE_EMPTY);
+        assert_eq!(
+            native.as_ref().size as usize,
+            std::mem::size_of::<sys::mln_geometry>()
+        );
+    }
+
+    #[test]
+    fn point_materializes_inline_coordinate() {
+        let native = Geometry::Point(LatLng::new(1.0, 2.0)).to_native();
+        let raw = native.as_ref();
+
+        assert_eq!(native.as_ptr(), raw as *const sys::mln_geometry);
+        assert_eq!(raw.type_, sys::MLN_GEOMETRY_TYPE_POINT);
+        // SAFETY: The active union field is point because type_ was set by the
+        // materializer above.
+        let point = unsafe { raw.data.point };
+        assert_eq!(point.latitude, 1.0);
+        assert_eq!(point.longitude, 2.0);
+    }
+
+    #[test]
+    fn line_string_materializes_borrowed_coordinate_span() {
+        let native =
+            Geometry::LineString(vec![LatLng::new(1.0, 2.0), LatLng::new(3.0, 4.0)]).to_native();
+        let raw = native.as_ref();
+
+        assert_eq!(raw.type_, sys::MLN_GEOMETRY_TYPE_LINE_STRING);
+        // SAFETY: The active union field is line_string because type_ was set
+        // by the materializer above, and native owns the backing storage.
+        let span = unsafe { raw.data.line_string };
+        assert_eq!(span.coordinate_count, 2);
+        assert!(!span.coordinates.is_null());
+        // SAFETY: The span points to coordinate_count valid entries retained
+        // by native for the duration of this test.
+        let coordinates =
+            unsafe { std::slice::from_raw_parts(span.coordinates, span.coordinate_count) };
+        assert_eq!(coordinates[0].latitude, 1.0);
+        assert_eq!(coordinates[1].longitude, 4.0);
+    }
+
+    #[test]
+    fn polygon_and_multi_geometry_materialize_nested_storage() {
+        let polygon = Geometry::Polygon(vec![vec![
+            LatLng::new(0.0, 0.0),
+            LatLng::new(0.0, 1.0),
+            LatLng::new(1.0, 1.0),
+        ]])
+        .to_native();
+        let raw_polygon = polygon.as_ref();
+        assert_eq!(raw_polygon.type_, sys::MLN_GEOMETRY_TYPE_POLYGON);
+        // SAFETY: The active union field is polygon because type_ was set by
+        // the materializer above, and polygon owns the backing storage.
+        let polygon_data = unsafe { raw_polygon.data.polygon };
+        assert_eq!(polygon_data.ring_count, 1);
+        assert!(!polygon_data.rings.is_null());
+
+        let multi_point =
+            Geometry::MultiPoint(vec![LatLng::new(1.0, 2.0), LatLng::new(3.0, 4.0)]).to_native();
+        let raw_multi_point = multi_point.as_ref();
+        assert_eq!(raw_multi_point.type_, sys::MLN_GEOMETRY_TYPE_MULTI_POINT);
+        // SAFETY: The active union field is multi_point because type_ was set
+        // by the materializer above, and multi_point owns the backing storage.
+        let points = unsafe { raw_multi_point.data.multi_point };
+        assert_eq!(points.coordinate_count, 2);
+        assert!(!points.coordinates.is_null());
+
+        let multi_line = Geometry::MultiLineString(vec![vec![LatLng::new(5.0, 6.0)]]).to_native();
+        let raw_multi_line = multi_line.as_ref();
+        assert_eq!(
+            raw_multi_line.type_,
+            sys::MLN_GEOMETRY_TYPE_MULTI_LINE_STRING
+        );
+        // SAFETY: The active union field is multi_line_string because type_ was
+        // set by the materializer above.
+        let lines = unsafe { raw_multi_line.data.multi_line_string };
+        assert_eq!(lines.line_count, 1);
+        assert!(!lines.lines.is_null());
+
+        let multi_polygon =
+            Geometry::MultiPolygon(vec![vec![vec![LatLng::new(7.0, 8.0)]]]).to_native();
+        let raw_multi_polygon = multi_polygon.as_ref();
+        assert_eq!(
+            raw_multi_polygon.type_,
+            sys::MLN_GEOMETRY_TYPE_MULTI_POLYGON
+        );
+        // SAFETY: The active union field is multi_polygon because type_ was set
+        // by the materializer above.
+        let polygons = unsafe { raw_multi_polygon.data.multi_polygon };
+        assert_eq!(polygons.polygon_count, 1);
+        assert!(!polygons.polygons.is_null());
+    }
+
+    #[test]
+    fn empty_nested_geometry_uses_null_pointers_with_zero_counts() {
+        let native = Geometry::MultiLineString(Vec::new()).to_native();
+        let raw = native.as_ref();
+
+        // SAFETY: The active union field is multi_line_string because type_ was
+        // set by the materializer above.
+        let lines = unsafe { raw.data.multi_line_string };
+        assert_eq!(lines.line_count, 0);
+        assert!(lines.lines.is_null());
+    }
+
+    #[test]
+    fn geometry_collection_retains_child_storage() {
+        let native = Geometry::GeometryCollection(vec![
+            Geometry::Point(LatLng::new(1.0, 2.0)),
+            Geometry::LineString(vec![LatLng::new(3.0, 4.0)]),
+        ])
+        .to_native();
+        let raw = native.as_ref();
+
+        assert_eq!(raw.type_, sys::MLN_GEOMETRY_TYPE_GEOMETRY_COLLECTION);
+        // SAFETY: The active union field is geometry_collection because type_
+        // was set by the materializer above.
+        let collection = unsafe { raw.data.geometry_collection };
+        assert_eq!(collection.geometry_count, 2);
+        assert!(!collection.geometries.is_null());
+    }
+}

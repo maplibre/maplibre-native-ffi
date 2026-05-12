@@ -90,12 +90,14 @@ pub(crate) fn out_handle<T>(
 #[cfg(test)]
 mod tests {
     use std::ptr;
+    use std::sync::Mutex;
     use std::sync::atomic::{AtomicI32, AtomicUsize, Ordering};
 
     use super::*;
 
     static DESTROY_COUNT: AtomicUsize = AtomicUsize::new(0);
     static DESTROY_STATUS: AtomicI32 = AtomicI32::new(sys::MLN_STATUS_OK);
+    static DESTROY_TEST_LOCK: Mutex<()> = Mutex::new(());
 
     unsafe extern "C" fn count_destroy(ptr: *mut u8) -> sys::mln_status {
         if !ptr.is_null() {
@@ -116,6 +118,7 @@ mod tests {
 
     #[test]
     fn close_is_internally_idempotent_after_success() {
+        let _guard = DESTROY_TEST_LOCK.lock().unwrap();
         let mut value = 1u8;
         let handle = test_handle(&mut value);
 
@@ -128,6 +131,7 @@ mod tests {
 
     #[test]
     fn failed_close_leaves_handle_live_for_later_close() {
+        let _guard = DESTROY_TEST_LOCK.lock().unwrap();
         let mut value = 1u8;
         let handle = test_handle(&mut value);
         DESTROY_STATUS.store(sys::MLN_STATUS_INVALID_STATE, Ordering::SeqCst);

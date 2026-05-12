@@ -6,7 +6,7 @@ use maplibre_native_support as support;
 use maplibre_native_sys as sys;
 
 use crate::handle::{ThreadAffineNativeHandle, closed_handle_error, out_handle};
-use crate::{Error, ErrorKind, MapHandle, Result};
+use crate::{Error, ErrorKind, MapHandle, MapOptions, Result};
 
 #[derive(Debug)]
 pub(crate) struct RuntimeState {
@@ -70,9 +70,14 @@ impl RuntimeHandle {
         })
     }
 
-    /// Creates a map owned by this runtime.
+    /// Creates a map owned by this runtime with native default map options.
     pub fn create_map(&self) -> Result<MapHandle> {
         MapHandle::new(self)
+    }
+
+    /// Creates a map owned by this runtime with explicit map options.
+    pub fn create_map_with_options(&self, options: &MapOptions) -> Result<MapHandle> {
+        MapHandle::with_options(self, options)
     }
 
     /// Runs one pending owner-thread task for this runtime.
