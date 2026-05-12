@@ -2,7 +2,6 @@
 #include <array>
 #include <cstddef>
 #include <exception>
-#include <iterator>
 #include <string>
 #include <string_view>
 
@@ -37,13 +36,9 @@ auto set_thread_error(const char* message) noexcept -> void {
 
   const auto length =
     std::min(std::char_traits<char>::length(message), buffer.size() - 1);
-  // Use std::next to write the null terminator via iterator advancement.
-  // Avoids: operator[] (cppcoreguidelines-pro-bounds-constant-array-index),
-  //   auto* (readability-qualified-auto vs MSVC C3535: std::array iterator is
-  //   char* on GCC/clang but std::_Array_iterator<char,N> on MSVC, so auto*
-  //   cannot be deduced portably).
-  std::ranges::copy(std::string_view{message, length}, buffer.begin());
-  *std::next(buffer.begin(), static_cast<std::ptrdiff_t>(length)) = '\0';
+  auto* const output =
+    std::ranges::copy(std::string_view{message, length}, buffer.begin()).out;
+  *output = '\0';
 }
 
 auto set_thread_error(const std::exception& exception) noexcept -> void {
