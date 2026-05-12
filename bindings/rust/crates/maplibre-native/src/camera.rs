@@ -307,6 +307,17 @@ impl BoundOptions {
         }
         raw
     }
+
+    pub(crate) fn from_native(raw: sys::mln_bound_options) -> Self {
+        Self {
+            bounds: has(raw.fields, sys::MLN_BOUND_OPTION_BOUNDS)
+                .then(|| LatLngBounds::from_native(raw.bounds)),
+            min_zoom: has(raw.fields, sys::MLN_BOUND_OPTION_MIN_ZOOM).then_some(raw.min_zoom),
+            max_zoom: has(raw.fields, sys::MLN_BOUND_OPTION_MAX_ZOOM).then_some(raw.max_zoom),
+            min_pitch: has(raw.fields, sys::MLN_BOUND_OPTION_MIN_PITCH).then_some(raw.min_pitch),
+            max_pitch: has(raw.fields, sys::MLN_BOUND_OPTION_MAX_PITCH).then_some(raw.max_pitch),
+        }
+    }
 }
 
 /// Free camera position and orientation in MapLibre Native camera space.
@@ -345,6 +356,73 @@ impl FreeCameraOptions {
             raw.orientation = orientation.to_native();
         }
         raw
+    }
+
+    #[allow(dead_code)]
+    pub(crate) fn from_native(raw: sys::mln_free_camera_options) -> Self {
+        Self {
+            position: has(raw.fields, sys::MLN_FREE_CAMERA_OPTION_POSITION)
+                .then(|| Vec3::from_native(raw.position)),
+            orientation: has(raw.fields, sys::MLN_FREE_CAMERA_OPTION_ORIENTATION)
+                .then(|| Quaternion::from_native(raw.orientation)),
+        }
+    }
+}
+
+/// Axonometric rendering options for the live map render transform.
+#[derive(Debug, Clone, PartialEq, Default)]
+#[non_exhaustive]
+pub struct ProjectionMode {
+    pub axonometric: Option<bool>,
+    pub x_skew: Option<f64>,
+    pub y_skew: Option<f64>,
+}
+
+impl ProjectionMode {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn with_axonometric(mut self, axonometric: bool) -> Self {
+        self.axonometric = Some(axonometric);
+        self
+    }
+
+    pub fn with_x_skew(mut self, x_skew: f64) -> Self {
+        self.x_skew = Some(x_skew);
+        self
+    }
+
+    pub fn with_y_skew(mut self, y_skew: f64) -> Self {
+        self.y_skew = Some(y_skew);
+        self
+    }
+
+    pub(crate) fn to_native(&self) -> sys::mln_projection_mode {
+        // SAFETY: Default constructor takes no arguments and initializes size.
+        let mut raw = unsafe { sys::mln_projection_mode_default() };
+        if let Some(axonometric) = self.axonometric {
+            raw.fields |= sys::MLN_PROJECTION_MODE_AXONOMETRIC;
+            raw.axonometric = axonometric;
+        }
+        if let Some(x_skew) = self.x_skew {
+            raw.fields |= sys::MLN_PROJECTION_MODE_X_SKEW;
+            raw.x_skew = x_skew;
+        }
+        if let Some(y_skew) = self.y_skew {
+            raw.fields |= sys::MLN_PROJECTION_MODE_Y_SKEW;
+            raw.y_skew = y_skew;
+        }
+        raw
+    }
+
+    pub(crate) fn from_native(raw: sys::mln_projection_mode) -> Self {
+        Self {
+            axonometric: has(raw.fields, sys::MLN_PROJECTION_MODE_AXONOMETRIC)
+                .then_some(raw.axonometric),
+            x_skew: has(raw.fields, sys::MLN_PROJECTION_MODE_X_SKEW).then_some(raw.x_skew),
+            y_skew: has(raw.fields, sys::MLN_PROJECTION_MODE_Y_SKEW).then_some(raw.y_skew),
+        }
     }
 }
 
@@ -418,6 +496,7 @@ mod tests {
         assert_eq!(CameraFitOptions::default().to_native().fields, 0);
         assert_eq!(BoundOptions::default().to_native().fields, 0);
         assert_eq!(FreeCameraOptions::default().to_native().fields, 0);
+        assert_eq!(ProjectionMode::default().to_native().fields, 0);
     }
 
     #[test]
@@ -505,6 +584,24 @@ mod tests {
         assert_eq!(
             free.fields & sys::MLN_FREE_CAMERA_OPTION_ORIENTATION,
             sys::MLN_FREE_CAMERA_OPTION_ORIENTATION
+        );
+
+        let projection = ProjectionMode::new()
+            .with_axonometric(true)
+            .with_x_skew(0.1)
+            .with_y_skew(0.2)
+            .to_native();
+        assert_eq!(
+            projection.fields & sys::MLN_PROJECTION_MODE_AXONOMETRIC,
+            sys::MLN_PROJECTION_MODE_AXONOMETRIC
+        );
+        assert_eq!(
+            projection.fields & sys::MLN_PROJECTION_MODE_X_SKEW,
+            sys::MLN_PROJECTION_MODE_X_SKEW
+        );
+        assert_eq!(
+            projection.fields & sys::MLN_PROJECTION_MODE_Y_SKEW,
+            sys::MLN_PROJECTION_MODE_Y_SKEW
         );
     }
 }

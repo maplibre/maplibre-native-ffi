@@ -1,13 +1,18 @@
 use std::cell::RefCell;
 use std::fmt;
+use std::ptr;
 use std::rc::Rc;
 
 use maplibre_native_support as support;
 use maplibre_native_sys as sys;
 
-use crate::handle::{ThreadAffineNativeHandle, out_handle};
+use crate::handle::{ThreadAffineNativeHandle, closed_handle_error, out_handle};
 use crate::runtime::{RuntimeHandle, RuntimeState};
-use crate::{MapOptions, Result};
+use crate::{
+    AnimationOptions, BoundOptions, CameraFitOptions, CameraOptions, Error, FreeCameraOptions,
+    Geometry, LatLng, LatLngBounds, MapDebugOptions, MapOptions, MapProjectionHandle,
+    MapTileOptions, MapViewportOptions, ProjectionMode, Result, ScreenPoint,
+};
 
 #[derive(Debug)]
 pub(crate) struct MapState {
@@ -24,6 +29,15 @@ impl MapState {
         Self {
             handle,
             runtime: RefCell::new(Some(runtime)),
+        }
+    }
+
+    pub(crate) fn as_ptr(&self) -> Result<*mut sys::mln_map> {
+        let ptr = self.handle.as_ptr();
+        if ptr.is_null() {
+            Err(closed_handle_error("MapHandle"))
+        } else {
+            Ok(ptr)
         }
     }
 
@@ -84,11 +98,582 @@ impl MapHandle {
     pub fn close(&self) -> Result<()> {
         self.inner.close()
     }
+
+    /// Requests a repaint for a continuous map.
+    pub fn request_repaint(&self) -> Result<()> {
+        let map = self.inner.as_ptr()?;
+        // SAFETY: map is a live map handle owned by this wrapper.
+        support::check(unsafe { sys::mln_map_request_repaint(map) })
+    }
+
+    /// Requests one still image for a static or tile map.
+    pub fn request_still_image(&self) -> Result<()> {
+        let map = self.inner.as_ptr()?;
+        // SAFETY: map is a live map handle owned by this wrapper.
+        support::check(unsafe { sys::mln_map_request_still_image(map) })
+    }
+
+    /// Loads a style URL through MapLibre Native style APIs.
+    pub fn set_style_url(&self, url: &str) -> Result<()> {
+        let map = self.inner.as_ptr()?;
+        let url = support::string::c_string(url)?;
+        // SAFETY: map is live and url is a NUL-terminated UTF-8 string valid
+        // for the duration of this command. The C API copies/consumes it before
+        // returning.
+        support::check(unsafe { sys::mln_map_set_style_url(map, url.as_ptr()) })
+    }
+
+    /// Loads inline style JSON through MapLibre Native style APIs.
+    pub fn set_style_json(&self, json: &str) -> Result<()> {
+        let map = self.inner.as_ptr()?;
+        let json = support::string::c_string(json)?;
+        // SAFETY: map is live and json is a NUL-terminated UTF-8 string valid
+        // for the duration of this command. The C API copies/consumes it before
+        // returning.
+        support::check(unsafe { sys::mln_map_set_style_json(map, json.as_ptr()) })
+    }
+
+    /// Applies MapLibre debug overlay mask bits.
+    pub fn set_debug_options(&self, options: MapDebugOptions) -> Result<()> {
+        let map = self.inner.as_ptr()?;
+        // SAFETY: map is live. The C API validates unknown mask bits.
+        support::check(unsafe { sys::mln_map_set_debug_options(map, options.bits()) })
+    }
+
+    /// Reads MapLibre debug overlay mask bits.
+    pub fn debug_options(&self) -> Result<MapDebugOptions> {
+        let map = self.inner.as_ptr()?;
+        let mut raw = 0;
+        // SAFETY: map is live and out_options points to writable u32 storage.
+        support::check(unsafe { sys::mln_map_get_debug_options(map, &mut raw) })?;
+        Ok(MapDebugOptions::from_bits_retain(raw))
+    }
+
+    /// Enables or disables MapLibre's rendering stats overlay view.
+    pub fn set_rendering_stats_view_enabled(&self, enabled: bool) -> Result<()> {
+        let map = self.inner.as_ptr()?;
+        // SAFETY: map is live and enabled is passed by value.
+        support::check(unsafe { sys::mln_map_set_rendering_stats_view_enabled(map, enabled) })
+    }
+
+    /// Reads whether MapLibre's rendering stats overlay view is enabled.
+    pub fn rendering_stats_view_enabled(&self) -> Result<bool> {
+        let map = self.inner.as_ptr()?;
+        let mut enabled = false;
+        // SAFETY: map is live and out_enabled points to writable bool storage.
+        support::check(unsafe {
+            sys::mln_map_get_rendering_stats_view_enabled(map, &mut enabled)
+        })?;
+        Ok(enabled)
+    }
+
+    /// Reads whether MapLibre currently considers the map fully loaded.
+    pub fn is_fully_loaded(&self) -> Result<bool> {
+        let map = self.inner.as_ptr()?;
+        let mut loaded = false;
+        // SAFETY: map is live and out_loaded points to writable bool storage.
+        support::check(unsafe { sys::mln_map_is_fully_loaded(map, &mut loaded) })?;
+        Ok(loaded)
+    }
+
+    /// Dumps map debug logs through MapLibre Native logging.
+    pub fn dump_debug_logs(&self) -> Result<()> {
+        let map = self.inner.as_ptr()?;
+        // SAFETY: map is live.
+        support::check(unsafe { sys::mln_map_dump_debug_logs(map) })
+    }
+
+    /// Reads live viewport and render-transform controls.
+    pub fn viewport_options(&self) -> Result<MapViewportOptions> {
+        let map = self.inner.as_ptr()?;
+        // SAFETY: Default constructor takes no arguments and initializes size.
+        let mut raw = unsafe { sys::mln_map_viewport_options_default() };
+        // SAFETY: map is live and raw has a valid size field for C to fill.
+        support::check(unsafe { sys::mln_map_get_viewport_options(map, &mut raw) })?;
+        Ok(MapViewportOptions::from_native(raw))
+    }
+
+    /// Applies selected live viewport and render-transform controls.
+    pub fn set_viewport_options(&self, options: &MapViewportOptions) -> Result<()> {
+        let map = self.inner.as_ptr()?;
+        let raw = options.to_native();
+        // SAFETY: map is live and raw is a materialized descriptor valid for
+        // the duration of this call.
+        support::check(unsafe { sys::mln_map_set_viewport_options(map, &raw) })
+    }
+
+    /// Reads tile prefetch and LOD tuning controls.
+    pub fn tile_options(&self) -> Result<MapTileOptions> {
+        let map = self.inner.as_ptr()?;
+        // SAFETY: Default constructor takes no arguments and initializes size.
+        let mut raw = unsafe { sys::mln_map_tile_options_default() };
+        // SAFETY: map is live and raw has a valid size field for C to fill.
+        support::check(unsafe { sys::mln_map_get_tile_options(map, &mut raw) })?;
+        Ok(MapTileOptions::from_native(raw))
+    }
+
+    /// Applies selected tile prefetch and LOD tuning controls.
+    pub fn set_tile_options(&self, options: &MapTileOptions) -> Result<()> {
+        let map = self.inner.as_ptr()?;
+        let raw = options.to_native();
+        // SAFETY: map is live and raw is a materialized descriptor valid for
+        // the duration of this call.
+        support::check(unsafe { sys::mln_map_set_tile_options(map, &raw) })
+    }
+
+    /// Reads the current camera snapshot.
+    pub fn camera(&self) -> Result<CameraOptions> {
+        let map = self.inner.as_ptr()?;
+        // SAFETY: Default constructor takes no arguments and initializes size.
+        let mut raw = unsafe { sys::mln_camera_options_default() };
+        // SAFETY: map is live and raw has a valid size field for C to fill.
+        support::check(unsafe { sys::mln_map_get_camera(map, &mut raw) })?;
+        Ok(CameraOptions::from_native(raw))
+    }
+
+    /// Applies a camera jump command.
+    pub fn jump_to(&self, camera: &CameraOptions) -> Result<()> {
+        let map = self.inner.as_ptr()?;
+        let raw = camera.to_native();
+        // SAFETY: map is live and raw is a materialized descriptor valid for
+        // the duration of this call.
+        support::check(unsafe { sys::mln_map_jump_to(map, &raw) })
+    }
+
+    /// Applies a camera ease transition command.
+    pub fn ease_to(
+        &self,
+        camera: &CameraOptions,
+        animation: Option<&AnimationOptions>,
+    ) -> Result<()> {
+        let map = self.inner.as_ptr()?;
+        let raw_camera = camera.to_native();
+        let raw_animation = animation.map(AnimationOptions::to_native);
+        // SAFETY: map is live and descriptors are valid for this call. A null
+        // animation pointer requests native defaults.
+        support::check(unsafe {
+            sys::mln_map_ease_to(map, &raw_camera, option_ptr(raw_animation.as_ref()))
+        })
+    }
+
+    /// Applies a camera fly transition command.
+    pub fn fly_to(
+        &self,
+        camera: &CameraOptions,
+        animation: Option<&AnimationOptions>,
+    ) -> Result<()> {
+        let map = self.inner.as_ptr()?;
+        let raw_camera = camera.to_native();
+        let raw_animation = animation.map(AnimationOptions::to_native);
+        // SAFETY: map is live and descriptors are valid for this call. A null
+        // animation pointer requests native defaults.
+        support::check(unsafe {
+            sys::mln_map_fly_to(map, &raw_camera, option_ptr(raw_animation.as_ref()))
+        })
+    }
+
+    /// Applies a screen-space pan command.
+    pub fn move_by(&self, delta_x: f64, delta_y: f64) -> Result<()> {
+        let map = self.inner.as_ptr()?;
+        // SAFETY: map is live. The C API validates numeric values.
+        support::check(unsafe { sys::mln_map_move_by(map, delta_x, delta_y) })
+    }
+
+    /// Applies an animated screen-space pan command.
+    pub fn move_by_animated(
+        &self,
+        delta_x: f64,
+        delta_y: f64,
+        animation: Option<&AnimationOptions>,
+    ) -> Result<()> {
+        let map = self.inner.as_ptr()?;
+        let raw_animation = animation.map(AnimationOptions::to_native);
+        // SAFETY: map is live and the optional animation descriptor is valid
+        // for this call. The C API validates numeric values.
+        support::check(unsafe {
+            sys::mln_map_move_by_animated(map, delta_x, delta_y, option_ptr(raw_animation.as_ref()))
+        })
+    }
+
+    /// Applies a screen-space zoom command.
+    pub fn scale_by(&self, scale: f64, anchor: Option<ScreenPoint>) -> Result<()> {
+        let map = self.inner.as_ptr()?;
+        let raw_anchor = anchor.map(ScreenPoint::to_native);
+        // SAFETY: map is live and the optional anchor pointer is valid for this
+        // call. The C API validates numeric values.
+        support::check(unsafe {
+            sys::mln_map_scale_by(map, scale, option_ptr(raw_anchor.as_ref()))
+        })
+    }
+
+    /// Applies an animated screen-space zoom command.
+    pub fn scale_by_animated(
+        &self,
+        scale: f64,
+        anchor: Option<ScreenPoint>,
+        animation: Option<&AnimationOptions>,
+    ) -> Result<()> {
+        let map = self.inner.as_ptr()?;
+        let raw_anchor = anchor.map(ScreenPoint::to_native);
+        let raw_animation = animation.map(AnimationOptions::to_native);
+        // SAFETY: map is live and optional descriptors are valid for this call.
+        // The C API validates numeric values.
+        support::check(unsafe {
+            sys::mln_map_scale_by_animated(
+                map,
+                scale,
+                option_ptr(raw_anchor.as_ref()),
+                option_ptr(raw_animation.as_ref()),
+            )
+        })
+    }
+
+    /// Applies a screen-space rotate command.
+    pub fn rotate_by(&self, first: ScreenPoint, second: ScreenPoint) -> Result<()> {
+        let map = self.inner.as_ptr()?;
+        // SAFETY: map is live. Points are passed by value and validated by C.
+        support::check(unsafe {
+            sys::mln_map_rotate_by(map, first.to_native(), second.to_native())
+        })
+    }
+
+    /// Applies an animated screen-space rotate command.
+    pub fn rotate_by_animated(
+        &self,
+        first: ScreenPoint,
+        second: ScreenPoint,
+        animation: Option<&AnimationOptions>,
+    ) -> Result<()> {
+        let map = self.inner.as_ptr()?;
+        let raw_animation = animation.map(AnimationOptions::to_native);
+        // SAFETY: map is live and optional animation descriptor is valid for
+        // this call. Points are passed by value and validated by C.
+        support::check(unsafe {
+            sys::mln_map_rotate_by_animated(
+                map,
+                first.to_native(),
+                second.to_native(),
+                option_ptr(raw_animation.as_ref()),
+            )
+        })
+    }
+
+    /// Applies a pitch delta command.
+    pub fn pitch_by(&self, pitch: f64) -> Result<()> {
+        let map = self.inner.as_ptr()?;
+        // SAFETY: map is live. The C API validates numeric values.
+        support::check(unsafe { sys::mln_map_pitch_by(map, pitch) })
+    }
+
+    /// Applies an animated pitch delta command.
+    pub fn pitch_by_animated(
+        &self,
+        pitch: f64,
+        animation: Option<&AnimationOptions>,
+    ) -> Result<()> {
+        let map = self.inner.as_ptr()?;
+        let raw_animation = animation.map(AnimationOptions::to_native);
+        // SAFETY: map is live and optional animation descriptor is valid for
+        // this call. The C API validates numeric values.
+        support::check(unsafe {
+            sys::mln_map_pitch_by_animated(map, pitch, option_ptr(raw_animation.as_ref()))
+        })
+    }
+
+    /// Cancels active camera transitions.
+    pub fn cancel_transitions(&self) -> Result<()> {
+        let map = self.inner.as_ptr()?;
+        // SAFETY: map is live.
+        support::check(unsafe { sys::mln_map_cancel_transitions(map) })
+    }
+
+    /// Computes a camera that fits geographic bounds in the current viewport.
+    pub fn camera_for_lat_lng_bounds(
+        &self,
+        bounds: LatLngBounds,
+        fit_options: Option<&CameraFitOptions>,
+    ) -> Result<CameraOptions> {
+        let map = self.inner.as_ptr()?;
+        let raw_fit = fit_options.map(CameraFitOptions::to_native);
+        // SAFETY: Default constructor takes no arguments and initializes size.
+        let mut raw_camera = unsafe { sys::mln_camera_options_default() };
+        // SAFETY: map is live, bounds is passed by value, optional fit options
+        // are valid for this call, and raw_camera is writable.
+        support::check(unsafe {
+            sys::mln_map_camera_for_lat_lng_bounds(
+                map,
+                bounds.to_native(),
+                option_ptr(raw_fit.as_ref()),
+                &mut raw_camera,
+            )
+        })?;
+        Ok(CameraOptions::from_native(raw_camera))
+    }
+
+    /// Computes a camera that fits geographic coordinates in the current viewport.
+    pub fn camera_for_lat_lngs(
+        &self,
+        coordinates: &[LatLng],
+        fit_options: Option<&CameraFitOptions>,
+    ) -> Result<CameraOptions> {
+        let map = self.inner.as_ptr()?;
+        if coordinates.is_empty() {
+            return Err(Error::invalid_argument(
+                "camera_for_lat_lngs requires at least one coordinate",
+            ));
+        }
+        let raw_coordinates = lat_lngs_to_native(coordinates);
+        let raw_fit = fit_options.map(CameraFitOptions::to_native);
+        // SAFETY: Default constructor takes no arguments and initializes size.
+        let mut raw_camera = unsafe { sys::mln_camera_options_default() };
+        // SAFETY: map is live, arrays are valid for coordinate_count non-empty
+        // entries, optional fit options are valid, and raw_camera is writable.
+        support::check(unsafe {
+            sys::mln_map_camera_for_lat_lngs(
+                map,
+                const_ptr_or_null(&raw_coordinates),
+                raw_coordinates.len(),
+                option_ptr(raw_fit.as_ref()),
+                &mut raw_camera,
+            )
+        })?;
+        Ok(CameraOptions::from_native(raw_camera))
+    }
+
+    /// Computes a camera that fits a geometry in the current viewport.
+    pub fn camera_for_geometry(
+        &self,
+        geometry: &Geometry,
+        fit_options: Option<&CameraFitOptions>,
+    ) -> Result<CameraOptions> {
+        let map = self.inner.as_ptr()?;
+        let native_geometry = geometry.to_native();
+        let raw_fit = fit_options.map(CameraFitOptions::to_native);
+        // SAFETY: Default constructor takes no arguments and initializes size.
+        let mut raw_camera = unsafe { sys::mln_camera_options_default() };
+        // SAFETY: map is live, native_geometry owns backing storage for the
+        // duration of this call, optional fit options are valid, and raw_camera
+        // is writable.
+        support::check(unsafe {
+            sys::mln_map_camera_for_geometry(
+                map,
+                native_geometry.as_ptr(),
+                option_ptr(raw_fit.as_ref()),
+                &mut raw_camera,
+            )
+        })?;
+        Ok(CameraOptions::from_native(raw_camera))
+    }
+
+    /// Computes wrapped geographic bounds for a camera in the current viewport.
+    pub fn lat_lng_bounds_for_camera(&self, camera: &CameraOptions) -> Result<LatLngBounds> {
+        let map = self.inner.as_ptr()?;
+        let raw_camera = camera.to_native();
+        let mut raw_bounds = empty_bounds();
+        // SAFETY: map is live, raw_camera is a valid descriptor for this call,
+        // and raw_bounds points to writable storage.
+        support::check(unsafe {
+            sys::mln_map_lat_lng_bounds_for_camera(map, &raw_camera, &mut raw_bounds)
+        })?;
+        Ok(LatLngBounds::from_native(raw_bounds))
+    }
+
+    /// Computes unwrapped geographic bounds for a camera in the current viewport.
+    pub fn lat_lng_bounds_for_camera_unwrapped(
+        &self,
+        camera: &CameraOptions,
+    ) -> Result<LatLngBounds> {
+        let map = self.inner.as_ptr()?;
+        let raw_camera = camera.to_native();
+        let mut raw_bounds = empty_bounds();
+        // SAFETY: map is live, raw_camera is a valid descriptor for this call,
+        // and raw_bounds points to writable storage.
+        support::check(unsafe {
+            sys::mln_map_lat_lng_bounds_for_camera_unwrapped(map, &raw_camera, &mut raw_bounds)
+        })?;
+        Ok(LatLngBounds::from_native(raw_bounds))
+    }
+
+    /// Reads map camera constraint options.
+    pub fn bounds(&self) -> Result<BoundOptions> {
+        let map = self.inner.as_ptr()?;
+        // SAFETY: Default constructor takes no arguments and initializes size.
+        let mut raw = unsafe { sys::mln_bound_options_default() };
+        // SAFETY: map is live and raw has a valid size field for C to fill.
+        support::check(unsafe { sys::mln_map_get_bounds(map, &mut raw) })?;
+        Ok(BoundOptions::from_native(raw))
+    }
+
+    /// Applies selected map camera constraint options.
+    pub fn set_bounds(&self, options: &BoundOptions) -> Result<()> {
+        let map = self.inner.as_ptr()?;
+        let raw = options.to_native();
+        // SAFETY: map is live and raw is a valid descriptor for this call.
+        support::check(unsafe { sys::mln_map_set_bounds(map, &raw) })
+    }
+
+    /// Reads the current free camera position and orientation.
+    pub fn free_camera_options(&self) -> Result<FreeCameraOptions> {
+        let map = self.inner.as_ptr()?;
+        // SAFETY: Default constructor takes no arguments and initializes size.
+        let mut raw = unsafe { sys::mln_free_camera_options_default() };
+        // SAFETY: map is live and raw has a valid size field for C to fill.
+        support::check(unsafe { sys::mln_map_get_free_camera_options(map, &mut raw) })?;
+        Ok(FreeCameraOptions::from_native(raw))
+    }
+
+    /// Applies selected free camera position and orientation fields.
+    pub fn set_free_camera_options(&self, options: &FreeCameraOptions) -> Result<()> {
+        let map = self.inner.as_ptr()?;
+        let raw = options.to_native();
+        // SAFETY: map is live and raw is a valid descriptor for this call.
+        support::check(unsafe { sys::mln_map_set_free_camera_options(map, &raw) })
+    }
+
+    /// Reads current axonometric rendering options.
+    pub fn projection_mode(&self) -> Result<ProjectionMode> {
+        let map = self.inner.as_ptr()?;
+        // SAFETY: Default constructor takes no arguments and initializes size.
+        let mut raw = unsafe { sys::mln_projection_mode_default() };
+        // SAFETY: map is live and raw has a valid size field for C to fill.
+        support::check(unsafe { sys::mln_map_get_projection_mode(map, &mut raw) })?;
+        Ok(ProjectionMode::from_native(raw))
+    }
+
+    /// Applies selected axonometric rendering option fields.
+    pub fn set_projection_mode(&self, mode: &ProjectionMode) -> Result<()> {
+        let map = self.inner.as_ptr()?;
+        let raw = mode.to_native();
+        // SAFETY: map is live and raw is a valid descriptor for this call.
+        support::check(unsafe { sys::mln_map_set_projection_mode(map, &raw) })
+    }
+
+    /// Converts a geographic world coordinate to a screen point for the current map.
+    pub fn pixel_for_lat_lng(&self, coordinate: LatLng) -> Result<ScreenPoint> {
+        let map = self.inner.as_ptr()?;
+        let mut raw_point = empty_screen_point();
+        // SAFETY: map is live, coordinate is passed by value, and raw_point is
+        // writable storage for the output.
+        support::check(unsafe {
+            sys::mln_map_pixel_for_lat_lng(map, coordinate.to_native(), &mut raw_point)
+        })?;
+        Ok(ScreenPoint::from_native(raw_point))
+    }
+
+    /// Converts a screen point to a geographic world coordinate for the current map.
+    pub fn lat_lng_for_pixel(&self, point: ScreenPoint) -> Result<LatLng> {
+        let map = self.inner.as_ptr()?;
+        let mut raw_coordinate = empty_lat_lng();
+        // SAFETY: map is live, point is passed by value, and raw_coordinate is
+        // writable storage for the output.
+        support::check(unsafe {
+            sys::mln_map_lat_lng_for_pixel(map, point.to_native(), &mut raw_coordinate)
+        })?;
+        Ok(LatLng::from_native(raw_coordinate))
+    }
+
+    /// Converts geographic world coordinates to screen points for the current map.
+    pub fn pixels_for_lat_lngs(&self, coordinates: &[LatLng]) -> Result<Vec<ScreenPoint>> {
+        let map = self.inner.as_ptr()?;
+        let raw_coordinates = lat_lngs_to_native(coordinates);
+        let mut raw_points = vec![empty_screen_point(); coordinates.len()];
+        // SAFETY: map is live. Input and output arrays are valid for len
+        // entries, or null when len is 0.
+        support::check(unsafe {
+            sys::mln_map_pixels_for_lat_lngs(
+                map,
+                const_ptr_or_null(&raw_coordinates),
+                raw_coordinates.len(),
+                mut_ptr_or_null(&mut raw_points),
+            )
+        })?;
+        Ok(raw_points
+            .into_iter()
+            .map(ScreenPoint::from_native)
+            .collect())
+    }
+
+    /// Converts screen points to geographic world coordinates for the current map.
+    pub fn lat_lngs_for_pixels(&self, points: &[ScreenPoint]) -> Result<Vec<LatLng>> {
+        let map = self.inner.as_ptr()?;
+        let raw_points = screen_points_to_native(points);
+        let mut raw_coordinates = vec![empty_lat_lng(); points.len()];
+        // SAFETY: map is live. Input and output arrays are valid for len
+        // entries, or null when len is 0.
+        support::check(unsafe {
+            sys::mln_map_lat_lngs_for_pixels(
+                map,
+                const_ptr_or_null(&raw_points),
+                raw_points.len(),
+                mut_ptr_or_null(&mut raw_coordinates),
+            )
+        })?;
+        Ok(raw_coordinates
+            .into_iter()
+            .map(LatLng::from_native)
+            .collect())
+    }
+
+    /// Creates a standalone projection snapshot from the current map transform.
+    pub fn create_projection(&self) -> Result<MapProjectionHandle> {
+        MapProjectionHandle::new(self)
+    }
+}
+
+pub(crate) fn empty_lat_lng() -> sys::mln_lat_lng {
+    sys::mln_lat_lng {
+        latitude: 0.0,
+        longitude: 0.0,
+    }
+}
+
+pub(crate) fn empty_screen_point() -> sys::mln_screen_point {
+    sys::mln_screen_point { x: 0.0, y: 0.0 }
+}
+
+pub(crate) fn empty_bounds() -> sys::mln_lat_lng_bounds {
+    sys::mln_lat_lng_bounds {
+        southwest: empty_lat_lng(),
+        northeast: empty_lat_lng(),
+    }
+}
+
+pub(crate) fn option_ptr<T>(value: Option<&T>) -> *const T {
+    value.map_or(ptr::null(), |value| value as *const T)
+}
+
+pub(crate) fn const_ptr_or_null<T>(values: &[T]) -> *const T {
+    if values.is_empty() {
+        ptr::null()
+    } else {
+        values.as_ptr()
+    }
+}
+
+pub(crate) fn mut_ptr_or_null<T>(values: &mut [T]) -> *mut T {
+    if values.is_empty() {
+        ptr::null_mut()
+    } else {
+        values.as_mut_ptr()
+    }
+}
+
+pub(crate) fn lat_lngs_to_native(coordinates: &[LatLng]) -> Vec<sys::mln_lat_lng> {
+    coordinates.iter().copied().map(LatLng::to_native).collect()
+}
+
+pub(crate) fn screen_points_to_native(points: &[ScreenPoint]) -> Vec<sys::mln_screen_point> {
+    points.iter().copied().map(ScreenPoint::to_native).collect()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{
+        ConstrainMode, EdgeInsets, ErrorKind, MapMode, NorthOrientation, TileLodMode, ViewportMode,
+    };
+
+    const VALID_STYLE_JSON: &str = r#"{"version":8,"sources":{},"layers":[]}"#;
 
     #[test]
     fn map_create_and_close() {
@@ -102,7 +687,7 @@ mod tests {
     #[test]
     fn map_create_with_options_and_close() {
         let runtime = RuntimeHandle::new().unwrap();
-        let options = MapOptions::new(320, 240, 2.0).with_mode(crate::MapMode::Static);
+        let options = MapOptions::new(320, 240, 2.0).with_mode(MapMode::Static);
         let map = MapHandle::with_options(&runtime, &options).unwrap();
 
         map.close().unwrap();
@@ -127,5 +712,191 @@ mod tests {
         drop(runtime);
 
         map.close().unwrap();
+    }
+
+    #[test]
+    fn style_setters_accept_valid_input_and_reject_embedded_nul() {
+        let runtime = RuntimeHandle::new().unwrap();
+        let map = MapHandle::new(&runtime).unwrap();
+
+        map.set_style_json(VALID_STYLE_JSON).unwrap();
+        map.set_style_url("https://example.com/style.json").unwrap();
+
+        let error = map
+            .set_style_url("https://example.com/\0style.json")
+            .unwrap_err();
+        assert_eq!(error.kind(), ErrorKind::InvalidArgument);
+        assert_eq!(error.raw_status(), None);
+        assert!(error.diagnostic().contains("embedded NUL"));
+
+        let error = map.set_style_json("{").unwrap_err();
+        assert!(matches!(
+            error.kind(),
+            ErrorKind::InvalidArgument | ErrorKind::NativeError
+        ));
+        assert!(error.raw_status().is_some());
+        assert!(!error.diagnostic().trim().is_empty());
+
+        map.close().unwrap();
+        runtime.close().unwrap();
+    }
+
+    #[test]
+    fn camera_jump_and_coordinate_conversions_round_trip() {
+        let runtime = RuntimeHandle::new().unwrap();
+        let map = RuntimeHandle::create_map_with_options(
+            &runtime,
+            &MapOptions::new(512, 512, 1.0).with_mode(MapMode::Continuous),
+        )
+        .unwrap();
+        let center = LatLng::new(45.0, -122.0);
+
+        map.jump_to(&CameraOptions::new().with_center(center).with_zoom(4.0))
+            .unwrap();
+        let camera = map.camera().unwrap();
+        assert_eq!(camera.center, Some(center));
+        assert_eq!(camera.zoom, Some(4.0));
+
+        let point = map.pixel_for_lat_lng(center).unwrap();
+        let round_tripped = map.lat_lng_for_pixel(point).unwrap();
+        assert!((round_tripped.latitude - center.latitude).abs() < 1e-7);
+        assert!((round_tripped.longitude - center.longitude).abs() < 1e-7);
+
+        let points = map.pixels_for_lat_lngs(&[center]).unwrap();
+        let coordinates = map.lat_lngs_for_pixels(&points).unwrap();
+        assert_eq!(points.len(), 1);
+        assert!((coordinates[0].latitude - center.latitude).abs() < 1e-7);
+        assert!((coordinates[0].longitude - center.longitude).abs() < 1e-7);
+
+        map.close().unwrap();
+        runtime.close().unwrap();
+    }
+
+    #[test]
+    fn camera_commands_and_queries_use_real_c_api() {
+        let runtime = RuntimeHandle::new().unwrap();
+        let map = MapHandle::new(&runtime).unwrap();
+        let camera = CameraOptions::new()
+            .with_center(LatLng::new(0.0, 0.0))
+            .with_zoom(1.0);
+        let animation = AnimationOptions::new().with_duration_ms(0.0);
+
+        map.ease_to(&camera, Some(&animation)).unwrap();
+        map.fly_to(&camera, Some(&animation)).unwrap();
+        map.move_by(0.0, 0.0).unwrap();
+        map.move_by_animated(0.0, 0.0, Some(&animation)).unwrap();
+        map.scale_by(1.0, Some(ScreenPoint::new(128.0, 128.0)))
+            .unwrap();
+        map.scale_by_animated(1.0, None, Some(&animation)).unwrap();
+        map.rotate_by(ScreenPoint::new(0.0, 0.0), ScreenPoint::new(0.0, 0.0))
+            .unwrap();
+        map.rotate_by_animated(
+            ScreenPoint::new(0.0, 0.0),
+            ScreenPoint::new(0.0, 0.0),
+            Some(&animation),
+        )
+        .unwrap();
+        map.pitch_by(0.0).unwrap();
+        map.pitch_by_animated(0.0, Some(&animation)).unwrap();
+        map.cancel_transitions().unwrap();
+
+        let bounds = LatLngBounds::new(LatLng::new(-1.0, -1.0), LatLng::new(1.0, 1.0));
+        let fit = CameraFitOptions::new().with_padding(EdgeInsets::new(1.0, 1.0, 1.0, 1.0));
+        map.camera_for_lat_lng_bounds(bounds, Some(&fit)).unwrap();
+        map.camera_for_lat_lngs(&[LatLng::new(0.0, 0.0), LatLng::new(1.0, 1.0)], Some(&fit))
+            .unwrap();
+        let error = map.camera_for_lat_lngs(&[], Some(&fit)).unwrap_err();
+        assert_eq!(error.kind(), ErrorKind::InvalidArgument);
+        assert_eq!(error.raw_status(), None);
+        assert!(error.diagnostic().contains("at least one coordinate"));
+        map.camera_for_geometry(
+            &Geometry::LineString(vec![LatLng::new(0.0, 0.0), LatLng::new(1.0, 1.0)]),
+            Some(&fit),
+        )
+        .unwrap();
+        map.lat_lng_bounds_for_camera(&camera).unwrap();
+        map.lat_lng_bounds_for_camera_unwrapped(&camera).unwrap();
+
+        map.close().unwrap();
+        runtime.close().unwrap();
+    }
+
+    #[test]
+    fn map_state_viewport_tile_debug_and_projection_mode_round_trip() {
+        let runtime = RuntimeHandle::new().unwrap();
+        let map = MapHandle::new(&runtime).unwrap();
+
+        map.set_debug_options(MapDebugOptions::TILE_BORDERS | MapDebugOptions::PARSE_STATUS)
+            .unwrap();
+        let debug = map.debug_options().unwrap();
+        assert!(debug.contains(MapDebugOptions::TILE_BORDERS));
+        assert!(debug.contains(MapDebugOptions::PARSE_STATUS));
+
+        map.set_rendering_stats_view_enabled(true).unwrap();
+        assert!(map.rendering_stats_view_enabled().unwrap());
+        assert!(!map.is_fully_loaded().unwrap());
+        map.dump_debug_logs().unwrap();
+
+        let viewport = MapViewportOptions::new()
+            .with_north_orientation(NorthOrientation::Up)
+            .with_constrain_mode(ConstrainMode::HeightOnly)
+            .with_viewport_mode(ViewportMode::Default)
+            .with_frustum_offset(EdgeInsets::new(0.0, 0.0, 0.0, 0.0));
+        map.set_viewport_options(&viewport).unwrap();
+        let copied_viewport = map.viewport_options().unwrap();
+        assert_eq!(
+            copied_viewport.north_orientation,
+            Some(NorthOrientation::Up)
+        );
+        assert_eq!(
+            copied_viewport.constrain_mode,
+            Some(ConstrainMode::HeightOnly)
+        );
+        assert_eq!(copied_viewport.viewport_mode, Some(ViewportMode::Default));
+
+        let tile = MapTileOptions::new()
+            .with_prefetch_zoom_delta(1)
+            .with_lod_mode(TileLodMode::Default);
+        map.set_tile_options(&tile).unwrap();
+        let copied_tile = map.tile_options().unwrap();
+        assert_eq!(copied_tile.prefetch_zoom_delta, Some(1));
+        assert_eq!(copied_tile.lod_mode, Some(TileLodMode::Default));
+
+        let projection_mode = ProjectionMode::new()
+            .with_axonometric(false)
+            .with_x_skew(0.0)
+            .with_y_skew(0.0);
+        map.set_projection_mode(&projection_mode).unwrap();
+        let copied_projection_mode = map.projection_mode().unwrap();
+        assert_eq!(copied_projection_mode.axonometric, Some(false));
+
+        map.close().unwrap();
+        runtime.close().unwrap();
+    }
+
+    #[test]
+    fn bounds_and_free_camera_operations_call_c_api() {
+        let runtime = RuntimeHandle::new().unwrap();
+        let map = MapHandle::new(&runtime).unwrap();
+
+        let bounds = BoundOptions::new()
+            .with_bounds(LatLngBounds::new(
+                LatLng::new(-10.0, -20.0),
+                LatLng::new(10.0, 20.0),
+            ))
+            .with_min_zoom(0.0)
+            .with_max_zoom(20.0)
+            .with_min_pitch(0.0)
+            .with_max_pitch(60.0);
+        map.set_bounds(&bounds).unwrap();
+        let copied_bounds = map.bounds().unwrap();
+        assert_eq!(copied_bounds.min_zoom, Some(0.0));
+        assert_eq!(copied_bounds.max_zoom, Some(20.0));
+
+        let free = map.free_camera_options().unwrap();
+        map.set_free_camera_options(&free).unwrap();
+
+        map.close().unwrap();
+        runtime.close().unwrap();
     }
 }

@@ -5,6 +5,7 @@ mod geometry;
 mod handle;
 mod map;
 mod options;
+mod projection;
 mod runtime;
 mod values;
 
@@ -13,6 +14,7 @@ use maplibre_native_sys as sys;
 
 pub use camera::{
     AnimationOptions, BoundOptions, CameraFitOptions, CameraOptions, FreeCameraOptions,
+    ProjectionMode,
 };
 pub use geometry::Geometry;
 pub use map::MapHandle;
@@ -20,6 +22,7 @@ pub use options::{
     ConstrainMode, MapDebugOptions, MapMode, MapOptions, MapTileOptions, MapViewportOptions,
     NorthOrientation, TileLodMode, ViewportMode,
 };
+pub use projection::MapProjectionHandle;
 pub use runtime::RuntimeHandle;
 pub use support::{Error, ErrorKind, Result};
 pub use values::{
@@ -136,6 +139,7 @@ mod tests {
 
     assert_not_impl_any!(RuntimeHandle: Send, Sync);
     assert_not_impl_any!(MapHandle: Send, Sync);
+    assert_not_impl_any!(MapProjectionHandle: Send, Sync);
 
     struct NetworkStatusRestore(NetworkStatus);
 
