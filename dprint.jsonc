@@ -9,6 +9,9 @@
   "newLineKind": "auto",
   "excludes": [
     "build*/**",
+    "**/build/**",
+    "**/.gradle/**",
+    "**/.kotlin/**",
     "third_party/**",
     "zig-out/**",
     ".zig-cache/**",
