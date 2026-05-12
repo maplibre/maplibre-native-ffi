@@ -8,8 +8,10 @@ use maplibre_native_sys as sys;
 
 use crate::events::{MapId, RuntimeEvent, RuntimeEventSource, empty_runtime_event};
 use crate::handle::{ThreadAffineNativeHandle, closed_handle_error, out_handle};
-use crate::resource::{ResourceTransformState, noop_resource_transform_descriptor};
-use crate::{Error, ErrorKind, MapHandle, MapOptions, Result};
+use crate::resource::{
+    ResourceProviderState, ResourceTransformState, noop_resource_transform_descriptor,
+};
+use crate::{Error, ErrorKind, MapHandle, MapOptions, ResourceProviderDecision, Result};
 
 #[derive(Debug)]
 pub(crate) struct RuntimeState {
@@ -18,6 +20,7 @@ pub(crate) struct RuntimeState {
     has_created_map: Cell<bool>,
     map_ids: RefCell<HashMap<usize, MapId>>,
     resource_transform: RefCell<Option<Box<ResourceTransformState>>>,
+    resource_provider: RefCell<Option<Box<ResourceProviderState>>>,
 }
 
 impl RuntimeState {
@@ -33,6 +36,7 @@ impl RuntimeState {
             has_created_map: Cell::new(false),
             map_ids: RefCell::new(HashMap::new()),
             resource_transform: RefCell::new(None),
+            resource_provider: RefCell::new(None),
         }
     }
 
@@ -52,6 +56,28 @@ impl RuntimeState {
     fn close(&self) -> Result<()> {
         self.handle.close()?;
         self.resource_transform.borrow_mut().take();
+        self.resource_provider.borrow_mut().take();
+        Ok(())
+    }
+
+    fn set_resource_provider<F>(&self, callback: F) -> Result<()>
+    where
+        F: Fn(crate::ResourceRequest, crate::ResourceRequestHandle) -> ResourceProviderDecision
+            + Send
+            + Sync
+            + 'static,
+    {
+        self.check_resource_callbacks_allowed()?;
+        let runtime = self.as_ptr()?;
+        let replacement = ResourceProviderState::new(callback);
+        let descriptor = replacement.descriptor();
+
+        // SAFETY: runtime is live. descriptor contains a C trampoline and a
+        // user_data pointer to replacement, which remains alive on success. On
+        // failure, native preserves the previous provider and replacement is
+        // dropped below.
+        support::check(unsafe { sys::mln_runtime_set_resource_provider(runtime, &descriptor) })?;
+        self.resource_provider.borrow_mut().replace(replacement);
         Ok(())
     }
 
@@ -59,7 +85,7 @@ impl RuntimeState {
     where
         F: Fn(crate::ResourceTransformRequest) -> Option<String> + Send + Sync + 'static,
     {
-        self.check_resource_transform_allowed()?;
+        self.check_resource_callbacks_allowed()?;
         let runtime = self.as_ptr()?;
         let replacement = ResourceTransformState::new(callback);
         let descriptor = replacement.descriptor();
@@ -74,7 +100,7 @@ impl RuntimeState {
     }
 
     fn clear_resource_transform(&self) -> Result<()> {
-        self.check_resource_transform_allowed()?;
+        self.check_resource_callbacks_allowed()?;
         let runtime = self.as_ptr()?;
         let descriptor = noop_resource_transform_descriptor();
 
@@ -86,12 +112,12 @@ impl RuntimeState {
         Ok(())
     }
 
-    fn check_resource_transform_allowed(&self) -> Result<()> {
+    fn check_resource_callbacks_allowed(&self) -> Result<()> {
         if self.has_created_map.get() {
             return Err(Error::new(
                 ErrorKind::InvalidState,
                 None,
-                "resource transforms must be configured before creating maps from the runtime",
+                "resource callbacks must be configured before creating maps from the runtime",
             ));
         }
         Ok(())
@@ -163,6 +189,27 @@ impl RuntimeHandle {
     /// Creates a map owned by this runtime with explicit map options.
     pub fn create_map_with_options(&self, options: &MapOptions) -> Result<MapHandle> {
         MapHandle::with_options(self, options)
+    }
+
+    /// Installs or replaces the runtime-scoped network resource provider.
+    ///
+    /// The provider must be installed before creating maps from this runtime.
+    /// Native code may invoke it from worker or network threads, so the closure
+    /// must be thread-safe and `'static`. Keep the closure quick, and do not
+    /// call map or runtime APIs from it. Return `PassThrough` to let native
+    /// networking handle the request. Return `Handle` to complete or release
+    /// the provided `ResourceRequestHandle` inline or later. If the callback
+    /// completes the handle inline, the wrapper returns native `Handle` even
+    /// when the closure returns `PassThrough`, preventing native double
+    /// handling.
+    pub fn set_resource_provider<F>(&self, callback: F) -> Result<()>
+    where
+        F: Fn(crate::ResourceRequest, crate::ResourceRequestHandle) -> ResourceProviderDecision
+            + Send
+            + Sync
+            + 'static,
+    {
+        self.inner.set_resource_provider(callback)
     }
 
     /// Installs or replaces the runtime-scoped network URL transform.
@@ -265,9 +312,29 @@ impl RuntimeHandle {
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::time::Duration;
 
     use super::*;
-    use crate::{ErrorKind, ResourceKind, RuntimeEventSource, RuntimeEventType};
+    use crate::{
+        ErrorKind, ResourceKind, ResourceProviderDecision, ResourceResponse, RuntimeEventSource,
+        RuntimeEventType,
+    };
+
+    const PROVIDER_STYLE_JSON: &str = r#"{"version":8,"sources":{},"layers":[]}"#;
+
+    fn wait_for_runtime_event(runtime: &RuntimeHandle, event_type: RuntimeEventType) -> bool {
+        for _ in 0..100 {
+            let _ = runtime.run_once();
+            while let Ok(Some(event)) = runtime.poll_event() {
+                if event.event_type == event_type {
+                    return true;
+                }
+            }
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        false
+    }
 
     #[test]
     fn runtime_create_run_poll_drain_and_close() {
@@ -285,6 +352,157 @@ mod tests {
         let runtime = RuntimeHandle::new().unwrap();
 
         runtime.close().unwrap();
+        runtime.close().unwrap();
+    }
+
+    #[test]
+    fn resource_provider_installs_replaces_and_releases_state() {
+        let runtime = RuntimeHandle::new().unwrap();
+        let first = Arc::new(());
+        let first_callback = Arc::clone(&first);
+
+        runtime
+            .set_resource_provider(move |_, _| {
+                let _ = &first_callback;
+                crate::ResourceProviderDecision::PassThrough
+            })
+            .unwrap();
+        assert_eq!(Arc::strong_count(&first), 2);
+
+        let second = Arc::new(());
+        let second_callback = Arc::clone(&second);
+        runtime
+            .set_resource_provider(move |_, _| {
+                let _ = &second_callback;
+                crate::ResourceProviderDecision::PassThrough
+            })
+            .unwrap();
+        assert_eq!(Arc::strong_count(&first), 1);
+        assert_eq!(Arc::strong_count(&second), 2);
+
+        runtime.close().unwrap();
+        assert_eq!(Arc::strong_count(&second), 1);
+    }
+
+    #[test]
+    fn resource_provider_replacement_rolls_back_when_native_install_fails() {
+        let runtime = RuntimeHandle::new().unwrap();
+        let first = Arc::new(());
+        let first_callback = Arc::clone(&first);
+        runtime
+            .set_resource_provider(move |_, _| {
+                let _ = &first_callback;
+                crate::ResourceProviderDecision::PassThrough
+            })
+            .unwrap();
+        let map = runtime.create_map().unwrap();
+
+        let second = Arc::new(());
+        let second_callback = Arc::clone(&second);
+        let error = runtime
+            .set_resource_provider(move |_, _| {
+                let _ = &second_callback;
+                crate::ResourceProviderDecision::PassThrough
+            })
+            .unwrap_err();
+
+        assert_eq!(error.kind(), ErrorKind::InvalidState);
+        assert_eq!(Arc::strong_count(&first), 2);
+        assert_eq!(Arc::strong_count(&second), 1);
+
+        map.close().unwrap();
+        runtime.close().unwrap();
+        assert_eq!(Arc::strong_count(&first), 1);
+    }
+
+    #[test]
+    fn resource_provider_rejects_install_after_map_was_closed() {
+        let runtime = RuntimeHandle::new().unwrap();
+        let map = runtime.create_map().unwrap();
+        map.close().unwrap();
+
+        let error = runtime
+            .set_resource_provider(|_, _| ResourceProviderDecision::PassThrough)
+            .unwrap_err();
+
+        assert_eq!(error.kind(), ErrorKind::InvalidState);
+        assert_eq!(error.raw_status(), None);
+        runtime.close().unwrap();
+    }
+
+    #[test]
+    fn resource_provider_completes_style_request_inline_through_c_abi() {
+        let runtime = RuntimeHandle::new().unwrap();
+        let calls = Arc::new(AtomicUsize::new(0));
+        let callback_calls = Arc::clone(&calls);
+        runtime
+            .set_resource_provider(move |request, handle| {
+                if request.url != "custom://style.json" {
+                    return ResourceProviderDecision::PassThrough;
+                }
+                callback_calls.fetch_add(1, Ordering::SeqCst);
+                assert_eq!(request.kind, ResourceKind::Style);
+                handle
+                    .complete(ResourceResponse::ok(
+                        PROVIDER_STYLE_JSON.as_bytes().to_vec(),
+                    ))
+                    .unwrap();
+                assert!(handle.complete(ResourceResponse::no_content()).is_err());
+                assert!(handle.is_cancelled().is_err());
+                ResourceProviderDecision::PassThrough
+            })
+            .unwrap();
+
+        let map = runtime.create_map().unwrap();
+        map.set_style_url("custom://style.json").unwrap();
+
+        assert!(wait_for_runtime_event(
+            &runtime,
+            RuntimeEventType::MapStyleLoaded
+        ));
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+        map.close().unwrap();
+        runtime.close().unwrap();
+    }
+
+    #[test]
+    fn resource_provider_completes_style_request_from_another_thread() {
+        let runtime = RuntimeHandle::new().unwrap();
+        let (sender, receiver) = std::sync::mpsc::channel();
+        runtime
+            .set_resource_provider(move |request, handle| {
+                if request.url == "custom://async-style.json" {
+                    sender.send(handle).unwrap();
+                    ResourceProviderDecision::Handle
+                } else {
+                    ResourceProviderDecision::PassThrough
+                }
+            })
+            .unwrap();
+
+        let map = runtime.create_map().unwrap();
+        map.set_style_url("custom://async-style.json").unwrap();
+        let handle = receiver
+            .recv_timeout(Duration::from_secs(5))
+            .expect("provider should send handled request");
+        assert!(!handle.is_cancelled().unwrap());
+        std::thread::spawn(move || {
+            handle
+                .complete(ResourceResponse::ok(
+                    PROVIDER_STYLE_JSON.as_bytes().to_vec(),
+                ))
+                .unwrap();
+            assert!(handle.complete(ResourceResponse::no_content()).is_err());
+            handle.close();
+        })
+        .join()
+        .unwrap();
+
+        assert!(wait_for_runtime_event(
+            &runtime,
+            RuntimeEventType::MapStyleLoaded
+        ));
+        map.close().unwrap();
         runtime.close().unwrap();
     }
 

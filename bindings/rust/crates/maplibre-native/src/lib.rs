@@ -36,7 +36,11 @@ pub use options::{
     NorthOrientation, TileLodMode, ViewportMode,
 };
 pub use projection::MapProjectionHandle;
-pub use resource::{ResourceKind, ResourceTransformRequest};
+pub use resource::{
+    ByteRange, ResourceKind, ResourceLoadingMethod, ResourcePriority, ResourceProviderDecision,
+    ResourceRequest, ResourceRequestHandle, ResourceResponse, ResourceResponseStatus,
+    ResourceStoragePolicy, ResourceTransformRequest, ResourceUsage,
+};
 pub use runtime::RuntimeHandle;
 pub use support::{Error, ErrorKind, Result};
 pub use values::{
