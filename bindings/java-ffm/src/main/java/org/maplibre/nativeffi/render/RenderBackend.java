@@ -5,7 +5,8 @@ import java.util.EnumSet;
 /** Render backend support flag reported by the native library build. */
 public enum RenderBackend {
   METAL(1),
-  VULKAN(1 << 1);
+  VULKAN(1 << 1),
+  OPENGL(1 << 2);
 
   private final int nativeMask;
 

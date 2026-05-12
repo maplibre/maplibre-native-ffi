@@ -3,6 +3,7 @@
 
 # include/maplibre_native_c/base.h
 --include-constant MLN_RENDER_BACKEND_FLAG_METAL
+--include-constant MLN_RENDER_BACKEND_FLAG_OPENGL
 --include-constant MLN_RENDER_BACKEND_FLAG_VULKAN
 --include-constant MLN_STATUS_INVALID_ARGUMENT
 --include-constant MLN_STATUS_INVALID_STATE
