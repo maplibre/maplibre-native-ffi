@@ -186,6 +186,39 @@ final class RenderSessionHandleTest {
   }
 
   @Test
+  void vulkanOwnedTextureFrameLeaseStaysActiveUntilClosed() throws Exception {
+    Maplibre.setLogCallback(record -> true);
+    Maplibre.setAsyncLogSeverities(EnumSet.noneOf(LogSeverity.class));
+
+    var runtime = RuntimeHandle.create();
+    var map = MapHandle.create(runtime, new MapOptions().size(64, 64));
+    RenderSessionHandle session = null;
+    try {
+      session = assumeVulkanOwnedTextureSession(map);
+      var activeSession = session;
+      map.setStyleJson(STYLE_JSON);
+      waitForMapEvent(runtime, map, RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE);
+      activeSession.renderUpdate();
+
+      VulkanOwnedTextureFrame frame;
+      try (var lease = activeSession.acquireVulkanOwnedTextureFrame()) {
+        frame = lease.frame();
+        assertEquals(32, frame.width());
+        assertFalse(lease.isClosed());
+        assertThrows(InvalidStateException.class, activeSession::renderUpdate);
+      }
+      assertThrows(IllegalStateException.class, frame::width);
+      activeSession.renderUpdate();
+    } finally {
+      if (session != null) {
+        session.close();
+      }
+      map.close();
+      runtime.close();
+    }
+  }
+
+  @Test
   void renderTargetDescriptorsTrackOptionalFields() {
     var vulkanBorrowed = new VulkanBorrowedTextureDescriptor();
     assertFalse(vulkanBorrowed.hasFinalLayout());

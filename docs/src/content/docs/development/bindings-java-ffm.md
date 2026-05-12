@@ -155,8 +155,15 @@ alive. Closing the map while a session is live reports native invalid state.
 Texture readback supports reusable off-heap storage through `NativeBuffer` and a
 convenience path that returns a copied `PremultipliedRgba8Image`.
 
-Owned texture frame access uses closure-scoped helpers. The helper acquires the
-native frame, exposes copied metadata and scoped `NativePointer` values,
-releases the frame in `finally`, and invalidates the frame scope after the
-callback returns or fails. Scoped frame values and pointers reject access after
-the callback.
+Owned texture frame access uses closure-scoped helpers for most callers. The
+helper acquires the native frame, exposes copied metadata and scoped
+`NativePointer` values, releases the frame in `finally`, and invalidates the
+frame scope after the callback returns or fails. Scoped frame values and
+pointers reject access after the callback.
+
+Vulkan integrations that must keep a MapLibre-owned image alive until GPU work
+finishes can use `RenderSessionHandle.acquireVulkanOwnedTextureFrame()`. The
+returned `VulkanOwnedTextureFrameLease` is an explicit `AutoCloseable` lease.
+Callers synchronize GPU use, close the lease on the render session owner thread,
+and close it before resize, another render update, detach, or session
+destruction.

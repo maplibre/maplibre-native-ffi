@@ -363,25 +363,34 @@ public final class RenderSessionHandle implements AutoCloseable {
   public <T> T withVulkanOwnedTextureFrame(Function<VulkanOwnedTextureFrame, T> callback) {
     NativeAccess.ensureLoaded();
     Objects.requireNonNull(callback, "callback");
-    try (var arena = Arena.ofConfined()) {
-      var frameSegment = RenderStructs.vulkanOwnedTextureFrame(arena);
+    try (var lease = acquireVulkanOwnedTextureFrame()) {
+      return callback.apply(lease.frame());
+    }
+  }
+
+  /**
+   * Acquires an explicit Vulkan session-owned texture frame lease.
+   *
+   * <p>This advanced API is intended for integrations that submit GPU work using the returned image
+   * and need to release it after an external fence signals. The returned lease must be closed on
+   * the render session owner thread after GPU work using {@link VulkanOwnedTextureFrame#image()} or
+   * {@link VulkanOwnedTextureFrame#imageView()} has completed. While the lease is open, the native
+   * session rejects resize, render, detach, destroy, and second-acquire operations.
+   */
+  public VulkanOwnedTextureFrameLease acquireVulkanOwnedTextureFrame() {
+    NativeAccess.ensureLoaded();
+    var arena = Arena.ofConfined();
+    var frameSegment = RenderStructs.vulkanOwnedTextureFrame(arena);
+    try {
       Status.check(
           MapLibreNativeC.mln_vulkan_owned_texture_acquire_frame(
               state.requireLive(), frameSegment));
       var scope = new FrameScope();
-      Throwable callbackFailure = null;
-      try {
-        return callback.apply(vulkanOwnedTextureFrame(frameSegment, scope));
-      } catch (Throwable throwable) {
-        callbackFailure = throwable;
-        throw throwable;
-      } finally {
-        try {
-          releaseVulkanFrame(frameSegment, callbackFailure);
-        } finally {
-          scope.close();
-        }
-      }
+      return new VulkanOwnedTextureFrameLease(
+          this, arena, frameSegment, scope, vulkanOwnedTextureFrame(frameSegment, scope));
+    } catch (Throwable throwable) {
+      arena.close();
+      throw throwable;
     }
   }
 
@@ -491,7 +500,7 @@ public final class RenderSessionHandle implements AutoCloseable {
     }
   }
 
-  private void releaseVulkanFrame(MemorySegment frameSegment, Throwable callbackFailure) {
+  void releaseVulkanFrame(MemorySegment frameSegment, Throwable callbackFailure) {
     try {
       Status.check(
           MapLibreNativeC.mln_vulkan_owned_texture_release_frame(
