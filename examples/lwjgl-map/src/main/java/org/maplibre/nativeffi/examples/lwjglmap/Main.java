@@ -47,9 +47,7 @@ public final class Main {
   private static RenderTargetMode parseArgs(String[] args) {
     var mode = RenderTargetMode.OWNED_TEXTURE;
     for (var arg : args) {
-      if (arg.equals("--help") || arg.equals("-h")) {
-        usageAndExit();
-      } else if (arg.startsWith("--render-target=")) {
+      if (arg.startsWith("--render-target=")) {
         mode = RenderTargetMode.parse(arg.substring("--render-target=".length()));
       } else if (!arg.startsWith("-")) {
         mode = RenderTargetMode.parse(arg);
@@ -58,17 +56,6 @@ public final class Main {
       }
     }
     return mode;
-  }
-
-  private static void usageAndExit() {
-    System.out.println("Usage: lwjgl-map [--render-target=owned-texture|native-surface]");
-    System.out.println("       lwjgl-map [owned-texture|native-surface]");
-    System.out.println();
-    System.out.println("Render targets:");
-    for (var mode : RenderTargetMode.values()) {
-      System.out.println("  " + mode.cliName() + " - " + mode.status());
-    }
-    System.exit(0);
   }
 
   private static void installResizeCallbacks(long window, ViewportHolder viewport) {

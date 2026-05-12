@@ -330,24 +330,33 @@ public final class RenderSessionHandle implements AutoCloseable {
   public <T> T withMetalOwnedTextureFrame(Function<MetalOwnedTextureFrame, T> callback) {
     NativeAccess.ensureLoaded();
     Objects.requireNonNull(callback, "callback");
-    try (var arena = Arena.ofConfined()) {
-      var frameSegment = RenderStructs.metalOwnedTextureFrame(arena);
+    try (var lease = acquireMetalOwnedTextureFrame()) {
+      return callback.apply(lease.frame());
+    }
+  }
+
+  /**
+   * Acquires an explicit Metal session-owned texture frame lease.
+   *
+   * <p>This advanced API is intended for integrations that submit GPU work using the returned
+   * texture and need to release it after that work completes. The returned lease must be closed on
+   * the render session owner thread after GPU work using {@link MetalOwnedTextureFrame#texture()}
+   * has completed. While the lease is open, the native session rejects resize, render, detach,
+   * destroy, and second-acquire operations.
+   */
+  public MetalOwnedTextureFrameLease acquireMetalOwnedTextureFrame() {
+    NativeAccess.ensureLoaded();
+    var arena = Arena.ofConfined();
+    var frameSegment = RenderStructs.metalOwnedTextureFrame(arena);
+    try {
       Status.check(
           MapLibreNativeC.mln_metal_owned_texture_acquire_frame(state.requireLive(), frameSegment));
       var scope = new FrameScope();
-      Throwable callbackFailure = null;
-      try {
-        return callback.apply(metalOwnedTextureFrame(frameSegment, scope));
-      } catch (Throwable throwable) {
-        callbackFailure = throwable;
-        throw throwable;
-      } finally {
-        try {
-          releaseMetalFrame(frameSegment, callbackFailure);
-        } finally {
-          scope.close();
-        }
-      }
+      return new MetalOwnedTextureFrameLease(
+          this, arena, frameSegment, scope, metalOwnedTextureFrame(frameSegment, scope));
+    } catch (Throwable throwable) {
+      arena.close();
+      throw throwable;
     }
   }
 
@@ -487,7 +496,7 @@ public final class RenderSessionHandle implements AutoCloseable {
         : NativePointer.scoped(segment.address(), scope);
   }
 
-  private void releaseMetalFrame(MemorySegment frameSegment, Throwable callbackFailure) {
+  void releaseMetalFrame(MemorySegment frameSegment, Throwable callbackFailure) {
     try {
       Status.check(
           MapLibreNativeC.mln_metal_owned_texture_release_frame(state.requireLive(), frameSegment));
