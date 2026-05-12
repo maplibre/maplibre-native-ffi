@@ -1,6 +1,7 @@
 const std = @import("std");
 const build_options = @import("build_options");
 const testing = std.testing;
+const egl_support = @import("egl_support.zig");
 const support = @import("support.zig");
 const c = support.c;
 
@@ -173,4 +174,49 @@ test "WGL surface attach rejects invalid arguments" {
     const defaults = c.mln_wgl_surface_descriptor_default();
     try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, c.mln_wgl_surface_attach(map, &defaults, &session));
     try testing.expectEqual(@as(?*c.mln_render_session, null), session);
+}
+
+// ── EGL surface lifecycle test ───────────────────────────────────────────────
+
+test "EGL surface lifecycle and render update" {
+    var egl = egl_support.create(64, 64) catch |err| switch (err) {
+        error.SkipZigTest => return error.SkipZigTest,
+        // EGL unavailable in this environment (no surfaceless driver, etc.).
+        else => return error.SkipZigTest,
+    };
+    defer egl_support.destroy(&egl);
+    try support.suppressLogs();
+    defer support.restoreLogs();
+
+    const runtime = try support.createRuntime();
+    defer support.destroyRuntime(runtime);
+    const map = try support.createMap(runtime);
+    defer support.destroyMap(map);
+
+    var descriptor = c.mln_egl_surface_descriptor_default();
+    descriptor.width = 64;
+    descriptor.height = 64;
+    descriptor.display = egl.display;
+    descriptor.config = egl.config;
+    descriptor.context = egl.context;
+    descriptor.surface = egl.surface;
+
+    var session: ?*c.mln_render_session = null;
+    try testing.expectEqual(c.MLN_STATUS_OK, c.mln_egl_surface_attach(map, &descriptor, &session));
+
+    // Only one surface session per map at a time.
+    var texture_descriptor = c.mln_owned_texture_descriptor_default();
+    var texture: ?*c.mln_render_session = null;
+    try testing.expectEqual(c.MLN_STATUS_INVALID_STATE, c.mln_owned_texture_attach(map, &texture_descriptor, &texture));
+    try testing.expectEqual(@as(?*c.mln_render_session, null), texture);
+
+    try testing.expectEqual(c.MLN_STATUS_OK, c.mln_map_set_style_json(map, support.style_json));
+    _ = try support.waitForEvent(runtime, map, c.MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE);
+    try testing.expectEqual(c.MLN_STATUS_OK, c.mln_render_session_render_update(session.?));
+
+    try testing.expectEqual(c.MLN_STATUS_OK, c.mln_render_session_resize(session.?, 32, 32, 2.0));
+    try testing.expectEqual(c.MLN_STATUS_OK, c.mln_render_session_detach(session.?));
+    try testing.expectEqual(c.MLN_STATUS_INVALID_STATE, c.mln_render_session_render_update(session.?));
+    try testing.expectEqual(c.MLN_STATUS_OK, c.mln_render_session_destroy(session.?));
+    try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, c.mln_render_session_destroy(session.?));
 }

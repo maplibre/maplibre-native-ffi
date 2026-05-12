@@ -87,13 +87,17 @@ fn addCTests(b: *std.Build, options: BuildOptions) *std.Build.Step.Compile {
             .windows => {
                 c_tests.root_module.linkSystemLibrary("OpenGL32", .{});
             },
-            else => {
-                // The test binary does not call EGL directly; all GL/EGL calls
-                // go through libmaplibre-native-c.so which carries its own
-                // RUNPATH to pixi's libEGL.so. Linking -lEGL here would pull
-                // in the system GLVND dispatcher as a second EGL instance,
-                // splitting EGL state and causing eglMakeCurrent to fail.
+            .linux => {
+                // egl_support_linux.c creates a real EGL pbuffer for the
+                // lifecycle test. It uses dlopen/dlsym so the test binary
+                // avoids linking -lEGL directly, which would risk pulling in
+                // the system GLVND dispatcher as a second EGL instance.
+                c_tests.root_module.addCSourceFile(.{
+                    .file = b.path("tests/c/egl_support_linux.c"),
+                });
+                c_tests.root_module.linkSystemLibrary("dl", .{});
             },
+            else => {},
         }
     }
     return c_tests;
