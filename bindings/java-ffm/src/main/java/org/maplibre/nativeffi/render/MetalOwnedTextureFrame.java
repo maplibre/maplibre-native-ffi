@@ -1,6 +1,6 @@
 package org.maplibre.nativeffi.render;
 
-/** Borrowed Metal texture frame valid only during the frame callback. */
+/** Borrowed Metal texture frame valid only while its frame handle is open. */
 public final class MetalOwnedTextureFrame {
   private final FrameScope scope;
   private final long generation;

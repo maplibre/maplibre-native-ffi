@@ -1,6 +1,6 @@
 package org.maplibre.nativeffi.render;
 
-/** Borrowed Vulkan texture frame valid only during the frame callback. */
+/** Borrowed Vulkan texture frame valid only while its frame handle is open. */
 public final class VulkanOwnedTextureFrame {
   private final FrameScope scope;
   private final long generation;

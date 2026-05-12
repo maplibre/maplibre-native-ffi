@@ -223,13 +223,12 @@ native handles after copying, even when copying fails. A lazy view tied to a
 native snapshot handle owns and releases that handle and never exposes
 free-floating borrowed views.
 
-A callback-scoped borrow exposes native data only during a language callback.
-The binding acquires the borrow before invoking the callback and releases it
-after the callback returns or fails. Texture frames use callback-scoped access:
-the frame view is valid only during the callback, unsafe accessors check that
-the frame is active, and the frame type has no public close method. The native
-session rejects nested acquisition, render updates, resize, detach, and destroy
-while a frame is acquired.
+A scoped borrow exposes native data only during a binding-controlled lifetime.
+The binding acquires the borrow, exposes a scoped view, and releases it when the
+scope ends. Session-owned texture frames use explicit frame handles: the frame
+view is valid only while the handle is live, unsafe accessors check that active
+state, and the native session rejects nested acquisition, render updates,
+resize, detach, and destroy while a frame is acquired.
 
 Runtime event polling returns copied language values. Public event objects are
 independent of the next native poll. A runtime wrapper may keep a registry of
@@ -296,10 +295,9 @@ caller-owned texture descriptors contain backend-native handles. The binding
 treats those handles as borrowed—the caller keeps backend objects valid and
 synchronized for the lifetime documented by the C API.
 
-Session-owned texture targets expose rendered backend objects through
-callback-scoped frame access. CPU readback APIs copy into language arrays, byte
-buffers, or explicit native buffers and return copied `TextureImageInfo`
-metadata.
+Session-owned texture targets expose rendered backend objects through explicit
+frame handles. CPU readback APIs copy into language arrays, byte buffers, or
+explicit native buffers and return copied `TextureImageInfo` metadata.
 
 Backend interop requires raw native handles in specific render-target APIs.
 Unsafe accessors are limited to those APIs, marked with the target language's
@@ -319,6 +317,6 @@ corresponding language function propagates the native status, diagnostic, or
 copied output correctly.
 
 Add regression tests when the binding owns a lifetime or threading invariant
-that raw C declarations cannot express, such as releasing a texture frame after
-a failing callback, preserving parent validity while child handles are live, or
-releasing callback references exactly once.
+that raw C declarations cannot express, such as invalidating a texture frame
+after its scope closes, preserving parent validity while child handles are live,
+or releasing callback references exactly once.

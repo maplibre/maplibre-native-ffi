@@ -182,13 +182,12 @@ Texture readback supports two shapes:
   caller-owned reusable storage.
 - A convenience method returning a copied `PremultipliedRgba8Image`.
 
-Session-owned texture frames use closure-scoped accessors (`with_metal_frame`,
-`with_vulkan_frame`). The helper acquires the native frame, passes a frame view
-tied to a mutable borrow of the session, and releases the frame on return or
-unwind. Frame views expose copied metadata through safe accessors. Backend
-handles use scoped `NativePointer` accessors marked `unsafe`—callers honor
-backend synchronization and lifetime rules.
+Session-owned texture frames use explicit frame handles. The handle acquires the
+native frame and releases it on close or drop. Frame views expose copied
+metadata through safe accessors. Backend handles use scoped `NativePointer`
+accessors marked `unsafe`—callers honor backend synchronization and lifetime
+rules.
 
-Safe Rust borrowing prevents reentrant session calls through the same handle
-while a frame is acquired. Backend `NativePointer` values are tied to the frame
-lifetime and cannot escape the closure.
+Safe Rust borrowing prevents reentrant session calls through the same session
+while a frame handle is live. Backend `NativePointer` values are tied to the
+frame lifetime and cannot outlive the frame handle.
