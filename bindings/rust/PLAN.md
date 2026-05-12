@@ -58,7 +58,7 @@ Runtime and process-global APIs:
 
 Map and style APIs:
 
-- Style source removal and source existence checks.
+- [x] Style source removal and source existence checks.
 - Style source type, source info, attribution, and related copied source output
   types.
 - Style image add/remove/query APIs and image metadata/value types.

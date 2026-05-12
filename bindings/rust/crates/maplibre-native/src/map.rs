@@ -330,6 +330,42 @@ impl MapHandle {
         })
     }
 
+    /// Removes one style source by ID.
+    ///
+    /// Returns whether a source existed and was removed. Native returns an
+    /// error when a layer still uses the source.
+    pub fn remove_style_source(&self, source_id: &str) -> Result<bool> {
+        let map = self.inner.as_ptr()?;
+        let source_id_key = source_id.to_owned();
+        let source_id = support::string::string_view(source_id);
+        let mut removed = false;
+        // SAFETY: map is live, source_id is an explicit-length view valid for
+        // this call, and removed points to writable storage.
+        support::check(unsafe {
+            sys::mln_map_remove_style_source(map, source_id.raw(), &mut removed)
+        })?;
+        if removed {
+            self.inner
+                .custom_geometry_sources
+                .borrow_mut()
+                .remove(&source_id_key);
+        }
+        Ok(removed)
+    }
+
+    /// Reports whether a style source ID exists.
+    pub fn style_source_exists(&self, source_id: &str) -> Result<bool> {
+        let map = self.inner.as_ptr()?;
+        let source_id = support::string::string_view(source_id);
+        let mut exists = false;
+        // SAFETY: map is live, source_id is an explicit-length view valid for
+        // this call, and exists points to writable storage.
+        support::check(unsafe {
+            sys::mln_map_style_source_exists(map, source_id.raw(), &mut exists)
+        })?;
+        Ok(exists)
+    }
+
     /// Adds a GeoJSON source with inline data.
     pub fn add_geojson_source_data(&self, source_id: &str, data: &GeoJson) -> Result<()> {
         let map = self.inner.as_ptr()?;
@@ -1310,6 +1346,44 @@ mod tests {
     }
 
     #[test]
+    fn style_source_exists_and_remove_call_real_c_api() {
+        let runtime = RuntimeHandle::new().unwrap();
+        let map = MapHandle::new(&runtime).unwrap();
+        map.set_style_json(VALID_STYLE_JSON).unwrap();
+
+        let source = JsonValue::Object(vec![
+            JsonMember::new("type", JsonValue::String("geojson".to_owned())),
+            JsonMember::new(
+                "data",
+                JsonValue::Object(vec![
+                    JsonMember::new("type", JsonValue::String("FeatureCollection".to_owned())),
+                    JsonMember::new("features", JsonValue::Array(Vec::new())),
+                ]),
+            ),
+        ]);
+
+        assert!(!map.style_source_exists("owned-source").unwrap());
+        assert!(!map.remove_style_source("owned-source").unwrap());
+
+        map.add_style_source_json("owned-source", &source).unwrap();
+        assert!(map.style_source_exists("owned-source").unwrap());
+        assert!(map.remove_style_source("owned-source").unwrap());
+        assert!(!map.style_source_exists("owned-source").unwrap());
+        assert!(!map.remove_style_source("owned-source").unwrap());
+
+        let error = map.style_source_exists("").unwrap_err();
+        assert_eq!(error.kind(), ErrorKind::InvalidArgument);
+        assert!(error.raw_status().is_some());
+
+        let error = map.remove_style_source("").unwrap_err();
+        assert_eq!(error.kind(), ErrorKind::InvalidArgument);
+        assert!(error.raw_status().is_some());
+
+        map.close().unwrap();
+        runtime.close().unwrap();
+    }
+
+    #[test]
     fn custom_geometry_source_apis_call_real_c_api_and_style_replacement_releases_state() {
         let runtime = RuntimeHandle::new().unwrap();
         let map = MapHandle::new(&runtime).unwrap();
@@ -1344,6 +1418,14 @@ mod tests {
             LatLngBounds::new(LatLng::new(-1.0, -1.0), LatLng::new(1.0, 1.0)),
         )
         .unwrap();
+
+        assert!(map.remove_style_source("custom").unwrap());
+        assert_eq!(map.custom_geometry_source_count_for_testing(), 0);
+        assert!(!map.style_source_exists("custom").unwrap());
+
+        map.add_custom_geometry_source("custom", CustomGeometrySourceOptions::new(|_| {}))
+            .unwrap();
+        assert_eq!(map.custom_geometry_source_count_for_testing(), 1);
 
         map.set_style_json(VALID_STYLE_JSON).unwrap();
         assert_eq!(map.custom_geometry_source_count_for_testing(), 0);

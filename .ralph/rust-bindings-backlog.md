@@ -19,7 +19,7 @@ commit/push after each item.
 - [x] Ambient cache operations.
 - [x] Process-global logging callbacks, clearing, severity values, and async
       severity mask.
-- [ ] Style source removal and source existence checks.
+- [x] Style source removal and source existence checks.
 - [ ] Style source type, source info, attribution, and copied source output
       types.
 - [ ] Style image add/remove/query APIs and image metadata/value types.
@@ -58,6 +58,8 @@ commit/push after each item.
   `cargo test -p maplibre-native logging`, and `mise run //bindings/rust:test`.
 - Process-global logging reviewer fixes: `cargo fmt --all --check` and
   `cargo test -p maplibre-native logging`.
+- Style source removal and existence checks: `cargo fmt --all --check` and
+  `cargo test -p maplibre-native style_source_exists_and_remove_call_real_c_api`.
 
 ## Notes
 
