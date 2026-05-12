@@ -1,7 +1,7 @@
 use maplibre_native::{
-    CameraOptions, EdgeInsets, LatLng, MapMode, MapOptions, NetworkStatus, RenderBackendMask,
-    RuntimeHandle, ScreenPoint, c_version, network_status, set_network_status,
-    supported_render_backends,
+    CameraOptions, EdgeInsets, Feature, FeatureIdentifier, GeoJson, Geometry, JsonMember,
+    JsonValue, LatLng, MapMode, MapOptions, NetworkStatus, RenderBackendMask, RuntimeHandle,
+    ScreenPoint, c_version, network_status, set_network_status, supported_render_backends,
 };
 
 struct NetworkStatusRestore(NetworkStatus);
@@ -51,4 +51,26 @@ fn public_descriptors_use_owned_rust_values() {
     assert_eq!(camera.center, Some(LatLng::new(45.0, -122.0)));
     assert_eq!(camera.zoom, Some(10.0));
     assert_eq!(camera.padding.unwrap().right, 4.0);
+
+    let json = JsonValue::Object(vec![
+        JsonMember::new("id", JsonValue::UInt(u64::MAX)),
+        JsonMember::new("id", JsonValue::String("duplicate key is preserved".into())),
+        JsonMember::new("nested", JsonValue::Array(vec![JsonValue::Bool(true)])),
+    ]);
+    assert_eq!(
+        json,
+        JsonValue::Object(vec![
+            JsonMember::new("id", JsonValue::UInt(u64::MAX)),
+            JsonMember::new("id", JsonValue::String("duplicate key is preserved".into())),
+            JsonMember::new("nested", JsonValue::Array(vec![JsonValue::Bool(true)])),
+        ])
+    );
+
+    let feature = Feature::new(
+        Geometry::Point(LatLng::new(1.0, 2.0)),
+        vec![JsonMember::new("name", JsonValue::String("park".into()))],
+    )
+    .with_identifier(FeatureIdentifier::String("feature-1".into()));
+    let geojson = GeoJson::Feature(feature);
+    assert!(matches!(geojson, GeoJson::Feature(_)));
 }

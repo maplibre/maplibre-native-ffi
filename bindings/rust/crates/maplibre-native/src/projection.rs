@@ -125,7 +125,7 @@ impl MapProjectionHandle {
     /// Updates the projection camera so geometry coordinates are visible.
     pub fn set_visible_geometry(&self, geometry: &Geometry, padding: EdgeInsets) -> Result<()> {
         let projection = self.inner.as_ptr()?;
-        let native_geometry = geometry.to_native();
+        let native_geometry = geometry.try_to_native()?;
         // SAFETY: projection is live, native_geometry owns backing storage for
         // the duration of this call, and padding is passed by value.
         support::check(unsafe {

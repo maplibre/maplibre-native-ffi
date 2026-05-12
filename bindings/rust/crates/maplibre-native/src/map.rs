@@ -11,8 +11,8 @@ use crate::handle::{ThreadAffineNativeHandle, closed_handle_error, out_handle};
 use crate::runtime::{RuntimeHandle, RuntimeState};
 use crate::{
     AnimationOptions, BoundOptions, CameraFitOptions, CameraOptions, Error, FreeCameraOptions,
-    Geometry, LatLng, LatLngBounds, MapDebugOptions, MapOptions, MapProjectionHandle,
-    MapTileOptions, MapViewportOptions, ProjectionMode, Result, ScreenPoint,
+    GeoJson, Geometry, JsonValue, LatLng, LatLngBounds, MapDebugOptions, MapOptions,
+    MapProjectionHandle, MapTileOptions, MapViewportOptions, ProjectionMode, Result, ScreenPoint,
 };
 
 #[derive(Debug)]
@@ -151,6 +151,179 @@ impl MapHandle {
         // for the duration of this command. The C API copies/consumes it before
         // returning.
         support::check(unsafe { sys::mln_map_set_style_json(map, json.as_ptr()) })
+    }
+
+    /// Adds one style source from a style-spec source JSON object.
+    pub fn add_style_source_json(&self, source_id: &str, source_json: &JsonValue) -> Result<()> {
+        let map = self.inner.as_ptr()?;
+        let source_id = support::string::string_view(source_id);
+        let source_json = source_json.try_to_native()?;
+        // SAFETY: map is live, source_id is an explicit-length view valid for
+        // this call, and source_json owns the descriptor graph for this call.
+        support::check(unsafe {
+            sys::mln_map_add_style_source_json(map, source_id.raw(), source_json.as_ptr())
+        })
+    }
+
+    /// Adds a GeoJSON source with inline data.
+    pub fn add_geojson_source_data(&self, source_id: &str, data: &GeoJson) -> Result<()> {
+        let map = self.inner.as_ptr()?;
+        let source_id = support::string::string_view(source_id);
+        let data = data.try_to_native()?;
+        // SAFETY: map is live, source_id is valid for this call, and data owns
+        // the descriptor graph for this call.
+        support::check(unsafe {
+            sys::mln_map_add_geojson_source_data(map, source_id.raw(), data.as_ptr())
+        })
+    }
+
+    /// Updates one GeoJSON source with inline data.
+    pub fn set_geojson_source_data(&self, source_id: &str, data: &GeoJson) -> Result<()> {
+        let map = self.inner.as_ptr()?;
+        let source_id = support::string::string_view(source_id);
+        let data = data.try_to_native()?;
+        // SAFETY: map is live, source_id is valid for this call, and data owns
+        // the descriptor graph for this call.
+        support::check(unsafe {
+            sys::mln_map_set_geojson_source_data(map, source_id.raw(), data.as_ptr())
+        })
+    }
+
+    /// Adds one style layer from a full style-spec layer JSON object.
+    pub fn add_style_layer_json(
+        &self,
+        layer_json: &JsonValue,
+        before_layer_id: Option<&str>,
+    ) -> Result<()> {
+        let map = self.inner.as_ptr()?;
+        let layer_json = layer_json.try_to_native()?;
+        let before_layer_id = support::string::string_view(before_layer_id.unwrap_or(""));
+        // SAFETY: map is live, layer_json owns the descriptor graph, and
+        // before_layer_id is an explicit-length view valid for this call.
+        support::check(unsafe {
+            sys::mln_map_add_style_layer_json(map, layer_json.as_ptr(), before_layer_id.raw())
+        })
+    }
+
+    /// Copies one style layer as a full style-spec JSON object.
+    pub fn style_layer_json(&self, layer_id: &str) -> Result<Option<JsonValue>> {
+        let map = self.inner.as_ptr()?;
+        let layer_id = support::string::string_view(layer_id);
+        let mut out = support::ptr::OutPtr::<sys::mln_json_snapshot>::new();
+        let mut found = false;
+        // SAFETY: map is live, layer_id is valid for this call, out is a
+        // null-initialized out-pointer, and found points to writable storage.
+        support::check(unsafe {
+            sys::mln_map_get_style_layer_json(map, layer_id.raw(), out.as_mut_ptr(), &mut found)
+        })?;
+        let snapshot = json_snapshot(out.into_option())?;
+        if found { Ok(snapshot) } else { Ok(None) }
+    }
+
+    /// Sets the style light from a style-spec light JSON object.
+    pub fn set_style_light_json(&self, light_json: &JsonValue) -> Result<()> {
+        let map = self.inner.as_ptr()?;
+        let light_json = light_json.try_to_native()?;
+        // SAFETY: map is live and light_json owns the descriptor graph for this call.
+        support::check(unsafe { sys::mln_map_set_style_light_json(map, light_json.as_ptr()) })
+    }
+
+    /// Sets one style light property.
+    pub fn set_style_light_property(&self, property_name: &str, value: &JsonValue) -> Result<()> {
+        let map = self.inner.as_ptr()?;
+        let property_name = support::string::string_view(property_name);
+        let value = value.try_to_native()?;
+        // SAFETY: map is live, property_name is valid for this call, and value
+        // owns the descriptor graph for this call.
+        support::check(unsafe {
+            sys::mln_map_set_style_light_property(map, property_name.raw(), value.as_ptr())
+        })
+    }
+
+    /// Copies one style light property as a style-spec JSON value.
+    pub fn style_light_property(&self, property_name: &str) -> Result<Option<JsonValue>> {
+        let map = self.inner.as_ptr()?;
+        let property_name = support::string::string_view(property_name);
+        let mut out = support::ptr::OutPtr::<sys::mln_json_snapshot>::new();
+        // SAFETY: map is live, property_name is valid for this call, and out is
+        // a null-initialized out-pointer.
+        support::check(unsafe {
+            sys::mln_map_get_style_light_property(map, property_name.raw(), out.as_mut_ptr())
+        })?;
+        json_snapshot(out.into_option())
+    }
+
+    /// Sets one layer style property.
+    pub fn set_layer_property(
+        &self,
+        layer_id: &str,
+        property_name: &str,
+        value: &JsonValue,
+    ) -> Result<()> {
+        let map = self.inner.as_ptr()?;
+        let layer_id = support::string::string_view(layer_id);
+        let property_name = support::string::string_view(property_name);
+        let value = value.try_to_native()?;
+        // SAFETY: map is live, string views are valid for this call, and value
+        // owns the descriptor graph for this call.
+        support::check(unsafe {
+            sys::mln_map_set_layer_property(
+                map,
+                layer_id.raw(),
+                property_name.raw(),
+                value.as_ptr(),
+            )
+        })
+    }
+
+    /// Copies one layer style property as a style-spec JSON value.
+    pub fn layer_property(&self, layer_id: &str, property_name: &str) -> Result<Option<JsonValue>> {
+        let map = self.inner.as_ptr()?;
+        let layer_id = support::string::string_view(layer_id);
+        let property_name = support::string::string_view(property_name);
+        let mut out = support::ptr::OutPtr::<sys::mln_json_snapshot>::new();
+        // SAFETY: map is live, string views are valid for this call, and out is
+        // a null-initialized out-pointer.
+        support::check(unsafe {
+            sys::mln_map_get_layer_property(
+                map,
+                layer_id.raw(),
+                property_name.raw(),
+                out.as_mut_ptr(),
+            )
+        })?;
+        json_snapshot(out.into_option())
+    }
+
+    /// Sets or clears one layer filter.
+    pub fn set_layer_filter(&self, layer_id: &str, filter: Option<&JsonValue>) -> Result<()> {
+        let map = self.inner.as_ptr()?;
+        let layer_id = support::string::string_view(layer_id);
+        let native_filter = filter.map(JsonValue::try_to_native).transpose()?;
+        // SAFETY: map is live, layer_id is valid for this call, and the
+        // optional filter descriptor is either null or valid for this call.
+        support::check(unsafe {
+            sys::mln_map_set_layer_filter(
+                map,
+                layer_id.raw(),
+                native_filter
+                    .as_ref()
+                    .map_or(ptr::null(), |filter| filter.as_ptr()),
+            )
+        })
+    }
+
+    /// Copies one layer filter as a style-spec JSON value.
+    pub fn layer_filter(&self, layer_id: &str) -> Result<Option<JsonValue>> {
+        let map = self.inner.as_ptr()?;
+        let layer_id = support::string::string_view(layer_id);
+        let mut out = support::ptr::OutPtr::<sys::mln_json_snapshot>::new();
+        // SAFETY: map is live, layer_id is valid for this call, and out is a
+        // null-initialized out-pointer.
+        support::check(unsafe {
+            sys::mln_map_get_layer_filter(map, layer_id.raw(), out.as_mut_ptr())
+        })?;
+        json_snapshot(out.into_option())
     }
 
     /// Copies current style source IDs into owned Rust strings.
@@ -497,7 +670,7 @@ impl MapHandle {
         fit_options: Option<&CameraFitOptions>,
     ) -> Result<CameraOptions> {
         let map = self.inner.as_ptr()?;
-        let native_geometry = geometry.to_native();
+        let native_geometry = geometry.try_to_native()?;
         let raw_fit = fit_options.map(CameraFitOptions::to_native);
         // SAFETY: Default constructor takes no arguments and initializes size.
         let mut raw_camera = unsafe { sys::mln_camera_options_default() };
@@ -716,6 +889,27 @@ pub(crate) fn screen_points_to_native(points: &[ScreenPoint]) -> Vec<sys::mln_sc
     points.iter().copied().map(ScreenPoint::to_native).collect()
 }
 
+fn json_snapshot(
+    snapshot: Option<std::ptr::NonNull<sys::mln_json_snapshot>>,
+) -> Result<Option<JsonValue>> {
+    let Some(snapshot) = snapshot else {
+        return Ok(None);
+    };
+    // SAFETY: snapshot is an owned JSON snapshot returned by the C API and is
+    // destroyed by the guard after copying.
+    let snapshot = unsafe { support::handle::json_snapshot(snapshot.as_ptr()) }?;
+    let mut value = ptr::null();
+    // SAFETY: snapshot is live and value points to writable storage. The
+    // borrowed JSON value is copied before the guard drops.
+    support::check(unsafe { sys::mln_json_snapshot_get(snapshot.as_ptr(), &mut value) })?;
+    if value.is_null() {
+        return Ok(None);
+    }
+    // SAFETY: value is borrowed from the live snapshot guard and copied before
+    // the guard drops at the end of this function.
+    unsafe { JsonValue::from_native(&*value) }.map(Some)
+}
+
 fn copy_style_id_list(list: &support::handle::StyleIdListGuard) -> Result<Vec<String>> {
     let mut count = 0;
     // SAFETY: list is a live style ID list guard and count points to writable storage.
@@ -742,11 +936,22 @@ fn copy_style_id_list(list: &support::handle::StyleIdListGuard) -> Result<Vec<St
 mod tests {
     use super::*;
     use crate::{
-        ConstrainMode, EdgeInsets, ErrorKind, MapMode, NorthOrientation, TileLodMode, ViewportMode,
+        ConstrainMode, EdgeInsets, ErrorKind, Feature, FeatureIdentifier, JsonMember, MapMode,
+        NorthOrientation, TileLodMode, ViewportMode,
     };
 
     const VALID_STYLE_JSON: &str = r#"{"version":8,"sources":{},"layers":[]}"#;
     const STYLE_WITH_IDS_JSON: &str = r#"{"version":8,"sources":{"geo":{"type":"geojson","data":{"type":"FeatureCollection","features":[]}}},"layers":[{"id":"background","type":"background"},{"id":"geo-fill","type":"fill","source":"geo"}]}"#;
+
+    fn object_member<'a>(value: &'a JsonValue, key: &str) -> Option<&'a JsonValue> {
+        let JsonValue::Object(members) = value else {
+            return None;
+        };
+        members
+            .iter()
+            .find(|member| member.key == key)
+            .map(|member| &member.value)
+    }
 
     #[test]
     fn map_create_and_close() {
@@ -819,6 +1024,92 @@ mod tests {
         ));
         assert!(error.raw_status().is_some());
         assert!(!error.diagnostic().trim().is_empty());
+
+        map.close().unwrap();
+        runtime.close().unwrap();
+    }
+
+    #[test]
+    fn style_json_and_geojson_descriptors_call_real_c_api() {
+        let runtime = RuntimeHandle::new().unwrap();
+        let map = MapHandle::new(&runtime).unwrap();
+        map.set_style_json(VALID_STYLE_JSON).unwrap();
+
+        let source = JsonValue::Object(vec![
+            JsonMember::new("type", JsonValue::String("geojson".to_owned())),
+            JsonMember::new(
+                "data",
+                JsonValue::Object(vec![
+                    JsonMember::new("type", JsonValue::String("FeatureCollection".to_owned())),
+                    JsonMember::new("features", JsonValue::Array(Vec::new())),
+                ]),
+            ),
+        ]);
+        map.add_style_source_json("owned-json-source", &source)
+            .unwrap();
+
+        let geojson = GeoJson::Feature(
+            Feature::new(
+                Geometry::Point(LatLng::new(1.0, 2.0)),
+                vec![JsonMember::new("name", JsonValue::String("one".to_owned()))],
+            )
+            .with_identifier(FeatureIdentifier::String("feature-1".to_owned())),
+        );
+        map.add_geojson_source_data("owned-geojson-source", &geojson)
+            .unwrap();
+        map.set_geojson_source_data(
+            "owned-geojson-source",
+            &GeoJson::FeatureCollection(Vec::new()),
+        )
+        .unwrap();
+
+        let layer = JsonValue::Object(vec![
+            JsonMember::new("id", JsonValue::String("owned-background".to_owned())),
+            JsonMember::new("type", JsonValue::String("background".to_owned())),
+            JsonMember::new(
+                "paint",
+                JsonValue::Object(vec![JsonMember::new(
+                    "background-opacity",
+                    JsonValue::Double(0.5),
+                )]),
+            ),
+        ]);
+        map.add_style_layer_json(&layer, None).unwrap();
+        let copied_layer = map
+            .style_layer_json("owned-background")
+            .unwrap()
+            .expect("added layer should have a JSON snapshot");
+        assert_eq!(
+            object_member(&copied_layer, "id"),
+            Some(&JsonValue::String("owned-background".to_owned()))
+        );
+        assert_eq!(
+            object_member(&copied_layer, "type"),
+            Some(&JsonValue::String("background".to_owned()))
+        );
+        let paint = object_member(&copied_layer, "paint").expect("layer paint should be copied");
+        assert_eq!(
+            object_member(paint, "background-opacity"),
+            Some(&JsonValue::Double(0.5))
+        );
+        map.set_layer_property(
+            "owned-background",
+            "background-opacity",
+            &JsonValue::Double(0.75),
+        )
+        .unwrap();
+        assert_eq!(
+            map.layer_property("owned-background", "background-opacity")
+                .unwrap(),
+            Some(JsonValue::Double(0.75))
+        );
+
+        let error = map
+            .set_layer_filter("owned-background", Some(&JsonValue::Double(f64::NAN)))
+            .err()
+            .unwrap();
+        assert_eq!(error.kind(), ErrorKind::InvalidArgument);
+        assert_eq!(error.raw_status(), None);
 
         map.close().unwrap();
         runtime.close().unwrap();

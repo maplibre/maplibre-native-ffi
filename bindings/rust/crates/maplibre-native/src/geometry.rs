@@ -2,7 +2,9 @@ use std::ptr;
 
 use maplibre_native_sys as sys;
 
-use crate::LatLng;
+use crate::{Error, LatLng, Result};
+
+pub const MAX_GEOMETRY_COLLECTION_DEPTH: usize = 64;
 
 /// Owned geometry descriptor.
 #[derive(Debug, Clone, PartialEq)]
@@ -22,6 +24,109 @@ impl Geometry {
     #[allow(dead_code)]
     pub(crate) fn to_native(&self) -> NativeGeometry {
         NativeGeometry::new(self)
+    }
+
+    pub(crate) fn try_to_native(&self) -> Result<NativeGeometry> {
+        self.try_to_native_with_depth(0)
+    }
+
+    pub(crate) fn try_to_native_with_depth(&self, depth: usize) -> Result<NativeGeometry> {
+        self.validate_depth(depth)?;
+        Ok(self.to_native())
+    }
+
+    fn validate_depth(&self, depth: usize) -> Result<()> {
+        check_geometry_depth(depth)?;
+        if let Self::GeometryCollection(children) = self {
+            for child in children {
+                child.validate_depth(depth + 1)?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Copies a borrowed native geometry descriptor into an owned Rust value.
+    ///
+    /// # Safety
+    ///
+    /// `raw` and all nested pointers must be valid for the duration of this
+    /// call. The returned value owns all copied data.
+    #[allow(dead_code)]
+    pub(crate) unsafe fn from_native(raw: &sys::mln_geometry) -> Result<Self> {
+        // SAFETY: The caller promises raw and nested pointers are valid for the
+        // duration of this call. The helper copies recursively before return.
+        unsafe { Self::from_native_with_depth(raw, 0) }
+    }
+
+    #[allow(dead_code)]
+    pub(crate) unsafe fn from_native_with_depth(
+        raw: &sys::mln_geometry,
+        depth: usize,
+    ) -> Result<Self> {
+        check_geometry_depth(depth)?;
+        match raw.type_ {
+            sys::MLN_GEOMETRY_TYPE_EMPTY => Ok(Self::Empty),
+            sys::MLN_GEOMETRY_TYPE_POINT => {
+                // SAFETY: The active union member is selected by raw.type_.
+                Ok(Self::Point(LatLng::from_native(unsafe { raw.data.point })))
+            }
+            sys::MLN_GEOMETRY_TYPE_LINE_STRING => {
+                // SAFETY: The active union member is selected by raw.type_.
+                let span = unsafe { raw.data.line_string };
+                Ok(Self::LineString(copy_coordinate_span(span)?))
+            }
+            sys::MLN_GEOMETRY_TYPE_POLYGON => {
+                // SAFETY: The active union member is selected by raw.type_.
+                let polygon = unsafe { raw.data.polygon };
+                Ok(Self::Polygon(copy_polygon_geometry(polygon)?))
+            }
+            sys::MLN_GEOMETRY_TYPE_MULTI_POINT => {
+                // SAFETY: The active union member is selected by raw.type_.
+                let span = unsafe { raw.data.multi_point };
+                Ok(Self::MultiPoint(copy_coordinate_span(span)?))
+            }
+            sys::MLN_GEOMETRY_TYPE_MULTI_LINE_STRING => {
+                // SAFETY: The active union member is selected by raw.type_.
+                let multi_line = unsafe { raw.data.multi_line_string };
+                Ok(Self::MultiLineString(copy_coordinate_spans(
+                    multi_line.lines,
+                    multi_line.line_count,
+                    "multi-line string lines",
+                )?))
+            }
+            sys::MLN_GEOMETRY_TYPE_MULTI_POLYGON => {
+                // SAFETY: The active union member is selected by raw.type_.
+                let multi_polygon = unsafe { raw.data.multi_polygon };
+                let polygons = polygon_slice(
+                    multi_polygon.polygons,
+                    multi_polygon.polygon_count,
+                    "multi-polygon polygons",
+                )?;
+                let mut copied = Vec::with_capacity(polygons.len());
+                for polygon in polygons {
+                    copied.push(copy_polygon_geometry(*polygon)?);
+                }
+                Ok(Self::MultiPolygon(copied))
+            }
+            sys::MLN_GEOMETRY_TYPE_GEOMETRY_COLLECTION => {
+                // SAFETY: The active union member is selected by raw.type_.
+                let collection = unsafe { raw.data.geometry_collection };
+                let geometries = geometry_slice(
+                    collection.geometries,
+                    collection.geometry_count,
+                    "geometry collection",
+                )?;
+                let mut copied = Vec::with_capacity(geometries.len());
+                for geometry in geometries {
+                    // SAFETY: geometries came from validated native collection storage.
+                    copied.push(unsafe { Self::from_native_with_depth(geometry, depth + 1) }?);
+                }
+                Ok(Self::GeometryCollection(copied))
+            }
+            type_ => Err(Error::invalid_argument(format!(
+                "unknown native geometry type: {type_}"
+            ))),
+        }
     }
 }
 
@@ -178,6 +283,91 @@ fn ptr_or_null<T>(values: &[T]) -> *const T {
     } else {
         values.as_ptr()
     }
+}
+
+fn check_geometry_depth(depth: usize) -> Result<()> {
+    if depth > MAX_GEOMETRY_COLLECTION_DEPTH {
+        Err(Error::invalid_argument(format!(
+            "geometry collection depth exceeds {MAX_GEOMETRY_COLLECTION_DEPTH}"
+        )))
+    } else {
+        Ok(())
+    }
+}
+
+#[allow(dead_code)]
+fn copy_coordinate_span(span: sys::mln_coordinate_span) -> Result<Vec<LatLng>> {
+    let coordinates = coordinate_slice(span.coordinates, span.coordinate_count, "coordinates")?;
+    Ok(coordinates
+        .iter()
+        .copied()
+        .map(LatLng::from_native)
+        .collect())
+}
+
+#[allow(dead_code)]
+fn copy_coordinate_spans(
+    spans: *const sys::mln_coordinate_span,
+    count: usize,
+    name: &'static str,
+) -> Result<Vec<Vec<LatLng>>> {
+    let spans = coordinate_span_slice(spans, count, name)?;
+    spans.iter().copied().map(copy_coordinate_span).collect()
+}
+
+#[allow(dead_code)]
+fn copy_polygon_geometry(polygon: sys::mln_polygon_geometry) -> Result<Vec<Vec<LatLng>>> {
+    copy_coordinate_spans(polygon.rings, polygon.ring_count, "polygon rings")
+}
+
+#[allow(dead_code)]
+fn coordinate_slice<'a>(
+    ptr: *const sys::mln_lat_lng,
+    count: usize,
+    name: &'static str,
+) -> Result<&'a [sys::mln_lat_lng]> {
+    slice_or_empty(ptr, count, name)
+}
+
+#[allow(dead_code)]
+fn coordinate_span_slice<'a>(
+    ptr: *const sys::mln_coordinate_span,
+    count: usize,
+    name: &'static str,
+) -> Result<&'a [sys::mln_coordinate_span]> {
+    slice_or_empty(ptr, count, name)
+}
+
+#[allow(dead_code)]
+fn polygon_slice<'a>(
+    ptr: *const sys::mln_polygon_geometry,
+    count: usize,
+    name: &'static str,
+) -> Result<&'a [sys::mln_polygon_geometry]> {
+    slice_or_empty(ptr, count, name)
+}
+
+#[allow(dead_code)]
+fn geometry_slice<'a>(
+    ptr: *const sys::mln_geometry,
+    count: usize,
+    name: &'static str,
+) -> Result<&'a [sys::mln_geometry]> {
+    slice_or_empty(ptr, count, name)
+}
+
+#[allow(dead_code)]
+fn slice_or_empty<'a, T>(ptr: *const T, count: usize, name: &'static str) -> Result<&'a [T]> {
+    if count == 0 {
+        return Ok(&[]);
+    }
+    if ptr.is_null() {
+        return Err(Error::invalid_argument(format!(
+            "{name} pointer must not be null when count is nonzero"
+        )));
+    }
+    // SAFETY: The caller promises ptr points to count valid elements.
+    Ok(unsafe { std::slice::from_raw_parts(ptr, count) })
 }
 
 #[cfg(test)]

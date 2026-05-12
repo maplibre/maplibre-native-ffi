@@ -2,8 +2,10 @@
 
 mod camera;
 mod events;
+mod geojson;
 mod geometry;
 mod handle;
+mod json;
 mod map;
 mod options;
 mod projection;
@@ -24,7 +26,9 @@ pub use events::{
     RuntimeEventSource, RuntimeEventType, StyleImageMissingEvent, TileActionEvent, TileId,
     TileOperation, UnknownRuntimeEventPayload,
 };
+pub use geojson::{Feature, FeatureIdentifier, GeoJson};
 pub use geometry::Geometry;
+pub use json::{JsonMember, JsonValue};
 pub use map::MapHandle;
 pub use options::{
     ConstrainMode, MapDebugOptions, MapMode, MapOptions, MapTileOptions, MapViewportOptions,
