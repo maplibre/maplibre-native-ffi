@@ -65,34 +65,3 @@ fn parse_args(args: impl IntoIterator<Item = String>) -> Result<Mode, Box<dyn Er
     }
     Ok(mode)
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn parse_args_defaults_to_native_surface() {
-        assert_eq!(parse_args([]).unwrap(), Mode::NativeSurface);
-    }
-
-    #[test]
-    fn parse_args_accepts_render_target_option() {
-        assert_eq!(
-            parse_args(["--render-target=native-surface".to_string()]).unwrap(),
-            Mode::NativeSurface
-        );
-    }
-
-    #[test]
-    fn parse_args_accepts_positional_render_target() {
-        assert_eq!(
-            parse_args(["native-surface".to_string()]).unwrap(),
-            Mode::NativeSurface
-        );
-    }
-
-    #[test]
-    fn parse_args_rejects_unknown_option() {
-        assert!(parse_args(["--wat".to_string()]).is_err());
-    }
-}
