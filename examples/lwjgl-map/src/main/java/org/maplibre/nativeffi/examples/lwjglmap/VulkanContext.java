@@ -79,17 +79,22 @@ final class VulkanContext implements AutoCloseable {
     if (!glfwInit()) {
       throw new IllegalStateException("GLFW initialization failed");
     }
-    if (!glfwVulkanSupported()) {
-      throw new IllegalStateException("GLFW reports Vulkan is not supported");
-    }
-    validateWaylandOnLinux();
-    glfwDefaultWindowHints();
-    glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-    glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
-    var window = glfwCreateWindow(width, height, title, NULL, NULL);
-    if (window == NULL) {
+    long window;
+    try {
+      if (!glfwVulkanSupported()) {
+        throw new IllegalStateException("GLFW reports Vulkan is not supported");
+      }
+      validateWaylandOnLinux();
+      glfwDefaultWindowHints();
+      glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+      glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
+      window = glfwCreateWindow(width, height, title, NULL, NULL);
+      if (window == NULL) {
+        throw new IllegalStateException("GLFW window creation failed");
+      }
+    } catch (RuntimeException error) {
       glfwTerminate();
-      throw new IllegalStateException("GLFW window creation failed");
+      throw error;
     }
     var context = new VulkanContext(window);
     try {
