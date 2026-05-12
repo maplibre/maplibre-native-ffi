@@ -8,13 +8,16 @@ use maplibre_native_sys as sys;
 
 use crate::events::{MapId, RuntimeEvent, RuntimeEventSource, empty_runtime_event};
 use crate::handle::{ThreadAffineNativeHandle, closed_handle_error, out_handle};
+use crate::resource::{ResourceTransformState, noop_resource_transform_descriptor};
 use crate::{Error, ErrorKind, MapHandle, MapOptions, Result};
 
 #[derive(Debug)]
 pub(crate) struct RuntimeState {
     handle: ThreadAffineNativeHandle<sys::mln_runtime>,
     next_map_id: Cell<u64>,
+    has_created_map: Cell<bool>,
     map_ids: RefCell<HashMap<usize, MapId>>,
+    resource_transform: RefCell<Option<Box<ResourceTransformState>>>,
 }
 
 impl RuntimeState {
@@ -27,7 +30,9 @@ impl RuntimeState {
         Self {
             handle,
             next_map_id: Cell::new(1),
+            has_created_map: Cell::new(false),
             map_ids: RefCell::new(HashMap::new()),
+            resource_transform: RefCell::new(None),
         }
     }
 
@@ -45,10 +50,55 @@ impl RuntimeState {
     }
 
     fn close(&self) -> Result<()> {
-        self.handle.close()
+        self.handle.close()?;
+        self.resource_transform.borrow_mut().take();
+        Ok(())
+    }
+
+    fn set_resource_transform<F>(&self, callback: F) -> Result<()>
+    where
+        F: Fn(crate::ResourceTransformRequest) -> Option<String> + Send + Sync + 'static,
+    {
+        self.check_resource_transform_allowed()?;
+        let runtime = self.as_ptr()?;
+        let replacement = ResourceTransformState::new(callback);
+        let descriptor = replacement.descriptor();
+
+        // SAFETY: runtime is live. descriptor contains a C trampoline and a
+        // user_data pointer to replacement, which remains alive on success. On
+        // failure, native preserves the previous transform and replacement is
+        // dropped below.
+        support::check(unsafe { sys::mln_runtime_set_resource_transform(runtime, &descriptor) })?;
+        self.resource_transform.borrow_mut().replace(replacement);
+        Ok(())
+    }
+
+    fn clear_resource_transform(&self) -> Result<()> {
+        self.check_resource_transform_allowed()?;
+        let runtime = self.as_ptr()?;
+        let descriptor = noop_resource_transform_descriptor();
+
+        // SAFETY: runtime is live. The C ABI has no null clear operation, so a
+        // no-op transform with static function state restores pass-through
+        // behavior without retaining Rust callback state.
+        support::check(unsafe { sys::mln_runtime_set_resource_transform(runtime, &descriptor) })?;
+        self.resource_transform.borrow_mut().take();
+        Ok(())
+    }
+
+    fn check_resource_transform_allowed(&self) -> Result<()> {
+        if self.has_created_map.get() {
+            return Err(Error::new(
+                ErrorKind::InvalidState,
+                None,
+                "resource transforms must be configured before creating maps from the runtime",
+            ));
+        }
+        Ok(())
     }
 
     pub(crate) fn register_map(&self, ptr: *mut sys::mln_map) -> MapId {
+        self.has_created_map.set(true);
         let id = MapId::new(self.next_map_id.get());
         self.next_map_id.set(id.get().saturating_add(1));
         self.map_ids.borrow_mut().insert(ptr as usize, id);
@@ -113,6 +163,32 @@ impl RuntimeHandle {
     /// Creates a map owned by this runtime with explicit map options.
     pub fn create_map_with_options(&self, options: &MapOptions) -> Result<MapHandle> {
         MapHandle::with_options(self, options)
+    }
+
+    /// Installs or replaces the runtime-scoped network URL transform.
+    ///
+    /// The transform must be installed before creating maps from this runtime.
+    /// Native code may invoke it from worker or network threads, so the closure
+    /// must be thread-safe and `'static`. Keep the closure quick, and do not
+    /// call MapLibre Native APIs from it. Returning `Some(url)` replaces the
+    /// request URL; returning `None` or an empty string keeps the original URL.
+    /// Panics are contained and treated by native code as no rewrite.
+    pub fn set_resource_transform<F>(&self, callback: F) -> Result<()>
+    where
+        F: Fn(crate::ResourceTransformRequest) -> Option<String> + Send + Sync + 'static,
+    {
+        self.inner.set_resource_transform(callback)
+    }
+
+    /// Clears the runtime-scoped network URL transform.
+    ///
+    /// Like installation, clearing must happen before creating maps from this
+    /// runtime. The current C ABI has no null clear operation. This method
+    /// installs a native no-op transform before releasing Rust callback state,
+    /// restoring pass-through URL behavior while honoring native install
+    /// constraints.
+    pub fn clear_resource_transform(&self) -> Result<()> {
+        self.inner.clear_resource_transform()
     }
 
     /// Runs one pending owner-thread task for this runtime.
@@ -188,8 +264,10 @@ impl RuntimeHandle {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+
     use super::*;
-    use crate::{ErrorKind, RuntimeEventSource, RuntimeEventType};
+    use crate::{ErrorKind, ResourceKind, RuntimeEventSource, RuntimeEventType};
 
     #[test]
     fn runtime_create_run_poll_drain_and_close() {
@@ -208,6 +286,140 @@ mod tests {
 
         runtime.close().unwrap();
         runtime.close().unwrap();
+    }
+
+    #[test]
+    fn resource_transform_installs_replaces_clears_and_releases_state() {
+        let runtime = RuntimeHandle::new().unwrap();
+        let first = Arc::new(());
+        let first_callback = Arc::clone(&first);
+
+        runtime
+            .set_resource_transform(move |request| {
+                let _ = &first_callback;
+                assert!(matches!(
+                    request.kind,
+                    ResourceKind::Style | ResourceKind::UnknownRaw(_)
+                ));
+                None
+            })
+            .unwrap();
+        assert_eq!(Arc::strong_count(&first), 2);
+
+        let second = Arc::new(());
+        let second_callback = Arc::clone(&second);
+        runtime
+            .set_resource_transform(move |_| {
+                let _ = &second_callback;
+                Some("https://example.test/replacement".to_owned())
+            })
+            .unwrap();
+        assert_eq!(Arc::strong_count(&first), 1);
+        assert_eq!(Arc::strong_count(&second), 2);
+
+        runtime.clear_resource_transform().unwrap();
+        assert_eq!(Arc::strong_count(&second), 1);
+        runtime.close().unwrap();
+    }
+
+    #[test]
+    fn resource_transform_replacement_rolls_back_when_native_install_fails() {
+        let runtime = RuntimeHandle::new().unwrap();
+        let first = Arc::new(());
+        let first_callback = Arc::clone(&first);
+        runtime
+            .set_resource_transform(move |_| {
+                let _ = &first_callback;
+                None
+            })
+            .unwrap();
+        let map = runtime.create_map().unwrap();
+
+        let second = Arc::new(());
+        let second_callback = Arc::clone(&second);
+        let error = runtime
+            .set_resource_transform(move |_| {
+                let _ = &second_callback;
+                None
+            })
+            .unwrap_err();
+
+        assert_eq!(error.kind(), ErrorKind::InvalidState);
+        assert_eq!(Arc::strong_count(&first), 2);
+        assert_eq!(Arc::strong_count(&second), 1);
+
+        map.close().unwrap();
+        runtime.close().unwrap();
+        assert_eq!(Arc::strong_count(&first), 1);
+    }
+
+    #[test]
+    fn runtime_teardown_releases_resource_transform_state() {
+        let runtime = RuntimeHandle::new().unwrap();
+        let token = Arc::new(());
+        let callback_token = Arc::clone(&token);
+        runtime
+            .set_resource_transform(move |_| {
+                let _ = &callback_token;
+                None
+            })
+            .unwrap();
+        assert_eq!(Arc::strong_count(&token), 2);
+
+        runtime.close().unwrap();
+
+        assert_eq!(Arc::strong_count(&token), 1);
+    }
+
+    #[test]
+    fn resource_transform_rejects_install_after_map_creation() {
+        let runtime = RuntimeHandle::new().unwrap();
+        let map = runtime.create_map().unwrap();
+
+        let error = runtime.set_resource_transform(|_| None).unwrap_err();
+
+        assert_eq!(error.kind(), ErrorKind::InvalidState);
+        map.close().unwrap();
+        runtime.close().unwrap();
+    }
+
+    #[test]
+    fn resource_transform_rejects_set_after_map_was_closed() {
+        let runtime = RuntimeHandle::new().unwrap();
+        let map = runtime.create_map().unwrap();
+        map.close().unwrap();
+
+        let error = runtime.set_resource_transform(|_| None).unwrap_err();
+
+        assert_eq!(error.kind(), ErrorKind::InvalidState);
+        assert_eq!(error.raw_status(), None);
+        runtime.close().unwrap();
+    }
+
+    #[test]
+    fn resource_transform_rejects_clear_after_map_was_closed_and_keeps_state_until_close() {
+        let runtime = RuntimeHandle::new().unwrap();
+        let token = Arc::new(());
+        let callback_token = Arc::clone(&token);
+        runtime
+            .set_resource_transform(move |_| {
+                let _ = &callback_token;
+                None
+            })
+            .unwrap();
+        assert_eq!(Arc::strong_count(&token), 2);
+
+        let map = runtime.create_map().unwrap();
+        map.close().unwrap();
+
+        let error = runtime.clear_resource_transform().unwrap_err();
+
+        assert_eq!(error.kind(), ErrorKind::InvalidState);
+        assert_eq!(error.raw_status(), None);
+        assert_eq!(Arc::strong_count(&token), 2);
+
+        runtime.close().unwrap();
+        assert_eq!(Arc::strong_count(&token), 1);
     }
 
     #[test]

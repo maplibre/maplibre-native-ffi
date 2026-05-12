@@ -9,6 +9,7 @@ mod json;
 mod map;
 mod options;
 mod projection;
+mod resource;
 mod runtime;
 mod values;
 
@@ -35,6 +36,7 @@ pub use options::{
     NorthOrientation, TileLodMode, ViewportMode,
 };
 pub use projection::MapProjectionHandle;
+pub use resource::{ResourceKind, ResourceTransformRequest};
 pub use runtime::RuntimeHandle;
 pub use support::{Error, ErrorKind, Result};
 pub use values::{
