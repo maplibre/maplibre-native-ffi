@@ -483,6 +483,152 @@ impl MapHandle {
         })
     }
 
+    /// Adds an image source that loads its image from a URL.
+    ///
+    /// Coordinates are borrowed for the call and copied by native on success.
+    /// The array entries are in top-left, top-right, bottom-right, bottom-left
+    /// order.
+    pub fn add_image_source_url(
+        &self,
+        source_id: &str,
+        coordinates: &[LatLng; 4],
+        url: &str,
+    ) -> Result<()> {
+        let map = self.inner.as_ptr()?;
+        let source_id = support::string::string_view(source_id);
+        let coordinates = lat_lngs_to_native(coordinates);
+        let url = support::string::string_view(url);
+        // SAFETY: map is live, source_id and url are explicit-length views
+        // valid for this call, and coordinates points to call-scoped native
+        // coordinate storage. Native validates coordinate contents.
+        support::check(unsafe {
+            sys::mln_map_add_image_source_url(
+                map,
+                source_id.raw(),
+                const_ptr_or_null(&coordinates),
+                coordinates.len(),
+                url.raw(),
+            )
+        })
+    }
+
+    /// Adds an image source with inline premultiplied RGBA8 pixels.
+    ///
+    /// Coordinates and image pixels are borrowed for the call and copied by
+    /// native on success. Coordinate entries are in top-left, top-right,
+    /// bottom-right, bottom-left order.
+    pub fn add_image_source_image(
+        &self,
+        source_id: &str,
+        coordinates: &[LatLng; 4],
+        image: &PremultipliedRgba8Image,
+    ) -> Result<()> {
+        let map = self.inner.as_ptr()?;
+        let source_id = support::string::string_view(source_id);
+        let coordinates = lat_lngs_to_native(coordinates);
+        let image = premultiplied_rgba8_image_to_native(image);
+        // SAFETY: map is live, source_id is an explicit-length view valid for
+        // this call, coordinates points to call-scoped native coordinate
+        // storage, and image points into the borrowed Rust image for this call.
+        support::check(unsafe {
+            sys::mln_map_add_image_source_image(
+                map,
+                source_id.raw(),
+                const_ptr_or_null(&coordinates),
+                coordinates.len(),
+                &image,
+            )
+        })
+    }
+
+    /// Updates an image source to load its image from a URL.
+    pub fn set_image_source_url(&self, source_id: &str, url: &str) -> Result<()> {
+        let map = self.inner.as_ptr()?;
+        let source_id = support::string::string_view(source_id);
+        let url = support::string::string_view(url);
+        // SAFETY: map is live, and source_id and url are explicit-length views
+        // valid for this call.
+        support::check(unsafe {
+            sys::mln_map_set_image_source_url(map, source_id.raw(), url.raw())
+        })
+    }
+
+    /// Updates an image source with inline premultiplied RGBA8 pixels.
+    pub fn set_image_source_image(
+        &self,
+        source_id: &str,
+        image: &PremultipliedRgba8Image,
+    ) -> Result<()> {
+        let map = self.inner.as_ptr()?;
+        let source_id = support::string::string_view(source_id);
+        let image = premultiplied_rgba8_image_to_native(image);
+        // SAFETY: map is live, source_id is an explicit-length view valid for
+        // this call, and image points into the borrowed Rust image for this call.
+        support::check(unsafe { sys::mln_map_set_image_source_image(map, source_id.raw(), &image) })
+    }
+
+    /// Updates image source coordinates.
+    ///
+    /// Coordinates are borrowed for the call and copied by native on success.
+    /// The array entries are in top-left, top-right, bottom-right, bottom-left
+    /// order.
+    pub fn set_image_source_coordinates(
+        &self,
+        source_id: &str,
+        coordinates: &[LatLng; 4],
+    ) -> Result<()> {
+        let map = self.inner.as_ptr()?;
+        let source_id = support::string::string_view(source_id);
+        let coordinates = lat_lngs_to_native(coordinates);
+        // SAFETY: map is live, source_id is an explicit-length view valid for
+        // this call, and coordinates points to call-scoped native coordinate
+        // storage. Native validates coordinate contents.
+        support::check(unsafe {
+            sys::mln_map_set_image_source_coordinates(
+                map,
+                source_id.raw(),
+                const_ptr_or_null(&coordinates),
+                coordinates.len(),
+            )
+        })
+    }
+
+    /// Copies image source coordinates into owned Rust values.
+    pub fn image_source_coordinates(&self, source_id: &str) -> Result<Option<[LatLng; 4]>> {
+        let map = self.inner.as_ptr()?;
+        let source_id = support::string::string_view(source_id);
+        let mut coordinates = [sys::mln_lat_lng {
+            latitude: 0.0,
+            longitude: 0.0,
+        }; 4];
+        let mut coordinate_count = 0;
+        let mut found = false;
+        // SAFETY: map is live, source_id is an explicit-length view valid for
+        // this call, coordinates has capacity for four native coordinates, and
+        // output pointers refer to writable storage.
+        support::check(unsafe {
+            sys::mln_map_get_image_source_coordinates(
+                map,
+                source_id.raw(),
+                coordinates.as_mut_ptr(),
+                coordinates.len(),
+                &mut coordinate_count,
+                &mut found,
+            )
+        })?;
+        if !found {
+            return Ok(None);
+        }
+        if coordinate_count != coordinates.len() {
+            return Err(Error::new(
+                ErrorKind::NativeError,
+                None,
+                "native image source coordinate count did not match Rust image source invariant",
+            ));
+        }
+        Ok(Some(coordinates.map(LatLng::from_native)))
+    }
+
     /// Removes one style source by ID.
     ///
     /// Returns whether a source existed and was removed. Native returns an
@@ -530,9 +676,7 @@ impl MapHandle {
         let image_id = support::string::string_view(image_id);
         let image = premultiplied_rgba8_image_to_native(image);
         let options = options.map(StyleImageOptions::to_native);
-        let options_ptr = options
-            .as_ref()
-            .map_or(ptr::null(), ptr::from_ref);
+        let options_ptr = options.as_ref().map_or(ptr::null(), ptr::from_ref);
         // SAFETY: map is live, image_id is an explicit-length view valid for
         // this call, image points into the borrowed Rust image for this call,
         // and options_ptr is either null or points to call-scoped options.
@@ -1955,6 +2099,176 @@ mod tests {
                 &image,
                 Some(&StyleImageOptions::new().with_pixel_ratio(0.0)),
             )
+            .unwrap_err();
+        assert_eq!(error.kind(), ErrorKind::InvalidArgument);
+        assert!(error.raw_status().is_some());
+    }
+
+    fn image_source_coordinates() -> [LatLng; 4] {
+        [
+            LatLng::new(0.0, 0.0),
+            LatLng::new(0.0, 1.0),
+            LatLng::new(1.0, 1.0),
+            LatLng::new(1.0, 0.0),
+        ]
+    }
+
+    #[test]
+    fn image_source_url_add_get_and_update_coordinates_call_real_c_api() {
+        let runtime = RuntimeHandle::new().unwrap();
+        let map = MapHandle::new(&runtime).unwrap();
+        map.set_style_json(VALID_STYLE_JSON).unwrap();
+
+        let coordinates = image_source_coordinates();
+        assert_eq!(map.image_source_coordinates("missing").unwrap(), None);
+
+        map.add_image_source_url("url-image", &coordinates, "https://example.com/image.png")
+            .unwrap();
+        assert!(map.style_source_exists("url-image").unwrap());
+        assert_eq!(
+            map.style_source_type("url-image").unwrap(),
+            Some(SourceType::Image)
+        );
+        assert_eq!(
+            map.image_source_coordinates("url-image").unwrap(),
+            Some(coordinates)
+        );
+
+        let error = map
+            .set_image_source_url("missing", "https://example.com/missing.png")
+            .unwrap_err();
+        assert_eq!(error.kind(), ErrorKind::InvalidArgument);
+        assert!(error.raw_status().is_some());
+
+        map.set_image_source_url("url-image", "https://example.com/replacement.png")
+            .unwrap();
+
+        let error = map.set_image_source_url("url-image", "").unwrap_err();
+        assert_eq!(error.kind(), ErrorKind::InvalidArgument);
+        assert!(error.raw_status().is_some());
+        let updated = [
+            LatLng::new(2.0, 2.0),
+            LatLng::new(2.0, 3.0),
+            LatLng::new(3.0, 3.0),
+            LatLng::new(3.0, 2.0),
+        ];
+        map.set_image_source_coordinates("url-image", &updated)
+            .unwrap();
+        assert_eq!(
+            map.image_source_coordinates("url-image").unwrap(),
+            Some(updated)
+        );
+
+        let error = map
+            .add_image_source_url("", &coordinates, "https://example.com/a.png")
+            .unwrap_err();
+        assert_eq!(error.kind(), ErrorKind::InvalidArgument);
+        assert!(error.raw_status().is_some());
+
+        let error = map
+            .add_image_source_url("bad-url", &coordinates, "")
+            .unwrap_err();
+        assert_eq!(error.kind(), ErrorKind::InvalidArgument);
+        assert!(error.raw_status().is_some());
+
+        let error = map
+            .set_image_source_coordinates("missing", &coordinates)
+            .unwrap_err();
+        assert_eq!(error.kind(), ErrorKind::InvalidArgument);
+        assert!(error.raw_status().is_some());
+
+        let error = map.image_source_coordinates("").unwrap_err();
+        assert_eq!(error.kind(), ErrorKind::InvalidArgument);
+        assert!(error.raw_status().is_some());
+    }
+
+    #[test]
+    fn image_source_inline_image_add_and_update_call_real_c_api() {
+        let runtime = RuntimeHandle::new().unwrap();
+        let map = MapHandle::new(&runtime).unwrap();
+        map.set_style_json(VALID_STYLE_JSON).unwrap();
+
+        let coordinates = image_source_coordinates();
+        let image = test_style_image(vec![1; 16]);
+        map.add_image_source_image("inline-image", &coordinates, &image)
+            .unwrap();
+        assert_eq!(
+            map.style_source_type("inline-image").unwrap(),
+            Some(SourceType::Image)
+        );
+        assert_eq!(
+            map.image_source_coordinates("inline-image").unwrap(),
+            Some(coordinates)
+        );
+
+        let replacement = test_style_image(vec![2; 16]);
+        let error = map
+            .set_image_source_image("missing", &replacement)
+            .unwrap_err();
+        assert_eq!(error.kind(), ErrorKind::InvalidArgument);
+        assert!(error.raw_status().is_some());
+
+        map.set_image_source_image("inline-image", &replacement)
+            .unwrap();
+
+        let too_short = PremultipliedRgba8Image {
+            info: TextureImageInfo {
+                width: 2,
+                height: 2,
+                stride: 8,
+                byte_length: 16,
+            },
+            data: vec![0; 15],
+        };
+        let error = map
+            .set_image_source_image("inline-image", &too_short)
+            .unwrap_err();
+        assert_eq!(error.kind(), ErrorKind::InvalidArgument);
+        assert!(error.raw_status().is_some());
+        map.set_image_source_url("inline-image", "https://example.com/after-inline.png")
+            .unwrap();
+
+        let error = map.set_image_source_image("", &replacement).unwrap_err();
+        assert_eq!(error.kind(), ErrorKind::InvalidArgument);
+        assert!(error.raw_status().is_some());
+    }
+
+    #[test]
+    fn image_source_methods_reject_non_image_sources() {
+        let runtime = RuntimeHandle::new().unwrap();
+        let map = MapHandle::new(&runtime).unwrap();
+        map.set_style_json(VALID_STYLE_JSON).unwrap();
+
+        let geojson_source = JsonValue::Object(vec![
+            JsonMember::new("type", JsonValue::String("geojson".to_owned())),
+            JsonMember::new(
+                "data",
+                JsonValue::Object(vec![
+                    JsonMember::new("type", JsonValue::String("FeatureCollection".to_owned())),
+                    JsonMember::new("features", JsonValue::Array(Vec::new())),
+                ]),
+            ),
+        ]);
+        map.add_style_source_json("geo", &geojson_source).unwrap();
+
+        let error = map.image_source_coordinates("geo").unwrap_err();
+        assert_eq!(error.kind(), ErrorKind::InvalidArgument);
+        assert!(error.raw_status().is_some());
+
+        let error = map
+            .set_image_source_url("geo", "https://example.com/not-image.png")
+            .unwrap_err();
+        assert_eq!(error.kind(), ErrorKind::InvalidArgument);
+        assert!(error.raw_status().is_some());
+
+        let image = test_style_image(vec![3; 16]);
+        let error = map.set_image_source_image("geo", &image).unwrap_err();
+        assert_eq!(error.kind(), ErrorKind::InvalidArgument);
+        assert!(error.raw_status().is_some());
+
+        let coordinates = image_source_coordinates();
+        let error = map
+            .set_image_source_coordinates("geo", &coordinates)
             .unwrap_err();
         assert_eq!(error.kind(), ErrorKind::InvalidArgument);
         assert!(error.raw_status().is_some());

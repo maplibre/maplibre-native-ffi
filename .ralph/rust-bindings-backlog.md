@@ -23,7 +23,7 @@ commit/push after each item.
 - [x] Style source type, source info, attribution, and copied source output
       types.
 - [x] Style image add/remove/query APIs and image metadata/value types.
-- [ ] Image source APIs for URL, coordinates, and image updates.
+- [x] Image source APIs for URL, coordinates, and image updates.
 - [ ] Remaining layer/source helpers exposed by Java FFM over the C style API.
 - [ ] RenderSession feature state set/get/remove.
 - [ ] FeatureStateSelector and selector materialization.
@@ -69,6 +69,8 @@ commit/push after each item.
   `cargo test -p maplibre-native style_image -- --nocapture`,
   `cargo test -p maplibre-native style_image_descriptor_materialization_rejects_invalid_images_and_options -- --nocapture`,
   and `mise run //bindings/rust:test`.
+- Image source APIs for URL, coordinates, and image updates:
+  `cargo fmt -p maplibre-native` and `mise run //bindings/rust:test`.
 
 ## Notes
 

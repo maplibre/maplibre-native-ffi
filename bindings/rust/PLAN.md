@@ -62,7 +62,7 @@ Map and style APIs:
 - [x] Style source type, source info, attribution, and related copied source
       output types.
 - [x] Style image add/remove/query APIs and image metadata/value types.
-- Image source APIs for URL, coordinates, and image updates.
+- [x] Image source APIs for URL, coordinates, and image updates.
 - Remaining layer/source helpers that Java FFM exposes over the C style API.
 
 Render session and query APIs:
