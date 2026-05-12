@@ -10,60 +10,38 @@ platforms = ["linux-64", "linux-aarch64", "osx-64", "osx-arm64", "win-64"]
 macos = "14.0"
 
 [dependencies]
-# Core build/package tools — available on all conda-forge platforms incl. win-arm64
+clang-tools = ">=22,<23"
 cmake = ">=4,<5"
+glslang = "*"
 icu = "*"
 libcurl = "*"
 libjpeg-turbo = "*"
 libpng = "*"
 libuv = "*"
+libvulkan-loader = "*"
 libwebp = "*"
 ninja = "*"
 pkg-config = "*"
+sdl3 = ">=3.4,<4"
 zlib = "*"
-
-# clang-tools, glslang, libvulkan-loader, and sdl3 are NOT yet packaged for
-# win-arm64 on conda-forge, so they are listed per platform below.
 
 [target.linux-64.dependencies]
 clang = ">=22,<23"
 clangdev = ">=22,<23"
-clang-tools = ">=22,<23"
-glslang = "*"
-libvulkan-loader = "*"
 mesalib = ">=26.0.3,<27"
-sdl3 = ">=3.4,<4"
 sysroot_linux-64 = "*"
 vulkan-tools = ">=1.4.341.0,<2"
 
 [target.linux-aarch64.dependencies]
 clang = ">=22,<23"
 clangdev = ">=22,<23"
-clang-tools = ">=22,<23"
-glslang = "*"
-libvulkan-loader = "*"
 mesalib = ">=26.0.3,<27"
-sdl3 = ">=3.4,<4"
 sysroot_linux-aarch64 = "*"
 vulkan-tools = ">=1.4.341.0,<2"
 
-[target.osx-64.dependencies]
-clang-tools = ">=22,<23"
-glslang = "*"
-libvulkan-loader = "*"
-sdl3 = ">=3.4,<4"
-
 [target.osx-arm64.dependencies]
-clang-tools = ">=22,<23"
-glslang = "*"
-libvulkan-loader = "*"
 moltenvk = ">=1.4.1,<2"
-sdl3 = ">=3.4,<4"
 
 [target.win-64.dependencies]
-clang-tools = ">=22,<23"
 cxx-compiler = "*"
 dlfcn-win32 = "*"
-glslang = "*"
-libvulkan-loader = "*"
-sdl3 = ">=3.4,<4"
