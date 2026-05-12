@@ -200,7 +200,9 @@ class EGLSurfaceSessionBackend final : public mln::core::SurfaceSessionBackend {
 
   auto swap_buffers() -> mln_status override {
     if (!backend_.swapBuffers()) {
-      mln::core::set_thread_error("eglSwapBuffers failed: surface may have been lost");
+      mln::core::set_thread_error(
+        "eglSwapBuffers failed: surface may have been lost"
+      );
       return MLN_STATUS_INVALID_STATE;
     }
     return MLN_STATUS_OK;
