@@ -64,8 +64,6 @@ typedef struct mln_egl_surface_descriptor {
   double scale_factor;
   /** Borrowed EGLDisplay. Required. */
   void* display;
-  /** Borrowed EGLConfig used when creating context and surface. Required. */
-  void* config;
   /** Borrowed EGLContext. Required. */
   void* context;
   /** Borrowed EGLSurface (window surface). Required. */

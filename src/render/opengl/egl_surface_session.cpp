@@ -66,11 +66,11 @@ auto validate_descriptor(const mln_egl_surface_descriptor* descriptor)
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   if (
-    descriptor->display == nullptr || descriptor->config == nullptr ||
-    descriptor->context == nullptr || descriptor->surface == nullptr
+    descriptor->display == nullptr || descriptor->context == nullptr ||
+    descriptor->surface == nullptr
   ) {
     mln::core::set_thread_error(
-      "EGL display, config, context, and surface must not be null"
+      "EGL display, context, and surface must not be null"
     );
     return MLN_STATUS_INVALID_ARGUMENT;
   }

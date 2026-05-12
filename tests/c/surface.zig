@@ -33,7 +33,6 @@ test "surface descriptors expose defaults" {
     try testing.expect(egl.height > 0);
     try testing.expect(egl.scale_factor > 0);
     try testing.expect(egl.display == null);
-    try testing.expect(egl.config == null);
     try testing.expect(egl.context == null);
     try testing.expect(egl.surface == null);
 

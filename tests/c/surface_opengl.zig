@@ -17,7 +17,6 @@ test "EGL surface unsupported backend validates arguments" {
 
     var descriptor = c.mln_egl_surface_descriptor_default();
     descriptor.display = @ptrFromInt(1);
-    descriptor.config = @ptrFromInt(1);
     descriptor.context = @ptrFromInt(1);
     descriptor.surface = @ptrFromInt(1);
 
@@ -43,7 +42,6 @@ test "EGL surface attach rejects invalid arguments" {
 
     var descriptor = c.mln_egl_surface_descriptor_default();
     descriptor.display = @ptrFromInt(1);
-    descriptor.config = @ptrFromInt(1);
     descriptor.context = @ptrFromInt(1);
     descriptor.surface = @ptrFromInt(1);
 
@@ -80,10 +78,6 @@ test "EGL surface attach rejects invalid arguments" {
     // Missing EGL handles
     bad = descriptor;
     bad.display = null;
-    try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, c.mln_egl_surface_attach(map, &bad, &session));
-
-    bad = descriptor;
-    bad.config = null;
     try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, c.mln_egl_surface_attach(map, &bad, &session));
 
     bad = descriptor;
@@ -197,7 +191,6 @@ test "EGL surface lifecycle and render update" {
     descriptor.width = 64;
     descriptor.height = 64;
     descriptor.display = egl.display;
-    descriptor.config = egl.config;
     descriptor.context = egl.context;
     descriptor.surface = egl.surface;
 

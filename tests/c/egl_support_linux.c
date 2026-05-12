@@ -74,7 +74,6 @@ typedef EGLBoolean (*PFN_eglTerminate)(EGLDisplay);
 typedef struct mln_test_egl_context {
   void* egl_lib;
   EGLDisplay display;
-  EGLConfig config;
   EGLContext context;
   EGLSurface surface;
   PFN_eglDestroyContext pfn_destroy_context;
@@ -155,10 +154,11 @@ bool mln_test_egl_create(
     8,
     EGL_NONE,
   };
+  EGLConfig config;
   EGLint num_configs = 0;
   if (
     !pfn_choose_config(
-      out->display, config_attribs, &out->config, 1, &num_configs
+      out->display, config_attribs, &config, 1, &num_configs
     ) ||
     num_configs == 0
   ) {
@@ -172,7 +172,7 @@ bool mln_test_egl_create(
     EGL_NONE,
   };
   out->context =
-    pfn_create_context(out->display, out->config, EGL_NO_CONTEXT, ctx_attribs);
+    pfn_create_context(out->display, config, EGL_NO_CONTEXT, ctx_attribs);
   if (out->context == EGL_NO_CONTEXT) {
     fprintf(stderr, "egl_support: eglCreateContext failed\n");
     return false;
@@ -181,7 +181,7 @@ bool mln_test_egl_create(
   const EGLint pbuffer_attribs[] = {
     EGL_WIDTH, (EGLint)width, EGL_HEIGHT, (EGLint)height, EGL_NONE,
   };
-  out->surface = pfn_create_pbuffer(out->display, out->config, pbuffer_attribs);
+  out->surface = pfn_create_pbuffer(out->display, config, pbuffer_attribs);
   if (out->surface == EGL_NO_SURFACE) {
     fprintf(stderr, "egl_support: eglCreatePbufferSurface failed\n");
     return false;

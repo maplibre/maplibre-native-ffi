@@ -1,13 +1,12 @@
 const build_options = @import("build_options");
 const builtin = @import("builtin");
 
-/// Holds the EGL display, config, context, and pbuffer surface created by
+/// Holds the EGL display, context, and pbuffer surface created by
 /// mln_test_egl_create. Layout must match mln_test_egl_context in
 /// egl_support_linux.c.
 pub const EglContext = extern struct {
     egl_lib: ?*anyopaque,
     display: ?*anyopaque,
-    config: ?*anyopaque,
     context: ?*anyopaque,
     surface: ?*anyopaque,
     pfn_destroy_context: ?*anyopaque,
