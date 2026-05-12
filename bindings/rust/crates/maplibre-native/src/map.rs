@@ -85,6 +85,190 @@ pub struct SourceInfo {
     pub attribution: Option<String>,
 }
 
+/// Tile URL coordinate scheme for vector, raster, and raster DEM sources.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum TileScheme {
+    Xyz,
+    Tms,
+}
+
+impl TileScheme {
+    pub fn raw_value(self) -> u32 {
+        match self {
+            Self::Xyz => sys::MLN_STYLE_TILE_SCHEME_XYZ,
+            Self::Tms => sys::MLN_STYLE_TILE_SCHEME_TMS,
+        }
+    }
+}
+
+/// Vector tile encoding for vector style sources.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum VectorTileEncoding {
+    Mvt,
+    Mlt,
+}
+
+impl VectorTileEncoding {
+    pub fn raw_value(self) -> u32 {
+        match self {
+            Self::Mvt => sys::MLN_STYLE_VECTOR_TILE_ENCODING_MVT,
+            Self::Mlt => sys::MLN_STYLE_VECTOR_TILE_ENCODING_MLT,
+        }
+    }
+}
+
+/// DEM raster encoding for raster DEM style sources.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum RasterDemEncoding {
+    Mapbox,
+    Terrarium,
+}
+
+impl RasterDemEncoding {
+    pub fn raw_value(self) -> u32 {
+        match self {
+            Self::Mapbox => sys::MLN_STYLE_RASTER_DEM_ENCODING_MAPBOX,
+            Self::Terrarium => sys::MLN_STYLE_RASTER_DEM_ENCODING_TERRARIUM,
+        }
+    }
+}
+
+/// Image-name property slots for location indicator layers.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum LocationIndicatorImageKind {
+    Top,
+    Bearing,
+    Shadow,
+}
+
+impl LocationIndicatorImageKind {
+    pub fn raw_value(self) -> u32 {
+        match self {
+            Self::Top => sys::MLN_LOCATION_INDICATOR_IMAGE_KIND_TOP,
+            Self::Bearing => sys::MLN_LOCATION_INDICATOR_IMAGE_KIND_BEARING,
+            Self::Shadow => sys::MLN_LOCATION_INDICATOR_IMAGE_KIND_SHADOW,
+        }
+    }
+}
+
+/// Options for vector, raster, and raster DEM tile sources.
+#[derive(Debug, Clone, Default, PartialEq)]
+#[non_exhaustive]
+pub struct TileSourceOptions {
+    pub min_zoom: Option<f64>,
+    pub max_zoom: Option<f64>,
+    pub attribution: Option<String>,
+    pub scheme: Option<TileScheme>,
+    pub bounds: Option<LatLngBounds>,
+    pub tile_size: Option<u32>,
+    pub vector_encoding: Option<VectorTileEncoding>,
+    pub raster_dem_encoding: Option<RasterDemEncoding>,
+}
+
+impl TileSourceOptions {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn with_min_zoom(mut self, min_zoom: f64) -> Self {
+        self.min_zoom = Some(min_zoom);
+        self
+    }
+
+    pub fn with_max_zoom(mut self, max_zoom: f64) -> Self {
+        self.max_zoom = Some(max_zoom);
+        self
+    }
+
+    pub fn with_attribution(mut self, attribution: impl Into<String>) -> Self {
+        self.attribution = Some(attribution.into());
+        self
+    }
+
+    pub fn with_scheme(mut self, scheme: TileScheme) -> Self {
+        self.scheme = Some(scheme);
+        self
+    }
+
+    pub fn with_bounds(mut self, bounds: LatLngBounds) -> Self {
+        self.bounds = Some(bounds);
+        self
+    }
+
+    pub fn with_tile_size(mut self, tile_size: u32) -> Self {
+        self.tile_size = Some(tile_size);
+        self
+    }
+
+    pub fn with_vector_encoding(mut self, vector_encoding: VectorTileEncoding) -> Self {
+        self.vector_encoding = Some(vector_encoding);
+        self
+    }
+
+    pub fn with_raster_dem_encoding(mut self, raster_dem_encoding: RasterDemEncoding) -> Self {
+        self.raster_dem_encoding = Some(raster_dem_encoding);
+        self
+    }
+
+    fn to_native(&self) -> NativeTileSourceOptions<'_> {
+        let attribution = self
+            .attribution
+            .as_deref()
+            .map(support::string::string_view);
+        // SAFETY: This C helper returns a plain value with no preconditions.
+        let mut raw = unsafe { sys::mln_style_tile_source_options_default() };
+        if let Some(value) = self.min_zoom {
+            raw.fields |= sys::MLN_STYLE_TILE_SOURCE_OPTION_MIN_ZOOM;
+            raw.min_zoom = value;
+        }
+        if let Some(value) = self.max_zoom {
+            raw.fields |= sys::MLN_STYLE_TILE_SOURCE_OPTION_MAX_ZOOM;
+            raw.max_zoom = value;
+        }
+        if let Some(value) = attribution.as_ref() {
+            raw.fields |= sys::MLN_STYLE_TILE_SOURCE_OPTION_ATTRIBUTION;
+            raw.attribution = value.raw();
+        }
+        if let Some(value) = self.scheme {
+            raw.fields |= sys::MLN_STYLE_TILE_SOURCE_OPTION_SCHEME;
+            raw.scheme = value.raw_value();
+        }
+        if let Some(value) = self.bounds {
+            raw.fields |= sys::MLN_STYLE_TILE_SOURCE_OPTION_BOUNDS;
+            raw.bounds = value.to_native();
+        }
+        if let Some(value) = self.tile_size {
+            raw.fields |= sys::MLN_STYLE_TILE_SOURCE_OPTION_TILE_SIZE;
+            raw.tile_size = value;
+        }
+        if let Some(value) = self.vector_encoding {
+            raw.fields |= sys::MLN_STYLE_TILE_SOURCE_OPTION_VECTOR_ENCODING;
+            raw.vector_encoding = value.raw_value();
+        }
+        if let Some(value) = self.raster_dem_encoding {
+            raw.fields |= sys::MLN_STYLE_TILE_SOURCE_OPTION_RASTER_ENCODING;
+            raw.raster_encoding = value.raw_value();
+        }
+        NativeTileSourceOptions { raw, attribution }
+    }
+}
+
+struct NativeTileSourceOptions<'a> {
+    raw: sys::mln_style_tile_source_options,
+    #[allow(dead_code)]
+    attribution: Option<support::string::StringView<'a>>,
+}
+
+impl NativeTileSourceOptions<'_> {
+    fn as_ptr(&self) -> *const sys::mln_style_tile_source_options {
+        ptr::from_ref(&self.raw)
+    }
+}
+
 /// Options for adding or replacing a runtime style image.
 #[derive(Debug, Clone, Default, PartialEq)]
 #[non_exhaustive]
@@ -480,6 +664,174 @@ impl MapHandle {
         // this call, and source_json owns the descriptor graph for this call.
         support::check(unsafe {
             sys::mln_map_add_style_source_json(map, source_id.raw(), source_json.as_ptr())
+        })
+    }
+
+    /// Adds a vector source with a TileJSON URL.
+    pub fn add_vector_source_url(
+        &self,
+        source_id: &str,
+        url: &str,
+        options: Option<&TileSourceOptions>,
+    ) -> Result<()> {
+        let map = self.inner.as_ptr()?;
+        let source_id = support::string::string_view(source_id);
+        let url = support::string::string_view(url);
+        let options = options.map(TileSourceOptions::to_native);
+        let options_ptr = options
+            .as_ref()
+            .map_or(ptr::null(), NativeTileSourceOptions::as_ptr);
+        // SAFETY: map is live, source_id and url are valid for this call, and
+        // options_ptr is null or points to call-scoped native options.
+        support::check(unsafe {
+            sys::mln_map_add_vector_source_url(map, source_id.raw(), url.raw(), options_ptr)
+        })
+    }
+
+    /// Adds a vector source with inline tile URLs.
+    pub fn add_vector_source_tiles<S: AsRef<str>>(
+        &self,
+        source_id: &str,
+        tiles: &[S],
+        options: Option<&TileSourceOptions>,
+    ) -> Result<()> {
+        let map = self.inner.as_ptr()?;
+        let source_id = support::string::string_view(source_id);
+        let tile_views: Vec<_> = tiles
+            .iter()
+            .map(|tile| support::string::string_view(tile.as_ref()))
+            .collect();
+        let raw_tiles: Vec<_> = tile_views
+            .iter()
+            .map(support::string::StringView::raw)
+            .collect();
+        let options = options.map(TileSourceOptions::to_native);
+        let options_ptr = options
+            .as_ref()
+            .map_or(ptr::null(), NativeTileSourceOptions::as_ptr);
+        // SAFETY: map is live, source_id is valid for this call, raw_tiles
+        // points to call-scoped string views, and options_ptr is null or points
+        // to call-scoped native options.
+        support::check(unsafe {
+            sys::mln_map_add_vector_source_tiles(
+                map,
+                source_id.raw(),
+                const_ptr_or_null(&raw_tiles),
+                raw_tiles.len(),
+                options_ptr,
+            )
+        })
+    }
+
+    /// Adds a raster source with a TileJSON URL.
+    pub fn add_raster_source_url(
+        &self,
+        source_id: &str,
+        url: &str,
+        options: Option<&TileSourceOptions>,
+    ) -> Result<()> {
+        let map = self.inner.as_ptr()?;
+        let source_id = support::string::string_view(source_id);
+        let url = support::string::string_view(url);
+        let options = options.map(TileSourceOptions::to_native);
+        let options_ptr = options
+            .as_ref()
+            .map_or(ptr::null(), NativeTileSourceOptions::as_ptr);
+        // SAFETY: map is live, source_id and url are valid for this call, and
+        // options_ptr is null or points to call-scoped native options.
+        support::check(unsafe {
+            sys::mln_map_add_raster_source_url(map, source_id.raw(), url.raw(), options_ptr)
+        })
+    }
+
+    /// Adds a raster source with inline tile URLs.
+    pub fn add_raster_source_tiles<S: AsRef<str>>(
+        &self,
+        source_id: &str,
+        tiles: &[S],
+        options: Option<&TileSourceOptions>,
+    ) -> Result<()> {
+        let map = self.inner.as_ptr()?;
+        let source_id = support::string::string_view(source_id);
+        let tile_views: Vec<_> = tiles
+            .iter()
+            .map(|tile| support::string::string_view(tile.as_ref()))
+            .collect();
+        let raw_tiles: Vec<_> = tile_views
+            .iter()
+            .map(support::string::StringView::raw)
+            .collect();
+        let options = options.map(TileSourceOptions::to_native);
+        let options_ptr = options
+            .as_ref()
+            .map_or(ptr::null(), NativeTileSourceOptions::as_ptr);
+        // SAFETY: map is live, source_id is valid for this call, raw_tiles
+        // points to call-scoped string views, and options_ptr is null or points
+        // to call-scoped native options.
+        support::check(unsafe {
+            sys::mln_map_add_raster_source_tiles(
+                map,
+                source_id.raw(),
+                const_ptr_or_null(&raw_tiles),
+                raw_tiles.len(),
+                options_ptr,
+            )
+        })
+    }
+
+    /// Adds a raster DEM source with a TileJSON URL.
+    pub fn add_raster_dem_source_url(
+        &self,
+        source_id: &str,
+        url: &str,
+        options: Option<&TileSourceOptions>,
+    ) -> Result<()> {
+        let map = self.inner.as_ptr()?;
+        let source_id = support::string::string_view(source_id);
+        let url = support::string::string_view(url);
+        let options = options.map(TileSourceOptions::to_native);
+        let options_ptr = options
+            .as_ref()
+            .map_or(ptr::null(), NativeTileSourceOptions::as_ptr);
+        // SAFETY: map is live, source_id and url are valid for this call, and
+        // options_ptr is null or points to call-scoped native options.
+        support::check(unsafe {
+            sys::mln_map_add_raster_dem_source_url(map, source_id.raw(), url.raw(), options_ptr)
+        })
+    }
+
+    /// Adds a raster DEM source with inline tile URLs.
+    pub fn add_raster_dem_source_tiles<S: AsRef<str>>(
+        &self,
+        source_id: &str,
+        tiles: &[S],
+        options: Option<&TileSourceOptions>,
+    ) -> Result<()> {
+        let map = self.inner.as_ptr()?;
+        let source_id = support::string::string_view(source_id);
+        let tile_views: Vec<_> = tiles
+            .iter()
+            .map(|tile| support::string::string_view(tile.as_ref()))
+            .collect();
+        let raw_tiles: Vec<_> = tile_views
+            .iter()
+            .map(support::string::StringView::raw)
+            .collect();
+        let options = options.map(TileSourceOptions::to_native);
+        let options_ptr = options
+            .as_ref()
+            .map_or(ptr::null(), NativeTileSourceOptions::as_ptr);
+        // SAFETY: map is live, source_id is valid for this call, raw_tiles
+        // points to call-scoped string views, and options_ptr is null or points
+        // to call-scoped native options.
+        support::check(unsafe {
+            sys::mln_map_add_raster_dem_source_tiles(
+                map,
+                source_id.raw(),
+                const_ptr_or_null(&raw_tiles),
+                raw_tiles.len(),
+                options_ptr,
+            )
         })
     }
 
@@ -966,6 +1318,132 @@ impl MapHandle {
         // before_layer_id is an explicit-length view valid for this call.
         support::check(unsafe {
             sys::mln_map_add_style_layer_json(map, layer_json.as_ptr(), before_layer_id.raw())
+        })
+    }
+
+    /// Adds a hillshade layer for a raster DEM source.
+    pub fn add_hillshade_layer(
+        &self,
+        layer_id: &str,
+        source_id: &str,
+        before_layer_id: Option<&str>,
+    ) -> Result<()> {
+        let map = self.inner.as_ptr()?;
+        let layer_id = support::string::string_view(layer_id);
+        let source_id = support::string::string_view(source_id);
+        let before_layer_id = support::string::string_view(before_layer_id.unwrap_or(""));
+        // SAFETY: map is live, and all string views are valid for this call.
+        support::check(unsafe {
+            sys::mln_map_add_hillshade_layer(
+                map,
+                layer_id.raw(),
+                source_id.raw(),
+                before_layer_id.raw(),
+            )
+        })
+    }
+
+    /// Adds a color-relief layer for a raster DEM source.
+    pub fn add_color_relief_layer(
+        &self,
+        layer_id: &str,
+        source_id: &str,
+        before_layer_id: Option<&str>,
+    ) -> Result<()> {
+        let map = self.inner.as_ptr()?;
+        let layer_id = support::string::string_view(layer_id);
+        let source_id = support::string::string_view(source_id);
+        let before_layer_id = support::string::string_view(before_layer_id.unwrap_or(""));
+        // SAFETY: map is live, and all string views are valid for this call.
+        support::check(unsafe {
+            sys::mln_map_add_color_relief_layer(
+                map,
+                layer_id.raw(),
+                source_id.raw(),
+                before_layer_id.raw(),
+            )
+        })
+    }
+
+    /// Adds a source-free location indicator layer.
+    pub fn add_location_indicator_layer(
+        &self,
+        layer_id: &str,
+        before_layer_id: Option<&str>,
+    ) -> Result<()> {
+        let map = self.inner.as_ptr()?;
+        let layer_id = support::string::string_view(layer_id);
+        let before_layer_id = support::string::string_view(before_layer_id.unwrap_or(""));
+        // SAFETY: map is live, and string views are valid for this call.
+        support::check(unsafe {
+            sys::mln_map_add_location_indicator_layer(map, layer_id.raw(), before_layer_id.raw())
+        })
+    }
+
+    /// Sets a location indicator layer location.
+    pub fn set_location_indicator_location(
+        &self,
+        layer_id: &str,
+        coordinate: LatLng,
+        altitude: f64,
+    ) -> Result<()> {
+        let map = self.inner.as_ptr()?;
+        let layer_id = support::string::string_view(layer_id);
+        // SAFETY: map is live, layer_id is valid for this call, and coordinate
+        // is passed by value.
+        support::check(unsafe {
+            sys::mln_map_set_location_indicator_location(
+                map,
+                layer_id.raw(),
+                coordinate.to_native(),
+                altitude,
+            )
+        })
+    }
+
+    /// Sets a location indicator layer bearing in degrees.
+    pub fn set_location_indicator_bearing(&self, layer_id: &str, bearing: f64) -> Result<()> {
+        let map = self.inner.as_ptr()?;
+        let layer_id = support::string::string_view(layer_id);
+        // SAFETY: map is live and layer_id is valid for this call.
+        support::check(unsafe {
+            sys::mln_map_set_location_indicator_bearing(map, layer_id.raw(), bearing)
+        })
+    }
+
+    /// Sets a location indicator layer accuracy radius in logical pixels.
+    pub fn set_location_indicator_accuracy_radius(
+        &self,
+        layer_id: &str,
+        radius: f64,
+    ) -> Result<()> {
+        let map = self.inner.as_ptr()?;
+        let layer_id = support::string::string_view(layer_id);
+        // SAFETY: map is live and layer_id is valid for this call.
+        support::check(unsafe {
+            sys::mln_map_set_location_indicator_accuracy_radius(map, layer_id.raw(), radius)
+        })
+    }
+
+    /// Sets one location indicator image-name property.
+    pub fn set_location_indicator_image_name(
+        &self,
+        layer_id: &str,
+        image_kind: LocationIndicatorImageKind,
+        image_id: &str,
+    ) -> Result<()> {
+        let map = self.inner.as_ptr()?;
+        let layer_id = support::string::string_view(layer_id);
+        let image_id = support::string::string_view(image_id);
+        // SAFETY: map is live, string views are valid for this call, and
+        // image_kind is a valid C enum value.
+        support::check(unsafe {
+            sys::mln_map_set_location_indicator_image_name(
+                map,
+                layer_id.raw(),
+                image_kind.raw_value(),
+                image_id.raw(),
+            )
         })
     }
 
@@ -2272,6 +2750,214 @@ mod tests {
             .unwrap_err();
         assert_eq!(error.kind(), ErrorKind::InvalidArgument);
         assert!(error.raw_status().is_some());
+    }
+
+    #[test]
+    fn tile_source_helpers_call_real_c_api() {
+        let runtime = RuntimeHandle::new().unwrap();
+        let map = MapHandle::new(&runtime).unwrap();
+        map.set_style_json(VALID_STYLE_JSON).unwrap();
+
+        let vector_options = TileSourceOptions::new()
+            .with_min_zoom(1.0)
+            .with_max_zoom(12.0)
+            .with_attribution("© vector")
+            .with_scheme(TileScheme::Xyz)
+            .with_bounds(LatLngBounds::new(
+                LatLng::new(-10.0, -20.0),
+                LatLng::new(10.0, 20.0),
+            ))
+            .with_vector_encoding(VectorTileEncoding::Mvt);
+        map.add_vector_source_url(
+            "vector-url",
+            "https://example.com/vector.json",
+            Some(&vector_options),
+        )
+        .unwrap();
+        assert_eq!(
+            map.style_source_type("vector-url").unwrap(),
+            Some(SourceType::Vector)
+        );
+
+        map.add_vector_source_tiles(
+            "vector-tiles",
+            &["https://example.com/vector/{z}/{x}/{y}.pbf"],
+            None,
+        )
+        .unwrap();
+        assert_eq!(
+            map.style_source_type("vector-tiles").unwrap(),
+            Some(SourceType::Vector)
+        );
+
+        let raster_options = TileSourceOptions::new()
+            .with_tile_size(256)
+            .with_scheme(TileScheme::Tms)
+            .with_attribution("© raster");
+        map.add_raster_source_url(
+            "raster-url",
+            "https://example.com/raster.json",
+            Some(&raster_options),
+        )
+        .unwrap();
+        assert_eq!(
+            map.style_source_type("raster-url").unwrap(),
+            Some(SourceType::Raster)
+        );
+
+        map.add_raster_source_tiles(
+            "raster-tiles",
+            &["https://example.com/raster/{z}/{x}/{y}.png"],
+            None,
+        )
+        .unwrap();
+        assert_eq!(
+            map.style_source_type("raster-tiles").unwrap(),
+            Some(SourceType::Raster)
+        );
+
+        let dem_options = TileSourceOptions::new()
+            .with_tile_size(512)
+            .with_raster_dem_encoding(RasterDemEncoding::Terrarium);
+        map.add_raster_dem_source_url(
+            "dem-url",
+            "https://example.com/dem.json",
+            Some(&dem_options),
+        )
+        .unwrap();
+        assert_eq!(
+            map.style_source_type("dem-url").unwrap(),
+            Some(SourceType::RasterDem)
+        );
+
+        map.add_raster_dem_source_tiles(
+            "dem-tiles",
+            &["https://example.com/dem/{z}/{x}/{y}.png"],
+            Some(&dem_options),
+        )
+        .unwrap();
+        assert_eq!(
+            map.style_source_type("dem-tiles").unwrap(),
+            Some(SourceType::RasterDem)
+        );
+
+        let error = map
+            .add_vector_source_url("", "https://example.com/vector.json", None)
+            .unwrap_err();
+        assert_eq!(error.kind(), ErrorKind::InvalidArgument);
+
+        let error = map
+            .add_raster_source_tiles("empty-tiles", &[] as &[&str], None)
+            .unwrap_err();
+        assert_eq!(error.kind(), ErrorKind::InvalidArgument);
+
+        let vector_only_options =
+            TileSourceOptions::new().with_vector_encoding(VectorTileEncoding::Mvt);
+        let error = map
+            .add_raster_source_tiles(
+                "raster-with-vector-option",
+                &["https://example.com/raster/{z}/{x}/{y}.png"],
+                Some(&vector_only_options),
+            )
+            .unwrap_err();
+        assert_eq!(error.kind(), ErrorKind::InvalidArgument);
+        assert!(error.raw_status().is_some());
+
+        let dem_only_options =
+            TileSourceOptions::new().with_raster_dem_encoding(RasterDemEncoding::Terrarium);
+        let error = map
+            .add_vector_source_tiles(
+                "vector-with-dem-option",
+                &["https://example.com/vector/{z}/{x}/{y}.pbf"],
+                Some(&dem_only_options),
+            )
+            .unwrap_err();
+        assert_eq!(error.kind(), ErrorKind::InvalidArgument);
+        assert!(error.raw_status().is_some());
+
+        let error = map
+            .add_raster_source_tiles(
+                "raster-with-dem-option",
+                &["https://example.com/raster/{z}/{x}/{y}.png"],
+                Some(&dem_only_options),
+            )
+            .unwrap_err();
+        assert_eq!(error.kind(), ErrorKind::InvalidArgument);
+        assert!(error.raw_status().is_some());
+    }
+
+    #[test]
+    fn terrain_and_location_layer_helpers_call_real_c_api() {
+        let runtime = RuntimeHandle::new().unwrap();
+        let map = MapHandle::new(&runtime).unwrap();
+        map.set_style_json(VALID_STYLE_JSON).unwrap();
+
+        map.add_raster_dem_source_tiles(
+            "dem",
+            &["https://example.com/dem/{z}/{x}/{y}.png"],
+            Some(&TileSourceOptions::new().with_raster_dem_encoding(RasterDemEncoding::Mapbox)),
+        )
+        .unwrap();
+        map.add_hillshade_layer("hillshade", "dem", None).unwrap();
+        map.add_color_relief_layer("color-relief", "dem", None)
+            .unwrap();
+
+        map.add_location_indicator_layer("location", None).unwrap();
+        map.set_location_indicator_location("location", LatLng::new(37.8, -122.4), 12.0)
+            .unwrap();
+        map.set_location_indicator_bearing("location", 45.0)
+            .unwrap();
+        map.set_location_indicator_accuracy_radius("location", 24.0)
+            .unwrap();
+        map.set_location_indicator_image_name(
+            "location",
+            LocationIndicatorImageKind::Top,
+            "location-top",
+        )
+        .unwrap();
+
+        assert_eq!(
+            map.layer_property("location", "location").unwrap(),
+            Some(JsonValue::Array(vec![
+                JsonValue::Double(-122.4),
+                JsonValue::Double(37.8),
+                JsonValue::Double(12.0),
+            ]))
+        );
+        assert_eq!(
+            map.layer_property("location", "bearing").unwrap(),
+            Some(JsonValue::Double(45.0))
+        );
+        assert_eq!(
+            map.layer_property("location", "accuracy-radius").unwrap(),
+            Some(JsonValue::Double(24.0))
+        );
+        assert_eq!(
+            map.layer_property("location", "top-image").unwrap(),
+            Some(JsonValue::Object(vec![
+                JsonMember::new("available", JsonValue::Bool(false)),
+                JsonMember::new("name", JsonValue::String("location-top".to_owned())),
+            ]))
+        );
+
+        let error = map.add_hillshade_layer("", "dem", None).unwrap_err();
+        assert_eq!(error.kind(), ErrorKind::InvalidArgument);
+
+        map.add_raster_source_tiles(
+            "raster",
+            &["https://example.com/raster/{z}/{x}/{y}.png"],
+            None,
+        )
+        .unwrap();
+        let error = map
+            .add_hillshade_layer("wrong-source-type", "raster", None)
+            .unwrap_err();
+        assert_eq!(error.kind(), ErrorKind::InvalidArgument);
+
+        let error = map
+            .set_location_indicator_image_name("location", LocationIndicatorImageKind::Bearing, "")
+            .unwrap_err();
+        assert_eq!(error.kind(), ErrorKind::InvalidArgument);
     }
 
     #[test]

@@ -24,7 +24,7 @@ commit/push after each item.
       types.
 - [x] Style image add/remove/query APIs and image metadata/value types.
 - [x] Image source APIs for URL, coordinates, and image updates.
-- [ ] Remaining layer/source helpers exposed by Java FFM over the C style API.
+- [x] Remaining layer/source helpers exposed by Java FFM over the C style API.
 - [ ] RenderSession feature state set/get/remove.
 - [ ] FeatureStateSelector and selector materialization.
 - [ ] Rendered query geometry and rendered/source query option types.
@@ -71,6 +71,11 @@ commit/push after each item.
   and `mise run //bindings/rust:test`.
 - Image source APIs for URL, coordinates, and image updates:
   `cargo fmt -p maplibre-native` and `mise run //bindings/rust:test`.
+- Remaining layer/source helpers exposed by Java FFM over the C style API:
+  `cargo fmt -p maplibre-native`,
+  `cargo test -p maplibre-native tile_source_helpers_call_real_c_api -- --nocapture`,
+  `cargo test -p maplibre-native terrain_and_location_layer_helpers_call_real_c_api -- --nocapture`,
+  and `mise run //bindings/rust:test`.
 
 ## Notes
 

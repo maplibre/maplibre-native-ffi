@@ -38,7 +38,10 @@ pub use logging::{
     LogEvent, LogRecord, LogSeverity, LogSeverityMask, clear_log_callback,
     restore_default_async_log_severity_mask, set_async_log_severity_mask, set_log_callback,
 };
-pub use map::{MapHandle, SourceInfo, SourceType, StyleImage, StyleImageInfo, StyleImageOptions};
+pub use map::{
+    LocationIndicatorImageKind, MapHandle, RasterDemEncoding, SourceInfo, SourceType, StyleImage,
+    StyleImageInfo, StyleImageOptions, TileScheme, TileSourceOptions, VectorTileEncoding,
+};
 pub use options::{
     ConstrainMode, MapDebugOptions, MapMode, MapOptions, MapTileOptions, MapViewportOptions,
     NorthOrientation, TileLodMode, ViewportMode,
