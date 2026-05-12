@@ -1,5 +1,6 @@
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
+use std::ffi::CString;
 use std::fmt;
 use std::rc::{Rc, Weak};
 
@@ -13,6 +14,97 @@ use crate::resource::{
     ResourceProviderState, ResourceTransformState, noop_resource_transform_descriptor,
 };
 use crate::{Error, ErrorKind, MapHandle, MapOptions, ResourceProviderDecision, Result};
+
+/// Options used when creating a runtime.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[non_exhaustive]
+pub struct RuntimeOptions {
+    /// Filesystem root for `asset://` URLs.
+    pub asset_path: Option<String>,
+    /// Cache database path.
+    pub cache_path: Option<String>,
+    /// Maximum ambient cache size in bytes.
+    pub maximum_cache_size: Option<u64>,
+}
+
+impl RuntimeOptions {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn with_asset_path(mut self, asset_path: impl Into<String>) -> Self {
+        self.asset_path = Some(asset_path.into());
+        self
+    }
+
+    pub fn with_cache_path(mut self, cache_path: impl Into<String>) -> Self {
+        self.cache_path = Some(cache_path.into());
+        self
+    }
+
+    pub fn with_maximum_cache_size(mut self, maximum_cache_size: u64) -> Self {
+        self.maximum_cache_size = Some(maximum_cache_size);
+        self
+    }
+
+    pub fn clear_asset_path(mut self) -> Self {
+        self.asset_path = None;
+        self
+    }
+
+    pub fn clear_cache_path(mut self) -> Self {
+        self.cache_path = None;
+        self
+    }
+
+    pub fn clear_maximum_cache_size(mut self) -> Self {
+        self.maximum_cache_size = None;
+        self
+    }
+
+    fn to_native(&self) -> Result<NativeRuntimeOptions> {
+        support::validate_abi_version()?;
+        NativeRuntimeOptions::new(self)
+    }
+}
+
+#[derive(Debug)]
+struct NativeRuntimeOptions {
+    raw: sys::mln_runtime_options,
+    _asset_path: Option<CString>,
+    _cache_path: Option<CString>,
+}
+
+impl NativeRuntimeOptions {
+    fn new(options: &RuntimeOptions) -> Result<Self> {
+        // SAFETY: Default constructor takes no arguments and initializes size,
+        // flags, and default values for this C ABI version.
+        let mut raw = unsafe { sys::mln_runtime_options_default() };
+        let asset_path = support::string::optional_c_string(options.asset_path.as_deref())?;
+        let cache_path = support::string::optional_c_string(options.cache_path.as_deref())?;
+
+        if let Some(asset_path) = &asset_path {
+            raw.asset_path = asset_path.as_ptr();
+        }
+        if let Some(cache_path) = &cache_path {
+            raw.cache_path = cache_path.as_ptr();
+        }
+        if let Some(maximum_cache_size) = options.maximum_cache_size {
+            raw.flags |= sys::MLN_RUNTIME_OPTION_MAXIMUM_CACHE_SIZE;
+            raw.maximum_cache_size = maximum_cache_size;
+        }
+
+        Ok(Self {
+            raw,
+            _asset_path: asset_path,
+            _cache_path: cache_path,
+        })
+    }
+
+    fn as_ptr(&self) -> *const sys::mln_runtime_options {
+        &self.raw
+    }
+}
 
 #[derive(Debug)]
 pub(crate) struct RuntimeState {
@@ -207,11 +299,24 @@ impl RuntimeHandle {
     /// Creates a runtime on the current thread using native default options.
     pub fn new() -> Result<Self> {
         support::validate_abi_version()?;
+        Self::create_with_native_options_after_abi_validation(std::ptr::null())
+    }
 
+    /// Creates a runtime on the current thread using explicit options.
+    pub fn with_options(options: &RuntimeOptions) -> Result<Self> {
+        let native_options = options.to_native()?;
+        Self::create_with_native_options_after_abi_validation(native_options.as_ptr())
+    }
+
+    fn create_with_native_options_after_abi_validation(
+        options: *const sys::mln_runtime_options,
+    ) -> Result<Self> {
         let mut out = support::ptr::OutPtr::<sys::mln_runtime>::new();
-        // SAFETY: Passing null options requests native defaults. out is a valid
-        // null-initialized out-pointer owned by this call.
-        support::check(unsafe { sys::mln_runtime_create(std::ptr::null(), out.as_mut_ptr()) })?;
+        // SAFETY: options is either null to request native defaults or points to
+        // a materialized mln_runtime_options value whose backing strings live
+        // for this call. out is a valid null-initialized out-pointer owned by
+        // this call.
+        support::check(unsafe { sys::mln_runtime_create(options, out.as_mut_ptr()) })?;
         let ptr = out_handle(out, "mln_runtime")?;
 
         Ok(Self {
@@ -366,6 +471,83 @@ mod tests {
     };
 
     const PROVIDER_STYLE_JSON: &str = r#"{"version":8,"sources":{},"layers":[]}"#;
+
+    #[test]
+    fn runtime_options_materialize_size_flags_and_strings() {
+        let options = RuntimeOptions::new()
+            .with_asset_path("/tmp/assets")
+            .with_cache_path("/tmp/cache.db")
+            .with_maximum_cache_size(1234);
+
+        let native = options.to_native().unwrap();
+
+        assert_eq!(
+            native.raw.size as usize,
+            std::mem::size_of::<sys::mln_runtime_options>()
+        );
+        assert_eq!(
+            native.raw.flags & sys::MLN_RUNTIME_OPTION_MAXIMUM_CACHE_SIZE,
+            sys::MLN_RUNTIME_OPTION_MAXIMUM_CACHE_SIZE
+        );
+        assert_eq!(native.raw.maximum_cache_size, 1234);
+        assert_eq!(
+            unsafe { std::ffi::CStr::from_ptr(native.raw.asset_path) }
+                .to_str()
+                .unwrap(),
+            "/tmp/assets"
+        );
+        assert_eq!(
+            unsafe { std::ffi::CStr::from_ptr(native.raw.cache_path) }
+                .to_str()
+                .unwrap(),
+            "/tmp/cache.db"
+        );
+    }
+
+    #[test]
+    fn runtime_options_materialize_absent_values_as_native_defaults() {
+        let native = RuntimeOptions::new().to_native().unwrap();
+
+        assert_eq!(
+            native.raw.flags & sys::MLN_RUNTIME_OPTION_MAXIMUM_CACHE_SIZE,
+            0
+        );
+        assert!(native.raw.asset_path.is_null());
+        assert!(native.raw.cache_path.is_null());
+    }
+
+    #[test]
+    fn runtime_options_reject_embedded_nul_strings() {
+        let error = RuntimeOptions::new()
+            .with_asset_path("asset\0path")
+            .to_native()
+            .unwrap_err();
+
+        assert_eq!(error.kind(), ErrorKind::InvalidArgument);
+        assert!(error.diagnostic().contains("embedded NUL"));
+
+        let error = RuntimeOptions::new()
+            .with_cache_path("cache\0path")
+            .to_native()
+            .unwrap_err();
+
+        assert_eq!(error.kind(), ErrorKind::InvalidArgument);
+        assert!(error.diagnostic().contains("embedded NUL"));
+    }
+
+    #[test]
+    fn runtime_create_with_explicit_options_uses_real_c_abi() {
+        let runtime = RuntimeHandle::with_options(
+            &RuntimeOptions::new()
+                .with_asset_path("")
+                .with_cache_path("")
+                .with_maximum_cache_size(0),
+        )
+        .unwrap();
+
+        runtime.run_once().unwrap();
+        runtime.close().unwrap();
+    }
 
     fn wait_for_runtime_event(runtime: &RuntimeHandle, event_type: RuntimeEventType) -> bool {
         for _ in 0..100 {

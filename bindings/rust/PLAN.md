@@ -49,8 +49,9 @@ scope.
 
 Runtime and process-global APIs:
 
-- `RuntimeOptions`, including asset path, cache path, and maximum cache size.
-- Runtime creation with explicit options.
+- [x] `RuntimeOptions`, including asset path, cache path, and maximum cache
+      size.
+- [x] Runtime creation with explicit options.
 - Ambient cache operations.
 - Process-global logging callbacks, callback clearing, log severity values, and
   async severity mask configuration.

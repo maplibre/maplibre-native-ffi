@@ -2,7 +2,7 @@ use maplibre_native::{
     CameraOptions, EdgeInsets, Feature, FeatureIdentifier, GeoJson, Geometry, JsonMember,
     JsonValue, LatLng, MapMode, MapOptions, MetalBorrowedTextureDescriptor,
     MetalOwnedTextureDescriptor, MetalSurfaceDescriptor, NativePointer, NetworkStatus,
-    OwnedTextureDescriptor, RenderBackendMask, RuntimeHandle, ScreenPoint,
+    OwnedTextureDescriptor, RenderBackendMask, RuntimeHandle, RuntimeOptions, ScreenPoint,
     VulkanBorrowedTextureDescriptor, VulkanOwnedTextureDescriptor, VulkanSurfaceDescriptor,
     c_version, network_status, set_network_status, supported_render_backends,
 };
@@ -31,7 +31,13 @@ fn public_api_uses_safe_rust_types() {
 
 #[test]
 fn public_handles_create_pump_drain_and_close() {
-    let runtime = RuntimeHandle::new().unwrap();
+    let runtime = RuntimeHandle::with_options(
+        &RuntimeOptions::new()
+            .with_asset_path("")
+            .with_cache_path("")
+            .with_maximum_cache_size(0),
+    )
+    .unwrap();
     runtime.run_once().unwrap();
     let _ = runtime.discard_one_event().unwrap();
     runtime.drain_events().unwrap();
