@@ -184,6 +184,7 @@ class EGLSurfaceSessionBackend final : public mln::core::SurfaceSessionBackend {
   }
 
   void swap_buffers() override { backend_.swapBuffers(); }
+  auto needs_explicit_scope() const -> bool override { return true; }
 
  private:
   EGLSurfaceBackendImpl backend_;

@@ -137,7 +137,10 @@ auto renderer_backend(mln_render_session* session)
 // borrow a caller-owned context, so the caller activates it (Implicit).
 auto session_scope_type(const mln_render_session* session)
   -> mbgl::gfx::BackendScope::ScopeType {
-  return (session->kind == mln::core::RenderSessionKind::Texture)
+  if (session->kind == mln::core::RenderSessionKind::Texture) {
+    return mbgl::gfx::BackendScope::ScopeType::Explicit;
+  }
+  return session->surface.backend->needs_explicit_scope()
            ? mbgl::gfx::BackendScope::ScopeType::Explicit
            : mbgl::gfx::BackendScope::ScopeType::Implicit;
 }
