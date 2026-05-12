@@ -1,6 +1,6 @@
 use maplibre_native::{
-    CameraOptions, LatLng, MapMode, MapOptions, RuntimeEventPayload, RuntimeEventType,
-    RuntimeHandle,
+    CameraOptions, LatLng, MapMode, MapOptions, RuntimeEventPayload, RuntimeEventSource,
+    RuntimeEventType, RuntimeHandle,
 };
 use std::error::Error;
 use winit::event::WindowEvent;
@@ -25,10 +25,11 @@ pub struct App {
     render_pending: bool,
     viewport_dirty: bool,
     closed: bool,
+    mode: Mode,
 }
 
 impl App {
-    pub fn new(window: Window) -> Result<Self, Box<dyn Error>> {
+    pub fn new(window: Window, mode: Mode) -> Result<Self, Box<dyn Error>> {
         let vulkan = VulkanContext::new(&window)?;
         let viewport = Viewport::from_window(&window);
         if viewport.is_empty() {
@@ -45,7 +46,7 @@ impl App {
             .with_mode(MapMode::Continuous),
         )?;
         viewport.log("initial viewport");
-        let target = RenderTarget::attach(Mode::NativeSurface, &map, &vulkan, viewport)?;
+        let target = RenderTarget::attach(mode, &map, &vulkan, viewport)?;
         map.set_style_url(STYLE_URL)?;
         map.jump_to(
             &CameraOptions::new()
@@ -67,12 +68,14 @@ impl App {
             render_pending: true,
             viewport_dirty: false,
             closed: false,
+            mode,
         })
     }
 
     pub fn print_status(&self) {
         println!("MapLibre Rust Vulkan map example running. Close the window to exit.");
-        println!("render target: native-surface");
+        println!("rust-map render target: {}", self.mode.cli_name());
+        println!("render target status: {}", self.mode.status());
         Controller::print_controls();
     }
 
@@ -102,7 +105,7 @@ impl App {
         }
     }
 
-    pub fn step(&mut self, _target: &EventLoopWindowTarget<()>) {
+    pub fn step(&mut self) {
         if let Err(error) = self.pump_runtime() {
             eprintln!("runtime update failed: {error}");
             self.abort_process(1);
@@ -145,7 +148,11 @@ impl App {
         self.runtime.run_once()?;
         while let Some(event) = self.runtime.poll_event()? {
             match event.event_type {
-                RuntimeEventType::MapRenderUpdateAvailable => self.render_pending = true,
+                RuntimeEventType::MapRenderUpdateAvailable
+                    if event.source == RuntimeEventSource::Map(self.map.id()) =>
+                {
+                    self.render_pending = true;
+                }
                 RuntimeEventType::MapRenderFrameFinished => {
                     if let RuntimeEventPayload::RenderFrame(frame) = event.payload {
                         self.render_pending |= frame.needs_repaint;

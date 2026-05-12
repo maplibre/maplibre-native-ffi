@@ -3,8 +3,30 @@ use maplibre_native::{MapHandle, RenderSessionHandle, VulkanSurfaceDescriptor};
 use crate::viewport::Viewport;
 use crate::vulkan::VulkanContext;
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Mode {
     NativeSurface,
+}
+
+impl Mode {
+    pub fn cli_name(self) -> &'static str {
+        match self {
+            Self::NativeSurface => "native-surface",
+        }
+    }
+
+    pub fn status(self) -> &'static str {
+        match self {
+            Self::NativeSurface => "renders directly to the winit Vulkan surface",
+        }
+    }
+
+    pub fn parse(value: &str) -> Result<Self, String> {
+        match value {
+            "native-surface" => Ok(Self::NativeSurface),
+            _ => Err(format!("unknown render target '{value}'")),
+        }
+    }
 }
 
 pub struct RenderTarget {

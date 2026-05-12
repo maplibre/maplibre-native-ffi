@@ -10,6 +10,7 @@ use std::error::Error;
 use std::time::{Duration, Instant};
 
 use app::App;
+use render_target::Mode;
 use winit::dpi::LogicalSize;
 use winit::event::Event;
 use winit::event_loop::{ControlFlow, EventLoop};
@@ -19,6 +20,7 @@ const INITIAL_WIDTH: u32 = 1280;
 const INITIAL_HEIGHT: u32 = 720;
 
 fn main() -> Result<(), Box<dyn Error>> {
+    let mode = parse_args(std::env::args().skip(1))?;
     if !maplibre_native::supported_render_backends()
         .contains(maplibre_native::RenderBackendMask::VULKAN)
     {
@@ -31,7 +33,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         .with_inner_size(LogicalSize::new(INITIAL_WIDTH, INITIAL_HEIGHT))
         .with_resizable(true)
         .build(&event_loop)?;
-    let mut app = App::new(window)?;
+    let mut app = App::new(window, mode)?;
 
     app.print_status();
     event_loop.run(move |event, target| {
@@ -41,11 +43,56 @@ fn main() -> Result<(), Box<dyn Error>> {
 
         match event {
             Event::WindowEvent { event, .. } => app.handle_window_event(event, target),
-            Event::AboutToWait => app.step(target),
+            Event::AboutToWait => app.step(),
             Event::LoopExiting => app.close_or_abort(),
             _ => {}
         }
     })?;
 
     Ok(())
+}
+
+fn parse_args(args: impl IntoIterator<Item = String>) -> Result<Mode, Box<dyn Error>> {
+    let mut mode = Mode::NativeSurface;
+    for arg in args {
+        if let Some(value) = arg.strip_prefix("--render-target=") {
+            mode = Mode::parse(value)?;
+        } else if !arg.starts_with('-') {
+            mode = Mode::parse(&arg)?;
+        } else {
+            return Err(format!("unknown argument: {arg}").into());
+        }
+    }
+    Ok(mode)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_args_defaults_to_native_surface() {
+        assert_eq!(parse_args([]).unwrap(), Mode::NativeSurface);
+    }
+
+    #[test]
+    fn parse_args_accepts_render_target_option() {
+        assert_eq!(
+            parse_args(["--render-target=native-surface".to_string()]).unwrap(),
+            Mode::NativeSurface
+        );
+    }
+
+    #[test]
+    fn parse_args_accepts_positional_render_target() {
+        assert_eq!(
+            parse_args(["native-surface".to_string()]).unwrap(),
+            Mode::NativeSurface
+        );
+    }
+
+    #[test]
+    fn parse_args_rejects_unknown_option() {
+        assert!(parse_args(["--wat".to_string()]).is_err());
+    }
 }
