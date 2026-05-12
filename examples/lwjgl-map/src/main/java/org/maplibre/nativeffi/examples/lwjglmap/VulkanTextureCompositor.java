@@ -315,8 +315,8 @@ final class VulkanTextureCompositor implements AutoCloseable {
         }
       }
       swapchainFormat = chosen.format();
-      extentWidth = chooseExtentDimension(capabilities, viewport.width(), true);
-      extentHeight = chooseExtentDimension(capabilities, viewport.height(), false);
+      extentWidth = chooseExtentDimension(capabilities, viewport.framebufferWidth(), true);
+      extentHeight = chooseExtentDimension(capabilities, viewport.framebufferHeight(), false);
       var imageCount = capabilities.minImageCount() + 1;
       if (capabilities.maxImageCount() > 0 && imageCount > capabilities.maxImageCount()) {
         imageCount = capabilities.maxImageCount();

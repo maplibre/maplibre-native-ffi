@@ -48,41 +48,12 @@ public final class MetalOwnedTextureFrameHandle implements AutoCloseable {
     if (closed) {
       return;
     }
-    RuntimeException releaseFailure = null;
-    Error releaseError = null;
+    session.releaseMetalFrame(frameSegment, null);
+    closed = true;
     try {
-      session.releaseMetalFrame(frameSegment, null);
-    } catch (RuntimeException error) {
-      releaseFailure = error;
-      throw error;
-    } catch (Error error) {
-      releaseError = error;
-      throw error;
+      scope.close();
     } finally {
-      closed = true;
-      try {
-        scope.close();
-      } catch (RuntimeException cleanupError) {
-        if (releaseFailure != null) {
-          releaseFailure.addSuppressed(cleanupError);
-        } else if (releaseError != null) {
-          releaseError.addSuppressed(cleanupError);
-        } else {
-          throw cleanupError;
-        }
-      } finally {
-        try {
-          arena.close();
-        } catch (RuntimeException cleanupError) {
-          if (releaseFailure != null) {
-            releaseFailure.addSuppressed(cleanupError);
-          } else if (releaseError != null) {
-            releaseError.addSuppressed(cleanupError);
-          } else {
-            throw cleanupError;
-          }
-        }
-      }
+      arena.close();
     }
   }
 
