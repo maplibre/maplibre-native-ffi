@@ -123,10 +123,12 @@ class EGLSurfaceBackendImpl final : public mbgl::gl::RendererBackend,
 
   void setSize(mbgl::Size size_) { size = size_; }
 
-  void swapBuffers() {
+  auto swapBuffers() -> bool {
     if (eglSwapBuffers(display, surface) == EGL_FALSE) {
       mbgl::Log::Error(mbgl::Event::Render, "eglSwapBuffers failed");
+      return false;
     }
+    return true;
   }
 
  protected:
@@ -196,7 +198,13 @@ class EGLSurfaceSessionBackend final : public mln::core::SurfaceSessionBackend {
     backend_.setSize(mbgl::Size{physical_width, physical_height});
   }
 
-  void swap_buffers() override { backend_.swapBuffers(); }
+  auto swap_buffers() -> mln_status override {
+    if (!backend_.swapBuffers()) {
+      mln::core::set_thread_error("eglSwapBuffers failed: surface may have been lost");
+      return MLN_STATUS_INVALID_STATE;
+    }
+    return MLN_STATUS_OK;
+  }
   [[nodiscard]] auto needs_explicit_scope() const -> bool override {
     return true;
   }

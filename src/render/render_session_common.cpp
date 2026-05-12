@@ -878,7 +878,10 @@ auto render_session_render_update(mln_render_session* session) -> mln_status {
 
   session->renderer->render(update);
   if (session->kind == RenderSessionKind::Surface) {
-    session->surface.backend->swap_buffers();
+    const auto swap_status = session->surface.backend->swap_buffers();
+    if (swap_status != MLN_STATUS_OK) {
+      return swap_status;
+    }
   }
   if (session->kind == RenderSessionKind::Texture) {
     const auto after_status = session->texture.backend->after_render(*session);
