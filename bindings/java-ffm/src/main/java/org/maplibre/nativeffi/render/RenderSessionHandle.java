@@ -317,15 +317,15 @@ public final class RenderSessionHandle implements AutoCloseable {
   }
 
   /**
-   * Acquires an explicit Metal session-owned texture frame lease.
+   * Acquires an explicit Metal session-owned texture frame handle.
    *
    * <p>This advanced API is intended for integrations that submit GPU work using the returned
-   * texture and need to release it after that work completes. The returned lease must be closed on
+   * texture and need to release it after that work completes. The returned handle must be closed on
    * the render session owner thread after GPU work using {@link MetalOwnedTextureFrame#texture()}
-   * has completed. While the lease is open, the native session rejects resize, render, detach,
+   * has completed. While the handle is open, the native session rejects resize, render, detach,
    * destroy, and second-acquire operations.
    */
-  public MetalOwnedTextureFrameLease acquireMetalOwnedTextureFrame() {
+  public MetalOwnedTextureFrameHandle acquireMetalOwnedTextureFrame() {
     NativeAccess.ensureLoaded();
     var arena = Arena.ofConfined();
     var frameSegment = RenderStructs.metalOwnedTextureFrame(arena);
@@ -333,7 +333,7 @@ public final class RenderSessionHandle implements AutoCloseable {
       Status.check(
           MapLibreNativeC.mln_metal_owned_texture_acquire_frame(state.requireLive(), frameSegment));
       var scope = new FrameScope();
-      return new MetalOwnedTextureFrameLease(
+      return new MetalOwnedTextureFrameHandle(
           this, arena, frameSegment, scope, metalOwnedTextureFrame(frameSegment, scope));
     } catch (Throwable throwable) {
       arena.close();
@@ -342,15 +342,15 @@ public final class RenderSessionHandle implements AutoCloseable {
   }
 
   /**
-   * Acquires an explicit Vulkan session-owned texture frame lease.
+   * Acquires an explicit Vulkan session-owned texture frame handle.
    *
    * <p>This advanced API is intended for integrations that submit GPU work using the returned image
-   * and need to release it after an external fence signals. The returned lease must be closed on
+   * and need to release it after an external fence signals. The returned handle must be closed on
    * the render session owner thread after GPU work using {@link VulkanOwnedTextureFrame#image()} or
-   * {@link VulkanOwnedTextureFrame#imageView()} has completed. While the lease is open, the native
+   * {@link VulkanOwnedTextureFrame#imageView()} has completed. While the handle is open, the native
    * session rejects resize, render, detach, destroy, and second-acquire operations.
    */
-  public VulkanOwnedTextureFrameLease acquireVulkanOwnedTextureFrame() {
+  public VulkanOwnedTextureFrameHandle acquireVulkanOwnedTextureFrame() {
     NativeAccess.ensureLoaded();
     var arena = Arena.ofConfined();
     var frameSegment = RenderStructs.vulkanOwnedTextureFrame(arena);
@@ -359,7 +359,7 @@ public final class RenderSessionHandle implements AutoCloseable {
           MapLibreNativeC.mln_vulkan_owned_texture_acquire_frame(
               state.requireLive(), frameSegment));
       var scope = new FrameScope();
-      return new VulkanOwnedTextureFrameLease(
+      return new VulkanOwnedTextureFrameHandle(
           this, arena, frameSegment, scope, vulkanOwnedTextureFrame(frameSegment, scope));
     } catch (Throwable throwable) {
       arena.close();

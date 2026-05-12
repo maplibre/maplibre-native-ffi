@@ -183,7 +183,7 @@ import org.lwjgl.vulkan.VkSurfaceFormatKHR;
 import org.lwjgl.vulkan.VkSwapchainCreateInfoKHR;
 import org.lwjgl.vulkan.VkViewport;
 import org.lwjgl.vulkan.VkWriteDescriptorSet;
-import org.maplibre.nativeffi.render.VulkanOwnedTextureFrameLease;
+import org.maplibre.nativeffi.render.VulkanOwnedTextureFrameHandle;
 
 final class VulkanTextureCompositor implements AutoCloseable {
   private static final String VERTEX_SHADER =
@@ -254,8 +254,8 @@ final class VulkanTextureCompositor implements AutoCloseable {
     createFramebuffers();
   }
 
-  void draw(VulkanOwnedTextureFrameLease lease) {
-    var frame = lease.frame();
+  void draw(VulkanOwnedTextureFrameHandle frameHandle) {
+    var frame = frameHandle.frame();
     if (frame.width() <= 0 || frame.height() <= 0) {
       throw new IllegalStateException("MapLibre returned an empty Vulkan owned texture frame");
     }

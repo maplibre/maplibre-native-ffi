@@ -109,7 +109,7 @@ final class RenderSessionHandleTest {
   }
 
   @Test
-  void metalOwnedTextureFrameLeaseStaysActiveUntilClosed() throws Exception {
+  void metalOwnedTextureFrameHandleStaysActiveUntilClosed() throws Exception {
     Maplibre.setLogCallback(record -> true);
     Maplibre.setAsyncLogSeverities(EnumSet.noneOf(LogSeverity.class));
 
@@ -124,10 +124,10 @@ final class RenderSessionHandleTest {
       activeSession.renderUpdate();
 
       MetalOwnedTextureFrame frame;
-      try (var lease = activeSession.acquireMetalOwnedTextureFrame()) {
-        frame = lease.frame();
+      try (var frameHandle = activeSession.acquireMetalOwnedTextureFrame()) {
+        frame = frameHandle.frame();
         assertEquals(32, frame.width());
-        assertFalse(lease.isClosed());
+        assertFalse(frameHandle.isClosed());
         assertThrows(InvalidStateException.class, activeSession::renderUpdate);
       }
       assertThrows(IllegalStateException.class, frame::width);
@@ -142,7 +142,7 @@ final class RenderSessionHandleTest {
   }
 
   @Test
-  void vulkanOwnedTextureFrameLeaseStaysActiveUntilClosed() throws Exception {
+  void vulkanOwnedTextureFrameHandleStaysActiveUntilClosed() throws Exception {
     Maplibre.setLogCallback(record -> true);
     Maplibre.setAsyncLogSeverities(EnumSet.noneOf(LogSeverity.class));
 
@@ -157,10 +157,10 @@ final class RenderSessionHandleTest {
       activeSession.renderUpdate();
 
       VulkanOwnedTextureFrame frame;
-      try (var lease = activeSession.acquireVulkanOwnedTextureFrame()) {
-        frame = lease.frame();
+      try (var frameHandle = activeSession.acquireVulkanOwnedTextureFrame()) {
+        frame = frameHandle.frame();
         assertEquals(32, frame.width());
-        assertFalse(lease.isClosed());
+        assertFalse(frameHandle.isClosed());
         assertThrows(InvalidStateException.class, activeSession::renderUpdate);
       }
       assertThrows(IllegalStateException.class, frame::width);

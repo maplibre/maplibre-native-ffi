@@ -204,8 +204,8 @@ final class MapState implements AutoCloseable {
     @Override
     public void renderUpdate() {
       session.renderUpdate();
-      try (var lease = session.acquireVulkanOwnedTextureFrame()) {
-        compositor.draw(lease);
+      try (var frameHandle = session.acquireVulkanOwnedTextureFrame()) {
+        compositor.draw(frameHandle);
       }
     }
 

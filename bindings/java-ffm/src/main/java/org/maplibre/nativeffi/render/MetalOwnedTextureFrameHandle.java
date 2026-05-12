@@ -5,28 +5,28 @@ import java.lang.foreign.MemorySegment;
 import java.util.Objects;
 
 /**
- * Explicit lease for a Vulkan session-owned texture frame.
+ * Explicit handle for a Metal session-owned texture frame.
  *
  * <p>This is an advanced API for render integrations that must submit GPU work and release the
- * MapLibre-owned image only after that work no longer samples it. The frame and its native pointers
- * stay valid until {@link #close()}. Callers must synchronize GPU use before closing the lease,
- * close it on the render session owner thread, and close it before resizing, rendering another
- * update, detaching, or closing the render session.
+ * MapLibre-owned texture only after that work no longer samples it. The frame and its native
+ * pointers stay valid until {@link #close()}. Callers must synchronize GPU use before closing the
+ * handle, close it on the render session owner thread, and close it before resizing, rendering
+ * another update, detaching, or closing the render session.
  */
-public final class VulkanOwnedTextureFrameLease implements AutoCloseable {
+public final class MetalOwnedTextureFrameHandle implements AutoCloseable {
   private final RenderSessionHandle session;
   private final Arena arena;
   private final MemorySegment frameSegment;
   private final FrameScope scope;
-  private final VulkanOwnedTextureFrame frame;
+  private final MetalOwnedTextureFrame frame;
   private boolean closed;
 
-  VulkanOwnedTextureFrameLease(
+  MetalOwnedTextureFrameHandle(
       RenderSessionHandle session,
       Arena arena,
       MemorySegment frameSegment,
       FrameScope scope,
-      VulkanOwnedTextureFrame frame) {
+      MetalOwnedTextureFrame frame) {
     this.session = Objects.requireNonNull(session, "session");
     this.arena = Objects.requireNonNull(arena, "arena");
     this.frameSegment = Objects.requireNonNull(frameSegment, "frameSegment");
@@ -34,7 +34,7 @@ public final class VulkanOwnedTextureFrameLease implements AutoCloseable {
     this.frame = Objects.requireNonNull(frame, "frame");
   }
 
-  public VulkanOwnedTextureFrame frame() {
+  public MetalOwnedTextureFrame frame() {
     ensureOpen();
     return frame;
   }
@@ -51,7 +51,7 @@ public final class VulkanOwnedTextureFrameLease implements AutoCloseable {
     RuntimeException releaseFailure = null;
     Error releaseError = null;
     try {
-      session.releaseVulkanFrame(frameSegment, null);
+      session.releaseMetalFrame(frameSegment, null);
     } catch (RuntimeException error) {
       releaseFailure = error;
       throw error;
@@ -88,7 +88,7 @@ public final class VulkanOwnedTextureFrameLease implements AutoCloseable {
 
   private void ensureOpen() {
     if (closed) {
-      throw new IllegalStateException("Vulkan owned texture frame lease is closed");
+      throw new IllegalStateException("Metal owned texture frame handle is closed");
     }
   }
 }

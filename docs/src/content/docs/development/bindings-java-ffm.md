@@ -155,10 +155,10 @@ alive. Closing the map while a session is live reports native invalid state.
 Texture readback supports reusable off-heap storage through `NativeBuffer` and a
 convenience path that returns a copied `PremultipliedRgba8Image`.
 
-Owned texture frame access uses explicit `AutoCloseable` lease APIs. The lease
-acquires the native frame, exposes copied metadata and scoped `NativePointer`
-values, and keeps the MapLibre-owned texture alive until callers close it.
-Callers synchronize GPU use, close the lease on the render session owner thread,
-and close it before resize, another render update, detach, or session
-destruction. Scoped frame values and pointers reject access after the lease
-closes.
+Owned texture frame access uses explicit `AutoCloseable` frame handle APIs. The
+handle acquires the native frame, exposes copied metadata and scoped
+`NativePointer` values, and keeps the MapLibre-owned texture alive until callers
+close it. Callers synchronize GPU use, close the handle on the render session
+owner thread, and close it before resize, another render update, detach, or
+session destruction. Scoped frame values and pointers reject access after the
+handle closes.
