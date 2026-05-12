@@ -22,11 +22,24 @@ fun lwjglNativeClassifier(): String {
 }
 
 val lwjglNative = lwjglNativeClassifier()
-val hostIsMac = System.getProperty("os.name").lowercase().contains("mac")
+val hostOs = System.getProperty("os.name").lowercase()
+val hostIsMac = hostOs.contains("mac")
+val hostIsLinux = hostOs.contains("linux")
+val pixiVulkanLoader =
+  rootProject.layout.projectDirectory.file(
+    when {
+      hostIsMac -> ".pixi/envs/default/lib/libvulkan.1.dylib"
+      hostIsLinux -> ".pixi/envs/default/lib/libvulkan.so.1"
+      else -> ""
+    }
+  )
 val lwjglMapJvmArgs = buildList {
   add("--enable-native-access=ALL-UNNAMED")
   if (hostIsMac) {
     add("-XstartOnFirstThread")
+  }
+  if ((hostIsMac || hostIsLinux) && pixiVulkanLoader.asFile.exists()) {
+    add("-Dorg.lwjgl.vulkan.libname=${pixiVulkanLoader.asFile.absolutePath}")
   }
 }
 
