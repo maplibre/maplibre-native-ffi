@@ -8,6 +8,16 @@ bash "$repo_root/bindings/rust/scripts/with-libclang.sh" cargo build --manifest-
 [tasks.run]
 depends = ["//:ensure-native-library"]
 run = '''
+set -euo pipefail
 repo_root=$(git rev-parse --show-toplevel)
+pixi_lib="$repo_root/.pixi/envs/default/lib"
+pixi_icd="$repo_root/.pixi/envs/default/share/vulkan/icd.d/MoltenVK_icd.json"
+if [[ -d "$pixi_lib" ]]; then
+  export DYLD_LIBRARY_PATH="$pixi_lib${DYLD_LIBRARY_PATH:+:$DYLD_LIBRARY_PATH}"
+  export LD_LIBRARY_PATH="$pixi_lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+fi
+if [[ -f "$pixi_icd" && -z "${VK_ICD_FILENAMES:-}" ]]; then
+  export VK_ICD_FILENAMES="$pixi_icd"
+fi
 bash "$repo_root/bindings/rust/scripts/with-libclang.sh" cargo run --manifest-path "$repo_root/Cargo.toml" -p rust-map
 '''

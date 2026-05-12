@@ -1,7 +1,7 @@
 #![deny(unsafe_op_in_unsafe_fn)]
 
 use std::error::Error;
-use std::ffi::CString;
+use std::ffi::{CStr, CString};
 use std::time::{Duration, Instant};
 
 use ash::vk;
@@ -198,9 +198,7 @@ struct VulkanContext {
 
 impl VulkanContext {
     fn new(window: &Window) -> Result<Self, Box<dyn Error>> {
-        // SAFETY: Loading the Vulkan loader is delegated to ash. The returned entry
-        // owns function pointers for the process Vulkan loader.
-        let entry = unsafe { ash::Entry::load()? };
+        let entry = load_vulkan_entry()?;
         let app_name = CString::new("MapLibre Rust Vulkan Map")?;
         let engine_name = CString::new("maplibre-native-ffi")?;
         let app_info = vk::ApplicationInfo::default()
@@ -212,10 +210,17 @@ impl VulkanContext {
 
         let display_handle = window.display_handle()?.as_raw();
         let window_handle = window.window_handle()?.as_raw();
-        let extension_names = ash_window::enumerate_required_extensions(display_handle)?;
+        let mut extension_names =
+            ash_window::enumerate_required_extensions(display_handle)?.to_vec();
+        let mut instance_flags = vk::InstanceCreateFlags::empty();
+        if has_instance_extension(&entry, ash::khr::portability_enumeration::NAME)? {
+            extension_names.push(ash::khr::portability_enumeration::NAME.as_ptr());
+            instance_flags |= vk::InstanceCreateFlags::ENUMERATE_PORTABILITY_KHR;
+        }
         let instance_info = vk::InstanceCreateInfo::default()
             .application_info(&app_info)
-            .enabled_extension_names(extension_names);
+            .enabled_extension_names(&extension_names)
+            .flags(instance_flags);
         // SAFETY: instance_info points to stable extension-name and app-info storage
         // for this call. Allocation callbacks are not used.
         let instance = unsafe { entry.create_instance(&instance_info, None)? };
@@ -250,7 +255,14 @@ impl VulkanContext {
         let queue_info = [vk::DeviceQueueCreateInfo::default()
             .queue_family_index(graphics_queue_family_index)
             .queue_priorities(&priorities)];
-        let device_extensions = [ash::khr::swapchain::NAME.as_ptr()];
+        let mut device_extensions = vec![ash::khr::swapchain::NAME.as_ptr()];
+        if has_device_extension(
+            &instance,
+            physical_device,
+            ash::khr::portability_subset::NAME,
+        )? {
+            device_extensions.push(ash::khr::portability_subset::NAME.as_ptr());
+        }
         let device_info = vk::DeviceCreateInfo::default()
             .queue_create_infos(&queue_info)
             .enabled_extension_names(&device_extensions);
@@ -282,6 +294,59 @@ impl VulkanContext {
             graphics_queue_family_index,
         })
     }
+}
+
+fn load_vulkan_entry() -> Result<ash::Entry, Box<dyn Error>> {
+    // SAFETY: Loading the Vulkan loader is delegated to ash. The returned entry
+    // owns function pointers for the process Vulkan loader.
+    match unsafe { ash::Entry::load() } {
+        Ok(entry) => Ok(entry),
+        Err(default_error) => {
+            let manifest_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+            let repo_root = manifest_dir
+                .parent()
+                .and_then(std::path::Path::parent)
+                .ok_or("rust-map manifest is not under examples/rust-map")?;
+            let pixi_loader = repo_root
+                .join(".pixi")
+                .join("envs")
+                .join("default")
+                .join("lib")
+                .join("libvulkan.dylib");
+            if pixi_loader.exists() {
+                // SAFETY: The path points to the pixi-provided Vulkan loader.
+                unsafe { ash::Entry::load_from(&pixi_loader) }.map_err(Into::into)
+            } else {
+                Err(default_error.into())
+            }
+        }
+    }
+}
+
+fn has_instance_extension(entry: &ash::Entry, name: &CStr) -> Result<bool, Box<dyn Error>> {
+    // SAFETY: entry is a live Vulkan loader entry and writes properties into an
+    // ash-owned vector.
+    let properties = unsafe { entry.enumerate_instance_extension_properties(None)? };
+    Ok(properties.iter().any(|property| {
+        // SAFETY: Vulkan extension names are fixed-size NUL-terminated arrays.
+        let property_name = unsafe { CStr::from_ptr(property.extension_name.as_ptr()) };
+        property_name == name
+    }))
+}
+
+fn has_device_extension(
+    instance: &ash::Instance,
+    physical_device: vk::PhysicalDevice,
+    name: &CStr,
+) -> Result<bool, Box<dyn Error>> {
+    // SAFETY: physical_device came from this live instance and writes
+    // properties into an ash-owned vector.
+    let properties = unsafe { instance.enumerate_device_extension_properties(physical_device)? };
+    Ok(properties.iter().any(|property| {
+        // SAFETY: Vulkan extension names are fixed-size NUL-terminated arrays.
+        let property_name = unsafe { CStr::from_ptr(property.extension_name.as_ptr()) };
+        property_name == name
+    }))
 }
 
 impl Drop for VulkanContext {
