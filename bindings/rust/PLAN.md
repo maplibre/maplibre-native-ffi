@@ -1,11 +1,5 @@
 # Rust bindings implementation plan
 
-Audience: contributors implementing the Rust bindings for MapLibre Native FFI up
-to the maturity of the existing Java bindings.
-
-Category: how-to guide. This plan gives an implementation path and points to
-copied research artifacts for deeper context.
-
 ## Goal
 
 Build first-party Rust bindings over the public C ABI until they reach rough
