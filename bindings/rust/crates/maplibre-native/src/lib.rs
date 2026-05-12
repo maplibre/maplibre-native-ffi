@@ -40,9 +40,11 @@ pub use options::{
 };
 pub use projection::MapProjectionHandle;
 pub use render::{
-    MetalBorrowedTextureDescriptor, MetalOwnedTextureDescriptor, MetalSurfaceDescriptor,
-    NativePointer, OwnedTextureDescriptor, RenderSessionHandle, VulkanBorrowedTextureDescriptor,
-    VulkanOwnedTextureDescriptor, VulkanSurfaceDescriptor,
+    MetalBorrowedTextureDescriptor, MetalOwnedTextureDescriptor, MetalOwnedTextureFrame,
+    MetalOwnedTextureFrameHandle, MetalSurfaceDescriptor, NativePointer, OwnedTextureDescriptor,
+    PremultipliedRgba8Image, RenderSessionHandle, TextureImageInfo,
+    VulkanBorrowedTextureDescriptor, VulkanOwnedTextureDescriptor, VulkanOwnedTextureFrame,
+    VulkanOwnedTextureFrameHandle, VulkanSurfaceDescriptor,
 };
 pub use resource::{
     ByteRange, ResourceKind, ResourceLoadingMethod, ResourcePriority, ResourceProviderDecision,
