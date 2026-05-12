@@ -1,8 +1,14 @@
 #![deny(unsafe_op_in_unsafe_fn)]
 
+mod handle;
+mod map;
+mod runtime;
+
 use maplibre_native_support as support;
 use maplibre_native_sys as sys;
 
+pub use map::MapHandle;
+pub use runtime::RuntimeHandle;
 pub use support::{Error, ErrorKind, Result};
 
 bitflags::bitflags! {
@@ -80,7 +86,12 @@ fn set_network_status_raw(raw_status: u32) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
+    use static_assertions::assert_not_impl_any;
+
     use super::*;
+
+    assert_not_impl_any!(RuntimeHandle: Send, Sync);
+    assert_not_impl_any!(MapHandle: Send, Sync);
 
     struct NetworkStatusRestore(NetworkStatus);
 

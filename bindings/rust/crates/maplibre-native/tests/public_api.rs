@@ -1,5 +1,5 @@
 use maplibre_native::{
-    NetworkStatus, RenderBackendMask, c_version, network_status, set_network_status,
+    NetworkStatus, RenderBackendMask, RuntimeHandle, c_version, network_status, set_network_status,
     supported_render_backends,
 };
 
@@ -23,4 +23,17 @@ fn public_api_uses_safe_rust_types() {
 
     set_network_status(NetworkStatus::Offline).unwrap();
     assert_eq!(network_status().unwrap(), NetworkStatus::Offline);
+}
+
+#[test]
+fn public_handles_create_pump_drain_and_close() {
+    let runtime = RuntimeHandle::new().unwrap();
+    runtime.run_once().unwrap();
+    let _ = runtime.discard_one_event().unwrap();
+    runtime.drain_events().unwrap();
+
+    let map = runtime.create_map().unwrap();
+    drop(runtime);
+
+    map.close().unwrap();
 }
