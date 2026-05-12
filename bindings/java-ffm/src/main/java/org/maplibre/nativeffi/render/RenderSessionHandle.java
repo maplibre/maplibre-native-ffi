@@ -5,8 +5,6 @@ import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
 import java.util.List;
 import java.util.Objects;
-import java.util.function.Consumer;
-import java.util.function.Function;
 import org.maplibre.nativeffi.error.InvalidArgumentException;
 import org.maplibre.nativeffi.error.MaplibreStatus;
 import org.maplibre.nativeffi.geo.Feature;
@@ -318,23 +316,6 @@ public final class RenderSessionHandle implements AutoCloseable {
     }
   }
 
-  public void withMetalOwnedTextureFrame(Consumer<MetalOwnedTextureFrame> callback) {
-    Objects.requireNonNull(callback, "callback");
-    withMetalOwnedTextureFrame(
-        frame -> {
-          callback.accept(frame);
-          return null;
-        });
-  }
-
-  public <T> T withMetalOwnedTextureFrame(Function<MetalOwnedTextureFrame, T> callback) {
-    NativeAccess.ensureLoaded();
-    Objects.requireNonNull(callback, "callback");
-    try (var lease = acquireMetalOwnedTextureFrame()) {
-      return callback.apply(lease.frame());
-    }
-  }
-
   /**
    * Acquires an explicit Metal session-owned texture frame lease.
    *
@@ -357,23 +338,6 @@ public final class RenderSessionHandle implements AutoCloseable {
     } catch (Throwable throwable) {
       arena.close();
       throw throwable;
-    }
-  }
-
-  public void withVulkanOwnedTextureFrame(Consumer<VulkanOwnedTextureFrame> callback) {
-    Objects.requireNonNull(callback, "callback");
-    withVulkanOwnedTextureFrame(
-        frame -> {
-          callback.accept(frame);
-          return null;
-        });
-  }
-
-  public <T> T withVulkanOwnedTextureFrame(Function<VulkanOwnedTextureFrame, T> callback) {
-    NativeAccess.ensureLoaded();
-    Objects.requireNonNull(callback, "callback");
-    try (var lease = acquireVulkanOwnedTextureFrame()) {
-      return callback.apply(lease.frame());
     }
   }
 
