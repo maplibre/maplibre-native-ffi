@@ -33,6 +33,7 @@
 #include <mbgl/gl/renderable_resource.hpp>
 #include <mbgl/gl/renderer_backend.hpp>
 #include <mbgl/renderer/renderer.hpp>
+#include <mbgl/util/event.hpp>
 #include <mbgl/util/logging.hpp>
 #include <mbgl/util/size.hpp>
 
@@ -152,11 +153,8 @@ class EGLSurfaceBackendImpl final : public mbgl::gl::RendererBackend,
     // generic void(*)() stub that the EGL spec requires callers to cast to the
     // intended signature before calling. This reinterpret_cast is the mandated
     // EGL pattern; there is no standard alternative.
-    return reinterpret_cast<
-      mbgl::gl::
-        ProcAddress>(  // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
-      eglGetProcAddress(name)
-    );
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
+    return reinterpret_cast<mbgl::gl::ProcAddress>(eglGetProcAddress(name));
   }
 
   // Re-sync mbgl's cached GL state to match what is actually current on the

@@ -173,11 +173,7 @@ test "WGL surface attach rejects invalid arguments" {
 // ── EGL surface lifecycle test ───────────────────────────────────────────────
 
 test "EGL surface lifecycle and render update" {
-    var egl = egl_support.create(64, 64) catch |err| switch (err) {
-        error.SkipZigTest => return error.SkipZigTest,
-        // EGL unavailable in this environment (no surfaceless driver, etc.).
-        else => return error.SkipZigTest,
-    };
+    var egl = egl_support.create(64, 64) catch return error.SkipZigTest;
     defer egl_support.destroy(&egl);
     try support.suppressLogs();
     defer support.restoreLogs();
