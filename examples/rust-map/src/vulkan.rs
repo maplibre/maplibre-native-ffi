@@ -119,6 +119,30 @@ impl VulkanContext {
         let _ = unsafe { self.device.device_wait_idle() };
     }
 
+    pub fn instance(&self) -> &ash::Instance {
+        &self.instance
+    }
+
+    pub fn surface_loader(&self) -> &ash::khr::surface::Instance {
+        &self.surface_loader
+    }
+
+    pub fn surface(&self) -> vk::SurfaceKHR {
+        self.surface
+    }
+
+    pub fn physical_device(&self) -> vk::PhysicalDevice {
+        self.physical_device
+    }
+
+    pub fn device(&self) -> &ash::Device {
+        &self.device
+    }
+
+    pub fn graphics_queue(&self) -> vk::Queue {
+        self.graphics_queue
+    }
+
     pub fn instance_pointer(&self) -> NativePointer {
         // SAFETY: The Vulkan instance is live for the render session lifetime.
         unsafe { NativePointer::from_address(self.instance.handle().as_raw() as usize) }

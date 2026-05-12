@@ -1,12 +1,20 @@
+[tasks.compile-shaders]
+hide = true
+run = '''
+set -euo pipefail
+pixi run glslangValidator -V src/vulkan_texture_compositor/shaders/fullscreen.vert -o src/vulkan_texture_compositor/shaders/fullscreen.vert.spv
+pixi run glslangValidator -V src/vulkan_texture_compositor/shaders/sample.frag -o src/vulkan_texture_compositor/shaders/sample.frag.spv
+'''
+
 [tasks.build]
-depends = ["//:ensure-native-library"]
+depends = ["//:ensure-native-library", ":compile-shaders"]
 run = '''
 repo_root=$(git rev-parse --show-toplevel)
 bash "$repo_root/bindings/rust/scripts/with-libclang.sh" cargo build --manifest-path "$repo_root/Cargo.toml" -p rust-map
 '''
 
 [tasks.run]
-depends = ["//:ensure-native-library"]
+depends = ["//:ensure-native-library", ":compile-shaders"]
 run = '''
 set -euo pipefail
 repo_root=$(git rev-parse --show-toplevel)
@@ -23,7 +31,7 @@ bash "$repo_root/bindings/rust/scripts/with-libclang.sh" cargo run --manifest-pa
 '''
 
 [tasks."run:owned-texture"]
-depends = ["//:ensure-native-library"]
+depends = ["//:ensure-native-library", ":compile-shaders"]
 run = '''
 set -euo pipefail
 repo_root=$(git rev-parse --show-toplevel)
@@ -40,7 +48,7 @@ bash "$repo_root/bindings/rust/scripts/with-libclang.sh" cargo run --manifest-pa
 '''
 
 [tasks."run:native-surface"]
-depends = ["//:ensure-native-library"]
+depends = ["//:ensure-native-library", ":compile-shaders"]
 run = '''
 set -euo pipefail
 repo_root=$(git rev-parse --show-toplevel)

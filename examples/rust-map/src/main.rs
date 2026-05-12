@@ -5,6 +5,7 @@ mod input;
 mod render_target;
 mod viewport;
 mod vulkan;
+mod vulkan_texture_compositor;
 
 use std::error::Error;
 use std::time::{Duration, Instant};
@@ -53,7 +54,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 }
 
 fn parse_args(args: impl IntoIterator<Item = String>) -> Result<Mode, Box<dyn Error>> {
-    let mut mode = Mode::NativeSurface;
+    let mut mode = Mode::OwnedTexture;
     for arg in args {
         if let Some(value) = arg.strip_prefix("--render-target=") {
             mode = Mode::parse(value)?;
