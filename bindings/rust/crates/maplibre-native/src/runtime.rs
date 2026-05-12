@@ -75,6 +75,35 @@ struct NativeRuntimeOptions {
     _cache_path: Option<CString>,
 }
 
+/// Ambient cache maintenance operation for a runtime.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum AmbientCacheOperation {
+    /// Reset the ambient cache database.
+    ResetDatabase,
+    /// Pack the ambient cache database.
+    PackDatabase,
+    /// Mark ambient cache resources as invalid.
+    Invalidate,
+    /// Clear ambient cache resources.
+    Clear,
+}
+
+impl AmbientCacheOperation {
+    const fn raw_value(self) -> u32 {
+        match self {
+            Self::ResetDatabase => sys::MLN_AMBIENT_CACHE_OPERATION_RESET_DATABASE,
+            Self::PackDatabase => sys::MLN_AMBIENT_CACHE_OPERATION_PACK_DATABASE,
+            Self::Invalidate => sys::MLN_AMBIENT_CACHE_OPERATION_INVALIDATE,
+            Self::Clear => sys::MLN_AMBIENT_CACHE_OPERATION_CLEAR,
+        }
+    }
+
+    fn to_native(self) -> u32 {
+        self.raw_value()
+    }
+}
+
 impl NativeRuntimeOptions {
     fn new(options: &RuntimeOptions) -> Result<Self> {
         // SAFETY: Default constructor takes no arguments and initializes size,
@@ -381,6 +410,16 @@ impl RuntimeHandle {
         self.inner.clear_resource_transform()
     }
 
+    /// Runs an ambient cache maintenance operation for this runtime.
+    pub fn run_ambient_cache_operation(&self, operation: AmbientCacheOperation) -> Result<()> {
+        let runtime = self.inner.as_ptr()?;
+        // SAFETY: runtime is a live runtime handle owned by this wrapper, and
+        // operation is materialized from the closed Rust enum domain.
+        support::check(unsafe {
+            sys::mln_runtime_run_ambient_cache_operation(runtime, operation.to_native())
+        })
+    }
+
     /// Runs one pending owner-thread task for this runtime.
     pub fn run_once(&self) -> Result<()> {
         let runtime = self.inner.as_ptr()?;
@@ -502,6 +541,43 @@ mod tests {
                 .unwrap(),
             "/tmp/cache.db"
         );
+    }
+
+    #[test]
+    fn ambient_cache_operation_raw_values_match_c_abi() {
+        assert_eq!(
+            AmbientCacheOperation::ResetDatabase.raw_value(),
+            sys::MLN_AMBIENT_CACHE_OPERATION_RESET_DATABASE
+        );
+        assert_eq!(
+            AmbientCacheOperation::PackDatabase.raw_value(),
+            sys::MLN_AMBIENT_CACHE_OPERATION_PACK_DATABASE
+        );
+        assert_eq!(
+            AmbientCacheOperation::Invalidate.raw_value(),
+            sys::MLN_AMBIENT_CACHE_OPERATION_INVALIDATE
+        );
+        assert_eq!(
+            AmbientCacheOperation::Clear.raw_value(),
+            sys::MLN_AMBIENT_CACHE_OPERATION_CLEAR
+        );
+    }
+
+    #[test]
+    fn runtime_ambient_cache_operations_use_real_c_abi() {
+        let runtime =
+            RuntimeHandle::with_options(&RuntimeOptions::new().with_maximum_cache_size(0)).unwrap();
+
+        for operation in [
+            AmbientCacheOperation::PackDatabase,
+            AmbientCacheOperation::Invalidate,
+            AmbientCacheOperation::Clear,
+            AmbientCacheOperation::ResetDatabase,
+        ] {
+            runtime.run_ambient_cache_operation(operation).unwrap();
+        }
+
+        runtime.close().unwrap();
     }
 
     #[test]

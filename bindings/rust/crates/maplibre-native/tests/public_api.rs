@@ -1,6 +1,6 @@
 use maplibre_native::{
-    CameraOptions, EdgeInsets, Feature, FeatureIdentifier, GeoJson, Geometry, JsonMember,
-    JsonValue, LatLng, MapMode, MapOptions, MetalBorrowedTextureDescriptor,
+    AmbientCacheOperation, CameraOptions, EdgeInsets, Feature, FeatureIdentifier, GeoJson,
+    Geometry, JsonMember, JsonValue, LatLng, MapMode, MapOptions, MetalBorrowedTextureDescriptor,
     MetalOwnedTextureDescriptor, MetalSurfaceDescriptor, NativePointer, NetworkStatus,
     OwnedTextureDescriptor, RenderBackendMask, RuntimeHandle, RuntimeOptions, ScreenPoint,
     VulkanBorrowedTextureDescriptor, VulkanOwnedTextureDescriptor, VulkanSurfaceDescriptor,
@@ -38,6 +38,9 @@ fn public_handles_create_pump_drain_and_close() {
             .with_maximum_cache_size(0),
     )
     .unwrap();
+    runtime
+        .run_ambient_cache_operation(AmbientCacheOperation::PackDatabase)
+        .unwrap();
     runtime.run_once().unwrap();
     let _ = runtime.discard_one_event().unwrap();
     runtime.drain_events().unwrap();

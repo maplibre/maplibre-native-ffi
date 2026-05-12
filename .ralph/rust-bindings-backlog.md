@@ -14,7 +14,7 @@ commit/push after each item.
 
 - [x] Commit and push current backlog/tooling changes (`6efbc1a`).
 - [x] Runtime options and explicit runtime creation.
-- [ ] Ambient cache operations.
+- [x] Ambient cache operations.
 - [ ] Process-global logging callbacks, clearing, severity values, and async
       severity mask.
 - [ ] Style source removal and source existence checks.
@@ -42,7 +42,16 @@ commit/push after each item.
 - Runtime options reviewer fixes: `cargo fmt --all --check`,
   `cargo test -p maplibre-native runtime_options`, and
   `cargo test -p maplibre-native runtime_create_with_explicit_options_uses_real_c_abi`.
+- Ambient cache operations: `cargo fmt --all --check`,
+  `cargo test -p maplibre-native ambient_cache_operation_raw_values_match_c_abi`,
+  `cargo test -p maplibre-native runtime_ambient_cache_operations_use_real_c_abi`,
+  `cargo test -p maplibre-native --test public_api public_handles_create_pump_drain_and_close`,
+  and `mise run //bindings/rust:test`.
 - Initial push: `git push origin rust-bindings-plan`.
+- Ambient cache reviewer fixes: `cargo fmt --all --check`,
+  `cargo test -p maplibre-native ambient_cache_operation_raw_values_match_c_abi`,
+  and
+  `cargo test -p maplibre-native runtime_ambient_cache_operations_use_real_c_abi`.
 
 ## Notes
 
