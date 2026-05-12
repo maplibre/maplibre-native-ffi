@@ -1,6 +1,7 @@
 #![deny(unsafe_op_in_unsafe_fn)]
 
 mod camera;
+mod events;
 mod geometry;
 mod handle;
 mod map;
@@ -15,6 +16,13 @@ use maplibre_native_sys as sys;
 pub use camera::{
     AnimationOptions, BoundOptions, CameraFitOptions, CameraOptions, FreeCameraOptions,
     ProjectionMode,
+};
+pub use events::{
+    MapId, OfflineRegionDownloadState, OfflineRegionResponseErrorEvent, OfflineRegionStatus,
+    OfflineRegionStatusEvent, OfflineRegionTileCountLimitEvent, RenderFrameEvent, RenderMapEvent,
+    RenderMode, RenderingStats, ResourceErrorReason, RuntimeEvent, RuntimeEventPayload,
+    RuntimeEventSource, RuntimeEventType, StyleImageMissingEvent, TileActionEvent, TileId,
+    TileOperation, UnknownRuntimeEventPayload,
 };
 pub use geometry::Geometry;
 pub use map::MapHandle;

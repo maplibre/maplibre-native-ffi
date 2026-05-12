@@ -6,6 +6,7 @@ use std::rc::Rc;
 use maplibre_native_support as support;
 use maplibre_native_sys as sys;
 
+use crate::events::MapId;
 use crate::handle::{ThreadAffineNativeHandle, closed_handle_error, out_handle};
 use crate::runtime::{RuntimeHandle, RuntimeState};
 use crate::{
@@ -18,6 +19,7 @@ use crate::{
 pub(crate) struct MapState {
     handle: ThreadAffineNativeHandle<sys::mln_map>,
     runtime: RefCell<Option<Rc<RuntimeState>>>,
+    id: MapId,
 }
 
 impl MapState {
@@ -26,9 +28,11 @@ impl MapState {
         // the matching map destroy function.
         let handle =
             unsafe { ThreadAffineNativeHandle::from_raw(ptr, sys::mln_map_destroy, "mln_map") };
+        let id = runtime.register_map(ptr.as_ptr());
         Self {
             handle,
             runtime: RefCell::new(Some(runtime)),
+            id,
         }
     }
 
@@ -46,9 +50,20 @@ impl MapState {
     }
 
     fn close(&self) -> Result<()> {
+        let ptr = self.handle.as_ptr();
         self.handle.close()?;
-        self.runtime.borrow_mut().take();
+        if let Some(runtime) = self.runtime.borrow_mut().take() {
+            runtime.unregister_map(ptr);
+        }
         Ok(())
+    }
+}
+
+impl Drop for MapState {
+    fn drop(&mut self) {
+        if let Some(runtime) = self.runtime.borrow_mut().take() {
+            runtime.unregister_map(self.handle.as_ptr());
+        }
     }
 }
 
@@ -88,6 +103,11 @@ impl MapHandle {
         Ok(Self {
             inner: Rc::new(MapState::new(ptr, Rc::clone(&runtime.inner))),
         })
+    }
+
+    /// Returns this map's runtime-local event source identity.
+    pub fn id(&self) -> MapId {
+        self.inner.id
     }
 
     /// Explicitly destroys the map.
@@ -131,6 +151,36 @@ impl MapHandle {
         // for the duration of this command. The C API copies/consumes it before
         // returning.
         support::check(unsafe { sys::mln_map_set_style_json(map, json.as_ptr()) })
+    }
+
+    /// Copies current style source IDs into owned Rust strings.
+    pub fn style_source_ids(&self) -> Result<Vec<String>> {
+        let map = self.inner.as_ptr()?;
+        let mut out = support::ptr::OutPtr::<sys::mln_style_id_list>::new();
+        // SAFETY: map is live and out is a null-initialized out-pointer owned by
+        // this call. On success the returned handle is wrapped and destroyed by
+        // the copying helper below.
+        support::check(unsafe { sys::mln_map_list_style_source_ids(map, out.as_mut_ptr()) })?;
+        let list = out_handle(out, "mln_style_id_list")?;
+        // SAFETY: list came from mln_map_list_style_source_ids and is owned by
+        // this function until the guard drops.
+        let list = unsafe { support::handle::style_id_list(list.as_ptr()) }?;
+        copy_style_id_list(&list)
+    }
+
+    /// Copies current style layer IDs into owned Rust strings.
+    pub fn style_layer_ids(&self) -> Result<Vec<String>> {
+        let map = self.inner.as_ptr()?;
+        let mut out = support::ptr::OutPtr::<sys::mln_style_id_list>::new();
+        // SAFETY: map is live and out is a null-initialized out-pointer owned by
+        // this call. On success the returned handle is wrapped and destroyed by
+        // the copying helper below.
+        support::check(unsafe { sys::mln_map_list_style_layer_ids(map, out.as_mut_ptr()) })?;
+        let list = out_handle(out, "mln_style_id_list")?;
+        // SAFETY: list came from mln_map_list_style_layer_ids and is owned by
+        // this function until the guard drops.
+        let list = unsafe { support::handle::style_id_list(list.as_ptr()) }?;
+        copy_style_id_list(&list)
     }
 
     /// Applies MapLibre debug overlay mask bits.
@@ -666,6 +716,28 @@ pub(crate) fn screen_points_to_native(points: &[ScreenPoint]) -> Vec<sys::mln_sc
     points.iter().copied().map(ScreenPoint::to_native).collect()
 }
 
+fn copy_style_id_list(list: &support::handle::StyleIdListGuard) -> Result<Vec<String>> {
+    let mut count = 0;
+    // SAFETY: list is a live style ID list guard and count points to writable storage.
+    support::check(unsafe { sys::mln_style_id_list_count(list.as_ptr(), &mut count) })?;
+
+    let mut ids = Vec::with_capacity(count);
+    for index in 0..count {
+        let mut view = sys::mln_string_view {
+            data: ptr::null(),
+            size: 0,
+        };
+        // SAFETY: list is live, index is less than count, and view points to
+        // writable storage. The borrowed view is copied before the next loop
+        // iteration and before the guard drops.
+        support::check(unsafe { sys::mln_style_id_list_get(list.as_ptr(), index, &mut view) })?;
+        // SAFETY: The C API returns a view into list-owned storage that remains
+        // valid until the list guard drops at the end of this function.
+        ids.push(unsafe { support::string::copy_string_view(view) }?);
+    }
+    Ok(ids)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -674,6 +746,7 @@ mod tests {
     };
 
     const VALID_STYLE_JSON: &str = r#"{"version":8,"sources":{},"layers":[]}"#;
+    const STYLE_WITH_IDS_JSON: &str = r#"{"version":8,"sources":{"geo":{"type":"geojson","data":{"type":"FeatureCollection","features":[]}}},"layers":[{"id":"background","type":"background"},{"id":"geo-fill","type":"fill","source":"geo"}]}"#;
 
     #[test]
     fn map_create_and_close() {
@@ -720,6 +793,16 @@ mod tests {
         let map = MapHandle::new(&runtime).unwrap();
 
         map.set_style_json(VALID_STYLE_JSON).unwrap();
+        let _ = map.style_source_ids().unwrap();
+        let _ = map.style_layer_ids().unwrap();
+
+        map.set_style_json(STYLE_WITH_IDS_JSON).unwrap();
+        let source_ids = map.style_source_ids().unwrap();
+        let layer_ids = map.style_layer_ids().unwrap();
+        assert!(source_ids.iter().any(|id| id == "geo"));
+        assert!(layer_ids.iter().any(|id| id == "background"));
+        assert!(layer_ids.iter().any(|id| id == "geo-fill"));
+
         map.set_style_url("https://example.com/style.json").unwrap();
 
         let error = map
