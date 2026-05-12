@@ -1,6 +1,9 @@
 [workspace]
 resolver = "3"
-members = ["bindings/rust/crates/maplibre-native-sys"]
+members = [
+  "bindings/rust/crates/maplibre-native-support",
+  "bindings/rust/crates/maplibre-native-sys",
+]
 
 [workspace.package]
 edition = "2024"
