@@ -13,8 +13,8 @@ use crate::events::MapId;
 use crate::handle::{ThreadAffineNativeHandle, closed_handle_error, out_handle};
 use crate::render::{
     MetalBorrowedTextureDescriptor, MetalOwnedTextureDescriptor, MetalSurfaceDescriptor,
-    OwnedTextureDescriptor, RenderSessionHandle, VulkanBorrowedTextureDescriptor,
-    VulkanOwnedTextureDescriptor, VulkanSurfaceDescriptor,
+    OwnedTextureDescriptor, PremultipliedRgba8Image, RenderSessionHandle, TextureImageInfo,
+    VulkanBorrowedTextureDescriptor, VulkanOwnedTextureDescriptor, VulkanSurfaceDescriptor,
 };
 use crate::runtime::{RuntimeHandle, RuntimeState};
 use crate::{
@@ -83,6 +83,97 @@ pub struct SourceInfo {
     pub raw_source_type: u32,
     pub is_volatile: bool,
     pub attribution: Option<String>,
+}
+
+/// Options for adding or replacing a runtime style image.
+#[derive(Debug, Clone, Default, PartialEq)]
+#[non_exhaustive]
+pub struct StyleImageOptions {
+    pub pixel_ratio: Option<f32>,
+    pub sdf: Option<bool>,
+}
+
+impl StyleImageOptions {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn with_pixel_ratio(mut self, pixel_ratio: f32) -> Self {
+        self.pixel_ratio = Some(pixel_ratio);
+        self
+    }
+
+    pub fn with_sdf(mut self, sdf: bool) -> Self {
+        self.sdf = Some(sdf);
+        self
+    }
+
+    fn to_native(&self) -> sys::mln_style_image_options {
+        let mut fields = 0;
+        let mut pixel_ratio = 1.0;
+        let mut sdf = false;
+        if let Some(value) = self.pixel_ratio {
+            fields |= sys::MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO;
+            pixel_ratio = value;
+        }
+        if let Some(value) = self.sdf {
+            fields |= sys::MLN_STYLE_IMAGE_OPTION_SDF;
+            sdf = value;
+        }
+        sys::mln_style_image_options {
+            size: mem::size_of::<sys::mln_style_image_options>() as u32,
+            fields,
+            pixel_ratio,
+            sdf,
+        }
+    }
+}
+
+/// Copied fixed metadata for one runtime style image.
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[non_exhaustive]
+pub struct StyleImageInfo {
+    pub width: u32,
+    pub height: u32,
+    pub stride: u32,
+    pub byte_length: usize,
+    pub pixel_ratio: f32,
+    pub sdf: bool,
+}
+
+impl StyleImageInfo {
+    fn from_native(raw: &sys::mln_style_image_info) -> Self {
+        Self {
+            width: raw.width,
+            height: raw.height,
+            stride: raw.stride,
+            byte_length: raw.byte_length,
+            pixel_ratio: raw.pixel_ratio,
+            sdf: raw.sdf,
+        }
+    }
+}
+
+/// Copied runtime style image pixels with style-specific metadata.
+#[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
+pub struct StyleImage {
+    pub image: PremultipliedRgba8Image,
+    pub pixel_ratio: f32,
+    pub sdf: bool,
+}
+
+fn premultiplied_rgba8_image_to_native(
+    image: &PremultipliedRgba8Image,
+) -> sys::mln_premultiplied_rgba8_image {
+    sys::mln_premultiplied_rgba8_image {
+        size: mem::size_of::<sys::mln_premultiplied_rgba8_image>() as u32,
+        width: image.info.width,
+        height: image.info.height,
+        stride: image.info.stride,
+        pixels: image.data.as_ptr(),
+        byte_length: image.data.len(),
+    }
 }
 
 #[derive(Debug)]
@@ -426,6 +517,154 @@ impl MapHandle {
             sys::mln_map_style_source_exists(map, source_id.raw(), &mut exists)
         })?;
         Ok(exists)
+    }
+
+    /// Adds or replaces one runtime style image.
+    pub fn set_style_image(
+        &self,
+        image_id: &str,
+        image: &PremultipliedRgba8Image,
+        options: Option<&StyleImageOptions>,
+    ) -> Result<()> {
+        let map = self.inner.as_ptr()?;
+        let image_id = support::string::string_view(image_id);
+        let image = premultiplied_rgba8_image_to_native(image);
+        let options = options.map(StyleImageOptions::to_native);
+        let options_ptr = options
+            .as_ref()
+            .map_or(ptr::null(), ptr::from_ref);
+        // SAFETY: map is live, image_id is an explicit-length view valid for
+        // this call, image points into the borrowed Rust image for this call,
+        // and options_ptr is either null or points to call-scoped options.
+        support::check(unsafe {
+            sys::mln_map_set_style_image(map, image_id.raw(), &image, options_ptr)
+        })
+    }
+
+    /// Removes one runtime style image by ID.
+    ///
+    /// Returns whether an image existed and was removed.
+    pub fn remove_style_image(&self, image_id: &str) -> Result<bool> {
+        let map = self.inner.as_ptr()?;
+        let image_id = support::string::string_view(image_id);
+        let mut removed = false;
+        // SAFETY: map is live, image_id is an explicit-length view valid for
+        // this call, and removed points to writable storage.
+        support::check(unsafe {
+            sys::mln_map_remove_style_image(map, image_id.raw(), &mut removed)
+        })?;
+        Ok(removed)
+    }
+
+    /// Reports whether a runtime style image ID exists.
+    pub fn style_image_exists(&self, image_id: &str) -> Result<bool> {
+        let map = self.inner.as_ptr()?;
+        let image_id = support::string::string_view(image_id);
+        let mut exists = false;
+        // SAFETY: map is live, image_id is an explicit-length view valid for
+        // this call, and exists points to writable storage.
+        support::check(unsafe {
+            sys::mln_map_style_image_exists(map, image_id.raw(), &mut exists)
+        })?;
+        Ok(exists)
+    }
+
+    /// Copies fixed metadata for one runtime style image.
+    pub fn style_image_info(&self, image_id: &str) -> Result<Option<StyleImageInfo>> {
+        let map = self.inner.as_ptr()?;
+        let image_id = support::string::string_view(image_id);
+        let mut info = sys::mln_style_image_info {
+            size: mem::size_of::<sys::mln_style_image_info>() as u32,
+            width: 0,
+            height: 0,
+            stride: 0,
+            byte_length: 0,
+            pixel_ratio: 1.0,
+            sdf: false,
+        };
+        let mut found = false;
+        // SAFETY: map is live, image_id is an explicit-length view valid for
+        // this call, info has its ABI size initialized, and found points to
+        // writable storage.
+        support::check(unsafe {
+            sys::mln_map_get_style_image_info(map, image_id.raw(), &mut info, &mut found)
+        })?;
+        Ok(found.then(|| StyleImageInfo::from_native(&info)))
+    }
+
+    /// Copies one runtime style image into owned tightly packed premultiplied RGBA8 pixels.
+    pub fn copy_style_image_premultiplied_rgba8(
+        &self,
+        image_id: &str,
+    ) -> Result<Option<StyleImage>> {
+        let map = self.inner.as_ptr()?;
+        let image_id = support::string::string_view(image_id);
+        let mut raw_info = sys::mln_style_image_info {
+            size: mem::size_of::<sys::mln_style_image_info>() as u32,
+            width: 0,
+            height: 0,
+            stride: 0,
+            byte_length: 0,
+            pixel_ratio: 1.0,
+            sdf: false,
+        };
+        let mut info_found = false;
+        // SAFETY: map is live, image_id is an explicit-length view valid for
+        // this call, raw_info has its ABI size initialized, and info_found
+        // points to writable storage.
+        support::check(unsafe {
+            sys::mln_map_get_style_image_info(map, image_id.raw(), &mut raw_info, &mut info_found)
+        })?;
+        if !info_found {
+            return Ok(None);
+        }
+        let info = StyleImageInfo::from_native(&raw_info);
+
+        let mut data = vec![0u8; info.byte_length];
+        let mut copied_size = 0;
+        let mut found = false;
+        let pixels = if data.is_empty() {
+            ptr::null_mut()
+        } else {
+            data.as_mut_ptr()
+        };
+        // SAFETY: map is live, image_id remains valid for this call, data is
+        // writable for info.byte_length bytes (or null with zero capacity), and
+        // output pointers refer to writable storage.
+        support::check(unsafe {
+            sys::mln_map_copy_style_image_premultiplied_rgba8(
+                map,
+                image_id.raw(),
+                pixels,
+                data.len(),
+                &mut copied_size,
+                &mut found,
+            )
+        })?;
+        if !found {
+            return Ok(None);
+        }
+        if copied_size > data.len() {
+            return Err(Error::new(
+                ErrorKind::NativeError,
+                None,
+                "native style image byte length exceeded caller buffer",
+            ));
+        }
+        data.truncate(copied_size);
+        Ok(Some(StyleImage {
+            image: PremultipliedRgba8Image {
+                info: TextureImageInfo {
+                    width: info.width,
+                    height: info.height,
+                    stride: info.stride,
+                    byte_length: copied_size,
+                },
+                data,
+            },
+            pixel_ratio: info.pixel_ratio,
+            sdf: info.sdf,
+        }))
     }
 
     /// Gets one style source type.
@@ -1433,7 +1672,8 @@ mod tests {
     use crate::events::empty_runtime_event;
     use crate::{
         ConstrainMode, CustomGeometrySourceOptions, EdgeInsets, ErrorKind, Feature,
-        FeatureIdentifier, JsonMember, MapMode, NorthOrientation, TileLodMode, ViewportMode,
+        FeatureIdentifier, JsonMember, MapMode, NorthOrientation, TextureImageInfo, TileLodMode,
+        ViewportMode,
     };
 
     const VALID_STYLE_JSON: &str = r#"{"version":8,"sources":{},"layers":[]}"#;
@@ -1573,6 +1813,151 @@ mod tests {
 
         map.close().unwrap();
         runtime.close().unwrap();
+    }
+
+    fn test_style_image(data: Vec<u8>) -> PremultipliedRgba8Image {
+        PremultipliedRgba8Image {
+            info: TextureImageInfo {
+                width: 2,
+                height: 2,
+                stride: 8,
+                byte_length: data.len(),
+            },
+            data,
+        }
+    }
+
+    #[test]
+    fn style_image_add_query_copy_and_remove_call_real_c_api() {
+        let runtime = RuntimeHandle::new().unwrap();
+        let map = MapHandle::new(&runtime).unwrap();
+        map.set_style_json(VALID_STYLE_JSON).unwrap();
+
+        let plain = test_style_image(vec![
+            255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255, 255, 255, 255, 255,
+        ]);
+        let sdf = test_style_image(vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]);
+
+        assert!(!map.style_image_exists("plain").unwrap());
+        assert_eq!(map.style_image_info("plain").unwrap(), None);
+        assert_eq!(
+            map.copy_style_image_premultiplied_rgba8("plain").unwrap(),
+            None
+        );
+        assert!(!map.remove_style_image("plain").unwrap());
+
+        map.set_style_image("plain", &plain, None).unwrap();
+        assert!(map.style_image_exists("plain").unwrap());
+        let info = map.style_image_info("plain").unwrap().unwrap();
+        assert_eq!(info.width, 2);
+        assert_eq!(info.height, 2);
+        assert_eq!(info.stride, 8);
+        assert_eq!(info.byte_length, 16);
+        assert_eq!(info.pixel_ratio, 1.0);
+        assert!(!info.sdf);
+        let copied = map
+            .copy_style_image_premultiplied_rgba8("plain")
+            .unwrap()
+            .unwrap();
+        assert_eq!(copied.image.info.width, info.width);
+        assert_eq!(copied.image.info.height, info.height);
+        assert_eq!(copied.image.info.stride, info.stride);
+        assert_eq!(copied.image.info.byte_length, info.byte_length);
+        assert_eq!(copied.pixel_ratio, info.pixel_ratio);
+        assert_eq!(copied.sdf, info.sdf);
+        assert_eq!(copied.image.data, plain.data);
+
+        map.set_style_image(
+            "sdf",
+            &sdf,
+            Some(
+                &StyleImageOptions::new()
+                    .with_pixel_ratio(2.0)
+                    .with_sdf(true),
+            ),
+        )
+        .unwrap();
+        let info = map.style_image_info("sdf").unwrap().unwrap();
+        assert_eq!(info.pixel_ratio, 2.0);
+        assert!(info.sdf);
+        let copied = map
+            .copy_style_image_premultiplied_rgba8("sdf")
+            .unwrap()
+            .unwrap();
+        assert_eq!(copied.pixel_ratio, 2.0);
+        assert!(copied.sdf);
+        assert_eq!(copied.image.data, sdf.data);
+
+        let replacement = test_style_image(vec![16; 16]);
+        map.set_style_image(
+            "sdf",
+            &replacement,
+            Some(&StyleImageOptions::new().with_sdf(false)),
+        )
+        .unwrap();
+        let info = map.style_image_info("sdf").unwrap().unwrap();
+        assert_eq!(info.pixel_ratio, 1.0);
+        assert!(!info.sdf);
+        let copied = map
+            .copy_style_image_premultiplied_rgba8("sdf")
+            .unwrap()
+            .unwrap();
+        assert_eq!(copied.image.data, replacement.data);
+
+        assert!(map.remove_style_image("plain").unwrap());
+        assert!(!map.style_image_exists("plain").unwrap());
+        assert!(!map.remove_style_image("plain").unwrap());
+
+        let error = map.style_image_exists("").unwrap_err();
+        assert_eq!(error.kind(), ErrorKind::InvalidArgument);
+        assert!(error.raw_status().is_some());
+
+        let error = map.set_style_image("", &plain, None).unwrap_err();
+        assert_eq!(error.kind(), ErrorKind::InvalidArgument);
+        assert!(error.raw_status().is_some());
+
+        let error = map.remove_style_image("").unwrap_err();
+        assert_eq!(error.kind(), ErrorKind::InvalidArgument);
+        assert!(error.raw_status().is_some());
+
+        let error = map.style_image_info("").unwrap_err();
+        assert_eq!(error.kind(), ErrorKind::InvalidArgument);
+        assert!(error.raw_status().is_some());
+
+        let error = map.copy_style_image_premultiplied_rgba8("").unwrap_err();
+        assert_eq!(error.kind(), ErrorKind::InvalidArgument);
+        assert!(error.raw_status().is_some());
+    }
+
+    #[test]
+    fn style_image_descriptor_materialization_rejects_invalid_images_and_options() {
+        let runtime = RuntimeHandle::new().unwrap();
+        let map = MapHandle::new(&runtime).unwrap();
+        map.set_style_json(VALID_STYLE_JSON).unwrap();
+
+        let too_short = PremultipliedRgba8Image {
+            info: TextureImageInfo {
+                width: 2,
+                height: 2,
+                stride: 8,
+                byte_length: 16,
+            },
+            data: vec![0; 15],
+        };
+        let error = map.set_style_image("bad", &too_short, None).unwrap_err();
+        assert_eq!(error.kind(), ErrorKind::InvalidArgument);
+        assert!(error.raw_status().is_some());
+
+        let image = test_style_image(vec![0; 16]);
+        let error = map
+            .set_style_image(
+                "bad-options",
+                &image,
+                Some(&StyleImageOptions::new().with_pixel_ratio(0.0)),
+            )
+            .unwrap_err();
+        assert_eq!(error.kind(), ErrorKind::InvalidArgument);
+        assert!(error.raw_status().is_some());
     }
 
     #[test]
