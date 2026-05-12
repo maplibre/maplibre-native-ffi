@@ -1,6 +1,7 @@
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::fmt;
+use std::mem;
 use std::ptr;
 use std::rc::Rc;
 
@@ -22,6 +23,67 @@ use crate::{
     MapDebugOptions, MapOptions, MapProjectionHandle, MapTileOptions, MapViewportOptions,
     ProjectionMode, Result, ScreenPoint,
 };
+
+/// Style source type values returned by native style source metadata.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum SourceType {
+    Unknown,
+    Vector,
+    Raster,
+    RasterDem,
+    GeoJson,
+    Image,
+    Video,
+    Annotations,
+    CustomVector,
+    Other(u32),
+}
+
+impl SourceType {
+    /// Converts a raw C ABI source type value into a Rust value, preserving
+    /// future values.
+    pub fn from_raw(raw: u32) -> Self {
+        match raw {
+            sys::MLN_STYLE_SOURCE_TYPE_UNKNOWN => Self::Unknown,
+            sys::MLN_STYLE_SOURCE_TYPE_VECTOR => Self::Vector,
+            sys::MLN_STYLE_SOURCE_TYPE_RASTER => Self::Raster,
+            sys::MLN_STYLE_SOURCE_TYPE_RASTER_DEM => Self::RasterDem,
+            sys::MLN_STYLE_SOURCE_TYPE_GEOJSON => Self::GeoJson,
+            sys::MLN_STYLE_SOURCE_TYPE_IMAGE => Self::Image,
+            sys::MLN_STYLE_SOURCE_TYPE_VIDEO => Self::Video,
+            sys::MLN_STYLE_SOURCE_TYPE_ANNOTATIONS => Self::Annotations,
+            sys::MLN_STYLE_SOURCE_TYPE_CUSTOM_VECTOR => Self::CustomVector,
+            _ => Self::Other(raw),
+        }
+    }
+
+    /// Returns the raw C ABI source type value.
+    pub fn raw_value(self) -> u32 {
+        match self {
+            Self::Unknown => sys::MLN_STYLE_SOURCE_TYPE_UNKNOWN,
+            Self::Vector => sys::MLN_STYLE_SOURCE_TYPE_VECTOR,
+            Self::Raster => sys::MLN_STYLE_SOURCE_TYPE_RASTER,
+            Self::RasterDem => sys::MLN_STYLE_SOURCE_TYPE_RASTER_DEM,
+            Self::GeoJson => sys::MLN_STYLE_SOURCE_TYPE_GEOJSON,
+            Self::Image => sys::MLN_STYLE_SOURCE_TYPE_IMAGE,
+            Self::Video => sys::MLN_STYLE_SOURCE_TYPE_VIDEO,
+            Self::Annotations => sys::MLN_STYLE_SOURCE_TYPE_ANNOTATIONS,
+            Self::CustomVector => sys::MLN_STYLE_SOURCE_TYPE_CUSTOM_VECTOR,
+            Self::Other(raw) => raw,
+        }
+    }
+}
+
+/// Copied fixed metadata for one style source.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct SourceInfo {
+    pub source_type: SourceType,
+    pub raw_source_type: u32,
+    pub is_volatile: bool,
+    pub attribution: Option<String>,
+}
 
 #[derive(Debug)]
 pub(crate) struct MapState {
@@ -364,6 +426,124 @@ impl MapHandle {
             sys::mln_map_style_source_exists(map, source_id.raw(), &mut exists)
         })?;
         Ok(exists)
+    }
+
+    /// Gets one style source type.
+    pub fn style_source_type(&self, source_id: &str) -> Result<Option<SourceType>> {
+        let map = self.inner.as_ptr()?;
+        let source_id = support::string::string_view(source_id);
+        let mut raw_source_type = sys::MLN_STYLE_SOURCE_TYPE_UNKNOWN;
+        let mut found = false;
+        // SAFETY: map is live, source_id is an explicit-length view valid for
+        // this call, and output pointers refer to writable storage.
+        support::check(unsafe {
+            sys::mln_map_get_style_source_type(
+                map,
+                source_id.raw(),
+                &mut raw_source_type,
+                &mut found,
+            )
+        })?;
+        Ok(found.then(|| SourceType::from_raw(raw_source_type)))
+    }
+
+    /// Copies fixed metadata and attribution for one style source.
+    pub fn style_source_info(&self, source_id: &str) -> Result<Option<SourceInfo>> {
+        let map = self.inner.as_ptr()?;
+        let source_id = support::string::string_view(source_id);
+        let mut info = sys::mln_style_source_info {
+            size: mem::size_of::<sys::mln_style_source_info>() as u32,
+            type_: sys::MLN_STYLE_SOURCE_TYPE_UNKNOWN,
+            id_size: 0,
+            is_volatile: false,
+            has_attribution: false,
+            attribution_size: 0,
+        };
+        let mut found = false;
+        // SAFETY: map is live, source_id is an explicit-length view valid for
+        // this call, info has its ABI size initialized, and found points to
+        // writable storage.
+        support::check(unsafe {
+            sys::mln_map_get_style_source_info(map, source_id.raw(), &mut info, &mut found)
+        })?;
+        if !found {
+            return Ok(None);
+        }
+
+        let attribution = if info.has_attribution {
+            match self.copy_style_source_attribution(map, source_id.raw(), info.attribution_size)? {
+                Some(attribution) => Some(attribution),
+                None => return Ok(None),
+            }
+        } else {
+            None
+        };
+
+        Ok(Some(SourceInfo {
+            source_type: SourceType::from_raw(info.type_),
+            raw_source_type: info.type_,
+            is_volatile: info.is_volatile,
+            attribution,
+        }))
+    }
+
+    fn copy_style_source_attribution(
+        &self,
+        map: *mut sys::mln_map,
+        source_id: sys::mln_string_view,
+        attribution_size: usize,
+    ) -> Result<Option<String>> {
+        if attribution_size == 0 {
+            let mut copied_size = 0;
+            let mut found = false;
+            // SAFETY: map is live, source_id remains valid for this call,
+            // capacity is zero so the output buffer may be null, and output
+            // pointers refer to writable storage.
+            support::check(unsafe {
+                sys::mln_map_copy_style_source_attribution(
+                    map,
+                    source_id,
+                    ptr::null_mut(),
+                    0,
+                    &mut copied_size,
+                    &mut found,
+                )
+            })?;
+            return Ok(found.then(String::new));
+        }
+
+        let mut buffer = vec![0u8; attribution_size];
+        let mut copied_size = 0;
+        let mut found = false;
+        // SAFETY: map is live, source_id remains valid for this call, buffer is
+        // writable for attribution_size bytes, and output pointers refer to
+        // writable storage.
+        support::check(unsafe {
+            sys::mln_map_copy_style_source_attribution(
+                map,
+                source_id,
+                buffer.as_mut_ptr().cast(),
+                buffer.len(),
+                &mut copied_size,
+                &mut found,
+            )
+        })?;
+        if !found {
+            return Ok(None);
+        }
+        if copied_size > buffer.len() {
+            return Err(Error::new(
+                ErrorKind::NativeError,
+                None,
+                "native style source attribution size exceeded caller buffer",
+            ));
+        }
+        buffer.truncate(copied_size);
+        String::from_utf8(buffer).map(Some).map_err(|error| {
+            Error::invalid_argument(format!(
+                "native style source attribution was not valid UTF-8: {error}"
+            ))
+        })
     }
 
     /// Adds a GeoJSON source with inline data.
@@ -1346,6 +1526,18 @@ mod tests {
     }
 
     #[test]
+    fn source_type_preserves_raw_values() {
+        assert_eq!(SourceType::Unknown.raw_value(), 0);
+        assert_eq!(SourceType::from_raw(0), SourceType::Unknown);
+        assert_eq!(
+            SourceType::GeoJson.raw_value(),
+            sys::MLN_STYLE_SOURCE_TYPE_GEOJSON
+        );
+        assert_eq!(SourceType::from_raw(999_101), SourceType::Other(999_101));
+        assert_eq!(SourceType::Other(999_101).raw_value(), 999_101);
+    }
+
+    #[test]
     fn style_source_exists_and_remove_call_real_c_api() {
         let runtime = RuntimeHandle::new().unwrap();
         let map = MapHandle::new(&runtime).unwrap();
@@ -1376,6 +1568,73 @@ mod tests {
         assert!(error.raw_status().is_some());
 
         let error = map.remove_style_source("").unwrap_err();
+        assert_eq!(error.kind(), ErrorKind::InvalidArgument);
+        assert!(error.raw_status().is_some());
+
+        map.close().unwrap();
+        runtime.close().unwrap();
+    }
+
+    #[test]
+    fn style_source_type_and_info_call_real_c_api() {
+        let runtime = RuntimeHandle::new().unwrap();
+        let map = MapHandle::new(&runtime).unwrap();
+        map.set_style_json(VALID_STYLE_JSON).unwrap();
+
+        let geojson_source = JsonValue::Object(vec![
+            JsonMember::new("type", JsonValue::String("geojson".to_owned())),
+            JsonMember::new(
+                "data",
+                JsonValue::Object(vec![
+                    JsonMember::new("type", JsonValue::String("FeatureCollection".to_owned())),
+                    JsonMember::new("features", JsonValue::Array(Vec::new())),
+                ]),
+            ),
+        ]);
+        let vector_source = JsonValue::Object(vec![
+            JsonMember::new("type", JsonValue::String("vector".to_owned())),
+            JsonMember::new(
+                "tiles",
+                JsonValue::Array(vec![JsonValue::String(
+                    "https://example.com/{z}/{x}/{y}.pbf".to_owned(),
+                )]),
+            ),
+            JsonMember::new(
+                "attribution",
+                JsonValue::String("Example attribution".to_owned()),
+            ),
+        ]);
+
+        assert_eq!(map.style_source_type("missing-source").unwrap(), None);
+        assert_eq!(map.style_source_info("missing-source").unwrap(), None);
+
+        map.add_style_source_json("empty", &geojson_source).unwrap();
+        assert_eq!(
+            map.style_source_type("empty").unwrap(),
+            Some(SourceType::GeoJson)
+        );
+        let info = map.style_source_info("empty").unwrap().unwrap();
+        assert_eq!(info.source_type, SourceType::GeoJson);
+        assert_eq!(info.raw_source_type, sys::MLN_STYLE_SOURCE_TYPE_GEOJSON);
+        assert!(!info.is_volatile);
+        assert_eq!(info.attribution, None);
+
+        map.add_style_source_json("vector-meta", &vector_source)
+            .unwrap();
+        assert_eq!(
+            map.style_source_type("vector-meta").unwrap(),
+            Some(SourceType::Vector)
+        );
+        let info = map.style_source_info("vector-meta").unwrap().unwrap();
+        assert_eq!(info.source_type, SourceType::Vector);
+        assert_eq!(info.raw_source_type, sys::MLN_STYLE_SOURCE_TYPE_VECTOR);
+        assert_eq!(info.attribution.as_deref(), Some("Example attribution"));
+
+        let error = map.style_source_type("").unwrap_err();
+        assert_eq!(error.kind(), ErrorKind::InvalidArgument);
+        assert!(error.raw_status().is_some());
+
+        let error = map.style_source_info("").unwrap_err();
         assert_eq!(error.kind(), ErrorKind::InvalidArgument);
         assert!(error.raw_status().is_some());
 

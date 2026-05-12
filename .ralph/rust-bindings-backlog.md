@@ -20,7 +20,7 @@ commit/push after each item.
 - [x] Process-global logging callbacks, clearing, severity values, and async
       severity mask.
 - [x] Style source removal and source existence checks.
-- [ ] Style source type, source info, attribution, and copied source output
+- [x] Style source type, source info, attribution, and copied source output
       types.
 - [ ] Style image add/remove/query APIs and image metadata/value types.
 - [ ] Image source APIs for URL, coordinates, and image updates.
@@ -60,6 +60,10 @@ commit/push after each item.
   `cargo test -p maplibre-native logging`.
 - Style source removal and existence checks: `cargo fmt --all --check` and
   `cargo test -p maplibre-native style_source_exists_and_remove_call_real_c_api`.
+- Style source type/info/attribution output types: `cargo fmt --all --check`,
+  `cargo test -p maplibre-native source_type_preserves_raw_values`,
+  `cargo test -p maplibre-native style_source_type_and_info_call_real_c_api`,
+  and `mise run //bindings/rust:test`.
 
 ## Notes
 
