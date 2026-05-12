@@ -11,18 +11,18 @@ macos = "14.0"
 
 [dependencies]
 clang-tools = ">=22,<23"
-cmake = ">=4,<5"
 glslang = "*"
+cmake = ">=4,<5"
 icu = "*"
 libcurl = "*"
 libjpeg-turbo = "*"
 libpng = "*"
 libuv = "*"
-libvulkan-loader = "*"
 libwebp = "*"
 ninja = "*"
-pkg-config = "*"
 sdl3 = ">=3.4,<4"
+pkg-config = "*"
+libvulkan-loader = "*"
 zlib = "*"
 
 [target.linux-64.dependencies]
