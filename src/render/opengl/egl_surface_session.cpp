@@ -137,11 +137,12 @@ class EGLSurfaceBackendImpl final : public mbgl::gl::RendererBackend,
 
   void deactivate() override {
     if (
-      eglMakeCurrent(
-        display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT
-      ) == EGL_FALSE
+      eglMakeCurrent(display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT) ==
+      EGL_FALSE
     ) {
-      mbgl::Log::Error(mbgl::Event::Render, "eglMakeCurrent (deactivate) failed");
+      mbgl::Log::Error(
+        mbgl::Event::Render, "eglMakeCurrent (deactivate) failed"
+      );
     }
   }
 
@@ -151,7 +152,9 @@ class EGLSurfaceBackendImpl final : public mbgl::gl::RendererBackend,
     // generic void(*)() stub that the EGL spec requires callers to cast to the
     // intended signature before calling. This reinterpret_cast is the mandated
     // EGL pattern; there is no standard alternative.
-    return reinterpret_cast<mbgl::gl::ProcAddress>(  // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+    return reinterpret_cast<
+      mbgl::gl::
+        ProcAddress>(  // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
       eglGetProcAddress(name)
     );
   }
