@@ -59,17 +59,23 @@ ownership and RAII rather than copying Java's synchronized object model.
   - Add Rust examples to the same root workspace.
 - Commit `Cargo.lock`.
 - Use Rust from `mise.toml`.
-  - The mise Rust backend uses rustup and can install components such as
-    `rustfmt` and `clippy` through tool options.
+  - Follow the [mise Rust backend docs](https://mise.jdx.dev/lang/rust.html).
+  - The mise Rust backend uses rustup. The default Rust profile is fine because
+    it includes `rustfmt` and `clippy`; specify components only if the profile
+    changes.
 - Use pixi to provide `libclang` for `bindgen`, similar to the Zig setup.
   - Prefer running Cargo through mise, not inside pixi.
   - Point `bindgen` at pixi's `libclang` with task environment such as
     `LIBCLANG_PATH` when needed.
-- Add Rust formatting and linting early.
-  - Formatting should integrate with the project formatting flow through
-    dprint/mise.
-  - Linting should run through mise tasks, using Rust tools such as `clippy`
-    from the mise-managed Rust toolchain.
+- Add Rust formatting and linting early through the repository-wide check/fix
+  flow.
+  - Formatting should route through `dprint.jsonc`, using the
+    [dprint exec plugin](https://github.com/dprint/dprint-plugin-exec/blob/main/README.md)
+    to call `rustfmt` if needed.
+  - Linting should integrate with `hk.pkl`, so `mise run check` and
+    `mise run fix` remain the contributor entrypoints.
+  - Use Rust tools such as `rustfmt` and `clippy` from the mise-managed Rust
+    toolchain.
 - Add CI matrix entries early through `.github/config/variants.toml`.
   - Add the Rust binding entry as soon as it is buildable and testable.
   - Add the Rust Vulkan map example entry when the example builds.
@@ -117,8 +123,8 @@ repository = "https://github.com/maplibre/maplibre-native-ffi"
 
 ## Milestone 1: workspace, tooling, formatting, linting, and raw sys crate
 
-Create the root Cargo workspace, local Rust mise tasks, formatting/linting
-hooks, and `maplibre-native-sys`.
+Create the root Cargo workspace, local Rust build/test mise tasks,
+repository-wide formatting/linting integration, and `maplibre-native-sys`.
 
 Requirements:
 
@@ -131,10 +137,13 @@ Requirements:
   find the library during local tests.
 - Configure `bindgen` to find pixi-provided `libclang` while Cargo still runs
   through mise.
-- Add local mise tasks for build, test, lint, and formatting.
-- Configure the Rust toolchain with the components needed for formatting and
-  linting.
-- Integrate formatting with the project dprint/mise flow.
+- Add local mise tasks for Rust build and test.
+- Use the default mise Rust profile for `rustfmt` and `clippy` unless the
+  project later switches to a minimal profile.
+- Add Rust formatting to `dprint.jsonc`, using dprint-plugin-exec to route
+  `*.rs` files to `rustfmt`.
+- Add Rust lint/check steps to `hk.pkl`, so `mise run check` and `mise run fix`
+  remain the lint/fix entrypoints.
 
 Tests:
 
@@ -500,8 +509,8 @@ Local Rust validation:
 mise run //:ensure-native-library
 mise run //bindings/rust:build
 mise run //bindings/rust:test
-mise run //bindings/rust:lint
-mise run //bindings/rust:fmt-check
+mise run check
+mise run fix
 ```
 
 Repository validation before broader integration or merge:
@@ -569,7 +578,7 @@ Approved decisions:
 - Use a root Cargo workspace with Rust crates under bindings/rust/crates and the Rust map example in the same workspace.
 - Commit Cargo.lock.
 - Use Rust from mise.toml. Use pixi-provided libclang for bindgen, but avoid running Cargo inside pixi; configure LIBCLANG_PATH or equivalent env in Rust mise tasks.
-- Add formatting and linting early. Formatting integrates with the project dprint/mise flow; linting runs through mise with Rust tools such as clippy.
+- Add formatting and linting early through the repository-wide flow: route Rust formatting through dprint.jsonc and Rust lint/check steps through hk.pkl, so contributors use mise run check and mise run fix.
 - Add .github/config/variants.toml entries as soon as the Rust binding and Rust map example have reliable build/test tasks.
 - For Rust-owned handles, design for RAII: thread-affine handles are !Send + !Sync so Drop can call native destroy in safe Rust. Drop must not panic. Also provide consuming close(self) -> Result<()> for fallible explicit cleanup.
 - Documentation, API reference generation, publishing metadata, and release packaging are out of scope for this project.
@@ -582,5 +591,5 @@ Hard constraints: Use include/maplibre_native_c.h unless maintainers approve ano
 
 Suggested approach: Build in milestones: workspace/sys/tooling, support errors and diagnostics, minimal safe API, handle foundations, descriptors and values, map/projection APIs, runtime events, JSON/GeoJSON, resource transform callbacks, resource providers, custom geometry callbacks, render sessions, texture frames, Vulkan map example, and CI variant integration as tasks become reliable. Add tests at each milestone before broadening scope.
 
-Validation: Run mise run //:ensure-native-library, the Rust build/test/lint/format tasks during development. Add variants.toml entries when tasks are reliable. Before final merge of integrated work, run mise run test and mise run fix.
+Validation: Run mise run //:ensure-native-library, the Rust build/test tasks, and the repository-wide mise run check / mise run fix flow during development. Add variants.toml entries when tasks are reliable. Before final merge of integrated work, run mise run test and mise run fix.
 ```
