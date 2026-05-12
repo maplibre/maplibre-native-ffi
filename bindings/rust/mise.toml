@@ -1,0 +1,31 @@
+[tasks.build]
+depends = ["//:ensure-native-library"]
+run = '''
+repo_root=$(git rev-parse --show-toplevel)
+bash scripts/with-libclang.sh cargo build --manifest-path "$repo_root/Cargo.toml" --workspace
+'''
+
+[tasks.test]
+depends = ["//:ensure-native-library"]
+run = '''
+repo_root=$(git rev-parse --show-toplevel)
+bash scripts/with-libclang.sh cargo test --manifest-path "$repo_root/Cargo.toml" --workspace
+'''
+
+[tasks.check]
+depends = ["//:ensure-native-library"]
+run = '''
+set -euo pipefail
+repo_root=$(git rev-parse --show-toplevel)
+bash scripts/with-libclang.sh cargo fmt --manifest-path "$repo_root/Cargo.toml" --all --check
+bash scripts/with-libclang.sh cargo clippy --manifest-path "$repo_root/Cargo.toml" --workspace --all-targets -- -D warnings
+'''
+
+[tasks.fix]
+depends = ["//:ensure-native-library"]
+run = '''
+set -euo pipefail
+repo_root=$(git rev-parse --show-toplevel)
+bash scripts/with-libclang.sh cargo fmt --manifest-path "$repo_root/Cargo.toml" --all
+bash scripts/with-libclang.sh cargo clippy --manifest-path "$repo_root/Cargo.toml" --workspace --all-targets --fix --allow-dirty --allow-staged -- -D warnings
+'''

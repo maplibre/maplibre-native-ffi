@@ -24,6 +24,9 @@
     "**/*-lock.yml",
     "**/*.lock.yml",
     "uv.lock",
+    "Cargo.lock",
+    "target/**",
+    "**/target/**",
     "gradlew",
     "gradlew.bat",
   ],
@@ -55,6 +58,7 @@
       },
       { "command": "zig fmt --stdin", "exts": ["zig"] },
       { "command": "zig fmt --stdin --zon", "exts": ["zon"] },
+      { "command": "rustfmt --edition 2024", "exts": ["rs"] },
       {
         "command": "pnpm --dir docs exec mdxlint --rc-path .mdxlintrc.json --file-path {{file_path}}",
         "exts": ["mdx"],

@@ -31,6 +31,12 @@ local lintSteps = new Mapping<String, Step> {
     exclude = List("third_party/**")
     check = "uv run ty check --error-on-warning .mise"
   }
+  ["rust"] {
+    glob = List("**/*.rs", "**/Cargo.toml", "Cargo.toml")
+    exclude = List("target/**", "**/target/**", "third_party/**")
+    check = "mise run //bindings/rust:check"
+    fix = "mise run //bindings/rust:fix"
+  }
 }
 
 hooks {
