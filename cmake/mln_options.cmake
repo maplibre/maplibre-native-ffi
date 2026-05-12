@@ -37,12 +37,6 @@ function(mln_configure_options)
       FATAL_ERROR
         "OpenGL/WGL backend is not yet supported on Windows in this build; use vulkan")
   endif()
-  if(MLN_FFI_RENDER_BACKEND STREQUAL "opengl" AND ANDROID)
-    message(
-      FATAL_ERROR
-        "OpenGL/EGL backend is not yet supported on Android in this build; use vulkan")
-  endif()
-
   set(MLN_WITH_METAL OFF CACHE BOOL "Build MapLibre Native Metal backend" FORCE)
   set(MLN_WITH_VULKAN OFF
       CACHE BOOL "Build MapLibre Native Vulkan backend" FORCE)
