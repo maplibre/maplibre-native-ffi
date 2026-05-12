@@ -90,22 +90,14 @@ def supports(example: TomlTable, variant: TomlTable) -> bool:
 def variant_from_profile(
     profile_path: Path,
     runners: TomlTable,
-) -> tuple[str, TomlTable] | None:
-    """Read variant metadata from a mise environment profile.
-
-    Returns None when no runner is configured for this profile's target triple
-    (e.g. a local-developer-only profile whose platform is not in the CI
-    runner table).
-    """
+) -> tuple[str, TomlTable]:
+    """Read variant metadata from a mise environment profile."""
     profile = load_toml(profile_path)
     env = as_table(profile.get("env"))
     variant_name = string_value(env, "MLN_FFI_VARIANT")
     target_triple = string_value(env, "MLN_FFI_TARGET_TRIPLE")
     backend = string_value(env, "MLN_FFI_RENDER_BACKEND")
     platform, arch = target_triple.split("-", maxsplit=1)
-
-    if target_triple not in runners:
-        return None
 
     return variant_name, {
         "platform": platform,
@@ -120,10 +112,7 @@ def load_variants(repo_root: Path, schema: TomlTable) -> dict[str, TomlTable]:
     runners = as_table(schema.get("runners"))
     variants: dict[str, TomlTable] = {}
     for profile_path in repo_root.glob(".mise/config.*.toml"):
-        result = variant_from_profile(profile_path, runners)
-        if result is None:
-            continue
-        variant_name, variant = result
+        variant_name, variant = variant_from_profile(profile_path, runners)
         variants[variant_name] = variant
     return dict(sorted(variants.items()))
 
