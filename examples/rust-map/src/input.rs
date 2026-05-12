@@ -44,9 +44,13 @@ impl Controller {
         viewport: Viewport,
     ) -> Result<bool, Box<dyn Error>> {
         match event {
-            WindowEvent::CursorMoved { position, .. } => self.cursor(map, position.x, position.y),
+            WindowEvent::CursorMoved { position, .. } => self.cursor(
+                map,
+                position.x / viewport.scale_factor,
+                position.y / viewport.scale_factor,
+            ),
             WindowEvent::MouseInput { state, button, .. } => self.mouse(map, *button, *state),
-            WindowEvent::MouseWheel { delta, .. } => self.wheel(map, *delta),
+            WindowEvent::MouseWheel { delta, .. } => self.wheel(map, viewport, *delta),
             WindowEvent::KeyboardInput { event, .. } => {
                 self.keyboard(map, viewport, event.physical_key, event.state)
             }
@@ -100,10 +104,15 @@ impl Controller {
         Ok(false)
     }
 
-    fn wheel(&mut self, map: &MapHandle, delta: MouseScrollDelta) -> Result<bool, Box<dyn Error>> {
+    fn wheel(
+        &mut self,
+        map: &MapHandle,
+        viewport: Viewport,
+        delta: MouseScrollDelta,
+    ) -> Result<bool, Box<dyn Error>> {
         let lines = match delta {
             MouseScrollDelta::LineDelta(_, y) => f64::from(y),
-            MouseScrollDelta::PixelDelta(position) => position.y / 120.0,
+            MouseScrollDelta::PixelDelta(position) => position.y / viewport.scale_factor / 120.0,
         };
         if lines == 0.0 {
             return Ok(false);

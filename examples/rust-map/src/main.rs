@@ -10,7 +10,7 @@ use std::error::Error;
 use std::time::{Duration, Instant};
 
 use app::App;
-use winit::dpi::PhysicalSize;
+use winit::dpi::LogicalSize;
 use winit::event::Event;
 use winit::event_loop::{ControlFlow, EventLoop};
 use winit::window::WindowBuilder;
@@ -28,7 +28,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let event_loop = EventLoop::new()?;
     let window = WindowBuilder::new()
         .with_title("MapLibre Rust Vulkan Map")
-        .with_inner_size(PhysicalSize::new(INITIAL_WIDTH, INITIAL_HEIGHT))
+        .with_inner_size(LogicalSize::new(INITIAL_WIDTH, INITIAL_HEIGHT))
         .with_resizable(true)
         .build(&event_loop)?;
     let mut app = App::new(window)?;

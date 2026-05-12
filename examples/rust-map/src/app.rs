@@ -1,10 +1,8 @@
-use std::error::Error;
-use std::time::{Duration, Instant};
-
 use maplibre_native::{
     CameraOptions, LatLng, MapMode, MapOptions, RuntimeEventPayload, RuntimeEventType,
     RuntimeHandle,
 };
+use std::error::Error;
 use winit::event::WindowEvent;
 use winit::event_loop::EventLoopWindowTarget;
 use winit::window::Window;
@@ -14,7 +12,6 @@ use crate::render_target::{Mode, RenderTarget};
 use crate::viewport::Viewport;
 use crate::vulkan::VulkanContext;
 
-const RESIZE_DEBOUNCE_MS: u64 = 80;
 const STYLE_URL: &str = "https://tiles.openfreemap.org/styles/bright";
 
 pub struct App {
@@ -26,8 +23,7 @@ pub struct App {
     viewport: Viewport,
     input: Controller,
     render_pending: bool,
-    pending_viewport: Option<Viewport>,
-    pending_resize_deadline: Option<Instant>,
+    viewport_dirty: bool,
     closed: bool,
 }
 
@@ -69,8 +65,7 @@ impl App {
             viewport,
             input: Controller::default(),
             render_pending: true,
-            pending_viewport: None,
-            pending_resize_deadline: None,
+            viewport_dirty: false,
             closed: false,
         })
     }
@@ -111,25 +106,15 @@ impl App {
     }
 
     fn queue_resize(&mut self) {
-        self.pending_viewport = Some(Viewport::from_window(&self.window));
-        self.pending_resize_deadline =
-            Some(Instant::now() + Duration::from_millis(RESIZE_DEBOUNCE_MS));
+        self.viewport_dirty = true;
     }
 
     fn apply_pending_resize(&mut self) -> Result<(), Box<dyn Error>> {
-        if self.closed {
+        if self.closed || !self.viewport_dirty {
             return Ok(());
         }
-        if self
-            .pending_resize_deadline
-            .is_some_and(|deadline| Instant::now() < deadline)
-        {
-            return Ok(());
-        }
-        self.pending_resize_deadline = None;
-        let Some(next) = self.pending_viewport.take() else {
-            return Ok(());
-        };
+        self.viewport_dirty = false;
+        let next = Viewport::from_window(&self.window);
         if next == self.viewport {
             return Ok(());
         }
@@ -202,8 +187,7 @@ impl App {
         }
         self.closed = true;
         self.render_pending = false;
-        self.pending_viewport = None;
-        self.pending_resize_deadline = None;
+        self.viewport_dirty = false;
         self.target.close()?;
         self.map.close()?;
         self.runtime.close()?;
