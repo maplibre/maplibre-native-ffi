@@ -33,6 +33,7 @@
 #include <mbgl/gl/renderable_resource.hpp>
 #include <mbgl/gl/renderer_backend.hpp>
 #include <mbgl/renderer/renderer.hpp>
+#include <mbgl/util/logging.hpp>
 #include <mbgl/util/size.hpp>
 
 #include <EGL/egl.h>
@@ -77,8 +78,6 @@ auto validate_descriptor(const mln_egl_surface_descriptor* descriptor)
   return MLN_STATUS_OK;
 }
 
-// ── EGL renderable resource ──────────────────────────────────────────────────
-
 class EGLRenderableResource final : public mbgl::gl::RenderableResource {
  public:
   explicit EGLRenderableResource(class EGLSurfaceBackendImpl& backend_)
@@ -88,8 +87,6 @@ class EGLRenderableResource final : public mbgl::gl::RenderableResource {
  private:
   class EGLSurfaceBackendImpl& backend;
 };
-
-// ── EGL renderer backend ─────────────────────────────────────────────────────
 
 class EGLSurfaceBackendImpl final : public mbgl::gl::RendererBackend,
                                     public mbgl::gfx::Renderable {
@@ -125,21 +122,38 @@ class EGLSurfaceBackendImpl final : public mbgl::gl::RendererBackend,
 
   void setSize(mbgl::Size size_) { size = size_; }
 
-  void swapBuffers() { eglSwapBuffers(display, surface); }
+  void swapBuffers() {
+    if (eglSwapBuffers(display, surface) == EGL_FALSE) {
+      mbgl::Log::Error(mbgl::Event::Render, "eglSwapBuffers failed");
+    }
+  }
 
  protected:
   void activate() override {
-    eglMakeCurrent(display, surface, surface, context);
+    if (eglMakeCurrent(display, surface, surface, context) == EGL_FALSE) {
+      mbgl::Log::Error(mbgl::Event::Render, "eglMakeCurrent failed");
+    }
   }
 
   void deactivate() override {
-    eglMakeCurrent(display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
+    if (
+      eglMakeCurrent(
+        display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT
+      ) == EGL_FALSE
+    ) {
+      mbgl::Log::Error(mbgl::Event::Render, "eglMakeCurrent (deactivate) failed");
+    }
   }
 
   auto getExtensionFunctionPointer(const char* name)
     -> mbgl::gl::ProcAddress override {
-    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
-    return reinterpret_cast<mbgl::gl::ProcAddress>(eglGetProcAddress(name));
+    // eglGetProcAddress returns __eglMustCastToProperFunctionPointerType, a
+    // generic void(*)() stub that the EGL spec requires callers to cast to the
+    // intended signature before calling. This reinterpret_cast is the mandated
+    // EGL pattern; there is no standard alternative.
+    return reinterpret_cast<mbgl::gl::ProcAddress>(  // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast)
+      eglGetProcAddress(name)
+    );
   }
 
   // Re-sync mbgl's cached GL state to match what is actually current on the
@@ -165,8 +179,6 @@ void EGLRenderableResource::bind() {
   backend.setFramebufferBinding(0);
   backend.setViewport(0, 0, backend.getSize());
 }
-
-// ── SurfaceSessionBackend adapter ────────────────────────────────────────────
 
 class EGLSurfaceSessionBackend final : public mln::core::SurfaceSessionBackend {
  public:
