@@ -1,7 +1,10 @@
 use maplibre_native::{
     CameraOptions, EdgeInsets, Feature, FeatureIdentifier, GeoJson, Geometry, JsonMember,
-    JsonValue, LatLng, MapMode, MapOptions, NetworkStatus, RenderBackendMask, RuntimeHandle,
-    ScreenPoint, c_version, network_status, set_network_status, supported_render_backends,
+    JsonValue, LatLng, MapMode, MapOptions, MetalBorrowedTextureDescriptor,
+    MetalOwnedTextureDescriptor, MetalSurfaceDescriptor, NativePointer, NetworkStatus,
+    OwnedTextureDescriptor, RenderBackendMask, RuntimeHandle, ScreenPoint,
+    VulkanBorrowedTextureDescriptor, VulkanOwnedTextureDescriptor, VulkanSurfaceDescriptor,
+    c_version, network_status, set_network_status, supported_render_backends,
 };
 
 struct NetworkStatusRestore(NetworkStatus);
@@ -73,4 +76,20 @@ fn public_descriptors_use_owned_rust_values() {
     .with_identifier(FeatureIdentifier::String("feature-1".into()));
     let geojson = GeoJson::Feature(feature);
     assert!(matches!(geojson, GeoJson::Feature(_)));
+
+    let texture = OwnedTextureDescriptor::new(128, 64, 2.0);
+    assert_eq!(texture.width, 128);
+    assert_eq!(texture.height, 64);
+    // SAFETY: The test uses dummy opaque addresses and does not dereference them.
+    let pointer = unsafe { NativePointer::from_address(0x1234) };
+    assert_eq!(pointer.address(), 0x1234);
+    let _ = MetalSurfaceDescriptor::new(128, 64, 2.0, pointer).with_device(pointer);
+    let _ =
+        VulkanSurfaceDescriptor::new(128, 64, 2.0, pointer, pointer, pointer, pointer, 0, pointer);
+    let _ = MetalOwnedTextureDescriptor::new(128, 64, 2.0, pointer);
+    let _ = MetalBorrowedTextureDescriptor::new(128, 64, 2.0, pointer);
+    let _ = VulkanOwnedTextureDescriptor::new(128, 64, 2.0, pointer, pointer, pointer, pointer, 0);
+    let _ = VulkanBorrowedTextureDescriptor::new(
+        128, 64, 2.0, pointer, pointer, pointer, pointer, 0, pointer, pointer, 44, 55, 66,
+    );
 }

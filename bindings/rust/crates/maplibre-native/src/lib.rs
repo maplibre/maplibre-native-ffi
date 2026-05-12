@@ -10,6 +10,7 @@ mod json;
 mod map;
 mod options;
 mod projection;
+mod render;
 mod resource;
 mod runtime;
 mod values;
@@ -38,6 +39,11 @@ pub use options::{
     NorthOrientation, TileLodMode, ViewportMode,
 };
 pub use projection::MapProjectionHandle;
+pub use render::{
+    MetalBorrowedTextureDescriptor, MetalOwnedTextureDescriptor, MetalSurfaceDescriptor,
+    NativePointer, OwnedTextureDescriptor, RenderSessionHandle, VulkanBorrowedTextureDescriptor,
+    VulkanOwnedTextureDescriptor, VulkanSurfaceDescriptor,
+};
 pub use resource::{
     ByteRange, ResourceKind, ResourceLoadingMethod, ResourcePriority, ResourceProviderDecision,
     ResourceRequest, ResourceRequestHandle, ResourceResponse, ResourceResponseStatus,
@@ -160,6 +166,8 @@ mod tests {
     assert_not_impl_any!(RuntimeHandle: Send, Sync);
     assert_not_impl_any!(MapHandle: Send, Sync);
     assert_not_impl_any!(MapProjectionHandle: Send, Sync);
+    assert_not_impl_any!(NativePointer: Send, Sync);
+    assert_not_impl_any!(RenderSessionHandle: Send, Sync);
 
     struct NetworkStatusRestore(NetworkStatus);
 

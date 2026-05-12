@@ -10,6 +10,11 @@ use maplibre_native_sys as sys;
 use crate::custom_geometry::{CanonicalTileId, CustomGeometrySourceState};
 use crate::events::MapId;
 use crate::handle::{ThreadAffineNativeHandle, closed_handle_error, out_handle};
+use crate::render::{
+    MetalBorrowedTextureDescriptor, MetalOwnedTextureDescriptor, MetalSurfaceDescriptor,
+    OwnedTextureDescriptor, RenderSessionHandle, VulkanBorrowedTextureDescriptor,
+    VulkanOwnedTextureDescriptor, VulkanSurfaceDescriptor,
+};
 use crate::runtime::{RuntimeHandle, RuntimeState};
 use crate::{
     AnimationOptions, BoundOptions, CameraFitOptions, CameraOptions, CustomGeometrySourceOptions,
@@ -990,6 +995,120 @@ impl MapHandle {
     /// Creates a standalone projection snapshot from the current map transform.
     pub fn create_projection(&self) -> Result<MapProjectionHandle> {
         MapProjectionHandle::new(self)
+    }
+
+    /// Attaches a session-owned offscreen texture render target to this map.
+    ///
+    /// The session owns the backend texture target. The returned render session
+    /// retains the map and remains owner-thread affine.
+    pub fn attach_owned_texture(
+        &self,
+        descriptor: &OwnedTextureDescriptor,
+    ) -> Result<RenderSessionHandle> {
+        let raw = descriptor.to_native();
+        RenderSessionHandle::attach(self, |map, out| {
+            // SAFETY: map is live, raw is a materialized descriptor valid for
+            // this call, and out is a null-initialized out-pointer.
+            unsafe { sys::mln_owned_texture_attach(map, &raw, out) }
+        })
+    }
+
+    /// Attaches a Metal native surface render target to this map.
+    ///
+    /// The layer and optional device pointers are backend-native handles. They
+    /// must name valid Metal objects for this session and remain usable on the
+    /// owner thread until the session is detached or closed.
+    pub fn attach_metal_surface(
+        &self,
+        descriptor: &MetalSurfaceDescriptor,
+    ) -> Result<RenderSessionHandle> {
+        let raw = descriptor.to_native();
+        RenderSessionHandle::attach(self, |map, out| {
+            // SAFETY: map is live, raw is a materialized descriptor valid for
+            // this call, and out is a null-initialized out-pointer.
+            unsafe { sys::mln_metal_surface_attach(map, &raw, out) }
+        })
+    }
+
+    /// Attaches a Vulkan native surface render target to this map.
+    ///
+    /// Vulkan handles are borrowed. They must remain valid and externally
+    /// synchronized until the session is detached or closed.
+    pub fn attach_vulkan_surface(
+        &self,
+        descriptor: &VulkanSurfaceDescriptor,
+    ) -> Result<RenderSessionHandle> {
+        let raw = descriptor.to_native();
+        RenderSessionHandle::attach(self, |map, out| {
+            // SAFETY: map is live, raw is a materialized descriptor valid for
+            // this call, and out is a null-initialized out-pointer.
+            unsafe { sys::mln_vulkan_surface_attach(map, &raw, out) }
+        })
+    }
+
+    /// Attaches a Metal session-owned texture render target to this map.
+    ///
+    /// The device pointer must name a valid Metal device that remains usable on
+    /// the owner thread until the session is detached or closed.
+    pub fn attach_metal_owned_texture(
+        &self,
+        descriptor: &MetalOwnedTextureDescriptor,
+    ) -> Result<RenderSessionHandle> {
+        let raw = descriptor.to_native();
+        RenderSessionHandle::attach(self, |map, out| {
+            // SAFETY: map is live, raw is a materialized descriptor valid for
+            // this call, and out is a null-initialized out-pointer.
+            unsafe { sys::mln_metal_owned_texture_attach(map, &raw, out) }
+        })
+    }
+
+    /// Attaches a Metal caller-owned texture render target to this map.
+    ///
+    /// The texture pointer is borrowed. The caller owns the texture, keeps it
+    /// valid until detach or close, and synchronizes use outside this session.
+    pub fn attach_metal_borrowed_texture(
+        &self,
+        descriptor: &MetalBorrowedTextureDescriptor,
+    ) -> Result<RenderSessionHandle> {
+        let raw = descriptor.to_native();
+        RenderSessionHandle::attach(self, |map, out| {
+            // SAFETY: map is live, raw is a materialized descriptor valid for
+            // this call, and out is a null-initialized out-pointer.
+            unsafe { sys::mln_metal_borrowed_texture_attach(map, &raw, out) }
+        })
+    }
+
+    /// Attaches a Vulkan session-owned texture render target to this map.
+    ///
+    /// Vulkan device and queue handles are borrowed. They must remain valid and
+    /// externally synchronized until the session is detached or closed.
+    pub fn attach_vulkan_owned_texture(
+        &self,
+        descriptor: &VulkanOwnedTextureDescriptor,
+    ) -> Result<RenderSessionHandle> {
+        let raw = descriptor.to_native();
+        RenderSessionHandle::attach(self, |map, out| {
+            // SAFETY: map is live, raw is a materialized descriptor valid for
+            // this call, and out is a null-initialized out-pointer.
+            unsafe { sys::mln_vulkan_owned_texture_attach(map, &raw, out) }
+        })
+    }
+
+    /// Attaches a Vulkan caller-owned texture render target to this map.
+    ///
+    /// Vulkan handles, image, and image view are borrowed. The caller owns the
+    /// image resources, keeps them valid until detach or close, and handles
+    /// queue-family ownership and synchronization outside this session.
+    pub fn attach_vulkan_borrowed_texture(
+        &self,
+        descriptor: &VulkanBorrowedTextureDescriptor,
+    ) -> Result<RenderSessionHandle> {
+        let raw = descriptor.to_native();
+        RenderSessionHandle::attach(self, |map, out| {
+            // SAFETY: map is live, raw is a materialized descriptor valid for
+            // this call, and out is a null-initialized out-pointer.
+            unsafe { sys::mln_vulkan_borrowed_texture_attach(map, &raw, out) }
+        })
     }
 }
 
