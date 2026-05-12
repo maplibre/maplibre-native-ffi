@@ -47,8 +47,14 @@ auto mln_egl_surface_attach(
     return mln::core::egl_surface_attach(map, descriptor, out_session);
   });
 #else
-  (void)map;
-  (void)descriptor;
+  if (map == nullptr) {
+    mln::core::set_thread_error("map must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (descriptor == nullptr) {
+    mln::core::set_thread_error("EGL surface descriptor must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
   if (out_session == nullptr) {
     mln::core::set_thread_error("out_session must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
@@ -79,8 +85,14 @@ auto mln_wgl_surface_attach(
     return mln::core::wgl_surface_attach(map, descriptor, out_session);
   });
 #else
-  (void)map;
-  (void)descriptor;
+  if (map == nullptr) {
+    mln::core::set_thread_error("map must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (descriptor == nullptr) {
+    mln::core::set_thread_error("WGL surface descriptor must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
   if (out_session == nullptr) {
     mln::core::set_thread_error("out_session must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;

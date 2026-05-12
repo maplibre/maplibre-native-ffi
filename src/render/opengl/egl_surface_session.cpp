@@ -183,7 +183,7 @@ class EGLSurfaceSessionBackend final : public mln::core::SurfaceSessionBackend {
     backend_.setSize(mbgl::Size{physical_width, physical_height});
   }
 
-  void swap_buffers() { backend_.swapBuffers(); }
+  void swap_buffers() override { backend_.swapBuffers(); }
 
  private:
   EGLSurfaceBackendImpl backend_;
