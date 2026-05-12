@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, ci-test/linux-x64-opengl]
+    branches: [main]
   pull_request:
     branches: [main]
 
