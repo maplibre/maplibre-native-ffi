@@ -1,15 +1,16 @@
 # Rust bindings implementation plan
 
-Audience: contributors implementing the Rust bindings for MapLibre Native FFI
-from scaffolding through a complete low-level binding surface.
+Audience: contributors implementing the Rust bindings for MapLibre Native FFI up
+to the maturity of the existing Java bindings.
 
 Category: how-to guide. This plan gives an implementation path and points to
 copied research artifacts for deeper context.
 
 ## Goal
 
-Build first-party Rust bindings over the public C ABI. The finished binding
-should provide:
+Build first-party Rust bindings over the public C ABI until they reach rough
+feature maturity with the Java bindings. The finished scope for this project
+includes:
 
 - generated unsafe C declarations in `maplibre-native-sys`;
 - reusable internal glue in `maplibre-native-support`;
@@ -17,10 +18,13 @@ should provide:
   model while using Rust ownership, `Result`, RAII, lifetimes, and explicit
   unsafe boundaries;
 - tests that exercise real C ABI calls and prove Rust-specific lifetime,
-  threading, error, callback, and rendering invariants.
+  threading, error, callback, and rendering invariants;
+- CI matrix entries for the Rust binding and Rust example once they are
+  buildable;
+- a Rust test app that opens a window and renders a map through Vulkan.
 
-Implement the binding in milestones. Each milestone should leave the crates
-buildable, tested, and useful enough for the next milestone.
+Out of scope for this PR/project: publishing metadata, API reference generation,
+standalone user documentation, docs.rs polish, and broad release packaging.
 
 ## Reference artifacts
 
@@ -38,10 +42,10 @@ Primary project docs:
 - [`docs/src/content/docs/development/bindings-java-ffm.md`](../../../docs/src/content/docs/development/bindings-java-ffm.md)
 - [`docs/src/content/docs/development/bindings-java-jni.md`](../../../docs/src/content/docs/development/bindings-java-jni.md)
 
-Use the Java FFM binding as the local reference for generated raw declarations,
-loader/version checks, status conversion, handle state, memory helpers, and test
-coverage. Translate those patterns to Rust ownership and RAII rather than
-copying Java's synchronized object model.
+Use the Java FFM binding as the local reference for maturity, generated raw
+declarations, loader/version checks, status conversion, handle state, memory
+helpers, callbacks, rendering, and tests. Translate those patterns to Rust
+ownership and RAII rather than copying Java's synchronized object model.
 
 ## Decisions
 
@@ -52,18 +56,23 @@ copying Java's synchronized object model.
     changes the loading model.
 - Use a root Cargo workspace for Rust packages in this monorepo.
   - Place binding crates under `bindings/rust/crates/`.
-  - Add future Rust examples, such as examples that depend on the binding
-    crates, to the same root workspace.
+  - Add Rust examples to the same root workspace.
 - Commit `Cargo.lock`.
 - Use Rust from `mise.toml`.
+  - The mise Rust backend uses rustup and can install components such as
+    `rustfmt` and `clippy` through tool options.
 - Use pixi to provide `libclang` for `bindgen`, similar to the Zig setup.
   - Prefer running Cargo through mise, not inside pixi.
   - Point `bindgen` at pixi's `libclang` with task environment such as
     `LIBCLANG_PATH` when needed.
-- Keep Rust build and test tasks local at first, such as
-  `mise run //bindings/rust:test`.
-  - Add Rust to the top-level test gate only after the binding foundation is
-    stable.
+- Add Rust formatting and linting early.
+  - Formatting should integrate with the project formatting flow through
+    dprint/mise.
+  - Linting should run through mise tasks, using Rust tools such as `clippy`
+    from the mise-managed Rust toolchain.
+- Add CI matrix entries early through `.github/config/variants.toml`.
+  - Add the Rust binding entry as soon as it is buildable and testable.
+  - Add the Rust Vulkan map example entry when the example builds.
 - Use Rust RAII for native handles.
   - Make thread-affine handles `!Send + !Sync`, so safe Rust keeps creation,
     use, and `Drop` on the owner thread.
@@ -85,7 +94,7 @@ bindings/rust/crates/maplibre-native-sys/
 bindings/rust/crates/maplibre-native-support/
 bindings/rust/crates/maplibre-native/
 
-examples/rust/...
+examples/rust-map/
 ```
 
 Root workspace sketch:
@@ -97,6 +106,7 @@ members = [
   "bindings/rust/crates/maplibre-native-sys",
   "bindings/rust/crates/maplibre-native-support",
   "bindings/rust/crates/maplibre-native",
+  "examples/rust-map",
 ]
 
 [workspace.package]
@@ -105,10 +115,10 @@ license = "BSD-2-Clause"
 repository = "https://github.com/maplibre/maplibre-native-ffi"
 ```
 
-## Milestone 1: workspace, tooling, and raw sys crate
+## Milestone 1: workspace, tooling, formatting, linting, and raw sys crate
 
-Create the root Cargo workspace, local Rust mise tasks, and
-`maplibre-native-sys`.
+Create the root Cargo workspace, local Rust mise tasks, formatting/linting
+hooks, and `maplibre-native-sys`.
 
 Requirements:
 
@@ -121,12 +131,21 @@ Requirements:
   find the library during local tests.
 - Configure `bindgen` to find pixi-provided `libclang` while Cargo still runs
   through mise.
+- Add local mise tasks for build, test, lint, and formatting.
+- Configure the Rust toolchain with the components needed for formatting and
+  linting.
+- Integrate formatting with the project dprint/mise flow.
 
 Tests:
 
 - Call `mln_c_version()`.
 - Call `mln_supported_render_backend_mask()`.
 - Verify the generated bindings compile on the supported development platforms.
+
+CI:
+
+- Add a `.github/config/variants.toml` binding entry once this milestone has a
+  reliable build/test task.
 
 ## Milestone 2: support crate and error model
 
@@ -393,8 +412,9 @@ Implement:
 
 - render target descriptors as Rust value types;
 - `NativePointer` as a borrowed opaque address value;
-- surface attachment APIs;
-- borrowed texture attachment APIs;
+- Vulkan surface or texture attachment APIs needed by the Rust map example;
+- other surface attachment APIs represented by the C ABI when they are needed
+  for parity;
 - session-owned texture attachment APIs;
 - `RenderSessionHandle` with parent retention to `MapHandle`.
 
@@ -410,7 +430,7 @@ Rules:
 
 Tests:
 
-- Attach/detach lifecycle for available backend targets.
+- Attach/detach lifecycle for Vulkan targets.
 - Parent retention from render session to map.
 - Invalid-state propagation for conflicting sessions.
 - `NativePointer` construction and reconversion stay limited to documented
@@ -445,36 +465,32 @@ Tests:
 - Nested frame acquisition and reentrant session calls fail or are prevented.
 - Frame close/drop releases native state exactly once.
 
-## Milestone 14: examples and documentation
+## Milestone 14: Vulkan map test app
 
-Add examples after the public API shape is stable enough to teach.
+Add a Rust test app that opens a window and renders a map. This is the practical
+parity target for the Rust binding, similar in spirit to the Java LWJGL map
+example.
 
-Implement:
+Initial scope:
 
-- a minimal smoke example that calls process-global APIs;
-- a runtime/map lifecycle example;
-- a rendering example when render sessions are ready;
-- generated or handwritten API reference guidance as appropriate;
-- contributor notes for regenerating sys bindings and configuring `libclang`.
+- Support Vulkan first.
+- Use idiomatic Rust crates for windowing and Vulkan integration.
+- Evaluate lightweight options before implementing, such as `winit` plus Vulkan
+  crates, SDL3 Rust bindings if mature enough, or a small framework that reduces
+  boilerplate without hiding the native handles the C ABI needs.
+- Keep the app small and focused: create a window, initialize Vulkan objects,
+  create runtime/map/render session handles, render a visible map, process
+  events, and shut down cleanly.
+- Add the example to the root Cargo workspace.
+- Add a `.github/config/variants.toml` example entry once it builds reliably in
+  CI.
 
-Keep examples small and focused. Add them to the root Rust workspace when they
-depend on the binding crates.
+Tests/checks:
 
-## Milestone 15: integration, polish, and release readiness
-
-After the binding surface is useful and stable, integrate it with the broader
-project workflow.
-
-Tasks:
-
-- Add Rust tasks to top-level `mise run test` when they are reliable on
-  supported platforms.
-- Add formatting and linting hooks through the project’s chosen hook system.
-- Add CI coverage for Rust build/test tasks.
-- Decide crate publication metadata if crates will be published.
-- Review docs for consistency with the final public API.
-- Audit unsafe blocks and document each invariant.
-- Run an API review against `bindings.md` and `bindings-rust.md`.
+- Build the example in CI for Linux Vulkan first, matching available runners and
+  native backend support.
+- Run locally with a short timeout when a GUI smoke check is useful.
+- Keep runtime GUI execution separate from ordinary non-GUI binding tests.
 
 ## Validation strategy
 
@@ -484,8 +500,8 @@ Local Rust validation:
 mise run //:ensure-native-library
 mise run //bindings/rust:build
 mise run //bindings/rust:test
-cargo fmt --all --check
-cargo clippy --workspace --all-targets -- -D warnings
+mise run //bindings/rust:lint
+mise run //bindings/rust:fmt-check
 ```
 
 Repository validation before broader integration or merge:
@@ -499,6 +515,26 @@ Add tests at the milestone where each invariant appears. Prefer small tests
 around real C calls. When C ABI tests already prove native behavior, Rust tests
 should prove the Rust adaptation: ownership, copying, diagnostics, status
 mapping, callback lifetime, thread-affinity, and safe public API shape.
+
+## CI variant integration
+
+Use `.github/config/variants.toml` for CI matrix integration.
+
+Add entries when the corresponding task is reliable:
+
+```toml
+[bindings.rust]
+task = "//bindings/rust:test"
+requires = { platform = ["linux", "macos"] }
+
+[examples.rust-map]
+task = "//examples/rust-map:build"
+requires = { platform = ["linux"], backend = ["vulkan"] }
+```
+
+Adjust platforms to match actual native library, Vulkan, and runner support.
+Keep CI build checks separate from GUI runtime smoke checks unless the runner
+can support the GUI path reliably.
 
 ## Risks and guardrails
 
@@ -519,27 +555,32 @@ mapping, callback lifetime, thread-affinity, and safe public API shape.
   complete, or release pass-through requests.
 - Future C ABI growth should preserve unknown raw status, enum, flag, and event
   values where public Rust values expose them.
+- The Vulkan test app may require iteration on the Rust window/Vulkan crate
+  stack. Choose crates that expose or preserve the native handles required by
+  the C ABI.
 
 ## Implementation-ready meta-prompt
 
 ```text
-Goal: Implement the Rust bindings for MapLibre Native FFI in milestones, from root Cargo workspace and sys generation through safe public handles, descriptors, events, callbacks, render sessions, texture frames, examples, and eventual project integration. Keep each milestone buildable and tested.
+Goal: Implement the Rust bindings for MapLibre Native FFI up to rough maturity with the existing Java bindings. Build in milestones from root Cargo workspace and sys generation through safe public handles, descriptors, events, callbacks, render sessions, texture frames, CI variant entries, and a Vulkan Rust map test app. Keep each milestone buildable and tested.
 
 Approved decisions:
 - Use normal direct Rust FFI linkage, not libloading.
-- Use a root Cargo workspace with Rust crates under bindings/rust/crates.
+- Use a root Cargo workspace with Rust crates under bindings/rust/crates and the Rust map example in the same workspace.
 - Commit Cargo.lock.
 - Use Rust from mise.toml. Use pixi-provided libclang for bindgen, but avoid running Cargo inside pixi; configure LIBCLANG_PATH or equivalent env in Rust mise tasks.
-- Keep Rust build/test tasks local to bindings/rust until the foundation is stable; add top-level integration later.
+- Add formatting and linting early. Formatting integrates with the project dprint/mise flow; linting runs through mise with Rust tools such as clippy.
+- Add .github/config/variants.toml entries as soon as the Rust binding and Rust map example have reliable build/test tasks.
 - For Rust-owned handles, design for RAII: thread-affine handles are !Send + !Sync so Drop can call native destroy in safe Rust. Drop must not panic. Also provide consuming close(self) -> Result<()> for fallible explicit cleanup.
+- Documentation, API reference generation, publishing metadata, and release packaging are out of scope for this project.
 
-Context/evidence: Follow docs/src/content/docs/development/bindings-rust.md for the three-crate split, direct sys generation, !Send + !Sync handles, status/error rules, materializers, callbacks, and render target boundaries. Follow docs/src/content/docs/development/bindings.md for deterministic release, parent retention, diagnostics capture, callback ownership, data copying, scoped borrows, and testing through the C ABI. Mirror Java FFM patterns for generated raw layer, loader/version check, Status.check, HandleState, out-pointer helpers, callbacks, render sessions, and tests, but translate them to Rust ownership, RAII, lifetimes, and narrow unsafe APIs.
+Context/evidence: Follow docs/src/content/docs/development/bindings-rust.md for the three-crate split, direct sys generation, !Send + !Sync handles, status/error rules, materializers, callbacks, and render target boundaries. Follow docs/src/content/docs/development/bindings.md for deterministic release, parent retention, diagnostics capture, callback ownership, data copying, scoped borrows, and testing through the C ABI. Use the Java bindings as the maturity target and local reference for generated raw layer, loader/version check, Status.check, HandleState, out-pointer helpers, callbacks, render sessions, examples, and tests, but translate them to Rust ownership, RAII, lifetimes, and narrow unsafe APIs.
 
-Success criteria: The finished binding provides maplibre-native-sys, maplibre-native-support, and maplibre-native; generated sys bindings from include/maplibre_native_c.h; status and diagnostic conversion; safe process-global APIs; thread-affine RAII handles; descriptors and copied values; runtime events; callbacks with panic containment and correct ownership; render sessions and texture frame APIs with scoped unsafe backend interop; examples; and milestone tests using real C ABI calls. Raw sys pointers stay out of the safe public API except for narrow documented unsafe interop through NativePointer-style values.
+Success criteria: The finished project provides maplibre-native-sys, maplibre-native-support, and maplibre-native; generated sys bindings from include/maplibre_native_c.h; status and diagnostic conversion; safe process-global APIs; thread-affine RAII handles; descriptors and copied values; runtime events; callbacks with panic containment and correct ownership; render sessions and texture frame APIs with scoped unsafe backend interop; CI variant entries; and a Rust Vulkan map test app. Raw sys pointers stay out of the safe public API except for narrow documented unsafe interop through NativePointer-style values.
 
 Hard constraints: Use include/maplibre_native_c.h unless maintainers approve another header. Capture diagnostics immediately on failure. Do not panic on native statuses. Preserve raw statuses and unknown future values. Keep thread-affine handles !Send + !Sync. ResourceRequestHandle is the documented Send exception. Do not unwind through C callbacks. Do not retain, complete, or release pass-through resource provider requests. Keep borrowed backend handles scoped and non-owning.
 
-Suggested approach: Build in milestones: workspace/sys, support errors and diagnostics, minimal safe API, handle foundations, descriptors and values, map/projection APIs, runtime events, JSON/GeoJSON, resource transform callbacks, resource providers, custom geometry callbacks, render sessions, texture frames, examples/docs, and top-level integration. Add tests at each milestone before broadening scope.
+Suggested approach: Build in milestones: workspace/sys/tooling, support errors and diagnostics, minimal safe API, handle foundations, descriptors and values, map/projection APIs, runtime events, JSON/GeoJSON, resource transform callbacks, resource providers, custom geometry callbacks, render sessions, texture frames, Vulkan map example, and CI variant integration as tasks become reliable. Add tests at each milestone before broadening scope.
 
-Validation: Run mise run //:ensure-native-library, the Rust build/test task, cargo fmt --all --check, and cargo clippy --workspace --all-targets -- -D warnings during development. Add top-level mise/CI integration after the binding foundation is stable. Before final merge of integrated work, run mise run test and mise run fix.
+Validation: Run mise run //:ensure-native-library, the Rust build/test/lint/format tasks during development. Add variants.toml entries when tasks are reliable. Before final merge of integrated work, run mise run test and mise run fix.
 ```
