@@ -44,6 +44,10 @@ concepts (for example, `runtime`, `map`, `render`). Generated types, raw
 pointers, field masks, and callback trampolines stay internal to `sys` or
 `support`.
 
+The native library is loaded dynamically at runtime. The search order:
+`MAPLIBRE_NATIVE_FFI_LIBRARY_PATH` for an exact file path, then the system
+library search path.
+
 ## Type Surface
 
 Owned values model copied C data as plain Rust structs. Mutable C option structs
@@ -53,16 +57,18 @@ materializers write `size` fields and masks—callers set semantic fields only.
 Native result, snapshot, and list handles stay internal; readers copy into owned
 Rust values before releasing the native handle.
 
-Closed C enum domains map to Rust enums with explicit raw conversions. Public
-C-backed enums are `#[non_exhaustive]`. Unknown future values include
-`Unknown(u32)` or `Unknown(i32)` preserving the raw code. C bit masks become
-`bitflags` types for user-visible masks; C field masks stay behind descriptors.
+Closed C enum domains map to Rust enums with explicit raw conversions. All
+public C-backed enums are `#[non_exhaustive]`. Output enums that may drift
+across C ABI versions include an `Unknown(u32)` or `Unknown(i32)` variant
+preserving the raw code for diagnostics. C bit masks become `bitflags` types for
+user-visible masks; C field masks stay behind descriptors.
 
 JSON and GeoJSON model as owned Rust value trees, preserving integer width,
 object member order, and duplicate keys.
 
 Runtime event polling returns owned `RuntimeEvent` values. Events identify
-source maps with copied metadata (a Rust-assigned `MapId`).
+source maps with copied metadata (a Rust-assigned `MapId`). Unknown payloads
+become `RuntimeEventPayload::Unknown`.
 
 ## Lifetimes and Threading
 
@@ -73,17 +79,22 @@ thread. `MapProjectionHandle` is still `!Send` despite not retaining its parent
 map—the projection is pinned to the map's owner thread at creation.
 
 No internal dispatch to another thread. Async adapters above this crate own any
-confinement or owner-thread executor policy. `MLN_STATUS_WRONG_THREAD` becomes a
-`WrongThread` error.
+confinement or owner-thread executor policy. The Rust type system enforces
+owner-thread confinement for thread-affine handles; native
+`MLN_STATUS_WRONG_THREAD` results still map to `WrongThread` errors.
 
-Parent retention follows the shared convention. `MapProjectionHandle` follows
+Parent retention follows the shared convention. A child holds its parent
+strongly while live, so closing a parent with live children is a compile-time or
+runtime error rather than native invalid state. `MapProjectionHandle` follows
 the shared exception: standalone snapshot, no parent retention.
 
 Handle state (released/live, parent reference, leak context) lives in a private
-field on each handle wrapper. Thread-affine handles drop on the owner thread in
-safe Rust. `Drop` calls the C destroy function for still-live handles, records
-diagnostics on failure, and avoids double release. Explicit `close` methods
-return `Result<()>` for deterministic status and diagnostics.
+field on each handle wrapper. Because `!Send` prevents thread escape and
+constructors run on the owner thread, the compiler proves thread-affine handles
+drop on the owner thread in safe Rust. `Drop` calls the C destroy function for
+still-live handles, records diagnostics on failure, and avoids double release.
+Explicit `close` methods return `Result<()>` for deterministic status and
+diagnostics.
 
 ## Status and Diagnostics
 
@@ -91,8 +102,9 @@ return `Result<()>` for deterministic status and diagnostics.
 pub type Result<T> = std::result::Result<T, Error>;
 ```
 
-All errors surface through `Result`. The binding never panics on a native
-status; `Result` is the sole error path.
+Fallible public operations surface through `Result`. The binding never panics on
+a native status. `Drop` and callback adapters follow their own documented paths
+rather than returning `Result`.
 
 Each C status category maps to a stable Rust error kind (for example,
 `MLN_STATUS_WRONG_THREAD` → `WrongThread`). `Error` stores the mapped kind, raw
@@ -139,9 +151,20 @@ old Rust state. If native installation fails, close the replacement state and
 keep the previous state active.
 
 Resource provider callbacks copy the borrowed `mln_resource_request` into an
-owned `ResourceRequest` before user code can retain it. `ResourceRequestHandle`
-is `Send`, enforces one-shot completion, and releases the C request handle
-exactly once—on `complete`, explicit release, or `Drop`.
+owned `ResourceRequest` before user code can retain it. Pass-through decisions
+return immediately; the binding must not retain or release the native handle.
+`ResourceRequestHandle` is `Send`, enforces one-shot completion, and releases
+the C request handle exactly once—on `complete`, explicit release, or `Drop`.
+
+Resource transform callbacks copy the request URL before invoking user code.
+Replacement URL storage stays alive until native consumes it. Per-thread
+response scratch storage closes on the next callback for that thread and during
+runtime teardown.
+
+Custom geometry source callbacks are map/style scoped. They catch user failures,
+track active upcalls, and delay state release until in-flight callbacks finish.
+Callbacks that need map methods hand work back to the map owner thread before
+calling thread-affine map APIs.
 
 ## Render Targets
 
@@ -149,8 +172,9 @@ Render target descriptors are Rust value types. Surface and borrowed-texture
 descriptors store backend objects as `NativePointer`.
 
 Attach methods return `RenderSessionHandle`. A session represents one attached
-target for one map and keeps the map alive. Violations of the single-session
-rule surface as `InvalidState` errors.
+target for one map and holds the map strongly, so the map cannot be closed while
+the session is live. Violations of the single-session rule surface as
+`InvalidState` errors.
 
 Texture readback supports two shapes:
 
@@ -166,4 +190,5 @@ handles use scoped `NativePointer` accessors marked `unsafe`—callers honor
 backend synchronization and lifetime rules.
 
 Safe Rust borrowing prevents reentrant session calls through the same handle
-while a frame is acquired.
+while a frame is acquired. Backend `NativePointer` values are tied to the frame
+lifetime and cannot escape the closure.
