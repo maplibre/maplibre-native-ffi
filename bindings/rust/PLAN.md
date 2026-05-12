@@ -53,8 +53,8 @@ Runtime and process-global APIs:
       size.
 - [x] Runtime creation with explicit options.
 - [x] Ambient cache operations.
-- Process-global logging callbacks, callback clearing, log severity values, and
-  async severity mask configuration.
+- [x] Process-global logging callbacks, callback clearing, log severity values,
+      and async severity mask configuration.
 
 Map and style APIs:
 

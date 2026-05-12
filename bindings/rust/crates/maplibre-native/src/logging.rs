@@ -1,0 +1,451 @@
+use std::ffi::{c_char, c_void};
+use std::panic::{self, AssertUnwindSafe};
+use std::sync::{Arc, Mutex, MutexGuard};
+
+use crate::{Result, support, sys};
+
+/// Severity for a MapLibre Native log record.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum LogSeverity {
+    Info,
+    Warning,
+    Error,
+    Unknown(u32),
+}
+
+impl LogSeverity {
+    /// Returns the raw C ABI value for this severity.
+    pub fn raw_value(self) -> u32 {
+        match self {
+            Self::Info => sys::MLN_LOG_SEVERITY_INFO,
+            Self::Warning => sys::MLN_LOG_SEVERITY_WARNING,
+            Self::Error => sys::MLN_LOG_SEVERITY_ERROR,
+            Self::Unknown(raw) => raw,
+        }
+    }
+
+    pub(crate) fn from_raw(raw: u32) -> Self {
+        match raw {
+            sys::MLN_LOG_SEVERITY_INFO => Self::Info,
+            sys::MLN_LOG_SEVERITY_WARNING => Self::Warning,
+            sys::MLN_LOG_SEVERITY_ERROR => Self::Error,
+            _ => Self::Unknown(raw),
+        }
+    }
+}
+
+bitflags::bitflags! {
+    /// Mask of log severities that MapLibre Native may dispatch asynchronously.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    pub struct LogSeverityMask: u32 {
+        const INFO = sys::MLN_LOG_SEVERITY_MASK_INFO;
+        const WARNING = sys::MLN_LOG_SEVERITY_MASK_WARNING;
+        const ERROR = sys::MLN_LOG_SEVERITY_MASK_ERROR;
+        const DEFAULT = sys::MLN_LOG_SEVERITY_MASK_DEFAULT;
+        const ALL = sys::MLN_LOG_SEVERITY_MASK_ALL;
+    }
+}
+
+/// Category for a MapLibre Native log record.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum LogEvent {
+    General,
+    Setup,
+    Shader,
+    ParseStyle,
+    ParseTile,
+    Render,
+    Style,
+    Database,
+    HttpRequest,
+    Sprite,
+    Image,
+    OpenGl,
+    Jni,
+    Android,
+    Crash,
+    Glyph,
+    Timing,
+    Unknown(u32),
+}
+
+impl LogEvent {
+    /// Returns the raw C ABI value for this event category.
+    pub fn raw_value(self) -> u32 {
+        match self {
+            Self::General => sys::MLN_LOG_EVENT_GENERAL,
+            Self::Setup => sys::MLN_LOG_EVENT_SETUP,
+            Self::Shader => sys::MLN_LOG_EVENT_SHADER,
+            Self::ParseStyle => sys::MLN_LOG_EVENT_PARSE_STYLE,
+            Self::ParseTile => sys::MLN_LOG_EVENT_PARSE_TILE,
+            Self::Render => sys::MLN_LOG_EVENT_RENDER,
+            Self::Style => sys::MLN_LOG_EVENT_STYLE,
+            Self::Database => sys::MLN_LOG_EVENT_DATABASE,
+            Self::HttpRequest => sys::MLN_LOG_EVENT_HTTP_REQUEST,
+            Self::Sprite => sys::MLN_LOG_EVENT_SPRITE,
+            Self::Image => sys::MLN_LOG_EVENT_IMAGE,
+            Self::OpenGl => sys::MLN_LOG_EVENT_OPENGL,
+            Self::Jni => sys::MLN_LOG_EVENT_JNI,
+            Self::Android => sys::MLN_LOG_EVENT_ANDROID,
+            Self::Crash => sys::MLN_LOG_EVENT_CRASH,
+            Self::Glyph => sys::MLN_LOG_EVENT_GLYPH,
+            Self::Timing => sys::MLN_LOG_EVENT_TIMING,
+            Self::Unknown(raw) => raw,
+        }
+    }
+
+    pub(crate) fn from_raw(raw: u32) -> Self {
+        match raw {
+            sys::MLN_LOG_EVENT_GENERAL => Self::General,
+            sys::MLN_LOG_EVENT_SETUP => Self::Setup,
+            sys::MLN_LOG_EVENT_SHADER => Self::Shader,
+            sys::MLN_LOG_EVENT_PARSE_STYLE => Self::ParseStyle,
+            sys::MLN_LOG_EVENT_PARSE_TILE => Self::ParseTile,
+            sys::MLN_LOG_EVENT_RENDER => Self::Render,
+            sys::MLN_LOG_EVENT_STYLE => Self::Style,
+            sys::MLN_LOG_EVENT_DATABASE => Self::Database,
+            sys::MLN_LOG_EVENT_HTTP_REQUEST => Self::HttpRequest,
+            sys::MLN_LOG_EVENT_SPRITE => Self::Sprite,
+            sys::MLN_LOG_EVENT_IMAGE => Self::Image,
+            sys::MLN_LOG_EVENT_OPENGL => Self::OpenGl,
+            sys::MLN_LOG_EVENT_JNI => Self::Jni,
+            sys::MLN_LOG_EVENT_ANDROID => Self::Android,
+            sys::MLN_LOG_EVENT_CRASH => Self::Crash,
+            sys::MLN_LOG_EVENT_GLYPH => Self::Glyph,
+            sys::MLN_LOG_EVENT_TIMING => Self::Timing,
+            _ => Self::Unknown(raw),
+        }
+    }
+}
+
+/// Copied MapLibre Native log record delivered to a Rust log callback.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LogRecord {
+    pub severity: LogSeverity,
+    pub event: LogEvent,
+    pub code: i64,
+    pub message: String,
+}
+
+type LogCallback = dyn Fn(LogRecord) -> bool + Send + Sync + 'static;
+
+struct CallbackState {
+    callback: Box<LogCallback>,
+}
+
+struct GlobalLogCallbackState {
+    current: Option<Arc<CallbackState>>,
+    retained: Vec<Arc<CallbackState>>,
+}
+
+static LOG_CALLBACK_STATE: Mutex<GlobalLogCallbackState> = Mutex::new(GlobalLogCallbackState {
+    current: None,
+    retained: Vec::new(),
+});
+
+fn lock_log_callback_state() -> MutexGuard<'static, GlobalLogCallbackState> {
+    LOG_CALLBACK_STATE
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
+/// Installs or replaces the process-global MapLibre Native log callback.
+///
+/// MapLibre Native may invoke the callback from logging or worker threads. The
+/// callback state must therefore be `Send + Sync + 'static`. The callback
+/// should return quickly and avoid calling MapLibre Native APIs. Panics are
+/// caught and reported to native logging as "not consumed".
+pub fn set_log_callback<F>(callback: F) -> Result<()>
+where
+    F: Fn(LogRecord) -> bool + Send + Sync + 'static,
+{
+    let replacement = Arc::new(CallbackState {
+        callback: Box::new(callback),
+    });
+    let user_data = Arc::as_ptr(&replacement).cast_mut().cast::<c_void>();
+    // SAFETY: log_callback_trampoline has the C callback ABI. user_data points
+    // at replacement, which is retained for the process lifetime below so native
+    // and in-flight callbacks never observe a dangling pointer.
+    support::check(unsafe { sys::mln_log_set_callback(Some(log_callback_trampoline), user_data) })?;
+
+    let mut state = lock_log_callback_state();
+    state.current = Some(replacement.clone());
+    state.retained.push(replacement);
+    Ok(())
+}
+
+/// Clears the process-global MapLibre Native log callback.
+pub fn clear_log_callback() -> Result<()> {
+    // SAFETY: mln_log_clear_callback takes no arguments and clears native's
+    // process-global callback slot.
+    support::check(unsafe { sys::mln_log_clear_callback() })?;
+
+    lock_log_callback_state().current = None;
+    Ok(())
+}
+
+/// Configures severities that MapLibre Native may dispatch asynchronously.
+pub fn set_async_log_severity_mask(mask: LogSeverityMask) -> Result<()> {
+    // SAFETY: mask is passed by value. The C API validates unknown bits and
+    // reports them as MLN_STATUS_INVALID_ARGUMENT.
+    support::check(unsafe { sys::mln_log_set_async_severity_mask(mask.bits()) })
+}
+
+/// Restores MapLibre Native's default async log severity mask.
+pub fn restore_default_async_log_severity_mask() -> Result<()> {
+    set_async_log_severity_mask(LogSeverityMask::DEFAULT)
+}
+
+unsafe extern "C" fn log_callback_trampoline(
+    user_data: *mut c_void,
+    severity: u32,
+    event: u32,
+    code: i64,
+    message: *const c_char,
+) -> u32 {
+    if user_data.is_null() {
+        return 0;
+    }
+
+    // SAFETY: set_log_callback installs Arc::as_ptr(&CallbackState) as
+    // user_data and retains every installed Arc for the process lifetime, so the
+    // pointer remains valid for native dispatch and in-flight callbacks.
+    let state = unsafe { &*user_data.cast::<CallbackState>() };
+    invoke_callback(state, severity, event, code, message)
+}
+
+fn invoke_callback(
+    state: &CallbackState,
+    raw_severity: u32,
+    raw_event: u32,
+    code: i64,
+    message: *const c_char,
+) -> u32 {
+    // SAFETY: message is supplied by the C logging callback contract as a
+    // null-terminated string pointer. Invalid strings are treated as not
+    // consumed.
+    let Ok(message) = (unsafe { support::string::copy_c_string(message) }) else {
+        return 0;
+    };
+    let record = LogRecord {
+        severity: LogSeverity::from_raw(raw_severity),
+        event: LogEvent::from_raw(raw_event),
+        code,
+        message,
+    };
+
+    match panic::catch_unwind(AssertUnwindSafe(|| (state.callback)(record))) {
+        Ok(true) => 1,
+        Ok(false) | Err(_) => 0,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::ffi::{CString, c_void};
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::{Arc, Mutex, MutexGuard};
+
+    use super::*;
+    use crate::ErrorKind;
+
+    static LOGGING_TEST_LOCK: Mutex<()> = Mutex::new(());
+
+    struct LoggingTestGuard {
+        _lock: MutexGuard<'static, ()>,
+    }
+
+    impl LoggingTestGuard {
+        fn new() -> Self {
+            let guard = Self {
+                _lock: LOGGING_TEST_LOCK
+                    .lock()
+                    .unwrap_or_else(|poisoned| poisoned.into_inner()),
+            };
+            clear_logging_after_test();
+            guard
+        }
+    }
+
+    impl Drop for LoggingTestGuard {
+        fn drop(&mut self) {
+            clear_logging_after_test();
+        }
+    }
+
+    fn clear_logging_after_test() {
+        let _ = clear_log_callback();
+        let _ = restore_default_async_log_severity_mask();
+    }
+
+    #[test]
+    fn log_severity_raw_values_match_c_abi() {
+        let _guard = LoggingTestGuard::new();
+
+        assert_eq!(LogSeverity::Info.raw_value(), sys::MLN_LOG_SEVERITY_INFO);
+        assert_eq!(
+            LogSeverity::Warning.raw_value(),
+            sys::MLN_LOG_SEVERITY_WARNING
+        );
+        assert_eq!(LogSeverity::Error.raw_value(), sys::MLN_LOG_SEVERITY_ERROR);
+        assert_eq!(LogSeverity::from_raw(999), LogSeverity::Unknown(999));
+    }
+
+    #[test]
+    fn log_event_raw_values_match_c_abi() {
+        let _guard = LoggingTestGuard::new();
+
+        let cases = [
+            (LogEvent::General, sys::MLN_LOG_EVENT_GENERAL),
+            (LogEvent::Setup, sys::MLN_LOG_EVENT_SETUP),
+            (LogEvent::Shader, sys::MLN_LOG_EVENT_SHADER),
+            (LogEvent::ParseStyle, sys::MLN_LOG_EVENT_PARSE_STYLE),
+            (LogEvent::ParseTile, sys::MLN_LOG_EVENT_PARSE_TILE),
+            (LogEvent::Render, sys::MLN_LOG_EVENT_RENDER),
+            (LogEvent::Style, sys::MLN_LOG_EVENT_STYLE),
+            (LogEvent::Database, sys::MLN_LOG_EVENT_DATABASE),
+            (LogEvent::HttpRequest, sys::MLN_LOG_EVENT_HTTP_REQUEST),
+            (LogEvent::Sprite, sys::MLN_LOG_EVENT_SPRITE),
+            (LogEvent::Image, sys::MLN_LOG_EVENT_IMAGE),
+            (LogEvent::OpenGl, sys::MLN_LOG_EVENT_OPENGL),
+            (LogEvent::Jni, sys::MLN_LOG_EVENT_JNI),
+            (LogEvent::Android, sys::MLN_LOG_EVENT_ANDROID),
+            (LogEvent::Crash, sys::MLN_LOG_EVENT_CRASH),
+            (LogEvent::Glyph, sys::MLN_LOG_EVENT_GLYPH),
+            (LogEvent::Timing, sys::MLN_LOG_EVENT_TIMING),
+        ];
+
+        for (event, raw) in cases {
+            assert_eq!(event.raw_value(), raw);
+            assert_eq!(LogEvent::from_raw(raw), event);
+        }
+        assert_eq!(LogEvent::from_raw(999), LogEvent::Unknown(999));
+    }
+
+    #[test]
+    fn log_severity_mask_values_match_c_abi() {
+        let _guard = LoggingTestGuard::new();
+
+        assert_eq!(
+            LogSeverityMask::INFO.bits(),
+            sys::MLN_LOG_SEVERITY_MASK_INFO
+        );
+        assert_eq!(
+            LogSeverityMask::WARNING.bits(),
+            sys::MLN_LOG_SEVERITY_MASK_WARNING
+        );
+        assert_eq!(
+            LogSeverityMask::ERROR.bits(),
+            sys::MLN_LOG_SEVERITY_MASK_ERROR
+        );
+        assert_eq!(
+            LogSeverityMask::DEFAULT.bits(),
+            sys::MLN_LOG_SEVERITY_MASK_DEFAULT
+        );
+        assert_eq!(LogSeverityMask::ALL.bits(), sys::MLN_LOG_SEVERITY_MASK_ALL);
+    }
+
+    #[test]
+    fn log_callback_install_clear_and_trampoline_copy_record() {
+        let _guard = LoggingTestGuard::new();
+        let calls = Arc::new(AtomicUsize::new(0));
+        let test_calls = calls.clone();
+
+        set_log_callback(move |record| {
+            test_calls.fetch_add(1, Ordering::SeqCst);
+            if record.code == 42 {
+                assert_eq!(record.severity, LogSeverity::Warning);
+                assert_eq!(record.severity.raw_value(), sys::MLN_LOG_SEVERITY_WARNING);
+                assert_eq!(record.event, LogEvent::Render);
+                assert_eq!(record.event.raw_value(), sys::MLN_LOG_EVENT_RENDER);
+                assert_eq!(record.message, "hello");
+                return true;
+            }
+            false
+        })
+        .unwrap();
+
+        let baseline_calls = calls.load(Ordering::SeqCst);
+        let message = CString::new("hello").unwrap();
+        let current = {
+            let state = lock_log_callback_state();
+            state.current.as_ref().unwrap().clone()
+        };
+        let user_data = Arc::as_ptr(&current).cast_mut().cast::<c_void>();
+        assert_eq!(
+            unsafe {
+                log_callback_trampoline(
+                    user_data,
+                    sys::MLN_LOG_SEVERITY_WARNING,
+                    sys::MLN_LOG_EVENT_RENDER,
+                    42,
+                    message.as_ptr(),
+                )
+            },
+            1
+        );
+        assert_eq!(calls.load(Ordering::SeqCst), baseline_calls + 1);
+
+        clear_log_callback().unwrap();
+        assert!(lock_log_callback_state().current.is_none());
+        assert_eq!(
+            unsafe {
+                log_callback_trampoline(
+                    std::ptr::null_mut(),
+                    sys::MLN_LOG_SEVERITY_WARNING,
+                    sys::MLN_LOG_EVENT_RENDER,
+                    42,
+                    message.as_ptr(),
+                )
+            },
+            0
+        );
+        assert_eq!(calls.load(Ordering::SeqCst), baseline_calls + 1);
+    }
+
+    #[test]
+    fn log_callback_panics_are_not_consumed() {
+        let _guard = LoggingTestGuard::new();
+        set_log_callback(|_| panic!("contained panic")).unwrap();
+
+        let message = CString::new("boom").unwrap();
+        let current = {
+            let state = lock_log_callback_state();
+            state.current.as_ref().unwrap().clone()
+        };
+
+        assert_eq!(
+            invoke_callback(
+                &current,
+                sys::MLN_LOG_SEVERITY_ERROR,
+                sys::MLN_LOG_EVENT_GENERAL,
+                0,
+                message.as_ptr(),
+            ),
+            0
+        );
+
+        clear_log_callback().unwrap();
+    }
+
+    #[test]
+    fn async_log_severity_mask_status_propagates_invalid_bits() {
+        let _guard = LoggingTestGuard::new();
+        let invalid_mask = LogSeverityMask::from_bits_retain(1 << 31);
+
+        let error = set_async_log_severity_mask(invalid_mask).unwrap_err();
+
+        assert_eq!(error.kind(), ErrorKind::InvalidArgument);
+        assert_eq!(error.raw_status(), Some(sys::MLN_STATUS_INVALID_ARGUMENT));
+    }
+
+    #[test]
+    fn async_log_severity_mask_accepts_known_values() {
+        let _guard = LoggingTestGuard::new();
+
+        set_async_log_severity_mask(LogSeverityMask::INFO | LogSeverityMask::ERROR).unwrap();
+        restore_default_async_log_severity_mask().unwrap();
+    }
+}

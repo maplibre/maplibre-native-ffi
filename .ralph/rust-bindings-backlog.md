@@ -7,6 +7,8 @@ commit/push after each item.
 
 - Complete the missing API parity backlog.
 - Complete the API polish backlog before review.
+- Continue after parity work until every API polish checklist item is complete;
+  ordering is flexible, but stopping after parity is not complete.
 - For each item: implement via worker, run parallel fresh-context reviewers,
   apply sensible fixes, mark item complete in PLAN.md, commit, and push.
 
@@ -15,7 +17,7 @@ commit/push after each item.
 - [x] Commit and push current backlog/tooling changes (`6efbc1a`).
 - [x] Runtime options and explicit runtime creation.
 - [x] Ambient cache operations.
-- [ ] Process-global logging callbacks, clearing, severity values, and async
+- [x] Process-global logging callbacks, clearing, severity values, and async
       severity mask.
 - [ ] Style source removal and source existence checks.
 - [ ] Style source type, source info, attribution, and copied source output
@@ -52,6 +54,10 @@ commit/push after each item.
   `cargo test -p maplibre-native ambient_cache_operation_raw_values_match_c_abi`,
   and
   `cargo test -p maplibre-native runtime_ambient_cache_operations_use_real_c_abi`.
+- Process-global logging APIs: `cargo fmt --all`,
+  `cargo test -p maplibre-native logging`, and `mise run //bindings/rust:test`.
+- Process-global logging reviewer fixes: `cargo fmt --all --check` and
+  `cargo test -p maplibre-native logging`.
 
 ## Notes
 

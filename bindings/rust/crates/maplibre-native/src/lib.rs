@@ -7,6 +7,7 @@ mod geojson;
 mod geometry;
 mod handle;
 mod json;
+mod logging;
 mod map;
 mod options;
 mod projection;
@@ -33,6 +34,10 @@ pub use events::{
 pub use geojson::{Feature, FeatureIdentifier, GeoJson};
 pub use geometry::Geometry;
 pub use json::{JsonMember, JsonValue};
+pub use logging::{
+    LogEvent, LogRecord, LogSeverity, LogSeverityMask, clear_log_callback,
+    restore_default_async_log_severity_mask, set_async_log_severity_mask, set_log_callback,
+};
 pub use map::MapHandle;
 pub use options::{
     ConstrainMode, MapDebugOptions, MapMode, MapOptions, MapTileOptions, MapViewportOptions,
