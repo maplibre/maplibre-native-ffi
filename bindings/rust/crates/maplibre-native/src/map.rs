@@ -1,4 +1,5 @@
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
+use std::collections::HashMap;
 use std::fmt;
 use std::ptr;
 use std::rc::Rc;
@@ -6,13 +7,15 @@ use std::rc::Rc;
 use maplibre_native_support as support;
 use maplibre_native_sys as sys;
 
+use crate::custom_geometry::{CanonicalTileId, CustomGeometrySourceState};
 use crate::events::MapId;
 use crate::handle::{ThreadAffineNativeHandle, closed_handle_error, out_handle};
 use crate::runtime::{RuntimeHandle, RuntimeState};
 use crate::{
-    AnimationOptions, BoundOptions, CameraFitOptions, CameraOptions, Error, FreeCameraOptions,
-    GeoJson, Geometry, JsonValue, LatLng, LatLngBounds, MapDebugOptions, MapOptions,
-    MapProjectionHandle, MapTileOptions, MapViewportOptions, ProjectionMode, Result, ScreenPoint,
+    AnimationOptions, BoundOptions, CameraFitOptions, CameraOptions, CustomGeometrySourceOptions,
+    Error, ErrorKind, FreeCameraOptions, GeoJson, Geometry, JsonValue, LatLng, LatLngBounds,
+    MapDebugOptions, MapOptions, MapProjectionHandle, MapTileOptions, MapViewportOptions,
+    ProjectionMode, Result, ScreenPoint,
 };
 
 #[derive(Debug)]
@@ -20,19 +23,22 @@ pub(crate) struct MapState {
     handle: ThreadAffineNativeHandle<sys::mln_map>,
     runtime: RefCell<Option<Rc<RuntimeState>>>,
     id: MapId,
+    custom_geometry_sources: RefCell<HashMap<String, Box<CustomGeometrySourceState>>>,
+    pending_custom_geometry_source_url_cleanup: Cell<bool>,
 }
 
 impl MapState {
-    fn new(ptr: std::ptr::NonNull<sys::mln_map>, runtime: Rc<RuntimeState>) -> Self {
+    fn new(ptr: std::ptr::NonNull<sys::mln_map>, runtime: Rc<RuntimeState>, id: MapId) -> Self {
         // SAFETY: ptr came from successful mln_map_create and is paired with
         // the matching map destroy function.
         let handle =
             unsafe { ThreadAffineNativeHandle::from_raw(ptr, sys::mln_map_destroy, "mln_map") };
-        let id = runtime.register_map(ptr.as_ptr());
         Self {
             handle,
             runtime: RefCell::new(Some(runtime)),
             id,
+            custom_geometry_sources: RefCell::new(HashMap::new()),
+            pending_custom_geometry_source_url_cleanup: Cell::new(false),
         }
     }
 
@@ -55,7 +61,34 @@ impl MapState {
         if let Some(runtime) = self.runtime.borrow_mut().take() {
             runtime.unregister_map(ptr);
         }
+        self.clear_custom_geometry_sources();
         Ok(())
+    }
+
+    pub(crate) fn clear_custom_geometry_sources(&self) {
+        self.pending_custom_geometry_source_url_cleanup.set(false);
+        self.custom_geometry_sources.borrow_mut().clear();
+    }
+
+    pub(crate) fn mark_custom_geometry_sources_pending_url_cleanup(&self) {
+        self.pending_custom_geometry_source_url_cleanup.set(true);
+    }
+
+    pub(crate) fn finish_custom_geometry_sources_pending_url_cleanup(&self) {
+        if self
+            .pending_custom_geometry_source_url_cleanup
+            .replace(false)
+        {
+            self.custom_geometry_sources.borrow_mut().clear();
+        }
+    }
+
+    pub(crate) fn cancel_custom_geometry_sources_pending_url_cleanup(&self) {
+        self.pending_custom_geometry_source_url_cleanup.set(false);
+    }
+
+    fn has_pending_custom_geometry_source_url_cleanup(&self) -> bool {
+        self.pending_custom_geometry_source_url_cleanup.get()
     }
 }
 
@@ -99,15 +132,23 @@ impl MapHandle {
             sys::mln_map_create(runtime_ptr, &raw_options, out.as_mut_ptr())
         })?;
         let ptr = out_handle(out, "mln_map")?;
+        let id = runtime.inner.register_map(ptr.as_ptr());
+        let state = Rc::new(MapState::new(ptr, Rc::clone(&runtime.inner), id));
+        runtime
+            .inner
+            .register_map_state(ptr.as_ptr(), Rc::downgrade(&state));
 
-        Ok(Self {
-            inner: Rc::new(MapState::new(ptr, Rc::clone(&runtime.inner))),
-        })
+        Ok(Self { inner: state })
     }
 
     /// Returns this map's runtime-local event source identity.
     pub fn id(&self) -> MapId {
         self.inner.id
+    }
+
+    #[cfg(test)]
+    fn custom_geometry_source_count_for_testing(&self) -> usize {
+        self.inner.custom_geometry_sources.borrow().len()
     }
 
     /// Explicitly destroys the map.
@@ -134,13 +175,22 @@ impl MapHandle {
     }
 
     /// Loads a style URL through MapLibre Native style APIs.
+    ///
+    /// Custom geometry source callback state from the previous style is kept
+    /// until the replacement style has loaded and that style-loaded event is
+    /// polled or discarded, because URL style replacement is asynchronous in
+    /// the C API. New custom geometry sources can be added after the pending
+    /// URL style load finishes or fails.
     pub fn set_style_url(&self, url: &str) -> Result<()> {
         let map = self.inner.as_ptr()?;
         let url = support::string::c_string(url)?;
         // SAFETY: map is live and url is a NUL-terminated UTF-8 string valid
         // for the duration of this command. The C API copies/consumes it before
         // returning.
-        support::check(unsafe { sys::mln_map_set_style_url(map, url.as_ptr()) })
+        support::check(unsafe { sys::mln_map_set_style_url(map, url.as_ptr()) })?;
+        self.inner
+            .mark_custom_geometry_sources_pending_url_cleanup();
+        Ok(())
     }
 
     /// Loads inline style JSON through MapLibre Native style APIs.
@@ -149,8 +199,108 @@ impl MapHandle {
         let json = support::string::c_string(json)?;
         // SAFETY: map is live and json is a NUL-terminated UTF-8 string valid
         // for the duration of this command. The C API copies/consumes it before
-        // returning.
-        support::check(unsafe { sys::mln_map_set_style_json(map, json.as_ptr()) })
+        // returning. Inline JSON style replacement completes before a successful
+        // return, so old custom geometry callback state can be released after.
+        support::check(unsafe { sys::mln_map_set_style_json(map, json.as_ptr()) })?;
+        self.inner.clear_custom_geometry_sources();
+        Ok(())
+    }
+
+    /// Adds a custom geometry source to the current style.
+    ///
+    /// The callback state is scoped to this map's current style. It is released
+    /// on map close/drop, successful inline JSON style replacement, or after an
+    /// asynchronous URL style replacement reports `MapStyleLoaded` through
+    /// runtime event polling or draining. Native may invoke callbacks from
+    /// worker threads; callbacks should queue owner-thread work before calling
+    /// map APIs. While a style URL load is pending, adding new custom geometry
+    /// sources returns `ErrorKind::InvalidState`.
+    pub fn add_custom_geometry_source(
+        &self,
+        source_id: &str,
+        options: CustomGeometrySourceOptions,
+    ) -> Result<()> {
+        let map = self.inner.as_ptr()?;
+        if self.inner.has_pending_custom_geometry_source_url_cleanup() {
+            return Err(Error::new(
+                ErrorKind::InvalidState,
+                None,
+                "custom geometry sources can be added after the pending style URL load finishes",
+            ));
+        }
+        let source_id_view = support::string::string_view(source_id);
+        let state = CustomGeometrySourceState::new(options);
+        let descriptor = state.descriptor();
+        // SAFETY: map is live, source_id_view is valid for this call, and
+        // descriptor points to callback state retained by this map on success.
+        support::check(unsafe {
+            sys::mln_map_add_custom_geometry_source(map, source_id_view.raw(), &descriptor)
+        })?;
+        self.inner
+            .custom_geometry_sources
+            .borrow_mut()
+            .insert(source_id.to_owned(), state);
+        Ok(())
+    }
+
+    /// Sets custom geometry source data for one canonical tile.
+    pub fn set_custom_geometry_source_tile_data(
+        &self,
+        source_id: &str,
+        tile_id: CanonicalTileId,
+        data: &GeoJson,
+    ) -> Result<()> {
+        let map = self.inner.as_ptr()?;
+        let source_id = support::string::string_view(source_id);
+        let data = data.try_to_native()?;
+        // SAFETY: map is live, source_id is valid for this call, tile_id is
+        // passed by value, and data owns the descriptor graph for this call.
+        support::check(unsafe {
+            sys::mln_map_set_custom_geometry_source_tile_data(
+                map,
+                source_id.raw(),
+                tile_id.to_native(),
+                data.as_ptr(),
+            )
+        })
+    }
+
+    /// Invalidates custom geometry source data for one canonical tile.
+    pub fn invalidate_custom_geometry_source_tile(
+        &self,
+        source_id: &str,
+        tile_id: CanonicalTileId,
+    ) -> Result<()> {
+        let map = self.inner.as_ptr()?;
+        let source_id = support::string::string_view(source_id);
+        // SAFETY: map is live, source_id is valid for this call, and tile_id is
+        // passed by value.
+        support::check(unsafe {
+            sys::mln_map_invalidate_custom_geometry_source_tile(
+                map,
+                source_id.raw(),
+                tile_id.to_native(),
+            )
+        })
+    }
+
+    /// Invalidates custom geometry source data inside a geographic region.
+    pub fn invalidate_custom_geometry_source_region(
+        &self,
+        source_id: &str,
+        bounds: LatLngBounds,
+    ) -> Result<()> {
+        let map = self.inner.as_ptr()?;
+        let source_id = support::string::string_view(source_id);
+        // SAFETY: map is live, source_id is valid for this call, and bounds is
+        // passed by value.
+        support::check(unsafe {
+            sys::mln_map_invalidate_custom_geometry_source_region(
+                map,
+                source_id.raw(),
+                bounds.to_native(),
+            )
+        })
     }
 
     /// Adds one style source from a style-spec source JSON object.
@@ -935,9 +1085,10 @@ fn copy_style_id_list(list: &support::handle::StyleIdListGuard) -> Result<Vec<St
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::events::empty_runtime_event;
     use crate::{
-        ConstrainMode, EdgeInsets, ErrorKind, Feature, FeatureIdentifier, JsonMember, MapMode,
-        NorthOrientation, TileLodMode, ViewportMode,
+        ConstrainMode, CustomGeometrySourceOptions, EdgeInsets, ErrorKind, Feature,
+        FeatureIdentifier, JsonMember, MapMode, NorthOrientation, TileLodMode, ViewportMode,
     };
 
     const VALID_STYLE_JSON: &str = r#"{"version":8,"sources":{},"layers":[]}"#;
@@ -1025,6 +1176,118 @@ mod tests {
         assert!(error.raw_status().is_some());
         assert!(!error.diagnostic().trim().is_empty());
 
+        map.close().unwrap();
+        runtime.close().unwrap();
+    }
+
+    #[test]
+    fn custom_geometry_source_apis_call_real_c_api_and_style_replacement_releases_state() {
+        let runtime = RuntimeHandle::new().unwrap();
+        let map = MapHandle::new(&runtime).unwrap();
+        map.set_style_json(VALID_STYLE_JSON).unwrap();
+
+        map.add_custom_geometry_source(
+            "custom",
+            CustomGeometrySourceOptions::new(|_| {})
+                .with_cancel_tile(|_| {})
+                .with_min_zoom(0.0)
+                .with_max_zoom(2.0)
+                .with_tolerance(0.375)
+                .with_tile_size(512)
+                .with_buffer(64)
+                .with_clip(true)
+                .with_wrap(false),
+        )
+        .unwrap();
+        assert_eq!(map.custom_geometry_source_count_for_testing(), 1);
+
+        let tile_id = CanonicalTileId::new(0, 0, 0);
+        map.set_custom_geometry_source_tile_data(
+            "custom",
+            tile_id,
+            &GeoJson::FeatureCollection(Vec::new()),
+        )
+        .unwrap();
+        map.invalidate_custom_geometry_source_tile("custom", tile_id)
+            .unwrap();
+        map.invalidate_custom_geometry_source_region(
+            "custom",
+            LatLngBounds::new(LatLng::new(-1.0, -1.0), LatLng::new(1.0, 1.0)),
+        )
+        .unwrap();
+
+        map.set_style_json(VALID_STYLE_JSON).unwrap();
+        assert_eq!(map.custom_geometry_source_count_for_testing(), 0);
+
+        map.close().unwrap();
+        runtime.close().unwrap();
+    }
+
+    #[test]
+    fn custom_geometry_source_state_is_released_on_map_close() {
+        let runtime = RuntimeHandle::new().unwrap();
+        let map = MapHandle::new(&runtime).unwrap();
+        map.set_style_json(VALID_STYLE_JSON).unwrap();
+        map.add_custom_geometry_source("custom", CustomGeometrySourceOptions::new(|_| {}))
+            .unwrap();
+        assert_eq!(map.custom_geometry_source_count_for_testing(), 1);
+
+        map.close().unwrap();
+        assert_eq!(map.custom_geometry_source_count_for_testing(), 0);
+        runtime.close().unwrap();
+    }
+
+    #[test]
+    fn custom_geometry_source_state_ignores_stale_style_loaded_events() {
+        let runtime = RuntimeHandle::new().unwrap();
+        let map = MapHandle::new(&runtime).unwrap();
+        map.set_style_json(VALID_STYLE_JSON).unwrap();
+        map.add_custom_geometry_source("custom", CustomGeometrySourceOptions::new(|_| {}))
+            .unwrap();
+
+        let mut event = empty_runtime_event();
+        event.type_ = sys::MLN_RUNTIME_EVENT_MAP_STYLE_LOADED;
+        event.source_type = sys::MLN_RUNTIME_EVENT_SOURCE_MAP;
+        event.source = map.inner.handle.as_ptr().cast();
+        runtime.inner.apply_event_side_effects_for_testing(&event);
+
+        assert_eq!(map.custom_geometry_source_count_for_testing(), 1);
+        map.close().unwrap();
+        runtime.close().unwrap();
+    }
+
+    #[test]
+    fn custom_geometry_source_state_releases_on_pending_url_style_loaded_event() {
+        let runtime = RuntimeHandle::new().unwrap();
+        let map = MapHandle::new(&runtime).unwrap();
+        map.set_style_json(VALID_STYLE_JSON).unwrap();
+        map.add_custom_geometry_source("custom", CustomGeometrySourceOptions::new(|_| {}))
+            .unwrap();
+        map.inner.mark_custom_geometry_sources_pending_url_cleanup();
+
+        let mut event = empty_runtime_event();
+        event.type_ = sys::MLN_RUNTIME_EVENT_MAP_STYLE_LOADED;
+        event.source_type = sys::MLN_RUNTIME_EVENT_SOURCE_MAP;
+        event.source = map.inner.handle.as_ptr().cast();
+        runtime.inner.apply_event_side_effects_for_testing(&event);
+
+        assert_eq!(map.custom_geometry_source_count_for_testing(), 0);
+        map.close().unwrap();
+        runtime.close().unwrap();
+    }
+
+    #[test]
+    fn custom_geometry_source_add_rejects_pending_url_style_replacement() {
+        let runtime = RuntimeHandle::new().unwrap();
+        let map = MapHandle::new(&runtime).unwrap();
+        map.set_style_json(VALID_STYLE_JSON).unwrap();
+        map.inner.mark_custom_geometry_sources_pending_url_cleanup();
+
+        let error = map
+            .add_custom_geometry_source("custom", CustomGeometrySourceOptions::new(|_| {}))
+            .unwrap_err();
+
+        assert_eq!(error.kind(), ErrorKind::InvalidState);
         map.close().unwrap();
         runtime.close().unwrap();
     }

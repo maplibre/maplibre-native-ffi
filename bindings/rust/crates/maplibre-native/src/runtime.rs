@@ -1,13 +1,14 @@
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::fmt;
-use std::rc::Rc;
+use std::rc::{Rc, Weak};
 
 use maplibre_native_support as support;
 use maplibre_native_sys as sys;
 
 use crate::events::{MapId, RuntimeEvent, RuntimeEventSource, empty_runtime_event};
 use crate::handle::{ThreadAffineNativeHandle, closed_handle_error, out_handle};
+use crate::map::MapState;
 use crate::resource::{
     ResourceProviderState, ResourceTransformState, noop_resource_transform_descriptor,
 };
@@ -19,6 +20,7 @@ pub(crate) struct RuntimeState {
     next_map_id: Cell<u64>,
     has_created_map: Cell<bool>,
     map_ids: RefCell<HashMap<usize, MapId>>,
+    map_states: RefCell<HashMap<usize, Weak<MapState>>>,
     resource_transform: RefCell<Option<Box<ResourceTransformState>>>,
     resource_provider: RefCell<Option<Box<ResourceProviderState>>>,
 }
@@ -35,6 +37,7 @@ impl RuntimeState {
             next_map_id: Cell::new(1),
             has_created_map: Cell::new(false),
             map_ids: RefCell::new(HashMap::new()),
+            map_states: RefCell::new(HashMap::new()),
             resource_transform: RefCell::new(None),
             resource_provider: RefCell::new(None),
         }
@@ -131,10 +134,45 @@ impl RuntimeState {
         id
     }
 
+    pub(crate) fn register_map_state(&self, ptr: *mut sys::mln_map, state: Weak<MapState>) {
+        if !ptr.is_null() {
+            self.map_states.borrow_mut().insert(ptr as usize, state);
+        }
+    }
+
     pub(crate) fn unregister_map(&self, ptr: *mut sys::mln_map) {
         if !ptr.is_null() {
             self.map_ids.borrow_mut().remove(&(ptr as usize));
+            self.map_states.borrow_mut().remove(&(ptr as usize));
         }
+    }
+
+    fn apply_event_side_effects(&self, raw: &sys::mln_runtime_event) {
+        if raw.source_type != sys::MLN_RUNTIME_EVENT_SOURCE_MAP {
+            return;
+        }
+        let state = self
+            .map_states
+            .borrow()
+            .get(&(raw.source as usize))
+            .and_then(Weak::upgrade);
+        let Some(state) = state else {
+            return;
+        };
+        match raw.type_ {
+            sys::MLN_RUNTIME_EVENT_MAP_STYLE_LOADED => {
+                state.finish_custom_geometry_sources_pending_url_cleanup();
+            }
+            sys::MLN_RUNTIME_EVENT_MAP_LOADING_FAILED => {
+                state.cancel_custom_geometry_sources_pending_url_cleanup();
+            }
+            _ => {}
+        }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn apply_event_side_effects_for_testing(&self, raw: &sys::mln_runtime_event) {
+        self.apply_event_side_effects(raw);
     }
 
     fn source_for_event(&self, raw: &sys::mln_runtime_event) -> RuntimeEventSource {
@@ -260,8 +298,11 @@ impl RuntimeHandle {
             return Ok(None);
         }
 
-        let source = self.inner.source_for_event(&event);
-        RuntimeEvent::from_native(&event, source).map(Some)
+        let raw_event = event;
+        let source = self.inner.source_for_event(&raw_event);
+        let event = RuntimeEvent::from_native(&raw_event, source)?;
+        self.inner.apply_event_side_effects(&raw_event);
+        Ok(Some(event))
     }
 
     /// Polls and discards one queued runtime event, returning whether one was present.
@@ -277,6 +318,9 @@ impl RuntimeHandle {
         support::check(unsafe {
             sys::mln_runtime_poll_event(runtime, &mut event, &mut has_event)
         })?;
+        if has_event {
+            self.inner.apply_event_side_effects(&event);
+        }
         Ok(has_event)
     }
 

@@ -1,6 +1,7 @@
 #![deny(unsafe_op_in_unsafe_fn)]
 
 mod camera;
+mod custom_geometry;
 mod events;
 mod geojson;
 mod geometry;
@@ -20,6 +21,7 @@ pub use camera::{
     AnimationOptions, BoundOptions, CameraFitOptions, CameraOptions, FreeCameraOptions,
     ProjectionMode,
 };
+pub use custom_geometry::{CanonicalTileId, CustomGeometrySourceOptions};
 pub use events::{
     MapId, OfflineRegionDownloadState, OfflineRegionResponseErrorEvent, OfflineRegionStatus,
     OfflineRegionStatusEvent, OfflineRegionTileCountLimitEvent, RenderFrameEvent, RenderMapEvent,
