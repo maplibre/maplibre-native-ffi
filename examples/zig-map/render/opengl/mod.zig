@@ -153,7 +153,7 @@ const OpenGLSurfaceBackend = struct {
         // SDL3 uses EGL internally on Linux; retrieve the borrowed handles.
         const egl_display = c.SDL_EGL_GetCurrentDisplay();
         const egl_config = c.SDL_EGL_GetCurrentConfig();
-        const egl_context = c.eglGetCurrentContext();
+        const egl_context = c.SDL_GL_GetCurrentContext();
         const egl_surface = c.SDL_EGL_GetWindowSurface(self.window);
 
         if (egl_display == null or egl_config == null or
