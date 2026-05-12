@@ -130,7 +130,13 @@ run = "rm -rf \"$MLN_FFI_BUILD_DIR\""
 
 [tasks.test]
 depends = ["//:build"]
-run = "zig build test --summary all --verbose -Dcmake-artifact-dir=\"$MLN_FFI_BUILD_DIR\" ${MLN_FFI_RENDER_BACKEND:+-Drender-backend=$MLN_FFI_RENDER_BACKEND}"
+run = '''
+native_library_dir="$MLN_FFI_BUILD_DIR"
+if [[ -n "${MLN_FFI_CMAKE_BUILD_CONFIG:-}" && -d "$native_library_dir/$MLN_FFI_CMAKE_BUILD_CONFIG" ]]; then
+  native_library_dir="$native_library_dir/$MLN_FFI_CMAKE_BUILD_CONFIG"
+fi
+zig build test --summary all --verbose -Dcmake-artifact-dir="$native_library_dir" ${MLN_FFI_RENDER_BACKEND:+-Drender-backend=$MLN_FFI_RENDER_BACKEND}
+'''
 
 [tasks.check]
 run = "hk check --all"
@@ -157,13 +163,17 @@ run = [
   "mkdir -p \"ci-artifact/build/${MLN_FFI_VARIANT:-host}\" ci-artifact/third_party/maplibre-native/vendor/Vulkan-Headers",
   '''
   found_native_lib=false
-  for native_lib in "$MLN_FFI_BUILD_DIR"/libmaplibre-native-c.* "$MLN_FFI_BUILD_DIR"/maplibre-native-c.*; do
+  native_library_dir="$MLN_FFI_BUILD_DIR"
+  if [[ -n "${MLN_FFI_CMAKE_BUILD_CONFIG:-}" && -d "$native_library_dir/$MLN_FFI_CMAKE_BUILD_CONFIG" ]]; then
+    native_library_dir="$native_library_dir/$MLN_FFI_CMAKE_BUILD_CONFIG"
+  fi
+  for native_lib in "$native_library_dir"/libmaplibre-native-c.* "$native_library_dir"/maplibre-native-c.*; do
     [[ -e "$native_lib" ]] || continue
     found_native_lib=true
     cp "$native_lib" "ci-artifact/build/${MLN_FFI_VARIANT:-host}"
   done
   if [[ "$found_native_lib" != true ]]; then
-    echo "missing $MLN_FFI_BUILD_DIR/[lib]maplibre-native-c.*; native artifact was not built" >&2
+    echo "missing $native_library_dir/[lib]maplibre-native-c.*; native artifact was not built" >&2
     exit 1
   fi
   ''',

@@ -30,4 +30,11 @@ if [[ -z "${LIBCLANG_PATH:-}" ]]; then
   exit 1
 fi
 
+native_library_dir="${MLN_FFI_BUILD_DIR:-$repo_root/build/host}"
+if [[ -n "${MLN_FFI_CMAKE_BUILD_CONFIG:-}" && -d "$native_library_dir/$MLN_FFI_CMAKE_BUILD_CONFIG" ]]; then
+  native_library_dir="$native_library_dir/$MLN_FFI_CMAKE_BUILD_CONFIG"
+fi
+export DYLD_LIBRARY_PATH="$native_library_dir${DYLD_LIBRARY_PATH:+:$DYLD_LIBRARY_PATH}"
+export LD_LIBRARY_PATH="$native_library_dir${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+
 exec "$@"

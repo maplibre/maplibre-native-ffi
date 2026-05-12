@@ -33,7 +33,14 @@ val nativeBuildDirForTests =
   providers
     .environmentVariable("MLN_FFI_BUILD_DIR")
     .orElse(rootProject.layout.buildDirectory.dir("host").map { it.asFile.absolutePath })
-val nativeLibraryPathForTests = nativeBuildDirForTests.map {
+val nativeBuildConfigForTests =
+  providers.environmentVariable("MLN_FFI_CMAKE_BUILD_CONFIG").orElse("")
+val nativeLibraryDirForTests =
+  nativeBuildDirForTests.zip(nativeBuildConfigForTests) { buildDir, config ->
+    val configDir = "$buildDir/$config"
+    if (config.isNotEmpty() && file(configDir).isDirectory) configDir else buildDir
+  }
+val nativeLibraryPathForTests = nativeLibraryDirForTests.map {
   "$it/${System.mapLibraryName("maplibre-native-c")}"
 }
 

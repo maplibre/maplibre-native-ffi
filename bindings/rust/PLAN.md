@@ -41,6 +41,80 @@ declarations, loader/version checks, status conversion, handle state, memory
 helpers, callbacks, rendering, and tests. Translate those patterns to Rust
 ownership and RAII rather than copying Java's synchronized object model.
 
+## Missing API parity backlog
+
+These public C and Java FFM surfaces remain to reach the branch's parity target.
+Implement them on this branch unless a later decision explicitly narrows Rust's
+scope.
+
+Runtime and process-global APIs:
+
+- `RuntimeOptions`, including asset path, cache path, and maximum cache size.
+- Runtime creation with explicit options.
+- Ambient cache operations.
+- Process-global logging callbacks, callback clearing, log severity values, and
+  async severity mask configuration.
+
+Map and style APIs:
+
+- Style source removal and source existence checks.
+- Style source type, source info, attribution, and related copied source output
+  types.
+- Style image add/remove/query APIs and image metadata/value types.
+- Image source APIs for URL, coordinates, and image updates.
+- Remaining layer/source helpers that Java FFM exposes over the C style API.
+
+Render session and query APIs:
+
+- Feature state set, get, and remove on `RenderSessionHandle`.
+- `FeatureStateSelector` and related selector materialization.
+- Rendered feature query geometry and rendered/source query option types.
+- Copied queried feature and feature-extension result types.
+- Rendered feature, source feature, and feature extension query methods on
+  `RenderSessionHandle`.
+
+Keep this backlog aligned with `include/maplibre_native_c/*.h` and
+`bindings/java-ffm/src/main/java/org/maplibre/nativeffi/**` as those APIs grow.
+
+## API polish backlog before review
+
+Polish the Rust surface fully on this branch before external review. Treat these
+items as part of the branch's completion criteria, not as minimal follow-up
+fixes.
+
+Handle lifecycle shape:
+
+- Revisit every public destructive or one-shot operation, including runtime,
+  map, projection, render session, texture frame, and resource request APIs.
+- Prefer consuming operations such as `close(self) -> Result<()>` and
+  `complete(self, response) -> Result<()>` where the operation logically ends
+  the handle's useful life.
+- Preserve retry-after-native-destroy-failure semantics with an explicit
+  pattern, such as returning the still-live handle in a close error, when the
+  native C API leaves ownership with the caller on failure.
+- Keep successful cleanup internally idempotent for `Drop` and shared internal
+  state, even when the public explicit operation consumes the wrapper.
+
+Frame backend pointer lifetimes:
+
+- Replace frame-derived bare `NativePointer` returns with a lifetime-bearing
+  type, such as `FrameNativePointer<'frame>`.
+- Tie `FrameNativePointer<'frame>` to the active texture frame handle so safe
+  Rust code cannot store the pointer beyond frame release.
+- Use consuming or mutable frame release APIs where needed so the borrow checker
+  prevents release while a frame pointer borrow is still live.
+- Keep GPU waiting and synchronization with the caller; the Rust API should
+  encode pointer lifetime without requiring callback-scoped GPU waits.
+
+Module structure:
+
+- Split large Rust modules before adding the remaining parity APIs.
+- Align the public/internal module split with the Java FFM package structure
+  where it maps cleanly to Rust: map, style, render, query, resource, runtime,
+  logging, geometry, JSON/GeoJSON, values, and internal support.
+- Keep tests colocated with the submodule or concern they exercise so new parity
+  work does not keep growing monolithic test modules.
+
 ## Decisions
 
 - Use normal direct Rust FFI linkage.
@@ -456,7 +530,9 @@ Rules:
 - Safe Rust borrowing should prevent reentrant session calls through the same
   session while a frame handle is live.
 - Backend pointers must not outlive the frame handle.
-- Frame release happens on close/drop.
+- Frame-derived backend pointers use lifetime-bearing wrappers rather than bare
+  `NativePointer` values.
+- Frame release happens on explicit consuming close/drop.
 - Resize, render update, detach, and session destruction must reject or be
   impossible while a frame is acquired.
 

@@ -10,13 +10,18 @@ fn main() -> Result<(), Box<dyn Error>> {
     let build_dir = env::var_os("MLN_FFI_BUILD_DIR")
         .map(PathBuf::from)
         .unwrap_or_else(|| repo_root.join("build/host"));
+    let native_library_dir = native_library_dir(&build_dir);
 
     println!("cargo:rerun-if-env-changed=MLN_FFI_BUILD_DIR");
+    println!("cargo:rerun-if-env-changed=MLN_FFI_CMAKE_BUILD_CONFIG");
     println!("cargo:rerun-if-env-changed=LIBCLANG_PATH");
     println!("cargo:rerun-if-env-changed=BINDGEN_EXTRA_CLANG_ARGS");
     print_rerun_if_changed(&repo_root.join("include"));
 
-    println!("cargo:rustc-link-search=native={}", build_dir.display());
+    println!(
+        "cargo:rustc-link-search=native={}",
+        native_library_dir.display()
+    );
     println!("cargo:rustc-link-lib=dylib=maplibre-native-c");
 
     let bindings = bindgen::Builder::default()
@@ -36,6 +41,22 @@ fn main() -> Result<(), Box<dyn Error>> {
     bindings.write_to_file(out_path.join("bindings.rs"))?;
 
     Ok(())
+}
+
+fn native_library_dir(build_dir: &Path) -> PathBuf {
+    let Some(config) = env::var_os("MLN_FFI_CMAKE_BUILD_CONFIG") else {
+        return build_dir.to_path_buf();
+    };
+    if config.is_empty() {
+        return build_dir.to_path_buf();
+    }
+
+    let candidate = build_dir.join(config);
+    if candidate.is_dir() {
+        candidate
+    } else {
+        build_dir.to_path_buf()
+    }
 }
 
 fn repo_root_from_manifest_dir(manifest_dir: &Path) -> Result<PathBuf, Box<dyn Error>> {
