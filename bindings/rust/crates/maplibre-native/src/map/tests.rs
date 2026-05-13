@@ -119,15 +119,7 @@ fn style_source_exists_and_remove_call_real_c_api() {
 }
 
 fn test_style_image(data: Vec<u8>) -> PremultipliedRgba8Image {
-    PremultipliedRgba8Image {
-        info: TextureImageInfo {
-            width: 2,
-            height: 2,
-            stride: 8,
-            byte_length: data.len(),
-        },
-        data,
-    }
+    PremultipliedRgba8Image::new(TextureImageInfo::new(2, 2, 8, data.len()), data)
 }
 
 #[test]

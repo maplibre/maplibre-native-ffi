@@ -7,6 +7,7 @@ use std::rc::Rc;
 
 use maplibre_native_core as support;
 use maplibre_native_sys as sys;
+pub use support::{PremultipliedRgba8Image, TextureImageInfo};
 
 use crate::handle::{ThreadAffineNativeHandle, closed_handle_error, out_handle};
 use crate::map::{MapHandle, MapState};
@@ -569,33 +570,6 @@ fn frame_acquired_error() -> crate::Error {
     )
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[non_exhaustive]
-pub struct TextureImageInfo {
-    pub width: u32,
-    pub height: u32,
-    pub stride: u32,
-    pub byte_length: usize,
-}
-
-impl TextureImageInfo {
-    fn from_native(raw: &sys::mln_texture_image_info) -> Self {
-        Self {
-            width: raw.width,
-            height: raw.height,
-            stride: raw.stride,
-            byte_length: raw.byte_length,
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[non_exhaustive]
-pub struct PremultipliedRgba8Image {
-    pub info: TextureImageInfo,
-    pub data: Vec<u8>,
-}
-
 /// Copied metadata for an acquired Metal session-owned texture frame.
 ///
 /// Backend pointers are exposed by [`MetalOwnedTextureFrameHandle`] so their
@@ -995,7 +969,7 @@ impl RenderSessionHandle {
         if status == sys::MLN_STATUS_OK
             || (status == sys::MLN_STATUS_INVALID_ARGUMENT && info.byte_length > 0)
         {
-            Ok(TextureImageInfo::from_native(&info))
+            Ok(support::values::texture_image_info_from_native(&info))
         } else {
             Err(crate::Error::from_status(status))
         }
@@ -1018,7 +992,7 @@ impl RenderSessionHandle {
         support::check(unsafe {
             sys::mln_texture_read_premultiplied_rgba8(session, data_ptr, data.len(), &mut info)
         })?;
-        Ok(TextureImageInfo::from_native(&info))
+        Ok(support::values::texture_image_info_from_native(&info))
     }
 
     /// Reads the most recently rendered texture frame into owned bytes.
@@ -1026,7 +1000,7 @@ impl RenderSessionHandle {
         let info = self.texture_image_info()?;
         let mut data = vec![0; info.byte_length];
         let info = self.read_premultiplied_rgba8_into(&mut data)?;
-        Ok(PremultipliedRgba8Image { info, data })
+        Ok(PremultipliedRgba8Image::new(info, data))
     }
 
     /// Acquires a borrowed Metal frame from a session-owned texture target.

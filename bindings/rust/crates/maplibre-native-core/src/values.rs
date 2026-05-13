@@ -319,6 +319,84 @@ pub fn unit_bezier_to_native(value: UnitBezier) -> sys::mln_unit_bezier {
     value.to_native()
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct TextureImageInfo {
+    pub width: u32,
+    pub height: u32,
+    pub stride: u32,
+    pub byte_length: usize,
+}
+
+impl TextureImageInfo {
+    pub const fn new(width: u32, height: u32, stride: u32, byte_length: usize) -> Self {
+        Self {
+            width,
+            height,
+            stride,
+            byte_length,
+        }
+    }
+}
+
+pub fn texture_image_info_from_native(raw: &sys::mln_texture_image_info) -> TextureImageInfo {
+    TextureImageInfo {
+        width: raw.width,
+        height: raw.height,
+        stride: raw.stride,
+        byte_length: raw.byte_length,
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct PremultipliedRgba8Image {
+    pub info: TextureImageInfo,
+    pub data: Vec<u8>,
+}
+
+impl PremultipliedRgba8Image {
+    pub fn new(info: TextureImageInfo, data: Vec<u8>) -> Self {
+        Self { info, data }
+    }
+}
+
+pub fn premultiplied_rgba8_image_to_native(
+    image: &PremultipliedRgba8Image,
+) -> sys::mln_premultiplied_rgba8_image {
+    sys::mln_premultiplied_rgba8_image {
+        size: std::mem::size_of::<sys::mln_premultiplied_rgba8_image>() as u32,
+        width: image.info.width,
+        height: image.info.height,
+        stride: image.info.stride,
+        pixels: image.data.as_ptr(),
+        byte_length: image.data.len(),
+    }
+}
+
+/// Copied fixed metadata for one runtime style image.
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[non_exhaustive]
+pub struct StyleImageInfo {
+    pub width: u32,
+    pub height: u32,
+    pub stride: u32,
+    pub byte_length: usize,
+    pub pixel_ratio: f32,
+    pub sdf: bool,
+}
+
+pub fn style_image_info_from_native(raw: &sys::mln_style_image_info) -> StyleImageInfo {
+    StyleImageInfo {
+        width: raw.width,
+        height: raw.height,
+        stride: raw.stride,
+        byte_length: raw.byte_length,
+        pixel_ratio: raw.pixel_ratio,
+        sdf: raw.sdf,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -447,6 +525,63 @@ mod tests {
             w: 8.0,
         });
         assert_eq!(copied, Quaternion::new(5.0, 6.0, 7.0, 8.0));
+    }
+
+    #[test]
+    fn texture_image_info_maps_raw_fields() {
+        let copied = texture_image_info_from_native(&sys::mln_texture_image_info {
+            size: 0,
+            width: 64,
+            height: 32,
+            stride: 256,
+            byte_length: 8192,
+        });
+        assert_eq!(copied.width, 64);
+        assert_eq!(copied.height, 32);
+        assert_eq!(copied.stride, 256);
+        assert_eq!(copied.byte_length, 8192);
+    }
+
+    #[test]
+    fn premultiplied_rgba8_image_materializes_raw_view() {
+        let image = PremultipliedRgba8Image {
+            info: TextureImageInfo {
+                width: 2,
+                height: 1,
+                stride: 8,
+                byte_length: 8,
+            },
+            data: vec![1, 2, 3, 4, 5, 6, 7, 8],
+        };
+        let raw = premultiplied_rgba8_image_to_native(&image);
+        assert_eq!(
+            raw.size,
+            std::mem::size_of::<sys::mln_premultiplied_rgba8_image>() as u32
+        );
+        assert_eq!(raw.width, 2);
+        assert_eq!(raw.height, 1);
+        assert_eq!(raw.stride, 8);
+        assert_eq!(raw.pixels, image.data.as_ptr());
+        assert_eq!(raw.byte_length, image.data.len());
+    }
+
+    #[test]
+    fn style_image_info_maps_raw_fields() {
+        let copied = style_image_info_from_native(&sys::mln_style_image_info {
+            size: 0,
+            width: 10,
+            height: 11,
+            stride: 40,
+            byte_length: 440,
+            pixel_ratio: 2.0,
+            sdf: true,
+        });
+        assert_eq!(copied.width, 10);
+        assert_eq!(copied.height, 11);
+        assert_eq!(copied.stride, 40);
+        assert_eq!(copied.byte_length, 440);
+        assert_eq!(copied.pixel_ratio, 2.0);
+        assert!(copied.sdf);
     }
 
     #[test]

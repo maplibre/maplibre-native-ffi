@@ -27,6 +27,6 @@ pub use enums::{
 };
 pub use error::{Error, ErrorKind, Result, check};
 pub use values::{
-    EdgeInsets, LatLng, LatLngBounds, ProjectedMeters, Quaternion, ScreenBox, ScreenPoint,
-    UnitBezier, Vec3,
+    EdgeInsets, LatLng, LatLngBounds, PremultipliedRgba8Image, ProjectedMeters, Quaternion,
+    ScreenBox, ScreenPoint, StyleImageInfo, TextureImageInfo, UnitBezier, Vec3,
 };

@@ -3,12 +3,13 @@ use std::{marker::PhantomData, mem, ptr};
 use maplibre_native_core as support;
 use maplibre_native_sys as sys;
 pub use support::{
-    LocationIndicatorImageKind, RasterDemEncoding, SourceType, TileScheme, VectorTileEncoding,
+    LocationIndicatorImageKind, RasterDemEncoding, SourceType, StyleImageInfo, TileScheme,
+    VectorTileEncoding,
 };
 
 use crate::custom_geometry::{CanonicalTileId, CustomGeometrySourceState};
 use crate::handle::out_handle;
-use crate::render::{PremultipliedRgba8Image, TextureImageInfo};
+use crate::render::PremultipliedRgba8Image;
 use crate::values::NativeValue;
 use crate::{
     CustomGeometrySourceOptions, Error, ErrorKind, GeoJson, JsonValue, LatLng, LatLngBounds, Result,
@@ -182,31 +183,6 @@ impl StyleImageOptions {
     }
 }
 
-/// Copied fixed metadata for one runtime style image.
-#[derive(Debug, Clone, Copy, PartialEq)]
-#[non_exhaustive]
-pub struct StyleImageInfo {
-    pub width: u32,
-    pub height: u32,
-    pub stride: u32,
-    pub byte_length: usize,
-    pub pixel_ratio: f32,
-    pub sdf: bool,
-}
-
-impl StyleImageInfo {
-    pub(crate) fn from_native(raw: &sys::mln_style_image_info) -> Self {
-        Self {
-            width: raw.width,
-            height: raw.height,
-            stride: raw.stride,
-            byte_length: raw.byte_length,
-            pixel_ratio: raw.pixel_ratio,
-            sdf: raw.sdf,
-        }
-    }
-}
-
 /// Copied runtime style image pixels with style-specific metadata.
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
@@ -219,14 +195,7 @@ pub struct StyleImage {
 pub(crate) fn premultiplied_rgba8_image_to_native(
     image: &PremultipliedRgba8Image,
 ) -> sys::mln_premultiplied_rgba8_image {
-    sys::mln_premultiplied_rgba8_image {
-        size: mem::size_of::<sys::mln_premultiplied_rgba8_image>() as u32,
-        width: image.info.width,
-        height: image.info.height,
-        stride: image.info.stride,
-        pixels: image.data.as_ptr(),
-        byte_length: image.data.len(),
-    }
+    support::values::premultiplied_rgba8_image_to_native(image)
 }
 
 impl super::MapHandle {
@@ -774,7 +743,7 @@ impl super::MapHandle {
         support::check(unsafe {
             sys::mln_map_get_style_image_info(map, image_id.raw(), &mut info, &mut found)
         })?;
-        Ok(found.then(|| StyleImageInfo::from_native(&info)))
+        Ok(found.then(|| support::values::style_image_info_from_native(&info)))
     }
 
     /// Copies one runtime style image into owned tightly packed premultiplied RGBA8 pixels.
@@ -803,7 +772,7 @@ impl super::MapHandle {
         if !info_found {
             return Ok(None);
         }
-        let info = StyleImageInfo::from_native(&raw_info);
+        let info = support::values::style_image_info_from_native(&raw_info);
 
         let mut data = vec![0u8; info.byte_length];
         let mut copied_size = 0;
@@ -838,15 +807,10 @@ impl super::MapHandle {
         }
         data.truncate(copied_size);
         Ok(Some(StyleImage {
-            image: PremultipliedRgba8Image {
-                info: TextureImageInfo {
-                    width: info.width,
-                    height: info.height,
-                    stride: info.stride,
-                    byte_length: copied_size,
-                },
+            image: PremultipliedRgba8Image::new(
+                support::TextureImageInfo::new(info.width, info.height, info.stride, copied_size),
                 data,
-            },
+            ),
             pixel_ratio: info.pixel_ratio,
             sdf: info.sdf,
         }))
