@@ -469,6 +469,92 @@ pub fn projection_mode_from_native(raw: sys::mln_projection_mode) -> ProjectionM
     ProjectionMode::from_native(raw)
 }
 
+#[doc(hidden)]
+pub trait CameraOptionsNativeExt {
+    fn to_native(&self) -> sys::mln_camera_options;
+    fn from_native(raw: sys::mln_camera_options) -> CameraOptions;
+}
+
+impl CameraOptionsNativeExt for CameraOptions {
+    fn to_native(&self) -> sys::mln_camera_options {
+        camera_options_to_native(self)
+    }
+
+    fn from_native(raw: sys::mln_camera_options) -> CameraOptions {
+        camera_options_from_native(raw)
+    }
+}
+
+#[doc(hidden)]
+pub trait AnimationOptionsNativeExt {
+    fn to_native(&self) -> sys::mln_animation_options;
+}
+
+impl AnimationOptionsNativeExt for AnimationOptions {
+    fn to_native(&self) -> sys::mln_animation_options {
+        animation_options_to_native(self)
+    }
+}
+
+#[doc(hidden)]
+pub trait CameraFitOptionsNativeExt {
+    fn to_native(&self) -> sys::mln_camera_fit_options;
+}
+
+impl CameraFitOptionsNativeExt for CameraFitOptions {
+    fn to_native(&self) -> sys::mln_camera_fit_options {
+        camera_fit_options_to_native(self)
+    }
+}
+
+#[doc(hidden)]
+pub trait BoundOptionsNativeExt {
+    fn to_native(&self) -> sys::mln_bound_options;
+    fn from_native(raw: sys::mln_bound_options) -> BoundOptions;
+}
+
+impl BoundOptionsNativeExt for BoundOptions {
+    fn to_native(&self) -> sys::mln_bound_options {
+        bound_options_to_native(self)
+    }
+
+    fn from_native(raw: sys::mln_bound_options) -> BoundOptions {
+        bound_options_from_native(raw)
+    }
+}
+
+#[doc(hidden)]
+pub trait FreeCameraOptionsNativeExt {
+    fn to_native(&self) -> sys::mln_free_camera_options;
+    fn from_native(raw: sys::mln_free_camera_options) -> FreeCameraOptions;
+}
+
+impl FreeCameraOptionsNativeExt for FreeCameraOptions {
+    fn to_native(&self) -> sys::mln_free_camera_options {
+        free_camera_options_to_native(self)
+    }
+
+    fn from_native(raw: sys::mln_free_camera_options) -> FreeCameraOptions {
+        free_camera_options_from_native(raw)
+    }
+}
+
+#[doc(hidden)]
+pub trait ProjectionModeNativeExt {
+    fn to_native(&self) -> sys::mln_projection_mode;
+    fn from_native(raw: sys::mln_projection_mode) -> ProjectionMode;
+}
+
+impl ProjectionModeNativeExt for ProjectionMode {
+    fn to_native(&self) -> sys::mln_projection_mode {
+        projection_mode_to_native(self)
+    }
+
+    fn from_native(raw: sys::mln_projection_mode) -> ProjectionMode {
+        projection_mode_from_native(raw)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -1,11 +1,15 @@
-use std::{mem, ptr};
+use std::ptr;
 
 use maplibre_native_core as support;
+use maplibre_native_core::ptr::const_ptr_or_null;
+use maplibre_native_core::values::lat_lngs_to_native;
 use maplibre_native_sys as sys;
-pub(crate) use support::style::NativeTileSourceOptions;
+pub(crate) use support::style::{
+    NativeTileSourceOptions, StyleImageOptionsNativeExt, TileSourceOptionsNativeExt,
+};
 pub use support::{
-    LocationIndicatorImageKind, RasterDemEncoding, SourceType, StyleImageInfo, StyleImageOptions,
-    TileScheme, TileSourceOptions, VectorTileEncoding,
+    LocationIndicatorImageKind, RasterDemEncoding, SourceInfo, SourceType, StyleImage,
+    StyleImageInfo, StyleImageOptions, TileScheme, TileSourceOptions, VectorTileEncoding,
 };
 
 use crate::custom_geometry::{CanonicalTileId, CustomGeometrySourceState};
@@ -16,53 +20,6 @@ use crate::values::NativeValue;
 use crate::{
     CustomGeometrySourceOptions, Error, ErrorKind, GeoJson, JsonValue, LatLng, LatLngBounds, Result,
 };
-
-use super::{const_ptr_or_null, lat_lngs_to_native};
-
-/// Copied fixed metadata for one style source.
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[non_exhaustive]
-pub struct SourceInfo {
-    pub source_type: SourceType,
-    pub raw_source_type: u32,
-    pub is_volatile: bool,
-    pub attribution: Option<String>,
-}
-
-pub(crate) trait TileSourceOptionsNativeExt {
-    fn to_native(&self) -> NativeTileSourceOptions<'_>;
-}
-
-impl TileSourceOptionsNativeExt for TileSourceOptions {
-    fn to_native(&self) -> NativeTileSourceOptions<'_> {
-        support::style::tile_source_options_to_native(self)
-    }
-}
-
-pub(crate) trait StyleImageOptionsNativeExt {
-    fn to_native(&self) -> sys::mln_style_image_options;
-}
-
-impl StyleImageOptionsNativeExt for StyleImageOptions {
-    fn to_native(&self) -> sys::mln_style_image_options {
-        support::style::style_image_options_to_native(self)
-    }
-}
-
-/// Copied runtime style image pixels with style-specific metadata.
-#[derive(Debug, Clone, PartialEq)]
-#[non_exhaustive]
-pub struct StyleImage {
-    pub image: PremultipliedRgba8Image,
-    pub pixel_ratio: f32,
-    pub sdf: bool,
-}
-
-pub(crate) fn premultiplied_rgba8_image_to_native(
-    image: &PremultipliedRgba8Image,
-) -> sys::mln_premultiplied_rgba8_image {
-    support::values::premultiplied_rgba8_image_to_native(image)
-}
 
 impl super::MapHandle {
     /// Loads a style URL through MapLibre Native style APIs.
@@ -402,7 +359,7 @@ impl super::MapHandle {
         let map = self.inner.as_ptr()?;
         let source_id = support::string::string_view(source_id);
         let coordinates = lat_lngs_to_native(coordinates);
-        let image = premultiplied_rgba8_image_to_native(image);
+        let image = support::values::premultiplied_rgba8_image_to_native(image);
         // SAFETY: map is live, source_id is an explicit-length view valid for
         // this call, coordinates points to call-scoped native coordinate
         // storage, and image points into the borrowed Rust image for this call.
@@ -437,7 +394,7 @@ impl super::MapHandle {
     ) -> Result<()> {
         let map = self.inner.as_ptr()?;
         let source_id = support::string::string_view(source_id);
-        let image = premultiplied_rgba8_image_to_native(image);
+        let image = support::values::premultiplied_rgba8_image_to_native(image);
         // SAFETY: map is live, source_id is an explicit-length view valid for
         // this call, and image points into the borrowed Rust image for this call.
         support::check(unsafe { sys::mln_map_set_image_source_image(map, source_id.raw(), &image) })
@@ -550,7 +507,7 @@ impl super::MapHandle {
     ) -> Result<()> {
         let map = self.inner.as_ptr()?;
         let image_id = support::string::string_view(image_id);
-        let image = premultiplied_rgba8_image_to_native(image);
+        let image = support::values::premultiplied_rgba8_image_to_native(image);
         let options = options.map(StyleImageOptions::to_native);
         let options_ptr = options.as_ref().map_or(ptr::null(), ptr::from_ref);
         // SAFETY: map is live, image_id is an explicit-length view valid for
@@ -593,15 +550,7 @@ impl super::MapHandle {
     pub fn style_image_info(&self, image_id: &str) -> Result<Option<StyleImageInfo>> {
         let map = self.inner.as_ptr()?;
         let image_id = support::string::string_view(image_id);
-        let mut info = sys::mln_style_image_info {
-            size: mem::size_of::<sys::mln_style_image_info>() as u32,
-            width: 0,
-            height: 0,
-            stride: 0,
-            byte_length: 0,
-            pixel_ratio: 1.0,
-            sdf: false,
-        };
+        let mut info = support::style::empty_style_image_info();
         let mut found = false;
         // SAFETY: map is live, image_id is an explicit-length view valid for
         // this call, info has its ABI size initialized, and found points to
@@ -619,15 +568,7 @@ impl super::MapHandle {
     ) -> Result<Option<StyleImage>> {
         let map = self.inner.as_ptr()?;
         let image_id = support::string::string_view(image_id);
-        let mut raw_info = sys::mln_style_image_info {
-            size: mem::size_of::<sys::mln_style_image_info>() as u32,
-            width: 0,
-            height: 0,
-            stride: 0,
-            byte_length: 0,
-            pixel_ratio: 1.0,
-            sdf: false,
-        };
+        let mut raw_info = support::style::empty_style_image_info();
         let mut info_found = false;
         // SAFETY: map is live, image_id is an explicit-length view valid for
         // this call, raw_info has its ABI size initialized, and info_found
@@ -672,14 +613,14 @@ impl super::MapHandle {
             ));
         }
         data.truncate(copied_size);
-        Ok(Some(StyleImage {
-            image: PremultipliedRgba8Image::new(
+        Ok(Some(StyleImage::new(
+            PremultipliedRgba8Image::new(
                 support::TextureImageInfo::new(info.width, info.height, info.stride, copied_size),
                 data,
             ),
-            pixel_ratio: info.pixel_ratio,
-            sdf: info.sdf,
-        }))
+            info.pixel_ratio,
+            info.sdf,
+        )))
     }
 
     /// Gets one style source type.
@@ -705,14 +646,7 @@ impl super::MapHandle {
     pub fn style_source_info(&self, source_id: &str) -> Result<Option<SourceInfo>> {
         let map = self.inner.as_ptr()?;
         let source_id = support::string::string_view(source_id);
-        let mut info = sys::mln_style_source_info {
-            size: mem::size_of::<sys::mln_style_source_info>() as u32,
-            type_: sys::MLN_STYLE_SOURCE_TYPE_UNKNOWN,
-            id_size: 0,
-            is_volatile: false,
-            has_attribution: false,
-            attribution_size: 0,
-        };
+        let mut info = support::style::empty_style_source_info();
         let mut found = false;
         // SAFETY: map is live, source_id is an explicit-length view valid for
         // this call, info has its ABI size initialized, and found points to
@@ -733,12 +667,10 @@ impl super::MapHandle {
             None
         };
 
-        Ok(Some(SourceInfo {
-            source_type: SourceType::from_raw(info.type_),
-            raw_source_type: info.type_,
-            is_volatile: info.is_volatile,
+        Ok(Some(support::style::style_source_info_from_native(
+            &info,
             attribution,
-        }))
+        )))
     }
 
     fn copy_style_source_attribution(

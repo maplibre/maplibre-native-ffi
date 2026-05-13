@@ -62,7 +62,7 @@ pub use resource::{
     ResourceTransformRequest,
 };
 pub use runtime::{OfflineRegionDefinition, OfflineRegionInfo, RuntimeOptions};
-pub use style::{StyleImageOptions, TileSourceOptions};
+pub use style::{SourceInfo, StyleImage, StyleImageOptions, TileSourceOptions};
 pub use values::{
     EdgeInsets, LatLng, LatLngBounds, PremultipliedRgba8Image, ProjectedMeters, Quaternion,
     ScreenBox, ScreenPoint, StyleImageInfo, TextureImageInfo, UnitBezier, Vec3,

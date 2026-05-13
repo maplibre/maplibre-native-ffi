@@ -105,8 +105,26 @@ milestone until complete (through 9).
 - [x] Milestone 8: Update public Rust thread-affine handles to wrap core handle
       state while preserving `!Send` policy and owner-thread `Drop` behavior.
 - [x] Milestone 8: Complete parallel review and apply relevant findings.
-- [ ] Milestone 9: Reshape the public Rust crate around `core` in small
-      buildable slices.
+- [x] Milestone 9: Move generic optional/slice pointer helpers into `core`.
+- [x] Milestone 9: Move coordinate empty-value and array materialization helpers
+      into `core`.
+- [x] Milestone 9: Update map, projection, and style code to use core helper
+      functions instead of public-crate duplicates.
+- [x] Milestone 9: Move the private Rust value raw-conversion trait into `core`
+      and reduce `maplibre-native/src/values.rs` to a thin re-export.
+- [x] Milestone 9: Move copied style source/image value types and source-info
+      raw field copying into `core`.
+- [x] Milestone 9: Remove remaining public-crate style image materialization
+      shim in favor of core value helpers.
+- [x] Milestone 9: Move camera/options/style private native-extension traits
+      into `core` and keep public-crate modules as thin private re-exports.
+- [x] Milestone 9: Move JSON, geometry, and GeoJSON private native-extension
+      traits into `core` and keep public-crate modules as thin re-exports.
+- [x] Milestone 9: Move render-query and runtime/offline-region private
+      native-extension traits into `core`.
+- [x] Milestone 9: Continue auditing direct `sys` use and duplicated conversion
+      logic in `maplibre-native`.
+- [x] Milestone 9: Complete parallel review and apply relevant findings.
 
 ## Verification
 
@@ -370,6 +388,88 @@ milestone until complete (through 9).
 - `mise run -C bindings/rust test` — passed after Milestone 8 review fixes (84
   `maplibre-native`, 87 `maplibre-native-core`, 0 `maplibre-native-sys`, doc
   tests passed).
+- `cargo fmt --all --manifest-path Cargo.toml` — passed after moving generic
+  pointer and coordinate-array helpers into core.
+- `cargo check --manifest-path Cargo.toml -p maplibre-native --tests` — passed
+  after moving generic pointer and coordinate-array helpers into core.
+- `cargo clippy --manifest-path Cargo.toml -p maplibre-native-core -p
+  maplibre-native --all-targets -- -D warnings`
+  — passed after moving generic pointer and coordinate-array helpers into core.
+- `mise run -C bindings/rust test` — passed after moving generic pointer and
+  coordinate-array helpers into core (84 `maplibre-native`, 89
+  `maplibre-native-core`, 0 `maplibre-native-sys`, doc tests passed).
+- `cargo fmt --all --manifest-path Cargo.toml` — passed after moving the Rust
+  value raw-conversion trait into core.
+- `cargo check --manifest-path Cargo.toml -p maplibre-native --tests` — passed
+  after moving the Rust value raw-conversion trait into core.
+- `cargo clippy --manifest-path Cargo.toml -p maplibre-native-core -p
+  maplibre-native --all-targets -- -D warnings`
+  — passed after moving the Rust value raw-conversion trait into core.
+- `mise run -C bindings/rust test` — passed after moving the Rust value
+  raw-conversion trait into core (84 `maplibre-native`, 89
+  `maplibre-native-core`, 0 `maplibre-native-sys`, doc tests passed).
+- `cargo fmt --all --manifest-path Cargo.toml` — passed after moving style
+  source/image copied values into core.
+- `cargo check --manifest-path Cargo.toml -p maplibre-native --tests` — passed
+  after moving style source/image copied values into core.
+- `cargo clippy --manifest-path Cargo.toml -p maplibre-native-core -p
+  maplibre-native --all-targets -- -D warnings`
+  — passed after moving style source/image copied values into core.
+- `mise run -C bindings/rust test` — passed after moving style source/image
+  copied values into core (84 `maplibre-native`, 90 `maplibre-native-core`, 0
+  `maplibre-native-sys`, doc tests passed).
+- `cargo fmt --all --manifest-path Cargo.toml` — passed after moving
+  camera/options/style private native-extension traits into core.
+- `cargo check --manifest-path Cargo.toml -p maplibre-native --tests` — passed
+  after moving camera/options/style private native-extension traits into core.
+- `cargo clippy --manifest-path Cargo.toml -p maplibre-native-core -p
+  maplibre-native --all-targets -- -D warnings`
+  — passed after moving camera/options/style private native-extension traits
+  into core.
+- `mise run -C bindings/rust test` — passed after moving camera/options/style
+  private native-extension traits into core (84 `maplibre-native`, 90
+  `maplibre-native-core`, 0 `maplibre-native-sys`, doc tests passed).
+- `cargo fmt --all --manifest-path Cargo.toml` — passed after moving JSON,
+  geometry, and GeoJSON private native-extension traits into core.
+- `cargo check --manifest-path Cargo.toml -p maplibre-native --tests` — passed
+  after moving JSON, geometry, and GeoJSON private native-extension traits into
+  core.
+- `cargo clippy --manifest-path Cargo.toml -p maplibre-native-core -p
+  maplibre-native --all-targets -- -D warnings`
+  — passed after moving JSON, geometry, and GeoJSON private native-extension
+  traits into core.
+- `mise run -C bindings/rust test` — passed after moving JSON, geometry, and
+  GeoJSON private native-extension traits into core (84 `maplibre-native`, 90
+  `maplibre-native-core`, 0 `maplibre-native-sys`, doc tests passed).
+- `cargo fmt --all --manifest-path Cargo.toml` — passed after moving
+  render-query and runtime/offline-region private native-extension traits into
+  core.
+- `cargo check --manifest-path Cargo.toml -p maplibre-native --tests` — passed
+  after moving render-query and runtime/offline-region private native-extension
+  traits into core.
+- `cargo clippy --manifest-path Cargo.toml -p maplibre-native-core -p
+  maplibre-native --all-targets -- -D warnings`
+  — passed after moving render-query and runtime/offline-region private
+  native-extension traits into core.
+- `mise run -C bindings/rust test` — passed after moving render-query and
+  runtime/offline-region private native-extension traits into core (84
+  `maplibre-native`, 90 `maplibre-native-core`, 0 `maplibre-native-sys`, doc
+  tests passed).
+- Parallel Milestone 9 review — reviewers confirmed public re-exports, remaining
+  direct `sys` calls, and coverage boundaries. Applied findings by hiding
+  adapter-only core extension traits from generated docs, adding
+  `empty_style_image_info` to core and using it from Rust style methods, and
+  adding an external public API smoke test for moved crate-root names.
+- `cargo fmt --all --manifest-path Cargo.toml` — passed after Milestone 9 review
+  fixes.
+- `cargo check --manifest-path Cargo.toml -p maplibre-native --tests` — passed
+  after Milestone 9 review fixes.
+- `cargo clippy --manifest-path Cargo.toml -p maplibre-native-core -p
+  maplibre-native --all-targets -- -D warnings`
+  — passed after Milestone 9 review fixes.
+- `mise run -C bindings/rust test` — passed after Milestone 9 review fixes (84
+  `maplibre-native` unit tests, 1 `maplibre-native` integration test, 90
+  `maplibre-native-core`, 0 `maplibre-native-sys`, doc tests passed).
 
 ## Reflection checkpoint 2026-05-13
 
@@ -412,6 +512,31 @@ milestone until complete (through 9).
 5. Next priorities: complete Milestone 6 review/fixes/commit, then start
    Milestone 7 by moving resource request copying and response materialization
    before touching the exactly-once request-handle state machine.
+
+## Reflection checkpoint 2026-05-13, Milestone 9
+
+1. Accomplished: Milestones 1-8 are complete, reviewed, committed, and pushed.
+   Milestone 9 is nearly complete: duplicated helper logic and private raw
+   conversion traits have moved into `core`; public Rust modules for values,
+   camera, options, JSON, geometry, and GeoJSON are now thin re-export shims;
+   copied style source/image values now live in core.
+2. Working well: moving small adaptation seams in groups keeps the workspace
+   buildable while steadily shrinking `maplibre-native` into Rust handle policy
+   plus native operation calls. Full Rust tests continue to pass after each
+   slice, and direct `sys` use is now concentrated in public handle methods,
+   callback trampolines, and tests.
+3. Friction: Milestone 9 is an audit milestone rather than a single extraction,
+   so it is easy to chase every remaining `sys` reference. Some `sys` calls are
+   intentional because they are Rust handle operations, backend attach calls, or
+   callback trampolines rather than shared ABI adaptation.
+4. Approach adjustment: stop moving code once no public-crate private conversion
+   traits remain. Treat remaining direct `sys` calls as acceptable when they
+   represent Rust handle methods, parent/lifetime policy, callback policy, or
+   tests. Use the milestone review to catch any missed adaptation duplication
+   before committing.
+5. Next priorities: finish the direct-`sys` audit, run a focused parallel
+   Milestone 9 review, apply actionable findings, then commit and push the final
+   requested milestone. Milestone 10 remains out of scope for this plan.
 
 ## Notes
 
@@ -597,3 +722,39 @@ milestone until complete (through 9).
   methods, leak-reporting documents that it consumes logical ownership, and
   tests cover `Send`, infallible close-once behavior, status close retry, and
   leak without destroy.
+- Iteration 30 started Milestone 9 cleanup by removing small duplicated ABI
+  helpers from the public Rust crate. Generic optional/slice pointer helpers now
+  live in `maplibre-native-core::ptr`, coordinate empty-value and array
+  materialization helpers live in `maplibre-native-core::values`, and map,
+  projection, and style methods import those core helpers directly while keeping
+  their Rust handle/method policy in `maplibre-native`.
+- Iteration 31 continued Milestone 9 by moving the `NativeValue` raw-conversion
+  trait and remaining scalar conversion gaps (`UnitBezier::from_native`, array
+  helpers) into core. The public Rust `values.rs` module is now only a private
+  module re-exporting core value APIs for internal adapter use; crate-root
+  public exports remain explicitly limited to ergonomic value types.
+- Iteration 32 moved copied style source/image values into core. `SourceInfo`,
+  `StyleImage`, source-info default/raw copying, and style-source metadata tests
+  now live in `maplibre-native-core::style`; `maplibre-native` re-exports those
+  public names and keeps only the map method calls plus attribution/image pixel
+  copy operations that require a live Rust map handle.
+- Iteration 33 moved the remaining camera/options/style private native-extension
+  traits into core. The public Rust camera and options modules now only
+  re-export public types plus the internal core traits needed by adapter method
+  bodies, and the style module imports core's tile-source and style-image option
+  extension traits directly.
+- Iteration 34 moved JSON, geometry, and GeoJSON private native-extension traits
+  into core. The public Rust `json.rs`, `geometry.rs`, and `geojson.rs` files
+  are now thin module re-exports, while all raw descriptor conversion trait
+  implementations live beside the shared materializers in core.
+- Iteration 35 reflection confirmed Milestone 9 is an audit/cleanup milestone
+  and that remaining direct `sys` calls should stay only where they express Rust
+  handle methods, callback trampolines, backend attach operations, or tests.
+  Moved render-query and runtime/offline-region private native-extension traits
+  into core; `maplibre-native` now has no `pub(crate) trait` conversion shims.
+- Iteration 36 completed the Milestone 9 review round and fixes. Reviewers found
+  no blockers; applied low/medium boundary polish by marking adapter-only core
+  extension traits `#[doc(hidden)]`, moving style image info default
+  initialization into core, and adding an external public API import smoke test.
+  This completes the requested plan scope through Milestone 9; Milestone 10
+  remains intentionally out of scope.

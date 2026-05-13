@@ -3,9 +3,9 @@ use std::ptr::NonNull;
 
 use maplibre_native_sys as sys;
 
-use crate::enums::{RasterDemEncoding, TileScheme, VectorTileEncoding};
+use crate::enums::{RasterDemEncoding, SourceType, TileScheme, VectorTileEncoding};
 use crate::string::{StringView, string_view};
-use crate::values::{LatLngBounds, lat_lng_bounds_to_native};
+use crate::values::{LatLngBounds, PremultipliedRgba8Image, lat_lng_bounds_to_native};
 
 /// Options for vector, raster, and raster DEM tile sources.
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -134,6 +134,58 @@ pub fn tile_source_options_to_native(options: &TileSourceOptions) -> NativeTileS
     options.to_native()
 }
 
+/// Copied fixed metadata for one style source.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct SourceInfo {
+    pub source_type: SourceType,
+    pub raw_source_type: u32,
+    pub is_volatile: bool,
+    pub attribution: Option<String>,
+}
+
+pub fn empty_style_source_info() -> sys::mln_style_source_info {
+    sys::mln_style_source_info {
+        size: std::mem::size_of::<sys::mln_style_source_info>() as u32,
+        type_: sys::MLN_STYLE_SOURCE_TYPE_UNKNOWN,
+        id_size: 0,
+        is_volatile: false,
+        has_attribution: false,
+        attribution_size: 0,
+    }
+}
+
+pub fn style_source_info_from_native(
+    info: &sys::mln_style_source_info,
+    attribution: Option<String>,
+) -> SourceInfo {
+    SourceInfo {
+        source_type: SourceType::from_raw(info.type_),
+        raw_source_type: info.type_,
+        is_volatile: info.is_volatile,
+        attribution,
+    }
+}
+
+/// Copied runtime style image pixels with style-specific metadata.
+#[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
+pub struct StyleImage {
+    pub image: PremultipliedRgba8Image,
+    pub pixel_ratio: f32,
+    pub sdf: bool,
+}
+
+impl StyleImage {
+    pub fn new(image: PremultipliedRgba8Image, pixel_ratio: f32, sdf: bool) -> Self {
+        Self {
+            image,
+            pixel_ratio,
+            sdf,
+        }
+    }
+}
+
 /// Options for adding or replacing a runtime style image.
 #[derive(Debug, Clone, Default, PartialEq)]
 #[non_exhaustive]
@@ -180,6 +232,40 @@ impl StyleImageOptions {
 
 pub fn style_image_options_to_native(options: &StyleImageOptions) -> sys::mln_style_image_options {
     options.to_native()
+}
+
+pub fn empty_style_image_info() -> sys::mln_style_image_info {
+    sys::mln_style_image_info {
+        size: std::mem::size_of::<sys::mln_style_image_info>() as u32,
+        width: 0,
+        height: 0,
+        stride: 0,
+        byte_length: 0,
+        pixel_ratio: 1.0,
+        sdf: false,
+    }
+}
+
+#[doc(hidden)]
+pub trait TileSourceOptionsNativeExt {
+    fn to_native(&self) -> NativeTileSourceOptions<'_>;
+}
+
+impl TileSourceOptionsNativeExt for TileSourceOptions {
+    fn to_native(&self) -> NativeTileSourceOptions<'_> {
+        tile_source_options_to_native(self)
+    }
+}
+
+#[doc(hidden)]
+pub trait StyleImageOptionsNativeExt {
+    fn to_native(&self) -> sys::mln_style_image_options;
+}
+
+impl StyleImageOptionsNativeExt for StyleImageOptions {
+    fn to_native(&self) -> sys::mln_style_image_options {
+        style_image_options_to_native(self)
+    }
 }
 
 /// Copies an owned native style ID list into owned Rust strings.
@@ -269,7 +355,33 @@ mod tests {
     }
 
     #[test]
+    fn style_source_info_copies_raw_fields_and_attribution() {
+        let raw = sys::mln_style_source_info {
+            type_: sys::MLN_STYLE_SOURCE_TYPE_VECTOR,
+            is_volatile: true,
+            has_attribution: true,
+            attribution_size: 11,
+            ..empty_style_source_info()
+        };
+
+        let copied = style_source_info_from_native(&raw, Some("© MapLibre".to_string()));
+
+        assert_eq!(copied.source_type, SourceType::Vector);
+        assert_eq!(copied.raw_source_type, sys::MLN_STYLE_SOURCE_TYPE_VECTOR);
+        assert!(copied.is_volatile);
+        assert_eq!(copied.attribution.as_deref(), Some("© MapLibre"));
+    }
+
+    #[test]
     fn style_image_options_materialize_masks_and_defaults() {
+        let empty_info = empty_style_image_info();
+        assert_eq!(
+            empty_info.size,
+            std::mem::size_of::<sys::mln_style_image_info>() as u32
+        );
+        assert_eq!(empty_info.pixel_ratio, 1.0);
+        assert!(!empty_info.sdf);
+
         let default_raw = style_image_options_to_native(&StyleImageOptions::new());
         assert_eq!(
             default_raw.size,

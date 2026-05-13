@@ -5,57 +5,17 @@ use maplibre_native_sys as sys;
 
 use crate::Result;
 use crate::geojson::{Feature, FeatureNativeExt};
-use crate::json::JsonValue;
-use crate::json::JsonValueNativeExt;
+use crate::json::{JsonValue, JsonValueNativeExt};
 
 pub use support::query::{
     FeatureExtensionResult, FeatureStateSelector, QueriedFeature, RenderedFeatureQueryOptions,
     RenderedQueryGeometry, SourceFeatureQueryOptions,
 };
 pub(crate) use support::query::{
-    NativeFeatureStateSelector, NativeRenderedFeatureQueryOptions, NativeRenderedQueryGeometry,
-    NativeSourceFeatureQueryOptions,
+    FeatureStateSelectorNativeExt, NativeRenderedFeatureQueryOptions,
+    NativeSourceFeatureQueryOptions, RenderedFeatureQueryOptionsNativeExt,
+    RenderedQueryGeometryNativeExt, SourceFeatureQueryOptionsNativeExt,
 };
-
-pub(crate) trait FeatureStateSelectorNativeExt {
-    fn to_native(&self) -> NativeFeatureStateSelector<'_>;
-}
-
-impl FeatureStateSelectorNativeExt for FeatureStateSelector {
-    fn to_native(&self) -> NativeFeatureStateSelector<'_> {
-        support::query::feature_state_selector_to_native(self)
-    }
-}
-
-pub(crate) trait RenderedQueryGeometryNativeExt {
-    fn to_native(&self) -> NativeRenderedQueryGeometry;
-}
-
-impl RenderedQueryGeometryNativeExt for RenderedQueryGeometry {
-    fn to_native(&self) -> NativeRenderedQueryGeometry {
-        support::query::rendered_query_geometry_to_native(self)
-    }
-}
-
-pub(crate) trait RenderedFeatureQueryOptionsNativeExt {
-    fn to_native(&self) -> Result<NativeRenderedFeatureQueryOptions<'_>>;
-}
-
-impl RenderedFeatureQueryOptionsNativeExt for RenderedFeatureQueryOptions {
-    fn to_native(&self) -> Result<NativeRenderedFeatureQueryOptions<'_>> {
-        support::query::rendered_feature_query_options_to_native(self)
-    }
-}
-
-pub(crate) trait SourceFeatureQueryOptionsNativeExt {
-    fn to_native(&self) -> Result<NativeSourceFeatureQueryOptions<'_>>;
-}
-
-impl SourceFeatureQueryOptionsNativeExt for SourceFeatureQueryOptions {
-    fn to_native(&self) -> Result<NativeSourceFeatureQueryOptions<'_>> {
-        support::query::source_feature_query_options_to_native(self)
-    }
-}
 
 impl super::RenderSessionHandle {
     /// Sets per-feature state on a render source for this session.

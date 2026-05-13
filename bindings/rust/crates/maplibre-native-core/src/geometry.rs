@@ -133,6 +133,17 @@ pub fn geometry_try_to_native_with_depth(value: &Geometry, depth: usize) -> Resu
     value.try_to_native_with_depth(depth)
 }
 
+#[doc(hidden)]
+pub trait GeometryNativeExt {
+    fn try_to_native(&self) -> Result<NativeGeometry>;
+}
+
+impl GeometryNativeExt for Geometry {
+    fn try_to_native(&self) -> Result<NativeGeometry> {
+        geometry_try_to_native(self)
+    }
+}
+
 /// Copies a borrowed native geometry descriptor into an owned Rust value.
 ///
 /// # Safety

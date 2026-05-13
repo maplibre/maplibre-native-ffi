@@ -265,6 +265,49 @@ pub fn map_tile_options_from_native(raw: sys::mln_map_tile_options) -> MapTileOp
     MapTileOptions::from_native(raw)
 }
 
+#[doc(hidden)]
+pub trait MapOptionsNativeExt {
+    fn to_native(&self) -> sys::mln_map_options;
+}
+
+impl MapOptionsNativeExt for MapOptions {
+    fn to_native(&self) -> sys::mln_map_options {
+        map_options_to_native(self)
+    }
+}
+
+#[doc(hidden)]
+pub trait MapViewportOptionsNativeExt {
+    fn to_native(&self) -> sys::mln_map_viewport_options;
+    fn from_native(raw: sys::mln_map_viewport_options) -> MapViewportOptions;
+}
+
+impl MapViewportOptionsNativeExt for MapViewportOptions {
+    fn to_native(&self) -> sys::mln_map_viewport_options {
+        map_viewport_options_to_native(self)
+    }
+
+    fn from_native(raw: sys::mln_map_viewport_options) -> MapViewportOptions {
+        map_viewport_options_from_native(raw)
+    }
+}
+
+#[doc(hidden)]
+pub trait MapTileOptionsNativeExt {
+    fn to_native(&self) -> sys::mln_map_tile_options;
+    fn from_native(raw: sys::mln_map_tile_options) -> MapTileOptions;
+}
+
+impl MapTileOptionsNativeExt for MapTileOptions {
+    fn to_native(&self) -> sys::mln_map_tile_options {
+        map_tile_options_to_native(self)
+    }
+
+    fn from_native(raw: sys::mln_map_tile_options) -> MapTileOptions {
+        map_tile_options_from_native(raw)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

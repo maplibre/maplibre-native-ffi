@@ -45,6 +45,26 @@ pub fn null_pointer_error(name: &'static str) -> Error {
     Error::invalid_argument(format!("{name} must not be null"))
 }
 
+pub fn option_ptr<T>(value: Option<&T>) -> *const T {
+    value.map_or(ptr::null(), ptr::from_ref)
+}
+
+pub fn const_ptr_or_null<T>(values: &[T]) -> *const T {
+    if values.is_empty() {
+        ptr::null()
+    } else {
+        values.as_ptr()
+    }
+}
+
+pub fn mut_ptr_or_null<T>(values: &mut [T]) -> *mut T {
+    if values.is_empty() {
+        ptr::null_mut()
+    } else {
+        values.as_mut_ptr()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -89,5 +109,20 @@ mod tests {
 
         assert_eq!(error.kind(), crate::error::ErrorKind::InvalidArgument);
         assert!(error.diagnostic().contains("value must not be null"));
+    }
+
+    #[test]
+    fn optional_and_slice_pointers_use_null_for_absent_or_empty_values() {
+        let value = 7u8;
+        assert_eq!(option_ptr(Some(&value)), ptr::from_ref(&value));
+        assert!(option_ptr::<u8>(None).is_null());
+
+        let values = [1u8, 2, 3];
+        assert_eq!(const_ptr_or_null(&values), values.as_ptr());
+        assert!(const_ptr_or_null::<u8>(&[]).is_null());
+
+        let mut values = [1u8, 2, 3];
+        assert_eq!(mut_ptr_or_null(&mut values), values.as_mut_ptr());
+        assert!(mut_ptr_or_null::<u8>(&mut []).is_null());
     }
 }

@@ -1,5 +1,17 @@
 use maplibre_native_sys as sys;
 
+/// Internal helper trait for Rust adapter code that needs raw value conversion.
+///
+/// Public language bindings can use the free functions in this module instead
+/// when a trait would expose more raw ABI detail than their API should show.
+#[doc(hidden)]
+pub trait NativeValue: Sized {
+    type Raw;
+
+    fn to_native(self) -> Self::Raw;
+    fn from_native(value: Self::Raw) -> Self;
+}
+
 /// Geographic coordinate in degrees.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct LatLng {
@@ -284,6 +296,26 @@ pub fn screen_point_from_native(value: sys::mln_screen_point) -> ScreenPoint {
     ScreenPoint::from_native(value)
 }
 
+pub fn empty_lat_lng() -> sys::mln_lat_lng {
+    LatLng::new(0.0, 0.0).to_native()
+}
+
+pub fn empty_screen_point() -> sys::mln_screen_point {
+    ScreenPoint::new(0.0, 0.0).to_native()
+}
+
+pub fn empty_lat_lng_bounds() -> sys::mln_lat_lng_bounds {
+    LatLngBounds::new(LatLng::new(0.0, 0.0), LatLng::new(0.0, 0.0)).to_native()
+}
+
+pub fn lat_lngs_to_native(coordinates: &[LatLng]) -> Vec<sys::mln_lat_lng> {
+    coordinates.iter().copied().map(LatLng::to_native).collect()
+}
+
+pub fn screen_points_to_native(points: &[ScreenPoint]) -> Vec<sys::mln_screen_point> {
+    points.iter().copied().map(ScreenPoint::to_native).collect()
+}
+
 pub fn screen_box_to_native(value: ScreenBox) -> sys::mln_screen_box {
     sys::mln_screen_box {
         min: value.min.to_native(),
@@ -317,6 +349,126 @@ pub fn quaternion_from_native(value: sys::mln_quaternion) -> Quaternion {
 
 pub fn unit_bezier_to_native(value: UnitBezier) -> sys::mln_unit_bezier {
     value.to_native()
+}
+
+pub fn unit_bezier_from_native(value: sys::mln_unit_bezier) -> UnitBezier {
+    UnitBezier {
+        x1: value.x1,
+        y1: value.y1,
+        x2: value.x2,
+        y2: value.y2,
+    }
+}
+
+impl NativeValue for LatLng {
+    type Raw = sys::mln_lat_lng;
+
+    fn to_native(self) -> Self::Raw {
+        LatLng::to_native(self)
+    }
+
+    fn from_native(value: Self::Raw) -> Self {
+        LatLng::from_native(value)
+    }
+}
+
+impl NativeValue for LatLngBounds {
+    type Raw = sys::mln_lat_lng_bounds;
+
+    fn to_native(self) -> Self::Raw {
+        LatLngBounds::to_native(self)
+    }
+
+    fn from_native(value: Self::Raw) -> Self {
+        LatLngBounds::from_native(value)
+    }
+}
+
+impl NativeValue for ProjectedMeters {
+    type Raw = sys::mln_projected_meters;
+
+    fn to_native(self) -> Self::Raw {
+        ProjectedMeters::to_native(self)
+    }
+
+    fn from_native(value: Self::Raw) -> Self {
+        ProjectedMeters::from_native(value)
+    }
+}
+
+impl NativeValue for ScreenPoint {
+    type Raw = sys::mln_screen_point;
+
+    fn to_native(self) -> Self::Raw {
+        ScreenPoint::to_native(self)
+    }
+
+    fn from_native(value: Self::Raw) -> Self {
+        ScreenPoint::from_native(value)
+    }
+}
+
+impl NativeValue for ScreenBox {
+    type Raw = sys::mln_screen_box;
+
+    fn to_native(self) -> Self::Raw {
+        screen_box_to_native(self)
+    }
+
+    fn from_native(value: Self::Raw) -> Self {
+        Self {
+            min: ScreenPoint::from_native(value.min),
+            max: ScreenPoint::from_native(value.max),
+        }
+    }
+}
+
+impl NativeValue for EdgeInsets {
+    type Raw = sys::mln_edge_insets;
+
+    fn to_native(self) -> Self::Raw {
+        EdgeInsets::to_native(self)
+    }
+
+    fn from_native(value: Self::Raw) -> Self {
+        EdgeInsets::from_native(value)
+    }
+}
+
+impl NativeValue for Vec3 {
+    type Raw = sys::mln_vec3;
+
+    fn to_native(self) -> Self::Raw {
+        Vec3::to_native(self)
+    }
+
+    fn from_native(value: Self::Raw) -> Self {
+        Vec3::from_native(value)
+    }
+}
+
+impl NativeValue for Quaternion {
+    type Raw = sys::mln_quaternion;
+
+    fn to_native(self) -> Self::Raw {
+        Quaternion::to_native(self)
+    }
+
+    fn from_native(value: Self::Raw) -> Self {
+        Quaternion::from_native(value)
+    }
+}
+
+impl NativeValue for UnitBezier {
+    type Raw = sys::mln_unit_bezier;
+
+    fn to_native(self) -> Self::Raw {
+        UnitBezier::to_native(self)
+    }
+
+    fn from_native(value: Self::Raw) -> Self {
+        unit_bezier_from_native(value)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -464,6 +616,8 @@ mod tests {
             screen_point_from_native(sys::mln_screen_point { x: 1.0, y: 2.0 }),
             ScreenPoint::new(1.0, 2.0)
         );
+        assert_eq!(empty_screen_point().x, 0.0);
+        assert_eq!(empty_screen_point().y, 0.0);
 
         let raw_box = screen_box_to_native(ScreenBox::new(
             ScreenPoint::new(1.0, 2.0),
@@ -473,6 +627,24 @@ mod tests {
         assert_eq!(raw_box.min.y, 2.0);
         assert_eq!(raw_box.max.x, 3.0);
         assert_eq!(raw_box.max.y, 4.0);
+    }
+
+    #[test]
+    fn coordinate_array_helpers_materialize_values() {
+        let empty_coordinate = empty_lat_lng();
+        assert_eq!(empty_coordinate.latitude, 0.0);
+        assert_eq!(empty_coordinate.longitude, 0.0);
+        let empty_bounds = empty_lat_lng_bounds();
+        assert_eq!(empty_bounds.southwest.latitude, 0.0);
+        assert_eq!(empty_bounds.northeast.longitude, 0.0);
+
+        let coordinates = lat_lngs_to_native(&[LatLng::new(1.0, 2.0), LatLng::new(3.0, 4.0)]);
+        assert_eq!(coordinates[0].latitude, 1.0);
+        assert_eq!(coordinates[1].longitude, 4.0);
+
+        let points = screen_points_to_native(&[ScreenPoint::new(5.0, 6.0)]);
+        assert_eq!(points[0].x, 5.0);
+        assert_eq!(points[0].y, 6.0);
     }
 
     #[test]
@@ -592,5 +764,7 @@ mod tests {
         assert_eq!(raw.y1, 0.2);
         assert_eq!(raw.x2, 0.3);
         assert_eq!(raw.y2, 0.4);
+        assert_eq!(unit_bezier_from_native(raw), value);
+        assert_eq!(UnitBezier::from_native(raw), value);
     }
 }

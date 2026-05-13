@@ -22,28 +22,8 @@ use crate::{
 #[cfg(test)]
 use crate::{Geometry, LatLngBounds};
 
-pub(crate) use support::runtime::{NativeOfflineRegionDefinition, NativeRuntimeOptions};
 pub use support::runtime::{OfflineRegionDefinition, OfflineRegionInfo, RuntimeOptions};
-
-pub(crate) trait RuntimeOptionsNativeExt {
-    fn to_native(&self) -> Result<NativeRuntimeOptions>;
-}
-
-impl RuntimeOptionsNativeExt for RuntimeOptions {
-    fn to_native(&self) -> Result<NativeRuntimeOptions> {
-        support::runtime::runtime_options_to_native(self)
-    }
-}
-
-pub(crate) trait OfflineRegionDefinitionNativeExt {
-    fn to_native(&self) -> Result<NativeOfflineRegionDefinition>;
-}
-
-impl OfflineRegionDefinitionNativeExt for OfflineRegionDefinition {
-    fn to_native(&self) -> Result<NativeOfflineRegionDefinition> {
-        support::runtime::offline_region_definition_to_native(self)
-    }
-}
+pub(crate) use support::runtime::{OfflineRegionDefinitionNativeExt, RuntimeOptionsNativeExt};
 
 #[derive(Debug)]
 pub(crate) struct RuntimeState {

@@ -141,6 +141,17 @@ pub fn feature_state_selector_to_native(
     NativeFeatureStateSelector::new(selector)
 }
 
+#[doc(hidden)]
+pub trait FeatureStateSelectorNativeExt {
+    fn to_native(&self) -> NativeFeatureStateSelector<'_>;
+}
+
+impl FeatureStateSelectorNativeExt for FeatureStateSelector {
+    fn to_native(&self) -> NativeFeatureStateSelector<'_> {
+        feature_state_selector_to_native(self)
+    }
+}
+
 fn empty_string_view() -> sys::mln_string_view {
     sys::mln_string_view {
         data: ptr::null(),
@@ -238,6 +249,17 @@ pub fn rendered_query_geometry_to_native(
     NativeRenderedQueryGeometry::new(geometry)
 }
 
+#[doc(hidden)]
+pub trait RenderedQueryGeometryNativeExt {
+    fn to_native(&self) -> NativeRenderedQueryGeometry;
+}
+
+impl RenderedQueryGeometryNativeExt for RenderedQueryGeometry {
+    fn to_native(&self) -> NativeRenderedQueryGeometry {
+        rendered_query_geometry_to_native(self)
+    }
+}
+
 /// Options for rendered feature queries.
 #[derive(Debug, Clone, PartialEq, Default)]
 #[non_exhaustive]
@@ -326,6 +348,17 @@ pub fn rendered_feature_query_options_to_native(
     options: &RenderedFeatureQueryOptions,
 ) -> Result<NativeRenderedFeatureQueryOptions<'_>> {
     NativeRenderedFeatureQueryOptions::new(options)
+}
+
+#[doc(hidden)]
+pub trait RenderedFeatureQueryOptionsNativeExt {
+    fn to_native(&self) -> Result<NativeRenderedFeatureQueryOptions<'_>>;
+}
+
+impl RenderedFeatureQueryOptionsNativeExt for RenderedFeatureQueryOptions {
+    fn to_native(&self) -> Result<NativeRenderedFeatureQueryOptions<'_>> {
+        rendered_feature_query_options_to_native(self)
+    }
 }
 
 /// Options for source feature queries.
@@ -419,6 +452,17 @@ pub fn source_feature_query_options_to_native(
     options: &SourceFeatureQueryOptions,
 ) -> Result<NativeSourceFeatureQueryOptions<'_>> {
     NativeSourceFeatureQueryOptions::new(options)
+}
+
+#[doc(hidden)]
+pub trait SourceFeatureQueryOptionsNativeExt {
+    fn to_native(&self) -> Result<NativeSourceFeatureQueryOptions<'_>>;
+}
+
+impl SourceFeatureQueryOptionsNativeExt for SourceFeatureQueryOptions {
+    fn to_native(&self) -> Result<NativeSourceFeatureQueryOptions<'_>> {
+        source_feature_query_options_to_native(self)
+    }
 }
 
 /// One copied query result feature.

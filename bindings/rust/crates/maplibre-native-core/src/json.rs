@@ -124,6 +124,17 @@ pub unsafe fn json_value_from_native(raw: &sys::mln_json_value) -> Result<JsonVa
     unsafe { JsonValue::from_native(raw) }
 }
 
+#[doc(hidden)]
+pub trait JsonValueNativeExt {
+    fn try_to_native(&self) -> Result<NativeJsonValue>;
+}
+
+impl JsonValueNativeExt for JsonValue {
+    fn try_to_native(&self) -> Result<NativeJsonValue> {
+        json_value_try_to_native(self)
+    }
+}
+
 /// Copies an owned native JSON snapshot into an owned Rust JSON value.
 ///
 /// # Safety

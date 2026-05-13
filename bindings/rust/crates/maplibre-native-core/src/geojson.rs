@@ -145,6 +145,17 @@ pub fn feature_try_to_native(feature: &Feature, depth: usize) -> Result<NativeFe
     feature.try_to_native(depth)
 }
 
+#[doc(hidden)]
+pub trait FeatureNativeExt {
+    fn try_to_native(&self, depth: usize) -> Result<NativeFeature>;
+}
+
+impl FeatureNativeExt for Feature {
+    fn try_to_native(&self, depth: usize) -> Result<NativeFeature> {
+        feature_try_to_native(self, depth)
+    }
+}
+
 /// Copies a borrowed native feature descriptor into an owned Rust value.
 ///
 /// # Safety
@@ -167,6 +178,17 @@ pub fn geojson_try_to_native(geojson: &GeoJson) -> Result<NativeGeoJson> {
 pub unsafe fn geojson_from_native(raw: &sys::mln_geojson) -> Result<GeoJson> {
     // SAFETY: The caller promises raw and nested pointers are valid for this call.
     unsafe { GeoJson::from_native(raw) }
+}
+
+#[doc(hidden)]
+pub trait GeoJsonNativeExt {
+    fn try_to_native(&self) -> Result<NativeGeoJson>;
+}
+
+impl GeoJsonNativeExt for GeoJson {
+    fn try_to_native(&self) -> Result<NativeGeoJson> {
+        geojson_try_to_native(self)
+    }
 }
 
 pub struct NativeFeature {

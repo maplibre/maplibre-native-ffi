@@ -386,6 +386,28 @@ pub fn runtime_options_to_native(options: &RuntimeOptions) -> Result<NativeRunti
     NativeRuntimeOptions::new(options)
 }
 
+#[doc(hidden)]
+pub trait RuntimeOptionsNativeExt {
+    fn to_native(&self) -> Result<NativeRuntimeOptions>;
+}
+
+impl RuntimeOptionsNativeExt for RuntimeOptions {
+    fn to_native(&self) -> Result<NativeRuntimeOptions> {
+        runtime_options_to_native(self)
+    }
+}
+
+#[doc(hidden)]
+pub trait OfflineRegionDefinitionNativeExt {
+    fn to_native(&self) -> Result<NativeOfflineRegionDefinition>;
+}
+
+impl OfflineRegionDefinitionNativeExt for OfflineRegionDefinition {
+    fn to_native(&self) -> Result<NativeOfflineRegionDefinition> {
+        offline_region_definition_to_native(self)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::ffi::CStr;

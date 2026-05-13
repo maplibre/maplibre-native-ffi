@@ -1,10 +1,14 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt;
-use std::ptr;
 use std::rc::Rc;
 
 use maplibre_native_core as support;
+use maplibre_native_core::ptr::{const_ptr_or_null, mut_ptr_or_null, option_ptr};
+use maplibre_native_core::values::{
+    empty_lat_lng, empty_lat_lng_bounds as empty_bounds, empty_screen_point, lat_lngs_to_native,
+    screen_points_to_native,
+};
 use maplibre_native_sys as sys;
 
 use crate::camera::{
@@ -826,52 +830,6 @@ impl MapHandle {
             unsafe { sys::mln_vulkan_borrowed_texture_attach(map, &raw, out) }
         })
     }
-}
-
-pub(crate) fn empty_lat_lng() -> sys::mln_lat_lng {
-    sys::mln_lat_lng {
-        latitude: 0.0,
-        longitude: 0.0,
-    }
-}
-
-pub(crate) fn empty_screen_point() -> sys::mln_screen_point {
-    sys::mln_screen_point { x: 0.0, y: 0.0 }
-}
-
-pub(crate) fn empty_bounds() -> sys::mln_lat_lng_bounds {
-    sys::mln_lat_lng_bounds {
-        southwest: empty_lat_lng(),
-        northeast: empty_lat_lng(),
-    }
-}
-
-pub(crate) fn option_ptr<T>(value: Option<&T>) -> *const T {
-    value.map_or(ptr::null(), |value| value as *const T)
-}
-
-pub(crate) fn const_ptr_or_null<T>(values: &[T]) -> *const T {
-    if values.is_empty() {
-        ptr::null()
-    } else {
-        values.as_ptr()
-    }
-}
-
-pub(crate) fn mut_ptr_or_null<T>(values: &mut [T]) -> *mut T {
-    if values.is_empty() {
-        ptr::null_mut()
-    } else {
-        values.as_mut_ptr()
-    }
-}
-
-pub(crate) fn lat_lngs_to_native(coordinates: &[LatLng]) -> Vec<sys::mln_lat_lng> {
-    coordinates.iter().copied().map(LatLng::to_native).collect()
-}
-
-pub(crate) fn screen_points_to_native(points: &[ScreenPoint]) -> Vec<sys::mln_screen_point> {
-    points.iter().copied().map(ScreenPoint::to_native).collect()
 }
 
 #[cfg(test)]
