@@ -3,9 +3,11 @@
 ## Audience and purpose
 
 This plan is for maintainers and contributors who shape the Rust binding and the
-native-extension bridge bindings built from it. It describes the ideal end state
-for the Rust crates after this branch lands. Backward compatibility with the
-branch's current Rust API is not a constraint.
+native-extension bridge bindings built from it. It describes the target
+architecture for the Rust crates and bridge boundary. This branch/PR is scoped
+to the Rust crates through Milestone 9; bridge skeleton crates are a future
+proof point. Backward compatibility with the branch's current Rust API is not a
+constraint.
 
 Rust bindings unblock Python, Node.js, and Java JNI because PyO3, napi-rs, and
 jni-rs can share Rust code that adapts the public C ABI. They should share that
@@ -321,6 +323,12 @@ Keep binding-specific policy out of `core`:
 
 ## Milestones
 
+Milestones 1 through 9 define this branch/PR's scope. They establish the shared
+core crate, move reusable ABI adaptation into it, and reshape the public Rust
+crate around Rust-specific policy. The bridge skeleton work remains a follow-up
+milestone because this PR proves the Rust/core boundary, not the Python,
+Node.js, or JNI package surfaces.
+
 ### Milestone 1: Establish the crate boundary
 
 Rename the shared crate and make the intended boundary explicit.
@@ -492,10 +500,11 @@ Acceptance criteria:
 - Shared adaptation tests live in `core`; Rust policy tests live in
   `maplibre-native`.
 
-### Milestone 10: Prove the bridge boundary with skeleton crates
+### Future milestone: Prove the bridge boundary with skeleton crates
 
-Create thin vertical slices for Python, Node.js, and JNI before filling broad
-coverage.
+This work is out of scope for this branch/PR. After the Rust/core refactor
+lands, create thin vertical slices for Python, Node.js, and JNI before filling
+broad coverage.
 
 Deliverables:
 
