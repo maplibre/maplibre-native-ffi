@@ -88,7 +88,16 @@ milestone until complete (through 9).
 - [x] Milestone 6: Move log record copying and raw severity/event mapping into
       `core` while keeping callback invocation policy in `maplibre-native`.
 - [x] Milestone 6: Complete parallel review and apply relevant findings.
-- [ ] Milestone 7+: Continue remaining resource/handle milestones in small
+- [x] Milestone 7: Move resource request copying into `core`.
+- [x] Milestone 7: Move resource response materialization into `core`.
+- [x] Milestone 7: Move resource transform request copying into `core`.
+- [x] Milestone 7: Move internal request-handle state machine into `core`.
+- [x] Milestone 7: Provide bridge-neutral complete/cancelled/release/provider
+      decision finalization primitives in `core`.
+- [x] Milestone 7: Keep Rust callback ergonomics, panic handling, replacement
+      URL retention, and `!Sync` handle wrapper in `maplibre-native`.
+- [x] Milestone 7: Complete parallel review and apply relevant findings.
+- [ ] Milestone 8+: Continue remaining handle/render-session milestones in small
       buildable slices.
 
 ## Verification
@@ -287,6 +296,44 @@ milestone until complete (through 9).
 - `mise run -C bindings/rust test` — passed after Milestone 6 review fixes (84
   `maplibre-native`, 76 `maplibre-native-core`, 0 `maplibre-native-sys`, doc
   tests passed).
+- `cargo fmt --all --manifest-path Cargo.toml` — passed after moving resource
+  request/response/transform primitives into core.
+- `cargo check --manifest-path Cargo.toml -p maplibre-native --tests` — passed
+  after moving resource request/response/transform primitives into core.
+- `cargo clippy --manifest-path Cargo.toml -p maplibre-native-core -p
+  maplibre-native --all-targets -- -D warnings`
+  — passed after moving resource request/response/transform primitives into
+  core.
+- `mise run -C bindings/rust test` — passed after moving resource
+  request/response/transform primitives into core (84 `maplibre-native`, 80
+  `maplibre-native-core`, 0 `maplibre-native-sys`, doc tests passed).
+- `cargo fmt --all --manifest-path Cargo.toml` — passed after moving the
+  resource request-handle state machine into core.
+- `cargo check --manifest-path Cargo.toml -p maplibre-native --tests` — passed
+  after moving the resource request-handle state machine into core.
+- `cargo clippy --manifest-path Cargo.toml -p maplibre-native-core -p
+  maplibre-native --all-targets -- -D warnings`
+  — passed after moving the resource request-handle state machine into core.
+- `mise run -C bindings/rust test` — passed after moving the resource
+  request-handle state machine into core (84 `maplibre-native`, 80
+  `maplibre-native-core`, 0 `maplibre-native-sys`, doc tests passed).
+- Parallel Milestone 7 review — reviewers confirmed request/response/transform
+  primitives and the request-handle state machine moved cleanly into core while
+  Rust callback/user-data/panic policy remains in `maplibre-native`. Applied
+  findings by making provider-decision finalization idempotent for exposed core
+  users, tying `NativeResourceResponse` to the borrowed `ResourceResponse`
+  lifetime, and adding tests for idempotent finalization, double successful
+  completion rejection, and nonempty response bytes.
+- `cargo fmt --all --manifest-path Cargo.toml` — passed after Milestone 7 review
+  fixes.
+- `cargo check --manifest-path Cargo.toml -p maplibre-native --tests` — passed
+  after Milestone 7 review fixes.
+- `cargo clippy --manifest-path Cargo.toml -p maplibre-native-core -p
+  maplibre-native --all-targets -- -D warnings`
+  — passed after Milestone 7 review fixes.
+- `mise run -C bindings/rust test` — passed after Milestone 7 review fixes (84
+  `maplibre-native`, 83 `maplibre-native-core`, 0 `maplibre-native-sys`, doc
+  tests passed).
 
 ## Reflection checkpoint 2026-05-13
 
@@ -481,3 +528,23 @@ milestone until complete (through 9).
   Added targeted tests for non-null raw source address preservation and invalid
   UTF-8 log callback fallback, then verified and prepared Milestone 6 for
   commit.
+- Iteration 25 started Milestone 7 by moving bridge-neutral resource primitives
+  into `maplibre-native-core::resource`: `ByteRange`, `ResourceRequest`,
+  `ResourceProviderDecision`, `ResourceResponse`, `NativeResourceResponse`, and
+  `ResourceTransformRequest`. Public Rust callback state, panic handling,
+  replacement URL retention, and the request-handle state machine remain in
+  `maplibre-native`; they now delegate request copying and response
+  materialization to core. Added core tests for request copy ownership, invalid
+  prior data, response fields, and transform request copying.
+- Iteration 26 moved the resource request-handle state machine into
+  `maplibre-native-core::resource`, including complete/cancelled/release
+  function tables, provider decision finalization, exception fallback, and
+  exactly-once release accounting. `maplibre-native` now keeps the ergonomic
+  `ResourceRequestHandle` wrapper with its Rust `!Sync` marker and callback
+  policy, while delegating bridge-neutral handle mechanics to core.
+- Iteration 27 completed Milestone 7 review. Fixed the exposed core state
+  machine's repeated provider-decision finalization behavior so a second
+  finalization preserves the first decision and still releases provider-owned
+  handles exactly once. Added a lifetime to `NativeResourceResponse` so native
+  byte pointers cannot outlive the borrowed response in safe Rust, and added
+  core tests for nonempty response bytes and double successful completion.

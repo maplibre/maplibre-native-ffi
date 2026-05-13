@@ -22,6 +22,7 @@ pub mod options;
 pub mod ptr;
 pub mod query;
 pub mod render;
+pub mod resource;
 pub mod runtime;
 pub mod string;
 pub mod style;
@@ -55,6 +56,10 @@ pub use options::{MapOptions, MapTileOptions, MapViewportOptions};
 pub use query::{
     FeatureStateSelector, RenderedFeatureQueryOptions, RenderedQueryGeometry,
     SourceFeatureQueryOptions,
+};
+pub use resource::{
+    ByteRange, ResourceProviderDecision, ResourceRequest, ResourceResponse,
+    ResourceTransformRequest,
 };
 pub use runtime::{OfflineRegionDefinition, OfflineRegionInfo, RuntimeOptions};
 pub use style::{StyleImageOptions, TileSourceOptions};
