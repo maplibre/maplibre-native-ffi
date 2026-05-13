@@ -93,7 +93,6 @@ pub enum NorthOrientation {
 }
 
 impl NorthOrientation {
-    #[allow(dead_code)]
     pub(crate) fn from_raw(raw: u32) -> Self {
         match raw {
             sys::MLN_NORTH_ORIENTATION_UP => Self::Up,
@@ -104,7 +103,6 @@ impl NorthOrientation {
         }
     }
 
-    #[allow(dead_code)]
     pub(crate) fn as_raw(self) -> u32 {
         match self {
             Self::Up => sys::MLN_NORTH_ORIENTATION_UP,
@@ -128,7 +126,6 @@ pub enum ConstrainMode {
 }
 
 impl ConstrainMode {
-    #[allow(dead_code)]
     pub(crate) fn from_raw(raw: u32) -> Self {
         match raw {
             sys::MLN_CONSTRAIN_MODE_NONE => Self::None,
@@ -139,7 +136,6 @@ impl ConstrainMode {
         }
     }
 
-    #[allow(dead_code)]
     pub(crate) fn as_raw(self) -> u32 {
         match self {
             Self::None => sys::MLN_CONSTRAIN_MODE_NONE,
@@ -161,7 +157,6 @@ pub enum ViewportMode {
 }
 
 impl ViewportMode {
-    #[allow(dead_code)]
     pub(crate) fn from_raw(raw: u32) -> Self {
         match raw {
             sys::MLN_VIEWPORT_MODE_DEFAULT => Self::Default,
@@ -170,7 +165,6 @@ impl ViewportMode {
         }
     }
 
-    #[allow(dead_code)]
     pub(crate) fn as_raw(self) -> u32 {
         match self {
             Self::Default => sys::MLN_VIEWPORT_MODE_DEFAULT,
@@ -190,7 +184,6 @@ pub enum TileLodMode {
 }
 
 impl TileLodMode {
-    #[allow(dead_code)]
     pub(crate) fn from_raw(raw: u32) -> Self {
         match raw {
             sys::MLN_TILE_LOD_MODE_DEFAULT => Self::Default,
@@ -199,7 +192,6 @@ impl TileLodMode {
         }
     }
 
-    #[allow(dead_code)]
     pub(crate) fn as_raw(self) -> u32 {
         match self {
             Self::Default => sys::MLN_TILE_LOD_MODE_DEFAULT,
@@ -259,7 +251,6 @@ impl MapViewportOptions {
         self
     }
 
-    #[allow(dead_code)]
     pub(crate) fn to_native(&self) -> sys::mln_map_viewport_options {
         // SAFETY: Default constructor takes no arguments and initializes size.
         let mut raw = unsafe { sys::mln_map_viewport_options_default() };
@@ -282,7 +273,6 @@ impl MapViewportOptions {
         raw
     }
 
-    #[allow(dead_code)]
     pub(crate) fn from_native(raw: sys::mln_map_viewport_options) -> Self {
         Self {
             north_orientation: maybe_enum(
@@ -356,7 +346,6 @@ impl MapTileOptions {
         self
     }
 
-    #[allow(dead_code)]
     pub(crate) fn to_native(&self) -> sys::mln_map_tile_options {
         // SAFETY: Default constructor takes no arguments and initializes size.
         let mut raw = unsafe { sys::mln_map_tile_options_default() };
@@ -387,7 +376,6 @@ impl MapTileOptions {
         raw
     }
 
-    #[allow(dead_code)]
     pub(crate) fn from_native(raw: sys::mln_map_tile_options) -> Self {
         Self {
             prefetch_zoom_delta: has(raw.fields, sys::MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA)
@@ -409,12 +397,10 @@ impl MapTileOptions {
     }
 }
 
-#[allow(dead_code)]
 fn has(fields: u32, flag: u32) -> bool {
     fields & flag != 0
 }
 
-#[allow(dead_code)]
 fn maybe_enum<T>(fields: u32, flag: u32, raw: u32, convert: impl FnOnce(u32) -> T) -> Option<T> {
     has(fields, flag).then(|| convert(raw))
 }

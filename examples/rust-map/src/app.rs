@@ -1,6 +1,6 @@
 use maplibre_native::{
     CameraOptions, LatLng, MapMode, MapOptions, RuntimeEventPayload, RuntimeEventSource,
-    RuntimeEventType, RuntimeHandle,
+    RuntimeEventType, RuntimeHandle, RuntimeOptions,
 };
 use std::error::Error;
 use winit::event::WindowEvent;
@@ -18,7 +18,7 @@ pub struct App {
     target: Option<RenderTarget>,
     map: Option<maplibre_native::MapHandle>,
     runtime: Option<RuntimeHandle>,
-    _vulkan: VulkanContext,
+    vulkan: VulkanContext,
     window: Window,
     viewport: Viewport,
     input: Controller,
@@ -36,32 +36,61 @@ impl App {
             return Err("window has no drawable extent".into());
         }
 
-        let runtime = RuntimeHandle::new()?;
-        let map = runtime.create_map_with_options(
-            &MapOptions::new(
-                viewport.logical_width,
-                viewport.logical_height,
-                viewport.scale_factor,
-            )
-            .with_mode(MapMode::Continuous),
-        )?;
+        let runtime =
+            match RuntimeHandle::with_options(&RuntimeOptions::new().with_cache_path(":memory:")) {
+                Ok(runtime) => runtime,
+                Err(error) => {
+                    return Err(startup_error(
+                        format!("runtime creation failed: {error}"),
+                        None,
+                        None,
+                        None,
+                    ));
+                }
+            };
+        let map_options = MapOptions::new(
+            viewport.logical_width,
+            viewport.logical_height,
+            viewport.scale_factor,
+        )
+        .with_mode(MapMode::Continuous);
+        let map = match runtime.create_map_with_options(&map_options) {
+            Ok(map) => map,
+            Err(error) => {
+                return Err(startup_error(
+                    format!("map creation failed: {error}"),
+                    None,
+                    None,
+                    Some(runtime),
+                ));
+            }
+        };
         viewport.log("initial viewport");
-        let target = RenderTarget::attach(mode, &map, &vulkan, viewport)?;
-        map.set_style_url(STYLE_URL)?;
-        map.jump_to(
-            &CameraOptions::new()
-                .with_center(LatLng::new(37.7749, -122.4194))
-                .with_zoom(13.0)
-                .with_bearing(12.0)
-                .with_pitch(30.0),
-        )?;
-        map.request_repaint()?;
+        let target = match RenderTarget::attach(mode, &map, &vulkan, viewport) {
+            Ok(target) => target,
+            Err(error) => {
+                return Err(startup_error(
+                    format!("render target attachment failed: {error}"),
+                    None,
+                    Some(map),
+                    Some(runtime),
+                ));
+            }
+        };
+        if let Err(error) = configure_map(&map) {
+            return Err(startup_error(
+                format!("map initialization failed: {error}"),
+                Some(target),
+                Some(map),
+                Some(runtime),
+            ));
+        }
 
         Ok(Self {
             target: Some(target),
             map: Some(map),
             runtime: Some(runtime),
-            _vulkan: vulkan,
+            vulkan,
             window,
             viewport,
             input: Controller::default(),
@@ -216,22 +245,86 @@ impl App {
         self.closed = true;
         self.render_pending = false;
         self.viewport_dirty = false;
-        if let Some(target) = self.target.take() {
-            target.close()?;
+
+        let mut first_error = self
+            .vulkan
+            .wait_idle()
+            .err()
+            .map(|error| format!("Vulkan device wait idle failed: {error:?}"));
+
+        if let Some(target) = self.target.take()
+            && let Err(error) = target.close()
+        {
+            append_error(&mut first_error, error.to_string());
         }
-        if let Some(map) = self.map.take() {
-            map.close()?;
+        if let Some(map) = self.map.take()
+            && let Err(error) = map.close()
+        {
+            append_error(&mut first_error, error.to_string());
         }
-        if let Some(runtime) = self.runtime.take() {
-            runtime.close()?;
+        if let Some(runtime) = self.runtime.take()
+            && let Err(error) = runtime.close()
+        {
+            append_error(&mut first_error, error.to_string());
         }
-        Ok(())
+
+        match first_error {
+            Some(error) => Err(error.into()),
+            None => Ok(()),
+        }
     }
 
     fn abort_process(&mut self, code: i32) -> ! {
         self.closed = true;
         self.render_pending = false;
         immediate_exit(code);
+    }
+}
+
+fn configure_map(map: &maplibre_native::MapHandle) -> maplibre_native::Result<()> {
+    map.set_style_url(STYLE_URL)?;
+    map.jump_to(
+        &CameraOptions::new()
+            .with_center(LatLng::new(37.7749, -122.4194))
+            .with_zoom(13.0)
+            .with_bearing(12.0)
+            .with_pitch(30.0),
+    )?;
+    map.request_repaint()
+}
+
+fn startup_error(
+    mut message: String,
+    target: Option<RenderTarget>,
+    map: Option<maplibre_native::MapHandle>,
+    runtime: Option<RuntimeHandle>,
+) -> Box<dyn Error> {
+    if let Some(target) = target {
+        append_cleanup_result(&mut message, "render target", target.close());
+    }
+    if let Some(map) = map {
+        append_cleanup_result(&mut message, "map", map.close());
+    }
+    if let Some(runtime) = runtime {
+        append_cleanup_result(&mut message, "runtime", runtime.close());
+    }
+    message.into()
+}
+
+fn append_cleanup_result<E: std::fmt::Display>(
+    message: &mut String,
+    resource: &str,
+    result: std::result::Result<(), E>,
+) {
+    if let Err(error) = result {
+        message.push_str(&format!("; {resource} cleanup failed: {error}"));
+    }
+}
+
+fn append_error(message: &mut Option<String>, error: String) {
+    match message {
+        Some(message) => message.push_str(&format!("; {error}")),
+        None => *message = Some(error),
     }
 }
 

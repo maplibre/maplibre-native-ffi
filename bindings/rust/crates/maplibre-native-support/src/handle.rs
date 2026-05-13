@@ -10,7 +10,6 @@ use crate::ptr::non_null_mut;
 struct NativeHandle<T> {
     ptr: NonNull<T>,
     destroy: unsafe extern "C" fn(*mut T),
-    type_name: &'static str,
     _owns_handle: PhantomData<T>,
 }
 
@@ -30,7 +29,6 @@ impl<T> NativeHandle<T> {
         Ok(Self {
             ptr: non_null_mut(ptr, type_name)?,
             destroy,
-            type_name,
             _owns_handle: PhantomData,
         })
     }
@@ -41,17 +39,6 @@ impl<T> NativeHandle<T> {
 
     fn as_non_null(&self) -> NonNull<T> {
         self.ptr
-    }
-
-    fn type_name(&self) -> &'static str {
-        self.type_name
-    }
-
-    #[allow(dead_code)]
-    fn into_raw(self) -> *mut T {
-        let ptr = self.ptr.as_ptr();
-        std::mem::forget(self);
-        ptr
     }
 
     fn close(self) {
@@ -82,10 +69,6 @@ macro_rules! native_guard {
 
             pub fn as_non_null(&self) -> NonNull<$native> {
                 self.inner.as_non_null()
-            }
-
-            pub fn type_name(&self) -> &'static str {
-                self.inner.type_name()
             }
 
             pub fn close(self) {
@@ -176,7 +159,6 @@ mod tests {
                 unsafe { NativeHandle::from_raw(&mut value, count_destroy, "test_handle") }
                     .unwrap();
             assert_eq!(handle.as_ptr().cast_const(), ptr::addr_of!(value));
-            assert_eq!(handle.type_name(), "test_handle");
         }
 
         assert_eq!(DESTROY_COUNT.load(Ordering::SeqCst), 1);
@@ -192,19 +174,6 @@ mod tests {
         handle.close();
 
         assert_eq!(DESTROY_COUNT.load(Ordering::SeqCst), 1);
-    }
-
-    #[test]
-    fn native_handle_into_raw_suppresses_drop() {
-        DESTROY_COUNT.store(0, Ordering::SeqCst);
-        let mut value = 1u8;
-
-        let handle =
-            unsafe { NativeHandle::from_raw(&mut value, count_destroy, "test_handle") }.unwrap();
-        let raw = handle.into_raw();
-
-        assert_eq!(raw.cast_const(), ptr::addr_of!(value));
-        assert_eq!(DESTROY_COUNT.load(Ordering::SeqCst), 0);
     }
 
     #[test]

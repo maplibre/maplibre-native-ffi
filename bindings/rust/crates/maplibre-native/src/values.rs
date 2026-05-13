@@ -45,7 +45,6 @@ impl LatLngBounds {
         }
     }
 
-    #[allow(dead_code)]
     pub(crate) fn to_native(self) -> sys::mln_lat_lng_bounds {
         sys::mln_lat_lng_bounds {
             southwest: self.southwest.to_native(),
@@ -53,7 +52,6 @@ impl LatLngBounds {
         }
     }
 
-    #[allow(dead_code)]
     pub(crate) fn from_native(value: sys::mln_lat_lng_bounds) -> Self {
         Self {
             southwest: LatLng::from_native(value.southwest),
@@ -101,7 +99,6 @@ impl ScreenPoint {
         Self { x, y }
     }
 
-    #[allow(dead_code)]
     pub(crate) fn to_native(self) -> sys::mln_screen_point {
         sys::mln_screen_point {
             x: self.x,
@@ -109,7 +106,6 @@ impl ScreenPoint {
         }
     }
 
-    #[allow(dead_code)]
     pub(crate) fn from_native(value: sys::mln_screen_point) -> Self {
         Self {
             x: value.x,
@@ -150,7 +146,6 @@ impl EdgeInsets {
         }
     }
 
-    #[allow(dead_code)]
     pub(crate) fn to_native(self) -> sys::mln_edge_insets {
         sys::mln_edge_insets {
             top: self.top,
@@ -160,7 +155,6 @@ impl EdgeInsets {
         }
     }
 
-    #[allow(dead_code)]
     pub(crate) fn from_native(value: sys::mln_edge_insets) -> Self {
         Self {
             top: value.top,
@@ -184,7 +178,6 @@ impl Vec3 {
         Self { x, y, z }
     }
 
-    #[allow(dead_code)]
     pub(crate) fn to_native(self) -> sys::mln_vec3 {
         sys::mln_vec3 {
             x: self.x,
@@ -193,7 +186,6 @@ impl Vec3 {
         }
     }
 
-    #[allow(dead_code)]
     pub(crate) fn from_native(value: sys::mln_vec3) -> Self {
         Self {
             x: value.x,
@@ -217,7 +209,6 @@ impl Quaternion {
         Self { x, y, z, w }
     }
 
-    #[allow(dead_code)]
     pub(crate) fn to_native(self) -> sys::mln_quaternion {
         sys::mln_quaternion {
             x: self.x,
@@ -227,7 +218,6 @@ impl Quaternion {
         }
     }
 
-    #[allow(dead_code)]
     pub(crate) fn from_native(value: sys::mln_quaternion) -> Self {
         Self {
             x: value.x,
@@ -252,7 +242,6 @@ impl UnitBezier {
         Self { x1, y1, x2, y2 }
     }
 
-    #[allow(dead_code)]
     pub(crate) fn to_native(self) -> sys::mln_unit_bezier {
         sys::mln_unit_bezier {
             x1: self.x1,
@@ -262,7 +251,7 @@ impl UnitBezier {
         }
     }
 
-    #[allow(dead_code)]
+    #[cfg(test)]
     pub(crate) fn from_native(value: sys::mln_unit_bezier) -> Self {
         Self {
             x1: value.x1,

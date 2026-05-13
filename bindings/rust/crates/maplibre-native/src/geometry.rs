@@ -21,7 +21,6 @@ pub enum Geometry {
 }
 
 impl Geometry {
-    #[allow(dead_code)]
     pub(crate) fn to_native(&self) -> NativeGeometry {
         NativeGeometry::new(self)
     }
@@ -51,14 +50,13 @@ impl Geometry {
     ///
     /// `raw` and all nested pointers must be valid for the duration of this
     /// call. The returned value owns all copied data.
-    #[allow(dead_code)]
+    #[cfg(test)]
     pub(crate) unsafe fn from_native(raw: &sys::mln_geometry) -> Result<Self> {
         // SAFETY: The caller promises raw and nested pointers are valid for the
         // duration of this call. The helper copies recursively before return.
         unsafe { Self::from_native_with_depth(raw, 0) }
     }
 
-    #[allow(dead_code)]
     pub(crate) unsafe fn from_native_with_depth(
         raw: &sys::mln_geometry,
         depth: usize,
@@ -130,7 +128,6 @@ impl Geometry {
     }
 }
 
-#[allow(dead_code)]
 pub(crate) struct NativeGeometry {
     raw: sys::mln_geometry,
     coordinates: Vec<Box<[sys::mln_lat_lng]>>,
@@ -140,7 +137,6 @@ pub(crate) struct NativeGeometry {
     children: Vec<NativeGeometry>,
 }
 
-#[allow(dead_code)]
 impl NativeGeometry {
     fn new(geometry: &Geometry) -> Self {
         let mut native = Self::empty(sys::MLN_GEOMETRY_TYPE_EMPTY);
@@ -276,7 +272,6 @@ impl NativeGeometry {
     }
 }
 
-#[allow(dead_code)]
 fn ptr_or_null<T>(values: &[T]) -> *const T {
     if values.is_empty() {
         ptr::null()
@@ -295,7 +290,6 @@ fn check_geometry_depth(depth: usize) -> Result<()> {
     }
 }
 
-#[allow(dead_code)]
 fn copy_coordinate_span(span: sys::mln_coordinate_span) -> Result<Vec<LatLng>> {
     let coordinates = coordinate_slice(span.coordinates, span.coordinate_count, "coordinates")?;
     Ok(coordinates
@@ -305,7 +299,6 @@ fn copy_coordinate_span(span: sys::mln_coordinate_span) -> Result<Vec<LatLng>> {
         .collect())
 }
 
-#[allow(dead_code)]
 fn copy_coordinate_spans(
     spans: *const sys::mln_coordinate_span,
     count: usize,
@@ -315,12 +308,10 @@ fn copy_coordinate_spans(
     spans.iter().copied().map(copy_coordinate_span).collect()
 }
 
-#[allow(dead_code)]
 fn copy_polygon_geometry(polygon: sys::mln_polygon_geometry) -> Result<Vec<Vec<LatLng>>> {
     copy_coordinate_spans(polygon.rings, polygon.ring_count, "polygon rings")
 }
 
-#[allow(dead_code)]
 fn coordinate_slice<'a>(
     ptr: *const sys::mln_lat_lng,
     count: usize,
@@ -329,7 +320,6 @@ fn coordinate_slice<'a>(
     slice_or_empty(ptr, count, name)
 }
 
-#[allow(dead_code)]
 fn coordinate_span_slice<'a>(
     ptr: *const sys::mln_coordinate_span,
     count: usize,
@@ -338,7 +328,6 @@ fn coordinate_span_slice<'a>(
     slice_or_empty(ptr, count, name)
 }
 
-#[allow(dead_code)]
 fn polygon_slice<'a>(
     ptr: *const sys::mln_polygon_geometry,
     count: usize,
@@ -347,7 +336,6 @@ fn polygon_slice<'a>(
     slice_or_empty(ptr, count, name)
 }
 
-#[allow(dead_code)]
 fn geometry_slice<'a>(
     ptr: *const sys::mln_geometry,
     count: usize,
@@ -356,7 +344,6 @@ fn geometry_slice<'a>(
     slice_or_empty(ptr, count, name)
 }
 
-#[allow(dead_code)]
 fn slice_or_empty<'a, T>(ptr: *const T, count: usize, name: &'static str) -> Result<&'a [T]> {
     if count == 0 {
         return Ok(&[]);

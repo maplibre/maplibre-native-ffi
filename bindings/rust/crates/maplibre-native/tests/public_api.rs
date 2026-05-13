@@ -1,10 +1,11 @@
 use maplibre_native::{
     AmbientCacheOperation, CameraOptions, EdgeInsets, Feature, FeatureIdentifier, GeoJson,
-    Geometry, JsonMember, JsonValue, LatLng, MapMode, MapOptions, MetalBorrowedTextureDescriptor,
-    MetalOwnedTextureDescriptor, MetalSurfaceDescriptor, NativePointer, NetworkStatus,
-    OwnedTextureDescriptor, RenderBackendMask, RuntimeHandle, RuntimeOptions, ScreenPoint,
-    VulkanBorrowedTextureDescriptor, VulkanOwnedTextureDescriptor, VulkanSurfaceDescriptor,
-    c_version, network_status, set_network_status, supported_render_backends,
+    Geometry, JsonMember, JsonValue, LatLng, LatLngBounds, MapMode, MapOptions,
+    MetalBorrowedTextureDescriptor, MetalOwnedTextureDescriptor, MetalSurfaceDescriptor,
+    NativePointer, NetworkStatus, OfflineRegionDefinition, OwnedTextureDescriptor,
+    RenderBackendMask, RuntimeHandle, RuntimeOptions, ScreenPoint, VulkanBorrowedTextureDescriptor,
+    VulkanOwnedTextureDescriptor, VulkanSurfaceDescriptor, c_version, network_status,
+    set_network_status, supported_render_backends,
 };
 
 struct NetworkStatusRestore(NetworkStatus);
@@ -77,6 +78,19 @@ fn public_descriptors_use_owned_rust_values() {
             JsonMember::new("nested", JsonValue::Array(vec![JsonValue::Bool(true)])),
         ])
     );
+
+    let offline_region = OfflineRegionDefinition::TilePyramid {
+        style_url: "custom://style.json".into(),
+        bounds: LatLngBounds::new(LatLng::new(1.0, 2.0), LatLng::new(3.0, 4.0)),
+        min_zoom: 0.0,
+        max_zoom: f64::INFINITY,
+        pixel_ratio: 1.0,
+        include_ideographs: false,
+    };
+    assert!(matches!(
+        offline_region,
+        OfflineRegionDefinition::TilePyramid { .. }
+    ));
 
     let feature = Feature::new(
         Geometry::Point(LatLng::new(1.0, 2.0)),

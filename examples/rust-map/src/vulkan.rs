@@ -8,7 +8,6 @@ use raw_window_handle::{HasDisplayHandle, HasWindowHandle};
 use winit::window::Window;
 
 pub struct VulkanContext {
-    _entry: ash::Entry,
     instance: ash::Instance,
     surface_loader: ash::khr::surface::Instance,
     surface: vk::SurfaceKHR,
@@ -103,7 +102,6 @@ impl VulkanContext {
         let graphics_queue = unsafe { device.get_device_queue(graphics_queue_family_index, 0) };
 
         Ok(Self {
-            _entry: entry,
             instance,
             surface_loader,
             surface,
@@ -114,9 +112,9 @@ impl VulkanContext {
         })
     }
 
-    pub fn wait_idle(&self) {
+    pub fn wait_idle(&self) -> Result<(), vk::Result> {
         // SAFETY: device is live while VulkanContext is live.
-        let _ = unsafe { self.device.device_wait_idle() };
+        unsafe { self.device.device_wait_idle() }
     }
 
     pub fn instance(&self) -> &ash::Instance {
@@ -178,7 +176,7 @@ impl Drop for VulkanContext {
         // SAFETY: Objects are destroyed in reverse dependency order after the
         // render target that borrowed them has closed or after process exit.
         unsafe {
-            self.wait_idle();
+            let _ = self.wait_idle();
             self.device.destroy_device(None);
             self.surface_loader.destroy_surface(self.surface, None);
             self.instance.destroy_instance(None);

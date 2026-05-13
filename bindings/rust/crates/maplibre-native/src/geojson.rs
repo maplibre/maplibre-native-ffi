@@ -53,7 +53,6 @@ impl Feature {
     ///
     /// `raw` and all nested pointers must be valid for the duration of this
     /// call. The returned value owns all copied data.
-    #[allow(dead_code)]
     pub(crate) unsafe fn from_native(raw: &sys::mln_feature, depth: usize) -> Result<Self> {
         check_geojson_depth(depth)?;
         if raw.geometry.is_null() {
@@ -95,7 +94,7 @@ impl GeoJson {
     ///
     /// `raw` and all nested pointers must be valid for the duration of this
     /// call. The returned value owns all copied data.
-    #[allow(dead_code)]
+    #[cfg(test)]
     pub(crate) unsafe fn from_native(raw: &sys::mln_geojson) -> Result<Self> {
         match raw.type_ {
             sys::MLN_GEOJSON_TYPE_GEOMETRY => {
@@ -313,7 +312,6 @@ impl NativeGeoJson {
     }
 }
 
-#[allow(dead_code)]
 unsafe fn copy_feature_identifier(raw: &sys::mln_feature) -> Result<FeatureIdentifier> {
     match raw.identifier_type {
         sys::MLN_FEATURE_IDENTIFIER_TYPE_NULL => Ok(FeatureIdentifier::Null),
@@ -343,7 +341,7 @@ unsafe fn copy_feature_identifier(raw: &sys::mln_feature) -> Result<FeatureIdent
     }
 }
 
-#[allow(dead_code)]
+#[cfg(test)]
 fn feature_slice<'a>(
     ptr: *const sys::mln_feature,
     count: usize,

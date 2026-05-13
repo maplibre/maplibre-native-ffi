@@ -67,7 +67,6 @@ impl CameraOptions {
         self
     }
 
-    #[allow(dead_code)]
     pub(crate) fn to_native(&self) -> sys::mln_camera_options {
         // SAFETY: Default constructor takes no arguments and initializes size
         // and default values for this C ABI version.
@@ -112,7 +111,6 @@ impl CameraOptions {
         raw
     }
 
-    #[allow(dead_code)]
     pub(crate) fn from_native(raw: sys::mln_camera_options) -> Self {
         Self {
             center: has(raw.fields, sys::MLN_CAMERA_OPTION_CENTER)
@@ -167,7 +165,6 @@ impl AnimationOptions {
         self
     }
 
-    #[allow(dead_code)]
     pub(crate) fn to_native(&self) -> sys::mln_animation_options {
         // SAFETY: Default constructor takes no arguments and initializes size.
         let mut raw = unsafe { sys::mln_animation_options_default() };
@@ -220,7 +217,6 @@ impl CameraFitOptions {
         self
     }
 
-    #[allow(dead_code)]
     pub(crate) fn to_native(&self) -> sys::mln_camera_fit_options {
         // SAFETY: Default constructor takes no arguments and initializes size.
         let mut raw = unsafe { sys::mln_camera_fit_options_default() };
@@ -281,7 +277,6 @@ impl BoundOptions {
         self
     }
 
-    #[allow(dead_code)]
     pub(crate) fn to_native(&self) -> sys::mln_bound_options {
         // SAFETY: Default constructor takes no arguments and initializes size.
         let mut raw = unsafe { sys::mln_bound_options_default() };
@@ -343,7 +338,6 @@ impl FreeCameraOptions {
         self
     }
 
-    #[allow(dead_code)]
     pub(crate) fn to_native(&self) -> sys::mln_free_camera_options {
         // SAFETY: Default constructor takes no arguments and initializes size.
         let mut raw = unsafe { sys::mln_free_camera_options_default() };
@@ -358,7 +352,6 @@ impl FreeCameraOptions {
         raw
     }
 
-    #[allow(dead_code)]
     pub(crate) fn from_native(raw: sys::mln_free_camera_options) -> Self {
         Self {
             position: has(raw.fields, sys::MLN_FREE_CAMERA_OPTION_POSITION)
@@ -426,7 +419,6 @@ impl ProjectionMode {
     }
 }
 
-#[allow(dead_code)]
 fn has(fields: u32, flag: u32) -> bool {
     fields & flag != 0
 }

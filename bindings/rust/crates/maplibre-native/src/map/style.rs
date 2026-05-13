@@ -1,4 +1,4 @@
-use std::{mem, ptr};
+use std::{marker::PhantomData, mem, ptr};
 
 use maplibre_native_support as support;
 use maplibre_native_sys as sys;
@@ -203,10 +203,6 @@ impl TileSourceOptions {
     }
 
     pub(crate) fn to_native(&self) -> NativeTileSourceOptions<'_> {
-        let attribution = self
-            .attribution
-            .as_deref()
-            .map(support::string::string_view);
         // SAFETY: This C helper returns a plain value with no preconditions.
         let mut raw = unsafe { sys::mln_style_tile_source_options_default() };
         if let Some(value) = self.min_zoom {
@@ -217,9 +213,9 @@ impl TileSourceOptions {
             raw.fields |= sys::MLN_STYLE_TILE_SOURCE_OPTION_MAX_ZOOM;
             raw.max_zoom = value;
         }
-        if let Some(value) = attribution.as_ref() {
+        if let Some(value) = self.attribution.as_deref() {
             raw.fields |= sys::MLN_STYLE_TILE_SOURCE_OPTION_ATTRIBUTION;
-            raw.attribution = value.raw();
+            raw.attribution = support::string::string_view(value).raw();
         }
         if let Some(value) = self.scheme {
             raw.fields |= sys::MLN_STYLE_TILE_SOURCE_OPTION_SCHEME;
@@ -241,14 +237,16 @@ impl TileSourceOptions {
             raw.fields |= sys::MLN_STYLE_TILE_SOURCE_OPTION_RASTER_ENCODING;
             raw.raster_encoding = value.raw_value();
         }
-        NativeTileSourceOptions { raw, attribution }
+        NativeTileSourceOptions {
+            raw,
+            lifetime: PhantomData,
+        }
     }
 }
 
 pub(crate) struct NativeTileSourceOptions<'a> {
     raw: sys::mln_style_tile_source_options,
-    #[allow(dead_code)]
-    attribution: Option<support::string::StringView<'a>>,
+    lifetime: PhantomData<&'a str>,
 }
 
 impl NativeTileSourceOptions<'_> {

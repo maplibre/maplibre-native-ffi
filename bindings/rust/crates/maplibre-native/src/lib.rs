@@ -61,7 +61,10 @@ pub use resource::{
     ResourceRequest, ResourceRequestHandle, ResourceResponse, ResourceResponseStatus,
     ResourceStoragePolicy, ResourceTransformRequest, ResourceUsage,
 };
-pub use runtime::{AmbientCacheOperation, RuntimeHandle, RuntimeOptions};
+pub use runtime::{
+    AmbientCacheOperation, OfflineRegionDefinition, OfflineRegionInfo, RuntimeHandle,
+    RuntimeOptions,
+};
 pub use support::{Error, ErrorKind, Result};
 pub use values::{
     EdgeInsets, LatLng, LatLngBounds, ProjectedMeters, Quaternion, ScreenBox, ScreenPoint,

@@ -280,7 +280,7 @@ pub struct OfflineRegionStatus {
 }
 
 impl OfflineRegionStatus {
-    fn from_native(raw: sys::mln_offline_region_status) -> Self {
+    pub(crate) fn from_native(raw: sys::mln_offline_region_status) -> Self {
         Self {
             download_state: OfflineRegionDownloadState::from_raw(raw.download_state),
             completed_resource_count: raw.completed_resource_count,

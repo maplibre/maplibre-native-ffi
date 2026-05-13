@@ -97,7 +97,7 @@ impl VulkanTextureCompositor {
     pub fn draw(&mut self, frame: &VulkanOwnedTextureFrameHandle) -> maplibre_native::Result<()> {
         let metadata = frame.frame()?;
         if metadata.width == 0 || metadata.height == 0 {
-            return Ok(());
+            return Err(compositor_error("owned Vulkan frame has an empty extent"));
         }
         if metadata.layout != vk::ImageLayout::SHADER_READ_ONLY_OPTIMAL.as_raw() as u32 {
             return Err(compositor_error(format!(
@@ -118,8 +118,8 @@ impl VulkanTextureCompositor {
         if self.closed {
             return Ok(());
         }
-        self.closed = true;
         self.wait_idle()?;
+        self.closed = true;
         unsafe {
             if self.in_flight != vk::Fence::null() {
                 self.device.destroy_fence(self.in_flight, None);
