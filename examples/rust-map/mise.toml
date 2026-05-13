@@ -1,72 +1,38 @@
+[env]
+MLN_FFI_REPO_ROOT = "{{config_root}}/../.."
+MLN_FFI_CARGO_MANIFEST = "{{env.MLN_FFI_REPO_ROOT}}/Cargo.toml"
+MLN_FFI_PIXI_LIB = "{{env.MLN_FFI_REPO_ROOT}}/.pixi/envs/default/lib"
+DYLD_LIBRARY_PATH = "{{env.MLN_FFI_PIXI_LIB}}:{{env.DYLD_LIBRARY_PATH}}"
+LD_LIBRARY_PATH = "{{env.MLN_FFI_PIXI_LIB}}:{{env.LD_LIBRARY_PATH}}"
+
 [tasks.compile-shaders]
 hide = true
-run = '''
-set -euo pipefail
-pixi run glslangValidator -V src/vulkan_texture_compositor/shaders/fullscreen.vert -o src/vulkan_texture_compositor/shaders/fullscreen.vert.spv
-pixi run glslangValidator -V src/vulkan_texture_compositor/shaders/sample.frag -o src/vulkan_texture_compositor/shaders/sample.frag.spv
-'''
+run = [
+  "pixi run glslangValidator -V src/vulkan_texture_compositor/shaders/fullscreen.vert -o src/vulkan_texture_compositor/shaders/fullscreen.vert.spv",
+  "pixi run glslangValidator -V src/vulkan_texture_compositor/shaders/sample.frag -o src/vulkan_texture_compositor/shaders/sample.frag.spv",
+]
 
 [tasks.build]
 depends = ["//:ensure-native-library", ":compile-shaders"]
-run = '''
-repo_root=$(git rev-parse --show-toplevel)
-bash "$repo_root/bindings/rust/scripts/with-libclang.sh" cargo build --manifest-path "$repo_root/Cargo.toml" -p rust-map
-'''
+run = "bash \"$MLN_FFI_REPO_ROOT/bindings/rust/scripts/with-libclang.sh\" cargo build --manifest-path \"$MLN_FFI_CARGO_MANIFEST\" -p rust-map"
 
 [tasks.ci]
 depends = [":build"]
-run = '''
-repo_root=$(git rev-parse --show-toplevel)
-bash "$repo_root/bindings/rust/scripts/with-libclang.sh" cargo clippy --manifest-path "$repo_root/Cargo.toml" -p rust-map --all-targets -- -D warnings
-'''
+run = "bash \"$MLN_FFI_REPO_ROOT/bindings/rust/scripts/with-libclang.sh\" cargo clippy --manifest-path \"$MLN_FFI_CARGO_MANIFEST\" -p rust-map --all-targets -- -D warnings"
 
 [tasks.run]
 depends = ["//:ensure-native-library", ":compile-shaders"]
+usage = 'arg "[render-target]" default="owned-texture"'
 run = '''
-set -euo pipefail
-repo_root=$(git rev-parse --show-toplevel)
-pixi_lib="$repo_root/.pixi/envs/default/lib"
-pixi_icd="$repo_root/.pixi/envs/default/share/vulkan/icd.d/MoltenVK_icd.json"
-if [[ -d "$pixi_lib" ]]; then
-  export DYLD_LIBRARY_PATH="$pixi_lib${DYLD_LIBRARY_PATH:+:$DYLD_LIBRARY_PATH}"
-  export LD_LIBRARY_PATH="$pixi_lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
-fi
+pixi_icd="$MLN_FFI_REPO_ROOT/.pixi/envs/default/share/vulkan/icd.d/MoltenVK_icd.json"
 if [[ -f "$pixi_icd" && -z "${VK_ICD_FILENAMES:-}" ]]; then
   export VK_ICD_FILENAMES="$pixi_icd"
 fi
-bash "$repo_root/bindings/rust/scripts/with-libclang.sh" cargo run --manifest-path "$repo_root/Cargo.toml" -p rust-map -- --render-target=owned-texture
+bash "$MLN_FFI_REPO_ROOT/bindings/rust/scripts/with-libclang.sh" cargo run --manifest-path "$MLN_FFI_CARGO_MANIFEST" -p rust-map -- --render-target="$usage_render_target"
 '''
 
 [tasks."run:owned-texture"]
-depends = ["//:ensure-native-library", ":compile-shaders"]
-run = '''
-set -euo pipefail
-repo_root=$(git rev-parse --show-toplevel)
-pixi_lib="$repo_root/.pixi/envs/default/lib"
-pixi_icd="$repo_root/.pixi/envs/default/share/vulkan/icd.d/MoltenVK_icd.json"
-if [[ -d "$pixi_lib" ]]; then
-  export DYLD_LIBRARY_PATH="$pixi_lib${DYLD_LIBRARY_PATH:+:$DYLD_LIBRARY_PATH}"
-  export LD_LIBRARY_PATH="$pixi_lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
-fi
-if [[ -f "$pixi_icd" && -z "${VK_ICD_FILENAMES:-}" ]]; then
-  export VK_ICD_FILENAMES="$pixi_icd"
-fi
-bash "$repo_root/bindings/rust/scripts/with-libclang.sh" cargo run --manifest-path "$repo_root/Cargo.toml" -p rust-map -- --render-target=owned-texture
-'''
+run = [{ task = "run", args = ["owned-texture"] }]
 
 [tasks."run:native-surface"]
-depends = ["//:ensure-native-library", ":compile-shaders"]
-run = '''
-set -euo pipefail
-repo_root=$(git rev-parse --show-toplevel)
-pixi_lib="$repo_root/.pixi/envs/default/lib"
-pixi_icd="$repo_root/.pixi/envs/default/share/vulkan/icd.d/MoltenVK_icd.json"
-if [[ -d "$pixi_lib" ]]; then
-  export DYLD_LIBRARY_PATH="$pixi_lib${DYLD_LIBRARY_PATH:+:$DYLD_LIBRARY_PATH}"
-  export LD_LIBRARY_PATH="$pixi_lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
-fi
-if [[ -f "$pixi_icd" && -z "${VK_ICD_FILENAMES:-}" ]]; then
-  export VK_ICD_FILENAMES="$pixi_icd"
-fi
-bash "$repo_root/bindings/rust/scripts/with-libclang.sh" cargo run --manifest-path "$repo_root/Cargo.toml" -p rust-map -- --render-target=native-surface
-'''
+run = [{ task = "run", args = ["native-surface"] }]
