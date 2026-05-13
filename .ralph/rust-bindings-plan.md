@@ -43,7 +43,31 @@ milestone until complete (through 9).
       readers.
 - [x] Milestone 3: Preserve depth checks, integer width, object member order,
       duplicate keys, copied-output ownership, and finite-number validation.
-- [ ] Milestone 4+: Continue descriptor/result/event/resource/handle milestones
+- [x] Milestone 4: Move map creation/options descriptor materializer into
+      `core`.
+- [x] Milestone 4: Move map viewport descriptor materializer/reader into `core`.
+- [x] Milestone 4: Move map tile descriptor materializer/reader into `core`.
+- [x] Milestone 4: Move camera, animation, and camera-fit descriptor
+      materializers into `core`.
+- [x] Milestone 4: Move camera bounds, free-camera, and projection descriptor
+      materializers/readers into `core`.
+- [x] Milestone 4: Move runtime options descriptor materializer into `core`.
+- [x] Milestone 4: Move offline-region definition descriptor materializers into
+      `core`.
+- [x] Milestone 5: Start offline-region native reader extraction by moving
+      `OfflineRegionInfo` and definition copying into `core`.
+- [x] Milestone 4: Move render-target descriptor materializers into `core`.
+- [x] Milestone 4: Move feature-state selector descriptor materializer into
+      `core`.
+- [x] Milestone 4: Move rendered-query geometry descriptor materializer into
+      `core`.
+- [x] Milestone 4: Move rendered/source feature query options descriptor
+      materializers into `core`.
+- [x] Milestone 4: Move tile-source options descriptor materializer into `core`.
+- [x] Milestone 4: Move style-image options descriptor materializer into `core`.
+- [x] Milestone 4: Finish remaining style descriptor/materializer audit.
+- [x] Milestone 4: Complete parallel review and apply relevant findings.
+- [ ] Milestone 5+: Continue remaining result/event/resource/handle milestones
       in small buildable slices.
 
 ## Verification
@@ -111,6 +135,102 @@ milestone until complete (through 9).
 - `git commit -m "Address Rust descriptor core review findings"` — created
   `354e26b`.
 - `git push` — pushed `354e26b` to `origin/rust-refactor`.
+- `git commit -m "Update Rust bindings plan progress"` — created `a9ca868`.
+- `git push` — pushed `a9ca868` to `origin/rust-refactor`.
+- `cargo fmt --all --manifest-path Cargo.toml` — passed after moving map option
+  descriptors into core.
+- `cargo check --manifest-path Cargo.toml -p maplibre-native --tests` — passed
+  after moving map option descriptors into core.
+- `cargo clippy --manifest-path Cargo.toml -p maplibre-native-core -p
+  maplibre-native --all-targets -- -D warnings`
+  — passed after moving map option descriptors into core.
+- `mise run -C bindings/rust test` — passed after moving map option descriptors
+  into core (85 `maplibre-native`, 52 `maplibre-native-core`, 0
+  `maplibre-native-sys`, doc tests passed).
+- `cargo fmt --all --manifest-path Cargo.toml` — passed after moving camera
+  descriptors into core.
+- `cargo clippy --manifest-path Cargo.toml -p maplibre-native-core -p
+  maplibre-native --all-targets -- -D warnings`
+  — passed after moving camera descriptors into core.
+- `mise run -C bindings/rust test` — passed after moving camera descriptors into
+  core (85 `maplibre-native`, 55 `maplibre-native-core`, 0
+  `maplibre-native-sys`, doc tests passed).
+- `cargo fmt --all --manifest-path Cargo.toml` — passed after moving runtime
+  options into core.
+- `cargo check --manifest-path Cargo.toml -p maplibre-native --tests` — passed
+  after moving runtime options into core.
+- `cargo clippy --manifest-path Cargo.toml -p maplibre-native-core -p
+  maplibre-native --all-targets -- -D warnings`
+  — passed after moving runtime options into core.
+- `mise run -C bindings/rust test` — passed after moving runtime options into
+  core (85 `maplibre-native`, 57 `maplibre-native-core`, 0
+  `maplibre-native-sys`, doc tests passed).
+- `cargo fmt --all --manifest-path Cargo.toml` — passed after moving
+  offline-region descriptors/readers into core.
+- `cargo clippy --manifest-path Cargo.toml -p maplibre-native-core -p
+  maplibre-native --all-targets -- -D warnings`
+  — passed after moving offline-region descriptors/readers into core.
+- `mise run -C bindings/rust test` — passed after moving offline-region
+  descriptors/readers into core (85 `maplibre-native`, 60
+  `maplibre-native-core`, 0 `maplibre-native-sys`, doc tests passed).
+- `cargo fmt --all --manifest-path Cargo.toml` — passed after moving
+  render-target descriptors into core.
+- `cargo check --manifest-path Cargo.toml -p maplibre-native --tests` — passed
+  after moving render-target descriptors into core.
+- `cargo clippy --manifest-path Cargo.toml -p maplibre-native-core -p
+  maplibre-native --all-targets -- -D warnings`
+  — passed after moving render-target descriptors into core.
+- `mise run -C bindings/rust test` — passed after moving render-target
+  descriptors into core (85 `maplibre-native`, 62 `maplibre-native-core`, 0
+  `maplibre-native-sys`, doc tests passed).
+- `cargo fmt --all --manifest-path Cargo.toml` — passed after moving query
+  descriptors into core.
+- `cargo check --manifest-path Cargo.toml -p maplibre-native --tests` — passed
+  after moving query descriptors into core.
+- `cargo clippy --manifest-path Cargo.toml -p maplibre-native-core -p
+  maplibre-native --all-targets -- -D warnings`
+  — passed after moving query descriptors into core.
+- `mise run -C bindings/rust test` — passed after moving query descriptors into
+  core (85 `maplibre-native`, 65 `maplibre-native-core`, 0
+  `maplibre-native-sys`, doc tests passed).
+- `cargo fmt --all --manifest-path Cargo.toml` — passed after moving style
+  option descriptors into core.
+- `cargo check --manifest-path Cargo.toml -p maplibre-native --tests` — passed
+  after moving style option descriptors into core.
+- `cargo clippy --manifest-path Cargo.toml -p maplibre-native-core -p
+  maplibre-native --all-targets -- -D warnings`
+  — passed after moving style option descriptors into core.
+- `mise run -C bindings/rust test` — passed after moving style option
+  descriptors into core (85 `maplibre-native`, 67 `maplibre-native-core`, 0
+  `maplibre-native-sys`, doc tests passed).
+- Parallel Milestone 4 review — no blockers or required fixes found. Reviewers
+  confirmed public re-exports/private raw traits, core ownership of descriptor
+  materializers, backing-storage lifetimes, and validation coverage. The only
+  remaining public descriptor builder noted was custom geometry source options,
+  which stays above `core` because it owns callback trampolines and Rust
+  `user_data` policy.
+
+## Reflection checkpoint 2026-05-13
+
+1. Accomplished: Milestones 1-3 are complete and pushed through the review-fix
+   commit. Milestone 4 is underway with map options, camera descriptors, and
+   runtime options moved into `core` while public Rust names stay re-exported.
+2. Working well: small buildable slices plus private extension traits keep the
+   public API stable and keep raw `sys` conversions out of public inherent
+   methods. Core tests are catching size fields, masks, round trips, and backing
+   storage lifetimes close to the shared materializers.
+3. Friction: Milestone 4 spans many descriptor families. Some areas, especially
+   offline regions and query/style descriptors, mix materialization with result
+   reading or Rust handle policy, so extraction needs careful seams rather than
+   bulk moves.
+4. Approach adjustment: keep moving one descriptor family at a time, with core
+   free functions and native wrapper types first. Defer milestone review and
+   commits until the remaining Milestone 4 descriptor families are moved and the
+   diff is coherent.
+5. Next priorities: move offline-region definition materializers/readers next,
+   then render-target descriptors, then query/style descriptors. Preserve tests
+   for C `size` fields, masks, null pointers, strings, nested arrays, and owned
+   backing storage.
 
 ## Notes
 
@@ -182,3 +302,50 @@ milestone until complete (through 9).
   implementations for native wrappers, adding `NativeJsonMembers::is_empty`,
   documenting `copy_json_members` safety, and adding JSON/geometry/GeoJSON copy
   survival tests. Committed and pushed review fixes as `354e26b`.
+- Iteration 12 started Milestone 4 by moving `MapOptions`, `MapViewportOptions`,
+  and `MapTileOptions` plus their native materializers and readers into
+  `maplibre-native-core::options`. The public Rust crate re-exports the option
+  types and keeps raw conversion calls behind private extension traits. Added
+  core tests for size fields, field masks, and round trips.
+- Iteration 13 moved camera descriptor adaptation into
+  `maplibre-native-core::camera`: `CameraOptions`, `AnimationOptions`,
+  `CameraFitOptions`, `BoundOptions`, `FreeCameraOptions`, and `ProjectionMode`.
+  The public Rust crate re-exports those types and keeps raw conversions/readers
+  behind private extension traits. Added core tests for size fields, field
+  masks, and round trips.
+- Iteration 14 reflection confirmed the slice-by-slice approach is still sound
+  for Milestone 4. Moved `RuntimeOptions` and `NativeRuntimeOptions` into
+  `maplibre-native-core::runtime`, kept public Rust ergonomics via a private
+  extension trait, and added core tests for flags, null pointers, and retained C
+  string backing storage.
+- Iteration 15 moved offline-region definition descriptors into
+  `maplibre-native-core::runtime`, including tile-pyramid and geometry-region
+  materializers with retained C string and geometry backing storage. Also moved
+  `OfflineRegionInfo` and offline definition copying into core as the first
+  Milestone 5 reader extraction slice. Public Rust now re-exports the types and
+  uses private extension traits/free functions for raw conversion calls.
+- Iteration 16 moved render-target descriptor materializers into
+  `maplibre-native-core::render` for generic owned textures, Metal surface and
+  texture descriptors, and Vulkan surface and texture descriptors. The public
+  Rust descriptors keep `NativePointer` ergonomics and delegate raw size/pointer
+  field initialization to core helpers. Added core tests for size fields,
+  backend pointer fields, and Vulkan layout/format fields.
+- Iteration 17 moved query descriptor materializers into
+  `maplibre-native-core::query`: `FeatureStateSelector`,
+  `RenderedQueryGeometry`, `RenderedFeatureQueryOptions`, and
+  `SourceFeatureQueryOptions` plus their native wrappers. The public render
+  module re-exports the query types and uses private extension traits for raw
+  materialization. Added core tests for selector masks/views, rendered query
+  geometry variants, layer/source-layer arrays, JSON filter pointers, and
+  retained backing storage.
+- Iteration 18 moved style option descriptor materializers into
+  `maplibre-native-core::style`: `TileSourceOptions`, `NativeTileSourceOptions`,
+  and `StyleImageOptions`. The public map style module re-exports those types
+  and uses private extension traits for raw calls. Added core tests for tile
+  source masks, attribution string views, bounds, encoding fields, and style
+  image option defaults/masks.
+- Iteration 19 completed Milestone 4 review. Parallel reviewers found no
+  blockers and confirmed the descriptor extraction is coherent. Custom geometry
+  source options remain in the public crate because they include callback
+  trampolines and Rust callback/user-data policy rather than bridge-neutral C
+  descriptor adaptation.

@@ -9,418 +9,60 @@ use crate::geojson::Feature;
 use crate::geojson::FeatureNativeExt;
 use crate::json::JsonValue;
 use crate::json::JsonValueNativeExt;
-use crate::values::NativeValue;
-use crate::values::{ScreenBox, ScreenPoint};
 
-/// Source, feature, and state-key selector for render-session feature state.
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[non_exhaustive]
-pub struct FeatureStateSelector {
-    source_id: String,
-    source_layer_id: Option<String>,
-    feature_id: Option<String>,
-    state_key: Option<String>,
+pub use support::query::{
+    FeatureStateSelector, RenderedFeatureQueryOptions, RenderedQueryGeometry,
+    SourceFeatureQueryOptions,
+};
+pub(crate) use support::query::{
+    NativeFeatureStateSelector, NativeRenderedFeatureQueryOptions, NativeRenderedQueryGeometry,
+    NativeSourceFeatureQueryOptions,
+};
+
+pub(crate) trait FeatureStateSelectorNativeExt {
+    fn to_native(&self) -> NativeFeatureStateSelector<'_>;
 }
 
-impl FeatureStateSelector {
-    pub fn new(source_id: impl Into<String>) -> Self {
-        Self {
-            source_id: source_id.into(),
-            source_layer_id: None,
-            feature_id: None,
-            state_key: None,
-        }
-    }
-
-    pub fn source_id(&self) -> &str {
-        &self.source_id
-    }
-
-    pub fn source_layer_id(&self) -> Option<&str> {
-        self.source_layer_id.as_deref()
-    }
-
-    pub fn feature_id(&self) -> Option<&str> {
-        self.feature_id.as_deref()
-    }
-
-    pub fn state_key(&self) -> Option<&str> {
-        self.state_key.as_deref()
-    }
-
-    pub fn with_source_layer_id(mut self, source_layer_id: impl Into<String>) -> Self {
-        self.source_layer_id = Some(source_layer_id.into());
-        self
-    }
-
-    pub fn without_source_layer_id(mut self) -> Self {
-        self.source_layer_id = None;
-        self
-    }
-
-    pub fn with_feature_id(mut self, feature_id: impl Into<String>) -> Self {
-        self.feature_id = Some(feature_id.into());
-        self
-    }
-
-    pub fn without_feature_id(mut self) -> Self {
-        self.feature_id = None;
-        self.state_key = None;
-        self
-    }
-
-    pub fn with_state_key(mut self, state_key: impl Into<String>) -> Result<Self> {
-        if self.feature_id.is_none() {
-            return Err(crate::Error::invalid_argument(
-                "feature state selector state_key requires feature_id",
-            ));
-        }
-        self.state_key = Some(state_key.into());
-        Ok(self)
-    }
-
-    pub fn without_state_key(mut self) -> Self {
-        self.state_key = None;
-        self
-    }
-
-    pub(crate) fn to_native(&self) -> NativeFeatureStateSelector<'_> {
-        NativeFeatureStateSelector::new(self)
+impl FeatureStateSelectorNativeExt for FeatureStateSelector {
+    fn to_native(&self) -> NativeFeatureStateSelector<'_> {
+        support::query::feature_state_selector_to_native(self)
     }
 }
 
-pub(crate) struct NativeFeatureStateSelector<'a> {
-    raw: sys::mln_feature_state_selector,
-    _source_id: support::string::StringView<'a>,
-    _source_layer_id: Option<support::string::StringView<'a>>,
-    _feature_id: Option<support::string::StringView<'a>>,
-    _state_key: Option<support::string::StringView<'a>>,
+pub(crate) trait RenderedQueryGeometryNativeExt {
+    fn to_native(&self) -> NativeRenderedQueryGeometry;
 }
 
-impl<'a> NativeFeatureStateSelector<'a> {
-    fn new(selector: &'a FeatureStateSelector) -> Self {
-        let source_id = support::string::string_view(&selector.source_id);
-        let source_layer_id = selector
-            .source_layer_id
-            .as_deref()
-            .map(support::string::string_view);
-        let feature_id = selector
-            .feature_id
-            .as_deref()
-            .map(support::string::string_view);
-        let state_key = selector
-            .state_key
-            .as_deref()
-            .map(support::string::string_view);
-        let mut fields = 0;
-        if source_layer_id.is_some() {
-            fields |= sys::MLN_FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID;
-        }
-        if feature_id.is_some() {
-            fields |= sys::MLN_FEATURE_STATE_SELECTOR_FEATURE_ID;
-        }
-        if state_key.is_some() {
-            fields |= sys::MLN_FEATURE_STATE_SELECTOR_STATE_KEY;
-        }
-        let raw = sys::mln_feature_state_selector {
-            size: mem::size_of::<sys::mln_feature_state_selector>() as u32,
-            fields,
-            source_id: source_id.raw(),
-            source_layer_id: source_layer_id.map_or(empty_string_view(), |view| view.raw()),
-            feature_id: feature_id.map_or(empty_string_view(), |view| view.raw()),
-            state_key: state_key.map_or(empty_string_view(), |view| view.raw()),
-        };
-        Self {
-            raw,
-            _source_id: source_id,
-            _source_layer_id: source_layer_id,
-            _feature_id: feature_id,
-            _state_key: state_key,
-        }
+impl RenderedQueryGeometryNativeExt for RenderedQueryGeometry {
+    fn to_native(&self) -> NativeRenderedQueryGeometry {
+        support::query::rendered_query_geometry_to_native(self)
     }
+}
 
-    pub(crate) fn as_ptr(&self) -> *const sys::mln_feature_state_selector {
-        &self.raw
+pub(crate) trait RenderedFeatureQueryOptionsNativeExt {
+    fn to_native(&self) -> Result<NativeRenderedFeatureQueryOptions<'_>>;
+}
+
+impl RenderedFeatureQueryOptionsNativeExt for RenderedFeatureQueryOptions {
+    fn to_native(&self) -> Result<NativeRenderedFeatureQueryOptions<'_>> {
+        support::query::rendered_feature_query_options_to_native(self)
     }
+}
 
-    #[cfg(test)]
-    pub(crate) fn as_ref(&self) -> &sys::mln_feature_state_selector {
-        &self.raw
+pub(crate) trait SourceFeatureQueryOptionsNativeExt {
+    fn to_native(&self) -> Result<NativeSourceFeatureQueryOptions<'_>>;
+}
+
+impl SourceFeatureQueryOptionsNativeExt for SourceFeatureQueryOptions {
+    fn to_native(&self) -> Result<NativeSourceFeatureQueryOptions<'_>> {
+        support::query::source_feature_query_options_to_native(self)
     }
 }
 
 fn empty_string_view() -> sys::mln_string_view {
     sys::mln_string_view {
-        data: std::ptr::null(),
+        data: ptr::null(),
         size: 0,
-    }
-}
-
-/// Screen-space geometry used for rendered feature queries.
-#[derive(Debug, Clone, PartialEq)]
-#[non_exhaustive]
-pub enum RenderedQueryGeometry {
-    Point(ScreenPoint),
-    Box(ScreenBox),
-    LineString(Vec<ScreenPoint>),
-}
-
-impl RenderedQueryGeometry {
-    pub fn point(point: ScreenPoint) -> Self {
-        Self::Point(point)
-    }
-
-    pub fn box_(box_: ScreenBox) -> Self {
-        Self::Box(box_)
-    }
-
-    pub fn line_string(points: Vec<ScreenPoint>) -> Self {
-        Self::LineString(points)
-    }
-
-    pub(crate) fn to_native(&self) -> NativeRenderedQueryGeometry {
-        NativeRenderedQueryGeometry::new(self)
-    }
-}
-
-pub(crate) struct NativeRenderedQueryGeometry {
-    raw: sys::mln_rendered_query_geometry,
-    _points: Vec<sys::mln_screen_point>,
-}
-
-impl NativeRenderedQueryGeometry {
-    fn new(geometry: &RenderedQueryGeometry) -> Self {
-        match geometry {
-            RenderedQueryGeometry::Point(point) => {
-                // SAFETY: C constructor takes the point by value.
-                let raw = unsafe { sys::mln_rendered_query_geometry_point(point.to_native()) };
-                Self {
-                    raw,
-                    _points: Vec::new(),
-                }
-            }
-            RenderedQueryGeometry::Box(box_) => {
-                let raw_box = sys::mln_screen_box {
-                    min: box_.min.to_native(),
-                    max: box_.max.to_native(),
-                };
-                // SAFETY: C constructor takes the box by value.
-                let raw = unsafe { sys::mln_rendered_query_geometry_box(raw_box) };
-                Self {
-                    raw,
-                    _points: Vec::new(),
-                }
-            }
-            RenderedQueryGeometry::LineString(points) => {
-                let native_points = points
-                    .iter()
-                    .copied()
-                    .map(ScreenPoint::to_native)
-                    .collect::<Vec<_>>();
-                let ptr = const_ptr_or_null(&native_points);
-                // SAFETY: ptr either is null for empty points or points to
-                // native_points storage retained by this materializer.
-                let raw = unsafe {
-                    sys::mln_rendered_query_geometry_line_string(ptr, native_points.len())
-                };
-                Self {
-                    raw,
-                    _points: native_points,
-                }
-            }
-        }
-    }
-
-    pub(crate) fn as_ptr(&self) -> *const sys::mln_rendered_query_geometry {
-        &self.raw
-    }
-
-    #[cfg(test)]
-    pub(crate) fn as_ref(&self) -> &sys::mln_rendered_query_geometry {
-        &self.raw
-    }
-}
-
-/// Options for rendered feature queries.
-#[derive(Debug, Clone, PartialEq, Default)]
-#[non_exhaustive]
-pub struct RenderedFeatureQueryOptions {
-    pub layer_ids: Option<Vec<String>>,
-    pub filter: Option<JsonValue>,
-}
-
-impl RenderedFeatureQueryOptions {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn with_layer_ids(mut self, layer_ids: Vec<String>) -> Self {
-        self.layer_ids = Some(layer_ids);
-        self
-    }
-
-    pub fn without_layer_ids(mut self) -> Self {
-        self.layer_ids = None;
-        self
-    }
-
-    pub fn with_filter(mut self, filter: JsonValue) -> Self {
-        self.filter = Some(filter);
-        self
-    }
-
-    pub fn without_filter(mut self) -> Self {
-        self.filter = None;
-        self
-    }
-
-    pub(crate) fn to_native(&self) -> Result<NativeRenderedFeatureQueryOptions<'_>> {
-        NativeRenderedFeatureQueryOptions::new(self)
-    }
-}
-
-pub(crate) struct NativeRenderedFeatureQueryOptions<'a> {
-    raw: sys::mln_rendered_feature_query_options,
-    _layer_id_views: Vec<support::string::StringView<'a>>,
-    _raw_layer_ids: Vec<sys::mln_string_view>,
-    _filter: Option<crate::json::NativeJsonValue>,
-    _filter_raw: Option<Box<sys::mln_json_value>>,
-}
-
-impl<'a> NativeRenderedFeatureQueryOptions<'a> {
-    fn new(options: &'a RenderedFeatureQueryOptions) -> Result<Self> {
-        // SAFETY: Default constructor takes no arguments and initializes size.
-        let mut raw = unsafe { sys::mln_rendered_feature_query_options_default() };
-        let mut layer_id_views = Vec::new();
-        let mut raw_layer_ids = Vec::new();
-        if let Some(layer_ids) = &options.layer_ids {
-            raw.fields |= sys::MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS;
-            layer_id_views = layer_ids
-                .iter()
-                .map(|id| support::string::string_view(id))
-                .collect();
-            raw_layer_ids = layer_id_views.iter().map(|view| view.raw()).collect();
-            raw.layer_ids = const_ptr_or_null(&raw_layer_ids);
-            raw.layer_id_count = raw_layer_ids.len();
-        }
-        let filter = options
-            .filter
-            .as_ref()
-            .map(JsonValue::try_to_native)
-            .transpose()?;
-        let filter_raw = filter.as_ref().map(|filter| Box::new(*filter.as_ref()));
-        if let Some(filter_raw) = &filter_raw {
-            raw.filter = filter_raw.as_ref();
-        }
-        Ok(Self {
-            raw,
-            _layer_id_views: layer_id_views,
-            _raw_layer_ids: raw_layer_ids,
-            _filter: filter,
-            _filter_raw: filter_raw,
-        })
-    }
-
-    pub(crate) fn as_ptr(&self) -> *const sys::mln_rendered_feature_query_options {
-        &self.raw
-    }
-
-    #[cfg(test)]
-    pub(crate) fn as_ref(&self) -> &sys::mln_rendered_feature_query_options {
-        &self.raw
-    }
-}
-
-/// Options for source feature queries.
-#[derive(Debug, Clone, PartialEq, Default)]
-#[non_exhaustive]
-pub struct SourceFeatureQueryOptions {
-    pub source_layer_ids: Option<Vec<String>>,
-    pub filter: Option<JsonValue>,
-}
-
-impl SourceFeatureQueryOptions {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn with_source_layer_ids(mut self, source_layer_ids: Vec<String>) -> Self {
-        self.source_layer_ids = Some(source_layer_ids);
-        self
-    }
-
-    pub fn without_source_layer_ids(mut self) -> Self {
-        self.source_layer_ids = None;
-        self
-    }
-
-    pub fn with_filter(mut self, filter: JsonValue) -> Self {
-        self.filter = Some(filter);
-        self
-    }
-
-    pub fn without_filter(mut self) -> Self {
-        self.filter = None;
-        self
-    }
-
-    pub(crate) fn to_native(&self) -> Result<NativeSourceFeatureQueryOptions<'_>> {
-        NativeSourceFeatureQueryOptions::new(self)
-    }
-}
-
-pub(crate) struct NativeSourceFeatureQueryOptions<'a> {
-    raw: sys::mln_source_feature_query_options,
-    _source_layer_id_views: Vec<support::string::StringView<'a>>,
-    _raw_source_layer_ids: Vec<sys::mln_string_view>,
-    _filter: Option<crate::json::NativeJsonValue>,
-    _filter_raw: Option<Box<sys::mln_json_value>>,
-}
-
-impl<'a> NativeSourceFeatureQueryOptions<'a> {
-    fn new(options: &'a SourceFeatureQueryOptions) -> Result<Self> {
-        // SAFETY: Default constructor takes no arguments and initializes size.
-        let mut raw = unsafe { sys::mln_source_feature_query_options_default() };
-        let mut source_layer_id_views = Vec::new();
-        let mut raw_source_layer_ids = Vec::new();
-        if let Some(source_layer_ids) = &options.source_layer_ids {
-            raw.fields |= sys::MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS;
-            source_layer_id_views = source_layer_ids
-                .iter()
-                .map(|id| support::string::string_view(id))
-                .collect();
-            raw_source_layer_ids = source_layer_id_views
-                .iter()
-                .map(|view| view.raw())
-                .collect();
-            raw.source_layer_ids = const_ptr_or_null(&raw_source_layer_ids);
-            raw.source_layer_id_count = raw_source_layer_ids.len();
-        }
-        let filter = options
-            .filter
-            .as_ref()
-            .map(JsonValue::try_to_native)
-            .transpose()?;
-        let filter_raw = filter.as_ref().map(|filter| Box::new(*filter.as_ref()));
-        if let Some(filter_raw) = &filter_raw {
-            raw.filter = filter_raw.as_ref();
-        }
-        Ok(Self {
-            raw,
-            _source_layer_id_views: source_layer_id_views,
-            _raw_source_layer_ids: raw_source_layer_ids,
-            _filter: filter,
-            _filter_raw: filter_raw,
-        })
-    }
-
-    pub(crate) fn as_ptr(&self) -> *const sys::mln_source_feature_query_options {
-        &self.raw
-    }
-
-    #[cfg(test)]
-    pub(crate) fn as_ref(&self) -> &sys::mln_source_feature_query_options {
-        &self.raw
     }
 }
 
@@ -478,14 +120,6 @@ impl Drop for FeatureExtensionResultHandle {
     fn drop(&mut self) {
         // SAFETY: self.0 is an owned feature-extension result handle.
         unsafe { sys::mln_feature_extension_result_destroy(self.0.as_ptr()) };
-    }
-}
-
-fn const_ptr_or_null<T>(values: &[T]) -> *const T {
-    if values.is_empty() {
-        ptr::null()
-    } else {
-        values.as_ptr()
     }
 }
 

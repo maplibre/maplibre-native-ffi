@@ -1,10 +1,11 @@
-use std::{marker::PhantomData, mem, ptr};
+use std::{mem, ptr};
 
 use maplibre_native_core as support;
 use maplibre_native_sys as sys;
+pub(crate) use support::style::NativeTileSourceOptions;
 pub use support::{
-    LocationIndicatorImageKind, RasterDemEncoding, SourceType, StyleImageInfo, TileScheme,
-    VectorTileEncoding,
+    LocationIndicatorImageKind, RasterDemEncoding, SourceType, StyleImageInfo, StyleImageOptions,
+    TileScheme, TileSourceOptions, VectorTileEncoding,
 };
 
 use crate::custom_geometry::{CanonicalTileId, CustomGeometrySourceState};
@@ -29,159 +30,23 @@ pub struct SourceInfo {
     pub attribution: Option<String>,
 }
 
-/// Options for vector, raster, and raster DEM tile sources.
-#[derive(Debug, Clone, Default, PartialEq)]
-#[non_exhaustive]
-pub struct TileSourceOptions {
-    pub min_zoom: Option<f64>,
-    pub max_zoom: Option<f64>,
-    pub attribution: Option<String>,
-    pub scheme: Option<TileScheme>,
-    pub bounds: Option<LatLngBounds>,
-    pub tile_size: Option<u32>,
-    pub vector_encoding: Option<VectorTileEncoding>,
-    pub raster_dem_encoding: Option<RasterDemEncoding>,
+pub(crate) trait TileSourceOptionsNativeExt {
+    fn to_native(&self) -> NativeTileSourceOptions<'_>;
 }
 
-impl TileSourceOptions {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn with_min_zoom(mut self, min_zoom: f64) -> Self {
-        self.min_zoom = Some(min_zoom);
-        self
-    }
-
-    pub fn with_max_zoom(mut self, max_zoom: f64) -> Self {
-        self.max_zoom = Some(max_zoom);
-        self
-    }
-
-    pub fn with_attribution(mut self, attribution: impl Into<String>) -> Self {
-        self.attribution = Some(attribution.into());
-        self
-    }
-
-    pub fn with_scheme(mut self, scheme: TileScheme) -> Self {
-        self.scheme = Some(scheme);
-        self
-    }
-
-    pub fn with_bounds(mut self, bounds: LatLngBounds) -> Self {
-        self.bounds = Some(bounds);
-        self
-    }
-
-    pub fn with_tile_size(mut self, tile_size: u32) -> Self {
-        self.tile_size = Some(tile_size);
-        self
-    }
-
-    pub fn with_vector_encoding(mut self, vector_encoding: VectorTileEncoding) -> Self {
-        self.vector_encoding = Some(vector_encoding);
-        self
-    }
-
-    pub fn with_raster_dem_encoding(mut self, raster_dem_encoding: RasterDemEncoding) -> Self {
-        self.raster_dem_encoding = Some(raster_dem_encoding);
-        self
-    }
-
-    pub(crate) fn to_native(&self) -> NativeTileSourceOptions<'_> {
-        // SAFETY: This C helper returns a plain value with no preconditions.
-        let mut raw = unsafe { sys::mln_style_tile_source_options_default() };
-        if let Some(value) = self.min_zoom {
-            raw.fields |= sys::MLN_STYLE_TILE_SOURCE_OPTION_MIN_ZOOM;
-            raw.min_zoom = value;
-        }
-        if let Some(value) = self.max_zoom {
-            raw.fields |= sys::MLN_STYLE_TILE_SOURCE_OPTION_MAX_ZOOM;
-            raw.max_zoom = value;
-        }
-        if let Some(value) = self.attribution.as_deref() {
-            raw.fields |= sys::MLN_STYLE_TILE_SOURCE_OPTION_ATTRIBUTION;
-            raw.attribution = support::string::string_view(value).raw();
-        }
-        if let Some(value) = self.scheme {
-            raw.fields |= sys::MLN_STYLE_TILE_SOURCE_OPTION_SCHEME;
-            raw.scheme = value.raw_value();
-        }
-        if let Some(value) = self.bounds {
-            raw.fields |= sys::MLN_STYLE_TILE_SOURCE_OPTION_BOUNDS;
-            raw.bounds = value.to_native();
-        }
-        if let Some(value) = self.tile_size {
-            raw.fields |= sys::MLN_STYLE_TILE_SOURCE_OPTION_TILE_SIZE;
-            raw.tile_size = value;
-        }
-        if let Some(value) = self.vector_encoding {
-            raw.fields |= sys::MLN_STYLE_TILE_SOURCE_OPTION_VECTOR_ENCODING;
-            raw.vector_encoding = value.raw_value();
-        }
-        if let Some(value) = self.raster_dem_encoding {
-            raw.fields |= sys::MLN_STYLE_TILE_SOURCE_OPTION_RASTER_ENCODING;
-            raw.raster_encoding = value.raw_value();
-        }
-        NativeTileSourceOptions {
-            raw,
-            lifetime: PhantomData,
-        }
+impl TileSourceOptionsNativeExt for TileSourceOptions {
+    fn to_native(&self) -> NativeTileSourceOptions<'_> {
+        support::style::tile_source_options_to_native(self)
     }
 }
 
-pub(crate) struct NativeTileSourceOptions<'a> {
-    raw: sys::mln_style_tile_source_options,
-    lifetime: PhantomData<&'a str>,
+pub(crate) trait StyleImageOptionsNativeExt {
+    fn to_native(&self) -> sys::mln_style_image_options;
 }
 
-impl NativeTileSourceOptions<'_> {
-    pub(crate) fn as_ptr(&self) -> *const sys::mln_style_tile_source_options {
-        ptr::from_ref(&self.raw)
-    }
-}
-
-/// Options for adding or replacing a runtime style image.
-#[derive(Debug, Clone, Default, PartialEq)]
-#[non_exhaustive]
-pub struct StyleImageOptions {
-    pub pixel_ratio: Option<f32>,
-    pub sdf: Option<bool>,
-}
-
-impl StyleImageOptions {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn with_pixel_ratio(mut self, pixel_ratio: f32) -> Self {
-        self.pixel_ratio = Some(pixel_ratio);
-        self
-    }
-
-    pub fn with_sdf(mut self, sdf: bool) -> Self {
-        self.sdf = Some(sdf);
-        self
-    }
-
-    pub(crate) fn to_native(&self) -> sys::mln_style_image_options {
-        let mut fields = 0;
-        let mut pixel_ratio = 1.0;
-        let mut sdf = false;
-        if let Some(value) = self.pixel_ratio {
-            fields |= sys::MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO;
-            pixel_ratio = value;
-        }
-        if let Some(value) = self.sdf {
-            fields |= sys::MLN_STYLE_IMAGE_OPTION_SDF;
-            sdf = value;
-        }
-        sys::mln_style_image_options {
-            size: mem::size_of::<sys::mln_style_image_options>() as u32,
-            fields,
-            pixel_ratio,
-            sdf,
-        }
+impl StyleImageOptionsNativeExt for StyleImageOptions {
+    fn to_native(&self) -> sys::mln_style_image_options {
+        support::style::style_image_options_to_native(self)
     }
 }
 

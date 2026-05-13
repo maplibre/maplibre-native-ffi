@@ -7,6 +7,10 @@ use std::rc::Rc;
 use maplibre_native_core as support;
 use maplibre_native_sys as sys;
 
+use crate::camera::{
+    AnimationOptionsNativeExt, BoundOptionsNativeExt, CameraFitOptionsNativeExt,
+    CameraOptionsNativeExt, FreeCameraOptionsNativeExt, ProjectionModeNativeExt,
+};
 #[cfg(test)]
 use crate::custom_geometry::CanonicalTileId;
 use crate::custom_geometry::CustomGeometrySourceState;
@@ -14,6 +18,7 @@ use crate::events::MapId;
 use crate::geometry::GeometryNativeExt;
 use crate::handle::{ThreadAffineNativeHandle, closed_handle_error, out_handle};
 use crate::json::JsonValueNativeExt;
+use crate::options::{MapOptionsNativeExt, MapTileOptionsNativeExt, MapViewportOptionsNativeExt};
 use crate::render::{
     MetalBorrowedTextureDescriptor, MetalOwnedTextureDescriptor, MetalSurfaceDescriptor,
     OwnedTextureDescriptor, RenderSessionHandle, VulkanBorrowedTextureDescriptor,

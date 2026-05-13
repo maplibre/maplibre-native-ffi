@@ -158,6 +158,11 @@ pub use query::{
     FeatureExtensionResult, FeatureStateSelector, QueriedFeature, RenderedFeatureQueryOptions,
     RenderedQueryGeometry, SourceFeatureQueryOptions,
 };
+#[cfg(test)]
+pub(crate) use query::{
+    FeatureStateSelectorNativeExt, RenderedFeatureQueryOptionsNativeExt,
+    RenderedQueryGeometryNativeExt, SourceFeatureQueryOptionsNativeExt,
+};
 
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
@@ -177,12 +182,13 @@ impl OwnedTextureDescriptor {
     }
 
     pub(crate) fn to_native(&self) -> sys::mln_owned_texture_descriptor {
-        // SAFETY: Default constructor takes no arguments and initializes size.
-        let mut raw = unsafe { sys::mln_owned_texture_descriptor_default() };
-        raw.width = self.width;
-        raw.height = self.height;
-        raw.scale_factor = self.scale_factor;
-        raw
+        support::render::owned_texture_descriptor_to_native(
+            support::render::TextureDescriptorFields {
+                width: self.width,
+                height: self.height,
+                scale_factor: self.scale_factor,
+            },
+        )
     }
 }
 
@@ -219,14 +225,13 @@ impl MetalSurfaceDescriptor {
     }
 
     pub(crate) fn to_native(&self) -> sys::mln_metal_surface_descriptor {
-        // SAFETY: Default constructor takes no arguments and initializes size.
-        let mut raw = unsafe { sys::mln_metal_surface_descriptor_default() };
-        raw.width = self.width;
-        raw.height = self.height;
-        raw.scale_factor = self.scale_factor;
-        raw.layer = self.layer.as_void_ptr();
-        raw.device = self.device.as_void_ptr();
-        raw
+        support::render::metal_surface_descriptor_to_native(
+            support::render::MetalSurfaceDescriptorFields {
+                texture: texture_descriptor_fields(self.width, self.height, self.scale_factor),
+                layer: self.layer.as_void_ptr(),
+                device: self.device.as_void_ptr(),
+            },
+        )
     }
 }
 
@@ -271,18 +276,17 @@ impl VulkanSurfaceDescriptor {
     }
 
     pub(crate) fn to_native(&self) -> sys::mln_vulkan_surface_descriptor {
-        // SAFETY: Default constructor takes no arguments and initializes size.
-        let mut raw = unsafe { sys::mln_vulkan_surface_descriptor_default() };
-        raw.width = self.width;
-        raw.height = self.height;
-        raw.scale_factor = self.scale_factor;
-        raw.instance = self.instance.as_void_ptr();
-        raw.physical_device = self.physical_device.as_void_ptr();
-        raw.device = self.device.as_void_ptr();
-        raw.graphics_queue = self.graphics_queue.as_void_ptr();
-        raw.graphics_queue_family_index = self.graphics_queue_family_index;
-        raw.surface = self.surface.as_void_ptr();
-        raw
+        support::render::vulkan_surface_descriptor_to_native(
+            support::render::VulkanSurfaceDescriptorFields {
+                texture: texture_descriptor_fields(self.width, self.height, self.scale_factor),
+                instance: self.instance.as_void_ptr(),
+                physical_device: self.physical_device.as_void_ptr(),
+                device: self.device.as_void_ptr(),
+                graphics_queue: self.graphics_queue.as_void_ptr(),
+                graphics_queue_family_index: self.graphics_queue_family_index,
+                surface: self.surface.as_void_ptr(),
+            },
+        )
     }
 }
 
@@ -306,13 +310,12 @@ impl MetalOwnedTextureDescriptor {
     }
 
     pub(crate) fn to_native(&self) -> sys::mln_metal_owned_texture_descriptor {
-        // SAFETY: Default constructor takes no arguments and initializes size.
-        let mut raw = unsafe { sys::mln_metal_owned_texture_descriptor_default() };
-        raw.width = self.width;
-        raw.height = self.height;
-        raw.scale_factor = self.scale_factor;
-        raw.device = self.device.as_void_ptr();
-        raw
+        support::render::metal_owned_texture_descriptor_to_native(
+            support::render::MetalOwnedTextureDescriptorFields {
+                texture: texture_descriptor_fields(self.width, self.height, self.scale_factor),
+                device: self.device.as_void_ptr(),
+            },
+        )
     }
 }
 
@@ -336,13 +339,12 @@ impl MetalBorrowedTextureDescriptor {
     }
 
     pub(crate) fn to_native(&self) -> sys::mln_metal_borrowed_texture_descriptor {
-        // SAFETY: Default constructor takes no arguments and initializes size.
-        let mut raw = unsafe { sys::mln_metal_borrowed_texture_descriptor_default() };
-        raw.width = self.width;
-        raw.height = self.height;
-        raw.scale_factor = self.scale_factor;
-        raw.texture = self.texture.as_void_ptr();
-        raw
+        support::render::metal_borrowed_texture_descriptor_to_native(
+            support::render::MetalBorrowedTextureDescriptorFields {
+                texture: texture_descriptor_fields(self.width, self.height, self.scale_factor),
+                texture_handle: self.texture.as_void_ptr(),
+            },
+        )
     }
 }
 
@@ -384,17 +386,16 @@ impl VulkanOwnedTextureDescriptor {
     }
 
     pub(crate) fn to_native(&self) -> sys::mln_vulkan_owned_texture_descriptor {
-        // SAFETY: Default constructor takes no arguments and initializes size.
-        let mut raw = unsafe { sys::mln_vulkan_owned_texture_descriptor_default() };
-        raw.width = self.width;
-        raw.height = self.height;
-        raw.scale_factor = self.scale_factor;
-        raw.instance = self.instance.as_void_ptr();
-        raw.physical_device = self.physical_device.as_void_ptr();
-        raw.device = self.device.as_void_ptr();
-        raw.graphics_queue = self.graphics_queue.as_void_ptr();
-        raw.graphics_queue_family_index = self.graphics_queue_family_index;
-        raw
+        support::render::vulkan_owned_texture_descriptor_to_native(
+            support::render::VulkanOwnedTextureDescriptorFields {
+                texture: texture_descriptor_fields(self.width, self.height, self.scale_factor),
+                instance: self.instance.as_void_ptr(),
+                physical_device: self.physical_device.as_void_ptr(),
+                device: self.device.as_void_ptr(),
+                graphics_queue: self.graphics_queue.as_void_ptr(),
+                graphics_queue_family_index: self.graphics_queue_family_index,
+            },
+        )
     }
 }
 
@@ -451,22 +452,33 @@ impl VulkanBorrowedTextureDescriptor {
     }
 
     pub(crate) fn to_native(&self) -> sys::mln_vulkan_borrowed_texture_descriptor {
-        // SAFETY: Default constructor takes no arguments and initializes size.
-        let mut raw = unsafe { sys::mln_vulkan_borrowed_texture_descriptor_default() };
-        raw.width = self.width;
-        raw.height = self.height;
-        raw.scale_factor = self.scale_factor;
-        raw.instance = self.instance.as_void_ptr();
-        raw.physical_device = self.physical_device.as_void_ptr();
-        raw.device = self.device.as_void_ptr();
-        raw.graphics_queue = self.graphics_queue.as_void_ptr();
-        raw.graphics_queue_family_index = self.graphics_queue_family_index;
-        raw.image = self.image.as_void_ptr();
-        raw.image_view = self.image_view.as_void_ptr();
-        raw.format = self.format;
-        raw.initial_layout = self.initial_layout;
-        raw.final_layout = self.final_layout;
-        raw
+        support::render::vulkan_borrowed_texture_descriptor_to_native(
+            support::render::VulkanBorrowedTextureDescriptorFields {
+                texture: texture_descriptor_fields(self.width, self.height, self.scale_factor),
+                instance: self.instance.as_void_ptr(),
+                physical_device: self.physical_device.as_void_ptr(),
+                device: self.device.as_void_ptr(),
+                graphics_queue: self.graphics_queue.as_void_ptr(),
+                graphics_queue_family_index: self.graphics_queue_family_index,
+                image: self.image.as_void_ptr(),
+                image_view: self.image_view.as_void_ptr(),
+                format: self.format,
+                initial_layout: self.initial_layout,
+                final_layout: self.final_layout,
+            },
+        )
+    }
+}
+
+fn texture_descriptor_fields(
+    width: u32,
+    height: u32,
+    scale_factor: f64,
+) -> support::render::TextureDescriptorFields {
+    support::render::TextureDescriptorFields {
+        width,
+        height,
+        scale_factor,
     }
 }
 

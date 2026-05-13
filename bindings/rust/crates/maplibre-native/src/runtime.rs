@@ -1,6 +1,5 @@
 use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
-use std::ffi::CString;
 use std::fmt;
 use std::rc::{Rc, Weak};
 
@@ -12,336 +11,37 @@ use crate::events::{
     MapId, OfflineRegionDownloadState, OfflineRegionStatus, RuntimeEvent, RuntimeEventSource,
     empty_runtime_event,
 };
-use crate::geometry::GeometryNativeExt;
 use crate::handle::{ThreadAffineNativeHandle, closed_handle_error, out_handle};
 use crate::map::MapState;
 use crate::resource::{
     ResourceProviderState, ResourceTransformState, noop_resource_transform_descriptor,
 };
-use crate::values::NativeValue;
 use crate::{
-    Error, ErrorKind, Geometry, HandleOperationError, LatLngBounds, MapHandle, MapOptions,
-    ResourceProviderDecision, Result,
+    Error, ErrorKind, HandleOperationError, MapHandle, MapOptions, ResourceProviderDecision, Result,
 };
+#[cfg(test)]
+use crate::{Geometry, LatLngBounds};
 
-/// Options used when creating a runtime.
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
-#[non_exhaustive]
-pub struct RuntimeOptions {
-    /// Filesystem root for `asset://` URLs.
-    pub asset_path: Option<String>,
-    /// Cache database path.
-    pub cache_path: Option<String>,
-    /// Maximum ambient cache size in bytes.
-    pub maximum_cache_size: Option<u64>,
+pub(crate) use support::runtime::{NativeOfflineRegionDefinition, NativeRuntimeOptions};
+pub use support::runtime::{OfflineRegionDefinition, OfflineRegionInfo, RuntimeOptions};
+
+pub(crate) trait RuntimeOptionsNativeExt {
+    fn to_native(&self) -> Result<NativeRuntimeOptions>;
 }
 
-impl RuntimeOptions {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn with_asset_path(mut self, asset_path: impl Into<String>) -> Self {
-        self.asset_path = Some(asset_path.into());
-        self
-    }
-
-    pub fn with_cache_path(mut self, cache_path: impl Into<String>) -> Self {
-        self.cache_path = Some(cache_path.into());
-        self
-    }
-
-    pub fn with_maximum_cache_size(mut self, maximum_cache_size: u64) -> Self {
-        self.maximum_cache_size = Some(maximum_cache_size);
-        self
-    }
-
-    pub fn clear_asset_path(mut self) -> Self {
-        self.asset_path = None;
-        self
-    }
-
-    pub fn clear_cache_path(mut self) -> Self {
-        self.cache_path = None;
-        self
-    }
-
-    pub fn clear_maximum_cache_size(mut self) -> Self {
-        self.maximum_cache_size = None;
-        self
-    }
-
+impl RuntimeOptionsNativeExt for RuntimeOptions {
     fn to_native(&self) -> Result<NativeRuntimeOptions> {
-        support::validate_abi_version()?;
-        NativeRuntimeOptions::new(self)
+        support::runtime::runtime_options_to_native(self)
     }
 }
 
-#[derive(Debug)]
-struct NativeRuntimeOptions {
-    asset_path: Option<CString>,
-    cache_path: Option<CString>,
-    maximum_cache_size: Option<u64>,
+pub(crate) trait OfflineRegionDefinitionNativeExt {
+    fn to_native(&self) -> Result<NativeOfflineRegionDefinition>;
 }
 
-/// Region descriptor used to create or inspect offline regions.
-#[derive(Debug, Clone, PartialEq)]
-#[non_exhaustive]
-pub enum OfflineRegionDefinition {
-    TilePyramid {
-        style_url: String,
-        bounds: LatLngBounds,
-        min_zoom: f64,
-        max_zoom: f64,
-        pixel_ratio: f32,
-        include_ideographs: bool,
-    },
-    GeometryRegion {
-        style_url: String,
-        geometry: Geometry,
-        min_zoom: f64,
-        max_zoom: f64,
-        pixel_ratio: f32,
-        include_ideographs: bool,
-    },
-}
-
-/// Offline region snapshot copied from native storage.
-#[derive(Debug, Clone, PartialEq)]
-#[non_exhaustive]
-pub struct OfflineRegionInfo {
-    pub id: i64,
-    pub definition: OfflineRegionDefinition,
-    pub metadata: Vec<u8>,
-}
-
-enum NativeOfflineRegionDefinition {
-    TilePyramid {
-        style_url: CString,
-        bounds: LatLngBounds,
-        min_zoom: f64,
-        max_zoom: f64,
-        pixel_ratio: f32,
-        include_ideographs: bool,
-    },
-    GeometryRegion {
-        style_url: CString,
-        geometry: crate::geometry::NativeGeometry,
-        min_zoom: f64,
-        max_zoom: f64,
-        pixel_ratio: f32,
-        include_ideographs: bool,
-    },
-}
-
-impl NativeOfflineRegionDefinition {
-    fn new(definition: &OfflineRegionDefinition) -> Result<Self> {
-        match definition {
-            OfflineRegionDefinition::TilePyramid {
-                style_url,
-                bounds,
-                min_zoom,
-                max_zoom,
-                pixel_ratio,
-                include_ideographs,
-            } => Ok(Self::TilePyramid {
-                style_url: support::string::c_string(style_url)?,
-                bounds: *bounds,
-                min_zoom: *min_zoom,
-                max_zoom: *max_zoom,
-                pixel_ratio: *pixel_ratio,
-                include_ideographs: *include_ideographs,
-            }),
-            OfflineRegionDefinition::GeometryRegion {
-                style_url,
-                geometry,
-                min_zoom,
-                max_zoom,
-                pixel_ratio,
-                include_ideographs,
-            } => Ok(Self::GeometryRegion {
-                style_url: support::string::c_string(style_url)?,
-                geometry: geometry.try_to_native()?,
-                min_zoom: *min_zoom,
-                max_zoom: *max_zoom,
-                pixel_ratio: *pixel_ratio,
-                include_ideographs: *include_ideographs,
-            }),
-        }
-    }
-
-    fn to_raw(&self) -> sys::mln_offline_region_definition {
-        match self {
-            Self::TilePyramid {
-                style_url,
-                bounds,
-                min_zoom,
-                max_zoom,
-                pixel_ratio,
-                include_ideographs,
-            } => sys::mln_offline_region_definition {
-                size: std::mem::size_of::<sys::mln_offline_region_definition>() as u32,
-                type_: sys::MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID,
-                data: sys::mln_offline_region_definition__bindgen_ty_1 {
-                    tile_pyramid: sys::mln_offline_tile_pyramid_region_definition {
-                        size: std::mem::size_of::<sys::mln_offline_tile_pyramid_region_definition>()
-                            as u32,
-                        style_url: style_url.as_ptr(),
-                        bounds: bounds.to_native(),
-                        min_zoom: *min_zoom,
-                        max_zoom: *max_zoom,
-                        pixel_ratio: *pixel_ratio,
-                        include_ideographs: *include_ideographs,
-                    },
-                },
-            },
-            Self::GeometryRegion {
-                style_url,
-                geometry,
-                min_zoom,
-                max_zoom,
-                pixel_ratio,
-                include_ideographs,
-            } => sys::mln_offline_region_definition {
-                size: std::mem::size_of::<sys::mln_offline_region_definition>() as u32,
-                type_: sys::MLN_OFFLINE_REGION_DEFINITION_GEOMETRY,
-                data: sys::mln_offline_region_definition__bindgen_ty_1 {
-                    geometry: sys::mln_offline_geometry_region_definition {
-                        size: std::mem::size_of::<sys::mln_offline_geometry_region_definition>()
-                            as u32,
-                        style_url: style_url.as_ptr(),
-                        geometry: geometry.as_ptr(),
-                        min_zoom: *min_zoom,
-                        max_zoom: *max_zoom,
-                        pixel_ratio: *pixel_ratio,
-                        include_ideographs: *include_ideographs,
-                    },
-                },
-            },
-        }
-    }
-}
-
-fn empty_offline_region_info() -> sys::mln_offline_region_info {
-    sys::mln_offline_region_info {
-        size: std::mem::size_of::<sys::mln_offline_region_info>() as u32,
-        id: 0,
-        definition: sys::mln_offline_region_definition {
-            size: std::mem::size_of::<sys::mln_offline_region_definition>() as u32,
-            type_: 0,
-            data: sys::mln_offline_region_definition__bindgen_ty_1 {
-                tile_pyramid: sys::mln_offline_tile_pyramid_region_definition {
-                    size: std::mem::size_of::<sys::mln_offline_tile_pyramid_region_definition>()
-                        as u32,
-                    style_url: std::ptr::null(),
-                    bounds: crate::map::empty_bounds(),
-                    min_zoom: 0.0,
-                    max_zoom: 0.0,
-                    pixel_ratio: 0.0,
-                    include_ideographs: false,
-                },
-            },
-        },
-        metadata: std::ptr::null(),
-        metadata_size: 0,
-    }
-}
-
-fn copy_offline_region_info(raw: &sys::mln_offline_region_info) -> Result<OfflineRegionInfo> {
-    Ok(OfflineRegionInfo {
-        id: raw.id,
-        definition: copy_offline_region_definition(&raw.definition)?,
-        metadata: copy_metadata(raw.metadata, raw.metadata_size)?,
-    })
-}
-
-fn copy_offline_region_definition(
-    raw: &sys::mln_offline_region_definition,
-) -> Result<OfflineRegionDefinition> {
-    match raw.type_ {
-        sys::MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID => {
-            // SAFETY: Active union member is selected by raw.type_.
-            let tile = unsafe { raw.data.tile_pyramid };
-            Ok(OfflineRegionDefinition::TilePyramid {
-                // SAFETY: Native snapshot/list storage owns a NUL-terminated style URL.
-                style_url: unsafe { support::string::copy_c_string(tile.style_url) }?,
-                bounds: LatLngBounds::from_native(tile.bounds),
-                min_zoom: tile.min_zoom,
-                max_zoom: tile.max_zoom,
-                pixel_ratio: tile.pixel_ratio,
-                include_ideographs: tile.include_ideographs,
-            })
-        }
-        sys::MLN_OFFLINE_REGION_DEFINITION_GEOMETRY => {
-            // SAFETY: Active union member is selected by raw.type_.
-            let geometry = unsafe { raw.data.geometry };
-            if geometry.geometry.is_null() {
-                return Err(Error::invalid_argument(
-                    "offline region geometry must not be null",
-                ));
-            }
-            Ok(OfflineRegionDefinition::GeometryRegion {
-                // SAFETY: Native snapshot/list storage owns a NUL-terminated style URL.
-                style_url: unsafe { support::string::copy_c_string(geometry.style_url) }?,
-                // SAFETY: geometry.geometry is non-null and borrowed from live snapshot/list storage.
-                geometry: unsafe { Geometry::from_native_with_depth(&*geometry.geometry, 0) }?,
-                min_zoom: geometry.min_zoom,
-                max_zoom: geometry.max_zoom,
-                pixel_ratio: geometry.pixel_ratio,
-                include_ideographs: geometry.include_ideographs,
-            })
-        }
-        type_ => Err(Error::invalid_argument(format!(
-            "unknown offline region definition type: {type_}"
-        ))),
-    }
-}
-
-fn copy_metadata(ptr: *const u8, len: usize) -> Result<Vec<u8>> {
-    if len == 0 {
-        return Ok(Vec::new());
-    }
-    if ptr.is_null() {
-        return Err(Error::invalid_argument(
-            "offline region metadata must not be null when size is nonzero",
-        ));
-    }
-    // SAFETY: Metadata is borrowed from live snapshot/list storage and copied immediately.
-    Ok(unsafe { std::slice::from_raw_parts(ptr, len) }.to_vec())
-}
-
-fn metadata_ptr(metadata: &[u8]) -> *const u8 {
-    if metadata.is_empty() {
-        std::ptr::null()
-    } else {
-        metadata.as_ptr()
-    }
-}
-
-impl NativeRuntimeOptions {
-    fn new(options: &RuntimeOptions) -> Result<Self> {
-        Ok(Self {
-            asset_path: support::string::optional_c_string(options.asset_path.as_deref())?,
-            cache_path: support::string::optional_c_string(options.cache_path.as_deref())?,
-            maximum_cache_size: options.maximum_cache_size,
-        })
-    }
-
-    fn to_raw(&self) -> sys::mln_runtime_options {
-        // SAFETY: Default constructor takes no arguments and initializes size,
-        // flags, and default values for this C ABI version.
-        let mut raw = unsafe { sys::mln_runtime_options_default() };
-        if let Some(asset_path) = &self.asset_path {
-            raw.asset_path = asset_path.as_ptr();
-        }
-        if let Some(cache_path) = &self.cache_path {
-            raw.cache_path = cache_path.as_ptr();
-        }
-        if let Some(maximum_cache_size) = self.maximum_cache_size {
-            raw.flags |= sys::MLN_RUNTIME_OPTION_MAXIMUM_CACHE_SIZE;
-            raw.maximum_cache_size = maximum_cache_size;
-        }
-        raw
+impl OfflineRegionDefinitionNativeExt for OfflineRegionDefinition {
+    fn to_native(&self) -> Result<NativeOfflineRegionDefinition> {
+        support::runtime::offline_region_definition_to_native(self)
     }
 }
 
@@ -520,10 +220,10 @@ fn copy_offline_region_snapshot(
 ) -> Result<OfflineRegionInfo> {
     // SAFETY: ptr is an owned snapshot returned by the C API and released by the guard.
     let snapshot = unsafe { support::handle::offline_region_snapshot(ptr.as_ptr()) }?;
-    let mut raw = empty_offline_region_info();
+    let mut raw = support::runtime::empty_offline_region_info();
     // SAFETY: snapshot is live and raw points to writable storage with size initialized.
     support::check(unsafe { sys::mln_offline_region_snapshot_get(snapshot.as_ptr(), &mut raw) })?;
-    copy_offline_region_info(&raw)
+    support::runtime::copy_offline_region_info(&raw)
 }
 
 fn copy_offline_region_list(
@@ -536,12 +236,12 @@ fn copy_offline_region_list(
     support::check(unsafe { sys::mln_offline_region_list_count(list.as_ptr(), &mut count) })?;
     let mut regions = Vec::with_capacity(count);
     for index in 0..count {
-        let mut raw = empty_offline_region_info();
+        let mut raw = support::runtime::empty_offline_region_info();
         // SAFETY: list is live, index is in range, and raw points to writable storage.
         support::check(unsafe {
             sys::mln_offline_region_list_get(list.as_ptr(), index, &mut raw)
         })?;
-        regions.push(copy_offline_region_info(&raw)?);
+        regions.push(support::runtime::copy_offline_region_info(&raw)?);
     }
     Ok(regions)
 }
@@ -663,7 +363,7 @@ impl RuntimeHandle {
         metadata: &[u8],
     ) -> Result<OfflineRegionInfo> {
         let runtime = self.inner.as_ptr()?;
-        let definition = NativeOfflineRegionDefinition::new(definition)?;
+        let definition = definition.to_native()?;
         let mut out = support::ptr::OutPtr::<sys::mln_offline_region_snapshot>::new();
         let raw_definition = definition.to_raw();
         // SAFETY: runtime is live. raw_definition points into definition-owned
@@ -673,7 +373,7 @@ impl RuntimeHandle {
             sys::mln_runtime_offline_region_create(
                 runtime,
                 &raw_definition,
-                metadata_ptr(metadata),
+                support::runtime::metadata_ptr(metadata),
                 metadata.len(),
                 out.as_mut_ptr(),
             )
@@ -742,7 +442,7 @@ impl RuntimeHandle {
             sys::mln_runtime_offline_region_update_metadata(
                 runtime,
                 region_id,
-                metadata_ptr(metadata),
+                support::runtime::metadata_ptr(metadata),
                 metadata.len(),
                 out.as_mut_ptr(),
             )

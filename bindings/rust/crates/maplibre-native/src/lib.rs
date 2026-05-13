@@ -49,7 +49,6 @@ pub use map::{
     LocationIndicatorImageKind, MapHandle, RasterDemEncoding, SourceInfo, SourceType, StyleImage,
     StyleImageInfo, StyleImageOptions, TileScheme, TileSourceOptions, VectorTileEncoding,
 };
-pub use options::{MapOptions, MapTileOptions, MapViewportOptions};
 pub use projection::MapProjectionHandle;
 pub use render::{
     DetachedRenderSessionHandle, FeatureExtensionResult, FeatureStateSelector, FrameNativePointer,
@@ -67,10 +66,11 @@ pub use resource::{
 pub use runtime::{OfflineRegionDefinition, OfflineRegionInfo, RuntimeHandle, RuntimeOptions};
 pub use support::{
     AmbientCacheOperation, ConstrainMode, Error, ErrorKind, LogEvent, LogSeverity, LogSeverityMask,
-    MapDebugOptions, MapMode, NetworkStatus, NorthOrientation, OfflineRegionDownloadState,
-    RenderBackendMask, RenderMode, ResourceErrorReason, ResourceKind, ResourceLoadingMethod,
-    ResourcePriority, ResourceResponseStatus, ResourceStoragePolicy, ResourceUsage, Result,
-    RuntimeEventType, TileLodMode, TileOperation, ViewportMode,
+    MapDebugOptions, MapMode, MapOptions, MapTileOptions, MapViewportOptions, NetworkStatus,
+    NorthOrientation, OfflineRegionDownloadState, RenderBackendMask, RenderMode,
+    ResourceErrorReason, ResourceKind, ResourceLoadingMethod, ResourcePriority,
+    ResourceResponseStatus, ResourceStoragePolicy, ResourceUsage, Result, RuntimeEventType,
+    TileLodMode, TileOperation, ViewportMode,
 };
 pub use values::{
     EdgeInsets, LatLng, LatLngBounds, ProjectedMeters, Quaternion, ScreenBox, ScreenPoint,

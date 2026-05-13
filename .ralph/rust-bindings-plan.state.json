@@ -1,7 +1,7 @@
 {
   "name": "rust-bindings-plan",
   "taskFile": ".ralph/rust-bindings-plan.md",
-  "iteration": 8,
+  "iteration": 16,
   "maxIterations": 50,
   "itemsPerIteration": 3,
   "reflectEvery": 10,
@@ -9,5 +9,5 @@
   "active": true,
   "status": "active",
   "startedAt": "2026-05-13T06:32:01.135Z",
-  "lastReflectionAt": 0
+  "lastReflectionAt": 11
 }

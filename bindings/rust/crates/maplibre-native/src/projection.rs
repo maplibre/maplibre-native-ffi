@@ -3,6 +3,7 @@ use std::fmt;
 use maplibre_native_core as support;
 use maplibre_native_sys as sys;
 
+use crate::camera::CameraOptionsNativeExt;
 use crate::geometry::GeometryNativeExt;
 use crate::handle::{ThreadAffineNativeHandle, closed_handle_error, out_handle};
 use crate::map::{const_ptr_or_null, empty_lat_lng, empty_screen_point, lat_lngs_to_native};
