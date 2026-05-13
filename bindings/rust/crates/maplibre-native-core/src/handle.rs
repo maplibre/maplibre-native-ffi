@@ -1,3 +1,4 @@
+use std::cell::Cell;
 use std::marker::PhantomData;
 use std::ptr::NonNull;
 
@@ -6,11 +7,124 @@ use maplibre_native_sys as sys;
 use crate::error::Result;
 use crate::ptr::non_null_mut;
 
+pub type StatusDestroyFn<T> = unsafe extern "C" fn(*mut T) -> sys::mln_status;
+pub type InfallibleDestroyFn<T> = unsafe extern "C" fn(*mut T);
+
+/// Bridge-neutral native pointer ownership state.
+///
+/// `NativeHandleState` tracks whether a native handle pointer is still live and
+/// centralizes close-once behavior. It intentionally does not encode public Rust
+/// handle policy such as `!Send`, parent retention, owner-thread checks, or
+/// finalizer dispatch.
+#[derive(Debug)]
+pub struct NativeHandleState<T> {
+    address: Cell<Option<usize>>,
+    type_name: &'static str,
+    _typed_handle: PhantomData<fn() -> T>,
+}
+
+impl<T> NativeHandleState<T> {
+    /// Takes ownership of a native handle pointer.
+    ///
+    /// # Safety
+    ///
+    /// `ptr` must be a non-null owned live handle of the matching native type.
+    /// The caller must later close the state with the matching C API destroy
+    /// function or intentionally report the pointer as leaked.
+    pub unsafe fn from_raw(ptr: NonNull<T>, type_name: &'static str) -> Self {
+        Self {
+            address: Cell::new(Some(ptr.as_ptr() as usize)),
+            type_name,
+            _typed_handle: PhantomData,
+        }
+    }
+
+    /// Takes ownership of a native handle pointer after validating non-nullness.
+    ///
+    /// # Safety
+    ///
+    /// `ptr` must be an owned live handle of the matching native type when it is
+    /// non-null. The caller must later close the state with the matching C API
+    /// destroy function or intentionally report the pointer as leaked.
+    pub unsafe fn from_raw_ptr(ptr: *mut T, type_name: &'static str) -> Result<Self> {
+        let ptr = non_null_mut(ptr, type_name)?;
+        // SAFETY: The caller promises ptr is an owned live handle, and
+        // non_null_mut validated that it is non-null.
+        Ok(unsafe { Self::from_raw(ptr, type_name) })
+    }
+
+    pub fn as_ptr(&self) -> *mut T {
+        self.address
+            .get()
+            .map_or(std::ptr::null_mut(), |address| address as *mut T)
+    }
+
+    pub fn as_non_null(&self) -> Option<NonNull<T>> {
+        NonNull::new(self.as_ptr())
+    }
+
+    pub fn is_closed(&self) -> bool {
+        self.address.get().is_none()
+    }
+
+    pub fn type_name(&self) -> &'static str {
+        self.type_name
+    }
+
+    /// Closes the handle with a status-returning destroy function.
+    ///
+    /// The state remains live when the destroy function reports an error, which
+    /// lets callers retry an owner-thread close later.
+    ///
+    /// # Safety
+    ///
+    /// `destroy` must be the matching C API destroy function for this handle
+    /// type. It must not take ownership when it returns a non-OK status.
+    pub unsafe fn close_status(&self, destroy: StatusDestroyFn<T>) -> Result<()> {
+        let Some(ptr) = self.as_non_null() else {
+            return Ok(());
+        };
+
+        // SAFETY: The caller promises destroy matches the live handle pointer.
+        crate::check(unsafe { destroy(ptr.as_ptr()) })?;
+        self.address.set(None);
+        Ok(())
+    }
+
+    /// Closes the handle with an infallible destroy function.
+    ///
+    /// # Safety
+    ///
+    /// `destroy` must be the matching C API destroy function for this handle
+    /// type and must release the handle exactly once.
+    pub unsafe fn close_infallible(&self, destroy: InfallibleDestroyFn<T>) {
+        let Some(ptr) = self.as_non_null() else {
+            return;
+        };
+
+        self.address.set(None);
+        // SAFETY: The caller promises destroy matches the live handle pointer.
+        unsafe { destroy(ptr.as_ptr()) };
+    }
+
+    /// Marks the handle as intentionally leaked and returns its address for
+    /// diagnostics or host-runtime finalizer reporting.
+    ///
+    /// This does not call the destroy function. Use it only on paths where the
+    /// caller deliberately avoids destroying thread-affine native state, such as
+    /// a GC finalizer running on an arbitrary host thread. It consumes logical
+    /// ownership of the handle state: future close calls become no-ops.
+    pub fn leak_for_report(&self) -> Option<usize> {
+        let address = self.address.get()?;
+        self.address.set(None);
+        Some(address)
+    }
+}
+
 #[derive(Debug)]
 struct NativeHandle<T> {
-    ptr: NonNull<T>,
-    destroy: unsafe extern "C" fn(*mut T),
-    _owns_handle: PhantomData<T>,
+    state: NativeHandleState<T>,
+    destroy: InfallibleDestroyFn<T>,
 }
 
 impl<T> NativeHandle<T> {
@@ -23,22 +137,24 @@ impl<T> NativeHandle<T> {
     /// type and accepts null as a no-op.
     unsafe fn from_raw(
         ptr: *mut T,
-        destroy: unsafe extern "C" fn(*mut T),
+        destroy: InfallibleDestroyFn<T>,
         type_name: &'static str,
     ) -> Result<Self> {
-        Ok(Self {
-            ptr: non_null_mut(ptr, type_name)?,
-            destroy,
-            _owns_handle: PhantomData,
-        })
+        // SAFETY: The caller promises ptr is a non-null owned handle of the
+        // matching native type; this constructor pairs it with the matching
+        // infallible destroy function.
+        let state = unsafe { NativeHandleState::from_raw_ptr(ptr, type_name) }?;
+        Ok(Self { state, destroy })
     }
 
     fn as_ptr(&self) -> *mut T {
-        self.ptr.as_ptr()
+        self.state.as_ptr()
     }
 
     fn as_non_null(&self) -> NonNull<T> {
-        self.ptr
+        self.state
+            .as_non_null()
+            .expect("native result handle guard is unexpectedly closed")
     }
 
     fn close(self) {
@@ -48,10 +164,9 @@ impl<T> NativeHandle<T> {
 
 impl<T> Drop for NativeHandle<T> {
     fn drop(&mut self) {
-        // SAFETY: NativeHandle is constructed only from an owned pointer and the
-        // matching C API destroy function. Destroy functions for scoped handles
-        // are void, noexcept, and accept null; ptr is non-null here.
-        unsafe { (self.destroy)(self.ptr.as_ptr()) }
+        // SAFETY: NativeHandle binds the owned pointer to the matching
+        // infallible destroy function at construction.
+        unsafe { self.state.close_infallible(self.destroy) };
     }
 }
 
@@ -138,17 +253,33 @@ native_guard!(
 mod tests {
     use std::ptr;
     use std::sync::Mutex;
-    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::atomic::{AtomicI32, AtomicUsize, Ordering};
 
     use super::*;
 
     static DESTROY_COUNT: AtomicUsize = AtomicUsize::new(0);
+    static STATUS_DESTROY_COUNT: AtomicUsize = AtomicUsize::new(0);
+    static DESTROY_STATUS: AtomicI32 = AtomicI32::new(sys::MLN_STATUS_OK);
     static DESTROY_COUNT_LOCK: Mutex<()> = Mutex::new(());
 
     unsafe extern "C" fn count_destroy(ptr: *mut u8) {
         if !ptr.is_null() {
             DESTROY_COUNT.fetch_add(1, Ordering::SeqCst);
         }
+    }
+
+    unsafe extern "C" fn count_status_destroy(ptr: *mut u8) -> sys::mln_status {
+        if !ptr.is_null() {
+            STATUS_DESTROY_COUNT.fetch_add(1, Ordering::SeqCst);
+        }
+        DESTROY_STATUS.load(Ordering::SeqCst)
+    }
+
+    fn assert_send<T: Send>() {}
+
+    #[test]
+    fn native_handle_state_is_send_for_bridge_storage() {
+        assert_send::<NativeHandleState<u8>>();
     }
 
     #[test]
@@ -188,5 +319,75 @@ mod tests {
                 .unwrap_err();
 
         assert_eq!(error.kind(), crate::error::ErrorKind::InvalidArgument);
+    }
+
+    #[test]
+    fn native_handle_state_retries_status_destroy_after_failure() {
+        let _lock = DESTROY_COUNT_LOCK.lock().unwrap();
+        STATUS_DESTROY_COUNT.store(0, Ordering::SeqCst);
+        DESTROY_STATUS.store(sys::MLN_STATUS_INVALID_STATE, Ordering::SeqCst);
+        let mut value = 1u8;
+        let ptr = NonNull::from(&mut value);
+        // SAFETY: ptr points to live test storage, and the fake destroy only
+        // records calls without taking ownership.
+        let state = unsafe { NativeHandleState::from_raw(ptr, "test_handle") };
+
+        // SAFETY: count_status_destroy is the matching fake destroy function
+        // for this test handle and does not take ownership on failure.
+        let error = unsafe { state.close_status(count_status_destroy) }.unwrap_err();
+        assert_eq!(error.kind(), crate::error::ErrorKind::InvalidState);
+        assert_eq!(state.as_ptr().cast_const(), ptr::addr_of!(value));
+
+        DESTROY_STATUS.store(sys::MLN_STATUS_OK, Ordering::SeqCst);
+        // SAFETY: count_status_destroy is the matching fake destroy function
+        // for this test handle and reports success on this path.
+        unsafe { state.close_status(count_status_destroy) }.unwrap();
+        // SAFETY: close after success is a no-op and the same matching fake
+        // destroy function is still used.
+        unsafe { state.close_status(count_status_destroy) }.unwrap();
+
+        assert_eq!(STATUS_DESTROY_COUNT.load(Ordering::SeqCst), 2);
+        assert!(state.is_closed());
+    }
+
+    #[test]
+    fn native_handle_state_closes_infallible_once() {
+        let _lock = DESTROY_COUNT_LOCK.lock().unwrap();
+        DESTROY_COUNT.store(0, Ordering::SeqCst);
+        let mut value = 1u8;
+        let ptr = NonNull::from(&mut value);
+        // SAFETY: ptr points to live test storage, and count_destroy only
+        // records calls.
+        let state = unsafe { NativeHandleState::from_raw(ptr, "test_handle") };
+
+        // SAFETY: count_destroy is the matching fake destroy function for this
+        // test handle.
+        unsafe { state.close_infallible(count_destroy) };
+        // SAFETY: close after success is a no-op and the same matching fake
+        // destroy function is still used.
+        unsafe { state.close_infallible(count_destroy) };
+
+        assert_eq!(DESTROY_COUNT.load(Ordering::SeqCst), 1);
+        assert!(state.is_closed());
+    }
+
+    #[test]
+    fn native_handle_state_reports_leak_without_destroying() {
+        let _lock = DESTROY_COUNT_LOCK.lock().unwrap();
+        DESTROY_COUNT.store(0, Ordering::SeqCst);
+        let mut value = 1u8;
+        let ptr = NonNull::from(&mut value);
+        // SAFETY: ptr points to live test storage. The test intentionally uses
+        // leak_for_report instead of a destroy function.
+        let state = unsafe { NativeHandleState::from_raw(ptr, "test_handle") };
+
+        assert_eq!(state.leak_for_report(), Some(ptr::addr_of!(value) as usize));
+        assert_eq!(state.leak_for_report(), None);
+        // SAFETY: close after leak_for_report is a no-op and the same matching
+        // fake destroy function is still used.
+        unsafe { state.close_infallible(count_destroy) };
+
+        assert_eq!(DESTROY_COUNT.load(Ordering::SeqCst), 0);
+        assert!(state.is_closed());
     }
 }

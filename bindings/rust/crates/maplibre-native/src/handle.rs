@@ -1,16 +1,15 @@
-use std::cell::Cell;
 use std::marker::PhantomData;
 use std::ptr::NonNull;
 use std::rc::Rc;
 
-use maplibre_native_core as support;
+use maplibre_native_core::{self as support, handle::NativeHandleState};
 use maplibre_native_sys as sys;
 
 use crate::{Error, Result};
 
 #[derive(Debug)]
 pub(crate) struct ThreadAffineNativeHandle<T> {
-    ptr: Cell<Option<NonNull<T>>>,
+    state: NativeHandleState<T>,
     destroy: unsafe extern "C" fn(*mut T) -> sys::mln_status,
     _thread_affine: PhantomData<Rc<()>>,
 }
@@ -29,50 +28,38 @@ impl<T> ThreadAffineNativeHandle<T> {
         _type_name: &'static str,
     ) -> Self {
         Self {
-            ptr: Cell::new(Some(ptr)),
+            // SAFETY: The caller promises ptr is a non-null owned live handle of
+            // the matching native type.
+            state: unsafe { NativeHandleState::from_raw(ptr, _type_name) },
             destroy,
             _thread_affine: PhantomData,
         }
     }
 
     pub(crate) fn as_ptr(&self) -> *mut T {
-        self.ptr.get().map_or(std::ptr::null_mut(), NonNull::as_ptr)
+        self.state.as_ptr()
     }
 
     pub(crate) fn is_closed(&self) -> bool {
-        self.ptr.get().is_none()
+        self.state.is_closed()
     }
 
     pub(crate) fn close(&self) -> Result<()> {
-        let Some(ptr) = self.ptr.get() else {
-            return Ok(());
-        };
-
-        // SAFETY: ptr is a live owned handle while stored in self.ptr, and
-        // destroy is the matching C API destroy function for T.
-        let status = unsafe { (self.destroy)(ptr.as_ptr()) };
-        if status == sys::MLN_STATUS_OK {
-            self.ptr.set(None);
-            Ok(())
-        } else {
-            Err(Error::from_status(status))
-        }
+        // SAFETY: from_raw binds this Rust handle to the matching C API destroy
+        // function for its owned native pointer.
+        unsafe { self.state.close_status(self.destroy) }
     }
 }
 
 impl<T> Drop for ThreadAffineNativeHandle<T> {
     fn drop(&mut self) {
-        let Some(ptr) = self.ptr.get() else {
-            return;
-        };
-
-        // SAFETY: ptr is a live owned handle while stored in self.ptr, and
-        // destroy is the matching C API destroy function for T. Drop cannot
-        // report errors, so it ignores non-OK statuses and never panics.
-        let status = unsafe { (self.destroy)(ptr.as_ptr()) };
-        if status == sys::MLN_STATUS_OK {
-            self.ptr.set(None);
-        }
+        // Drop keeps Rust's owner-thread behavior while delegating close-once
+        // state tracking to core. Drop cannot report errors, so it ignores
+        // non-OK statuses and never panics; failed closes leave the pointer live
+        // until process teardown, matching the previous Rust policy.
+        // SAFETY: from_raw binds this Rust handle to the matching C API destroy
+        // function for its owned native pointer.
+        let _ = unsafe { self.state.close_status(self.destroy) };
     }
 }
 

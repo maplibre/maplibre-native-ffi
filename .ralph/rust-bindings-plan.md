@@ -97,7 +97,15 @@ milestone until complete (through 9).
 - [x] Milestone 7: Keep Rust callback ergonomics, panic handling, replacement
       URL retention, and `!Sync` handle wrapper in `maplibre-native`.
 - [x] Milestone 7: Complete parallel review and apply relevant findings.
-- [ ] Milestone 8+: Continue remaining handle/render-session milestones in small
+- [x] Milestone 8: Add explicit close-once native handle state in `core`.
+- [x] Milestone 8: Support status-returning and infallible destroy functions in
+      core native handle state.
+- [x] Milestone 8: Support leak-report-only finalizer paths in core native
+      handle state.
+- [x] Milestone 8: Update public Rust thread-affine handles to wrap core handle
+      state while preserving `!Send` policy and owner-thread `Drop` behavior.
+- [x] Milestone 8: Complete parallel review and apply relevant findings.
+- [ ] Milestone 9: Reshape the public Rust crate around `core` in small
       buildable slices.
 
 ## Verification
@@ -334,6 +342,34 @@ milestone until complete (through 9).
 - `mise run -C bindings/rust test` — passed after Milestone 7 review fixes (84
   `maplibre-native`, 83 `maplibre-native-core`, 0 `maplibre-native-sys`, doc
   tests passed).
+- `cargo fmt --all --manifest-path Cargo.toml` — passed after adding core native
+  handle state and wrapping Rust thread-affine handles around it.
+- `cargo check --manifest-path Cargo.toml -p maplibre-native --tests` — passed
+  after adding core native handle state and wrapping Rust thread-affine handles
+  around it.
+- `cargo clippy --manifest-path Cargo.toml -p maplibre-native-core -p
+  maplibre-native --all-targets -- -D warnings`
+  — passed after adding core native handle state and wrapping Rust thread-affine
+  handles around it.
+- `mise run -C bindings/rust test` — passed after adding core native handle
+  state and wrapping Rust thread-affine handles around it (84 `maplibre-native`,
+  85 `maplibre-native-core`, 0 `maplibre-native-sys`, doc tests passed).
+- Parallel Milestone 8 review — reviewers confirmed core centralizes close-once
+  handle mechanics and public Rust keeps `!Send` policy, then flagged unsafe
+  destroy-function preconditions and bridge-storage auto-traits. Applied fixes
+  by making close methods unsafe with safety docs, storing handle addresses as
+  integers so core state is `Send`, documenting leak-report ownership
+  consumption, and adding compile-time/direct close-once tests.
+- `cargo fmt --all --manifest-path Cargo.toml` — passed after Milestone 8 review
+  fixes.
+- `cargo check --manifest-path Cargo.toml -p maplibre-native --tests` — passed
+  after Milestone 8 review fixes.
+- `cargo clippy --manifest-path Cargo.toml -p maplibre-native-core -p
+  maplibre-native --all-targets -- -D warnings`
+  — passed after Milestone 8 review fixes.
+- `mise run -C bindings/rust test` — passed after Milestone 8 review fixes (84
+  `maplibre-native`, 87 `maplibre-native-core`, 0 `maplibre-native-sys`, doc
+  tests passed).
 
 ## Reflection checkpoint 2026-05-13
 
@@ -548,3 +584,16 @@ milestone until complete (through 9).
   handles exactly once. Added a lifetime to `NativeResourceResponse` so native
   byte pointers cannot outlive the borrowed response in safe Rust, and added
   core tests for nonempty response bytes and double successful completion.
+- Iteration 28 started and implemented the main Milestone 8 handle-state slice.
+  Added `maplibre-native-core::handle::NativeHandleState` with close-once
+  status-returning destroy, infallible destroy, live/closed inspection, and
+  leak-report-only finalizer support. Core result guards now use this state for
+  infallible result handles, and public Rust `ThreadAffineNativeHandle` wraps it
+  while keeping Rust's `Rc`-based `!Send` marker and owner-thread `Drop` policy.
+- Iteration 29 completed the Milestone 8 review round and fixes. The core state
+  now stores addresses as integers with typed reconstruction, so bridges can
+  move it into lock/runtime storage while public Rust keeps thread-affinity
+  policy in its wrapper. Unsafe destroy preconditions are expressed on close
+  methods, leak-reporting documents that it consumes logical ownership, and
+  tests cover `Send`, infallible close-once behavior, status close retry, and
+  leak without destroy.
