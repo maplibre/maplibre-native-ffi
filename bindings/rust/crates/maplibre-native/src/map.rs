@@ -4,7 +4,7 @@ use std::fmt;
 use std::ptr;
 use std::rc::Rc;
 
-use maplibre_native_support as support;
+use maplibre_native_core as support;
 use maplibre_native_sys as sys;
 
 #[cfg(test)]
@@ -18,6 +18,7 @@ use crate::render::{
     VulkanOwnedTextureDescriptor, VulkanSurfaceDescriptor,
 };
 use crate::runtime::{RuntimeHandle, RuntimeState};
+use crate::values::NativeValue;
 use crate::{
     AnimationOptions, BoundOptions, CameraFitOptions, CameraOptions, Error, ErrorKind,
     FreeCameraOptions, Geometry, HandleOperationError, JsonValue, LatLng, LatLngBounds,

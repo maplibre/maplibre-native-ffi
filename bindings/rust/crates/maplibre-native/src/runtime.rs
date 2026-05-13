@@ -4,8 +4,9 @@ use std::ffi::CString;
 use std::fmt;
 use std::rc::{Rc, Weak};
 
-use maplibre_native_support as support;
+use maplibre_native_core as support;
 use maplibre_native_sys as sys;
+use support::AmbientCacheOperation;
 
 use crate::events::{
     MapId, OfflineRegionDownloadState, OfflineRegionStatus, RuntimeEvent, RuntimeEventSource,
@@ -16,6 +17,7 @@ use crate::map::MapState;
 use crate::resource::{
     ResourceProviderState, ResourceTransformState, noop_resource_transform_descriptor,
 };
+use crate::values::NativeValue;
 use crate::{
     Error, ErrorKind, Geometry, HandleOperationError, LatLngBounds, MapHandle, MapOptions,
     ResourceProviderDecision, Result,
@@ -79,35 +81,6 @@ struct NativeRuntimeOptions {
     asset_path: Option<CString>,
     cache_path: Option<CString>,
     maximum_cache_size: Option<u64>,
-}
-
-/// Ambient cache maintenance operation for a runtime.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[non_exhaustive]
-pub enum AmbientCacheOperation {
-    /// Reset the ambient cache database.
-    ResetDatabase,
-    /// Pack the ambient cache database.
-    PackDatabase,
-    /// Mark ambient cache resources as invalid.
-    Invalidate,
-    /// Clear ambient cache resources.
-    Clear,
-}
-
-impl AmbientCacheOperation {
-    const fn raw_value(self) -> u32 {
-        match self {
-            Self::ResetDatabase => sys::MLN_AMBIENT_CACHE_OPERATION_RESET_DATABASE,
-            Self::PackDatabase => sys::MLN_AMBIENT_CACHE_OPERATION_PACK_DATABASE,
-            Self::Invalidate => sys::MLN_AMBIENT_CACHE_OPERATION_INVALIDATE,
-            Self::Clear => sys::MLN_AMBIENT_CACHE_OPERATION_CLEAR,
-        }
-    }
-
-    fn to_native(self) -> u32 {
-        self.raw_value()
-    }
 }
 
 /// Region descriptor used to create or inspect offline regions.
@@ -814,15 +787,7 @@ impl RuntimeHandle {
         state: OfflineRegionDownloadState,
     ) -> Result<()> {
         let runtime = self.inner.as_ptr()?;
-        let state = match state {
-            OfflineRegionDownloadState::Inactive => sys::MLN_OFFLINE_REGION_DOWNLOAD_INACTIVE,
-            OfflineRegionDownloadState::Active => sys::MLN_OFFLINE_REGION_DOWNLOAD_ACTIVE,
-            OfflineRegionDownloadState::Unknown(raw) => {
-                return Err(Error::invalid_argument(format!(
-                    "unknown offline region download state cannot be set: {raw}"
-                )));
-            }
-        };
+        let state = state.raw_for_set()?;
         // SAFETY: runtime is live, region_id is passed by value, and state is a
         // closed Rust enum domain mapped to the C ABI value.
         support::check(unsafe {

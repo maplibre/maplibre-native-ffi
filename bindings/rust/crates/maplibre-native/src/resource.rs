@@ -9,121 +9,16 @@ use std::ptr;
 use std::sync::{Arc, Mutex};
 use std::thread::ThreadId;
 
-use maplibre_native_support as support;
+use maplibre_native_core as support;
 use maplibre_native_sys as sys;
 
 use crate::{Error, ErrorKind, HandleOperationError, ResourceErrorReason, Result};
+use support::{
+    ResourceKind, ResourceLoadingMethod, ResourcePriority, ResourceResponseStatus,
+    ResourceStoragePolicy, ResourceUsage,
+};
 
 const UNKNOWN_PROVIDER_DECISION: u32 = u32::MAX;
-
-/// Network resource kind passed to resource callbacks.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[non_exhaustive]
-pub enum ResourceKind {
-    Unknown,
-    Style,
-    Source,
-    Tile,
-    Glyphs,
-    SpriteImage,
-    SpriteJson,
-    Image,
-    UnknownRaw(u32),
-}
-
-impl ResourceKind {
-    pub(crate) fn from_raw(raw: u32) -> Self {
-        match raw {
-            sys::MLN_RESOURCE_KIND_UNKNOWN => Self::Unknown,
-            sys::MLN_RESOURCE_KIND_STYLE => Self::Style,
-            sys::MLN_RESOURCE_KIND_SOURCE => Self::Source,
-            sys::MLN_RESOURCE_KIND_TILE => Self::Tile,
-            sys::MLN_RESOURCE_KIND_GLYPHS => Self::Glyphs,
-            sys::MLN_RESOURCE_KIND_SPRITE_IMAGE => Self::SpriteImage,
-            sys::MLN_RESOURCE_KIND_SPRITE_JSON => Self::SpriteJson,
-            sys::MLN_RESOURCE_KIND_IMAGE => Self::Image,
-            _ => Self::UnknownRaw(raw),
-        }
-    }
-}
-
-/// Resource loading method requested by MapLibre Native.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[non_exhaustive]
-pub enum ResourceLoadingMethod {
-    All,
-    CacheOnly,
-    NetworkOnly,
-    Unknown(u32),
-}
-
-impl ResourceLoadingMethod {
-    fn from_raw(raw: u32) -> Self {
-        match raw {
-            sys::MLN_RESOURCE_LOADING_METHOD_ALL => Self::All,
-            sys::MLN_RESOURCE_LOADING_METHOD_CACHE_ONLY => Self::CacheOnly,
-            sys::MLN_RESOURCE_LOADING_METHOD_NETWORK_ONLY => Self::NetworkOnly,
-            _ => Self::Unknown(raw),
-        }
-    }
-}
-
-/// Resource request priority.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[non_exhaustive]
-pub enum ResourcePriority {
-    Regular,
-    Low,
-    Unknown(u32),
-}
-
-impl ResourcePriority {
-    fn from_raw(raw: u32) -> Self {
-        match raw {
-            sys::MLN_RESOURCE_PRIORITY_REGULAR => Self::Regular,
-            sys::MLN_RESOURCE_PRIORITY_LOW => Self::Low,
-            _ => Self::Unknown(raw),
-        }
-    }
-}
-
-/// Resource request usage.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[non_exhaustive]
-pub enum ResourceUsage {
-    Online,
-    Offline,
-    Unknown(u32),
-}
-
-impl ResourceUsage {
-    fn from_raw(raw: u32) -> Self {
-        match raw {
-            sys::MLN_RESOURCE_USAGE_ONLINE => Self::Online,
-            sys::MLN_RESOURCE_USAGE_OFFLINE => Self::Offline,
-            _ => Self::Unknown(raw),
-        }
-    }
-}
-
-/// Resource cache storage policy.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[non_exhaustive]
-pub enum ResourceStoragePolicy {
-    Permanent,
-    Volatile,
-    Unknown(u32),
-}
-
-impl ResourceStoragePolicy {
-    fn from_raw(raw: u32) -> Self {
-        match raw {
-            sys::MLN_RESOURCE_STORAGE_POLICY_PERMANENT => Self::Permanent,
-            sys::MLN_RESOURCE_STORAGE_POLICY_VOLATILE => Self::Volatile,
-            _ => Self::Unknown(raw),
-        }
-    }
-}
 
 /// Byte range requested for a network resource.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -179,15 +74,15 @@ impl ResourceRequest {
         Ok(Self {
             // SAFETY: The caller promised raw points to callback-duration storage.
             url: unsafe { support::string::copy_c_string(raw.url) }?,
-            kind: ResourceKind::from_raw(raw.kind),
+            kind: support::enums::resource_kind_from_raw(raw.kind),
             raw_kind: raw.kind,
-            loading_method: ResourceLoadingMethod::from_raw(raw.loading_method),
+            loading_method: support::enums::resource_loading_method_from_raw(raw.loading_method),
             raw_loading_method: raw.loading_method,
-            priority: ResourcePriority::from_raw(raw.priority),
+            priority: support::enums::resource_priority_from_raw(raw.priority),
             raw_priority: raw.priority,
-            usage: ResourceUsage::from_raw(raw.usage),
+            usage: support::enums::resource_usage_from_raw(raw.usage),
             raw_usage: raw.usage,
-            storage_policy: ResourceStoragePolicy::from_raw(raw.storage_policy),
+            storage_policy: support::enums::resource_storage_policy_from_raw(raw.storage_policy),
             raw_storage_policy: raw.storage_policy,
             range: raw.has_range.then_some(ByteRange {
                 start: raw.range_start,
@@ -213,41 +108,6 @@ pub enum ResourceProviderDecision {
     PassThrough,
     /// Keep ownership of the request handle and complete or release it later.
     Handle,
-}
-
-/// Status for a resource provider response.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[non_exhaustive]
-pub enum ResourceResponseStatus {
-    Ok,
-    Error,
-    NoContent,
-    NotModified,
-}
-
-impl ResourceResponseStatus {
-    fn as_raw(self) -> u32 {
-        match self {
-            Self::Ok => sys::MLN_RESOURCE_RESPONSE_STATUS_OK,
-            Self::Error => sys::MLN_RESOURCE_RESPONSE_STATUS_ERROR,
-            Self::NoContent => sys::MLN_RESOURCE_RESPONSE_STATUS_NO_CONTENT,
-            Self::NotModified => sys::MLN_RESOURCE_RESPONSE_STATUS_NOT_MODIFIED,
-        }
-    }
-}
-
-impl ResourceErrorReason {
-    pub(crate) fn as_raw(self) -> u32 {
-        match self {
-            Self::None => sys::MLN_RESOURCE_ERROR_REASON_NONE,
-            Self::NotFound => sys::MLN_RESOURCE_ERROR_REASON_NOT_FOUND,
-            Self::Server => sys::MLN_RESOURCE_ERROR_REASON_SERVER,
-            Self::Connection => sys::MLN_RESOURCE_ERROR_REASON_CONNECTION,
-            Self::RateLimit => sys::MLN_RESOURCE_ERROR_REASON_RATE_LIMIT,
-            Self::Other => sys::MLN_RESOURCE_ERROR_REASON_OTHER,
-            Self::Unknown(raw) => raw,
-        }
-    }
 }
 
 /// Response used to complete a handled resource request.
@@ -365,7 +225,7 @@ impl NativeResourceResponse {
             raw: sys::mln_resource_response {
                 size: std::mem::size_of::<sys::mln_resource_response>() as u32,
                 status: response.status.as_raw(),
-                error_reason: response.error_reason.as_raw(),
+                error_reason: response.error_reason.raw_value(),
                 bytes: if response.bytes.is_empty() {
                     ptr::null()
                 } else {
@@ -788,7 +648,7 @@ impl ResourceTransformState {
             Err(error) => return status_for_error(&error),
         };
         let request = ResourceTransformRequest {
-            kind: ResourceKind::from_raw(raw_kind),
+            kind: support::enums::resource_kind_from_raw(raw_kind),
             raw_kind,
             url: request_url,
         };

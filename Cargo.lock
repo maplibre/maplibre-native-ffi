@@ -659,15 +659,16 @@ name = "maplibre-native"
 version = "0.0.0"
 dependencies = [
  "bitflags 2.11.1",
- "maplibre-native-support",
+ "maplibre-native-core",
  "maplibre-native-sys",
  "static_assertions",
 ]
 
 [[package]]
-name = "maplibre-native-support"
+name = "maplibre-native-core"
 version = "0.0.0"
 dependencies = [
+ "bitflags 2.11.1",
  "maplibre-native-sys",
 ]
 

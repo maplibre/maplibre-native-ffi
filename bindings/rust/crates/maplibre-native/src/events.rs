@@ -1,10 +1,13 @@
 use std::mem;
 use std::ptr;
 
-use maplibre_native_support as support;
+use maplibre_native_core as support;
 use maplibre_native_sys as sys;
 
 use crate::{Error, Result};
+pub(crate) use support::{
+    OfflineRegionDownloadState, RenderMode, ResourceErrorReason, RuntimeEventType, TileOperation,
+};
 
 /// Rust-assigned identity for a map owned by a runtime.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -29,167 +32,6 @@ pub enum RuntimeEventSource {
     Map(MapId),
     UnknownMap,
     Unknown(u32),
-}
-
-/// Runtime event type.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[non_exhaustive]
-pub enum RuntimeEventType {
-    MapCameraWillChange,
-    MapCameraIsChanging,
-    MapCameraDidChange,
-    MapStyleLoaded,
-    MapLoadingStarted,
-    MapLoadingFinished,
-    MapLoadingFailed,
-    MapIdle,
-    MapRenderUpdateAvailable,
-    MapRenderError,
-    MapStillImageFinished,
-    MapStillImageFailed,
-    MapRenderFrameStarted,
-    MapRenderFrameFinished,
-    MapRenderMapStarted,
-    MapRenderMapFinished,
-    MapStyleImageMissing,
-    MapTileAction,
-    OfflineRegionStatusChanged,
-    OfflineRegionResponseError,
-    OfflineRegionTileCountLimitExceeded,
-    Unknown(u32),
-}
-
-impl RuntimeEventType {
-    pub(crate) fn from_raw(raw: u32) -> Self {
-        match raw {
-            sys::MLN_RUNTIME_EVENT_MAP_CAMERA_WILL_CHANGE => Self::MapCameraWillChange,
-            sys::MLN_RUNTIME_EVENT_MAP_CAMERA_IS_CHANGING => Self::MapCameraIsChanging,
-            sys::MLN_RUNTIME_EVENT_MAP_CAMERA_DID_CHANGE => Self::MapCameraDidChange,
-            sys::MLN_RUNTIME_EVENT_MAP_STYLE_LOADED => Self::MapStyleLoaded,
-            sys::MLN_RUNTIME_EVENT_MAP_LOADING_STARTED => Self::MapLoadingStarted,
-            sys::MLN_RUNTIME_EVENT_MAP_LOADING_FINISHED => Self::MapLoadingFinished,
-            sys::MLN_RUNTIME_EVENT_MAP_LOADING_FAILED => Self::MapLoadingFailed,
-            sys::MLN_RUNTIME_EVENT_MAP_IDLE => Self::MapIdle,
-            sys::MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE => Self::MapRenderUpdateAvailable,
-            sys::MLN_RUNTIME_EVENT_MAP_RENDER_ERROR => Self::MapRenderError,
-            sys::MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FINISHED => Self::MapStillImageFinished,
-            sys::MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FAILED => Self::MapStillImageFailed,
-            sys::MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_STARTED => Self::MapRenderFrameStarted,
-            sys::MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED => Self::MapRenderFrameFinished,
-            sys::MLN_RUNTIME_EVENT_MAP_RENDER_MAP_STARTED => Self::MapRenderMapStarted,
-            sys::MLN_RUNTIME_EVENT_MAP_RENDER_MAP_FINISHED => Self::MapRenderMapFinished,
-            sys::MLN_RUNTIME_EVENT_MAP_STYLE_IMAGE_MISSING => Self::MapStyleImageMissing,
-            sys::MLN_RUNTIME_EVENT_MAP_TILE_ACTION => Self::MapTileAction,
-            sys::MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED => {
-                Self::OfflineRegionStatusChanged
-            }
-            sys::MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR => {
-                Self::OfflineRegionResponseError
-            }
-            sys::MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED => {
-                Self::OfflineRegionTileCountLimitExceeded
-            }
-            _ => Self::Unknown(raw),
-        }
-    }
-}
-
-/// Render mode reported by render observer events.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[non_exhaustive]
-pub enum RenderMode {
-    Partial,
-    Full,
-    Unknown(u32),
-}
-
-impl RenderMode {
-    fn from_raw(raw: u32) -> Self {
-        match raw {
-            sys::MLN_RENDER_MODE_PARTIAL => Self::Partial,
-            sys::MLN_RENDER_MODE_FULL => Self::Full,
-            _ => Self::Unknown(raw),
-        }
-    }
-}
-
-/// Tile operation reported by tile observer events.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[non_exhaustive]
-pub enum TileOperation {
-    RequestedFromCache,
-    RequestedFromNetwork,
-    LoadFromNetwork,
-    LoadFromCache,
-    StartParse,
-    EndParse,
-    Error,
-    Cancelled,
-    Null,
-    Unknown(u32),
-}
-
-impl TileOperation {
-    fn from_raw(raw: u32) -> Self {
-        match raw {
-            sys::MLN_TILE_OPERATION_REQUESTED_FROM_CACHE => Self::RequestedFromCache,
-            sys::MLN_TILE_OPERATION_REQUESTED_FROM_NETWORK => Self::RequestedFromNetwork,
-            sys::MLN_TILE_OPERATION_LOAD_FROM_NETWORK => Self::LoadFromNetwork,
-            sys::MLN_TILE_OPERATION_LOAD_FROM_CACHE => Self::LoadFromCache,
-            sys::MLN_TILE_OPERATION_START_PARSE => Self::StartParse,
-            sys::MLN_TILE_OPERATION_END_PARSE => Self::EndParse,
-            sys::MLN_TILE_OPERATION_ERROR => Self::Error,
-            sys::MLN_TILE_OPERATION_CANCELLED => Self::Cancelled,
-            sys::MLN_TILE_OPERATION_NULL => Self::Null,
-            _ => Self::Unknown(raw),
-        }
-    }
-}
-
-/// Offline region download state copied from event payloads.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[non_exhaustive]
-pub enum OfflineRegionDownloadState {
-    Inactive,
-    Active,
-    Unknown(u32),
-}
-
-impl OfflineRegionDownloadState {
-    fn from_raw(raw: u32) -> Self {
-        match raw {
-            sys::MLN_OFFLINE_REGION_DOWNLOAD_INACTIVE => Self::Inactive,
-            sys::MLN_OFFLINE_REGION_DOWNLOAD_ACTIVE => Self::Active,
-            _ => Self::Unknown(raw),
-        }
-    }
-}
-
-/// Resource error reason copied from event payloads.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[non_exhaustive]
-pub enum ResourceErrorReason {
-    None,
-    NotFound,
-    Server,
-    Connection,
-    RateLimit,
-    Other,
-    Unknown(u32),
-}
-
-impl ResourceErrorReason {
-    fn from_raw(raw: u32) -> Self {
-        match raw {
-            sys::MLN_RESOURCE_ERROR_REASON_NONE => Self::None,
-            sys::MLN_RESOURCE_ERROR_REASON_NOT_FOUND => Self::NotFound,
-            sys::MLN_RESOURCE_ERROR_REASON_SERVER => Self::Server,
-            sys::MLN_RESOURCE_ERROR_REASON_CONNECTION => Self::Connection,
-            sys::MLN_RESOURCE_ERROR_REASON_RATE_LIMIT => Self::RateLimit,
-            sys::MLN_RESOURCE_ERROR_REASON_OTHER => Self::Other,
-            _ => Self::Unknown(raw),
-        }
-    }
 }
 
 /// Rendering statistics copied from a render-frame event payload.

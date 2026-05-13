@@ -1,3 +1,10 @@
+//! Safe Rust binding for the MapLibre Native C API.
+//!
+//! This crate owns Rust-specific ergonomics and safety policy: thread-affine
+//! public handles, parent retention, owner-thread `Drop`, Rust errors,
+//! callback closure APIs, and lifetime-scoped render resources. Shared C ABI
+//! adaptation lives in `maplibre-native-core`.
+
 #![deny(unsafe_op_in_unsafe_fn)]
 
 mod camera;
@@ -16,7 +23,8 @@ mod resource;
 mod runtime;
 mod values;
 
-use maplibre_native_support as support;
+use crate::values::NativeValue;
+use maplibre_native_core as support;
 use maplibre_native_sys as sys;
 
 pub use camera::{
@@ -25,27 +33,23 @@ pub use camera::{
 };
 pub use custom_geometry::{CanonicalTileId, CustomGeometrySourceOptions};
 pub use events::{
-    MapId, OfflineRegionDownloadState, OfflineRegionResponseErrorEvent, OfflineRegionStatus,
-    OfflineRegionStatusEvent, OfflineRegionTileCountLimitEvent, RenderFrameEvent, RenderMapEvent,
-    RenderMode, RenderingStats, ResourceErrorReason, RuntimeEvent, RuntimeEventPayload,
-    RuntimeEventSource, RuntimeEventType, StyleImageMissingEvent, TileActionEvent, TileId,
-    TileOperation, UnknownRuntimeEventPayload,
+    MapId, OfflineRegionResponseErrorEvent, OfflineRegionStatus, OfflineRegionStatusEvent,
+    OfflineRegionTileCountLimitEvent, RenderFrameEvent, RenderMapEvent, RenderingStats,
+    RuntimeEvent, RuntimeEventPayload, RuntimeEventSource, StyleImageMissingEvent, TileActionEvent,
+    TileId, UnknownRuntimeEventPayload,
 };
 pub use geojson::{Feature, FeatureIdentifier, GeoJson};
 pub use geometry::Geometry;
 pub use json::{JsonMember, JsonValue};
 pub use logging::{
-    LogEvent, LogRecord, LogSeverity, LogSeverityMask, clear_log_callback,
-    restore_default_async_log_severity_mask, set_async_log_severity_mask, set_log_callback,
+    LogRecord, clear_log_callback, restore_default_async_log_severity_mask,
+    set_async_log_severity_mask, set_log_callback,
 };
 pub use map::{
     LocationIndicatorImageKind, MapHandle, RasterDemEncoding, SourceInfo, SourceType, StyleImage,
     StyleImageInfo, StyleImageOptions, TileScheme, TileSourceOptions, VectorTileEncoding,
 };
-pub use options::{
-    ConstrainMode, MapDebugOptions, MapMode, MapOptions, MapTileOptions, MapViewportOptions,
-    NorthOrientation, TileLodMode, ViewportMode,
-};
+pub use options::{MapOptions, MapTileOptions, MapViewportOptions};
 pub use projection::MapProjectionHandle;
 pub use render::{
     DetachedRenderSessionHandle, FeatureExtensionResult, FeatureStateSelector, FrameNativePointer,
@@ -57,15 +61,17 @@ pub use render::{
     VulkanOwnedTextureFrameHandle, VulkanSurfaceDescriptor,
 };
 pub use resource::{
-    ByteRange, ResourceKind, ResourceLoadingMethod, ResourcePriority, ResourceProviderDecision,
-    ResourceRequest, ResourceRequestHandle, ResourceResponse, ResourceResponseStatus,
-    ResourceStoragePolicy, ResourceTransformRequest, ResourceUsage,
+    ByteRange, ResourceProviderDecision, ResourceRequest, ResourceRequestHandle, ResourceResponse,
+    ResourceTransformRequest,
 };
-pub use runtime::{
-    AmbientCacheOperation, OfflineRegionDefinition, OfflineRegionInfo, RuntimeHandle,
-    RuntimeOptions,
+pub use runtime::{OfflineRegionDefinition, OfflineRegionInfo, RuntimeHandle, RuntimeOptions};
+pub use support::{
+    AmbientCacheOperation, ConstrainMode, Error, ErrorKind, LogEvent, LogSeverity, LogSeverityMask,
+    MapDebugOptions, MapMode, NetworkStatus, NorthOrientation, OfflineRegionDownloadState,
+    RenderBackendMask, RenderMode, ResourceErrorReason, ResourceKind, ResourceLoadingMethod,
+    ResourcePriority, ResourceResponseStatus, ResourceStoragePolicy, ResourceUsage, Result,
+    RuntimeEventType, TileLodMode, TileOperation, ViewportMode,
 };
-pub use support::{Error, ErrorKind, Result};
 pub use values::{
     EdgeInsets, LatLng, LatLngBounds, ProjectedMeters, Quaternion, ScreenBox, ScreenPoint,
     UnitBezier, Vec3,
@@ -127,45 +133,6 @@ impl<T> std::fmt::Display for HandleOperationError<T> {
 }
 
 impl<T: std::fmt::Debug> std::error::Error for HandleOperationError<T> {}
-
-bitflags::bitflags! {
-    /// Render backends compiled into the linked native library.
-    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-    pub struct RenderBackendMask: u32 {
-        const METAL = sys::MLN_RENDER_BACKEND_FLAG_METAL;
-        const VULKAN = sys::MLN_RENDER_BACKEND_FLAG_VULKAN;
-        const _ = !0;
-    }
-}
-
-/// Process-global network reachability state used by MapLibre Native.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[non_exhaustive]
-pub enum NetworkStatus {
-    Online,
-    Offline,
-    Unknown(u32),
-}
-
-impl NetworkStatus {
-    fn from_raw(raw: u32) -> Self {
-        match raw {
-            sys::MLN_NETWORK_STATUS_ONLINE => Self::Online,
-            sys::MLN_NETWORK_STATUS_OFFLINE => Self::Offline,
-            _ => Self::Unknown(raw),
-        }
-    }
-
-    fn raw(self) -> Result<u32> {
-        match self {
-            Self::Online => Ok(sys::MLN_NETWORK_STATUS_ONLINE),
-            Self::Offline => Ok(sys::MLN_NETWORK_STATUS_OFFLINE),
-            Self::Unknown(raw) => Err(Error::invalid_argument(format!(
-                "unknown network status values cannot be set: {raw}"
-            ))),
-        }
-    }
-}
 
 /// Returns the native C ABI contract version.
 pub fn c_version() -> u32 {

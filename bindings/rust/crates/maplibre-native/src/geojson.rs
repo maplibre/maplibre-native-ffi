@@ -332,7 +332,7 @@ unsafe fn copy_feature_identifier(raw: &sys::mln_feature) -> Result<FeatureIdent
             let view = unsafe { raw.identifier.string_value };
             // SAFETY: Caller promises string storage is valid for this call.
             Ok(FeatureIdentifier::String(unsafe {
-                maplibre_native_support::string::copy_string_view(view)
+                maplibre_native_core::string::copy_string_view(view)
             }?))
         }
         type_ => Err(Error::invalid_argument(format!(

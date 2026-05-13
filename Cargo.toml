@@ -2,7 +2,7 @@
 resolver = "3"
 members = [
   "bindings/rust/crates/maplibre-native",
-  "bindings/rust/crates/maplibre-native-support",
+  "bindings/rust/crates/maplibre-native-core",
   "bindings/rust/crates/maplibre-native-sys",
   "examples/rust-map",
 ]

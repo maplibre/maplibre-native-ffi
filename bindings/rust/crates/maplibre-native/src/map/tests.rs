@@ -360,7 +360,7 @@ fn custom_geometry_source_state_releases_detached_sources_on_style_loaded_event(
     map.add_custom_geometry_source("custom", CustomGeometrySourceOptions::new(|_| {}))
         .unwrap();
 
-    let source_id = maplibre_native_support::string::string_view("custom");
+    let source_id = maplibre_native_core::string::string_view("custom");
     let mut removed = false;
     // SAFETY: map is live, source_id is valid for this call, and removed
     // points to writable storage. This bypasses the binding cleanup path to

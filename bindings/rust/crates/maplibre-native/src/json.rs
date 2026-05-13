@@ -1,7 +1,7 @@
 use std::os::raw::c_char;
 use std::ptr;
 
-use maplibre_native_support as support;
+use maplibre_native_core as support;
 use maplibre_native_sys as sys;
 
 use crate::{Error, Result};

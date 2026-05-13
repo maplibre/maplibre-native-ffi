@@ -4,12 +4,12 @@ MLN_FFI_CARGO_MANIFEST = "{{env.MLN_FFI_REPO_ROOT}}/Cargo.toml"
 
 [tasks.build]
 depends = ["//:ensure-native-library"]
-run = "bash scripts/with-libclang.sh cargo build --manifest-path \"$MLN_FFI_CARGO_MANIFEST\" -p maplibre-native-sys -p maplibre-native-support -p maplibre-native"
+run = "bash scripts/with-libclang.sh cargo build --manifest-path \"$MLN_FFI_CARGO_MANIFEST\" -p maplibre-native-sys -p maplibre-native-core -p maplibre-native"
 
 [tasks.test]
 depends = ["//:ensure-native-library"]
-run = "bash scripts/with-libclang.sh cargo test --manifest-path \"$MLN_FFI_CARGO_MANIFEST\" -p maplibre-native-sys -p maplibre-native-support -p maplibre-native"
+run = "bash scripts/with-libclang.sh cargo test --manifest-path \"$MLN_FFI_CARGO_MANIFEST\" -p maplibre-native-sys -p maplibre-native-core -p maplibre-native"
 
 [tasks.ci]
 depends = [":test"]
-run = "bash scripts/with-libclang.sh cargo clippy --manifest-path \"$MLN_FFI_CARGO_MANIFEST\" -p maplibre-native-sys -p maplibre-native-support -p maplibre-native --all-targets -- -D warnings"
+run = "bash scripts/with-libclang.sh cargo clippy --manifest-path \"$MLN_FFI_CARGO_MANIFEST\" -p maplibre-native-sys -p maplibre-native-core -p maplibre-native --all-targets -- -D warnings"

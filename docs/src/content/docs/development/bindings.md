@@ -78,8 +78,8 @@ Bindings use one of two implementation paths. A direct C import generates or
 writes the internal C declarations from the public headers, then wraps them—this
 works when the target language can consume C headers and call C functions as
 part of its normal package model. A bridge library is built in Rust over the
-shared `-sys` and support crates, then adapted to the target runtime—this is
-needed when the package boundary is a native extension or native-method entry
+shared `-sys` and ABI-adaptation crates, then adapted to the target runtime—this
+is needed when the package boundary is a native extension or native-method entry
 point (Python, Node.js, Java JNI) or an object and introspection ABI
 (GLib/GObject for Vala). Both paths keep raw ABI details internal.
 

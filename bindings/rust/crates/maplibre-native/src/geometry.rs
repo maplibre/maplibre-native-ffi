@@ -2,6 +2,7 @@ use std::ptr;
 
 use maplibre_native_sys as sys;
 
+use crate::values::NativeValue;
 use crate::{Error, LatLng, Result};
 
 pub const MAX_GEOMETRY_COLLECTION_DEPTH: usize = 64;

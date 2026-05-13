@@ -7,7 +7,7 @@ repository.workspace = true
 
 [dependencies]
 bitflags = "2.10.0"
-maplibre-native-support = { path = "../maplibre-native-support" }
+maplibre-native-core = { path = "../maplibre-native-core" }
 maplibre-native-sys = { path = "../maplibre-native-sys" }
 
 [dev-dependencies]

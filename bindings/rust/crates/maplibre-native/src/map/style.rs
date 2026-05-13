@@ -1,67 +1,20 @@
 use std::{marker::PhantomData, mem, ptr};
 
-use maplibre_native_support as support;
+use maplibre_native_core as support;
 use maplibre_native_sys as sys;
+pub use support::{
+    LocationIndicatorImageKind, RasterDemEncoding, SourceType, TileScheme, VectorTileEncoding,
+};
 
 use crate::custom_geometry::{CanonicalTileId, CustomGeometrySourceState};
 use crate::handle::out_handle;
 use crate::render::{PremultipliedRgba8Image, TextureImageInfo};
+use crate::values::NativeValue;
 use crate::{
     CustomGeometrySourceOptions, Error, ErrorKind, GeoJson, JsonValue, LatLng, LatLngBounds, Result,
 };
 
 use super::{const_ptr_or_null, copy_style_id_list, json_snapshot, lat_lngs_to_native};
-
-/// Style source type values returned by native style source metadata.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[non_exhaustive]
-pub enum SourceType {
-    Unknown,
-    Vector,
-    Raster,
-    RasterDem,
-    GeoJson,
-    Image,
-    Video,
-    Annotations,
-    CustomVector,
-    Other(u32),
-}
-
-impl SourceType {
-    /// Converts a raw C ABI source type value into a Rust value, preserving
-    /// future values.
-    pub fn from_raw(raw: u32) -> Self {
-        match raw {
-            sys::MLN_STYLE_SOURCE_TYPE_UNKNOWN => Self::Unknown,
-            sys::MLN_STYLE_SOURCE_TYPE_VECTOR => Self::Vector,
-            sys::MLN_STYLE_SOURCE_TYPE_RASTER => Self::Raster,
-            sys::MLN_STYLE_SOURCE_TYPE_RASTER_DEM => Self::RasterDem,
-            sys::MLN_STYLE_SOURCE_TYPE_GEOJSON => Self::GeoJson,
-            sys::MLN_STYLE_SOURCE_TYPE_IMAGE => Self::Image,
-            sys::MLN_STYLE_SOURCE_TYPE_VIDEO => Self::Video,
-            sys::MLN_STYLE_SOURCE_TYPE_ANNOTATIONS => Self::Annotations,
-            sys::MLN_STYLE_SOURCE_TYPE_CUSTOM_VECTOR => Self::CustomVector,
-            _ => Self::Other(raw),
-        }
-    }
-
-    /// Returns the raw C ABI source type value.
-    pub fn raw_value(self) -> u32 {
-        match self {
-            Self::Unknown => sys::MLN_STYLE_SOURCE_TYPE_UNKNOWN,
-            Self::Vector => sys::MLN_STYLE_SOURCE_TYPE_VECTOR,
-            Self::Raster => sys::MLN_STYLE_SOURCE_TYPE_RASTER,
-            Self::RasterDem => sys::MLN_STYLE_SOURCE_TYPE_RASTER_DEM,
-            Self::GeoJson => sys::MLN_STYLE_SOURCE_TYPE_GEOJSON,
-            Self::Image => sys::MLN_STYLE_SOURCE_TYPE_IMAGE,
-            Self::Video => sys::MLN_STYLE_SOURCE_TYPE_VIDEO,
-            Self::Annotations => sys::MLN_STYLE_SOURCE_TYPE_ANNOTATIONS,
-            Self::CustomVector => sys::MLN_STYLE_SOURCE_TYPE_CUSTOM_VECTOR,
-            Self::Other(raw) => raw,
-        }
-    }
-}
 
 /// Copied fixed metadata for one style source.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -71,76 +24,6 @@ pub struct SourceInfo {
     pub raw_source_type: u32,
     pub is_volatile: bool,
     pub attribution: Option<String>,
-}
-
-/// Tile URL coordinate scheme for vector, raster, and raster DEM sources.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[non_exhaustive]
-pub enum TileScheme {
-    Xyz,
-    Tms,
-}
-
-impl TileScheme {
-    pub fn raw_value(self) -> u32 {
-        match self {
-            Self::Xyz => sys::MLN_STYLE_TILE_SCHEME_XYZ,
-            Self::Tms => sys::MLN_STYLE_TILE_SCHEME_TMS,
-        }
-    }
-}
-
-/// Vector tile encoding for vector style sources.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[non_exhaustive]
-pub enum VectorTileEncoding {
-    Mvt,
-    Mlt,
-}
-
-impl VectorTileEncoding {
-    pub fn raw_value(self) -> u32 {
-        match self {
-            Self::Mvt => sys::MLN_STYLE_VECTOR_TILE_ENCODING_MVT,
-            Self::Mlt => sys::MLN_STYLE_VECTOR_TILE_ENCODING_MLT,
-        }
-    }
-}
-
-/// DEM raster encoding for raster DEM style sources.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[non_exhaustive]
-pub enum RasterDemEncoding {
-    Mapbox,
-    Terrarium,
-}
-
-impl RasterDemEncoding {
-    pub fn raw_value(self) -> u32 {
-        match self {
-            Self::Mapbox => sys::MLN_STYLE_RASTER_DEM_ENCODING_MAPBOX,
-            Self::Terrarium => sys::MLN_STYLE_RASTER_DEM_ENCODING_TERRARIUM,
-        }
-    }
-}
-
-/// Image-name property slots for location indicator layers.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[non_exhaustive]
-pub enum LocationIndicatorImageKind {
-    Top,
-    Bearing,
-    Shadow,
-}
-
-impl LocationIndicatorImageKind {
-    pub fn raw_value(self) -> u32 {
-        match self {
-            Self::Top => sys::MLN_LOCATION_INDICATOR_IMAGE_KIND_TOP,
-            Self::Bearing => sys::MLN_LOCATION_INDICATOR_IMAGE_KIND_BEARING,
-            Self::Shadow => sys::MLN_LOCATION_INDICATOR_IMAGE_KIND_SHADOW,
-        }
-    }
 }
 
 /// Options for vector, raster, and raster DEM tile sources.

@@ -1,5 +1,6 @@
 use maplibre_native_sys as sys;
 
+use crate::values::NativeValue;
 use crate::{EdgeInsets, LatLng, LatLngBounds, Quaternion, ScreenPoint, UnitBezier, Vec3};
 
 /// Camera fields used for snapshots and camera commands.

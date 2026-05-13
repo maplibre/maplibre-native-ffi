@@ -1,12 +1,13 @@
 use std::mem;
 use std::ptr::{self, NonNull};
 
-use maplibre_native_support as support;
+use maplibre_native_core as support;
 use maplibre_native_sys as sys;
 
 use crate::Result;
 use crate::geojson::Feature;
 use crate::json::JsonValue;
+use crate::values::NativeValue;
 use crate::values::{ScreenBox, ScreenPoint};
 
 /// Source, feature, and state-key selector for render-session feature state.

@@ -137,11 +137,13 @@ native_guard!(
 #[cfg(test)]
 mod tests {
     use std::ptr;
+    use std::sync::Mutex;
     use std::sync::atomic::{AtomicUsize, Ordering};
 
     use super::*;
 
     static DESTROY_COUNT: AtomicUsize = AtomicUsize::new(0);
+    static DESTROY_COUNT_LOCK: Mutex<()> = Mutex::new(());
 
     unsafe extern "C" fn count_destroy(ptr: *mut u8) {
         if !ptr.is_null() {
@@ -151,6 +153,7 @@ mod tests {
 
     #[test]
     fn native_handle_destroys_owned_pointer_on_drop() {
+        let _lock = DESTROY_COUNT_LOCK.lock().unwrap();
         DESTROY_COUNT.store(0, Ordering::SeqCst);
         let mut value = 1u8;
 
@@ -166,6 +169,7 @@ mod tests {
 
     #[test]
     fn native_handle_close_destroys_owned_pointer_once() {
+        let _lock = DESTROY_COUNT_LOCK.lock().unwrap();
         DESTROY_COUNT.store(0, Ordering::SeqCst);
         let mut value = 1u8;
 
@@ -178,6 +182,7 @@ mod tests {
 
     #[test]
     fn native_handle_rejects_null() {
+        let _lock = DESTROY_COUNT_LOCK.lock().unwrap();
         let error =
             unsafe { NativeHandle::from_raw(ptr::null_mut::<u8>(), count_destroy, "test_handle") }
                 .unwrap_err();

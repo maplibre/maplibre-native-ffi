@@ -15,16 +15,15 @@ Resources:
 
 The Rust binding serves two roles: a direct low-level Rust API and the shared
 native implementation base for bridge bindings. Bridge bindings depend on
-`maplibre-native-support`, keeping each host runtime's exception types,
-schedulers, and package conventions separate while sharing the C ABI adaptation
-code.
+`maplibre-native-core`, keeping each host runtime's exception types, schedulers,
+and package conventions separate while sharing the C ABI adaptation code.
 
 ```text
 maplibre-native-sys
   Generated unsafe declarations for the public C ABI.
 
-maplibre-native-support
-  Shared glue above sys: status conversion, diagnostics, descriptor
+maplibre-native-core
+  Shared ABI adaptation above sys: status conversion, diagnostics, descriptor
   materializers, callback trampolines, and build/link utilities.
 
 maplibre-native
@@ -42,7 +41,7 @@ with the appropriate mise task when the C headers change.
 FFI details stay below the public crate boundary. Public modules group C API
 concepts (for example, `runtime`, `map`, `render`). Generated types, raw
 pointers, field masks, and callback trampolines stay internal to `sys` or
-`support`.
+`core`.
 
 The native library is loaded dynamically at runtime. The search order:
 `MAPLIBRE_NATIVE_FFI_LIBRARY_PATH` for an exact file path, then the system
@@ -52,7 +51,7 @@ library search path.
 
 Owned values model copied C data as plain Rust structs. Mutable C option structs
 become Rust structs with `Default` and builder-style setters; C field masks
-derive from `Option<T>` fields or explicit setters and stay internal. Support
+derive from `Option<T>` fields or explicit setters and stay internal. Core
 materializers write `size` fields and masks—callers set semantic fields only.
 Native result, snapshot, and list handles stay internal; readers copy into owned
 Rust values before releasing the native handle.
@@ -122,7 +121,7 @@ booleans become `Result<Option<T>>` or `Result<bool>`.
 ## FFI Memory
 
 Public safe methods materialize C inputs at the call boundary. Temporary storage
-uses stack values, `CString`, `Vec<T>`, or support-owned arenas scoped to the C
+uses stack values, `CString`, `Vec<T>`, or core-owned arenas scoped to the C
 call. Object-owned native memory is reserved for storage the C API needs beyond
 one call (callback state, reusable buffers, resource-provider request state).
 
@@ -137,10 +136,12 @@ native invariant they require, and document caller obligations.
 
 ## Callbacks
 
-Trampolines live in `support`. They adapt C function pointers to Rust closures
-or trait objects, copy or wrap callback arguments, catch panics with
-`catch_unwind`, and convert failures to the C callback's documented behavior.
-Panics never unwind through C frames.
+Shared callback trampoline primitives live in `core`; binding-specific
+trampolines may stay in `maplibre-native` while they encode Rust callback
+policy. Trampolines adapt C function pointers to Rust closures or trait objects,
+copy or wrap callback arguments, catch panics with `catch_unwind`, and convert
+failures to the C callback's documented behavior. Panics never unwind through C
+frames.
 
 Callback scoping follows the shared convention. State for callbacks that may
 arrive on MapLibre worker, network, logging, or render threads requires
