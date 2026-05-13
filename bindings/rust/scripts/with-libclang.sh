@@ -3,6 +3,18 @@ set -euo pipefail
 
 repo_root=$(git rev-parse --show-toplevel)
 pixi_env="$repo_root/.pixi/envs/default"
+pixi_lib_dir="$pixi_env/lib"
+pixi_bin_dir="$pixi_env/Library/bin"
+
+if [[ -d "$pixi_lib_dir" ]]; then
+  case "$(uname -s)" in
+    Darwin) ;;
+    *) export LD_LIBRARY_PATH="$pixi_lib_dir${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" ;;
+  esac
+fi
+if [[ -d "$pixi_bin_dir" ]]; then
+  export PATH="$pixi_bin_dir${PATH:+:$PATH}"
+fi
 
 if [[ -z "${LIBCLANG_PATH:-}" ]]; then
   for libclang_candidate in \
