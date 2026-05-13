@@ -2245,7 +2245,7 @@ pub(crate) fn screen_points_to_native(points: &[ScreenPoint]) -> Vec<sys::mln_sc
     points.iter().copied().map(ScreenPoint::to_native).collect()
 }
 
-fn json_snapshot(
+pub(crate) fn json_snapshot(
     snapshot: Option<std::ptr::NonNull<sys::mln_json_snapshot>>,
 ) -> Result<Option<JsonValue>> {
     let Some(snapshot) = snapshot else {

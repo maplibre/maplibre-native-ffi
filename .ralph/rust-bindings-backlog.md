@@ -25,8 +25,8 @@ commit/push after each item.
 - [x] Style image add/remove/query APIs and image metadata/value types.
 - [x] Image source APIs for URL, coordinates, and image updates.
 - [x] Remaining layer/source helpers exposed by Java FFM over the C style API.
-- [ ] RenderSession feature state set/get/remove.
-- [ ] FeatureStateSelector and selector materialization.
+- [x] RenderSession feature state set/get/remove.
+- [x] FeatureStateSelector and selector materialization.
 - [ ] Rendered query geometry and rendered/source query option types.
 - [ ] Copied queried feature and feature-extension result types.
 - [ ] Rendered feature, source feature, and feature extension query methods.
@@ -76,6 +76,10 @@ commit/push after each item.
   `cargo test -p maplibre-native tile_source_helpers_call_real_c_api -- --nocapture`,
   `cargo test -p maplibre-native terrain_and_location_layer_helpers_call_real_c_api -- --nocapture`,
   and `mise run //bindings/rust:test`.
+- RenderSession feature state and FeatureStateSelector materialization:
+  `cargo fmt --manifest-path bindings/rust/crates/maplibre-native/Cargo.toml`
+  and
+  `cargo test --manifest-path bindings/rust/crates/maplibre-native/Cargo.toml feature_state -- --nocapture`.
 
 ## Notes
 

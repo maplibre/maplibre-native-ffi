@@ -10,6 +10,7 @@ use maplibre_native_sys as sys;
 
 use crate::Result;
 use crate::handle::{ThreadAffineNativeHandle, closed_handle_error, out_handle};
+use crate::json::JsonValue;
 use crate::map::{MapHandle, MapState};
 
 /// Borrowed opaque native address used for backend interop handles.
@@ -90,6 +91,150 @@ impl NativePointer {
 impl fmt::Debug for NativePointer {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "NativePointer(0x{:x})", self.address)
+    }
+}
+
+/// Source, feature, and state-key selector for render-session feature state.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct FeatureStateSelector {
+    source_id: String,
+    source_layer_id: Option<String>,
+    feature_id: Option<String>,
+    state_key: Option<String>,
+}
+
+impl FeatureStateSelector {
+    pub fn new(source_id: impl Into<String>) -> Self {
+        Self {
+            source_id: source_id.into(),
+            source_layer_id: None,
+            feature_id: None,
+            state_key: None,
+        }
+    }
+
+    pub fn source_id(&self) -> &str {
+        &self.source_id
+    }
+
+    pub fn source_layer_id(&self) -> Option<&str> {
+        self.source_layer_id.as_deref()
+    }
+
+    pub fn feature_id(&self) -> Option<&str> {
+        self.feature_id.as_deref()
+    }
+
+    pub fn state_key(&self) -> Option<&str> {
+        self.state_key.as_deref()
+    }
+
+    pub fn with_source_layer_id(mut self, source_layer_id: impl Into<String>) -> Self {
+        self.source_layer_id = Some(source_layer_id.into());
+        self
+    }
+
+    pub fn without_source_layer_id(mut self) -> Self {
+        self.source_layer_id = None;
+        self
+    }
+
+    pub fn with_feature_id(mut self, feature_id: impl Into<String>) -> Self {
+        self.feature_id = Some(feature_id.into());
+        self
+    }
+
+    pub fn without_feature_id(mut self) -> Self {
+        self.feature_id = None;
+        self.state_key = None;
+        self
+    }
+
+    pub fn with_state_key(mut self, state_key: impl Into<String>) -> Result<Self> {
+        if self.feature_id.is_none() {
+            return Err(crate::Error::invalid_argument(
+                "feature state selector state_key requires feature_id",
+            ));
+        }
+        self.state_key = Some(state_key.into());
+        Ok(self)
+    }
+
+    pub fn without_state_key(mut self) -> Self {
+        self.state_key = None;
+        self
+    }
+
+    fn to_native(&self) -> NativeFeatureStateSelector<'_> {
+        NativeFeatureStateSelector::new(self)
+    }
+}
+
+pub(crate) struct NativeFeatureStateSelector<'a> {
+    raw: sys::mln_feature_state_selector,
+    _source_id: support::string::StringView<'a>,
+    _source_layer_id: Option<support::string::StringView<'a>>,
+    _feature_id: Option<support::string::StringView<'a>>,
+    _state_key: Option<support::string::StringView<'a>>,
+}
+
+impl<'a> NativeFeatureStateSelector<'a> {
+    fn new(selector: &'a FeatureStateSelector) -> Self {
+        let source_id = support::string::string_view(&selector.source_id);
+        let source_layer_id = selector
+            .source_layer_id
+            .as_deref()
+            .map(support::string::string_view);
+        let feature_id = selector
+            .feature_id
+            .as_deref()
+            .map(support::string::string_view);
+        let state_key = selector
+            .state_key
+            .as_deref()
+            .map(support::string::string_view);
+        let mut fields = 0;
+        if source_layer_id.is_some() {
+            fields |= sys::MLN_FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID;
+        }
+        if feature_id.is_some() {
+            fields |= sys::MLN_FEATURE_STATE_SELECTOR_FEATURE_ID;
+        }
+        if state_key.is_some() {
+            fields |= sys::MLN_FEATURE_STATE_SELECTOR_STATE_KEY;
+        }
+        let raw = sys::mln_feature_state_selector {
+            size: mem::size_of::<sys::mln_feature_state_selector>() as u32,
+            fields,
+            source_id: source_id.raw(),
+            source_layer_id: source_layer_id.map_or(empty_string_view(), |view| view.raw()),
+            feature_id: feature_id.map_or(empty_string_view(), |view| view.raw()),
+            state_key: state_key.map_or(empty_string_view(), |view| view.raw()),
+        };
+        Self {
+            raw,
+            _source_id: source_id,
+            _source_layer_id: source_layer_id,
+            _feature_id: feature_id,
+            _state_key: state_key,
+        }
+    }
+
+    fn as_ptr(&self) -> *const sys::mln_feature_state_selector {
+        &self.raw
+    }
+
+    #[cfg(test)]
+    fn as_ref(&self) -> &sys::mln_feature_state_selector {
+        &self.raw
+    }
+}
+
+fn empty_string_view() -> sys::mln_string_view {
+    sys::mln_string_view {
+        data: std::ptr::null(),
+        size: 0,
     }
 }
 
@@ -857,6 +1002,55 @@ impl RenderSessionHandle {
         support::check(unsafe { sys::mln_render_session_dump_debug_logs(session) })
     }
 
+    /// Sets per-feature state on a render source for this session.
+    pub fn set_feature_state(
+        &self,
+        selector: &FeatureStateSelector,
+        state: &JsonValue,
+    ) -> Result<()> {
+        self.inner.ensure_no_frame_acquired()?;
+        let session = self.inner.as_ptr()?;
+        let selector = selector.to_native();
+        let state = state.try_to_native()?;
+        // SAFETY: session is live. selector and state own all call-scoped
+        // descriptor storage until the native call returns.
+        support::check(unsafe {
+            sys::mln_render_session_set_feature_state(session, selector.as_ptr(), state.as_ptr())
+        })
+    }
+
+    /// Copies per-feature state from a render source in this session.
+    pub fn get_feature_state(&self, selector: &FeatureStateSelector) -> Result<JsonValue> {
+        self.inner.ensure_no_frame_acquired()?;
+        let session = self.inner.as_ptr()?;
+        let selector = selector.to_native();
+        let mut out = support::ptr::OutPtr::<sys::mln_json_snapshot>::new();
+        // SAFETY: session is live, selector owns call-scoped storage, and out
+        // is a null-initialized out-pointer owned by this call.
+        support::check(unsafe {
+            sys::mln_render_session_get_feature_state(session, selector.as_ptr(), out.as_mut_ptr())
+        })?;
+        Ok(crate::map::json_snapshot(out.into_option())?
+            .unwrap_or_else(|| JsonValue::Object(Vec::new())))
+    }
+
+    /// Copies per-feature state from a render source in this session.
+    pub fn feature_state(&self, selector: &FeatureStateSelector) -> Result<JsonValue> {
+        self.get_feature_state(selector)
+    }
+
+    /// Removes per-feature state selected for this session.
+    pub fn remove_feature_state(&self, selector: &FeatureStateSelector) -> Result<()> {
+        self.inner.ensure_no_frame_acquired()?;
+        let session = self.inner.as_ptr()?;
+        let selector = selector.to_native();
+        // SAFETY: session is live and selector owns all call-scoped storage
+        // until the native call returns.
+        support::check(unsafe {
+            sys::mln_render_session_remove_feature_state(session, selector.as_ptr())
+        })
+    }
+
     /// Returns CPU readback metadata for the most recently rendered texture frame.
     pub fn texture_image_info(&self) -> Result<TextureImageInfo> {
         self.inner.ensure_no_frame_acquired()?;
@@ -973,16 +1167,59 @@ fn empty_vulkan_owned_texture_frame() -> sys::mln_vulkan_owned_texture_frame {
 #[cfg(test)]
 mod tests {
     use std::mem;
+    use std::time::Duration;
 
     use static_assertions::assert_not_impl_any;
 
     use super::*;
-    use crate::{ErrorKind, MapMode, MapOptions, RuntimeHandle};
+    use crate::{ErrorKind, JsonMember, MapMode, MapOptions, RuntimeEventType, RuntimeHandle};
 
     assert_not_impl_any!(NativePointer: Send, Sync);
     assert_not_impl_any!(RenderSessionHandle: Send, Sync);
     assert_not_impl_any!(MetalOwnedTextureFrameHandle: Send, Sync);
     assert_not_impl_any!(VulkanOwnedTextureFrameHandle: Send, Sync);
+
+    const FEATURE_STATE_STYLE_JSON: &str = r#"{"version":8,"sources":{"point":{"type":"geojson","data":{"type":"FeatureCollection","features":[{"type":"Feature","id":"feature-1","properties":{},"geometry":{"type":"Point","coordinates":[0,0]}}]}}},"layers":[{"id":"circle","type":"circle","source":"point","paint":{"circle-radius":["case",["boolean",["feature-state","hover"],false],10,5]}}]}"#;
+
+    fn wait_for_runtime_event(runtime: &RuntimeHandle, event_type: RuntimeEventType) -> bool {
+        for _ in 0..100 {
+            let _ = runtime.run_once();
+            while let Ok(Some(event)) = runtime.poll_event() {
+                if event.event_type == event_type {
+                    return true;
+                }
+            }
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        false
+    }
+
+    fn load_feature_state_style(
+        runtime: &RuntimeHandle,
+        map: &MapHandle,
+        session: &RenderSessionHandle,
+    ) {
+        map.set_style_json(FEATURE_STATE_STYLE_JSON).unwrap();
+        assert!(wait_for_runtime_event(
+            runtime,
+            RuntimeEventType::MapRenderUpdateAvailable
+        ));
+        session.render_update().unwrap();
+    }
+
+    fn json_member<'a>(value: &'a JsonValue, key: &str) -> Option<&'a JsonValue> {
+        let JsonValue::Object(members) = value else {
+            return None;
+        };
+        members
+            .iter()
+            .find(|member| member.key == key)
+            .map(|member| &member.value)
+    }
+
+    fn assert_json_member(value: &JsonValue, key: &str, expected: &JsonValue) {
+        assert_eq!(json_member(value, key), Some(expected));
+    }
 
     #[test]
     fn native_pointer_round_trips_address() {
@@ -1110,6 +1347,146 @@ mod tests {
     }
 
     #[test]
+    fn feature_state_selector_materialization_sets_fields_and_views() {
+        let selector = FeatureStateSelector::new("point")
+            .with_source_layer_id("layer")
+            .with_feature_id("feature-1")
+            .with_state_key("hover")
+            .unwrap();
+        let native = selector.to_native();
+        let raw = native.as_ref();
+
+        assert_eq!(raw.size as usize, mem::size_of_val(raw));
+        assert_eq!(
+            raw.fields,
+            sys::MLN_FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID
+                | sys::MLN_FEATURE_STATE_SELECTOR_FEATURE_ID
+                | sys::MLN_FEATURE_STATE_SELECTOR_STATE_KEY
+        );
+        // SAFETY: The materializer keeps these views valid for this scope.
+        assert_eq!(
+            unsafe { support::string::copy_string_view(raw.source_id) }.unwrap(),
+            "point"
+        );
+        assert_eq!(
+            unsafe { support::string::copy_string_view(raw.source_layer_id) }.unwrap(),
+            "layer"
+        );
+        assert_eq!(
+            unsafe { support::string::copy_string_view(raw.feature_id) }.unwrap(),
+            "feature-1"
+        );
+        assert_eq!(
+            unsafe { support::string::copy_string_view(raw.state_key) }.unwrap(),
+            "hover"
+        );
+
+        let source_only_selector = FeatureStateSelector::new("point");
+        let source_only = source_only_selector.to_native();
+        let raw = source_only.as_ref();
+        assert_eq!(raw.fields, 0);
+        assert_eq!(raw.source_layer_id.size, 0);
+        assert!(raw.source_layer_id.data.is_null());
+        assert_eq!(raw.feature_id.size, 0);
+        assert!(raw.feature_id.data.is_null());
+        assert_eq!(raw.state_key.size, 0);
+        assert!(raw.state_key.data.is_null());
+
+        let error = FeatureStateSelector::new("point")
+            .with_state_key("hover")
+            .unwrap_err();
+        assert_eq!(error.kind(), ErrorKind::InvalidArgument);
+    }
+
+    #[test]
+    fn feature_state_set_get_and_remove_copy_snapshots() {
+        let runtime = RuntimeHandle::new().unwrap();
+        let map = MapHandle::with_options(&runtime, &MapOptions::new(64, 64, 1.0)).unwrap();
+        let session = map
+            .attach_owned_texture(&OwnedTextureDescriptor::new(64, 64, 1.0))
+            .unwrap();
+        let selector = FeatureStateSelector::new("point").with_feature_id("feature-1");
+        let state = JsonValue::Object(vec![
+            JsonMember::new("hover", JsonValue::Bool(true)),
+            JsonMember::new("radius", JsonValue::UInt(20)),
+        ]);
+
+        let error = session.set_feature_state(&selector, &state).unwrap_err();
+        assert_eq!(error.kind(), ErrorKind::InvalidState);
+
+        load_feature_state_style(&runtime, &map, &session);
+
+        let error = session
+            .set_feature_state(&selector, &JsonValue::Array(Vec::new()))
+            .unwrap_err();
+        assert_eq!(error.kind(), ErrorKind::InvalidArgument);
+
+        session.set_feature_state(&selector, &state).unwrap();
+        let copied = session.get_feature_state(&selector).unwrap();
+        assert_json_member(&copied, "hover", &JsonValue::Bool(true));
+        assert_json_member(&copied, "radius", &JsonValue::UInt(20));
+
+        let hover_selector = FeatureStateSelector::new("point")
+            .with_feature_id("feature-1")
+            .with_state_key("hover")
+            .unwrap();
+        session.remove_feature_state(&hover_selector).unwrap();
+        let _ = wait_for_runtime_event(&runtime, RuntimeEventType::MapRenderUpdateAvailable);
+        let _ = session.render_update();
+
+        let after_remove = session.get_feature_state(&selector).unwrap();
+        assert_json_member(&after_remove, "radius", &JsonValue::UInt(20));
+        assert!(json_member(&after_remove, "hover").is_none());
+
+        let source_only = FeatureStateSelector::new("point");
+        session.remove_feature_state(&source_only).unwrap();
+        let _ = wait_for_runtime_event(&runtime, RuntimeEventType::MapRenderUpdateAvailable);
+        let _ = session.render_update();
+        assert_eq!(
+            session.get_feature_state(&selector).unwrap(),
+            JsonValue::Object(Vec::new())
+        );
+
+        session.close().unwrap();
+        map.close().unwrap();
+        runtime.close().unwrap();
+    }
+
+    #[test]
+    fn feature_state_selector_native_validation_surfaces_through_methods() {
+        let runtime = RuntimeHandle::new().unwrap();
+        let map = MapHandle::with_options(&runtime, &MapOptions::new(64, 64, 1.0)).unwrap();
+        let session = map
+            .attach_owned_texture(&OwnedTextureDescriptor::new(64, 64, 1.0))
+            .unwrap();
+        load_feature_state_style(&runtime, &map, &session);
+
+        let source_only = FeatureStateSelector::new("point");
+        assert_eq!(
+            session
+                .set_feature_state(&source_only, &JsonValue::Object(Vec::new()))
+                .unwrap_err()
+                .kind(),
+            ErrorKind::InvalidArgument
+        );
+        assert_eq!(
+            session.get_feature_state(&source_only).unwrap_err().kind(),
+            ErrorKind::InvalidArgument
+        );
+        assert_eq!(
+            session
+                .remove_feature_state(&FeatureStateSelector::new(""))
+                .unwrap_err()
+                .kind(),
+            ErrorKind::InvalidArgument
+        );
+
+        session.close().unwrap();
+        map.close().unwrap();
+        runtime.close().unwrap();
+    }
+
+    #[test]
     fn owned_texture_session_retains_parent_and_enforces_single_session() {
         let runtime = RuntimeHandle::new().unwrap();
         let map = MapHandle::with_options(
@@ -1153,11 +1530,17 @@ mod tests {
 
         session.inner.frame_acquired.set(true);
 
+        let selector = FeatureStateSelector::new("point").with_feature_id("feature-1");
         for error in [
             session.resize(32, 16, 1.0).unwrap_err(),
             session.render_update().unwrap_err(),
             session.detach().unwrap_err(),
             session.close().unwrap_err(),
+            session
+                .set_feature_state(&selector, &JsonValue::Object(Vec::new()))
+                .unwrap_err(),
+            session.get_feature_state(&selector).unwrap_err(),
+            session.remove_feature_state(&selector).unwrap_err(),
             session.read_premultiplied_rgba8_into(&mut []).unwrap_err(),
             session.acquire_metal_owned_texture_frame().unwrap_err(),
             session.acquire_vulkan_owned_texture_frame().unwrap_err(),
