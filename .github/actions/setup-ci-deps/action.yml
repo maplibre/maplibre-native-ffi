@@ -48,6 +48,10 @@ runs:
         cache_key_prefix: mise-v2
         install: true
 
+    - name: Work around https://github.com/jdx/mise-action/issues/184
+      run: rustup set profile default
+      shell: bash
+
     - name: Trim Windows PATH before Pixi activation
       if: ${{ runner.os == 'Windows' }}
       shell: pwsh
