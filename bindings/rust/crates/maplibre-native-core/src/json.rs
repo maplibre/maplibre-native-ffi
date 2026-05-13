@@ -1,5 +1,6 @@
 use std::os::raw::c_char;
 use std::ptr;
+use std::ptr::NonNull;
 
 use maplibre_native_sys as sys;
 
@@ -121,6 +122,35 @@ pub fn json_value_try_to_native(value: &JsonValue) -> Result<NativeJsonValue> {
 pub unsafe fn json_value_from_native(raw: &sys::mln_json_value) -> Result<JsonValue> {
     // SAFETY: The caller promises raw and nested pointers are valid for this call.
     unsafe { JsonValue::from_native(raw) }
+}
+
+/// Copies an owned native JSON snapshot into an owned Rust JSON value.
+///
+/// # Safety
+///
+/// If `snapshot` is `Some`, it must point to a live `mln_json_snapshot` handle
+/// owned by the caller and returned by the matching C API. This function takes
+/// ownership of that handle and releases it before returning, including on copy
+/// errors.
+pub unsafe fn copy_json_snapshot(
+    snapshot: Option<NonNull<sys::mln_json_snapshot>>,
+) -> Result<Option<JsonValue>> {
+    let Some(snapshot) = snapshot else {
+        return Ok(None);
+    };
+    // SAFETY: snapshot is an owned JSON snapshot returned by the C API and is
+    // destroyed by the guard after copying.
+    let snapshot = unsafe { crate::handle::json_snapshot(snapshot.as_ptr()) }?;
+    let mut value = ptr::null();
+    // SAFETY: snapshot is live and value points to writable storage. The
+    // borrowed JSON value is copied before the guard drops.
+    crate::check(unsafe { sys::mln_json_snapshot_get(snapshot.as_ptr(), &mut value) })?;
+    if value.is_null() {
+        return Ok(None);
+    }
+    // SAFETY: value is borrowed from the live snapshot guard and copied before
+    // the guard drops at the end of this function.
+    unsafe { JsonValue::from_native(&*value) }.map(Some)
 }
 
 pub struct NativeJsonValue {

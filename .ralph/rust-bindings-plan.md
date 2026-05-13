@@ -56,6 +56,20 @@ milestone until complete (through 9).
       `core`.
 - [x] Milestone 5: Start offline-region native reader extraction by moving
       `OfflineRegionInfo` and definition copying into `core`.
+- [x] Milestone 5: Move JSON snapshot reader/guard ownership into `core`.
+- [x] Milestone 5: Move style ID list reader/guard ownership into `core`.
+- [x] Milestone 5: Move offline-region snapshot/list reader guard ownership into
+      `core`.
+- [x] Milestone 5: Move feature query result reader/guard ownership into `core`.
+- [x] Milestone 5: Move feature-extension result reader/guard ownership into
+      `core`.
+- [x] Milestone 5: Add copy failure-path coverage for feature-extension
+      collection pointer validation.
+- [x] Milestone 5: Mark owned native-result reader helpers unsafe and document
+      handle ownership/liveness preconditions.
+- [x] Milestone 5: Add offline-region copy failure-path coverage for nonempty
+      null metadata and null geometry pointers.
+- [x] Milestone 5: Complete parallel review and apply relevant findings.
 - [x] Milestone 4: Move render-target descriptor materializers into `core`.
 - [x] Milestone 4: Move feature-state selector descriptor materializer into
       `core`.
@@ -67,8 +81,8 @@ milestone until complete (through 9).
 - [x] Milestone 4: Move style-image options descriptor materializer into `core`.
 - [x] Milestone 4: Finish remaining style descriptor/materializer audit.
 - [x] Milestone 4: Complete parallel review and apply relevant findings.
-- [ ] Milestone 5+: Continue remaining result/event/resource/handle milestones
-      in small buildable slices.
+- [ ] Milestone 6+: Continue remaining event/resource/handle milestones in small
+      buildable slices.
 
 ## Verification
 
@@ -209,6 +223,36 @@ milestone until complete (through 9).
   remaining public descriptor builder noted was custom geometry source options,
   which stays above `core` because it owns callback trampolines and Rust
   `user_data` policy.
+- `cargo fmt --all --manifest-path Cargo.toml` — passed after moving JSON
+  snapshot, style ID list, and offline-region snapshot/list readers into core.
+- `cargo clippy --manifest-path Cargo.toml -p maplibre-native-core -p
+  maplibre-native --all-targets -- -D warnings`
+  — passed after moving the first Milestone 5 result readers into core.
+- `mise run -C bindings/rust test` — passed after moving the first Milestone 5
+  result readers into core (85 `maplibre-native`, 67 `maplibre-native-core`, 0
+  `maplibre-native-sys`, doc tests passed).
+- `cargo fmt --all --manifest-path Cargo.toml` — passed after moving feature
+  query and feature-extension result readers into core.
+- `cargo clippy --manifest-path Cargo.toml -p maplibre-native-core -p
+  maplibre-native --all-targets -- -D warnings`
+  — passed after moving feature query and feature-extension result readers into
+  core.
+- `mise run -C bindings/rust test` — passed after moving feature query and
+  feature-extension result readers into core (85 `maplibre-native`, 68
+  `maplibre-native-core`, 0 `maplibre-native-sys`, doc tests passed).
+- Parallel Milestone 5 review — reviewers confirmed result-reader ownership was
+  centralized in core and public APIs still return copied Rust values. Applied
+  the blocker/medium finding by making owned native-result reader helpers
+  `unsafe fn` with safety docs and explicit unsafe call-site comments. Applied
+  coverage suggestions for offline-region metadata/geometry copy failures.
+- `cargo fmt --all --manifest-path Cargo.toml` — passed after Milestone 5 review
+  fixes.
+- `cargo clippy --manifest-path Cargo.toml -p maplibre-native-core -p
+  maplibre-native --all-targets -- -D warnings`
+  — passed after Milestone 5 review fixes.
+- `mise run -C bindings/rust test` — passed after Milestone 5 review fixes (85
+  `maplibre-native`, 70 `maplibre-native-core`, 0 `maplibre-native-sys`, doc
+  tests passed).
 
 ## Reflection checkpoint 2026-05-13
 
@@ -349,3 +393,22 @@ milestone until complete (through 9).
   source options remain in the public crate because they include callback
   trampolines and Rust callback/user-data policy rather than bridge-neutral C
   descriptor adaptation.
+- Iteration 20 started Milestone 5 result-reader extraction by moving native
+  JSON snapshot copying, style ID list copying, and offline-region snapshot/list
+  copying into `maplibre-native-core`. The public crate now passes owned
+  non-null handles into core free functions, so guard construction and release
+  on success/error stay inside the shared ABI adaptation layer for these result
+  families.
+- Iteration 21 moved `QueriedFeature`, `FeatureExtensionResult`, feature query
+  result copying, and feature-extension result copying into
+  `maplibre-native-core::query`. The public render module re-exports the copied
+  result types and hands owned native result handles to core, keeping handle
+  release and copy failure paths out of public binding code. Added core coverage
+  for invalid nonempty feature-extension collection pointers.
+- Iteration 22 completed the Milestone 5 review round. Reviewers found no public
+  API boundary regressions and flagged that core reader helpers must express
+  owned-handle safety preconditions. Fixed by making owned native-result reader
+  helpers unsafe with safety docs, adding explicit safety comments at public
+  crate call sites, removing now-redundant public-crate reader shims, and adding
+  offline-region copy failure tests for nonempty null metadata and null geometry
+  pointers.

@@ -215,37 +215,6 @@ impl RuntimeState {
     }
 }
 
-fn copy_offline_region_snapshot(
-    ptr: std::ptr::NonNull<sys::mln_offline_region_snapshot>,
-) -> Result<OfflineRegionInfo> {
-    // SAFETY: ptr is an owned snapshot returned by the C API and released by the guard.
-    let snapshot = unsafe { support::handle::offline_region_snapshot(ptr.as_ptr()) }?;
-    let mut raw = support::runtime::empty_offline_region_info();
-    // SAFETY: snapshot is live and raw points to writable storage with size initialized.
-    support::check(unsafe { sys::mln_offline_region_snapshot_get(snapshot.as_ptr(), &mut raw) })?;
-    support::runtime::copy_offline_region_info(&raw)
-}
-
-fn copy_offline_region_list(
-    ptr: std::ptr::NonNull<sys::mln_offline_region_list>,
-) -> Result<Vec<OfflineRegionInfo>> {
-    // SAFETY: ptr is an owned list returned by the C API and released by the guard.
-    let list = unsafe { support::handle::offline_region_list(ptr.as_ptr()) }?;
-    let mut count = 0;
-    // SAFETY: list is live and count points to writable storage.
-    support::check(unsafe { sys::mln_offline_region_list_count(list.as_ptr(), &mut count) })?;
-    let mut regions = Vec::with_capacity(count);
-    for index in 0..count {
-        let mut raw = support::runtime::empty_offline_region_info();
-        // SAFETY: list is live, index is in range, and raw points to writable storage.
-        support::check(unsafe {
-            sys::mln_offline_region_list_get(list.as_ptr(), index, &mut raw)
-        })?;
-        regions.push(support::runtime::copy_offline_region_info(&raw)?);
-    }
-    Ok(regions)
-}
-
 /// Owner-thread runtime handle for MapLibre Native work and event polling.
 pub struct RuntimeHandle {
     pub(crate) inner: Rc<RuntimeState>,
@@ -378,7 +347,13 @@ impl RuntimeHandle {
                 out.as_mut_ptr(),
             )
         })?;
-        copy_offline_region_snapshot(out.into_non_null("mln_offline_region_snapshot")?)
+        // SAFETY: On success, the C API returns an owned offline-region
+        // snapshot handle; core copies and releases it.
+        unsafe {
+            support::runtime::copy_offline_region_snapshot(
+                out.into_non_null("mln_offline_region_snapshot")?,
+            )
+        }
     }
 
     /// Gets an offline region snapshot by ID.
@@ -392,9 +367,13 @@ impl RuntimeHandle {
             sys::mln_runtime_offline_region_get(runtime, region_id, out.as_mut_ptr(), &mut found)
         })?;
         if found {
-            Ok(Some(copy_offline_region_snapshot(
-                out.into_non_null("mln_offline_region_snapshot")?,
-            )?))
+            // SAFETY: When found is true, the C API returns an owned
+            // offline-region snapshot handle; core copies and releases it.
+            Ok(Some(unsafe {
+                support::runtime::copy_offline_region_snapshot(
+                    out.into_non_null("mln_offline_region_snapshot")?,
+                )
+            }?))
         } else {
             Ok(None)
         }
@@ -408,7 +387,13 @@ impl RuntimeHandle {
         support::check(unsafe {
             sys::mln_runtime_offline_regions_list(runtime, out.as_mut_ptr())
         })?;
-        copy_offline_region_list(out.into_non_null("mln_offline_region_list")?)
+        // SAFETY: On success, the C API returns an owned offline-region list
+        // handle; core copies and releases it.
+        unsafe {
+            support::runtime::copy_offline_region_list(
+                out.into_non_null("mln_offline_region_list")?,
+            )
+        }
     }
 
     /// Merges offline regions from another database path.
@@ -425,7 +410,13 @@ impl RuntimeHandle {
                 out.as_mut_ptr(),
             )
         })?;
-        copy_offline_region_list(out.into_non_null("mln_offline_region_list")?)
+        // SAFETY: On success, the C API returns an owned offline-region list
+        // handle; core copies and releases it.
+        unsafe {
+            support::runtime::copy_offline_region_list(
+                out.into_non_null("mln_offline_region_list")?,
+            )
+        }
     }
 
     /// Updates opaque metadata for an offline region.
@@ -447,7 +438,13 @@ impl RuntimeHandle {
                 out.as_mut_ptr(),
             )
         })?;
-        copy_offline_region_snapshot(out.into_non_null("mln_offline_region_snapshot")?)
+        // SAFETY: On success, the C API returns an owned offline-region
+        // snapshot handle; core copies and releases it.
+        unsafe {
+            support::runtime::copy_offline_region_snapshot(
+                out.into_non_null("mln_offline_region_snapshot")?,
+            )
+        }
     }
 
     /// Gets the current completed/download status for an offline region.

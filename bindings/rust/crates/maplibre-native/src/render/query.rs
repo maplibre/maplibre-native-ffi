@@ -1,18 +1,16 @@
-use std::mem;
-use std::ptr::{self, NonNull};
+use std::ptr;
 
 use maplibre_native_core as support;
 use maplibre_native_sys as sys;
 
 use crate::Result;
-use crate::geojson::Feature;
-use crate::geojson::FeatureNativeExt;
+use crate::geojson::{Feature, FeatureNativeExt};
 use crate::json::JsonValue;
 use crate::json::JsonValueNativeExt;
 
 pub use support::query::{
-    FeatureStateSelector, RenderedFeatureQueryOptions, RenderedQueryGeometry,
-    SourceFeatureQueryOptions,
+    FeatureExtensionResult, FeatureStateSelector, QueriedFeature, RenderedFeatureQueryOptions,
+    RenderedQueryGeometry, SourceFeatureQueryOptions,
 };
 pub(crate) use support::query::{
     NativeFeatureStateSelector, NativeRenderedFeatureQueryOptions, NativeRenderedQueryGeometry,
@@ -59,199 +57,6 @@ impl SourceFeatureQueryOptionsNativeExt for SourceFeatureQueryOptions {
     }
 }
 
-fn empty_string_view() -> sys::mln_string_view {
-    sys::mln_string_view {
-        data: ptr::null(),
-        size: 0,
-    }
-}
-
-/// One copied query result feature.
-#[derive(Debug, Clone, PartialEq)]
-#[non_exhaustive]
-pub struct QueriedFeature {
-    pub feature: Feature,
-    pub source_id: Option<String>,
-    pub source_layer_id: Option<String>,
-    pub state: Option<JsonValue>,
-}
-
-/// Copied feature-extension query result.
-#[derive(Debug, Clone, PartialEq)]
-#[non_exhaustive]
-pub enum FeatureExtensionResult {
-    Value(JsonValue),
-    FeatureCollection(Vec<Feature>),
-    Unknown(u32),
-}
-
-pub(crate) struct FeatureQueryResultHandle(NonNull<sys::mln_feature_query_result>);
-
-impl FeatureQueryResultHandle {
-    pub(crate) fn new(ptr: NonNull<sys::mln_feature_query_result>) -> Self {
-        Self(ptr)
-    }
-
-    fn as_ptr(&self) -> *const sys::mln_feature_query_result {
-        self.0.as_ptr()
-    }
-}
-
-impl Drop for FeatureQueryResultHandle {
-    fn drop(&mut self) {
-        // SAFETY: self.0 is an owned feature-query result handle.
-        unsafe { sys::mln_feature_query_result_destroy(self.0.as_ptr()) };
-    }
-}
-
-pub(crate) struct FeatureExtensionResultHandle(NonNull<sys::mln_feature_extension_result>);
-
-impl FeatureExtensionResultHandle {
-    pub(crate) fn new(ptr: NonNull<sys::mln_feature_extension_result>) -> Self {
-        Self(ptr)
-    }
-
-    fn as_ptr(&self) -> *const sys::mln_feature_extension_result {
-        self.0.as_ptr()
-    }
-}
-
-impl Drop for FeatureExtensionResultHandle {
-    fn drop(&mut self) {
-        // SAFETY: self.0 is an owned feature-extension result handle.
-        unsafe { sys::mln_feature_extension_result_destroy(self.0.as_ptr()) };
-    }
-}
-
-pub(crate) fn copy_feature_query_result(
-    result: FeatureQueryResultHandle,
-) -> Result<Vec<QueriedFeature>> {
-    let mut count = 0;
-    // SAFETY: result is live and count points to writable storage.
-    support::check(unsafe { sys::mln_feature_query_result_count(result.as_ptr(), &mut count) })?;
-    let mut features = Vec::with_capacity(count);
-    for index in 0..count {
-        let mut raw = sys::mln_queried_feature {
-            size: mem::size_of::<sys::mln_queried_feature>() as u32,
-            fields: 0,
-            feature: empty_feature(),
-            source_id: empty_string_view(),
-            source_layer_id: empty_string_view(),
-            state: ptr::null(),
-        };
-        // SAFETY: result is live, index is within count reported by native,
-        // and raw points to initialized writable storage with size set.
-        support::check(unsafe {
-            sys::mln_feature_query_result_get(result.as_ptr(), index, &mut raw)
-        })?;
-        // SAFETY: raw now contains result-owned views valid until result drops;
-        // this copies all nested data before the next iteration/drop.
-        features.push(unsafe { copy_queried_feature(&raw) }?);
-    }
-    Ok(features)
-}
-
-unsafe fn copy_queried_feature(raw: &sys::mln_queried_feature) -> Result<QueriedFeature> {
-    // SAFETY: Caller promises raw.feature nested storage is valid for this call.
-    let feature = unsafe { Feature::from_native(&raw.feature, 0) }?;
-    let source_id = if raw.fields & sys::MLN_QUERIED_FEATURE_SOURCE_ID != 0 {
-        // SAFETY: Caller promises native string storage is valid.
-        Some(unsafe { support::string::copy_string_view(raw.source_id) }?)
-    } else {
-        None
-    };
-    let source_layer_id = if raw.fields & sys::MLN_QUERIED_FEATURE_SOURCE_LAYER_ID != 0 {
-        // SAFETY: Caller promises native string storage is valid.
-        Some(unsafe { support::string::copy_string_view(raw.source_layer_id) }?)
-    } else {
-        None
-    };
-    let state = if raw.fields & sys::MLN_QUERIED_FEATURE_STATE != 0 && !raw.state.is_null() {
-        // SAFETY: Caller promises state storage is valid.
-        Some(unsafe { JsonValue::from_native(&*raw.state) }?)
-    } else {
-        None
-    };
-    Ok(QueriedFeature {
-        feature,
-        source_id,
-        source_layer_id,
-        state,
-    })
-}
-
-pub(crate) fn copy_feature_extension_result(
-    result: FeatureExtensionResultHandle,
-) -> Result<FeatureExtensionResult> {
-    let mut info = sys::mln_feature_extension_result_info {
-        size: mem::size_of::<sys::mln_feature_extension_result_info>() as u32,
-        type_: 0,
-        data: sys::mln_feature_extension_result_info__bindgen_ty_1 { value: ptr::null() },
-    };
-    // SAFETY: result is live and info points to initialized writable storage.
-    support::check(unsafe { sys::mln_feature_extension_result_get(result.as_ptr(), &mut info) })?;
-    match info.type_ {
-        sys::MLN_FEATURE_EXTENSION_RESULT_TYPE_VALUE => {
-            // SAFETY: Active union member is selected by type_. Native returned
-            // a value pointer valid until result drops; this copies it now.
-            let value = unsafe { info.data.value };
-            if value.is_null() {
-                return Err(crate::Error::invalid_argument(
-                    "feature extension value result must not be null",
-                ));
-            }
-            // SAFETY: value was checked non-null and is result-owned.
-            Ok(FeatureExtensionResult::Value(unsafe {
-                JsonValue::from_native(&*value)
-            }?))
-        }
-        sys::MLN_FEATURE_EXTENSION_RESULT_TYPE_FEATURE_COLLECTION => {
-            // SAFETY: Active union member is selected by type_.
-            let collection = unsafe { info.data.feature_collection };
-            let features = feature_collection_slice(
-                collection.features,
-                collection.feature_count,
-                "feature extension feature collection",
-            )?;
-            let mut copied = Vec::with_capacity(features.len());
-            for feature in features {
-                // SAFETY: features came from validated collection storage.
-                copied.push(unsafe { Feature::from_native(feature, 1) }?);
-            }
-            Ok(FeatureExtensionResult::FeatureCollection(copied))
-        }
-        type_ => Ok(FeatureExtensionResult::Unknown(type_)),
-    }
-}
-
-fn feature_collection_slice<'a>(
-    ptr: *const sys::mln_feature,
-    len: usize,
-    context: &'static str,
-) -> Result<&'a [sys::mln_feature]> {
-    if len == 0 {
-        return Ok(&[]);
-    }
-    if ptr.is_null() {
-        return Err(crate::Error::invalid_argument(format!(
-            "{context} pointer must not be null when length is nonzero"
-        )));
-    }
-    // SAFETY: ptr is non-null and caller/native reports len initialized entries.
-    Ok(unsafe { std::slice::from_raw_parts(ptr, len) })
-}
-
-pub(crate) fn empty_feature() -> sys::mln_feature {
-    sys::mln_feature {
-        size: mem::size_of::<sys::mln_feature>() as u32,
-        geometry: ptr::null(),
-        properties: ptr::null(),
-        property_count: 0,
-        identifier_type: sys::MLN_FEATURE_IDENTIFIER_TYPE_NULL,
-        identifier: sys::mln_feature__bindgen_ty_1 { uint_value: 0 },
-    }
-}
-
 impl super::RenderSessionHandle {
     /// Sets per-feature state on a render source for this session.
     pub fn set_feature_state(
@@ -281,8 +86,12 @@ impl super::RenderSessionHandle {
         support::check(unsafe {
             sys::mln_render_session_get_feature_state(session, selector.as_ptr(), out.as_mut_ptr())
         })?;
-        Ok(crate::map::json_snapshot(out.into_option())?
-            .unwrap_or_else(|| JsonValue::Object(Vec::new())))
+        // SAFETY: On success, the C API returns either null or an owned JSON
+        // snapshot handle for this call; core copies and releases it.
+        Ok(
+            unsafe { support::json::copy_json_snapshot(out.into_option()) }?
+                .unwrap_or_else(|| JsonValue::Object(Vec::new())),
+        )
     }
 
     /// Copies per-feature state from a render source in this session.
@@ -328,9 +137,13 @@ impl super::RenderSessionHandle {
                 out.as_mut_ptr(),
             )
         })?;
-        copy_feature_query_result(FeatureQueryResultHandle::new(
-            out.into_non_null("mln_feature_query_result")?,
-        ))
+        // SAFETY: On success, the C API returns an owned feature-query result
+        // handle; core copies and releases it.
+        unsafe {
+            support::query::copy_feature_query_result(
+                out.into_non_null("mln_feature_query_result")?,
+            )
+        }
     }
 
     /// Queries source features from the latest render session state.
@@ -359,9 +172,13 @@ impl super::RenderSessionHandle {
                 out.as_mut_ptr(),
             )
         })?;
-        copy_feature_query_result(FeatureQueryResultHandle::new(
-            out.into_non_null("mln_feature_query_result")?,
-        ))
+        // SAFETY: On success, the C API returns an owned feature-query result
+        // handle; core copies and releases it.
+        unsafe {
+            support::query::copy_feature_query_result(
+                out.into_non_null("mln_feature_query_result")?,
+            )
+        }
     }
 
     /// Queries a feature extension from the latest render session state.
@@ -404,8 +221,12 @@ impl super::RenderSessionHandle {
                 out.as_mut_ptr(),
             )
         })?;
-        copy_feature_extension_result(FeatureExtensionResultHandle::new(
-            out.into_non_null("mln_feature_extension_result")?,
-        ))
+        // SAFETY: On success, the C API returns an owned feature-extension
+        // result handle; core copies and releases it.
+        unsafe {
+            support::query::copy_feature_extension_result(
+                out.into_non_null("mln_feature_extension_result")?,
+            )
+        }
     }
 }

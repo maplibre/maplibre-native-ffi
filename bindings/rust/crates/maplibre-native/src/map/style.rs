@@ -10,7 +10,6 @@ pub use support::{
 
 use crate::custom_geometry::{CanonicalTileId, CustomGeometrySourceState};
 use crate::geojson::GeoJsonNativeExt;
-use crate::handle::out_handle;
 use crate::json::JsonValueNativeExt;
 use crate::render::PremultipliedRgba8Image;
 use crate::values::NativeValue;
@@ -18,7 +17,7 @@ use crate::{
     CustomGeometrySourceOptions, Error, ErrorKind, GeoJson, JsonValue, LatLng, LatLngBounds, Result,
 };
 
-use super::{const_ptr_or_null, copy_style_id_list, json_snapshot, lat_lngs_to_native};
+use super::{const_ptr_or_null, lat_lngs_to_native};
 
 /// Copied fixed metadata for one style source.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -978,7 +977,9 @@ impl super::MapHandle {
         support::check(unsafe {
             sys::mln_map_get_style_layer_json(map, layer_id.raw(), out.as_mut_ptr(), &mut found)
         })?;
-        let snapshot = json_snapshot(out.into_option())?;
+        // SAFETY: On success, the C API returns either null or an owned JSON
+        // snapshot handle for this call; core copies and releases it.
+        let snapshot = unsafe { support::json::copy_json_snapshot(out.into_option()) }?;
         if found { Ok(snapshot) } else { Ok(None) }
     }
 
@@ -1012,7 +1013,9 @@ impl super::MapHandle {
         support::check(unsafe {
             sys::mln_map_get_style_light_property(map, property_name.raw(), out.as_mut_ptr())
         })?;
-        json_snapshot(out.into_option())
+        // SAFETY: On success, the C API returns either null or an owned JSON
+        // snapshot handle for this call; core copies and releases it.
+        unsafe { support::json::copy_json_snapshot(out.into_option()) }
     }
 
     /// Sets one layer style property.
@@ -1054,7 +1057,9 @@ impl super::MapHandle {
                 out.as_mut_ptr(),
             )
         })?;
-        json_snapshot(out.into_option())
+        // SAFETY: On success, the C API returns either null or an owned JSON
+        // snapshot handle for this call; core copies and releases it.
+        unsafe { support::json::copy_json_snapshot(out.into_option()) }
     }
 
     /// Sets or clears one layer filter.
@@ -1085,7 +1090,9 @@ impl super::MapHandle {
         support::check(unsafe {
             sys::mln_map_get_layer_filter(map, layer_id.raw(), out.as_mut_ptr())
         })?;
-        json_snapshot(out.into_option())
+        // SAFETY: On success, the C API returns either null or an owned JSON
+        // snapshot handle for this call; core copies and releases it.
+        unsafe { support::json::copy_json_snapshot(out.into_option()) }
     }
 
     /// Copies current style source IDs into owned Rust strings.
@@ -1096,11 +1103,9 @@ impl super::MapHandle {
         // this call. On success the returned handle is wrapped and destroyed by
         // the copying helper below.
         support::check(unsafe { sys::mln_map_list_style_source_ids(map, out.as_mut_ptr()) })?;
-        let list = out_handle(out, "mln_style_id_list")?;
-        // SAFETY: list came from mln_map_list_style_source_ids and is owned by
-        // this function until the guard drops.
-        let list = unsafe { support::handle::style_id_list(list.as_ptr()) }?;
-        copy_style_id_list(&list)
+        // SAFETY: On success, the C API returns an owned style ID list handle;
+        // core copies and releases it.
+        unsafe { support::style::copy_style_id_list(out.into_non_null("mln_style_id_list")?) }
     }
 
     /// Copies current style layer IDs into owned Rust strings.
@@ -1111,10 +1116,8 @@ impl super::MapHandle {
         // this call. On success the returned handle is wrapped and destroyed by
         // the copying helper below.
         support::check(unsafe { sys::mln_map_list_style_layer_ids(map, out.as_mut_ptr()) })?;
-        let list = out_handle(out, "mln_style_id_list")?;
-        // SAFETY: list came from mln_map_list_style_layer_ids and is owned by
-        // this function until the guard drops.
-        let list = unsafe { support::handle::style_id_list(list.as_ptr()) }?;
-        copy_style_id_list(&list)
+        // SAFETY: On success, the C API returns an owned style ID list handle;
+        // core copies and releases it.
+        unsafe { support::style::copy_style_id_list(out.into_non_null("mln_style_id_list")?) }
     }
 }

@@ -1,4 +1,5 @@
 use std::ptr;
+use std::ptr::NonNull;
 
 use maplibre_native_sys as sys;
 
@@ -179,6 +180,36 @@ impl StyleImageOptions {
 
 pub fn style_image_options_to_native(options: &StyleImageOptions) -> sys::mln_style_image_options {
     options.to_native()
+}
+
+/// Copies an owned native style ID list into owned Rust strings.
+///
+/// # Safety
+///
+/// `ptr` must point to a live `mln_style_id_list` handle owned by the caller
+/// and returned by the matching C API. This function takes ownership of that
+/// handle and releases it before returning, including on copy errors.
+pub unsafe fn copy_style_id_list(
+    ptr: NonNull<sys::mln_style_id_list>,
+) -> crate::Result<Vec<String>> {
+    // SAFETY: ptr is an owned style ID list returned by the C API and released by the guard.
+    let list = unsafe { crate::handle::style_id_list(ptr.as_ptr()) }?;
+    let mut count = 0;
+    // SAFETY: list is live and count points to writable storage.
+    crate::check(unsafe { sys::mln_style_id_list_count(list.as_ptr(), &mut count) })?;
+
+    let mut ids = Vec::with_capacity(count);
+    for index in 0..count {
+        let mut view = sys::mln_string_view {
+            data: ptr::null(),
+            size: 0,
+        };
+        // SAFETY: list is live, index is less than count, and view points to writable storage.
+        crate::check(unsafe { sys::mln_style_id_list_get(list.as_ptr(), index, &mut view) })?;
+        // SAFETY: The C API returns a view into list-owned storage that remains valid here.
+        ids.push(unsafe { crate::string::copy_string_view(view) }?);
+    }
+    Ok(ids)
 }
 
 #[cfg(test)]

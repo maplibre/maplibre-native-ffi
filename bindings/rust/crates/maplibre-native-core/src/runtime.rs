@@ -1,4 +1,5 @@
 use std::ffi::CString;
+use std::ptr::NonNull;
 
 use maplibre_native_sys as sys;
 
@@ -303,6 +304,49 @@ pub fn metadata_ptr(metadata: &[u8]) -> *const u8 {
     }
 }
 
+/// Copies an owned native offline-region snapshot into owned Rust data.
+///
+/// # Safety
+///
+/// `ptr` must point to a live `mln_offline_region_snapshot` handle owned by
+/// the caller and returned by the matching C API. This function takes ownership
+/// of that handle and releases it before returning, including on copy errors.
+pub unsafe fn copy_offline_region_snapshot(
+    ptr: NonNull<sys::mln_offline_region_snapshot>,
+) -> Result<OfflineRegionInfo> {
+    // SAFETY: ptr is an owned snapshot returned by the C API and released by the guard.
+    let snapshot = unsafe { crate::handle::offline_region_snapshot(ptr.as_ptr()) }?;
+    let mut raw = empty_offline_region_info();
+    // SAFETY: snapshot is live and raw points to writable storage with size initialized.
+    crate::check(unsafe { sys::mln_offline_region_snapshot_get(snapshot.as_ptr(), &mut raw) })?;
+    copy_offline_region_info(&raw)
+}
+
+/// Copies an owned native offline-region list into owned Rust data.
+///
+/// # Safety
+///
+/// `ptr` must point to a live `mln_offline_region_list` handle owned by the
+/// caller and returned by the matching C API. This function takes ownership of
+/// that handle and releases it before returning, including on copy errors.
+pub unsafe fn copy_offline_region_list(
+    ptr: NonNull<sys::mln_offline_region_list>,
+) -> Result<Vec<OfflineRegionInfo>> {
+    // SAFETY: ptr is an owned list returned by the C API and released by the guard.
+    let list = unsafe { crate::handle::offline_region_list(ptr.as_ptr()) }?;
+    let mut count = 0;
+    // SAFETY: list is live and count points to writable storage.
+    crate::check(unsafe { sys::mln_offline_region_list_count(list.as_ptr(), &mut count) })?;
+    let mut regions = Vec::with_capacity(count);
+    for index in 0..count {
+        let mut raw = empty_offline_region_info();
+        // SAFETY: list is live, index is in range, and raw points to writable storage.
+        crate::check(unsafe { sys::mln_offline_region_list_get(list.as_ptr(), index, &mut raw) })?;
+        regions.push(copy_offline_region_info(&raw)?);
+    }
+    Ok(regions)
+}
+
 #[derive(Debug)]
 pub struct NativeRuntimeOptions {
     asset_path: Option<CString>,
@@ -500,6 +544,72 @@ mod tests {
                 pixel_ratio: 2.0,
                 include_ideographs: true,
             }
+        );
+    }
+
+    #[test]
+    fn offline_region_info_rejects_nonempty_null_metadata() {
+        let style_url = b"maplibre://a\0";
+        let raw = sys::mln_offline_region_info {
+            size: std::mem::size_of::<sys::mln_offline_region_info>() as u32,
+            id: 7,
+            definition: sys::mln_offline_region_definition {
+                size: std::mem::size_of::<sys::mln_offline_region_definition>() as u32,
+                type_: sys::MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID,
+                data: sys::mln_offline_region_definition__bindgen_ty_1 {
+                    tile_pyramid: sys::mln_offline_tile_pyramid_region_definition {
+                        size: std::mem::size_of::<sys::mln_offline_tile_pyramid_region_definition>()
+                            as u32,
+                        style_url: style_url.as_ptr().cast(),
+                        bounds: crate::values::lat_lng_bounds_to_native(crate::LatLngBounds::new(
+                            crate::LatLng::new(1.0, 2.0),
+                            crate::LatLng::new(3.0, 4.0),
+                        )),
+                        min_zoom: 5.0,
+                        max_zoom: 6.0,
+                        pixel_ratio: 2.0,
+                        include_ideographs: true,
+                    },
+                },
+            },
+            metadata: std::ptr::null(),
+            metadata_size: 1,
+        };
+
+        let Err(err) = copy_offline_region_info(&raw) else {
+            panic!("nonempty null metadata should fail");
+        };
+        assert!(
+            err.to_string()
+                .contains("offline region metadata must not be null")
+        );
+    }
+
+    #[test]
+    fn offline_region_definition_rejects_null_geometry_pointer() {
+        let style_url = b"maplibre://geometry\0";
+        let raw = sys::mln_offline_region_definition {
+            size: std::mem::size_of::<sys::mln_offline_region_definition>() as u32,
+            type_: sys::MLN_OFFLINE_REGION_DEFINITION_GEOMETRY,
+            data: sys::mln_offline_region_definition__bindgen_ty_1 {
+                geometry: sys::mln_offline_geometry_region_definition {
+                    size: std::mem::size_of::<sys::mln_offline_geometry_region_definition>() as u32,
+                    style_url: style_url.as_ptr().cast(),
+                    geometry: std::ptr::null(),
+                    min_zoom: 1.0,
+                    max_zoom: 4.0,
+                    pixel_ratio: 1.0,
+                    include_ideographs: false,
+                },
+            },
+        };
+
+        let Err(err) = copy_offline_region_definition(&raw) else {
+            panic!("null offline geometry pointer should fail");
+        };
+        assert!(
+            err.to_string()
+                .contains("offline region geometry must not be null")
         );
     }
 }

@@ -17,7 +17,6 @@ use crate::custom_geometry::CustomGeometrySourceState;
 use crate::events::MapId;
 use crate::geometry::GeometryNativeExt;
 use crate::handle::{ThreadAffineNativeHandle, closed_handle_error, out_handle};
-use crate::json::JsonValueNativeExt;
 use crate::options::{MapOptionsNativeExt, MapTileOptionsNativeExt, MapViewportOptionsNativeExt};
 use crate::render::{
     MetalBorrowedTextureDescriptor, MetalOwnedTextureDescriptor, MetalSurfaceDescriptor,
@@ -28,12 +27,12 @@ use crate::runtime::{RuntimeHandle, RuntimeState};
 use crate::values::NativeValue;
 use crate::{
     AnimationOptions, BoundOptions, CameraFitOptions, CameraOptions, Error, ErrorKind,
-    FreeCameraOptions, Geometry, HandleOperationError, JsonValue, LatLng, LatLngBounds,
-    MapDebugOptions, MapOptions, MapProjectionHandle, MapTileOptions, MapViewportOptions,
-    ProjectionMode, Result, ScreenPoint,
+    FreeCameraOptions, Geometry, HandleOperationError, LatLng, LatLngBounds, MapDebugOptions,
+    MapOptions, MapProjectionHandle, MapTileOptions, MapViewportOptions, ProjectionMode, Result,
+    ScreenPoint,
 };
 #[cfg(test)]
-use crate::{GeoJson, PremultipliedRgba8Image};
+use crate::{GeoJson, JsonValue, PremultipliedRgba8Image};
 
 mod style;
 pub use style::{
@@ -873,49 +872,6 @@ pub(crate) fn lat_lngs_to_native(coordinates: &[LatLng]) -> Vec<sys::mln_lat_lng
 
 pub(crate) fn screen_points_to_native(points: &[ScreenPoint]) -> Vec<sys::mln_screen_point> {
     points.iter().copied().map(ScreenPoint::to_native).collect()
-}
-
-pub(crate) fn json_snapshot(
-    snapshot: Option<std::ptr::NonNull<sys::mln_json_snapshot>>,
-) -> Result<Option<JsonValue>> {
-    let Some(snapshot) = snapshot else {
-        return Ok(None);
-    };
-    // SAFETY: snapshot is an owned JSON snapshot returned by the C API and is
-    // destroyed by the guard after copying.
-    let snapshot = unsafe { support::handle::json_snapshot(snapshot.as_ptr()) }?;
-    let mut value = ptr::null();
-    // SAFETY: snapshot is live and value points to writable storage. The
-    // borrowed JSON value is copied before the guard drops.
-    support::check(unsafe { sys::mln_json_snapshot_get(snapshot.as_ptr(), &mut value) })?;
-    if value.is_null() {
-        return Ok(None);
-    }
-    // SAFETY: value is borrowed from the live snapshot guard and copied before
-    // the guard drops at the end of this function.
-    unsafe { JsonValue::from_native(&*value) }.map(Some)
-}
-
-fn copy_style_id_list(list: &support::handle::StyleIdListGuard) -> Result<Vec<String>> {
-    let mut count = 0;
-    // SAFETY: list is a live style ID list guard and count points to writable storage.
-    support::check(unsafe { sys::mln_style_id_list_count(list.as_ptr(), &mut count) })?;
-
-    let mut ids = Vec::with_capacity(count);
-    for index in 0..count {
-        let mut view = sys::mln_string_view {
-            data: ptr::null(),
-            size: 0,
-        };
-        // SAFETY: list is live, index is less than count, and view points to
-        // writable storage. The borrowed view is copied before the next loop
-        // iteration and before the guard drops.
-        support::check(unsafe { sys::mln_style_id_list_get(list.as_ptr(), index, &mut view) })?;
-        // SAFETY: The C API returns a view into list-owned storage that remains
-        // valid until the list guard drops at the end of this function.
-        ids.push(unsafe { support::string::copy_string_view(view) }?);
-    }
-    Ok(ids)
 }
 
 #[cfg(test)]
