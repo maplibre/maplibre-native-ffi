@@ -9,6 +9,7 @@ import static org.junit.jupiter.api.Assertions.fail;
 
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
@@ -27,6 +28,9 @@ import org.maplibre.nativeffi.internal.c.mln_custom_geometry_source_tile_callbac
 import org.maplibre.nativeffi.internal.struct.StyleStructs;
 import org.maplibre.nativeffi.json.JsonValue;
 import org.maplibre.nativeffi.render.PremultipliedRgba8Image;
+import org.maplibre.nativeffi.resource.ResourceKind;
+import org.maplibre.nativeffi.resource.ResourceProviderDecision;
+import org.maplibre.nativeffi.resource.ResourceResponse;
 import org.maplibre.nativeffi.runtime.RuntimeEventType;
 import org.maplibre.nativeffi.runtime.RuntimeHandle;
 import org.maplibre.nativeffi.style.CustomGeometrySourceOptions;
@@ -243,6 +247,7 @@ final class StyleHandleTest {
       map.addCustomGeometrySource("temporary-custom", new CustomGeometrySourceOptions(tile -> {}));
       assertEquals(1, map.customGeometrySourceCountForTesting());
       map.setStyleJson(EMPTY_STYLE);
+      assertEquals(0, map.customGeometrySourceCountForTesting());
       waitForMapEvent(runtime, map, RuntimeEventType.MAP_STYLE_LOADED);
       assertEquals(0, map.customGeometrySourceCountForTesting());
 
@@ -256,6 +261,38 @@ final class StyleHandleTest {
       map.setLocationIndicatorImageName("location", LocationIndicatorImageKind.TOP, "location-top");
     } finally {
       map.close();
+      runtime.close();
+    }
+  }
+
+  @Test
+  void customGeometryCallbackStateReleasesAfterUrlStyleReplacement() throws Exception {
+    var runtime = RuntimeHandle.create();
+    try {
+      runtime.setResourceProvider(
+          (request, handle) -> {
+            if (!"custom://style.json".equals(request.url())) {
+              return ResourceProviderDecision.PASS_THROUGH;
+            }
+            assertEquals(ResourceKind.STYLE, request.kind());
+            handle.complete(ResourceResponse.ok(EMPTY_STYLE.getBytes(StandardCharsets.UTF_8)));
+            return ResourceProviderDecision.PASS_THROUGH;
+          });
+      var map = MapHandle.create(runtime, new MapOptions().size(128, 128));
+      try {
+        map.setStyleJson(EMPTY_STYLE);
+        map.addCustomGeometrySource("custom", new CustomGeometrySourceOptions(tile -> {}));
+        assertEquals(1, map.customGeometrySourceCountForTesting());
+        drainEvents(runtime);
+
+        map.setStyleUrl("custom://style.json");
+        waitForMapEvent(runtime, map, RuntimeEventType.MAP_STYLE_LOADED);
+
+        assertEquals(0, map.customGeometrySourceCountForTesting());
+      } finally {
+        map.close();
+      }
+    } finally {
       runtime.close();
     }
   }

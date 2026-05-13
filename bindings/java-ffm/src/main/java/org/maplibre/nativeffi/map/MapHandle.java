@@ -99,6 +99,7 @@ public final class MapHandle implements AutoCloseable {
           MapLibreNativeC.mln_map_set_style_json(
               state.requireLive(),
               MemoryUtil.allocateCString(arena, Objects.requireNonNull(json))));
+      clearCustomGeometrySources();
     }
   }
 
@@ -1556,19 +1557,31 @@ public final class MapHandle implements AutoCloseable {
     return state.address();
   }
 
-  public void reconcileCustomGeometrySources(InternalAccess access) {
+  public void releaseDetachedCustomGeometrySources(InternalAccess access) {
     Objects.requireNonNull(access, "access");
-    reconcileCustomGeometrySources();
+    releaseDetachedCustomGeometrySources();
   }
 
-  void reconcileCustomGeometrySources() {
-    var iterator = customGeometrySources.entrySet().iterator();
-    while (iterator.hasNext()) {
-      var entry = iterator.next();
-      var sourceType = styleSourceType(entry.getKey());
-      if (sourceType.isEmpty() || sourceType.get() != SourceType.CUSTOM_VECTOR) {
-        closeQuietly(entry.getValue());
-        iterator.remove();
+  void releaseDetachedCustomGeometrySources() {
+    try (var arena = Arena.ofConfined()) {
+      var map = state.requireLive();
+      var iterator = customGeometrySources.entrySet().iterator();
+      while (iterator.hasNext()) {
+        var entry = iterator.next();
+        var outType = arena.allocate(ValueLayout.JAVA_INT);
+        var outFound = arena.allocate(ValueLayout.JAVA_BOOLEAN);
+        var status =
+            MapLibreNativeC.mln_map_get_style_source_type(
+                map, CoreStructs.stringView(entry.getKey(), arena), outType, outFound);
+        if (status != MapLibreNativeC.MLN_STATUS_OK()) {
+          continue;
+        }
+        var found = outFound.get(ValueLayout.JAVA_BOOLEAN, 0);
+        var sourceType = SourceType.fromNative(outType.get(ValueLayout.JAVA_INT, 0));
+        if (!found || sourceType != SourceType.CUSTOM_VECTOR) {
+          closeQuietly(entry.getValue());
+          iterator.remove();
+        }
       }
     }
   }

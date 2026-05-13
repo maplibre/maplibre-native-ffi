@@ -315,7 +315,7 @@ public final class RuntimeHandle implements AutoCloseable {
             MemoryUtil.copyStringView(
                 mln_runtime_event.message(event), mln_runtime_event.message_size(event)));
     if (eventType == RuntimeEventType.MAP_STYLE_LOADED) {
-      mapSource.ifPresent(map -> map.reconcileCustomGeometrySources(InternalAccess.INSTANCE));
+      mapSource.ifPresent(map -> map.releaseDetachedCustomGeometrySources(InternalAccess.INSTANCE));
     }
     return copied;
   }

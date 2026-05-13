@@ -1,7 +1,10 @@
 use super::*;
-use crate::events::empty_runtime_event;
+use std::time::Duration;
+
+use crate::events::{RuntimeEventSource, RuntimeEventType, empty_runtime_event};
 use crate::{
-    CustomGeometrySourceOptions, EdgeInsets, ErrorKind, JsonMember, MapMode, TextureImageInfo,
+    CustomGeometrySourceOptions, EdgeInsets, ErrorKind, JsonMember, MapMode, ResourceKind,
+    ResourceProviderDecision, ResourceResponse, TextureImageInfo,
 };
 
 const VALID_STYLE_JSON: &str = r#"{"version":8,"sources":{},"layers":[]}"#;
@@ -350,13 +353,24 @@ fn custom_geometry_source_state_ignores_stale_style_loaded_events() {
 }
 
 #[test]
-fn custom_geometry_source_state_releases_on_pending_url_style_loaded_event() {
+fn custom_geometry_source_state_releases_detached_sources_on_style_loaded_event() {
     let runtime = RuntimeHandle::new().unwrap();
     let map = MapHandle::new(&runtime).unwrap();
     map.set_style_json(VALID_STYLE_JSON).unwrap();
     map.add_custom_geometry_source("custom", CustomGeometrySourceOptions::new(|_| {}))
         .unwrap();
-    map.inner.mark_custom_geometry_sources_pending_url_cleanup();
+
+    let source_id = maplibre_native_support::string::string_view("custom");
+    let mut removed = false;
+    // SAFETY: map is live, source_id is valid for this call, and removed
+    // points to writable storage. This bypasses the binding cleanup path to
+    // model native style replacement detaching the source.
+    let status = unsafe {
+        sys::mln_map_remove_style_source(map.inner.handle.as_ptr(), source_id.raw(), &mut removed)
+    };
+    assert_eq!(status, sys::MLN_STATUS_OK);
+    assert!(removed);
+    assert_eq!(map.custom_geometry_source_count_for_testing(), 1);
 
     let mut event = empty_runtime_event();
     event.type_ = sys::MLN_RUNTIME_EVENT_MAP_STYLE_LOADED;
@@ -370,19 +384,67 @@ fn custom_geometry_source_state_releases_on_pending_url_style_loaded_event() {
 }
 
 #[test]
-fn custom_geometry_source_add_rejects_pending_url_style_replacement() {
+fn custom_geometry_source_adds_to_current_style_after_url_style_request() {
     let runtime = RuntimeHandle::new().unwrap();
     let map = MapHandle::new(&runtime).unwrap();
     map.set_style_json(VALID_STYLE_JSON).unwrap();
-    map.inner.mark_custom_geometry_sources_pending_url_cleanup();
+    map.set_style_url("unsupported://style.json").unwrap();
 
-    let error = map
-        .add_custom_geometry_source("custom", CustomGeometrySourceOptions::new(|_| {}))
-        .unwrap_err();
+    map.add_custom_geometry_source("custom", CustomGeometrySourceOptions::new(|_| {}))
+        .unwrap();
 
-    assert_eq!(error.kind(), ErrorKind::InvalidState);
+    assert_eq!(map.custom_geometry_source_count_for_testing(), 1);
     map.close().unwrap();
     runtime.close().unwrap();
+}
+
+#[test]
+fn custom_geometry_source_state_releases_after_url_style_replacement() {
+    let runtime = RuntimeHandle::new().unwrap();
+    runtime
+        .set_resource_provider(|request, handle| {
+            if request.url == "custom://style.json" {
+                assert_eq!(request.kind, ResourceKind::Style);
+                handle
+                    .complete(ResourceResponse::ok(VALID_STYLE_JSON.as_bytes().to_vec()))
+                    .unwrap();
+            }
+            ResourceProviderDecision::PassThrough
+        })
+        .unwrap();
+    let map = MapHandle::new(&runtime).unwrap();
+    map.set_style_json(VALID_STYLE_JSON).unwrap();
+    map.add_custom_geometry_source("custom", CustomGeometrySourceOptions::new(|_| {}))
+        .unwrap();
+    assert_eq!(map.custom_geometry_source_count_for_testing(), 1);
+    drain_runtime_events(&runtime);
+
+    map.set_style_url("custom://style.json").unwrap();
+    wait_for_map_event(&runtime, &map, RuntimeEventType::MapStyleLoaded);
+
+    assert_eq!(map.custom_geometry_source_count_for_testing(), 0);
+    map.close().unwrap();
+    runtime.close().unwrap();
+}
+
+fn drain_runtime_events(runtime: &RuntimeHandle) {
+    for _ in 0..20 {
+        runtime.run_once().unwrap();
+        while runtime.poll_event().unwrap().is_some() {}
+    }
+}
+
+fn wait_for_map_event(runtime: &RuntimeHandle, map: &MapHandle, event_type: RuntimeEventType) {
+    for _ in 0..1000 {
+        runtime.run_once().unwrap();
+        while let Some(event) = runtime.poll_event().unwrap() {
+            if event.event_type == event_type && event.source == RuntimeEventSource::Map(map.id()) {
+                return;
+            }
+        }
+        std::thread::sleep(Duration::from_millis(1));
+    }
+    panic!("timed out waiting for {event_type:?}");
 }
 
 #[test]

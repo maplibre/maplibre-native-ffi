@@ -516,14 +516,8 @@ impl RuntimeState {
         let Some(state) = state else {
             return;
         };
-        match raw.type_ {
-            sys::MLN_RUNTIME_EVENT_MAP_STYLE_LOADED => {
-                state.finish_custom_geometry_sources_pending_url_cleanup();
-            }
-            sys::MLN_RUNTIME_EVENT_MAP_LOADING_FAILED => {
-                state.cancel_custom_geometry_sources_pending_url_cleanup();
-            }
-            _ => {}
+        if raw.type_ == sys::MLN_RUNTIME_EVENT_MAP_STYLE_LOADED {
+            state.release_detached_custom_geometry_sources();
         }
     }
 

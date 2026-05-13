@@ -1,4 +1,4 @@
-use std::cell::{Cell, RefCell};
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt;
 use std::ptr;
@@ -39,7 +39,6 @@ pub(crate) struct MapState {
     runtime: RefCell<Option<Rc<RuntimeState>>>,
     id: MapId,
     custom_geometry_sources: RefCell<HashMap<String, Box<CustomGeometrySourceState>>>,
-    pending_custom_geometry_source_url_cleanup: Cell<bool>,
 }
 
 impl MapState {
@@ -53,7 +52,6 @@ impl MapState {
             runtime: RefCell::new(Some(runtime)),
             id,
             custom_geometry_sources: RefCell::new(HashMap::new()),
-            pending_custom_geometry_source_url_cleanup: Cell::new(false),
         }
     }
 
@@ -81,29 +79,47 @@ impl MapState {
     }
 
     pub(crate) fn clear_custom_geometry_sources(&self) {
-        self.pending_custom_geometry_source_url_cleanup.set(false);
         self.custom_geometry_sources.borrow_mut().clear();
     }
 
-    pub(crate) fn mark_custom_geometry_sources_pending_url_cleanup(&self) {
-        self.pending_custom_geometry_source_url_cleanup.set(true);
-    }
-
-    pub(crate) fn finish_custom_geometry_sources_pending_url_cleanup(&self) {
-        if self
-            .pending_custom_geometry_source_url_cleanup
-            .replace(false)
-        {
-            self.custom_geometry_sources.borrow_mut().clear();
+    pub(crate) fn release_detached_custom_geometry_sources(&self) {
+        let map = match self.as_ptr() {
+            Ok(map) => map,
+            Err(_) => return,
+        };
+        let source_ids = self
+            .custom_geometry_sources
+            .borrow()
+            .keys()
+            .cloned()
+            .collect::<Vec<_>>();
+        let mut detached = Vec::new();
+        for source_id in source_ids {
+            let source_id_view = support::string::string_view(&source_id);
+            let mut source_type = 0;
+            let mut found = false;
+            // SAFETY: map is live, source_id_view is valid for this call, and
+            // output pointers refer to writable storage.
+            let status = unsafe {
+                sys::mln_map_get_style_source_type(
+                    map,
+                    source_id_view.raw(),
+                    &mut source_type,
+                    &mut found,
+                )
+            };
+            if status == sys::MLN_STATUS_OK
+                && (!found || source_type != sys::MLN_STYLE_SOURCE_TYPE_CUSTOM_VECTOR)
+            {
+                detached.push(source_id);
+            }
         }
-    }
-
-    pub(crate) fn cancel_custom_geometry_sources_pending_url_cleanup(&self) {
-        self.pending_custom_geometry_source_url_cleanup.set(false);
-    }
-
-    fn has_pending_custom_geometry_source_url_cleanup(&self) -> bool {
-        self.pending_custom_geometry_source_url_cleanup.get()
+        if !detached.is_empty() {
+            let mut sources = self.custom_geometry_sources.borrow_mut();
+            for source_id in detached {
+                sources.remove(&source_id);
+            }
+        }
     }
 }
 

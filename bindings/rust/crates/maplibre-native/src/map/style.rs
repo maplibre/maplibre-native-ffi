@@ -349,11 +349,6 @@ pub(crate) fn premultiplied_rgba8_image_to_native(
 impl super::MapHandle {
     /// Loads a style URL through MapLibre Native style APIs.
     ///
-    /// Custom geometry source callback state from the previous style is kept
-    /// until the replacement style has loaded and that style-loaded event is
-    /// polled or discarded, because URL style replacement is asynchronous in
-    /// the C API. New custom geometry sources can be added after the pending
-    /// URL style load finishes or fails.
     pub fn set_style_url(&self, url: &str) -> Result<()> {
         let map = self.inner.as_ptr()?;
         let url = support::string::c_string(url)?;
@@ -361,8 +356,6 @@ impl super::MapHandle {
         // for the duration of this command. The C API copies/consumes it before
         // returning.
         support::check(unsafe { sys::mln_map_set_style_url(map, url.as_ptr()) })?;
-        self.inner
-            .mark_custom_geometry_sources_pending_url_cleanup();
         Ok(())
     }
 
@@ -382,25 +375,17 @@ impl super::MapHandle {
     /// Adds a custom geometry source to the current style.
     ///
     /// The callback state is scoped to this map's current style. It is released
-    /// on map close/drop, successful inline JSON style replacement, or after an
-    /// asynchronous URL style replacement reports `MapStyleLoaded` through
-    /// runtime event polling or draining. Native may invoke callbacks from
+    /// on source removal, map close/drop, successful inline JSON style
+    /// replacement, or after runtime event polling observes that the loaded
+    /// style no longer contains the source. Native may invoke callbacks from
     /// worker threads; callbacks should queue owner-thread work before calling
-    /// map APIs. While a style URL load is pending, adding new custom geometry
-    /// sources returns `ErrorKind::InvalidState`.
+    /// map APIs.
     pub fn add_custom_geometry_source(
         &self,
         source_id: &str,
         options: CustomGeometrySourceOptions,
     ) -> Result<()> {
         let map = self.inner.as_ptr()?;
-        if self.inner.has_pending_custom_geometry_source_url_cleanup() {
-            return Err(Error::new(
-                ErrorKind::InvalidState,
-                None,
-                "custom geometry sources can be added after the pending style URL load finishes",
-            ));
-        }
         let source_id_view = support::string::string_view(source_id);
         let state = CustomGeometrySourceState::new(options);
         let descriptor = state.descriptor();
