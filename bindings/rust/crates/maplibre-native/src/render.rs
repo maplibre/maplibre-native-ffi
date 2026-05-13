@@ -8,12 +8,12 @@ use std::rc::Rc;
 use maplibre_native_support as support;
 use maplibre_native_sys as sys;
 
-use crate::Result;
 use crate::geojson::Feature;
 use crate::handle::{ThreadAffineNativeHandle, closed_handle_error, out_handle};
 use crate::json::JsonValue;
 use crate::map::{MapHandle, MapState};
 use crate::values::{ScreenBox, ScreenPoint};
+use crate::{HandleOperationError, Result};
 
 /// Borrowed opaque native address used for backend interop handles.
 ///
@@ -941,6 +941,33 @@ impl fmt::Debug for RenderSessionHandle {
     }
 }
 
+/// Render session after backend resources have been detached.
+pub struct DetachedRenderSessionHandle {
+    inner: Rc<RenderSessionState>,
+}
+
+impl fmt::Debug for DetachedRenderSessionHandle {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("DetachedRenderSessionHandle")
+            .field("closed", &self.is_closed())
+            .finish()
+    }
+}
+
+impl DetachedRenderSessionHandle {
+    /// Explicitly destroys the detached render session.
+    pub fn close(self) -> std::result::Result<(), HandleOperationError<Self>> {
+        if let Err(error) = self.inner.close() {
+            return Err(HandleOperationError::new(error, self));
+        }
+        Ok(())
+    }
+
+    pub fn is_closed(&self) -> bool {
+        self.inner.handle.is_closed()
+    }
+}
+
 fn frame_acquired_error() -> crate::Error {
     crate::Error::new(
         crate::ErrorKind::InvalidState,
@@ -1101,14 +1128,21 @@ impl MetalOwnedTextureFrameHandle {
     }
 
     /// Explicitly releases this frame.
-    pub fn close(&self) -> Result<()> {
+    pub fn close(self) -> std::result::Result<(), HandleOperationError<Self>> {
         if self.closed.get() {
             return Ok(());
         }
-        let session = self.session.as_ptr()?;
+        let session = match self.session.as_ptr() {
+            Ok(session) => session,
+            Err(error) => return Err(HandleOperationError::new(error, self)),
+        };
         // SAFETY: session is live, and raw is the active frame returned by a
         // successful acquire for this session until release succeeds.
-        support::check(unsafe { sys::mln_metal_owned_texture_release_frame(session, &self.raw) })?;
+        if let Err(error) = support::check(unsafe {
+            sys::mln_metal_owned_texture_release_frame(session, &self.raw)
+        }) {
+            return Err(HandleOperationError::new(error, self));
+        }
         self.closed.set(true);
         self.session.frame_acquired.set(false);
         Ok(())
@@ -1215,14 +1249,21 @@ impl VulkanOwnedTextureFrameHandle {
     }
 
     /// Explicitly releases this frame.
-    pub fn close(&self) -> Result<()> {
+    pub fn close(self) -> std::result::Result<(), HandleOperationError<Self>> {
         if self.closed.get() {
             return Ok(());
         }
-        let session = self.session.as_ptr()?;
+        let session = match self.session.as_ptr() {
+            Ok(session) => session,
+            Err(error) => return Err(HandleOperationError::new(error, self)),
+        };
         // SAFETY: session is live, and raw is the active frame returned by a
         // successful acquire for this session until release succeeds.
-        support::check(unsafe { sys::mln_vulkan_owned_texture_release_frame(session, &self.raw) })?;
+        if let Err(error) = support::check(unsafe {
+            sys::mln_vulkan_owned_texture_release_frame(session, &self.raw)
+        }) {
+            return Err(HandleOperationError::new(error, self));
+        }
         self.closed.set(true);
         self.session.frame_acquired.set(false);
         Ok(())
@@ -1265,9 +1306,14 @@ impl RenderSessionHandle {
     ///
     /// Native destruction errors are returned. When destruction fails, the
     /// underlying native handle remains live so a later `close` can retry.
-    pub fn close(&self) -> Result<()> {
-        self.inner.ensure_no_frame_acquired()?;
-        self.inner.close()
+    pub fn close(self) -> std::result::Result<(), HandleOperationError<Self>> {
+        if let Err(error) = self.inner.ensure_no_frame_acquired() {
+            return Err(HandleOperationError::new(error, self));
+        }
+        if let Err(error) = self.inner.close() {
+            return Err(HandleOperationError::new(error, self));
+        }
+        Ok(())
     }
 
     pub fn is_closed(&self) -> bool {
@@ -1293,16 +1339,27 @@ impl RenderSessionHandle {
     }
 
     /// Detaches backend-bound render resources from the map.
-    pub fn detach(&self) -> Result<()> {
-        self.inner.ensure_no_frame_acquired()?;
-        if self.inner.detached.get() {
-            return Ok(());
+    ///
+    /// The native session remains live only for destruction, so successful
+    /// detach consumes this handle and returns a detached close-only handle.
+    pub fn detach(
+        self,
+    ) -> std::result::Result<DetachedRenderSessionHandle, HandleOperationError<Self>> {
+        if let Err(error) = self.inner.ensure_no_frame_acquired() {
+            return Err(HandleOperationError::new(error, self));
         }
-        let session = self.inner.as_ptr()?;
+        let session = match self.inner.as_ptr() {
+            Ok(session) => session,
+            Err(error) => return Err(HandleOperationError::new(error, self)),
+        };
         // SAFETY: session is a live render session handle owned by this wrapper.
-        support::check(unsafe { sys::mln_render_session_detach(session) })?;
+        if let Err(error) = support::check(unsafe { sys::mln_render_session_detach(session) }) {
+            return Err(HandleOperationError::new(error, self));
+        }
         self.inner.detached.set(true);
-        Ok(())
+        Ok(DetachedRenderSessionHandle {
+            inner: Rc::clone(&self.inner),
+        })
     }
 
     /// Asks the session renderer to release cached resources where possible.
@@ -2362,13 +2419,12 @@ mod tests {
         let error = map.close().unwrap_err();
         assert_eq!(error.kind(), ErrorKind::InvalidState);
         assert!(error.diagnostic().contains("child handles are live"));
+        let map = error.into_handle();
 
         drop(runtime);
 
-        session.detach().unwrap();
-        session.detach().unwrap();
-        session.close().unwrap();
-        session.close().unwrap();
+        let detached = session.detach().unwrap();
+        detached.close().unwrap();
         map.close().unwrap();
     }
 
@@ -2387,11 +2443,14 @@ mod tests {
         session.inner.frame_acquired.set(true);
 
         let selector = FeatureStateSelector::new("point").with_feature_id("feature-1");
+        let detach_error = session.detach().unwrap_err();
+        assert_eq!(detach_error.kind(), ErrorKind::InvalidState);
+        assert!(detach_error.diagnostic().contains("acquired texture frame"));
+        let session = detach_error.into_handle();
+
         for error in [
             session.resize(32, 16, 1.0).unwrap_err(),
             session.render_update().unwrap_err(),
-            session.detach().unwrap_err(),
-            session.close().unwrap_err(),
             session
                 .set_feature_state(&selector, &JsonValue::Object(Vec::new()))
                 .unwrap_err(),
@@ -2420,6 +2479,11 @@ mod tests {
             assert_eq!(error.kind(), ErrorKind::InvalidState);
             assert!(error.diagnostic().contains("acquired texture frame"));
         }
+
+        let error = session.close().unwrap_err();
+        assert_eq!(error.kind(), ErrorKind::InvalidState);
+        assert!(error.diagnostic().contains("acquired texture frame"));
+        let session = error.into_handle();
 
         session.inner.frame_acquired.set(false);
         session.close().unwrap();

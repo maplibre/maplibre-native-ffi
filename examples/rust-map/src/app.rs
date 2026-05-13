@@ -15,9 +15,9 @@ use crate::vulkan::VulkanContext;
 const STYLE_URL: &str = "https://tiles.openfreemap.org/styles/bright";
 
 pub struct App {
-    target: RenderTarget,
-    map: maplibre_native::MapHandle,
-    runtime: RuntimeHandle,
+    target: Option<RenderTarget>,
+    map: Option<maplibre_native::MapHandle>,
+    runtime: Option<RuntimeHandle>,
     _vulkan: VulkanContext,
     window: Window,
     viewport: Viewport,
@@ -58,9 +58,9 @@ impl App {
         map.request_repaint()?;
 
         Ok(Self {
-            target,
-            map,
-            runtime,
+            target: Some(target),
+            map: Some(map),
+            runtime: Some(runtime),
             _vulkan: vulkan,
             window,
             viewport,
@@ -91,7 +91,11 @@ impl App {
             WindowEvent::CloseRequested => self.request_exit(target),
             WindowEvent::Resized(_) | WindowEvent::ScaleFactorChanged { .. } => self.queue_resize(),
             WindowEvent::RedrawRequested => self.render_or_exit(),
-            event => match self.input.handle(&event, &self.map, self.viewport) {
+            event => match self.input.handle(
+                &event,
+                self.map.as_ref().expect("map is open"),
+                self.viewport,
+            ) {
                 Ok(true) => {
                     self.render_pending = true;
                     self.window.request_redraw();
@@ -134,8 +138,11 @@ impl App {
             self.render_pending = false;
             return Ok(());
         }
-        self.target.resize(next)?;
-        self.map.request_repaint()?;
+        self.target
+            .as_mut()
+            .expect("render target is open")
+            .resize(next)?;
+        self.map.as_ref().expect("map is open").request_repaint()?;
         self.render_pending = true;
         Ok(())
     }
@@ -145,11 +152,15 @@ impl App {
             return Ok(());
         }
         self.apply_pending_resize()?;
-        self.runtime.run_once()?;
-        while let Some(event) = self.runtime.poll_event()? {
+        let runtime = self.runtime.as_ref().expect("runtime is open");
+        runtime.run_once()?;
+        while let Some(event) = runtime.poll_event()? {
             match event.event_type {
                 RuntimeEventType::MapRenderUpdateAvailable
-                    if event.source == RuntimeEventSource::Map(self.map.id()) =>
+                    if event.source
+                        == RuntimeEventSource::Map(
+                            self.map.as_ref().expect("map is open").id(),
+                        ) =>
                 {
                     self.render_pending = true;
                 }
@@ -177,7 +188,10 @@ impl App {
         }
         self.pump_runtime()?;
         if self.render_pending {
-            self.target.render_update()?;
+            self.target
+                .as_mut()
+                .expect("render target is open")
+                .render_update()?;
             self.render_pending = false;
         }
         Ok(())
@@ -202,9 +216,15 @@ impl App {
         self.closed = true;
         self.render_pending = false;
         self.viewport_dirty = false;
-        self.target.close()?;
-        self.map.close()?;
-        self.runtime.close()?;
+        if let Some(target) = self.target.take() {
+            target.close()?;
+        }
+        if let Some(map) = self.map.take() {
+            map.close()?;
+        }
+        if let Some(runtime) = self.runtime.take() {
+            runtime.close()?;
+        }
         Ok(())
     }
 

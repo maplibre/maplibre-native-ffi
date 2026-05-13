@@ -19,9 +19,9 @@ use crate::render::{
 use crate::runtime::{RuntimeHandle, RuntimeState};
 use crate::{
     AnimationOptions, BoundOptions, CameraFitOptions, CameraOptions, CustomGeometrySourceOptions,
-    Error, ErrorKind, FreeCameraOptions, GeoJson, Geometry, JsonValue, LatLng, LatLngBounds,
-    MapDebugOptions, MapOptions, MapProjectionHandle, MapTileOptions, MapViewportOptions,
-    ProjectionMode, Result, ScreenPoint,
+    Error, ErrorKind, FreeCameraOptions, GeoJson, Geometry, HandleOperationError, JsonValue,
+    LatLng, LatLngBounds, MapDebugOptions, MapOptions, MapProjectionHandle, MapTileOptions,
+    MapViewportOptions, ProjectionMode, Result, ScreenPoint,
 };
 
 /// Style source type values returned by native style source metadata.
@@ -498,18 +498,23 @@ impl MapHandle {
     /// Native destruction errors are returned. When destruction fails, the
     /// underlying native handle remains live in the shared state so future child
     /// handles can continue to retain and close the map safely.
-    pub fn close(&self) -> Result<()> {
+    pub fn close(self) -> std::result::Result<(), HandleOperationError<Self>> {
         if self.inner.is_closed() {
             return Ok(());
         }
         if Rc::strong_count(&self.inner) > 1 {
-            return Err(Error::new(
-                ErrorKind::InvalidState,
-                None,
-                "MapHandle cannot close while child handles are live",
+            return Err(HandleOperationError::new(
+                Error::new(
+                    ErrorKind::InvalidState,
+                    None,
+                    "MapHandle cannot close while child handles are live",
+                ),
+                self,
             ));
         }
-        self.inner.close()
+        self.inner
+            .close()
+            .map_err(|error| HandleOperationError::new(error, self))
     }
 
     /// Requests a repaint for a continuous map.
@@ -2331,11 +2336,10 @@ mod tests {
     }
 
     #[test]
-    fn map_close_is_idempotent() {
+    fn map_close_consumes_handle_and_drop_stays_idempotent() {
         let runtime = RuntimeHandle::new().unwrap();
         let map = MapHandle::new(&runtime).unwrap();
 
-        map.close().unwrap();
         map.close().unwrap();
         runtime.close().unwrap();
     }
@@ -3088,7 +3092,6 @@ mod tests {
         assert_eq!(map.custom_geometry_source_count_for_testing(), 1);
 
         map.close().unwrap();
-        assert_eq!(map.custom_geometry_source_count_for_testing(), 0);
         runtime.close().unwrap();
     }
 

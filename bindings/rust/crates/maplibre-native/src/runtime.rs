@@ -13,7 +13,9 @@ use crate::map::MapState;
 use crate::resource::{
     ResourceProviderState, ResourceTransformState, noop_resource_transform_descriptor,
 };
-use crate::{Error, ErrorKind, MapHandle, MapOptions, ResourceProviderDecision, Result};
+use crate::{
+    Error, ErrorKind, HandleOperationError, MapHandle, MapOptions, ResourceProviderDecision, Result,
+};
 
 /// Options used when creating a runtime.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -482,18 +484,23 @@ impl RuntimeHandle {
     /// Native destruction errors are returned. When destruction fails, the
     /// underlying native handle remains live in the shared state so child
     /// handles that retain the runtime can still close safely.
-    pub fn close(&self) -> Result<()> {
+    pub fn close(self) -> std::result::Result<(), HandleOperationError<Self>> {
         if self.inner.is_closed() {
             return Ok(());
         }
         if Rc::strong_count(&self.inner) > 1 {
-            return Err(Error::new(
-                ErrorKind::InvalidState,
-                None,
-                "RuntimeHandle cannot close while child handles are live",
+            return Err(HandleOperationError::new(
+                Error::new(
+                    ErrorKind::InvalidState,
+                    None,
+                    "RuntimeHandle cannot close while child handles are live",
+                ),
+                self,
             ));
         }
-        self.inner.close()
+        self.inner
+            .close()
+            .map_err(|error| HandleOperationError::new(error, self))
     }
 }
 
@@ -650,10 +657,9 @@ mod tests {
     }
 
     #[test]
-    fn runtime_close_is_idempotent() {
+    fn runtime_close_consumes_handle_and_drop_stays_idempotent() {
         let runtime = RuntimeHandle::new().unwrap();
 
-        runtime.close().unwrap();
         runtime.close().unwrap();
     }
 
@@ -749,8 +755,6 @@ mod tests {
                         PROVIDER_STYLE_JSON.as_bytes().to_vec(),
                     ))
                     .unwrap();
-                assert!(handle.complete(ResourceResponse::no_content()).is_err());
-                assert!(handle.is_cancelled().is_err());
                 ResourceProviderDecision::PassThrough
             })
             .unwrap();
@@ -794,8 +798,6 @@ mod tests {
                     PROVIDER_STYLE_JSON.as_bytes().to_vec(),
                 ))
                 .unwrap();
-            assert!(handle.complete(ResourceResponse::no_content()).is_err());
-            handle.close();
         })
         .join()
         .unwrap();
@@ -1000,6 +1002,7 @@ mod tests {
         let error = runtime.close().unwrap_err();
         assert_eq!(error.kind(), ErrorKind::InvalidState);
         assert_eq!(error.raw_status(), None);
+        let runtime = error.into_handle();
 
         runtime.run_once().unwrap();
         map.close().unwrap();

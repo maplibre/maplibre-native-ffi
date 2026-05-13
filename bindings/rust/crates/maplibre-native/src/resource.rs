@@ -12,7 +12,7 @@ use std::thread::ThreadId;
 use maplibre_native_support as support;
 use maplibre_native_sys as sys;
 
-use crate::{Error, ErrorKind, ResourceErrorReason, Result};
+use crate::{Error, ErrorKind, HandleOperationError, ResourceErrorReason, Result};
 
 const UNKNOWN_PROVIDER_DECISION: u32 = u32::MAX;
 
@@ -616,8 +616,13 @@ impl ResourceRequestHandle {
     /// [`ResourceProviderDecision::PassThrough`], the wrapper still returns the
     /// native `Handle` decision. Native code must not also pass the completed
     /// request through to its own networking path.
-    pub fn complete(&self, response: ResourceResponse) -> Result<()> {
-        self.state.complete(&response)
+    pub fn complete(
+        self,
+        response: ResourceResponse,
+    ) -> std::result::Result<(), HandleOperationError<Self>> {
+        self.state
+            .complete(&response)
+            .map_err(|error| HandleOperationError::new(error, self))
     }
 
     /// Reports whether native code has cancelled the request.
@@ -626,14 +631,14 @@ impl ResourceRequestHandle {
     }
 
     /// Releases the provider-owned request handle without completing it.
-    pub fn close(&self) {
+    pub fn close(self) {
         self.state.close();
     }
 }
 
 impl Drop for ResourceRequestHandle {
     fn drop(&mut self) {
-        self.close();
+        self.state.close();
     }
 }
 
@@ -1061,14 +1066,21 @@ mod tests {
     }
 
     #[test]
-    fn double_completion_fails_safely() {
+    fn failed_completion_returns_handle_for_retry() {
         let _guard = FAKE_HANDLE_TEST_LOCK.lock().unwrap();
         let handle = fake_handle();
-        handle.complete(ResourceResponse::ok(Vec::new())).unwrap();
-        let error = handle.complete(ResourceResponse::no_content()).unwrap_err();
+        COMPLETE_STATUS.store(sys::MLN_STATUS_INVALID_STATE, Ordering::SeqCst);
 
+        let error = handle
+            .complete(ResourceResponse::ok(Vec::new()))
+            .unwrap_err();
         assert_eq!(error.kind(), ErrorKind::InvalidState);
         assert_eq!(COMPLETE_COUNT.load(Ordering::SeqCst), 1);
+
+        COMPLETE_STATUS.store(sys::MLN_STATUS_OK, Ordering::SeqCst);
+        let handle = error.into_handle();
+        handle.complete(ResourceResponse::no_content()).unwrap();
+        assert_eq!(COMPLETE_COUNT.load(Ordering::SeqCst), 2);
     }
 
     #[test]
@@ -1090,12 +1102,11 @@ mod tests {
     fn close_before_handle_decision_releases_after_decision() {
         let _guard = FAKE_HANDLE_TEST_LOCK.lock().unwrap();
         let handle = fake_handle();
+        let state = Arc::clone(&handle.state);
         handle.close();
         assert_eq!(RELEASE_COUNT.load(Ordering::SeqCst), 0);
         assert_eq!(
-            handle
-                .state
-                .finish_provider_decision(ResourceProviderDecision::Handle),
+            state.finish_provider_decision(ResourceProviderDecision::Handle),
             sys::MLN_RESOURCE_PROVIDER_DECISION_HANDLE
         );
 
@@ -1110,8 +1121,6 @@ mod tests {
 
         assert!(handle.is_cancelled().unwrap());
         handle.close();
-        let error = handle.is_cancelled().unwrap_err();
-        assert_eq!(error.kind(), ErrorKind::InvalidArgument);
     }
 
     #[test]

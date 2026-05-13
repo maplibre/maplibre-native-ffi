@@ -30,7 +30,7 @@ commit/push after each item.
 - [x] Rendered query geometry and rendered/source query option types.
 - [x] Copied queried feature and feature-extension result types.
 - [x] Rendered feature, source feature, and feature extension query methods.
-- [ ] Revisit every public destructive or one-shot operation; prefer consuming
+- [x] Revisit every public destructive or one-shot operation; prefer consuming
       close/complete and preserve retry semantics explicitly.
 - [ ] Replace frame-derived bare NativePointer returns with lifetime-bearing
       FrameNativePointer<'frame> or equivalent.
@@ -84,6 +84,13 @@ commit/push after each item.
   `cargo fmt -p maplibre-native`,
   `cargo test -p maplibre-native render::tests -- --nocapture`,
   `cargo test -p maplibre-native`, and `mise run //bindings/rust:test`.
+- Destructive/one-shot API polish: `cargo check --workspace`,
+  `cargo test -p maplibre-native handle::tests -- --nocapture`,
+  `cargo test -p maplibre-native failed_completion_returns_handle_for_retry -- --nocapture`,
+  `cargo test -p maplibre-native runtime_close_with_live_map_is_rust_invalid_state_and_retryable -- --nocapture`,
+  `cargo test -p maplibre-native acquired_frame_state_rejects_reentrant_session_operations_before_native_calls -- --nocapture`,
+  `cargo test -p maplibre-native`, `cargo fmt --all --check`, and
+  `mise run //bindings/rust:test`.
 
 ## Notes
 

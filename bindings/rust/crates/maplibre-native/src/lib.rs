@@ -48,13 +48,13 @@ pub use options::{
 };
 pub use projection::MapProjectionHandle;
 pub use render::{
-    FeatureExtensionResult, FeatureStateSelector, MetalBorrowedTextureDescriptor,
-    MetalOwnedTextureDescriptor, MetalOwnedTextureFrame, MetalOwnedTextureFrameHandle,
-    MetalSurfaceDescriptor, NativePointer, OwnedTextureDescriptor, PremultipliedRgba8Image,
-    QueriedFeature, RenderSessionHandle, RenderedFeatureQueryOptions, RenderedQueryGeometry,
-    SourceFeatureQueryOptions, TextureImageInfo, VulkanBorrowedTextureDescriptor,
-    VulkanOwnedTextureDescriptor, VulkanOwnedTextureFrame, VulkanOwnedTextureFrameHandle,
-    VulkanSurfaceDescriptor,
+    DetachedRenderSessionHandle, FeatureExtensionResult, FeatureStateSelector,
+    MetalBorrowedTextureDescriptor, MetalOwnedTextureDescriptor, MetalOwnedTextureFrame,
+    MetalOwnedTextureFrameHandle, MetalSurfaceDescriptor, NativePointer, OwnedTextureDescriptor,
+    PremultipliedRgba8Image, QueriedFeature, RenderSessionHandle, RenderedFeatureQueryOptions,
+    RenderedQueryGeometry, SourceFeatureQueryOptions, TextureImageInfo,
+    VulkanBorrowedTextureDescriptor, VulkanOwnedTextureDescriptor, VulkanOwnedTextureFrame,
+    VulkanOwnedTextureFrameHandle, VulkanSurfaceDescriptor,
 };
 pub use resource::{
     ByteRange, ResourceKind, ResourceLoadingMethod, ResourcePriority, ResourceProviderDecision,
@@ -67,6 +67,63 @@ pub use values::{
     EdgeInsets, LatLng, LatLngBounds, ProjectedMeters, Quaternion, ScreenBox, ScreenPoint,
     UnitBezier, Vec3,
 };
+
+/// Error returned by consuming one-shot handle operations when the handle
+/// remains live and the operation can be retried.
+#[derive(Debug)]
+pub struct HandleOperationError<T> {
+    error: Error,
+    handle: T,
+}
+
+impl<T> HandleOperationError<T> {
+    pub(crate) fn new(error: Error, handle: T) -> Self {
+        Self { error, handle }
+    }
+
+    /// Returns the operation error.
+    pub fn error(&self) -> &Error {
+        &self.error
+    }
+
+    /// Returns the stable category for the operation error.
+    pub fn kind(&self) -> ErrorKind {
+        self.error.kind()
+    }
+
+    /// Returns the raw C status for native operation errors, when available.
+    pub fn raw_status(&self) -> Option<sys::mln_status> {
+        self.error.raw_status()
+    }
+
+    /// Returns the copied diagnostic message for the operation error.
+    pub fn diagnostic(&self) -> &str {
+        self.error.diagnostic()
+    }
+
+    /// Returns the operation error, dropping the still-live handle.
+    pub fn into_error(self) -> Error {
+        self.error
+    }
+
+    /// Returns the still-live handle so the operation can be retried.
+    pub fn into_handle(self) -> T {
+        self.handle
+    }
+
+    /// Splits this error into the operation error and still-live handle.
+    pub fn into_parts(self) -> (Error, T) {
+        (self.error, self.handle)
+    }
+}
+
+impl<T> std::fmt::Display for HandleOperationError<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.error.fmt(f)
+    }
+}
+
+impl<T: std::fmt::Debug> std::error::Error for HandleOperationError<T> {}
 
 bitflags::bitflags! {
     /// Render backends compiled into the linked native library.

@@ -2,6 +2,7 @@ use maplibre_native::{
     Error, ErrorKind, MapHandle, RenderSessionHandle, VulkanOwnedTextureDescriptor,
     VulkanSurfaceDescriptor,
 };
+use std::error::Error as StdError;
 
 use crate::viewport::Viewport;
 use crate::vulkan::VulkanContext;
@@ -94,26 +95,34 @@ impl RenderTarget {
                 session.render_update()?;
                 let frame = session.acquire_vulkan_owned_texture_frame()?;
                 compositor.draw(&frame)?;
-                frame.close()
+                match frame.close() {
+                    Ok(()) => Ok(()),
+                    Err(error) => error
+                        .into_handle()
+                        .close()
+                        .map_err(|error| error.into_error()),
+                }
             }
             Self::VulkanNativeSurface { session } => session.render_update(),
         }
     }
 
-    pub fn close(&mut self) -> maplibre_native::Result<()> {
+    pub fn close(self) -> Result<(), Box<dyn StdError>> {
         match self {
             Self::VulkanOwnedTexture {
                 session,
-                compositor,
+                mut compositor,
             } => {
-                let compositor_result = compositor.close().map_err(|error| {
+                session
+                    .close()
+                    .map_err(|error| Box::new(error) as Box<dyn StdError>)?;
+                compositor.close().map_err(|error| {
                     compositor_error(format!("Vulkan texture compositor close failed: {error:?}"))
-                });
-                let session_result = session.close();
-                compositor_result?;
-                session_result
+                })
             }
-            Self::VulkanNativeSurface { session } => session.close(),
+            Self::VulkanNativeSurface { session } => session
+                .close()
+                .map_err(|error| Box::new(error) as Box<dyn StdError>),
         }
     }
 

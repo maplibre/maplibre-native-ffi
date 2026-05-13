@@ -86,6 +86,15 @@ Verification evidence for the completed render-session query chunk:
 `cargo test -p maplibre-native render::tests -- --nocapture`,
 `cargo test -p maplibre-native`, and `mise run //bindings/rust:test`.
 
+Verification evidence for the completed destructive/one-shot API polish chunk:
+`cargo check --workspace`,
+`cargo test -p maplibre-native handle::tests -- --nocapture`,
+`cargo test -p maplibre-native failed_completion_returns_handle_for_retry -- --nocapture`,
+`cargo test -p maplibre-native runtime_close_with_live_map_is_rust_invalid_state_and_retryable -- --nocapture`,
+`cargo test -p maplibre-native acquired_frame_state_rejects_reentrant_session_operations_before_native_calls -- --nocapture`,
+`cargo test -p maplibre-native`, `cargo fmt --all --check`, and
+`mise run //bindings/rust:test`.
+
 ## API polish backlog before review
 
 Polish the Rust surface fully on this branch before external review. Treat these
@@ -94,16 +103,17 @@ fixes.
 
 Handle lifecycle shape:
 
-- Revisit every public destructive or one-shot operation, including runtime,
-  map, projection, render session, texture frame, and resource request APIs.
-- Prefer consuming operations such as `close(self) -> Result<()>` and
-  `complete(self, response) -> Result<()>` where the operation logically ends
-  the handle's useful life.
-- Preserve retry-after-native-destroy-failure semantics with an explicit
-  pattern, such as returning the still-live handle in a close error, when the
-  native C API leaves ownership with the caller on failure.
-- Keep successful cleanup internally idempotent for `Drop` and shared internal
-  state, even when the public explicit operation consumes the wrapper.
+- [x] Revisit every public destructive or one-shot operation, including runtime,
+      map, projection, render session, texture frame, and resource request APIs.
+- [x] Prefer consuming operations such as `close(self) -> Result<()>` and
+      `complete(self, response) -> Result<()>` where the operation logically
+      ends the handle's useful life.
+- [x] Preserve retry-after-native-destroy-failure semantics with an explicit
+      pattern, such as returning the still-live handle in a close error, when
+      the native C API leaves ownership with the caller on failure.
+- [x] Keep successful cleanup internally idempotent for `Drop` and shared
+      internal state, even when the public explicit operation consumes the
+      wrapper.
 
 Frame backend pointer lifetimes:
 

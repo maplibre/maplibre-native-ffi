@@ -5,7 +5,10 @@ use maplibre_native_sys as sys;
 
 use crate::handle::{ThreadAffineNativeHandle, closed_handle_error, out_handle};
 use crate::map::{const_ptr_or_null, empty_lat_lng, empty_screen_point, lat_lngs_to_native};
-use crate::{CameraOptions, EdgeInsets, Error, Geometry, LatLng, MapHandle, Result, ScreenPoint};
+use crate::{
+    CameraOptions, EdgeInsets, Error, Geometry, HandleOperationError, LatLng, MapHandle, Result,
+    ScreenPoint,
+};
 
 #[derive(Debug)]
 pub(crate) struct MapProjectionState {
@@ -74,8 +77,10 @@ impl MapProjectionHandle {
     }
 
     /// Explicitly destroys the projection snapshot.
-    pub fn close(&self) -> Result<()> {
-        self.inner.close()
+    pub fn close(self) -> std::result::Result<(), HandleOperationError<Self>> {
+        self.inner
+            .close()
+            .map_err(|error| HandleOperationError::new(error, self))
     }
 
     /// Reads the projection helper's current camera snapshot.
@@ -198,7 +203,6 @@ mod tests {
         assert!((round_tripped.latitude - center.latitude).abs() < 1e-7);
         assert!((round_tripped.longitude - center.longitude).abs() < 1e-7);
 
-        projection.close().unwrap();
         projection.close().unwrap();
     }
 
