@@ -10,7 +10,6 @@ __pycache__/
 zig-out/
 zig-pkg/
 *.spv
-!examples/rust-map/src/vulkan_texture_compositor/shaders/*.spv
 dist/
 .astro/
 node_modules/
