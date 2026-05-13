@@ -101,6 +101,10 @@ Verification evidence for the completed frame backend pointer lifetime chunk:
 `cargo test -p maplibre-native --test public_api -- --nocapture`,
 `cargo test -p maplibre-native`, and `cargo fmt --all --check`.
 
+Verification evidence for the completed module structure chunk:
+`cargo fmt -p maplibre-native`, `cargo check -p maplibre-native`,
+`cargo test -p maplibre-native`, and `mise run //bindings/rust:test`.
+
 ## API polish backlog before review
 
 Polish the Rust surface fully on this branch before external review. Treat these
@@ -134,12 +138,12 @@ Frame backend pointer lifetimes:
 
 Module structure:
 
-- Split large Rust modules before adding the remaining parity APIs.
-- Align the public/internal module split with the Java FFM package structure
-  where it maps cleanly to Rust: map, style, render, query, resource, runtime,
-  logging, geometry, JSON/GeoJSON, values, and internal support.
-- Keep tests colocated with the submodule or concern they exercise so new parity
-  work does not keep growing monolithic test modules.
+- [x] Split large Rust modules before adding the remaining parity APIs.
+- [x] Align the public/internal module split with the Java FFM package structure
+      where it maps cleanly to Rust: map, style, render, query, resource,
+      runtime, logging, geometry, JSON/GeoJSON, values, and internal support.
+- [x] Keep tests colocated with the submodule or concern they exercise so new
+      parity work does not keep growing monolithic test modules.
 
 ## Decisions
 

@@ -34,7 +34,7 @@ commit/push after each item.
       close/complete and preserve retry semantics explicitly.
 - [x] Replace frame-derived bare NativePointer returns with lifetime-bearing
       FrameNativePointer<'frame> or equivalent.
-- [ ] Split large Rust modules, aligned with Java FFM package structure where
+- [x] Split large Rust modules, aligned with Java FFM package structure where
       appropriate.
 
 ## Verification
@@ -95,6 +95,9 @@ commit/push after each item.
   `cargo test -p maplibre-native pointer_round_trips -- --nocapture`,
   `cargo test -p maplibre-native --test public_api -- --nocapture`,
   `cargo test -p maplibre-native`, and `cargo fmt --all --check`.
+- Module structure polish: `cargo fmt -p maplibre-native`,
+  `cargo check -p maplibre-native`, `cargo test -p maplibre-native`, and
+  `mise run //bindings/rust:test`.
 
 ## Notes
 
