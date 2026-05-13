@@ -3,16 +3,9 @@ use std::panic::{self, AssertUnwindSafe};
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use crate::{Result, support, sys};
-use support::{LogEvent, LogSeverity, LogSeverityMask};
+use support::LogSeverityMask;
 
-/// Copied MapLibre Native log record delivered to a Rust log callback.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct LogRecord {
-    pub severity: LogSeverity,
-    pub event: LogEvent,
-    pub code: i64,
-    pub message: String,
-}
+pub use support::LogRecord;
 
 type LogCallback = dyn Fn(LogRecord) -> bool + Send + Sync + 'static;
 
@@ -111,14 +104,10 @@ fn invoke_callback(
     // SAFETY: message is supplied by the C logging callback contract as a
     // null-terminated string pointer. Invalid strings are treated as not
     // consumed.
-    let Ok(message) = (unsafe { support::string::copy_c_string(message) }) else {
+    let Ok(record) =
+        (unsafe { support::logging::copy_log_record(raw_severity, raw_event, code, message) })
+    else {
         return 0;
-    };
-    let record = LogRecord {
-        severity: LogSeverity::from_raw(raw_severity),
-        event: LogEvent::from_raw(raw_event),
-        code,
-        message,
     };
 
     match panic::catch_unwind(AssertUnwindSafe(|| (state.callback)(record))) {
@@ -135,6 +124,7 @@ mod tests {
 
     use super::*;
     use crate::ErrorKind;
+    use support::{LogEvent, LogSeverity};
 
     static LOGGING_TEST_LOCK: Mutex<()> = Mutex::new(());
 
@@ -221,6 +211,30 @@ mod tests {
             0
         );
         assert_eq!(calls.load(Ordering::SeqCst), baseline_calls + 1);
+    }
+
+    #[test]
+    fn invalid_utf8_log_messages_are_not_consumed() {
+        let _guard = LoggingTestGuard::new();
+        set_log_callback(|_| true).unwrap();
+        let invalid = b"\xff\0";
+        let current = {
+            let state = lock_log_callback_state();
+            state.current.as_ref().unwrap().clone()
+        };
+
+        assert_eq!(
+            invoke_callback(
+                &current,
+                sys::MLN_LOG_SEVERITY_ERROR,
+                sys::MLN_LOG_EVENT_GENERAL,
+                0,
+                invalid.as_ptr().cast(),
+            ),
+            0
+        );
+
+        clear_log_callback().unwrap();
     }
 
     #[test]

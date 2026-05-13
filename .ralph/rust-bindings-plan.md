@@ -81,7 +81,14 @@ milestone until complete (through 9).
 - [x] Milestone 4: Move style-image options descriptor materializer into `core`.
 - [x] Milestone 4: Finish remaining style descriptor/materializer audit.
 - [x] Milestone 4: Complete parallel review and apply relevant findings.
-- [ ] Milestone 6+: Continue remaining event/resource/handle milestones in small
+- [x] Milestone 6: Move runtime event raw copying into `core` with raw source
+      type/address preservation.
+- [x] Milestone 6: Keep Rust `MapId` source lookup policy in `maplibre-native`
+      while re-exporting copied payload types.
+- [x] Milestone 6: Move log record copying and raw severity/event mapping into
+      `core` while keeping callback invocation policy in `maplibre-native`.
+- [x] Milestone 6: Complete parallel review and apply relevant findings.
+- [ ] Milestone 7+: Continue remaining resource/handle milestones in small
       buildable slices.
 
 ## Verification
@@ -253,6 +260,33 @@ milestone until complete (through 9).
 - `mise run -C bindings/rust test` — passed after Milestone 5 review fixes (85
   `maplibre-native`, 70 `maplibre-native-core`, 0 `maplibre-native-sys`, doc
   tests passed).
+- `cargo fmt --all --manifest-path Cargo.toml` — passed after moving runtime
+  event and log record copying into core.
+- `cargo check --manifest-path Cargo.toml -p maplibre-native --tests` — passed
+  after moving runtime event and log record copying into core.
+- `cargo clippy --manifest-path Cargo.toml -p maplibre-native-core -p
+  maplibre-native --all-targets -- -D warnings`
+  — passed after moving runtime event and log record copying into core.
+- `mise run -C bindings/rust test` — passed after moving runtime event and log
+  record copying into core (83 `maplibre-native`, 76 `maplibre-native-core`, 0
+  `maplibre-native-sys`, doc tests passed).
+- Parallel Milestone 6 review — reviewers confirmed event/log copying moved to
+  core, raw event source data is preserved, and Rust `MapId` plus logging
+  callback policy remains in `maplibre-native`. Applied findings by making
+  `runtime_event_from_native` unsafe with safety docs, removing the public
+  inherent raw `OfflineRegionStatus::from_native` method, adding non-null raw
+  source address coverage, and adding invalid UTF-8 log callback fallback
+  coverage.
+- `cargo fmt --all --manifest-path Cargo.toml` — passed after Milestone 6 review
+  fixes.
+- `cargo check --manifest-path Cargo.toml -p maplibre-native --tests` — passed
+  after Milestone 6 review fixes.
+- `cargo clippy --manifest-path Cargo.toml -p maplibre-native-core -p
+  maplibre-native --all-targets -- -D warnings`
+  — passed after Milestone 6 review fixes.
+- `mise run -C bindings/rust test` — passed after Milestone 6 review fixes (84
+  `maplibre-native`, 76 `maplibre-native-core`, 0 `maplibre-native-sys`, doc
+  tests passed).
 
 ## Reflection checkpoint 2026-05-13
 
@@ -275,6 +309,26 @@ milestone until complete (through 9).
    then render-target descriptors, then query/style descriptors. Preserve tests
    for C `size` fields, masks, null pointers, strings, nested arrays, and owned
    backing storage.
+
+## Reflection checkpoint 2026-05-13, Milestone 6
+
+1. Accomplished: Milestones 1-5 are complete, reviewed, committed, and pushed.
+   Milestone 6 is mostly implemented: runtime event payload copying, raw source
+   preservation, log record copying, and raw severity/event mapping now live in
+   `core`; `maplibre-native` keeps `MapId` lookup and callback policy.
+2. Working well: moving copied value/payload types wholesale to core reduces
+   shim code quickly while preserving public Rust names via re-exports. Keeping
+   source lookup and callback invocation above core continues to make the
+   policy/mechanism boundary clear.
+3. Friction: public Rust tests that used internal event constructors shifted
+   into core, so test counts moved between crates. This is expected, but review
+   should confirm there are no accidental public API removals or lost coverage.
+4. Approach adjustment: finish Milestone 6 with an immediate parallel review
+   before committing. Ask reviewers to focus on source-policy separation,
+   callback safety, and event/log validation rather than broader refactoring.
+5. Next priorities: complete Milestone 6 review/fixes/commit, then start
+   Milestone 7 by moving resource request copying and response materialization
+   before touching the exactly-once request-handle state machine.
 
 ## Notes
 
@@ -412,3 +466,18 @@ milestone until complete (through 9).
   crate call sites, removing now-redundant public-crate reader shims, and adding
   offline-region copy failure tests for nonempty null metadata and null geometry
   pointers.
+- Iteration 23 started Milestone 6 by moving copied runtime event payload types,
+  runtime event raw copying, payload validation, and `empty_runtime_event` into
+  `maplibre-native-core::events`. Core now preserves raw source type and raw
+  source address in `CopiedRuntimeEvent`; `maplibre-native` keeps only the
+  `MapId` lookup/source policy wrapper. Also moved `LogRecord` and log record
+  copying into `maplibre-native-core::logging`, leaving process-global callback
+  installation, retention, panic containment, and invocation policy in the
+  public Rust crate.
+- Iteration 24 completed the Milestone 6 reflection and review round. Reviewers
+  found one raw-ABI boundary issue and one unsafe-precondition issue; fixed both
+  by making runtime event copying unsafe and moving offline-region status raw
+  conversion behind a core module helper rather than a public inherent method.
+  Added targeted tests for non-null raw source address preservation and invalid
+  UTF-8 log callback fallback, then verified and prepared Milestone 6 for
+  commit.

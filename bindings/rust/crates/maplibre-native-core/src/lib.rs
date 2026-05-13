@@ -12,10 +12,12 @@ pub mod abi;
 pub mod camera;
 pub mod enums;
 pub mod error;
+pub mod events;
 pub mod geojson;
 pub mod geometry;
 pub mod handle;
 pub mod json;
+pub mod logging;
 pub mod options;
 pub mod ptr;
 pub mod query;
@@ -39,9 +41,16 @@ pub use enums::{
     TileLodMode, TileOperation, TileScheme, VectorTileEncoding, ViewportMode,
 };
 pub use error::{Error, ErrorKind, Result, check};
+pub use events::{
+    CopiedRuntimeEvent, OfflineRegionResponseErrorEvent, OfflineRegionStatus,
+    OfflineRegionStatusEvent, OfflineRegionTileCountLimitEvent, RawRuntimeEventSource,
+    RenderFrameEvent, RenderMapEvent, RenderingStats, RuntimeEventPayload, StyleImageMissingEvent,
+    TileActionEvent, TileId, UnknownRuntimeEventPayload,
+};
 pub use geojson::{Feature, FeatureIdentifier, GeoJson};
 pub use geometry::Geometry;
 pub use json::{JsonMember, JsonValue};
+pub use logging::LogRecord;
 pub use options::{MapOptions, MapTileOptions, MapViewportOptions};
 pub use query::{
     FeatureStateSelector, RenderedFeatureQueryOptions, RenderedQueryGeometry,

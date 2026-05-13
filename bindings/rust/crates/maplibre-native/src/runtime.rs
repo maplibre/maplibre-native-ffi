@@ -466,7 +466,7 @@ impl RuntimeHandle {
         support::check(unsafe {
             sys::mln_runtime_offline_region_get_status(runtime, region_id, &mut raw)
         })?;
-        Ok(OfflineRegionStatus::from_native(raw))
+        Ok(support::events::offline_region_status_from_native(raw))
     }
 
     /// Enables or disables runtime events for an offline region.
