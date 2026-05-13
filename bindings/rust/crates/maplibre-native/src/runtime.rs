@@ -12,6 +12,7 @@ use crate::events::{
     MapId, OfflineRegionDownloadState, OfflineRegionStatus, RuntimeEvent, RuntimeEventSource,
     empty_runtime_event,
 };
+use crate::geometry::GeometryNativeExt;
 use crate::handle::{ThreadAffineNativeHandle, closed_handle_error, out_handle};
 use crate::map::MapState;
 use crate::resource::{

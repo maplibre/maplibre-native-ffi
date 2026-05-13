@@ -8,7 +8,9 @@ pub use support::{
 };
 
 use crate::custom_geometry::{CanonicalTileId, CustomGeometrySourceState};
+use crate::geojson::GeoJsonNativeExt;
 use crate::handle::out_handle;
+use crate::json::JsonValueNativeExt;
 use crate::render::PremultipliedRgba8Image;
 use crate::values::NativeValue;
 use crate::{

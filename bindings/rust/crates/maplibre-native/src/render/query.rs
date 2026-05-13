@@ -6,7 +6,9 @@ use maplibre_native_sys as sys;
 
 use crate::Result;
 use crate::geojson::Feature;
+use crate::geojson::FeatureNativeExt;
 use crate::json::JsonValue;
+use crate::json::JsonValueNativeExt;
 use crate::values::NativeValue;
 use crate::values::{ScreenBox, ScreenPoint};
 

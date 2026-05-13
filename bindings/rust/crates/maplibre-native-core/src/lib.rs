@@ -11,7 +11,10 @@
 pub mod abi;
 pub mod enums;
 pub mod error;
+pub mod geojson;
+pub mod geometry;
 pub mod handle;
+pub mod json;
 pub mod ptr;
 pub mod string;
 pub mod values;
@@ -26,6 +29,9 @@ pub use enums::{
     TileLodMode, TileOperation, TileScheme, VectorTileEncoding, ViewportMode,
 };
 pub use error::{Error, ErrorKind, Result, check};
+pub use geojson::{Feature, FeatureIdentifier, GeoJson};
+pub use geometry::Geometry;
+pub use json::{JsonMember, JsonValue};
 pub use values::{
     EdgeInsets, LatLng, LatLngBounds, PremultipliedRgba8Image, ProjectedMeters, Quaternion,
     ScreenBox, ScreenPoint, StyleImageInfo, TextureImageInfo, UnitBezier, Vec3,
