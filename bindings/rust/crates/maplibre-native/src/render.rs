@@ -1128,6 +1128,7 @@ impl MetalOwnedTextureFrameHandle {
     }
 
     /// Explicitly releases this frame.
+    #[allow(clippy::result_large_err)]
     pub fn close(self) -> std::result::Result<(), HandleOperationError<Self>> {
         if self.closed.get() {
             return Ok(());
@@ -1249,6 +1250,7 @@ impl VulkanOwnedTextureFrameHandle {
     }
 
     /// Explicitly releases this frame.
+    #[allow(clippy::result_large_err)]
     pub fn close(self) -> std::result::Result<(), HandleOperationError<Self>> {
         if self.closed.get() {
             return Ok(());
