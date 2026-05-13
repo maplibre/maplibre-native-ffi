@@ -48,7 +48,7 @@ pub use options::{
 };
 pub use projection::MapProjectionHandle;
 pub use render::{
-    DetachedRenderSessionHandle, FeatureExtensionResult, FeatureStateSelector,
+    DetachedRenderSessionHandle, FeatureExtensionResult, FeatureStateSelector, FrameNativePointer,
     MetalBorrowedTextureDescriptor, MetalOwnedTextureDescriptor, MetalOwnedTextureFrame,
     MetalOwnedTextureFrameHandle, MetalSurfaceDescriptor, NativePointer, OwnedTextureDescriptor,
     PremultipliedRgba8Image, QueriedFeature, RenderSessionHandle, RenderedFeatureQueryOptions,
@@ -236,6 +236,7 @@ mod tests {
     assert_not_impl_any!(MapHandle: Send, Sync);
     assert_not_impl_any!(MapProjectionHandle: Send, Sync);
     assert_not_impl_any!(NativePointer: Send, Sync);
+    assert_not_impl_any!(FrameNativePointer<'static>: Send, Sync);
     assert_not_impl_any!(RenderSessionHandle: Send, Sync);
 
     struct NetworkStatusRestore(NetworkStatus);

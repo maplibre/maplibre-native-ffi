@@ -95,6 +95,12 @@ Verification evidence for the completed destructive/one-shot API polish chunk:
 `cargo test -p maplibre-native`, `cargo fmt --all --check`, and
 `mise run //bindings/rust:test`.
 
+Verification evidence for the completed frame backend pointer lifetime chunk:
+`cargo check --workspace`,
+`cargo test -p maplibre-native pointer_round_trips -- --nocapture`,
+`cargo test -p maplibre-native --test public_api -- --nocapture`,
+`cargo test -p maplibre-native`, and `cargo fmt --all --check`.
+
 ## API polish backlog before review
 
 Polish the Rust surface fully on this branch before external review. Treat these
@@ -117,14 +123,14 @@ Handle lifecycle shape:
 
 Frame backend pointer lifetimes:
 
-- Replace frame-derived bare `NativePointer` returns with a lifetime-bearing
-  type, such as `FrameNativePointer<'frame>`.
-- Tie `FrameNativePointer<'frame>` to the active texture frame handle so safe
-  Rust code cannot store the pointer beyond frame release.
-- Use consuming or mutable frame release APIs where needed so the borrow checker
-  prevents release while a frame pointer borrow is still live.
-- Keep GPU waiting and synchronization with the caller; the Rust API should
-  encode pointer lifetime without requiring callback-scoped GPU waits.
+- [x] Replace frame-derived bare `NativePointer` returns with a lifetime-bearing
+      type, such as `FrameNativePointer<'frame>`.
+- [x] Tie `FrameNativePointer<'frame>` to the active texture frame handle so
+      safe Rust code cannot store the pointer beyond frame release.
+- [x] Use consuming or mutable frame release APIs where needed so the borrow
+      checker prevents release while a frame pointer borrow is still live.
+- [x] Keep GPU waiting and synchronization with the caller; the Rust API should
+      encode pointer lifetime without requiring callback-scoped GPU waits.
 
 Module structure:
 

@@ -32,7 +32,7 @@ commit/push after each item.
 - [x] Rendered feature, source feature, and feature extension query methods.
 - [x] Revisit every public destructive or one-shot operation; prefer consuming
       close/complete and preserve retry semantics explicitly.
-- [ ] Replace frame-derived bare NativePointer returns with lifetime-bearing
+- [x] Replace frame-derived bare NativePointer returns with lifetime-bearing
       FrameNativePointer<'frame> or equivalent.
 - [ ] Split large Rust modules, aligned with Java FFM package structure where
       appropriate.
@@ -91,6 +91,10 @@ commit/push after each item.
   `cargo test -p maplibre-native acquired_frame_state_rejects_reentrant_session_operations_before_native_calls -- --nocapture`,
   `cargo test -p maplibre-native`, `cargo fmt --all --check`, and
   `mise run //bindings/rust:test`.
+- Frame backend pointer lifetime polish: `cargo check --workspace`,
+  `cargo test -p maplibre-native pointer_round_trips -- --nocapture`,
+  `cargo test -p maplibre-native --test public_api -- --nocapture`,
+  `cargo test -p maplibre-native`, and `cargo fmt --all --check`.
 
 ## Notes
 

@@ -117,7 +117,9 @@ impl RenderTarget {
                     .close()
                     .map_err(|error| Box::new(error) as Box<dyn StdError>)?;
                 compositor.close().map_err(|error| {
-                    compositor_error(format!("Vulkan texture compositor close failed: {error:?}"))
+                    Box::new(compositor_error(format!(
+                        "Vulkan texture compositor close failed: {error:?}"
+                    ))) as Box<dyn StdError>
                 })
             }
             Self::VulkanNativeSurface { session } => session

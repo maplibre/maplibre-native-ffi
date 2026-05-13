@@ -96,6 +96,63 @@ impl fmt::Debug for NativePointer {
     }
 }
 
+/// Borrowed opaque native address whose validity is tied to an active texture frame.
+///
+/// The value does not own, retain, dereference, or validate the pointed-to
+/// object. It exists so backend pointers returned from acquired frame handles
+/// carry the frame borrow in their Rust type instead of escaping as plain
+/// [`NativePointer`] values.
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+pub struct FrameNativePointer<'frame> {
+    address: usize,
+    _frame: PhantomData<&'frame ()>,
+    _thread_affine: PhantomData<Rc<()>>,
+}
+
+impl<'frame> FrameNativePointer<'frame> {
+    unsafe fn from_ptr<T>(ptr: *mut T) -> Self {
+        Self {
+            address: ptr as usize,
+            _frame: PhantomData,
+            _thread_affine: PhantomData,
+        }
+    }
+
+    /// Returns this opaque value as an integer address.
+    ///
+    /// # Safety
+    ///
+    /// The returned integer no longer carries this value's frame lifetime. The
+    /// caller must use it only while the borrowed frame remains open and must
+    /// satisfy the backend API's type, synchronization, and thread-affinity
+    /// requirements.
+    pub unsafe fn address(self) -> usize {
+        self.address
+    }
+
+    /// Returns whether this value is null.
+    pub fn is_null(self) -> bool {
+        self.address == 0
+    }
+
+    /// Reconstructs a raw pointer for a backend interop call.
+    ///
+    /// # Safety
+    ///
+    /// The caller must choose the correct pointer type and uphold the lifetime,
+    /// thread-affinity, synchronization, and aliasing requirements of the
+    /// backend API that will receive the pointer.
+    pub unsafe fn as_ptr<T>(self) -> *mut T {
+        self.address as *mut T
+    }
+}
+
+impl fmt::Debug for FrameNativePointer<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "FrameNativePointer(0x{:x})", self.address)
+    }
+}
+
 /// Source, feature, and state-key selector for render-session feature state.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
@@ -1102,13 +1159,13 @@ impl MetalOwnedTextureFrameHandle {
     /// The returned pointer is valid only while this frame handle remains open.
     /// The caller must not store or use it after frame release and must satisfy
     /// Metal synchronization and thread-affinity requirements.
-    pub unsafe fn texture(&self) -> Result<NativePointer> {
+    pub unsafe fn texture(&self) -> Result<FrameNativePointer<'_>> {
         if self.closed.get() {
             Err(closed_handle_error("MetalOwnedTextureFrameHandle"))
         } else {
             // SAFETY: The active native frame owns the validity contract for
             // this borrowed backend handle until release.
-            Ok(unsafe { NativePointer::from_ptr(self.raw.texture) })
+            Ok(unsafe { FrameNativePointer::from_ptr(self.raw.texture) })
         }
     }
 
@@ -1118,12 +1175,12 @@ impl MetalOwnedTextureFrameHandle {
     ///
     /// The returned pointer has the same lifetime and synchronization
     /// requirements as [`MetalOwnedTextureFrameHandle::texture`].
-    pub unsafe fn device(&self) -> Result<NativePointer> {
+    pub unsafe fn device(&self) -> Result<FrameNativePointer<'_>> {
         if self.closed.get() {
             Err(closed_handle_error("MetalOwnedTextureFrameHandle"))
         } else {
             // SAFETY: See texture above.
-            Ok(unsafe { NativePointer::from_ptr(self.raw.device) })
+            Ok(unsafe { FrameNativePointer::from_ptr(self.raw.device) })
         }
     }
 
@@ -1209,13 +1266,13 @@ impl VulkanOwnedTextureFrameHandle {
     /// The returned pointer is valid only while this frame handle remains open.
     /// The caller must not store or use it after frame release and must satisfy
     /// Vulkan synchronization and thread-affinity requirements.
-    pub unsafe fn image(&self) -> Result<NativePointer> {
+    pub unsafe fn image(&self) -> Result<FrameNativePointer<'_>> {
         if self.closed.get() {
             Err(closed_handle_error("VulkanOwnedTextureFrameHandle"))
         } else {
             // SAFETY: The active native frame owns the validity contract for
             // this borrowed backend handle until release.
-            Ok(unsafe { NativePointer::from_ptr(self.raw.image) })
+            Ok(unsafe { FrameNativePointer::from_ptr(self.raw.image) })
         }
     }
 
@@ -1225,12 +1282,12 @@ impl VulkanOwnedTextureFrameHandle {
     ///
     /// The returned pointer has the same lifetime and synchronization
     /// requirements as [`VulkanOwnedTextureFrameHandle::image`].
-    pub unsafe fn image_view(&self) -> Result<NativePointer> {
+    pub unsafe fn image_view(&self) -> Result<FrameNativePointer<'_>> {
         if self.closed.get() {
             Err(closed_handle_error("VulkanOwnedTextureFrameHandle"))
         } else {
             // SAFETY: See image above.
-            Ok(unsafe { NativePointer::from_ptr(self.raw.image_view) })
+            Ok(unsafe { FrameNativePointer::from_ptr(self.raw.image_view) })
         }
     }
 
@@ -1240,12 +1297,12 @@ impl VulkanOwnedTextureFrameHandle {
     ///
     /// The returned pointer has the same lifetime and synchronization
     /// requirements as [`VulkanOwnedTextureFrameHandle::image`].
-    pub unsafe fn device(&self) -> Result<NativePointer> {
+    pub unsafe fn device(&self) -> Result<FrameNativePointer<'_>> {
         if self.closed.get() {
             Err(closed_handle_error("VulkanOwnedTextureFrameHandle"))
         } else {
             // SAFETY: See image above.
-            Ok(unsafe { NativePointer::from_ptr(self.raw.device) })
+            Ok(unsafe { FrameNativePointer::from_ptr(self.raw.device) })
         }
     }
 
@@ -1806,6 +1863,7 @@ mod tests {
     };
 
     assert_not_impl_any!(NativePointer: Send, Sync);
+    assert_not_impl_any!(FrameNativePointer<'static>: Send, Sync);
     assert_not_impl_any!(RenderSessionHandle: Send, Sync);
     assert_not_impl_any!(MetalOwnedTextureFrameHandle: Send, Sync);
     assert_not_impl_any!(VulkanOwnedTextureFrameHandle: Send, Sync);
@@ -1904,6 +1962,17 @@ mod tests {
         // SAFETY: Test only verifies address reconstruction; it does not dereference.
         assert_eq!(unsafe { pointer.as_ptr::<u8>() } as usize, 0x1234);
         assert!(NativePointer::NULL.is_null());
+    }
+
+    #[test]
+    fn frame_native_pointer_round_trips_address_without_plain_native_pointer() {
+        // SAFETY: Test uses a dummy opaque address and does not dereference it.
+        let pointer = unsafe { FrameNativePointer::<'_>::from_ptr(0x4321usize as *mut u8) };
+        // SAFETY: Test only verifies address reconstruction while the typed frame borrow is live.
+        assert_eq!(unsafe { pointer.address() }, 0x4321);
+        // SAFETY: Test only verifies raw pointer reconstruction; it does not dereference.
+        assert_eq!(unsafe { pointer.as_ptr::<u8>() } as usize, 0x4321);
+        assert!(!pointer.is_null());
     }
 
     #[test]
