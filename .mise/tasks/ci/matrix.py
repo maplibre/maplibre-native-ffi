@@ -4,6 +4,7 @@
 # [USAGE]   choices "native" "examples" "bindings"
 # [USAGE] }
 # [USAGE] flag "--schema <schema>" help="Path to the GitHub matrix config"
+# [USAGE] flag "--variant <variant>" help="Limit the matrix to one native variant"
 # [USAGE] flag "--pretty" help="Print indented JSON for local inspection"
 
 import json
@@ -116,6 +117,21 @@ def load_variants(repo_root: Path, schema: TomlTable) -> dict[str, TomlTable]:
     return dict(sorted(variants.items()))
 
 
+def select_variant(
+    variants: dict[str, TomlTable],
+    variant_name: str | None,
+) -> dict[str, TomlTable]:
+    """Return all variants, or one named variant when requested."""
+    if variant_name is None:
+        return variants
+
+    if variant_name in variants:
+        return {variant_name: variants[variant_name]}
+
+    message = f"unknown variant: {variant_name}"
+    raise ValueError(message)
+
+
 def native_matrix(variants: dict[str, TomlTable]) -> Matrix:
     """Generate the native build matrix."""
     return {
@@ -173,7 +189,10 @@ def main() -> int:
     pretty = os.environ.get("usage_pretty") == "true"
 
     schema = load_toml(schema_path)
-    variants = load_variants(Path.cwd(), schema)
+    variants = select_variant(
+        load_variants(Path.cwd(), schema),
+        os.environ.get("usage_variant"),
+    )
     if matrix_name == "native":
         matrix = native_matrix(variants)
     elif matrix_name == "examples":
