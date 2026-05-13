@@ -39,10 +39,10 @@ milestone until complete (through 9).
       `core`. Moved `JsonValue`, `JsonMember`, `NativeJsonValue`,
       `NativeJsonMembers`, and JSON copy helpers.
 - [x] Milestone 3: Move geometry value types, materializers, and readers.
-- [ ] Milestone 3: Move GeoJSON feature and feature-collection materializers and
+- [x] Milestone 3: Move GeoJSON feature and feature-collection materializers and
       readers.
-- [ ] Milestone 3: Preserve depth checks, integer width, object member order,
-      duplicate keys, and finite-number validation.
+- [x] Milestone 3: Preserve depth checks, integer width, object member order,
+      duplicate keys, copied-output ownership, and finite-number validation.
 - [ ] Milestone 4+: Continue descriptor/result/event/resource/handle milestones
       in small buildable slices.
 
@@ -100,6 +100,17 @@ milestone until complete (through 9).
 - `mise run -C bindings/rust test` — passed after moving geometry into core (88
   `maplibre-native`, 42 `maplibre-native-core`, 0 `maplibre-native-sys`, doc
   tests passed).
+- `cargo fmt --all --manifest-path Cargo.toml` — passed after applying Milestone
+  3 review findings.
+- `cargo clippy --manifest-path Cargo.toml -p maplibre-native-core -p
+  maplibre-native --all-targets -- -D warnings`
+  — passed after applying Milestone 3 review findings.
+- `mise run -C bindings/rust test` — passed after applying Milestone 3 review
+  findings (85 `maplibre-native`, 49 `maplibre-native-core`, 0
+  `maplibre-native-sys`, doc tests passed).
+- `git commit -m "Address Rust descriptor core review findings"` — created
+  `354e26b`.
+- `git push` — pushed `354e26b` to `origin/rust-refactor`.
 
 ## Notes
 
@@ -163,3 +174,11 @@ milestone until complete (through 9).
   helpers into `maplibre-native-core::geometry`. The public crate now re-exports
   `Geometry`, uses a private extension trait for internal native conversion
   calls, and core owns the geometry depth/materialization tests.
+- Iteration 11 completed Milestone 3 by moving GeoJSON feature and collection
+  materializers/readers into `maplibre-native-core::geojson`, preserving public
+  crate re-exports and private extension traits.
+- Parallel Milestone 3 review found no migration blockers and flagged clippy API
+  polish plus copied-output ownership coverage. Fixed by using `AsRef` trait
+  implementations for native wrappers, adding `NativeJsonMembers::is_empty`,
+  documenting `copy_json_members` safety, and adding JSON/geometry/GeoJSON copy
+  survival tests. Committed and pushed review fixes as `354e26b`.
