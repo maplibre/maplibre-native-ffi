@@ -48,8 +48,10 @@ runs:
         cache_key_prefix: mise-v2
         install: true
 
-    - name: Work around https://github.com/jdx/mise-action/issues/184
-      run: rustup set profile default
+    # The mise action may restore a Rust toolchain without optional components.
+    # See https://github.com/jdx/mise-action/issues/184.
+    - name: Ensure Rust components
+      run: mise exec -- rustup component add rustfmt clippy
       shell: bash
 
     - name: Trim Windows PATH before Pixi activation
