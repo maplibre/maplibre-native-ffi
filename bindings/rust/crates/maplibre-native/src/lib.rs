@@ -24,7 +24,7 @@ mod runtime;
 mod values;
 
 use crate::values::NativeValue;
-use maplibre_native_core as support;
+use maplibre_native_core as maplibre_core;
 use maplibre_native_sys as sys;
 
 pub use camera::{
@@ -49,6 +49,14 @@ pub use map::{
     LocationIndicatorImageKind, MapHandle, RasterDemEncoding, SourceInfo, SourceType, StyleImage,
     StyleImageInfo, StyleImageOptions, TileScheme, TileSourceOptions, VectorTileEncoding,
 };
+pub use maplibre_core::{
+    AmbientCacheOperation, ConstrainMode, Error, ErrorKind, LogEvent, LogSeverity, LogSeverityMask,
+    MapDebugOptions, MapMode, MapOptions, MapTileOptions, MapViewportOptions, NetworkStatus,
+    NorthOrientation, OfflineRegionDownloadState, RenderBackendMask, RenderMode,
+    ResourceErrorReason, ResourceKind, ResourceLoadingMethod, ResourcePriority,
+    ResourceResponseStatus, ResourceStoragePolicy, ResourceUsage, Result, RuntimeEventType,
+    TileLodMode, TileOperation, ViewportMode,
+};
 pub use projection::MapProjectionHandle;
 pub use render::{
     DetachedRenderSessionHandle, FeatureExtensionResult, FeatureStateSelector, FrameNativePointer,
@@ -64,14 +72,6 @@ pub use resource::{
     ResourceTransformRequest,
 };
 pub use runtime::{OfflineRegionDefinition, OfflineRegionInfo, RuntimeHandle, RuntimeOptions};
-pub use support::{
-    AmbientCacheOperation, ConstrainMode, Error, ErrorKind, LogEvent, LogSeverity, LogSeverityMask,
-    MapDebugOptions, MapMode, MapOptions, MapTileOptions, MapViewportOptions, NetworkStatus,
-    NorthOrientation, OfflineRegionDownloadState, RenderBackendMask, RenderMode,
-    ResourceErrorReason, ResourceKind, ResourceLoadingMethod, ResourcePriority,
-    ResourceResponseStatus, ResourceStoragePolicy, ResourceUsage, Result, RuntimeEventType,
-    TileLodMode, TileOperation, ViewportMode,
-};
 pub use values::{
     EdgeInsets, LatLng, LatLngBounds, ProjectedMeters, Quaternion, ScreenBox, ScreenPoint,
     UnitBezier, Vec3,
@@ -157,7 +157,7 @@ pub fn projected_meters_for_lat_lng(coordinate: LatLng) -> Result<ProjectedMeter
     };
     // SAFETY: coordinate is passed by value. out_meters points to valid
     // writable storage for one projected-meter value.
-    support::check(unsafe {
+    maplibre_core::check(unsafe {
         sys::mln_projected_meters_for_lat_lng(coordinate.to_native(), &mut raw_meters)
     })?;
     Ok(ProjectedMeters::from_native(raw_meters))
@@ -171,7 +171,7 @@ pub fn lat_lng_for_projected_meters(meters: ProjectedMeters) -> Result<LatLng> {
     };
     // SAFETY: meters is passed by value. out_coordinate points to valid
     // writable storage for one coordinate value.
-    support::check(unsafe {
+    maplibre_core::check(unsafe {
         sys::mln_lat_lng_for_projected_meters(meters.to_native(), &mut raw_coordinate)
     })?;
     Ok(LatLng::from_native(raw_coordinate))
@@ -181,7 +181,7 @@ pub fn lat_lng_for_projected_meters(meters: ProjectedMeters) -> Result<LatLng> {
 pub fn network_status() -> Result<NetworkStatus> {
     let mut raw_status = 0;
     // SAFETY: out_status points to valid writable storage for one u32.
-    support::check(unsafe { sys::mln_network_status_get(&mut raw_status) })?;
+    maplibre_core::check(unsafe { sys::mln_network_status_get(&mut raw_status) })?;
     Ok(NetworkStatus::from_raw(raw_status))
 }
 
@@ -193,7 +193,7 @@ pub fn set_network_status(status: NetworkStatus) -> Result<()> {
 fn set_network_status_raw(raw_status: u32) -> Result<()> {
     // SAFETY: The raw value is passed by value. The C API validates the enum
     // domain and reports invalid values as MLN_STATUS_INVALID_ARGUMENT.
-    support::check(unsafe { sys::mln_network_status_set(raw_status) })
+    maplibre_core::check(unsafe { sys::mln_network_status_set(raw_status) })
 }
 
 #[cfg(test)]
@@ -219,7 +219,7 @@ mod tests {
 
     #[test]
     fn reports_c_abi_version() {
-        assert_eq!(c_version(), support::EXPECTED_C_ABI_VERSION);
+        assert_eq!(c_version(), maplibre_core::EXPECTED_C_ABI_VERSION);
     }
 
     #[test]

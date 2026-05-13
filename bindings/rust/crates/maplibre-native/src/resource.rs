@@ -9,17 +9,17 @@ use std::ptr;
 use std::sync::{Arc, Mutex};
 use std::thread::ThreadId;
 
-use maplibre_native_core as support;
+use maplibre_native_core as maplibre_core;
 use maplibre_native_sys as sys;
 
-use crate::{Error, ErrorKind, HandleOperationError, Result};
+use crate::{HandleOperationError, Result};
 
-pub use support::resource::{
+pub use maplibre_core::resource::{
     ByteRange, ResourceProviderDecision, ResourceRequest, ResourceResponse,
     ResourceTransformRequest,
 };
 
-use support::resource::{
+use maplibre_core::resource::{
     ResourceRequestHandleFns, ResourceRequestHandleState, UNKNOWN_PROVIDER_DECISION,
 };
 
@@ -122,11 +122,10 @@ impl ResourceProviderState {
     }
 
     pub(crate) fn descriptor(&self) -> sys::mln_resource_provider {
-        sys::mln_resource_provider {
-            size: std::mem::size_of::<sys::mln_resource_provider>() as u32,
-            callback: Some(resource_provider_trampoline),
-            user_data: ptr::from_ref(self).cast_mut().cast::<c_void>(),
-        }
+        maplibre_core::resource::resource_provider_descriptor(
+            Some(resource_provider_trampoline),
+            ptr::from_ref(self).cast_mut().cast::<c_void>(),
+        )
     }
 
     fn invoke(
@@ -145,7 +144,7 @@ impl ResourceProviderState {
 
         // SAFETY: raw_request is non-null and borrowed for the callback duration.
         let request =
-            match unsafe { support::resource::copy_resource_request(raw_request.as_ref()) } {
+            match unsafe { maplibre_core::resource::copy_resource_request(raw_request.as_ref()) } {
                 Ok(request) => request,
                 Err(_) => return state.finish_provider_exception(),
             };
@@ -198,11 +197,10 @@ impl ResourceTransformState {
     }
 
     pub(crate) fn descriptor(&self) -> sys::mln_resource_transform {
-        sys::mln_resource_transform {
-            size: std::mem::size_of::<sys::mln_resource_transform>() as u32,
-            callback: Some(resource_transform_trampoline),
-            user_data: ptr::from_ref(self).cast_mut().cast::<c_void>(),
-        }
+        maplibre_core::resource::resource_transform_descriptor(
+            Some(resource_transform_trampoline),
+            ptr::from_ref(self).cast_mut().cast::<c_void>(),
+        )
     }
 
     fn invoke(
@@ -211,24 +209,22 @@ impl ResourceTransformState {
         url: *const c_char,
         out_response: *mut sys::mln_resource_transform_response,
     ) -> sys::mln_status {
-        if out_response.is_null() {
-            return sys::MLN_STATUS_INVALID_ARGUMENT;
-        }
-
-        // SAFETY: out_response was checked non-null and is borrowed for the
-        // callback duration by the C API.
-        unsafe {
-            (*out_response).size =
-                std::mem::size_of::<sys::mln_resource_transform_response>() as u32;
-            (*out_response).url = ptr::null();
+        // SAFETY: out_response is callback-duration output storage provided by
+        // native; core validates null before initializing it.
+        let status = unsafe {
+            maplibre_core::resource::initialize_resource_transform_response(out_response)
+        };
+        if status != sys::MLN_STATUS_OK {
+            return status;
         }
 
         // SAFETY: url is borrowed for the callback duration by the C API.
-        let request =
-            match unsafe { support::resource::copy_resource_transform_request(raw_kind, url) } {
-                Ok(request) => request,
-                Err(error) => return status_for_error(&error),
-            };
+        let request = match unsafe {
+            maplibre_core::resource::copy_resource_transform_request(raw_kind, url)
+        } {
+            Ok(request) => request,
+            Err(error) => return maplibre_core::resource::status_for_error(&error),
+        };
 
         let replacement = match catch_unwind(AssertUnwindSafe(|| (self.callback)(request))) {
             Ok(replacement) => replacement,
@@ -269,28 +265,7 @@ impl ResourceTransformState {
 }
 
 pub(crate) fn noop_resource_transform_descriptor() -> sys::mln_resource_transform {
-    sys::mln_resource_transform {
-        size: std::mem::size_of::<sys::mln_resource_transform>() as u32,
-        callback: Some(noop_resource_transform),
-        user_data: ptr::null_mut(),
-    }
-}
-
-unsafe extern "C" fn noop_resource_transform(
-    _user_data: *mut c_void,
-    _kind: u32,
-    _url: *const c_char,
-    out_response: *mut sys::mln_resource_transform_response,
-) -> sys::mln_status {
-    if out_response.is_null() {
-        return sys::MLN_STATUS_INVALID_ARGUMENT;
-    }
-    // SAFETY: out_response was checked non-null and is borrowed for this callback.
-    unsafe {
-        (*out_response).size = std::mem::size_of::<sys::mln_resource_transform_response>() as u32;
-        (*out_response).url = ptr::null();
-    }
-    sys::MLN_STATUS_OK
+    maplibre_core::resource::noop_resource_transform_descriptor()
 }
 
 unsafe extern "C" fn resource_transform_trampoline(
@@ -308,22 +283,6 @@ unsafe extern "C" fn resource_transform_trampoline(
     unsafe { state.as_ref() }.invoke(kind, url, out_response)
 }
 
-fn status_for_error(error: &Error) -> sys::mln_status {
-    if let Some(status) = error.raw_status() {
-        return status;
-    }
-    match error.kind() {
-        ErrorKind::InvalidArgument => sys::MLN_STATUS_INVALID_ARGUMENT,
-        ErrorKind::InvalidState => sys::MLN_STATUS_INVALID_STATE,
-        ErrorKind::WrongThread => sys::MLN_STATUS_WRONG_THREAD,
-        ErrorKind::Unsupported => sys::MLN_STATUS_UNSUPPORTED,
-        ErrorKind::NativeError | ErrorKind::AbiVersionMismatch | ErrorKind::UnknownStatus => {
-            sys::MLN_STATUS_NATIVE_ERROR
-        }
-        _ => sys::MLN_STATUS_NATIVE_ERROR,
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use std::ffi::CStr;
@@ -334,8 +293,8 @@ mod tests {
 
     use super::*;
     use crate::{
-        ResourceErrorReason, ResourceKind, ResourceLoadingMethod, ResourcePriority,
-        ResourceStoragePolicy, ResourceUsage,
+        ErrorKind, ResourceKind, ResourceLoadingMethod, ResourcePriority, ResourceStoragePolicy,
+        ResourceUsage,
     };
 
     static FAKE_HANDLE_TEST_LOCK: StdMutex<()> = StdMutex::new(());
@@ -580,41 +539,6 @@ mod tests {
 
         assert_eq!(decision, UNKNOWN_PROVIDER_DECISION);
         assert_eq!(RELEASE_COUNT.load(Ordering::SeqCst), 0);
-    }
-
-    #[test]
-    fn resource_response_materializes_error_and_cache_fields() {
-        let response = ResourceResponse::error(ResourceErrorReason::RateLimit, "slow down")
-            .with_retry_after_unix_ms(1_700_000_001)
-            .with_must_revalidate(true)
-            .with_modified_unix_ms(1_700_000_002)
-            .with_expires_unix_ms(1_700_000_003)
-            .with_etag("abc123");
-
-        let native = support::resource::resource_response_to_native(&response).unwrap();
-        let raw = native.as_ref();
-
-        assert_eq!(raw.status, sys::MLN_RESOURCE_RESPONSE_STATUS_ERROR);
-        assert_eq!(raw.error_reason, sys::MLN_RESOURCE_ERROR_REASON_RATE_LIMIT);
-        assert!(raw.bytes.is_null());
-        assert_eq!(raw.byte_count, 0);
-        assert!(raw.must_revalidate);
-        assert!(raw.has_modified);
-        assert_eq!(raw.modified_unix_ms, 1_700_000_002);
-        assert!(raw.has_expires);
-        assert_eq!(raw.expires_unix_ms, 1_700_000_003);
-        assert!(raw.has_retry_after);
-        assert_eq!(raw.retry_after_unix_ms, 1_700_000_001);
-        assert_eq!(
-            unsafe { CStr::from_ptr(raw.error_message) }
-                .to_str()
-                .unwrap(),
-            "slow down"
-        );
-        assert_eq!(
-            unsafe { CStr::from_ptr(raw.etag) }.to_str().unwrap(),
-            "abc123"
-        );
     }
 
     #[test]

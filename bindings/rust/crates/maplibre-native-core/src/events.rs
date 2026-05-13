@@ -125,6 +125,21 @@ pub fn offline_region_status_from_native(
     OfflineRegionStatus::from_native(raw)
 }
 
+pub fn empty_offline_region_status_native() -> sys::mln_offline_region_status {
+    sys::mln_offline_region_status {
+        size: std::mem::size_of::<sys::mln_offline_region_status>() as u32,
+        download_state: sys::MLN_OFFLINE_REGION_DOWNLOAD_INACTIVE,
+        completed_resource_count: 0,
+        completed_resource_size: 0,
+        completed_tile_count: 0,
+        required_tile_count: 0,
+        completed_tile_size: 0,
+        required_resource_count: 0,
+        required_resource_count_is_precise: false,
+        complete: false,
+    }
+}
+
 /// Offline region status-change event payload.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[non_exhaustive]

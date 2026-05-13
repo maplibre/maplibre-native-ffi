@@ -390,8 +390,8 @@ Deliverables:
 
 - Move camera, map, viewport, tile, runtime, offline-region, render-target,
   style, and query descriptor materializers.
-- Keep public Rust builder methods in `maplibre-native`, but make them call
-  `core` materializers.
+- Keep the public Rust API natural through re-exported shared descriptor types
+  or thin Rust wrappers that call `core` materializers.
 - Add tests that inspect `size` fields, masks, null pointers, string views,
   nested arrays, and backing storage lifetimes.
 
@@ -486,7 +486,9 @@ Make `maplibre-native` a clean Rust adapter over the shared layer.
 Deliverables:
 
 - Remove duplicated conversion logic from the public crate.
-- Keep public Rust names, builders, and methods focused on Rust ergonomics.
+- Keep public Rust names, builders, and methods focused on Rust ergonomics; when
+  a descriptor type is bridge-neutral, it may live in `core` and be re-exported
+  by `maplibre-native`.
 - Audit all direct `sys` calls in `maplibre-native`; keep only native operation
   calls that belong in Rust handle methods.
 - Add tests that assert Rust-specific invariants: `!Send`/`!Sync`, parent

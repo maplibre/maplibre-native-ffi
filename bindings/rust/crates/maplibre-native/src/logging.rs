@@ -2,10 +2,11 @@ use std::ffi::{c_char, c_void};
 use std::panic::{self, AssertUnwindSafe};
 use std::sync::{Arc, Mutex, MutexGuard};
 
-use crate::{Result, support, sys};
-use support::LogSeverityMask;
+use crate::{Result, sys};
+use maplibre_core::LogSeverityMask;
+use maplibre_native_core as maplibre_core;
 
-pub use support::LogRecord;
+pub use maplibre_core::LogRecord;
 
 type LogCallback = dyn Fn(LogRecord) -> bool + Send + Sync + 'static;
 
@@ -46,7 +47,9 @@ where
     // SAFETY: log_callback_trampoline has the C callback ABI. user_data points
     // at replacement, which is retained for the process lifetime below so native
     // and in-flight callbacks never observe a dangling pointer.
-    support::check(unsafe { sys::mln_log_set_callback(Some(log_callback_trampoline), user_data) })?;
+    maplibre_core::check(unsafe {
+        sys::mln_log_set_callback(Some(log_callback_trampoline), user_data)
+    })?;
 
     let mut state = lock_log_callback_state();
     state.current = Some(replacement.clone());
@@ -58,7 +61,7 @@ where
 pub fn clear_log_callback() -> Result<()> {
     // SAFETY: mln_log_clear_callback takes no arguments and clears native's
     // process-global callback slot.
-    support::check(unsafe { sys::mln_log_clear_callback() })?;
+    maplibre_core::check(unsafe { sys::mln_log_clear_callback() })?;
 
     lock_log_callback_state().current = None;
     Ok(())
@@ -68,7 +71,7 @@ pub fn clear_log_callback() -> Result<()> {
 pub fn set_async_log_severity_mask(mask: LogSeverityMask) -> Result<()> {
     // SAFETY: mask is passed by value. The C API validates unknown bits and
     // reports them as MLN_STATUS_INVALID_ARGUMENT.
-    support::check(unsafe { sys::mln_log_set_async_severity_mask(mask.bits()) })
+    maplibre_core::check(unsafe { sys::mln_log_set_async_severity_mask(mask.bits()) })
 }
 
 /// Restores MapLibre Native's default async log severity mask.
@@ -104,9 +107,9 @@ fn invoke_callback(
     // SAFETY: message is supplied by the C logging callback contract as a
     // null-terminated string pointer. Invalid strings are treated as not
     // consumed.
-    let Ok(record) =
-        (unsafe { support::logging::copy_log_record(raw_severity, raw_event, code, message) })
-    else {
+    let Ok(record) = (unsafe {
+        maplibre_core::logging::copy_log_record(raw_severity, raw_event, code, message)
+    }) else {
         return 0;
     };
 
@@ -124,7 +127,7 @@ mod tests {
 
     use super::*;
     use crate::ErrorKind;
-    use support::{LogEvent, LogSeverity};
+    use maplibre_core::{LogEvent, LogSeverity};
 
     static LOGGING_TEST_LOCK: Mutex<()> = Mutex::new(());
 

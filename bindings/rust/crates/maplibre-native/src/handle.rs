@@ -2,7 +2,7 @@ use std::marker::PhantomData;
 use std::ptr::NonNull;
 use std::rc::Rc;
 
-use maplibre_native_core::{self as support, handle::NativeHandleState};
+use maplibre_native_core::{self as maplibre_core, handle::NativeHandleState};
 use maplibre_native_sys as sys;
 
 use crate::{Error, Result};
@@ -68,7 +68,7 @@ pub(crate) fn closed_handle_error(type_name: &'static str) -> Error {
 }
 
 pub(crate) fn out_handle<T>(
-    out: support::ptr::OutPtr<T>,
+    out: maplibre_core::ptr::OutPtr<T>,
     type_name: &'static str,
 ) -> Result<NonNull<T>> {
     out.into_non_null(type_name)

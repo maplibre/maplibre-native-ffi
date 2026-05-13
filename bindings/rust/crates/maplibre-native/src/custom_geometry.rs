@@ -4,6 +4,7 @@ use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::ptr;
 use std::sync::{Condvar, Mutex};
 
+use maplibre_native_core as maplibre_core;
 use maplibre_native_sys as sys;
 
 /// Canonical tile identity used by custom geometry source callbacks.
@@ -187,44 +188,23 @@ impl CustomGeometrySourceState {
     }
 
     pub(crate) fn descriptor(&self) -> sys::mln_custom_geometry_source_options {
-        // SAFETY: Default constructor takes no arguments and initializes size
-        // and default values for this C ABI version.
-        let mut raw = unsafe { sys::mln_custom_geometry_source_options_default() };
-        raw.fetch_tile = Some(fetch_tile_trampoline);
-        raw.cancel_tile = self
-            .cancel_tile
-            .as_ref()
-            .map(|_| cancel_tile_trampoline as _);
-        raw.user_data = ptr::from_ref(self).cast_mut().cast::<c_void>();
-        if let Some(min_zoom) = self.min_zoom {
-            raw.fields |= sys::MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MIN_ZOOM;
-            raw.min_zoom = min_zoom;
-        }
-        if let Some(max_zoom) = self.max_zoom {
-            raw.fields |= sys::MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MAX_ZOOM;
-            raw.max_zoom = max_zoom;
-        }
-        if let Some(tolerance) = self.tolerance {
-            raw.fields |= sys::MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TOLERANCE;
-            raw.tolerance = tolerance;
-        }
-        if let Some(tile_size) = self.tile_size {
-            raw.fields |= sys::MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TILE_SIZE;
-            raw.tile_size = tile_size;
-        }
-        if let Some(buffer) = self.buffer {
-            raw.fields |= sys::MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_BUFFER;
-            raw.buffer = buffer;
-        }
-        if let Some(clip) = self.clip {
-            raw.fields |= sys::MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_CLIP;
-            raw.clip = clip;
-        }
-        if let Some(wrap) = self.wrap {
-            raw.fields |= sys::MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_WRAP;
-            raw.wrap = wrap;
-        }
-        raw
+        maplibre_core::style::custom_geometry_source_options_to_native(
+            maplibre_core::style::CustomGeometrySourceDescriptorFields {
+                fetch_tile: Some(fetch_tile_trampoline),
+                cancel_tile: self
+                    .cancel_tile
+                    .as_ref()
+                    .map(|_| cancel_tile_trampoline as _),
+                user_data: ptr::from_ref(self).cast_mut().cast::<c_void>(),
+                min_zoom: self.min_zoom,
+                max_zoom: self.max_zoom,
+                tolerance: self.tolerance,
+                tile_size: self.tile_size,
+                buffer: self.buffer,
+                clip: self.clip,
+                wrap: self.wrap,
+            },
+        )
     }
 
     pub(crate) fn close(&self) {

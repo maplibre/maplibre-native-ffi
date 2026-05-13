@@ -24,7 +24,7 @@ maplibre-native-sys
 
 maplibre-native-core
   Shared ABI adaptation above sys: status conversion, diagnostics, descriptor
-  materializers, callback trampolines, and build/link utilities.
+  materializers, callback trampolines, and copied native results.
 
 maplibre-native
   Public safe Rust crate. Handles, owned values, events, errors,

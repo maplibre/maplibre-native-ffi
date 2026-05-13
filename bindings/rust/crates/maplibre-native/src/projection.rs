@@ -1,6 +1,6 @@
 use std::fmt;
 
-use maplibre_native_core as support;
+use maplibre_native_core as maplibre_core;
 use maplibre_native_core::ptr::const_ptr_or_null;
 use maplibre_native_core::values::{empty_lat_lng, empty_screen_point, lat_lngs_to_native};
 use maplibre_native_sys as sys;
@@ -70,10 +70,10 @@ impl fmt::Debug for MapProjectionHandle {
 impl MapProjectionHandle {
     pub(crate) fn new(map: &MapHandle) -> Result<Self> {
         let map_ptr = map.inner.as_ptr()?;
-        let mut out = support::ptr::OutPtr::<sys::mln_map_projection>::new();
+        let mut out = maplibre_core::ptr::OutPtr::<sys::mln_map_projection>::new();
         // SAFETY: map_ptr is a live map handle. out is a valid null-initialized
         // out-pointer owned by this call.
-        support::check(unsafe { sys::mln_map_projection_create(map_ptr, out.as_mut_ptr()) })?;
+        maplibre_core::check(unsafe { sys::mln_map_projection_create(map_ptr, out.as_mut_ptr()) })?;
         let ptr = out_handle(out, "mln_map_projection")?;
         Ok(Self {
             inner: MapProjectionState::new(ptr),
@@ -93,7 +93,7 @@ impl MapProjectionHandle {
         // SAFETY: Default constructor takes no arguments and initializes size.
         let mut raw = unsafe { sys::mln_camera_options_default() };
         // SAFETY: projection is live and raw has a valid size field for C to fill.
-        support::check(unsafe { sys::mln_map_projection_get_camera(projection, &mut raw) })?;
+        maplibre_core::check(unsafe { sys::mln_map_projection_get_camera(projection, &mut raw) })?;
         Ok(CameraOptions::from_native(raw))
     }
 
@@ -103,7 +103,7 @@ impl MapProjectionHandle {
         let raw = camera.to_native();
         // SAFETY: projection is live and raw is a materialized descriptor valid
         // for the duration of this call.
-        support::check(unsafe { sys::mln_map_projection_set_camera(projection, &raw) })
+        maplibre_core::check(unsafe { sys::mln_map_projection_set_camera(projection, &raw) })
     }
 
     /// Updates the projection camera so coordinates are visible within padding.
@@ -121,7 +121,7 @@ impl MapProjectionHandle {
         let raw_coordinates = lat_lngs_to_native(coordinates);
         // SAFETY: projection is live. coordinates points to coordinate_count
         // non-empty entries. padding is passed by value.
-        support::check(unsafe {
+        maplibre_core::check(unsafe {
             sys::mln_map_projection_set_visible_coordinates(
                 projection,
                 const_ptr_or_null(&raw_coordinates),
@@ -137,7 +137,7 @@ impl MapProjectionHandle {
         let native_geometry = geometry.try_to_native()?;
         // SAFETY: projection is live, native_geometry owns backing storage for
         // the duration of this call, and padding is passed by value.
-        support::check(unsafe {
+        maplibre_core::check(unsafe {
             sys::mln_map_projection_set_visible_geometry(
                 projection,
                 native_geometry.as_ptr(),
@@ -152,7 +152,7 @@ impl MapProjectionHandle {
         let mut raw_point = empty_screen_point();
         // SAFETY: projection is live, coordinate is passed by value, and
         // raw_point is writable output storage.
-        support::check(unsafe {
+        maplibre_core::check(unsafe {
             sys::mln_map_projection_pixel_for_lat_lng(
                 projection,
                 coordinate.to_native(),
@@ -168,7 +168,7 @@ impl MapProjectionHandle {
         let mut raw_coordinate = empty_lat_lng();
         // SAFETY: projection is live, point is passed by value, and
         // raw_coordinate is writable output storage.
-        support::check(unsafe {
+        maplibre_core::check(unsafe {
             sys::mln_map_projection_lat_lng_for_pixel(
                 projection,
                 point.to_native(),

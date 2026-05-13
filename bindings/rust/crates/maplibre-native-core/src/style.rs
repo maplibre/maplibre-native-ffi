@@ -1,3 +1,4 @@
+use std::ffi::c_void;
 use std::ptr;
 use std::ptr::NonNull;
 
@@ -5,7 +6,10 @@ use maplibre_native_sys as sys;
 
 use crate::enums::{RasterDemEncoding, SourceType, TileScheme, VectorTileEncoding};
 use crate::string::{StringView, string_view};
-use crate::values::{LatLngBounds, PremultipliedRgba8Image, lat_lng_bounds_to_native};
+use crate::values::{
+    LatLngBounds, PremultipliedRgba8Image, StyleImageInfo, TextureImageInfo,
+    lat_lng_bounds_to_native,
+};
 
 /// Options for vector, raster, and raster DEM tile sources.
 #[derive(Debug, Clone, Default, PartialEq)]
@@ -134,6 +138,93 @@ pub fn tile_source_options_to_native(options: &TileSourceOptions) -> NativeTileS
     options.to_native()
 }
 
+pub struct NativeTileUrls<'a> {
+    raw_tiles: Vec<sys::mln_string_view>,
+    _tile_views: Vec<StringView<'a>>,
+}
+
+impl<'a> NativeTileUrls<'a> {
+    pub fn new<S: AsRef<str> + 'a>(tiles: &'a [S]) -> Self {
+        let tile_views: Vec<_> = tiles
+            .iter()
+            .map(|tile| string_view(tile.as_ref()))
+            .collect();
+        let raw_tiles: Vec<_> = tile_views.iter().map(StringView::raw).collect();
+        Self {
+            raw_tiles,
+            _tile_views: tile_views,
+        }
+    }
+
+    pub fn as_ptr(&self) -> *const sys::mln_string_view {
+        crate::ptr::const_ptr_or_null(&self.raw_tiles)
+    }
+
+    pub fn len(&self) -> usize {
+        self.raw_tiles.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.raw_tiles.is_empty()
+    }
+}
+
+pub type CustomGeometryTileCallbackFn =
+    unsafe extern "C" fn(*mut c_void, sys::mln_canonical_tile_id);
+
+#[derive(Debug, Clone, Copy)]
+pub struct CustomGeometrySourceDescriptorFields {
+    pub fetch_tile: Option<CustomGeometryTileCallbackFn>,
+    pub cancel_tile: Option<CustomGeometryTileCallbackFn>,
+    pub user_data: *mut c_void,
+    pub min_zoom: Option<f64>,
+    pub max_zoom: Option<f64>,
+    pub tolerance: Option<f64>,
+    pub tile_size: Option<u32>,
+    pub buffer: Option<u32>,
+    pub clip: Option<bool>,
+    pub wrap: Option<bool>,
+}
+
+pub fn custom_geometry_source_options_to_native(
+    fields: CustomGeometrySourceDescriptorFields,
+) -> sys::mln_custom_geometry_source_options {
+    // SAFETY: This C helper returns a plain value with no preconditions.
+    let mut raw = unsafe { sys::mln_custom_geometry_source_options_default() };
+    raw.fetch_tile = fields.fetch_tile;
+    raw.cancel_tile = fields.cancel_tile;
+    raw.user_data = fields.user_data;
+    if let Some(min_zoom) = fields.min_zoom {
+        raw.fields |= sys::MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MIN_ZOOM;
+        raw.min_zoom = min_zoom;
+    }
+    if let Some(max_zoom) = fields.max_zoom {
+        raw.fields |= sys::MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MAX_ZOOM;
+        raw.max_zoom = max_zoom;
+    }
+    if let Some(tolerance) = fields.tolerance {
+        raw.fields |= sys::MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TOLERANCE;
+        raw.tolerance = tolerance;
+    }
+    if let Some(tile_size) = fields.tile_size {
+        raw.fields |= sys::MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TILE_SIZE;
+        raw.tile_size = tile_size;
+    }
+    if let Some(buffer) = fields.buffer {
+        raw.fields |= sys::MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_BUFFER;
+        raw.buffer = buffer;
+    }
+    if let Some(clip) = fields.clip {
+        raw.fields |= sys::MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_CLIP;
+        raw.clip = clip;
+    }
+    if let Some(wrap) = fields.wrap {
+        raw.fields |= sys::MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_WRAP;
+        raw.wrap = wrap;
+    }
+    raw
+}
+
 /// Copied fixed metadata for one style source.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
@@ -184,6 +275,29 @@ impl StyleImage {
             sdf,
         }
     }
+}
+
+pub fn style_image_from_copied_premultiplied_rgba8(
+    info: StyleImageInfo,
+    mut data: Vec<u8>,
+    copied_size: usize,
+) -> crate::Result<StyleImage> {
+    if copied_size > data.len() {
+        return Err(crate::Error::new(
+            crate::ErrorKind::NativeError,
+            None,
+            "native style image byte length exceeded caller buffer",
+        ));
+    }
+    data.truncate(copied_size);
+    Ok(StyleImage::new(
+        PremultipliedRgba8Image::new(
+            TextureImageInfo::new(info.width, info.height, info.stride, copied_size),
+            data,
+        ),
+        info.pixel_ratio,
+        info.sdf,
+    ))
 }
 
 /// Options for adding or replacing a runtime style image.
@@ -355,6 +469,76 @@ mod tests {
     }
 
     #[test]
+    fn native_tile_urls_materialize_string_view_array() {
+        let urls = vec!["a://tile".to_string(), "b://tile".to_string()];
+        let native = NativeTileUrls::new(&urls);
+
+        assert_eq!(native.len(), 2);
+        assert!(!native.as_ptr().is_null());
+        // SAFETY: native keeps string views and raw array storage live for this scope.
+        assert_eq!(
+            unsafe { crate::string::copy_string_view(*native.as_ptr()) }.unwrap(),
+            "a://tile"
+        );
+
+        let empty: Vec<String> = Vec::new();
+        let native = NativeTileUrls::new(&empty);
+        assert!(native.is_empty());
+        assert!(native.as_ptr().is_null());
+    }
+
+    #[test]
+    fn custom_geometry_source_options_materialize_masks_and_callbacks() {
+        unsafe extern "C" fn fetch(_user_data: *mut c_void, _tile_id: sys::mln_canonical_tile_id) {}
+        unsafe extern "C" fn cancel(_user_data: *mut c_void, _tile_id: sys::mln_canonical_tile_id) {
+        }
+
+        let raw = custom_geometry_source_options_to_native(CustomGeometrySourceDescriptorFields {
+            fetch_tile: Some(fetch),
+            cancel_tile: Some(cancel),
+            user_data: 0x1234usize as *mut c_void,
+            min_zoom: Some(1.0),
+            max_zoom: Some(22.0),
+            tolerance: Some(0.5),
+            tile_size: Some(512),
+            buffer: Some(8),
+            clip: Some(true),
+            wrap: Some(false),
+        });
+
+        assert_eq!(
+            raw.size,
+            std::mem::size_of::<sys::mln_custom_geometry_source_options>() as u32
+        );
+        assert_eq!(
+            raw.fetch_tile.map(|callback| callback as usize),
+            Some(fetch as *const () as usize)
+        );
+        assert_eq!(
+            raw.cancel_tile.map(|callback| callback as usize),
+            Some(cancel as *const () as usize)
+        );
+        assert_eq!(raw.user_data, 0x1234usize as *mut c_void);
+        assert_eq!(
+            raw.fields,
+            sys::MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MIN_ZOOM
+                | sys::MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MAX_ZOOM
+                | sys::MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TOLERANCE
+                | sys::MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TILE_SIZE
+                | sys::MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_BUFFER
+                | sys::MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_CLIP
+                | sys::MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_WRAP
+        );
+        assert_eq!(raw.min_zoom, 1.0);
+        assert_eq!(raw.max_zoom, 22.0);
+        assert_eq!(raw.tolerance, 0.5);
+        assert_eq!(raw.tile_size, 512);
+        assert_eq!(raw.buffer, 8);
+        assert!(raw.clip);
+        assert!(!raw.wrap);
+    }
+
+    #[test]
     fn style_source_info_copies_raw_fields_and_attribution() {
         let raw = sys::mln_style_source_info {
             type_: sys::MLN_STYLE_SOURCE_TYPE_VECTOR,
@@ -370,6 +554,28 @@ mod tests {
         assert_eq!(copied.raw_source_type, sys::MLN_STYLE_SOURCE_TYPE_VECTOR);
         assert!(copied.is_volatile);
         assert_eq!(copied.attribution.as_deref(), Some("© MapLibre"));
+    }
+
+    #[test]
+    fn style_image_copy_builds_owned_image_and_rejects_oversized_copy() {
+        let info = StyleImageInfo {
+            width: 2,
+            height: 2,
+            stride: 8,
+            byte_length: 8,
+            pixel_ratio: 2.0,
+            sdf: true,
+        };
+        let image = style_image_from_copied_premultiplied_rgba8(info, vec![1, 2, 3, 4], 3).unwrap();
+
+        assert_eq!(image.image.info.width, 2);
+        assert_eq!(image.image.info.byte_length, 3);
+        assert_eq!(image.image.data, vec![1, 2, 3]);
+        assert_eq!(image.pixel_ratio, 2.0);
+        assert!(image.sdf);
+
+        let error = style_image_from_copied_premultiplied_rgba8(info, vec![1, 2], 3).unwrap_err();
+        assert!(error.to_string().contains("byte length exceeded"));
     }
 
     #[test]

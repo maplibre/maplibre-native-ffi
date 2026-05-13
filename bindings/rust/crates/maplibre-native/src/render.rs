@@ -5,9 +5,9 @@ use std::mem;
 use std::ptr::NonNull;
 use std::rc::Rc;
 
-use maplibre_native_core as support;
+pub use maplibre_core::{PremultipliedRgba8Image, TextureImageInfo};
+use maplibre_native_core as maplibre_core;
 use maplibre_native_sys as sys;
-pub use support::{PremultipliedRgba8Image, TextureImageInfo};
 
 use crate::handle::{ThreadAffineNativeHandle, closed_handle_error, out_handle};
 use crate::map::{MapHandle, MapState};
@@ -158,12 +158,6 @@ pub use query::{
     FeatureExtensionResult, FeatureStateSelector, QueriedFeature, RenderedFeatureQueryOptions,
     RenderedQueryGeometry, SourceFeatureQueryOptions,
 };
-#[cfg(test)]
-pub(crate) use query::{
-    FeatureStateSelectorNativeExt, RenderedFeatureQueryOptionsNativeExt,
-    RenderedQueryGeometryNativeExt, SourceFeatureQueryOptionsNativeExt,
-};
-
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct OwnedTextureDescriptor {
@@ -182,8 +176,8 @@ impl OwnedTextureDescriptor {
     }
 
     pub(crate) fn to_native(&self) -> sys::mln_owned_texture_descriptor {
-        support::render::owned_texture_descriptor_to_native(
-            support::render::TextureDescriptorFields {
+        maplibre_core::render::owned_texture_descriptor_to_native(
+            maplibre_core::render::TextureDescriptorFields {
                 width: self.width,
                 height: self.height,
                 scale_factor: self.scale_factor,
@@ -225,8 +219,8 @@ impl MetalSurfaceDescriptor {
     }
 
     pub(crate) fn to_native(&self) -> sys::mln_metal_surface_descriptor {
-        support::render::metal_surface_descriptor_to_native(
-            support::render::MetalSurfaceDescriptorFields {
+        maplibre_core::render::metal_surface_descriptor_to_native(
+            maplibre_core::render::MetalSurfaceDescriptorFields {
                 texture: texture_descriptor_fields(self.width, self.height, self.scale_factor),
                 layer: self.layer.as_void_ptr(),
                 device: self.device.as_void_ptr(),
@@ -276,8 +270,8 @@ impl VulkanSurfaceDescriptor {
     }
 
     pub(crate) fn to_native(&self) -> sys::mln_vulkan_surface_descriptor {
-        support::render::vulkan_surface_descriptor_to_native(
-            support::render::VulkanSurfaceDescriptorFields {
+        maplibre_core::render::vulkan_surface_descriptor_to_native(
+            maplibre_core::render::VulkanSurfaceDescriptorFields {
                 texture: texture_descriptor_fields(self.width, self.height, self.scale_factor),
                 instance: self.instance.as_void_ptr(),
                 physical_device: self.physical_device.as_void_ptr(),
@@ -310,8 +304,8 @@ impl MetalOwnedTextureDescriptor {
     }
 
     pub(crate) fn to_native(&self) -> sys::mln_metal_owned_texture_descriptor {
-        support::render::metal_owned_texture_descriptor_to_native(
-            support::render::MetalOwnedTextureDescriptorFields {
+        maplibre_core::render::metal_owned_texture_descriptor_to_native(
+            maplibre_core::render::MetalOwnedTextureDescriptorFields {
                 texture: texture_descriptor_fields(self.width, self.height, self.scale_factor),
                 device: self.device.as_void_ptr(),
             },
@@ -339,8 +333,8 @@ impl MetalBorrowedTextureDescriptor {
     }
 
     pub(crate) fn to_native(&self) -> sys::mln_metal_borrowed_texture_descriptor {
-        support::render::metal_borrowed_texture_descriptor_to_native(
-            support::render::MetalBorrowedTextureDescriptorFields {
+        maplibre_core::render::metal_borrowed_texture_descriptor_to_native(
+            maplibre_core::render::MetalBorrowedTextureDescriptorFields {
                 texture: texture_descriptor_fields(self.width, self.height, self.scale_factor),
                 texture_handle: self.texture.as_void_ptr(),
             },
@@ -386,8 +380,8 @@ impl VulkanOwnedTextureDescriptor {
     }
 
     pub(crate) fn to_native(&self) -> sys::mln_vulkan_owned_texture_descriptor {
-        support::render::vulkan_owned_texture_descriptor_to_native(
-            support::render::VulkanOwnedTextureDescriptorFields {
+        maplibre_core::render::vulkan_owned_texture_descriptor_to_native(
+            maplibre_core::render::VulkanOwnedTextureDescriptorFields {
                 texture: texture_descriptor_fields(self.width, self.height, self.scale_factor),
                 instance: self.instance.as_void_ptr(),
                 physical_device: self.physical_device.as_void_ptr(),
@@ -452,8 +446,8 @@ impl VulkanBorrowedTextureDescriptor {
     }
 
     pub(crate) fn to_native(&self) -> sys::mln_vulkan_borrowed_texture_descriptor {
-        support::render::vulkan_borrowed_texture_descriptor_to_native(
-            support::render::VulkanBorrowedTextureDescriptorFields {
+        maplibre_core::render::vulkan_borrowed_texture_descriptor_to_native(
+            maplibre_core::render::VulkanBorrowedTextureDescriptorFields {
                 texture: texture_descriptor_fields(self.width, self.height, self.scale_factor),
                 instance: self.instance.as_void_ptr(),
                 physical_device: self.physical_device.as_void_ptr(),
@@ -474,8 +468,8 @@ fn texture_descriptor_fields(
     width: u32,
     height: u32,
     scale_factor: f64,
-) -> support::render::TextureDescriptorFields {
-    support::render::TextureDescriptorFields {
+) -> maplibre_core::render::TextureDescriptorFields {
+    maplibre_core::render::TextureDescriptorFields {
         width,
         height,
         scale_factor,
@@ -718,7 +712,7 @@ impl MetalOwnedTextureFrameHandle {
         };
         // SAFETY: session is live, and raw is the active frame returned by a
         // successful acquire for this session until release succeeds.
-        if let Err(error) = support::check(unsafe {
+        if let Err(error) = maplibre_core::check(unsafe {
             sys::mln_metal_owned_texture_release_frame(session, &self.raw)
         }) {
             return Err(HandleOperationError::new(error, self));
@@ -840,7 +834,7 @@ impl VulkanOwnedTextureFrameHandle {
         };
         // SAFETY: session is live, and raw is the active frame returned by a
         // successful acquire for this session until release succeeds.
-        if let Err(error) = support::check(unsafe {
+        if let Err(error) = maplibre_core::check(unsafe {
             sys::mln_vulkan_owned_texture_release_frame(session, &self.raw)
         }) {
             return Err(HandleOperationError::new(error, self));
@@ -874,9 +868,9 @@ impl RenderSessionHandle {
         F: FnOnce(*mut sys::mln_map, *mut *mut sys::mln_render_session) -> sys::mln_status,
     {
         let map_ptr = map.inner.as_ptr()?;
-        let mut out = support::ptr::OutPtr::<sys::mln_render_session>::new();
+        let mut out = maplibre_core::ptr::OutPtr::<sys::mln_render_session>::new();
         let status = attach(map_ptr, out.as_mut_ptr());
-        support::check(status)?;
+        maplibre_core::check(status)?;
         let ptr = out_handle(out, "mln_render_session")?;
         Ok(Self {
             inner: Rc::new(RenderSessionState::new(ptr, Rc::clone(&map.inner))),
@@ -906,7 +900,7 @@ impl RenderSessionHandle {
         self.inner.ensure_no_frame_acquired()?;
         let session = self.inner.as_ptr()?;
         // SAFETY: session is a live render session handle owned by this wrapper.
-        support::check(unsafe {
+        maplibre_core::check(unsafe {
             sys::mln_render_session_resize(session, width, height, scale_factor)
         })
     }
@@ -916,7 +910,7 @@ impl RenderSessionHandle {
         self.inner.ensure_no_frame_acquired()?;
         let session = self.inner.as_ptr()?;
         // SAFETY: session is a live render session handle owned by this wrapper.
-        support::check(unsafe { sys::mln_render_session_render_update(session) })
+        maplibre_core::check(unsafe { sys::mln_render_session_render_update(session) })
     }
 
     /// Detaches backend-bound render resources from the map.
@@ -934,7 +928,8 @@ impl RenderSessionHandle {
             Err(error) => return Err(HandleOperationError::new(error, self)),
         };
         // SAFETY: session is a live render session handle owned by this wrapper.
-        if let Err(error) = support::check(unsafe { sys::mln_render_session_detach(session) }) {
+        if let Err(error) = maplibre_core::check(unsafe { sys::mln_render_session_detach(session) })
+        {
             return Err(HandleOperationError::new(error, self));
         }
         self.inner.detached.set(true);
@@ -948,7 +943,7 @@ impl RenderSessionHandle {
         self.inner.ensure_no_frame_acquired()?;
         let session = self.inner.as_ptr()?;
         // SAFETY: session is a live render session handle owned by this wrapper.
-        support::check(unsafe { sys::mln_render_session_reduce_memory_use(session) })
+        maplibre_core::check(unsafe { sys::mln_render_session_reduce_memory_use(session) })
     }
 
     /// Clears renderer data for the session.
@@ -956,7 +951,7 @@ impl RenderSessionHandle {
         self.inner.ensure_no_frame_acquired()?;
         let session = self.inner.as_ptr()?;
         // SAFETY: session is a live render session handle owned by this wrapper.
-        support::check(unsafe { sys::mln_render_session_clear_data(session) })
+        maplibre_core::check(unsafe { sys::mln_render_session_clear_data(session) })
     }
 
     /// Dumps renderer debug logs through MapLibre Native logging.
@@ -964,7 +959,7 @@ impl RenderSessionHandle {
         self.inner.ensure_no_frame_acquired()?;
         let session = self.inner.as_ptr()?;
         // SAFETY: session is a live render session handle owned by this wrapper.
-        support::check(unsafe { sys::mln_render_session_dump_debug_logs(session) })
+        maplibre_core::check(unsafe { sys::mln_render_session_dump_debug_logs(session) })
     }
 
     /// Returns CPU readback metadata for the most recently rendered texture frame.
@@ -981,7 +976,7 @@ impl RenderSessionHandle {
         if status == sys::MLN_STATUS_OK
             || (status == sys::MLN_STATUS_INVALID_ARGUMENT && info.byte_length > 0)
         {
-            Ok(support::values::texture_image_info_from_native(&info))
+            Ok(maplibre_core::values::texture_image_info_from_native(&info))
         } else {
             Err(crate::Error::from_status(status))
         }
@@ -1001,10 +996,10 @@ impl RenderSessionHandle {
         // SAFETY: session is live, data_ptr either points to data's mutable
         // storage for data.len() bytes or is null for an empty buffer, and info
         // points to initialized writable storage.
-        support::check(unsafe {
+        maplibre_core::check(unsafe {
             sys::mln_texture_read_premultiplied_rgba8(session, data_ptr, data.len(), &mut info)
         })?;
-        Ok(support::values::texture_image_info_from_native(&info))
+        Ok(maplibre_core::values::texture_image_info_from_native(&info))
     }
 
     /// Reads the most recently rendered texture frame into owned bytes.
@@ -1021,7 +1016,9 @@ impl RenderSessionHandle {
         let session = self.inner.as_ptr()?;
         let mut raw = empty_metal_owned_texture_frame();
         // SAFETY: session is live and raw points to initialized writable frame storage.
-        support::check(unsafe { sys::mln_metal_owned_texture_acquire_frame(session, &mut raw) })?;
+        maplibre_core::check(unsafe {
+            sys::mln_metal_owned_texture_acquire_frame(session, &mut raw)
+        })?;
         self.inner.frame_acquired.set(true);
         Ok(MetalOwnedTextureFrameHandle {
             session: Rc::clone(&self.inner),
@@ -1038,7 +1035,9 @@ impl RenderSessionHandle {
         let session = self.inner.as_ptr()?;
         let mut raw = empty_vulkan_owned_texture_frame();
         // SAFETY: session is live and raw points to initialized writable frame storage.
-        support::check(unsafe { sys::mln_vulkan_owned_texture_acquire_frame(session, &mut raw) })?;
+        maplibre_core::check(unsafe {
+            sys::mln_vulkan_owned_texture_acquire_frame(session, &mut raw)
+        })?;
         self.inner.frame_acquired.set(true);
         Ok(VulkanOwnedTextureFrameHandle {
             session: Rc::clone(&self.inner),

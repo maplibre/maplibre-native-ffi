@@ -1,4 +1,4 @@
-use std::ffi::{CString, c_char};
+use std::ffi::{CString, c_char, c_void};
 use std::marker::PhantomData;
 use std::ptr;
 use std::sync::{Arc, Mutex};
@@ -257,6 +257,91 @@ pub fn resource_response_to_native(
     response: &ResourceResponse,
 ) -> Result<NativeResourceResponse<'_>> {
     NativeResourceResponse::new(response)
+}
+
+pub type ResourceProviderCallbackFn = unsafe extern "C" fn(
+    *mut c_void,
+    *const sys::mln_resource_request,
+    *mut sys::mln_resource_request_handle,
+) -> u32;
+
+pub fn resource_provider_descriptor(
+    callback: Option<ResourceProviderCallbackFn>,
+    user_data: *mut c_void,
+) -> sys::mln_resource_provider {
+    sys::mln_resource_provider {
+        size: std::mem::size_of::<sys::mln_resource_provider>() as u32,
+        callback,
+        user_data,
+    }
+}
+
+pub type ResourceTransformCallbackFn = unsafe extern "C" fn(
+    *mut c_void,
+    u32,
+    *const c_char,
+    *mut sys::mln_resource_transform_response,
+) -> sys::mln_status;
+
+pub fn resource_transform_descriptor(
+    callback: Option<ResourceTransformCallbackFn>,
+    user_data: *mut c_void,
+) -> sys::mln_resource_transform {
+    sys::mln_resource_transform {
+        size: std::mem::size_of::<sys::mln_resource_transform>() as u32,
+        callback,
+        user_data,
+    }
+}
+
+pub fn noop_resource_transform_descriptor() -> sys::mln_resource_transform {
+    resource_transform_descriptor(Some(noop_resource_transform), ptr::null_mut())
+}
+
+/// Initializes a resource transform callback response to an empty replacement.
+///
+/// # Safety
+///
+/// `out_response` must be null or point to writable callback-duration storage.
+pub unsafe fn initialize_resource_transform_response(
+    out_response: *mut sys::mln_resource_transform_response,
+) -> sys::mln_status {
+    if out_response.is_null() {
+        return sys::MLN_STATUS_INVALID_ARGUMENT;
+    }
+    // SAFETY: The caller promised writable callback-duration storage, and the
+    // null check above guards the write.
+    unsafe {
+        (*out_response).size = std::mem::size_of::<sys::mln_resource_transform_response>() as u32;
+        (*out_response).url = ptr::null();
+    }
+    sys::MLN_STATUS_OK
+}
+
+unsafe extern "C" fn noop_resource_transform(
+    _user_data: *mut c_void,
+    _kind: u32,
+    _url: *const c_char,
+    out_response: *mut sys::mln_resource_transform_response,
+) -> sys::mln_status {
+    // SAFETY: Native provides callback-duration output storage or null; the
+    // helper validates null before writing.
+    unsafe { initialize_resource_transform_response(out_response) }
+}
+
+pub fn status_for_error(error: &Error) -> sys::mln_status {
+    if let Some(status) = error.raw_status() {
+        return status;
+    }
+    match error.kind() {
+        ErrorKind::InvalidArgument => sys::MLN_STATUS_INVALID_ARGUMENT,
+        ErrorKind::InvalidState => sys::MLN_STATUS_INVALID_STATE,
+        ErrorKind::WrongThread => sys::MLN_STATUS_WRONG_THREAD,
+        ErrorKind::Unsupported => sys::MLN_STATUS_UNSUPPORTED,
+        ErrorKind::NativeError | ErrorKind::AbiVersionMismatch | ErrorKind::UnknownStatus => {
+            sys::MLN_STATUS_NATIVE_ERROR
+        }
+    }
 }
 
 pub const UNKNOWN_PROVIDER_DECISION: u32 = u32::MAX;

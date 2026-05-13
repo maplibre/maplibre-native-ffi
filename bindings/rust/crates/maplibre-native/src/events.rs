@@ -1,14 +1,14 @@
-use maplibre_native_core as support;
+use maplibre_native_core as maplibre_core;
 use maplibre_native_sys as sys;
 
 use crate::Result;
-pub use support::events::{
+pub use maplibre_core::events::{
     OfflineRegionResponseErrorEvent, OfflineRegionStatus, OfflineRegionStatusEvent,
     OfflineRegionTileCountLimitEvent, RenderFrameEvent, RenderMapEvent, RenderingStats,
     RuntimeEventPayload, StyleImageMissingEvent, TileActionEvent, TileId,
     UnknownRuntimeEventPayload,
 };
-pub(crate) use support::{OfflineRegionDownloadState, RuntimeEventType};
+pub(crate) use maplibre_core::{OfflineRegionDownloadState, RuntimeEventType};
 
 /// Rust-assigned identity for a map owned by a runtime.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -53,7 +53,7 @@ impl RuntimeEvent {
     ) -> Result<Self> {
         // SAFETY: raw is borrowed from the latest runtime poll result and is
         // copied before another poll can invalidate event-owned storage.
-        let copied = unsafe { support::events::runtime_event_from_native(raw) }?;
+        let copied = unsafe { maplibre_core::events::runtime_event_from_native(raw) }?;
         Ok(Self {
             event_type: copied.event_type,
             source,
@@ -65,7 +65,7 @@ impl RuntimeEvent {
 }
 
 pub(crate) fn empty_runtime_event() -> sys::mln_runtime_event {
-    support::events::empty_runtime_event()
+    maplibre_core::events::empty_runtime_event()
 }
 
 #[cfg(test)]
