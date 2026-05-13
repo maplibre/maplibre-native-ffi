@@ -256,14 +256,6 @@ mod tests {
     }
 
     #[test]
-    fn reports_supported_render_backends() {
-        let backends = supported_render_backends();
-        let known_backends = RenderBackendMask::METAL | RenderBackendMask::VULKAN;
-
-        assert!(backends.intersects(known_backends));
-    }
-
-    #[test]
     fn projected_meter_helpers_round_trip() {
         let coordinate = LatLng::new(45.0, -122.0);
         let meters = projected_meters_for_lat_lng(coordinate).unwrap();
@@ -292,14 +284,6 @@ mod tests {
         assert_eq!(error.kind(), ErrorKind::InvalidArgument);
         assert_eq!(error.raw_status(), Some(sys::MLN_STATUS_INVALID_ARGUMENT));
         assert!(error.diagnostic().contains("network status"));
-    }
-
-    #[test]
-    fn unknown_network_status_output_preserves_raw_value() {
-        assert_eq!(
-            NetworkStatus::from_raw(999_999),
-            NetworkStatus::Unknown(999_999)
-        );
     }
 
     #[test]

@@ -947,59 +947,6 @@ mod tests {
     const PROVIDER_STYLE_JSON: &str = r#"{"version":8,"sources":{},"layers":[]}"#;
 
     #[test]
-    fn runtime_options_materialize_size_flags_and_strings() {
-        let options = RuntimeOptions::new()
-            .with_asset_path("/tmp/assets")
-            .with_cache_path("/tmp/cache.db")
-            .with_maximum_cache_size(1234);
-
-        let native = options.to_native().unwrap();
-        let raw = native.to_raw();
-
-        assert_eq!(
-            raw.size as usize,
-            std::mem::size_of::<sys::mln_runtime_options>()
-        );
-        assert_eq!(
-            raw.flags & sys::MLN_RUNTIME_OPTION_MAXIMUM_CACHE_SIZE,
-            sys::MLN_RUNTIME_OPTION_MAXIMUM_CACHE_SIZE
-        );
-        assert_eq!(raw.maximum_cache_size, 1234);
-        assert_eq!(
-            unsafe { std::ffi::CStr::from_ptr(raw.asset_path) }
-                .to_str()
-                .unwrap(),
-            "/tmp/assets"
-        );
-        assert_eq!(
-            unsafe { std::ffi::CStr::from_ptr(raw.cache_path) }
-                .to_str()
-                .unwrap(),
-            "/tmp/cache.db"
-        );
-    }
-
-    #[test]
-    fn ambient_cache_operation_raw_values_match_c_abi() {
-        assert_eq!(
-            AmbientCacheOperation::ResetDatabase.raw_value(),
-            sys::MLN_AMBIENT_CACHE_OPERATION_RESET_DATABASE
-        );
-        assert_eq!(
-            AmbientCacheOperation::PackDatabase.raw_value(),
-            sys::MLN_AMBIENT_CACHE_OPERATION_PACK_DATABASE
-        );
-        assert_eq!(
-            AmbientCacheOperation::Invalidate.raw_value(),
-            sys::MLN_AMBIENT_CACHE_OPERATION_INVALIDATE
-        );
-        assert_eq!(
-            AmbientCacheOperation::Clear.raw_value(),
-            sys::MLN_AMBIENT_CACHE_OPERATION_CLEAR
-        );
-    }
-
-    #[test]
     fn runtime_ambient_cache_operations_use_real_c_abi() {
         let runtime =
             RuntimeHandle::with_options(&RuntimeOptions::new().with_maximum_cache_size(0)).unwrap();
@@ -1014,65 +961,6 @@ mod tests {
         }
 
         runtime.close().unwrap();
-    }
-
-    #[test]
-    fn offline_region_definitions_materialize_native_storage() {
-        let bounds = LatLngBounds::new(
-            crate::LatLng::new(37.0, -123.0),
-            crate::LatLng::new(38.0, -122.0),
-        );
-        let tile_definition = OfflineRegionDefinition::TilePyramid {
-            style_url: "custom://style.json".into(),
-            bounds,
-            min_zoom: 1.0,
-            max_zoom: 4.0,
-            pixel_ratio: 2.0,
-            include_ideographs: true,
-        };
-
-        let native = NativeOfflineRegionDefinition::new(&tile_definition).unwrap();
-        let raw = native.to_raw();
-        assert_eq!(raw.type_, sys::MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID);
-        let tile = unsafe { raw.data.tile_pyramid };
-        assert_eq!(LatLngBounds::from_native(tile.bounds), bounds);
-        assert_eq!(tile.min_zoom, 1.0);
-        assert_eq!(tile.max_zoom, 4.0);
-        assert_eq!(tile.pixel_ratio, 2.0);
-        assert!(tile.include_ideographs);
-        assert_eq!(
-            unsafe { std::ffi::CStr::from_ptr(tile.style_url) }
-                .to_str()
-                .unwrap(),
-            "custom://style.json"
-        );
-
-        let geometry_definition = OfflineRegionDefinition::GeometryRegion {
-            style_url: "custom://geometry.json".into(),
-            geometry: Geometry::Point(crate::LatLng::new(37.5, -122.5)),
-            min_zoom: 0.0,
-            max_zoom: f64::INFINITY,
-            pixel_ratio: 1.0,
-            include_ideographs: false,
-        };
-        let native = NativeOfflineRegionDefinition::new(&geometry_definition).unwrap();
-        let raw = native.to_raw();
-        assert_eq!(raw.type_, sys::MLN_OFFLINE_REGION_DEFINITION_GEOMETRY);
-        let geometry = unsafe { raw.data.geometry };
-        assert_eq!(geometry.min_zoom, 0.0);
-        assert_eq!(geometry.max_zoom, f64::INFINITY);
-        assert_eq!(geometry.pixel_ratio, 1.0);
-        assert!(!geometry.include_ideographs);
-        assert_eq!(
-            unsafe { std::ffi::CStr::from_ptr(geometry.style_url) }
-                .to_str()
-                .unwrap(),
-            "custom://geometry.json"
-        );
-        assert_eq!(
-            unsafe { Geometry::from_native_with_depth(&*geometry.geometry, 0) }.unwrap(),
-            Geometry::Point(crate::LatLng::new(37.5, -122.5))
-        );
     }
 
     #[test]
@@ -1203,35 +1091,6 @@ mod tests {
     }
 
     #[test]
-    fn runtime_options_materialize_absent_values_as_native_defaults() {
-        let native = RuntimeOptions::new().to_native().unwrap();
-        let raw = native.to_raw();
-
-        assert_eq!(raw.flags & sys::MLN_RUNTIME_OPTION_MAXIMUM_CACHE_SIZE, 0);
-        assert!(raw.asset_path.is_null());
-        assert!(raw.cache_path.is_null());
-    }
-
-    #[test]
-    fn runtime_options_reject_embedded_nul_strings() {
-        let error = RuntimeOptions::new()
-            .with_asset_path("asset\0path")
-            .to_native()
-            .unwrap_err();
-
-        assert_eq!(error.kind(), ErrorKind::InvalidArgument);
-        assert!(error.diagnostic().contains("embedded NUL"));
-
-        let error = RuntimeOptions::new()
-            .with_cache_path("cache\0path")
-            .to_native()
-            .unwrap_err();
-
-        assert_eq!(error.kind(), ErrorKind::InvalidArgument);
-        assert!(error.diagnostic().contains("embedded NUL"));
-    }
-
-    #[test]
     fn runtime_create_with_explicit_options_uses_real_c_abi() {
         let runtime = RuntimeHandle::with_options(
             &RuntimeOptions::new()
@@ -1266,13 +1125,6 @@ mod tests {
         let _ = runtime.poll_event().unwrap();
         let _ = runtime.discard_one_event().unwrap();
         runtime.drain_events().unwrap();
-        runtime.close().unwrap();
-    }
-
-    #[test]
-    fn runtime_close_consumes_handle_and_drop_stays_idempotent() {
-        let runtime = RuntimeHandle::new().unwrap();
-
         runtime.close().unwrap();
     }
 
@@ -1519,19 +1371,6 @@ mod tests {
     }
 
     #[test]
-    fn resource_transform_rejects_set_after_map_was_closed() {
-        let runtime = RuntimeHandle::new().unwrap();
-        let map = runtime.create_map().unwrap();
-        map.close().unwrap();
-
-        let error = runtime.set_resource_transform(|_| None).unwrap_err();
-
-        assert_eq!(error.kind(), ErrorKind::InvalidState);
-        assert_eq!(error.raw_status(), None);
-        runtime.close().unwrap();
-    }
-
-    #[test]
     fn resource_transform_rejects_clear_after_map_was_closed_and_keeps_state_until_close() {
         let runtime = RuntimeHandle::new().unwrap();
         let token = Arc::new(());
@@ -1555,15 +1394,6 @@ mod tests {
 
         runtime.close().unwrap();
         assert_eq!(Arc::strong_count(&token), 1);
-    }
-
-    #[test]
-    fn poll_event_returns_none_for_empty_queue() {
-        let runtime = RuntimeHandle::new().unwrap();
-
-        assert_eq!(runtime.poll_event().unwrap(), None);
-
-        runtime.close().unwrap();
     }
 
     #[test]

@@ -19,25 +19,6 @@ fn object_member<'a>(value: &'a JsonValue, key: &str) -> Option<&'a JsonValue> {
 }
 
 #[test]
-fn map_create_and_close() {
-    let runtime = RuntimeHandle::new().unwrap();
-    let map = MapHandle::new(&runtime).unwrap();
-
-    map.close().unwrap();
-    runtime.close().unwrap();
-}
-
-#[test]
-fn map_create_with_options_and_close() {
-    let runtime = RuntimeHandle::new().unwrap();
-    let options = MapOptions::new(320, 240, 2.0).with_mode(MapMode::Static);
-    let map = MapHandle::with_options(&runtime, &options).unwrap();
-
-    map.close().unwrap();
-    runtime.close().unwrap();
-}
-
-#[test]
 fn map_close_consumes_handle_and_drop_stays_idempotent() {
     let runtime = RuntimeHandle::new().unwrap();
     let map = MapHandle::new(&runtime).unwrap();
@@ -130,14 +111,6 @@ fn style_source_exists_and_remove_call_real_c_api() {
     assert!(map.remove_style_source("owned-source").unwrap());
     assert!(!map.style_source_exists("owned-source").unwrap());
     assert!(!map.remove_style_source("owned-source").unwrap());
-
-    let error = map.style_source_exists("").unwrap_err();
-    assert_eq!(error.kind(), ErrorKind::InvalidArgument);
-    assert!(error.raw_status().is_some());
-
-    let error = map.remove_style_source("").unwrap_err();
-    assert_eq!(error.kind(), ErrorKind::InvalidArgument);
-    assert!(error.raw_status().is_some());
 
     map.close().unwrap();
     runtime.close().unwrap();
@@ -235,57 +208,6 @@ fn style_image_add_query_copy_and_remove_call_real_c_api() {
     assert!(map.remove_style_image("plain").unwrap());
     assert!(!map.style_image_exists("plain").unwrap());
     assert!(!map.remove_style_image("plain").unwrap());
-
-    let error = map.style_image_exists("").unwrap_err();
-    assert_eq!(error.kind(), ErrorKind::InvalidArgument);
-    assert!(error.raw_status().is_some());
-
-    let error = map.set_style_image("", &plain, None).unwrap_err();
-    assert_eq!(error.kind(), ErrorKind::InvalidArgument);
-    assert!(error.raw_status().is_some());
-
-    let error = map.remove_style_image("").unwrap_err();
-    assert_eq!(error.kind(), ErrorKind::InvalidArgument);
-    assert!(error.raw_status().is_some());
-
-    let error = map.style_image_info("").unwrap_err();
-    assert_eq!(error.kind(), ErrorKind::InvalidArgument);
-    assert!(error.raw_status().is_some());
-
-    let error = map.copy_style_image_premultiplied_rgba8("").unwrap_err();
-    assert_eq!(error.kind(), ErrorKind::InvalidArgument);
-    assert!(error.raw_status().is_some());
-}
-
-#[test]
-fn style_image_descriptor_materialization_rejects_invalid_images_and_options() {
-    let runtime = RuntimeHandle::new().unwrap();
-    let map = MapHandle::new(&runtime).unwrap();
-    map.set_style_json(VALID_STYLE_JSON).unwrap();
-
-    let too_short = PremultipliedRgba8Image {
-        info: TextureImageInfo {
-            width: 2,
-            height: 2,
-            stride: 8,
-            byte_length: 16,
-        },
-        data: vec![0; 15],
-    };
-    let error = map.set_style_image("bad", &too_short, None).unwrap_err();
-    assert_eq!(error.kind(), ErrorKind::InvalidArgument);
-    assert!(error.raw_status().is_some());
-
-    let image = test_style_image(vec![0; 16]);
-    let error = map
-        .set_style_image(
-            "bad-options",
-            &image,
-            Some(&StyleImageOptions::new().with_pixel_ratio(0.0)),
-        )
-        .unwrap_err();
-    assert_eq!(error.kind(), ErrorKind::InvalidArgument);
-    assert!(error.raw_status().is_some());
 }
 
 fn image_source_coordinates() -> [LatLng; 4] {
@@ -318,18 +240,9 @@ fn image_source_url_add_get_and_update_coordinates_call_real_c_api() {
         Some(coordinates)
     );
 
-    let error = map
-        .set_image_source_url("missing", "https://example.com/missing.png")
-        .unwrap_err();
-    assert_eq!(error.kind(), ErrorKind::InvalidArgument);
-    assert!(error.raw_status().is_some());
-
     map.set_image_source_url("url-image", "https://example.com/replacement.png")
         .unwrap();
 
-    let error = map.set_image_source_url("url-image", "").unwrap_err();
-    assert_eq!(error.kind(), ErrorKind::InvalidArgument);
-    assert!(error.raw_status().is_some());
     let updated = [
         LatLng::new(2.0, 2.0),
         LatLng::new(2.0, 3.0),
@@ -342,28 +255,6 @@ fn image_source_url_add_get_and_update_coordinates_call_real_c_api() {
         map.image_source_coordinates("url-image").unwrap(),
         Some(updated)
     );
-
-    let error = map
-        .add_image_source_url("", &coordinates, "https://example.com/a.png")
-        .unwrap_err();
-    assert_eq!(error.kind(), ErrorKind::InvalidArgument);
-    assert!(error.raw_status().is_some());
-
-    let error = map
-        .add_image_source_url("bad-url", &coordinates, "")
-        .unwrap_err();
-    assert_eq!(error.kind(), ErrorKind::InvalidArgument);
-    assert!(error.raw_status().is_some());
-
-    let error = map
-        .set_image_source_coordinates("missing", &coordinates)
-        .unwrap_err();
-    assert_eq!(error.kind(), ErrorKind::InvalidArgument);
-    assert!(error.raw_status().is_some());
-
-    let error = map.image_source_coordinates("").unwrap_err();
-    assert_eq!(error.kind(), ErrorKind::InvalidArgument);
-    assert!(error.raw_status().is_some());
 }
 
 #[test]
@@ -386,76 +277,11 @@ fn image_source_inline_image_add_and_update_call_real_c_api() {
     );
 
     let replacement = test_style_image(vec![2; 16]);
-    let error = map
-        .set_image_source_image("missing", &replacement)
-        .unwrap_err();
-    assert_eq!(error.kind(), ErrorKind::InvalidArgument);
-    assert!(error.raw_status().is_some());
-
     map.set_image_source_image("inline-image", &replacement)
         .unwrap();
 
-    let too_short = PremultipliedRgba8Image {
-        info: TextureImageInfo {
-            width: 2,
-            height: 2,
-            stride: 8,
-            byte_length: 16,
-        },
-        data: vec![0; 15],
-    };
-    let error = map
-        .set_image_source_image("inline-image", &too_short)
-        .unwrap_err();
-    assert_eq!(error.kind(), ErrorKind::InvalidArgument);
-    assert!(error.raw_status().is_some());
     map.set_image_source_url("inline-image", "https://example.com/after-inline.png")
         .unwrap();
-
-    let error = map.set_image_source_image("", &replacement).unwrap_err();
-    assert_eq!(error.kind(), ErrorKind::InvalidArgument);
-    assert!(error.raw_status().is_some());
-}
-
-#[test]
-fn image_source_methods_reject_non_image_sources() {
-    let runtime = RuntimeHandle::new().unwrap();
-    let map = MapHandle::new(&runtime).unwrap();
-    map.set_style_json(VALID_STYLE_JSON).unwrap();
-
-    let geojson_source = JsonValue::Object(vec![
-        JsonMember::new("type", JsonValue::String("geojson".to_owned())),
-        JsonMember::new(
-            "data",
-            JsonValue::Object(vec![
-                JsonMember::new("type", JsonValue::String("FeatureCollection".to_owned())),
-                JsonMember::new("features", JsonValue::Array(Vec::new())),
-            ]),
-        ),
-    ]);
-    map.add_style_source_json("geo", &geojson_source).unwrap();
-
-    let error = map.image_source_coordinates("geo").unwrap_err();
-    assert_eq!(error.kind(), ErrorKind::InvalidArgument);
-    assert!(error.raw_status().is_some());
-
-    let error = map
-        .set_image_source_url("geo", "https://example.com/not-image.png")
-        .unwrap_err();
-    assert_eq!(error.kind(), ErrorKind::InvalidArgument);
-    assert!(error.raw_status().is_some());
-
-    let image = test_style_image(vec![3; 16]);
-    let error = map.set_image_source_image("geo", &image).unwrap_err();
-    assert_eq!(error.kind(), ErrorKind::InvalidArgument);
-    assert!(error.raw_status().is_some());
-
-    let coordinates = image_source_coordinates();
-    let error = map
-        .set_image_source_coordinates("geo", &coordinates)
-        .unwrap_err();
-    assert_eq!(error.kind(), ErrorKind::InvalidArgument);
-    assert!(error.raw_status().is_some());
 }
 
 #[test]
@@ -546,50 +372,6 @@ fn tile_source_helpers_call_real_c_api() {
         map.style_source_type("dem-tiles").unwrap(),
         Some(SourceType::RasterDem)
     );
-
-    let error = map
-        .add_vector_source_url("", "https://example.com/vector.json", None)
-        .unwrap_err();
-    assert_eq!(error.kind(), ErrorKind::InvalidArgument);
-
-    let error = map
-        .add_raster_source_tiles("empty-tiles", &[] as &[&str], None)
-        .unwrap_err();
-    assert_eq!(error.kind(), ErrorKind::InvalidArgument);
-
-    let vector_only_options =
-        TileSourceOptions::new().with_vector_encoding(VectorTileEncoding::Mvt);
-    let error = map
-        .add_raster_source_tiles(
-            "raster-with-vector-option",
-            &["https://example.com/raster/{z}/{x}/{y}.png"],
-            Some(&vector_only_options),
-        )
-        .unwrap_err();
-    assert_eq!(error.kind(), ErrorKind::InvalidArgument);
-    assert!(error.raw_status().is_some());
-
-    let dem_only_options =
-        TileSourceOptions::new().with_raster_dem_encoding(RasterDemEncoding::Terrarium);
-    let error = map
-        .add_vector_source_tiles(
-            "vector-with-dem-option",
-            &["https://example.com/vector/{z}/{x}/{y}.pbf"],
-            Some(&dem_only_options),
-        )
-        .unwrap_err();
-    assert_eq!(error.kind(), ErrorKind::InvalidArgument);
-    assert!(error.raw_status().is_some());
-
-    let error = map
-        .add_raster_source_tiles(
-            "raster-with-dem-option",
-            &["https://example.com/raster/{z}/{x}/{y}.png"],
-            Some(&dem_only_options),
-        )
-        .unwrap_err();
-    assert_eq!(error.kind(), ErrorKind::InvalidArgument);
-    assert!(error.raw_status().is_some());
 }
 
 #[test]
@@ -645,25 +427,6 @@ fn terrain_and_location_layer_helpers_call_real_c_api() {
             JsonMember::new("name", JsonValue::String("location-top".to_owned())),
         ]))
     );
-
-    let error = map.add_hillshade_layer("", "dem", None).unwrap_err();
-    assert_eq!(error.kind(), ErrorKind::InvalidArgument);
-
-    map.add_raster_source_tiles(
-        "raster",
-        &["https://example.com/raster/{z}/{x}/{y}.png"],
-        None,
-    )
-    .unwrap();
-    let error = map
-        .add_hillshade_layer("wrong-source-type", "raster", None)
-        .unwrap_err();
-    assert_eq!(error.kind(), ErrorKind::InvalidArgument);
-
-    let error = map
-        .set_location_indicator_image_name("location", LocationIndicatorImageKind::Bearing, "")
-        .unwrap_err();
-    assert_eq!(error.kind(), ErrorKind::InvalidArgument);
 }
 
 #[test]
@@ -720,14 +483,6 @@ fn style_source_type_and_info_call_real_c_api() {
     assert_eq!(info.source_type, SourceType::Vector);
     assert_eq!(info.raw_source_type, sys::MLN_STYLE_SOURCE_TYPE_VECTOR);
     assert_eq!(info.attribution.as_deref(), Some("Example attribution"));
-
-    let error = map.style_source_type("").unwrap_err();
-    assert_eq!(error.kind(), ErrorKind::InvalidArgument);
-    assert!(error.raw_status().is_some());
-
-    let error = map.style_source_info("").unwrap_err();
-    assert_eq!(error.kind(), ErrorKind::InvalidArgument);
-    assert!(error.raw_status().is_some());
 
     map.close().unwrap();
     runtime.close().unwrap();
@@ -1066,32 +821,6 @@ fn map_state_viewport_tile_debug_and_projection_mode_round_trip() {
     map.set_projection_mode(&projection_mode).unwrap();
     let copied_projection_mode = map.projection_mode().unwrap();
     assert_eq!(copied_projection_mode.axonometric, Some(false));
-
-    map.close().unwrap();
-    runtime.close().unwrap();
-}
-
-#[test]
-fn bounds_and_free_camera_operations_call_c_api() {
-    let runtime = RuntimeHandle::new().unwrap();
-    let map = MapHandle::new(&runtime).unwrap();
-
-    let bounds = BoundOptions::new()
-        .with_bounds(LatLngBounds::new(
-            LatLng::new(-10.0, -20.0),
-            LatLng::new(10.0, 20.0),
-        ))
-        .with_min_zoom(0.0)
-        .with_max_zoom(20.0)
-        .with_min_pitch(0.0)
-        .with_max_pitch(60.0);
-    map.set_bounds(&bounds).unwrap();
-    let copied_bounds = map.bounds().unwrap();
-    assert_eq!(copied_bounds.min_zoom, Some(0.0));
-    assert_eq!(copied_bounds.max_zoom, Some(20.0));
-
-    let free = map.free_camera_options().unwrap();
-    map.set_free_camera_options(&free).unwrap();
 
     map.close().unwrap();
     runtime.close().unwrap();

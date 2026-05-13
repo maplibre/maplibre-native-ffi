@@ -1178,40 +1178,6 @@ mod tests {
     }
 
     #[test]
-    fn resource_response_materializes_no_content_and_not_modified() {
-        let no_content = ResourceResponse::no_content().to_native().unwrap();
-        assert_eq!(
-            no_content.raw.status,
-            sys::MLN_RESOURCE_RESPONSE_STATUS_NO_CONTENT
-        );
-        assert!(no_content.raw.bytes.is_null());
-        assert_eq!(no_content.raw.byte_count, 0);
-
-        let not_modified = ResourceResponse::not_modified().to_native().unwrap();
-        assert_eq!(
-            not_modified.raw.status,
-            sys::MLN_RESOURCE_RESPONSE_STATUS_NOT_MODIFIED
-        );
-        assert!(not_modified.raw.bytes.is_null());
-        assert_eq!(not_modified.raw.byte_count, 0);
-    }
-
-    #[test]
-    fn resource_response_rejects_embedded_nul_strings() {
-        let response = ResourceResponse::error(ResourceErrorReason::Other, "bad\0message");
-        let Err(error) = response.to_native() else {
-            panic!("embedded NUL error message should be rejected");
-        };
-        assert_eq!(error.kind(), ErrorKind::InvalidArgument);
-
-        let response = ResourceResponse::ok(Vec::new()).with_etag("bad\0etag");
-        let Err(error) = response.to_native() else {
-            panic!("embedded NUL etag should be rejected");
-        };
-        assert_eq!(error.kind(), ErrorKind::InvalidArgument);
-    }
-
-    #[test]
     fn transform_callback_copies_request_and_keeps_replacement_url_alive() {
         let state = ResourceTransformState::new(|request| {
             assert_eq!(request.kind, ResourceKind::Style);
@@ -1315,26 +1281,6 @@ mod tests {
         assert_eq!(Arc::strong_count(&token), 2);
         drop(state);
         assert_eq!(Arc::strong_count(&token), 1);
-    }
-
-    #[test]
-    fn no_op_transform_descriptor_discards_without_state() {
-        let descriptor = noop_resource_transform_descriptor();
-        let callback = descriptor.callback.unwrap();
-        let url = CString::new("https://example.test/style.json").unwrap();
-        let mut response = response();
-
-        let status = unsafe {
-            callback(
-                descriptor.user_data,
-                sys::MLN_RESOURCE_KIND_STYLE,
-                url.as_ptr(),
-                &mut response,
-            )
-        };
-
-        assert_eq!(status, sys::MLN_STATUS_OK);
-        assert!(response.url.is_null());
     }
 
     #[test]

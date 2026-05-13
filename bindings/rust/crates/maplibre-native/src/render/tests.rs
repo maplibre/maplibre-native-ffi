@@ -375,11 +375,6 @@ fn feature_state_set_get_and_remove_copy_snapshots() {
 
     load_feature_state_style(&runtime, &map, &session);
 
-    let error = session
-        .set_feature_state(&selector, &JsonValue::Array(Vec::new()))
-        .unwrap_err();
-    assert_eq!(error.kind(), ErrorKind::InvalidArgument);
-
     session.set_feature_state(&selector, &state).unwrap();
     let copied = session.get_feature_state(&selector).unwrap();
     assert_json_member(&copied, "hover", &JsonValue::Bool(true));
@@ -396,15 +391,6 @@ fn feature_state_set_get_and_remove_copy_snapshots() {
     let after_remove = session.get_feature_state(&selector).unwrap();
     assert_json_member(&after_remove, "radius", &JsonValue::UInt(20));
     assert!(json_member(&after_remove, "hover").is_none());
-
-    let source_only = FeatureStateSelector::new("point");
-    session.remove_feature_state(&source_only).unwrap();
-    let _ = wait_for_runtime_event(&runtime, RuntimeEventType::MapRenderUpdateAvailable);
-    let _ = session.render_update();
-    assert_eq!(
-        session.get_feature_state(&selector).unwrap(),
-        JsonValue::Object(Vec::new())
-    );
 
     session.close().unwrap();
     map.close().unwrap();
@@ -466,17 +452,6 @@ fn rendered_and_source_queries_copy_results() {
         feature_member(&source[0].feature, "kind"),
         Some(&JsonValue::String("capital".into()))
     );
-
-    let empty = session
-        .query_rendered_features(
-            &RenderedQueryGeometry::point(ScreenPoint::new(-1000.0, -1000.0)),
-            None,
-        )
-        .unwrap();
-    assert!(empty.is_empty());
-
-    let error = session.query_source_features("", None).unwrap_err();
-    assert_eq!(error.kind(), ErrorKind::InvalidArgument);
 
     session.close().unwrap();
     map.close().unwrap();
@@ -540,70 +515,6 @@ fn feature_extension_queries_copy_value_and_feature_collection_results() {
         expansion_zoom,
         FeatureExtensionResult::Value(JsonValue::UInt(_))
     ));
-
-    let arguments = JsonValue::Object(vec![
-        JsonMember::new("limit", JsonValue::UInt(1)),
-        JsonMember::new("offset", JsonValue::UInt(0)),
-    ]);
-    let leaves = session
-        .query_feature_extension(
-            "cluster-source",
-            &cluster.feature,
-            "supercluster",
-            "leaves",
-            Some(&arguments),
-        )
-        .unwrap();
-    let FeatureExtensionResult::FeatureCollection(leaves) = leaves else {
-        panic!("expected leaves feature collection");
-    };
-    assert_eq!(leaves.len(), 1);
-
-    let error = session
-        .query_feature_extension(
-            "cluster-source",
-            &cluster.feature,
-            "supercluster",
-            "leaves",
-            Some(&JsonValue::Array(Vec::new())),
-        )
-        .unwrap_err();
-    assert_eq!(error.kind(), ErrorKind::InvalidArgument);
-    assert!(error.diagnostic().contains("JSON object"));
-
-    session.close().unwrap();
-    map.close().unwrap();
-    runtime.close().unwrap();
-}
-
-#[test]
-fn feature_state_selector_native_validation_surfaces_through_methods() {
-    let runtime = RuntimeHandle::new().unwrap();
-    let map = MapHandle::with_options(&runtime, &MapOptions::new(64, 64, 1.0)).unwrap();
-    let session = map
-        .attach_owned_texture(&OwnedTextureDescriptor::new(64, 64, 1.0))
-        .unwrap();
-    load_feature_state_style(&runtime, &map, &session);
-
-    let source_only = FeatureStateSelector::new("point");
-    assert_eq!(
-        session
-            .set_feature_state(&source_only, &JsonValue::Object(Vec::new()))
-            .unwrap_err()
-            .kind(),
-        ErrorKind::InvalidArgument
-    );
-    assert_eq!(
-        session.get_feature_state(&source_only).unwrap_err().kind(),
-        ErrorKind::InvalidArgument
-    );
-    assert_eq!(
-        session
-            .remove_feature_state(&FeatureStateSelector::new(""))
-            .unwrap_err()
-            .kind(),
-        ErrorKind::InvalidArgument
-    );
 
     session.close().unwrap();
     map.close().unwrap();

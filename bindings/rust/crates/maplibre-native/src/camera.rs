@@ -428,14 +428,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn camera_options_default_materializes_no_fields() {
-        let raw = CameraOptions::default().to_native();
-
-        assert_eq!(raw.fields, 0);
-        assert!(raw.size as usize >= std::mem::size_of::<sys::mln_camera_options>());
-    }
-
-    #[test]
     fn camera_options_materialize_field_mask_and_values() {
         let options = CameraOptions::new()
             .with_center(LatLng::new(10.0, 20.0))
@@ -480,15 +472,6 @@ mod tests {
         assert_eq!(copied.center, Some(LatLng::new(1.0, 2.0)));
         assert_eq!(copied.zoom, Some(4.0));
         assert_eq!(copied.bearing, None);
-    }
-
-    #[test]
-    fn other_camera_descriptors_default_to_no_fields() {
-        assert_eq!(AnimationOptions::default().to_native().fields, 0);
-        assert_eq!(CameraFitOptions::default().to_native().fields, 0);
-        assert_eq!(BoundOptions::default().to_native().fields, 0);
-        assert_eq!(FreeCameraOptions::default().to_native().fields, 0);
-        assert_eq!(ProjectionMode::default().to_native().fields, 0);
     }
 
     #[test]

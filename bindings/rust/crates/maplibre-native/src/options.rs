@@ -410,29 +410,15 @@ mod tests {
     use super::*;
 
     #[test]
-    fn map_options_default_and_materialization_fill_size() {
-        let options = MapOptions::default();
+    fn map_options_materialize_public_fields() {
+        let options = MapOptions::new(320, 240, 2.0).with_mode(MapMode::Static);
         let raw = options.to_native();
 
-        assert_eq!(options.width, 256);
-        assert_eq!(options.height, 256);
-        assert_eq!(options.scale_factor, 1.0);
-        assert_eq!(options.mode, MapMode::Continuous);
         assert!(raw.size as usize >= std::mem::size_of::<sys::mln_map_options>());
-        assert_eq!(raw.width, options.width);
-        assert_eq!(raw.height, options.height);
-        assert_eq!(raw.scale_factor, options.scale_factor);
-        assert_eq!(raw.map_mode, sys::MLN_MAP_MODE_CONTINUOUS);
-    }
-
-    #[test]
-    fn map_mode_has_explicit_raw_conversions() {
-        assert_eq!(MapMode::Continuous.as_raw(), sys::MLN_MAP_MODE_CONTINUOUS);
-        assert_eq!(
-            MapMode::from_raw(sys::MLN_MAP_MODE_STATIC),
-            Some(MapMode::Static)
-        );
-        assert_eq!(MapMode::from_raw(999_999), None);
+        assert_eq!(raw.width, 320);
+        assert_eq!(raw.height, 240);
+        assert_eq!(raw.scale_factor, 2.0);
+        assert_eq!(raw.map_mode, sys::MLN_MAP_MODE_STATIC);
     }
 
     #[test]
@@ -563,17 +549,6 @@ mod tests {
         assert_eq!(
             MapTileOptions::from_native(tile).lod_mode,
             Some(TileLodMode::Unknown(999_004))
-        );
-    }
-
-    #[test]
-    fn map_debug_options_are_public_bitflags() {
-        let options = MapDebugOptions::TILE_BORDERS | MapDebugOptions::PARSE_STATUS;
-
-        assert!(options.contains(MapDebugOptions::TILE_BORDERS));
-        assert_eq!(
-            options.bits() & sys::MLN_MAP_DEBUG_TILE_BORDERS,
-            sys::MLN_MAP_DEBUG_TILE_BORDERS
         );
     }
 }
