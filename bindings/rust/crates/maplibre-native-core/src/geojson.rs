@@ -203,10 +203,6 @@ impl NativeFeature {
         Ok(native)
     }
 
-    pub fn as_ref(&self) -> &sys::mln_feature {
-        &self.raw
-    }
-
     pub fn as_ptr(&self) -> *const sys::mln_feature {
         &self.raw
     }
@@ -251,6 +247,12 @@ impl NativeFeature {
             }
         }
         Ok(())
+    }
+}
+
+impl AsRef<sys::mln_feature> for NativeFeature {
+    fn as_ref(&self) -> &sys::mln_feature {
+        &self.raw
     }
 }
 
@@ -333,8 +335,10 @@ impl NativeGeoJson {
     pub fn as_ptr(&self) -> *const sys::mln_geojson {
         &self.raw
     }
+}
 
-    pub fn as_ref(&self) -> &sys::mln_geojson {
+impl AsRef<sys::mln_geojson> for NativeGeoJson {
+    fn as_ref(&self) -> &sys::mln_geojson {
         &self.raw
     }
 }
@@ -429,6 +433,74 @@ mod tests {
 
         assert_eq!(copied_feature, feature);
         assert_eq!(copied_geojson, geojson);
+    }
+
+    #[test]
+    fn geojson_copy_survives_backing_storage_changes() {
+        let mut coordinates = [sys::mln_lat_lng {
+            latitude: 1.0,
+            longitude: 2.0,
+        }];
+        let geometry = sys::mln_geometry {
+            size: std::mem::size_of::<sys::mln_geometry>() as u32,
+            type_: sys::MLN_GEOMETRY_TYPE_POINT,
+            data: sys::mln_geometry__bindgen_ty_1 {
+                point: coordinates[0],
+            },
+        };
+        let mut key = b"name".to_vec();
+        let mut value_bytes = b"park".to_vec();
+        let property_value = sys::mln_json_value {
+            size: std::mem::size_of::<sys::mln_json_value>() as u32,
+            type_: sys::MLN_JSON_VALUE_TYPE_STRING,
+            data: sys::mln_json_value__bindgen_ty_1 {
+                string_value: sys::mln_string_view {
+                    data: value_bytes.as_ptr().cast::<c_char>(),
+                    size: value_bytes.len(),
+                },
+            },
+        };
+        let property = sys::mln_json_member {
+            key: sys::mln_string_view {
+                data: key.as_ptr().cast::<c_char>(),
+                size: key.len(),
+            },
+            value: &property_value,
+        };
+        let mut identifier = b"id-1".to_vec();
+        let raw_feature = sys::mln_feature {
+            size: std::mem::size_of::<sys::mln_feature>() as u32,
+            geometry: &geometry,
+            properties: &property,
+            property_count: 1,
+            identifier_type: sys::MLN_FEATURE_IDENTIFIER_TYPE_STRING,
+            identifier: sys::mln_feature__bindgen_ty_1 {
+                string_value: sys::mln_string_view {
+                    data: identifier.as_ptr().cast::<c_char>(),
+                    size: identifier.len(),
+                },
+            },
+        };
+
+        // SAFETY: raw_feature points to valid stack descriptors and backing buffers.
+        let copied = unsafe { Feature::from_native(&raw_feature, 0) }.unwrap();
+        coordinates[0].latitude = 9.0;
+        assert_eq!(coordinates[0].latitude, 9.0);
+        key.copy_from_slice(b"kind");
+        value_bytes.copy_from_slice(b"lake");
+        identifier.copy_from_slice(b"id-2");
+
+        assert_eq!(
+            copied,
+            Feature::new(
+                Geometry::Point(LatLng::new(1.0, 2.0)),
+                vec![JsonMember::new(
+                    "name",
+                    JsonValue::String("park".to_owned())
+                )]
+            )
+            .with_identifier(FeatureIdentifier::String("id-1".to_owned()))
+        );
     }
 
     #[test]

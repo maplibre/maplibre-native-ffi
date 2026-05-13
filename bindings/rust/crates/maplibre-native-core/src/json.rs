@@ -207,10 +207,6 @@ impl NativeJsonValue {
         &self.raw
     }
 
-    pub fn as_ref(&self) -> &sys::mln_json_value {
-        &self.raw
-    }
-
     fn store_string(&mut self, value: &str) -> sys::mln_string_view {
         let bytes = value.as_bytes().to_vec().into_boxed_slice();
         let view = sys::mln_string_view {
@@ -269,6 +265,12 @@ impl NativeJsonValue {
     }
 }
 
+impl AsRef<sys::mln_json_value> for NativeJsonValue {
+    fn as_ref(&self) -> &sys::mln_json_value {
+        &self.raw
+    }
+}
+
 pub struct NativeJsonMembers {
     raw_members: Box<[sys::mln_json_member]>,
     _raw_values: Box<[sys::mln_json_value]>,
@@ -323,6 +325,10 @@ impl NativeJsonMembers {
     pub fn len(&self) -> usize {
         self.raw_members.len()
     }
+
+    pub fn is_empty(&self) -> bool {
+        self.raw_members.is_empty()
+    }
 }
 
 fn check_json_depth(depth: usize) -> Result<()> {
@@ -335,6 +341,13 @@ fn check_json_depth(depth: usize) -> Result<()> {
     }
 }
 
+/// Copies borrowed native JSON object members into owned Rust values.
+///
+/// # Safety
+///
+/// `members` must either be null with `count == 0`, or point to `count` valid
+/// native member descriptors. Each member key and value pointer must remain
+/// valid for the duration of this call.
 pub unsafe fn copy_json_members(
     members: *const sys::mln_json_member,
     count: usize,
@@ -431,6 +444,52 @@ mod tests {
         let copied = unsafe { JsonValue::from_native(native.as_ref()) }.unwrap();
 
         assert_eq!(copied, value);
+    }
+
+    #[test]
+    fn json_copy_survives_backing_storage_changes() {
+        let mut key = b"name".to_vec();
+        let mut string = b"park".to_vec();
+        let value = sys::mln_json_value {
+            size: std::mem::size_of::<sys::mln_json_value>() as u32,
+            type_: sys::MLN_JSON_VALUE_TYPE_STRING,
+            data: sys::mln_json_value__bindgen_ty_1 {
+                string_value: sys::mln_string_view {
+                    data: string.as_ptr().cast::<c_char>(),
+                    size: string.len(),
+                },
+            },
+        };
+        let member = sys::mln_json_member {
+            key: sys::mln_string_view {
+                data: key.as_ptr().cast::<c_char>(),
+                size: key.len(),
+            },
+            value: &value,
+        };
+        let raw = sys::mln_json_value {
+            size: std::mem::size_of::<sys::mln_json_value>() as u32,
+            type_: sys::MLN_JSON_VALUE_TYPE_OBJECT,
+            data: sys::mln_json_value__bindgen_ty_1 {
+                object_value: sys::mln_json_object {
+                    members: &member,
+                    member_count: 1,
+                },
+            },
+        };
+
+        // SAFETY: raw points to valid stack descriptors and backing buffers for this call.
+        let copied = unsafe { JsonValue::from_native(&raw) }.unwrap();
+        key.copy_from_slice(b"kind");
+        string.copy_from_slice(b"lake");
+
+        assert_eq!(
+            copied,
+            JsonValue::object(vec![JsonMember::new(
+                "name",
+                JsonValue::String("park".to_owned())
+            )])
+        );
     }
 
     #[test]

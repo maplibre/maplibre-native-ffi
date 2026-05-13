@@ -262,10 +262,6 @@ impl NativeGeometry {
         &self.raw
     }
 
-    pub fn as_ref(&self) -> &sys::mln_geometry {
-        &self.raw
-    }
-
     fn coordinate_span(&mut self, points: &[LatLng]) -> sys::mln_coordinate_span {
         let coordinates = points
             .iter()
@@ -297,6 +293,12 @@ impl NativeGeometry {
         };
         self.spans.push(ring_spans);
         polygon
+    }
+}
+
+impl AsRef<sys::mln_geometry> for NativeGeometry {
+    fn as_ref(&self) -> &sys::mln_geometry {
+        &self.raw
     }
 }
 
@@ -424,5 +426,56 @@ mod tests {
         let collection = unsafe { raw.data.geometry_collection };
         assert_eq!(collection.geometry_count, 2);
         assert!(!collection.geometries.is_null());
+    }
+
+    #[test]
+    fn geometry_copy_survives_backing_storage_changes() {
+        let mut coordinates = [
+            sys::mln_lat_lng {
+                latitude: 1.0,
+                longitude: 2.0,
+            },
+            sys::mln_lat_lng {
+                latitude: 3.0,
+                longitude: 4.0,
+            },
+        ];
+        let raw = sys::mln_geometry {
+            size: std::mem::size_of::<sys::mln_geometry>() as u32,
+            type_: sys::MLN_GEOMETRY_TYPE_LINE_STRING,
+            data: sys::mln_geometry__bindgen_ty_1 {
+                line_string: sys::mln_coordinate_span {
+                    coordinates: coordinates.as_ptr(),
+                    coordinate_count: coordinates.len(),
+                },
+            },
+        };
+
+        // SAFETY: raw points to valid coordinate storage for this call.
+        let copied = unsafe { Geometry::from_native(&raw) }.unwrap();
+        coordinates[0].latitude = 10.0;
+        coordinates[1].longitude = 40.0;
+        assert_eq!(coordinates[1].longitude, 40.0);
+
+        assert_eq!(
+            copied,
+            Geometry::LineString(vec![LatLng::new(1.0, 2.0), LatLng::new(3.0, 4.0)])
+        );
+    }
+
+    #[test]
+    fn geometry_collection_copies_back_before_native_storage_drops() {
+        let geometry = Geometry::GeometryCollection(vec![
+            Geometry::MultiPoint(vec![LatLng::new(1.0, 2.0), LatLng::new(3.0, 4.0)]),
+            Geometry::Polygon(vec![vec![LatLng::new(5.0, 6.0), LatLng::new(7.0, 8.0)]]),
+        ]);
+
+        let copied = {
+            let native = geometry_try_to_native(&geometry).unwrap();
+            // SAFETY: native owns a valid descriptor graph for this copy.
+            unsafe { geometry_from_native(native.as_ref()) }.unwrap()
+        };
+
+        assert_eq!(copied, geometry);
     }
 }
