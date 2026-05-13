@@ -27,9 +27,9 @@ commit/push after each item.
 - [x] Remaining layer/source helpers exposed by Java FFM over the C style API.
 - [x] RenderSession feature state set/get/remove.
 - [x] FeatureStateSelector and selector materialization.
-- [ ] Rendered query geometry and rendered/source query option types.
-- [ ] Copied queried feature and feature-extension result types.
-- [ ] Rendered feature, source feature, and feature extension query methods.
+- [x] Rendered query geometry and rendered/source query option types.
+- [x] Copied queried feature and feature-extension result types.
+- [x] Rendered feature, source feature, and feature extension query methods.
 - [ ] Revisit every public destructive or one-shot operation; prefer consuming
       close/complete and preserve retry semantics explicitly.
 - [ ] Replace frame-derived bare NativePointer returns with lifetime-bearing
@@ -80,6 +80,10 @@ commit/push after each item.
   `cargo fmt --manifest-path bindings/rust/crates/maplibre-native/Cargo.toml`
   and
   `cargo test --manifest-path bindings/rust/crates/maplibre-native/Cargo.toml feature_state -- --nocapture`.
+- Render session query APIs and copied query result types:
+  `cargo fmt -p maplibre-native`,
+  `cargo test -p maplibre-native render::tests -- --nocapture`,
+  `cargo test -p maplibre-native`, and `mise run //bindings/rust:test`.
 
 ## Notes
 

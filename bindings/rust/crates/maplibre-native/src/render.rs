@@ -2,16 +2,18 @@ use std::cell::{Cell, RefCell};
 use std::fmt;
 use std::marker::PhantomData;
 use std::mem;
-use std::ptr::NonNull;
+use std::ptr::{self, NonNull};
 use std::rc::Rc;
 
 use maplibre_native_support as support;
 use maplibre_native_sys as sys;
 
 use crate::Result;
+use crate::geojson::Feature;
 use crate::handle::{ThreadAffineNativeHandle, closed_handle_error, out_handle};
 use crate::json::JsonValue;
 use crate::map::{MapHandle, MapState};
+use crate::values::{ScreenBox, ScreenPoint};
 
 /// Borrowed opaque native address used for backend interop handles.
 ///
@@ -235,6 +237,331 @@ fn empty_string_view() -> sys::mln_string_view {
     sys::mln_string_view {
         data: std::ptr::null(),
         size: 0,
+    }
+}
+
+/// Screen-space geometry used for rendered feature queries.
+#[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
+pub enum RenderedQueryGeometry {
+    Point(ScreenPoint),
+    Box(ScreenBox),
+    LineString(Vec<ScreenPoint>),
+}
+
+impl RenderedQueryGeometry {
+    pub fn point(point: ScreenPoint) -> Self {
+        Self::Point(point)
+    }
+
+    pub fn box_(box_: ScreenBox) -> Self {
+        Self::Box(box_)
+    }
+
+    pub fn line_string(points: Vec<ScreenPoint>) -> Self {
+        Self::LineString(points)
+    }
+
+    fn to_native(&self) -> NativeRenderedQueryGeometry {
+        NativeRenderedQueryGeometry::new(self)
+    }
+}
+
+pub(crate) struct NativeRenderedQueryGeometry {
+    raw: sys::mln_rendered_query_geometry,
+    _points: Vec<sys::mln_screen_point>,
+}
+
+impl NativeRenderedQueryGeometry {
+    fn new(geometry: &RenderedQueryGeometry) -> Self {
+        match geometry {
+            RenderedQueryGeometry::Point(point) => {
+                // SAFETY: C constructor takes the point by value.
+                let raw = unsafe { sys::mln_rendered_query_geometry_point(point.to_native()) };
+                Self {
+                    raw,
+                    _points: Vec::new(),
+                }
+            }
+            RenderedQueryGeometry::Box(box_) => {
+                let raw_box = sys::mln_screen_box {
+                    min: box_.min.to_native(),
+                    max: box_.max.to_native(),
+                };
+                // SAFETY: C constructor takes the box by value.
+                let raw = unsafe { sys::mln_rendered_query_geometry_box(raw_box) };
+                Self {
+                    raw,
+                    _points: Vec::new(),
+                }
+            }
+            RenderedQueryGeometry::LineString(points) => {
+                let native_points = points
+                    .iter()
+                    .copied()
+                    .map(ScreenPoint::to_native)
+                    .collect::<Vec<_>>();
+                let ptr = const_ptr_or_null(&native_points);
+                // SAFETY: ptr either is null for empty points or points to
+                // native_points storage retained by this materializer.
+                let raw = unsafe {
+                    sys::mln_rendered_query_geometry_line_string(ptr, native_points.len())
+                };
+                Self {
+                    raw,
+                    _points: native_points,
+                }
+            }
+        }
+    }
+
+    fn as_ptr(&self) -> *const sys::mln_rendered_query_geometry {
+        &self.raw
+    }
+
+    #[cfg(test)]
+    fn as_ref(&self) -> &sys::mln_rendered_query_geometry {
+        &self.raw
+    }
+}
+
+/// Options for rendered feature queries.
+#[derive(Debug, Clone, PartialEq, Default)]
+#[non_exhaustive]
+pub struct RenderedFeatureQueryOptions {
+    pub layer_ids: Option<Vec<String>>,
+    pub filter: Option<JsonValue>,
+}
+
+impl RenderedFeatureQueryOptions {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn with_layer_ids(mut self, layer_ids: Vec<String>) -> Self {
+        self.layer_ids = Some(layer_ids);
+        self
+    }
+
+    pub fn without_layer_ids(mut self) -> Self {
+        self.layer_ids = None;
+        self
+    }
+
+    pub fn with_filter(mut self, filter: JsonValue) -> Self {
+        self.filter = Some(filter);
+        self
+    }
+
+    pub fn without_filter(mut self) -> Self {
+        self.filter = None;
+        self
+    }
+
+    fn to_native(&self) -> Result<NativeRenderedFeatureQueryOptions<'_>> {
+        NativeRenderedFeatureQueryOptions::new(self)
+    }
+}
+
+pub(crate) struct NativeRenderedFeatureQueryOptions<'a> {
+    raw: sys::mln_rendered_feature_query_options,
+    _layer_id_views: Vec<support::string::StringView<'a>>,
+    _raw_layer_ids: Vec<sys::mln_string_view>,
+    _filter: Option<crate::json::NativeJsonValue>,
+    _filter_raw: Option<Box<sys::mln_json_value>>,
+}
+
+impl<'a> NativeRenderedFeatureQueryOptions<'a> {
+    fn new(options: &'a RenderedFeatureQueryOptions) -> Result<Self> {
+        // SAFETY: Default constructor takes no arguments and initializes size.
+        let mut raw = unsafe { sys::mln_rendered_feature_query_options_default() };
+        let mut layer_id_views = Vec::new();
+        let mut raw_layer_ids = Vec::new();
+        if let Some(layer_ids) = &options.layer_ids {
+            raw.fields |= sys::MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS;
+            layer_id_views = layer_ids
+                .iter()
+                .map(|id| support::string::string_view(id))
+                .collect();
+            raw_layer_ids = layer_id_views.iter().map(|view| view.raw()).collect();
+            raw.layer_ids = const_ptr_or_null(&raw_layer_ids);
+            raw.layer_id_count = raw_layer_ids.len();
+        }
+        let filter = options
+            .filter
+            .as_ref()
+            .map(JsonValue::try_to_native)
+            .transpose()?;
+        let filter_raw = filter.as_ref().map(|filter| Box::new(*filter.as_ref()));
+        if let Some(filter_raw) = &filter_raw {
+            raw.filter = filter_raw.as_ref();
+        }
+        Ok(Self {
+            raw,
+            _layer_id_views: layer_id_views,
+            _raw_layer_ids: raw_layer_ids,
+            _filter: filter,
+            _filter_raw: filter_raw,
+        })
+    }
+
+    fn as_ptr(&self) -> *const sys::mln_rendered_feature_query_options {
+        &self.raw
+    }
+
+    #[cfg(test)]
+    fn as_ref(&self) -> &sys::mln_rendered_feature_query_options {
+        &self.raw
+    }
+}
+
+/// Options for source feature queries.
+#[derive(Debug, Clone, PartialEq, Default)]
+#[non_exhaustive]
+pub struct SourceFeatureQueryOptions {
+    pub source_layer_ids: Option<Vec<String>>,
+    pub filter: Option<JsonValue>,
+}
+
+impl SourceFeatureQueryOptions {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn with_source_layer_ids(mut self, source_layer_ids: Vec<String>) -> Self {
+        self.source_layer_ids = Some(source_layer_ids);
+        self
+    }
+
+    pub fn without_source_layer_ids(mut self) -> Self {
+        self.source_layer_ids = None;
+        self
+    }
+
+    pub fn with_filter(mut self, filter: JsonValue) -> Self {
+        self.filter = Some(filter);
+        self
+    }
+
+    pub fn without_filter(mut self) -> Self {
+        self.filter = None;
+        self
+    }
+
+    fn to_native(&self) -> Result<NativeSourceFeatureQueryOptions<'_>> {
+        NativeSourceFeatureQueryOptions::new(self)
+    }
+}
+
+pub(crate) struct NativeSourceFeatureQueryOptions<'a> {
+    raw: sys::mln_source_feature_query_options,
+    _source_layer_id_views: Vec<support::string::StringView<'a>>,
+    _raw_source_layer_ids: Vec<sys::mln_string_view>,
+    _filter: Option<crate::json::NativeJsonValue>,
+    _filter_raw: Option<Box<sys::mln_json_value>>,
+}
+
+impl<'a> NativeSourceFeatureQueryOptions<'a> {
+    fn new(options: &'a SourceFeatureQueryOptions) -> Result<Self> {
+        // SAFETY: Default constructor takes no arguments and initializes size.
+        let mut raw = unsafe { sys::mln_source_feature_query_options_default() };
+        let mut source_layer_id_views = Vec::new();
+        let mut raw_source_layer_ids = Vec::new();
+        if let Some(source_layer_ids) = &options.source_layer_ids {
+            raw.fields |= sys::MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS;
+            source_layer_id_views = source_layer_ids
+                .iter()
+                .map(|id| support::string::string_view(id))
+                .collect();
+            raw_source_layer_ids = source_layer_id_views
+                .iter()
+                .map(|view| view.raw())
+                .collect();
+            raw.source_layer_ids = const_ptr_or_null(&raw_source_layer_ids);
+            raw.source_layer_id_count = raw_source_layer_ids.len();
+        }
+        let filter = options
+            .filter
+            .as_ref()
+            .map(JsonValue::try_to_native)
+            .transpose()?;
+        let filter_raw = filter.as_ref().map(|filter| Box::new(*filter.as_ref()));
+        if let Some(filter_raw) = &filter_raw {
+            raw.filter = filter_raw.as_ref();
+        }
+        Ok(Self {
+            raw,
+            _source_layer_id_views: source_layer_id_views,
+            _raw_source_layer_ids: raw_source_layer_ids,
+            _filter: filter,
+            _filter_raw: filter_raw,
+        })
+    }
+
+    fn as_ptr(&self) -> *const sys::mln_source_feature_query_options {
+        &self.raw
+    }
+
+    #[cfg(test)]
+    fn as_ref(&self) -> &sys::mln_source_feature_query_options {
+        &self.raw
+    }
+}
+
+/// One copied query result feature.
+#[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
+pub struct QueriedFeature {
+    pub feature: Feature,
+    pub source_id: Option<String>,
+    pub source_layer_id: Option<String>,
+    pub state: Option<JsonValue>,
+}
+
+/// Copied feature-extension query result.
+#[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
+pub enum FeatureExtensionResult {
+    Value(JsonValue),
+    FeatureCollection(Vec<Feature>),
+    Unknown(u32),
+}
+
+struct FeatureQueryResultHandle(NonNull<sys::mln_feature_query_result>);
+
+impl FeatureQueryResultHandle {
+    fn new(ptr: NonNull<sys::mln_feature_query_result>) -> Self {
+        Self(ptr)
+    }
+
+    fn as_ptr(&self) -> *const sys::mln_feature_query_result {
+        self.0.as_ptr()
+    }
+}
+
+impl Drop for FeatureQueryResultHandle {
+    fn drop(&mut self) {
+        // SAFETY: self.0 is an owned feature-query result handle.
+        unsafe { sys::mln_feature_query_result_destroy(self.0.as_ptr()) };
+    }
+}
+
+struct FeatureExtensionResultHandle(NonNull<sys::mln_feature_extension_result>);
+
+impl FeatureExtensionResultHandle {
+    fn new(ptr: NonNull<sys::mln_feature_extension_result>) -> Self {
+        Self(ptr)
+    }
+
+    fn as_ptr(&self) -> *const sys::mln_feature_extension_result {
+        self.0.as_ptr()
+    }
+}
+
+impl Drop for FeatureExtensionResultHandle {
+    fn drop(&mut self) {
+        // SAFETY: self.0 is an owned feature-extension result handle.
+        unsafe { sys::mln_feature_extension_result_destroy(self.0.as_ptr()) };
     }
 }
 
@@ -1051,6 +1378,113 @@ impl RenderSessionHandle {
         })
     }
 
+    /// Queries rendered features from the latest render session state.
+    pub fn query_rendered_features(
+        &self,
+        geometry: &RenderedQueryGeometry,
+        options: Option<&RenderedFeatureQueryOptions>,
+    ) -> Result<Vec<QueriedFeature>> {
+        self.inner.ensure_no_frame_acquired()?;
+        let session = self.inner.as_ptr()?;
+        let geometry = geometry.to_native();
+        let options = options
+            .map(RenderedFeatureQueryOptions::to_native)
+            .transpose()?;
+        let mut out = support::ptr::OutPtr::<sys::mln_feature_query_result>::new();
+        // SAFETY: session is live; geometry and options retain all borrowed
+        // descriptor storage for the call; out is a null-initialized owned
+        // out-pointer.
+        support::check(unsafe {
+            sys::mln_render_session_query_rendered_features(
+                session,
+                geometry.as_ptr(),
+                options
+                    .as_ref()
+                    .map_or(ptr::null(), NativeRenderedFeatureQueryOptions::as_ptr),
+                out.as_mut_ptr(),
+            )
+        })?;
+        copy_feature_query_result(FeatureQueryResultHandle::new(
+            out.into_non_null("mln_feature_query_result")?,
+        ))
+    }
+
+    /// Queries source features from the latest render session state.
+    pub fn query_source_features(
+        &self,
+        source_id: &str,
+        options: Option<&SourceFeatureQueryOptions>,
+    ) -> Result<Vec<QueriedFeature>> {
+        self.inner.ensure_no_frame_acquired()?;
+        let session = self.inner.as_ptr()?;
+        let source_id = support::string::string_view(source_id);
+        let options = options
+            .map(SourceFeatureQueryOptions::to_native)
+            .transpose()?;
+        let mut out = support::ptr::OutPtr::<sys::mln_feature_query_result>::new();
+        // SAFETY: session is live; source_id and options retain all borrowed
+        // descriptor storage for the call; out is a null-initialized owned
+        // out-pointer.
+        support::check(unsafe {
+            sys::mln_render_session_query_source_features(
+                session,
+                source_id.raw(),
+                options
+                    .as_ref()
+                    .map_or(ptr::null(), NativeSourceFeatureQueryOptions::as_ptr),
+                out.as_mut_ptr(),
+            )
+        })?;
+        copy_feature_query_result(FeatureQueryResultHandle::new(
+            out.into_non_null("mln_feature_query_result")?,
+        ))
+    }
+
+    /// Queries a feature extension from the latest render session state.
+    pub fn query_feature_extension(
+        &self,
+        source_id: &str,
+        feature: &Feature,
+        extension: &str,
+        extension_field: &str,
+        arguments: Option<&JsonValue>,
+    ) -> Result<FeatureExtensionResult> {
+        self.inner.ensure_no_frame_acquired()?;
+        let session = self.inner.as_ptr()?;
+        let source_id = support::string::string_view(source_id);
+        let extension = support::string::string_view(extension);
+        let extension_field = support::string::string_view(extension_field);
+        let feature = feature.try_to_native(0)?;
+        if let Some(arguments) = arguments
+            && !matches!(arguments, JsonValue::Object(_))
+        {
+            return Err(crate::Error::invalid_argument(
+                "feature extension arguments must be a JSON object",
+            ));
+        }
+        let arguments = arguments.map(JsonValue::try_to_native).transpose()?;
+        let mut out = support::ptr::OutPtr::<sys::mln_feature_extension_result>::new();
+        // SAFETY: session is live; all string, feature, and optional JSON
+        // descriptors retain borrowed storage for the call; out is a
+        // null-initialized owned out-pointer.
+        support::check(unsafe {
+            sys::mln_render_session_query_feature_extensions(
+                session,
+                source_id.raw(),
+                feature.as_ptr(),
+                extension.raw(),
+                extension_field.raw(),
+                arguments
+                    .as_ref()
+                    .map_or(ptr::null(), crate::json::NativeJsonValue::as_ptr),
+                out.as_mut_ptr(),
+            )
+        })?;
+        copy_feature_extension_result(FeatureExtensionResultHandle::new(
+            out.into_non_null("mln_feature_extension_result")?,
+        ))
+    }
+
     /// Returns CPU readback metadata for the most recently rendered texture frame.
     pub fn texture_image_info(&self) -> Result<TextureImageInfo> {
         self.inner.ensure_no_frame_acquired()?;
@@ -1134,6 +1568,141 @@ impl RenderSessionHandle {
     }
 }
 
+fn const_ptr_or_null<T>(values: &[T]) -> *const T {
+    if values.is_empty() {
+        ptr::null()
+    } else {
+        values.as_ptr()
+    }
+}
+
+fn copy_feature_query_result(result: FeatureQueryResultHandle) -> Result<Vec<QueriedFeature>> {
+    let mut count = 0;
+    // SAFETY: result is live and count points to writable storage.
+    support::check(unsafe { sys::mln_feature_query_result_count(result.as_ptr(), &mut count) })?;
+    let mut features = Vec::with_capacity(count);
+    for index in 0..count {
+        let mut raw = sys::mln_queried_feature {
+            size: mem::size_of::<sys::mln_queried_feature>() as u32,
+            fields: 0,
+            feature: empty_feature(),
+            source_id: empty_string_view(),
+            source_layer_id: empty_string_view(),
+            state: ptr::null(),
+        };
+        // SAFETY: result is live, index is within count reported by native,
+        // and raw points to initialized writable storage with size set.
+        support::check(unsafe {
+            sys::mln_feature_query_result_get(result.as_ptr(), index, &mut raw)
+        })?;
+        // SAFETY: raw now contains result-owned views valid until result drops;
+        // this copies all nested data before the next iteration/drop.
+        features.push(unsafe { copy_queried_feature(&raw) }?);
+    }
+    Ok(features)
+}
+
+unsafe fn copy_queried_feature(raw: &sys::mln_queried_feature) -> Result<QueriedFeature> {
+    // SAFETY: Caller promises raw.feature nested storage is valid for this call.
+    let feature = unsafe { Feature::from_native(&raw.feature, 0) }?;
+    let source_id = if raw.fields & sys::MLN_QUERIED_FEATURE_SOURCE_ID != 0 {
+        // SAFETY: Caller promises native string storage is valid.
+        Some(unsafe { support::string::copy_string_view(raw.source_id) }?)
+    } else {
+        None
+    };
+    let source_layer_id = if raw.fields & sys::MLN_QUERIED_FEATURE_SOURCE_LAYER_ID != 0 {
+        // SAFETY: Caller promises native string storage is valid.
+        Some(unsafe { support::string::copy_string_view(raw.source_layer_id) }?)
+    } else {
+        None
+    };
+    let state = if raw.fields & sys::MLN_QUERIED_FEATURE_STATE != 0 && !raw.state.is_null() {
+        // SAFETY: Caller promises state storage is valid.
+        Some(unsafe { JsonValue::from_native(&*raw.state) }?)
+    } else {
+        None
+    };
+    Ok(QueriedFeature {
+        feature,
+        source_id,
+        source_layer_id,
+        state,
+    })
+}
+
+fn copy_feature_extension_result(
+    result: FeatureExtensionResultHandle,
+) -> Result<FeatureExtensionResult> {
+    let mut info = sys::mln_feature_extension_result_info {
+        size: mem::size_of::<sys::mln_feature_extension_result_info>() as u32,
+        type_: 0,
+        data: sys::mln_feature_extension_result_info__bindgen_ty_1 { value: ptr::null() },
+    };
+    // SAFETY: result is live and info points to initialized writable storage.
+    support::check(unsafe { sys::mln_feature_extension_result_get(result.as_ptr(), &mut info) })?;
+    match info.type_ {
+        sys::MLN_FEATURE_EXTENSION_RESULT_TYPE_VALUE => {
+            // SAFETY: Active union member is selected by type_. Native returned
+            // a value pointer valid until result drops; this copies it now.
+            let value = unsafe { info.data.value };
+            if value.is_null() {
+                return Err(crate::Error::invalid_argument(
+                    "feature extension value result must not be null",
+                ));
+            }
+            // SAFETY: value was checked non-null and is result-owned.
+            Ok(FeatureExtensionResult::Value(unsafe {
+                JsonValue::from_native(&*value)
+            }?))
+        }
+        sys::MLN_FEATURE_EXTENSION_RESULT_TYPE_FEATURE_COLLECTION => {
+            // SAFETY: Active union member is selected by type_.
+            let collection = unsafe { info.data.feature_collection };
+            let features = feature_collection_slice(
+                collection.features,
+                collection.feature_count,
+                "feature extension feature collection",
+            )?;
+            let mut copied = Vec::with_capacity(features.len());
+            for feature in features {
+                // SAFETY: features came from validated collection storage.
+                copied.push(unsafe { Feature::from_native(feature, 1) }?);
+            }
+            Ok(FeatureExtensionResult::FeatureCollection(copied))
+        }
+        type_ => Ok(FeatureExtensionResult::Unknown(type_)),
+    }
+}
+
+fn feature_collection_slice<'a>(
+    ptr: *const sys::mln_feature,
+    len: usize,
+    context: &'static str,
+) -> Result<&'a [sys::mln_feature]> {
+    if len == 0 {
+        return Ok(&[]);
+    }
+    if ptr.is_null() {
+        return Err(crate::Error::invalid_argument(format!(
+            "{context} pointer must not be null when length is nonzero"
+        )));
+    }
+    // SAFETY: ptr is non-null and caller/native reports len initialized entries.
+    Ok(unsafe { std::slice::from_raw_parts(ptr, len) })
+}
+
+fn empty_feature() -> sys::mln_feature {
+    sys::mln_feature {
+        size: mem::size_of::<sys::mln_feature>() as u32,
+        geometry: ptr::null(),
+        properties: ptr::null(),
+        property_count: 0,
+        identifier_type: sys::MLN_FEATURE_IDENTIFIER_TYPE_NULL,
+        identifier: sys::mln_feature__bindgen_ty_1 { uint_value: 0 },
+    }
+}
+
 fn empty_metal_owned_texture_frame() -> sys::mln_metal_owned_texture_frame {
     sys::mln_metal_owned_texture_frame {
         size: mem::size_of::<sys::mln_metal_owned_texture_frame>() as u32,
@@ -1172,7 +1741,10 @@ mod tests {
     use static_assertions::assert_not_impl_any;
 
     use super::*;
-    use crate::{ErrorKind, JsonMember, MapMode, MapOptions, RuntimeEventType, RuntimeHandle};
+    use crate::{
+        CameraOptions, ErrorKind, JsonMember, LatLng, MapMode, MapOptions, RuntimeEventType,
+        RuntimeHandle,
+    };
 
     assert_not_impl_any!(NativePointer: Send, Sync);
     assert_not_impl_any!(RenderSessionHandle: Send, Sync);
@@ -1180,6 +1752,8 @@ mod tests {
     assert_not_impl_any!(VulkanOwnedTextureFrameHandle: Send, Sync);
 
     const FEATURE_STATE_STYLE_JSON: &str = r#"{"version":8,"sources":{"point":{"type":"geojson","data":{"type":"FeatureCollection","features":[{"type":"Feature","id":"feature-1","properties":{},"geometry":{"type":"Point","coordinates":[0,0]}}]}}},"layers":[{"id":"circle","type":"circle","source":"point","paint":{"circle-radius":["case",["boolean",["feature-state","hover"],false],10,5]}}]}"#;
+    const QUERY_STYLE_JSON: &str = r##"{"version":8,"sources":{"point":{"type":"geojson","data":{"type":"FeatureCollection","features":[{"type":"Feature","id":"feature-1","geometry":{"type":"Point","coordinates":[-122.4194,37.7749]},"properties":{"kind":"capital","visible":true}}]}}},"layers":[{"id":"background","type":"background","paint":{"background-color":"#d8f1ff"}},{"id":"point-circle","type":"circle","source":"point","paint":{"circle-color":"#f97316","circle-radius":12}}]}"##;
+    const CLUSTER_STYLE_JSON: &str = r##"{"version":8,"sources":{"cluster-source":{"type":"geojson","cluster":true,"data":{"type":"FeatureCollection","features":[{"type":"Feature","geometry":{"type":"Point","coordinates":[0.0,0.0]},"properties":{"name":"one"}},{"type":"Feature","geometry":{"type":"Point","coordinates":[0.001,0.001]},"properties":{"name":"two"}},{"type":"Feature","geometry":{"type":"Point","coordinates":[0.002,0.002]},"properties":{"name":"three"}}]}}},"layers":[{"id":"background","type":"background","paint":{"background-color":"#ffffff"}},{"id":"cluster-circle","type":"circle","source":"cluster-source","filter":["has","point_count"],"paint":{"circle-color":"#2563eb","circle-radius":20}}]}"##;
 
     fn wait_for_runtime_event(runtime: &RuntimeHandle, event_type: RuntimeEventType) -> bool {
         for _ in 0..100 {
@@ -1205,6 +1779,48 @@ mod tests {
             RuntimeEventType::MapRenderUpdateAvailable
         ));
         session.render_update().unwrap();
+    }
+
+    fn load_query_style(runtime: &RuntimeHandle, map: &MapHandle, session: &RenderSessionHandle) {
+        map.jump_to(
+            &CameraOptions::new()
+                .with_center(LatLng::new(37.7749, -122.4194))
+                .with_zoom(10.0),
+        )
+        .unwrap();
+        map.set_style_json(QUERY_STYLE_JSON).unwrap();
+        render_available_updates(runtime, session, 5);
+    }
+
+    fn load_cluster_style(runtime: &RuntimeHandle, map: &MapHandle, session: &RenderSessionHandle) {
+        map.jump_to(
+            &CameraOptions::new()
+                .with_center(LatLng::new(0.0, 0.0))
+                .with_zoom(0.0),
+        )
+        .unwrap();
+        map.set_style_json(CLUSTER_STYLE_JSON).unwrap();
+        render_available_updates(runtime, session, 5);
+    }
+
+    fn render_available_updates(
+        runtime: &RuntimeHandle,
+        session: &RenderSessionHandle,
+        count: usize,
+    ) {
+        for _ in 0..count {
+            if wait_for_runtime_event(runtime, RuntimeEventType::MapRenderUpdateAvailable) {
+                let _ = session.render_update();
+            }
+        }
+    }
+
+    fn feature_member<'a>(feature: &'a Feature, key: &str) -> Option<&'a JsonValue> {
+        feature
+            .properties
+            .iter()
+            .find(|member| member.key == key)
+            .map(|member| &member.value)
     }
 
     fn json_member<'a>(value: &'a JsonValue, key: &str) -> Option<&'a JsonValue> {
@@ -1347,6 +1963,80 @@ mod tests {
     }
 
     #[test]
+    fn query_descriptor_materialization_sets_fields_and_views() {
+        let point = RenderedQueryGeometry::point(ScreenPoint::new(1.0, 2.0)).to_native();
+        let raw = point.as_ref();
+        assert_eq!(raw.size as usize, mem::size_of_val(raw));
+        assert_eq!(raw.type_, sys::MLN_RENDERED_QUERY_GEOMETRY_TYPE_POINT);
+        // SAFETY: Active union member is selected by type_.
+        let raw_point = unsafe { raw.data.point };
+        assert_eq!((raw_point.x, raw_point.y), (1.0, 2.0));
+
+        let box_geometry = RenderedQueryGeometry::box_(ScreenBox::new(
+            ScreenPoint::new(1.0, 2.0),
+            ScreenPoint::new(3.0, 4.0),
+        ))
+        .to_native();
+        let raw = box_geometry.as_ref();
+        assert_eq!(raw.type_, sys::MLN_RENDERED_QUERY_GEOMETRY_TYPE_BOX);
+        // SAFETY: Active union member is selected by type_.
+        let raw_box = unsafe { raw.data.box_ };
+        assert_eq!((raw_box.min.x, raw_box.min.y), (1.0, 2.0));
+        assert_eq!((raw_box.max.x, raw_box.max.y), (3.0, 4.0));
+
+        let line = RenderedQueryGeometry::line_string(vec![
+            ScreenPoint::new(1.0, 2.0),
+            ScreenPoint::new(3.0, 4.0),
+        ])
+        .to_native();
+        let raw = line.as_ref();
+        assert_eq!(raw.type_, sys::MLN_RENDERED_QUERY_GEOMETRY_TYPE_LINE_STRING);
+        // SAFETY: Active union member is selected by type_.
+        let line_string = unsafe { raw.data.line_string };
+        assert_eq!(line_string.point_count, 2);
+        assert!(!line_string.points.is_null());
+
+        let filter = JsonValue::Array(vec![
+            JsonValue::String("has".into()),
+            JsonValue::String("kind".into()),
+        ]);
+        let rendered_options = RenderedFeatureQueryOptions::new()
+            .with_layer_ids(vec!["point-circle".into()])
+            .with_filter(filter.clone());
+        let rendered = rendered_options.to_native().unwrap();
+        let raw = rendered.as_ref();
+        assert_eq!(raw.size as usize, mem::size_of_val(raw));
+        assert_eq!(raw.fields, sys::MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS);
+        assert_eq!(raw.layer_id_count, 1);
+        assert!(!raw.layer_ids.is_null());
+        assert!(!raw.filter.is_null());
+        // SAFETY: The materializer keeps the string view valid for this scope.
+        assert_eq!(
+            unsafe { support::string::copy_string_view(*raw.layer_ids) }.unwrap(),
+            "point-circle"
+        );
+
+        let source_options = SourceFeatureQueryOptions::new()
+            .with_source_layer_ids(vec!["landuse".into()])
+            .with_filter(filter);
+        let source = source_options.to_native().unwrap();
+        let raw = source.as_ref();
+        assert_eq!(raw.size as usize, mem::size_of_val(raw));
+        assert_eq!(
+            raw.fields,
+            sys::MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS
+        );
+        assert_eq!(raw.source_layer_id_count, 1);
+        assert!(!raw.source_layer_ids.is_null());
+        assert!(!raw.filter.is_null());
+        // SAFETY: The materializer keeps the string view valid for this scope.
+        assert_eq!(
+            unsafe { support::string::copy_string_view(*raw.source_layer_ids) }.unwrap(),
+            "landuse"
+        );
+    }
+
+    #[test]
     fn feature_state_selector_materialization_sets_fields_and_views() {
         let selector = FeatureStateSelector::new("point")
             .with_source_layer_id("layer")
@@ -1453,6 +2143,172 @@ mod tests {
     }
 
     #[test]
+    fn rendered_and_source_queries_copy_results() {
+        let runtime = RuntimeHandle::new().unwrap();
+        let map = MapHandle::with_options(&runtime, &MapOptions::new(64, 64, 1.0)).unwrap();
+        let session = map
+            .attach_owned_texture(&OwnedTextureDescriptor::new(64, 64, 1.0))
+            .unwrap();
+
+        let error = session
+            .query_rendered_features(
+                &RenderedQueryGeometry::point(ScreenPoint::new(32.0, 32.0)),
+                None,
+            )
+            .unwrap_err();
+        assert_eq!(error.kind(), ErrorKind::InvalidState);
+
+        load_query_style(&runtime, &map, &session);
+        let query_point = map
+            .pixel_for_lat_lng(LatLng::new(37.7749, -122.4194))
+            .unwrap();
+        let geometry = RenderedQueryGeometry::box_(ScreenBox::new(
+            ScreenPoint::new(query_point.x - 20.0, query_point.y - 20.0),
+            ScreenPoint::new(query_point.x + 20.0, query_point.y + 20.0),
+        ));
+        let filter = JsonValue::Array(vec![
+            JsonValue::String("==".into()),
+            JsonValue::Array(vec![
+                JsonValue::String("get".into()),
+                JsonValue::String("kind".into()),
+            ]),
+            JsonValue::String("capital".into()),
+        ]);
+        let rendered_options = RenderedFeatureQueryOptions::new()
+            .with_layer_ids(vec!["point-circle".into()])
+            .with_filter(filter.clone());
+        let rendered = session
+            .query_rendered_features(&geometry, Some(&rendered_options))
+            .unwrap();
+        assert_eq!(rendered.len(), 1);
+        assert_eq!(rendered[0].source_id.as_deref(), Some("point"));
+        assert_eq!(
+            feature_member(&rendered[0].feature, "kind"),
+            Some(&JsonValue::String("capital".into()))
+        );
+
+        let source_options = SourceFeatureQueryOptions::new().with_filter(filter);
+        let source = session
+            .query_source_features("point", Some(&source_options))
+            .unwrap();
+        assert_eq!(source.len(), 1);
+        assert_eq!(source[0].source_id.as_deref(), Some("point"));
+        assert_eq!(
+            feature_member(&source[0].feature, "kind"),
+            Some(&JsonValue::String("capital".into()))
+        );
+
+        let empty = session
+            .query_rendered_features(
+                &RenderedQueryGeometry::point(ScreenPoint::new(-1000.0, -1000.0)),
+                None,
+            )
+            .unwrap();
+        assert!(empty.is_empty());
+
+        let error = session.query_source_features("", None).unwrap_err();
+        assert_eq!(error.kind(), ErrorKind::InvalidArgument);
+
+        session.close().unwrap();
+        map.close().unwrap();
+        runtime.close().unwrap();
+    }
+
+    #[test]
+    fn feature_extension_queries_copy_value_and_feature_collection_results() {
+        let runtime = RuntimeHandle::new().unwrap();
+        let map = MapHandle::with_options(&runtime, &MapOptions::new(64, 64, 1.0)).unwrap();
+        let session = map
+            .attach_owned_texture(&OwnedTextureDescriptor::new(64, 64, 1.0))
+            .unwrap();
+
+        load_cluster_style(&runtime, &map, &session);
+        let query_point = map.pixel_for_lat_lng(LatLng::new(0.0, 0.0)).unwrap();
+        let geometry = RenderedQueryGeometry::box_(ScreenBox::new(
+            ScreenPoint::new(query_point.x - 30.0, query_point.y - 30.0),
+            ScreenPoint::new(query_point.x + 30.0, query_point.y + 30.0),
+        ));
+        let options =
+            RenderedFeatureQueryOptions::new().with_layer_ids(vec!["cluster-circle".into()]);
+        let cluster = (0..100)
+            .find_map(|_| {
+                let clusters = session
+                    .query_rendered_features(&geometry, Some(&options))
+                    .ok()?;
+                if clusters.len() == 1 {
+                    clusters.into_iter().next()
+                } else {
+                    render_available_updates(&runtime, &session, 1);
+                    std::thread::sleep(Duration::from_millis(1));
+                    None
+                }
+            })
+            .expect("timed out waiting for rendered cluster");
+
+        let children = session
+            .query_feature_extension(
+                "cluster-source",
+                &cluster.feature,
+                "supercluster",
+                "children",
+                None,
+            )
+            .unwrap();
+        let FeatureExtensionResult::FeatureCollection(children) = children else {
+            panic!("expected children feature collection");
+        };
+        assert!(!children.is_empty());
+
+        let expansion_zoom = session
+            .query_feature_extension(
+                "cluster-source",
+                &cluster.feature,
+                "supercluster",
+                "expansion-zoom",
+                None,
+            )
+            .unwrap();
+        assert!(matches!(
+            expansion_zoom,
+            FeatureExtensionResult::Value(JsonValue::UInt(_))
+        ));
+
+        let arguments = JsonValue::Object(vec![
+            JsonMember::new("limit", JsonValue::UInt(1)),
+            JsonMember::new("offset", JsonValue::UInt(0)),
+        ]);
+        let leaves = session
+            .query_feature_extension(
+                "cluster-source",
+                &cluster.feature,
+                "supercluster",
+                "leaves",
+                Some(&arguments),
+            )
+            .unwrap();
+        let FeatureExtensionResult::FeatureCollection(leaves) = leaves else {
+            panic!("expected leaves feature collection");
+        };
+        assert_eq!(leaves.len(), 1);
+
+        let error = session
+            .query_feature_extension(
+                "cluster-source",
+                &cluster.feature,
+                "supercluster",
+                "leaves",
+                Some(&JsonValue::Array(Vec::new())),
+            )
+            .unwrap_err();
+        assert_eq!(error.kind(), ErrorKind::InvalidArgument);
+        assert!(error.diagnostic().contains("JSON object"));
+
+        session.close().unwrap();
+        map.close().unwrap();
+        runtime.close().unwrap();
+    }
+
+    #[test]
     fn feature_state_selector_native_validation_surfaces_through_methods() {
         let runtime = RuntimeHandle::new().unwrap();
         let map = MapHandle::with_options(&runtime, &MapOptions::new(64, 64, 1.0)).unwrap();
@@ -1541,6 +2397,22 @@ mod tests {
                 .unwrap_err(),
             session.get_feature_state(&selector).unwrap_err(),
             session.remove_feature_state(&selector).unwrap_err(),
+            session
+                .query_rendered_features(
+                    &RenderedQueryGeometry::point(ScreenPoint::new(0.0, 0.0)),
+                    None,
+                )
+                .unwrap_err(),
+            session.query_source_features("point", None).unwrap_err(),
+            session
+                .query_feature_extension(
+                    "point",
+                    &Feature::new(crate::Geometry::Empty, Vec::new()),
+                    "x",
+                    "y",
+                    None,
+                )
+                .unwrap_err(),
             session.read_premultiplied_rgba8_into(&mut []).unwrap_err(),
             session.acquire_metal_owned_texture_frame().unwrap_err(),
             session.acquire_vulkan_owned_texture_frame().unwrap_err(),

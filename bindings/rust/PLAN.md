@@ -69,10 +69,10 @@ Render session and query APIs:
 
 - [x] Feature state set, get, and remove on `RenderSessionHandle`.
 - [x] `FeatureStateSelector` and related selector materialization.
-- Rendered feature query geometry and rendered/source query option types.
-- Copied queried feature and feature-extension result types.
-- Rendered feature, source feature, and feature extension query methods on
-  `RenderSessionHandle`.
+- [x] Rendered feature query geometry and rendered/source query option types.
+- [x] Copied queried feature and feature-extension result types.
+- [x] Rendered feature, source feature, and feature extension query methods on
+      `RenderSessionHandle`.
 
 Keep this backlog aligned with `include/maplibre_native_c/*.h` and
 `bindings/java-ffm/src/main/java/org/maplibre/nativeffi/**` as those APIs grow.
@@ -80,6 +80,11 @@ Keep this backlog aligned with `include/maplibre_native_c/*.h` and
 Verification evidence for the completed render-session feature-state chunk:
 `cargo fmt --manifest-path bindings/rust/crates/maplibre-native/Cargo.toml` and
 `cargo test --manifest-path bindings/rust/crates/maplibre-native/Cargo.toml feature_state -- --nocapture`.
+
+Verification evidence for the completed render-session query chunk:
+`cargo fmt -p maplibre-native`,
+`cargo test -p maplibre-native render::tests -- --nocapture`,
+`cargo test -p maplibre-native`, and `mise run //bindings/rust:test`.
 
 ## API polish backlog before review
 

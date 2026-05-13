@@ -176,7 +176,11 @@ impl NativeFeature {
         Ok(native)
     }
 
-    fn as_ref(&self) -> &sys::mln_feature {
+    pub(crate) fn as_ref(&self) -> &sys::mln_feature {
+        &self.raw
+    }
+
+    pub(crate) fn as_ptr(&self) -> *const sys::mln_feature {
         &self.raw
     }
 

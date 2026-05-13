@@ -194,7 +194,6 @@ impl NativeJsonValue {
         &self.raw
     }
 
-    #[cfg(test)]
     pub(crate) fn as_ref(&self) -> &sys::mln_json_value {
         &self.raw
     }
