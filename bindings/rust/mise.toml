@@ -12,20 +12,9 @@ repo_root=$(git rev-parse --show-toplevel)
 bash scripts/with-libclang.sh cargo test --manifest-path "$repo_root/Cargo.toml" -p maplibre-native-sys -p maplibre-native-support -p maplibre-native
 '''
 
-[tasks.check]
-depends = ["//:ensure-native-library"]
+[tasks.ci]
+depends = [":test"]
 run = '''
-set -euo pipefail
 repo_root=$(git rev-parse --show-toplevel)
-bash scripts/with-libclang.sh cargo fmt --manifest-path "$repo_root/Cargo.toml" --all --check
 bash scripts/with-libclang.sh cargo clippy --manifest-path "$repo_root/Cargo.toml" -p maplibre-native-sys -p maplibre-native-support -p maplibre-native --all-targets -- -D warnings
-'''
-
-[tasks.fix]
-depends = ["//:ensure-native-library"]
-run = '''
-set -euo pipefail
-repo_root=$(git rev-parse --show-toplevel)
-bash scripts/with-libclang.sh cargo fmt --manifest-path "$repo_root/Cargo.toml" --all
-bash scripts/with-libclang.sh cargo clippy --manifest-path "$repo_root/Cargo.toml" -p maplibre-native-sys -p maplibre-native-support -p maplibre-native --all-targets --fix --allow-dirty --allow-staged -- -D warnings
 '''

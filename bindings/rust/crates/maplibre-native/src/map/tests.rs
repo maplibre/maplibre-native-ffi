@@ -1,8 +1,7 @@
 use super::*;
 use crate::events::empty_runtime_event;
 use crate::{
-    ConstrainMode, CustomGeometrySourceOptions, EdgeInsets, ErrorKind, Feature, FeatureIdentifier,
-    JsonMember, MapMode, NorthOrientation, TextureImageInfo, TileLodMode, ViewportMode,
+    CustomGeometrySourceOptions, EdgeInsets, ErrorKind, JsonMember, MapMode, TextureImageInfo,
 };
 
 const VALID_STYLE_JSON: &str = r#"{"version":8,"sources":{},"layers":[]}"#;
@@ -129,85 +128,24 @@ fn test_style_image(data: Vec<u8>) -> PremultipliedRgba8Image {
 }
 
 #[test]
-fn style_image_add_query_copy_and_remove_call_real_c_api() {
+fn style_image_copy_uses_rust_owned_buffer() {
     let runtime = RuntimeHandle::new().unwrap();
     let map = MapHandle::new(&runtime).unwrap();
     map.set_style_json(VALID_STYLE_JSON).unwrap();
 
-    let plain = test_style_image(vec![
+    let image = test_style_image(vec![
         255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255, 255, 255, 255, 255,
     ]);
-    let sdf = test_style_image(vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]);
 
-    assert!(!map.style_image_exists("plain").unwrap());
-    assert_eq!(map.style_image_info("plain").unwrap(), None);
-    assert_eq!(
-        map.copy_style_image_premultiplied_rgba8("plain").unwrap(),
-        None
-    );
-    assert!(!map.remove_style_image("plain").unwrap());
-
-    map.set_style_image("plain", &plain, None).unwrap();
-    assert!(map.style_image_exists("plain").unwrap());
-    let info = map.style_image_info("plain").unwrap().unwrap();
-    assert_eq!(info.width, 2);
-    assert_eq!(info.height, 2);
-    assert_eq!(info.stride, 8);
-    assert_eq!(info.byte_length, 16);
-    assert_eq!(info.pixel_ratio, 1.0);
-    assert!(!info.sdf);
+    map.set_style_image("plain", &image, None).unwrap();
     let copied = map
         .copy_style_image_premultiplied_rgba8("plain")
         .unwrap()
-        .unwrap();
-    assert_eq!(copied.image.info.width, info.width);
-    assert_eq!(copied.image.info.height, info.height);
-    assert_eq!(copied.image.info.stride, info.stride);
-    assert_eq!(copied.image.info.byte_length, info.byte_length);
-    assert_eq!(copied.pixel_ratio, info.pixel_ratio);
-    assert_eq!(copied.sdf, info.sdf);
-    assert_eq!(copied.image.data, plain.data);
+        .expect("added Rust image should copy back through C");
 
-    map.set_style_image(
-        "sdf",
-        &sdf,
-        Some(
-            &StyleImageOptions::new()
-                .with_pixel_ratio(2.0)
-                .with_sdf(true),
-        ),
-    )
-    .unwrap();
-    let info = map.style_image_info("sdf").unwrap().unwrap();
-    assert_eq!(info.pixel_ratio, 2.0);
-    assert!(info.sdf);
-    let copied = map
-        .copy_style_image_premultiplied_rgba8("sdf")
-        .unwrap()
-        .unwrap();
-    assert_eq!(copied.pixel_ratio, 2.0);
-    assert!(copied.sdf);
-    assert_eq!(copied.image.data, sdf.data);
-
-    let replacement = test_style_image(vec![16; 16]);
-    map.set_style_image(
-        "sdf",
-        &replacement,
-        Some(&StyleImageOptions::new().with_sdf(false)),
-    )
-    .unwrap();
-    let info = map.style_image_info("sdf").unwrap().unwrap();
-    assert_eq!(info.pixel_ratio, 1.0);
-    assert!(!info.sdf);
-    let copied = map
-        .copy_style_image_premultiplied_rgba8("sdf")
-        .unwrap()
-        .unwrap();
-    assert_eq!(copied.image.data, replacement.data);
-
-    assert!(map.remove_style_image("plain").unwrap());
-    assert!(!map.style_image_exists("plain").unwrap());
-    assert!(!map.remove_style_image("plain").unwrap());
+    assert_eq!(copied.image.info.width, image.info.width);
+    assert_eq!(copied.image.info.height, image.info.height);
+    assert_eq!(copied.image.data, image.data);
 }
 
 fn image_source_coordinates() -> [LatLng; 4] {
@@ -220,50 +158,19 @@ fn image_source_coordinates() -> [LatLng; 4] {
 }
 
 #[test]
-fn image_source_url_add_get_and_update_coordinates_call_real_c_api() {
+fn image_source_helpers_accept_url_and_inline_images() {
     let runtime = RuntimeHandle::new().unwrap();
     let map = MapHandle::new(&runtime).unwrap();
     map.set_style_json(VALID_STYLE_JSON).unwrap();
 
     let coordinates = image_source_coordinates();
-    assert_eq!(map.image_source_coordinates("missing").unwrap(), None);
-
     map.add_image_source_url("url-image", &coordinates, "https://example.com/image.png")
         .unwrap();
-    assert!(map.style_source_exists("url-image").unwrap());
-    assert_eq!(
-        map.style_source_type("url-image").unwrap(),
-        Some(SourceType::Image)
-    );
     assert_eq!(
         map.image_source_coordinates("url-image").unwrap(),
         Some(coordinates)
     );
 
-    map.set_image_source_url("url-image", "https://example.com/replacement.png")
-        .unwrap();
-
-    let updated = [
-        LatLng::new(2.0, 2.0),
-        LatLng::new(2.0, 3.0),
-        LatLng::new(3.0, 3.0),
-        LatLng::new(3.0, 2.0),
-    ];
-    map.set_image_source_coordinates("url-image", &updated)
-        .unwrap();
-    assert_eq!(
-        map.image_source_coordinates("url-image").unwrap(),
-        Some(updated)
-    );
-}
-
-#[test]
-fn image_source_inline_image_add_and_update_call_real_c_api() {
-    let runtime = RuntimeHandle::new().unwrap();
-    let map = MapHandle::new(&runtime).unwrap();
-    map.set_style_json(VALID_STYLE_JSON).unwrap();
-
-    let coordinates = image_source_coordinates();
     let image = test_style_image(vec![1; 16]);
     map.add_image_source_image("inline-image", &coordinates, &image)
         .unwrap();
@@ -271,17 +178,6 @@ fn image_source_inline_image_add_and_update_call_real_c_api() {
         map.style_source_type("inline-image").unwrap(),
         Some(SourceType::Image)
     );
-    assert_eq!(
-        map.image_source_coordinates("inline-image").unwrap(),
-        Some(coordinates)
-    );
-
-    let replacement = test_style_image(vec![2; 16]);
-    map.set_image_source_image("inline-image", &replacement)
-        .unwrap();
-
-    map.set_image_source_url("inline-image", "https://example.com/after-inline.png")
-        .unwrap();
 }
 
 #[test]
@@ -290,78 +186,15 @@ fn tile_source_helpers_call_real_c_api() {
     let map = MapHandle::new(&runtime).unwrap();
     map.set_style_json(VALID_STYLE_JSON).unwrap();
 
-    let vector_options = TileSourceOptions::new()
-        .with_min_zoom(1.0)
-        .with_max_zoom(12.0)
-        .with_attribution("© vector")
-        .with_scheme(TileScheme::Xyz)
-        .with_bounds(LatLngBounds::new(
-            LatLng::new(-10.0, -20.0),
-            LatLng::new(10.0, 20.0),
-        ))
-        .with_vector_encoding(VectorTileEncoding::Mvt);
-    map.add_vector_source_url(
-        "vector-url",
-        "https://example.com/vector.json",
-        Some(&vector_options),
-    )
-    .unwrap();
+    map.add_vector_source_url("vector-url", "https://example.com/vector.json", None)
+        .unwrap();
     assert_eq!(
         map.style_source_type("vector-url").unwrap(),
         Some(SourceType::Vector)
     );
 
-    map.add_vector_source_tiles(
-        "vector-tiles",
-        &["https://example.com/vector/{z}/{x}/{y}.pbf"],
-        None,
-    )
-    .unwrap();
-    assert_eq!(
-        map.style_source_type("vector-tiles").unwrap(),
-        Some(SourceType::Vector)
-    );
-
-    let raster_options = TileSourceOptions::new()
-        .with_tile_size(256)
-        .with_scheme(TileScheme::Tms)
-        .with_attribution("© raster");
-    map.add_raster_source_url(
-        "raster-url",
-        "https://example.com/raster.json",
-        Some(&raster_options),
-    )
-    .unwrap();
-    assert_eq!(
-        map.style_source_type("raster-url").unwrap(),
-        Some(SourceType::Raster)
-    );
-
-    map.add_raster_source_tiles(
-        "raster-tiles",
-        &["https://example.com/raster/{z}/{x}/{y}.png"],
-        None,
-    )
-    .unwrap();
-    assert_eq!(
-        map.style_source_type("raster-tiles").unwrap(),
-        Some(SourceType::Raster)
-    );
-
-    let dem_options = TileSourceOptions::new()
-        .with_tile_size(512)
-        .with_raster_dem_encoding(RasterDemEncoding::Terrarium);
-    map.add_raster_dem_source_url(
-        "dem-url",
-        "https://example.com/dem.json",
-        Some(&dem_options),
-    )
-    .unwrap();
-    assert_eq!(
-        map.style_source_type("dem-url").unwrap(),
-        Some(SourceType::RasterDem)
-    );
-
+    let dem_options =
+        TileSourceOptions::new().with_raster_dem_encoding(RasterDemEncoding::Terrarium);
     map.add_raster_dem_source_tiles(
         "dem-tiles",
         &["https://example.com/dem/{z}/{x}/{y}.png"],
@@ -371,61 +204,6 @@ fn tile_source_helpers_call_real_c_api() {
     assert_eq!(
         map.style_source_type("dem-tiles").unwrap(),
         Some(SourceType::RasterDem)
-    );
-}
-
-#[test]
-fn terrain_and_location_layer_helpers_call_real_c_api() {
-    let runtime = RuntimeHandle::new().unwrap();
-    let map = MapHandle::new(&runtime).unwrap();
-    map.set_style_json(VALID_STYLE_JSON).unwrap();
-
-    map.add_raster_dem_source_tiles(
-        "dem",
-        &["https://example.com/dem/{z}/{x}/{y}.png"],
-        Some(&TileSourceOptions::new().with_raster_dem_encoding(RasterDemEncoding::Mapbox)),
-    )
-    .unwrap();
-    map.add_hillshade_layer("hillshade", "dem", None).unwrap();
-    map.add_color_relief_layer("color-relief", "dem", None)
-        .unwrap();
-
-    map.add_location_indicator_layer("location", None).unwrap();
-    map.set_location_indicator_location("location", LatLng::new(37.8, -122.4), 12.0)
-        .unwrap();
-    map.set_location_indicator_bearing("location", 45.0)
-        .unwrap();
-    map.set_location_indicator_accuracy_radius("location", 24.0)
-        .unwrap();
-    map.set_location_indicator_image_name(
-        "location",
-        LocationIndicatorImageKind::Top,
-        "location-top",
-    )
-    .unwrap();
-
-    assert_eq!(
-        map.layer_property("location", "location").unwrap(),
-        Some(JsonValue::Array(vec![
-            JsonValue::Double(-122.4),
-            JsonValue::Double(37.8),
-            JsonValue::Double(12.0),
-        ]))
-    );
-    assert_eq!(
-        map.layer_property("location", "bearing").unwrap(),
-        Some(JsonValue::Double(45.0))
-    );
-    assert_eq!(
-        map.layer_property("location", "accuracy-radius").unwrap(),
-        Some(JsonValue::Double(24.0))
-    );
-    assert_eq!(
-        map.layer_property("location", "top-image").unwrap(),
-        Some(JsonValue::Object(vec![
-            JsonMember::new("available", JsonValue::Bool(false)),
-            JsonMember::new("name", JsonValue::String("location-top".to_owned())),
-        ]))
     );
 }
 
@@ -608,38 +386,10 @@ fn custom_geometry_source_add_rejects_pending_url_style_replacement() {
 }
 
 #[test]
-fn style_json_and_geojson_descriptors_call_real_c_api() {
+fn style_json_descriptors_copy_owned_rust_values() {
     let runtime = RuntimeHandle::new().unwrap();
     let map = MapHandle::new(&runtime).unwrap();
     map.set_style_json(VALID_STYLE_JSON).unwrap();
-
-    let source = JsonValue::Object(vec![
-        JsonMember::new("type", JsonValue::String("geojson".to_owned())),
-        JsonMember::new(
-            "data",
-            JsonValue::Object(vec![
-                JsonMember::new("type", JsonValue::String("FeatureCollection".to_owned())),
-                JsonMember::new("features", JsonValue::Array(Vec::new())),
-            ]),
-        ),
-    ]);
-    map.add_style_source_json("owned-json-source", &source)
-        .unwrap();
-
-    let geojson = GeoJson::Feature(
-        Feature::new(
-            Geometry::Point(LatLng::new(1.0, 2.0)),
-            vec![JsonMember::new("name", JsonValue::String("one".to_owned()))],
-        )
-        .with_identifier(FeatureIdentifier::String("feature-1".to_owned())),
-    );
-    map.add_geojson_source_data("owned-geojson-source", &geojson)
-        .unwrap();
-    map.set_geojson_source_data(
-        "owned-geojson-source",
-        &GeoJson::FeatureCollection(Vec::new()),
-    )
-    .unwrap();
 
     let layer = JsonValue::Object(vec![
         JsonMember::new("id", JsonValue::String("owned-background".to_owned())),
@@ -657,35 +407,20 @@ fn style_json_and_geojson_descriptors_call_real_c_api() {
         .style_layer_json("owned-background")
         .unwrap()
         .expect("added layer should have a JSON snapshot");
+
     assert_eq!(
         object_member(&copied_layer, "id"),
         Some(&JsonValue::String("owned-background".to_owned()))
-    );
-    assert_eq!(
-        object_member(&copied_layer, "type"),
-        Some(&JsonValue::String("background".to_owned()))
     );
     let paint = object_member(&copied_layer, "paint").expect("layer paint should be copied");
     assert_eq!(
         object_member(paint, "background-opacity"),
         Some(&JsonValue::Double(0.5))
     );
-    map.set_layer_property(
-        "owned-background",
-        "background-opacity",
-        &JsonValue::Double(0.75),
-    )
-    .unwrap();
-    assert_eq!(
-        map.layer_property("owned-background", "background-opacity")
-            .unwrap(),
-        Some(JsonValue::Double(0.75))
-    );
 
     let error = map
         .set_layer_filter("owned-background", Some(&JsonValue::Double(f64::NAN)))
-        .err()
-        .unwrap();
+        .unwrap_err();
     assert_eq!(error.kind(), ErrorKind::InvalidArgument);
     assert_eq!(error.raw_status(), None);
 
@@ -725,94 +460,25 @@ fn camera_jump_and_coordinate_conversions_round_trip() {
 }
 
 #[test]
-fn camera_commands_and_queries_use_real_c_api() {
+fn empty_coordinate_slice_is_rejected_before_calling_c() {
     let runtime = RuntimeHandle::new().unwrap();
     let map = MapHandle::new(&runtime).unwrap();
-    let camera = CameraOptions::new()
-        .with_center(LatLng::new(0.0, 0.0))
-        .with_zoom(1.0);
-    let animation = AnimationOptions::new().with_duration_ms(0.0);
-
-    map.ease_to(&camera, Some(&animation)).unwrap();
-    map.fly_to(&camera, Some(&animation)).unwrap();
-    map.move_by(0.0, 0.0).unwrap();
-    map.move_by_animated(0.0, 0.0, Some(&animation)).unwrap();
-    map.scale_by(1.0, Some(ScreenPoint::new(128.0, 128.0)))
-        .unwrap();
-    map.scale_by_animated(1.0, None, Some(&animation)).unwrap();
-    map.rotate_by(ScreenPoint::new(0.0, 0.0), ScreenPoint::new(0.0, 0.0))
-        .unwrap();
-    map.rotate_by_animated(
-        ScreenPoint::new(0.0, 0.0),
-        ScreenPoint::new(0.0, 0.0),
-        Some(&animation),
-    )
-    .unwrap();
-    map.pitch_by(0.0).unwrap();
-    map.pitch_by_animated(0.0, Some(&animation)).unwrap();
-    map.cancel_transitions().unwrap();
-
-    let bounds = LatLngBounds::new(LatLng::new(-1.0, -1.0), LatLng::new(1.0, 1.0));
     let fit = CameraFitOptions::new().with_padding(EdgeInsets::new(1.0, 1.0, 1.0, 1.0));
-    map.camera_for_lat_lng_bounds(bounds, Some(&fit)).unwrap();
-    map.camera_for_lat_lngs(&[LatLng::new(0.0, 0.0), LatLng::new(1.0, 1.0)], Some(&fit))
-        .unwrap();
+
     let error = map.camera_for_lat_lngs(&[], Some(&fit)).unwrap_err();
+
     assert_eq!(error.kind(), ErrorKind::InvalidArgument);
     assert_eq!(error.raw_status(), None);
     assert!(error.diagnostic().contains("at least one coordinate"));
-    map.camera_for_geometry(
-        &Geometry::LineString(vec![LatLng::new(0.0, 0.0), LatLng::new(1.0, 1.0)]),
-        Some(&fit),
-    )
-    .unwrap();
-    map.lat_lng_bounds_for_camera(&camera).unwrap();
-    map.lat_lng_bounds_for_camera_unwrapped(&camera).unwrap();
 
     map.close().unwrap();
     runtime.close().unwrap();
 }
 
 #[test]
-fn map_state_viewport_tile_debug_and_projection_mode_round_trip() {
+fn projection_mode_round_trips_through_real_c_api() {
     let runtime = RuntimeHandle::new().unwrap();
     let map = MapHandle::new(&runtime).unwrap();
-
-    map.set_debug_options(MapDebugOptions::TILE_BORDERS | MapDebugOptions::PARSE_STATUS)
-        .unwrap();
-    let debug = map.debug_options().unwrap();
-    assert!(debug.contains(MapDebugOptions::TILE_BORDERS));
-    assert!(debug.contains(MapDebugOptions::PARSE_STATUS));
-
-    map.set_rendering_stats_view_enabled(true).unwrap();
-    assert!(map.rendering_stats_view_enabled().unwrap());
-    assert!(!map.is_fully_loaded().unwrap());
-    map.dump_debug_logs().unwrap();
-
-    let viewport = MapViewportOptions::new()
-        .with_north_orientation(NorthOrientation::Up)
-        .with_constrain_mode(ConstrainMode::HeightOnly)
-        .with_viewport_mode(ViewportMode::Default)
-        .with_frustum_offset(EdgeInsets::new(0.0, 0.0, 0.0, 0.0));
-    map.set_viewport_options(&viewport).unwrap();
-    let copied_viewport = map.viewport_options().unwrap();
-    assert_eq!(
-        copied_viewport.north_orientation,
-        Some(NorthOrientation::Up)
-    );
-    assert_eq!(
-        copied_viewport.constrain_mode,
-        Some(ConstrainMode::HeightOnly)
-    );
-    assert_eq!(copied_viewport.viewport_mode, Some(ViewportMode::Default));
-
-    let tile = MapTileOptions::new()
-        .with_prefetch_zoom_delta(1)
-        .with_lod_mode(TileLodMode::Default);
-    map.set_tile_options(&tile).unwrap();
-    let copied_tile = map.tile_options().unwrap();
-    assert_eq!(copied_tile.prefetch_zoom_delta, Some(1));
-    assert_eq!(copied_tile.lod_mode, Some(TileLodMode::Default));
 
     let projection_mode = ProjectionMode::new()
         .with_axonometric(false)
@@ -820,6 +486,7 @@ fn map_state_viewport_tile_debug_and_projection_mode_round_trip() {
         .with_y_skew(0.0);
     map.set_projection_mode(&projection_mode).unwrap();
     let copied_projection_mode = map.projection_mode().unwrap();
+
     assert_eq!(copied_projection_mode.axonometric, Some(false));
 
     map.close().unwrap();

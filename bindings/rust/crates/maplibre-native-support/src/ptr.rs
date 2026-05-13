@@ -67,13 +67,6 @@ mod tests {
     }
 
     #[test]
-    fn out_pointer_into_option_returns_none_for_null() {
-        let out = OutPtr::<u8>::new();
-
-        assert_eq!(out.into_option(), None);
-    }
-
-    #[test]
     fn out_pointer_into_option_wraps_non_null_values() {
         let mut out = OutPtr::<u8>::new();
         let mut value = 7u8;

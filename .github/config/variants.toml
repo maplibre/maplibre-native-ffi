@@ -21,7 +21,7 @@ task = "//examples/lwjgl-map:build"
 requires = { platform = ["linux", "macos"], backend = ["vulkan"] }
 
 [examples.rust-map]
-task = "//examples/rust-map:build"
+task = "//examples/rust-map:ci"
 requires = { platform = ["linux"], backend = ["vulkan"] }
 
 [examples.zig-readback]
@@ -39,5 +39,5 @@ task = "//bindings/java-ffm:build"
 requires = { platform = ["linux", "macos"] }
 
 [bindings.rust]
-task = "//bindings/rust:test"
+task = "//bindings/rust:ci"
 requires = { platform = ["linux", "macos"] }

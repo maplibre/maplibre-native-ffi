@@ -13,6 +13,13 @@ repo_root=$(git rev-parse --show-toplevel)
 bash "$repo_root/bindings/rust/scripts/with-libclang.sh" cargo build --manifest-path "$repo_root/Cargo.toml" -p rust-map
 '''
 
+[tasks.ci]
+depends = [":build"]
+run = '''
+repo_root=$(git rev-parse --show-toplevel)
+bash "$repo_root/bindings/rust/scripts/with-libclang.sh" cargo clippy --manifest-path "$repo_root/Cargo.toml" -p rust-map --all-targets -- -D warnings
+'''
+
 [tasks.run]
 depends = ["//:ensure-native-library", ":compile-shaders"]
 run = '''

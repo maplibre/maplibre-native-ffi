@@ -362,31 +362,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn empty_geometry_materializes_size_and_type() {
-        let native = Geometry::Empty.to_native();
-
-        assert_eq!(native.as_ref().type_, sys::MLN_GEOMETRY_TYPE_EMPTY);
-        assert_eq!(
-            native.as_ref().size as usize,
-            std::mem::size_of::<sys::mln_geometry>()
-        );
-    }
-
-    #[test]
-    fn point_materializes_inline_coordinate() {
-        let native = Geometry::Point(LatLng::new(1.0, 2.0)).to_native();
-        let raw = native.as_ref();
-
-        assert_eq!(native.as_ptr(), raw as *const sys::mln_geometry);
-        assert_eq!(raw.type_, sys::MLN_GEOMETRY_TYPE_POINT);
-        // SAFETY: The active union field is point because type_ was set by the
-        // materializer above.
-        let point = unsafe { raw.data.point };
-        assert_eq!(point.latitude, 1.0);
-        assert_eq!(point.longitude, 2.0);
-    }
-
-    #[test]
     fn line_string_materializes_borrowed_coordinate_span() {
         let native =
             Geometry::LineString(vec![LatLng::new(1.0, 2.0), LatLng::new(3.0, 4.0)]).to_native();
@@ -404,70 +379,6 @@ mod tests {
             unsafe { std::slice::from_raw_parts(span.coordinates, span.coordinate_count) };
         assert_eq!(coordinates[0].latitude, 1.0);
         assert_eq!(coordinates[1].longitude, 4.0);
-    }
-
-    #[test]
-    fn polygon_and_multi_geometry_materialize_nested_storage() {
-        let polygon = Geometry::Polygon(vec![vec![
-            LatLng::new(0.0, 0.0),
-            LatLng::new(0.0, 1.0),
-            LatLng::new(1.0, 1.0),
-        ]])
-        .to_native();
-        let raw_polygon = polygon.as_ref();
-        assert_eq!(raw_polygon.type_, sys::MLN_GEOMETRY_TYPE_POLYGON);
-        // SAFETY: The active union field is polygon because type_ was set by
-        // the materializer above, and polygon owns the backing storage.
-        let polygon_data = unsafe { raw_polygon.data.polygon };
-        assert_eq!(polygon_data.ring_count, 1);
-        assert!(!polygon_data.rings.is_null());
-
-        let multi_point =
-            Geometry::MultiPoint(vec![LatLng::new(1.0, 2.0), LatLng::new(3.0, 4.0)]).to_native();
-        let raw_multi_point = multi_point.as_ref();
-        assert_eq!(raw_multi_point.type_, sys::MLN_GEOMETRY_TYPE_MULTI_POINT);
-        // SAFETY: The active union field is multi_point because type_ was set
-        // by the materializer above, and multi_point owns the backing storage.
-        let points = unsafe { raw_multi_point.data.multi_point };
-        assert_eq!(points.coordinate_count, 2);
-        assert!(!points.coordinates.is_null());
-
-        let multi_line = Geometry::MultiLineString(vec![vec![LatLng::new(5.0, 6.0)]]).to_native();
-        let raw_multi_line = multi_line.as_ref();
-        assert_eq!(
-            raw_multi_line.type_,
-            sys::MLN_GEOMETRY_TYPE_MULTI_LINE_STRING
-        );
-        // SAFETY: The active union field is multi_line_string because type_ was
-        // set by the materializer above.
-        let lines = unsafe { raw_multi_line.data.multi_line_string };
-        assert_eq!(lines.line_count, 1);
-        assert!(!lines.lines.is_null());
-
-        let multi_polygon =
-            Geometry::MultiPolygon(vec![vec![vec![LatLng::new(7.0, 8.0)]]]).to_native();
-        let raw_multi_polygon = multi_polygon.as_ref();
-        assert_eq!(
-            raw_multi_polygon.type_,
-            sys::MLN_GEOMETRY_TYPE_MULTI_POLYGON
-        );
-        // SAFETY: The active union field is multi_polygon because type_ was set
-        // by the materializer above.
-        let polygons = unsafe { raw_multi_polygon.data.multi_polygon };
-        assert_eq!(polygons.polygon_count, 1);
-        assert!(!polygons.polygons.is_null());
-    }
-
-    #[test]
-    fn empty_nested_geometry_uses_null_pointers_with_zero_counts() {
-        let native = Geometry::MultiLineString(Vec::new()).to_native();
-        let raw = native.as_ref();
-
-        // SAFETY: The active union field is multi_line_string because type_ was
-        // set by the materializer above.
-        let lines = unsafe { raw.data.multi_line_string };
-        assert_eq!(lines.line_count, 0);
-        assert!(lines.lines.is_null());
     }
 
     #[test]

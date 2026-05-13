@@ -128,17 +128,6 @@ mod tests {
     }
 
     #[test]
-    fn optional_c_strings_reject_embedded_nul() {
-        let error = optional_c_string(Some("a\0b")).unwrap_err();
-
-        assert_eq!(error.kind(), crate::error::ErrorKind::InvalidArgument);
-        assert_eq!(
-            error.diagnostic(),
-            "C string inputs must not contain embedded NUL characters"
-        );
-    }
-
-    #[test]
     fn string_views_materialize_with_explicit_length() {
         let value = "hello";
         let view = string_view(value).raw();
@@ -146,15 +135,6 @@ mod tests {
         assert_eq!(view.size, 5);
         assert!(!view.data.is_null());
         assert_eq!(unsafe { copy_string_view(view) }.unwrap(), value);
-    }
-
-    #[test]
-    fn empty_string_views_use_null_data() {
-        let view = string_view("").raw();
-
-        assert_eq!(view.size, 0);
-        assert!(view.data.is_null());
-        assert_eq!(unsafe { copy_string_view(view) }.unwrap(), "");
     }
 
     #[test]

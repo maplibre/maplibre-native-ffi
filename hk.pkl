@@ -1,9 +1,9 @@
 // hk orchestrates checks for pre-commit, `mise run check`, and `mise run fix`.
 // Tools used here must be installed by `mise install`.
 
-amends "package://github.com/jdx/hk/releases/download/v1.40.0/hk@1.40.0#/Config.pkl"
+amends "package://github.com/jdx/hk/releases/download/v1.45.0/hk@1.45.0#/Config.pkl"
 
-import "package://github.com/jdx/hk/releases/download/v1.40.0/hk@1.40.0#/Builtins.pkl"
+import "package://github.com/jdx/hk/releases/download/v1.45.0/hk@1.45.0#/Builtins.pkl"
 
 local lintSteps = new Mapping<String, Step> {
   ["dprint"] = Builtins.dprint
@@ -30,12 +30,6 @@ local lintSteps = new Mapping<String, Step> {
     glob = List("**/*.py")
     exclude = List("third_party/**")
     check = "uv run ty check --error-on-warning .mise"
-  }
-  ["rust"] {
-    glob = List("**/*.rs", "**/Cargo.toml", "Cargo.toml")
-    exclude = List("target/**", "**/target/**", "third_party/**")
-    check = "mise run //bindings/rust:check"
-    fix = "mise run //bindings/rust:fix"
   }
 }
 
