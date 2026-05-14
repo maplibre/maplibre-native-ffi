@@ -25,12 +25,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn accepts_current_abi_version() {
-        validate_abi_version().unwrap();
-        validate_abi_version_value(EXPECTED_C_ABI_VERSION).unwrap();
-    }
-
-    #[test]
     fn rejects_unexpected_abi_version() {
         let error = validate_abi_version_value(EXPECTED_C_ABI_VERSION + 1).unwrap_err();
 

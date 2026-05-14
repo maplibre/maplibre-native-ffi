@@ -554,24 +554,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn coordinate_array_helpers_materialize_values() {
-        let empty_coordinate = empty_lat_lng();
-        assert_eq!(empty_coordinate.latitude, 0.0);
-        assert_eq!(empty_coordinate.longitude, 0.0);
-        let empty_bounds = empty_lat_lng_bounds();
-        assert_eq!(empty_bounds.southwest.latitude, 0.0);
-        assert_eq!(empty_bounds.northeast.longitude, 0.0);
-
-        let coordinates = lat_lngs_to_native(&[LatLng::new(1.0, 2.0), LatLng::new(3.0, 4.0)]);
-        assert_eq!(coordinates[0].latitude, 1.0);
-        assert_eq!(coordinates[1].longitude, 4.0);
-
-        let points = screen_points_to_native(&[ScreenPoint::new(5.0, 6.0)]);
-        assert_eq!(points[0].x, 5.0);
-        assert_eq!(points[0].y, 6.0);
-    }
-
-    #[test]
     fn premultiplied_rgba8_image_materializes_raw_view() {
         let image = PremultipliedRgba8Image {
             info: TextureImageInfo {

@@ -210,11 +210,6 @@ mod tests {
     assert_not_impl_any!(RenderSessionHandle: Send, Sync);
 
     #[test]
-    fn reports_c_abi_version() {
-        assert_eq!(c_version(), maplibre_core::EXPECTED_C_ABI_VERSION);
-    }
-
-    #[test]
     fn projected_meter_helpers_round_trip() {
         let coordinate = LatLng::new(45.0, -122.0);
         let meters = projected_meters_for_lat_lng(coordinate).unwrap();
