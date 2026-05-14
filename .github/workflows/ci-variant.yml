@@ -83,17 +83,15 @@ jobs:
       # Windows builds successfully, but native tests/examples are runtime-broken for now.
       - if: ${{ inputs.variant == 'windows-x64-vulkan' }}
         run: mise run build
-      - name: Run tests (Linux OpenGL — Mesa llvmpipe surfaceless)
-        if: ${{ contains(inputs.variant, 'opengl') && runner.os == 'Linux' }}
-        # EGL_PLATFORM=surfaceless — use EGL surfaceless platform (pbuffer only)
-        # LIBGL_ALWAYS_SOFTWARE=1  — force llvmpipe software rasterizer
-        # GALLIUM_DRIVER=llvmpipe  — select llvmpipe inside Mesa explicitly
+      - name: Run tests
+        if: ${{ inputs.variant != 'windows-x64-vulkan' }}
         env:
-          EGL_PLATFORM: surfaceless
-          LIBGL_ALWAYS_SOFTWARE: "1"
-          GALLIUM_DRIVER: llvmpipe
-        run: mise run test
-      - if: ${{ !contains(inputs.variant, 'opengl') && inputs.variant != 'windows-x64-vulkan' }}
+          # For OpenGL on Linux: direct EGL to the surfaceless platform and
+          # force Mesa llvmpipe so tests can render without a display server.
+          # These are no-ops for non-OpenGL backends (empty value is ignored).
+          EGL_PLATFORM: ${{ contains(inputs.variant, 'opengl') && runner.os == 'Linux' && 'surfaceless' || '' }}
+          LIBGL_ALWAYS_SOFTWARE: ${{ contains(inputs.variant, 'opengl') && runner.os == 'Linux' && '1' || '' }}
+          GALLIUM_DRIVER: ${{ contains(inputs.variant, 'opengl') && runner.os == 'Linux' && 'llvmpipe' || '' }}
         run: mise run test
       - run: mise run ci:prepare-native-artifact
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
