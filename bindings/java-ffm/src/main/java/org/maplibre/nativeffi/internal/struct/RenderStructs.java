@@ -82,8 +82,7 @@ public final class RenderStructs {
     return segment;
   }
 
-  public static MemorySegment eglSurfaceDescriptor(
-      EglSurfaceDescriptor descriptor, Arena arena) {
+  public static MemorySegment eglSurfaceDescriptor(EglSurfaceDescriptor descriptor, Arena arena) {
     var segment = MapLibreNativeC.mln_egl_surface_descriptor_default(arena);
     mln_egl_surface_descriptor.width(segment, descriptor.width());
     mln_egl_surface_descriptor.height(segment, descriptor.height());
