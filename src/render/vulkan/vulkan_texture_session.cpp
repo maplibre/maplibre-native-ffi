@@ -12,6 +12,7 @@
 #include "diagnostics/diagnostics.hpp"
 #include "map/map.hpp"
 #include "maplibre_native_c/base.h"
+#include "maplibre_native_c/render_target.h"
 #include "maplibre_native_c/texture.h"
 #include "render/render_session_common.hpp"
 #include "render/texture_session.hpp"
