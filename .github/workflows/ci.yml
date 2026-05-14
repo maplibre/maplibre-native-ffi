@@ -38,94 +38,22 @@ jobs:
     timeout-minutes: 10
     outputs:
       native: ${{ steps.matrix.outputs.native }}
-      examples: ${{ steps.matrix.outputs.examples }}
-      bindings: ${{ steps.matrix.outputs.bindings }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - uses: ./.github/actions/setup-ci-deps
       - id: matrix
-        run: |
-          {
-            echo "native=$(mise run -q ci:matrix native)"
-            echo "examples=$(mise run -q ci:matrix examples)"
-            echo "bindings=$(mise run -q ci:matrix bindings)"
-          } >> "$GITHUB_OUTPUT"
+        run: echo "native=$(mise run -q ci:matrix native)" >> "$GITHUB_OUTPUT"
 
-  native:
-    name: native / ${{ matrix.variant }}
-    runs-on: ${{ matrix.runner }}
+  variants:
+    name: variant / ${{ matrix.variant }}
     needs: prepare-matrices
-    timeout-minutes: 60
-    env:
-      MISE_ENV: ${{ matrix.variant }}
     strategy:
       fail-fast: false
       matrix: ${{ fromJson(needs.prepare-matrices.outputs.native) }}
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - name: Cache MapLibre Native source
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
-        with:
-          path: |
-            third_party/maplibre-native
-            .git/modules/third_party/maplibre-native
-          key: mln-src-v2-${{ hashFiles('.gitmodules', 'cmake/mln_version.cmake') }}
-      - uses: ./.github/actions/setup-ci-deps
-      - run: mise run configure
-      # Windows builds successfully, but native tests/examples are runtime-broken for now.
-      - if: ${{ matrix.variant == 'windows-x64-vulkan' }}
-        run: mise run build
-      - if: ${{ matrix.variant != 'windows-x64-vulkan' }}
-        run: mise run test
-      - run: mise run ci:prepare-native-artifact
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: native-${{ matrix.variant }}
-          path: ci-artifact
-          if-no-files-found: error
-          retention-days: 14
-
-  bindings:
-    name: bindings / ${{ matrix.binding }} / ${{ matrix.variant }}
-    runs-on: ${{ matrix.runner }}
-    needs:
-      - native
-      - prepare-matrices
-    timeout-minutes: 60
-    env:
-      MISE_ENV: ${{ matrix.variant }}
-    strategy:
-      fail-fast: false
-      matrix: ${{ fromJson(needs.prepare-matrices.outputs.bindings) }}
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - uses: ./.github/actions/setup-ci-deps
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: native-${{ matrix.variant }}
-          path: .
-      - run: mise run "${{ matrix.task }}"
-
-  examples:
-    name: examples / ${{ matrix.example }} / ${{ matrix.variant }}
-    runs-on: ${{ matrix.runner }}
-    needs:
-      - native
-      - prepare-matrices
-    timeout-minutes: 60
-    env:
-      MISE_ENV: ${{ matrix.variant }}
-    strategy:
-      fail-fast: false
-      matrix: ${{ fromJson(needs.prepare-matrices.outputs.examples) }}
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - uses: ./.github/actions/setup-ci-deps
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: native-${{ matrix.variant }}
-          path: .
-      - run: mise run "${{ matrix.task }}"
+    uses: ./.github/workflows/ci-variant.yml
+    with:
+      variant: ${{ matrix.variant }}
+      runner: ${{ matrix.runner }}
 
   required:
     name: ci-required
@@ -136,9 +64,7 @@ jobs:
       - hygiene
       - docs
       - prepare-matrices
-      - native
-      - bindings
-      - examples
+      - variants
     steps:
       - name: Fail if required jobs failed
         if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || contains(needs.*.result, 'skipped') }}
