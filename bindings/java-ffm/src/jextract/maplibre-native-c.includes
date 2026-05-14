@@ -528,8 +528,11 @@
 --include-function mln_style_tile_source_options_default
 
 # include/maplibre_native_c/surface.h
+--include-struct mln_egl_surface_descriptor
 --include-struct mln_metal_surface_descriptor
 --include-struct mln_vulkan_surface_descriptor
+--include-function mln_egl_surface_attach
+--include-function mln_egl_surface_descriptor_default
 --include-function mln_metal_surface_attach
 --include-function mln_metal_surface_descriptor_default
 --include-function mln_vulkan_surface_attach
