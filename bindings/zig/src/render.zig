@@ -238,6 +238,7 @@ pub const RenderSessionHandle = struct {
     state: *RenderSessionStateHandle,
 
     pub fn resize(self: RenderSessionHandle, extent: RenderTargetExtent) status.Error!void {
+        try ensureNoActiveOwnedFrame(self);
         try status.checkStatus(
             c.mln_render_session_resize(try native(self), extent.width, extent.height, extent.scale_factor),
             state(self).diagnostic_store,
@@ -245,10 +246,12 @@ pub const RenderSessionHandle = struct {
     }
 
     pub fn renderUpdate(self: RenderSessionHandle) status.Error!void {
+        try ensureNoActiveOwnedFrame(self);
         try status.checkStatus(c.mln_render_session_render_update(try native(self)), state(self).diagnostic_store);
     }
 
     pub fn detach(self: RenderSessionHandle) status.Error!void {
+        try ensureNoActiveOwnedFrame(self);
         try status.checkStatus(c.mln_render_session_detach(try native(self)), state(self).diagnostic_store);
     }
 
@@ -399,6 +402,7 @@ pub const RenderSessionHandle = struct {
     }
 
     pub fn acquireMetalOwnedTextureFrame(self: RenderSessionHandle) status.Error!MetalOwnedTextureFrameHandle {
+        try ensureNoActiveOwnedFrame(self);
         var frame = c.mln_metal_owned_texture_frame{
             .size = @sizeOf(c.mln_metal_owned_texture_frame),
             .generation = 0,
@@ -419,6 +423,7 @@ pub const RenderSessionHandle = struct {
     }
 
     pub fn acquireVulkanOwnedTextureFrame(self: RenderSessionHandle) status.Error!VulkanOwnedTextureFrameHandle {
+        try ensureNoActiveOwnedFrame(self);
         var frame = c.mln_vulkan_owned_texture_frame{
             .size = @sizeOf(c.mln_vulkan_owned_texture_frame),
             .generation = 0,
@@ -443,6 +448,7 @@ pub const RenderSessionHandle = struct {
     pub fn close(self: RenderSessionHandle) status.Error!void {
         const session_state = state(self);
         const session = session_state.native orelse return;
+        if (session_state.metal_frame_active or session_state.vulkan_frame_active) return error.ActiveBorrow;
         try status.checkStatus(c.mln_render_session_destroy(session), session_state.diagnostic_store);
         session_state.native = null;
     }
@@ -575,6 +581,9 @@ fn attach(
         attachFn(try map_module.native(map), descriptor, &session),
         map_module.diagnosticStore(map),
     );
+    errdefer {
+        if (session) |handle| _ = c.mln_render_session_destroy(handle);
+    }
     return try newRenderSession(session.?, map_module.diagnosticStore(map));
 }
 
@@ -593,6 +602,12 @@ fn state(handle: RenderSessionHandle) *RenderSessionState {
 
 fn native(handle: RenderSessionHandle) status.BindingError!*c.mln_render_session {
     return state(handle).native orelse error.ClosedHandle;
+}
+
+fn ensureNoActiveOwnedFrame(handle: RenderSessionHandle) status.BindingError!void {
+    const session_state = state(handle);
+    _ = session_state.native orelse return error.ClosedHandle;
+    if (session_state.metal_frame_active or session_state.vulkan_frame_active) return error.ActiveBorrow;
 }
 
 fn metalFrame(handle: MetalOwnedTextureFrameHandle) status.BindingError!c.mln_metal_owned_texture_frame {
@@ -828,14 +843,14 @@ fn copyOwnedFeature(allocator: std.mem.Allocator, raw: *const c.mln_feature) sta
     };
 }
 
-fn copyFeatureIdentifier(allocator: std.mem.Allocator, raw: c.mln_feature) std.mem.Allocator.Error!values.FeatureIdentifier {
+fn copyFeatureIdentifier(allocator: std.mem.Allocator, raw: c.mln_feature) status.Error!values.FeatureIdentifier {
     return switch (raw.identifier_type) {
         c.MLN_FEATURE_IDENTIFIER_TYPE_NULL => .null,
         c.MLN_FEATURE_IDENTIFIER_TYPE_UINT => .{ .uint = raw.identifier.uint_value },
         c.MLN_FEATURE_IDENTIFIER_TYPE_INT => .{ .int = raw.identifier.int_value },
         c.MLN_FEATURE_IDENTIFIER_TYPE_DOUBLE => .{ .double = raw.identifier.double_value },
         c.MLN_FEATURE_IDENTIFIER_TYPE_STRING => .{ .string = try copyStringView(allocator, raw.identifier.string_value) },
-        else => .null,
+        else => error.UnknownStatus,
     };
 }
 
@@ -860,4 +875,10 @@ fn vulkanContextToNative(context: VulkanContextDescriptor) c.mln_vulkan_context_
         .graphics_queue = context.graphics_queue.ptr,
         .graphics_queue_family_index = context.graphics_queue_family_index,
     };
+}
+
+test "feature identifier copy rejects unknown native tags" {
+    var feature = std.mem.zeroes(c.mln_feature);
+    feature.identifier_type = 0xbeef;
+    try std.testing.expectError(error.UnknownStatus, copyFeatureIdentifier(std.testing.allocator, feature));
 }

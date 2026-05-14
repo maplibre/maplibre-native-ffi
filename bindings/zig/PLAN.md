@@ -17,7 +17,7 @@ branch-specific work that remains.
 - [C API conventions](../../docs/src/content/docs/development/c-conventions.md)
 - [Concepts](../../docs/src/content/docs/concepts.md)
 - Comparable bindings in `bindings/rust/` and `bindings/java-ffm/`
-- Legacy direct Zig C tests in `tests/c/`
+- Retained direct Zig C ABI tests in `src/c_api/tests/zig/`
 - Zig binding tests in `bindings/zig/tests/`
 
 ## Current status
@@ -109,20 +109,47 @@ Acceptance:
 
 ### Milestone 4: decide API parity scope for the initial release
 
-Compare the Zig API against Rust and Java, then mark each gap as required before
-merge or deferred with rationale.
+Status: completed. The initial Zig release keeps the current tested low-level
+surface and defers the reviewed parity gaps below. These gaps are mechanical API
+coverage over existing C entry points, not ownership or safety blockers.
+Required pre-merge work remains focused on lifetime, callback, copied-output,
+and C ABI migration correctness.
 
-Review these gaps first:
+Deferred follow-up list with comparable APIs:
 
-- camera and navigation helpers: still-image requests, animated gesture
+- Camera and navigation helpers: still-image requests, animated gesture
   variants, fitting for coordinate lists and geometry, unwrapped bounds, bounds
-  constraints, and free-camera options;
-- style layer lifecycle and JSON helpers: add, remove, exists, move, and fetch
-  layer JSON;
-- projection `setVisibleGeometry`;
-- resource-transform clearing;
-- logging restore-default helper;
-- ergonomic overloads or optional placement for style-layer insertion.
+  constraints, and free-camera options. Comparable APIs: Rust
+  `bindings/rust/crates/maplibre-native/src/map.rs` methods
+  `request_still_image`, `move_by_animated`, `scale_by_animated`,
+  `rotate_by_animated`, `pitch_by_animated`, `camera_for_lat_lngs`,
+  `camera_for_geometry`, `lat_lng_bounds_for_camera_unwrapped`, `bounds`,
+  `set_bounds`, `free_camera_options`, and `set_free_camera_options`; Java
+  `bindings/java-ffm/src/main/java/org/maplibre/nativeffi/map/MapHandle.java`
+  methods `requestStillImage`, `moveByAnimated`, `scaleByAnimated`,
+  `rotateByAnimated`, `pitchByAnimated`, `cameraForLatLngs`,
+  `cameraForGeometry`, `latLngBoundsForCameraUnwrapped`, `bounds`, `setBounds`,
+  `freeCameraOptions`, and `setFreeCameraOptions`.
+- Style layer lifecycle and JSON helpers: add, remove, exists, move, and fetch
+  layer JSON. Comparable APIs: Rust `map/style.rs` methods
+  `add_style_layer_json`, `style_layer_json`, and style layer ID/type helpers;
+  Java `MapHandle.java` methods `addStyleLayerJson`, `removeStyleLayer`,
+  `styleLayerExists`, `moveStyleLayer`, and `styleLayerJson`.
+- Projection `setVisibleGeometry`. Comparable APIs: Rust
+  `bindings/rust/crates/maplibre-native/src/projection.rs` method
+  `set_visible_geometry`; Java `MapProjectionHandle.java` method
+  `setVisibleGeometry`.
+- Resource-transform clearing. Comparable implementation point: Java
+  `RuntimeHandle.java` resource-transform lifecycle; Zig currently supports
+  replacement only while native state accepts it.
+- Logging restore-default helper. Comparable API: Rust
+  `bindings/rust/crates/maplibre-native/src/logging.rs`
+  `restore_default_async_log_severity_mask`; Zig callers use
+  `setAsyncLogSeverityMask(.default, ...)`.
+- Ergonomic overloads or optional placement for style-layer insertion.
+  Comparable APIs: Java `MapHandle.java` overloads for `addStyleLayerJson` and
+  concrete layer helpers with optional `beforeLayerId`; Zig can add optional
+  placement wrappers without changing current explicit methods.
 
 Acceptance:
 
@@ -156,22 +183,10 @@ Acceptance:
 
 ### Milestone 6: relocate retained C ABI tests
 
-After binding-level migration is complete, move the retained raw C ABI tests out
-of the repository root `tests/` tree. Keep them near the C API implementation so
-the top-level layout does not present them as a peer product area beside `src`,
-`bindings`, and `examples`.
-
-Recommended shape:
-
-- move retained direct-C tests to a C API-owned path, such as
-  `src/c_api/tests/zig/`;
-- update the root `build.zig` test entrypoint and Objective-C support-file
-  paths;
-- update docs and task descriptions so contributors understand that this suite
-  validates the C ABI, not the Zig binding;
-- keep only tests that need raw C access: descriptor sizes, null-pointer
-  validation, unknown raw enum values, stale native handles, undersized output
-  buffers, and similar ABI contracts.
+Status: completed. Retained raw C ABI tests now live in `src/c_api/tests/zig/`,
+next to the C API implementation. The root `build.zig` test entrypoint and
+Objective-C support-file path use that location, and the root test step
+describes the suite as retained Zig C ABI tests.
 
 Acceptance:
 

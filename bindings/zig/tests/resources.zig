@@ -255,6 +255,23 @@ test "offline tile-pyramid regions copy definitions and metadata" {
     }
 }
 
+fn expectOfflineGeometryRegion(region: *const maplibre.OwnedOfflineRegion, expected_metadata: []const u8) !void {
+    try testing.expect(region.id > 0);
+    const definition = region.definition.geometry;
+    try testing.expectEqualStrings(offline_style_url, definition.style_url);
+    try testing.expectEqual(@as(f64, 5.0), definition.min_zoom);
+    try testing.expectEqual(@as(f64, 6.0), definition.max_zoom);
+    try testing.expectEqual(@as(f32, 2.0), definition.pixel_ratio);
+    try testing.expect(definition.include_ideographs);
+    const copied_line = definition.geometry.line_string;
+    try testing.expectEqual(@as(usize, 2), copied_line.len);
+    try testing.expectEqual(@as(f64, 1.0), copied_line[0].latitude);
+    try testing.expectEqual(@as(f64, 2.0), copied_line[0].longitude);
+    try testing.expectEqual(@as(f64, 3.0), copied_line[1].latitude);
+    try testing.expectEqual(@as(f64, 4.0), copied_line[1].longitude);
+    try testing.expectEqualSlices(u8, expected_metadata, region.metadata);
+}
+
 test "offline geometry regions expose copied geometry values" {
     var tmp = testing.tmpDir(.{});
     defer tmp.cleanup();
@@ -268,35 +285,47 @@ test "offline geometry regions expose copied geometry values" {
         .{ .latitude = 3.0, .longitude = 4.0 },
     };
     const metadata = [_]u8{ 7, 8, 9 };
+    var region_id: maplibre.OfflineRegionId = 0;
 
-    const runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{ .cache_path = cache_path }, null);
-    defer runtime.close() catch @panic("runtime close failed");
+    {
+        const runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{ .cache_path = cache_path }, null);
+        defer runtime.close() catch @panic("runtime close failed");
 
-    var created = try runtime.createOfflineRegion(testing.allocator, .{ .geometry = .{
-        .style_url = offline_style_url,
-        .geometry = .{ .line_string = coordinates[0..] },
-        .min_zoom = 5.0,
-        .max_zoom = 6.0,
-        .pixel_ratio = 2.0,
-        .include_ideographs = true,
-    } }, metadata[0..]);
-    defer created.deinit();
+        var created = try runtime.createOfflineRegion(testing.allocator, .{ .geometry = .{
+            .style_url = offline_style_url,
+            .geometry = .{ .line_string = coordinates[0..] },
+            .min_zoom = 5.0,
+            .max_zoom = 6.0,
+            .pixel_ratio = 2.0,
+            .include_ideographs = true,
+        } }, metadata[0..]);
+        defer created.deinit();
+        region_id = created.id;
+        try expectOfflineGeometryRegion(&created, metadata[0..]);
 
-    const definition = created.definition.geometry;
-    try testing.expectEqualStrings(offline_style_url, definition.style_url);
-    try testing.expectEqual(@as(f64, 5.0), definition.min_zoom);
-    try testing.expectEqual(@as(f64, 6.0), definition.max_zoom);
-    try testing.expectEqual(@as(f32, 2.0), definition.pixel_ratio);
-    try testing.expect(definition.include_ideographs);
-    const copied_line = definition.geometry.line_string;
-    try testing.expectEqual(@as(usize, 2), copied_line.len);
-    try testing.expectEqual(@as(f64, 1.0), copied_line[0].latitude);
-    try testing.expectEqual(@as(f64, 4.0), copied_line[1].longitude);
-    try testing.expectEqualSlices(u8, metadata[0..], created.metadata);
+        var list = try runtime.listOfflineRegions(testing.allocator);
+        defer list.deinit();
+        try testing.expectEqual(@as(usize, 1), list.items.len);
+        try expectOfflineGeometryRegion(&list.items[0], metadata[0..]);
+    }
+
+    {
+        const runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{ .cache_path = cache_path }, null);
+        defer runtime.close() catch @panic("runtime close failed");
+
+        var reloaded = (try runtime.getOfflineRegion(testing.allocator, region_id)) orelse return error.RegionReloadFailed;
+        defer reloaded.deinit();
+        try expectOfflineGeometryRegion(&reloaded, metadata[0..]);
+
+        try runtime.deleteOfflineRegion(region_id);
+        const missing = try runtime.getOfflineRegion(testing.allocator, region_id);
+        try testing.expect(missing == null);
+    }
 }
 
 const AsyncProviderState = struct {
-    handle: std.atomic.Value(usize) = std.atomic.Value(usize).init(0),
+    handle_index: std.atomic.Value(usize) = std.atomic.Value(usize).init(0),
+    handle_generation: std.atomic.Value(u64) = std.atomic.Value(u64).init(0),
     saw_style: std.atomic.Value(bool) = std.atomic.Value(bool).init(false),
     saw_all_loading: std.atomic.Value(bool) = std.atomic.Value(bool).init(false),
     saw_regular_priority: std.atomic.Value(bool) = std.atomic.Value(bool).init(false),
@@ -314,13 +343,14 @@ const AsyncProviderState = struct {
         self.saw_no_range.store(request.range == null, .seq_cst);
         self.saw_no_prior.store(request.prior_modified_unix_ms == null and request.prior_expires_unix_ms == null and
             request.prior_etag == null and request.prior_data.len == 0, .seq_cst);
-        self.handle.store(handle.state, .seq_cst);
+        self.handle_generation.store(handle.generation, .seq_cst);
+        self.handle_index.store(handle.index, .seq_cst);
     }
 
     fn takeHandle(self: *AsyncProviderState) ?maplibre.ResourceRequestHandle {
-        const raw = self.handle.swap(0, .seq_cst);
-        if (raw == 0) return null;
-        return .{ .state = raw };
+        const index = self.handle_index.swap(0, .seq_cst);
+        if (index == 0) return null;
+        return .{ .index = index, .generation = self.handle_generation.load(.seq_cst) };
     }
 
     fn expectObservedRequest(self: *AsyncProviderState) !void {
@@ -339,7 +369,7 @@ fn delayedStyleProvider(
     request: maplibre.ResourceRequest,
     maybe_handle: ?maplibre.ResourceRequestHandle,
 ) maplibre.ResourceProviderDecision {
-    if (!std.mem.eql(u8, request.url, "custom://delayed-style.json")) return .pass_through;
+    if (!std.mem.startsWith(u8, request.url, "custom://delayed-style")) return .pass_through;
     const handle = maybe_handle orelse return .pass_through;
     const state: *AsyncProviderState = @ptrCast(@alignCast(context.?));
     state.store(request, handle);
@@ -403,11 +433,45 @@ test "released resource request handle copies stay closed after later requests" 
     try map.setStyleUrl(testing.allocator, "custom://delayed-style.json");
     const live_handle = try waitForProviderHandle(runtime, &state);
     defer live_handle.release();
+    try testing.expectEqual(stale_handle.index, live_handle.index);
+    try testing.expect(stale_handle.generation != live_handle.generation);
 
     try testing.expectError(error.ClosedHandle, stale_handle.complete(.{ .bytes = support.style_json }));
     try testing.expect(!try live_handle.cancelled());
     try live_handle.complete(.{ .bytes = support.style_json });
     try waitForStyleLoaded(runtime);
+}
+
+test "resource request registry reuses slots across many handled requests" {
+    const runtime = try maplibre.RuntimeHandle.init(null);
+    defer runtime.close() catch @panic("runtime close failed");
+
+    var state = AsyncProviderState{};
+    try runtime.setResourceProvider(.{ .handler = delayedStyleProvider, .context = &state });
+
+    const map = try maplibre.MapHandle.create(runtime, .{});
+    defer map.close() catch @panic("map close failed");
+
+    var previous_index: ?usize = null;
+    var previous_generation: u64 = 0;
+    for (0..16) |request_index| {
+        const style_url = try std.fmt.allocPrint(testing.allocator, "custom://delayed-style-{d}.json", .{request_index});
+        defer testing.allocator.free(style_url);
+        try map.setStyleUrl(testing.allocator, style_url);
+
+        const handle = try waitForProviderHandle(runtime, &state);
+        try state.expectObservedRequest();
+        if (previous_index) |index| {
+            try testing.expectEqual(index, handle.index);
+            try testing.expect(previous_generation != handle.generation);
+        }
+        previous_index = handle.index;
+        previous_generation = handle.generation;
+
+        try handle.complete(.{ .bytes = support.style_json });
+        handle.release();
+        try waitForStyleLoaded(runtime);
+    }
 }
 
 test "resource provider can complete request from another thread" {

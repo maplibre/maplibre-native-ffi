@@ -237,7 +237,9 @@ pub const OwnedJsonValue = union(enum) {
     }
 };
 
-pub fn ownedJsonValueFromNative(allocator: std.mem.Allocator, raw: *const c.mln_json_value) std.mem.Allocator.Error!OwnedJsonValue {
+pub const JsonCopyError = std.mem.Allocator.Error || error{UnknownStatus};
+
+pub fn ownedJsonValueFromNative(allocator: std.mem.Allocator, raw: *const c.mln_json_value) JsonCopyError!OwnedJsonValue {
     return switch (raw.type) {
         c.MLN_JSON_VALUE_TYPE_NULL => .null,
         c.MLN_JSON_VALUE_TYPE_BOOL => .{ .bool = raw.data.bool_value },
@@ -284,7 +286,7 @@ pub fn ownedJsonValueFromNative(allocator: std.mem.Allocator, raw: *const c.mln_
             }
             break :blk .{ .object = copied };
         },
-        else => .null,
+        else => error.UnknownStatus,
     };
 }
 
@@ -453,7 +455,7 @@ pub const GeoJson = union(enum) {
     feature_collection: []const Feature,
 };
 
-pub const StyleSourceType = enum {
+pub const StyleSourceType = union(enum) {
     unknown,
     vector,
     raster,
@@ -463,6 +465,7 @@ pub const StyleSourceType = enum {
     video,
     annotations,
     custom_vector,
+    raw: u32,
 };
 
 pub const StyleSourceInfo = struct {
@@ -488,7 +491,7 @@ fn copyStringView(allocator: std.mem.Allocator, view: c.mln_string_view) std.mem
     return allocator.dupe(u8, view.data[0..view.size]);
 }
 
-pub fn styleSourceTypeFromNative(raw: u32) error{UnknownStatus}!StyleSourceType {
+pub fn styleSourceTypeFromNative(raw: u32) StyleSourceType {
     return switch (raw) {
         c.MLN_STYLE_SOURCE_TYPE_UNKNOWN => .unknown,
         c.MLN_STYLE_SOURCE_TYPE_VECTOR => .vector,
@@ -499,13 +502,13 @@ pub fn styleSourceTypeFromNative(raw: u32) error{UnknownStatus}!StyleSourceType 
         c.MLN_STYLE_SOURCE_TYPE_VIDEO => .video,
         c.MLN_STYLE_SOURCE_TYPE_ANNOTATIONS => .annotations,
         c.MLN_STYLE_SOURCE_TYPE_CUSTOM_VECTOR => .custom_vector,
-        else => error.UnknownStatus,
+        else => .{ .raw = raw },
     };
 }
 
-pub fn styleSourceInfoFromNative(raw: c.mln_style_source_info) error{UnknownStatus}!StyleSourceInfo {
+pub fn styleSourceInfoFromNative(raw: c.mln_style_source_info) StyleSourceInfo {
     return .{
-        .source_type = try styleSourceTypeFromNative(raw.type),
+        .source_type = styleSourceTypeFromNative(raw.type),
         .id_size = raw.id_size,
         .is_volatile = raw.is_volatile,
         .has_attribution = raw.has_attribution,
@@ -891,6 +894,19 @@ pub fn locationIndicatorImageKindToNative(value: LocationIndicatorImageKind) u32
         .bearing => c.MLN_LOCATION_INDICATOR_IMAGE_KIND_BEARING,
         .shadow => c.MLN_LOCATION_INDICATOR_IMAGE_KIND_SHADOW,
     };
+}
+
+test "owned JSON copy rejects unknown native tags" {
+    var unknown = c.mln_json_value{
+        .size = @sizeOf(c.mln_json_value),
+        .type = 0xbeef,
+        .data = .{ .bool_value = false },
+    };
+    try std.testing.expectError(error.UnknownStatus, ownedJsonValueFromNative(std.testing.allocator, &unknown));
+}
+
+test "growable style source type preserves unknown raw values" {
+    try std.testing.expect(std.meta.eql(styleSourceTypeFromNative(0xbeef), StyleSourceType{ .raw = 0xbeef }));
 }
 
 test "owned JSON copy handles empty native arrays and objects" {

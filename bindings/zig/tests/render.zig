@@ -152,6 +152,7 @@ test "owned texture render session lifecycle and readback" {
     var session = try maplibre.attachOwnedTexture(map, .{
         .extent = .{ .width = 32, .height = 16, .scale_factor = 1.0 },
     });
+    const session_copy = session;
     defer session.close() catch {};
 
     try testing.expectError(error.InvalidState, session.readPremultipliedRgba8(testing.allocator));
@@ -180,6 +181,7 @@ test "owned texture render session lifecycle and readback" {
     try session.close();
     try session.close();
     try testing.expectError(error.ClosedHandle, session.renderUpdate());
+    try testing.expectError(error.ClosedHandle, session_copy.renderUpdate());
 }
 
 test "owned texture attachment validates public descriptors" {
@@ -227,6 +229,19 @@ test "render session feature state set get and remove" {
         else => return error.ExpectedObject,
     };
     try testing.expectEqual(@as(usize, 2), members.len);
+    var saw_hover = false;
+    var saw_radius = false;
+    for (members) |member| {
+        if (std.mem.eql(u8, member.key, "hover")) {
+            try testing.expectEqual(true, member.value.bool);
+            saw_hover = true;
+        } else if (std.mem.eql(u8, member.key, "radius")) {
+            try testing.expectEqual(@as(u64, 20), member.value.uint);
+            saw_radius = true;
+        }
+    }
+    try testing.expect(saw_hover);
+    try testing.expect(saw_radius);
 
     try session.removeFeatureState(testing.allocator, .{ .source_id = "point", .feature_id = "feature-1", .state_key = "hover" });
     try testing.expect(try waitForEvent(runtime, .map_render_update_available));
@@ -240,6 +255,7 @@ test "render session feature state set get and remove" {
     };
     try testing.expectEqual(@as(usize, 1), after_members.len);
     try testing.expectEqualStrings("radius", after_members[0].key);
+    try testing.expectEqual(@as(u64, 20), after_members[0].value.uint);
 
     try testing.expectError(error.InvalidArgument, session.removeFeatureState(testing.allocator, .{ .source_id = "point", .state_key = "hover" }));
 }
@@ -369,8 +385,11 @@ test "Metal owned texture frame handle scopes native pointers" {
     try testing.expectEqual(@as(u64, 1), info.generation);
     try testing.expect(info.texture.ptr != info.device.ptr);
 
-    try testing.expectError(error.InvalidState, session.resize(.{ .width = 16, .height = 16, .scale_factor = 1.0 }));
-    try testing.expectError(error.InvalidState, session.close());
+    try testing.expectError(error.ActiveBorrow, session.resize(.{ .width = 16, .height = 16, .scale_factor = 1.0 }));
+    try testing.expectError(error.ActiveBorrow, session.renderUpdate());
+    try testing.expectError(error.ActiveBorrow, session.detach());
+    try testing.expectError(error.ActiveBorrow, session.acquireMetalOwnedTextureFrame());
+    try testing.expectError(error.ActiveBorrow, session.close());
 
     try frame.release();
     try frame.release();

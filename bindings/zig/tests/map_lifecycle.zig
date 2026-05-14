@@ -54,15 +54,25 @@ test "successful close is idempotent and closed handles fail before C calls" {
     defer diagnostics.deinit();
 
     const runtime = try maplibre.RuntimeHandle.init(&diagnostics);
+    const runtime_copy = runtime;
     const map = try maplibre.MapHandle.create(runtime, .{});
+    const map_copy = map;
+    const projection = try maplibre.MapProjectionHandle.create(map);
+    const projection_copy = projection;
+
+    try projection.close();
+    try projection.close();
+    try testing.expectError(error.ClosedHandle, projection_copy.getCamera());
 
     try map.close();
     try map.close();
     try testing.expectError(error.ClosedHandle, map.requestRepaint());
+    try testing.expectError(error.ClosedHandle, map_copy.requestRepaint());
 
     try runtime.close();
     try runtime.close();
     try testing.expectError(error.ClosedHandle, runtime.runOnce());
+    try testing.expectError(error.ClosedHandle, runtime_copy.runOnce());
 }
 
 test "failed close remains retryable" {

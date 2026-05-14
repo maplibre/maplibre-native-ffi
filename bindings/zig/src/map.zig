@@ -268,7 +268,7 @@ pub const MapHandle = struct {
             state(self).diagnostic_store,
         );
         if (!found) return null;
-        return try values.styleSourceTypeFromNative(raw_type);
+        return values.styleSourceTypeFromNative(raw_type);
     }
 
     pub fn getStyleSourceInfo(
@@ -292,7 +292,7 @@ pub const MapHandle = struct {
             state(self).diagnostic_store,
         );
         if (!found) return null;
-        return try values.styleSourceInfoFromNative(raw_info);
+        return values.styleSourceInfoFromNative(raw_info);
     }
 
     pub fn copyStyleSourceAttribution(

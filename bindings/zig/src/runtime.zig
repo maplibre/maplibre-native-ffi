@@ -23,11 +23,16 @@ const RuntimeState = struct {
 const ResourceRequestState = struct {
     native: ?*c.mln_resource_request_handle,
     completed: bool,
-    released: bool,
+};
+
+const ResourceRequestRegistrySlot = struct {
+    state: ?*ResourceRequestState,
+    generation: u64,
 };
 
 var resource_request_registry_lock = std.atomic.Value(bool).init(false);
-var resource_request_registry: std.ArrayList(?*ResourceRequestState) = .empty;
+var resource_request_registry: std.ArrayList(ResourceRequestRegistrySlot) = .empty;
+var resource_request_free_list: std.ArrayList(usize) = .empty;
 
 pub const RuntimeOptions = struct {
     asset_path: ?[]const u8 = null,
@@ -330,7 +335,8 @@ pub const ResourceProvider = struct {
 };
 
 pub const ResourceRequestHandle = struct {
-    state: usize,
+    index: usize,
+    generation: u64,
 
     pub fn complete(self: ResourceRequestHandle, response: ResourceResponse) status.Error!void {
         lockResourceRequestRegistry();
@@ -364,7 +370,6 @@ pub const ResourceRequestHandle = struct {
         const native_handle = request_state.native orelse return;
         c.mln_resource_request_release(native_handle);
         request_state.native = null;
-        request_state.released = true;
     }
 };
 
@@ -1029,8 +1034,9 @@ fn resourceProviderTrampoline(
 fn createResourceRequestHandle(native_handle: ?*c.mln_resource_request_handle) std.mem.Allocator.Error!?ResourceRequestHandle {
     const request_handle = native_handle orelse return null;
     const request_state = try std.heap.smp_allocator.create(ResourceRequestState);
-    request_state.* = .{ .native = request_handle, .completed = false, .released = false };
-    return .{ .state = try registerResourceRequestState(request_state) };
+    request_state.* = .{ .native = request_handle, .completed = false };
+    errdefer std.heap.smp_allocator.destroy(request_state);
+    return try registerResourceRequestState(request_state);
 }
 
 fn destroyUnreleasedResourceRequestHandle(handle: ResourceRequestHandle) void {
@@ -1039,27 +1045,39 @@ fn destroyUnreleasedResourceRequestHandle(handle: ResourceRequestHandle) void {
 
     const request_state = unregisterResourceRequestState(handle) orelse return;
     request_state.native = null;
-    request_state.released = true;
     std.heap.smp_allocator.destroy(request_state);
 }
 
-fn registerResourceRequestState(request_state: *ResourceRequestState) std.mem.Allocator.Error!usize {
+fn registerResourceRequestState(request_state: *ResourceRequestState) std.mem.Allocator.Error!ResourceRequestHandle {
     lockResourceRequestRegistry();
     defer unlockResourceRequestRegistry();
 
-    try resource_request_registry.append(std.heap.smp_allocator, request_state);
-    return resource_request_registry.items.len;
+    if (resource_request_free_list.items.len > 0) {
+        const slot_index = resource_request_free_list.pop().?;
+        resource_request_registry.items[slot_index].state = request_state;
+        return .{ .index = slot_index + 1, .generation = resource_request_registry.items[slot_index].generation };
+    }
+
+    try resource_request_registry.append(std.heap.smp_allocator, .{ .state = request_state, .generation = 1 });
+    return .{ .index = resource_request_registry.items.len, .generation = 1 };
 }
 
 fn resourceRequestState(handle: ResourceRequestHandle) ?*ResourceRequestState {
-    if (handle.state == 0 or handle.state > resource_request_registry.items.len) return null;
-    return resource_request_registry.items[handle.state - 1];
+    if (handle.index == 0 or handle.index > resource_request_registry.items.len) return null;
+    const slot = resource_request_registry.items[handle.index - 1];
+    if (slot.generation != handle.generation) return null;
+    return slot.state;
 }
 
 fn unregisterResourceRequestState(handle: ResourceRequestHandle) ?*ResourceRequestState {
-    if (handle.state == 0 or handle.state > resource_request_registry.items.len) return null;
-    const request_state = resource_request_registry.items[handle.state - 1] orelse return null;
-    resource_request_registry.items[handle.state - 1] = null;
+    if (handle.index == 0 or handle.index > resource_request_registry.items.len) return null;
+    const slot_index = handle.index - 1;
+    const slot = &resource_request_registry.items[slot_index];
+    if (slot.generation != handle.generation) return null;
+    const request_state = slot.state orelse return null;
+    slot.state = null;
+    slot.generation +%= 1;
+    resource_request_free_list.append(std.heap.smp_allocator, slot_index) catch {};
     return request_state;
 }
 

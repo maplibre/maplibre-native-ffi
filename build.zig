@@ -61,7 +61,7 @@ fn addCTests(b: *std.Build, options: BuildOptions) *std.Build.Step.Compile {
 
     const c_tests = b.addTest(.{
         .root_module = b.createModule(.{
-            .root_source_file = b.path("tests/c/main.zig"),
+            .root_source_file = b.path("src/c_api/tests/zig/main.zig"),
             .target = options.target,
             .optimize = options.optimize,
         }),
@@ -70,7 +70,7 @@ fn addCTests(b: *std.Build, options: BuildOptions) *std.Build.Step.Compile {
     c_tests.root_module.addOptions("build_options", build_options);
     linkMapLibreC(b, c_tests.root_module, options.cmake_artifact_dir);
     if (options.render_backend == .metal) {
-        c_tests.root_module.addCSourceFile(.{ .file = b.path("tests/c/metal_support_macos.m") });
+        c_tests.root_module.addCSourceFile(.{ .file = b.path("src/c_api/tests/zig/metal_support_macos.m") });
         c_tests.root_module.linkFramework("AppKit", .{});
         c_tests.root_module.linkFramework("Metal", .{});
         c_tests.root_module.linkFramework("QuartzCore", .{});
@@ -106,6 +106,6 @@ pub fn build(b: *std.Build) void {
         run_c_tests.addPathDir(".pixi/envs/default");
         run_c_tests.addPathDir(".pixi/envs/default/Library/bin");
     }
-    const test_step = b.step("test", "Run Zig C API tests");
+    const test_step = b.step("test", "Run retained Zig C ABI tests");
     test_step.dependOn(&run_c_tests.step);
 }
