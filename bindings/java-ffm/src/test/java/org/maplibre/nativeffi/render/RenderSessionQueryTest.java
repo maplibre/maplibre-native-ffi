@@ -170,18 +170,26 @@ final class RenderSessionQueryTest {
                   JsonValue.array(List.of(JsonValue.of("get"), JsonValue.of("kind"))),
                   JsonValue.of("capital")));
       var rendered =
-          session.queryRenderedFeatures(
+          waitForRenderedFeature(
+              runtime,
+              map,
+              session,
               geometry,
-              new RenderedFeatureQueryOptions().layerIds(List.of("point-circle")).filter(filter));
-      assertEquals(1, rendered.size());
-      assertEquals("point", rendered.getFirst().sourceId().orElseThrow());
-      assertEquals(JsonValue.of("capital"), member(rendered.getFirst().feature(), "kind"));
+              new RenderedFeatureQueryOptions().layerIds(List.of("point-circle")).filter(filter),
+              "rendered point feature");
+      assertEquals("point", rendered.sourceId().orElseThrow());
+      assertEquals(JsonValue.of("capital"), member(rendered.feature(), "kind"));
 
       var source =
-          session.querySourceFeatures("point", new SourceFeatureQueryOptions().filter(filter));
-      assertEquals(1, source.size());
-      assertEquals("point", source.getFirst().sourceId().orElseThrow());
-      assertEquals(JsonValue.of("capital"), member(source.getFirst().feature(), "kind"));
+          waitForSourceFeature(
+              runtime,
+              map,
+              session,
+              "point",
+              new SourceFeatureQueryOptions().filter(filter),
+              "source point feature");
+      assertEquals("point", source.sourceId().orElseThrow());
+      assertEquals(JsonValue.of("capital"), member(source.feature(), "kind"));
     } finally {
       session.close();
       map.close();
@@ -206,12 +214,13 @@ final class RenderSessionQueryTest {
                   new ScreenPoint(queryPoint.x() - 30.0, queryPoint.y() - 30.0),
                   new ScreenPoint(queryPoint.x() + 30.0, queryPoint.y() + 30.0)));
       var cluster =
-          waitForRenderedCluster(
+          waitForRenderedFeature(
               runtime,
               map,
               session,
               geometry,
-              new RenderedFeatureQueryOptions().layerIds(List.of("cluster-circle")));
+              new RenderedFeatureQueryOptions().layerIds(List.of("cluster-circle")),
+              "rendered cluster");
 
       var children =
           assertInstanceOf(
@@ -274,22 +283,43 @@ final class RenderSessionQueryTest {
     }
   }
 
-  private static QueriedFeature waitForRenderedCluster(
+  private static QueriedFeature waitForRenderedFeature(
       RuntimeHandle runtime,
       MapHandle map,
       RenderSessionHandle session,
       RenderedQueryGeometry geometry,
-      RenderedFeatureQueryOptions options)
+      RenderedFeatureQueryOptions options,
+      String description)
       throws InterruptedException {
     for (var attempt = 0; attempt < 1000; attempt++) {
-      var clusters = session.queryRenderedFeatures(geometry, options);
-      if (clusters.size() == 1) {
-        return clusters.getFirst();
+      var features = session.queryRenderedFeatures(geometry, options);
+      if (features.size() == 1) {
+        return features.getFirst();
       }
       renderPendingUpdates(runtime, map, session);
       Thread.sleep(1);
     }
-    fail("Timed out waiting for rendered cluster");
+    fail("Timed out waiting for " + description);
+    return null;
+  }
+
+  private static QueriedFeature waitForSourceFeature(
+      RuntimeHandle runtime,
+      MapHandle map,
+      RenderSessionHandle session,
+      String sourceId,
+      SourceFeatureQueryOptions options,
+      String description)
+      throws InterruptedException {
+    for (var attempt = 0; attempt < 1000; attempt++) {
+      var features = session.querySourceFeatures(sourceId, options);
+      if (features.size() == 1) {
+        return features.getFirst();
+      }
+      renderPendingUpdates(runtime, map, session);
+      Thread.sleep(1);
+    }
+    fail("Timed out waiting for " + description);
     return null;
   }
 
@@ -307,7 +337,7 @@ final class RenderSessionQueryTest {
   private static void renderPendingUpdates(
       RuntimeHandle runtime, MapHandle map, RenderSessionHandle session) {
     runtime.runOnce();
-    while (true) {
+    for (var eventCount = 0; eventCount < 100; eventCount++) {
       var event = runtime.pollEvent();
       if (event.isEmpty()) {
         return;

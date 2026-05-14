@@ -75,6 +75,58 @@ fn render_available_updates(runtime: &RuntimeHandle, session: &RenderSessionHand
     }
 }
 
+fn render_pending_updates(runtime: &RuntimeHandle, session: &RenderSessionHandle) {
+    let _ = runtime.run_once();
+    for _ in 0..100 {
+        let Ok(Some(event)) = runtime.poll_event() else {
+            return;
+        };
+        if event.event_type == RuntimeEventType::MapRenderUpdateAvailable {
+            let _ = session.render_update();
+        }
+    }
+}
+
+fn wait_for_rendered_feature(
+    runtime: &RuntimeHandle,
+    session: &RenderSessionHandle,
+    geometry: &RenderedQueryGeometry,
+    options: &RenderedFeatureQueryOptions,
+    description: &str,
+) -> QueriedFeature {
+    for _ in 0..1000 {
+        let features = session
+            .query_rendered_features(geometry, Some(options))
+            .unwrap();
+        if features.len() == 1 {
+            return features.into_iter().next().unwrap();
+        }
+        render_pending_updates(runtime, session);
+        std::thread::sleep(Duration::from_millis(1));
+    }
+    panic!("timed out waiting for {description}");
+}
+
+fn wait_for_source_feature(
+    runtime: &RuntimeHandle,
+    session: &RenderSessionHandle,
+    source_id: &str,
+    options: &SourceFeatureQueryOptions,
+    description: &str,
+) -> QueriedFeature {
+    for _ in 0..1000 {
+        let features = session
+            .query_source_features(source_id, Some(options))
+            .unwrap();
+        if features.len() == 1 {
+            return features.into_iter().next().unwrap();
+        }
+        render_pending_updates(runtime, session);
+        std::thread::sleep(Duration::from_millis(1));
+    }
+    panic!("timed out waiting for {description}");
+}
+
 fn feature_member<'a>(feature: &'a Feature, key: &str) -> Option<&'a JsonValue> {
     feature
         .properties
@@ -432,24 +484,30 @@ fn rendered_and_source_queries_copy_results() {
     let rendered_options = RenderedFeatureQueryOptions::new()
         .with_layer_ids(vec!["point-circle".into()])
         .with_filter(filter.clone());
-    let rendered = session
-        .query_rendered_features(&geometry, Some(&rendered_options))
-        .unwrap();
-    assert_eq!(rendered.len(), 1);
-    assert_eq!(rendered[0].source_id.as_deref(), Some("point"));
+    let rendered = wait_for_rendered_feature(
+        &runtime,
+        &session,
+        &geometry,
+        &rendered_options,
+        "rendered point feature",
+    );
+    assert_eq!(rendered.source_id.as_deref(), Some("point"));
     assert_eq!(
-        feature_member(&rendered[0].feature, "kind"),
+        feature_member(&rendered.feature, "kind"),
         Some(&JsonValue::String("capital".into()))
     );
 
     let source_options = SourceFeatureQueryOptions::new().with_filter(filter);
-    let source = session
-        .query_source_features("point", Some(&source_options))
-        .unwrap();
-    assert_eq!(source.len(), 1);
-    assert_eq!(source[0].source_id.as_deref(), Some("point"));
+    let source = wait_for_source_feature(
+        &runtime,
+        &session,
+        "point",
+        &source_options,
+        "source point feature",
+    );
+    assert_eq!(source.source_id.as_deref(), Some("point"));
     assert_eq!(
-        feature_member(&source[0].feature, "kind"),
+        feature_member(&source.feature, "kind"),
         Some(&JsonValue::String("capital".into()))
     );
 
@@ -473,20 +531,8 @@ fn feature_extension_queries_copy_value_and_feature_collection_results() {
         ScreenPoint::new(query_point.x + 30.0, query_point.y + 30.0),
     ));
     let options = RenderedFeatureQueryOptions::new().with_layer_ids(vec!["cluster-circle".into()]);
-    let cluster = (0..100)
-        .find_map(|_| {
-            let clusters = session
-                .query_rendered_features(&geometry, Some(&options))
-                .ok()?;
-            if clusters.len() == 1 {
-                clusters.into_iter().next()
-            } else {
-                render_available_updates(&runtime, &session, 1);
-                std::thread::sleep(Duration::from_millis(1));
-                None
-            }
-        })
-        .expect("timed out waiting for rendered cluster");
+    let cluster =
+        wait_for_rendered_feature(&runtime, &session, &geometry, &options, "rendered cluster");
 
     let children = session
         .query_feature_extension(

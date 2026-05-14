@@ -3,6 +3,8 @@ const testing = std.testing;
 const support = @import("support.zig");
 const c = support.c;
 
+extern fn usleep(useconds: c_uint) c_int;
+
 const query_style_json =
     \\{
     \\  "version": 8,
@@ -139,7 +141,26 @@ fn loadClusterStyleAndRender(runtime: *c.mln_runtime, map: *c.mln_map, session: 
     }
 }
 
-fn waitForRenderedCluster(runtime: *c.mln_runtime, map: *c.mln_map, session: *c.mln_render_session, geometry: *const c.mln_rendered_query_geometry, options: *const c.mln_rendered_feature_query_options) !*c.mln_feature_query_result {
+fn renderPendingUpdates(runtime: *c.mln_runtime, map: *c.mln_map, session: *c.mln_render_session) !void {
+    try testing.expectEqual(c.MLN_STATUS_OK, c.mln_runtime_run_once(runtime));
+    for (0..100) |_| {
+        var event = support.emptyEvent();
+        var has_event = false;
+        try testing.expectEqual(c.MLN_STATUS_OK, c.mln_runtime_poll_event(runtime, &event, &has_event));
+        if (!has_event) return;
+        if (event.type == c.MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE and
+            event.source_type == c.MLN_RUNTIME_EVENT_SOURCE_MAP and
+            event.source == @as(?*anyopaque, @ptrCast(map)))
+        {
+            const status = c.mln_render_session_render_update(session);
+            if (status != c.MLN_STATUS_INVALID_STATE) {
+                try testing.expectEqual(c.MLN_STATUS_OK, status);
+            }
+        }
+    }
+}
+
+fn waitForRenderedFeature(runtime: *c.mln_runtime, map: *c.mln_map, session: *c.mln_render_session, geometry: *const c.mln_rendered_query_geometry, options: *const c.mln_rendered_feature_query_options) !*c.mln_feature_query_result {
     for (0..1000) |_| {
         var result: ?*c.mln_feature_query_result = null;
         try testing.expectEqual(c.MLN_STATUS_OK, c.mln_render_session_query_rendered_features(session, geometry, options, &result));
@@ -149,11 +170,26 @@ fn waitForRenderedCluster(runtime: *c.mln_runtime, map: *c.mln_map, session: *c.
         if (count == 1) return result.?;
 
         c.mln_feature_query_result_destroy(result.?);
-        if (try support.waitForEvent(runtime, map, c.MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE)) {
-            try testing.expectEqual(c.MLN_STATUS_OK, c.mln_render_session_render_update(session));
-        }
+        try renderPendingUpdates(runtime, map, session);
+        _ = usleep(1000);
     }
-    return error.ClusterNotQueryable;
+    return error.RenderedFeatureNotQueryable;
+}
+
+fn waitForSourceFeature(runtime: *c.mln_runtime, map: *c.mln_map, session: *c.mln_render_session, source_id: c.mln_string_view, options: *const c.mln_source_feature_query_options) !*c.mln_feature_query_result {
+    for (0..1000) |_| {
+        var result: ?*c.mln_feature_query_result = null;
+        try testing.expectEqual(c.MLN_STATUS_OK, c.mln_render_session_query_source_features(session, source_id, options, &result));
+
+        var count: usize = 0;
+        try testing.expectEqual(c.MLN_STATUS_OK, c.mln_feature_query_result_count(result.?, &count));
+        if (count == 1) return result.?;
+
+        c.mln_feature_query_result_destroy(result.?);
+        try renderPendingUpdates(runtime, map, session);
+        _ = usleep(1000);
+    }
+    return error.SourceFeatureNotQueryable;
 }
 
 fn expectFeatureKind(feature: *const c.mln_queried_feature, expected: []const u8) !void {
@@ -218,12 +254,8 @@ test "render session queries rendered and source features" {
     const rendered_filter = jsonArray(&rendered_filter_values);
     rendered_options.filter = &rendered_filter;
 
-    try testing.expectEqual(c.MLN_STATUS_OK, c.mln_render_session_query_rendered_features(session, &rendered_geometry, &rendered_options, &rendered_result));
+    rendered_result = try waitForRenderedFeature(runtime, map, session, &rendered_geometry, &rendered_options);
     defer c.mln_feature_query_result_destroy(rendered_result.?);
-
-    var count: usize = 0;
-    try testing.expectEqual(c.MLN_STATUS_OK, c.mln_feature_query_result_count(rendered_result.?, &count));
-    try testing.expectEqual(@as(usize, 1), count);
 
     var rendered_feature: c.mln_queried_feature = .{ .size = @sizeOf(c.mln_queried_feature), .fields = 0, .feature = undefined, .source_id = .{ .data = null, .size = 0 }, .source_layer_id = .{ .data = null, .size = 0 }, .state = null };
     try testing.expectEqual(c.MLN_STATUS_OK, c.mln_feature_query_result_get(rendered_result.?, 0, &rendered_feature));
@@ -238,13 +270,8 @@ test "render session queries rendered and source features" {
     const source_filter = jsonArray(&source_filter_values);
     source_options.filter = &source_filter;
 
-    var source_result: ?*c.mln_feature_query_result = null;
-    try testing.expectEqual(c.MLN_STATUS_OK, c.mln_render_session_query_source_features(session, stringView("point"), &source_options, &source_result));
+    const source_result: ?*c.mln_feature_query_result = try waitForSourceFeature(runtime, map, session, stringView("point"), &source_options);
     defer c.mln_feature_query_result_destroy(source_result.?);
-
-    count = 0;
-    try testing.expectEqual(c.MLN_STATUS_OK, c.mln_feature_query_result_count(source_result.?, &count));
-    try testing.expectEqual(@as(usize, 1), count);
 
     var source_feature: c.mln_queried_feature = .{ .size = @sizeOf(c.mln_queried_feature), .fields = 0, .feature = undefined, .source_id = .{ .data = null, .size = 0 }, .source_layer_id = .{ .data = null, .size = 0 }, .state = null };
     try testing.expectEqual(c.MLN_STATUS_OK, c.mln_feature_query_result_get(source_result.?, 0, &source_feature));
@@ -278,7 +305,7 @@ test "render session queries feature extensions" {
     options.layer_ids = &layer_ids;
     options.layer_id_count = layer_ids.len;
 
-    const cluster_result = try waitForRenderedCluster(runtime, map, session, &geometry, &options);
+    const cluster_result = try waitForRenderedFeature(runtime, map, session, &geometry, &options);
     defer c.mln_feature_query_result_destroy(cluster_result);
 
     var cluster: c.mln_queried_feature = .{ .size = @sizeOf(c.mln_queried_feature), .fields = 0, .feature = undefined, .source_id = .{ .data = null, .size = 0 }, .source_layer_id = .{ .data = null, .size = 0 }, .state = null };
