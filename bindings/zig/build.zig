@@ -3,12 +3,12 @@ const std = @import("std");
 const BuildOptions = struct {
     target: std.Build.ResolvedTarget,
     optimize: std.builtin.OptimizeMode,
-    cmake_artifact_dir_path: []const u8,
     cmake_artifact_dir: std.Build.LazyPath,
+    cmake_artifact_dir_runtime_path: []const u8,
     render_backend: RenderBackend,
 };
 
-const RenderBackend = enum {
+pub const RenderBackend = enum {
     metal,
     vulkan,
 };
@@ -34,19 +34,12 @@ fn renderBackend(b: *std.Build) RenderBackend {
     std.debug.panic("unsupported render backend: {s}", .{value});
 }
 
-fn cmakeArtifactDirPath(b: *std.Build) []const u8 {
+fn cmakeArtifactDir(b: *std.Build) std.Build.LazyPath {
     return b.option(
-        []const u8,
+        std.Build.LazyPath,
         "cmake-artifact-dir",
         "Directory containing the CMake-built maplibre-native-c library",
     ) orelse @panic("missing required -Dcmake-artifact-dir=<path-to-cmake-artifacts>");
-}
-
-fn lazyPath(b: *std.Build, path: []const u8) std.Build.LazyPath {
-    if (std.fs.path.isAbsolute(path)) {
-        return .{ .cwd_relative = path };
-    }
-    return b.path(path);
 }
 
 fn pixiLibraryDir(b: *std.Build, target: std.Build.ResolvedTarget) std.Build.LazyPath {
@@ -168,12 +161,12 @@ fn addPrivateModuleTests(
 
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
-    const cmake_artifact_dir_path = cmakeArtifactDirPath(b);
+    const cmake_artifact_dir = cmakeArtifactDir(b);
     const options = BuildOptions{
         .target = target,
         .optimize = b.standardOptimizeOption(.{}),
-        .cmake_artifact_dir_path = cmake_artifact_dir_path,
-        .cmake_artifact_dir = lazyPath(b, cmake_artifact_dir_path),
+        .cmake_artifact_dir = cmake_artifact_dir,
+        .cmake_artifact_dir_runtime_path = cmake_artifact_dir.getPath2(b, null),
         .render_backend = renderBackend(b),
     };
     checkSupportedTarget(options.target, options.render_backend);
@@ -196,19 +189,19 @@ pub fn build(b: *std.Build) void {
     const run_logging_tests = b.addRunArtifact(logging_tests);
     const run_map_tests = b.addRunArtifact(map_tests);
     if (target.result.os.tag == .windows) {
-        run_binding_tests.addPathDir(options.cmake_artifact_dir_path);
+        run_binding_tests.addPathDir(options.cmake_artifact_dir_runtime_path);
         run_binding_tests.addPathDir("../../.pixi/envs/default");
         run_binding_tests.addPathDir("../../.pixi/envs/default/Library/bin");
-        run_status_tests.addPathDir(options.cmake_artifact_dir_path);
+        run_status_tests.addPathDir(options.cmake_artifact_dir_runtime_path);
         run_status_tests.addPathDir("../../.pixi/envs/default");
         run_status_tests.addPathDir("../../.pixi/envs/default/Library/bin");
-        run_runtime_tests.addPathDir(options.cmake_artifact_dir_path);
+        run_runtime_tests.addPathDir(options.cmake_artifact_dir_runtime_path);
         run_runtime_tests.addPathDir("../../.pixi/envs/default");
         run_runtime_tests.addPathDir("../../.pixi/envs/default/Library/bin");
-        run_logging_tests.addPathDir(options.cmake_artifact_dir_path);
+        run_logging_tests.addPathDir(options.cmake_artifact_dir_runtime_path);
         run_logging_tests.addPathDir("../../.pixi/envs/default");
         run_logging_tests.addPathDir("../../.pixi/envs/default/Library/bin");
-        run_map_tests.addPathDir(options.cmake_artifact_dir_path);
+        run_map_tests.addPathDir(options.cmake_artifact_dir_runtime_path);
         run_map_tests.addPathDir("../../.pixi/envs/default");
         run_map_tests.addPathDir("../../.pixi/envs/default/Library/bin");
     }

@@ -6,6 +6,7 @@
             .url = "git+https://github.com/mitchellh/zig-objc.git#c8de82ff80281215ad92900866dab7103a8efa8b",
             .hash = "zig_objc-0.0.0-Ir_Sp9gsAQCPAJc0oF5xoWePHWP6Y6tCphDeyNUThJoi",
         },
+        .maplibre_native = .{ .path = "../../bindings/zig" },
     },
     .paths = .{""},
     .fingerprint = 0x2e1fc989e1e5656a,

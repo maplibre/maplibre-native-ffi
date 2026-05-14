@@ -25,24 +25,18 @@ fn renderBackend(b: *std.Build) RenderBackend {
 }
 
 fn cmakeArtifactDir(b: *std.Build) std.Build.LazyPath {
-    const path = b.option(
-        []const u8,
+    return b.option(
+        std.Build.LazyPath,
         "cmake-artifact-dir",
         "Directory containing the CMake-built maplibre-native-c library",
-    ) orelse "../../build/host";
-
-    if (std.fs.path.isAbsolute(path)) {
-        return .{ .cwd_relative = path };
-    }
-    return b.path(path);
+    ) orelse b.path("../../build/host");
 }
 
-fn linkMapLibreC(b: *std.Build, module: *std.Build.Module, cmake_artifact_dir: std.Build.LazyPath) void {
-    module.addIncludePath(b.path("../../include"));
-    module.addLibraryPath(cmake_artifact_dir);
-    module.addRPath(cmake_artifact_dir);
-    module.linkSystemLibrary("maplibre-native-c", .{});
-    module.link_libc = true;
+fn renderBackendName(render_backend: RenderBackend) []const u8 {
+    return switch (render_backend) {
+        .metal => "metal",
+        .vulkan => "vulkan",
+    };
 }
 
 fn pixiIncludeDir(b: *std.Build, target: std.Build.ResolvedTarget) std.Build.LazyPath {
@@ -78,6 +72,16 @@ fn failUnsupportedTarget() noreturn {
     @panic("zig-map does not support this target platform");
 }
 
+fn maplibreNativeModule(b: *std.Build, options: BuildOptions) *std.Build.Module {
+    const dependency = b.dependency("maplibre_native", .{
+        .target = options.target,
+        .optimize = options.optimize,
+        .@"cmake-artifact-dir" = options.cmake_artifact_dir,
+        .@"render-backend" = renderBackendName(options.render_backend),
+    });
+    return dependency.module("maplibre_native");
+}
+
 fn addZigMapExample(b: *std.Build, options: BuildOptions) *std.Build.Step.Compile {
     const build_options = b.addOptions();
     build_options.addOption(bool, "supports_metal", options.render_backend == .metal);
@@ -93,7 +97,7 @@ fn addZigMapExample(b: *std.Build, options: BuildOptions) *std.Build.Step.Compil
     });
 
     example.root_module.addOptions("build_options", build_options);
-    linkMapLibreC(b, example.root_module, options.cmake_artifact_dir);
+    example.root_module.addImport("maplibre_native", maplibreNativeModule(b, options));
     example.root_module.addIncludePath(pixiIncludeDir(b, options.target));
     example.root_module.addLibraryPath(pixiLibraryDir(b, options.target));
     example.root_module.addRPath(pixiLibraryDir(b, options.target));

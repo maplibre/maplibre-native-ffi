@@ -1,11 +1,19 @@
 const std = @import("std");
 const build_options = @import("build_options");
-
-const c = @import("c.zig").c;
+const maplibre = @import("maplibre_native");
 
 const width = 512;
 const height = 512;
-const style_url = "https://tiles.openfreemap.org/styles/bright";
+const style_json =
+    \\{
+    \\  "version": 8,
+    \\  "name": "zig-readback",
+    \\  "sources": {},
+    \\  "layers": [
+    \\    {"id":"background","type":"background","paint":{"background-color":"#d8f1ff"}}
+    \\  ]
+    \\}
+;
 
 pub fn main(init_args: std.process.Init) !void {
     const allocator = init_args.gpa;
@@ -14,135 +22,87 @@ pub fn main(init_args: std.process.Init) !void {
     _ = args.skip();
     const output_path = args.next() orelse "map.ppm";
 
-    _ = c.mln_log_set_async_severity_mask(0);
-    defer _ = c.mln_log_set_async_severity_mask(c.MLN_LOG_SEVERITY_MASK_DEFAULT);
-    try logAndValidateNativeRenderBackend();
+    try maplibre.setAsyncLogSeverityMask(.none, null);
+    defer maplibre.setAsyncLogSeverityMask(.default, null) catch {};
+    try logAndValidateRenderBackend();
 
-    var runtime: ?*c.mln_runtime = null;
-    var runtime_options = c.mln_runtime_options_default();
-    runtime_options.cache_path = ":memory:";
-    try check(c.mln_runtime_create(&runtime_options, &runtime), "runtime create failed");
-    defer _ = c.mln_runtime_destroy(runtime.?);
+    const runtime = try maplibre.RuntimeHandle.create(allocator, .{ .cache_path = ":memory:" }, null);
+    defer runtime.close() catch {};
 
-    var map: ?*c.mln_map = null;
-    var map_options = c.mln_map_options_default();
-    map_options.width = width;
-    map_options.height = height;
-    map_options.scale_factor = 1.0;
-    map_options.map_mode = c.MLN_MAP_MODE_STATIC;
-    try check(c.mln_map_create(runtime.?, &map_options, &map), "map create failed");
-    defer _ = c.mln_map_destroy(map.?);
+    const map = try maplibre.MapHandle.create(runtime, .{
+        .width = width,
+        .height = height,
+        .scale_factor = 1.0,
+        .mode = .continuous,
+    });
+    defer map.close() catch {};
 
-    var texture: ?*c.mln_render_session = null;
-    var texture_descriptor = c.mln_owned_texture_descriptor_default();
-    texture_descriptor.extent.width = width;
-    texture_descriptor.extent.height = height;
-    texture_descriptor.extent.scale_factor = 1.0;
-    try check(c.mln_owned_texture_attach(map.?, &texture_descriptor, &texture), "owned texture attach failed");
-    defer _ = c.mln_render_session_destroy(texture.?);
+    var texture = try maplibre.attachOwnedTexture(map, .{
+        .extent = .{ .width = width, .height = height, .scale_factor = 1.0 },
+    });
+    defer texture.close() catch {};
 
-    try setInitialCamera(map.?);
-    try check(c.mln_map_set_style_url(map.?, style_url), "style load failed");
-    try check(c.mln_map_request_still_image(map.?), "still image request failed");
-    try renderTexture(runtime.?, map.?, texture.?);
+    try setInitialCamera(map);
+    try map.setStyleJson(allocator, style_json);
+    try renderTexture(runtime, map, texture);
 
-    var info = c.mln_texture_image_info_default();
-    const probe_status = c.mln_texture_read_premultiplied_rgba8(texture.?, null, 0, &info);
-    if (probe_status != c.MLN_STATUS_INVALID_ARGUMENT) {
-        try check(probe_status, "texture readback size query failed");
-    }
+    const image = try texture.readPremultipliedRgba8(allocator);
+    defer image.deinit();
 
-    const rgba = try allocator.alloc(u8, info.byte_length);
-    defer allocator.free(rgba);
-    try check(c.mln_texture_read_premultiplied_rgba8(texture.?, rgba.ptr, rgba.len, &info), "texture readback failed");
-    try writePpm(init_args.io, allocator, output_path, rgba, info);
-    std.debug.print("wrote {s} ({d}x{d})\n", .{ output_path, info.width, info.height });
+    try writePpm(init_args.io, allocator, output_path, image.data, image.info);
+    std.debug.print("wrote {s} ({d}x{d})\n", .{ output_path, image.info.width, image.info.height });
 }
 
-fn logAndValidateNativeRenderBackend() !void {
-    const mask = c.mln_supported_render_backend_mask();
-    const expected = expectedNativeRenderBackend();
-    std.debug.print("native render backends: {s}\n", .{renderBackendMaskLabel(mask)});
-    if (mask & expected == 0) return error.NativeRenderBackendMismatch;
+fn logAndValidateRenderBackend() !void {
+    const support = maplibre.supportedRenderBackends();
+    std.debug.print("native render backends: {s}\n", .{renderBackendSupportLabel(support)});
+    if (build_options.supports_metal and !support.metal) return error.NativeRenderBackendMismatch;
+    if (build_options.supports_vulkan and !support.vulkan) return error.NativeRenderBackendMismatch;
 }
 
-fn expectedNativeRenderBackend() u32 {
-    if (build_options.supports_metal) return c.MLN_RENDER_BACKEND_FLAG_METAL;
-    if (build_options.supports_vulkan) return c.MLN_RENDER_BACKEND_FLAG_VULKAN;
-    return 0;
-}
-
-fn renderBackendMaskLabel(mask: u32) []const u8 {
-    const supports_metal = mask & c.MLN_RENDER_BACKEND_FLAG_METAL != 0;
-    const supports_vulkan = mask & c.MLN_RENDER_BACKEND_FLAG_VULKAN != 0;
-    if (supports_metal and supports_vulkan) return "metal,vulkan";
-    if (supports_metal) return "metal";
-    if (supports_vulkan) return "vulkan";
+fn renderBackendSupportLabel(support: maplibre.RenderBackendSupport) []const u8 {
+    if (support.metal and support.vulkan) return "metal,vulkan";
+    if (support.metal) return "metal";
+    if (support.vulkan) return "vulkan";
     return "none";
 }
 
-fn setInitialCamera(map: *c.mln_map) !void {
-    var camera = c.mln_camera_options_default();
-    camera.fields = c.MLN_CAMERA_OPTION_CENTER |
-        c.MLN_CAMERA_OPTION_ZOOM |
-        c.MLN_CAMERA_OPTION_BEARING |
-        c.MLN_CAMERA_OPTION_PITCH;
-    camera.latitude = 37.7749;
-    camera.longitude = -122.4194;
-    camera.zoom = 13.0;
-    camera.bearing = 12.0;
-    camera.pitch = 30.0;
-    try check(c.mln_map_jump_to(map, &camera), "camera jump failed");
+fn setInitialCamera(map: maplibre.MapHandle) !void {
+    try map.jumpTo(.{
+        .center = .{ .latitude = 37.7749, .longitude = -122.4194 },
+        .zoom = 13.0,
+        .bearing = 12.0,
+        .pitch = 30.0,
+    });
 }
 
-fn renderTexture(runtime: *c.mln_runtime, map: *c.mln_map, texture: *c.mln_render_session) !void {
-    var rendered_frame = false;
-    while (true) {
-        try check(c.mln_runtime_run_once(runtime), "runtime pump failed");
-
-        while (true) {
-            var event = emptyEvent();
-            var has_event = false;
-            try check(c.mln_runtime_poll_event(runtime, &event, &has_event), "event poll failed");
-            if (!has_event) break;
-            if (event.source_type != c.MLN_RUNTIME_EVENT_SOURCE_MAP or
-                event.source != @as(?*anyopaque, @ptrCast(map))) continue;
-
-            switch (event.type) {
-                c.MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE => {
-                    const status = c.mln_render_session_render_update(texture);
-                    if (status == c.MLN_STATUS_OK) {
-                        rendered_frame = true;
-                    } else if (status != c.MLN_STATUS_INVALID_STATE) {
-                        try check(status, "texture render failed");
-                    }
-                },
-                c.MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FINISHED => {
-                    if (!rendered_frame) return error.StillImageFinishedWithoutFrame;
-                    return;
-                },
-                c.MLN_RUNTIME_EVENT_MAP_LOADING_FAILED => return error.MapLoadingFailed,
-                c.MLN_RUNTIME_EVENT_MAP_RENDER_ERROR => return error.MapRenderFailed,
-                c.MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FAILED => return error.StillImageFailed,
+fn renderTexture(
+    runtime: maplibre.RuntimeHandle,
+    map: maplibre.MapHandle,
+    texture: maplibre.RenderSessionHandle,
+) !void {
+    const map_id = try map.id();
+    for (0..10_000) |_| {
+        try runtime.runOnce();
+        while (try runtime.pollEvent()) |event| {
+            if (event.source_type != .map or event.source_id == null or !std.meta.eql(event.source_id.?, map_id)) continue;
+            switch (event.event_type) {
+                .map_loading_failed => return error.MapLoadingFailed,
+                .map_render_error => return error.MapRenderFailed,
                 else => {},
             }
         }
-    }
-}
 
-fn emptyEvent() c.mln_runtime_event {
-    return .{
-        .size = @sizeOf(c.mln_runtime_event),
-        .type = 0,
-        .source_type = c.MLN_RUNTIME_EVENT_SOURCE_RUNTIME,
-        .source = null,
-        .code = 0,
-        .payload_type = c.MLN_RUNTIME_EVENT_PAYLOAD_NONE,
-        .payload = null,
-        .payload_size = 0,
-        .message = null,
-        .message_size = 0,
-    };
+        texture.renderUpdate() catch |err| switch (err) {
+            error.InvalidState => {
+                std.Thread.yield() catch {};
+                continue;
+            },
+            else => return err,
+        };
+        return;
+    }
+    return error.RenderTimedOut;
 }
 
 fn writePpm(
@@ -150,7 +110,7 @@ fn writePpm(
     allocator: std.mem.Allocator,
     output_path: []const u8,
     rgba: []const u8,
-    info: c.mln_texture_image_info,
+    info: maplibre.TextureImageInfo,
 ) !void {
     const pixel_count = @as(usize, @intCast(info.width)) * @as(usize, @intCast(info.height));
     const rgb = try allocator.alloc(u8, pixel_count * 3);
@@ -173,15 +133,4 @@ fn writePpm(
     );
     try file.writeStreamingAll(io, header);
     try file.writeStreamingAll(io, rgb);
-}
-
-fn check(status: c.mln_status, context: []const u8) !void {
-    if (status == c.MLN_STATUS_OK) return;
-    const diagnostic = std.mem.span(c.mln_thread_last_error_message());
-    if (diagnostic.len == 0) {
-        std.debug.print("{s}: status {d}\n", .{ context, status });
-    } else {
-        std.debug.print("{s}: {s}\n", .{ context, diagnostic });
-    }
-    return error.CApiFailed;
 }

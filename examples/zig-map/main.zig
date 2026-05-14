@@ -4,6 +4,7 @@ const objc = if (build_options.supports_metal) @import("objc") else struct {};
 
 const c = @import("c.zig").c;
 const diagnostics = @import("diagnostics.zig");
+const maplibre = @import("maplibre_native");
 const input = @import("input.zig");
 const map_state = @import("map_state.zig");
 const render = @import("render/mod.zig");
@@ -17,8 +18,8 @@ pub fn main(init_args: std.process.Init) !void {
     std.debug.print("render target: {s}\n", .{target_mode.label()});
     try logAndValidateNativeRenderBackend();
 
-    _ = c.mln_log_set_callback(diagnostics.logCallback, null);
-    defer _ = c.mln_log_clear_callback();
+    try maplibre.setLogCallback(.{ .handler = diagnostics.logRecord }, null);
+    defer maplibre.clearLogCallback(null) catch {};
 
     if (!c.SDL_Init(c.SDL_INIT_VIDEO)) {
         std.debug.print("SDL_Init failed: {s}\n", .{std.mem.span(c.SDL_GetError())});
@@ -53,7 +54,7 @@ pub fn main(init_args: std.process.Init) !void {
     var backend = try Backend.init(allocator, window_handle, current_viewport, target_mode);
     defer backend.deinit();
 
-    var map = try map_state.MapState.init(current_viewport, &backend);
+    var map = try map_state.MapState.init(allocator, current_viewport, &backend);
     defer map.deinit();
     defer backend.finishFrame() catch |err| {
         std.debug.print("failed to finish final frame: {s}\n", .{@errorName(err)});
@@ -99,7 +100,7 @@ pub fn main(init_args: std.process.Init) !void {
             }
         }
 
-        _ = c.mln_runtime_run_once(map.runtime);
+        try map.runtime.runOnce();
         const render_update_available = try map_state.drainEvents(map.runtime, map.map);
         render_pending = render_pending or render_update_available;
         did_work = did_work or render_update_available;
@@ -127,24 +128,16 @@ pub fn main(init_args: std.process.Init) !void {
 }
 
 fn logAndValidateNativeRenderBackend() !void {
-    const mask = c.mln_supported_render_backend_mask();
-    const expected = expectedNativeRenderBackend();
-    std.debug.print("native render backends: {s}\n", .{renderBackendMaskLabel(mask)});
-    if (mask & expected == 0) return error.NativeRenderBackendMismatch;
+    const support = maplibre.supportedRenderBackends();
+    std.debug.print("native render backends: {s}\n", .{renderBackendSupportLabel(support)});
+    if (build_options.supports_metal and !support.metal) return error.NativeRenderBackendMismatch;
+    if (build_options.supports_vulkan and !support.vulkan) return error.NativeRenderBackendMismatch;
 }
 
-fn expectedNativeRenderBackend() u32 {
-    if (build_options.supports_metal) return c.MLN_RENDER_BACKEND_FLAG_METAL;
-    if (build_options.supports_vulkan) return c.MLN_RENDER_BACKEND_FLAG_VULKAN;
-    return 0;
-}
-
-fn renderBackendMaskLabel(mask: u32) []const u8 {
-    const supports_metal = mask & c.MLN_RENDER_BACKEND_FLAG_METAL != 0;
-    const supports_vulkan = mask & c.MLN_RENDER_BACKEND_FLAG_VULKAN != 0;
-    if (supports_metal and supports_vulkan) return "metal,vulkan";
-    if (supports_metal) return "metal";
-    if (supports_vulkan) return "vulkan";
+fn renderBackendSupportLabel(support: maplibre.RenderBackendSupport) []const u8 {
+    if (support.metal and support.vulkan) return "metal,vulkan";
+    if (support.metal) return "metal";
+    if (support.vulkan) return "vulkan";
     return "none";
 }
 

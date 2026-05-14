@@ -60,7 +60,7 @@ platform and render backend.
 ## Common Commands
 
 ```bash
-# Build and test
+# Build and test the native C API plus supported in-repo binding suites
 mise run test
 
 # Build only
@@ -69,7 +69,15 @@ mise run build
 # Run linters and formatters
 mise run fix
 
+# Run the Zig binding suite directly
+mise run //bindings/zig:test
+
+# Build focused Zig examples
+mise run //examples/zig-readback:build
+mise run //examples/zig-map:build
+
 # Run examples
+mise run //examples/zig-readback:run
 mise run //examples/zig-map:run
 
 # Build the documentation site
@@ -132,12 +140,19 @@ Markdown into `docs/src/content/docs/reference/`.
 
 ## Tests And Examples
 
-Every feature needs automated CI coverage when practical. Tests consume the
-public C API. Zig tests also check header shape because `@cImport` catches C API
-issues quickly.
+Every feature needs automated CI coverage when practical. The root
+`mise run test` command builds the native library, runs the direct Zig C API
+suite, and runs the public Zig binding suite for supported host variants.
+
+Use `mise run //bindings/zig:test` when you need a narrower loop for Zig binding
+changes. Use root `mise run test` before and after retiring duplicate direct C
+assertions or changing shared build integration.
 
 Use examples for demos and behavior that needs manual validation, such as visual
-output, interactive input, or host graphics integration.
+output, interactive input, or host graphics integration. Build examples before
+running them in CI-like checks. Run GUI examples with a short timeout when you
+only need a smoke test because they keep running until the user closes the
+window.
 
 Keep examples small. This repository includes low-level language bindings and
 focused integration examples. Full application SDKs live outside this

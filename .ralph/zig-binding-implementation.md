@@ -162,14 +162,14 @@ For each phase or smaller milestone:
 
 ### Phase 9: examples and documentation
 
-- [ ] Port `examples/zig-readback` to the binding.
-- [ ] Port `examples/zig-map` to the binding.
-- [ ] Update contributor docs and command lists for Zig binding tasks.
-- [ ] Add the Zig binding suite to root `mise run test` when supported by native
+- [x] Port `examples/zig-readback` to the binding.
+- [x] Port `examples/zig-map` to the binding.
+- [x] Update contributor docs and command lists for Zig binding tasks.
+- [x] Add the Zig binding suite to root `mise run test` when supported by native
       variants.
-- [ ] Update `.github/config/variants.toml` and workflow task lists for
+- [x] Update `.github/config/variants.toml` and workflow task lists for
       supported platform/render-backend variants and explicit exclusions.
-- [ ] Keep examples small and focused on low-level binding usage.
+- [x] Keep examples small and focused on low-level binding usage.
 - [ ] Review, apply findings, commit, and push.
 
 ### Final definition of done
@@ -884,6 +884,103 @@ For each phase or smaller milestone:
   passed: `mise run fix`, `mise run //bindings/zig:test` (79/79 tests passed),
   and `mise run test` (87 passed, 12 skipped; 99 total). Phase 8 was committed
   and pushed as the reviewed render-target/readback milestone.
+- 2026-05-14: Iteration 43 started Phase 9 examples by porting
+  `examples/zig-readback` from direct `@cImport`/raw C calls to the public
+  `maplibre_native` Zig binding. The example now depends on `bindings/zig` as a
+  local package, creates runtime/map/render-session handles through public APIs,
+  uses semantic camera/render/readback values, writes the copied owned image to
+  PPM, and removed its example-local `c.zig` MapLibre C import.
+- 2026-05-14: Iteration 43 made the binding package's build `RenderBackend` enum
+  public so downstream build scripts can use the `linkMaplibreNativeC` helper or
+  dependency options with a stable type. Verification passed: `mise run fix`,
+  `mise run //bindings/zig:test` (79/79 tests passed),
+  `mise run //examples/zig-readback:build`, and a bounded
+  `mise run //examples/zig-readback:run` completed in about 3.5s and wrote
+  `examples/zig-readback/zig-out/macos-arm64-metal/zig-readback.ppm`.
+- 2026-05-14: Iteration 44 ported `examples/zig-map` from raw MapLibre C calls
+  to the public `maplibre_native` binding. The example now depends on the local
+  binding package, uses public runtime/map/render-session handles in its app
+  state, drives camera commands through semantic binding methods, drains binding
+  runtime events, and attaches Metal/Vulkan render targets through public
+  descriptor APIs. The example-local `c.zig` now imports SDL/Metal/Vulkan only;
+  `rg "mln_|logAbiError" examples/zig-map` returns no MapLibre raw-C usage.
+- 2026-05-14: Iteration 44 verification passed after the Zig map port:
+  `mise run fix`, `mise run //bindings/zig:test` (79/79 tests passed),
+  `mise run //examples/zig-readback:build`, and
+  `mise run //examples/zig-map:build`. A bounded
+  `mise run //examples/zig-map:run:owned-texture` launched the GUI example,
+  printed controls/backend information, processed resize events, and was stopped
+  after 8s as expected for a GUI app.
+- 2026-05-14: Iteration 45 updated contributor documentation for the Zig binding
+  workflow: `docs/src/content/docs/development/overview.md` now lists focused
+  binding/example commands and clarifies root test coverage, and
+  `docs/src/content/docs/development/bindings-zig.md` now includes a build/test
+  guide for the binding package and examples. Audience/category: contributors,
+  how-to guide.
+- 2026-05-14: Iteration 45 integrated the Zig binding suite into root
+  `mise run test` by running the binding package tests after the direct Zig C
+  API suite with the same native artifact directory and render-backend variant.
+- 2026-05-14: Iteration 45 updated `.github/config/variants.toml` so CI runs
+  `//bindings/zig:ci` on Linux/macOS Metal/Vulkan-supported variants and runs a
+  Windows Zig binding build-only check while native runtime tests remain
+  excluded on Windows. Matrix previews passed for
+  `mise run ci:matrix bindings
+  --pretty` and
+  `mise run ci:matrix examples --pretty`.
+- 2026-05-14: Iteration 45 verification passed: `mise run test` now runs the
+  direct C suite (87 passed, 12 skipped; 99 total) and then the Zig binding
+  suite (79/79 passed), followed by `mise run fix` with all checks passing and a
+  second `mise run test` with the same counts after formatting.
+- 2026-05-14: Iteration 46 reflection:
+  - Accomplished so far: Phases 1-8 are complete, reviewed, verified, committed,
+    and pushed. Phase 9 has ported both Zig examples to the public binding,
+    added contributor/build documentation, integrated the binding suite into
+    root `mise run test`, and added Zig binding CI matrix entries with an
+    explicit Windows build-only path.
+  - Working well: the public binding is now the normal Zig consumption path for
+    tests, examples, and root verification. Parallel reviews continue to find
+    real integration issues that local host builds can miss, especially package
+    consumption from outside the repository.
+  - Not working/blocking: the Phase 9 diff is reviewed but not committed yet.
+    One reviewer found that forwarding relative `cmake-artifact-dir` strings to
+    the binding dependency resolved them relative to `bindings/zig`, which would
+    break external Zig consumers with relative artifact paths.
+  - Approach adjustment: finish Phase 9 by tightening package-consumer path
+    handling and recording the external-consumer smoke test, then rerun the
+    root/example verification and commit/push the milestone before the final
+    definition-of-done audit.
+  - Next priorities: finish applying Phase 9 review findings, run final Phase 9
+    verification, commit and push the example/docs/integration milestone, then
+    perform a final public-boundary/full-verification pass.
+- 2026-05-14: Iteration 46 ran Phase 9 parallel review `ff87536b` with two
+  reviewers. Reviewer 0 found no blockers and confirmed the examples use public
+  MapLibre binding APIs while keeping `@cImport` to SDL/Metal/Vulkan host
+  integration. Reviewer 1 found a package-consumption bug: relative
+  `cmake-artifact-dir` values forwarded to the `maplibre_native` dependency were
+  interpreted relative to `bindings/zig` instead of the consuming build.
+- 2026-05-14: Iteration 46 applied the package-consumption review finding by
+  changing `cmake-artifact-dir` handling in `bindings/zig/build.zig`,
+  `examples/zig-readback/build.zig`, and `examples/zig-map/build.zig` from raw
+  string paths to `std.Build.LazyPath` options. Example build scripts now pass a
+  LazyPath to the binding dependency so relative paths stay anchored to the
+  consumer build root; the binding still resolves a runtime path string for
+  Windows test `PATH` setup.
+- 2026-05-14: Iteration 46 kept the examples small/focused after review:
+  `rg "mln_|maplibre_native_c|logAbiError" examples/zig-readback examples/zig-map`
+  finds no raw MapLibre C usage, while the remaining example-local `@cImport`
+  imports only host integration headers in `examples/zig-map/c.zig`. Line-count
+  spot check: `zig-readback/main.zig` is 136 lines, and the larger `zig-map`
+  files stay focused on SDL input/windowing plus Metal/Vulkan host render setup.
+- 2026-05-14: Iteration 46 verification after review fixes passed:
+  `mise run //bindings/zig:test` (79/79 passed),
+  `mise run //examples/zig-readback:build`, `mise run //examples/zig-map:build`,
+  `mise run fix`, and `mise run test` (direct C suite 87 passed, 12 skipped; Zig
+  binding suite 79/79 passed). A temporary external Zig consumer at
+  `/tmp/mln-zig-consumer.cQxEls` also built successfully while passing
+  `b.path("relative-artifacts")` as the binding dependency's
+  `cmake-artifact-dir`, covering the relative-path review finding. One parallel
+  `ensure-native-library` run failed due a concurrent CMake/Ninja regeneration
+  race; rerunning the Zig map build sequentially passed.
 - 2026-05-14: Iteration 31 added public resource-provider cancellation coverage:
   a delayed request survives callback return, the map closes before completion,
   `cancelled()` becomes true, and late completion reports `error.InvalidState`.
@@ -995,6 +1092,17 @@ For each phase or smaller milestone:
   `/Users/sargunv/.pi/agent/sessions/--Users-sargunv-Code-maplibre-native-ffi--/subagent-artifacts/38ebc2f9_reviewer_0_output.md`
   and
   `/Users/sargunv/.pi/agent/sessions/--Users-sargunv-Code-maplibre-native-ffi--/subagent-artifacts/38ebc2f9_reviewer_1_output.md`.
+- Phase 9 parallel review run `ff87536b` completed with two reviewers. Findings
+  applied: `cmake-artifact-dir` forwarding to the `maplibre_native` Zig
+  dependency now uses `std.Build.LazyPath` so external consumers can pass
+  relative artifact paths anchored to their build roots. Findings deferred:
+  examples could thread `DiagnosticStore` through more operations for richer
+  native messages, but the current examples intentionally keep diagnostics thin
+  and focused while demonstrating binding API usage; revisit if examples gain
+  error-handling guidance. Artifacts:
+  `/Users/sargunv/.pi/agent/sessions/--Users-sargunv-Code-maplibre-native-ffi--/subagent-artifacts/ff87536b_reviewer_0_output.md`
+  and
+  `/Users/sargunv/.pi/agent/sessions/--Users-sargunv-Code-maplibre-native-ffi--/subagent-artifacts/ff87536b_reviewer_1_output.md`.
 
 ## Notes and decisions
 
@@ -1090,3 +1198,7 @@ For each phase or smaller milestone:
   binding generations instead of per-acquire heap state. Release clears the
   active slot, repeated release is a no-op, and stale copied frame handles see
   `error.ClosedHandle` after the slot generation changes or is cleared.
+- The Zig examples should use the public binding for MapLibre APIs. They may
+  still import host-platform libraries such as SDL, Metal, Objective-C, and
+  Vulkan directly because those are application integration dependencies rather
+  than MapLibre C ABI declarations.

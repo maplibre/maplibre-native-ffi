@@ -25,38 +25,28 @@ fn renderBackend(b: *std.Build) RenderBackend {
 }
 
 fn cmakeArtifactDir(b: *std.Build) std.Build.LazyPath {
-    const path = b.option(
-        []const u8,
+    return b.option(
+        std.Build.LazyPath,
         "cmake-artifact-dir",
         "Directory containing the CMake-built maplibre-native-c library",
-    ) orelse "../../build/host";
-
-    if (std.fs.path.isAbsolute(path)) {
-        return .{ .cwd_relative = path };
-    }
-    return b.path(path);
+    ) orelse b.path("../../build/host");
 }
 
-fn linkMapLibreC(b: *std.Build, module: *std.Build.Module, cmake_artifact_dir: std.Build.LazyPath) void {
-    module.addIncludePath(b.path("../../include"));
-    module.addLibraryPath(cmake_artifact_dir);
-    module.addRPath(cmake_artifact_dir);
-    module.linkSystemLibrary("maplibre-native-c", .{});
-    module.link_libc = true;
-}
-
-fn pixiLibraryDir(b: *std.Build, target: std.Build.ResolvedTarget) std.Build.LazyPath {
-    return switch (target.result.os.tag) {
-        .windows => b.path("../../.pixi/envs/default/Library/lib"),
-        else => b.path("../../.pixi/envs/default/lib"),
+fn renderBackendName(render_backend: RenderBackend) []const u8 {
+    return switch (render_backend) {
+        .metal => "metal",
+        .vulkan => "vulkan",
     };
 }
 
-fn vulkanLibraryName(target: std.Build.ResolvedTarget) []const u8 {
-    return switch (target.result.os.tag) {
-        .windows => "vulkan-1",
-        else => "vulkan",
-    };
+fn addMaplibreNativeModule(b: *std.Build, options: BuildOptions) *std.Build.Module {
+    const dependency = b.dependency("maplibre_native", .{
+        .target = options.target,
+        .optimize = options.optimize,
+        .@"cmake-artifact-dir" = options.cmake_artifact_dir,
+        .@"render-backend" = renderBackendName(options.render_backend),
+    });
+    return dependency.module("maplibre_native");
 }
 
 fn addReadbackExample(b: *std.Build, options: BuildOptions) *std.Build.Step.Compile {
@@ -74,16 +64,7 @@ fn addReadbackExample(b: *std.Build, options: BuildOptions) *std.Build.Step.Comp
     });
 
     example.root_module.addOptions("build_options", build_options);
-    linkMapLibreC(b, example.root_module, options.cmake_artifact_dir);
-    example.root_module.addLibraryPath(pixiLibraryDir(b, options.target));
-    example.root_module.addRPath(pixiLibraryDir(b, options.target));
-    if (options.render_backend == .vulkan) {
-        example.root_module.addIncludePath(b.path("../../third_party/maplibre-native/vendor/Vulkan-Headers/include"));
-        example.root_module.linkSystemLibrary(vulkanLibraryName(options.target), .{});
-    } else if (options.render_backend == .metal) {
-        example.root_module.linkFramework("Metal", .{});
-        example.root_module.linkFramework("QuartzCore", .{});
-    }
+    example.root_module.addImport("maplibre_native", addMaplibreNativeModule(b, options));
     b.installArtifact(example);
     return example;
 }
