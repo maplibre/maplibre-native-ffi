@@ -10,10 +10,10 @@ Resources: [Zig C interop](https://ziglang.org/documentation/master/#C) and
 
 The Zig binding exposes one safe low-level package over the public C API.
 
-Keep `@cImport` declarations from `include/maplibre_native_c.h` private. Raw C
-handles, C structs, C field masks, C function pointers, and `callconv(.c)`
-trampolines stay below the public API. Public APIs use Zig values, handles,
-slices, allocators, function pointers, context pointers, and error unions.
+Keep `@cImport` declarations from `maplibre_native_c.h` private. Raw C handles,
+C structs, C field masks, C function pointers, and `callconv(.c)` trampolines
+stay below the public API. Public APIs use Zig values, handles, slices,
+allocators, function pointers, context pointers, and error unions.
 
 Direct C calls are fine inside the package. Add private helpers only for
 repeated invariants such as status checking, diagnostic capture, string
