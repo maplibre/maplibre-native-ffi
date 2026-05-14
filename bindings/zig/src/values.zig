@@ -121,6 +121,71 @@ pub const TileOptions = struct {
     lod_mode: ?TileLodMode = null,
 };
 
+pub const StyleTileScheme = enum {
+    xyz,
+    tms,
+};
+
+pub const StyleVectorTileEncoding = enum {
+    mvt,
+    mlt,
+};
+
+pub const StyleRasterDemEncoding = enum {
+    mapbox,
+    terrarium,
+};
+
+pub const StyleTileSourceOptions = struct {
+    min_zoom: ?f64 = null,
+    max_zoom: ?f64 = null,
+    attribution: ?[]const u8 = null,
+    scheme: ?StyleTileScheme = null,
+    bounds: ?LatLngBounds = null,
+    tile_size: ?u32 = null,
+    vector_encoding: ?StyleVectorTileEncoding = null,
+    raster_encoding: ?StyleRasterDemEncoding = null,
+};
+
+pub const PremultipliedRgba8Image = struct {
+    width: u32,
+    height: u32,
+    stride: u32,
+    pixels: []const u8,
+};
+
+pub const StyleImageOptions = struct {
+    pixel_ratio: ?f32 = null,
+    sdf: ?bool = null,
+};
+
+pub const StyleImageInfo = struct {
+    width: u32,
+    height: u32,
+    stride: u32,
+    byte_length: usize,
+    pixel_ratio: f32,
+    sdf: bool,
+};
+
+pub const OwnedStyleImage = struct {
+    allocator: std.mem.Allocator,
+    info: StyleImageInfo,
+    pixels: []u8,
+
+    pub fn deinit(self: *OwnedStyleImage) void {
+        self.allocator.free(self.pixels);
+        self.pixels = &.{};
+        self.info = .{ .width = 0, .height = 0, .stride = 0, .byte_length = 0, .pixel_ratio = 1.0, .sdf = false };
+    }
+};
+
+pub const LocationIndicatorImageKind = enum {
+    top,
+    bearing,
+    shadow,
+};
+
 pub const JsonMember = struct {
     key: []const u8,
     value: JsonValue,
@@ -762,6 +827,69 @@ pub fn tileOptionsFromNative(raw: c.mln_map_tile_options) error{UnknownStatus}!T
         .lod_pitch_threshold = if ((raw.fields & c.MLN_MAP_TILE_OPTION_LOD_PITCH_THRESHOLD) != 0) raw.lod_pitch_threshold else null,
         .lod_zoom_shift = if ((raw.fields & c.MLN_MAP_TILE_OPTION_LOD_ZOOM_SHIFT) != 0) raw.lod_zoom_shift else null,
         .lod_mode = if ((raw.fields & c.MLN_MAP_TILE_OPTION_LOD_MODE) != 0) try tileLodModeFromNative(raw.lod_mode) else null,
+    };
+}
+
+pub fn styleTileSchemeToNative(value: StyleTileScheme) u32 {
+    return switch (value) {
+        .xyz => c.MLN_STYLE_TILE_SCHEME_XYZ,
+        .tms => c.MLN_STYLE_TILE_SCHEME_TMS,
+    };
+}
+
+pub fn styleVectorTileEncodingToNative(value: StyleVectorTileEncoding) u32 {
+    return switch (value) {
+        .mvt => c.MLN_STYLE_VECTOR_TILE_ENCODING_MVT,
+        .mlt => c.MLN_STYLE_VECTOR_TILE_ENCODING_MLT,
+    };
+}
+
+pub fn styleRasterDemEncodingToNative(value: StyleRasterDemEncoding) u32 {
+    return switch (value) {
+        .mapbox => c.MLN_STYLE_RASTER_DEM_ENCODING_MAPBOX,
+        .terrarium => c.MLN_STYLE_RASTER_DEM_ENCODING_TERRARIUM,
+    };
+}
+
+pub fn premultipliedRgba8ImageToNative(value: PremultipliedRgba8Image) c.mln_premultiplied_rgba8_image {
+    var raw = c.mln_premultiplied_rgba8_image_default();
+    raw.width = value.width;
+    raw.height = value.height;
+    raw.stride = value.stride;
+    raw.pixels = if (value.pixels.len == 0) null else value.pixels.ptr;
+    raw.byte_length = value.pixels.len;
+    return raw;
+}
+
+pub fn styleImageOptionsToNative(value: StyleImageOptions) c.mln_style_image_options {
+    var raw = c.mln_style_image_options_default();
+    if (value.pixel_ratio) |pixel_ratio| {
+        raw.fields |= c.MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO;
+        raw.pixel_ratio = pixel_ratio;
+    }
+    if (value.sdf) |sdf| {
+        raw.fields |= c.MLN_STYLE_IMAGE_OPTION_SDF;
+        raw.sdf = sdf;
+    }
+    return raw;
+}
+
+pub fn styleImageInfoFromNative(raw: c.mln_style_image_info) StyleImageInfo {
+    return .{
+        .width = raw.width,
+        .height = raw.height,
+        .stride = raw.stride,
+        .byte_length = raw.byte_length,
+        .pixel_ratio = raw.pixel_ratio,
+        .sdf = raw.sdf,
+    };
+}
+
+pub fn locationIndicatorImageKindToNative(value: LocationIndicatorImageKind) u32 {
+    return switch (value) {
+        .top => c.MLN_LOCATION_INDICATOR_IMAGE_KIND_TOP,
+        .bearing => c.MLN_LOCATION_INDICATOR_IMAGE_KIND_BEARING,
+        .shadow => c.MLN_LOCATION_INDICATOR_IMAGE_KIND_SHADOW,
     };
 }
 

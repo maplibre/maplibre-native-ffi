@@ -108,18 +108,18 @@ For each phase or smaller milestone:
 
 ### Phase 5: options, values, and copied results
 
-- [ ] Add public Zig value types needed for camera, geometry, render extents,
+- [x] Add public Zig value types needed for camera, geometry, render extents,
       style images, query options, offline regions, events, and resource
       metadata.
-- [ ] Represent C option structs as semantic Zig descriptors and materialize C
+- [x] Represent C option structs as semantic Zig descriptors and materialize C
       ABI fields internally.
-- [ ] Add private temporary storage helpers for strings, string views, arrays,
+- [x] Add private temporary storage helpers for strings, string views, arrays,
       nested descriptor graphs, and output pointers.
-- [ ] Add native result guards for snapshot/list/query handles.
-- [ ] Add owned output deinit paths and tests.
-- [ ] Port matching value/descriptor tests: style, style values, camera,
+- [x] Add native result guards for snapshot/list/query handles.
+- [x] Add owned output deinit paths and tests.
+- [x] Port matching value/descriptor tests: style, style values, camera,
       projection, map tuning, and geojson as supported.
-- [ ] Review, apply findings, commit, and push.
+- [x] Review, apply findings, commit, and push.
 
 ### Phase 6: events and source identity
 
@@ -174,19 +174,19 @@ For each phase or smaller milestone:
 
 ### Final definition of done
 
-- [ ] Public package exposes no raw C declarations.
-- [ ] Relocated Zig binding tests pass through public binding APIs.
-- [ ] Zig binding suite covers behavior previously covered by direct Zig C API
+- [x] Public package exposes no raw C declarations.
+- [x] Relocated Zig binding tests pass through public binding APIs.
+- [x] Zig binding suite covers behavior previously covered by direct Zig C API
       tests.
-- [ ] Handle close, diagnostic capture, copied output, callback state, and
+- [x] Handle close, diagnostic capture, copied output, callback state, and
       render frame lifetimes have tests.
-- [ ] Examples use the binding package.
-- [ ] `mise run test` includes the Zig binding suite in the normal project path
+- [x] Examples use the binding package.
+- [x] `mise run test` includes the Zig binding suite in the normal project path
       where supported.
-- [ ] Final parallel review has no blocking findings or all sensible findings
+- [x] Final parallel review has no blocking findings or all sensible findings
       are applied.
-- [ ] Final full verification is recorded.
-- [ ] Final commit is pushed.
+- [x] Final full verification is recorded.
+- [x] Final commit is pushed.
 - [ ] Output `<promise>COMPLETE</promise>` only after the final pushed state
       satisfies this definition.
 
@@ -1012,6 +1012,101 @@ For each phase or smaller milestone:
   with hillshade/color-relief layers, location indicator helpers, and some
   vector/raster source helper behavior still covered only by
   `tests/c/style_values.zig`.
+- 2026-05-14: Iteration 48 started resolving the remaining final-review style
+  helper blocker. Added public semantic style helper values for tile source
+  options, tile schemes, vector/raster DEM encodings, premultiplied RGBA8 style
+  images, style image options/info/owned copies, and location indicator image
+  kind placeholders in `bindings/zig/src/values.zig`, with root exports and
+  public-boundary coverage.
+- 2026-05-14: Iteration 48 added public map APIs for style light JSON/property
+  set/get, vector/raster/raster DEM URL and tile source helpers, hillshade and
+  color-relief layer helpers, style layer type lookup, runtime style image
+  set/exists/info/copy/remove, plus private `TempStorage.stringViews` and tile
+  source option materialization.
+- 2026-05-14: Iteration 48 ported binding tests for three previously direct-C
+  style helper domains: style light updates, runtime style image copied-pixel
+  lifecycle, and vector/raster/raster DEM source helpers with hillshade and
+  color-relief layers. Verification passed before and after formatting:
+  `mise run //bindings/zig:test` (82/82 passed) and `mise run fix`.
+- 2026-05-14: Iteration 48 remaining style-helper coverage before final DoD:
+  image source URL/inline-image/coordinate helpers and location indicator layer
+  helpers still need public binding APIs/tests or explicit final scoping before
+  the final review blocker is resolved.
+- 2026-05-14: Iteration 49 finished the remaining style-helper public API slice:
+  added binding methods for image source URL, inline image, coordinate update,
+  and coordinate copy helpers, plus location-indicator layer creation and
+  focused property setters for location, bearing, accuracy radius, and image
+  names.
+- 2026-05-14: Iteration 49 ported binding tests for the last final-review style
+  helper domains: image sources now cover URL and inline-image add/update,
+  copied coordinate output, missing-source results, duplicate-source rejection,
+  and non-image update rejection; location-indicator tests cover layer type and
+  property updates through public binding APIs.
+- 2026-05-14: Iteration 49 verification passed after the style-helper slice:
+  `mise run //bindings/zig:test` (84/84 passed), `mise run fix`, and
+  `mise run //bindings/zig:test` again (84/84 passed). Remaining final-review
+  work is exact duplicate retirement from `tests/c/style_values.zig`, root
+  verification, re-review, and the final pushed commit.
+- 2026-05-14: Iteration 50 retired duplicate direct C style-helper behavior now
+  covered by public binding tests: style light JSON/property updates, vector/
+  raster/raster DEM source helpers, runtime style image copied-pixel lifecycle,
+  image source add/update/coordinate copies, hillshade/color-relief layers, and
+  location-indicator focused property updates. Kept one direct C test for C ABI-
+  only invalid/raw domains: style image undersized copy output, image source
+  undersized coordinate output and wrong coordinate count, raw raster DEM
+  encoding value `99`, and raw location-indicator image kind `99`.
+- 2026-05-14: Iteration 50 verification passed after direct-C duplicate
+  retirement: `mise run test` (direct C suite 82 passed, 12 skipped; Zig binding
+  suite 84/84 passed), `mise run fix`, and `mise run test` again with the same
+  counts. Remaining work is final re-review, any review fixes, final DoD audit,
+  commit, and push.
+- 2026-05-14: Iteration 51 ran final style-helper fix review `21b04708` with two
+  reviewers. Reviewer 0 had a transport failure after producing usable output
+  and found no public-boundary/package-consumer blockers. Reviewer 1 found two
+  coverage blockers: GeoJSON URL helper duplicate/wrong-type coverage had been
+  retired without public binding replacement, and color-relief-color property
+  validation had been retired without public binding replacement.
+- 2026-05-14: Iteration 51 applied final review findings: added public
+  `addGeoJsonSourceUrl`/`setGeoJsonSourceUrl` coverage for URL add/update,
+  duplicate source rejection, and wrong-source-type rejection; added public
+  color-relief-color property coverage for accepted elevation expressions and
+  rejected zoom expressions; and applied the non-blocking suggestion to extend
+  public-boundary type-name assertions to the new style helper enums.
+- 2026-05-14: Iteration 51 verification after final-review fixes passed:
+  `mise run //bindings/zig:test` (84/84 passed), `mise run fix`, and
+  `mise run //bindings/zig:test` again (84/84 passed). Root verification remains
+  for the final DoD pass because this iteration only changed binding tests after
+  the previous root `mise run test`.
+- 2026-05-14: Iteration 52 final DoD audit passed. Public-boundary grep found
+  raw MapLibre C usage only inside private binding implementation modules and
+  `bindings/zig/src/c.zig`; Zig examples retain `@cImport` only for host
+  integration in `examples/zig-map/c.zig`. The package root hides raw C
+  declarations through binding tests, and the remaining direct C assertions are
+  C ABI-only invalid/raw descriptor coverage.
+- 2026-05-14: Iteration 52 final full verification passed: `mise run test`
+  (direct C suite 82 passed, 12 skipped; Zig binding suite 84/84 passed). This
+  follows the final style-helper review fixes and `mise run fix` from iteration
+  51.
+- 2026-05-14: Iteration 51 reflection:
+  - Accomplished so far: all planned phases are implemented, reviewed, verified,
+    committed, and pushed through Phase 9; the final-review package-consumer
+    blocker is fixed; and the remaining style-helper blocker now has public
+    binding APIs/tests plus duplicate direct-C retirement.
+  - Working well: the semantic public descriptor/private C materialization
+    pattern still keeps raw C declarations out of the package API while letting
+    the binding cover rich style, render, resource, callback, and offline
+    behavior. Root `mise run test` now exercises both the remaining C ABI suite
+    and the public Zig binding suite.
+  - Not working/blocking: the final style-helper/package-consumer fix set is
+    staged but not committed until a fresh final review confirms there are no
+    blockers. The direct C suite still intentionally carries C ABI-only invalid
+    descriptor/raw enum coverage, so final review needs to validate that split.
+  - Approach adjustment: stop adding API surface unless the final reviewers find
+    a concrete blocker. Focus on fresh review, small targeted fixes, final full
+    verification, DoD checkoff, then one final commit and push.
+  - Next priorities: run the final parallel review against the staged diff,
+    apply any sensible findings, rerun verification, update the DoD checklist,
+    commit, and push.
 - 2026-05-14: Iteration 31 added public resource-provider cancellation coverage:
   a delayed request survives callback return, the map closes before completion,
   `cancelled()` becomes true, and late completion reports `error.InvalidState`.
@@ -1140,11 +1235,22 @@ For each phase or smaller milestone:
   Zig C style helper coverage still lacked public binding APIs/tests. The
   package-consumer blocker is fixed with `include-dir`, `vulkan-include-dir`,
   and `dependency-library-dir` build options plus a standalone copied-package
-  smoke test. The style helper coverage blocker remains for the next slice.
-  Artifacts:
+  smoke test. The style helper coverage blocker was addressed in the follow-up
+  style-helper slice and re-reviewed in `21b04708`. Artifacts:
   `/Users/sargunv/.pi/agent/sessions/--Users-sargunv-Code-maplibre-native-ffi--/subagent-artifacts/4786579a_reviewer_0_output.md`
   and
   `/Users/sargunv/.pi/agent/sessions/--Users-sargunv-Code-maplibre-native-ffi--/subagent-artifacts/4786579a_reviewer_1_output.md`.
+- Final style-helper follow-up review run `21b04708` completed with one normal
+  reviewer and one transport-failed reviewer that returned usable output.
+  Findings applied: add public GeoJSON URL helper add/update/duplicate/wrong-
+  type coverage, add public color-relief-color accepted/rejected expression
+  coverage, and extend public-boundary assertions for new style helper enums.
+  Reviewer 0 found no public-boundary or package-consumer blockers; reviewer 1
+  confirmed the remaining direct C style helper test is C ABI-only raw/invalid
+  descriptor coverage. Artifacts:
+  `/Users/sargunv/.pi/agent/sessions/--Users-sargunv-Code-maplibre-native-ffi--/subagent-artifacts/21b04708_reviewer_0_output.md`
+  and
+  `/Users/sargunv/.pi/agent/sessions/--Users-sargunv-Code-maplibre-native-ffi--/subagent-artifacts/21b04708_reviewer_1_output.md`.
 
 ## Notes and decisions
 

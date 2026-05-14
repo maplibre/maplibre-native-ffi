@@ -44,6 +44,12 @@ pub const TempStorage = struct {
         return .{ .data = if (value.len == 0) null else value.ptr, .size = value.len };
     }
 
+    pub fn stringViews(self: *TempStorage, source: []const []const u8) status.Error![]const c.mln_string_view {
+        const raw = try self.arena.allocator().alloc(c.mln_string_view, source.len);
+        for (source, raw) |value, *out| out.* = try self.stringView(value);
+        return raw;
+    }
+
     pub fn jsonValue(self: *TempStorage, value: values.JsonValue) status.Error!*const c.mln_json_value {
         const arena_allocator = self.arena.allocator();
         const raw = try arena_allocator.create(c.mln_json_value);

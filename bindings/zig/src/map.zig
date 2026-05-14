@@ -332,6 +332,484 @@ pub const MapHandle = struct {
         return .{ .allocator = allocator, .value = buffer };
     }
 
+    pub fn getStyleLayerType(
+        self: MapHandle,
+        allocator: std.mem.Allocator,
+        layer_id: []const u8,
+    ) status.Error!?values.OwnedString {
+        var temp = native_temp.TempStorage.init(allocator);
+        defer temp.deinit();
+        var layer_type = c.mln_string_view{ .data = null, .size = 0 };
+        var found = false;
+        try status.checkStatus(
+            c.mln_map_get_style_layer_type(try native(self), try temp.stringView(layer_id), &layer_type, &found),
+            state(self).diagnostic_store,
+        );
+        if (!found) return null;
+        const copied = if (layer_type.size == 0) try allocator.dupe(u8, "") else try allocator.dupe(u8, layer_type.data[0..layer_type.size]);
+        return .{ .allocator = allocator, .value = copied };
+    }
+
+    pub fn setStyleLightJson(self: MapHandle, allocator: std.mem.Allocator, value: values.JsonValue) status.Error!void {
+        var temp = native_temp.TempStorage.init(allocator);
+        defer temp.deinit();
+        try status.checkStatus(
+            c.mln_map_set_style_light_json(try native(self), try temp.jsonValue(value)),
+            state(self).diagnostic_store,
+        );
+    }
+
+    pub fn setStyleLightProperty(
+        self: MapHandle,
+        allocator: std.mem.Allocator,
+        property_name: []const u8,
+        value: values.JsonValue,
+    ) status.Error!void {
+        var temp = native_temp.TempStorage.init(allocator);
+        defer temp.deinit();
+        try status.checkStatus(
+            c.mln_map_set_style_light_property(try native(self), try temp.stringView(property_name), try temp.jsonValue(value)),
+            state(self).diagnostic_store,
+        );
+    }
+
+    pub fn getStyleLightProperty(
+        self: MapHandle,
+        allocator: std.mem.Allocator,
+        property_name: []const u8,
+    ) status.Error!?values.OwnedJsonValue {
+        var temp = native_temp.TempStorage.init(allocator);
+        defer temp.deinit();
+        var snapshot: ?*c.mln_json_snapshot = null;
+        try status.checkStatus(
+            c.mln_map_get_style_light_property(try native(self), try temp.stringView(property_name), &snapshot),
+            state(self).diagnostic_store,
+        );
+        defer if (snapshot) |handle| c.mln_json_snapshot_destroy(handle);
+        return try copyJsonSnapshot(allocator, snapshot, state(self).diagnostic_store);
+    }
+
+    pub fn addVectorSourceUrl(
+        self: MapHandle,
+        allocator: std.mem.Allocator,
+        source_id: []const u8,
+        url: []const u8,
+        options: ?values.StyleTileSourceOptions,
+    ) status.Error!void {
+        var temp = native_temp.TempStorage.init(allocator);
+        defer temp.deinit();
+        var raw_options = if (options) |value| try styleTileSourceOptionsToNative(&temp, value) else undefined;
+        try status.checkStatus(
+            c.mln_map_add_vector_source_url(try native(self), try temp.stringView(source_id), try temp.stringView(url), if (options != null) &raw_options else null),
+            state(self).diagnostic_store,
+        );
+    }
+
+    pub fn addVectorSourceTiles(
+        self: MapHandle,
+        allocator: std.mem.Allocator,
+        source_id: []const u8,
+        tiles: []const []const u8,
+        options: ?values.StyleTileSourceOptions,
+    ) status.Error!void {
+        var temp = native_temp.TempStorage.init(allocator);
+        defer temp.deinit();
+        const raw_tiles = try temp.stringViews(tiles);
+        var raw_options = if (options) |value| try styleTileSourceOptionsToNative(&temp, value) else undefined;
+        try status.checkStatus(
+            c.mln_map_add_vector_source_tiles(try native(self), try temp.stringView(source_id), raw_tiles.ptr, raw_tiles.len, if (options != null) &raw_options else null),
+            state(self).diagnostic_store,
+        );
+    }
+
+    pub fn addRasterSourceUrl(
+        self: MapHandle,
+        allocator: std.mem.Allocator,
+        source_id: []const u8,
+        url: []const u8,
+        options: ?values.StyleTileSourceOptions,
+    ) status.Error!void {
+        var temp = native_temp.TempStorage.init(allocator);
+        defer temp.deinit();
+        var raw_options = if (options) |value| try styleTileSourceOptionsToNative(&temp, value) else undefined;
+        try status.checkStatus(
+            c.mln_map_add_raster_source_url(try native(self), try temp.stringView(source_id), try temp.stringView(url), if (options != null) &raw_options else null),
+            state(self).diagnostic_store,
+        );
+    }
+
+    pub fn addRasterSourceTiles(
+        self: MapHandle,
+        allocator: std.mem.Allocator,
+        source_id: []const u8,
+        tiles: []const []const u8,
+        options: ?values.StyleTileSourceOptions,
+    ) status.Error!void {
+        var temp = native_temp.TempStorage.init(allocator);
+        defer temp.deinit();
+        const raw_tiles = try temp.stringViews(tiles);
+        var raw_options = if (options) |value| try styleTileSourceOptionsToNative(&temp, value) else undefined;
+        try status.checkStatus(
+            c.mln_map_add_raster_source_tiles(try native(self), try temp.stringView(source_id), raw_tiles.ptr, raw_tiles.len, if (options != null) &raw_options else null),
+            state(self).diagnostic_store,
+        );
+    }
+
+    pub fn addRasterDemSourceUrl(
+        self: MapHandle,
+        allocator: std.mem.Allocator,
+        source_id: []const u8,
+        url: []const u8,
+        options: ?values.StyleTileSourceOptions,
+    ) status.Error!void {
+        var temp = native_temp.TempStorage.init(allocator);
+        defer temp.deinit();
+        var raw_options = if (options) |value| try styleTileSourceOptionsToNative(&temp, value) else undefined;
+        try status.checkStatus(
+            c.mln_map_add_raster_dem_source_url(try native(self), try temp.stringView(source_id), try temp.stringView(url), if (options != null) &raw_options else null),
+            state(self).diagnostic_store,
+        );
+    }
+
+    pub fn addRasterDemSourceTiles(
+        self: MapHandle,
+        allocator: std.mem.Allocator,
+        source_id: []const u8,
+        tiles: []const []const u8,
+        options: ?values.StyleTileSourceOptions,
+    ) status.Error!void {
+        var temp = native_temp.TempStorage.init(allocator);
+        defer temp.deinit();
+        const raw_tiles = try temp.stringViews(tiles);
+        var raw_options = if (options) |value| try styleTileSourceOptionsToNative(&temp, value) else undefined;
+        try status.checkStatus(
+            c.mln_map_add_raster_dem_source_tiles(try native(self), try temp.stringView(source_id), raw_tiles.ptr, raw_tiles.len, if (options != null) &raw_options else null),
+            state(self).diagnostic_store,
+        );
+    }
+
+    pub fn addHillshadeLayer(
+        self: MapHandle,
+        allocator: std.mem.Allocator,
+        layer_id: []const u8,
+        source_id: []const u8,
+        before_layer_id: []const u8,
+    ) status.Error!void {
+        var temp = native_temp.TempStorage.init(allocator);
+        defer temp.deinit();
+        try status.checkStatus(
+            c.mln_map_add_hillshade_layer(try native(self), try temp.stringView(layer_id), try temp.stringView(source_id), try temp.stringView(before_layer_id)),
+            state(self).diagnostic_store,
+        );
+    }
+
+    pub fn addColorReliefLayer(
+        self: MapHandle,
+        allocator: std.mem.Allocator,
+        layer_id: []const u8,
+        source_id: []const u8,
+        before_layer_id: []const u8,
+    ) status.Error!void {
+        var temp = native_temp.TempStorage.init(allocator);
+        defer temp.deinit();
+        try status.checkStatus(
+            c.mln_map_add_color_relief_layer(try native(self), try temp.stringView(layer_id), try temp.stringView(source_id), try temp.stringView(before_layer_id)),
+            state(self).diagnostic_store,
+        );
+    }
+
+    pub fn setStyleImage(
+        self: MapHandle,
+        allocator: std.mem.Allocator,
+        image_id: []const u8,
+        image: values.PremultipliedRgba8Image,
+        options: ?values.StyleImageOptions,
+    ) status.Error!void {
+        var temp = native_temp.TempStorage.init(allocator);
+        defer temp.deinit();
+        var raw_image = values.premultipliedRgba8ImageToNative(image);
+        var raw_options = if (options) |value| values.styleImageOptionsToNative(value) else undefined;
+        try status.checkStatus(
+            c.mln_map_set_style_image(try native(self), try temp.stringView(image_id), &raw_image, if (options != null) &raw_options else null),
+            state(self).diagnostic_store,
+        );
+    }
+
+    pub fn removeStyleImage(self: MapHandle, allocator: std.mem.Allocator, image_id: []const u8) status.Error!bool {
+        var temp = native_temp.TempStorage.init(allocator);
+        defer temp.deinit();
+        var removed = false;
+        try status.checkStatus(
+            c.mln_map_remove_style_image(try native(self), try temp.stringView(image_id), &removed),
+            state(self).diagnostic_store,
+        );
+        return removed;
+    }
+
+    pub fn styleImageExists(self: MapHandle, allocator: std.mem.Allocator, image_id: []const u8) status.Error!bool {
+        var temp = native_temp.TempStorage.init(allocator);
+        defer temp.deinit();
+        var exists = false;
+        try status.checkStatus(
+            c.mln_map_style_image_exists(try native(self), try temp.stringView(image_id), &exists),
+            state(self).diagnostic_store,
+        );
+        return exists;
+    }
+
+    pub fn getStyleImageInfo(
+        self: MapHandle,
+        allocator: std.mem.Allocator,
+        image_id: []const u8,
+    ) status.Error!?values.StyleImageInfo {
+        var temp = native_temp.TempStorage.init(allocator);
+        defer temp.deinit();
+        var info = c.mln_style_image_info_default();
+        var found = false;
+        try status.checkStatus(
+            c.mln_map_get_style_image_info(try native(self), try temp.stringView(image_id), &info, &found),
+            state(self).diagnostic_store,
+        );
+        if (!found) return null;
+        return values.styleImageInfoFromNative(info);
+    }
+
+    pub fn copyStyleImagePremultipliedRgba8(
+        self: MapHandle,
+        allocator: std.mem.Allocator,
+        image_id: []const u8,
+    ) status.Error!?values.OwnedStyleImage {
+        const info = (try self.getStyleImageInfo(allocator, image_id)) orelse return null;
+        const pixels = try allocator.alloc(u8, info.byte_length);
+        errdefer allocator.free(pixels);
+
+        var temp = native_temp.TempStorage.init(allocator);
+        defer temp.deinit();
+        var copied_size: usize = 0;
+        var found = false;
+        try status.checkStatus(
+            c.mln_map_copy_style_image_premultiplied_rgba8(
+                try native(self),
+                try temp.stringView(image_id),
+                if (pixels.len == 0) null else pixels.ptr,
+                pixels.len,
+                &copied_size,
+                &found,
+            ),
+            state(self).diagnostic_store,
+        );
+        if (!found) {
+            allocator.free(pixels);
+            return null;
+        }
+        if (copied_size != pixels.len) return error.NativeError;
+        return .{ .allocator = allocator, .info = info, .pixels = pixels };
+    }
+
+    pub fn addImageSourceUrl(
+        self: MapHandle,
+        allocator: std.mem.Allocator,
+        source_id: []const u8,
+        coordinates: [4]values.LatLng,
+        url: []const u8,
+    ) status.Error!void {
+        var temp = native_temp.TempStorage.init(allocator);
+        defer temp.deinit();
+        const raw_coordinates = try temp.latLngs(&coordinates);
+        try status.checkStatus(
+            c.mln_map_add_image_source_url(
+                try native(self),
+                try temp.stringView(source_id),
+                raw_coordinates.ptr,
+                raw_coordinates.len,
+                try temp.stringView(url),
+            ),
+            state(self).diagnostic_store,
+        );
+    }
+
+    pub fn addImageSourceImage(
+        self: MapHandle,
+        allocator: std.mem.Allocator,
+        source_id: []const u8,
+        coordinates: [4]values.LatLng,
+        image: values.PremultipliedRgba8Image,
+    ) status.Error!void {
+        var temp = native_temp.TempStorage.init(allocator);
+        defer temp.deinit();
+        const raw_coordinates = try temp.latLngs(&coordinates);
+        var raw_image = values.premultipliedRgba8ImageToNative(image);
+        try status.checkStatus(
+            c.mln_map_add_image_source_image(
+                try native(self),
+                try temp.stringView(source_id),
+                raw_coordinates.ptr,
+                raw_coordinates.len,
+                &raw_image,
+            ),
+            state(self).diagnostic_store,
+        );
+    }
+
+    pub fn setImageSourceUrl(
+        self: MapHandle,
+        allocator: std.mem.Allocator,
+        source_id: []const u8,
+        url: []const u8,
+    ) status.Error!void {
+        var temp = native_temp.TempStorage.init(allocator);
+        defer temp.deinit();
+        try status.checkStatus(
+            c.mln_map_set_image_source_url(try native(self), try temp.stringView(source_id), try temp.stringView(url)),
+            state(self).diagnostic_store,
+        );
+    }
+
+    pub fn setImageSourceImage(
+        self: MapHandle,
+        allocator: std.mem.Allocator,
+        source_id: []const u8,
+        image: values.PremultipliedRgba8Image,
+    ) status.Error!void {
+        var temp = native_temp.TempStorage.init(allocator);
+        defer temp.deinit();
+        var raw_image = values.premultipliedRgba8ImageToNative(image);
+        try status.checkStatus(
+            c.mln_map_set_image_source_image(try native(self), try temp.stringView(source_id), &raw_image),
+            state(self).diagnostic_store,
+        );
+    }
+
+    pub fn setImageSourceCoordinates(
+        self: MapHandle,
+        allocator: std.mem.Allocator,
+        source_id: []const u8,
+        coordinates: [4]values.LatLng,
+    ) status.Error!void {
+        var temp = native_temp.TempStorage.init(allocator);
+        defer temp.deinit();
+        const raw_coordinates = try temp.latLngs(&coordinates);
+        try status.checkStatus(
+            c.mln_map_set_image_source_coordinates(
+                try native(self),
+                try temp.stringView(source_id),
+                raw_coordinates.ptr,
+                raw_coordinates.len,
+            ),
+            state(self).diagnostic_store,
+        );
+    }
+
+    pub fn getImageSourceCoordinates(
+        self: MapHandle,
+        allocator: std.mem.Allocator,
+        source_id: []const u8,
+    ) status.Error!?[4]values.LatLng {
+        var temp = native_temp.TempStorage.init(allocator);
+        defer temp.deinit();
+        var raw_coordinates: [4]c.mln_lat_lng = undefined;
+        var coordinate_count: usize = 0;
+        var found = false;
+        try status.checkStatus(
+            c.mln_map_get_image_source_coordinates(
+                try native(self),
+                try temp.stringView(source_id),
+                &raw_coordinates,
+                raw_coordinates.len,
+                &coordinate_count,
+                &found,
+            ),
+            state(self).diagnostic_store,
+        );
+        if (!found) return null;
+        if (coordinate_count != raw_coordinates.len) return error.NativeError;
+        var coordinates: [4]values.LatLng = undefined;
+        for (raw_coordinates, &coordinates) |raw_coordinate, *coordinate| coordinate.* = values.latLngFromNative(raw_coordinate);
+        return coordinates;
+    }
+
+    pub fn addLocationIndicatorLayer(
+        self: MapHandle,
+        allocator: std.mem.Allocator,
+        layer_id: []const u8,
+        before_layer_id: []const u8,
+    ) status.Error!void {
+        var temp = native_temp.TempStorage.init(allocator);
+        defer temp.deinit();
+        try status.checkStatus(
+            c.mln_map_add_location_indicator_layer(try native(self), try temp.stringView(layer_id), try temp.stringView(before_layer_id)),
+            state(self).diagnostic_store,
+        );
+    }
+
+    pub fn setLocationIndicatorLocation(
+        self: MapHandle,
+        allocator: std.mem.Allocator,
+        layer_id: []const u8,
+        coordinate: values.LatLng,
+        altitude: f64,
+    ) status.Error!void {
+        var temp = native_temp.TempStorage.init(allocator);
+        defer temp.deinit();
+        try status.checkStatus(
+            c.mln_map_set_location_indicator_location(
+                try native(self),
+                try temp.stringView(layer_id),
+                values.latLngToNative(coordinate),
+                altitude,
+            ),
+            state(self).diagnostic_store,
+        );
+    }
+
+    pub fn setLocationIndicatorBearing(
+        self: MapHandle,
+        allocator: std.mem.Allocator,
+        layer_id: []const u8,
+        bearing: f64,
+    ) status.Error!void {
+        var temp = native_temp.TempStorage.init(allocator);
+        defer temp.deinit();
+        try status.checkStatus(
+            c.mln_map_set_location_indicator_bearing(try native(self), try temp.stringView(layer_id), bearing),
+            state(self).diagnostic_store,
+        );
+    }
+
+    pub fn setLocationIndicatorAccuracyRadius(
+        self: MapHandle,
+        allocator: std.mem.Allocator,
+        layer_id: []const u8,
+        radius: f64,
+    ) status.Error!void {
+        var temp = native_temp.TempStorage.init(allocator);
+        defer temp.deinit();
+        try status.checkStatus(
+            c.mln_map_set_location_indicator_accuracy_radius(try native(self), try temp.stringView(layer_id), radius),
+            state(self).diagnostic_store,
+        );
+    }
+
+    pub fn setLocationIndicatorImageName(
+        self: MapHandle,
+        allocator: std.mem.Allocator,
+        layer_id: []const u8,
+        kind: values.LocationIndicatorImageKind,
+        image_id: []const u8,
+    ) status.Error!void {
+        var temp = native_temp.TempStorage.init(allocator);
+        defer temp.deinit();
+        try status.checkStatus(
+            c.mln_map_set_location_indicator_image_name(
+                try native(self),
+                try temp.stringView(layer_id),
+                values.locationIndicatorImageKindToNative(kind),
+                try temp.stringView(image_id),
+            ),
+            state(self).diagnostic_store,
+        );
+    }
+
     pub fn addGeoJsonSourceData(
         self: MapHandle,
         allocator: std.mem.Allocator,
@@ -677,6 +1155,46 @@ pub const MapHandle = struct {
         map_state.native = null;
     }
 };
+
+fn styleTileSourceOptionsToNative(
+    temp: *native_temp.TempStorage,
+    options: values.StyleTileSourceOptions,
+) status.Error!c.mln_style_tile_source_options {
+    var raw = c.mln_style_tile_source_options_default();
+    if (options.min_zoom) |min_zoom| {
+        raw.fields |= c.MLN_STYLE_TILE_SOURCE_OPTION_MIN_ZOOM;
+        raw.min_zoom = min_zoom;
+    }
+    if (options.max_zoom) |max_zoom| {
+        raw.fields |= c.MLN_STYLE_TILE_SOURCE_OPTION_MAX_ZOOM;
+        raw.max_zoom = max_zoom;
+    }
+    if (options.attribution) |attribution| {
+        raw.fields |= c.MLN_STYLE_TILE_SOURCE_OPTION_ATTRIBUTION;
+        raw.attribution = try temp.stringView(attribution);
+    }
+    if (options.scheme) |scheme| {
+        raw.fields |= c.MLN_STYLE_TILE_SOURCE_OPTION_SCHEME;
+        raw.scheme = values.styleTileSchemeToNative(scheme);
+    }
+    if (options.bounds) |bounds| {
+        raw.fields |= c.MLN_STYLE_TILE_SOURCE_OPTION_BOUNDS;
+        raw.bounds = values.latLngBoundsToNative(bounds);
+    }
+    if (options.tile_size) |tile_size| {
+        raw.fields |= c.MLN_STYLE_TILE_SOURCE_OPTION_TILE_SIZE;
+        raw.tile_size = tile_size;
+    }
+    if (options.vector_encoding) |encoding| {
+        raw.fields |= c.MLN_STYLE_TILE_SOURCE_OPTION_VECTOR_ENCODING;
+        raw.vector_encoding = values.styleVectorTileEncodingToNative(encoding);
+    }
+    if (options.raster_encoding) |encoding| {
+        raw.fields |= c.MLN_STYLE_TILE_SOURCE_OPTION_RASTER_ENCODING;
+        raw.raster_encoding = values.styleRasterDemEncodingToNative(encoding);
+    }
+    return raw;
+}
 
 fn customGeometrySourceOptionsToNative(
     options: CustomGeometrySourceOptions,

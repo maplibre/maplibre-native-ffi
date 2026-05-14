@@ -55,6 +55,15 @@ test "GeoJSON descriptors add and update sources through public binding" {
         .identifier = .{ .string = "sf" },
     }};
     try handles.map.setGeoJsonSourceData(testing.allocator, "empty", .{ .feature_collection = features[0..] });
+    try handles.map.setGeoJsonSourceUrl(testing.allocator, "empty", "https://example.com/data.geojson");
+
+    try handles.map.addGeoJsonSourceUrl(testing.allocator, "geo-url", "https://example.com/initial.geojson");
+    try testing.expectEqual(maplibre.StyleSourceType.geojson, (try handles.map.getStyleSourceType(testing.allocator, "geo-url")).?);
+    try handles.map.setGeoJsonSourceUrl(testing.allocator, "geo-url", "https://example.com/updated.geojson");
+
+    try testing.expectError(error.InvalidArgument, handles.map.addGeoJsonSourceUrl(testing.allocator, "empty", "https://example.com/again.geojson"));
+    try handles.map.addVectorSourceUrl(testing.allocator, "vector-url", "https://example.com/vector.json", null);
+    try testing.expectError(error.InvalidArgument, handles.map.setGeoJsonSourceUrl(testing.allocator, "vector-url", "https://example.com/not-geojson"));
 }
 
 test "geometry descriptor graphs support nested collections" {

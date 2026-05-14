@@ -33,6 +33,15 @@ test "package root hides raw C declarations" {
     try testing.expect(!support.typeNameContains(maplibre.ProjectionMode, "mln_"));
     try testing.expect(!support.typeNameContains(maplibre.ViewportOptions, "mln_"));
     try testing.expect(!support.typeNameContains(maplibre.TileOptions, "mln_"));
+    try testing.expect(!support.typeNameContains(maplibre.StyleTileScheme, "mln_"));
+    try testing.expect(!support.typeNameContains(maplibre.StyleVectorTileEncoding, "mln_"));
+    try testing.expect(!support.typeNameContains(maplibre.StyleRasterDemEncoding, "mln_"));
+    try testing.expect(!support.typeNameContains(maplibre.StyleTileSourceOptions, "mln_"));
+    try testing.expect(!support.typeNameContains(maplibre.PremultipliedRgba8Image, "mln_"));
+    try testing.expect(!support.typeNameContains(maplibre.StyleImageOptions, "mln_"));
+    try testing.expect(!support.typeNameContains(maplibre.StyleImageInfo, "mln_"));
+    try testing.expect(!support.typeNameContains(maplibre.OwnedStyleImage, "mln_"));
+    try testing.expect(!support.typeNameContains(maplibre.LocationIndicatorImageKind, "mln_"));
     try testing.expect(!support.typeNameContains(maplibre.JsonValue, "mln_"));
     try testing.expect(!support.typeNameContains(maplibre.OwnedJsonValue, "mln_"));
     try testing.expect(!support.typeNameContains(maplibre.Geometry, "mln_"));
