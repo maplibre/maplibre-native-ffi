@@ -199,7 +199,6 @@ run = [
     echo "missing $native_library_dir/[lib]maplibre-native-c.*; native artifact was not built" >&2
     exit 1
   fi
-  cp "${native_libs[@]}" "ci-artifact/build/$MLN_FFI_VARIANT"
   ''',
   "if [ \"${MLN_FFI_RENDER_BACKEND:-}\" = \"vulkan\" ]; then cp -R third_party/maplibre-native/vendor/Vulkan-Headers/include ci-artifact/third_party/maplibre-native/vendor/Vulkan-Headers/include; fi",
 ]
