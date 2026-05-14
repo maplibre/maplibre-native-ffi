@@ -133,6 +133,10 @@ fn addMaplibreNativeModule(b: *std.Build, options: BuildOptions) *std.Build.Modu
 }
 
 fn addBindingTests(b: *std.Build, options: BuildOptions, maplibre_native: *std.Build.Module) *std.Build.Step.Compile {
+    const build_options = b.addOptions();
+    build_options.addOption(bool, "supports_metal", options.render_backend == .metal);
+    build_options.addOption(bool, "supports_vulkan", options.render_backend == .vulkan);
+
     const tests = b.addTest(.{
         .root_module = b.createModule(.{
             .root_source_file = b.path("tests/main.zig"),
@@ -141,6 +145,7 @@ fn addBindingTests(b: *std.Build, options: BuildOptions, maplibre_native: *std.B
         }),
     });
     tests.root_module.addImport("maplibre_native", maplibre_native);
+    tests.root_module.addOptions("build_options", build_options);
     linkMaplibreNativeC(b, tests.root_module, repoLinkOptions(b, options));
     return tests;
 }

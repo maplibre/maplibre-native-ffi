@@ -10,7 +10,7 @@ pub const style_json =
     \\      "data": {
     \\        "type": "FeatureCollection",
     \\        "features": [
-    \\          {"type":"Feature","geometry":{"type":"Point","coordinates":[-122.4194,37.7749]},"properties":{"visible":true}}
+    \\          {"type":"Feature","id":"feature-1","geometry":{"type":"Point","coordinates":[-122.4194,37.7749]},"properties":{"visible":true,"kind":"capital"}}
     \\        ]
     \\      }
     \\    }

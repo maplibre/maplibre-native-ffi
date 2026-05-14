@@ -149,16 +149,16 @@ For each phase or smaller milestone:
 
 ### Phase 8: render targets and readback
 
-- [ ] Add `NativePointer` borrowed opaque backend address value.
-- [ ] Add public render target descriptors for supported Metal and Vulkan
+- [x] Add `NativePointer` borrowed opaque backend address value.
+- [x] Add public render target descriptors for supported Metal and Vulkan
       surfaces, borrowed textures, and owned textures.
-- [ ] Add `RenderSessionHandle` with fallible close.
-- [ ] Add readback APIs for caller-owned buffers and allocator-backed owned
+- [x] Add `RenderSessionHandle` with fallible close.
+- [x] Add readback APIs for caller-owned buffers and allocator-backed owned
       images.
-- [ ] Add owned texture frame handles with scoped native pointer access.
-- [ ] Port render backend, surface, texture, feature-state, and query render
+- [x] Add owned texture frame handles with scoped native pointer access.
+- [x] Port render backend, surface, texture, feature-state, and query render
       coverage.
-- [ ] Review, apply findings, commit, and push.
+- [x] Review, apply findings, commit, and push.
 
 ### Phase 9: examples and documentation
 
@@ -758,6 +758,132 @@ For each phase or smaller milestone:
   (`Add Zig resource callback
   bindings`) and pushed
   `zig-binding-implementation` to origin.
+- 2026-05-14: Iteration 36 reflection:
+  - Accomplished so far: Phases 1-7 are implemented, reviewed, verified,
+    committed, and pushed. The binding now covers package setup,
+    diagnostics/status, runtime/map lifecycle, semantic descriptors and copied
+    outputs, owned runtime events, logging, resources, offline regions, and
+    callback lifetimes through public Zig APIs.
+  - Working well: milestone-sized review loops continue to catch concrete safety
+    defects before commits. The semantic-descriptor/private-materializer pattern
+    has scaled from map/style values into offline and render setup, and direct C
+    duplicate retirement is staying conservative.
+  - Not working/blocking: Phase 8 introduces platform/backend objects and frame
+    lifetimes, so tests need to separate portable owned-texture/readback
+    behavior from Metal/Vulkan platform scaffolding. Feature-state and query
+    ports must wait until the render session slice has a stable public API.
+  - Approach adjustment: start Phase 8 with portable owned-texture sessions,
+    readback, and render-session lifetime coverage, then add backend-specific
+    borrowed surface/texture attach APIs and owned frame handles in smaller
+    reviewed slices.
+  - Next priorities: add owned texture frame handles, port remaining render
+    session maintenance coverage, then run the Phase 8 review before retiring
+    matching direct C render assertions.
+- 2026-05-14: Iteration 36 started Phase 8 with `bindings/zig/src/render.zig`:
+  public `NativePointer`, semantic render-target extent and Metal/Vulkan
+  surface/texture descriptor types, `RenderSessionHandle` with resize/render/
+  detach/maintenance/close operations, owned texture attachment, caller-buffer
+  readback, and allocator-backed `OwnedImage` readback.
+- 2026-05-14: Iteration 36 added public render tests covering owned texture
+  attachment validation, render update, readback metadata and owned bytes,
+  resize, detach, idempotent close, and public-boundary checks for render types.
+  Verification passed: `mise run //bindings/zig:test` (74/74 tests passed;
+  expected native log lines appear during event/style/resource tests).
+- 2026-05-14: Iteration 37 added backend-specific render attach APIs for Metal
+  and Vulkan owned textures, borrowed textures, and surfaces. Public descriptors
+  materialize C `size` fields and borrowed backend pointers internally while
+  keeping raw native declarations private.
+- 2026-05-14: Iteration 37 added scoped owned texture frame handles for Metal
+  and Vulkan. Frame access returns semantic info values with borrowed
+  `NativePointer`s valid until explicit frame release; release is routed through
+  the owning render session and repeated release is a no-op.
+- 2026-05-14: Iteration 37 extended public render coverage with renderer
+  maintenance calls after render creation and a Metal owned-frame test covering
+  acquire, native-pointer access, acquired-frame resize/close rejection,
+  release, and closed-frame access. Verification passed:
+  `mise run //bindings/zig:test` (75/75 tests passed; expected native log lines
+  appear during event/style/ resource/render tests).
+- 2026-05-14: Iteration 38 added semantic render-backend support reporting so
+  callers can inspect Metal/Vulkan support without raw C backend bitmasks.
+- 2026-05-14: Iteration 38 added render-session feature-state APIs:
+  `FeatureStateSelector`, `RenderSessionHandle.setFeatureState`,
+  `getFeatureState`, and `removeFeatureState`. Selectors and JSON state are
+  materialized through private temporary C descriptors, and JSON snapshots are
+  copied into `OwnedJsonValue` before native handles are destroyed.
+- 2026-05-14: Iteration 38 ported public feature-state coverage for invalid
+  pre-render state, set/get of object state, key removal, repaint/render update
+  after removal, selector validation, and public-boundary checks. Verification
+  passed: `mise run //bindings/zig:test` (77/77 tests passed; expected native
+  log lines appear during event/style/resource/render tests).
+- 2026-05-14: Iteration 39 added copied feature-query APIs for rendered and
+  source features: semantic point/box/line query geometry, rendered/source query
+  options, copied `FeatureQueryResult`, and copied `QueriedFeature` properties,
+  geometry, optional source IDs, and feature state. Native query result handles
+  are destroyed before returning.
+- 2026-05-14: Iteration 39 ported rendered/source feature query coverage through
+  public render sessions, including pre-render `error.InvalidState`, layer and
+  filter options, copied source IDs/properties, source-feature filtering,
+  invalid source IDs, and public-boundary checks. The shared binding style
+  fixture now gives the point feature a stable ID and `kind` property used by
+  feature-state/query tests. Verification passed: `mise run //bindings/zig:test`
+  (78/78 tests passed; expected native log lines appear during event/style/
+  resource/render tests).
+- 2026-05-14: Iteration 40 added feature-extension query support:
+  `OwnedFeature`, `OwnedFeatureCollection`, `FeatureExtensionResult`, and
+  `RenderSessionHandle.queryFeatureExtension`. Feature-extension values and
+  feature collections are copied before native extension result handles are
+  destroyed.
+- 2026-05-14: Iteration 40 ported cluster feature-extension coverage through
+  public render sessions: rendered cluster query, borrowed conversion of the
+  copied queried feature into an extension input, `children`, `expansion-zoom`,
+  and limited `leaves` extension queries. Verification passed:
+  `mise run //bindings/zig:test` (79/79 tests passed; expected native log lines
+  appear during event/style/resource/render tests).
+- 2026-05-14: Iteration 41 reflection:
+  - Accomplished so far: Phases 1-7 are reviewed, verified, committed, and
+    pushed. Phase 8 now covers render sessions, readback, backend descriptors,
+    owned texture frames, feature state, rendered/source queries, and cluster
+    feature-extension queries through public binding APIs.
+  - Working well: semantic public descriptors plus private C materialization are
+    still keeping raw `mln_*` types out of the package root, and the review loop
+    is catching the exact safety edges this phase is meant to harden.
+  - Not working/blocking: Phase 8 remains uncommitted until review findings,
+    root verification, and direct-C render duplicate-retirement decisions are
+    complete. Backend-specific tests need build-option gates so non-Metal
+    variants stay portable.
+  - Approach adjustment: finish review fixes before adding new Phase 8 API
+    surface, then run root verification and retire only exact duplicate direct C
+    render/query/feature-state assertions.
+  - Next priorities: complete Phase 8 duplicate-retirement/root verification,
+    commit and push the render milestone, then start Phase 9 examples/docs.
+- 2026-05-14: Iteration 41 ran the Phase 8 parallel review retry `38ebc2f9`
+  after the first retry `670862f2` failed with no usable output. Applied review
+  findings: owned texture frame handles now store active frame state on the
+  render session instead of allocating one heap object per acquire/release,
+  copied feature properties free the copied key if JSON value copying fails,
+  binding tests receive backend build options, the Metal owned-frame test skips
+  on non-Metal variants, and backend support coverage no longer assumes Metal
+  and Vulkan support are mutually exclusive.
+- 2026-05-14: Iteration 41 verification after review fixes passed:
+  `mise run
+  fix` and `mise run //bindings/zig:test` (79/79 tests passed;
+  expected native log lines appear during event/style/resource/render tests).
+- 2026-05-14: Iteration 42 root verification before direct-C duplicate
+  retirement passed: `mise run test` (92 passed, 12 skipped; 104 total).
+- 2026-05-14: Iteration 42 retired exact duplicate direct C render assertions
+  now covered by Phase 8 binding tests: owned-texture extent validation,
+  lifecycle/render-update/resize/detach/readback behavior, feature-state
+  set/get/remove behavior, rendered/source feature queries, and cluster feature
+  extension queries. Kept direct C coverage for C ABI struct defaults/imports,
+  null/out-param/undersized raw descriptors, raw query validation, backend-
+  specific Metal/Vulkan surface and borrowed-texture scaffolding, raw stale
+  native handle behavior, wrong-thread render calls, observer/still-image paths,
+  and platform transport details not yet usefully portable through the public
+  binding tests.
+- 2026-05-14: Iteration 42 final Phase 8 verification after duplicate retirement
+  passed: `mise run fix`, `mise run //bindings/zig:test` (79/79 tests passed),
+  and `mise run test` (87 passed, 12 skipped; 99 total). Phase 8 was committed
+  and pushed as the reviewed render-target/readback milestone.
 - 2026-05-14: Iteration 31 added public resource-provider cancellation coverage:
   a delayed request survives callback return, the map closes before completion,
   `cancelled()` becomes true, and late completion reports `error.InvalidState`.
@@ -858,6 +984,17 @@ For each phase or smaller milestone:
   `/Users/sargunv/.pi/agent/sessions/--Users-sargunv-Code-maplibre-native-ffi--/subagent-artifacts/6e729b64_reviewer_0_output.md`
   and
   `/Users/sargunv/.pi/agent/sessions/--Users-sargunv-Code-maplibre-native-ffi--/subagent-artifacts/6e729b64_reviewer_1_output.md`.
+- Phase 8 first review attempt `670862f2` failed with no usable reviewer output,
+  so it was not used for milestone decisions. Retry review run `38ebc2f9`
+  completed with two reviewers. Findings applied: avoid per-frame heap leaks in
+  owned texture frame handles, free copied feature property keys if JSON value
+  copying fails, gate Metal-only frame tests with binding build options, and
+  remove the brittle assumption that Metal and Vulkan support bits are mutually
+  exclusive. Duplicate direct-C render retirement remains deferred until root
+  verification and exact-coverage comparison are complete. Artifacts:
+  `/Users/sargunv/.pi/agent/sessions/--Users-sargunv-Code-maplibre-native-ffi--/subagent-artifacts/38ebc2f9_reviewer_0_output.md`
+  and
+  `/Users/sargunv/.pi/agent/sessions/--Users-sargunv-Code-maplibre-native-ffi--/subagent-artifacts/38ebc2f9_reviewer_1_output.md`.
 
 ## Notes and decisions
 
@@ -929,3 +1066,27 @@ For each phase or smaller milestone:
 - Callback replacement follows the binding convention that native installation
   succeeds before active Zig state changes. On failed replacement, the previous
   resource/logging callback remains the active dispatch target.
+- Phase 8 render target descriptors expose borrowed backend addresses as
+  `NativePointer` values. The binding materializes native descriptor sizes and
+  option graphs internally so Metal/Vulkan handles remain opaque at the public
+  API boundary.
+- Owned texture frame handles scope borrowed backend texture/image pointers to
+  the acquired frame lifetime. Release goes through the owning render session;
+  after release, public frame access reports `error.ClosedHandle`.
+- Render-session feature-state snapshots are copied into `OwnedJsonValue` before
+  native JSON snapshot handles are destroyed. Feature-state selectors use
+  nullable public fields for optional source-layer, feature, and state-key
+  fields instead of exposing C field masks.
+- Rendered/source feature query results are copied before native result handles
+  are destroyed. Query options expose semantic optional fields and JSON filters;
+  the binding materializes C string-view arrays and filters in temporary
+  borrowed storage for each call.
+- Feature-extension query results use copied `OwnedJsonValue` or
+  `OwnedFeatureCollection` values before native extension result handles are
+  destroyed. Extension inputs currently take semantic `Feature` descriptors; a
+  caller can build one from a copied query result when chaining rendered cluster
+  queries into extension queries.
+- Owned texture frame handles use render-session-owned active frame slots with
+  binding generations instead of per-acquire heap state. Release clears the
+  active slot, repeated release is a no-op, and stale copied frame handles see
+  `error.ClosedHandle` after the slot generation changes or is cleared.

@@ -240,7 +240,7 @@ pub const TempStorage = struct {
         return raw;
     }
 
-    fn feature(self: *TempStorage, value: values.Feature) status.Error!*const c.mln_feature {
+    pub fn feature(self: *TempStorage, value: values.Feature) status.Error!*const c.mln_feature {
         const arena_allocator = self.arena.allocator();
         const raw = try arena_allocator.create(c.mln_feature);
         raw.* = try self.featureStruct(value);

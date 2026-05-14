@@ -15,6 +15,7 @@ comptime {
     _ = @import("style_sources.zig");
     _ = @import("resources.zig");
     _ = @import("logging.zig");
+    _ = @import("render.zig");
 }
 
 test "package root hides raw C declarations" {
@@ -46,9 +47,20 @@ test "package root hides raw C declarations" {
     try testing.expect(!support.typeNameContains(maplibre.ResourceRequest, "mln_"));
     try testing.expect(!support.typeNameContains(maplibre.ResourceResponse, "mln_"));
     try testing.expect(!support.typeNameContains(maplibre.ResourceRequestHandle, "mln_"));
+    try testing.expect(!support.typeNameContains(maplibre.RenderTargetExtent, "mln_"));
+    try testing.expect(!support.typeNameContains(maplibre.RenderBackendSupport, "mln_"));
+    try testing.expect(!support.typeNameContains(maplibre.OwnedTextureDescriptor, "mln_"));
+    try testing.expect(!support.typeNameContains(maplibre.FeatureStateSelector, "mln_"));
+    try testing.expect(!support.typeNameContains(maplibre.RenderedQueryGeometry, "mln_"));
+    try testing.expect(!support.typeNameContains(maplibre.FeatureQueryResult, "mln_"));
+    try testing.expect(!support.typeNameContains(maplibre.FeatureExtensionResult, "mln_"));
+    try testing.expect(!support.typeNameContains(maplibre.RenderSessionHandle, "mln_"));
+    try testing.expect(!support.typeNameContains(maplibre.MetalOwnedTextureFrameHandle, "mln_"));
+    try testing.expect(!support.typeNameContains(maplibre.MetalOwnedTextureFrameInfo, "mln_"));
     try testing.expect(!support.typeNameContains(maplibre.RuntimeHandle, "anyopaque"));
     try testing.expect(!support.typeNameContains(maplibre.MapHandle, "anyopaque"));
     try testing.expect(!support.typeNameContains(maplibre.MapProjectionHandle, "anyopaque"));
+    try testing.expect(!support.typeNameContains(maplibre.RenderSessionHandle, "anyopaque"));
 }
 
 test "package links the native C library" {
