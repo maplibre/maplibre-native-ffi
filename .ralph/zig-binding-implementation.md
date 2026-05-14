@@ -753,6 +753,11 @@ For each phase or smaller milestone:
 - 2026-05-14: Iteration 35 verification passed after duplicate retirement and
   formatting: `mise run fix`, `mise run //bindings/zig:test` (72/72 tests
   passed), and `mise run test` (92 passed, 12 skipped; 104 total).
+- 2026-05-14: Iteration 35 committed the reviewed Phase 7 logging/resources/
+  offline/callback milestone as `a726553`
+  (`Add Zig resource callback
+  bindings`) and pushed
+  `zig-binding-implementation` to origin.
 - 2026-05-14: Iteration 31 added public resource-provider cancellation coverage:
   a delayed request survives callback return, the map closes before completion,
   `cancelled()` becomes true, and late completion reports `error.InvalidState`.
