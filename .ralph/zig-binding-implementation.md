@@ -85,15 +85,15 @@ For each phase or smaller milestone:
 
 ### Phase 3: runtime and map vertical slice
 
-- [ ] Implement `RuntimeHandle` with create/init, `runOnce`, `pollEvent`, and
+- [x] Implement `RuntimeHandle` with create/init, `runOnce`, `pollEvent`, and
       fallible close.
-- [ ] Implement `MapHandle` with creation, basic options, style setter, and
+- [x] Implement `MapHandle` with creation, basic options, style setter, and
       fallible close.
-- [ ] Implement initial `MapProjectionHandle` ownership and close.
-- [ ] Add private live-handle checks and retryable close behavior.
-- [ ] Verify no public API leaks raw C handle types.
-- [ ] Add vertical-slice binding test.
-- [ ] Review, apply findings, commit, and push.
+- [x] Implement initial `MapProjectionHandle` ownership and close.
+- [x] Add private live-handle checks and retryable close behavior.
+- [x] Verify no public API leaks raw C handle types.
+- [x] Add vertical-slice binding test.
+- [x] Review, apply findings, commit, and push.
 
 ### Phase 4: foundational tests
 
@@ -253,9 +253,48 @@ For each phase or smaller milestone:
   gaps. Keep using private module tests for internals until public handle APIs
   can cover the same behavior through `maplibre_native`.
 - 2026-05-14: Iteration 5 committed Phase 2 as `77e9f34`
-  (`Add Zig status
-  diagnostics layer`) and pushed `zig-binding-implementation`
+  (`Add Zig status diagnostics layer`) and pushed `zig-binding-implementation`
   to origin.
+- 2026-05-14: Iteration 6 reflection:
+  - Accomplished so far: Phase 1 package skeleton and Phase 2 status/diagnostics
+    are reviewed, committed, and pushed; Phase 3 now has the first runtime/map
+    slice in progress.
+  - Working well: small phase-sized commits, fresh parallel reviews, and narrow
+    `//bindings/zig:test` verification catch issues quickly while root test
+    integration waits for a supported binding path.
+  - Not working/blocking: Zig has no field privacy for public structs, so raw
+    native handle storage needs careful shaping. The current Phase 3 slice uses
+    opaque handle storage to avoid public raw C handle fields, but it still
+    needs review before committing.
+  - Approach adjustment: keep milestone reviews before every commit, and add a
+    focused public-boundary check for handle types before marking Phase 3 done.
+  - Next priorities: add `MapProjectionHandle`, tighten live-handle/public
+    boundary checks, then run the Phase 3 parallel review.
+- 2026-05-14: Iteration 6 implemented the first Phase 3 vertical slice:
+  `RuntimeHandle`, `MapHandle`, basic options, `runOnce`, `pollEvent`, style
+  JSON/URL setters, fallible idempotent close, embedded-NUL string validation,
+  and public tests for runtime/map creation, style JSON, closed-handle errors,
+  and string validation.
+- 2026-05-14: Iteration 6 verification passed: `mise run //bindings/zig:test`
+  (10/10 tests passed).
+- 2026-05-14: Iteration 7 completed the Phase 3 implementation slice before
+  review: added `MapProjectionHandle`, removed public `nativeOpaque` methods in
+  favor of non-root internal module helpers, added a public-boundary test that
+  handle exported types do not contain raw `mln_` type names, and extended the
+  vertical-slice test to create and close a projection snapshot.
+- 2026-05-14: Iteration 7 verification passed: `mise run //bindings/zig:test`
+  (10/10 tests passed).
+- 2026-05-14: Iteration 8 ran Phase 3 parallel review (`22251894`) and follow-up
+  review (`373e331f`). Applied findings: removed borrowed event message exposure
+  from `RuntimeEvent`, added wrong-thread diagnostic coverage, added close-retry
+  coverage, checked handle use before string materialization, strengthened
+  public-boundary tests, and replaced public `?*anyopaque` native storage with
+  private allocated state behind opaque state pointers.
+- 2026-05-14: Iteration 8 verification passed after review fixes:
+  `mise run
+  //bindings/zig:test` (12/12 tests), `mise run fix`, and
+  `mise run
+  //bindings/zig:test` again after formatting/lint fixes.
 
 ## Review log
 
@@ -277,6 +316,21 @@ For each phase or smaller milestone:
   `/Users/sargunv/.pi/agent/sessions/--Users-sargunv-Code-maplibre-native-ffi--/subagent-artifacts/f0c39965_reviewer_0_output.md`
   and
   `/Users/sargunv/.pi/agent/sessions/--Users-sargunv-Code-maplibre-native-ffi--/subagent-artifacts/f0c39965_reviewer_1_output.md`.
+- Phase 3 parallel review run `22251894` completed with two reviewers. Findings
+  applied or re-reviewed: borrowed event message exposure, public mutable
+  `?*anyopaque` handle storage, wrong-thread diagnostic coverage, close-retry
+  coverage, and closed-handle/string-validation ordering. Artifacts:
+  `/Users/sargunv/.pi/agent/sessions/--Users-sargunv-Code-maplibre-native-ffi--/subagent-artifacts/22251894_reviewer_0_output.md`
+  and
+  `/Users/sargunv/.pi/agent/sessions/--Users-sargunv-Code-maplibre-native-ffi--/subagent-artifacts/22251894_reviewer_1_output.md`.
+- Phase 3 follow-up review run `373e331f` completed with two reviewers. It
+  confirmed event memory safety, wrong-thread coverage, and close-retry
+  behavior; the remaining public `?*anyopaque` handle-storage blocker was fixed
+  afterwards by moving native handles into private allocated state behind opaque
+  state pointers. Artifacts:
+  `/Users/sargunv/.pi/agent/sessions/--Users-sargunv-Code-maplibre-native-ffi--/subagent-artifacts/373e331f_reviewer_0_output.md`
+  and
+  `/Users/sargunv/.pi/agent/sessions/--Users-sargunv-Code-maplibre-native-ffi--/subagent-artifacts/373e331f_reviewer_1_output.md`.
 
 ## Notes and decisions
 
@@ -290,3 +344,13 @@ For each phase or smaller milestone:
 - Phase 2 keeps raw C status handling in private `status.zig`; the public root
   exposes stable Zig error sets, diagnostics, and ABI validation without
   exposing raw C declarations.
+- Phase 3 handle structs store only pointers to private opaque state handles in
+  the public type. Native `mln_*` pointers and diagnostic store references live
+  in private implementation structs inside the module.
+- Phase 3 keeps cast-to-C helpers in internal modules and does not re-export
+  those modules from the package root; public methods operate through Zig handle
+  types and stable binding errors.
+- Phase 3 currently keeps private handle-state allocations alive after close so
+  copied handle values can make repeated `close()` calls a no-op and later
+  method calls return `error.ClosedHandle`. Revisit state reclamation later if a
+  better Zig ownership shape preserves those semantics without leaks.
