@@ -2,8 +2,10 @@ const c = @import("c.zig").raw;
 const diagnostics = @import("diagnostics.zig");
 const map_module = @import("map.zig");
 const MapHandle = map_module.MapHandle;
+const native_temp = @import("native_temp.zig");
 const status = @import("status.zig");
 const std = @import("std");
+const values = @import("values.zig");
 
 const MapProjectionStateHandle = opaque {};
 const MapProjectionState = struct {
@@ -30,6 +32,56 @@ pub const MapProjectionHandle = struct {
         return .{ .state = @ptrCast(projection_state) };
     }
 
+    pub fn getCamera(self: MapProjectionHandle) status.Error!values.CameraOptions {
+        var camera = c.mln_camera_options_default();
+        try status.checkStatus(c.mln_map_projection_get_camera(try native(self), &camera), state(self).diagnostic_store);
+        return values.cameraOptionsFromNative(camera);
+    }
+
+    pub fn setCamera(self: MapProjectionHandle, camera: values.CameraOptions) status.Error!void {
+        var raw_camera = values.cameraOptionsToNative(camera);
+        try status.checkStatus(c.mln_map_projection_set_camera(try native(self), &raw_camera), state(self).diagnostic_store);
+    }
+
+    pub fn setVisibleCoordinates(
+        self: MapProjectionHandle,
+        allocator: std.mem.Allocator,
+        coordinates: []const values.LatLng,
+        padding: values.EdgeInsets,
+    ) status.Error!void {
+        var temp = native_temp.TempStorage.init(allocator);
+        defer temp.deinit();
+        const raw_coordinates = try temp.latLngs(coordinates);
+        const coordinate_ptr = if (raw_coordinates.len == 0) null else raw_coordinates.ptr;
+        try status.checkStatus(
+            c.mln_map_projection_set_visible_coordinates(
+                try native(self),
+                coordinate_ptr,
+                raw_coordinates.len,
+                values.edgeInsetsToNative(padding),
+            ),
+            state(self).diagnostic_store,
+        );
+    }
+
+    pub fn pixelForLatLng(self: MapProjectionHandle, coordinate: values.LatLng) status.Error!values.ScreenPoint {
+        var point: c.mln_screen_point = undefined;
+        try status.checkStatus(
+            c.mln_map_projection_pixel_for_lat_lng(try native(self), values.latLngToNative(coordinate), &point),
+            state(self).diagnostic_store,
+        );
+        return values.screenPointFromNative(point);
+    }
+
+    pub fn latLngForPixel(self: MapProjectionHandle, point: values.ScreenPoint) status.Error!values.LatLng {
+        var coordinate: c.mln_lat_lng = undefined;
+        try status.checkStatus(
+            c.mln_map_projection_lat_lng_for_pixel(try native(self), values.screenPointToNative(point), &coordinate),
+            state(self).diagnostic_store,
+        );
+        return values.latLngFromNative(coordinate);
+    }
+
     pub fn close(self: MapProjectionHandle) status.Error!void {
         const projection_state = state(self);
         const projection = projection_state.native orelse return;
@@ -40,4 +92,20 @@ pub const MapProjectionHandle = struct {
 
 fn state(handle: MapProjectionHandle) *MapProjectionState {
     return @ptrCast(@alignCast(handle.state));
+}
+
+fn native(handle: MapProjectionHandle) status.BindingError!*c.mln_map_projection {
+    return state(handle).native orelse error.ClosedHandle;
+}
+
+pub fn projectedMetersForLatLng(coordinate: values.LatLng) status.Error!values.ProjectedMeters {
+    var meters: c.mln_projected_meters = undefined;
+    try status.checkStatus(c.mln_projected_meters_for_lat_lng(values.latLngToNative(coordinate), &meters), null);
+    return values.projectedMetersFromNative(meters);
+}
+
+pub fn latLngForProjectedMeters(meters: values.ProjectedMeters) status.Error!values.LatLng {
+    var coordinate: c.mln_lat_lng = undefined;
+    try status.checkStatus(c.mln_lat_lng_for_projected_meters(values.projectedMetersToNative(meters), &coordinate), null);
+    return values.latLngFromNative(coordinate);
 }

@@ -4,9 +4,20 @@ pub const style_json =
     \\{
     \\  "version": 8,
     \\  "name": "zig-binding-test",
-    \\  "sources": {},
+    \\  "sources": {
+    \\    "point": {
+    \\      "type": "geojson",
+    \\      "data": {
+    \\        "type": "FeatureCollection",
+    \\        "features": [
+    \\          {"type":"Feature","geometry":{"type":"Point","coordinates":[-122.4194,37.7749]},"properties":{"visible":true}}
+    \\        ]
+    \\      }
+    \\    }
+    \\  },
     \\  "layers": [
-    \\    {"id":"background","type":"background","paint":{"background-color":"#d8f1ff"}}
+    \\    {"id":"background","type":"background","paint":{"background-color":"#d8f1ff"}},
+    \\    {"id":"point-circle","type":"circle","source":"point","paint":{"circle-color":"#f97316","circle-radius":12}}
     \\  ]
     \\}
 ;

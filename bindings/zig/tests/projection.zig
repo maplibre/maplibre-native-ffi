@@ -1,0 +1,104 @@
+const testing = @import("std").testing;
+
+const maplibre = @import("maplibre_native");
+
+const center = maplibre.LatLng{ .latitude = 37.7749, .longitude = -122.4194 };
+
+fn createRuntimeAndMap() !struct { runtime: maplibre.RuntimeHandle, map: maplibre.MapHandle } {
+    const runtime = try maplibre.RuntimeHandle.init(null);
+    errdefer runtime.close() catch {};
+    const map = try maplibre.MapHandle.create(runtime, .{});
+    return .{ .runtime = runtime, .map = map };
+}
+
+fn expectCenterPoint(point: maplibre.ScreenPoint) !void {
+    try testing.expectApproxEqAbs(@as(f64, 256.0), point.x, 0.001);
+    try testing.expectApproxEqAbs(@as(f64, 256.0), point.y, 0.001);
+}
+
+fn expectLatLngApprox(expected: maplibre.LatLng, actual: maplibre.LatLng) !void {
+    try testing.expectApproxEqAbs(expected.latitude, actual.latitude, 0.000001);
+    try testing.expectApproxEqAbs(expected.longitude, actual.longitude, 0.000001);
+}
+
+test "map projection mode updates snapshot fields through public binding" {
+    const handles = try createRuntimeAndMap();
+    defer handles.runtime.close() catch @panic("runtime close failed");
+    defer handles.map.close() catch @panic("map close failed");
+
+    try handles.map.setProjectionMode(.{ .axonometric = true, .x_skew = 0.25, .y_skew = -0.125 });
+
+    const snapshot = try handles.map.getProjectionMode();
+    try testing.expectEqual(true, snapshot.axonometric.?);
+    try testing.expectApproxEqAbs(@as(f64, 0.25), snapshot.x_skew.?, 0.000001);
+    try testing.expectApproxEqAbs(@as(f64, -0.125), snapshot.y_skew.?, 0.000001);
+}
+
+test "map converts between lat lngs and screen points" {
+    const handles = try createRuntimeAndMap();
+    defer handles.runtime.close() catch @panic("runtime close failed");
+    defer handles.map.close() catch @panic("map close failed");
+
+    try handles.map.jumpTo(.{ .center = center, .zoom = 10.0 });
+
+    const point = try handles.map.pixelForLatLng(center);
+    try expectCenterPoint(point);
+
+    const coordinate = try handles.map.latLngForPixel(point);
+    try expectLatLngApprox(center, coordinate);
+
+    const coordinates = [_]maplibre.LatLng{
+        center,
+        .{ .latitude = 0.0, .longitude = 0.0 },
+    };
+    var points: [coordinates.len]maplibre.ScreenPoint = undefined;
+    try handles.map.pixelsForLatLngs(testing.allocator, coordinates[0..], points[0..]);
+    try expectCenterPoint(points[0]);
+
+    var roundtrip: [points.len]maplibre.LatLng = undefined;
+    try handles.map.latLngsForPixels(testing.allocator, points[0..], roundtrip[0..]);
+    try expectLatLngApprox(coordinates[0], roundtrip[0]);
+    try expectLatLngApprox(coordinates[1], roundtrip[1]);
+}
+
+test "standalone projection converts and updates camera" {
+    const handles = try createRuntimeAndMap();
+    defer handles.runtime.close() catch @panic("runtime close failed");
+    defer handles.map.close() catch @panic("map close failed");
+
+    try handles.map.jumpTo(.{ .center = center, .zoom = 10.0 });
+    const projection = try maplibre.MapProjectionHandle.create(handles.map);
+    defer projection.close() catch @panic("projection close failed");
+
+    const point = try projection.pixelForLatLng(center);
+    try expectCenterPoint(point);
+
+    const coordinate = try projection.latLngForPixel(point);
+    try expectLatLngApprox(center, coordinate);
+
+    const helper_camera = maplibre.CameraOptions{ .center = .{ .latitude = 0.0, .longitude = 0.0 }, .zoom = 3.0 };
+    try projection.setCamera(helper_camera);
+    const snapshot = try projection.getCamera();
+    try expectLatLngApprox(helper_camera.center.?, snapshot.center.?);
+    try testing.expectApproxEqAbs(helper_camera.zoom.?, snapshot.zoom.?, 0.000001);
+
+    var visible = [_]maplibre.LatLng{
+        .{ .latitude = -10.0, .longitude = -10.0 },
+        .{ .latitude = 10.0, .longitude = 10.0 },
+    };
+    try projection.setVisibleCoordinates(testing.allocator, visible[0..], .{ .top = 10.0, .left = 20.0, .bottom = 10.0, .right = 20.0 });
+    const fitted = try projection.getCamera();
+    try testing.expect(fitted.center != null);
+    try testing.expect(fitted.zoom != null);
+}
+
+test "projected meters convert to and from lat lng" {
+    const origin = maplibre.LatLng{ .latitude = 0.0, .longitude = 0.0 };
+    const origin_meters = try maplibre.projectedMetersForLatLng(origin);
+    try testing.expectApproxEqAbs(@as(f64, 0.0), origin_meters.northing, 0.000001);
+    try testing.expectApproxEqAbs(@as(f64, 0.0), origin_meters.easting, 0.000001);
+
+    const meters = try maplibre.projectedMetersForLatLng(center);
+    const roundtrip = try maplibre.latLngForProjectedMeters(meters);
+    try expectLatLngApprox(center, roundtrip);
+}

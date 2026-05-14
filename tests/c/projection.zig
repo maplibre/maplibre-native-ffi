@@ -30,30 +30,6 @@ test "projection mode exposes default options" {
     try testing.expectEqual(@as(u32, 0), mode.fields);
 }
 
-test "map projection mode updates snapshot fields" {
-    const runtime = try support.createRuntime();
-    defer support.destroyRuntime(runtime);
-
-    const map = try support.createMap(runtime);
-    defer support.destroyMap(map);
-
-    var mode = c.mln_projection_mode_default();
-    mode.fields = c.MLN_PROJECTION_MODE_AXONOMETRIC | c.MLN_PROJECTION_MODE_X_SKEW | c.MLN_PROJECTION_MODE_Y_SKEW;
-    mode.axonometric = true;
-    mode.x_skew = 0.25;
-    mode.y_skew = -0.125;
-    try testing.expectEqual(c.MLN_STATUS_OK, c.mln_map_set_projection_mode(map, &mode));
-
-    var snapshot = c.mln_projection_mode_default();
-    try testing.expectEqual(c.MLN_STATUS_OK, c.mln_map_get_projection_mode(map, &snapshot));
-    try testing.expect((snapshot.fields & c.MLN_PROJECTION_MODE_AXONOMETRIC) != 0);
-    try testing.expect((snapshot.fields & c.MLN_PROJECTION_MODE_X_SKEW) != 0);
-    try testing.expect((snapshot.fields & c.MLN_PROJECTION_MODE_Y_SKEW) != 0);
-    try testing.expect(snapshot.axonometric);
-    try testing.expectApproxEqAbs(mode.x_skew, snapshot.x_skew, 0.000001);
-    try testing.expectApproxEqAbs(mode.y_skew, snapshot.y_skew, 0.000001);
-}
-
 test "map projection mode rejects invalid arguments" {
     const runtime = try support.createRuntime();
     defer support.destroyRuntime(runtime);
@@ -81,38 +57,6 @@ test "map projection mode rejects invalid arguments" {
     mode.fields = c.MLN_PROJECTION_MODE_X_SKEW;
     mode.x_skew = std.math.inf(f64);
     try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, c.mln_map_set_projection_mode(map, &mode));
-}
-
-test "map converts between lat lngs and screen points" {
-    const runtime = try support.createRuntime();
-    defer support.destroyRuntime(runtime);
-
-    const map = try support.createMap(runtime);
-    defer support.destroyMap(map);
-
-    var camera = centeredCamera();
-    try testing.expectEqual(c.MLN_STATUS_OK, c.mln_map_jump_to(map, &camera));
-
-    var point: c.mln_screen_point = undefined;
-    try testing.expectEqual(c.MLN_STATUS_OK, c.mln_map_pixel_for_lat_lng(map, center, &point));
-    try expectCenterPoint(point);
-
-    var coordinate: c.mln_lat_lng = undefined;
-    try testing.expectEqual(c.MLN_STATUS_OK, c.mln_map_lat_lng_for_pixel(map, point, &coordinate));
-    try expectLatLngApprox(center, coordinate);
-
-    var coordinates = [_]c.mln_lat_lng{
-        center,
-        .{ .latitude = 0.0, .longitude = 0.0 },
-    };
-    var points: [coordinates.len]c.mln_screen_point = undefined;
-    try testing.expectEqual(c.MLN_STATUS_OK, c.mln_map_pixels_for_lat_lngs(map, coordinates[0..].ptr, coordinates.len, points[0..].ptr));
-    try expectCenterPoint(points[0]);
-
-    var roundtrip: [points.len]c.mln_lat_lng = undefined;
-    try testing.expectEqual(c.MLN_STATUS_OK, c.mln_map_lat_lngs_for_pixels(map, points[0..].ptr, points.len, roundtrip[0..].ptr));
-    try expectLatLngApprox(coordinates[0], roundtrip[0]);
-    try expectLatLngApprox(coordinates[1], roundtrip[1]);
 }
 
 test "map coordinate conversion rejects invalid arguments" {
@@ -240,19 +184,6 @@ test "standalone projection rejects invalid arguments" {
     try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, c.mln_map_projection_pixel_for_lat_lng(helper, .{ .latitude = std.math.nan(f64), .longitude = 0.0 }, &point));
     try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, c.mln_map_projection_lat_lng_for_pixel(helper, .{ .x = 0.0, .y = std.math.inf(f64) }, &coordinate));
     try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, c.mln_map_projection_lat_lng_for_pixel(helper, .{ .x = 0.0, .y = 0.0 }, null));
-}
-
-test "projected meters convert to and from lat lng" {
-    const origin = c.mln_lat_lng{ .latitude = 0.0, .longitude = 0.0 };
-    var meters: c.mln_projected_meters = undefined;
-    try testing.expectEqual(c.MLN_STATUS_OK, c.mln_projected_meters_for_lat_lng(origin, &meters));
-    try testing.expectApproxEqAbs(@as(f64, 0.0), meters.northing, 0.000001);
-    try testing.expectApproxEqAbs(@as(f64, 0.0), meters.easting, 0.000001);
-
-    try testing.expectEqual(c.MLN_STATUS_OK, c.mln_projected_meters_for_lat_lng(center, &meters));
-    var roundtrip: c.mln_lat_lng = undefined;
-    try testing.expectEqual(c.MLN_STATUS_OK, c.mln_lat_lng_for_projected_meters(meters, &roundtrip));
-    try expectLatLngApprox(center, roundtrip);
 }
 
 test "projected meters reject invalid arguments" {

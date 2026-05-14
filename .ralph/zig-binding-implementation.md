@@ -347,6 +347,132 @@ For each phase or smaller milestone:
 - 2026-05-14: Iteration 11 committed Phase 4 duplicate-retirement work as
   `5deffc3` (`Retire duplicated foundational C assertions`) and pushed
   `zig-binding-implementation` to origin.
+- 2026-05-14: Iteration 12 started Phase 5 with the camera/projection value
+  slice: added public semantic values for geographic coordinates, screen points,
+  edge insets, bounds, projected meters, camera options, animation options,
+  camera-fit options, and projection modes in `bindings/zig/src/values.zig`.
+- 2026-05-14: Iteration 12 added internal descriptor materialization and temp
+  storage: C option structs are now created inside the binding from semantic Zig
+  descriptors, and `bindings/zig/src/native_temp.zig` owns temporary arrays for
+  coordinate and screen-point calls.
+- 2026-05-14: Iteration 12 ported the first Phase 5 public binding coverage for
+  camera and projection behavior in `bindings/zig/tests/camera.zig` and
+  `bindings/zig/tests/projection.zig`, covering camera snapshots/commands,
+  camera fitting, projection mode snapshots, map/projection coordinate
+  conversion, and projected-meter helpers.
+- 2026-05-14: Iteration 12 verification passed: `mise run //bindings/zig:test`
+  (28/28 tests passed). This slice still needs the Phase 5 milestone review,
+  formatting/fix pass, broader value/descriptor coverage, and commit/push.
+- 2026-05-14: Iteration 13 expanded Phase 5 value coverage to map tuning: added
+  public semantic debug options, viewport option enums/descriptors, and tile
+  option enums/descriptors, with internal raw enum and field-mask
+  materialization in `bindings/zig/src/values.zig`.
+- 2026-05-14: Iteration 13 added public `MapHandle` tuning APIs for debug
+  options, rendering stats, loaded-state queries, debug-log dump, viewport
+  options, and tile options without exposing raw C bitmasks or option structs.
+- 2026-05-14: Iteration 13 ported map tuning coverage to
+  `bindings/zig/tests/map_tuning.zig`, covering debug option round trips,
+  rendering stats toggles, viewport/tile selected-field updates, and invalid
+  descriptor values surfaced as public binding errors.
+- 2026-05-14: Iteration 13 verification passed: `mise run //bindings/zig:test`
+  (32/32 tests passed; `dumpDebugLogs` emitted native debug log lines during the
+  run). Phase 5 still needs style/style-value/geojson descriptors, copied-result
+  guards/deinit paths, review, fix, commit, and push.
+- 2026-05-14: Iteration 14 added semantic JSON descriptors and owned copied JSON
+  outputs: public `JsonValue`/`JsonMember` inputs materialize recursive C
+  descriptor graphs through arena-backed temporary storage, while
+  `OwnedJsonValue` copies snapshot data before destroying native snapshot
+  handles and provides explicit recursive `deinit`.
+- 2026-05-14: Iteration 14 added copied style ID list output with `StringList`
+  and public `MapHandle` style-value APIs for layer properties, layer filters,
+  style source ID lists, and style layer ID lists. Native snapshot/list handles
+  are guarded as private temporaries and always destroyed after copying.
+- 2026-05-14: Iteration 14 expanded the binding test style fixture to include a
+  GeoJSON source and circle layer, then ported style-value coverage in
+  `bindings/zig/tests/style_values.zig` for owned ID lists, layer property JSON
+  values, nested filter arrays, copied snapshot deinit, and invalid JSON
+  descriptor/string handling.
+- 2026-05-14: Iteration 14 verification passed: `mise run //bindings/zig:test`
+  (36/36 tests passed; native debug log lines still appear from the map tuning
+  `dumpDebugLogs` test). Phase 5 still needs geometry/GeoJSON descriptors,
+  broader style/source coverage as supported, review, fix, commit, and push.
+- 2026-05-14: Iteration 15 added public semantic geometry and GeoJSON input
+  descriptors: `Geometry`, `FeatureIdentifier`, `Feature`, and `GeoJson` cover
+  points, lines, polygons, multi-geometries, geometry collections, feature
+  properties, feature IDs, and feature collections without exposing raw C
+  descriptor structs.
+- 2026-05-14: Iteration 15 extended private temporary storage to materialize
+  nested geometry, feature, GeoJSON, coordinate-span, polygon, and JSON member
+  descriptor graphs into arena-owned C ABI memory borrowed only for the native
+  call.
+- 2026-05-14: Iteration 15 added public GeoJSON source APIs on `MapHandle` for
+  source existence checks, adding/updating inline GeoJSON data, and adding/
+  updating GeoJSON URLs, then ported `geojson.zig` coverage through public
+  binding APIs for source add/update, nested geometry collections, invalid
+  native geometry values, and embedded-NUL descriptor strings.
+- 2026-05-14: Iteration 15 verification passed: `mise run //bindings/zig:test`
+  (39/39 tests passed; native debug log lines still appear from the map tuning
+  `dumpDebugLogs` test). Phase 5 still needs broader style/source coverage as
+  supported, duplicate direct-C retirement decisions, review, fix, commit, and
+  push.
+- 2026-05-14: Iteration 16 reflection:
+  - Accomplished so far: Phases 1-4 are complete, reviewed, committed, and
+    pushed. Phase 5 now has public value descriptors for camera/projection, map
+    tuning, JSON values, copied JSON snapshots/lists, geometry, GeoJSON, and a
+    growing set of style/source APIs.
+  - Working well: semantic descriptors plus private arena materialization keep
+    raw C structs out of the public API while preserving the C ABI's
+    borrowed-for-call lifetime model. The binding tests now cover progressively
+    richer behavior through `maplibre_native` instead of direct `@cImport`.
+  - Not working/blocking: Phase 5 has become broad enough that review and
+    duplicate-retirement should happen soon. `values.zig` and `native_temp.zig`
+    are growing into large mixed-responsibility files and may need splitting
+    after the current milestone review.
+  - Approach adjustment: finish one more coherent style/source coverage slice,
+    then run formatting, parallel review, and targeted duplicate retirement
+    rather than continuing to expand Phase 5 indefinitely.
+  - Next priorities: add style source metadata/attribution coverage, run the
+    Phase 5 review loop, retire direct C duplicates that public binding tests
+    now preserve, then commit and push the reviewed milestone.
+- 2026-05-14: Iteration 16 added the style source metadata slice: public
+  `StyleSourceType`, `StyleSourceInfo`, and `OwnedString` copied-attribution
+  values; `MapHandle` APIs for adding/removing style source JSON, source type
+  and info lookup, and attribution copying; and `style_sources.zig` tests for
+  source JSON descriptors, metadata, copied attribution deinit, missing-source
+  results, removal, and invalid source descriptors.
+- 2026-05-14: Iteration 16 verification passed: `mise run //bindings/zig:test`
+  (42/42 tests passed; native debug log lines still appear from the map tuning
+  `dumpDebugLogs` test). Next iteration should run formatting, Phase 5 review,
+  and direct-C duplicate retirement rather than expanding the milestone much
+  further.
+- 2026-05-14: Iteration 17 ran `mise run fix`; dprint formatted the Ralph JSON,
+  Ralph Markdown, and touched Zig files. Verification after formatting passed:
+  `mise run //bindings/zig:test` (42/42 tests passed).
+- 2026-05-14: Iteration 17 ran Phase 5 parallel review `9679e64a` with two
+  reviewers. Applied blocking findings: removed public raw-C leakage from
+  `OwnedJsonValue.copyFromNative` by moving native JSON copying to an internal
+  module-level helper, changed geometry coordinate spans to arena-stable arrays
+  so nested descriptor graphs cannot dangle after later appends, fixed empty
+  native JSON array/object copying, and fixed copied attribution deinit by
+  returning an exact allocation length.
+- 2026-05-14: Iteration 17 added regressions for the applied review findings:
+  public-boundary coverage that `OwnedJsonValue` has no `copyFromNative` raw-C
+  helper, an internal empty native JSON array/object copy test, and a public
+  multi-line GeoJSON source test with enough coordinates to exercise stable
+  nested coordinate span materialization. Verification passed after fixes:
+  `mise run //bindings/zig:test` (43/43 tests passed).
+- 2026-05-14: Iteration 18 retired exact duplicate direct C assertions now
+  covered by Phase 5 binding tests: camera jump snapshots, projection mode
+  snapshots, map coordinate conversion, projected-meter conversion, map debug
+  and tuning option round trips, layer property/filter values, and invalid
+  layer-property descriptor/conversion behavior. Kept direct C coverage for C
+  ABI-only defaults, undersized structs, raw unknown enum/field masks, null
+  pointers/out-pointers, source/layer/image/light APIs not yet ported, and
+  callback/resource/render coverage not yet in the binding.
+- 2026-05-14: Iteration 18 verification before and after formatting passed:
+  `mise run test` (107 passed, 12 skipped), `mise run //bindings/zig:test`
+  (43/43 tests passed), `mise run fix`, then `mise run test` (107 passed, 12
+  skipped) and `mise run //bindings/zig:test` (43/43 tests passed).
 
 ## Review log
 
@@ -391,6 +517,17 @@ For each phase or smaller milestone:
   `/Users/sargunv/.pi/agent/sessions/--Users-sargunv-Code-maplibre-native-ffi--/subagent-artifacts/2fec76ed_reviewer_0_output.md`
   and
   `/Users/sargunv/.pi/agent/sessions/--Users-sargunv-Code-maplibre-native-ffi--/subagent-artifacts/2fec76ed_reviewer_1_output.md`.
+- Phase 5 parallel review run `9679e64a` completed with two reviewers. Findings
+  applied: raw C leakage through `OwnedJsonValue.copyFromNative`, dangling
+  nested geometry coordinate spans from `ArrayList` reallocation, empty native
+  JSON array/object copy safety, and copied-attribution exact allocation
+  ownership. Findings deferred for a later slice: diagnostic-aware projection
+  free-helper overloads and preserving unknown raw `StyleSourceType` values;
+  those are not blockers for the current copied-result/descriptor milestone and
+  will be revisited with broader output-domain/API polish. Artifacts:
+  `/Users/sargunv/.pi/agent/sessions/--Users-sargunv-Code-maplibre-native-ffi--/subagent-artifacts/9679e64a_reviewer_0_output.md`
+  and
+  `/Users/sargunv/.pi/agent/sessions/--Users-sargunv-Code-maplibre-native-ffi--/subagent-artifacts/9679e64a_reviewer_1_output.md`.
 
 ## Notes and decisions
 
@@ -417,3 +554,15 @@ For each phase or smaller milestone:
 - Phase 4 foundational binding tests cover public binding behavior now exposed
   by Phases 2 and 3. Direct C tests remain for C ABI-only validation and raw
   stale-handle coverage after duplicate native-behavior assertions are retired.
+- Phase 5 uses nullable fields on public option structs to represent C field
+  masks semantically. The binding materializes `size` and `fields` internally
+  before C calls so callers never construct raw C option structs.
+- Public Zig enums represent known C enum domains for map tuning. Snapshot
+  conversion treats unknown native enum values as `error.UnknownStatus` so the
+  binding fails explicitly rather than preserving a raw C value in public data.
+- Phase 5 copies native snapshot/list handles into Zig-owned values immediately
+  and destroys native result handles before returning. Callers deinitialize the
+  copied outputs with `OwnedJsonValue.deinit()` and `StringList.deinit()`.
+- Geometry and GeoJSON inputs use public recursive descriptors. The binding
+  materializes the corresponding nested C graph in temporary arena storage for
+  each call, preserving the C API's borrowed-for-call ownership model.

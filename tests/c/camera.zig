@@ -85,22 +85,6 @@ test "camera rejects invalid arguments" {
     try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, c.mln_map_pitch_by(map, std.math.nan(f64)));
 }
 
-test "camera jump updates snapshot fields" {
-    const runtime = try support.createRuntime();
-    defer support.destroyRuntime(runtime);
-
-    const map = try support.createMap(runtime);
-    defer support.destroyMap(map);
-
-    var camera = support.testCamera();
-    try testing.expectEqual(c.MLN_STATUS_OK, c.mln_map_jump_to(map, &camera));
-
-    var snapshot = c.mln_camera_options_default();
-    try testing.expectEqual(c.MLN_STATUS_OK, c.mln_map_get_camera(map, &snapshot));
-    try testing.expect((snapshot.fields & c.MLN_CAMERA_OPTION_CENTER) != 0);
-    try testing.expect((snapshot.fields & c.MLN_CAMERA_OPTION_ZOOM) != 0);
-}
-
 test "camera commands accept valid arguments" {
     const runtime = try support.createRuntime();
     defer support.destroyRuntime(runtime);
