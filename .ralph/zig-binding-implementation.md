@@ -100,9 +100,9 @@ For each phase or smaller milestone:
 - [x] Port `diagnostics.zig` assertions to binding tests.
 - [x] Port `runtime.zig` assertions to binding tests.
 - [x] Port `map_lifecycle.zig` assertions to binding tests.
-- [ ] Retire exact duplicate direct C API assertions only after binding coverage
+- [x] Retire exact duplicate direct C API assertions only after binding coverage
       preserves intent.
-- [ ] Keep a private C import compile test if needed for early header
+- [x] Keep a private C import compile test if needed for early header
       bindability.
 - [x] Review, apply findings, commit, and push.
 
@@ -316,6 +316,34 @@ For each phase or smaller milestone:
 - 2026-05-14: Iteration 10 committed the foundational binding test port as
   `e3017d7` (`Port foundational Zig binding tests`) and pushed
   `zig-binding-implementation` to origin.
+- 2026-05-14: Iteration 11 reflection:
+  - Accomplished so far: Phases 1-3 are complete, reviewed, committed, and
+    pushed. Phase 4 now has public binding tests for foundational diagnostics,
+    runtime, and map lifecycle behavior.
+  - Working well: the review-before-commit rhythm continues to catch concrete
+    safety gaps, and the split binding test files make coverage easier to map
+    back to direct C test areas.
+  - Not working/blocking: exact duplicate retirement is necessarily granular;
+    direct C tests still contain C ABI-only assertions mixed with native
+    behavior assertions.
+  - Approach adjustment: retire only assertions that public binding tests now
+    preserve, while keeping direct C tests for null pointers, undersized
+    structs, out-parameter initialization, raw enum/status domains, and stale
+    raw handles.
+  - Next priorities: finish Phase 4 commit, then start Phase 5 by adding the
+    value/descriptor and memory helpers needed for style/camera/projection test
+    ports.
+- 2026-05-14: Iteration 11 retired exact duplicate direct C assertions from
+  `tests/c/runtime.zig` and `tests/c/map_lifecycle.zig`: wrong-thread runtime
+  destroy/poll, runtime pump before/after maps, distinct-thread runtime
+  creation, map width/height/scale validation, multiple maps, and wrong-thread
+  map repaint. Kept C ABI-specific invalid argument, raw stale-handle,
+  out-pointer, raw enum, and still-image invalid-state coverage.
+- 2026-05-14: Iteration 11 verification passed: `mise run test` (117 passed, 12
+  skipped), `mise run //bindings/zig:test` (20/20 tests passed), `mise run fix`,
+  then `mise run test` and `mise run //bindings/zig:test` again. The binding
+  private `status.zig` test artifact and remaining direct C suite continue to
+  compile the private C import/header path.
 
 ## Review log
 
@@ -384,5 +412,5 @@ For each phase or smaller milestone:
   method calls return `error.ClosedHandle`. Revisit state reclamation later if a
   better Zig ownership shape preserves those semantics without leaks.
 - Phase 4 foundational binding tests cover public binding behavior now exposed
-  by Phases 2 and 3. Direct C tests remain until review confirms which exact
-  assertions are duplicated and safe to retire.
+  by Phases 2 and 3. Direct C tests remain for C ABI-only validation and raw
+  stale-handle coverage after duplicate native-behavior assertions are retired.

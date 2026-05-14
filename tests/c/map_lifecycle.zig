@@ -1,11 +1,6 @@
-const std = @import("std");
-const testing = std.testing;
+const testing = @import("std").testing;
 const support = @import("support.zig");
 const c = support.c;
-
-fn requestRepaintOnThread(map: *c.mln_map, out_status: *c.mln_status) void {
-    out_status.* = c.mln_map_request_repaint(map);
-}
 
 test "map exposes default options" {
     const options = c.mln_map_options_default();
@@ -37,18 +32,6 @@ test "map create rejects invalid arguments" {
     try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, c.mln_map_create(runtime, &small_options, &map));
 
     var invalid_options = c.mln_map_options_default();
-    invalid_options.width = 0;
-    try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, c.mln_map_create(runtime, &invalid_options, &map));
-
-    invalid_options = c.mln_map_options_default();
-    invalid_options.height = 0;
-    try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, c.mln_map_create(runtime, &invalid_options, &map));
-
-    invalid_options = c.mln_map_options_default();
-    invalid_options.scale_factor = 0;
-    try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, c.mln_map_create(runtime, &invalid_options, &map));
-
-    invalid_options = c.mln_map_options_default();
     invalid_options.map_mode = 999;
     try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, c.mln_map_create(runtime, &invalid_options, &map));
 }
@@ -82,31 +65,4 @@ test "continuous repaint request makes render update available" {
     try testing.expectEqual(c.MLN_STATUS_INVALID_STATE, c.mln_map_request_still_image(map));
     try testing.expectEqual(c.MLN_STATUS_OK, c.mln_map_request_repaint(map));
     try testing.expect(try support.waitForEvent(runtime, map, c.MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE));
-}
-
-test "runtime supports multiple maps" {
-    const runtime = try support.createRuntime();
-    defer support.destroyRuntime(runtime);
-
-    const first = try support.createMap(runtime);
-    defer support.destroyMap(first);
-
-    const second = try support.createMap(runtime);
-    defer support.destroyMap(second);
-
-    try testing.expectEqual(c.MLN_STATUS_OK, c.mln_runtime_run_once(runtime));
-}
-
-test "map rejects wrong-thread calls" {
-    const runtime = try support.createRuntime();
-    defer support.destroyRuntime(runtime);
-
-    const map = try support.createMap(runtime);
-    defer support.destroyMap(map);
-
-    var status: c.mln_status = c.MLN_STATUS_OK;
-    const request_thread = try std.Thread.spawn(.{}, requestRepaintOnThread, .{ map, &status });
-    request_thread.join();
-
-    try testing.expectEqual(c.MLN_STATUS_WRONG_THREAD, status);
 }
