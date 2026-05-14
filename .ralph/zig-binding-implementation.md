@@ -291,10 +291,12 @@ For each phase or smaller milestone:
   public-boundary tests, and replaced public `?*anyopaque` native storage with
   private allocated state behind opaque state pointers.
 - 2026-05-14: Iteration 8 verification passed after review fixes:
-  `mise run
-  //bindings/zig:test` (12/12 tests), `mise run fix`, and
-  `mise run
-  //bindings/zig:test` again after formatting/lint fixes.
+  `mise run //bindings/zig:test` (12/12 tests), `mise run fix`, and
+  `mise run //bindings/zig:test` again after formatting/lint fixes.
+- 2026-05-14: Iteration 8 committed Phase 3 as `3d3d826`
+  (`Add Zig runtime map
+  vertical slice`) and pushed
+  `zig-binding-implementation` to origin.
 
 ## Review log
 
