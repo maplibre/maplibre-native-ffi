@@ -150,6 +150,12 @@ The binding tasks use the active mise variant's native artifact directory and
 render backend. Select another supported variant with `MISE_ENV=<variant>` or
 `mise -E <variant> run ...`.
 
+External Zig consumers pass the native artifact directory and render backend to
+the package dependency. If the package is used outside this repository layout,
+pass `include-dir` as the directory that contains `maplibre_native_c.h`. Vulkan
+consumers may also pass `vulkan-include-dir` and `dependency-library-dir` when
+those dependencies are outside normal system search paths.
+
 The repository root `mise run test` also runs the Zig binding suite for normal
 supported host variants. Run the root task before and after changing shared
 build integration or retiring duplicate direct C assertions.

@@ -5,6 +5,9 @@ const BuildOptions = struct {
     optimize: std.builtin.OptimizeMode,
     cmake_artifact_dir: std.Build.LazyPath,
     cmake_artifact_dir_runtime_path: []const u8,
+    include_dir: std.Build.LazyPath,
+    vulkan_include_dir: std.Build.LazyPath,
+    dependency_library_dir: std.Build.LazyPath,
     render_backend: RenderBackend,
 };
 
@@ -42,6 +45,32 @@ fn cmakeArtifactDir(b: *std.Build) std.Build.LazyPath {
     ) orelse @panic("missing required -Dcmake-artifact-dir=<path-to-cmake-artifacts>");
 }
 
+fn includeDir(b: *std.Build) std.Build.LazyPath {
+    return b.option(
+        std.Build.LazyPath,
+        "include-dir",
+        "Directory containing maplibre_native_c.h",
+    ) orelse b.path("../../include");
+}
+
+fn vulkanIncludeDir(b: *std.Build) std.Build.LazyPath {
+    return b.option(
+        std.Build.LazyPath,
+        "vulkan-include-dir",
+        "Directory containing Vulkan headers for Vulkan builds",
+    ) orelse b.path("../../third_party/maplibre-native/vendor/Vulkan-Headers/include");
+}
+
+fn dependencyLibraryDir(b: *std.Build, target: std.Build.ResolvedTarget) std.Build.LazyPath {
+    const override = b.option(
+        std.Build.LazyPath,
+        "dependency-library-dir",
+        "Directory containing backend dependency libraries such as Vulkan",
+    );
+    if (override) |path| return path;
+    return pixiLibraryDir(b, target);
+}
+
 fn pixiLibraryDir(b: *std.Build, target: std.Build.ResolvedTarget) std.Build.LazyPath {
     return switch (target.result.os.tag) {
         .windows => b.path("../../.pixi/envs/default/Library/lib"),
@@ -73,14 +102,14 @@ fn checkSupportedTarget(target: std.Build.ResolvedTarget, render_backend: Render
     }
 }
 
-fn repoLinkOptions(b: *std.Build, options: BuildOptions) LinkOptions {
+fn repoLinkOptions(_: *std.Build, options: BuildOptions) LinkOptions {
     return .{
         .target = options.target,
         .cmake_artifact_dir = options.cmake_artifact_dir,
         .render_backend = options.render_backend,
-        .include_dir = b.path("../../include"),
-        .vulkan_include_dir = b.path("../../third_party/maplibre-native/vendor/Vulkan-Headers/include"),
-        .dependency_library_dir = pixiLibraryDir(b, options.target),
+        .include_dir = options.include_dir,
+        .vulkan_include_dir = options.vulkan_include_dir,
+        .dependency_library_dir = options.dependency_library_dir,
     };
 }
 
@@ -167,6 +196,9 @@ pub fn build(b: *std.Build) void {
         .optimize = b.standardOptimizeOption(.{}),
         .cmake_artifact_dir = cmake_artifact_dir,
         .cmake_artifact_dir_runtime_path = cmake_artifact_dir.getPath2(b, null),
+        .include_dir = includeDir(b),
+        .vulkan_include_dir = vulkanIncludeDir(b),
+        .dependency_library_dir = dependencyLibraryDir(b, target),
         .render_backend = renderBackend(b),
     };
     checkSupportedTarget(options.target, options.render_backend);

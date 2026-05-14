@@ -985,6 +985,33 @@ For each phase or smaller milestone:
   docs, root-test, and CI integration milestone as `ae6152e`
   (`Port Zig examples
   to binding`).
+- 2026-05-14: Iteration 47 ran final parallel review `4786579a` with two
+  reviewers. Reviewer 0 found no blockers and confirmed public-boundary,
+  examples, docs, CI, root-test, and major lifetime coverage. Reviewer 1 found
+  two blockers: standalone package consumers need configurable C header/backend
+  dependency paths because `bindings/zig` is packaged without repository-level
+  `include/`, and several remaining direct Zig C style helper domains still lack
+  public binding APIs/tests.
+- 2026-05-14: Iteration 47 applied the standalone package-consumption blocker by
+  adding binding build options for `include-dir`, `vulkan-include-dir`, and
+  `dependency-library-dir`. Repository builds keep defaults pointing at
+  `../../include`, vendored Vulkan headers, and Pixi libraries; external
+  consumers can pass package-local or system paths explicitly. The Zig binding
+  build/test path still passed: `mise run //bindings/zig:test` (79/79).
+- 2026-05-14: Iteration 47 verified a standalone copied-package consumer at
+  `/tmp/mln-zig-standalone.Cxly4l`: copying only `bindings/zig` into the
+  consumer, then passing `b.path("headers")` as `include-dir` and
+  `b.path("relative-artifacts")` as `cmake-artifact-dir`, built successfully.
+- 2026-05-14: Iteration 47 updated Zig binding docs to document external
+  consumer `include-dir`, `vulkan-include-dir`, and `dependency-library-dir`
+  options. Verification passed: `mise run fix` and `mise run test` (direct C
+  suite 87 passed, 12 skipped; Zig binding suite 79/79 passed).
+- 2026-05-14: Iteration 47 remaining final-review blocker: port or explicitly
+  scope remaining direct Zig C style helper coverage. Unported domains include
+  style light, runtime style images, image source helpers, raster DEM helpers
+  with hillshade/color-relief layers, location indicator helpers, and some
+  vector/raster source helper behavior still covered only by
+  `tests/c/style_values.zig`.
 - 2026-05-14: Iteration 31 added public resource-provider cancellation coverage:
   a delayed request survives callback return, the map closes before completion,
   `cancelled()` becomes true, and late completion reports `error.InvalidState`.
@@ -1107,6 +1134,17 @@ For each phase or smaller milestone:
   `/Users/sargunv/.pi/agent/sessions/--Users-sargunv-Code-maplibre-native-ffi--/subagent-artifacts/ff87536b_reviewer_0_output.md`
   and
   `/Users/sargunv/.pi/agent/sessions/--Users-sargunv-Code-maplibre-native-ffi--/subagent-artifacts/ff87536b_reviewer_1_output.md`.
+- Final parallel review run `4786579a` completed with two reviewers. Reviewer 0
+  found no blockers. Reviewer 1 found two blockers: standalone package consumers
+  needed configurable C header/backend dependency paths, and remaining direct
+  Zig C style helper coverage still lacked public binding APIs/tests. The
+  package-consumer blocker is fixed with `include-dir`, `vulkan-include-dir`,
+  and `dependency-library-dir` build options plus a standalone copied-package
+  smoke test. The style helper coverage blocker remains for the next slice.
+  Artifacts:
+  `/Users/sargunv/.pi/agent/sessions/--Users-sargunv-Code-maplibre-native-ffi--/subagent-artifacts/4786579a_reviewer_0_output.md`
+  and
+  `/Users/sargunv/.pi/agent/sessions/--Users-sargunv-Code-maplibre-native-ffi--/subagent-artifacts/4786579a_reviewer_1_output.md`.
 
 ## Notes and decisions
 
@@ -1206,3 +1244,8 @@ For each phase or smaller milestone:
   still import host-platform libraries such as SDL, Metal, Objective-C, and
   Vulkan directly because those are application integration dependencies rather
   than MapLibre C ABI declarations.
+- The Zig package defaults `include-dir`, `vulkan-include-dir`, and
+  `dependency-library-dir` to the repository layout for in-tree tasks. External
+  consumers that package or vendor `bindings/zig` without the full repository
+  pass those options explicitly so `maplibre_native_c.h`, Vulkan headers, and
+  backend libraries resolve from the consumer's layout.
