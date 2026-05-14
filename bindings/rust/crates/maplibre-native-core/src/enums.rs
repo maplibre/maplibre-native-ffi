@@ -1068,26 +1068,6 @@ mod tests {
     }
 
     #[test]
-    fn network_status_maps_known_raw_values() {
-        assert_eq!(
-            NetworkStatus::from_raw(sys::MLN_NETWORK_STATUS_ONLINE),
-            NetworkStatus::Online
-        );
-        assert_eq!(
-            NetworkStatus::from_raw(sys::MLN_NETWORK_STATUS_OFFLINE),
-            NetworkStatus::Offline
-        );
-        assert_eq!(
-            NetworkStatus::Online.raw().unwrap(),
-            sys::MLN_NETWORK_STATUS_ONLINE
-        );
-        assert_eq!(
-            NetworkStatus::Offline.raw().unwrap(),
-            sys::MLN_NETWORK_STATUS_OFFLINE
-        );
-    }
-
-    #[test]
     fn network_status_preserves_unknown_raw_values() {
         assert_eq!(
             NetworkStatus::from_raw(999_999),

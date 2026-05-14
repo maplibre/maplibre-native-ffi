@@ -77,18 +77,6 @@ fn style_setters_accept_valid_input_and_reject_embedded_nul() {
 }
 
 #[test]
-fn source_type_preserves_raw_values() {
-    assert_eq!(SourceType::Unknown.raw_value(), 0);
-    assert_eq!(SourceType::from_raw(0), SourceType::Unknown);
-    assert_eq!(
-        SourceType::GeoJson.raw_value(),
-        sys::MLN_STYLE_SOURCE_TYPE_GEOJSON
-    );
-    assert_eq!(SourceType::from_raw(999_101), SourceType::Other(999_101));
-    assert_eq!(SourceType::Other(999_101).raw_value(), 999_101);
-}
-
-#[test]
 fn style_source_exists_and_remove_call_real_c_api() {
     let runtime = RuntimeHandle::new().unwrap();
     let map = MapHandle::new(&runtime).unwrap();

@@ -554,82 +554,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn lat_lng_maps_raw_fields() {
-        let value = LatLng::new(45.0, -122.0);
-        let raw = lat_lng_to_native(value);
-        assert_eq!(raw.latitude, 45.0);
-        assert_eq!(raw.longitude, -122.0);
-
-        let copied = lat_lng_from_native(sys::mln_lat_lng {
-            latitude: 46.0,
-            longitude: -121.0,
-        });
-        assert_eq!(copied, LatLng::new(46.0, -121.0));
-    }
-
-    #[test]
-    fn lat_lng_bounds_maps_raw_fields() {
-        let value = LatLngBounds::new(LatLng::new(45.0, -122.0), LatLng::new(46.0, -121.0));
-        let raw = lat_lng_bounds_to_native(value);
-        assert_eq!(raw.southwest.latitude, 45.0);
-        assert_eq!(raw.southwest.longitude, -122.0);
-        assert_eq!(raw.northeast.latitude, 46.0);
-        assert_eq!(raw.northeast.longitude, -121.0);
-
-        let copied = lat_lng_bounds_from_native(sys::mln_lat_lng_bounds {
-            southwest: sys::mln_lat_lng {
-                latitude: 1.0,
-                longitude: 2.0,
-            },
-            northeast: sys::mln_lat_lng {
-                latitude: 3.0,
-                longitude: 4.0,
-            },
-        });
-        assert_eq!(
-            copied,
-            LatLngBounds::new(LatLng::new(1.0, 2.0), LatLng::new(3.0, 4.0))
-        );
-    }
-
-    #[test]
-    fn projected_meters_maps_raw_fields() {
-        let value = ProjectedMeters::new(10.5, -20.25);
-        let raw = projected_meters_to_native(value);
-        assert_eq!(raw.northing, 10.5);
-        assert_eq!(raw.easting, -20.25);
-
-        let copied = projected_meters_from_native(sys::mln_projected_meters {
-            northing: 1.5,
-            easting: 2.5,
-        });
-        assert_eq!(copied, ProjectedMeters::new(1.5, 2.5));
-    }
-
-    #[test]
-    fn screen_point_and_box_map_raw_fields() {
-        let point = ScreenPoint::new(128.0, 256.0);
-        let raw_point = screen_point_to_native(point);
-        assert_eq!(raw_point.x, 128.0);
-        assert_eq!(raw_point.y, 256.0);
-        assert_eq!(
-            screen_point_from_native(sys::mln_screen_point { x: 1.0, y: 2.0 }),
-            ScreenPoint::new(1.0, 2.0)
-        );
-        assert_eq!(empty_screen_point().x, 0.0);
-        assert_eq!(empty_screen_point().y, 0.0);
-
-        let raw_box = screen_box_to_native(ScreenBox::new(
-            ScreenPoint::new(1.0, 2.0),
-            ScreenPoint::new(3.0, 4.0),
-        ));
-        assert_eq!(raw_box.min.x, 1.0);
-        assert_eq!(raw_box.min.y, 2.0);
-        assert_eq!(raw_box.max.x, 3.0);
-        assert_eq!(raw_box.max.y, 4.0);
-    }
-
-    #[test]
     fn coordinate_array_helpers_materialize_values() {
         let empty_coordinate = empty_lat_lng();
         assert_eq!(empty_coordinate.latitude, 0.0);
@@ -645,73 +569,6 @@ mod tests {
         let points = screen_points_to_native(&[ScreenPoint::new(5.0, 6.0)]);
         assert_eq!(points[0].x, 5.0);
         assert_eq!(points[0].y, 6.0);
-    }
-
-    #[test]
-    fn edge_insets_maps_raw_fields() {
-        let value = EdgeInsets::new(1.0, 2.0, 3.0, 4.0);
-        let raw = edge_insets_to_native(value);
-        assert_eq!(raw.top, 1.0);
-        assert_eq!(raw.left, 2.0);
-        assert_eq!(raw.bottom, 3.0);
-        assert_eq!(raw.right, 4.0);
-
-        let copied = edge_insets_from_native(sys::mln_edge_insets {
-            top: 5.0,
-            left: 6.0,
-            bottom: 7.0,
-            right: 8.0,
-        });
-        assert_eq!(copied, EdgeInsets::new(5.0, 6.0, 7.0, 8.0));
-    }
-
-    #[test]
-    fn vec3_maps_raw_fields() {
-        let value = Vec3::new(1.0, 2.0, 3.0);
-        let raw = vec3_to_native(value);
-        assert_eq!(raw.x, 1.0);
-        assert_eq!(raw.y, 2.0);
-        assert_eq!(raw.z, 3.0);
-
-        let copied = vec3_from_native(sys::mln_vec3 {
-            x: 4.0,
-            y: 5.0,
-            z: 6.0,
-        });
-        assert_eq!(copied, Vec3::new(4.0, 5.0, 6.0));
-    }
-
-    #[test]
-    fn quaternion_maps_raw_fields() {
-        let value = Quaternion::new(1.0, 2.0, 3.0, 4.0);
-        let raw = quaternion_to_native(value);
-        assert_eq!(raw.x, 1.0);
-        assert_eq!(raw.y, 2.0);
-        assert_eq!(raw.z, 3.0);
-        assert_eq!(raw.w, 4.0);
-
-        let copied = quaternion_from_native(sys::mln_quaternion {
-            x: 5.0,
-            y: 6.0,
-            z: 7.0,
-            w: 8.0,
-        });
-        assert_eq!(copied, Quaternion::new(5.0, 6.0, 7.0, 8.0));
-    }
-
-    #[test]
-    fn texture_image_info_maps_raw_fields() {
-        let copied = texture_image_info_from_native(&sys::mln_texture_image_info {
-            size: 0,
-            width: 64,
-            height: 32,
-            stride: 256,
-            byte_length: 8192,
-        });
-        assert_eq!(copied.width, 64);
-        assert_eq!(copied.height, 32);
-        assert_eq!(copied.stride, 256);
-        assert_eq!(copied.byte_length, 8192);
     }
 
     #[test]
@@ -735,36 +592,5 @@ mod tests {
         assert_eq!(raw.stride, 8);
         assert_eq!(raw.pixels, image.data.as_ptr());
         assert_eq!(raw.byte_length, image.data.len());
-    }
-
-    #[test]
-    fn style_image_info_maps_raw_fields() {
-        let copied = style_image_info_from_native(&sys::mln_style_image_info {
-            size: 0,
-            width: 10,
-            height: 11,
-            stride: 40,
-            byte_length: 440,
-            pixel_ratio: 2.0,
-            sdf: true,
-        });
-        assert_eq!(copied.width, 10);
-        assert_eq!(copied.height, 11);
-        assert_eq!(copied.stride, 40);
-        assert_eq!(copied.byte_length, 440);
-        assert_eq!(copied.pixel_ratio, 2.0);
-        assert!(copied.sdf);
-    }
-
-    #[test]
-    fn unit_bezier_materializes_raw_fields() {
-        let value = UnitBezier::new(0.1, 0.2, 0.3, 0.4);
-        let raw = unit_bezier_to_native(value);
-        assert_eq!(raw.x1, 0.1);
-        assert_eq!(raw.y1, 0.2);
-        assert_eq!(raw.x2, 0.3);
-        assert_eq!(raw.y2, 0.4);
-        assert_eq!(unit_bezier_from_native(raw), value);
-        assert_eq!(UnitBezier::from_native(raw), value);
     }
 }

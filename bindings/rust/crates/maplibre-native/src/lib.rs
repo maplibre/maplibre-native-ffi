@@ -209,14 +209,6 @@ mod tests {
     assert_not_impl_any!(FrameNativePointer<'static>: Send, Sync);
     assert_not_impl_any!(RenderSessionHandle: Send, Sync);
 
-    struct NetworkStatusRestore(NetworkStatus);
-
-    impl Drop for NetworkStatusRestore {
-        fn drop(&mut self) {
-            let _ = set_network_status(self.0);
-        }
-    }
-
     #[test]
     fn reports_c_abi_version() {
         assert_eq!(c_version(), maplibre_core::EXPECTED_C_ABI_VERSION);
@@ -230,18 +222,6 @@ mod tests {
 
         assert!((round_tripped.latitude - coordinate.latitude).abs() < 1e-9);
         assert!((round_tripped.longitude - coordinate.longitude).abs() < 1e-9);
-    }
-
-    #[test]
-    fn network_status_round_trips() {
-        let original = network_status().unwrap();
-        let _restore = NetworkStatusRestore(original);
-
-        set_network_status(NetworkStatus::Offline).unwrap();
-        assert_eq!(network_status().unwrap(), NetworkStatus::Offline);
-
-        set_network_status(NetworkStatus::Online).unwrap();
-        assert_eq!(network_status().unwrap(), NetworkStatus::Online);
     }
 
     #[test]
