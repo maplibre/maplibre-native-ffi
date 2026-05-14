@@ -197,6 +197,18 @@ For each phase or smaller milestone:
 - 2026-05-14: Confirmed `.ralph/zig-binding-implementation.md` is not ignored,
   committed it as `c500d79` (`Track Zig binding Ralph loop`), and pushed
   `zig-binding-implementation` to origin.
+- 2026-05-14: Iteration 1 read required context docs:
+  `docs/src/content/docs/development/overview.md`,
+  `docs/src/content/docs/concepts.md`,
+  `docs/src/content/docs/development/c-conventions.md`,
+  `docs/src/content/docs/development/bindings.md`, and
+  `docs/src/content/docs/development/bindings-zig.md`.
+- 2026-05-14: Iteration 1 inspected existing Zig direct C tests in `tests/c/`,
+  Zig examples in `examples/zig-*`, root `build.zig`, root `mise.toml`, and
+  example mise tasks to plan Phase 1 build integration.
+- 2026-05-14: Restored the full 212-line Ralph task file after `ralph_start`
+  rewrote it with the shorter startup task content; keep the committed file as
+  canonical and avoid passing abbreviated task content for this loop again.
 
 ## Review log
 
