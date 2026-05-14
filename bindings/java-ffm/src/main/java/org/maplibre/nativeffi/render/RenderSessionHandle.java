@@ -119,6 +119,22 @@ public final class RenderSessionHandle implements AutoCloseable {
     }
   }
 
+  public static RenderSessionHandle attachEglSurface(
+      MapHandle map, EglSurfaceDescriptor descriptor) {
+    NativeAccess.ensureLoaded();
+    Objects.requireNonNull(map, "map");
+    Objects.requireNonNull(descriptor, "descriptor");
+    try (var arena = Arena.ofConfined()) {
+      var outSession = MemoryUtil.allocatePointer(arena);
+      Status.check(
+          MapLibreNativeC.mln_egl_surface_attach(
+              map.nativeHandle(InternalAccess.INSTANCE),
+              RenderStructs.eglSurfaceDescriptor(descriptor, arena),
+              outSession));
+      return new RenderSessionHandle(map, outSession.get(ValueLayout.ADDRESS, 0));
+    }
+  }
+
   public static RenderSessionHandle attachMetalSurface(
       MapHandle map, MetalSurfaceDescriptor descriptor) {
     NativeAccess.ensureLoaded();

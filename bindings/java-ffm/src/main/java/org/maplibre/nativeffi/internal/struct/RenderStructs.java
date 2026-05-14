@@ -3,6 +3,7 @@ package org.maplibre.nativeffi.internal.struct;
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 import org.maplibre.nativeffi.internal.c.MapLibreNativeC;
+import org.maplibre.nativeffi.internal.c.mln_egl_surface_descriptor;
 import org.maplibre.nativeffi.internal.c.mln_metal_borrowed_texture_descriptor;
 import org.maplibre.nativeffi.internal.c.mln_metal_context_descriptor;
 import org.maplibre.nativeffi.internal.c.mln_metal_owned_texture_descriptor;
@@ -16,6 +17,7 @@ import org.maplibre.nativeffi.internal.c.mln_vulkan_context_descriptor;
 import org.maplibre.nativeffi.internal.c.mln_vulkan_owned_texture_descriptor;
 import org.maplibre.nativeffi.internal.c.mln_vulkan_owned_texture_frame;
 import org.maplibre.nativeffi.internal.c.mln_vulkan_surface_descriptor;
+import org.maplibre.nativeffi.render.EglSurfaceDescriptor;
 import org.maplibre.nativeffi.render.MetalBorrowedTextureDescriptor;
 import org.maplibre.nativeffi.render.MetalContextDescriptor;
 import org.maplibre.nativeffi.render.MetalOwnedTextureDescriptor;
@@ -77,6 +79,18 @@ public final class RenderStructs {
     if (descriptor.hasFinalLayout()) {
       mln_vulkan_borrowed_texture_descriptor.final_layout(segment, descriptor.finalLayout());
     }
+    return segment;
+  }
+
+  public static MemorySegment eglSurfaceDescriptor(
+      EglSurfaceDescriptor descriptor, Arena arena) {
+    var segment = MapLibreNativeC.mln_egl_surface_descriptor_default(arena);
+    mln_egl_surface_descriptor.width(segment, descriptor.width());
+    mln_egl_surface_descriptor.height(segment, descriptor.height());
+    mln_egl_surface_descriptor.scale_factor(segment, descriptor.scaleFactor());
+    mln_egl_surface_descriptor.display(segment, pointer(descriptor.display()));
+    mln_egl_surface_descriptor.context(segment, pointer(descriptor.context()));
+    mln_egl_surface_descriptor.surface(segment, pointer(descriptor.surface()));
     return segment;
   }
 

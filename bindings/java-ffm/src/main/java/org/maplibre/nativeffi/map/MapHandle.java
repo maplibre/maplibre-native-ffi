@@ -36,6 +36,7 @@ import org.maplibre.nativeffi.internal.struct.MapStructs;
 import org.maplibre.nativeffi.internal.struct.StyleStructs;
 import org.maplibre.nativeffi.internal.struct.ValueStructs;
 import org.maplibre.nativeffi.json.JsonValue;
+import org.maplibre.nativeffi.render.EglSurfaceDescriptor;
 import org.maplibre.nativeffi.render.MetalBorrowedTextureDescriptor;
 import org.maplibre.nativeffi.render.MetalOwnedTextureDescriptor;
 import org.maplibre.nativeffi.render.MetalSurfaceDescriptor;
@@ -844,6 +845,10 @@ public final class MapHandle implements AutoCloseable {
   public RenderSessionHandle attachVulkanBorrowedTexture(
       VulkanBorrowedTextureDescriptor descriptor) {
     return RenderSessionHandle.attachVulkanBorrowedTexture(this, descriptor);
+  }
+
+  public RenderSessionHandle attachEglSurface(EglSurfaceDescriptor descriptor) {
+    return RenderSessionHandle.attachEglSurface(this, descriptor);
   }
 
   public RenderSessionHandle attachMetalSurface(MetalSurfaceDescriptor descriptor) {
