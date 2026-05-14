@@ -12,4 +12,5 @@ pub const c = if (build_options.supports_metal) @cImport({
 }) else if (build_options.supports_opengl) @cImport({
     @cInclude("maplibre_native_c.h");
     @cInclude("SDL3/SDL.h");
+    @cInclude("EGL/egl.h");
 }) else @compileError("zig-map currently supports Metal, Vulkan, and OpenGL variants");

@@ -118,8 +118,11 @@ pub const OpenGLBackend = union(enum) {
 // ── Native surface backend ────────────────────────────────────────────────────
 //
 // SDL3 creates the EGL context internally when SDL_GL_CreateContext is called.
-// We query the EGL handles back from SDL3 and hand them to mln_egl_surface_attach.
-// The session then owns rendering and buffer swapping for its lifetime.
+// We query the EGL handles back from SDL3: SDL_EGL_GetCurrentDisplay() and
+// SDL_EGL_GetWindowSurface() return real EGL types directly.  The EGL context
+// handle is NOT obtainable as a real EGLContext from SDL_GL_GetCurrentContext()
+// (that returns an opaque SDL wrapper); instead we call eglGetCurrentContext()
+// directly from <EGL/egl.h> after SDL makes the context current.
 
 const OpenGLSurfaceBackend = struct {
     gl_ctx: c.SDL_GLContext,
@@ -151,8 +154,12 @@ const OpenGLSurfaceBackend = struct {
         viewport: types.Viewport,
     ) !render_target.Session {
         // SDL3 uses EGL internally on Linux; retrieve the borrowed handles.
+        // SDL_EGL_GetCurrentDisplay/GetWindowSurface return real EGL opaque
+        // types, but SDL_GL_GetCurrentContext returns an opaque SDL wrapper
+        // rather than the underlying EGLContext.  Use eglGetCurrentContext()
+        // directly to obtain the true EGLContext handle.
         const egl_display = c.SDL_EGL_GetCurrentDisplay();
-        const egl_context = c.SDL_GL_GetCurrentContext();
+        const egl_context = c.eglGetCurrentContext();
         const egl_surface = c.SDL_EGL_GetWindowSurface(self.window);
 
         if (egl_display == null or
