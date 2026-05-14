@@ -11,6 +11,8 @@ const values = @import("values.zig");
 const MapStateHandle = opaque {};
 const MapState = struct {
     native: ?*c.mln_map,
+    runtime: RuntimeHandle,
+    id: values.MapId,
     diagnostic_store: ?*diagnostics.DiagnosticStore,
 };
 
@@ -55,9 +57,17 @@ pub const MapHandle = struct {
             if (map) |handle| _ = c.mln_map_destroy(handle);
         }
 
+        const map_id = try runtime_module.registerMap(runtime, map.?);
+        errdefer runtime_module.unregisterMap(runtime, map.?);
         const map_state = try std.heap.smp_allocator.create(MapState);
-        map_state.* = .{ .native = map.?, .diagnostic_store = diagnostic_store };
+        map_state.* = .{ .native = map.?, .runtime = runtime, .id = map_id, .diagnostic_store = diagnostic_store };
         return .{ .state = @ptrCast(map_state) };
+    }
+
+    pub fn id(self: MapHandle) status.BindingError!values.MapId {
+        const map_state = state(self);
+        _ = map_state.native orelse return error.ClosedHandle;
+        return map_state.id;
     }
 
     pub fn setStyleJson(
@@ -546,6 +556,7 @@ pub const MapHandle = struct {
         const map_state = state(self);
         const map = map_state.native orelse return;
         try status.checkStatus(c.mln_map_destroy(map), map_state.diagnostic_store);
+        runtime_module.unregisterMap(map_state.runtime, map);
         map_state.native = null;
     }
 };

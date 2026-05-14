@@ -123,13 +123,13 @@ For each phase or smaller milestone:
 
 ### Phase 6: events and source identity
 
-- [ ] Add binding-assigned `MapId`.
-- [ ] Register maps with runtimes for source lookup while handles are live.
-- [ ] Copy runtime events into owned Zig values before next poll.
-- [ ] Preserve unknown event and payload raw values.
-- [ ] Apply binding-owned side effects required by other bindings where
+- [x] Add binding-assigned `MapId`.
+- [x] Register maps with runtimes for source lookup while handles are live.
+- [x] Copy runtime events into owned Zig values before next poll.
+- [x] Preserve unknown event and payload raw values.
+- [x] Apply binding-owned side effects required by other bindings where
       applicable.
-- [ ] Port `events.zig` coverage.
+- [x] Port `events.zig` coverage.
 - [ ] Review, apply findings, commit, and push.
 
 ### Phase 7: logging, resources, offline, and callbacks
@@ -476,6 +476,79 @@ For each phase or smaller milestone:
 - 2026-05-14: Iteration 18 committed the reviewed Phase 5 value/descriptor
   milestone as `db14aa0` (`Add Zig binding value descriptors`) and pushed
   `zig-binding-implementation` to origin.
+- 2026-05-14: Iteration 18 added follow-up commit `d9f1037`
+  (`Record Zig value
+  descriptor milestone`) with the Ralph record of the
+  pushed milestone.
+- 2026-05-14: Iteration 19 started Phase 6 event/source identity work: added a
+  public binding-assigned `MapId`, assigned IDs when maps are created, and
+  registered live maps with their runtime for native event source lookup.
+- 2026-05-14: Iteration 19 added copied runtime event polling with
+  `RuntimeHandle.pollEventOwned(allocator)`, returning an `OwnedRuntimeEvent`
+  that owns copied message bytes and resolves map-originated events back to a
+  `MapId` while preserving the existing lightweight `pollEvent()` API.
+- 2026-05-14: Iteration 19 added binding coverage for unsupported-style failure
+  events: the test verifies owned event message persistence after a later
+  runtime call and verifies the event source resolves to the creating map's
+  `MapId`. Verification passed: `mise run //bindings/zig:test` (44/44 tests
+  passed; expected native unsupported-URL log line appears during the new test).
+- 2026-05-14: Iteration 21 reflection:
+  - Accomplished so far: Phases 1-5 are reviewed, committed, and pushed; Phase 6
+    now has map identity, live runtime registration, owned event messages, and
+    the first public event-source coverage in progress.
+  - Working well: keeping `pollEvent()` lightweight while adding
+    `pollEventOwned(allocator)` gives callers a clear choice between borrowed
+    native event metadata and allocator-backed copies.
+  - Not working/blocking: event payload coverage is broad and some payloads need
+    callback/render/offline setup before they can be observed through purely
+    public binding tests.
+  - Approach adjustment: copy and model all payload shapes now, use private
+    payload-copy tests for hard-to-trigger raw domains, then add public tests as
+    later render/offline/callback APIs make those events observable.
+  - Next priorities: finish event payload modeling, port the remaining feasible
+    `events.zig` public coverage, run Phase 6 review, apply findings, verify,
+    commit, and push.
+- 2026-05-14: Iteration 21 expanded `OwnedRuntimeEvent` with owned payload
+  copies for render-frame, render-map, style-image-missing, tile-action,
+  offline-status, offline-response-error, tile-count-limit, and unknown payload
+  bytes. Unknown event, source, payload, render mode, tile operation, offline
+  state, and resource-error raw values are preserved as public `unknown` union
+  cases instead of collapsing to generic errors.
+- 2026-05-14: Iteration 21 added private runtime-module tests for raw-domain
+  preservation, borrowed tile-action source ID copying, unknown payload byte
+  copying, and malformed native payload rejection, then wired `src/runtime.zig`
+  into the private Zig binding test step. Public runtime coverage now also
+  asserts no payload for the unsupported-style loading failure and covers
+  map-close event draining. Verification passed: `mise run //bindings/zig:test`
+  (53/53 tests passed; expected native log lines appear during event/style
+  tests).
+- 2026-05-14: Iteration 22 ported and retired the remaining duplicate public
+  event behavior from `tests/c/events.zig`: empty queue polling now runs through
+  both `RuntimeHandle.pollEvent()` and `pollEventOwned()`, unsupported-style
+  loading failure message/source/payload coverage is in the public binding test,
+  and map-close event draining is covered through `MapHandle.close()`. Remaining
+  direct C event tests are C ABI-specific invalid-output and raw payload-layout
+  checks.
+- 2026-05-14: Iteration 22 ran `mise run //bindings/zig:test` (54/54 tests
+  passed), `mise run test` (104 passed, 12 skipped), `mise run fix`, and
+  `mise run //bindings/zig:test` again (54/54 tests passed) before review fixes.
+- 2026-05-14: Iteration 22 ran Phase 6 parallel review `29c7eea9` with two
+  reviewers. Blocking findings applied: the public copied-message lifetime test
+  now performs a later event poll before asserting the copied bytes remain
+  stable; private payload-copy tests now mutate borrowed tile-action and unknown
+  payload backing storage after copying; `payloadAs` validates byte size,
+  pointer alignment, and the payload struct's leading `size` field before
+  casting/reading; malformed payload tests now cover null, undersized, and
+  misaligned payload pointers. Also changed the public source-ID assertion to
+  return `error.MissingSourceId` instead of force-unwrapping.
+- 2026-05-14: Iteration 22 verification after review fixes passed:
+  `mise run //bindings/zig:test` (54/54 tests passed), `mise run fix`, then
+  `mise run //bindings/zig:test` again (54/54 tests passed; expected native log
+  lines appear during event/style tests). Deferred public payload-bearing event
+  lifetime coverage until render/offline/callback APIs make such events
+  observable through public binding APIs.
+- 2026-05-14: Iteration 23 final Phase 6 root verification passed before the
+  milestone commit: `mise run test` (104 passed, 12 skipped).
 
 ## Review log
 
@@ -531,6 +604,18 @@ For each phase or smaller milestone:
   `/Users/sargunv/.pi/agent/sessions/--Users-sargunv-Code-maplibre-native-ffi--/subagent-artifacts/9679e64a_reviewer_0_output.md`
   and
   `/Users/sargunv/.pi/agent/sessions/--Users-sargunv-Code-maplibre-native-ffi--/subagent-artifacts/9679e64a_reviewer_1_output.md`.
+- Phase 6 parallel review run `29c7eea9` completed with two reviewers. Findings
+  applied: exercise event-copy invalidation with a later poll, mutate borrowed
+  payload backing storage after private copies to prove ownership, validate
+  native payload alignment and leading size before casting, add malformed
+  payload tests for null/undersized/misaligned inputs, and replace a public
+  source-ID force unwrap with a clear test error. Deferred: public
+  payload-bearing event lifetime coverage waits for later render/offline/
+  callback APIs that can produce those events through public binding APIs.
+  Artifacts:
+  `/Users/sargunv/.pi/agent/sessions/--Users-sargunv-Code-maplibre-native-ffi--/subagent-artifacts/29c7eea9_reviewer_0_output.md`
+  and
+  `/Users/sargunv/.pi/agent/sessions/--Users-sargunv-Code-maplibre-native-ffi--/subagent-artifacts/29c7eea9_reviewer_1_output.md`.
 
 ## Notes and decisions
 
@@ -569,3 +654,7 @@ For each phase or smaller milestone:
 - Geometry and GeoJSON inputs use public recursive descriptors. The binding
   materializes the corresponding nested C graph in temporary arena storage for
   each call, preserving the C API's borrowed-for-call ownership model.
+- Phase 6 keeps `pollEvent()` as the no-allocation event API and adds
+  `pollEventOwned(allocator)` for callers that need copied borrowed data such as
+  native event messages. `MapId` is binding-assigned and stable only while a map
+  is live with its runtime.

@@ -29,6 +29,10 @@ pub const ProjectedMeters = struct {
     easting: f64,
 };
 
+pub const MapId = struct {
+    value: u64,
+};
+
 pub const UnitBezier = struct {
     x1: f64,
     y1: f64,

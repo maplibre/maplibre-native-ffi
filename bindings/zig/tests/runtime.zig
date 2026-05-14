@@ -3,6 +3,8 @@ const testing = std.testing;
 
 const maplibre = @import("maplibre_native");
 
+extern fn usleep(useconds: c_uint) c_int;
+
 fn runRuntimeOnThread(runtime: maplibre.RuntimeHandle, out_error: *?anyerror) void {
     runtime.runOnce() catch |err| {
         out_error.* = err;
@@ -87,4 +89,74 @@ test "runtime option strings reject embedded NUL before C calls" {
         error.InvalidString,
         maplibre.RuntimeHandle.create(testing.allocator, .{ .asset_path = "asset\x00path" }, &diagnostics),
     );
+}
+
+test "owned runtime events copy message and resolve map identity" {
+    const runtime = try maplibre.RuntimeHandle.init(null);
+    defer runtime.close() catch @panic("runtime close failed");
+
+    const map = try maplibre.MapHandle.create(runtime, .{});
+    defer map.close() catch @panic("map close failed");
+    const map_id = try map.id();
+
+    try map.setStyleUrl(testing.allocator, "unsupported://style.json");
+
+    var found: ?maplibre.OwnedRuntimeEvent = null;
+    for (0..1000) |_| {
+        try runtime.runOnce();
+        while (try runtime.pollEventOwned(testing.allocator)) |event| {
+            if (std.meta.eql(event.event_type, maplibre.RuntimeEventType.map_loading_failed)) {
+                found = event;
+                break;
+            }
+            var discard = event;
+            discard.deinit();
+        }
+        if (found != null) break;
+        _ = usleep(1000);
+    }
+
+    var event = found orelse return error.EventNotFound;
+    defer event.deinit();
+    const source_id = event.source_id orelse return error.MissingSourceId;
+    try testing.expectEqual(map_id, source_id);
+    try testing.expect(std.meta.eql(event.payload, maplibre.RuntimeEventPayload.none));
+    try testing.expect(event.message.len > 0);
+    const copied_message = try testing.allocator.dupe(u8, event.message);
+    defer testing.allocator.free(copied_message);
+
+    if (try runtime.pollEventOwned(testing.allocator)) |later_event| {
+        var discard = later_event;
+        discard.deinit();
+    }
+    try testing.expectEqualSlices(u8, copied_message, event.message);
+}
+
+test "closing a map discards queued runtime events" {
+    const runtime = try maplibre.RuntimeHandle.init(null);
+    defer runtime.close() catch @panic("runtime close failed");
+
+    const map = try maplibre.MapHandle.create(runtime, .{});
+    try testing.expectError(error.NativeError, map.setStyleJson(testing.allocator, "{"));
+    try map.close();
+
+    try testing.expectEqual(@as(?maplibre.RuntimeEvent, null), try runtime.pollEvent());
+}
+
+test "runtime event polling reports empty queues" {
+    const runtime = try maplibre.RuntimeHandle.init(null);
+    defer runtime.close() catch @panic("runtime close failed");
+
+    const map = try maplibre.MapHandle.create(runtime, .{});
+    defer map.close() catch @panic("map close failed");
+
+    for (0..100) |_| {
+        try runtime.runOnce();
+        var drained = false;
+        while (try runtime.pollEvent()) |_| drained = true;
+        if (!drained) break;
+    }
+
+    try testing.expectEqual(@as(?maplibre.RuntimeEvent, null), try runtime.pollEvent());
+    try testing.expectEqual(@as(?maplibre.OwnedRuntimeEvent, null), try runtime.pollEventOwned(testing.allocator));
 }
