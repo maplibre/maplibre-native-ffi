@@ -252,6 +252,10 @@ For each phase or smaller milestone:
   pushed-ready; the milestone review loop is catching useful ownership/test
   gaps. Keep using private module tests for internals until public handle APIs
   can cover the same behavior through `maplibre_native`.
+- 2026-05-14: Iteration 5 committed Phase 2 as `77e9f34`
+  (`Add Zig status
+  diagnostics layer`) and pushed `zig-binding-implementation`
+  to origin.
 
 ## Review log
 
