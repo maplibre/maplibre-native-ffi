@@ -521,6 +521,12 @@ pub unsafe fn copy_feature_query_result(
     Ok(features)
 }
 
+/// Copies a borrowed native queried feature descriptor into owned Rust data.
+///
+/// # Safety
+///
+/// `raw` and all nested pointers indicated by `raw.fields` must be valid for
+/// the duration of this call. The returned value owns all copied data.
 unsafe fn copy_queried_feature(raw: &sys::mln_queried_feature) -> Result<QueriedFeature> {
     // SAFETY: Caller promises raw.feature nested storage is valid for this call.
     let feature = unsafe { feature_from_native(&raw.feature, 0) }?;
