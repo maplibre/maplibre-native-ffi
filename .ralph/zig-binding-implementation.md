@@ -229,6 +229,10 @@ For each phase or smaller milestone:
   `mise run fix`, `mise run //bindings/zig:test`, and
   `cd bindings/zig && zig build --summary all -Dcmake-artifact-dir=../../build/macos-arm64-metal -Drender-backend=metal`
   showing the default build compiles the test artifact.
+- 2026-05-14: Iteration 3 committed Phase 1 as `1fe500f`
+  (`Add initial Zig
+  binding package skeleton`) and pushed
+  `zig-binding-implementation` to origin.
 
 ## Review log
 
