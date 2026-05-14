@@ -97,14 +97,14 @@ For each phase or smaller milestone:
 
 ### Phase 4: foundational tests
 
-- [ ] Port `diagnostics.zig` assertions to binding tests.
-- [ ] Port `runtime.zig` assertions to binding tests.
-- [ ] Port `map_lifecycle.zig` assertions to binding tests.
+- [x] Port `diagnostics.zig` assertions to binding tests.
+- [x] Port `runtime.zig` assertions to binding tests.
+- [x] Port `map_lifecycle.zig` assertions to binding tests.
 - [ ] Retire exact duplicate direct C API assertions only after binding coverage
       preserves intent.
 - [ ] Keep a private C import compile test if needed for early header
       bindability.
-- [ ] Review, apply findings, commit, and push.
+- [x] Review, apply findings, commit, and push.
 
 ### Phase 5: options, values, and copied results
 
@@ -294,9 +294,25 @@ For each phase or smaller milestone:
   `mise run //bindings/zig:test` (12/12 tests), `mise run fix`, and
   `mise run //bindings/zig:test` again after formatting/lint fixes.
 - 2026-05-14: Iteration 8 committed Phase 3 as `3d3d826`
-  (`Add Zig runtime map
-  vertical slice`) and pushed
-  `zig-binding-implementation` to origin.
+  (`Add Zig runtime map vertical slice`) and pushed `zig-binding-implementation`
+  to origin.
+- 2026-05-14: Iteration 9 ported foundational diagnostics/runtime/map lifecycle
+  assertions into public binding tests: lifecycle diagnostics capture and copy
+  behavior, second-runtime same-thread rejection, distinct-thread runtime
+  creation, map option validation, wrong-thread runtime and map errors with
+  diagnostics, and multiple-map runtime pumping.
+- 2026-05-14: Iteration 9 verification passed: `mise run //bindings/zig:test`
+  (17/17 tests passed).
+- 2026-05-14: Iteration 10 reorganized foundational binding tests into
+  `bindings/zig/tests/diagnostics.zig`, `runtime.zig`, `map_lifecycle.zig`, and
+  `support.zig`, ran Phase 4 parallel review (`2fec76ed`), and applied findings
+  by adding wrong-thread runtime `pollEvent`/`close` coverage, runtime pump
+  after map close, repaint-to-render-update event coverage, and live-handle
+  embedded-NUL validation.
+- 2026-05-14: Iteration 10 verification passed: `mise run //bindings/zig:test`
+  (20/20 tests passed). Direct C tests remain for C ABI-only assertions, raw
+  stale-handle behavior, and exact duplicate retirement decisions in the next
+  slice.
 
 ## Review log
 
@@ -333,6 +349,14 @@ For each phase or smaller milestone:
   `/Users/sargunv/.pi/agent/sessions/--Users-sargunv-Code-maplibre-native-ffi--/subagent-artifacts/373e331f_reviewer_0_output.md`
   and
   `/Users/sargunv/.pi/agent/sessions/--Users-sargunv-Code-maplibre-native-ffi--/subagent-artifacts/373e331f_reviewer_1_output.md`.
+- Phase 4 parallel review run `2fec76ed` completed with two reviewers. Findings
+  applied: add wrong-thread runtime destroy/poll coverage, add runtime pump
+  after map destruction, add repaint render-update event coverage, and clarify
+  that direct C tests remain justified for C ABI-only invalid-input and raw
+  stale-handle assertions. Artifacts:
+  `/Users/sargunv/.pi/agent/sessions/--Users-sargunv-Code-maplibre-native-ffi--/subagent-artifacts/2fec76ed_reviewer_0_output.md`
+  and
+  `/Users/sargunv/.pi/agent/sessions/--Users-sargunv-Code-maplibre-native-ffi--/subagent-artifacts/2fec76ed_reviewer_1_output.md`.
 
 ## Notes and decisions
 
@@ -356,3 +380,6 @@ For each phase or smaller milestone:
   copied handle values can make repeated `close()` calls a no-op and later
   method calls return `error.ClosedHandle`. Revisit state reclamation later if a
   better Zig ownership shape preserves those semantics without leaks.
+- Phase 4 foundational binding tests cover public binding behavior now exposed
+  by Phases 2 and 3. Direct C tests remain until review confirms which exact
+  assertions are duplicated and safe to retire.

@@ -1,7 +1,7 @@
 {
   "name": "zig-binding-implementation",
   "taskFile": ".ralph/zig-binding-implementation.md",
-  "iteration": 8,
+  "iteration": 10,
   "maxIterations": 80,
   "itemsPerIteration": 3,
   "reflectEvery": 5,
