@@ -58,17 +58,17 @@ For each phase or smaller milestone:
 
 ### Phase 1: package skeleton
 
-- [ ] Add `bindings/zig/build.zig` and `bindings/zig/build.zig.zon`.
-- [ ] Add `bindings/zig/src/maplibre_native.zig` as public root.
-- [ ] Add private `bindings/zig/src/c.zig` with the only public-package
+- [x] Add `bindings/zig/build.zig` and `bindings/zig/build.zig.zon`.
+- [x] Add `bindings/zig/src/maplibre_native.zig` as public root.
+- [x] Add private `bindings/zig/src/c.zig` with the only public-package
       `@cImport` of `maplibre_native_c.h`.
-- [ ] Add build options for CMake artifact directory, render backend variant,
+- [x] Add build options for CMake artifact directory, render backend variant,
       platform include/library paths, and test rpath.
-- [ ] Add `zig build test` step linking `maplibre-native-c`.
-- [ ] Add or update mise tasks for `//bindings/zig:build`,
+- [x] Add `zig build test` step linking `maplibre-native-c`.
+- [x] Add or update mise tasks for `//bindings/zig:build`,
       `//bindings/zig:test`, and `//bindings/zig:ci`.
-- [ ] Verify empty binding tests compile and link.
-- [ ] Review, apply findings, commit, and push.
+- [x] Verify empty binding tests compile and link.
+- [x] Review, apply findings, commit, and push.
 
 ### Phase 2: status and diagnostics
 
@@ -209,11 +209,39 @@ For each phase or smaller milestone:
 - 2026-05-14: Restored the full 212-line Ralph task file after `ralph_start`
   rewrote it with the shorter startup task content; keep the committed file as
   canonical and avoid passing abbreviated task content for this loop again.
+- 2026-05-14: Iteration 2 added the initial Zig package skeleton:
+  `bindings/zig/build.zig`, `bindings/zig/build.zig.zon`,
+  `bindings/zig/src/maplibre_native.zig`, private `bindings/zig/src/c.zig`,
+  `bindings/zig/tests/main.zig`, and `bindings/zig/mise.toml`.
+- 2026-05-14: Iteration 2 verification passed: `mise run //bindings/zig:test`
+  (2/2 tests passed; compiles private C import and links `maplibre-native-c`)
+  and `mise run //bindings/zig:build`.
+- 2026-05-14: Iteration 2 verified missing build options fail clearly with
+  direct `zig build test` checks for omitted `-Drender-backend` and omitted
+  `-Dcmake-artifact-dir`.
+- 2026-05-14: Iteration 3 applied Phase 1 parallel review findings: made the
+  default `zig build` compile the binding test artifact, changed
+  `linkMaplibreNativeC` to require explicit consumer paths, mirrored root
+  multi-config native library directory resolution in `bindings/zig/mise.toml`,
+  added explicit target/backend validation, and removed the raw public render
+  backend bitmask helper.
+- 2026-05-14: Iteration 3 verification passed after review fixes:
+  `mise run fix`, `mise run //bindings/zig:test`, and
+  `cd bindings/zig && zig build --summary all -Dcmake-artifact-dir=../../build/macos-arm64-metal -Drender-backend=metal`
+  showing the default build compiles the test artifact.
 
 ## Review log
 
 - Setup milestone: no code implementation diff to review. First parallel
   implementation review is required before the Phase 1 commit.
+- Phase 1 parallel review run `5e4ffacb` completed with two fresh-context
+  reviewers. Findings applied: default `zig build` no-op, consumer-unsafe link
+  helper paths, multi-config mise native library dir handling, unsupported
+  target/backend clarity, and raw public render-backend bitmask exposure.
+  Artifacts:
+  `/Users/sargunv/.pi/agent/sessions/--Users-sargunv-Code-maplibre-native-ffi--/subagent-artifacts/5e4ffacb_reviewer_0_output.md`
+  and
+  `/Users/sargunv/.pi/agent/sessions/--Users-sargunv-Code-maplibre-native-ffi--/subagent-artifacts/5e4ffacb_reviewer_1_output.md`.
 
 ## Notes and decisions
 
@@ -222,3 +250,5 @@ For each phase or smaller milestone:
   after the binding suite has a supported path.
 - Commit and push every completed phase or meaningful milestone so the branch
   always carries the latest Ralph artifact and implementation state.
+- Phase 1 uses a tiny public root (`cAbiVersion`) to prove native linking while
+  keeping the raw `@cImport` private in `src/c.zig` and out of the package root.

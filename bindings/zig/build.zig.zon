@@ -1,0 +1,7 @@
+.{
+    .name = .maplibre_native,
+    .version = "0.16.0",
+    .dependencies = .{},
+    .paths = .{""},
+    .fingerprint = 0xf39f1b6c19db75ea,
+}

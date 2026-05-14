@@ -1,0 +1,173 @@
+const std = @import("std");
+
+const BuildOptions = struct {
+    target: std.Build.ResolvedTarget,
+    optimize: std.builtin.OptimizeMode,
+    cmake_artifact_dir_path: []const u8,
+    cmake_artifact_dir: std.Build.LazyPath,
+    render_backend: RenderBackend,
+};
+
+const RenderBackend = enum {
+    metal,
+    vulkan,
+};
+
+pub const LinkOptions = struct {
+    target: std.Build.ResolvedTarget,
+    cmake_artifact_dir: std.Build.LazyPath,
+    render_backend: RenderBackend,
+    include_dir: std.Build.LazyPath,
+    vulkan_include_dir: ?std.Build.LazyPath = null,
+    dependency_library_dir: ?std.Build.LazyPath = null,
+};
+
+fn renderBackend(b: *std.Build) RenderBackend {
+    const value = b.option(
+        []const u8,
+        "render-backend",
+        "Render backend built into the CMake artifact: metal or vulkan",
+    ) orelse @panic("missing required -Drender-backend=metal|vulkan");
+
+    if (std.mem.eql(u8, value, "metal")) return .metal;
+    if (std.mem.eql(u8, value, "vulkan")) return .vulkan;
+    std.debug.panic("unsupported render backend: {s}", .{value});
+}
+
+fn cmakeArtifactDirPath(b: *std.Build) []const u8 {
+    return b.option(
+        []const u8,
+        "cmake-artifact-dir",
+        "Directory containing the CMake-built maplibre-native-c library",
+    ) orelse @panic("missing required -Dcmake-artifact-dir=<path-to-cmake-artifacts>");
+}
+
+fn lazyPath(b: *std.Build, path: []const u8) std.Build.LazyPath {
+    if (std.fs.path.isAbsolute(path)) {
+        return .{ .cwd_relative = path };
+    }
+    return b.path(path);
+}
+
+fn pixiLibraryDir(b: *std.Build, target: std.Build.ResolvedTarget) std.Build.LazyPath {
+    return switch (target.result.os.tag) {
+        .windows => b.path("../../.pixi/envs/default/Library/lib"),
+        else => b.path("../../.pixi/envs/default/lib"),
+    };
+}
+
+fn vulkanLibraryName(target: std.Build.ResolvedTarget) []const u8 {
+    return switch (target.result.os.tag) {
+        .windows => "vulkan-1",
+        else => "vulkan",
+    };
+}
+
+fn isSupportedTarget(target: std.Build.ResolvedTarget, render_backend: RenderBackend) bool {
+    return switch (render_backend) {
+        .metal => target.result.os.tag == .macos,
+        .vulkan => target.result.os.tag == .macos or target.result.os.tag == .linux or
+            target.result.os.tag == .windows,
+    };
+}
+
+fn checkSupportedTarget(target: std.Build.ResolvedTarget, render_backend: RenderBackend) void {
+    if (!isSupportedTarget(target, render_backend)) {
+        std.debug.panic(
+            "unsupported target/render-backend combination: {s}/{s}",
+            .{ @tagName(target.result.os.tag), @tagName(render_backend) },
+        );
+    }
+}
+
+fn repoLinkOptions(b: *std.Build, options: BuildOptions) LinkOptions {
+    return .{
+        .target = options.target,
+        .cmake_artifact_dir = options.cmake_artifact_dir,
+        .render_backend = options.render_backend,
+        .include_dir = b.path("../../include"),
+        .vulkan_include_dir = b.path("../../third_party/maplibre-native/vendor/Vulkan-Headers/include"),
+        .dependency_library_dir = pixiLibraryDir(b, options.target),
+    };
+}
+
+/// Links a Zig module to the MapLibre Native C library and its backend-specific dependencies.
+///
+/// Callers provide all filesystem paths explicitly so the helper works both from this
+/// package and from external consumers with a different build root layout.
+pub fn linkMaplibreNativeC(_: *std.Build, module: *std.Build.Module, options: LinkOptions) void {
+    checkSupportedTarget(options.target, options.render_backend);
+
+    module.addIncludePath(options.include_dir);
+    module.addLibraryPath(options.cmake_artifact_dir);
+    module.addRPath(options.cmake_artifact_dir);
+    module.linkSystemLibrary("maplibre-native-c", .{});
+    module.link_libc = true;
+
+    switch (options.render_backend) {
+        .metal => {
+            module.linkFramework("Metal", .{});
+            module.linkFramework("QuartzCore", .{});
+        },
+        .vulkan => {
+            const vulkan_include_dir = options.vulkan_include_dir orelse
+                @panic("missing LinkOptions.vulkan_include_dir for vulkan backend");
+            module.addIncludePath(vulkan_include_dir);
+            if (options.dependency_library_dir) |dependency_library_dir| {
+                module.addLibraryPath(dependency_library_dir);
+                module.addRPath(dependency_library_dir);
+            }
+            module.linkSystemLibrary(vulkanLibraryName(options.target), .{});
+        },
+    }
+}
+
+fn addMaplibreNativeModule(b: *std.Build, options: BuildOptions) *std.Build.Module {
+    const module = b.addModule("maplibre_native", .{
+        .root_source_file = b.path("src/maplibre_native.zig"),
+        .target = options.target,
+        .optimize = options.optimize,
+    });
+    linkMaplibreNativeC(b, module, repoLinkOptions(b, options));
+    return module;
+}
+
+fn addBindingTests(b: *std.Build, options: BuildOptions, maplibre_native: *std.Build.Module) *std.Build.Step.Compile {
+    const tests = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("tests/main.zig"),
+            .target = options.target,
+            .optimize = options.optimize,
+        }),
+    });
+    tests.root_module.addImport("maplibre_native", maplibre_native);
+    linkMaplibreNativeC(b, tests.root_module, repoLinkOptions(b, options));
+    return tests;
+}
+
+pub fn build(b: *std.Build) void {
+    const target = b.standardTargetOptions(.{});
+    const cmake_artifact_dir_path = cmakeArtifactDirPath(b);
+    const options = BuildOptions{
+        .target = target,
+        .optimize = b.standardOptimizeOption(.{}),
+        .cmake_artifact_dir_path = cmake_artifact_dir_path,
+        .cmake_artifact_dir = lazyPath(b, cmake_artifact_dir_path),
+        .render_backend = renderBackend(b),
+    };
+    checkSupportedTarget(options.target, options.render_backend);
+
+    const maplibre_native = addMaplibreNativeModule(b, options);
+    const binding_tests = addBindingTests(b, options, maplibre_native);
+    b.default_step.dependOn(&binding_tests.step);
+
+    const run_binding_tests = b.addRunArtifact(binding_tests);
+    if (target.result.os.tag == .windows) {
+        run_binding_tests.addPathDir(options.cmake_artifact_dir_path);
+        run_binding_tests.addPathDir("../../.pixi/envs/default");
+        run_binding_tests.addPathDir("../../.pixi/envs/default/Library/bin");
+    }
+
+    const test_step = b.step("test", "Run Zig binding tests");
+    test_step.dependOn(&run_binding_tests.step);
+}
