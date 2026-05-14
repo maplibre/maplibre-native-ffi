@@ -145,6 +145,22 @@ fn addBindingTests(b: *std.Build, options: BuildOptions, maplibre_native: *std.B
     return tests;
 }
 
+fn addPrivateModuleTests(
+    b: *std.Build,
+    options: BuildOptions,
+    root_source_file: std.Build.LazyPath,
+) *std.Build.Step.Compile {
+    const tests = b.addTest(.{
+        .root_module = b.createModule(.{
+            .root_source_file = root_source_file,
+            .target = options.target,
+            .optimize = options.optimize,
+        }),
+    });
+    linkMaplibreNativeC(b, tests.root_module, repoLinkOptions(b, options));
+    return tests;
+}
+
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const cmake_artifact_dir_path = cmakeArtifactDirPath(b);
@@ -159,15 +175,22 @@ pub fn build(b: *std.Build) void {
 
     const maplibre_native = addMaplibreNativeModule(b, options);
     const binding_tests = addBindingTests(b, options, maplibre_native);
+    const status_tests = addPrivateModuleTests(b, options, b.path("src/status.zig"));
     b.default_step.dependOn(&binding_tests.step);
+    b.default_step.dependOn(&status_tests.step);
 
     const run_binding_tests = b.addRunArtifact(binding_tests);
+    const run_status_tests = b.addRunArtifact(status_tests);
     if (target.result.os.tag == .windows) {
         run_binding_tests.addPathDir(options.cmake_artifact_dir_path);
         run_binding_tests.addPathDir("../../.pixi/envs/default");
         run_binding_tests.addPathDir("../../.pixi/envs/default/Library/bin");
+        run_status_tests.addPathDir(options.cmake_artifact_dir_path);
+        run_status_tests.addPathDir("../../.pixi/envs/default");
+        run_status_tests.addPathDir("../../.pixi/envs/default/Library/bin");
     }
 
     const test_step = b.step("test", "Run Zig binding tests");
     test_step.dependOn(&run_binding_tests.step);
+    test_step.dependOn(&run_status_tests.step);
 }

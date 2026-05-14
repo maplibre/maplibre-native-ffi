@@ -12,3 +12,11 @@ test "package root hides raw C declarations" {
 test "package links the native C library" {
     try testing.expectEqual(@as(u32, 0), maplibre.cAbiVersion());
 }
+
+test "package validates the supported C ABI version" {
+    var diagnostics = maplibre.DiagnosticStore.init(testing.allocator);
+    defer diagnostics.deinit();
+
+    try maplibre.validateAbiVersion(&diagnostics);
+    try testing.expect(diagnostics.get() == null);
+}

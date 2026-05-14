@@ -72,16 +72,16 @@ For each phase or smaller milestone:
 
 ### Phase 2: status and diagnostics
 
-- [ ] Define native status error mapping.
-- [ ] Define public binding error set for status and binding-local validation
+- [x] Define native status error mapping.
+- [x] Define public binding error set for status and binding-local validation
       errors.
-- [ ] Add owned diagnostic record and `DiagnosticStore`.
-- [ ] Implement `checkStatus(status, diagnostics)` with thread-local message
+- [x] Add owned diagnostic record and `DiagnosticStore`.
+- [x] Implement `checkStatus(status, diagnostics)` with thread-local message
       copying before later C calls.
-- [ ] Add ABI version validation with diagnostics.
-- [ ] Add tests for invalid status mapping, copied diagnostics, and unknown
+- [x] Add ABI version validation with diagnostics.
+- [x] Add tests for invalid status mapping, copied diagnostics, and unknown
       status preservation.
-- [ ] Review, apply findings, commit, and push.
+- [x] Review, apply findings, commit, and push.
 
 ### Phase 3: runtime and map vertical slice
 
@@ -230,9 +230,28 @@ For each phase or smaller milestone:
   `cd bindings/zig && zig build --summary all -Dcmake-artifact-dir=../../build/macos-arm64-metal -Drender-backend=metal`
   showing the default build compiles the test artifact.
 - 2026-05-14: Iteration 3 committed Phase 1 as `1fe500f`
-  (`Add initial Zig
-  binding package skeleton`) and pushed
+  (`Add initial Zig binding package skeleton`) and pushed
   `zig-binding-implementation` to origin.
+- 2026-05-14: Iteration 4 implemented Phase 2 status and diagnostics:
+  `bindings/zig/src/status.zig`, `bindings/zig/src/diagnostics.zig`, public root
+  exports for `DiagnosticStore`, error sets, and ABI validation, plus a private
+  status-module test artifact wired into `bindings/zig/build.zig`.
+- 2026-05-14: Iteration 4 verification passed: `mise run //bindings/zig:test`
+  ran both public package tests and private status-module tests (7/7 tests
+  passed).
+- 2026-05-14: Iteration 5 applied Phase 2 review findings: `DiagnosticStore.get`
+  now returns a read-only pointer to store-owned diagnostics, diagnostic message
+  slices are read-only to callers, `Diagnostic` no longer exposes a public
+  deinit footgun, and the copied-diagnostics test now performs a later real C
+  API call before checking the stored copy.
+- 2026-05-14: Iteration 5 verification passed after review fixes:
+  `mise run
+  //bindings/zig:test`, `mise run fix`, and
+  `mise run //bindings/zig:test` again after formatting/lint fixes.
+- 2026-05-14: Iteration 5 reflection: Phase 1 and Phase 2 are complete and
+  pushed-ready; the milestone review loop is catching useful ownership/test
+  gaps. Keep using private module tests for internals until public handle APIs
+  can cover the same behavior through `maplibre_native`.
 
 ## Review log
 
@@ -246,6 +265,14 @@ For each phase or smaller milestone:
   `/Users/sargunv/.pi/agent/sessions/--Users-sargunv-Code-maplibre-native-ffi--/subagent-artifacts/5e4ffacb_reviewer_0_output.md`
   and
   `/Users/sargunv/.pi/agent/sessions/--Users-sargunv-Code-maplibre-native-ffi--/subagent-artifacts/5e4ffacb_reviewer_1_output.md`.
+- Phase 2 parallel review run `f0c39965` completed with one completed reviewer
+  and one transport-failed reviewer that still returned usable output. Findings
+  applied: avoid `DiagnosticStore.get()` returning an owned-looking value with a
+  public deinit path, and strengthen copied-diagnostics coverage with a later
+  real C API call. Artifacts:
+  `/Users/sargunv/.pi/agent/sessions/--Users-sargunv-Code-maplibre-native-ffi--/subagent-artifacts/f0c39965_reviewer_0_output.md`
+  and
+  `/Users/sargunv/.pi/agent/sessions/--Users-sargunv-Code-maplibre-native-ffi--/subagent-artifacts/f0c39965_reviewer_1_output.md`.
 
 ## Notes and decisions
 
@@ -256,3 +283,6 @@ For each phase or smaller milestone:
   always carries the latest Ralph artifact and implementation state.
 - Phase 1 uses a tiny public root (`cAbiVersion`) to prove native linking while
   keeping the raw `@cImport` private in `src/c.zig` and out of the package root.
+- Phase 2 keeps raw C status handling in private `status.zig`; the public root
+  exposes stable Zig error sets, diagnostics, and ABI validation without
+  exposing raw C declarations.
