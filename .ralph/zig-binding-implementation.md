@@ -170,7 +170,7 @@ For each phase or smaller milestone:
 - [x] Update `.github/config/variants.toml` and workflow task lists for
       supported platform/render-backend variants and explicit exclusions.
 - [x] Keep examples small and focused on low-level binding usage.
-- [ ] Review, apply findings, commit, and push.
+- [x] Review, apply findings, commit, and push.
 
 ### Final definition of done
 
@@ -981,6 +981,10 @@ For each phase or smaller milestone:
   `cmake-artifact-dir`, covering the relative-path review finding. One parallel
   `ensure-native-library` run failed due a concurrent CMake/Ninja regeneration
   race; rerunning the Zig map build sequentially passed.
+- 2026-05-14: Iteration 46 committed and pushed the reviewed Phase 9 examples,
+  docs, root-test, and CI integration milestone as `ae6152e`
+  (`Port Zig examples
+  to binding`).
 - 2026-05-14: Iteration 31 added public resource-provider cancellation coverage:
   a delayed request survives callback return, the map closes before completion,
   `cancelled()` becomes true, and late completion reports `error.InvalidState`.
