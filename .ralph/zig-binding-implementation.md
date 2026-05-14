@@ -313,6 +313,9 @@ For each phase or smaller milestone:
   (20/20 tests passed). Direct C tests remain for C ABI-only assertions, raw
   stale-handle behavior, and exact duplicate retirement decisions in the next
   slice.
+- 2026-05-14: Iteration 10 committed the foundational binding test port as
+  `e3017d7` (`Port foundational Zig binding tests`) and pushed
+  `zig-binding-implementation` to origin.
 
 ## Review log
 
