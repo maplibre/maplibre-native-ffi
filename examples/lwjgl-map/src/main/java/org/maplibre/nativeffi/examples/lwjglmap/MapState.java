@@ -5,6 +5,8 @@ import org.maplibre.nativeffi.map.MapHandle;
 import org.maplibre.nativeffi.map.MapMode;
 import org.maplibre.nativeffi.map.MapOptions;
 import org.maplibre.nativeffi.render.RenderSessionHandle;
+import org.maplibre.nativeffi.render.RenderTargetExtent;
+import org.maplibre.nativeffi.render.VulkanContextDescriptor;
 import org.maplibre.nativeffi.render.VulkanOwnedTextureDescriptor;
 import org.maplibre.nativeffi.render.VulkanSurfaceDescriptor;
 import org.maplibre.nativeffi.runtime.RuntimeEventType;
@@ -104,13 +106,10 @@ final class MapState implements AutoCloseable {
       case NATIVE_SURFACE -> {
         var descriptor =
             new VulkanSurfaceDescriptor()
-                .size(viewport.width(), viewport.height())
-                .scaleFactor(viewport.scaleFactor())
-                .instance(vulkan.instancePointer())
-                .physicalDevice(vulkan.physicalDevicePointer())
-                .device(vulkan.devicePointer())
-                .graphicsQueue(vulkan.graphicsQueuePointer())
-                .graphicsQueueFamilyIndex(vulkan.graphicsQueueFamilyIndex())
+                .extent(
+                    new RenderTargetExtent(
+                        viewport.width(), viewport.height(), viewport.scaleFactor()))
+                .context(vulkanContextDescriptor(vulkan))
                 .surface(vulkan.surfacePointer());
         yield new SurfaceRenderTarget(RenderSessionHandle.attachVulkanSurface(map, descriptor));
       }
@@ -122,13 +121,9 @@ final class MapState implements AutoCloseable {
       VulkanContext vulkan, MapHandle map, Viewport viewport) {
     var descriptor =
         new VulkanOwnedTextureDescriptor()
-            .size(viewport.width(), viewport.height())
-            .scaleFactor(viewport.scaleFactor())
-            .instance(vulkan.instancePointer())
-            .physicalDevice(vulkan.physicalDevicePointer())
-            .device(vulkan.devicePointer())
-            .graphicsQueue(vulkan.graphicsQueuePointer())
-            .graphicsQueueFamilyIndex(vulkan.graphicsQueueFamilyIndex());
+            .extent(
+                new RenderTargetExtent(viewport.width(), viewport.height(), viewport.scaleFactor()))
+            .context(vulkanContextDescriptor(vulkan));
     RenderSessionHandle session = null;
     VulkanTextureCompositor compositor = null;
     try {
@@ -152,6 +147,15 @@ final class MapState implements AutoCloseable {
       }
       throw error;
     }
+  }
+
+  private static VulkanContextDescriptor vulkanContextDescriptor(VulkanContext vulkan) {
+    return new VulkanContextDescriptor(
+        vulkan.instancePointer(),
+        vulkan.physicalDevicePointer(),
+        vulkan.devicePointer(),
+        vulkan.graphicsQueuePointer(),
+        vulkan.graphicsQueueFamilyIndex());
   }
 
   private interface RenderTarget extends AutoCloseable {

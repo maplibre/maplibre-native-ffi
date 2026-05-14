@@ -103,8 +103,8 @@ fn viewBytes(view: c.mln_string_view) []const u8 {
 
 fn attachTextureSession(map: *c.mln_map) !*c.mln_render_session {
     var descriptor = c.mln_owned_texture_descriptor_default();
-    descriptor.width = 64;
-    descriptor.height = 64;
+    descriptor.extent.width = 64;
+    descriptor.extent.height = 64;
 
     var session: ?*c.mln_render_session = null;
     try testing.expectEqual(c.MLN_STATUS_OK, c.mln_owned_texture_attach(map, &descriptor, &session));

@@ -62,8 +62,8 @@ test "render session feature state set get and remove" {
     defer support.destroyMap(map);
 
     var descriptor = c.mln_owned_texture_descriptor_default();
-    descriptor.width = 64;
-    descriptor.height = 64;
+    descriptor.extent.width = 64;
+    descriptor.extent.height = 64;
 
     var session: ?*c.mln_render_session = null;
     try testing.expectEqual(c.MLN_STATUS_OK, c.mln_owned_texture_attach(map, &descriptor, &session));
@@ -135,8 +135,8 @@ test "feature state selector validation" {
     defer support.destroyMap(map);
 
     var descriptor = c.mln_owned_texture_descriptor_default();
-    descriptor.width = 64;
-    descriptor.height = 64;
+    descriptor.extent.width = 64;
+    descriptor.extent.height = 64;
 
     var session: ?*c.mln_render_session = null;
     try testing.expectEqual(c.MLN_STATUS_OK, c.mln_owned_texture_attach(map, &descriptor, &session));

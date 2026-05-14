@@ -215,7 +215,9 @@ fn feature_state_set_get_and_remove_copy_snapshots() {
     let runtime = RuntimeHandle::new().unwrap();
     let map = MapHandle::with_options(&runtime, &MapOptions::new(64, 64, 1.0)).unwrap();
     let session = map
-        .attach_owned_texture(&OwnedTextureDescriptor::new(64, 64, 1.0))
+        .attach_owned_texture(&OwnedTextureDescriptor::new(RenderTargetExtent::new(
+            64, 64, 1.0,
+        )))
         .unwrap();
     let selector = FeatureStateSelector::new("point").with_feature_id("feature-1");
     let state = JsonValue::Object(vec![
@@ -255,7 +257,9 @@ fn rendered_and_source_queries_copy_results() {
     let runtime = RuntimeHandle::new().unwrap();
     let map = MapHandle::with_options(&runtime, &MapOptions::new(64, 64, 1.0)).unwrap();
     let session = map
-        .attach_owned_texture(&OwnedTextureDescriptor::new(64, 64, 1.0))
+        .attach_owned_texture(&OwnedTextureDescriptor::new(RenderTargetExtent::new(
+            64, 64, 1.0,
+        )))
         .unwrap();
 
     let error = session
@@ -322,7 +326,9 @@ fn feature_extension_queries_copy_value_and_feature_collection_results() {
     let runtime = RuntimeHandle::new().unwrap();
     let map = MapHandle::with_options(&runtime, &MapOptions::new(64, 64, 1.0)).unwrap();
     let session = map
-        .attach_owned_texture(&OwnedTextureDescriptor::new(64, 64, 1.0))
+        .attach_owned_texture(&OwnedTextureDescriptor::new(RenderTargetExtent::new(
+            64, 64, 1.0,
+        )))
         .unwrap();
 
     load_cluster_style(&runtime, &map, &session);
@@ -377,11 +383,15 @@ fn owned_texture_session_retains_parent_and_enforces_single_session() {
     )
     .unwrap();
     let session = map
-        .attach_owned_texture(&OwnedTextureDescriptor::new(32, 16, 1.0))
+        .attach_owned_texture(&OwnedTextureDescriptor::new(RenderTargetExtent::new(
+            32, 16, 1.0,
+        )))
         .unwrap();
 
     let error = map
-        .attach_owned_texture(&OwnedTextureDescriptor::new(32, 16, 1.0))
+        .attach_owned_texture(&OwnedTextureDescriptor::new(RenderTargetExtent::new(
+            32, 16, 1.0,
+        )))
         .unwrap_err();
     assert_eq!(error.kind(), ErrorKind::InvalidState);
 
@@ -406,7 +416,9 @@ fn acquired_frame_state_rejects_reentrant_session_operations_before_native_calls
     )
     .unwrap();
     let session = map
-        .attach_owned_texture(&OwnedTextureDescriptor::new(32, 16, 1.0))
+        .attach_owned_texture(&OwnedTextureDescriptor::new(RenderTargetExtent::new(
+            32, 16, 1.0,
+        )))
         .unwrap();
 
     session.inner.frame_acquired.set(true);
@@ -467,7 +479,9 @@ fn texture_readback_reports_documented_error_kinds_for_unsized_buffer() {
     )
     .unwrap();
     let session = map
-        .attach_owned_texture(&OwnedTextureDescriptor::new(32, 16, 1.0))
+        .attach_owned_texture(&OwnedTextureDescriptor::new(RenderTargetExtent::new(
+            32, 16, 1.0,
+        )))
         .unwrap();
 
     let _ = session.render_update();
@@ -494,10 +508,8 @@ fn backend_specific_attach_calls_report_native_statuses() {
 
     let metal_error = map
         .attach_metal_owned_texture(&MetalOwnedTextureDescriptor::new(
-            32,
-            16,
-            1.0,
-            NativePointer::NULL,
+            RenderTargetExtent::new(32, 16, 1.0),
+            MetalContextDescriptor::new(NativePointer::NULL),
         ))
         .unwrap_err();
     assert!(matches!(
@@ -507,14 +519,14 @@ fn backend_specific_attach_calls_report_native_statuses() {
 
     let vulkan_error = map
         .attach_vulkan_surface(&VulkanSurfaceDescriptor::new(
-            32,
-            16,
-            1.0,
-            NativePointer::NULL,
-            NativePointer::NULL,
-            NativePointer::NULL,
-            NativePointer::NULL,
-            0,
+            RenderTargetExtent::new(32, 16, 1.0),
+            VulkanContextDescriptor::new(
+                NativePointer::NULL,
+                NativePointer::NULL,
+                NativePointer::NULL,
+                NativePointer::NULL,
+                0,
+            ),
             NativePointer::NULL,
         ))
         .unwrap_err();

@@ -4,32 +4,25 @@ import java.util.Objects;
 
 /** Mutable descriptor for Metal native surface render targets. */
 public final class MetalSurfaceDescriptor {
-  private int width = 256;
-  private int height = 256;
-  private double scaleFactor = 1.0;
+  private RenderTargetExtent extent = new RenderTargetExtent();
+  private MetalContextDescriptor context = new MetalContextDescriptor();
   private NativePointer layer = NativePointer.NULL;
-  private NativePointer device = NativePointer.NULL;
 
-  public int width() {
-    return width;
+  public RenderTargetExtent extent() {
+    return extent;
   }
 
-  public int height() {
-    return height;
-  }
-
-  public MetalSurfaceDescriptor size(int width, int height) {
-    this.width = width;
-    this.height = height;
+  public MetalSurfaceDescriptor extent(RenderTargetExtent extent) {
+    this.extent = Objects.requireNonNull(extent, "extent");
     return this;
   }
 
-  public double scaleFactor() {
-    return scaleFactor;
+  public MetalContextDescriptor context() {
+    return context;
   }
 
-  public MetalSurfaceDescriptor scaleFactor(double scaleFactor) {
-    this.scaleFactor = scaleFactor;
+  public MetalSurfaceDescriptor context(MetalContextDescriptor context) {
+    this.context = Objects.requireNonNull(context, "context");
     return this;
   }
 
@@ -39,15 +32,6 @@ public final class MetalSurfaceDescriptor {
 
   public MetalSurfaceDescriptor layer(NativePointer layer) {
     this.layer = Objects.requireNonNull(layer, "layer");
-    return this;
-  }
-
-  public NativePointer device() {
-    return device;
-  }
-
-  public MetalSurfaceDescriptor device(NativePointer device) {
-    this.device = Objects.requireNonNull(device, "device");
     return this;
   }
 }

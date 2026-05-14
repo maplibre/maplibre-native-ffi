@@ -60,11 +60,12 @@ pub use maplibre_core::{
 pub use projection::MapProjectionHandle;
 pub use render::{
     DetachedRenderSessionHandle, FeatureExtensionResult, FeatureStateSelector, FrameNativePointer,
-    MetalBorrowedTextureDescriptor, MetalOwnedTextureDescriptor, MetalOwnedTextureFrame,
-    MetalOwnedTextureFrameHandle, MetalSurfaceDescriptor, NativePointer, OwnedTextureDescriptor,
-    PremultipliedRgba8Image, QueriedFeature, RenderSessionHandle, RenderedFeatureQueryOptions,
-    RenderedQueryGeometry, SourceFeatureQueryOptions, TextureImageInfo,
-    VulkanBorrowedTextureDescriptor, VulkanOwnedTextureDescriptor, VulkanOwnedTextureFrame,
+    MetalBorrowedTextureDescriptor, MetalContextDescriptor, MetalOwnedTextureDescriptor,
+    MetalOwnedTextureFrame, MetalOwnedTextureFrameHandle, MetalSurfaceDescriptor, NativePointer,
+    OwnedTextureDescriptor, PremultipliedRgba8Image, QueriedFeature, RenderSessionHandle,
+    RenderTargetExtent, RenderedFeatureQueryOptions, RenderedQueryGeometry,
+    SourceFeatureQueryOptions, TextureImageInfo, VulkanBorrowedTextureDescriptor,
+    VulkanContextDescriptor, VulkanOwnedTextureDescriptor, VulkanOwnedTextureFrame,
     VulkanOwnedTextureFrameHandle, VulkanSurfaceDescriptor,
 };
 pub use resource::{

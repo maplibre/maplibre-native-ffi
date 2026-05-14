@@ -6,9 +6,10 @@ const c = support.c;
 test "owned texture descriptor exposes defaults" {
     const descriptor = c.mln_owned_texture_descriptor_default();
     try testing.expectEqual(@as(u32, @sizeOf(c.mln_owned_texture_descriptor)), descriptor.size);
-    try testing.expect(descriptor.width > 0);
-    try testing.expect(descriptor.height > 0);
-    try testing.expect(descriptor.scale_factor > 0);
+    try testing.expectEqual(@as(u32, @sizeOf(c.mln_render_target_extent)), descriptor.extent.size);
+    try testing.expect(descriptor.extent.width > 0);
+    try testing.expect(descriptor.extent.height > 0);
+    try testing.expect(descriptor.extent.scale_factor > 0);
 }
 
 test "owned texture attach rejects invalid arguments" {
@@ -35,20 +36,24 @@ test "owned texture attach rejects invalid arguments" {
     try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, c.mln_owned_texture_attach(map, &small_descriptor, &texture));
 
     var invalid_descriptor = descriptor;
-    invalid_descriptor.width = 0;
+    invalid_descriptor.extent.size = @sizeOf(c.mln_render_target_extent) - 1;
     try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, c.mln_owned_texture_attach(map, &invalid_descriptor, &texture));
 
     invalid_descriptor = descriptor;
-    invalid_descriptor.height = 0;
+    invalid_descriptor.extent.width = 0;
     try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, c.mln_owned_texture_attach(map, &invalid_descriptor, &texture));
 
     invalid_descriptor = descriptor;
-    invalid_descriptor.scale_factor = 0;
+    invalid_descriptor.extent.height = 0;
     try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, c.mln_owned_texture_attach(map, &invalid_descriptor, &texture));
 
-    descriptor.width = 64;
-    descriptor.height = 64;
-    descriptor.scale_factor = 2.0;
+    invalid_descriptor = descriptor;
+    invalid_descriptor.extent.scale_factor = 0;
+    try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, c.mln_owned_texture_attach(map, &invalid_descriptor, &texture));
+
+    descriptor.extent.width = 64;
+    descriptor.extent.height = 64;
+    descriptor.extent.scale_factor = 2.0;
     try testing.expectEqual(c.MLN_STATUS_OK, c.mln_owned_texture_attach(map, &descriptor, &texture));
     try testing.expectEqual(c.MLN_STATUS_OK, c.mln_render_session_destroy(texture.?));
 }
@@ -63,8 +68,8 @@ test "owned texture lifecycle and render update" {
     defer support.destroyMap(map);
 
     var descriptor = c.mln_owned_texture_descriptor_default();
-    descriptor.width = 128;
-    descriptor.height = 128;
+    descriptor.extent.width = 128;
+    descriptor.extent.height = 128;
 
     var texture: ?*c.mln_render_session = null;
     try testing.expectEqual(c.MLN_STATUS_OK, c.mln_owned_texture_attach(map, &descriptor, &texture));
@@ -98,8 +103,8 @@ test "render session maintenance follows renderer lifetime" {
     defer support.destroyMap(map);
 
     var descriptor = c.mln_owned_texture_descriptor_default();
-    descriptor.width = 64;
-    descriptor.height = 64;
+    descriptor.extent.width = 64;
+    descriptor.extent.height = 64;
 
     var session: ?*c.mln_render_session = null;
     try testing.expectEqual(c.MLN_STATUS_OK, c.mln_owned_texture_attach(map, &descriptor, &session));
@@ -134,15 +139,15 @@ test "owned texture reads premultiplied rgba8" {
     defer support.destroyMap(map);
 
     var descriptor = c.mln_owned_texture_descriptor_default();
-    descriptor.width = 32;
-    descriptor.height = 16;
+    descriptor.extent.width = 32;
+    descriptor.extent.height = 16;
 
     var texture: ?*c.mln_render_session = null;
     try testing.expectEqual(c.MLN_STATUS_OK, c.mln_owned_texture_attach(map, &descriptor, &texture));
     defer testing.expectEqual(c.MLN_STATUS_OK, c.mln_render_session_destroy(texture.?)) catch @panic("texture destroy failed");
 
     var info = c.mln_texture_image_info_default();
-    const data = try testing.allocator.alloc(u8, descriptor.width * descriptor.height * 4);
+    const data = try testing.allocator.alloc(u8, descriptor.extent.width * descriptor.extent.height * 4);
     defer testing.allocator.free(data);
     try testing.expectEqual(c.MLN_STATUS_INVALID_STATE, c.mln_texture_read_premultiplied_rgba8(texture.?, data.ptr, data.len, &info));
 

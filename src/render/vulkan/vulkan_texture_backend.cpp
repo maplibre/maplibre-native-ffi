@@ -49,14 +49,8 @@ auto owned_descriptor_from_borrowed(
 ) -> mln_vulkan_owned_texture_descriptor {
   return mln_vulkan_owned_texture_descriptor{
     .size = sizeof(mln_vulkan_owned_texture_descriptor),
-    .width = descriptor.width,
-    .height = descriptor.height,
-    .scale_factor = descriptor.scale_factor,
-    .instance = descriptor.instance,
-    .physical_device = descriptor.physical_device,
-    .device = descriptor.device,
-    .graphics_queue = descriptor.graphics_queue,
-    .graphics_queue_family_index = descriptor.graphics_queue_family_index,
+    .extent = descriptor.extent,
+    .context = descriptor.context,
   };
 }
 
@@ -344,7 +338,8 @@ void VulkanTextureBackend::initSharedDevice() {
       "vkGetInstanceProcAddr"
     );
   dispatcher = vk::DispatchLoaderDynamic(
-    static_cast<VkInstance>(descriptor_.instance), get_instance_proc_addr
+    static_cast<VkInstance>(descriptor_.context.instance),
+    get_instance_proc_addr
   );
 
   initFrameCapture();
@@ -494,7 +489,7 @@ auto VulkanTextureBackend::frame_resources() -> VulkanTextureFrameResources {
 void VulkanTextureBackend::initInstance() {
   usingSharedContext = true;
   instance = vk::UniqueInstance(
-    static_cast<VkInstance>(descriptor_.instance),
+    static_cast<VkInstance>(descriptor_.context.instance),
     vk::ObjectDestroy<vk::NoParent, vk::DispatchLoaderDynamic>(
       nullptr, dispatcher
     )
@@ -508,7 +503,7 @@ void VulkanTextureBackend::initSurface() {}
 void VulkanTextureBackend::initDevice() {
   const auto physical_devices = instance->enumeratePhysicalDevices(dispatcher);
   auto* const requested_physical_device =
-    static_cast<VkPhysicalDevice>(descriptor_.physical_device);
+    static_cast<VkPhysicalDevice>(descriptor_.context.physical_device);
   auto found_physical_device = false;
   for (const auto& candidate : physical_devices) {
     if (static_cast<VkPhysicalDevice>(candidate) == requested_physical_device) {
@@ -523,19 +518,20 @@ void VulkanTextureBackend::initDevice() {
     );
   }
   device = vk::UniqueDevice(
-    static_cast<VkDevice>(descriptor_.device),
+    static_cast<VkDevice>(descriptor_.context.device),
     vk::ObjectDestroy<vk::NoParent, vk::DispatchLoaderDynamic>(
       nullptr, dispatcher
     )
   );
   dispatcher.init(
-    static_cast<VkInstance>(descriptor_.instance), ::vkGetInstanceProcAddr,
-    static_cast<VkDevice>(descriptor_.device), ::vkGetDeviceProcAddr
+    static_cast<VkInstance>(descriptor_.context.instance),
+    ::vkGetInstanceProcAddr, static_cast<VkDevice>(descriptor_.context.device),
+    ::vkGetDeviceProcAddr
   );
   graphicsQueueIndex =
-    static_cast<int32_t>(descriptor_.graphics_queue_family_index);
+    static_cast<int32_t>(descriptor_.context.graphics_queue_family_index);
   presentQueueIndex = -1;
-  graphicsQueue = static_cast<VkQueue>(descriptor_.graphics_queue);
+  graphicsQueue = static_cast<VkQueue>(descriptor_.context.graphics_queue);
   physicalDeviceFeatures = physicalDevice.getFeatures(dispatcher);
 }
 

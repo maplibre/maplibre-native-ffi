@@ -23,7 +23,7 @@ const Backend = struct {
 
         pub fn descriptor(self: *const AttachContext) c.mln_metal_owned_texture_descriptor {
             var value = c.mln_metal_owned_texture_descriptor_default();
-            value.device = self.device;
+            value.context.device = self.device;
             return value;
         }
     };
@@ -35,8 +35,8 @@ const Backend = struct {
         pub fn create(map: *c.mln_map) !Fixture {
             var context = try AttachContext.init();
             var texture_descriptor = context.descriptor();
-            texture_descriptor.width = 256;
-            texture_descriptor.height = 256;
+            texture_descriptor.extent.width = 256;
+            texture_descriptor.extent.height = 256;
 
             var texture: ?*c.mln_render_session = null;
             try testing.expectEqual(c.MLN_STATUS_OK, c.mln_metal_owned_texture_attach(map, &texture_descriptor, &texture));
@@ -109,7 +109,11 @@ const Backend = struct {
     }
 
     pub fn clearRequiredHandle(descriptor: *c.mln_metal_owned_texture_descriptor) void {
-        descriptor.device = null;
+        descriptor.context.device = null;
+    }
+
+    pub fn shrinkContext(descriptor: *c.mln_metal_owned_texture_descriptor) void {
+        descriptor.context.size = @sizeOf(c.mln_metal_context_descriptor) - 1;
     }
 
     pub fn expectInitialFrame(frame: *const Frame) !void {
@@ -151,7 +155,7 @@ test "Metal texture unsupported backend validates arguments" {
     defer support.destroyMap(map);
 
     var descriptor = c.mln_metal_owned_texture_descriptor_default();
-    descriptor.device = @ptrFromInt(1);
+    descriptor.context.device = @ptrFromInt(1);
 
     var texture: ?*c.mln_render_session = @ptrFromInt(1);
     try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, c.mln_metal_owned_texture_attach(map, &descriptor, &texture));
@@ -209,10 +213,16 @@ test "Metal borrowed texture renders into caller texture" {
     defer support.destroyMap(map);
 
     var descriptor = c.mln_metal_borrowed_texture_descriptor_default();
-    descriptor.width = 128;
-    descriptor.height = 128;
+    descriptor.extent.width = 128;
+    descriptor.extent.height = 128;
 
     var texture: ?*c.mln_render_session = null;
+    var invalid_extent_descriptor = descriptor;
+    invalid_extent_descriptor.extent.size = @sizeOf(c.mln_render_target_extent) - 1;
+    invalid_extent_descriptor.texture = borrowed;
+    try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, c.mln_metal_borrowed_texture_attach(map, &invalid_extent_descriptor, &texture));
+    try testing.expectEqual(@as(?*c.mln_render_session, null), texture);
+
     try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, c.mln_metal_borrowed_texture_attach(map, &descriptor, &texture));
 
     descriptor.texture = borrowed;

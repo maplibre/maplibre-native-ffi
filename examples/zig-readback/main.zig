@@ -35,9 +35,9 @@ pub fn main(init_args: std.process.Init) !void {
 
     var texture: ?*c.mln_render_session = null;
     var texture_descriptor = c.mln_owned_texture_descriptor_default();
-    texture_descriptor.width = width;
-    texture_descriptor.height = height;
-    texture_descriptor.scale_factor = 1.0;
+    texture_descriptor.extent.width = width;
+    texture_descriptor.extent.height = height;
+    texture_descriptor.extent.scale_factor = 1.0;
     try check(c.mln_owned_texture_attach(map.?, &texture_descriptor, &texture), "owned texture attach failed");
     defer _ = c.mln_render_session_destroy(texture.?);
 

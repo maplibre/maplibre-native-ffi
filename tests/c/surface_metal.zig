@@ -52,15 +52,23 @@ test "Metal surface attach rejects invalid arguments" {
     try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, c.mln_metal_surface_attach(map, &small_descriptor, &surface));
 
     var invalid_descriptor = descriptor;
-    invalid_descriptor.width = 0;
+    invalid_descriptor.extent.size = @sizeOf(c.mln_render_target_extent) - 1;
     try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, c.mln_metal_surface_attach(map, &invalid_descriptor, &surface));
 
     invalid_descriptor = descriptor;
-    invalid_descriptor.height = 0;
+    invalid_descriptor.context.size = @sizeOf(c.mln_metal_context_descriptor) - 1;
     try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, c.mln_metal_surface_attach(map, &invalid_descriptor, &surface));
 
     invalid_descriptor = descriptor;
-    invalid_descriptor.scale_factor = 0;
+    invalid_descriptor.extent.width = 0;
+    try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, c.mln_metal_surface_attach(map, &invalid_descriptor, &surface));
+
+    invalid_descriptor = descriptor;
+    invalid_descriptor.extent.height = 0;
+    try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, c.mln_metal_surface_attach(map, &invalid_descriptor, &surface));
+
+    invalid_descriptor = descriptor;
+    invalid_descriptor.extent.scale_factor = 0;
     try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, c.mln_metal_surface_attach(map, &invalid_descriptor, &surface));
 }
 
@@ -75,8 +83,8 @@ test "Metal surface lifecycle and render update" {
     defer support.destroyMap(map);
 
     var descriptor = c.mln_metal_surface_descriptor_default();
-    descriptor.width = 64;
-    descriptor.height = 64;
+    descriptor.extent.width = 64;
+    descriptor.extent.height = 64;
     descriptor.layer = try metal_support.createLayer();
 
     var surface: ?*c.mln_render_session = null;
@@ -115,8 +123,8 @@ test "Metal surface renders to window-attached layer under autorelease pool" {
     defer support.destroyMap(map);
 
     var descriptor = c.mln_metal_surface_descriptor_default();
-    descriptor.width = 64;
-    descriptor.height = 64;
+    descriptor.extent.width = 64;
+    descriptor.extent.height = 64;
     descriptor.layer = window_layer.layer.?;
 
     var surface: ?*c.mln_render_session = null;
@@ -145,8 +153,8 @@ test "Metal surface render acquires one drawable per frame" {
     defer support.destroyMap(map);
 
     var descriptor = c.mln_metal_surface_descriptor_default();
-    descriptor.width = 64;
-    descriptor.height = 64;
+    descriptor.extent.width = 64;
+    descriptor.extent.height = 64;
     descriptor.layer = window_layer.layer.?;
 
     var surface: ?*c.mln_render_session = null;

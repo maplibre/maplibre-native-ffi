@@ -13,10 +13,10 @@ test "Vulkan surface unsupported backend validates arguments" {
     defer support.destroyMap(map);
 
     var descriptor = c.mln_vulkan_surface_descriptor_default();
-    descriptor.instance = @ptrFromInt(1);
-    descriptor.physical_device = @ptrFromInt(1);
-    descriptor.device = @ptrFromInt(1);
-    descriptor.graphics_queue = @ptrFromInt(1);
+    descriptor.context.instance = @ptrFromInt(1);
+    descriptor.context.physical_device = @ptrFromInt(1);
+    descriptor.context.device = @ptrFromInt(1);
+    descriptor.context.graphics_queue = @ptrFromInt(1);
     descriptor.surface = @ptrFromInt(1);
 
     var surface: ?*c.mln_render_session = @ptrFromInt(1);
@@ -43,10 +43,10 @@ test "Vulkan surface attach rejects invalid arguments" {
     try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, c.mln_vulkan_surface_attach(map, null, &surface));
     try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, c.mln_vulkan_surface_attach(map, &descriptor, null));
 
-    descriptor.instance = @ptrFromInt(1);
-    descriptor.physical_device = @ptrFromInt(1);
-    descriptor.device = @ptrFromInt(1);
-    descriptor.graphics_queue = @ptrFromInt(1);
+    descriptor.context.instance = @ptrFromInt(1);
+    descriptor.context.physical_device = @ptrFromInt(1);
+    descriptor.context.device = @ptrFromInt(1);
+    descriptor.context.graphics_queue = @ptrFromInt(1);
     descriptor.surface = @ptrFromInt(1);
 
     surface = @ptrFromInt(1);
@@ -59,15 +59,23 @@ test "Vulkan surface attach rejects invalid arguments" {
     try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, c.mln_vulkan_surface_attach(map, &small_descriptor, &surface));
 
     var invalid_descriptor = descriptor;
-    invalid_descriptor.width = 0;
+    invalid_descriptor.extent.size = @sizeOf(c.mln_render_target_extent) - 1;
     try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, c.mln_vulkan_surface_attach(map, &invalid_descriptor, &surface));
 
     invalid_descriptor = descriptor;
-    invalid_descriptor.height = 0;
+    invalid_descriptor.context.size = @sizeOf(c.mln_vulkan_context_descriptor) - 1;
     try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, c.mln_vulkan_surface_attach(map, &invalid_descriptor, &surface));
 
     invalid_descriptor = descriptor;
-    invalid_descriptor.scale_factor = 0;
+    invalid_descriptor.extent.width = 0;
+    try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, c.mln_vulkan_surface_attach(map, &invalid_descriptor, &surface));
+
+    invalid_descriptor = descriptor;
+    invalid_descriptor.extent.height = 0;
+    try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, c.mln_vulkan_surface_attach(map, &invalid_descriptor, &surface));
+
+    invalid_descriptor = descriptor;
+    invalid_descriptor.extent.scale_factor = 0;
     try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, c.mln_vulkan_surface_attach(map, &invalid_descriptor, &surface));
 
     descriptor = c.mln_vulkan_surface_descriptor_default();

@@ -9,6 +9,7 @@
 #include <stdint.h>
 
 #include "base.h"
+#include "render_target.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -17,40 +18,25 @@ extern "C" {
 /** Metal native surface session attachment options. */
 typedef struct mln_metal_surface_descriptor {
   uint32_t size;
-  /** Logical map width in UI pixels. */
-  uint32_t width;
-  /** Logical map height in UI pixels. */
-  uint32_t height;
-  /** UI-to-device pixel scale. Must be positive and finite. */
-  double scale_factor;
+  /** Logical surface extent. */
+  mln_render_target_extent extent;
+  /** Metal backend context. device is optional for Metal surfaces. */
+  mln_metal_context_descriptor context;
   /** CAMetalLayer* / CA::MetalLayer* retained by the session. Required. */
   void* layer;
-  /** Optional id<MTLDevice> / MTL::Device* retained by the session. */
-  void* device;
 } mln_metal_surface_descriptor;
 
 /** Vulkan native surface session attachment options. */
 typedef struct mln_vulkan_surface_descriptor {
   uint32_t size;
-  /** Logical map width in UI pixels. */
-  uint32_t width;
-  /** Logical map height in UI pixels. */
-  uint32_t height;
-  /** UI-to-device pixel scale. Must be positive and finite. */
-  double scale_factor;
-  /** Borrowed VkInstance. Required. */
-  void* instance;
-  /** Borrowed VkPhysicalDevice. Required. */
-  void* physical_device;
-  /** Borrowed VkDevice with VK_KHR_swapchain enabled. Required. */
-  void* device;
-  /** Borrowed graphics VkQueue. Required. */
-  void* graphics_queue;
+  /** Logical surface extent. */
+  mln_render_target_extent extent;
   /**
-   * Queue family index for graphics_queue. Must support graphics commands and
-   * presentation to surface.
+   * Borrowed Vulkan context. All handles are required. The device must support
+   * VK_KHR_swapchain, and the queue family must support graphics and
+   * presentation to this descriptor's surface.
    */
-  uint32_t graphics_queue_family_index;
+  mln_vulkan_context_descriptor context;
   /** Borrowed VkSurfaceKHR. Required. */
   void* surface;
 } mln_vulkan_surface_descriptor;
@@ -72,9 +58,10 @@ mln_vulkan_surface_descriptor_default(void) MLN_NOEXCEPT;
  *
  * The map may have at most one live render session. The session and
  * every surface-session call are owner-thread affine to the map owner thread.
- * The session retains descriptor->layer and optional descriptor->device. It
- * renders into the layer and presents through it. On success, *out_session
- * receives a handle the caller destroys with mln_render_session_destroy().
+ * The session retains descriptor->layer and optional
+ * descriptor->context.device. It renders into the layer and presents through
+ * it. On success, *out_session receives a handle the caller destroys with
+ * mln_render_session_destroy().
  *
  * Returns:
  * - MLN_STATUS_OK on success.
@@ -97,10 +84,12 @@ MLN_API mln_status mln_metal_surface_attach(
  *
  * The map may have at most one live render session. The session and
  * every surface-session call are owner-thread affine to the map owner thread.
- * The session renders to descriptor->surface and presents through it. Vulkan
- * handles are borrowed and must remain valid until the session is detached or
- * destroyed. On success, *out_session receives a handle the caller destroys
- * with mln_render_session_destroy().
+ * The session renders to descriptor->surface and presents through it. The
+ * Vulkan device must support VK_KHR_swapchain, and the queue family must
+ * support graphics and presentation to descriptor->surface. Vulkan handles are
+ * borrowed and must remain valid until the session is detached or destroyed.
+ * On success, *out_session receives a handle the caller destroys with
+ * mln_render_session_destroy().
  *
  * Returns:
  * - MLN_STATUS_OK on success.

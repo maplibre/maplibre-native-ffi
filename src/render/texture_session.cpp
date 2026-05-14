@@ -1,4 +1,3 @@
-#include <cmath>
 #include <cstdint>
 #include <cstring>
 #include <limits>
@@ -33,16 +32,9 @@ auto validate_owned_descriptor(const mln_owned_texture_descriptor* descriptor)
     );
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (
-    descriptor->width == 0 || descriptor->height == 0 ||
-    !std::isfinite(descriptor->scale_factor) || descriptor->scale_factor <= 0.0
-  ) {
-    mln::core::set_thread_error(
-      "texture dimensions and scale_factor must be positive"
-    );
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  return MLN_STATUS_OK;
+  return mln::core::validate_render_target_extent(
+    descriptor->extent, "texture dimensions and scale_factor must be positive"
+  );
 }
 
 class GenericTextureSessionBackend final
@@ -76,9 +68,12 @@ auto owned_texture_descriptor_default() noexcept
   -> mln_owned_texture_descriptor {
   return mln_owned_texture_descriptor{
     .size = sizeof(mln_owned_texture_descriptor),
-    .width = 256,
-    .height = 256,
-    .scale_factor = 1.0
+    .extent = mln_render_target_extent{
+      .size = sizeof(mln_render_target_extent),
+      .width = 256,
+      .height = 256,
+      .scale_factor = 1.0,
+    },
   };
 }
 
@@ -136,8 +131,8 @@ auto owned_texture_attach(
     return output_status;
   }
   const auto physical_status = validate_physical_size(
-    descriptor->width, descriptor->height, descriptor->scale_factor,
-    "scaled texture dimensions are too large"
+    descriptor->extent.width, descriptor->extent.height,
+    descriptor->extent.scale_factor, "scaled texture dimensions are too large"
   );
   if (physical_status != MLN_STATUS_OK) {
     return physical_status;
@@ -146,13 +141,7 @@ auto owned_texture_attach(
   auto session = std::make_unique<mln_render_session>();
   session->map = map;
   session->owner_thread = map_owner_thread(map);
-  session->width = descriptor->width;
-  session->height = descriptor->height;
-  session->scale_factor = descriptor->scale_factor;
-  session->physical_width =
-    physical_dimension(descriptor->width, descriptor->scale_factor);
-  session->physical_height =
-    physical_dimension(descriptor->height, descriptor->scale_factor);
+  set_session_extent(*session, descriptor->extent);
   session->texture.api_kind = TextureSessionApi::Generic;
   session->texture.mode = TextureSessionMode::Owned;
   auto backend = std::make_unique<GenericTextureSessionBackend>(

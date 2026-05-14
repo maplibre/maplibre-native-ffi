@@ -1,4 +1,3 @@
-#include <cmath>
 #include <cstdint>
 #include <memory>
 #include <utility>
@@ -32,23 +31,15 @@ auto validate_owned_descriptor(
     );
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (
-    descriptor->width == 0 || descriptor->height == 0 ||
-    !std::isfinite(descriptor->scale_factor) || descriptor->scale_factor <= 0.0
-  ) {
-    mln::core::set_thread_error(
-      "texture dimensions and scale_factor must be positive"
-    );
-    return MLN_STATUS_INVALID_ARGUMENT;
+  const auto extent_status = mln::core::validate_render_target_extent(
+    descriptor->extent, "texture dimensions and scale_factor must be positive"
+  );
+  if (extent_status != MLN_STATUS_OK) {
+    return extent_status;
   }
-  if (
-    descriptor->instance == nullptr || descriptor->physical_device == nullptr ||
-    descriptor->device == nullptr || descriptor->graphics_queue == nullptr
-  ) {
-    mln::core::set_thread_error("Vulkan handles must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  return MLN_STATUS_OK;
+  return mln::core::validate_vulkan_context(
+    descriptor->context, "Vulkan handles must not be null"
+  );
 }
 
 auto validate_borrowed_descriptor(
@@ -64,20 +55,19 @@ auto validate_borrowed_descriptor(
     );
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (
-    descriptor->width == 0 || descriptor->height == 0 ||
-    !std::isfinite(descriptor->scale_factor) || descriptor->scale_factor <= 0.0
-  ) {
-    mln::core::set_thread_error(
-      "texture dimensions and scale_factor must be positive"
-    );
-    return MLN_STATUS_INVALID_ARGUMENT;
+  const auto extent_status = mln::core::validate_render_target_extent(
+    descriptor->extent, "texture dimensions and scale_factor must be positive"
+  );
+  if (extent_status != MLN_STATUS_OK) {
+    return extent_status;
   }
-  if (
-    descriptor->instance == nullptr || descriptor->physical_device == nullptr ||
-    descriptor->device == nullptr || descriptor->graphics_queue == nullptr ||
-    descriptor->image == nullptr || descriptor->image_view == nullptr
-  ) {
+  const auto context_status = mln::core::validate_vulkan_context(
+    descriptor->context, "Vulkan handles must not be null"
+  );
+  if (context_status != MLN_STATUS_OK) {
+    return context_status;
+  }
+  if (descriptor->image == nullptr || descriptor->image_view == nullptr) {
     mln::core::set_thread_error("Vulkan handles must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
@@ -105,20 +95,13 @@ auto validate_metal_owned_descriptor(
     );
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (
-    descriptor->width == 0 || descriptor->height == 0 ||
-    !std::isfinite(descriptor->scale_factor) || descriptor->scale_factor <= 0.0
-  ) {
-    mln::core::set_thread_error(
-      "texture dimensions and scale_factor must be positive"
-    );
-    return MLN_STATUS_INVALID_ARGUMENT;
+  const auto extent_status = mln::core::validate_render_target_extent(
+    descriptor->extent, "texture dimensions and scale_factor must be positive"
+  );
+  if (extent_status != MLN_STATUS_OK) {
+    return extent_status;
   }
-  if (descriptor->device == nullptr) {
-    mln::core::set_thread_error("Metal device must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  return MLN_STATUS_OK;
+  return mln::core::validate_metal_context(descriptor->context, true);
 }
 
 auto validate_metal_borrowed_descriptor(
@@ -134,14 +117,11 @@ auto validate_metal_borrowed_descriptor(
     );
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (
-    descriptor->width == 0 || descriptor->height == 0 ||
-    !std::isfinite(descriptor->scale_factor) || descriptor->scale_factor <= 0.0
-  ) {
-    mln::core::set_thread_error(
-      "texture dimensions and scale_factor must be positive"
-    );
-    return MLN_STATUS_INVALID_ARGUMENT;
+  const auto extent_status = mln::core::validate_render_target_extent(
+    descriptor->extent, "texture dimensions and scale_factor must be positive"
+  );
+  if (extent_status != MLN_STATUS_OK) {
+    return extent_status;
   }
   if (descriptor->texture == nullptr) {
     mln::core::set_thread_error("Metal texture must not be null");
@@ -153,9 +133,9 @@ auto validate_metal_borrowed_descriptor(
 auto validate_vulkan_handles(
   const mln_vulkan_owned_texture_descriptor& descriptor
 ) -> mln_status {
-  auto* const instance = static_cast<VkInstance>(descriptor.instance);
+  auto* const instance = static_cast<VkInstance>(descriptor.context.instance);
   auto* const physical_device =
-    static_cast<VkPhysicalDevice>(descriptor.physical_device);
+    static_cast<VkPhysicalDevice>(descriptor.context.physical_device);
 
   auto physical_device_count = uint32_t{};
   auto result =
@@ -194,7 +174,7 @@ auto validate_vulkan_handles(
   ::vkGetPhysicalDeviceQueueFamilyProperties(
     physical_device, &queue_family_count, nullptr
   );
-  if (descriptor.graphics_queue_family_index >= queue_family_count) {
+  if (descriptor.context.graphics_queue_family_index >= queue_family_count) {
     mln::core::set_thread_error(
       "Vulkan graphics_queue_family_index is out of range"
     );
@@ -207,7 +187,7 @@ auto validate_vulkan_handles(
     physical_device, &queue_family_count, queue_families.data()
   );
   const auto& queue_family =
-    queue_families.at(descriptor.graphics_queue_family_index);
+    queue_families.at(descriptor.context.graphics_queue_family_index);
   if (
     (queue_family.queueFlags & VK_QUEUE_GRAPHICS_BIT) == 0 ||
     queue_family.queueCount == 0
@@ -280,14 +260,21 @@ auto vulkan_owned_texture_descriptor_default() noexcept
   -> mln_vulkan_owned_texture_descriptor {
   return mln_vulkan_owned_texture_descriptor{
     .size = sizeof(mln_vulkan_owned_texture_descriptor),
-    .width = 256,
-    .height = 256,
-    .scale_factor = 1.0,
-    .instance = nullptr,
-    .physical_device = nullptr,
-    .device = nullptr,
-    .graphics_queue = nullptr,
-    .graphics_queue_family_index = 0,
+    .extent =
+      mln_render_target_extent{
+        .size = sizeof(mln_render_target_extent),
+        .width = 256,
+        .height = 256,
+        .scale_factor = 1.0,
+      },
+    .context = mln_vulkan_context_descriptor{
+      .size = sizeof(mln_vulkan_context_descriptor),
+      .instance = nullptr,
+      .physical_device = nullptr,
+      .device = nullptr,
+      .graphics_queue = nullptr,
+      .graphics_queue_family_index = 0,
+    },
   };
 }
 
@@ -295,14 +282,22 @@ auto vulkan_borrowed_texture_descriptor_default() noexcept
   -> mln_vulkan_borrowed_texture_descriptor {
   return mln_vulkan_borrowed_texture_descriptor{
     .size = sizeof(mln_vulkan_borrowed_texture_descriptor),
-    .width = 256,
-    .height = 256,
-    .scale_factor = 1.0,
-    .instance = nullptr,
-    .physical_device = nullptr,
-    .device = nullptr,
-    .graphics_queue = nullptr,
-    .graphics_queue_family_index = 0,
+    .extent =
+      mln_render_target_extent{
+        .size = sizeof(mln_render_target_extent),
+        .width = 256,
+        .height = 256,
+        .scale_factor = 1.0,
+      },
+    .context =
+      mln_vulkan_context_descriptor{
+        .size = sizeof(mln_vulkan_context_descriptor),
+        .instance = nullptr,
+        .physical_device = nullptr,
+        .device = nullptr,
+        .graphics_queue = nullptr,
+        .graphics_queue_family_index = 0,
+      },
     .image = nullptr,
     .image_view = nullptr,
     .format = VK_FORMAT_UNDEFINED,
@@ -331,8 +326,8 @@ auto vulkan_owned_texture_attach(
     return output_status;
   }
   const auto physical_status = validate_physical_size(
-    descriptor->width, descriptor->height, descriptor->scale_factor,
-    "scaled texture dimensions are too large"
+    descriptor->extent.width, descriptor->extent.height,
+    descriptor->extent.scale_factor, "scaled texture dimensions are too large"
   );
   if (physical_status != MLN_STATUS_OK) {
     return physical_status;
@@ -345,13 +340,7 @@ auto vulkan_owned_texture_attach(
   auto session = std::make_unique<mln_render_session>();
   session->map = map;
   session->owner_thread = map_owner_thread(map);
-  session->width = descriptor->width;
-  session->height = descriptor->height;
-  session->scale_factor = descriptor->scale_factor;
-  session->physical_width =
-    physical_dimension(descriptor->width, descriptor->scale_factor);
-  session->physical_height =
-    physical_dimension(descriptor->height, descriptor->scale_factor);
+  set_session_extent(*session, descriptor->extent);
   session->texture.api_kind = TextureSessionApi::Vulkan;
   session->texture.mode = TextureSessionMode::Owned;
   session->texture.backend = std::make_unique<VulkanTextureSessionBackend>(
@@ -387,22 +376,16 @@ auto vulkan_borrowed_texture_attach(
     return output_status;
   }
   const auto physical_status = validate_physical_size(
-    descriptor->width, descriptor->height, descriptor->scale_factor,
-    "scaled texture dimensions are too large"
+    descriptor->extent.width, descriptor->extent.height,
+    descriptor->extent.scale_factor, "scaled texture dimensions are too large"
   );
   if (physical_status != MLN_STATUS_OK) {
     return physical_status;
   }
   auto handle_descriptor = mln_vulkan_owned_texture_descriptor{
     .size = sizeof(mln_vulkan_owned_texture_descriptor),
-    .width = descriptor->width,
-    .height = descriptor->height,
-    .scale_factor = descriptor->scale_factor,
-    .instance = descriptor->instance,
-    .physical_device = descriptor->physical_device,
-    .device = descriptor->device,
-    .graphics_queue = descriptor->graphics_queue,
-    .graphics_queue_family_index = descriptor->graphics_queue_family_index,
+    .extent = descriptor->extent,
+    .context = descriptor->context,
   };
   const auto vulkan_status = validate_vulkan_handles(handle_descriptor);
   if (vulkan_status != MLN_STATUS_OK) {
@@ -412,13 +395,7 @@ auto vulkan_borrowed_texture_attach(
   auto session = std::make_unique<mln_render_session>();
   session->map = map;
   session->owner_thread = map_owner_thread(map);
-  session->width = descriptor->width;
-  session->height = descriptor->height;
-  session->scale_factor = descriptor->scale_factor;
-  session->physical_width =
-    physical_dimension(descriptor->width, descriptor->scale_factor);
-  session->physical_height =
-    physical_dimension(descriptor->height, descriptor->scale_factor);
+  set_session_extent(*session, descriptor->extent);
   session->texture.api_kind = TextureSessionApi::Vulkan;
   session->texture.mode = TextureSessionMode::Borrowed;
   session->texture.backend = std::make_unique<VulkanTextureSessionBackend>(
@@ -514,10 +491,17 @@ auto metal_owned_texture_descriptor_default() noexcept
   -> mln_metal_owned_texture_descriptor {
   return mln_metal_owned_texture_descriptor{
     .size = sizeof(mln_metal_owned_texture_descriptor),
-    .width = 256,
-    .height = 256,
-    .scale_factor = 1.0,
-    .device = nullptr,
+    .extent =
+      mln_render_target_extent{
+        .size = sizeof(mln_render_target_extent),
+        .width = 256,
+        .height = 256,
+        .scale_factor = 1.0,
+      },
+    .context = mln_metal_context_descriptor{
+      .size = sizeof(mln_metal_context_descriptor),
+      .device = nullptr,
+    },
   };
 }
 
@@ -525,9 +509,13 @@ auto metal_borrowed_texture_descriptor_default() noexcept
   -> mln_metal_borrowed_texture_descriptor {
   return mln_metal_borrowed_texture_descriptor{
     .size = sizeof(mln_metal_borrowed_texture_descriptor),
-    .width = 256,
-    .height = 256,
-    .scale_factor = 1.0,
+    .extent =
+      mln_render_target_extent{
+        .size = sizeof(mln_render_target_extent),
+        .width = 256,
+        .height = 256,
+        .scale_factor = 1.0,
+      },
     .texture = nullptr,
   };
 }
@@ -552,8 +540,8 @@ auto metal_owned_texture_attach(
     return output_status;
   }
   const auto physical_status = validate_physical_size(
-    descriptor->width, descriptor->height, descriptor->scale_factor,
-    "scaled texture dimensions are too large"
+    descriptor->extent.width, descriptor->extent.height,
+    descriptor->extent.scale_factor, "scaled texture dimensions are too large"
   );
   if (physical_status != MLN_STATUS_OK) {
     return physical_status;
@@ -582,8 +570,8 @@ auto metal_borrowed_texture_attach(
     return output_status;
   }
   const auto physical_status = validate_physical_size(
-    descriptor->width, descriptor->height, descriptor->scale_factor,
-    "scaled texture dimensions are too large"
+    descriptor->extent.width, descriptor->extent.height,
+    descriptor->extent.scale_factor, "scaled texture dimensions are too large"
   );
   if (physical_status != MLN_STATUS_OK) {
     return physical_status;

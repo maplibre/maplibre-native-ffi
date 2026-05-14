@@ -10,37 +10,44 @@ const ThreadCall = enum { resize, render_update, acquire, release, detach, destr
 pub fn expectDescriptorDefaults() !void {
     const metal = c.mln_metal_owned_texture_descriptor_default();
     try testing.expectEqual(@as(u32, @sizeOf(c.mln_metal_owned_texture_descriptor)), metal.size);
-    try testing.expect(metal.width > 0);
-    try testing.expect(metal.height > 0);
-    try testing.expect(metal.scale_factor > 0);
-    try testing.expect(metal.device == null);
+    try testing.expectEqual(@as(u32, @sizeOf(c.mln_render_target_extent)), metal.extent.size);
+    try testing.expectEqual(@as(u32, @sizeOf(c.mln_metal_context_descriptor)), metal.context.size);
+    try testing.expect(metal.extent.width > 0);
+    try testing.expect(metal.extent.height > 0);
+    try testing.expect(metal.extent.scale_factor > 0);
+    try testing.expect(metal.context.device == null);
 
     const metal_borrowed = c.mln_metal_borrowed_texture_descriptor_default();
     try testing.expectEqual(@as(u32, @sizeOf(c.mln_metal_borrowed_texture_descriptor)), metal_borrowed.size);
-    try testing.expect(metal_borrowed.width > 0);
-    try testing.expect(metal_borrowed.height > 0);
-    try testing.expect(metal_borrowed.scale_factor > 0);
+    try testing.expectEqual(@as(u32, @sizeOf(c.mln_render_target_extent)), metal_borrowed.extent.size);
+    try testing.expect(metal_borrowed.extent.width > 0);
+    try testing.expect(metal_borrowed.extent.height > 0);
+    try testing.expect(metal_borrowed.extent.scale_factor > 0);
     try testing.expect(metal_borrowed.texture == null);
 
     const vulkan = c.mln_vulkan_owned_texture_descriptor_default();
     try testing.expectEqual(@as(u32, @sizeOf(c.mln_vulkan_owned_texture_descriptor)), vulkan.size);
-    try testing.expect(vulkan.width > 0);
-    try testing.expect(vulkan.height > 0);
-    try testing.expect(vulkan.scale_factor > 0);
-    try testing.expect(vulkan.instance == null);
-    try testing.expect(vulkan.physical_device == null);
-    try testing.expect(vulkan.device == null);
-    try testing.expect(vulkan.graphics_queue == null);
+    try testing.expectEqual(@as(u32, @sizeOf(c.mln_render_target_extent)), vulkan.extent.size);
+    try testing.expectEqual(@as(u32, @sizeOf(c.mln_vulkan_context_descriptor)), vulkan.context.size);
+    try testing.expect(vulkan.extent.width > 0);
+    try testing.expect(vulkan.extent.height > 0);
+    try testing.expect(vulkan.extent.scale_factor > 0);
+    try testing.expect(vulkan.context.instance == null);
+    try testing.expect(vulkan.context.physical_device == null);
+    try testing.expect(vulkan.context.device == null);
+    try testing.expect(vulkan.context.graphics_queue == null);
 
     const vulkan_borrowed = c.mln_vulkan_borrowed_texture_descriptor_default();
     try testing.expectEqual(@as(u32, @sizeOf(c.mln_vulkan_borrowed_texture_descriptor)), vulkan_borrowed.size);
-    try testing.expect(vulkan_borrowed.width > 0);
-    try testing.expect(vulkan_borrowed.height > 0);
-    try testing.expect(vulkan_borrowed.scale_factor > 0);
-    try testing.expect(vulkan_borrowed.instance == null);
-    try testing.expect(vulkan_borrowed.physical_device == null);
-    try testing.expect(vulkan_borrowed.device == null);
-    try testing.expect(vulkan_borrowed.graphics_queue == null);
+    try testing.expectEqual(@as(u32, @sizeOf(c.mln_render_target_extent)), vulkan_borrowed.extent.size);
+    try testing.expectEqual(@as(u32, @sizeOf(c.mln_vulkan_context_descriptor)), vulkan_borrowed.context.size);
+    try testing.expect(vulkan_borrowed.extent.width > 0);
+    try testing.expect(vulkan_borrowed.extent.height > 0);
+    try testing.expect(vulkan_borrowed.extent.scale_factor > 0);
+    try testing.expect(vulkan_borrowed.context.instance == null);
+    try testing.expect(vulkan_borrowed.context.physical_device == null);
+    try testing.expect(vulkan_borrowed.context.device == null);
+    try testing.expect(vulkan_borrowed.context.graphics_queue == null);
     try testing.expect(vulkan_borrowed.image == null);
     try testing.expect(vulkan_borrowed.image_view == null);
 
@@ -79,15 +86,23 @@ pub fn expectAttachRejectsInvalidArguments(comptime Backend: type) !void {
     try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, Backend.attach(map, &small_descriptor, &texture));
 
     var invalid_descriptor = context.descriptor();
-    invalid_descriptor.width = 0;
+    invalid_descriptor.extent.size = @sizeOf(c.mln_render_target_extent) - 1;
     try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, Backend.attach(map, &invalid_descriptor, &texture));
 
     invalid_descriptor = context.descriptor();
-    invalid_descriptor.height = 0;
+    Backend.shrinkContext(&invalid_descriptor);
     try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, Backend.attach(map, &invalid_descriptor, &texture));
 
     invalid_descriptor = context.descriptor();
-    invalid_descriptor.scale_factor = 0;
+    invalid_descriptor.extent.width = 0;
+    try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, Backend.attach(map, &invalid_descriptor, &texture));
+
+    invalid_descriptor = context.descriptor();
+    invalid_descriptor.extent.height = 0;
+    try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, Backend.attach(map, &invalid_descriptor, &texture));
+
+    invalid_descriptor = context.descriptor();
+    invalid_descriptor.extent.scale_factor = 0;
     try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, Backend.attach(map, &invalid_descriptor, &texture));
 
     invalid_descriptor = context.descriptor();
@@ -95,7 +110,7 @@ pub fn expectAttachRejectsInvalidArguments(comptime Backend: type) !void {
     try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, Backend.attach(map, &invalid_descriptor, &texture));
 
     var scaled_descriptor = context.descriptor();
-    scaled_descriptor.scale_factor = 2.0;
+    scaled_descriptor.extent.scale_factor = 2.0;
     try testing.expectEqual(c.MLN_STATUS_OK, Backend.attach(map, &scaled_descriptor, &texture));
     try testing.expectEqual(c.MLN_STATUS_OK, c.mln_render_session_destroy(texture.?));
 }

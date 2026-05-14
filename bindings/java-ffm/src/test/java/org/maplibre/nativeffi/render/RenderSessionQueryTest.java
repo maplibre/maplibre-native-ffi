@@ -107,7 +107,9 @@ final class RenderSessionQueryTest {
 
     var runtime = RuntimeHandle.create();
     var map = MapHandle.create(runtime, new MapOptions().size(64, 64));
-    var session = map.attachOwnedTexture(new OwnedTextureDescriptor().size(64, 64));
+    var session =
+        map.attachOwnedTexture(
+            new OwnedTextureDescriptor().extent(new RenderTargetExtent(64, 64, 1.0)));
     try {
       var selector = new FeatureStateSelector("point").featureId("feature-1");
       var state =
@@ -149,7 +151,9 @@ final class RenderSessionQueryTest {
 
     var runtime = RuntimeHandle.create();
     var map = MapHandle.create(runtime, new MapOptions().size(64, 64));
-    var session = map.attachOwnedTexture(new OwnedTextureDescriptor().size(64, 64));
+    var session =
+        map.attachOwnedTexture(
+            new OwnedTextureDescriptor().extent(new RenderTargetExtent(64, 64, 1.0)));
     try {
       assertThrows(
           InvalidStateException.class,
@@ -204,7 +208,9 @@ final class RenderSessionQueryTest {
 
     var runtime = RuntimeHandle.create();
     var map = MapHandle.create(runtime, new MapOptions().size(64, 64));
-    var session = map.attachOwnedTexture(new OwnedTextureDescriptor().size(64, 64));
+    var session =
+        map.attachOwnedTexture(
+            new OwnedTextureDescriptor().extent(new RenderTargetExtent(64, 64, 1.0)));
     try {
       loadClusterStyleAndRender(runtime, map, session);
       var queryPoint = map.pixelForLatLng(new LatLng(0.0, 0.0));

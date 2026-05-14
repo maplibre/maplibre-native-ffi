@@ -4,85 +4,29 @@ import java.util.Objects;
 
 /** Mutable descriptor for Vulkan caller-owned texture render targets. */
 public final class VulkanBorrowedTextureDescriptor {
-  private int width = 256;
-  private int height = 256;
-  private double scaleFactor = 1.0;
-  private NativePointer instance = NativePointer.NULL;
-  private NativePointer physicalDevice = NativePointer.NULL;
-  private NativePointer device = NativePointer.NULL;
-  private NativePointer graphicsQueue = NativePointer.NULL;
-  private int graphicsQueueFamilyIndex;
+  private RenderTargetExtent extent = new RenderTargetExtent();
+  private VulkanContextDescriptor context = new VulkanContextDescriptor();
   private NativePointer image = NativePointer.NULL;
   private NativePointer imageView = NativePointer.NULL;
   private int format;
   private int initialLayout;
   private Integer finalLayout;
 
-  public int width() {
-    return width;
+  public RenderTargetExtent extent() {
+    return extent;
   }
 
-  public int height() {
-    return height;
-  }
-
-  public VulkanBorrowedTextureDescriptor size(int width, int height) {
-    this.width = width;
-    this.height = height;
+  public VulkanBorrowedTextureDescriptor extent(RenderTargetExtent extent) {
+    this.extent = Objects.requireNonNull(extent, "extent");
     return this;
   }
 
-  public double scaleFactor() {
-    return scaleFactor;
+  public VulkanContextDescriptor context() {
+    return context;
   }
 
-  public VulkanBorrowedTextureDescriptor scaleFactor(double scaleFactor) {
-    this.scaleFactor = scaleFactor;
-    return this;
-  }
-
-  public NativePointer instance() {
-    return instance;
-  }
-
-  public VulkanBorrowedTextureDescriptor instance(NativePointer instance) {
-    this.instance = Objects.requireNonNull(instance, "instance");
-    return this;
-  }
-
-  public NativePointer physicalDevice() {
-    return physicalDevice;
-  }
-
-  public VulkanBorrowedTextureDescriptor physicalDevice(NativePointer physicalDevice) {
-    this.physicalDevice = Objects.requireNonNull(physicalDevice, "physicalDevice");
-    return this;
-  }
-
-  public NativePointer device() {
-    return device;
-  }
-
-  public VulkanBorrowedTextureDescriptor device(NativePointer device) {
-    this.device = Objects.requireNonNull(device, "device");
-    return this;
-  }
-
-  public NativePointer graphicsQueue() {
-    return graphicsQueue;
-  }
-
-  public VulkanBorrowedTextureDescriptor graphicsQueue(NativePointer graphicsQueue) {
-    this.graphicsQueue = Objects.requireNonNull(graphicsQueue, "graphicsQueue");
-    return this;
-  }
-
-  public int graphicsQueueFamilyIndex() {
-    return graphicsQueueFamilyIndex;
-  }
-
-  public VulkanBorrowedTextureDescriptor graphicsQueueFamilyIndex(int index) {
-    this.graphicsQueueFamilyIndex = index;
+  public VulkanBorrowedTextureDescriptor context(VulkanContextDescriptor context) {
+    this.context = Objects.requireNonNull(context, "context");
     return this;
   }
 

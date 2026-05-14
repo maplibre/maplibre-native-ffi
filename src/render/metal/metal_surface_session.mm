@@ -1,4 +1,3 @@
-#include <cmath>
 #include <memory>
 #include <stdexcept>
 
@@ -38,14 +37,16 @@ auto validate_descriptor(const mln_metal_surface_descriptor* descriptor)
     );
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (
-    descriptor->width == 0 || descriptor->height == 0 ||
-    !std::isfinite(descriptor->scale_factor) || descriptor->scale_factor <= 0.0
-  ) {
-    mln::core::set_thread_error(
-      "surface dimensions and scale_factor must be positive"
-    );
-    return MLN_STATUS_INVALID_ARGUMENT;
+  const auto extent_status = mln::core::validate_render_target_extent(
+    descriptor->extent, "surface dimensions and scale_factor must be positive"
+  );
+  if (extent_status != MLN_STATUS_OK) {
+    return extent_status;
+  }
+  const auto context_status =
+    mln::core::validate_metal_context(descriptor->context, false);
+  if (context_status != MLN_STATUS_OK) {
+    return context_status;
   }
   if (descriptor->layer == nullptr) {
     mln::core::set_thread_error("Metal surface layer must not be null");
@@ -281,20 +282,19 @@ auto validate_vulkan_descriptor(const mln_vulkan_surface_descriptor* descriptor)
     );
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (
-    descriptor->width == 0 || descriptor->height == 0 ||
-    !std::isfinite(descriptor->scale_factor) || descriptor->scale_factor <= 0.0
-  ) {
-    mln::core::set_thread_error(
-      "surface dimensions and scale_factor must be positive"
-    );
-    return MLN_STATUS_INVALID_ARGUMENT;
+  const auto extent_status = mln::core::validate_render_target_extent(
+    descriptor->extent, "surface dimensions and scale_factor must be positive"
+  );
+  if (extent_status != MLN_STATUS_OK) {
+    return extent_status;
   }
-  if (
-    descriptor->instance == nullptr || descriptor->physical_device == nullptr ||
-    descriptor->device == nullptr || descriptor->graphics_queue == nullptr ||
-    descriptor->surface == nullptr
-  ) {
+  const auto context_status = mln::core::validate_vulkan_context(
+    descriptor->context, "Vulkan surface handles must not be null"
+  );
+  if (context_status != MLN_STATUS_OK) {
+    return context_status;
+  }
+  if (descriptor->surface == nullptr) {
     mln::core::set_thread_error("Vulkan surface handles must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
@@ -325,8 +325,8 @@ auto metal_surface_attach(
     return output_status;
   }
   const auto physical_status = validate_physical_size(
-    descriptor->width, descriptor->height, descriptor->scale_factor,
-    "scaled surface dimensions are too large"
+    descriptor->extent.width, descriptor->extent.height,
+    descriptor->extent.scale_factor, "scaled surface dimensions are too large"
   );
   if (physical_status != MLN_STATUS_OK) {
     return physical_status;
@@ -335,16 +335,10 @@ auto metal_surface_attach(
   auto session = std::make_unique<mln_render_session>();
   session->map = map;
   session->owner_thread = map_owner_thread(map);
-  session->width = descriptor->width;
-  session->height = descriptor->height;
-  session->scale_factor = descriptor->scale_factor;
-  session->physical_width =
-    physical_dimension(descriptor->width, descriptor->scale_factor);
-  session->physical_height =
-    physical_dimension(descriptor->height, descriptor->scale_factor);
+  set_session_extent(*session, descriptor->extent);
   session->surface.backend = std::make_unique<MetalSurfaceSessionBackend>(
     static_cast<CA::MetalLayer*>(descriptor->layer),
-    static_cast<MTL::Device*>(descriptor->device),
+    static_cast<MTL::Device*>(descriptor->context.device),
     mbgl::Size{session->physical_width, session->physical_height}
   );
   return attach_render_session(
@@ -377,8 +371,8 @@ auto vulkan_surface_attach(
     return output_status;
   }
   const auto physical_status = validate_physical_size(
-    descriptor->width, descriptor->height, descriptor->scale_factor,
-    "scaled surface dimensions are too large"
+    descriptor->extent.width, descriptor->extent.height,
+    descriptor->extent.scale_factor, "scaled surface dimensions are too large"
   );
   if (physical_status != MLN_STATUS_OK) {
     return physical_status;

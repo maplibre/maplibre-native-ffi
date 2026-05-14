@@ -138,6 +138,66 @@ inline auto physical_dimension(uint32_t logical, double scale_factor)
   return static_cast<uint32_t>(std::ceil(logical * scale_factor));
 }
 
+inline auto validate_render_target_extent(
+  const mln_render_target_extent& extent, const char* dimension_message
+) -> mln_status {
+  if (extent.size < sizeof(mln_render_target_extent)) {
+    set_thread_error("mln_render_target_extent.size is too small");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (
+    extent.width == 0 || extent.height == 0 ||
+    !std::isfinite(extent.scale_factor) || extent.scale_factor <= 0.0
+  ) {
+    set_thread_error(dimension_message);
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  return MLN_STATUS_OK;
+}
+
+inline auto validate_metal_context(
+  const mln_metal_context_descriptor& context, bool require_device
+) -> mln_status {
+  if (context.size < sizeof(mln_metal_context_descriptor)) {
+    set_thread_error("mln_metal_context_descriptor.size is too small");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (require_device && context.device == nullptr) {
+    set_thread_error("Metal device must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  return MLN_STATUS_OK;
+}
+
+inline auto validate_vulkan_context(
+  const mln_vulkan_context_descriptor& context, const char* null_handles_message
+) -> mln_status {
+  if (context.size < sizeof(mln_vulkan_context_descriptor)) {
+    set_thread_error("mln_vulkan_context_descriptor.size is too small");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (
+    context.instance == nullptr || context.physical_device == nullptr ||
+    context.device == nullptr || context.graphics_queue == nullptr
+  ) {
+    set_thread_error(null_handles_message);
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  return MLN_STATUS_OK;
+}
+
+inline auto set_session_extent(
+  mln_render_session& session, const mln_render_target_extent& extent
+) -> void {
+  session.width = extent.width;
+  session.height = extent.height;
+  session.scale_factor = extent.scale_factor;
+  session.physical_width =
+    physical_dimension(extent.width, extent.scale_factor);
+  session.physical_height =
+    physical_dimension(extent.height, extent.scale_factor);
+}
+
 inline auto validate_physical_size(
   uint32_t width, uint32_t height, double scale_factor,
   const char* too_large_message

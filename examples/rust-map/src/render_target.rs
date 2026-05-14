@@ -1,6 +1,6 @@
 use maplibre_native::{
-    Error, ErrorKind, MapHandle, RenderSessionHandle, VulkanOwnedTextureDescriptor,
-    VulkanSurfaceDescriptor,
+    Error, ErrorKind, MapHandle, RenderSessionHandle, RenderTargetExtent, VulkanContextDescriptor,
+    VulkanOwnedTextureDescriptor, VulkanSurfaceDescriptor,
 };
 use std::error::Error as StdError;
 
@@ -144,14 +144,18 @@ impl RenderTarget {
         viewport: Viewport,
     ) -> maplibre_native::Result<Self> {
         let descriptor = VulkanOwnedTextureDescriptor::new(
-            viewport.logical_width,
-            viewport.logical_height,
-            viewport.scale_factor,
-            vulkan.instance_pointer(),
-            vulkan.physical_device_pointer(),
-            vulkan.device_pointer(),
-            vulkan.graphics_queue_pointer(),
-            vulkan.graphics_queue_family_index(),
+            RenderTargetExtent::new(
+                viewport.logical_width,
+                viewport.logical_height,
+                viewport.scale_factor,
+            ),
+            VulkanContextDescriptor::new(
+                vulkan.instance_pointer(),
+                vulkan.physical_device_pointer(),
+                vulkan.device_pointer(),
+                vulkan.graphics_queue_pointer(),
+                vulkan.graphics_queue_family_index(),
+            ),
         );
         let session = map.attach_vulkan_owned_texture(&descriptor)?;
         let compositor = match VulkanTextureCompositor::new(vulkan, viewport) {
@@ -176,14 +180,18 @@ impl RenderTarget {
         viewport: Viewport,
     ) -> maplibre_native::Result<Self> {
         let descriptor = VulkanSurfaceDescriptor::new(
-            viewport.logical_width,
-            viewport.logical_height,
-            viewport.scale_factor,
-            vulkan.instance_pointer(),
-            vulkan.physical_device_pointer(),
-            vulkan.device_pointer(),
-            vulkan.graphics_queue_pointer(),
-            vulkan.graphics_queue_family_index(),
+            RenderTargetExtent::new(
+                viewport.logical_width,
+                viewport.logical_height,
+                viewport.scale_factor,
+            ),
+            VulkanContextDescriptor::new(
+                vulkan.instance_pointer(),
+                vulkan.physical_device_pointer(),
+                vulkan.device_pointer(),
+                vulkan.graphics_queue_pointer(),
+                vulkan.graphics_queue_family_index(),
+            ),
             vulkan.surface_pointer(),
         );
         Ok(Self::VulkanNativeSurface {

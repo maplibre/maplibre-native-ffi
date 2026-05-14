@@ -114,11 +114,11 @@ const Backend = struct {
 
         pub fn descriptor(self: *const AttachContext) c.mln_vulkan_owned_texture_descriptor {
             var value = c.mln_vulkan_owned_texture_descriptor_default();
-            value.instance = self.instance;
-            value.physical_device = self.physical_device;
-            value.device = self.device;
-            value.graphics_queue = self.queue;
-            value.graphics_queue_family_index = self.queue_family_index;
+            value.context.instance = self.instance;
+            value.context.physical_device = self.physical_device;
+            value.context.device = self.device;
+            value.context.graphics_queue = self.queue;
+            value.context.graphics_queue_family_index = self.queue_family_index;
             return value;
         }
     };
@@ -132,8 +132,8 @@ const Backend = struct {
             errdefer context.deinit();
 
             var texture_descriptor = context.descriptor();
-            texture_descriptor.width = 256;
-            texture_descriptor.height = 256;
+            texture_descriptor.extent.width = 256;
+            texture_descriptor.extent.height = 256;
 
             var texture: ?*c.mln_render_session = null;
             try testing.expectEqual(c.MLN_STATUS_OK, c.mln_vulkan_owned_texture_attach(map, &texture_descriptor, &texture));
@@ -210,7 +210,11 @@ const Backend = struct {
     }
 
     pub fn clearRequiredHandle(descriptor: *c.mln_vulkan_owned_texture_descriptor) void {
-        descriptor.device = null;
+        descriptor.context.device = null;
+    }
+
+    pub fn shrinkContext(descriptor: *c.mln_vulkan_owned_texture_descriptor) void {
+        descriptor.context.size = @sizeOf(c.mln_vulkan_context_descriptor) - 1;
     }
 
     pub fn expectInitialFrame(frame: *const Frame) !void {
@@ -313,13 +317,13 @@ const BorrowedImage = struct {
 
     pub fn descriptor(self: *const BorrowedImage) c.mln_vulkan_borrowed_texture_descriptor {
         var value = c.mln_vulkan_borrowed_texture_descriptor_default();
-        value.width = self.width;
-        value.height = self.height;
-        value.instance = self.context.instance;
-        value.physical_device = self.context.physical_device;
-        value.device = self.context.device;
-        value.graphics_queue = self.context.queue;
-        value.graphics_queue_family_index = self.context.queue_family_index;
+        value.extent.width = self.width;
+        value.extent.height = self.height;
+        value.context.instance = self.context.instance;
+        value.context.physical_device = self.context.physical_device;
+        value.context.device = self.context.device;
+        value.context.graphics_queue = self.context.queue;
+        value.context.graphics_queue_family_index = self.context.queue_family_index;
         value.image = self.image;
         value.image_view = self.image_view;
         value.format = @as(u32, vk.VK_FORMAT_R8G8B8A8_UNORM);
@@ -339,10 +343,10 @@ test "Vulkan texture unsupported backend validates arguments" {
     defer support.destroyMap(map);
 
     var descriptor = c.mln_vulkan_owned_texture_descriptor_default();
-    descriptor.instance = @ptrFromInt(1);
-    descriptor.physical_device = @ptrFromInt(1);
-    descriptor.device = @ptrFromInt(1);
-    descriptor.graphics_queue = @ptrFromInt(1);
+    descriptor.context.instance = @ptrFromInt(1);
+    descriptor.context.physical_device = @ptrFromInt(1);
+    descriptor.context.device = @ptrFromInt(1);
+    descriptor.context.graphics_queue = @ptrFromInt(1);
 
     var texture: ?*c.mln_render_session = @ptrFromInt(1);
     try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, c.mln_vulkan_owned_texture_attach(map, &descriptor, &texture));
@@ -411,6 +415,16 @@ test "Vulkan borrowed texture renders into caller image" {
 
     var descriptor = borrowed.descriptor();
     var texture: ?*c.mln_render_session = null;
+    var invalid_extent_descriptor = descriptor;
+    invalid_extent_descriptor.extent.size = @sizeOf(c.mln_render_target_extent) - 1;
+    try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, c.mln_vulkan_borrowed_texture_attach(map, &invalid_extent_descriptor, &texture));
+    try testing.expectEqual(@as(?*c.mln_render_session, null), texture);
+
+    var invalid_context_descriptor = descriptor;
+    invalid_context_descriptor.context.size = @sizeOf(c.mln_vulkan_context_descriptor) - 1;
+    try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, c.mln_vulkan_borrowed_texture_attach(map, &invalid_context_descriptor, &texture));
+    try testing.expectEqual(@as(?*c.mln_render_session, null), texture);
+
     var missing_image_descriptor = descriptor;
     missing_image_descriptor.image = null;
     try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, c.mln_vulkan_borrowed_texture_attach(map, &missing_image_descriptor, &texture));

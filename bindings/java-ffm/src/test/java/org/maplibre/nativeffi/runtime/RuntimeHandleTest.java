@@ -24,6 +24,7 @@ import org.maplibre.nativeffi.map.MapHandle;
 import org.maplibre.nativeffi.map.MapOptions;
 import org.maplibre.nativeffi.render.OwnedTextureDescriptor;
 import org.maplibre.nativeffi.render.RenderSessionHandle;
+import org.maplibre.nativeffi.render.RenderTargetExtent;
 import org.maplibre.nativeffi.resource.ResourceKind;
 import org.maplibre.nativeffi.resource.ResourceProviderDecision;
 import org.maplibre.nativeffi.resource.ResourceRequestHandle;
@@ -192,7 +193,9 @@ final class RuntimeHandleTest {
       var failedEvent = waitForMapEventRecord(runtime, map, RuntimeEventType.MAP_LOADING_FAILED);
       assertFalse(failedEvent.message().isBlank());
 
-      session = map.attachOwnedTexture(new OwnedTextureDescriptor().size(64, 64));
+      session =
+          map.attachOwnedTexture(
+              new OwnedTextureDescriptor().extent(new RenderTargetExtent(64, 64, 1.0)));
       map.setStyleJson(STYLE_JSON);
       waitForMapEvent(runtime, map, RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE);
       session.renderUpdate();

@@ -1,4 +1,3 @@
-#include <cmath>
 #include <cstdint>
 #include <memory>
 #include <stdexcept>
@@ -44,14 +43,16 @@ auto validate_metal_descriptor(const mln_metal_surface_descriptor* descriptor)
     );
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (
-    descriptor->width == 0 || descriptor->height == 0 ||
-    !std::isfinite(descriptor->scale_factor) || descriptor->scale_factor <= 0.0
-  ) {
-    mln::core::set_thread_error(
-      "surface dimensions and scale_factor must be positive"
-    );
-    return MLN_STATUS_INVALID_ARGUMENT;
+  const auto extent_status = mln::core::validate_render_target_extent(
+    descriptor->extent, "surface dimensions and scale_factor must be positive"
+  );
+  if (extent_status != MLN_STATUS_OK) {
+    return extent_status;
+  }
+  const auto context_status =
+    mln::core::validate_metal_context(descriptor->context, false);
+  if (context_status != MLN_STATUS_OK) {
+    return context_status;
   }
   if (descriptor->layer == nullptr) {
     mln::core::set_thread_error("Metal surface layer must not be null");
@@ -72,20 +73,19 @@ auto validate_vulkan_descriptor(const mln_vulkan_surface_descriptor* descriptor)
     );
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (
-    descriptor->width == 0 || descriptor->height == 0 ||
-    !std::isfinite(descriptor->scale_factor) || descriptor->scale_factor <= 0.0
-  ) {
-    mln::core::set_thread_error(
-      "surface dimensions and scale_factor must be positive"
-    );
-    return MLN_STATUS_INVALID_ARGUMENT;
+  const auto extent_status = mln::core::validate_render_target_extent(
+    descriptor->extent, "surface dimensions and scale_factor must be positive"
+  );
+  if (extent_status != MLN_STATUS_OK) {
+    return extent_status;
   }
-  if (
-    descriptor->instance == nullptr || descriptor->physical_device == nullptr ||
-    descriptor->device == nullptr || descriptor->graphics_queue == nullptr ||
-    descriptor->surface == nullptr
-  ) {
+  const auto context_status = mln::core::validate_vulkan_context(
+    descriptor->context, "Vulkan surface handles must not be null"
+  );
+  if (context_status != MLN_STATUS_OK) {
+    return context_status;
+  }
+  if (descriptor->surface == nullptr) {
     mln::core::set_thread_error("Vulkan surface handles must not be null");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
@@ -94,9 +94,9 @@ auto validate_vulkan_descriptor(const mln_vulkan_surface_descriptor* descriptor)
 
 auto validate_vulkan_handles(const mln_vulkan_surface_descriptor& descriptor)
   -> mln_status {
-  auto* const instance = static_cast<VkInstance>(descriptor.instance);
+  auto* const instance = static_cast<VkInstance>(descriptor.context.instance);
   auto* const physical_device =
-    static_cast<VkPhysicalDevice>(descriptor.physical_device);
+    static_cast<VkPhysicalDevice>(descriptor.context.physical_device);
   auto* const surface = static_cast<VkSurfaceKHR>(descriptor.surface);
 
   auto physical_device_count = uint32_t{};
@@ -136,7 +136,7 @@ auto validate_vulkan_handles(const mln_vulkan_surface_descriptor& descriptor)
   ::vkGetPhysicalDeviceQueueFamilyProperties(
     physical_device, &queue_family_count, nullptr
   );
-  if (descriptor.graphics_queue_family_index >= queue_family_count) {
+  if (descriptor.context.graphics_queue_family_index >= queue_family_count) {
     mln::core::set_thread_error(
       "Vulkan graphics_queue_family_index is out of range"
     );
@@ -149,7 +149,7 @@ auto validate_vulkan_handles(const mln_vulkan_surface_descriptor& descriptor)
     physical_device, &queue_family_count, queue_families.data()
   );
   const auto& queue_family =
-    queue_families.at(descriptor.graphics_queue_family_index);
+    queue_families.at(descriptor.context.graphics_queue_family_index);
   if (
     (queue_family.queueFlags & VK_QUEUE_GRAPHICS_BIT) == 0 ||
     queue_family.queueCount == 0
@@ -162,7 +162,7 @@ auto validate_vulkan_handles(const mln_vulkan_surface_descriptor& descriptor)
 
   auto present_supported = VkBool32{VK_FALSE};
   result = ::vkGetPhysicalDeviceSurfaceSupportKHR(
-    physical_device, descriptor.graphics_queue_family_index, surface,
+    physical_device, descriptor.context.graphics_queue_family_index, surface,
     &present_supported
   );
   if (result != VK_SUCCESS) {
@@ -323,7 +323,7 @@ class VulkanSurfaceBackend final : public mbgl::vulkan::RendererBackend,
   void initInstance() override {
     usingSharedContext = true;
     instance = vk::UniqueInstance(
-      static_cast<VkInstance>(descriptor_.instance),
+      static_cast<VkInstance>(descriptor_.context.instance),
       vk::ObjectDestroy<vk::NoParent, vk::DispatchLoaderDynamic>(
         nullptr, dispatcher
       )
@@ -342,7 +342,7 @@ class VulkanSurfaceBackend final : public mbgl::vulkan::RendererBackend,
     const auto physical_devices =
       instance->enumeratePhysicalDevices(dispatcher);
     auto* const requested_physical_device =
-      static_cast<VkPhysicalDevice>(descriptor_.physical_device);
+      static_cast<VkPhysicalDevice>(descriptor_.context.physical_device);
     auto found_physical_device = false;
     for (const auto& candidate : physical_devices) {
       if (
@@ -360,19 +360,20 @@ class VulkanSurfaceBackend final : public mbgl::vulkan::RendererBackend,
     }
 
     device = vk::UniqueDevice(
-      static_cast<VkDevice>(descriptor_.device),
+      static_cast<VkDevice>(descriptor_.context.device),
       vk::ObjectDestroy<vk::NoParent, vk::DispatchLoaderDynamic>(
         nullptr, dispatcher
       )
     );
     dispatcher.init(
-      static_cast<VkInstance>(descriptor_.instance), ::vkGetInstanceProcAddr,
-      static_cast<VkDevice>(descriptor_.device), ::vkGetDeviceProcAddr
+      static_cast<VkInstance>(descriptor_.context.instance),
+      ::vkGetInstanceProcAddr,
+      static_cast<VkDevice>(descriptor_.context.device), ::vkGetDeviceProcAddr
     );
     graphicsQueueIndex =
-      static_cast<int32_t>(descriptor_.graphics_queue_family_index);
+      static_cast<int32_t>(descriptor_.context.graphics_queue_family_index);
     presentQueueIndex = graphicsQueueIndex;
-    graphicsQueue = static_cast<VkQueue>(descriptor_.graphics_queue);
+    graphicsQueue = static_cast<VkQueue>(descriptor_.context.graphics_queue);
     presentQueue = graphicsQueue;
     physicalDeviceFeatures = physicalDevice.getFeatures(dispatcher);
   }
@@ -384,7 +385,8 @@ class VulkanSurfaceBackend final : public mbgl::vulkan::RendererBackend,
         "vkGetInstanceProcAddr"
       );
     dispatcher = vk::DispatchLoaderDynamic(
-      static_cast<VkInstance>(descriptor_.instance), get_instance_proc_addr
+      static_cast<VkInstance>(descriptor_.context.instance),
+      get_instance_proc_addr
     );
 
     initFrameCapture();
@@ -443,8 +445,8 @@ auto metal_surface_attach(
     return output_status;
   }
   const auto physical_status = validate_physical_size(
-    descriptor->width, descriptor->height, descriptor->scale_factor,
-    "scaled surface dimensions are too large"
+    descriptor->extent.width, descriptor->extent.height,
+    descriptor->extent.scale_factor, "scaled surface dimensions are too large"
   );
   if (physical_status != MLN_STATUS_OK) {
     return physical_status;
@@ -473,8 +475,8 @@ auto vulkan_surface_attach(
     return output_status;
   }
   const auto physical_status = validate_physical_size(
-    descriptor->width, descriptor->height, descriptor->scale_factor,
-    "scaled surface dimensions are too large"
+    descriptor->extent.width, descriptor->extent.height,
+    descriptor->extent.scale_factor, "scaled surface dimensions are too large"
   );
   if (physical_status != MLN_STATUS_OK) {
     return physical_status;
@@ -487,13 +489,7 @@ auto vulkan_surface_attach(
   auto session = std::make_unique<mln_render_session>();
   session->map = map;
   session->owner_thread = map_owner_thread(map);
-  session->width = descriptor->width;
-  session->height = descriptor->height;
-  session->scale_factor = descriptor->scale_factor;
-  session->physical_width =
-    physical_dimension(descriptor->width, descriptor->scale_factor);
-  session->physical_height =
-    physical_dimension(descriptor->height, descriptor->scale_factor);
+  set_session_extent(*session, descriptor->extent);
   session->surface.backend = std::make_unique<VulkanSurfaceSessionBackend>(
     *descriptor, mbgl::Size{session->physical_width, session->physical_height}
   );

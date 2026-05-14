@@ -249,14 +249,14 @@ const VulkanOwnedTextureBackend = struct {
         viewport: types.Viewport,
     ) !render_target.Session {
         var descriptor = c.mln_vulkan_owned_texture_descriptor_default();
-        descriptor.width = viewport.logical_width;
-        descriptor.height = viewport.logical_height;
-        descriptor.scale_factor = viewport.scale_factor;
-        descriptor.instance = self.compositor.context.instance;
-        descriptor.physical_device = self.compositor.context.physical_device;
-        descriptor.device = self.compositor.context.device;
-        descriptor.graphics_queue = self.compositor.context.queue;
-        descriptor.graphics_queue_family_index = self.compositor.context.queue_family_index;
+        descriptor.extent.width = viewport.logical_width;
+        descriptor.extent.height = viewport.logical_height;
+        descriptor.extent.scale_factor = viewport.scale_factor;
+        descriptor.context.instance = self.compositor.context.instance;
+        descriptor.context.physical_device = self.compositor.context.physical_device;
+        descriptor.context.device = self.compositor.context.device;
+        descriptor.context.graphics_queue = self.compositor.context.queue;
+        descriptor.context.graphics_queue_family_index = self.compositor.context.queue_family_index;
 
         var texture: ?*c.mln_render_session = null;
         if (c.mln_vulkan_owned_texture_attach(map, &descriptor, &texture) !=
@@ -438,14 +438,14 @@ const VulkanBorrowedTextureBackend = struct {
         viewport: types.Viewport,
     ) !render_target.Session {
         var descriptor = c.mln_vulkan_borrowed_texture_descriptor_default();
-        descriptor.width = viewport.logical_width;
-        descriptor.height = viewport.logical_height;
-        descriptor.scale_factor = viewport.scale_factor;
-        descriptor.instance = self.compositor.context.instance;
-        descriptor.physical_device = self.compositor.context.physical_device;
-        descriptor.device = self.compositor.context.device;
-        descriptor.graphics_queue = self.compositor.context.queue;
-        descriptor.graphics_queue_family_index = self.compositor.context.queue_family_index;
+        descriptor.extent.width = viewport.logical_width;
+        descriptor.extent.height = viewport.logical_height;
+        descriptor.extent.scale_factor = viewport.scale_factor;
+        descriptor.context.instance = self.compositor.context.instance;
+        descriptor.context.physical_device = self.compositor.context.physical_device;
+        descriptor.context.device = self.compositor.context.device;
+        descriptor.context.graphics_queue = self.compositor.context.queue;
+        descriptor.context.graphics_queue_family_index = self.compositor.context.queue_family_index;
         descriptor.image = self.borrowed_image.image;
         descriptor.image_view = self.borrowed_image.view;
         descriptor.format = c.VK_FORMAT_R8G8B8A8_UNORM;
@@ -494,14 +494,14 @@ const VulkanSurfaceBackend = struct {
         viewport: types.Viewport,
     ) !render_target.Session {
         var descriptor = c.mln_vulkan_surface_descriptor_default();
-        descriptor.width = viewport.logical_width;
-        descriptor.height = viewport.logical_height;
-        descriptor.scale_factor = viewport.scale_factor;
-        descriptor.instance = self.context.instance;
-        descriptor.physical_device = self.context.physical_device;
-        descriptor.device = self.context.device;
-        descriptor.graphics_queue = self.context.queue;
-        descriptor.graphics_queue_family_index = self.context.queue_family_index;
+        descriptor.extent.width = viewport.logical_width;
+        descriptor.extent.height = viewport.logical_height;
+        descriptor.extent.scale_factor = viewport.scale_factor;
+        descriptor.context.instance = self.context.instance;
+        descriptor.context.physical_device = self.context.physical_device;
+        descriptor.context.device = self.context.device;
+        descriptor.context.graphics_queue = self.context.queue;
+        descriptor.context.graphics_queue_family_index = self.context.queue_family_index;
         descriptor.surface = self.context.surface;
 
         var surface: ?*c.mln_render_session = null;

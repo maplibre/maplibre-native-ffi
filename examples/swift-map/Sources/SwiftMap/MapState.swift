@@ -129,9 +129,9 @@ final class MapState {
     outSession: inout OpaquePointer?
   ) throws {
     var descriptor = mln_metal_surface_descriptor_default()
-    descriptor.width = viewport.logicalWidth
-    descriptor.height = viewport.logicalHeight
-    descriptor.scale_factor = viewport.scaleFactor
+    descriptor.extent.width = viewport.logicalWidth
+    descriptor.extent.height = viewport.logicalHeight
+    descriptor.extent.scale_factor = viewport.scaleFactor
     descriptor.layer = Unmanaged.passUnretained(layer).toOpaque()
     try checkCAPI(mln_metal_surface_attach(map, &descriptor, &outSession), "Metal surface attach failed")
   }

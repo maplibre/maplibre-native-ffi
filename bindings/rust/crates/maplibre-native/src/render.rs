@@ -160,13 +160,13 @@ pub use query::{
 };
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
-pub struct OwnedTextureDescriptor {
+pub struct RenderTargetExtent {
     pub width: u32,
     pub height: u32,
     pub scale_factor: f64,
 }
 
-impl OwnedTextureDescriptor {
+impl RenderTargetExtent {
     pub fn new(width: u32, height: u32, scale_factor: f64) -> Self {
         Self {
             width,
@@ -175,18 +175,16 @@ impl OwnedTextureDescriptor {
         }
     }
 
-    pub(crate) fn to_native(&self) -> sys::mln_owned_texture_descriptor {
-        maplibre_core::render::owned_texture_descriptor_to_native(
-            maplibre_core::render::TextureDescriptorFields {
-                width: self.width,
-                height: self.height,
-                scale_factor: self.scale_factor,
-            },
-        )
+    pub(crate) fn to_core(&self) -> maplibre_core::render::RenderTargetExtentFields {
+        maplibre_core::render::RenderTargetExtentFields {
+            width: self.width,
+            height: self.height,
+            scale_factor: self.scale_factor,
+        }
     }
 }
 
-impl Default for OwnedTextureDescriptor {
+impl Default for RenderTargetExtent {
     fn default() -> Self {
         Self::new(256, 256, 1.0)
     }
@@ -194,36 +192,128 @@ impl Default for OwnedTextureDescriptor {
 
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
-pub struct MetalSurfaceDescriptor {
-    pub width: u32,
-    pub height: u32,
-    pub scale_factor: f64,
-    pub layer: NativePointer,
+pub struct MetalContextDescriptor {
     pub device: NativePointer,
 }
 
-impl MetalSurfaceDescriptor {
-    pub fn new(width: u32, height: u32, scale_factor: f64, layer: NativePointer) -> Self {
+impl MetalContextDescriptor {
+    pub fn new(device: NativePointer) -> Self {
+        Self { device }
+    }
+
+    pub(crate) fn to_core(&self) -> maplibre_core::render::MetalContextDescriptorFields {
+        maplibre_core::render::MetalContextDescriptorFields {
+            device: self.device.as_void_ptr(),
+        }
+    }
+}
+
+impl Default for MetalContextDescriptor {
+    fn default() -> Self {
+        Self::new(NativePointer::NULL)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
+pub struct VulkanContextDescriptor {
+    pub instance: NativePointer,
+    pub physical_device: NativePointer,
+    pub device: NativePointer,
+    pub graphics_queue: NativePointer,
+    pub graphics_queue_family_index: u32,
+}
+
+impl VulkanContextDescriptor {
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        instance: NativePointer,
+        physical_device: NativePointer,
+        device: NativePointer,
+        graphics_queue: NativePointer,
+        graphics_queue_family_index: u32,
+    ) -> Self {
         Self {
-            width,
-            height,
-            scale_factor,
-            layer,
-            device: NativePointer::NULL,
+            instance,
+            physical_device,
+            device,
+            graphics_queue,
+            graphics_queue_family_index,
         }
     }
 
-    pub fn with_device(mut self, device: NativePointer) -> Self {
-        self.device = device;
-        self
+    pub(crate) fn to_core(&self) -> maplibre_core::render::VulkanContextDescriptorFields {
+        maplibre_core::render::VulkanContextDescriptorFields {
+            instance: self.instance.as_void_ptr(),
+            physical_device: self.physical_device.as_void_ptr(),
+            device: self.device.as_void_ptr(),
+            graphics_queue: self.graphics_queue.as_void_ptr(),
+            graphics_queue_family_index: self.graphics_queue_family_index,
+        }
+    }
+}
+
+impl Default for VulkanContextDescriptor {
+    fn default() -> Self {
+        Self::new(
+            NativePointer::NULL,
+            NativePointer::NULL,
+            NativePointer::NULL,
+            NativePointer::NULL,
+            0,
+        )
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
+pub struct OwnedTextureDescriptor {
+    pub extent: RenderTargetExtent,
+}
+
+impl OwnedTextureDescriptor {
+    pub fn new(extent: RenderTargetExtent) -> Self {
+        Self { extent }
+    }
+
+    pub(crate) fn to_native(&self) -> sys::mln_owned_texture_descriptor {
+        maplibre_core::render::owned_texture_descriptor_to_native(self.extent.to_core())
+    }
+}
+
+impl Default for OwnedTextureDescriptor {
+    fn default() -> Self {
+        Self::new(RenderTargetExtent::default())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
+pub struct MetalSurfaceDescriptor {
+    pub extent: RenderTargetExtent,
+    pub context: MetalContextDescriptor,
+    pub layer: NativePointer,
+}
+
+impl MetalSurfaceDescriptor {
+    pub fn new(
+        extent: RenderTargetExtent,
+        context: MetalContextDescriptor,
+        layer: NativePointer,
+    ) -> Self {
+        Self {
+            extent,
+            context,
+            layer,
+        }
     }
 
     pub(crate) fn to_native(&self) -> sys::mln_metal_surface_descriptor {
         maplibre_core::render::metal_surface_descriptor_to_native(
             maplibre_core::render::MetalSurfaceDescriptorFields {
-                texture: texture_descriptor_fields(self.width, self.height, self.scale_factor),
+                extent: self.extent.to_core(),
+                context: self.context.to_core(),
                 layer: self.layer.as_void_ptr(),
-                device: self.device.as_void_ptr(),
             },
         )
     }
@@ -232,39 +322,20 @@ impl MetalSurfaceDescriptor {
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct VulkanSurfaceDescriptor {
-    pub width: u32,
-    pub height: u32,
-    pub scale_factor: f64,
-    pub instance: NativePointer,
-    pub physical_device: NativePointer,
-    pub device: NativePointer,
-    pub graphics_queue: NativePointer,
-    pub graphics_queue_family_index: u32,
+    pub extent: RenderTargetExtent,
+    pub context: VulkanContextDescriptor,
     pub surface: NativePointer,
 }
 
 impl VulkanSurfaceDescriptor {
-    #[allow(clippy::too_many_arguments)]
     pub fn new(
-        width: u32,
-        height: u32,
-        scale_factor: f64,
-        instance: NativePointer,
-        physical_device: NativePointer,
-        device: NativePointer,
-        graphics_queue: NativePointer,
-        graphics_queue_family_index: u32,
+        extent: RenderTargetExtent,
+        context: VulkanContextDescriptor,
         surface: NativePointer,
     ) -> Self {
         Self {
-            width,
-            height,
-            scale_factor,
-            instance,
-            physical_device,
-            device,
-            graphics_queue,
-            graphics_queue_family_index,
+            extent,
+            context,
             surface,
         }
     }
@@ -272,12 +343,8 @@ impl VulkanSurfaceDescriptor {
     pub(crate) fn to_native(&self) -> sys::mln_vulkan_surface_descriptor {
         maplibre_core::render::vulkan_surface_descriptor_to_native(
             maplibre_core::render::VulkanSurfaceDescriptorFields {
-                texture: texture_descriptor_fields(self.width, self.height, self.scale_factor),
-                instance: self.instance.as_void_ptr(),
-                physical_device: self.physical_device.as_void_ptr(),
-                device: self.device.as_void_ptr(),
-                graphics_queue: self.graphics_queue.as_void_ptr(),
-                graphics_queue_family_index: self.graphics_queue_family_index,
+                extent: self.extent.to_core(),
+                context: self.context.to_core(),
                 surface: self.surface.as_void_ptr(),
             },
         )
@@ -287,27 +354,20 @@ impl VulkanSurfaceDescriptor {
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct MetalOwnedTextureDescriptor {
-    pub width: u32,
-    pub height: u32,
-    pub scale_factor: f64,
-    pub device: NativePointer,
+    pub extent: RenderTargetExtent,
+    pub context: MetalContextDescriptor,
 }
 
 impl MetalOwnedTextureDescriptor {
-    pub fn new(width: u32, height: u32, scale_factor: f64, device: NativePointer) -> Self {
-        Self {
-            width,
-            height,
-            scale_factor,
-            device,
-        }
+    pub fn new(extent: RenderTargetExtent, context: MetalContextDescriptor) -> Self {
+        Self { extent, context }
     }
 
     pub(crate) fn to_native(&self) -> sys::mln_metal_owned_texture_descriptor {
         maplibre_core::render::metal_owned_texture_descriptor_to_native(
             maplibre_core::render::MetalOwnedTextureDescriptorFields {
-                texture: texture_descriptor_fields(self.width, self.height, self.scale_factor),
-                device: self.device.as_void_ptr(),
+                extent: self.extent.to_core(),
+                context: self.context.to_core(),
             },
         )
     }
@@ -316,27 +376,20 @@ impl MetalOwnedTextureDescriptor {
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct MetalBorrowedTextureDescriptor {
-    pub width: u32,
-    pub height: u32,
-    pub scale_factor: f64,
+    pub extent: RenderTargetExtent,
     pub texture: NativePointer,
 }
 
 impl MetalBorrowedTextureDescriptor {
-    pub fn new(width: u32, height: u32, scale_factor: f64, texture: NativePointer) -> Self {
-        Self {
-            width,
-            height,
-            scale_factor,
-            texture,
-        }
+    pub fn new(extent: RenderTargetExtent, texture: NativePointer) -> Self {
+        Self { extent, texture }
     }
 
     pub(crate) fn to_native(&self) -> sys::mln_metal_borrowed_texture_descriptor {
         maplibre_core::render::metal_borrowed_texture_descriptor_to_native(
             maplibre_core::render::MetalBorrowedTextureDescriptorFields {
-                texture: texture_descriptor_fields(self.width, self.height, self.scale_factor),
-                texture_handle: self.texture.as_void_ptr(),
+                extent: self.extent.to_core(),
+                texture: self.texture.as_void_ptr(),
             },
         )
     }
@@ -345,49 +398,20 @@ impl MetalBorrowedTextureDescriptor {
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct VulkanOwnedTextureDescriptor {
-    pub width: u32,
-    pub height: u32,
-    pub scale_factor: f64,
-    pub instance: NativePointer,
-    pub physical_device: NativePointer,
-    pub device: NativePointer,
-    pub graphics_queue: NativePointer,
-    pub graphics_queue_family_index: u32,
+    pub extent: RenderTargetExtent,
+    pub context: VulkanContextDescriptor,
 }
 
 impl VulkanOwnedTextureDescriptor {
-    #[allow(clippy::too_many_arguments)]
-    pub fn new(
-        width: u32,
-        height: u32,
-        scale_factor: f64,
-        instance: NativePointer,
-        physical_device: NativePointer,
-        device: NativePointer,
-        graphics_queue: NativePointer,
-        graphics_queue_family_index: u32,
-    ) -> Self {
-        Self {
-            width,
-            height,
-            scale_factor,
-            instance,
-            physical_device,
-            device,
-            graphics_queue,
-            graphics_queue_family_index,
-        }
+    pub fn new(extent: RenderTargetExtent, context: VulkanContextDescriptor) -> Self {
+        Self { extent, context }
     }
 
     pub(crate) fn to_native(&self) -> sys::mln_vulkan_owned_texture_descriptor {
         maplibre_core::render::vulkan_owned_texture_descriptor_to_native(
             maplibre_core::render::VulkanOwnedTextureDescriptorFields {
-                texture: texture_descriptor_fields(self.width, self.height, self.scale_factor),
-                instance: self.instance.as_void_ptr(),
-                physical_device: self.physical_device.as_void_ptr(),
-                device: self.device.as_void_ptr(),
-                graphics_queue: self.graphics_queue.as_void_ptr(),
-                graphics_queue_family_index: self.graphics_queue_family_index,
+                extent: self.extent.to_core(),
+                context: self.context.to_core(),
             },
         )
     }
@@ -396,14 +420,8 @@ impl VulkanOwnedTextureDescriptor {
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct VulkanBorrowedTextureDescriptor {
-    pub width: u32,
-    pub height: u32,
-    pub scale_factor: f64,
-    pub instance: NativePointer,
-    pub physical_device: NativePointer,
-    pub device: NativePointer,
-    pub graphics_queue: NativePointer,
-    pub graphics_queue_family_index: u32,
+    pub extent: RenderTargetExtent,
+    pub context: VulkanContextDescriptor,
     pub image: NativePointer,
     pub image_view: NativePointer,
     pub format: u32,
@@ -414,14 +432,8 @@ pub struct VulkanBorrowedTextureDescriptor {
 impl VulkanBorrowedTextureDescriptor {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
-        width: u32,
-        height: u32,
-        scale_factor: f64,
-        instance: NativePointer,
-        physical_device: NativePointer,
-        device: NativePointer,
-        graphics_queue: NativePointer,
-        graphics_queue_family_index: u32,
+        extent: RenderTargetExtent,
+        context: VulkanContextDescriptor,
         image: NativePointer,
         image_view: NativePointer,
         format: u32,
@@ -429,14 +441,8 @@ impl VulkanBorrowedTextureDescriptor {
         final_layout: u32,
     ) -> Self {
         Self {
-            width,
-            height,
-            scale_factor,
-            instance,
-            physical_device,
-            device,
-            graphics_queue,
-            graphics_queue_family_index,
+            extent,
+            context,
             image,
             image_view,
             format,
@@ -448,12 +454,8 @@ impl VulkanBorrowedTextureDescriptor {
     pub(crate) fn to_native(&self) -> sys::mln_vulkan_borrowed_texture_descriptor {
         maplibre_core::render::vulkan_borrowed_texture_descriptor_to_native(
             maplibre_core::render::VulkanBorrowedTextureDescriptorFields {
-                texture: texture_descriptor_fields(self.width, self.height, self.scale_factor),
-                instance: self.instance.as_void_ptr(),
-                physical_device: self.physical_device.as_void_ptr(),
-                device: self.device.as_void_ptr(),
-                graphics_queue: self.graphics_queue.as_void_ptr(),
-                graphics_queue_family_index: self.graphics_queue_family_index,
+                extent: self.extent.to_core(),
+                context: self.context.to_core(),
                 image: self.image.as_void_ptr(),
                 image_view: self.image_view.as_void_ptr(),
                 format: self.format,
@@ -461,18 +463,6 @@ impl VulkanBorrowedTextureDescriptor {
                 final_layout: self.final_layout,
             },
         )
-    }
-}
-
-fn texture_descriptor_fields(
-    width: u32,
-    height: u32,
-    scale_factor: f64,
-) -> maplibre_core::render::TextureDescriptorFields {
-    maplibre_core::render::TextureDescriptorFields {
-        width,
-        height,
-        scale_factor,
     }
 }
 
