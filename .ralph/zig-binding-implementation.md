@@ -54,7 +54,7 @@ For each phase or smaller milestone:
 
 - [x] Load Ralph Loop skill.
 - [x] Create tracked Ralph task file under `.ralph/`.
-- [ ] Commit and push initial Ralph setup.
+- [x] Commit and push initial Ralph setup.
 
 ### Phase 1: package skeleton
 
@@ -194,10 +194,14 @@ For each phase or smaller milestone:
 
 - 2026-05-14: Loaded Ralph skill and created this task file from
   `bindings/zig/PLAN.md`.
+- 2026-05-14: Confirmed `.ralph/zig-binding-implementation.md` is not ignored,
+  committed it as `c500d79` (`Track Zig binding Ralph loop`), and pushed
+  `zig-binding-implementation` to origin.
 
 ## Review log
 
-- Pending: first implementation milestone review.
+- Setup milestone: no code implementation diff to review. First parallel
+  implementation review is required before the Phase 1 commit.
 
 ## Notes and decisions
 
