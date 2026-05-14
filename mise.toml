@@ -144,6 +144,10 @@ run = "hk check --all"
 [tasks.fix]
 run = "hk fix --all"
 
+[tasks.actions-up]
+description = "Update and pin GitHub Actions steps."
+run = "pnpm dlx actions-up"
+
 [tasks._ktfmt]
 description = "Called by dprint.jsonc"
 hide = true

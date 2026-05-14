@@ -2,3 +2,4 @@
 	path = third_party/maplibre-native
 	url = https://github.com/maplibre/maplibre-native.git
 	shallow = true
+	ignore = dirty
