@@ -14,6 +14,15 @@ const MapState = struct {
     runtime: RuntimeHandle,
     id: values.MapId,
     diagnostic_store: ?*diagnostics.DiagnosticStore,
+    custom_geometry_sources: std.ArrayList(*CustomGeometrySourceState),
+};
+
+const CustomGeometrySourceState = struct {
+    fetch_tile: CustomGeometrySourceTileCallback,
+    cancel_tile: ?CustomGeometrySourceTileCallback,
+    context: ?*anyopaque,
+    retired: std.atomic.Value(bool),
+    active_upcalls: std.atomic.Value(usize),
 };
 
 pub const MapMode = enum {
@@ -35,6 +44,30 @@ pub const MapOptions = struct {
     height: u32 = 512,
     scale_factor: f64 = 1.0,
     mode: MapMode = .continuous,
+};
+
+pub const CanonicalTileId = struct {
+    z: u32,
+    x: u32,
+    y: u32,
+};
+
+pub const CustomGeometrySourceTileCallback = *const fn (
+    context: ?*anyopaque,
+    tile_id: CanonicalTileId,
+) void;
+
+pub const CustomGeometrySourceOptions = struct {
+    fetch_tile: CustomGeometrySourceTileCallback,
+    cancel_tile: ?CustomGeometrySourceTileCallback = null,
+    context: ?*anyopaque = null,
+    min_zoom: ?f64 = null,
+    max_zoom: ?f64 = null,
+    tolerance: ?f64 = null,
+    tile_size: ?u32 = null,
+    buffer: ?u32 = null,
+    clip: ?bool = null,
+    wrap: ?bool = null,
 };
 
 pub const MapHandle = struct {
@@ -60,7 +93,13 @@ pub const MapHandle = struct {
         const map_id = try runtime_module.registerMap(runtime, map.?);
         errdefer runtime_module.unregisterMap(runtime, map.?);
         const map_state = try std.heap.smp_allocator.create(MapState);
-        map_state.* = .{ .native = map.?, .runtime = runtime, .id = map_id, .diagnostic_store = diagnostic_store };
+        map_state.* = .{
+            .native = map.?,
+            .runtime = runtime,
+            .id = map_id,
+            .diagnostic_store = diagnostic_store,
+            .custom_geometry_sources = .empty,
+        };
         return .{ .state = @ptrCast(map_state) };
     }
 
@@ -349,6 +388,83 @@ pub const MapHandle = struct {
         );
     }
 
+    pub fn addCustomGeometrySource(
+        self: MapHandle,
+        allocator: std.mem.Allocator,
+        source_id: []const u8,
+        options: CustomGeometrySourceOptions,
+    ) status.Error!void {
+        const map_state = state(self);
+        const source_state = try std.heap.smp_allocator.create(CustomGeometrySourceState);
+        source_state.* = .{
+            .fetch_tile = options.fetch_tile,
+            .cancel_tile = options.cancel_tile,
+            .context = options.context,
+            .retired = std.atomic.Value(bool).init(false),
+            .active_upcalls = std.atomic.Value(usize).init(0),
+        };
+        errdefer std.heap.smp_allocator.destroy(source_state);
+
+        try map_state.custom_geometry_sources.append(std.heap.smp_allocator, source_state);
+        errdefer _ = map_state.custom_geometry_sources.pop();
+
+        var temp = native_temp.TempStorage.init(allocator);
+        defer temp.deinit();
+        var native_options = customGeometrySourceOptionsToNative(options, source_state);
+        try status.checkStatus(
+            c.mln_map_add_custom_geometry_source(try native(self), try temp.stringView(source_id), &native_options),
+            map_state.diagnostic_store,
+        );
+    }
+
+    pub fn setCustomGeometrySourceTileData(
+        self: MapHandle,
+        allocator: std.mem.Allocator,
+        source_id: []const u8,
+        tile_id: CanonicalTileId,
+        data: values.GeoJson,
+    ) status.Error!void {
+        var temp = native_temp.TempStorage.init(allocator);
+        defer temp.deinit();
+        try status.checkStatus(
+            c.mln_map_set_custom_geometry_source_tile_data(
+                try native(self),
+                try temp.stringView(source_id),
+                canonicalTileIdToNative(tile_id),
+                try temp.geoJson(data),
+            ),
+            state(self).diagnostic_store,
+        );
+    }
+
+    pub fn invalidateCustomGeometrySourceTile(
+        self: MapHandle,
+        allocator: std.mem.Allocator,
+        source_id: []const u8,
+        tile_id: CanonicalTileId,
+    ) status.Error!void {
+        var temp = native_temp.TempStorage.init(allocator);
+        defer temp.deinit();
+        try status.checkStatus(
+            c.mln_map_invalidate_custom_geometry_source_tile(try native(self), try temp.stringView(source_id), canonicalTileIdToNative(tile_id)),
+            state(self).diagnostic_store,
+        );
+    }
+
+    pub fn invalidateCustomGeometrySourceRegion(
+        self: MapHandle,
+        allocator: std.mem.Allocator,
+        source_id: []const u8,
+        bounds: values.LatLngBounds,
+    ) status.Error!void {
+        var temp = native_temp.TempStorage.init(allocator);
+        defer temp.deinit();
+        try status.checkStatus(
+            c.mln_map_invalidate_custom_geometry_source_region(try native(self), try temp.stringView(source_id), values.latLngBoundsToNative(bounds)),
+            state(self).diagnostic_store,
+        );
+    }
+
     pub fn requestRepaint(self: MapHandle) status.Error!void {
         try status.checkStatus(c.mln_map_request_repaint(try native(self)), state(self).diagnostic_store);
     }
@@ -557,9 +673,102 @@ pub const MapHandle = struct {
         const map = map_state.native orelse return;
         try status.checkStatus(c.mln_map_destroy(map), map_state.diagnostic_store);
         runtime_module.unregisterMap(map_state.runtime, map);
+        freeCustomGeometrySourceStates(map_state);
         map_state.native = null;
     }
 };
+
+fn customGeometrySourceOptionsToNative(
+    options: CustomGeometrySourceOptions,
+    source_state: *CustomGeometrySourceState,
+) c.mln_custom_geometry_source_options {
+    var raw = c.mln_custom_geometry_source_options_default();
+    raw.fetch_tile = customGeometryFetchTileTrampoline;
+    raw.cancel_tile = if (options.cancel_tile != null) customGeometryCancelTileTrampoline else null;
+    raw.user_data = source_state;
+    if (options.min_zoom) |min_zoom| {
+        raw.fields |= c.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MIN_ZOOM;
+        raw.min_zoom = min_zoom;
+    }
+    if (options.max_zoom) |max_zoom| {
+        raw.fields |= c.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MAX_ZOOM;
+        raw.max_zoom = max_zoom;
+    }
+    if (options.tolerance) |tolerance| {
+        raw.fields |= c.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TOLERANCE;
+        raw.tolerance = tolerance;
+    }
+    if (options.tile_size) |tile_size| {
+        raw.fields |= c.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TILE_SIZE;
+        raw.tile_size = tile_size;
+    }
+    if (options.buffer) |buffer| {
+        raw.fields |= c.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_BUFFER;
+        raw.buffer = buffer;
+    }
+    if (options.clip) |clip| {
+        raw.fields |= c.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_CLIP;
+        raw.clip = clip;
+    }
+    if (options.wrap) |wrap| {
+        raw.fields |= c.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_WRAP;
+        raw.wrap = wrap;
+    }
+    return raw;
+}
+
+fn customGeometryFetchTileTrampoline(user_data: ?*anyopaque, raw_tile_id: c.mln_canonical_tile_id) callconv(.c) void {
+    const source_state: *CustomGeometrySourceState = @ptrCast(@alignCast(user_data orelse return));
+    if (!beginCustomGeometryUpcall(source_state)) return;
+    defer endCustomGeometryUpcall(source_state);
+
+    source_state.fetch_tile(source_state.context, canonicalTileIdFromNative(raw_tile_id));
+}
+
+fn customGeometryCancelTileTrampoline(user_data: ?*anyopaque, raw_tile_id: c.mln_canonical_tile_id) callconv(.c) void {
+    const source_state: *CustomGeometrySourceState = @ptrCast(@alignCast(user_data orelse return));
+    if (!beginCustomGeometryUpcall(source_state)) return;
+    defer endCustomGeometryUpcall(source_state);
+
+    const cancel_tile = source_state.cancel_tile orelse return;
+    cancel_tile(source_state.context, canonicalTileIdFromNative(raw_tile_id));
+}
+
+fn beginCustomGeometryUpcall(source_state: *CustomGeometrySourceState) bool {
+    if (source_state.retired.load(.seq_cst)) return false;
+    _ = source_state.active_upcalls.fetchAdd(1, .seq_cst);
+    if (source_state.retired.load(.seq_cst)) {
+        endCustomGeometryUpcall(source_state);
+        return false;
+    }
+    return true;
+}
+
+fn endCustomGeometryUpcall(source_state: *CustomGeometrySourceState) void {
+    _ = source_state.active_upcalls.fetchSub(1, .seq_cst);
+}
+
+fn canonicalTileIdToNative(tile_id: CanonicalTileId) c.mln_canonical_tile_id {
+    return .{ .z = tile_id.z, .x = tile_id.x, .y = tile_id.y };
+}
+
+fn canonicalTileIdFromNative(tile_id: c.mln_canonical_tile_id) CanonicalTileId {
+    return .{ .z = tile_id.z, .x = tile_id.x, .y = tile_id.y };
+}
+
+fn freeCustomGeometrySourceStates(map_state: *MapState) void {
+    for (map_state.custom_geometry_sources.items) |source_state| {
+        source_state.retired.store(true, .seq_cst);
+    }
+    for (map_state.custom_geometry_sources.items) |source_state| {
+        while (source_state.active_upcalls.load(.seq_cst) != 0) {
+            std.Thread.yield() catch {};
+        }
+        std.heap.smp_allocator.destroy(source_state);
+    }
+    map_state.custom_geometry_sources.deinit(std.heap.smp_allocator);
+    map_state.custom_geometry_sources = .empty;
+}
 
 fn state(handle: MapHandle) *MapState {
     return @ptrCast(@alignCast(handle.state));
@@ -609,4 +818,50 @@ fn copyStyleIdList(
 fn nulTerminated(allocator: std.mem.Allocator, value: []const u8) status.Error![:0]u8 {
     if (std.mem.indexOfScalar(u8, value, 0) != null) return error.InvalidString;
     return allocator.dupeZ(u8, value);
+}
+
+const TestCustomGeometryCallbackState = struct {
+    fetch_count: usize = 0,
+    cancel_count: usize = 0,
+    last_tile: CanonicalTileId = .{ .z = 0, .x = 0, .y = 0 },
+};
+
+fn testFetchCustomGeometryTile(context: ?*anyopaque, tile_id: CanonicalTileId) void {
+    const test_state: *TestCustomGeometryCallbackState = @ptrCast(@alignCast(context.?));
+    test_state.fetch_count += 1;
+    test_state.last_tile = tile_id;
+}
+
+fn testCancelCustomGeometryTile(context: ?*anyopaque, tile_id: CanonicalTileId) void {
+    const test_state: *TestCustomGeometryCallbackState = @ptrCast(@alignCast(context.?));
+    test_state.cancel_count += 1;
+    test_state.last_tile = tile_id;
+}
+
+test "custom geometry trampolines route semantic tile ids" {
+    var test_state = TestCustomGeometryCallbackState{};
+    var source_state = CustomGeometrySourceState{
+        .fetch_tile = testFetchCustomGeometryTile,
+        .cancel_tile = testCancelCustomGeometryTile,
+        .context = &test_state,
+        .retired = std.atomic.Value(bool).init(false),
+        .active_upcalls = std.atomic.Value(usize).init(0),
+    };
+
+    customGeometryFetchTileTrampoline(&source_state, .{ .z = 3, .x = 4, .y = 5 });
+    try std.testing.expectEqual(@as(usize, 1), test_state.fetch_count);
+    try std.testing.expectEqual(CanonicalTileId{ .z = 3, .x = 4, .y = 5 }, test_state.last_tile);
+
+    customGeometryCancelTileTrampoline(&source_state, .{ .z = 6, .x = 7, .y = 8 });
+    try std.testing.expectEqual(@as(usize, 1), test_state.cancel_count);
+    try std.testing.expectEqual(CanonicalTileId{ .z = 6, .x = 7, .y = 8 }, test_state.last_tile);
+
+    source_state.cancel_tile = null;
+    customGeometryCancelTileTrampoline(&source_state, .{ .z = 9, .x = 10, .y = 11 });
+    try std.testing.expectEqual(@as(usize, 1), test_state.cancel_count);
+
+    source_state.retired.store(true, .seq_cst);
+    customGeometryFetchTileTrampoline(&source_state, .{ .z = 12, .x = 13, .y = 14 });
+    try std.testing.expectEqual(@as(usize, 1), test_state.fetch_count);
+    try std.testing.expectEqual(@as(usize, 0), source_state.active_upcalls.load(.seq_cst));
 }

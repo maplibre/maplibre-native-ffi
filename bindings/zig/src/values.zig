@@ -245,6 +245,129 @@ pub const Geometry = union(enum) {
     collection: []const Geometry,
 };
 
+pub const OwnedGeometry = union(enum) {
+    empty,
+    point: LatLng,
+    line_string: []const LatLng,
+    polygon: []const []const LatLng,
+    multi_point: []const LatLng,
+    multi_line_string: []const []const LatLng,
+    multi_polygon: []const []const []const LatLng,
+    collection: []OwnedGeometry,
+
+    pub fn deinit(self: *OwnedGeometry, allocator: std.mem.Allocator) void {
+        switch (self.*) {
+            .empty, .point => {},
+            .line_string, .multi_point => |coordinates| allocator.free(coordinates),
+            .polygon, .multi_line_string => |rings| {
+                freeCoordinateSpans(allocator, rings);
+            },
+            .multi_polygon => |polygons_value| {
+                for (polygons_value) |rings| freeCoordinateSpans(allocator, rings);
+                allocator.free(polygons_value);
+            },
+            .collection => |geometries_value| {
+                for (geometries_value) |*geometry_value| geometry_value.deinit(allocator);
+                allocator.free(geometries_value);
+            },
+        }
+        self.* = .empty;
+    }
+};
+
+pub const GeometryCopyError = std.mem.Allocator.Error || error{ UnknownStatus, NativeError };
+
+pub fn ownedGeometryFromNative(allocator: std.mem.Allocator, raw: *const c.mln_geometry) GeometryCopyError!OwnedGeometry {
+    return switch (raw.type) {
+        c.MLN_GEOMETRY_TYPE_EMPTY => .empty,
+        c.MLN_GEOMETRY_TYPE_POINT => .{ .point = latLngFromNative(raw.data.point) },
+        c.MLN_GEOMETRY_TYPE_LINE_STRING => .{ .line_string = try copyCoordinateSpan(allocator, raw.data.line_string) },
+        c.MLN_GEOMETRY_TYPE_POLYGON => .{ .polygon = try copyCoordinateSpans(allocator, raw.data.polygon.rings, raw.data.polygon.ring_count) },
+        c.MLN_GEOMETRY_TYPE_MULTI_POINT => .{ .multi_point = try copyCoordinateSpan(allocator, raw.data.multi_point) },
+        c.MLN_GEOMETRY_TYPE_MULTI_LINE_STRING => .{ .multi_line_string = try copyCoordinateSpans(allocator, raw.data.multi_line_string.lines, raw.data.multi_line_string.line_count) },
+        c.MLN_GEOMETRY_TYPE_MULTI_POLYGON => .{ .multi_polygon = try copyPolygonGeometry(allocator, raw.data.multi_polygon.polygons, raw.data.multi_polygon.polygon_count) },
+        c.MLN_GEOMETRY_TYPE_GEOMETRY_COLLECTION => .{ .collection = try copyGeometryCollection(allocator, raw.data.geometry_collection.geometries, raw.data.geometry_collection.geometry_count) },
+        else => error.UnknownStatus,
+    };
+}
+
+fn freeCoordinateSpans(allocator: std.mem.Allocator, spans: []const []const LatLng) void {
+    for (spans) |coordinates| allocator.free(coordinates);
+    allocator.free(spans);
+}
+
+fn copyCoordinateSpan(allocator: std.mem.Allocator, span: c.mln_coordinate_span) std.mem.Allocator.Error![]const LatLng {
+    const copied = try allocator.alloc(LatLng, span.coordinate_count);
+    if (span.coordinate_count > 0) {
+        const coordinates = span.coordinates[0..span.coordinate_count];
+        for (coordinates, copied) |coordinate, *out| out.* = latLngFromNative(coordinate);
+    }
+    return copied;
+}
+
+fn copyCoordinateSpans(
+    allocator: std.mem.Allocator,
+    raw_spans: [*c]const c.mln_coordinate_span,
+    span_count: usize,
+) std.mem.Allocator.Error![]const []const LatLng {
+    const copied = try allocator.alloc([]const LatLng, span_count);
+    var initialized: usize = 0;
+    errdefer {
+        for (copied[0..initialized]) |coordinates| allocator.free(coordinates);
+        allocator.free(copied);
+    }
+    if (span_count > 0) {
+        const spans = raw_spans[0..span_count];
+        for (spans, copied) |span, *out| {
+            out.* = try copyCoordinateSpan(allocator, span);
+            initialized += 1;
+        }
+    }
+    return copied;
+}
+
+fn copyPolygonGeometry(
+    allocator: std.mem.Allocator,
+    raw_polygons: [*c]const c.mln_polygon_geometry,
+    polygon_count: usize,
+) std.mem.Allocator.Error![]const []const []const LatLng {
+    const copied = try allocator.alloc([]const []const LatLng, polygon_count);
+    var initialized: usize = 0;
+    errdefer {
+        for (copied[0..initialized]) |rings| freeCoordinateSpans(allocator, rings);
+        allocator.free(copied);
+    }
+    if (polygon_count > 0) {
+        const polygons_value = raw_polygons[0..polygon_count];
+        for (polygons_value, copied) |polygon, *out| {
+            out.* = try copyCoordinateSpans(allocator, polygon.rings, polygon.ring_count);
+            initialized += 1;
+        }
+    }
+    return copied;
+}
+
+fn copyGeometryCollection(
+    allocator: std.mem.Allocator,
+    raw_geometries: [*c]const c.mln_geometry,
+    geometry_count: usize,
+) GeometryCopyError![]OwnedGeometry {
+    const copied = try allocator.alloc(OwnedGeometry, geometry_count);
+    var initialized: usize = 0;
+    errdefer {
+        for (copied[0..initialized]) |*geometry_value| geometry_value.deinit(allocator);
+        allocator.free(copied);
+    }
+    if (geometry_count > 0) {
+        const geometries_value = raw_geometries[0..geometry_count];
+        for (geometries_value, copied) |geometry_value, *out| {
+            out.* = try ownedGeometryFromNative(allocator, &geometry_value);
+            initialized += 1;
+        }
+    }
+    return copied;
+}
+
 pub const FeatureIdentifier = union(enum) {
     null,
     uint: u64,

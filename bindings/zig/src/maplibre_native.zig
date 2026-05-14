@@ -1,5 +1,6 @@
 const c = @import("c.zig").raw;
 const diagnostics = @import("diagnostics.zig");
+const logging = @import("logging.zig");
 const map = @import("map.zig");
 const projection = @import("projection.zig");
 const runtime = @import("runtime.zig");
@@ -14,6 +15,34 @@ pub const Error = status.Error;
 
 pub const RuntimeHandle = runtime.RuntimeHandle;
 pub const RuntimeOptions = runtime.RuntimeOptions;
+pub const NetworkStatus = runtime.NetworkStatus;
+pub const AmbientCacheOperation = runtime.AmbientCacheOperation;
+pub const OfflineRegionId = runtime.OfflineRegionId;
+pub const OfflineTilePyramidRegionDefinition = runtime.OfflineTilePyramidRegionDefinition;
+pub const OfflineGeometryRegionDefinition = runtime.OfflineGeometryRegionDefinition;
+pub const OfflineRegionDefinition = runtime.OfflineRegionDefinition;
+pub const OwnedOfflineTilePyramidRegionDefinition = runtime.OwnedOfflineTilePyramidRegionDefinition;
+pub const OwnedOfflineGeometryRegionDefinition = runtime.OwnedOfflineGeometryRegionDefinition;
+pub const OwnedOfflineRegionDefinition = runtime.OwnedOfflineRegionDefinition;
+pub const OwnedOfflineRegion = runtime.OwnedOfflineRegion;
+pub const OfflineRegionList = runtime.OfflineRegionList;
+pub const ResourceKind = runtime.ResourceKind;
+pub const ResourceTransformRequest = runtime.ResourceTransformRequest;
+pub const ResourceTransformResponse = runtime.ResourceTransformResponse;
+pub const ResourceTransformHandler = runtime.ResourceTransformHandler;
+pub const ResourceTransform = runtime.ResourceTransform;
+pub const ResourceLoadingMethod = runtime.ResourceLoadingMethod;
+pub const ResourcePriority = runtime.ResourcePriority;
+pub const ResourceUsage = runtime.ResourceUsage;
+pub const ResourceStoragePolicy = runtime.ResourceStoragePolicy;
+pub const ResourceResponseStatus = runtime.ResourceResponseStatus;
+pub const ResourceProviderDecision = runtime.ResourceProviderDecision;
+pub const ResourceByteRange = runtime.ResourceByteRange;
+pub const ResourceRequest = runtime.ResourceRequest;
+pub const ResourceResponse = runtime.ResourceResponse;
+pub const ResourceProviderHandler = runtime.ResourceProviderHandler;
+pub const ResourceProvider = runtime.ResourceProvider;
+pub const ResourceRequestHandle = runtime.ResourceRequestHandle;
 pub const RuntimeEvent = runtime.RuntimeEvent;
 pub const OwnedRuntimeEvent = runtime.OwnedRuntimeEvent;
 pub const RuntimeEventPayload = runtime.RuntimeEventPayload;
@@ -36,9 +65,19 @@ pub const OfflineRegionResponseErrorPayload = runtime.OfflineRegionResponseError
 pub const OfflineRegionTileCountLimitPayload = runtime.OfflineRegionTileCountLimitPayload;
 pub const UnknownPayload = runtime.UnknownPayload;
 
+pub const LogSeverity = logging.LogSeverity;
+pub const LogEvent = logging.LogEvent;
+pub const LogSeverityMask = logging.LogSeverityMask;
+pub const LogRecord = logging.LogRecord;
+pub const LogHandler = logging.LogHandler;
+pub const LogCallback = logging.LogCallback;
+
 pub const MapHandle = map.MapHandle;
 pub const MapOptions = map.MapOptions;
 pub const MapMode = map.MapMode;
+pub const CanonicalTileId = map.CanonicalTileId;
+pub const CustomGeometrySourceTileCallback = map.CustomGeometrySourceTileCallback;
+pub const CustomGeometrySourceOptions = map.CustomGeometrySourceOptions;
 pub const MapProjectionHandle = projection.MapProjectionHandle;
 
 pub const LatLng = values.LatLng;
@@ -65,6 +104,7 @@ pub const OwnedJsonValue = values.OwnedJsonValue;
 pub const OwnedJsonMember = values.OwnedJsonMember;
 pub const StringList = values.StringList;
 pub const Geometry = values.Geometry;
+pub const OwnedGeometry = values.OwnedGeometry;
 pub const FeatureIdentifier = values.FeatureIdentifier;
 pub const Feature = values.Feature;
 pub const GeoJson = values.GeoJson;
@@ -74,6 +114,11 @@ pub const OwnedString = values.OwnedString;
 
 pub const projectedMetersForLatLng = projection.projectedMetersForLatLng;
 pub const latLngForProjectedMeters = projection.latLngForProjectedMeters;
+pub const getNetworkStatus = runtime.getNetworkStatus;
+pub const setNetworkStatus = runtime.setNetworkStatus;
+pub const setLogCallback = logging.setLogCallback;
+pub const clearLogCallback = logging.clearLogCallback;
+pub const setAsyncLogSeverityMask = logging.setAsyncLogSeverityMask;
 
 /// Returns the C ABI contract version reported by the linked native library.
 pub fn cAbiVersion() u32 {

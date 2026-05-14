@@ -171,6 +171,44 @@ pub const TempStorage = struct {
         return raw;
     }
 
+    pub fn offlineRegionDefinition(self: *TempStorage, value: anytype) status.Error!*const c.mln_offline_region_definition {
+        const arena_allocator = self.arena.allocator();
+        const raw = try arena_allocator.create(c.mln_offline_region_definition);
+        raw.size = @sizeOf(c.mln_offline_region_definition);
+        switch (value) {
+            .tile_pyramid => |definition| {
+                raw.type = c.MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID;
+                raw.data = .{ .tile_pyramid = .{
+                    .size = @sizeOf(c.mln_offline_tile_pyramid_region_definition),
+                    .style_url = (try self.nulTerminatedString(definition.style_url)).ptr,
+                    .bounds = values.latLngBoundsToNative(definition.bounds),
+                    .min_zoom = definition.min_zoom,
+                    .max_zoom = definition.max_zoom,
+                    .pixel_ratio = definition.pixel_ratio,
+                    .include_ideographs = definition.include_ideographs,
+                } };
+            },
+            .geometry => |definition| {
+                raw.type = c.MLN_OFFLINE_REGION_DEFINITION_GEOMETRY;
+                raw.data = .{ .geometry = .{
+                    .size = @sizeOf(c.mln_offline_geometry_region_definition),
+                    .style_url = (try self.nulTerminatedString(definition.style_url)).ptr,
+                    .geometry = try self.geometry(definition.geometry),
+                    .min_zoom = definition.min_zoom,
+                    .max_zoom = definition.max_zoom,
+                    .pixel_ratio = definition.pixel_ratio,
+                    .include_ideographs = definition.include_ideographs,
+                } };
+            },
+        }
+        return raw;
+    }
+
+    fn nulTerminatedString(self: *TempStorage, value: []const u8) status.Error![:0]u8 {
+        if (std.mem.indexOfScalar(u8, value, 0) != null) return error.InvalidString;
+        return self.arena.allocator().dupeZ(u8, value);
+    }
+
     fn coordinateSpan(self: *TempStorage, coordinates: []const values.LatLng) status.Error!c.mln_coordinate_span {
         const arena_allocator = self.arena.allocator();
         const raw_coordinates = try arena_allocator.alloc(c.mln_lat_lng, coordinates.len);

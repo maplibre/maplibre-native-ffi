@@ -177,13 +177,19 @@ pub fn build(b: *std.Build) void {
     const binding_tests = addBindingTests(b, options, maplibre_native);
     const status_tests = addPrivateModuleTests(b, options, b.path("src/status.zig"));
     const runtime_tests = addPrivateModuleTests(b, options, b.path("src/runtime.zig"));
+    const logging_tests = addPrivateModuleTests(b, options, b.path("src/logging.zig"));
+    const map_tests = addPrivateModuleTests(b, options, b.path("src/map.zig"));
     b.default_step.dependOn(&binding_tests.step);
     b.default_step.dependOn(&status_tests.step);
     b.default_step.dependOn(&runtime_tests.step);
+    b.default_step.dependOn(&logging_tests.step);
+    b.default_step.dependOn(&map_tests.step);
 
     const run_binding_tests = b.addRunArtifact(binding_tests);
     const run_status_tests = b.addRunArtifact(status_tests);
     const run_runtime_tests = b.addRunArtifact(runtime_tests);
+    const run_logging_tests = b.addRunArtifact(logging_tests);
+    const run_map_tests = b.addRunArtifact(map_tests);
     if (target.result.os.tag == .windows) {
         run_binding_tests.addPathDir(options.cmake_artifact_dir_path);
         run_binding_tests.addPathDir("../../.pixi/envs/default");
@@ -194,10 +200,18 @@ pub fn build(b: *std.Build) void {
         run_runtime_tests.addPathDir(options.cmake_artifact_dir_path);
         run_runtime_tests.addPathDir("../../.pixi/envs/default");
         run_runtime_tests.addPathDir("../../.pixi/envs/default/Library/bin");
+        run_logging_tests.addPathDir(options.cmake_artifact_dir_path);
+        run_logging_tests.addPathDir("../../.pixi/envs/default");
+        run_logging_tests.addPathDir("../../.pixi/envs/default/Library/bin");
+        run_map_tests.addPathDir(options.cmake_artifact_dir_path);
+        run_map_tests.addPathDir("../../.pixi/envs/default");
+        run_map_tests.addPathDir("../../.pixi/envs/default/Library/bin");
     }
 
     const test_step = b.step("test", "Run Zig binding tests");
     test_step.dependOn(&run_binding_tests.step);
     test_step.dependOn(&run_status_tests.step);
     test_step.dependOn(&run_runtime_tests.step);
+    test_step.dependOn(&run_logging_tests.step);
+    test_step.dependOn(&run_map_tests.step);
 }

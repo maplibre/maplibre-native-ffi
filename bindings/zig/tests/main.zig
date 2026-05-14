@@ -13,6 +13,8 @@ comptime {
     _ = @import("style_values.zig");
     _ = @import("geojson.zig");
     _ = @import("style_sources.zig");
+    _ = @import("resources.zig");
+    _ = @import("logging.zig");
 }
 
 test "package root hides raw C declarations" {
@@ -23,6 +25,8 @@ test "package root hides raw C declarations" {
     try testing.expect(!support.typeNameContains(maplibre.RuntimeHandle, "mln_"));
     try testing.expect(!support.typeNameContains(maplibre.MapHandle, "mln_"));
     try testing.expect(!support.typeNameContains(maplibre.MapProjectionHandle, "mln_"));
+    try testing.expect(!support.typeNameContains(maplibre.CanonicalTileId, "mln_"));
+    try testing.expect(!support.typeNameContains(maplibre.CustomGeometrySourceOptions, "mln_"));
     try testing.expect(!support.typeNameContains(maplibre.CameraOptions, "mln_"));
     try testing.expect(!support.typeNameContains(maplibre.AnimationOptions, "mln_"));
     try testing.expect(!support.typeNameContains(maplibre.ProjectionMode, "mln_"));
@@ -33,6 +37,15 @@ test "package root hides raw C declarations" {
     try testing.expect(!support.typeNameContains(maplibre.Geometry, "mln_"));
     try testing.expect(!support.typeNameContains(maplibre.GeoJson, "mln_"));
     try testing.expect(!support.typeNameContains(maplibre.StyleSourceInfo, "mln_"));
+    try testing.expect(!support.typeNameContains(maplibre.NetworkStatus, "mln_"));
+    try testing.expect(!support.typeNameContains(maplibre.AmbientCacheOperation, "mln_"));
+    try testing.expect(!support.typeNameContains(maplibre.OfflineRegionDefinition, "mln_"));
+    try testing.expect(!support.typeNameContains(maplibre.OwnedOfflineRegion, "mln_"));
+    try testing.expect(!support.typeNameContains(maplibre.OfflineRegionList, "mln_"));
+    try testing.expect(!support.typeNameContains(maplibre.LogRecord, "mln_"));
+    try testing.expect(!support.typeNameContains(maplibre.ResourceRequest, "mln_"));
+    try testing.expect(!support.typeNameContains(maplibre.ResourceResponse, "mln_"));
+    try testing.expect(!support.typeNameContains(maplibre.ResourceRequestHandle, "mln_"));
     try testing.expect(!support.typeNameContains(maplibre.RuntimeHandle, "anyopaque"));
     try testing.expect(!support.typeNameContains(maplibre.MapHandle, "anyopaque"));
     try testing.expect(!support.typeNameContains(maplibre.MapProjectionHandle, "anyopaque"));

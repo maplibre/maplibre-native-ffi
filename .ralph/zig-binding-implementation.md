@@ -134,18 +134,18 @@ For each phase or smaller milestone:
 
 ### Phase 7: logging, resources, offline, and callbacks
 
-- [ ] Add network status and logging callback APIs.
-- [ ] Add runtime ambient cache operations.
-- [ ] Add offline region APIs with copied value types.
-- [ ] Add resource transform callbacks.
-- [ ] Add resource provider callbacks and `ResourceRequestHandle`.
-- [ ] Add custom geometry source callbacks and lifetime management.
-- [ ] Model callbacks as function pointers plus context pointers first.
-- [ ] Ensure C trampolines use `callconv(.c)`, copy borrowed data before
+- [x] Add network status and logging callback APIs.
+- [x] Add runtime ambient cache operations.
+- [x] Add offline region APIs with copied value types.
+- [x] Add resource transform callbacks.
+- [x] Add resource provider callbacks and `ResourceRequestHandle`.
+- [x] Add custom geometry source callbacks and lifetime management.
+- [x] Model callbacks as function pointers plus context pointers first.
+- [x] Ensure C trampolines use `callconv(.c)`, copy borrowed data before
       returning, and never let failures escape through C frames.
-- [ ] Enforce one-shot request completion or release.
-- [ ] Port logging, resources, offline, and custom geometry tests.
-- [ ] Review, apply findings, commit, and push.
+- [x] Enforce one-shot request completion or release.
+- [x] Port logging, resources, offline, and custom geometry tests.
+- [x] Review, apply findings, commit, and push.
 
 ### Phase 8: render targets and readback
 
@@ -552,6 +552,216 @@ For each phase or smaller milestone:
 - 2026-05-14: Iteration 23 committed the reviewed Phase 6 event/source identity
   milestone as `97db8ec` (`Add Zig runtime event bindings`) and pushed
   `zig-binding-implementation` to origin.
+- 2026-05-14: Iteration 24 started Phase 7 with process-global network status,
+  runtime ambient cache operations, and logging callbacks. Added semantic
+  `NetworkStatus`, `AmbientCacheOperation`, `LogSeverity`, `LogEvent`,
+  `LogSeverityMask`, `LogRecord`, and callback registration APIs without
+  exposing raw C declarations; the logging C trampoline copies only borrowed
+  callback metadata into a Zig `LogRecord` view and calls a stored function
+  pointer plus context pointer.
+- 2026-05-14: Iteration 24 added public binding tests for network status get/set
+  and invalid status diagnostics, ambient cache pack on a runtime without
+  explicit cache path, log callback receive/consume behavior, severity masks,
+  and callback clearing. Added private logging-module coverage for unknown raw
+  log severity/event preservation and wired the module into the Zig binding
+  private test step.
+- 2026-05-14: Iteration 24 verification passed: `mise run //bindings/zig:test`
+  (60/60 tests passed), `mise run fix`, then `mise run //bindings/zig:test`
+  again (60/60 tests passed; expected native log lines appear during event/style
+  tests). Direct C duplicate retirement and Phase 7 review remain for a later
+  coherent callback/resource milestone.
+- 2026-05-14: Iteration 25 added runtime-scoped resource transform callbacks:
+  public `ResourceKind`, `ResourceTransformRequest`,
+  `ResourceTransformResponse`, and `ResourceTransform` model the callback as a
+  function pointer plus context pointer, store it in private runtime state, and
+  route native calls through a `callconv(.c)` trampoline that returns a status
+  instead of letting Zig errors cross the C frame.
+- 2026-05-14: Iteration 25 added public transform coverage that registers a
+  transform before map creation, rejects re-registration after the runtime owns
+  a live map, observes the original HTTP style URL and style resource kind, and
+  rewrites the URL to a replacement copied by the native C API before the
+  callback returns.
+- 2026-05-14: Iteration 25 verification passed: `mise run //bindings/zig:test`
+  (61/61 tests passed), `mise run fix`, then `mise run //bindings/zig:test`
+  again (61/61 tests passed; expected native log lines appear during
+  event/style/resource tests). Resource provider callbacks,
+  `ResourceRequestHandle`, offline APIs, duplicate direct-C retirement, and
+  Phase 7 review remain.
+- 2026-05-14: Iteration 26 reflection:
+  - Accomplished so far: Phases 1-6 are reviewed, committed, and pushed. Phase 7
+    now has network status, ambient cache operations, logging callbacks,
+    resource transforms, and the first resource-provider/request-handle slice in
+    progress.
+  - Working well: callback APIs are staying low-level and explicit: function
+    pointer plus context pointer, private `callconv(.c)` trampolines, borrowed
+    native inputs projected into semantic Zig views, and C status/decision
+    returns instead of Zig errors crossing C frames.
+  - Not working/blocking: provider and offline coverage is inherently broad;
+    exact direct-C duplicate retirement should wait until the provider handle
+    lifecycle and offline copied outputs have both been reviewed.
+  - Approach adjustment: keep Phase 7 as a larger reviewed milestone, but still
+    add it in coherent slices with narrow binding verification after each slice.
+  - Next priorities: finish provider handle lifecycle coverage, add offline
+    region copied value APIs, run the Phase 7 review, retire covered direct-C
+    duplicates, then commit and push.
+- 2026-05-14: Iteration 26 added public resource provider callbacks and
+  `ResourceRequestHandle`: provider callbacks receive borrowed `ResourceRequest`
+  views plus an optional handle, return semantic pass-through/handle decisions,
+  can complete with a semantic `ResourceResponse`, check cancellation, and
+  release the native request handle through a private opaque state wrapper.
+- 2026-05-14: Iteration 26 added binding coverage for a custom URL style served
+  through the resource provider, including observed request kind/loading/
+  priority/usage/storage/range metadata, inline completion, handle release, and
+  post-map provider registration rejection. Verification passed:
+  `mise run //bindings/zig:test` (62/62 tests passed), `mise run fix`, then
+  `mise run //bindings/zig:test` again (62/62 tests passed; expected native log
+  lines appear during event/style/resource tests).
+- 2026-05-14: Iteration 27 tightened `ResourceRequestHandle` lifecycle:
+  successful completion marks the handle completed, second completion returns
+  `error.AlreadyCompleted`, release is idempotent and closes the handle for
+  later operations, pass-through destroys only the Zig wrapper without releasing
+  the native handle, and copied handle values avoid dangling private state.
+- 2026-05-14: Iteration 27 expanded resource-provider coverage for cancellation
+  checks, duplicate completion rejection, duplicate release no-op behavior,
+  after-release `error.ClosedHandle`, and public-boundary checks for resource
+  request/response/handle types. Verification passed:
+  `mise run
+  //bindings/zig:test` (62/62 tests passed), `mise run fix`, then
+  `mise run
+  //bindings/zig:test` again (62/62 tests passed; expected native
+  log lines appear during event/style/resource tests).
+- 2026-05-14: Iteration 28 added copied offline region value APIs: public tile-
+  pyramid and geometry definitions, owned offline region/list outputs, recursive
+  `OwnedGeometry` copies, metadata copying, create/get/list/merge/
+  metadata/status/observe/download/invalidate/delete runtime methods, and
+  private materialization of offline C definitions through `TempStorage`.
+- 2026-05-14: Iteration 28 ported public offline coverage for tile-pyramid
+  region persistence, copied metadata lifecycle, list/get/delete behavior,
+  inactive status snapshots, geometry region copied coordinate views, and
+  public-boundary checks for offline types. Verification passed:
+  `mise run
+  //bindings/zig:test` (64/64 tests passed), `mise run fix`, then
+  `mise run
+  //bindings/zig:test` again (64/64 tests passed; expected native
+  log lines appear during event/style/resource tests).
+- 2026-05-14: Iteration 29 added custom geometry source binding APIs with
+  semantic `CanonicalTileId`, nullable option fields, function-pointer/context
+  callbacks, private `callconv(.c)` fetch/cancel trampolines, and map-owned
+  callback state retained until map close so native worker callbacks cannot
+  reach freed binding trampoline state.
+- 2026-05-14: Iteration 29 ported custom geometry source coverage for adding a
+  custom-vector source, setting tile GeoJSON, tile and region invalidation,
+  duplicate source rejection, invalid zoom and tile validation, public-boundary
+  checks, and private trampoline routing/cancel no-op behavior. Verification
+  passed: `mise run //bindings/zig:test` (65/65 tests passed), `mise run fix`,
+  then `mise run //bindings/zig:test` again (66/66 tests passed after adding
+  private map-module tests; expected native log lines appear during event/style/
+  resource tests).
+- 2026-05-14: Iteration 30 expanded resource-provider test ports beyond inline
+  completion: delayed request completion stores the semantic handle outside the
+  callback, verifies observed prior metadata absence and request fields, rejects
+  duplicate completion, and completes successfully after the callback returns.
+- 2026-05-14: Iteration 30 added cross-thread public binding coverage for
+  `ResourceRequestHandle.complete`, plus an error-response provider test that
+  produces a public `map_loading_failed` event through `pollEventOwned`.
+  Verification passed: `mise run //bindings/zig:test` (69/69 tests passed),
+  `mise run fix`, then `mise run //bindings/zig:test` again (69/69 tests passed;
+  expected native log lines appear during event/style/resource tests).
+- 2026-05-14: Iteration 31 reflection:
+  - Accomplished so far: Phases 1-6 are reviewed, committed, and pushed. Phase 7
+    now has public APIs and tests for logging, network status, ambient cache
+    operations, resource transforms, resource providers, delayed request
+    handles, offline region copied values/events, and custom geometry source
+    callbacks.
+  - Working well: the callback boundary remains explicit and low-level: function
+    pointers plus context pointers in public APIs, private `callconv(.c)`
+    trampolines, and semantic borrowed/copying rules backed by public tests plus
+    private module tests for trampoline internals.
+  - Not working/blocking: Phase 7 is now broad and uncommitted, so the next
+    substantial step should be review and duplicate-retirement rather than more
+    API expansion. Some direct C resource tests still cover native transport
+    paths and C ABI invalid-input behavior that the binding should not duplicate
+    one-for-one.
+  - Approach adjustment: finish only the remaining high-value public behavior
+    ports, then run Phase 7 parallel review, apply safety findings, run root
+    verification, retire exact duplicates, and commit/push the milestone.
+  - Next priorities: finish provider cancellation/offline event coverage, run
+    the Phase 7 review, then decide which direct C logging/resource/offline/
+    custom-geometry assertions are now duplicate binding behavior.
+- 2026-05-14: Iteration 32 ran Phase 7 parallel review `58e3504e` with two
+  reviewers. Blocking findings included failed callback replacement mutating
+  active Zig state, racy logging callback globals, borrowed callback input
+  slices, `ResourceRequestHandle` wrapper lifetime/thread-safety gaps, and
+  custom geometry active-upcall lifetime tracking.
+- 2026-05-14: Iteration 32 applied the first Phase 7 review fixes: resource
+  transform/provider state now updates only after native installation succeeds;
+  failed post-map replacement keeps the previous callback active; logging now
+  passes one callback state through native `user_data` instead of separate
+  handler/context atomics and frees old state only after successful replacement
+  or clear; logging, transform, and provider trampolines copy native borrowed
+  strings/bytes into Zig-owned callback-duration storage before invoking user
+  code.
+- 2026-05-14: Iteration 32 added regressions that failed resource transform and
+  provider replacement after map creation does not dispatch to the replacement
+  state. Verification passed: `mise run //bindings/zig:test` (71/71 tests
+  passed), `mise run fix`, then `mise run //bindings/zig:test` again (71/71
+  tests passed; expected native log lines appear during event/style/resource
+  tests). Remaining review blockers for the next iteration: request-handle state
+  reclamation/thread-safety and custom-geometry active-upcall teardown.
+- 2026-05-14: Iteration 33 applied more Phase 7 review fixes:
+  `ResourceRequestHandle` operations now serialize with a binding-owned atomic
+  lock, duplicate completion is marked before crossing into native code, release
+  is still idempotent, and pass-through request wrappers are destroyed
+  immediately because they are never exposed to public callers.
+- 2026-05-14: Iteration 33 added custom-geometry active-upcall tracking:
+  binding-owned source state carries retired and active callback counters,
+  trampolines avoid invoking retired states, and map close retires source states
+  then waits for active upcalls to finish before freeing the callback state.
+  Private map-module tests now cover retired trampoline suppression.
+  Verification passed: `mise run //bindings/zig:test` (71/71 tests passed),
+  `mise run fix`, then `mise run //bindings/zig:test` again (71/71 tests passed;
+  expected native log lines appear during event/style/resource tests). Remaining
+  review follow-up: decide whether handled request wrapper reclamation can
+  improve without breaking copied-handle `error.ClosedHandle` semantics, then
+  re-review.
+- 2026-05-14: Iteration 34 ran Phase 7 follow-up parallel review `6e729b64`.
+  Reviewers confirmed the prior callback replacement, logging state, borrowed
+  callback input copying, and custom-geometry active-upcall findings were
+  resolved, but found a remaining blocking ABA hazard in the request-handle
+  registry: released handle slots could be reused, allowing stale copied handles
+  to alias later requests.
+- 2026-05-14: Iteration 34 fixed the remaining request-handle reclamation
+  blocker by making the registry tombstone released slots instead of reusing
+  them. Released/completed request state is reclaimed, stale copied handles keep
+  resolving to `error.ClosedHandle`, and later requests receive fresh registry
+  IDs.
+- 2026-05-14: Iteration 34 added a regression that releases a delayed provider
+  handle, creates a later request, and verifies the stale copied handle cannot
+  complete/cancel/release the later request. Verification passed after
+  formatting: `mise run //bindings/zig:test` (72/72 tests passed; expected
+  native log lines appear during event/style/resource tests).
+- 2026-05-14: Iteration 35 retired exact duplicate direct C assertions now
+  covered by Phase 7 binding tests: logging callback receive/mask/clear
+  behavior, custom resource provider style load, cross-thread completion,
+  cancellation-before-late-completion, error-response style failure, offline
+  tile-pyramid and geometry copied-value lifecycle coverage, offline status
+  event coverage, custom-geometry source helper behavior, and provider
+  replacement rejection after map creation. Kept direct C coverage for file,
+  asset, HTTP, PMTiles range metadata, ambient cache with real cache, offline
+  invalid descriptor/input, offline error and merge behavior, native transport
+  pass-through, and C ABI invalid-input behavior.
+- 2026-05-14: Iteration 35 verification passed after duplicate retirement and
+  formatting: `mise run fix`, `mise run //bindings/zig:test` (72/72 tests
+  passed), and `mise run test` (92 passed, 12 skipped; 104 total).
+- 2026-05-14: Iteration 31 added public resource-provider cancellation coverage:
+  a delayed request survives callback return, the map closes before completion,
+  `cancelled()` becomes true, and late completion reports `error.InvalidState`.
+- 2026-05-14: Iteration 31 added public offline download-control event coverage:
+  invalid observe/download commands surface `error.InvalidArgument`, observing a
+  region and activating download produces an owned
+  `offline_region_status_changed` event with copied status payload data. Narrow
+  verification passed: `mise run //bindings/zig:test` (71/71 tests passed;
+  expected native log lines appear during event/style/resource tests).
 
 ## Review log
 
@@ -619,6 +829,30 @@ For each phase or smaller milestone:
   `/Users/sargunv/.pi/agent/sessions/--Users-sargunv-Code-maplibre-native-ffi--/subagent-artifacts/29c7eea9_reviewer_0_output.md`
   and
   `/Users/sargunv/.pi/agent/sessions/--Users-sargunv-Code-maplibre-native-ffi--/subagent-artifacts/29c7eea9_reviewer_1_output.md`.
+- Phase 7 parallel review run `58e3504e` completed with two reviewers. Findings
+  applied across iterations 32-33: failed resource callback replacement no
+  longer mutates active Zig state, logging no longer uses racy split globals,
+  borrowed native callback strings/bytes are copied before invoking Zig user
+  callbacks, request-handle operations are serialized, pass-through request
+  wrappers are destroyed immediately, and custom-geometry callback state waits
+  for active upcalls before freeing. Remaining follow-up: decide whether handled
+  request wrapper reclamation can improve without breaking copied-handle
+  `error.ClosedHandle` semantics. Direct-C duplicate retirement is deferred
+  until that follow-up is settled. Artifacts:
+  `/Users/sargunv/.pi/agent/sessions/--Users-sargunv-Code-maplibre-native-ffi--/subagent-artifacts/58e3504e_reviewer_0_output.md`
+  and
+  `/Users/sargunv/.pi/agent/sessions/--Users-sargunv-Code-maplibre-native-ffi--/subagent-artifacts/58e3504e_reviewer_1_output.md`.
+- Phase 7 follow-up review run `6e729b64` completed with two reviewers. Findings
+  applied: request-handle registry slot reuse created an ABA hazard for stale
+  copied handles after release. The registry now tombstones released slots
+  instead of reusing them, reclaims request state on release/completion wrapper
+  destruction, and has a public regression proving stale handles stay closed
+  after a later request is created. Non-blocking follow-up from reviewers: a
+  stronger custom-geometry in-flight close stress test could add confidence, but
+  the structural active-upcall lifetime blocker is resolved. Artifacts:
+  `/Users/sargunv/.pi/agent/sessions/--Users-sargunv-Code-maplibre-native-ffi--/subagent-artifacts/6e729b64_reviewer_0_output.md`
+  and
+  `/Users/sargunv/.pi/agent/sessions/--Users-sargunv-Code-maplibre-native-ffi--/subagent-artifacts/6e729b64_reviewer_1_output.md`.
 
 ## Notes and decisions
 
@@ -661,3 +895,32 @@ For each phase or smaller milestone:
   `pollEventOwned(allocator)` for callers that need copied borrowed data such as
   native event messages. `MapId` is binding-assigned and stable only while a map
   is live with its runtime.
+- Phase 7 callback APIs start with function pointers plus context pointers. The
+  binding-owned trampoline remains private and translates native borrowed inputs
+  into Zig semantic request/record values for the callback duration.
+- Resource provider callbacks allocate a private request-handle wrapper only
+  when native supplies a handle. Returning pass-through destroys the wrapper
+  without releasing the native handle; returning handle transfers release
+  responsibility to the caller-facing `ResourceRequestHandle`.
+- Resource request handle state is reclaimed on release or internal wrapper
+  destruction. The registry tombstones released slots instead of reusing them so
+  stale copied handle values keep reporting `error.ClosedHandle` and cannot
+  alias later native requests.
+- Offline region snapshot/list handles are copied immediately into Zig-owned
+  `OwnedOfflineRegion` values and destroyed before returning. Region style URLs,
+  geometry coordinates, recursive geometry collections, and metadata are caller-
+  owned and released through `deinit` methods.
+- Custom geometry source callbacks use a binding-owned per-source state object
+  as native `user_data`; map close frees those state objects after native map
+  destruction succeeds. Source removal and style replacement may retire the
+  native source earlier, but the binding keeps callback state alive until map
+  close to prefer safety over eager reclamation.
+- Resource provider tests now cover both inline completion and delayed handle
+  ownership. A provider may retain the semantic `ResourceRequestHandle` when it
+  returns `.handle`; the caller remains responsible for completing or releasing
+  that handle exactly once from any valid thread. Request handle operations use
+  a binding-owned atomic lock so complete/cancel/release do not race with each
+  other.
+- Callback replacement follows the binding convention that native installation
+  succeeds before active Zig state changes. On failed replacement, the previous
+  resource/logging callback remains the active dispatch target.

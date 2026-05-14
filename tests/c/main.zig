@@ -12,7 +12,6 @@ comptime {
     _ = @import("map_tuning.zig");
     _ = @import("diagnostics.zig");
     _ = @import("events.zig");
-    _ = @import("logging.zig");
     _ = @import("render_backend.zig");
     _ = @import("surface.zig");
     _ = @import("surface_metal.zig");
