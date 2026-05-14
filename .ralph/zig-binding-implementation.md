@@ -130,7 +130,7 @@ For each phase or smaller milestone:
 - [x] Apply binding-owned side effects required by other bindings where
       applicable.
 - [x] Port `events.zig` coverage.
-- [ ] Review, apply findings, commit, and push.
+- [x] Review, apply findings, commit, and push.
 
 ### Phase 7: logging, resources, offline, and callbacks
 
@@ -549,6 +549,9 @@ For each phase or smaller milestone:
   observable through public binding APIs.
 - 2026-05-14: Iteration 23 final Phase 6 root verification passed before the
   milestone commit: `mise run test` (104 passed, 12 skipped).
+- 2026-05-14: Iteration 23 committed the reviewed Phase 6 event/source identity
+  milestone as `97db8ec` (`Add Zig runtime event bindings`) and pushed
+  `zig-binding-implementation` to origin.
 
 ## Review log
 
