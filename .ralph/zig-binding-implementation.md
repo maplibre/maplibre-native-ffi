@@ -344,6 +344,9 @@ For each phase or smaller milestone:
   then `mise run test` and `mise run //bindings/zig:test` again. The binding
   private `status.zig` test artifact and remaining direct C suite continue to
   compile the private C import/header path.
+- 2026-05-14: Iteration 11 committed Phase 4 duplicate-retirement work as
+  `5deffc3` (`Retire duplicated foundational C assertions`) and pushed
+  `zig-binding-implementation` to origin.
 
 ## Review log
 
