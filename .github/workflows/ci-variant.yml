@@ -57,11 +57,43 @@ jobs:
             .git/modules/third_party/maplibre-native
           key: mln-src-v2-${{ hashFiles('.gitmodules', 'cmake/mln_version.cmake') }}
       - uses: ./.github/actions/setup-ci-deps
+      - name: Install EGL/GLES2 dev libraries (Linux OpenGL only)
+        if: ${{ contains(inputs.variant, 'opengl') && runner.os == 'Linux' }}
+        # libegl-dev    — provides /usr/lib/.../libEGL.so (unversioned symlink)
+        # libgles-dev   — Ubuntu 24.04 name (was libgles2-dev); depends on
+        #                 libglvnd-dev which provides /usr/include/GLES3/*.h
+        #                 without a libpng-dev dependency.
+        # libgles2      — runtime library, provides libGLESv2.so.2.
+        # libgles2-mesa-dev is intentionally omitted: it has a hard Depends:
+        # libpng-dev which installs libpng headers newer than pixi's libpng.so,
+        # causing a header/ABI mismatch. The cmake find_library call extends
+        # CMAKE_FIND_LIBRARY_SUFFIXES to also match .so.2 so the versioned
+        # runtime file is accepted for linking.
+        # libegl-mesa0      — Mesa's EGL ICD: installs 50_mesa.json into
+        #                     /usr/share/glvnd/egl_vendor.d/ and provides
+        #                     libEGL_mesa.so.0 (compiled WITH X11 platform
+        #                     support). The system GLVND dispatcher (libEGL.so.1)
+        #                     loads this ICD when asked for EGL_DEFAULT_DISPLAY.
+        # libegl1           — GLVND EGL dispatcher (libEGL.so.1). Already
+        #                     present on Ubuntu 24.04 but listed for clarity.
+        # libgl1-mesa-dri   — Mesa DRI drivers including swrast/llvmpipe CPU
+        #                     rasterizer (often pre-installed; listed for clarity).
+        run: sudo apt-get update -y && sudo apt-get install -y --no-install-recommends libegl-dev libgles-dev libgles2 libegl-mesa0 libegl1 libgl1-mesa-dri
       - run: mise run configure
       # Windows builds successfully, but native tests/examples are runtime-broken for now.
       - if: ${{ inputs.variant == 'windows-x64-vulkan' }}
         run: mise run build
-      - if: ${{ inputs.variant != 'windows-x64-vulkan' }}
+      - name: Run tests (Linux OpenGL — Mesa llvmpipe surfaceless)
+        if: ${{ contains(inputs.variant, 'opengl') && runner.os == 'Linux' }}
+        # EGL_PLATFORM=surfaceless — use EGL surfaceless platform (pbuffer only)
+        # LIBGL_ALWAYS_SOFTWARE=1  — force llvmpipe software rasterizer
+        # GALLIUM_DRIVER=llvmpipe  — select llvmpipe inside Mesa explicitly
+        env:
+          EGL_PLATFORM: surfaceless
+          LIBGL_ALWAYS_SOFTWARE: "1"
+          GALLIUM_DRIVER: llvmpipe
+        run: mise run test
+      - if: ${{ !contains(inputs.variant, 'opengl') && inputs.variant != 'windows-x64-vulkan' }}
         run: mise run test
       - run: mise run ci:prepare-native-artifact
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -91,7 +123,18 @@ jobs:
         with:
           name: native-${{ inputs.variant }}
           path: .
-      - run: mise run "${{ matrix.task }}"
+      - name: Install EGL/GLES2 runtime libraries (Linux OpenGL only)
+        if: ${{ contains(inputs.variant, 'opengl') && runner.os == 'Linux' }}
+        run: sudo apt-get update -y && sudo apt-get install -y --no-install-recommends libgles2 libegl-mesa0 libegl1 libgl1-mesa-dri
+      - name: Run binding task
+        env:
+          # For OpenGL on Linux: direct EGL to the surfaceless platform and
+          # force Mesa llvmpipe so tests can render without a display server.
+          # These are no-ops for non-OpenGL backends (empty value is ignored).
+          EGL_PLATFORM: ${{ contains(inputs.variant, 'opengl') && runner.os == 'Linux' && 'surfaceless' || '' }}
+          LIBGL_ALWAYS_SOFTWARE: ${{ contains(inputs.variant, 'opengl') && runner.os == 'Linux' && '1' || '' }}
+          GALLIUM_DRIVER: ${{ contains(inputs.variant, 'opengl') && runner.os == 'Linux' && 'llvmpipe' || '' }}
+        run: mise run "${{ matrix.task }}"
 
   examples:
     name: examples / ${{ matrix.example }} / ${{ inputs.variant }}
