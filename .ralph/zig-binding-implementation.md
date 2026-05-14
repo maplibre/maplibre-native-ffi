@@ -473,6 +473,9 @@ For each phase or smaller milestone:
   `mise run test` (107 passed, 12 skipped), `mise run //bindings/zig:test`
   (43/43 tests passed), `mise run fix`, then `mise run test` (107 passed, 12
   skipped) and `mise run //bindings/zig:test` (43/43 tests passed).
+- 2026-05-14: Iteration 18 committed the reviewed Phase 5 value/descriptor
+  milestone as `db14aa0` (`Add Zig binding value descriptors`) and pushed
+  `zig-binding-implementation` to origin.
 
 ## Review log
 
