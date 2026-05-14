@@ -215,9 +215,9 @@ const OpenGLOwnedTextureBackend = struct {
         viewport: types.Viewport,
     ) !render_target.Session {
         var descriptor = c.mln_owned_texture_descriptor_default();
-        descriptor.width = viewport.logical_width;
-        descriptor.height = viewport.logical_height;
-        descriptor.scale_factor = viewport.scale_factor;
+        descriptor.extent.width = viewport.logical_width;
+        descriptor.extent.height = viewport.logical_height;
+        descriptor.extent.scale_factor = viewport.scale_factor;
 
         var texture: ?*c.mln_render_session = null;
         if (c.mln_owned_texture_attach(map, &descriptor, &texture) != c.MLN_STATUS_OK or
