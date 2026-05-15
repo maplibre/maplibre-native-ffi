@@ -119,8 +119,22 @@ test "camera public descriptors report invalid native arguments" {
     defer handles.map.close() catch @panic("map close failed");
 
     try testing.expectError(error.InvalidArgument, handles.map.jumpTo(.{ .center = .{ .latitude = std.math.inf(f64), .longitude = 0 } }));
+    try testing.expectError(error.InvalidArgument, handles.map.easeTo(.{ .center = center }, .{ .duration_ms = -1 }));
+    try testing.expectError(error.InvalidArgument, handles.map.flyTo(.{ .center = center }, .{ .easing = .{ .x1 = 2, .y1 = 0, .x2 = 1, .y2 = 1 } }));
     try testing.expectError(error.InvalidArgument, handles.map.moveBy(std.math.nan(f64), 0));
     try testing.expectError(error.InvalidArgument, handles.map.scaleBy(0, null));
     try testing.expectError(error.InvalidArgument, handles.map.rotateBy(.{ .x = std.math.inf(f64), .y = 0 }, .{ .x = 0, .y = 0 }));
     try testing.expectError(error.InvalidArgument, handles.map.pitchBy(std.math.nan(f64)));
+
+    const inverted_bounds = maplibre.LatLngBounds{
+        .southwest = .{ .latitude = 10.0, .longitude = 10.0 },
+        .northeast = .{ .latitude = -10.0, .longitude = 20.0 },
+    };
+    try testing.expectError(error.InvalidArgument, handles.map.cameraForLatLngBounds(inverted_bounds, null));
+    try testing.expectError(error.InvalidArgument, handles.map.cameraForLatLngs(testing.allocator, &.{}, null));
+    try testing.expectError(error.InvalidArgument, handles.map.cameraForGeometry(testing.allocator, .empty, null));
+
+    try testing.expectError(error.InvalidArgument, handles.map.setBounds(.{ .min_zoom = 10, .max_zoom = 1 }));
+    try testing.expectError(error.InvalidArgument, handles.map.setFreeCameraOptions(.{ .position = .{ .x = std.math.inf(f64), .y = 0, .z = 0 } }));
+    try testing.expectError(error.InvalidArgument, handles.map.setFreeCameraOptions(.{ .orientation = .{ .x = 0, .y = 0, .z = 0, .w = 0 } }));
 }

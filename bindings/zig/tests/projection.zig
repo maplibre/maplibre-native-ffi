@@ -60,6 +60,9 @@ test "map converts between lat lngs and screen points" {
     try handles.map.latLngsForPixels(testing.allocator, points[0..], roundtrip[0..]);
     try expectLatLngApprox(coordinates[0], roundtrip[0]);
     try expectLatLngApprox(coordinates[1], roundtrip[1]);
+
+    try handles.map.pixelsForLatLngs(testing.allocator, &.{}, &.{});
+    try handles.map.latLngsForPixels(testing.allocator, &.{}, &.{});
 }
 
 test "standalone projection converts and updates camera" {
@@ -109,6 +112,27 @@ test "projected meters convert to and from lat lng" {
     try expectLatLngApprox(center, roundtrip);
 }
 
+test "projection public descriptors report invalid native arguments" {
+    const handles = try createRuntimeAndMap();
+    defer handles.runtime.close() catch @panic("runtime close failed");
+    defer handles.map.close() catch @panic("map close failed");
+
+    try testing.expectError(error.InvalidArgument, handles.map.setProjectionMode(.{ .x_skew = std.math.inf(f64) }));
+    try testing.expectError(error.InvalidArgument, handles.map.pixelForLatLng(.{ .latitude = 91.0, .longitude = 0.0 }));
+    try testing.expectError(error.InvalidArgument, handles.map.latLngForPixel(.{ .x = std.math.inf(f64), .y = 0.0 }));
+
+    const projection = try maplibre.MapProjectionHandle.create(handles.map);
+    defer projection.close() catch @panic("projection close failed");
+
+    try testing.expectError(error.InvalidArgument, projection.setCamera(.{ .center = .{ .latitude = std.math.inf(f64), .longitude = 0.0 } }));
+    try testing.expectError(error.InvalidArgument, projection.setVisibleCoordinates(testing.allocator, &.{}, .{}));
+    try testing.expectError(error.InvalidArgument, projection.setVisibleCoordinates(testing.allocator, &.{center}, .{ .top = -1.0 }));
+    try testing.expectError(error.InvalidArgument, projection.setVisibleGeometry(testing.allocator, .empty, .{}));
+    try testing.expectError(error.InvalidArgument, projection.setVisibleGeometry(testing.allocator, .{ .point = .{ .latitude = std.math.inf(f64), .longitude = 0.0 } }, .{}));
+    try testing.expectError(error.InvalidArgument, projection.pixelForLatLng(.{ .latitude = std.math.nan(f64), .longitude = 0.0 }));
+    try testing.expectError(error.InvalidArgument, projection.latLngForPixel(.{ .x = 0.0, .y = std.math.inf(f64) }));
+}
+
 test "projection free helpers preserve native diagnostics" {
     var diagnostics = maplibre.DiagnosticStore.init(testing.allocator);
     defer diagnostics.deinit();
@@ -120,4 +144,6 @@ test "projection free helpers preserve native diagnostics" {
     const diagnostic = diagnostics.get().?;
     try testing.expectEqual(@as(?i32, -1), diagnostic.raw_status);
     try testing.expect(diagnostic.message.len > 0);
+
+    try testing.expectError(error.InvalidArgument, maplibre.latLngForProjectedMeters(.{ .northing = std.math.nan(f64), .easting = 0.0 }, null));
 }

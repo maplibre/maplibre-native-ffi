@@ -169,6 +169,10 @@ fn addBindingTests(b: *std.Build, options: BuildOptions, maplibre_native: *std.B
     tests.root_module.addImport("maplibre_native", maplibre_native);
     tests.root_module.addOptions("build_options", build_options);
     linkMaplibreNativeC(b, tests.root_module, repoLinkOptions(b, options));
+    if (options.render_backend == .metal) {
+        tests.root_module.addCSourceFile(.{ .file = b.path("tests/metal_support_macos.m") });
+        tests.root_module.linkFramework("AppKit", .{});
+    }
     return tests;
 }
 

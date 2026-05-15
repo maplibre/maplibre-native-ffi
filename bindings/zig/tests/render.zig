@@ -319,6 +319,7 @@ test "render session queries rendered and source features" {
     try testing.expectEqualStrings("point", source.features[0].source_id.?);
     try expectFeaturePropertyString(&source.features[0], "kind", "capital");
 
+    try testing.expectError(error.InvalidArgument, session.queryRenderedFeatures(testing.allocator, .{ .point = .{ .x = std.math.inf(f64), .y = 0.0 } }, null));
     try testing.expectError(error.InvalidArgument, session.querySourceFeatures(testing.allocator, "", null));
 }
 

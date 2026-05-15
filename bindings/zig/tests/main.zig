@@ -16,6 +16,7 @@ comptime {
     _ = @import("resources.zig");
     _ = @import("logging.zig");
     _ = @import("render.zig");
+    _ = @import("surface.zig");
 }
 
 test "package root hides raw C declarations" {

@@ -101,10 +101,21 @@ test "network status APIs wrap process-global MapLibre status" {
 }
 
 test "ambient cache operations validate cache configuration" {
-    const runtime = try maplibre.RuntimeHandle.init(null);
-    defer runtime.close() catch @panic("runtime close failed");
-
+    var runtime = try maplibre.RuntimeHandle.init(null);
     try runtime.runAmbientCacheOperation(.pack_database);
+    try runtime.close();
+
+    var tmp = testing.tmpDir(.{});
+    defer tmp.cleanup();
+    const cache_path = try tempPath(testing.allocator, tmp.sub_path[0..], "ambient-cache.db");
+    defer testing.allocator.free(cache_path);
+
+    const cached_runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{ .cache_path = cache_path }, null);
+    defer cached_runtime.close() catch @panic("cached runtime close failed");
+    try cached_runtime.runAmbientCacheOperation(.reset_database);
+    try cached_runtime.runAmbientCacheOperation(.pack_database);
+    try cached_runtime.runAmbientCacheOperation(.invalidate);
+    try cached_runtime.runAmbientCacheOperation(.clear);
 }
 
 test "file URL style loads through public binding" {
@@ -277,6 +288,102 @@ test "http URL style loads through native network provider" {
     server_thread_joined = true;
     try testing.expect(server_state.served);
     try testing.expectEqual(@as(?anyerror, null), server_state.err);
+}
+
+const PassThroughProviderState = struct {
+    calls: std.atomic.Value(usize) = std.atomic.Value(usize).init(0),
+    saw_style: std.atomic.Value(bool) = std.atomic.Value(bool).init(false),
+};
+
+fn passThroughStyleProvider(
+    context: ?*anyopaque,
+    request: maplibre.ResourceRequest,
+    maybe_handle: ?maplibre.ResourceRequestHandle,
+) maplibre.ResourceProviderDecision {
+    const state: *PassThroughProviderState = @ptrCast(@alignCast(context.?));
+    _ = state.calls.fetchAdd(1, .seq_cst);
+    if (std.meta.eql(request.kind, maplibre.ResourceKind.style)) state.saw_style.store(true, .seq_cst);
+    _ = maybe_handle;
+    return .pass_through;
+}
+
+test "http style can load from ambient cache after online load" {
+    try maplibre.setNetworkStatus(.online, null);
+    defer maplibre.setNetworkStatus(.online, null) catch @panic("network status restore failed");
+
+    var tmp = testing.tmpDir(.{});
+    defer tmp.cleanup();
+    const cache_path = try tempPath(testing.allocator, tmp.sub_path[0..], "http-cache.db");
+    defer testing.allocator.free(cache_path);
+
+    var address = try std.Io.net.IpAddress.parse("127.0.0.1", 0);
+    var server = try address.listen(testing.io, .{ .reuse_address = true });
+    var server_state = HttpServerState{ .server = &server };
+    const server_thread = try std.Thread.spawn(.{}, serveOneHttpStyle, .{&server_state});
+    var server_thread_joined = false;
+    defer {
+        server.deinit(testing.io);
+        if (!server_thread_joined) server_thread.join();
+    }
+    const style_url = try std.fmt.allocPrint(testing.allocator, "http://127.0.0.1:{d}/style.json", .{server.socket.address.getPort()});
+    defer testing.allocator.free(style_url);
+
+    {
+        const runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{ .cache_path = cache_path, .maximum_cache_size = 1024 * 1024 }, null);
+        defer runtime.close() catch @panic("runtime close failed");
+        const map = try maplibre.MapHandle.create(runtime, .{});
+        defer map.close() catch @panic("map close failed");
+        try map.setStyleUrl(testing.allocator, style_url);
+        try waitForStyleLoaded(runtime);
+        try runtime.runAmbientCacheOperation(.pack_database);
+    }
+
+    server_thread.join();
+    server_thread_joined = true;
+    try testing.expect(server_state.served);
+    try testing.expectEqual(@as(?anyerror, null), server_state.err);
+
+    try maplibre.setNetworkStatus(.offline, null);
+    const cached_runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{ .cache_path = cache_path }, null);
+    defer cached_runtime.close() catch @panic("cached runtime close failed");
+    const cached_map = try maplibre.MapHandle.create(cached_runtime, .{});
+    defer cached_map.close() catch @panic("cached map close failed");
+    try cached_map.setStyleUrl(testing.allocator, style_url);
+    try waitForStyleLoaded(cached_runtime);
+}
+
+test "resource provider pass-through delegates to native HTTP" {
+    try maplibre.setNetworkStatus(.online, null);
+    defer maplibre.setNetworkStatus(.online, null) catch @panic("network status restore failed");
+
+    var address = try std.Io.net.IpAddress.parse("127.0.0.1", 0);
+    var server = try address.listen(testing.io, .{ .reuse_address = true });
+    var server_state = HttpServerState{ .server = &server };
+    const server_thread = try std.Thread.spawn(.{}, serveOneHttpStyle, .{&server_state});
+    var server_thread_joined = false;
+    defer {
+        server.deinit(testing.io);
+        if (!server_thread_joined) server_thread.join();
+    }
+    const style_url = try std.fmt.allocPrint(testing.allocator, "http://127.0.0.1:{d}/style.json", .{server.socket.address.getPort()});
+    defer testing.allocator.free(style_url);
+
+    var state = PassThroughProviderState{};
+    const runtime = try maplibre.RuntimeHandle.init(null);
+    defer runtime.close() catch @panic("runtime close failed");
+    try runtime.setResourceProvider(.{ .handler = passThroughStyleProvider, .context = &state });
+
+    const map = try maplibre.MapHandle.create(runtime, .{});
+    defer map.close() catch @panic("map close failed");
+
+    try map.setStyleUrl(testing.allocator, style_url);
+    try waitForStyleLoaded(runtime);
+    server_thread.join();
+    server_thread_joined = true;
+    try testing.expect(server_state.served);
+    try testing.expectEqual(@as(?anyerror, null), server_state.err);
+    try testing.expect(state.calls.load(.seq_cst) > 0);
+    try testing.expect(state.saw_style.load(.seq_cst));
 }
 
 test "resource transform rewrites network style URL" {
@@ -566,6 +673,46 @@ test "offline tile-pyramid regions copy definitions and metadata" {
         defer list.deinit();
         try testing.expectEqual(@as(usize, 0), list.items.len);
     }
+}
+
+test "offline region definitions reject invalid public values" {
+    var tmp = testing.tmpDir(.{});
+    defer tmp.cleanup();
+    const cache_path = try tempPath(testing.allocator, tmp.sub_path[0..], "invalid-offline-cache.db");
+    defer testing.allocator.free(cache_path);
+
+    const runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{ .cache_path = cache_path }, null);
+    defer runtime.close() catch @panic("runtime close failed");
+
+    var invalid_zoom = offlineTileDefinition();
+    invalid_zoom.tile_pyramid.min_zoom = 8.0;
+    invalid_zoom.tile_pyramid.max_zoom = 2.0;
+    try testing.expectError(error.InvalidArgument, runtime.createOfflineRegion(testing.allocator, invalid_zoom, &.{}));
+
+    var invalid_bounds = offlineTileDefinition();
+    invalid_bounds.tile_pyramid.bounds.southwest.latitude = std.math.inf(f64);
+    try testing.expectError(error.InvalidArgument, runtime.createOfflineRegion(testing.allocator, invalid_bounds, &.{}));
+
+    try testing.expectError(error.InvalidArgument, runtime.createOfflineRegion(testing.allocator, .{ .geometry = .{
+        .style_url = offline_style_url,
+        .geometry = .empty,
+        .min_zoom = 5.0,
+        .max_zoom = 6.0,
+    } }, &.{}));
+
+    var nested_geometries: [66]maplibre.Geometry = undefined;
+    nested_geometries[nested_geometries.len - 1] = .{ .point = .{ .latitude = 1.0, .longitude = 2.0 } };
+    var nested_index = nested_geometries.len - 1;
+    while (nested_index > 0) {
+        nested_index -= 1;
+        nested_geometries[nested_index] = .{ .collection = nested_geometries[nested_index + 1 .. nested_index + 2] };
+    }
+    try testing.expectError(error.InvalidArgument, runtime.createOfflineRegion(testing.allocator, .{ .geometry = .{
+        .style_url = offline_style_url,
+        .geometry = nested_geometries[0],
+        .min_zoom = 5.0,
+        .max_zoom = 6.0,
+    } }, &.{}));
 }
 
 fn expectOfflineGeometryRegion(region: *const maplibre.OwnedOfflineRegion, expected_metadata: []const u8) !void {
