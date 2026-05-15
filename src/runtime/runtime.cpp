@@ -1654,13 +1654,16 @@ auto invoke_resource_transform(
     return MLN_STATUS_OK;
   }
 
-  const std::scoped_lock registry_lock(runtime_registry_mutex());
   auto* runtime = static_cast<mln_runtime*>(platform_context);
-  if (!runtime_registry().contains(runtime)) {
-    return MLN_STATUS_OK;
+  std::shared_lock<std::shared_mutex> transform_lock;
+  {
+    const std::scoped_lock registry_lock(runtime_registry_mutex());
+    if (!runtime_registry().contains(runtime)) {
+      return MLN_STATUS_OK;
+    }
+    transform_lock = std::shared_lock{runtime->resource_transform_mutex};
   }
 
-  const std::shared_lock transform_lock(runtime->resource_transform_mutex);
   const auto callback = runtime->resource_transform_callback;
   if (callback == nullptr) {
     return MLN_STATUS_OK;
