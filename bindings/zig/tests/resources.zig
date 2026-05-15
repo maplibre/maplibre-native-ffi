@@ -405,7 +405,7 @@ test "resource transform rewrites network style URL" {
     const map = try maplibre.MapHandle.create(runtime, .{});
     defer map.close() catch @panic("map close failed");
 
-    try testing.expectError(error.InvalidState, runtime.setResourceTransform(.{ .handler = rewriteStyleUrl, .context = &replacement_state }));
+    try runtime.setResourceTransform(.{ .handler = rewriteStyleUrl, .context = &replacement_state });
 
     try map.setStyleUrl(testing.allocator, original_url);
     for (0..1000) |_| {
@@ -414,11 +414,11 @@ test "resource transform rewrites network style URL" {
             var owned_event = event;
             owned_event.deinit();
         }
-        if (state.calls.load(.seq_cst) > 0) break;
+        if (replacement_state.calls.load(.seq_cst) > 0) break;
     }
 
-    try testing.expect(state.calls.load(.seq_cst) > 0);
-    try testing.expectEqual(@as(usize, 0), replacement_state.calls.load(.seq_cst));
+    try testing.expectEqual(@as(usize, 0), state.calls.load(.seq_cst));
+    try testing.expect(replacement_state.calls.load(.seq_cst) > 0);
 }
 
 const ProviderState = struct {

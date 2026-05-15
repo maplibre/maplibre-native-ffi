@@ -143,12 +143,27 @@ test "resource transform rejects raw invalid descriptors" {
     const runtime = try support.createRuntime();
     defer support.destroyRuntime(runtime);
 
+    try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, c.mln_runtime_clear_resource_transform(null));
     try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, c.mln_runtime_set_resource_transform(runtime, null));
     var transform = c.mln_resource_transform{ .size = 0, .callback = resourceTransformStub, .user_data = null };
     try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, c.mln_runtime_set_resource_transform(runtime, &transform));
     transform.size = @sizeOf(c.mln_resource_transform);
     transform.callback = null;
     try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, c.mln_runtime_set_resource_transform(runtime, &transform));
+}
+
+test "resource transform updates and clears after map creation" {
+    const runtime = try support.createRuntime();
+    defer support.destroyRuntime(runtime);
+
+    var transform = c.mln_resource_transform{ .size = @sizeOf(c.mln_resource_transform), .callback = resourceTransformStub, .user_data = null };
+    try testing.expectEqual(c.MLN_STATUS_OK, c.mln_runtime_set_resource_transform(runtime, &transform));
+
+    const map = try support.createMap(runtime);
+    defer support.destroyMap(map);
+
+    try testing.expectEqual(c.MLN_STATUS_OK, c.mln_runtime_set_resource_transform(runtime, &transform));
+    try testing.expectEqual(c.MLN_STATUS_OK, c.mln_runtime_clear_resource_transform(runtime));
 }
 
 test "resource provider rejects raw invalid descriptors" {

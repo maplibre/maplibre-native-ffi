@@ -15,7 +15,7 @@ const RuntimeState = struct {
     diagnostic_store: ?*diagnostics.DiagnosticStore,
     maps: std.ArrayList(MapRegistration),
     next_map_id: u64,
-    resource_transform: ?ResourceTransform,
+    resource_transform: ?*ResourceTransform,
     resource_provider: ?ResourceProvider,
 };
 
@@ -896,22 +896,33 @@ pub const RuntimeHandle = enum(usize) {
 
     pub fn setResourceTransform(self: RuntimeHandle, transform: ?ResourceTransform) status.Error!void {
         const runtime_state = state(self);
-        if (transform == null) {
-            _ = try native(self);
-            runtime_state.resource_transform = null;
+        if (transform) |value| {
+            const replacement = try std.heap.smp_allocator.create(ResourceTransform);
+            errdefer std.heap.smp_allocator.destroy(replacement);
+            replacement.* = value;
+            var native_transform = c.mln_resource_transform{
+                .size = @sizeOf(c.mln_resource_transform),
+                .callback = resourceTransformTrampoline,
+                .user_data = replacement,
+            };
+            try status.checkStatus(
+                c.mln_runtime_set_resource_transform(try native(self), &native_transform),
+                runtime_state.diagnostic_store,
+            );
+            const previous = runtime_state.resource_transform;
+            runtime_state.resource_transform = replacement;
+            if (previous) |old| std.heap.smp_allocator.destroy(old);
             return;
         }
 
-        var native_transform = c.mln_resource_transform{
-            .size = @sizeOf(c.mln_resource_transform),
-            .callback = resourceTransformTrampoline,
-            .user_data = runtime_state,
-        };
         try status.checkStatus(
-            c.mln_runtime_set_resource_transform(try native(self), &native_transform),
+            c.mln_runtime_clear_resource_transform(try native(self)),
             runtime_state.diagnostic_store,
         );
-        runtime_state.resource_transform = transform;
+        if (runtime_state.resource_transform) |old| {
+            runtime_state.resource_transform = null;
+            std.heap.smp_allocator.destroy(old);
+        }
     }
 
     pub fn setResourceProvider(self: RuntimeHandle, provider: ResourceProvider) status.Error!void {
@@ -932,6 +943,10 @@ pub const RuntimeHandle = enum(usize) {
         const runtime_state = state(self);
         const runtime = runtime_state.native orelse return;
         try status.checkStatus(c.mln_runtime_destroy(runtime), runtime_state.diagnostic_store);
+        if (runtime_state.resource_transform) |old| {
+            runtime_state.resource_transform = null;
+            std.heap.smp_allocator.destroy(old);
+        }
         runtime_state.maps.deinit(std.heap.smp_allocator);
         runtime_state.maps = .empty;
         runtime_state.native = null;
@@ -995,8 +1010,7 @@ fn resourceTransformTrampoline(
     url: [*c]const u8,
     out_response: [*c]c.mln_resource_transform_response,
 ) callconv(.c) c.mln_status {
-    const runtime_state: *RuntimeState = @ptrCast(@alignCast(user_data orelse return c.MLN_STATUS_INVALID_ARGUMENT));
-    const transform = runtime_state.resource_transform orelse return c.MLN_STATUS_OK;
+    const transform: *ResourceTransform = @ptrCast(@alignCast(user_data orelse return c.MLN_STATUS_INVALID_ARGUMENT));
     const copied_url = std.heap.smp_allocator.dupe(u8, if (url == null) "" else std.mem.span(url)) catch return c.MLN_STATUS_NATIVE_ERROR;
     defer std.heap.smp_allocator.free(copied_url);
     const response = transform.handler(transform.context, .{

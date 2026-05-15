@@ -294,10 +294,6 @@ pub fn resource_transform_descriptor(
     }
 }
 
-pub fn noop_resource_transform_descriptor() -> sys::mln_resource_transform {
-    resource_transform_descriptor(Some(noop_resource_transform), ptr::null_mut())
-}
-
 /// Initializes a resource transform callback response to an empty replacement.
 ///
 /// # Safety
@@ -316,17 +312,6 @@ pub unsafe fn initialize_resource_transform_response(
         (*out_response).url = ptr::null();
     }
     sys::MLN_STATUS_OK
-}
-
-unsafe extern "C" fn noop_resource_transform(
-    _user_data: *mut c_void,
-    _kind: u32,
-    _url: *const c_char,
-    out_response: *mut sys::mln_resource_transform_response,
-) -> sys::mln_status {
-    // SAFETY: Native provides callback-duration output storage or null; the
-    // helper validates null before writing.
-    unsafe { initialize_resource_transform_response(out_response) }
 }
 
 pub fn status_for_error(error: &Error) -> sys::mln_status {

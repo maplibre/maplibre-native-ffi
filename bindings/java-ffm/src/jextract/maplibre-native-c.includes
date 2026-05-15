@@ -419,6 +419,7 @@
 --include-function mln_runtime_run_once
 --include-function mln_runtime_set_resource_provider
 --include-function mln_runtime_set_resource_transform
+--include-function mln_runtime_clear_resource_transform
 
 # include/maplibre_native_c/style.h
 --include-struct mln_canonical_tile_id

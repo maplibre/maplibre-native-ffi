@@ -13,9 +13,7 @@ use crate::events::{
 };
 use crate::handle::{ThreadAffineNativeHandle, closed_handle_error, out_handle};
 use crate::map::MapState;
-use crate::resource::{
-    ResourceProviderState, ResourceTransformState, noop_resource_transform_descriptor,
-};
+use crate::resource::{ResourceProviderState, ResourceTransformState};
 use crate::{
     Error, ErrorKind, HandleOperationError, MapHandle, MapOptions, ResourceProviderDecision, Result,
 };
@@ -103,7 +101,6 @@ impl RuntimeState {
     where
         F: Fn(crate::ResourceTransformRequest) -> Option<String> + Send + Sync + 'static,
     {
-        self.check_resource_callbacks_allowed()?;
         let runtime = self.as_ptr()?;
         let replacement = ResourceTransformState::new(callback);
         let descriptor = replacement.descriptor();
@@ -120,16 +117,11 @@ impl RuntimeState {
     }
 
     fn clear_resource_transform(&self) -> Result<()> {
-        self.check_resource_callbacks_allowed()?;
         let runtime = self.as_ptr()?;
-        let descriptor = noop_resource_transform_descriptor();
 
-        // SAFETY: runtime is live. The C ABI has no null clear operation, so a
-        // no-op transform with static function state restores pass-through
-        // behavior without retaining Rust callback state.
-        maplibre_core::check(unsafe {
-            sys::mln_runtime_set_resource_transform(runtime, &descriptor)
-        })?;
+        // SAFETY: runtime is live. Native clear waits for in-flight transform
+        // callbacks before returning, so dropping Rust callback state below is safe.
+        maplibre_core::check(unsafe { sys::mln_runtime_clear_resource_transform(runtime) })?;
         self.resource_transform.borrow_mut().take();
         Ok(())
     }
@@ -279,12 +271,13 @@ impl RuntimeHandle {
 
     /// Installs or replaces the runtime-scoped network URL transform.
     ///
-    /// The transform must be installed before creating maps from this runtime.
-    /// Native code may invoke it from worker or network threads, so the closure
-    /// must be thread-safe and `'static`. Keep the closure quick, and do not
-    /// call MapLibre Native APIs from it. Returning `Some(url)` replaces the
-    /// request URL; returning `None` or an empty string keeps the original URL.
-    /// Panics are contained and treated by native code as no rewrite.
+    /// The transform may be installed before or after creating maps from this
+    /// runtime. Native code may invoke it from worker or network threads, so
+    /// the closure must be thread-safe and `'static`. Keep the closure quick,
+    /// and do not call MapLibre Native APIs from it. Returning `Some(url)`
+    /// replaces the request URL; returning `None` or an empty string keeps the
+    /// original URL. Panics are contained and treated by native code as no
+    /// rewrite.
     pub fn set_resource_transform<F>(&self, callback: F) -> Result<()>
     where
         F: Fn(crate::ResourceTransformRequest) -> Option<String> + Send + Sync + 'static,
@@ -294,11 +287,9 @@ impl RuntimeHandle {
 
     /// Clears the runtime-scoped network URL transform.
     ///
-    /// Like installation, clearing must happen before creating maps from this
-    /// runtime. The current C ABI has no null clear operation. This method
-    /// installs a native no-op transform before releasing Rust callback state,
-    /// restoring pass-through URL behavior while honoring native install
-    /// constraints.
+    /// Clearing may happen before or after creating maps from this runtime.
+    /// Native clear waits for in-flight transform callbacks before returning,
+    /// so this method can release Rust callback state after a successful clear.
     pub fn clear_resource_transform(&self) -> Result<()> {
         self.inner.clear_resource_transform()
     }
@@ -948,7 +939,7 @@ mod tests {
     }
 
     #[test]
-    fn resource_transform_replacement_rolls_back_when_native_install_fails() {
+    fn resource_transform_replacement_after_map_creation_releases_previous_state() {
         let runtime = RuntimeHandle::new().unwrap();
         let first = Arc::new(());
         let first_callback = Arc::clone(&first);
@@ -962,20 +953,19 @@ mod tests {
 
         let second = Arc::new(());
         let second_callback = Arc::clone(&second);
-        let error = runtime
+        runtime
             .set_resource_transform(move |_| {
                 let _ = &second_callback;
                 None
             })
-            .unwrap_err();
+            .unwrap();
 
-        assert_eq!(error.kind(), ErrorKind::InvalidState);
-        assert_eq!(Arc::strong_count(&first), 2);
-        assert_eq!(Arc::strong_count(&second), 1);
+        assert_eq!(Arc::strong_count(&first), 1);
+        assert_eq!(Arc::strong_count(&second), 2);
 
         map.close().unwrap();
         runtime.close().unwrap();
-        assert_eq!(Arc::strong_count(&first), 1);
+        assert_eq!(Arc::strong_count(&second), 1);
     }
 
     #[test]
@@ -997,19 +987,18 @@ mod tests {
     }
 
     #[test]
-    fn resource_transform_rejects_install_after_map_creation() {
+    fn resource_transform_installs_after_map_creation() {
         let runtime = RuntimeHandle::new().unwrap();
         let map = runtime.create_map().unwrap();
 
-        let error = runtime.set_resource_transform(|_| None).unwrap_err();
+        runtime.set_resource_transform(|_| None).unwrap();
 
-        assert_eq!(error.kind(), ErrorKind::InvalidState);
         map.close().unwrap();
         runtime.close().unwrap();
     }
 
     #[test]
-    fn resource_transform_rejects_clear_after_map_was_closed_and_keeps_state_until_close() {
+    fn resource_transform_clears_after_map_was_closed_and_releases_state() {
         let runtime = RuntimeHandle::new().unwrap();
         let token = Arc::new(());
         let callback_token = Arc::clone(&token);
@@ -1024,14 +1013,11 @@ mod tests {
         let map = runtime.create_map().unwrap();
         map.close().unwrap();
 
-        let error = runtime.clear_resource_transform().unwrap_err();
+        runtime.clear_resource_transform().unwrap();
 
-        assert_eq!(error.kind(), ErrorKind::InvalidState);
-        assert_eq!(error.raw_status(), None);
-        assert_eq!(Arc::strong_count(&token), 2);
+        assert_eq!(Arc::strong_count(&token), 1);
 
         runtime.close().unwrap();
-        assert_eq!(Arc::strong_count(&token), 1);
     }
 
     #[test]

@@ -204,6 +204,14 @@ public final class RuntimeHandle implements AutoCloseable {
     closeQuietly(previous);
   }
 
+  public void clearResourceTransform() {
+    NativeAccess.ensureLoaded();
+    Status.check(MapLibreNativeC.mln_runtime_clear_resource_transform(state.requireLive()));
+    var previous = resourceTransformState;
+    resourceTransformState = null;
+    closeQuietly(previous);
+  }
+
   public void setResourceProvider(ResourceProviderCallback callback) {
     NativeAccess.ensureLoaded();
     var replacement = new ResourceProviderState(Objects.requireNonNull(callback, "callback"));

@@ -264,10 +264,6 @@ impl ResourceTransformState {
     }
 }
 
-pub(crate) fn noop_resource_transform_descriptor() -> sys::mln_resource_transform {
-    maplibre_core::resource::noop_resource_transform_descriptor()
-}
-
 unsafe extern "C" fn resource_transform_trampoline(
     user_data: *mut c_void,
     kind: u32,

@@ -79,6 +79,7 @@ final class RuntimeHandleTest {
     var runtime = RuntimeHandle.create();
     try {
       runtime.setResourceTransform(request -> java.util.Optional.empty());
+      runtime.clearResourceTransform();
       runtime.setResourceProvider((request, handle) -> ResourceProviderDecision.PASS_THROUGH);
     } finally {
       runtime.close();
@@ -86,13 +87,23 @@ final class RuntimeHandleTest {
   }
 
   @Test
-  void resourceCallbacksRejectInstallAfterMapCreation() {
+  void resourceTransformUpdatesAndClearsAfterMapCreation() {
     var runtime = RuntimeHandle.create();
     var map = MapHandle.create(runtime, new MapOptions().size(128, 128));
     try {
-      assertThrows(
-          InvalidStateException.class,
-          () -> runtime.setResourceTransform(request -> java.util.Optional.empty()));
+      runtime.setResourceTransform(request -> java.util.Optional.empty());
+      runtime.clearResourceTransform();
+    } finally {
+      map.close();
+      runtime.close();
+    }
+  }
+
+  @Test
+  void resourceProviderRejectsInstallAfterMapCreation() {
+    var runtime = RuntimeHandle.create();
+    var map = MapHandle.create(runtime, new MapOptions().size(128, 128));
+    try {
       assertThrows(
           InvalidStateException.class,
           () ->
