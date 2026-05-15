@@ -649,6 +649,32 @@ test "render session queries cluster feature extensions" {
     try testing.expectEqual(@as(usize, 1), leaf_collection.features.len);
 }
 
+test "unsupported backend owned texture attachment reports unsupported" {
+    const runtime = try maplibre.RuntimeHandle.init(null);
+    defer runtime.close() catch @panic("runtime close failed");
+
+    const map = try maplibre.MapHandle.create(runtime, .{});
+    defer map.close() catch @panic("map close failed");
+
+    const fake_pointer = maplibre.NativePointer{ .ptr = @ptrFromInt(1) };
+    if (build_options.supports_metal) {
+        try testing.expectError(error.Unsupported, maplibre.attachVulkanOwnedTexture(map, .{
+            .context = .{
+                .instance = fake_pointer,
+                .physical_device = fake_pointer,
+                .device = fake_pointer,
+                .graphics_queue = fake_pointer,
+                .graphics_queue_family_index = 0,
+            },
+        }));
+    }
+    if (build_options.supports_vulkan) {
+        try testing.expectError(error.Unsupported, maplibre.attachMetalOwnedTexture(map, .{
+            .context = .{ .device = fake_pointer },
+        }));
+    }
+}
+
 test "Metal owned texture frame handle scopes native pointers" {
     if (!build_options.supports_metal) return error.SkipZigTest;
     const device = MTLCreateSystemDefaultDevice() orelse return error.SkipZigTest;
@@ -668,6 +694,12 @@ test "Metal owned texture frame handle scopes native pointers" {
     try map.setStyleJson(testing.allocator, support.style_json);
     try testing.expect(try waitForEvent(runtime, .map_render_update_available));
     try session.renderUpdate();
+
+    var image = try session.readPremultipliedRgba8(testing.allocator);
+    defer image.deinit();
+    try testing.expectEqual(@as(u32, 32), image.info.width);
+    try testing.expectEqual(@as(u32, 32), image.info.height);
+    try testing.expectEqual(@as(usize, 32 * 32 * 4), image.info.byte_length);
 
     const frame = try session.acquireMetalOwnedTextureFrame();
     const info = try frame.info();
@@ -778,6 +810,12 @@ test "Vulkan owned texture frame handle scopes native pointers" {
     try map.setStyleJson(testing.allocator, support.style_json);
     try testing.expect(try waitForEvent(runtime, .map_render_update_available));
     try session.renderUpdate();
+
+    var image = try session.readPremultipliedRgba8(testing.allocator);
+    defer image.deinit();
+    try testing.expectEqual(@as(u32, 32), image.info.width);
+    try testing.expectEqual(@as(u32, 32), image.info.height);
+    try testing.expectEqual(@as(usize, 32 * 32 * 4), image.info.byte_length);
 
     const frame = try session.acquireVulkanOwnedTextureFrame();
     const info = try frame.info();
