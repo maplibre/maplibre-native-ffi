@@ -99,11 +99,15 @@ pub const MapProjectionHandle = enum(usize) {
         return values.latLngFromNative(coordinate);
     }
 
+    /// Closes the native projection and releases this Zig wrapper state.
+    ///
+    /// After this succeeds, this handle and any copies of it are invalid.
     pub fn close(self: MapProjectionHandle) status.Error!void {
         const projection_state = state(self);
         const projection = projection_state.native orelse return;
         try status.checkStatus(c.mln_map_projection_destroy(projection), projection_state.diagnostic_store);
         projection_state.native = null;
+        std.heap.smp_allocator.destroy(projection_state);
     }
 };
 

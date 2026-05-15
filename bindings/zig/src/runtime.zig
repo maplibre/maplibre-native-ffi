@@ -945,6 +945,9 @@ pub const RuntimeHandle = enum(usize) {
         runtime_state.resource_provider = provider;
     }
 
+    /// Closes the native runtime and releases this Zig wrapper state.
+    ///
+    /// After this succeeds, this handle and any copies of it are invalid.
     pub fn close(self: RuntimeHandle) status.Error!void {
         const runtime_state = state(self);
         const runtime = runtime_state.native orelse return;
@@ -956,6 +959,7 @@ pub const RuntimeHandle = enum(usize) {
         runtime_state.maps.deinit(std.heap.smp_allocator);
         runtime_state.maps = .empty;
         runtime_state.native = null;
+        std.heap.smp_allocator.destroy(runtime_state);
     }
 };
 

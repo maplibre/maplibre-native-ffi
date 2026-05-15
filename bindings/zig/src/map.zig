@@ -1301,6 +1301,9 @@ pub const MapHandle = enum(usize) {
         try status.checkStatus(c.mln_map_set_free_camera_options(try native(self), &raw_options), state(self).diagnostic_store);
     }
 
+    /// Closes the native map and releases this Zig wrapper state.
+    ///
+    /// After this succeeds, this handle and any copies of it are invalid.
     pub fn close(self: MapHandle) status.Error!void {
         const map_state = state(self);
         const map = map_state.native orelse return;
@@ -1308,6 +1311,7 @@ pub const MapHandle = enum(usize) {
         runtime_module.unregisterMap(map_state.runtime, map);
         freeCustomGeometrySourceStates(map_state);
         map_state.native = null;
+        std.heap.smp_allocator.destroy(map_state);
     }
 };
 

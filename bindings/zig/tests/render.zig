@@ -417,11 +417,10 @@ test "owned texture render session lifecycle and readback" {
     const map = try maplibre.MapHandle.create(runtime, .{});
     defer map.close() catch @panic("map close failed");
 
-    var session = try maplibre.attachOwnedTexture(map, .{
+    const session = try maplibre.attachOwnedTexture(map, .{
         .extent = .{ .width = 32, .height = 16, .scale_factor = 1.0 },
     });
-    const session_copy = session;
-    defer session.close() catch {};
+    errdefer session.close() catch {};
 
     try testing.expectError(error.InvalidState, session.readPremultipliedRgba8(testing.allocator));
 
@@ -452,9 +451,6 @@ test "owned texture render session lifecycle and readback" {
     try session.detach();
     try testing.expectError(error.InvalidState, session.renderUpdate());
     try session.close();
-    try session.close();
-    try testing.expectError(error.ClosedHandle, session.renderUpdate());
-    try testing.expectError(error.ClosedHandle, session_copy.renderUpdate());
 }
 
 test "still-image map modes drive owned texture rendering" {

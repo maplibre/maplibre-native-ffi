@@ -34,7 +34,6 @@ test "runtime and map vertical slice" {
     try testing.expectEqual(@as(?maplibre.RuntimeEvent, null), try runtime.pollEvent());
 
     const map = try maplibre.MapHandle.create(runtime, .{});
-    defer map.close() catch @panic("map close failed");
 
     try map.setStyleJson(testing.allocator, support.style_json);
     try runtime.runOnce();
@@ -46,33 +45,19 @@ test "runtime and map vertical slice" {
     defer map_after_close.close() catch @panic("map close failed");
     const projection = try maplibre.MapProjectionHandle.create(map_after_close);
     try projection.close();
-    try projection.close();
 }
 
-test "successful close is idempotent and closed handles fail before C calls" {
+test "successful close releases lifecycle handles" {
     var diagnostics = maplibre.DiagnosticStore.init(testing.allocator);
     defer diagnostics.deinit();
 
     const runtime = try maplibre.RuntimeHandle.init(&diagnostics);
-    const runtime_copy = runtime;
     const map = try maplibre.MapHandle.create(runtime, .{});
-    const map_copy = map;
     const projection = try maplibre.MapProjectionHandle.create(map);
-    const projection_copy = projection;
 
     try projection.close();
-    try projection.close();
-    try testing.expectError(error.ClosedHandle, projection_copy.getCamera());
-
     try map.close();
-    try map.close();
-    try testing.expectError(error.ClosedHandle, map.requestRepaint());
-    try testing.expectError(error.ClosedHandle, map_copy.requestRepaint());
-
     try runtime.close();
-    try runtime.close();
-    try testing.expectError(error.ClosedHandle, runtime.runOnce());
-    try testing.expectError(error.ClosedHandle, runtime_copy.runOnce());
 }
 
 test "failed close remains retryable" {
@@ -133,19 +118,6 @@ test "runtime supports multiple maps" {
     defer second.close() catch @panic("second map close failed");
 
     try runtime.runOnce();
-}
-
-test "map string methods check closed handles before string materialization" {
-    var diagnostics = maplibre.DiagnosticStore.init(testing.allocator);
-    defer diagnostics.deinit();
-
-    const runtime = try maplibre.RuntimeHandle.init(&diagnostics);
-    defer runtime.close() catch @panic("runtime close failed");
-    const map = try maplibre.MapHandle.create(runtime, .{});
-    defer map.close() catch @panic("map close failed");
-
-    try map.close();
-    try testing.expectError(error.ClosedHandle, map.setStyleJson(testing.allocator, "{\x00}"));
 }
 
 test "live map string methods reject embedded NUL before C calls" {

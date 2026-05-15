@@ -451,12 +451,16 @@ pub const RenderSessionHandle = enum(usize) {
         return .{ .session = self, .generation = session_state.vulkan_frame_generation };
     }
 
+    /// Closes the native render session and releases this Zig wrapper state.
+    ///
+    /// After this succeeds, this handle and any copies of it are invalid.
     pub fn close(self: RenderSessionHandle) status.Error!void {
         const session_state = state(self);
         const session = session_state.native orelse return;
         if (session_state.metal_frame_active or session_state.vulkan_frame_active) return error.ActiveBorrow;
         try status.checkStatus(c.mln_render_session_destroy(session), session_state.diagnostic_store);
         session_state.native = null;
+        std.heap.smp_allocator.destroy(session_state);
     }
 };
 
