@@ -1,11 +1,17 @@
 const std = @import("std");
+const builtin = @import("builtin");
 const build_options = @import("build_options");
 const testing = std.testing;
 
 const maplibre = @import("maplibre_native");
+const metal_support = @import("metal_support.zig");
 const support = @import("support.zig");
 
 extern "c" fn MTLCreateSystemDefaultDevice() ?*anyopaque;
+
+const vk = if (build_options.supports_vulkan) @cImport({
+    @cInclude("vulkan/vulkan.h");
+}) else struct {};
 
 const cluster_style_json =
     \\{
@@ -142,6 +148,268 @@ fn waitForEvent(runtime: maplibre.RuntimeHandle, event_type: maplibre.RuntimeEve
     return false;
 }
 
+fn expectPixelApprox(actual: [4]u8, expected: [4]u8, tolerance: u8) !void {
+    for (actual, expected) |actual_channel, expected_channel| {
+        const delta = if (actual_channel > expected_channel)
+            actual_channel - expected_channel
+        else
+            expected_channel - actual_channel;
+        try testing.expect(delta <= tolerance);
+    }
+}
+
+const RenderSessionThreadCall = enum {
+    render_update,
+    resize,
+    detach,
+    reduce_memory_use,
+    clear_data,
+    dump_debug_logs,
+    close,
+    acquire_metal_frame,
+    acquire_vulkan_frame,
+};
+
+fn callRenderSessionOnThread(session: maplibre.RenderSessionHandle, call: RenderSessionThreadCall, out_error: *?anyerror) void {
+    const result = switch (call) {
+        .render_update => session.renderUpdate(),
+        .resize => session.resize(.{ .width = 16, .height = 16, .scale_factor = 1.0 }),
+        .detach => session.detach(),
+        .reduce_memory_use => session.reduceMemoryUse(),
+        .clear_data => session.clearData(),
+        .dump_debug_logs => session.dumpDebugLogs(),
+        .close => session.close(),
+        .acquire_metal_frame => blk: {
+            var frame = session.acquireMetalOwnedTextureFrame() catch |err| break :blk err;
+            frame.release() catch {};
+            break :blk {};
+        },
+        .acquire_vulkan_frame => blk: {
+            var frame = session.acquireVulkanOwnedTextureFrame() catch |err| break :blk err;
+            frame.release() catch {};
+            break :blk {};
+        },
+    };
+    if (result) |_| {
+        out_error.* = null;
+    } else |err| {
+        out_error.* = err;
+    }
+}
+
+fn expectRenderSessionCallWrongThread(session: maplibre.RenderSessionHandle, call: RenderSessionThreadCall) !void {
+    var observed: ?anyerror = null;
+    const thread = try std.Thread.spawn(.{}, callRenderSessionOnThread, .{ session, call, &observed });
+    thread.join();
+    try testing.expect(observed != null);
+    try testing.expect(observed.? == error.WrongThread);
+}
+
+const VulkanAttachContext = if (build_options.supports_vulkan) struct {
+    instance: vk.VkInstance,
+    physical_device: vk.VkPhysicalDevice,
+    device: vk.VkDevice,
+    queue: vk.VkQueue,
+    queue_family_index: u32,
+
+    pub fn init() !VulkanAttachContext {
+        var app_info = std.mem.zeroes(vk.VkApplicationInfo);
+        app_info.sType = vk.VK_STRUCTURE_TYPE_APPLICATION_INFO;
+        app_info.pApplicationName = "maplibre-native-zig-binding-tests";
+        app_info.applicationVersion = 1;
+        app_info.pEngineName = "maplibre-native-zig-binding-tests";
+        app_info.engineVersion = 1;
+        app_info.apiVersion = vk.VK_API_VERSION_1_1;
+
+        var instance_info = std.mem.zeroes(vk.VkInstanceCreateInfo);
+        instance_info.sType = vk.VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
+        instance_info.pApplicationInfo = &app_info;
+        if (builtin.os.tag == .macos) {
+            const instance_extensions = [_][*c]const u8{vk.VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME};
+            instance_info.flags = vk.VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
+            instance_info.enabledExtensionCount = instance_extensions.len;
+            instance_info.ppEnabledExtensionNames = &instance_extensions;
+        }
+
+        var instance: vk.VkInstance = null;
+        try expectVk(vk.vkCreateInstance(&instance_info, null, &instance));
+        errdefer vk.vkDestroyInstance(instance, null);
+
+        var physical_device_count: u32 = 0;
+        try expectVk(vk.vkEnumeratePhysicalDevices(instance, &physical_device_count, null));
+        try testing.expect(physical_device_count != 0);
+
+        const physical_devices = try testing.allocator.alloc(vk.VkPhysicalDevice, physical_device_count);
+        defer testing.allocator.free(physical_devices);
+        try expectVk(vk.vkEnumeratePhysicalDevices(instance, &physical_device_count, physical_devices.ptr));
+
+        for (physical_devices) |physical_device| {
+            var queue_family_count: u32 = 0;
+            vk.vkGetPhysicalDeviceQueueFamilyProperties(physical_device, &queue_family_count, null);
+            if (queue_family_count == 0) continue;
+
+            const queue_families = try testing.allocator.alloc(vk.VkQueueFamilyProperties, queue_family_count);
+            defer testing.allocator.free(queue_families);
+            vk.vkGetPhysicalDeviceQueueFamilyProperties(physical_device, &queue_family_count, queue_families.ptr);
+
+            for (queue_families, 0..) |queue_family, index| {
+                if ((queue_family.queueFlags & vk.VK_QUEUE_GRAPHICS_BIT) == 0 or queue_family.queueCount == 0) continue;
+
+                var priority: f32 = 1.0;
+                var queue_info = std.mem.zeroes(vk.VkDeviceQueueCreateInfo);
+                queue_info.sType = vk.VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+                queue_info.queueFamilyIndex = @intCast(index);
+                queue_info.queueCount = 1;
+                queue_info.pQueuePriorities = &priority;
+
+                var supported_features = std.mem.zeroes(vk.VkPhysicalDeviceFeatures);
+                vk.vkGetPhysicalDeviceFeatures(physical_device, &supported_features);
+                var features = std.mem.zeroes(vk.VkPhysicalDeviceFeatures);
+                features.samplerAnisotropy = supported_features.samplerAnisotropy;
+                features.wideLines = supported_features.wideLines;
+
+                var device_info = std.mem.zeroes(vk.VkDeviceCreateInfo);
+                device_info.sType = vk.VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+                device_info.queueCreateInfoCount = 1;
+                device_info.pQueueCreateInfos = &queue_info;
+                device_info.pEnabledFeatures = &features;
+
+                var device: vk.VkDevice = null;
+                if (vk.vkCreateDevice(physical_device, &device_info, null, &device) != vk.VK_SUCCESS) continue;
+
+                var queue: vk.VkQueue = null;
+                vk.vkGetDeviceQueue(device, @intCast(index), 0, &queue);
+                return .{
+                    .instance = instance,
+                    .physical_device = physical_device,
+                    .device = device,
+                    .queue = queue,
+                    .queue_family_index = @intCast(index),
+                };
+            }
+        }
+
+        return error.NoUsableVulkanGraphicsQueue;
+    }
+
+    pub fn deinit(self: *VulkanAttachContext) void {
+        _ = vk.vkDeviceWaitIdle(self.device);
+        vk.vkDestroyDevice(self.device, null);
+        vk.vkDestroyInstance(self.instance, null);
+    }
+
+    pub fn descriptor(self: *const VulkanAttachContext) maplibre.VulkanContextDescriptor {
+        return .{
+            .instance = .{ .ptr = @ptrCast(self.instance.?) },
+            .physical_device = .{ .ptr = @ptrCast(self.physical_device.?) },
+            .device = .{ .ptr = @ptrCast(self.device.?) },
+            .graphics_queue = .{ .ptr = @ptrCast(self.queue.?) },
+            .graphics_queue_family_index = self.queue_family_index,
+        };
+    }
+} else struct {};
+
+const VulkanBorrowedImage = if (build_options.supports_vulkan) struct {
+    context: VulkanAttachContext,
+    image: vk.VkImage,
+    image_view: vk.VkImageView,
+    memory: vk.VkDeviceMemory,
+    width: u32,
+    height: u32,
+
+    pub fn create(width: u32, height: u32) !VulkanBorrowedImage {
+        var context = try VulkanAttachContext.init();
+        errdefer context.deinit();
+
+        var image: vk.VkImage = null;
+        var memory: vk.VkDeviceMemory = null;
+        var image_view: vk.VkImageView = null;
+        errdefer {
+            if (image_view != null) vk.vkDestroyImageView(context.device, image_view, null);
+            if (image != null) vk.vkDestroyImage(context.device, image, null);
+            if (memory != null) vk.vkFreeMemory(context.device, memory, null);
+        }
+
+        var image_info = std.mem.zeroes(vk.VkImageCreateInfo);
+        image_info.sType = vk.VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+        image_info.imageType = vk.VK_IMAGE_TYPE_2D;
+        image_info.format = vk.VK_FORMAT_R8G8B8A8_UNORM;
+        image_info.extent = .{ .width = width, .height = height, .depth = 1 };
+        image_info.mipLevels = 1;
+        image_info.arrayLayers = 1;
+        image_info.samples = vk.VK_SAMPLE_COUNT_1_BIT;
+        image_info.tiling = vk.VK_IMAGE_TILING_OPTIMAL;
+        image_info.usage = vk.VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | vk.VK_IMAGE_USAGE_SAMPLED_BIT | vk.VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+        image_info.sharingMode = vk.VK_SHARING_MODE_EXCLUSIVE;
+        image_info.initialLayout = vk.VK_IMAGE_LAYOUT_UNDEFINED;
+        try expectVk(vk.vkCreateImage(context.device, &image_info, null, &image));
+
+        var requirements: vk.VkMemoryRequirements = undefined;
+        vk.vkGetImageMemoryRequirements(context.device, image, &requirements);
+
+        var allocate_info = std.mem.zeroes(vk.VkMemoryAllocateInfo);
+        allocate_info.sType = vk.VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+        allocate_info.allocationSize = requirements.size;
+        allocate_info.memoryTypeIndex = try findVulkanMemoryType(context.physical_device, requirements.memoryTypeBits, vk.VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+        try expectVk(vk.vkAllocateMemory(context.device, &allocate_info, null, &memory));
+        try expectVk(vk.vkBindImageMemory(context.device, image, memory, 0));
+
+        var view_info = std.mem.zeroes(vk.VkImageViewCreateInfo);
+        view_info.sType = vk.VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+        view_info.image = image;
+        view_info.viewType = vk.VK_IMAGE_VIEW_TYPE_2D;
+        view_info.format = vk.VK_FORMAT_R8G8B8A8_UNORM;
+        view_info.subresourceRange = .{
+            .aspectMask = vk.VK_IMAGE_ASPECT_COLOR_BIT,
+            .baseMipLevel = 0,
+            .levelCount = 1,
+            .baseArrayLayer = 0,
+            .layerCount = 1,
+        };
+        try expectVk(vk.vkCreateImageView(context.device, &view_info, null, &image_view));
+
+        return .{ .context = context, .image = image, .image_view = image_view, .memory = memory, .width = width, .height = height };
+    }
+
+    pub fn deinit(self: *VulkanBorrowedImage) void {
+        _ = vk.vkDeviceWaitIdle(self.context.device);
+        vk.vkDestroyImageView(self.context.device, self.image_view, null);
+        vk.vkDestroyImage(self.context.device, self.image, null);
+        vk.vkFreeMemory(self.context.device, self.memory, null);
+        self.context.deinit();
+    }
+
+    pub fn descriptor(self: *const VulkanBorrowedImage) maplibre.VulkanBorrowedTextureDescriptor {
+        return .{
+            .extent = .{ .width = self.width, .height = self.height },
+            .context = self.context.descriptor(),
+            .image = .{ .ptr = @ptrCast(self.image.?) },
+            .image_view = .{ .ptr = @ptrCast(self.image_view.?) },
+            .format = @as(u32, vk.VK_FORMAT_R8G8B8A8_UNORM),
+            .initial_layout = @as(u32, vk.VK_IMAGE_LAYOUT_UNDEFINED),
+            .final_layout = @as(u32, vk.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL),
+        };
+    }
+} else struct {};
+
+fn expectVk(result: if (build_options.supports_vulkan) vk.VkResult else i32) !void {
+    if (build_options.supports_vulkan) try testing.expectEqual(vk.VK_SUCCESS, result);
+}
+
+fn findVulkanMemoryType(physical_device: if (build_options.supports_vulkan) vk.VkPhysicalDevice else ?*anyopaque, type_filter: u32, properties: if (build_options.supports_vulkan) vk.VkMemoryPropertyFlags else u32) !u32 {
+    var memory_properties: vk.VkPhysicalDeviceMemoryProperties = undefined;
+    vk.vkGetPhysicalDeviceMemoryProperties(physical_device, &memory_properties);
+
+    for (0..memory_properties.memoryTypeCount) |index| {
+        const type_bit = @as(u32, 1) << @as(u5, @intCast(index));
+        const memory_type = memory_properties.memoryTypes[index];
+        if ((type_filter & type_bit) != 0 and (memory_type.propertyFlags & properties) == properties) {
+            return @intCast(index);
+        }
+    }
+    return error.NoSuitableVulkanMemoryType;
+}
+
 test "owned texture render session lifecycle and readback" {
     const runtime = try maplibre.RuntimeHandle.init(null);
     defer runtime.close() catch @panic("runtime close failed");
@@ -189,19 +457,21 @@ test "owned texture render session lifecycle and readback" {
     try testing.expectError(error.ClosedHandle, session_copy.renderUpdate());
 }
 
-test "static map still-image requests drive owned texture rendering" {
-    const runtime = try maplibre.RuntimeHandle.init(null);
-    defer runtime.close() catch @panic("runtime close failed");
+test "still-image map modes drive owned texture rendering" {
+    inline for (.{ maplibre.MapMode.static, maplibre.MapMode.tile }) |mode| {
+        const runtime = try maplibre.RuntimeHandle.init(null);
+        defer runtime.close() catch @panic("runtime close failed");
 
-    const map = try maplibre.MapHandle.create(runtime, .{ .mode = .static });
-    defer map.close() catch @panic("map close failed");
+        const map = try maplibre.MapHandle.create(runtime, .{ .mode = mode });
+        defer map.close() catch @panic("map close failed");
 
-    var session = try maplibre.attachOwnedTexture(map, .{ .extent = .{ .width = 32, .height = 32 } });
-    defer session.close() catch {};
+        var session = try maplibre.attachOwnedTexture(map, .{ .extent = .{ .width = 32, .height = 32 } });
+        defer session.close() catch {};
 
-    try map.setStyleJson(testing.allocator, support.style_json);
-    try map.requestStillImage();
-    try testing.expectError(error.InvalidState, map.requestStillImage());
+        try map.setStyleJson(testing.allocator, support.style_json);
+        try map.requestStillImage();
+        try testing.expectError(error.InvalidState, map.requestStillImage());
+    }
 }
 
 test "owned texture attachment validates public descriptors" {
@@ -415,5 +685,151 @@ test "Metal owned texture frame handle scopes native pointers" {
     try frame.release();
     try frame.release();
     try testing.expectError(error.ClosedHandle, frame.info());
+
+    try session.resize(.{ .width = 16, .height = 8, .scale_factor = 2.0 });
+    try session.renderUpdate();
+    const resized_frame = try session.acquireMetalOwnedTextureFrame();
+    const resized_info = try resized_frame.info();
+    try testing.expectEqual(@as(u32, 32), resized_info.width);
+    try testing.expectEqual(@as(u32, 16), resized_info.height);
+    try testing.expectEqual(@as(f64, 2.0), resized_info.scale_factor);
+    try testing.expectEqual(@as(u64, 2), resized_info.generation);
+    try resized_frame.release();
+
+    try expectRenderSessionCallWrongThread(session, .acquire_metal_frame);
     try session.close();
+}
+
+test "render session rejects wrong-thread calls through public bindings" {
+    const runtime = try maplibre.RuntimeHandle.init(null);
+    defer runtime.close() catch @panic("runtime close failed");
+
+    const map = try maplibre.MapHandle.create(runtime, .{});
+    defer map.close() catch @panic("map close failed");
+
+    var session = try maplibre.attachOwnedTexture(map, .{});
+    defer session.close() catch {};
+
+    inline for (.{
+        RenderSessionThreadCall.render_update,
+        .resize,
+        .detach,
+        .reduce_memory_use,
+        .clear_data,
+        .dump_debug_logs,
+        .close,
+    }) |call| {
+        try expectRenderSessionCallWrongThread(session, call);
+    }
+}
+
+test "Metal borrowed texture renders through public bindings" {
+    if (!build_options.supports_metal) return error.SkipZigTest;
+    const device = MTLCreateSystemDefaultDevice() orelse return error.SkipZigTest;
+
+    const pool = try metal_support.AutoreleasePool.init();
+    defer pool.deinit();
+
+    const borrowed = try metal_support.createTexture(device, 128, 128);
+    defer metal_support.releaseObject(borrowed);
+    try metal_support.clearTextureRGBA8(borrowed, .{ 255, 0, 255, 255 });
+    try expectPixelApprox(try metal_support.readTexturePixelRGBA8(borrowed, 0, 0), .{ 255, 0, 255, 255 }, 0);
+
+    const runtime = try maplibre.RuntimeHandle.init(null);
+    defer runtime.close() catch @panic("runtime close failed");
+
+    const map = try maplibre.MapHandle.create(runtime, .{});
+    defer map.close() catch @panic("map close failed");
+
+    var session = try maplibre.attachMetalBorrowedTexture(map, .{
+        .extent = .{ .width = 128, .height = 128 },
+        .texture = .{ .ptr = borrowed },
+    });
+    defer session.close() catch {};
+
+    try map.setStyleJson(testing.allocator, support.style_json);
+    try testing.expect(try waitForEvent(runtime, .map_render_update_available));
+    try session.renderUpdate();
+    try expectPixelApprox(try metal_support.readTexturePixelRGBA8(borrowed, 0, 0), .{ 0xd8, 0xf1, 0xff, 0xff }, 8);
+
+    try testing.expectError(error.Unsupported, session.acquireMetalOwnedTextureFrame());
+    try testing.expectError(error.Unsupported, session.resize(.{ .width = 64, .height = 64, .scale_factor = 1.0 }));
+    try testing.expectError(error.Unsupported, session.readPremultipliedRgba8(testing.allocator));
+}
+
+test "Vulkan owned texture frame handle scopes native pointers" {
+    if (!build_options.supports_vulkan) return error.SkipZigTest;
+
+    var context = try VulkanAttachContext.init();
+    defer context.deinit();
+
+    const runtime = try maplibre.RuntimeHandle.init(null);
+    defer runtime.close() catch @panic("runtime close failed");
+
+    const map = try maplibre.MapHandle.create(runtime, .{});
+    defer map.close() catch @panic("map close failed");
+
+    var session = try maplibre.attachVulkanOwnedTexture(map, .{
+        .extent = .{ .width = 32, .height = 32, .scale_factor = 1.0 },
+        .context = context.descriptor(),
+    });
+    defer session.close() catch {};
+
+    try map.setStyleJson(testing.allocator, support.style_json);
+    try testing.expect(try waitForEvent(runtime, .map_render_update_available));
+    try session.renderUpdate();
+
+    const frame = try session.acquireVulkanOwnedTextureFrame();
+    const info = try frame.info();
+    try testing.expectEqual(@as(u32, 32), info.width);
+    try testing.expectEqual(@as(u32, 32), info.height);
+    try testing.expectEqual(@as(u64, 1), info.generation);
+    try testing.expect(info.image.ptr != info.device.ptr);
+
+    try testing.expectError(error.ActiveBorrow, session.resize(.{ .width = 16, .height = 16, .scale_factor = 1.0 }));
+    try testing.expectError(error.ActiveBorrow, session.renderUpdate());
+    try testing.expectError(error.ActiveBorrow, session.detach());
+    try testing.expectError(error.ActiveBorrow, session.acquireVulkanOwnedTextureFrame());
+    try testing.expectError(error.ActiveBorrow, session.close());
+
+    try frame.release();
+    try frame.release();
+    try testing.expectError(error.ClosedHandle, frame.info());
+
+    try session.resize(.{ .width = 16, .height = 8, .scale_factor = 2.0 });
+    try session.renderUpdate();
+    const resized_frame = try session.acquireVulkanOwnedTextureFrame();
+    const resized_info = try resized_frame.info();
+    try testing.expectEqual(@as(u32, 32), resized_info.width);
+    try testing.expectEqual(@as(u32, 16), resized_info.height);
+    try testing.expectEqual(@as(f64, 2.0), resized_info.scale_factor);
+    try testing.expectEqual(@as(u64, 2), resized_info.generation);
+    try resized_frame.release();
+
+    try expectRenderSessionCallWrongThread(session, .acquire_vulkan_frame);
+    try session.close();
+}
+
+test "Vulkan borrowed texture renders through public bindings" {
+    if (!build_options.supports_vulkan) return error.SkipZigTest;
+
+    var borrowed = try VulkanBorrowedImage.create(128, 128);
+    defer borrowed.deinit();
+
+    const runtime = try maplibre.RuntimeHandle.init(null);
+    defer runtime.close() catch @panic("runtime close failed");
+
+    const map = try maplibre.MapHandle.create(runtime, .{});
+    defer map.close() catch @panic("map close failed");
+
+    var session = try maplibre.attachVulkanBorrowedTexture(map, borrowed.descriptor());
+    defer session.close() catch {};
+
+    try map.setStyleJson(testing.allocator, support.style_json);
+    try testing.expect(try waitForEvent(runtime, .map_render_update_available));
+    try session.renderUpdate();
+
+    try testing.expectError(error.Unsupported, session.acquireVulkanOwnedTextureFrame());
+    try testing.expectError(error.Unsupported, session.resize(.{ .width = 64, .height = 64, .scale_factor = 1.0 }));
+    try testing.expectError(error.Unsupported, session.readPremultipliedRgba8(testing.allocator));
 }

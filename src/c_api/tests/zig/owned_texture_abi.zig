@@ -33,6 +33,12 @@ test "owned texture attach rejects invalid arguments" {
     try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, c.mln_owned_texture_attach(map, &invalid_descriptor, &texture));
 }
 
+test "render session maintenance rejects null raw handles" {
+    try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, c.mln_render_session_reduce_memory_use(null));
+    try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, c.mln_render_session_clear_data(null));
+    try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, c.mln_render_session_dump_debug_logs(null));
+}
+
 test "render session rejects stale raw handles" {
     const runtime = try support.createRuntime();
     defer support.destroyRuntime(runtime);
