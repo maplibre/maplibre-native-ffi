@@ -106,6 +106,6 @@ pub fn build(b: *std.Build) void {
         run_c_tests.addPathDir(".pixi/envs/default");
         run_c_tests.addPathDir(".pixi/envs/default/Library/bin");
     }
-    const test_step = b.step("test", "Run retained Zig C ABI tests");
+    const test_step = b.step("test", "Run Zig C ABI tests");
     test_step.dependOn(&run_c_tests.step);
 }

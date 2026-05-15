@@ -35,7 +35,6 @@ requires = { platform = ["windows"], backend = ["vulkan"] }
 
 [bindings.java-ffm]
 task = "//bindings/java-ffm:build"
-# The Java build task includes tests, which are runtime-broken on Windows for now.
 requires = { platform = ["linux", "macos"] }
 
 [bindings.rust]
@@ -45,9 +44,3 @@ requires = { platform = ["linux", "macos"] }
 [bindings.zig]
 task = "//bindings/zig:ci"
 requires = { platform = ["linux", "macos"], backend = ["metal", "vulkan"] }
-
-# Windows builds the Zig package against the native artifact, but runtime tests
-# follow the native job's current Windows exclusion.
-[bindings.zig-windows-build]
-task = "//bindings/zig:build"
-requires = { platform = ["windows"], backend = ["vulkan"] }

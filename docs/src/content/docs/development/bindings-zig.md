@@ -143,47 +143,8 @@ objects through explicit frame handles. Backend pointer accessors are scoped to
 the live frame handle and documented with a `Safety:` section when callers must
 uphold synchronization or lifetime rules.
 
-## Build And Test
-
-Use the Zig binding tasks when you need a focused loop:
-
-```bash
-mise run //bindings/zig:build
-mise run //bindings/zig:test
-mise run //bindings/zig:ci
-```
-
-The binding tasks use the active mise variant's native artifact directory and
-render backend. Select another supported variant with `MISE_ENV=<variant>` or
-`mise -E <variant> run ...`.
-
-External Zig consumers pass the native artifact directory and render backend to
-the package dependency. If the package is used outside this repository layout,
-pass `include-dir` as the directory that contains `maplibre_native_c.h`. Vulkan
-consumers may also pass `vulkan-include-dir` and `dependency-library-dir` when
-those dependencies are outside normal system search paths.
-
-The repository root `mise run test` also runs the Zig binding suite for normal
-supported host variants. Run the root task before and after changing shared
-build integration or retiring duplicate direct C assertions.
-
-Build the focused Zig examples when checking package consumption from another
-Zig project:
-
-```bash
-mise run //examples/zig-readback:build
-mise run //examples/zig-map:build
-```
-
-Run GUI examples with a short timeout when you only need a smoke test.
-
 ## Testing
 
 Zig binding tests are the primary Zig-path test suite. They exercise the public
 Zig API against the real `maplibre-native-c` library and cover both native C API
 behavior and Zig adaptation at that boundary.
-
-Focus tests on status-to-error mapping, copied diagnostics, handle close
-behavior, descriptor materialization, allocator-backed output, copied events,
-callback replacement, one-shot request completion, render sessions, readback,
-and texture frame lifetimes. Keep platform scaffolding test-private.
