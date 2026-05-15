@@ -46,7 +46,7 @@ pub fn main(init_args: std.process.Init) !void {
     try map.setStyleJson(allocator, style_json);
     try renderTexture(runtime, map, texture);
 
-    const image = try texture.readPremultipliedRgba8(allocator);
+    var image = try texture.readPremultipliedRgba8(allocator);
     defer image.deinit();
 
     try writePpm(init_args.io, allocator, output_path, image.data, image.info);

@@ -208,7 +208,7 @@ test "image source helpers add update and copy coordinates" {
     try testing.expectError(error.InvalidArgument, handles.map.setImageSourceUrl(testing.allocator, "point", "https://example.com/not-image.png"));
 }
 
-test "style source JSON descriptors reject invalid source data" {
+test "style source JSON descriptors reject invalid source data and pass explicit-length IDs" {
     const handles = try createLoadedMap();
     defer handles.runtime.close() catch @panic("runtime close failed");
     defer handles.map.close() catch @panic("map close failed");
@@ -218,10 +218,20 @@ test "style source JSON descriptors reject invalid source data" {
         error.InvalidArgument,
         handles.map.addStyleSourceJson(testing.allocator, "invalid-json-source", .{ .object = source_members[0..] }),
     );
-    try testing.expectError(
-        error.InvalidString,
-        handles.map.addStyleSourceJson(testing.allocator, "bad\x00source", .{ .object = source_members[0..] }),
-    );
+
+    const empty_features = [_]maplibre.JsonValue{};
+    const data_members = [_]maplibre.JsonMember{
+        .{ .key = "type", .value = .{ .string = "FeatureCollection" } },
+        .{ .key = "features", .value = .{ .array = empty_features[0..] } },
+    };
+    const valid_source_members = [_]maplibre.JsonMember{
+        .{ .key = "type", .value = .{ .string = "geojson" } },
+        .{ .key = "data", .value = .{ .object = data_members[0..] } },
+    };
+    try handles.map.addStyleSourceJson(testing.allocator, "nul\x00source", .{ .object = valid_source_members[0..] });
+    try testing.expect(try handles.map.styleSourceExists(testing.allocator, "nul\x00source"));
+    const info = (try handles.map.getStyleSourceInfo(testing.allocator, "nul\x00source")).?;
+    try testing.expectEqual(@as(usize, "nul\x00source".len), info.id_size);
 }
 
 const CustomGeometryState = struct {

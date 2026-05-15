@@ -7,14 +7,13 @@ const status = @import("status.zig");
 const std = @import("std");
 const values = @import("values.zig");
 
-const MapProjectionStateHandle = opaque {};
 const MapProjectionState = struct {
     native: ?*c.mln_map_projection,
     diagnostic_store: ?*diagnostics.DiagnosticStore,
 };
 
-pub const MapProjectionHandle = struct {
-    state: *MapProjectionStateHandle,
+pub const MapProjectionHandle = enum(usize) {
+    _,
 
     pub fn create(map: MapHandle) status.Error!MapProjectionHandle {
         var projection: ?*c.mln_map_projection = null;
@@ -29,7 +28,7 @@ pub const MapProjectionHandle = struct {
 
         const projection_state = try std.heap.smp_allocator.create(MapProjectionState);
         projection_state.* = .{ .native = projection.?, .diagnostic_store = diagnostic_store };
-        return .{ .state = @ptrCast(projection_state) };
+        return projectionHandleFromState(projection_state);
     }
 
     pub fn getCamera(self: MapProjectionHandle) status.Error!values.CameraOptions {
@@ -64,6 +63,24 @@ pub const MapProjectionHandle = struct {
         );
     }
 
+    pub fn setVisibleGeometry(
+        self: MapProjectionHandle,
+        allocator: std.mem.Allocator,
+        geometry: values.Geometry,
+        padding: values.EdgeInsets,
+    ) status.Error!void {
+        var temp = native_temp.TempStorage.init(allocator);
+        defer temp.deinit();
+        try status.checkStatus(
+            c.mln_map_projection_set_visible_geometry(
+                try native(self),
+                try temp.geometry(geometry),
+                values.edgeInsetsToNative(padding),
+            ),
+            state(self).diagnostic_store,
+        );
+    }
+
     pub fn pixelForLatLng(self: MapProjectionHandle, coordinate: values.LatLng) status.Error!values.ScreenPoint {
         var point: c.mln_screen_point = undefined;
         try status.checkStatus(
@@ -90,22 +107,32 @@ pub const MapProjectionHandle = struct {
     }
 };
 
+fn projectionHandleFromState(projection_state: *MapProjectionState) MapProjectionHandle {
+    return @enumFromInt(@intFromPtr(projection_state));
+}
+
 fn state(handle: MapProjectionHandle) *MapProjectionState {
-    return @ptrCast(@alignCast(handle.state));
+    return @ptrFromInt(@intFromEnum(handle));
 }
 
 fn native(handle: MapProjectionHandle) status.BindingError!*c.mln_map_projection {
     return state(handle).native orelse error.ClosedHandle;
 }
 
-pub fn projectedMetersForLatLng(coordinate: values.LatLng) status.Error!values.ProjectedMeters {
+pub fn projectedMetersForLatLng(
+    coordinate: values.LatLng,
+    diagnostic_store: ?*diagnostics.DiagnosticStore,
+) status.Error!values.ProjectedMeters {
     var meters: c.mln_projected_meters = undefined;
-    try status.checkStatus(c.mln_projected_meters_for_lat_lng(values.latLngToNative(coordinate), &meters), null);
+    try status.checkStatus(c.mln_projected_meters_for_lat_lng(values.latLngToNative(coordinate), &meters), diagnostic_store);
     return values.projectedMetersFromNative(meters);
 }
 
-pub fn latLngForProjectedMeters(meters: values.ProjectedMeters) status.Error!values.LatLng {
+pub fn latLngForProjectedMeters(
+    meters: values.ProjectedMeters,
+    diagnostic_store: ?*diagnostics.DiagnosticStore,
+) status.Error!values.LatLng {
     var coordinate: c.mln_lat_lng = undefined;
-    try status.checkStatus(c.mln_lat_lng_for_projected_meters(values.projectedMetersToNative(meters), &coordinate), null);
+    try status.checkStatus(c.mln_lat_lng_for_projected_meters(values.projectedMetersToNative(meters), &coordinate), diagnostic_store);
     return values.latLngFromNative(coordinate);
 }

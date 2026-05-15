@@ -6,7 +6,6 @@ const native_temp = @import("native_temp.zig");
 const status = @import("status.zig");
 const values = @import("values.zig");
 
-pub const RuntimeStateHandle = opaque {};
 const MapRegistration = struct {
     native: *c.mln_map,
     id: values.MapId,
@@ -23,6 +22,7 @@ const RuntimeState = struct {
 const ResourceRequestState = struct {
     native: ?*c.mln_resource_request_handle,
     completed: bool,
+    diagnostic_store: ?*diagnostics.DiagnosticStore,
 };
 
 const ResourceRequestRegistrySlot = struct {
@@ -334,9 +334,8 @@ pub const ResourceProvider = struct {
     context: ?*anyopaque = null,
 };
 
-pub const ResourceRequestHandle = struct {
-    index: usize,
-    generation: u64,
+pub const ResourceRequestHandle = enum(u128) {
+    _,
 
     pub fn complete(self: ResourceRequestHandle, response: ResourceResponse) status.Error!void {
         lockResourceRequestRegistry();
@@ -347,7 +346,7 @@ pub const ResourceRequestHandle = struct {
         const native_handle = request_state.native orelse return error.ClosedHandle;
         var native_response = resourceResponseToNative(response);
         request_state.completed = true;
-        try status.checkStatus(c.mln_resource_request_complete(native_handle, &native_response), null);
+        try status.checkStatus(c.mln_resource_request_complete(native_handle, &native_response), request_state.diagnostic_store);
     }
 
     pub fn cancelled(self: ResourceRequestHandle) status.Error!bool {
@@ -357,7 +356,7 @@ pub const ResourceRequestHandle = struct {
         const request_state = resourceRequestState(self) orelse return error.ClosedHandle;
         const native_handle = request_state.native orelse return error.ClosedHandle;
         var is_cancelled = false;
-        try status.checkStatus(c.mln_resource_request_cancelled(native_handle, &is_cancelled), null);
+        try status.checkStatus(c.mln_resource_request_cancelled(native_handle, &is_cancelled), request_state.diagnostic_store);
         return is_cancelled;
     }
 
@@ -680,8 +679,8 @@ pub const RuntimeEventPayloadType = union(enum) {
     }
 };
 
-pub const RuntimeHandle = struct {
-    state: *RuntimeStateHandle,
+pub const RuntimeHandle = enum(usize) {
+    _,
 
     pub fn init(diagnostic_store: ?*diagnostics.DiagnosticStore) status.Error!RuntimeHandle {
         var native_options = c.mln_runtime_options_default();
@@ -895,8 +894,14 @@ pub const RuntimeHandle = struct {
         );
     }
 
-    pub fn setResourceTransform(self: RuntimeHandle, transform: ResourceTransform) status.Error!void {
+    pub fn setResourceTransform(self: RuntimeHandle, transform: ?ResourceTransform) status.Error!void {
         const runtime_state = state(self);
+        if (transform == null) {
+            _ = try native(self);
+            runtime_state.resource_transform = null;
+            return;
+        }
+
         var native_transform = c.mln_resource_transform{
             .size = @sizeOf(c.mln_resource_transform),
             .callback = resourceTransformTrampoline,
@@ -962,7 +967,7 @@ fn createNative(
         .resource_transform = null,
         .resource_provider = null,
     };
-    return .{ .state = @ptrCast(runtime_state) };
+    return runtimeHandleFromState(runtime_state);
 }
 
 fn runtimeEventFromNative(handle: RuntimeHandle, native_event: c.mln_runtime_event) RuntimeEvent {
@@ -1017,7 +1022,7 @@ fn resourceProviderTrampoline(
     const raw_request = request orelse return c.MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH;
     const request_view = resourceRequestFromNative(std.heap.smp_allocator, raw_request) catch return c.MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH;
     defer resourceRequestDeinit(std.heap.smp_allocator, request_view);
-    const handle = createResourceRequestHandle(native_handle) catch null;
+    const handle = createResourceRequestHandle(native_handle, runtime_state.diagnostic_store) catch null;
     const decision = provider.handler(provider.context, request_view, handle);
     return switch (decision) {
         .pass_through => blk: {
@@ -1031,10 +1036,13 @@ fn resourceProviderTrampoline(
     };
 }
 
-fn createResourceRequestHandle(native_handle: ?*c.mln_resource_request_handle) std.mem.Allocator.Error!?ResourceRequestHandle {
+fn createResourceRequestHandle(
+    native_handle: ?*c.mln_resource_request_handle,
+    diagnostic_store: ?*diagnostics.DiagnosticStore,
+) std.mem.Allocator.Error!?ResourceRequestHandle {
     const request_handle = native_handle orelse return null;
     const request_state = try std.heap.smp_allocator.create(ResourceRequestState);
-    request_state.* = .{ .native = request_handle, .completed = false };
+    request_state.* = .{ .native = request_handle, .completed = false, .diagnostic_store = diagnostic_store };
     errdefer std.heap.smp_allocator.destroy(request_state);
     return try registerResourceRequestState(request_state);
 }
@@ -1055,25 +1063,41 @@ fn registerResourceRequestState(request_state: *ResourceRequestState) std.mem.Al
     if (resource_request_free_list.items.len > 0) {
         const slot_index = resource_request_free_list.pop().?;
         resource_request_registry.items[slot_index].state = request_state;
-        return .{ .index = slot_index + 1, .generation = resource_request_registry.items[slot_index].generation };
+        return resourceRequestHandle(slot_index + 1, resource_request_registry.items[slot_index].generation);
     }
 
     try resource_request_registry.append(std.heap.smp_allocator, .{ .state = request_state, .generation = 1 });
-    return .{ .index = resource_request_registry.items.len, .generation = 1 };
+    return resourceRequestHandle(resource_request_registry.items.len, 1);
+}
+
+fn resourceRequestHandle(index: usize, generation: u64) ResourceRequestHandle {
+    return @enumFromInt((@as(u128, generation) << 64) | @as(u128, @intCast(index)));
+}
+
+fn resourceRequestIndex(handle: ResourceRequestHandle) ?usize {
+    const index = @intFromEnum(handle) & std.math.maxInt(u64);
+    if (index == 0 or index > std.math.maxInt(usize)) return null;
+    return @intCast(index);
+}
+
+fn resourceRequestGeneration(handle: ResourceRequestHandle) u64 {
+    return @intCast(@intFromEnum(handle) >> 64);
 }
 
 fn resourceRequestState(handle: ResourceRequestHandle) ?*ResourceRequestState {
-    if (handle.index == 0 or handle.index > resource_request_registry.items.len) return null;
-    const slot = resource_request_registry.items[handle.index - 1];
-    if (slot.generation != handle.generation) return null;
+    const index = resourceRequestIndex(handle) orelse return null;
+    if (index > resource_request_registry.items.len) return null;
+    const slot = resource_request_registry.items[index - 1];
+    if (slot.generation != resourceRequestGeneration(handle)) return null;
     return slot.state;
 }
 
 fn unregisterResourceRequestState(handle: ResourceRequestHandle) ?*ResourceRequestState {
-    if (handle.index == 0 or handle.index > resource_request_registry.items.len) return null;
-    const slot_index = handle.index - 1;
+    const index = resourceRequestIndex(handle) orelse return null;
+    if (index > resource_request_registry.items.len) return null;
+    const slot_index = index - 1;
     const slot = &resource_request_registry.items[slot_index];
-    if (slot.generation != handle.generation) return null;
+    if (slot.generation != resourceRequestGeneration(handle)) return null;
     const request_state = slot.state orelse return null;
     slot.state = null;
     slot.generation +%= 1;
@@ -1316,8 +1340,12 @@ fn copyOfflineRegionDefinition(
     };
 }
 
+fn runtimeHandleFromState(runtime_state: *RuntimeState) RuntimeHandle {
+    return @enumFromInt(@intFromPtr(runtime_state));
+}
+
 fn state(handle: RuntimeHandle) *RuntimeState {
-    return @ptrCast(@alignCast(handle.state));
+    return @ptrFromInt(@intFromEnum(handle));
 }
 
 pub fn native(handle: RuntimeHandle) status.BindingError!*c.mln_runtime {

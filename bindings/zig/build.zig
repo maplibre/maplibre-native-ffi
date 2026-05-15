@@ -188,6 +188,12 @@ fn addPrivateModuleTests(
     return tests;
 }
 
+fn addWindowsTestRuntimePaths(run: *std.Build.Step.Run, options: BuildOptions) void {
+    run.addPathDir(options.cmake_artifact_dir_runtime_path);
+    run.addPathDir("../../.pixi/envs/default");
+    run.addPathDir("../../.pixi/envs/default/Library/bin");
+}
+
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const cmake_artifact_dir = cmakeArtifactDir(b);
@@ -221,21 +227,11 @@ pub fn build(b: *std.Build) void {
     const run_logging_tests = b.addRunArtifact(logging_tests);
     const run_map_tests = b.addRunArtifact(map_tests);
     if (target.result.os.tag == .windows) {
-        run_binding_tests.addPathDir(options.cmake_artifact_dir_runtime_path);
-        run_binding_tests.addPathDir("../../.pixi/envs/default");
-        run_binding_tests.addPathDir("../../.pixi/envs/default/Library/bin");
-        run_status_tests.addPathDir(options.cmake_artifact_dir_runtime_path);
-        run_status_tests.addPathDir("../../.pixi/envs/default");
-        run_status_tests.addPathDir("../../.pixi/envs/default/Library/bin");
-        run_runtime_tests.addPathDir(options.cmake_artifact_dir_runtime_path);
-        run_runtime_tests.addPathDir("../../.pixi/envs/default");
-        run_runtime_tests.addPathDir("../../.pixi/envs/default/Library/bin");
-        run_logging_tests.addPathDir(options.cmake_artifact_dir_runtime_path);
-        run_logging_tests.addPathDir("../../.pixi/envs/default");
-        run_logging_tests.addPathDir("../../.pixi/envs/default/Library/bin");
-        run_map_tests.addPathDir(options.cmake_artifact_dir_runtime_path);
-        run_map_tests.addPathDir("../../.pixi/envs/default");
-        run_map_tests.addPathDir("../../.pixi/envs/default/Library/bin");
+        addWindowsTestRuntimePaths(run_binding_tests, options);
+        addWindowsTestRuntimePaths(run_status_tests, options);
+        addWindowsTestRuntimePaths(run_runtime_tests, options);
+        addWindowsTestRuntimePaths(run_logging_tests, options);
+        addWindowsTestRuntimePaths(run_map_tests, options);
     }
 
     const test_step = b.step("test", "Run Zig binding tests");

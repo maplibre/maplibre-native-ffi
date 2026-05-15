@@ -1,4 +1,5 @@
-const testing = @import("std").testing;
+const std = @import("std");
+const testing = std.testing;
 
 const maplibre = @import("maplibre_native");
 
@@ -90,15 +91,33 @@ test "standalone projection converts and updates camera" {
     const fitted = try projection.getCamera();
     try testing.expect(fitted.center != null);
     try testing.expect(fitted.zoom != null);
+
+    try projection.setVisibleGeometry(testing.allocator, .{ .line_string = visible[0..] }, .{ .top = 0.0, .left = 0.0, .bottom = 0.0, .right = 0.0 });
+    const geometry_fitted = try projection.getCamera();
+    try testing.expect(geometry_fitted.center != null);
+    try testing.expect(geometry_fitted.zoom != null);
 }
 
 test "projected meters convert to and from lat lng" {
     const origin = maplibre.LatLng{ .latitude = 0.0, .longitude = 0.0 };
-    const origin_meters = try maplibre.projectedMetersForLatLng(origin);
+    const origin_meters = try maplibre.projectedMetersForLatLng(origin, null);
     try testing.expectApproxEqAbs(@as(f64, 0.0), origin_meters.northing, 0.000001);
     try testing.expectApproxEqAbs(@as(f64, 0.0), origin_meters.easting, 0.000001);
 
-    const meters = try maplibre.projectedMetersForLatLng(center);
-    const roundtrip = try maplibre.latLngForProjectedMeters(meters);
+    const meters = try maplibre.projectedMetersForLatLng(center, null);
+    const roundtrip = try maplibre.latLngForProjectedMeters(meters, null);
     try expectLatLngApprox(center, roundtrip);
+}
+
+test "projection free helpers preserve native diagnostics" {
+    var diagnostics = maplibre.DiagnosticStore.init(testing.allocator);
+    defer diagnostics.deinit();
+
+    try testing.expectError(
+        error.InvalidArgument,
+        maplibre.projectedMetersForLatLng(.{ .latitude = std.math.inf(f64), .longitude = 0.0 }, &diagnostics),
+    );
+    const diagnostic = diagnostics.get().?;
+    try testing.expectEqual(@as(?i32, -1), diagnostic.raw_status);
+    try testing.expect(diagnostic.message.len > 0);
 }

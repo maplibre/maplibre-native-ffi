@@ -6,6 +6,12 @@ const support = @import("support.zig");
 
 extern fn usleep(useconds: c_uint) c_int;
 
+const HttpServerState = struct {
+    server: *std.Io.net.Server,
+    served: bool = false,
+    err: ?anyerror = null,
+};
+
 fn waitForEvent(runtime: maplibre.RuntimeHandle, event_type: maplibre.RuntimeEventType) !bool {
     for (0..1000) |_| {
         try runtime.runOnce();
@@ -19,9 +25,65 @@ fn waitForEvent(runtime: maplibre.RuntimeHandle, event_type: maplibre.RuntimeEve
     return false;
 }
 
+fn waitForOwnedEvent(
+    runtime: maplibre.RuntimeHandle,
+    event_type: maplibre.RuntimeEventType,
+) !maplibre.OwnedRuntimeEvent {
+    for (0..5000) |_| {
+        try runtime.runOnce();
+        while (try runtime.pollEventOwned(testing.allocator)) |event| {
+            var owned_event = event;
+            if (std.meta.eql(owned_event.event_type, event_type)) return owned_event;
+            owned_event.deinit();
+        }
+        _ = usleep(1000);
+    }
+    return error.EventNotObserved;
+}
+
 fn waitForStyleLoaded(runtime: maplibre.RuntimeHandle) !void {
     try testing.expect(try waitForEvent(runtime, .map_style_loaded));
 }
+
+const TempStyle = struct {
+    tmp: std.testing.TmpDir,
+    dir_path: []const u8,
+    style_url: []const u8,
+
+    fn deinit(self: *TempStyle) void {
+        testing.allocator.free(self.style_url);
+        testing.allocator.free(self.dir_path);
+        self.tmp.cleanup();
+    }
+};
+
+fn tempDirPath(allocator: std.mem.Allocator, sub_path: []const u8) ![]u8 {
+    const cwd = try std.process.currentPathAlloc(testing.io, allocator);
+    defer allocator.free(cwd);
+    return std.fmt.allocPrint(allocator, "{s}/.zig-cache/tmp/{s}", .{ cwd, sub_path });
+}
+
+fn tempPath(allocator: std.mem.Allocator, sub_path: []const u8, relative_path: []const u8) ![]u8 {
+    const dir_path = try tempDirPath(allocator, sub_path);
+    defer allocator.free(dir_path);
+    return std.fs.path.join(allocator, &.{ dir_path, relative_path });
+}
+
+fn writeTempStyle() !TempStyle {
+    var tmp = testing.tmpDir(.{});
+    errdefer tmp.cleanup();
+    try tmp.dir.writeFile(testing.io, .{ .sub_path = "style.json", .data = support.style_json });
+
+    const dir_path = try tempDirPath(testing.allocator, tmp.sub_path[0..]);
+    errdefer testing.allocator.free(dir_path);
+    const style_path = try tempPath(testing.allocator, tmp.sub_path[0..], "style.json");
+    defer testing.allocator.free(style_path);
+    const style_url = try std.fmt.allocPrint(testing.allocator, "file://{s}", .{style_path});
+    errdefer testing.allocator.free(style_url);
+
+    return .{ .tmp = tmp, .dir_path = dir_path, .style_url = style_url };
+}
+
 test "network status APIs wrap process-global MapLibre status" {
     const original_status = try maplibre.getNetworkStatus(null);
     defer maplibre.setNetworkStatus(original_status, null) catch @panic("network status restore failed");
@@ -45,6 +107,72 @@ test "ambient cache operations validate cache configuration" {
     try runtime.runAmbientCacheOperation(.pack_database);
 }
 
+test "file URL style loads through public binding" {
+    var fixture = try writeTempStyle();
+    defer fixture.deinit();
+
+    const runtime = try maplibre.RuntimeHandle.init(null);
+    defer runtime.close() catch @panic("runtime close failed");
+
+    const map = try maplibre.MapHandle.create(runtime, .{});
+    defer map.close() catch @panic("map close failed");
+
+    try map.setStyleUrl(testing.allocator, fixture.style_url);
+    try waitForStyleLoaded(runtime);
+}
+
+test "asset URL style loads through public binding runtime asset path" {
+    var fixture = try writeTempStyle();
+    defer fixture.deinit();
+
+    const runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{ .asset_path = fixture.dir_path }, null);
+    defer runtime.close() catch @panic("runtime close failed");
+
+    const map = try maplibre.MapHandle.create(runtime, .{});
+    defer map.close() catch @panic("map close failed");
+
+    try map.setStyleUrl(testing.allocator, "asset://style.json");
+    try waitForStyleLoaded(runtime);
+}
+
+test "missing file URL reports map loading failure through public events" {
+    var fixture = try writeTempStyle();
+    defer fixture.deinit();
+
+    const missing_path = try std.fs.path.join(testing.allocator, &.{ fixture.dir_path, "missing-style.json" });
+    defer testing.allocator.free(missing_path);
+    const missing_url = try std.fmt.allocPrint(testing.allocator, "file://{s}", .{missing_path});
+    defer testing.allocator.free(missing_url);
+
+    const runtime = try maplibre.RuntimeHandle.init(null);
+    defer runtime.close() catch @panic("runtime close failed");
+
+    const map = try maplibre.MapHandle.create(runtime, .{});
+    defer map.close() catch @panic("map close failed");
+
+    try map.setStyleUrl(testing.allocator, missing_url);
+    try testing.expect(try waitForEvent(runtime, .map_loading_failed));
+}
+
+const pmtiles_style_json =
+    \\{
+    \\  "version": 8,
+    \\  "name": "zig-pmtiles-range-test",
+    \\  "sources": {
+    \\    "archive": {
+    \\      "type": "vector",
+    \\      "url": "pmtiles://http://example.invalid/test.pmtiles"
+    \\    }
+    \\  },
+    \\  "layers": [
+    \\    {"id":"archive-fill","type":"fill","source":"archive","source-layer":"land","paint":{"fill-color":"#8dd3c7"}}
+    \\  ]
+    \\}
+;
+
+const pmtiles_style_url = "custom://pmtiles-range-style.json";
+const pmtiles_archive_url = "http://example.invalid/test.pmtiles";
+
 const TransformState = struct {
     replacement_url: [:0]const u8,
     calls: std.atomic.Value(usize) = std.atomic.Value(usize).init(0),
@@ -56,6 +184,99 @@ fn rewriteStyleUrl(context: ?*anyopaque, request: maplibre.ResourceTransformRequ
     _ = request.kind;
     _ = request.url;
     return .{ .replacement_url = state.replacement_url };
+}
+
+fn serveOneHttpStyleInner(state: *HttpServerState) !void {
+    var stream = try state.server.accept(testing.io);
+    defer stream.close(testing.io);
+
+    var request_buffer: [1024]u8 = undefined;
+    var reader = stream.reader(testing.io, &request_buffer);
+    _ = try reader.interface.discardDelimiterInclusive('\n');
+
+    var header_buffer: [256]u8 = undefined;
+    const header = try std.fmt.bufPrint(
+        &header_buffer,
+        "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nCache-Control: public, max-age=3600\r\nETag: \"zig-style\"\r\nContent-Length: {d}\r\nConnection: close\r\n\r\n",
+        .{support.style_json.len},
+    );
+    var response_buffer: [1024]u8 = undefined;
+    var writer = stream.writer(testing.io, &response_buffer);
+    try writer.interface.writeAll(header);
+    try writer.interface.writeAll(support.style_json);
+    try writer.interface.flush();
+    state.served = true;
+}
+
+fn serveOneHttpStyle(state: *HttpServerState) void {
+    serveOneHttpStyleInner(state) catch |err| {
+        state.err = err;
+    };
+}
+
+test "resource transform can be cleared after map creation" {
+    try maplibre.setNetworkStatus(.online, null);
+    defer maplibre.setNetworkStatus(.online, null) catch @panic("network status restore failed");
+
+    const runtime = try maplibre.RuntimeHandle.init(null);
+    defer runtime.close() catch @panic("runtime close failed");
+
+    var state = TransformState{ .replacement_url = "unsupported://rewritten-style.json" };
+    try runtime.setResourceTransform(.{ .handler = rewriteStyleUrl, .context = &state });
+
+    const map = try maplibre.MapHandle.create(runtime, .{});
+    defer map.close() catch @panic("map close failed");
+    try runtime.setResourceTransform(null);
+
+    var address = try std.Io.net.IpAddress.parse("127.0.0.1", 0);
+    var server = try address.listen(testing.io, .{ .reuse_address = true });
+    var server_state = HttpServerState{ .server = &server };
+    const server_thread = try std.Thread.spawn(.{}, serveOneHttpStyle, .{&server_state});
+    var server_thread_joined = false;
+    defer {
+        server.deinit(testing.io);
+        if (!server_thread_joined) server_thread.join();
+    }
+    const style_url = try std.fmt.allocPrint(testing.allocator, "http://127.0.0.1:{d}/style.json", .{server.socket.address.getPort()});
+    defer testing.allocator.free(style_url);
+
+    try map.setStyleUrl(testing.allocator, style_url);
+    try waitForStyleLoaded(runtime);
+    server_thread.join();
+    server_thread_joined = true;
+    try testing.expect(server_state.served);
+    try testing.expectEqual(@as(?anyerror, null), server_state.err);
+    try testing.expectEqual(@as(usize, 0), state.calls.load(.seq_cst));
+}
+
+test "http URL style loads through native network provider" {
+    try maplibre.setNetworkStatus(.online, null);
+    defer maplibre.setNetworkStatus(.online, null) catch @panic("network status restore failed");
+
+    var address = try std.Io.net.IpAddress.parse("127.0.0.1", 0);
+    var server = try address.listen(testing.io, .{ .reuse_address = true });
+    var server_state = HttpServerState{ .server = &server };
+    const server_thread = try std.Thread.spawn(.{}, serveOneHttpStyle, .{&server_state});
+    var server_thread_joined = false;
+    defer {
+        server.deinit(testing.io);
+        if (!server_thread_joined) server_thread.join();
+    }
+    const style_url = try std.fmt.allocPrint(testing.allocator, "http://127.0.0.1:{d}/style.json", .{server.socket.address.getPort()});
+    defer testing.allocator.free(style_url);
+
+    const runtime = try maplibre.RuntimeHandle.init(null);
+    defer runtime.close() catch @panic("runtime close failed");
+
+    const map = try maplibre.MapHandle.create(runtime, .{});
+    defer map.close() catch @panic("map close failed");
+
+    try map.setStyleUrl(testing.allocator, style_url);
+    try waitForStyleLoaded(runtime);
+    server_thread.join();
+    server_thread_joined = true;
+    try testing.expect(server_state.served);
+    try testing.expectEqual(@as(?anyerror, null), server_state.err);
 }
 
 test "resource transform rewrites network style URL" {
@@ -142,6 +363,100 @@ fn customStyleProvider(
     return .handle;
 }
 
+const PmtilesRangeProviderState = struct {
+    saw_style_absent_range: std.atomic.Value(bool) = std.atomic.Value(bool).init(false),
+    saw_pmtiles_request: std.atomic.Value(bool) = std.atomic.Value(bool).init(false),
+    saw_source_kind: std.atomic.Value(bool) = std.atomic.Value(bool).init(false),
+    saw_network_only_loading: std.atomic.Value(bool) = std.atomic.Value(bool).init(false),
+    range_start: std.atomic.Value(u64) = std.atomic.Value(u64).init(0),
+    range_end: std.atomic.Value(u64) = std.atomic.Value(u64).init(0),
+
+    fn markStyle(self: *PmtilesRangeProviderState, request: maplibre.ResourceRequest) void {
+        self.saw_style_absent_range.store(request.range == null, .seq_cst);
+    }
+
+    fn markPmtilesRequest(self: *PmtilesRangeProviderState, request: maplibre.ResourceRequest) void {
+        self.saw_pmtiles_request.store(true, .seq_cst);
+        self.saw_source_kind.store(std.meta.eql(request.kind, maplibre.ResourceKind.source), .seq_cst);
+        self.saw_network_only_loading.store(std.meta.eql(request.loading_method, maplibre.ResourceLoadingMethod.network_only), .seq_cst);
+        if (request.range) |range| {
+            self.range_start.store(range.start, .seq_cst);
+            self.range_end.store(range.end, .seq_cst);
+        }
+    }
+
+    fn expectObservedRequest(self: *PmtilesRangeProviderState) !void {
+        const start = self.range_start.load(.seq_cst);
+        const end = self.range_end.load(.seq_cst);
+        try testing.expect(self.saw_style_absent_range.load(.seq_cst));
+        try testing.expect(self.saw_pmtiles_request.load(.seq_cst));
+        try testing.expect(self.saw_source_kind.load(.seq_cst));
+        try testing.expect(self.saw_network_only_loading.load(.seq_cst));
+        try testing.expectEqual(@as(u64, 0), start);
+        try testing.expect(end >= start);
+        try testing.expect(end - start + 1 > 0);
+    }
+};
+
+fn pmtilesRangeProvider(
+    context: ?*anyopaque,
+    request: maplibre.ResourceRequest,
+    maybe_handle: ?maplibre.ResourceRequestHandle,
+) maplibre.ResourceProviderDecision {
+    const state: *PmtilesRangeProviderState = @ptrCast(@alignCast(context.?));
+    const handle = maybe_handle orelse return .pass_through;
+
+    if (std.mem.eql(u8, request.url, pmtiles_style_url)) {
+        state.markStyle(request);
+        handle.complete(.{ .bytes = pmtiles_style_json }) catch {
+            handle.release();
+            return .pass_through;
+        };
+        handle.release();
+        return .handle;
+    }
+
+    if (std.mem.eql(u8, request.url, pmtiles_archive_url)) {
+        state.markPmtilesRequest(request);
+        handle.complete(.{
+            .status = .@"error",
+            .error_reason = .not_found,
+            .error_message = "pmtiles archive intentionally unavailable",
+        }) catch {
+            handle.release();
+            return .pass_through;
+        };
+        handle.release();
+        return .handle;
+    }
+
+    return .pass_through;
+}
+
+fn waitForPmtilesRangeRequest(runtime: maplibre.RuntimeHandle, state: *PmtilesRangeProviderState) !void {
+    for (0..1000) |_| {
+        try runtime.runOnce();
+        if (state.saw_pmtiles_request.load(.seq_cst)) return;
+        _ = usleep(1000);
+    }
+    return error.ProviderNotCalled;
+}
+
+test "resource provider observes PMTiles range metadata" {
+    const runtime = try maplibre.RuntimeHandle.init(null);
+    defer runtime.close() catch @panic("runtime close failed");
+
+    var state = PmtilesRangeProviderState{};
+    try runtime.setResourceProvider(.{ .handler = pmtilesRangeProvider, .context = &state });
+
+    const map = try maplibre.MapHandle.create(runtime, .{});
+    defer map.close() catch @panic("map close failed");
+
+    try map.setStyleUrl(testing.allocator, pmtiles_style_url);
+    try waitForPmtilesRangeRequest(runtime, &state);
+    try state.expectObservedRequest();
+}
+
 test "custom URL style loads through resource provider" {
     const runtime = try maplibre.RuntimeHandle.init(null);
     defer runtime.close() catch @panic("runtime close failed");
@@ -204,9 +519,7 @@ fn expectOfflineTileRegion(region: *const maplibre.OwnedOfflineRegion, expected_
 test "offline tile-pyramid regions copy definitions and metadata" {
     var tmp = testing.tmpDir(.{});
     defer tmp.cleanup();
-    const cwd = try std.process.currentPathAlloc(testing.io, testing.allocator);
-    defer testing.allocator.free(cwd);
-    const cache_path = try std.fmt.allocPrint(testing.allocator, "{s}/.zig-cache/tmp/{s}/cache.db", .{ cwd, tmp.sub_path[0..] });
+    const cache_path = try tempPath(testing.allocator, tmp.sub_path[0..], "cache.db");
     defer testing.allocator.free(cache_path);
 
     const metadata = [_]u8{ 1, 2, 3 };
@@ -272,12 +585,36 @@ fn expectOfflineGeometryRegion(region: *const maplibre.OwnedOfflineRegion, expec
     try testing.expectEqualSlices(u8, expected_metadata, region.metadata);
 }
 
+test "offline database merge returns copied region list" {
+    var main_tmp = testing.tmpDir(.{});
+    defer main_tmp.cleanup();
+    var side_tmp = testing.tmpDir(.{});
+    defer side_tmp.cleanup();
+    const main_cache_path = try tempPath(testing.allocator, main_tmp.sub_path[0..], "cache.db");
+    defer testing.allocator.free(main_cache_path);
+    const side_cache_path = try tempPath(testing.allocator, side_tmp.sub_path[0..], "cache.db");
+    defer testing.allocator.free(side_cache_path);
+
+    const metadata = [_]u8{ 5, 4, 3 };
+    {
+        const side_runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{ .cache_path = side_cache_path }, null);
+        defer side_runtime.close() catch @panic("side runtime close failed");
+        var created = try side_runtime.createOfflineRegion(testing.allocator, offlineTileDefinition(), metadata[0..]);
+        defer created.deinit();
+    }
+
+    const main_runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{ .cache_path = main_cache_path }, null);
+    defer main_runtime.close() catch @panic("main runtime close failed");
+    var merged = try main_runtime.mergeOfflineRegionsDatabase(testing.allocator, side_cache_path);
+    defer merged.deinit();
+    try testing.expectEqual(@as(usize, 1), merged.items.len);
+    try expectOfflineTileRegion(&merged.items[0], metadata[0..]);
+}
+
 test "offline geometry regions expose copied geometry values" {
     var tmp = testing.tmpDir(.{});
     defer tmp.cleanup();
-    const cwd = try std.process.currentPathAlloc(testing.io, testing.allocator);
-    defer testing.allocator.free(cwd);
-    const cache_path = try std.fmt.allocPrint(testing.allocator, "{s}/.zig-cache/tmp/{s}/geometry-cache.db", .{ cwd, tmp.sub_path[0..] });
+    const cache_path = try tempPath(testing.allocator, tmp.sub_path[0..], "geometry-cache.db");
     defer testing.allocator.free(cache_path);
 
     const coordinates = [_]maplibre.LatLng{
@@ -324,8 +661,8 @@ test "offline geometry regions expose copied geometry values" {
 }
 
 const AsyncProviderState = struct {
-    handle_index: std.atomic.Value(usize) = std.atomic.Value(usize).init(0),
-    handle_generation: std.atomic.Value(u64) = std.atomic.Value(u64).init(0),
+    handle_lock: std.atomic.Mutex = .unlocked,
+    handle: ?maplibre.ResourceRequestHandle = null,
     saw_style: std.atomic.Value(bool) = std.atomic.Value(bool).init(false),
     saw_all_loading: std.atomic.Value(bool) = std.atomic.Value(bool).init(false),
     saw_regular_priority: std.atomic.Value(bool) = std.atomic.Value(bool).init(false),
@@ -343,14 +680,27 @@ const AsyncProviderState = struct {
         self.saw_no_range.store(request.range == null, .seq_cst);
         self.saw_no_prior.store(request.prior_modified_unix_ms == null and request.prior_expires_unix_ms == null and
             request.prior_etag == null and request.prior_data.len == 0, .seq_cst);
-        self.handle_generation.store(handle.generation, .seq_cst);
-        self.handle_index.store(handle.index, .seq_cst);
+        self.lockHandle();
+        defer self.unlockHandle();
+        self.handle = handle;
     }
 
     fn takeHandle(self: *AsyncProviderState) ?maplibre.ResourceRequestHandle {
-        const index = self.handle_index.swap(0, .seq_cst);
-        if (index == 0) return null;
-        return .{ .index = index, .generation = self.handle_generation.load(.seq_cst) };
+        self.lockHandle();
+        defer self.unlockHandle();
+        const handle = self.handle;
+        self.handle = null;
+        return handle;
+    }
+
+    fn lockHandle(self: *AsyncProviderState) void {
+        while (!self.handle_lock.tryLock()) {
+            std.Thread.yield() catch {};
+        }
+    }
+
+    fn unlockHandle(self: *AsyncProviderState) void {
+        self.handle_lock.unlock();
     }
 
     fn expectObservedRequest(self: *AsyncProviderState) !void {
@@ -433,16 +783,13 @@ test "released resource request handle copies stay closed after later requests" 
     try map.setStyleUrl(testing.allocator, "custom://delayed-style.json");
     const live_handle = try waitForProviderHandle(runtime, &state);
     defer live_handle.release();
-    try testing.expectEqual(stale_handle.index, live_handle.index);
-    try testing.expect(stale_handle.generation != live_handle.generation);
-
     try testing.expectError(error.ClosedHandle, stale_handle.complete(.{ .bytes = support.style_json }));
     try testing.expect(!try live_handle.cancelled());
     try live_handle.complete(.{ .bytes = support.style_json });
     try waitForStyleLoaded(runtime);
 }
 
-test "resource request registry reuses slots across many handled requests" {
+test "resource request handles stay usable across many handled requests" {
     const runtime = try maplibre.RuntimeHandle.init(null);
     defer runtime.close() catch @panic("runtime close failed");
 
@@ -452,8 +799,6 @@ test "resource request registry reuses slots across many handled requests" {
     const map = try maplibre.MapHandle.create(runtime, .{});
     defer map.close() catch @panic("map close failed");
 
-    var previous_index: ?usize = null;
-    var previous_generation: u64 = 0;
     for (0..16) |request_index| {
         const style_url = try std.fmt.allocPrint(testing.allocator, "custom://delayed-style-{d}.json", .{request_index});
         defer testing.allocator.free(style_url);
@@ -461,13 +806,7 @@ test "resource request registry reuses slots across many handled requests" {
 
         const handle = try waitForProviderHandle(runtime, &state);
         try state.expectObservedRequest();
-        if (previous_index) |index| {
-            try testing.expectEqual(index, handle.index);
-            try testing.expect(previous_generation != handle.generation);
-        }
-        previous_index = handle.index;
-        previous_generation = handle.generation;
-
+        try testing.expect(!try handle.cancelled());
         try handle.complete(.{ .bytes = support.style_json });
         handle.release();
         try waitForStyleLoaded(runtime);
@@ -527,6 +866,36 @@ test "resource provider error response fails style load" {
     try testing.expect(try waitForEvent(runtime, .map_loading_failed));
 }
 
+test "offline region download errors are runtime events" {
+    const runtime = try maplibre.RuntimeHandle.init(null);
+    defer runtime.close() catch @panic("runtime close failed");
+
+    try runtime.setResourceProvider(.{ .handler = errorStyleProvider });
+
+    var definition = offlineTileDefinition();
+    definition.tile_pyramid.style_url = "custom://error-style.json";
+    const metadata = [_]u8{8};
+    var created = try runtime.createOfflineRegion(testing.allocator, definition, metadata[0..]);
+    defer created.deinit();
+    const region_id = created.id;
+
+    try runtime.setOfflineRegionObserved(region_id, true);
+    defer runtime.setOfflineRegionObserved(region_id, false) catch {};
+    try runtime.setOfflineRegionDownloadState(region_id, .active);
+    defer runtime.setOfflineRegionDownloadState(region_id, .inactive) catch {};
+
+    var event = try waitForOwnedEvent(runtime, .offline_region_response_error);
+    defer event.deinit();
+    try testing.expect(std.meta.eql(event.payload_type, maplibre.RuntimeEventPayloadType.offline_region_response_error));
+    const payload = switch (event.payload) {
+        .offline_region_response_error => |payload| payload,
+        else => return error.UnexpectedPayload,
+    };
+    try testing.expectEqual(region_id, payload.region_id);
+    try testing.expect(std.meta.eql(payload.reason, maplibre.ResourceErrorReason.not_found));
+    try testing.expect(event.message.len > 0);
+}
+
 fn waitForRequestCancellation(runtime: maplibre.RuntimeHandle, handle: maplibre.ResourceRequestHandle) !void {
     for (0..5000) |_| {
         if (try handle.cancelled()) return;
@@ -537,7 +906,10 @@ fn waitForRequestCancellation(runtime: maplibre.RuntimeHandle, handle: maplibre.
 }
 
 test "resource provider observes cancellation before late completion" {
-    const runtime = try maplibre.RuntimeHandle.init(null);
+    var diagnostics = maplibre.DiagnosticStore.init(testing.allocator);
+    defer diagnostics.deinit();
+
+    const runtime = try maplibre.RuntimeHandle.init(&diagnostics);
     defer runtime.close() catch @panic("runtime close failed");
 
     var state = AsyncProviderState{};
@@ -551,14 +923,15 @@ test "resource provider observes cancellation before late completion" {
     try map.close();
     try waitForRequestCancellation(runtime, handle);
     try testing.expectError(error.InvalidState, handle.complete(.{ .bytes = support.style_json }));
+    const diagnostic = diagnostics.get().?;
+    try testing.expectEqual(@as(?i32, -2), diagnostic.raw_status);
+    try testing.expect(diagnostic.message.len > 0);
 }
 
 test "offline region download control emits copied status events" {
     var tmp = testing.tmpDir(.{});
     defer tmp.cleanup();
-    const cwd = try std.process.currentPathAlloc(testing.io, testing.allocator);
-    defer testing.allocator.free(cwd);
-    const cache_path = try std.fmt.allocPrint(testing.allocator, "{s}/.zig-cache/tmp/{s}/events-cache.db", .{ cwd, tmp.sub_path[0..] });
+    const cache_path = try tempPath(testing.allocator, tmp.sub_path[0..], "events-cache.db");
     defer testing.allocator.free(cache_path);
 
     const runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{ .cache_path = cache_path }, null);

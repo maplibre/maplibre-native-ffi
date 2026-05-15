@@ -91,7 +91,7 @@ test "geometry descriptor graphs support nested collections" {
     try testing.expect(try handles.map.styleSourceExists(testing.allocator, "collection"));
 }
 
-test "GeoJSON descriptors reject invalid native values and invalid strings" {
+test "GeoJSON descriptors reject invalid native values and pass explicit-length strings" {
     const handles = try createLoadedMap();
     defer handles.runtime.close() catch @panic("runtime close failed");
     defer handles.map.close() catch @panic("map close failed");
@@ -112,10 +112,8 @@ test "GeoJSON descriptors reject invalid native values and invalid strings" {
         .geometry = .{ .point = .{ .latitude = 0.0, .longitude = 0.0 } },
         .identifier = .{ .string = "bad\x00id" },
     }};
-    try testing.expectError(
-        error.InvalidString,
-        handles.map.addGeoJsonSourceData(testing.allocator, "bad-id", .{ .feature_collection = features[0..] }),
-    );
+    try handles.map.addGeoJsonSourceData(testing.allocator, "embedded-nul-id", .{ .feature_collection = features[0..] });
+    try testing.expect(try handles.map.styleSourceExists(testing.allocator, "embedded-nul-id"));
 }
 
 test "geometry coordinate spans remain stable across nested materialization" {

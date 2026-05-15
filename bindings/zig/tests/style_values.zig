@@ -32,6 +32,23 @@ fn expectListContains(list: maplibre.StringList, expected: []const u8) !void {
     return error.MissingListEntry;
 }
 
+fn listIndexOf(list: maplibre.StringList, expected: []const u8) !usize {
+    for (list.items, 0..) |item, index| {
+        if (std.mem.eql(u8, item, expected)) return index;
+    }
+    return error.MissingListEntry;
+}
+
+fn expectObjectString(value: maplibre.OwnedJsonValue, key: []const u8, expected: []const u8) !void {
+    for (value.object) |member| {
+        if (std.mem.eql(u8, member.key, key)) {
+            try testing.expectEqualStrings(expected, member.value.string);
+            return;
+        }
+    }
+    return error.MissingObjectMember;
+}
+
 test "style ID lists are copied into owned Zig output" {
     const handles = try createLoadedMap();
     defer handles.runtime.close() catch @panic("runtime close failed");
@@ -45,6 +62,42 @@ test "style ID lists are copied into owned Zig output" {
     defer layer_ids.deinit();
     try expectListContains(layer_ids, "background");
     try expectListContains(layer_ids, "point-circle");
+}
+
+test "style layer JSON helpers manage lifecycle and order" {
+    const handles = try createLoadedMap();
+    defer handles.runtime.close() catch @panic("runtime close failed");
+    defer handles.map.close() catch @panic("map close failed");
+
+    const empty_features = [_]maplibre.Feature{};
+    try handles.map.addGeoJsonSourceData(testing.allocator, "empty-layer-source", .{ .feature_collection = empty_features[0..] });
+
+    const layer_members = [_]maplibre.JsonMember{
+        .{ .key = "id", .value = .{ .string = "empty-circle" } },
+        .{ .key = "type", .value = .{ .string = "circle" } },
+        .{ .key = "source", .value = .{ .string = "empty-layer-source" } },
+    };
+    try handles.map.addStyleLayerJson(testing.allocator, .{ .object = layer_members[0..] }, "point-circle");
+    try testing.expect(try handles.map.styleLayerExists("empty-circle"));
+
+    var before_move = try handles.map.listStyleLayerIds(testing.allocator);
+    defer before_move.deinit();
+    try testing.expect((try listIndexOf(before_move, "empty-circle")) < (try listIndexOf(before_move, "point-circle")));
+
+    var layer_type = (try handles.map.getStyleLayerType(testing.allocator, "empty-circle")).?;
+    defer layer_type.deinit();
+    try testing.expectEqualStrings("circle", layer_type.value);
+
+    var layer_json = (try handles.map.getStyleLayerJson(testing.allocator, "empty-circle")).?;
+    defer layer_json.deinit(testing.allocator);
+    try expectObjectString(layer_json, "id", "empty-circle");
+
+    try handles.map.moveStyleLayer("empty-circle", "");
+    try testing.expectError(error.InvalidState, handles.map.removeStyleSource(testing.allocator, "empty-layer-source"));
+    try testing.expect(try handles.map.removeStyleLayer("empty-circle"));
+    try testing.expect(!try handles.map.styleLayerExists("empty-circle"));
+    try testing.expect(try handles.map.removeStyleSource(testing.allocator, "empty-layer-source"));
+    try testing.expect((try handles.map.getStyleLayerJson(testing.allocator, "empty-circle")) == null);
 }
 
 test "layer properties accept semantic JSON values and return owned snapshots" {
@@ -198,7 +251,7 @@ test "location indicator helpers set focused properties" {
     try testing.expectError(error.InvalidArgument, handles.map.setLocationIndicatorBearing(testing.allocator, "point-circle", 1.0));
 }
 
-test "style JSON descriptors reject invalid values and embedded NUL strings" {
+test "style JSON descriptors reject invalid values" {
     const handles = try createLoadedMap();
     defer handles.runtime.close() catch @panic("runtime close failed");
     defer handles.map.close() catch @panic("map close failed");
@@ -210,9 +263,5 @@ test "style JSON descriptors reject invalid values and embedded NUL strings" {
     try testing.expectError(
         error.InvalidArgument,
         handles.map.setLayerProperty(testing.allocator, "point-circle", "circle-radius", .{ .string = "not a radius" }),
-    );
-    try testing.expectError(
-        error.InvalidString,
-        handles.map.setLayerProperty(testing.allocator, "point-circle", "circle-radius", .{ .string = "bad\x00value" }),
     );
 }

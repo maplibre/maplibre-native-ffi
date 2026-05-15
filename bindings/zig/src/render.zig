@@ -7,7 +7,6 @@ const native_temp = @import("native_temp.zig");
 const status = @import("status.zig");
 const values = @import("values.zig");
 
-const RenderSessionStateHandle = opaque {};
 const RenderSessionState = struct {
     native: ?*c.mln_render_session,
     diagnostic_store: ?*diagnostics.DiagnosticStore,
@@ -229,13 +228,15 @@ pub const OwnedImage = struct {
     info: TextureImageInfo,
     data: []u8,
 
-    pub fn deinit(self: OwnedImage) void {
+    pub fn deinit(self: *OwnedImage) void {
         self.allocator.free(self.data);
+        self.data = &.{};
+        self.info = .{ .width = 0, .height = 0, .stride = 0, .byte_length = 0 };
     }
 };
 
-pub const RenderSessionHandle = struct {
-    state: *RenderSessionStateHandle,
+pub const RenderSessionHandle = enum(usize) {
+    _,
 
     pub fn resize(self: RenderSessionHandle, extent: RenderTargetExtent) status.Error!void {
         try ensureNoActiveOwnedFrame(self);
@@ -379,6 +380,16 @@ pub const RenderSessionHandle = struct {
         return try copyFeatureExtensionResult(allocator, result.?, state(self).diagnostic_store);
     }
 
+    pub fn textureImageInfo(self: RenderSessionHandle) status.Error!TextureImageInfo {
+        var info = c.mln_texture_image_info_default();
+        const probe_status = c.mln_texture_read_premultiplied_rgba8(try native(self), null, 0, &info);
+        switch (probe_status) {
+            c.MLN_STATUS_INVALID_ARGUMENT => {},
+            else => try status.checkStatus(probe_status, state(self).diagnostic_store),
+        }
+        return textureImageInfoFromNative(info);
+    }
+
     pub fn readPremultipliedRgba8Into(self: RenderSessionHandle, buffer: []u8) status.Error!TextureImageInfo {
         var info = c.mln_texture_image_info_default();
         try status.checkStatus(
@@ -389,12 +400,7 @@ pub const RenderSessionHandle = struct {
     }
 
     pub fn readPremultipliedRgba8(self: RenderSessionHandle, allocator: std.mem.Allocator) status.Error!OwnedImage {
-        var info = c.mln_texture_image_info_default();
-        const probe_status = c.mln_texture_read_premultiplied_rgba8(try native(self), null, 0, &info);
-        switch (probe_status) {
-            c.MLN_STATUS_INVALID_ARGUMENT => {},
-            else => try status.checkStatus(probe_status, state(self).diagnostic_store),
-        }
+        const info = try self.textureImageInfo();
         const data = try allocator.alloc(u8, info.byte_length);
         errdefer allocator.free(data);
         const copied_info = try self.readPremultipliedRgba8Into(data);
@@ -593,11 +599,15 @@ fn newRenderSession(
 ) std.mem.Allocator.Error!RenderSessionHandle {
     const session_state = try std.heap.smp_allocator.create(RenderSessionState);
     session_state.* = .{ .native = session, .diagnostic_store = diagnostic_store };
-    return .{ .state = @ptrCast(session_state) };
+    return renderSessionHandleFromState(session_state);
+}
+
+fn renderSessionHandleFromState(session_state: *RenderSessionState) RenderSessionHandle {
+    return @enumFromInt(@intFromPtr(session_state));
 }
 
 fn state(handle: RenderSessionHandle) *RenderSessionState {
-    return @ptrCast(@alignCast(handle.state));
+    return @ptrFromInt(@intFromEnum(handle));
 }
 
 fn native(handle: RenderSessionHandle) status.BindingError!*c.mln_render_session {

@@ -167,7 +167,12 @@ test "owned texture render session lifecycle and readback" {
     var small: [4]u8 = .{ 0, 0, 0, 0 };
     try testing.expectError(error.InvalidArgument, session.readPremultipliedRgba8Into(small[0..]));
 
-    const image = try session.readPremultipliedRgba8(testing.allocator);
+    const probed_info = try session.textureImageInfo();
+    try testing.expectEqual(@as(u32, 32), probed_info.width);
+    try testing.expectEqual(@as(u32, 16), probed_info.height);
+    try testing.expectEqual(@as(usize, 32 * 16 * 4), probed_info.byte_length);
+
+    var image = try session.readPremultipliedRgba8(testing.allocator);
     defer image.deinit();
     try testing.expectEqual(@as(u32, 32), image.info.width);
     try testing.expectEqual(@as(u32, 16), image.info.height);
@@ -182,6 +187,21 @@ test "owned texture render session lifecycle and readback" {
     try session.close();
     try testing.expectError(error.ClosedHandle, session.renderUpdate());
     try testing.expectError(error.ClosedHandle, session_copy.renderUpdate());
+}
+
+test "static map still-image requests drive owned texture rendering" {
+    const runtime = try maplibre.RuntimeHandle.init(null);
+    defer runtime.close() catch @panic("runtime close failed");
+
+    const map = try maplibre.MapHandle.create(runtime, .{ .mode = .static });
+    defer map.close() catch @panic("map close failed");
+
+    var session = try maplibre.attachOwnedTexture(map, .{ .extent = .{ .width = 32, .height = 32 } });
+    defer session.close() catch {};
+
+    try map.setStyleJson(testing.allocator, support.style_json);
+    try map.requestStillImage();
+    try testing.expectError(error.InvalidState, map.requestStillImage());
 }
 
 test "owned texture attachment validates public descriptors" {

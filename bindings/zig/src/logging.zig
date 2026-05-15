@@ -64,19 +64,21 @@ pub const LogEvent = union(enum) {
     }
 };
 
-pub const LogSeverityMask = packed struct(u32) {
-    _reserved0: u1 = 0,
+pub const LogSeverityMask = struct {
     info: bool = false,
     warning: bool = false,
     @"error": bool = false,
-    _reserved4: u28 = 0,
 
     pub const default = LogSeverityMask{ .info = true, .warning = true };
     pub const all = LogSeverityMask{ .info = true, .warning = true, .@"error" = true };
     pub const none = LogSeverityMask{};
 
     fn toRaw(self: LogSeverityMask) u32 {
-        return @bitCast(self);
+        var raw: u32 = 0;
+        if (self.info) raw |= c.MLN_LOG_SEVERITY_MASK_INFO;
+        if (self.warning) raw |= c.MLN_LOG_SEVERITY_MASK_WARNING;
+        if (self.@"error") raw |= c.MLN_LOG_SEVERITY_MASK_ERROR;
+        return raw;
     }
 };
 
@@ -143,4 +145,17 @@ fn logTrampoline(user_data: ?*anyopaque, severity: u32, event: u32, code: i64, m
 test "log raw domains preserve unknown values" {
     try std.testing.expect(std.meta.eql(LogSeverity.fromRaw(0xbeef), LogSeverity{ .unknown = 0xbeef }));
     try std.testing.expect(std.meta.eql(LogEvent.fromRaw(0xfeed), LogEvent{ .unknown = 0xfeed }));
+}
+
+test "raw log severity masks reject unknown bits" {
+    var store = diagnostics.DiagnosticStore.init(std.testing.allocator);
+    defer store.deinit();
+
+    try std.testing.expectError(
+        error.InvalidArgument,
+        status.checkStatus(c.mln_log_set_async_severity_mask(c.MLN_LOG_SEVERITY_MASK_ALL << 1), &store),
+    );
+    const diagnostic = store.get().?;
+    try std.testing.expectEqual(@as(?i32, c.MLN_STATUS_INVALID_ARGUMENT), diagnostic.raw_status);
+    try std.testing.expect(diagnostic.message.len > 0);
 }

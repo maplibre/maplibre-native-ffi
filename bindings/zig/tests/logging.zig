@@ -46,19 +46,8 @@ test "log async severity mask exposes semantic masks" {
     try maplibre.setAsyncLogSeverityMask(.default, null);
     try maplibre.setAsyncLogSeverityMask(.all, null);
     try maplibre.setAsyncLogSeverityMask(.none, null);
+    try maplibre.setAsyncLogSeverityMask(.{ .info = true, .@"error" = true }, null);
     try maplibre.setAsyncLogSeverityMask(.default, null);
-}
-
-test "log async severity mask rejects reserved bits with diagnostics" {
-    var diagnostics = maplibre.DiagnosticStore.init(testing.allocator);
-    defer diagnostics.deinit();
-
-    try testing.expectError(error.InvalidArgument, maplibre.setAsyncLogSeverityMask(.{ ._reserved0 = 1 }, &diagnostics));
-    try testing.expect(diagnostics.get().?.message.len > 0);
-
-    diagnostics.clear();
-    try testing.expectError(error.InvalidArgument, maplibre.setAsyncLogSeverityMask(.{ ._reserved4 = 1 }, &diagnostics));
-    try testing.expect(diagnostics.get().?.message.len > 0);
 }
 
 test "log callback can be cleared" {

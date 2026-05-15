@@ -38,10 +38,14 @@ test "camera commands accept valid public descriptors" {
     };
 
     try handles.map.moveBy(4, -2);
+    try handles.map.moveByAnimated(1, 1, animation);
     try handles.map.scaleBy(1.1, anchor);
     try handles.map.scaleBy(0.95, null);
+    try handles.map.scaleByAnimated(1.05, anchor, animation);
     try handles.map.rotateBy(rotate_start, rotate_end);
+    try handles.map.rotateByAnimated(rotate_start, rotate_end, animation);
     try handles.map.pitchBy(3);
+    try handles.map.pitchByAnimated(-1, animation);
     try handles.map.easeTo(.{ .center = center, .zoom = 12.0 }, animation);
     try handles.map.flyTo(.{ .center = center, .zoom = 10.0 }, animation);
     try handles.map.cancelTransitions();
@@ -67,8 +71,46 @@ test "camera fitting computes camera and visible bounds" {
     try testing.expect(camera.bearing != null);
     try testing.expect(camera.pitch != null);
 
+    const coordinates = [_]maplibre.LatLng{ bounds.southwest, bounds.northeast };
+    const coordinate_camera = try handles.map.cameraForLatLngs(testing.allocator, coordinates[0..], null);
+    try testing.expect(coordinate_camera.center != null);
+    try testing.expect(coordinate_camera.zoom != null);
+
+    const geometry_camera = try handles.map.cameraForGeometry(testing.allocator, .{ .line_string = coordinates[0..] }, null);
+    try testing.expect(geometry_camera.center != null);
+    try testing.expect(geometry_camera.zoom != null);
+
     const visible_bounds = try handles.map.latLngBoundsForCamera(camera);
     try testing.expect(visible_bounds.southwest.latitude <= visible_bounds.northeast.latitude);
+    const unwrapped_bounds = try handles.map.latLngBoundsForCameraUnwrapped(camera);
+    try testing.expect(unwrapped_bounds.southwest.latitude <= unwrapped_bounds.northeast.latitude);
+}
+
+test "camera constraints and free camera options round-trip public values" {
+    const handles = try createRuntimeAndMap();
+    defer handles.runtime.close() catch @panic("runtime close failed");
+    defer handles.map.close() catch @panic("map close failed");
+
+    const constraints = maplibre.BoundOptions{
+        .bounds = .{
+            .southwest = .{ .latitude = -45.0, .longitude = -120.0 },
+            .northeast = .{ .latitude = 45.0, .longitude = 120.0 },
+        },
+        .min_zoom = 1.0,
+        .max_zoom = 12.0,
+        .min_pitch = 0.0,
+        .max_pitch = 45.0,
+    };
+    try handles.map.setBounds(constraints);
+    const copied_constraints = try handles.map.getBounds();
+    try testing.expect(copied_constraints.bounds != null);
+    try testing.expectApproxEqAbs(constraints.min_zoom.?, copied_constraints.min_zoom.?, 0.000001);
+    try testing.expectApproxEqAbs(constraints.max_pitch.?, copied_constraints.max_pitch.?, 0.000001);
+
+    const free_camera = try handles.map.getFreeCameraOptions();
+    try testing.expect(free_camera.position != null);
+    try testing.expect(free_camera.orientation != null);
+    try handles.map.setFreeCameraOptions(.{ .orientation = free_camera.orientation });
 }
 
 test "camera public descriptors report invalid native arguments" {

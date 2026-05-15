@@ -5,42 +5,29 @@ const status = @import("status.zig");
 const values = @import("values.zig");
 
 pub const TempStorage = struct {
-    allocator: std.mem.Allocator,
     arena: std.heap.ArenaAllocator,
-    lat_lngs: std.ArrayList(c.mln_lat_lng),
-    screen_points: std.ArrayList(c.mln_screen_point),
 
     pub fn init(allocator: std.mem.Allocator) TempStorage {
-        return .{
-            .allocator = allocator,
-            .arena = std.heap.ArenaAllocator.init(allocator),
-            .lat_lngs = .empty,
-            .screen_points = .empty,
-        };
+        return .{ .arena = std.heap.ArenaAllocator.init(allocator) };
     }
 
     pub fn deinit(self: *TempStorage) void {
-        self.lat_lngs.deinit(self.allocator);
-        self.screen_points.deinit(self.allocator);
         self.arena.deinit();
     }
 
     pub fn latLngs(self: *TempStorage, coordinates: []const values.LatLng) std.mem.Allocator.Error![]const c.mln_lat_lng {
-        const start = self.lat_lngs.items.len;
-        try self.lat_lngs.ensureUnusedCapacity(self.allocator, coordinates.len);
-        for (coordinates) |coordinate| self.lat_lngs.appendAssumeCapacity(values.latLngToNative(coordinate));
-        return self.lat_lngs.items[start..];
+        const raw = try self.arena.allocator().alloc(c.mln_lat_lng, coordinates.len);
+        for (coordinates, raw) |coordinate, *out| out.* = values.latLngToNative(coordinate);
+        return raw;
     }
 
     pub fn screenPoints(self: *TempStorage, points: []const values.ScreenPoint) std.mem.Allocator.Error![]const c.mln_screen_point {
-        const start = self.screen_points.items.len;
-        try self.screen_points.ensureUnusedCapacity(self.allocator, points.len);
-        for (points) |point| self.screen_points.appendAssumeCapacity(values.screenPointToNative(point));
-        return self.screen_points.items[start..];
+        const raw = try self.arena.allocator().alloc(c.mln_screen_point, points.len);
+        for (points, raw) |point, *out| out.* = values.screenPointToNative(point);
+        return raw;
     }
 
     pub fn stringView(_: *TempStorage, value: []const u8) status.Error!c.mln_string_view {
-        if (std.mem.indexOfScalar(u8, value, 0) != null) return error.InvalidString;
         return .{ .data = if (value.len == 0) null else value.ptr, .size = value.len };
     }
 

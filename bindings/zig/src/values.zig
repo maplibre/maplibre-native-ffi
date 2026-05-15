@@ -65,6 +65,32 @@ pub const CameraFitOptions = struct {
     pitch: ?f64 = null,
 };
 
+pub const BoundOptions = struct {
+    bounds: ?LatLngBounds = null,
+    min_zoom: ?f64 = null,
+    max_zoom: ?f64 = null,
+    min_pitch: ?f64 = null,
+    max_pitch: ?f64 = null,
+};
+
+pub const Vec3 = struct {
+    x: f64,
+    y: f64,
+    z: f64,
+};
+
+pub const Quaternion = struct {
+    x: f64,
+    y: f64,
+    z: f64,
+    w: f64,
+};
+
+pub const FreeCameraOptions = struct {
+    position: ?Vec3 = null,
+    orientation: ?Quaternion = null,
+};
+
 pub const ProjectionMode = struct {
     axonometric: ?bool = null,
     x_skew: ?f64 = null,
@@ -644,6 +670,61 @@ pub fn cameraFitOptionsToNative(value: CameraFitOptions) c.mln_camera_fit_option
         raw.pitch = pitch;
     }
     return raw;
+}
+
+pub fn boundOptionsToNative(value: BoundOptions) c.mln_bound_options {
+    var raw = c.mln_bound_options_default();
+    if (value.bounds) |bounds| {
+        raw.fields |= c.MLN_BOUND_OPTION_BOUNDS;
+        raw.bounds = latLngBoundsToNative(bounds);
+    }
+    if (value.min_zoom) |min_zoom| {
+        raw.fields |= c.MLN_BOUND_OPTION_MIN_ZOOM;
+        raw.min_zoom = min_zoom;
+    }
+    if (value.max_zoom) |max_zoom| {
+        raw.fields |= c.MLN_BOUND_OPTION_MAX_ZOOM;
+        raw.max_zoom = max_zoom;
+    }
+    if (value.min_pitch) |min_pitch| {
+        raw.fields |= c.MLN_BOUND_OPTION_MIN_PITCH;
+        raw.min_pitch = min_pitch;
+    }
+    if (value.max_pitch) |max_pitch| {
+        raw.fields |= c.MLN_BOUND_OPTION_MAX_PITCH;
+        raw.max_pitch = max_pitch;
+    }
+    return raw;
+}
+
+pub fn boundOptionsFromNative(raw: c.mln_bound_options) BoundOptions {
+    return .{
+        .bounds = if ((raw.fields & c.MLN_BOUND_OPTION_BOUNDS) != 0) latLngBoundsFromNative(raw.bounds) else null,
+        .min_zoom = if ((raw.fields & c.MLN_BOUND_OPTION_MIN_ZOOM) != 0) raw.min_zoom else null,
+        .max_zoom = if ((raw.fields & c.MLN_BOUND_OPTION_MAX_ZOOM) != 0) raw.max_zoom else null,
+        .min_pitch = if ((raw.fields & c.MLN_BOUND_OPTION_MIN_PITCH) != 0) raw.min_pitch else null,
+        .max_pitch = if ((raw.fields & c.MLN_BOUND_OPTION_MAX_PITCH) != 0) raw.max_pitch else null,
+    };
+}
+
+pub fn freeCameraOptionsToNative(value: FreeCameraOptions) c.mln_free_camera_options {
+    var raw = c.mln_free_camera_options_default();
+    if (value.position) |position| {
+        raw.fields |= c.MLN_FREE_CAMERA_OPTION_POSITION;
+        raw.position = .{ .x = position.x, .y = position.y, .z = position.z };
+    }
+    if (value.orientation) |orientation| {
+        raw.fields |= c.MLN_FREE_CAMERA_OPTION_ORIENTATION;
+        raw.orientation = .{ .x = orientation.x, .y = orientation.y, .z = orientation.z, .w = orientation.w };
+    }
+    return raw;
+}
+
+pub fn freeCameraOptionsFromNative(raw: c.mln_free_camera_options) FreeCameraOptions {
+    return .{
+        .position = if ((raw.fields & c.MLN_FREE_CAMERA_OPTION_POSITION) != 0) .{ .x = raw.position.x, .y = raw.position.y, .z = raw.position.z } else null,
+        .orientation = if ((raw.fields & c.MLN_FREE_CAMERA_OPTION_ORIENTATION) != 0) .{ .x = raw.orientation.x, .y = raw.orientation.y, .z = raw.orientation.z, .w = raw.orientation.w } else null,
+    };
 }
 
 pub fn projectionModeToNative(value: ProjectionMode) c.mln_projection_mode {
