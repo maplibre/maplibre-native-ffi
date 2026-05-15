@@ -415,6 +415,7 @@ test "resource transform rewrites network style URL" {
             owned_event.deinit();
         }
         if (replacement_state.calls.load(.seq_cst) > 0) break;
+        _ = usleep(1000);
     }
 
     try testing.expectEqual(@as(usize, 0), state.calls.load(.seq_cst));
