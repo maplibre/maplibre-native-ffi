@@ -200,6 +200,12 @@ pub const ResourceTransformRequest = struct {
 };
 
 pub const ResourceTransformResponse = struct {
+    /// Replacement URL borrowed by native code during the current callback invocation.
+    ///
+    /// Safety: when set, the pointed-to null-terminated storage must remain valid
+    /// after the handler returns until native code copies it before completing the
+    /// current transform invocation. String literals and context-owned storage are
+    /// suitable; stack or temporary formatted buffers are not.
     replacement_url: ?[:0]const u8 = null,
 };
 

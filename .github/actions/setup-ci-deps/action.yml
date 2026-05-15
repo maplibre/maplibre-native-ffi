@@ -43,6 +43,11 @@ runs:
     - name: Install mise toolchain
       uses: jdx/mise-action@1648a7812b9aeae629881980618f079932869151 # v4.0.1
       with:
+        # TODO: unpin after mise/pixi resolve SLSA verification for Pixi's
+        # binary-only release attestations.
+        # https://github.com/jdx/mise/discussions/9895
+        # https://github.com/prefix-dev/pixi/issues/6133
+        version: 2026.5.7
         cache: true
         cache_key_prefix: mise-v2
         install: true
