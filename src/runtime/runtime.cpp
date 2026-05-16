@@ -3,14 +3,17 @@
 #include <condition_variable>
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
 #include <cstring>
 #include <exception>
 #include <functional>
+#include <iostream>
 #include <memory>
 #include <mutex>
 #include <optional>
 #include <shared_mutex>
 #include <string>
+#include <string_view>
 #include <thread>
 #include <unordered_map>
 #include <utility>
@@ -108,13 +111,33 @@ auto set_status_from_exception(
   return MLN_STATUS_NATIVE_ERROR;
 }
 
+auto trace_database_waits_enabled() -> bool {
+  static const auto enabled = []() -> bool {
+    const auto* value = std::getenv("MLN_FFI_TRACE_DATABASE_WAITS");
+    const auto text =
+      value == nullptr ? std::string_view{} : std::string_view{value};
+    return !text.empty() && text != "0";
+  }();
+  return enabled;
+}
+
+auto trace_database_wait(std::string_view label, std::string_view event)
+  -> void {
+  if (!trace_database_waits_enabled()) {
+    return;
+  }
+  std::cerr << "[mln-ffi-db-wait] " << event << " " << label << std::endl;
+}
+
 template <typename Result, typename Start>
-auto wait_for_database_result(Start start) -> Result {
+auto wait_for_database_result(std::string_view label, Start start) -> Result {
   auto mutex = std::mutex{};
   auto condition = std::condition_variable{};
   auto result = std::optional<Result>{};
 
+  trace_database_wait(label, "begin");
   start([&](Result value) -> void {
+    trace_database_wait(label, "callback");
     {
       const std::scoped_lock lock(mutex);
       result.emplace(std::move(value));
@@ -124,6 +147,7 @@ auto wait_for_database_result(Start start) -> Result {
 
   auto lock = std::unique_lock{mutex};
   condition.wait(lock, [&]() -> bool { return result.has_value(); });
+  trace_database_wait(label, "end");
   if (!result.has_value()) {
     std::terminate();
   }
@@ -671,6 +695,7 @@ auto database_source_for_runtime(mln_runtime* runtime)
 }
 
 auto wait_for_database_operation(
+  std::string_view label,
   const std::function<void(std::function<void(std::exception_ptr)>)>& start
 ) -> mln_status {
   auto mutex = std::mutex{};
@@ -678,7 +703,9 @@ auto wait_for_database_operation(
   auto complete = false;
   auto failure = std::exception_ptr{};
 
+  trace_database_wait(label, "begin");
   start([&](std::exception_ptr exception) -> void {
+    trace_database_wait(label, "callback");
     {
       const std::scoped_lock lock(mutex);
       failure = exception;
@@ -689,6 +716,7 @@ auto wait_for_database_operation(
 
   auto lock = std::unique_lock{mutex};
   condition.wait(lock, [&]() -> bool { return complete; });
+  trace_database_wait(label, "end");
   if (failure) {
     try {
       std::rethrow_exception(failure);
@@ -900,21 +928,29 @@ auto run_ambient_cache_operation(mln_runtime* runtime, uint32_t operation)
 
   switch (operation) {
     case MLN_AMBIENT_CACHE_OPERATION_RESET_DATABASE:
-      return wait_for_database_operation([&](auto callback) -> void {
-        database->resetDatabase(std::move(callback));
-      });
+      return wait_for_database_operation(
+        "ambient_cache_reset_database", [&](auto callback) -> void {
+          database->resetDatabase(std::move(callback));
+        }
+      );
     case MLN_AMBIENT_CACHE_OPERATION_PACK_DATABASE:
-      return wait_for_database_operation([&](auto callback) -> void {
-        database->packDatabase(std::move(callback));
-      });
+      return wait_for_database_operation(
+        "ambient_cache_pack_database", [&](auto callback) -> void {
+          database->packDatabase(std::move(callback));
+        }
+      );
     case MLN_AMBIENT_CACHE_OPERATION_INVALIDATE:
-      return wait_for_database_operation([&](auto callback) -> void {
-        database->invalidateAmbientCache(std::move(callback));
-      });
+      return wait_for_database_operation(
+        "ambient_cache_invalidate", [&](auto callback) -> void {
+          database->invalidateAmbientCache(std::move(callback));
+        }
+      );
     case MLN_AMBIENT_CACHE_OPERATION_CLEAR:
-      return wait_for_database_operation([&](auto callback) -> void {
-        database->clearAmbientCache(std::move(callback));
-      });
+      return wait_for_database_operation(
+        "ambient_cache_clear", [&](auto callback) -> void {
+          database->clearAmbientCache(std::move(callback));
+        }
+      );
     default:
       return MLN_STATUS_INVALID_ARGUMENT;
   }
@@ -957,7 +993,7 @@ auto offline_region_create(
   }
   auto result = wait_for_database_result<
     mbgl::expected<mbgl::OfflineRegion, std::exception_ptr>>(
-    [&](auto callback) -> void {
+    "offline_region_create", [&](auto callback) -> void {
       database->createOfflineRegion(
         native_definition, native_metadata, std::move(callback)
       );
@@ -1000,7 +1036,7 @@ auto offline_region_get(
 
   auto result = wait_for_database_result<
     mbgl::expected<std::optional<mbgl::OfflineRegion>, std::exception_ptr>>(
-    [&](auto callback) -> void {
+    "offline_region_get", [&](auto callback) -> void {
       database->getOfflineRegion(region_id, std::move(callback));
     }
   );
@@ -1043,7 +1079,7 @@ auto offline_regions_list(
 
   auto result = wait_for_database_result<
     mbgl::expected<mbgl::OfflineRegions, std::exception_ptr>>(
-    [&](auto callback) -> void {
+    "offline_regions_list", [&](auto callback) -> void {
       database->listOfflineRegions(std::move(callback));
     }
   );
@@ -1086,7 +1122,7 @@ auto offline_regions_merge_database(
 
   auto result = wait_for_database_result<
     mbgl::expected<mbgl::OfflineRegions, std::exception_ptr>>(
-    [&](auto callback) -> void {
+    "offline_regions_merge_database", [&](auto callback) -> void {
       database->mergeOfflineRegions(side_database_path, std::move(callback));
     }
   );
@@ -1135,7 +1171,7 @@ auto offline_region_update_metadata(
   }
   auto update_result = wait_for_database_result<
     mbgl::expected<mbgl::OfflineRegionMetadata, std::exception_ptr>>(
-    [&](auto callback) -> void {
+    "offline_region_update_metadata:update", [&](auto callback) -> void {
       database->updateOfflineMetadata(
         region_id, native_metadata, std::move(callback)
       );
@@ -1149,7 +1185,7 @@ auto offline_region_update_metadata(
 
   auto get_result = wait_for_database_result<
     mbgl::expected<std::optional<mbgl::OfflineRegion>, std::exception_ptr>>(
-    [&](auto callback) -> void {
+    "offline_region_get_related:get", [&](auto callback) -> void {
       database->getOfflineRegion(region_id, std::move(callback));
     }
   );
@@ -1195,7 +1231,7 @@ auto offline_region_get_status(
 
   auto get_result = wait_for_database_result<
     mbgl::expected<std::optional<mbgl::OfflineRegion>, std::exception_ptr>>(
-    [&](auto callback) -> void {
+    "offline_region_get_related:get", [&](auto callback) -> void {
       database->getOfflineRegion(region_id, std::move(callback));
     }
   );
@@ -1211,7 +1247,7 @@ auto offline_region_get_status(
 
   auto status_result = wait_for_database_result<
     mbgl::expected<mbgl::OfflineRegionStatus, std::exception_ptr>>(
-    [&](auto callback) -> void {
+    "offline_region_get_status:status", [&](auto callback) -> void {
       database->getOfflineRegionStatus(
         *get_result.value(), std::move(callback)
       );
@@ -1242,7 +1278,7 @@ auto offline_region_set_observed(
 
   auto get_result = wait_for_database_result<
     mbgl::expected<std::optional<mbgl::OfflineRegion>, std::exception_ptr>>(
-    [&](auto callback) -> void {
+    "offline_region_get_related:get", [&](auto callback) -> void {
       database->getOfflineRegion(region_id, std::move(callback));
     }
   );
@@ -1286,7 +1322,7 @@ auto offline_region_set_download_state(
 
   auto get_result = wait_for_database_result<
     mbgl::expected<std::optional<mbgl::OfflineRegion>, std::exception_ptr>>(
-    [&](auto callback) -> void {
+    "offline_region_set_download_state:get", [&](auto callback) -> void {
       database->getOfflineRegion(request.region_id, std::move(callback));
     }
   );
@@ -1320,7 +1356,7 @@ auto offline_region_invalidate(
 
   auto get_result = wait_for_database_result<
     mbgl::expected<std::optional<mbgl::OfflineRegion>, std::exception_ptr>>(
-    [&](auto callback) -> void {
+    "offline_region_get_related:get", [&](auto callback) -> void {
       database->getOfflineRegion(region_id, std::move(callback));
     }
   );
@@ -1334,9 +1370,13 @@ auto offline_region_invalidate(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
-  return wait_for_database_operation([&](auto callback) -> void {
-    database->invalidateOfflineRegion(*get_result.value(), std::move(callback));
-  });
+  return wait_for_database_operation(
+    "offline_region_invalidate:invalidate", [&](auto callback) -> void {
+      database->invalidateOfflineRegion(
+        *get_result.value(), std::move(callback)
+      );
+    }
+  );
 }
 
 auto offline_region_delete(
@@ -1355,7 +1395,7 @@ auto offline_region_delete(
 
   auto get_result = wait_for_database_result<
     mbgl::expected<std::optional<mbgl::OfflineRegion>, std::exception_ptr>>(
-    [&](auto callback) -> void {
+    "offline_region_get_related:get", [&](auto callback) -> void {
       database->getOfflineRegion(region_id, std::move(callback));
     }
   );
@@ -1375,9 +1415,11 @@ auto offline_region_delete(
     *get_result.value(), mbgl::OfflineRegionDownloadState::Inactive
   );
 
-  return wait_for_database_operation([&](auto callback) -> void {
-    database->deleteOfflineRegion(*get_result.value(), std::move(callback));
-  });
+  return wait_for_database_operation(
+    "offline_region_delete:delete", [&](auto callback) -> void {
+      database->deleteOfflineRegion(*get_result.value(), std::move(callback));
+    }
+  );
 }
 
 auto offline_region_snapshot_get(

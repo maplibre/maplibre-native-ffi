@@ -1,0 +1,58 @@
+name: Offline wedge diagnostics
+
+on:
+  workflow_dispatch:
+    inputs:
+      iterations:
+        description: Number of repro-loop iterations per job
+        required: false
+        default: "200"
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  macos-arm64-metal:
+    name: macos-arm64-metal / ${{ matrix.mode }}
+    runs-on: macos-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - mode: normal
+            stress_procs: 0
+          - mode: cpu-stress
+            stress_procs: 24
+    env:
+      MISE_ENV: macos-arm64-metal
+      REPRO_ITERATIONS: ${{ inputs.iterations || '200' }}
+      REPRO_STRESS_PROCS: ${{ matrix.stress_procs }}
+      REPRO_ARTIFACT_DIR: offline-wedge-artifacts-${{ matrix.mode }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Cache MapLibre Native source
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: |
+            third_party/maplibre-native
+            .git/modules/third_party/maplibre-native
+          key: mln-src-v2-${{ hashFiles('.gitmodules', 'cmake/mln_version.cmake') }}
+      - uses: ./.github/actions/setup-ci-deps
+      - run: mise run build
+      - name: Run offline wedge repro loop
+        run: python3 scripts/ci_offline_wedge_repro.py
+      - name: Upload diagnostics
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: offline-wedge-artifacts-${{ matrix.mode }}
+          path: offline-wedge-artifacts-${{ matrix.mode }}
+          if-no-files-found: ignore
+          retention-days: 14
