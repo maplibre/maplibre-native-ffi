@@ -102,6 +102,21 @@ def main() -> int:
     print(run_text(["sysctl", "-n", "hw.ncpu"]).strip() + " logical CPUs", flush=True)
     print("command: " + " ".join(cmd), flush=True)
 
+    print("warming Zig build/test artifacts before timed repro loop", flush=True)
+    warmup = subprocess.run(
+        cmd,
+        cwd=cwd,
+        env=env,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        timeout=180,
+    )
+    if warmup.returncode != 0:
+        print("warmup failed", flush=True)
+        print(warmup.stdout[-12000:], flush=True)
+        return warmup.returncode
+
     stress: list[subprocess.Popen[bytes]] = []
     try:
         for _ in range(args.stress_procs):
