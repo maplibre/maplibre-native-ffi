@@ -8,9 +8,13 @@ const values = @import("values.zig");
 
 const NativeRuntime = opaque {};
 
+pub const MapStyleLoadedHandler = *const fn (map: *c.mln_map, context: ?*anyopaque) void;
+
 const MapRegistration = struct {
     native: *c.mln_map,
     id: values.MapId,
+    style_loaded_handler: MapStyleLoadedHandler,
+    style_loaded_context: ?*anyopaque,
 };
 
 pub const RuntimeRegistry = struct {
@@ -740,6 +744,7 @@ pub const RuntimeHandle = struct {
             self.diagnostic_store,
         );
         if (!has_event) return null;
+        applyEventSideEffects(self, native_event);
         return runtimeEventFromNative(self, native_event);
     }
 
@@ -752,6 +757,7 @@ pub const RuntimeHandle = struct {
         );
         if (!has_event) return null;
 
+        applyEventSideEffects(self, native_event);
         const event = runtimeEventFromNative(self, native_event);
         const message = try copyOptionalBytes(allocator, native_event.message, native_event.message_size);
         errdefer allocator.free(message);
@@ -1018,6 +1024,19 @@ fn runtimeEventFromNative(handle: *RuntimeHandle, native_event: c.mln_runtime_ev
         .payload_type = RuntimeEventPayloadType.fromRaw(native_event.payload_type),
         .code = native_event.code,
     };
+}
+
+fn applyEventSideEffects(handle: *RuntimeHandle, native_event: c.mln_runtime_event) void {
+    if (native_event.type != c.MLN_RUNTIME_EVENT_MAP_STYLE_LOADED) return;
+    if (native_event.source_type != c.MLN_RUNTIME_EVENT_SOURCE_MAP) return;
+    const source_ptr = native_event.source orelse return;
+    const runtime_registry = handle.registry orelse return;
+    for (runtime_registry.maps.items) |registration| {
+        if (@intFromPtr(registration.native) == @intFromPtr(source_ptr)) {
+            registration.style_loaded_handler(registration.native, registration.style_loaded_context);
+            return;
+        }
+    }
 }
 
 fn mapIdForNativeSource(handle: *RuntimeHandle, source_type: u32, source: ?*anyopaque) ?values.MapId {
@@ -1392,10 +1411,20 @@ pub fn registry(handle: *RuntimeHandle) status.BindingError!*RuntimeRegistry {
     return handle.registry orelse error.ClosedHandle;
 }
 
-pub fn registerMap(runtime_registry: *RuntimeRegistry, map: *c.mln_map) std.mem.Allocator.Error!values.MapId {
+pub fn registerMap(
+    runtime_registry: *RuntimeRegistry,
+    map: *c.mln_map,
+    style_loaded_handler: MapStyleLoadedHandler,
+    style_loaded_context: ?*anyopaque,
+) std.mem.Allocator.Error!values.MapId {
     const id = values.MapId{ .value = runtime_registry.next_map_id };
     runtime_registry.next_map_id += 1;
-    try runtime_registry.maps.append(std.heap.smp_allocator, .{ .native = map, .id = id });
+    try runtime_registry.maps.append(std.heap.smp_allocator, .{
+        .native = map,
+        .id = id,
+        .style_loaded_handler = style_loaded_handler,
+        .style_loaded_context = style_loaded_context,
+    });
     return id;
 }
 
