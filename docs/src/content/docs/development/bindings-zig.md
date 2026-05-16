@@ -46,17 +46,16 @@ duplicate keys.
 
 ## Handles and Threading
 
-Zig callers manage native ownership explicitly with reverse-order `defer`
-cleanup. Each handle stores its native pointer in a private wrapper cell.
-Successful `close()` releases the native object and stores `null`; later
-`close()` calls no-op. Failed native destruction leaves the pointer live so
-callers can retry.
+Zig callers manage native ownership explicitly with `var` handles and
+reverse-order `defer` cleanup. Lifecycle handles are owned Zig structs that
+store the native pointer and Zig adapter state. Successful `close()` releases
+the native object, releases Zig-owned adapter state, and stores `null`; later
+`close()` calls on the same handle no-op. Failed native destruction leaves the
+pointer live so callers can retry.
 
-Handle values are copyable Zig structs. Wrapper cells stay allocated for the
-process lifetime so copied handle values keep observing `ClosedHandle` after any
-copy closes the native object. Native state has deterministic release through
-`close()`. Wrapper state uses one small cell for each created runtime, map,
-projection, and render-session handle.
+Treat lifecycle handles like other Zig resource structs: pass them by pointer
+and avoid copying them. A copied lifecycle handle is a duplicate owner; using
+that copy after the original closes, or closing both copies, is invalid.
 
 The Zig binding does not retain parents with counters by default. Callers keep
 parents live while child handles are live. Default destruction order is child
