@@ -73,7 +73,7 @@ pub const MetalBackend = union(enum) {
 
     pub fn attachRenderTarget(
         self: *MetalBackend,
-        map: maplibre.MapHandle,
+        map: *maplibre.MapHandle,
         viewport: types.Viewport,
     ) !render_target.Session {
         return switch (self.*) {
@@ -85,7 +85,7 @@ pub const MetalBackend = union(enum) {
 
     pub fn drawTexture(
         self: *MetalBackend,
-        texture: maplibre.RenderSessionHandle,
+        texture: *maplibre.RenderSessionHandle,
         viewport: types.Viewport,
     ) !bool {
         return switch (self.*) {
@@ -222,7 +222,7 @@ const MetalOwnedTextureBackend = struct {
 
     fn attachRenderTarget(
         self: *MetalOwnedTextureBackend,
-        map: maplibre.MapHandle,
+        map: *maplibre.MapHandle,
         viewport: types.Viewport,
     ) !render_target.Session {
         const texture = maplibre.attachMetalOwnedTexture(map, .{
@@ -237,10 +237,10 @@ const MetalOwnedTextureBackend = struct {
 
     fn drawTexture(
         self: *MetalOwnedTextureBackend,
-        texture: maplibre.RenderSessionHandle,
+        texture: *maplibre.RenderSessionHandle,
         _: types.Viewport,
     ) !bool {
-        const frame = texture.acquireMetalOwnedTextureFrame() catch |err| switch (err) {
+        var frame = texture.acquireMetalOwnedTextureFrame() catch |err| switch (err) {
             error.InvalidState => return false,
             else => {
                 diagnostics.logError("Metal texture acquire failed", err);
@@ -281,7 +281,7 @@ const MetalBorrowedTextureBackend = struct {
 
     fn attachRenderTarget(
         self: *MetalBorrowedTextureBackend,
-        map: maplibre.MapHandle,
+        map: *maplibre.MapHandle,
         viewport: types.Viewport,
     ) !render_target.Session {
         const texture = maplibre.attachMetalBorrowedTexture(map, .{
@@ -296,7 +296,7 @@ const MetalBorrowedTextureBackend = struct {
 
     fn drawTexture(
         self: *MetalBorrowedTextureBackend,
-        texture: maplibre.RenderSessionHandle,
+        texture: *maplibre.RenderSessionHandle,
         _: types.Viewport,
     ) !bool {
         _ = texture;
@@ -319,7 +319,7 @@ const MetalSurfaceBackend = struct {
 
     fn attachRenderTarget(
         self: *MetalSurfaceBackend,
-        map: maplibre.MapHandle,
+        map: *maplibre.MapHandle,
         viewport: types.Viewport,
     ) !render_target.Session {
         const surface = maplibre.attachMetalSurface(map, .{

@@ -5,13 +5,6 @@ const maplibre = @import("maplibre_native");
 
 const center = maplibre.LatLng{ .latitude = 37.7749, .longitude = -122.4194 };
 
-fn createRuntimeAndMap() !struct { runtime: maplibre.RuntimeHandle, map: maplibre.MapHandle } {
-    const runtime = try maplibre.RuntimeHandle.init(null);
-    errdefer runtime.close() catch {};
-    const map = try maplibre.MapHandle.create(runtime, .{});
-    return .{ .runtime = runtime, .map = map };
-}
-
 fn expectCenterPoint(point: maplibre.ScreenPoint) !void {
     try testing.expectApproxEqAbs(@as(f64, 256.0), point.x, 0.001);
     try testing.expectApproxEqAbs(@as(f64, 256.0), point.y, 0.001);
@@ -23,29 +16,31 @@ fn expectLatLngApprox(expected: maplibre.LatLng, actual: maplibre.LatLng) !void 
 }
 
 test "map projection mode updates snapshot fields through public binding" {
-    const handles = try createRuntimeAndMap();
-    defer handles.runtime.close() catch @panic("runtime close failed");
-    defer handles.map.close() catch @panic("map close failed");
+    var runtime = try maplibre.RuntimeHandle.init(null);
+    defer runtime.close() catch @panic("runtime close failed");
+    var map = try maplibre.MapHandle.create(&runtime, .{});
+    defer map.close() catch @panic("map close failed");
 
-    try handles.map.setProjectionMode(.{ .axonometric = true, .x_skew = 0.25, .y_skew = -0.125 });
+    try map.setProjectionMode(.{ .axonometric = true, .x_skew = 0.25, .y_skew = -0.125 });
 
-    const snapshot = try handles.map.getProjectionMode();
+    const snapshot = try map.getProjectionMode();
     try testing.expectEqual(true, snapshot.axonometric.?);
     try testing.expectApproxEqAbs(@as(f64, 0.25), snapshot.x_skew.?, 0.000001);
     try testing.expectApproxEqAbs(@as(f64, -0.125), snapshot.y_skew.?, 0.000001);
 }
 
 test "map converts between lat lngs and screen points" {
-    const handles = try createRuntimeAndMap();
-    defer handles.runtime.close() catch @panic("runtime close failed");
-    defer handles.map.close() catch @panic("map close failed");
+    var runtime = try maplibre.RuntimeHandle.init(null);
+    defer runtime.close() catch @panic("runtime close failed");
+    var map = try maplibre.MapHandle.create(&runtime, .{});
+    defer map.close() catch @panic("map close failed");
 
-    try handles.map.jumpTo(.{ .center = center, .zoom = 10.0 });
+    try map.jumpTo(.{ .center = center, .zoom = 10.0 });
 
-    const point = try handles.map.pixelForLatLng(center);
+    const point = try map.pixelForLatLng(center);
     try expectCenterPoint(point);
 
-    const coordinate = try handles.map.latLngForPixel(point);
+    const coordinate = try map.latLngForPixel(point);
     try expectLatLngApprox(center, coordinate);
 
     const coordinates = [_]maplibre.LatLng{
@@ -53,25 +48,26 @@ test "map converts between lat lngs and screen points" {
         .{ .latitude = 0.0, .longitude = 0.0 },
     };
     var points: [coordinates.len]maplibre.ScreenPoint = undefined;
-    try handles.map.pixelsForLatLngs(testing.allocator, coordinates[0..], points[0..]);
+    try map.pixelsForLatLngs(testing.allocator, coordinates[0..], points[0..]);
     try expectCenterPoint(points[0]);
 
     var roundtrip: [points.len]maplibre.LatLng = undefined;
-    try handles.map.latLngsForPixels(testing.allocator, points[0..], roundtrip[0..]);
+    try map.latLngsForPixels(testing.allocator, points[0..], roundtrip[0..]);
     try expectLatLngApprox(coordinates[0], roundtrip[0]);
     try expectLatLngApprox(coordinates[1], roundtrip[1]);
 
-    try handles.map.pixelsForLatLngs(testing.allocator, &.{}, &.{});
-    try handles.map.latLngsForPixels(testing.allocator, &.{}, &.{});
+    try map.pixelsForLatLngs(testing.allocator, &.{}, &.{});
+    try map.latLngsForPixels(testing.allocator, &.{}, &.{});
 }
 
 test "standalone projection converts and updates camera" {
-    const handles = try createRuntimeAndMap();
-    defer handles.runtime.close() catch @panic("runtime close failed");
-    defer handles.map.close() catch @panic("map close failed");
+    var runtime = try maplibre.RuntimeHandle.init(null);
+    defer runtime.close() catch @panic("runtime close failed");
+    var map = try maplibre.MapHandle.create(&runtime, .{});
+    defer map.close() catch @panic("map close failed");
 
-    try handles.map.jumpTo(.{ .center = center, .zoom = 10.0 });
-    const projection = try maplibre.MapProjectionHandle.create(handles.map);
+    try map.jumpTo(.{ .center = center, .zoom = 10.0 });
+    var projection = try maplibre.MapProjectionHandle.create(&map);
     defer projection.close() catch @panic("projection close failed");
 
     const point = try projection.pixelForLatLng(center);
@@ -113,15 +109,16 @@ test "projected meters convert to and from lat lng" {
 }
 
 test "projection public descriptors report invalid native arguments" {
-    const handles = try createRuntimeAndMap();
-    defer handles.runtime.close() catch @panic("runtime close failed");
-    defer handles.map.close() catch @panic("map close failed");
+    var runtime = try maplibre.RuntimeHandle.init(null);
+    defer runtime.close() catch @panic("runtime close failed");
+    var map = try maplibre.MapHandle.create(&runtime, .{});
+    defer map.close() catch @panic("map close failed");
 
-    try testing.expectError(error.InvalidArgument, handles.map.setProjectionMode(.{ .x_skew = std.math.inf(f64) }));
-    try testing.expectError(error.InvalidArgument, handles.map.pixelForLatLng(.{ .latitude = 91.0, .longitude = 0.0 }));
-    try testing.expectError(error.InvalidArgument, handles.map.latLngForPixel(.{ .x = std.math.inf(f64), .y = 0.0 }));
+    try testing.expectError(error.InvalidArgument, map.setProjectionMode(.{ .x_skew = std.math.inf(f64) }));
+    try testing.expectError(error.InvalidArgument, map.pixelForLatLng(.{ .latitude = 91.0, .longitude = 0.0 }));
+    try testing.expectError(error.InvalidArgument, map.latLngForPixel(.{ .x = std.math.inf(f64), .y = 0.0 }));
 
-    const projection = try maplibre.MapProjectionHandle.create(handles.map);
+    var projection = try maplibre.MapProjectionHandle.create(&map);
     defer projection.close() catch @panic("projection close failed");
 
     try testing.expectError(error.InvalidArgument, projection.setCamera(.{ .center = .{ .latitude = std.math.inf(f64), .longitude = 0.0 } }));

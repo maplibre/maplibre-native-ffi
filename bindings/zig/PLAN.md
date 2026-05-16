@@ -51,9 +51,10 @@ caller can retry.
 
 ## Ownership rules
 
-- Treat lifecycle handles like `std.ArrayList`: they are ordinary Zig values but
-  are owned resources. Do not copy them and then use both copies.
-- Share lifecycle handles by pointer.
+- Treat lifecycle handles and texture frame handles like `std.ArrayList`: they
+  are ordinary Zig values but are owned resources. Do not copy them and then use
+  both copies.
+- Share lifecycle and texture frame handles by pointer.
 - Keep parents live while children are live.
 - Close children before parents:
   - texture frames before render sessions;
@@ -77,20 +78,19 @@ caller can retry.
 
 ### 1. RuntimeHandle
 
-- Replace the pointer-backed enum with a struct containing the current
-  `RuntimeState` fields inline:
+- Replace the pointer-backed enum with a struct containing runtime-owned state:
   - `native: ?*c.mln_runtime`
   - `diagnostic_store: ?*diagnostics.DiagnosticStore`
-  - `maps: std.ArrayList(MapRegistration)`
-  - `next_map_id: u64`
+  - stable map registration state, for example `?*RuntimeRegistry`
   - `resource_transform: ?*ResourceTransform`
   - resource-provider callback state, likely `?*ResourceProviderState`
 - Remove `runtimeHandleFromState()` and `state(RuntimeHandle)`.
 - Change `init()` and `create()` to return `RuntimeHandle` values directly.
 - Change `close()` to `pub fn close(self: *RuntimeHandle) status.Error!void`.
 - Change public runtime methods to pointer receivers.
-- Change helper functions such as `native`, `diagnosticStore`, `registerMap`,
-  and `unregisterMap` to accept runtime pointers.
+- Change helper functions such as `native`, `diagnosticStore`, `registry`,
+  `registerMap`, and `unregisterMap` to use runtime pointers or the stable
+  runtime registry.
 - Move resource-provider callback storage out of `RuntimeHandle` if native code
   needs a stable `user_data` pointer:
   - allocate a `ResourceProviderState` on `setResourceProvider()`;
@@ -104,7 +104,7 @@ caller can retry.
 - Replace the pointer-backed enum with a struct containing the current
   `MapState` fields inline:
   - `native: ?*c.mln_map`
-  - `runtime: *RuntimeHandle`
+  - stable runtime registration state used to unregister the map
   - `id: values.MapId`
   - `diagnostic_store: ?*diagnostics.DiagnosticStore`
   - `custom_geometry_sources: std.ArrayList(*CustomGeometrySourceState)`
@@ -114,9 +114,9 @@ caller can retry.
 - Change public map methods to pointer receivers.
 - Keep custom-geometry source callback state heap allocated, because native code
   stores those callback user-data pointers independently of the map wrapper.
-- On successful close, destroy the native map, unregister from the runtime, free
-  custom-geometry source states, deinit the source list, and set
-  `native = null`.
+- On successful close, destroy the native map, unregister from the runtime
+  registration state, free custom-geometry source states, deinit the source
+  list, and set `native = null`.
 
 ### 3. MapProjectionHandle
 
@@ -135,9 +135,10 @@ caller can retry.
   `RenderSessionHandle` value.
 - Change session methods to pointer receivers.
 - Change `MetalOwnedTextureFrameHandle` and `VulkanOwnedTextureFrameHandle` to
-  store `*RenderSessionHandle` plus the generation.
-- Keep frame handles scoped: callers release frames before moving or closing the
-  render session.
+  owned resource structs with pointer-receiver `release()` methods that
+  invalidate the same frame handle.
+- Keep frame handles scoped: callers release frames before closing the render
+  session, and copied frame handles are invalid duplicate owners.
 - On successful session close, reject active frame borrows, destroy the native
   session, and set `native = null`.
 
@@ -147,8 +148,9 @@ caller can retry.
 - Update all Zig tests and examples:
   - declare lifecycle handles as `var`;
   - pass parents by pointer, for example `MapHandle.create(&runtime, .{})`;
-  - remove tests that require copied handles to keep returning `ClosedHandle`;
-  - keep tests that prove same-wrapper double close is a no-op;
+  - remove tests that require copied handles or released frame handles to keep
+    returning `ClosedHandle`;
+  - keep tests that prove same-wrapper double close/release is a no-op;
   - keep failed-close retry coverage.
 - Update any helper functions in tests to accept pointers instead of copied
   handles.
@@ -159,7 +161,7 @@ caller can retry.
   model.
 - Add short safety notes where callback or frame APIs require stable wrapper
   addresses while a borrow or callback registration is active.
-- Avoid documenting copied lifecycle handles as supported.
+- Avoid documenting copied lifecycle or texture frame handles as supported.
 
 ## Validation
 
@@ -179,12 +181,12 @@ resource-transform tests closely.
 
 - Passing a pointer to an inline Zig handle as long-lived C `user_data` would be
   unsafe if callers move the handle. Use heap callback state for those cases.
-- Frame handles that store `*RenderSessionHandle` require the render session
-  wrapper to stay at the same address while a frame is live. Keep frame borrows
-  short and explicit.
+- Frame handles need stable active-borrow state because render session wrappers
+  can move as ordinary Zig values. Keep frame borrows short and explicit.
 - Some tests currently rely on stale copied handles returning `ClosedHandle`.
-  Those tests should change because copied lifecycle handles are invalid under
-  the target model.
-- Parent pointers in child wrappers require callers to close children before
-  parents. Keep this documented and preserve native validation for misuse where
-  the C API can detect it.
+  Those tests should change because copied lifecycle and texture frame handles
+  are invalid under the target model.
+- Parent-owned registration state must stay stable when callers return or move
+  aggregate structs that contain both parent and child handles. Keep child
+  wrapper pointers limited to stable state, or document shorter scoped borrows
+  such as frame handles explicitly.

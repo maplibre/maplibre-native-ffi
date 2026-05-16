@@ -11,13 +11,13 @@ pub const MapState = struct {
     target: render_target.Session,
 
     pub fn init(allocator: std.mem.Allocator, viewport: types.Viewport, backend: anytype) !MapState {
-        const runtime = maplibre.RuntimeHandle.create(allocator, .{ .cache_path = ":memory:" }, null) catch |err| {
+        var runtime = maplibre.RuntimeHandle.create(allocator, .{ .cache_path = ":memory:" }, null) catch |err| {
             diagnostics.logError("runtime create failed", err);
             return types.AppError.RuntimeCreateFailed;
         };
         errdefer runtime.close() catch {};
 
-        const map = maplibre.MapHandle.create(runtime, .{
+        var map = maplibre.MapHandle.create(&runtime, .{
             .width = viewport.logical_width,
             .height = viewport.logical_height,
             .scale_factor = viewport.scale_factor,
@@ -28,10 +28,10 @@ pub const MapState = struct {
         };
         errdefer map.close() catch {};
 
-        try loadStyle(allocator, map);
-        try setCamera(map);
+        try loadStyle(allocator, &map);
+        try setCamera(&map);
 
-        var target = try backend.attachRenderTarget(map, viewport);
+        var target = try backend.attachRenderTarget(&map, viewport);
         errdefer target.deinit();
         return .{ .runtime = runtime, .map = map, .target = target };
     }
@@ -53,11 +53,11 @@ pub const MapState = struct {
     ) !void {
         self.target.deinit();
         try backend.resize(viewport);
-        self.target = try backend.attachRenderTarget(self.map, viewport);
+        self.target = try backend.attachRenderTarget(&self.map, viewport);
     }
 };
 
-pub fn drainEvents(runtime: maplibre.RuntimeHandle, map: maplibre.MapHandle) !bool {
+pub fn drainEvents(runtime: *maplibre.RuntimeHandle, map: *maplibre.MapHandle) !bool {
     const map_id = try map.id();
     var render_update_available = false;
     while (try runtime.pollEvent()) |event| {
@@ -70,14 +70,14 @@ pub fn drainEvents(runtime: maplibre.RuntimeHandle, map: maplibre.MapHandle) !bo
     return render_update_available;
 }
 
-fn loadStyle(allocator: std.mem.Allocator, map: maplibre.MapHandle) !void {
+fn loadStyle(allocator: std.mem.Allocator, map: *maplibre.MapHandle) !void {
     map.setStyleUrl(allocator, "https://tiles.openfreemap.org/styles/bright") catch |err| {
         diagnostics.logError("style load failed", err);
         return types.AppError.StyleLoadFailed;
     };
 }
 
-fn setCamera(map: maplibre.MapHandle) !void {
+fn setCamera(map: *maplibre.MapHandle) !void {
     map.jumpTo(.{
         .center = .{ .latitude = 37.7749, .longitude = -122.4194 },
         .zoom = 13.0,

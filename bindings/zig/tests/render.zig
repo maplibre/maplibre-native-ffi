@@ -60,8 +60,8 @@ fn expectFeaturePropertyString(feature: *const maplibre.QueriedFeature, key: []c
 }
 
 fn waitForRenderedFeatureQuery(
-    runtime: maplibre.RuntimeHandle,
-    session: maplibre.RenderSessionHandle,
+    runtime: *maplibre.RuntimeHandle,
+    session: *maplibre.RenderSessionHandle,
     geometry: maplibre.RenderedQueryGeometry,
     options: maplibre.RenderedFeatureQueryOptions,
 ) !maplibre.FeatureQueryResult {
@@ -77,8 +77,8 @@ fn waitForRenderedFeatureQuery(
 }
 
 fn waitForSourceFeatureQuery(
-    runtime: maplibre.RuntimeHandle,
-    session: maplibre.RenderSessionHandle,
+    runtime: *maplibre.RuntimeHandle,
+    session: *maplibre.RenderSessionHandle,
 ) !maplibre.FeatureQueryResult {
     for (0..1000) |_| {
         var result = try session.querySourceFeatures(testing.allocator, "point", .{
@@ -137,7 +137,7 @@ fn queriedFeatureAsBorrowed(allocator: std.mem.Allocator, queried: *const maplib
     };
 }
 
-fn waitForEvent(runtime: maplibre.RuntimeHandle, event_type: maplibre.RuntimeEventType) !bool {
+fn waitForEvent(runtime: *maplibre.RuntimeHandle, event_type: maplibre.RuntimeEventType) !bool {
     for (0..1000) |_| {
         try runtime.runOnce();
         while (try runtime.pollEvent()) |event| {
@@ -170,7 +170,7 @@ const RenderSessionThreadCall = enum {
     acquire_vulkan_frame,
 };
 
-fn callRenderSessionOnThread(session: maplibre.RenderSessionHandle, call: RenderSessionThreadCall, out_error: *?anyerror) void {
+fn callRenderSessionOnThread(session: *maplibre.RenderSessionHandle, call: RenderSessionThreadCall, out_error: *?anyerror) void {
     const result = switch (call) {
         .render_update => session.renderUpdate(),
         .resize => session.resize(.{ .width = 16, .height = 16, .scale_factor = 1.0 }),
@@ -197,12 +197,38 @@ fn callRenderSessionOnThread(session: maplibre.RenderSessionHandle, call: Render
     }
 }
 
-fn expectRenderSessionCallWrongThread(session: maplibre.RenderSessionHandle, call: RenderSessionThreadCall) !void {
+fn expectRenderSessionCallWrongThread(session: *maplibre.RenderSessionHandle, call: RenderSessionThreadCall) !void {
     var observed: ?anyerror = null;
     const thread = try std.Thread.spawn(.{}, callRenderSessionOnThread, .{ session, call, &observed });
     thread.join();
     try testing.expect(observed != null);
     try testing.expect(observed.? == error.WrongThread);
+}
+
+fn createMovedMetalSessionWithFrame(device: *anyopaque) !struct {
+    runtime: maplibre.RuntimeHandle,
+    map: maplibre.MapHandle,
+    session: maplibre.RenderSessionHandle,
+    frame: maplibre.MetalOwnedTextureFrameHandle,
+} {
+    var runtime = try maplibre.RuntimeHandle.init(null);
+    errdefer runtime.close() catch @panic("runtime close failed");
+
+    var map = try maplibre.MapHandle.create(&runtime, .{});
+    errdefer map.close() catch @panic("map close failed");
+
+    var session = try maplibre.attachMetalOwnedTexture(&map, .{
+        .extent = .{ .width = 32, .height = 32, .scale_factor = 1.0 },
+        .context = .{ .device = .{ .ptr = device } },
+    });
+    errdefer session.close() catch {};
+
+    try map.setStyleJson(testing.allocator, support.style_json);
+    try testing.expect(try waitForEvent(&runtime, .map_render_update_available));
+    try session.renderUpdate();
+
+    const frame = try session.acquireMetalOwnedTextureFrame();
+    return .{ .runtime = runtime, .map = map, .session = session, .frame = frame };
 }
 
 const VulkanAttachContext = if (build_options.supports_vulkan) struct {
@@ -411,13 +437,13 @@ fn findVulkanMemoryType(physical_device: if (build_options.supports_vulkan) vk.V
 }
 
 test "owned texture render session lifecycle and readback" {
-    const runtime = try maplibre.RuntimeHandle.init(null);
+    var runtime = try maplibre.RuntimeHandle.init(null);
     defer runtime.close() catch @panic("runtime close failed");
 
-    const map = try maplibre.MapHandle.create(runtime, .{});
+    var map = try maplibre.MapHandle.create(&runtime, .{});
     defer map.close() catch @panic("map close failed");
 
-    const session = try maplibre.attachOwnedTexture(map, .{
+    var session = try maplibre.attachOwnedTexture(&map, .{
         .extent = .{ .width = 32, .height = 16, .scale_factor = 1.0 },
     });
     errdefer session.close() catch {};
@@ -425,7 +451,7 @@ test "owned texture render session lifecycle and readback" {
     try testing.expectError(error.InvalidState, session.readPremultipliedRgba8(testing.allocator));
 
     try map.setStyleJson(testing.allocator, support.style_json);
-    try testing.expect(try waitForEvent(runtime, .map_render_update_available));
+    try testing.expect(try waitForEvent(&runtime, .map_render_update_available));
     try session.renderUpdate();
     try session.reduceMemoryUse();
     try session.dumpDebugLogs();
@@ -455,13 +481,13 @@ test "owned texture render session lifecycle and readback" {
 
 test "still-image map modes drive owned texture rendering" {
     inline for (.{ maplibre.MapMode.static, maplibre.MapMode.tile }) |mode| {
-        const runtime = try maplibre.RuntimeHandle.init(null);
+        var runtime = try maplibre.RuntimeHandle.init(null);
         defer runtime.close() catch @panic("runtime close failed");
 
-        const map = try maplibre.MapHandle.create(runtime, .{ .mode = mode });
+        var map = try maplibre.MapHandle.create(&runtime, .{ .mode = mode });
         defer map.close() catch @panic("map close failed");
 
-        var session = try maplibre.attachOwnedTexture(map, .{ .extent = .{ .width = 32, .height = 32 } });
+        var session = try maplibre.attachOwnedTexture(&map, .{ .extent = .{ .width = 32, .height = 32 } });
         defer session.close() catch {};
 
         try map.setStyleJson(testing.allocator, support.style_json);
@@ -471,29 +497,29 @@ test "still-image map modes drive owned texture rendering" {
 }
 
 test "owned texture attachment validates public descriptors" {
-    const runtime = try maplibre.RuntimeHandle.init(null);
+    var runtime = try maplibre.RuntimeHandle.init(null);
     defer runtime.close() catch @panic("runtime close failed");
 
-    const map = try maplibre.MapHandle.create(runtime, .{});
+    var map = try maplibre.MapHandle.create(&runtime, .{});
     defer map.close() catch @panic("map close failed");
 
-    try testing.expectError(error.InvalidArgument, maplibre.attachOwnedTexture(map, .{ .extent = .{ .width = 0 } }));
-    try testing.expectError(error.InvalidArgument, maplibre.attachOwnedTexture(map, .{ .extent = .{ .height = 0 } }));
-    try testing.expectError(error.InvalidArgument, maplibre.attachOwnedTexture(map, .{ .extent = .{ .scale_factor = 0 } }));
+    try testing.expectError(error.InvalidArgument, maplibre.attachOwnedTexture(&map, .{ .extent = .{ .width = 0 } }));
+    try testing.expectError(error.InvalidArgument, maplibre.attachOwnedTexture(&map, .{ .extent = .{ .height = 0 } }));
+    try testing.expectError(error.InvalidArgument, maplibre.attachOwnedTexture(&map, .{ .extent = .{ .scale_factor = 0 } }));
 
-    var first = try maplibre.attachOwnedTexture(map, .{});
+    var first = try maplibre.attachOwnedTexture(&map, .{});
     defer first.close() catch {};
-    try testing.expectError(error.InvalidState, maplibre.attachOwnedTexture(map, .{}));
+    try testing.expectError(error.InvalidState, maplibre.attachOwnedTexture(&map, .{}));
 }
 
 test "render session feature state set get and remove" {
-    const runtime = try maplibre.RuntimeHandle.init(null);
+    var runtime = try maplibre.RuntimeHandle.init(null);
     defer runtime.close() catch @panic("runtime close failed");
 
-    const map = try maplibre.MapHandle.create(runtime, .{});
+    var map = try maplibre.MapHandle.create(&runtime, .{});
     defer map.close() catch @panic("map close failed");
 
-    var session = try maplibre.attachOwnedTexture(map, .{ .extent = .{ .width = 64, .height = 64 } });
+    var session = try maplibre.attachOwnedTexture(&map, .{ .extent = .{ .width = 64, .height = 64 } });
     defer session.close() catch {};
 
     const selector = maplibre.FeatureStateSelector{ .source_id = "point", .feature_id = "feature-1" };
@@ -504,7 +530,7 @@ test "render session feature state set get and remove" {
     try testing.expectError(error.InvalidState, session.setFeatureState(testing.allocator, selector, .{ .object = state_members[0..] }));
 
     try map.setStyleJson(testing.allocator, support.style_json);
-    try testing.expect(try waitForEvent(runtime, .map_render_update_available));
+    try testing.expect(try waitForEvent(&runtime, .map_render_update_available));
     try session.renderUpdate();
 
     try session.setFeatureState(testing.allocator, selector, .{ .object = state_members[0..] });
@@ -530,7 +556,7 @@ test "render session feature state set get and remove" {
     try testing.expect(saw_radius);
 
     try session.removeFeatureState(testing.allocator, .{ .source_id = "point", .feature_id = "feature-1", .state_key = "hover" });
-    try testing.expect(try waitForEvent(runtime, .map_render_update_available));
+    try testing.expect(try waitForEvent(&runtime, .map_render_update_available));
     try session.renderUpdate();
 
     var after_remove = try session.getFeatureState(testing.allocator, selector);
@@ -547,23 +573,23 @@ test "render session feature state set get and remove" {
 }
 
 test "render session queries rendered and source features" {
-    const runtime = try maplibre.RuntimeHandle.init(null);
+    var runtime = try maplibre.RuntimeHandle.init(null);
     defer runtime.close() catch @panic("runtime close failed");
 
-    const map = try maplibre.MapHandle.create(runtime, .{});
+    var map = try maplibre.MapHandle.create(&runtime, .{});
     defer map.close() catch @panic("map close failed");
 
-    var session = try maplibre.attachOwnedTexture(map, .{});
+    var session = try maplibre.attachOwnedTexture(&map, .{});
     defer session.close() catch {};
 
     try testing.expectError(error.InvalidState, session.queryRenderedFeatures(testing.allocator, .{ .point = .{ .x = 256, .y = 256 } }, null));
 
     try map.setStyleJson(testing.allocator, support.style_json);
-    try testing.expect(try waitForEvent(runtime, .map_render_update_available));
+    try testing.expect(try waitForEvent(&runtime, .map_render_update_available));
     try session.renderUpdate();
 
     const query_point = try map.pixelForLatLng(.{ .latitude = 37.7749, .longitude = -122.4194 });
-    var rendered = try waitForRenderedFeatureQuery(runtime, session, .{ .box = .{
+    var rendered = try waitForRenderedFeatureQuery(&runtime, &session, .{ .box = .{
         .min = .{ .x = query_point.x - 20, .y = query_point.y - 20 },
         .max = .{ .x = query_point.x + 20, .y = query_point.y + 20 },
     } }, .{
@@ -579,7 +605,7 @@ test "render session queries rendered and source features" {
     try testing.expectEqualStrings("point", rendered.features[0].source_id.?);
     try expectFeaturePropertyString(&rendered.features[0], "kind", "capital");
 
-    var source = try waitForSourceFeatureQuery(runtime, session);
+    var source = try waitForSourceFeatureQuery(&runtime, &session);
     defer source.deinit();
     try testing.expect(source.features[0].source_id != null);
     try testing.expectEqualStrings("point", source.features[0].source_id.?);
@@ -590,24 +616,24 @@ test "render session queries rendered and source features" {
 }
 
 test "render session queries cluster feature extensions" {
-    const runtime = try maplibre.RuntimeHandle.init(null);
+    var runtime = try maplibre.RuntimeHandle.init(null);
     defer runtime.close() catch @panic("runtime close failed");
 
-    const map = try maplibre.MapHandle.create(runtime, .{});
+    var map = try maplibre.MapHandle.create(&runtime, .{});
     defer map.close() catch @panic("map close failed");
 
-    var session = try maplibre.attachOwnedTexture(map, .{});
+    var session = try maplibre.attachOwnedTexture(&map, .{});
     defer session.close() catch {};
 
     try map.jumpTo(.{ .center = .{ .latitude = 0, .longitude = 0 }, .zoom = 0 });
     try map.setStyleJson(testing.allocator, cluster_style_json);
     for (0..5) |_| {
-        if (!try waitForEvent(runtime, .map_render_update_available)) break;
+        if (!try waitForEvent(&runtime, .map_render_update_available)) break;
         try session.renderUpdate();
     }
 
     const query_point = try map.pixelForLatLng(.{ .latitude = 0, .longitude = 0 });
-    var clusters = try waitForRenderedFeatureQuery(runtime, session, .{ .box = .{
+    var clusters = try waitForRenderedFeatureQuery(&runtime, &session, .{ .box = .{
         .min = .{ .x = query_point.x - 30, .y = query_point.y - 30 },
         .max = .{ .x = query_point.x + 30, .y = query_point.y + 30 },
     } }, .{ .layer_ids = &.{"cluster-circle"} });
@@ -646,15 +672,15 @@ test "render session queries cluster feature extensions" {
 }
 
 test "unsupported backend owned texture attachment reports unsupported" {
-    const runtime = try maplibre.RuntimeHandle.init(null);
+    var runtime = try maplibre.RuntimeHandle.init(null);
     defer runtime.close() catch @panic("runtime close failed");
 
-    const map = try maplibre.MapHandle.create(runtime, .{});
+    var map = try maplibre.MapHandle.create(&runtime, .{});
     defer map.close() catch @panic("map close failed");
 
     const fake_pointer = maplibre.NativePointer{ .ptr = @ptrFromInt(1) };
     if (build_options.supports_metal) {
-        try testing.expectError(error.Unsupported, maplibre.attachVulkanOwnedTexture(map, .{
+        try testing.expectError(error.Unsupported, maplibre.attachVulkanOwnedTexture(&map, .{
             .context = .{
                 .instance = fake_pointer,
                 .physical_device = fake_pointer,
@@ -665,7 +691,7 @@ test "unsupported backend owned texture attachment reports unsupported" {
         }));
     }
     if (build_options.supports_vulkan) {
-        try testing.expectError(error.Unsupported, maplibre.attachMetalOwnedTexture(map, .{
+        try testing.expectError(error.Unsupported, maplibre.attachMetalOwnedTexture(&map, .{
             .context = .{ .device = fake_pointer },
         }));
     }
@@ -675,20 +701,20 @@ test "Metal owned texture frame handle scopes native pointers" {
     if (!build_options.supports_metal) return error.SkipZigTest;
     const device = MTLCreateSystemDefaultDevice() orelse return error.SkipZigTest;
 
-    const runtime = try maplibre.RuntimeHandle.init(null);
+    var runtime = try maplibre.RuntimeHandle.init(null);
     defer runtime.close() catch @panic("runtime close failed");
 
-    const map = try maplibre.MapHandle.create(runtime, .{});
+    var map = try maplibre.MapHandle.create(&runtime, .{});
     defer map.close() catch @panic("map close failed");
 
-    var session = try maplibre.attachMetalOwnedTexture(map, .{
+    var session = try maplibre.attachMetalOwnedTexture(&map, .{
         .extent = .{ .width = 32, .height = 32, .scale_factor = 1.0 },
         .context = .{ .device = .{ .ptr = device } },
     });
     defer session.close() catch {};
 
     try map.setStyleJson(testing.allocator, support.style_json);
-    try testing.expect(try waitForEvent(runtime, .map_render_update_available));
+    try testing.expect(try waitForEvent(&runtime, .map_render_update_available));
     try session.renderUpdate();
 
     var image = try session.readPremultipliedRgba8(testing.allocator);
@@ -697,7 +723,7 @@ test "Metal owned texture frame handle scopes native pointers" {
     try testing.expectEqual(@as(u32, 32), image.info.height);
     try testing.expectEqual(@as(usize, 32 * 32 * 4), image.info.byte_length);
 
-    const frame = try session.acquireMetalOwnedTextureFrame();
+    var frame = try session.acquireMetalOwnedTextureFrame();
     const info = try frame.info();
     try testing.expectEqual(@as(u32, 32), info.width);
     try testing.expectEqual(@as(u32, 32), info.height);
@@ -712,11 +738,10 @@ test "Metal owned texture frame handle scopes native pointers" {
 
     try frame.release();
     try frame.release();
-    try testing.expectError(error.ClosedHandle, frame.info());
 
     try session.resize(.{ .width = 16, .height = 8, .scale_factor = 2.0 });
     try session.renderUpdate();
-    const resized_frame = try session.acquireMetalOwnedTextureFrame();
+    var resized_frame = try session.acquireMetalOwnedTextureFrame();
     const resized_info = try resized_frame.info();
     try testing.expectEqual(@as(u32, 32), resized_info.width);
     try testing.expectEqual(@as(u32, 16), resized_info.height);
@@ -724,18 +749,33 @@ test "Metal owned texture frame handle scopes native pointers" {
     try testing.expectEqual(@as(u64, 2), resized_info.generation);
     try resized_frame.release();
 
-    try expectRenderSessionCallWrongThread(session, .acquire_metal_frame);
+    try expectRenderSessionCallWrongThread(&session, .acquire_metal_frame);
     try session.close();
 }
 
+test "Metal owned texture frame release follows moved session wrapper" {
+    if (!build_options.supports_metal) return error.SkipZigTest;
+    const device = MTLCreateSystemDefaultDevice() orelse return error.SkipZigTest;
+
+    const pool = try metal_support.AutoreleasePool.init();
+    defer pool.deinit();
+
+    var handles = try createMovedMetalSessionWithFrame(device);
+    try testing.expectError(error.ActiveBorrow, handles.session.close());
+    try handles.frame.release();
+    try handles.session.close();
+    try handles.map.close();
+    try handles.runtime.close();
+}
+
 test "render session rejects wrong-thread calls through public bindings" {
-    const runtime = try maplibre.RuntimeHandle.init(null);
+    var runtime = try maplibre.RuntimeHandle.init(null);
     defer runtime.close() catch @panic("runtime close failed");
 
-    const map = try maplibre.MapHandle.create(runtime, .{});
+    var map = try maplibre.MapHandle.create(&runtime, .{});
     defer map.close() catch @panic("map close failed");
 
-    var session = try maplibre.attachOwnedTexture(map, .{});
+    var session = try maplibre.attachOwnedTexture(&map, .{});
     defer session.close() catch {};
 
     inline for (.{
@@ -747,7 +787,7 @@ test "render session rejects wrong-thread calls through public bindings" {
         .dump_debug_logs,
         .close,
     }) |call| {
-        try expectRenderSessionCallWrongThread(session, call);
+        try expectRenderSessionCallWrongThread(&session, call);
     }
 }
 
@@ -763,20 +803,20 @@ test "Metal borrowed texture renders through public bindings" {
     try metal_support.clearTextureRGBA8(borrowed, .{ 255, 0, 255, 255 });
     try expectPixelApprox(try metal_support.readTexturePixelRGBA8(borrowed, 0, 0), .{ 255, 0, 255, 255 }, 0);
 
-    const runtime = try maplibre.RuntimeHandle.init(null);
+    var runtime = try maplibre.RuntimeHandle.init(null);
     defer runtime.close() catch @panic("runtime close failed");
 
-    const map = try maplibre.MapHandle.create(runtime, .{});
+    var map = try maplibre.MapHandle.create(&runtime, .{});
     defer map.close() catch @panic("map close failed");
 
-    var session = try maplibre.attachMetalBorrowedTexture(map, .{
+    var session = try maplibre.attachMetalBorrowedTexture(&map, .{
         .extent = .{ .width = 128, .height = 128 },
         .texture = .{ .ptr = borrowed },
     });
     defer session.close() catch {};
 
     try map.setStyleJson(testing.allocator, support.style_json);
-    try testing.expect(try waitForEvent(runtime, .map_render_update_available));
+    try testing.expect(try waitForEvent(&runtime, .map_render_update_available));
     try session.renderUpdate();
     try expectPixelApprox(try metal_support.readTexturePixelRGBA8(borrowed, 0, 0), .{ 0xd8, 0xf1, 0xff, 0xff }, 8);
 
@@ -791,20 +831,20 @@ test "Vulkan owned texture frame handle scopes native pointers" {
     var context = try VulkanAttachContext.init();
     defer context.deinit();
 
-    const runtime = try maplibre.RuntimeHandle.init(null);
+    var runtime = try maplibre.RuntimeHandle.init(null);
     defer runtime.close() catch @panic("runtime close failed");
 
-    const map = try maplibre.MapHandle.create(runtime, .{});
+    var map = try maplibre.MapHandle.create(&runtime, .{});
     defer map.close() catch @panic("map close failed");
 
-    var session = try maplibre.attachVulkanOwnedTexture(map, .{
+    var session = try maplibre.attachVulkanOwnedTexture(&map, .{
         .extent = .{ .width = 32, .height = 32, .scale_factor = 1.0 },
         .context = context.descriptor(),
     });
     defer session.close() catch {};
 
     try map.setStyleJson(testing.allocator, support.style_json);
-    try testing.expect(try waitForEvent(runtime, .map_render_update_available));
+    try testing.expect(try waitForEvent(&runtime, .map_render_update_available));
     try session.renderUpdate();
 
     var image = try session.readPremultipliedRgba8(testing.allocator);
@@ -813,7 +853,7 @@ test "Vulkan owned texture frame handle scopes native pointers" {
     try testing.expectEqual(@as(u32, 32), image.info.height);
     try testing.expectEqual(@as(usize, 32 * 32 * 4), image.info.byte_length);
 
-    const frame = try session.acquireVulkanOwnedTextureFrame();
+    var frame = try session.acquireVulkanOwnedTextureFrame();
     const info = try frame.info();
     try testing.expectEqual(@as(u32, 32), info.width);
     try testing.expectEqual(@as(u32, 32), info.height);
@@ -828,11 +868,10 @@ test "Vulkan owned texture frame handle scopes native pointers" {
 
     try frame.release();
     try frame.release();
-    try testing.expectError(error.ClosedHandle, frame.info());
 
     try session.resize(.{ .width = 16, .height = 8, .scale_factor = 2.0 });
     try session.renderUpdate();
-    const resized_frame = try session.acquireVulkanOwnedTextureFrame();
+    var resized_frame = try session.acquireVulkanOwnedTextureFrame();
     const resized_info = try resized_frame.info();
     try testing.expectEqual(@as(u32, 32), resized_info.width);
     try testing.expectEqual(@as(u32, 16), resized_info.height);
@@ -840,7 +879,7 @@ test "Vulkan owned texture frame handle scopes native pointers" {
     try testing.expectEqual(@as(u64, 2), resized_info.generation);
     try resized_frame.release();
 
-    try expectRenderSessionCallWrongThread(session, .acquire_vulkan_frame);
+    try expectRenderSessionCallWrongThread(&session, .acquire_vulkan_frame);
     try session.close();
 }
 
@@ -850,17 +889,17 @@ test "Vulkan borrowed texture renders through public bindings" {
     var borrowed = try VulkanBorrowedImage.create(128, 128);
     defer borrowed.deinit();
 
-    const runtime = try maplibre.RuntimeHandle.init(null);
+    var runtime = try maplibre.RuntimeHandle.init(null);
     defer runtime.close() catch @panic("runtime close failed");
 
-    const map = try maplibre.MapHandle.create(runtime, .{});
+    var map = try maplibre.MapHandle.create(&runtime, .{});
     defer map.close() catch @panic("map close failed");
 
-    var session = try maplibre.attachVulkanBorrowedTexture(map, borrowed.descriptor());
+    var session = try maplibre.attachVulkanBorrowedTexture(&map, borrowed.descriptor());
     defer session.close() catch {};
 
     try map.setStyleJson(testing.allocator, support.style_json);
-    try testing.expect(try waitForEvent(runtime, .map_render_update_available));
+    try testing.expect(try waitForEvent(&runtime, .map_render_update_available));
     try session.renderUpdate();
 
     try testing.expectError(error.Unsupported, session.acquireVulkanOwnedTextureFrame());

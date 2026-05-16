@@ -3,52 +3,47 @@ const testing = std.testing;
 
 const maplibre = @import("maplibre_native");
 
-fn createRuntimeAndMap() !struct { runtime: maplibre.RuntimeHandle, map: maplibre.MapHandle } {
-    const runtime = try maplibre.RuntimeHandle.init(null);
-    errdefer runtime.close() catch {};
-    const map = try maplibre.MapHandle.create(runtime, .{});
-    return .{ .runtime = runtime, .map = map };
-}
-
 test "map debug options round trip and diagnostics toggles" {
-    const handles = try createRuntimeAndMap();
-    defer handles.runtime.close() catch @panic("runtime close failed");
-    defer handles.map.close() catch @panic("map close failed");
+    var runtime = try maplibre.RuntimeHandle.init(null);
+    defer runtime.close() catch @panic("runtime close failed");
+    var map = try maplibre.MapHandle.create(&runtime, .{});
+    defer map.close() catch @panic("map close failed");
 
     const debug = maplibre.DebugOptions{
         .tile_borders = true,
         .collision = true,
         .depth_buffer = true,
     };
-    try handles.map.setDebugOptions(debug);
+    try map.setDebugOptions(debug);
 
-    const snapshot = try handles.map.getDebugOptions();
+    const snapshot = try map.getDebugOptions();
     try testing.expect(snapshot.tile_borders);
     try testing.expect(snapshot.collision);
     try testing.expect(snapshot.depth_buffer);
     try testing.expect(!snapshot.overdraw);
 
-    try testing.expect(!try handles.map.getRenderingStatsViewEnabled());
-    try handles.map.setRenderingStatsViewEnabled(true);
-    try testing.expect(try handles.map.getRenderingStatsViewEnabled());
+    try testing.expect(!try map.getRenderingStatsViewEnabled());
+    try map.setRenderingStatsViewEnabled(true);
+    try testing.expect(try map.getRenderingStatsViewEnabled());
 
-    _ = try handles.map.isFullyLoaded();
-    try handles.map.dumpDebugLogs();
+    _ = try map.isFullyLoaded();
+    try map.dumpDebugLogs();
 }
 
 test "map viewport options update selected fields through public descriptors" {
-    const handles = try createRuntimeAndMap();
-    defer handles.runtime.close() catch @panic("runtime close failed");
-    defer handles.map.close() catch @panic("map close failed");
+    var runtime = try maplibre.RuntimeHandle.init(null);
+    defer runtime.close() catch @panic("runtime close failed");
+    var map = try maplibre.MapHandle.create(&runtime, .{});
+    defer map.close() catch @panic("map close failed");
 
-    try handles.map.setViewportOptions(.{
+    try map.setViewportOptions(.{
         .north_orientation = .right,
         .constrain_mode = .width_and_height,
         .viewport_mode = .flipped_y,
         .frustum_offset = .{ .top = 1.0, .left = 2.0, .bottom = 3.0, .right = 4.0 },
     });
 
-    var snapshot = try handles.map.getViewportOptions();
+    var snapshot = try map.getViewportOptions();
     try testing.expectEqual(maplibre.NorthOrientation.right, snapshot.north_orientation.?);
     try testing.expectEqual(maplibre.ConstrainMode.width_and_height, snapshot.constrain_mode.?);
     try testing.expectEqual(maplibre.ViewportMode.flipped_y, snapshot.viewport_mode.?);
@@ -57,18 +52,19 @@ test "map viewport options update selected fields through public descriptors" {
     try testing.expectApproxEqAbs(@as(f64, 3.0), snapshot.frustum_offset.?.bottom, 0.000001);
     try testing.expectApproxEqAbs(@as(f64, 4.0), snapshot.frustum_offset.?.right, 0.000001);
 
-    try handles.map.setViewportOptions(.{ .north_orientation = .down });
-    snapshot = try handles.map.getViewportOptions();
+    try map.setViewportOptions(.{ .north_orientation = .down });
+    snapshot = try map.getViewportOptions();
     try testing.expectEqual(maplibre.NorthOrientation.down, snapshot.north_orientation.?);
     try testing.expectEqual(maplibre.ConstrainMode.width_and_height, snapshot.constrain_mode.?);
 }
 
 test "map tile options update selected fields through public descriptors" {
-    const handles = try createRuntimeAndMap();
-    defer handles.runtime.close() catch @panic("runtime close failed");
-    defer handles.map.close() catch @panic("map close failed");
+    var runtime = try maplibre.RuntimeHandle.init(null);
+    defer runtime.close() catch @panic("runtime close failed");
+    var map = try maplibre.MapHandle.create(&runtime, .{});
+    defer map.close() catch @panic("map close failed");
 
-    try handles.map.setTileOptions(.{
+    try map.setTileOptions(.{
         .prefetch_zoom_delta = 2,
         .lod_min_radius = 1.5,
         .lod_scale = 2.5,
@@ -77,7 +73,7 @@ test "map tile options update selected fields through public descriptors" {
         .lod_mode = .distance,
     });
 
-    var snapshot = try handles.map.getTileOptions();
+    var snapshot = try map.getTileOptions();
     try testing.expectEqual(@as(u32, 2), snapshot.prefetch_zoom_delta.?);
     try testing.expectApproxEqAbs(@as(f64, 1.5), snapshot.lod_min_radius.?, 0.000001);
     try testing.expectApproxEqAbs(@as(f64, 2.5), snapshot.lod_scale.?, 0.000001);
@@ -85,19 +81,20 @@ test "map tile options update selected fields through public descriptors" {
     try testing.expectApproxEqAbs(@as(f64, -1.0), snapshot.lod_zoom_shift.?, 0.000001);
     try testing.expectEqual(maplibre.TileLodMode.distance, snapshot.lod_mode.?);
 
-    try handles.map.setTileOptions(.{ .prefetch_zoom_delta = 7 });
-    snapshot = try handles.map.getTileOptions();
+    try map.setTileOptions(.{ .prefetch_zoom_delta = 7 });
+    snapshot = try map.getTileOptions();
     try testing.expectEqual(@as(u32, 7), snapshot.prefetch_zoom_delta.?);
     try testing.expectEqual(maplibre.TileLodMode.distance, snapshot.lod_mode.?);
 }
 
 test "map tuning public descriptors report invalid native arguments" {
-    const handles = try createRuntimeAndMap();
-    defer handles.runtime.close() catch @panic("runtime close failed");
-    defer handles.map.close() catch @panic("map close failed");
+    var runtime = try maplibre.RuntimeHandle.init(null);
+    defer runtime.close() catch @panic("runtime close failed");
+    var map = try maplibre.MapHandle.create(&runtime, .{});
+    defer map.close() catch @panic("map close failed");
 
-    try testing.expectError(error.InvalidArgument, handles.map.setViewportOptions(.{ .frustum_offset = .{ .top = std.math.inf(f64) } }));
-    try testing.expectError(error.InvalidArgument, handles.map.setViewportOptions(.{ .frustum_offset = .{ .left = -1.0 } }));
-    try testing.expectError(error.InvalidArgument, handles.map.setTileOptions(.{ .prefetch_zoom_delta = 256 }));
-    try testing.expectError(error.InvalidArgument, handles.map.setTileOptions(.{ .lod_scale = std.math.nan(f64) }));
+    try testing.expectError(error.InvalidArgument, map.setViewportOptions(.{ .frustum_offset = .{ .top = std.math.inf(f64) } }));
+    try testing.expectError(error.InvalidArgument, map.setViewportOptions(.{ .frustum_offset = .{ .left = -1.0 } }));
+    try testing.expectError(error.InvalidArgument, map.setTileOptions(.{ .prefetch_zoom_delta = 256 }));
+    try testing.expectError(error.InvalidArgument, map.setTileOptions(.{ .lod_scale = std.math.nan(f64) }));
 }

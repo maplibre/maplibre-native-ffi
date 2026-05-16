@@ -92,7 +92,7 @@ pub fn main(init_args: std.process.Init) !void {
                 else => {
                     const input_result = try input_controller.handleEvent(
                         &event,
-                        map.map,
+                        &map.map,
                         current_viewport,
                     );
                     render_pending = render_pending or input_result.camera_changed;
@@ -101,7 +101,7 @@ pub fn main(init_args: std.process.Init) !void {
         }
 
         try map.runtime.runOnce();
-        const render_update_available = try map_state.drainEvents(map.runtime, map.map);
+        const render_update_available = try map_state.drainEvents(&map.runtime, &map.map);
         render_pending = render_pending or render_update_available;
         did_work = did_work or render_update_available;
 
@@ -113,7 +113,7 @@ pub fn main(init_args: std.process.Init) !void {
                 did_work = true;
                 switch (map.target) {
                     .none => {},
-                    .texture => |texture| {
+                    .texture => |*texture| {
                         if (try backend.drawTexture(texture, current_viewport)) {
                             has_presented_frame = true;
                         }

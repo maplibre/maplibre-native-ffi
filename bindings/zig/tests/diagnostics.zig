@@ -6,8 +6,8 @@ test "diagnostics capture public lifecycle failures and keep copied messages" {
     var diagnostics = maplibre.DiagnosticStore.init(testing.allocator);
     defer diagnostics.deinit();
 
-    const runtime = try maplibre.RuntimeHandle.init(&diagnostics);
-    const map = try maplibre.MapHandle.create(runtime, .{});
+    var runtime = try maplibre.RuntimeHandle.init(&diagnostics);
+    var map = try maplibre.MapHandle.create(&runtime, .{});
 
     try testing.expectError(error.InvalidState, runtime.close());
     const first = diagnostics.get().?;

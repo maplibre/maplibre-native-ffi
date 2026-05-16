@@ -7,13 +7,15 @@ const native_temp = @import("native_temp.zig");
 const status = @import("status.zig");
 const values = @import("values.zig");
 
-const RenderSessionState = struct {
-    native: ?*c.mln_render_session,
-    diagnostic_store: ?*diagnostics.DiagnosticStore,
-    metal_frame: ?c.mln_metal_owned_texture_frame = null,
+const NativeRenderSession = opaque {};
+const MetalOwnedTextureFrameStorage = struct { raw: c.mln_metal_owned_texture_frame };
+const VulkanOwnedTextureFrameStorage = struct { raw: c.mln_vulkan_owned_texture_frame };
+
+const RenderSessionFrameState = struct {
+    metal_frame: ?MetalOwnedTextureFrameStorage = null,
     metal_frame_active: bool = false,
     metal_frame_generation: u64 = 0,
-    vulkan_frame: ?c.mln_vulkan_owned_texture_frame = null,
+    vulkan_frame: ?VulkanOwnedTextureFrameStorage = null,
     vulkan_frame_active: bool = false,
     vulkan_frame_generation: u64 = 0,
 };
@@ -235,41 +237,43 @@ pub const OwnedImage = struct {
     }
 };
 
-pub const RenderSessionHandle = enum(usize) {
-    _,
+pub const RenderSessionHandle = struct {
+    native: ?*NativeRenderSession,
+    diagnostic_store: ?*diagnostics.DiagnosticStore,
+    frame_state: ?*RenderSessionFrameState,
 
-    pub fn resize(self: RenderSessionHandle, extent: RenderTargetExtent) status.Error!void {
+    pub fn resize(self: *RenderSessionHandle, extent: RenderTargetExtent) status.Error!void {
         try ensureNoActiveOwnedFrame(self);
         try status.checkStatus(
             c.mln_render_session_resize(try native(self), extent.width, extent.height, extent.scale_factor),
-            state(self).diagnostic_store,
+            self.diagnostic_store,
         );
     }
 
-    pub fn renderUpdate(self: RenderSessionHandle) status.Error!void {
+    pub fn renderUpdate(self: *RenderSessionHandle) status.Error!void {
         try ensureNoActiveOwnedFrame(self);
-        try status.checkStatus(c.mln_render_session_render_update(try native(self)), state(self).diagnostic_store);
+        try status.checkStatus(c.mln_render_session_render_update(try native(self)), self.diagnostic_store);
     }
 
-    pub fn detach(self: RenderSessionHandle) status.Error!void {
+    pub fn detach(self: *RenderSessionHandle) status.Error!void {
         try ensureNoActiveOwnedFrame(self);
-        try status.checkStatus(c.mln_render_session_detach(try native(self)), state(self).diagnostic_store);
+        try status.checkStatus(c.mln_render_session_detach(try native(self)), self.diagnostic_store);
     }
 
-    pub fn reduceMemoryUse(self: RenderSessionHandle) status.Error!void {
-        try status.checkStatus(c.mln_render_session_reduce_memory_use(try native(self)), state(self).diagnostic_store);
+    pub fn reduceMemoryUse(self: *RenderSessionHandle) status.Error!void {
+        try status.checkStatus(c.mln_render_session_reduce_memory_use(try native(self)), self.diagnostic_store);
     }
 
-    pub fn clearData(self: RenderSessionHandle) status.Error!void {
-        try status.checkStatus(c.mln_render_session_clear_data(try native(self)), state(self).diagnostic_store);
+    pub fn clearData(self: *RenderSessionHandle) status.Error!void {
+        try status.checkStatus(c.mln_render_session_clear_data(try native(self)), self.diagnostic_store);
     }
 
-    pub fn dumpDebugLogs(self: RenderSessionHandle) status.Error!void {
-        try status.checkStatus(c.mln_render_session_dump_debug_logs(try native(self)), state(self).diagnostic_store);
+    pub fn dumpDebugLogs(self: *RenderSessionHandle) status.Error!void {
+        try status.checkStatus(c.mln_render_session_dump_debug_logs(try native(self)), self.diagnostic_store);
     }
 
     pub fn setFeatureState(
-        self: RenderSessionHandle,
+        self: *RenderSessionHandle,
         allocator: std.mem.Allocator,
         selector: FeatureStateSelector,
         feature_state: values.JsonValue,
@@ -280,12 +284,12 @@ pub const RenderSessionHandle = enum(usize) {
         const raw_state = try temp.jsonValue(feature_state);
         try status.checkStatus(
             c.mln_render_session_set_feature_state(try native(self), &raw_selector, raw_state),
-            state(self).diagnostic_store,
+            self.diagnostic_store,
         );
     }
 
     pub fn getFeatureState(
-        self: RenderSessionHandle,
+        self: *RenderSessionHandle,
         allocator: std.mem.Allocator,
         selector: FeatureStateSelector,
     ) status.Error!values.OwnedJsonValue {
@@ -295,16 +299,16 @@ pub const RenderSessionHandle = enum(usize) {
         var snapshot: ?*c.mln_json_snapshot = null;
         try status.checkStatus(
             c.mln_render_session_get_feature_state(try native(self), &raw_selector, &snapshot),
-            state(self).diagnostic_store,
+            self.diagnostic_store,
         );
         defer c.mln_json_snapshot_destroy(snapshot);
         var raw: ?*const c.mln_json_value = null;
-        try status.checkStatus(c.mln_json_snapshot_get(snapshot.?, &raw), state(self).diagnostic_store);
+        try status.checkStatus(c.mln_json_snapshot_get(snapshot.?, &raw), self.diagnostic_store);
         return try values.ownedJsonValueFromNative(allocator, raw.?);
     }
 
     pub fn removeFeatureState(
-        self: RenderSessionHandle,
+        self: *RenderSessionHandle,
         allocator: std.mem.Allocator,
         selector: FeatureStateSelector,
     ) status.Error!void {
@@ -313,12 +317,12 @@ pub const RenderSessionHandle = enum(usize) {
         var raw_selector = try featureStateSelectorToNative(&temp, selector);
         try status.checkStatus(
             c.mln_render_session_remove_feature_state(try native(self), &raw_selector),
-            state(self).diagnostic_store,
+            self.diagnostic_store,
         );
     }
 
     pub fn queryRenderedFeatures(
-        self: RenderSessionHandle,
+        self: *RenderSessionHandle,
         allocator: std.mem.Allocator,
         geometry: RenderedQueryGeometry,
         options: ?RenderedFeatureQueryOptions,
@@ -330,14 +334,14 @@ pub const RenderSessionHandle = enum(usize) {
         var result: ?*c.mln_feature_query_result = null;
         try status.checkStatus(
             c.mln_render_session_query_rendered_features(try native(self), &raw_geometry, if (options != null) &raw_options else null, &result),
-            state(self).diagnostic_store,
+            self.diagnostic_store,
         );
         defer c.mln_feature_query_result_destroy(result);
-        return try copyFeatureQueryResult(allocator, result.?, state(self).diagnostic_store);
+        return try copyFeatureQueryResult(allocator, result.?, self.diagnostic_store);
     }
 
     pub fn querySourceFeatures(
-        self: RenderSessionHandle,
+        self: *RenderSessionHandle,
         allocator: std.mem.Allocator,
         source_id: []const u8,
         options: ?SourceFeatureQueryOptions,
@@ -349,14 +353,14 @@ pub const RenderSessionHandle = enum(usize) {
         var result: ?*c.mln_feature_query_result = null;
         try status.checkStatus(
             c.mln_render_session_query_source_features(try native(self), raw_source_id, if (options != null) &raw_options else null, &result),
-            state(self).diagnostic_store,
+            self.diagnostic_store,
         );
         defer c.mln_feature_query_result_destroy(result);
-        return try copyFeatureQueryResult(allocator, result.?, state(self).diagnostic_store);
+        return try copyFeatureQueryResult(allocator, result.?, self.diagnostic_store);
     }
 
     pub fn queryFeatureExtension(
-        self: RenderSessionHandle,
+        self: *RenderSessionHandle,
         allocator: std.mem.Allocator,
         source_id: []const u8,
         feature: values.Feature,
@@ -374,32 +378,32 @@ pub const RenderSessionHandle = enum(usize) {
         var result: ?*c.mln_feature_extension_result = null;
         try status.checkStatus(
             c.mln_render_session_query_feature_extensions(try native(self), raw_source_id, raw_feature, raw_extension, raw_extension_field, raw_arguments, &result),
-            state(self).diagnostic_store,
+            self.diagnostic_store,
         );
         defer c.mln_feature_extension_result_destroy(result);
-        return try copyFeatureExtensionResult(allocator, result.?, state(self).diagnostic_store);
+        return try copyFeatureExtensionResult(allocator, result.?, self.diagnostic_store);
     }
 
-    pub fn textureImageInfo(self: RenderSessionHandle) status.Error!TextureImageInfo {
+    pub fn textureImageInfo(self: *RenderSessionHandle) status.Error!TextureImageInfo {
         var info = c.mln_texture_image_info_default();
         const probe_status = c.mln_texture_read_premultiplied_rgba8(try native(self), null, 0, &info);
         switch (probe_status) {
             c.MLN_STATUS_INVALID_ARGUMENT => {},
-            else => try status.checkStatus(probe_status, state(self).diagnostic_store),
+            else => try status.checkStatus(probe_status, self.diagnostic_store),
         }
         return textureImageInfoFromNative(info);
     }
 
-    pub fn readPremultipliedRgba8Into(self: RenderSessionHandle, buffer: []u8) status.Error!TextureImageInfo {
+    pub fn readPremultipliedRgba8Into(self: *RenderSessionHandle, buffer: []u8) status.Error!TextureImageInfo {
         var info = c.mln_texture_image_info_default();
         try status.checkStatus(
             c.mln_texture_read_premultiplied_rgba8(try native(self), buffer.ptr, buffer.len, &info),
-            state(self).diagnostic_store,
+            self.diagnostic_store,
         );
         return textureImageInfoFromNative(info);
     }
 
-    pub fn readPremultipliedRgba8(self: RenderSessionHandle, allocator: std.mem.Allocator) status.Error!OwnedImage {
+    pub fn readPremultipliedRgba8(self: *RenderSessionHandle, allocator: std.mem.Allocator) status.Error!OwnedImage {
         const info = try self.textureImageInfo();
         const data = try allocator.alloc(u8, info.byte_length);
         errdefer allocator.free(data);
@@ -407,7 +411,7 @@ pub const RenderSessionHandle = enum(usize) {
         return .{ .allocator = allocator, .info = copied_info, .data = data };
     }
 
-    pub fn acquireMetalOwnedTextureFrame(self: RenderSessionHandle) status.Error!MetalOwnedTextureFrameHandle {
+    pub fn acquireMetalOwnedTextureFrame(self: *RenderSessionHandle) status.Error!MetalOwnedTextureFrameHandle {
         try ensureNoActiveOwnedFrame(self);
         var frame = c.mln_metal_owned_texture_frame{
             .size = @sizeOf(c.mln_metal_owned_texture_frame),
@@ -420,15 +424,21 @@ pub const RenderSessionHandle = enum(usize) {
             .device = null,
             .pixel_format = 0,
         };
-        const session_state = state(self);
-        try status.checkStatus(c.mln_metal_owned_texture_acquire_frame(try native(self), &frame), session_state.diagnostic_store);
-        session_state.metal_frame_generation +%= 1;
-        session_state.metal_frame = frame;
-        session_state.metal_frame_active = true;
-        return .{ .session = self, .generation = session_state.metal_frame_generation };
+        const session_native = try native(self);
+        const session_frame_state = try frameState(self);
+        try status.checkStatus(c.mln_metal_owned_texture_acquire_frame(session_native, &frame), self.diagnostic_store);
+        session_frame_state.metal_frame_generation +%= 1;
+        session_frame_state.metal_frame = .{ .raw = frame };
+        session_frame_state.metal_frame_active = true;
+        return .{
+            .session_native = @ptrCast(session_native),
+            .diagnostic_store = self.diagnostic_store,
+            .frame_state = session_frame_state,
+            .generation = session_frame_state.metal_frame_generation,
+        };
     }
 
-    pub fn acquireVulkanOwnedTextureFrame(self: RenderSessionHandle) status.Error!VulkanOwnedTextureFrameHandle {
+    pub fn acquireVulkanOwnedTextureFrame(self: *RenderSessionHandle) status.Error!VulkanOwnedTextureFrameHandle {
         try ensureNoActiveOwnedFrame(self);
         var frame = c.mln_vulkan_owned_texture_frame{
             .size = @sizeOf(c.mln_vulkan_owned_texture_frame),
@@ -443,32 +453,43 @@ pub const RenderSessionHandle = enum(usize) {
             .format = 0,
             .layout = 0,
         };
-        const session_state = state(self);
-        try status.checkStatus(c.mln_vulkan_owned_texture_acquire_frame(try native(self), &frame), session_state.diagnostic_store);
-        session_state.vulkan_frame_generation +%= 1;
-        session_state.vulkan_frame = frame;
-        session_state.vulkan_frame_active = true;
-        return .{ .session = self, .generation = session_state.vulkan_frame_generation };
+        const session_native = try native(self);
+        const session_frame_state = try frameState(self);
+        try status.checkStatus(c.mln_vulkan_owned_texture_acquire_frame(session_native, &frame), self.diagnostic_store);
+        session_frame_state.vulkan_frame_generation +%= 1;
+        session_frame_state.vulkan_frame = .{ .raw = frame };
+        session_frame_state.vulkan_frame_active = true;
+        return .{
+            .session_native = @ptrCast(session_native),
+            .diagnostic_store = self.diagnostic_store,
+            .frame_state = session_frame_state,
+            .generation = session_frame_state.vulkan_frame_generation,
+        };
     }
 
-    /// Closes the native render session and releases this Zig wrapper state.
-    ///
-    /// After this succeeds, this handle and any copies of it are invalid.
-    pub fn close(self: RenderSessionHandle) status.Error!void {
-        const session_state = state(self);
-        const session = session_state.native orelse return;
-        if (session_state.metal_frame_active or session_state.vulkan_frame_active) return error.ActiveBorrow;
-        try status.checkStatus(c.mln_render_session_destroy(session), session_state.diagnostic_store);
-        session_state.native = null;
-        std.heap.smp_allocator.destroy(session_state);
+    pub fn close(self: *RenderSessionHandle) status.Error!void {
+        const session: *c.mln_render_session = @ptrCast(self.native orelse return);
+        const session_frame_state = try frameState(self);
+        if (session_frame_state.metal_frame_active or session_frame_state.vulkan_frame_active) return error.ActiveBorrow;
+        try status.checkStatus(c.mln_render_session_destroy(session), self.diagnostic_store);
+        self.native = null;
+        self.frame_state = null;
+        std.heap.smp_allocator.destroy(session_frame_state);
     }
 };
 
 pub const MetalOwnedTextureFrameHandle = struct {
-    session: RenderSessionHandle,
+    session_native: ?*NativeRenderSession,
+    diagnostic_store: ?*diagnostics.DiagnosticStore,
+    frame_state: ?*RenderSessionFrameState,
     generation: u64,
 
-    pub fn info(self: MetalOwnedTextureFrameHandle) status.BindingError!MetalOwnedTextureFrameInfo {
+    /// Returns native Metal objects for this acquired frame.
+    ///
+    /// Safety: returned backend pointers stay valid only until this frame handle
+    /// is released. Callers must follow the backend synchronization rules from
+    /// the C API while using them.
+    pub fn info(self: *const MetalOwnedTextureFrameHandle) status.BindingError!MetalOwnedTextureFrameInfo {
         const frame = try metalFrame(self);
         return .{
             .generation = frame.generation,
@@ -481,24 +502,33 @@ pub const MetalOwnedTextureFrameHandle = struct {
         };
     }
 
-    pub fn release(self: MetalOwnedTextureFrameHandle) status.Error!void {
-        const session_state = state(self.session);
-        if (!session_state.metal_frame_active or self.generation != session_state.metal_frame_generation) return;
-        var frame = session_state.metal_frame orelse return;
+    pub fn release(self: *MetalOwnedTextureFrameHandle) status.Error!void {
+        const session_frame_state = self.frame_state orelse return;
+        const session_native = self.session_native orelse return;
+        if (!session_frame_state.metal_frame_active or self.generation != session_frame_state.metal_frame_generation) return;
+        var frame = (session_frame_state.metal_frame orelse return).raw;
         try status.checkStatus(
-            c.mln_metal_owned_texture_release_frame(try native(self.session), &frame),
-            session_state.diagnostic_store,
+            c.mln_metal_owned_texture_release_frame(@ptrCast(session_native), &frame),
+            self.diagnostic_store,
         );
-        session_state.metal_frame_active = false;
-        session_state.metal_frame = null;
+        session_frame_state.metal_frame_active = false;
+        session_frame_state.metal_frame = null;
+        self.* = .{ .session_native = null, .diagnostic_store = self.diagnostic_store, .frame_state = null, .generation = 0 };
     }
 };
 
 pub const VulkanOwnedTextureFrameHandle = struct {
-    session: RenderSessionHandle,
+    session_native: ?*NativeRenderSession,
+    diagnostic_store: ?*diagnostics.DiagnosticStore,
+    frame_state: ?*RenderSessionFrameState,
     generation: u64,
 
-    pub fn info(self: VulkanOwnedTextureFrameHandle) status.BindingError!VulkanOwnedTextureFrameInfo {
+    /// Returns native Vulkan objects for this acquired frame.
+    ///
+    /// Safety: returned backend pointers stay valid only until this frame handle
+    /// is released. Callers must follow the backend synchronization rules from
+    /// the C API while using them.
+    pub fn info(self: *const VulkanOwnedTextureFrameHandle) status.BindingError!VulkanOwnedTextureFrameInfo {
         const frame = try vulkanFrame(self);
         return .{
             .generation = frame.generation,
@@ -513,47 +543,49 @@ pub const VulkanOwnedTextureFrameHandle = struct {
         };
     }
 
-    pub fn release(self: VulkanOwnedTextureFrameHandle) status.Error!void {
-        const session_state = state(self.session);
-        if (!session_state.vulkan_frame_active or self.generation != session_state.vulkan_frame_generation) return;
-        var frame = session_state.vulkan_frame orelse return;
+    pub fn release(self: *VulkanOwnedTextureFrameHandle) status.Error!void {
+        const session_frame_state = self.frame_state orelse return;
+        const session_native = self.session_native orelse return;
+        if (!session_frame_state.vulkan_frame_active or self.generation != session_frame_state.vulkan_frame_generation) return;
+        var frame = (session_frame_state.vulkan_frame orelse return).raw;
         try status.checkStatus(
-            c.mln_vulkan_owned_texture_release_frame(try native(self.session), &frame),
-            session_state.diagnostic_store,
+            c.mln_vulkan_owned_texture_release_frame(@ptrCast(session_native), &frame),
+            self.diagnostic_store,
         );
-        session_state.vulkan_frame_active = false;
-        session_state.vulkan_frame = null;
+        session_frame_state.vulkan_frame_active = false;
+        session_frame_state.vulkan_frame = null;
+        self.* = .{ .session_native = null, .diagnostic_store = self.diagnostic_store, .frame_state = null, .generation = 0 };
     }
 };
 
-pub fn attachOwnedTexture(map: map_module.MapHandle, descriptor: OwnedTextureDescriptor) status.Error!RenderSessionHandle {
+pub fn attachOwnedTexture(map: *map_module.MapHandle, descriptor: OwnedTextureDescriptor) status.Error!RenderSessionHandle {
     var raw = c.mln_owned_texture_descriptor_default();
     raw.extent = renderTargetExtentToNative(descriptor.extent);
     return try attach(map, c.mln_owned_texture_attach, &raw);
 }
 
-pub fn attachMetalOwnedTexture(map: map_module.MapHandle, descriptor: MetalOwnedTextureDescriptor) status.Error!RenderSessionHandle {
+pub fn attachMetalOwnedTexture(map: *map_module.MapHandle, descriptor: MetalOwnedTextureDescriptor) status.Error!RenderSessionHandle {
     var raw = c.mln_metal_owned_texture_descriptor_default();
     raw.extent = renderTargetExtentToNative(descriptor.extent);
     raw.context = metalContextToNative(descriptor.context);
     return try attach(map, c.mln_metal_owned_texture_attach, &raw);
 }
 
-pub fn attachMetalBorrowedTexture(map: map_module.MapHandle, descriptor: MetalBorrowedTextureDescriptor) status.Error!RenderSessionHandle {
+pub fn attachMetalBorrowedTexture(map: *map_module.MapHandle, descriptor: MetalBorrowedTextureDescriptor) status.Error!RenderSessionHandle {
     var raw = c.mln_metal_borrowed_texture_descriptor_default();
     raw.extent = renderTargetExtentToNative(descriptor.extent);
     raw.texture = descriptor.texture.ptr;
     return try attach(map, c.mln_metal_borrowed_texture_attach, &raw);
 }
 
-pub fn attachVulkanOwnedTexture(map: map_module.MapHandle, descriptor: VulkanOwnedTextureDescriptor) status.Error!RenderSessionHandle {
+pub fn attachVulkanOwnedTexture(map: *map_module.MapHandle, descriptor: VulkanOwnedTextureDescriptor) status.Error!RenderSessionHandle {
     var raw = c.mln_vulkan_owned_texture_descriptor_default();
     raw.extent = renderTargetExtentToNative(descriptor.extent);
     raw.context = vulkanContextToNative(descriptor.context);
     return try attach(map, c.mln_vulkan_owned_texture_attach, &raw);
 }
 
-pub fn attachVulkanBorrowedTexture(map: map_module.MapHandle, descriptor: VulkanBorrowedTextureDescriptor) status.Error!RenderSessionHandle {
+pub fn attachVulkanBorrowedTexture(map: *map_module.MapHandle, descriptor: VulkanBorrowedTextureDescriptor) status.Error!RenderSessionHandle {
     var raw = c.mln_vulkan_borrowed_texture_descriptor_default();
     raw.extent = renderTargetExtentToNative(descriptor.extent);
     raw.context = vulkanContextToNative(descriptor.context);
@@ -565,7 +597,7 @@ pub fn attachVulkanBorrowedTexture(map: map_module.MapHandle, descriptor: Vulkan
     return try attach(map, c.mln_vulkan_borrowed_texture_attach, &raw);
 }
 
-pub fn attachMetalSurface(map: map_module.MapHandle, descriptor: MetalSurfaceDescriptor) status.Error!RenderSessionHandle {
+pub fn attachMetalSurface(map: *map_module.MapHandle, descriptor: MetalSurfaceDescriptor) status.Error!RenderSessionHandle {
     var raw = c.mln_metal_surface_descriptor_default();
     raw.extent = renderTargetExtentToNative(descriptor.extent);
     raw.context = metalContextToNative(descriptor.context);
@@ -573,7 +605,7 @@ pub fn attachMetalSurface(map: map_module.MapHandle, descriptor: MetalSurfaceDes
     return try attach(map, c.mln_metal_surface_attach, &raw);
 }
 
-pub fn attachVulkanSurface(map: map_module.MapHandle, descriptor: VulkanSurfaceDescriptor) status.Error!RenderSessionHandle {
+pub fn attachVulkanSurface(map: *map_module.MapHandle, descriptor: VulkanSurfaceDescriptor) status.Error!RenderSessionHandle {
     var raw = c.mln_vulkan_surface_descriptor_default();
     raw.extent = renderTargetExtentToNative(descriptor.extent);
     raw.context = vulkanContextToNative(descriptor.context);
@@ -582,7 +614,7 @@ pub fn attachVulkanSurface(map: map_module.MapHandle, descriptor: VulkanSurfaceD
 }
 
 fn attach(
-    map: map_module.MapHandle,
+    map: *map_module.MapHandle,
     comptime attachFn: anytype,
     descriptor: anytype,
 ) status.Error!RenderSessionHandle {
@@ -601,39 +633,35 @@ fn newRenderSession(
     session: *c.mln_render_session,
     diagnostic_store: ?*diagnostics.DiagnosticStore,
 ) std.mem.Allocator.Error!RenderSessionHandle {
-    const session_state = try std.heap.smp_allocator.create(RenderSessionState);
-    session_state.* = .{ .native = session, .diagnostic_store = diagnostic_store };
-    return renderSessionHandleFromState(session_state);
+    const session_frame_state = try std.heap.smp_allocator.create(RenderSessionFrameState);
+    session_frame_state.* = .{};
+    return .{ .native = @ptrCast(session), .diagnostic_store = diagnostic_store, .frame_state = session_frame_state };
 }
 
-fn renderSessionHandleFromState(session_state: *RenderSessionState) RenderSessionHandle {
-    return @enumFromInt(@intFromPtr(session_state));
+fn native(handle: *RenderSessionHandle) status.BindingError!*c.mln_render_session {
+    return @ptrCast(handle.native orelse return error.ClosedHandle);
 }
 
-fn state(handle: RenderSessionHandle) *RenderSessionState {
-    return @ptrFromInt(@intFromEnum(handle));
+fn frameState(handle: *RenderSessionHandle) status.BindingError!*RenderSessionFrameState {
+    return handle.frame_state orelse error.ClosedHandle;
 }
 
-fn native(handle: RenderSessionHandle) status.BindingError!*c.mln_render_session {
-    return state(handle).native orelse error.ClosedHandle;
+fn ensureNoActiveOwnedFrame(handle: *RenderSessionHandle) status.BindingError!void {
+    _ = handle.native orelse return error.ClosedHandle;
+    const session_frame_state = try frameState(handle);
+    if (session_frame_state.metal_frame_active or session_frame_state.vulkan_frame_active) return error.ActiveBorrow;
 }
 
-fn ensureNoActiveOwnedFrame(handle: RenderSessionHandle) status.BindingError!void {
-    const session_state = state(handle);
-    _ = session_state.native orelse return error.ClosedHandle;
-    if (session_state.metal_frame_active or session_state.vulkan_frame_active) return error.ActiveBorrow;
+fn metalFrame(handle: *const MetalOwnedTextureFrameHandle) status.BindingError!c.mln_metal_owned_texture_frame {
+    const session_frame_state = handle.frame_state orelse return error.ClosedHandle;
+    if (!session_frame_state.metal_frame_active or handle.generation != session_frame_state.metal_frame_generation) return error.ClosedHandle;
+    return (session_frame_state.metal_frame orelse return error.ClosedHandle).raw;
 }
 
-fn metalFrame(handle: MetalOwnedTextureFrameHandle) status.BindingError!c.mln_metal_owned_texture_frame {
-    const session_state = state(handle.session);
-    if (!session_state.metal_frame_active or handle.generation != session_state.metal_frame_generation) return error.ClosedHandle;
-    return session_state.metal_frame orelse error.ClosedHandle;
-}
-
-fn vulkanFrame(handle: VulkanOwnedTextureFrameHandle) status.BindingError!c.mln_vulkan_owned_texture_frame {
-    const session_state = state(handle.session);
-    if (!session_state.vulkan_frame_active or handle.generation != session_state.vulkan_frame_generation) return error.ClosedHandle;
-    return session_state.vulkan_frame orelse error.ClosedHandle;
+fn vulkanFrame(handle: *const VulkanOwnedTextureFrameHandle) status.BindingError!c.mln_vulkan_owned_texture_frame {
+    const session_frame_state = handle.frame_state orelse return error.ClosedHandle;
+    if (!session_frame_state.vulkan_frame_active or handle.generation != session_frame_state.vulkan_frame_generation) return error.ClosedHandle;
+    return (session_frame_state.vulkan_frame orelse return error.ClosedHandle).raw;
 }
 
 fn renderTargetExtentToNative(extent: RenderTargetExtent) c.mln_render_target_extent {

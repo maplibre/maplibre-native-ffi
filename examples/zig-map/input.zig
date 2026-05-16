@@ -28,7 +28,7 @@ pub const Controller = struct {
     pub fn handleEvent(
         self: *Controller,
         event: *const c.SDL_Event,
-        map: maplibre.MapHandle,
+        map: *maplibre.MapHandle,
         current_viewport: types.Viewport,
     ) !Result {
         return switch (event.type) {
@@ -44,7 +44,7 @@ pub const Controller = struct {
     fn handleMouseButtonDown(
         self: *Controller,
         button: c.SDL_MouseButtonEvent,
-        map: maplibre.MapHandle,
+        map: *maplibre.MapHandle,
     ) !Result {
         self.last_x = button.x;
         self.last_y = button.y;
@@ -70,7 +70,7 @@ pub const Controller = struct {
     fn handleMouseMotion(
         self: *Controller,
         motion: c.SDL_MouseMotionEvent,
-        map: maplibre.MapHandle,
+        map: *maplibre.MapHandle,
     ) !Result {
         const x: f64 = motion.x;
         const y: f64 = motion.y;
@@ -119,7 +119,7 @@ pub fn logControls() void {
     , .{});
 }
 
-fn handleMouseWheel(wheel: c.SDL_MouseWheelEvent, map: maplibre.MapHandle) !Result {
+fn handleMouseWheel(wheel: c.SDL_MouseWheelEvent, map: *maplibre.MapHandle) !Result {
     const delta: f64 = -wheel.y;
     if (delta == 0) return .{ .handled = true };
 
@@ -131,7 +131,7 @@ fn handleMouseWheel(wheel: c.SDL_MouseWheelEvent, map: maplibre.MapHandle) !Resu
 
 fn handleKeyDown(
     key: c.SDL_KeyboardEvent,
-    map: maplibre.MapHandle,
+    map: *maplibre.MapHandle,
     current_viewport: types.Viewport,
 ) !Result {
     const pan_step = 120.0;
@@ -189,27 +189,27 @@ fn dragModeForButton(button: u8) DragMode {
     return .pan;
 }
 
-fn adjustBearing(map: maplibre.MapHandle, delta: f64) !void {
+fn adjustBearing(map: *maplibre.MapHandle, delta: f64) !void {
     const camera = try currentCamera(map);
     try expectCameraStatus(map.jumpTo(.{ .bearing = (camera.bearing orelse 0) + delta }), "keyboard rotate failed");
 }
 
-fn adjustBearingAnimated(map: maplibre.MapHandle, delta: f64, animation: maplibre.AnimationOptions) !void {
+fn adjustBearingAnimated(map: *maplibre.MapHandle, delta: f64, animation: maplibre.AnimationOptions) !void {
     const camera = try currentCamera(map);
     try expectCameraStatus(map.easeTo(.{ .bearing = (camera.bearing orelse 0) + delta }, animation), "keyboard rotate failed");
 }
 
-fn adjustPitchAnimated(map: maplibre.MapHandle, delta: f64, animation: maplibre.AnimationOptions) !void {
+fn adjustPitchAnimated(map: *maplibre.MapHandle, delta: f64, animation: maplibre.AnimationOptions) !void {
     const camera = try currentCamera(map);
     const current_pitch = camera.pitch orelse 0;
     try expectCameraStatus(map.easeTo(.{ .pitch = clamp(current_pitch + delta, 0.0, 60.0) }, animation), "keyboard pitch failed");
 }
 
-fn resetPitchAndBearingAnimated(map: maplibre.MapHandle, animation: maplibre.AnimationOptions) !void {
+fn resetPitchAndBearingAnimated(map: *maplibre.MapHandle, animation: maplibre.AnimationOptions) !void {
     try expectCameraStatus(map.easeTo(.{ .bearing = 0, .pitch = 0 }, animation), "camera reset failed");
 }
 
-fn currentCamera(map: maplibre.MapHandle) !maplibre.CameraOptions {
+fn currentCamera(map: *maplibre.MapHandle) !maplibre.CameraOptions {
     return map.getCamera() catch |err| {
         diagnostics.logError("camera snapshot failed", err);
         return types.AppError.CameraCommandFailed;

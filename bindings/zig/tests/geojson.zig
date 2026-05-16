@@ -4,7 +4,7 @@ const testing = std.testing;
 const maplibre = @import("maplibre_native");
 const support = @import("support.zig");
 
-fn waitForEvent(runtime: maplibre.RuntimeHandle, event_type: maplibre.RuntimeEventType) !bool {
+fn waitForEvent(runtime: *maplibre.RuntimeHandle, event_type: maplibre.RuntimeEventType) !bool {
     for (0..1000) |_| {
         try runtime.runOnce();
         while (try runtime.pollEvent()) |event| {
@@ -15,14 +15,12 @@ fn waitForEvent(runtime: maplibre.RuntimeHandle, event_type: maplibre.RuntimeEve
     return false;
 }
 
-fn createLoadedMap() !struct { runtime: maplibre.RuntimeHandle, map: maplibre.MapHandle } {
-    const runtime = try maplibre.RuntimeHandle.init(null);
-    errdefer runtime.close() catch {};
-    const map = try maplibre.MapHandle.create(runtime, .{});
+fn createLoadedMap(runtime: *maplibre.RuntimeHandle) !maplibre.MapHandle {
+    var map = try maplibre.MapHandle.create(runtime, .{});
     errdefer map.close() catch {};
     try map.setStyleJson(testing.allocator, support.style_json);
     try testing.expect(try waitForEvent(runtime, .map_style_loaded));
-    return .{ .runtime = runtime, .map = map };
+    return map;
 }
 
 fn expectListContains(list: maplibre.StringList, expected: []const u8) !void {
@@ -33,15 +31,16 @@ fn expectListContains(list: maplibre.StringList, expected: []const u8) !void {
 }
 
 test "GeoJSON descriptors add and update sources through public binding" {
-    const handles = try createLoadedMap();
-    defer handles.runtime.close() catch @panic("runtime close failed");
-    defer handles.map.close() catch @panic("map close failed");
+    var runtime = try maplibre.RuntimeHandle.init(null);
+    defer runtime.close() catch @panic("runtime close failed");
+    var map = try createLoadedMap(&runtime);
+    defer map.close() catch @panic("map close failed");
 
     const empty_features = [_]maplibre.Feature{};
-    try handles.map.addGeoJsonSourceData(testing.allocator, "empty", .{ .feature_collection = empty_features[0..] });
-    try testing.expect(try handles.map.styleSourceExists(testing.allocator, "empty"));
+    try map.addGeoJsonSourceData(testing.allocator, "empty", .{ .feature_collection = empty_features[0..] });
+    try testing.expect(try map.styleSourceExists(testing.allocator, "empty"));
 
-    var source_ids = try handles.map.listStyleSourceIds(testing.allocator);
+    var source_ids = try map.listStyleSourceIds(testing.allocator);
     defer source_ids.deinit();
     try expectListContains(source_ids, "empty");
 
@@ -54,22 +53,23 @@ test "GeoJSON descriptors add and update sources through public binding" {
         .properties = properties[0..],
         .identifier = .{ .string = "sf" },
     }};
-    try handles.map.setGeoJsonSourceData(testing.allocator, "empty", .{ .feature_collection = features[0..] });
-    try handles.map.setGeoJsonSourceUrl(testing.allocator, "empty", "https://example.com/data.geojson");
+    try map.setGeoJsonSourceData(testing.allocator, "empty", .{ .feature_collection = features[0..] });
+    try map.setGeoJsonSourceUrl(testing.allocator, "empty", "https://example.com/data.geojson");
 
-    try handles.map.addGeoJsonSourceUrl(testing.allocator, "geo-url", "https://example.com/initial.geojson");
-    try testing.expectEqual(maplibre.StyleSourceType.geojson, (try handles.map.getStyleSourceType(testing.allocator, "geo-url")).?);
-    try handles.map.setGeoJsonSourceUrl(testing.allocator, "geo-url", "https://example.com/updated.geojson");
+    try map.addGeoJsonSourceUrl(testing.allocator, "geo-url", "https://example.com/initial.geojson");
+    try testing.expectEqual(maplibre.StyleSourceType.geojson, (try map.getStyleSourceType(testing.allocator, "geo-url")).?);
+    try map.setGeoJsonSourceUrl(testing.allocator, "geo-url", "https://example.com/updated.geojson");
 
-    try testing.expectError(error.InvalidArgument, handles.map.addGeoJsonSourceUrl(testing.allocator, "empty", "https://example.com/again.geojson"));
-    try handles.map.addVectorSourceUrl(testing.allocator, "vector-url", "https://example.com/vector.json", null);
-    try testing.expectError(error.InvalidArgument, handles.map.setGeoJsonSourceUrl(testing.allocator, "vector-url", "https://example.com/not-geojson"));
+    try testing.expectError(error.InvalidArgument, map.addGeoJsonSourceUrl(testing.allocator, "empty", "https://example.com/again.geojson"));
+    try map.addVectorSourceUrl(testing.allocator, "vector-url", "https://example.com/vector.json", null);
+    try testing.expectError(error.InvalidArgument, map.setGeoJsonSourceUrl(testing.allocator, "vector-url", "https://example.com/not-geojson"));
 }
 
 test "geometry descriptor graphs support nested collections" {
-    const handles = try createLoadedMap();
-    defer handles.runtime.close() catch @panic("runtime close failed");
-    defer handles.map.close() catch @panic("map close failed");
+    var runtime = try maplibre.RuntimeHandle.init(null);
+    defer runtime.close() catch @panic("runtime close failed");
+    var map = try createLoadedMap(&runtime);
+    defer map.close() catch @panic("map close failed");
 
     const line = [_]maplibre.LatLng{
         .{ .latitude = 37.0, .longitude = -123.0 },
@@ -87,22 +87,23 @@ test "geometry descriptor graphs support nested collections" {
         .{ .polygon = rings[0..] },
     };
 
-    try handles.map.addGeoJsonSourceData(testing.allocator, "collection", .{ .geometry = .{ .collection = children[0..] } });
-    try testing.expect(try handles.map.styleSourceExists(testing.allocator, "collection"));
+    try map.addGeoJsonSourceData(testing.allocator, "collection", .{ .geometry = .{ .collection = children[0..] } });
+    try testing.expect(try map.styleSourceExists(testing.allocator, "collection"));
 }
 
 test "GeoJSON descriptors reject invalid native values and pass explicit-length strings" {
-    const handles = try createLoadedMap();
-    defer handles.runtime.close() catch @panic("runtime close failed");
-    defer handles.map.close() catch @panic("map close failed");
+    var runtime = try maplibre.RuntimeHandle.init(null);
+    defer runtime.close() catch @panic("runtime close failed");
+    var map = try createLoadedMap(&runtime);
+    defer map.close() catch @panic("map close failed");
 
     try testing.expectError(
         error.InvalidArgument,
-        handles.map.addGeoJsonSourceData(testing.allocator, "", .{ .geometry = .{ .empty = {} } }),
+        map.addGeoJsonSourceData(testing.allocator, "", .{ .geometry = .{ .empty = {} } }),
     );
     try testing.expectError(
         error.InvalidArgument,
-        handles.map.addGeoJsonSourceData(
+        map.addGeoJsonSourceData(
             testing.allocator,
             "bad-coordinate",
             .{ .geometry = .{ .point = .{ .latitude = std.math.inf(f64), .longitude = 0.0 } } },
@@ -112,14 +113,15 @@ test "GeoJSON descriptors reject invalid native values and pass explicit-length 
         .geometry = .{ .point = .{ .latitude = 0.0, .longitude = 0.0 } },
         .identifier = .{ .string = "bad\x00id" },
     }};
-    try handles.map.addGeoJsonSourceData(testing.allocator, "embedded-nul-id", .{ .feature_collection = features[0..] });
-    try testing.expect(try handles.map.styleSourceExists(testing.allocator, "embedded-nul-id"));
+    try map.addGeoJsonSourceData(testing.allocator, "embedded-nul-id", .{ .feature_collection = features[0..] });
+    try testing.expect(try map.styleSourceExists(testing.allocator, "embedded-nul-id"));
 }
 
 test "geometry coordinate spans remain stable across nested materialization" {
-    const handles = try createLoadedMap();
-    defer handles.runtime.close() catch @panic("runtime close failed");
-    defer handles.map.close() catch @panic("map close failed");
+    var runtime = try maplibre.RuntimeHandle.init(null);
+    defer runtime.close() catch @panic("runtime close failed");
+    var map = try createLoadedMap(&runtime);
+    defer map.close() catch @panic("map close failed");
 
     var first_line: [96]maplibre.LatLng = undefined;
     var second_line: [96]maplibre.LatLng = undefined;
@@ -131,10 +133,10 @@ test "geometry coordinate spans remain stable across nested materialization" {
     }
     const lines = [_][]const maplibre.LatLng{ first_line[0..], second_line[0..] };
 
-    try handles.map.addGeoJsonSourceData(
+    try map.addGeoJsonSourceData(
         testing.allocator,
         "many-lines",
         .{ .geometry = .{ .multi_line_string = lines[0..] } },
     );
-    try testing.expect(try handles.map.styleSourceExists(testing.allocator, "many-lines"));
+    try testing.expect(try map.styleSourceExists(testing.allocator, "many-lines"));
 }

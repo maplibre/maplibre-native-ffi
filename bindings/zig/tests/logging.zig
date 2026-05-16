@@ -30,10 +30,10 @@ test "log callback receives and consumes native logs" {
         maplibre.setAsyncLogSeverityMask(.default, null) catch @panic("log severity restore failed");
     }
 
-    const runtime = try maplibre.RuntimeHandle.init(null);
+    var runtime = try maplibre.RuntimeHandle.init(null);
     defer runtime.close() catch @panic("runtime close failed");
 
-    const map = try maplibre.MapHandle.create(runtime, .{});
+    var map = try maplibre.MapHandle.create(&runtime, .{});
     defer map.close() catch @panic("map close failed");
 
     try testing.expectError(error.NativeError, map.setStyleJson(testing.allocator, "{"));

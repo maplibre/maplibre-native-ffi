@@ -6,17 +6,21 @@ const native_temp = @import("native_temp.zig");
 const status = @import("status.zig");
 const values = @import("values.zig");
 
+const NativeRuntime = opaque {};
+
 const MapRegistration = struct {
     native: *c.mln_map,
     id: values.MapId,
 };
-const RuntimeState = struct {
-    native: ?*c.mln_runtime,
-    diagnostic_store: ?*diagnostics.DiagnosticStore,
+
+pub const RuntimeRegistry = struct {
     maps: std.ArrayList(MapRegistration),
     next_map_id: u64,
-    resource_transform: ?*ResourceTransform,
-    resource_provider: ?ResourceProvider,
+};
+
+const ResourceProviderState = struct {
+    provider: ResourceProvider,
+    diagnostic_store: ?*diagnostics.DiagnosticStore,
 };
 
 const ResourceRequestState = struct {
@@ -685,8 +689,12 @@ pub const RuntimeEventPayloadType = union(enum) {
     }
 };
 
-pub const RuntimeHandle = enum(usize) {
-    _,
+pub const RuntimeHandle = struct {
+    native: ?*NativeRuntime,
+    diagnostic_store: ?*diagnostics.DiagnosticStore,
+    registry: ?*RuntimeRegistry,
+    resource_transform: ?*ResourceTransform,
+    resource_provider: ?*ResourceProviderState,
 
     pub fn init(diagnostic_store: ?*diagnostics.DiagnosticStore) status.Error!RuntimeHandle {
         var native_options = c.mln_runtime_options_default();
@@ -720,27 +728,27 @@ pub const RuntimeHandle = enum(usize) {
         return createNative(&native_options, diagnostic_store);
     }
 
-    pub fn runOnce(self: RuntimeHandle) status.Error!void {
-        try status.checkStatus(c.mln_runtime_run_once(try native(self)), state(self).diagnostic_store);
+    pub fn runOnce(self: *RuntimeHandle) status.Error!void {
+        try status.checkStatus(c.mln_runtime_run_once(try native(self)), self.diagnostic_store);
     }
 
-    pub fn pollEvent(self: RuntimeHandle) status.Error!?RuntimeEvent {
+    pub fn pollEvent(self: *RuntimeHandle) status.Error!?RuntimeEvent {
         var native_event = emptyNativeEvent();
         var has_event = false;
         try status.checkStatus(
             c.mln_runtime_poll_event(try native(self), &native_event, &has_event),
-            state(self).diagnostic_store,
+            self.diagnostic_store,
         );
         if (!has_event) return null;
         return runtimeEventFromNative(self, native_event);
     }
 
-    pub fn pollEventOwned(self: RuntimeHandle, allocator: std.mem.Allocator) status.Error!?OwnedRuntimeEvent {
+    pub fn pollEventOwned(self: *RuntimeHandle, allocator: std.mem.Allocator) status.Error!?OwnedRuntimeEvent {
         var native_event = emptyNativeEvent();
         var has_event = false;
         try status.checkStatus(
             c.mln_runtime_poll_event(try native(self), &native_event, &has_event),
-            state(self).diagnostic_store,
+            self.diagnostic_store,
         );
         if (!has_event) return null;
 
@@ -759,15 +767,15 @@ pub const RuntimeHandle = enum(usize) {
         };
     }
 
-    pub fn runAmbientCacheOperation(self: RuntimeHandle, operation: AmbientCacheOperation) status.Error!void {
+    pub fn runAmbientCacheOperation(self: *RuntimeHandle, operation: AmbientCacheOperation) status.Error!void {
         try status.checkStatus(
             c.mln_runtime_run_ambient_cache_operation(try native(self), operation.toRaw()),
-            state(self).diagnostic_store,
+            self.diagnostic_store,
         );
     }
 
     pub fn createOfflineRegion(
-        self: RuntimeHandle,
+        self: *RuntimeHandle,
         allocator: std.mem.Allocator,
         definition: OfflineRegionDefinition,
         metadata: []const u8,
@@ -784,7 +792,7 @@ pub const RuntimeHandle = enum(usize) {
                 metadata.len,
                 &snapshot,
             ),
-            state(self).diagnostic_store,
+            self.diagnostic_store,
         );
         const snapshot_handle = snapshot orelse return error.NativeError;
         defer c.mln_offline_region_snapshot_destroy(snapshot_handle);
@@ -792,7 +800,7 @@ pub const RuntimeHandle = enum(usize) {
     }
 
     pub fn getOfflineRegion(
-        self: RuntimeHandle,
+        self: *RuntimeHandle,
         allocator: std.mem.Allocator,
         region_id: OfflineRegionId,
     ) status.Error!?OwnedOfflineRegion {
@@ -800,7 +808,7 @@ pub const RuntimeHandle = enum(usize) {
         var found = false;
         try status.checkStatus(
             c.mln_runtime_offline_region_get(try native(self), region_id, &snapshot, &found),
-            state(self).diagnostic_store,
+            self.diagnostic_store,
         );
         if (!found) return null;
         const snapshot_handle = snapshot orelse return error.NativeError;
@@ -808,11 +816,11 @@ pub const RuntimeHandle = enum(usize) {
         return try copyOfflineRegionSnapshot(allocator, snapshot_handle);
     }
 
-    pub fn listOfflineRegions(self: RuntimeHandle, allocator: std.mem.Allocator) status.Error!OfflineRegionList {
+    pub fn listOfflineRegions(self: *RuntimeHandle, allocator: std.mem.Allocator) status.Error!OfflineRegionList {
         var list: ?*c.mln_offline_region_list = null;
         try status.checkStatus(
             c.mln_runtime_offline_regions_list(try native(self), &list),
-            state(self).diagnostic_store,
+            self.diagnostic_store,
         );
         const list_handle = list orelse return error.NativeError;
         defer c.mln_offline_region_list_destroy(list_handle);
@@ -820,7 +828,7 @@ pub const RuntimeHandle = enum(usize) {
     }
 
     pub fn mergeOfflineRegionsDatabase(
-        self: RuntimeHandle,
+        self: *RuntimeHandle,
         allocator: std.mem.Allocator,
         side_database_path: []const u8,
     ) status.Error!OfflineRegionList {
@@ -829,7 +837,7 @@ pub const RuntimeHandle = enum(usize) {
         var list: ?*c.mln_offline_region_list = null;
         try status.checkStatus(
             c.mln_runtime_offline_regions_merge_database(try native(self), path.ptr, &list),
-            state(self).diagnostic_store,
+            self.diagnostic_store,
         );
         const list_handle = list orelse return error.NativeError;
         defer c.mln_offline_region_list_destroy(list_handle);
@@ -837,7 +845,7 @@ pub const RuntimeHandle = enum(usize) {
     }
 
     pub fn updateOfflineRegionMetadata(
-        self: RuntimeHandle,
+        self: *RuntimeHandle,
         allocator: std.mem.Allocator,
         region_id: OfflineRegionId,
         metadata: []const u8,
@@ -851,57 +859,57 @@ pub const RuntimeHandle = enum(usize) {
                 metadata.len,
                 &snapshot,
             ),
-            state(self).diagnostic_store,
+            self.diagnostic_store,
         );
         const snapshot_handle = snapshot orelse return error.NativeError;
         defer c.mln_offline_region_snapshot_destroy(snapshot_handle);
         return copyOfflineRegionSnapshot(allocator, snapshot_handle);
     }
 
-    pub fn getOfflineRegionStatus(self: RuntimeHandle, region_id: OfflineRegionId) status.Error!OfflineRegionStatus {
+    pub fn getOfflineRegionStatus(self: *RuntimeHandle, region_id: OfflineRegionId) status.Error!OfflineRegionStatus {
         var native_status: c.mln_offline_region_status = undefined;
         native_status.size = @sizeOf(c.mln_offline_region_status);
         try status.checkStatus(
             c.mln_runtime_offline_region_get_status(try native(self), region_id, &native_status),
-            state(self).diagnostic_store,
+            self.diagnostic_store,
         );
         return offlineStatusFromNative(native_status);
     }
 
-    pub fn setOfflineRegionObserved(self: RuntimeHandle, region_id: OfflineRegionId, observed: bool) status.Error!void {
+    pub fn setOfflineRegionObserved(self: *RuntimeHandle, region_id: OfflineRegionId, observed: bool) status.Error!void {
         try status.checkStatus(
             c.mln_runtime_offline_region_set_observed(try native(self), region_id, observed),
-            state(self).diagnostic_store,
+            self.diagnostic_store,
         );
     }
 
     pub fn setOfflineRegionDownloadState(
-        self: RuntimeHandle,
+        self: *RuntimeHandle,
         region_id: OfflineRegionId,
         download_state: OfflineRegionDownloadState,
     ) status.Error!void {
         try status.checkStatus(
             c.mln_runtime_offline_region_set_download_state(try native(self), region_id, download_state.toRaw()),
-            state(self).diagnostic_store,
+            self.diagnostic_store,
         );
     }
 
-    pub fn invalidateOfflineRegion(self: RuntimeHandle, region_id: OfflineRegionId) status.Error!void {
+    pub fn invalidateOfflineRegion(self: *RuntimeHandle, region_id: OfflineRegionId) status.Error!void {
         try status.checkStatus(
             c.mln_runtime_offline_region_invalidate(try native(self), region_id),
-            state(self).diagnostic_store,
+            self.diagnostic_store,
         );
     }
 
-    pub fn deleteOfflineRegion(self: RuntimeHandle, region_id: OfflineRegionId) status.Error!void {
+    pub fn deleteOfflineRegion(self: *RuntimeHandle, region_id: OfflineRegionId) status.Error!void {
         try status.checkStatus(
             c.mln_runtime_offline_region_delete(try native(self), region_id),
-            state(self).diagnostic_store,
+            self.diagnostic_store,
         );
     }
 
-    pub fn setResourceTransform(self: RuntimeHandle, transform: ?ResourceTransform) status.Error!void {
-        const runtime_state = state(self);
+    pub fn setResourceTransform(self: *RuntimeHandle, transform: ?ResourceTransform) status.Error!void {
+        const runtime_state = self;
         if (transform) |value| {
             const replacement = try std.heap.smp_allocator.create(ResourceTransform);
             errdefer std.heap.smp_allocator.destroy(replacement);
@@ -913,7 +921,7 @@ pub const RuntimeHandle = enum(usize) {
             };
             try status.checkStatus(
                 c.mln_runtime_set_resource_transform(try native(self), &native_transform),
-                runtime_state.diagnostic_store,
+                self.diagnostic_store,
             );
             const previous = runtime_state.resource_transform;
             runtime_state.resource_transform = replacement;
@@ -923,7 +931,7 @@ pub const RuntimeHandle = enum(usize) {
 
         try status.checkStatus(
             c.mln_runtime_clear_resource_transform(try native(self)),
-            runtime_state.diagnostic_store,
+            self.diagnostic_store,
         );
         if (runtime_state.resource_transform) |old| {
             runtime_state.resource_transform = null;
@@ -931,35 +939,41 @@ pub const RuntimeHandle = enum(usize) {
         }
     }
 
-    pub fn setResourceProvider(self: RuntimeHandle, provider: ResourceProvider) status.Error!void {
-        const runtime_state = state(self);
+    pub fn setResourceProvider(self: *RuntimeHandle, provider: ResourceProvider) status.Error!void {
+        const replacement = try std.heap.smp_allocator.create(ResourceProviderState);
+        errdefer std.heap.smp_allocator.destroy(replacement);
+        replacement.* = .{ .provider = provider, .diagnostic_store = self.diagnostic_store };
         var native_provider = c.mln_resource_provider{
             .size = @sizeOf(c.mln_resource_provider),
             .callback = resourceProviderTrampoline,
-            .user_data = runtime_state,
+            .user_data = replacement,
         };
         try status.checkStatus(
             c.mln_runtime_set_resource_provider(try native(self), &native_provider),
-            runtime_state.diagnostic_store,
+            self.diagnostic_store,
         );
-        runtime_state.resource_provider = provider;
+        const previous = self.resource_provider;
+        self.resource_provider = replacement;
+        if (previous) |old_provider| std.heap.smp_allocator.destroy(old_provider);
     }
 
-    /// Closes the native runtime and releases this Zig wrapper state.
-    ///
-    /// After this succeeds, this handle and any copies of it are invalid.
-    pub fn close(self: RuntimeHandle) status.Error!void {
-        const runtime_state = state(self);
-        const runtime = runtime_state.native orelse return;
-        try status.checkStatus(c.mln_runtime_destroy(runtime), runtime_state.diagnostic_store);
-        if (runtime_state.resource_transform) |old| {
-            runtime_state.resource_transform = null;
+    pub fn close(self: *RuntimeHandle) status.Error!void {
+        const runtime: *c.mln_runtime = @ptrCast(self.native orelse return);
+        try status.checkStatus(c.mln_runtime_destroy(runtime), self.diagnostic_store);
+        if (self.resource_transform) |old| {
+            self.resource_transform = null;
             std.heap.smp_allocator.destroy(old);
         }
-        runtime_state.maps.deinit(std.heap.smp_allocator);
-        runtime_state.maps = .empty;
-        runtime_state.native = null;
-        std.heap.smp_allocator.destroy(runtime_state);
+        if (self.resource_provider) |old| {
+            self.resource_provider = null;
+            std.heap.smp_allocator.destroy(old);
+        }
+        if (self.registry) |runtime_registry| {
+            self.registry = null;
+            runtime_registry.maps.deinit(std.heap.smp_allocator);
+            std.heap.smp_allocator.destroy(runtime_registry);
+        }
+        self.native = null;
     }
 };
 
@@ -983,19 +997,20 @@ fn createNative(
         if (runtime) |handle| _ = c.mln_runtime_destroy(handle);
     }
 
-    const runtime_state = try std.heap.smp_allocator.create(RuntimeState);
-    runtime_state.* = .{
-        .native = runtime.?,
+    const runtime_registry = try std.heap.smp_allocator.create(RuntimeRegistry);
+    runtime_registry.* = .{ .maps = .empty, .next_map_id = 1 };
+    errdefer std.heap.smp_allocator.destroy(runtime_registry);
+
+    return .{
+        .native = @ptrCast(runtime.?),
         .diagnostic_store = diagnostic_store,
-        .maps = .empty,
-        .next_map_id = 1,
+        .registry = runtime_registry,
         .resource_transform = null,
         .resource_provider = null,
     };
-    return runtimeHandleFromState(runtime_state);
 }
 
-fn runtimeEventFromNative(handle: RuntimeHandle, native_event: c.mln_runtime_event) RuntimeEvent {
+fn runtimeEventFromNative(handle: *RuntimeHandle, native_event: c.mln_runtime_event) RuntimeEvent {
     return .{
         .event_type = RuntimeEventType.fromRaw(native_event.type),
         .source_type = RuntimeEventSourceType.fromRaw(native_event.source_type),
@@ -1005,10 +1020,11 @@ fn runtimeEventFromNative(handle: RuntimeHandle, native_event: c.mln_runtime_eve
     };
 }
 
-fn mapIdForNativeSource(handle: RuntimeHandle, source_type: u32, source: ?*anyopaque) ?values.MapId {
+fn mapIdForNativeSource(handle: *RuntimeHandle, source_type: u32, source: ?*anyopaque) ?values.MapId {
     if (source_type != c.MLN_RUNTIME_EVENT_SOURCE_MAP) return null;
     const source_ptr = source orelse return null;
-    for (state(handle).maps.items) |registration| {
+    const runtime_registry = handle.registry orelse return null;
+    for (runtime_registry.maps.items) |registration| {
         if (@intFromPtr(registration.native) == @intFromPtr(source_ptr)) return registration.id;
     }
     return null;
@@ -1041,12 +1057,12 @@ fn resourceProviderTrampoline(
     request: ?*const c.mln_resource_request,
     native_handle: ?*c.mln_resource_request_handle,
 ) callconv(.c) u32 {
-    const runtime_state: *RuntimeState = @ptrCast(@alignCast(user_data orelse return c.MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH));
-    const provider = runtime_state.resource_provider orelse return c.MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH;
+    const provider_state: *ResourceProviderState = @ptrCast(@alignCast(user_data orelse return c.MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH));
+    const provider = provider_state.provider;
     const raw_request = request orelse return c.MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH;
     const request_view = resourceRequestFromNative(std.heap.smp_allocator, raw_request) catch return c.MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH;
     defer resourceRequestDeinit(std.heap.smp_allocator, request_view);
-    const handle = createResourceRequestHandle(native_handle, runtime_state.diagnostic_store) catch null;
+    const handle = createResourceRequestHandle(native_handle, provider_state.diagnostic_store) catch null;
     const decision = provider.handler(provider.context, request_view, handle);
     return switch (decision) {
         .pass_through => blk: {
@@ -1364,35 +1380,29 @@ fn copyOfflineRegionDefinition(
     };
 }
 
-fn runtimeHandleFromState(runtime_state: *RuntimeState) RuntimeHandle {
-    return @enumFromInt(@intFromPtr(runtime_state));
+pub fn native(handle: *RuntimeHandle) status.BindingError!*c.mln_runtime {
+    return @ptrCast(handle.native orelse return error.ClosedHandle);
 }
 
-fn state(handle: RuntimeHandle) *RuntimeState {
-    return @ptrFromInt(@intFromEnum(handle));
+pub fn diagnosticStore(handle: *RuntimeHandle) ?*diagnostics.DiagnosticStore {
+    return handle.diagnostic_store;
 }
 
-pub fn native(handle: RuntimeHandle) status.BindingError!*c.mln_runtime {
-    return state(handle).native orelse error.ClosedHandle;
+pub fn registry(handle: *RuntimeHandle) status.BindingError!*RuntimeRegistry {
+    return handle.registry orelse error.ClosedHandle;
 }
 
-pub fn diagnosticStore(handle: RuntimeHandle) ?*diagnostics.DiagnosticStore {
-    return state(handle).diagnostic_store;
-}
-
-pub fn registerMap(handle: RuntimeHandle, map: *c.mln_map) std.mem.Allocator.Error!values.MapId {
-    const runtime_state = state(handle);
-    const id = values.MapId{ .value = runtime_state.next_map_id };
-    runtime_state.next_map_id += 1;
-    try runtime_state.maps.append(std.heap.smp_allocator, .{ .native = map, .id = id });
+pub fn registerMap(runtime_registry: *RuntimeRegistry, map: *c.mln_map) std.mem.Allocator.Error!values.MapId {
+    const id = values.MapId{ .value = runtime_registry.next_map_id };
+    runtime_registry.next_map_id += 1;
+    try runtime_registry.maps.append(std.heap.smp_allocator, .{ .native = map, .id = id });
     return id;
 }
 
-pub fn unregisterMap(handle: RuntimeHandle, map: *c.mln_map) void {
-    const runtime_state = state(handle);
-    for (runtime_state.maps.items, 0..) |registration, index| {
+pub fn unregisterMap(runtime_registry: *RuntimeRegistry, map: *c.mln_map) void {
+    for (runtime_registry.maps.items, 0..) |registration, index| {
         if (@intFromPtr(registration.native) == @intFromPtr(map)) {
-            _ = runtime_state.maps.orderedRemove(index);
+            _ = runtime_registry.maps.orderedRemove(index);
             return;
         }
     }

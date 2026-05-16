@@ -26,10 +26,10 @@ pub fn main(init_args: std.process.Init) !void {
     defer maplibre.setAsyncLogSeverityMask(.default, null) catch {};
     try logAndValidateRenderBackend();
 
-    const runtime = try maplibre.RuntimeHandle.create(allocator, .{ .cache_path = ":memory:" }, null);
+    var runtime = try maplibre.RuntimeHandle.create(allocator, .{ .cache_path = ":memory:" }, null);
     defer runtime.close() catch {};
 
-    const map = try maplibre.MapHandle.create(runtime, .{
+    var map = try maplibre.MapHandle.create(&runtime, .{
         .width = width,
         .height = height,
         .scale_factor = 1.0,
@@ -37,14 +37,14 @@ pub fn main(init_args: std.process.Init) !void {
     });
     defer map.close() catch {};
 
-    var texture = try maplibre.attachOwnedTexture(map, .{
+    var texture = try maplibre.attachOwnedTexture(&map, .{
         .extent = .{ .width = width, .height = height, .scale_factor = 1.0 },
     });
     defer texture.close() catch {};
 
-    try setInitialCamera(map);
+    try setInitialCamera(&map);
     try map.setStyleJson(allocator, style_json);
-    try renderTexture(runtime, map, texture);
+    try renderTexture(&runtime, &map, &texture);
 
     var image = try texture.readPremultipliedRgba8(allocator);
     defer image.deinit();
@@ -67,7 +67,7 @@ fn renderBackendSupportLabel(support: maplibre.RenderBackendSupport) []const u8 
     return "none";
 }
 
-fn setInitialCamera(map: maplibre.MapHandle) !void {
+fn setInitialCamera(map: *maplibre.MapHandle) !void {
     try map.jumpTo(.{
         .center = .{ .latitude = 37.7749, .longitude = -122.4194 },
         .zoom = 13.0,
@@ -77,9 +77,9 @@ fn setInitialCamera(map: maplibre.MapHandle) !void {
 }
 
 fn renderTexture(
-    runtime: maplibre.RuntimeHandle,
-    map: maplibre.MapHandle,
-    texture: maplibre.RenderSessionHandle,
+    runtime: *maplibre.RuntimeHandle,
+    map: *maplibre.MapHandle,
+    texture: *maplibre.RenderSessionHandle,
 ) !void {
     const map_id = try map.id();
     for (0..10_000) |_| {

@@ -64,7 +64,7 @@ pub const VulkanBackend = union(enum) {
 
     pub fn attachRenderTarget(
         self: *VulkanBackend,
-        map: maplibre.MapHandle,
+        map: *maplibre.MapHandle,
         viewport: types.Viewport,
     ) !render_target.Session {
         return switch (self.*) {
@@ -76,7 +76,7 @@ pub const VulkanBackend = union(enum) {
 
     pub fn drawTexture(
         self: *VulkanBackend,
-        texture: maplibre.RenderSessionHandle,
+        texture: *maplibre.RenderSessionHandle,
         viewport: types.Viewport,
     ) !bool {
         return switch (self.*) {
@@ -244,7 +244,7 @@ const VulkanOwnedTextureBackend = struct {
 
     fn attachRenderTarget(
         self: *VulkanOwnedTextureBackend,
-        map: maplibre.MapHandle,
+        map: *maplibre.MapHandle,
         viewport: types.Viewport,
     ) !render_target.Session {
         const texture = maplibre.attachVulkanOwnedTexture(map, .{
@@ -259,10 +259,10 @@ const VulkanOwnedTextureBackend = struct {
 
     fn drawTexture(
         self: *VulkanOwnedTextureBackend,
-        texture: maplibre.RenderSessionHandle,
+        texture: *maplibre.RenderSessionHandle,
         _: types.Viewport,
     ) !bool {
-        const frame = texture.acquireVulkanOwnedTextureFrame() catch |err| switch (err) {
+        var frame = texture.acquireVulkanOwnedTextureFrame() catch |err| switch (err) {
             error.InvalidState => return false,
             else => {
                 diagnostics.logError("Vulkan texture acquire failed", err);
@@ -283,7 +283,7 @@ const VulkanOwnedTextureBackend = struct {
     }
 
     fn releasePendingFrame(self: *VulkanOwnedTextureBackend) void {
-        if (self.pending_frame) |frame| frame.release() catch |err| diagnostics.logError("Vulkan texture release failed", err);
+        if (self.pending_frame) |*frame| frame.release() catch |err| diagnostics.logError("Vulkan texture release failed", err);
         self.pending_frame = null;
     }
 };
@@ -407,7 +407,7 @@ const VulkanBorrowedTextureBackend = struct {
 
     fn attachRenderTarget(
         self: *VulkanBorrowedTextureBackend,
-        map: maplibre.MapHandle,
+        map: *maplibre.MapHandle,
         viewport: types.Viewport,
     ) !render_target.Session {
         const texture = maplibre.attachVulkanBorrowedTexture(map, .{
@@ -427,7 +427,7 @@ const VulkanBorrowedTextureBackend = struct {
 
     fn drawTexture(
         self: *VulkanBorrowedTextureBackend,
-        texture: maplibre.RenderSessionHandle,
+        texture: *maplibre.RenderSessionHandle,
         _: types.Viewport,
     ) !bool {
         _ = texture;
@@ -453,7 +453,7 @@ const VulkanSurfaceBackend = struct {
 
     fn attachRenderTarget(
         self: *VulkanSurfaceBackend,
-        map: maplibre.MapHandle,
+        map: *maplibre.MapHandle,
         viewport: types.Viewport,
     ) !render_target.Session {
         const surface = maplibre.attachVulkanSurface(map, .{
