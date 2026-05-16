@@ -9,6 +9,7 @@
 #include <memory>
 #include <mutex>
 #include <optional>
+#include <shared_mutex>
 #include <string>
 #include <thread>
 #include <unordered_map>
@@ -857,15 +858,21 @@ auto set_resource_transform(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
-  const std::scoped_lock lock(runtime_registry_mutex());
-  if (runtime->live_maps != 0) {
-    set_thread_error(
-      "resource transform must be registered before map creation"
-    );
-    return MLN_STATUS_INVALID_STATE;
-  }
+  const std::unique_lock lock(runtime->resource_transform_mutex);
   runtime->resource_transform_callback = transform->callback;
   runtime->resource_transform_user_data = transform->user_data;
+  return MLN_STATUS_OK;
+}
+
+auto clear_resource_transform(mln_runtime* runtime) -> mln_status {
+  const auto status = validate_runtime(runtime);
+  if (status != MLN_STATUS_OK) {
+    return status;
+  }
+
+  const std::unique_lock lock(runtime->resource_transform_mutex);
+  runtime->resource_transform_callback = nullptr;
+  runtime->resource_transform_user_data = nullptr;
   return MLN_STATUS_OK;
 }
 
@@ -1492,6 +1499,14 @@ auto destroy_runtime(mln_runtime* runtime) -> mln_status {
   }
 
   {
+    const std::unique_lock transform_lock(
+      found->second->resource_transform_mutex
+    );
+    found->second->resource_transform_callback = nullptr;
+    found->second->resource_transform_user_data = nullptr;
+  }
+
+  {
     const std::scoped_lock state_lock(
       found->second->offline_event_state->mutex
     );
@@ -1629,6 +1644,47 @@ auto find_runtime_for_platform_context(void* platform_context) noexcept
   const std::scoped_lock lock(runtime_registry_mutex());
   auto* runtime = static_cast<mln_runtime*>(platform_context);
   return runtime_registry().contains(runtime) ? runtime : nullptr;
+}
+
+auto invoke_resource_transform(
+  void* platform_context, uint32_t kind, const char* url,
+  std::string& out_replacement_url
+) noexcept -> mln_status {
+  if (platform_context == nullptr) {
+    return MLN_STATUS_OK;
+  }
+
+  auto* runtime = static_cast<mln_runtime*>(platform_context);
+  std::shared_lock<std::shared_mutex> transform_lock;
+  {
+    const std::scoped_lock registry_lock(runtime_registry_mutex());
+    if (!runtime_registry().contains(runtime)) {
+      return MLN_STATUS_OK;
+    }
+    transform_lock = std::shared_lock{runtime->resource_transform_mutex};
+  }
+
+  const auto callback = runtime->resource_transform_callback;
+  if (callback == nullptr) {
+    return MLN_STATUS_OK;
+  }
+
+  auto response = mln_resource_transform_response{
+    .size = sizeof(mln_resource_transform_response), .url = nullptr
+  };
+  try {
+    const auto status =
+      callback(runtime->resource_transform_user_data, kind, url, &response);
+    if (
+      status == MLN_STATUS_OK && response.url != nullptr &&
+      *response.url != '\0'
+    ) {
+      out_replacement_url = response.url;
+    }
+    return status;
+  } catch (...) {
+    return MLN_STATUS_NATIVE_ERROR;
+  }
 }
 
 auto push_runtime_map_event(

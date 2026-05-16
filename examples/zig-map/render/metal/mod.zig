@@ -3,6 +3,7 @@ const objc = @import("objc");
 
 const c = @import("../../c.zig").c;
 const diagnostics = @import("../../diagnostics.zig");
+const maplibre = @import("maplibre_native");
 const render_target = @import("../../render_target.zig");
 const types = @import("../../types.zig");
 
@@ -72,7 +73,7 @@ pub const MetalBackend = union(enum) {
 
     pub fn attachRenderTarget(
         self: *MetalBackend,
-        map: *c.mln_map,
+        map: *maplibre.MapHandle,
         viewport: types.Viewport,
     ) !render_target.Session {
         return switch (self.*) {
@@ -84,7 +85,7 @@ pub const MetalBackend = union(enum) {
 
     pub fn drawTexture(
         self: *MetalBackend,
-        texture: *c.mln_render_session,
+        texture: *maplibre.RenderSessionHandle,
         viewport: types.Viewport,
     ) !bool {
         return switch (self.*) {
@@ -221,49 +222,35 @@ const MetalOwnedTextureBackend = struct {
 
     fn attachRenderTarget(
         self: *MetalOwnedTextureBackend,
-        map: *c.mln_map,
+        map: *maplibre.MapHandle,
         viewport: types.Viewport,
     ) !render_target.Session {
-        var descriptor = c.mln_metal_owned_texture_descriptor_default();
-        descriptor.extent.width = viewport.logical_width;
-        descriptor.extent.height = viewport.logical_height;
-        descriptor.extent.scale_factor = viewport.scale_factor;
-        descriptor.context.device = self.compositor.view.device.value.?;
-        var texture: ?*c.mln_render_session = null;
-        if (c.mln_metal_owned_texture_attach(map, &descriptor, &texture) !=
-            c.MLN_STATUS_OK or texture == null)
-        {
-            diagnostics.logAbiError("Metal texture attach failed");
+        const texture = maplibre.attachMetalOwnedTexture(map, .{
+            .extent = render_target.extent(viewport),
+            .context = .{ .device = .{ .ptr = self.compositor.view.device.value.? } },
+        }) catch |err| {
+            diagnostics.logError("Metal texture attach failed", err);
             return types.AppError.TextureAttachFailed;
-        }
-        return .{ .texture = texture.? };
+        };
+        return .{ .texture = texture };
     }
 
     fn drawTexture(
         self: *MetalOwnedTextureBackend,
-        texture: *c.mln_render_session,
+        texture: *maplibre.RenderSessionHandle,
         _: types.Viewport,
     ) !bool {
-        var frame: c.mln_metal_owned_texture_frame = .{
-            .size = @sizeOf(c.mln_metal_owned_texture_frame),
-            .generation = 0,
-            .width = 0,
-            .height = 0,
-            .scale_factor = 0,
-            .frame_id = 0,
-            .texture = null,
-            .device = null,
-            .pixel_format = 0,
+        var frame = texture.acquireMetalOwnedTextureFrame() catch |err| switch (err) {
+            error.InvalidState => return false,
+            else => {
+                diagnostics.logError("Metal texture acquire failed", err);
+                return types.AppError.BackendDrawFailed;
+            },
         };
-        const acquire_status = c.mln_metal_owned_texture_acquire_frame(texture, &frame);
-        if (acquire_status == c.MLN_STATUS_INVALID_STATE) return false;
-        if (acquire_status != c.MLN_STATUS_OK) {
-            diagnostics.logAbiError("Metal texture acquire failed");
-            return types.AppError.BackendDrawFailed;
-        }
-        defer releaseMetalFrame(texture, &frame);
+        defer frame.release() catch |err| diagnostics.logError("Metal texture release failed", err);
 
-        return try self.compositor.drawMetalTexture(frame.texture.?);
+        const info = try frame.info();
+        return try self.compositor.drawMetalTexture(info.texture.ptr);
     }
 };
 
@@ -294,27 +281,22 @@ const MetalBorrowedTextureBackend = struct {
 
     fn attachRenderTarget(
         self: *MetalBorrowedTextureBackend,
-        map: *c.mln_map,
+        map: *maplibre.MapHandle,
         viewport: types.Viewport,
     ) !render_target.Session {
-        var descriptor = c.mln_metal_borrowed_texture_descriptor_default();
-        descriptor.extent.width = viewport.logical_width;
-        descriptor.extent.height = viewport.logical_height;
-        descriptor.extent.scale_factor = viewport.scale_factor;
-        descriptor.texture = self.borrowed_texture.value.?;
-        var texture: ?*c.mln_render_session = null;
-        if (c.mln_metal_borrowed_texture_attach(map, &descriptor, &texture) !=
-            c.MLN_STATUS_OK or texture == null)
-        {
-            diagnostics.logAbiError("Metal borrowed texture attach failed");
+        const texture = maplibre.attachMetalBorrowedTexture(map, .{
+            .extent = render_target.extent(viewport),
+            .texture = .{ .ptr = self.borrowed_texture.value.? },
+        }) catch |err| {
+            diagnostics.logError("Metal borrowed texture attach failed", err);
             return types.AppError.TextureAttachFailed;
-        }
-        return .{ .texture = texture.? };
+        };
+        return .{ .texture = texture };
     }
 
     fn drawTexture(
         self: *MetalBorrowedTextureBackend,
-        texture: *c.mln_render_session,
+        texture: *maplibre.RenderSessionHandle,
         _: types.Viewport,
     ) !bool {
         _ = texture;
@@ -337,34 +319,20 @@ const MetalSurfaceBackend = struct {
 
     fn attachRenderTarget(
         self: *MetalSurfaceBackend,
-        map: *c.mln_map,
+        map: *maplibre.MapHandle,
         viewport: types.Viewport,
     ) !render_target.Session {
-        var descriptor = c.mln_metal_surface_descriptor_default();
-        descriptor.extent.width = viewport.logical_width;
-        descriptor.extent.height = viewport.logical_height;
-        descriptor.extent.scale_factor = viewport.scale_factor;
-        descriptor.layer = self.view.layer.value.?;
-        descriptor.context.device = self.view.device.value.?;
-        var surface: ?*c.mln_render_session = null;
-        if (c.mln_metal_surface_attach(map, &descriptor, &surface) !=
-            c.MLN_STATUS_OK or surface == null)
-        {
-            diagnostics.logAbiError("Metal surface attach failed");
+        const surface = maplibre.attachMetalSurface(map, .{
+            .extent = render_target.extent(viewport),
+            .context = .{ .device = .{ .ptr = self.view.device.value.? } },
+            .layer = .{ .ptr = self.view.layer.value.? },
+        }) catch |err| {
+            diagnostics.logError("Metal surface attach failed", err);
             return types.AppError.SurfaceAttachFailed;
-        }
-        return .{ .surface = surface.? };
+        };
+        return .{ .surface = surface };
     }
 };
-
-fn releaseMetalFrame(
-    texture: *c.mln_render_session,
-    frame: *const c.mln_metal_owned_texture_frame,
-) void {
-    if (c.mln_metal_owned_texture_release_frame(texture, frame) != c.MLN_STATUS_OK) {
-        diagnostics.logAbiError("Metal texture release failed");
-    }
-}
 
 fn createBorrowedTexture(device: objc.Object, viewport: types.Viewport) !objc.Object {
     const descriptor = objc.getClass("MTLTextureDescriptor").?

@@ -2,6 +2,7 @@ const std = @import("std");
 
 const c = @import("../../c.zig").c;
 const diagnostics = @import("../../diagnostics.zig");
+const maplibre = @import("maplibre_native");
 const render_target = @import("../../render_target.zig");
 const types = @import("../../types.zig");
 const Commands = @import("commands.zig").Commands;
@@ -63,7 +64,7 @@ pub const VulkanBackend = union(enum) {
 
     pub fn attachRenderTarget(
         self: *VulkanBackend,
-        map: *c.mln_map,
+        map: *maplibre.MapHandle,
         viewport: types.Viewport,
     ) !render_target.Session {
         return switch (self.*) {
@@ -75,7 +76,7 @@ pub const VulkanBackend = union(enum) {
 
     pub fn drawTexture(
         self: *VulkanBackend,
-        texture: *c.mln_render_session,
+        texture: *maplibre.RenderSessionHandle,
         viewport: types.Viewport,
     ) !bool {
         return switch (self.*) {
@@ -210,8 +211,7 @@ const VulkanTextureCompositor = struct {
 
 const VulkanOwnedTextureBackend = struct {
     compositor: VulkanTextureCompositor,
-    pending_texture: ?*c.mln_render_session,
-    pending_frame: ?c.mln_vulkan_owned_texture_frame,
+    pending_frame: ?maplibre.VulkanOwnedTextureFrameHandle,
 
     fn init(
         allocator: std.mem.Allocator,
@@ -220,7 +220,6 @@ const VulkanOwnedTextureBackend = struct {
     ) !VulkanOwnedTextureBackend {
         return .{
             .compositor = try VulkanTextureCompositor.init(allocator, window, viewport, false),
-            .pending_texture = null,
             .pending_frame = null,
         };
     }
@@ -245,72 +244,46 @@ const VulkanOwnedTextureBackend = struct {
 
     fn attachRenderTarget(
         self: *VulkanOwnedTextureBackend,
-        map: *c.mln_map,
+        map: *maplibre.MapHandle,
         viewport: types.Viewport,
     ) !render_target.Session {
-        var descriptor = c.mln_vulkan_owned_texture_descriptor_default();
-        descriptor.extent.width = viewport.logical_width;
-        descriptor.extent.height = viewport.logical_height;
-        descriptor.extent.scale_factor = viewport.scale_factor;
-        descriptor.context.instance = self.compositor.context.instance;
-        descriptor.context.physical_device = self.compositor.context.physical_device;
-        descriptor.context.device = self.compositor.context.device;
-        descriptor.context.graphics_queue = self.compositor.context.queue;
-        descriptor.context.graphics_queue_family_index = self.compositor.context.queue_family_index;
-
-        var texture: ?*c.mln_render_session = null;
-        if (c.mln_vulkan_owned_texture_attach(map, &descriptor, &texture) !=
-            c.MLN_STATUS_OK or texture == null)
-        {
-            diagnostics.logAbiError("Vulkan texture attach failed");
+        const texture = maplibre.attachVulkanOwnedTexture(map, .{
+            .extent = render_target.extent(viewport),
+            .context = vulkanContextDescriptor(&self.compositor.context),
+        }) catch |err| {
+            diagnostics.logError("Vulkan texture attach failed", err);
             return types.AppError.TextureAttachFailed;
-        }
-        return .{ .texture = texture.? };
+        };
+        return .{ .texture = texture };
     }
 
     fn drawTexture(
         self: *VulkanOwnedTextureBackend,
-        texture: *c.mln_render_session,
+        texture: *maplibre.RenderSessionHandle,
         _: types.Viewport,
     ) !bool {
-        var frame: c.mln_vulkan_owned_texture_frame = .{
-            .size = @sizeOf(c.mln_vulkan_owned_texture_frame),
-            .generation = 0,
-            .width = 0,
-            .height = 0,
-            .scale_factor = 0,
-            .frame_id = 0,
-            .image = null,
-            .image_view = null,
-            .device = null,
-            .format = 0,
-            .layout = 0,
+        var frame = texture.acquireVulkanOwnedTextureFrame() catch |err| switch (err) {
+            error.InvalidState => return false,
+            else => {
+                diagnostics.logError("Vulkan texture acquire failed", err);
+                return types.AppError.BackendDrawFailed;
+            },
         };
-        const acquire_status = c.mln_vulkan_owned_texture_acquire_frame(texture, &frame);
-        if (acquire_status == c.MLN_STATUS_INVALID_STATE) return false;
-        if (acquire_status != c.MLN_STATUS_OK) {
-            diagnostics.logAbiError("Vulkan texture acquire failed");
-            return types.AppError.BackendDrawFailed;
-        }
-        errdefer releaseVulkanFrame(texture, &frame);
+        errdefer frame.release() catch |err| diagnostics.logError("Vulkan texture release failed", err);
 
-        if (frame.image_view == null) return types.AppError.BackendDrawFailed;
-        const image_view: c.VkImageView = @ptrCast(frame.image_view.?);
+        const info = try frame.info();
+        const image_view: c.VkImageView = @ptrCast(info.image_view.ptr);
         if (!try self.compositor.presentImageView(image_view)) {
-            releaseVulkanFrame(texture, &frame);
+            frame.release() catch |err| diagnostics.logError("Vulkan texture release failed", err);
             return false;
         }
 
-        self.pending_texture = texture;
         self.pending_frame = frame;
         return true;
     }
 
     fn releasePendingFrame(self: *VulkanOwnedTextureBackend) void {
-        if (self.pending_texture) |texture| {
-            if (self.pending_frame) |*frame| releaseVulkanFrame(texture, frame);
-        }
-        self.pending_texture = null;
+        if (self.pending_frame) |*frame| frame.release() catch |err| diagnostics.logError("Vulkan texture release failed", err);
         self.pending_frame = null;
     }
 };
@@ -434,37 +407,27 @@ const VulkanBorrowedTextureBackend = struct {
 
     fn attachRenderTarget(
         self: *VulkanBorrowedTextureBackend,
-        map: *c.mln_map,
+        map: *maplibre.MapHandle,
         viewport: types.Viewport,
     ) !render_target.Session {
-        var descriptor = c.mln_vulkan_borrowed_texture_descriptor_default();
-        descriptor.extent.width = viewport.logical_width;
-        descriptor.extent.height = viewport.logical_height;
-        descriptor.extent.scale_factor = viewport.scale_factor;
-        descriptor.context.instance = self.compositor.context.instance;
-        descriptor.context.physical_device = self.compositor.context.physical_device;
-        descriptor.context.device = self.compositor.context.device;
-        descriptor.context.graphics_queue = self.compositor.context.queue;
-        descriptor.context.graphics_queue_family_index = self.compositor.context.queue_family_index;
-        descriptor.image = self.borrowed_image.image;
-        descriptor.image_view = self.borrowed_image.view;
-        descriptor.format = c.VK_FORMAT_R8G8B8A8_UNORM;
-        descriptor.initial_layout = c.VK_IMAGE_LAYOUT_UNDEFINED;
-        descriptor.final_layout = c.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-
-        var texture: ?*c.mln_render_session = null;
-        if (c.mln_vulkan_borrowed_texture_attach(map, &descriptor, &texture) !=
-            c.MLN_STATUS_OK or texture == null)
-        {
-            diagnostics.logAbiError("Vulkan borrowed texture attach failed");
+        const texture = maplibre.attachVulkanBorrowedTexture(map, .{
+            .extent = render_target.extent(viewport),
+            .context = vulkanContextDescriptor(&self.compositor.context),
+            .image = .{ .ptr = @ptrCast(self.borrowed_image.image.?) },
+            .image_view = .{ .ptr = @ptrCast(self.borrowed_image.view.?) },
+            .format = c.VK_FORMAT_R8G8B8A8_UNORM,
+            .initial_layout = c.VK_IMAGE_LAYOUT_UNDEFINED,
+            .final_layout = c.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+        }) catch |err| {
+            diagnostics.logError("Vulkan borrowed texture attach failed", err);
             return types.AppError.TextureAttachFailed;
-        }
-        return .{ .texture = texture.? };
+        };
+        return .{ .texture = texture };
     }
 
     fn drawTexture(
         self: *VulkanBorrowedTextureBackend,
-        texture: *c.mln_render_session,
+        texture: *maplibre.RenderSessionHandle,
         _: types.Viewport,
     ) !bool {
         _ = texture;
@@ -490,38 +453,29 @@ const VulkanSurfaceBackend = struct {
 
     fn attachRenderTarget(
         self: *VulkanSurfaceBackend,
-        map: *c.mln_map,
+        map: *maplibre.MapHandle,
         viewport: types.Viewport,
     ) !render_target.Session {
-        var descriptor = c.mln_vulkan_surface_descriptor_default();
-        descriptor.extent.width = viewport.logical_width;
-        descriptor.extent.height = viewport.logical_height;
-        descriptor.extent.scale_factor = viewport.scale_factor;
-        descriptor.context.instance = self.context.instance;
-        descriptor.context.physical_device = self.context.physical_device;
-        descriptor.context.device = self.context.device;
-        descriptor.context.graphics_queue = self.context.queue;
-        descriptor.context.graphics_queue_family_index = self.context.queue_family_index;
-        descriptor.surface = self.context.surface;
-
-        var surface: ?*c.mln_render_session = null;
-        if (c.mln_vulkan_surface_attach(map, &descriptor, &surface) !=
-            c.MLN_STATUS_OK or surface == null)
-        {
-            diagnostics.logAbiError("Vulkan surface attach failed");
+        const surface = maplibre.attachVulkanSurface(map, .{
+            .extent = render_target.extent(viewport),
+            .context = vulkanContextDescriptor(&self.context),
+            .surface = .{ .ptr = @ptrCast(self.context.surface.?) },
+        }) catch |err| {
+            diagnostics.logError("Vulkan surface attach failed", err);
             return types.AppError.SurfaceAttachFailed;
-        }
-        return .{ .surface = surface.? };
+        };
+        return .{ .surface = surface };
     }
 };
 
-fn releaseVulkanFrame(
-    texture: *c.mln_render_session,
-    frame: *const c.mln_vulkan_owned_texture_frame,
-) void {
-    if (c.mln_vulkan_owned_texture_release_frame(texture, frame) != c.MLN_STATUS_OK) {
-        diagnostics.logAbiError("Vulkan texture release failed");
-    }
+fn vulkanContextDescriptor(context: *const Context) maplibre.VulkanContextDescriptor {
+    return .{
+        .instance = .{ .ptr = @ptrCast(context.instance.?) },
+        .physical_device = .{ .ptr = @ptrCast(context.physical_device.?) },
+        .device = .{ .ptr = @ptrCast(context.device.?) },
+        .graphics_queue = .{ .ptr = @ptrCast(context.queue.?) },
+        .graphics_queue_family_index = context.queue_family_index,
+    };
 }
 
 fn findMemoryType(

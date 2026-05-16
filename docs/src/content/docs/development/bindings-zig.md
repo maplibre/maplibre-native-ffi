@@ -36,9 +36,10 @@ output domains that may grow preserve unknown raw values. User-visible bit masks
 use purpose-built wrappers or `packed struct(u32)` values. C field masks stay
 behind descriptors.
 
-`NativePointer` is a borrowed opaque backend address backed by `?*anyopaque`. It
-grants no memory access, transfers no ownership, and appears only where the C
-API already accepts or returns opaque backend handles.
+`NativePointer` is a borrowed non-null opaque backend address backed by
+`*anyopaque`. Optional backend handles use `?NativePointer`. It grants no memory
+access, transfers no ownership, and appears only where the C API already accepts
+or returns opaque backend handles.
 
 JSON and GeoJSON values are owned Zig value trees when the binding needs to
 preserve MapLibre value semantics: integer width, object member order, and
@@ -46,10 +47,17 @@ duplicate keys.
 
 ## Handles and Threading
 
-Zig callers manage native ownership explicitly with reverse-order `defer`
-cleanup. Each handle stores its native pointer as private nullable state.
-Successful `close()` stores `null`; later `close()` calls no-op. Failed native
-destruction leaves the pointer live so callers can retry.
+Zig callers manage native ownership explicitly with `var` handles and
+reverse-order `defer` cleanup. Lifecycle handles are owned Zig structs that
+store the native pointer and Zig adapter state. Successful `close()` releases
+the native object, releases Zig-owned adapter state, and stores `null`; later
+`close()` calls on the same handle no-op. Failed native destruction leaves the
+pointer live so callers can retry.
+
+Treat lifecycle handles and texture frame handles like other Zig resource
+structs: pass them by pointer and avoid copying them. A copied handle is a
+duplicate owner; using that copy after the original closes or releases, or
+closing or releasing both copies, is invalid.
 
 The Zig binding does not retain parents with counters by default. Callers keep
 parents live while child handles are live. Default destruction order is child
@@ -132,17 +140,13 @@ API's required lifetime.
 
 Texture readback supports caller-owned `[]u8` storage and an allocator-backed
 owned image convenience path. Session-owned texture targets expose backend
-objects through explicit frame handles. Backend pointer accessors are scoped to
-the live frame handle and documented with a `Safety:` section when callers must
-uphold synchronization or lifetime rules.
+objects through explicit frame handles. Frame handles use `release()` and follow
+the same no-copy owned-resource rule as lifecycle handles. Backend pointer
+accessors are scoped to the live frame handle and documented with a `Safety:`
+section when callers must uphold synchronization or lifetime rules.
 
 ## Testing
 
 Zig binding tests are the primary Zig-path test suite. They exercise the public
 Zig API against the real `maplibre-native-c` library and cover both native C API
 behavior and Zig adaptation at that boundary.
-
-Focus tests on status-to-error mapping, copied diagnostics, handle close
-behavior, descriptor materialization, allocator-backed output, copied events,
-callback replacement, one-shot request completion, render sessions, readback,
-and texture frame lifetimes. Keep platform scaffolding test-private.

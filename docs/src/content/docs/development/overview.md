@@ -60,7 +60,7 @@ platform and render backend.
 ## Common Commands
 
 ```bash
-# Build and test
+# Build and test the C API (via Zig bindings)
 mise run test
 
 # Build only
@@ -132,9 +132,9 @@ Markdown into `docs/src/content/docs/reference/`.
 
 ## Tests And Examples
 
-Every feature needs automated CI coverage when practical. Tests consume the
-public C API. Zig tests also check header shape because `@cImport` catches C API
-issues quickly.
+Every feature needs automated CI coverage when practical. The root
+`mise run test` command builds the native library, runs the direct Zig C API
+suite, and runs the public Zig binding suite for supported host variants.
 
 Use examples for demos and behavior that needs manual validation, such as visual
 output, interactive input, or host graphics integration.

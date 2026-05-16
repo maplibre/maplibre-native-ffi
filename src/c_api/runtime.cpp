@@ -64,6 +64,13 @@ auto mln_runtime_set_resource_transform(
   });
 }
 
+auto mln_runtime_clear_resource_transform(mln_runtime* runtime) noexcept
+  -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::clear_resource_transform(runtime);
+  });
+}
+
 auto mln_runtime_run_ambient_cache_operation(
   mln_runtime* runtime, uint32_t operation
 ) noexcept -> mln_status {

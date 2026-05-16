@@ -30,7 +30,7 @@ config_roots = ["bindings/*", "examples/*", "docs"]
 "aqua:koalaman/shellcheck" = "0.11.0" # Shell script linter (used by actionlint)
 
 # C/C++ ecosystem
-"github:prefix-dev/pixi" = "0.67.2"
+"github:prefix-dev/pixi" = "0.68.1"
 "github:cmakefmt/cmakefmt" = "1.3.0"
 "conda:doxygen" = "1.13.2"
 "aqua:XcodesOrg/xcodes" = { version = "1.6.2", os = ["macos"] }
@@ -67,6 +67,7 @@ MLN_FFI_BUILD_DIR = "{{env.MLN_FFI_BUILD_DIR | default(value=config_root ~ \"/bu
 MLN_FFI_CMAKE_GENERATOR = "{{env.MLN_FFI_CMAKE_GENERATOR | default(value=\"Ninja\")}}"
 MLN_FFI_CMAKE_GENERATOR_PLATFORM = "{{env.MLN_FFI_CMAKE_GENERATOR_PLATFORM | default(value=\"\")}}"
 MLN_FFI_CMAKE_BUILD_CONFIG = "{{env.MLN_FFI_CMAKE_BUILD_CONFIG | default(value=\"\")}}"
+MLN_FFI_TEST_TIMEOUT = "{{env.MLN_FFI_TEST_TIMEOUT | default(value=\"30s\")}}"
 DYLD_LIBRARY_PATH = "{{env.MLN_FFI_BUILD_DIR | default(value=config_root ~ \"/build/host\")}}"
 LD_LIBRARY_PATH = "{{env.MLN_FFI_BUILD_DIR | default(value=config_root ~ \"/build/host\")}}"
 XDG_DATA_DIRS = "{{config_root}}/.pixi/envs/default/share:{{env.XDG_DATA_DIRS | default(value=\"/usr/local/share:/usr/share\")}}"
@@ -143,7 +144,14 @@ native_library_dir="$MLN_FFI_BUILD_DIR"
 if [[ -n "${MLN_FFI_CMAKE_BUILD_CONFIG:-}" && -d "$native_library_dir/$MLN_FFI_CMAKE_BUILD_CONFIG" ]]; then
   native_library_dir="$native_library_dir/$MLN_FFI_CMAKE_BUILD_CONFIG"
 fi
-zig build test --summary all --verbose -Dcmake-artifact-dir="$native_library_dir" ${MLN_FFI_RENDER_BACKEND:+-Drender-backend=$MLN_FFI_RENDER_BACKEND}
+(
+  cd src/c_api/tests/zig
+  zig build --test-timeout "$MLN_FFI_TEST_TIMEOUT" --prefix "zig-out/${MLN_FFI_VARIANT:-host}" test --summary all --verbose -Dcmake-artifact-dir="$native_library_dir" ${MLN_FFI_RENDER_BACKEND:+-Drender-backend=$MLN_FFI_RENDER_BACKEND}
+)
+(
+  cd bindings/zig
+  zig build --test-timeout "$MLN_FFI_TEST_TIMEOUT" --prefix "zig-out/${MLN_FFI_VARIANT:-host}" test --summary all --verbose -Dcmake-artifact-dir="$native_library_dir" ${MLN_FFI_RENDER_BACKEND:+-Drender-backend=$MLN_FFI_RENDER_BACKEND}
+)
 '''
 
 [tasks.check]

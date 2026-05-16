@@ -35,9 +35,12 @@ requires = { platform = ["windows"], backend = ["vulkan"] }
 
 [bindings.java-ffm]
 task = "//bindings/java-ffm:build"
-# The Java build task includes tests, which are runtime-broken on Windows for now.
 requires = { platform = ["linux", "macos"] }
 
 [bindings.rust]
 task = "//bindings/rust:ci"
 requires = { platform = ["linux", "macos"] }
+
+[bindings.zig]
+task = "//bindings/zig:ci"
+requires = { platform = ["linux", "macos"], backend = ["metal", "vulkan"] }

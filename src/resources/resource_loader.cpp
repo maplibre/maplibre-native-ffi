@@ -67,28 +67,14 @@ auto make_resource_transform(void* platform_context)
       mbgl::Resource::Kind kind, const std::string& url,
       mbgl::ResourceTransform::FinishedCallback finished
     ) -> void {
-      const auto* runtime = find_runtime_for_platform_context(platform_context);
-      if (
-        runtime == nullptr || runtime->resource_transform_callback == nullptr
-      ) {
-        finished(url);
-        return;
-      }
-
-      auto callback = runtime->resource_transform_callback;
-      auto* user_data = runtime->resource_transform_user_data;
-      auto response = mln_resource_transform_response{
-        .size = sizeof(mln_resource_transform_response), .url = nullptr
-      };
+      std::string replacement_url;
       try {
-        const auto status = callback(
-          user_data, resource_kind_to_abi(kind), url.c_str(), &response
+        const auto status = invoke_resource_transform(
+          platform_context, resource_kind_to_abi(kind), url.c_str(),
+          replacement_url
         );
-        if (
-          status == MLN_STATUS_OK && response.url != nullptr &&
-          *response.url != '\0'
-        ) {
-          finished(std::string{response.url});
+        if (status == MLN_STATUS_OK && !replacement_url.empty()) {
+          finished(replacement_url);
           return;
         }
       } catch (...) {

@@ -1,67 +1,66 @@
-const c = @import("c.zig").c;
+const maplibre = @import("maplibre_native");
 const diagnostics = @import("diagnostics.zig");
 const types = @import("types.zig");
 
 pub const Session = union(enum) {
     none,
-    texture: *c.mln_render_session,
-    surface: *c.mln_render_session,
+    texture: maplibre.RenderSessionHandle,
+    surface: maplibre.RenderSessionHandle,
 
     pub fn deinit(self: *Session) void {
         switch (self.*) {
             .none => {},
-            .texture => |texture| _ = c.mln_render_session_destroy(texture),
-            .surface => |surface| _ = c.mln_render_session_destroy(surface),
+            .texture => |*texture| texture.close() catch {},
+            .surface => |*surface| surface.close() catch {},
         }
         self.* = .none;
     }
 
     pub fn resize(self: *Session, viewport: types.Viewport) !void {
-        const status = switch (self.*) {
-            .none => c.MLN_STATUS_INVALID_STATE,
-            .texture => |texture| c.mln_render_session_resize(
-                texture,
-                viewport.logical_width,
-                viewport.logical_height,
-                viewport.scale_factor,
-            ),
-            .surface => |surface| c.mln_render_session_resize(
-                surface,
-                viewport.logical_width,
-                viewport.logical_height,
-                viewport.scale_factor,
-            ),
-        };
-        if (status == c.MLN_STATUS_OK) return;
         switch (self.*) {
-            .none, .texture => {
-                diagnostics.logAbiError("texture resize failed");
+            .none => return types.AppError.TextureResizeFailed,
+            .texture => |*texture| texture.resize(extent(viewport)) catch |err| {
+                diagnostics.logError("texture resize failed", err);
                 return types.AppError.TextureResizeFailed;
             },
-            .surface => {
-                diagnostics.logAbiError("surface resize failed");
+            .surface => |*surface| surface.resize(extent(viewport)) catch |err| {
+                diagnostics.logError("surface resize failed", err);
                 return types.AppError.SurfaceResizeFailed;
             },
         }
     }
 
     pub fn renderUpdate(self: *Session) !bool {
-        const status = switch (self.*) {
-            .none => c.MLN_STATUS_INVALID_STATE,
-            .texture => |texture| c.mln_render_session_render_update(texture),
-            .surface => |surface| c.mln_render_session_render_update(surface),
-        };
-        if (status == c.MLN_STATUS_OK) return true;
-        if (status == c.MLN_STATUS_INVALID_STATE) return false;
         switch (self.*) {
-            .none, .texture => {
-                diagnostics.logAbiError("texture render failed");
-                return types.AppError.TextureRenderFailed;
+            .none => return false,
+            .texture => |*texture| {
+                texture.renderUpdate() catch |err| switch (err) {
+                    error.InvalidState => return false,
+                    else => {
+                        diagnostics.logError("texture render failed", err);
+                        return types.AppError.TextureRenderFailed;
+                    },
+                };
+                return true;
             },
-            .surface => {
-                diagnostics.logAbiError("surface render failed");
-                return types.AppError.SurfaceRenderFailed;
+            .surface => |*surface| {
+                surface.renderUpdate() catch |err| switch (err) {
+                    error.InvalidState => return false,
+                    else => {
+                        diagnostics.logError("surface render failed", err);
+                        return types.AppError.SurfaceRenderFailed;
+                    },
+                };
+                return true;
             },
         }
     }
 };
+
+pub fn extent(viewport: types.Viewport) maplibre.RenderTargetExtent {
+    return .{
+        .width = viewport.logical_width,
+        .height = viewport.logical_height,
+        .scale_factor = viewport.scale_factor,
+    };
+}

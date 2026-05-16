@@ -1,20 +1,11 @@
 const std = @import("std");
-const c = @import("c.zig").c;
+const maplibre = @import("maplibre_native");
 
-pub fn logAbiError(message: []const u8) void {
-    std.debug.print("{s}: {s}\n", .{ message, std.mem.span(c.mln_thread_last_error_message()) });
+pub fn logError(message: []const u8, err: anyerror) void {
+    std.debug.print("{s}: {s}\n", .{ message, @errorName(err) });
 }
 
-pub fn logCallback(
-    _: ?*anyopaque,
-    severity: u32,
-    event: u32,
-    code: i64,
-    message: [*c]const u8,
-) callconv(.c) u32 {
-    std.debug.print(
-        "maplibre log severity={d} event={d} code={d}: {s}\n",
-        .{ severity, event, code, std.mem.span(message) },
-    );
-    return 1;
+pub fn logRecord(_: ?*anyopaque, record: maplibre.LogRecord) bool {
+    std.debug.print("[{s}] {s}\n", .{ @tagName(record.severity), record.message });
+    return true;
 }

@@ -352,13 +352,16 @@ typedef struct mln_resource_transform_response {
  * - The callback must be thread-safe, return quickly, and must not call this C
  *   API.
  * - url and out_response are borrowed for the callback duration.
- * - The C API copies out_response->url before the callback returns when a
- *   replacement URL is set.
+ * - When a replacement URL is set, out_response->url must point to
+ *   null-terminated storage that remains valid after the callback returns until
+ *   the C API copies it during the current transform invocation. Bindings
+ *   usually keep per-thread response storage alive until the next callback,
+ *   transform replacement, transform clear, or runtime teardown.
  * - A non-OK return status is treated as no rewrite and does not fail the
  *   resource request.
- * - The callback and user_data must remain valid until no live maps or
- *   in-flight requests can invoke the transform, normally until runtime
- *   teardown.
+ * - The callback and user_data must remain valid until the transform is
+ *   replaced, cleared, or the runtime is destroyed. Those calls wait for
+ *   in-flight transform callbacks before returning.
  */
 typedef mln_status (*mln_resource_transform_callback)(
   void* user_data, uint32_t kind, const char* url,
@@ -543,19 +546,20 @@ MLN_API void mln_resource_request_release(
 ) MLN_NOEXCEPT;
 
 /**
- * Registers a runtime-scoped URL transform for network resources.
+ * Registers or updates a runtime-scoped URL transform for network resources.
  *
- * The transform must be registered before any map is created from the runtime.
  * It is forwarded to MapLibre's OnlineFileSource, so it applies wherever native
  * OnlineFileSource applies transforms, including nested PMTiles network range
  * requests. It does not apply to file, asset, database, MBTiles, or registered
  * C API provider responses intercepted before OnlineFileSource.
  *
+ * This call may replace an existing transform while maps exist. When it
+ * returns, no in-flight request can still invoke the previous transform.
+ *
  * Returns:
  * - MLN_STATUS_OK on success.
  * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, transform is
  *   null, transform->size is too small, or callback is null.
- * - MLN_STATUS_INVALID_STATE when runtime already owns live maps.
  * - MLN_STATUS_WRONG_THREAD when called from a thread other than the runtime
  *   owner thread.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
@@ -563,6 +567,22 @@ MLN_API void mln_resource_request_release(
 MLN_API mln_status mln_runtime_set_resource_transform(
   mln_runtime* runtime, const mln_resource_transform* transform
 ) MLN_NOEXCEPT;
+
+/**
+ * Clears the runtime-scoped URL transform for network resources.
+ *
+ * After this call succeeds, network resource URLs pass through unchanged. When
+ * it returns, no in-flight request can still invoke the previous transform.
+ *
+ * Returns:
+ * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live.
+ * - MLN_STATUS_WRONG_THREAD when called from a thread other than the runtime
+ *   owner thread.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ */
+MLN_API mln_status
+mln_runtime_clear_resource_transform(mln_runtime* runtime) MLN_NOEXCEPT;
 
 /**
  * Runs a MapLibre ambient cache maintenance operation for this runtime.
