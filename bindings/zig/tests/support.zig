@@ -1,4 +1,15 @@
 const std = @import("std");
+const testing = std.testing;
+
+pub const c = @cImport({
+    @cInclude("maplibre_native_c.h");
+});
+
+extern fn usleep(useconds: c_uint) c_int;
+
+fn consumeLog(_: ?*anyopaque, _: u32, _: u32, _: i64, _: [*c]const u8) callconv(.c) u32 {
+    return 1;
+}
 
 pub const style_json =
     \\{
@@ -30,4 +41,76 @@ pub fn typeNameContains(comptime T: type, comptime needle: []const u8) bool {
         if (std.mem.indexOf(u8, @typeName(field.type), needle) != null) return true;
     }
     return false;
+}
+
+pub fn createRuntime() !*c.mln_runtime {
+    var runtime: ?*c.mln_runtime = null;
+    var options = c.mln_runtime_options_default();
+    try testing.expectEqual(c.MLN_STATUS_OK, c.mln_runtime_create(&options, &runtime));
+    return runtime orelse error.RuntimeCreateFailed;
+}
+
+pub fn createMap(runtime: *c.mln_runtime) !*c.mln_map {
+    return createMapWithMode(runtime, c.MLN_MAP_MODE_CONTINUOUS);
+}
+
+pub fn createMapWithMode(runtime: *c.mln_runtime, map_mode: u32) !*c.mln_map {
+    var map: ?*c.mln_map = null;
+    var options = c.mln_map_options_default();
+    options.width = 512;
+    options.height = 512;
+    options.map_mode = map_mode;
+    try testing.expectEqual(c.MLN_STATUS_OK, c.mln_map_create(runtime, &options, &map));
+    return map orelse error.MapCreateFailed;
+}
+
+pub fn destroyRuntime(runtime: *c.mln_runtime) void {
+    testing.expectEqual(c.MLN_STATUS_OK, c.mln_runtime_destroy(runtime)) catch @panic("runtime destroy failed");
+}
+
+pub fn destroyMap(map: *c.mln_map) void {
+    testing.expectEqual(c.MLN_STATUS_OK, c.mln_map_destroy(map)) catch @panic("map destroy failed");
+}
+
+pub fn suppressLogs() !void {
+    try testing.expectEqual(c.MLN_STATUS_OK, c.mln_log_set_async_severity_mask(0));
+    errdefer restoreLogs();
+    try testing.expectEqual(c.MLN_STATUS_OK, c.mln_log_set_callback(consumeLog, null));
+}
+
+pub fn restoreLogs() void {
+    testing.expectEqual(c.MLN_STATUS_OK, c.mln_log_clear_callback()) catch @panic("log clear failed");
+    testing.expectEqual(c.MLN_STATUS_OK, c.mln_log_set_async_severity_mask(c.MLN_LOG_SEVERITY_MASK_DEFAULT)) catch @panic("log async mask restore failed");
+}
+
+pub fn waitForEvent(runtime: *c.mln_runtime, map: *c.mln_map, event_type: u32) !bool {
+    for (0..1000) |_| {
+        try testing.expectEqual(c.MLN_STATUS_OK, c.mln_runtime_run_once(runtime));
+        while (true) {
+            var event = emptyEvent();
+            var has_event = false;
+            try testing.expectEqual(c.MLN_STATUS_OK, c.mln_runtime_poll_event(runtime, &event, &has_event));
+            if (!has_event) break;
+            if (event.type == event_type and
+                event.source_type == c.MLN_RUNTIME_EVENT_SOURCE_MAP and
+                event.source == @as(?*anyopaque, @ptrCast(map))) return true;
+        }
+        _ = usleep(1000);
+    }
+    return false;
+}
+
+fn emptyEvent() c.mln_runtime_event {
+    return .{
+        .size = @sizeOf(c.mln_runtime_event),
+        .type = 0,
+        .source_type = c.MLN_RUNTIME_EVENT_SOURCE_RUNTIME,
+        .source = null,
+        .code = 0,
+        .payload_type = c.MLN_RUNTIME_EVENT_PAYLOAD_NONE,
+        .payload = null,
+        .payload_size = 0,
+        .message = null,
+        .message_size = 0,
+    };
 }

@@ -91,7 +91,7 @@ fn addCTests(b: *std.Build, options: BuildOptions) *std.Build.Step.Compile {
                 // avoids linking -lEGL directly, which would risk pulling in
                 // the system GLVND dispatcher as a second EGL instance.
                 c_tests.root_module.addCSourceFile(.{
-                    .file = b.path("tests/c/egl_support_linux.c"),
+                    .file = b.path("../../../../bindings/zig/tests/egl_support_linux.c"),
                 });
                 c_tests.root_module.linkSystemLibrary("dl", .{});
             },

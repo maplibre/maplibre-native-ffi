@@ -182,6 +182,7 @@ fn addBindingTests(b: *std.Build, options: BuildOptions, maplibre_native: *std.B
         tests.root_module.linkFramework("AppKit", .{});
     } else if (options.render_backend == .opengl and options.target.result.os.tag == .linux) {
         tests.root_module.addCSourceFile(.{ .file = b.path("tests/egl_support_linux.c") });
+        tests.root_module.linkSystemLibrary("dl", .{});
     }
     return tests;
 }
