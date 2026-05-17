@@ -103,6 +103,7 @@ fn addZigMapExample(b: *std.Build, options: BuildOptions) *std.Build.Step.Compil
 
     example.root_module.addOptions("build_options", build_options);
     example.root_module.addImport("maplibre_native", maplibreNativeModule(b, options));
+    example.root_module.addIncludePath(b.path("../../include"));
     example.root_module.addIncludePath(pixiIncludeDir(b, options.target));
     example.root_module.addLibraryPath(pixiLibraryDir(b, options.target));
     example.root_module.addRPath(pixiLibraryDir(b, options.target));
