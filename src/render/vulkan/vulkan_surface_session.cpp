@@ -26,6 +26,8 @@ namespace {
 auto vulkan_loader_library_name() noexcept -> const char* {
 #ifdef __APPLE__
   return "libvulkan.dylib";
+#elif defined(_WIN32)
+  return "vulkan-1.dll";
 #else
   return "libvulkan.so.1";
 #endif
