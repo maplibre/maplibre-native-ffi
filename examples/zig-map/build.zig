@@ -37,6 +37,7 @@ fn cmakeArtifactDir(b: *std.Build) std.Build.LazyPath {
 fn renderBackendName(render_backend: RenderBackend) []const u8 {
     return switch (render_backend) {
         .metal => "metal",
+        .opengl => "opengl",
         .vulkan => "vulkan",
     };
 }
