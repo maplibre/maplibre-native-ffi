@@ -48,7 +48,7 @@ config_roots = ["bindings/*", "examples/*", "docs"]
 
 # Swift ecosystem
 "core:swift" = { version = "6.3.1", os = ["macos", "linux"] }
-"github:nicklockwood/SwiftFormat" = "0.61.1"
+"github:nicklockwood/SwiftFormat" = { version = "0.61.1", os = ["macos", "linux"] }
 
 # Other ecosystems
 "core:rust" = { version = "1.95.0", profile = "minimal", components = ["rustfmt", "clippy"] }

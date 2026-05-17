@@ -23,6 +23,7 @@ const std = @import("std");
 
 const c = @import("../../c.zig").c;
 const diagnostics = @import("../../diagnostics.zig");
+const maplibre = @import("maplibre_native");
 const render_target = @import("../../render_target.zig");
 const types = @import("../../types.zig");
 const Compositor = @import("compositor.zig").Compositor;
@@ -94,7 +95,7 @@ pub const OpenGLBackend = union(enum) {
 
     pub fn attachRenderTarget(
         self: *OpenGLBackend,
-        map: *c.mln_map,
+        map: *maplibre.MapHandle,
         viewport: types.Viewport,
     ) !render_target.Session {
         return switch (self.*) {
@@ -150,7 +151,7 @@ const OpenGLSurfaceBackend = struct {
 
     fn attachRenderTarget(
         self: *OpenGLSurfaceBackend,
-        map: *c.mln_map,
+        map: *maplibre.MapHandle,
         viewport: types.Viewport,
     ) !render_target.Session {
         // SDL3 uses EGL internally on Linux; retrieve the borrowed handles.
@@ -180,8 +181,9 @@ const OpenGLSurfaceBackend = struct {
         descriptor.context = egl_context;
         descriptor.surface = egl_surface;
 
+        const raw_map = try maplibre.native(map);
         var session: ?*c.mln_render_session = null;
-        if (c.mln_egl_surface_attach(map, &descriptor, &session) != c.MLN_STATUS_OK or
+        if (c.mln_egl_surface_attach(raw_map, &descriptor, &session) != c.MLN_STATUS_OK or
             session == null)
         {
             diagnostics.logAbiError("EGL surface attach failed");
@@ -218,7 +220,7 @@ const OpenGLOwnedTextureBackend = struct {
 
     fn attachRenderTarget(
         _: *OpenGLOwnedTextureBackend,
-        map: *c.mln_map,
+        map: *maplibre.MapHandle,
         viewport: types.Viewport,
     ) !render_target.Session {
         var descriptor = c.mln_owned_texture_descriptor_default();
@@ -226,8 +228,9 @@ const OpenGLOwnedTextureBackend = struct {
         descriptor.extent.height = viewport.logical_height;
         descriptor.extent.scale_factor = viewport.scale_factor;
 
+        const raw_map = try maplibre.native(map);
         var texture: ?*c.mln_render_session = null;
-        if (c.mln_owned_texture_attach(map, &descriptor, &texture) != c.MLN_STATUS_OK or
+        if (c.mln_owned_texture_attach(raw_map, &descriptor, &texture) != c.MLN_STATUS_OK or
             texture == null)
         {
             diagnostics.logAbiError("OpenGL owned texture attach failed");
