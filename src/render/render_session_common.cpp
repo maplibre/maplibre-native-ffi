@@ -134,15 +134,13 @@ auto renderer_backend(mln_render_session* session)
 
 // For texture sessions the library owns the headless backend and must
 // activate the GL/Vulkan context via an Explicit scope. Surface sessions
-// borrow a caller-owned context, so the caller activates it (Implicit).
+// delegate to the backend's scope_type().
 auto session_scope_type(const mln_render_session* session)
   -> mbgl::gfx::BackendScope::ScopeType {
   if (session->kind == mln::core::RenderSessionKind::Texture) {
     return mbgl::gfx::BackendScope::ScopeType::Explicit;
   }
-  return session->surface.backend->needs_explicit_scope()
-           ? mbgl::gfx::BackendScope::ScopeType::Explicit
-           : mbgl::gfx::BackendScope::ScopeType::Implicit;
+  return session->surface.backend->scope_type();
 }
 
 auto validate_renderer_backend(mln_render_session* session)

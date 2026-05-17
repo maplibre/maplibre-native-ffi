@@ -43,30 +43,23 @@ local commonSteps = new Mapping<String, Step> {
   }
 }
 
-local nativeSteps = new Mapping<String, Step> {}
-
-local allSteps = new Mapping<String, Step> {
-  ...commonSteps
-  ...nativeSteps
-}
-
 hooks {
   ["pre-commit"] {
     fix = true
     stash = "git"
     steps {
-      ...allSteps
+      ...commonSteps
     }
   }
   ["check"] {
     steps {
-      ...allSteps
+      ...commonSteps
     }
   }
   ["fix"] {
     fix = true
     steps {
-      ...allSteps
+      ...commonSteps
     }
   }
 }

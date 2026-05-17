@@ -121,9 +121,9 @@ fn addZigMapExample(b: *std.Build, options: BuildOptions) *std.Build.Step.Compil
         example.root_module.addIncludePath(b.path("../../third_party/maplibre-native/vendor/Vulkan-Headers/include"));
         example.root_module.linkSystemLibrary(vulkanLibraryName(options.target), .{});
     } else if (options.render_backend == .opengl) {
-        // EGL and GLES are embedded in libmaplibre-native-c.so; the compositor
-        // loads GL function pointers at runtime via SDL_GL_GetProcAddress.
-        // No additional compile-time link targets are needed.
+        // eglGetCurrentContext() is called directly in render/opengl/mod.zig
+        // so the example binary must link EGL at compile time.
+        example.root_module.linkSystemLibrary("EGL", .{});
     } else {
         failUnsupportedTarget();
     }

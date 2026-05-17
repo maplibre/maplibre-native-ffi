@@ -7,6 +7,7 @@
 #include <memory>
 #include <thread>
 
+#include <mbgl/gfx/backend_scope.hpp>
 #include <mbgl/gfx/headless_backend.hpp>
 #include <mbgl/gfx/renderer_backend.hpp>
 #include <mbgl/renderer/renderer.hpp>
@@ -36,10 +37,11 @@ class SurfaceSessionBackend {
   virtual auto renderer_backend() -> mbgl::gfx::RendererBackend& = 0;
   virtual void resize(uint32_t physical_width, uint32_t physical_height) = 0;
   virtual auto swap_buffers() -> mln_status { return MLN_STATUS_OK; }
-  // Return true when the backend's activate()/deactivate() must be called
-  // around each render. EGL surfaces need this; Vulkan surfaces do not.
-  [[nodiscard]] virtual auto needs_explicit_scope() const -> bool {
-    return false;
+  // Returns Explicit when the backend's activate()/deactivate() must be called
+  // around each render (EGL surfaces). Vulkan surfaces use Implicit.
+  [[nodiscard]] virtual auto scope_type() const
+    -> mbgl::gfx::BackendScope::ScopeType {
+    return mbgl::gfx::BackendScope::ScopeType::Implicit;
   }
 };
 

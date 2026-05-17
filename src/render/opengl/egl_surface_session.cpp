@@ -207,8 +207,9 @@ class EGLSurfaceSessionBackend final : public mln::core::SurfaceSessionBackend {
     }
     return MLN_STATUS_OK;
   }
-  [[nodiscard]] auto needs_explicit_scope() const -> bool override {
-    return true;
+  [[nodiscard]] auto scope_type() const
+    -> mbgl::gfx::BackendScope::ScopeType override {
+    return mbgl::gfx::BackendScope::ScopeType::Explicit;
   }
 
  private:
