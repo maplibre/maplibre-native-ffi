@@ -14,6 +14,7 @@
 const std = @import("std");
 
 const c = @import("../../c.zig").c;
+const maplibre = @import("maplibre_native");
 const types = @import("../../types.zig");
 
 // ── Minimal OpenGL ES 3.0 type aliases (no GL headers required) ──────────────
@@ -190,32 +191,24 @@ pub const Compositor = struct {
     pub fn presentTexture(
         self: *Compositor,
         allocator: std.mem.Allocator,
-        texture: *c.mln_render_session,
+        texture: *maplibre.RenderSessionHandle,
         viewport: types.Viewport,
     ) !bool {
         // Probe the pixel buffer size without reading.
-        var info = c.mln_texture_image_info_default();
-        const probe = c.mln_texture_read_premultiplied_rgba8(texture, null, 0, &info);
-        if (probe == c.MLN_STATUS_INVALID_STATE) return false;
-        if (probe != c.MLN_STATUS_INVALID_ARGUMENT) {
-            return types.AppError.BackendDrawFailed;
-        }
+        const probe_info = texture.textureImageInfo() catch |err| switch (err) {
+            error.InvalidState => return false,
+            else => return types.AppError.BackendDrawFailed,
+        };
 
         // Grow the pixel buffer if needed.
-        if (info.byte_length > self.pixel_buffer.len) {
+        if (probe_info.byte_length > self.pixel_buffer.len) {
             allocator.free(self.pixel_buffer);
-            self.pixel_buffer = try allocator.alloc(u8, info.byte_length);
+            self.pixel_buffer = try allocator.alloc(u8, probe_info.byte_length);
         }
 
         // Read back the rendered pixels.
-        if (c.mln_texture_read_premultiplied_rgba8(
-            texture,
-            self.pixel_buffer.ptr,
-            self.pixel_buffer.len,
-            &info,
-        ) != c.MLN_STATUS_OK) {
+        const info = texture.readPremultipliedRgba8Into(self.pixel_buffer) catch
             return types.AppError.BackendDrawFailed;
-        }
 
         // Re-activate our display GL context (the headless EGL backend deactivated
         // all contexts after rendering, leaving no context current).

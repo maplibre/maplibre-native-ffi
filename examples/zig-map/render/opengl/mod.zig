@@ -106,7 +106,7 @@ pub const OpenGLBackend = union(enum) {
 
     pub fn drawTexture(
         self: *OpenGLBackend,
-        texture: *c.mln_render_session,
+        texture: *maplibre.RenderSessionHandle,
         viewport: types.Viewport,
     ) !bool {
         return switch (self.*) {
@@ -173,23 +173,16 @@ const OpenGLSurfaceBackend = struct {
             return types.AppError.BackendSetupFailed;
         }
 
-        var descriptor = c.mln_egl_surface_descriptor_default();
-        descriptor.width = viewport.logical_width;
-        descriptor.height = viewport.logical_height;
-        descriptor.scale_factor = viewport.scale_factor;
-        descriptor.display = egl_display;
-        descriptor.context = egl_context;
-        descriptor.surface = egl_surface;
-
-        const raw_map = try maplibre.native(map);
-        var session: ?*c.mln_render_session = null;
-        if (c.mln_egl_surface_attach(raw_map, &descriptor, &session) != c.MLN_STATUS_OK or
-            session == null)
-        {
-            diagnostics.logAbiError("EGL surface attach failed");
+        const session = maplibre.attachEglSurface(map, .{
+            .extent = render_target.extent(viewport),
+            .display = .{ .ptr = egl_display.? },
+            .context = .{ .ptr = egl_context.? },
+            .surface = .{ .ptr = egl_surface.? },
+        }) catch |err| {
+            diagnostics.logError("EGL surface attach failed", err);
             return types.AppError.SurfaceAttachFailed;
-        }
-        return .{ .surface = session.? };
+        };
+        return .{ .surface = session };
     }
 };
 
@@ -223,25 +216,22 @@ const OpenGLOwnedTextureBackend = struct {
         map: *maplibre.MapHandle,
         viewport: types.Viewport,
     ) !render_target.Session {
-        var descriptor = c.mln_owned_texture_descriptor_default();
-        descriptor.extent.width = viewport.logical_width;
-        descriptor.extent.height = viewport.logical_height;
-        descriptor.extent.scale_factor = viewport.scale_factor;
-
-        const raw_map = try maplibre.native(map);
-        var texture: ?*c.mln_render_session = null;
-        if (c.mln_owned_texture_attach(raw_map, &descriptor, &texture) != c.MLN_STATUS_OK or
-            texture == null)
-        {
-            diagnostics.logAbiError("OpenGL owned texture attach failed");
+        const texture = maplibre.attachOwnedTexture(map, .{
+            .extent = .{
+                .width = viewport.logical_width,
+                .height = viewport.logical_height,
+                .scale_factor = viewport.scale_factor,
+            },
+        }) catch |err| {
+            diagnostics.logError("OpenGL owned texture attach failed", err);
             return types.AppError.TextureAttachFailed;
-        }
-        return .{ .texture = texture.? };
+        };
+        return .{ .texture = texture };
     }
 
     fn drawTexture(
         self: *OpenGLOwnedTextureBackend,
-        texture: *c.mln_render_session,
+        texture: *maplibre.RenderSessionHandle,
         viewport: types.Viewport,
     ) !bool {
         return self.compositor.presentTexture(self.allocator, texture, viewport);

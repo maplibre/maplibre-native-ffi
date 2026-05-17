@@ -171,6 +171,8 @@ pub const attachVulkanOwnedTexture = render.attachVulkanOwnedTexture;
 pub const attachVulkanBorrowedTexture = render.attachVulkanBorrowedTexture;
 pub const attachMetalSurface = render.attachMetalSurface;
 pub const attachVulkanSurface = render.attachVulkanSurface;
+pub const attachEglSurface = render.attachEglSurface;
+pub const EglSurfaceDescriptor = render.EglSurfaceDescriptor;
 
 /// Returns the C ABI contract version reported by the linked native library.
 pub fn cAbiVersion() u32 {

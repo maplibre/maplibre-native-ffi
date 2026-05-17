@@ -98,6 +98,13 @@ pub const VulkanSurfaceDescriptor = struct {
     surface: NativePointer,
 };
 
+pub const EglSurfaceDescriptor = struct {
+    extent: RenderTargetExtent = .{},
+    display: NativePointer,
+    context: NativePointer,
+    surface: NativePointer,
+};
+
 pub const TextureImageInfo = struct {
     width: u32,
     height: u32,
@@ -613,6 +620,17 @@ pub fn attachVulkanSurface(map: *map_module.MapHandle, descriptor: VulkanSurface
     raw.context = vulkanContextToNative(descriptor.context);
     raw.surface = descriptor.surface.ptr;
     return try attach(map, c.mln_vulkan_surface_attach, &raw);
+}
+
+pub fn attachEglSurface(map: *map_module.MapHandle, descriptor: EglSurfaceDescriptor) status.Error!RenderSessionHandle {
+    var raw = c.mln_egl_surface_descriptor_default();
+    raw.width = descriptor.extent.width;
+    raw.height = descriptor.extent.height;
+    raw.scale_factor = descriptor.extent.scale_factor;
+    raw.display = descriptor.display.ptr;
+    raw.context = descriptor.context.ptr;
+    raw.surface = descriptor.surface.ptr;
+    return try attach(map, c.mln_egl_surface_attach, &raw);
 }
 
 fn attach(
