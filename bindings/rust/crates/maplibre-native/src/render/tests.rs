@@ -41,7 +41,7 @@ fn create_owned_texture_session(
             extent,
             context.descriptor(),
         ))?;
-        return Ok((OwnedTextureTestContext::Vulkan(context), session));
+        return Ok((OwnedTextureTestContext::Vulkan(Box::new(context)), session));
     }
     Err("native library does not support Metal or Vulkan owned texture sessions".into())
 }
@@ -49,7 +49,7 @@ fn create_owned_texture_session(
 #[allow(dead_code)]
 enum OwnedTextureTestContext {
     Metal(MetalTestContext),
-    Vulkan(VulkanTestContext),
+    Vulkan(Box<VulkanTestContext>),
 }
 
 impl OwnedTextureTestContext {
@@ -89,10 +89,10 @@ impl MetalTestContext {
             if device.is_null() {
                 return Err("Metal did not return a default device".into());
             }
-            return Ok(Self {
+            Ok(Self {
                 // SAFETY: The Metal device remains live for the test context lifetime.
                 device: unsafe { NativePointer::from_ptr(device) },
-            });
+            })
         }
 
         #[cfg(not(target_os = "macos"))]
@@ -164,9 +164,11 @@ impl VulkanTestContext {
         }
         // SAFETY: physical_device came from this live instance.
         let supported_features = unsafe { instance.get_physical_device_features(physical_device) };
-        let mut features = vk::PhysicalDeviceFeatures::default();
-        features.sampler_anisotropy = supported_features.sampler_anisotropy;
-        features.wide_lines = supported_features.wide_lines;
+        let features = vk::PhysicalDeviceFeatures {
+            sampler_anisotropy: supported_features.sampler_anisotropy,
+            wide_lines: supported_features.wide_lines,
+            ..Default::default()
+        };
         let device_info = vk::DeviceCreateInfo::default()
             .queue_create_infos(&queue_info)
             .enabled_extension_names(&device_extensions)
