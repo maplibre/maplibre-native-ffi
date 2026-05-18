@@ -221,9 +221,7 @@ auto texture_read_premultiplied_rgba8(
     return MLN_STATUS_INVALID_STATE;
   }
   auto guard = mbgl::gfx::BackendScope{
-    // Explicit: the headless GL context may not be current at call time;
-    // activate() / deactivate() ensure it is made current for the readback.
-    *renderer_backend, mbgl::gfx::BackendScope::ScopeType::Explicit
+    *renderer_backend
   };
   auto image = texture->texture.backend->headless_backend().readStillImage();
   if (!image.valid()) {
