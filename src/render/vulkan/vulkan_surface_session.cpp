@@ -294,11 +294,11 @@ class VulkanSurfaceBackend final : public mbgl::vulkan::RendererBackend,
       vmaDestroyAllocator(allocator);
       allocator = nullptr;
     }
-    usingSharedContext = true;
     static_cast<void>(device.release());
     static_cast<void>(instance.release());
     device.get() = nullptr;
     instance.get() = nullptr;
+    usingSharedContext = true;
   }
 
   auto getDefaultRenderable() -> mbgl::gfx::Renderable& override {
