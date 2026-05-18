@@ -22,11 +22,8 @@ if(MSVC)
                       "$<$<COMPILE_LANG_AND_ID:CXX,MSVC>:/FS>")
 endif()
 
-# When building inside a pixi/conda environment on Linux, embed
-# $CONDA_PREFIX/lib in the build-tree RPATH. Without this, the dynamic linker
-# finds system libraries (e.g. libpng16.so.16 v1.6.43 on ubuntu-24.04) before
-# the conda-managed ones (e.g. libpng 1.6.58 from pixi), causing a header/ABI
-# version mismatch at test runtime.
+# Prefer pixi-managed libraries over system ones on Linux (e.g. avoids a
+# libpng version mismatch between pixi headers and the system .so at runtime).
 if(DEFINED ENV{CONDA_PREFIX} AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
   list(APPEND CMAKE_BUILD_RPATH "$ENV{CONDA_PREFIX}/lib")
 endif()
