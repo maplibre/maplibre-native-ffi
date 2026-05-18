@@ -6,7 +6,6 @@ amends "package://github.com/jdx/hk/releases/download/v1.45.0/hk@1.45.0#/Config.
 import "package://github.com/jdx/hk/releases/download/v1.45.0/hk@1.45.0#/Builtins.pkl"
 
 local commonProfiles = List("!ci-native")
-local nativeProfiles = List("!ci-common")
 
 local commonSteps = new Mapping<String, Step> {
   ["dprint"] = (Builtins.dprint) {
