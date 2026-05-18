@@ -1,4 +1,4 @@
-﻿// hk orchestrates checks for pre-commit, `mise run check`, and `mise run fix`.
+// hk orchestrates checks for pre-commit, `mise run check`, and `mise run fix`.
 // Tools used here must be installed by `mise install`.
 
 amends "package://github.com/jdx/hk/releases/download/v1.45.0/hk@1.45.0#/Config.pkl"
