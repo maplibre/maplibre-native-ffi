@@ -1,27 +1,3 @@
-/**
- * egl_surface_session.cpp — EGL surface session for maplibre-native-ffi.
- *
- * Provides mln_egl_surface_attach(), enabling OpenGL ES rendering on
- * Android and Linux platforms through a caller-owned EGL
- * display/context/surface.
- *
- * Design mirrors vulkan_surface_session.cpp:
- *   - All EGL handles (EGLDisplay, EGLConfig, EGLContext, EGLSurface) are
- *     borrowed from the host and must remain valid until the session is
- *     detached or destroyed.
- *   - EGLSurfaceBackend implements SurfaceSessionBackend, which gives the
- *     shared render-session machinery a renderer_backend() and resize().
- *   - EGLBackend extends mbgl::gl::RendererBackend and mbgl::gfx::Renderable,
- *     following the pattern used by the MapLibre Native GLFW and Qt backends.
- *   - activate() / deactivate() call eglMakeCurrent.
- *   - updateAssumedState() re-syncs mbgl's cached GL state after each
- *     context switch, preventing stale framebuffer/viewport assumptions.
- *   - After each render the session calls eglSwapBuffers to present the frame.
- *
- * Threading: all methods must be called on the session owner thread (the map
- * owner thread). EGL contexts are not shared across threads here.
- */
-
 #include <cmath>
 #include <cstdint>
 #include <memory>
@@ -159,14 +135,8 @@ class EGLSurfaceBackendImpl final : public mbgl::gl::RendererBackend,
     return reinterpret_cast<mbgl::gl::ProcAddress>(eglGetProcAddress(name));
   }
 
-  // Re-sync mbgl's cached GL state to match what is actually current on the
-  // context. This is important because the host may mutate framebuffer
-  // binding / viewport / clear state between frames. Without this, mbgl's
-  // internal state cache thinks its bindings are already current and skips
-  // re-binding, producing missing fills / labels / draw calls.
-  // Mirrors the pattern used by the Qt GL backend, the GLFW headless
-  // backend, and the GL backends in tdcosta100/MaplibreNative.NET (and the
-  // acalcutt/MaplibreNative.NET fork) and bjtrounson/maplibre-maui.
+  // Re-sync mbgl's assumed GL state after each context switch; the host may
+  // have mutated framebuffer binding or viewport between frames.
   void updateAssumedState() override {
     assumeFramebufferBinding(ImplicitFramebufferBinding);
     assumeViewport(0, 0, size);
