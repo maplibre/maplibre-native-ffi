@@ -68,7 +68,6 @@ fn addCTests(b: *std.Build, options: BuildOptions) *std.Build.Step.Compile {
             .optimize = options.optimize,
         }),
     });
-
     c_tests.root_module.addOptions("build_options", build_options);
     linkMapLibreC(b, c_tests.root_module, options.cmake_artifact_dir);
     if (options.render_backend == .metal) {

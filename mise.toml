@@ -66,6 +66,7 @@ MLN_FFI_VARIANT = { required = true }
 MLN_FFI_TARGET_TRIPLE = { required = true }
 MLN_FFI_RENDER_BACKEND = { required = true }
 MLN_FFI_BUILD_DIR = { required = true }
+MLN_FFI_ZIG_TARGET = { required = true }
 MLN_FFI_TEST_TIMEOUT = "{{env.MLN_FFI_TEST_TIMEOUT | default(value=\"30s\")}}"
 
 [hooks]
@@ -118,11 +119,11 @@ native_library_dir="$MLN_FFI_BUILD_DIR"
 dependency_library_dir="$($MLN_FFI_REPO_ROOT/scripts/pixi-library-dir)"
 (
   cd src/c_api/tests/zig
-  zig build --test-timeout "$MLN_FFI_TEST_TIMEOUT" test --summary all --verbose -Dcmake-artifact-dir="$native_library_dir" -Ddependency-library-dir="$dependency_library_dir" -Drender-backend="$MLN_FFI_RENDER_BACKEND"
+  zig build -Dtarget="$MLN_FFI_ZIG_TARGET" --test-timeout "$MLN_FFI_TEST_TIMEOUT" test --summary all --verbose -Dcmake-artifact-dir="$native_library_dir" -Ddependency-library-dir="$dependency_library_dir" -Drender-backend="$MLN_FFI_RENDER_BACKEND"
 )
 (
   cd bindings/zig
-  zig build --test-timeout "$MLN_FFI_TEST_TIMEOUT" test --summary all --verbose -Dcmake-artifact-dir="$native_library_dir" -Ddependency-library-dir="$dependency_library_dir" -Drender-backend="$MLN_FFI_RENDER_BACKEND"
+  zig build -Dtarget="$MLN_FFI_ZIG_TARGET" --test-timeout "$MLN_FFI_TEST_TIMEOUT" test --summary all --verbose -Dcmake-artifact-dir="$native_library_dir" -Ddependency-library-dir="$dependency_library_dir" -Drender-backend="$MLN_FFI_RENDER_BACKEND"
 )
 '''
 
