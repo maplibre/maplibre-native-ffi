@@ -22,7 +22,6 @@ import org.maplibre.nativeffi.error.NativeErrorException;
 import org.maplibre.nativeffi.error.WrongThreadException;
 import org.maplibre.nativeffi.map.MapHandle;
 import org.maplibre.nativeffi.map.MapOptions;
-import org.maplibre.nativeffi.render.RenderSessionHandle;
 import org.maplibre.nativeffi.render.RenderTargetExtent;
 import org.maplibre.nativeffi.resource.ResourceKind;
 import org.maplibre.nativeffi.resource.ResourceProviderDecision;
@@ -197,16 +196,15 @@ final class RuntimeHandleTest {
   void runtimeEventsCopyPayloadAndMessageBeforeNextPoll() throws Exception {
     var runtime = RuntimeHandle.create();
     var map = MapHandle.create(runtime, new MapOptions().size(64, 64));
-    RenderSessionHandle session = null;
+    RenderTargetTestSupport target = null;
     try {
       var failure = assertThrows(NativeErrorException.class, () -> map.setStyleJson("{"));
       assertFalse(failure.diagnostic().isBlank());
       var failedEvent = waitForMapEventRecord(runtime, map, RuntimeEventType.MAP_LOADING_FAILED);
       assertFalse(failedEvent.message().isBlank());
 
-      session =
-          RenderTargetTestSupport.attachVulkanOwnedTexture(
-              map, new RenderTargetExtent(64, 64, 1.0));
+      target = RenderTargetTestSupport.attachOwnedTexture(map, new RenderTargetExtent(64, 64, 1.0));
+      var session = target.session();
       map.setStyleJson(STYLE_JSON);
       waitForMapEvent(runtime, map, RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE);
       session.renderUpdate();
@@ -222,8 +220,8 @@ final class RuntimeHandleTest {
       assertFalse(failedEvent.message().isBlank());
       assertEquals(frameCount, frame.stats().frameCount());
     } finally {
-      if (session != null) {
-        session.close();
+      if (target != null) {
+        target.close();
       }
       map.close();
       runtime.close();
