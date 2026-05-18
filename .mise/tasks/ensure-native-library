@@ -6,7 +6,7 @@ import sys
 
 
 def main() -> int:
-    build_dir = os.environ.get("MLN_FFI_BUILD_DIR", "build/host")
+    build_dir = os.environ["MLN_FFI_BUILD_DIR"]
     if os.environ.get("CI") != "true":
         return subprocess.call(["mise", "run", "//:build"])
 

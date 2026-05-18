@@ -5,6 +5,7 @@ const BuildOptions = struct {
     optimize: std.builtin.OptimizeMode,
     cmake_artifact_dir_path: []const u8,
     cmake_artifact_dir: std.Build.LazyPath,
+    dependency_library_dir: ?std.Build.LazyPath,
     render_backend: RenderBackend,
 };
 
@@ -33,18 +34,19 @@ fn linkMapLibreC(b: *std.Build, module: *std.Build.Module, cmake_artifact_dir: s
     module.link_libc = true;
 }
 
-fn pixiLibraryDir(b: *std.Build, target: std.Build.ResolvedTarget) std.Build.LazyPath {
-    return switch (target.result.os.tag) {
-        .windows => b.path("../../../../.pixi/envs/default/Library/lib"),
-        else => b.path("../../../../.pixi/envs/default/lib"),
-    };
-}
-
 fn vulkanLibraryName(target: std.Build.ResolvedTarget) []const u8 {
     return switch (target.result.os.tag) {
         .windows => "vulkan-1",
         else => "vulkan",
     };
+}
+
+fn dependencyLibraryDir(b: *std.Build) ?std.Build.LazyPath {
+    return b.option(
+        std.Build.LazyPath,
+        "dependency-library-dir",
+        "Directory containing backend dependency libraries such as Vulkan",
+    );
 }
 
 fn lazyPath(b: *std.Build, path: []const u8) std.Build.LazyPath {
@@ -74,8 +76,10 @@ fn addCTests(b: *std.Build, options: BuildOptions) *std.Build.Step.Compile {
         c_tests.root_module.linkFramework("QuartzCore", .{});
     } else if (options.render_backend == .vulkan) {
         c_tests.root_module.addIncludePath(b.path("../../../../third_party/maplibre-native/vendor/Vulkan-Headers/include"));
-        c_tests.root_module.addLibraryPath(pixiLibraryDir(b, options.target));
-        c_tests.root_module.addRPath(pixiLibraryDir(b, options.target));
+        if (options.dependency_library_dir) |dependency_library_dir| {
+            c_tests.root_module.addLibraryPath(dependency_library_dir);
+            c_tests.root_module.addRPath(dependency_library_dir);
+        }
         c_tests.root_module.linkSystemLibrary(vulkanLibraryName(options.target), .{});
     }
     return c_tests;
@@ -93,6 +97,7 @@ pub fn build(b: *std.Build) void {
         .optimize = b.standardOptimizeOption(.{}),
         .cmake_artifact_dir_path = cmake_artifact_dir_path,
         .cmake_artifact_dir = lazyPath(b, cmake_artifact_dir_path),
+        .dependency_library_dir = dependencyLibraryDir(b),
         .render_backend = renderBackend(b),
     };
 
@@ -101,8 +106,6 @@ pub fn build(b: *std.Build) void {
     const run_c_tests = b.addRunArtifact(c_tests);
     if (target.result.os.tag == .windows) {
         run_c_tests.addPathDir(options.cmake_artifact_dir_path);
-        run_c_tests.addPathDir("../../../../.pixi/envs/default");
-        run_c_tests.addPathDir("../../../../.pixi/envs/default/Library/bin");
     }
     const test_step = b.step("test", "Run Zig C ABI tests");
     test_step.dependOn(&run_c_tests.step);

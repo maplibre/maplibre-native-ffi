@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+: "${CONDA_PREFIX:?CONDA_PREFIX is required; source the Pixi environment first}"
+
+case "$(uname -s)" in
+  MINGW* | MSYS* | CYGWIN*)
+    printf '%s\n' "$CONDA_PREFIX/Library/lib"
+    ;;
+  *)
+    printf '%s\n' "$CONDA_PREFIX/lib"
+    ;;
+esac

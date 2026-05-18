@@ -59,18 +59,14 @@ config_roots = ["bindings/*", "examples/*", "docs"]
 "core:dotnet" = "10.0.203"
 
 [env]
+_.source = { path = "scripts/pixi-env.sh", tools = true }
 UV_PYTHON = { value = "{{ tools.python.path }}", tools = true }
-MLN_FFI_VARIANT = "{{env.MLN_FFI_VARIANT | default(value=\"host\")}}"
-MLN_FFI_TARGET_TRIPLE = "{{env.MLN_FFI_TARGET_TRIPLE | default(value=\"host\")}}"
-MLN_FFI_RENDER_BACKEND = "{{env.MLN_FFI_RENDER_BACKEND | default(value=\"\")}}"
-MLN_FFI_BUILD_DIR = "{{env.MLN_FFI_BUILD_DIR | default(value=config_root ~ \"/build/\" ~ env.MLN_FFI_VARIANT | default(value=\"host\"))}}"
-MLN_FFI_CMAKE_GENERATOR = "{{env.MLN_FFI_CMAKE_GENERATOR | default(value=\"Ninja\")}}"
-MLN_FFI_CMAKE_GENERATOR_PLATFORM = "{{env.MLN_FFI_CMAKE_GENERATOR_PLATFORM | default(value=\"\")}}"
-MLN_FFI_CMAKE_BUILD_CONFIG = "{{env.MLN_FFI_CMAKE_BUILD_CONFIG | default(value=\"\")}}"
+MLN_FFI_REPO_ROOT = "{{config_root}}"
+MLN_FFI_VARIANT = { required = true }
+MLN_FFI_TARGET_TRIPLE = { required = true }
+MLN_FFI_RENDER_BACKEND = { required = true }
+MLN_FFI_BUILD_DIR = { required = true }
 MLN_FFI_TEST_TIMEOUT = "{{env.MLN_FFI_TEST_TIMEOUT | default(value=\"30s\")}}"
-DYLD_LIBRARY_PATH = "{{env.MLN_FFI_BUILD_DIR | default(value=config_root ~ \"/build/host\")}}"
-LD_LIBRARY_PATH = "{{env.MLN_FFI_BUILD_DIR | default(value=config_root ~ \"/build/host\")}}"
-XDG_DATA_DIRS = "{{config_root}}/.pixi/envs/default/share:{{env.XDG_DATA_DIRS | default(value=\"/usr/local/share:/usr/share\")}}"
 
 [hooks]
 postinstall = [
@@ -87,20 +83,11 @@ run = [
   cmake_args=(
     -S .
     -B "$MLN_FFI_BUILD_DIR"
-    -G "$MLN_FFI_CMAKE_GENERATOR"
+    -G Ninja
+    -DMLN_FFI_RENDER_BACKEND="$MLN_FFI_RENDER_BACKEND"
   )
 
-  if [[ -n "$MLN_FFI_CMAKE_GENERATOR_PLATFORM" ]]; then
-    cmake_args+=(-A "$MLN_FFI_CMAKE_GENERATOR_PLATFORM")
-  fi
-  if [[ -n "$MLN_FFI_RENDER_BACKEND" ]]; then
-    cmake_args+=(-DMLN_FFI_RENDER_BACKEND="$MLN_FFI_RENDER_BACKEND")
-  fi
-  if [[ -n "$MLN_FFI_ENABLE_CLANG_TIDY" ]]; then
-    cmake_args+=(-DMLN_FFI_ENABLE_CLANG_TIDY="$MLN_FFI_ENABLE_CLANG_TIDY")
-  fi
-
-  pixi run cmake "${cmake_args[@]}"
+  cmake "${cmake_args[@]}"
   ''',
   '''
   if [[ -f "$MLN_FFI_BUILD_DIR/compile_commands.json" ]]; then
@@ -119,12 +106,7 @@ build_args=(
   --parallel
 )
 
-if [[ -n "$MLN_FFI_CMAKE_BUILD_CONFIG" ]]; then
-  build_args+=(--config "$MLN_FFI_CMAKE_BUILD_CONFIG")
-fi
-
-pixi run cmake "${build_args[@]}"
-'''
+cmake "${build_args[@]}"'''
 
 [tasks.clean]
 run = "rm -rf \"$MLN_FFI_BUILD_DIR\""
@@ -133,16 +115,14 @@ run = "rm -rf \"$MLN_FFI_BUILD_DIR\""
 depends = ["//:build"]
 run = '''
 native_library_dir="$MLN_FFI_BUILD_DIR"
-if [[ -n "${MLN_FFI_CMAKE_BUILD_CONFIG:-}" && -d "$native_library_dir/$MLN_FFI_CMAKE_BUILD_CONFIG" ]]; then
-  native_library_dir="$native_library_dir/$MLN_FFI_CMAKE_BUILD_CONFIG"
-fi
+dependency_library_dir="$($MLN_FFI_REPO_ROOT/scripts/pixi-library-dir)"
 (
   cd src/c_api/tests/zig
-  zig build --test-timeout "$MLN_FFI_TEST_TIMEOUT" --prefix "zig-out/${MLN_FFI_VARIANT:-host}" test --summary all --verbose -Dcmake-artifact-dir="$native_library_dir" ${MLN_FFI_RENDER_BACKEND:+-Drender-backend=$MLN_FFI_RENDER_BACKEND}
+  zig build --test-timeout "$MLN_FFI_TEST_TIMEOUT" test --summary all --verbose -Dcmake-artifact-dir="$native_library_dir" -Ddependency-library-dir="$dependency_library_dir" -Drender-backend="$MLN_FFI_RENDER_BACKEND"
 )
 (
   cd bindings/zig
-  zig build --test-timeout "$MLN_FFI_TEST_TIMEOUT" --prefix "zig-out/${MLN_FFI_VARIANT:-host}" test --summary all --verbose -Dcmake-artifact-dir="$native_library_dir" ${MLN_FFI_RENDER_BACKEND:+-Drender-backend=$MLN_FFI_RENDER_BACKEND}
+  zig build --test-timeout "$MLN_FFI_TEST_TIMEOUT" test --summary all --verbose -Dcmake-artifact-dir="$native_library_dir" -Ddependency-library-dir="$dependency_library_dir" -Drender-backend="$MLN_FFI_RENDER_BACKEND"
 )
 '''
 
@@ -172,17 +152,14 @@ run = [
 [tasks."ci:prepare-native-artifact"]
 run = [
   "rm -rf ci-artifact",
-  "mkdir -p \"ci-artifact/build/${MLN_FFI_VARIANT:-host}\" ci-artifact/third_party/maplibre-native/vendor/Vulkan-Headers",
+  "mkdir -p \"ci-artifact/build/$MLN_FFI_VARIANT\" ci-artifact/third_party/maplibre-native/vendor/Vulkan-Headers",
   '''
   found_native_lib=false
   native_library_dir="$MLN_FFI_BUILD_DIR"
-  if [[ -n "${MLN_FFI_CMAKE_BUILD_CONFIG:-}" && -d "$native_library_dir/$MLN_FFI_CMAKE_BUILD_CONFIG" ]]; then
-    native_library_dir="$native_library_dir/$MLN_FFI_CMAKE_BUILD_CONFIG"
-  fi
   for native_lib in "$native_library_dir"/libmaplibre-native-c.* "$native_library_dir"/maplibre-native-c.*; do
     [[ -e "$native_lib" ]] || continue
     found_native_lib=true
-    cp "$native_lib" "ci-artifact/build/${MLN_FFI_VARIANT:-host}"
+    cp "$native_lib" "ci-artifact/build/$MLN_FFI_VARIANT"
   done
   if [[ "$found_native_lib" != true ]]; then
     echo "missing $native_library_dir/[lib]maplibre-native-c.*; native artifact was not built" >&2

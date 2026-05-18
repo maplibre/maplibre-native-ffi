@@ -4,6 +4,7 @@ const BuildOptions = struct {
     target: std.Build.ResolvedTarget,
     optimize: std.builtin.OptimizeMode,
     cmake_artifact_dir: std.Build.LazyPath,
+    dependency_library_dir: ?std.Build.LazyPath,
     render_backend: RenderBackend,
 };
 
@@ -29,7 +30,7 @@ fn cmakeArtifactDir(b: *std.Build) std.Build.LazyPath {
         std.Build.LazyPath,
         "cmake-artifact-dir",
         "Directory containing the CMake-built maplibre-native-c library",
-    ) orelse b.path("../../build/host");
+    ) orelse @panic("missing required -Dcmake-artifact-dir=<path-to-cmake-artifacts>");
 }
 
 fn renderBackendName(render_backend: RenderBackend) []const u8 {
@@ -39,11 +40,12 @@ fn renderBackendName(render_backend: RenderBackend) []const u8 {
     };
 }
 
-fn pixiLibraryDir(b: *std.Build, target: std.Build.ResolvedTarget) std.Build.LazyPath {
-    return switch (target.result.os.tag) {
-        .windows => b.path("../../.pixi/envs/default/Library/lib"),
-        else => b.path("../../.pixi/envs/default/lib"),
-    };
+fn dependencyLibraryDir(b: *std.Build) ?std.Build.LazyPath {
+    return b.option(
+        std.Build.LazyPath,
+        "dependency-library-dir",
+        "Directory containing backend dependency libraries such as Vulkan",
+    );
 }
 
 fn vulkanLibraryName(target: std.Build.ResolvedTarget) []const u8 {
@@ -83,8 +85,10 @@ fn addReadbackExample(b: *std.Build, options: BuildOptions) *std.Build.Step.Comp
         example.root_module.linkFramework("Metal", .{});
     } else if (options.render_backend == .vulkan) {
         example.root_module.addIncludePath(b.path("../../third_party/maplibre-native/vendor/Vulkan-Headers/include"));
-        example.root_module.addLibraryPath(pixiLibraryDir(b, options.target));
-        example.root_module.addRPath(pixiLibraryDir(b, options.target));
+        if (options.dependency_library_dir) |dependency_library_dir| {
+            example.root_module.addLibraryPath(dependency_library_dir);
+            example.root_module.addRPath(dependency_library_dir);
+        }
         example.root_module.linkSystemLibrary(vulkanLibraryName(options.target), .{});
     }
     b.installArtifact(example);
@@ -97,15 +101,12 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = b.standardOptimizeOption(.{}),
         .cmake_artifact_dir = cmakeArtifactDir(b),
+        .dependency_library_dir = dependencyLibraryDir(b),
         .render_backend = renderBackend(b),
     };
 
     const readback = addReadbackExample(b, options);
     const run_readback = b.addRunArtifact(readback);
-    if (target.result.os.tag == .windows) {
-        run_readback.addPathDir("../../.pixi/envs/default");
-        run_readback.addPathDir("../../.pixi/envs/default/Library/bin");
-    }
     if (b.args) |args| run_readback.addArgs(args);
 
     const run_step = b.step("run", "Render a map image to map.ppm");

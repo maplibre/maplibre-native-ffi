@@ -7,7 +7,7 @@ const BuildOptions = struct {
     cmake_artifact_dir_runtime_path: []const u8,
     include_dir: std.Build.LazyPath,
     vulkan_include_dir: std.Build.LazyPath,
-    dependency_library_dir: std.Build.LazyPath,
+    dependency_library_dir: ?std.Build.LazyPath,
     render_backend: RenderBackend,
 };
 
@@ -61,21 +61,12 @@ fn vulkanIncludeDir(b: *std.Build) std.Build.LazyPath {
     ) orelse b.path("../../third_party/maplibre-native/vendor/Vulkan-Headers/include");
 }
 
-fn dependencyLibraryDir(b: *std.Build, target: std.Build.ResolvedTarget) std.Build.LazyPath {
-    const override = b.option(
+fn dependencyLibraryDir(b: *std.Build) ?std.Build.LazyPath {
+    return b.option(
         std.Build.LazyPath,
         "dependency-library-dir",
         "Directory containing backend dependency libraries such as Vulkan",
     );
-    if (override) |path| return path;
-    return pixiLibraryDir(b, target);
-}
-
-fn pixiLibraryDir(b: *std.Build, target: std.Build.ResolvedTarget) std.Build.LazyPath {
-    return switch (target.result.os.tag) {
-        .windows => b.path("../../.pixi/envs/default/Library/lib"),
-        else => b.path("../../.pixi/envs/default/lib"),
-    };
 }
 
 fn vulkanLibraryName(target: std.Build.ResolvedTarget) []const u8 {
@@ -192,10 +183,8 @@ fn addPrivateModuleTests(
     return tests;
 }
 
-fn addWindowsTestRuntimePaths(run: *std.Build.Step.Run, options: BuildOptions) void {
+fn addWindowsTestRuntimePaths(_: *std.Build, run: *std.Build.Step.Run, options: BuildOptions) void {
     run.addPathDir(options.cmake_artifact_dir_runtime_path);
-    run.addPathDir("../../.pixi/envs/default");
-    run.addPathDir("../../.pixi/envs/default/Library/bin");
 }
 
 pub fn build(b: *std.Build) void {
@@ -208,7 +197,7 @@ pub fn build(b: *std.Build) void {
         .cmake_artifact_dir_runtime_path = cmake_artifact_dir.getPath2(b, null),
         .include_dir = includeDir(b),
         .vulkan_include_dir = vulkanIncludeDir(b),
-        .dependency_library_dir = dependencyLibraryDir(b, target),
+        .dependency_library_dir = dependencyLibraryDir(b),
         .render_backend = renderBackend(b),
     };
     checkSupportedTarget(options.target, options.render_backend);
@@ -231,11 +220,11 @@ pub fn build(b: *std.Build) void {
     const run_logging_tests = b.addRunArtifact(logging_tests);
     const run_map_tests = b.addRunArtifact(map_tests);
     if (target.result.os.tag == .windows) {
-        addWindowsTestRuntimePaths(run_binding_tests, options);
-        addWindowsTestRuntimePaths(run_status_tests, options);
-        addWindowsTestRuntimePaths(run_runtime_tests, options);
-        addWindowsTestRuntimePaths(run_logging_tests, options);
-        addWindowsTestRuntimePaths(run_map_tests, options);
+        addWindowsTestRuntimePaths(b, run_binding_tests, options);
+        addWindowsTestRuntimePaths(b, run_status_tests, options);
+        addWindowsTestRuntimePaths(b, run_runtime_tests, options);
+        addWindowsTestRuntimePaths(b, run_logging_tests, options);
+        addWindowsTestRuntimePaths(b, run_map_tests, options);
     }
 
     const test_step = b.step("test", "Run Zig binding tests");

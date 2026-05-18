@@ -6,26 +6,41 @@ set -euo pipefail
 if [[ "${MLN_FFI_RENDER_BACKEND:-}" != "vulkan" ]]; then
   exit 0
 fi
-pixi run glslangValidator -V render/vulkan/shaders/fullscreen.vert -o render/vulkan/shaders/fullscreen.vert.spv
-pixi run glslangValidator -V render/vulkan/shaders/sample.frag -o render/vulkan/shaders/sample.frag.spv
+glslangValidator -V render/vulkan/shaders/fullscreen.vert -o render/vulkan/shaders/fullscreen.vert.spv
+glslangValidator -V render/vulkan/shaders/sample.frag -o render/vulkan/shaders/sample.frag.spv
 '''
 
 [tasks.build]
 depends = ["//:ensure-native-library", ":compile-shaders"]
-run = "zig build --prefix \"zig-out/${MLN_FFI_VARIANT:-host}\" -Dcmake-artifact-dir=\"$MLN_FFI_BUILD_DIR\" ${MLN_FFI_RENDER_BACKEND:+-Drender-backend=$MLN_FFI_RENDER_BACKEND}"
+run = '''
+native_library_dir="$MLN_FFI_BUILD_DIR"
+dependency_library_dir="$($MLN_FFI_REPO_ROOT/scripts/pixi-library-dir)"
+zig build -Dcmake-artifact-dir="$native_library_dir" -Ddependency-library-dir="$dependency_library_dir" -Drender-backend="$MLN_FFI_RENDER_BACKEND"
+'''
 
 [tasks.run]
 depends = ["//:ensure-native-library", ":compile-shaders"]
-run = "zig build --prefix \"zig-out/${MLN_FFI_VARIANT:-host}\" run -Dcmake-artifact-dir=\"$MLN_FFI_BUILD_DIR\" ${MLN_FFI_RENDER_BACKEND:+-Drender-backend=$MLN_FFI_RENDER_BACKEND} -- --render-target=owned-texture"
+run = '''
+native_library_dir="$MLN_FFI_BUILD_DIR"
+dependency_library_dir="$($MLN_FFI_REPO_ROOT/scripts/pixi-library-dir)"
+zig build run -Dcmake-artifact-dir="$native_library_dir" -Ddependency-library-dir="$dependency_library_dir" -Drender-backend="$MLN_FFI_RENDER_BACKEND" -- --render-target=owned-texture
+'''
 
 [tasks."run:owned-texture"]
-depends = ["//:ensure-native-library", ":compile-shaders"]
-run = "zig build --prefix \"zig-out/${MLN_FFI_VARIANT:-host}\" run -Dcmake-artifact-dir=\"$MLN_FFI_BUILD_DIR\" ${MLN_FFI_RENDER_BACKEND:+-Drender-backend=$MLN_FFI_RENDER_BACKEND} -- --render-target=owned-texture"
+run = [{ task = "run", args = [] }]
 
 [tasks."run:borrowed-texture"]
 depends = ["//:ensure-native-library", ":compile-shaders"]
-run = "zig build --prefix \"zig-out/${MLN_FFI_VARIANT:-host}\" run -Dcmake-artifact-dir=\"$MLN_FFI_BUILD_DIR\" ${MLN_FFI_RENDER_BACKEND:+-Drender-backend=$MLN_FFI_RENDER_BACKEND} -- --render-target=borrowed-texture"
+run = '''
+native_library_dir="$MLN_FFI_BUILD_DIR"
+dependency_library_dir="$($MLN_FFI_REPO_ROOT/scripts/pixi-library-dir)"
+zig build run -Dcmake-artifact-dir="$native_library_dir" -Ddependency-library-dir="$dependency_library_dir" -Drender-backend="$MLN_FFI_RENDER_BACKEND" -- --render-target=borrowed-texture
+'''
 
 [tasks."run:native-surface"]
 depends = ["//:ensure-native-library", ":compile-shaders"]
-run = "zig build --prefix \"zig-out/${MLN_FFI_VARIANT:-host}\" run -Dcmake-artifact-dir=\"$MLN_FFI_BUILD_DIR\" ${MLN_FFI_RENDER_BACKEND:+-Drender-backend=$MLN_FFI_RENDER_BACKEND} -- --render-target=native-surface"
+run = '''
+native_library_dir="$MLN_FFI_BUILD_DIR"
+dependency_library_dir="$($MLN_FFI_REPO_ROOT/scripts/pixi-library-dir)"
+zig build run -Dcmake-artifact-dir="$native_library_dir" -Ddependency-library-dir="$dependency_library_dir" -Drender-backend="$MLN_FFI_RENDER_BACKEND" -- --render-target=native-surface
+'''
