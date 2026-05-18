@@ -59,25 +59,8 @@ jobs:
       - uses: ./.github/actions/setup-ci-deps
       - name: Install EGL/GLES2 dev libraries (Linux OpenGL only)
         if: ${{ contains(inputs.variant, 'opengl') && runner.os == 'Linux' }}
-        # libegl-dev    — provides /usr/lib/.../libEGL.so (unversioned symlink)
-        # libgles-dev   — Ubuntu 24.04 name (was libgles2-dev); depends on
-        #                 libglvnd-dev which provides /usr/include/GLES3/*.h
-        #                 without a libpng-dev dependency.
-        # libgles2      — runtime library, provides libGLESv2.so.2.
-        # libgles2-mesa-dev is intentionally omitted: it has a hard Depends:
-        # libpng-dev which installs libpng headers newer than pixi's libpng.so,
-        # causing a header/ABI mismatch. The cmake find_library call extends
-        # CMAKE_FIND_LIBRARY_SUFFIXES to also match .so.2 so the versioned
-        # runtime file is accepted for linking.
-        # libegl-mesa0      — Mesa's EGL ICD: installs 50_mesa.json into
-        #                     /usr/share/glvnd/egl_vendor.d/ and provides
-        #                     libEGL_mesa.so.0 (compiled WITH X11 platform
-        #                     support). The system GLVND dispatcher (libEGL.so.1)
-        #                     loads this ICD when asked for EGL_DEFAULT_DISPLAY.
-        # libegl1           — GLVND EGL dispatcher (libEGL.so.1). Already
-        #                     present on Ubuntu 24.04 but listed for clarity.
-        # libgl1-mesa-dri   — Mesa DRI drivers including swrast/llvmpipe CPU
-        #                     rasterizer (often pre-installed; listed for clarity).
+        # libgles-dev (not libgles2-mesa-dev): avoids a hard libpng-dev
+        # dependency that conflicts with pixi's managed libpng headers.
         run: sudo apt-get update -y && sudo apt-get install -y --no-install-recommends libegl-dev libgles-dev libgles2 libegl-mesa0 libegl1 libgl1-mesa-dri
       - run: mise run configure
       # Windows builds successfully, but native tests/examples are runtime-broken for now.
