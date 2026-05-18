@@ -59,7 +59,8 @@ test "package root hides raw C declarations" {
     try testing.expect(!support.typeNameContains(maplibre.ResourceRequestHandle, "mln_"));
     try testing.expect(!support.typeNameContains(maplibre.RenderTargetExtent, "mln_"));
     try testing.expect(!support.typeNameContains(maplibre.RenderBackendSupport, "mln_"));
-    try testing.expect(!support.typeNameContains(maplibre.OwnedTextureDescriptor, "mln_"));
+    try testing.expect(!support.typeNameContains(maplibre.MetalOwnedTextureDescriptor, "mln_"));
+    try testing.expect(!support.typeNameContains(maplibre.VulkanOwnedTextureDescriptor, "mln_"));
     try testing.expect(!support.typeNameContains(maplibre.FeatureStateSelector, "mln_"));
     try testing.expect(!support.typeNameContains(maplibre.RenderedQueryGeometry, "mln_"));
     try testing.expect(!support.typeNameContains(maplibre.FeatureQueryResult, "mln_"));

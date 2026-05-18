@@ -10,8 +10,6 @@ struct mln_render_session;
 namespace mln::core {
 
 auto supported_render_backend_mask() noexcept -> uint32_t;
-auto owned_texture_descriptor_default() noexcept
-  -> mln_owned_texture_descriptor;
 auto metal_owned_texture_descriptor_default() noexcept
   -> mln_metal_owned_texture_descriptor;
 auto metal_borrowed_texture_descriptor_default() noexcept
@@ -23,10 +21,6 @@ auto vulkan_borrowed_texture_descriptor_default() noexcept
 auto texture_image_info_default() noexcept -> mln_texture_image_info;
 auto validate_texture(mln_render_session* texture) -> mln_status;
 auto validate_live_attached_texture(mln_render_session* texture) -> mln_status;
-auto owned_texture_attach(
-  mln_map* map, const mln_owned_texture_descriptor* descriptor,
-  mln_render_session** out_session
-) -> mln_status;
 auto metal_owned_texture_attach(
   mln_map* map, const mln_metal_owned_texture_descriptor* descriptor,
   mln_render_session** out_session

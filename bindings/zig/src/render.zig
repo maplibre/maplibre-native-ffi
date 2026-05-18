@@ -55,10 +55,6 @@ pub const VulkanContextDescriptor = struct {
     graphics_queue_family_index: u32,
 };
 
-pub const OwnedTextureDescriptor = struct {
-    extent: RenderTargetExtent = .{},
-};
-
 pub const MetalOwnedTextureDescriptor = struct {
     extent: RenderTargetExtent = .{},
     context: MetalContextDescriptor,
@@ -557,12 +553,6 @@ pub const VulkanOwnedTextureFrameHandle = struct {
         self.* = .{ .session_native = null, .diagnostic_store = self.diagnostic_store, .frame_state = null, .generation = 0 };
     }
 };
-
-pub fn attachOwnedTexture(map: *map_module.MapHandle, descriptor: OwnedTextureDescriptor) status.Error!RenderSessionHandle {
-    var raw = c.mln_owned_texture_descriptor_default();
-    raw.extent = renderTargetExtentToNative(descriptor.extent);
-    return try attach(map, c.mln_owned_texture_attach, &raw);
-}
 
 pub fn attachMetalOwnedTexture(map: *map_module.MapHandle, descriptor: MetalOwnedTextureDescriptor) status.Error!RenderSessionHandle {
     var raw = c.mln_metal_owned_texture_descriptor_default();

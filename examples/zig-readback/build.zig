@@ -39,6 +39,20 @@ fn renderBackendName(render_backend: RenderBackend) []const u8 {
     };
 }
 
+fn pixiLibraryDir(b: *std.Build, target: std.Build.ResolvedTarget) std.Build.LazyPath {
+    return switch (target.result.os.tag) {
+        .windows => b.path("../../.pixi/envs/default/Library/lib"),
+        else => b.path("../../.pixi/envs/default/lib"),
+    };
+}
+
+fn vulkanLibraryName(target: std.Build.ResolvedTarget) []const u8 {
+    return switch (target.result.os.tag) {
+        .windows => "vulkan-1",
+        else => "vulkan",
+    };
+}
+
 fn addMaplibreNativeModule(b: *std.Build, options: BuildOptions) *std.Build.Module {
     const dependency = b.dependency("maplibre_native", .{
         .target = options.target,
@@ -65,6 +79,14 @@ fn addReadbackExample(b: *std.Build, options: BuildOptions) *std.Build.Step.Comp
 
     example.root_module.addOptions("build_options", build_options);
     example.root_module.addImport("maplibre_native", addMaplibreNativeModule(b, options));
+    if (options.render_backend == .metal) {
+        example.root_module.linkFramework("Metal", .{});
+    } else if (options.render_backend == .vulkan) {
+        example.root_module.addIncludePath(b.path("../../third_party/maplibre-native/vendor/Vulkan-Headers/include"));
+        example.root_module.addLibraryPath(pixiLibraryDir(b, options.target));
+        example.root_module.addRPath(pixiLibraryDir(b, options.target));
+        example.root_module.linkSystemLibrary(vulkanLibraryName(options.target), .{});
+    }
     b.installArtifact(example);
     return example;
 }
@@ -80,6 +102,10 @@ pub fn build(b: *std.Build) void {
 
     const readback = addReadbackExample(b, options);
     const run_readback = b.addRunArtifact(readback);
+    if (target.result.os.tag == .windows) {
+        run_readback.addPathDir("../../.pixi/envs/default");
+        run_readback.addPathDir("../../.pixi/envs/default/Library/bin");
+    }
     if (b.args) |args| run_readback.addArgs(args);
 
     const run_step = b.step("run", "Render a map image to map.ppm");
