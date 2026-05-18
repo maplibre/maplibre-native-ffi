@@ -562,6 +562,7 @@ test "owned texture render session lifecycle and readback" {
 }
 
 test "still-image map modes drive owned texture rendering" {
+    if (!build_options.supports_vulkan and !build_options.supports_metal) return error.SkipZigTest;
     inline for (.{ maplibre.MapMode.static, maplibre.MapMode.tile }) |mode| {
         var runtime = try maplibre.RuntimeHandle.init(null);
         defer runtime.close() catch @panic("runtime close failed");
