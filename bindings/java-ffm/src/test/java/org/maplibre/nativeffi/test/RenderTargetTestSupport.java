@@ -82,19 +82,37 @@ public final class RenderTargetTestSupport implements AutoCloseable {
   public static RenderTargetTestSupport attachMetalOwnedTexture(
       MapHandle map, RenderTargetExtent extent) {
     var context = MetalTestContext.create();
-    return new RenderTargetTestSupport(
-        map.attachMetalOwnedTexture(
-            new MetalOwnedTextureDescriptor().extent(extent).context(context.descriptor())),
-        context);
+    try {
+      return new RenderTargetTestSupport(
+          map.attachMetalOwnedTexture(
+              new MetalOwnedTextureDescriptor().extent(extent).context(context.descriptor())),
+          context);
+    } catch (RuntimeException | Error error) {
+      closeContextAfterAttachFailure(context, error);
+      throw error;
+    }
   }
 
   public static RenderTargetTestSupport attachVulkanOwnedTexture(
       MapHandle map, RenderTargetExtent extent) {
     var context = VulkanTestContext.create();
-    return new RenderTargetTestSupport(
-        map.attachVulkanOwnedTexture(
-            new VulkanOwnedTextureDescriptor().extent(extent).context(context.descriptor())),
-        context);
+    try {
+      return new RenderTargetTestSupport(
+          map.attachVulkanOwnedTexture(
+              new VulkanOwnedTextureDescriptor().extent(extent).context(context.descriptor())),
+          context);
+    } catch (RuntimeException | Error error) {
+      closeContextAfterAttachFailure(context, error);
+      throw error;
+    }
+  }
+
+  private static void closeContextAfterAttachFailure(AutoCloseable context, Throwable failure) {
+    try {
+      context.close();
+    } catch (Exception closeError) {
+      failure.addSuppressed(closeError);
+    }
   }
 
   public RenderSessionHandle session() {

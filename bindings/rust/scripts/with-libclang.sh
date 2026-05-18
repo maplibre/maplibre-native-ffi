@@ -5,11 +5,9 @@ repo_root=$(git rev-parse --show-toplevel)
 pixi_env="$repo_root/.pixi/envs/default"
 pixi_lib_dir="$pixi_env/lib"
 pixi_bin_dir="$pixi_env/Library/bin"
-path_sep=":"
 host_is_windows=false
 case "$(uname -s)" in
   MINGW* | MSYS* | CYGWIN*)
-    path_sep=";"
     host_is_windows=true
     ;;
 esac
@@ -28,8 +26,7 @@ if [[ -d "$pixi_lib_dir" ]]; then
   esac
 fi
 if [[ -d "$pixi_bin_dir" ]]; then
-  pixi_bin_path="$(path_for_env "$pixi_bin_dir")"
-  export PATH="$pixi_bin_path${PATH:+$path_sep$PATH}"
+  export PATH="$pixi_bin_dir${PATH:+:$PATH}"
 fi
 
 if [[ -z "${LIBCLANG_PATH:-}" ]]; then

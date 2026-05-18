@@ -184,7 +184,17 @@ const VulkanAttachContext = if (build_options.supports_vulkan) struct {
         return error.NoUsableVulkanGraphicsQueue;
     }
 
-    pub fn deinit(_: *VulkanAttachContext) void {}
+    pub fn deinit(self: *VulkanAttachContext) void {
+        if (self.device != null) {
+            _ = vk.vkDeviceWaitIdle(self.device);
+            vk.vkDestroyDevice(self.device, null);
+            self.device = null;
+        }
+        if (self.instance != null) {
+            vk.vkDestroyInstance(self.instance, null);
+            self.instance = null;
+        }
+    }
 
     pub fn descriptor(self: *const VulkanAttachContext) c.mln_vulkan_context_descriptor {
         return .{
