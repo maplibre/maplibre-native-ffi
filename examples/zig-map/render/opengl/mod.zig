@@ -1,6 +1,6 @@
 // mod.zig — OpenGL (EGL) backend for zig-map.
 //
-// Two render target modes are supported:
+// One render target mode is supported:
 //
 //   native_surface  — The SDL3 GL context IS the EGL context; its EGL handles
 //                     are passed directly to mln_egl_surface_attach().  The
@@ -8,12 +8,8 @@
 //                     eglSwapBuffers after each frame.  This is the simplest
 //                     and most efficient mode.
 //
-//   owned_texture   — A maplibre-owned headless EGL context renders off-screen.
-//                     A separate SDL3 GL context (the compositor) reads back
-//                     the pixels and blits them to the window via a full-screen
-//                     triangle shader.
-//
-//   borrowed_texture — Not supported for OpenGL; returns BackendSetupFailed.
+//   owned_texture / borrowed_texture — Not supported for OpenGL; returns
+//                     BackendSetupFailed.
 //
 // Requires GLES 3.0 (Mesa llvmpipe on Ubuntu 24.04 supports 3.2).  The caller
 // must have called setupGLAttributes() before SDL_CreateWindow so that SDL3
@@ -26,12 +22,10 @@ const diagnostics = @import("../../diagnostics.zig");
 const maplibre = @import("maplibre_native");
 const render_target = @import("../../render_target.zig");
 const types = @import("../../types.zig");
-const Compositor = @import("compositor.zig").Compositor;
 
 pub const OpenGLBackend = union(enum) {
     pub const window_flags = c.SDL_WINDOW_OPENGL;
 
-    owned_texture: OpenGLOwnedTextureBackend,
     native_surface: OpenGLSurfaceBackend,
 
     /// Must be called after SDL_Init but before SDL_CreateWindow.
@@ -42,20 +36,25 @@ pub const OpenGLBackend = union(enum) {
     }
 
     pub fn init(
-        allocator: std.mem.Allocator,
+        _: std.mem.Allocator,
         window: *c.SDL_Window,
         viewport: types.Viewport,
         mode: types.RenderTargetMode,
     ) !OpenGLBackend {
         _ = viewport;
         return switch (mode) {
-            .owned_texture => .{
-                .owned_texture = try OpenGLOwnedTextureBackend.init(allocator, window),
+            .owned_texture => {
+                std.debug.print(
+                    "OpenGL owned-texture mode is not supported; " ++
+                        "use native-surface\n",
+                    .{},
+                );
+                return types.AppError.BackendSetupFailed;
             },
             .borrowed_texture => {
                 std.debug.print(
                     "OpenGL borrowed-texture mode is not supported; " ++
-                        "use owned-texture or native-surface\n",
+                        "use native-surface\n",
                     .{},
                 );
                 return types.AppError.BackendSetupFailed;
@@ -68,27 +67,24 @@ pub const OpenGLBackend = union(enum) {
 
     pub fn deinit(self: *OpenGLBackend) void {
         switch (self.*) {
-            .owned_texture => |*backend| backend.deinit(),
             .native_surface => |*backend| backend.deinit(),
         }
     }
 
     pub fn resize(self: *OpenGLBackend, viewport: types.Viewport) !void {
         switch (self.*) {
-            .owned_texture => |*backend| try backend.resize(viewport),
             .native_surface => {},
         }
     }
 
     pub fn needsRenderTargetReattachOnResize(self: *const OpenGLBackend) bool {
         return switch (self.*) {
-            .owned_texture, .native_surface => false,
+            .native_surface => false,
         };
     }
 
     pub fn finishFrame(self: *OpenGLBackend) !void {
         switch (self.*) {
-            .owned_texture => |*backend| try backend.finishFrame(),
             .native_surface => {},
         }
     }
@@ -99,7 +95,6 @@ pub const OpenGLBackend = union(enum) {
         viewport: types.Viewport,
     ) !render_target.Session {
         return switch (self.*) {
-            .owned_texture => |*backend| backend.attachRenderTarget(map, viewport),
             .native_surface => |*backend| backend.attachRenderTarget(map, viewport),
         };
     }
@@ -110,7 +105,6 @@ pub const OpenGLBackend = union(enum) {
         viewport: types.Viewport,
     ) !bool {
         return switch (self.*) {
-            .owned_texture => |*backend| backend.drawTexture(texture, viewport),
             .native_surface => unreachable,
         };
     }
@@ -183,57 +177,5 @@ const OpenGLSurfaceBackend = struct {
             return types.AppError.SurfaceAttachFailed;
         };
         return .{ .surface = session };
-    }
-};
-
-// ── Owned texture backend ─────────────────────────────────────────────────────
-//
-// maplibre renders into its own internal headless EGL context.  We blit the
-// result to the window via a GL compositor that uploads the pixel readback as
-// a texture and draws a full-screen triangle.
-
-const OpenGLOwnedTextureBackend = struct {
-    allocator: std.mem.Allocator,
-    compositor: Compositor,
-
-    fn init(allocator: std.mem.Allocator, window: *c.SDL_Window) !OpenGLOwnedTextureBackend {
-        return .{
-            .allocator = allocator,
-            .compositor = try Compositor.init(allocator, window),
-        };
-    }
-
-    fn deinit(self: *OpenGLOwnedTextureBackend) void {
-        self.compositor.deinit(self.allocator);
-    }
-
-    fn resize(_: *OpenGLOwnedTextureBackend, _: types.Viewport) !void {}
-
-    fn finishFrame(_: *OpenGLOwnedTextureBackend) !void {}
-
-    fn attachRenderTarget(
-        _: *OpenGLOwnedTextureBackend,
-        map: *maplibre.MapHandle,
-        viewport: types.Viewport,
-    ) !render_target.Session {
-        const texture = maplibre.attachOwnedTexture(map, .{
-            .extent = .{
-                .width = viewport.logical_width,
-                .height = viewport.logical_height,
-                .scale_factor = viewport.scale_factor,
-            },
-        }) catch |err| {
-            diagnostics.logError("OpenGL owned texture attach failed", err);
-            return types.AppError.TextureAttachFailed;
-        };
-        return .{ .texture = texture };
-    }
-
-    fn drawTexture(
-        self: *OpenGLOwnedTextureBackend,
-        texture: *maplibre.RenderSessionHandle,
-        viewport: types.Viewport,
-    ) !bool {
-        return self.compositor.presentTexture(self.allocator, texture, viewport);
     }
 };
