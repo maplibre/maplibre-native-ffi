@@ -127,12 +127,7 @@ class EGLSurfaceBackendImpl final : public mbgl::gl::RendererBackend,
 
   auto getExtensionFunctionPointer(const char* name)
     -> mbgl::gl::ProcAddress override {
-    // eglGetProcAddress returns __eglMustCastToProperFunctionPointerType, a
-    // generic void(*)() stub that the EGL spec requires callers to cast to the
-    // intended signature before calling. This reinterpret_cast is the mandated
-    // EGL pattern; there is no standard alternative.
-    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
-    return reinterpret_cast<mbgl::gl::ProcAddress>(eglGetProcAddress(name));
+    return eglGetProcAddress(name);
   }
 
   // Re-sync mbgl's assumed GL state after each context switch; the host may
