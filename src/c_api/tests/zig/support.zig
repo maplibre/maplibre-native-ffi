@@ -160,10 +160,18 @@ const VulkanAttachContext = if (build_options.supports_vulkan) struct {
                 features.samplerAnisotropy = supported_features.samplerAnisotropy;
                 features.wideLines = supported_features.wideLines;
 
+                const portability_subset_extensions = [_][*c]const u8{"VK_KHR_portability_subset"};
+                const enabled_device_extensions = if (try hasDeviceExtension(physical_device, "VK_KHR_portability_subset"))
+                    portability_subset_extensions[0..]
+                else
+                    portability_subset_extensions[0..0];
+
                 var device_info = std.mem.zeroes(vk.VkDeviceCreateInfo);
                 device_info.sType = vk.VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
                 device_info.queueCreateInfoCount = 1;
                 device_info.pQueueCreateInfos = &queue_info;
+                device_info.enabledExtensionCount = @intCast(enabled_device_extensions.len);
+                device_info.ppEnabledExtensionNames = enabled_device_extensions.ptr;
                 device_info.pEnabledFeatures = &features;
 
                 var device: vk.VkDevice = null;
@@ -207,6 +215,23 @@ const VulkanAttachContext = if (build_options.supports_vulkan) struct {
         };
     }
 } else struct {};
+
+fn hasDeviceExtension(physical_device: if (build_options.supports_vulkan) vk.VkPhysicalDevice else ?*anyopaque, name: [*c]const u8) !bool {
+    if (!build_options.supports_vulkan) return false;
+
+    var count: u32 = 0;
+    try expectVk(vk.vkEnumerateDeviceExtensionProperties(physical_device, null, &count, null));
+
+    var properties_buffer: [256]vk.VkExtensionProperties = undefined;
+    if (count > properties_buffer.len) count = properties_buffer.len;
+    try expectVk(vk.vkEnumerateDeviceExtensionProperties(physical_device, null, &count, &properties_buffer));
+
+    const expected = std.mem.span(name);
+    for (properties_buffer[0..count]) |property| {
+        if (std.mem.eql(u8, std.mem.span(@as([*:0]const u8, @ptrCast(&property.extensionName))), expected)) return true;
+    }
+    return false;
+}
 
 fn expectVk(result: if (build_options.supports_vulkan) vk.VkResult else i32) !void {
     if (build_options.supports_vulkan) try testing.expectEqual(vk.VK_SUCCESS, result);
