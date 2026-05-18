@@ -10,8 +10,9 @@ run = "bash scripts/with-libclang.sh cargo build --manifest-path \"$MLN_FFI_CARG
 depends = ["//:ensure-native-library"]
 run = '''
 extra_args=()
-# EGL surfaceless (Mesa llvmpipe) doesn't handle concurrent contexts across
-# threads reliably; run tests single-threaded for the OpenGL backend.
+# Only one mln_runtime can exist at a time; parallel tests that each
+# create and destroy the runtime will race. Run single-threaded for the
+# OpenGL backend where tests exercise the full runtime lifecycle.
 if [[ "${MLN_FFI_RENDER_BACKEND:-}" == "opengl" ]]; then
   extra_args=(-- --test-threads 1)
 fi
