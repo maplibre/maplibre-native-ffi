@@ -16,13 +16,6 @@
 extern "C" {
 #endif
 
-/** Default texture session attachment options for a session-owned target. */
-typedef struct mln_owned_texture_descriptor {
-  uint32_t size;
-  /** Logical texture extent. */
-  mln_render_target_extent extent;
-} mln_owned_texture_descriptor;
-
 /** Metal texture session attachment options for a session-owned target. */
 typedef struct mln_metal_owned_texture_descriptor {
   uint32_t size;
@@ -152,13 +145,8 @@ typedef struct mln_texture_image_info {
 } mln_texture_image_info;
 
 /**
- * Returns session-owned texture descriptor defaults for this C API version.
- */
-MLN_API mln_owned_texture_descriptor
-mln_owned_texture_descriptor_default(void) MLN_NOEXCEPT;
-
-/**
  * Returns Metal owned-texture descriptor defaults for this C API version.
+
  */
 MLN_API mln_metal_owned_texture_descriptor
 mln_metal_owned_texture_descriptor_default(void) MLN_NOEXCEPT;
@@ -186,33 +174,6 @@ mln_vulkan_borrowed_texture_descriptor_default(void) MLN_NOEXCEPT;
  */
 MLN_API mln_texture_image_info
 mln_texture_image_info_default(void) MLN_NOEXCEPT;
-
-/**
- * Attaches an offscreen texture render target owned by the session to a map.
- *
- * The map may have at most one live render session. The session and
- * every texture-session call are owner-thread affine to the map owner thread.
- * The session creates a backend-native offscreen target using the default
- * headless backend for this build. On success, *out_session receives a handle
- * the caller destroys with mln_render_session_destroy().
- *
- * Use this target for still-image and CPU-readback workflows. Use
- * backend-specific borrowed texture attach functions when a UI framework
- * samples the rendered texture on its own graphics device.
- *
- * Returns:
- * - MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, descriptor is
- *   null or invalid, out_session is null, or *out_session is not null.
- * - MLN_STATUS_INVALID_STATE when the map already has a render session.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
- *   thread.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
- */
-MLN_API mln_status mln_owned_texture_attach(
-  mln_map* map, const mln_owned_texture_descriptor* descriptor,
-  mln_render_session** out_session
-) MLN_NOEXCEPT;
 
 /**
  * Attaches a Metal texture render target owned by the session to a map.

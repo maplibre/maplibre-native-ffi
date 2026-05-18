@@ -267,28 +267,6 @@ impl Default for VulkanContextDescriptor {
 
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
-pub struct OwnedTextureDescriptor {
-    pub extent: RenderTargetExtent,
-}
-
-impl OwnedTextureDescriptor {
-    pub fn new(extent: RenderTargetExtent) -> Self {
-        Self { extent }
-    }
-
-    pub(crate) fn to_native(&self) -> sys::mln_owned_texture_descriptor {
-        maplibre_core::render::owned_texture_descriptor_to_native(self.extent.to_core())
-    }
-}
-
-impl Default for OwnedTextureDescriptor {
-    fn default() -> Self {
-        Self::new(RenderTargetExtent::default())
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-#[non_exhaustive]
 pub struct MetalSurfaceDescriptor {
     pub extent: RenderTargetExtent,
     pub context: MetalContextDescriptor,

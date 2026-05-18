@@ -30,22 +30,6 @@
 
 namespace {
 
-auto vulkan_loader_library_name() noexcept -> const char* {
-#ifdef __APPLE__
-  return "libvulkan.dylib";
-#elif defined(_WIN32)
-  return "vulkan-1.dll";
-#else
-  return "libvulkan.so.1";
-#endif
-}
-
-}  // namespace
-
-namespace mln::core {
-
-namespace {
-
 auto owned_descriptor_from_borrowed(
   const mln_vulkan_borrowed_texture_descriptor& descriptor
 ) -> mln_vulkan_owned_texture_descriptor {
@@ -57,6 +41,8 @@ auto owned_descriptor_from_borrowed(
 }
 
 }  // namespace
+
+namespace mln::core {
 
 class VulkanTextureBackend::VulkanTextureRenderableResource final
     : public mbgl::vulkan::SurfaceRenderableResource {
@@ -309,7 +295,6 @@ VulkanTextureBackend::VulkanTextureBackend(
     : mbgl::vulkan::RendererBackend(mbgl::gfx::ContextMode::Unique),
       mbgl::gfx::HeadlessBackend(size),
       descriptor_(descriptor) {
-  dynamicLoader = vk::DynamicLoader{vulkan_loader_library_name()};
   initSharedDevice();
 }
 
@@ -321,7 +306,6 @@ VulkanTextureBackend::VulkanTextureBackend(
       descriptor_(owned_descriptor_from_borrowed(descriptor)),
       borrowed_descriptor_(descriptor),
       uses_borrowed_texture_(true) {
-  dynamicLoader = vk::DynamicLoader{vulkan_loader_library_name()};
   initSharedDevice();
 }
 
@@ -332,20 +316,24 @@ VulkanTextureBackend::~VulkanTextureBackend() {
   resource.reset();
   getThreadPool().runRenderJobs(true);
   context.reset();
+  commandPool.reset();
+  if (allocator != nullptr) {
+    vmaDestroyAllocator(allocator);
+    allocator = nullptr;
+  }
+  usingSharedContext = true;
+  static_cast<void>(device.release());
+  static_cast<void>(instance.release());
+  device.get() = nullptr;
+  instance.get() = nullptr;
 }
 
 void VulkanTextureBackend::initSharedDevice() {
-  auto* get_instance_proc_addr =
-    dynamicLoader.getProcAddress<PFN_vkGetInstanceProcAddr>(
-      "vkGetInstanceProcAddr"
-    );
-  dispatcher = vk::DispatchLoaderDynamic(
-    static_cast<VkInstance>(descriptor_.context.instance),
-    get_instance_proc_addr
-  );
+  dispatcher = vk::DispatchLoaderDynamic(::vkGetInstanceProcAddr);
 
   initFrameCapture();
   initInstance();
+  dispatcher.init(instance.get());
   initDebug();
   initSurface();
   initDevice();
@@ -525,11 +513,8 @@ void VulkanTextureBackend::initDevice() {
       nullptr, dispatcher
     )
   );
-  dispatcher.init(
-    static_cast<VkInstance>(descriptor_.context.instance),
-    ::vkGetInstanceProcAddr, static_cast<VkDevice>(descriptor_.context.device),
-    ::vkGetDeviceProcAddr
-  );
+  dispatcher.init(device.get());
+  dispatcher.vkDeviceWaitIdle = ::vkDeviceWaitIdle;
   graphicsQueueIndex =
     static_cast<int32_t>(descriptor_.context.graphics_queue_family_index);
   presentQueueIndex = -1;

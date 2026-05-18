@@ -23,16 +23,6 @@
 
 namespace {
 
-auto vulkan_loader_library_name() noexcept -> const char* {
-#ifdef __APPLE__
-  return "libvulkan.dylib";
-#elif defined(_WIN32)
-  return "vulkan-1.dll";
-#else
-  return "libvulkan.so.1";
-#endif
-}
-
 auto validate_metal_descriptor(const mln_metal_surface_descriptor* descriptor)
   -> mln_status {
   if (descriptor == nullptr) {
@@ -281,7 +271,6 @@ class VulkanSurfaceBackend final : public mbgl::vulkan::RendererBackend,
       : mbgl::vulkan::RendererBackend(mbgl::gfx::ContextMode::Unique),
         mbgl::vulkan::Renderable(size, nullptr),
         descriptor_(descriptor) {
-    dynamicLoader = vk::DynamicLoader{vulkan_loader_library_name()};
     initSharedDevice();
     initAllocator();
     initSwapchain();
@@ -300,6 +289,16 @@ class VulkanSurfaceBackend final : public mbgl::vulkan::RendererBackend,
     resource.reset();
     getThreadPool().runRenderJobs(true);
     context.reset();
+    commandPool.reset();
+    if (allocator != nullptr) {
+      vmaDestroyAllocator(allocator);
+      allocator = nullptr;
+    }
+    usingSharedContext = true;
+    static_cast<void>(device.release());
+    static_cast<void>(instance.release());
+    device.get() = nullptr;
+    instance.get() = nullptr;
   }
 
   auto getDefaultRenderable() -> mbgl::gfx::Renderable& override {
@@ -367,11 +366,8 @@ class VulkanSurfaceBackend final : public mbgl::vulkan::RendererBackend,
         nullptr, dispatcher
       )
     );
-    dispatcher.init(
-      static_cast<VkInstance>(descriptor_.context.instance),
-      ::vkGetInstanceProcAddr,
-      static_cast<VkDevice>(descriptor_.context.device), ::vkGetDeviceProcAddr
-    );
+    dispatcher.init(device.get());
+    dispatcher.vkDeviceWaitIdle = ::vkDeviceWaitIdle;
     graphicsQueueIndex =
       static_cast<int32_t>(descriptor_.context.graphics_queue_family_index);
     presentQueueIndex = graphicsQueueIndex;
@@ -382,17 +378,11 @@ class VulkanSurfaceBackend final : public mbgl::vulkan::RendererBackend,
 
  private:
   void initSharedDevice() {
-    auto* get_instance_proc_addr =
-      dynamicLoader.getProcAddress<PFN_vkGetInstanceProcAddr>(
-        "vkGetInstanceProcAddr"
-      );
-    dispatcher = vk::DispatchLoaderDynamic(
-      static_cast<VkInstance>(descriptor_.context.instance),
-      get_instance_proc_addr
-    );
+    dispatcher = vk::DispatchLoaderDynamic(::vkGetInstanceProcAddr);
 
     initFrameCapture();
     initInstance();
+    dispatcher.init(instance.get());
     initDebug();
     initSurface();
     initDevice();

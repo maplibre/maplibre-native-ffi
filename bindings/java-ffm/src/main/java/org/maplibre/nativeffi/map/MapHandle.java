@@ -40,7 +40,6 @@ import org.maplibre.nativeffi.render.EglSurfaceDescriptor;
 import org.maplibre.nativeffi.render.MetalBorrowedTextureDescriptor;
 import org.maplibre.nativeffi.render.MetalOwnedTextureDescriptor;
 import org.maplibre.nativeffi.render.MetalSurfaceDescriptor;
-import org.maplibre.nativeffi.render.OwnedTextureDescriptor;
 import org.maplibre.nativeffi.render.PremultipliedRgba8Image;
 import org.maplibre.nativeffi.render.RenderSessionHandle;
 import org.maplibre.nativeffi.render.VulkanBorrowedTextureDescriptor;
@@ -824,10 +823,6 @@ public final class MapHandle implements AutoCloseable {
               outFilter));
       return ValueStructs.jsonSnapshot(outFilter.get(ValueLayout.ADDRESS, 0));
     }
-  }
-
-  public RenderSessionHandle attachOwnedTexture(OwnedTextureDescriptor descriptor) {
-    return RenderSessionHandle.attachOwnedTexture(this, descriptor);
   }
 
   public RenderSessionHandle attachMetalOwnedTexture(MetalOwnedTextureDescriptor descriptor) {

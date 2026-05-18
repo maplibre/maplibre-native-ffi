@@ -194,12 +194,29 @@ fn load_vulkan_entry() -> Result<ash::Entry, Box<dyn Error>> {
                 .parent()
                 .and_then(std::path::Path::parent)
                 .ok_or("rust-map manifest is not under examples/rust-map")?;
-            let pixi_loader = repo_root
-                .join(".pixi")
-                .join("envs")
-                .join("default")
-                .join("lib")
-                .join("libvulkan.dylib");
+            let pixi_loader = if cfg!(target_os = "windows") {
+                repo_root
+                    .join(".pixi")
+                    .join("envs")
+                    .join("default")
+                    .join("Library")
+                    .join("bin")
+                    .join("vulkan-1.dll")
+            } else if cfg!(target_os = "linux") {
+                repo_root
+                    .join(".pixi")
+                    .join("envs")
+                    .join("default")
+                    .join("lib")
+                    .join("libvulkan.so.1")
+            } else {
+                repo_root
+                    .join(".pixi")
+                    .join("envs")
+                    .join("default")
+                    .join("lib")
+                    .join("libvulkan.1.dylib")
+            };
             if pixi_loader.exists() {
                 // SAFETY: The path points to the pixi-provided Vulkan loader.
                 unsafe { ash::Entry::load_from(&pixi_loader) }.map_err(Into::into)
