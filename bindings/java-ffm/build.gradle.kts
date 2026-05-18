@@ -96,8 +96,8 @@ tasks.withType<Test>().configureEach {
   inputs.file(nativeLibraryPathForTests).withPropertyName("maplibreNativeCLibrary")
   if (pixiRuntimeBin?.asFile?.isDirectory == true) {
     environment(
-        "PATH",
-        "${pixiRuntimeBin.asFile.absolutePath}${File.pathSeparator}${System.getenv("PATH")}",
+      "PATH",
+      "${pixiRuntimeBin.asFile.absolutePath}${File.pathSeparator}${System.getenv("PATH")}",
     )
   }
 }

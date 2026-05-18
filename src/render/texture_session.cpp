@@ -8,7 +8,6 @@
 #include "render/texture_session.hpp"
 
 #include "diagnostics/diagnostics.hpp"
-#include "map/map.hpp"
 #include "maplibre_native_c.h"
 #include "render/render_session_common.hpp"
 

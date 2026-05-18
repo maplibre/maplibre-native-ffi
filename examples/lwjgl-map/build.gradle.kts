@@ -30,8 +30,7 @@ val pixiVulkanLoader =
   when {
     hostIsMac ->
       rootProject.layout.projectDirectory.file(".pixi/envs/default/lib/libvulkan.1.dylib")
-    hostIsLinux ->
-      rootProject.layout.projectDirectory.file(".pixi/envs/default/lib/libvulkan.so.1")
+    hostIsLinux -> rootProject.layout.projectDirectory.file(".pixi/envs/default/lib/libvulkan.so.1")
     hostIsWindows ->
       rootProject.layout.projectDirectory.file(".pixi/envs/default/Library/bin/vulkan-1.dll")
     else -> null
