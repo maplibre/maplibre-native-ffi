@@ -3,9 +3,6 @@ include(mln_platform)
 include(mln_render_backend)
 
 function(mln_add_c_api_library target)
-  # Use the CMake imported target (ZLIB::ZLIB) so that CMake resolves the
-  # correct library name and paths on all platforms (e.g. zlibstatic.lib on
-  # MSVC rather than the raw -lz that works only on Unix).
   find_package(ZLIB REQUIRED)
 
   set(MLN_FFI_C_API_SOURCES

@@ -37,8 +37,6 @@ class SurfaceSessionBackend {
   virtual auto renderer_backend() -> mbgl::gfx::RendererBackend& = 0;
   virtual void resize(uint32_t physical_width, uint32_t physical_height) = 0;
   virtual auto swap_buffers() -> mln_status { return MLN_STATUS_OK; }
-  // Returns Explicit when the backend's activate()/deactivate() must be called
-  // around each render (EGL surfaces). Vulkan surfaces use Implicit.
   [[nodiscard]] virtual auto scope_type() const
     -> mbgl::gfx::BackendScope::ScopeType {
     return mbgl::gfx::BackendScope::ScopeType::Implicit;

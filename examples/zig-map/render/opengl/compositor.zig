@@ -17,15 +17,11 @@ const c = @import("../../c.zig").c;
 const maplibre = @import("maplibre_native");
 const types = @import("../../types.zig");
 
-// ── Minimal OpenGL ES 3.0 type aliases (no GL headers required) ──────────────
-
 const GLuint = c_uint;
 const GLenum = c_uint;
 const GLint = c_int;
 const GLsizei = c_int;
 const GLchar = u8;
-
-// ── GL constants ─────────────────────────────────────────────────────────────
 
 const GL_TEXTURE_2D: GLenum = 0x0DE1;
 const GL_RGBA: GLenum = 0x1908;
@@ -40,8 +36,6 @@ const GL_LINK_STATUS: GLenum = 0x8B82;
 const GL_TRIANGLES: GLenum = 0x0004;
 const GL_COLOR_BUFFER_BIT: GLenum = 0x00004000;
 const GL_TEXTURE0: GLenum = 0x84C0;
-
-// ── GL function pointer types ────────────────────────────────────────────────
 
 const PFN = struct {
     const GenTextures = *const fn (GLsizei, [*]GLuint) callconv(.c) void;
@@ -68,8 +62,6 @@ const PFN = struct {
     const DrawArrays = *const fn (GLenum, GLint, GLsizei) callconv(.c) void;
 };
 
-// ── Shaders ───────────────────────────────────────────────────────────────────
-//
 // Full-screen triangle using gl_VertexID (GLSL ES 3.00, no VBO required).
 // The pixel buffer is top-to-bottom; Y is flipped so the image is right-side up.
 
@@ -94,8 +86,6 @@ const frag_glsl: [:0]const u8 =
     \\    out_color = texture(u_texture, v_texcoord);
     \\}
 ;
-
-// ── Compositor ────────────────────────────────────────────────────────────────
 
 pub const Compositor = struct {
     window: *c.SDL_Window,
