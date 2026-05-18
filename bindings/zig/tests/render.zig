@@ -517,6 +517,7 @@ fn findVulkanMemoryType(physical_device: if (build_options.supports_vulkan) vk.V
 }
 
 test "owned texture render session lifecycle and readback" {
+    if (!build_options.supports_vulkan and !build_options.supports_metal) return error.SkipZigTest;
     var runtime = try maplibre.RuntimeHandle.init(null);
     defer runtime.close() catch @panic("runtime close failed");
 
@@ -578,6 +579,7 @@ test "still-image map modes drive owned texture rendering" {
 }
 
 test "owned texture attachment validates public descriptors" {
+    if (!build_options.supports_vulkan and !build_options.supports_metal) return error.SkipZigTest;
     var runtime = try maplibre.RuntimeHandle.init(null);
     defer runtime.close() catch @panic("runtime close failed");
 
