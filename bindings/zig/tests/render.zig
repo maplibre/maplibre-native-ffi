@@ -597,6 +597,7 @@ test "owned texture attachment validates public descriptors" {
 }
 
 test "render session feature state set get and remove" {
+    if (!build_options.supports_vulkan and !build_options.supports_metal) return error.SkipZigTest;
     var runtime = try maplibre.RuntimeHandle.init(null);
     defer runtime.close() catch @panic("runtime close failed");
 
@@ -658,6 +659,7 @@ test "render session feature state set get and remove" {
 }
 
 test "render session queries rendered and source features" {
+    if (!build_options.supports_vulkan and !build_options.supports_metal) return error.SkipZigTest;
     var runtime = try maplibre.RuntimeHandle.init(null);
     defer runtime.close() catch @panic("runtime close failed");
 
@@ -702,6 +704,7 @@ test "render session queries rendered and source features" {
 }
 
 test "render session queries cluster feature extensions" {
+    if (!build_options.supports_vulkan and !build_options.supports_metal) return error.SkipZigTest;
     var runtime = try maplibre.RuntimeHandle.init(null);
     defer runtime.close() catch @panic("runtime close failed");
 
@@ -856,6 +859,7 @@ test "Metal owned texture frame release follows moved session wrapper" {
 }
 
 test "render session rejects wrong-thread calls through public bindings" {
+    if (!build_options.supports_vulkan and !build_options.supports_metal) return error.SkipZigTest;
     var runtime = try maplibre.RuntimeHandle.init(null);
     defer runtime.close() catch @panic("runtime close failed");
 
