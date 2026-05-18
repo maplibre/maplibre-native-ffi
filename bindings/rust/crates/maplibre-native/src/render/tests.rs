@@ -70,6 +70,7 @@ impl OwnedTextureTestContext {
 }
 
 #[cfg(target_os = "macos")]
+#[link(name = "Metal", kind = "framework")]
 unsafe extern "C" {
     fn MTLCreateSystemDefaultDevice() -> *mut std::ffi::c_void;
 }
@@ -222,7 +223,7 @@ fn load_vulkan_entry() -> std::result::Result<ash::Entry, Box<dyn StdError>> {
         Err(default_error) => {
             let repo_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
                 .ancestors()
-                .find(|path| path.join("mise.toml").is_file())
+                .find(|path| path.join("include/maplibre_native_c.h").is_file())
                 .ok_or("could not locate repository root for pixi Vulkan loader")?;
             let pixi_loader = if cfg!(target_os = "windows") {
                 repo_root

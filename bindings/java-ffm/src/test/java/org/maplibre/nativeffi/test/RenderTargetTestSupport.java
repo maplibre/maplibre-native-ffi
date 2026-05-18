@@ -28,7 +28,6 @@ import java.lang.foreign.Linker;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.SymbolLookup;
 import java.lang.foreign.ValueLayout;
-import java.nio.file.Path;
 import java.util.LinkedHashSet;
 import java.util.Locale;
 import java.util.Set;
@@ -151,7 +150,7 @@ public final class RenderTargetTestSupport implements AutoCloseable {
       try {
         var lookup =
             SymbolLookup.libraryLookup(
-                Path.of("/System/Library/Frameworks/Metal.framework/Metal"), Arena.global());
+                "/System/Library/Frameworks/Metal.framework/Metal", Arena.global());
         var symbol =
             lookup
                 .find("MTLCreateSystemDefaultDevice")
@@ -188,7 +187,9 @@ public final class RenderTargetTestSupport implements AutoCloseable {
     private int graphicsQueueFamilyIndex;
 
     static VulkanTestContext create() {
-      VK.create();
+      if (VK.getFunctionProvider() == null) {
+        VK.create();
+      }
       var context = new VulkanTestContext();
       try {
         context.createInstance();
