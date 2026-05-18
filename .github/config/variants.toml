@@ -43,4 +43,4 @@ requires = { platform = ["linux", "macos"] }
 
 [bindings.zig]
 task = "//bindings/zig:ci"
-requires = { platform = ["linux", "macos"], backend = ["metal", "vulkan"] }
+requires = { platform = ["linux", "macos"], backend = ["metal", "opengl", "vulkan"] }
