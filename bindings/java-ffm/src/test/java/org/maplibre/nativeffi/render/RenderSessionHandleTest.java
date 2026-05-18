@@ -27,6 +27,7 @@ import org.maplibre.nativeffi.map.MapOptions;
 import org.maplibre.nativeffi.runtime.RuntimeEventType;
 import org.maplibre.nativeffi.runtime.RuntimeHandle;
 import org.maplibre.nativeffi.test.NativeTestSupport;
+import org.maplibre.nativeffi.test.RenderTargetTestSupport;
 
 final class RenderSessionHandleTest {
   private static final String STYLE_JSON =
@@ -61,8 +62,8 @@ final class RenderSessionHandleTest {
     RenderSessionHandle session = null;
     try {
       session =
-          map.attachOwnedTexture(
-              new OwnedTextureDescriptor().extent(new RenderTargetExtent(32, 16, 1.0)));
+          RenderTargetTestSupport.attachVulkanOwnedTexture(
+              map, new RenderTargetExtent(32, 16, 1.0));
       var activeSession = session;
       assertSame(map, activeSession.map());
       assertThrows(InvalidStateException.class, activeSession::textureImageInfo);
@@ -215,8 +216,8 @@ final class RenderSessionHandleTest {
     var runtime = RuntimeHandle.create();
     var map = MapHandle.create(runtime, new MapOptions().size(64, 64));
     var session =
-        map.attachOwnedTexture(
-            new OwnedTextureDescriptor().extent(new RenderTargetExtent(64, 64, 1.0)));
+        RenderTargetTestSupport.attachVulkanOwnedTexture(
+            map, new RenderTargetExtent(64, 64, 1.0));
     try {
       assertWrongThread(runOnOtherThread(session::renderUpdate));
       assertWrongThread(runOnOtherThread(session::close));

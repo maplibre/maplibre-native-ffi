@@ -22,7 +22,6 @@ import org.maplibre.nativeffi.error.NativeErrorException;
 import org.maplibre.nativeffi.error.WrongThreadException;
 import org.maplibre.nativeffi.map.MapHandle;
 import org.maplibre.nativeffi.map.MapOptions;
-import org.maplibre.nativeffi.render.OwnedTextureDescriptor;
 import org.maplibre.nativeffi.render.RenderSessionHandle;
 import org.maplibre.nativeffi.render.RenderTargetExtent;
 import org.maplibre.nativeffi.resource.ResourceKind;
@@ -30,6 +29,7 @@ import org.maplibre.nativeffi.resource.ResourceProviderDecision;
 import org.maplibre.nativeffi.resource.ResourceRequestHandle;
 import org.maplibre.nativeffi.resource.ResourceResponse;
 import org.maplibre.nativeffi.test.NativeTestSupport;
+import org.maplibre.nativeffi.test.RenderTargetTestSupport;
 
 final class RuntimeHandleTest {
   private static final String STYLE_JSON =
@@ -205,8 +205,8 @@ final class RuntimeHandleTest {
       assertFalse(failedEvent.message().isBlank());
 
       session =
-          map.attachOwnedTexture(
-              new OwnedTextureDescriptor().extent(new RenderTargetExtent(64, 64, 1.0)));
+          RenderTargetTestSupport.attachVulkanOwnedTexture(
+              map, new RenderTargetExtent(64, 64, 1.0));
       map.setStyleJson(STYLE_JSON);
       waitForMapEvent(runtime, map, RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE);
       session.renderUpdate();

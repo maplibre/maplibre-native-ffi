@@ -539,7 +539,6 @@
 --include-struct mln_metal_borrowed_texture_descriptor
 --include-struct mln_metal_owned_texture_descriptor
 --include-struct mln_metal_owned_texture_frame
---include-struct mln_owned_texture_descriptor
 --include-struct mln_texture_image_info
 --include-struct mln_vulkan_borrowed_texture_descriptor
 --include-struct mln_vulkan_owned_texture_descriptor
@@ -550,8 +549,6 @@
 --include-function mln_metal_owned_texture_attach
 --include-function mln_metal_owned_texture_descriptor_default
 --include-function mln_metal_owned_texture_release_frame
---include-function mln_owned_texture_attach
---include-function mln_owned_texture_descriptor_default
 --include-function mln_texture_image_info_default
 --include-function mln_texture_read_premultiplied_rgba8
 --include-function mln_vulkan_borrowed_texture_attach

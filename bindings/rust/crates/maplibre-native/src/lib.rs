@@ -62,11 +62,11 @@ pub use render::{
     DetachedRenderSessionHandle, FeatureExtensionResult, FeatureStateSelector, FrameNativePointer,
     MetalBorrowedTextureDescriptor, MetalContextDescriptor, MetalOwnedTextureDescriptor,
     MetalOwnedTextureFrame, MetalOwnedTextureFrameHandle, MetalSurfaceDescriptor, NativePointer,
-    OwnedTextureDescriptor, PremultipliedRgba8Image, QueriedFeature, RenderSessionHandle,
-    RenderTargetExtent, RenderedFeatureQueryOptions, RenderedQueryGeometry,
-    SourceFeatureQueryOptions, TextureImageInfo, VulkanBorrowedTextureDescriptor,
-    VulkanContextDescriptor, VulkanOwnedTextureDescriptor, VulkanOwnedTextureFrame,
-    VulkanOwnedTextureFrameHandle, VulkanSurfaceDescriptor,
+    PremultipliedRgba8Image, QueriedFeature, RenderSessionHandle, RenderTargetExtent,
+    RenderedFeatureQueryOptions, RenderedQueryGeometry, SourceFeatureQueryOptions,
+    TextureImageInfo, VulkanBorrowedTextureDescriptor, VulkanContextDescriptor,
+    VulkanOwnedTextureDescriptor, VulkanOwnedTextureFrame, VulkanOwnedTextureFrameHandle,
+    VulkanSurfaceDescriptor,
 };
 pub use resource::{
     ByteRange, ResourceProviderDecision, ResourceRequest, ResourceRequestHandle, ResourceResponse,

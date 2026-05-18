@@ -18,6 +18,16 @@ const FEATURE_STATE_STYLE_JSON: &str = r#"{"version":8,"sources":{"point":{"type
 const QUERY_STYLE_JSON: &str = r##"{"version":8,"sources":{"point":{"type":"geojson","data":{"type":"FeatureCollection","features":[{"type":"Feature","id":"feature-1","geometry":{"type":"Point","coordinates":[-122.4194,37.7749]},"properties":{"kind":"capital","visible":true}}]}}},"layers":[{"id":"background","type":"background","paint":{"background-color":"#d8f1ff"}},{"id":"point-circle","type":"circle","source":"point","paint":{"circle-color":"#f97316","circle-radius":12}}]}"##;
 const CLUSTER_STYLE_JSON: &str = r##"{"version":8,"sources":{"cluster-source":{"type":"geojson","cluster":true,"data":{"type":"FeatureCollection","features":[{"type":"Feature","geometry":{"type":"Point","coordinates":[0.0,0.0]},"properties":{"name":"one"}},{"type":"Feature","geometry":{"type":"Point","coordinates":[0.001,0.001]},"properties":{"name":"two"}},{"type":"Feature","geometry":{"type":"Point","coordinates":[0.002,0.002]},"properties":{"name":"three"}}]}}},"layers":[{"id":"background","type":"background","paint":{"background-color":"#ffffff"}},{"id":"cluster-circle","type":"circle","source":"cluster-source","filter":["has","point_count"],"paint":{"circle-color":"#2563eb","circle-radius":20}}]}"##;
 
+fn attach_test_owned_texture(
+    map: &MapHandle,
+    extent: RenderTargetExtent,
+) -> Result<RenderSessionHandle> {
+    map.attach_vulkan_owned_texture(&VulkanOwnedTextureDescriptor::new(
+        extent,
+        VulkanContextDescriptor::default(),
+    ))
+}
+
 fn wait_for_runtime_event(runtime: &RuntimeHandle, event_type: RuntimeEventType) -> bool {
     for _ in 0..100 {
         let _ = runtime.run_once();
@@ -214,11 +224,7 @@ fn frame_metadata_copies_values_without_exposing_backend_pointers() {
 fn feature_state_set_get_and_remove_copy_snapshots() {
     let runtime = RuntimeHandle::new().unwrap();
     let map = MapHandle::with_options(&runtime, &MapOptions::new(64, 64, 1.0)).unwrap();
-    let session = map
-        .attach_owned_texture(&OwnedTextureDescriptor::new(RenderTargetExtent::new(
-            64, 64, 1.0,
-        )))
-        .unwrap();
+    let session = attach_test_owned_texture(&map, RenderTargetExtent::new(64, 64, 1.0)).unwrap();
     let selector = FeatureStateSelector::new("point").with_feature_id("feature-1");
     let state = JsonValue::Object(vec![
         JsonMember::new("hover", JsonValue::Bool(true)),
@@ -256,11 +262,7 @@ fn feature_state_set_get_and_remove_copy_snapshots() {
 fn rendered_and_source_queries_copy_results() {
     let runtime = RuntimeHandle::new().unwrap();
     let map = MapHandle::with_options(&runtime, &MapOptions::new(64, 64, 1.0)).unwrap();
-    let session = map
-        .attach_owned_texture(&OwnedTextureDescriptor::new(RenderTargetExtent::new(
-            64, 64, 1.0,
-        )))
-        .unwrap();
+    let session = attach_test_owned_texture(&map, RenderTargetExtent::new(64, 64, 1.0)).unwrap();
 
     let error = session
         .query_rendered_features(
@@ -325,11 +327,7 @@ fn rendered_and_source_queries_copy_results() {
 fn feature_extension_queries_copy_value_and_feature_collection_results() {
     let runtime = RuntimeHandle::new().unwrap();
     let map = MapHandle::with_options(&runtime, &MapOptions::new(64, 64, 1.0)).unwrap();
-    let session = map
-        .attach_owned_texture(&OwnedTextureDescriptor::new(RenderTargetExtent::new(
-            64, 64, 1.0,
-        )))
-        .unwrap();
+    let session = attach_test_owned_texture(&map, RenderTargetExtent::new(64, 64, 1.0)).unwrap();
 
     load_cluster_style(&runtime, &map, &session);
     let query_point = map.pixel_for_lat_lng(LatLng::new(0.0, 0.0)).unwrap();
@@ -382,16 +380,13 @@ fn owned_texture_session_retains_parent_and_enforces_single_session() {
         &MapOptions::new(64, 64, 1.0).with_mode(MapMode::Static),
     )
     .unwrap();
-    let session = map
-        .attach_owned_texture(&OwnedTextureDescriptor::new(RenderTargetExtent::new(
-            32, 16, 1.0,
-        )))
-        .unwrap();
+    let session = attach_test_owned_texture(&map, RenderTargetExtent::new(32, 16, 1.0)).unwrap();
 
     let error = map
-        .attach_owned_texture(&OwnedTextureDescriptor::new(RenderTargetExtent::new(
-            32, 16, 1.0,
-        )))
+        .attach_vulkan_owned_texture(&VulkanOwnedTextureDescriptor::new(
+            RenderTargetExtent::new(32, 16, 1.0),
+            VulkanContextDescriptor::default(),
+        ))
         .unwrap_err();
     assert_eq!(error.kind(), ErrorKind::InvalidState);
 
@@ -415,11 +410,7 @@ fn acquired_frame_state_rejects_reentrant_session_operations_before_native_calls
         &MapOptions::new(64, 64, 1.0).with_mode(MapMode::Static),
     )
     .unwrap();
-    let session = map
-        .attach_owned_texture(&OwnedTextureDescriptor::new(RenderTargetExtent::new(
-            32, 16, 1.0,
-        )))
-        .unwrap();
+    let session = attach_test_owned_texture(&map, RenderTargetExtent::new(32, 16, 1.0)).unwrap();
 
     session.inner.frame_acquired.set(true);
 
@@ -478,11 +469,7 @@ fn texture_readback_reports_documented_error_kinds_for_unsized_buffer() {
         &MapOptions::new(64, 64, 1.0).with_mode(MapMode::Static),
     )
     .unwrap();
-    let session = map
-        .attach_owned_texture(&OwnedTextureDescriptor::new(RenderTargetExtent::new(
-            32, 16, 1.0,
-        )))
-        .unwrap();
+    let session = attach_test_owned_texture(&map, RenderTargetExtent::new(32, 16, 1.0)).unwrap();
 
     let _ = session.render_update();
     let mut empty = [];
