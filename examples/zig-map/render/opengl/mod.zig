@@ -71,7 +71,7 @@ pub const OpenGLBackend = union(enum) {
         }
     }
 
-    pub fn resize(self: *OpenGLBackend, viewport: types.Viewport) !void {
+    pub fn resize(_: *OpenGLBackend, _: types.Viewport) !void {
         switch (self.*) {
             .native_surface => {},
         }
@@ -100,9 +100,9 @@ pub const OpenGLBackend = union(enum) {
     }
 
     pub fn drawTexture(
-        self: *OpenGLBackend,
-        texture: *maplibre.RenderSessionHandle,
-        viewport: types.Viewport,
+        _: *OpenGLBackend,
+        _: *maplibre.RenderSessionHandle,
+        _: types.Viewport,
     ) !bool {
         return switch (self.*) {
             .native_surface => unreachable,

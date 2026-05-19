@@ -93,7 +93,13 @@ const OwnedTextureContext = if (build_options.supports_vulkan) VulkanAttachConte
     fn descriptor(self: *const @This()) maplibre.MetalContextDescriptor {
         return .{ .device = .{ .ptr = self.device } };
     }
-} else struct {};
+} else struct {
+    fn init() error{UnsupportedBackend}!@This() {
+        return error.UnsupportedBackend;
+    }
+
+    fn deinit(_: *@This()) void {}
+};
 
 const OwnedTextureTarget = struct {
     context: OwnedTextureContext,
