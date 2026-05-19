@@ -11,11 +11,18 @@ fn main() -> Result<(), Box<dyn Error>> {
         PathBuf::from(env::var_os("MLN_FFI_BUILD_DIR").ok_or("MLN_FFI_BUILD_DIR is required")?);
 
     println!("cargo:rerun-if-env-changed=MLN_FFI_BUILD_DIR");
+    println!("cargo:rerun-if-env-changed=MLN_FFI_DEPENDENCY_LIBRARY_DIR");
     println!("cargo:rerun-if-env-changed=LIBCLANG_PATH");
     println!("cargo:rerun-if-env-changed=BINDGEN_EXTRA_CLANG_ARGS");
     print_rerun_if_changed(&repo_root.join("include"));
 
     println!("cargo:rustc-link-search=native={}", build_dir.display());
+    if let Some(dependency_library_dir) = dependency_library_dir() {
+        println!(
+            "cargo:rustc-link-search=native={}",
+            dependency_library_dir.display()
+        );
+    }
     println!("cargo:rustc-link-lib=dylib=maplibre-native-c");
 
     let bindings = bindgen::Builder::default()
@@ -35,6 +42,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     bindings.write_to_file(out_path.join("bindings.rs"))?;
 
     Ok(())
+}
+
+fn dependency_library_dir() -> Option<PathBuf> {
+    env::var_os("MLN_FFI_DEPENDENCY_LIBRARY_DIR").map(PathBuf::from)
 }
 
 fn repo_root_from_manifest_dir(manifest_dir: &Path) -> Result<PathBuf, Box<dyn Error>> {

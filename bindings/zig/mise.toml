@@ -1,17 +1,13 @@
 [tasks.build]
 depends = ["//:ensure-native-library"]
 run = '''
-native_library_dir="$MLN_FFI_BUILD_DIR"
-dependency_library_dir="$($MLN_FFI_REPO_ROOT/scripts/pixi-library-dir)"
-zig build -Dcmake-artifact-dir="$native_library_dir" -Ddependency-library-dir="$dependency_library_dir" -Drender-backend="$MLN_FFI_RENDER_BACKEND"
+zig build -Dcmake-artifact-dir="$MLN_FFI_BUILD_DIR" -Ddependency-library-dir="$MLN_FFI_DEPENDENCY_LIBRARY_DIR" -Drender-backend="$MLN_FFI_RENDER_BACKEND"
 '''
 
 [tasks.test]
 depends = ["//:ensure-native-library"]
 run = '''
-native_library_dir="$MLN_FFI_BUILD_DIR"
-dependency_library_dir="$($MLN_FFI_REPO_ROOT/scripts/pixi-library-dir)"
-zig build test --summary all --verbose -Dcmake-artifact-dir="$native_library_dir" -Ddependency-library-dir="$dependency_library_dir" -Drender-backend="$MLN_FFI_RENDER_BACKEND"
+zig build test --summary all --verbose -Dcmake-artifact-dir="$MLN_FFI_BUILD_DIR" -Ddependency-library-dir="$MLN_FFI_DEPENDENCY_LIBRARY_DIR" -Drender-backend="$MLN_FFI_RENDER_BACKEND"
 '''
 
 [tasks.ci]

@@ -17,6 +17,11 @@ format = { features = ["format"], no-default-feature = true }
 [target.unix.activation.env]
 # Rust bindgen's clang-sys uses LIBCLANG_PATH to find Pixi's libclang.
 LIBCLANG_PATH = "$CONDA_PREFIX/lib"
+MLN_FFI_DEPENDENCY_LIBRARY_DIR = "$CONDA_PREFIX/lib"
+RUSTFLAGS = "-C link-arg=-Wl,-rpath,$CONDA_PREFIX/lib"
+
+[target.linux.activation.env]
+RUSTFLAGS = "-C link-arg=-Wl,-rpath,$CONDA_PREFIX/lib -C link-arg=-Wl,-rpath-link,$CONDA_PREFIX/lib"
 
 [target.osx.activation.env]
 # Use Pixi's MoltenVK ICD for Vulkan runs on macOS.
@@ -25,14 +30,18 @@ VK_ICD_FILENAMES = "$CONDA_PREFIX/share/vulkan/icd.d/MoltenVK_icd.json"
 [target.linux-64.activation.env]
 # Use Pixi's lavapipe ICD for Vulkan runs on Linux x64.
 VK_ICD_FILENAMES = "$CONDA_PREFIX/share/vulkan/icd.d/lvp_icd.x86_64.json"
+BINDGEN_EXTRA_CLANG_ARGS = "--sysroot=$CONDA_BUILD_SYSROOT -isystem$CONDA_PREFIX/lib/gcc/x86_64-conda-linux-gnu/14.3.0/include -isystem$CONDA_PREFIX/lib/gcc/x86_64-conda-linux-gnu/14.3.0/include-fixed"
 
 [target.linux-aarch64.activation.env]
 # Use Pixi's lavapipe ICD for Vulkan runs on Linux ARM64.
 VK_ICD_FILENAMES = "$CONDA_PREFIX/share/vulkan/icd.d/lvp_icd.aarch64.json"
+BINDGEN_EXTRA_CLANG_ARGS = "--sysroot=$CONDA_BUILD_SYSROOT -isystem$CONDA_PREFIX/lib/gcc/aarch64-conda-linux-gnu/14.3.0/include -isystem$CONDA_PREFIX/lib/gcc/aarch64-conda-linux-gnu/14.3.0/include-fixed"
 
 [target.win.activation.env]
 # Rust bindgen's clang-sys uses LIBCLANG_PATH to find Pixi's libclang.
 LIBCLANG_PATH = "%CONDA_PREFIX%\\Library\\bin"
+MLN_FFI_DEPENDENCY_LIBRARY_DIR = "%CONDA_PREFIX%\\Library\\lib"
+RUSTFLAGS = "-L native=%CONDA_PREFIX%\\Library\\lib"
 # Tools and DLLs from Pixi's Windows prefix live under Library\\bin.
 PATH = "%CONDA_PREFIX%\\Library\\bin;%PATH%"
 

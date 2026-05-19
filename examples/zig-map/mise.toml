@@ -13,17 +13,13 @@ glslangValidator -V render/vulkan/shaders/sample.frag -o render/vulkan/shaders/s
 [tasks.build]
 depends = ["//:ensure-native-library", ":compile-shaders"]
 run = '''
-native_library_dir="$MLN_FFI_BUILD_DIR"
-dependency_library_dir="$($MLN_FFI_REPO_ROOT/scripts/pixi-library-dir)"
-zig build -Dcmake-artifact-dir="$native_library_dir" -Ddependency-library-dir="$dependency_library_dir" -Drender-backend="$MLN_FFI_RENDER_BACKEND"
+zig build -Dcmake-artifact-dir="$MLN_FFI_BUILD_DIR" -Ddependency-library-dir="$MLN_FFI_DEPENDENCY_LIBRARY_DIR" -Drender-backend="$MLN_FFI_RENDER_BACKEND"
 '''
 
 [tasks.run]
 depends = ["//:ensure-native-library", ":compile-shaders"]
 run = '''
-native_library_dir="$MLN_FFI_BUILD_DIR"
-dependency_library_dir="$($MLN_FFI_REPO_ROOT/scripts/pixi-library-dir)"
-zig build run -Dcmake-artifact-dir="$native_library_dir" -Ddependency-library-dir="$dependency_library_dir" -Drender-backend="$MLN_FFI_RENDER_BACKEND" -- --render-target=owned-texture
+zig build run -Dcmake-artifact-dir="$MLN_FFI_BUILD_DIR" -Ddependency-library-dir="$MLN_FFI_DEPENDENCY_LIBRARY_DIR" -Drender-backend="$MLN_FFI_RENDER_BACKEND" -- --render-target=owned-texture
 '''
 
 [tasks."run:owned-texture"]
@@ -32,15 +28,11 @@ run = [{ task = "run", args = [] }]
 [tasks."run:borrowed-texture"]
 depends = ["//:ensure-native-library", ":compile-shaders"]
 run = '''
-native_library_dir="$MLN_FFI_BUILD_DIR"
-dependency_library_dir="$($MLN_FFI_REPO_ROOT/scripts/pixi-library-dir)"
-zig build run -Dcmake-artifact-dir="$native_library_dir" -Ddependency-library-dir="$dependency_library_dir" -Drender-backend="$MLN_FFI_RENDER_BACKEND" -- --render-target=borrowed-texture
+zig build run -Dcmake-artifact-dir="$MLN_FFI_BUILD_DIR" -Ddependency-library-dir="$MLN_FFI_DEPENDENCY_LIBRARY_DIR" -Drender-backend="$MLN_FFI_RENDER_BACKEND" -- --render-target=borrowed-texture
 '''
 
 [tasks."run:native-surface"]
 depends = ["//:ensure-native-library", ":compile-shaders"]
 run = '''
-native_library_dir="$MLN_FFI_BUILD_DIR"
-dependency_library_dir="$($MLN_FFI_REPO_ROOT/scripts/pixi-library-dir)"
-zig build run -Dcmake-artifact-dir="$native_library_dir" -Ddependency-library-dir="$dependency_library_dir" -Drender-backend="$MLN_FFI_RENDER_BACKEND" -- --render-target=native-surface
+zig build run -Dcmake-artifact-dir="$MLN_FFI_BUILD_DIR" -Ddependency-library-dir="$MLN_FFI_DEPENDENCY_LIBRARY_DIR" -Drender-backend="$MLN_FFI_RENDER_BACKEND" -- --render-target=native-surface
 '''

@@ -115,15 +115,13 @@ run = "rm -rf \"$MLN_FFI_BUILD_DIR\""
 [tasks.test]
 depends = ["//:build"]
 run = '''
-native_library_dir="$MLN_FFI_BUILD_DIR"
-dependency_library_dir="$($MLN_FFI_REPO_ROOT/scripts/pixi-library-dir)"
 (
   cd src/c_api/tests/zig
-  zig build -Dtarget="$MLN_FFI_ZIG_TARGET" --test-timeout "$MLN_FFI_TEST_TIMEOUT" test --summary all --verbose -Dcmake-artifact-dir="$native_library_dir" -Ddependency-library-dir="$dependency_library_dir" -Drender-backend="$MLN_FFI_RENDER_BACKEND"
+  zig build -Dtarget="$MLN_FFI_ZIG_TARGET" --test-timeout "$MLN_FFI_TEST_TIMEOUT" test --summary all --verbose -Dcmake-artifact-dir="$MLN_FFI_BUILD_DIR" -Ddependency-library-dir="$MLN_FFI_DEPENDENCY_LIBRARY_DIR" -Drender-backend="$MLN_FFI_RENDER_BACKEND"
 )
 (
   cd bindings/zig
-  zig build -Dtarget="$MLN_FFI_ZIG_TARGET" --test-timeout "$MLN_FFI_TEST_TIMEOUT" test --summary all --verbose -Dcmake-artifact-dir="$native_library_dir" -Ddependency-library-dir="$dependency_library_dir" -Drender-backend="$MLN_FFI_RENDER_BACKEND"
+  zig build -Dtarget="$MLN_FFI_ZIG_TARGET" --test-timeout "$MLN_FFI_TEST_TIMEOUT" test --summary all --verbose -Dcmake-artifact-dir="$MLN_FFI_BUILD_DIR" -Ddependency-library-dir="$MLN_FFI_DEPENDENCY_LIBRARY_DIR" -Drender-backend="$MLN_FFI_RENDER_BACKEND"
 )
 '''
 

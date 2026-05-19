@@ -8,18 +8,27 @@ run = [
 [tasks.build]
 depends = ["//:ensure-native-library", ":compile-shaders"]
 dir = "{{env.MLN_FFI_REPO_ROOT}}"
-run = "cargo build -p rust-map"
+run = '''
+export RUSTFLAGS="$RUSTFLAGS -C link-arg=-Wl,-rpath,$MLN_FFI_BUILD_DIR"
+cargo build -p rust-map
+'''
 
 [tasks.ci]
 depends = [":build"]
 dir = "{{env.MLN_FFI_REPO_ROOT}}"
-run = "cargo clippy -p rust-map --all-targets -- -D warnings"
+run = '''
+export RUSTFLAGS="$RUSTFLAGS -C link-arg=-Wl,-rpath,$MLN_FFI_BUILD_DIR"
+cargo clippy -p rust-map --all-targets -- -D warnings
+'''
 
 [tasks.run]
 depends = ["//:ensure-native-library", ":compile-shaders"]
 dir = "{{env.MLN_FFI_REPO_ROOT}}"
 usage = 'arg "[render-target]" default="owned-texture"'
-run = 'cargo run -p rust-map -- --render-target="$usage_render_target"'
+run = '''
+export RUSTFLAGS="$RUSTFLAGS -C link-arg=-Wl,-rpath,$MLN_FFI_BUILD_DIR"
+cargo run -p rust-map -- --render-target="$usage_render_target"
+'''
 
 [tasks."run:owned-texture"]
 run = [{ task = "run", args = ["owned-texture"] }]
