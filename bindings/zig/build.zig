@@ -25,6 +25,26 @@ pub const LinkOptions = struct {
     dependency_library_dir: ?std.Build.LazyPath = null,
 };
 
+fn configureSysroot(b: *std.Build, target: std.Build.ResolvedTarget) void {
+    if (b.sysroot != null or target.result.os.tag.isDarwin()) return;
+
+    const sysroot = b.graph.environ_map.get("MLN_FFI_SYSROOT") orelse return;
+    if (sysroot.len == 0) return;
+
+    b.sysroot = sysroot;
+}
+
+fn addDarwinSdkPaths(b: *std.Build, module: *std.Build.Module, target: std.Build.ResolvedTarget) void {
+    if (!target.result.os.tag.isDarwin()) return;
+
+    const sdkroot = b.graph.environ_map.get("SDKROOT") orelse return;
+    if (sdkroot.len == 0) return;
+
+    module.addSystemFrameworkPath(.{ .cwd_relative = b.pathJoin(&.{ sdkroot, "System", "Library", "Frameworks" }) });
+    module.addSystemIncludePath(.{ .cwd_relative = b.pathJoin(&.{ sdkroot, "usr", "include" }) });
+    module.addLibraryPath(.{ .cwd_relative = b.pathJoin(&.{ sdkroot, "usr", "lib" }) });
+}
+
 fn renderBackend(b: *std.Build) RenderBackend {
     const value = b.option(
         []const u8,
@@ -108,7 +128,7 @@ fn repoLinkOptions(_: *std.Build, options: BuildOptions) LinkOptions {
 ///
 /// Callers provide all filesystem paths explicitly so the helper works both from this
 /// package and from external consumers with a different build root layout.
-pub fn linkMaplibreNativeC(_: *std.Build, module: *std.Build.Module, options: LinkOptions) void {
+pub fn linkMaplibreNativeC(b: *std.Build, module: *std.Build.Module, options: LinkOptions) void {
     checkSupportedTarget(options.target, options.render_backend);
 
     module.addIncludePath(options.include_dir);
@@ -119,6 +139,7 @@ pub fn linkMaplibreNativeC(_: *std.Build, module: *std.Build.Module, options: Li
 
     switch (options.render_backend) {
         .metal => {
+            addDarwinSdkPaths(b, module, options.target);
             module.linkFramework("Metal", .{});
             module.linkFramework("QuartzCore", .{});
         },
@@ -189,6 +210,7 @@ fn addWindowsTestRuntimePaths(_: *std.Build, run: *std.Build.Step.Run, options: 
 
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
+    configureSysroot(b, target);
     const cmake_artifact_dir = cmakeArtifactDir(b);
     const options = BuildOptions{
         .target = target,

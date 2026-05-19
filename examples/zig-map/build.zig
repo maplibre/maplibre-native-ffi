@@ -13,6 +13,26 @@ const RenderBackend = enum {
     vulkan,
 };
 
+fn configureSysroot(b: *std.Build, target: std.Build.ResolvedTarget) void {
+    if (b.sysroot != null or target.result.os.tag.isDarwin()) return;
+
+    const sysroot = b.graph.environ_map.get("MLN_FFI_SYSROOT") orelse return;
+    if (sysroot.len == 0) return;
+
+    b.sysroot = sysroot;
+}
+
+fn addDarwinSdkPaths(b: *std.Build, module: *std.Build.Module, target: std.Build.ResolvedTarget) void {
+    if (!target.result.os.tag.isDarwin()) return;
+
+    const sdkroot = b.graph.environ_map.get("SDKROOT") orelse return;
+    if (sdkroot.len == 0) return;
+
+    module.addSystemFrameworkPath(.{ .cwd_relative = b.pathJoin(&.{ sdkroot, "System", "Library", "Frameworks" }) });
+    module.addSystemIncludePath(.{ .cwd_relative = b.pathJoin(&.{ sdkroot, "usr", "include" }) });
+    module.addLibraryPath(.{ .cwd_relative = b.pathJoin(&.{ sdkroot, "usr", "lib" }) });
+}
+
 fn renderBackend(b: *std.Build) RenderBackend {
     const value = b.option(
         []const u8,
@@ -99,6 +119,7 @@ fn addZigMapExample(b: *std.Build, options: BuildOptions) *std.Build.Step.Compil
     }
     example.root_module.linkSystemLibrary("SDL3", .{});
     if (options.render_backend == .metal) {
+        addDarwinSdkPaths(b, example.root_module, options.target);
         const zig_objc = b.dependency("zig_objc", .{
             .target = options.target,
             .optimize = options.optimize,
@@ -119,6 +140,7 @@ fn addZigMapExample(b: *std.Build, options: BuildOptions) *std.Build.Step.Compil
 
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
+    configureSysroot(b, target);
     const options = BuildOptions{
         .target = target,
         .optimize = b.standardOptimizeOption(.{}),
