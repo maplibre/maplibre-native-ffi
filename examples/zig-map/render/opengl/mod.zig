@@ -71,11 +71,7 @@ pub const OpenGLBackend = union(enum) {
         }
     }
 
-    pub fn resize(_: *OpenGLBackend, _: types.Viewport) !void {
-        switch (self.*) {
-            .native_surface => {},
-        }
-    }
+    pub fn resize(_: *OpenGLBackend, _: types.Viewport) !void {}
 
     pub fn needsRenderTargetReattachOnResize(self: *const OpenGLBackend) bool {
         return switch (self.*) {
@@ -104,9 +100,7 @@ pub const OpenGLBackend = union(enum) {
         _: *maplibre.RenderSessionHandle,
         _: types.Viewport,
     ) !bool {
-        return switch (self.*) {
-            .native_surface => unreachable,
-        };
+        unreachable;
     }
 };
 

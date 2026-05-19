@@ -32,6 +32,10 @@ pub fn main(init_args: std.process.Init) !void {
     try maplibre.setAsyncLogSeverityMask(.none, null);
     defer maplibre.setAsyncLogSeverityMask(.default, null) catch {};
     try logAndValidateRenderBackend();
+    if (comptime build_options.supports_opengl and !build_options.supports_vulkan and !build_options.supports_metal) {
+        std.debug.print("zig-readback requires Vulkan or Metal; skipping on OpenGL\n", .{});
+        return;
+    }
 
     var runtime = try maplibre.RuntimeHandle.create(allocator, .{ .cache_path = ":memory:" }, null);
     defer runtime.close() catch {};
