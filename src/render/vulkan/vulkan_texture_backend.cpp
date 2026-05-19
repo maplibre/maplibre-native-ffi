@@ -285,8 +285,8 @@ class VulkanTextureBackend::VulkanTextureRenderableResource final
   }
 
   bool usesBorrowedImage = false;
-  vk::Image borrowedImage{};
-  vk::ImageView borrowedImageView{};
+  vk::Image borrowedImage;
+  vk::ImageView borrowedImageView;
 };
 
 VulkanTextureBackend::VulkanTextureBackend(
