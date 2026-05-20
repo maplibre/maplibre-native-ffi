@@ -13,24 +13,21 @@ const RenderBackend = enum {
     vulkan,
 };
 
-fn configureSysroot(b: *std.Build, target: std.Build.ResolvedTarget) void {
-    if (b.sysroot != null or target.result.os.tag.isDarwin()) return;
-
+fn addPlatformSysrootPaths(b: *std.Build, module: *std.Build.Module, target: std.Build.ResolvedTarget) void {
+    if (!target.result.os.tag.isDarwin() and target.result.os.tag != .linux) return;
     const sysroot = b.graph.environ_map.get("MLN_FFI_SYSROOT") orelse return;
     if (sysroot.len == 0) return;
 
-    b.sysroot = sysroot;
-}
-
-fn addDarwinSdkPaths(b: *std.Build, module: *std.Build.Module, target: std.Build.ResolvedTarget) void {
-    if (!target.result.os.tag.isDarwin()) return;
-
-    const sdkroot = b.graph.environ_map.get("SDKROOT") orelse return;
-    if (sdkroot.len == 0) return;
-
-    module.addSystemFrameworkPath(.{ .cwd_relative = b.pathJoin(&.{ sdkroot, "System", "Library", "Frameworks" }) });
-    module.addSystemIncludePath(.{ .cwd_relative = b.pathJoin(&.{ sdkroot, "usr", "include" }) });
-    module.addLibraryPath(.{ .cwd_relative = b.pathJoin(&.{ sdkroot, "usr", "lib" }) });
+    if (target.result.os.tag.isDarwin()) {
+        module.addSystemFrameworkPath(.{ .cwd_relative = b.pathJoin(&.{ sysroot, "System", "Library", "Frameworks" }) });
+    }
+    module.addSystemIncludePath(.{ .cwd_relative = b.pathJoin(&.{ sysroot, "usr", "include" }) });
+    module.addLibraryPath(.{ .cwd_relative = b.pathJoin(&.{ sysroot, "usr", "lib" }) });
+    if (target.result.os.tag == .linux) {
+        module.addLibraryPath(.{ .cwd_relative = b.pathJoin(&.{ sysroot, "usr", "lib64" }) });
+        module.addLibraryPath(.{ .cwd_relative = b.pathJoin(&.{ sysroot, "lib" }) });
+        module.addLibraryPath(.{ .cwd_relative = b.pathJoin(&.{ sysroot, "lib64" }) });
+    }
 }
 
 fn renderBackend(b: *std.Build) RenderBackend {
@@ -113,13 +110,13 @@ fn addZigMapExample(b: *std.Build, options: BuildOptions) *std.Build.Step.Compil
 
     example.root_module.addOptions("build_options", build_options);
     example.root_module.addImport("maplibre_native", maplibreNativeModule(b, options));
+    addPlatformSysrootPaths(b, example.root_module, options.target);
     if (options.dependency_library_dir) |dependency_library_dir| {
         example.root_module.addLibraryPath(dependency_library_dir);
         example.root_module.addRPath(dependency_library_dir);
     }
     example.root_module.linkSystemLibrary("SDL3", .{});
     if (options.render_backend == .metal) {
-        addDarwinSdkPaths(b, example.root_module, options.target);
         const zig_objc = b.dependency("zig_objc", .{
             .target = options.target,
             .optimize = options.optimize,
@@ -140,7 +137,6 @@ fn addZigMapExample(b: *std.Build, options: BuildOptions) *std.Build.Step.Compil
 
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
-    configureSysroot(b, target);
     const options = BuildOptions{
         .target = target,
         .optimize = b.standardOptimizeOption(.{}),

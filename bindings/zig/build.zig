@@ -25,24 +25,21 @@ pub const LinkOptions = struct {
     dependency_library_dir: ?std.Build.LazyPath = null,
 };
 
-fn configureSysroot(b: *std.Build, target: std.Build.ResolvedTarget) void {
-    if (b.sysroot != null or target.result.os.tag.isDarwin()) return;
-
+fn addPlatformSysrootPaths(b: *std.Build, module: *std.Build.Module, target: std.Build.ResolvedTarget) void {
+    if (!target.result.os.tag.isDarwin() and target.result.os.tag != .linux) return;
     const sysroot = b.graph.environ_map.get("MLN_FFI_SYSROOT") orelse return;
     if (sysroot.len == 0) return;
 
-    b.sysroot = sysroot;
-}
-
-fn addDarwinSdkPaths(b: *std.Build, module: *std.Build.Module, target: std.Build.ResolvedTarget) void {
-    if (!target.result.os.tag.isDarwin()) return;
-
-    const sdkroot = b.graph.environ_map.get("SDKROOT") orelse return;
-    if (sdkroot.len == 0) return;
-
-    module.addSystemFrameworkPath(.{ .cwd_relative = b.pathJoin(&.{ sdkroot, "System", "Library", "Frameworks" }) });
-    module.addSystemIncludePath(.{ .cwd_relative = b.pathJoin(&.{ sdkroot, "usr", "include" }) });
-    module.addLibraryPath(.{ .cwd_relative = b.pathJoin(&.{ sdkroot, "usr", "lib" }) });
+    if (target.result.os.tag.isDarwin()) {
+        module.addSystemFrameworkPath(.{ .cwd_relative = b.pathJoin(&.{ sysroot, "System", "Library", "Frameworks" }) });
+    }
+    module.addSystemIncludePath(.{ .cwd_relative = b.pathJoin(&.{ sysroot, "usr", "include" }) });
+    module.addLibraryPath(.{ .cwd_relative = b.pathJoin(&.{ sysroot, "usr", "lib" }) });
+    if (target.result.os.tag == .linux) {
+        module.addLibraryPath(.{ .cwd_relative = b.pathJoin(&.{ sysroot, "usr", "lib64" }) });
+        module.addLibraryPath(.{ .cwd_relative = b.pathJoin(&.{ sysroot, "lib" }) });
+        module.addLibraryPath(.{ .cwd_relative = b.pathJoin(&.{ sysroot, "lib64" }) });
+    }
 }
 
 fn renderBackend(b: *std.Build) RenderBackend {
@@ -132,6 +129,7 @@ pub fn linkMaplibreNativeC(b: *std.Build, module: *std.Build.Module, options: Li
     checkSupportedTarget(options.target, options.render_backend);
 
     module.addIncludePath(options.include_dir);
+    addPlatformSysrootPaths(b, module, options.target);
     module.addLibraryPath(options.cmake_artifact_dir);
     module.addRPath(options.cmake_artifact_dir);
     module.linkSystemLibrary("maplibre-native-c", .{});
@@ -139,7 +137,6 @@ pub fn linkMaplibreNativeC(b: *std.Build, module: *std.Build.Module, options: Li
 
     switch (options.render_backend) {
         .metal => {
-            addDarwinSdkPaths(b, module, options.target);
             module.linkFramework("Metal", .{});
             module.linkFramework("QuartzCore", .{});
         },
@@ -210,7 +207,6 @@ fn addWindowsTestRuntimePaths(_: *std.Build, run: *std.Build.Step.Run, options: 
 
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
-    configureSysroot(b, target);
     const cmake_artifact_dir = cmakeArtifactDir(b);
     const options = BuildOptions{
         .target = target,
