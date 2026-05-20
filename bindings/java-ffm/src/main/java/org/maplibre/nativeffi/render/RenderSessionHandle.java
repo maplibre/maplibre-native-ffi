@@ -39,22 +39,6 @@ public final class RenderSessionHandle implements AutoCloseable {
     this.state = new HandleState("RenderSessionHandle", handle, map);
   }
 
-  public static RenderSessionHandle attachOwnedTexture(
-      MapHandle map, OwnedTextureDescriptor descriptor) {
-    NativeAccess.ensureLoaded();
-    Objects.requireNonNull(map, "map");
-    Objects.requireNonNull(descriptor, "descriptor");
-    try (var arena = Arena.ofConfined()) {
-      var outSession = MemoryUtil.allocatePointer(arena);
-      Status.check(
-          MapLibreNativeC.mln_owned_texture_attach(
-              map.nativeHandle(InternalAccess.INSTANCE),
-              RenderStructs.ownedTextureDescriptor(descriptor, arena),
-              outSession));
-      return new RenderSessionHandle(map, outSession.get(ValueLayout.ADDRESS, 0));
-    }
-  }
-
   public static RenderSessionHandle attachMetalOwnedTexture(
       MapHandle map, MetalOwnedTextureDescriptor descriptor) {
     NativeAccess.ensureLoaded();

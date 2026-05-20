@@ -23,9 +23,13 @@ function(mln_configure_source_linting target)
     PROPERTIES CXX_CLANG_TIDY "${MLN_FFI_CLANG_TIDY_COMMAND}")
 
   if(APPLE)
+    # clang-tidy 19 crashes when this checker visits Apple SDK Objective-C
+    # declarations from Objective-C++ sources. Revisit when updating clang-tidy.
+    set(MLN_FFI_OBJCXX_CLANG_TIDY_COMMAND ${MLN_FFI_CLANG_TIDY_COMMAND}
+        --checks=-cppcoreguidelines-avoid-const-or-ref-data-members)
     set_target_properties(
       ${target}
-      PROPERTIES OBJCXX_CLANG_TIDY "${MLN_FFI_CLANG_TIDY_COMMAND}")
+      PROPERTIES OBJCXX_CLANG_TIDY "${MLN_FFI_OBJCXX_CLANG_TIDY_COMMAND}")
   endif()
 endfunction()
 
