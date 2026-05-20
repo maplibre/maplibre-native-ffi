@@ -40,6 +40,27 @@ runs:
         restore-keys: |
           ${{ runner.os }}-${{ runner.arch }}-gradle-
 
+    - name: Trim Windows PATH before Pixi activation
+      if: ${{ runner.os == 'Windows' }}
+      shell: pwsh
+      run: |
+        # Pixi's Windows activation uses cmd.exe and emits a single PATH update
+        # line; the default GitHub Actions Path can make that line exceed cmd's
+        # limit. See https://github.com/prefix-dev/pixi/issues/1108.
+        $paths = @(
+          $(if ($env:SCCACHE_PATH) { Split-Path -Parent $env:SCCACHE_PATH }),
+          "C:\Program Files\Git\bin",
+          "C:\Program Files\Git\usr\bin",
+          "$env:SystemRoot\System32",
+          "$env:SystemRoot",
+          "$env:SystemRoot\System32\Wbem",
+          "$env:SystemRoot\System32\WindowsPowerShell\v1.0",
+          "C:\Program Files\PowerShell\7",
+          "C:\Program Files\Git\cmd"
+        ) | Where-Object { $_ -and (Test-Path $_) }
+
+        "Path=$($paths -join ';')" >> $env:GITHUB_ENV
+
     - name: Install mise toolchain
       uses: jdx/mise-action@1648a7812b9aeae629881980618f079932869151 # v4.0.1
       with:
@@ -68,26 +89,3 @@ runs:
           mise install --force rust
           ensure_rust_components
         fi
-
-    - name: Trim Windows PATH before Pixi activation
-      if: ${{ runner.os == 'Windows' }}
-      shell: pwsh
-      run: |
-        # Pixi's Windows activation uses cmd.exe and emits a single PATH update
-        # line; the default GitHub Actions Path can make that line exceed cmd's
-        # limit. See https://github.com/prefix-dev/pixi/issues/1108.
-        $paths = @(
-          "$env:USERPROFILE\AppData\Local\mise\shims",
-          "$env:USERPROFILE\AppData\Local\mise\bin",
-          $(if ($env:SCCACHE_PATH) { Split-Path -Parent $env:SCCACHE_PATH }),
-          "$env:SystemRoot\System32",
-          "$env:SystemRoot",
-          "$env:SystemRoot\System32\Wbem",
-          "$env:SystemRoot\System32\WindowsPowerShell\v1.0",
-          "C:\Program Files\PowerShell\7",
-          "C:\Program Files\Git\cmd",
-          "C:\Program Files\Git\bin",
-          "C:\Program Files\Git\usr\bin"
-        ) | Where-Object { $_ -and (Test-Path $_) }
-
-        "Path=$($paths -join ';')" >> $env:GITHUB_ENV

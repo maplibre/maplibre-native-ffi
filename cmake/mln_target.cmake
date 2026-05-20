@@ -56,6 +56,15 @@ function(mln_add_c_api_library target)
     ${target}
     PRIVATE $<$<COMPILE_LANGUAGE:CXX,OBJCXX>:NDEBUG>)
 
+  if(UNIX AND DEFINED ENV{CONDA_PREFIX})
+    # Build-tree binaries find Pixi-provided shared libraries through embedded
+    # runtime search paths.
+    set_property(
+      TARGET ${target}
+      APPEND
+      PROPERTY BUILD_RPATH "$ENV{CONDA_PREFIX}/lib")
+  endif()
+
   set_target_properties(
     ${target}
     PROPERTIES

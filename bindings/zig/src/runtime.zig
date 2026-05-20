@@ -1525,9 +1525,15 @@ test "runtime event payload copying rejects malformed borrowed payloads" {
         size: u32,
         value: u32,
     };
-    var misaligned_storage: [@sizeOf(AlignedPayload) + 1]u8 align(1) = undefined;
+    const alignment = @alignOf(AlignedPayload);
+    try std.testing.expect(alignment > 1);
+    var misaligned_storage: [@sizeOf(AlignedPayload) + alignment]u8 align(1) = undefined;
+    const base_address = @intFromPtr(&misaligned_storage[0]);
+    var misaligned_offset: usize = 0;
+    while ((base_address + misaligned_offset) % alignment == 0) : (misaligned_offset += 1) {}
+    try std.testing.expect(misaligned_offset < alignment);
     try std.testing.expectError(
         error.NativeError,
-        payloadAs(AlignedPayload, @ptrCast(&misaligned_storage[1]), @sizeOf(AlignedPayload)),
+        payloadAs(AlignedPayload, @ptrCast(&misaligned_storage[misaligned_offset]), @sizeOf(AlignedPayload)),
     );
 }

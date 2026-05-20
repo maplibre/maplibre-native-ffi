@@ -658,6 +658,7 @@ dependencies = [
 name = "maplibre-native"
 version = "0.0.0"
 dependencies = [
+ "ash",
  "bitflags 2.11.1",
  "maplibre-native-core",
  "maplibre-native-sys",
