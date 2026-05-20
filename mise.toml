@@ -9,9 +9,9 @@ pin = true
 experimental = true
 python.uv_venv_auto = "create|source"
 windows_default_file_shell_args = '"C:/Program Files/Git/bin/bash.exe"'
-windows_default_inline_shell_args = '"C:/Program Files/Git/bin/bash.exe" -lc'
+windows_default_inline_shell_args = 'pixi run --locked -x "C:/Program Files/Git/bin/bash.exe" -lc'
 unix_default_file_shell_args = "bash"
-unix_default_inline_shell_args = "bash -lc"
+unix_default_inline_shell_args = "pixi run --locked -x bash -lc"
 # On Windows, the Microsoft Store Python alias in WindowsApps can appear before
 # mise-managed Python. Keep mise tool paths first so file tasks run pinned tools.
 activate_aggressive = true
@@ -59,7 +59,6 @@ config_roots = ["bindings/*", "examples/*", "docs"]
 "core:dotnet" = "10.0.203"
 
 [env]
-_.source = { path = "scripts/pixi-env.sh", tools = true }
 UV_PYTHON = { value = "{{ tools.python.path }}", tools = true }
 MLN_FFI_REPO_ROOT = "{{config_root}}"
 MLN_FFI_VARIANT = { required = true }
