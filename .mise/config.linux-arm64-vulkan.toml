@@ -1,9 +1,6 @@
 [env]
-CC = "clang"
-CXX = "clang++"
 MLN_FFI_VARIANT = "linux-arm64-vulkan"
 MLN_FFI_TARGET_TRIPLE = "linux-arm64"
 MLN_FFI_RENDER_BACKEND = "vulkan"
 MLN_FFI_BUILD_DIR = "{{config_root}}/build/linux-arm64-vulkan"
-DYLD_LIBRARY_PATH = "{{config_root}}/build/linux-arm64-vulkan"
-LD_LIBRARY_PATH = "{{config_root}}/build/linux-arm64-vulkan"
+MLN_FFI_ZIG_TARGET = "aarch64-linux-gnu"
