@@ -9,7 +9,6 @@ import org.maplibre.nativeffi.internal.c.mln_metal_borrowed_texture_descriptor;
 import org.maplibre.nativeffi.internal.c.mln_metal_context_descriptor;
 import org.maplibre.nativeffi.internal.c.mln_metal_owned_texture_descriptor;
 import org.maplibre.nativeffi.internal.c.mln_metal_surface_descriptor;
-import org.maplibre.nativeffi.internal.c.mln_owned_texture_descriptor;
 import org.maplibre.nativeffi.internal.c.mln_render_target_extent;
 import org.maplibre.nativeffi.internal.c.mln_vulkan_borrowed_texture_descriptor;
 import org.maplibre.nativeffi.internal.c.mln_vulkan_context_descriptor;
@@ -20,7 +19,6 @@ import org.maplibre.nativeffi.render.MetalContextDescriptor;
 import org.maplibre.nativeffi.render.MetalOwnedTextureDescriptor;
 import org.maplibre.nativeffi.render.MetalSurfaceDescriptor;
 import org.maplibre.nativeffi.render.NativePointer;
-import org.maplibre.nativeffi.render.OwnedTextureDescriptor;
 import org.maplibre.nativeffi.render.RenderTargetExtent;
 import org.maplibre.nativeffi.render.VulkanBorrowedTextureDescriptor;
 import org.maplibre.nativeffi.render.VulkanContextDescriptor;
@@ -41,13 +39,6 @@ final class RenderStructsTest {
             7);
 
     try (var arena = Arena.ofConfined()) {
-      var ownedTexture =
-          RenderStructs.ownedTextureDescriptor(new OwnedTextureDescriptor().extent(extent), arena);
-      assertEquals(
-          (int) mln_owned_texture_descriptor.sizeof(),
-          mln_owned_texture_descriptor.size(ownedTexture));
-      assertExtent(extent, mln_owned_texture_descriptor.extent(ownedTexture));
-
       var metalOwnedTexture =
           RenderStructs.metalOwnedTextureDescriptor(
               new MetalOwnedTextureDescriptor().extent(extent).context(metalContext), arena);
