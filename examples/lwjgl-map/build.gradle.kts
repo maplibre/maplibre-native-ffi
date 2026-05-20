@@ -24,22 +24,10 @@ fun lwjglNativeClassifier(): String {
 val lwjglNative = lwjglNativeClassifier()
 val hostOs = System.getProperty("os.name").lowercase()
 val hostIsMac = hostOs.contains("mac")
-val hostIsLinux = hostOs.contains("linux")
-val pixiVulkanLoader =
-  rootProject.layout.projectDirectory.file(
-    when {
-      hostIsMac -> ".pixi/envs/default/lib/libvulkan.1.dylib"
-      hostIsLinux -> ".pixi/envs/default/lib/libvulkan.so.1"
-      else -> ""
-    }
-  )
 val lwjglMapJvmArgs = buildList {
   add("--enable-native-access=ALL-UNNAMED")
   if (hostIsMac) {
     add("-XstartOnFirstThread")
-  }
-  if ((hostIsMac || hostIsLinux) && pixiVulkanLoader.asFile.exists()) {
-    add("-Dorg.lwjgl.vulkan.libname=${pixiVulkanLoader.asFile.absolutePath}")
   }
 }
 
@@ -69,10 +57,7 @@ tasks.withType<JavaCompile>().configureEach { options.release = 25 }
 tasks.withType<Test>().configureEach { useJUnitPlatform() }
 
 val nativeLibraryPathProperty = "org.maplibre.nativeffi.library.path"
-val nativeBuildDir =
-  providers
-    .environmentVariable("MLN_FFI_BUILD_DIR")
-    .orElse(rootProject.layout.buildDirectory.dir("host").map { it.asFile.absolutePath })
+val nativeBuildDir = providers.environmentVariable("MLN_FFI_BUILD_DIR")
 val nativeLibraryPath = nativeBuildDir.map { "$it/${System.mapLibraryName("maplibre-native-c")}" }
 
 tasks.withType<JavaExec>().configureEach {

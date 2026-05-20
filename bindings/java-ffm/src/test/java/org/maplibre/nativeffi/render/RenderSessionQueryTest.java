@@ -33,6 +33,7 @@ import org.maplibre.nativeffi.query.SourceFeatureQueryOptions;
 import org.maplibre.nativeffi.runtime.RuntimeEventType;
 import org.maplibre.nativeffi.runtime.RuntimeHandle;
 import org.maplibre.nativeffi.test.NativeTestSupport;
+import org.maplibre.nativeffi.test.RenderTargetTestSupport;
 
 final class RenderSessionQueryTest {
   private static final String QUERY_STYLE_JSON =
@@ -107,10 +108,9 @@ final class RenderSessionQueryTest {
 
     var runtime = RuntimeHandle.create();
     var map = MapHandle.create(runtime, new MapOptions().size(64, 64));
-    var session =
-        map.attachOwnedTexture(
-            new OwnedTextureDescriptor().extent(new RenderTargetExtent(64, 64, 1.0)));
-    try {
+    try (var target =
+        RenderTargetTestSupport.attachOwnedTexture(map, new RenderTargetExtent(64, 64, 1.0))) {
+      var session = target.session();
       var selector = new FeatureStateSelector("point").featureId("feature-1");
       var state =
           JsonValue.object(
@@ -138,7 +138,6 @@ final class RenderSessionQueryTest {
       assertEquals(JsonValue.unsigned(20), member(afterRemove, "radius"));
       assertFalse(hasMember(afterRemove, "hover"));
     } finally {
-      session.close();
       map.close();
       runtime.close();
     }
@@ -151,10 +150,9 @@ final class RenderSessionQueryTest {
 
     var runtime = RuntimeHandle.create();
     var map = MapHandle.create(runtime, new MapOptions().size(64, 64));
-    var session =
-        map.attachOwnedTexture(
-            new OwnedTextureDescriptor().extent(new RenderTargetExtent(64, 64, 1.0)));
-    try {
+    try (var target =
+        RenderTargetTestSupport.attachOwnedTexture(map, new RenderTargetExtent(64, 64, 1.0))) {
+      var session = target.session();
       assertThrows(
           InvalidStateException.class,
           () ->
@@ -195,7 +193,6 @@ final class RenderSessionQueryTest {
       assertEquals("point", source.sourceId().orElseThrow());
       assertEquals(JsonValue.of("capital"), member(source.feature(), "kind"));
     } finally {
-      session.close();
       map.close();
       runtime.close();
     }
@@ -208,10 +205,9 @@ final class RenderSessionQueryTest {
 
     var runtime = RuntimeHandle.create();
     var map = MapHandle.create(runtime, new MapOptions().size(64, 64));
-    var session =
-        map.attachOwnedTexture(
-            new OwnedTextureDescriptor().extent(new RenderTargetExtent(64, 64, 1.0)));
-    try {
+    try (var target =
+        RenderTargetTestSupport.attachOwnedTexture(map, new RenderTargetExtent(64, 64, 1.0))) {
+      var session = target.session();
       loadClusterStyleAndRender(runtime, map, session);
       var queryPoint = map.pixelForLatLng(new LatLng(0.0, 0.0));
       var geometry =
@@ -263,7 +259,6 @@ final class RenderSessionQueryTest {
                   "leaves",
                   JsonValue.array(List.of())));
     } finally {
-      session.close();
       map.close();
       runtime.close();
     }
