@@ -21,11 +21,11 @@ MLN_FFI_DEPENDENCY_LIBRARY_DIR = "$CONDA_PREFIX/lib"
 RUSTFLAGS = "-C link-arg=-Wl,-rpath,$CONDA_PREFIX/lib"
 
 [target.linux.activation.env]
-MLN_FFI_SYSROOT = "$CONDA_BUILD_SYSROOT"
+MLN_FFI_SYSTEM_ROOT = "$CONDA_BUILD_SYSROOT"
 RUSTFLAGS = "-C link-arg=-Wl,-rpath,$CONDA_PREFIX/lib -C link-arg=-Wl,-rpath-link,$CONDA_PREFIX/lib"
 
 [target.osx.activation.env]
-MLN_FFI_SYSROOT = "$SDKROOT"
+MLN_FFI_SYSTEM_ROOT = "$SDKROOT"
 # Use Pixi's MoltenVK ICD for Vulkan runs on macOS.
 VK_ICD_FILENAMES = "$CONDA_PREFIX/share/vulkan/icd.d/MoltenVK_icd.json"
 

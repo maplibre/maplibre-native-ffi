@@ -26,26 +26,26 @@ fn renderBackend(b: *std.Build) RenderBackend {
     std.debug.panic("unsupported render backend: {s}", .{value});
 }
 
-fn addPlatformSysrootPaths(b: *std.Build, module: *std.Build.Module, target: std.Build.ResolvedTarget) void {
+fn addPlatformSystemPaths(b: *std.Build, module: *std.Build.Module, target: std.Build.ResolvedTarget) void {
     if (!target.result.os.tag.isDarwin() and target.result.os.tag != .linux) return;
-    const sysroot = b.graph.environ_map.get("MLN_FFI_SYSROOT") orelse return;
-    if (sysroot.len == 0) return;
+    const system_root = b.graph.environ_map.get("MLN_FFI_SYSTEM_ROOT") orelse return;
+    if (system_root.len == 0) return;
 
     if (target.result.os.tag.isDarwin()) {
-        module.addSystemFrameworkPath(.{ .cwd_relative = b.pathJoin(&.{ sysroot, "System", "Library", "Frameworks" }) });
+        module.addSystemFrameworkPath(.{ .cwd_relative = b.pathJoin(&.{ system_root, "System", "Library", "Frameworks" }) });
     }
-    module.addSystemIncludePath(.{ .cwd_relative = b.pathJoin(&.{ sysroot, "usr", "include" }) });
-    module.addLibraryPath(.{ .cwd_relative = b.pathJoin(&.{ sysroot, "usr", "lib" }) });
+    module.addSystemIncludePath(.{ .cwd_relative = b.pathJoin(&.{ system_root, "usr", "include" }) });
+    module.addLibraryPath(.{ .cwd_relative = b.pathJoin(&.{ system_root, "usr", "lib" }) });
     if (target.result.os.tag == .linux) {
-        module.addLibraryPath(.{ .cwd_relative = b.pathJoin(&.{ sysroot, "usr", "lib64" }) });
-        module.addLibraryPath(.{ .cwd_relative = b.pathJoin(&.{ sysroot, "lib" }) });
-        module.addLibraryPath(.{ .cwd_relative = b.pathJoin(&.{ sysroot, "lib64" }) });
+        module.addLibraryPath(.{ .cwd_relative = b.pathJoin(&.{ system_root, "usr", "lib64" }) });
+        module.addLibraryPath(.{ .cwd_relative = b.pathJoin(&.{ system_root, "lib" }) });
+        module.addLibraryPath(.{ .cwd_relative = b.pathJoin(&.{ system_root, "lib64" }) });
     }
 }
 
 fn linkMapLibreC(b: *std.Build, module: *std.Build.Module, target: std.Build.ResolvedTarget, cmake_artifact_dir: std.Build.LazyPath) void {
     module.addIncludePath(b.path("../../../../include"));
-    addPlatformSysrootPaths(b, module, target);
+    addPlatformSystemPaths(b, module, target);
     module.addLibraryPath(cmake_artifact_dir);
     module.addRPath(cmake_artifact_dir);
     module.linkSystemLibrary("maplibre-native-c", .{});
