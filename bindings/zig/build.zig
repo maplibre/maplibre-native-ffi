@@ -5,8 +5,7 @@ const BuildOptions = struct {
     optimize: std.builtin.OptimizeMode,
     cmake_artifact_dir: std.Build.LazyPath,
     cmake_artifact_dir_runtime_path: []const u8,
-    include_dir: std.Build.LazyPath,
-    vulkan_include_dir: ?std.Build.LazyPath,
+    include_dirs: []const std.Build.LazyPath,
     dependency_library_dir: ?std.Build.LazyPath,
     render_backend: RenderBackend,
 };
@@ -20,8 +19,7 @@ pub const LinkOptions = struct {
     target: std.Build.ResolvedTarget,
     cmake_artifact_dir: std.Build.LazyPath,
     render_backend: RenderBackend,
-    include_dir: std.Build.LazyPath,
-    vulkan_include_dir: ?std.Build.LazyPath = null,
+    include_dirs: []const std.Build.LazyPath,
     dependency_library_dir: ?std.Build.LazyPath = null,
 };
 
@@ -29,16 +27,14 @@ pub const DependencyOptions = struct {
     target: std.Build.ResolvedTarget,
     optimize: std.builtin.OptimizeMode,
     cmake_artifact_dir: std.Build.LazyPath,
-    include_dir: std.Build.LazyPath,
+    include_dirs: []const std.Build.LazyPath,
     render_backend: RenderBackend,
-    vulkan_include_dir: ?std.Build.LazyPath = null,
     dependency_library_dir: ?std.Build.LazyPath = null,
 };
 
 pub const RenderBackendLinkOptions = struct {
     target: std.Build.ResolvedTarget,
     render_backend: RenderBackend,
-    vulkan_include_dir: ?std.Build.LazyPath = null,
     dependency_library_dir: ?std.Build.LazyPath = null,
 };
 
@@ -58,24 +54,18 @@ pub fn cmakeArtifactDir(b: *std.Build) std.Build.LazyPath {
     ) orelse @panic("missing required -Dcmake-artifact-dir=<path-to-cmake-artifacts>");
 }
 
-pub fn includeDir(b: *std.Build) std.Build.LazyPath {
+pub fn includeDirs(b: *std.Build) []const std.Build.LazyPath {
     return b.option(
-        std.Build.LazyPath,
+        []const std.Build.LazyPath,
         "include-dir",
-        "Directory containing maplibre_native_c.h",
-    ) orelse @panic("missing required -Dinclude-dir=<path-to-maplibre-native-ffi-include>");
+        "Include directory. Repeat for project, dependency, and backend headers.",
+    ) orelse @panic("missing required -Dinclude-dir=<path>; repeat for additional include roots");
 }
 
-pub fn vulkanIncludeDir(b: *std.Build, backend: RenderBackend) ?std.Build.LazyPath {
-    const path = b.option(
-        std.Build.LazyPath,
-        "vulkan-include-dir",
-        "Directory containing Vulkan headers for Vulkan builds",
-    );
-    if (backend == .vulkan) {
-        return path orelse @panic("missing required -Dvulkan-include-dir=<path-to-vulkan-headers>");
+pub fn addIncludePaths(module: *std.Build.Module, include_dirs: []const std.Build.LazyPath) void {
+    for (include_dirs) |include_dir| {
+        module.addIncludePath(include_dir);
     }
-    return path;
 }
 
 pub fn dependencyLibraryDir(b: *std.Build) ?std.Build.LazyPath {
@@ -144,9 +134,6 @@ pub fn linkRenderBackend(b: *std.Build, module: *std.Build.Module, options: Rend
             module.linkFramework("QuartzCore", .{});
         },
         .vulkan => {
-            const vulkan_include_dir = options.vulkan_include_dir orelse
-                @panic("missing RenderBackendLinkOptions.vulkan_include_dir for vulkan backend");
-            module.addIncludePath(vulkan_include_dir);
             if (options.dependency_library_dir) |dependency_library_dir| {
                 module.addLibraryPath(dependency_library_dir);
                 module.addRPath(dependency_library_dir);
@@ -160,18 +147,16 @@ fn dependencyArgs(options: DependencyOptions) struct {
     target: std.Build.ResolvedTarget,
     optimize: std.builtin.OptimizeMode,
     @"cmake-artifact-dir": std.Build.LazyPath,
-    @"include-dir": std.Build.LazyPath,
+    @"include-dir": []const std.Build.LazyPath,
     @"render-backend": RenderBackend,
-    @"vulkan-include-dir": ?std.Build.LazyPath,
     @"dependency-library-dir": ?std.Build.LazyPath,
 } {
     return .{
         .target = options.target,
         .optimize = options.optimize,
         .@"cmake-artifact-dir" = options.cmake_artifact_dir,
-        .@"include-dir" = options.include_dir,
+        .@"include-dir" = options.include_dirs,
         .@"render-backend" = options.render_backend,
-        .@"vulkan-include-dir" = options.vulkan_include_dir,
         .@"dependency-library-dir" = options.dependency_library_dir,
     };
 }
@@ -189,8 +174,7 @@ fn repoLinkOptions(options: BuildOptions) LinkOptions {
         .target = options.target,
         .cmake_artifact_dir = options.cmake_artifact_dir,
         .render_backend = options.render_backend,
-        .include_dir = options.include_dir,
-        .vulkan_include_dir = options.vulkan_include_dir,
+        .include_dirs = options.include_dirs,
         .dependency_library_dir = options.dependency_library_dir,
     };
 }
@@ -200,7 +184,7 @@ fn repoLinkOptions(options: BuildOptions) LinkOptions {
 /// Callers provide all filesystem paths explicitly so the helper works both from this
 /// package and from external consumers with a different build root layout.
 pub fn linkMaplibreNativeC(b: *std.Build, module_: *std.Build.Module, options: LinkOptions) void {
-    module_.addIncludePath(options.include_dir);
+    addIncludePaths(module_, options.include_dirs);
     module_.addLibraryPath(options.cmake_artifact_dir);
     module_.addRPath(options.cmake_artifact_dir);
     module_.linkSystemLibrary("maplibre-native-c", .{});
@@ -208,7 +192,6 @@ pub fn linkMaplibreNativeC(b: *std.Build, module_: *std.Build.Module, options: L
     linkRenderBackend(b, module_, .{
         .target = options.target,
         .render_backend = options.render_backend,
-        .vulkan_include_dir = options.vulkan_include_dir,
         .dependency_library_dir = options.dependency_library_dir,
     });
 }
@@ -259,8 +242,7 @@ pub fn build(b: *std.Build) void {
         .optimize = b.standardOptimizeOption(.{}),
         .cmake_artifact_dir = cmake_artifact_dir,
         .cmake_artifact_dir_runtime_path = cmake_artifact_dir.getPath2(b, null),
-        .include_dir = includeDir(b),
-        .vulkan_include_dir = vulkanIncludeDir(b, backend),
+        .include_dirs = includeDirs(b),
         .dependency_library_dir = dependencyLibraryDir(b),
         .render_backend = backend,
     };

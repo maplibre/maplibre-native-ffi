@@ -6,8 +6,7 @@ const BuildOptions = struct {
     optimize: std.builtin.OptimizeMode,
     cmake_artifact_dir: std.Build.LazyPath,
     cmake_artifact_dir_runtime_path: []const u8,
-    include_dir: std.Build.LazyPath,
-    vulkan_include_dir: ?std.Build.LazyPath,
+    include_dirs: []const std.Build.LazyPath,
     dependency_library_dir: ?std.Build.LazyPath,
     render_backend: maplibre_build.RenderBackend,
 };
@@ -25,8 +24,7 @@ fn addCTests(b: *std.Build, options: BuildOptions) *std.Build.Step.Compile {
         .target = options.target,
         .cmake_artifact_dir = options.cmake_artifact_dir,
         .render_backend = options.render_backend,
-        .include_dir = options.include_dir,
-        .vulkan_include_dir = options.vulkan_include_dir,
+        .include_dirs = options.include_dirs,
         .dependency_library_dir = options.dependency_library_dir,
     });
     return c_tests;
@@ -41,8 +39,7 @@ pub fn build(b: *std.Build) void {
         .optimize = b.standardOptimizeOption(.{}),
         .cmake_artifact_dir = cmake_artifact_dir,
         .cmake_artifact_dir_runtime_path = cmake_artifact_dir.getPath2(b, null),
-        .include_dir = maplibre_build.includeDir(b),
-        .vulkan_include_dir = maplibre_build.vulkanIncludeDir(b, render_backend),
+        .include_dirs = maplibre_build.includeDirs(b),
         .dependency_library_dir = maplibre_build.dependencyLibraryDir(b),
         .render_backend = render_backend,
     };
