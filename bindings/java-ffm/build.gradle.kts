@@ -55,24 +55,10 @@ val nativeBuildDirForTests = providers.environmentVariable("MLN_FFI_BUILD_DIR")
 val nativeLibraryPathForTests = nativeBuildDirForTests.map {
   "$it/${System.mapLibraryName("maplibre-native-c")}"
 }
-val nativeDependencyLibraryDir = providers.environmentVariable("MLN_FFI_DEPENDENCY_LIBRARY_DIR")
-val lwjglVulkanLibraryPath = nativeDependencyLibraryDir.map {
-  val os = System.getProperty("os.name").lowercase()
-  val libraryName =
-    when {
-      os.contains("mac") -> "libvulkan.1.dylib"
-      os.contains("linux") -> "libvulkan.so.1"
-      os.contains("windows") -> "vulkan-1.dll"
-      else -> System.mapLibraryName("vulkan")
-    }
-  file("$it/$libraryName").absolutePath
-}
 
 tasks.withType<Test>().configureEach {
   useJUnitPlatform()
   jvmArgs(lwjglTestJvmArgs)
   systemProperty(nativeLibraryPathProperty, nativeLibraryPathForTests.get())
-  systemProperty("org.lwjgl.vulkan.libname", lwjglVulkanLibraryPath.get())
   inputs.file(nativeLibraryPathForTests).withPropertyName("maplibreNativeCLibrary")
-  inputs.file(lwjglVulkanLibraryPath).withPropertyName("lwjglVulkanLibrary")
 }
