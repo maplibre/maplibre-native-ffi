@@ -25,6 +25,17 @@ fn maplibreNativeModule(b: *std.Build, options: BuildOptions) *std.Build.Module 
     });
 }
 
+fn addSdlTranslateCWorkarounds(module: *std.Build.Module, target: std.Build.ResolvedTarget) void {
+    if (target.result.os.tag != .windows or target.result.abi != .msvc) return;
+
+    // Zig 0.16 translate-c cannot parse MSVC's non-standard i64/ui64 integer
+    // literal suffixes when SDL3 headers expose them through @cImport. Keep the
+    // workaround local to zig-map: it is the only Zig target that imports SDL.
+    module.addCMacro("SIZE_MAX", "((size_t)-1)");
+    module.addCMacro("SDL_SINT64_C(c)", "c##LL");
+    module.addCMacro("SDL_UINT64_C(c)", "c##ULL");
+}
+
 fn addZigMapExample(b: *std.Build, options: BuildOptions) *std.Build.Step.Compile {
     const example = b.addExecutable(.{
         .name = "zig-map",
@@ -37,6 +48,7 @@ fn addZigMapExample(b: *std.Build, options: BuildOptions) *std.Build.Step.Compil
 
     maplibre_build.addRenderBackendOptions(b, example.root_module, options.render_backend);
     maplibre_build.addIncludePaths(example.root_module, options.include_dirs);
+    addSdlTranslateCWorkarounds(example.root_module, options.target);
     example.root_module.addImport("maplibre_native", maplibreNativeModule(b, options));
     if (options.dependency_library_dir) |dependency_library_dir| {
         example.root_module.addLibraryPath(dependency_library_dir);
