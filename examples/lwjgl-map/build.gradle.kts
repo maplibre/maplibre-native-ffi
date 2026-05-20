@@ -62,9 +62,6 @@ val nativeLibraryPath = nativeBuildDir.map { "$it/${System.mapLibraryName("mapli
 
 tasks.withType<JavaExec>().configureEach {
   jvmArgs(lwjglMapJvmArgs)
-  // TODO: Validate Linux LWJGL runs with Pixi's Vulkan loader after the RUNPATH
-  // migration. If LWJGL loads Vulkan outside libmaplibre-native-c's dependency
-  // chain, set a JVM/LWJGL-specific loader path here.
   systemProperty(nativeLibraryPathProperty, nativeLibraryPath.get())
   inputs.file(nativeLibraryPath).withPropertyName("maplibreNativeCLibrary").optional()
 }
