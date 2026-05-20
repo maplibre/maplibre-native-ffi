@@ -1,104 +1,33 @@
 const std = @import("std");
+const maplibre_build = @import("maplibre_native");
 
 const BuildOptions = struct {
     target: std.Build.ResolvedTarget,
     optimize: std.builtin.OptimizeMode,
     cmake_artifact_dir: std.Build.LazyPath,
+    include_dir: std.Build.LazyPath,
+    vulkan_include_dir: ?std.Build.LazyPath,
     dependency_library_dir: ?std.Build.LazyPath,
-    render_backend: RenderBackend,
+    render_backend: maplibre_build.RenderBackend,
 };
-
-const RenderBackend = enum {
-    metal,
-    vulkan,
-};
-
-fn addPlatformSystemPaths(b: *std.Build, module: *std.Build.Module, target: std.Build.ResolvedTarget) void {
-    if (!target.result.os.tag.isDarwin() and target.result.os.tag != .linux) return;
-    const system_root = b.graph.environ_map.get("MLN_FFI_SYSTEM_ROOT") orelse return;
-    if (system_root.len == 0) return;
-
-    if (target.result.os.tag.isDarwin()) {
-        module.addSystemFrameworkPath(.{ .cwd_relative = b.pathJoin(&.{ system_root, "System", "Library", "Frameworks" }) });
-    }
-    module.addSystemIncludePath(.{ .cwd_relative = b.pathJoin(&.{ system_root, "usr", "include" }) });
-    module.addLibraryPath(.{ .cwd_relative = b.pathJoin(&.{ system_root, "usr", "lib" }) });
-    if (target.result.os.tag == .linux) {
-        module.addLibraryPath(.{ .cwd_relative = b.pathJoin(&.{ system_root, "usr", "lib64" }) });
-        module.addLibraryPath(.{ .cwd_relative = b.pathJoin(&.{ system_root, "lib" }) });
-        module.addLibraryPath(.{ .cwd_relative = b.pathJoin(&.{ system_root, "lib64" }) });
-    }
-}
-
-fn renderBackend(b: *std.Build) RenderBackend {
-    const value = b.option(
-        []const u8,
-        "render-backend",
-        "Render backend built into the CMake artifact: metal or vulkan",
-    ) orelse @panic("missing required -Drender-backend=metal|vulkan");
-
-    if (std.mem.eql(u8, value, "metal")) return .metal;
-    if (std.mem.eql(u8, value, "vulkan")) return .vulkan;
-    std.debug.panic("unsupported render backend: {s}", .{value});
-}
-
-fn cmakeArtifactDir(b: *std.Build) std.Build.LazyPath {
-    return b.option(
-        std.Build.LazyPath,
-        "cmake-artifact-dir",
-        "Directory containing the CMake-built maplibre-native-c library",
-    ) orelse @panic("missing required -Dcmake-artifact-dir=<path-to-cmake-artifacts>");
-}
-
-fn renderBackendName(render_backend: RenderBackend) []const u8 {
-    return switch (render_backend) {
-        .metal => "metal",
-        .vulkan => "vulkan",
-    };
-}
-
-fn dependencyLibraryDir(b: *std.Build) ?std.Build.LazyPath {
-    return b.option(
-        std.Build.LazyPath,
-        "dependency-library-dir",
-        "Directory containing backend dependency libraries such as Vulkan",
-    );
-}
-
-fn vulkanLibraryName(target: std.Build.ResolvedTarget) []const u8 {
-    return switch (target.result.os.tag) {
-        .windows => "vulkan-1",
-        else => "vulkan",
-    };
-}
-
-fn isSupportedTarget(options: BuildOptions) bool {
-    return switch (options.render_backend) {
-        .metal => options.target.result.os.tag == .macos,
-        .vulkan => options.target.result.os.tag == .macos or options.target.result.os.tag == .linux or
-            options.target.result.os.tag == .windows,
-    };
-}
 
 fn failUnsupportedTarget() noreturn {
     @panic("zig-map does not support this target platform");
 }
 
 fn maplibreNativeModule(b: *std.Build, options: BuildOptions) *std.Build.Module {
-    const dependency = b.dependency("maplibre_native", .{
+    return maplibre_build.maplibreNativeModule(b, .{
         .target = options.target,
         .optimize = options.optimize,
-        .@"cmake-artifact-dir" = options.cmake_artifact_dir,
-        .@"render-backend" = renderBackendName(options.render_backend),
+        .cmake_artifact_dir = options.cmake_artifact_dir,
+        .include_dir = options.include_dir,
+        .render_backend = options.render_backend,
+        .vulkan_include_dir = options.vulkan_include_dir,
+        .dependency_library_dir = options.dependency_library_dir,
     });
-    return dependency.module("maplibre_native");
 }
 
 fn addZigMapExample(b: *std.Build, options: BuildOptions) *std.Build.Step.Compile {
-    const build_options = b.addOptions();
-    build_options.addOption(bool, "supports_metal", options.render_backend == .metal);
-    build_options.addOption(bool, "supports_vulkan", options.render_backend == .vulkan);
-
     const example = b.addExecutable(.{
         .name = "zig-map",
         .root_module = b.createModule(.{
@@ -108,14 +37,20 @@ fn addZigMapExample(b: *std.Build, options: BuildOptions) *std.Build.Step.Compil
         }),
     });
 
-    example.root_module.addOptions("build_options", build_options);
+    maplibre_build.addRenderBackendOptions(b, example.root_module, options.render_backend);
     example.root_module.addImport("maplibre_native", maplibreNativeModule(b, options));
-    addPlatformSystemPaths(b, example.root_module, options.target);
     if (options.dependency_library_dir) |dependency_library_dir| {
         example.root_module.addLibraryPath(dependency_library_dir);
         example.root_module.addRPath(dependency_library_dir);
     }
     example.root_module.linkSystemLibrary("SDL3", .{});
+    maplibre_build.linkRenderBackend(b, example.root_module, .{
+        .target = options.target,
+        .render_backend = options.render_backend,
+        .vulkan_include_dir = options.vulkan_include_dir,
+        .dependency_library_dir = options.dependency_library_dir,
+    });
+
     if (options.render_backend == .metal) {
         const zig_objc = b.dependency("zig_objc", .{
             .target = options.target,
@@ -123,30 +58,27 @@ fn addZigMapExample(b: *std.Build, options: BuildOptions) *std.Build.Step.Compil
         });
         example.root_module.addImport("objc", zig_objc.module("objc"));
         example.root_module.linkFramework("Foundation", .{});
-        example.root_module.linkFramework("Metal", .{});
-        example.root_module.linkFramework("QuartzCore", .{});
-    } else if (options.render_backend == .vulkan) {
-        example.root_module.addIncludePath(b.path("../../third_party/maplibre-native/vendor/Vulkan-Headers/include"));
-        example.root_module.linkSystemLibrary(vulkanLibraryName(options.target), .{});
-    } else {
-        failUnsupportedTarget();
     }
+
     b.installArtifact(example);
     return example;
 }
 
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
+    const render_backend = maplibre_build.renderBackend(b);
     const options = BuildOptions{
         .target = target,
         .optimize = b.standardOptimizeOption(.{}),
-        .cmake_artifact_dir = cmakeArtifactDir(b),
-        .dependency_library_dir = dependencyLibraryDir(b),
-        .render_backend = renderBackend(b),
+        .cmake_artifact_dir = maplibre_build.cmakeArtifactDir(b),
+        .include_dir = maplibre_build.includeDir(b),
+        .vulkan_include_dir = maplibre_build.vulkanIncludeDir(b, render_backend),
+        .dependency_library_dir = maplibre_build.dependencyLibraryDir(b),
+        .render_backend = render_backend,
     };
 
     const run_step = b.step("run", "Run Zig map example");
-    if (!isSupportedTarget(options)) {
+    if (!maplibre_build.isSupportedTarget(options.target, options.render_backend)) {
         failUnsupportedTarget();
     }
     const zig_map = addZigMapExample(b, options);

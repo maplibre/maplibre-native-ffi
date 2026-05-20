@@ -1,13 +1,13 @@
 [tasks.build]
 depends = ["//:ensure-native-library"]
 run = '''
-zig build -Dcmake-artifact-dir="$MLN_FFI_BUILD_DIR" -Ddependency-library-dir="$MLN_FFI_DEPENDENCY_LIBRARY_DIR" -Drender-backend="$MLN_FFI_RENDER_BACKEND"
+zig build -Dcmake-artifact-dir="$MLN_FFI_BUILD_DIR" -Dinclude-dir="$MLN_FFI_INCLUDE_DIR" -Dvulkan-include-dir="$MLN_FFI_VULKAN_INCLUDE_DIR" -Ddependency-library-dir="$MLN_FFI_DEPENDENCY_LIBRARY_DIR" -Drender-backend="$MLN_FFI_RENDER_BACKEND"
 '''
 
 [tasks.test]
 depends = ["//:ensure-native-library"]
 run = '''
-zig build test --summary all --verbose -Dcmake-artifact-dir="$MLN_FFI_BUILD_DIR" -Ddependency-library-dir="$MLN_FFI_DEPENDENCY_LIBRARY_DIR" -Drender-backend="$MLN_FFI_RENDER_BACKEND"
+zig build test --summary all --verbose -Dcmake-artifact-dir="$MLN_FFI_BUILD_DIR" -Dinclude-dir="$MLN_FFI_INCLUDE_DIR" -Dvulkan-include-dir="$MLN_FFI_VULKAN_INCLUDE_DIR" -Ddependency-library-dir="$MLN_FFI_DEPENDENCY_LIBRARY_DIR" -Drender-backend="$MLN_FFI_RENDER_BACKEND"
 '''
 
 [tasks.ci]

@@ -66,6 +66,8 @@ MLN_FFI_VARIANT = { required = true }
 MLN_FFI_TARGET_TRIPLE = { required = true }
 MLN_FFI_RENDER_BACKEND = { required = true }
 MLN_FFI_BUILD_DIR = { required = true }
+MLN_FFI_INCLUDE_DIR = "{{config_root}}/include"
+MLN_FFI_VULKAN_INCLUDE_DIR = "{{config_root}}/third_party/maplibre-native/vendor/Vulkan-Headers/include"
 MLN_FFI_ZIG_TARGET = { required = true }
 MLN_FFI_TEST_TIMEOUT = "{{env.MLN_FFI_TEST_TIMEOUT | default(value=\"30s\")}}"
 
@@ -117,11 +119,11 @@ depends = ["//:build"]
 run = '''
 (
   cd src/c_api/tests/zig
-  zig build -Dtarget="$MLN_FFI_ZIG_TARGET" --test-timeout "$MLN_FFI_TEST_TIMEOUT" test --summary all --verbose -Dcmake-artifact-dir="$MLN_FFI_BUILD_DIR" -Ddependency-library-dir="$MLN_FFI_DEPENDENCY_LIBRARY_DIR" -Drender-backend="$MLN_FFI_RENDER_BACKEND"
+  zig build -Dtarget="$MLN_FFI_ZIG_TARGET" --test-timeout "$MLN_FFI_TEST_TIMEOUT" test --summary all --verbose -Dcmake-artifact-dir="$MLN_FFI_BUILD_DIR" -Dinclude-dir="$MLN_FFI_INCLUDE_DIR" -Dvulkan-include-dir="$MLN_FFI_VULKAN_INCLUDE_DIR" -Ddependency-library-dir="$MLN_FFI_DEPENDENCY_LIBRARY_DIR" -Drender-backend="$MLN_FFI_RENDER_BACKEND"
 )
 (
   cd bindings/zig
-  zig build -Dtarget="$MLN_FFI_ZIG_TARGET" --test-timeout "$MLN_FFI_TEST_TIMEOUT" test --summary all --verbose -Dcmake-artifact-dir="$MLN_FFI_BUILD_DIR" -Ddependency-library-dir="$MLN_FFI_DEPENDENCY_LIBRARY_DIR" -Drender-backend="$MLN_FFI_RENDER_BACKEND"
+  zig build -Dtarget="$MLN_FFI_ZIG_TARGET" --test-timeout "$MLN_FFI_TEST_TIMEOUT" test --summary all --verbose -Dcmake-artifact-dir="$MLN_FFI_BUILD_DIR" -Dinclude-dir="$MLN_FFI_INCLUDE_DIR" -Dvulkan-include-dir="$MLN_FFI_VULKAN_INCLUDE_DIR" -Ddependency-library-dir="$MLN_FFI_DEPENDENCY_LIBRARY_DIR" -Drender-backend="$MLN_FFI_RENDER_BACKEND"
 )
 '''
 
