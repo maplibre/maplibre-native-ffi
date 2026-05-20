@@ -185,9 +185,13 @@ fn repoLinkOptions(options: BuildOptions) LinkOptions {
 /// package and from external consumers with a different build root layout.
 pub fn linkMaplibreNativeC(b: *std.Build, module_: *std.Build.Module, options: LinkOptions) void {
     addIncludePaths(module_, options.include_dirs);
-    module_.addLibraryPath(options.cmake_artifact_dir);
-    module_.addRPath(options.cmake_artifact_dir);
-    module_.linkSystemLibrary("maplibre-native-c", .{});
+    if (options.target.result.os.tag == .windows) {
+        module_.addObjectFile(options.cmake_artifact_dir.path(b, "maplibre-native-c.lib"));
+    } else {
+        module_.addLibraryPath(options.cmake_artifact_dir);
+        module_.addRPath(options.cmake_artifact_dir);
+        module_.linkSystemLibrary("maplibre-native-c", .{});
+    }
     module_.link_libc = true;
     linkRenderBackend(b, module_, .{
         .target = options.target,
