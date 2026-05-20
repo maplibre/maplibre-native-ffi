@@ -24,29 +24,10 @@ fun lwjglNativeClassifier(): String {
 val lwjglNative = lwjglNativeClassifier()
 val hostOs = System.getProperty("os.name").lowercase()
 val hostIsMac = hostOs.contains("mac")
-val hostIsLinux = hostOs.contains("linux")
-val hostIsWindows = hostOs.contains("windows")
-val pixiVulkanLoader =
-  when {
-    hostIsMac ->
-      rootProject.layout.projectDirectory.file(".pixi/envs/default/lib/libvulkan.1.dylib")
-    hostIsLinux -> rootProject.layout.projectDirectory.file(".pixi/envs/default/lib/libvulkan.so.1")
-    hostIsWindows ->
-      rootProject.layout.projectDirectory.file(".pixi/envs/default/Library/bin/vulkan-1.dll")
-    else -> null
-  }
-val pixiRuntimeBin =
-  when {
-    hostIsWindows -> rootProject.layout.projectDirectory.dir(".pixi/envs/default/Library/bin")
-    else -> null
-  }
 val lwjglMapJvmArgs = buildList {
   add("--enable-native-access=ALL-UNNAMED")
   if (hostIsMac) {
     add("-XstartOnFirstThread")
-  }
-  if (pixiVulkanLoader?.asFile?.exists() == true) {
-    add("-Dorg.lwjgl.vulkan.libname=${pixiVulkanLoader.asFile.absolutePath}")
   }
 }
 
@@ -76,26 +57,11 @@ tasks.withType<JavaCompile>().configureEach { options.release = 25 }
 tasks.withType<Test>().configureEach { useJUnitPlatform() }
 
 val nativeLibraryPathProperty = "org.maplibre.nativeffi.library.path"
-val nativeBuildDir =
-  providers
-    .environmentVariable("MLN_FFI_BUILD_DIR")
-    .orElse(rootProject.layout.buildDirectory.dir("host").map { it.asFile.absolutePath })
-val nativeBuildConfig = providers.environmentVariable("MLN_FFI_CMAKE_BUILD_CONFIG").orElse("")
-val nativeLibraryDir =
-  nativeBuildDir.zip(nativeBuildConfig) { buildDir, config ->
-    val configDir = "$buildDir/$config"
-    if (config.isNotEmpty() && file(configDir).isDirectory) configDir else buildDir
-  }
-val nativeLibraryPath = nativeLibraryDir.map { "$it/${System.mapLibraryName("maplibre-native-c")}" }
+val nativeBuildDir = providers.environmentVariable("MLN_FFI_BUILD_DIR")
+val nativeLibraryPath = nativeBuildDir.map { "$it/${System.mapLibraryName("maplibre-native-c")}" }
 
 tasks.withType<JavaExec>().configureEach {
   jvmArgs(lwjglMapJvmArgs)
   systemProperty(nativeLibraryPathProperty, nativeLibraryPath.get())
   inputs.file(nativeLibraryPath).withPropertyName("maplibreNativeCLibrary").optional()
-  if (pixiRuntimeBin?.asFile?.isDirectory == true) {
-    environment(
-      "PATH",
-      "${pixiRuntimeBin.asFile.absolutePath}${File.pathSeparator}${System.getenv("PATH")}",
-    )
-  }
 }

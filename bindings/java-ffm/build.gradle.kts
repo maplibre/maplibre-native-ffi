@@ -24,30 +24,7 @@ fun lwjglNativeClassifier(): String {
 }
 
 val lwjglNative = lwjglNativeClassifier()
-val hostOs = System.getProperty("os.name").lowercase()
-val hostIsMac = hostOs.contains("mac")
-val hostIsLinux = hostOs.contains("linux")
-val hostIsWindows = hostOs.contains("windows")
-val pixiVulkanLoader =
-  when {
-    hostIsMac ->
-      rootProject.layout.projectDirectory.file(".pixi/envs/default/lib/libvulkan.1.dylib")
-    hostIsLinux -> rootProject.layout.projectDirectory.file(".pixi/envs/default/lib/libvulkan.so.1")
-    hostIsWindows ->
-      rootProject.layout.projectDirectory.file(".pixi/envs/default/Library/bin/vulkan-1.dll")
-    else -> null
-  }
-val pixiRuntimeBin =
-  when {
-    hostIsWindows -> rootProject.layout.projectDirectory.dir(".pixi/envs/default/Library/bin")
-    else -> null
-  }
-val lwjglTestJvmArgs = buildList {
-  add("--enable-native-access=ALL-UNNAMED")
-  if (pixiVulkanLoader?.asFile?.exists() == true) {
-    add("-Dorg.lwjgl.vulkan.libname=${pixiVulkanLoader.asFile.absolutePath}")
-  }
-}
+val lwjglTestJvmArgs = listOf("--enable-native-access=ALL-UNNAMED")
 
 jextract.libraries {
   val maplibreNativeC by registering {
@@ -74,18 +51,8 @@ dependencies {
 tasks.withType<JavaCompile>().configureEach { options.release = 25 }
 
 val nativeLibraryPathProperty = "org.maplibre.nativeffi.library.path"
-val nativeBuildDirForTests =
-  providers
-    .environmentVariable("MLN_FFI_BUILD_DIR")
-    .orElse(rootProject.layout.buildDirectory.dir("host").map { it.asFile.absolutePath })
-val nativeBuildConfigForTests =
-  providers.environmentVariable("MLN_FFI_CMAKE_BUILD_CONFIG").orElse("")
-val nativeLibraryDirForTests =
-  nativeBuildDirForTests.zip(nativeBuildConfigForTests) { buildDir, config ->
-    val configDir = "$buildDir/$config"
-    if (config.isNotEmpty() && file(configDir).isDirectory) configDir else buildDir
-  }
-val nativeLibraryPathForTests = nativeLibraryDirForTests.map {
+val nativeBuildDirForTests = providers.environmentVariable("MLN_FFI_BUILD_DIR")
+val nativeLibraryPathForTests = nativeBuildDirForTests.map {
   "$it/${System.mapLibraryName("maplibre-native-c")}"
 }
 
@@ -94,10 +61,4 @@ tasks.withType<Test>().configureEach {
   jvmArgs(lwjglTestJvmArgs)
   systemProperty(nativeLibraryPathProperty, nativeLibraryPathForTests.get())
   inputs.file(nativeLibraryPathForTests).withPropertyName("maplibreNativeCLibrary")
-  if (pixiRuntimeBin?.asFile?.isDirectory == true) {
-    environment(
-      "PATH",
-      "${pixiRuntimeBin.asFile.absolutePath}${File.pathSeparator}${System.getenv("PATH")}",
-    )
-  }
 }

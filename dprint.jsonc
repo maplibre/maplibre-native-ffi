@@ -37,7 +37,7 @@
   "exec": {
     "commands": [
       {
-        "command": "pixi run clang-format --assume-filename={{file_path}}",
+        "command": "pixi run --environment format --locked --quiet clang-format --assume-filename={{file_path}}",
         "exts": ["c", "cc", "cpp", "cxx", "h", "hh", "hpp", "hxx", "m", "mm"],
       },
       {

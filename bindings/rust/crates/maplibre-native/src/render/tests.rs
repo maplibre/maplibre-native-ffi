@@ -219,45 +219,9 @@ impl Drop for VulkanTestContext {
 }
 
 fn load_vulkan_entry() -> std::result::Result<ash::Entry, Box<dyn StdError>> {
-    // SAFETY: Loading the Vulkan loader is delegated to ash.
-    match unsafe { ash::Entry::load() } {
-        Ok(entry) => Ok(entry),
-        Err(default_error) => {
-            let repo_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-                .ancestors()
-                .find(|path| path.join("include/maplibre_native_c.h").is_file())
-                .ok_or("could not locate repository root for pixi Vulkan loader")?;
-            let pixi_loader = if cfg!(target_os = "windows") {
-                repo_root
-                    .join(".pixi")
-                    .join("envs")
-                    .join("default")
-                    .join("Library")
-                    .join("bin")
-                    .join("vulkan-1.dll")
-            } else if cfg!(target_os = "linux") {
-                repo_root
-                    .join(".pixi")
-                    .join("envs")
-                    .join("default")
-                    .join("lib")
-                    .join("libvulkan.so.1")
-            } else {
-                repo_root
-                    .join(".pixi")
-                    .join("envs")
-                    .join("default")
-                    .join("lib")
-                    .join("libvulkan.1.dylib")
-            };
-            if pixi_loader.exists() {
-                // SAFETY: The path points to the pixi-provided Vulkan loader.
-                unsafe { ash::Entry::load_from(&pixi_loader) }.map_err(Into::into)
-            } else {
-                Err(default_error.into())
-            }
-        }
-    }
+    // SAFETY: Loading the Vulkan loader is delegated to ash. Repository tasks
+    // run through Pixi and expose the native library directory to this process.
+    unsafe { ash::Entry::load() }.map_err(Into::into)
 }
 
 fn has_instance_extension(
