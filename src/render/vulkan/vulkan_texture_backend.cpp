@@ -315,17 +315,6 @@ VulkanTextureBackend::~VulkanTextureBackend() {
   };
   resource.reset();
   getThreadPool().runRenderJobs(true);
-  context.reset();
-  commandPool.reset();
-  if (allocator != nullptr) {
-    vmaDestroyAllocator(allocator);
-    allocator = nullptr;
-  }
-  static_cast<void>(device.release());
-  static_cast<void>(instance.release());
-  device.get() = nullptr;
-  instance.get() = nullptr;
-  usingSharedContext = true;
 }
 
 void VulkanTextureBackend::initSharedDevice() {
