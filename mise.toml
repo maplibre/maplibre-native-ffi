@@ -60,6 +60,7 @@ config_roots = ["bindings/*", "examples/*", "docs"]
 
 [env]
 _.source = { path = "scripts/pixi-env.sh", tools = true }
+MISE_BASH_PATH = "C:/Program Files/Git/bin/bash.exe"
 UV_PYTHON = { value = "{{ tools.python.path }}", tools = true }
 MLN_FFI_REPO_ROOT = "{{config_root}}"
 MLN_FFI_VARIANT = { required = true }
