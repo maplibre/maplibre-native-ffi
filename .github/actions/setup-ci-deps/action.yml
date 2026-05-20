@@ -80,14 +80,14 @@ runs:
           "$env:USERPROFILE\AppData\Local\mise\shims",
           "$env:USERPROFILE\AppData\Local\mise\bin",
           $(if ($env:SCCACHE_PATH) { Split-Path -Parent $env:SCCACHE_PATH }),
+          "C:\Program Files\Git\bin",
+          "C:\Program Files\Git\usr\bin",
           "$env:SystemRoot\System32",
           "$env:SystemRoot",
           "$env:SystemRoot\System32\Wbem",
           "$env:SystemRoot\System32\WindowsPowerShell\v1.0",
           "C:\Program Files\PowerShell\7",
-          "C:\Program Files\Git\cmd",
-          "C:\Program Files\Git\bin",
-          "C:\Program Files\Git\usr\bin"
+          "C:\Program Files\Git\cmd"
         ) | Where-Object { $_ -and (Test-Path $_) }
 
         "Path=$($paths -join ';')" >> $env:GITHUB_ENV
