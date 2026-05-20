@@ -19,12 +19,12 @@ format = { features = ["format"], no-default-feature = true }
 LIBCLANG_PATH = "$CONDA_PREFIX/lib"
 MLN_FFI_DEPENDENCY_INCLUDE_DIR = "$CONDA_PREFIX/include"
 MLN_FFI_DEPENDENCY_LIBRARY_DIR = "$CONDA_PREFIX/lib"
-RUSTFLAGS = "-C link-arg=-Wl,-rpath,$CONDA_PREFIX/lib"
+RUSTFLAGS = "-C link-arg=-Wl,-rpath,$CONDA_PREFIX/lib -C link-arg=-Wl,-rpath,$MLN_FFI_BUILD_DIR"
 
 [target.linux.activation.env]
 LD_LIBRARY_PATH = "$CONDA_PREFIX/lib"
 MLN_FFI_SYSTEM_ROOT = "$CONDA_BUILD_SYSROOT"
-RUSTFLAGS = "-C link-arg=-Wl,-rpath,$CONDA_PREFIX/lib -C link-arg=-Wl,-rpath-link,$CONDA_PREFIX/lib"
+RUSTFLAGS = "-C link-arg=-Wl,-rpath,$CONDA_PREFIX/lib -C link-arg=-Wl,-rpath-link,$CONDA_PREFIX/lib -C link-arg=-Wl,-rpath,$MLN_FFI_BUILD_DIR"
 
 [target.osx.activation.env]
 MLN_FFI_SYSTEM_ROOT = "$SDKROOT"
