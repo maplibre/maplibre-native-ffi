@@ -6,7 +6,6 @@
 #include <mbgl/gfx/headless_backend.hpp>
 #include <mbgl/util/size.hpp>
 
-#include <vulkan/vulkan.hpp>
 #include <vulkan/vulkan_core.h>
 
 #include "diagnostics/diagnostics.hpp"

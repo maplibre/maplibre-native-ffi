@@ -99,15 +99,6 @@ fn vulkan_context_descriptor_to_native(
     }
 }
 
-pub fn owned_texture_descriptor_to_native(
-    extent: RenderTargetExtentFields,
-) -> sys::mln_owned_texture_descriptor {
-    // SAFETY: Default constructor takes no arguments and initializes size fields.
-    let mut raw = unsafe { sys::mln_owned_texture_descriptor_default() };
-    raw.extent = render_target_extent_to_native(extent);
-    raw
-}
-
 pub fn metal_surface_descriptor_to_native(
     fields: MetalSurfaceDescriptorFields,
 ) -> sys::mln_metal_surface_descriptor {
@@ -208,20 +199,7 @@ mod tests {
     }
 
     #[test]
-    fn owned_and_metal_descriptors_fill_sizes_fields_and_pointers() {
-        let owned = owned_texture_descriptor_to_native(extent());
-        assert_eq!(
-            owned.size,
-            std::mem::size_of::<sys::mln_owned_texture_descriptor>() as u32
-        );
-        assert_eq!(
-            owned.extent.size,
-            std::mem::size_of::<sys::mln_render_target_extent>() as u32
-        );
-        assert_eq!(owned.extent.width, 32);
-        assert_eq!(owned.extent.height, 16);
-        assert_eq!(owned.extent.scale_factor, 2.0);
-
+    fn metal_descriptors_fill_sizes_fields_and_pointers() {
         let surface = metal_surface_descriptor_to_native(MetalSurfaceDescriptorFields {
             extent: extent(),
             context: metal_context(2),

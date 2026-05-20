@@ -1,81 +1,17 @@
 #include <cstdint>
 #include <cstring>
 #include <limits>
-#include <memory>
-#include <utility>
 
 #include <mbgl/gfx/backend_scope.hpp>
-#include <mbgl/gfx/headless_backend.hpp>
-#include <mbgl/gfx/renderable.hpp>
-#include <mbgl/gfx/renderer_backend.hpp>
 #include <mbgl/util/image.hpp>
-#include <mbgl/util/size.hpp>
 
 #include "render/texture_session.hpp"
 
 #include "diagnostics/diagnostics.hpp"
-#include "map/map.hpp"
 #include "maplibre_native_c.h"
 #include "render/render_session_common.hpp"
 
-namespace {
-
-auto validate_owned_descriptor(const mln_owned_texture_descriptor* descriptor)
-  -> mln_status {
-  if (descriptor == nullptr) {
-    mln::core::set_thread_error("texture descriptor must not be null");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  if (descriptor->size < sizeof(mln_owned_texture_descriptor)) {
-    mln::core::set_thread_error(
-      "mln_owned_texture_descriptor.size is too small"
-    );
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
-  return mln::core::validate_render_target_extent(
-    descriptor->extent, "texture dimensions and scale_factor must be positive"
-  );
-}
-
-class GenericTextureSessionBackend final
-    : public mln::core::TextureSessionBackend {
- public:
-  explicit GenericTextureSessionBackend(mbgl::Size size)
-      : backend_(
-          mbgl::gfx::HeadlessBackend::Create(
-            size, mbgl::gfx::Renderable::SwapBehaviour::Flush,
-            mbgl::gfx::ContextMode::Unique
-          )
-        ) {}
-
-  auto headless_backend() -> mbgl::gfx::HeadlessBackend& override {
-    return *backend_;
-  }
-
-  [[nodiscard]] auto is_valid() const noexcept -> bool {
-    return backend_ != nullptr;
-  }
-
- private:
-  std::unique_ptr<mbgl::gfx::HeadlessBackend> backend_;
-};
-
-}  // namespace
-
 namespace mln::core {
-
-auto owned_texture_descriptor_default() noexcept
-  -> mln_owned_texture_descriptor {
-  return mln_owned_texture_descriptor{
-    .size = sizeof(mln_owned_texture_descriptor),
-    .extent = mln_render_target_extent{
-      .size = sizeof(mln_render_target_extent),
-      .width = 256,
-      .height = 256,
-      .scale_factor = 1.0,
-    },
-  };
-}
 
 auto texture_image_info_default() noexcept -> mln_texture_image_info {
   return mln_texture_image_info{
@@ -109,57 +45,6 @@ auto validate_live_attached_texture(mln_render_session* texture) -> mln_status {
     return MLN_STATUS_INVALID_STATE;
   }
   return MLN_STATUS_OK;
-}
-
-auto owned_texture_attach(
-  mln_map* map, const mln_owned_texture_descriptor* descriptor,
-  mln_render_session** out_session
-) -> mln_status {
-  const auto map_status = validate_map(map);
-  if (map_status != MLN_STATUS_OK) {
-    return map_status;
-  }
-  const auto descriptor_status = validate_owned_descriptor(descriptor);
-  if (descriptor_status != MLN_STATUS_OK) {
-    return descriptor_status;
-  }
-  const auto output_status = validate_attach_output(
-    out_session, "out_session must not be null",
-    "out_session must point to a null handle"
-  );
-  if (output_status != MLN_STATUS_OK) {
-    return output_status;
-  }
-  const auto physical_status = validate_physical_size(
-    descriptor->extent.width, descriptor->extent.height,
-    descriptor->extent.scale_factor, "scaled texture dimensions are too large"
-  );
-  if (physical_status != MLN_STATUS_OK) {
-    return physical_status;
-  }
-
-  auto session = std::make_unique<mln_render_session>();
-  session->map = map;
-  session->owner_thread = map_owner_thread(map);
-  set_session_extent(*session, descriptor->extent);
-  session->texture.api_kind = TextureSessionApi::Generic;
-  session->texture.mode = TextureSessionMode::Owned;
-  auto backend = std::make_unique<GenericTextureSessionBackend>(
-    mbgl::Size{session->physical_width, session->physical_height}
-  );
-  if (!backend->is_valid()) {
-    set_thread_error("texture session backend is not available");
-    return MLN_STATUS_UNSUPPORTED;
-  }
-  session->texture.backend = std::move(backend);
-  return attach_render_session(
-    std::move(session), out_session, RenderSessionKind::Texture,
-    RenderSessionAttachMessages{
-      .null_session = "texture session must not be null",
-      .null_output = "out_session must not be null",
-      .non_null_output = "out_session must point to a null handle"
-    }
-  );
 }
 
 auto texture_read_premultiplied_rgba8(
