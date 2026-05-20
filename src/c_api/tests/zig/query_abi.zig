@@ -5,14 +5,12 @@ const testing = std.testing;
 const support = @import("support.zig");
 const c = support.c;
 
-fn attachTextureSession(map: *c.mln_map) !*c.mln_render_session {
-    var descriptor = c.mln_owned_texture_descriptor_default();
+fn attachTextureSession(map: *c.mln_map, context: *const support.OwnedTextureAttachContext) !*c.mln_render_session {
+    var descriptor = support.ownedTextureDescriptor(context);
     descriptor.extent.width = 64;
     descriptor.extent.height = 64;
 
-    var session: ?*c.mln_render_session = null;
-    try testing.expectEqual(c.MLN_STATUS_OK, c.mln_owned_texture_attach(map, &descriptor, &session));
-    return session orelse error.SessionAttachFailed;
+    return support.attachOwnedTextureSession(map, &descriptor);
 }
 
 test "feature query validation rejects raw descriptor shapes" {
@@ -20,7 +18,9 @@ test "feature query validation rejects raw descriptor shapes" {
     defer support.destroyRuntime(runtime);
     const map = try support.createMap(runtime);
     defer support.destroyMap(map);
-    const session = try attachTextureSession(map);
+    var context = try support.OwnedTextureAttachContext.init();
+    defer context.deinit();
+    const session = try attachTextureSession(map, &context);
     defer testing.expectEqual(c.MLN_STATUS_OK, c.mln_render_session_destroy(session)) catch @panic("session destroy failed");
 
     var result: ?*c.mln_feature_query_result = null;

@@ -1009,12 +1009,13 @@ auto offline_region_get(
       result.error(), "offline region get failed"
     );
   }
-  if (!result.value()) {
+  const auto& region = result.value();
+  if (!region.has_value()) {
     *out_found = false;
     return MLN_STATUS_OK;
   }
 
-  auto data = to_c_region_data(*result.value());
+  auto data = to_c_region_data(region.value());
   if (!data) {
     return MLN_STATUS_UNSUPPORTED;
   }
@@ -1158,12 +1159,13 @@ auto offline_region_update_metadata(
       get_result.error(), "offline region get failed"
     );
   }
-  if (!get_result.value()) {
+  const auto& region = get_result.value();
+  if (!region.has_value()) {
     set_thread_error("offline region not found");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
-  auto data = to_c_region_data(*get_result.value());
+  auto data = to_c_region_data(region.value());
   if (!data) {
     return MLN_STATUS_UNSUPPORTED;
   }
@@ -1204,7 +1206,8 @@ auto offline_region_get_status(
       get_result.error(), "offline region get failed"
     );
   }
-  if (!get_result.value()) {
+  const auto& region = get_result.value();
+  if (!region.has_value()) {
     set_thread_error("offline region not found");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
@@ -1212,9 +1215,7 @@ auto offline_region_get_status(
   auto status_result = wait_for_database_result<
     mbgl::expected<mbgl::OfflineRegionStatus, std::exception_ptr>>(
     [&](auto callback) -> void {
-      database->getOfflineRegionStatus(
-        *get_result.value(), std::move(callback)
-      );
+      database->getOfflineRegionStatus(region.value(), std::move(callback));
     }
   );
   if (!status_result) {
@@ -1251,7 +1252,8 @@ auto offline_region_set_observed(
       get_result.error(), "offline region get failed"
     );
   }
-  if (!get_result.value()) {
+  const auto& region = get_result.value();
+  if (!region.has_value()) {
     set_thread_error("offline region not found");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
@@ -1261,7 +1263,7 @@ auto offline_region_set_observed(
                                runtime->offline_event_state, region_id
                              )
                            : nullptr;
-  database->setOfflineRegionObserver(*get_result.value(), std::move(observer));
+  database->setOfflineRegionObserver(region.value(), std::move(observer));
   return MLN_STATUS_OK;
 }
 
@@ -1295,12 +1297,13 @@ auto offline_region_set_download_state(
       get_result.error(), "offline region get failed"
     );
   }
-  if (!get_result.value()) {
+  const auto& region = get_result.value();
+  if (!region.has_value()) {
     set_thread_error("offline region not found");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
-  database->setOfflineRegionDownloadState(*get_result.value(), *native_state);
+  database->setOfflineRegionDownloadState(region.value(), *native_state);
   return MLN_STATUS_OK;
 }
 
@@ -1329,13 +1332,14 @@ auto offline_region_invalidate(
       get_result.error(), "offline region get failed"
     );
   }
-  if (!get_result.value()) {
+  const auto& region = get_result.value();
+  if (!region.has_value()) {
     set_thread_error("offline region not found");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
   return wait_for_database_operation([&](auto callback) -> void {
-    database->invalidateOfflineRegion(*get_result.value(), std::move(callback));
+    database->invalidateOfflineRegion(region.value(), std::move(callback));
   });
 }
 
@@ -1364,19 +1368,20 @@ auto offline_region_delete(
       get_result.error(), "offline region get failed"
     );
   }
-  if (!get_result.value()) {
+  const auto& region = get_result.value();
+  if (!region.has_value()) {
     set_thread_error("offline region not found");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
   set_offline_region_observed_flag(runtime, region_id, false);
-  database->setOfflineRegionObserver(*get_result.value(), nullptr);
+  database->setOfflineRegionObserver(region.value(), nullptr);
   database->setOfflineRegionDownloadState(
-    *get_result.value(), mbgl::OfflineRegionDownloadState::Inactive
+    region.value(), mbgl::OfflineRegionDownloadState::Inactive
   );
 
   return wait_for_database_operation([&](auto callback) -> void {
-    database->deleteOfflineRegion(*get_result.value(), std::move(callback));
+    database->deleteOfflineRegion(region.value(), std::move(callback));
   });
 }
 

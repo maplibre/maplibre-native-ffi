@@ -8,7 +8,6 @@ import org.maplibre.nativeffi.internal.c.mln_metal_context_descriptor;
 import org.maplibre.nativeffi.internal.c.mln_metal_owned_texture_descriptor;
 import org.maplibre.nativeffi.internal.c.mln_metal_owned_texture_frame;
 import org.maplibre.nativeffi.internal.c.mln_metal_surface_descriptor;
-import org.maplibre.nativeffi.internal.c.mln_owned_texture_descriptor;
 import org.maplibre.nativeffi.internal.c.mln_render_target_extent;
 import org.maplibre.nativeffi.internal.c.mln_texture_image_info;
 import org.maplibre.nativeffi.internal.c.mln_vulkan_borrowed_texture_descriptor;
@@ -21,7 +20,6 @@ import org.maplibre.nativeffi.render.MetalContextDescriptor;
 import org.maplibre.nativeffi.render.MetalOwnedTextureDescriptor;
 import org.maplibre.nativeffi.render.MetalSurfaceDescriptor;
 import org.maplibre.nativeffi.render.NativePointer;
-import org.maplibre.nativeffi.render.OwnedTextureDescriptor;
 import org.maplibre.nativeffi.render.RenderTargetExtent;
 import org.maplibre.nativeffi.render.TextureImageInfo;
 import org.maplibre.nativeffi.render.VulkanBorrowedTextureDescriptor;
@@ -32,13 +30,6 @@ import org.maplibre.nativeffi.render.VulkanSurfaceDescriptor;
 /** Internal materializers and readers for render target descriptors and frames. */
 public final class RenderStructs {
   private RenderStructs() {}
-
-  public static MemorySegment ownedTextureDescriptor(
-      OwnedTextureDescriptor descriptor, Arena arena) {
-    var segment = MapLibreNativeC.mln_owned_texture_descriptor_default(arena);
-    fillExtent(mln_owned_texture_descriptor.extent(segment), descriptor.extent());
-    return segment;
-  }
 
   public static MemorySegment metalOwnedTextureDescriptor(
       MetalOwnedTextureDescriptor descriptor, Arena arena) {
