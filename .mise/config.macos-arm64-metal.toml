@@ -1,9 +1,6 @@
 [env]
-CC = "{{ exec(command='xcodebuild -find clang') }}"
-CXX = "{{ exec(command='xcodebuild -find clang++') }}"
 MLN_FFI_VARIANT = "macos-arm64-metal"
 MLN_FFI_TARGET_TRIPLE = "macos-arm64"
 MLN_FFI_RENDER_BACKEND = "metal"
 MLN_FFI_BUILD_DIR = "{{config_root}}/build/macos-arm64-metal"
-DYLD_LIBRARY_PATH = "{{config_root}}/build/macos-arm64-metal"
-LD_LIBRARY_PATH = "{{config_root}}/build/macos-arm64-metal"
+MLN_FFI_ZIG_TARGET = "aarch64-macos"

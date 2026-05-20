@@ -24,8 +24,8 @@ use crate::handle::{ThreadAffineNativeHandle, closed_handle_error, out_handle};
 use crate::options::{MapOptionsNativeExt, MapTileOptionsNativeExt, MapViewportOptionsNativeExt};
 use crate::render::{
     MetalBorrowedTextureDescriptor, MetalOwnedTextureDescriptor, MetalSurfaceDescriptor,
-    OwnedTextureDescriptor, RenderSessionHandle, VulkanBorrowedTextureDescriptor,
-    VulkanOwnedTextureDescriptor, VulkanSurfaceDescriptor,
+    RenderSessionHandle, VulkanBorrowedTextureDescriptor, VulkanOwnedTextureDescriptor,
+    VulkanSurfaceDescriptor,
 };
 use crate::runtime::{RuntimeHandle, RuntimeState};
 use crate::values::NativeValue;
@@ -715,22 +715,6 @@ impl MapHandle {
     /// Creates a standalone projection snapshot from the current map transform.
     pub fn create_projection(&self) -> Result<MapProjectionHandle> {
         MapProjectionHandle::new(self)
-    }
-
-    /// Attaches a session-owned offscreen texture render target to this map.
-    ///
-    /// The session owns the backend texture target. The returned render session
-    /// retains the map and remains owner-thread affine.
-    pub fn attach_owned_texture(
-        &self,
-        descriptor: &OwnedTextureDescriptor,
-    ) -> Result<RenderSessionHandle> {
-        let raw = descriptor.to_native();
-        RenderSessionHandle::attach(self, |map, out| {
-            // SAFETY: map is live, raw is a materialized descriptor valid for
-            // this call, and out is a null-initialized out-pointer.
-            unsafe { sys::mln_owned_texture_attach(map, &raw, out) }
-        })
     }
 
     /// Attaches a Metal native surface render target to this map.

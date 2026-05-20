@@ -2,7 +2,9 @@
 
 import PackageDescription
 
-let nativeBuildDir = Context.environment["MLN_FFI_BUILD_DIR"] ?? "../../build/host"
+let nativeBuildDir = Context.environment["MLN_FFI_BUILD_DIR"] ?? {
+  fatalError("MLN_FFI_BUILD_DIR is required")
+}()
 
 let package = Package(
   name: "swift-map",
@@ -18,7 +20,7 @@ let package = Package(
       name: "SwiftMap",
       dependencies: ["CMapLibreNativeC"],
       linkerSettings: [
-        .unsafeFlags(["-L\(nativeBuildDir)", "-lmaplibre-native-c"]),
+        .unsafeFlags(["-L\(nativeBuildDir)", "-lmaplibre-native-c", "-Xlinker", "-rpath", "-Xlinker", nativeBuildDir]),
         .linkedFramework("AppKit"),
         .linkedFramework("Metal"),
         .linkedFramework("QuartzCore"),

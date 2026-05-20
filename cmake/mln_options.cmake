@@ -39,7 +39,12 @@ function(mln_configure_options)
   set(MLN_WITH_WERROR OFF
       CACHE BOOL "Do not fail wrapper builds on MapLibre Native warnings" FORCE)
 
-  option(MLN_FFI_ENABLE_CLANG_TIDY "Run clang-tidy for wrapper sources" ON)
+  set(MLN_FFI_ENABLE_CLANG_TIDY_DEFAULT OFF)
+  if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    set(MLN_FFI_ENABLE_CLANG_TIDY_DEFAULT ON)
+  endif()
+  option(MLN_FFI_ENABLE_CLANG_TIDY "Run clang-tidy for wrapper sources"
+         ${MLN_FFI_ENABLE_CLANG_TIDY_DEFAULT})
 
   message(
     STATUS "Configuring maplibre-native-c ${MLN_FFI_RENDER_BACKEND} backend")
