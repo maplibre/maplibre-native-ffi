@@ -43,12 +43,10 @@ BINDGEN_EXTRA_CLANG_ARGS = "--sysroot=$CONDA_BUILD_SYSROOT -isystem$CONDA_PREFIX
 
 [target.win.activation.env]
 # Rust bindgen's clang-sys uses LIBCLANG_PATH to find Pixi's libclang.
-LIBCLANG_PATH = "%CONDA_PREFIX%\\Library\\bin"
-MLN_FFI_DEPENDENCY_INCLUDE_DIR = "%CONDA_PREFIX%\\Library\\include"
-MLN_FFI_DEPENDENCY_LIBRARY_DIR = "%CONDA_PREFIX%\\Library\\lib"
-RUSTFLAGS = "-L native=%CONDA_PREFIX%\\Library\\lib"
-# Tools and DLLs from Pixi's Windows prefix live under Library\\bin.
-PATH = "%CONDA_PREFIX%\\Library\\bin;%PATH%"
+LIBCLANG_PATH = "$CONDA_PREFIX/Library/bin"
+MLN_FFI_DEPENDENCY_INCLUDE_DIR = "$CONDA_PREFIX/Library/include"
+MLN_FFI_DEPENDENCY_LIBRARY_DIR = "$CONDA_PREFIX/Library/lib"
+RUSTFLAGS = "-L native=$CONDA_PREFIX/Library/lib"
 
 [feature.format.dependencies]
 # Formatting stays on a single clang-format version across platforms.
