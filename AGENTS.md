@@ -83,48 +83,6 @@ Read these docs for related tooling:
 
 ## Cursor Cloud specific instructions
 
-The active build variant on Linux x86_64 is `linux-x64-vulkan`, auto-selected by
-`.miserc.toml`. Mise activates it via `MISE_ENV`.
-
-### Vulkan on headless Linux
-
-Pixi installs Mesa's lavapipe software Vulkan ICD, but the Vulkan loader does
-not discover it automatically. Set `VK_ICD_FILENAMES` before running tests or
-examples:
-
-```bash
-export VK_ICD_FILENAMES="/workspace/.pixi/envs/default/share/vulkan/icd.d/lvp_icd.x86_64.json"
-```
-
-Without this, Vulkan-dependent tests fail with `vkCreateInstance` errors and
-examples that render via Vulkan cannot create an instance.
-
-### Rust components
-
-After `mise install`, the Rust toolchain may lack `rustfmt` and `clippy`. Add
-them before running `mise run fix`:
-
-```bash
-mise exec -- rustup component add rustfmt clippy
-```
-
-CI does this in `.github/actions/setup-ci-deps/action.yml` ("Ensure Rust
-components" step).
-
-### Key commands
-
-| Task                            | Command                                |
-| ------------------------------- | -------------------------------------- |
-| Build + test                    | `mise run test`                        |
-| Lint + format                   | `mise run fix`                         |
-| Readback example (headless)     | `mise run //examples/zig-readback:run` |
-| GUI map example (needs display) | `mise run //examples/zig-map:run`      |
-
-### Notes
-
-- `mise trust --all` is needed on first clone to trust the workspace config
-  files.
-- The zig-readback example is the best smoke test in headless environments; it
-  renders a 512×512 map tile to a PPM file without needing a display server.
-- GUI examples (`zig-map`, `rust-map`, `lwjgl-map`) need SDL3 and a display, so
-  they are impractical in Cloud Agent VMs.
+The `zig-readback` example is the best smoke test in headless environments; it
+renders a 512×512 map tile to a PPM file without needing a display server. GUI
+examples (`zig-map`, `rust-map`, `lwjgl-map`) need SDL3 and a display.
