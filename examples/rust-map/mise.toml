@@ -1,35 +1,25 @@
-[env]
-MLN_FFI_REPO_ROOT = "{{config_root}}/../.."
-MLN_FFI_CARGO_MANIFEST = "{{env.MLN_FFI_REPO_ROOT}}/Cargo.toml"
-MLN_FFI_PIXI_LIB = "{{env.MLN_FFI_REPO_ROOT}}/.pixi/envs/default/lib"
-DYLD_LIBRARY_PATH = "{{env.MLN_FFI_PIXI_LIB}}:{{env.DYLD_LIBRARY_PATH}}"
-LD_LIBRARY_PATH = "{{env.MLN_FFI_PIXI_LIB}}:{{env.LD_LIBRARY_PATH}}"
-
 [tasks.compile-shaders]
 hide = true
 run = [
-  "pixi run glslangValidator -V src/vulkan_texture_compositor/shaders/fullscreen.vert -o src/vulkan_texture_compositor/shaders/fullscreen.vert.spv",
-  "pixi run glslangValidator -V src/vulkan_texture_compositor/shaders/sample.frag -o src/vulkan_texture_compositor/shaders/sample.frag.spv",
+  "glslangValidator -V src/vulkan_texture_compositor/shaders/fullscreen.vert -o src/vulkan_texture_compositor/shaders/fullscreen.vert.spv",
+  "glslangValidator -V src/vulkan_texture_compositor/shaders/sample.frag -o src/vulkan_texture_compositor/shaders/sample.frag.spv",
 ]
 
 [tasks.build]
 depends = ["//:ensure-native-library", ":compile-shaders"]
-run = "bash \"$MLN_FFI_REPO_ROOT/bindings/rust/scripts/with-libclang.sh\" cargo build --manifest-path \"$MLN_FFI_CARGO_MANIFEST\" -p rust-map"
+dir = "{{env.MLN_FFI_REPO_ROOT}}"
+run = "cargo build -p rust-map"
 
 [tasks.ci]
 depends = [":build"]
-run = "bash \"$MLN_FFI_REPO_ROOT/bindings/rust/scripts/with-libclang.sh\" cargo clippy --manifest-path \"$MLN_FFI_CARGO_MANIFEST\" -p rust-map --all-targets -- -D warnings"
+dir = "{{env.MLN_FFI_REPO_ROOT}}"
+run = "cargo clippy -p rust-map --all-targets -- -D warnings"
 
 [tasks.run]
 depends = ["//:ensure-native-library", ":compile-shaders"]
+dir = "{{env.MLN_FFI_REPO_ROOT}}"
 usage = 'arg "[render-target]" default="owned-texture"'
-run = '''
-pixi_icd="$MLN_FFI_REPO_ROOT/.pixi/envs/default/share/vulkan/icd.d/MoltenVK_icd.json"
-if [[ -f "$pixi_icd" && -z "${VK_ICD_FILENAMES:-}" ]]; then
-  export VK_ICD_FILENAMES="$pixi_icd"
-fi
-bash "$MLN_FFI_REPO_ROOT/bindings/rust/scripts/with-libclang.sh" cargo run --manifest-path "$MLN_FFI_CARGO_MANIFEST" -p rust-map -- --render-target="$usage_render_target"
-'''
+run = "cargo run -p rust-map -- --render-target=\"$usage_render_target\""
 
 [tasks."run:owned-texture"]
 run = [{ task = "run", args = ["owned-texture"] }]

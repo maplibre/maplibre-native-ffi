@@ -1,21 +1,13 @@
 [tasks.build]
 depends = ["//:ensure-native-library"]
 run = '''
-native_library_dir="$MLN_FFI_BUILD_DIR"
-if [[ -n "${MLN_FFI_CMAKE_BUILD_CONFIG:-}" && -d "$native_library_dir/$MLN_FFI_CMAKE_BUILD_CONFIG" ]]; then
-  native_library_dir="$native_library_dir/$MLN_FFI_CMAKE_BUILD_CONFIG"
-fi
-zig build --prefix "zig-out/${MLN_FFI_VARIANT:-host}" -Dcmake-artifact-dir="$native_library_dir" ${MLN_FFI_RENDER_BACKEND:+-Drender-backend=$MLN_FFI_RENDER_BACKEND}
+zig build -Dtarget="$MLN_FFI_ZIG_TARGET" -Dcmake-artifact-dir="$MLN_FFI_BUILD_DIR" -Dinclude-dir="$MLN_FFI_INCLUDE_DIR" -Dinclude-dir="$MLN_FFI_DEPENDENCY_INCLUDE_DIR" -Dinclude-dir="$MLN_FFI_VULKAN_INCLUDE_DIR" -Ddependency-library-dir="$MLN_FFI_DEPENDENCY_LIBRARY_DIR" -Drender-backend="$MLN_FFI_RENDER_BACKEND"
 '''
 
 [tasks.test]
 depends = ["//:ensure-native-library"]
 run = '''
-native_library_dir="$MLN_FFI_BUILD_DIR"
-if [[ -n "${MLN_FFI_CMAKE_BUILD_CONFIG:-}" && -d "$native_library_dir/$MLN_FFI_CMAKE_BUILD_CONFIG" ]]; then
-  native_library_dir="$native_library_dir/$MLN_FFI_CMAKE_BUILD_CONFIG"
-fi
-zig build --prefix "zig-out/${MLN_FFI_VARIANT:-host}" test --summary all --verbose -Dcmake-artifact-dir="$native_library_dir" ${MLN_FFI_RENDER_BACKEND:+-Drender-backend=$MLN_FFI_RENDER_BACKEND}
+zig build -Dtarget="$MLN_FFI_ZIG_TARGET" test --summary all --verbose -Dcmake-artifact-dir="$MLN_FFI_BUILD_DIR" -Dinclude-dir="$MLN_FFI_INCLUDE_DIR" -Dinclude-dir="$MLN_FFI_DEPENDENCY_INCLUDE_DIR" -Dinclude-dir="$MLN_FFI_VULKAN_INCLUDE_DIR" -Ddependency-library-dir="$MLN_FFI_DEPENDENCY_LIBRARY_DIR" -Drender-backend="$MLN_FFI_RENDER_BACKEND"
 '''
 
 [tasks.ci]
