@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import org.maplibre.nativeffi.error.InvalidStateException;
 import org.maplibre.nativeffi.error.MaplibreException;
 import org.maplibre.nativeffi.error.MaplibreStatus;
 import org.maplibre.nativeffi.internal.access.InternalAccess;
@@ -385,8 +386,14 @@ public final class RuntimeHandle implements AutoCloseable {
       return;
     }
     var operationId = operation.requireLive(this);
-    Status.check(
-        MapLibreNativeC.mln_runtime_offline_operation_discard(state.requireLive(), operationId));
+    MemorySegment runtime;
+    try {
+      runtime = state.requireLive();
+    } catch (InvalidStateException error) {
+      operation.markConsumed();
+      throw error;
+    }
+    Status.check(MapLibreNativeC.mln_runtime_offline_operation_discard(runtime, operationId));
     operation.markConsumed();
   }
 
@@ -578,9 +585,7 @@ public final class RuntimeHandle implements AutoCloseable {
           : new RuntimeEventPayload.Unknown(rawPayloadType, payloadSize);
     }
     if (rawPayloadType == MapLibreNativeC.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_OPERATION_COMPLETED()) {
-      return payloadSize >= mln_runtime_event_offline_operation_completed.sizeof()
-          ? readOfflineOperationCompleted(payload)
-          : new RuntimeEventPayload.Unknown(rawPayloadType, payloadSize);
+      return readOfflineOperationCompletedPayload(rawPayloadType, payload, payloadSize);
     }
     return new RuntimeEventPayload.Unknown(rawPayloadType, payloadSize);
   }
@@ -646,6 +651,15 @@ public final class RuntimeHandle implements AutoCloseable {
     return new RuntimeEventPayload.OfflineRegionTileCountLimit(
         mln_runtime_event_offline_region_tile_count_limit.region_id(limit),
         mln_runtime_event_offline_region_tile_count_limit.limit(limit));
+  }
+
+  private RuntimeEventPayload readOfflineOperationCompletedPayload(
+      int rawPayloadType, MemorySegment payload, long payloadSize) {
+    var requiredSize = mln_runtime_event_offline_operation_completed.sizeof();
+    if (MemoryUtil.isNull(payload) || payloadSize < requiredSize) {
+      return new RuntimeEventPayload.Unknown(rawPayloadType, payloadSize);
+    }
+    return readOfflineOperationCompleted(payload);
   }
 
   static MemorySegment offlineOperationCompletedPayload(MemorySegment event) {

@@ -137,6 +137,41 @@ final class RuntimeHandleTest {
   }
 
   @Test
+  void failedNativeDiscardLeavesOfflineOperationHandleLive() {
+    var runtime = RuntimeHandle.create();
+    try {
+      var operation =
+          new OfflineOperationHandle<Void>(
+              runtime,
+              9_999_999L,
+              OfflineOperationKind.AMBIENT_CACHE,
+              OfflineOperationResultKind.NONE);
+      var error = assertThrows(InvalidArgumentException.class, operation::close);
+      assertEquals(MaplibreStatus.INVALID_ARGUMENT, error.status());
+      assertFalse(operation.isClosed());
+      operation.markConsumed();
+    } finally {
+      runtime.close();
+    }
+  }
+
+  @Test
+  void discardAfterRuntimeCloseMarksOfflineOperationHandleClosed() {
+    var runtime = RuntimeHandle.create();
+    var operation =
+        new OfflineOperationHandle<Void>(
+            runtime,
+            9_999_999L,
+            OfflineOperationKind.AMBIENT_CACHE,
+            OfflineOperationResultKind.NONE);
+    runtime.close();
+
+    var error = assertThrows(InvalidStateException.class, operation::close);
+    assertEquals(MaplibreStatus.INVALID_STATE, error.status());
+    assertTrue(operation.isClosed());
+  }
+
+  @Test
   void setsResourceCallbacksBeforeMapsAreCreated() {
     var runtime = RuntimeHandle.create();
     try {
