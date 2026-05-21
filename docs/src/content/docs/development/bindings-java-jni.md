@@ -20,11 +20,11 @@ JVMs with FFM support use the
 a bridge path: Java declares `native` methods, and a companion native library
 adapts JNI values and calls the shared native binding core.
 
-Keep the public Java API close to Java FFM where practical. The JNI and FFM
-bindings should share package names, handle names, descriptor shapes, event
-values, exception classes, and `NativePointer` semantics. This alignment lets
-Java FFM, Java JNI, and later Kotlin Multiplatform actual implementations back
-the same low-level model.
+Keep the public Java API parallel to Java FFM where practical. JNI and FFM use
+compatible handle names, descriptor shapes, event values, exception taxonomy,
+and `NativePointer` semantics. JNI uses its own artifact and package root.
+Kotlin Multiplatform `commonMain` is the shared facade for common declarations
+and actual implementations.
 
 Build the bridge library in Rust with the `jni` crate from jni-rs over the
 shared Rust adaptation crates described in the
@@ -43,13 +43,13 @@ classes, `AutoCloseable` handles, exceptions, callbacks, buffers, and
 
 ## Code Organization
 
-Use the same public concept packages as Java FFM. Keep JNI-specific
-declarations, method metadata, reference helpers, and registration code under
-internal packages and the Rust bridge crate. Generated assistance is useful for
-coverage: a java-bindgen-style tool may generate Java `native` declarations, JNI
-method tables, and Rust registration stubs from public C API metadata plus
-binding rules. Public Java types remain curated so naming, lifetime, and error
-behavior stay aligned with Java FFM.
+Use a JNI-specific package root with concept grouping parallel to Java FFM. Keep
+JNI-specific declarations, method metadata, reference helpers, and registration
+code under internal packages and the Rust bridge crate. Generated assistance is
+useful for coverage: a java-bindgen-style tool may generate Java `native`
+declarations, JNI method tables, and Rust registration stubs from public C API
+metadata plus binding rules. Public Java types remain curated so naming,
+lifetime, and error behavior stay aligned with Java FFM.
 
 Use explicit native-method registration from `JNI_OnLoad` so generated method
 tables and cached IDs fail fast when artifacts do not match. Avoid relying on
@@ -58,9 +58,8 @@ JNI's name-mangled lookup for broad API coverage.
 ## Public Types and Errors
 
 Long-lived native objects use the shared `Handle` suffix and implement
-`AutoCloseable`: `RuntimeHandle`, `MapHandle`, `MapProjectionHandle`, and
-`RenderSessionHandle`. Descriptor classes, records, enums, events, JSON trees,
-and render target types mirror Java FFM unless JNI needs a concrete memory
+`AutoCloseable`. Descriptor classes, records, enums, events, JSON trees, and
+render target types mirror Java FFM unless JNI needs a concrete memory
 difference.
 
 `NativePointer` is a borrowed opaque address value. JNI converts it to and from
@@ -142,9 +141,7 @@ in-flight calls return.
 ## Render Targets
 
 Render APIs mirror Java FFM. Surface and texture descriptors use `NativePointer`
-for host-owned Android, JVM, or backend objects. JNI may obtain Android-specific
-native objects, such as `ANativeWindow`, inside platform helper methods, but
-public ownership stays explicit and borrowed.
+for host-owned backend objects. Public ownership stays explicit and borrowed.
 
 `RenderSessionHandle` represents one attached target for one map and keeps the
 map wrapper alive. Session-owned texture targets expose explicit frame handles.
