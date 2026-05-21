@@ -1,6 +1,5 @@
 [submodule "third_party/maplibre-native"]
 	path = third_party/maplibre-native
-	url = https://github.com/sargunv/maplibre-native.git
-	branch = codex/windows-vulkan-wedge-fixes
+	url = https://github.com/maplibre/maplibre-native.git
 	shallow = true
 	ignore = dirty
