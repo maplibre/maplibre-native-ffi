@@ -56,10 +56,10 @@ masks use `[Flags]` enums or purpose-built value types. Native result, snapshot,
 and list handles stay internal; readers copy into .NET values and release native
 handles in `finally`.
 
-`NativePointer` is an immutable value around `nint` or `IntPtr`. It represents a
-borrowed backend-native address, grants no memory access, and transfers no
-ownership. Public APIs accept it only where the C API already accepts opaque
-host-owned backend handles.
+`NativePointer` is an immutable value around `nint`. It represents a borrowed
+backend-native address, grants no memory access, and transfers no ownership.
+Public APIs accept it only where the C API already accepts opaque host-owned
+backend handles.
 
 ## Handles and Threading
 
@@ -121,6 +121,10 @@ may arrive on MapLibre worker, network, logging, or render-related threads, so
 the state they touch is thread-safe. Thunks catch managed exceptions and convert
 them to the C callback's documented behavior. Managed exceptions never unwind
 through native frames.
+
+When replacing a callback, install the new native descriptor before releasing
+the old managed state. If native installation fails, release the replacement
+state and keep the previous state active.
 
 Resource providers copy request data before user code can retain it. A handled
 `ResourceRequestHandle` owns the provider request reference, supports completion
