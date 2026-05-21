@@ -13,8 +13,7 @@ Resources:
 ## Architecture
 
 The Dart binding exposes a safe low-level package over the public C API through
-`dart:ffi`. Use Dart 3.10+ so stable build hooks and code assets can locate,
-bundle, or download the native MapLibre libraries used by FFI.
+`dart:ffi`. Use Dart 3.10+ as the language floor for the low-level API.
 
 Generate private `ffigen` declarations from the public umbrella header.
 Generated ABI classes, raw pointers, C structs, field masks, and
@@ -28,8 +27,7 @@ frame scheduling, and UI integration belong in adapters above it.
 
 ## Public Types
 
-Long-lived C-owned objects use the shared `Handle` suffix: `RuntimeHandle`,
-`MapHandle`, `MapProjectionHandle`, and `RenderSessionHandle`. Handles are Dart
+Long-lived C-owned objects use the shared `Handle` suffix. Handles are Dart
 classes with explicit `close()` methods. A successful `close()` releases the
 native object once and makes later closes no-ops. Failed native destruction
 leaves the handle live so callers can retry or inspect diagnostics.
