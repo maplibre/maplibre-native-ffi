@@ -26,11 +26,10 @@ ordinary call-scoped buffers rely on cgo's per-call pinning.
 
 ## Public Surface
 
-Long-lived native objects use the shared names: `RuntimeHandle`, `MapHandle`,
-`MapProjectionHandle`, and `RenderSessionHandle`. They are Go structs with
-private native state and explicit `Close() error` methods. A successful close
-releases once and makes later closes no-ops. A failed close leaves the handle
-live so callers can retry on the owner thread.
+Long-lived native objects use the shared `Handle` suffix. They are Go structs
+with private native state and explicit `Close() error` methods. A successful
+close releases once and makes later closes no-ops. A failed close leaves the
+handle live so callers can retry on the owner thread.
 
 Go names follow Go casing while treating maplibre as one word in identifiers. C
 option structs become Go descriptor structs; materializers write C `size`
