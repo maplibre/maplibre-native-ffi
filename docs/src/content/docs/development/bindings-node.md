@@ -131,18 +131,18 @@ borrowed-texture descriptors store backend handles as `NativePointer`; callers
 keep backend objects valid and synchronized for the lifetime required by the C
 API.
 
-Attach methods return `RenderSessionHandle`. Texture readback supports caller-provided
-`Uint8Array` or `ArrayBuffer` storage and may offer a convenience
-method that returns a copied image object.
+Attach methods return `RenderSessionHandle`. Texture readback supports
+caller-provided `Uint8Array` or `ArrayBuffer` storage and may offer a
+convenience method that returns a copied image object.
 
 Session-owned texture frames use synchronous callback scopes. A helper acquires
 the native frame, passes a scoped frame view to the callback, and releases the
 frame before returning to JavaScript. TypeScript signatures express a
 non-`Promise` return; any returned promise is silently ignored because the
-native frame is released before the microtask queue drains.
-Frame metadata may be copied; backend `NativePointer` accessors reject use after
-the scope ends. Callers close the frame scope before resize, another render
-update, detach, or session destruction.
+native frame is released before the microtask queue drains. Frame metadata may
+be copied; backend `NativePointer` accessors reject use after the scope ends.
+Callers close the frame scope before resize, another render update, detach, or
+session destruction.
 
 ## Testing
 
