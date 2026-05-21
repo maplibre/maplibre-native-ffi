@@ -7,7 +7,6 @@
   "indentWidth": 2,
   "useTabs": false,
   "newLineKind": "auto",
-  // dprint also excludes gitignored paths; keep only tracked paths we must skip.
   "excludes": [
     "third_party/**",
     "docs/api/c/templates/**",
