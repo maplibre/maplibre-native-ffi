@@ -46,11 +46,26 @@ export default defineConfig({
         {
           label: "Reference",
           items: [
-            { label: "Overview", slug: "reference" },
-            { label: "C API", link: "/reference/c/" },
-            { label: "Java API", link: "/reference/java/" },
-            { label: "Rust API", link: "/reference/rust/" },
-            { label: "Zig API", link: "/reference/zig/" },
+            {
+              label: "C API",
+              link: "/reference/c/",
+              attrs: { target: "_blank", rel: "noopener noreferrer" },
+            },
+            {
+              label: "Java API",
+              link: "/reference/java/",
+              attrs: { target: "_blank", rel: "noopener noreferrer" },
+            },
+            {
+              label: "Rust API",
+              link: "/reference/rust/maplibre_native/",
+              attrs: { target: "_blank", rel: "noopener noreferrer" },
+            },
+            {
+              label: "Zig API",
+              link: "/reference/zig/",
+              attrs: { target: "_blank", rel: "noopener noreferrer" },
+            },
           ],
         },
         {

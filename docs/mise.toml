@@ -12,7 +12,7 @@ run = [
   "rm -rf docs/public/reference/rust",
   "mkdir -p docs/public/reference",
   "cargo doc -p maplibre-native --no-deps",
-  "cp -a target/doc/maplibre_native/. docs/public/reference/rust/",
+  "cp -a target/doc/. docs/public/reference/rust/",
 ]
 
 [tasks."api:java"]
