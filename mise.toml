@@ -73,10 +73,8 @@ MLN_FFI_TEST_TIMEOUT = "{{env.MLN_FFI_TEST_TIMEOUT | default(value=\"30s\")}}"
 
 [hooks]
 postinstall = [
-  "git submodule sync third_party/maplibre-native",
-  "git submodule update --init --depth 1 third_party/maplibre-native",
-  "git -C third_party/maplibre-native submodule sync --recursive",
-  "git -C third_party/maplibre-native submodule update --init --recursive --depth 1",
+  "git submodule sync --recursive third_party/maplibre-native",
+  "git submodule update --init --recursive --depth 1 third_party/maplibre-native",
   "hk install --mise --quiet",
   "pixi install --locked --quiet",
   "uv sync --locked --quiet",
