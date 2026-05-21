@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 #MISE description="Regenerate the jextract symbol include argfile"
 
 import os
