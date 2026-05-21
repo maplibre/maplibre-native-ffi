@@ -14,7 +14,6 @@ const CustomGeometrySourceState = struct {
     fetch_tile: CustomGeometrySourceTileCallback,
     cancel_tile: ?CustomGeometrySourceTileCallback,
     context: ?*anyopaque,
-    retired: std.atomic.Value(bool),
     active_upcalls: std.atomic.Value(usize),
 };
 
@@ -950,7 +949,6 @@ pub const MapHandle = struct {
             .fetch_tile = options.fetch_tile,
             .cancel_tile = options.cancel_tile,
             .context = options.context,
-            .retired = std.atomic.Value(bool).init(false),
             .active_upcalls = std.atomic.Value(usize).init(0),
         };
         errdefer std.heap.smp_allocator.destroy(source_state);
@@ -1431,7 +1429,6 @@ fn beginCustomGeometryUpcall(source_state: *CustomGeometrySourceState) bool {
 
     for (custom_geometry_state_registry.items) |live_state| {
         if (live_state == source_state) {
-            if (source_state.retired.load(.seq_cst)) return false;
             _ = source_state.active_upcalls.fetchAdd(1, .seq_cst);
             return true;
         }
@@ -1518,7 +1515,6 @@ fn unregisterLiveCustomGeometrySourceState(source_state: *CustomGeometrySourceSt
 fn retireLiveCustomGeometrySourceState(source_state: *CustomGeometrySourceState) void {
     std.Io.Threaded.mutexLock(&custom_geometry_state_registry_lock);
     defer std.Io.Threaded.mutexUnlock(&custom_geometry_state_registry_lock);
-    source_state.retired.store(true, .seq_cst);
     removeLiveCustomGeometrySourceStateLocked(source_state);
 }
 
@@ -1612,7 +1608,6 @@ test "custom geometry trampolines route semantic tile ids" {
         .fetch_tile = testFetchCustomGeometryTile,
         .cancel_tile = testCancelCustomGeometryTile,
         .context = &test_state,
-        .retired = std.atomic.Value(bool).init(false),
         .active_upcalls = std.atomic.Value(usize).init(0),
     };
     try registerLiveCustomGeometrySourceState(&source_state);
@@ -1630,7 +1625,7 @@ test "custom geometry trampolines route semantic tile ids" {
     customGeometryCancelTileTrampoline(&source_state, .{ .z = 9, .x = 10, .y = 11 });
     try std.testing.expectEqual(@as(usize, 1), test_state.cancel_count);
 
-    source_state.retired.store(true, .seq_cst);
+    retireLiveCustomGeometrySourceState(&source_state);
     customGeometryFetchTileTrampoline(&source_state, .{ .z = 12, .x = 13, .y = 14 });
     try std.testing.expectEqual(@as(usize, 1), test_state.fetch_count);
     try std.testing.expectEqual(@as(usize, 0), source_state.active_upcalls.load(.seq_cst));
