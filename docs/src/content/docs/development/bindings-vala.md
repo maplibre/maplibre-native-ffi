@@ -43,8 +43,7 @@ above this binding.
 
 ## Public Types
 
-Long-lived native objects are `GObject` classes with the shared `Handle` suffix:
-`RuntimeHandle`, `MapHandle`, `MapProjectionHandle`, and `RenderSessionHandle`.
+Long-lived native objects are `GObject` classes with the shared `Handle` suffix.
 Each class stores the native pointer privately, records live or closed state,
 and exposes `close() throws MaplibreNative.Error`. Successful `close()` releases
 exactly once; later calls no-op. Failed native destruction leaves the object
