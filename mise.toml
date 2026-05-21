@@ -73,8 +73,6 @@ MLN_FFI_TEST_TIMEOUT = "{{env.MLN_FFI_TEST_TIMEOUT | default(value=\"30s\")}}"
 
 [hooks]
 postinstall = [
-  # Sync before update so reruns pick up URL changes from .gitmodules. Update
-  # the root submodule first so nested sync reads MapLibre's pinned .gitmodules.
   "git submodule sync third_party/maplibre-native",
   "git submodule update --init --depth 1 third_party/maplibre-native",
   "git -C third_party/maplibre-native submodule sync --recursive",
