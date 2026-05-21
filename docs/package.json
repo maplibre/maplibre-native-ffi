@@ -18,5 +18,10 @@
     "starlight-links-validator": "^0.24.0",
     "starlight-llms-txt": "^0.8.1"
   },
-  "devDependencies": { "mdxlint": "1.0.0", "vite-plus": "^0.1.20" }
+  "devDependencies": {
+    "mdxlint": "1.0.0",
+    "remark-frontmatter": "^5.0.0",
+    "remark-gfm": "^4.0.1",
+    "vite-plus": "^0.1.20"
+  }
 }

@@ -20,6 +20,10 @@ repeated invariants such as status checking, diagnostic capture, string
 conversion, native result guards, callback state, and descriptor
 materialization. Link to `maplibre-native-c` through Zig build configuration.
 
+`zig build docs` generates API reference HTML from the public headers only; it
+does not require a built `maplibre-native-c` library. Tests and the default
+build still pass `-Dcmake-artifact-dir` and the render-backend flags.
+
 ## Public Surface
 
 Long-lived native objects use the shared `Handle` suffix: `RuntimeHandle`,

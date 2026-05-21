@@ -26,11 +26,10 @@ run = [
 
 [tasks."api:zig"]
 dir = "{{env.MLN_FFI_REPO_ROOT}}/bindings/zig"
-depends = ["//:ensure-native-library"]
 run = '''
 rm -rf ../../docs/public/reference/zig
 mkdir -p ../../docs/public/reference
-zig build docs -Dtarget="$MLN_FFI_ZIG_TARGET" -Dcmake-artifact-dir="$MLN_FFI_BUILD_DIR" -Dinclude-dir="$MLN_FFI_INCLUDE_DIR" -Dinclude-dir="$MLN_FFI_DEPENDENCY_INCLUDE_DIR" -Dinclude-dir="$MLN_FFI_VULKAN_INCLUDE_DIR" -Ddependency-library-dir="$MLN_FFI_DEPENDENCY_LIBRARY_DIR" -Drender-backend="$MLN_FFI_RENDER_BACKEND" --prefix ../../docs/public/reference/zig
+zig build docs -Dinclude-dir="$MLN_FFI_INCLUDE_DIR" --prefix ../../docs/public/reference/zig
 '''
 
 [tasks.api]
