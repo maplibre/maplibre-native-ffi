@@ -10,7 +10,6 @@ Resources:
 - [Vala manual](https://docs.vala.dev/)
 - [Vala bindings documentation](https://docs.vala.dev/developer-guides/bindings.html)
 - [Generating a VAPI with GObject Introspection](https://docs.vala.dev/developer-guides/bindings/generating-a-vapi-with-gobject-introspection.html)
-- [Writing a VAPI manually](https://docs.vala.dev/developer-guides/bindings/writing-a-vapi-manually.html)
 - [GObject API reference](https://docs.gtk.org/gobject/)
 - [GObject Introspection](https://gi.readthedocs.io/)
 - [Rust `glib` crate](https://docs.rs/glib/)
@@ -18,23 +17,25 @@ Resources:
 ## Architecture
 
 The Vala binding presents a GLib/GObject-shaped low-level API over the public
-MapLibre Native C API. Maintain it as an introspectable GLib adapter with GIR,
-typelib, and a generated `.vapi` from `vapigen`. This path gives maintainers one
-checked source of ownership, nullability, transfer, `out`/`ref`, callback, and
-error metadata, and it lets other GObject Introspection consumers share fixes.
+MapLibre Native C API. Maintain it as a Rust `glib` adapter over the shared Rust
+ABI-adaptation crates. The Rust adapter implements GObject classes, boxed
+values, `GError` mapping, handle lifetime, callback state, and thread-safety
+policy.
 
-A manual `.vapi` over `maplibre_native_c.h` is useful for experiments and
-C-symbol compile checks. It is not the maintained binding path, because the raw
-C API does not carry the GObject classes, `GError`, boxed values, callback
-ownership, and introspection annotations needed for safe Vala use. When
+Binding metadata drives the repetitive ABI surface. A generator derives
+scanner-facing annotated C headers and Rust `extern "C"` entry stubs for the
+GObject-style ABI: type declarations, function prototypes, transfer ownership,
+nullability, `out`/`inout`, array lengths, closure and destroy-notify metadata,
+and error behavior. The generated C headers describe the compiled Rust shared
+library to GObject Introspection; they are not a separate C implementation.
+
+`g-ir-scanner` consumes the generated annotated headers and compiled Rust
+library to produce GIR and typelib files. `vapigen` produces the generated
+`.vapi`. Do not maintain a manual `.vapi` over `maplibre_native_c.h`: the raw C
+API does not carry the GObject classes, `GError`, boxed values, callback
+ownership, or introspection annotations needed for safe Vala use. When
 `g-ir-scanner`, `vapigen`, or a small Vala compile test loses a safety contract,
-fix the GLib adapter or its annotations first.
-
-The adapter exports an annotated GObject-style C ABI. Its implementation may
-reuse Rust bridge internals only when the GIR-facing ABI remains easy to scan,
-review, and test from Vala; otherwise keep the adapter as a small C GObject
-layer over the public C ABI. The maintained contract is the introspectable GLib
-ABI.
+fix the binding metadata, generator, or Rust adapter first.
 
 Keep this layer low-level. It exposes runtime, map, render-session, resource,
 event, camera, geometry, and render-target concepts directly. GLib main-loop
