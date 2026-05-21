@@ -72,9 +72,6 @@ mise run fix
 # Run examples
 mise run //examples/zig-map:run
 
-# Regenerate API reference HTML only
-mise run //docs:api
-
 # Build the documentation site
 mise run //docs:build
 ```
@@ -131,8 +128,7 @@ repository-wide formatting defaults.
 
 [Astro](https://astro.build/) and [Starlight](https://starlight.astro.build/)
 build the documentation site. Generated API reference HTML is installed into
-`docs/public/reference/` (Doxygen, Javadoc, rustdoc, and Zig doc) before each
-docs build.
+`docs/public/reference/` before each docs build.
 
 ## Tests And Examples
 
