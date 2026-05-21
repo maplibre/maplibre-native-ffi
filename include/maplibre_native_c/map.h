@@ -826,7 +826,7 @@ MLN_API mln_status mln_runtime_offline_regions_list_take_result(
  * - MLN_STATUS_INVALID_STATE when the operation has not completed or its result
  *   kind does not match a region list.
  * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, or
- * out_regions is null.
+ *   out_regions is null.
  */
 MLN_API mln_status mln_runtime_offline_regions_merge_database_take_result(
   mln_runtime* runtime, mln_offline_operation_id operation_id,
