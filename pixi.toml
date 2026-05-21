@@ -37,9 +37,10 @@ VK_ICD_FILENAMES = "$CONDA_PREFIX/share/vulkan/icd.d/MoltenVK_icd.json"
 
 [target.linux-64.activation.env]
 BINDGEN_EXTRA_CLANG_ARGS = "--sysroot=$CONDA_BUILD_SYSROOT -isystem$CONDA_PREFIX/lib/gcc/x86_64-conda-linux-gnu/14.3.0/include -isystem$CONDA_PREFIX/lib/gcc/x86_64-conda-linux-gnu/14.3.0/include-fixed"
-# Add Pixi's lavapipe software Vulkan ICD to the loader search. This keeps
-# system ICDs (e.g. GPU drivers in /etc/vulkan/icd.d/) visible while ensuring
-# lavapipe is available on headless machines without a hardware GPU.
+# Register Pixi's lavapipe software Vulkan ICD with the loader. Unlike
+# VK_ICD_FILENAMES, VK_ADD_DRIVER_FILES appends to the default search so system
+# GPU drivers stay visible. The loader sorts discrete GPUs before CPU-type
+# devices, so lavapipe only activates when no hardware driver is present.
 VK_ADD_DRIVER_FILES = "$CONDA_PREFIX/share/vulkan/icd.d/lvp_icd.x86_64.json"
 
 [target.linux-aarch64.activation.env]
