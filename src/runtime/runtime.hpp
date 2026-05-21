@@ -34,6 +34,8 @@ struct OfflineRegionEventState {
   bool alive = false;
 };
 
+struct OfflineOperationEventState;
+
 struct QueuedRuntimeEvent {
   uint32_t type;
   uint32_t source_type;
@@ -45,6 +47,8 @@ struct QueuedRuntimeEvent {
   std::string message;
   bool has_offline_region = false;
   mln_offline_region_id offline_region_id = 0;
+  bool has_offline_operation = false;
+  mln_offline_operation_id offline_operation_id = 0;
 };
 
 }  // namespace mln::core
@@ -60,6 +64,8 @@ struct mln_runtime {
   bool has_resource_provider = false;
   mln::core::ResourceProvider resource_provider;
   std::shared_ptr<mln::core::OfflineRegionEventState> offline_event_state;
+  std::shared_ptr<mln::core::OfflineOperationEventState>
+    offline_operation_state;
   mutable std::shared_mutex resource_transform_mutex;
   mln_resource_transform_callback resource_transform_callback = nullptr;
   void* resource_transform_user_data = nullptr;
@@ -94,35 +100,41 @@ auto invoke_resource_transform(
   void* platform_context, uint32_t kind, const char* url,
   std::string& out_replacement_url
 ) noexcept -> mln_status;
-auto run_ambient_cache_operation(mln_runtime* runtime, uint32_t operation)
-  -> mln_status;
-auto offline_region_create(
+auto run_ambient_cache_operation_start(
+  mln_runtime* runtime, uint32_t operation,
+  mln_offline_operation_id* out_operation_id
+) -> mln_status;
+auto offline_operation_discard(
+  mln_runtime* runtime, mln_offline_operation_id operation_id
+) -> mln_status;
+auto offline_region_create_start(
   mln_runtime* runtime, const mln_offline_region_definition* definition,
   const uint8_t* metadata, size_t metadata_size,
-  mln_offline_region_snapshot** out_region
+  mln_offline_operation_id* out_operation_id
 ) -> mln_status;
-auto offline_region_get(
+auto offline_region_get_start(
   mln_runtime* runtime, mln_offline_region_id region_id,
-  mln_offline_region_snapshot** out_region, bool* out_found
+  mln_offline_operation_id* out_operation_id
 ) -> mln_status;
-auto offline_regions_list(
-  mln_runtime* runtime, mln_offline_region_list** out_regions
+auto offline_regions_list_start(
+  mln_runtime* runtime, mln_offline_operation_id* out_operation_id
 ) -> mln_status;
-auto offline_regions_merge_database(
+auto offline_regions_merge_database_start(
   mln_runtime* runtime, const char* side_database_path,
-  mln_offline_region_list** out_regions
+  mln_offline_operation_id* out_operation_id
 ) -> mln_status;
-auto offline_region_update_metadata(
+auto offline_region_update_metadata_start(
   mln_runtime* runtime, mln_offline_region_id region_id,
   const uint8_t* metadata, size_t metadata_size,
-  mln_offline_region_snapshot** out_region
+  mln_offline_operation_id* out_operation_id
 ) -> mln_status;
-auto offline_region_get_status(
+auto offline_region_get_status_start(
   mln_runtime* runtime, mln_offline_region_id region_id,
-  mln_offline_region_status* out_status
+  mln_offline_operation_id* out_operation_id
 ) -> mln_status;
-auto offline_region_set_observed(
-  mln_runtime* runtime, mln_offline_region_id region_id, bool observed
+auto offline_region_set_observed_start(
+  mln_runtime* runtime, mln_offline_region_id region_id, bool observed,
+  mln_offline_operation_id* out_operation_id
 ) -> mln_status;
 
 struct OfflineRegionDownloadStateRequest {
@@ -130,14 +142,41 @@ struct OfflineRegionDownloadStateRequest {
   uint32_t state;
 };
 
-auto offline_region_set_download_state(
-  mln_runtime* runtime, OfflineRegionDownloadStateRequest request
+auto offline_region_set_download_state_start(
+  mln_runtime* runtime, OfflineRegionDownloadStateRequest request,
+  mln_offline_operation_id* out_operation_id
 ) -> mln_status;
-auto offline_region_invalidate(
-  mln_runtime* runtime, mln_offline_region_id region_id
+auto offline_region_invalidate_start(
+  mln_runtime* runtime, mln_offline_region_id region_id,
+  mln_offline_operation_id* out_operation_id
 ) -> mln_status;
-auto offline_region_delete(
-  mln_runtime* runtime, mln_offline_region_id region_id
+auto offline_region_delete_start(
+  mln_runtime* runtime, mln_offline_region_id region_id,
+  mln_offline_operation_id* out_operation_id
+) -> mln_status;
+auto offline_region_create_take_result(
+  mln_runtime* runtime, mln_offline_operation_id operation_id,
+  mln_offline_region_snapshot** out_region
+) -> mln_status;
+auto offline_region_get_take_result(
+  mln_runtime* runtime, mln_offline_operation_id operation_id,
+  mln_offline_region_snapshot** out_region, bool* out_found
+) -> mln_status;
+auto offline_regions_list_take_result(
+  mln_runtime* runtime, mln_offline_operation_id operation_id,
+  mln_offline_region_list** out_regions
+) -> mln_status;
+auto offline_regions_merge_database_take_result(
+  mln_runtime* runtime, mln_offline_operation_id operation_id,
+  mln_offline_region_list** out_regions
+) -> mln_status;
+auto offline_region_update_metadata_take_result(
+  mln_runtime* runtime, mln_offline_operation_id operation_id,
+  mln_offline_region_snapshot** out_region
+) -> mln_status;
+auto offline_region_get_status_take_result(
+  mln_runtime* runtime, mln_offline_operation_id operation_id,
+  mln_offline_region_status* out_status
 ) -> mln_status;
 auto offline_region_snapshot_get(
   const mln_offline_region_snapshot* snapshot, mln_offline_region_info* out_info

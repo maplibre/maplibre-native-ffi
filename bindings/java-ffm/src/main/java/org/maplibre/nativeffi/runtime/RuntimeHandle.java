@@ -5,13 +5,18 @@ import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
 import java.lang.ref.WeakReference;
 import java.nio.file.Path;
+import java.util.ArrayDeque;
+import java.util.Deque;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import org.maplibre.nativeffi.error.MaplibreException;
+import org.maplibre.nativeffi.error.MaplibreStatus;
 import org.maplibre.nativeffi.internal.access.InternalAccess;
 import org.maplibre.nativeffi.internal.c.MapLibreNativeC;
 import org.maplibre.nativeffi.internal.c.mln_runtime_event;
+import org.maplibre.nativeffi.internal.c.mln_runtime_event_offline_operation_completed;
 import org.maplibre.nativeffi.internal.c.mln_runtime_event_offline_region_response_error;
 import org.maplibre.nativeffi.internal.c.mln_runtime_event_offline_region_status;
 import org.maplibre.nativeffi.internal.c.mln_runtime_event_offline_region_tile_count_limit;
@@ -41,6 +46,7 @@ public final class RuntimeHandle implements AutoCloseable {
   private final HandleState state;
   private final ConcurrentHashMap<Long, WeakReference<MapHandle>> liveMaps =
       new ConcurrentHashMap<>();
+  private final Deque<RuntimeEvent> pendingEvents = new ArrayDeque<>();
   private ResourceTransformState resourceTransformState;
   private ResourceProviderState resourceProviderState;
 
@@ -71,9 +77,21 @@ public final class RuntimeHandle implements AutoCloseable {
 
   public void runAmbientCacheOperation(AmbientCacheOperation operation) {
     NativeAccess.ensureLoaded();
-    Status.check(
-        MapLibreNativeC.mln_runtime_run_ambient_cache_operation(
-            state.requireLive(), Objects.requireNonNull(operation, "operation").nativeValue()));
+    var runtime = state.requireLive();
+    try (var arena = Arena.ofConfined()) {
+      var outOperationId = arena.allocate(ValueLayout.JAVA_LONG);
+      Status.check(
+          MapLibreNativeC.mln_runtime_run_ambient_cache_operation_start(
+              runtime,
+              Objects.requireNonNull(operation, "operation").nativeValue(),
+              outOperationId));
+      var operationId = outOperationId.get(ValueLayout.JAVA_LONG, 0);
+      try {
+        waitForOfflineOperation(runtime, operationId);
+      } finally {
+        discardOfflineOperation(runtime, operationId);
+      }
+    }
   }
 
   public OfflineRegionInfo createOfflineRegion(
@@ -82,41 +100,75 @@ public final class RuntimeHandle implements AutoCloseable {
     Objects.requireNonNull(definition, "definition");
     Objects.requireNonNull(metadata, "metadata");
     try (var arena = Arena.ofConfined()) {
-      var outRegion = MemoryUtil.allocatePointer(arena);
+      var runtime = state.requireLive();
+      var outOperationId = arena.allocate(ValueLayout.JAVA_LONG);
       Status.check(
-          MapLibreNativeC.mln_runtime_offline_region_create(
-              state.requireLive(),
+          MapLibreNativeC.mln_runtime_offline_region_create_start(
+              runtime,
               RuntimeStructs.offlineRegionDefinition(definition, arena),
               RuntimeStructs.metadata(metadata, arena),
               metadata.length,
-              outRegion));
-      return RuntimeStructs.offlineRegionSnapshot(outRegion.get(ValueLayout.ADDRESS, 0));
+              outOperationId));
+      var operationId = outOperationId.get(ValueLayout.JAVA_LONG, 0);
+      try {
+        waitForOfflineOperation(runtime, operationId);
+        var outRegion = MemoryUtil.allocatePointer(arena);
+        Status.check(
+            MapLibreNativeC.mln_runtime_offline_region_create_take_result(
+                runtime, operationId, outRegion));
+        return RuntimeStructs.offlineRegionSnapshot(outRegion.get(ValueLayout.ADDRESS, 0));
+      } catch (RuntimeException | Error error) {
+        discardOfflineOperation(runtime, operationId);
+        throw error;
+      }
     }
   }
 
   public Optional<OfflineRegionInfo> offlineRegion(long id) {
     NativeAccess.ensureLoaded();
     try (var arena = Arena.ofConfined()) {
-      var outRegion = MemoryUtil.allocatePointer(arena);
-      var outFound = arena.allocate(ValueLayout.JAVA_BOOLEAN);
+      var runtime = state.requireLive();
+      var outOperationId = arena.allocate(ValueLayout.JAVA_LONG);
       Status.check(
-          MapLibreNativeC.mln_runtime_offline_region_get(
-              state.requireLive(), id, outRegion, outFound));
-      if (!outFound.get(ValueLayout.JAVA_BOOLEAN, 0)) {
-        return Optional.empty();
+          MapLibreNativeC.mln_runtime_offline_region_get_start(runtime, id, outOperationId));
+      var operationId = outOperationId.get(ValueLayout.JAVA_LONG, 0);
+      try {
+        waitForOfflineOperation(runtime, operationId);
+        var outRegion = MemoryUtil.allocatePointer(arena);
+        var outFound = arena.allocate(ValueLayout.JAVA_BOOLEAN);
+        Status.check(
+            MapLibreNativeC.mln_runtime_offline_region_get_take_result(
+                runtime, operationId, outRegion, outFound));
+        if (!outFound.get(ValueLayout.JAVA_BOOLEAN, 0)) {
+          return Optional.empty();
+        }
+        return Optional.of(
+            RuntimeStructs.offlineRegionSnapshot(outRegion.get(ValueLayout.ADDRESS, 0)));
+      } catch (RuntimeException | Error error) {
+        discardOfflineOperation(runtime, operationId);
+        throw error;
       }
-      return Optional.of(
-          RuntimeStructs.offlineRegionSnapshot(outRegion.get(ValueLayout.ADDRESS, 0)));
     }
   }
 
   public List<OfflineRegionInfo> offlineRegions() {
     NativeAccess.ensureLoaded();
     try (var arena = Arena.ofConfined()) {
-      var outRegions = MemoryUtil.allocatePointer(arena);
-      Status.check(
-          MapLibreNativeC.mln_runtime_offline_regions_list(state.requireLive(), outRegions));
-      return RuntimeStructs.offlineRegionList(outRegions.get(ValueLayout.ADDRESS, 0));
+      var runtime = state.requireLive();
+      var outOperationId = arena.allocate(ValueLayout.JAVA_LONG);
+      Status.check(MapLibreNativeC.mln_runtime_offline_regions_list_start(runtime, outOperationId));
+      var operationId = outOperationId.get(ValueLayout.JAVA_LONG, 0);
+      try {
+        waitForOfflineOperation(runtime, operationId);
+        var outRegions = MemoryUtil.allocatePointer(arena);
+        Status.check(
+            MapLibreNativeC.mln_runtime_offline_regions_list_take_result(
+                runtime, operationId, outRegions));
+        return RuntimeStructs.offlineRegionList(outRegions.get(ValueLayout.ADDRESS, 0));
+      } catch (RuntimeException | Error error) {
+        discardOfflineOperation(runtime, operationId);
+        throw error;
+      }
     }
   }
 
@@ -127,13 +179,25 @@ public final class RuntimeHandle implements AutoCloseable {
   public List<OfflineRegionInfo> mergeOfflineRegionsDatabase(String path) {
     NativeAccess.ensureLoaded();
     try (var arena = Arena.ofConfined()) {
-      var outRegions = MemoryUtil.allocatePointer(arena);
+      var runtime = state.requireLive();
+      var outOperationId = arena.allocate(ValueLayout.JAVA_LONG);
       Status.check(
-          MapLibreNativeC.mln_runtime_offline_regions_merge_database(
-              state.requireLive(),
+          MapLibreNativeC.mln_runtime_offline_regions_merge_database_start(
+              runtime,
               MemoryUtil.allocateCString(arena, Objects.requireNonNull(path, "path")),
-              outRegions));
-      return RuntimeStructs.offlineRegionList(outRegions.get(ValueLayout.ADDRESS, 0));
+              outOperationId));
+      var operationId = outOperationId.get(ValueLayout.JAVA_LONG, 0);
+      try {
+        waitForOfflineOperation(runtime, operationId);
+        var outRegions = MemoryUtil.allocatePointer(arena);
+        Status.check(
+            MapLibreNativeC.mln_runtime_offline_regions_merge_database_take_result(
+                runtime, operationId, outRegions));
+        return RuntimeStructs.offlineRegionList(outRegions.get(ValueLayout.ADDRESS, 0));
+      } catch (RuntimeException | Error error) {
+        discardOfflineOperation(runtime, operationId);
+        throw error;
+      }
     }
   }
 
@@ -141,50 +205,173 @@ public final class RuntimeHandle implements AutoCloseable {
     NativeAccess.ensureLoaded();
     Objects.requireNonNull(metadata, "metadata");
     try (var arena = Arena.ofConfined()) {
-      var outRegion = MemoryUtil.allocatePointer(arena);
+      var runtime = state.requireLive();
+      var outOperationId = arena.allocate(ValueLayout.JAVA_LONG);
       Status.check(
-          MapLibreNativeC.mln_runtime_offline_region_update_metadata(
-              state.requireLive(),
+          MapLibreNativeC.mln_runtime_offline_region_update_metadata_start(
+              runtime,
               id,
               RuntimeStructs.metadata(metadata, arena),
               metadata.length,
-              outRegion));
-      return RuntimeStructs.offlineRegionSnapshot(outRegion.get(ValueLayout.ADDRESS, 0));
+              outOperationId));
+      var operationId = outOperationId.get(ValueLayout.JAVA_LONG, 0);
+      try {
+        waitForOfflineOperation(runtime, operationId);
+        var outRegion = MemoryUtil.allocatePointer(arena);
+        Status.check(
+            MapLibreNativeC.mln_runtime_offline_region_update_metadata_take_result(
+                runtime, operationId, outRegion));
+        return RuntimeStructs.offlineRegionSnapshot(outRegion.get(ValueLayout.ADDRESS, 0));
+      } catch (RuntimeException | Error error) {
+        discardOfflineOperation(runtime, operationId);
+        throw error;
+      }
     }
   }
 
   public OfflineRegionStatus offlineRegionStatus(long id) {
     NativeAccess.ensureLoaded();
     try (var arena = Arena.ofConfined()) {
-      var status = RuntimeStructs.offlineRegionStatus(arena);
+      var runtime = state.requireLive();
+      var outOperationId = arena.allocate(ValueLayout.JAVA_LONG);
       Status.check(
-          MapLibreNativeC.mln_runtime_offline_region_get_status(state.requireLive(), id, status));
-      return RuntimeStructs.offlineRegionStatus(status);
+          MapLibreNativeC.mln_runtime_offline_region_get_status_start(runtime, id, outOperationId));
+      var operationId = outOperationId.get(ValueLayout.JAVA_LONG, 0);
+      try {
+        waitForOfflineOperation(runtime, operationId);
+        var status = RuntimeStructs.offlineRegionStatus(arena);
+        Status.check(
+            MapLibreNativeC.mln_runtime_offline_region_get_status_take_result(
+                runtime, operationId, status));
+        return RuntimeStructs.offlineRegionStatus(status);
+      } catch (RuntimeException | Error error) {
+        discardOfflineOperation(runtime, operationId);
+        throw error;
+      }
     }
   }
 
   public void setOfflineRegionObserved(long id, boolean observed) {
     NativeAccess.ensureLoaded();
-    Status.check(
-        MapLibreNativeC.mln_runtime_offline_region_set_observed(state.requireLive(), id, observed));
+    var runtime = state.requireLive();
+    try (var arena = Arena.ofConfined()) {
+      var outOperationId = arena.allocate(ValueLayout.JAVA_LONG);
+      Status.check(
+          MapLibreNativeC.mln_runtime_offline_region_set_observed_start(
+              runtime, id, observed, outOperationId));
+      var operationId = outOperationId.get(ValueLayout.JAVA_LONG, 0);
+      try {
+        waitForOfflineOperation(runtime, operationId);
+      } finally {
+        discardOfflineOperation(runtime, operationId);
+      }
+    }
   }
 
   public void setOfflineRegionDownloadState(long id, OfflineRegionDownloadState downloadState) {
     NativeAccess.ensureLoaded();
     var stateValue = Objects.requireNonNull(downloadState, "downloadState").nativeValue();
-    Status.check(
-        MapLibreNativeC.mln_runtime_offline_region_set_download_state(
-            state.requireLive(), id, stateValue));
+    var runtime = state.requireLive();
+    try (var arena = Arena.ofConfined()) {
+      var outOperationId = arena.allocate(ValueLayout.JAVA_LONG);
+      Status.check(
+          MapLibreNativeC.mln_runtime_offline_region_set_download_state_start(
+              runtime, id, stateValue, outOperationId));
+      var operationId = outOperationId.get(ValueLayout.JAVA_LONG, 0);
+      try {
+        waitForOfflineOperation(runtime, operationId);
+      } finally {
+        discardOfflineOperation(runtime, operationId);
+      }
+    }
   }
 
   public void invalidateOfflineRegion(long id) {
     NativeAccess.ensureLoaded();
-    Status.check(MapLibreNativeC.mln_runtime_offline_region_invalidate(state.requireLive(), id));
+    var runtime = state.requireLive();
+    try (var arena = Arena.ofConfined()) {
+      var outOperationId = arena.allocate(ValueLayout.JAVA_LONG);
+      Status.check(
+          MapLibreNativeC.mln_runtime_offline_region_invalidate_start(runtime, id, outOperationId));
+      var operationId = outOperationId.get(ValueLayout.JAVA_LONG, 0);
+      try {
+        waitForOfflineOperation(runtime, operationId);
+      } finally {
+        discardOfflineOperation(runtime, operationId);
+      }
+    }
   }
 
   public void deleteOfflineRegion(long id) {
     NativeAccess.ensureLoaded();
-    Status.check(MapLibreNativeC.mln_runtime_offline_region_delete(state.requireLive(), id));
+    var runtime = state.requireLive();
+    try (var arena = Arena.ofConfined()) {
+      var outOperationId = arena.allocate(ValueLayout.JAVA_LONG);
+      Status.check(
+          MapLibreNativeC.mln_runtime_offline_region_delete_start(runtime, id, outOperationId));
+      var operationId = outOperationId.get(ValueLayout.JAVA_LONG, 0);
+      try {
+        waitForOfflineOperation(runtime, operationId);
+      } finally {
+        discardOfflineOperation(runtime, operationId);
+      }
+    }
+  }
+
+  private void waitForOfflineOperation(MemorySegment runtime, long operationId) {
+    try (var arena = Arena.ofConfined()) {
+      var event = mln_runtime_event.allocate(arena);
+      var hasEvent = arena.allocate(ValueLayout.JAVA_BOOLEAN);
+      while (true) {
+        Status.check(MapLibreNativeC.mln_runtime_run_once(runtime));
+        while (true) {
+          mln_runtime_event.size(event, (int) mln_runtime_event.sizeof());
+          Status.check(MapLibreNativeC.mln_runtime_poll_event(runtime, event, hasEvent));
+          if (!hasEvent.get(ValueLayout.JAVA_BOOLEAN, 0)) {
+            break;
+          }
+          if (mln_runtime_event.type(event)
+                  != MapLibreNativeC.MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED()
+              || mln_runtime_event.payload_type(event)
+                  != MapLibreNativeC.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_OPERATION_COMPLETED()) {
+            pendingEvents.add(readEvent(event));
+            continue;
+          }
+          var payload =
+              mln_runtime_event
+                  .payload(event)
+                  .reinterpret(mln_runtime_event_offline_operation_completed.sizeof());
+          if (mln_runtime_event_offline_operation_completed.operation_id(payload) != operationId) {
+            pendingEvents.add(readEvent(event));
+            continue;
+          }
+          var resultStatus = mln_runtime_event_offline_operation_completed.result_status(payload);
+          if (resultStatus != MapLibreNativeC.MLN_STATUS_OK()) {
+            throw MaplibreException.forStatus(
+                MaplibreStatus.fromNative(resultStatus),
+                resultStatus,
+                MemoryUtil.copyStringView(
+                    mln_runtime_event.message(event), mln_runtime_event.message_size(event)));
+          }
+          return;
+        }
+        sleepForOfflineOperation();
+      }
+    }
+  }
+
+  private void sleepForOfflineOperation() {
+    try {
+      Thread.sleep(1);
+    } catch (InterruptedException error) {
+      Thread.currentThread().interrupt();
+      throw MaplibreException.forStatus(
+          MaplibreStatus.NATIVE_ERROR, MapLibreNativeC.MLN_STATUS_NATIVE_ERROR(), error.toString());
+    }
+  }
+
+  private void discardOfflineOperation(MemorySegment runtime, long operationId) {
+    Status.check(MapLibreNativeC.mln_runtime_offline_operation_discard(runtime, operationId));
   }
 
   public void setResourceTransform(ResourceTransformCallback callback) {
@@ -231,6 +418,10 @@ public final class RuntimeHandle implements AutoCloseable {
 
   public Optional<RuntimeEvent> pollEvent() {
     NativeAccess.ensureLoaded();
+    var pending = pendingEvents.pollFirst();
+    if (pending != null) {
+      return Optional.of(pending);
+    }
     try (var arena = Arena.ofConfined()) {
       var event = mln_runtime_event.allocate(arena);
       mln_runtime_event.size(event, (int) mln_runtime_event.sizeof());
@@ -374,6 +565,11 @@ public final class RuntimeHandle implements AutoCloseable {
           ? readOfflineRegionTileCountLimit(payload)
           : new RuntimeEventPayload.Unknown(rawPayloadType, payloadSize);
     }
+    if (rawPayloadType == MapLibreNativeC.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_OPERATION_COMPLETED()) {
+      return payloadSize >= mln_runtime_event_offline_operation_completed.sizeof()
+          ? readOfflineOperationCompleted(payload)
+          : new RuntimeEventPayload.Unknown(rawPayloadType, payloadSize);
+    }
     return new RuntimeEventPayload.Unknown(rawPayloadType, payloadSize);
   }
 
@@ -438,6 +634,17 @@ public final class RuntimeHandle implements AutoCloseable {
     return new RuntimeEventPayload.OfflineRegionTileCountLimit(
         mln_runtime_event_offline_region_tile_count_limit.region_id(limit),
         mln_runtime_event_offline_region_tile_count_limit.limit(limit));
+  }
+
+  private RuntimeEventPayload.OfflineOperationCompleted readOfflineOperationCompleted(
+      MemorySegment payload) {
+    var completed = payload.reinterpret(mln_runtime_event_offline_operation_completed.sizeof());
+    return new RuntimeEventPayload.OfflineOperationCompleted(
+        mln_runtime_event_offline_operation_completed.operation_id(completed),
+        mln_runtime_event_offline_operation_completed.operation_kind(completed),
+        mln_runtime_event_offline_operation_completed.result_kind(completed),
+        mln_runtime_event_offline_operation_completed.result_status(completed),
+        mln_runtime_event_offline_operation_completed.found(completed));
   }
 
   private void closeResourceCallbacks() {

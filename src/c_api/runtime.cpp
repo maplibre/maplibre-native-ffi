@@ -71,110 +71,201 @@ auto mln_runtime_clear_resource_transform(mln_runtime* runtime) noexcept
   });
 }
 
-auto mln_runtime_run_ambient_cache_operation(
-  mln_runtime* runtime, uint32_t operation
+auto mln_runtime_run_ambient_cache_operation_start(
+  mln_runtime* runtime, uint32_t operation,
+  mln_offline_operation_id* out_operation_id
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
-    return mln::core::run_ambient_cache_operation(runtime, operation);
-  });
-}
-
-auto mln_runtime_offline_region_create(
-  mln_runtime* runtime, const mln_offline_region_definition* definition,
-  const uint8_t* metadata, size_t metadata_size,
-  mln_offline_region_snapshot** out_region
-) noexcept -> mln_status {
-  return mln::c_api::status_boundary([&]() -> mln_status {
-    return mln::core::offline_region_create(
-      runtime, definition, metadata, metadata_size, out_region
+    return mln::core::run_ambient_cache_operation_start(
+      runtime, operation, out_operation_id
     );
   });
 }
 
-auto mln_runtime_offline_region_get(
+auto mln_runtime_offline_operation_discard(
+  mln_runtime* runtime, mln_offline_operation_id operation_id
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::offline_operation_discard(runtime, operation_id);
+  });
+}
+
+auto mln_runtime_offline_region_create_start(
+  mln_runtime* runtime, const mln_offline_region_definition* definition,
+  const uint8_t* metadata, size_t metadata_size,
+  mln_offline_operation_id* out_operation_id
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::offline_region_create_start(
+      runtime, definition, metadata, metadata_size, out_operation_id
+    );
+  });
+}
+
+auto mln_runtime_offline_region_get_start(
   mln_runtime* runtime, mln_offline_region_id region_id,
+  mln_offline_operation_id* out_operation_id
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::offline_region_get_start(
+      runtime, region_id, out_operation_id
+    );
+  });
+}
+
+auto mln_runtime_offline_regions_list_start(
+  mln_runtime* runtime, mln_offline_operation_id* out_operation_id
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::offline_regions_list_start(runtime, out_operation_id);
+  });
+}
+
+auto mln_runtime_offline_regions_merge_database_start(
+  mln_runtime* runtime, const char* side_database_path,
+  mln_offline_operation_id* out_operation_id
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::offline_regions_merge_database_start(
+      runtime, side_database_path, out_operation_id
+    );
+  });
+}
+
+auto mln_runtime_offline_region_update_metadata_start(
+  mln_runtime* runtime, mln_offline_region_id region_id,
+  const uint8_t* metadata, size_t metadata_size,
+  mln_offline_operation_id* out_operation_id
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::offline_region_update_metadata_start(
+      runtime, region_id, metadata, metadata_size, out_operation_id
+    );
+  });
+}
+
+auto mln_runtime_offline_region_get_status_start(
+  mln_runtime* runtime, mln_offline_region_id region_id,
+  mln_offline_operation_id* out_operation_id
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::offline_region_get_status_start(
+      runtime, region_id, out_operation_id
+    );
+  });
+}
+
+auto mln_runtime_offline_region_set_observed_start(
+  mln_runtime* runtime, mln_offline_region_id region_id, bool observed,
+  mln_offline_operation_id* out_operation_id
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::offline_region_set_observed_start(
+      runtime, region_id, observed, out_operation_id
+    );
+  });
+}
+
+auto mln_runtime_offline_region_set_download_state_start(
+  mln_runtime* runtime, mln_offline_region_id region_id, uint32_t state,
+  mln_offline_operation_id* out_operation_id
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::offline_region_set_download_state_start(
+      runtime,
+      mln::core::OfflineRegionDownloadStateRequest{
+        .region_id = region_id, .state = state
+      },
+      out_operation_id
+    );
+  });
+}
+
+auto mln_runtime_offline_region_invalidate_start(
+  mln_runtime* runtime, mln_offline_region_id region_id,
+  mln_offline_operation_id* out_operation_id
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::offline_region_invalidate_start(
+      runtime, region_id, out_operation_id
+    );
+  });
+}
+
+auto mln_runtime_offline_region_delete_start(
+  mln_runtime* runtime, mln_offline_region_id region_id,
+  mln_offline_operation_id* out_operation_id
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::offline_region_delete_start(
+      runtime, region_id, out_operation_id
+    );
+  });
+}
+
+auto mln_runtime_offline_region_create_take_result(
+  mln_runtime* runtime, mln_offline_operation_id operation_id,
+  mln_offline_region_snapshot** out_region
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::offline_region_create_take_result(
+      runtime, operation_id, out_region
+    );
+  });
+}
+
+auto mln_runtime_offline_region_get_take_result(
+  mln_runtime* runtime, mln_offline_operation_id operation_id,
   mln_offline_region_snapshot** out_region, bool* out_found
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
-    return mln::core::offline_region_get(
-      runtime, region_id, out_region, out_found
+    return mln::core::offline_region_get_take_result(
+      runtime, operation_id, out_region, out_found
     );
   });
 }
 
-auto mln_runtime_offline_regions_list(
-  mln_runtime* runtime, mln_offline_region_list** out_regions
-) noexcept -> mln_status {
-  return mln::c_api::status_boundary([&]() -> mln_status {
-    return mln::core::offline_regions_list(runtime, out_regions);
-  });
-}
-
-auto mln_runtime_offline_regions_merge_database(
-  mln_runtime* runtime, const char* side_database_path,
+auto mln_runtime_offline_regions_list_take_result(
+  mln_runtime* runtime, mln_offline_operation_id operation_id,
   mln_offline_region_list** out_regions
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
-    return mln::core::offline_regions_merge_database(
-      runtime, side_database_path, out_regions
+    return mln::core::offline_regions_list_take_result(
+      runtime, operation_id, out_regions
     );
   });
 }
 
-auto mln_runtime_offline_region_update_metadata(
-  mln_runtime* runtime, mln_offline_region_id region_id,
-  const uint8_t* metadata, size_t metadata_size,
+auto mln_runtime_offline_regions_merge_database_take_result(
+  mln_runtime* runtime, mln_offline_operation_id operation_id,
+  mln_offline_region_list** out_regions
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::offline_regions_merge_database_take_result(
+      runtime, operation_id, out_regions
+    );
+  });
+}
+
+auto mln_runtime_offline_region_update_metadata_take_result(
+  mln_runtime* runtime, mln_offline_operation_id operation_id,
   mln_offline_region_snapshot** out_region
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
-    return mln::core::offline_region_update_metadata(
-      runtime, region_id, metadata, metadata_size, out_region
+    return mln::core::offline_region_update_metadata_take_result(
+      runtime, operation_id, out_region
     );
   });
 }
 
-auto mln_runtime_offline_region_get_status(
-  mln_runtime* runtime, mln_offline_region_id region_id,
+auto mln_runtime_offline_region_get_status_take_result(
+  mln_runtime* runtime, mln_offline_operation_id operation_id,
   mln_offline_region_status* out_status
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
-    return mln::core::offline_region_get_status(runtime, region_id, out_status);
-  });
-}
-
-auto mln_runtime_offline_region_set_observed(
-  mln_runtime* runtime, mln_offline_region_id region_id, bool observed
-) noexcept -> mln_status {
-  return mln::c_api::status_boundary([&]() -> mln_status {
-    return mln::core::offline_region_set_observed(runtime, region_id, observed);
-  });
-}
-
-auto mln_runtime_offline_region_set_download_state(
-  mln_runtime* runtime, mln_offline_region_id region_id, uint32_t state
-) noexcept -> mln_status {
-  return mln::c_api::status_boundary([&]() -> mln_status {
-    return mln::core::offline_region_set_download_state(
-      runtime, mln::core::OfflineRegionDownloadStateRequest{
-                 .region_id = region_id, .state = state
-               }
+    return mln::core::offline_region_get_status_take_result(
+      runtime, operation_id, out_status
     );
-  });
-}
-
-auto mln_runtime_offline_region_invalidate(
-  mln_runtime* runtime, mln_offline_region_id region_id
-) noexcept -> mln_status {
-  return mln::c_api::status_boundary([&]() -> mln_status {
-    return mln::core::offline_region_invalidate(runtime, region_id);
-  });
-}
-
-auto mln_runtime_offline_region_delete(
-  mln_runtime* runtime, mln_offline_region_id region_id
-) noexcept -> mln_status {
-  return mln::c_api::status_boundary([&]() -> mln_status {
-    return mln::core::offline_region_delete(runtime, region_id);
   });
 }
 

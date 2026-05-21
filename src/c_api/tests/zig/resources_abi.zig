@@ -5,7 +5,41 @@ const testing = std.testing;
 const support = @import("support.zig");
 const c = support.c;
 
+extern fn usleep(useconds: c_uint) c_int;
+
 const offline_style_url = "http://example.com/offline-style.json";
+
+fn emptyEvent() c.mln_runtime_event {
+    return .{
+        .size = @sizeOf(c.mln_runtime_event),
+        .type = 0,
+        .source_type = c.MLN_RUNTIME_EVENT_SOURCE_RUNTIME,
+        .source = null,
+        .code = 0,
+        .payload_type = c.MLN_RUNTIME_EVENT_PAYLOAD_NONE,
+        .payload = null,
+        .payload_size = 0,
+        .message = null,
+        .message_size = 0,
+    };
+}
+
+fn waitForOfflineOperation(runtime: *c.mln_runtime, operation_id: c.mln_offline_operation_id) !c.mln_runtime_event_offline_operation_completed {
+    for (0..5000) |_| {
+        try testing.expectEqual(c.MLN_STATUS_OK, c.mln_runtime_run_once(runtime));
+        while (true) {
+            var event = emptyEvent();
+            var has_event = false;
+            try testing.expectEqual(c.MLN_STATUS_OK, c.mln_runtime_poll_event(runtime, &event, &has_event));
+            if (!has_event) break;
+            if (event.type != c.MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED or event.payload_type != c.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_OPERATION_COMPLETED) continue;
+            const payload: *const c.mln_runtime_event_offline_operation_completed = @ptrCast(@alignCast(event.payload orelse return error.MissingPayload));
+            if (payload.operation_id == operation_id) return payload.*;
+        }
+        _ = usleep(1000);
+    }
+    return error.OperationNotCompleted;
+}
 
 fn offlineTileDefinition() c.mln_offline_region_definition {
     var definition: c.mln_offline_region_definition = undefined;
@@ -88,7 +122,9 @@ test "ambient cache operations validate raw operation values" {
     const runtime = try support.createRuntime();
     defer support.destroyRuntime(runtime);
 
-    try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, c.mln_runtime_run_ambient_cache_operation(runtime, 999));
+    var operation_id: c.mln_offline_operation_id = 123;
+    try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, c.mln_runtime_run_ambient_cache_operation_start(runtime, 999, &operation_id));
+    try testing.expectEqual(@as(c.mln_offline_operation_id, 0), operation_id);
 }
 
 test "offline regions reject raw invalid descriptors" {
@@ -97,19 +133,21 @@ test "offline regions reject raw invalid descriptors" {
 
     var definition = offlineTileDefinition();
     const metadata = [_]u8{ 1, 2, 3 };
-    var snapshot: ?*c.mln_offline_region_snapshot = null;
+    var operation_id: c.mln_offline_operation_id = 123;
 
-    try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, c.mln_runtime_offline_region_create(runtime, null, metadata[0..].ptr, metadata.len, &snapshot));
-    try testing.expectEqual(@as(?*c.mln_offline_region_snapshot, null), snapshot);
+    try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, c.mln_runtime_offline_region_create_start(runtime, null, metadata[0..].ptr, metadata.len, &operation_id));
+    try testing.expectEqual(@as(c.mln_offline_operation_id, 0), operation_id);
 
     definition.type = 999;
-    try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, c.mln_runtime_offline_region_create(runtime, &definition, metadata[0..].ptr, metadata.len, &snapshot));
-    try testing.expectEqual(@as(?*c.mln_offline_region_snapshot, null), snapshot);
+    operation_id = 123;
+    try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, c.mln_runtime_offline_region_create_start(runtime, &definition, metadata[0..].ptr, metadata.len, &operation_id));
+    try testing.expectEqual(@as(c.mln_offline_operation_id, 0), operation_id);
 
     definition = offlineTileDefinition();
     definition.data.tile_pyramid.style_url = null;
-    try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, c.mln_runtime_offline_region_create(runtime, &definition, metadata[0..].ptr, metadata.len, &snapshot));
-    try testing.expectEqual(@as(?*c.mln_offline_region_snapshot, null), snapshot);
+    operation_id = 123;
+    try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, c.mln_runtime_offline_region_create_start(runtime, &definition, metadata[0..].ptr, metadata.len, &operation_id));
+    try testing.expectEqual(@as(c.mln_offline_operation_id, 0), operation_id);
 
     var coordinates = [_]c.mln_lat_lng{
         .{ .latitude = 1.0, .longitude = 2.0 },
@@ -122,21 +160,56 @@ test "offline regions reject raw invalid descriptors" {
     };
     definition = offlineGeometryDefinition(&geometry);
     definition.data.geometry.style_url = null;
-    try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, c.mln_runtime_offline_region_create(runtime, &definition, metadata[0..].ptr, metadata.len, &snapshot));
-    try testing.expectEqual(@as(?*c.mln_offline_region_snapshot, null), snapshot);
+    operation_id = 123;
+    try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, c.mln_runtime_offline_region_create_start(runtime, &definition, metadata[0..].ptr, metadata.len, &operation_id));
+    try testing.expectEqual(@as(c.mln_offline_operation_id, 0), operation_id);
 
     definition = offlineGeometryDefinition(&geometry);
     definition.data.geometry.geometry = null;
-    try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, c.mln_runtime_offline_region_create(runtime, &definition, metadata[0..].ptr, metadata.len, &snapshot));
-    try testing.expectEqual(@as(?*c.mln_offline_region_snapshot, null), snapshot);
+    operation_id = 123;
+    try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, c.mln_runtime_offline_region_create_start(runtime, &definition, metadata[0..].ptr, metadata.len, &operation_id));
+    try testing.expectEqual(@as(c.mln_offline_operation_id, 0), operation_id);
 }
 
 test "offline database merge rejects raw null path" {
     const runtime = try support.createRuntime();
     defer support.destroyRuntime(runtime);
 
-    var merged: ?*c.mln_offline_region_list = null;
-    try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, c.mln_runtime_offline_regions_merge_database(runtime, null, &merged));
+    var operation_id: c.mln_offline_operation_id = 123;
+    try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, c.mln_runtime_offline_regions_merge_database_start(runtime, null, &operation_id));
+    try testing.expectEqual(@as(c.mln_offline_operation_id, 0), operation_id);
+}
+
+test "offline operations complete through runtime events and typed take results" {
+    const runtime = try support.createRuntime();
+    defer support.destroyRuntime(runtime);
+
+    const metadata = [_]u8{ 1, 2, 3 };
+    var definition = offlineTileDefinition();
+    var create_id: c.mln_offline_operation_id = 0;
+    try testing.expectEqual(c.MLN_STATUS_OK, c.mln_runtime_offline_region_create_start(runtime, &definition, metadata[0..].ptr, metadata.len, &create_id));
+    try testing.expect(create_id != 0);
+
+    const create_payload = try waitForOfflineOperation(runtime, create_id);
+    try testing.expectEqual(create_id, create_payload.operation_id);
+    try testing.expectEqual(c.MLN_OFFLINE_OPERATION_REGION_CREATE, create_payload.operation_kind);
+    try testing.expectEqual(c.MLN_OFFLINE_OPERATION_RESULT_REGION, create_payload.result_kind);
+    try testing.expectEqual(@as(i32, c.MLN_STATUS_OK), create_payload.result_status);
+
+    var wrong_list: ?*c.mln_offline_region_list = null;
+    try testing.expectEqual(c.MLN_STATUS_INVALID_STATE, c.mln_runtime_offline_regions_list_take_result(runtime, create_id, &wrong_list));
+    try testing.expectEqual(@as(?*c.mln_offline_region_list, null), wrong_list);
+
+    var snapshot: ?*c.mln_offline_region_snapshot = null;
+    try testing.expectEqual(c.MLN_STATUS_OK, c.mln_runtime_offline_region_create_take_result(runtime, create_id, &snapshot));
+    const snapshot_handle = snapshot orelse return error.MissingSnapshot;
+    defer c.mln_offline_region_snapshot_destroy(snapshot_handle);
+
+    var info: c.mln_offline_region_info = undefined;
+    info.size = @sizeOf(c.mln_offline_region_info);
+    try testing.expectEqual(c.MLN_STATUS_OK, c.mln_offline_region_snapshot_get(snapshot_handle, &info));
+    try testing.expect(info.id > 0);
+    try testing.expectEqualSlices(u8, metadata[0..], info.metadata[0..info.metadata_size]);
 }
 
 test "resource transform rejects raw invalid descriptors" {

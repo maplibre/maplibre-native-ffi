@@ -47,6 +47,33 @@ typedef enum mln_offline_region_download_state : uint32_t {
   MLN_OFFLINE_REGION_DOWNLOAD_ACTIVE = 1,
 } mln_offline_region_download_state;
 
+/** Offline database operation token. Zero is never a valid operation ID. */
+typedef uint64_t mln_offline_operation_id;
+
+/** Offline database operation kinds reported by completion events. */
+typedef enum mln_offline_operation_kind : uint32_t {
+  MLN_OFFLINE_OPERATION_AMBIENT_CACHE = 1,
+  MLN_OFFLINE_OPERATION_REGION_CREATE = 2,
+  MLN_OFFLINE_OPERATION_REGION_GET = 3,
+  MLN_OFFLINE_OPERATION_REGIONS_LIST = 4,
+  MLN_OFFLINE_OPERATION_REGIONS_MERGE_DATABASE = 5,
+  MLN_OFFLINE_OPERATION_REGION_UPDATE_METADATA = 6,
+  MLN_OFFLINE_OPERATION_REGION_GET_STATUS = 7,
+  MLN_OFFLINE_OPERATION_REGION_SET_OBSERVED = 8,
+  MLN_OFFLINE_OPERATION_REGION_SET_DOWNLOAD_STATE = 9,
+  MLN_OFFLINE_OPERATION_REGION_INVALIDATE = 10,
+  MLN_OFFLINE_OPERATION_REGION_DELETE = 11,
+} mln_offline_operation_kind;
+
+/** Offline database operation result kinds reported by completion events. */
+typedef enum mln_offline_operation_result_kind : uint32_t {
+  MLN_OFFLINE_OPERATION_RESULT_NONE = 0,
+  MLN_OFFLINE_OPERATION_RESULT_REGION = 1,
+  MLN_OFFLINE_OPERATION_RESULT_OPTIONAL_REGION = 2,
+  MLN_OFFLINE_OPERATION_RESULT_REGION_LIST = 3,
+  MLN_OFFLINE_OPERATION_RESULT_REGION_STATUS = 4,
+} mln_offline_operation_result_kind;
+
 /** Offline region status snapshot. */
 typedef struct mln_offline_region_status {
   uint32_t size;
@@ -85,6 +112,7 @@ typedef enum mln_runtime_event_type : uint32_t {
   MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED = 19,
   MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR = 20,
   MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED = 21,
+  MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED = 22,
 } mln_runtime_event_type;
 
 /** Source kinds used by mln_runtime_event.source_type. */
@@ -103,6 +131,7 @@ typedef enum mln_runtime_event_payload_type : uint32_t {
   MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS = 5,
   MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR = 6,
   MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT = 7,
+  MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_OPERATION_COMPLETED = 8,
 } mln_runtime_event_payload_type;
 
 /** Render modes reported by render observer events. */
@@ -306,6 +335,20 @@ typedef struct mln_runtime_event_offline_region_tile_count_limit {
   mln_offline_region_id region_id;
   uint64_t limit;
 } mln_runtime_event_offline_region_tile_count_limit;
+
+/** Payload for MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED. */
+typedef struct mln_runtime_event_offline_operation_completed {
+  uint32_t size;
+  mln_offline_operation_id operation_id;
+  /** One of mln_offline_operation_kind. */
+  uint32_t operation_kind;
+  /** One of mln_offline_operation_result_kind. */
+  uint32_t result_kind;
+  /** Async result status as a mln_status value. */
+  int32_t result_status;
+  /** Meaningful for MLN_OFFLINE_OPERATION_REGION_GET. */
+  bool found;
+} mln_runtime_event_offline_operation_completed;
 
 /** Event payload returned by mln_runtime_poll_event(). */
 typedef struct mln_runtime_event {
@@ -585,24 +628,43 @@ MLN_API mln_status
 mln_runtime_clear_resource_transform(mln_runtime* runtime) MLN_NOEXCEPT;
 
 /**
- * Runs a MapLibre ambient cache maintenance operation for this runtime.
+ * Starts a MapLibre ambient cache maintenance operation for this runtime.
  *
  * When runtime options omit cache_path, this operates on MapLibre's default
  * in-memory database and its effects are not durable beyond the native database
- * lifetime. Native cache operations are asynchronous internally; this call
- * waits until MapLibre's database callback reports completion and returns the
- * resulting status.
+ * lifetime. Completion is reported through
+ * MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED.
  *
  * Returns:
- * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_OK when the operation was accepted and out_operation_id was set.
  * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, or operation
- *   is not a mln_ambient_cache_operation value.
+ *   is not a mln_ambient_cache_operation value, or out_operation_id is null.
  * - MLN_STATUS_WRONG_THREAD when called from a thread other than the runtime
  *   owner thread.
  * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
-MLN_API mln_status mln_runtime_run_ambient_cache_operation(
-  mln_runtime* runtime, uint32_t operation
+MLN_API mln_status mln_runtime_run_ambient_cache_operation_start(
+  mln_runtime* runtime, uint32_t operation,
+  mln_offline_operation_id* out_operation_id
+) MLN_NOEXCEPT;
+
+/**
+ * Discards runtime-owned state for an offline database operation.
+ *
+ * Discarding does not cancel native database work. It drops stored results,
+ * removes queued completion events for the operation, and suppresses later
+ * completion delivery when the native operation is still pending.
+ *
+ * Returns:
+ * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_INVALID_ARGUMENT when runtime is null or not live, or
+ *   operation_id is zero or unknown.
+ * - MLN_STATUS_WRONG_THREAD when called from a thread other than the runtime
+ *   owner thread.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ */
+MLN_API mln_status mln_runtime_offline_operation_discard(
+  mln_runtime* runtime, mln_offline_operation_id operation_id
 ) MLN_NOEXCEPT;
 
 /**
