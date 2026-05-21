@@ -5,8 +5,6 @@ const testing = std.testing;
 const support = @import("support.zig");
 const c = support.c;
 
-extern fn usleep(useconds: c_uint) c_int;
-
 const style_json =
     \\{
     \\  "version": 8,
@@ -17,6 +15,10 @@ const style_json =
     \\  ]
     \\}
 ;
+
+fn sleepOneMillisecond() !void {
+    try testing.io.sleep(.fromMilliseconds(1), .awake);
+}
 
 fn stringView(value: []const u8) c.mln_string_view {
     return .{ .data = value.ptr, .size = value.len };
@@ -47,7 +49,7 @@ fn waitForMapEvent(runtime: *c.mln_runtime, map: *c.mln_map, event_type: u32) !b
             if (!has_event) break;
             if (event.type == event_type and event.source_type == c.MLN_RUNTIME_EVENT_SOURCE_MAP and event.source == @as(?*anyopaque, @ptrCast(map))) return true;
         }
-        _ = usleep(1000);
+        try sleepOneMillisecond();
     }
     return false;
 }

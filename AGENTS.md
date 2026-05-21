@@ -7,7 +7,8 @@ linters. Read the
 [development overview](docs/src/content/docs/development/overview.md) for
 contributor setup, workflow commands, examples, and platform/render backend
 variants. Run examples only when useful, with a brief timeout because most are
-GUI apps, not one-shot tests.
+GUI apps, not one-shot tests. The `zig-readback` example works headless and is a
+good smoke test; GUI examples need SDL3 and a display.
 
 Feature changes need tests through the C ABI when practical.
 
