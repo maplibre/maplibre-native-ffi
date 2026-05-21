@@ -49,17 +49,24 @@ public final class OfflineOperationHandle<T> implements AutoCloseable {
     return closed;
   }
 
-  synchronized long requireLive() {
+  synchronized long requireLive(RuntimeHandle expectedRuntime) {
     if (closed) {
       throw new InvalidStateException(
           MaplibreStatus.INVALID_STATE.nativeCode(), "OfflineOperationHandle is already closed");
+    }
+    if (runtime != Objects.requireNonNull(expectedRuntime, "expectedRuntime")) {
+      throw new InvalidStateException(
+          MaplibreStatus.INVALID_STATE.nativeCode(),
+          "OfflineOperationHandle belongs to a different RuntimeHandle");
     }
     return id;
   }
 
   synchronized long requireLive(
-      OfflineOperationKind expectedKind, OfflineOperationResultKind expectedResultKind) {
-    requireLive();
+      RuntimeHandle expectedRuntime,
+      OfflineOperationKind expectedKind,
+      OfflineOperationResultKind expectedResultKind) {
+    requireLive(expectedRuntime);
     if (kind != expectedKind || resultKind != expectedResultKind) {
       throw new InvalidStateException(
           MaplibreStatus.INVALID_STATE.nativeCode(),
@@ -76,10 +83,11 @@ public final class OfflineOperationHandle<T> implements AutoCloseable {
   }
 
   synchronized long requireLiveForOneOf(
+      RuntimeHandle expectedRuntime,
       OfflineOperationKind firstKind,
       OfflineOperationKind secondKind,
       OfflineOperationResultKind expectedResultKind) {
-    requireLive();
+    requireLive(expectedRuntime);
     if ((kind != firstKind && kind != secondKind) || resultKind != expectedResultKind) {
       throw new InvalidStateException(
           MaplibreStatus.INVALID_STATE.nativeCode(),

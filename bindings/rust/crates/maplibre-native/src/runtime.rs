@@ -343,8 +343,8 @@ impl OfflineOperationHandle<OfflineRegionInfo> {
             },
             _ => sys::MLN_STATUS_INVALID_STATE,
         };
-        maplibre_core::check(status)?;
         self.mark_consumed();
+        maplibre_core::check(status)?;
         // SAFETY: On success, the C API returns an owned snapshot handle;
         // core copies and releases it.
         unsafe {
@@ -369,8 +369,8 @@ impl OfflineOperationHandle<Option<OfflineRegionInfo>> {
                 &mut found,
             )
         };
-        maplibre_core::check(status)?;
         self.mark_consumed();
+        maplibre_core::check(status)?;
         if !found {
             return Ok(None);
         }
@@ -406,8 +406,8 @@ impl OfflineOperationHandle<Vec<OfflineRegionInfo>> {
             },
             _ => sys::MLN_STATUS_INVALID_STATE,
         };
-        maplibre_core::check(status)?;
         self.mark_consumed();
+        maplibre_core::check(status)?;
         // SAFETY: On success, the C API returns an owned list handle; core
         // copies and releases it.
         unsafe {
@@ -430,8 +430,8 @@ impl OfflineOperationHandle<OfflineRegionStatus> {
                 &mut raw,
             )
         };
-        maplibre_core::check(status)?;
         self.mark_consumed();
+        maplibre_core::check(status)?;
         Ok(maplibre_core::events::offline_region_status_from_native(
             raw,
         ))

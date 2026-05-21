@@ -272,12 +272,12 @@ public final class RuntimeHandle implements AutoCloseable {
       var outRegion = MemoryUtil.allocatePointer(arena);
       var operationId =
           operation.requireLive(
-              OfflineOperationKind.REGION_CREATE, OfflineOperationResultKind.REGION);
+              this, OfflineOperationKind.REGION_CREATE, OfflineOperationResultKind.REGION);
       var nativeStatus =
           MapLibreNativeC.mln_runtime_offline_region_create_take_result(
               state.requireLive(), operationId, outRegion);
-      Status.check(nativeStatus);
       operation.markConsumed();
+      Status.check(nativeStatus);
       return RuntimeStructs.offlineRegionSnapshot(outRegion.get(ValueLayout.ADDRESS, 0));
     }
   }
@@ -291,12 +291,12 @@ public final class RuntimeHandle implements AutoCloseable {
       var outFound = arena.allocate(ValueLayout.JAVA_BOOLEAN);
       var operationId =
           operation.requireLive(
-              OfflineOperationKind.REGION_GET, OfflineOperationResultKind.OPTIONAL_REGION);
+              this, OfflineOperationKind.REGION_GET, OfflineOperationResultKind.OPTIONAL_REGION);
       var nativeStatus =
           MapLibreNativeC.mln_runtime_offline_region_get_take_result(
               state.requireLive(), operationId, outRegion, outFound);
-      Status.check(nativeStatus);
       operation.markConsumed();
+      Status.check(nativeStatus);
       if (!outFound.get(ValueLayout.JAVA_BOOLEAN, 0)) {
         return Optional.empty();
       }
@@ -313,12 +313,12 @@ public final class RuntimeHandle implements AutoCloseable {
       var outRegions = MemoryUtil.allocatePointer(arena);
       var operationId =
           operation.requireLive(
-              OfflineOperationKind.REGIONS_LIST, OfflineOperationResultKind.REGION_LIST);
+              this, OfflineOperationKind.REGIONS_LIST, OfflineOperationResultKind.REGION_LIST);
       var nativeStatus =
           MapLibreNativeC.mln_runtime_offline_regions_list_take_result(
               state.requireLive(), operationId, outRegions);
-      Status.check(nativeStatus);
       operation.markConsumed();
+      Status.check(nativeStatus);
       return RuntimeStructs.offlineRegionList(outRegions.get(ValueLayout.ADDRESS, 0));
     }
   }
@@ -331,12 +331,14 @@ public final class RuntimeHandle implements AutoCloseable {
       var outRegions = MemoryUtil.allocatePointer(arena);
       var operationId =
           operation.requireLive(
-              OfflineOperationKind.REGIONS_MERGE_DATABASE, OfflineOperationResultKind.REGION_LIST);
+              this,
+              OfflineOperationKind.REGIONS_MERGE_DATABASE,
+              OfflineOperationResultKind.REGION_LIST);
       var nativeStatus =
           MapLibreNativeC.mln_runtime_offline_regions_merge_database_take_result(
               state.requireLive(), operationId, outRegions);
-      Status.check(nativeStatus);
       operation.markConsumed();
+      Status.check(nativeStatus);
       return RuntimeStructs.offlineRegionList(outRegions.get(ValueLayout.ADDRESS, 0));
     }
   }
@@ -349,12 +351,12 @@ public final class RuntimeHandle implements AutoCloseable {
       var outRegion = MemoryUtil.allocatePointer(arena);
       var operationId =
           operation.requireLive(
-              OfflineOperationKind.REGION_UPDATE_METADATA, OfflineOperationResultKind.REGION);
+              this, OfflineOperationKind.REGION_UPDATE_METADATA, OfflineOperationResultKind.REGION);
       var nativeStatus =
           MapLibreNativeC.mln_runtime_offline_region_update_metadata_take_result(
               state.requireLive(), operationId, outRegion);
-      Status.check(nativeStatus);
       operation.markConsumed();
+      Status.check(nativeStatus);
       return RuntimeStructs.offlineRegionSnapshot(outRegion.get(ValueLayout.ADDRESS, 0));
     }
   }
@@ -367,12 +369,14 @@ public final class RuntimeHandle implements AutoCloseable {
       var status = RuntimeStructs.offlineRegionStatus(arena);
       var operationId =
           operation.requireLive(
-              OfflineOperationKind.REGION_GET_STATUS, OfflineOperationResultKind.REGION_STATUS);
+              this,
+              OfflineOperationKind.REGION_GET_STATUS,
+              OfflineOperationResultKind.REGION_STATUS);
       var nativeStatus =
           MapLibreNativeC.mln_runtime_offline_region_get_status_take_result(
               state.requireLive(), operationId, status);
-      Status.check(nativeStatus);
       operation.markConsumed();
+      Status.check(nativeStatus);
       return RuntimeStructs.offlineRegionStatus(status);
     }
   }
@@ -383,7 +387,7 @@ public final class RuntimeHandle implements AutoCloseable {
     if (operation.isClosed()) {
       return;
     }
-    var operationId = operation.requireLive();
+    var operationId = operation.requireLive(this);
     Status.check(
         MapLibreNativeC.mln_runtime_offline_operation_discard(state.requireLive(), operationId));
     operation.markConsumed();

@@ -782,10 +782,12 @@ pub const OfflineOperationHandle = struct {
 
     fn require(
         self: *OfflineOperationHandle,
+        expected_runtime: *RuntimeHandle,
         operation_kind: OfflineOperationKind,
         result_kind: OfflineOperationResultKind,
     ) status.Error!OfflineOperationId {
         if (!self.live) return error.ClosedHandle;
+        if (self.runtime != expected_runtime) return error.InvalidState;
         if (!std.meta.eql(self.operation_kind, operation_kind) or !std.meta.eql(self.result_kind, result_kind)) {
             return error.InvalidState;
         }
@@ -794,11 +796,13 @@ pub const OfflineOperationHandle = struct {
 
     fn requireEither(
         self: *OfflineOperationHandle,
+        expected_runtime: *RuntimeHandle,
         first_kind: OfflineOperationKind,
         second_kind: OfflineOperationKind,
         result_kind: OfflineOperationResultKind,
     ) status.Error!OfflineOperationId {
         if (!self.live) return error.ClosedHandle;
+        if (self.runtime != expected_runtime) return error.InvalidState;
         if ((!std.meta.eql(self.operation_kind, first_kind) and !std.meta.eql(self.operation_kind, second_kind)) or
             !std.meta.eql(self.result_kind, result_kind))
         {
@@ -1076,15 +1080,15 @@ pub const RuntimeHandle = struct {
         operation: *OfflineOperationHandle,
     ) status.Error!OwnedOfflineRegion {
         const runtime = try native(self);
-        const operation_id = try operation.requireEither(.region_create, .region_update_metadata, .region);
+        const operation_id = try operation.requireEither(self, .region_create, .region_update_metadata, .region);
         var snapshot: ?*c.mln_offline_region_snapshot = null;
         const native_status = switch (operation.operation_kind) {
             .region_create => c.mln_runtime_offline_region_create_take_result(runtime, operation_id, &snapshot),
             .region_update_metadata => c.mln_runtime_offline_region_update_metadata_take_result(runtime, operation_id, &snapshot),
             else => c.MLN_STATUS_INVALID_STATE,
         };
-        try status.checkStatus(native_status, self.diagnostic_store);
         operation.consume();
+        try status.checkStatus(native_status, self.diagnostic_store);
         const snapshot_handle = snapshot orelse return error.NativeError;
         defer c.mln_offline_region_snapshot_destroy(snapshot_handle);
         return copyOfflineRegionSnapshot(allocator, snapshot_handle);
@@ -1096,12 +1100,12 @@ pub const RuntimeHandle = struct {
         operation: *OfflineOperationHandle,
     ) status.Error!?OwnedOfflineRegion {
         const runtime = try native(self);
-        const operation_id = try operation.require(.region_get, .optional_region);
+        const operation_id = try operation.require(self, .region_get, .optional_region);
         var snapshot: ?*c.mln_offline_region_snapshot = null;
         var found = false;
         const native_status = c.mln_runtime_offline_region_get_take_result(runtime, operation_id, &snapshot, &found);
-        try status.checkStatus(native_status, self.diagnostic_store);
         operation.consume();
+        try status.checkStatus(native_status, self.diagnostic_store);
         if (!found) return null;
         const snapshot_handle = snapshot orelse return error.NativeError;
         defer c.mln_offline_region_snapshot_destroy(snapshot_handle);
@@ -1114,15 +1118,15 @@ pub const RuntimeHandle = struct {
         operation: *OfflineOperationHandle,
     ) status.Error!OfflineRegionList {
         const runtime = try native(self);
-        const operation_id = try operation.requireEither(.regions_list, .regions_merge_database, .region_list);
+        const operation_id = try operation.requireEither(self, .regions_list, .regions_merge_database, .region_list);
         var list: ?*c.mln_offline_region_list = null;
         const native_status = switch (operation.operation_kind) {
             .regions_list => c.mln_runtime_offline_regions_list_take_result(runtime, operation_id, &list),
             .regions_merge_database => c.mln_runtime_offline_regions_merge_database_take_result(runtime, operation_id, &list),
             else => c.MLN_STATUS_INVALID_STATE,
         };
-        try status.checkStatus(native_status, self.diagnostic_store);
         operation.consume();
+        try status.checkStatus(native_status, self.diagnostic_store);
         const list_handle = list orelse return error.NativeError;
         defer c.mln_offline_region_list_destroy(list_handle);
         return copyOfflineRegionList(allocator, list_handle);
@@ -1130,12 +1134,12 @@ pub const RuntimeHandle = struct {
 
     pub fn takeOfflineRegionStatus(self: *RuntimeHandle, operation: *OfflineOperationHandle) status.Error!OfflineRegionStatus {
         const runtime = try native(self);
-        const operation_id = try operation.require(.region_get_status, .region_status);
+        const operation_id = try operation.require(self, .region_get_status, .region_status);
         var native_status_value: c.mln_offline_region_status = undefined;
         native_status_value.size = @sizeOf(c.mln_offline_region_status);
         const native_status = c.mln_runtime_offline_region_get_status_take_result(runtime, operation_id, &native_status_value);
-        try status.checkStatus(native_status, self.diagnostic_store);
         operation.consume();
+        try status.checkStatus(native_status, self.diagnostic_store);
         return offlineStatusFromNative(native_status_value);
     }
 
