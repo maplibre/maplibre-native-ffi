@@ -859,6 +859,22 @@ test "offline region definitions reject invalid public values" {
     } }, &.{}));
 }
 
+test "offline operation take-result failures preserve handle state" {
+    var runtime = try maplibre.RuntimeHandle.init(null);
+    defer runtime.close() catch @panic("runtime close failed");
+
+    var operation = maplibre.OfflineOperationHandle{
+        .runtime = &runtime,
+        .operation_id = 9_999_999,
+        .operation_kind = .region_get_status,
+        .result_kind = .region_status,
+        .live = true,
+    };
+    try testing.expectError(error.InvalidArgument, runtime.takeOfflineRegionStatus(&operation));
+    try testing.expect(operation.live);
+    try testing.expectEqual(@as(maplibre.OfflineOperationId, 9_999_999), operation.operation_id);
+}
+
 fn expectOfflineGeometryRegion(region: *const maplibre.OwnedOfflineRegion, expected_metadata: []const u8) !void {
     try testing.expect(region.id > 0);
     const definition = region.definition.geometry;

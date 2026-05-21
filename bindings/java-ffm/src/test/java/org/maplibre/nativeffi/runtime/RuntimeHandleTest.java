@@ -28,6 +28,7 @@ import org.maplibre.nativeffi.internal.c.mln_runtime_event;
 import org.maplibre.nativeffi.internal.c.mln_runtime_event_offline_operation_completed;
 import org.maplibre.nativeffi.map.MapHandle;
 import org.maplibre.nativeffi.map.MapOptions;
+import org.maplibre.nativeffi.offline.OfflineRegionInfo;
 import org.maplibre.nativeffi.render.RenderTargetExtent;
 import org.maplibre.nativeffi.resource.ResourceKind;
 import org.maplibre.nativeffi.resource.ResourceProviderDecision;
@@ -110,6 +111,28 @@ final class RuntimeHandleTest {
       mln_runtime_event.payload_size(event, requiredSize);
       assertEquals(
           payload.address(), RuntimeHandle.offlineOperationCompletedPayload(event).address());
+    }
+  }
+
+  @Test
+  void failedTakeResultLeavesOfflineOperationHandleLive() {
+    var runtime = RuntimeHandle.create();
+    try {
+      var operation =
+          new OfflineOperationHandle<OfflineRegionInfo>(
+              runtime,
+              9_999_999L,
+              OfflineOperationKind.REGION_CREATE,
+              OfflineOperationResultKind.REGION);
+      var error =
+          assertThrows(
+              InvalidArgumentException.class,
+              () -> runtime.takeCreateOfflineRegionResult(operation));
+      assertEquals(MaplibreStatus.INVALID_ARGUMENT, error.status());
+      assertFalse(operation.isClosed());
+      operation.markConsumed();
+    } finally {
+      runtime.close();
     }
   }
 

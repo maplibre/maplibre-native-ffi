@@ -5,8 +5,6 @@ import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
 import java.lang.ref.WeakReference;
 import java.nio.file.Path;
-import java.util.ArrayDeque;
-import java.util.Deque;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -46,7 +44,6 @@ public final class RuntimeHandle implements AutoCloseable {
   private final HandleState state;
   private final ConcurrentHashMap<Long, WeakReference<MapHandle>> liveMaps =
       new ConcurrentHashMap<>();
-  private final Deque<RuntimeEvent> pendingEvents = new ArrayDeque<>();
   private ResourceTransformState resourceTransformState;
   private ResourceProviderState resourceProviderState;
 
@@ -276,8 +273,8 @@ public final class RuntimeHandle implements AutoCloseable {
       var nativeStatus =
           MapLibreNativeC.mln_runtime_offline_region_create_take_result(
               state.requireLive(), operationId, outRegion);
-      operation.markConsumed();
       Status.check(nativeStatus);
+      operation.markConsumed();
       return RuntimeStructs.offlineRegionSnapshot(outRegion.get(ValueLayout.ADDRESS, 0));
     }
   }
@@ -295,8 +292,8 @@ public final class RuntimeHandle implements AutoCloseable {
       var nativeStatus =
           MapLibreNativeC.mln_runtime_offline_region_get_take_result(
               state.requireLive(), operationId, outRegion, outFound);
-      operation.markConsumed();
       Status.check(nativeStatus);
+      operation.markConsumed();
       if (!outFound.get(ValueLayout.JAVA_BOOLEAN, 0)) {
         return Optional.empty();
       }
@@ -317,8 +314,8 @@ public final class RuntimeHandle implements AutoCloseable {
       var nativeStatus =
           MapLibreNativeC.mln_runtime_offline_regions_list_take_result(
               state.requireLive(), operationId, outRegions);
-      operation.markConsumed();
       Status.check(nativeStatus);
+      operation.markConsumed();
       return RuntimeStructs.offlineRegionList(outRegions.get(ValueLayout.ADDRESS, 0));
     }
   }
@@ -337,8 +334,8 @@ public final class RuntimeHandle implements AutoCloseable {
       var nativeStatus =
           MapLibreNativeC.mln_runtime_offline_regions_merge_database_take_result(
               state.requireLive(), operationId, outRegions);
-      operation.markConsumed();
       Status.check(nativeStatus);
+      operation.markConsumed();
       return RuntimeStructs.offlineRegionList(outRegions.get(ValueLayout.ADDRESS, 0));
     }
   }
@@ -355,8 +352,8 @@ public final class RuntimeHandle implements AutoCloseable {
       var nativeStatus =
           MapLibreNativeC.mln_runtime_offline_region_update_metadata_take_result(
               state.requireLive(), operationId, outRegion);
-      operation.markConsumed();
       Status.check(nativeStatus);
+      operation.markConsumed();
       return RuntimeStructs.offlineRegionSnapshot(outRegion.get(ValueLayout.ADDRESS, 0));
     }
   }
@@ -375,8 +372,8 @@ public final class RuntimeHandle implements AutoCloseable {
       var nativeStatus =
           MapLibreNativeC.mln_runtime_offline_region_get_status_take_result(
               state.requireLive(), operationId, status);
-      operation.markConsumed();
       Status.check(nativeStatus);
+      operation.markConsumed();
       return RuntimeStructs.offlineRegionStatus(status);
     }
   }
@@ -437,10 +434,6 @@ public final class RuntimeHandle implements AutoCloseable {
 
   public Optional<RuntimeEvent> pollEvent() {
     NativeAccess.ensureLoaded();
-    var pending = pendingEvents.pollFirst();
-    if (pending != null) {
-      return Optional.of(pending);
-    }
     try (var arena = Arena.ofConfined()) {
       var event = mln_runtime_event.allocate(arena);
       mln_runtime_event.size(event, (int) mln_runtime_event.sizeof());

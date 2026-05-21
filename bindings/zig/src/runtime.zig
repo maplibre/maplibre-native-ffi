@@ -1093,8 +1093,8 @@ pub const RuntimeHandle = struct {
             .region_update_metadata => c.mln_runtime_offline_region_update_metadata_take_result(runtime, operation_id, &snapshot),
             else => c.MLN_STATUS_INVALID_STATE,
         };
-        operation.consume();
         try status.checkStatus(native_status, self.diagnostic_store);
+        operation.consume();
         const snapshot_handle = snapshot orelse return error.NativeError;
         defer c.mln_offline_region_snapshot_destroy(snapshot_handle);
         return copyOfflineRegionSnapshot(allocator, snapshot_handle);
@@ -1110,8 +1110,8 @@ pub const RuntimeHandle = struct {
         var snapshot: ?*c.mln_offline_region_snapshot = null;
         var found = false;
         const native_status = c.mln_runtime_offline_region_get_take_result(runtime, operation_id, &snapshot, &found);
-        operation.consume();
         try status.checkStatus(native_status, self.diagnostic_store);
+        operation.consume();
         if (!found) return null;
         const snapshot_handle = snapshot orelse return error.NativeError;
         defer c.mln_offline_region_snapshot_destroy(snapshot_handle);
@@ -1131,8 +1131,8 @@ pub const RuntimeHandle = struct {
             .regions_merge_database => c.mln_runtime_offline_regions_merge_database_take_result(runtime, operation_id, &list),
             else => c.MLN_STATUS_INVALID_STATE,
         };
-        operation.consume();
         try status.checkStatus(native_status, self.diagnostic_store);
+        operation.consume();
         const list_handle = list orelse return error.NativeError;
         defer c.mln_offline_region_list_destroy(list_handle);
         return copyOfflineRegionList(allocator, list_handle);
@@ -1144,8 +1144,8 @@ pub const RuntimeHandle = struct {
         var native_status_value: c.mln_offline_region_status = undefined;
         native_status_value.size = @sizeOf(c.mln_offline_region_status);
         const native_status = c.mln_runtime_offline_region_get_status_take_result(runtime, operation_id, &native_status_value);
-        operation.consume();
         try status.checkStatus(native_status, self.diagnostic_store);
+        operation.consume();
         return offlineStatusFromNative(native_status_value);
     }
 
