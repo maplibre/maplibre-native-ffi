@@ -223,14 +223,6 @@ fn defaultDocIncludeDirs(b: *std.Build) []const std.Build.LazyPath {
     return &.{b.path("../../include")};
 }
 
-fn docIncludeDirs(b: *std.Build) []const std.Build.LazyPath {
-    return b.option(
-        []const std.Build.LazyPath,
-        "include-dir",
-        "Include directory for @cImport (docs need only the project include root).",
-    ) orelse defaultDocIncludeDirs(b);
-}
-
 fn addMaplibreNativeDocs(
     b: *std.Build,
     target: std.Build.ResolvedTarget,
@@ -288,7 +280,18 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    addMaplibreNativeDocs(b, target, optimize, docIncludeDirs(b));
+    const include_dirs_from_cli = b.option(
+        []const std.Build.LazyPath,
+        "include-dir",
+        "Include directory. Repeat for project, dependency, and backend headers.",
+    );
+
+    addMaplibreNativeDocs(
+        b,
+        target,
+        optimize,
+        include_dirs_from_cli orelse defaultDocIncludeDirs(b),
+    );
 
     const cmake_artifact_dir = b.option(
         std.Build.LazyPath,
@@ -296,13 +299,16 @@ pub fn build(b: *std.Build) void {
         "Directory containing the CMake-built maplibre-native-c library",
     ) orelse return;
 
+    const include_dirs = include_dirs_from_cli orelse
+        @panic("missing required -Dinclude-dir=<path>; repeat for additional include roots");
+
     const backend = renderBackend(b);
     const options = BuildOptions{
         .target = target,
         .optimize = optimize,
         .cmake_artifact_dir = cmake_artifact_dir,
         .cmake_artifact_dir_runtime_path = cmake_artifact_dir.getPath2(b, null),
-        .include_dirs = includeDirs(b),
+        .include_dirs = include_dirs,
         .dependency_library_dir = dependencyLibraryDir(b),
         .render_backend = backend,
     };
