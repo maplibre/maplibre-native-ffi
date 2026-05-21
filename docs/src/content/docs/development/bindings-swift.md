@@ -130,7 +130,7 @@ and releases exactly once. Custom geometry callbacks track active upcalls and
 delay state release until in-flight callbacks finish. When replacing a callback,
 install the new native descriptor before releasing the old Swift box.
 
-## Render Targets and Testing
+## Render Targets
 
 Render target descriptors are Swift values. Surface and borrowed-texture
 descriptors store host-owned backend handles as `NativePointer`; callers keep
@@ -142,6 +142,8 @@ Session-owned texture targets use explicit frame handle classes with
 once, and reject access after close. Safe accessors return copied metadata;
 backend interop uses a frame-scoped view or closure and documents unsafe
 synchronization requirements.
+
+## Testing
 
 Swift tests exercise the public Swift API against the real C library. Focus on
 throwing status conversion, diagnostic copying, explicit close behavior,
