@@ -5,7 +5,6 @@ const BuildOptions = struct {
     target: std.Build.ResolvedTarget,
     optimize: std.builtin.OptimizeMode,
     cmake_artifact_dir: std.Build.LazyPath,
-    cmake_artifact_dir_runtime_path: []const u8,
     include_dirs: []const std.Build.LazyPath,
     dependency_library_dir: ?std.Build.LazyPath,
     render_backend: maplibre_build.RenderBackend,
@@ -38,7 +37,6 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = b.standardOptimizeOption(.{}),
         .cmake_artifact_dir = cmake_artifact_dir,
-        .cmake_artifact_dir_runtime_path = cmake_artifact_dir.getPath2(b, null),
         .include_dirs = maplibre_build.includeDirs(b),
         .dependency_library_dir = maplibre_build.dependencyLibraryDir(b),
         .render_backend = render_backend,
@@ -47,9 +45,6 @@ pub fn build(b: *std.Build) void {
     const c_tests = addCTests(b, options);
 
     const run_c_tests = b.addRunArtifact(c_tests);
-    if (target.result.os.tag == .windows) {
-        run_c_tests.addPathDir(options.cmake_artifact_dir_runtime_path);
-    }
     const test_step = b.step("test", "Run Zig C ABI tests");
     test_step.dependOn(&run_c_tests.step);
 }

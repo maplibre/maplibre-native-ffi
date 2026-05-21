@@ -65,6 +65,7 @@ MLN_FFI_VARIANT = { required = true }
 MLN_FFI_TARGET_TRIPLE = { required = true }
 MLN_FFI_RENDER_BACKEND = { required = true }
 MLN_FFI_BUILD_DIR = { required = true }
+MLN_FFI_CMAKE_BUILD_TYPE = "{{env.MLN_FFI_CMAKE_BUILD_TYPE | default(value=\"RelWithDebInfo\")}}"
 MLN_FFI_INCLUDE_DIR = "{{config_root}}/include"
 MLN_FFI_VULKAN_INCLUDE_DIR = "{{config_root}}/third_party/maplibre-native/vendor/Vulkan-Headers/include"
 MLN_FFI_ZIG_TARGET = { required = true }
@@ -86,6 +87,7 @@ run = [
     -S .
     -B "$MLN_FFI_BUILD_DIR"
     -G Ninja
+    -DCMAKE_BUILD_TYPE="$MLN_FFI_CMAKE_BUILD_TYPE"
     -DMLN_FFI_RENDER_BACKEND="$MLN_FFI_RENDER_BACKEND"
   )
 
