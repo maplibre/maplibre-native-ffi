@@ -178,12 +178,22 @@ fn repoLinkOptions(options: BuildOptions) LinkOptions {
     };
 }
 
+pub const IncludeOptions = struct {
+    include_dirs: []const std.Build.LazyPath,
+};
+
+/// Configures include paths and libc for `@cImport` without linking maplibre-native-c.
+pub fn addMaplibreNativeIncludes(module_: *std.Build.Module, options: IncludeOptions) void {
+    addIncludePaths(module_, options.include_dirs);
+    module_.link_libc = true;
+}
+
 /// Links a Zig module to the MapLibre Native C library and its backend-specific dependencies.
 ///
 /// Callers provide all filesystem paths explicitly so the helper works both from this
 /// package and from external consumers with a different build root layout.
 pub fn linkMaplibreNativeC(b: *std.Build, module_: *std.Build.Module, options: LinkOptions) void {
-    addIncludePaths(module_, options.include_dirs);
+    addMaplibreNativeIncludes(module_, .{ .include_dirs = options.include_dirs });
     if (options.target.result.os.tag == .windows) {
         module_.addObjectFile(options.cmake_artifact_dir.path(b, "maplibre-native-c.lib"));
     } else {
@@ -191,7 +201,6 @@ pub fn linkMaplibreNativeC(b: *std.Build, module_: *std.Build.Module, options: L
         module_.addRPath(options.cmake_artifact_dir);
         module_.linkSystemLibrary("maplibre-native-c", .{});
     }
-    module_.link_libc = true;
     linkRenderBackend(b, module_, .{
         .target = options.target,
         .render_backend = options.render_backend,
@@ -207,6 +216,36 @@ fn addMaplibreNativeModule(b: *std.Build, options: BuildOptions) *std.Build.Modu
     });
     linkMaplibreNativeC(b, maplibre_native, repoLinkOptions(options));
     return maplibre_native;
+}
+
+fn defaultDocIncludeDirs(b: *std.Build) []const std.Build.LazyPath {
+    return &.{b.path("../../include")};
+}
+
+fn addMaplibreNativeDocs(
+    b: *std.Build,
+    target: std.Build.ResolvedTarget,
+    optimize: std.builtin.OptimizeMode,
+    include_dirs: []const std.Build.LazyPath,
+) void {
+    const docs_module = b.createModule(.{
+        .root_source_file = b.path("src/maplibre_native.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
+    addMaplibreNativeIncludes(docs_module, .{ .include_dirs = include_dirs });
+
+    const doc_compile = b.addObject(.{
+        .name = "maplibre_native_docs",
+        .root_module = docs_module,
+    });
+    const install_docs = b.addInstallDirectory(.{
+        .source_dir = doc_compile.getEmittedDocs(),
+        .install_dir = .prefix,
+        .install_subdir = "",
+    });
+    const docs_step = b.step("docs", "Install package documentation into the prefix");
+    docs_step.dependOn(&install_docs.step);
 }
 
 fn addTestCompile(b: *std.Build, options: BuildOptions, root_source_file: std.Build.LazyPath) *std.Build.Step.Compile {
@@ -234,13 +273,36 @@ fn addBindingTests(b: *std.Build, options: BuildOptions, maplibre_native: *std.B
 
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
+    const optimize = b.standardOptimizeOption(.{});
+
+    const include_dirs_from_cli = b.option(
+        []const std.Build.LazyPath,
+        "include-dir",
+        "Include directory. Repeat for project, dependency, and backend headers.",
+    );
+
+    addMaplibreNativeDocs(
+        b,
+        target,
+        optimize,
+        include_dirs_from_cli orelse defaultDocIncludeDirs(b),
+    );
+
+    const cmake_artifact_dir = b.option(
+        std.Build.LazyPath,
+        "cmake-artifact-dir",
+        "Directory containing the CMake-built maplibre-native-c library",
+    ) orelse return;
+
+    const include_dirs = include_dirs_from_cli orelse
+        @panic("missing required -Dinclude-dir=<path>; repeat for additional include roots");
+
     const backend = renderBackend(b);
-    const cmake_artifact_dir = cmakeArtifactDir(b);
     const options = BuildOptions{
         .target = target,
-        .optimize = b.standardOptimizeOption(.{}),
+        .optimize = optimize,
         .cmake_artifact_dir = cmake_artifact_dir,
-        .include_dirs = includeDirs(b),
+        .include_dirs = include_dirs,
         .dependency_library_dir = dependencyLibraryDir(b),
         .render_backend = backend,
     };
