@@ -3,8 +3,6 @@ const testing = std.testing;
 
 const maplibre = @import("maplibre_native");
 
-extern fn usleep(useconds: c_uint) c_int;
-
 fn runRuntimeOnThread(runtime: *maplibre.RuntimeHandle, out_error: *?anyerror) void {
     runtime.runOnce() catch |err| {
         out_error.* = err;
@@ -39,6 +37,10 @@ fn createRuntimeOnThread(out_error: *?anyerror) void {
         return;
     };
     out_error.* = null;
+}
+
+fn sleepOneMillisecond() !void {
+    try testing.io.sleep(.fromMilliseconds(1), .awake);
 }
 
 test "runtime rejects second runtime on same owner and permits distinct owner" {
@@ -113,7 +115,7 @@ test "owned runtime events copy message and resolve map identity" {
             discard.deinit();
         }
         if (found != null) break;
-        _ = usleep(1000);
+        try sleepOneMillisecond();
     }
 
     var event = found orelse return error.EventNotFound;
