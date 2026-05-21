@@ -5,7 +5,8 @@ use maplibre_native_sys as sys;
 
 use crate::{Error, Result};
 use crate::{
-    OfflineRegionDownloadState, RenderMode, ResourceErrorReason, RuntimeEventType, TileOperation,
+    OfflineOperationKind, OfflineOperationResultKind, OfflineRegionDownloadState, RenderMode,
+    ResourceErrorReason, RuntimeEventType, TileOperation,
 };
 
 /// Raw source fields copied from a native runtime event.
@@ -164,6 +165,19 @@ pub struct OfflineRegionTileCountLimitEvent {
     pub limit: u64,
 }
 
+/// Offline operation-completion event payload.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub struct OfflineOperationCompletedEvent {
+    pub operation_id: u64,
+    pub operation_kind: OfflineOperationKind,
+    pub raw_operation_kind: u32,
+    pub result_kind: OfflineOperationResultKind,
+    pub raw_result_kind: u32,
+    pub result_status: i32,
+    pub found: bool,
+}
+
 /// Style-image-missing event payload.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[non_exhaustive]
@@ -191,6 +205,7 @@ pub enum RuntimeEventPayload {
     OfflineRegionStatus(OfflineRegionStatusEvent),
     OfflineRegionResponseError(OfflineRegionResponseErrorEvent),
     OfflineRegionTileCountLimit(OfflineRegionTileCountLimitEvent),
+    OfflineOperationCompleted(OfflineOperationCompletedEvent),
     Unknown(UnknownRuntimeEventPayload),
 }
 
@@ -304,6 +319,21 @@ fn copy_payload(raw: &sys::mln_runtime_event) -> Result<RuntimeEventPayload> {
                 OfflineRegionTileCountLimitEvent {
                     region_id: payload.region_id,
                     limit: payload.limit,
+                },
+            ))
+        }
+        sys::MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_OPERATION_COMPLETED => {
+            let payload =
+                copy_payload_struct::<sys::mln_runtime_event_offline_operation_completed>(raw)?;
+            Ok(RuntimeEventPayload::OfflineOperationCompleted(
+                OfflineOperationCompletedEvent {
+                    operation_id: payload.operation_id,
+                    operation_kind: OfflineOperationKind::from_raw(payload.operation_kind),
+                    raw_operation_kind: payload.operation_kind,
+                    result_kind: OfflineOperationResultKind::from_raw(payload.result_kind),
+                    raw_result_kind: payload.result_kind,
+                    result_status: payload.result_status,
+                    found: payload.found,
                 },
             ))
         }

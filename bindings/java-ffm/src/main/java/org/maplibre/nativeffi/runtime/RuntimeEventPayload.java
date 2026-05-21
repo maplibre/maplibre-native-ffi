@@ -47,7 +47,13 @@ public sealed interface RuntimeEventPayload
   record OfflineRegionTileCountLimit(long regionId, long limit) implements RuntimeEventPayload {}
 
   record OfflineOperationCompleted(
-      long operationId, int operationKind, int resultKind, int resultStatus, boolean found)
+      long operationId,
+      OfflineOperationKind operationKind,
+      int rawOperationKind,
+      OfflineOperationResultKind resultKind,
+      int rawResultKind,
+      int resultStatus,
+      boolean found)
       implements RuntimeEventPayload {}
 
   record Unknown(int rawPayloadType, long payloadSize) implements RuntimeEventPayload {}

@@ -43,6 +43,147 @@ fn waitForOwnedEvent(
     return error.EventNotObserved;
 }
 
+fn rawStatusError(raw_status: i32) maplibre.NativeStatusError!void {
+    return switch (raw_status) {
+        0 => {},
+        -1 => error.InvalidArgument,
+        -2 => error.InvalidState,
+        -3 => error.WrongThread,
+        -4 => error.Unsupported,
+        -5 => error.NativeError,
+        else => error.UnknownStatus,
+    };
+}
+
+fn waitForOfflineOperation(
+    runtime: *maplibre.RuntimeHandle,
+    operation: *const maplibre.OfflineOperationHandle,
+) !maplibre.OfflineOperationCompletedPayload {
+    for (0..5000) |_| {
+        try runtime.runOnce();
+        while (try runtime.pollEventOwned(testing.allocator)) |event| {
+            var owned_event = event;
+            defer owned_event.deinit();
+            const payload = switch (owned_event.payload) {
+                .offline_operation_completed => |completed| completed,
+                else => continue,
+            };
+            if (payload.operation_id != operation.operation_id) continue;
+            try testing.expect(std.meta.eql(payload.operation_kind, operation.operation_kind));
+            try testing.expectEqual(operation.operation_kind.toRaw(), payload.raw_operation_kind);
+            try testing.expect(std.meta.eql(payload.result_kind, operation.result_kind));
+            try testing.expectEqual(operation.result_kind.toRaw(), payload.raw_result_kind);
+            try rawStatusError(payload.result_status);
+            return payload;
+        }
+        try sleepOneMillisecond();
+    }
+    return error.EventNotObserved;
+}
+
+fn runAmbientCacheOperation(runtime: *maplibre.RuntimeHandle, operation: maplibre.AmbientCacheOperation) !void {
+    var handle = try runtime.startAmbientCacheOperation(operation);
+    _ = waitForOfflineOperation(runtime, &handle) catch |err| {
+        handle.discard() catch {};
+        return err;
+    };
+    try handle.discard();
+}
+
+fn createOfflineRegion(
+    runtime: *maplibre.RuntimeHandle,
+    allocator: std.mem.Allocator,
+    definition: maplibre.OfflineRegionDefinition,
+    metadata: []const u8,
+) !maplibre.OwnedOfflineRegion {
+    var handle = try runtime.startCreateOfflineRegion(allocator, definition, metadata);
+    _ = try waitForOfflineOperation(runtime, &handle);
+    return runtime.takeOfflineRegion(allocator, &handle);
+}
+
+fn getOfflineRegion(
+    runtime: *maplibre.RuntimeHandle,
+    allocator: std.mem.Allocator,
+    region_id: maplibre.OfflineRegionId,
+) !?maplibre.OwnedOfflineRegion {
+    var handle = try runtime.startGetOfflineRegion(region_id);
+    _ = try waitForOfflineOperation(runtime, &handle);
+    return runtime.takeOptionalOfflineRegion(allocator, &handle);
+}
+
+fn listOfflineRegions(runtime: *maplibre.RuntimeHandle, allocator: std.mem.Allocator) !maplibre.OfflineRegionList {
+    var handle = try runtime.startListOfflineRegions();
+    _ = try waitForOfflineOperation(runtime, &handle);
+    return runtime.takeOfflineRegionList(allocator, &handle);
+}
+
+fn mergeOfflineRegionsDatabase(
+    runtime: *maplibre.RuntimeHandle,
+    allocator: std.mem.Allocator,
+    side_database_path: []const u8,
+) !maplibre.OfflineRegionList {
+    var handle = try runtime.startMergeOfflineRegionsDatabase(allocator, side_database_path);
+    _ = try waitForOfflineOperation(runtime, &handle);
+    return runtime.takeOfflineRegionList(allocator, &handle);
+}
+
+fn updateOfflineRegionMetadata(
+    runtime: *maplibre.RuntimeHandle,
+    allocator: std.mem.Allocator,
+    region_id: maplibre.OfflineRegionId,
+    metadata: []const u8,
+) !maplibre.OwnedOfflineRegion {
+    var handle = try runtime.startUpdateOfflineRegionMetadata(region_id, metadata);
+    _ = try waitForOfflineOperation(runtime, &handle);
+    return runtime.takeOfflineRegion(allocator, &handle);
+}
+
+fn getOfflineRegionStatus(runtime: *maplibre.RuntimeHandle, region_id: maplibre.OfflineRegionId) !maplibre.OfflineRegionStatus {
+    var handle = try runtime.startGetOfflineRegionStatus(region_id);
+    _ = try waitForOfflineOperation(runtime, &handle);
+    return runtime.takeOfflineRegionStatus(&handle);
+}
+
+fn setOfflineRegionObserved(runtime: *maplibre.RuntimeHandle, region_id: maplibre.OfflineRegionId, observed: bool) !void {
+    var handle = try runtime.startSetOfflineRegionObserved(region_id, observed);
+    _ = waitForOfflineOperation(runtime, &handle) catch |err| {
+        handle.discard() catch {};
+        return err;
+    };
+    try handle.discard();
+}
+
+fn setOfflineRegionDownloadState(
+    runtime: *maplibre.RuntimeHandle,
+    region_id: maplibre.OfflineRegionId,
+    download_state: maplibre.OfflineRegionDownloadState,
+) !void {
+    var handle = try runtime.startSetOfflineRegionDownloadState(region_id, download_state);
+    _ = waitForOfflineOperation(runtime, &handle) catch |err| {
+        handle.discard() catch {};
+        return err;
+    };
+    try handle.discard();
+}
+
+fn invalidateOfflineRegion(runtime: *maplibre.RuntimeHandle, region_id: maplibre.OfflineRegionId) !void {
+    var handle = try runtime.startInvalidateOfflineRegion(region_id);
+    _ = waitForOfflineOperation(runtime, &handle) catch |err| {
+        handle.discard() catch {};
+        return err;
+    };
+    try handle.discard();
+}
+
+fn deleteOfflineRegion(runtime: *maplibre.RuntimeHandle, region_id: maplibre.OfflineRegionId) !void {
+    var handle = try runtime.startDeleteOfflineRegion(region_id);
+    _ = waitForOfflineOperation(runtime, &handle) catch |err| {
+        handle.discard() catch {};
+        return err;
+    };
+    try handle.discard();
+}
+
 fn waitForStyleLoaded(runtime: *maplibre.RuntimeHandle) !void {
     try testing.expect(try waitForEvent(runtime, .map_style_loaded));
 }
@@ -104,7 +245,7 @@ test "network status APIs wrap process-global MapLibre status" {
 
 test "ambient cache operations validate cache configuration" {
     var runtime = try maplibre.RuntimeHandle.init(null);
-    try runtime.runAmbientCacheOperation(.pack_database);
+    try runAmbientCacheOperation(&runtime, .pack_database);
     try runtime.close();
 
     var tmp = testing.tmpDir(.{});
@@ -114,10 +255,10 @@ test "ambient cache operations validate cache configuration" {
 
     var cached_runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{ .cache_path = cache_path }, null);
     defer cached_runtime.close() catch @panic("cached runtime close failed");
-    try cached_runtime.runAmbientCacheOperation(.reset_database);
-    try cached_runtime.runAmbientCacheOperation(.pack_database);
-    try cached_runtime.runAmbientCacheOperation(.invalidate);
-    try cached_runtime.runAmbientCacheOperation(.clear);
+    try runAmbientCacheOperation(&cached_runtime, .reset_database);
+    try runAmbientCacheOperation(&cached_runtime, .pack_database);
+    try runAmbientCacheOperation(&cached_runtime, .invalidate);
+    try runAmbientCacheOperation(&cached_runtime, .clear);
 }
 
 test "file URL style loads through public binding" {
@@ -337,7 +478,7 @@ test "http style can load from ambient cache after online load" {
         defer map.close() catch @panic("map close failed");
         try map.setStyleUrl(testing.allocator, style_url);
         try waitForStyleLoaded(&runtime);
-        try runtime.runAmbientCacheOperation(.pack_database);
+        try runAmbientCacheOperation(&runtime, .pack_database);
     }
 
     server_thread.join();
@@ -640,20 +781,20 @@ test "offline tile-pyramid regions copy definitions and metadata" {
         var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{ .cache_path = cache_path }, null);
         defer runtime.close() catch @panic("runtime close failed");
 
-        var created = try runtime.createOfflineRegion(testing.allocator, offlineTileDefinition(), metadata[0..]);
+        var created = try createOfflineRegion(&runtime, testing.allocator, offlineTileDefinition(), metadata[0..]);
         defer created.deinit();
         region_id = created.id;
         try expectOfflineTileRegion(&created, metadata[0..]);
 
-        const status = try runtime.getOfflineRegionStatus(region_id);
+        const status = try getOfflineRegionStatus(&runtime, region_id);
         try testing.expect(std.meta.eql(status.download_state, maplibre.OfflineRegionDownloadState.inactive));
 
-        var list = try runtime.listOfflineRegions(testing.allocator);
+        var list = try listOfflineRegions(&runtime, testing.allocator);
         defer list.deinit();
         try testing.expectEqual(@as(usize, 1), list.items.len);
         try expectOfflineTileRegion(&list.items[0], metadata[0..]);
 
-        var updated = try runtime.updateOfflineRegionMetadata(testing.allocator, region_id, updated_metadata[0..]);
+        var updated = try updateOfflineRegionMetadata(&runtime, testing.allocator, region_id, updated_metadata[0..]);
         defer updated.deinit();
         try expectOfflineTileRegion(&updated, updated_metadata[0..]);
     }
@@ -662,17 +803,17 @@ test "offline tile-pyramid regions copy definitions and metadata" {
         var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{ .cache_path = cache_path }, null);
         defer runtime.close() catch @panic("runtime close failed");
 
-        var reloaded = (try runtime.getOfflineRegion(testing.allocator, region_id)) orelse return error.RegionReloadFailed;
+        var reloaded = (try getOfflineRegion(&runtime, testing.allocator, region_id)) orelse return error.RegionReloadFailed;
         defer reloaded.deinit();
         try expectOfflineTileRegion(&reloaded, updated_metadata[0..]);
 
-        try runtime.invalidateOfflineRegion(region_id);
-        try runtime.deleteOfflineRegion(region_id);
+        try invalidateOfflineRegion(&runtime, region_id);
+        try deleteOfflineRegion(&runtime, region_id);
 
-        const missing = try runtime.getOfflineRegion(testing.allocator, region_id);
+        const missing = try getOfflineRegion(&runtime, testing.allocator, region_id);
         try testing.expect(missing == null);
 
-        var list = try runtime.listOfflineRegions(testing.allocator);
+        var list = try listOfflineRegions(&runtime, testing.allocator);
         defer list.deinit();
         try testing.expectEqual(@as(usize, 0), list.items.len);
     }
@@ -690,13 +831,13 @@ test "offline region definitions reject invalid public values" {
     var invalid_zoom = offlineTileDefinition();
     invalid_zoom.tile_pyramid.min_zoom = 8.0;
     invalid_zoom.tile_pyramid.max_zoom = 2.0;
-    try testing.expectError(error.InvalidArgument, runtime.createOfflineRegion(testing.allocator, invalid_zoom, &.{}));
+    try testing.expectError(error.InvalidArgument, createOfflineRegion(&runtime, testing.allocator, invalid_zoom, &.{}));
 
     var invalid_bounds = offlineTileDefinition();
     invalid_bounds.tile_pyramid.bounds.southwest.latitude = std.math.inf(f64);
-    try testing.expectError(error.InvalidArgument, runtime.createOfflineRegion(testing.allocator, invalid_bounds, &.{}));
+    try testing.expectError(error.InvalidArgument, createOfflineRegion(&runtime, testing.allocator, invalid_bounds, &.{}));
 
-    try testing.expectError(error.InvalidArgument, runtime.createOfflineRegion(testing.allocator, .{ .geometry = .{
+    try testing.expectError(error.InvalidArgument, createOfflineRegion(&runtime, testing.allocator, .{ .geometry = .{
         .style_url = offline_style_url,
         .geometry = .empty,
         .min_zoom = 5.0,
@@ -710,7 +851,7 @@ test "offline region definitions reject invalid public values" {
         nested_index -= 1;
         nested_geometries[nested_index] = .{ .collection = nested_geometries[nested_index + 1 .. nested_index + 2] };
     }
-    try testing.expectError(error.InvalidArgument, runtime.createOfflineRegion(testing.allocator, .{ .geometry = .{
+    try testing.expectError(error.InvalidArgument, createOfflineRegion(&runtime, testing.allocator, .{ .geometry = .{
         .style_url = offline_style_url,
         .geometry = nested_geometries[0],
         .min_zoom = 5.0,
@@ -749,13 +890,13 @@ test "offline database merge returns copied region list" {
     {
         var side_runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{ .cache_path = side_cache_path }, null);
         defer side_runtime.close() catch @panic("side runtime close failed");
-        var created = try side_runtime.createOfflineRegion(testing.allocator, offlineTileDefinition(), metadata[0..]);
+        var created = try createOfflineRegion(&side_runtime, testing.allocator, offlineTileDefinition(), metadata[0..]);
         defer created.deinit();
     }
 
     var main_runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{ .cache_path = main_cache_path }, null);
     defer main_runtime.close() catch @panic("main runtime close failed");
-    var merged = try main_runtime.mergeOfflineRegionsDatabase(testing.allocator, side_cache_path);
+    var merged = try mergeOfflineRegionsDatabase(&main_runtime, testing.allocator, side_cache_path);
     defer merged.deinit();
     try testing.expectEqual(@as(usize, 1), merged.items.len);
     try expectOfflineTileRegion(&merged.items[0], metadata[0..]);
@@ -778,7 +919,7 @@ test "offline geometry regions expose copied geometry values" {
         var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{ .cache_path = cache_path }, null);
         defer runtime.close() catch @panic("runtime close failed");
 
-        var created = try runtime.createOfflineRegion(testing.allocator, .{ .geometry = .{
+        var created = try createOfflineRegion(&runtime, testing.allocator, .{ .geometry = .{
             .style_url = offline_style_url,
             .geometry = .{ .line_string = coordinates[0..] },
             .min_zoom = 5.0,
@@ -790,7 +931,7 @@ test "offline geometry regions expose copied geometry values" {
         region_id = created.id;
         try expectOfflineGeometryRegion(&created, metadata[0..]);
 
-        var list = try runtime.listOfflineRegions(testing.allocator);
+        var list = try listOfflineRegions(&runtime, testing.allocator);
         defer list.deinit();
         try testing.expectEqual(@as(usize, 1), list.items.len);
         try expectOfflineGeometryRegion(&list.items[0], metadata[0..]);
@@ -800,12 +941,12 @@ test "offline geometry regions expose copied geometry values" {
         var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{ .cache_path = cache_path }, null);
         defer runtime.close() catch @panic("runtime close failed");
 
-        var reloaded = (try runtime.getOfflineRegion(testing.allocator, region_id)) orelse return error.RegionReloadFailed;
+        var reloaded = (try getOfflineRegion(&runtime, testing.allocator, region_id)) orelse return error.RegionReloadFailed;
         defer reloaded.deinit();
         try expectOfflineGeometryRegion(&reloaded, metadata[0..]);
 
-        try runtime.deleteOfflineRegion(region_id);
-        const missing = try runtime.getOfflineRegion(testing.allocator, region_id);
+        try deleteOfflineRegion(&runtime, region_id);
+        const missing = try getOfflineRegion(&runtime, testing.allocator, region_id);
         try testing.expect(missing == null);
     }
 }
@@ -1025,14 +1166,14 @@ test "offline region download errors are runtime events" {
     var definition = offlineTileDefinition();
     definition.tile_pyramid.style_url = "custom://error-style.json";
     const metadata = [_]u8{8};
-    var created = try runtime.createOfflineRegion(testing.allocator, definition, metadata[0..]);
+    var created = try createOfflineRegion(&runtime, testing.allocator, definition, metadata[0..]);
     defer created.deinit();
     const region_id = created.id;
 
-    try runtime.setOfflineRegionObserved(region_id, true);
-    defer runtime.setOfflineRegionObserved(region_id, false) catch {};
-    try runtime.setOfflineRegionDownloadState(region_id, .active);
-    defer runtime.setOfflineRegionDownloadState(region_id, .inactive) catch {};
+    try setOfflineRegionObserved(&runtime, region_id, true);
+    defer setOfflineRegionObserved(&runtime, region_id, false) catch {};
+    try setOfflineRegionDownloadState(&runtime, region_id, .active);
+    defer setOfflineRegionDownloadState(&runtime, region_id, .inactive) catch {};
 
     var event = try waitForOwnedEvent(&runtime, .offline_region_response_error);
     defer event.deinit();
@@ -1088,17 +1229,17 @@ test "offline region download control emits copied status events" {
     defer runtime.close() catch @panic("runtime close failed");
 
     const metadata = [_]u8{9};
-    var created = try runtime.createOfflineRegion(testing.allocator, offlineTileDefinition(), metadata[0..]);
+    var created = try createOfflineRegion(&runtime, testing.allocator, offlineTileDefinition(), metadata[0..]);
     defer created.deinit();
     const region_id = created.id;
 
-    try testing.expectError(error.InvalidArgument, runtime.setOfflineRegionObserved(region_id + 1000, true));
-    try testing.expectError(error.InvalidArgument, runtime.setOfflineRegionDownloadState(region_id, .{ .unknown = 999 }));
+    try testing.expectError(error.InvalidArgument, setOfflineRegionObserved(&runtime, region_id + 1000, true));
+    try testing.expectError(error.InvalidArgument, setOfflineRegionDownloadState(&runtime, region_id, .{ .unknown = 999 }));
 
-    try runtime.setOfflineRegionObserved(region_id, true);
-    defer runtime.setOfflineRegionObserved(region_id, false) catch {};
-    try runtime.setOfflineRegionDownloadState(region_id, .active);
-    defer runtime.setOfflineRegionDownloadState(region_id, .inactive) catch {};
+    try setOfflineRegionObserved(&runtime, region_id, true);
+    defer setOfflineRegionObserved(&runtime, region_id, false) catch {};
+    try setOfflineRegionDownloadState(&runtime, region_id, .active);
+    defer setOfflineRegionDownloadState(&runtime, region_id, .inactive) catch {};
 
     var observed = false;
     for (0..5000) |_| {

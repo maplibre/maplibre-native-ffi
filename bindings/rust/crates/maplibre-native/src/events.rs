@@ -3,9 +3,9 @@ use maplibre_native_sys as sys;
 
 use crate::Result;
 pub use maplibre_core::events::{
-    OfflineRegionResponseErrorEvent, OfflineRegionStatus, OfflineRegionStatusEvent,
-    OfflineRegionTileCountLimitEvent, RenderFrameEvent, RenderMapEvent, RenderingStats,
-    RuntimeEventPayload, StyleImageMissingEvent, TileActionEvent, TileId,
+    OfflineOperationCompletedEvent, OfflineRegionResponseErrorEvent, OfflineRegionStatus,
+    OfflineRegionStatusEvent, OfflineRegionTileCountLimitEvent, RenderFrameEvent, RenderMapEvent,
+    RenderingStats, RuntimeEventPayload, StyleImageMissingEvent, TileActionEvent, TileId,
     UnknownRuntimeEventPayload,
 };
 pub(crate) use maplibre_core::{OfflineRegionDownloadState, RuntimeEventType};

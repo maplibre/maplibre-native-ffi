@@ -6,8 +6,6 @@ const native_temp = @import("native_temp.zig");
 const status = @import("status.zig");
 const values = @import("values.zig");
 
-extern fn usleep(useconds: c_uint) c_int;
-
 const NativeRuntime = opaque {};
 
 const MapRegistration = struct {
@@ -86,6 +84,86 @@ pub const AmbientCacheOperation = enum {
 
 pub const OfflineRegionId = i64;
 pub const OfflineOperationId = u64;
+
+pub const OfflineOperationKind = union(enum) {
+    ambient_cache,
+    region_create,
+    region_get,
+    regions_list,
+    regions_merge_database,
+    region_update_metadata,
+    region_get_status,
+    region_set_observed,
+    region_set_download_state,
+    region_invalidate,
+    region_delete,
+    unknown: u32,
+
+    pub fn fromRaw(raw: u32) OfflineOperationKind {
+        return switch (raw) {
+            c.MLN_OFFLINE_OPERATION_AMBIENT_CACHE => .ambient_cache,
+            c.MLN_OFFLINE_OPERATION_REGION_CREATE => .region_create,
+            c.MLN_OFFLINE_OPERATION_REGION_GET => .region_get,
+            c.MLN_OFFLINE_OPERATION_REGIONS_LIST => .regions_list,
+            c.MLN_OFFLINE_OPERATION_REGIONS_MERGE_DATABASE => .regions_merge_database,
+            c.MLN_OFFLINE_OPERATION_REGION_UPDATE_METADATA => .region_update_metadata,
+            c.MLN_OFFLINE_OPERATION_REGION_GET_STATUS => .region_get_status,
+            c.MLN_OFFLINE_OPERATION_REGION_SET_OBSERVED => .region_set_observed,
+            c.MLN_OFFLINE_OPERATION_REGION_SET_DOWNLOAD_STATE => .region_set_download_state,
+            c.MLN_OFFLINE_OPERATION_REGION_INVALIDATE => .region_invalidate,
+            c.MLN_OFFLINE_OPERATION_REGION_DELETE => .region_delete,
+            else => .{ .unknown = raw },
+        };
+    }
+
+    pub fn toRaw(self: OfflineOperationKind) u32 {
+        return switch (self) {
+            .ambient_cache => c.MLN_OFFLINE_OPERATION_AMBIENT_CACHE,
+            .region_create => c.MLN_OFFLINE_OPERATION_REGION_CREATE,
+            .region_get => c.MLN_OFFLINE_OPERATION_REGION_GET,
+            .regions_list => c.MLN_OFFLINE_OPERATION_REGIONS_LIST,
+            .regions_merge_database => c.MLN_OFFLINE_OPERATION_REGIONS_MERGE_DATABASE,
+            .region_update_metadata => c.MLN_OFFLINE_OPERATION_REGION_UPDATE_METADATA,
+            .region_get_status => c.MLN_OFFLINE_OPERATION_REGION_GET_STATUS,
+            .region_set_observed => c.MLN_OFFLINE_OPERATION_REGION_SET_OBSERVED,
+            .region_set_download_state => c.MLN_OFFLINE_OPERATION_REGION_SET_DOWNLOAD_STATE,
+            .region_invalidate => c.MLN_OFFLINE_OPERATION_REGION_INVALIDATE,
+            .region_delete => c.MLN_OFFLINE_OPERATION_REGION_DELETE,
+            .unknown => |raw| raw,
+        };
+    }
+};
+
+pub const OfflineOperationResultKind = union(enum) {
+    none,
+    region,
+    optional_region,
+    region_list,
+    region_status,
+    unknown: u32,
+
+    pub fn fromRaw(raw: u32) OfflineOperationResultKind {
+        return switch (raw) {
+            c.MLN_OFFLINE_OPERATION_RESULT_NONE => .none,
+            c.MLN_OFFLINE_OPERATION_RESULT_REGION => .region,
+            c.MLN_OFFLINE_OPERATION_RESULT_OPTIONAL_REGION => .optional_region,
+            c.MLN_OFFLINE_OPERATION_RESULT_REGION_LIST => .region_list,
+            c.MLN_OFFLINE_OPERATION_RESULT_REGION_STATUS => .region_status,
+            else => .{ .unknown = raw },
+        };
+    }
+
+    pub fn toRaw(self: OfflineOperationResultKind) u32 {
+        return switch (self) {
+            .none => c.MLN_OFFLINE_OPERATION_RESULT_NONE,
+            .region => c.MLN_OFFLINE_OPERATION_RESULT_REGION,
+            .optional_region => c.MLN_OFFLINE_OPERATION_RESULT_OPTIONAL_REGION,
+            .region_list => c.MLN_OFFLINE_OPERATION_RESULT_REGION_LIST,
+            .region_status => c.MLN_OFFLINE_OPERATION_RESULT_REGION_STATUS,
+            .unknown => |raw| raw,
+        };
+    }
+};
 
 pub const OfflineTilePyramidRegionDefinition = struct {
     style_url: []const u8,
@@ -598,8 +676,10 @@ pub const OfflineRegionTileCountLimitPayload = struct {
 
 pub const OfflineOperationCompletedPayload = struct {
     operation_id: OfflineOperationId,
-    operation_kind: u32,
-    result_kind: u32,
+    operation_kind: OfflineOperationKind,
+    raw_operation_kind: u32,
+    result_kind: OfflineOperationResultKind,
+    raw_result_kind: u32,
     result_status: i32,
     found: bool,
 };
@@ -677,6 +757,72 @@ pub const RuntimeEventSourceType = union(enum) {
     }
 };
 
+pub const OfflineOperationHandle = struct {
+    runtime: *RuntimeHandle,
+    operation_id: OfflineOperationId,
+    operation_kind: OfflineOperationKind,
+    result_kind: OfflineOperationResultKind,
+    live: bool = true,
+
+    fn init(
+        runtime: *RuntimeHandle,
+        operation_id: OfflineOperationId,
+        operation_kind: OfflineOperationKind,
+        result_kind: OfflineOperationResultKind,
+    ) status.Error!OfflineOperationHandle {
+        if (operation_id == 0) return error.InvalidArgument;
+        return .{
+            .runtime = runtime,
+            .operation_id = operation_id,
+            .operation_kind = operation_kind,
+            .result_kind = result_kind,
+            .live = true,
+        };
+    }
+
+    fn require(
+        self: *OfflineOperationHandle,
+        operation_kind: OfflineOperationKind,
+        result_kind: OfflineOperationResultKind,
+    ) status.Error!OfflineOperationId {
+        if (!self.live) return error.ClosedHandle;
+        if (!std.meta.eql(self.operation_kind, operation_kind) or !std.meta.eql(self.result_kind, result_kind)) {
+            return error.InvalidState;
+        }
+        return self.operation_id;
+    }
+
+    fn requireEither(
+        self: *OfflineOperationHandle,
+        first_kind: OfflineOperationKind,
+        second_kind: OfflineOperationKind,
+        result_kind: OfflineOperationResultKind,
+    ) status.Error!OfflineOperationId {
+        if (!self.live) return error.ClosedHandle;
+        if ((!std.meta.eql(self.operation_kind, first_kind) and !std.meta.eql(self.operation_kind, second_kind)) or
+            !std.meta.eql(self.result_kind, result_kind))
+        {
+            return error.InvalidState;
+        }
+        return self.operation_id;
+    }
+
+    fn consume(self: *OfflineOperationHandle) void {
+        self.live = false;
+        self.operation_id = 0;
+    }
+
+    pub fn discard(self: *OfflineOperationHandle) status.Error!void {
+        if (!self.live) return;
+        const runtime = try native(self.runtime);
+        try status.checkStatus(
+            c.mln_runtime_offline_operation_discard(runtime, self.operation_id),
+            self.runtime.diagnostic_store,
+        );
+        self.consume();
+    }
+};
+
 pub const RuntimeEventPayloadType = union(enum) {
     none,
     render_frame,
@@ -711,8 +857,6 @@ pub const RuntimeHandle = struct {
     registry: ?*RuntimeRegistry,
     resource_transform: ?*ResourceTransform,
     resource_provider: ?*ResourceProviderState,
-    pending_events: std.ArrayList(OwnedRuntimeEvent),
-    borrowed_event: ?OwnedRuntimeEvent,
 
     pub fn init(diagnostic_store: ?*diagnostics.DiagnosticStore) status.Error!RuntimeHandle {
         var native_options = c.mln_runtime_options_default();
@@ -751,14 +895,6 @@ pub const RuntimeHandle = struct {
     }
 
     pub fn pollEvent(self: *RuntimeHandle) status.Error!?RuntimeEvent {
-        if (self.borrowed_event) |*event| {
-            event.deinit();
-            self.borrowed_event = null;
-        }
-        if (self.pending_events.items.len > 0) {
-            self.borrowed_event = self.pending_events.orderedRemove(0);
-            return runtimeEventFromOwned(&self.borrowed_event.?);
-        }
         var native_event = emptyNativeEvent();
         var has_event = false;
         try status.checkStatus(
@@ -770,13 +906,6 @@ pub const RuntimeHandle = struct {
     }
 
     pub fn pollEventOwned(self: *RuntimeHandle, allocator: std.mem.Allocator) status.Error!?OwnedRuntimeEvent {
-        if (self.borrowed_event) |*event| {
-            event.deinit();
-            self.borrowed_event = null;
-        }
-        if (self.pending_events.items.len > 0) {
-            return self.pending_events.orderedRemove(0);
-        }
         var native_event = emptyNativeEvent();
         var has_event = false;
         try status.checkStatus(
@@ -788,65 +917,36 @@ pub const RuntimeHandle = struct {
         return try copyRuntimeEventOwned(self, allocator, native_event);
     }
 
-    fn waitForOfflineOperation(self: *RuntimeHandle, operation_id: c.mln_offline_operation_id) status.Error!c.mln_runtime_event_offline_operation_completed {
-        const runtime = try native(self);
-        while (true) {
-            try self.runOnce();
-            while (true) {
-                var native_event = emptyNativeEvent();
-                var has_event = false;
-                try status.checkStatus(c.mln_runtime_poll_event(runtime, &native_event, &has_event), self.diagnostic_store);
-                if (!has_event) break;
-                if (native_event.type != c.MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED or
-                    native_event.payload_type != c.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_OPERATION_COMPLETED)
-                {
-                    try self.pending_events.append(std.heap.smp_allocator, try copyRuntimeEventOwned(self, std.heap.smp_allocator, native_event));
-                    continue;
-                }
-                const payload = (try payloadAs(c.mln_runtime_event_offline_operation_completed, native_event.payload, native_event.payload_size)).*;
-                if (payload.operation_id != operation_id) {
-                    try self.pending_events.append(std.heap.smp_allocator, try copyRuntimeEventOwned(self, std.heap.smp_allocator, native_event));
-                    continue;
-                }
-                if (payload.result_status != c.MLN_STATUS_OK) {
-                    if (self.diagnostic_store) |store| {
-                        const message = if (native_event.message_size == 0)
-                            ""
-                        else
-                            native_event.message[0..native_event.message_size];
-                        try store.set(payload.result_status, message);
-                    }
-                    return rawStatusError(payload.result_status);
-                }
-                return payload;
-            }
-            _ = usleep(1000);
-        }
+    fn operationHandle(
+        self: *RuntimeHandle,
+        operation_id: c.mln_offline_operation_id,
+        operation_kind: OfflineOperationKind,
+        result_kind: OfflineOperationResultKind,
+    ) status.Error!OfflineOperationHandle {
+        return OfflineOperationHandle.init(self, operation_id, operation_kind, result_kind);
     }
 
-    pub fn runAmbientCacheOperation(self: *RuntimeHandle, operation: AmbientCacheOperation) status.Error!void {
+    pub fn startAmbientCacheOperation(self: *RuntimeHandle, operation: AmbientCacheOperation) status.Error!OfflineOperationHandle {
         const runtime = try native(self);
         var operation_id: c.mln_offline_operation_id = 0;
         try status.checkStatus(
             c.mln_runtime_run_ambient_cache_operation_start(runtime, operation.toRaw(), &operation_id),
             self.diagnostic_store,
         );
-        defer _ = c.mln_runtime_offline_operation_discard(runtime, operation_id);
-        _ = try self.waitForOfflineOperation(operation_id);
+        return self.operationHandle(operation_id, .ambient_cache, .none);
     }
 
-    pub fn createOfflineRegion(
+    pub fn startCreateOfflineRegion(
         self: *RuntimeHandle,
         allocator: std.mem.Allocator,
         definition: OfflineRegionDefinition,
         metadata: []const u8,
-    ) status.Error!OwnedOfflineRegion {
+    ) status.Error!OfflineOperationHandle {
         var temp = native_temp.TempStorage.init(allocator);
         defer temp.deinit();
         const native_definition = try temp.offlineRegionDefinition(definition);
         const runtime = try native(self);
         var operation_id: c.mln_offline_operation_id = 0;
-        var snapshot: ?*c.mln_offline_region_snapshot = null;
         try status.checkStatus(
             c.mln_runtime_offline_region_create_start(
                 runtime,
@@ -857,83 +957,52 @@ pub const RuntimeHandle = struct {
             ),
             self.diagnostic_store,
         );
-        errdefer _ = c.mln_runtime_offline_operation_discard(runtime, operation_id);
-        _ = try self.waitForOfflineOperation(operation_id);
-        try status.checkStatus(c.mln_runtime_offline_region_create_take_result(runtime, operation_id, &snapshot), self.diagnostic_store);
-        const snapshot_handle = snapshot orelse return error.NativeError;
-        defer c.mln_offline_region_snapshot_destroy(snapshot_handle);
-        return copyOfflineRegionSnapshot(allocator, snapshot_handle);
+        return self.operationHandle(operation_id, .region_create, .region);
     }
 
-    pub fn getOfflineRegion(
-        self: *RuntimeHandle,
-        allocator: std.mem.Allocator,
-        region_id: OfflineRegionId,
-    ) status.Error!?OwnedOfflineRegion {
+    pub fn startGetOfflineRegion(self: *RuntimeHandle, region_id: OfflineRegionId) status.Error!OfflineOperationHandle {
         const runtime = try native(self);
         var operation_id: c.mln_offline_operation_id = 0;
-        var snapshot: ?*c.mln_offline_region_snapshot = null;
-        var found = false;
         try status.checkStatus(
             c.mln_runtime_offline_region_get_start(runtime, region_id, &operation_id),
             self.diagnostic_store,
         );
-        errdefer _ = c.mln_runtime_offline_operation_discard(runtime, operation_id);
-        _ = try self.waitForOfflineOperation(operation_id);
-        try status.checkStatus(c.mln_runtime_offline_region_get_take_result(runtime, operation_id, &snapshot, &found), self.diagnostic_store);
-        if (!found) return null;
-        const snapshot_handle = snapshot orelse return error.NativeError;
-        defer c.mln_offline_region_snapshot_destroy(snapshot_handle);
-        return try copyOfflineRegionSnapshot(allocator, snapshot_handle);
+        return self.operationHandle(operation_id, .region_get, .optional_region);
     }
 
-    pub fn listOfflineRegions(self: *RuntimeHandle, allocator: std.mem.Allocator) status.Error!OfflineRegionList {
+    pub fn startListOfflineRegions(self: *RuntimeHandle) status.Error!OfflineOperationHandle {
         const runtime = try native(self);
         var operation_id: c.mln_offline_operation_id = 0;
-        var list: ?*c.mln_offline_region_list = null;
         try status.checkStatus(
             c.mln_runtime_offline_regions_list_start(runtime, &operation_id),
             self.diagnostic_store,
         );
-        errdefer _ = c.mln_runtime_offline_operation_discard(runtime, operation_id);
-        _ = try self.waitForOfflineOperation(operation_id);
-        try status.checkStatus(c.mln_runtime_offline_regions_list_take_result(runtime, operation_id, &list), self.diagnostic_store);
-        const list_handle = list orelse return error.NativeError;
-        defer c.mln_offline_region_list_destroy(list_handle);
-        return copyOfflineRegionList(allocator, list_handle);
+        return self.operationHandle(operation_id, .regions_list, .region_list);
     }
 
-    pub fn mergeOfflineRegionsDatabase(
+    pub fn startMergeOfflineRegionsDatabase(
         self: *RuntimeHandle,
         allocator: std.mem.Allocator,
         side_database_path: []const u8,
-    ) status.Error!OfflineRegionList {
+    ) status.Error!OfflineOperationHandle {
         const path = try nulTerminated(allocator, side_database_path);
         defer allocator.free(path);
         const runtime = try native(self);
         var operation_id: c.mln_offline_operation_id = 0;
-        var list: ?*c.mln_offline_region_list = null;
         try status.checkStatus(
             c.mln_runtime_offline_regions_merge_database_start(runtime, path.ptr, &operation_id),
             self.diagnostic_store,
         );
-        errdefer _ = c.mln_runtime_offline_operation_discard(runtime, operation_id);
-        _ = try self.waitForOfflineOperation(operation_id);
-        try status.checkStatus(c.mln_runtime_offline_regions_merge_database_take_result(runtime, operation_id, &list), self.diagnostic_store);
-        const list_handle = list orelse return error.NativeError;
-        defer c.mln_offline_region_list_destroy(list_handle);
-        return copyOfflineRegionList(allocator, list_handle);
+        return self.operationHandle(operation_id, .regions_merge_database, .region_list);
     }
 
-    pub fn updateOfflineRegionMetadata(
+    pub fn startUpdateOfflineRegionMetadata(
         self: *RuntimeHandle,
-        allocator: std.mem.Allocator,
         region_id: OfflineRegionId,
         metadata: []const u8,
-    ) status.Error!OwnedOfflineRegion {
+    ) status.Error!OfflineOperationHandle {
         const runtime = try native(self);
         var operation_id: c.mln_offline_operation_id = 0;
-        var snapshot: ?*c.mln_offline_region_snapshot = null;
         try status.checkStatus(
             c.mln_runtime_offline_region_update_metadata_start(
                 runtime,
@@ -944,75 +1013,130 @@ pub const RuntimeHandle = struct {
             ),
             self.diagnostic_store,
         );
-        errdefer _ = c.mln_runtime_offline_operation_discard(runtime, operation_id);
-        _ = try self.waitForOfflineOperation(operation_id);
-        try status.checkStatus(c.mln_runtime_offline_region_update_metadata_take_result(runtime, operation_id, &snapshot), self.diagnostic_store);
-        const snapshot_handle = snapshot orelse return error.NativeError;
-        defer c.mln_offline_region_snapshot_destroy(snapshot_handle);
-        return copyOfflineRegionSnapshot(allocator, snapshot_handle);
+        return self.operationHandle(operation_id, .region_update_metadata, .region);
     }
 
-    pub fn getOfflineRegionStatus(self: *RuntimeHandle, region_id: OfflineRegionId) status.Error!OfflineRegionStatus {
+    pub fn startGetOfflineRegionStatus(self: *RuntimeHandle, region_id: OfflineRegionId) status.Error!OfflineOperationHandle {
         const runtime = try native(self);
         var operation_id: c.mln_offline_operation_id = 0;
         try status.checkStatus(
             c.mln_runtime_offline_region_get_status_start(runtime, region_id, &operation_id),
             self.diagnostic_store,
         );
-        errdefer _ = c.mln_runtime_offline_operation_discard(runtime, operation_id);
-        _ = try self.waitForOfflineOperation(operation_id);
-        var native_status: c.mln_offline_region_status = undefined;
-        native_status.size = @sizeOf(c.mln_offline_region_status);
-        try status.checkStatus(c.mln_runtime_offline_region_get_status_take_result(runtime, operation_id, &native_status), self.diagnostic_store);
-        return offlineStatusFromNative(native_status);
+        return self.operationHandle(operation_id, .region_get_status, .region_status);
     }
 
-    pub fn setOfflineRegionObserved(self: *RuntimeHandle, region_id: OfflineRegionId, observed: bool) status.Error!void {
+    pub fn startSetOfflineRegionObserved(self: *RuntimeHandle, region_id: OfflineRegionId, observed: bool) status.Error!OfflineOperationHandle {
         const runtime = try native(self);
         var operation_id: c.mln_offline_operation_id = 0;
         try status.checkStatus(
             c.mln_runtime_offline_region_set_observed_start(runtime, region_id, observed, &operation_id),
             self.diagnostic_store,
         );
-        defer _ = c.mln_runtime_offline_operation_discard(runtime, operation_id);
-        _ = try self.waitForOfflineOperation(operation_id);
+        return self.operationHandle(operation_id, .region_set_observed, .none);
     }
 
-    pub fn setOfflineRegionDownloadState(
+    pub fn startSetOfflineRegionDownloadState(
         self: *RuntimeHandle,
         region_id: OfflineRegionId,
         download_state: OfflineRegionDownloadState,
-    ) status.Error!void {
+    ) status.Error!OfflineOperationHandle {
         const runtime = try native(self);
         var operation_id: c.mln_offline_operation_id = 0;
         try status.checkStatus(
             c.mln_runtime_offline_region_set_download_state_start(runtime, region_id, download_state.toRaw(), &operation_id),
             self.diagnostic_store,
         );
-        defer _ = c.mln_runtime_offline_operation_discard(runtime, operation_id);
-        _ = try self.waitForOfflineOperation(operation_id);
+        return self.operationHandle(operation_id, .region_set_download_state, .none);
     }
 
-    pub fn invalidateOfflineRegion(self: *RuntimeHandle, region_id: OfflineRegionId) status.Error!void {
+    pub fn startInvalidateOfflineRegion(self: *RuntimeHandle, region_id: OfflineRegionId) status.Error!OfflineOperationHandle {
         const runtime = try native(self);
         var operation_id: c.mln_offline_operation_id = 0;
         try status.checkStatus(
             c.mln_runtime_offline_region_invalidate_start(runtime, region_id, &operation_id),
             self.diagnostic_store,
         );
-        defer _ = c.mln_runtime_offline_operation_discard(runtime, operation_id);
-        _ = try self.waitForOfflineOperation(operation_id);
+        return self.operationHandle(operation_id, .region_invalidate, .none);
     }
 
-    pub fn deleteOfflineRegion(self: *RuntimeHandle, region_id: OfflineRegionId) status.Error!void {
+    pub fn startDeleteOfflineRegion(self: *RuntimeHandle, region_id: OfflineRegionId) status.Error!OfflineOperationHandle {
         const runtime = try native(self);
         var operation_id: c.mln_offline_operation_id = 0;
         try status.checkStatus(
             c.mln_runtime_offline_region_delete_start(runtime, region_id, &operation_id),
             self.diagnostic_store,
         );
-        defer _ = c.mln_runtime_offline_operation_discard(runtime, operation_id);
-        _ = try self.waitForOfflineOperation(operation_id);
+        return self.operationHandle(operation_id, .region_delete, .none);
+    }
+
+    pub fn takeOfflineRegion(
+        self: *RuntimeHandle,
+        allocator: std.mem.Allocator,
+        operation: *OfflineOperationHandle,
+    ) status.Error!OwnedOfflineRegion {
+        const runtime = try native(self);
+        const operation_id = try operation.requireEither(.region_create, .region_update_metadata, .region);
+        var snapshot: ?*c.mln_offline_region_snapshot = null;
+        const native_status = switch (operation.operation_kind) {
+            .region_create => c.mln_runtime_offline_region_create_take_result(runtime, operation_id, &snapshot),
+            .region_update_metadata => c.mln_runtime_offline_region_update_metadata_take_result(runtime, operation_id, &snapshot),
+            else => c.MLN_STATUS_INVALID_STATE,
+        };
+        try status.checkStatus(native_status, self.diagnostic_store);
+        operation.consume();
+        const snapshot_handle = snapshot orelse return error.NativeError;
+        defer c.mln_offline_region_snapshot_destroy(snapshot_handle);
+        return copyOfflineRegionSnapshot(allocator, snapshot_handle);
+    }
+
+    pub fn takeOptionalOfflineRegion(
+        self: *RuntimeHandle,
+        allocator: std.mem.Allocator,
+        operation: *OfflineOperationHandle,
+    ) status.Error!?OwnedOfflineRegion {
+        const runtime = try native(self);
+        const operation_id = try operation.require(.region_get, .optional_region);
+        var snapshot: ?*c.mln_offline_region_snapshot = null;
+        var found = false;
+        const native_status = c.mln_runtime_offline_region_get_take_result(runtime, operation_id, &snapshot, &found);
+        try status.checkStatus(native_status, self.diagnostic_store);
+        operation.consume();
+        if (!found) return null;
+        const snapshot_handle = snapshot orelse return error.NativeError;
+        defer c.mln_offline_region_snapshot_destroy(snapshot_handle);
+        return try copyOfflineRegionSnapshot(allocator, snapshot_handle);
+    }
+
+    pub fn takeOfflineRegionList(
+        self: *RuntimeHandle,
+        allocator: std.mem.Allocator,
+        operation: *OfflineOperationHandle,
+    ) status.Error!OfflineRegionList {
+        const runtime = try native(self);
+        const operation_id = try operation.requireEither(.regions_list, .regions_merge_database, .region_list);
+        var list: ?*c.mln_offline_region_list = null;
+        const native_status = switch (operation.operation_kind) {
+            .regions_list => c.mln_runtime_offline_regions_list_take_result(runtime, operation_id, &list),
+            .regions_merge_database => c.mln_runtime_offline_regions_merge_database_take_result(runtime, operation_id, &list),
+            else => c.MLN_STATUS_INVALID_STATE,
+        };
+        try status.checkStatus(native_status, self.diagnostic_store);
+        operation.consume();
+        const list_handle = list orelse return error.NativeError;
+        defer c.mln_offline_region_list_destroy(list_handle);
+        return copyOfflineRegionList(allocator, list_handle);
+    }
+
+    pub fn takeOfflineRegionStatus(self: *RuntimeHandle, operation: *OfflineOperationHandle) status.Error!OfflineRegionStatus {
+        const runtime = try native(self);
+        const operation_id = try operation.require(.region_get_status, .region_status);
+        var native_status_value: c.mln_offline_region_status = undefined;
+        native_status_value.size = @sizeOf(c.mln_offline_region_status);
+        const native_status = c.mln_runtime_offline_region_get_status_take_result(runtime, operation_id, &native_status_value);
+        try status.checkStatus(native_status, self.diagnostic_store);
+        operation.consume();
+        return offlineStatusFromNative(native_status_value);
     }
 
     pub fn setResourceTransform(self: *RuntimeHandle, transform: ?ResourceTransform) status.Error!void {
@@ -1080,12 +1204,6 @@ pub const RuntimeHandle = struct {
             runtime_registry.maps.deinit(std.heap.smp_allocator);
             std.heap.smp_allocator.destroy(runtime_registry);
         }
-        if (self.borrowed_event) |*event| {
-            event.deinit();
-            self.borrowed_event = null;
-        }
-        for (self.pending_events.items) |*event| event.deinit();
-        self.pending_events.deinit(std.heap.smp_allocator);
         self.native = null;
     }
 };
@@ -1120,18 +1238,6 @@ fn createNative(
         .registry = runtime_registry,
         .resource_transform = null,
         .resource_provider = null,
-        .pending_events = .empty,
-        .borrowed_event = null,
-    };
-}
-
-fn runtimeEventFromOwned(event: *const OwnedRuntimeEvent) RuntimeEvent {
-    return .{
-        .event_type = event.event_type,
-        .source_type = event.source_type,
-        .source_id = event.source_id,
-        .payload_type = event.payload_type,
-        .code = event.code,
     };
 }
 
@@ -1392,8 +1498,10 @@ fn copyPayload(allocator: std.mem.Allocator, native_event: c.mln_runtime_event) 
             const payload = try payloadAs(c.mln_runtime_event_offline_operation_completed, native_event.payload, native_event.payload_size);
             break :blk .{ .offline_operation_completed = .{
                 .operation_id = payload.operation_id,
-                .operation_kind = payload.operation_kind,
-                .result_kind = payload.result_kind,
+                .operation_kind = OfflineOperationKind.fromRaw(payload.operation_kind),
+                .raw_operation_kind = payload.operation_kind,
+                .result_kind = OfflineOperationResultKind.fromRaw(payload.result_kind),
+                .raw_result_kind = payload.result_kind,
                 .result_status = payload.result_status,
                 .found = payload.found,
             } };

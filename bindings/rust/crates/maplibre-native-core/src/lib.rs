@@ -36,17 +36,18 @@ pub use camera::{
 pub use enums::{
     AmbientCacheOperation, ConstrainMode, LocationIndicatorImageKind, LogEvent, LogSeverity,
     LogSeverityMask, MapDebugOptions, MapMode, NetworkStatus, NorthOrientation,
-    OfflineRegionDownloadState, RasterDemEncoding, RenderBackendMask, RenderMode,
-    ResourceErrorReason, ResourceKind, ResourceLoadingMethod, ResourcePriority,
-    ResourceResponseStatus, ResourceStoragePolicy, ResourceUsage, RuntimeEventType, SourceType,
-    TileLodMode, TileOperation, TileScheme, VectorTileEncoding, ViewportMode,
+    OfflineOperationKind, OfflineOperationResultKind, OfflineRegionDownloadState,
+    RasterDemEncoding, RenderBackendMask, RenderMode, ResourceErrorReason, ResourceKind,
+    ResourceLoadingMethod, ResourcePriority, ResourceResponseStatus, ResourceStoragePolicy,
+    ResourceUsage, RuntimeEventType, SourceType, TileLodMode, TileOperation, TileScheme,
+    VectorTileEncoding, ViewportMode,
 };
 pub use error::{Error, ErrorKind, Result, check};
 pub use events::{
-    CopiedRuntimeEvent, OfflineRegionResponseErrorEvent, OfflineRegionStatus,
-    OfflineRegionStatusEvent, OfflineRegionTileCountLimitEvent, RawRuntimeEventSource,
-    RenderFrameEvent, RenderMapEvent, RenderingStats, RuntimeEventPayload, StyleImageMissingEvent,
-    TileActionEvent, TileId, UnknownRuntimeEventPayload,
+    CopiedRuntimeEvent, OfflineOperationCompletedEvent, OfflineRegionResponseErrorEvent,
+    OfflineRegionStatus, OfflineRegionStatusEvent, OfflineRegionTileCountLimitEvent,
+    RawRuntimeEventSource, RenderFrameEvent, RenderMapEvent, RenderingStats, RuntimeEventPayload,
+    StyleImageMissingEvent, TileActionEvent, TileId, UnknownRuntimeEventPayload,
 };
 pub use geojson::{Feature, FeatureIdentifier, GeoJson};
 pub use geometry::Geometry;

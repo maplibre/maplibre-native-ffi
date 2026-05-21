@@ -1,6 +1,7 @@
 use std::cell::{Cell, RefCell};
-use std::collections::{HashMap, VecDeque};
+use std::collections::HashMap;
 use std::fmt;
+use std::marker::PhantomData;
 use std::rc::{Rc, Weak};
 
 use maplibre_core::AmbientCacheOperation;
@@ -32,7 +33,6 @@ pub(crate) struct RuntimeState {
     has_created_map: Cell<bool>,
     map_ids: RefCell<HashMap<usize, MapId>>,
     map_states: RefCell<HashMap<usize, Weak<MapState>>>,
-    pending_events: RefCell<VecDeque<RuntimeEvent>>,
     resource_transform: RefCell<Option<Box<ResourceTransformState>>>,
     resource_provider: RefCell<Option<Box<ResourceProviderState>>>,
 }
@@ -50,7 +50,6 @@ impl RuntimeState {
             has_created_map: Cell::new(false),
             map_ids: RefCell::new(HashMap::new()),
             map_states: RefCell::new(HashMap::new()),
-            pending_events: RefCell::new(VecDeque::new()),
             resource_transform: RefCell::new(None),
             resource_provider: RefCell::new(None),
         }
@@ -195,14 +194,6 @@ impl RuntimeState {
             source_type => RuntimeEventSource::Unknown(source_type),
         }
     }
-
-    fn copy_and_store_event(&self, raw: &sys::mln_runtime_event) -> Result<()> {
-        let source = self.source_for_event(raw);
-        let event = RuntimeEvent::from_native(raw, source)?;
-        self.apply_event_side_effects(raw);
-        self.pending_events.borrow_mut().push_back(event);
-        Ok(())
-    }
 }
 
 /// Owner-thread runtime handle for MapLibre Native work and event polling.
@@ -215,6 +206,235 @@ impl fmt::Debug for RuntimeHandle {
         f.debug_struct("RuntimeHandle")
             .field("closed", &self.inner.is_closed())
             .finish()
+    }
+}
+
+/// Owner-thread offline database operation token that must be taken or discarded.
+pub struct OfflineOperationHandle<T> {
+    runtime: Rc<RuntimeState>,
+    operation_id: sys::mln_offline_operation_id,
+    operation_kind: maplibre_core::OfflineOperationKind,
+    result_kind: maplibre_core::OfflineOperationResultKind,
+    live: Cell<bool>,
+    _result: PhantomData<fn() -> T>,
+    _thread_affine: PhantomData<Rc<()>>,
+}
+
+impl<T> fmt::Debug for OfflineOperationHandle<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("OfflineOperationHandle")
+            .field("operation_id", &self.operation_id)
+            .field("operation_kind", &self.operation_kind)
+            .field("result_kind", &self.result_kind)
+            .field("live", &self.live.get())
+            .finish()
+    }
+}
+
+impl<T> OfflineOperationHandle<T> {
+    fn new(
+        runtime: Rc<RuntimeState>,
+        operation_id: sys::mln_offline_operation_id,
+        operation_kind: maplibre_core::OfflineOperationKind,
+        result_kind: maplibre_core::OfflineOperationResultKind,
+    ) -> Result<Self> {
+        if operation_id == 0 {
+            return Err(Error::invalid_argument(
+                "offline operation id must not be zero",
+            ));
+        }
+        Ok(Self {
+            runtime,
+            operation_id,
+            operation_kind,
+            result_kind,
+            live: Cell::new(true),
+            _result: PhantomData,
+            _thread_affine: PhantomData,
+        })
+    }
+
+    /// Returns the native operation ID.
+    pub fn id(&self) -> u64 {
+        self.operation_id
+    }
+
+    /// Returns the operation kind expected for this handle.
+    pub fn operation_kind(&self) -> maplibre_core::OfflineOperationKind {
+        self.operation_kind
+    }
+
+    /// Returns the result kind expected for this handle.
+    pub fn result_kind(&self) -> maplibre_core::OfflineOperationResultKind {
+        self.result_kind
+    }
+
+    /// Reports whether this handle still owns runtime operation state.
+    pub fn is_live(&self) -> bool {
+        self.live.get()
+    }
+
+    fn runtime_ptr(&self) -> Result<*mut sys::mln_runtime> {
+        if !self.live.get() {
+            return Err(closed_handle_error("OfflineOperationHandle"));
+        }
+        self.runtime.as_ptr()
+    }
+
+    fn mark_consumed(&self) {
+        self.live.set(false);
+    }
+
+    /// Discards runtime-owned state for this offline operation.
+    #[allow(clippy::result_large_err)]
+    pub fn discard(self) -> std::result::Result<(), HandleOperationError<Self>> {
+        if !self.live.get() {
+            return Ok(());
+        }
+        let runtime = match self.runtime_ptr() {
+            Ok(runtime) => runtime,
+            Err(error) => return Err(HandleOperationError::new(error, self)),
+        };
+        let status =
+            unsafe { sys::mln_runtime_offline_operation_discard(runtime, self.operation_id) };
+        if let Err(error) = maplibre_core::check(status) {
+            return Err(HandleOperationError::new(error, self));
+        }
+        self.live.set(false);
+        Ok(())
+    }
+}
+
+impl<T> Drop for OfflineOperationHandle<T> {
+    fn drop(&mut self) {
+        if !self.live.get() {
+            return;
+        }
+        if let Ok(runtime) = self.runtime.as_ptr() {
+            // SAFETY: Safe Rust keeps this !Send/!Sync handle on the runtime owner thread.
+            let status =
+                unsafe { sys::mln_runtime_offline_operation_discard(runtime, self.operation_id) };
+            if status == sys::MLN_STATUS_OK {
+                self.live.set(false);
+            }
+        }
+    }
+}
+
+impl OfflineOperationHandle<OfflineRegionInfo> {
+    /// Takes a completed create/update operation result as copied region info.
+    pub fn take(self) -> Result<OfflineRegionInfo> {
+        let runtime = self.runtime_ptr()?;
+        let mut out = maplibre_core::ptr::OutPtr::<sys::mln_offline_region_snapshot>::new();
+        let status = match self.operation_kind {
+            maplibre_core::OfflineOperationKind::RegionCreate => unsafe {
+                sys::mln_runtime_offline_region_create_take_result(
+                    runtime,
+                    self.operation_id,
+                    out.as_mut_ptr(),
+                )
+            },
+            maplibre_core::OfflineOperationKind::RegionUpdateMetadata => unsafe {
+                sys::mln_runtime_offline_region_update_metadata_take_result(
+                    runtime,
+                    self.operation_id,
+                    out.as_mut_ptr(),
+                )
+            },
+            _ => sys::MLN_STATUS_INVALID_STATE,
+        };
+        maplibre_core::check(status)?;
+        self.mark_consumed();
+        // SAFETY: On success, the C API returns an owned snapshot handle;
+        // core copies and releases it.
+        unsafe {
+            maplibre_core::runtime::copy_offline_region_snapshot(
+                out.into_non_null("mln_offline_region_snapshot")?,
+            )
+        }
+    }
+}
+
+impl OfflineOperationHandle<Option<OfflineRegionInfo>> {
+    /// Takes a completed get operation result as optional copied region info.
+    pub fn take(self) -> Result<Option<OfflineRegionInfo>> {
+        let runtime = self.runtime_ptr()?;
+        let mut out = maplibre_core::ptr::OutPtr::<sys::mln_offline_region_snapshot>::new();
+        let mut found = false;
+        let status = unsafe {
+            sys::mln_runtime_offline_region_get_take_result(
+                runtime,
+                self.operation_id,
+                out.as_mut_ptr(),
+                &mut found,
+            )
+        };
+        maplibre_core::check(status)?;
+        self.mark_consumed();
+        if !found {
+            return Ok(None);
+        }
+        // SAFETY: When found is true, the C API returns an owned snapshot
+        // handle; core copies and releases it.
+        Ok(Some(unsafe {
+            maplibre_core::runtime::copy_offline_region_snapshot(
+                out.into_non_null("mln_offline_region_snapshot")?,
+            )
+        }?))
+    }
+}
+
+impl OfflineOperationHandle<Vec<OfflineRegionInfo>> {
+    /// Takes a completed list/merge operation result as copied region info.
+    pub fn take(self) -> Result<Vec<OfflineRegionInfo>> {
+        let runtime = self.runtime_ptr()?;
+        let mut out = maplibre_core::ptr::OutPtr::<sys::mln_offline_region_list>::new();
+        let status = match self.operation_kind {
+            maplibre_core::OfflineOperationKind::RegionsList => unsafe {
+                sys::mln_runtime_offline_regions_list_take_result(
+                    runtime,
+                    self.operation_id,
+                    out.as_mut_ptr(),
+                )
+            },
+            maplibre_core::OfflineOperationKind::RegionsMergeDatabase => unsafe {
+                sys::mln_runtime_offline_regions_merge_database_take_result(
+                    runtime,
+                    self.operation_id,
+                    out.as_mut_ptr(),
+                )
+            },
+            _ => sys::MLN_STATUS_INVALID_STATE,
+        };
+        maplibre_core::check(status)?;
+        self.mark_consumed();
+        // SAFETY: On success, the C API returns an owned list handle; core
+        // copies and releases it.
+        unsafe {
+            maplibre_core::runtime::copy_offline_region_list(
+                out.into_non_null("mln_offline_region_list")?,
+            )
+        }
+    }
+}
+
+impl OfflineOperationHandle<OfflineRegionStatus> {
+    /// Takes a completed status operation result as copied status data.
+    pub fn take(self) -> Result<OfflineRegionStatus> {
+        let runtime = self.runtime_ptr()?;
+        let mut raw = maplibre_core::events::empty_offline_region_status_native();
+        let status = unsafe {
+            sys::mln_runtime_offline_region_get_status_take_result(
+                runtime,
+                self.operation_id,
+                &mut raw,
+            )
+        };
+        maplibre_core::check(status)?;
+        self.mark_consumed();
+        Ok(maplibre_core::events::offline_region_status_from_native(
+            raw,
+        ))
     }
 }
 
@@ -304,8 +524,25 @@ impl RuntimeHandle {
         self.inner.clear_resource_transform()
     }
 
-    /// Runs an ambient cache maintenance operation for this runtime.
-    pub fn run_ambient_cache_operation(&self, operation: AmbientCacheOperation) -> Result<()> {
+    fn start_operation<T>(
+        &self,
+        operation_id: sys::mln_offline_operation_id,
+        operation_kind: maplibre_core::OfflineOperationKind,
+        result_kind: maplibre_core::OfflineOperationResultKind,
+    ) -> Result<OfflineOperationHandle<T>> {
+        OfflineOperationHandle::new(
+            Rc::clone(&self.inner),
+            operation_id,
+            operation_kind,
+            result_kind,
+        )
+    }
+
+    /// Starts an ambient cache maintenance operation for this runtime.
+    pub fn start_ambient_cache_operation(
+        &self,
+        operation: AmbientCacheOperation,
+    ) -> Result<OfflineOperationHandle<()>> {
         let runtime = self.inner.as_ptr()?;
         let mut operation_id: sys::mln_offline_operation_id = 0;
         maplibre_core::check(unsafe {
@@ -315,27 +552,25 @@ impl RuntimeHandle {
                 &mut operation_id,
             )
         })?;
-        let result = self.wait_for_offline_operation(operation_id);
-        unsafe {
-            sys::mln_runtime_offline_operation_discard(runtime, operation_id);
-        }
-        result.map(|_| ())
+        self.start_operation(
+            operation_id,
+            maplibre_core::OfflineOperationKind::AmbientCache,
+            maplibre_core::OfflineOperationResultKind::None,
+        )
     }
 
-    /// Creates an offline region and returns its copied native snapshot.
-    pub fn create_offline_region(
+    /// Starts creating an offline region.
+    pub fn start_create_offline_region(
         &self,
         definition: &OfflineRegionDefinition,
         metadata: &[u8],
-    ) -> Result<OfflineRegionInfo> {
+    ) -> Result<OfflineOperationHandle<OfflineRegionInfo>> {
         let runtime = self.inner.as_ptr()?;
         let definition = definition.to_native()?;
-        let mut operation_id: sys::mln_offline_operation_id = 0;
-        let mut out = maplibre_core::ptr::OutPtr::<sys::mln_offline_region_snapshot>::new();
         let raw_definition = definition.to_raw();
+        let mut operation_id: sys::mln_offline_operation_id = 0;
         // SAFETY: runtime is live. raw_definition points into definition-owned
-        // string and geometry storage, metadata storage is valid for this call,
-        // and out is a null-initialized out-pointer.
+        // string and geometry storage, metadata storage is valid for this call.
         maplibre_core::check(unsafe {
             sys::mln_runtime_offline_region_create_start(
                 runtime,
@@ -345,132 +580,56 @@ impl RuntimeHandle {
                 &mut operation_id,
             )
         })?;
-        if let Err(error) = self.wait_for_offline_operation(operation_id) {
-            unsafe {
-                sys::mln_runtime_offline_operation_discard(runtime, operation_id);
-            }
-            return Err(error);
-        }
-        let take_status = unsafe {
-            sys::mln_runtime_offline_region_create_take_result(
-                runtime,
-                operation_id,
-                out.as_mut_ptr(),
-            )
-        };
-        if take_status != sys::MLN_STATUS_OK {
-            unsafe {
-                sys::mln_runtime_offline_operation_discard(runtime, operation_id);
-            }
-            return Err(Error::from_status_and_diagnostic(
-                take_status,
-                format!("mln_runtime_offline_region_create_take_result failed: {take_status}"),
-            ));
-        }
-        // SAFETY: On success, the C API returns an owned offline-region
-        // snapshot handle; core copies and releases it.
-        unsafe {
-            maplibre_core::runtime::copy_offline_region_snapshot(
-                out.into_non_null("mln_offline_region_snapshot")?,
-            )
-        }
+        self.start_operation(
+            operation_id,
+            maplibre_core::OfflineOperationKind::RegionCreate,
+            maplibre_core::OfflineOperationResultKind::Region,
+        )
     }
 
-    /// Gets an offline region snapshot by ID.
-    pub fn offline_region(&self, region_id: i64) -> Result<Option<OfflineRegionInfo>> {
+    /// Starts getting an offline region snapshot by ID.
+    pub fn start_offline_region(
+        &self,
+        region_id: i64,
+    ) -> Result<OfflineOperationHandle<Option<OfflineRegionInfo>>> {
         let runtime = self.inner.as_ptr()?;
         let mut operation_id: sys::mln_offline_operation_id = 0;
-        let mut out = maplibre_core::ptr::OutPtr::<sys::mln_offline_region_snapshot>::new();
-        let mut found = false;
-        // SAFETY: runtime is live, out is a null-initialized out-pointer, and
-        // found points to writable bool storage.
+        // SAFETY: runtime is live and operation_id points to writable storage.
         maplibre_core::check(unsafe {
             sys::mln_runtime_offline_region_get_start(runtime, region_id, &mut operation_id)
         })?;
-        if let Err(error) = self.wait_for_offline_operation(operation_id) {
-            unsafe {
-                sys::mln_runtime_offline_operation_discard(runtime, operation_id);
-            }
-            return Err(error);
-        }
-        let take_status = unsafe {
-            sys::mln_runtime_offline_region_get_take_result(
-                runtime,
-                operation_id,
-                out.as_mut_ptr(),
-                &mut found,
-            )
-        };
-        if take_status != sys::MLN_STATUS_OK {
-            unsafe {
-                sys::mln_runtime_offline_operation_discard(runtime, operation_id);
-            }
-            return Err(Error::from_status_and_diagnostic(
-                take_status,
-                format!("mln_runtime_offline_region_get_take_result failed: {take_status}"),
-            ));
-        }
-        if found {
-            // SAFETY: When found is true, the C API returns an owned
-            // offline-region snapshot handle; core copies and releases it.
-            Ok(Some(unsafe {
-                maplibre_core::runtime::copy_offline_region_snapshot(
-                    out.into_non_null("mln_offline_region_snapshot")?,
-                )
-            }?))
-        } else {
-            Ok(None)
-        }
+        self.start_operation(
+            operation_id,
+            maplibre_core::OfflineOperationKind::RegionGet,
+            maplibre_core::OfflineOperationResultKind::OptionalRegion,
+        )
     }
 
-    /// Lists offline regions in this runtime's database.
-    pub fn offline_regions(&self) -> Result<Vec<OfflineRegionInfo>> {
+    /// Starts listing offline regions in this runtime's database.
+    pub fn start_offline_regions(&self) -> Result<OfflineOperationHandle<Vec<OfflineRegionInfo>>> {
         let runtime = self.inner.as_ptr()?;
         let mut operation_id: sys::mln_offline_operation_id = 0;
-        let mut out = maplibre_core::ptr::OutPtr::<sys::mln_offline_region_list>::new();
-        // SAFETY: runtime is live and out is a null-initialized out-pointer.
+        // SAFETY: runtime is live and operation_id points to writable storage.
         maplibre_core::check(unsafe {
             sys::mln_runtime_offline_regions_list_start(runtime, &mut operation_id)
         })?;
-        if let Err(error) = self.wait_for_offline_operation(operation_id) {
-            unsafe {
-                sys::mln_runtime_offline_operation_discard(runtime, operation_id);
-            }
-            return Err(error);
-        }
-        let take_status = unsafe {
-            sys::mln_runtime_offline_regions_list_take_result(
-                runtime,
-                operation_id,
-                out.as_mut_ptr(),
-            )
-        };
-        if take_status != sys::MLN_STATUS_OK {
-            unsafe {
-                sys::mln_runtime_offline_operation_discard(runtime, operation_id);
-            }
-            return Err(Error::from_status_and_diagnostic(
-                take_status,
-                format!("mln_runtime_offline_regions_list_take_result failed: {take_status}"),
-            ));
-        }
-        // SAFETY: On success, the C API returns an owned offline-region list
-        // handle; core copies and releases it.
-        unsafe {
-            maplibre_core::runtime::copy_offline_region_list(
-                out.into_non_null("mln_offline_region_list")?,
-            )
-        }
+        self.start_operation(
+            operation_id,
+            maplibre_core::OfflineOperationKind::RegionsList,
+            maplibre_core::OfflineOperationResultKind::RegionList,
+        )
     }
 
-    /// Merges offline regions from another database path.
-    pub fn merge_offline_regions_database(&self, path: &str) -> Result<Vec<OfflineRegionInfo>> {
+    /// Starts merging offline regions from another database path.
+    pub fn start_merge_offline_regions_database(
+        &self,
+        path: &str,
+    ) -> Result<OfflineOperationHandle<Vec<OfflineRegionInfo>>> {
         let runtime = self.inner.as_ptr()?;
         let path = maplibre_core::string::c_string(path)?;
         let mut operation_id: sys::mln_offline_operation_id = 0;
-        let mut out = maplibre_core::ptr::OutPtr::<sys::mln_offline_region_list>::new();
-        // SAFETY: runtime is live, path is a NUL-terminated string valid for
-        // this call, and out is a null-initialized out-pointer.
+        // SAFETY: runtime is live, path is NUL-terminated and valid for this
+        // call, and operation_id points to writable storage.
         maplibre_core::check(unsafe {
             sys::mln_runtime_offline_regions_merge_database_start(
                 runtime,
@@ -478,50 +637,23 @@ impl RuntimeHandle {
                 &mut operation_id,
             )
         })?;
-        if let Err(error) = self.wait_for_offline_operation(operation_id) {
-            unsafe {
-                sys::mln_runtime_offline_operation_discard(runtime, operation_id);
-            }
-            return Err(error);
-        }
-        let take_status = unsafe {
-            sys::mln_runtime_offline_regions_merge_database_take_result(
-                runtime,
-                operation_id,
-                out.as_mut_ptr(),
-            )
-        };
-        if take_status != sys::MLN_STATUS_OK {
-            unsafe {
-                sys::mln_runtime_offline_operation_discard(runtime, operation_id);
-            }
-            return Err(Error::from_status_and_diagnostic(
-                take_status,
-                format!(
-                    "mln_runtime_offline_regions_merge_database_take_result failed: {take_status}"
-                ),
-            ));
-        }
-        // SAFETY: On success, the C API returns an owned offline-region list
-        // handle; core copies and releases it.
-        unsafe {
-            maplibre_core::runtime::copy_offline_region_list(
-                out.into_non_null("mln_offline_region_list")?,
-            )
-        }
+        self.start_operation(
+            operation_id,
+            maplibre_core::OfflineOperationKind::RegionsMergeDatabase,
+            maplibre_core::OfflineOperationResultKind::RegionList,
+        )
     }
 
-    /// Updates opaque metadata for an offline region.
-    pub fn update_offline_region_metadata(
+    /// Starts updating opaque metadata for an offline region.
+    pub fn start_update_offline_region_metadata(
         &self,
         region_id: i64,
         metadata: &[u8],
-    ) -> Result<OfflineRegionInfo> {
+    ) -> Result<OfflineOperationHandle<OfflineRegionInfo>> {
         let runtime = self.inner.as_ptr()?;
         let mut operation_id: sys::mln_offline_operation_id = 0;
-        let mut out = maplibre_core::ptr::OutPtr::<sys::mln_offline_region_snapshot>::new();
         // SAFETY: runtime is live, metadata storage is valid for this call, and
-        // out is a null-initialized out-pointer.
+        // operation_id points to writable storage.
         maplibre_core::check(unsafe {
             sys::mln_runtime_offline_region_update_metadata_start(
                 runtime,
@@ -531,72 +663,37 @@ impl RuntimeHandle {
                 &mut operation_id,
             )
         })?;
-        if let Err(error) = self.wait_for_offline_operation(operation_id) {
-            unsafe {
-                sys::mln_runtime_offline_operation_discard(runtime, operation_id);
-            }
-            return Err(error);
-        }
-        let take_status = unsafe {
-            sys::mln_runtime_offline_region_update_metadata_take_result(
-                runtime,
-                operation_id,
-                out.as_mut_ptr(),
-            )
-        };
-        if take_status != sys::MLN_STATUS_OK {
-            unsafe {
-                sys::mln_runtime_offline_operation_discard(runtime, operation_id);
-            }
-            return Err(Error::from_status_and_diagnostic(
-                take_status,
-                format!(
-                    "mln_runtime_offline_region_update_metadata_take_result failed: {take_status}"
-                ),
-            ));
-        }
-        // SAFETY: On success, the C API returns an owned offline-region
-        // snapshot handle; core copies and releases it.
-        unsafe {
-            maplibre_core::runtime::copy_offline_region_snapshot(
-                out.into_non_null("mln_offline_region_snapshot")?,
-            )
-        }
+        self.start_operation(
+            operation_id,
+            maplibre_core::OfflineOperationKind::RegionUpdateMetadata,
+            maplibre_core::OfflineOperationResultKind::Region,
+        )
     }
 
-    /// Gets the current completed/download status for an offline region.
-    pub fn offline_region_status(&self, region_id: i64) -> Result<OfflineRegionStatus> {
+    /// Starts getting the current completed/download status for an offline region.
+    pub fn start_offline_region_status(
+        &self,
+        region_id: i64,
+    ) -> Result<OfflineOperationHandle<OfflineRegionStatus>> {
         let runtime = self.inner.as_ptr()?;
         let mut operation_id: sys::mln_offline_operation_id = 0;
-        let mut raw = maplibre_core::events::empty_offline_region_status_native();
+        // SAFETY: runtime is live and operation_id points to writable storage.
         maplibre_core::check(unsafe {
             sys::mln_runtime_offline_region_get_status_start(runtime, region_id, &mut operation_id)
         })?;
-        if let Err(error) = self.wait_for_offline_operation(operation_id) {
-            unsafe {
-                sys::mln_runtime_offline_operation_discard(runtime, operation_id);
-            }
-            return Err(error);
-        }
-        let take_status = unsafe {
-            sys::mln_runtime_offline_region_get_status_take_result(runtime, operation_id, &mut raw)
-        };
-        if take_status != sys::MLN_STATUS_OK {
-            unsafe {
-                sys::mln_runtime_offline_operation_discard(runtime, operation_id);
-            }
-            return Err(Error::from_status_and_diagnostic(
-                take_status,
-                format!("mln_runtime_offline_region_get_status_take_result failed: {take_status}"),
-            ));
-        }
-        Ok(maplibre_core::events::offline_region_status_from_native(
-            raw,
-        ))
+        self.start_operation(
+            operation_id,
+            maplibre_core::OfflineOperationKind::RegionGetStatus,
+            maplibre_core::OfflineOperationResultKind::RegionStatus,
+        )
     }
 
-    /// Enables or disables runtime events for an offline region.
-    pub fn set_offline_region_observed(&self, region_id: i64, observed: bool) -> Result<()> {
+    /// Starts enabling or disabling runtime events for an offline region.
+    pub fn start_set_offline_region_observed(
+        &self,
+        region_id: i64,
+        observed: bool,
+    ) -> Result<OfflineOperationHandle<()>> {
         let runtime = self.inner.as_ptr()?;
         let mut operation_id: sys::mln_offline_operation_id = 0;
         maplibre_core::check(unsafe {
@@ -607,19 +704,19 @@ impl RuntimeHandle {
                 &mut operation_id,
             )
         })?;
-        let result = self.wait_for_offline_operation(operation_id);
-        unsafe {
-            sys::mln_runtime_offline_operation_discard(runtime, operation_id);
-        }
-        result.map(|_| ())
+        self.start_operation(
+            operation_id,
+            maplibre_core::OfflineOperationKind::RegionSetObserved,
+            maplibre_core::OfflineOperationResultKind::None,
+        )
     }
 
-    /// Sets an offline region's native download state.
-    pub fn set_offline_region_download_state(
+    /// Starts setting an offline region's native download state.
+    pub fn start_set_offline_region_download_state(
         &self,
         region_id: i64,
         state: OfflineRegionDownloadState,
-    ) -> Result<()> {
+    ) -> Result<OfflineOperationHandle<()>> {
         let runtime = self.inner.as_ptr()?;
         let state = state.raw_for_set()?;
         let mut operation_id: sys::mln_offline_operation_id = 0;
@@ -631,79 +728,45 @@ impl RuntimeHandle {
                 &mut operation_id,
             )
         })?;
-        let result = self.wait_for_offline_operation(operation_id);
-        unsafe {
-            sys::mln_runtime_offline_operation_discard(runtime, operation_id);
-        }
-        result.map(|_| ())
+        self.start_operation(
+            operation_id,
+            maplibre_core::OfflineOperationKind::RegionSetDownloadState,
+            maplibre_core::OfflineOperationResultKind::None,
+        )
     }
 
-    /// Invalidates cached resources for an offline region.
-    pub fn invalidate_offline_region(&self, region_id: i64) -> Result<()> {
+    /// Starts invalidating cached resources for an offline region.
+    pub fn start_invalidate_offline_region(
+        &self,
+        region_id: i64,
+    ) -> Result<OfflineOperationHandle<()>> {
         let runtime = self.inner.as_ptr()?;
         let mut operation_id: sys::mln_offline_operation_id = 0;
         maplibre_core::check(unsafe {
             sys::mln_runtime_offline_region_invalidate_start(runtime, region_id, &mut operation_id)
         })?;
-        let result = self.wait_for_offline_operation(operation_id);
-        unsafe {
-            sys::mln_runtime_offline_operation_discard(runtime, operation_id);
-        }
-        result.map(|_| ())
+        self.start_operation(
+            operation_id,
+            maplibre_core::OfflineOperationKind::RegionInvalidate,
+            maplibre_core::OfflineOperationResultKind::None,
+        )
     }
 
-    /// Deletes an offline region.
-    pub fn delete_offline_region(&self, region_id: i64) -> Result<()> {
+    /// Starts deleting an offline region.
+    pub fn start_delete_offline_region(
+        &self,
+        region_id: i64,
+    ) -> Result<OfflineOperationHandle<()>> {
         let runtime = self.inner.as_ptr()?;
         let mut operation_id: sys::mln_offline_operation_id = 0;
         maplibre_core::check(unsafe {
             sys::mln_runtime_offline_region_delete_start(runtime, region_id, &mut operation_id)
         })?;
-        let result = self.wait_for_offline_operation(operation_id);
-        unsafe {
-            sys::mln_runtime_offline_operation_discard(runtime, operation_id);
-        }
-        result.map(|_| ())
-    }
-
-    fn wait_for_offline_operation(
-        &self,
-        operation_id: sys::mln_offline_operation_id,
-    ) -> Result<sys::mln_runtime_event_offline_operation_completed> {
-        let runtime = self.inner.as_ptr()?;
-        loop {
-            self.run_once()?;
-            loop {
-                let mut event = empty_runtime_event();
-                let mut has_event = false;
-                maplibre_core::check(unsafe {
-                    sys::mln_runtime_poll_event(runtime, &mut event, &mut has_event)
-                })?;
-                if !has_event {
-                    break;
-                }
-                if event.type_ != sys::MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED
-                    || event.payload_type
-                        != sys::MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_OPERATION_COMPLETED
-                {
-                    self.inner.copy_and_store_event(&event)?;
-                    continue;
-                }
-                let payload = copy_offline_operation_payload(&event)?;
-                if payload.operation_id != operation_id {
-                    self.inner.copy_and_store_event(&event)?;
-                    continue;
-                }
-                if payload.result_status != sys::MLN_STATUS_OK {
-                    return Err(Error::from_status_and_diagnostic(
-                        payload.result_status,
-                        copy_event_message(&event),
-                    ));
-                }
-                return Ok(payload);
-            }
-            std::thread::sleep(std::time::Duration::from_millis(1));
-        }
+        self.start_operation(
+            operation_id,
+            maplibre_core::OfflineOperationKind::RegionDelete,
+            maplibre_core::OfflineOperationResultKind::None,
+        )
     }
 
     /// Runs one pending owner-thread task for this runtime.
@@ -715,9 +778,6 @@ impl RuntimeHandle {
 
     /// Polls one queued runtime event and copies it into an owned Rust value.
     pub fn poll_event(&self) -> Result<Option<RuntimeEvent>> {
-        if let Some(event) = self.inner.pending_events.borrow_mut().pop_front() {
-            return Ok(Some(event));
-        }
         let runtime = self.inner.as_ptr()?;
         let mut event = empty_runtime_event();
         let mut has_event = false;
@@ -740,9 +800,6 @@ impl RuntimeHandle {
 
     /// Polls and discards one queued runtime event, returning whether one was present.
     pub fn discard_one_event(&self) -> Result<bool> {
-        if self.inner.pending_events.borrow_mut().pop_front().is_some() {
-            return Ok(true);
-        }
         let runtime = self.inner.as_ptr()?;
         let mut event = empty_runtime_event();
         let mut has_event = false;
@@ -794,41 +851,6 @@ impl RuntimeHandle {
     }
 }
 
-fn copy_offline_operation_payload(
-    event: &sys::mln_runtime_event,
-) -> Result<sys::mln_runtime_event_offline_operation_completed> {
-    if event.payload.is_null()
-        || event.payload_size
-            < std::mem::size_of::<sys::mln_runtime_event_offline_operation_completed>()
-    {
-        return Err(Error::new(
-            ErrorKind::InvalidArgument,
-            None,
-            "offline operation completion payload is invalid",
-        ));
-    }
-
-    let mut payload =
-        std::mem::MaybeUninit::<sys::mln_runtime_event_offline_operation_completed>::uninit();
-    unsafe {
-        std::ptr::copy_nonoverlapping(
-            event.payload.cast::<u8>(),
-            payload.as_mut_ptr().cast::<u8>(),
-            std::mem::size_of::<sys::mln_runtime_event_offline_operation_completed>(),
-        );
-        Ok(payload.assume_init())
-    }
-}
-
-fn copy_event_message(event: &sys::mln_runtime_event) -> String {
-    if event.message.is_null() || event.message_size == 0 {
-        return String::new();
-    }
-    let bytes =
-        unsafe { std::slice::from_raw_parts(event.message.cast::<u8>(), event.message_size) };
-    String::from_utf8_lossy(bytes).into_owned()
-}
-
 #[cfg(test)]
 mod tests {
     use std::sync::Arc;
@@ -837,11 +859,47 @@ mod tests {
 
     use super::*;
     use crate::{
-        ErrorKind, ResourceKind, ResourceProviderDecision, ResourceResponse, RuntimeEventSource,
-        RuntimeEventType,
+        ErrorKind, OfflineOperationCompletedEvent, ResourceKind, ResourceProviderDecision,
+        ResourceResponse, RuntimeEventPayload, RuntimeEventSource, RuntimeEventType,
     };
 
     const PROVIDER_STYLE_JSON: &str = r#"{"version":8,"sources":{},"layers":[]}"#;
+
+    fn wait_for_operation<T>(
+        runtime: &RuntimeHandle,
+        operation: &OfflineOperationHandle<T>,
+    ) -> Result<OfflineOperationCompletedEvent> {
+        loop {
+            runtime.run_once()?;
+            while let Some(event) = runtime.poll_event()? {
+                let RuntimeEventPayload::OfflineOperationCompleted(completed) = event.payload
+                else {
+                    continue;
+                };
+                if completed.operation_id != operation.id() {
+                    continue;
+                }
+                assert_eq!(completed.operation_kind, operation.operation_kind());
+                assert_eq!(
+                    completed.raw_operation_kind,
+                    operation.operation_kind().raw_value()
+                );
+                assert_eq!(completed.result_kind, operation.result_kind());
+                assert_eq!(
+                    completed.raw_result_kind,
+                    operation.result_kind().raw_value()
+                );
+                if completed.result_status != sys::MLN_STATUS_OK {
+                    return Err(Error::from_status_and_diagnostic(
+                        completed.result_status,
+                        event.message.unwrap_or_default(),
+                    ));
+                }
+                return Ok(completed);
+            }
+            std::thread::sleep(Duration::from_millis(1));
+        }
+    }
 
     #[test]
     fn runtime_ambient_cache_operations_use_real_c_abi() {
@@ -854,7 +912,10 @@ mod tests {
             AmbientCacheOperation::Clear,
             AmbientCacheOperation::ResetDatabase,
         ] {
-            runtime.run_ambient_cache_operation(operation).unwrap();
+            let operation = runtime.start_ambient_cache_operation(operation).unwrap();
+            let completed = wait_for_operation(&runtime, &operation).unwrap();
+            assert_eq!(completed.operation_id, operation.id());
+            operation.discard().unwrap();
         }
 
         runtime.close().unwrap();
@@ -867,7 +928,11 @@ mod tests {
                 .unwrap();
         let definition = test_offline_region_definition("custom://offline-style.json");
 
-        let created = runtime.create_offline_region(&definition, b"abc").unwrap();
+        let create = runtime
+            .start_create_offline_region(&definition, b"abc")
+            .unwrap();
+        wait_for_operation(&runtime, &create).unwrap();
+        let created = create.take().unwrap();
         assert_eq!(created.definition, definition);
         assert_eq!(created.metadata, b"abc");
 
@@ -879,54 +944,84 @@ mod tests {
             pixel_ratio: 1.0,
             include_ideographs: false,
         };
-        let geometry_region = runtime
-            .create_offline_region(&geometry_definition, b"geo")
+        let create_geometry = runtime
+            .start_create_offline_region(&geometry_definition, b"geo")
             .unwrap();
+        wait_for_operation(&runtime, &create_geometry).unwrap();
+        let geometry_region = create_geometry.take().unwrap();
         assert_eq!(geometry_region.definition, geometry_definition);
         assert_eq!(geometry_region.metadata, b"geo");
 
-        let fetched = runtime.offline_region(created.id).unwrap().unwrap();
+        let get = runtime.start_offline_region(created.id).unwrap();
+        wait_for_operation(&runtime, &get).unwrap();
+        let fetched = get.take().unwrap().unwrap();
         assert_eq!(fetched, created);
 
-        let listed = runtime.offline_regions().unwrap();
+        let list = runtime.start_offline_regions().unwrap();
+        wait_for_operation(&runtime, &list).unwrap();
+        let listed = list.take().unwrap();
         assert!(listed.iter().any(|region| region.id == created.id));
 
-        let updated = runtime
-            .update_offline_region_metadata(created.id, b"")
+        let update = runtime
+            .start_update_offline_region_metadata(created.id, b"")
             .unwrap();
+        wait_for_operation(&runtime, &update).unwrap();
+        let updated = update.take().unwrap();
         assert_eq!(updated.id, created.id);
         assert!(updated.metadata.is_empty());
 
-        let status = runtime.offline_region_status(created.id).unwrap();
+        let status_operation = runtime.start_offline_region_status(created.id).unwrap();
+        wait_for_operation(&runtime, &status_operation).unwrap();
+        let status = status_operation.take().unwrap();
         assert!(matches!(
             status.download_state,
             OfflineRegionDownloadState::Inactive | OfflineRegionDownloadState::Active
         ));
 
-        runtime
-            .set_offline_region_download_state(created.id, OfflineRegionDownloadState::Inactive)
+        let set_inactive = runtime
+            .start_set_offline_region_download_state(
+                created.id,
+                OfflineRegionDownloadState::Inactive,
+            )
             .unwrap();
+        wait_for_operation(&runtime, &set_inactive).unwrap();
+        set_inactive.discard().unwrap();
         let error = runtime
-            .set_offline_region_download_state(created.id, OfflineRegionDownloadState::Unknown(99))
+            .start_set_offline_region_download_state(
+                created.id,
+                OfflineRegionDownloadState::Unknown(99),
+            )
             .unwrap_err();
         assert_eq!(error.kind(), ErrorKind::InvalidArgument);
 
-        runtime
-            .set_offline_region_observed(created.id, true)
+        let observe = runtime
+            .start_set_offline_region_observed(created.id, true)
             .unwrap();
-        runtime
-            .set_offline_region_observed(created.id, false)
+        wait_for_operation(&runtime, &observe).unwrap();
+        observe.discard().unwrap();
+        let unobserve = runtime
+            .start_set_offline_region_observed(created.id, false)
             .unwrap();
-        runtime.invalidate_offline_region(created.id).unwrap();
-        runtime.delete_offline_region(created.id).unwrap();
-        runtime.delete_offline_region(geometry_region.id).unwrap();
-        assert!(runtime.offline_region(created.id).unwrap().is_none());
-        assert!(
-            runtime
-                .offline_region(geometry_region.id)
-                .unwrap()
-                .is_none()
-        );
+        wait_for_operation(&runtime, &unobserve).unwrap();
+        unobserve.discard().unwrap();
+        let invalidate = runtime.start_invalidate_offline_region(created.id).unwrap();
+        wait_for_operation(&runtime, &invalidate).unwrap();
+        invalidate.discard().unwrap();
+        let delete = runtime.start_delete_offline_region(created.id).unwrap();
+        wait_for_operation(&runtime, &delete).unwrap();
+        delete.discard().unwrap();
+        let delete_geometry = runtime
+            .start_delete_offline_region(geometry_region.id)
+            .unwrap();
+        wait_for_operation(&runtime, &delete_geometry).unwrap();
+        delete_geometry.discard().unwrap();
+
+        let missing_created = runtime.start_offline_region(created.id).unwrap();
+        wait_for_operation(&runtime, &missing_created).unwrap();
+        assert!(missing_created.take().unwrap().is_none());
+        let missing_geometry = runtime.start_offline_region(geometry_region.id).unwrap();
+        wait_for_operation(&runtime, &missing_geometry).unwrap();
+        assert!(missing_geometry.take().unwrap().is_none());
 
         runtime.close().unwrap();
     }
@@ -944,9 +1039,11 @@ mod tests {
                 &RuntimeOptions::new().with_cache_path(side_cache.to_string_lossy()),
             )
             .unwrap();
-            side_runtime
-                .create_offline_region(&definition, b"merge")
+            let create = side_runtime
+                .start_create_offline_region(&definition, b"merge")
                 .unwrap();
+            wait_for_operation(&side_runtime, &create).unwrap();
+            create.take().unwrap();
             side_runtime.close().unwrap();
         }
 
@@ -954,9 +1051,11 @@ mod tests {
             &RuntimeOptions::new().with_cache_path(main_cache.to_string_lossy()),
         )
         .unwrap();
-        let merged = main_runtime
-            .merge_offline_regions_database(&side_cache.to_string_lossy())
+        let merge = main_runtime
+            .start_merge_offline_regions_database(&side_cache.to_string_lossy())
             .unwrap();
+        wait_for_operation(&main_runtime, &merge).unwrap();
+        let merged = merge.take().unwrap();
         assert_eq!(merged.len(), 1);
         assert_eq!(merged[0].definition, definition);
         assert_eq!(merged[0].metadata, b"merge");
