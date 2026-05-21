@@ -4,7 +4,6 @@ const BuildOptions = struct {
     target: std.Build.ResolvedTarget,
     optimize: std.builtin.OptimizeMode,
     cmake_artifact_dir: std.Build.LazyPath,
-    cmake_artifact_dir_runtime_path: []const u8,
     include_dirs: []const std.Build.LazyPath,
     dependency_library_dir: ?std.Build.LazyPath,
     render_backend: RenderBackend,
@@ -233,10 +232,6 @@ fn addBindingTests(b: *std.Build, options: BuildOptions, maplibre_native: *std.B
     return tests;
 }
 
-fn addWindowsTestRuntimePath(run: *std.Build.Step.Run, options: BuildOptions) void {
-    run.addPathDir(options.cmake_artifact_dir_runtime_path);
-}
-
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const backend = renderBackend(b);
@@ -245,7 +240,6 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = b.standardOptimizeOption(.{}),
         .cmake_artifact_dir = cmake_artifact_dir,
-        .cmake_artifact_dir_runtime_path = cmake_artifact_dir.getPath2(b, null),
         .include_dirs = includeDirs(b),
         .dependency_library_dir = dependencyLibraryDir(b),
         .render_backend = backend,
@@ -266,14 +260,12 @@ pub fn build(b: *std.Build) void {
     const binding_tests = addBindingTests(b, options, maplibre_native);
     b.default_step.dependOn(&binding_tests.step);
     const run_binding_tests = b.addRunArtifact(binding_tests);
-    if (target.result.os.tag == .windows) addWindowsTestRuntimePath(run_binding_tests, options);
     test_step.dependOn(&run_binding_tests.step);
 
     for (test_sources) |source| {
         const tests = addTestCompile(b, options, source);
         b.default_step.dependOn(&tests.step);
         const run_tests = b.addRunArtifact(tests);
-        if (target.result.os.tag == .windows) addWindowsTestRuntimePath(run_tests, options);
         test_step.dependOn(&run_tests.step);
     }
 }
