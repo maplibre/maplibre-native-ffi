@@ -27,10 +27,10 @@ modules group C API concepts.
 
 ## Public Types
 
-Long-lived native objects are final classes named `RuntimeHandle`, `MapHandle`,
-`MapProjectionHandle`, and `RenderSessionHandle`. Final classes give ARC stable
-identity and avoid value copies of native owners. Each class stores the native
-pointer, release state, parent references, callbacks, and optional leak context.
+Long-lived native objects are final classes with the shared `Handle` suffix.
+Final classes give ARC stable identity and avoid value copies of native owners.
+Each class stores the native pointer, release state, parent references,
+callbacks, and optional leak context.
 
 Swift value types model copied C data. Descriptors are structs unless identity
 or shared mutation is useful. Descriptor APIs set semantic fields; internal
