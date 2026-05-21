@@ -18,7 +18,7 @@ const CustomGeometrySourceState = struct {
     active_upcalls: std.atomic.Value(usize),
 };
 
-var custom_geometry_state_registry_lock = std.Thread.Mutex{};
+var custom_geometry_state_registry_lock = std.Io.Mutex.init;
 var custom_geometry_state_registry: std.ArrayList(*CustomGeometrySourceState) = .empty;
 
 pub const MapMode = enum {
@@ -939,6 +939,7 @@ pub const MapHandle = struct {
         source_id: []const u8,
         options: CustomGeometrySourceOptions,
     ) status.Error!void {
+        _ = try native(self);
         const map_state = self;
         const owned_source_id = try std.heap.smp_allocator.dupe(u8, source_id);
         errdefer std.heap.smp_allocator.free(owned_source_id);
@@ -1425,8 +1426,8 @@ fn customGeometryCancelTileTrampoline(user_data: ?*anyopaque, raw_tile_id: c.mln
 }
 
 fn beginCustomGeometryUpcall(source_state: *CustomGeometrySourceState) bool {
-    custom_geometry_state_registry_lock.lock();
-    defer custom_geometry_state_registry_lock.unlock();
+    std.Io.Threaded.mutexLock(&custom_geometry_state_registry_lock);
+    defer std.Io.Threaded.mutexUnlock(&custom_geometry_state_registry_lock);
 
     for (custom_geometry_state_registry.items) |live_state| {
         if (live_state == source_state) {
@@ -1503,20 +1504,20 @@ fn freeCustomGeometrySourceState(source_state: *CustomGeometrySourceState) void 
 }
 
 fn registerLiveCustomGeometrySourceState(source_state: *CustomGeometrySourceState) std.mem.Allocator.Error!void {
-    custom_geometry_state_registry_lock.lock();
-    defer custom_geometry_state_registry_lock.unlock();
+    std.Io.Threaded.mutexLock(&custom_geometry_state_registry_lock);
+    defer std.Io.Threaded.mutexUnlock(&custom_geometry_state_registry_lock);
     try custom_geometry_state_registry.append(std.heap.smp_allocator, source_state);
 }
 
 fn unregisterLiveCustomGeometrySourceState(source_state: *CustomGeometrySourceState) void {
-    custom_geometry_state_registry_lock.lock();
-    defer custom_geometry_state_registry_lock.unlock();
+    std.Io.Threaded.mutexLock(&custom_geometry_state_registry_lock);
+    defer std.Io.Threaded.mutexUnlock(&custom_geometry_state_registry_lock);
     removeLiveCustomGeometrySourceStateLocked(source_state);
 }
 
 fn retireLiveCustomGeometrySourceState(source_state: *CustomGeometrySourceState) void {
-    custom_geometry_state_registry_lock.lock();
-    defer custom_geometry_state_registry_lock.unlock();
+    std.Io.Threaded.mutexLock(&custom_geometry_state_registry_lock);
+    defer std.Io.Threaded.mutexUnlock(&custom_geometry_state_registry_lock);
     source_state.retired.store(true, .seq_cst);
     removeLiveCustomGeometrySourceStateLocked(source_state);
 }
@@ -1666,7 +1667,7 @@ fn waitForRuntimeEventForTesting(runtime: *RuntimeHandle, event_type: runtime_mo
         while (try runtime.pollEvent()) |event| {
             if (std.meta.eql(event.event_type, event_type)) return true;
         }
-        std.time.sleep(10 * std.time.ns_per_ms);
+        try std.testing.io.sleep(.fromMilliseconds(10), .awake);
     }
     return false;
 }
