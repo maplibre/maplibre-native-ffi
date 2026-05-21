@@ -337,10 +337,7 @@ public final class RuntimeHandle implements AutoCloseable {
             pendingEvents.add(readEvent(event));
             continue;
           }
-          var payload =
-              mln_runtime_event
-                  .payload(event)
-                  .reinterpret(mln_runtime_event_offline_operation_completed.sizeof());
+          var payload = offlineOperationCompletedPayload(event);
           if (mln_runtime_event_offline_operation_completed.operation_id(payload) != operationId) {
             pendingEvents.add(readEvent(event));
             continue;
@@ -358,6 +355,19 @@ public final class RuntimeHandle implements AutoCloseable {
         sleepForOfflineOperation();
       }
     }
+  }
+
+  static MemorySegment offlineOperationCompletedPayload(MemorySegment event) {
+    var payload = mln_runtime_event.payload(event);
+    var payloadSize = mln_runtime_event.payload_size(event);
+    var requiredSize = mln_runtime_event_offline_operation_completed.sizeof();
+    if (MemoryUtil.isNull(payload) || payloadSize < requiredSize) {
+      throw MaplibreException.forStatus(
+          MaplibreStatus.INVALID_ARGUMENT,
+          MapLibreNativeC.MLN_STATUS_INVALID_ARGUMENT(),
+          "offline operation completion payload is invalid");
+    }
+    return payload.reinterpret(requiredSize);
   }
 
   private void sleepForOfflineOperation() {

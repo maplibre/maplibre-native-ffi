@@ -1214,8 +1214,7 @@ auto offline_region_get_start(
         return;
       }
       complete_offline_operation(
-        state, operation_id, MLN_STATUS_OK,
-        std::optional<OfflineRegionData>{std::move(*data)}, true
+        state, operation_id, MLN_STATUS_OK, std::move(data), true
       );
     }
   );

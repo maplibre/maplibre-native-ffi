@@ -7,6 +7,8 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.lang.foreign.Arena;
+import java.lang.foreign.MemorySegment;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -16,10 +18,14 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.maplibre.nativeffi.Maplibre;
+import org.maplibre.nativeffi.error.InvalidArgumentException;
 import org.maplibre.nativeffi.error.InvalidStateException;
 import org.maplibre.nativeffi.error.MaplibreStatus;
 import org.maplibre.nativeffi.error.NativeErrorException;
 import org.maplibre.nativeffi.error.WrongThreadException;
+import org.maplibre.nativeffi.internal.c.MapLibreNativeC;
+import org.maplibre.nativeffi.internal.c.mln_runtime_event;
+import org.maplibre.nativeffi.internal.c.mln_runtime_event_offline_operation_completed;
 import org.maplibre.nativeffi.map.MapHandle;
 import org.maplibre.nativeffi.map.MapOptions;
 import org.maplibre.nativeffi.render.RenderTargetExtent;
@@ -71,6 +77,40 @@ final class RuntimeHandleTest {
     var error = assertThrows(InvalidStateException.class, runtime::runOnce);
     assertEquals(MaplibreStatus.INVALID_STATE, error.status());
     assertTrue(error.diagnostic().contains("RuntimeHandle"));
+  }
+
+  @Test
+  void offlineOperationCompletedPayloadRejectsMalformedEvents() {
+    try (var arena = Arena.ofConfined()) {
+      var event = mln_runtime_event.allocate(arena);
+      var requiredSize = mln_runtime_event_offline_operation_completed.sizeof();
+      mln_runtime_event.size(event, (int) mln_runtime_event.sizeof());
+      mln_runtime_event.type(
+          event, MapLibreNativeC.MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED());
+      mln_runtime_event.payload_type(
+          event, MapLibreNativeC.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_OPERATION_COMPLETED());
+
+      mln_runtime_event.payload(event, MemorySegment.NULL);
+      mln_runtime_event.payload_size(event, requiredSize);
+      var nullPayloadError =
+          assertThrows(
+              InvalidArgumentException.class,
+              () -> RuntimeHandle.offlineOperationCompletedPayload(event));
+      assertEquals(MaplibreStatus.INVALID_ARGUMENT, nullPayloadError.status());
+
+      var payload = mln_runtime_event_offline_operation_completed.allocate(arena);
+      mln_runtime_event.payload(event, payload);
+      mln_runtime_event.payload_size(event, requiredSize - 1);
+      var undersizedPayloadError =
+          assertThrows(
+              InvalidArgumentException.class,
+              () -> RuntimeHandle.offlineOperationCompletedPayload(event));
+      assertEquals(MaplibreStatus.INVALID_ARGUMENT, undersizedPayloadError.status());
+
+      mln_runtime_event.payload_size(event, requiredSize);
+      assertEquals(
+          payload.address(), RuntimeHandle.offlineOperationCompletedPayload(event).address());
+    }
   }
 
   @Test
