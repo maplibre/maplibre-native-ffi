@@ -1,24 +1,54 @@
 [tasks."api:c"]
 run = [
-  "rm -rf api/c/gen src/content/docs/api/c src/content/docs/api/c.md src/content/docs/reference/c src/content/docs/reference/c.md",
-  "mkdir -p api/c/gen src/content/docs/reference",
+  "rm -rf api/c/gen public/reference/c",
+  "mkdir -p api/c/gen public/reference",
   "doxygen api/c/Doxyfile",
-  "pnpm exec moxygen --quiet --frontmatter --html-anchors --source-root ../include --templates api/c/templates/cpp --output src/content/docs/reference/c.md api/c/gen/xml",
+  "cp -a api/c/gen/html/. public/reference/c/",
 ]
 
+[tasks."api:rust"]
+dir = "{{env.MLN_FFI_REPO_ROOT}}"
+run = [
+  "rm -rf docs/public/reference/rust",
+  "mkdir -p docs/public/reference",
+  "cargo doc -p maplibre-native --no-deps",
+  "cp -a target/doc/. docs/public/reference/rust/",
+]
+
+[tasks."api:java"]
+dir = "{{env.MLN_FFI_REPO_ROOT}}"
+run = [
+  "rm -rf docs/public/reference/java",
+  "mkdir -p docs/public/reference",
+  "./gradlew :bindings:java-ffm:compileJava :bindings:java-ffm:javadoc -q",
+  "cp -a bindings/java-ffm/build/docs/javadoc/. docs/public/reference/java/",
+]
+
+[tasks."api:zig"]
+dir = "{{env.MLN_FFI_REPO_ROOT}}/bindings/zig"
+run = '''
+rm -rf ../../docs/public/reference/zig
+mkdir -p ../../docs/public/reference
+zig build docs -Dinclude-dir="{{env.MLN_FFI_INCLUDE_DIR}}" --prefix ../../docs/public/reference/zig
+'''
+
+[tasks.api]
+depends = ["api:c", "api:rust", "api:java", "api:zig"]
+
 [tasks.dev]
-depends = ["api:c"]
+depends = ["api"]
 run = "pnpm exec astro dev"
 
 [tasks.start]
-depends = ["api:c"]
+depends = ["api"]
 run = "pnpm exec astro dev"
 
 [tasks.build]
-depends = ["api:c"]
+depends = ["api"]
 run = "pnpm exec astro build"
 
 [tasks.preview]
+depends = ["api"]
 run = "pnpm exec astro preview"
 
 [tasks.astro]
