@@ -84,7 +84,7 @@ native objects because the JVM runs them on arbitrary threads.
 
 Child handles retain their Java parent wrappers while native validity depends on
 that parent. `MapProjectionHandle` follows the shared exception: it owns a
-standalone projection snapshot after creation and does not retain the source
+standalone transform snapshot after creation and does not retain the source
 `MapHandle` for native validity.
 
 Ordinary JNI calls execute on the Java thread that invoked them. The binding
