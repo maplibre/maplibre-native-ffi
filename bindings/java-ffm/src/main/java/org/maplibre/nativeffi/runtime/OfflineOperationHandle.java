@@ -82,29 +82,6 @@ public final class OfflineOperationHandle<T> implements AutoCloseable {
     return id;
   }
 
-  synchronized long requireLiveForOneOf(
-      RuntimeHandle expectedRuntime,
-      OfflineOperationKind firstKind,
-      OfflineOperationKind secondKind,
-      OfflineOperationResultKind expectedResultKind) {
-    requireLive(expectedRuntime);
-    if ((kind != firstKind && kind != secondKind) || resultKind != expectedResultKind) {
-      throw new InvalidStateException(
-          MaplibreStatus.INVALID_STATE.nativeCode(),
-          "OfflineOperationHandle has kind "
-              + kind
-              + " and result kind "
-              + resultKind
-              + ", expected "
-              + firstKind
-              + " or "
-              + secondKind
-              + " and "
-              + expectedResultKind);
-    }
-    return id;
-  }
-
   synchronized void markConsumed() {
     closed = true;
     leakReport.markClosed();
