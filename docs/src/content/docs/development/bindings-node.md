@@ -33,11 +33,10 @@ integrations above this layer.
 
 ## TypeScript Surface
 
-Long-lived native objects use the shared `Handle` suffix: `RuntimeHandle`,
-`MapHandle`, `MapProjectionHandle`, and `RenderSessionHandle`. They expose
-explicit `close()` methods and implement `Symbol.dispose` for `using` blocks.
-Successful `close()` releases once; later calls no-op. Failed native destruction
-leaves the handle live so callers can retry or report the diagnostic.
+Long-lived native objects use the shared `Handle` suffix. They expose explicit
+`close()` methods and implement `Symbol.dispose` for `using` blocks. Successful
+`close()` releases once; later calls no-op. Failed native destruction leaves the
+handle live so callers can retry or report the diagnostic.
 
 C option structs become TypeScript descriptor interfaces or small classes. Input
 descriptors use ordinary optional properties for field-mask presence. Internal
