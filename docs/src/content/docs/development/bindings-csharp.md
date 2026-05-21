@@ -32,12 +32,11 @@ practical: same concepts, same handle suffixes, same copied-value model, and
 ## Public Types
 
 Long-lived C-owned objects are public sealed classes with the shared `Handle`
-suffix: `RuntimeHandle`, `MapHandle`, `MapProjectionHandle`, and
-`RenderSessionHandle`. They implement `IDisposable` and expose `Close()` for
-fallible deterministic release. `Close()` throws `MaplibreException` on native
-failure and leaves the handle live for retry. `Dispose()` uses a non-throwing
-cleanup path for `using`, stack unwinding, and best-effort teardown; it marks
-the wrapper closed only after successful native release and records or reports
+suffix. They implement `IDisposable` and expose `Close()` for fallible
+deterministic release. `Close()` throws `MaplibreException` on native failure
+and leaves the handle live for retry. `Dispose()` uses a non-throwing cleanup
+path for `using`, stack unwinding, and best-effort teardown; it marks the
+wrapper closed only after successful native release and records or reports
 failures without hiding an in-flight exception.
 
 Use `SafeHandle` only at the private boundary when it helps contain pointer
