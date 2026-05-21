@@ -25,7 +25,9 @@ export default defineConfig({
       plugins: [
         starlightCopyButton(),
         starlightLlmsTxt({ exclude: ["reference/**"] }),
-        starlightLinksValidator(),
+        starlightLinksValidator({
+          exclude: ["/maplibre-native-ffi/reference/**"],
+        }),
       ],
       social: [
         {
@@ -43,7 +45,13 @@ export default defineConfig({
         },
         {
           label: "Reference",
-          autogenerate: { directory: "reference" },
+          items: [
+            { label: "Overview", slug: "reference" },
+            { label: "C API", link: "/reference/c/" },
+            { label: "Java API", link: "/reference/java/" },
+            { label: "Rust API", link: "/reference/rust/" },
+            { label: "Zig API", link: "/reference/zig/" },
+          ],
         },
         {
           label: "Development",

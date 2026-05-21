@@ -210,6 +210,20 @@ fn addMaplibreNativeModule(b: *std.Build, options: BuildOptions) *std.Build.Modu
     return maplibre_native;
 }
 
+fn addMaplibreNativeDocs(b: *std.Build, maplibre_native: *std.Build.Module) void {
+    const lib = b.addLibrary(.{
+        .name = "maplibre_native",
+        .root_module = maplibre_native,
+    });
+    const install_docs = b.addInstallDirectory(.{
+        .source_dir = lib.getEmittedDocs(),
+        .install_dir = .prefix,
+        .install_subdir = "",
+    });
+    const docs_step = b.step("docs", "Install package documentation into the prefix");
+    docs_step.dependOn(&install_docs.step);
+}
+
 fn addTestCompile(b: *std.Build, options: BuildOptions, root_source_file: std.Build.LazyPath) *std.Build.Step.Compile {
     const tests = b.addTest(.{
         .root_module = b.createModule(.{
@@ -253,6 +267,7 @@ pub fn build(b: *std.Build) void {
     checkSupportedTarget(options.target, options.render_backend);
 
     const maplibre_native = addMaplibreNativeModule(b, options);
+    addMaplibreNativeDocs(b, maplibre_native);
 
     const test_sources = [_]std.Build.LazyPath{
         b.path("src/status.zig"),

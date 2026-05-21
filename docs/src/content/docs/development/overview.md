@@ -72,6 +72,9 @@ mise run fix
 # Run examples
 mise run //examples/zig-map:run
 
+# Regenerate API reference HTML only
+mise run //docs:api
+
 # Build the documentation site
 mise run //docs:build
 ```
@@ -127,8 +130,9 @@ generators usually live with the language package graph they serve.
 repository-wide formatting defaults.
 
 [Astro](https://astro.build/) and [Starlight](https://starlight.astro.build/)
-build the documentation site. Generated reference documentation is exported as
-Markdown into `docs/src/content/docs/reference/`.
+build the documentation site. Generated API reference HTML is installed into
+`docs/public/reference/` (Doxygen, Javadoc, rustdoc, and Zig doc) before each
+docs build.
 
 ## Tests And Examples
 
