@@ -27,19 +27,16 @@ Use the Rust bridge path rather than a direct Python C import. `_native` depends
 on the shared Rust ABI-adaptation crates described in the
 [Rust binding conventions](/maplibre-native-ffi/development/bindings-rust/),
 then adds Python-specific lifetime state, exception conversion, GIL handling,
-and package layout. Standard and free-threaded CPython build from the same
-sources, with narrow conditional code for PyO3 features and synchronization.
-
-Keep standard and free-threaded CPython build variants in the same source tree.
-Source layout, build configuration, and extension boundaries stay in scope.
+and the public wrapper boundary. Standard and free-threaded CPython use the same
+source conventions, with narrow conditional code for PyO3 features and
+synchronization.
 
 ## Public Surface
 
-Long-lived native objects use the shared names `RuntimeHandle`, `MapHandle`,
-`MapProjectionHandle`, and `RenderSessionHandle`. Each handle exposes `close()`
-and implements the context-manager protocol. A successful `close()` releases the
-native object exactly once; later closes no-op. Failed native destruction leaves
-the handle live for retry or inspection.
+Long-lived native objects use the shared `Handle` suffix. Each handle exposes
+`close()` and implements the context-manager protocol. A successful `close()`
+releases the native object exactly once; later closes no-op. Failed native
+destruction leaves the handle live for retry or inspection.
 
 Use Python dataclasses or small classes for descriptors. `_native` materializers
 write C `size` fields, masks, string views, and nested structs. Python callers
