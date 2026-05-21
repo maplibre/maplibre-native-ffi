@@ -1,4 +1,5 @@
 [env]
+_.path = ["{{config_root}}/build/windows-x64-vulkan"]
 MLN_FFI_VARIANT = "windows-x64-vulkan"
 MLN_FFI_TARGET_TRIPLE = "windows-x64"
 MLN_FFI_RENDER_BACKEND = "vulkan"
