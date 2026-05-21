@@ -34,12 +34,11 @@ scheduler, rendering, and application policy.
 
 ## Public Surface
 
-Long-lived native objects use the shared `Handle` suffix: `RuntimeHandle`,
-`MapHandle`, `MapProjectionHandle`, and `RenderSessionHandle`. Public operations
-stay close to the Java FFM and JNI names where that preserves the C model,
-because these targets may become Kotlin Multiplatform actual implementations.
-Prefer Kotlin spelling for properties, builders, and nullability when it does
-not change the low-level contract.
+Long-lived native objects use the shared `Handle` suffix. Public operations stay
+close to the Java FFM and JNI names where that preserves the C model, because
+these targets may become Kotlin Multiplatform actual implementations. Prefer
+Kotlin spelling for properties, builders, and nullability when it does not
+change the low-level contract.
 
 C option structs become Kotlin descriptor classes or data classes. Mutable
 field-mask descriptors use explicit setters, clearers, and presence checks.
