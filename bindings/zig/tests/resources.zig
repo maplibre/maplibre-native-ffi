@@ -4,13 +4,15 @@ const testing = std.testing;
 const maplibre = @import("maplibre_native");
 const support = @import("support.zig");
 
-extern fn usleep(useconds: c_uint) c_int;
-
 const HttpServerState = struct {
     server: *std.Io.net.Server,
     served: bool = false,
     err: ?anyerror = null,
 };
+
+fn sleepOneMillisecond() !void {
+    try testing.io.sleep(.fromMilliseconds(1), .awake);
+}
 
 fn waitForEvent(runtime: *maplibre.RuntimeHandle, event_type: maplibre.RuntimeEventType) !bool {
     for (0..1000) |_| {
@@ -20,7 +22,7 @@ fn waitForEvent(runtime: *maplibre.RuntimeHandle, event_type: maplibre.RuntimeEv
             defer owned_event.deinit();
             if (std.meta.eql(owned_event.event_type, event_type)) return true;
         }
-        _ = usleep(1000);
+        try sleepOneMillisecond();
     }
     return false;
 }
@@ -36,7 +38,7 @@ fn waitForOwnedEvent(
             if (std.meta.eql(owned_event.event_type, event_type)) return owned_event;
             owned_event.deinit();
         }
-        _ = usleep(1000);
+        try sleepOneMillisecond();
     }
     return error.EventNotObserved;
 }
@@ -415,7 +417,7 @@ test "resource transform rewrites network style URL" {
             owned_event.deinit();
         }
         if (replacement_state.calls.load(.seq_cst) > 0) break;
-        _ = usleep(1000);
+        try sleepOneMillisecond();
     }
 
     try testing.expectEqual(@as(usize, 0), state.calls.load(.seq_cst));
@@ -545,7 +547,7 @@ fn waitForPmtilesRangeRequest(runtime: *maplibre.RuntimeHandle, state: *PmtilesR
     for (0..1000) |_| {
         try runtime.runOnce();
         if (state.recorded_pmtiles_request.load(.seq_cst)) return;
-        _ = usleep(1000);
+        try sleepOneMillisecond();
     }
     return error.ProviderNotCalled;
 }
@@ -878,7 +880,7 @@ fn waitForProviderHandle(runtime: *maplibre.RuntimeHandle, state: *AsyncProvider
     for (0..1000) |_| {
         try runtime.runOnce();
         if (state.takeHandle()) |handle| return handle;
-        _ = usleep(1000);
+        try sleepOneMillisecond();
     }
     return error.ProviderNotCalled;
 }
@@ -1048,7 +1050,7 @@ fn waitForRequestCancellation(runtime: *maplibre.RuntimeHandle, handle: maplibre
     for (0..5000) |_| {
         if (try handle.cancelled()) return;
         try runtime.runOnce();
-        _ = usleep(1000);
+        try sleepOneMillisecond();
     }
     return error.RequestNotCancelled;
 }
@@ -1115,7 +1117,7 @@ test "offline region download control emits copied status events" {
             break;
         }
         if (observed) break;
-        _ = usleep(1000);
+        try sleepOneMillisecond();
     }
     try testing.expect(observed);
 }
