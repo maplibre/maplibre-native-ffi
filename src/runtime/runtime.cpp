@@ -639,6 +639,65 @@ auto register_offline_operation(
   return MLN_STATUS_OK;
 }
 
+auto erase_offline_operation_registration(
+  mln_runtime* runtime, mln_offline_operation_id operation_id
+) noexcept -> void {
+  if (runtime == nullptr || operation_id == 0) {
+    return;
+  }
+  try {
+    auto state = runtime->offline_operation_state;
+    if (!state) {
+      return;
+    }
+    {
+      const std::scoped_lock state_lock(state->mutex);
+      state->operations.erase(operation_id);
+    }
+
+    const std::scoped_lock event_lock(runtime->event_mutex);
+    std::erase_if(runtime->events, [operation_id](const auto& event) -> bool {
+      return event.has_offline_operation &&
+             event.offline_operation_id == operation_id;
+    });
+  } catch (...) {
+  }
+}
+
+class OfflineOperationRegistrationGuard {
+ public:
+  OfflineOperationRegistrationGuard(
+    mln_runtime* runtime, mln_offline_operation_id operation_id,
+    mln_offline_operation_id* out_operation_id
+  ) noexcept
+      : runtime_(runtime),
+        operation_id_(operation_id),
+        out_operation_id_(out_operation_id) {}
+
+  OfflineOperationRegistrationGuard(const OfflineOperationRegistrationGuard&) =
+    delete;
+  auto operator=(const OfflineOperationRegistrationGuard&)
+    -> OfflineOperationRegistrationGuard& = delete;
+
+  ~OfflineOperationRegistrationGuard() noexcept {
+    if (!active_) {
+      return;
+    }
+    erase_offline_operation_registration(runtime_, operation_id_);
+    if (out_operation_id_ != nullptr) {
+      *out_operation_id_ = 0;
+    }
+  }
+
+  auto release() noexcept -> void { active_ = false; }
+
+ private:
+  mln_runtime* runtime_ = nullptr;
+  mln_offline_operation_id operation_id_ = 0;
+  mln_offline_operation_id* out_operation_id_ = nullptr;
+  bool active_ = true;
+};
+
 auto make_offline_completion_payload(
   const mln::core::OfflineOperation& operation
 ) -> mln_runtime_event_offline_operation_completed {
@@ -1022,6 +1081,8 @@ auto run_ambient_cache_operation_start(
     return register_status;
   }
   const auto operation_id = *out_operation_id;
+  auto registration =
+    OfflineOperationRegistrationGuard{runtime, operation_id, out_operation_id};
   auto state = runtime->offline_operation_state;
 
   auto callback = [state, operation_id](std::exception_ptr exception) -> void {
@@ -1046,6 +1107,7 @@ auto run_ambient_cache_operation_start(
     default:
       std::terminate();
   }
+  registration.release();
   return MLN_STATUS_OK;
 }
 
@@ -1124,6 +1186,8 @@ auto offline_region_create_start(
     return register_status;
   }
   const auto operation_id = *out_operation_id;
+  auto registration =
+    OfflineOperationRegistrationGuard{runtime, operation_id, out_operation_id};
   auto state = runtime->offline_operation_state;
   database->createOfflineRegion(
     native_definition, native_metadata,
@@ -1150,6 +1214,7 @@ auto offline_region_create_start(
       );
     }
   );
+  registration.release();
   return MLN_STATUS_OK;
 }
 
@@ -1183,6 +1248,8 @@ auto offline_region_get_start(
     return register_status;
   }
   const auto operation_id = *out_operation_id;
+  auto registration =
+    OfflineOperationRegistrationGuard{runtime, operation_id, out_operation_id};
   auto state = runtime->offline_operation_state;
   database->getOfflineRegion(
     region_id,
@@ -1218,6 +1285,7 @@ auto offline_region_get_start(
       );
     }
   );
+  registration.release();
   return MLN_STATUS_OK;
 }
 
@@ -1250,6 +1318,8 @@ auto offline_regions_list_start(
     return register_status;
   }
   const auto operation_id = *out_operation_id;
+  auto registration =
+    OfflineOperationRegistrationGuard{runtime, operation_id, out_operation_id};
   auto state = runtime->offline_operation_state;
   database->listOfflineRegions(
     [state, operation_id](
@@ -1275,6 +1345,7 @@ auto offline_regions_list_start(
       );
     }
   );
+  registration.release();
   return MLN_STATUS_OK;
 }
 
@@ -1312,6 +1383,8 @@ auto offline_regions_merge_database_start(
     return register_status;
   }
   const auto operation_id = *out_operation_id;
+  auto registration =
+    OfflineOperationRegistrationGuard{runtime, operation_id, out_operation_id};
   auto state = runtime->offline_operation_state;
   const auto path = std::string{side_database_path};
   database->mergeOfflineRegions(
@@ -1341,6 +1414,7 @@ auto offline_regions_merge_database_start(
       );
     }
   );
+  registration.release();
   return MLN_STATUS_OK;
 }
 
@@ -1384,6 +1458,8 @@ auto offline_region_update_metadata_start(
     return register_status;
   }
   const auto operation_id = *out_operation_id;
+  auto registration =
+    OfflineOperationRegistrationGuard{runtime, operation_id, out_operation_id};
   auto state = runtime->offline_operation_state;
   database->updateOfflineMetadata(
     region_id, native_metadata,
@@ -1435,6 +1511,7 @@ auto offline_region_update_metadata_start(
       );
     }
   );
+  registration.release();
   return MLN_STATUS_OK;
 }
 
@@ -1468,6 +1545,8 @@ auto offline_region_get_status_start(
     return register_status;
   }
   const auto operation_id = *out_operation_id;
+  auto registration =
+    OfflineOperationRegistrationGuard{runtime, operation_id, out_operation_id};
   auto state = runtime->offline_operation_state;
   database->getOfflineRegion(
     region_id,
@@ -1512,6 +1591,7 @@ auto offline_region_get_status_start(
       );
     }
   );
+  registration.release();
   return MLN_STATUS_OK;
 }
 
@@ -1545,6 +1625,8 @@ auto offline_region_set_observed_start(
     return register_status;
   }
   const auto operation_id = *out_operation_id;
+  auto registration =
+    OfflineOperationRegistrationGuard{runtime, operation_id, out_operation_id};
   auto state = runtime->offline_operation_state;
   database->getOfflineRegion(
     region_id,
@@ -1586,6 +1668,7 @@ auto offline_region_set_observed_start(
       );
     }
   );
+  registration.release();
   return MLN_STATUS_OK;
 }
 
@@ -1624,6 +1707,8 @@ auto offline_region_set_download_state_start(
     return register_status;
   }
   const auto operation_id = *out_operation_id;
+  auto registration =
+    OfflineOperationRegistrationGuard{runtime, operation_id, out_operation_id};
   auto state = runtime->offline_operation_state;
   database->getOfflineRegion(
     request.region_id,
@@ -1652,6 +1737,7 @@ auto offline_region_set_download_state_start(
       );
     }
   );
+  registration.release();
   return MLN_STATUS_OK;
 }
 
@@ -1685,6 +1771,8 @@ auto offline_region_invalidate_start(
     return register_status;
   }
   const auto operation_id = *out_operation_id;
+  auto registration =
+    OfflineOperationRegistrationGuard{runtime, operation_id, out_operation_id};
   auto state = runtime->offline_operation_state;
   database->getOfflineRegion(
     region_id,
@@ -1717,6 +1805,7 @@ auto offline_region_invalidate_start(
       );
     }
   );
+  registration.release();
   return MLN_STATUS_OK;
 }
 
@@ -1750,6 +1839,8 @@ auto offline_region_delete_start(
     return register_status;
   }
   const auto operation_id = *out_operation_id;
+  auto registration =
+    OfflineOperationRegistrationGuard{runtime, operation_id, out_operation_id};
   auto state = runtime->offline_operation_state;
   database->getOfflineRegion(
     region_id,
@@ -1793,6 +1884,7 @@ auto offline_region_delete_start(
       );
     }
   );
+  registration.release();
   return MLN_STATUS_OK;
 }
 
