@@ -9,7 +9,6 @@
   "newLineKind": "auto",
   "excludes": [
     "third_party/**",
-    "docs/api/c/templates/**",
     "**/*-lock.yaml",
     "**/*.lock.yaml",
     "**/*-lock.yml",
