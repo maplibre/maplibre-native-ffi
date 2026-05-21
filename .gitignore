@@ -2,7 +2,7 @@ build/
 target/
 bindings/*/bin/
 docs/api/c/gen/
-docs/src/content/docs/reference/c.md
+docs/public/reference/
 .zig-cache/
 .ruff_cache/
 __pycache__/

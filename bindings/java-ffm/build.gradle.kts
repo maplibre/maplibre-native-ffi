@@ -50,6 +50,18 @@ dependencies {
 
 tasks.withType<JavaCompile>().configureEach { options.release = 25 }
 
+tasks.named<Javadoc>("javadoc") {
+  dependsOn(tasks.classes)
+  isFailOnError = true
+  options {
+    encoding = "UTF-8"
+    (this as StandardJavadocDocletOptions).apply {
+      links("https://docs.oracle.com/en/java/javase/25/docs/api/")
+      addStringOption("exclude", "org.maplibre.nativeffi.internal:*")
+    }
+  }
+}
+
 val nativeLibraryPathProperty = "org.maplibre.nativeffi.library.path"
 val nativeBuildDirForTests = providers.environmentVariable("MLN_FFI_BUILD_DIR")
 val nativeLibraryPathForTests = nativeBuildDirForTests.map {

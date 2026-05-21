@@ -127,8 +127,8 @@ generators usually live with the language package graph they serve.
 repository-wide formatting defaults.
 
 [Astro](https://astro.build/) and [Starlight](https://starlight.astro.build/)
-build the documentation site. Generated reference documentation is exported as
-Markdown into `docs/src/content/docs/reference/`.
+build the documentation site. Generated API reference HTML is installed into
+`docs/public/reference/` before each docs build.
 
 ## Tests And Examples
 

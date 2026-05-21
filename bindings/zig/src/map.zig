@@ -10,12 +10,15 @@ const status = @import("status.zig");
 const values = @import("values.zig");
 
 const CustomGeometrySourceState = struct {
+    source_id: []const u8,
     fetch_tile: CustomGeometrySourceTileCallback,
     cancel_tile: ?CustomGeometrySourceTileCallback,
     context: ?*anyopaque,
-    retired: std.atomic.Value(bool),
     active_upcalls: std.atomic.Value(usize),
 };
+
+var custom_geometry_state_registry_lock = std.Io.Mutex.init;
+var custom_geometry_state_registry: std.ArrayList(*CustomGeometrySourceState) = .empty;
 
 pub const MapMode = enum {
     continuous,
@@ -67,7 +70,7 @@ pub const MapHandle = struct {
     runtime_registry: *runtime_module.RuntimeRegistry,
     id_value: values.MapId,
     diagnostic_store: ?*diagnostics.DiagnosticStore,
-    custom_geometry_sources: std.ArrayList(*CustomGeometrySourceState),
+    custom_geometry_sources: *std.ArrayList(*CustomGeometrySourceState),
 
     pub fn create(runtime: *RuntimeHandle, options: MapOptions) status.Error!MapHandle {
         var native_options = c.mln_map_options_default();
@@ -86,15 +89,24 @@ pub const MapHandle = struct {
             if (map) |handle| _ = c.mln_map_destroy(handle);
         }
 
+        const custom_geometry_sources = try std.heap.smp_allocator.create(std.ArrayList(*CustomGeometrySourceState));
+        custom_geometry_sources.* = .empty;
+        errdefer std.heap.smp_allocator.destroy(custom_geometry_sources);
+
         const runtime_registry = try runtime_module.registry(runtime);
-        const map_id = try runtime_module.registerMap(runtime_registry, map.?);
+        const map_id = try runtime_module.registerMap(
+            runtime_registry,
+            map.?,
+            releaseDetachedCustomGeometrySourceStatesForStyleLoaded,
+            custom_geometry_sources,
+        );
         errdefer runtime_module.unregisterMap(runtime_registry, map.?);
         return .{
             .native = @ptrCast(map.?),
             .runtime_registry = runtime_registry,
             .id_value = map_id,
             .diagnostic_store = diagnostic_store,
-            .custom_geometry_sources = .empty,
+            .custom_geometry_sources = custom_geometry_sources,
         };
     }
 
@@ -113,6 +125,7 @@ pub const MapHandle = struct {
         const json_z = try nulTerminated(allocator, json);
         defer allocator.free(json_z);
         try status.checkStatus(c.mln_map_set_style_json(native_map, json_z.ptr), self.diagnostic_store);
+        clearCustomGeometrySourceStates(self);
     }
 
     pub fn setStyleUrl(
@@ -235,6 +248,7 @@ pub const MapHandle = struct {
             c.mln_map_remove_style_source(try native(self), try temp.stringView(source_id), &removed),
             self.diagnostic_store,
         );
+        if (removed) releaseCustomGeometrySourceState(self, source_id);
         return removed;
     }
 
@@ -924,16 +938,23 @@ pub const MapHandle = struct {
         source_id: []const u8,
         options: CustomGeometrySourceOptions,
     ) status.Error!void {
+        _ = try native(self);
         const map_state = self;
+        const owned_source_id = try std.heap.smp_allocator.dupe(u8, source_id);
+        errdefer std.heap.smp_allocator.free(owned_source_id);
+
         const source_state = try std.heap.smp_allocator.create(CustomGeometrySourceState);
         source_state.* = .{
+            .source_id = owned_source_id,
             .fetch_tile = options.fetch_tile,
             .cancel_tile = options.cancel_tile,
             .context = options.context,
-            .retired = std.atomic.Value(bool).init(false),
             .active_upcalls = std.atomic.Value(usize).init(0),
         };
         errdefer std.heap.smp_allocator.destroy(source_state);
+
+        try registerLiveCustomGeometrySourceState(source_state);
+        errdefer unregisterLiveCustomGeometrySourceState(source_state);
 
         try map_state.custom_geometry_sources.append(std.heap.smp_allocator, source_state);
         errdefer _ = map_state.custom_geometry_sources.pop();
@@ -1403,13 +1424,16 @@ fn customGeometryCancelTileTrampoline(user_data: ?*anyopaque, raw_tile_id: c.mln
 }
 
 fn beginCustomGeometryUpcall(source_state: *CustomGeometrySourceState) bool {
-    if (source_state.retired.load(.seq_cst)) return false;
-    _ = source_state.active_upcalls.fetchAdd(1, .seq_cst);
-    if (source_state.retired.load(.seq_cst)) {
-        endCustomGeometryUpcall(source_state);
-        return false;
+    std.Io.Threaded.mutexLock(&custom_geometry_state_registry_lock);
+    defer std.Io.Threaded.mutexUnlock(&custom_geometry_state_registry_lock);
+
+    for (custom_geometry_state_registry.items) |live_state| {
+        if (live_state == source_state) {
+            _ = source_state.active_upcalls.fetchAdd(1, .seq_cst);
+            return true;
+        }
     }
-    return true;
+    return false;
 }
 
 fn endCustomGeometryUpcall(source_state: *CustomGeometrySourceState) void {
@@ -1424,18 +1448,89 @@ fn canonicalTileIdFromNative(tile_id: c.mln_canonical_tile_id) CanonicalTileId {
     return .{ .z = tile_id.z, .x = tile_id.x, .y = tile_id.y };
 }
 
-fn freeCustomGeometrySourceStates(map_state: *MapHandle) void {
+fn releaseCustomGeometrySourceState(map_state: *MapHandle, source_id: []const u8) void {
+    for (map_state.custom_geometry_sources.items, 0..) |source_state, index| {
+        if (std.mem.eql(u8, source_state.source_id, source_id)) {
+            _ = map_state.custom_geometry_sources.orderedRemove(index);
+            freeCustomGeometrySourceState(source_state);
+            return;
+        }
+    }
+}
+
+fn releaseDetachedCustomGeometrySourceStatesForStyleLoaded(map: *c.mln_map, context: ?*anyopaque) void {
+    const custom_geometry_sources: *std.ArrayList(*CustomGeometrySourceState) = @ptrCast(@alignCast(context orelse return));
+    var index: usize = 0;
+    while (index < custom_geometry_sources.items.len) {
+        const source_state = custom_geometry_sources.items[index];
+        var source_type: u32 = c.MLN_STYLE_SOURCE_TYPE_UNKNOWN;
+        var found = false;
+        const check = c.mln_map_get_style_source_type(map, stringView(source_state.source_id), &source_type, &found);
+        if (check != c.MLN_STATUS_OK or (found and source_type == c.MLN_STYLE_SOURCE_TYPE_CUSTOM_VECTOR)) {
+            index += 1;
+            continue;
+        }
+        _ = custom_geometry_sources.orderedRemove(index);
+        freeCustomGeometrySourceState(source_state);
+    }
+}
+
+fn clearCustomGeometrySourceStates(map_state: *MapHandle) void {
     for (map_state.custom_geometry_sources.items) |source_state| {
-        source_state.retired.store(true, .seq_cst);
+        retireLiveCustomGeometrySourceState(source_state);
     }
     for (map_state.custom_geometry_sources.items) |source_state| {
-        while (source_state.active_upcalls.load(.seq_cst) != 0) {
-            std.Thread.yield() catch {};
-        }
+        waitForCustomGeometryUpcalls(source_state);
+        std.heap.smp_allocator.free(source_state.source_id);
         std.heap.smp_allocator.destroy(source_state);
     }
+    map_state.custom_geometry_sources.clearRetainingCapacity();
+}
+
+fn freeCustomGeometrySourceStates(map_state: *MapHandle) void {
+    clearCustomGeometrySourceStates(map_state);
     map_state.custom_geometry_sources.deinit(std.heap.smp_allocator);
-    map_state.custom_geometry_sources = .empty;
+    std.heap.smp_allocator.destroy(map_state.custom_geometry_sources);
+}
+
+fn freeCustomGeometrySourceState(source_state: *CustomGeometrySourceState) void {
+    retireLiveCustomGeometrySourceState(source_state);
+    waitForCustomGeometryUpcalls(source_state);
+    std.heap.smp_allocator.free(source_state.source_id);
+    std.heap.smp_allocator.destroy(source_state);
+}
+
+fn registerLiveCustomGeometrySourceState(source_state: *CustomGeometrySourceState) std.mem.Allocator.Error!void {
+    std.Io.Threaded.mutexLock(&custom_geometry_state_registry_lock);
+    defer std.Io.Threaded.mutexUnlock(&custom_geometry_state_registry_lock);
+    try custom_geometry_state_registry.append(std.heap.smp_allocator, source_state);
+}
+
+fn unregisterLiveCustomGeometrySourceState(source_state: *CustomGeometrySourceState) void {
+    std.Io.Threaded.mutexLock(&custom_geometry_state_registry_lock);
+    defer std.Io.Threaded.mutexUnlock(&custom_geometry_state_registry_lock);
+    removeLiveCustomGeometrySourceStateLocked(source_state);
+}
+
+fn retireLiveCustomGeometrySourceState(source_state: *CustomGeometrySourceState) void {
+    std.Io.Threaded.mutexLock(&custom_geometry_state_registry_lock);
+    defer std.Io.Threaded.mutexUnlock(&custom_geometry_state_registry_lock);
+    removeLiveCustomGeometrySourceStateLocked(source_state);
+}
+
+fn removeLiveCustomGeometrySourceStateLocked(source_state: *CustomGeometrySourceState) void {
+    for (custom_geometry_state_registry.items, 0..) |live_state, index| {
+        if (live_state == source_state) {
+            _ = custom_geometry_state_registry.orderedRemove(index);
+            return;
+        }
+    }
+}
+
+fn waitForCustomGeometryUpcalls(source_state: *CustomGeometrySourceState) void {
+    while (source_state.active_upcalls.load(.seq_cst) != 0) {
+        std.Thread.yield() catch {};
+    }
 }
 
 pub fn native(handle: *MapHandle) status.BindingError!*c.mln_map {
@@ -1509,12 +1604,14 @@ fn testCancelCustomGeometryTile(context: ?*anyopaque, tile_id: CanonicalTileId) 
 test "custom geometry trampolines route semantic tile ids" {
     var test_state = TestCustomGeometryCallbackState{};
     var source_state = CustomGeometrySourceState{
+        .source_id = "custom"[0..],
         .fetch_tile = testFetchCustomGeometryTile,
         .cancel_tile = testCancelCustomGeometryTile,
         .context = &test_state,
-        .retired = std.atomic.Value(bool).init(false),
         .active_upcalls = std.atomic.Value(usize).init(0),
     };
+    try registerLiveCustomGeometrySourceState(&source_state);
+    defer unregisterLiveCustomGeometrySourceState(&source_state);
 
     customGeometryFetchTileTrampoline(&source_state, .{ .z = 3, .x = 4, .y = 5 });
     try std.testing.expectEqual(@as(usize, 1), test_state.fetch_count);
@@ -1528,8 +1625,115 @@ test "custom geometry trampolines route semantic tile ids" {
     customGeometryCancelTileTrampoline(&source_state, .{ .z = 9, .x = 10, .y = 11 });
     try std.testing.expectEqual(@as(usize, 1), test_state.cancel_count);
 
-    source_state.retired.store(true, .seq_cst);
+    retireLiveCustomGeometrySourceState(&source_state);
     customGeometryFetchTileTrampoline(&source_state, .{ .z = 12, .x = 13, .y = 14 });
     try std.testing.expectEqual(@as(usize, 1), test_state.fetch_count);
     try std.testing.expectEqual(@as(usize, 0), source_state.active_upcalls.load(.seq_cst));
+}
+
+const test_style_json =
+    \\{
+    \\  "version": 8,
+    \\  "name": "zig-binding-test",
+    \\  "sources": {
+    \\    "point": {
+    \\      "type": "geojson",
+    \\      "data": {"type":"FeatureCollection","features":[]}
+    \\    }
+    \\  },
+    \\  "layers": [
+    \\    {"id":"background","type":"background","paint":{"background-color":"#d8f1ff"}}
+    \\  ]
+    \\}
+;
+
+fn createLoadedMapForTesting(runtime: *RuntimeHandle) !MapHandle {
+    var map = try MapHandle.create(runtime, .{});
+    errdefer map.close() catch {};
+    try map.setStyleJson(std.testing.allocator, test_style_json);
+    try std.testing.expect(try waitForRuntimeEventForTesting(runtime, .map_style_loaded));
+    return map;
+}
+
+fn waitForRuntimeEventForTesting(runtime: *RuntimeHandle, event_type: runtime_module.RuntimeEventType) !bool {
+    var attempts: usize = 0;
+    while (attempts < 200) : (attempts += 1) {
+        try runtime.runOnce();
+        while (try runtime.pollEvent()) |event| {
+            if (std.meta.eql(event.event_type, event_type)) return true;
+        }
+        try std.testing.io.sleep(.fromMilliseconds(10), .awake);
+    }
+    return false;
+}
+
+fn testStyleJsonProvider(
+    context: ?*anyopaque,
+    request: runtime_module.ResourceRequest,
+    maybe_handle: ?runtime_module.ResourceRequestHandle,
+) runtime_module.ResourceProviderDecision {
+    _ = context;
+    if (!std.mem.eql(u8, request.url, "custom://style.json")) return .pass_through;
+    const handle = maybe_handle orelse return .pass_through;
+    handle.complete(.{ .bytes = test_style_json }) catch {
+        handle.release();
+        return .pass_through;
+    };
+    handle.release();
+    return .handle;
+}
+
+test "custom geometry source state is released on source removal" {
+    var runtime = try RuntimeHandle.init(null);
+    defer runtime.close() catch @panic("runtime close failed");
+    var map = try createLoadedMapForTesting(&runtime);
+    defer map.close() catch @panic("map close failed");
+
+    var state = TestCustomGeometryCallbackState{};
+    try map.addCustomGeometrySource(std.testing.allocator, "custom", .{
+        .fetch_tile = testFetchCustomGeometryTile,
+        .context = &state,
+    });
+    try std.testing.expectEqual(@as(usize, 1), map.custom_geometry_sources.items.len);
+
+    try std.testing.expect(try map.removeStyleSource(std.testing.allocator, "custom"));
+    try std.testing.expectEqual(@as(usize, 0), map.custom_geometry_sources.items.len);
+}
+
+test "custom geometry source states are released on inline style replacement" {
+    var runtime = try RuntimeHandle.init(null);
+    defer runtime.close() catch @panic("runtime close failed");
+    var map = try createLoadedMapForTesting(&runtime);
+    defer map.close() catch @panic("map close failed");
+
+    var state = TestCustomGeometryCallbackState{};
+    try map.addCustomGeometrySource(std.testing.allocator, "custom", .{
+        .fetch_tile = testFetchCustomGeometryTile,
+        .context = &state,
+    });
+    try std.testing.expectEqual(@as(usize, 1), map.custom_geometry_sources.items.len);
+
+    try map.setStyleJson(std.testing.allocator, test_style_json);
+    try std.testing.expectEqual(@as(usize, 0), map.custom_geometry_sources.items.len);
+}
+
+test "custom geometry source states are released after style URL load detaches them" {
+    var runtime = try RuntimeHandle.init(null);
+    defer runtime.close() catch @panic("runtime close failed");
+    try runtime.setResourceProvider(.{ .handler = testStyleJsonProvider });
+
+    var map = try createLoadedMapForTesting(&runtime);
+    defer map.close() catch @panic("map close failed");
+
+    var state = TestCustomGeometryCallbackState{};
+    try map.addCustomGeometrySource(std.testing.allocator, "custom", .{
+        .fetch_tile = testFetchCustomGeometryTile,
+        .context = &state,
+    });
+    try std.testing.expectEqual(@as(usize, 1), map.custom_geometry_sources.items.len);
+
+    try map.setStyleUrl(std.testing.allocator, "custom://style.json");
+    try std.testing.expectEqual(@as(usize, 1), map.custom_geometry_sources.items.len);
+    try std.testing.expect(try waitForRuntimeEventForTesting(&runtime, .map_style_loaded));
+    try std.testing.expectEqual(@as(usize, 0), map.custom_geometry_sources.items.len);
 }
