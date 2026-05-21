@@ -744,8 +744,9 @@ MLN_API mln_status mln_runtime_offline_region_delete_start(
  * status MLN_STATUS_OK). The caller owns the returned snapshot handle and must
  * destroy it with mln_offline_region_snapshot_destroy().
  *
- * On failure the operation entry is still consumed; the caller does not need to
- * call mln_runtime_offline_operation_discard().
+ * On success, the operation entry is consumed. On failure, it remains live so
+ * the caller may retry this call or discard the operation with
+ * mln_runtime_offline_operation_discard().
  *
  * Returns:
  * - MLN_STATUS_OK when the result was taken and out_region was set.
@@ -767,8 +768,9 @@ MLN_API mln_status mln_runtime_offline_region_create_take_result(
  * The caller owns the returned snapshot handle and must destroy it with
  * mln_offline_region_snapshot_destroy().
  *
- * On failure the operation entry is still consumed; the caller does not need to
- * call mln_runtime_offline_operation_discard().
+ * On success, the operation entry is consumed. On failure, it remains live so
+ * the caller may retry this call or discard the operation with
+ * mln_runtime_offline_operation_discard().
  *
  * Returns:
  * - MLN_STATUS_OK when the result was taken; out_found indicates whether a
@@ -791,8 +793,9 @@ MLN_API mln_status mln_runtime_offline_region_get_take_result(
  * successfully. The caller owns the returned list handle and must destroy it
  * with mln_offline_region_list_destroy().
  *
- * On failure the operation entry is still consumed; the caller does not need to
- * call mln_runtime_offline_operation_discard().
+ * On success, the operation entry is consumed. On failure, it remains live so
+ * the caller may retry this call or discard the operation with
+ * mln_runtime_offline_operation_discard().
  *
  * Returns:
  * - MLN_STATUS_OK when the result was taken and out_regions was set.
@@ -814,8 +817,9 @@ MLN_API mln_status mln_runtime_offline_regions_list_take_result(
  * successfully. The caller owns the returned list handle and must destroy it
  * with mln_offline_region_list_destroy().
  *
- * On failure the operation entry is still consumed; the caller does not need to
- * call mln_runtime_offline_operation_discard().
+ * On success, the operation entry is consumed. On failure, it remains live so
+ * the caller may retry this call or discard the operation with
+ * mln_runtime_offline_operation_discard().
  *
  * Returns:
  * - MLN_STATUS_OK when the result was taken and out_regions was set.
@@ -838,8 +842,9 @@ MLN_API mln_status mln_runtime_offline_regions_merge_database_take_result(
  * successfully. The caller owns the returned snapshot handle and must destroy
  * it with mln_offline_region_snapshot_destroy().
  *
- * On failure the operation entry is still consumed; the caller does not need to
- * call mln_runtime_offline_operation_discard().
+ * On success, the operation entry is consumed. On failure, it remains live so
+ * the caller may retry this call or discard the operation with
+ * mln_runtime_offline_operation_discard().
  *
  * Returns:
  * - MLN_STATUS_OK when the result was taken and out_region was set.
@@ -861,8 +866,9 @@ MLN_API mln_status mln_runtime_offline_region_update_metadata_take_result(
  * successfully. The caller provides a pre-allocated mln_offline_region_status
  * struct which is filled by this function.
  *
- * On failure the operation entry is still consumed; the caller does not need to
- * call mln_runtime_offline_operation_discard().
+ * On success, the operation entry is consumed. On failure, it remains live so
+ * the caller may retry this call or discard the operation with
+ * mln_runtime_offline_operation_discard().
  *
  * Returns:
  * - MLN_STATUS_OK when the result was taken and out_status was filled.
