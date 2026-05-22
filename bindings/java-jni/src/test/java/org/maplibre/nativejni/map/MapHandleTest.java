@@ -13,10 +13,13 @@ import org.junit.jupiter.api.Test;
 import org.maplibre.nativejni.camera.AnimationOptions;
 import org.maplibre.nativejni.camera.BoundOptions;
 import org.maplibre.nativejni.camera.CameraOptions;
+import org.maplibre.nativejni.camera.FreeCameraOptions;
 import org.maplibre.nativejni.error.InvalidStateException;
 import org.maplibre.nativejni.geo.LatLng;
 import org.maplibre.nativejni.geo.LatLngBounds;
+import org.maplibre.nativejni.geo.Quaternion;
 import org.maplibre.nativejni.geo.ScreenPoint;
+import org.maplibre.nativejni.geo.Vec3;
 import org.maplibre.nativejni.internal.access.InternalAccess;
 import org.maplibre.nativejni.runtime.RuntimeHandle;
 import org.maplibre.nativejni.style.SourceType;
@@ -92,6 +95,25 @@ class MapHandleTest {
         var animation = new AnimationOptions().durationMs(0);
         map.easeTo(new CameraOptions().zoom(4), animation);
         map.flyTo(new CameraOptions().zoom(3), animation);
+      }
+    }
+  }
+
+  @Test
+  void freeCameraCrossNativeBoundary() {
+    try (var runtime = RuntimeHandle.create()) {
+      try (var map = MapHandle.create(runtime, new MapOptions().size(64, 64))) {
+        map.setFreeCameraOptions(
+            new FreeCameraOptions()
+                .position(new Vec3(0.1, 0.2, 0.3))
+                .orientation(new Quaternion(0, 0, 0, 1)));
+
+        var camera = map.freeCameraOptions();
+        assertTrue(camera.hasPosition());
+        assertTrue(Double.isFinite(camera.position().x()));
+        assertTrue(Double.isFinite(camera.position().y()));
+        assertTrue(Double.isFinite(camera.position().z()));
+        assertTrue(camera.hasOrientation());
       }
     }
   }

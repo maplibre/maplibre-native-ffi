@@ -17,7 +17,9 @@ import org.maplibre.nativejni.geo.GeoJson;
 import org.maplibre.nativejni.geo.Geometry;
 import org.maplibre.nativejni.geo.LatLng;
 import org.maplibre.nativejni.geo.LatLngBounds;
+import org.maplibre.nativejni.geo.Quaternion;
 import org.maplibre.nativejni.geo.ScreenPoint;
+import org.maplibre.nativejni.geo.Vec3;
 import org.maplibre.nativejni.internal.access.InternalAccess;
 import org.maplibre.nativejni.internal.bridge.CameraNative;
 import org.maplibre.nativejni.internal.bridge.MapNative;
@@ -51,6 +53,8 @@ public final class MapHandle implements AutoCloseable {
   static final int CAMERA_VALUE_COUNT = 14;
   private static final int BOUND_FIELD_COUNT = 5;
   private static final int BOUND_VALUE_COUNT = 8;
+  private static final int FREE_CAMERA_FIELD_COUNT = 2;
+  private static final int FREE_CAMERA_VALUE_COUNT = 7;
   private static final int PROJECTION_MODE_FIELD_COUNT = 3;
   private static final int PROJECTION_MODE_BOOLEAN_COUNT = 1;
   private static final int PROJECTION_MODE_VALUE_COUNT = 2;
@@ -806,11 +810,20 @@ public final class MapHandle implements AutoCloseable {
   }
 
   public FreeCameraOptions freeCameraOptions() {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    var fields = new boolean[FREE_CAMERA_FIELD_COUNT];
+    var values = new double[FREE_CAMERA_VALUE_COUNT];
+    Status.check(
+        CameraNative.mln_map_get_free_camera_options(state.requireLiveAddress(), fields, values));
+    return freeCameraFromNative(fields, values);
   }
 
   public void setFreeCameraOptions(FreeCameraOptions options) {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    var nativeFreeCamera = freeCameraToNative(options);
+    Status.check(
+        CameraNative.mln_map_set_free_camera_options(
+            state.requireLiveAddress(), nativeFreeCamera.fields(), nativeFreeCamera.values()));
   }
 
   public ProjectionModeOptions projectionMode() {
@@ -1008,6 +1021,37 @@ public final class MapHandle implements AutoCloseable {
     }
     if (fields[4]) {
       options.maxPitch(values[7]);
+    }
+    return options;
+  }
+
+  private static NativeOptions freeCameraToNative(FreeCameraOptions options) {
+    var freeCamera = MapStructs.freeCameraOptions(options);
+    var fields = new boolean[FREE_CAMERA_FIELD_COUNT];
+    var values = new double[FREE_CAMERA_VALUE_COUNT];
+    fields[0] = freeCamera.hasPosition();
+    if (fields[0]) {
+      values[0] = freeCamera.position().x();
+      values[1] = freeCamera.position().y();
+      values[2] = freeCamera.position().z();
+    }
+    fields[1] = freeCamera.hasOrientation();
+    if (fields[1]) {
+      values[3] = freeCamera.orientation().x();
+      values[4] = freeCamera.orientation().y();
+      values[5] = freeCamera.orientation().z();
+      values[6] = freeCamera.orientation().w();
+    }
+    return new NativeOptions(fields, values);
+  }
+
+  private static FreeCameraOptions freeCameraFromNative(boolean[] fields, double[] values) {
+    var options = new FreeCameraOptions();
+    if (fields[0]) {
+      options.position(new Vec3(values[0], values[1], values[2]));
+    }
+    if (fields[1]) {
+      options.orientation(new Quaternion(values[3], values[4], values[5], values[6]));
     }
     return options;
   }

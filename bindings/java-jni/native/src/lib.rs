@@ -111,6 +111,18 @@ const BOUND_VALUE_MIN_PITCH: usize = 6;
 const BOUND_VALUE_MAX_PITCH: usize = 7;
 const BOUND_VALUE_COUNT: usize = 8;
 
+const FREE_CAMERA_FIELD_POSITION: usize = 0;
+const FREE_CAMERA_FIELD_ORIENTATION: usize = 1;
+const FREE_CAMERA_FIELD_COUNT: usize = 2;
+const FREE_CAMERA_VALUE_POSITION_X: usize = 0;
+const FREE_CAMERA_VALUE_POSITION_Y: usize = 1;
+const FREE_CAMERA_VALUE_POSITION_Z: usize = 2;
+const FREE_CAMERA_VALUE_ORIENTATION_X: usize = 3;
+const FREE_CAMERA_VALUE_ORIENTATION_Y: usize = 4;
+const FREE_CAMERA_VALUE_ORIENTATION_Z: usize = 5;
+const FREE_CAMERA_VALUE_ORIENTATION_W: usize = 6;
+const FREE_CAMERA_VALUE_COUNT: usize = 7;
+
 const PROJECTION_MODE_FIELD_AXONOMETRIC: usize = 0;
 const PROJECTION_MODE_FIELD_X_SKEW: usize = 1;
 const PROJECTION_MODE_FIELD_Y_SKEW: usize = 2;
@@ -555,8 +567,6 @@ mod registration {
             "mln_map_camera_for_geometry",
             "mln_map_lat_lng_bounds_for_camera",
             "mln_map_lat_lng_bounds_for_camera_unwrapped",
-            "mln_map_get_free_camera_options",
-            "mln_map_set_free_camera_options",
         ]);
         methods.push(NativeMethod {
             name: "mln_map_set_debug_options".into(),
@@ -587,6 +597,16 @@ mod registration {
             name: "mln_map_dump_debug_logs".into(),
             sig: "(J)I".into(),
             fn_ptr: map_dump_debug_logs as *mut c_void,
+        });
+        methods.push(NativeMethod {
+            name: "mln_map_get_free_camera_options".into(),
+            sig: "(J[Z[D)I".into(),
+            fn_ptr: map_get_free_camera_options as *mut c_void,
+        });
+        methods.push(NativeMethod {
+            name: "mln_map_set_free_camera_options".into(),
+            sig: "(J[Z[D)I".into(),
+            fn_ptr: map_set_free_camera_options as *mut c_void,
         });
         methods.push(NativeMethod {
             name: "mln_map_get_projection_mode".into(),
@@ -1814,6 +1834,45 @@ extern "system" fn map_dump_debug_logs(_env: JNIEnv<'_>, _class: JClass<'_>, map
         .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
 }
 
+extern "system" fn map_get_free_camera_options(
+    env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    map: jlong,
+    out_fields: JBooleanArray<'_>,
+    out_values: JDoubleArray<'_>,
+) -> jint {
+    catch_unwind(AssertUnwindSafe(|| {
+        if !free_camera_arrays_are_valid(&env, &out_fields, &out_values) {
+            return sys::MLN_STATUS_INVALID_ARGUMENT;
+        }
+        let mut options = unsafe { sys::mln_free_camera_options_default() };
+        let result =
+            unsafe { sys::mln_map_get_free_camera_options(map as *mut sys::mln_map, &mut options) };
+        if result != sys::MLN_STATUS_OK {
+            return result;
+        }
+        write_free_camera_arrays(&env, &out_fields, &out_values, &options)
+    }))
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+extern "system" fn map_set_free_camera_options(
+    env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    map: jlong,
+    fields: JBooleanArray<'_>,
+    values: JDoubleArray<'_>,
+) -> jint {
+    catch_unwind(AssertUnwindSafe(|| {
+        let options = match read_free_camera_options(&env, &fields, &values) {
+            Ok(options) => options,
+            Err(status) => return status,
+        };
+        unsafe { sys::mln_map_set_free_camera_options(map as *mut sys::mln_map, &options) }
+    }))
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
 extern "system" fn map_get_projection_mode(
     env: JNIEnv<'_>,
     _class: JClass<'_>,
@@ -2022,6 +2081,17 @@ fn camera_arrays_are_valid(
         && env.get_array_length(values).unwrap_or(0) >= CAMERA_VALUE_COUNT as i32
 }
 
+fn free_camera_arrays_are_valid(
+    env: &JNIEnv<'_>,
+    fields: &JBooleanArray<'_>,
+    values: &JDoubleArray<'_>,
+) -> bool {
+    !fields.is_null()
+        && !values.is_null()
+        && env.get_array_length(fields).unwrap_or(0) >= FREE_CAMERA_FIELD_COUNT as i32
+        && env.get_array_length(values).unwrap_or(0) >= FREE_CAMERA_VALUE_COUNT as i32
+}
+
 fn projection_mode_arrays_are_valid(
     env: &JNIEnv<'_>,
     fields: &JBooleanArray<'_>,
@@ -2056,6 +2126,74 @@ fn animation_arrays_are_valid(
         && !values.is_null()
         && env.get_array_length(fields).unwrap_or(0) >= ANIMATION_FIELD_COUNT as i32
         && env.get_array_length(values).unwrap_or(0) >= ANIMATION_VALUE_COUNT as i32
+}
+
+fn read_free_camera_options(
+    env: &JNIEnv<'_>,
+    fields: &JBooleanArray<'_>,
+    values: &JDoubleArray<'_>,
+) -> Result<sys::mln_free_camera_options, jint> {
+    if !free_camera_arrays_are_valid(env, fields, values) {
+        return Err(sys::MLN_STATUS_INVALID_ARGUMENT);
+    }
+    let mut field_values = [0 as jboolean; FREE_CAMERA_FIELD_COUNT];
+    let mut option_values = [0.0_f64; FREE_CAMERA_VALUE_COUNT];
+    if env
+        .get_boolean_array_region(fields, 0, &mut field_values)
+        .is_err()
+        || env
+            .get_double_array_region(values, 0, &mut option_values)
+            .is_err()
+    {
+        return Err(sys::MLN_STATUS_INVALID_ARGUMENT);
+    }
+    let mut options = unsafe { sys::mln_free_camera_options_default() };
+    if field_values[FREE_CAMERA_FIELD_POSITION] != 0 {
+        options.fields |= sys::MLN_FREE_CAMERA_OPTION_POSITION;
+        options.position.x = option_values[FREE_CAMERA_VALUE_POSITION_X];
+        options.position.y = option_values[FREE_CAMERA_VALUE_POSITION_Y];
+        options.position.z = option_values[FREE_CAMERA_VALUE_POSITION_Z];
+    }
+    if field_values[FREE_CAMERA_FIELD_ORIENTATION] != 0 {
+        options.fields |= sys::MLN_FREE_CAMERA_OPTION_ORIENTATION;
+        options.orientation.x = option_values[FREE_CAMERA_VALUE_ORIENTATION_X];
+        options.orientation.y = option_values[FREE_CAMERA_VALUE_ORIENTATION_Y];
+        options.orientation.z = option_values[FREE_CAMERA_VALUE_ORIENTATION_Z];
+        options.orientation.w = option_values[FREE_CAMERA_VALUE_ORIENTATION_W];
+    }
+    Ok(options)
+}
+
+fn write_free_camera_arrays(
+    env: &JNIEnv<'_>,
+    fields: &JBooleanArray<'_>,
+    values: &JDoubleArray<'_>,
+    options: &sys::mln_free_camera_options,
+) -> jint {
+    let field_values = [
+        jboolean::from(options.fields & sys::MLN_FREE_CAMERA_OPTION_POSITION != 0),
+        jboolean::from(options.fields & sys::MLN_FREE_CAMERA_OPTION_ORIENTATION != 0),
+    ];
+    let option_values = [
+        options.position.x,
+        options.position.y,
+        options.position.z,
+        options.orientation.x,
+        options.orientation.y,
+        options.orientation.z,
+        options.orientation.w,
+    ];
+    if env
+        .set_boolean_array_region(fields, 0, &field_values)
+        .is_err()
+        || env
+            .set_double_array_region(values, 0, &option_values)
+            .is_err()
+    {
+        sys::MLN_STATUS_INVALID_ARGUMENT
+    } else {
+        sys::MLN_STATUS_OK
+    }
 }
 
 fn read_projection_mode(
