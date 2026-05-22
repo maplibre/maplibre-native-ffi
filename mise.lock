@@ -451,17 +451,6 @@ conda_deps = [
     "libgomp-15.2.0-he0feb66_19",
 ]
 
-[tools."conda:doxygen"."platforms.windows-x64"]
-checksum = "sha256:7a0fd40fd704e97a8f6533a081ba29579766d7a60bcb8e5de76679b066c4a72e"
-url = "https://conda.anaconda.org/conda-forge/win-64/doxygen-1.13.2-hbf3f430_0.conda"
-conda_deps = [
-    "libiconv-1.18-hc1393d2_2",
-    "ucrt-10.0.26100.0-h57928b3_0",
-    "vc-14.5-h1b7c187_37",
-    "vc14_runtime-14.51.36231-h1b9f54f_37",
-    "vcomp14-14.51.36231-h1b9f54f_37",
-]
-
 [[tools.dotnet]]
 version = "10.0.203"
 backend = "core:dotnet"
