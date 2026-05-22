@@ -7,6 +7,11 @@ project(maplibre_native_c VERSION 0.1.0 LANGUAGES C CXX)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
+# This project uses C++20 language features, but not C++20 modules. Keep CMake
+# from generating compiler-specific module dependency scanner steps for every
+# C++ source file.
+set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
+
 if(MSVC)
   # sccache cannot reliably cache MSVC compilations that emit shared compiler
   # PDBs with /Zi. Embed debug information in objects instead; link.exe may

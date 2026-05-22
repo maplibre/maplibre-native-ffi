@@ -185,46 +185,9 @@ impl Drop for VulkanContext {
 }
 
 fn load_vulkan_entry() -> Result<ash::Entry, Box<dyn Error>> {
-    // SAFETY: Loading the Vulkan loader is delegated to ash.
-    match unsafe { ash::Entry::load() } {
-        Ok(entry) => Ok(entry),
-        Err(default_error) => {
-            let manifest_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
-            let repo_root = manifest_dir
-                .parent()
-                .and_then(std::path::Path::parent)
-                .ok_or("rust-map manifest is not under examples/rust-map")?;
-            let pixi_loader = if cfg!(target_os = "windows") {
-                repo_root
-                    .join(".pixi")
-                    .join("envs")
-                    .join("default")
-                    .join("Library")
-                    .join("bin")
-                    .join("vulkan-1.dll")
-            } else if cfg!(target_os = "linux") {
-                repo_root
-                    .join(".pixi")
-                    .join("envs")
-                    .join("default")
-                    .join("lib")
-                    .join("libvulkan.so.1")
-            } else {
-                repo_root
-                    .join(".pixi")
-                    .join("envs")
-                    .join("default")
-                    .join("lib")
-                    .join("libvulkan.1.dylib")
-            };
-            if pixi_loader.exists() {
-                // SAFETY: The path points to the pixi-provided Vulkan loader.
-                unsafe { ash::Entry::load_from(&pixi_loader) }.map_err(Into::into)
-            } else {
-                Err(default_error.into())
-            }
-        }
-    }
+    // SAFETY: Loading the Vulkan loader is delegated to ash. Repository tasks
+    // run through Pixi and expose the native library directory to this process.
+    unsafe { ash::Entry::load() }.map_err(Into::into)
 }
 
 fn has_instance_extension(entry: &ash::Entry, name: &CStr) -> Result<bool, Box<dyn Error>> {

@@ -1,0 +1,9 @@
+.{
+    .name = .maplibre_native_c_zig_tests,
+    .version = "0.16.0",
+    .dependencies = .{
+        .maplibre_native = .{ .path = "../../../../bindings/zig" },
+    },
+    .paths = .{""},
+    .fingerprint = 0x46e55102fec0a354,
+}

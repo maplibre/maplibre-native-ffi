@@ -4,13 +4,15 @@ const testing = std.testing;
 const maplibre = @import("maplibre_native");
 const support = @import("support.zig");
 
-extern fn usleep(useconds: c_uint) c_int;
-
 const HttpServerState = struct {
     server: *std.Io.net.Server,
     served: bool = false,
     err: ?anyerror = null,
 };
+
+fn sleepOneMillisecond() !void {
+    try testing.io.sleep(.fromMilliseconds(1), .awake);
+}
 
 fn waitForEvent(runtime: *maplibre.RuntimeHandle, event_type: maplibre.RuntimeEventType) !bool {
     for (0..1000) |_| {
@@ -20,7 +22,7 @@ fn waitForEvent(runtime: *maplibre.RuntimeHandle, event_type: maplibre.RuntimeEv
             defer owned_event.deinit();
             if (std.meta.eql(owned_event.event_type, event_type)) return true;
         }
-        _ = usleep(1000);
+        try sleepOneMillisecond();
     }
     return false;
 }
@@ -36,7 +38,7 @@ fn waitForOwnedEvent(
             if (std.meta.eql(owned_event.event_type, event_type)) return owned_event;
             owned_event.deinit();
         }
-        _ = usleep(1000);
+        try sleepOneMillisecond();
     }
     return error.EventNotObserved;
 }
@@ -415,7 +417,7 @@ test "resource transform rewrites network style URL" {
             owned_event.deinit();
         }
         if (replacement_state.calls.load(.seq_cst) > 0) break;
-        _ = usleep(1000);
+        try sleepOneMillisecond();
     }
 
     try testing.expectEqual(@as(usize, 0), state.calls.load(.seq_cst));
@@ -473,7 +475,7 @@ fn customStyleProvider(
 
 const PmtilesRangeProviderState = struct {
     saw_style_absent_range: std.atomic.Value(bool) = std.atomic.Value(bool).init(false),
-    saw_pmtiles_request: std.atomic.Value(bool) = std.atomic.Value(bool).init(false),
+    recorded_pmtiles_request: std.atomic.Value(bool) = std.atomic.Value(bool).init(false),
     saw_source_kind: std.atomic.Value(bool) = std.atomic.Value(bool).init(false),
     saw_network_only_loading: std.atomic.Value(bool) = std.atomic.Value(bool).init(false),
     range_start: std.atomic.Value(u64) = std.atomic.Value(u64).init(0),
@@ -484,20 +486,20 @@ const PmtilesRangeProviderState = struct {
     }
 
     fn markPmtilesRequest(self: *PmtilesRangeProviderState, request: maplibre.ResourceRequest) void {
-        self.saw_pmtiles_request.store(true, .seq_cst);
         self.saw_source_kind.store(std.meta.eql(request.kind, maplibre.ResourceKind.source), .seq_cst);
         self.saw_network_only_loading.store(std.meta.eql(request.loading_method, maplibre.ResourceLoadingMethod.network_only), .seq_cst);
         if (request.range) |range| {
             self.range_start.store(range.start, .seq_cst);
             self.range_end.store(range.end, .seq_cst);
         }
+        self.recorded_pmtiles_request.store(true, .seq_cst);
     }
 
     fn expectObservedRequest(self: *PmtilesRangeProviderState) !void {
         const start = self.range_start.load(.seq_cst);
         const end = self.range_end.load(.seq_cst);
         try testing.expect(self.saw_style_absent_range.load(.seq_cst));
-        try testing.expect(self.saw_pmtiles_request.load(.seq_cst));
+        try testing.expect(self.recorded_pmtiles_request.load(.seq_cst));
         try testing.expect(self.saw_source_kind.load(.seq_cst));
         try testing.expect(self.saw_network_only_loading.load(.seq_cst));
         try testing.expectEqual(@as(u64, 0), start);
@@ -544,8 +546,8 @@ fn pmtilesRangeProvider(
 fn waitForPmtilesRangeRequest(runtime: *maplibre.RuntimeHandle, state: *PmtilesRangeProviderState) !void {
     for (0..1000) |_| {
         try runtime.runOnce();
-        if (state.saw_pmtiles_request.load(.seq_cst)) return;
-        _ = usleep(1000);
+        if (state.recorded_pmtiles_request.load(.seq_cst)) return;
+        try sleepOneMillisecond();
     }
     return error.ProviderNotCalled;
 }
@@ -878,7 +880,7 @@ fn waitForProviderHandle(runtime: *maplibre.RuntimeHandle, state: *AsyncProvider
     for (0..1000) |_| {
         try runtime.runOnce();
         if (state.takeHandle()) |handle| return handle;
-        _ = usleep(1000);
+        try sleepOneMillisecond();
     }
     return error.ProviderNotCalled;
 }
@@ -1048,7 +1050,7 @@ fn waitForRequestCancellation(runtime: *maplibre.RuntimeHandle, handle: maplibre
     for (0..5000) |_| {
         if (try handle.cancelled()) return;
         try runtime.runOnce();
-        _ = usleep(1000);
+        try sleepOneMillisecond();
     }
     return error.RequestNotCancelled;
 }
@@ -1115,7 +1117,7 @@ test "offline region download control emits copied status events" {
             break;
         }
         if (observed) break;
-        _ = usleep(1000);
+        try sleepOneMillisecond();
     }
     try testing.expect(observed);
 }
