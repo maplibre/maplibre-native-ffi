@@ -107,13 +107,14 @@ Internal adapters copy or scope callback arguments, catch Dart exceptions, and
 convert failures to the documented C callback behavior. Dart exceptions never
 escape through native frames.
 
-`NativeCallable.isolateLocal` is appropriate only when Dart can safely run the
-callback on the invoking native thread and the lifetime is tied to an explicit
-owner scope. `NativeCallable.listener` fits void callbacks that may arrive on
-any native thread and can be posted asynchronously to the creating isolate. For
-lower-level port dispatch, use `ReceivePort` with `sendPort.nativePort`, or a
-request queue that hands copied data to the owning isolate. Avoid experimental
-isolate-group callback support as a core design dependency.
+Use `NativeCallable.listener` for void MapLibre upcalls that can post copied
+arguments to Dart, such as custom geometry fetch and cancel notifications.
+Reserve `NativeCallable.isolateLocal` for binding-owned helpers that call back
+on the same native thread during the initiating FFI call. Use `ReceivePort` with
+`sendPort.nativePort`, usually behind a native shim, when logging, resource
+providers, or owner-thread handoff need to return quickly while queuing copied
+work for the owning isolate. Keep isolate-group callback support in experimental
+adapters, outside the core binding design.
 
 Resource transforms stay synchronous. Implement them with native-owned rewrite
 rules or a callback shape that can return quickly without touching thread-affine
