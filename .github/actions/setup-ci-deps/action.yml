@@ -21,6 +21,15 @@ runs:
           echo "CMAKE_CXX_COMPILER_LAUNCHER=sccache"
         } >> "$GITHUB_ENV"
 
+    - name: Use software OpenGL on Linux
+      if: ${{ runner.os == 'Linux' }}
+      shell: bash
+      run: |
+        {
+          echo "EGL_PLATFORM=surfaceless"
+          echo "LIBGL_ALWAYS_SOFTWARE=true"
+        } >> "$GITHUB_ENV"
+
     - name: Cache Cargo packages
       uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
       with:

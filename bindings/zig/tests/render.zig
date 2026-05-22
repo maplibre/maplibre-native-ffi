@@ -421,7 +421,7 @@ const EglProcs = if (build_options.supports_opengl and builtin.os.tag == .linux)
             "TexImage2D",
             "TexParameteri",
         }) |command| {
-            @field(procs, command) = @ptrCast(egl.eglGetProcAddress(glProcName(command)) orelse return error.SkipZigTest);
+            @field(procs, command) = @ptrCast(egl.eglGetProcAddress(glProcName(command)) orelse return error.EglUnavailable);
         }
         return procs;
     }
@@ -442,7 +442,7 @@ const EglAttachContext = if (build_options.supports_opengl and builtin.os.tag ==
         const display = try initDisplay();
         errdefer _ = egl.eglTerminate(display);
 
-        if (egl.eglBindAPI(egl.EGL_OPENGL_ES_API) == egl.EGL_FALSE) return error.SkipZigTest;
+        if (egl.eglBindAPI(egl.EGL_OPENGL_ES_API) == egl.EGL_FALSE) return error.EglUnavailable;
 
         const config_attributes = [_]egl.EGLint{
             egl.EGL_SURFACE_TYPE,    egl.EGL_PBUFFER_BIT,
@@ -460,7 +460,7 @@ const EglAttachContext = if (build_options.supports_opengl and builtin.os.tag ==
         if (egl.eglChooseConfig(display, &config_attributes, &config, 1, &config_count) == egl.EGL_FALSE or
             config_count == 0 or config == null)
         {
-            return error.SkipZigTest;
+            return error.EglUnavailable;
         }
 
         const context_attributes = [_]egl.EGLint{
@@ -468,7 +468,7 @@ const EglAttachContext = if (build_options.supports_opengl and builtin.os.tag ==
             egl.EGL_NONE,
         };
         const share_context = egl.eglCreateContext(display, config, egl.EGL_NO_CONTEXT, &context_attributes);
-        if (share_context == egl.EGL_NO_CONTEXT) return error.SkipZigTest;
+        if (share_context == egl.EGL_NO_CONTEXT) return error.EglUnavailable;
         errdefer _ = egl.eglDestroyContext(display, share_context);
 
         const surface_attributes = [_]egl.EGLint{
@@ -477,10 +477,10 @@ const EglAttachContext = if (build_options.supports_opengl and builtin.os.tag ==
             egl.EGL_NONE,
         };
         const pbuffer = egl.eglCreatePbufferSurface(display, config, &surface_attributes);
-        if (pbuffer == egl.EGL_NO_SURFACE) return error.SkipZigTest;
+        if (pbuffer == egl.EGL_NO_SURFACE) return error.EglUnavailable;
         errdefer _ = egl.eglDestroySurface(display, pbuffer);
 
-        if (egl.eglMakeCurrent(display, pbuffer, pbuffer, share_context) == egl.EGL_FALSE) return error.SkipZigTest;
+        if (egl.eglMakeCurrent(display, pbuffer, pbuffer, share_context) == egl.EGL_FALSE) return error.EglUnavailable;
         return .{
             .display = display,
             .config = config,
@@ -499,22 +499,22 @@ const EglAttachContext = if (build_options.supports_opengl and builtin.os.tag ==
 
     fn initDisplay() !egl.EGLDisplay {
         const get_platform_display: EglGetPlatformDisplayExt = @ptrCast(
-            egl.eglGetProcAddress("eglGetPlatformDisplayEXT") orelse return error.SkipZigTest,
+            egl.eglGetProcAddress("eglGetPlatformDisplayEXT") orelse return error.EglUnavailable,
         );
         return initializeDisplay(get_platform_display(egl_platform_surfaceless_mesa, null, null));
     }
 
     fn initializeDisplay(display: egl.EGLDisplay) !egl.EGLDisplay {
-        if (display == egl.EGL_NO_DISPLAY) return error.SkipZigTest;
+        if (display == egl.EGL_NO_DISPLAY) return error.EglUnavailable;
 
         var major: egl.EGLint = 0;
         var minor: egl.EGLint = 0;
-        if (egl.eglInitialize(display, &major, &minor) == egl.EGL_FALSE) return error.SkipZigTest;
+        if (egl.eglInitialize(display, &major, &minor) == egl.EGL_FALSE) return error.EglUnavailable;
         return display;
     }
 
     pub fn makeCurrent(self: *const EglAttachContext) !void {
-        if (egl.eglMakeCurrent(self.display, self.egl_surface, self.egl_surface, self.share_context) == egl.EGL_FALSE) return error.SkipZigTest;
+        if (egl.eglMakeCurrent(self.display, self.egl_surface, self.egl_surface, self.share_context) == egl.EGL_FALSE) return error.EglUnavailable;
     }
 
     pub fn descriptor(self: *const EglAttachContext) maplibre.OpenGLContextDescriptor {
@@ -535,7 +535,7 @@ const EglAttachContext = if (build_options.supports_opengl and builtin.os.tag ==
 
         var texture: gl.uint = 0;
         self.procs.GenTextures(1, @ptrCast(&texture));
-        if (texture == 0) return error.SkipZigTest;
+        if (texture == 0) return error.EglUnavailable;
         errdefer self.procs.DeleteTextures(1, @ptrCast(&texture));
 
         self.procs.BindTexture(gl.TEXTURE_2D, texture);
@@ -565,7 +565,7 @@ const EglAttachContext = if (build_options.supports_opengl and builtin.os.tag ==
         try self.makeCurrent();
         var framebuffer: gl.uint = 0;
         self.procs.GenFramebuffers(1, @ptrCast(&framebuffer));
-        if (framebuffer == 0) return error.SkipZigTest;
+        if (framebuffer == 0) return error.EglUnavailable;
         defer self.procs.DeleteFramebuffers(1, @ptrCast(&framebuffer));
         self.procs.BindFramebuffer(gl.FRAMEBUFFER, framebuffer);
         defer self.procs.BindFramebuffer(gl.FRAMEBUFFER, 0);

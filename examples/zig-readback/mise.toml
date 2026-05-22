@@ -8,9 +8,5 @@ zig build -Dtarget="$MLN_FFI_ZIG_TARGET" -Dcmake-artifact-dir="$MLN_FFI_BUILD_DI
 depends = ["//:ensure-native-library"]
 run = '''
 mkdir -p zig-out
-if [[ "$MLN_FFI_RENDER_BACKEND" == "opengl" && "$MLN_FFI_TARGET_TRIPLE" == *linux* ]]; then
-  export LIBGL_ALWAYS_SOFTWARE=true
-  export __EGL_VENDOR_LIBRARY_DIRS="$CONDA_PREFIX/share/glvnd/egl_vendor.d"
-fi
 zig build run -Dtarget="$MLN_FFI_ZIG_TARGET" -Dcmake-artifact-dir="$MLN_FFI_BUILD_DIR" -Dinclude-dir="$MLN_FFI_INCLUDE_DIR" -Dinclude-dir="$MLN_FFI_DEPENDENCY_INCLUDE_DIR" -Dinclude-dir="$MLN_FFI_VULKAN_INCLUDE_DIR" -Ddependency-library-dir="$MLN_FFI_DEPENDENCY_LIBRARY_DIR" -Drender-backend="$MLN_FFI_RENDER_BACKEND" -- zig-out/zig-readback.ppm
 '''

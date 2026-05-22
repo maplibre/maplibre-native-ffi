@@ -403,8 +403,7 @@ final class RenderSessionHandleTest {
       return RenderTargetTestSupport.attachMetalOwnedTexture(
           map, new RenderTargetExtent(32, 16, 1.0));
     } catch (MaplibreException error) {
-      Assumptions.assumeTrue(false, "Metal owned texture unavailable: " + error.getMessage());
-      throw new AssertionError("unreachable");
+      return fail("Metal owned texture unavailable: " + error.getMessage(), error);
     }
   }
 
@@ -413,8 +412,7 @@ final class RenderSessionHandleTest {
     try {
       return RenderTargetTestSupport.attachOwnedTexture(map, extent);
     } catch (IllegalStateException error) {
-      Assumptions.assumeTrue(false, "Owned texture target unavailable: " + error.getMessage());
-      throw new AssertionError("unreachable");
+      return fail("Owned texture target unavailable: " + error.getMessage(), error);
     }
   }
 
@@ -426,8 +424,7 @@ final class RenderSessionHandleTest {
       return RenderTargetTestSupport.attachVulkanOwnedTexture(
           map, new RenderTargetExtent(32, 16, 1.0));
     } catch (MaplibreException error) {
-      Assumptions.assumeTrue(false, "Vulkan owned texture unavailable: " + error.getMessage());
-      throw new AssertionError("unreachable");
+      return fail("Vulkan owned texture unavailable: " + error.getMessage(), error);
     }
   }
 
@@ -439,8 +436,7 @@ final class RenderSessionHandleTest {
       return RenderTargetTestSupport.attachOpenGLOwnedTexture(
           map, new RenderTargetExtent(32, 16, 1.0));
     } catch (MaplibreException | IllegalStateException error) {
-      Assumptions.assumeTrue(false, "OpenGL owned texture unavailable: " + error.getMessage());
-      throw new AssertionError("unreachable");
+      return fail("OpenGL owned texture unavailable: " + error.getMessage(), error);
     }
   }
 
@@ -452,8 +448,7 @@ final class RenderSessionHandleTest {
       return RenderTargetTestSupport.attachOpenGLBorrowedTexture(
           map, new RenderTargetExtent(128, 128, 1.0));
     } catch (MaplibreException | IllegalStateException error) {
-      Assumptions.assumeTrue(false, "OpenGL borrowed texture unavailable: " + error.getMessage());
-      throw new AssertionError("unreachable");
+      return fail("OpenGL borrowed texture unavailable: " + error.getMessage(), error);
     }
   }
 
@@ -465,8 +460,7 @@ final class RenderSessionHandleTest {
       return RenderTargetTestSupport.attachOpenGLSurface(
           map, new RenderTargetExtent(128, 128, 1.0));
     } catch (MaplibreException | IllegalStateException error) {
-      Assumptions.assumeTrue(false, "OpenGL surface unavailable: " + error.getMessage());
-      throw new AssertionError("unreachable");
+      return fail("OpenGL surface unavailable: " + error.getMessage(), error);
     }
   }
 

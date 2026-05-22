@@ -146,7 +146,7 @@ const Procs = if (builtin.os.tag == .windows) struct {
             "TexImage2D",
             "TexParameteri",
         }) |command| {
-            @field(procs, command) = @ptrCast(wgl.getProcAddress(glProcName(command)) orelse return error.SkipZigTest);
+            @field(procs, command) = @ptrCast(wgl.getProcAddress(glProcName(command)) orelse return error.WglUnavailable);
         }
         return procs;
     }
@@ -167,7 +167,7 @@ pub const Context = if (builtin.os.tag == .windows) struct {
     }
 
     pub fn initWithClassName(class_name: [:0]const u8, width: u32, height: u32) !Context {
-        const module = wgl.GetModuleHandleA(null) orelse return error.SkipZigTest;
+        const module = wgl.GetModuleHandleA(null) orelse return error.WglUnavailable;
 
         var window_class = std.mem.zeroes(wgl.WNDCLASSA);
         window_class.style = wgl.CS_OWNDC;
@@ -192,10 +192,10 @@ pub const Context = if (builtin.os.tag == .windows) struct {
             null,
             module,
             null,
-        ) orelse return error.SkipZigTest;
+        ) orelse return error.WglUnavailable;
         errdefer _ = wgl.DestroyWindow(window);
 
-        const device_context = wgl.GetDC(window) orelse return error.SkipZigTest;
+        const device_context = wgl.GetDC(window) orelse return error.WglUnavailable;
         errdefer _ = wgl.ReleaseDC(window, device_context);
 
         var pixel_format_descriptor = std.mem.zeroes(wgl.PIXELFORMATDESCRIPTOR);
@@ -209,12 +209,12 @@ pub const Context = if (builtin.os.tag == .windows) struct {
         pixel_format_descriptor.iLayerType = wgl.PFD_MAIN_PLANE;
 
         const pixel_format = wgl.ChoosePixelFormat(device_context, &pixel_format_descriptor);
-        if (pixel_format == 0) return error.SkipZigTest;
-        if (wgl.SetPixelFormat(device_context, pixel_format, &pixel_format_descriptor) == 0) return error.SkipZigTest;
+        if (pixel_format == 0) return error.WglUnavailable;
+        if (wgl.SetPixelFormat(device_context, pixel_format, &pixel_format_descriptor) == 0) return error.WglUnavailable;
 
-        const share_context = wgl.wglCreateContext(device_context) orelse return error.SkipZigTest;
+        const share_context = wgl.wglCreateContext(device_context) orelse return error.WglUnavailable;
         errdefer _ = wgl.wglDeleteContext(share_context);
-        if (wgl.wglMakeCurrent(device_context, share_context) == 0) return error.SkipZigTest;
+        if (wgl.wglMakeCurrent(device_context, share_context) == 0) return error.WglUnavailable;
 
         return .{
             .window = window,
@@ -232,7 +232,7 @@ pub const Context = if (builtin.os.tag == .windows) struct {
     }
 
     pub fn makeCurrent(self: *const Context) !void {
-        if (wgl.wglMakeCurrent(self.device_context, self.share_context) == 0) return error.SkipZigTest;
+        if (wgl.wglMakeCurrent(self.device_context, self.share_context) == 0) return error.WglUnavailable;
     }
 
     pub fn deviceContextPointer(self: *const Context) *anyopaque {
@@ -252,7 +252,7 @@ pub const Context = if (builtin.os.tag == .windows) struct {
 
         var texture: gl.uint = 0;
         self.procs.GenTextures(1, @ptrCast(&texture));
-        if (texture == 0) return error.SkipZigTest;
+        if (texture == 0) return error.WglUnavailable;
         errdefer self.procs.DeleteTextures(1, @ptrCast(&texture));
 
         self.procs.BindTexture(gl.TEXTURE_2D, texture);

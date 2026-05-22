@@ -10,7 +10,6 @@ import static org.junit.jupiter.api.Assertions.fail;
 import java.util.EnumSet;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.maplibre.nativeffi.Maplibre;
@@ -286,8 +285,7 @@ final class RenderSessionQueryTest {
     try {
       return RenderTargetTestSupport.attachOwnedTexture(map, new RenderTargetExtent(64, 64, 1.0));
     } catch (IllegalStateException error) {
-      Assumptions.assumeTrue(false, "Owned texture target unavailable: " + error.getMessage());
-      throw new AssertionError("unreachable");
+      return fail("Owned texture target unavailable: " + error.getMessage(), error);
     }
   }
 
