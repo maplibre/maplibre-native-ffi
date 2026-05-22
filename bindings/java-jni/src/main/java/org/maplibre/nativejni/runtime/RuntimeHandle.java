@@ -10,6 +10,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.maplibre.nativejni.internal.access.InternalAccess;
 import org.maplibre.nativejni.internal.bridge.OfflineNative;
 import org.maplibre.nativejni.internal.bridge.RuntimeNative;
+import org.maplibre.nativejni.internal.callback.ResourceTransformState;
 import org.maplibre.nativejni.internal.lifecycle.HandleState;
 import org.maplibre.nativejni.internal.loader.NativeLibrary;
 import org.maplibre.nativejni.internal.status.Status;
@@ -27,6 +28,7 @@ public final class RuntimeHandle implements AutoCloseable {
   private final HandleState state;
   private final ConcurrentHashMap<Long, WeakReference<MapHandle>> liveMaps =
       new ConcurrentHashMap<>();
+  private ResourceTransformState resourceTransform;
 
   private RuntimeHandle(long handle) {
     this.state = new HandleState("RuntimeHandle", handle);
@@ -336,11 +338,20 @@ public final class RuntimeHandle implements AutoCloseable {
   }
 
   public void setResourceTransform(ResourceTransformCallback callback) {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    var outState = new long[1];
+    Status.check(
+        RuntimeNative.mln_runtime_set_resource_transform(
+            state.requireLiveAddress(), Objects.requireNonNull(callback, "callback"), outState));
+    closeQuietly(resourceTransform);
+    resourceTransform = new ResourceTransformState(outState[0]);
   }
 
   public void clearResourceTransform() {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    Status.check(RuntimeNative.mln_runtime_clear_resource_transform(state.requireLiveAddress()));
+    closeQuietly(resourceTransform);
+    resourceTransform = null;
   }
 
   public void setResourceProvider(ResourceProviderCallback callback) {
@@ -381,7 +392,12 @@ public final class RuntimeHandle implements AutoCloseable {
   }
 
   public void close() {
-    state.closeOnce(RuntimeNative::mln_runtime_destroy);
+    state.closeOnce(
+        RuntimeNative::mln_runtime_destroy,
+        () -> {
+          closeQuietly(resourceTransform);
+          resourceTransform = null;
+        });
   }
 
   public boolean isClosed() {
@@ -427,5 +443,16 @@ public final class RuntimeHandle implements AutoCloseable {
 
   static MemorySegment offlineOperationCompletedPayload(MemorySegment event) {
     throw unsupported();
+  }
+
+  private static void closeQuietly(AutoCloseable closeable) {
+    if (closeable == null) {
+      return;
+    }
+    try {
+      closeable.close();
+    } catch (Exception ignored) {
+      // Closing callback state is best-effort during runtime teardown/replacement.
+    }
   }
 }

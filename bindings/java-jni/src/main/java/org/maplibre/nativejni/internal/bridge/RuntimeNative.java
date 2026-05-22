@@ -20,9 +20,14 @@ public final class RuntimeNative {
 
   public static native int mln_resource_request_release();
 
-  public static native int mln_runtime_set_resource_transform();
+  public static native int mln_runtime_set_resource_transform(
+      long runtime,
+      org.maplibre.nativejni.resource.ResourceTransformCallback callback,
+      long[] outState);
 
-  public static native int mln_runtime_clear_resource_transform();
+  public static native int mln_runtime_clear_resource_transform(long runtime);
+
+  public static native void mln_resource_transform_state_destroy(long state);
 
   public static native int mln_runtime_run_ambient_cache_operation_start(
       long runtime, int operation, long[] outOperationId);

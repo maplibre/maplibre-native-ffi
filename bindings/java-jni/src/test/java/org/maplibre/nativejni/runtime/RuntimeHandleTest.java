@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.Optional;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.maplibre.nativejni.error.InvalidStateException;
@@ -103,6 +104,16 @@ class RuntimeHandleTest {
           runtime.startSetOfflineRegionDownloadState(123, OfflineRegionDownloadState.INACTIVE));
       runtime.discardOfflineOperation(runtime.startInvalidateOfflineRegion(123));
       runtime.discardOfflineOperation(runtime.startDeleteOfflineRegion(123));
+    }
+  }
+
+  @Test
+  void resourceTransformLifecycleCrossesNativeBoundary() {
+    try (var runtime = RuntimeHandle.create()) {
+      runtime.setResourceTransform(request -> Optional.empty());
+      runtime.setResourceTransform(request -> Optional.of(request.url() + "?rewritten=true"));
+      runtime.clearResourceTransform();
+      runtime.clearResourceTransform();
     }
   }
 

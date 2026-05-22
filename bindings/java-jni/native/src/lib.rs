@@ -3,10 +3,12 @@
 //! This crate owns JNI registration and delegates shared ABI adaptation to the
 //! Rust binding crates.
 
-use std::ffi::{CString, c_char, c_void};
+use std::collections::HashMap;
+use std::ffi::{CStr, CString, c_char, c_void};
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::ptr::NonNull;
 use std::sync::Mutex;
+use std::thread::ThreadId;
 
 use jni::objects::{
     GlobalRef, JBooleanArray, JByteArray, JClass, JDoubleArray, JIntArray, JLongArray, JObject,
@@ -88,6 +90,12 @@ struct CustomGeometrySourceState {
 struct CustomGeometrySourceLifecycle {
     active_callbacks: usize,
     close_requested: bool,
+}
+
+struct ResourceTransformState {
+    vm: JavaVM,
+    callback: GlobalRef,
+    response_storage: Mutex<HashMap<ThreadId, CString>>,
 }
 
 const CAMERA_FIELD_CENTER: usize = 0;
@@ -744,8 +752,6 @@ mod registration {
             "mln_resource_request_complete",
             "mln_resource_request_cancelled",
             "mln_resource_request_release",
-            "mln_runtime_set_resource_transform",
-            "mln_runtime_clear_resource_transform",
         ]);
         methods.push(NativeMethod {
             name: "mln_runtime_create".into(),
@@ -766,6 +772,21 @@ mod registration {
             name: "mln_runtime_poll_event".into(),
             sig: "(J[J[I[Z[D[Ljava/lang/String;)I".into(),
             fn_ptr: runtime_poll_event as *mut c_void,
+        });
+        methods.push(NativeMethod {
+            name: "mln_runtime_set_resource_transform".into(),
+            sig: "(JLorg/maplibre/nativejni/resource/ResourceTransformCallback;[J)I".into(),
+            fn_ptr: runtime_set_resource_transform as *mut c_void,
+        });
+        methods.push(NativeMethod {
+            name: "mln_runtime_clear_resource_transform".into(),
+            sig: "(J)I".into(),
+            fn_ptr: runtime_clear_resource_transform as *mut c_void,
+        });
+        methods.push(NativeMethod {
+            name: "mln_resource_transform_state_destroy".into(),
+            sig: "(J)V".into(),
+            fn_ptr: resource_transform_state_destroy as *mut c_void,
         });
         methods.push(NativeMethod {
             name: "mln_runtime_run_ambient_cache_operation_start".into(),
@@ -1295,6 +1316,205 @@ extern "system" fn runtime_destroy(_env: JNIEnv<'_>, _class: JClass<'_>, runtime
 extern "system" fn runtime_run_once(_env: JNIEnv<'_>, _class: JClass<'_>, runtime: jlong) -> jint {
     catch_unwind(|| unsafe { sys::mln_runtime_run_once(runtime as *mut sys::mln_runtime) })
         .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+extern "system" fn runtime_set_resource_transform<'local>(
+    env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    runtime: jlong,
+    callback: JObject<'local>,
+    out_state: JLongArray<'local>,
+) -> jint {
+    catch_unwind(AssertUnwindSafe(|| {
+        if callback.is_null()
+            || out_state.is_null()
+            || env.get_array_length(&out_state).unwrap_or(0) < 1
+        {
+            return sys::MLN_STATUS_INVALID_ARGUMENT;
+        }
+        let vm = match env.get_java_vm() {
+            Ok(value) => value,
+            Err(_) => return sys::MLN_STATUS_NATIVE_ERROR,
+        };
+        let callback = match env.new_global_ref(callback) {
+            Ok(value) => value,
+            Err(_) => return sys::MLN_STATUS_INVALID_ARGUMENT,
+        };
+        let state = Box::new(ResourceTransformState {
+            vm,
+            callback,
+            response_storage: Mutex::new(HashMap::new()),
+        });
+        let state_ptr = Box::into_raw(state);
+        let transform = sys::mln_resource_transform {
+            size: std::mem::size_of::<sys::mln_resource_transform>() as u32,
+            callback: Some(resource_transform_callback),
+            user_data: state_ptr.cast::<c_void>(),
+        };
+        let result = unsafe {
+            sys::mln_runtime_set_resource_transform(runtime as *mut sys::mln_runtime, &transform)
+        };
+        if result == sys::MLN_STATUS_OK {
+            if env
+                .set_long_array_region(&out_state, 0, &[state_ptr as jlong])
+                .is_err()
+            {
+                return sys::MLN_STATUS_NATIVE_ERROR;
+            }
+        } else {
+            unsafe {
+                drop(Box::from_raw(state_ptr));
+            }
+        }
+        result
+    }))
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+extern "system" fn runtime_clear_resource_transform(
+    _env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    runtime: jlong,
+) -> jint {
+    catch_unwind(|| unsafe {
+        sys::mln_runtime_clear_resource_transform(runtime as *mut sys::mln_runtime)
+    })
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+extern "system" fn resource_transform_state_destroy(
+    _env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    state: jlong,
+) {
+    if state != 0 {
+        unsafe {
+            drop(Box::from_raw(state as *mut ResourceTransformState));
+        }
+    }
+}
+
+unsafe extern "C" fn resource_transform_callback(
+    user_data: *mut c_void,
+    kind: u32,
+    url: *const c_char,
+    out_response: *mut sys::mln_resource_transform_response,
+) -> sys::mln_status {
+    catch_unwind(AssertUnwindSafe(|| {
+        if user_data.is_null() || url.is_null() || out_response.is_null() {
+            return sys::MLN_STATUS_INVALID_ARGUMENT;
+        }
+        unsafe {
+            (*out_response).size =
+                std::mem::size_of::<sys::mln_resource_transform_response>() as u32;
+            (*out_response).url = std::ptr::null();
+        }
+        let state = unsafe { &*(user_data as *mut ResourceTransformState) };
+        let mut env = match state.vm.attach_current_thread() {
+            Ok(value) => value,
+            Err(_) => return sys::MLN_STATUS_NATIVE_ERROR,
+        };
+        let request = match java_resource_transform_request(&mut env, kind, url) {
+            Ok(value) => value,
+            Err(status) => return status,
+        };
+        let replacement = match env
+            .call_method(
+                state.callback.as_obj(),
+                "transform",
+                "(Lorg/maplibre/nativejni/resource/ResourceTransformRequest;)Ljava/util/Optional;",
+                &[JValue::Object(&request)],
+            )
+            .and_then(|value| value.l())
+        {
+            Ok(value) => value,
+            Err(_) => {
+                let _ = env.exception_clear();
+                return sys::MLN_STATUS_NATIVE_ERROR;
+            }
+        };
+        if replacement.is_null() {
+            return sys::MLN_STATUS_INVALID_ARGUMENT;
+        }
+        let present = match env
+            .call_method(&replacement, "isPresent", "()Z", &[])
+            .and_then(|value| value.z())
+        {
+            Ok(value) => value,
+            Err(_) => {
+                let _ = env.exception_clear();
+                return sys::MLN_STATUS_NATIVE_ERROR;
+            }
+        };
+        if !present {
+            return sys::MLN_STATUS_OK;
+        }
+        let value = match env
+            .call_method(&replacement, "get", "()Ljava/lang/Object;", &[])
+            .and_then(|value| value.l())
+        {
+            Ok(value) => JString::from(value),
+            Err(_) => {
+                let _ = env.exception_clear();
+                return sys::MLN_STATUS_NATIVE_ERROR;
+            }
+        };
+        let value = match env.get_string(&value) {
+            Ok(value) => String::from(value),
+            Err(_) => return sys::MLN_STATUS_INVALID_ARGUMENT,
+        };
+        if value.is_empty() {
+            return sys::MLN_STATUS_OK;
+        }
+        let value = match CString::new(value) {
+            Ok(value) => value,
+            Err(_) => return sys::MLN_STATUS_INVALID_ARGUMENT,
+        };
+        let pointer = value.as_ptr();
+        match state.response_storage.lock() {
+            Ok(mut storage) => {
+                storage.insert(std::thread::current().id(), value);
+            }
+            Err(_) => return sys::MLN_STATUS_NATIVE_ERROR,
+        }
+        unsafe {
+            (*out_response).url = pointer;
+        }
+        sys::MLN_STATUS_OK
+    }))
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+fn java_resource_transform_request<'local>(
+    env: &mut JNIEnv<'local>,
+    kind: u32,
+    url: *const c_char,
+) -> Result<JObject<'local>, jint> {
+    let kind_object = env
+        .call_static_method(
+            "org/maplibre/nativejni/resource/ResourceKind",
+            "fromNative",
+            "(I)Lorg/maplibre/nativejni/resource/ResourceKind;",
+            &[JValue::Int(kind as jint)],
+        )
+        .and_then(|value| value.l())
+        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
+    let url = unsafe { CStr::from_ptr(url) }
+        .to_str()
+        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
+    let url = env
+        .new_string(url)
+        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
+    env.new_object(
+        "org/maplibre/nativejni/resource/ResourceTransformRequest",
+        "(Lorg/maplibre/nativejni/resource/ResourceKind;ILjava/lang/String;)V",
+        &[
+            JValue::Object(&kind_object),
+            JValue::Int(kind as jint),
+            JValue::Object(&url),
+        ],
+    )
+    .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)
 }
 
 extern "system" fn runtime_run_ambient_cache_operation_start(
