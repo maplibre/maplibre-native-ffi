@@ -212,6 +212,43 @@ test "offline operations complete through runtime events and typed take results"
     try testing.expectEqualSlices(u8, metadata[0..], info.metadata[0..info.metadata_size]);
 }
 
+test "offline take result before polling removes queued completion event" {
+    const runtime = try support.createRuntime();
+    defer support.destroyRuntime(runtime);
+
+    const metadata = [_]u8{ 4, 5, 6 };
+    var definition = offlineTileDefinition();
+    var create_id: c.mln_offline_operation_id = 0;
+    try testing.expectEqual(c.MLN_STATUS_OK, c.mln_runtime_offline_region_create_start(runtime, &definition, metadata[0..].ptr, metadata.len, &create_id));
+    try testing.expect(create_id != 0);
+
+    var snapshot: ?*c.mln_offline_region_snapshot = null;
+    var took_result = false;
+    for (0..5000) |_| {
+        try testing.expectEqual(c.MLN_STATUS_OK, c.mln_runtime_run_once(runtime));
+        const take_status = c.mln_runtime_offline_region_create_take_result(runtime, create_id, &snapshot);
+        if (take_status == c.MLN_STATUS_OK) {
+            took_result = true;
+            break;
+        }
+        try testing.expectEqual(c.MLN_STATUS_INVALID_STATE, take_status);
+        _ = usleep(1000);
+    }
+    try testing.expect(took_result);
+    const snapshot_handle = snapshot orelse return error.MissingSnapshot;
+    defer c.mln_offline_region_snapshot_destroy(snapshot_handle);
+
+    while (true) {
+        var event = emptyEvent();
+        var has_event = false;
+        try testing.expectEqual(c.MLN_STATUS_OK, c.mln_runtime_poll_event(runtime, &event, &has_event));
+        if (!has_event) break;
+        if (event.type != c.MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED or event.payload_type != c.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_OPERATION_COMPLETED) continue;
+        const payload: *const c.mln_runtime_event_offline_operation_completed = @ptrCast(@alignCast(event.payload orelse return error.MissingPayload));
+        try testing.expect(payload.operation_id != create_id);
+    }
+}
+
 test "resource transform rejects raw invalid descriptors" {
     const runtime = try support.createRuntime();
     defer support.destroyRuntime(runtime);

@@ -9,6 +9,7 @@
 #include <mutex>
 #include <optional>
 #include <shared_mutex>
+#include <stdexcept>
 #include <string>
 #include <thread>
 #include <unordered_map>
@@ -540,23 +541,43 @@ auto set_offline_region_observed_flag(
   }
 }
 
-auto register_offline_region_snapshot(OfflineRegionData data)
+template <typename Fill>
+auto register_offline_region_snapshot_from_result(Fill&& fill)
   -> mln_offline_region_snapshot* {
   auto owned = std::make_unique<mln_offline_region_snapshot>();
-  owned->data = std::move(data);
   auto* handle = owned.get();
   const std::scoped_lock lock(offline_region_handle_mutex());
-  offline_region_snapshots().emplace(handle, std::move(owned));
+  auto [entry, inserted] = offline_region_snapshots().emplace(handle, nullptr);
+  if (!inserted) {
+    throw std::logic_error("offline region snapshot handle already exists");
+  }
+  try {
+    std::forward<Fill>(fill)(owned->data);
+    entry->second = std::move(owned);
+  } catch (...) {
+    offline_region_snapshots().erase(handle);
+    throw;
+  }
   return handle;
 }
 
-auto register_offline_region_list(std::vector<OfflineRegionData> regions)
+template <typename Fill>
+auto register_offline_region_list_from_result(Fill&& fill)
   -> mln_offline_region_list* {
   auto owned = std::make_unique<mln_offline_region_list>();
-  owned->regions = std::move(regions);
   auto* handle = owned.get();
   const std::scoped_lock lock(offline_region_handle_mutex());
-  offline_region_lists().emplace(handle, std::move(owned));
+  auto [entry, inserted] = offline_region_lists().emplace(handle, nullptr);
+  if (!inserted) {
+    throw std::logic_error("offline region list handle already exists");
+  }
+  try {
+    std::forward<Fill>(fill)(owned->regions);
+    entry->second = std::move(owned);
+  } catch (...) {
+    offline_region_lists().erase(handle);
+    throw;
+  }
   return handle;
 }
 
@@ -639,6 +660,16 @@ auto register_offline_operation(
   return MLN_STATUS_OK;
 }
 
+auto erase_queued_offline_operation_events(
+  mln_runtime* runtime, mln_offline_operation_id operation_id
+) -> void {
+  const std::scoped_lock event_lock(runtime->event_mutex);
+  std::erase_if(runtime->events, [operation_id](const auto& event) -> bool {
+    return event.has_offline_operation &&
+           event.offline_operation_id == operation_id;
+  });
+}
+
 auto erase_offline_operation_registration(
   mln_runtime* runtime, mln_offline_operation_id operation_id
 ) -> void {
@@ -654,11 +685,7 @@ auto erase_offline_operation_registration(
     state->operations.erase(operation_id);
   }
 
-  const std::scoped_lock event_lock(runtime->event_mutex);
-  std::erase_if(runtime->events, [operation_id](const auto& event) -> bool {
-    return event.has_offline_operation &&
-           event.offline_operation_id == operation_id;
-  });
+  erase_queued_offline_operation_events(runtime, operation_id);
 }
 
 template <typename Schedule>
@@ -1110,11 +1137,7 @@ auto offline_operation_discard(
   }
   state->operations.erase(found);
 
-  const std::scoped_lock event_lock(runtime->event_mutex);
-  std::erase_if(runtime->events, [operation_id](const auto& event) -> bool {
-    return event.has_offline_operation &&
-           event.offline_operation_id == operation_id;
-  });
+  erase_queued_offline_operation_events(runtime, operation_id);
   return MLN_STATUS_OK;
 }
 
@@ -1821,7 +1844,6 @@ auto offline_region_create_take_result(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   auto state = runtime->offline_operation_state;
-  auto data = OfflineRegionData{};
   {
     const std::scoped_lock lock(state->mutex);
     auto found = state->operations.find(operation_id);
@@ -1843,10 +1865,27 @@ auto offline_region_create_take_result(
       set_thread_error("offline operation result kind is invalid");
       return MLN_STATUS_INVALID_STATE;
     }
-    data = std::move(*result);
-    state->operations.erase(found);
   }
-  *out_region = register_offline_region_snapshot(std::move(data));
+  auto* snapshot = register_offline_region_snapshot_from_result(
+    [state, operation_id](OfflineRegionData& data) -> void {
+      const std::scoped_lock lock(state->mutex);
+      auto found = state->operations.find(operation_id);
+      if (found == state->operations.end()) {
+        throw std::logic_error(
+          "offline operation disappeared while taking result"
+        );
+      }
+      auto* result = std::get_if<OfflineRegionData>(&found->second.result);
+      if (result == nullptr) {
+        throw std::logic_error(
+          "offline operation result kind changed while taking result"
+        );
+      }
+      data = std::move(*result);
+    }
+  );
+  erase_offline_operation_registration(runtime, operation_id);
+  *out_region = snapshot;
   return MLN_STATUS_OK;
 }
 
@@ -1865,7 +1904,7 @@ auto offline_region_get_take_result(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   auto state = runtime->offline_operation_state;
-  auto data = std::optional<OfflineRegionData>{};
+  auto has_region = false;
   {
     const std::scoped_lock lock(state->mutex);
     auto found = state->operations.find(operation_id);
@@ -1888,14 +1927,34 @@ auto offline_region_get_take_result(
       set_thread_error("offline operation result kind is invalid");
       return MLN_STATUS_INVALID_STATE;
     }
-    data = std::move(*result);
-    state->operations.erase(found);
+    has_region = result->has_value();
   }
-  if (!data.has_value()) {
+  if (!has_region) {
+    erase_offline_operation_registration(runtime, operation_id);
     *out_found = false;
     return MLN_STATUS_OK;
   }
-  *out_region = register_offline_region_snapshot(std::move(*data));
+  auto* snapshot = register_offline_region_snapshot_from_result(
+    [state, operation_id](OfflineRegionData& data) -> void {
+      const std::scoped_lock lock(state->mutex);
+      auto found = state->operations.find(operation_id);
+      if (found == state->operations.end()) {
+        throw std::logic_error(
+          "offline operation disappeared while taking result"
+        );
+      }
+      auto* result =
+        std::get_if<std::optional<OfflineRegionData>>(&found->second.result);
+      if (result == nullptr || !result->has_value()) {
+        throw std::logic_error(
+          "offline operation result kind changed while taking result"
+        );
+      }
+      data = std::move(**result);
+    }
+  );
+  erase_offline_operation_registration(runtime, operation_id);
+  *out_region = snapshot;
   *out_found = true;
   return MLN_STATUS_OK;
 }
@@ -1913,7 +1972,6 @@ auto offline_regions_list_take_result(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   auto state = runtime->offline_operation_state;
-  auto regions = std::vector<OfflineRegionData>{};
   {
     const std::scoped_lock lock(state->mutex);
     auto found = state->operations.find(operation_id);
@@ -1936,10 +1994,28 @@ auto offline_regions_list_take_result(
       set_thread_error("offline operation result kind is invalid");
       return MLN_STATUS_INVALID_STATE;
     }
-    regions = std::move(*result);
-    state->operations.erase(found);
   }
-  *out_regions = register_offline_region_list(std::move(regions));
+  auto* regions = register_offline_region_list_from_result(
+    [state, operation_id](std::vector<OfflineRegionData>& destination) -> void {
+      const std::scoped_lock lock(state->mutex);
+      auto found = state->operations.find(operation_id);
+      if (found == state->operations.end()) {
+        throw std::logic_error(
+          "offline operation disappeared while taking result"
+        );
+      }
+      auto* result =
+        std::get_if<std::vector<OfflineRegionData>>(&found->second.result);
+      if (result == nullptr) {
+        throw std::logic_error(
+          "offline operation result kind changed while taking result"
+        );
+      }
+      destination = std::move(*result);
+    }
+  );
+  erase_offline_operation_registration(runtime, operation_id);
+  *out_regions = regions;
   return MLN_STATUS_OK;
 }
 
@@ -1956,7 +2032,6 @@ auto offline_regions_merge_database_take_result(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   auto state = runtime->offline_operation_state;
-  auto regions = std::vector<OfflineRegionData>{};
   {
     const std::scoped_lock lock(state->mutex);
     auto found = state->operations.find(operation_id);
@@ -1979,10 +2054,28 @@ auto offline_regions_merge_database_take_result(
       set_thread_error("offline operation result kind is invalid");
       return MLN_STATUS_INVALID_STATE;
     }
-    regions = std::move(*result);
-    state->operations.erase(found);
   }
-  *out_regions = register_offline_region_list(std::move(regions));
+  auto* regions = register_offline_region_list_from_result(
+    [state, operation_id](std::vector<OfflineRegionData>& destination) -> void {
+      const std::scoped_lock lock(state->mutex);
+      auto found = state->operations.find(operation_id);
+      if (found == state->operations.end()) {
+        throw std::logic_error(
+          "offline operation disappeared while taking result"
+        );
+      }
+      auto* result =
+        std::get_if<std::vector<OfflineRegionData>>(&found->second.result);
+      if (result == nullptr) {
+        throw std::logic_error(
+          "offline operation result kind changed while taking result"
+        );
+      }
+      destination = std::move(*result);
+    }
+  );
+  erase_offline_operation_registration(runtime, operation_id);
+  *out_regions = regions;
   return MLN_STATUS_OK;
 }
 
@@ -1999,7 +2092,6 @@ auto offline_region_update_metadata_take_result(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   auto state = runtime->offline_operation_state;
-  auto data = OfflineRegionData{};
   {
     const std::scoped_lock lock(state->mutex);
     auto found = state->operations.find(operation_id);
@@ -2021,10 +2113,27 @@ auto offline_region_update_metadata_take_result(
       set_thread_error("offline operation result kind is invalid");
       return MLN_STATUS_INVALID_STATE;
     }
-    data = std::move(*result);
-    state->operations.erase(found);
   }
-  *out_region = register_offline_region_snapshot(std::move(data));
+  auto* snapshot = register_offline_region_snapshot_from_result(
+    [state, operation_id](OfflineRegionData& data) -> void {
+      const std::scoped_lock lock(state->mutex);
+      auto found = state->operations.find(operation_id);
+      if (found == state->operations.end()) {
+        throw std::logic_error(
+          "offline operation disappeared while taking result"
+        );
+      }
+      auto* result = std::get_if<OfflineRegionData>(&found->second.result);
+      if (result == nullptr) {
+        throw std::logic_error(
+          "offline operation result kind changed while taking result"
+        );
+      }
+      data = std::move(*result);
+    }
+  );
+  erase_offline_operation_registration(runtime, operation_id);
+  *out_region = snapshot;
   return MLN_STATUS_OK;
 }
 
@@ -2067,9 +2176,9 @@ auto offline_region_get_status_take_result(
       return MLN_STATUS_INVALID_STATE;
     }
     result_status = *result;
-    state->operations.erase(found);
   }
   *out_status = result_status;
+  erase_offline_operation_registration(runtime, operation_id);
   return MLN_STATUS_OK;
 }
 
