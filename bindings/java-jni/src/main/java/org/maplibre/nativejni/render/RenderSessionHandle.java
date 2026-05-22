@@ -408,16 +408,6 @@ public final class RenderSessionHandle implements AutoCloseable {
     return map;
   }
 
-  public MemorySegment nativeHandle(InternalAccess access) {
-    Objects.requireNonNull(access, "access");
-    return state.requireLiveSegment();
-  }
-
-  public long nativeAddress(InternalAccess access) {
-    Objects.requireNonNull(access, "access");
-    return state.requireLiveAddress();
-  }
-
   MemorySegment nativeHandle() {
     return state.requireLiveSegment();
   }

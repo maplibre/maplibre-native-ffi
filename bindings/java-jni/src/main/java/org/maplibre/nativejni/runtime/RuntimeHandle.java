@@ -43,7 +43,8 @@ public final class RuntimeHandle implements AutoCloseable {
     Objects.requireNonNull(options, "options");
     NativeLibrary.ensureLoaded();
     var outRuntime = new long[1];
-    Status.check(RuntimeNative.mln_runtime_create(outRuntime));
+    Status.check(
+        RuntimeNative.mln_runtime_create(RuntimeStructs.runtimeOptions(options), outRuntime));
     return new RuntimeHandle(outRuntime[0]);
   }
 

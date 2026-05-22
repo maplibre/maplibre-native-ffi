@@ -10,7 +10,9 @@ public final class RuntimeNative {
 
   public static native int mln_runtime_options_default();
 
-  public static native int mln_runtime_create(long[] outRuntime);
+  public static native int mln_runtime_create(
+      org.maplibre.nativejni.internal.struct.RuntimeStructs.RuntimeOptionsValue options,
+      long[] outRuntime);
 
   public static native int mln_runtime_set_resource_provider(
       long runtime,

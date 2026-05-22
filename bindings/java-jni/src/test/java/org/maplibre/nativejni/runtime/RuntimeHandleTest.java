@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.maplibre.nativejni.error.InvalidArgumentException;
 import org.maplibre.nativejni.error.InvalidStateException;
 import org.maplibre.nativejni.geo.Geometry;
 import org.maplibre.nativejni.geo.LatLng;
@@ -34,6 +35,17 @@ class RuntimeHandleTest {
     runtime.close();
     assertTrue(runtime.isClosed());
     assertThrows(InvalidStateException.class, runtime::runOnce);
+  }
+
+  @Test
+  void createRuntimeUsesSuppliedOptions() {
+    try (var runtime = RuntimeHandle.create(new RuntimeOptions().maximumCacheSize(42))) {
+      runtime.runOnce();
+    }
+
+    assertThrows(
+        InvalidArgumentException.class,
+        () -> RuntimeHandle.create(new RuntimeOptions().assetPath("asset\0path")));
   }
 
   @Test

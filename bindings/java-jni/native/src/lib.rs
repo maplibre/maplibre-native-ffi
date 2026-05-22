@@ -802,7 +802,8 @@ mod registration {
         let mut methods = recorded_unsupported_status_methods(&["mln_runtime_options_default"]);
         methods.push(NativeMethod {
             name: "mln_runtime_create".into(),
-            sig: "([J)I".into(),
+            sig: "(Lorg/maplibre/nativejni/internal/struct/RuntimeStructs$RuntimeOptionsValue;[J)I"
+                .into(),
             fn_ptr: runtime_create as *mut c_void,
         });
         methods.push(NativeMethod {
@@ -1514,24 +1515,61 @@ fn drop_log_callback_state(state: Option<usize>) {
     }
 }
 
-extern "system" fn runtime_create(
-    env: JNIEnv<'_>,
-    _class: JClass<'_>,
-    out_runtime: JLongArray<'_>,
+extern "system" fn runtime_create<'local>(
+    mut env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    options: JObject<'local>,
+    out_runtime: JLongArray<'local>,
 ) -> jint {
     catch_unwind(AssertUnwindSafe(|| {
-        if out_runtime.is_null() || env.get_array_length(&out_runtime).unwrap_or(0) < 1 {
+        if options.is_null()
+            || out_runtime.is_null()
+            || env.get_array_length(&out_runtime).unwrap_or(0) < 1
+        {
             return sys::MLN_STATUS_INVALID_ARGUMENT;
         }
 
-        let options = unsafe { sys::mln_runtime_options_default() };
+        let mut options_value = unsafe { sys::mln_runtime_options_default() };
+        let asset_path = match java_nullable_string_method(&mut env, &options, "assetPath") {
+            Ok(value) => value,
+            Err(status) => return status,
+        };
+        let cache_path = match java_nullable_string_method(&mut env, &options, "cachePath") {
+            Ok(value) => value,
+            Err(status) => return status,
+        };
+        if let Some(value) = asset_path.as_ref() {
+            options_value.asset_path = value.as_ptr();
+        }
+        if let Some(value) = cache_path.as_ref() {
+            options_value.cache_path = value.as_ptr();
+        }
+        let has_maximum_cache_size =
+            match java_boolean_method(&mut env, &options, "hasMaximumCacheSize") {
+                Ok(value) => value,
+                Err(status) => return status,
+            };
+        if has_maximum_cache_size {
+            options_value.flags |= sys::MLN_RUNTIME_OPTION_MAXIMUM_CACHE_SIZE;
+            options_value.maximum_cache_size = match env
+                .call_method(&options, "maximumCacheSize", "()J", &[])
+                .and_then(|value| value.j())
+            {
+                Ok(value) => value as u64,
+                Err(_) => return sys::MLN_STATUS_INVALID_ARGUMENT,
+            };
+        }
+
         let mut runtime: *mut sys::mln_runtime = std::ptr::null_mut();
-        let result = unsafe { sys::mln_runtime_create(&options, &mut runtime) };
+        let result = unsafe { sys::mln_runtime_create(&options_value, &mut runtime) };
         if result == sys::MLN_STATUS_OK
             && env
                 .set_long_array_region(&out_runtime, 0, &[runtime as jlong])
                 .is_err()
         {
+            unsafe {
+                sys::mln_runtime_destroy(runtime);
+            }
             return sys::MLN_STATUS_INVALID_ARGUMENT;
         }
         result
