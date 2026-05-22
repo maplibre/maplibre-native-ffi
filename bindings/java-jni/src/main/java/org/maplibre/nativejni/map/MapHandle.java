@@ -53,6 +53,8 @@ public final class MapHandle implements AutoCloseable {
   static final int CAMERA_VALUE_COUNT = 14;
   private static final int BOUND_FIELD_COUNT = 5;
   private static final int BOUND_VALUE_COUNT = 8;
+  private static final int FIT_FIELD_COUNT = 3;
+  private static final int FIT_VALUE_COUNT = 6;
   private static final int FREE_CAMERA_FIELD_COUNT = 2;
   private static final int FREE_CAMERA_VALUE_COUNT = 7;
   private static final int PROJECTION_MODE_FIELD_COUNT = 3;
@@ -762,19 +764,21 @@ public final class MapHandle implements AutoCloseable {
   }
 
   public CameraOptions cameraForLatLngBounds(LatLngBounds bounds) {
-    throw unsupported();
+    return cameraForLatLngBoundsInternal(bounds, null, false);
   }
 
   public CameraOptions cameraForLatLngBounds(LatLngBounds bounds, CameraFitOptions fitOptions) {
-    throw unsupported();
+    return cameraForLatLngBoundsInternal(
+        bounds, Objects.requireNonNull(fitOptions, "fitOptions"), true);
   }
 
   public CameraOptions cameraForLatLngs(List<LatLng> coordinates) {
-    throw unsupported();
+    return cameraForLatLngsInternal(coordinates, null, false);
   }
 
   public CameraOptions cameraForLatLngs(List<LatLng> coordinates, CameraFitOptions fitOptions) {
-    throw unsupported();
+    return cameraForLatLngsInternal(
+        coordinates, Objects.requireNonNull(fitOptions, "fitOptions"), true);
   }
 
   public CameraOptions cameraForGeometry(Geometry geometry) {
@@ -786,11 +790,79 @@ public final class MapHandle implements AutoCloseable {
   }
 
   public LatLngBounds latLngBoundsForCamera(CameraOptions camera) {
-    throw unsupported();
+    return latLngBoundsForCameraInternal(camera, false);
   }
 
   public LatLngBounds latLngBoundsForCameraUnwrapped(CameraOptions camera) {
-    throw unsupported();
+    return latLngBoundsForCameraInternal(camera, true);
+  }
+
+  private CameraOptions cameraForLatLngBoundsInternal(
+      LatLngBounds bounds, CameraFitOptions fitOptions, boolean hasFitOptions) {
+    NativeLibrary.ensureLoaded();
+    Objects.requireNonNull(bounds, "bounds");
+    var nativeFit = fitToNative(fitOptions, hasFitOptions);
+    var fields = new boolean[CAMERA_FIELD_COUNT];
+    var values = new double[CAMERA_VALUE_COUNT];
+    Status.check(
+        CameraNative.mln_map_camera_for_lat_lng_bounds(
+            state.requireLiveAddress(),
+            bounds.southwest().latitude(),
+            bounds.southwest().longitude(),
+            bounds.northeast().latitude(),
+            bounds.northeast().longitude(),
+            hasFitOptions,
+            nativeFit.fields(),
+            nativeFit.values(),
+            fields,
+            values));
+    return cameraFromNative(fields, values);
+  }
+
+  private CameraOptions cameraForLatLngsInternal(
+      List<LatLng> coordinates, CameraFitOptions fitOptions, boolean hasFitOptions) {
+    NativeLibrary.ensureLoaded();
+    Objects.requireNonNull(coordinates, "coordinates");
+    var coordinateValues = new double[coordinates.size() * 2];
+    for (var index = 0; index < coordinates.size(); index++) {
+      var coordinate = Objects.requireNonNull(coordinates.get(index), "coordinate");
+      coordinateValues[index * 2] = coordinate.latitude();
+      coordinateValues[index * 2 + 1] = coordinate.longitude();
+    }
+    var nativeFit = fitToNative(fitOptions, hasFitOptions);
+    var fields = new boolean[CAMERA_FIELD_COUNT];
+    var values = new double[CAMERA_VALUE_COUNT];
+    Status.check(
+        CameraNative.mln_map_camera_for_lat_lngs(
+            state.requireLiveAddress(),
+            coordinateValues,
+            hasFitOptions,
+            nativeFit.fields(),
+            nativeFit.values(),
+            fields,
+            values));
+    return cameraFromNative(fields, values);
+  }
+
+  private LatLngBounds latLngBoundsForCameraInternal(CameraOptions camera, boolean unwrapped) {
+    NativeLibrary.ensureLoaded();
+    var nativeCamera = cameraToNative(camera);
+    var boundsValues = new double[4];
+    var status =
+        unwrapped
+            ? CameraNative.mln_map_lat_lng_bounds_for_camera_unwrapped(
+                state.requireLiveAddress(),
+                nativeCamera.fields(),
+                nativeCamera.values(),
+                boundsValues)
+            : CameraNative.mln_map_lat_lng_bounds_for_camera(
+                state.requireLiveAddress(),
+                nativeCamera.fields(),
+                nativeCamera.values(),
+                boundsValues);
+    Status.check(status);
+    return new LatLngBounds(
+        new LatLng(boundsValues[0], boundsValues[1]), new LatLng(boundsValues[2], boundsValues[3]));
   }
 
   public BoundOptions bounds() {
@@ -980,6 +1052,26 @@ public final class MapHandle implements AutoCloseable {
       camera.fieldOfView(values[13]);
     }
     return camera;
+  }
+
+  private static NativeOptions fitToNative(CameraFitOptions options, boolean hasOptions) {
+    var fields = new boolean[FIT_FIELD_COUNT];
+    var values = new double[FIT_VALUE_COUNT];
+    if (hasOptions) {
+      var fitOptions = MapStructs.cameraFitOptions(options);
+      fields[0] = fitOptions.hasPadding();
+      if (fields[0]) {
+        values[0] = fitOptions.padding().top();
+        values[1] = fitOptions.padding().left();
+        values[2] = fitOptions.padding().bottom();
+        values[3] = fitOptions.padding().right();
+      }
+      fields[1] = fitOptions.hasBearing();
+      values[4] = fitOptions.bearing();
+      fields[2] = fitOptions.hasPitch();
+      values[5] = fitOptions.pitch();
+    }
+    return new NativeOptions(fields, values);
   }
 
   private static NativeOptions boundsToNative(BoundOptions options) {

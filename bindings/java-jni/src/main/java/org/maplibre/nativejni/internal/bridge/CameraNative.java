@@ -107,15 +107,34 @@ public final class CameraNative {
 
   public static native int mln_map_cancel_transitions(long map);
 
-  public static native int mln_map_camera_for_lat_lng_bounds();
+  public static native int mln_map_camera_for_lat_lng_bounds(
+      long map,
+      double southwestLatitude,
+      double southwestLongitude,
+      double northeastLatitude,
+      double northeastLongitude,
+      boolean hasFitOptions,
+      boolean[] fitFields,
+      double[] fitValues,
+      boolean[] outCameraFields,
+      double[] outCameraValues);
 
-  public static native int mln_map_camera_for_lat_lngs();
+  public static native int mln_map_camera_for_lat_lngs(
+      long map,
+      double[] coordinates,
+      boolean hasFitOptions,
+      boolean[] fitFields,
+      double[] fitValues,
+      boolean[] outCameraFields,
+      double[] outCameraValues);
 
   public static native int mln_map_camera_for_geometry();
 
-  public static native int mln_map_lat_lng_bounds_for_camera();
+  public static native int mln_map_lat_lng_bounds_for_camera(
+      long map, boolean[] cameraFields, double[] cameraValues, double[] outBounds);
 
-  public static native int mln_map_lat_lng_bounds_for_camera_unwrapped();
+  public static native int mln_map_lat_lng_bounds_for_camera_unwrapped(
+      long map, boolean[] cameraFields, double[] cameraValues, double[] outBounds);
 
   public static native int mln_map_get_bounds(long map, boolean[] outFields, double[] outValues);
 

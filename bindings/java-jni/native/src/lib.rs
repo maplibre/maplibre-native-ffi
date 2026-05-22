@@ -94,6 +94,18 @@ const CAMERA_VALUE_ROLL: usize = 12;
 const CAMERA_VALUE_FOV: usize = 13;
 const CAMERA_VALUE_COUNT: usize = 14;
 
+const FIT_FIELD_PADDING: usize = 0;
+const FIT_FIELD_BEARING: usize = 1;
+const FIT_FIELD_PITCH: usize = 2;
+const FIT_FIELD_COUNT: usize = 3;
+const FIT_VALUE_PADDING_TOP: usize = 0;
+const FIT_VALUE_PADDING_LEFT: usize = 1;
+const FIT_VALUE_PADDING_BOTTOM: usize = 2;
+const FIT_VALUE_PADDING_RIGHT: usize = 3;
+const FIT_VALUE_BEARING: usize = 4;
+const FIT_VALUE_PITCH: usize = 5;
+const FIT_VALUE_COUNT: usize = 6;
+
 const BOUND_FIELD_BOUNDS: usize = 0;
 const BOUND_FIELD_MIN_ZOOM: usize = 1;
 const BOUND_FIELD_MAX_ZOOM: usize = 2;
@@ -562,11 +574,7 @@ mod registration {
             "mln_map_set_viewport_options",
             "mln_map_get_tile_options",
             "mln_map_set_tile_options",
-            "mln_map_camera_for_lat_lng_bounds",
-            "mln_map_camera_for_lat_lngs",
             "mln_map_camera_for_geometry",
-            "mln_map_lat_lng_bounds_for_camera",
-            "mln_map_lat_lng_bounds_for_camera_unwrapped",
         ]);
         methods.push(NativeMethod {
             name: "mln_map_set_debug_options".into(),
@@ -597,6 +605,26 @@ mod registration {
             name: "mln_map_dump_debug_logs".into(),
             sig: "(J)I".into(),
             fn_ptr: map_dump_debug_logs as *mut c_void,
+        });
+        methods.push(NativeMethod {
+            name: "mln_map_camera_for_lat_lng_bounds".into(),
+            sig: "(JDDDDZ[Z[D[Z[D)I".into(),
+            fn_ptr: map_camera_for_lat_lng_bounds as *mut c_void,
+        });
+        methods.push(NativeMethod {
+            name: "mln_map_camera_for_lat_lngs".into(),
+            sig: "(J[DZ[Z[D[Z[D)I".into(),
+            fn_ptr: map_camera_for_lat_lngs as *mut c_void,
+        });
+        methods.push(NativeMethod {
+            name: "mln_map_lat_lng_bounds_for_camera".into(),
+            sig: "(J[Z[D[D)I".into(),
+            fn_ptr: map_lat_lng_bounds_for_camera as *mut c_void,
+        });
+        methods.push(NativeMethod {
+            name: "mln_map_lat_lng_bounds_for_camera_unwrapped".into(),
+            sig: "(J[Z[D[D)I".into(),
+            fn_ptr: map_lat_lng_bounds_for_camera_unwrapped as *mut c_void,
         });
         methods.push(NativeMethod {
             name: "mln_map_get_free_camera_options".into(),
@@ -1834,6 +1862,196 @@ extern "system" fn map_dump_debug_logs(_env: JNIEnv<'_>, _class: JClass<'_>, map
         .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
 }
 
+#[allow(clippy::too_many_arguments)]
+extern "system" fn map_camera_for_lat_lng_bounds(
+    env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    map: jlong,
+    southwest_latitude: f64,
+    southwest_longitude: f64,
+    northeast_latitude: f64,
+    northeast_longitude: f64,
+    has_fit_options: jboolean,
+    fit_fields: JBooleanArray<'_>,
+    fit_values: JDoubleArray<'_>,
+    out_camera_fields: JBooleanArray<'_>,
+    out_camera_values: JDoubleArray<'_>,
+) -> jint {
+    catch_unwind(AssertUnwindSafe(|| {
+        if !camera_arrays_are_valid(&env, &out_camera_fields, &out_camera_values) {
+            return sys::MLN_STATUS_INVALID_ARGUMENT;
+        }
+        let fit_options =
+            match optional_camera_fit_options(&env, has_fit_options, &fit_fields, &fit_values) {
+                Ok(value) => value,
+                Err(status) => return status,
+            };
+        let mut camera = unsafe { sys::mln_camera_options_default() };
+        let result = unsafe {
+            sys::mln_map_camera_for_lat_lng_bounds(
+                map as *mut sys::mln_map,
+                sys::mln_lat_lng_bounds {
+                    southwest: sys::mln_lat_lng {
+                        latitude: southwest_latitude,
+                        longitude: southwest_longitude,
+                    },
+                    northeast: sys::mln_lat_lng {
+                        latitude: northeast_latitude,
+                        longitude: northeast_longitude,
+                    },
+                },
+                camera_fit_ptr(&fit_options),
+                &mut camera,
+            )
+        };
+        if result != sys::MLN_STATUS_OK {
+            return result;
+        }
+        write_camera_arrays(&env, &out_camera_fields, &out_camera_values, &camera)
+    }))
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+extern "system" fn map_camera_for_lat_lngs(
+    env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    map: jlong,
+    coordinates: JDoubleArray<'_>,
+    has_fit_options: jboolean,
+    fit_fields: JBooleanArray<'_>,
+    fit_values: JDoubleArray<'_>,
+    out_camera_fields: JBooleanArray<'_>,
+    out_camera_values: JDoubleArray<'_>,
+) -> jint {
+    catch_unwind(AssertUnwindSafe(|| {
+        if !camera_arrays_are_valid(&env, &out_camera_fields, &out_camera_values) {
+            return sys::MLN_STATUS_INVALID_ARGUMENT;
+        }
+        let coordinate_values = match read_nonempty_coordinate_pairs(&env, &coordinates) {
+            Ok(value) => value,
+            Err(status) => return status,
+        };
+        let coordinates: Vec<_> = coordinate_values
+            .chunks_exact(2)
+            .map(|pair| sys::mln_lat_lng {
+                latitude: pair[0],
+                longitude: pair[1],
+            })
+            .collect();
+        let fit_options =
+            match optional_camera_fit_options(&env, has_fit_options, &fit_fields, &fit_values) {
+                Ok(value) => value,
+                Err(status) => return status,
+            };
+        let mut camera = unsafe { sys::mln_camera_options_default() };
+        let result = unsafe {
+            sys::mln_map_camera_for_lat_lngs(
+                map as *mut sys::mln_map,
+                coordinates.as_ptr(),
+                coordinates.len(),
+                camera_fit_ptr(&fit_options),
+                &mut camera,
+            )
+        };
+        if result != sys::MLN_STATUS_OK {
+            return result;
+        }
+        write_camera_arrays(&env, &out_camera_fields, &out_camera_values, &camera)
+    }))
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+extern "system" fn map_lat_lng_bounds_for_camera(
+    env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    map: jlong,
+    camera_fields: JBooleanArray<'_>,
+    camera_values: JDoubleArray<'_>,
+    out_bounds: JDoubleArray<'_>,
+) -> jint {
+    map_lat_lng_bounds_for_camera_impl(
+        env,
+        map,
+        camera_fields,
+        camera_values,
+        out_bounds,
+        sys::mln_map_lat_lng_bounds_for_camera,
+    )
+}
+
+extern "system" fn map_lat_lng_bounds_for_camera_unwrapped(
+    env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    map: jlong,
+    camera_fields: JBooleanArray<'_>,
+    camera_values: JDoubleArray<'_>,
+    out_bounds: JDoubleArray<'_>,
+) -> jint {
+    map_lat_lng_bounds_for_camera_impl(
+        env,
+        map,
+        camera_fields,
+        camera_values,
+        out_bounds,
+        sys::mln_map_lat_lng_bounds_for_camera_unwrapped,
+    )
+}
+
+fn map_lat_lng_bounds_for_camera_impl(
+    env: JNIEnv<'_>,
+    map: jlong,
+    camera_fields: JBooleanArray<'_>,
+    camera_values: JDoubleArray<'_>,
+    out_bounds: JDoubleArray<'_>,
+    bounds_function: unsafe extern "C" fn(
+        *mut sys::mln_map,
+        *const sys::mln_camera_options,
+        *mut sys::mln_lat_lng_bounds,
+    ) -> sys::mln_status,
+) -> jint {
+    catch_unwind(AssertUnwindSafe(|| {
+        if out_bounds.is_null() || env.get_array_length(&out_bounds).unwrap_or(0) < 4 {
+            return sys::MLN_STATUS_INVALID_ARGUMENT;
+        }
+        let camera = match read_camera_options(&env, &camera_fields, &camera_values) {
+            Ok(camera) => camera,
+            Err(status) => return status,
+        };
+        let mut bounds = sys::mln_lat_lng_bounds {
+            southwest: sys::mln_lat_lng {
+                latitude: 0.0,
+                longitude: 0.0,
+            },
+            northeast: sys::mln_lat_lng {
+                latitude: 0.0,
+                longitude: 0.0,
+            },
+        };
+        let result = unsafe { bounds_function(map as *mut sys::mln_map, &camera, &mut bounds) };
+        if result != sys::MLN_STATUS_OK {
+            return result;
+        }
+        if env
+            .set_double_array_region(
+                &out_bounds,
+                0,
+                &[
+                    bounds.southwest.latitude,
+                    bounds.southwest.longitude,
+                    bounds.northeast.latitude,
+                    bounds.northeast.longitude,
+                ],
+            )
+            .is_err()
+        {
+            sys::MLN_STATUS_INVALID_ARGUMENT
+        } else {
+            sys::MLN_STATUS_OK
+        }
+    }))
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
 extern "system" fn map_get_free_camera_options(
     env: JNIEnv<'_>,
     _class: JClass<'_>,
@@ -2081,6 +2299,17 @@ fn camera_arrays_are_valid(
         && env.get_array_length(values).unwrap_or(0) >= CAMERA_VALUE_COUNT as i32
 }
 
+fn camera_fit_arrays_are_valid(
+    env: &JNIEnv<'_>,
+    fields: &JBooleanArray<'_>,
+    values: &JDoubleArray<'_>,
+) -> bool {
+    !fields.is_null()
+        && !values.is_null()
+        && env.get_array_length(fields).unwrap_or(0) >= FIT_FIELD_COUNT as i32
+        && env.get_array_length(values).unwrap_or(0) >= FIT_VALUE_COUNT as i32
+}
+
 fn free_camera_arrays_are_valid(
     env: &JNIEnv<'_>,
     fields: &JBooleanArray<'_>,
@@ -2126,6 +2355,65 @@ fn animation_arrays_are_valid(
         && !values.is_null()
         && env.get_array_length(fields).unwrap_or(0) >= ANIMATION_FIELD_COUNT as i32
         && env.get_array_length(values).unwrap_or(0) >= ANIMATION_VALUE_COUNT as i32
+}
+
+fn optional_camera_fit_options(
+    env: &JNIEnv<'_>,
+    has_fit_options: jboolean,
+    fields: &JBooleanArray<'_>,
+    values: &JDoubleArray<'_>,
+) -> Result<Option<sys::mln_camera_fit_options>, jint> {
+    if has_fit_options != 0 {
+        read_camera_fit_options(env, fields, values).map(Some)
+    } else {
+        Ok(None)
+    }
+}
+
+fn camera_fit_ptr(
+    fit_options: &Option<sys::mln_camera_fit_options>,
+) -> *const sys::mln_camera_fit_options {
+    fit_options
+        .as_ref()
+        .map_or(std::ptr::null(), |fit_options| fit_options as *const _)
+}
+
+fn read_camera_fit_options(
+    env: &JNIEnv<'_>,
+    fields: &JBooleanArray<'_>,
+    values: &JDoubleArray<'_>,
+) -> Result<sys::mln_camera_fit_options, jint> {
+    if !camera_fit_arrays_are_valid(env, fields, values) {
+        return Err(sys::MLN_STATUS_INVALID_ARGUMENT);
+    }
+    let mut field_values = [0 as jboolean; FIT_FIELD_COUNT];
+    let mut option_values = [0.0_f64; FIT_VALUE_COUNT];
+    if env
+        .get_boolean_array_region(fields, 0, &mut field_values)
+        .is_err()
+        || env
+            .get_double_array_region(values, 0, &mut option_values)
+            .is_err()
+    {
+        return Err(sys::MLN_STATUS_INVALID_ARGUMENT);
+    }
+    let mut options = unsafe { sys::mln_camera_fit_options_default() };
+    if field_values[FIT_FIELD_PADDING] != 0 {
+        options.fields |= sys::MLN_CAMERA_FIT_OPTION_PADDING;
+        options.padding.top = option_values[FIT_VALUE_PADDING_TOP];
+        options.padding.left = option_values[FIT_VALUE_PADDING_LEFT];
+        options.padding.bottom = option_values[FIT_VALUE_PADDING_BOTTOM];
+        options.padding.right = option_values[FIT_VALUE_PADDING_RIGHT];
+    }
+    if field_values[FIT_FIELD_BEARING] != 0 {
+        options.fields |= sys::MLN_CAMERA_FIT_OPTION_BEARING;
+        options.bearing = option_values[FIT_VALUE_BEARING];
+    }
+    if field_values[FIT_FIELD_PITCH] != 0 {
+        options.fields |= sys::MLN_CAMERA_FIT_OPTION_PITCH;
+        options.pitch = option_values[FIT_VALUE_PITCH];
+    }
+    Ok(options)
 }
 
 fn read_free_camera_options(

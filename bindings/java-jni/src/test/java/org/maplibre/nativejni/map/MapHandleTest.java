@@ -12,7 +12,9 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.maplibre.nativejni.camera.AnimationOptions;
 import org.maplibre.nativejni.camera.BoundOptions;
+import org.maplibre.nativejni.camera.CameraFitOptions;
 import org.maplibre.nativejni.camera.CameraOptions;
+import org.maplibre.nativejni.camera.EdgeInsets;
 import org.maplibre.nativejni.camera.FreeCameraOptions;
 import org.maplibre.nativejni.error.InvalidStateException;
 import org.maplibre.nativejni.geo.LatLng;
@@ -153,6 +155,34 @@ class MapHandleTest {
         assertEquals(10, result.maxZoom(), 1.0e-9);
         assertEquals(0, result.minPitch(), 1.0e-9);
         assertEquals(60, result.maxPitch(), 1.0e-9);
+      }
+    }
+  }
+
+  @Test
+  void cameraFitQueriesCrossNativeBoundary() {
+    try (var runtime = RuntimeHandle.create()) {
+      try (var map = MapHandle.create(runtime, new MapOptions().size(256, 256))) {
+        var bounds = new LatLngBounds(new LatLng(-1, -1), new LatLng(1, 1));
+        var fit = new CameraFitOptions().padding(new EdgeInsets(4, 4, 4, 4)).bearing(0).pitch(0);
+
+        var boundsCamera = map.cameraForLatLngBounds(bounds, fit);
+        assertTrue(boundsCamera.hasCenter());
+        assertTrue(boundsCamera.hasZoom());
+
+        var coordinatesCamera =
+            map.cameraForLatLngs(List.of(bounds.southwest(), bounds.northeast()));
+        assertTrue(coordinatesCamera.hasCenter());
+        assertTrue(coordinatesCamera.hasZoom());
+
+        var visibleBounds = map.latLngBoundsForCamera(new CameraOptions().center(0, 0).zoom(1));
+        assertTrue(Double.isFinite(visibleBounds.southwest().latitude()));
+        assertTrue(Double.isFinite(visibleBounds.northeast().longitude()));
+
+        var unwrappedBounds =
+            map.latLngBoundsForCameraUnwrapped(new CameraOptions().center(0, 0).zoom(1));
+        assertTrue(Double.isFinite(unwrappedBounds.southwest().latitude()));
+        assertTrue(Double.isFinite(unwrappedBounds.northeast().longitude()));
       }
     }
   }
