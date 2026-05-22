@@ -257,6 +257,7 @@ mod registration {
     pub(super) fn register_natives(vm: &JavaVM) -> jni::errors::Result<()> {
         register_legacy_bridge(vm)?;
         register_base(vm)?;
+        register_test_support(vm)?;
         register_methods(
             vm,
             "org/maplibre/nativejni/internal/bridge/LogNative",
@@ -793,6 +794,30 @@ mod registration {
                     name: "mln_thread_last_error_message".into(),
                     sig: "()Ljava/lang/String;".into(),
                     fn_ptr: thread_last_error_message as *mut c_void,
+                },
+            ],
+        )
+    }
+
+    fn register_test_support(vm: &JavaVM) -> jni::errors::Result<()> {
+        register_methods(
+            vm,
+            "org/maplibre/nativejni/internal/bridge/JniTestNative",
+            vec![
+                NativeMethod {
+                    name: "panicStatus".into(),
+                    sig: "()I".into(),
+                    fn_ptr: test_panic_status as *mut c_void,
+                },
+                NativeMethod {
+                    name: "createManyLocalStrings".into(),
+                    sig: "(I)I".into(),
+                    fn_ptr: test_create_many_local_strings as *mut c_void,
+                },
+                NativeMethod {
+                    name: "invokeOnAttachedNativeThread".into(),
+                    sig: "(Ljava/lang/Runnable;)Z".into(),
+                    fn_ptr: test_invoke_on_attached_native_thread as *mut c_void,
                 },
             ],
         )
@@ -1351,6 +1376,72 @@ extern "system" fn network_status_get(
 extern "system" fn network_status_set(_env: JNIEnv<'_>, _class: JClass<'_>, status: jint) -> jint {
     catch_unwind(|| unsafe { sys::mln_network_status_set(status as sys::mln_network_status) })
         .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+extern "system" fn test_panic_status(_env: JNIEnv<'_>, _class: JClass<'_>) -> jint {
+    catch_unwind(|| panic!("intentional JNI panic-boundary test"))
+        .map(|_: ()| sys::MLN_STATUS_OK)
+        .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+extern "system" fn test_create_many_local_strings(
+    env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    count: jint,
+) -> jint {
+    catch_unwind(AssertUnwindSafe(|| {
+        if count < 0 {
+            return sys::MLN_STATUS_INVALID_ARGUMENT;
+        }
+        for index in 0..count {
+            let value = match env.new_string(format!("local-{index}")) {
+                Ok(value) => value,
+                Err(_) => return sys::MLN_STATUS_NATIVE_ERROR,
+            };
+            if env.delete_local_ref(value).is_err() {
+                return sys::MLN_STATUS_NATIVE_ERROR;
+            }
+        }
+        sys::MLN_STATUS_OK
+    }))
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+extern "system" fn test_invoke_on_attached_native_thread(
+    env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    callback: JObject<'_>,
+) -> jboolean {
+    catch_unwind(AssertUnwindSafe(|| {
+        if callback.is_null() {
+            return 0;
+        }
+        let vm = match env.get_java_vm() {
+            Ok(value) => value,
+            Err(_) => return 0,
+        };
+        let callback = match env.new_global_ref(callback) {
+            Ok(value) => value,
+            Err(_) => return 0,
+        };
+        let result = std::thread::spawn(move || {
+            let mut env = match vm.attach_current_thread() {
+                Ok(value) => value,
+                Err(_) => return false,
+            };
+            match env.call_method(callback.as_obj(), "run", "()V", &[]) {
+                Ok(_) => !env.exception_check().unwrap_or(true),
+                Err(_) => {
+                    let _ = env.exception_clear();
+                    false
+                }
+            }
+        })
+        .join()
+        .unwrap_or(false);
+        jboolean::from(result)
+    }))
+    .unwrap_or(0)
 }
 
 extern "system" fn log_set_callback<'local>(
