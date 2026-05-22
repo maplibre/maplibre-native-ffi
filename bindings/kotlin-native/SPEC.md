@@ -26,8 +26,9 @@ restating their rules.
 
 When this spec and a convention document overlap, the convention contains the
 rule and this spec names the concrete files, functions, and tests that implement
-it. The public C headers are the ABI source. The Java FFM binding is the public
-surface parity source for concept coverage and low-level naming.
+it. The public C headers are the ABI source. The Java FFM binding is the current
+public surface parity source for concept coverage and low-level naming. The Java
+JNI binding is the Android/JVM parity target as it lands.
 
 ## Scope
 
@@ -42,11 +43,13 @@ The package root is `org.maplibre.nativeffi`. Public packages group C concepts:
 status conversion, descriptor materialization, memory helpers, callback state,
 handle state, and native-library or linker integration.
 
-Kotlin/Native owns the first implementation. `commonMain` contains only public
-names, copied value models, exceptions, `NativePointer`, and `expect`
-declarations that can align with future JVM, Android, Java FFM, or JNI actuals.
-`nativeMain` contains the Kotlin/Native `actual` implementations and all
-`kotlinx.cinterop` usage.
+Kotlin/Native owns this implementation. `nativeMain` contains the public
+Kotlin/Native API, its support internals, and all `kotlinx.cinterop` usage. A
+future shared Kotlin Multiplatform facade can place aliases or `expect`
+declarations in `commonMain`, with actual implementations backed by Java FFM on
+`jvmMain`, Java JNI on `androidMain` when Android support exists, and this
+Kotlin/Native implementation on native targets. This spec therefore focuses on
+nativeMain implementation while preserving API parity with the Java bindings.
 
 ## Kotlin/Native differences and omissions
 
@@ -66,11 +69,10 @@ bindings/kotlin-native/
   build.gradle.kts
   mise.toml
   src/nativeInterop/cinterop/maplibreNativeC.def
-  src/commonMain/kotlin/org/maplibre/nativeffi/Maplibre.kt
-  src/commonMain/kotlin/org/maplibre/nativeffi/error/*.kt
-  src/commonMain/kotlin/org/maplibre/nativeffi/render/NativePointer.kt
-  src/commonMain/kotlin/org/maplibre/nativeffi/<concept>/PackageMarker.kt
-  src/nativeMain/kotlin/org/maplibre/nativeffi/Maplibre.native.kt
+  src/nativeMain/kotlin/org/maplibre/nativeffi/Maplibre.kt
+  src/nativeMain/kotlin/org/maplibre/nativeffi/error/*.kt
+  src/nativeMain/kotlin/org/maplibre/nativeffi/render/NativePointer.kt
+  src/nativeMain/kotlin/org/maplibre/nativeffi/<concept>/PackageMarker.kt
 ```
 
 This scaffold implements one proof slice:
@@ -80,8 +82,8 @@ This scaffold implements one proof slice:
   `org.maplibre.nativeffi.internal.c`.
 - `Maplibre.cVersion()` calls `mln_c_version()` through the internal cinterop
   package.
-- Common public error and `NativePointer` types establish naming and value
-  semantics for later concept implementations.
+- Native public error and `NativePointer` types establish naming and value
+  semantics for later concept implementations and future common aliases.
 
 ## Build artifacts and tasks
 
@@ -89,7 +91,7 @@ Implement these artifacts:
 
 | Artifact                    | Path                               | Contents                                                                      |
 | --------------------------- | ---------------------------------- | ----------------------------------------------------------------------------- |
-| Kotlin Multiplatform module | `bindings/kotlin-native`           | `commonMain` facade, Kotlin/Native actuals, cinterop config, tests.           |
+| Kotlin/Native Gradle module | `bindings/kotlin-native`           | `nativeMain` public API, Kotlin/Native internals, cinterop config, tests.     |
 | Kotlin/Native cinterop klib | Gradle build output                | Generated declarations for the public C ABI, internal to the binding.         |
 | Native test executable      | Gradle build output                | Kotlin/Native tests linked to the C library for the host target.              |
 | Published package metadata  | TBD under `bindings/kotlin-native` | Maven publication or Kotlin package metadata after artifact policy is chosen. |
@@ -610,7 +612,7 @@ Add Kotlin/Native-specific tests:
 
 ## Implementation milestones
 
-1. Keep the proof slice green: Gradle host target, cinterop, common facade, and
+1. Keep the proof slice green: Gradle host target, cinterop, nativeMain API, and
    `Maplibre.cVersion()`.
 2. Add status conversion, diagnostic capture, and Kotlin exception taxonomy.
 3. Add `HandleState`, `RuntimeHandle`, `MapHandle`, and `MapProjectionHandle`
@@ -636,14 +638,15 @@ Add Kotlin/Native-specific tests:
       replacements.
 - [ ] Every C API function listed in the cinterop coverage map has a Kotlin
       implementation or a recorded unsupported reason in the differences table.
-- [ ] Public common APIs expose no `kotlinx.cinterop` types, generated C types,
-      `StableRef`, `NativePtr`, `CPointer`, `COpaquePointer`, `CValue`,
+- [ ] Public nativeMain APIs expose no `kotlinx.cinterop` types, generated C
+      types, `StableRef`, `NativePtr`, `CPointer`, `COpaquePointer`, `CValue`,
       `CValuesRef`, or `NativePlacement`.
-- [ ] Native actual implementations keep `@OptIn(ExperimentalForeignApi::class)`
-      out of public common APIs.
+- [ ] `@OptIn(ExperimentalForeignApi::class)` stays in nativeMain
+      implementations and internals, not in any future common facade.
 - [ ] Kotlin/Native tests pass on supported host variants.
 - [ ] `mise run //bindings/kotlin-native:build` passes.
 - [ ] `./gradlew :bindings:kotlin-native:allTests` passes once linked test
       support exists.
-- [ ] The Kotlin common facade remains alignable with Java FFM and Java JNI
-      actual implementations.
+- [ ] The nativeMain API remains alignable with Java FFM and Java JNI so a
+      future common facade can alias or expect/actual the platform
+      implementations.
