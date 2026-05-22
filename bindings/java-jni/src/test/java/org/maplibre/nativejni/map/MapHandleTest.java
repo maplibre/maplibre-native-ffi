@@ -123,6 +123,12 @@ class MapHandleTest {
     try (var runtime = RuntimeHandle.create()) {
       try (var map = MapHandle.create(runtime, new MapOptions().size(64, 64))) {
         map.setStyleJson("{\"version\":8,\"sources\":{},\"layers\":[]}");
+        assertFalse(map.styleSourceExists("geojson-source"));
+        map.addGeoJsonSourceUrl("geojson-source", "https://example.com/data.geojson");
+        assertTrue(map.styleSourceExists("geojson-source"));
+        map.setGeoJsonSourceUrl("geojson-source", "https://example.com/updated.geojson");
+        assertTrue(map.removeStyleSource("geojson-source"));
+        assertFalse(map.removeStyleSource("geojson-source"));
         map.setStyleUrl("https://example.com/style.json");
         map.requestRepaint();
         assertThrows(InvalidStateException.class, map::requestStillImage);

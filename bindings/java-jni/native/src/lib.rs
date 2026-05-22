@@ -232,72 +232,89 @@ mod registration {
                 "mln_vulkan_owned_texture_release_frame",
             ],
         )?;
-        register_no_arg_status_class(
+        let mut style_methods = no_arg_status_methods(&[
+            "mln_style_tile_source_options_default",
+            "mln_custom_geometry_source_options_default",
+            "mln_premultiplied_rgba8_image_default",
+            "mln_style_image_options_default",
+            "mln_style_image_info_default",
+            "mln_style_id_list_count",
+            "mln_style_id_list_get",
+            "mln_style_id_list_destroy",
+            "mln_map_add_style_source_json",
+            "mln_map_get_style_source_type",
+            "mln_map_get_style_source_info",
+            "mln_map_copy_style_source_attribution",
+            "mln_map_list_style_source_ids",
+            "mln_map_add_geojson_source_data",
+            "mln_map_set_geojson_source_data",
+            "mln_map_add_vector_source_url",
+            "mln_map_add_vector_source_tiles",
+            "mln_map_add_raster_source_url",
+            "mln_map_add_raster_source_tiles",
+            "mln_map_add_raster_dem_source_url",
+            "mln_map_add_raster_dem_source_tiles",
+            "mln_map_add_custom_geometry_source",
+            "mln_map_set_custom_geometry_source_tile_data",
+            "mln_map_invalidate_custom_geometry_source_tile",
+            "mln_map_invalidate_custom_geometry_source_region",
+            "mln_map_set_style_image",
+            "mln_map_remove_style_image",
+            "mln_map_style_image_exists",
+            "mln_map_get_style_image_info",
+            "mln_map_copy_style_image_premultiplied_rgba8",
+            "mln_map_add_image_source_url",
+            "mln_map_add_image_source_image",
+            "mln_map_set_image_source_url",
+            "mln_map_set_image_source_image",
+            "mln_map_set_image_source_coordinates",
+            "mln_map_get_image_source_coordinates",
+            "mln_map_add_hillshade_layer",
+            "mln_map_add_color_relief_layer",
+            "mln_map_add_location_indicator_layer",
+            "mln_map_set_location_indicator_location",
+            "mln_map_set_location_indicator_bearing",
+            "mln_map_set_location_indicator_accuracy_radius",
+            "mln_map_set_location_indicator_image_name",
+            "mln_map_add_style_layer_json",
+            "mln_map_remove_style_layer",
+            "mln_map_style_layer_exists",
+            "mln_map_get_style_layer_type",
+            "mln_map_list_style_layer_ids",
+            "mln_map_move_style_layer",
+            "mln_map_get_style_layer_json",
+            "mln_map_set_style_light_json",
+            "mln_map_set_style_light_property",
+            "mln_map_get_style_light_property",
+            "mln_map_set_layer_property",
+            "mln_map_get_layer_property",
+            "mln_map_set_layer_filter",
+            "mln_map_get_layer_filter",
+        ]);
+        style_methods.push(NativeMethod {
+            name: "mln_map_remove_style_source".into(),
+            sig: "(JLjava/lang/String;[Z)I".into(),
+            fn_ptr: map_remove_style_source as *mut c_void,
+        });
+        style_methods.push(NativeMethod {
+            name: "mln_map_style_source_exists".into(),
+            sig: "(JLjava/lang/String;[Z)I".into(),
+            fn_ptr: map_style_source_exists as *mut c_void,
+        });
+        style_methods.push(NativeMethod {
+            name: "mln_map_add_geojson_source_url".into(),
+            sig: "(JLjava/lang/String;Ljava/lang/String;)I".into(),
+            fn_ptr: map_add_geojson_source_url as *mut c_void,
+        });
+        style_methods.push(NativeMethod {
+            name: "mln_map_set_geojson_source_url".into(),
+            sig: "(JLjava/lang/String;Ljava/lang/String;)I".into(),
+            fn_ptr: map_set_geojson_source_url as *mut c_void,
+        });
+        register_methods(
             vm,
             "org/maplibre/nativejni/internal/bridge/StyleNative",
-            &[
-                "mln_style_tile_source_options_default",
-                "mln_custom_geometry_source_options_default",
-                "mln_premultiplied_rgba8_image_default",
-                "mln_style_image_options_default",
-                "mln_style_image_info_default",
-                "mln_style_id_list_count",
-                "mln_style_id_list_get",
-                "mln_style_id_list_destroy",
-                "mln_map_add_style_source_json",
-                "mln_map_remove_style_source",
-                "mln_map_style_source_exists",
-                "mln_map_get_style_source_type",
-                "mln_map_get_style_source_info",
-                "mln_map_copy_style_source_attribution",
-                "mln_map_list_style_source_ids",
-                "mln_map_add_geojson_source_url",
-                "mln_map_add_geojson_source_data",
-                "mln_map_set_geojson_source_url",
-                "mln_map_set_geojson_source_data",
-                "mln_map_add_vector_source_url",
-                "mln_map_add_vector_source_tiles",
-                "mln_map_add_raster_source_url",
-                "mln_map_add_raster_source_tiles",
-                "mln_map_add_raster_dem_source_url",
-                "mln_map_add_raster_dem_source_tiles",
-                "mln_map_add_custom_geometry_source",
-                "mln_map_set_custom_geometry_source_tile_data",
-                "mln_map_invalidate_custom_geometry_source_tile",
-                "mln_map_invalidate_custom_geometry_source_region",
-                "mln_map_set_style_image",
-                "mln_map_remove_style_image",
-                "mln_map_style_image_exists",
-                "mln_map_get_style_image_info",
-                "mln_map_copy_style_image_premultiplied_rgba8",
-                "mln_map_add_image_source_url",
-                "mln_map_add_image_source_image",
-                "mln_map_set_image_source_url",
-                "mln_map_set_image_source_image",
-                "mln_map_set_image_source_coordinates",
-                "mln_map_get_image_source_coordinates",
-                "mln_map_add_hillshade_layer",
-                "mln_map_add_color_relief_layer",
-                "mln_map_add_location_indicator_layer",
-                "mln_map_set_location_indicator_location",
-                "mln_map_set_location_indicator_bearing",
-                "mln_map_set_location_indicator_accuracy_radius",
-                "mln_map_set_location_indicator_image_name",
-                "mln_map_add_style_layer_json",
-                "mln_map_remove_style_layer",
-                "mln_map_style_layer_exists",
-                "mln_map_get_style_layer_type",
-                "mln_map_list_style_layer_ids",
-                "mln_map_move_style_layer",
-                "mln_map_get_style_layer_json",
-                "mln_map_set_style_light_json",
-                "mln_map_set_style_light_property",
-                "mln_map_get_style_light_property",
-                "mln_map_set_layer_property",
-                "mln_map_get_layer_property",
-                "mln_map_set_layer_filter",
-                "mln_map_get_layer_filter",
-            ],
+            style_methods,
         )?;
         Ok(())
     }
@@ -1164,6 +1181,150 @@ fn map_set_style_string(
         unsafe { setter(map as *mut sys::mln_map, string.as_ptr()) }
     }))
     .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+extern "system" fn map_add_geojson_source_url(
+    env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    map: jlong,
+    source_id: JString<'_>,
+    url: JString<'_>,
+) -> jint {
+    map_style_source_url(
+        env,
+        map,
+        source_id,
+        url,
+        sys::mln_map_add_geojson_source_url,
+    )
+}
+
+extern "system" fn map_set_geojson_source_url(
+    env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    map: jlong,
+    source_id: JString<'_>,
+    url: JString<'_>,
+) -> jint {
+    map_style_source_url(
+        env,
+        map,
+        source_id,
+        url,
+        sys::mln_map_set_geojson_source_url,
+    )
+}
+
+fn map_style_source_url(
+    mut env: JNIEnv<'_>,
+    map: jlong,
+    source_id: JString<'_>,
+    url: JString<'_>,
+    operation: unsafe extern "C" fn(
+        *mut sys::mln_map,
+        sys::mln_string_view,
+        sys::mln_string_view,
+    ) -> sys::mln_status,
+) -> jint {
+    catch_unwind(AssertUnwindSafe(|| {
+        let (source_id, source_id_view) = match string_view(&mut env, &source_id) {
+            Ok(value) => value,
+            Err(status) => return status,
+        };
+        let (url, url_view) = match string_view(&mut env, &url) {
+            Ok(value) => value,
+            Err(status) => return status,
+        };
+        let _source_id = source_id;
+        let _url = url;
+        unsafe { operation(map as *mut sys::mln_map, source_id_view, url_view) }
+    }))
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+extern "system" fn map_remove_style_source(
+    env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    map: jlong,
+    source_id: JString<'_>,
+    out_removed: JBooleanArray<'_>,
+) -> jint {
+    map_style_source_bool(
+        env,
+        map,
+        source_id,
+        out_removed,
+        sys::mln_map_remove_style_source,
+    )
+}
+
+extern "system" fn map_style_source_exists(
+    env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    map: jlong,
+    source_id: JString<'_>,
+    out_exists: JBooleanArray<'_>,
+) -> jint {
+    map_style_source_bool(
+        env,
+        map,
+        source_id,
+        out_exists,
+        sys::mln_map_style_source_exists,
+    )
+}
+
+fn map_style_source_bool(
+    mut env: JNIEnv<'_>,
+    map: jlong,
+    source_id: JString<'_>,
+    out_value: JBooleanArray<'_>,
+    operation: unsafe extern "C" fn(
+        *mut sys::mln_map,
+        sys::mln_string_view,
+        *mut bool,
+    ) -> sys::mln_status,
+) -> jint {
+    catch_unwind(AssertUnwindSafe(|| {
+        if out_value.is_null() || env.get_array_length(&out_value).unwrap_or(0) < 1 {
+            return sys::MLN_STATUS_INVALID_ARGUMENT;
+        }
+        let (source_id, source_id_view) = match string_view(&mut env, &source_id) {
+            Ok(value) => value,
+            Err(status) => return status,
+        };
+        let _source_id = source_id;
+        let mut value = false;
+        let result = unsafe { operation(map as *mut sys::mln_map, source_id_view, &mut value) };
+        if result == sys::MLN_STATUS_OK
+            && env
+                .set_boolean_array_region(&out_value, 0, &[jboolean::from(value)])
+                .is_err()
+        {
+            return sys::MLN_STATUS_INVALID_ARGUMENT;
+        }
+        result
+    }))
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+fn string_view(
+    env: &mut JNIEnv<'_>,
+    value: &JString<'_>,
+) -> Result<(CString, sys::mln_string_view), jint> {
+    if value.is_null() {
+        return Err(sys::MLN_STATUS_INVALID_ARGUMENT);
+    }
+    let java_string = env
+        .get_string(value)
+        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
+    let string =
+        CString::new(String::from(java_string)).map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
+    let view = sys::mln_string_view {
+        data: string.as_ptr(),
+        size: string.as_bytes().len(),
+    };
+    Ok((string, view))
 }
 
 extern "system" fn map_set_debug_options(

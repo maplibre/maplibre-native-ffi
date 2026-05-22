@@ -21,6 +21,7 @@ import org.maplibre.nativejni.geo.ScreenPoint;
 import org.maplibre.nativejni.internal.access.InternalAccess;
 import org.maplibre.nativejni.internal.bridge.CameraNative;
 import org.maplibre.nativejni.internal.bridge.MapNative;
+import org.maplibre.nativejni.internal.bridge.StyleNative;
 import org.maplibre.nativejni.internal.lifecycle.HandleState;
 import org.maplibre.nativejni.internal.loader.NativeLibrary;
 import org.maplibre.nativejni.internal.status.Status;
@@ -99,11 +100,21 @@ public final class MapHandle implements AutoCloseable {
   }
 
   public boolean removeStyleSource(String sourceId) {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    var outRemoved = new boolean[1];
+    Status.check(
+        StyleNative.mln_map_remove_style_source(
+            state.requireLiveAddress(), Objects.requireNonNull(sourceId, "sourceId"), outRemoved));
+    return outRemoved[0];
   }
 
   public boolean styleSourceExists(String sourceId) {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    var outExists = new boolean[1];
+    Status.check(
+        StyleNative.mln_map_style_source_exists(
+            state.requireLiveAddress(), Objects.requireNonNull(sourceId, "sourceId"), outExists));
+    return outExists[0];
   }
 
   public Optional<SourceType> styleSourceType(String sourceId) {
@@ -119,7 +130,12 @@ public final class MapHandle implements AutoCloseable {
   }
 
   public void addGeoJsonSourceUrl(String sourceId, String url) {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    Status.check(
+        StyleNative.mln_map_add_geojson_source_url(
+            state.requireLiveAddress(),
+            Objects.requireNonNull(sourceId, "sourceId"),
+            Objects.requireNonNull(url, "url")));
   }
 
   public void addGeoJsonSourceData(String sourceId, GeoJson data) {
@@ -127,7 +143,12 @@ public final class MapHandle implements AutoCloseable {
   }
 
   public void setGeoJsonSourceUrl(String sourceId, String url) {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    Status.check(
+        StyleNative.mln_map_set_geojson_source_url(
+            state.requireLiveAddress(),
+            Objects.requireNonNull(sourceId, "sourceId"),
+            Objects.requireNonNull(url, "url")));
   }
 
   public void setGeoJsonSourceData(String sourceId, GeoJson data) {

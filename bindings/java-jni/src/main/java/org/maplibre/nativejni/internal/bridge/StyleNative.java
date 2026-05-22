@@ -22,9 +22,11 @@ public final class StyleNative {
 
   public static native int mln_map_add_style_source_json();
 
-  public static native int mln_map_remove_style_source();
+  public static native int mln_map_remove_style_source(
+      long map, String sourceId, boolean[] outRemoved);
 
-  public static native int mln_map_style_source_exists();
+  public static native int mln_map_style_source_exists(
+      long map, String sourceId, boolean[] outExists);
 
   public static native int mln_map_get_style_source_type();
 
@@ -34,11 +36,11 @@ public final class StyleNative {
 
   public static native int mln_map_list_style_source_ids();
 
-  public static native int mln_map_add_geojson_source_url();
+  public static native int mln_map_add_geojson_source_url(long map, String sourceId, String url);
 
   public static native int mln_map_add_geojson_source_data();
 
-  public static native int mln_map_set_geojson_source_url();
+  public static native int mln_map_set_geojson_source_url(long map, String sourceId, String url);
 
   public static native int mln_map_set_geojson_source_data();
 
