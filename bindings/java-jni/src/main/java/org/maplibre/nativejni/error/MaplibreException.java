@@ -2,7 +2,7 @@ package org.maplibre.nativejni.error;
 
 import java.util.Objects;
 
-/** Base unchecked exception for errors reported by the native MapLibre C ABI. */
+/** Base unchecked exception for errors reported by the native Maplibre C ABI. */
 public class MaplibreException extends RuntimeException {
   private final MaplibreStatus status;
   private final int nativeStatusCode;

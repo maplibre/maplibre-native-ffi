@@ -1,6 +1,6 @@
 package org.maplibre.nativejni.error;
 
-/** Status categories reported by the native MapLibre C ABI. */
+/** Status categories reported by the native Maplibre C ABI. */
 public enum MaplibreStatus {
   OK(0),
   INVALID_ARGUMENT(-1),

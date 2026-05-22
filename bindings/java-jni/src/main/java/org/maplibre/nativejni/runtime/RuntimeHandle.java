@@ -1,0 +1,169 @@
+package org.maplibre.nativejni.runtime;
+
+import java.lang.foreign.MemorySegment;
+import java.nio.file.Path;
+import java.util.List;
+import java.util.Optional;
+import org.maplibre.nativejni.internal.access.InternalAccess;
+import org.maplibre.nativejni.map.MapHandle;
+import org.maplibre.nativejni.offline.OfflineRegionDefinition;
+import org.maplibre.nativejni.offline.OfflineRegionDownloadState;
+import org.maplibre.nativejni.offline.OfflineRegionInfo;
+import org.maplibre.nativejni.offline.OfflineRegionStatus;
+import org.maplibre.nativejni.resource.ResourceProviderCallback;
+import org.maplibre.nativejni.resource.ResourceTransformCallback;
+
+/** API-parity scaffold for the Java JNI binding. */
+public final class RuntimeHandle implements AutoCloseable {
+  private static UnsupportedOperationException unsupported() {
+    return new UnsupportedOperationException(
+        "RuntimeHandle is not implemented by the JNI bridge yet");
+  }
+
+  public static RuntimeHandle create() {
+    throw unsupported();
+  }
+
+  public static RuntimeHandle create(RuntimeOptions options) {
+    throw unsupported();
+  }
+
+  public void runOnce() {
+    throw unsupported();
+  }
+
+  public OfflineOperationHandle<Void> startAmbientCacheOperation(AmbientCacheOperation operation) {
+    throw unsupported();
+  }
+
+  public OfflineOperationHandle<OfflineRegionInfo> startCreateOfflineRegion(
+      OfflineRegionDefinition definition, byte[] metadata) {
+    throw unsupported();
+  }
+
+  public OfflineOperationHandle<Optional<OfflineRegionInfo>> startOfflineRegion(long id) {
+    throw unsupported();
+  }
+
+  public OfflineOperationHandle<List<OfflineRegionInfo>> startOfflineRegions() {
+    throw unsupported();
+  }
+
+  public OfflineOperationHandle<List<OfflineRegionInfo>> startMergeOfflineRegionsDatabase(
+      Path path) {
+    throw unsupported();
+  }
+
+  public OfflineOperationHandle<List<OfflineRegionInfo>> startMergeOfflineRegionsDatabase(
+      String path) {
+    throw unsupported();
+  }
+
+  public OfflineOperationHandle<OfflineRegionInfo> startUpdateOfflineRegionMetadata(
+      long id, byte[] metadata) {
+    throw unsupported();
+  }
+
+  public OfflineOperationHandle<OfflineRegionStatus> startOfflineRegionStatus(long id) {
+    throw unsupported();
+  }
+
+  public OfflineOperationHandle<Void> startSetOfflineRegionObserved(long id, boolean observed) {
+    throw unsupported();
+  }
+
+  public OfflineOperationHandle<Void> startSetOfflineRegionDownloadState(
+      long id, OfflineRegionDownloadState downloadState) {
+    throw unsupported();
+  }
+
+  public OfflineOperationHandle<Void> startInvalidateOfflineRegion(long id) {
+    throw unsupported();
+  }
+
+  public OfflineOperationHandle<Void> startDeleteOfflineRegion(long id) {
+    throw unsupported();
+  }
+
+  public OfflineRegionInfo takeCreateOfflineRegionResult(
+      OfflineOperationHandle<OfflineRegionInfo> operation) {
+    throw unsupported();
+  }
+
+  public Optional<OfflineRegionInfo> takeOfflineRegionResult(
+      OfflineOperationHandle<Optional<OfflineRegionInfo>> operation) {
+    throw unsupported();
+  }
+
+  public List<OfflineRegionInfo> takeOfflineRegionsResult(
+      OfflineOperationHandle<List<OfflineRegionInfo>> operation) {
+    throw unsupported();
+  }
+
+  public List<OfflineRegionInfo> takeMergeOfflineRegionsDatabaseResult(
+      OfflineOperationHandle<List<OfflineRegionInfo>> operation) {
+    throw unsupported();
+  }
+
+  public OfflineRegionInfo takeUpdateOfflineRegionMetadataResult(
+      OfflineOperationHandle<OfflineRegionInfo> operation) {
+    throw unsupported();
+  }
+
+  public OfflineRegionStatus takeOfflineRegionStatusResult(
+      OfflineOperationHandle<OfflineRegionStatus> operation) {
+    throw unsupported();
+  }
+
+  public void discardOfflineOperation(OfflineOperationHandle<?> operation) {
+    throw unsupported();
+  }
+
+  public void setResourceTransform(ResourceTransformCallback callback) {
+    throw unsupported();
+  }
+
+  public void clearResourceTransform() {
+    throw unsupported();
+  }
+
+  public void setResourceProvider(ResourceProviderCallback callback) {
+    throw unsupported();
+  }
+
+  public Optional<RuntimeEvent> pollEvent() {
+    throw unsupported();
+  }
+
+  public void close() {
+    throw unsupported();
+  }
+
+  public boolean isClosed() {
+    throw unsupported();
+  }
+
+  public MemorySegment nativeHandle(InternalAccess access) {
+    throw unsupported();
+  }
+
+  MemorySegment nativeHandle() {
+    throw unsupported();
+  }
+
+  long nativeAddress() {
+    throw unsupported();
+  }
+
+  public void registerMap(InternalAccess access, MapHandle map) {
+    throw unsupported();
+  }
+
+  public void unregisterMap(InternalAccess access, MapHandle map) {
+    throw unsupported();
+  }
+
+  static MemorySegment offlineOperationCompletedPayload(MemorySegment event) {
+    throw unsupported();
+  }
+}
