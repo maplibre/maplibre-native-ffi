@@ -80,6 +80,56 @@ class MapHandleTest {
   }
 
   @Test
+  void viewportAndTileOptionsCrossNativeBoundary() {
+    try (var runtime = RuntimeHandle.create()) {
+      try (var map = MapHandle.create(runtime, new MapOptions().size(64, 64))) {
+        map.setViewportOptions(
+            new ViewportOptions()
+                .northOrientation(NorthOrientation.RIGHT)
+                .constrainMode(ConstrainMode.HEIGHT_ONLY)
+                .viewportMode(ViewportMode.FLIPPED_Y)
+                .frustumOffset(new EdgeInsets(1, 2, 3, 4)));
+
+        var viewport = map.viewportOptions();
+        assertTrue(viewport.hasNorthOrientation());
+        assertEquals(NorthOrientation.RIGHT, viewport.northOrientation());
+        assertTrue(viewport.hasConstrainMode());
+        assertEquals(ConstrainMode.HEIGHT_ONLY, viewport.constrainMode());
+        assertTrue(viewport.hasViewportMode());
+        assertEquals(ViewportMode.FLIPPED_Y, viewport.viewportMode());
+        assertTrue(viewport.hasFrustumOffset());
+        assertEquals(1, viewport.frustumOffset().top(), 1.0e-9);
+        assertEquals(2, viewport.frustumOffset().left(), 1.0e-9);
+        assertEquals(3, viewport.frustumOffset().bottom(), 1.0e-9);
+        assertEquals(4, viewport.frustumOffset().right(), 1.0e-9);
+
+        map.setTileOptions(
+            new TileOptions()
+                .prefetchZoomDelta(2)
+                .lodMinRadius(1.5)
+                .lodScale(2.5)
+                .lodPitchThreshold(35.0)
+                .lodZoomShift(0.75)
+                .lodMode(TileLodMode.DISTANCE));
+
+        var tile = map.tileOptions();
+        assertTrue(tile.hasPrefetchZoomDelta());
+        assertEquals(2, tile.prefetchZoomDelta());
+        assertTrue(tile.hasLodMinRadius());
+        assertEquals(1.5, tile.lodMinRadius(), 1.0e-9);
+        assertTrue(tile.hasLodScale());
+        assertEquals(2.5, tile.lodScale(), 1.0e-9);
+        assertTrue(tile.hasLodPitchThreshold());
+        assertEquals(35.0, tile.lodPitchThreshold(), 1.0e-9);
+        assertTrue(tile.hasLodZoomShift());
+        assertEquals(0.75, tile.lodZoomShift(), 1.0e-9);
+        assertTrue(tile.hasLodMode());
+        assertEquals(TileLodMode.DISTANCE, tile.lodMode());
+      }
+    }
+  }
+
+  @Test
   void cameraStateCommandsCrossNativeBoundary() {
     try (var runtime = RuntimeHandle.create()) {
       try (var map = MapHandle.create(runtime, new MapOptions().size(64, 64))) {

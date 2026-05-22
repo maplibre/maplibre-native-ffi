@@ -146,6 +146,37 @@ const PROJECTION_MODE_VALUE_X_SKEW: usize = 0;
 const PROJECTION_MODE_VALUE_Y_SKEW: usize = 1;
 const PROJECTION_MODE_VALUE_COUNT: usize = 2;
 
+const VIEWPORT_FIELD_NORTH_ORIENTATION: usize = 0;
+const VIEWPORT_FIELD_CONSTRAIN_MODE: usize = 1;
+const VIEWPORT_FIELD_VIEWPORT_MODE: usize = 2;
+const VIEWPORT_FIELD_FRUSTUM_OFFSET: usize = 3;
+const VIEWPORT_FIELD_COUNT: usize = 4;
+const VIEWPORT_INT_NORTH_ORIENTATION: usize = 0;
+const VIEWPORT_INT_CONSTRAIN_MODE: usize = 1;
+const VIEWPORT_INT_VIEWPORT_MODE: usize = 2;
+const VIEWPORT_INT_COUNT: usize = 3;
+const VIEWPORT_VALUE_FRUSTUM_TOP: usize = 0;
+const VIEWPORT_VALUE_FRUSTUM_LEFT: usize = 1;
+const VIEWPORT_VALUE_FRUSTUM_BOTTOM: usize = 2;
+const VIEWPORT_VALUE_FRUSTUM_RIGHT: usize = 3;
+const VIEWPORT_VALUE_COUNT: usize = 4;
+
+const TILE_FIELD_PREFETCH_ZOOM_DELTA: usize = 0;
+const TILE_FIELD_LOD_MIN_RADIUS: usize = 1;
+const TILE_FIELD_LOD_SCALE: usize = 2;
+const TILE_FIELD_LOD_PITCH_THRESHOLD: usize = 3;
+const TILE_FIELD_LOD_ZOOM_SHIFT: usize = 4;
+const TILE_FIELD_LOD_MODE: usize = 5;
+const TILE_FIELD_COUNT: usize = 6;
+const TILE_INT_PREFETCH_ZOOM_DELTA: usize = 0;
+const TILE_INT_LOD_MODE: usize = 1;
+const TILE_INT_COUNT: usize = 2;
+const TILE_VALUE_LOD_MIN_RADIUS: usize = 0;
+const TILE_VALUE_LOD_SCALE: usize = 1;
+const TILE_VALUE_LOD_PITCH_THRESHOLD: usize = 2;
+const TILE_VALUE_LOD_ZOOM_SHIFT: usize = 3;
+const TILE_VALUE_COUNT: usize = 4;
+
 const ANIMATION_FIELD_DURATION: usize = 0;
 const ANIMATION_FIELD_VELOCITY: usize = 1;
 const ANIMATION_FIELD_MIN_ZOOM: usize = 2;
@@ -716,10 +747,6 @@ mod registration {
             "mln_projection_mode_default",
             "mln_map_viewport_options_default",
             "mln_map_tile_options_default",
-            "mln_map_get_viewport_options",
-            "mln_map_set_viewport_options",
-            "mln_map_get_tile_options",
-            "mln_map_set_tile_options",
             "mln_map_camera_for_geometry",
         ]);
         methods.push(NativeMethod {
@@ -751,6 +778,26 @@ mod registration {
             name: "mln_map_dump_debug_logs".into(),
             sig: "(J)I".into(),
             fn_ptr: map_dump_debug_logs as *mut c_void,
+        });
+        methods.push(NativeMethod {
+            name: "mln_map_get_viewport_options".into(),
+            sig: "(J[Z[I[D)I".into(),
+            fn_ptr: map_get_viewport_options as *mut c_void,
+        });
+        methods.push(NativeMethod {
+            name: "mln_map_set_viewport_options".into(),
+            sig: "(J[Z[I[D)I".into(),
+            fn_ptr: map_set_viewport_options as *mut c_void,
+        });
+        methods.push(NativeMethod {
+            name: "mln_map_get_tile_options".into(),
+            sig: "(J[Z[I[D)I".into(),
+            fn_ptr: map_get_tile_options as *mut c_void,
+        });
+        methods.push(NativeMethod {
+            name: "mln_map_set_tile_options".into(),
+            sig: "(J[Z[I[D)I".into(),
+            fn_ptr: map_set_tile_options as *mut c_void,
         });
         methods.push(NativeMethod {
             name: "mln_map_camera_for_lat_lng_bounds".into(),
@@ -3524,6 +3571,88 @@ extern "system" fn map_dump_debug_logs(_env: JNIEnv<'_>, _class: JClass<'_>, map
         .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
 }
 
+extern "system" fn map_get_viewport_options(
+    env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    map: jlong,
+    out_fields: JBooleanArray<'_>,
+    out_ints: JIntArray<'_>,
+    out_values: JDoubleArray<'_>,
+) -> jint {
+    catch_unwind(AssertUnwindSafe(|| {
+        if !viewport_arrays_are_valid(&env, &out_fields, &out_ints, &out_values) {
+            return sys::MLN_STATUS_INVALID_ARGUMENT;
+        }
+        let mut options = unsafe { sys::mln_map_viewport_options_default() };
+        let result =
+            unsafe { sys::mln_map_get_viewport_options(map as *mut sys::mln_map, &mut options) };
+        if result != sys::MLN_STATUS_OK {
+            return result;
+        }
+        write_viewport_arrays(&env, &out_fields, &out_ints, &out_values, &options)
+    }))
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+extern "system" fn map_set_viewport_options(
+    env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    map: jlong,
+    fields: JBooleanArray<'_>,
+    ints: JIntArray<'_>,
+    values: JDoubleArray<'_>,
+) -> jint {
+    catch_unwind(AssertUnwindSafe(|| {
+        let options = match read_viewport_options(&env, &fields, &ints, &values) {
+            Ok(value) => value,
+            Err(status) => return status,
+        };
+        unsafe { sys::mln_map_set_viewport_options(map as *mut sys::mln_map, &options) }
+    }))
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+extern "system" fn map_get_tile_options(
+    env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    map: jlong,
+    out_fields: JBooleanArray<'_>,
+    out_ints: JIntArray<'_>,
+    out_values: JDoubleArray<'_>,
+) -> jint {
+    catch_unwind(AssertUnwindSafe(|| {
+        if !tile_arrays_are_valid(&env, &out_fields, &out_ints, &out_values) {
+            return sys::MLN_STATUS_INVALID_ARGUMENT;
+        }
+        let mut options = unsafe { sys::mln_map_tile_options_default() };
+        let result =
+            unsafe { sys::mln_map_get_tile_options(map as *mut sys::mln_map, &mut options) };
+        if result != sys::MLN_STATUS_OK {
+            return result;
+        }
+        write_tile_arrays(&env, &out_fields, &out_ints, &out_values, &options)
+    }))
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+extern "system" fn map_set_tile_options(
+    env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    map: jlong,
+    fields: JBooleanArray<'_>,
+    ints: JIntArray<'_>,
+    values: JDoubleArray<'_>,
+) -> jint {
+    catch_unwind(AssertUnwindSafe(|| {
+        let options = match read_tile_options(&env, &fields, &ints, &values) {
+            Ok(value) => value,
+            Err(status) => return status,
+        };
+        unsafe { sys::mln_map_set_tile_options(map as *mut sys::mln_map, &options) }
+    }))
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
 #[allow(clippy::too_many_arguments)]
 extern "system" fn map_camera_for_lat_lng_bounds(
     env: JNIEnv<'_>,
@@ -3950,6 +4079,34 @@ fn map_camera_transition(
     .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
 }
 
+fn viewport_arrays_are_valid(
+    env: &JNIEnv<'_>,
+    fields: &JBooleanArray<'_>,
+    ints: &JIntArray<'_>,
+    values: &JDoubleArray<'_>,
+) -> bool {
+    !fields.is_null()
+        && !ints.is_null()
+        && !values.is_null()
+        && env.get_array_length(fields).unwrap_or(0) >= VIEWPORT_FIELD_COUNT as i32
+        && env.get_array_length(ints).unwrap_or(0) >= VIEWPORT_INT_COUNT as i32
+        && env.get_array_length(values).unwrap_or(0) >= VIEWPORT_VALUE_COUNT as i32
+}
+
+fn tile_arrays_are_valid(
+    env: &JNIEnv<'_>,
+    fields: &JBooleanArray<'_>,
+    ints: &JIntArray<'_>,
+    values: &JDoubleArray<'_>,
+) -> bool {
+    !fields.is_null()
+        && !ints.is_null()
+        && !values.is_null()
+        && env.get_array_length(fields).unwrap_or(0) >= TILE_FIELD_COUNT as i32
+        && env.get_array_length(ints).unwrap_or(0) >= TILE_INT_COUNT as i32
+        && env.get_array_length(values).unwrap_or(0) >= TILE_VALUE_COUNT as i32
+}
+
 fn camera_arrays_are_valid(
     env: &JNIEnv<'_>,
     fields: &JBooleanArray<'_>,
@@ -4038,6 +4195,178 @@ fn camera_fit_ptr(
     fit_options
         .as_ref()
         .map_or(std::ptr::null(), |fit_options| fit_options as *const _)
+}
+
+fn read_viewport_options(
+    env: &JNIEnv<'_>,
+    fields: &JBooleanArray<'_>,
+    ints: &JIntArray<'_>,
+    values: &JDoubleArray<'_>,
+) -> Result<sys::mln_map_viewport_options, jint> {
+    if !viewport_arrays_are_valid(env, fields, ints, values) {
+        return Err(sys::MLN_STATUS_INVALID_ARGUMENT);
+    }
+    let mut field_values = [0 as jboolean; VIEWPORT_FIELD_COUNT];
+    let mut int_values = [0 as jint; VIEWPORT_INT_COUNT];
+    let mut option_values = [0.0_f64; VIEWPORT_VALUE_COUNT];
+    if env
+        .get_boolean_array_region(fields, 0, &mut field_values)
+        .is_err()
+        || env.get_int_array_region(ints, 0, &mut int_values).is_err()
+        || env
+            .get_double_array_region(values, 0, &mut option_values)
+            .is_err()
+    {
+        return Err(sys::MLN_STATUS_INVALID_ARGUMENT);
+    }
+    let mut options = unsafe { sys::mln_map_viewport_options_default() };
+    if field_values[VIEWPORT_FIELD_NORTH_ORIENTATION] != 0 {
+        options.fields |= sys::MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION;
+        options.north_orientation = int_values[VIEWPORT_INT_NORTH_ORIENTATION] as u32;
+    }
+    if field_values[VIEWPORT_FIELD_CONSTRAIN_MODE] != 0 {
+        options.fields |= sys::MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE;
+        options.constrain_mode = int_values[VIEWPORT_INT_CONSTRAIN_MODE] as u32;
+    }
+    if field_values[VIEWPORT_FIELD_VIEWPORT_MODE] != 0 {
+        options.fields |= sys::MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE;
+        options.viewport_mode = int_values[VIEWPORT_INT_VIEWPORT_MODE] as u32;
+    }
+    if field_values[VIEWPORT_FIELD_FRUSTUM_OFFSET] != 0 {
+        options.fields |= sys::MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET;
+        options.frustum_offset.top = option_values[VIEWPORT_VALUE_FRUSTUM_TOP];
+        options.frustum_offset.left = option_values[VIEWPORT_VALUE_FRUSTUM_LEFT];
+        options.frustum_offset.bottom = option_values[VIEWPORT_VALUE_FRUSTUM_BOTTOM];
+        options.frustum_offset.right = option_values[VIEWPORT_VALUE_FRUSTUM_RIGHT];
+    }
+    Ok(options)
+}
+
+fn write_viewport_arrays(
+    env: &JNIEnv<'_>,
+    fields: &JBooleanArray<'_>,
+    ints: &JIntArray<'_>,
+    values: &JDoubleArray<'_>,
+    options: &sys::mln_map_viewport_options,
+) -> jint {
+    let field_values = [
+        jboolean::from(options.fields & sys::MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION != 0),
+        jboolean::from(options.fields & sys::MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE != 0),
+        jboolean::from(options.fields & sys::MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE != 0),
+        jboolean::from(options.fields & sys::MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET != 0),
+    ];
+    let int_values = [
+        options.north_orientation as jint,
+        options.constrain_mode as jint,
+        options.viewport_mode as jint,
+    ];
+    let option_values = [
+        options.frustum_offset.top,
+        options.frustum_offset.left,
+        options.frustum_offset.bottom,
+        options.frustum_offset.right,
+    ];
+    if env
+        .set_boolean_array_region(fields, 0, &field_values)
+        .is_err()
+        || env.set_int_array_region(ints, 0, &int_values).is_err()
+        || env
+            .set_double_array_region(values, 0, &option_values)
+            .is_err()
+    {
+        sys::MLN_STATUS_INVALID_ARGUMENT
+    } else {
+        sys::MLN_STATUS_OK
+    }
+}
+
+fn read_tile_options(
+    env: &JNIEnv<'_>,
+    fields: &JBooleanArray<'_>,
+    ints: &JIntArray<'_>,
+    values: &JDoubleArray<'_>,
+) -> Result<sys::mln_map_tile_options, jint> {
+    if !tile_arrays_are_valid(env, fields, ints, values) {
+        return Err(sys::MLN_STATUS_INVALID_ARGUMENT);
+    }
+    let mut field_values = [0 as jboolean; TILE_FIELD_COUNT];
+    let mut int_values = [0 as jint; TILE_INT_COUNT];
+    let mut option_values = [0.0_f64; TILE_VALUE_COUNT];
+    if env
+        .get_boolean_array_region(fields, 0, &mut field_values)
+        .is_err()
+        || env.get_int_array_region(ints, 0, &mut int_values).is_err()
+        || env
+            .get_double_array_region(values, 0, &mut option_values)
+            .is_err()
+    {
+        return Err(sys::MLN_STATUS_INVALID_ARGUMENT);
+    }
+    let mut options = unsafe { sys::mln_map_tile_options_default() };
+    if field_values[TILE_FIELD_PREFETCH_ZOOM_DELTA] != 0 {
+        options.fields |= sys::MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA;
+        options.prefetch_zoom_delta = int_values[TILE_INT_PREFETCH_ZOOM_DELTA] as u32;
+    }
+    if field_values[TILE_FIELD_LOD_MIN_RADIUS] != 0 {
+        options.fields |= sys::MLN_MAP_TILE_OPTION_LOD_MIN_RADIUS;
+        options.lod_min_radius = option_values[TILE_VALUE_LOD_MIN_RADIUS];
+    }
+    if field_values[TILE_FIELD_LOD_SCALE] != 0 {
+        options.fields |= sys::MLN_MAP_TILE_OPTION_LOD_SCALE;
+        options.lod_scale = option_values[TILE_VALUE_LOD_SCALE];
+    }
+    if field_values[TILE_FIELD_LOD_PITCH_THRESHOLD] != 0 {
+        options.fields |= sys::MLN_MAP_TILE_OPTION_LOD_PITCH_THRESHOLD;
+        options.lod_pitch_threshold = option_values[TILE_VALUE_LOD_PITCH_THRESHOLD];
+    }
+    if field_values[TILE_FIELD_LOD_ZOOM_SHIFT] != 0 {
+        options.fields |= sys::MLN_MAP_TILE_OPTION_LOD_ZOOM_SHIFT;
+        options.lod_zoom_shift = option_values[TILE_VALUE_LOD_ZOOM_SHIFT];
+    }
+    if field_values[TILE_FIELD_LOD_MODE] != 0 {
+        options.fields |= sys::MLN_MAP_TILE_OPTION_LOD_MODE;
+        options.lod_mode = int_values[TILE_INT_LOD_MODE] as u32;
+    }
+    Ok(options)
+}
+
+fn write_tile_arrays(
+    env: &JNIEnv<'_>,
+    fields: &JBooleanArray<'_>,
+    ints: &JIntArray<'_>,
+    values: &JDoubleArray<'_>,
+    options: &sys::mln_map_tile_options,
+) -> jint {
+    let field_values = [
+        jboolean::from(options.fields & sys::MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA != 0),
+        jboolean::from(options.fields & sys::MLN_MAP_TILE_OPTION_LOD_MIN_RADIUS != 0),
+        jboolean::from(options.fields & sys::MLN_MAP_TILE_OPTION_LOD_SCALE != 0),
+        jboolean::from(options.fields & sys::MLN_MAP_TILE_OPTION_LOD_PITCH_THRESHOLD != 0),
+        jboolean::from(options.fields & sys::MLN_MAP_TILE_OPTION_LOD_ZOOM_SHIFT != 0),
+        jboolean::from(options.fields & sys::MLN_MAP_TILE_OPTION_LOD_MODE != 0),
+    ];
+    let int_values = [
+        options.prefetch_zoom_delta as jint,
+        options.lod_mode as jint,
+    ];
+    let option_values = [
+        options.lod_min_radius,
+        options.lod_scale,
+        options.lod_pitch_threshold,
+        options.lod_zoom_shift,
+    ];
+    if env
+        .set_boolean_array_region(fields, 0, &field_values)
+        .is_err()
+        || env.set_int_array_region(ints, 0, &int_values).is_err()
+        || env
+            .set_double_array_region(values, 0, &option_values)
+            .is_err()
+    {
+        sys::MLN_STATUS_INVALID_ARGUMENT
+    } else {
+        sys::MLN_STATUS_OK
+    }
 }
 
 fn read_camera_fit_options(

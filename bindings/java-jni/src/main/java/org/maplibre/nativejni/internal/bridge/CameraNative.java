@@ -32,13 +32,17 @@ public final class CameraNative {
 
   public static native int mln_map_dump_debug_logs(long map);
 
-  public static native int mln_map_get_viewport_options();
+  public static native int mln_map_get_viewport_options(
+      long map, boolean[] outFields, int[] outInts, double[] outValues);
 
-  public static native int mln_map_set_viewport_options();
+  public static native int mln_map_set_viewport_options(
+      long map, boolean[] fields, int[] ints, double[] values);
 
-  public static native int mln_map_get_tile_options();
+  public static native int mln_map_get_tile_options(
+      long map, boolean[] outFields, int[] outInts, double[] outValues);
 
-  public static native int mln_map_set_tile_options();
+  public static native int mln_map_set_tile_options(
+      long map, boolean[] fields, int[] ints, double[] values);
 
   public static native int mln_map_get_camera(long map, boolean[] outFields, double[] outValues);
 

@@ -771,19 +771,102 @@ public final class MapHandle implements AutoCloseable {
   }
 
   public ViewportOptions viewportOptions() {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    var fields = new boolean[4];
+    var ints = new int[3];
+    var values = new double[4];
+    Status.check(
+        CameraNative.mln_map_get_viewport_options(
+            state.requireLiveAddress(), fields, ints, values));
+    var options = new ViewportOptions();
+    if (fields[0]) {
+      options.northOrientation(NorthOrientation.fromNative(ints[0]));
+    }
+    if (fields[1]) {
+      options.constrainMode(ConstrainMode.fromNative(ints[1]));
+    }
+    if (fields[2]) {
+      options.viewportMode(ViewportMode.fromNative(ints[2]));
+    }
+    if (fields[3]) {
+      options.frustumOffset(new EdgeInsets(values[0], values[1], values[2], values[3]));
+    }
+    return options;
   }
 
   public void setViewportOptions(ViewportOptions options) {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    Objects.requireNonNull(options, "options");
+    var fields = new boolean[4];
+    var ints = new int[3];
+    var values = new double[4];
+    fields[0] = options.hasNorthOrientation();
+    ints[0] = fields[0] ? options.northOrientation().nativeValue() : 0;
+    fields[1] = options.hasConstrainMode();
+    ints[1] = fields[1] ? options.constrainMode().nativeValue() : 0;
+    fields[2] = options.hasViewportMode();
+    ints[2] = fields[2] ? options.viewportMode().nativeValue() : 0;
+    fields[3] = options.hasFrustumOffset();
+    if (fields[3]) {
+      values[0] = options.frustumOffset().top();
+      values[1] = options.frustumOffset().left();
+      values[2] = options.frustumOffset().bottom();
+      values[3] = options.frustumOffset().right();
+    }
+    Status.check(
+        CameraNative.mln_map_set_viewport_options(
+            state.requireLiveAddress(), fields, ints, values));
   }
 
   public TileOptions tileOptions() {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    var fields = new boolean[6];
+    var ints = new int[2];
+    var values = new double[4];
+    Status.check(
+        CameraNative.mln_map_get_tile_options(state.requireLiveAddress(), fields, ints, values));
+    var options = new TileOptions();
+    if (fields[0]) {
+      options.prefetchZoomDelta(ints[0]);
+    }
+    if (fields[1]) {
+      options.lodMinRadius(values[0]);
+    }
+    if (fields[2]) {
+      options.lodScale(values[1]);
+    }
+    if (fields[3]) {
+      options.lodPitchThreshold(values[2]);
+    }
+    if (fields[4]) {
+      options.lodZoomShift(values[3]);
+    }
+    if (fields[5]) {
+      options.lodMode(TileLodMode.fromNative(ints[1]));
+    }
+    return options;
   }
 
   public void setTileOptions(TileOptions options) {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    Objects.requireNonNull(options, "options");
+    var fields = new boolean[6];
+    var ints = new int[2];
+    var values = new double[4];
+    fields[0] = options.hasPrefetchZoomDelta();
+    ints[0] = fields[0] ? options.prefetchZoomDelta() : 0;
+    fields[1] = options.hasLodMinRadius();
+    values[0] = fields[1] ? options.lodMinRadius() : 0.0;
+    fields[2] = options.hasLodScale();
+    values[1] = fields[2] ? options.lodScale() : 0.0;
+    fields[3] = options.hasLodPitchThreshold();
+    values[2] = fields[3] ? options.lodPitchThreshold() : 0.0;
+    fields[4] = options.hasLodZoomShift();
+    values[3] = fields[4] ? options.lodZoomShift() : 0.0;
+    fields[5] = options.hasLodMode();
+    ints[1] = fields[5] ? options.lodMode().nativeValue() : 0;
+    Status.check(
+        CameraNative.mln_map_set_tile_options(state.requireLiveAddress(), fields, ints, values));
   }
 
   public CameraOptions camera() {
