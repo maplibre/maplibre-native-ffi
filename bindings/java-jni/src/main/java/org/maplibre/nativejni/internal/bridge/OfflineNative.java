@@ -6,23 +6,32 @@ public final class OfflineNative {
 
   public static native int mln_runtime_offline_region_create_start();
 
-  public static native int mln_runtime_offline_region_get_start();
+  public static native int mln_runtime_offline_region_get_start(
+      long runtime, long regionId, long[] outOperationId);
 
-  public static native int mln_runtime_offline_regions_list_start();
+  public static native int mln_runtime_offline_regions_list_start(
+      long runtime, long[] outOperationId);
 
-  public static native int mln_runtime_offline_regions_merge_database_start();
+  public static native int mln_runtime_offline_regions_merge_database_start(
+      long runtime, String sideDatabasePath, long[] outOperationId);
 
-  public static native int mln_runtime_offline_region_update_metadata_start();
+  public static native int mln_runtime_offline_region_update_metadata_start(
+      long runtime, long regionId, byte[] metadata, long[] outOperationId);
 
-  public static native int mln_runtime_offline_region_get_status_start();
+  public static native int mln_runtime_offline_region_get_status_start(
+      long runtime, long regionId, long[] outOperationId);
 
-  public static native int mln_runtime_offline_region_set_observed_start();
+  public static native int mln_runtime_offline_region_set_observed_start(
+      long runtime, long regionId, boolean observed, long[] outOperationId);
 
-  public static native int mln_runtime_offline_region_set_download_state_start();
+  public static native int mln_runtime_offline_region_set_download_state_start(
+      long runtime, long regionId, int downloadState, long[] outOperationId);
 
-  public static native int mln_runtime_offline_region_invalidate_start();
+  public static native int mln_runtime_offline_region_invalidate_start(
+      long runtime, long regionId, long[] outOperationId);
 
-  public static native int mln_runtime_offline_region_delete_start();
+  public static native int mln_runtime_offline_region_delete_start(
+      long runtime, long regionId, long[] outOperationId);
 
   public static native int mln_runtime_offline_region_create_take_result();
 

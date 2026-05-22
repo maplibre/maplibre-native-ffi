@@ -7,7 +7,8 @@ use std::ffi::{CString, c_void};
 use std::panic::{AssertUnwindSafe, catch_unwind};
 
 use jni::objects::{
-    JBooleanArray, JClass, JDoubleArray, JIntArray, JLongArray, JObject, JObjectArray, JString,
+    JBooleanArray, JByteArray, JClass, JDoubleArray, JIntArray, JLongArray, JObject, JObjectArray,
+    JString,
 };
 use jni::sys::{JNI_VERSION_1_8, jboolean, jint, jlong, jstring};
 use jni::{JNIEnv, JavaVM, NativeMethod};
@@ -186,33 +187,7 @@ mod registration {
             ],
         )?;
         register_runtime(vm)?;
-        register_no_arg_status_class(
-            vm,
-            "org/maplibre/nativejni/internal/bridge/OfflineNative",
-            &[
-                "mln_runtime_offline_region_create_start",
-                "mln_runtime_offline_region_get_start",
-                "mln_runtime_offline_regions_list_start",
-                "mln_runtime_offline_regions_merge_database_start",
-                "mln_runtime_offline_region_update_metadata_start",
-                "mln_runtime_offline_region_get_status_start",
-                "mln_runtime_offline_region_set_observed_start",
-                "mln_runtime_offline_region_set_download_state_start",
-                "mln_runtime_offline_region_invalidate_start",
-                "mln_runtime_offline_region_delete_start",
-                "mln_runtime_offline_region_create_take_result",
-                "mln_runtime_offline_region_get_take_result",
-                "mln_runtime_offline_regions_list_take_result",
-                "mln_runtime_offline_regions_merge_database_take_result",
-                "mln_runtime_offline_region_update_metadata_take_result",
-                "mln_runtime_offline_region_get_status_take_result",
-                "mln_offline_region_snapshot_get",
-                "mln_offline_region_snapshot_destroy",
-                "mln_offline_region_list_count",
-                "mln_offline_region_list_get",
-                "mln_offline_region_list_destroy",
-            ],
-        )?;
+        register_offline(vm)?;
         register_map(vm)?;
         register_camera(vm)?;
         register_projection(vm)?;
@@ -517,6 +492,73 @@ mod registration {
         register_methods(
             vm,
             "org/maplibre/nativejni/internal/bridge/RuntimeNative",
+            methods,
+        )
+    }
+
+    fn register_offline(vm: &JavaVM) -> jni::errors::Result<()> {
+        let mut methods = no_arg_status_methods(&[
+            "mln_runtime_offline_region_create_start",
+            "mln_runtime_offline_region_create_take_result",
+            "mln_runtime_offline_region_get_take_result",
+            "mln_runtime_offline_regions_list_take_result",
+            "mln_runtime_offline_regions_merge_database_take_result",
+            "mln_runtime_offline_region_update_metadata_take_result",
+            "mln_runtime_offline_region_get_status_take_result",
+            "mln_offline_region_snapshot_get",
+            "mln_offline_region_snapshot_destroy",
+            "mln_offline_region_list_count",
+            "mln_offline_region_list_get",
+            "mln_offline_region_list_destroy",
+        ]);
+        methods.push(NativeMethod {
+            name: "mln_runtime_offline_region_get_start".into(),
+            sig: "(JJ[J)I".into(),
+            fn_ptr: offline_region_get_start as *mut c_void,
+        });
+        methods.push(NativeMethod {
+            name: "mln_runtime_offline_regions_list_start".into(),
+            sig: "(J[J)I".into(),
+            fn_ptr: offline_regions_list_start as *mut c_void,
+        });
+        methods.push(NativeMethod {
+            name: "mln_runtime_offline_regions_merge_database_start".into(),
+            sig: "(JLjava/lang/String;[J)I".into(),
+            fn_ptr: offline_regions_merge_database_start as *mut c_void,
+        });
+        methods.push(NativeMethod {
+            name: "mln_runtime_offline_region_update_metadata_start".into(),
+            sig: "(JJ[B[J)I".into(),
+            fn_ptr: offline_region_update_metadata_start as *mut c_void,
+        });
+        methods.push(NativeMethod {
+            name: "mln_runtime_offline_region_get_status_start".into(),
+            sig: "(JJ[J)I".into(),
+            fn_ptr: offline_region_get_status_start as *mut c_void,
+        });
+        methods.push(NativeMethod {
+            name: "mln_runtime_offline_region_set_observed_start".into(),
+            sig: "(JJZ[J)I".into(),
+            fn_ptr: offline_region_set_observed_start as *mut c_void,
+        });
+        methods.push(NativeMethod {
+            name: "mln_runtime_offline_region_set_download_state_start".into(),
+            sig: "(JJI[J)I".into(),
+            fn_ptr: offline_region_set_download_state_start as *mut c_void,
+        });
+        methods.push(NativeMethod {
+            name: "mln_runtime_offline_region_invalidate_start".into(),
+            sig: "(JJ[J)I".into(),
+            fn_ptr: offline_region_invalidate_start as *mut c_void,
+        });
+        methods.push(NativeMethod {
+            name: "mln_runtime_offline_region_delete_start".into(),
+            sig: "(JJ[J)I".into(),
+            fn_ptr: offline_region_delete_start as *mut c_void,
+        });
+        register_methods(
+            vm,
+            "org/maplibre/nativejni/internal/bridge/OfflineNative",
             methods,
         )
     }
@@ -947,6 +989,196 @@ extern "system" fn runtime_offline_operation_discard(
             operation_id as sys::mln_offline_operation_id,
         )
     })
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+extern "system" fn offline_region_get_start(
+    env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    runtime: jlong,
+    region_id: jlong,
+    out_operation_id: JLongArray<'_>,
+) -> jint {
+    offline_start_with_out(env, out_operation_id, |out| unsafe {
+        sys::mln_runtime_offline_region_get_start(
+            runtime as *mut sys::mln_runtime,
+            region_id as sys::mln_offline_region_id,
+            out,
+        )
+    })
+}
+
+extern "system" fn offline_regions_list_start(
+    env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    runtime: jlong,
+    out_operation_id: JLongArray<'_>,
+) -> jint {
+    offline_start_with_out(env, out_operation_id, |out| unsafe {
+        sys::mln_runtime_offline_regions_list_start(runtime as *mut sys::mln_runtime, out)
+    })
+}
+
+extern "system" fn offline_regions_merge_database_start(
+    mut env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    runtime: jlong,
+    side_database_path: JString<'_>,
+    out_operation_id: JLongArray<'_>,
+) -> jint {
+    catch_unwind(AssertUnwindSafe(|| {
+        let path = match jstring_to_cstring(&mut env, &side_database_path) {
+            Ok(path) => path,
+            Err(status) => return status,
+        };
+        offline_start_with_out(env, out_operation_id, |out| unsafe {
+            sys::mln_runtime_offline_regions_merge_database_start(
+                runtime as *mut sys::mln_runtime,
+                path.as_ptr(),
+                out,
+            )
+        })
+    }))
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+extern "system" fn offline_region_update_metadata_start(
+    env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    runtime: jlong,
+    region_id: jlong,
+    metadata: JByteArray<'_>,
+    out_operation_id: JLongArray<'_>,
+) -> jint {
+    catch_unwind(AssertUnwindSafe(|| {
+        if metadata.is_null() {
+            return sys::MLN_STATUS_INVALID_ARGUMENT;
+        }
+        let metadata = match env.convert_byte_array(&metadata) {
+            Ok(metadata) => metadata,
+            Err(_) => return sys::MLN_STATUS_INVALID_ARGUMENT,
+        };
+        offline_start_with_out(env, out_operation_id, |out| unsafe {
+            sys::mln_runtime_offline_region_update_metadata_start(
+                runtime as *mut sys::mln_runtime,
+                region_id as sys::mln_offline_region_id,
+                if metadata.is_empty() {
+                    std::ptr::null()
+                } else {
+                    metadata.as_ptr()
+                },
+                metadata.len(),
+                out,
+            )
+        })
+    }))
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+extern "system" fn offline_region_get_status_start(
+    env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    runtime: jlong,
+    region_id: jlong,
+    out_operation_id: JLongArray<'_>,
+) -> jint {
+    offline_start_with_out(env, out_operation_id, |out| unsafe {
+        sys::mln_runtime_offline_region_get_status_start(
+            runtime as *mut sys::mln_runtime,
+            region_id as sys::mln_offline_region_id,
+            out,
+        )
+    })
+}
+
+extern "system" fn offline_region_set_observed_start(
+    env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    runtime: jlong,
+    region_id: jlong,
+    observed: jboolean,
+    out_operation_id: JLongArray<'_>,
+) -> jint {
+    offline_start_with_out(env, out_operation_id, |out| unsafe {
+        sys::mln_runtime_offline_region_set_observed_start(
+            runtime as *mut sys::mln_runtime,
+            region_id as sys::mln_offline_region_id,
+            observed != 0,
+            out,
+        )
+    })
+}
+
+extern "system" fn offline_region_set_download_state_start(
+    env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    runtime: jlong,
+    region_id: jlong,
+    state: jint,
+    out_operation_id: JLongArray<'_>,
+) -> jint {
+    offline_start_with_out(env, out_operation_id, |out| unsafe {
+        sys::mln_runtime_offline_region_set_download_state_start(
+            runtime as *mut sys::mln_runtime,
+            region_id as sys::mln_offline_region_id,
+            state as u32,
+            out,
+        )
+    })
+}
+
+extern "system" fn offline_region_invalidate_start(
+    env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    runtime: jlong,
+    region_id: jlong,
+    out_operation_id: JLongArray<'_>,
+) -> jint {
+    offline_start_with_out(env, out_operation_id, |out| unsafe {
+        sys::mln_runtime_offline_region_invalidate_start(
+            runtime as *mut sys::mln_runtime,
+            region_id as sys::mln_offline_region_id,
+            out,
+        )
+    })
+}
+
+extern "system" fn offline_region_delete_start(
+    env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    runtime: jlong,
+    region_id: jlong,
+    out_operation_id: JLongArray<'_>,
+) -> jint {
+    offline_start_with_out(env, out_operation_id, |out| unsafe {
+        sys::mln_runtime_offline_region_delete_start(
+            runtime as *mut sys::mln_runtime,
+            region_id as sys::mln_offline_region_id,
+            out,
+        )
+    })
+}
+
+fn offline_start_with_out(
+    env: JNIEnv<'_>,
+    out_operation_id: JLongArray<'_>,
+    start: impl FnOnce(*mut sys::mln_offline_operation_id) -> sys::mln_status,
+) -> jint {
+    catch_unwind(AssertUnwindSafe(|| {
+        if out_operation_id.is_null() || env.get_array_length(&out_operation_id).unwrap_or(0) < 1 {
+            return sys::MLN_STATUS_INVALID_ARGUMENT;
+        }
+        let mut operation_id: sys::mln_offline_operation_id = 0;
+        let result = start(&mut operation_id);
+        if result == sys::MLN_STATUS_OK
+            && env
+                .set_long_array_region(&out_operation_id, 0, &[operation_id as jlong])
+                .is_err()
+        {
+            return sys::MLN_STATUS_INVALID_ARGUMENT;
+        }
+        result
+    }))
     .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
 }
 
@@ -1764,6 +1996,16 @@ impl Drop for StyleIdListGuard {
     fn drop(&mut self) {
         unsafe { sys::mln_style_id_list_destroy(self.0) }
     }
+}
+
+fn jstring_to_cstring(env: &mut JNIEnv<'_>, value: &JString<'_>) -> Result<CString, jint> {
+    if value.is_null() {
+        return Err(sys::MLN_STATUS_INVALID_ARGUMENT);
+    }
+    let string = env
+        .get_string(value)
+        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
+    CString::new(string.to_bytes()).map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)
 }
 
 fn string_view(

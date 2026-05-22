@@ -8,6 +8,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import org.maplibre.nativejni.internal.access.InternalAccess;
+import org.maplibre.nativejni.internal.bridge.OfflineNative;
 import org.maplibre.nativejni.internal.bridge.RuntimeNative;
 import org.maplibre.nativejni.internal.lifecycle.HandleState;
 import org.maplibre.nativejni.internal.loader.NativeLibrary;
@@ -76,47 +77,121 @@ public final class RuntimeHandle implements AutoCloseable {
   }
 
   public OfflineOperationHandle<Optional<OfflineRegionInfo>> startOfflineRegion(long id) {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    var outOperationId = new long[1];
+    Status.check(
+        OfflineNative.mln_runtime_offline_region_get_start(
+            state.requireLiveAddress(), id, outOperationId));
+    return offlineOperation(
+        outOperationId[0],
+        OfflineOperationKind.REGION_GET,
+        OfflineOperationResultKind.OPTIONAL_REGION);
   }
 
   public OfflineOperationHandle<List<OfflineRegionInfo>> startOfflineRegions() {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    var outOperationId = new long[1];
+    Status.check(
+        OfflineNative.mln_runtime_offline_regions_list_start(
+            state.requireLiveAddress(), outOperationId));
+    return offlineOperation(
+        outOperationId[0],
+        OfflineOperationKind.REGIONS_LIST,
+        OfflineOperationResultKind.REGION_LIST);
   }
 
   public OfflineOperationHandle<List<OfflineRegionInfo>> startMergeOfflineRegionsDatabase(
       Path path) {
-    throw unsupported();
+    return startMergeOfflineRegionsDatabase(Objects.requireNonNull(path, "path").toString());
   }
 
   public OfflineOperationHandle<List<OfflineRegionInfo>> startMergeOfflineRegionsDatabase(
       String path) {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    var outOperationId = new long[1];
+    Status.check(
+        OfflineNative.mln_runtime_offline_regions_merge_database_start(
+            state.requireLiveAddress(), Objects.requireNonNull(path, "path"), outOperationId));
+    return offlineOperation(
+        outOperationId[0],
+        OfflineOperationKind.REGIONS_MERGE_DATABASE,
+        OfflineOperationResultKind.REGION_LIST);
   }
 
   public OfflineOperationHandle<OfflineRegionInfo> startUpdateOfflineRegionMetadata(
       long id, byte[] metadata) {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    var outOperationId = new long[1];
+    Status.check(
+        OfflineNative.mln_runtime_offline_region_update_metadata_start(
+            state.requireLiveAddress(),
+            id,
+            Objects.requireNonNull(metadata, "metadata"),
+            outOperationId));
+    return offlineOperation(
+        outOperationId[0],
+        OfflineOperationKind.REGION_UPDATE_METADATA,
+        OfflineOperationResultKind.REGION);
   }
 
   public OfflineOperationHandle<OfflineRegionStatus> startOfflineRegionStatus(long id) {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    var outOperationId = new long[1];
+    Status.check(
+        OfflineNative.mln_runtime_offline_region_get_status_start(
+            state.requireLiveAddress(), id, outOperationId));
+    return offlineOperation(
+        outOperationId[0],
+        OfflineOperationKind.REGION_GET_STATUS,
+        OfflineOperationResultKind.REGION_STATUS);
   }
 
   public OfflineOperationHandle<Void> startSetOfflineRegionObserved(long id, boolean observed) {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    var outOperationId = new long[1];
+    Status.check(
+        OfflineNative.mln_runtime_offline_region_set_observed_start(
+            state.requireLiveAddress(), id, observed, outOperationId));
+    return offlineOperation(
+        outOperationId[0],
+        OfflineOperationKind.REGION_SET_OBSERVED,
+        OfflineOperationResultKind.NONE);
   }
 
   public OfflineOperationHandle<Void> startSetOfflineRegionDownloadState(
       long id, OfflineRegionDownloadState downloadState) {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    var outOperationId = new long[1];
+    Status.check(
+        OfflineNative.mln_runtime_offline_region_set_download_state_start(
+            state.requireLiveAddress(),
+            id,
+            Objects.requireNonNull(downloadState, "downloadState").nativeValue(),
+            outOperationId));
+    return offlineOperation(
+        outOperationId[0],
+        OfflineOperationKind.REGION_SET_DOWNLOAD_STATE,
+        OfflineOperationResultKind.NONE);
   }
 
   public OfflineOperationHandle<Void> startInvalidateOfflineRegion(long id) {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    var outOperationId = new long[1];
+    Status.check(
+        OfflineNative.mln_runtime_offline_region_invalidate_start(
+            state.requireLiveAddress(), id, outOperationId));
+    return offlineOperation(
+        outOperationId[0], OfflineOperationKind.REGION_INVALIDATE, OfflineOperationResultKind.NONE);
   }
 
   public OfflineOperationHandle<Void> startDeleteOfflineRegion(long id) {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    var outOperationId = new long[1];
+    Status.check(
+        OfflineNative.mln_runtime_offline_region_delete_start(
+            state.requireLiveAddress(), id, outOperationId));
+    return offlineOperation(
+        outOperationId[0], OfflineOperationKind.REGION_DELETE, OfflineOperationResultKind.NONE);
   }
 
   public OfflineRegionInfo takeCreateOfflineRegionResult(
