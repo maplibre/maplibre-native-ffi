@@ -19,11 +19,16 @@ public final class RenderSessionNative {
 
   public static native int mln_render_session_dump_debug_logs(long session);
 
-  public static native int mln_render_session_set_feature_state();
+  public static native int mln_render_session_set_feature_state(
+      long session,
+      org.maplibre.nativejni.query.FeatureStateSelector selector,
+      org.maplibre.nativejni.json.JsonValue value);
 
-  public static native int mln_render_session_get_feature_state();
+  public static native int mln_render_session_get_feature_state(
+      long session, org.maplibre.nativejni.query.FeatureStateSelector selector, Object[] outState);
 
-  public static native int mln_render_session_remove_feature_state();
+  public static native int mln_render_session_remove_feature_state(
+      long session, org.maplibre.nativejni.query.FeatureStateSelector selector);
 
   public static native int mln_json_snapshot_get();
 

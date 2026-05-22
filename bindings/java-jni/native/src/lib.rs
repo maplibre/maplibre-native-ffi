@@ -276,13 +276,8 @@ mod registration {
             "org/maplibre/nativejni/internal/bridge/QueryNative",
             query_methods,
         )?;
-        let mut render_session_methods = no_arg_status_methods(&[
-            "mln_render_session_set_feature_state",
-            "mln_render_session_get_feature_state",
-            "mln_render_session_remove_feature_state",
-            "mln_json_snapshot_get",
-            "mln_json_snapshot_destroy",
-        ]);
+        let mut render_session_methods =
+            no_arg_status_methods(&["mln_json_snapshot_get", "mln_json_snapshot_destroy"]);
         render_session_methods.push(NativeMethod {
             name: "mln_render_session_resize".into(),
             sig: "(JIID)I".into(),
@@ -317,6 +312,22 @@ mod registration {
             name: "mln_render_session_dump_debug_logs".into(),
             sig: "(J)I".into(),
             fn_ptr: render_session_dump_debug_logs as *mut c_void,
+        });
+        render_session_methods.push(NativeMethod {
+            name: "mln_render_session_set_feature_state".into(),
+            sig: "(JLorg/maplibre/nativejni/query/FeatureStateSelector;Lorg/maplibre/nativejni/json/JsonValue;)I".into(),
+            fn_ptr: render_session_set_feature_state as *mut c_void,
+        });
+        render_session_methods.push(NativeMethod {
+            name: "mln_render_session_get_feature_state".into(),
+            sig: "(JLorg/maplibre/nativejni/query/FeatureStateSelector;[Ljava/lang/Object;)I"
+                .into(),
+            fn_ptr: render_session_get_feature_state as *mut c_void,
+        });
+        render_session_methods.push(NativeMethod {
+            name: "mln_render_session_remove_feature_state".into(),
+            sig: "(JLorg/maplibre/nativejni/query/FeatureStateSelector;)I".into(),
+            fn_ptr: render_session_remove_feature_state as *mut c_void,
         });
         register_methods(
             vm,
@@ -5549,6 +5560,88 @@ extern "system" fn render_session_dump_debug_logs(
     render_session_unary(session, sys::mln_render_session_dump_debug_logs)
 }
 
+extern "system" fn render_session_set_feature_state<'local>(
+    mut env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    session: jlong,
+    selector: JObject<'local>,
+    value: JObject<'local>,
+) -> jint {
+    catch_unwind(AssertUnwindSafe(|| {
+        let selector = match java_feature_state_selector(&mut env, &selector) {
+            Ok(value) => value,
+            Err(status) => return status,
+        };
+        let selector = core_query::feature_state_selector_to_native(&selector);
+        let value = match java_native_json_value(&mut env, &value) {
+            Ok(value) => value,
+            Err(status) => return status,
+        };
+        unsafe {
+            sys::mln_render_session_set_feature_state(
+                session as *mut sys::mln_render_session,
+                selector.as_ptr(),
+                value.as_ptr(),
+            )
+        }
+    }))
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+extern "system" fn render_session_get_feature_state<'local>(
+    mut env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    session: jlong,
+    selector: JObject<'local>,
+    out_state: JObjectArray<'local>,
+) -> jint {
+    catch_unwind(AssertUnwindSafe(|| {
+        if out_state.is_null() || env.get_array_length(&out_state).unwrap_or(0) < 1 {
+            return sys::MLN_STATUS_INVALID_ARGUMENT;
+        }
+        let selector = match java_feature_state_selector(&mut env, &selector) {
+            Ok(value) => value,
+            Err(status) => return status,
+        };
+        let selector = core_query::feature_state_selector_to_native(&selector);
+        let mut snapshot: *mut sys::mln_json_snapshot = std::ptr::null_mut();
+        let status = unsafe {
+            sys::mln_render_session_get_feature_state(
+                session as *mut sys::mln_render_session,
+                selector.as_ptr(),
+                &mut snapshot,
+            )
+        };
+        if status != sys::MLN_STATUS_OK {
+            return status;
+        }
+        copy_json_snapshot_to_array(&mut env, snapshot, &out_state)
+    }))
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+extern "system" fn render_session_remove_feature_state<'local>(
+    mut env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    session: jlong,
+    selector: JObject<'local>,
+) -> jint {
+    catch_unwind(AssertUnwindSafe(|| {
+        let selector = match java_feature_state_selector(&mut env, &selector) {
+            Ok(value) => value,
+            Err(status) => return status,
+        };
+        let selector = core_query::feature_state_selector_to_native(&selector);
+        unsafe {
+            sys::mln_render_session_remove_feature_state(
+                session as *mut sys::mln_render_session,
+                selector.as_ptr(),
+            )
+        }
+    }))
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
 fn render_session_unary(
     session: jlong,
     operation: unsafe extern "C" fn(*mut sys::mln_render_session) -> sys::mln_status,
@@ -6096,6 +6189,30 @@ fn java_screen_point<'local>(
         .and_then(|value| value.d())
         .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
     Ok(CoreScreenPoint::new(x, y))
+}
+
+fn java_feature_state_selector<'local>(
+    env: &mut JNIEnv<'local>,
+    value: &JObject<'local>,
+) -> Result<core_query::FeatureStateSelector, jint> {
+    if value.is_null() {
+        return Err(sys::MLN_STATUS_INVALID_ARGUMENT);
+    }
+    let mut selector =
+        core_query::FeatureStateSelector::new(java_string_method(env, value, "sourceId")?);
+    if java_boolean_method(env, value, "hasSourceLayerId")? {
+        selector = selector.with_source_layer_id(java_string_method(env, value, "sourceLayerId")?);
+    }
+    if java_boolean_method(env, value, "hasFeatureId")? {
+        selector = selector.with_feature_id(java_string_method(env, value, "featureId")?);
+    }
+    if java_boolean_method(env, value, "hasStateKey")? {
+        selector = match selector.with_state_key(java_string_method(env, value, "stateKey")?) {
+            Ok(value) => value,
+            Err(_) => return Err(sys::MLN_STATUS_INVALID_ARGUMENT),
+        };
+    }
+    Ok(selector)
 }
 
 fn java_rendered_feature_query_options<'local>(

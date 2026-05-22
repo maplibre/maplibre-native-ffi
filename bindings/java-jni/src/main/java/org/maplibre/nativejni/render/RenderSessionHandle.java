@@ -196,15 +196,28 @@ public final class RenderSessionHandle implements AutoCloseable {
   }
 
   public void setFeatureState(FeatureStateSelector selector, JsonValue value) {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    Status.check(
+        RenderSessionNative.mln_render_session_set_feature_state(
+            state.requireLiveAddress(),
+            Objects.requireNonNull(selector, "selector"),
+            Objects.requireNonNull(value, "value")));
   }
 
   public JsonValue getFeatureState(FeatureStateSelector selector) {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    var outState = new Object[1];
+    Status.check(
+        RenderSessionNative.mln_render_session_get_feature_state(
+            state.requireLiveAddress(), Objects.requireNonNull(selector, "selector"), outState));
+    return outState[0] == null ? JsonValue.object(List.of()) : (JsonValue) outState[0];
   }
 
   public void removeFeatureState(FeatureStateSelector selector) {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    Status.check(
+        RenderSessionNative.mln_render_session_remove_feature_state(
+            state.requireLiveAddress(), Objects.requireNonNull(selector, "selector")));
   }
 
   public List<QueriedFeature> queryRenderedFeatures(RenderedQueryGeometry geometry) {
