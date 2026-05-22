@@ -6,13 +6,66 @@
 use std::ffi::c_void;
 use std::panic::{AssertUnwindSafe, catch_unwind};
 
-use jni::objects::{JClass, JIntArray, JLongArray, JObject};
-use jni::sys::{JNI_VERSION_1_8, jint, jlong, jstring};
+use jni::objects::{
+    JBooleanArray, JClass, JDoubleArray, JIntArray, JLongArray, JObject, JObjectArray,
+};
+use jni::sys::{JNI_VERSION_1_8, jboolean, jint, jlong, jstring};
 use jni::{JNIEnv, JavaVM, NativeMethod};
 use maplibre_native_core::error::capture_thread_diagnostic;
 use maplibre_native_sys as sys;
 
 const BRIDGE_CLASS: &str = "org/maplibre/nativejni/internal/bridge/NativeBridge";
+
+const LONG_SOURCE_ADDRESS: usize = 0;
+const LONG_PAYLOAD_SIZE: usize = 1;
+const LONG_TILE_OVERSCALED_Z: usize = 2;
+const LONG_TILE_CANONICAL_Z: usize = 3;
+const LONG_TILE_CANONICAL_X: usize = 4;
+const LONG_TILE_CANONICAL_Y: usize = 5;
+const LONG_REGION_ID: usize = 6;
+const LONG_LIMIT: usize = 7;
+const LONG_OPERATION_ID: usize = 8;
+const LONG_COMPLETED_RESOURCE_COUNT: usize = 9;
+const LONG_COMPLETED_RESOURCE_SIZE: usize = 10;
+const LONG_COMPLETED_TILE_COUNT: usize = 11;
+const LONG_REQUIRED_TILE_COUNT: usize = 12;
+const LONG_COMPLETED_TILE_SIZE: usize = 13;
+const LONG_REQUIRED_RESOURCE_COUNT: usize = 14;
+const LONG_FRAME_COUNT: usize = 15;
+const LONG_DRAW_CALL_COUNT: usize = 16;
+const LONG_TOTAL_DRAW_CALL_COUNT: usize = 17;
+const LONG_COUNT: usize = 18;
+
+const INT_EVENT_TYPE: usize = 0;
+const INT_SOURCE_TYPE: usize = 1;
+const INT_CODE: usize = 2;
+const INT_PAYLOAD_TYPE: usize = 3;
+const INT_RENDER_MODE: usize = 4;
+const INT_TILE_OPERATION: usize = 5;
+const INT_TILE_WRAP: usize = 6;
+const INT_RESOURCE_ERROR_REASON: usize = 7;
+const INT_OFFLINE_DOWNLOAD_STATE: usize = 8;
+const INT_OFFLINE_OPERATION_KIND: usize = 9;
+const INT_OFFLINE_RESULT_KIND: usize = 10;
+const INT_OFFLINE_RESULT_STATUS: usize = 11;
+const INT_PAYLOAD_AVAILABLE: usize = 12;
+const INT_COUNT: usize = 13;
+
+const BOOLEAN_HAS_EVENT: usize = 0;
+const BOOLEAN_NEEDS_REPAINT: usize = 1;
+const BOOLEAN_PLACEMENT_CHANGED: usize = 2;
+const BOOLEAN_REQUIRED_RESOURCE_COUNT_IS_PRECISE: usize = 3;
+const BOOLEAN_COMPLETE: usize = 4;
+const BOOLEAN_FOUND: usize = 5;
+const BOOLEAN_COUNT: usize = 6;
+
+const DOUBLE_ENCODING_TIME: usize = 0;
+const DOUBLE_RENDERING_TIME: usize = 1;
+const DOUBLE_COUNT: usize = 2;
+
+const STRING_MESSAGE: i32 = 0;
+const STRING_PAYLOAD: i32 = 1;
+const STRING_COUNT: i32 = 2;
 
 #[unsafe(no_mangle)]
 pub extern "system" fn JNI_OnLoad(vm: JavaVM, _reserved: *mut c_void) -> jint {
@@ -327,7 +380,6 @@ mod registration {
             "mln_runtime_clear_resource_transform",
             "mln_runtime_run_ambient_cache_operation_start",
             "mln_runtime_offline_operation_discard",
-            "mln_runtime_poll_event",
         ]);
         methods.push(NativeMethod {
             name: "mln_runtime_create".into(),
@@ -343,6 +395,11 @@ mod registration {
             name: "mln_runtime_run_once".into(),
             sig: "(J)I".into(),
             fn_ptr: runtime_run_once as *mut c_void,
+        });
+        methods.push(NativeMethod {
+            name: "mln_runtime_poll_event".into(),
+            sig: "(J[J[I[Z[D[Ljava/lang/String;)I".into(),
+            fn_ptr: runtime_poll_event as *mut c_void,
         });
         methods.push(NativeMethod {
             name: "mln_network_status_get".into(),
@@ -514,6 +571,278 @@ extern "system" fn runtime_destroy(_env: JNIEnv<'_>, _class: JClass<'_>, runtime
 extern "system" fn runtime_run_once(_env: JNIEnv<'_>, _class: JClass<'_>, runtime: jlong) -> jint {
     catch_unwind(|| unsafe { sys::mln_runtime_run_once(runtime as *mut sys::mln_runtime) })
         .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+extern "system" fn runtime_poll_event(
+    env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    runtime: jlong,
+    longs: JLongArray<'_>,
+    ints: JIntArray<'_>,
+    booleans: JBooleanArray<'_>,
+    doubles: JDoubleArray<'_>,
+    strings: JObjectArray<'_>,
+) -> jint {
+    catch_unwind(AssertUnwindSafe(|| {
+        if !runtime_event_arrays_are_valid(&env, &longs, &ints, &booleans, &doubles, &strings) {
+            return sys::MLN_STATUS_INVALID_ARGUMENT;
+        }
+
+        let mut event: sys::mln_runtime_event = unsafe { std::mem::zeroed() };
+        event.size = std::mem::size_of::<sys::mln_runtime_event>() as u32;
+        let mut has_event = false;
+        let result = unsafe {
+            sys::mln_runtime_poll_event(
+                runtime as *mut sys::mln_runtime,
+                &mut event,
+                &mut has_event,
+            )
+        };
+        if result != sys::MLN_STATUS_OK {
+            return result;
+        }
+
+        let mut long_values = [0 as jlong; LONG_COUNT];
+        let mut int_values = [0 as jint; INT_COUNT];
+        let mut boolean_values = [0 as jboolean; BOOLEAN_COUNT];
+        let mut double_values = [0.0_f64; DOUBLE_COUNT];
+        boolean_values[BOOLEAN_HAS_EVENT] = jboolean::from(has_event);
+        if !has_event {
+            return if env
+                .set_boolean_array_region(&booleans, 0, &boolean_values)
+                .is_ok()
+            {
+                sys::MLN_STATUS_OK
+            } else {
+                sys::MLN_STATUS_INVALID_ARGUMENT
+            };
+        }
+
+        long_values[LONG_SOURCE_ADDRESS] = event.source as jlong;
+        long_values[LONG_PAYLOAD_SIZE] = event.payload_size as jlong;
+        int_values[INT_EVENT_TYPE] = event.type_ as jint;
+        int_values[INT_SOURCE_TYPE] = event.source_type as jint;
+        int_values[INT_CODE] = event.code as jint;
+        int_values[INT_PAYLOAD_TYPE] = event.payload_type as jint;
+
+        fill_runtime_event_payload(
+            &event,
+            &mut long_values,
+            &mut int_values,
+            &mut boolean_values,
+            &mut double_values,
+        );
+
+        if env.set_long_array_region(&longs, 0, &long_values).is_err()
+            || env.set_int_array_region(&ints, 0, &int_values).is_err()
+            || env
+                .set_boolean_array_region(&booleans, 0, &boolean_values)
+                .is_err()
+            || env
+                .set_double_array_region(&doubles, 0, &double_values)
+                .is_err()
+            || set_string_array_element(&env, &strings, STRING_MESSAGE, unsafe {
+                copy_string(event.message, event.message_size)
+            })
+            .is_err()
+        {
+            return sys::MLN_STATUS_INVALID_ARGUMENT;
+        }
+
+        let payload_string = payload_string(&event);
+        if set_string_array_element(&env, &strings, STRING_PAYLOAD, payload_string).is_err() {
+            return sys::MLN_STATUS_INVALID_ARGUMENT;
+        }
+        sys::MLN_STATUS_OK
+    }))
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+fn runtime_event_arrays_are_valid(
+    env: &JNIEnv<'_>,
+    longs: &JLongArray<'_>,
+    ints: &JIntArray<'_>,
+    booleans: &JBooleanArray<'_>,
+    doubles: &JDoubleArray<'_>,
+    strings: &JObjectArray<'_>,
+) -> bool {
+    !longs.is_null()
+        && !ints.is_null()
+        && !booleans.is_null()
+        && !doubles.is_null()
+        && !strings.is_null()
+        && env.get_array_length(longs).unwrap_or(0) >= LONG_COUNT as i32
+        && env.get_array_length(ints).unwrap_or(0) >= INT_COUNT as i32
+        && env.get_array_length(booleans).unwrap_or(0) >= BOOLEAN_COUNT as i32
+        && env.get_array_length(doubles).unwrap_or(0) >= DOUBLE_COUNT as i32
+        && env.get_array_length(strings).unwrap_or(0) >= STRING_COUNT
+}
+
+fn fill_runtime_event_payload(
+    event: &sys::mln_runtime_event,
+    longs: &mut [jlong; LONG_COUNT],
+    ints: &mut [jint; INT_COUNT],
+    booleans: &mut [jboolean; BOOLEAN_COUNT],
+    doubles: &mut [f64; DOUBLE_COUNT],
+) {
+    if event.payload_type == sys::MLN_RUNTIME_EVENT_PAYLOAD_NONE {
+        ints[INT_PAYLOAD_AVAILABLE] = 1;
+        return;
+    }
+    if event.payload.is_null() {
+        return;
+    }
+
+    unsafe {
+        match event.payload_type {
+            sys::MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME
+                if event.payload_size
+                    >= std::mem::size_of::<sys::mln_runtime_event_render_frame>() =>
+            {
+                let payload = &*(event.payload as *const sys::mln_runtime_event_render_frame);
+                ints[INT_PAYLOAD_AVAILABLE] = 1;
+                ints[INT_RENDER_MODE] = payload.mode as jint;
+                booleans[BOOLEAN_NEEDS_REPAINT] = jboolean::from(payload.needs_repaint);
+                booleans[BOOLEAN_PLACEMENT_CHANGED] = jboolean::from(payload.placement_changed);
+                doubles[DOUBLE_ENCODING_TIME] = payload.stats.encoding_time;
+                doubles[DOUBLE_RENDERING_TIME] = payload.stats.rendering_time;
+                longs[LONG_FRAME_COUNT] = payload.stats.frame_count as jlong;
+                longs[LONG_DRAW_CALL_COUNT] = payload.stats.draw_call_count as jlong;
+                longs[LONG_TOTAL_DRAW_CALL_COUNT] = payload.stats.total_draw_call_count as jlong;
+            }
+            sys::MLN_RUNTIME_EVENT_PAYLOAD_RENDER_MAP
+                if event.payload_size
+                    >= std::mem::size_of::<sys::mln_runtime_event_render_map>() =>
+            {
+                let payload = &*(event.payload as *const sys::mln_runtime_event_render_map);
+                ints[INT_PAYLOAD_AVAILABLE] = 1;
+                ints[INT_RENDER_MODE] = payload.mode as jint;
+            }
+            sys::MLN_RUNTIME_EVENT_PAYLOAD_STYLE_IMAGE_MISSING
+                if event.payload_size
+                    >= std::mem::size_of::<sys::mln_runtime_event_style_image_missing>() =>
+            {
+                ints[INT_PAYLOAD_AVAILABLE] = 1;
+            }
+            sys::MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION
+                if event.payload_size
+                    >= std::mem::size_of::<sys::mln_runtime_event_tile_action>() =>
+            {
+                let payload = &*(event.payload as *const sys::mln_runtime_event_tile_action);
+                ints[INT_PAYLOAD_AVAILABLE] = 1;
+                ints[INT_TILE_OPERATION] = payload.operation as jint;
+                ints[INT_TILE_WRAP] = payload.tile_id.wrap as jint;
+                longs[LONG_TILE_OVERSCALED_Z] = payload.tile_id.overscaled_z as jlong;
+                longs[LONG_TILE_CANONICAL_Z] = payload.tile_id.canonical_z as jlong;
+                longs[LONG_TILE_CANONICAL_X] = payload.tile_id.canonical_x as jlong;
+                longs[LONG_TILE_CANONICAL_Y] = payload.tile_id.canonical_y as jlong;
+            }
+            sys::MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS
+                if event.payload_size
+                    >= std::mem::size_of::<sys::mln_runtime_event_offline_region_status>() =>
+            {
+                let payload =
+                    &*(event.payload as *const sys::mln_runtime_event_offline_region_status);
+                ints[INT_PAYLOAD_AVAILABLE] = 1;
+                ints[INT_OFFLINE_DOWNLOAD_STATE] = payload.status.download_state as jint;
+                longs[LONG_REGION_ID] = payload.region_id as jlong;
+                longs[LONG_COMPLETED_RESOURCE_COUNT] =
+                    payload.status.completed_resource_count as jlong;
+                longs[LONG_COMPLETED_RESOURCE_SIZE] =
+                    payload.status.completed_resource_size as jlong;
+                longs[LONG_COMPLETED_TILE_COUNT] = payload.status.completed_tile_count as jlong;
+                longs[LONG_REQUIRED_TILE_COUNT] = payload.status.required_tile_count as jlong;
+                longs[LONG_COMPLETED_TILE_SIZE] = payload.status.completed_tile_size as jlong;
+                longs[LONG_REQUIRED_RESOURCE_COUNT] =
+                    payload.status.required_resource_count as jlong;
+                booleans[BOOLEAN_REQUIRED_RESOURCE_COUNT_IS_PRECISE] =
+                    jboolean::from(payload.status.required_resource_count_is_precise);
+                booleans[BOOLEAN_COMPLETE] = jboolean::from(payload.status.complete);
+            }
+            sys::MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR
+                if event.payload_size
+                    >= std::mem::size_of::<sys::mln_runtime_event_offline_region_response_error>(
+                    ) =>
+            {
+                let payload = &*(event.payload
+                    as *const sys::mln_runtime_event_offline_region_response_error);
+                ints[INT_PAYLOAD_AVAILABLE] = 1;
+                ints[INT_RESOURCE_ERROR_REASON] = payload.reason as jint;
+                longs[LONG_REGION_ID] = payload.region_id as jlong;
+            }
+            sys::MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT
+                if event.payload_size
+                    >= std::mem::size_of::<
+                        sys::mln_runtime_event_offline_region_tile_count_limit,
+                    >() =>
+            {
+                let payload = &*(event.payload
+                    as *const sys::mln_runtime_event_offline_region_tile_count_limit);
+                ints[INT_PAYLOAD_AVAILABLE] = 1;
+                longs[LONG_REGION_ID] = payload.region_id as jlong;
+                longs[LONG_LIMIT] = payload.limit as jlong;
+            }
+            sys::MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_OPERATION_COMPLETED
+                if event.payload_size
+                    >= std::mem::size_of::<sys::mln_runtime_event_offline_operation_completed>(
+                    ) =>
+            {
+                let payload =
+                    &*(event.payload as *const sys::mln_runtime_event_offline_operation_completed);
+                ints[INT_PAYLOAD_AVAILABLE] = 1;
+                ints[INT_OFFLINE_OPERATION_KIND] = payload.operation_kind as jint;
+                ints[INT_OFFLINE_RESULT_KIND] = payload.result_kind as jint;
+                ints[INT_OFFLINE_RESULT_STATUS] = payload.result_status as jint;
+                longs[LONG_OPERATION_ID] = payload.operation_id as jlong;
+                booleans[BOOLEAN_FOUND] = jboolean::from(payload.found);
+            }
+            _ => {}
+        }
+    }
+}
+
+fn payload_string(event: &sys::mln_runtime_event) -> String {
+    if event.payload.is_null() {
+        return String::new();
+    }
+    unsafe {
+        match event.payload_type {
+            sys::MLN_RUNTIME_EVENT_PAYLOAD_STYLE_IMAGE_MISSING
+                if event.payload_size
+                    >= std::mem::size_of::<sys::mln_runtime_event_style_image_missing>() =>
+            {
+                let payload =
+                    &*(event.payload as *const sys::mln_runtime_event_style_image_missing);
+                copy_string(payload.image_id, payload.image_id_size)
+            }
+            sys::MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION
+                if event.payload_size
+                    >= std::mem::size_of::<sys::mln_runtime_event_tile_action>() =>
+            {
+                let payload = &*(event.payload as *const sys::mln_runtime_event_tile_action);
+                copy_string(payload.source_id, payload.source_id_size)
+            }
+            _ => String::new(),
+        }
+    }
+}
+
+unsafe fn copy_string(ptr: *const std::os::raw::c_char, len: usize) -> String {
+    if ptr.is_null() || len == 0 {
+        return String::new();
+    }
+    let bytes = unsafe { std::slice::from_raw_parts(ptr.cast::<u8>(), len) };
+    String::from_utf8_lossy(bytes).into_owned()
+}
+
+fn set_string_array_element(
+    env: &JNIEnv<'_>,
+    strings: &JObjectArray<'_>,
+    index: i32,
+    value: String,
+) -> jni::errors::Result<()> {
+    let java_string = env.new_string(value)?;
+    env.set_object_array_element(strings, index, &java_string)
 }
 
 extern "system" fn map_create(

@@ -32,5 +32,11 @@ public final class RuntimeNative {
 
   public static native int mln_runtime_run_once(long runtime);
 
-  public static native int mln_runtime_poll_event();
+  public static native int mln_runtime_poll_event(
+      long runtime,
+      long[] longs,
+      int[] ints,
+      boolean[] booleans,
+      double[] doubles,
+      String[] strings);
 }

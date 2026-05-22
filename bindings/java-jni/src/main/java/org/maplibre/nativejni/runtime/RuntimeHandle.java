@@ -1,15 +1,18 @@
 package org.maplibre.nativejni.runtime;
 
 import java.lang.foreign.MemorySegment;
+import java.lang.ref.WeakReference;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 import org.maplibre.nativejni.internal.access.InternalAccess;
 import org.maplibre.nativejni.internal.bridge.RuntimeNative;
 import org.maplibre.nativejni.internal.lifecycle.HandleState;
 import org.maplibre.nativejni.internal.loader.NativeLibrary;
 import org.maplibre.nativejni.internal.status.Status;
+import org.maplibre.nativejni.internal.struct.RuntimeStructs;
 import org.maplibre.nativejni.map.MapHandle;
 import org.maplibre.nativejni.offline.OfflineRegionDefinition;
 import org.maplibre.nativejni.offline.OfflineRegionDownloadState;
@@ -21,6 +24,8 @@ import org.maplibre.nativejni.resource.ResourceTransformCallback;
 /** API-parity scaffold for the Java JNI binding. */
 public final class RuntimeHandle implements AutoCloseable {
   private final HandleState state;
+  private final ConcurrentHashMap<Long, WeakReference<MapHandle>> liveMaps =
+      new ConcurrentHashMap<>();
 
   private RuntimeHandle(long handle) {
     this.state = new HandleState("RuntimeHandle", handle);
@@ -148,7 +153,36 @@ public final class RuntimeHandle implements AutoCloseable {
   }
 
   public Optional<RuntimeEvent> pollEvent() {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    var longs = new long[RuntimeStructs.LONG_COUNT];
+    var ints = new int[RuntimeStructs.INT_COUNT];
+    var booleans = new boolean[RuntimeStructs.BOOLEAN_COUNT];
+    var doubles = new double[RuntimeStructs.DOUBLE_COUNT];
+    var strings = new String[RuntimeStructs.STRING_COUNT];
+    Status.check(
+        RuntimeNative.mln_runtime_poll_event(
+            state.requireLiveAddress(), longs, ints, booleans, doubles, strings));
+    if (!booleans[RuntimeStructs.BOOLEAN_HAS_EVENT]) {
+      return Optional.empty();
+    }
+    var sourceType = RuntimeEventSourceType.fromNative(ints[RuntimeStructs.INT_SOURCE_TYPE]);
+    var runtimeSource =
+        sourceType == RuntimeEventSourceType.RUNTIME
+            ? Optional.of(this)
+            : Optional.<RuntimeHandle>empty();
+    var mapSource =
+        sourceType == RuntimeEventSourceType.MAP
+            ? Optional.ofNullable(mapFor(longs[RuntimeStructs.LONG_SOURCE_ADDRESS]))
+            : Optional.<MapHandle>empty();
+    var event =
+        RuntimeStructs.runtimeEvent(
+            longs, ints, booleans, doubles, strings, runtimeSource, mapSource);
+    if (event.type() == RuntimeEventType.MAP_STYLE_LOADED) {
+      event
+          .mapSource()
+          .ifPresent(map -> map.releaseDetachedCustomGeometrySources(InternalAccess.INSTANCE));
+    }
+    return Optional.of(event);
   }
 
   public void close() {
@@ -175,11 +209,25 @@ public final class RuntimeHandle implements AutoCloseable {
   public void registerMap(InternalAccess access, MapHandle map) {
     Objects.requireNonNull(access, "access");
     Objects.requireNonNull(map, "map");
+    liveMaps.put(map.nativeAddress(InternalAccess.INSTANCE), new WeakReference<>(map));
   }
 
   public void unregisterMap(InternalAccess access, MapHandle map) {
     Objects.requireNonNull(access, "access");
     Objects.requireNonNull(map, "map");
+    liveMaps.entrySet().removeIf(entry -> entry.getValue().get() == map);
+  }
+
+  private MapHandle mapFor(long sourceAddress) {
+    if (sourceAddress == 0) {
+      return null;
+    }
+    var reference = liveMaps.get(sourceAddress);
+    var map = reference == null ? null : reference.get();
+    if (reference != null && map == null) {
+      liveMaps.remove(sourceAddress, reference);
+    }
+    return map;
   }
 
   static MemorySegment offlineOperationCompletedPayload(MemorySegment event) {

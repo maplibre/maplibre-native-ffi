@@ -28,4 +28,12 @@ class RuntimeHandleTest {
     assertTrue(runtime.isClosed());
     assertThrows(InvalidStateException.class, runtime::runOnce);
   }
+
+  @Test
+  void pollEventReturnsEmptyWhenNativeQueueIsEmpty() {
+    try (var runtime = RuntimeHandle.create()) {
+      runtime.runOnce();
+      assertTrue(runtime.pollEvent().isEmpty());
+    }
+  }
 }
