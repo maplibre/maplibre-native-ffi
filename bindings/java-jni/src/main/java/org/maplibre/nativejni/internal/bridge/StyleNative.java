@@ -103,11 +103,14 @@ public final class StyleNative {
 
   public static native int mln_map_add_style_layer_json();
 
-  public static native int mln_map_remove_style_layer();
+  public static native int mln_map_remove_style_layer(
+      long map, String layerId, boolean[] outRemoved);
 
-  public static native int mln_map_style_layer_exists();
+  public static native int mln_map_style_layer_exists(
+      long map, String layerId, boolean[] outExists);
 
-  public static native int mln_map_get_style_layer_type();
+  public static native int mln_map_get_style_layer_type(
+      long map, String layerId, String[] outLayerType, boolean[] outFound);
 
   public static native int mln_map_list_style_layer_ids();
 

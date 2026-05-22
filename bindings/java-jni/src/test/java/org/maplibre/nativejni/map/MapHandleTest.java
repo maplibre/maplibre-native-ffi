@@ -132,6 +132,13 @@ class MapHandleTest {
         map.setGeoJsonSourceUrl("geojson-source", "https://example.com/updated.geojson");
         assertTrue(map.removeStyleSource("geojson-source"));
         assertFalse(map.removeStyleSource("geojson-source"));
+        map.setStyleJson(
+            "{\"version\":8,\"sources\":{},\"layers\":[{\"id\":\"background-layer\",\"type\":\"background\"}]}");
+        assertTrue(map.styleLayerExists("background-layer"));
+        assertEquals("background", map.styleLayerType("background-layer").orElseThrow());
+        assertTrue(map.styleLayerType("missing-layer").isEmpty());
+        assertTrue(map.removeStyleLayer("background-layer"));
+        assertFalse(map.removeStyleLayer("background-layer"));
         map.setStyleUrl("https://example.com/style.json");
         map.requestRepaint();
         assertThrows(InvalidStateException.class, map::requestStillImage);

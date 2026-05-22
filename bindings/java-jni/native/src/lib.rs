@@ -276,9 +276,6 @@ mod registration {
             "mln_map_set_location_indicator_accuracy_radius",
             "mln_map_set_location_indicator_image_name",
             "mln_map_add_style_layer_json",
-            "mln_map_remove_style_layer",
-            "mln_map_style_layer_exists",
-            "mln_map_get_style_layer_type",
             "mln_map_list_style_layer_ids",
             "mln_map_move_style_layer",
             "mln_map_get_style_layer_json",
@@ -314,6 +311,21 @@ mod registration {
             name: "mln_map_set_geojson_source_url".into(),
             sig: "(JLjava/lang/String;Ljava/lang/String;)I".into(),
             fn_ptr: map_set_geojson_source_url as *mut c_void,
+        });
+        style_methods.push(NativeMethod {
+            name: "mln_map_remove_style_layer".into(),
+            sig: "(JLjava/lang/String;[Z)I".into(),
+            fn_ptr: map_remove_style_layer as *mut c_void,
+        });
+        style_methods.push(NativeMethod {
+            name: "mln_map_style_layer_exists".into(),
+            sig: "(JLjava/lang/String;[Z)I".into(),
+            fn_ptr: map_style_layer_exists as *mut c_void,
+        });
+        style_methods.push(NativeMethod {
+            name: "mln_map_get_style_layer_type".into(),
+            sig: "(JLjava/lang/String;[Ljava/lang/String;[Z)I".into(),
+            fn_ptr: map_get_style_layer_type as *mut c_void,
         });
         register_methods(
             vm,
@@ -1354,6 +1366,126 @@ fn map_style_source_bool(
             return sys::MLN_STATUS_INVALID_ARGUMENT;
         }
         result
+    }))
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+extern "system" fn map_remove_style_layer(
+    env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    map: jlong,
+    layer_id: JString<'_>,
+    out_removed: JBooleanArray<'_>,
+) -> jint {
+    map_style_layer_bool(
+        env,
+        map,
+        layer_id,
+        out_removed,
+        sys::mln_map_remove_style_layer,
+    )
+}
+
+extern "system" fn map_style_layer_exists(
+    env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    map: jlong,
+    layer_id: JString<'_>,
+    out_exists: JBooleanArray<'_>,
+) -> jint {
+    map_style_layer_bool(
+        env,
+        map,
+        layer_id,
+        out_exists,
+        sys::mln_map_style_layer_exists,
+    )
+}
+
+fn map_style_layer_bool(
+    mut env: JNIEnv<'_>,
+    map: jlong,
+    layer_id: JString<'_>,
+    out_value: JBooleanArray<'_>,
+    operation: unsafe extern "C" fn(
+        *mut sys::mln_map,
+        sys::mln_string_view,
+        *mut bool,
+    ) -> sys::mln_status,
+) -> jint {
+    catch_unwind(AssertUnwindSafe(|| {
+        if out_value.is_null() || env.get_array_length(&out_value).unwrap_or(0) < 1 {
+            return sys::MLN_STATUS_INVALID_ARGUMENT;
+        }
+        let (layer_id, layer_id_view) = match string_view(&mut env, &layer_id) {
+            Ok(value) => value,
+            Err(status) => return status,
+        };
+        let _layer_id = layer_id;
+        let mut value = false;
+        let result = unsafe { operation(map as *mut sys::mln_map, layer_id_view, &mut value) };
+        if result == sys::MLN_STATUS_OK
+            && env
+                .set_boolean_array_region(&out_value, 0, &[jboolean::from(value)])
+                .is_err()
+        {
+            return sys::MLN_STATUS_INVALID_ARGUMENT;
+        }
+        result
+    }))
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+extern "system" fn map_get_style_layer_type(
+    mut env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    map: jlong,
+    layer_id: JString<'_>,
+    out_layer_type: JObjectArray<'_>,
+    out_found: JBooleanArray<'_>,
+) -> jint {
+    catch_unwind(AssertUnwindSafe(|| {
+        if out_layer_type.is_null()
+            || out_found.is_null()
+            || env.get_array_length(&out_layer_type).unwrap_or(0) < 1
+            || env.get_array_length(&out_found).unwrap_or(0) < 1
+        {
+            return sys::MLN_STATUS_INVALID_ARGUMENT;
+        }
+        let (layer_id, layer_id_view) = match string_view(&mut env, &layer_id) {
+            Ok(value) => value,
+            Err(status) => return status,
+        };
+        let _layer_id = layer_id;
+        let mut layer_type = sys::mln_string_view {
+            data: std::ptr::null(),
+            size: 0,
+        };
+        let mut found = false;
+        let result = unsafe {
+            sys::mln_map_get_style_layer_type(
+                map as *mut sys::mln_map,
+                layer_id_view,
+                &mut layer_type,
+                &mut found,
+            )
+        };
+        if result != sys::MLN_STATUS_OK {
+            return result;
+        }
+        if env
+            .set_boolean_array_region(&out_found, 0, &[jboolean::from(found)])
+            .is_err()
+        {
+            return sys::MLN_STATUS_INVALID_ARGUMENT;
+        }
+        if found {
+            let layer_type = unsafe { copy_string(layer_type.data, layer_type.size) };
+            if set_string_array_element(&env, &out_layer_type, 0, layer_type).is_err() {
+                return sys::MLN_STATUS_INVALID_ARGUMENT;
+            }
+        }
+        sys::MLN_STATUS_OK
     }))
     .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
 }

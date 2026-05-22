@@ -330,15 +330,34 @@ public final class MapHandle implements AutoCloseable {
   }
 
   public boolean removeStyleLayer(String layerId) {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    var outRemoved = new boolean[1];
+    Status.check(
+        StyleNative.mln_map_remove_style_layer(
+            state.requireLiveAddress(), Objects.requireNonNull(layerId, "layerId"), outRemoved));
+    return outRemoved[0];
   }
 
   public boolean styleLayerExists(String layerId) {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    var outExists = new boolean[1];
+    Status.check(
+        StyleNative.mln_map_style_layer_exists(
+            state.requireLiveAddress(), Objects.requireNonNull(layerId, "layerId"), outExists));
+    return outExists[0];
   }
 
   public Optional<String> styleLayerType(String layerId) {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    var outLayerType = new String[1];
+    var outFound = new boolean[1];
+    Status.check(
+        StyleNative.mln_map_get_style_layer_type(
+            state.requireLiveAddress(),
+            Objects.requireNonNull(layerId, "layerId"),
+            outLayerType,
+            outFound));
+    return outFound[0] ? Optional.of(outLayerType[0]) : Optional.empty();
   }
 
   public List<String> styleLayerIds() {
