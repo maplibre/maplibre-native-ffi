@@ -94,6 +94,23 @@ const CAMERA_VALUE_ROLL: usize = 12;
 const CAMERA_VALUE_FOV: usize = 13;
 const CAMERA_VALUE_COUNT: usize = 14;
 
+const BOUND_FIELD_BOUNDS: usize = 0;
+const BOUND_FIELD_MIN_ZOOM: usize = 1;
+const BOUND_FIELD_MAX_ZOOM: usize = 2;
+const BOUND_FIELD_MIN_PITCH: usize = 3;
+const BOUND_FIELD_MAX_PITCH: usize = 4;
+const BOUND_FIELD_COUNT: usize = 5;
+
+const BOUND_VALUE_SW_LATITUDE: usize = 0;
+const BOUND_VALUE_SW_LONGITUDE: usize = 1;
+const BOUND_VALUE_NE_LATITUDE: usize = 2;
+const BOUND_VALUE_NE_LONGITUDE: usize = 3;
+const BOUND_VALUE_MIN_ZOOM: usize = 4;
+const BOUND_VALUE_MAX_ZOOM: usize = 5;
+const BOUND_VALUE_MIN_PITCH: usize = 6;
+const BOUND_VALUE_MAX_PITCH: usize = 7;
+const BOUND_VALUE_COUNT: usize = 8;
+
 const ANIMATION_FIELD_DURATION: usize = 0;
 const ANIMATION_FIELD_VELOCITY: usize = 1;
 const ANIMATION_FIELD_MIN_ZOOM: usize = 2;
@@ -528,8 +545,6 @@ mod registration {
             "mln_map_camera_for_geometry",
             "mln_map_lat_lng_bounds_for_camera",
             "mln_map_lat_lng_bounds_for_camera_unwrapped",
-            "mln_map_get_bounds",
-            "mln_map_set_bounds",
             "mln_map_get_free_camera_options",
             "mln_map_set_free_camera_options",
             "mln_map_get_projection_mode",
@@ -564,6 +579,16 @@ mod registration {
             name: "mln_map_dump_debug_logs".into(),
             sig: "(J)I".into(),
             fn_ptr: map_dump_debug_logs as *mut c_void,
+        });
+        methods.push(NativeMethod {
+            name: "mln_map_get_bounds".into(),
+            sig: "(J[Z[D)I".into(),
+            fn_ptr: map_get_bounds as *mut c_void,
+        });
+        methods.push(NativeMethod {
+            name: "mln_map_set_bounds".into(),
+            sig: "(J[Z[D)I".into(),
+            fn_ptr: map_set_bounds as *mut c_void,
         });
         methods.push(NativeMethod {
             name: "mln_map_get_camera".into(),
@@ -1771,6 +1796,44 @@ extern "system" fn map_dump_debug_logs(_env: JNIEnv<'_>, _class: JClass<'_>, map
         .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
 }
 
+extern "system" fn map_get_bounds(
+    env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    map: jlong,
+    out_fields: JBooleanArray<'_>,
+    out_values: JDoubleArray<'_>,
+) -> jint {
+    catch_unwind(AssertUnwindSafe(|| {
+        if !bound_arrays_are_valid(&env, &out_fields, &out_values) {
+            return sys::MLN_STATUS_INVALID_ARGUMENT;
+        }
+        let mut bounds = unsafe { sys::mln_bound_options_default() };
+        let result = unsafe { sys::mln_map_get_bounds(map as *mut sys::mln_map, &mut bounds) };
+        if result != sys::MLN_STATUS_OK {
+            return result;
+        }
+        write_bound_arrays(&env, &out_fields, &out_values, &bounds)
+    }))
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+extern "system" fn map_set_bounds(
+    env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    map: jlong,
+    fields: JBooleanArray<'_>,
+    values: JDoubleArray<'_>,
+) -> jint {
+    catch_unwind(AssertUnwindSafe(|| {
+        let bounds = match read_bound_options(&env, &fields, &values) {
+            Ok(bounds) => bounds,
+            Err(status) => return status,
+        };
+        unsafe { sys::mln_map_set_bounds(map as *mut sys::mln_map, &bounds) }
+    }))
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
 extern "system" fn map_get_camera(
     env: JNIEnv<'_>,
     _class: JClass<'_>,
@@ -1900,6 +1963,17 @@ fn camera_arrays_are_valid(
         && env.get_array_length(values).unwrap_or(0) >= CAMERA_VALUE_COUNT as i32
 }
 
+fn bound_arrays_are_valid(
+    env: &JNIEnv<'_>,
+    fields: &JBooleanArray<'_>,
+    values: &JDoubleArray<'_>,
+) -> bool {
+    !fields.is_null()
+        && !values.is_null()
+        && env.get_array_length(fields).unwrap_or(0) >= BOUND_FIELD_COUNT as i32
+        && env.get_array_length(values).unwrap_or(0) >= BOUND_VALUE_COUNT as i32
+}
+
 fn animation_arrays_are_valid(
     env: &JNIEnv<'_>,
     fields: &JBooleanArray<'_>,
@@ -1909,6 +1983,93 @@ fn animation_arrays_are_valid(
         && !values.is_null()
         && env.get_array_length(fields).unwrap_or(0) >= ANIMATION_FIELD_COUNT as i32
         && env.get_array_length(values).unwrap_or(0) >= ANIMATION_VALUE_COUNT as i32
+}
+
+fn read_bound_options(
+    env: &JNIEnv<'_>,
+    fields: &JBooleanArray<'_>,
+    values: &JDoubleArray<'_>,
+) -> Result<sys::mln_bound_options, jint> {
+    if !bound_arrays_are_valid(env, fields, values) {
+        return Err(sys::MLN_STATUS_INVALID_ARGUMENT);
+    }
+    let mut field_values = [0 as jboolean; BOUND_FIELD_COUNT];
+    let mut option_values = [0.0_f64; BOUND_VALUE_COUNT];
+    if env
+        .get_boolean_array_region(fields, 0, &mut field_values)
+        .is_err()
+        || env
+            .get_double_array_region(values, 0, &mut option_values)
+            .is_err()
+    {
+        return Err(sys::MLN_STATUS_INVALID_ARGUMENT);
+    }
+
+    let mut bounds = unsafe { sys::mln_bound_options_default() };
+    if field_values[BOUND_FIELD_BOUNDS] != 0 {
+        bounds.fields |= sys::MLN_BOUND_OPTION_BOUNDS;
+        bounds.bounds.southwest.latitude = option_values[BOUND_VALUE_SW_LATITUDE];
+        bounds.bounds.southwest.longitude = option_values[BOUND_VALUE_SW_LONGITUDE];
+        bounds.bounds.northeast.latitude = option_values[BOUND_VALUE_NE_LATITUDE];
+        bounds.bounds.northeast.longitude = option_values[BOUND_VALUE_NE_LONGITUDE];
+    }
+    if field_values[BOUND_FIELD_MIN_ZOOM] != 0 {
+        bounds.fields |= sys::MLN_BOUND_OPTION_MIN_ZOOM;
+        bounds.min_zoom = option_values[BOUND_VALUE_MIN_ZOOM];
+    }
+    if field_values[BOUND_FIELD_MAX_ZOOM] != 0 {
+        bounds.fields |= sys::MLN_BOUND_OPTION_MAX_ZOOM;
+        bounds.max_zoom = option_values[BOUND_VALUE_MAX_ZOOM];
+    }
+    if field_values[BOUND_FIELD_MIN_PITCH] != 0 {
+        bounds.fields |= sys::MLN_BOUND_OPTION_MIN_PITCH;
+        bounds.min_pitch = option_values[BOUND_VALUE_MIN_PITCH];
+    }
+    if field_values[BOUND_FIELD_MAX_PITCH] != 0 {
+        bounds.fields |= sys::MLN_BOUND_OPTION_MAX_PITCH;
+        bounds.max_pitch = option_values[BOUND_VALUE_MAX_PITCH];
+    }
+    Ok(bounds)
+}
+
+fn write_bound_arrays(
+    env: &JNIEnv<'_>,
+    fields: &JBooleanArray<'_>,
+    values: &JDoubleArray<'_>,
+    bounds: &sys::mln_bound_options,
+) -> jint {
+    let mut field_values = [0 as jboolean; BOUND_FIELD_COUNT];
+    let mut option_values = [0.0_f64; BOUND_VALUE_COUNT];
+    field_values[BOUND_FIELD_BOUNDS] =
+        jboolean::from(bounds.fields & sys::MLN_BOUND_OPTION_BOUNDS != 0);
+    field_values[BOUND_FIELD_MIN_ZOOM] =
+        jboolean::from(bounds.fields & sys::MLN_BOUND_OPTION_MIN_ZOOM != 0);
+    field_values[BOUND_FIELD_MAX_ZOOM] =
+        jboolean::from(bounds.fields & sys::MLN_BOUND_OPTION_MAX_ZOOM != 0);
+    field_values[BOUND_FIELD_MIN_PITCH] =
+        jboolean::from(bounds.fields & sys::MLN_BOUND_OPTION_MIN_PITCH != 0);
+    field_values[BOUND_FIELD_MAX_PITCH] =
+        jboolean::from(bounds.fields & sys::MLN_BOUND_OPTION_MAX_PITCH != 0);
+    option_values[BOUND_VALUE_SW_LATITUDE] = bounds.bounds.southwest.latitude;
+    option_values[BOUND_VALUE_SW_LONGITUDE] = bounds.bounds.southwest.longitude;
+    option_values[BOUND_VALUE_NE_LATITUDE] = bounds.bounds.northeast.latitude;
+    option_values[BOUND_VALUE_NE_LONGITUDE] = bounds.bounds.northeast.longitude;
+    option_values[BOUND_VALUE_MIN_ZOOM] = bounds.min_zoom;
+    option_values[BOUND_VALUE_MAX_ZOOM] = bounds.max_zoom;
+    option_values[BOUND_VALUE_MIN_PITCH] = bounds.min_pitch;
+    option_values[BOUND_VALUE_MAX_PITCH] = bounds.max_pitch;
+
+    if env
+        .set_boolean_array_region(fields, 0, &field_values)
+        .is_err()
+        || env
+            .set_double_array_region(values, 0, &option_values)
+            .is_err()
+    {
+        sys::MLN_STATUS_INVALID_ARGUMENT
+    } else {
+        sys::MLN_STATUS_OK
+    }
 }
 
 fn read_camera_options(

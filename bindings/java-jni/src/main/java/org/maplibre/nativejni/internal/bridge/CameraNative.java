@@ -117,9 +117,9 @@ public final class CameraNative {
 
   public static native int mln_map_lat_lng_bounds_for_camera_unwrapped();
 
-  public static native int mln_map_get_bounds();
+  public static native int mln_map_get_bounds(long map, boolean[] outFields, double[] outValues);
 
-  public static native int mln_map_set_bounds();
+  public static native int mln_map_set_bounds(long map, boolean[] fields, double[] values);
 
   public static native int mln_map_get_free_camera_options();
 

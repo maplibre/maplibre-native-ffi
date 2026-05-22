@@ -11,9 +11,11 @@ import java.util.List;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.maplibre.nativejni.camera.AnimationOptions;
+import org.maplibre.nativejni.camera.BoundOptions;
 import org.maplibre.nativejni.camera.CameraOptions;
 import org.maplibre.nativejni.error.InvalidStateException;
 import org.maplibre.nativejni.geo.LatLng;
+import org.maplibre.nativejni.geo.LatLngBounds;
 import org.maplibre.nativejni.geo.ScreenPoint;
 import org.maplibre.nativejni.internal.access.InternalAccess;
 import org.maplibre.nativejni.runtime.RuntimeHandle;
@@ -90,6 +92,28 @@ class MapHandleTest {
         var animation = new AnimationOptions().durationMs(0);
         map.easeTo(new CameraOptions().zoom(4), animation);
         map.flyTo(new CameraOptions().zoom(3), animation);
+      }
+    }
+  }
+
+  @Test
+  void cameraBoundsCrossNativeBoundary() {
+    try (var runtime = RuntimeHandle.create()) {
+      try (var map = MapHandle.create(runtime, new MapOptions().size(64, 64))) {
+        var bounds = new LatLngBounds(new LatLng(-10, -20), new LatLng(10, 20));
+        map.setBounds(
+            new BoundOptions().bounds(bounds).minZoom(1).maxZoom(10).minPitch(0).maxPitch(60));
+
+        var result = map.bounds();
+        assertTrue(result.hasBounds());
+        assertEquals(-10, result.bounds().southwest().latitude(), 1.0e-9);
+        assertEquals(-20, result.bounds().southwest().longitude(), 1.0e-9);
+        assertEquals(10, result.bounds().northeast().latitude(), 1.0e-9);
+        assertEquals(20, result.bounds().northeast().longitude(), 1.0e-9);
+        assertEquals(1, result.minZoom(), 1.0e-9);
+        assertEquals(10, result.maxZoom(), 1.0e-9);
+        assertEquals(0, result.minPitch(), 1.0e-9);
+        assertEquals(60, result.maxPitch(), 1.0e-9);
       }
     }
   }

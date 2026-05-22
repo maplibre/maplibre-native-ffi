@@ -49,6 +49,8 @@ import org.maplibre.nativejni.style.TileSourceOptions;
 public final class MapHandle implements AutoCloseable {
   static final int CAMERA_FIELD_COUNT = 9;
   static final int CAMERA_VALUE_COUNT = 14;
+  private static final int BOUND_FIELD_COUNT = 5;
+  private static final int BOUND_VALUE_COUNT = 8;
   private static final int ANIMATION_FIELD_COUNT = 4;
   private static final int ANIMATION_VALUE_COUNT = 7;
 
@@ -785,11 +787,19 @@ public final class MapHandle implements AutoCloseable {
   }
 
   public BoundOptions bounds() {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    var fields = new boolean[BOUND_FIELD_COUNT];
+    var values = new double[BOUND_VALUE_COUNT];
+    Status.check(CameraNative.mln_map_get_bounds(state.requireLiveAddress(), fields, values));
+    return boundsFromNative(fields, values);
   }
 
   public void setBounds(BoundOptions options) {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    var nativeBounds = boundsToNative(options);
+    Status.check(
+        CameraNative.mln_map_set_bounds(
+            state.requireLiveAddress(), nativeBounds.fields(), nativeBounds.values()));
   }
 
   public FreeCameraOptions freeCameraOptions() {
@@ -934,6 +944,49 @@ public final class MapHandle implements AutoCloseable {
       camera.fieldOfView(values[13]);
     }
     return camera;
+  }
+
+  private static NativeOptions boundsToNative(BoundOptions options) {
+    var boundsValue = MapStructs.boundOptions(options);
+    var fields = new boolean[BOUND_FIELD_COUNT];
+    var values = new double[BOUND_VALUE_COUNT];
+    fields[0] = boundsValue.hasBounds();
+    if (fields[0]) {
+      values[0] = boundsValue.bounds().southwest().latitude();
+      values[1] = boundsValue.bounds().southwest().longitude();
+      values[2] = boundsValue.bounds().northeast().latitude();
+      values[3] = boundsValue.bounds().northeast().longitude();
+    }
+    fields[1] = boundsValue.hasMinZoom();
+    values[4] = boundsValue.minZoom();
+    fields[2] = boundsValue.hasMaxZoom();
+    values[5] = boundsValue.maxZoom();
+    fields[3] = boundsValue.hasMinPitch();
+    values[6] = boundsValue.minPitch();
+    fields[4] = boundsValue.hasMaxPitch();
+    values[7] = boundsValue.maxPitch();
+    return new NativeOptions(fields, values);
+  }
+
+  private static BoundOptions boundsFromNative(boolean[] fields, double[] values) {
+    var options = new BoundOptions();
+    if (fields[0]) {
+      options.bounds(
+          new LatLngBounds(new LatLng(values[0], values[1]), new LatLng(values[2], values[3])));
+    }
+    if (fields[1]) {
+      options.minZoom(values[4]);
+    }
+    if (fields[2]) {
+      options.maxZoom(values[5]);
+    }
+    if (fields[3]) {
+      options.minPitch(values[6]);
+    }
+    if (fields[4]) {
+      options.maxPitch(values[7]);
+    }
+    return options;
   }
 
   private static NativeOptions animationToNative(AnimationOptions animation, boolean hasAnimation) {
