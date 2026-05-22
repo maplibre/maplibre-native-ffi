@@ -65,6 +65,8 @@ class RuntimeHandleTest {
 
       assertTrue(operation.kind() == OfflineOperationKind.REGION_CREATE);
       assertTrue(operation.resultKind() == OfflineOperationResultKind.REGION);
+      assertThrows(
+          InvalidStateException.class, () -> runtime.takeCreateOfflineRegionResult(operation));
       runtime.discardOfflineOperation(operation);
     }
   }
@@ -81,6 +83,13 @@ class RuntimeHandleTest {
       assertTrue(list.kind() == OfflineOperationKind.REGIONS_LIST);
       assertTrue(list.resultKind() == OfflineOperationResultKind.REGION_LIST);
       runtime.discardOfflineOperation(list);
+
+      var update = runtime.startUpdateOfflineRegionMetadata(123, new byte[] {4, 5, 6});
+      assertTrue(update.kind() == OfflineOperationKind.REGION_UPDATE_METADATA);
+      assertTrue(update.resultKind() == OfflineOperationResultKind.REGION);
+      assertThrows(
+          InvalidStateException.class, () -> runtime.takeUpdateOfflineRegionMetadataResult(update));
+      runtime.discardOfflineOperation(update);
 
       var status = runtime.startOfflineRegionStatus(123);
       assertTrue(status.kind() == OfflineOperationKind.REGION_GET_STATUS);

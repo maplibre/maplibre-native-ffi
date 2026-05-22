@@ -45,15 +45,20 @@ public final class OfflineNative {
   public static native int mln_runtime_offline_region_delete_start(
       long runtime, long regionId, long[] outOperationId);
 
-  public static native int mln_runtime_offline_region_create_take_result();
+  public static native int mln_runtime_offline_region_create_take_result(
+      long runtime, long operationId, Object[] outRegion);
 
-  public static native int mln_runtime_offline_region_get_take_result();
+  public static native int mln_runtime_offline_region_get_take_result(
+      long runtime, long operationId, Object[] outRegion, boolean[] outFound);
 
-  public static native int mln_runtime_offline_regions_list_take_result();
+  public static native int mln_runtime_offline_regions_list_take_result(
+      long runtime, long operationId, Object[] outRegions);
 
-  public static native int mln_runtime_offline_regions_merge_database_take_result();
+  public static native int mln_runtime_offline_regions_merge_database_take_result(
+      long runtime, long operationId, Object[] outRegions);
 
-  public static native int mln_runtime_offline_region_update_metadata_take_result();
+  public static native int mln_runtime_offline_region_update_metadata_take_result(
+      long runtime, long operationId, Object[] outRegion);
 
   public static native int mln_runtime_offline_region_get_status_take_result(
       long runtime, long operationId, long[] longs, int[] ints, boolean[] booleans);

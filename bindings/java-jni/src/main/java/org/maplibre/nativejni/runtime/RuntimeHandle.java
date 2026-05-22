@@ -218,27 +218,80 @@ public final class RuntimeHandle implements AutoCloseable {
 
   public OfflineRegionInfo takeCreateOfflineRegionResult(
       OfflineOperationHandle<OfflineRegionInfo> operation) {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    Objects.requireNonNull(operation, "operation");
+    var operationId =
+        operation.requireLive(
+            this, OfflineOperationKind.REGION_CREATE, OfflineOperationResultKind.REGION);
+    var outRegion = new Object[1];
+    Status.check(
+        OfflineNative.mln_runtime_offline_region_create_take_result(
+            state.requireLiveAddress(), operationId, outRegion));
+    operation.markConsumed();
+    return (OfflineRegionInfo) outRegion[0];
   }
 
   public Optional<OfflineRegionInfo> takeOfflineRegionResult(
       OfflineOperationHandle<Optional<OfflineRegionInfo>> operation) {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    Objects.requireNonNull(operation, "operation");
+    var operationId =
+        operation.requireLive(
+            this, OfflineOperationKind.REGION_GET, OfflineOperationResultKind.OPTIONAL_REGION);
+    var outRegion = new Object[1];
+    var outFound = new boolean[1];
+    Status.check(
+        OfflineNative.mln_runtime_offline_region_get_take_result(
+            state.requireLiveAddress(), operationId, outRegion, outFound));
+    operation.markConsumed();
+    return outFound[0] ? Optional.of((OfflineRegionInfo) outRegion[0]) : Optional.empty();
   }
 
   public List<OfflineRegionInfo> takeOfflineRegionsResult(
       OfflineOperationHandle<List<OfflineRegionInfo>> operation) {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    Objects.requireNonNull(operation, "operation");
+    var operationId =
+        operation.requireLive(
+            this, OfflineOperationKind.REGIONS_LIST, OfflineOperationResultKind.REGION_LIST);
+    var outRegions = new Object[1];
+    Status.check(
+        OfflineNative.mln_runtime_offline_regions_list_take_result(
+            state.requireLiveAddress(), operationId, outRegions));
+    operation.markConsumed();
+    return List.of((OfflineRegionInfo[]) outRegions[0]);
   }
 
   public List<OfflineRegionInfo> takeMergeOfflineRegionsDatabaseResult(
       OfflineOperationHandle<List<OfflineRegionInfo>> operation) {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    Objects.requireNonNull(operation, "operation");
+    var operationId =
+        operation.requireLive(
+            this,
+            OfflineOperationKind.REGIONS_MERGE_DATABASE,
+            OfflineOperationResultKind.REGION_LIST);
+    var outRegions = new Object[1];
+    Status.check(
+        OfflineNative.mln_runtime_offline_regions_merge_database_take_result(
+            state.requireLiveAddress(), operationId, outRegions));
+    operation.markConsumed();
+    return List.of((OfflineRegionInfo[]) outRegions[0]);
   }
 
   public OfflineRegionInfo takeUpdateOfflineRegionMetadataResult(
       OfflineOperationHandle<OfflineRegionInfo> operation) {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    Objects.requireNonNull(operation, "operation");
+    var operationId =
+        operation.requireLive(
+            this, OfflineOperationKind.REGION_UPDATE_METADATA, OfflineOperationResultKind.REGION);
+    var outRegion = new Object[1];
+    Status.check(
+        OfflineNative.mln_runtime_offline_region_update_metadata_take_result(
+            state.requireLiveAddress(), operationId, outRegion));
+    operation.markConsumed();
+    return (OfflineRegionInfo) outRegion[0];
   }
 
   public OfflineRegionStatus takeOfflineRegionStatusResult(

@@ -13,11 +13,12 @@ use jni::objects::{
 };
 use jni::sys::{JNI_VERSION_1_8, jboolean, jint, jlong, jstring};
 use jni::{JNIEnv, JavaVM, NativeMethod};
-use maplibre_native_core::LatLng as CoreLatLng;
 use maplibre_native_core::error::capture_thread_diagnostic;
 use maplibre_native_core::geojson as core_geojson;
 use maplibre_native_core::geometry as core_geometry;
 use maplibre_native_core::json as core_json;
+use maplibre_native_core::runtime as core_runtime;
+use maplibre_native_core::{LatLng as CoreLatLng, LatLngBounds as CoreLatLngBounds};
 use maplibre_native_sys as sys;
 
 const BRIDGE_CLASS: &str = "org/maplibre/nativejni/internal/bridge/NativeBridge";
@@ -679,11 +680,6 @@ mod registration {
 
     fn register_offline(vm: &JavaVM) -> jni::errors::Result<()> {
         let mut methods = no_arg_status_methods(&[
-            "mln_runtime_offline_region_create_take_result",
-            "mln_runtime_offline_region_get_take_result",
-            "mln_runtime_offline_regions_list_take_result",
-            "mln_runtime_offline_regions_merge_database_take_result",
-            "mln_runtime_offline_region_update_metadata_take_result",
             "mln_offline_region_snapshot_get",
             "mln_offline_region_snapshot_destroy",
             "mln_offline_region_list_count",
@@ -739,6 +735,31 @@ mod registration {
             name: "mln_runtime_offline_region_delete_start".into(),
             sig: "(JJ[J)I".into(),
             fn_ptr: offline_region_delete_start as *mut c_void,
+        });
+        methods.push(NativeMethod {
+            name: "mln_runtime_offline_region_create_take_result".into(),
+            sig: "(JJ[Ljava/lang/Object;)I".into(),
+            fn_ptr: offline_region_create_take_result as *mut c_void,
+        });
+        methods.push(NativeMethod {
+            name: "mln_runtime_offline_region_get_take_result".into(),
+            sig: "(JJ[Ljava/lang/Object;[Z)I".into(),
+            fn_ptr: offline_region_get_take_result as *mut c_void,
+        });
+        methods.push(NativeMethod {
+            name: "mln_runtime_offline_regions_list_take_result".into(),
+            sig: "(JJ[Ljava/lang/Object;)I".into(),
+            fn_ptr: offline_regions_list_take_result as *mut c_void,
+        });
+        methods.push(NativeMethod {
+            name: "mln_runtime_offline_regions_merge_database_take_result".into(),
+            sig: "(JJ[Ljava/lang/Object;)I".into(),
+            fn_ptr: offline_regions_merge_database_take_result as *mut c_void,
+        });
+        methods.push(NativeMethod {
+            name: "mln_runtime_offline_region_update_metadata_take_result".into(),
+            sig: "(JJ[Ljava/lang/Object;)I".into(),
+            fn_ptr: offline_region_update_metadata_take_result as *mut c_void,
         });
         methods.push(NativeMethod {
             name: "mln_runtime_offline_region_get_status_take_result".into(),
@@ -1439,6 +1460,214 @@ extern "system" fn offline_region_delete_start(
             out,
         )
     })
+}
+
+extern "system" fn offline_region_create_take_result<'local>(
+    mut env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    runtime: jlong,
+    operation_id: jlong,
+    out_region: JObjectArray<'local>,
+) -> jint {
+    offline_region_snapshot_take_result(
+        &mut env,
+        runtime,
+        operation_id,
+        &out_region,
+        sys::mln_runtime_offline_region_create_take_result,
+    )
+}
+
+extern "system" fn offline_region_get_take_result<'local>(
+    mut env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    runtime: jlong,
+    operation_id: jlong,
+    out_region: JObjectArray<'local>,
+    out_found: JBooleanArray<'local>,
+) -> jint {
+    catch_unwind(AssertUnwindSafe(|| {
+        if out_region.is_null()
+            || out_found.is_null()
+            || env.get_array_length(&out_region).unwrap_or(0) < 1
+            || env.get_array_length(&out_found).unwrap_or(0) < 1
+        {
+            return sys::MLN_STATUS_INVALID_ARGUMENT;
+        }
+        let mut snapshot: *mut sys::mln_offline_region_snapshot = std::ptr::null_mut();
+        let mut found = false;
+        let result = unsafe {
+            sys::mln_runtime_offline_region_get_take_result(
+                runtime as *mut sys::mln_runtime,
+                operation_id as sys::mln_offline_operation_id,
+                &mut snapshot,
+                &mut found,
+            )
+        };
+        if result != sys::MLN_STATUS_OK {
+            return result;
+        }
+        if env
+            .set_boolean_array_region(&out_found, 0, &[jboolean::from(found)])
+            .is_err()
+        {
+            return sys::MLN_STATUS_INVALID_ARGUMENT;
+        }
+        if found {
+            offline_region_snapshot_to_array(&mut env, snapshot, &out_region)
+        } else {
+            sys::MLN_STATUS_OK
+        }
+    }))
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+extern "system" fn offline_regions_list_take_result<'local>(
+    mut env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    runtime: jlong,
+    operation_id: jlong,
+    out_regions: JObjectArray<'local>,
+) -> jint {
+    offline_region_list_take_result(
+        &mut env,
+        runtime,
+        operation_id,
+        &out_regions,
+        sys::mln_runtime_offline_regions_list_take_result,
+    )
+}
+
+extern "system" fn offline_regions_merge_database_take_result<'local>(
+    mut env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    runtime: jlong,
+    operation_id: jlong,
+    out_regions: JObjectArray<'local>,
+) -> jint {
+    offline_region_list_take_result(
+        &mut env,
+        runtime,
+        operation_id,
+        &out_regions,
+        sys::mln_runtime_offline_regions_merge_database_take_result,
+    )
+}
+
+extern "system" fn offline_region_update_metadata_take_result<'local>(
+    mut env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    runtime: jlong,
+    operation_id: jlong,
+    out_region: JObjectArray<'local>,
+) -> jint {
+    offline_region_snapshot_take_result(
+        &mut env,
+        runtime,
+        operation_id,
+        &out_region,
+        sys::mln_runtime_offline_region_update_metadata_take_result,
+    )
+}
+
+fn offline_region_snapshot_take_result<'local>(
+    env: &mut JNIEnv<'local>,
+    runtime: jlong,
+    operation_id: jlong,
+    out_region: &JObjectArray<'local>,
+    take: unsafe extern "C" fn(
+        *mut sys::mln_runtime,
+        sys::mln_offline_operation_id,
+        *mut *mut sys::mln_offline_region_snapshot,
+    ) -> sys::mln_status,
+) -> jint {
+    catch_unwind(AssertUnwindSafe(|| {
+        if out_region.is_null() || env.get_array_length(out_region).unwrap_or(0) < 1 {
+            return sys::MLN_STATUS_INVALID_ARGUMENT;
+        }
+        let mut snapshot: *mut sys::mln_offline_region_snapshot = std::ptr::null_mut();
+        let result = unsafe {
+            take(
+                runtime as *mut sys::mln_runtime,
+                operation_id as sys::mln_offline_operation_id,
+                &mut snapshot,
+            )
+        };
+        if result != sys::MLN_STATUS_OK {
+            return result;
+        }
+        offline_region_snapshot_to_array(env, snapshot, out_region)
+    }))
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+fn offline_region_list_take_result<'local>(
+    env: &mut JNIEnv<'local>,
+    runtime: jlong,
+    operation_id: jlong,
+    out_regions: &JObjectArray<'local>,
+    take: unsafe extern "C" fn(
+        *mut sys::mln_runtime,
+        sys::mln_offline_operation_id,
+        *mut *mut sys::mln_offline_region_list,
+    ) -> sys::mln_status,
+) -> jint {
+    catch_unwind(AssertUnwindSafe(|| {
+        if out_regions.is_null() || env.get_array_length(out_regions).unwrap_or(0) < 1 {
+            return sys::MLN_STATUS_INVALID_ARGUMENT;
+        }
+        let mut list: *mut sys::mln_offline_region_list = std::ptr::null_mut();
+        let result = unsafe {
+            take(
+                runtime as *mut sys::mln_runtime,
+                operation_id as sys::mln_offline_operation_id,
+                &mut list,
+            )
+        };
+        if result != sys::MLN_STATUS_OK {
+            return result;
+        }
+        let Some(list) = NonNull::new(list) else {
+            return sys::MLN_STATUS_INVALID_ARGUMENT;
+        };
+        let regions = match unsafe { core_runtime::copy_offline_region_list(list) } {
+            Ok(value) => value,
+            Err(_) => return sys::MLN_STATUS_INVALID_ARGUMENT,
+        };
+        let array = match java_offline_region_info_array(env, &regions) {
+            Ok(value) => value,
+            Err(status) => return status,
+        };
+        if env.set_object_array_element(out_regions, 0, array).is_err() {
+            sys::MLN_STATUS_INVALID_ARGUMENT
+        } else {
+            sys::MLN_STATUS_OK
+        }
+    }))
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+fn offline_region_snapshot_to_array<'local>(
+    env: &mut JNIEnv<'local>,
+    snapshot: *mut sys::mln_offline_region_snapshot,
+    out_region: &JObjectArray<'local>,
+) -> jint {
+    let Some(snapshot) = NonNull::new(snapshot) else {
+        return sys::MLN_STATUS_INVALID_ARGUMENT;
+    };
+    let region = match unsafe { core_runtime::copy_offline_region_snapshot(snapshot) } {
+        Ok(value) => value,
+        Err(_) => return sys::MLN_STATUS_INVALID_ARGUMENT,
+    };
+    let region = match java_offline_region_info_object(env, &region) {
+        Ok(value) => value,
+        Err(status) => return status,
+    };
+    if env.set_object_array_element(out_region, 0, region).is_err() {
+        sys::MLN_STATUS_INVALID_ARGUMENT
+    } else {
+        sys::MLN_STATUS_OK
+    }
 }
 
 extern "system" fn offline_region_get_status_take_result(
@@ -4142,6 +4371,254 @@ fn java_json_members_list<'local>(
         ));
     }
     Ok(members)
+}
+
+fn java_offline_region_info_array<'local>(
+    env: &mut JNIEnv<'local>,
+    regions: &[core_runtime::OfflineRegionInfo],
+) -> Result<JObjectArray<'local>, jint> {
+    let class = env
+        .find_class("org/maplibre/nativejni/offline/OfflineRegionInfo")
+        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
+    let array = env
+        .new_object_array(regions.len() as i32, class, JObject::null())
+        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
+    for (index, region) in regions.iter().enumerate() {
+        let region = java_offline_region_info_object(env, region)?;
+        env.set_object_array_element(&array, index as i32, region)
+            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
+    }
+    Ok(array)
+}
+
+fn java_offline_region_info_object<'local>(
+    env: &mut JNIEnv<'local>,
+    region: &core_runtime::OfflineRegionInfo,
+) -> Result<JObject<'local>, jint> {
+    let definition = java_offline_region_definition_object(env, &region.definition)?;
+    let metadata = env
+        .byte_array_from_slice(&region.metadata)
+        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
+    env.new_object(
+        "org/maplibre/nativejni/offline/OfflineRegionInfo",
+        "(JLorg/maplibre/nativejni/offline/OfflineRegionDefinition;[B)V",
+        &[
+            JValue::Long(region.id as jlong),
+            JValue::Object(&definition),
+            JValue::Object(&metadata),
+        ],
+    )
+    .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)
+}
+
+fn java_offline_region_definition_object<'local>(
+    env: &mut JNIEnv<'local>,
+    definition: &core_runtime::OfflineRegionDefinition,
+) -> Result<JObject<'local>, jint> {
+    match definition {
+        core_runtime::OfflineRegionDefinition::TilePyramid {
+            style_url,
+            bounds,
+            min_zoom,
+            max_zoom,
+            pixel_ratio,
+            include_ideographs,
+        } => {
+            let style_url = env
+                .new_string(style_url)
+                .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
+            let bounds = java_lat_lng_bounds_object(env, bounds)?;
+            env.new_object(
+                "org/maplibre/nativejni/offline/OfflineRegionDefinition$TilePyramid",
+                "(Ljava/lang/String;Lorg/maplibre/nativejni/geo/LatLngBounds;DDFZ)V",
+                &[
+                    JValue::Object(&style_url),
+                    JValue::Object(&bounds),
+                    JValue::Double(*min_zoom),
+                    JValue::Double(*max_zoom),
+                    JValue::Float(*pixel_ratio),
+                    JValue::Bool(jboolean::from(*include_ideographs)),
+                ],
+            )
+            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)
+        }
+        core_runtime::OfflineRegionDefinition::GeometryRegion {
+            style_url,
+            geometry,
+            min_zoom,
+            max_zoom,
+            pixel_ratio,
+            include_ideographs,
+        } => {
+            let style_url = env
+                .new_string(style_url)
+                .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
+            let geometry = java_geometry_object(env, geometry)?;
+            env.new_object(
+                "org/maplibre/nativejni/offline/OfflineRegionDefinition$GeometryRegion",
+                "(Ljava/lang/String;Lorg/maplibre/nativejni/geo/Geometry;DDFZ)V",
+                &[
+                    JValue::Object(&style_url),
+                    JValue::Object(&geometry),
+                    JValue::Double(*min_zoom),
+                    JValue::Double(*max_zoom),
+                    JValue::Float(*pixel_ratio),
+                    JValue::Bool(jboolean::from(*include_ideographs)),
+                ],
+            )
+            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)
+        }
+        _ => Err(sys::MLN_STATUS_INVALID_ARGUMENT),
+    }
+}
+
+fn java_lat_lng_object<'local>(
+    env: &mut JNIEnv<'local>,
+    coordinate: CoreLatLng,
+) -> Result<JObject<'local>, jint> {
+    env.new_object(
+        "org/maplibre/nativejni/geo/LatLng",
+        "(DD)V",
+        &[
+            JValue::Double(coordinate.latitude),
+            JValue::Double(coordinate.longitude),
+        ],
+    )
+    .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)
+}
+
+fn java_lat_lng_bounds_object<'local>(
+    env: &mut JNIEnv<'local>,
+    bounds: &CoreLatLngBounds,
+) -> Result<JObject<'local>, jint> {
+    let southwest = java_lat_lng_object(env, bounds.southwest)?;
+    let northeast = java_lat_lng_object(env, bounds.northeast)?;
+    env.new_object(
+        "org/maplibre/nativejni/geo/LatLngBounds",
+        "(Lorg/maplibre/nativejni/geo/LatLng;Lorg/maplibre/nativejni/geo/LatLng;)V",
+        &[JValue::Object(&southwest), JValue::Object(&northeast)],
+    )
+    .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)
+}
+
+fn java_geometry_object<'local>(
+    env: &mut JNIEnv<'local>,
+    geometry: &core_geometry::Geometry,
+) -> Result<JObject<'local>, jint> {
+    match geometry {
+        core_geometry::Geometry::Empty => env
+            .get_static_field(
+                "org/maplibre/nativejni/geo/Geometry$Empty",
+                "INSTANCE",
+                "Lorg/maplibre/nativejni/geo/Geometry$Empty;",
+            )
+            .and_then(|value| value.l())
+            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT),
+        core_geometry::Geometry::Point(coordinate) => {
+            let coordinate = java_lat_lng_object(env, *coordinate)?;
+            env.new_object(
+                "org/maplibre/nativejni/geo/Geometry$Point",
+                "(Lorg/maplibre/nativejni/geo/LatLng;)V",
+                &[JValue::Object(&coordinate)],
+            )
+            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)
+        }
+        core_geometry::Geometry::LineString(coordinates) => {
+            let coordinates = java_lat_lng_object_list(env, coordinates)?;
+            env.new_object(
+                "org/maplibre/nativejni/geo/Geometry$LineString",
+                "(Ljava/util/List;)V",
+                &[JValue::Object(&coordinates)],
+            )
+            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)
+        }
+        core_geometry::Geometry::Polygon(rings) => {
+            let rings = java_nested_lat_lng_object_list(env, rings)?;
+            env.new_object(
+                "org/maplibre/nativejni/geo/Geometry$Polygon",
+                "(Ljava/util/List;)V",
+                &[JValue::Object(&rings)],
+            )
+            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)
+        }
+        core_geometry::Geometry::MultiPoint(coordinates) => {
+            let coordinates = java_lat_lng_object_list(env, coordinates)?;
+            env.new_object(
+                "org/maplibre/nativejni/geo/Geometry$MultiPoint",
+                "(Ljava/util/List;)V",
+                &[JValue::Object(&coordinates)],
+            )
+            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)
+        }
+        core_geometry::Geometry::MultiLineString(lines) => {
+            let lines = java_nested_lat_lng_object_list(env, lines)?;
+            env.new_object(
+                "org/maplibre/nativejni/geo/Geometry$MultiLineString",
+                "(Ljava/util/List;)V",
+                &[JValue::Object(&lines)],
+            )
+            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)
+        }
+        core_geometry::Geometry::MultiPolygon(polygons) => {
+            let polygons = java_deep_lat_lng_object_list(env, polygons)?;
+            env.new_object(
+                "org/maplibre/nativejni/geo/Geometry$MultiPolygon",
+                "(Ljava/util/List;)V",
+                &[JValue::Object(&polygons)],
+            )
+            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)
+        }
+        core_geometry::Geometry::GeometryCollection(geometries) => {
+            let list = java_array_list(env)?;
+            for geometry in geometries {
+                let geometry = java_geometry_object(env, geometry)?;
+                java_array_list_add(env, &list, &geometry)?;
+            }
+            env.new_object(
+                "org/maplibre/nativejni/geo/Geometry$Collection",
+                "(Ljava/util/List;)V",
+                &[JValue::Object(&list)],
+            )
+            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)
+        }
+        _ => Err(sys::MLN_STATUS_INVALID_ARGUMENT),
+    }
+}
+
+fn java_lat_lng_object_list<'local>(
+    env: &mut JNIEnv<'local>,
+    coordinates: &[CoreLatLng],
+) -> Result<JObject<'local>, jint> {
+    let list = java_array_list(env)?;
+    for coordinate in coordinates {
+        let coordinate = java_lat_lng_object(env, *coordinate)?;
+        java_array_list_add(env, &list, &coordinate)?;
+    }
+    Ok(list)
+}
+
+fn java_nested_lat_lng_object_list<'local>(
+    env: &mut JNIEnv<'local>,
+    coordinates: &[Vec<CoreLatLng>],
+) -> Result<JObject<'local>, jint> {
+    let list = java_array_list(env)?;
+    for child in coordinates {
+        let child = java_lat_lng_object_list(env, child)?;
+        java_array_list_add(env, &list, &child)?;
+    }
+    Ok(list)
+}
+
+fn java_deep_lat_lng_object_list<'local>(
+    env: &mut JNIEnv<'local>,
+    coordinates: &[Vec<Vec<CoreLatLng>>],
+) -> Result<JObject<'local>, jint> {
+    let list = java_array_list(env)?;
+    for child in coordinates {
+        let child = java_nested_lat_lng_object_list(env, child)?;
+        java_array_list_add(env, &list, &child)?;
+    }
+    Ok(list)
 }
 
 fn java_native_geojson<'local>(
