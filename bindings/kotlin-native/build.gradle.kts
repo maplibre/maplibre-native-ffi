@@ -1,0 +1,38 @@
+import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
+
+plugins { kotlin("multiplatform") version "2.2.21" }
+
+repositories { mavenCentral() }
+
+kotlin {
+  compilerOptions { freeCompilerArgs.add("-Xexpect-actual-classes") }
+
+  val hostOs = System.getProperty("os.name").lowercase()
+  val hostArch = System.getProperty("os.arch").lowercase()
+  val hostTarget =
+    when {
+      hostOs.contains("mac") && (hostArch == "aarch64" || hostArch == "arm64") -> macosArm64()
+      hostOs.contains("mac") -> macosX64()
+      hostOs.contains("linux") && (hostArch == "aarch64" || hostArch == "arm64") -> linuxArm64()
+      hostOs.contains("linux") -> linuxX64()
+      hostOs.contains("mingw") || hostOs.contains("windows") -> mingwX64()
+      else -> throw GradleException("Unsupported Kotlin/Native host target: $hostOs/$hostArch")
+    }
+
+  targets.withType<KotlinNativeTarget>().configureEach {
+    compilations.getByName("main") {
+      cinterops {
+        val maplibreNativeC by creating {
+          defFile(project.file("src/nativeInterop/cinterop/maplibreNativeC.def"))
+          includeDirs.headerFilterOnly(rootProject.file("include"))
+          compilerOpts("-I${rootProject.file("include").absolutePath}")
+          compilerOpts(
+            "-I${rootProject.file("third_party/maplibre-native/vendor/Vulkan-Headers/include").absolutePath}"
+          )
+        }
+      }
+    }
+  }
+
+  sourceSets { commonTest.dependencies { implementation(kotlin("test")) } }
+}
