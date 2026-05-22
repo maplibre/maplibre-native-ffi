@@ -98,15 +98,21 @@ class MapHandleTest {
     try (var runtime = RuntimeHandle.create()) {
       try (var map = MapHandle.create(runtime, new MapOptions().size(64, 64))) {
         map.moveBy(1, 2);
+        var animation = new AnimationOptions().durationMs(0);
         map.moveByAnimated(0, 0);
+        map.moveByAnimated(0, 0, animation);
         map.scaleBy(1.1);
         map.scaleBy(1.0, new ScreenPoint(32, 32));
         map.scaleByAnimated(1.0);
+        map.scaleByAnimated(1.0, animation);
         map.scaleByAnimated(1.0, new ScreenPoint(32, 32));
+        map.scaleByAnimated(1.0, new ScreenPoint(32, 32), animation);
         map.rotateBy(new ScreenPoint(0, 0), new ScreenPoint(1, 1));
         map.rotateByAnimated(new ScreenPoint(0, 0), new ScreenPoint(1, 1));
+        map.rotateByAnimated(new ScreenPoint(0, 0), new ScreenPoint(1, 1), animation);
         map.pitchBy(0);
         map.pitchByAnimated(0);
+        map.pitchByAnimated(0, animation);
         map.cancelTransitions();
       }
     }

@@ -498,12 +498,11 @@ public final class MapHandle implements AutoCloseable {
   }
 
   public void moveByAnimated(double deltaX, double deltaY) {
-    NativeLibrary.ensureLoaded();
-    Status.check(CameraNative.mln_map_move_by_animated(state.requireLiveAddress(), deltaX, deltaY));
+    moveByAnimatedInternal(deltaX, deltaY, null, false);
   }
 
   public void moveByAnimated(double deltaX, double deltaY, AnimationOptions animation) {
-    throw unsupported();
+    moveByAnimatedInternal(deltaX, deltaY, Objects.requireNonNull(animation, "animation"), true);
   }
 
   public void scaleBy(double scale) {
@@ -523,11 +522,17 @@ public final class MapHandle implements AutoCloseable {
   }
 
   public void scaleByAnimated(double scale, AnimationOptions animation) {
-    throw unsupported();
+    scaleByAnimatedInternal(
+        scale, null, false, Objects.requireNonNull(animation, "animation"), true);
   }
 
   public void scaleByAnimated(double scale, ScreenPoint anchor, AnimationOptions animation) {
-    throw unsupported();
+    scaleByAnimatedInternal(
+        scale,
+        Objects.requireNonNull(anchor, "anchor"),
+        true,
+        Objects.requireNonNull(animation, "animation"),
+        true);
   }
 
   public void rotateBy(ScreenPoint first, ScreenPoint second) {
@@ -540,16 +545,11 @@ public final class MapHandle implements AutoCloseable {
   }
 
   public void rotateByAnimated(ScreenPoint first, ScreenPoint second) {
-    NativeLibrary.ensureLoaded();
-    Objects.requireNonNull(first, "first");
-    Objects.requireNonNull(second, "second");
-    Status.check(
-        CameraNative.mln_map_rotate_by_animated(
-            state.requireLiveAddress(), first.x(), first.y(), second.x(), second.y()));
+    rotateByAnimatedInternal(first, second, null, false);
   }
 
   public void rotateByAnimated(ScreenPoint first, ScreenPoint second, AnimationOptions animation) {
-    throw unsupported();
+    rotateByAnimatedInternal(first, second, Objects.requireNonNull(animation, "animation"), true);
   }
 
   public void pitchBy(double pitch) {
@@ -558,12 +558,11 @@ public final class MapHandle implements AutoCloseable {
   }
 
   public void pitchByAnimated(double pitch) {
-    NativeLibrary.ensureLoaded();
-    Status.check(CameraNative.mln_map_pitch_by_animated(state.requireLiveAddress(), pitch));
+    pitchByAnimatedInternal(pitch, null, false);
   }
 
   public void pitchByAnimated(double pitch, AnimationOptions animation) {
-    throw unsupported();
+    pitchByAnimatedInternal(pitch, Objects.requireNonNull(animation, "animation"), true);
   }
 
   public void cancelTransitions() {
@@ -601,17 +600,85 @@ public final class MapHandle implements AutoCloseable {
             nativeAnimation.values()));
   }
 
+  private void moveByAnimatedInternal(
+      double deltaX, double deltaY, AnimationOptions animation, boolean hasAnimation) {
+    NativeLibrary.ensureLoaded();
+    var nativeAnimation = animationToNative(animation, hasAnimation);
+    Status.check(
+        CameraNative.mln_map_move_by_animated(
+            state.requireLiveAddress(),
+            deltaX,
+            deltaY,
+            hasAnimation,
+            nativeAnimation.fields(),
+            nativeAnimation.values()));
+  }
+
   private void scaleByInternal(double scale, ScreenPoint anchor, boolean animated) {
+    if (animated) {
+      scaleByAnimatedInternal(scale, anchor, anchor != null, null, false);
+      return;
+    }
     NativeLibrary.ensureLoaded();
     var hasAnchor = anchor != null;
     var anchorX = hasAnchor ? anchor.x() : 0;
     var anchorY = hasAnchor ? anchor.y() : 0;
     Status.check(
-        animated
-            ? CameraNative.mln_map_scale_by_animated(
-                state.requireLiveAddress(), scale, hasAnchor, anchorX, anchorY)
-            : CameraNative.mln_map_scale_by(
-                state.requireLiveAddress(), scale, hasAnchor, anchorX, anchorY));
+        CameraNative.mln_map_scale_by(
+            state.requireLiveAddress(), scale, hasAnchor, anchorX, anchorY));
+  }
+
+  private void scaleByAnimatedInternal(
+      double scale,
+      ScreenPoint anchor,
+      boolean hasAnchor,
+      AnimationOptions animation,
+      boolean hasAnimation) {
+    NativeLibrary.ensureLoaded();
+    var anchorX = hasAnchor ? anchor.x() : 0;
+    var anchorY = hasAnchor ? anchor.y() : 0;
+    var nativeAnimation = animationToNative(animation, hasAnimation);
+    Status.check(
+        CameraNative.mln_map_scale_by_animated(
+            state.requireLiveAddress(),
+            scale,
+            hasAnchor,
+            anchorX,
+            anchorY,
+            hasAnimation,
+            nativeAnimation.fields(),
+            nativeAnimation.values()));
+  }
+
+  private void rotateByAnimatedInternal(
+      ScreenPoint first, ScreenPoint second, AnimationOptions animation, boolean hasAnimation) {
+    NativeLibrary.ensureLoaded();
+    Objects.requireNonNull(first, "first");
+    Objects.requireNonNull(second, "second");
+    var nativeAnimation = animationToNative(animation, hasAnimation);
+    Status.check(
+        CameraNative.mln_map_rotate_by_animated(
+            state.requireLiveAddress(),
+            first.x(),
+            first.y(),
+            second.x(),
+            second.y(),
+            hasAnimation,
+            nativeAnimation.fields(),
+            nativeAnimation.values()));
+  }
+
+  private void pitchByAnimatedInternal(
+      double pitch, AnimationOptions animation, boolean hasAnimation) {
+    NativeLibrary.ensureLoaded();
+    var nativeAnimation = animationToNative(animation, hasAnimation);
+    Status.check(
+        CameraNative.mln_map_pitch_by_animated(
+            state.requireLiveAddress(),
+            pitch,
+            hasAnimation,
+            nativeAnimation.fields(),
+            nativeAnimation.values()));
   }
 
   public CameraOptions cameraForLatLngBounds(LatLngBounds bounds) {

@@ -539,7 +539,7 @@ mod registration {
         });
         methods.push(NativeMethod {
             name: "mln_map_move_by_animated".into(),
-            sig: "(JDD)I".into(),
+            sig: "(JDDZ[Z[D)I".into(),
             fn_ptr: map_move_by_animated as *mut c_void,
         });
         methods.push(NativeMethod {
@@ -549,7 +549,7 @@ mod registration {
         });
         methods.push(NativeMethod {
             name: "mln_map_scale_by_animated".into(),
-            sig: "(JDZDD)I".into(),
+            sig: "(JDZDDZ[Z[D)I".into(),
             fn_ptr: map_scale_by_animated as *mut c_void,
         });
         methods.push(NativeMethod {
@@ -559,7 +559,7 @@ mod registration {
         });
         methods.push(NativeMethod {
             name: "mln_map_rotate_by_animated".into(),
-            sig: "(JDDDD)I".into(),
+            sig: "(JDDDDZ[Z[D)I".into(),
             fn_ptr: map_rotate_by_animated as *mut c_void,
         });
         methods.push(NativeMethod {
@@ -569,7 +569,7 @@ mod registration {
         });
         methods.push(NativeMethod {
             name: "mln_map_pitch_by_animated".into(),
-            sig: "(JD)I".into(),
+            sig: "(JDZ[Z[D)I".into(),
             fn_ptr: map_pitch_by_animated as *mut c_void,
         });
         methods.push(NativeMethod {
@@ -1502,6 +1502,27 @@ fn write_camera_arrays(
     }
 }
 
+fn optional_animation(
+    env: &JNIEnv<'_>,
+    has_animation: jboolean,
+    fields: &JBooleanArray<'_>,
+    values: &JDoubleArray<'_>,
+) -> Result<Option<sys::mln_animation_options>, jint> {
+    if has_animation != 0 {
+        read_animation_options(env, fields, values).map(Some)
+    } else {
+        Ok(None)
+    }
+}
+
+fn animation_ptr(
+    animation: &Option<sys::mln_animation_options>,
+) -> *const sys::mln_animation_options {
+    animation
+        .as_ref()
+        .map_or(std::ptr::null(), |animation| animation as *const _)
+}
+
 fn read_animation_options(
     env: &JNIEnv<'_>,
     fields: &JBooleanArray<'_>,
@@ -1581,15 +1602,30 @@ extern "system" fn map_move_by(
 }
 
 extern "system" fn map_move_by_animated(
-    _env: JNIEnv<'_>,
+    env: JNIEnv<'_>,
     _class: JClass<'_>,
     map: jlong,
     delta_x: f64,
     delta_y: f64,
+    has_animation: jboolean,
+    animation_fields: JBooleanArray<'_>,
+    animation_values: JDoubleArray<'_>,
 ) -> jint {
-    catch_unwind(|| unsafe {
-        sys::mln_map_move_by_animated(map as *mut sys::mln_map, delta_x, delta_y, std::ptr::null())
-    })
+    catch_unwind(AssertUnwindSafe(|| {
+        let animation =
+            match optional_animation(&env, has_animation, &animation_fields, &animation_values) {
+                Ok(animation) => animation,
+                Err(status) => return status,
+            };
+        unsafe {
+            sys::mln_map_move_by_animated(
+                map as *mut sys::mln_map,
+                delta_x,
+                delta_y,
+                animation_ptr(&animation),
+            )
+        }
+    }))
     .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
 }
 
@@ -1618,31 +1654,41 @@ extern "system" fn map_scale_by(
 }
 
 extern "system" fn map_scale_by_animated(
-    _env: JNIEnv<'_>,
+    env: JNIEnv<'_>,
     _class: JClass<'_>,
     map: jlong,
     scale: f64,
     has_anchor: jboolean,
     anchor_x: f64,
     anchor_y: f64,
+    has_animation: jboolean,
+    animation_fields: JBooleanArray<'_>,
+    animation_values: JDoubleArray<'_>,
 ) -> jint {
-    catch_unwind(|| unsafe {
-        let anchor = sys::mln_screen_point {
-            x: anchor_x,
-            y: anchor_y,
-        };
-        let anchor_ptr = if has_anchor != 0 {
-            &anchor as *const sys::mln_screen_point
-        } else {
-            std::ptr::null()
-        };
-        sys::mln_map_scale_by_animated(
-            map as *mut sys::mln_map,
-            scale,
-            anchor_ptr,
-            std::ptr::null(),
-        )
-    })
+    catch_unwind(AssertUnwindSafe(|| {
+        let animation =
+            match optional_animation(&env, has_animation, &animation_fields, &animation_values) {
+                Ok(animation) => animation,
+                Err(status) => return status,
+            };
+        unsafe {
+            let anchor = sys::mln_screen_point {
+                x: anchor_x,
+                y: anchor_y,
+            };
+            let anchor_ptr = if has_anchor != 0 {
+                &anchor as *const sys::mln_screen_point
+            } else {
+                std::ptr::null()
+            };
+            sys::mln_map_scale_by_animated(
+                map as *mut sys::mln_map,
+                scale,
+                anchor_ptr,
+                animation_ptr(&animation),
+            )
+        }
+    }))
     .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
 }
 
@@ -1672,28 +1718,38 @@ extern "system" fn map_rotate_by(
 }
 
 extern "system" fn map_rotate_by_animated(
-    _env: JNIEnv<'_>,
+    env: JNIEnv<'_>,
     _class: JClass<'_>,
     map: jlong,
     first_x: f64,
     first_y: f64,
     second_x: f64,
     second_y: f64,
+    has_animation: jboolean,
+    animation_fields: JBooleanArray<'_>,
+    animation_values: JDoubleArray<'_>,
 ) -> jint {
-    catch_unwind(|| unsafe {
-        sys::mln_map_rotate_by_animated(
-            map as *mut sys::mln_map,
-            sys::mln_screen_point {
-                x: first_x,
-                y: first_y,
-            },
-            sys::mln_screen_point {
-                x: second_x,
-                y: second_y,
-            },
-            std::ptr::null(),
-        )
-    })
+    catch_unwind(AssertUnwindSafe(|| {
+        let animation =
+            match optional_animation(&env, has_animation, &animation_fields, &animation_values) {
+                Ok(animation) => animation,
+                Err(status) => return status,
+            };
+        unsafe {
+            sys::mln_map_rotate_by_animated(
+                map as *mut sys::mln_map,
+                sys::mln_screen_point {
+                    x: first_x,
+                    y: first_y,
+                },
+                sys::mln_screen_point {
+                    x: second_x,
+                    y: second_y,
+                },
+                animation_ptr(&animation),
+            )
+        }
+    }))
     .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
 }
 
@@ -1708,14 +1764,28 @@ extern "system" fn map_pitch_by(
 }
 
 extern "system" fn map_pitch_by_animated(
-    _env: JNIEnv<'_>,
+    env: JNIEnv<'_>,
     _class: JClass<'_>,
     map: jlong,
     pitch: f64,
+    has_animation: jboolean,
+    animation_fields: JBooleanArray<'_>,
+    animation_values: JDoubleArray<'_>,
 ) -> jint {
-    catch_unwind(|| unsafe {
-        sys::mln_map_pitch_by_animated(map as *mut sys::mln_map, pitch, std::ptr::null())
-    })
+    catch_unwind(AssertUnwindSafe(|| {
+        let animation =
+            match optional_animation(&env, has_animation, &animation_fields, &animation_values) {
+                Ok(animation) => animation,
+                Err(status) => return status,
+            };
+        unsafe {
+            sys::mln_map_pitch_by_animated(
+                map as *mut sys::mln_map,
+                pitch,
+                animation_ptr(&animation),
+            )
+        }
+    }))
     .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
 }
 

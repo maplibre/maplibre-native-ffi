@@ -62,23 +62,48 @@ public final class CameraNative {
 
   public static native int mln_map_move_by(long map, double deltaX, double deltaY);
 
-  public static native int mln_map_move_by_animated(long map, double deltaX, double deltaY);
+  public static native int mln_map_move_by_animated(
+      long map,
+      double deltaX,
+      double deltaY,
+      boolean hasAnimation,
+      boolean[] animationFields,
+      double[] animationValues);
 
   public static native int mln_map_scale_by(
       long map, double scale, boolean hasAnchor, double anchorX, double anchorY);
 
   public static native int mln_map_scale_by_animated(
-      long map, double scale, boolean hasAnchor, double anchorX, double anchorY);
+      long map,
+      double scale,
+      boolean hasAnchor,
+      double anchorX,
+      double anchorY,
+      boolean hasAnimation,
+      boolean[] animationFields,
+      double[] animationValues);
 
   public static native int mln_map_rotate_by(
       long map, double firstX, double firstY, double secondX, double secondY);
 
   public static native int mln_map_rotate_by_animated(
-      long map, double firstX, double firstY, double secondX, double secondY);
+      long map,
+      double firstX,
+      double firstY,
+      double secondX,
+      double secondY,
+      boolean hasAnimation,
+      boolean[] animationFields,
+      double[] animationValues);
 
   public static native int mln_map_pitch_by(long map, double pitch);
 
-  public static native int mln_map_pitch_by_animated(long map, double pitch);
+  public static native int mln_map_pitch_by_animated(
+      long map,
+      double pitch,
+      boolean hasAnimation,
+      boolean[] animationFields,
+      double[] animationValues);
 
   public static native int mln_map_cancel_transitions(long map);
 
