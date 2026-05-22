@@ -328,32 +328,32 @@ mod registration {
         });
         style_methods.push(NativeMethod {
             name: "mln_map_add_vector_source_url".into(),
-            sig: "(JLjava/lang/String;Ljava/lang/String;)I".into(),
+            sig: "(JLjava/lang/String;Ljava/lang/String;[Z[DLjava/lang/String;)I".into(),
             fn_ptr: map_add_vector_source_url as *mut c_void,
         });
         style_methods.push(NativeMethod {
             name: "mln_map_add_raster_source_url".into(),
-            sig: "(JLjava/lang/String;Ljava/lang/String;)I".into(),
+            sig: "(JLjava/lang/String;Ljava/lang/String;[Z[DLjava/lang/String;)I".into(),
             fn_ptr: map_add_raster_source_url as *mut c_void,
         });
         style_methods.push(NativeMethod {
             name: "mln_map_add_raster_dem_source_url".into(),
-            sig: "(JLjava/lang/String;Ljava/lang/String;)I".into(),
+            sig: "(JLjava/lang/String;Ljava/lang/String;[Z[DLjava/lang/String;)I".into(),
             fn_ptr: map_add_raster_dem_source_url as *mut c_void,
         });
         style_methods.push(NativeMethod {
             name: "mln_map_add_vector_source_tiles".into(),
-            sig: "(JLjava/lang/String;[Ljava/lang/String;)I".into(),
+            sig: "(JLjava/lang/String;[Ljava/lang/String;[Z[DLjava/lang/String;)I".into(),
             fn_ptr: map_add_vector_source_tiles as *mut c_void,
         });
         style_methods.push(NativeMethod {
             name: "mln_map_add_raster_source_tiles".into(),
-            sig: "(JLjava/lang/String;[Ljava/lang/String;)I".into(),
+            sig: "(JLjava/lang/String;[Ljava/lang/String;[Z[DLjava/lang/String;)I".into(),
             fn_ptr: map_add_raster_source_tiles as *mut c_void,
         });
         style_methods.push(NativeMethod {
             name: "mln_map_add_raster_dem_source_tiles".into(),
-            sig: "(JLjava/lang/String;[Ljava/lang/String;)I".into(),
+            sig: "(JLjava/lang/String;[Ljava/lang/String;[Z[DLjava/lang/String;)I".into(),
             fn_ptr: map_add_raster_dem_source_tiles as *mut c_void,
         });
         style_methods.push(NativeMethod {
@@ -1687,8 +1687,20 @@ extern "system" fn map_add_vector_source_url(
     map: jlong,
     source_id: JString<'_>,
     url: JString<'_>,
+    option_fields: JBooleanArray<'_>,
+    option_values: JDoubleArray<'_>,
+    attribution: JString<'_>,
 ) -> jint {
-    map_tile_source_url(env, map, source_id, url, sys::mln_map_add_vector_source_url)
+    map_tile_source_url(
+        env,
+        map,
+        source_id,
+        url,
+        option_fields,
+        option_values,
+        attribution,
+        sys::mln_map_add_vector_source_url,
+    )
 }
 
 extern "system" fn map_add_raster_source_url(
@@ -1697,8 +1709,20 @@ extern "system" fn map_add_raster_source_url(
     map: jlong,
     source_id: JString<'_>,
     url: JString<'_>,
+    option_fields: JBooleanArray<'_>,
+    option_values: JDoubleArray<'_>,
+    attribution: JString<'_>,
 ) -> jint {
-    map_tile_source_url(env, map, source_id, url, sys::mln_map_add_raster_source_url)
+    map_tile_source_url(
+        env,
+        map,
+        source_id,
+        url,
+        option_fields,
+        option_values,
+        attribution,
+        sys::mln_map_add_raster_source_url,
+    )
 }
 
 extern "system" fn map_add_raster_dem_source_url(
@@ -1707,12 +1731,18 @@ extern "system" fn map_add_raster_dem_source_url(
     map: jlong,
     source_id: JString<'_>,
     url: JString<'_>,
+    option_fields: JBooleanArray<'_>,
+    option_values: JDoubleArray<'_>,
+    attribution: JString<'_>,
 ) -> jint {
     map_tile_source_url(
         env,
         map,
         source_id,
         url,
+        option_fields,
+        option_values,
+        attribution,
         sys::mln_map_add_raster_dem_source_url,
     )
 }
@@ -1723,12 +1753,18 @@ extern "system" fn map_add_vector_source_tiles(
     map: jlong,
     source_id: JString<'_>,
     tiles: JObjectArray<'_>,
+    option_fields: JBooleanArray<'_>,
+    option_values: JDoubleArray<'_>,
+    attribution: JString<'_>,
 ) -> jint {
     map_tile_source_tiles(
         env,
         map,
         source_id,
         tiles,
+        option_fields,
+        option_values,
+        attribution,
         sys::mln_map_add_vector_source_tiles,
     )
 }
@@ -1739,12 +1775,18 @@ extern "system" fn map_add_raster_source_tiles(
     map: jlong,
     source_id: JString<'_>,
     tiles: JObjectArray<'_>,
+    option_fields: JBooleanArray<'_>,
+    option_values: JDoubleArray<'_>,
+    attribution: JString<'_>,
 ) -> jint {
     map_tile_source_tiles(
         env,
         map,
         source_id,
         tiles,
+        option_fields,
+        option_values,
+        attribution,
         sys::mln_map_add_raster_source_tiles,
     )
 }
@@ -1755,12 +1797,18 @@ extern "system" fn map_add_raster_dem_source_tiles(
     map: jlong,
     source_id: JString<'_>,
     tiles: JObjectArray<'_>,
+    option_fields: JBooleanArray<'_>,
+    option_values: JDoubleArray<'_>,
+    attribution: JString<'_>,
 ) -> jint {
     map_tile_source_tiles(
         env,
         map,
         source_id,
         tiles,
+        option_fields,
+        option_values,
+        attribution,
         sys::mln_map_add_raster_dem_source_tiles,
     )
 }
@@ -1770,6 +1818,9 @@ fn map_tile_source_tiles(
     map: jlong,
     source_id: JString<'_>,
     tiles: JObjectArray<'_>,
+    option_fields: JBooleanArray<'_>,
+    option_values: JDoubleArray<'_>,
+    attribution: JString<'_>,
     operation: unsafe extern "C" fn(
         *mut sys::mln_map,
         sys::mln_string_view,
@@ -1790,6 +1841,15 @@ fn map_tile_source_tiles(
             Ok(value) => value,
             Err(status) => return status,
         };
+        let (options, attribution_storage) = match read_tile_source_options(
+            &mut env,
+            &option_fields,
+            &option_values,
+            &attribution,
+        ) {
+            Ok(value) => value,
+            Err(status) => return status,
+        };
         let mut tile_storage = Vec::with_capacity(tile_count);
         let mut tile_views = Vec::with_capacity(tile_count);
         for index in 0..tile_count {
@@ -1804,8 +1864,7 @@ fn map_tile_source_tiles(
             tile_storage.push(tile_storage_value);
             tile_views.push(tile_view);
         }
-        let _source_id = source_id;
-        let _tile_storage = tile_storage;
+        let _keep_alive = (source_id, attribution_storage, tile_storage);
         let tile_ptr = if tile_views.is_empty() {
             std::ptr::null()
         } else {
@@ -1817,7 +1876,7 @@ fn map_tile_source_tiles(
                 source_id_view,
                 tile_ptr,
                 tile_views.len(),
-                std::ptr::null(),
+                &options,
             )
         }
     }))
@@ -1829,6 +1888,9 @@ fn map_tile_source_url(
     map: jlong,
     source_id: JString<'_>,
     url: JString<'_>,
+    option_fields: JBooleanArray<'_>,
+    option_values: JDoubleArray<'_>,
+    attribution: JString<'_>,
     operation: unsafe extern "C" fn(
         *mut sys::mln_map,
         sys::mln_string_view,
@@ -1845,18 +1907,91 @@ fn map_tile_source_url(
             Ok(value) => value,
             Err(status) => return status,
         };
-        let _source_id = source_id;
-        let _url = url;
-        unsafe {
-            operation(
-                map as *mut sys::mln_map,
-                source_id_view,
-                url_view,
-                std::ptr::null(),
-            )
-        }
+        let (options, attribution_storage) = match read_tile_source_options(
+            &mut env,
+            &option_fields,
+            &option_values,
+            &attribution,
+        ) {
+            Ok(value) => value,
+            Err(status) => return status,
+        };
+        let _keep_alive = (source_id, url, attribution_storage);
+        unsafe { operation(map as *mut sys::mln_map, source_id_view, url_view, &options) }
     }))
     .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+fn read_tile_source_options(
+    env: &mut JNIEnv<'_>,
+    fields: &JBooleanArray<'_>,
+    values: &JDoubleArray<'_>,
+    attribution: &JString<'_>,
+) -> Result<(sys::mln_style_tile_source_options, Option<CString>), jint> {
+    if fields.is_null()
+        || values.is_null()
+        || env.get_array_length(fields).unwrap_or(0) < 8
+        || env.get_array_length(values).unwrap_or(0) < 10
+    {
+        return Err(sys::MLN_STATUS_INVALID_ARGUMENT);
+    }
+    let mut field_values = [0 as jboolean; 8];
+    let mut option_values = [0.0_f64; 10];
+    if env
+        .get_boolean_array_region(fields, 0, &mut field_values)
+        .is_err()
+        || env
+            .get_double_array_region(values, 0, &mut option_values)
+            .is_err()
+    {
+        return Err(sys::MLN_STATUS_INVALID_ARGUMENT);
+    }
+    let mut options = unsafe { sys::mln_style_tile_source_options_default() };
+    let mut attribution_storage = None;
+    if field_values[0] != 0 {
+        options.fields |= sys::MLN_STYLE_TILE_SOURCE_OPTION_MIN_ZOOM;
+        options.min_zoom = option_values[0];
+    }
+    if field_values[1] != 0 {
+        options.fields |= sys::MLN_STYLE_TILE_SOURCE_OPTION_MAX_ZOOM;
+        options.max_zoom = option_values[1];
+    }
+    if field_values[2] != 0 {
+        let (storage, view) = string_view(env, attribution)?;
+        options.fields |= sys::MLN_STYLE_TILE_SOURCE_OPTION_ATTRIBUTION;
+        options.attribution = view;
+        attribution_storage = Some(storage);
+    }
+    if field_values[3] != 0 {
+        options.fields |= sys::MLN_STYLE_TILE_SOURCE_OPTION_SCHEME;
+        options.scheme = option_values[6] as u32;
+    }
+    if field_values[4] != 0 {
+        options.fields |= sys::MLN_STYLE_TILE_SOURCE_OPTION_BOUNDS;
+        options.bounds = sys::mln_lat_lng_bounds {
+            southwest: sys::mln_lat_lng {
+                latitude: option_values[2],
+                longitude: option_values[3],
+            },
+            northeast: sys::mln_lat_lng {
+                latitude: option_values[4],
+                longitude: option_values[5],
+            },
+        };
+    }
+    if field_values[5] != 0 {
+        options.fields |= sys::MLN_STYLE_TILE_SOURCE_OPTION_TILE_SIZE;
+        options.tile_size = option_values[7] as u32;
+    }
+    if field_values[6] != 0 {
+        options.fields |= sys::MLN_STYLE_TILE_SOURCE_OPTION_VECTOR_ENCODING;
+        options.vector_encoding = option_values[8] as u32;
+    }
+    if field_values[7] != 0 {
+        options.fields |= sys::MLN_STYLE_TILE_SOURCE_OPTION_RASTER_ENCODING;
+        options.raster_encoding = option_values[9] as u32;
+    }
+    Ok((options, attribution_storage))
 }
 
 fn map_style_source_url(

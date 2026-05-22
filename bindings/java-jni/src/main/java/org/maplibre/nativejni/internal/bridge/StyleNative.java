@@ -51,20 +51,53 @@ public final class StyleNative {
 
   public static native int mln_map_set_geojson_source_data();
 
-  public static native int mln_map_add_vector_source_url(long map, String sourceId, String url);
+  public static native int mln_map_add_vector_source_url(
+      long map,
+      String sourceId,
+      String url,
+      boolean[] optionFields,
+      double[] optionValues,
+      String attribution);
 
   public static native int mln_map_add_vector_source_tiles(
-      long map, String sourceId, String[] tiles);
+      long map,
+      String sourceId,
+      String[] tiles,
+      boolean[] optionFields,
+      double[] optionValues,
+      String attribution);
 
-  public static native int mln_map_add_raster_source_url(long map, String sourceId, String url);
+  public static native int mln_map_add_raster_source_url(
+      long map,
+      String sourceId,
+      String url,
+      boolean[] optionFields,
+      double[] optionValues,
+      String attribution);
 
   public static native int mln_map_add_raster_source_tiles(
-      long map, String sourceId, String[] tiles);
+      long map,
+      String sourceId,
+      String[] tiles,
+      boolean[] optionFields,
+      double[] optionValues,
+      String attribution);
 
-  public static native int mln_map_add_raster_dem_source_url(long map, String sourceId, String url);
+  public static native int mln_map_add_raster_dem_source_url(
+      long map,
+      String sourceId,
+      String url,
+      boolean[] optionFields,
+      double[] optionValues,
+      String attribution);
 
   public static native int mln_map_add_raster_dem_source_tiles(
-      long map, String sourceId, String[] tiles);
+      long map,
+      String sourceId,
+      String[] tiles,
+      boolean[] optionFields,
+      double[] optionValues,
+      String attribution);
 
   public static native int mln_map_add_custom_geometry_source();
 

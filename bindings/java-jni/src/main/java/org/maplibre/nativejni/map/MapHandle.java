@@ -239,82 +239,106 @@ public final class MapHandle implements AutoCloseable {
   }
 
   public void addVectorSourceUrl(String sourceId, String url) {
+    addVectorSourceUrl(sourceId, url, null);
+  }
+
+  public void addVectorSourceUrl(String sourceId, String url, TileSourceOptions options) {
     NativeLibrary.ensureLoaded();
+    var nativeOptions = tileSourceOptions(options);
     Status.check(
         StyleNative.mln_map_add_vector_source_url(
             state.requireLiveAddress(),
             Objects.requireNonNull(sourceId, "sourceId"),
-            Objects.requireNonNull(url, "url")));
-  }
-
-  public void addVectorSourceUrl(String sourceId, String url, TileSourceOptions options) {
-    throw unsupported();
+            Objects.requireNonNull(url, "url"),
+            nativeOptions.fields(),
+            nativeOptions.values(),
+            nativeOptions.attribution()));
   }
 
   public void addVectorSourceTiles(String sourceId, List<String> tiles) {
+    addVectorSourceTiles(sourceId, tiles, null);
+  }
+
+  public void addVectorSourceTiles(String sourceId, List<String> tiles, TileSourceOptions options) {
     NativeLibrary.ensureLoaded();
+    var nativeOptions = tileSourceOptions(options);
     Status.check(
         StyleNative.mln_map_add_vector_source_tiles(
             state.requireLiveAddress(),
             Objects.requireNonNull(sourceId, "sourceId"),
-            stringArray(tiles, "tiles")));
-  }
-
-  public void addVectorSourceTiles(String sourceId, List<String> tiles, TileSourceOptions options) {
-    throw unsupported();
+            stringArray(tiles, "tiles"),
+            nativeOptions.fields(),
+            nativeOptions.values(),
+            nativeOptions.attribution()));
   }
 
   public void addRasterSourceUrl(String sourceId, String url) {
+    addRasterSourceUrl(sourceId, url, null);
+  }
+
+  public void addRasterSourceUrl(String sourceId, String url, TileSourceOptions options) {
     NativeLibrary.ensureLoaded();
+    var nativeOptions = tileSourceOptions(options);
     Status.check(
         StyleNative.mln_map_add_raster_source_url(
             state.requireLiveAddress(),
             Objects.requireNonNull(sourceId, "sourceId"),
-            Objects.requireNonNull(url, "url")));
-  }
-
-  public void addRasterSourceUrl(String sourceId, String url, TileSourceOptions options) {
-    throw unsupported();
+            Objects.requireNonNull(url, "url"),
+            nativeOptions.fields(),
+            nativeOptions.values(),
+            nativeOptions.attribution()));
   }
 
   public void addRasterSourceTiles(String sourceId, List<String> tiles) {
+    addRasterSourceTiles(sourceId, tiles, null);
+  }
+
+  public void addRasterSourceTiles(String sourceId, List<String> tiles, TileSourceOptions options) {
     NativeLibrary.ensureLoaded();
+    var nativeOptions = tileSourceOptions(options);
     Status.check(
         StyleNative.mln_map_add_raster_source_tiles(
             state.requireLiveAddress(),
             Objects.requireNonNull(sourceId, "sourceId"),
-            stringArray(tiles, "tiles")));
-  }
-
-  public void addRasterSourceTiles(String sourceId, List<String> tiles, TileSourceOptions options) {
-    throw unsupported();
+            stringArray(tiles, "tiles"),
+            nativeOptions.fields(),
+            nativeOptions.values(),
+            nativeOptions.attribution()));
   }
 
   public void addRasterDemSourceUrl(String sourceId, String url) {
+    addRasterDemSourceUrl(sourceId, url, null);
+  }
+
+  public void addRasterDemSourceUrl(String sourceId, String url, TileSourceOptions options) {
     NativeLibrary.ensureLoaded();
+    var nativeOptions = tileSourceOptions(options);
     Status.check(
         StyleNative.mln_map_add_raster_dem_source_url(
             state.requireLiveAddress(),
             Objects.requireNonNull(sourceId, "sourceId"),
-            Objects.requireNonNull(url, "url")));
-  }
-
-  public void addRasterDemSourceUrl(String sourceId, String url, TileSourceOptions options) {
-    throw unsupported();
+            Objects.requireNonNull(url, "url"),
+            nativeOptions.fields(),
+            nativeOptions.values(),
+            nativeOptions.attribution()));
   }
 
   public void addRasterDemSourceTiles(String sourceId, List<String> tiles) {
-    NativeLibrary.ensureLoaded();
-    Status.check(
-        StyleNative.mln_map_add_raster_dem_source_tiles(
-            state.requireLiveAddress(),
-            Objects.requireNonNull(sourceId, "sourceId"),
-            stringArray(tiles, "tiles")));
+    addRasterDemSourceTiles(sourceId, tiles, null);
   }
 
   public void addRasterDemSourceTiles(
       String sourceId, List<String> tiles, TileSourceOptions options) {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    var nativeOptions = tileSourceOptions(options);
+    Status.check(
+        StyleNative.mln_map_add_raster_dem_source_tiles(
+            state.requireLiveAddress(),
+            Objects.requireNonNull(sourceId, "sourceId"),
+            stringArray(tiles, "tiles"),
+            nativeOptions.fields(),
+            nativeOptions.values(),
+            nativeOptions.attribution()));
   }
 
   public void setStyleImage(String imageId, PremultipliedRgba8Image image) {
@@ -1404,7 +1428,39 @@ public final class MapHandle implements AutoCloseable {
     return values;
   }
 
+  private static NativeTileSourceOptions tileSourceOptions(TileSourceOptions options) {
+    var fields = new boolean[8];
+    var values = new double[10];
+    var attribution = "";
+    if (options != null) {
+      fields[0] = options.hasMinZoom();
+      values[0] = fields[0] ? options.minZoom() : 0.0;
+      fields[1] = options.hasMaxZoom();
+      values[1] = fields[1] ? options.maxZoom() : 0.0;
+      fields[2] = options.hasAttribution();
+      attribution = fields[2] ? options.attribution() : "";
+      fields[3] = options.hasScheme();
+      values[6] = fields[3] ? options.scheme().nativeValue() : 0.0;
+      fields[4] = options.hasBounds();
+      if (fields[4]) {
+        values[2] = options.bounds().southwest().latitude();
+        values[3] = options.bounds().southwest().longitude();
+        values[4] = options.bounds().northeast().latitude();
+        values[5] = options.bounds().northeast().longitude();
+      }
+      fields[5] = options.hasTileSize();
+      values[7] = fields[5] ? options.tileSize() : 0.0;
+      fields[6] = options.hasVectorEncoding();
+      values[8] = fields[6] ? options.vectorEncoding().nativeValue() : 0.0;
+      fields[7] = options.hasRasterDemEncoding();
+      values[9] = fields[7] ? options.rasterDemEncoding().nativeValue() : 0.0;
+    }
+    return new NativeTileSourceOptions(fields, values, attribution);
+  }
+
   record NativeOptions(boolean[] fields, double[] values) {}
+
+  record NativeTileSourceOptions(boolean[] fields, double[] values, String attribution) {}
 
   public MapProjectionHandle createProjection() {
     return MapProjectionHandle.create(this);

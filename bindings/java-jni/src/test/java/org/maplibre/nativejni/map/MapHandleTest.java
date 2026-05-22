@@ -26,9 +26,13 @@ import org.maplibre.nativejni.internal.access.InternalAccess;
 import org.maplibre.nativejni.render.PremultipliedRgba8Image;
 import org.maplibre.nativejni.runtime.RuntimeHandle;
 import org.maplibre.nativejni.style.LocationIndicatorImageKind;
+import org.maplibre.nativejni.style.RasterDemEncoding;
 import org.maplibre.nativejni.style.SourceInfo;
 import org.maplibre.nativejni.style.SourceType;
 import org.maplibre.nativejni.style.StyleImageOptions;
+import org.maplibre.nativejni.style.TileScheme;
+import org.maplibre.nativejni.style.TileSourceOptions;
+import org.maplibre.nativejni.style.VectorTileEncoding;
 import org.maplibre.nativejni.test.NativeTestSupport;
 
 class MapHandleTest {
@@ -250,7 +254,13 @@ class MapHandleTest {
         assertTrue(map.removeStyleSource("geojson-source"));
         assertFalse(map.removeStyleSource("geojson-source"));
 
-        map.addVectorSourceUrl("vector-source", "https://example.com/vector.json");
+        map.addVectorSourceUrl(
+            "vector-source",
+            "https://example.com/vector.json",
+            new TileSourceOptions()
+                .minZoom(1.0)
+                .maxZoom(12.0)
+                .vectorEncoding(VectorTileEncoding.MVT));
         assertTrue(map.styleSourceIds().contains("vector-source"));
         assertEquals(SourceType.VECTOR, map.styleSourceType("vector-source").orElseThrow());
         assertTrue(map.removeStyleSource("vector-source"));
@@ -258,7 +268,14 @@ class MapHandleTest {
             "vector-tiles-source", List.of("https://example.com/vector/{z}/{x}/{y}.pbf"));
         assertEquals(SourceType.VECTOR, map.styleSourceType("vector-tiles-source").orElseThrow());
         assertTrue(map.removeStyleSource("vector-tiles-source"));
-        map.addRasterSourceUrl("raster-source", "https://example.com/raster.json");
+        map.addRasterSourceUrl(
+            "raster-source",
+            "https://example.com/raster.json",
+            new TileSourceOptions()
+                .attribution("© raster")
+                .scheme(TileScheme.XYZ)
+                .tileSize(256)
+                .bounds(new LatLngBounds(new LatLng(-1.0, -2.0), new LatLng(1.0, 2.0))));
         assertEquals(SourceType.RASTER, map.styleSourceType("raster-source").orElseThrow());
         SourceInfo rasterInfo = map.styleSourceInfo("raster-source").orElseThrow();
         assertEquals(SourceType.RASTER, rasterInfo.type());
@@ -271,7 +288,10 @@ class MapHandleTest {
             "raster-tiles-source", List.of("https://example.com/raster/{z}/{x}/{y}.png"));
         assertEquals(SourceType.RASTER, map.styleSourceType("raster-tiles-source").orElseThrow());
         assertTrue(map.removeStyleSource("raster-tiles-source"));
-        map.addRasterDemSourceUrl("raster-dem-source", "https://example.com/raster-dem.json");
+        map.addRasterDemSourceUrl(
+            "raster-dem-source",
+            "https://example.com/raster-dem.json",
+            new TileSourceOptions().rasterDemEncoding(RasterDemEncoding.MAPBOX));
         assertEquals(SourceType.RASTER_DEM, map.styleSourceType("raster-dem-source").orElseThrow());
         assertTrue(map.removeStyleSource("raster-dem-source"));
         map.addRasterDemSourceTiles(
