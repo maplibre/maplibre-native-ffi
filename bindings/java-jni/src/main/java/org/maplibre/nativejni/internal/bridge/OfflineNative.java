@@ -6,15 +6,7 @@ public final class OfflineNative {
 
   public static native int mln_runtime_offline_region_create_start(
       long runtime,
-      String styleUrl,
-      double southwestLatitude,
-      double southwestLongitude,
-      double northeastLatitude,
-      double northeastLongitude,
-      double minZoom,
-      double maxZoom,
-      double pixelRatio,
-      boolean includeIdeographs,
+      org.maplibre.nativejni.offline.OfflineRegionDefinition definition,
       byte[] metadata,
       long[] outOperationId);
 

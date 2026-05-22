@@ -8,6 +8,7 @@ import java.util.Optional;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.maplibre.nativejni.error.InvalidStateException;
+import org.maplibre.nativejni.geo.Geometry;
 import org.maplibre.nativejni.geo.LatLng;
 import org.maplibre.nativejni.geo.LatLngBounds;
 import org.maplibre.nativejni.offline.OfflineRegionDefinition;
@@ -70,6 +71,20 @@ class RuntimeHandleTest {
       assertThrows(
           InvalidStateException.class, () -> runtime.takeCreateOfflineRegionResult(operation));
       runtime.discardOfflineOperation(operation);
+
+      var geometryOperation =
+          runtime.startCreateOfflineRegion(
+              new OfflineRegionDefinition.GeometryRegion(
+                  "https://example.com/style.json",
+                  Geometry.point(new LatLng(0.5, 0.5)),
+                  0.0,
+                  1.0,
+                  1.0f,
+                  true),
+              new byte[] {1, 2, 3});
+      assertTrue(geometryOperation.kind() == OfflineOperationKind.REGION_CREATE);
+      assertTrue(geometryOperation.resultKind() == OfflineOperationResultKind.REGION);
+      runtime.discardOfflineOperation(geometryOperation);
     }
   }
 

@@ -78,23 +78,11 @@ public final class RuntimeHandle implements AutoCloseable {
       OfflineRegionDefinition definition, byte[] metadata) {
     NativeLibrary.ensureLoaded();
     Objects.requireNonNull(definition, "definition");
-    if (!(definition instanceof OfflineRegionDefinition.TilePyramid tilePyramid)) {
-      throw unsupported();
-    }
-    var bounds = tilePyramid.bounds();
     var outOperationId = new long[1];
     Status.check(
         OfflineNative.mln_runtime_offline_region_create_start(
             state.requireLiveAddress(),
-            tilePyramid.styleUrl(),
-            bounds.southwest().latitude(),
-            bounds.southwest().longitude(),
-            bounds.northeast().latitude(),
-            bounds.northeast().longitude(),
-            tilePyramid.minZoom(),
-            tilePyramid.maxZoom(),
-            tilePyramid.pixelRatio(),
-            tilePyramid.includeIdeographs(),
+            definition,
             Objects.requireNonNull(metadata, "metadata"),
             outOperationId));
     return offlineOperation(

@@ -858,7 +858,7 @@ mod registration {
         ]);
         methods.push(NativeMethod {
             name: "mln_runtime_offline_region_create_start".into(),
-            sig: "(JLjava/lang/String;DDDDDDDZ[B[J)I".into(),
+            sig: "(JLorg/maplibre/nativejni/offline/OfflineRegionDefinition;[B[J)I".into(),
             fn_ptr: offline_region_create_start as *mut c_void,
         });
         methods.push(NativeMethod {
@@ -1767,6 +1767,34 @@ fn java_int_method<'local>(
         .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)
 }
 
+fn java_double_method<'local>(
+    env: &mut JNIEnv<'local>,
+    value: &JObject<'local>,
+    method: &str,
+) -> Result<f64, jint> {
+    env.call_method(value, method, "()D", &[])
+        .and_then(|value| value.d())
+        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)
+}
+
+fn java_float_method<'local>(
+    env: &mut JNIEnv<'local>,
+    value: &JObject<'local>,
+    method: &str,
+) -> Result<f32, jint> {
+    env.call_method(value, method, "()F", &[])
+        .and_then(|value| value.f())
+        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)
+}
+
+fn java_latitude<'local>(env: &mut JNIEnv<'local>, value: &JObject<'local>) -> Result<f64, jint> {
+    java_double_method(env, value, "latitude")
+}
+
+fn java_longitude<'local>(env: &mut JNIEnv<'local>, value: &JObject<'local>) -> Result<f64, jint> {
+    java_double_method(env, value, "longitude")
+}
+
 fn java_nullable_string_method<'local>(
     env: &mut JNIEnv<'local>,
     value: &JObject<'local>,
@@ -2051,70 +2079,219 @@ extern "system" fn runtime_offline_operation_discard(
     .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
 }
 
-extern "system" fn offline_region_create_start(
-    mut env: JNIEnv<'_>,
-    _class: JClass<'_>,
+extern "system" fn offline_region_create_start<'local>(
+    mut env: JNIEnv<'local>,
+    _class: JClass<'local>,
     runtime: jlong,
-    style_url: JString<'_>,
-    southwest_latitude: f64,
-    southwest_longitude: f64,
-    northeast_latitude: f64,
-    northeast_longitude: f64,
-    min_zoom: f64,
-    max_zoom: f64,
-    pixel_ratio: f64,
-    include_ideographs: jboolean,
-    metadata: JByteArray<'_>,
-    out_operation_id: JLongArray<'_>,
+    definition: JObject<'local>,
+    metadata: JByteArray<'local>,
+    out_operation_id: JLongArray<'local>,
 ) -> jint {
     catch_unwind(AssertUnwindSafe(|| {
-        if metadata.is_null() {
+        if definition.is_null() || metadata.is_null() {
             return sys::MLN_STATUS_INVALID_ARGUMENT;
         }
-        let style_url = match jstring_to_cstring(&mut env, &style_url) {
-            Ok(value) => value,
-            Err(status) => return status,
-        };
         let metadata = match env.convert_byte_array(&metadata) {
             Ok(value) => value,
             Err(_) => return sys::MLN_STATUS_INVALID_ARGUMENT,
         };
-        let tile_pyramid = sys::mln_offline_tile_pyramid_region_definition {
-            size: std::mem::size_of::<sys::mln_offline_tile_pyramid_region_definition>() as u32,
-            style_url: style_url.as_ptr(),
-            bounds: sys::mln_lat_lng_bounds {
-                southwest: sys::mln_lat_lng {
-                    latitude: southwest_latitude,
-                    longitude: southwest_longitude,
-                },
-                northeast: sys::mln_lat_lng {
-                    latitude: northeast_latitude,
-                    longitude: northeast_longitude,
-                },
-            },
-            min_zoom,
-            max_zoom,
-            pixel_ratio: pixel_ratio as f32,
-            include_ideographs: include_ideographs != 0,
-        };
-        let definition = sys::mln_offline_region_definition {
-            size: std::mem::size_of::<sys::mln_offline_region_definition>() as u32,
-            type_: sys::MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID,
-            data: sys::mln_offline_region_definition__bindgen_ty_1 { tile_pyramid },
-        };
-        offline_start_with_out(env, out_operation_id, |out| unsafe {
-            sys::mln_runtime_offline_region_create_start(
-                runtime as *mut sys::mln_runtime,
+        if env
+            .is_instance_of(
                 &definition,
-                if metadata.is_empty() {
-                    std::ptr::null()
-                } else {
-                    metadata.as_ptr()
-                },
-                metadata.len(),
-                out,
+                "org/maplibre/nativejni/offline/OfflineRegionDefinition$TilePyramid",
             )
-        })
+            .unwrap_or(false)
+        {
+            let style_url = match java_string_method(&mut env, &definition, "styleUrl") {
+                Ok(value) => value,
+                Err(status) => return status,
+            };
+            let style_url = match CString::new(style_url) {
+                Ok(value) => value,
+                Err(_) => return sys::MLN_STATUS_INVALID_ARGUMENT,
+            };
+            let bounds = match env
+                .call_method(
+                    &definition,
+                    "bounds",
+                    "()Lorg/maplibre/nativejni/geo/LatLngBounds;",
+                    &[],
+                )
+                .and_then(|value| value.l())
+            {
+                Ok(value) => value,
+                Err(_) => return sys::MLN_STATUS_INVALID_ARGUMENT,
+            };
+            let southwest = match env
+                .call_method(
+                    &bounds,
+                    "southwest",
+                    "()Lorg/maplibre/nativejni/geo/LatLng;",
+                    &[],
+                )
+                .and_then(|value| value.l())
+            {
+                Ok(value) => value,
+                Err(_) => return sys::MLN_STATUS_INVALID_ARGUMENT,
+            };
+            let northeast = match env
+                .call_method(
+                    &bounds,
+                    "northeast",
+                    "()Lorg/maplibre/nativejni/geo/LatLng;",
+                    &[],
+                )
+                .and_then(|value| value.l())
+            {
+                Ok(value) => value,
+                Err(_) => return sys::MLN_STATUS_INVALID_ARGUMENT,
+            };
+            let tile_pyramid = sys::mln_offline_tile_pyramid_region_definition {
+                size: std::mem::size_of::<sys::mln_offline_tile_pyramid_region_definition>() as u32,
+                style_url: style_url.as_ptr(),
+                bounds: sys::mln_lat_lng_bounds {
+                    southwest: sys::mln_lat_lng {
+                        latitude: match java_latitude(&mut env, &southwest) {
+                            Ok(value) => value,
+                            Err(status) => return status,
+                        },
+                        longitude: match java_longitude(&mut env, &southwest) {
+                            Ok(value) => value,
+                            Err(status) => return status,
+                        },
+                    },
+                    northeast: sys::mln_lat_lng {
+                        latitude: match java_latitude(&mut env, &northeast) {
+                            Ok(value) => value,
+                            Err(status) => return status,
+                        },
+                        longitude: match java_longitude(&mut env, &northeast) {
+                            Ok(value) => value,
+                            Err(status) => return status,
+                        },
+                    },
+                },
+                min_zoom: match java_double_method(&mut env, &definition, "minZoom") {
+                    Ok(value) => value,
+                    Err(status) => return status,
+                },
+                max_zoom: match java_double_method(&mut env, &definition, "maxZoom") {
+                    Ok(value) => value,
+                    Err(status) => return status,
+                },
+                pixel_ratio: match java_float_method(&mut env, &definition, "pixelRatio") {
+                    Ok(value) => value,
+                    Err(status) => return status,
+                },
+                include_ideographs: match java_boolean_method(
+                    &mut env,
+                    &definition,
+                    "includeIdeographs",
+                ) {
+                    Ok(value) => value,
+                    Err(status) => return status,
+                },
+            };
+            let definition = sys::mln_offline_region_definition {
+                size: std::mem::size_of::<sys::mln_offline_region_definition>() as u32,
+                type_: sys::MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID,
+                data: sys::mln_offline_region_definition__bindgen_ty_1 { tile_pyramid },
+            };
+            return offline_start_with_out(env, out_operation_id, |out| unsafe {
+                sys::mln_runtime_offline_region_create_start(
+                    runtime as *mut sys::mln_runtime,
+                    &definition,
+                    if metadata.is_empty() {
+                        std::ptr::null()
+                    } else {
+                        metadata.as_ptr()
+                    },
+                    metadata.len(),
+                    out,
+                )
+            });
+        }
+        if env
+            .is_instance_of(
+                &definition,
+                "org/maplibre/nativejni/offline/OfflineRegionDefinition$GeometryRegion",
+            )
+            .unwrap_or(false)
+        {
+            let style_url = match java_string_method(&mut env, &definition, "styleUrl") {
+                Ok(value) => value,
+                Err(status) => return status,
+            };
+            let style_url = match CString::new(style_url) {
+                Ok(value) => value,
+                Err(_) => return sys::MLN_STATUS_INVALID_ARGUMENT,
+            };
+            let geometry = match env
+                .call_method(
+                    &definition,
+                    "geometry",
+                    "()Lorg/maplibre/nativejni/geo/Geometry;",
+                    &[],
+                )
+                .and_then(|value| value.l())
+            {
+                Ok(value) => value,
+                Err(_) => return sys::MLN_STATUS_INVALID_ARGUMENT,
+            };
+            let geometry = match java_geometry(&mut env, &geometry, 0).and_then(|value| {
+                core_geometry::geometry_try_to_native(&value)
+                    .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)
+            }) {
+                Ok(value) => value,
+                Err(status) => return status,
+            };
+            let geometry_region = sys::mln_offline_geometry_region_definition {
+                size: std::mem::size_of::<sys::mln_offline_geometry_region_definition>() as u32,
+                style_url: style_url.as_ptr(),
+                geometry: geometry.as_ptr(),
+                min_zoom: match java_double_method(&mut env, &definition, "minZoom") {
+                    Ok(value) => value,
+                    Err(status) => return status,
+                },
+                max_zoom: match java_double_method(&mut env, &definition, "maxZoom") {
+                    Ok(value) => value,
+                    Err(status) => return status,
+                },
+                pixel_ratio: match java_float_method(&mut env, &definition, "pixelRatio") {
+                    Ok(value) => value,
+                    Err(status) => return status,
+                },
+                include_ideographs: match java_boolean_method(
+                    &mut env,
+                    &definition,
+                    "includeIdeographs",
+                ) {
+                    Ok(value) => value,
+                    Err(status) => return status,
+                },
+            };
+            let definition = sys::mln_offline_region_definition {
+                size: std::mem::size_of::<sys::mln_offline_region_definition>() as u32,
+                type_: sys::MLN_OFFLINE_REGION_DEFINITION_GEOMETRY,
+                data: sys::mln_offline_region_definition__bindgen_ty_1 {
+                    geometry: geometry_region,
+                },
+            };
+            return offline_start_with_out(env, out_operation_id, |out| unsafe {
+                sys::mln_runtime_offline_region_create_start(
+                    runtime as *mut sys::mln_runtime,
+                    &definition,
+                    if metadata.is_empty() {
+                        std::ptr::null()
+                    } else {
+                        metadata.as_ptr()
+                    },
+                    metadata.len(),
+                    out,
+                )
+            });
+        }
+        sys::MLN_STATUS_INVALID_ARGUMENT
     }))
     .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
 }
