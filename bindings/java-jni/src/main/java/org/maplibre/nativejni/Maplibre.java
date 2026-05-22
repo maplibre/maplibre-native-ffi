@@ -6,7 +6,8 @@ import java.util.Objects;
 import java.util.Set;
 import org.maplibre.nativejni.geo.LatLng;
 import org.maplibre.nativejni.geo.ProjectedMeters;
-import org.maplibre.nativejni.internal.bridge.NativeBridge;
+import org.maplibre.nativejni.internal.bridge.BaseNative;
+import org.maplibre.nativejni.internal.bridge.RuntimeNative;
 import org.maplibre.nativejni.internal.loader.NativeLibrary;
 import org.maplibre.nativejni.internal.status.Status;
 import org.maplibre.nativejni.log.LogCallback;
@@ -31,20 +32,20 @@ public final class Maplibre {
   /** Returns the native C ABI contract version. */
   public static long cVersion() {
     NativeLibrary.ensureLoaded();
-    return NativeBridge.cVersion();
+    return BaseNative.mln_c_version();
   }
 
   /** Returns the render backends compiled into the loaded native library. */
   public static EnumSet<RenderBackend> supportedRenderBackends() {
     NativeLibrary.ensureLoaded();
-    return RenderBackend.fromMask(NativeBridge.supportedRenderBackendMask());
+    return RenderBackend.fromMask(BaseNative.mln_supported_render_backend_mask());
   }
 
   /** Reads Maplibre Native's process-global network status. */
   public static NetworkStatus networkStatus() {
     NativeLibrary.ensureLoaded();
     var out = new int[1];
-    Status.check(NativeBridge.networkStatusGet(out));
+    Status.check(RuntimeNative.mln_network_status_get(out));
     return NetworkStatus.fromNative(out[0]);
   }
 
@@ -52,7 +53,8 @@ public final class Maplibre {
   public static void setNetworkStatus(NetworkStatus status) {
     NativeLibrary.ensureLoaded();
     Status.check(
-        NativeBridge.networkStatusSet(Objects.requireNonNull(status, "status").nativeValue()));
+        RuntimeNative.mln_network_status_set(
+            Objects.requireNonNull(status, "status").nativeValue()));
   }
 
   /**
