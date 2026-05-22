@@ -274,11 +274,6 @@ mod registration {
             "mln_map_set_custom_geometry_source_tile_data",
             "mln_map_invalidate_custom_geometry_source_tile",
             "mln_map_invalidate_custom_geometry_source_region",
-            "mln_map_set_style_image",
-            "mln_map_remove_style_image",
-            "mln_map_style_image_exists",
-            "mln_map_get_style_image_info",
-            "mln_map_copy_style_image_premultiplied_rgba8",
             "mln_map_add_image_source_image",
             "mln_map_set_image_source_image",
             "mln_map_add_style_layer_json",
@@ -360,6 +355,31 @@ mod registration {
             name: "mln_map_add_raster_dem_source_tiles".into(),
             sig: "(JLjava/lang/String;[Ljava/lang/String;)I".into(),
             fn_ptr: map_add_raster_dem_source_tiles as *mut c_void,
+        });
+        style_methods.push(NativeMethod {
+            name: "mln_map_set_style_image".into(),
+            sig: "(JLjava/lang/String;III[BZDZZ)I".into(),
+            fn_ptr: map_set_style_image as *mut c_void,
+        });
+        style_methods.push(NativeMethod {
+            name: "mln_map_remove_style_image".into(),
+            sig: "(JLjava/lang/String;[Z)I".into(),
+            fn_ptr: map_remove_style_image as *mut c_void,
+        });
+        style_methods.push(NativeMethod {
+            name: "mln_map_style_image_exists".into(),
+            sig: "(JLjava/lang/String;[Z)I".into(),
+            fn_ptr: map_style_image_exists as *mut c_void,
+        });
+        style_methods.push(NativeMethod {
+            name: "mln_map_get_style_image_info".into(),
+            sig: "(JLjava/lang/String;[I[J[D[Z)I".into(),
+            fn_ptr: map_get_style_image_info as *mut c_void,
+        });
+        style_methods.push(NativeMethod {
+            name: "mln_map_copy_style_image_premultiplied_rgba8".into(),
+            sig: "(JLjava/lang/String;[B[J[Z)I".into(),
+            fn_ptr: map_copy_style_image_premultiplied_rgba8 as *mut c_void,
         });
         style_methods.push(NativeMethod {
             name: "mln_map_add_image_source_url".into(),
@@ -2123,6 +2143,276 @@ extern "system" fn map_list_style_layer_ids(
     out_layer_ids: JObjectArray<'_>,
 ) -> jint {
     map_list_style_ids(env, map, out_layer_ids, sys::mln_map_list_style_layer_ids)
+}
+
+extern "system" fn map_set_style_image(
+    mut env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    map: jlong,
+    image_id: JString<'_>,
+    width: jint,
+    height: jint,
+    stride: jint,
+    pixels: JByteArray<'_>,
+    has_pixel_ratio: jboolean,
+    pixel_ratio: f64,
+    has_sdf: jboolean,
+    sdf: jboolean,
+) -> jint {
+    catch_unwind(AssertUnwindSafe(|| {
+        if pixels.is_null() || width < 0 || height < 0 || stride < 0 {
+            return sys::MLN_STATUS_INVALID_ARGUMENT;
+        }
+        let pixel_count = match env.get_array_length(&pixels) {
+            Ok(value) if value >= 0 => value as usize,
+            _ => return sys::MLN_STATUS_INVALID_ARGUMENT,
+        };
+        let mut pixel_values = vec![0_i8; pixel_count];
+        if env
+            .get_byte_array_region(&pixels, 0, &mut pixel_values)
+            .is_err()
+        {
+            return sys::MLN_STATUS_INVALID_ARGUMENT;
+        }
+        let (image_id_storage, image_id_view) = match string_view(&mut env, &image_id) {
+            Ok(value) => value,
+            Err(status) => return status,
+        };
+        let mut options = unsafe { sys::mln_style_image_options_default() };
+        if has_pixel_ratio != 0 {
+            options.fields |= sys::MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO;
+            options.pixel_ratio = pixel_ratio as f32;
+        }
+        if has_sdf != 0 {
+            options.fields |= sys::MLN_STYLE_IMAGE_OPTION_SDF;
+            options.sdf = sdf != 0;
+        }
+        let image = sys::mln_premultiplied_rgba8_image {
+            size: std::mem::size_of::<sys::mln_premultiplied_rgba8_image>() as u32,
+            width: width as u32,
+            height: height as u32,
+            stride: stride as u32,
+            pixels: if pixel_values.is_empty() {
+                std::ptr::null()
+            } else {
+                pixel_values.as_ptr() as *const u8
+            },
+            byte_length: pixel_values.len(),
+        };
+        let _keep_alive = (image_id_storage, pixel_values);
+        unsafe {
+            sys::mln_map_set_style_image(map as *mut sys::mln_map, image_id_view, &image, &options)
+        }
+    }))
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+extern "system" fn map_remove_style_image(
+    env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    map: jlong,
+    image_id: JString<'_>,
+    out_removed: JBooleanArray<'_>,
+) -> jint {
+    map_style_image_bool(
+        env,
+        map,
+        image_id,
+        out_removed,
+        sys::mln_map_remove_style_image,
+    )
+}
+
+extern "system" fn map_style_image_exists(
+    env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    map: jlong,
+    image_id: JString<'_>,
+    out_exists: JBooleanArray<'_>,
+) -> jint {
+    map_style_image_bool(
+        env,
+        map,
+        image_id,
+        out_exists,
+        sys::mln_map_style_image_exists,
+    )
+}
+
+fn map_style_image_bool(
+    mut env: JNIEnv<'_>,
+    map: jlong,
+    image_id: JString<'_>,
+    out_value: JBooleanArray<'_>,
+    operation: unsafe extern "C" fn(
+        *mut sys::mln_map,
+        sys::mln_string_view,
+        *mut bool,
+    ) -> sys::mln_status,
+) -> jint {
+    catch_unwind(AssertUnwindSafe(|| {
+        if out_value.is_null() || env.get_array_length(&out_value).unwrap_or(0) < 1 {
+            return sys::MLN_STATUS_INVALID_ARGUMENT;
+        }
+        let (image_id_storage, image_id_view) = match string_view(&mut env, &image_id) {
+            Ok(value) => value,
+            Err(status) => return status,
+        };
+        let _keep_alive = image_id_storage;
+        let mut value = false;
+        let result = unsafe { operation(map as *mut sys::mln_map, image_id_view, &mut value) };
+        if result == sys::MLN_STATUS_OK
+            && env
+                .set_boolean_array_region(&out_value, 0, &[jboolean::from(value)])
+                .is_err()
+        {
+            return sys::MLN_STATUS_INVALID_ARGUMENT;
+        }
+        result
+    }))
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+extern "system" fn map_get_style_image_info(
+    mut env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    map: jlong,
+    image_id: JString<'_>,
+    out_info: JIntArray<'_>,
+    out_byte_length: JLongArray<'_>,
+    out_pixel_ratio: JDoubleArray<'_>,
+    out_flags: JBooleanArray<'_>,
+) -> jint {
+    catch_unwind(AssertUnwindSafe(|| {
+        if out_info.is_null()
+            || out_byte_length.is_null()
+            || out_pixel_ratio.is_null()
+            || out_flags.is_null()
+            || env.get_array_length(&out_info).unwrap_or(0) < 3
+            || env.get_array_length(&out_byte_length).unwrap_or(0) < 1
+            || env.get_array_length(&out_pixel_ratio).unwrap_or(0) < 1
+            || env.get_array_length(&out_flags).unwrap_or(0) < 2
+        {
+            return sys::MLN_STATUS_INVALID_ARGUMENT;
+        }
+        let (image_id_storage, image_id_view) = match string_view(&mut env, &image_id) {
+            Ok(value) => value,
+            Err(status) => return status,
+        };
+        let _keep_alive = image_id_storage;
+        let mut info = unsafe { sys::mln_style_image_info_default() };
+        let mut found = false;
+        let result = unsafe {
+            sys::mln_map_get_style_image_info(
+                map as *mut sys::mln_map,
+                image_id_view,
+                &mut info,
+                &mut found,
+            )
+        };
+        if result == sys::MLN_STATUS_OK
+            && (env
+                .set_int_array_region(
+                    &out_info,
+                    0,
+                    &[info.width as jint, info.height as jint, info.stride as jint],
+                )
+                .is_err()
+                || env
+                    .set_long_array_region(&out_byte_length, 0, &[info.byte_length as jlong])
+                    .is_err()
+                || env
+                    .set_double_array_region(&out_pixel_ratio, 0, &[info.pixel_ratio as f64])
+                    .is_err()
+                || env
+                    .set_boolean_array_region(
+                        &out_flags,
+                        0,
+                        &[jboolean::from(found), jboolean::from(info.sdf)],
+                    )
+                    .is_err())
+        {
+            return sys::MLN_STATUS_INVALID_ARGUMENT;
+        }
+        result
+    }))
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+extern "system" fn map_copy_style_image_premultiplied_rgba8(
+    mut env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    map: jlong,
+    image_id: JString<'_>,
+    out_pixels: JByteArray<'_>,
+    out_byte_length: JLongArray<'_>,
+    out_found: JBooleanArray<'_>,
+) -> jint {
+    catch_unwind(AssertUnwindSafe(|| {
+        if out_pixels.is_null()
+            || out_byte_length.is_null()
+            || out_found.is_null()
+            || env.get_array_length(&out_byte_length).unwrap_or(0) < 1
+            || env.get_array_length(&out_found).unwrap_or(0) < 1
+        {
+            return sys::MLN_STATUS_INVALID_ARGUMENT;
+        }
+        let capacity = match env.get_array_length(&out_pixels) {
+            Ok(value) if value >= 0 => value as usize,
+            _ => return sys::MLN_STATUS_INVALID_ARGUMENT,
+        };
+        let (image_id_storage, image_id_view) = match string_view(&mut env, &image_id) {
+            Ok(value) => value,
+            Err(status) => return status,
+        };
+        let _keep_alive = image_id_storage;
+        let mut buffer = vec![0_u8; capacity];
+        let mut byte_length = 0_usize;
+        let mut found = false;
+        let result = unsafe {
+            sys::mln_map_copy_style_image_premultiplied_rgba8(
+                map as *mut sys::mln_map,
+                image_id_view,
+                if buffer.is_empty() {
+                    std::ptr::null_mut()
+                } else {
+                    buffer.as_mut_ptr()
+                },
+                buffer.len(),
+                &mut byte_length,
+                &mut found,
+            )
+        };
+        if result == sys::MLN_STATUS_OK {
+            if byte_length > buffer.len() {
+                return sys::MLN_STATUS_INVALID_ARGUMENT;
+            }
+            if byte_length > 0 {
+                let signed_pixels: Vec<i8> = buffer[..byte_length]
+                    .iter()
+                    .copied()
+                    .map(|value| value as i8)
+                    .collect();
+                if env
+                    .set_byte_array_region(&out_pixels, 0, &signed_pixels)
+                    .is_err()
+                {
+                    return sys::MLN_STATUS_INVALID_ARGUMENT;
+                }
+            }
+            if env
+                .set_long_array_region(&out_byte_length, 0, &[byte_length as jlong])
+                .is_err()
+                || env
+                    .set_boolean_array_region(&out_found, 0, &[jboolean::from(found)])
+                    .is_err()
+            {
+                return sys::MLN_STATUS_INVALID_ARGUMENT;
+            }
+        }
+        result
+    }))
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
 }
 
 extern "system" fn map_add_image_source_url(

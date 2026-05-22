@@ -74,15 +74,34 @@ public final class StyleNative {
 
   public static native int mln_map_invalidate_custom_geometry_source_region();
 
-  public static native int mln_map_set_style_image();
+  public static native int mln_map_set_style_image(
+      long map,
+      String imageId,
+      int width,
+      int height,
+      int stride,
+      byte[] pixels,
+      boolean hasPixelRatio,
+      double pixelRatio,
+      boolean hasSdf,
+      boolean sdf);
 
-  public static native int mln_map_remove_style_image();
+  public static native int mln_map_remove_style_image(
+      long map, String imageId, boolean[] outRemoved);
 
-  public static native int mln_map_style_image_exists();
+  public static native int mln_map_style_image_exists(
+      long map, String imageId, boolean[] outExists);
 
-  public static native int mln_map_get_style_image_info();
+  public static native int mln_map_get_style_image_info(
+      long map,
+      String imageId,
+      int[] outInfo,
+      long[] outByteLength,
+      double[] outPixelRatio,
+      boolean[] outFlags);
 
-  public static native int mln_map_copy_style_image_premultiplied_rgba8();
+  public static native int mln_map_copy_style_image_premultiplied_rgba8(
+      long map, String imageId, byte[] outPixels, long[] outByteLength, boolean[] outFound);
 
   public static native int mln_map_add_image_source_url(
       long map, String sourceId, double[] coordinates, String url);

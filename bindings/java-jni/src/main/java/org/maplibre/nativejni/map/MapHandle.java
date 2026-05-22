@@ -318,28 +318,96 @@ public final class MapHandle implements AutoCloseable {
   }
 
   public void setStyleImage(String imageId, PremultipliedRgba8Image image) {
-    throw unsupported();
+    setStyleImage(imageId, image, null);
   }
 
   public void setStyleImage(
       String imageId, PremultipliedRgba8Image image, StyleImageOptions options) {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    Objects.requireNonNull(image, "image");
+    Status.check(
+        StyleNative.mln_map_set_style_image(
+            state.requireLiveAddress(),
+            Objects.requireNonNull(imageId, "imageId"),
+            image.width(),
+            image.height(),
+            image.stride(),
+            image.pixels(),
+            options != null && options.hasPixelRatio(),
+            options != null && options.hasPixelRatio() ? options.pixelRatio() : 1.0,
+            options != null && options.hasSdf(),
+            options != null && options.hasSdf() && options.sdf()));
   }
 
   public boolean removeStyleImage(String imageId) {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    var outRemoved = new boolean[1];
+    Status.check(
+        StyleNative.mln_map_remove_style_image(
+            state.requireLiveAddress(), Objects.requireNonNull(imageId, "imageId"), outRemoved));
+    return outRemoved[0];
   }
 
   public boolean styleImageExists(String imageId) {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    var outExists = new boolean[1];
+    Status.check(
+        StyleNative.mln_map_style_image_exists(
+            state.requireLiveAddress(), Objects.requireNonNull(imageId, "imageId"), outExists));
+    return outExists[0];
   }
 
   public Optional<StyleImageInfo> styleImageInfo(String imageId) {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    var outInfo = new int[3];
+    var outByteLength = new long[1];
+    var outPixelRatio = new double[1];
+    var outFlags = new boolean[2];
+    Status.check(
+        StyleNative.mln_map_get_style_image_info(
+            state.requireLiveAddress(),
+            Objects.requireNonNull(imageId, "imageId"),
+            outInfo,
+            outByteLength,
+            outPixelRatio,
+            outFlags));
+    return outFlags[0]
+        ? Optional.of(
+            new StyleImageInfo(
+                outInfo[0],
+                outInfo[1],
+                outInfo[2],
+                outByteLength[0],
+                (float) outPixelRatio[0],
+                outFlags[1]))
+        : Optional.empty();
   }
 
   public Optional<StyleImage> copyStyleImagePremultipliedRgba8(String imageId) {
-    throw unsupported();
+    var info = styleImageInfo(imageId);
+    if (info.isEmpty()) {
+      return Optional.empty();
+    }
+    var imageInfo = info.orElseThrow();
+    var outPixels = new byte[Math.toIntExact(imageInfo.byteLength())];
+    var outByteLength = new long[1];
+    var outFound = new boolean[1];
+    Status.check(
+        StyleNative.mln_map_copy_style_image_premultiplied_rgba8(
+            state.requireLiveAddress(),
+            Objects.requireNonNull(imageId, "imageId"),
+            outPixels,
+            outByteLength,
+            outFound));
+    if (!outFound[0]) {
+      return Optional.empty();
+    }
+    return Optional.of(
+        new StyleImage(
+            new PremultipliedRgba8Image(
+                imageInfo.width(), imageInfo.height(), imageInfo.stride(), outPixels),
+            imageInfo.pixelRatio(),
+            imageInfo.sdf()));
   }
 
   public void addImageSourceUrl(String sourceId, List<LatLng> coordinates, String url) {

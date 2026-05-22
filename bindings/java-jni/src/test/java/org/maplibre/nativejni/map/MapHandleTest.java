@@ -23,10 +23,12 @@ import org.maplibre.nativejni.geo.Quaternion;
 import org.maplibre.nativejni.geo.ScreenPoint;
 import org.maplibre.nativejni.geo.Vec3;
 import org.maplibre.nativejni.internal.access.InternalAccess;
+import org.maplibre.nativejni.render.PremultipliedRgba8Image;
 import org.maplibre.nativejni.runtime.RuntimeHandle;
 import org.maplibre.nativejni.style.LocationIndicatorImageKind;
 import org.maplibre.nativejni.style.SourceInfo;
 import org.maplibre.nativejni.style.SourceType;
+import org.maplibre.nativejni.style.StyleImageOptions;
 import org.maplibre.nativejni.test.NativeTestSupport;
 
 class MapHandleTest {
@@ -219,6 +221,26 @@ class MapHandleTest {
     try (var runtime = RuntimeHandle.create()) {
       try (var map = MapHandle.create(runtime, new MapOptions().size(64, 64))) {
         map.setStyleJson("{\"version\":8,\"sources\":{},\"layers\":[]}");
+        var styleImage = new PremultipliedRgba8Image(1, 1, 4, new byte[] {1, 2, 3, 4});
+        map.setStyleImage(
+            "style-image", styleImage, new StyleImageOptions().pixelRatio(2.0f).sdf(true));
+        assertTrue(map.styleImageExists("style-image"));
+        var styleImageInfo = map.styleImageInfo("style-image").orElseThrow();
+        assertEquals(1, styleImageInfo.width());
+        assertEquals(1, styleImageInfo.height());
+        assertEquals(4, styleImageInfo.stride());
+        assertEquals(4, styleImageInfo.byteLength());
+        assertEquals(2.0f, styleImageInfo.pixelRatio());
+        assertTrue(styleImageInfo.sdf());
+        var copiedStyleImage = map.copyStyleImagePremultipliedRgba8("style-image").orElseThrow();
+        assertEquals(styleImage, copiedStyleImage.image());
+        assertEquals(2.0f, copiedStyleImage.pixelRatio());
+        assertTrue(copiedStyleImage.sdf());
+        assertTrue(map.styleImageInfo("missing-style-image").isEmpty());
+        assertTrue(map.removeStyleImage("style-image"));
+        assertFalse(map.removeStyleImage("style-image"));
+        assertFalse(map.styleImageExists("style-image"));
+        assertFalse(map.copyStyleImagePremultipliedRgba8("style-image").isPresent());
         assertFalse(map.styleSourceExists("geojson-source"));
         map.addGeoJsonSourceUrl("geojson-source", "https://example.com/data.geojson");
         assertTrue(map.styleSourceExists("geojson-source"));
