@@ -328,7 +328,7 @@ final class RenderSessionHandleTest {
   void openglAttachMethodsReportNativeValidationErrors() {
     var runtime = RuntimeHandle.create();
     var map = MapHandle.create(runtime, new MapOptions().size(64, 64));
-    var context = new WglContextDescriptor();
+    var context = fakeSupportedOpenGLContext();
     try {
       assertThrows(
           InvalidArgumentException.class,
@@ -473,6 +473,18 @@ final class RenderSessionHandleTest {
   private static WglContextDescriptor fakeWglContext() {
     var fake = NativePointer.ofAddress(1);
     return new WglContextDescriptor(fake, fake);
+  }
+
+  private static OpenGLContextDescriptor fakeSupportedOpenGLContext() {
+    var fake = NativePointer.ofAddress(1);
+    var providers = Maplibre.supportedOpenGLContextProviders();
+    if (providers.contains(OpenGLContextProvider.EGL)) {
+      return new EglContextDescriptor(fake, fake, fake);
+    }
+    if (providers.contains(OpenGLContextProvider.WGL)) {
+      return new WglContextDescriptor(fake, fake);
+    }
+    return fakeWglContext();
   }
 
   private static boolean hasNonZeroByte(byte[] bytes) {
