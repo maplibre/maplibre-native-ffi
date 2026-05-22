@@ -194,11 +194,16 @@ test "EGL surface lifecycle and render update" {
     try testing.expectEqual(c.MLN_STATUS_OK, c.mln_egl_surface_attach(map, &descriptor, &session));
 
     // Only one surface session per map at a time.
-    // mln_owned_texture_descriptor_default is only available on Vulkan/Metal builds.
-    if (build_options.supports_vulkan or build_options.supports_metal) {
-        var texture_descriptor = c.mln_owned_texture_descriptor_default();
+    if (build_options.supports_vulkan) {
+        var texture_descriptor = c.mln_vulkan_owned_texture_descriptor_default();
         var texture: ?*c.mln_render_session = null;
-        try testing.expectEqual(c.MLN_STATUS_INVALID_STATE, c.mln_owned_texture_attach(map, &texture_descriptor, &texture));
+        try testing.expectEqual(c.MLN_STATUS_INVALID_STATE, c.mln_vulkan_owned_texture_attach(map, &texture_descriptor, &texture));
+        try testing.expectEqual(@as(?*c.mln_render_session, null), texture);
+    }
+    if (build_options.supports_metal) {
+        var texture_descriptor = c.mln_metal_owned_texture_descriptor_default();
+        var texture: ?*c.mln_render_session = null;
+        try testing.expectEqual(c.MLN_STATUS_INVALID_STATE, c.mln_metal_owned_texture_attach(map, &texture_descriptor, &texture));
         try testing.expectEqual(@as(?*c.mln_render_session, null), texture);
     }
 
