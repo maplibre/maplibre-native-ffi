@@ -9,6 +9,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.util.EnumSet;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.maplibre.nativejni.camera.AnimationOptions;
+import org.maplibre.nativejni.camera.CameraOptions;
 import org.maplibre.nativejni.error.InvalidStateException;
 import org.maplibre.nativejni.geo.ScreenPoint;
 import org.maplibre.nativejni.internal.access.InternalAccess;
@@ -55,6 +57,25 @@ class MapHandleTest {
 
         assertFalse(map.isFullyLoaded());
         map.dumpDebugLogs();
+      }
+    }
+  }
+
+  @Test
+  void cameraStateCommandsCrossNativeBoundary() {
+    try (var runtime = RuntimeHandle.create()) {
+      try (var map = MapHandle.create(runtime, new MapOptions().size(64, 64))) {
+        map.jumpTo(new CameraOptions().center(10, 20).zoom(3).bearing(4).pitch(5));
+        var camera = map.camera();
+        assertTrue(camera.hasCenter());
+        assertEquals(10, camera.center().latitude(), 0.000001);
+        assertEquals(20, camera.center().longitude(), 0.000001);
+        assertTrue(camera.hasZoom());
+        assertEquals(3, camera.zoom(), 0.000001);
+
+        var animation = new AnimationOptions().durationMs(0);
+        map.easeTo(new CameraOptions().zoom(4), animation);
+        map.flyTo(new CameraOptions().zoom(3), animation);
       }
     }
   }

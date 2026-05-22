@@ -67,6 +67,48 @@ const STRING_MESSAGE: i32 = 0;
 const STRING_PAYLOAD: i32 = 1;
 const STRING_COUNT: i32 = 2;
 
+const CAMERA_FIELD_CENTER: usize = 0;
+const CAMERA_FIELD_CENTER_ALTITUDE: usize = 1;
+const CAMERA_FIELD_PADDING: usize = 2;
+const CAMERA_FIELD_ANCHOR: usize = 3;
+const CAMERA_FIELD_ZOOM: usize = 4;
+const CAMERA_FIELD_BEARING: usize = 5;
+const CAMERA_FIELD_PITCH: usize = 6;
+const CAMERA_FIELD_ROLL: usize = 7;
+const CAMERA_FIELD_FOV: usize = 8;
+const CAMERA_FIELD_COUNT: usize = 9;
+
+const CAMERA_VALUE_LATITUDE: usize = 0;
+const CAMERA_VALUE_LONGITUDE: usize = 1;
+const CAMERA_VALUE_CENTER_ALTITUDE: usize = 2;
+const CAMERA_VALUE_PADDING_TOP: usize = 3;
+const CAMERA_VALUE_PADDING_LEFT: usize = 4;
+const CAMERA_VALUE_PADDING_BOTTOM: usize = 5;
+const CAMERA_VALUE_PADDING_RIGHT: usize = 6;
+const CAMERA_VALUE_ANCHOR_X: usize = 7;
+const CAMERA_VALUE_ANCHOR_Y: usize = 8;
+const CAMERA_VALUE_ZOOM: usize = 9;
+const CAMERA_VALUE_BEARING: usize = 10;
+const CAMERA_VALUE_PITCH: usize = 11;
+const CAMERA_VALUE_ROLL: usize = 12;
+const CAMERA_VALUE_FOV: usize = 13;
+const CAMERA_VALUE_COUNT: usize = 14;
+
+const ANIMATION_FIELD_DURATION: usize = 0;
+const ANIMATION_FIELD_VELOCITY: usize = 1;
+const ANIMATION_FIELD_MIN_ZOOM: usize = 2;
+const ANIMATION_FIELD_EASING: usize = 3;
+const ANIMATION_FIELD_COUNT: usize = 4;
+
+const ANIMATION_VALUE_DURATION: usize = 0;
+const ANIMATION_VALUE_VELOCITY: usize = 1;
+const ANIMATION_VALUE_MIN_ZOOM: usize = 2;
+const ANIMATION_VALUE_EASING_X1: usize = 3;
+const ANIMATION_VALUE_EASING_Y1: usize = 4;
+const ANIMATION_VALUE_EASING_X2: usize = 5;
+const ANIMATION_VALUE_EASING_Y2: usize = 6;
+const ANIMATION_VALUE_COUNT: usize = 7;
+
 #[unsafe(no_mangle)]
 pub extern "system" fn JNI_OnLoad(vm: JavaVM, _reserved: *mut c_void) -> jint {
     match catch_unwind(AssertUnwindSafe(|| registration::register_natives(&vm))) {
@@ -428,10 +470,6 @@ mod registration {
             "mln_map_set_viewport_options",
             "mln_map_get_tile_options",
             "mln_map_set_tile_options",
-            "mln_map_get_camera",
-            "mln_map_jump_to",
-            "mln_map_ease_to",
-            "mln_map_fly_to",
             "mln_map_camera_for_lat_lng_bounds",
             "mln_map_camera_for_lat_lngs",
             "mln_map_camera_for_geometry",
@@ -477,6 +515,26 @@ mod registration {
             name: "mln_map_dump_debug_logs".into(),
             sig: "(J)I".into(),
             fn_ptr: map_dump_debug_logs as *mut c_void,
+        });
+        methods.push(NativeMethod {
+            name: "mln_map_get_camera".into(),
+            sig: "(J[Z[D)I".into(),
+            fn_ptr: map_get_camera as *mut c_void,
+        });
+        methods.push(NativeMethod {
+            name: "mln_map_jump_to".into(),
+            sig: "(J[Z[D)I".into(),
+            fn_ptr: map_jump_to as *mut c_void,
+        });
+        methods.push(NativeMethod {
+            name: "mln_map_ease_to".into(),
+            sig: "(J[Z[DZ[Z[D)I".into(),
+            fn_ptr: map_ease_to as *mut c_void,
+        });
+        methods.push(NativeMethod {
+            name: "mln_map_fly_to".into(),
+            sig: "(J[Z[DZ[Z[D)I".into(),
+            fn_ptr: map_fly_to as *mut c_void,
         });
         methods.push(NativeMethod {
             name: "mln_map_move_by".into(),
@@ -1167,6 +1225,308 @@ extern "system" fn map_is_fully_loaded(
 extern "system" fn map_dump_debug_logs(_env: JNIEnv<'_>, _class: JClass<'_>, map: jlong) -> jint {
     catch_unwind(|| unsafe { sys::mln_map_dump_debug_logs(map as *mut sys::mln_map) })
         .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+extern "system" fn map_get_camera(
+    env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    map: jlong,
+    out_fields: JBooleanArray<'_>,
+    out_values: JDoubleArray<'_>,
+) -> jint {
+    catch_unwind(AssertUnwindSafe(|| {
+        if !camera_arrays_are_valid(&env, &out_fields, &out_values) {
+            return sys::MLN_STATUS_INVALID_ARGUMENT;
+        }
+        let mut camera = unsafe { sys::mln_camera_options_default() };
+        let result = unsafe { sys::mln_map_get_camera(map as *mut sys::mln_map, &mut camera) };
+        if result != sys::MLN_STATUS_OK {
+            return result;
+        }
+        write_camera_arrays(&env, &out_fields, &out_values, &camera)
+    }))
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+extern "system" fn map_jump_to(
+    env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    map: jlong,
+    fields: JBooleanArray<'_>,
+    values: JDoubleArray<'_>,
+) -> jint {
+    catch_unwind(AssertUnwindSafe(|| {
+        let camera = match read_camera_options(&env, &fields, &values) {
+            Ok(camera) => camera,
+            Err(status) => return status,
+        };
+        unsafe { sys::mln_map_jump_to(map as *mut sys::mln_map, &camera) }
+    }))
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+extern "system" fn map_ease_to(
+    env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    map: jlong,
+    camera_fields: JBooleanArray<'_>,
+    camera_values: JDoubleArray<'_>,
+    has_animation: jboolean,
+    animation_fields: JBooleanArray<'_>,
+    animation_values: JDoubleArray<'_>,
+) -> jint {
+    map_camera_transition(
+        env,
+        map,
+        camera_fields,
+        camera_values,
+        has_animation,
+        animation_fields,
+        animation_values,
+        sys::mln_map_ease_to,
+    )
+}
+
+extern "system" fn map_fly_to(
+    env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    map: jlong,
+    camera_fields: JBooleanArray<'_>,
+    camera_values: JDoubleArray<'_>,
+    has_animation: jboolean,
+    animation_fields: JBooleanArray<'_>,
+    animation_values: JDoubleArray<'_>,
+) -> jint {
+    map_camera_transition(
+        env,
+        map,
+        camera_fields,
+        camera_values,
+        has_animation,
+        animation_fields,
+        animation_values,
+        sys::mln_map_fly_to,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn map_camera_transition(
+    env: JNIEnv<'_>,
+    map: jlong,
+    camera_fields: JBooleanArray<'_>,
+    camera_values: JDoubleArray<'_>,
+    has_animation: jboolean,
+    animation_fields: JBooleanArray<'_>,
+    animation_values: JDoubleArray<'_>,
+    transition: unsafe extern "C" fn(
+        *mut sys::mln_map,
+        *const sys::mln_camera_options,
+        *const sys::mln_animation_options,
+    ) -> sys::mln_status,
+) -> jint {
+    catch_unwind(AssertUnwindSafe(|| {
+        let camera = match read_camera_options(&env, &camera_fields, &camera_values) {
+            Ok(camera) => camera,
+            Err(status) => return status,
+        };
+        let animation = if has_animation != 0 {
+            match read_animation_options(&env, &animation_fields, &animation_values) {
+                Ok(animation) => Some(animation),
+                Err(status) => return status,
+            }
+        } else {
+            None
+        };
+        let animation_ptr = animation
+            .as_ref()
+            .map_or(std::ptr::null(), |animation| animation as *const _);
+        unsafe { transition(map as *mut sys::mln_map, &camera, animation_ptr) }
+    }))
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+fn camera_arrays_are_valid(
+    env: &JNIEnv<'_>,
+    fields: &JBooleanArray<'_>,
+    values: &JDoubleArray<'_>,
+) -> bool {
+    !fields.is_null()
+        && !values.is_null()
+        && env.get_array_length(fields).unwrap_or(0) >= CAMERA_FIELD_COUNT as i32
+        && env.get_array_length(values).unwrap_or(0) >= CAMERA_VALUE_COUNT as i32
+}
+
+fn animation_arrays_are_valid(
+    env: &JNIEnv<'_>,
+    fields: &JBooleanArray<'_>,
+    values: &JDoubleArray<'_>,
+) -> bool {
+    !fields.is_null()
+        && !values.is_null()
+        && env.get_array_length(fields).unwrap_or(0) >= ANIMATION_FIELD_COUNT as i32
+        && env.get_array_length(values).unwrap_or(0) >= ANIMATION_VALUE_COUNT as i32
+}
+
+fn read_camera_options(
+    env: &JNIEnv<'_>,
+    fields: &JBooleanArray<'_>,
+    values: &JDoubleArray<'_>,
+) -> Result<sys::mln_camera_options, jint> {
+    if !camera_arrays_are_valid(env, fields, values) {
+        return Err(sys::MLN_STATUS_INVALID_ARGUMENT);
+    }
+    let mut field_values = [0 as jboolean; CAMERA_FIELD_COUNT];
+    let mut option_values = [0.0_f64; CAMERA_VALUE_COUNT];
+    if env
+        .get_boolean_array_region(fields, 0, &mut field_values)
+        .is_err()
+        || env
+            .get_double_array_region(values, 0, &mut option_values)
+            .is_err()
+    {
+        return Err(sys::MLN_STATUS_INVALID_ARGUMENT);
+    }
+
+    let mut camera = unsafe { sys::mln_camera_options_default() };
+    if field_values[CAMERA_FIELD_CENTER] != 0 {
+        camera.fields |= sys::MLN_CAMERA_OPTION_CENTER;
+        camera.latitude = option_values[CAMERA_VALUE_LATITUDE];
+        camera.longitude = option_values[CAMERA_VALUE_LONGITUDE];
+    }
+    if field_values[CAMERA_FIELD_CENTER_ALTITUDE] != 0 {
+        camera.fields |= sys::MLN_CAMERA_OPTION_CENTER_ALTITUDE;
+        camera.center_altitude = option_values[CAMERA_VALUE_CENTER_ALTITUDE];
+    }
+    if field_values[CAMERA_FIELD_PADDING] != 0 {
+        camera.fields |= sys::MLN_CAMERA_OPTION_PADDING;
+        camera.padding.top = option_values[CAMERA_VALUE_PADDING_TOP];
+        camera.padding.left = option_values[CAMERA_VALUE_PADDING_LEFT];
+        camera.padding.bottom = option_values[CAMERA_VALUE_PADDING_BOTTOM];
+        camera.padding.right = option_values[CAMERA_VALUE_PADDING_RIGHT];
+    }
+    if field_values[CAMERA_FIELD_ANCHOR] != 0 {
+        camera.fields |= sys::MLN_CAMERA_OPTION_ANCHOR;
+        camera.anchor.x = option_values[CAMERA_VALUE_ANCHOR_X];
+        camera.anchor.y = option_values[CAMERA_VALUE_ANCHOR_Y];
+    }
+    if field_values[CAMERA_FIELD_ZOOM] != 0 {
+        camera.fields |= sys::MLN_CAMERA_OPTION_ZOOM;
+        camera.zoom = option_values[CAMERA_VALUE_ZOOM];
+    }
+    if field_values[CAMERA_FIELD_BEARING] != 0 {
+        camera.fields |= sys::MLN_CAMERA_OPTION_BEARING;
+        camera.bearing = option_values[CAMERA_VALUE_BEARING];
+    }
+    if field_values[CAMERA_FIELD_PITCH] != 0 {
+        camera.fields |= sys::MLN_CAMERA_OPTION_PITCH;
+        camera.pitch = option_values[CAMERA_VALUE_PITCH];
+    }
+    if field_values[CAMERA_FIELD_ROLL] != 0 {
+        camera.fields |= sys::MLN_CAMERA_OPTION_ROLL;
+        camera.roll = option_values[CAMERA_VALUE_ROLL];
+    }
+    if field_values[CAMERA_FIELD_FOV] != 0 {
+        camera.fields |= sys::MLN_CAMERA_OPTION_FOV;
+        camera.field_of_view = option_values[CAMERA_VALUE_FOV];
+    }
+    Ok(camera)
+}
+
+fn write_camera_arrays(
+    env: &JNIEnv<'_>,
+    fields: &JBooleanArray<'_>,
+    values: &JDoubleArray<'_>,
+    camera: &sys::mln_camera_options,
+) -> jint {
+    let mut field_values = [0 as jboolean; CAMERA_FIELD_COUNT];
+    let mut option_values = [0.0_f64; CAMERA_VALUE_COUNT];
+    field_values[CAMERA_FIELD_CENTER] =
+        jboolean::from(camera.fields & sys::MLN_CAMERA_OPTION_CENTER != 0);
+    field_values[CAMERA_FIELD_CENTER_ALTITUDE] =
+        jboolean::from(camera.fields & sys::MLN_CAMERA_OPTION_CENTER_ALTITUDE != 0);
+    field_values[CAMERA_FIELD_PADDING] =
+        jboolean::from(camera.fields & sys::MLN_CAMERA_OPTION_PADDING != 0);
+    field_values[CAMERA_FIELD_ANCHOR] =
+        jboolean::from(camera.fields & sys::MLN_CAMERA_OPTION_ANCHOR != 0);
+    field_values[CAMERA_FIELD_ZOOM] =
+        jboolean::from(camera.fields & sys::MLN_CAMERA_OPTION_ZOOM != 0);
+    field_values[CAMERA_FIELD_BEARING] =
+        jboolean::from(camera.fields & sys::MLN_CAMERA_OPTION_BEARING != 0);
+    field_values[CAMERA_FIELD_PITCH] =
+        jboolean::from(camera.fields & sys::MLN_CAMERA_OPTION_PITCH != 0);
+    field_values[CAMERA_FIELD_ROLL] =
+        jboolean::from(camera.fields & sys::MLN_CAMERA_OPTION_ROLL != 0);
+    field_values[CAMERA_FIELD_FOV] =
+        jboolean::from(camera.fields & sys::MLN_CAMERA_OPTION_FOV != 0);
+    option_values[CAMERA_VALUE_LATITUDE] = camera.latitude;
+    option_values[CAMERA_VALUE_LONGITUDE] = camera.longitude;
+    option_values[CAMERA_VALUE_CENTER_ALTITUDE] = camera.center_altitude;
+    option_values[CAMERA_VALUE_PADDING_TOP] = camera.padding.top;
+    option_values[CAMERA_VALUE_PADDING_LEFT] = camera.padding.left;
+    option_values[CAMERA_VALUE_PADDING_BOTTOM] = camera.padding.bottom;
+    option_values[CAMERA_VALUE_PADDING_RIGHT] = camera.padding.right;
+    option_values[CAMERA_VALUE_ANCHOR_X] = camera.anchor.x;
+    option_values[CAMERA_VALUE_ANCHOR_Y] = camera.anchor.y;
+    option_values[CAMERA_VALUE_ZOOM] = camera.zoom;
+    option_values[CAMERA_VALUE_BEARING] = camera.bearing;
+    option_values[CAMERA_VALUE_PITCH] = camera.pitch;
+    option_values[CAMERA_VALUE_ROLL] = camera.roll;
+    option_values[CAMERA_VALUE_FOV] = camera.field_of_view;
+
+    if env
+        .set_boolean_array_region(fields, 0, &field_values)
+        .is_err()
+        || env
+            .set_double_array_region(values, 0, &option_values)
+            .is_err()
+    {
+        sys::MLN_STATUS_INVALID_ARGUMENT
+    } else {
+        sys::MLN_STATUS_OK
+    }
+}
+
+fn read_animation_options(
+    env: &JNIEnv<'_>,
+    fields: &JBooleanArray<'_>,
+    values: &JDoubleArray<'_>,
+) -> Result<sys::mln_animation_options, jint> {
+    if !animation_arrays_are_valid(env, fields, values) {
+        return Err(sys::MLN_STATUS_INVALID_ARGUMENT);
+    }
+    let mut field_values = [0 as jboolean; ANIMATION_FIELD_COUNT];
+    let mut option_values = [0.0_f64; ANIMATION_VALUE_COUNT];
+    if env
+        .get_boolean_array_region(fields, 0, &mut field_values)
+        .is_err()
+        || env
+            .get_double_array_region(values, 0, &mut option_values)
+            .is_err()
+    {
+        return Err(sys::MLN_STATUS_INVALID_ARGUMENT);
+    }
+
+    let mut animation = unsafe { sys::mln_animation_options_default() };
+    if field_values[ANIMATION_FIELD_DURATION] != 0 {
+        animation.fields |= sys::MLN_ANIMATION_OPTION_DURATION;
+        animation.duration_ms = option_values[ANIMATION_VALUE_DURATION];
+    }
+    if field_values[ANIMATION_FIELD_VELOCITY] != 0 {
+        animation.fields |= sys::MLN_ANIMATION_OPTION_VELOCITY;
+        animation.velocity = option_values[ANIMATION_VALUE_VELOCITY];
+    }
+    if field_values[ANIMATION_FIELD_MIN_ZOOM] != 0 {
+        animation.fields |= sys::MLN_ANIMATION_OPTION_MIN_ZOOM;
+        animation.min_zoom = option_values[ANIMATION_VALUE_MIN_ZOOM];
+    }
+    if field_values[ANIMATION_FIELD_EASING] != 0 {
+        animation.fields |= sys::MLN_ANIMATION_OPTION_EASING;
+        animation.easing.x1 = option_values[ANIMATION_VALUE_EASING_X1];
+        animation.easing.y1 = option_values[ANIMATION_VALUE_EASING_Y1];
+        animation.easing.x2 = option_values[ANIMATION_VALUE_EASING_X2];
+        animation.easing.y2 = option_values[ANIMATION_VALUE_EASING_Y2];
+    }
+    Ok(animation)
 }
 
 fn map_get_bool(

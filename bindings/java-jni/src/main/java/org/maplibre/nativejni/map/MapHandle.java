@@ -10,6 +10,7 @@ import org.maplibre.nativejni.camera.AnimationOptions;
 import org.maplibre.nativejni.camera.BoundOptions;
 import org.maplibre.nativejni.camera.CameraFitOptions;
 import org.maplibre.nativejni.camera.CameraOptions;
+import org.maplibre.nativejni.camera.EdgeInsets;
 import org.maplibre.nativejni.camera.FreeCameraOptions;
 import org.maplibre.nativejni.geo.CanonicalTileId;
 import org.maplibre.nativejni.geo.GeoJson;
@@ -23,6 +24,7 @@ import org.maplibre.nativejni.internal.bridge.MapNative;
 import org.maplibre.nativejni.internal.lifecycle.HandleState;
 import org.maplibre.nativejni.internal.loader.NativeLibrary;
 import org.maplibre.nativejni.internal.status.Status;
+import org.maplibre.nativejni.internal.struct.MapStructs;
 import org.maplibre.nativejni.json.JsonValue;
 import org.maplibre.nativejni.render.MetalBorrowedTextureDescriptor;
 import org.maplibre.nativejni.render.MetalOwnedTextureDescriptor;
@@ -44,6 +46,11 @@ import org.maplibre.nativejni.style.TileSourceOptions;
 
 /** API-parity scaffold for the Java JNI binding. */
 public final class MapHandle implements AutoCloseable {
+  private static final int CAMERA_FIELD_COUNT = 9;
+  private static final int CAMERA_VALUE_COUNT = 14;
+  private static final int ANIMATION_FIELD_COUNT = 4;
+  private static final int ANIMATION_VALUE_COUNT = 7;
+
   private final RuntimeHandle runtime;
   private final HandleState state;
 
@@ -454,27 +461,35 @@ public final class MapHandle implements AutoCloseable {
   }
 
   public CameraOptions camera() {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    var fields = new boolean[CAMERA_FIELD_COUNT];
+    var values = new double[CAMERA_VALUE_COUNT];
+    Status.check(CameraNative.mln_map_get_camera(state.requireLiveAddress(), fields, values));
+    return cameraFromNative(fields, values);
   }
 
   public void jumpTo(CameraOptions camera) {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    var nativeCamera = cameraToNative(camera);
+    Status.check(
+        CameraNative.mln_map_jump_to(
+            state.requireLiveAddress(), nativeCamera.fields(), nativeCamera.values()));
   }
 
   public void easeTo(CameraOptions camera) {
-    throw unsupported();
+    easeToInternal(camera, null, false);
   }
 
   public void easeTo(CameraOptions camera, AnimationOptions animation) {
-    throw unsupported();
+    easeToInternal(camera, Objects.requireNonNull(animation, "animation"), true);
   }
 
   public void flyTo(CameraOptions camera) {
-    throw unsupported();
+    flyToInternal(camera, null, false);
   }
 
   public void flyTo(CameraOptions camera, AnimationOptions animation) {
-    throw unsupported();
+    flyToInternal(camera, Objects.requireNonNull(animation, "animation"), true);
   }
 
   public void moveBy(double deltaX, double deltaY) {
@@ -554,6 +569,36 @@ public final class MapHandle implements AutoCloseable {
   public void cancelTransitions() {
     NativeLibrary.ensureLoaded();
     Status.check(CameraNative.mln_map_cancel_transitions(state.requireLiveAddress()));
+  }
+
+  private void easeToInternal(
+      CameraOptions camera, AnimationOptions animation, boolean hasAnimation) {
+    NativeLibrary.ensureLoaded();
+    var nativeCamera = cameraToNative(camera);
+    var nativeAnimation = animationToNative(animation, hasAnimation);
+    Status.check(
+        CameraNative.mln_map_ease_to(
+            state.requireLiveAddress(),
+            nativeCamera.fields(),
+            nativeCamera.values(),
+            hasAnimation,
+            nativeAnimation.fields(),
+            nativeAnimation.values()));
+  }
+
+  private void flyToInternal(
+      CameraOptions camera, AnimationOptions animation, boolean hasAnimation) {
+    NativeLibrary.ensureLoaded();
+    var nativeCamera = cameraToNative(camera);
+    var nativeAnimation = animationToNative(animation, hasAnimation);
+    Status.check(
+        CameraNative.mln_map_fly_to(
+            state.requireLiveAddress(),
+            nativeCamera.fields(),
+            nativeCamera.values(),
+            hasAnimation,
+            nativeAnimation.fields(),
+            nativeAnimation.values()));
   }
 
   private void scaleByInternal(double scale, ScreenPoint anchor, boolean animated) {
@@ -640,6 +685,98 @@ public final class MapHandle implements AutoCloseable {
   public List<LatLng> latLngsForPixels(List<ScreenPoint> points) {
     throw unsupported();
   }
+
+  private static NativeOptions cameraToNative(CameraOptions camera) {
+    var cameraValue = MapStructs.cameraOptions(camera);
+    var fields = new boolean[CAMERA_FIELD_COUNT];
+    var values = new double[CAMERA_VALUE_COUNT];
+    fields[0] = cameraValue.hasCenter();
+    if (fields[0]) {
+      values[0] = cameraValue.center().latitude();
+      values[1] = cameraValue.center().longitude();
+    }
+    fields[1] = cameraValue.hasCenterAltitude();
+    values[2] = cameraValue.centerAltitude();
+    fields[2] = cameraValue.hasPadding();
+    if (fields[2]) {
+      values[3] = cameraValue.padding().top();
+      values[4] = cameraValue.padding().left();
+      values[5] = cameraValue.padding().bottom();
+      values[6] = cameraValue.padding().right();
+    }
+    fields[3] = cameraValue.hasAnchor();
+    if (fields[3]) {
+      values[7] = cameraValue.anchor().x();
+      values[8] = cameraValue.anchor().y();
+    }
+    fields[4] = cameraValue.hasZoom();
+    values[9] = cameraValue.zoom();
+    fields[5] = cameraValue.hasBearing();
+    values[10] = cameraValue.bearing();
+    fields[6] = cameraValue.hasPitch();
+    values[11] = cameraValue.pitch();
+    fields[7] = cameraValue.hasRoll();
+    values[12] = cameraValue.roll();
+    fields[8] = cameraValue.hasFieldOfView();
+    values[13] = cameraValue.fieldOfView();
+    return new NativeOptions(fields, values);
+  }
+
+  private static CameraOptions cameraFromNative(boolean[] fields, double[] values) {
+    var camera = new CameraOptions();
+    if (fields[0]) {
+      camera.center(values[0], values[1]);
+    }
+    if (fields[1]) {
+      camera.centerAltitude(values[2]);
+    }
+    if (fields[2]) {
+      camera.padding(new EdgeInsets(values[3], values[4], values[5], values[6]));
+    }
+    if (fields[3]) {
+      camera.anchor(new ScreenPoint(values[7], values[8]));
+    }
+    if (fields[4]) {
+      camera.zoom(values[9]);
+    }
+    if (fields[5]) {
+      camera.bearing(values[10]);
+    }
+    if (fields[6]) {
+      camera.pitch(values[11]);
+    }
+    if (fields[7]) {
+      camera.roll(values[12]);
+    }
+    if (fields[8]) {
+      camera.fieldOfView(values[13]);
+    }
+    return camera;
+  }
+
+  private static NativeOptions animationToNative(AnimationOptions animation, boolean hasAnimation) {
+    var fields = new boolean[ANIMATION_FIELD_COUNT];
+    var values = new double[ANIMATION_VALUE_COUNT];
+    if (hasAnimation) {
+      var animationValue = MapStructs.animationOptions(animation);
+      fields[0] = animationValue.hasDurationMs();
+      values[0] = animationValue.durationMs();
+      fields[1] = animationValue.hasVelocity();
+      values[1] = animationValue.velocity();
+      fields[2] = animationValue.hasMinZoom();
+      values[2] = animationValue.minZoom();
+      fields[3] = animationValue.hasEasing();
+      if (fields[3]) {
+        values[3] = animationValue.easing().x1();
+        values[4] = animationValue.easing().y1();
+        values[5] = animationValue.easing().x2();
+        values[6] = animationValue.easing().y2();
+      }
+    }
+    return new NativeOptions(fields, values);
+  }
+
+  private record NativeOptions(boolean[] fields, double[] values) {}
 
   public MapProjectionHandle createProjection() {
     return MapProjectionHandle.create(this);

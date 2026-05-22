@@ -40,13 +40,25 @@ public final class CameraNative {
 
   public static native int mln_map_set_tile_options();
 
-  public static native int mln_map_get_camera();
+  public static native int mln_map_get_camera(long map, boolean[] outFields, double[] outValues);
 
-  public static native int mln_map_jump_to();
+  public static native int mln_map_jump_to(long map, boolean[] cameraFields, double[] cameraValues);
 
-  public static native int mln_map_ease_to();
+  public static native int mln_map_ease_to(
+      long map,
+      boolean[] cameraFields,
+      double[] cameraValues,
+      boolean hasAnimation,
+      boolean[] animationFields,
+      double[] animationValues);
 
-  public static native int mln_map_fly_to();
+  public static native int mln_map_fly_to(
+      long map,
+      boolean[] cameraFields,
+      double[] cameraValues,
+      boolean hasAnimation,
+      boolean[] animationFields,
+      double[] animationValues);
 
   public static native int mln_map_move_by(long map, double deltaX, double deltaY);
 
