@@ -4,7 +4,9 @@ import java.lang.foreign.MemorySegment;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.EnumSet;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -64,9 +66,12 @@ public final class MapHandle implements AutoCloseable {
   private static final int PROJECTION_MODE_VALUE_COUNT = 2;
   private static final int ANIMATION_FIELD_COUNT = 4;
   private static final int ANIMATION_VALUE_COUNT = 7;
+  private static final int CUSTOM_GEOMETRY_FIELD_COUNT = 7;
+  private static final int CUSTOM_GEOMETRY_VALUE_COUNT = 7;
 
   private final RuntimeHandle runtime;
   private final HandleState state;
+  private final Map<String, CustomGeometrySourceState> customGeometrySources = new HashMap<>();
 
   private MapHandle(RuntimeHandle runtime, long handle) {
     this.runtime = Objects.requireNonNull(runtime, "runtime");
@@ -106,6 +111,7 @@ public final class MapHandle implements AutoCloseable {
     NativeLibrary.ensureLoaded();
     Status.check(
         MapNative.mln_map_set_style_json(state.requireLiveAddress(), Objects.requireNonNull(json)));
+    clearCustomGeometrySources();
   }
 
   public void addStyleSourceJson(String sourceId, JsonValue sourceJson) {
@@ -120,9 +126,13 @@ public final class MapHandle implements AutoCloseable {
   public boolean removeStyleSource(String sourceId) {
     NativeLibrary.ensureLoaded();
     var outRemoved = new boolean[1];
+    var sourceIdValue = Objects.requireNonNull(sourceId, "sourceId");
     Status.check(
         StyleNative.mln_map_remove_style_source(
-            state.requireLiveAddress(), Objects.requireNonNull(sourceId, "sourceId"), outRemoved));
+            state.requireLiveAddress(), sourceIdValue, outRemoved));
+    if (outRemoved[0]) {
+      closeCustomGeometrySource(sourceIdValue);
+    }
     return outRemoved[0];
   }
 
@@ -237,20 +247,59 @@ public final class MapHandle implements AutoCloseable {
   }
 
   public void addCustomGeometrySource(String sourceId, CustomGeometrySourceOptions options) {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    var copiedSourceId = Objects.requireNonNull(sourceId, "sourceId");
+    var nativeOptions = customGeometrySourceOptions(Objects.requireNonNull(options, "options"));
+    var outState = new long[1];
+    Status.check(
+        StyleNative.mln_map_add_custom_geometry_source(
+            state.requireLiveAddress(),
+            copiedSourceId,
+            options.callback(),
+            nativeOptions.fields(),
+            nativeOptions.values(),
+            outState));
+    closeQuietly(
+        customGeometrySources.put(copiedSourceId, new CustomGeometrySourceState(outState[0])));
   }
 
   public void setCustomGeometrySourceTileData(
       String sourceId, CanonicalTileId tileId, GeoJson data) {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    Objects.requireNonNull(tileId, "tileId");
+    Status.check(
+        StyleNative.mln_map_set_custom_geometry_source_tile_data(
+            state.requireLiveAddress(),
+            Objects.requireNonNull(sourceId, "sourceId"),
+            tileId.z(),
+            tileId.x(),
+            tileId.y(),
+            Objects.requireNonNull(data, "data")));
   }
 
   public void invalidateCustomGeometrySourceTile(String sourceId, CanonicalTileId tileId) {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    Objects.requireNonNull(tileId, "tileId");
+    Status.check(
+        StyleNative.mln_map_invalidate_custom_geometry_source_tile(
+            state.requireLiveAddress(),
+            Objects.requireNonNull(sourceId, "sourceId"),
+            tileId.z(),
+            tileId.x(),
+            tileId.y()));
   }
 
   public void invalidateCustomGeometrySourceRegion(String sourceId, LatLngBounds bounds) {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    Objects.requireNonNull(bounds, "bounds");
+    Status.check(
+        StyleNative.mln_map_invalidate_custom_geometry_source_region(
+            state.requireLiveAddress(),
+            Objects.requireNonNull(sourceId, "sourceId"),
+            bounds.southwest().latitude(),
+            bounds.southwest().longitude(),
+            bounds.northeast().latitude(),
+            bounds.northeast().longitude()));
   }
 
   public void addVectorSourceUrl(String sourceId, String url) {
@@ -1650,6 +1699,26 @@ public final class MapHandle implements AutoCloseable {
     return new NativeTileSourceOptions(fields, values, attribution);
   }
 
+  private static NativeOptions customGeometrySourceOptions(CustomGeometrySourceOptions options) {
+    var fields = new boolean[CUSTOM_GEOMETRY_FIELD_COUNT];
+    var values = new double[CUSTOM_GEOMETRY_VALUE_COUNT];
+    fields[0] = options.hasMinZoom();
+    values[0] = fields[0] ? options.minZoom() : 0.0;
+    fields[1] = options.hasMaxZoom();
+    values[1] = fields[1] ? options.maxZoom() : 0.0;
+    fields[2] = options.hasTolerance();
+    values[2] = fields[2] ? options.tolerance() : 0.0;
+    fields[3] = options.hasTileSize();
+    values[3] = fields[3] ? options.tileSize() : 0.0;
+    fields[4] = options.hasBuffer();
+    values[4] = fields[4] ? options.buffer() : 0.0;
+    fields[5] = options.hasClip();
+    values[5] = fields[5] && options.clip() ? 1.0 : 0.0;
+    fields[6] = options.hasWrap();
+    values[6] = fields[6] && options.wrap() ? 1.0 : 0.0;
+    return new NativeOptions(fields, values);
+  }
+
   record NativeOptions(boolean[] fields, double[] values) {}
 
   record NativeTileSourceOptions(boolean[] fields, double[] values, String attribution) {}
@@ -1660,7 +1729,11 @@ public final class MapHandle implements AutoCloseable {
 
   public void close() {
     state.closeOnce(
-        MapNative::mln_map_destroy, () -> runtime.unregisterMap(InternalAccess.INSTANCE, this));
+        MapNative::mln_map_destroy,
+        () -> {
+          clearCustomGeometrySources();
+          runtime.unregisterMap(InternalAccess.INSTANCE, this);
+        });
   }
 
   public boolean isClosed() {
@@ -1691,11 +1764,42 @@ public final class MapHandle implements AutoCloseable {
 
   public void releaseDetachedCustomGeometrySources(InternalAccess access) {
     Objects.requireNonNull(access, "access");
+    releaseDetachedCustomGeometrySources();
   }
 
-  void releaseDetachedCustomGeometrySources() {}
+  void releaseDetachedCustomGeometrySources() {
+    var iterator = customGeometrySources.entrySet().iterator();
+    while (iterator.hasNext()) {
+      var entry = iterator.next();
+      var type = styleSourceType(entry.getKey());
+      if (type.isEmpty() || type.orElseThrow() != SourceType.CUSTOM_VECTOR) {
+        closeQuietly(entry.getValue());
+        iterator.remove();
+      }
+    }
+  }
 
   int customGeometrySourceCountForTesting() {
-    return 0;
+    return customGeometrySources.size();
+  }
+
+  private void closeCustomGeometrySource(String sourceId) {
+    closeQuietly(customGeometrySources.remove(sourceId));
+  }
+
+  private void clearCustomGeometrySources() {
+    customGeometrySources.values().forEach(MapHandle::closeQuietly);
+    customGeometrySources.clear();
+  }
+
+  private static void closeQuietly(AutoCloseable closeable) {
+    if (closeable == null) {
+      return;
+    }
+    try {
+      closeable.close();
+    } catch (Exception ignored) {
+      // Closing callback state is best-effort after native ownership ends.
+    }
   }
 }

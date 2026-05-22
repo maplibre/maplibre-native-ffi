@@ -6,12 +6,13 @@
 use std::ffi::{CString, c_char, c_void};
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::ptr::NonNull;
+use std::sync::Mutex;
 
 use jni::objects::{
-    JBooleanArray, JByteArray, JClass, JDoubleArray, JIntArray, JLongArray, JObject, JObjectArray,
-    JString, JValue,
+    GlobalRef, JBooleanArray, JByteArray, JClass, JDoubleArray, JIntArray, JLongArray, JObject,
+    JObjectArray, JString, JValue,
 };
-use jni::sys::{JNI_VERSION_1_8, jboolean, jint, jlong, jstring};
+use jni::sys::{JNI_VERSION_1_8, jboolean, jdouble, jint, jlong, jstring};
 use jni::{JNIEnv, JavaVM, NativeMethod};
 use maplibre_native_core::error::capture_thread_diagnostic;
 use maplibre_native_core::geojson as core_geojson;
@@ -73,6 +74,17 @@ const DOUBLE_COUNT: usize = 2;
 const STRING_MESSAGE: i32 = 0;
 const STRING_PAYLOAD: i32 = 1;
 const STRING_COUNT: i32 = 2;
+
+struct CustomGeometrySourceState {
+    vm: JavaVM,
+    callback: GlobalRef,
+    lifecycle: Mutex<CustomGeometrySourceLifecycle>,
+}
+
+struct CustomGeometrySourceLifecycle {
+    active_callbacks: usize,
+    close_requested: bool,
+}
 
 const CAMERA_FIELD_CENTER: usize = 0;
 const CAMERA_FIELD_CENTER_ALTITUDE: usize = 1;
@@ -304,10 +316,6 @@ mod registration {
             "mln_style_id_list_count",
             "mln_style_id_list_get",
             "mln_style_id_list_destroy",
-            "mln_map_add_custom_geometry_source",
-            "mln_map_set_custom_geometry_source_tile_data",
-            "mln_map_invalidate_custom_geometry_source_tile",
-            "mln_map_invalidate_custom_geometry_source_region",
         ]);
         style_methods.push(NativeMethod {
             name: "mln_map_remove_style_source".into(),
@@ -363,6 +371,31 @@ mod registration {
             name: "mln_map_set_geojson_source_data".into(),
             sig: "(JLjava/lang/String;Lorg/maplibre/nativejni/geo/GeoJson;)I".into(),
             fn_ptr: map_set_geojson_source_data as *mut c_void,
+        });
+        style_methods.push(NativeMethod {
+            name: "mln_map_add_custom_geometry_source".into(),
+            sig: "(JLjava/lang/String;Lorg/maplibre/nativejni/style/CustomGeometrySourceCallback;[Z[D[J)I".into(),
+            fn_ptr: map_add_custom_geometry_source as *mut c_void,
+        });
+        style_methods.push(NativeMethod {
+            name: "mln_map_set_custom_geometry_source_tile_data".into(),
+            sig: "(JLjava/lang/String;IJJLorg/maplibre/nativejni/geo/GeoJson;)I".into(),
+            fn_ptr: map_set_custom_geometry_source_tile_data as *mut c_void,
+        });
+        style_methods.push(NativeMethod {
+            name: "mln_map_invalidate_custom_geometry_source_tile".into(),
+            sig: "(JLjava/lang/String;IJJ)I".into(),
+            fn_ptr: map_invalidate_custom_geometry_source_tile as *mut c_void,
+        });
+        style_methods.push(NativeMethod {
+            name: "mln_map_invalidate_custom_geometry_source_region".into(),
+            sig: "(JLjava/lang/String;DDDD)I".into(),
+            fn_ptr: map_invalidate_custom_geometry_source_region as *mut c_void,
+        });
+        style_methods.push(NativeMethod {
+            name: "mln_custom_geometry_source_state_destroy".into(),
+            sig: "(J)V".into(),
+            fn_ptr: custom_geometry_source_state_destroy as *mut c_void,
         });
         style_methods.push(NativeMethod {
             name: "mln_map_add_vector_source_url".into(),
@@ -2260,6 +2293,375 @@ fn map_geojson_source_data<'local>(
         unsafe { operation(map as *mut sys::mln_map, source_id, data.as_ptr()) }
     }))
     .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+extern "system" fn map_add_custom_geometry_source<'local>(
+    mut env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    map: jlong,
+    source_id: JString<'local>,
+    callback: JObject<'local>,
+    option_fields: JBooleanArray<'local>,
+    option_values: JDoubleArray<'local>,
+    out_state: JLongArray<'local>,
+) -> jint {
+    catch_unwind(AssertUnwindSafe(|| {
+        if callback.is_null()
+            || out_state.is_null()
+            || env.get_array_length(&out_state).unwrap_or(0) < 1
+        {
+            return sys::MLN_STATUS_INVALID_ARGUMENT;
+        }
+        let (source_id_storage, source_id_view) = match string_view(&mut env, &source_id) {
+            Ok(value) => value,
+            Err(status) => return status,
+        };
+        let mut options =
+            match read_custom_geometry_source_options(&env, &option_fields, &option_values) {
+                Ok(value) => value,
+                Err(status) => return status,
+            };
+        let vm = match env.get_java_vm() {
+            Ok(value) => value,
+            Err(_) => return sys::MLN_STATUS_NATIVE_ERROR,
+        };
+        let callback = match env.new_global_ref(callback) {
+            Ok(value) => value,
+            Err(_) => return sys::MLN_STATUS_INVALID_ARGUMENT,
+        };
+        let state = Box::new(CustomGeometrySourceState {
+            vm,
+            callback,
+            lifecycle: Mutex::new(CustomGeometrySourceLifecycle {
+                active_callbacks: 0,
+                close_requested: false,
+            }),
+        });
+        let state_ptr = Box::into_raw(state);
+        options.fetch_tile = Some(custom_geometry_source_fetch_tile);
+        options.cancel_tile = Some(custom_geometry_source_cancel_tile);
+        options.user_data = state_ptr.cast::<c_void>();
+        let _keep_alive = source_id_storage;
+        let result = unsafe {
+            sys::mln_map_add_custom_geometry_source(
+                map as *mut sys::mln_map,
+                source_id_view,
+                &options,
+            )
+        };
+        if result == sys::MLN_STATUS_OK {
+            if env
+                .set_long_array_region(&out_state, 0, &[state_ptr as jlong])
+                .is_err()
+            {
+                return sys::MLN_STATUS_NATIVE_ERROR;
+            }
+        } else {
+            unsafe {
+                drop(Box::from_raw(state_ptr));
+            }
+        }
+        result
+    }))
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+extern "system" fn map_set_custom_geometry_source_tile_data<'local>(
+    mut env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    map: jlong,
+    source_id: JString<'local>,
+    tile_z: jint,
+    tile_x: jlong,
+    tile_y: jlong,
+    data: JObject<'local>,
+) -> jint {
+    catch_unwind(AssertUnwindSafe(|| {
+        let (source_id_storage, source_id_view) = match string_view(&mut env, &source_id) {
+            Ok(value) => value,
+            Err(status) => return status,
+        };
+        let tile_id = match canonical_tile_id(tile_z, tile_x, tile_y) {
+            Ok(value) => value,
+            Err(status) => return status,
+        };
+        let data = match java_native_geojson(&mut env, &data) {
+            Ok(value) => value,
+            Err(status) => return status,
+        };
+        let _keep_alive = source_id_storage;
+        unsafe {
+            sys::mln_map_set_custom_geometry_source_tile_data(
+                map as *mut sys::mln_map,
+                source_id_view,
+                tile_id,
+                data.as_ptr(),
+            )
+        }
+    }))
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+extern "system" fn map_invalidate_custom_geometry_source_tile(
+    mut env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    map: jlong,
+    source_id: JString<'_>,
+    tile_z: jint,
+    tile_x: jlong,
+    tile_y: jlong,
+) -> jint {
+    catch_unwind(AssertUnwindSafe(|| {
+        let (source_id_storage, source_id_view) = match string_view(&mut env, &source_id) {
+            Ok(value) => value,
+            Err(status) => return status,
+        };
+        let tile_id = match canonical_tile_id(tile_z, tile_x, tile_y) {
+            Ok(value) => value,
+            Err(status) => return status,
+        };
+        let _keep_alive = source_id_storage;
+        unsafe {
+            sys::mln_map_invalidate_custom_geometry_source_tile(
+                map as *mut sys::mln_map,
+                source_id_view,
+                tile_id,
+            )
+        }
+    }))
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+extern "system" fn map_invalidate_custom_geometry_source_region(
+    mut env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    map: jlong,
+    source_id: JString<'_>,
+    southwest_latitude: jdouble,
+    southwest_longitude: jdouble,
+    northeast_latitude: jdouble,
+    northeast_longitude: jdouble,
+) -> jint {
+    catch_unwind(AssertUnwindSafe(|| {
+        let (source_id_storage, source_id_view) = match string_view(&mut env, &source_id) {
+            Ok(value) => value,
+            Err(status) => return status,
+        };
+        let bounds = sys::mln_lat_lng_bounds {
+            southwest: sys::mln_lat_lng {
+                latitude: southwest_latitude,
+                longitude: southwest_longitude,
+            },
+            northeast: sys::mln_lat_lng {
+                latitude: northeast_latitude,
+                longitude: northeast_longitude,
+            },
+        };
+        let _keep_alive = source_id_storage;
+        unsafe {
+            sys::mln_map_invalidate_custom_geometry_source_region(
+                map as *mut sys::mln_map,
+                source_id_view,
+                bounds,
+            )
+        }
+    }))
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+extern "system" fn custom_geometry_source_state_destroy(
+    _env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    state: jlong,
+) {
+    if state == 0 {
+        return;
+    }
+    unsafe {
+        request_custom_geometry_source_state_drop(state as *mut CustomGeometrySourceState);
+    }
+}
+
+unsafe extern "C" fn custom_geometry_source_fetch_tile(
+    user_data: *mut c_void,
+    tile_id: sys::mln_canonical_tile_id,
+) {
+    custom_geometry_source_tile_callback(user_data, tile_id, "fetchTile");
+}
+
+unsafe extern "C" fn custom_geometry_source_cancel_tile(
+    user_data: *mut c_void,
+    tile_id: sys::mln_canonical_tile_id,
+) {
+    custom_geometry_source_tile_callback(user_data, tile_id, "cancelTile");
+}
+
+fn custom_geometry_source_tile_callback(
+    user_data: *mut c_void,
+    tile_id: sys::mln_canonical_tile_id,
+    method: &str,
+) {
+    if user_data.is_null() {
+        return;
+    }
+    let state = user_data.cast::<CustomGeometrySourceState>();
+    let state_ref = unsafe { &*state };
+    if !enter_custom_geometry_source_callback(state_ref) {
+        return;
+    }
+    let callback_result = catch_unwind(AssertUnwindSafe(|| {
+        let mut env = match state_ref.vm.attach_current_thread() {
+            Ok(value) => value,
+            Err(_) => return,
+        };
+        let tile = match env.new_object(
+            "org/maplibre/nativejni/geo/CanonicalTileId",
+            "(IJJ)V",
+            &[
+                JValue::Int(tile_id.z as jint),
+                JValue::Long(tile_id.x as jlong),
+                JValue::Long(tile_id.y as jlong),
+            ],
+        ) {
+            Ok(value) => value,
+            Err(_) => return,
+        };
+        let _ = env.call_method(
+            state_ref.callback.as_obj(),
+            method,
+            "(Lorg/maplibre/nativejni/geo/CanonicalTileId;)V",
+            &[JValue::Object(&tile)],
+        );
+        if env.exception_check().unwrap_or(false) {
+            let _ = env.exception_clear();
+        }
+    }));
+    let _ = callback_result;
+    exit_custom_geometry_source_callback(state);
+}
+
+fn enter_custom_geometry_source_callback(state: &CustomGeometrySourceState) -> bool {
+    let Ok(mut lifecycle) = state.lifecycle.lock() else {
+        return false;
+    };
+    if lifecycle.close_requested {
+        return false;
+    }
+    lifecycle.active_callbacks += 1;
+    true
+}
+
+fn exit_custom_geometry_source_callback(state: *mut CustomGeometrySourceState) {
+    let should_drop = unsafe {
+        let state_ref = &*state;
+        let Ok(mut lifecycle) = state_ref.lifecycle.lock() else {
+            return;
+        };
+        lifecycle.active_callbacks = lifecycle.active_callbacks.saturating_sub(1);
+        lifecycle.close_requested && lifecycle.active_callbacks == 0
+    };
+    if should_drop {
+        unsafe {
+            drop(Box::from_raw(state));
+        }
+    }
+}
+
+unsafe fn request_custom_geometry_source_state_drop(state: *mut CustomGeometrySourceState) {
+    if state.is_null() {
+        return;
+    }
+    let should_drop = {
+        let state_ref = unsafe { &*state };
+        let Ok(mut lifecycle) = state_ref.lifecycle.lock() else {
+            return;
+        };
+        if lifecycle.close_requested {
+            return;
+        }
+        lifecycle.close_requested = true;
+        lifecycle.active_callbacks == 0
+    };
+    if should_drop {
+        unsafe {
+            drop(Box::from_raw(state));
+        }
+    }
+}
+
+fn read_custom_geometry_source_options(
+    env: &JNIEnv<'_>,
+    fields: &JBooleanArray<'_>,
+    values: &JDoubleArray<'_>,
+) -> Result<sys::mln_custom_geometry_source_options, jint> {
+    if fields.is_null()
+        || values.is_null()
+        || env.get_array_length(fields).unwrap_or(0) < 7
+        || env.get_array_length(values).unwrap_or(0) < 7
+    {
+        return Err(sys::MLN_STATUS_INVALID_ARGUMENT);
+    }
+    let mut field_values = [0 as jboolean; 7];
+    let mut option_values = [0.0_f64; 7];
+    if env
+        .get_boolean_array_region(fields, 0, &mut field_values)
+        .is_err()
+        || env
+            .get_double_array_region(values, 0, &mut option_values)
+            .is_err()
+    {
+        return Err(sys::MLN_STATUS_INVALID_ARGUMENT);
+    }
+    let mut options = unsafe { sys::mln_custom_geometry_source_options_default() };
+    if field_values[0] != 0 {
+        options.fields |= sys::MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MIN_ZOOM;
+        options.min_zoom = option_values[0];
+    }
+    if field_values[1] != 0 {
+        options.fields |= sys::MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MAX_ZOOM;
+        options.max_zoom = option_values[1];
+    }
+    if field_values[2] != 0 {
+        options.fields |= sys::MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TOLERANCE;
+        options.tolerance = option_values[2];
+    }
+    if field_values[3] != 0 {
+        options.fields |= sys::MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TILE_SIZE;
+        options.tile_size = option_values[3] as u32;
+    }
+    if field_values[4] != 0 {
+        options.fields |= sys::MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_BUFFER;
+        options.buffer = option_values[4] as u32;
+    }
+    if field_values[5] != 0 {
+        options.fields |= sys::MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_CLIP;
+        options.clip = option_values[5] != 0.0;
+    }
+    if field_values[6] != 0 {
+        options.fields |= sys::MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_WRAP;
+        options.wrap = option_values[6] != 0.0;
+    }
+    Ok(options)
+}
+
+fn canonical_tile_id(
+    tile_z: jint,
+    tile_x: jlong,
+    tile_y: jlong,
+) -> Result<sys::mln_canonical_tile_id, jint> {
+    if tile_z < 0
+        || tile_x < 0
+        || tile_y < 0
+        || tile_x > u32::MAX as jlong
+        || tile_y > u32::MAX as jlong
+    {
+        return Err(sys::MLN_STATUS_INVALID_ARGUMENT);
+    }
+    Ok(sys::mln_canonical_tile_id {
+        z: tile_z as u32,
+        x: tile_x as u32,
+        y: tile_y as u32,
+    })
 }
 
 extern "system" fn map_add_vector_source_url(

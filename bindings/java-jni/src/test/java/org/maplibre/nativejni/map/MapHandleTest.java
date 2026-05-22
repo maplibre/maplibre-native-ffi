@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.EnumSet;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.maplibre.nativejni.camera.AnimationOptions;
@@ -17,6 +18,7 @@ import org.maplibre.nativejni.camera.CameraOptions;
 import org.maplibre.nativejni.camera.EdgeInsets;
 import org.maplibre.nativejni.camera.FreeCameraOptions;
 import org.maplibre.nativejni.error.InvalidStateException;
+import org.maplibre.nativejni.geo.CanonicalTileId;
 import org.maplibre.nativejni.geo.Feature;
 import org.maplibre.nativejni.geo.GeoJson;
 import org.maplibre.nativejni.geo.Geometry;
@@ -29,6 +31,7 @@ import org.maplibre.nativejni.internal.access.InternalAccess;
 import org.maplibre.nativejni.json.JsonValue;
 import org.maplibre.nativejni.render.PremultipliedRgba8Image;
 import org.maplibre.nativejni.runtime.RuntimeHandle;
+import org.maplibre.nativejni.style.CustomGeometrySourceOptions;
 import org.maplibre.nativejni.style.LocationIndicatorImageKind;
 import org.maplibre.nativejni.style.RasterDemEncoding;
 import org.maplibre.nativejni.style.SourceInfo;
@@ -338,6 +341,27 @@ class MapHandleTest {
                                 new JsonValue.Member("features", JsonValue.array(List.of()))))))));
         assertEquals(SourceType.GEOJSON, map.styleSourceType("json-geojson-source").orElseThrow());
         assertTrue(map.removeStyleSource("json-geojson-source"));
+
+        var customFetchCount = new AtomicInteger();
+        map.addCustomGeometrySource(
+            "custom-source",
+            new CustomGeometrySourceOptions(tileId -> customFetchCount.incrementAndGet())
+                .minZoom(1.0)
+                .maxZoom(12.0)
+                .tileSize(512)
+                .buffer(64)
+                .clip(true)
+                .wrap(false));
+        assertEquals(1, map.customGeometrySourceCountForTesting());
+        assertEquals(SourceType.CUSTOM_VECTOR, map.styleSourceType("custom-source").orElseThrow());
+        var customTile = new CanonicalTileId(0, 0, 0);
+        map.setCustomGeometrySourceTileData(
+            "custom-source", customTile, GeoJson.featureCollection(List.of()));
+        map.invalidateCustomGeometrySourceTile("custom-source", customTile);
+        map.invalidateCustomGeometrySourceRegion(
+            "custom-source", new LatLngBounds(new LatLng(-1.0, -2.0), new LatLng(1.0, 2.0)));
+        assertTrue(map.removeStyleSource("custom-source"));
+        assertEquals(0, map.customGeometrySourceCountForTesting());
 
         map.addVectorSourceUrl(
             "vector-source",

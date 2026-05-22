@@ -1,24 +1,28 @@
 package org.maplibre.nativejni.map;
 
-import java.lang.foreign.MemorySegment;
-import org.maplibre.nativejni.style.CustomGeometrySourceOptions;
+import org.maplibre.nativejni.internal.bridge.StyleNative;
 
-/** API-parity scaffold for the Java JNI binding. */
+/** Owns map/style-scoped custom geometry source callback state. */
 final class CustomGeometrySourceState implements AutoCloseable {
-  private static UnsupportedOperationException unsupported() {
-    return new UnsupportedOperationException(
-        "CustomGeometrySourceState is not implemented by the JNI bridge yet");
+  private final long address;
+  private boolean closed;
+
+  CustomGeometrySourceState(long address) {
+    if (address == 0) {
+      throw new IllegalArgumentException("address must be non-zero");
+    }
+    this.address = address;
   }
 
-  CustomGeometrySourceState(CustomGeometrySourceOptions options) {
-    throw unsupported();
+  long address() {
+    return address;
   }
 
-  MemorySegment descriptor() {
-    throw unsupported();
-  }
-
+  @Override
   public void close() {
-    throw unsupported();
+    if (!closed) {
+      closed = true;
+      StyleNative.mln_custom_geometry_source_state_destroy(address);
+    }
   }
 }

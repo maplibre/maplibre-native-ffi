@@ -102,13 +102,34 @@ public final class StyleNative {
       double[] optionValues,
       String attribution);
 
-  public static native int mln_map_add_custom_geometry_source();
+  public static native int mln_map_add_custom_geometry_source(
+      long map,
+      String sourceId,
+      org.maplibre.nativejni.style.CustomGeometrySourceCallback callback,
+      boolean[] optionFields,
+      double[] optionValues,
+      long[] outState);
 
-  public static native int mln_map_set_custom_geometry_source_tile_data();
+  public static native int mln_map_set_custom_geometry_source_tile_data(
+      long map,
+      String sourceId,
+      int tileZ,
+      long tileX,
+      long tileY,
+      org.maplibre.nativejni.geo.GeoJson data);
 
-  public static native int mln_map_invalidate_custom_geometry_source_tile();
+  public static native int mln_map_invalidate_custom_geometry_source_tile(
+      long map, String sourceId, int tileZ, long tileX, long tileY);
 
-  public static native int mln_map_invalidate_custom_geometry_source_region();
+  public static native int mln_map_invalidate_custom_geometry_source_region(
+      long map,
+      String sourceId,
+      double southwestLatitude,
+      double southwestLongitude,
+      double northeastLatitude,
+      double northeastLongitude);
+
+  public static native void mln_custom_geometry_source_state_destroy(long state);
 
   public static native int mln_map_set_style_image(
       long map,
