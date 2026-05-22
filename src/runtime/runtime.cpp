@@ -661,6 +661,7 @@ auto erase_offline_operation_registration(
              event.offline_operation_id == operation_id;
     });
   } catch (...) {
+    std::terminate();
   }
 }
 
@@ -677,6 +678,10 @@ class OfflineOperationRegistrationGuard {
   OfflineOperationRegistrationGuard(const OfflineOperationRegistrationGuard&) =
     delete;
   auto operator=(const OfflineOperationRegistrationGuard&)
+    -> OfflineOperationRegistrationGuard& = delete;
+  OfflineOperationRegistrationGuard(OfflineOperationRegistrationGuard&&) =
+    delete;
+  auto operator=(OfflineOperationRegistrationGuard&&)
     -> OfflineOperationRegistrationGuard& = delete;
 
   ~OfflineOperationRegistrationGuard() noexcept {
