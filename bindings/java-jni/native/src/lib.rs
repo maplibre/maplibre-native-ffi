@@ -424,15 +424,6 @@ mod registration {
             "mln_map_jump_to",
             "mln_map_ease_to",
             "mln_map_fly_to",
-            "mln_map_move_by",
-            "mln_map_move_by_animated",
-            "mln_map_scale_by",
-            "mln_map_scale_by_animated",
-            "mln_map_rotate_by",
-            "mln_map_rotate_by_animated",
-            "mln_map_pitch_by",
-            "mln_map_pitch_by_animated",
-            "mln_map_cancel_transitions",
             "mln_map_camera_for_lat_lng_bounds",
             "mln_map_camera_for_lat_lngs",
             "mln_map_camera_for_geometry",
@@ -478,6 +469,51 @@ mod registration {
             name: "mln_map_dump_debug_logs".into(),
             sig: "(J)I".into(),
             fn_ptr: map_dump_debug_logs as *mut c_void,
+        });
+        methods.push(NativeMethod {
+            name: "mln_map_move_by".into(),
+            sig: "(JDD)I".into(),
+            fn_ptr: map_move_by as *mut c_void,
+        });
+        methods.push(NativeMethod {
+            name: "mln_map_move_by_animated".into(),
+            sig: "(JDD)I".into(),
+            fn_ptr: map_move_by_animated as *mut c_void,
+        });
+        methods.push(NativeMethod {
+            name: "mln_map_scale_by".into(),
+            sig: "(JDZDD)I".into(),
+            fn_ptr: map_scale_by as *mut c_void,
+        });
+        methods.push(NativeMethod {
+            name: "mln_map_scale_by_animated".into(),
+            sig: "(JDZDD)I".into(),
+            fn_ptr: map_scale_by_animated as *mut c_void,
+        });
+        methods.push(NativeMethod {
+            name: "mln_map_rotate_by".into(),
+            sig: "(JDDDD)I".into(),
+            fn_ptr: map_rotate_by as *mut c_void,
+        });
+        methods.push(NativeMethod {
+            name: "mln_map_rotate_by_animated".into(),
+            sig: "(JDDDD)I".into(),
+            fn_ptr: map_rotate_by_animated as *mut c_void,
+        });
+        methods.push(NativeMethod {
+            name: "mln_map_pitch_by".into(),
+            sig: "(JD)I".into(),
+            fn_ptr: map_pitch_by as *mut c_void,
+        });
+        methods.push(NativeMethod {
+            name: "mln_map_pitch_by_animated".into(),
+            sig: "(JD)I".into(),
+            fn_ptr: map_pitch_by_animated as *mut c_void,
+        });
+        methods.push(NativeMethod {
+            name: "mln_map_cancel_transitions".into(),
+            sig: "(J)I".into(),
+            fn_ptr: map_cancel_transitions as *mut c_void,
         });
         register_methods(
             vm,
@@ -1085,6 +1121,165 @@ fn map_get_bool(
         result
     }))
     .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+extern "system" fn map_move_by(
+    _env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    map: jlong,
+    delta_x: f64,
+    delta_y: f64,
+) -> jint {
+    catch_unwind(|| unsafe { sys::mln_map_move_by(map as *mut sys::mln_map, delta_x, delta_y) })
+        .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+extern "system" fn map_move_by_animated(
+    _env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    map: jlong,
+    delta_x: f64,
+    delta_y: f64,
+) -> jint {
+    catch_unwind(|| unsafe {
+        sys::mln_map_move_by_animated(map as *mut sys::mln_map, delta_x, delta_y, std::ptr::null())
+    })
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+extern "system" fn map_scale_by(
+    _env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    map: jlong,
+    scale: f64,
+    has_anchor: jboolean,
+    anchor_x: f64,
+    anchor_y: f64,
+) -> jint {
+    catch_unwind(|| unsafe {
+        let anchor = sys::mln_screen_point {
+            x: anchor_x,
+            y: anchor_y,
+        };
+        let anchor_ptr = if has_anchor != 0 {
+            &anchor as *const sys::mln_screen_point
+        } else {
+            std::ptr::null()
+        };
+        sys::mln_map_scale_by(map as *mut sys::mln_map, scale, anchor_ptr)
+    })
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+extern "system" fn map_scale_by_animated(
+    _env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    map: jlong,
+    scale: f64,
+    has_anchor: jboolean,
+    anchor_x: f64,
+    anchor_y: f64,
+) -> jint {
+    catch_unwind(|| unsafe {
+        let anchor = sys::mln_screen_point {
+            x: anchor_x,
+            y: anchor_y,
+        };
+        let anchor_ptr = if has_anchor != 0 {
+            &anchor as *const sys::mln_screen_point
+        } else {
+            std::ptr::null()
+        };
+        sys::mln_map_scale_by_animated(
+            map as *mut sys::mln_map,
+            scale,
+            anchor_ptr,
+            std::ptr::null(),
+        )
+    })
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+extern "system" fn map_rotate_by(
+    _env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    map: jlong,
+    first_x: f64,
+    first_y: f64,
+    second_x: f64,
+    second_y: f64,
+) -> jint {
+    catch_unwind(|| unsafe {
+        sys::mln_map_rotate_by(
+            map as *mut sys::mln_map,
+            sys::mln_screen_point {
+                x: first_x,
+                y: first_y,
+            },
+            sys::mln_screen_point {
+                x: second_x,
+                y: second_y,
+            },
+        )
+    })
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+extern "system" fn map_rotate_by_animated(
+    _env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    map: jlong,
+    first_x: f64,
+    first_y: f64,
+    second_x: f64,
+    second_y: f64,
+) -> jint {
+    catch_unwind(|| unsafe {
+        sys::mln_map_rotate_by_animated(
+            map as *mut sys::mln_map,
+            sys::mln_screen_point {
+                x: first_x,
+                y: first_y,
+            },
+            sys::mln_screen_point {
+                x: second_x,
+                y: second_y,
+            },
+            std::ptr::null(),
+        )
+    })
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+extern "system" fn map_pitch_by(
+    _env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    map: jlong,
+    pitch: f64,
+) -> jint {
+    catch_unwind(|| unsafe { sys::mln_map_pitch_by(map as *mut sys::mln_map, pitch) })
+        .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+extern "system" fn map_pitch_by_animated(
+    _env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    map: jlong,
+    pitch: f64,
+) -> jint {
+    catch_unwind(|| unsafe {
+        sys::mln_map_pitch_by_animated(map as *mut sys::mln_map, pitch, std::ptr::null())
+    })
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+extern "system" fn map_cancel_transitions(
+    _env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    map: jlong,
+) -> jint {
+    catch_unwind(|| unsafe { sys::mln_map_cancel_transitions(map as *mut sys::mln_map) })
+        .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
 }
 
 extern "system" fn projection_create(

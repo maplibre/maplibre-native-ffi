@@ -48,23 +48,27 @@ public final class CameraNative {
 
   public static native int mln_map_fly_to();
 
-  public static native int mln_map_move_by();
+  public static native int mln_map_move_by(long map, double deltaX, double deltaY);
 
-  public static native int mln_map_move_by_animated();
+  public static native int mln_map_move_by_animated(long map, double deltaX, double deltaY);
 
-  public static native int mln_map_scale_by();
+  public static native int mln_map_scale_by(
+      long map, double scale, boolean hasAnchor, double anchorX, double anchorY);
 
-  public static native int mln_map_scale_by_animated();
+  public static native int mln_map_scale_by_animated(
+      long map, double scale, boolean hasAnchor, double anchorX, double anchorY);
 
-  public static native int mln_map_rotate_by();
+  public static native int mln_map_rotate_by(
+      long map, double firstX, double firstY, double secondX, double secondY);
 
-  public static native int mln_map_rotate_by_animated();
+  public static native int mln_map_rotate_by_animated(
+      long map, double firstX, double firstY, double secondX, double secondY);
 
-  public static native int mln_map_pitch_by();
+  public static native int mln_map_pitch_by(long map, double pitch);
 
-  public static native int mln_map_pitch_by_animated();
+  public static native int mln_map_pitch_by_animated(long map, double pitch);
 
-  public static native int mln_map_cancel_transitions();
+  public static native int mln_map_cancel_transitions(long map);
 
   public static native int mln_map_camera_for_lat_lng_bounds();
 

@@ -10,6 +10,7 @@ import java.util.EnumSet;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.maplibre.nativejni.error.InvalidStateException;
+import org.maplibre.nativejni.geo.ScreenPoint;
 import org.maplibre.nativejni.internal.access.InternalAccess;
 import org.maplibre.nativejni.runtime.RuntimeHandle;
 import org.maplibre.nativejni.test.NativeTestSupport;
@@ -54,6 +55,25 @@ class MapHandleTest {
 
         assertFalse(map.isFullyLoaded());
         map.dumpDebugLogs();
+      }
+    }
+  }
+
+  @Test
+  void primitiveCameraCommandsCrossNativeBoundary() {
+    try (var runtime = RuntimeHandle.create()) {
+      try (var map = MapHandle.create(runtime, new MapOptions().size(64, 64))) {
+        map.moveBy(1, 2);
+        map.moveByAnimated(0, 0);
+        map.scaleBy(1.1);
+        map.scaleBy(1.0, new ScreenPoint(32, 32));
+        map.scaleByAnimated(1.0);
+        map.scaleByAnimated(1.0, new ScreenPoint(32, 32));
+        map.rotateBy(new ScreenPoint(0, 0), new ScreenPoint(1, 1));
+        map.rotateByAnimated(new ScreenPoint(0, 0), new ScreenPoint(1, 1));
+        map.pitchBy(0);
+        map.pitchByAnimated(0);
+        map.cancelTransitions();
       }
     }
   }
