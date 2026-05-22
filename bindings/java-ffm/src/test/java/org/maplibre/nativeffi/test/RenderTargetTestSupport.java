@@ -21,6 +21,7 @@ import static org.lwjgl.vulkan.VK10.vkEnumeratePhysicalDevices;
 import static org.lwjgl.vulkan.VK10.vkGetDeviceQueue;
 import static org.lwjgl.vulkan.VK10.vkGetPhysicalDeviceFeatures;
 import static org.lwjgl.vulkan.VK10.vkGetPhysicalDeviceQueueFamilyProperties;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import java.lang.foreign.Arena;
 import java.lang.foreign.FunctionDescriptor;
@@ -75,7 +76,8 @@ public final class RenderTargetTestSupport implements AutoCloseable {
     if (backends.contains(RenderBackend.VULKAN)) {
       return attachVulkanOwnedTexture(map, extent);
     }
-    throw new IllegalStateException("Native library does not support Metal or Vulkan");
+    assumeTrue(false, "Skipping: owned texture sessions require Metal or Vulkan");
+    throw new IllegalStateException("unreachable");
   }
 
   public static RenderTargetTestSupport attachMetalOwnedTexture(
