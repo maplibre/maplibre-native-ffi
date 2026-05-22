@@ -674,6 +674,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "maplibre-native-jni"
+version = "0.0.0"
+dependencies = [
+ "jni",
+ "maplibre-native-core",
+ "maplibre-native-sys",
+]
+
+[[package]]
 name = "maplibre-native-sys"
 version = "0.0.0"
 dependencies = [

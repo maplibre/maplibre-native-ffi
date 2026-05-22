@@ -1,0 +1,6 @@
+[tasks.build]
+run = "../../gradlew :bindings:java-jni:build"
+
+[tasks."native:build"]
+depends = ["//:ensure-native-library"]
+run = "cargo build -p maplibre-native-jni"
