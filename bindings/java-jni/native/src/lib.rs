@@ -1000,7 +1000,7 @@ mod registration {
     }
 
     fn register_projection(vm: &JavaVM) -> jni::errors::Result<()> {
-        let mut methods = no_arg_status_methods(&["mln_map_projection_set_visible_geometry"]);
+        let mut methods = Vec::new();
         methods.push(NativeMethod {
             name: "mln_map_projection_create".into(),
             sig: "(J[J)I".into(),
@@ -1025,6 +1025,11 @@ mod registration {
             name: "mln_map_projection_set_visible_coordinates".into(),
             sig: "(J[D[D)I".into(),
             fn_ptr: projection_set_visible_coordinates as *mut c_void,
+        });
+        methods.push(NativeMethod {
+            name: "mln_map_projection_set_visible_geometry".into(),
+            sig: "(JLorg/maplibre/nativejni/geo/Geometry;[D)I".into(),
+            fn_ptr: projection_set_visible_geometry as *mut c_void,
         });
         methods.push(NativeMethod {
             name: "mln_map_projection_pixel_for_lat_lng".into(),
@@ -6461,6 +6466,33 @@ extern "system" fn projection_set_visible_coordinates(
                 projection as *mut sys::mln_map_projection,
                 coordinates.as_ptr(),
                 coordinates.len(),
+                padding,
+            )
+        }
+    }))
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+extern "system" fn projection_set_visible_geometry<'local>(
+    mut env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    projection: jlong,
+    geometry: JObject<'local>,
+    padding: JDoubleArray<'local>,
+) -> jint {
+    catch_unwind(AssertUnwindSafe(|| {
+        let geometry = match java_native_geometry(&mut env, &geometry) {
+            Ok(value) => value,
+            Err(status) => return status,
+        };
+        let padding = match read_edge_insets(&env, &padding) {
+            Ok(value) => value,
+            Err(status) => return status,
+        };
+        unsafe {
+            sys::mln_map_projection_set_visible_geometry(
+                projection as *mut sys::mln_map_projection,
+                geometry.as_ptr(),
                 padding,
             )
         }

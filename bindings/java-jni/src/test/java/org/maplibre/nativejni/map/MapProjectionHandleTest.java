@@ -9,6 +9,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.maplibre.nativejni.camera.CameraOptions;
 import org.maplibre.nativejni.camera.EdgeInsets;
+import org.maplibre.nativejni.geo.Geometry;
 import org.maplibre.nativejni.geo.LatLng;
 import org.maplibre.nativejni.runtime.RuntimeHandle;
 import org.maplibre.nativejni.test.NativeTestSupport;
@@ -52,6 +53,11 @@ class MapProjectionHandleTest {
 
           projection.setVisibleCoordinates(
               List.of(new LatLng(-1, -1), new LatLng(1, 1)), new EdgeInsets(0, 0, 0, 0));
+          assertTrue(projection.camera().hasCenter());
+
+          projection.setVisibleGeometry(
+              Geometry.lineString(List.of(new LatLng(-2, -2), new LatLng(2, 2))),
+              new EdgeInsets(0, 0, 0, 0));
           assertTrue(projection.camera().hasCenter());
         }
       }

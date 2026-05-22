@@ -71,7 +71,14 @@ public final class MapProjectionHandle implements AutoCloseable {
   }
 
   public void setVisibleGeometry(Geometry geometry, EdgeInsets padding) {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    Objects.requireNonNull(geometry, "geometry");
+    Objects.requireNonNull(padding, "padding");
+    var paddingValues =
+        new double[] {padding.top(), padding.left(), padding.bottom(), padding.right()};
+    Status.check(
+        ProjectionNative.mln_map_projection_set_visible_geometry(
+            state.requireLiveAddress(), geometry, paddingValues));
   }
 
   public ScreenPoint pixelForLatLng(LatLng coordinate) {

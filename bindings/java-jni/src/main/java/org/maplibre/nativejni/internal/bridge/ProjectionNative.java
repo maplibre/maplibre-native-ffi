@@ -17,7 +17,8 @@ public final class ProjectionNative {
   public static native int mln_map_projection_set_visible_coordinates(
       long projection, double[] coordinates, double[] padding);
 
-  public static native int mln_map_projection_set_visible_geometry();
+  public static native int mln_map_projection_set_visible_geometry(
+      long projection, org.maplibre.nativejni.geo.Geometry geometry, double[] padding);
 
   public static native int mln_map_projection_pixel_for_lat_lng(
       long projection, double latitude, double longitude, double[] outPoint);
