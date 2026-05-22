@@ -17,6 +17,7 @@ import org.maplibre.nativejni.geo.LatLng;
 import org.maplibre.nativejni.geo.ScreenPoint;
 import org.maplibre.nativejni.internal.access.InternalAccess;
 import org.maplibre.nativejni.runtime.RuntimeHandle;
+import org.maplibre.nativejni.style.SourceType;
 import org.maplibre.nativejni.test.NativeTestSupport;
 
 class MapHandleTest {
@@ -126,6 +127,8 @@ class MapHandleTest {
         assertFalse(map.styleSourceExists("geojson-source"));
         map.addGeoJsonSourceUrl("geojson-source", "https://example.com/data.geojson");
         assertTrue(map.styleSourceExists("geojson-source"));
+        assertEquals(SourceType.GEOJSON, map.styleSourceType("geojson-source").orElseThrow());
+        assertTrue(map.styleSourceType("missing-source").isEmpty());
         map.setGeoJsonSourceUrl("geojson-source", "https://example.com/updated.geojson");
         assertTrue(map.removeStyleSource("geojson-source"));
         assertFalse(map.removeStyleSource("geojson-source"));

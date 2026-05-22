@@ -118,7 +118,16 @@ public final class MapHandle implements AutoCloseable {
   }
 
   public Optional<SourceType> styleSourceType(String sourceId) {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    var outSourceType = new int[1];
+    var outFound = new boolean[1];
+    Status.check(
+        StyleNative.mln_map_get_style_source_type(
+            state.requireLiveAddress(),
+            Objects.requireNonNull(sourceId, "sourceId"),
+            outSourceType,
+            outFound));
+    return outFound[0] ? Optional.of(SourceType.fromNative(outSourceType[0])) : Optional.empty();
   }
 
   public Optional<SourceInfo> styleSourceInfo(String sourceId) {

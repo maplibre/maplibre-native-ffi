@@ -28,7 +28,8 @@ public final class StyleNative {
   public static native int mln_map_style_source_exists(
       long map, String sourceId, boolean[] outExists);
 
-  public static native int mln_map_get_style_source_type();
+  public static native int mln_map_get_style_source_type(
+      long map, String sourceId, int[] outSourceType, boolean[] outFound);
 
   public static native int mln_map_get_style_source_info();
 

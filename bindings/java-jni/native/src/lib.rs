@@ -242,7 +242,6 @@ mod registration {
             "mln_style_id_list_get",
             "mln_style_id_list_destroy",
             "mln_map_add_style_source_json",
-            "mln_map_get_style_source_type",
             "mln_map_get_style_source_info",
             "mln_map_copy_style_source_attribution",
             "mln_map_list_style_source_ids",
@@ -300,6 +299,11 @@ mod registration {
             name: "mln_map_style_source_exists".into(),
             sig: "(JLjava/lang/String;[Z)I".into(),
             fn_ptr: map_style_source_exists as *mut c_void,
+        });
+        style_methods.push(NativeMethod {
+            name: "mln_map_get_style_source_type".into(),
+            sig: "(JLjava/lang/String;[I[Z)I".into(),
+            fn_ptr: map_get_style_source_type as *mut c_void,
         });
         style_methods.push(NativeMethod {
             name: "mln_map_add_geojson_source_url".into(),
@@ -1272,6 +1276,52 @@ extern "system" fn map_style_source_exists(
         out_exists,
         sys::mln_map_style_source_exists,
     )
+}
+
+extern "system" fn map_get_style_source_type(
+    mut env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    map: jlong,
+    source_id: JString<'_>,
+    out_source_type: JIntArray<'_>,
+    out_found: JBooleanArray<'_>,
+) -> jint {
+    catch_unwind(AssertUnwindSafe(|| {
+        if out_source_type.is_null()
+            || out_found.is_null()
+            || env.get_array_length(&out_source_type).unwrap_or(0) < 1
+            || env.get_array_length(&out_found).unwrap_or(0) < 1
+        {
+            return sys::MLN_STATUS_INVALID_ARGUMENT;
+        }
+        let (source_id, source_id_view) = match string_view(&mut env, &source_id) {
+            Ok(value) => value,
+            Err(status) => return status,
+        };
+        let _source_id = source_id;
+        let mut source_type = 0_u32;
+        let mut found = false;
+        let result = unsafe {
+            sys::mln_map_get_style_source_type(
+                map as *mut sys::mln_map,
+                source_id_view,
+                &mut source_type,
+                &mut found,
+            )
+        };
+        if result == sys::MLN_STATUS_OK
+            && (env
+                .set_int_array_region(&out_source_type, 0, &[source_type as jint])
+                .is_err()
+                || env
+                    .set_boolean_array_region(&out_found, 0, &[jboolean::from(found)])
+                    .is_err())
+        {
+            return sys::MLN_STATUS_INVALID_ARGUMENT;
+        }
+        result
+    }))
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
 }
 
 fn map_style_source_bool(
