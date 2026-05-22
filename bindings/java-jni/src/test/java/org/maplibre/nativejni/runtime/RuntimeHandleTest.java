@@ -62,6 +62,8 @@ class RuntimeHandleTest {
       var status = runtime.startOfflineRegionStatus(123);
       assertTrue(status.kind() == OfflineOperationKind.REGION_GET_STATUS);
       assertTrue(status.resultKind() == OfflineOperationResultKind.REGION_STATUS);
+      assertThrows(
+          InvalidStateException.class, () -> runtime.takeOfflineRegionStatusResult(status));
       runtime.discardOfflineOperation(status);
 
       runtime.discardOfflineOperation(runtime.startSetOfflineRegionObserved(123, false));

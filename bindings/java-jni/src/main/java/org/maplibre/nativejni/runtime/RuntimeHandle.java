@@ -221,7 +221,30 @@ public final class RuntimeHandle implements AutoCloseable {
 
   public OfflineRegionStatus takeOfflineRegionStatusResult(
       OfflineOperationHandle<OfflineRegionStatus> operation) {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    Objects.requireNonNull(operation, "operation");
+    var longs = new long[6];
+    var ints = new int[1];
+    var booleans = new boolean[2];
+    var operationId =
+        operation.requireLive(
+            this, OfflineOperationKind.REGION_GET_STATUS, OfflineOperationResultKind.REGION_STATUS);
+    Status.check(
+        OfflineNative.mln_runtime_offline_region_get_status_take_result(
+            state.requireLiveAddress(), operationId, longs, ints, booleans));
+    operation.markConsumed();
+    var rawDownloadState = ints[0];
+    return new OfflineRegionStatus(
+        OfflineRegionDownloadState.fromNative(rawDownloadState),
+        rawDownloadState,
+        longs[0],
+        longs[1],
+        longs[2],
+        longs[3],
+        longs[4],
+        longs[5],
+        booleans[0],
+        booleans[1]);
   }
 
   public void discardOfflineOperation(OfflineOperationHandle<?> operation) {

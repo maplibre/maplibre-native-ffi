@@ -592,7 +592,6 @@ mod registration {
             "mln_runtime_offline_regions_list_take_result",
             "mln_runtime_offline_regions_merge_database_take_result",
             "mln_runtime_offline_region_update_metadata_take_result",
-            "mln_runtime_offline_region_get_status_take_result",
             "mln_offline_region_snapshot_get",
             "mln_offline_region_snapshot_destroy",
             "mln_offline_region_list_count",
@@ -643,6 +642,11 @@ mod registration {
             name: "mln_runtime_offline_region_delete_start".into(),
             sig: "(JJ[J)I".into(),
             fn_ptr: offline_region_delete_start as *mut c_void,
+        });
+        methods.push(NativeMethod {
+            name: "mln_runtime_offline_region_get_status_take_result".into(),
+            sig: "(JJ[J[I[Z)I".into(),
+            fn_ptr: offline_region_get_status_take_result as *mut c_void,
         });
         register_methods(
             vm,
@@ -1245,6 +1249,80 @@ extern "system" fn offline_region_delete_start(
             out,
         )
     })
+}
+
+extern "system" fn offline_region_get_status_take_result(
+    env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    runtime: jlong,
+    operation_id: jlong,
+    longs: JLongArray<'_>,
+    ints: JIntArray<'_>,
+    booleans: JBooleanArray<'_>,
+) -> jint {
+    catch_unwind(AssertUnwindSafe(|| {
+        if longs.is_null()
+            || ints.is_null()
+            || booleans.is_null()
+            || env.get_array_length(&longs).unwrap_or(0) < 6
+            || env.get_array_length(&ints).unwrap_or(0) < 1
+            || env.get_array_length(&booleans).unwrap_or(0) < 2
+        {
+            return sys::MLN_STATUS_INVALID_ARGUMENT;
+        }
+        let mut status = sys::mln_offline_region_status {
+            size: std::mem::size_of::<sys::mln_offline_region_status>() as u32,
+            download_state: 0,
+            completed_resource_count: 0,
+            completed_resource_size: 0,
+            completed_tile_count: 0,
+            required_tile_count: 0,
+            completed_tile_size: 0,
+            required_resource_count: 0,
+            required_resource_count_is_precise: false,
+            complete: false,
+        };
+        let result = unsafe {
+            sys::mln_runtime_offline_region_get_status_take_result(
+                runtime as *mut sys::mln_runtime,
+                operation_id as sys::mln_offline_operation_id,
+                &mut status,
+            )
+        };
+        if result == sys::MLN_STATUS_OK
+            && (env
+                .set_long_array_region(
+                    &longs,
+                    0,
+                    &[
+                        status.completed_resource_count as jlong,
+                        status.completed_resource_size as jlong,
+                        status.completed_tile_count as jlong,
+                        status.required_tile_count as jlong,
+                        status.completed_tile_size as jlong,
+                        status.required_resource_count as jlong,
+                    ],
+                )
+                .is_err()
+                || env
+                    .set_int_array_region(&ints, 0, &[status.download_state as jint])
+                    .is_err()
+                || env
+                    .set_boolean_array_region(
+                        &booleans,
+                        0,
+                        &[
+                            jboolean::from(status.required_resource_count_is_precise),
+                            jboolean::from(status.complete),
+                        ],
+                    )
+                    .is_err())
+        {
+            return sys::MLN_STATUS_INVALID_ARGUMENT;
+        }
+        result
+    }))
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
 }
 
 fn offline_start_with_out(

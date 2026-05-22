@@ -43,7 +43,8 @@ public final class OfflineNative {
 
   public static native int mln_runtime_offline_region_update_metadata_take_result();
 
-  public static native int mln_runtime_offline_region_get_status_take_result();
+  public static native int mln_runtime_offline_region_get_status_take_result(
+      long runtime, long operationId, long[] longs, int[] ints, boolean[] booleans);
 
   public static native int mln_offline_region_snapshot_get();
 
