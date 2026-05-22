@@ -105,6 +105,7 @@ auto texture_read_premultiplied_rgba8(
     set_thread_error("texture session renderer backend is not available");
     return MLN_STATUS_INVALID_STATE;
   }
+  // Explicit: library owns the headless backend, so activate before readback.
   auto guard = mbgl::gfx::BackendScope{*renderer_backend};
   auto image = texture->texture.backend->headless_backend().readStillImage();
   if (!image.valid()) {

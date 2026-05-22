@@ -132,9 +132,8 @@ auto renderer_backend(mln_render_session* session)
   return session->texture.backend->renderer_backend();
 }
 
-// For texture sessions the library owns the headless backend and must
-// activate the GL/Vulkan context via an Explicit scope. Surface sessions
-// delegate to the backend's scope_type().
+// Texture sessions own the headless backend (must activate); surface sessions
+// delegate to the backend.
 auto session_scope_type(const mln_render_session* session)
   -> mbgl::gfx::BackendScope::ScopeType {
   if (session->kind == mln::core::RenderSessionKind::Texture) {
