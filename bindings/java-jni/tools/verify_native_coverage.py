@@ -45,12 +45,38 @@ def rust_registered_methods() -> set[str]:
     return set(re.findall(r'"(mln_\w+)"', text))
 
 
+def rust_recorded_unsupported_methods() -> set[str]:
+    text = RUST_BRIDGE.read_text(encoding="utf-8")
+    methods: set[str] = set()
+    for match in re.finditer(
+        r"recorded_unsupported_status_methods\(&\[(.*?)\]\)", text, re.S
+    ):
+        methods.update(re.findall(r'"(mln_\w+)"', match.group(1)))
+    return methods
+
+
+def spec_recorded_unsupported_methods() -> set[str]:
+    text = SPEC.read_text(encoding="utf-8")
+    start = text.index("### Recorded unsupported or replaced C helper coverage")
+    end = text.index("### `BaseNative`", start)
+    section = text[start:end]
+    return set(re.findall(r"- `(mln_\w+)`:", section))
+
+
 def main() -> int:
     groups = parse_coverage_map()
     rust_methods = rust_registered_methods()
+    unsupported_methods = rust_recorded_unsupported_methods()
+    recorded_unsupported_methods = spec_recorded_unsupported_methods()
     missing_classes: list[str] = []
     missing_java: list[tuple[str, str]] = []
     missing_rust: list[tuple[str, str]] = []
+    undocumented_unsupported = sorted(
+        unsupported_methods - recorded_unsupported_methods
+    )
+    stale_recorded_unsupported = sorted(
+        recorded_unsupported_methods - unsupported_methods
+    )
 
     for group, functions in groups.items():
         java_path = JAVA_BRIDGE_ROOT / f"{group}.java"
@@ -68,7 +94,13 @@ def main() -> int:
             if function not in rust_methods:
                 missing_rust.append((group, function))
 
-    if missing_classes or missing_java or missing_rust:
+    if (
+        missing_classes
+        or missing_java
+        or missing_rust
+        or undocumented_unsupported
+        or stale_recorded_unsupported
+    ):
         if missing_classes:
             print("Missing Java native coverage classes:", file=sys.stderr)
             for group in missing_classes:
@@ -81,11 +113,25 @@ def main() -> int:
             print("Missing Rust JNI registrations:", file=sys.stderr)
             for group, function in missing_rust:
                 print(f"  {group}.{function}", file=sys.stderr)
+        if undocumented_unsupported:
+            print(
+                "Rust unsupported registrations missing SPEC reasons:", file=sys.stderr
+            )
+            for function in undocumented_unsupported:
+                print(f"  {function}", file=sys.stderr)
+        if stale_recorded_unsupported:
+            print(
+                "SPEC records unsupported helpers not registered as unsupported:",
+                file=sys.stderr,
+            )
+            for function in stale_recorded_unsupported:
+                print(f"  {function}", file=sys.stderr)
         return 1
 
     total = sum(len(functions) for functions in groups.values())
     print(
-        f"Verified {total} JNI native declarations and Rust registrations from SPEC.md."
+        f"Verified {total} JNI native declarations and Rust registrations from SPEC.md; "
+        f"{len(unsupported_methods)} recorded unsupported helper replacements."
     )
     return 0
 

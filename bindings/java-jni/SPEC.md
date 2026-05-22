@@ -55,10 +55,13 @@ The package root is `org.maplibre.nativejni`. The Java module is
 Record JNI-only differences here. Keep the `None` row only when Java JNI
 intentionally mirrors Java FFM and the public C ABI for all supported features.
 
-| Item                                         | Difference or omission                     | Reason                                                                                                                            | User-visible behavior                                                                                                                                                          | Tests/docs impact                                                                                                          |
-| -------------------------------------------- | ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------- |
-| JVM native distribution packaging            | Out of scope for this implementation pass. | Existing bindings currently build, test, and support local examples without published per-platform native distribution artifacts. | JVM users load the locally built JNI bridge through `org.maplibre.nativejni.library.path`, `MAPLIBRE_NATIVE_JNI_LIBRARY_PATH`, or `System.loadLibrary("maplibre-native-jni")`. | Local JVM build, native build, and loader tests cover the supported path.                                                  |
-| Android/AAR packaging and Android load tests | Out of scope for this implementation pass. | The repository does not yet define an Android packaging target or supported Android ABI test runner for this binding.             | Android artifacts are not produced by `bindings/java-jni`; Android load behavior is not claimed for this pass.                                                                 | The completion checklist records Android packaging and load tests as unsupported until an Android packaging target exists. |
+| Item                                         | Difference or omission                                                                   | Reason                                                                                                                            | User-visible behavior                                                                                                                                                          | Tests/docs impact                                                                                                          |
+| -------------------------------------------- | ---------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------- |
+| JVM native distribution packaging            | Out of scope for this implementation pass.                                               | Existing bindings currently build, test, and support local examples without published per-platform native distribution artifacts. | JVM users load the locally built JNI bridge through `org.maplibre.nativejni.library.path`, `MAPLIBRE_NATIVE_JNI_LIBRARY_PATH`, or `System.loadLibrary("maplibre-native-jni")`. | Local JVM build, native build, and loader tests cover the supported path.                                                  |
+| Android/AAR packaging and Android load tests | Out of scope for this implementation pass.                                               | The repository does not yet define an Android packaging target or supported Android ABI test runner for this binding.             | Android artifacts are not produced by `bindings/java-jni`; Android load behavior is not claimed for this pass.                                                                 | The completion checklist records Android packaging and load tests as unsupported until an Android packaging target exists. |
+| Internal C default/descriptor helpers        | Replaced by Java-side value construction for this implementation pass.                   | Java JNI owns copied descriptor/value classes and does not expose raw C descriptor allocation.                                    | Public Java constructors/builders provide the same local binding inputs without requiring callers to allocate C defaults.                                                      | The native coverage map records each replaced helper.                                                                      |
+| Internal C result/list/snapshot helpers      | Replaced by Rust-side copy-and-destroy adapters for this implementation pass.            | Java JNI returns copied Java objects and does not expose raw C result, list, or snapshot handles.                                 | Query, JSON snapshot, style-list, and offline result APIs return Java values directly.                                                                                         | The native coverage map records each replaced helper.                                                                      |
+| Rust bridge module split                     | Replaced by a consolidated `native/src/lib.rs` bridge file for this implementation pass. | The current bridge is easier to audit as one file while the API surface is still stabilizing.                                     | No user-visible behavior difference.                                                                                                                                           | The Rust bridge inventory records `lib.rs` as the replacement for the planned module split.                                |
 
 ## Current scaffold
 
@@ -336,7 +339,10 @@ state:
 
 ## Rust bridge crate inventory
 
-Implement these Rust modules in `bindings/java-jni/native/src`:
+Track these Rust bridge responsibilities in `bindings/java-jni/native/src`. The
+current implementation records the single `lib.rs` file as the replacement for
+the planned module split; future refactors may split these responsibilities
+without changing the Java API.
 
 | Module                            | Contents                                                                      |
 | --------------------------------- | ----------------------------------------------------------------------------- |
@@ -380,6 +386,92 @@ Each C API function listed below must have a JNI implementation or a recorded
 unsupported reason before the binding leaves draft status. Reviewers may update
 this list while comparing it with the headers, but this task does not require a
 mechanical header-sync check or generator.
+
+### Recorded unsupported or replaced C helper coverage
+
+These functions remain in the coverage map, Java declarations, and Rust
+registration table, but the JNI bridge returns `MLN_STATUS_UNSUPPORTED` when
+called directly. They are internal C helper surfaces whose behavior is provided
+through Java-owned values or Rust copy adapters instead of raw C helper handles.
+
+- `mln_runtime_options_default`: replaced by `RuntimeOptions` Java defaults.
+- `mln_map_options_default`: replaced by `MapOptions` Java defaults.
+- `mln_camera_options_default`: replaced by `CameraOptions` Java defaults.
+- `mln_animation_options_default`: replaced by `AnimationOptions` Java defaults.
+- `mln_camera_fit_options_default`: replaced by `CameraFitOptions` Java
+  defaults.
+- `mln_bound_options_default`: replaced by `BoundOptions` Java defaults.
+- `mln_free_camera_options_default`: replaced by `FreeCameraOptions` Java
+  defaults.
+- `mln_projection_mode_default`: replaced by `ProjectionModeOptions` Java
+  defaults.
+- `mln_map_viewport_options_default`: replaced by `ViewportOptions` Java
+  defaults.
+- `mln_map_tile_options_default`: replaced by `TileOptions` Java defaults.
+- `mln_rendered_feature_query_options_default`: replaced by
+  `RenderedFeatureQueryOptions` Java defaults.
+- `mln_source_feature_query_options_default`: replaced by
+  `SourceFeatureQueryOptions` Java defaults.
+- `mln_rendered_query_geometry_point`: replaced by `RenderedQueryGeometry.Point`
+  Java values.
+- `mln_rendered_query_geometry_box`: replaced by `RenderedQueryGeometry.Box`
+  Java values.
+- `mln_rendered_query_geometry_line_string`: replaced by
+  `RenderedQueryGeometry.LineString` Java values.
+- `mln_feature_query_result_count`: replaced by Rust query result copying into
+  Java lists.
+- `mln_feature_query_result_get`: replaced by Rust query result copying into
+  Java lists.
+- `mln_feature_query_result_destroy`: replaced by Rust-owned query result
+  destruction after copying.
+- `mln_feature_extension_result_get`: replaced by Rust feature-extension result
+  copying into Java values.
+- `mln_feature_extension_result_destroy`: replaced by Rust-owned
+  feature-extension result destruction after copying.
+- `mln_json_snapshot_get`: replaced by Rust JSON snapshot copying into
+  `JsonValue`.
+- `mln_json_snapshot_destroy`: replaced by Rust-owned JSON snapshot destruction
+  after copying.
+- `mln_metal_surface_descriptor_default`: replaced by `MetalSurfaceDescriptor`
+  Java defaults.
+- `mln_vulkan_surface_descriptor_default`: replaced by `VulkanSurfaceDescriptor`
+  Java defaults.
+- `mln_metal_owned_texture_descriptor_default`: replaced by
+  `MetalOwnedTextureDescriptor` Java defaults.
+- `mln_metal_borrowed_texture_descriptor_default`: replaced by
+  `MetalBorrowedTextureDescriptor` Java defaults.
+- `mln_vulkan_owned_texture_descriptor_default`: replaced by
+  `VulkanOwnedTextureDescriptor` Java defaults.
+- `mln_vulkan_borrowed_texture_descriptor_default`: replaced by
+  `VulkanBorrowedTextureDescriptor` Java defaults.
+- `mln_texture_image_info_default`: replaced by `TextureImageInfo` Java values
+  copied from native results.
+- `mln_style_tile_source_options_default`: replaced by `TileSourceOptions` Java
+  defaults.
+- `mln_custom_geometry_source_options_default`: replaced by
+  `CustomGeometrySourceOptions` Java defaults.
+- `mln_premultiplied_rgba8_image_default`: replaced by `PremultipliedRgba8Image`
+  Java values.
+- `mln_style_image_options_default`: replaced by `StyleImageOptions` Java
+  defaults.
+- `mln_style_image_info_default`: replaced by `StyleImageInfo` Java values
+  copied from native results.
+- `mln_style_id_list_count`: replaced by Rust style ID list copying into Java
+  lists.
+- `mln_style_id_list_get`: replaced by Rust style ID list copying into Java
+  lists.
+- `mln_style_id_list_destroy`: replaced by Rust-owned style ID list destruction
+  after copying.
+- `mln_offline_region_snapshot_get`: replaced by Rust offline snapshot copying
+  into Java values.
+- `mln_offline_region_snapshot_destroy`: replaced by Rust-owned offline snapshot
+  destruction after copying.
+- `mln_offline_region_list_count`: replaced by Rust offline list copying into
+  Java lists.
+- `mln_offline_region_list_get`: replaced by Rust offline list copying into Java
+  lists.
+- `mln_offline_region_list_destroy`: replaced by Rust-owned offline list
+  destruction after copying.
 
 ### `BaseNative`
 

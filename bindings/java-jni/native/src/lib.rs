@@ -283,7 +283,7 @@ mod registration {
         register_map(vm)?;
         register_camera(vm)?;
         register_projection(vm)?;
-        let mut query_methods = no_arg_status_methods(&[
+        let mut query_methods = recorded_unsupported_status_methods(&[
             "mln_rendered_feature_query_options_default",
             "mln_source_feature_query_options_default",
             "mln_rendered_query_geometry_point",
@@ -315,8 +315,10 @@ mod registration {
             "org/maplibre/nativejni/internal/bridge/QueryNative",
             query_methods,
         )?;
-        let mut render_session_methods =
-            no_arg_status_methods(&["mln_json_snapshot_get", "mln_json_snapshot_destroy"]);
+        let mut render_session_methods = recorded_unsupported_status_methods(&[
+            "mln_json_snapshot_get",
+            "mln_json_snapshot_destroy",
+        ]);
         render_session_methods.push(NativeMethod {
             name: "mln_render_session_resize".into(),
             sig: "(JIID)I".into(),
@@ -373,7 +375,7 @@ mod registration {
             "org/maplibre/nativejni/internal/bridge/RenderSessionNative",
             render_session_methods,
         )?;
-        let mut surface_methods = no_arg_status_methods(&[
+        let mut surface_methods = recorded_unsupported_status_methods(&[
             "mln_metal_surface_descriptor_default",
             "mln_vulkan_surface_descriptor_default",
         ]);
@@ -392,7 +394,7 @@ mod registration {
             "org/maplibre/nativejni/internal/bridge/SurfaceNative",
             surface_methods,
         )?;
-        let mut texture_methods = no_arg_status_methods(&[
+        let mut texture_methods = recorded_unsupported_status_methods(&[
             "mln_metal_owned_texture_descriptor_default",
             "mln_metal_borrowed_texture_descriptor_default",
             "mln_vulkan_owned_texture_descriptor_default",
@@ -449,7 +451,7 @@ mod registration {
             "org/maplibre/nativejni/internal/bridge/TextureNative",
             texture_methods,
         )?;
-        let mut style_methods = no_arg_status_methods(&[
+        let mut style_methods = recorded_unsupported_status_methods(&[
             "mln_style_tile_source_options_default",
             "mln_custom_geometry_source_options_default",
             "mln_premultiplied_rgba8_image_default",
@@ -797,7 +799,7 @@ mod registration {
     }
 
     fn register_runtime(vm: &JavaVM) -> jni::errors::Result<()> {
-        let mut methods = no_arg_status_methods(&["mln_runtime_options_default"]);
+        let mut methods = recorded_unsupported_status_methods(&["mln_runtime_options_default"]);
         methods.push(NativeMethod {
             name: "mln_runtime_create".into(),
             sig: "([J)I".into(),
@@ -888,7 +890,7 @@ mod registration {
     }
 
     fn register_offline(vm: &JavaVM) -> jni::errors::Result<()> {
-        let mut methods = no_arg_status_methods(&[
+        let mut methods = recorded_unsupported_status_methods(&[
             "mln_offline_region_snapshot_get",
             "mln_offline_region_snapshot_destroy",
             "mln_offline_region_list_count",
@@ -983,7 +985,7 @@ mod registration {
     }
 
     fn register_map(vm: &JavaVM) -> jni::errors::Result<()> {
-        let mut methods = no_arg_status_methods(&["mln_map_options_default"]);
+        let mut methods = recorded_unsupported_status_methods(&["mln_map_options_default"]);
         methods.push(NativeMethod {
             name: "mln_map_create".into(),
             sig: "(JIIDI[J)I".into(),
@@ -1022,7 +1024,7 @@ mod registration {
     }
 
     fn register_camera(vm: &JavaVM) -> jni::errors::Result<()> {
-        let mut methods = no_arg_status_methods(&[
+        let mut methods = recorded_unsupported_status_methods(&[
             "mln_camera_options_default",
             "mln_animation_options_default",
             "mln_camera_fit_options_default",
@@ -1288,7 +1290,10 @@ mod registration {
         )
     }
 
-    fn no_arg_status_methods(names: &[&str]) -> Vec<NativeMethod> {
+    // These C helper functions are tracked in SPEC.md as Java-side replacements.
+    // They remain registered so coverage drift is visible, but Java public APIs
+    // use binding-owned values or copied snapshots instead of these raw helpers.
+    fn recorded_unsupported_status_methods(names: &[&str]) -> Vec<NativeMethod> {
         names
             .iter()
             .map(|name| NativeMethod {
