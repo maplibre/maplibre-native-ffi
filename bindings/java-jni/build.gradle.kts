@@ -24,4 +24,10 @@ tasks.named<Javadoc>("javadoc") {
   }
 }
 
-tasks.withType<Test>().configureEach { useJUnitPlatform() }
+val nativeJniLibraryPath = providers.systemProperty("org.maplibre.nativejni.library.path")
+
+tasks.withType<Test>().configureEach {
+  useJUnitPlatform()
+  inputs.property("org.maplibre.nativejni.library.path", nativeJniLibraryPath.orElse(""))
+  nativeJniLibraryPath.orNull?.let { systemProperty("org.maplibre.nativejni.library.path", it) }
+}

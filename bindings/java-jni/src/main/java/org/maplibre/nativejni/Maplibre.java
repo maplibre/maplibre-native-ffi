@@ -8,6 +8,7 @@ import org.maplibre.nativejni.geo.LatLng;
 import org.maplibre.nativejni.geo.ProjectedMeters;
 import org.maplibre.nativejni.internal.bridge.NativeBridge;
 import org.maplibre.nativejni.internal.loader.NativeLibrary;
+import org.maplibre.nativejni.internal.status.Status;
 import org.maplibre.nativejni.log.LogCallback;
 import org.maplibre.nativejni.log.LogSeverity;
 import org.maplibre.nativejni.render.RenderBackend;
@@ -36,23 +37,22 @@ public final class Maplibre {
   /** Returns the render backends compiled into the loaded native library. */
   public static EnumSet<RenderBackend> supportedRenderBackends() {
     NativeLibrary.ensureLoaded();
-    throw new UnsupportedOperationException(
-        "supportedRenderBackends is not implemented by the JNI bridge yet");
+    return RenderBackend.fromMask(NativeBridge.supportedRenderBackendMask());
   }
 
   /** Reads Maplibre Native's process-global network status. */
   public static NetworkStatus networkStatus() {
     NativeLibrary.ensureLoaded();
-    throw new UnsupportedOperationException(
-        "networkStatus is not implemented by the JNI bridge yet");
+    var out = new int[1];
+    Status.check(NativeBridge.networkStatusGet(out));
+    return NetworkStatus.fromNative(out[0]);
   }
 
   /** Sets Maplibre Native's process-global network status. */
   public static void setNetworkStatus(NetworkStatus status) {
     NativeLibrary.ensureLoaded();
-    Objects.requireNonNull(status, "status");
-    throw new UnsupportedOperationException(
-        "setNetworkStatus is not implemented by the JNI bridge yet");
+    Status.check(
+        NativeBridge.networkStatusSet(Objects.requireNonNull(status, "status").nativeValue()));
   }
 
   /**
