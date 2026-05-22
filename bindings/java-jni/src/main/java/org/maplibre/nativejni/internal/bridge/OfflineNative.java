@@ -4,7 +4,19 @@ package org.maplibre.nativejni.internal.bridge;
 public final class OfflineNative {
   private OfflineNative() {}
 
-  public static native int mln_runtime_offline_region_create_start();
+  public static native int mln_runtime_offline_region_create_start(
+      long runtime,
+      String styleUrl,
+      double southwestLatitude,
+      double southwestLongitude,
+      double northeastLatitude,
+      double northeastLongitude,
+      double minZoom,
+      double maxZoom,
+      double pixelRatio,
+      boolean includeIdeographs,
+      byte[] metadata,
+      long[] outOperationId);
 
   public static native int mln_runtime_offline_region_get_start(
       long runtime, long regionId, long[] outOperationId);

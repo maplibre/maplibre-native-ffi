@@ -586,7 +586,6 @@ mod registration {
 
     fn register_offline(vm: &JavaVM) -> jni::errors::Result<()> {
         let mut methods = no_arg_status_methods(&[
-            "mln_runtime_offline_region_create_start",
             "mln_runtime_offline_region_create_take_result",
             "mln_runtime_offline_region_get_take_result",
             "mln_runtime_offline_regions_list_take_result",
@@ -598,6 +597,11 @@ mod registration {
             "mln_offline_region_list_get",
             "mln_offline_region_list_destroy",
         ]);
+        methods.push(NativeMethod {
+            name: "mln_runtime_offline_region_create_start".into(),
+            sig: "(JLjava/lang/String;DDDDDDDZ[B[J)I".into(),
+            fn_ptr: offline_region_create_start as *mut c_void,
+        });
         methods.push(NativeMethod {
             name: "mln_runtime_offline_region_get_start".into(),
             sig: "(JJ[J)I".into(),
@@ -1081,6 +1085,74 @@ extern "system" fn runtime_offline_operation_discard(
             operation_id as sys::mln_offline_operation_id,
         )
     })
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+extern "system" fn offline_region_create_start(
+    mut env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    runtime: jlong,
+    style_url: JString<'_>,
+    southwest_latitude: f64,
+    southwest_longitude: f64,
+    northeast_latitude: f64,
+    northeast_longitude: f64,
+    min_zoom: f64,
+    max_zoom: f64,
+    pixel_ratio: f64,
+    include_ideographs: jboolean,
+    metadata: JByteArray<'_>,
+    out_operation_id: JLongArray<'_>,
+) -> jint {
+    catch_unwind(AssertUnwindSafe(|| {
+        if metadata.is_null() {
+            return sys::MLN_STATUS_INVALID_ARGUMENT;
+        }
+        let style_url = match jstring_to_cstring(&mut env, &style_url) {
+            Ok(value) => value,
+            Err(status) => return status,
+        };
+        let metadata = match env.convert_byte_array(&metadata) {
+            Ok(value) => value,
+            Err(_) => return sys::MLN_STATUS_INVALID_ARGUMENT,
+        };
+        let tile_pyramid = sys::mln_offline_tile_pyramid_region_definition {
+            size: std::mem::size_of::<sys::mln_offline_tile_pyramid_region_definition>() as u32,
+            style_url: style_url.as_ptr(),
+            bounds: sys::mln_lat_lng_bounds {
+                southwest: sys::mln_lat_lng {
+                    latitude: southwest_latitude,
+                    longitude: southwest_longitude,
+                },
+                northeast: sys::mln_lat_lng {
+                    latitude: northeast_latitude,
+                    longitude: northeast_longitude,
+                },
+            },
+            min_zoom,
+            max_zoom,
+            pixel_ratio: pixel_ratio as f32,
+            include_ideographs: include_ideographs != 0,
+        };
+        let definition = sys::mln_offline_region_definition {
+            size: std::mem::size_of::<sys::mln_offline_region_definition>() as u32,
+            type_: sys::MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID,
+            data: sys::mln_offline_region_definition__bindgen_ty_1 { tile_pyramid },
+        };
+        offline_start_with_out(env, out_operation_id, |out| unsafe {
+            sys::mln_runtime_offline_region_create_start(
+                runtime as *mut sys::mln_runtime,
+                &definition,
+                if metadata.is_empty() {
+                    std::ptr::null()
+                } else {
+                    metadata.as_ptr()
+                },
+                metadata.len(),
+                out,
+            )
+        })
+    }))
     .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
 }
 

@@ -7,6 +7,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.maplibre.nativejni.error.InvalidStateException;
+import org.maplibre.nativejni.geo.LatLng;
+import org.maplibre.nativejni.geo.LatLngBounds;
+import org.maplibre.nativejni.offline.OfflineRegionDefinition;
 import org.maplibre.nativejni.offline.OfflineRegionDownloadState;
 import org.maplibre.nativejni.test.NativeTestSupport;
 
@@ -42,6 +45,26 @@ class RuntimeHandleTest {
 
       runtime.discardOfflineOperation(operation);
       assertTrue(operation.isClosed());
+      runtime.discardOfflineOperation(operation);
+    }
+  }
+
+  @Test
+  void startsAndDiscardsCreateOfflineRegionOperation() {
+    try (var runtime = RuntimeHandle.create()) {
+      var operation =
+          runtime.startCreateOfflineRegion(
+              new OfflineRegionDefinition.TilePyramid(
+                  "https://example.com/style.json",
+                  new LatLngBounds(new LatLng(0, 0), new LatLng(1, 1)),
+                  0.0,
+                  1.0,
+                  1.0f,
+                  true),
+              new byte[] {1, 2, 3});
+
+      assertTrue(operation.kind() == OfflineOperationKind.REGION_CREATE);
+      assertTrue(operation.resultKind() == OfflineOperationResultKind.REGION);
       runtime.discardOfflineOperation(operation);
     }
   }
