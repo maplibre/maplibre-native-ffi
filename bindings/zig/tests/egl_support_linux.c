@@ -121,6 +121,8 @@ bool mln_test_egl_create(
     !out->pfn_destroy_surface || !out->pfn_terminate
   ) {
     fprintf(stderr, "egl_support: missing EGL symbols\n");
+    dlclose(lib);
+    out->egl_lib = NULL;
     return false;
   }
 

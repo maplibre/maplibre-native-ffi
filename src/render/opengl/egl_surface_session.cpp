@@ -88,7 +88,7 @@ class EGLSurfaceBackendImpl final : public mbgl::gl::RendererBackend,
 
   ~EGLSurfaceBackendImpl() override {
     auto guard = mbgl::gfx::BackendScope{
-      *this, mbgl::gfx::BackendScope::ScopeType::Implicit
+      *this, mbgl::gfx::BackendScope::ScopeType::Explicit
     };
     (void)guard;
   }

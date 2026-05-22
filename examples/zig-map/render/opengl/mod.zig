@@ -100,7 +100,7 @@ pub const OpenGLBackend = union(enum) {
         _: *maplibre.RenderSessionHandle,
         _: types.Viewport,
     ) !bool {
-        unreachable;
+        return types.AppError.BackendSetupFailed;
     }
 };
 

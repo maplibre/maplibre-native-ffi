@@ -138,6 +138,7 @@ fn logAndValidateNativeRenderBackend() !void {
     std.debug.print("native render backends: {s}\n", .{renderBackendSupportLabel(support)});
     if (build_options.supports_metal and !support.metal) return error.NativeRenderBackendMismatch;
     if (build_options.supports_vulkan and !support.vulkan) return error.NativeRenderBackendMismatch;
+    if (build_options.supports_opengl and !support.opengl) return error.NativeRenderBackendMismatch;
 }
 
 fn renderBackendSupportLabel(support: maplibre.RenderBackendSupport) []const u8 {
