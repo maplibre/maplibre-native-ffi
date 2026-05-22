@@ -47,8 +47,8 @@ import org.maplibre.nativejni.style.TileSourceOptions;
 
 /** API-parity scaffold for the Java JNI binding. */
 public final class MapHandle implements AutoCloseable {
-  private static final int CAMERA_FIELD_COUNT = 9;
-  private static final int CAMERA_VALUE_COUNT = 14;
+  static final int CAMERA_FIELD_COUNT = 9;
+  static final int CAMERA_VALUE_COUNT = 14;
   private static final int ANIMATION_FIELD_COUNT = 4;
   private static final int ANIMATION_VALUE_COUNT = 7;
 
@@ -868,7 +868,7 @@ public final class MapHandle implements AutoCloseable {
     return List.copyOf(coordinates);
   }
 
-  private static NativeOptions cameraToNative(CameraOptions camera) {
+  static NativeOptions cameraToNative(CameraOptions camera) {
     var cameraValue = MapStructs.cameraOptions(camera);
     var fields = new boolean[CAMERA_FIELD_COUNT];
     var values = new double[CAMERA_VALUE_COUNT];
@@ -904,7 +904,7 @@ public final class MapHandle implements AutoCloseable {
     return new NativeOptions(fields, values);
   }
 
-  private static CameraOptions cameraFromNative(boolean[] fields, double[] values) {
+  static CameraOptions cameraFromNative(boolean[] fields, double[] values) {
     var camera = new CameraOptions();
     if (fields[0]) {
       camera.center(values[0], values[1]);
@@ -958,7 +958,7 @@ public final class MapHandle implements AutoCloseable {
     return new NativeOptions(fields, values);
   }
 
-  private record NativeOptions(boolean[] fields, double[] values) {}
+  record NativeOptions(boolean[] fields, double[] values) {}
 
   public MapProjectionHandle createProjection() {
     return MapProjectionHandle.create(this);

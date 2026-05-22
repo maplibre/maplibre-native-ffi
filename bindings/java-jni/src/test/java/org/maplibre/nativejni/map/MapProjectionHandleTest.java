@@ -4,8 +4,11 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.List;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.maplibre.nativejni.camera.CameraOptions;
+import org.maplibre.nativejni.camera.EdgeInsets;
 import org.maplibre.nativejni.geo.LatLng;
 import org.maplibre.nativejni.runtime.RuntimeHandle;
 import org.maplibre.nativejni.test.NativeTestSupport;
@@ -27,6 +30,29 @@ class MapProjectionHandleTest {
 
           assertEquals(coordinate.latitude(), roundTrip.latitude(), 1.0e-9);
           assertEquals(coordinate.longitude(), roundTrip.longitude(), 1.0e-9);
+        }
+      }
+    }
+  }
+
+  @Test
+  void projectionCameraCanBeReadSetAndFitToCoordinates() {
+    try (var runtime = RuntimeHandle.create()) {
+      try (var map = MapHandle.create(runtime, new MapOptions().size(256, 256))) {
+        try (var projection = map.createProjection()) {
+          projection.setCamera(new CameraOptions().center(10, 20).zoom(3).bearing(15).pitch(20));
+          var camera = projection.camera();
+
+          assertTrue(camera.hasCenter());
+          assertEquals(10, camera.center().latitude(), 1.0e-9);
+          assertEquals(20, camera.center().longitude(), 1.0e-9);
+          assertEquals(3, camera.zoom(), 1.0e-9);
+          assertEquals(15, camera.bearing(), 1.0e-9);
+          assertEquals(20, camera.pitch(), 1.0e-9);
+
+          projection.setVisibleCoordinates(
+              List.of(new LatLng(-1, -1), new LatLng(1, 1)), new EdgeInsets(0, 0, 0, 0));
+          assertTrue(projection.camera().hasCenter());
         }
       }
     }

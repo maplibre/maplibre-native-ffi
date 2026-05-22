@@ -8,11 +8,14 @@ public final class ProjectionNative {
 
   public static native int mln_map_projection_destroy(long projection);
 
-  public static native int mln_map_projection_get_camera();
+  public static native int mln_map_projection_get_camera(
+      long projection, boolean[] outFields, double[] outValues);
 
-  public static native int mln_map_projection_set_camera();
+  public static native int mln_map_projection_set_camera(
+      long projection, boolean[] fields, double[] values);
 
-  public static native int mln_map_projection_set_visible_coordinates();
+  public static native int mln_map_projection_set_visible_coordinates(
+      long projection, double[] coordinates, double[] padding);
 
   public static native int mln_map_projection_set_visible_geometry();
 

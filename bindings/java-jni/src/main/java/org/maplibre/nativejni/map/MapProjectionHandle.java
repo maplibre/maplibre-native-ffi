@@ -37,15 +37,37 @@ public final class MapProjectionHandle implements AutoCloseable {
   }
 
   public CameraOptions camera() {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    var fields = new boolean[MapHandle.CAMERA_FIELD_COUNT];
+    var values = new double[MapHandle.CAMERA_VALUE_COUNT];
+    Status.check(
+        ProjectionNative.mln_map_projection_get_camera(state.requireLiveAddress(), fields, values));
+    return MapHandle.cameraFromNative(fields, values);
   }
 
   public void setCamera(CameraOptions camera) {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    var nativeCamera = MapHandle.cameraToNative(camera);
+    Status.check(
+        ProjectionNative.mln_map_projection_set_camera(
+            state.requireLiveAddress(), nativeCamera.fields(), nativeCamera.values()));
   }
 
   public void setVisibleCoordinates(List<LatLng> coordinates, EdgeInsets padding) {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    Objects.requireNonNull(coordinates, "coordinates");
+    Objects.requireNonNull(padding, "padding");
+    var coordinateValues = new double[coordinates.size() * 2];
+    for (var index = 0; index < coordinates.size(); index++) {
+      var coordinate = Objects.requireNonNull(coordinates.get(index), "coordinate");
+      coordinateValues[index * 2] = coordinate.latitude();
+      coordinateValues[index * 2 + 1] = coordinate.longitude();
+    }
+    var paddingValues =
+        new double[] {padding.top(), padding.left(), padding.bottom(), padding.right()};
+    Status.check(
+        ProjectionNative.mln_map_projection_set_visible_coordinates(
+            state.requireLiveAddress(), coordinateValues, paddingValues));
   }
 
   public void setVisibleGeometry(Geometry geometry, EdgeInsets padding) {

@@ -658,12 +658,7 @@ mod registration {
     }
 
     fn register_projection(vm: &JavaVM) -> jni::errors::Result<()> {
-        let mut methods = no_arg_status_methods(&[
-            "mln_map_projection_get_camera",
-            "mln_map_projection_set_camera",
-            "mln_map_projection_set_visible_coordinates",
-            "mln_map_projection_set_visible_geometry",
-        ]);
+        let mut methods = no_arg_status_methods(&["mln_map_projection_set_visible_geometry"]);
         methods.push(NativeMethod {
             name: "mln_map_projection_create".into(),
             sig: "(J[J)I".into(),
@@ -673,6 +668,21 @@ mod registration {
             name: "mln_map_projection_destroy".into(),
             sig: "(J)I".into(),
             fn_ptr: projection_destroy as *mut c_void,
+        });
+        methods.push(NativeMethod {
+            name: "mln_map_projection_get_camera".into(),
+            sig: "(J[Z[D)I".into(),
+            fn_ptr: projection_get_camera as *mut c_void,
+        });
+        methods.push(NativeMethod {
+            name: "mln_map_projection_set_camera".into(),
+            sig: "(J[Z[D)I".into(),
+            fn_ptr: projection_set_camera as *mut c_void,
+        });
+        methods.push(NativeMethod {
+            name: "mln_map_projection_set_visible_coordinates".into(),
+            sig: "(J[D[D)I".into(),
+            fn_ptr: projection_set_visible_coordinates as *mut c_void,
         });
         methods.push(NativeMethod {
             name: "mln_map_projection_pixel_for_lat_lng".into(),
@@ -2484,6 +2494,45 @@ extern "system" fn map_lat_lngs_for_pixels(
     .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
 }
 
+fn read_nonempty_coordinate_pairs(
+    env: &JNIEnv<'_>,
+    input: &JDoubleArray<'_>,
+) -> Result<Vec<f64>, jint> {
+    if input.is_null() {
+        return Err(sys::MLN_STATUS_INVALID_ARGUMENT);
+    }
+    let input_length = env
+        .get_array_length(input)
+        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
+    if input_length <= 0 || input_length % 2 != 0 {
+        return Err(sys::MLN_STATUS_INVALID_ARGUMENT);
+    }
+    let mut values = vec![0.0_f64; input_length as usize];
+    if env.get_double_array_region(input, 0, &mut values).is_err() {
+        return Err(sys::MLN_STATUS_INVALID_ARGUMENT);
+    }
+    Ok(values)
+}
+
+fn read_edge_insets(
+    env: &JNIEnv<'_>,
+    input: &JDoubleArray<'_>,
+) -> Result<sys::mln_edge_insets, jint> {
+    if input.is_null() || env.get_array_length(input).unwrap_or(0) < 4 {
+        return Err(sys::MLN_STATUS_INVALID_ARGUMENT);
+    }
+    let mut values = [0.0_f64; 4];
+    if env.get_double_array_region(input, 0, &mut values).is_err() {
+        return Err(sys::MLN_STATUS_INVALID_ARGUMENT);
+    }
+    Ok(sys::mln_edge_insets {
+        top: values[0],
+        left: values[1],
+        bottom: values[2],
+        right: values[3],
+    })
+}
+
 fn read_double_pairs(
     env: &JNIEnv<'_>,
     input: &JDoubleArray<'_>,
@@ -2542,6 +2591,86 @@ extern "system" fn projection_destroy(
     catch_unwind(|| unsafe {
         sys::mln_map_projection_destroy(projection as *mut sys::mln_map_projection)
     })
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+extern "system" fn projection_get_camera(
+    env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    projection: jlong,
+    out_fields: JBooleanArray<'_>,
+    out_values: JDoubleArray<'_>,
+) -> jint {
+    catch_unwind(AssertUnwindSafe(|| {
+        if !camera_arrays_are_valid(&env, &out_fields, &out_values) {
+            return sys::MLN_STATUS_INVALID_ARGUMENT;
+        }
+        let mut camera = unsafe { sys::mln_camera_options_default() };
+        let result = unsafe {
+            sys::mln_map_projection_get_camera(
+                projection as *mut sys::mln_map_projection,
+                &mut camera,
+            )
+        };
+        if result != sys::MLN_STATUS_OK {
+            return result;
+        }
+        write_camera_arrays(&env, &out_fields, &out_values, &camera)
+    }))
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+extern "system" fn projection_set_camera(
+    env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    projection: jlong,
+    fields: JBooleanArray<'_>,
+    values: JDoubleArray<'_>,
+) -> jint {
+    catch_unwind(AssertUnwindSafe(|| {
+        let camera = match read_camera_options(&env, &fields, &values) {
+            Ok(camera) => camera,
+            Err(status) => return status,
+        };
+        unsafe {
+            sys::mln_map_projection_set_camera(projection as *mut sys::mln_map_projection, &camera)
+        }
+    }))
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+extern "system" fn projection_set_visible_coordinates(
+    env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    projection: jlong,
+    coordinates: JDoubleArray<'_>,
+    padding: JDoubleArray<'_>,
+) -> jint {
+    catch_unwind(AssertUnwindSafe(|| {
+        let coordinate_values = match read_nonempty_coordinate_pairs(&env, &coordinates) {
+            Ok(values) => values,
+            Err(status) => return status,
+        };
+        let padding = match read_edge_insets(&env, &padding) {
+            Ok(value) => value,
+            Err(status) => return status,
+        };
+        let coordinates: Vec<_> = coordinate_values
+            .chunks_exact(2)
+            .map(|pair| sys::mln_lat_lng {
+                latitude: pair[0],
+                longitude: pair[1],
+            })
+            .collect();
+        unsafe {
+            sys::mln_map_projection_set_visible_coordinates(
+                projection as *mut sys::mln_map_projection,
+                coordinates.as_ptr(),
+                coordinates.len(),
+                padding,
+            )
+        }
+    }))
     .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
 }
 
