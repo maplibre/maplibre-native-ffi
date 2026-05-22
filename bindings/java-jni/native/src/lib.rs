@@ -279,12 +279,8 @@ mod registration {
             "mln_map_style_image_exists",
             "mln_map_get_style_image_info",
             "mln_map_copy_style_image_premultiplied_rgba8",
-            "mln_map_add_image_source_url",
             "mln_map_add_image_source_image",
-            "mln_map_set_image_source_url",
             "mln_map_set_image_source_image",
-            "mln_map_set_image_source_coordinates",
-            "mln_map_get_image_source_coordinates",
             "mln_map_add_style_layer_json",
             "mln_map_get_style_layer_json",
             "mln_map_set_style_light_json",
@@ -364,6 +360,26 @@ mod registration {
             name: "mln_map_add_raster_dem_source_tiles".into(),
             sig: "(JLjava/lang/String;[Ljava/lang/String;)I".into(),
             fn_ptr: map_add_raster_dem_source_tiles as *mut c_void,
+        });
+        style_methods.push(NativeMethod {
+            name: "mln_map_add_image_source_url".into(),
+            sig: "(JLjava/lang/String;[DLjava/lang/String;)I".into(),
+            fn_ptr: map_add_image_source_url as *mut c_void,
+        });
+        style_methods.push(NativeMethod {
+            name: "mln_map_set_image_source_url".into(),
+            sig: "(JLjava/lang/String;Ljava/lang/String;)I".into(),
+            fn_ptr: map_set_image_source_url as *mut c_void,
+        });
+        style_methods.push(NativeMethod {
+            name: "mln_map_set_image_source_coordinates".into(),
+            sig: "(JLjava/lang/String;[D)I".into(),
+            fn_ptr: map_set_image_source_coordinates as *mut c_void,
+        });
+        style_methods.push(NativeMethod {
+            name: "mln_map_get_image_source_coordinates".into(),
+            sig: "(JLjava/lang/String;[D[J[Z)I".into(),
+            fn_ptr: map_get_image_source_coordinates as *mut c_void,
         });
         style_methods.push(NativeMethod {
             name: "mln_map_add_hillshade_layer".into(),
@@ -2107,6 +2123,173 @@ extern "system" fn map_list_style_layer_ids(
     out_layer_ids: JObjectArray<'_>,
 ) -> jint {
     map_list_style_ids(env, map, out_layer_ids, sys::mln_map_list_style_layer_ids)
+}
+
+extern "system" fn map_add_image_source_url(
+    mut env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    map: jlong,
+    source_id: JString<'_>,
+    coordinates: JDoubleArray<'_>,
+    url: JString<'_>,
+) -> jint {
+    catch_unwind(AssertUnwindSafe(|| {
+        let (source_id_storage, source_id_view) = match string_view(&mut env, &source_id) {
+            Ok(value) => value,
+            Err(status) => return status,
+        };
+        let coordinate_values = match read_nonempty_coordinate_pairs(&env, &coordinates) {
+            Ok(value) => value,
+            Err(status) => return status,
+        };
+        let coordinates: Vec<_> = coordinate_values
+            .chunks_exact(2)
+            .map(|pair| sys::mln_lat_lng {
+                latitude: pair[0],
+                longitude: pair[1],
+            })
+            .collect();
+        let (url_storage, url_view) = match string_view(&mut env, &url) {
+            Ok(value) => value,
+            Err(status) => return status,
+        };
+        let _keep_alive = (source_id_storage, url_storage);
+        unsafe {
+            sys::mln_map_add_image_source_url(
+                map as *mut sys::mln_map,
+                source_id_view,
+                coordinates.as_ptr(),
+                coordinates.len(),
+                url_view,
+            )
+        }
+    }))
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+extern "system" fn map_set_image_source_url(
+    env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    map: jlong,
+    source_id: JString<'_>,
+    url: JString<'_>,
+) -> jint {
+    map_style_source_url(env, map, source_id, url, sys::mln_map_set_image_source_url)
+}
+
+extern "system" fn map_set_image_source_coordinates(
+    mut env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    map: jlong,
+    source_id: JString<'_>,
+    coordinates: JDoubleArray<'_>,
+) -> jint {
+    catch_unwind(AssertUnwindSafe(|| {
+        let (source_id_storage, source_id_view) = match string_view(&mut env, &source_id) {
+            Ok(value) => value,
+            Err(status) => return status,
+        };
+        let coordinate_values = match read_nonempty_coordinate_pairs(&env, &coordinates) {
+            Ok(value) => value,
+            Err(status) => return status,
+        };
+        let coordinates: Vec<_> = coordinate_values
+            .chunks_exact(2)
+            .map(|pair| sys::mln_lat_lng {
+                latitude: pair[0],
+                longitude: pair[1],
+            })
+            .collect();
+        let _keep_alive = source_id_storage;
+        unsafe {
+            sys::mln_map_set_image_source_coordinates(
+                map as *mut sys::mln_map,
+                source_id_view,
+                coordinates.as_ptr(),
+                coordinates.len(),
+            )
+        }
+    }))
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+extern "system" fn map_get_image_source_coordinates(
+    mut env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    map: jlong,
+    source_id: JString<'_>,
+    out_coordinates: JDoubleArray<'_>,
+    out_coordinate_count: JLongArray<'_>,
+    out_found: JBooleanArray<'_>,
+) -> jint {
+    catch_unwind(AssertUnwindSafe(|| {
+        if out_coordinates.is_null()
+            || out_coordinate_count.is_null()
+            || out_found.is_null()
+            || env.get_array_length(&out_coordinate_count).unwrap_or(0) < 1
+            || env.get_array_length(&out_found).unwrap_or(0) < 1
+        {
+            return sys::MLN_STATUS_INVALID_ARGUMENT;
+        }
+        let capacity_values = match env.get_array_length(&out_coordinates) {
+            Ok(value) if value >= 0 && value % 2 == 0 => value as usize,
+            _ => return sys::MLN_STATUS_INVALID_ARGUMENT,
+        };
+        let coordinate_capacity = capacity_values / 2;
+        let (source_id_storage, source_id_view) = match string_view(&mut env, &source_id) {
+            Ok(value) => value,
+            Err(status) => return status,
+        };
+        let _keep_alive = source_id_storage;
+        let mut coordinates = vec![
+            sys::mln_lat_lng {
+                latitude: 0.0,
+                longitude: 0.0,
+            };
+            coordinate_capacity
+        ];
+        let mut coordinate_count = 0_usize;
+        let mut found = false;
+        let result = unsafe {
+            sys::mln_map_get_image_source_coordinates(
+                map as *mut sys::mln_map,
+                source_id_view,
+                if coordinates.is_empty() {
+                    std::ptr::null_mut()
+                } else {
+                    coordinates.as_mut_ptr()
+                },
+                coordinates.len(),
+                &mut coordinate_count,
+                &mut found,
+            )
+        };
+        if result == sys::MLN_STATUS_OK {
+            if coordinate_count > coordinates.len() {
+                return sys::MLN_STATUS_INVALID_ARGUMENT;
+            }
+            let mut values = vec![0.0_f64; coordinate_count * 2];
+            for (index, coordinate) in coordinates.iter().take(coordinate_count).enumerate() {
+                values[index * 2] = coordinate.latitude;
+                values[index * 2 + 1] = coordinate.longitude;
+            }
+            if (!values.is_empty()
+                && env
+                    .set_double_array_region(&out_coordinates, 0, &values)
+                    .is_err())
+                || env
+                    .set_long_array_region(&out_coordinate_count, 0, &[coordinate_count as jlong])
+                    .is_err()
+                || env
+                    .set_boolean_array_region(&out_found, 0, &[jboolean::from(found)])
+                    .is_err()
+            {
+                return sys::MLN_STATUS_INVALID_ARGUMENT;
+            }
+        }
+        result
+    }))
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
 }
 
 extern "system" fn map_add_hillshade_layer(

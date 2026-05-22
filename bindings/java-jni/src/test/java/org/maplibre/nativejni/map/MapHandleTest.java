@@ -257,6 +257,27 @@ class MapHandleTest {
         assertEquals(
             SourceType.RASTER_DEM, map.styleSourceType("raster-dem-tiles-source").orElseThrow());
         assertTrue(map.removeStyleSource("raster-dem-tiles-source"));
+        List<LatLng> imageCoordinates =
+            List.of(
+                new LatLng(1.0, 2.0),
+                new LatLng(1.0, 3.0),
+                new LatLng(0.0, 3.0),
+                new LatLng(0.0, 2.0));
+        map.addImageSourceUrl("image-source", imageCoordinates, "https://example.com/image.png");
+        assertEquals(SourceType.IMAGE, map.styleSourceType("image-source").orElseThrow());
+        assertEquals(imageCoordinates, map.imageSourceCoordinates("image-source").orElseThrow());
+        map.setImageSourceUrl("image-source", "https://example.com/updated-image.png");
+        List<LatLng> updatedImageCoordinates =
+            List.of(
+                new LatLng(2.0, 4.0),
+                new LatLng(2.0, 5.0),
+                new LatLng(1.0, 5.0),
+                new LatLng(1.0, 4.0));
+        map.setImageSourceCoordinates("image-source", updatedImageCoordinates);
+        assertEquals(
+            updatedImageCoordinates, map.imageSourceCoordinates("image-source").orElseThrow());
+        assertTrue(map.imageSourceCoordinates("missing-image-source").isEmpty());
+        assertTrue(map.removeStyleSource("image-source"));
         map.setStyleJson(
             "{\"version\":8,\"sources\":{},\"layers\":[{\"id\":\"background-layer\",\"type\":\"background\"}]}");
         assertTrue(map.styleLayerExists("background-layer"));

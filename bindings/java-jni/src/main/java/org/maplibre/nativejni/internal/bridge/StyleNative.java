@@ -84,17 +84,24 @@ public final class StyleNative {
 
   public static native int mln_map_copy_style_image_premultiplied_rgba8();
 
-  public static native int mln_map_add_image_source_url();
+  public static native int mln_map_add_image_source_url(
+      long map, String sourceId, double[] coordinates, String url);
 
   public static native int mln_map_add_image_source_image();
 
-  public static native int mln_map_set_image_source_url();
+  public static native int mln_map_set_image_source_url(long map, String sourceId, String url);
 
   public static native int mln_map_set_image_source_image();
 
-  public static native int mln_map_set_image_source_coordinates();
+  public static native int mln_map_set_image_source_coordinates(
+      long map, String sourceId, double[] coordinates);
 
-  public static native int mln_map_get_image_source_coordinates();
+  public static native int mln_map_get_image_source_coordinates(
+      long map,
+      String sourceId,
+      double[] outCoordinates,
+      long[] outCoordinateCount,
+      boolean[] outFound);
 
   public static native int mln_map_add_hillshade_layer(
       long map, String layerId, String sourceId, String beforeLayerId);

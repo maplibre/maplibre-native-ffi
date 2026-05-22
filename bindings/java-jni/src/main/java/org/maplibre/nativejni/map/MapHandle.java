@@ -2,6 +2,7 @@ package org.maplibre.nativejni.map;
 
 import java.lang.foreign.MemorySegment;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Objects;
@@ -342,7 +343,13 @@ public final class MapHandle implements AutoCloseable {
   }
 
   public void addImageSourceUrl(String sourceId, List<LatLng> coordinates, String url) {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    Status.check(
+        StyleNative.mln_map_add_image_source_url(
+            state.requireLiveAddress(),
+            Objects.requireNonNull(sourceId, "sourceId"),
+            coordinateArray(coordinates, "coordinates"),
+            Objects.requireNonNull(url, "url")));
   }
 
   public void addImageSourceImage(
@@ -351,7 +358,12 @@ public final class MapHandle implements AutoCloseable {
   }
 
   public void setImageSourceUrl(String sourceId, String url) {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    Status.check(
+        StyleNative.mln_map_set_image_source_url(
+            state.requireLiveAddress(),
+            Objects.requireNonNull(sourceId, "sourceId"),
+            Objects.requireNonNull(url, "url")));
   }
 
   public void setImageSourceImage(String sourceId, PremultipliedRgba8Image image) {
@@ -359,11 +371,34 @@ public final class MapHandle implements AutoCloseable {
   }
 
   public void setImageSourceCoordinates(String sourceId, List<LatLng> coordinates) {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    Status.check(
+        StyleNative.mln_map_set_image_source_coordinates(
+            state.requireLiveAddress(),
+            Objects.requireNonNull(sourceId, "sourceId"),
+            coordinateArray(coordinates, "coordinates")));
   }
 
   public Optional<List<LatLng>> imageSourceCoordinates(String sourceId) {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    var outCoordinates = new double[8];
+    var outCoordinateCount = new long[1];
+    var outFound = new boolean[1];
+    Status.check(
+        StyleNative.mln_map_get_image_source_coordinates(
+            state.requireLiveAddress(),
+            Objects.requireNonNull(sourceId, "sourceId"),
+            outCoordinates,
+            outCoordinateCount,
+            outFound));
+    if (!outFound[0]) {
+      return Optional.empty();
+    }
+    var coordinates = new ArrayList<LatLng>(Math.toIntExact(outCoordinateCount[0]));
+    for (var index = 0; index < outCoordinateCount[0]; index++) {
+      coordinates.add(new LatLng(outCoordinates[index * 2], outCoordinates[index * 2 + 1]));
+    }
+    return Optional.of(List.copyOf(coordinates));
   }
 
   public void addStyleLayerJson(JsonValue layerJson) {
@@ -1288,6 +1323,17 @@ public final class MapHandle implements AutoCloseable {
     return values.stream()
         .map(value -> Objects.requireNonNull(value, name + " element"))
         .toArray(String[]::new);
+  }
+
+  private static double[] coordinateArray(List<LatLng> coordinates, String name) {
+    Objects.requireNonNull(coordinates, name);
+    var values = new double[coordinates.size() * 2];
+    for (var index = 0; index < coordinates.size(); index++) {
+      var coordinate = Objects.requireNonNull(coordinates.get(index), name + " element");
+      values[index * 2] = coordinate.latitude();
+      values[index * 2 + 1] = coordinate.longitude();
+    }
+    return values;
   }
 
   record NativeOptions(boolean[] fields, double[] values) {}
