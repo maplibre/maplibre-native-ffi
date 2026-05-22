@@ -29,7 +29,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     let render_backend = env::var("MLN_FFI_RENDER_BACKEND").unwrap_or_default();
     let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap_or_default();
     if render_backend == "opengl" && target_os == "linux" {
-        println!("cargo:rustc-link-lib=dylib=GLESv2");
+        // libmaplibre-native-c.so carries DT_NEEDED=libGLESv2.so.2; the
+        // runtime linker resolves those symbols via the installed libgles2.
+        // Allow undefined symbols in shared libs so the static linker
+        // doesn't require libgles-dev at link time.
+        println!("cargo:rustc-link-arg=-Wl,--allow-shlib-undefined");
     }
 
     let bindings = bindgen::Builder::default()

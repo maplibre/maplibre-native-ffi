@@ -75,7 +75,17 @@ fn addZigMapExample(b: *std.Build, options: BuildOptions) *std.Build.Step.Compil
         example.root_module.linkSystemLibrary(maplibre_build.vulkanLibraryName(options.target), .{});
     } else if (options.render_backend == .opengl) {
         // eglGetCurrentContext() is called directly in render/opengl/mod.zig
-        // so the example binary must link EGL at compile time.
+        // so the example binary must link EGL at compile time.  On Linux the
+        // GLVND libEGL.so is installed by libegl-dev into the multiarch
+        // directory which is not in the pixi sysroot library path; add it
+        // explicitly so the Zig linker can resolve the symbol.
+        if (options.target.result.os.tag == .linux) {
+            const arch_lib = switch (options.target.result.cpu.arch) {
+                .aarch64 => "/usr/lib/aarch64-linux-gnu",
+                else => "/usr/lib/x86_64-linux-gnu",
+            };
+            example.root_module.addLibraryPath(.{ .cwd_relative = arch_lib });
+        }
         example.root_module.linkSystemLibrary("EGL", .{});
     } else {
         failUnsupportedTarget();
