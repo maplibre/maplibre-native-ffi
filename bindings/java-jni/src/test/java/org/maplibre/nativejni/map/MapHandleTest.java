@@ -7,11 +7,13 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.EnumSet;
+import java.util.List;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.maplibre.nativejni.camera.AnimationOptions;
 import org.maplibre.nativejni.camera.CameraOptions;
 import org.maplibre.nativejni.error.InvalidStateException;
+import org.maplibre.nativejni.geo.LatLng;
 import org.maplibre.nativejni.geo.ScreenPoint;
 import org.maplibre.nativejni.internal.access.InternalAccess;
 import org.maplibre.nativejni.runtime.RuntimeHandle;
@@ -79,6 +81,10 @@ class MapHandleTest {
         var coordinate = map.latLngForPixel(point);
         assertTrue(Double.isFinite(coordinate.latitude()));
         assertTrue(Double.isFinite(coordinate.longitude()));
+        var points = map.pixelsForLatLngs(List.of(camera.center(), new LatLng(0, 0)));
+        assertEquals(2, points.size());
+        var coordinates = map.latLngsForPixels(points);
+        assertEquals(2, coordinates.size());
 
         var animation = new AnimationOptions().durationMs(0);
         map.easeTo(new CameraOptions().zoom(4), animation);

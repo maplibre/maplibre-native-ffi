@@ -691,11 +691,43 @@ public final class MapHandle implements AutoCloseable {
   }
 
   public List<ScreenPoint> pixelsForLatLngs(List<LatLng> coordinates) {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    Objects.requireNonNull(coordinates, "coordinates");
+    var coordinateValues = new double[coordinates.size() * 2];
+    for (var index = 0; index < coordinates.size(); index++) {
+      var coordinate = Objects.requireNonNull(coordinates.get(index), "coordinate");
+      coordinateValues[index * 2] = coordinate.latitude();
+      coordinateValues[index * 2 + 1] = coordinate.longitude();
+    }
+    var pointValues = new double[coordinateValues.length];
+    Status.check(
+        CameraNative.mln_map_pixels_for_lat_lngs(
+            state.requireLiveAddress(), coordinateValues, pointValues));
+    var points = new java.util.ArrayList<ScreenPoint>(coordinates.size());
+    for (var index = 0; index < coordinates.size(); index++) {
+      points.add(new ScreenPoint(pointValues[index * 2], pointValues[index * 2 + 1]));
+    }
+    return List.copyOf(points);
   }
 
   public List<LatLng> latLngsForPixels(List<ScreenPoint> points) {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    Objects.requireNonNull(points, "points");
+    var pointValues = new double[points.size() * 2];
+    for (var index = 0; index < points.size(); index++) {
+      var point = Objects.requireNonNull(points.get(index), "point");
+      pointValues[index * 2] = point.x();
+      pointValues[index * 2 + 1] = point.y();
+    }
+    var coordinateValues = new double[pointValues.length];
+    Status.check(
+        CameraNative.mln_map_lat_lngs_for_pixels(
+            state.requireLiveAddress(), pointValues, coordinateValues));
+    var coordinates = new java.util.ArrayList<LatLng>(points.size());
+    for (var index = 0; index < points.size(); index++) {
+      coordinates.add(new LatLng(coordinateValues[index * 2], coordinateValues[index * 2 + 1]));
+    }
+    return List.copyOf(coordinates);
   }
 
   private static NativeOptions cameraToNative(CameraOptions camera) {

@@ -110,7 +110,9 @@ public final class CameraNative {
   public static native int mln_map_lat_lng_for_pixel(
       long map, double x, double y, double[] outCoordinate);
 
-  public static native int mln_map_pixels_for_lat_lngs();
+  public static native int mln_map_pixels_for_lat_lngs(
+      long map, double[] coordinates, double[] outPoints);
 
-  public static native int mln_map_lat_lngs_for_pixels();
+  public static native int mln_map_lat_lngs_for_pixels(
+      long map, double[] points, double[] outCoordinates);
 }

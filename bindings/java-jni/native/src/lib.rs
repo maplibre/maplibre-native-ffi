@@ -481,8 +481,6 @@ mod registration {
             "mln_map_set_free_camera_options",
             "mln_map_get_projection_mode",
             "mln_map_set_projection_mode",
-            "mln_map_pixels_for_lat_lngs",
-            "mln_map_lat_lngs_for_pixels",
         ]);
         methods.push(NativeMethod {
             name: "mln_map_set_debug_options".into(),
@@ -588,6 +586,16 @@ mod registration {
             name: "mln_map_lat_lng_for_pixel".into(),
             sig: "(JDD[D)I".into(),
             fn_ptr: map_lat_lng_for_pixel as *mut c_void,
+        });
+        methods.push(NativeMethod {
+            name: "mln_map_pixels_for_lat_lngs".into(),
+            sig: "(J[D[D)I".into(),
+            fn_ptr: map_pixels_for_lat_lngs as *mut c_void,
+        });
+        methods.push(NativeMethod {
+            name: "mln_map_lat_lngs_for_pixels".into(),
+            sig: "(J[D[D)I".into(),
+            fn_ptr: map_lat_lngs_for_pixels as *mut c_void,
         });
         register_methods(
             vm,
@@ -1766,6 +1774,150 @@ extern "system" fn map_lat_lng_for_pixel(
         out[1] = coordinate.longitude;
         result
     })
+}
+
+extern "system" fn map_pixels_for_lat_lngs(
+    env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    map: jlong,
+    coordinates: JDoubleArray<'_>,
+    out_points: JDoubleArray<'_>,
+) -> jint {
+    catch_unwind(AssertUnwindSafe(|| {
+        let coordinate_values = match read_double_pairs(&env, &coordinates, &out_points) {
+            Ok(values) => values,
+            Err(status) => return status,
+        };
+        let coordinate_count = coordinate_values.len() / 2;
+        let coordinates: Vec<_> = coordinate_values
+            .chunks_exact(2)
+            .map(|pair| sys::mln_lat_lng {
+                latitude: pair[0],
+                longitude: pair[1],
+            })
+            .collect();
+        let mut points = vec![sys::mln_screen_point { x: 0.0, y: 0.0 }; coordinate_count];
+        let result = unsafe {
+            sys::mln_map_pixels_for_lat_lngs(
+                map as *mut sys::mln_map,
+                if coordinates.is_empty() {
+                    std::ptr::null()
+                } else {
+                    coordinates.as_ptr()
+                },
+                coordinate_count,
+                if points.is_empty() {
+                    std::ptr::null_mut()
+                } else {
+                    points.as_mut_ptr()
+                },
+            )
+        };
+        if result != sys::MLN_STATUS_OK {
+            return result;
+        }
+        let mut point_values = vec![0.0_f64; coordinate_values.len()];
+        for (index, point) in points.iter().enumerate() {
+            point_values[index * 2] = point.x;
+            point_values[index * 2 + 1] = point.y;
+        }
+        if env
+            .set_double_array_region(&out_points, 0, &point_values)
+            .is_err()
+        {
+            sys::MLN_STATUS_INVALID_ARGUMENT
+        } else {
+            sys::MLN_STATUS_OK
+        }
+    }))
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+extern "system" fn map_lat_lngs_for_pixels(
+    env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    map: jlong,
+    points: JDoubleArray<'_>,
+    out_coordinates: JDoubleArray<'_>,
+) -> jint {
+    catch_unwind(AssertUnwindSafe(|| {
+        let point_values = match read_double_pairs(&env, &points, &out_coordinates) {
+            Ok(values) => values,
+            Err(status) => return status,
+        };
+        let point_count = point_values.len() / 2;
+        let points: Vec<_> = point_values
+            .chunks_exact(2)
+            .map(|pair| sys::mln_screen_point {
+                x: pair[0],
+                y: pair[1],
+            })
+            .collect();
+        let mut coordinates = vec![
+            sys::mln_lat_lng {
+                latitude: 0.0,
+                longitude: 0.0,
+            };
+            point_count
+        ];
+        let result = unsafe {
+            sys::mln_map_lat_lngs_for_pixels(
+                map as *mut sys::mln_map,
+                if points.is_empty() {
+                    std::ptr::null()
+                } else {
+                    points.as_ptr()
+                },
+                point_count,
+                if coordinates.is_empty() {
+                    std::ptr::null_mut()
+                } else {
+                    coordinates.as_mut_ptr()
+                },
+            )
+        };
+        if result != sys::MLN_STATUS_OK {
+            return result;
+        }
+        let mut coordinate_values = vec![0.0_f64; point_values.len()];
+        for (index, coordinate) in coordinates.iter().enumerate() {
+            coordinate_values[index * 2] = coordinate.latitude;
+            coordinate_values[index * 2 + 1] = coordinate.longitude;
+        }
+        if env
+            .set_double_array_region(&out_coordinates, 0, &coordinate_values)
+            .is_err()
+        {
+            sys::MLN_STATUS_INVALID_ARGUMENT
+        } else {
+            sys::MLN_STATUS_OK
+        }
+    }))
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+fn read_double_pairs(
+    env: &JNIEnv<'_>,
+    input: &JDoubleArray<'_>,
+    output: &JDoubleArray<'_>,
+) -> Result<Vec<f64>, jint> {
+    if input.is_null() || output.is_null() {
+        return Err(sys::MLN_STATUS_INVALID_ARGUMENT);
+    }
+    let input_length = env
+        .get_array_length(input)
+        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
+    let output_length = env
+        .get_array_length(output)
+        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
+    if input_length < 0 || input_length % 2 != 0 || output_length < input_length {
+        return Err(sys::MLN_STATUS_INVALID_ARGUMENT);
+    }
+    let mut values = vec![0.0_f64; input_length as usize];
+    if env.get_double_array_region(input, 0, &mut values).is_err() {
+        return Err(sys::MLN_STATUS_INVALID_ARGUMENT);
+    }
+    Ok(values)
 }
 
 extern "system" fn projection_create(
