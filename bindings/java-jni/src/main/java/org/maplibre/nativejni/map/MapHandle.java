@@ -18,6 +18,7 @@ import org.maplibre.nativejni.geo.LatLng;
 import org.maplibre.nativejni.geo.LatLngBounds;
 import org.maplibre.nativejni.geo.ScreenPoint;
 import org.maplibre.nativejni.internal.access.InternalAccess;
+import org.maplibre.nativejni.internal.bridge.CameraNative;
 import org.maplibre.nativejni.internal.bridge.MapNative;
 import org.maplibre.nativejni.internal.lifecycle.HandleState;
 import org.maplibre.nativejni.internal.loader.NativeLibrary;
@@ -387,27 +388,53 @@ public final class MapHandle implements AutoCloseable {
   }
 
   public void setDebugOptions(Set<DebugOption> options) {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    Objects.requireNonNull(options, "options");
+    var mask = 0;
+    for (var option : options) {
+      mask |= Objects.requireNonNull(option, "option").nativeMask();
+    }
+    Status.check(CameraNative.mln_map_set_debug_options(state.requireLiveAddress(), mask));
   }
 
   public EnumSet<DebugOption> debugOptions() {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    var outOptions = new int[1];
+    Status.check(CameraNative.mln_map_get_debug_options(state.requireLiveAddress(), outOptions));
+    var options = EnumSet.noneOf(DebugOption.class);
+    for (var option : DebugOption.values()) {
+      if ((outOptions[0] & option.nativeMask()) != 0) {
+        options.add(option);
+      }
+    }
+    return options;
   }
 
   public void setRenderingStatsViewEnabled(boolean enabled) {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    Status.check(
+        CameraNative.mln_map_set_rendering_stats_view_enabled(state.requireLiveAddress(), enabled));
   }
 
   public boolean isRenderingStatsViewEnabled() {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    var outEnabled = new boolean[1];
+    Status.check(
+        CameraNative.mln_map_get_rendering_stats_view_enabled(
+            state.requireLiveAddress(), outEnabled));
+    return outEnabled[0];
   }
 
   public boolean isFullyLoaded() {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    var outLoaded = new boolean[1];
+    Status.check(CameraNative.mln_map_is_fully_loaded(state.requireLiveAddress(), outLoaded));
+    return outLoaded[0];
   }
 
   public void dumpDebugLogs() {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    Status.check(CameraNative.mln_map_dump_debug_logs(state.requireLiveAddress()));
   }
 
   public ViewportOptions viewportOptions() {

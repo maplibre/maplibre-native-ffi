@@ -121,58 +121,7 @@ mod registration {
             ],
         )?;
         register_map(vm)?;
-        register_no_arg_status_class(
-            vm,
-            "org/maplibre/nativejni/internal/bridge/CameraNative",
-            &[
-                "mln_camera_options_default",
-                "mln_animation_options_default",
-                "mln_camera_fit_options_default",
-                "mln_bound_options_default",
-                "mln_free_camera_options_default",
-                "mln_projection_mode_default",
-                "mln_map_viewport_options_default",
-                "mln_map_tile_options_default",
-                "mln_map_set_debug_options",
-                "mln_map_get_debug_options",
-                "mln_map_set_rendering_stats_view_enabled",
-                "mln_map_get_rendering_stats_view_enabled",
-                "mln_map_is_fully_loaded",
-                "mln_map_dump_debug_logs",
-                "mln_map_get_viewport_options",
-                "mln_map_set_viewport_options",
-                "mln_map_get_tile_options",
-                "mln_map_set_tile_options",
-                "mln_map_get_camera",
-                "mln_map_jump_to",
-                "mln_map_ease_to",
-                "mln_map_fly_to",
-                "mln_map_move_by",
-                "mln_map_move_by_animated",
-                "mln_map_scale_by",
-                "mln_map_scale_by_animated",
-                "mln_map_rotate_by",
-                "mln_map_rotate_by_animated",
-                "mln_map_pitch_by",
-                "mln_map_pitch_by_animated",
-                "mln_map_cancel_transitions",
-                "mln_map_camera_for_lat_lng_bounds",
-                "mln_map_camera_for_lat_lngs",
-                "mln_map_camera_for_geometry",
-                "mln_map_lat_lng_bounds_for_camera",
-                "mln_map_lat_lng_bounds_for_camera_unwrapped",
-                "mln_map_get_bounds",
-                "mln_map_set_bounds",
-                "mln_map_get_free_camera_options",
-                "mln_map_set_free_camera_options",
-                "mln_map_get_projection_mode",
-                "mln_map_set_projection_mode",
-                "mln_map_pixel_for_lat_lng",
-                "mln_map_lat_lng_for_pixel",
-                "mln_map_pixels_for_lat_lngs",
-                "mln_map_lat_lngs_for_pixels",
-            ],
-        )?;
+        register_camera(vm)?;
         register_projection(vm)?;
         register_no_arg_status_class(
             vm,
@@ -453,6 +402,86 @@ mod registration {
         register_methods(
             vm,
             "org/maplibre/nativejni/internal/bridge/MapNative",
+            methods,
+        )
+    }
+
+    fn register_camera(vm: &JavaVM) -> jni::errors::Result<()> {
+        let mut methods = no_arg_status_methods(&[
+            "mln_camera_options_default",
+            "mln_animation_options_default",
+            "mln_camera_fit_options_default",
+            "mln_bound_options_default",
+            "mln_free_camera_options_default",
+            "mln_projection_mode_default",
+            "mln_map_viewport_options_default",
+            "mln_map_tile_options_default",
+            "mln_map_get_viewport_options",
+            "mln_map_set_viewport_options",
+            "mln_map_get_tile_options",
+            "mln_map_set_tile_options",
+            "mln_map_get_camera",
+            "mln_map_jump_to",
+            "mln_map_ease_to",
+            "mln_map_fly_to",
+            "mln_map_move_by",
+            "mln_map_move_by_animated",
+            "mln_map_scale_by",
+            "mln_map_scale_by_animated",
+            "mln_map_rotate_by",
+            "mln_map_rotate_by_animated",
+            "mln_map_pitch_by",
+            "mln_map_pitch_by_animated",
+            "mln_map_cancel_transitions",
+            "mln_map_camera_for_lat_lng_bounds",
+            "mln_map_camera_for_lat_lngs",
+            "mln_map_camera_for_geometry",
+            "mln_map_lat_lng_bounds_for_camera",
+            "mln_map_lat_lng_bounds_for_camera_unwrapped",
+            "mln_map_get_bounds",
+            "mln_map_set_bounds",
+            "mln_map_get_free_camera_options",
+            "mln_map_set_free_camera_options",
+            "mln_map_get_projection_mode",
+            "mln_map_set_projection_mode",
+            "mln_map_pixel_for_lat_lng",
+            "mln_map_lat_lng_for_pixel",
+            "mln_map_pixels_for_lat_lngs",
+            "mln_map_lat_lngs_for_pixels",
+        ]);
+        methods.push(NativeMethod {
+            name: "mln_map_set_debug_options".into(),
+            sig: "(JI)I".into(),
+            fn_ptr: map_set_debug_options as *mut c_void,
+        });
+        methods.push(NativeMethod {
+            name: "mln_map_get_debug_options".into(),
+            sig: "(J[I)I".into(),
+            fn_ptr: map_get_debug_options as *mut c_void,
+        });
+        methods.push(NativeMethod {
+            name: "mln_map_set_rendering_stats_view_enabled".into(),
+            sig: "(JZ)I".into(),
+            fn_ptr: map_set_rendering_stats_view_enabled as *mut c_void,
+        });
+        methods.push(NativeMethod {
+            name: "mln_map_get_rendering_stats_view_enabled".into(),
+            sig: "(J[Z)I".into(),
+            fn_ptr: map_get_rendering_stats_view_enabled as *mut c_void,
+        });
+        methods.push(NativeMethod {
+            name: "mln_map_is_fully_loaded".into(),
+            sig: "(J[Z)I".into(),
+            fn_ptr: map_is_fully_loaded as *mut c_void,
+        });
+        methods.push(NativeMethod {
+            name: "mln_map_dump_debug_logs".into(),
+            sig: "(J)I".into(),
+            fn_ptr: map_dump_debug_logs as *mut c_void,
+        });
+        register_methods(
+            vm,
+            "org/maplibre/nativejni/internal/bridge/CameraNative",
             methods,
         )
     }
@@ -953,6 +982,107 @@ fn map_set_style_string(
             Err(_) => return sys::MLN_STATUS_INVALID_ARGUMENT,
         };
         unsafe { setter(map as *mut sys::mln_map, string.as_ptr()) }
+    }))
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+extern "system" fn map_set_debug_options(
+    _env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    map: jlong,
+    options: jint,
+) -> jint {
+    catch_unwind(|| unsafe {
+        sys::mln_map_set_debug_options(map as *mut sys::mln_map, options as u32)
+    })
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+extern "system" fn map_get_debug_options(
+    env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    map: jlong,
+    out_options: JIntArray<'_>,
+) -> jint {
+    catch_unwind(AssertUnwindSafe(|| {
+        if out_options.is_null() || env.get_array_length(&out_options).unwrap_or(0) < 1 {
+            return sys::MLN_STATUS_INVALID_ARGUMENT;
+        }
+        let mut options = 0_u32;
+        let result =
+            unsafe { sys::mln_map_get_debug_options(map as *mut sys::mln_map, &mut options) };
+        if result == sys::MLN_STATUS_OK
+            && env
+                .set_int_array_region(&out_options, 0, &[options as jint])
+                .is_err()
+        {
+            return sys::MLN_STATUS_INVALID_ARGUMENT;
+        }
+        result
+    }))
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+extern "system" fn map_set_rendering_stats_view_enabled(
+    _env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    map: jlong,
+    enabled: jboolean,
+) -> jint {
+    catch_unwind(|| unsafe {
+        sys::mln_map_set_rendering_stats_view_enabled(map as *mut sys::mln_map, enabled != 0)
+    })
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+extern "system" fn map_get_rendering_stats_view_enabled(
+    env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    map: jlong,
+    out_enabled: JBooleanArray<'_>,
+) -> jint {
+    map_get_bool(
+        env,
+        map,
+        out_enabled,
+        sys::mln_map_get_rendering_stats_view_enabled,
+    )
+}
+
+extern "system" fn map_is_fully_loaded(
+    env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    map: jlong,
+    out_loaded: JBooleanArray<'_>,
+) -> jint {
+    map_get_bool(env, map, out_loaded, sys::mln_map_is_fully_loaded)
+}
+
+extern "system" fn map_dump_debug_logs(_env: JNIEnv<'_>, _class: JClass<'_>, map: jlong) -> jint {
+    catch_unwind(|| unsafe { sys::mln_map_dump_debug_logs(map as *mut sys::mln_map) })
+        .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+fn map_get_bool(
+    env: JNIEnv<'_>,
+    map: jlong,
+    out_value: JBooleanArray<'_>,
+    getter: unsafe extern "C" fn(*mut sys::mln_map, *mut bool) -> sys::mln_status,
+) -> jint {
+    catch_unwind(AssertUnwindSafe(|| {
+        if out_value.is_null() || env.get_array_length(&out_value).unwrap_or(0) < 1 {
+            return sys::MLN_STATUS_INVALID_ARGUMENT;
+        }
+        let mut value = false;
+        let result = unsafe { getter(map as *mut sys::mln_map, &mut value) };
+        if result == sys::MLN_STATUS_OK
+            && env
+                .set_boolean_array_region(&out_value, 0, &[jboolean::from(value)])
+                .is_err()
+        {
+            return sys::MLN_STATUS_INVALID_ARGUMENT;
+        }
+        result
     }))
     .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
 }

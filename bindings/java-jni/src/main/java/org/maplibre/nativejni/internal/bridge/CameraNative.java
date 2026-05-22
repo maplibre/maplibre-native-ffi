@@ -20,17 +20,17 @@ public final class CameraNative {
 
   public static native int mln_map_tile_options_default();
 
-  public static native int mln_map_set_debug_options();
+  public static native int mln_map_set_debug_options(long map, int options);
 
-  public static native int mln_map_get_debug_options();
+  public static native int mln_map_get_debug_options(long map, int[] outOptions);
 
-  public static native int mln_map_set_rendering_stats_view_enabled();
+  public static native int mln_map_set_rendering_stats_view_enabled(long map, boolean enabled);
 
-  public static native int mln_map_get_rendering_stats_view_enabled();
+  public static native int mln_map_get_rendering_stats_view_enabled(long map, boolean[] outEnabled);
 
-  public static native int mln_map_is_fully_loaded();
+  public static native int mln_map_is_fully_loaded(long map, boolean[] outLoaded);
 
-  public static native int mln_map_dump_debug_logs();
+  public static native int mln_map_dump_debug_logs(long map);
 
   public static native int mln_map_get_viewport_options();
 
