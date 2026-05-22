@@ -232,6 +232,10 @@ class MapHandleTest {
         assertTrue(map.styleSourceIds().contains("vector-source"));
         assertEquals(SourceType.VECTOR, map.styleSourceType("vector-source").orElseThrow());
         assertTrue(map.removeStyleSource("vector-source"));
+        map.addVectorSourceTiles(
+            "vector-tiles-source", List.of("https://example.com/vector/{z}/{x}/{y}.pbf"));
+        assertEquals(SourceType.VECTOR, map.styleSourceType("vector-tiles-source").orElseThrow());
+        assertTrue(map.removeStyleSource("vector-tiles-source"));
         map.addRasterSourceUrl("raster-source", "https://example.com/raster.json");
         assertEquals(SourceType.RASTER, map.styleSourceType("raster-source").orElseThrow());
         SourceInfo rasterInfo = map.styleSourceInfo("raster-source").orElseThrow();
@@ -241,9 +245,18 @@ class MapHandleTest {
         assertTrue(rasterInfo.attribution().isEmpty());
         assertTrue(map.styleSourceInfo("missing-source").isEmpty());
         assertTrue(map.removeStyleSource("raster-source"));
+        map.addRasterSourceTiles(
+            "raster-tiles-source", List.of("https://example.com/raster/{z}/{x}/{y}.png"));
+        assertEquals(SourceType.RASTER, map.styleSourceType("raster-tiles-source").orElseThrow());
+        assertTrue(map.removeStyleSource("raster-tiles-source"));
         map.addRasterDemSourceUrl("raster-dem-source", "https://example.com/raster-dem.json");
         assertEquals(SourceType.RASTER_DEM, map.styleSourceType("raster-dem-source").orElseThrow());
         assertTrue(map.removeStyleSource("raster-dem-source"));
+        map.addRasterDemSourceTiles(
+            "raster-dem-tiles-source", List.of("https://example.com/dem/{z}/{x}/{y}.png"));
+        assertEquals(
+            SourceType.RASTER_DEM, map.styleSourceType("raster-dem-tiles-source").orElseThrow());
+        assertTrue(map.removeStyleSource("raster-dem-tiles-source"));
         map.setStyleJson(
             "{\"version\":8,\"sources\":{},\"layers\":[{\"id\":\"background-layer\",\"type\":\"background\"}]}");
         assertTrue(map.styleLayerExists("background-layer"));

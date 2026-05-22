@@ -53,15 +53,18 @@ public final class StyleNative {
 
   public static native int mln_map_add_vector_source_url(long map, String sourceId, String url);
 
-  public static native int mln_map_add_vector_source_tiles();
+  public static native int mln_map_add_vector_source_tiles(
+      long map, String sourceId, String[] tiles);
 
   public static native int mln_map_add_raster_source_url(long map, String sourceId, String url);
 
-  public static native int mln_map_add_raster_source_tiles();
+  public static native int mln_map_add_raster_source_tiles(
+      long map, String sourceId, String[] tiles);
 
   public static native int mln_map_add_raster_dem_source_url(long map, String sourceId, String url);
 
-  public static native int mln_map_add_raster_dem_source_tiles();
+  public static native int mln_map_add_raster_dem_source_tiles(
+      long map, String sourceId, String[] tiles);
 
   public static native int mln_map_add_custom_geometry_source();
 

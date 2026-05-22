@@ -270,9 +270,6 @@ mod registration {
             "mln_map_add_style_source_json",
             "mln_map_add_geojson_source_data",
             "mln_map_set_geojson_source_data",
-            "mln_map_add_vector_source_tiles",
-            "mln_map_add_raster_source_tiles",
-            "mln_map_add_raster_dem_source_tiles",
             "mln_map_add_custom_geometry_source",
             "mln_map_set_custom_geometry_source_tile_data",
             "mln_map_invalidate_custom_geometry_source_tile",
@@ -352,6 +349,21 @@ mod registration {
             name: "mln_map_add_raster_dem_source_url".into(),
             sig: "(JLjava/lang/String;Ljava/lang/String;)I".into(),
             fn_ptr: map_add_raster_dem_source_url as *mut c_void,
+        });
+        style_methods.push(NativeMethod {
+            name: "mln_map_add_vector_source_tiles".into(),
+            sig: "(JLjava/lang/String;[Ljava/lang/String;)I".into(),
+            fn_ptr: map_add_vector_source_tiles as *mut c_void,
+        });
+        style_methods.push(NativeMethod {
+            name: "mln_map_add_raster_source_tiles".into(),
+            sig: "(JLjava/lang/String;[Ljava/lang/String;)I".into(),
+            fn_ptr: map_add_raster_source_tiles as *mut c_void,
+        });
+        style_methods.push(NativeMethod {
+            name: "mln_map_add_raster_dem_source_tiles".into(),
+            sig: "(JLjava/lang/String;[Ljava/lang/String;)I".into(),
+            fn_ptr: map_add_raster_dem_source_tiles as *mut c_void,
         });
         style_methods.push(NativeMethod {
             name: "mln_map_add_hillshade_layer".into(),
@@ -1667,6 +1679,113 @@ extern "system" fn map_add_raster_dem_source_url(
         url,
         sys::mln_map_add_raster_dem_source_url,
     )
+}
+
+extern "system" fn map_add_vector_source_tiles(
+    env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    map: jlong,
+    source_id: JString<'_>,
+    tiles: JObjectArray<'_>,
+) -> jint {
+    map_tile_source_tiles(
+        env,
+        map,
+        source_id,
+        tiles,
+        sys::mln_map_add_vector_source_tiles,
+    )
+}
+
+extern "system" fn map_add_raster_source_tiles(
+    env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    map: jlong,
+    source_id: JString<'_>,
+    tiles: JObjectArray<'_>,
+) -> jint {
+    map_tile_source_tiles(
+        env,
+        map,
+        source_id,
+        tiles,
+        sys::mln_map_add_raster_source_tiles,
+    )
+}
+
+extern "system" fn map_add_raster_dem_source_tiles(
+    env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    map: jlong,
+    source_id: JString<'_>,
+    tiles: JObjectArray<'_>,
+) -> jint {
+    map_tile_source_tiles(
+        env,
+        map,
+        source_id,
+        tiles,
+        sys::mln_map_add_raster_dem_source_tiles,
+    )
+}
+
+fn map_tile_source_tiles(
+    mut env: JNIEnv<'_>,
+    map: jlong,
+    source_id: JString<'_>,
+    tiles: JObjectArray<'_>,
+    operation: unsafe extern "C" fn(
+        *mut sys::mln_map,
+        sys::mln_string_view,
+        *const sys::mln_string_view,
+        usize,
+        *const sys::mln_style_tile_source_options,
+    ) -> sys::mln_status,
+) -> jint {
+    catch_unwind(AssertUnwindSafe(|| {
+        if tiles.is_null() {
+            return sys::MLN_STATUS_INVALID_ARGUMENT;
+        }
+        let tile_count = match env.get_array_length(&tiles) {
+            Ok(value) if value >= 0 => value as usize,
+            _ => return sys::MLN_STATUS_INVALID_ARGUMENT,
+        };
+        let (source_id, source_id_view) = match string_view(&mut env, &source_id) {
+            Ok(value) => value,
+            Err(status) => return status,
+        };
+        let mut tile_storage = Vec::with_capacity(tile_count);
+        let mut tile_views = Vec::with_capacity(tile_count);
+        for index in 0..tile_count {
+            let tile = match env.get_object_array_element(&tiles, index as i32) {
+                Ok(value) => JString::from(value),
+                Err(_) => return sys::MLN_STATUS_INVALID_ARGUMENT,
+            };
+            let (tile_storage_value, tile_view) = match string_view(&mut env, &tile) {
+                Ok(value) => value,
+                Err(status) => return status,
+            };
+            tile_storage.push(tile_storage_value);
+            tile_views.push(tile_view);
+        }
+        let _source_id = source_id;
+        let _tile_storage = tile_storage;
+        let tile_ptr = if tile_views.is_empty() {
+            std::ptr::null()
+        } else {
+            tile_views.as_ptr()
+        };
+        unsafe {
+            operation(
+                map as *mut sys::mln_map,
+                source_id_view,
+                tile_ptr,
+                tile_views.len(),
+                std::ptr::null(),
+            )
+        }
+    }))
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
 }
 
 fn map_tile_source_url(

@@ -251,7 +251,12 @@ public final class MapHandle implements AutoCloseable {
   }
 
   public void addVectorSourceTiles(String sourceId, List<String> tiles) {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    Status.check(
+        StyleNative.mln_map_add_vector_source_tiles(
+            state.requireLiveAddress(),
+            Objects.requireNonNull(sourceId, "sourceId"),
+            stringArray(tiles, "tiles")));
   }
 
   public void addVectorSourceTiles(String sourceId, List<String> tiles, TileSourceOptions options) {
@@ -272,7 +277,12 @@ public final class MapHandle implements AutoCloseable {
   }
 
   public void addRasterSourceTiles(String sourceId, List<String> tiles) {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    Status.check(
+        StyleNative.mln_map_add_raster_source_tiles(
+            state.requireLiveAddress(),
+            Objects.requireNonNull(sourceId, "sourceId"),
+            stringArray(tiles, "tiles")));
   }
 
   public void addRasterSourceTiles(String sourceId, List<String> tiles, TileSourceOptions options) {
@@ -293,7 +303,12 @@ public final class MapHandle implements AutoCloseable {
   }
 
   public void addRasterDemSourceTiles(String sourceId, List<String> tiles) {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    Status.check(
+        StyleNative.mln_map_add_raster_dem_source_tiles(
+            state.requireLiveAddress(),
+            Objects.requireNonNull(sourceId, "sourceId"),
+            stringArray(tiles, "tiles")));
   }
 
   public void addRasterDemSourceTiles(
@@ -1266,6 +1281,13 @@ public final class MapHandle implements AutoCloseable {
       }
     }
     return new NativeOptions(fields, values);
+  }
+
+  private static String[] stringArray(List<String> values, String name) {
+    Objects.requireNonNull(values, name);
+    return values.stream()
+        .map(value -> Objects.requireNonNull(value, name + " element"))
+        .toArray(String[]::new);
   }
 
   record NativeOptions(boolean[] fields, double[] values) {}
