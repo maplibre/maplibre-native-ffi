@@ -1,5 +1,6 @@
 package org.maplibre.nativeffi.test;
 
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 import static org.lwjgl.vulkan.KHRPortabilityEnumeration.VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
 import static org.lwjgl.vulkan.KHRPortabilityEnumeration.VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME;
 import static org.lwjgl.vulkan.KHRPortabilitySubset.VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME;
@@ -21,7 +22,6 @@ import static org.lwjgl.vulkan.VK10.vkEnumeratePhysicalDevices;
 import static org.lwjgl.vulkan.VK10.vkGetDeviceQueue;
 import static org.lwjgl.vulkan.VK10.vkGetPhysicalDeviceFeatures;
 import static org.lwjgl.vulkan.VK10.vkGetPhysicalDeviceQueueFamilyProperties;
-import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 import java.lang.foreign.Arena;
 import java.lang.foreign.FunctionDescriptor;
