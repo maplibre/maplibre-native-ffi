@@ -135,7 +135,11 @@ public final class MapHandle implements AutoCloseable {
   }
 
   public List<String> styleSourceIds() {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    var outSourceIds = new Object[1];
+    Status.check(
+        StyleNative.mln_map_list_style_source_ids(state.requireLiveAddress(), outSourceIds));
+    return List.of((String[]) outSourceIds[0]);
   }
 
   public void addGeoJsonSourceUrl(String sourceId, String url) {
@@ -376,7 +380,10 @@ public final class MapHandle implements AutoCloseable {
   }
 
   public List<String> styleLayerIds() {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    var outLayerIds = new Object[1];
+    Status.check(StyleNative.mln_map_list_style_layer_ids(state.requireLiveAddress(), outLayerIds));
+    return List.of((String[]) outLayerIds[0]);
   }
 
   public void moveStyleLayer(String layerId) {

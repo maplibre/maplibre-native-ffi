@@ -134,6 +134,7 @@ class MapHandleTest {
         assertFalse(map.removeStyleSource("geojson-source"));
 
         map.addVectorSourceUrl("vector-source", "https://example.com/vector.json");
+        assertTrue(map.styleSourceIds().contains("vector-source"));
         assertEquals(SourceType.VECTOR, map.styleSourceType("vector-source").orElseThrow());
         assertTrue(map.removeStyleSource("vector-source"));
         map.addRasterSourceUrl("raster-source", "https://example.com/raster.json");
@@ -145,6 +146,7 @@ class MapHandleTest {
         map.setStyleJson(
             "{\"version\":8,\"sources\":{},\"layers\":[{\"id\":\"background-layer\",\"type\":\"background\"}]}");
         assertTrue(map.styleLayerExists("background-layer"));
+        assertTrue(map.styleLayerIds().contains("background-layer"));
         assertEquals("background", map.styleLayerType("background-layer").orElseThrow());
         assertTrue(map.styleLayerType("missing-layer").isEmpty());
         assertTrue(map.removeStyleLayer("background-layer"));

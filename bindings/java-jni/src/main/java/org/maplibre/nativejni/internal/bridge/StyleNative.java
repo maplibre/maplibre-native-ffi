@@ -35,7 +35,7 @@ public final class StyleNative {
 
   public static native int mln_map_copy_style_source_attribution();
 
-  public static native int mln_map_list_style_source_ids();
+  public static native int mln_map_list_style_source_ids(long map, Object[] outSourceIds);
 
   public static native int mln_map_add_geojson_source_url(long map, String sourceId, String url);
 
@@ -112,7 +112,7 @@ public final class StyleNative {
   public static native int mln_map_get_style_layer_type(
       long map, String layerId, String[] outLayerType, boolean[] outFound);
 
-  public static native int mln_map_list_style_layer_ids();
+  public static native int mln_map_list_style_layer_ids(long map, Object[] outLayerIds);
 
   public static native int mln_map_move_style_layer();
 

@@ -244,7 +244,6 @@ mod registration {
             "mln_map_add_style_source_json",
             "mln_map_get_style_source_info",
             "mln_map_copy_style_source_attribution",
-            "mln_map_list_style_source_ids",
             "mln_map_add_geojson_source_data",
             "mln_map_set_geojson_source_data",
             "mln_map_add_vector_source_tiles",
@@ -273,7 +272,6 @@ mod registration {
             "mln_map_set_location_indicator_accuracy_radius",
             "mln_map_set_location_indicator_image_name",
             "mln_map_add_style_layer_json",
-            "mln_map_list_style_layer_ids",
             "mln_map_move_style_layer",
             "mln_map_get_style_layer_json",
             "mln_map_set_style_light_json",
@@ -298,6 +296,11 @@ mod registration {
             name: "mln_map_get_style_source_type".into(),
             sig: "(JLjava/lang/String;[I[Z)I".into(),
             fn_ptr: map_get_style_source_type as *mut c_void,
+        });
+        style_methods.push(NativeMethod {
+            name: "mln_map_list_style_source_ids".into(),
+            sig: "(J[Ljava/lang/Object;)I".into(),
+            fn_ptr: map_list_style_source_ids as *mut c_void,
         });
         style_methods.push(NativeMethod {
             name: "mln_map_add_geojson_source_url".into(),
@@ -338,6 +341,11 @@ mod registration {
             name: "mln_map_get_style_layer_type".into(),
             sig: "(JLjava/lang/String;[Ljava/lang/String;[Z)I".into(),
             fn_ptr: map_get_style_layer_type as *mut c_void,
+        });
+        style_methods.push(NativeMethod {
+            name: "mln_map_list_style_layer_ids".into(),
+            sig: "(J[Ljava/lang/Object;)I".into(),
+            fn_ptr: map_list_style_layer_ids as *mut c_void,
         });
         register_methods(
             vm,
@@ -1211,6 +1219,15 @@ fn map_set_style_string(
     .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
 }
 
+extern "system" fn map_list_style_source_ids(
+    env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    map: jlong,
+    out_source_ids: JObjectArray<'_>,
+) -> jint {
+    map_list_style_ids(env, map, out_source_ids, sys::mln_map_list_style_source_ids)
+}
+
 extern "system" fn map_add_geojson_source_url(
     env: JNIEnv<'_>,
     _class: JClass<'_>,
@@ -1453,6 +1470,15 @@ fn map_style_source_bool(
     .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
 }
 
+extern "system" fn map_list_style_layer_ids(
+    env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    map: jlong,
+    out_layer_ids: JObjectArray<'_>,
+) -> jint {
+    map_list_style_ids(env, map, out_layer_ids, sys::mln_map_list_style_layer_ids)
+}
+
 extern "system" fn map_remove_style_layer(
     env: JNIEnv<'_>,
     _class: JClass<'_>,
@@ -1571,6 +1597,72 @@ extern "system" fn map_get_style_layer_type(
         sys::MLN_STATUS_OK
     }))
     .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+fn map_list_style_ids(
+    mut env: JNIEnv<'_>,
+    map: jlong,
+    out_ids: JObjectArray<'_>,
+    list_function: unsafe extern "C" fn(
+        *mut sys::mln_map,
+        *mut *mut sys::mln_style_id_list,
+    ) -> sys::mln_status,
+) -> jint {
+    catch_unwind(AssertUnwindSafe(|| {
+        if out_ids.is_null() || env.get_array_length(&out_ids).unwrap_or(0) < 1 {
+            return sys::MLN_STATUS_INVALID_ARGUMENT;
+        }
+        let mut list: *mut sys::mln_style_id_list = std::ptr::null_mut();
+        let result = unsafe { list_function(map as *mut sys::mln_map, &mut list) };
+        if result != sys::MLN_STATUS_OK {
+            return result;
+        }
+        let list_guard = StyleIdListGuard(list);
+        let mut count = 0_usize;
+        let result = unsafe { sys::mln_style_id_list_count(list_guard.0, &mut count) };
+        if result != sys::MLN_STATUS_OK {
+            return result;
+        }
+        let string_class = match env.find_class("java/lang/String") {
+            Ok(value) => value,
+            Err(_) => return sys::MLN_STATUS_INVALID_ARGUMENT,
+        };
+        let ids = match env.new_object_array(count as i32, string_class, JObject::null()) {
+            Ok(value) => value,
+            Err(_) => return sys::MLN_STATUS_INVALID_ARGUMENT,
+        };
+        for index in 0..count {
+            let mut id = sys::mln_string_view {
+                data: std::ptr::null(),
+                size: 0,
+            };
+            let result = unsafe { sys::mln_style_id_list_get(list_guard.0, index, &mut id) };
+            if result != sys::MLN_STATUS_OK {
+                return result;
+            }
+            if set_string_array_element(&env, &ids, index as i32, unsafe {
+                copy_string(id.data, id.size)
+            })
+            .is_err()
+            {
+                return sys::MLN_STATUS_INVALID_ARGUMENT;
+            }
+        }
+        if env.set_object_array_element(&out_ids, 0, &ids).is_err() {
+            sys::MLN_STATUS_INVALID_ARGUMENT
+        } else {
+            sys::MLN_STATUS_OK
+        }
+    }))
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+struct StyleIdListGuard(*mut sys::mln_style_id_list);
+
+impl Drop for StyleIdListGuard {
+    fn drop(&mut self) {
+        unsafe { sys::mln_style_id_list_destroy(self.0) }
+    }
 }
 
 fn string_view(
