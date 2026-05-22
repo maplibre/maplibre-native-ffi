@@ -20,7 +20,8 @@ public final class StyleNative {
 
   public static native int mln_style_id_list_destroy();
 
-  public static native int mln_map_add_style_source_json();
+  public static native int mln_map_add_style_source_json(
+      long map, String sourceId, org.maplibre.nativejni.json.JsonValue sourceJson);
 
   public static native int mln_map_remove_style_source(
       long map, String sourceId, boolean[] outRemoved);
@@ -184,7 +185,8 @@ public final class StyleNative {
   public static native int mln_map_set_location_indicator_image_name(
       long map, String layerId, int imageKind, String imageId);
 
-  public static native int mln_map_add_style_layer_json();
+  public static native int mln_map_add_style_layer_json(
+      long map, org.maplibre.nativejni.json.JsonValue layerJson, String beforeLayerId);
 
   public static native int mln_map_remove_style_layer(
       long map, String layerId, boolean[] outRemoved);
@@ -201,17 +203,21 @@ public final class StyleNative {
 
   public static native int mln_map_get_style_layer_json();
 
-  public static native int mln_map_set_style_light_json();
+  public static native int mln_map_set_style_light_json(
+      long map, org.maplibre.nativejni.json.JsonValue lightJson);
 
-  public static native int mln_map_set_style_light_property();
+  public static native int mln_map_set_style_light_property(
+      long map, String propertyName, org.maplibre.nativejni.json.JsonValue value);
 
   public static native int mln_map_get_style_light_property();
 
-  public static native int mln_map_set_layer_property();
+  public static native int mln_map_set_layer_property(
+      long map, String layerId, String propertyName, org.maplibre.nativejni.json.JsonValue value);
 
   public static native int mln_map_get_layer_property();
 
-  public static native int mln_map_set_layer_filter();
+  public static native int mln_map_set_layer_filter(
+      long map, String layerId, org.maplibre.nativejni.json.JsonValue filter);
 
   public static native int mln_map_get_layer_filter();
 }

@@ -23,6 +23,7 @@ import org.maplibre.nativejni.geo.Quaternion;
 import org.maplibre.nativejni.geo.ScreenPoint;
 import org.maplibre.nativejni.geo.Vec3;
 import org.maplibre.nativejni.internal.access.InternalAccess;
+import org.maplibre.nativejni.json.JsonValue;
 import org.maplibre.nativejni.render.PremultipliedRgba8Image;
 import org.maplibre.nativejni.runtime.RuntimeHandle;
 import org.maplibre.nativejni.style.LocationIndicatorImageKind;
@@ -303,6 +304,19 @@ class MapHandleTest {
         map.setGeoJsonSourceUrl("geojson-source", "https://example.com/updated.geojson");
         assertTrue(map.removeStyleSource("geojson-source"));
         assertFalse(map.removeStyleSource("geojson-source"));
+        map.addStyleSourceJson(
+            "json-geojson-source",
+            JsonValue.object(
+                List.of(
+                    new JsonValue.Member("type", JsonValue.of("geojson")),
+                    new JsonValue.Member(
+                        "data",
+                        JsonValue.object(
+                            List.of(
+                                new JsonValue.Member("type", JsonValue.of("FeatureCollection")),
+                                new JsonValue.Member("features", JsonValue.array(List.of()))))))));
+        assertEquals(SourceType.GEOJSON, map.styleSourceType("json-geojson-source").orElseThrow());
+        assertTrue(map.removeStyleSource("json-geojson-source"));
 
         map.addVectorSourceUrl(
             "vector-source",
@@ -378,6 +392,36 @@ class MapHandleTest {
         map.setStyleJson(
             "{\"version\":8,\"sources\":{},\"layers\":[{\"id\":\"background-layer\",\"type\":\"background\"}]}");
         assertTrue(map.styleLayerExists("background-layer"));
+        map.addStyleLayerJson(
+            JsonValue.object(
+                List.of(
+                    new JsonValue.Member("id", JsonValue.of("json-background-layer")),
+                    new JsonValue.Member("type", JsonValue.of("background")))));
+        assertEquals("background", map.styleLayerType("json-background-layer").orElseThrow());
+        map.setLayerProperty("json-background-layer", "background-color", JsonValue.of("#ff0000"));
+        map.addVectorSourceUrl("json-vector-source", "https://example.com/vector.json");
+        map.addStyleLayerJson(
+            JsonValue.object(
+                List.of(
+                    new JsonValue.Member("id", JsonValue.of("json-circle-layer")),
+                    new JsonValue.Member("type", JsonValue.of("circle")),
+                    new JsonValue.Member("source", JsonValue.of("json-vector-source")),
+                    new JsonValue.Member("source-layer", JsonValue.of("pois")))));
+        map.setLayerFilter(
+            "json-circle-layer",
+            JsonValue.array(
+                List.of(
+                    JsonValue.of("=="),
+                    JsonValue.array(List.of(JsonValue.of("get"), JsonValue.of("kind"))),
+                    JsonValue.of("park"))));
+        map.clearLayerFilter("json-circle-layer");
+        map.setStyleLightJson(
+            JsonValue.object(
+                List.of(
+                    new JsonValue.Member("anchor", JsonValue.of("viewport")),
+                    new JsonValue.Member("color", JsonValue.of("white")),
+                    new JsonValue.Member("intensity", JsonValue.of(0.4)))));
+        map.setStyleLightProperty("intensity", JsonValue.of(0.6));
         assertTrue(map.styleLayerIds().contains("background-layer"));
         assertEquals("background", map.styleLayerType("background-layer").orElseThrow());
         map.addRasterDemSourceUrl("dem-source", "https://example.com/dem.json");

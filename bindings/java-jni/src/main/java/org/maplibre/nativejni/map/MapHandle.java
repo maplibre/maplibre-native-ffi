@@ -109,7 +109,12 @@ public final class MapHandle implements AutoCloseable {
   }
 
   public void addStyleSourceJson(String sourceId, JsonValue sourceJson) {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    Status.check(
+        StyleNative.mln_map_add_style_source_json(
+            state.requireLiveAddress(),
+            Objects.requireNonNull(sourceId, "sourceId"),
+            Objects.requireNonNull(sourceJson, "sourceJson")));
   }
 
   public boolean removeStyleSource(String sourceId) {
@@ -513,11 +518,16 @@ public final class MapHandle implements AutoCloseable {
   }
 
   public void addStyleLayerJson(JsonValue layerJson) {
-    throw unsupported();
+    addStyleLayerJson(layerJson, "");
   }
 
   public void addStyleLayerJson(JsonValue layerJson, String beforeLayerId) {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    Status.check(
+        StyleNative.mln_map_add_style_layer_json(
+            state.requireLiveAddress(),
+            Objects.requireNonNull(layerJson, "layerJson"),
+            Objects.requireNonNull(beforeLayerId, "beforeLayerId")));
   }
 
   public void addHillshadeLayer(String layerId, String sourceId) {
@@ -654,11 +664,19 @@ public final class MapHandle implements AutoCloseable {
   }
 
   public void setStyleLightJson(JsonValue lightJson) {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    Status.check(
+        StyleNative.mln_map_set_style_light_json(
+            state.requireLiveAddress(), Objects.requireNonNull(lightJson, "lightJson")));
   }
 
   public void setStyleLightProperty(String propertyName, JsonValue value) {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    Status.check(
+        StyleNative.mln_map_set_style_light_property(
+            state.requireLiveAddress(),
+            Objects.requireNonNull(propertyName, "propertyName"),
+            Objects.requireNonNull(value, "value")));
   }
 
   public Optional<JsonValue> styleLightProperty(String propertyName) {
@@ -666,7 +684,13 @@ public final class MapHandle implements AutoCloseable {
   }
 
   public void setLayerProperty(String layerId, String propertyName, JsonValue value) {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    Status.check(
+        StyleNative.mln_map_set_layer_property(
+            state.requireLiveAddress(),
+            Objects.requireNonNull(layerId, "layerId"),
+            Objects.requireNonNull(propertyName, "propertyName"),
+            Objects.requireNonNull(value, "value")));
   }
 
   public Optional<JsonValue> layerProperty(String layerId, String propertyName) {
@@ -674,11 +698,19 @@ public final class MapHandle implements AutoCloseable {
   }
 
   public void setLayerFilter(String layerId, JsonValue filter) {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    Status.check(
+        StyleNative.mln_map_set_layer_filter(
+            state.requireLiveAddress(),
+            Objects.requireNonNull(layerId, "layerId"),
+            Objects.requireNonNull(filter, "filter")));
   }
 
   public void clearLayerFilter(String layerId) {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    Status.check(
+        StyleNative.mln_map_set_layer_filter(
+            state.requireLiveAddress(), Objects.requireNonNull(layerId, "layerId"), null));
   }
 
   public Optional<JsonValue> layerFilter(String layerId) {
