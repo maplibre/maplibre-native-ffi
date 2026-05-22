@@ -9,13 +9,13 @@ public final class MapNative {
   public static native int mln_map_create(
       long runtime, int width, int height, double scaleFactor, int mapMode, long[] outMap);
 
-  public static native int mln_map_request_repaint();
+  public static native int mln_map_request_repaint(long map);
 
-  public static native int mln_map_request_still_image();
+  public static native int mln_map_request_still_image(long map);
 
   public static native int mln_map_destroy(long map);
 
-  public static native int mln_map_set_style_url();
+  public static native int mln_map_set_style_url(long map, String url);
 
-  public static native int mln_map_set_style_json();
+  public static native int mln_map_set_style_json(long map, String json);
 }

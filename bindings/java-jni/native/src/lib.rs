@@ -3,11 +3,11 @@
 //! This crate owns JNI registration and delegates shared ABI adaptation to the
 //! Rust binding crates.
 
-use std::ffi::c_void;
+use std::ffi::{CString, c_void};
 use std::panic::{AssertUnwindSafe, catch_unwind};
 
 use jni::objects::{
-    JBooleanArray, JClass, JDoubleArray, JIntArray, JLongArray, JObject, JObjectArray,
+    JBooleanArray, JClass, JDoubleArray, JIntArray, JLongArray, JObject, JObjectArray, JString,
 };
 use jni::sys::{JNI_VERSION_1_8, jboolean, jint, jlong, jstring};
 use jni::{JNIEnv, JavaVM, NativeMethod};
@@ -419,13 +419,7 @@ mod registration {
     }
 
     fn register_map(vm: &JavaVM) -> jni::errors::Result<()> {
-        let mut methods = no_arg_status_methods(&[
-            "mln_map_options_default",
-            "mln_map_request_repaint",
-            "mln_map_request_still_image",
-            "mln_map_set_style_url",
-            "mln_map_set_style_json",
-        ]);
+        let mut methods = no_arg_status_methods(&["mln_map_options_default"]);
         methods.push(NativeMethod {
             name: "mln_map_create".into(),
             sig: "(JIIDI[J)I".into(),
@@ -435,6 +429,26 @@ mod registration {
             name: "mln_map_destroy".into(),
             sig: "(J)I".into(),
             fn_ptr: map_destroy as *mut c_void,
+        });
+        methods.push(NativeMethod {
+            name: "mln_map_request_repaint".into(),
+            sig: "(J)I".into(),
+            fn_ptr: map_request_repaint as *mut c_void,
+        });
+        methods.push(NativeMethod {
+            name: "mln_map_request_still_image".into(),
+            sig: "(J)I".into(),
+            fn_ptr: map_request_still_image as *mut c_void,
+        });
+        methods.push(NativeMethod {
+            name: "mln_map_set_style_url".into(),
+            sig: "(JLjava/lang/String;)I".into(),
+            fn_ptr: map_set_style_url as *mut c_void,
+        });
+        methods.push(NativeMethod {
+            name: "mln_map_set_style_json".into(),
+            sig: "(JLjava/lang/String;)I".into(),
+            fn_ptr: map_set_style_json as *mut c_void,
         });
         register_methods(
             vm,
@@ -886,6 +900,61 @@ extern "system" fn map_create(
 extern "system" fn map_destroy(_env: JNIEnv<'_>, _class: JClass<'_>, map: jlong) -> jint {
     catch_unwind(|| unsafe { sys::mln_map_destroy(map as *mut sys::mln_map) })
         .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+extern "system" fn map_request_repaint(_env: JNIEnv<'_>, _class: JClass<'_>, map: jlong) -> jint {
+    catch_unwind(|| unsafe { sys::mln_map_request_repaint(map as *mut sys::mln_map) })
+        .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+extern "system" fn map_request_still_image(
+    _env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    map: jlong,
+) -> jint {
+    catch_unwind(|| unsafe { sys::mln_map_request_still_image(map as *mut sys::mln_map) })
+        .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+extern "system" fn map_set_style_url(
+    env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    map: jlong,
+    url: JString<'_>,
+) -> jint {
+    map_set_style_string(env, map, url, sys::mln_map_set_style_url)
+}
+
+extern "system" fn map_set_style_json(
+    env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    map: jlong,
+    json: JString<'_>,
+) -> jint {
+    map_set_style_string(env, map, json, sys::mln_map_set_style_json)
+}
+
+fn map_set_style_string(
+    mut env: JNIEnv<'_>,
+    map: jlong,
+    value: JString<'_>,
+    setter: unsafe extern "C" fn(*mut sys::mln_map, *const std::os::raw::c_char) -> sys::mln_status,
+) -> jint {
+    catch_unwind(AssertUnwindSafe(|| {
+        if value.is_null() {
+            return sys::MLN_STATUS_INVALID_ARGUMENT;
+        }
+        let java_string = match env.get_string(&value) {
+            Ok(value) => value,
+            Err(_) => return sys::MLN_STATUS_INVALID_ARGUMENT,
+        };
+        let string = match CString::new(String::from(java_string)) {
+            Ok(value) => value,
+            Err(_) => return sys::MLN_STATUS_INVALID_ARGUMENT,
+        };
+        unsafe { setter(map as *mut sys::mln_map, string.as_ptr()) }
+    }))
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
 }
 
 extern "system" fn projection_create(

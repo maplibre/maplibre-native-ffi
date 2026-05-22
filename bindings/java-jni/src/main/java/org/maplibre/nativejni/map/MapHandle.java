@@ -75,11 +75,15 @@ public final class MapHandle implements AutoCloseable {
   }
 
   public void setStyleUrl(String url) {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    Status.check(
+        MapNative.mln_map_set_style_url(state.requireLiveAddress(), Objects.requireNonNull(url)));
   }
 
   public void setStyleJson(String json) {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    Status.check(
+        MapNative.mln_map_set_style_json(state.requireLiveAddress(), Objects.requireNonNull(json)));
   }
 
   public void addStyleSourceJson(String sourceId, JsonValue sourceJson) {
@@ -373,11 +377,13 @@ public final class MapHandle implements AutoCloseable {
   }
 
   public void requestRepaint() {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    Status.check(MapNative.mln_map_request_repaint(state.requireLiveAddress()));
   }
 
   public void requestStillImage() {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    Status.check(MapNative.mln_map_request_still_image(state.requireLiveAddress()));
   }
 
   public void setDebugOptions(Set<DebugOption> options) {

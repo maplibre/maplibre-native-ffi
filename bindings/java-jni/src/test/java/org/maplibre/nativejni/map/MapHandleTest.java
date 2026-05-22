@@ -33,4 +33,16 @@ class MapHandleTest {
       assertThrows(InvalidStateException.class, () -> map.nativeAddress(InternalAccess.INSTANCE));
     }
   }
+
+  @Test
+  void basicStyleAndRenderRequestsCrossNativeBoundary() {
+    try (var runtime = RuntimeHandle.create()) {
+      try (var map = MapHandle.create(runtime, new MapOptions().size(64, 64))) {
+        map.setStyleJson("{\"version\":8,\"sources\":{},\"layers\":[]}");
+        map.setStyleUrl("https://example.com/style.json");
+        map.requestRepaint();
+        assertThrows(InvalidStateException.class, map::requestStillImage);
+      }
+    }
+  }
 }
