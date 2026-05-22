@@ -5,6 +5,7 @@
 
 use std::ffi::{CString, c_char, c_void};
 use std::panic::{AssertUnwindSafe, catch_unwind};
+use std::ptr::NonNull;
 
 use jni::objects::{
     JBooleanArray, JByteArray, JClass, JDoubleArray, JIntArray, JLongArray, JObject, JObjectArray,
@@ -305,10 +306,6 @@ mod registration {
             "mln_map_set_custom_geometry_source_tile_data",
             "mln_map_invalidate_custom_geometry_source_tile",
             "mln_map_invalidate_custom_geometry_source_region",
-            "mln_map_get_style_layer_json",
-            "mln_map_get_style_light_property",
-            "mln_map_get_layer_property",
-            "mln_map_get_layer_filter",
         ]);
         style_methods.push(NativeMethod {
             name: "mln_map_remove_style_source".into(),
@@ -525,6 +522,26 @@ mod registration {
             name: "mln_map_set_layer_filter".into(),
             sig: "(JLjava/lang/String;Lorg/maplibre/nativejni/json/JsonValue;)I".into(),
             fn_ptr: map_set_layer_filter as *mut c_void,
+        });
+        style_methods.push(NativeMethod {
+            name: "mln_map_get_style_layer_json".into(),
+            sig: "(JLjava/lang/String;[Ljava/lang/Object;[Z)I".into(),
+            fn_ptr: map_get_style_layer_json as *mut c_void,
+        });
+        style_methods.push(NativeMethod {
+            name: "mln_map_get_style_light_property".into(),
+            sig: "(JLjava/lang/String;[Ljava/lang/Object;)I".into(),
+            fn_ptr: map_get_style_light_property as *mut c_void,
+        });
+        style_methods.push(NativeMethod {
+            name: "mln_map_get_layer_property".into(),
+            sig: "(JLjava/lang/String;Ljava/lang/String;[Ljava/lang/Object;)I".into(),
+            fn_ptr: map_get_layer_property as *mut c_void,
+        });
+        style_methods.push(NativeMethod {
+            name: "mln_map_get_layer_filter".into(),
+            sig: "(JLjava/lang/String;[Ljava/lang/Object;)I".into(),
+            fn_ptr: map_get_layer_filter as *mut c_void,
         });
         register_methods(
             vm,
@@ -3468,6 +3485,117 @@ extern "system" fn map_set_layer_filter<'local>(
     .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
 }
 
+extern "system" fn map_get_style_layer_json<'local>(
+    mut env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    map: jlong,
+    layer_id: JString<'local>,
+    out_json: JObjectArray<'local>,
+    out_found: JBooleanArray<'local>,
+) -> jint {
+    catch_unwind(AssertUnwindSafe(|| {
+        if out_json.is_null()
+            || out_found.is_null()
+            || env.get_array_length(&out_json).unwrap_or(0) < 1
+            || env.get_array_length(&out_found).unwrap_or(0) < 1
+        {
+            return sys::MLN_STATUS_INVALID_ARGUMENT;
+        }
+        let (_layer_id, layer_id) = match string_view(&mut env, &layer_id) {
+            Ok(value) => value,
+            Err(status) => return status,
+        };
+        let mut snapshot: *mut sys::mln_json_snapshot = std::ptr::null_mut();
+        let mut found = false;
+        let result = unsafe {
+            sys::mln_map_get_style_layer_json(
+                map as *mut sys::mln_map,
+                layer_id,
+                &mut snapshot,
+                &mut found,
+            )
+        };
+        if result != sys::MLN_STATUS_OK {
+            return result;
+        }
+        if env
+            .set_boolean_array_region(&out_found, 0, &[jboolean::from(found)])
+            .is_err()
+        {
+            return sys::MLN_STATUS_INVALID_ARGUMENT;
+        }
+        if found {
+            copy_json_snapshot_to_array(&mut env, snapshot, &out_json)
+        } else {
+            sys::MLN_STATUS_OK
+        }
+    }))
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+extern "system" fn map_get_style_light_property<'local>(
+    mut env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    map: jlong,
+    property_name: JString<'local>,
+    out_json: JObjectArray<'local>,
+) -> jint {
+    catch_unwind(AssertUnwindSafe(|| {
+        let (_property_name, property_name) = match string_view(&mut env, &property_name) {
+            Ok(value) => value,
+            Err(status) => return status,
+        };
+        copy_json_snapshot_property_to_array(&mut env, &out_json, |out| unsafe {
+            sys::mln_map_get_style_light_property(map as *mut sys::mln_map, property_name, out)
+        })
+    }))
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+extern "system" fn map_get_layer_property<'local>(
+    mut env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    map: jlong,
+    layer_id: JString<'local>,
+    property_name: JString<'local>,
+    out_json: JObjectArray<'local>,
+) -> jint {
+    catch_unwind(AssertUnwindSafe(|| {
+        let (layer_id_storage, layer_id) = match string_view(&mut env, &layer_id) {
+            Ok(value) => value,
+            Err(status) => return status,
+        };
+        let (property_name_storage, property_name) = match string_view(&mut env, &property_name) {
+            Ok(value) => value,
+            Err(status) => return status,
+        };
+        let _keep_alive = (layer_id_storage, property_name_storage);
+        copy_json_snapshot_property_to_array(&mut env, &out_json, |out| unsafe {
+            sys::mln_map_get_layer_property(map as *mut sys::mln_map, layer_id, property_name, out)
+        })
+    }))
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+extern "system" fn map_get_layer_filter<'local>(
+    mut env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    map: jlong,
+    layer_id: JString<'local>,
+    out_json: JObjectArray<'local>,
+) -> jint {
+    catch_unwind(AssertUnwindSafe(|| {
+        let (_layer_id, layer_id) = match string_view(&mut env, &layer_id) {
+            Ok(value) => value,
+            Err(status) => return status,
+        };
+        copy_json_snapshot_property_to_array(&mut env, &out_json, |out| unsafe {
+            sys::mln_map_get_layer_filter(map as *mut sys::mln_map, layer_id, out)
+        })
+    }))
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
 extern "system" fn map_remove_style_layer(
     env: JNIEnv<'_>,
     _class: JClass<'_>,
@@ -3652,6 +3780,158 @@ impl Drop for StyleIdListGuard {
     fn drop(&mut self) {
         unsafe { sys::mln_style_id_list_destroy(self.0) }
     }
+}
+
+fn copy_json_snapshot_property_to_array<'local>(
+    env: &mut JNIEnv<'local>,
+    out_json: &JObjectArray<'local>,
+    get_snapshot: impl FnOnce(*mut *mut sys::mln_json_snapshot) -> sys::mln_status,
+) -> jint {
+    if out_json.is_null() || env.get_array_length(out_json).unwrap_or(0) < 1 {
+        return sys::MLN_STATUS_INVALID_ARGUMENT;
+    }
+    let mut snapshot: *mut sys::mln_json_snapshot = std::ptr::null_mut();
+    let result = get_snapshot(&mut snapshot);
+    if result != sys::MLN_STATUS_OK {
+        return result;
+    }
+    copy_json_snapshot_to_array(env, snapshot, out_json)
+}
+
+fn copy_json_snapshot_to_array<'local>(
+    env: &mut JNIEnv<'local>,
+    snapshot: *mut sys::mln_json_snapshot,
+    out_json: &JObjectArray<'local>,
+) -> jint {
+    let value = unsafe { core_json::copy_json_snapshot(NonNull::new(snapshot)) };
+    let value = match value {
+        Ok(value) => value,
+        Err(_) => return sys::MLN_STATUS_INVALID_ARGUMENT,
+    };
+    let Some(value) = value else {
+        return sys::MLN_STATUS_OK;
+    };
+    let value = match java_json_value_object(env, &value) {
+        Ok(value) => value,
+        Err(status) => return status,
+    };
+    if env.set_object_array_element(out_json, 0, value).is_err() {
+        sys::MLN_STATUS_INVALID_ARGUMENT
+    } else {
+        sys::MLN_STATUS_OK
+    }
+}
+
+fn java_json_value_object<'local>(
+    env: &mut JNIEnv<'local>,
+    value: &core_json::JsonValue,
+) -> Result<JObject<'local>, jint> {
+    match value {
+        core_json::JsonValue::Null => env
+            .get_static_field(
+                "org/maplibre/nativejni/json/JsonValue$Null",
+                "INSTANCE",
+                "Lorg/maplibre/nativejni/json/JsonValue$Null;",
+            )
+            .and_then(|value| value.l())
+            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT),
+        core_json::JsonValue::Bool(value) => env
+            .new_object(
+                "org/maplibre/nativejni/json/JsonValue$Bool",
+                "(Z)V",
+                &[JValue::Bool(jboolean::from(*value))],
+            )
+            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT),
+        core_json::JsonValue::UInt(value) => env
+            .new_object(
+                "org/maplibre/nativejni/json/JsonValue$UInt",
+                "(J)V",
+                &[JValue::Long(*value as jlong)],
+            )
+            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT),
+        core_json::JsonValue::Int(value) => env
+            .new_object(
+                "org/maplibre/nativejni/json/JsonValue$Int",
+                "(J)V",
+                &[JValue::Long(*value as jlong)],
+            )
+            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT),
+        core_json::JsonValue::Double(value) => env
+            .new_object(
+                "org/maplibre/nativejni/json/JsonValue$DoubleValue",
+                "(D)V",
+                &[JValue::Double(*value)],
+            )
+            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT),
+        core_json::JsonValue::String(value) => {
+            let value = env
+                .new_string(value)
+                .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
+            env.new_object(
+                "org/maplibre/nativejni/json/JsonValue$StringValue",
+                "(Ljava/lang/String;)V",
+                &[JValue::Object(&value)],
+            )
+            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)
+        }
+        core_json::JsonValue::Array(values) => {
+            let list = java_array_list(env)?;
+            for value in values {
+                let value = java_json_value_object(env, value)?;
+                java_array_list_add(env, &list, &value)?;
+            }
+            env.new_object(
+                "org/maplibre/nativejni/json/JsonValue$Array",
+                "(Ljava/util/List;)V",
+                &[JValue::Object(&list)],
+            )
+            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)
+        }
+        core_json::JsonValue::Object(members) => {
+            let list = java_array_list(env)?;
+            for member in members {
+                let key = env
+                    .new_string(&member.key)
+                    .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
+                let value = java_json_value_object(env, &member.value)?;
+                let member = env
+                    .new_object(
+                        "org/maplibre/nativejni/json/JsonValue$Member",
+                        "(Ljava/lang/String;Lorg/maplibre/nativejni/json/JsonValue;)V",
+                        &[JValue::Object(&key), JValue::Object(&value)],
+                    )
+                    .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
+                java_array_list_add(env, &list, &member)?;
+            }
+            env.new_object(
+                "org/maplibre/nativejni/json/JsonValue$ObjectValue",
+                "(Ljava/util/List;)V",
+                &[JValue::Object(&list)],
+            )
+            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)
+        }
+        _ => Err(sys::MLN_STATUS_INVALID_ARGUMENT),
+    }
+}
+
+fn java_array_list<'local>(env: &mut JNIEnv<'local>) -> Result<JObject<'local>, jint> {
+    env.new_object("java/util/ArrayList", "()V", &[])
+        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)
+}
+
+fn java_array_list_add<'local>(
+    env: &mut JNIEnv<'local>,
+    list: &JObject<'local>,
+    value: &JObject<'local>,
+) -> Result<(), jint> {
+    env.call_method(
+        list,
+        "add",
+        "(Ljava/lang/Object;)Z",
+        &[JValue::Object(value)],
+    )
+    .map(|_| ())
+    .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)
 }
 
 fn java_native_json_value<'local>(

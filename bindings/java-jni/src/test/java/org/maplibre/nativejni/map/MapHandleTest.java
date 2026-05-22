@@ -398,7 +398,10 @@ class MapHandleTest {
                     new JsonValue.Member("id", JsonValue.of("json-background-layer")),
                     new JsonValue.Member("type", JsonValue.of("background")))));
         assertEquals("background", map.styleLayerType("json-background-layer").orElseThrow());
+        assertTrue(map.styleLayerJson("json-background-layer").isPresent());
+        assertTrue(map.styleLayerJson("missing-layer").isEmpty());
         map.setLayerProperty("json-background-layer", "background-color", JsonValue.of("#ff0000"));
+        assertTrue(map.layerProperty("json-background-layer", "background-color").isPresent());
         map.addVectorSourceUrl("json-vector-source", "https://example.com/vector.json");
         map.addStyleLayerJson(
             JsonValue.object(
@@ -414,6 +417,7 @@ class MapHandleTest {
                     JsonValue.of("=="),
                     JsonValue.array(List.of(JsonValue.of("get"), JsonValue.of("kind"))),
                     JsonValue.of("park"))));
+        assertTrue(map.layerFilter("json-circle-layer").isPresent());
         map.clearLayerFilter("json-circle-layer");
         map.setStyleLightJson(
             JsonValue.object(
@@ -422,6 +426,7 @@ class MapHandleTest {
                     new JsonValue.Member("color", JsonValue.of("white")),
                     new JsonValue.Member("intensity", JsonValue.of(0.4)))));
         map.setStyleLightProperty("intensity", JsonValue.of(0.6));
+        assertTrue(map.styleLightProperty("intensity").isPresent());
         assertTrue(map.styleLayerIds().contains("background-layer"));
         assertEquals("background", map.styleLayerType("background-layer").orElseThrow());
         map.addRasterDemSourceUrl("dem-source", "https://example.com/dem.json");

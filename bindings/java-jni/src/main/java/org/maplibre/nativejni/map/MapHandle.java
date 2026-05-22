@@ -660,7 +660,16 @@ public final class MapHandle implements AutoCloseable {
   }
 
   public Optional<JsonValue> styleLayerJson(String layerId) {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    var outJson = new Object[1];
+    var outFound = new boolean[1];
+    Status.check(
+        StyleNative.mln_map_get_style_layer_json(
+            state.requireLiveAddress(),
+            Objects.requireNonNull(layerId, "layerId"),
+            outJson,
+            outFound));
+    return outFound[0] ? Optional.of((JsonValue) outJson[0]) : Optional.empty();
   }
 
   public void setStyleLightJson(JsonValue lightJson) {
@@ -680,7 +689,14 @@ public final class MapHandle implements AutoCloseable {
   }
 
   public Optional<JsonValue> styleLightProperty(String propertyName) {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    var outJson = new Object[1];
+    Status.check(
+        StyleNative.mln_map_get_style_light_property(
+            state.requireLiveAddress(),
+            Objects.requireNonNull(propertyName, "propertyName"),
+            outJson));
+    return Optional.ofNullable((JsonValue) outJson[0]);
   }
 
   public void setLayerProperty(String layerId, String propertyName, JsonValue value) {
@@ -694,7 +710,15 @@ public final class MapHandle implements AutoCloseable {
   }
 
   public Optional<JsonValue> layerProperty(String layerId, String propertyName) {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    var outJson = new Object[1];
+    Status.check(
+        StyleNative.mln_map_get_layer_property(
+            state.requireLiveAddress(),
+            Objects.requireNonNull(layerId, "layerId"),
+            Objects.requireNonNull(propertyName, "propertyName"),
+            outJson));
+    return Optional.ofNullable((JsonValue) outJson[0]);
   }
 
   public void setLayerFilter(String layerId, JsonValue filter) {
@@ -714,7 +738,12 @@ public final class MapHandle implements AutoCloseable {
   }
 
   public Optional<JsonValue> layerFilter(String layerId) {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    var outJson = new Object[1];
+    Status.check(
+        StyleNative.mln_map_get_layer_filter(
+            state.requireLiveAddress(), Objects.requireNonNull(layerId, "layerId"), outJson));
+    return Optional.ofNullable((JsonValue) outJson[0]);
   }
 
   public RenderSessionHandle attachMetalOwnedTexture(MetalOwnedTextureDescriptor descriptor) {
