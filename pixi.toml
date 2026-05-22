@@ -24,7 +24,7 @@ RUSTFLAGS = "-C link-arg=-Wl,-rpath,$CONDA_PREFIX/lib -C link-arg=-Wl,-rpath,$ML
 [target.linux.activation.env]
 LD_LIBRARY_PATH = "$CONDA_PREFIX/lib"
 MLN_FFI_SYSTEM_ROOT = "$CONDA_BUILD_SYSROOT"
-RUSTFLAGS = "-C link-arg=-Wl,-rpath,$CONDA_PREFIX/lib -C link-arg=-Wl,-rpath-link,$CONDA_PREFIX/lib -C link-arg=-Wl,-rpath,$MLN_FFI_BUILD_DIR"
+RUSTFLAGS = "-C link-arg=-Wl,-rpath,$CONDA_PREFIX/lib -C link-arg=-Wl,-rpath-link,$CONDA_PREFIX/lib -C link-arg=-Wl,-rpath,$MLN_FFI_BUILD_DIR -C link-arg=-Wl,--allow-shlib-undefined"
 
 [target.osx.activation.env]
 MLN_FFI_SYSTEM_ROOT = "$SDKROOT"

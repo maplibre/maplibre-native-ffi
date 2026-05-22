@@ -26,24 +26,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
     println!("cargo:rustc-link-lib=dylib=maplibre-native-c");
 
-    let render_backend = env::var("MLN_FFI_RENDER_BACKEND").unwrap_or_default();
-    let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap_or_default();
-    if render_backend == "opengl" && target_os == "linux" {
-        // libmaplibre-native-c.so carries DT_NEEDED=libGLESv2.so.2.  The
-        // conda/pixi linker doesn't search system multiarch paths by default,
-        // so we add it explicitly and link libGLESv2 directly.  libgles-dev
-        // (installed in CI) provides the unversioned libGLESv2.so symlink.
-        // cargo:rustc-link-search and cargo:rustc-link-lib both propagate
-        // to dependent crate test binaries, unlike cargo:rustc-link-arg.
-        let arch = env::var("CARGO_CFG_TARGET_ARCH").unwrap_or_default();
-        let multiarch = if arch == "aarch64" {
-            "aarch64-linux-gnu"
-        } else {
-            "x86_64-linux-gnu"
-        };
-        println!("cargo:rustc-link-search=native=/usr/lib/{multiarch}");
-        println!("cargo:rustc-link-lib=dylib=GLESv2");
-    }
+    // Note: on Linux with the OpenGL render backend, libmaplibre-native-c.so
+    // carries DT_NEEDED=libGLESv2.so.2.  The conda/pixi linker is strict about
+    // undefined symbols in shared libs.  We tell it to relax via
+    // --allow-shlib-undefined, set in RUSTFLAGS in pixi.toml so it is present
+    // in every link invocation.
 
     let bindings = bindgen::Builder::default()
         .header(header.display().to_string())
