@@ -1,0 +1,5 @@
+[tasks.build]
+run = "dotnet build Maplibre.Native.slnx"
+
+[tasks.ci]
+depends = [":build"]
