@@ -55,9 +55,10 @@ The package root is `org.maplibre.nativejni`. The Java module is
 Record JNI-only differences here. Keep the `None` row only when Java JNI
 intentionally mirrors Java FFM and the public C ABI for all supported features.
 
-| Item | Difference or omission | Reason | User-visible behavior | Tests/docs impact |
-| ---- | ---------------------- | ------ | --------------------- | ----------------- |
-| None | None known.            | N/A    | N/A                   | N/A               |
+| Item                                         | Difference or omission                     | Reason                                                                                                                            | User-visible behavior                                                                                                                                                          | Tests/docs impact                                                                                                          |
+| -------------------------------------------- | ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------- |
+| JVM native distribution packaging            | Out of scope for this implementation pass. | Existing bindings currently build, test, and support local examples without published per-platform native distribution artifacts. | JVM users load the locally built JNI bridge through `org.maplibre.nativejni.library.path`, `MAPLIBRE_NATIVE_JNI_LIBRARY_PATH`, or `System.loadLibrary("maplibre-native-jni")`. | Local JVM build, native build, and loader tests cover the supported path.                                                  |
+| Android/AAR packaging and Android load tests | Out of scope for this implementation pass. | The repository does not yet define an Android packaging target or supported Android ABI test runner for this binding.             | Android artifacts are not produced by `bindings/java-jni`; Android load behavior is not claimed for this pass.                                                                 | The completion checklist records Android packaging and load tests as unsupported until an Android packaging target exists. |
 
 ## Current scaffold
 
@@ -87,12 +88,12 @@ placeholders. The scaffold implements one proof slice:
 
 Implement these artifacts:
 
-| Artifact                | Path                          | Contents                                                                         |
-| ----------------------- | ----------------------------- | -------------------------------------------------------------------------------- |
-| Java jar                | `bindings/java-jni`           | Public Java API, internal native declarations, loader, tests.                    |
-| JNI bridge              | `bindings/java-jni/native`    | Rust `cdylib` using `jni-rs`, `maplibre-native-core`, and `maplibre-native-sys`. |
-| JVM native distribution | TBD under `bindings/java-jni` | Platform JNI libraries for supported desktop/server JVM triples.                 |
-| Android distribution    | TBD under `bindings/java-jni` | AAR-compatible native library layout for supported Android ABIs.                 |
+| Artifact                | Path                       | Contents                                                                         |
+| ----------------------- | -------------------------- | -------------------------------------------------------------------------------- |
+| Java jar                | `bindings/java-jni`        | Public Java API, internal native declarations, loader, tests.                    |
+| JNI bridge              | `bindings/java-jni/native` | Rust `cdylib` using `jni-rs`, `maplibre-native-core`, and `maplibre-native-sys`. |
+| JVM native distribution | Out of scope               | Use the local native bridge build and loader paths for this pass.                |
+| Android distribution    | Out of scope               | AAR-compatible native library layout requires a future Android packaging target. |
 
 Implement these tasks:
 
@@ -683,9 +684,10 @@ Add JNI-specific tests:
    completion.
 9. Implement render sessions, surface and texture descriptors, readback,
    `NativeBuffer`, and owned texture frame handles.
-10. Add JVM native packaging and Android packaging.
-11. Mark all items complete before changing the PR from draft to ready for
-    review.
+10. Verify local JVM native loading/build integration parity and record
+    packaging omissions.
+11. Mark all in-scope items complete before changing the PR from draft to ready
+    for review.
 
 ## Completion checklist
 
@@ -696,10 +698,12 @@ Add JNI-specific tests:
 - [ ] Every C API function listed in the native method coverage map has a JNI
       implementation or a recorded unsupported reason in the differences table.
 - [ ] Java JNI tests pass on supported JVM host variants.
-- [ ] Android load tests pass on supported Android ABI variants.
+- [ ] JVM native distribution packaging and Android/AAR packaging/load tests are
+      recorded as out of scope until packaging targets exist.
 - [ ] `mise run //bindings/java-jni:build` passes.
 - [ ] `mise run //bindings/java-jni:native:build` passes.
 - [ ] `cargo test -p maplibre-native-jni` passes.
 - [ ] `./gradlew :bindings:java-jni:javadoc` passes.
 - [ ] Kotlin common facade compatibility has been checked against the Kotlin
       binding conventions when the facade is available.
+- [ ] Local JVM native loading works through the documented loader paths.
