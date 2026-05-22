@@ -258,7 +258,9 @@ auto to_native_offline_region_definition(
       const auto& geometry = definition.data.geometry;
       auto native_geometry = mln::core::to_native_geometry(geometry.geometry);
       if (!native_geometry) {
-        std::terminate();
+        throw std::logic_error(
+          "offline geometry definition failed after validation"
+        );
       }
       return mbgl::OfflineGeometryRegionDefinition{
         std::string{geometry.style_url},
@@ -270,7 +272,9 @@ auto to_native_offline_region_definition(
       };
     }
     default:
-      std::terminate();
+      throw std::logic_error(
+        "offline region definition type failed after validation"
+      );
   }
 }
 
@@ -1110,7 +1114,9 @@ auto run_ambient_cache_operation_start(
           database->clearAmbientCache(std::move(callback));
           break;
         default:
-          std::terminate();
+          throw std::logic_error(
+            "ambient cache operation failed after validation"
+          );
       }
     }
   );

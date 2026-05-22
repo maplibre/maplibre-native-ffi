@@ -97,6 +97,8 @@ auto FileSourceManager::get() noexcept -> FileSourceManager* {
       );
       return true;
     } catch (...) {
+      // This overrides MapLibre's noexcept get(), so initialization failures
+      // cannot be reported without changing its error-handling contract.
       std::terminate();
     }
   }();
