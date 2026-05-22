@@ -111,6 +111,16 @@ const BOUND_VALUE_MIN_PITCH: usize = 6;
 const BOUND_VALUE_MAX_PITCH: usize = 7;
 const BOUND_VALUE_COUNT: usize = 8;
 
+const PROJECTION_MODE_FIELD_AXONOMETRIC: usize = 0;
+const PROJECTION_MODE_FIELD_X_SKEW: usize = 1;
+const PROJECTION_MODE_FIELD_Y_SKEW: usize = 2;
+const PROJECTION_MODE_FIELD_COUNT: usize = 3;
+const PROJECTION_MODE_BOOLEAN_AXONOMETRIC: usize = 0;
+const PROJECTION_MODE_BOOLEAN_COUNT: usize = 1;
+const PROJECTION_MODE_VALUE_X_SKEW: usize = 0;
+const PROJECTION_MODE_VALUE_Y_SKEW: usize = 1;
+const PROJECTION_MODE_VALUE_COUNT: usize = 2;
+
 const ANIMATION_FIELD_DURATION: usize = 0;
 const ANIMATION_FIELD_VELOCITY: usize = 1;
 const ANIMATION_FIELD_MIN_ZOOM: usize = 2;
@@ -547,8 +557,6 @@ mod registration {
             "mln_map_lat_lng_bounds_for_camera_unwrapped",
             "mln_map_get_free_camera_options",
             "mln_map_set_free_camera_options",
-            "mln_map_get_projection_mode",
-            "mln_map_set_projection_mode",
         ]);
         methods.push(NativeMethod {
             name: "mln_map_set_debug_options".into(),
@@ -579,6 +587,16 @@ mod registration {
             name: "mln_map_dump_debug_logs".into(),
             sig: "(J)I".into(),
             fn_ptr: map_dump_debug_logs as *mut c_void,
+        });
+        methods.push(NativeMethod {
+            name: "mln_map_get_projection_mode".into(),
+            sig: "(J[Z[Z[D)I".into(),
+            fn_ptr: map_get_projection_mode as *mut c_void,
+        });
+        methods.push(NativeMethod {
+            name: "mln_map_set_projection_mode".into(),
+            sig: "(J[Z[Z[D)I".into(),
+            fn_ptr: map_set_projection_mode as *mut c_void,
         });
         methods.push(NativeMethod {
             name: "mln_map_get_bounds".into(),
@@ -1796,6 +1814,47 @@ extern "system" fn map_dump_debug_logs(_env: JNIEnv<'_>, _class: JClass<'_>, map
         .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
 }
 
+extern "system" fn map_get_projection_mode(
+    env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    map: jlong,
+    out_fields: JBooleanArray<'_>,
+    out_booleans: JBooleanArray<'_>,
+    out_values: JDoubleArray<'_>,
+) -> jint {
+    catch_unwind(AssertUnwindSafe(|| {
+        if !projection_mode_arrays_are_valid(&env, &out_fields, &out_booleans, &out_values) {
+            return sys::MLN_STATUS_INVALID_ARGUMENT;
+        }
+        let mut mode = unsafe { sys::mln_projection_mode_default() };
+        let result =
+            unsafe { sys::mln_map_get_projection_mode(map as *mut sys::mln_map, &mut mode) };
+        if result != sys::MLN_STATUS_OK {
+            return result;
+        }
+        write_projection_mode_arrays(&env, &out_fields, &out_booleans, &out_values, &mode)
+    }))
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+extern "system" fn map_set_projection_mode(
+    env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    map: jlong,
+    fields: JBooleanArray<'_>,
+    booleans: JBooleanArray<'_>,
+    values: JDoubleArray<'_>,
+) -> jint {
+    catch_unwind(AssertUnwindSafe(|| {
+        let mode = match read_projection_mode(&env, &fields, &booleans, &values) {
+            Ok(mode) => mode,
+            Err(status) => return status,
+        };
+        unsafe { sys::mln_map_set_projection_mode(map as *mut sys::mln_map, &mode) }
+    }))
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
 extern "system" fn map_get_bounds(
     env: JNIEnv<'_>,
     _class: JClass<'_>,
@@ -1963,6 +2022,20 @@ fn camera_arrays_are_valid(
         && env.get_array_length(values).unwrap_or(0) >= CAMERA_VALUE_COUNT as i32
 }
 
+fn projection_mode_arrays_are_valid(
+    env: &JNIEnv<'_>,
+    fields: &JBooleanArray<'_>,
+    booleans: &JBooleanArray<'_>,
+    values: &JDoubleArray<'_>,
+) -> bool {
+    !fields.is_null()
+        && !booleans.is_null()
+        && !values.is_null()
+        && env.get_array_length(fields).unwrap_or(0) >= PROJECTION_MODE_FIELD_COUNT as i32
+        && env.get_array_length(booleans).unwrap_or(0) >= PROJECTION_MODE_BOOLEAN_COUNT as i32
+        && env.get_array_length(values).unwrap_or(0) >= PROJECTION_MODE_VALUE_COUNT as i32
+}
+
 fn bound_arrays_are_valid(
     env: &JNIEnv<'_>,
     fields: &JBooleanArray<'_>,
@@ -1983,6 +2056,76 @@ fn animation_arrays_are_valid(
         && !values.is_null()
         && env.get_array_length(fields).unwrap_or(0) >= ANIMATION_FIELD_COUNT as i32
         && env.get_array_length(values).unwrap_or(0) >= ANIMATION_VALUE_COUNT as i32
+}
+
+fn read_projection_mode(
+    env: &JNIEnv<'_>,
+    fields: &JBooleanArray<'_>,
+    booleans: &JBooleanArray<'_>,
+    values: &JDoubleArray<'_>,
+) -> Result<sys::mln_projection_mode, jint> {
+    if !projection_mode_arrays_are_valid(env, fields, booleans, values) {
+        return Err(sys::MLN_STATUS_INVALID_ARGUMENT);
+    }
+    let mut field_values = [0 as jboolean; PROJECTION_MODE_FIELD_COUNT];
+    let mut boolean_values = [0 as jboolean; PROJECTION_MODE_BOOLEAN_COUNT];
+    let mut option_values = [0.0_f64; PROJECTION_MODE_VALUE_COUNT];
+    if env
+        .get_boolean_array_region(fields, 0, &mut field_values)
+        .is_err()
+        || env
+            .get_boolean_array_region(booleans, 0, &mut boolean_values)
+            .is_err()
+        || env
+            .get_double_array_region(values, 0, &mut option_values)
+            .is_err()
+    {
+        return Err(sys::MLN_STATUS_INVALID_ARGUMENT);
+    }
+    let mut mode = unsafe { sys::mln_projection_mode_default() };
+    if field_values[PROJECTION_MODE_FIELD_AXONOMETRIC] != 0 {
+        mode.fields |= sys::MLN_PROJECTION_MODE_AXONOMETRIC;
+        mode.axonometric = boolean_values[PROJECTION_MODE_BOOLEAN_AXONOMETRIC] != 0;
+    }
+    if field_values[PROJECTION_MODE_FIELD_X_SKEW] != 0 {
+        mode.fields |= sys::MLN_PROJECTION_MODE_X_SKEW;
+        mode.x_skew = option_values[PROJECTION_MODE_VALUE_X_SKEW];
+    }
+    if field_values[PROJECTION_MODE_FIELD_Y_SKEW] != 0 {
+        mode.fields |= sys::MLN_PROJECTION_MODE_Y_SKEW;
+        mode.y_skew = option_values[PROJECTION_MODE_VALUE_Y_SKEW];
+    }
+    Ok(mode)
+}
+
+fn write_projection_mode_arrays(
+    env: &JNIEnv<'_>,
+    fields: &JBooleanArray<'_>,
+    booleans: &JBooleanArray<'_>,
+    values: &JDoubleArray<'_>,
+    mode: &sys::mln_projection_mode,
+) -> jint {
+    let field_values = [
+        jboolean::from(mode.fields & sys::MLN_PROJECTION_MODE_AXONOMETRIC != 0),
+        jboolean::from(mode.fields & sys::MLN_PROJECTION_MODE_X_SKEW != 0),
+        jboolean::from(mode.fields & sys::MLN_PROJECTION_MODE_Y_SKEW != 0),
+    ];
+    let boolean_values = [jboolean::from(mode.axonometric)];
+    let option_values = [mode.x_skew, mode.y_skew];
+    if env
+        .set_boolean_array_region(fields, 0, &field_values)
+        .is_err()
+        || env
+            .set_boolean_array_region(booleans, 0, &boolean_values)
+            .is_err()
+        || env
+            .set_double_array_region(values, 0, &option_values)
+            .is_err()
+    {
+        sys::MLN_STATUS_INVALID_ARGUMENT
+    } else {
+        sys::MLN_STATUS_OK
+    }
 }
 
 fn read_bound_options(

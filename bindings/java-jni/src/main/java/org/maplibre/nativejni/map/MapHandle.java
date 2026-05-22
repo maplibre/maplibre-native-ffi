@@ -51,6 +51,9 @@ public final class MapHandle implements AutoCloseable {
   static final int CAMERA_VALUE_COUNT = 14;
   private static final int BOUND_FIELD_COUNT = 5;
   private static final int BOUND_VALUE_COUNT = 8;
+  private static final int PROJECTION_MODE_FIELD_COUNT = 3;
+  private static final int PROJECTION_MODE_BOOLEAN_COUNT = 1;
+  private static final int PROJECTION_MODE_VALUE_COUNT = 2;
   private static final int ANIMATION_FIELD_COUNT = 4;
   private static final int ANIMATION_VALUE_COUNT = 7;
 
@@ -811,11 +814,31 @@ public final class MapHandle implements AutoCloseable {
   }
 
   public ProjectionModeOptions projectionMode() {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    var fields = new boolean[PROJECTION_MODE_FIELD_COUNT];
+    var booleans = new boolean[PROJECTION_MODE_BOOLEAN_COUNT];
+    var values = new double[PROJECTION_MODE_VALUE_COUNT];
+    Status.check(
+        CameraNative.mln_map_get_projection_mode(
+            state.requireLiveAddress(), fields, booleans, values));
+    return projectionModeFromNative(fields, booleans, values);
   }
 
   public void setProjectionMode(ProjectionModeOptions mode) {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    Objects.requireNonNull(mode, "mode");
+    var fields = new boolean[PROJECTION_MODE_FIELD_COUNT];
+    var booleans = new boolean[PROJECTION_MODE_BOOLEAN_COUNT];
+    var values = new double[PROJECTION_MODE_VALUE_COUNT];
+    fields[0] = mode.hasAxonometric();
+    booleans[0] = mode.hasAxonometric() && mode.axonometric();
+    fields[1] = mode.hasXSkew();
+    values[0] = mode.hasXSkew() ? mode.xSkew() : 0;
+    fields[2] = mode.hasYSkew();
+    values[1] = mode.hasYSkew() ? mode.ySkew() : 0;
+    Status.check(
+        CameraNative.mln_map_set_projection_mode(
+            state.requireLiveAddress(), fields, booleans, values));
   }
 
   public ScreenPoint pixelForLatLng(LatLng coordinate) {
@@ -987,6 +1010,21 @@ public final class MapHandle implements AutoCloseable {
       options.maxPitch(values[7]);
     }
     return options;
+  }
+
+  private static ProjectionModeOptions projectionModeFromNative(
+      boolean[] fields, boolean[] booleans, double[] values) {
+    var mode = new ProjectionModeOptions();
+    if (fields[0]) {
+      mode.axonometric(booleans[0]);
+    }
+    if (fields[1]) {
+      mode.xSkew(values[0]);
+    }
+    if (fields[2]) {
+      mode.ySkew(values[1]);
+    }
+    return mode;
   }
 
   private static NativeOptions animationToNative(AnimationOptions animation, boolean hasAnimation) {

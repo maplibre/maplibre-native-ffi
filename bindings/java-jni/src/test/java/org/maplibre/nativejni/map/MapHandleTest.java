@@ -97,6 +97,23 @@ class MapHandleTest {
   }
 
   @Test
+  void projectionModeCrossNativeBoundary() {
+    try (var runtime = RuntimeHandle.create()) {
+      try (var map = MapHandle.create(runtime, new MapOptions().size(64, 64))) {
+        map.setProjectionMode(new ProjectionModeOptions().axonometric(true).xSkew(0.25).ySkew(0.5));
+
+        var mode = map.projectionMode();
+        assertTrue(mode.hasAxonometric());
+        assertTrue(mode.axonometric());
+        assertTrue(mode.hasXSkew());
+        assertEquals(0.25, mode.xSkew(), 1.0e-9);
+        assertTrue(mode.hasYSkew());
+        assertEquals(0.5, mode.ySkew(), 1.0e-9);
+      }
+    }
+  }
+
+  @Test
   void cameraBoundsCrossNativeBoundary() {
     try (var runtime = RuntimeHandle.create()) {
       try (var map = MapHandle.create(runtime, new MapOptions().size(64, 64))) {
