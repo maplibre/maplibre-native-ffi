@@ -31,9 +31,11 @@ use winit::event_loop::EventLoop;
 use winit::platform::windows::EventLoopBuilderExtWindows;
 #[cfg(target_os = "linux")]
 use winit::platform::x11::EventLoopBuilderExtX11;
+use winit::raw_window_handle::HasWindowHandle;
+#[cfg(target_os = "windows")]
+use winit::raw_window_handle::RawWindowHandle;
 #[cfg(target_os = "windows")]
 use winit::raw_window_handle::Win32WindowHandle;
-use winit::raw_window_handle::{HasWindowHandle, RawWindowHandle};
 use winit::window::{Window, WindowAttributes};
 
 use super::*;
