@@ -104,7 +104,7 @@ jobs:
           path: .
       - name: Install EGL/GLES2 runtime libraries (Linux OpenGL only)
         if: ${{ contains(inputs.variant, 'opengl') && runner.os == 'Linux' }}
-        run: sudo apt-get update -y && sudo apt-get install -y --no-install-recommends libgles2 libegl-mesa0 libegl1 libgl1-mesa-dri
+        run: sudo apt-get update -y && sudo apt-get install -y --no-install-recommends libgles-dev libgles2 libegl-mesa0 libegl1 libgl1-mesa-dri
       - name: Run binding task
         env:
           # OpenGL on Linux: surfaceless EGL + Mesa llvmpipe for headless CI rendering.

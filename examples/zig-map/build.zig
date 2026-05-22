@@ -85,6 +85,12 @@ fn addZigMapExample(b: *std.Build, options: BuildOptions) *std.Build.Step.Compil
                 else => "/usr/lib/x86_64-linux-gnu",
             };
             example.root_module.addLibraryPath(.{ .cwd_relative = arch_lib });
+            // libegl-dev installs EGL/KHR headers to /usr/include, which the
+            // pixi/conda sysroot does not contain.  Add it as a lower-priority
+            // system include so Zig translate-c can find EGL/egl.h without
+            // shadowing the sysroot's glibc headers (sysroot is added first
+            // by linkRenderBackend -> addPlatformSystemPaths above).
+            example.root_module.addSystemIncludePath(.{ .cwd_relative = "/usr/include" });
         }
         example.root_module.linkSystemLibrary("EGL", .{});
     } else {
