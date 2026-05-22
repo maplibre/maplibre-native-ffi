@@ -104,9 +104,11 @@ public final class CameraNative {
 
   public static native int mln_map_set_projection_mode();
 
-  public static native int mln_map_pixel_for_lat_lng();
+  public static native int mln_map_pixel_for_lat_lng(
+      long map, double latitude, double longitude, double[] outPoint);
 
-  public static native int mln_map_lat_lng_for_pixel();
+  public static native int mln_map_lat_lng_for_pixel(
+      long map, double x, double y, double[] outCoordinate);
 
   public static native int mln_map_pixels_for_lat_lngs();
 

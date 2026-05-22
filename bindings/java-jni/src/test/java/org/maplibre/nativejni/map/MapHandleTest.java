@@ -73,6 +73,13 @@ class MapHandleTest {
         assertTrue(camera.hasZoom());
         assertEquals(3, camera.zoom(), 0.000001);
 
+        var point = map.pixelForLatLng(camera.center());
+        assertTrue(Double.isFinite(point.x()));
+        assertTrue(Double.isFinite(point.y()));
+        var coordinate = map.latLngForPixel(point);
+        assertTrue(Double.isFinite(coordinate.latitude()));
+        assertTrue(Double.isFinite(coordinate.longitude()));
+
         var animation = new AnimationOptions().durationMs(0);
         map.easeTo(new CameraOptions().zoom(4), animation);
         map.flyTo(new CameraOptions().zoom(3), animation);

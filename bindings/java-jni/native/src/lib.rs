@@ -481,8 +481,6 @@ mod registration {
             "mln_map_set_free_camera_options",
             "mln_map_get_projection_mode",
             "mln_map_set_projection_mode",
-            "mln_map_pixel_for_lat_lng",
-            "mln_map_lat_lng_for_pixel",
             "mln_map_pixels_for_lat_lngs",
             "mln_map_lat_lngs_for_pixels",
         ]);
@@ -580,6 +578,16 @@ mod registration {
             name: "mln_map_cancel_transitions".into(),
             sig: "(J)I".into(),
             fn_ptr: map_cancel_transitions as *mut c_void,
+        });
+        methods.push(NativeMethod {
+            name: "mln_map_pixel_for_lat_lng".into(),
+            sig: "(JDD[D)I".into(),
+            fn_ptr: map_pixel_for_lat_lng as *mut c_void,
+        });
+        methods.push(NativeMethod {
+            name: "mln_map_lat_lng_for_pixel".into(),
+            sig: "(JDD[D)I".into(),
+            fn_ptr: map_lat_lng_for_pixel as *mut c_void,
         });
         register_methods(
             vm,
@@ -1710,6 +1718,54 @@ extern "system" fn map_cancel_transitions(
 ) -> jint {
     catch_unwind(|| unsafe { sys::mln_map_cancel_transitions(map as *mut sys::mln_map) })
         .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+extern "system" fn map_pixel_for_lat_lng(
+    env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    map: jlong,
+    latitude: f64,
+    longitude: f64,
+    out_point: JDoubleArray<'_>,
+) -> jint {
+    projection_get_double_pair(env, out_point, |out| unsafe {
+        let mut point = sys::mln_screen_point { x: 0.0, y: 0.0 };
+        let result = sys::mln_map_pixel_for_lat_lng(
+            map as *mut sys::mln_map,
+            sys::mln_lat_lng {
+                latitude,
+                longitude,
+            },
+            &mut point,
+        );
+        out[0] = point.x;
+        out[1] = point.y;
+        result
+    })
+}
+
+extern "system" fn map_lat_lng_for_pixel(
+    env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    map: jlong,
+    x: f64,
+    y: f64,
+    out_coordinate: JDoubleArray<'_>,
+) -> jint {
+    projection_get_double_pair(env, out_coordinate, |out| unsafe {
+        let mut coordinate = sys::mln_lat_lng {
+            latitude: 0.0,
+            longitude: 0.0,
+        };
+        let result = sys::mln_map_lat_lng_for_pixel(
+            map as *mut sys::mln_map,
+            sys::mln_screen_point { x, y },
+            &mut coordinate,
+        );
+        out[0] = coordinate.latitude;
+        out[1] = coordinate.longitude;
+        result
+    })
 }
 
 extern "system" fn projection_create(
