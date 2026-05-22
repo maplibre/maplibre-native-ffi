@@ -186,6 +186,16 @@ public final class RenderSessionHandle implements AutoCloseable {
 
   public void resize(int width, int height, double scaleFactor) {
     NativeAccess.ensureLoaded();
+    if (width < 0 || height < 0) {
+      throw new InvalidArgumentException(
+          MapLibreNativeC.MLN_STATUS_INVALID_ARGUMENT(),
+          "render target width and height must be non-negative");
+    }
+    if (!Double.isFinite(scaleFactor) || scaleFactor <= 0.0) {
+      throw new InvalidArgumentException(
+          MapLibreNativeC.MLN_STATUS_INVALID_ARGUMENT(),
+          "render target scale factor must be positive and finite");
+    }
     Status.check(
         MapLibreNativeC.mln_render_session_resize(state.requireLive(), width, height, scaleFactor));
   }

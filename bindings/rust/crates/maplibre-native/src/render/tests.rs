@@ -8,7 +8,7 @@ use ash::vk::Handle;
 use glow::HasContext;
 use glutin::config::ConfigTemplateBuilder;
 #[cfg(target_os = "linux")]
-use glutin::config::{AsRawConfig, RawConfig};
+use glutin::config::{AsRawConfig, ConfigSurfaceTypes, RawConfig};
 #[cfg(any(target_os = "windows", target_os = "linux"))]
 use glutin::context::{AsRawContext, RawContext};
 use glutin::context::{ContextApi, ContextAttributesBuilder, PossiblyCurrentContext, Version};
@@ -220,6 +220,10 @@ impl OpenGLTestContext {
             .with_alpha_size(8)
             .with_depth_size(24)
             .with_stencil_size(8);
+        #[cfg(target_os = "linux")]
+        let template = template
+            .with_surface_type(ConfigSurfaceTypes::WINDOW | ConfigSurfaceTypes::PBUFFER)
+            .with_pbuffer_sizes(NonZeroU32::new(8).unwrap(), NonZeroU32::new(8).unwrap());
         let (window, config) = DisplayBuilder::new()
             .with_preference(opengl_api_preference())
             .with_window_attributes(Some(window_attributes))

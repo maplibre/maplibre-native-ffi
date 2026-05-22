@@ -307,6 +307,7 @@
 
 # include/maplibre_native_c/render_target.h
 --include-constant MLN_OPENGL_CONTEXT_PLATFORM_EGL
+--include-constant MLN_OPENGL_CONTEXT_PLATFORM_UNSPECIFIED
 --include-constant MLN_OPENGL_CONTEXT_PLATFORM_WGL
 --include-constant MLN_OPENGL_CONTEXT_PROVIDER_FLAG_EGL
 --include-constant MLN_OPENGL_CONTEXT_PROVIDER_FLAG_WGL

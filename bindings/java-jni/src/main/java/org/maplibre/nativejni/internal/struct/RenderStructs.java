@@ -3,6 +3,7 @@ package org.maplibre.nativejni.internal.struct;
 import java.util.Objects;
 import org.maplibre.nativejni.internal.javacpp.JavaCppSupport;
 import org.maplibre.nativejni.internal.javacpp.MaplibreNativeC;
+import org.maplibre.nativejni.internal.status.Status;
 import org.maplibre.nativejni.render.EglContextDescriptor;
 import org.maplibre.nativejni.render.MetalBorrowedTextureDescriptor;
 import org.maplibre.nativejni.render.MetalContextDescriptor;
@@ -74,6 +75,14 @@ public final class RenderStructs {
 
   public static ExtentValue extent(RenderTargetExtent extent) {
     Objects.requireNonNull(extent, "extent");
+    if (extent.width() < 0 || extent.height() < 0) {
+      JavaCppSupport.setThreadDiagnostic("render target width and height must be non-negative");
+      Status.check(MaplibreNativeC.MLN_STATUS_INVALID_ARGUMENT);
+    }
+    if (!Double.isFinite(extent.scaleFactor()) || extent.scaleFactor() <= 0.0) {
+      JavaCppSupport.setThreadDiagnostic("render target scale factor must be positive and finite");
+      Status.check(MaplibreNativeC.MLN_STATUS_INVALID_ARGUMENT);
+    }
     return new ExtentValue(extent.width(), extent.height(), extent.scaleFactor());
   }
 

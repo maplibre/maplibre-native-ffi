@@ -14,6 +14,7 @@ import org.maplibre.nativeffi.camera.BoundOptions;
 import org.maplibre.nativeffi.camera.CameraFitOptions;
 import org.maplibre.nativeffi.camera.CameraOptions;
 import org.maplibre.nativeffi.camera.FreeCameraOptions;
+import org.maplibre.nativeffi.error.InvalidArgumentException;
 import org.maplibre.nativeffi.internal.c.MapLibreNativeC;
 import org.maplibre.nativeffi.internal.c.mln_animation_options;
 import org.maplibre.nativeffi.internal.c.mln_bound_options;
@@ -39,6 +40,11 @@ public final class MapStructs {
 
   public static MemorySegment mapOptions(MapOptions options, Arena arena) {
     var segment = MapLibreNativeC.mln_map_options_default(arena);
+    if ((options.width() != null && options.width() < 0)
+        || (options.height() != null && options.height() < 0)) {
+      throw new InvalidArgumentException(
+          MapLibreNativeC.MLN_STATUS_INVALID_ARGUMENT(), "width and height must be non-negative");
+    }
     if (options.width() != null) {
       mln_map_options.width(segment, options.width());
     }

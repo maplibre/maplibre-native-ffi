@@ -2,6 +2,7 @@ package org.maplibre.nativeffi.internal.struct;
 
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
+import org.maplibre.nativeffi.error.InvalidArgumentException;
 import org.maplibre.nativeffi.internal.c.MapLibreNativeC;
 import org.maplibre.nativeffi.internal.c.mln_egl_context_descriptor;
 import org.maplibre.nativeffi.internal.c.mln_metal_borrowed_texture_descriptor;
@@ -157,10 +158,20 @@ public final class RenderStructs {
   }
 
   private static void fillExtent(MemorySegment segment, RenderTargetExtent extent) {
+    if (extent.width() < 0 || extent.height() < 0) {
+      throw invalidArgument("render target width and height must be non-negative");
+    }
+    if (!Double.isFinite(extent.scaleFactor()) || extent.scaleFactor() <= 0.0) {
+      throw invalidArgument("render target scale factor must be positive and finite");
+    }
     mln_render_target_extent.size(segment, (int) mln_render_target_extent.sizeof());
     mln_render_target_extent.width(segment, extent.width());
     mln_render_target_extent.height(segment, extent.height());
     mln_render_target_extent.scale_factor(segment, extent.scaleFactor());
+  }
+
+  private static InvalidArgumentException invalidArgument(String diagnostic) {
+    return new InvalidArgumentException(MapLibreNativeC.MLN_STATUS_INVALID_ARGUMENT(), diagnostic);
   }
 
   private static void fillMetalContext(MemorySegment segment, MetalContextDescriptor context) {
