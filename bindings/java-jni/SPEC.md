@@ -129,6 +129,12 @@ ResourceRequestHandle
 Descriptor classes, records, enums, events, JSON trees, and render target types
 mirror Java FFM unless JNI requires a concrete representation difference.
 
+Kotlin Multiplatform shared declarations may wrap this Java JNI artifact as a
+JVM or Android actual implementation. The Java JNI public surface therefore
+stays alignable with Java FFM and Kotlin common names, copied values, exception
+semantics, and ownership rules. Coroutine, Android UI-thread, and higher-level
+scheduler policy remain above this low-level binding.
+
 Public APIs do not expose `JNIEnv`, `JavaVM`, `jclass`, `jobject`, raw JNI
 references, Rust `jni` crate types, generated method tables, or raw `long`
 handles. Raw native addresses appear only as `NativePointer`, a borrowed opaque
@@ -232,6 +238,16 @@ Resource provider callbacks create copied Java `ResourceRequest` values.
 Completion may occur during the callback or later from another thread when the C
 API permits it.
 
+Resource transform callbacks keep any C-borrowed response storage alive until
+native code has consumed it. Per-thread response scratch storage closes on the
+next callback for that thread and during runtime teardown.
+
+Custom geometry source callbacks track active upcalls. Replacing or removing a
+custom geometry source prevents new upcalls, then delays global-reference and
+native-state release until in-flight callbacks have returned. Java callbacks
+that need map methods hand work back to the map owner thread before calling
+thread-affine APIs.
+
 When replacing callback state, install the replacement native descriptor first.
 If installation fails, release the replacement and keep the previous callback
 active.
@@ -303,6 +319,11 @@ Generated outputs:
 - coverage reports listing public C API functions, generated declarations, and
   implemented public wrappers.
 
+Generated coverage becomes a CI check before the binding is considered feature
+complete. The report distinguishes unsupported C API features, intentionally
+internal bridge helpers, generated-but-unwrapped native methods, and completed
+public wrappers.
+
 Curated outputs:
 
 - public Java classes, records, enums, descriptors, callbacks, and handles;
@@ -327,6 +348,9 @@ adaptation invariants:
 - Java exception containment inside callbacks;
 - resource request one-shot completion;
 - frame handle invalidation;
+- resource transform response storage lifetime;
+- custom geometry active-upcall teardown;
+- generated coverage report completeness;
 - Android class-loader and thread-attach behavior where Android tests run.
 
 C ABI tests remain the source of truth for native behavior. JNI tests prove that
