@@ -52,11 +52,15 @@ public final class TextureNative {
   public static native int mln_texture_read_premultiplied_rgba8(
       long session, byte[] outData, int[] outInfo, long[] outByteLength);
 
-  public static native int mln_metal_owned_texture_acquire_frame();
+  public static native int mln_metal_owned_texture_acquire_frame(
+      long session, long[] outLongs, int[] outInts, double[] outDoubles);
 
-  public static native int mln_metal_owned_texture_release_frame();
+  public static native int mln_metal_owned_texture_release_frame(
+      long session, long[] longs, int[] ints, double[] doubles);
 
-  public static native int mln_vulkan_owned_texture_acquire_frame();
+  public static native int mln_vulkan_owned_texture_acquire_frame(
+      long session, long[] outLongs, int[] outInts, double[] outDoubles);
 
-  public static native int mln_vulkan_owned_texture_release_frame();
+  public static native int mln_vulkan_owned_texture_release_frame(
+      long session, long[] longs, int[] ints, double[] doubles);
 }

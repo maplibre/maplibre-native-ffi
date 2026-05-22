@@ -1,7 +1,5 @@
 package org.maplibre.nativejni.render;
 
-import java.lang.foreign.Arena;
-import java.lang.foreign.MemorySegment;
 import java.util.Objects;
 
 /**
@@ -9,27 +7,28 @@ import java.util.Objects;
  *
  * <p>This is an advanced API for render integrations that must submit GPU work and release the
  * MapLibre-owned texture only after that work no longer samples it. The frame and its native
- * pointers stay valid until {@link #close()}. Callers must synchronize GPU use before closing the
- * handle, close it on the render session owner thread, and close it before resizing, rendering
- * another update, detaching, or closing the render session.
+ * pointers stay valid until {@link #close()}.
  */
 public final class MetalOwnedTextureFrameHandle implements AutoCloseable {
   private final RenderSessionHandle session;
-  private final Arena arena;
-  private final MemorySegment frameSegment;
+  private final long[] longs;
+  private final int[] ints;
+  private final double[] doubles;
   private final FrameScope scope;
   private final MetalOwnedTextureFrame frame;
   private boolean closed;
 
   MetalOwnedTextureFrameHandle(
       RenderSessionHandle session,
-      Arena arena,
-      MemorySegment frameSegment,
+      long[] longs,
+      int[] ints,
+      double[] doubles,
       FrameScope scope,
       MetalOwnedTextureFrame frame) {
     this.session = Objects.requireNonNull(session, "session");
-    this.arena = Objects.requireNonNull(arena, "arena");
-    this.frameSegment = Objects.requireNonNull(frameSegment, "frameSegment");
+    this.longs = Objects.requireNonNull(longs, "longs").clone();
+    this.ints = Objects.requireNonNull(ints, "ints").clone();
+    this.doubles = Objects.requireNonNull(doubles, "doubles").clone();
     this.scope = Objects.requireNonNull(scope, "scope");
     this.frame = Objects.requireNonNull(frame, "frame");
   }
@@ -48,13 +47,9 @@ public final class MetalOwnedTextureFrameHandle implements AutoCloseable {
     if (closed) {
       return;
     }
-    session.releaseMetalFrame(frameSegment, null);
+    session.releaseMetalFrame(longs, ints, doubles, null);
     closed = true;
-    try {
-      scope.close();
-    } finally {
-      arena.close();
-    }
+    scope.close();
   }
 
   private void ensureOpen() {

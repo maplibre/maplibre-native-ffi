@@ -379,15 +379,31 @@ mod registration {
             "mln_vulkan_owned_texture_descriptor_default",
             "mln_vulkan_borrowed_texture_descriptor_default",
             "mln_texture_image_info_default",
-            "mln_metal_owned_texture_acquire_frame",
-            "mln_metal_owned_texture_release_frame",
-            "mln_vulkan_owned_texture_acquire_frame",
-            "mln_vulkan_owned_texture_release_frame",
         ]);
         texture_methods.push(NativeMethod {
             name: "mln_texture_read_premultiplied_rgba8".into(),
             sig: "(J[B[I[J)I".into(),
             fn_ptr: texture_read_premultiplied_rgba8 as *mut c_void,
+        });
+        texture_methods.push(NativeMethod {
+            name: "mln_metal_owned_texture_acquire_frame".into(),
+            sig: "(J[J[I[D)I".into(),
+            fn_ptr: metal_owned_texture_acquire_frame as *mut c_void,
+        });
+        texture_methods.push(NativeMethod {
+            name: "mln_metal_owned_texture_release_frame".into(),
+            sig: "(J[J[I[D)I".into(),
+            fn_ptr: metal_owned_texture_release_frame as *mut c_void,
+        });
+        texture_methods.push(NativeMethod {
+            name: "mln_vulkan_owned_texture_acquire_frame".into(),
+            sig: "(J[J[I[D)I".into(),
+            fn_ptr: vulkan_owned_texture_acquire_frame as *mut c_void,
+        });
+        texture_methods.push(NativeMethod {
+            name: "mln_vulkan_owned_texture_release_frame".into(),
+            sig: "(J[J[I[D)I".into(),
+            fn_ptr: vulkan_owned_texture_release_frame as *mut c_void,
         });
         texture_methods.push(NativeMethod {
             name: "mln_metal_owned_texture_attach".into(),
@@ -6767,6 +6783,262 @@ extern "system" fn texture_read_premultiplied_rgba8(
         result
     }))
     .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+extern "system" fn metal_owned_texture_acquire_frame(
+    env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    session: jlong,
+    out_longs: JLongArray<'_>,
+    out_ints: JIntArray<'_>,
+    out_doubles: JDoubleArray<'_>,
+) -> jint {
+    catch_unwind(AssertUnwindSafe(|| {
+        if !frame_arrays_valid(&env, &out_longs, &out_ints, &out_doubles, 5, 2, 1) {
+            return sys::MLN_STATUS_INVALID_ARGUMENT;
+        }
+        let mut frame = sys::mln_metal_owned_texture_frame {
+            size: std::mem::size_of::<sys::mln_metal_owned_texture_frame>() as u32,
+            generation: 0,
+            width: 0,
+            height: 0,
+            scale_factor: 0.0,
+            frame_id: 0,
+            texture: std::ptr::null_mut(),
+            device: std::ptr::null_mut(),
+            pixel_format: 0,
+        };
+        let result = unsafe {
+            sys::mln_metal_owned_texture_acquire_frame(
+                session as *mut sys::mln_render_session,
+                &mut frame,
+            )
+        };
+        if result == sys::MLN_STATUS_OK {
+            if env
+                .set_long_array_region(
+                    &out_longs,
+                    0,
+                    &[
+                        frame.generation as jlong,
+                        frame.frame_id as jlong,
+                        frame.texture as jlong,
+                        frame.device as jlong,
+                        frame.pixel_format as jlong,
+                    ],
+                )
+                .is_err()
+                || env
+                    .set_int_array_region(
+                        &out_ints,
+                        0,
+                        &[frame.width as jint, frame.height as jint],
+                    )
+                    .is_err()
+                || env
+                    .set_double_array_region(&out_doubles, 0, &[frame.scale_factor])
+                    .is_err()
+            {
+                return sys::MLN_STATUS_INVALID_ARGUMENT;
+            }
+        }
+        result
+    }))
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+extern "system" fn metal_owned_texture_release_frame(
+    env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    session: jlong,
+    longs: JLongArray<'_>,
+    ints: JIntArray<'_>,
+    doubles: JDoubleArray<'_>,
+) -> jint {
+    catch_unwind(AssertUnwindSafe(|| {
+        let (longs, ints, doubles) = match read_frame_arrays(&env, &longs, &ints, &doubles, 5, 2, 1)
+        {
+            Ok(value) => value,
+            Err(status) => return status,
+        };
+        let frame = sys::mln_metal_owned_texture_frame {
+            size: std::mem::size_of::<sys::mln_metal_owned_texture_frame>() as u32,
+            generation: longs[0] as u64,
+            width: ints[0] as u32,
+            height: ints[1] as u32,
+            scale_factor: doubles[0],
+            frame_id: longs[1] as u64,
+            texture: native_pointer(longs[2]),
+            device: native_pointer(longs[3]),
+            pixel_format: longs[4] as u64,
+        };
+        unsafe {
+            sys::mln_metal_owned_texture_release_frame(
+                session as *mut sys::mln_render_session,
+                &frame,
+            )
+        }
+    }))
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+extern "system" fn vulkan_owned_texture_acquire_frame(
+    env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    session: jlong,
+    out_longs: JLongArray<'_>,
+    out_ints: JIntArray<'_>,
+    out_doubles: JDoubleArray<'_>,
+) -> jint {
+    catch_unwind(AssertUnwindSafe(|| {
+        if !frame_arrays_valid(&env, &out_longs, &out_ints, &out_doubles, 5, 4, 1) {
+            return sys::MLN_STATUS_INVALID_ARGUMENT;
+        }
+        let mut frame = sys::mln_vulkan_owned_texture_frame {
+            size: std::mem::size_of::<sys::mln_vulkan_owned_texture_frame>() as u32,
+            generation: 0,
+            width: 0,
+            height: 0,
+            scale_factor: 0.0,
+            frame_id: 0,
+            image: std::ptr::null_mut(),
+            image_view: std::ptr::null_mut(),
+            device: std::ptr::null_mut(),
+            format: 0,
+            layout: 0,
+        };
+        let result = unsafe {
+            sys::mln_vulkan_owned_texture_acquire_frame(
+                session as *mut sys::mln_render_session,
+                &mut frame,
+            )
+        };
+        if result == sys::MLN_STATUS_OK {
+            if env
+                .set_long_array_region(
+                    &out_longs,
+                    0,
+                    &[
+                        frame.generation as jlong,
+                        frame.frame_id as jlong,
+                        frame.image as jlong,
+                        frame.image_view as jlong,
+                        frame.device as jlong,
+                    ],
+                )
+                .is_err()
+                || env
+                    .set_int_array_region(
+                        &out_ints,
+                        0,
+                        &[
+                            frame.width as jint,
+                            frame.height as jint,
+                            frame.format as jint,
+                            frame.layout as jint,
+                        ],
+                    )
+                    .is_err()
+                || env
+                    .set_double_array_region(&out_doubles, 0, &[frame.scale_factor])
+                    .is_err()
+            {
+                return sys::MLN_STATUS_INVALID_ARGUMENT;
+            }
+        }
+        result
+    }))
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+extern "system" fn vulkan_owned_texture_release_frame(
+    env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    session: jlong,
+    longs: JLongArray<'_>,
+    ints: JIntArray<'_>,
+    doubles: JDoubleArray<'_>,
+) -> jint {
+    catch_unwind(AssertUnwindSafe(|| {
+        let (longs, ints, doubles) = match read_frame_arrays(&env, &longs, &ints, &doubles, 5, 4, 1)
+        {
+            Ok(value) => value,
+            Err(status) => return status,
+        };
+        let frame = sys::mln_vulkan_owned_texture_frame {
+            size: std::mem::size_of::<sys::mln_vulkan_owned_texture_frame>() as u32,
+            generation: longs[0] as u64,
+            width: ints[0] as u32,
+            height: ints[1] as u32,
+            scale_factor: doubles[0],
+            frame_id: longs[1] as u64,
+            image: native_pointer(longs[2]),
+            image_view: native_pointer(longs[3]),
+            device: native_pointer(longs[4]),
+            format: ints[2] as u32,
+            layout: ints[3] as u32,
+        };
+        unsafe {
+            sys::mln_vulkan_owned_texture_release_frame(
+                session as *mut sys::mln_render_session,
+                &frame,
+            )
+        }
+    }))
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+fn frame_arrays_valid(
+    env: &JNIEnv<'_>,
+    longs: &JLongArray<'_>,
+    ints: &JIntArray<'_>,
+    doubles: &JDoubleArray<'_>,
+    long_count: i32,
+    int_count: i32,
+    double_count: i32,
+) -> bool {
+    !longs.is_null()
+        && !ints.is_null()
+        && !doubles.is_null()
+        && env.get_array_length(longs).unwrap_or(0) >= long_count
+        && env.get_array_length(ints).unwrap_or(0) >= int_count
+        && env.get_array_length(doubles).unwrap_or(0) >= double_count
+}
+
+fn read_frame_arrays(
+    env: &JNIEnv<'_>,
+    longs: &JLongArray<'_>,
+    ints: &JIntArray<'_>,
+    doubles: &JDoubleArray<'_>,
+    long_count: usize,
+    int_count: usize,
+    double_count: usize,
+) -> Result<(Vec<jlong>, Vec<jint>, Vec<jdouble>), jint> {
+    if !frame_arrays_valid(
+        env,
+        longs,
+        ints,
+        doubles,
+        long_count as i32,
+        int_count as i32,
+        double_count as i32,
+    ) {
+        return Err(sys::MLN_STATUS_INVALID_ARGUMENT);
+    }
+    let mut long_values = vec![0 as jlong; long_count];
+    let mut int_values = vec![0 as jint; int_count];
+    let mut double_values = vec![0.0 as jdouble; double_count];
+    if env
+        .get_long_array_region(longs, 0, &mut long_values)
+        .is_err()
+        || env.get_int_array_region(ints, 0, &mut int_values).is_err()
+        || env
+            .get_double_array_region(doubles, 0, &mut double_values)
+            .is_err()
+    {
+        return Err(sys::MLN_STATUS_INVALID_ARGUMENT);
+    }
+    Ok((long_values, int_values, double_values))
 }
 
 fn attach_render_session(

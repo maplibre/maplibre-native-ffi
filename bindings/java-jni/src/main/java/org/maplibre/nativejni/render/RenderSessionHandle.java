@@ -311,11 +311,59 @@ public final class RenderSessionHandle implements AutoCloseable {
   }
 
   public MetalOwnedTextureFrameHandle acquireMetalOwnedTextureFrame() {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    var longs = new long[5];
+    var ints = new int[2];
+    var doubles = new double[1];
+    Status.check(
+        TextureNative.mln_metal_owned_texture_acquire_frame(
+            state.requireLiveAddress(), longs, ints, doubles));
+    var scope = new FrameScope();
+    return new MetalOwnedTextureFrameHandle(
+        this,
+        longs,
+        ints,
+        doubles,
+        scope,
+        new MetalOwnedTextureFrame(
+            scope,
+            longs[0],
+            ints[0],
+            ints[1],
+            doubles[0],
+            longs[1],
+            NativePointer.scoped(longs[2], scope),
+            NativePointer.scoped(longs[3], scope),
+            longs[4]));
   }
 
   public VulkanOwnedTextureFrameHandle acquireVulkanOwnedTextureFrame() {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    var longs = new long[5];
+    var ints = new int[4];
+    var doubles = new double[1];
+    Status.check(
+        TextureNative.mln_vulkan_owned_texture_acquire_frame(
+            state.requireLiveAddress(), longs, ints, doubles));
+    var scope = new FrameScope();
+    return new VulkanOwnedTextureFrameHandle(
+        this,
+        longs,
+        ints,
+        doubles,
+        scope,
+        new VulkanOwnedTextureFrame(
+            scope,
+            longs[0],
+            ints[0],
+            ints[1],
+            doubles[0],
+            longs[1],
+            NativePointer.scoped(longs[2], scope),
+            NativePointer.scoped(longs[3], scope),
+            NativePointer.scoped(longs[4], scope),
+            ints[2],
+            ints[3]));
   }
 
   private static TextureImageInfo textureImageInfo(int[] info, long[] byteLength) {
@@ -383,11 +431,31 @@ public final class RenderSessionHandle implements AutoCloseable {
     return state.requireLiveAddress();
   }
 
-  void releaseMetalFrame(MemorySegment frameSegment, Throwable callbackFailure) {
-    throw unsupported();
+  void releaseMetalFrame(long[] longs, int[] ints, double[] doubles, Throwable callbackFailure) {
+    try {
+      Status.check(
+          TextureNative.mln_metal_owned_texture_release_frame(
+              state.requireLiveAddress(), longs, ints, doubles));
+    } catch (Throwable releaseFailure) {
+      if (callbackFailure != null) {
+        callbackFailure.addSuppressed(releaseFailure);
+      } else {
+        throw releaseFailure;
+      }
+    }
   }
 
-  void releaseVulkanFrame(MemorySegment frameSegment, Throwable callbackFailure) {
-    throw unsupported();
+  void releaseVulkanFrame(long[] longs, int[] ints, double[] doubles, Throwable callbackFailure) {
+    try {
+      Status.check(
+          TextureNative.mln_vulkan_owned_texture_release_frame(
+              state.requireLiveAddress(), longs, ints, doubles));
+    } catch (Throwable releaseFailure) {
+      if (callbackFailure != null) {
+        callbackFailure.addSuppressed(releaseFailure);
+      } else {
+        throw releaseFailure;
+      }
+    }
   }
 }
