@@ -247,11 +247,8 @@ mod registration {
             "mln_map_list_style_source_ids",
             "mln_map_add_geojson_source_data",
             "mln_map_set_geojson_source_data",
-            "mln_map_add_vector_source_url",
             "mln_map_add_vector_source_tiles",
-            "mln_map_add_raster_source_url",
             "mln_map_add_raster_source_tiles",
-            "mln_map_add_raster_dem_source_url",
             "mln_map_add_raster_dem_source_tiles",
             "mln_map_add_custom_geometry_source",
             "mln_map_set_custom_geometry_source_tile_data",
@@ -311,6 +308,21 @@ mod registration {
             name: "mln_map_set_geojson_source_url".into(),
             sig: "(JLjava/lang/String;Ljava/lang/String;)I".into(),
             fn_ptr: map_set_geojson_source_url as *mut c_void,
+        });
+        style_methods.push(NativeMethod {
+            name: "mln_map_add_vector_source_url".into(),
+            sig: "(JLjava/lang/String;Ljava/lang/String;)I".into(),
+            fn_ptr: map_add_vector_source_url as *mut c_void,
+        });
+        style_methods.push(NativeMethod {
+            name: "mln_map_add_raster_source_url".into(),
+            sig: "(JLjava/lang/String;Ljava/lang/String;)I".into(),
+            fn_ptr: map_add_raster_source_url as *mut c_void,
+        });
+        style_methods.push(NativeMethod {
+            name: "mln_map_add_raster_dem_source_url".into(),
+            sig: "(JLjava/lang/String;Ljava/lang/String;)I".into(),
+            fn_ptr: map_add_raster_dem_source_url as *mut c_void,
         });
         style_methods.push(NativeMethod {
             name: "mln_map_remove_style_layer".into(),
@@ -1229,6 +1241,77 @@ extern "system" fn map_set_geojson_source_url(
         url,
         sys::mln_map_set_geojson_source_url,
     )
+}
+
+extern "system" fn map_add_vector_source_url(
+    env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    map: jlong,
+    source_id: JString<'_>,
+    url: JString<'_>,
+) -> jint {
+    map_tile_source_url(env, map, source_id, url, sys::mln_map_add_vector_source_url)
+}
+
+extern "system" fn map_add_raster_source_url(
+    env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    map: jlong,
+    source_id: JString<'_>,
+    url: JString<'_>,
+) -> jint {
+    map_tile_source_url(env, map, source_id, url, sys::mln_map_add_raster_source_url)
+}
+
+extern "system" fn map_add_raster_dem_source_url(
+    env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    map: jlong,
+    source_id: JString<'_>,
+    url: JString<'_>,
+) -> jint {
+    map_tile_source_url(
+        env,
+        map,
+        source_id,
+        url,
+        sys::mln_map_add_raster_dem_source_url,
+    )
+}
+
+fn map_tile_source_url(
+    mut env: JNIEnv<'_>,
+    map: jlong,
+    source_id: JString<'_>,
+    url: JString<'_>,
+    operation: unsafe extern "C" fn(
+        *mut sys::mln_map,
+        sys::mln_string_view,
+        sys::mln_string_view,
+        *const sys::mln_style_tile_source_options,
+    ) -> sys::mln_status,
+) -> jint {
+    catch_unwind(AssertUnwindSafe(|| {
+        let (source_id, source_id_view) = match string_view(&mut env, &source_id) {
+            Ok(value) => value,
+            Err(status) => return status,
+        };
+        let (url, url_view) = match string_view(&mut env, &url) {
+            Ok(value) => value,
+            Err(status) => return status,
+        };
+        let _source_id = source_id;
+        let _url = url;
+        unsafe {
+            operation(
+                map as *mut sys::mln_map,
+                source_id_view,
+                url_view,
+                std::ptr::null(),
+            )
+        }
+    }))
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
 }
 
 fn map_style_source_url(

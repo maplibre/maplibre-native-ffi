@@ -182,7 +182,12 @@ public final class MapHandle implements AutoCloseable {
   }
 
   public void addVectorSourceUrl(String sourceId, String url) {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    Status.check(
+        StyleNative.mln_map_add_vector_source_url(
+            state.requireLiveAddress(),
+            Objects.requireNonNull(sourceId, "sourceId"),
+            Objects.requireNonNull(url, "url")));
   }
 
   public void addVectorSourceUrl(String sourceId, String url, TileSourceOptions options) {
@@ -198,7 +203,12 @@ public final class MapHandle implements AutoCloseable {
   }
 
   public void addRasterSourceUrl(String sourceId, String url) {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    Status.check(
+        StyleNative.mln_map_add_raster_source_url(
+            state.requireLiveAddress(),
+            Objects.requireNonNull(sourceId, "sourceId"),
+            Objects.requireNonNull(url, "url")));
   }
 
   public void addRasterSourceUrl(String sourceId, String url, TileSourceOptions options) {
@@ -214,7 +224,12 @@ public final class MapHandle implements AutoCloseable {
   }
 
   public void addRasterDemSourceUrl(String sourceId, String url) {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    Status.check(
+        StyleNative.mln_map_add_raster_dem_source_url(
+            state.requireLiveAddress(),
+            Objects.requireNonNull(sourceId, "sourceId"),
+            Objects.requireNonNull(url, "url")));
   }
 
   public void addRasterDemSourceUrl(String sourceId, String url, TileSourceOptions options) {

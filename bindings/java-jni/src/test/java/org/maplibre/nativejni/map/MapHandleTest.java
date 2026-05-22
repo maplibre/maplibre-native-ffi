@@ -132,6 +132,16 @@ class MapHandleTest {
         map.setGeoJsonSourceUrl("geojson-source", "https://example.com/updated.geojson");
         assertTrue(map.removeStyleSource("geojson-source"));
         assertFalse(map.removeStyleSource("geojson-source"));
+
+        map.addVectorSourceUrl("vector-source", "https://example.com/vector.json");
+        assertEquals(SourceType.VECTOR, map.styleSourceType("vector-source").orElseThrow());
+        assertTrue(map.removeStyleSource("vector-source"));
+        map.addRasterSourceUrl("raster-source", "https://example.com/raster.json");
+        assertEquals(SourceType.RASTER, map.styleSourceType("raster-source").orElseThrow());
+        assertTrue(map.removeStyleSource("raster-source"));
+        map.addRasterDemSourceUrl("raster-dem-source", "https://example.com/raster-dem.json");
+        assertEquals(SourceType.RASTER_DEM, map.styleSourceType("raster-dem-source").orElseThrow());
+        assertTrue(map.removeStyleSource("raster-dem-source"));
         map.setStyleJson(
             "{\"version\":8,\"sources\":{},\"layers\":[{\"id\":\"background-layer\",\"type\":\"background\"}]}");
         assertTrue(map.styleLayerExists("background-layer"));
