@@ -290,13 +290,6 @@ mod registration {
             "mln_map_set_image_source_image",
             "mln_map_set_image_source_coordinates",
             "mln_map_get_image_source_coordinates",
-            "mln_map_add_hillshade_layer",
-            "mln_map_add_color_relief_layer",
-            "mln_map_add_location_indicator_layer",
-            "mln_map_set_location_indicator_location",
-            "mln_map_set_location_indicator_bearing",
-            "mln_map_set_location_indicator_accuracy_radius",
-            "mln_map_set_location_indicator_image_name",
             "mln_map_add_style_layer_json",
             "mln_map_get_style_layer_json",
             "mln_map_set_style_light_json",
@@ -351,6 +344,41 @@ mod registration {
             name: "mln_map_add_raster_dem_source_url".into(),
             sig: "(JLjava/lang/String;Ljava/lang/String;)I".into(),
             fn_ptr: map_add_raster_dem_source_url as *mut c_void,
+        });
+        style_methods.push(NativeMethod {
+            name: "mln_map_add_hillshade_layer".into(),
+            sig: "(JLjava/lang/String;Ljava/lang/String;Ljava/lang/String;)I".into(),
+            fn_ptr: map_add_hillshade_layer as *mut c_void,
+        });
+        style_methods.push(NativeMethod {
+            name: "mln_map_add_color_relief_layer".into(),
+            sig: "(JLjava/lang/String;Ljava/lang/String;Ljava/lang/String;)I".into(),
+            fn_ptr: map_add_color_relief_layer as *mut c_void,
+        });
+        style_methods.push(NativeMethod {
+            name: "mln_map_add_location_indicator_layer".into(),
+            sig: "(JLjava/lang/String;Ljava/lang/String;)I".into(),
+            fn_ptr: map_add_location_indicator_layer as *mut c_void,
+        });
+        style_methods.push(NativeMethod {
+            name: "mln_map_set_location_indicator_location".into(),
+            sig: "(JLjava/lang/String;DDD)I".into(),
+            fn_ptr: map_set_location_indicator_location as *mut c_void,
+        });
+        style_methods.push(NativeMethod {
+            name: "mln_map_set_location_indicator_bearing".into(),
+            sig: "(JLjava/lang/String;D)I".into(),
+            fn_ptr: map_set_location_indicator_bearing as *mut c_void,
+        });
+        style_methods.push(NativeMethod {
+            name: "mln_map_set_location_indicator_accuracy_radius".into(),
+            sig: "(JLjava/lang/String;D)I".into(),
+            fn_ptr: map_set_location_indicator_accuracy_radius as *mut c_void,
+        });
+        style_methods.push(NativeMethod {
+            name: "mln_map_set_location_indicator_image_name".into(),
+            sig: "(JLjava/lang/String;ILjava/lang/String;)I".into(),
+            fn_ptr: map_set_location_indicator_image_name as *mut c_void,
         });
         style_methods.push(NativeMethod {
             name: "mln_map_remove_style_layer".into(),
@@ -1814,6 +1842,221 @@ extern "system" fn map_list_style_layer_ids(
     out_layer_ids: JObjectArray<'_>,
 ) -> jint {
     map_list_style_ids(env, map, out_layer_ids, sys::mln_map_list_style_layer_ids)
+}
+
+extern "system" fn map_add_hillshade_layer(
+    env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    map: jlong,
+    layer_id: JString<'_>,
+    source_id: JString<'_>,
+    before_layer_id: JString<'_>,
+) -> jint {
+    map_add_source_layer(
+        env,
+        map,
+        layer_id,
+        source_id,
+        before_layer_id,
+        sys::mln_map_add_hillshade_layer,
+    )
+}
+
+extern "system" fn map_add_color_relief_layer(
+    env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    map: jlong,
+    layer_id: JString<'_>,
+    source_id: JString<'_>,
+    before_layer_id: JString<'_>,
+) -> jint {
+    map_add_source_layer(
+        env,
+        map,
+        layer_id,
+        source_id,
+        before_layer_id,
+        sys::mln_map_add_color_relief_layer,
+    )
+}
+
+fn map_add_source_layer(
+    mut env: JNIEnv<'_>,
+    map: jlong,
+    layer_id: JString<'_>,
+    source_id: JString<'_>,
+    before_layer_id: JString<'_>,
+    native: unsafe extern "C" fn(
+        *mut sys::mln_map,
+        sys::mln_string_view,
+        sys::mln_string_view,
+        sys::mln_string_view,
+    ) -> sys::mln_status,
+) -> jint {
+    catch_unwind(AssertUnwindSafe(|| {
+        let (layer_id_storage, layer_id_view) = match string_view(&mut env, &layer_id) {
+            Ok(value) => value,
+            Err(status) => return status,
+        };
+        let (source_id_storage, source_id_view) = match string_view(&mut env, &source_id) {
+            Ok(value) => value,
+            Err(status) => return status,
+        };
+        let (before_layer_id_storage, before_layer_id_view) =
+            match string_view(&mut env, &before_layer_id) {
+                Ok(value) => value,
+                Err(status) => return status,
+            };
+        let _keep_alive = (layer_id_storage, source_id_storage, before_layer_id_storage);
+        unsafe {
+            native(
+                map as *mut sys::mln_map,
+                layer_id_view,
+                source_id_view,
+                before_layer_id_view,
+            )
+        }
+    }))
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+extern "system" fn map_add_location_indicator_layer(
+    mut env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    map: jlong,
+    layer_id: JString<'_>,
+    before_layer_id: JString<'_>,
+) -> jint {
+    catch_unwind(AssertUnwindSafe(|| {
+        let (layer_id_storage, layer_id_view) = match string_view(&mut env, &layer_id) {
+            Ok(value) => value,
+            Err(status) => return status,
+        };
+        let (before_layer_id_storage, before_layer_id_view) =
+            match string_view(&mut env, &before_layer_id) {
+                Ok(value) => value,
+                Err(status) => return status,
+            };
+        let _keep_alive = (layer_id_storage, before_layer_id_storage);
+        unsafe {
+            sys::mln_map_add_location_indicator_layer(
+                map as *mut sys::mln_map,
+                layer_id_view,
+                before_layer_id_view,
+            )
+        }
+    }))
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+extern "system" fn map_set_location_indicator_location(
+    mut env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    map: jlong,
+    layer_id: JString<'_>,
+    latitude: f64,
+    longitude: f64,
+    altitude: f64,
+) -> jint {
+    catch_unwind(AssertUnwindSafe(|| {
+        let (layer_id_storage, layer_id_view) = match string_view(&mut env, &layer_id) {
+            Ok(value) => value,
+            Err(status) => return status,
+        };
+        let _keep_alive = layer_id_storage;
+        unsafe {
+            sys::mln_map_set_location_indicator_location(
+                map as *mut sys::mln_map,
+                layer_id_view,
+                sys::mln_lat_lng {
+                    latitude,
+                    longitude,
+                },
+                altitude,
+            )
+        }
+    }))
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+extern "system" fn map_set_location_indicator_bearing(
+    env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    map: jlong,
+    layer_id: JString<'_>,
+    bearing: f64,
+) -> jint {
+    map_set_location_indicator_double(
+        env,
+        map,
+        layer_id,
+        bearing,
+        sys::mln_map_set_location_indicator_bearing,
+    )
+}
+
+extern "system" fn map_set_location_indicator_accuracy_radius(
+    env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    map: jlong,
+    layer_id: JString<'_>,
+    radius: f64,
+) -> jint {
+    map_set_location_indicator_double(
+        env,
+        map,
+        layer_id,
+        radius,
+        sys::mln_map_set_location_indicator_accuracy_radius,
+    )
+}
+
+fn map_set_location_indicator_double(
+    mut env: JNIEnv<'_>,
+    map: jlong,
+    layer_id: JString<'_>,
+    value: f64,
+    native: unsafe extern "C" fn(*mut sys::mln_map, sys::mln_string_view, f64) -> sys::mln_status,
+) -> jint {
+    catch_unwind(AssertUnwindSafe(|| {
+        let (layer_id_storage, layer_id_view) = match string_view(&mut env, &layer_id) {
+            Ok(value) => value,
+            Err(status) => return status,
+        };
+        let _keep_alive = layer_id_storage;
+        unsafe { native(map as *mut sys::mln_map, layer_id_view, value) }
+    }))
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+extern "system" fn map_set_location_indicator_image_name(
+    mut env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    map: jlong,
+    layer_id: JString<'_>,
+    image_kind: jint,
+    image_id: JString<'_>,
+) -> jint {
+    catch_unwind(AssertUnwindSafe(|| {
+        let (layer_id_storage, layer_id_view) = match string_view(&mut env, &layer_id) {
+            Ok(value) => value,
+            Err(status) => return status,
+        };
+        let (image_id_storage, image_id_view) = match string_view(&mut env, &image_id) {
+            Ok(value) => value,
+            Err(status) => return status,
+        };
+        let _keep_alive = (layer_id_storage, image_id_storage);
+        unsafe {
+            sys::mln_map_set_location_indicator_image_name(
+                map as *mut sys::mln_map,
+                layer_id_view,
+                image_kind as u32,
+                image_id_view,
+            )
+        }
+    }))
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
 }
 
 extern "system" fn map_move_style_layer(

@@ -87,19 +87,26 @@ public final class StyleNative {
 
   public static native int mln_map_get_image_source_coordinates();
 
-  public static native int mln_map_add_hillshade_layer();
+  public static native int mln_map_add_hillshade_layer(
+      long map, String layerId, String sourceId, String beforeLayerId);
 
-  public static native int mln_map_add_color_relief_layer();
+  public static native int mln_map_add_color_relief_layer(
+      long map, String layerId, String sourceId, String beforeLayerId);
 
-  public static native int mln_map_add_location_indicator_layer();
+  public static native int mln_map_add_location_indicator_layer(
+      long map, String layerId, String beforeLayerId);
 
-  public static native int mln_map_set_location_indicator_location();
+  public static native int mln_map_set_location_indicator_location(
+      long map, String layerId, double latitude, double longitude, double altitude);
 
-  public static native int mln_map_set_location_indicator_bearing();
+  public static native int mln_map_set_location_indicator_bearing(
+      long map, String layerId, double bearing);
 
-  public static native int mln_map_set_location_indicator_accuracy_radius();
+  public static native int mln_map_set_location_indicator_accuracy_radius(
+      long map, String layerId, double radius);
 
-  public static native int mln_map_set_location_indicator_image_name();
+  public static native int mln_map_set_location_indicator_image_name(
+      long map, String layerId, int imageKind, String imageId);
 
   public static native int mln_map_add_style_layer_json();
 

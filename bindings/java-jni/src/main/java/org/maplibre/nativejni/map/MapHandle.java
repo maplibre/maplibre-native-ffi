@@ -319,44 +319,81 @@ public final class MapHandle implements AutoCloseable {
   }
 
   public void addHillshadeLayer(String layerId, String sourceId) {
-    throw unsupported();
+    addHillshadeLayer(layerId, sourceId, "");
   }
 
   public void addHillshadeLayer(String layerId, String sourceId, String beforeLayerId) {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    Status.check(
+        StyleNative.mln_map_add_hillshade_layer(
+            state.requireLiveAddress(),
+            Objects.requireNonNull(layerId, "layerId"),
+            Objects.requireNonNull(sourceId, "sourceId"),
+            Objects.requireNonNull(beforeLayerId, "beforeLayerId")));
   }
 
   public void addColorReliefLayer(String layerId, String sourceId) {
-    throw unsupported();
+    addColorReliefLayer(layerId, sourceId, "");
   }
 
   public void addColorReliefLayer(String layerId, String sourceId, String beforeLayerId) {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    Status.check(
+        StyleNative.mln_map_add_color_relief_layer(
+            state.requireLiveAddress(),
+            Objects.requireNonNull(layerId, "layerId"),
+            Objects.requireNonNull(sourceId, "sourceId"),
+            Objects.requireNonNull(beforeLayerId, "beforeLayerId")));
   }
 
   public void addLocationIndicatorLayer(String layerId) {
-    throw unsupported();
+    addLocationIndicatorLayer(layerId, "");
   }
 
   public void addLocationIndicatorLayer(String layerId, String beforeLayerId) {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    Status.check(
+        StyleNative.mln_map_add_location_indicator_layer(
+            state.requireLiveAddress(),
+            Objects.requireNonNull(layerId, "layerId"),
+            Objects.requireNonNull(beforeLayerId, "beforeLayerId")));
   }
 
   public void setLocationIndicatorLocation(String layerId, LatLng coordinate, double altitude) {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    Objects.requireNonNull(coordinate, "coordinate");
+    Status.check(
+        StyleNative.mln_map_set_location_indicator_location(
+            state.requireLiveAddress(),
+            Objects.requireNonNull(layerId, "layerId"),
+            coordinate.latitude(),
+            coordinate.longitude(),
+            altitude));
   }
 
   public void setLocationIndicatorBearing(String layerId, double bearing) {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    Status.check(
+        StyleNative.mln_map_set_location_indicator_bearing(
+            state.requireLiveAddress(), Objects.requireNonNull(layerId, "layerId"), bearing));
   }
 
   public void setLocationIndicatorAccuracyRadius(String layerId, double radius) {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    Status.check(
+        StyleNative.mln_map_set_location_indicator_accuracy_radius(
+            state.requireLiveAddress(), Objects.requireNonNull(layerId, "layerId"), radius));
   }
 
   public void setLocationIndicatorImageName(
       String layerId, LocationIndicatorImageKind imageKind, String imageId) {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    Status.check(
+        StyleNative.mln_map_set_location_indicator_image_name(
+            state.requireLiveAddress(),
+            Objects.requireNonNull(layerId, "layerId"),
+            Objects.requireNonNull(imageKind, "imageKind").nativeValue(),
+            Objects.requireNonNull(imageId, "imageId")));
   }
 
   public boolean removeStyleLayer(String layerId) {

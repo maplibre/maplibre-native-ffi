@@ -24,6 +24,7 @@ import org.maplibre.nativejni.geo.ScreenPoint;
 import org.maplibre.nativejni.geo.Vec3;
 import org.maplibre.nativejni.internal.access.InternalAccess;
 import org.maplibre.nativejni.runtime.RuntimeHandle;
+import org.maplibre.nativejni.style.LocationIndicatorImageKind;
 import org.maplibre.nativejni.style.SourceType;
 import org.maplibre.nativejni.test.NativeTestSupport;
 
@@ -241,6 +242,18 @@ class MapHandleTest {
         assertTrue(map.styleLayerExists("background-layer"));
         assertTrue(map.styleLayerIds().contains("background-layer"));
         assertEquals("background", map.styleLayerType("background-layer").orElseThrow());
+        map.addRasterDemSourceUrl("dem-source", "https://example.com/dem.json");
+        map.addHillshadeLayer("hillshade-layer", "dem-source");
+        assertEquals("hillshade", map.styleLayerType("hillshade-layer").orElseThrow());
+        map.addColorReliefLayer("relief-layer", "dem-source", "hillshade-layer");
+        assertEquals("color-relief", map.styleLayerType("relief-layer").orElseThrow());
+        map.addLocationIndicatorLayer("location-layer");
+        assertEquals("location-indicator", map.styleLayerType("location-layer").orElseThrow());
+        map.setLocationIndicatorLocation("location-layer", new LatLng(1.0, 2.0), 3.0);
+        map.setLocationIndicatorBearing("location-layer", 45.0);
+        map.setLocationIndicatorAccuracyRadius("location-layer", 12.0);
+        map.setLocationIndicatorImageName(
+            "location-layer", LocationIndicatorImageKind.TOP, "location-top-image");
         map.setStyleJson(
             "{\"version\":8,\"sources\":{},\"layers\":[{\"id\":\"first-layer\",\"type\":\"background\"},{\"id\":\"second-layer\",\"type\":\"background\"}]}");
         map.moveStyleLayer("second-layer", "first-layer");
