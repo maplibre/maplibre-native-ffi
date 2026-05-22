@@ -1,24 +1,28 @@
 package org.maplibre.nativejni.runtime;
 
-import java.lang.foreign.MemorySegment;
-import org.maplibre.nativejni.resource.ResourceProviderCallback;
+import org.maplibre.nativejni.internal.bridge.RuntimeNative;
 
-/** API-parity scaffold for the Java JNI binding. */
+/** Owns runtime-scoped resource provider callback state. */
 final class ResourceProviderState implements AutoCloseable {
-  private static UnsupportedOperationException unsupported() {
-    return new UnsupportedOperationException(
-        "ResourceProviderState is not implemented by the JNI bridge yet");
+  private final long address;
+  private boolean closed;
+
+  ResourceProviderState(long address) {
+    if (address == 0) {
+      throw new IllegalArgumentException("address must be non-zero");
+    }
+    this.address = address;
   }
 
-  ResourceProviderState(ResourceProviderCallback callback) {
-    throw unsupported();
+  long address() {
+    return address;
   }
 
-  MemorySegment descriptor() {
-    throw unsupported();
-  }
-
-  public void close() {
-    throw unsupported();
+  @Override
+  public synchronized void close() {
+    if (!closed) {
+      closed = true;
+      RuntimeNative.mln_resource_provider_state_destroy(address);
+    }
   }
 }

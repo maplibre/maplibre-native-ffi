@@ -12,13 +12,20 @@ public final class RuntimeNative {
 
   public static native int mln_runtime_create(long[] outRuntime);
 
-  public static native int mln_runtime_set_resource_provider();
+  public static native int mln_runtime_set_resource_provider(
+      long runtime,
+      org.maplibre.nativejni.resource.ResourceProviderCallback callback,
+      long[] outState);
 
-  public static native int mln_resource_request_complete();
+  public static native int mln_resource_request_complete(
+      long handle,
+      org.maplibre.nativejni.internal.struct.ResourceStructs.ResourceResponseValue response);
 
-  public static native int mln_resource_request_cancelled();
+  public static native int mln_resource_request_cancelled(long handle, boolean[] outCancelled);
 
-  public static native int mln_resource_request_release();
+  public static native void mln_resource_request_release(long handle);
+
+  public static native void mln_resource_provider_state_destroy(long state);
 
   public static native int mln_runtime_set_resource_transform(
       long runtime,

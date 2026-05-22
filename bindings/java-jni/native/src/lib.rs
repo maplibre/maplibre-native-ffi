@@ -98,6 +98,18 @@ struct ResourceTransformState {
     response_storage: Mutex<HashMap<ThreadId, CString>>,
 }
 
+struct ResourceProviderState {
+    vm: JavaVM,
+    callback: GlobalRef,
+}
+
+struct NativeResourceResponse {
+    raw: sys::mln_resource_response,
+    _bytes: Vec<u8>,
+    _error_message: Option<CString>,
+    _etag: Option<CString>,
+}
+
 const CAMERA_FIELD_CENTER: usize = 0;
 const CAMERA_FIELD_CENTER_ALTITUDE: usize = 1;
 const CAMERA_FIELD_PADDING: usize = 2;
@@ -746,13 +758,7 @@ mod registration {
     }
 
     fn register_runtime(vm: &JavaVM) -> jni::errors::Result<()> {
-        let mut methods = no_arg_status_methods(&[
-            "mln_runtime_options_default",
-            "mln_runtime_set_resource_provider",
-            "mln_resource_request_complete",
-            "mln_resource_request_cancelled",
-            "mln_resource_request_release",
-        ]);
+        let mut methods = no_arg_status_methods(&["mln_runtime_options_default"]);
         methods.push(NativeMethod {
             name: "mln_runtime_create".into(),
             sig: "([J)I".into(),
@@ -772,6 +778,33 @@ mod registration {
             name: "mln_runtime_poll_event".into(),
             sig: "(J[J[I[Z[D[Ljava/lang/String;)I".into(),
             fn_ptr: runtime_poll_event as *mut c_void,
+        });
+        methods.push(NativeMethod {
+            name: "mln_runtime_set_resource_provider".into(),
+            sig: "(JLorg/maplibre/nativejni/resource/ResourceProviderCallback;[J)I".into(),
+            fn_ptr: runtime_set_resource_provider as *mut c_void,
+        });
+        methods.push(NativeMethod {
+            name: "mln_resource_provider_state_destroy".into(),
+            sig: "(J)V".into(),
+            fn_ptr: resource_provider_state_destroy as *mut c_void,
+        });
+        methods.push(NativeMethod {
+            name: "mln_resource_request_complete".into(),
+            sig:
+                "(JLorg/maplibre/nativejni/internal/struct/ResourceStructs$ResourceResponseValue;)I"
+                    .into(),
+            fn_ptr: resource_request_complete as *mut c_void,
+        });
+        methods.push(NativeMethod {
+            name: "mln_resource_request_cancelled".into(),
+            sig: "(J[Z)I".into(),
+            fn_ptr: resource_request_cancelled as *mut c_void,
+        });
+        methods.push(NativeMethod {
+            name: "mln_resource_request_release".into(),
+            sig: "(J)V".into(),
+            fn_ptr: resource_request_release as *mut c_void,
         });
         methods.push(NativeMethod {
             name: "mln_runtime_set_resource_transform".into(),
@@ -1316,6 +1349,461 @@ extern "system" fn runtime_destroy(_env: JNIEnv<'_>, _class: JClass<'_>, runtime
 extern "system" fn runtime_run_once(_env: JNIEnv<'_>, _class: JClass<'_>, runtime: jlong) -> jint {
     catch_unwind(|| unsafe { sys::mln_runtime_run_once(runtime as *mut sys::mln_runtime) })
         .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+extern "system" fn runtime_set_resource_provider<'local>(
+    env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    runtime: jlong,
+    callback: JObject<'local>,
+    out_state: JLongArray<'local>,
+) -> jint {
+    catch_unwind(AssertUnwindSafe(|| {
+        if callback.is_null()
+            || out_state.is_null()
+            || env.get_array_length(&out_state).unwrap_or(0) < 1
+        {
+            return sys::MLN_STATUS_INVALID_ARGUMENT;
+        }
+        let vm = match env.get_java_vm() {
+            Ok(value) => value,
+            Err(_) => return sys::MLN_STATUS_NATIVE_ERROR,
+        };
+        let callback = match env.new_global_ref(callback) {
+            Ok(value) => value,
+            Err(_) => return sys::MLN_STATUS_INVALID_ARGUMENT,
+        };
+        let state = Box::new(ResourceProviderState { vm, callback });
+        let state_ptr = Box::into_raw(state);
+        let provider = sys::mln_resource_provider {
+            size: std::mem::size_of::<sys::mln_resource_provider>() as u32,
+            callback: Some(resource_provider_callback),
+            user_data: state_ptr.cast::<c_void>(),
+        };
+        let result = unsafe {
+            sys::mln_runtime_set_resource_provider(runtime as *mut sys::mln_runtime, &provider)
+        };
+        if result == sys::MLN_STATUS_OK {
+            if env
+                .set_long_array_region(&out_state, 0, &[state_ptr as jlong])
+                .is_err()
+            {
+                return sys::MLN_STATUS_NATIVE_ERROR;
+            }
+        } else {
+            unsafe {
+                drop(Box::from_raw(state_ptr));
+            }
+        }
+        result
+    }))
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+extern "system" fn resource_provider_state_destroy(
+    _env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    state: jlong,
+) {
+    if state != 0 {
+        unsafe {
+            drop(Box::from_raw(state as *mut ResourceProviderState));
+        }
+    }
+}
+
+unsafe extern "C" fn resource_provider_callback(
+    user_data: *mut c_void,
+    request: *const sys::mln_resource_request,
+    handle: *mut sys::mln_resource_request_handle,
+) -> u32 {
+    catch_unwind(AssertUnwindSafe(|| {
+        if user_data.is_null() || request.is_null() || handle.is_null() {
+            return u32::MAX;
+        }
+        let state = unsafe { &*(user_data as *mut ResourceProviderState) };
+        let mut env = match state.vm.attach_current_thread() {
+            Ok(value) => value,
+            Err(_) => return u32::MAX,
+        };
+        let request = match java_resource_request(&mut env, unsafe { &*request }) {
+            Ok(value) => value,
+            Err(_) => return u32::MAX,
+        };
+        let handle_object = match env.new_object(
+            "org/maplibre/nativejni/resource/ResourceRequestHandle",
+            "(J)V",
+            &[JValue::Long(handle as jlong)],
+        ) {
+            Ok(value) => value,
+            Err(_) => return u32::MAX,
+        };
+        let decision = match env
+            .call_method(
+                state.callback.as_obj(),
+                "handle",
+                "(Lorg/maplibre/nativejni/resource/ResourceRequest;Lorg/maplibre/nativejni/resource/ResourceRequestHandle;)Lorg/maplibre/nativejni/resource/ResourceProviderDecision;",
+                &[JValue::Object(&request), JValue::Object(&handle_object)],
+            )
+            .and_then(|value| value.l())
+        {
+            Ok(value) => value,
+            Err(_) => {
+                let _ = env.exception_clear();
+                return finish_resource_provider_exception(&mut env, &handle_object);
+            }
+        };
+        finish_resource_provider_decision(&mut env, &handle_object, &decision)
+    }))
+    .unwrap_or(u32::MAX)
+}
+
+extern "system" fn resource_request_complete<'local>(
+    mut env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    handle: jlong,
+    response: JObject<'local>,
+) -> jint {
+    catch_unwind(AssertUnwindSafe(|| {
+        let response = match native_resource_response(&mut env, &response) {
+            Ok(value) => value,
+            Err(status) => return status,
+        };
+        unsafe {
+            sys::mln_resource_request_complete(
+                handle as *mut sys::mln_resource_request_handle,
+                &response.raw,
+            )
+        }
+    }))
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+extern "system" fn resource_request_cancelled(
+    env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    handle: jlong,
+    out_cancelled: JBooleanArray<'_>,
+) -> jint {
+    catch_unwind(AssertUnwindSafe(|| {
+        if out_cancelled.is_null() || env.get_array_length(&out_cancelled).unwrap_or(0) < 1 {
+            return sys::MLN_STATUS_INVALID_ARGUMENT;
+        }
+        let mut cancelled = false;
+        let result = unsafe {
+            sys::mln_resource_request_cancelled(
+                handle as *const sys::mln_resource_request_handle,
+                &mut cancelled,
+            )
+        };
+        if result == sys::MLN_STATUS_OK
+            && env
+                .set_boolean_array_region(&out_cancelled, 0, &[jboolean::from(cancelled)])
+                .is_err()
+        {
+            return sys::MLN_STATUS_INVALID_ARGUMENT;
+        }
+        result
+    }))
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+extern "system" fn resource_request_release(_env: JNIEnv<'_>, _class: JClass<'_>, handle: jlong) {
+    unsafe {
+        sys::mln_resource_request_release(handle as *mut sys::mln_resource_request_handle);
+    }
+}
+
+fn finish_resource_provider_decision<'local>(
+    env: &mut JNIEnv<'local>,
+    handle: &JObject<'local>,
+    decision: &JObject<'local>,
+) -> u32 {
+    if decision.is_null() {
+        return finish_resource_provider_exception(env, handle);
+    }
+    env.call_method(
+        handle,
+        "finishProviderDecision",
+        "(Lorg/maplibre/nativejni/resource/ResourceProviderDecision;)I",
+        &[JValue::Object(decision)],
+    )
+    .and_then(|value| value.i())
+    .map(|value| value as u32)
+    .unwrap_or_else(|_| {
+        let _ = env.exception_clear();
+        u32::MAX
+    })
+}
+
+fn finish_resource_provider_exception<'local>(
+    env: &mut JNIEnv<'local>,
+    handle: &JObject<'local>,
+) -> u32 {
+    env.call_method(handle, "finishProviderException", "()I", &[])
+        .and_then(|value| value.i())
+        .map(|value| value as u32)
+        .unwrap_or_else(|_| {
+            let _ = env.exception_clear();
+            u32::MAX
+        })
+}
+
+fn java_resource_request<'local>(
+    env: &mut JNIEnv<'local>,
+    request: &sys::mln_resource_request,
+) -> Result<JObject<'local>, jint> {
+    let url = java_string_from_c_ptr(env, request.url)?;
+    let kind = java_enum_from_native(
+        env,
+        "org/maplibre/nativejni/resource/ResourceKind",
+        request.kind as jint,
+    )?;
+    let loading_method = java_enum_from_native(
+        env,
+        "org/maplibre/nativejni/resource/ResourceLoadingMethod",
+        request.loading_method as jint,
+    )?;
+    let priority = java_enum_from_native(
+        env,
+        "org/maplibre/nativejni/resource/ResourcePriority",
+        request.priority as jint,
+    )?;
+    let usage = java_enum_from_native(
+        env,
+        "org/maplibre/nativejni/resource/ResourceUsage",
+        request.usage as jint,
+    )?;
+    let storage_policy = java_enum_from_native(
+        env,
+        "org/maplibre/nativejni/resource/ResourceStoragePolicy",
+        request.storage_policy as jint,
+    )?;
+    let range = if request.has_range {
+        let range = env
+            .new_object(
+                "org/maplibre/nativejni/resource/ResourceRequest$ByteRange",
+                "(JJ)V",
+                &[
+                    JValue::Long(request.range_start as jlong),
+                    JValue::Long(request.range_end as jlong),
+                ],
+            )
+            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
+        java_optional_object(env, Some(&range))?
+    } else {
+        java_optional_object(env, None)?
+    };
+    let prior_modified = java_optional_long(
+        env,
+        request
+            .has_prior_modified
+            .then_some(request.prior_modified_unix_ms as jlong),
+    )?;
+    let prior_expires = java_optional_long(
+        env,
+        request
+            .has_prior_expires
+            .then_some(request.prior_expires_unix_ms as jlong),
+    )?;
+    let prior_etag = if request.prior_etag.is_null() {
+        java_optional_object(env, None)?
+    } else {
+        let etag = java_string_from_c_ptr(env, request.prior_etag)?;
+        java_optional_object(env, Some(&etag))?
+    };
+    let prior_data = if request.prior_data.is_null() || request.prior_data_size == 0 {
+        env.byte_array_from_slice(&[])
+            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?
+    } else {
+        let bytes =
+            unsafe { std::slice::from_raw_parts(request.prior_data, request.prior_data_size) };
+        env.byte_array_from_slice(bytes)
+            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?
+    };
+    env.new_object(
+        "org/maplibre/nativejni/resource/ResourceRequest",
+        "(Ljava/lang/String;Lorg/maplibre/nativejni/resource/ResourceKind;ILorg/maplibre/nativejni/resource/ResourceLoadingMethod;ILorg/maplibre/nativejni/resource/ResourcePriority;ILorg/maplibre/nativejni/resource/ResourceUsage;ILorg/maplibre/nativejni/resource/ResourceStoragePolicy;ILjava/util/Optional;Ljava/util/Optional;Ljava/util/Optional;Ljava/util/Optional;[B)V",
+        &[
+            JValue::Object(&url),
+            JValue::Object(&kind),
+            JValue::Int(request.kind as jint),
+            JValue::Object(&loading_method),
+            JValue::Int(request.loading_method as jint),
+            JValue::Object(&priority),
+            JValue::Int(request.priority as jint),
+            JValue::Object(&usage),
+            JValue::Int(request.usage as jint),
+            JValue::Object(&storage_policy),
+            JValue::Int(request.storage_policy as jint),
+            JValue::Object(&range),
+            JValue::Object(&prior_modified),
+            JValue::Object(&prior_expires),
+            JValue::Object(&prior_etag),
+            JValue::Object(&prior_data),
+        ],
+    )
+    .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)
+}
+
+fn java_enum_from_native<'local>(
+    env: &mut JNIEnv<'local>,
+    class_name: &str,
+    value: jint,
+) -> Result<JObject<'local>, jint> {
+    env.call_static_method(
+        class_name,
+        "fromNative",
+        format!("(I)L{class_name};"),
+        &[JValue::Int(value)],
+    )
+    .and_then(|value| value.l())
+    .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)
+}
+
+fn java_string_from_c_ptr<'local>(
+    env: &mut JNIEnv<'local>,
+    value: *const c_char,
+) -> Result<JString<'local>, jint> {
+    if value.is_null() {
+        return Err(sys::MLN_STATUS_INVALID_ARGUMENT);
+    }
+    let value = unsafe { CStr::from_ptr(value) }
+        .to_str()
+        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
+    env.new_string(value)
+        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)
+}
+
+fn java_optional_long<'local>(
+    env: &mut JNIEnv<'local>,
+    value: Option<jlong>,
+) -> Result<JObject<'local>, jint> {
+    match value {
+        Some(value) => {
+            let value = env
+                .call_static_method(
+                    "java/lang/Long",
+                    "valueOf",
+                    "(J)Ljava/lang/Long;",
+                    &[JValue::Long(value)],
+                )
+                .and_then(|value| value.l())
+                .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
+            java_optional_object(env, Some(&value))
+        }
+        None => java_optional_object(env, None),
+    }
+}
+
+fn native_resource_response<'local>(
+    env: &mut JNIEnv<'local>,
+    response: &JObject<'local>,
+) -> Result<NativeResourceResponse, jint> {
+    if response.is_null() {
+        return Err(sys::MLN_STATUS_INVALID_ARGUMENT);
+    }
+    let bytes = env
+        .call_method(response, "bytes", "()[B", &[])
+        .and_then(|value| value.l())
+        .map(JByteArray::from)
+        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
+    let bytes = env
+        .convert_byte_array(&bytes)
+        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
+    let error_message = java_nullable_string_method(env, response, "errorMessage")?;
+    let etag = java_nullable_string_method(env, response, "etag")?;
+    let mut raw = sys::mln_resource_response {
+        size: std::mem::size_of::<sys::mln_resource_response>() as u32,
+        status: java_int_method(env, response, "status")? as u32,
+        error_reason: java_int_method(env, response, "errorReason")? as u32,
+        bytes: if bytes.is_empty() {
+            std::ptr::null()
+        } else {
+            bytes.as_ptr()
+        },
+        byte_count: bytes.len(),
+        error_message: error_message
+            .as_ref()
+            .map_or(std::ptr::null(), |value| value.as_ptr()),
+        must_revalidate: java_boolean_method(env, response, "mustRevalidate")?,
+        has_modified: false,
+        modified_unix_ms: 0,
+        has_expires: false,
+        expires_unix_ms: 0,
+        etag: etag
+            .as_ref()
+            .map_or(std::ptr::null(), |value| value.as_ptr()),
+        has_retry_after: false,
+        retry_after_unix_ms: 0,
+    };
+    if let Some(value) = java_nullable_long_method(env, response, "modifiedUnixMs")? {
+        raw.has_modified = true;
+        raw.modified_unix_ms = value;
+    }
+    if let Some(value) = java_nullable_long_method(env, response, "expiresUnixMs")? {
+        raw.has_expires = true;
+        raw.expires_unix_ms = value;
+    }
+    if let Some(value) = java_nullable_long_method(env, response, "retryAfterUnixMs")? {
+        raw.has_retry_after = true;
+        raw.retry_after_unix_ms = value;
+    }
+    Ok(NativeResourceResponse {
+        raw,
+        _bytes: bytes,
+        _error_message: error_message,
+        _etag: etag,
+    })
+}
+
+fn java_int_method<'local>(
+    env: &mut JNIEnv<'local>,
+    value: &JObject<'local>,
+    method: &str,
+) -> Result<jint, jint> {
+    env.call_method(value, method, "()I", &[])
+        .and_then(|value| value.i())
+        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)
+}
+
+fn java_nullable_string_method<'local>(
+    env: &mut JNIEnv<'local>,
+    value: &JObject<'local>,
+    method: &str,
+) -> Result<Option<CString>, jint> {
+    let value = env
+        .call_method(value, method, "()Ljava/lang/String;", &[])
+        .and_then(|value| value.l())
+        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
+    if value.is_null() {
+        return Ok(None);
+    }
+    let value = JString::from(value);
+    let value = env
+        .get_string(&value)
+        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
+    CString::new(String::from(value))
+        .map(Some)
+        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)
+}
+
+fn java_nullable_long_method<'local>(
+    env: &mut JNIEnv<'local>,
+    value: &JObject<'local>,
+    method: &str,
+) -> Result<Option<i64>, jint> {
+    let value = env
+        .call_method(value, method, "()Ljava/lang/Long;", &[])
+        .and_then(|value| value.l())
+        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
+    if value.is_null() {
+        return Ok(None);
+    }
+    env.call_method(&value, "longValue", "()J", &[])
+        .and_then(|value| value.j())
+        .map(Some)
+        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)
 }
 
 extern "system" fn runtime_set_resource_transform<'local>(

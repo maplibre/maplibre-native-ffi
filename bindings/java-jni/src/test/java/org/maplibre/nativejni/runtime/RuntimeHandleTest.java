@@ -12,6 +12,7 @@ import org.maplibre.nativejni.geo.LatLng;
 import org.maplibre.nativejni.geo.LatLngBounds;
 import org.maplibre.nativejni.offline.OfflineRegionDefinition;
 import org.maplibre.nativejni.offline.OfflineRegionDownloadState;
+import org.maplibre.nativejni.resource.ResourceProviderDecision;
 import org.maplibre.nativejni.test.NativeTestSupport;
 
 class RuntimeHandleTest {
@@ -104,6 +105,13 @@ class RuntimeHandleTest {
           runtime.startSetOfflineRegionDownloadState(123, OfflineRegionDownloadState.INACTIVE));
       runtime.discardOfflineOperation(runtime.startInvalidateOfflineRegion(123));
       runtime.discardOfflineOperation(runtime.startDeleteOfflineRegion(123));
+    }
+  }
+
+  @Test
+  void resourceProviderLifecycleCrossesNativeBoundary() {
+    try (var runtime = RuntimeHandle.create()) {
+      runtime.setResourceProvider((request, handle) -> ResourceProviderDecision.PASS_THROUGH);
     }
   }
 

@@ -28,6 +28,7 @@ public final class RuntimeHandle implements AutoCloseable {
   private final HandleState state;
   private final ConcurrentHashMap<Long, WeakReference<MapHandle>> liveMaps =
       new ConcurrentHashMap<>();
+  private ResourceProviderState resourceProvider;
   private ResourceTransformState resourceTransform;
 
   private RuntimeHandle(long handle) {
@@ -355,7 +356,13 @@ public final class RuntimeHandle implements AutoCloseable {
   }
 
   public void setResourceProvider(ResourceProviderCallback callback) {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    var outState = new long[1];
+    Status.check(
+        RuntimeNative.mln_runtime_set_resource_provider(
+            state.requireLiveAddress(), Objects.requireNonNull(callback, "callback"), outState));
+    closeQuietly(resourceProvider);
+    resourceProvider = new ResourceProviderState(outState[0]);
   }
 
   public Optional<RuntimeEvent> pollEvent() {
@@ -397,6 +404,8 @@ public final class RuntimeHandle implements AutoCloseable {
         () -> {
           closeQuietly(resourceTransform);
           resourceTransform = null;
+          closeQuietly(resourceProvider);
+          resourceProvider = null;
         });
   }
 
