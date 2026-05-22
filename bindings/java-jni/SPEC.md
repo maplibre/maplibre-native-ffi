@@ -691,19 +691,19 @@ Add JNI-specific tests:
 
 ## Completion checklist
 
-- [ ] All Java FFM source parity inventory files exist under
+- [x] All Java FFM source parity inventory files exist under
       `org.maplibre.nativejni` with matching Java FFM visibility.
-- [ ] All internal and package-private implementation inventory files exist or
+- [x] All internal and package-private implementation inventory files exist or
       have recorded replacements.
-- [ ] Every C API function listed in the native method coverage map has a JNI
+- [x] Every C API function listed in the native method coverage map has a JNI
       implementation or a recorded unsupported reason in the differences table.
-- [ ] Java JNI tests pass on supported JVM host variants.
-- [ ] JVM native distribution packaging and Android/AAR packaging/load tests are
+- [x] Java JNI tests pass on supported JVM host variants.
+- [x] JVM native distribution packaging and Android/AAR packaging/load tests are
       recorded as out of scope until packaging targets exist.
-- [ ] `mise run //bindings/java-jni:build` passes.
-- [ ] `mise run //bindings/java-jni:native:build` passes.
-- [ ] `cargo test -p maplibre-native-jni` passes.
-- [ ] `./gradlew :bindings:java-jni:javadoc` passes.
-- [ ] Kotlin common facade compatibility has been checked against the Kotlin
+- [x] `mise run //bindings/java-jni:build` passes.
+- [x] `mise run //bindings/java-jni:native:build` passes.
+- [x] `cargo test -p maplibre-native-jni` passes.
+- [x] `./gradlew :bindings:java-jni:javadoc` passes.
+- [x] Kotlin common facade compatibility has been checked against the Kotlin
       binding conventions when the facade is available.
-- [ ] Local JVM native loading works through the documented loader paths.
+- [x] Local JVM native loading works through the documented loader paths.
