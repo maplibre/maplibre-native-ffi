@@ -18,8 +18,12 @@ use maplibre_native_core::error::capture_thread_diagnostic;
 use maplibre_native_core::geojson as core_geojson;
 use maplibre_native_core::geometry as core_geometry;
 use maplibre_native_core::json as core_json;
+use maplibre_native_core::query as core_query;
 use maplibre_native_core::runtime as core_runtime;
-use maplibre_native_core::{LatLng as CoreLatLng, LatLngBounds as CoreLatLngBounds};
+use maplibre_native_core::{
+    LatLng as CoreLatLng, LatLngBounds as CoreLatLngBounds, ScreenBox as CoreScreenBox,
+    ScreenPoint as CoreScreenPoint,
+};
 use maplibre_native_sys as sys;
 
 const BRIDGE_CLASS: &str = "org/maplibre/nativejni/internal/bridge/NativeBridge";
@@ -240,24 +244,37 @@ mod registration {
         register_map(vm)?;
         register_camera(vm)?;
         register_projection(vm)?;
-        register_no_arg_status_class(
+        let mut query_methods = no_arg_status_methods(&[
+            "mln_rendered_feature_query_options_default",
+            "mln_source_feature_query_options_default",
+            "mln_rendered_query_geometry_point",
+            "mln_rendered_query_geometry_box",
+            "mln_rendered_query_geometry_line_string",
+            "mln_feature_query_result_count",
+            "mln_feature_query_result_get",
+            "mln_feature_query_result_destroy",
+            "mln_feature_extension_result_get",
+            "mln_feature_extension_result_destroy",
+        ]);
+        query_methods.push(NativeMethod {
+            name: "mln_render_session_query_rendered_features".into(),
+            sig: "(JLorg/maplibre/nativejni/query/RenderedQueryGeometry;Lorg/maplibre/nativejni/query/RenderedFeatureQueryOptions;[Ljava/lang/Object;)I".into(),
+            fn_ptr: render_session_query_rendered_features as *mut c_void,
+        });
+        query_methods.push(NativeMethod {
+            name: "mln_render_session_query_source_features".into(),
+            sig: "(JLjava/lang/String;Lorg/maplibre/nativejni/query/SourceFeatureQueryOptions;[Ljava/lang/Object;)I".into(),
+            fn_ptr: render_session_query_source_features as *mut c_void,
+        });
+        query_methods.push(NativeMethod {
+            name: "mln_render_session_query_feature_extensions".into(),
+            sig: "(JLjava/lang/String;Lorg/maplibre/nativejni/geo/Feature;Ljava/lang/String;Ljava/lang/String;Lorg/maplibre/nativejni/json/JsonValue;[Ljava/lang/Object;)I".into(),
+            fn_ptr: render_session_query_feature_extensions as *mut c_void,
+        });
+        register_methods(
             vm,
             "org/maplibre/nativejni/internal/bridge/QueryNative",
-            &[
-                "mln_rendered_feature_query_options_default",
-                "mln_source_feature_query_options_default",
-                "mln_rendered_query_geometry_point",
-                "mln_rendered_query_geometry_box",
-                "mln_rendered_query_geometry_line_string",
-                "mln_render_session_query_rendered_features",
-                "mln_render_session_query_source_features",
-                "mln_render_session_query_feature_extensions",
-                "mln_feature_query_result_count",
-                "mln_feature_query_result_get",
-                "mln_feature_query_result_destroy",
-                "mln_feature_extension_result_get",
-                "mln_feature_extension_result_destroy",
-            ],
+            query_methods,
         )?;
         let mut render_session_methods = no_arg_status_methods(&[
             "mln_render_session_set_feature_state",
@@ -5762,6 +5779,609 @@ fn optional_integer(env: &mut JNIEnv<'_>, value: &JObject<'_>) -> Result<Option<
         .and_then(|value| value.i())
         .map(|value| Some(value as u32))
         .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)
+}
+
+extern "system" fn render_session_query_rendered_features<'local>(
+    mut env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    session: jlong,
+    geometry: JObject<'local>,
+    options: JObject<'local>,
+    out_features: JObjectArray<'local>,
+) -> jint {
+    catch_unwind(AssertUnwindSafe(|| {
+        if out_features.is_null() || env.get_array_length(&out_features).unwrap_or(0) < 1 {
+            return sys::MLN_STATUS_INVALID_ARGUMENT;
+        }
+        let geometry = match java_rendered_query_geometry(&mut env, &geometry) {
+            Ok(value) => value,
+            Err(status) => return status,
+        };
+        let geometry = core_query::rendered_query_geometry_to_native(&geometry);
+        let options = if options.is_null() {
+            None
+        } else {
+            match java_rendered_feature_query_options(&mut env, &options) {
+                Ok(value) => Some(value),
+                Err(status) => return status,
+            }
+        };
+        let native_options = match options
+            .as_ref()
+            .map(core_query::rendered_feature_query_options_to_native)
+            .transpose()
+        {
+            Ok(value) => value,
+            Err(_) => return sys::MLN_STATUS_INVALID_ARGUMENT,
+        };
+        let mut result: *mut sys::mln_feature_query_result = std::ptr::null_mut();
+        let status = unsafe {
+            sys::mln_render_session_query_rendered_features(
+                session as *mut sys::mln_render_session,
+                geometry.as_ptr(),
+                native_options
+                    .as_ref()
+                    .map_or(std::ptr::null(), |value| value.as_ptr()),
+                &mut result,
+            )
+        };
+        if status != sys::MLN_STATUS_OK {
+            return status;
+        }
+        java_feature_query_result_object(&mut env, result, &out_features)
+    }))
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+extern "system" fn render_session_query_source_features<'local>(
+    mut env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    session: jlong,
+    source_id: JString<'local>,
+    options: JObject<'local>,
+    out_features: JObjectArray<'local>,
+) -> jint {
+    catch_unwind(AssertUnwindSafe(|| {
+        if out_features.is_null() || env.get_array_length(&out_features).unwrap_or(0) < 1 {
+            return sys::MLN_STATUS_INVALID_ARGUMENT;
+        }
+        let (source_id_storage, source_id_view) = match string_view(&mut env, &source_id) {
+            Ok(value) => value,
+            Err(status) => return status,
+        };
+        let options = if options.is_null() {
+            None
+        } else {
+            match java_source_feature_query_options(&mut env, &options) {
+                Ok(value) => Some(value),
+                Err(status) => return status,
+            }
+        };
+        let native_options = match options
+            .as_ref()
+            .map(core_query::source_feature_query_options_to_native)
+            .transpose()
+        {
+            Ok(value) => value,
+            Err(_) => return sys::MLN_STATUS_INVALID_ARGUMENT,
+        };
+        let mut result: *mut sys::mln_feature_query_result = std::ptr::null_mut();
+        let _keep_alive = source_id_storage;
+        let status = unsafe {
+            sys::mln_render_session_query_source_features(
+                session as *mut sys::mln_render_session,
+                source_id_view,
+                native_options
+                    .as_ref()
+                    .map_or(std::ptr::null(), |value| value.as_ptr()),
+                &mut result,
+            )
+        };
+        if status != sys::MLN_STATUS_OK {
+            return status;
+        }
+        java_feature_query_result_object(&mut env, result, &out_features)
+    }))
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+extern "system" fn render_session_query_feature_extensions<'local>(
+    mut env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    session: jlong,
+    source_id: JString<'local>,
+    feature: JObject<'local>,
+    extension: JString<'local>,
+    extension_field: JString<'local>,
+    arguments: JObject<'local>,
+    out_result: JObjectArray<'local>,
+) -> jint {
+    catch_unwind(AssertUnwindSafe(|| {
+        if out_result.is_null() || env.get_array_length(&out_result).unwrap_or(0) < 1 {
+            return sys::MLN_STATUS_INVALID_ARGUMENT;
+        }
+        let (source_id_storage, source_id_view) = match string_view(&mut env, &source_id) {
+            Ok(value) => value,
+            Err(status) => return status,
+        };
+        let feature = match java_feature(&mut env, &feature, 0) {
+            Ok(value) => value,
+            Err(status) => return status,
+        };
+        let feature = match core_geojson::feature_try_to_native(&feature, 0) {
+            Ok(value) => value,
+            Err(_) => return sys::MLN_STATUS_INVALID_ARGUMENT,
+        };
+        let (extension_storage, extension_view) = match string_view(&mut env, &extension) {
+            Ok(value) => value,
+            Err(status) => return status,
+        };
+        let (field_storage, field_view) = match string_view(&mut env, &extension_field) {
+            Ok(value) => value,
+            Err(status) => return status,
+        };
+        let arguments = if arguments.is_null() {
+            None
+        } else {
+            match java_native_json_value(&mut env, &arguments) {
+                Ok(value) => Some(value),
+                Err(status) => return status,
+            }
+        };
+        let mut result: *mut sys::mln_feature_extension_result = std::ptr::null_mut();
+        let _keep_alive = (source_id_storage, extension_storage, field_storage);
+        let status = unsafe {
+            sys::mln_render_session_query_feature_extensions(
+                session as *mut sys::mln_render_session,
+                source_id_view,
+                feature.as_ptr(),
+                extension_view,
+                field_view,
+                arguments
+                    .as_ref()
+                    .map_or(std::ptr::null(), |value| value.as_ptr()),
+                &mut result,
+            )
+        };
+        if status != sys::MLN_STATUS_OK {
+            return status;
+        }
+        java_feature_extension_result_object(&mut env, result, &out_result)
+    }))
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+fn java_feature_query_result_object<'local>(
+    env: &mut JNIEnv<'local>,
+    result: *mut sys::mln_feature_query_result,
+    out_features: &JObjectArray<'local>,
+) -> jint {
+    let Some(result) = NonNull::new(result) else {
+        return sys::MLN_STATUS_INVALID_ARGUMENT;
+    };
+    let features = match unsafe { core_query::copy_feature_query_result(result) } {
+        Ok(value) => value,
+        Err(_) => return sys::MLN_STATUS_INVALID_ARGUMENT,
+    };
+    let list = match java_queried_feature_list(env, &features) {
+        Ok(value) => value,
+        Err(status) => return status,
+    };
+    if env.set_object_array_element(out_features, 0, list).is_err() {
+        sys::MLN_STATUS_INVALID_ARGUMENT
+    } else {
+        sys::MLN_STATUS_OK
+    }
+}
+
+fn java_feature_extension_result_object<'local>(
+    env: &mut JNIEnv<'local>,
+    result: *mut sys::mln_feature_extension_result,
+    out_result: &JObjectArray<'local>,
+) -> jint {
+    let Some(result) = NonNull::new(result) else {
+        return sys::MLN_STATUS_INVALID_ARGUMENT;
+    };
+    let result = match unsafe { core_query::copy_feature_extension_result(result) } {
+        Ok(value) => value,
+        Err(_) => return sys::MLN_STATUS_INVALID_ARGUMENT,
+    };
+    let object = match java_feature_extension_result(env, &result) {
+        Ok(value) => value,
+        Err(status) => return status,
+    };
+    if env.set_object_array_element(out_result, 0, object).is_err() {
+        sys::MLN_STATUS_INVALID_ARGUMENT
+    } else {
+        sys::MLN_STATUS_OK
+    }
+}
+
+fn java_rendered_query_geometry<'local>(
+    env: &mut JNIEnv<'local>,
+    value: &JObject<'local>,
+) -> Result<core_query::RenderedQueryGeometry, jint> {
+    if value.is_null() {
+        return Err(sys::MLN_STATUS_INVALID_ARGUMENT);
+    }
+    if env
+        .is_instance_of(
+            value,
+            "org/maplibre/nativejni/query/RenderedQueryGeometry$Point",
+        )
+        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?
+    {
+        let point = env
+            .call_method(
+                value,
+                "point",
+                "()Lorg/maplibre/nativejni/geo/ScreenPoint;",
+                &[],
+            )
+            .and_then(|value| value.l())
+            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
+        return java_screen_point(env, &point).map(core_query::RenderedQueryGeometry::Point);
+    }
+    if env
+        .is_instance_of(
+            value,
+            "org/maplibre/nativejni/query/RenderedQueryGeometry$Box",
+        )
+        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?
+    {
+        let box_value = env
+            .call_method(
+                value,
+                "box",
+                "()Lorg/maplibre/nativejni/geo/ScreenBox;",
+                &[],
+            )
+            .and_then(|value| value.l())
+            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
+        let min = env
+            .call_method(
+                &box_value,
+                "min",
+                "()Lorg/maplibre/nativejni/geo/ScreenPoint;",
+                &[],
+            )
+            .and_then(|value| value.l())
+            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
+        let max = env
+            .call_method(
+                &box_value,
+                "max",
+                "()Lorg/maplibre/nativejni/geo/ScreenPoint;",
+                &[],
+            )
+            .and_then(|value| value.l())
+            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
+        return Ok(core_query::RenderedQueryGeometry::Box(CoreScreenBox::new(
+            java_screen_point(env, &min)?,
+            java_screen_point(env, &max)?,
+        )));
+    }
+    if env
+        .is_instance_of(
+            value,
+            "org/maplibre/nativejni/query/RenderedQueryGeometry$LineString",
+        )
+        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?
+    {
+        let points = java_object_list_method(env, value, "points")?;
+        let size = java_list_size(env, &points)?;
+        let mut values = Vec::with_capacity(size);
+        for index in 0..size {
+            let point = java_list_get(env, &points, index)?;
+            values.push(java_screen_point(env, &point)?);
+        }
+        return Ok(core_query::RenderedQueryGeometry::LineString(values));
+    }
+    Err(sys::MLN_STATUS_INVALID_ARGUMENT)
+}
+
+fn java_screen_point<'local>(
+    env: &mut JNIEnv<'local>,
+    point: &JObject<'local>,
+) -> Result<CoreScreenPoint, jint> {
+    if point.is_null() {
+        return Err(sys::MLN_STATUS_INVALID_ARGUMENT);
+    }
+    let x = env
+        .call_method(point, "x", "()D", &[])
+        .and_then(|value| value.d())
+        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
+    let y = env
+        .call_method(point, "y", "()D", &[])
+        .and_then(|value| value.d())
+        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
+    Ok(CoreScreenPoint::new(x, y))
+}
+
+fn java_rendered_feature_query_options<'local>(
+    env: &mut JNIEnv<'local>,
+    value: &JObject<'local>,
+) -> Result<core_query::RenderedFeatureQueryOptions, jint> {
+    let mut options = core_query::RenderedFeatureQueryOptions::new();
+    if java_boolean_method(env, value, "hasLayerIds")? {
+        options = options.with_layer_ids(java_string_list_method(env, value, "layerIds")?);
+    }
+    if java_boolean_method(env, value, "hasFilter")? {
+        let filter = env
+            .call_method(
+                value,
+                "filter",
+                "()Lorg/maplibre/nativejni/json/JsonValue;",
+                &[],
+            )
+            .and_then(|value| value.l())
+            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
+        options = options.with_filter(java_json_value(env, &filter, 0)?);
+    }
+    Ok(options)
+}
+
+fn java_source_feature_query_options<'local>(
+    env: &mut JNIEnv<'local>,
+    value: &JObject<'local>,
+) -> Result<core_query::SourceFeatureQueryOptions, jint> {
+    let mut options = core_query::SourceFeatureQueryOptions::new();
+    if java_boolean_method(env, value, "hasSourceLayerIds")? {
+        options =
+            options.with_source_layer_ids(java_string_list_method(env, value, "sourceLayerIds")?);
+    }
+    if java_boolean_method(env, value, "hasFilter")? {
+        let filter = env
+            .call_method(
+                value,
+                "filter",
+                "()Lorg/maplibre/nativejni/json/JsonValue;",
+                &[],
+            )
+            .and_then(|value| value.l())
+            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
+        options = options.with_filter(java_json_value(env, &filter, 0)?);
+    }
+    Ok(options)
+}
+
+fn java_queried_feature_list<'local>(
+    env: &mut JNIEnv<'local>,
+    features: &[core_query::QueriedFeature],
+) -> Result<JObject<'local>, jint> {
+    let list = java_array_list(env)?;
+    for feature in features {
+        let feature = java_queried_feature_object(env, feature)?;
+        java_array_list_add(env, &list, &feature)?;
+    }
+    Ok(list)
+}
+
+fn java_queried_feature_object<'local>(
+    env: &mut JNIEnv<'local>,
+    feature: &core_query::QueriedFeature,
+) -> Result<JObject<'local>, jint> {
+    let java_feature = java_feature_object_from_core(env, &feature.feature)?;
+    let source_id = java_optional_string(env, feature.source_id.as_deref())?;
+    let source_layer_id = java_optional_string(env, feature.source_layer_id.as_deref())?;
+    let state = match &feature.state {
+        Some(value) => {
+            let value = java_json_value_object(env, value)?;
+            java_optional_object(env, Some(&value))?
+        }
+        None => java_optional_object(env, None)?,
+    };
+    env.new_object(
+        "org/maplibre/nativejni/query/QueriedFeature",
+        "(Lorg/maplibre/nativejni/geo/Feature;Ljava/util/Optional;Ljava/util/Optional;Ljava/util/Optional;)V",
+        &[
+            JValue::Object(&java_feature),
+            JValue::Object(&source_id),
+            JValue::Object(&source_layer_id),
+            JValue::Object(&state),
+        ],
+    )
+    .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)
+}
+
+fn java_feature_extension_result<'local>(
+    env: &mut JNIEnv<'local>,
+    result: &core_query::FeatureExtensionResult,
+) -> Result<JObject<'local>, jint> {
+    match result {
+        core_query::FeatureExtensionResult::Value(value) => {
+            let value = java_json_value_object(env, value)?;
+            env.new_object(
+                "org/maplibre/nativejni/query/FeatureExtensionResult$Value",
+                "(Lorg/maplibre/nativejni/json/JsonValue;)V",
+                &[JValue::Object(&value)],
+            )
+            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)
+        }
+        core_query::FeatureExtensionResult::FeatureCollection(features) => {
+            let list = java_feature_object_list(env, features)?;
+            env.new_object(
+                "org/maplibre/nativejni/query/FeatureExtensionResult$FeatureCollection",
+                "(Ljava/util/List;)V",
+                &[JValue::Object(&list)],
+            )
+            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)
+        }
+        core_query::FeatureExtensionResult::Unknown(raw_type) => env
+            .new_object(
+                "org/maplibre/nativejni/query/FeatureExtensionResult$Unknown",
+                "(I)V",
+                &[JValue::Int(*raw_type as jint)],
+            )
+            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT),
+        _ => Err(sys::MLN_STATUS_INVALID_ARGUMENT),
+    }
+}
+
+fn java_feature_object_list<'local>(
+    env: &mut JNIEnv<'local>,
+    features: &[core_geojson::Feature],
+) -> Result<JObject<'local>, jint> {
+    let list = java_array_list(env)?;
+    for feature in features {
+        let feature = java_feature_object_from_core(env, feature)?;
+        java_array_list_add(env, &list, &feature)?;
+    }
+    Ok(list)
+}
+
+fn java_feature_object_from_core<'local>(
+    env: &mut JNIEnv<'local>,
+    feature: &core_geojson::Feature,
+) -> Result<JObject<'local>, jint> {
+    let geometry = java_geometry_object(env, &feature.geometry)?;
+    let properties = java_json_member_object_list(env, &feature.properties)?;
+    let identifier = java_feature_identifier_object(env, &feature.identifier)?;
+    env.new_object(
+        "org/maplibre/nativejni/geo/Feature",
+        "(Lorg/maplibre/nativejni/geo/Geometry;Ljava/util/List;Lorg/maplibre/nativejni/geo/FeatureIdentifier;)V",
+        &[
+            JValue::Object(&geometry),
+            JValue::Object(&properties),
+            JValue::Object(&identifier),
+        ],
+    )
+    .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)
+}
+
+fn java_json_member_object_list<'local>(
+    env: &mut JNIEnv<'local>,
+    members: &[core_json::JsonMember],
+) -> Result<JObject<'local>, jint> {
+    let list = java_array_list(env)?;
+    for member in members {
+        let key = env
+            .new_string(&member.key)
+            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
+        let value = java_json_value_object(env, &member.value)?;
+        let member = env
+            .new_object(
+                "org/maplibre/nativejni/json/JsonValue$Member",
+                "(Ljava/lang/String;Lorg/maplibre/nativejni/json/JsonValue;)V",
+                &[JValue::Object(&key), JValue::Object(&value)],
+            )
+            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
+        java_array_list_add(env, &list, &member)?;
+    }
+    Ok(list)
+}
+
+fn java_feature_identifier_object<'local>(
+    env: &mut JNIEnv<'local>,
+    identifier: &core_geojson::FeatureIdentifier,
+) -> Result<JObject<'local>, jint> {
+    match identifier {
+        core_geojson::FeatureIdentifier::Null => env
+            .get_static_field(
+                "org/maplibre/nativejni/geo/FeatureIdentifier$Null",
+                "INSTANCE",
+                "Lorg/maplibre/nativejni/geo/FeatureIdentifier$Null;",
+            )
+            .and_then(|value| value.l())
+            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT),
+        core_geojson::FeatureIdentifier::UInt(value) => env
+            .new_object(
+                "org/maplibre/nativejni/geo/FeatureIdentifier$UInt",
+                "(J)V",
+                &[JValue::Long(*value as jlong)],
+            )
+            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT),
+        core_geojson::FeatureIdentifier::Int(value) => env
+            .new_object(
+                "org/maplibre/nativejni/geo/FeatureIdentifier$Int",
+                "(J)V",
+                &[JValue::Long(*value as jlong)],
+            )
+            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT),
+        core_geojson::FeatureIdentifier::Double(value) => env
+            .new_object(
+                "org/maplibre/nativejni/geo/FeatureIdentifier$DoubleValue",
+                "(D)V",
+                &[JValue::Double(*value)],
+            )
+            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT),
+        core_geojson::FeatureIdentifier::String(value) => {
+            let value = env
+                .new_string(value)
+                .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
+            env.new_object(
+                "org/maplibre/nativejni/geo/FeatureIdentifier$StringValue",
+                "(Ljava/lang/String;)V",
+                &[JValue::Object(&value)],
+            )
+            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)
+        }
+        _ => Err(sys::MLN_STATUS_INVALID_ARGUMENT),
+    }
+}
+
+fn java_optional_string<'local>(
+    env: &mut JNIEnv<'local>,
+    value: Option<&str>,
+) -> Result<JObject<'local>, jint> {
+    match value {
+        Some(value) => {
+            let value = env
+                .new_string(value)
+                .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
+            java_optional_object(env, Some(&value))
+        }
+        None => java_optional_object(env, None),
+    }
+}
+
+fn java_optional_object<'local>(
+    env: &mut JNIEnv<'local>,
+    value: Option<&JObject<'local>>,
+) -> Result<JObject<'local>, jint> {
+    match value {
+        Some(value) => env
+            .call_static_method(
+                "java/util/Optional",
+                "of",
+                "(Ljava/lang/Object;)Ljava/util/Optional;",
+                &[JValue::Object(value)],
+            )
+            .and_then(|value| value.l())
+            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT),
+        None => env
+            .call_static_method("java/util/Optional", "empty", "()Ljava/util/Optional;", &[])
+            .and_then(|value| value.l())
+            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT),
+    }
+}
+
+fn java_boolean_method<'local>(
+    env: &mut JNIEnv<'local>,
+    value: &JObject<'local>,
+    method: &str,
+) -> Result<bool, jint> {
+    env.call_method(value, method, "()Z", &[])
+        .and_then(|value| value.z())
+        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)
+}
+
+fn java_string_list_method<'local>(
+    env: &mut JNIEnv<'local>,
+    value: &JObject<'local>,
+    method: &str,
+) -> Result<Vec<String>, jint> {
+    let list = java_object_list_method(env, value, method)?;
+    let size = java_list_size(env, &list)?;
+    let mut strings = Vec::with_capacity(size);
+    for index in 0..size {
+        let value = JString::from(java_list_get(env, &list, index)?);
+        let value = env
+            .get_string(&value)
+            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
+        strings.push(String::from(value));
+    }
+    Ok(strings)
 }
 
 extern "system" fn map_set_debug_options(

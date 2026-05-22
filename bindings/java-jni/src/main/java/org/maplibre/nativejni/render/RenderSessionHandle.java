@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Objects;
 import org.maplibre.nativejni.geo.Feature;
 import org.maplibre.nativejni.internal.access.InternalAccess;
+import org.maplibre.nativejni.internal.bridge.QueryNative;
 import org.maplibre.nativejni.internal.bridge.RenderSessionNative;
 import org.maplibre.nativejni.internal.bridge.SurfaceNative;
 import org.maplibre.nativejni.internal.bridge.TextureNative;
@@ -207,26 +208,26 @@ public final class RenderSessionHandle implements AutoCloseable {
   }
 
   public List<QueriedFeature> queryRenderedFeatures(RenderedQueryGeometry geometry) {
-    throw unsupported();
+    return queryRenderedFeaturesInternal(geometry, null);
   }
 
   public List<QueriedFeature> queryRenderedFeatures(
       RenderedQueryGeometry geometry, RenderedFeatureQueryOptions options) {
-    throw unsupported();
+    return queryRenderedFeaturesInternal(geometry, Objects.requireNonNull(options, "options"));
   }
 
   public List<QueriedFeature> querySourceFeatures(String sourceId) {
-    throw unsupported();
+    return querySourceFeaturesInternal(sourceId, null);
   }
 
   public List<QueriedFeature> querySourceFeatures(
       String sourceId, SourceFeatureQueryOptions options) {
-    throw unsupported();
+    return querySourceFeaturesInternal(sourceId, Objects.requireNonNull(options, "options"));
   }
 
   public FeatureExtensionResult queryFeatureExtension(
       String sourceId, Feature feature, String extension, String extensionField) {
-    throw unsupported();
+    return queryFeatureExtension(sourceId, feature, extension, extensionField, null);
   }
 
   public FeatureExtensionResult queryFeatureExtension(
@@ -235,7 +236,18 @@ public final class RenderSessionHandle implements AutoCloseable {
       String extension,
       String extensionField,
       JsonValue arguments) {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    var outResult = new Object[1];
+    Status.check(
+        QueryNative.mln_render_session_query_feature_extensions(
+            state.requireLiveAddress(),
+            Objects.requireNonNull(sourceId, "sourceId"),
+            Objects.requireNonNull(feature, "feature"),
+            Objects.requireNonNull(extension, "extension"),
+            Objects.requireNonNull(extensionField, "extensionField"),
+            arguments,
+            outResult));
+    return (FeatureExtensionResult) outResult[0];
   }
 
   public TextureImageInfo textureImageInfo() {
@@ -256,6 +268,36 @@ public final class RenderSessionHandle implements AutoCloseable {
 
   public VulkanOwnedTextureFrameHandle acquireVulkanOwnedTextureFrame() {
     throw unsupported();
+  }
+
+  private List<QueriedFeature> queryRenderedFeaturesInternal(
+      RenderedQueryGeometry geometry, RenderedFeatureQueryOptions options) {
+    NativeLibrary.ensureLoaded();
+    var outFeatures = new Object[1];
+    Status.check(
+        QueryNative.mln_render_session_query_rendered_features(
+            state.requireLiveAddress(),
+            Objects.requireNonNull(geometry, "geometry"),
+            options,
+            outFeatures));
+    @SuppressWarnings("unchecked")
+    var features = (List<QueriedFeature>) outFeatures[0];
+    return features;
+  }
+
+  private List<QueriedFeature> querySourceFeaturesInternal(
+      String sourceId, SourceFeatureQueryOptions options) {
+    NativeLibrary.ensureLoaded();
+    var outFeatures = new Object[1];
+    Status.check(
+        QueryNative.mln_render_session_query_source_features(
+            state.requireLiveAddress(),
+            Objects.requireNonNull(sourceId, "sourceId"),
+            options,
+            outFeatures));
+    @SuppressWarnings("unchecked")
+    var features = (List<QueriedFeature>) outFeatures[0];
+    return features;
   }
 
   public void close() {
