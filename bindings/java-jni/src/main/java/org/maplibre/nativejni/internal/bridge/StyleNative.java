@@ -31,9 +31,15 @@ public final class StyleNative {
   public static native int mln_map_get_style_source_type(
       long map, String sourceId, int[] outSourceType, boolean[] outFound);
 
-  public static native int mln_map_get_style_source_info();
+  public static native int mln_map_get_style_source_info(
+      long map, String sourceId, int[] outInfo, boolean[] outFlags, long[] outSizes);
 
-  public static native int mln_map_copy_style_source_attribution();
+  public static native int mln_map_copy_style_source_attribution(
+      long map,
+      String sourceId,
+      byte[] outAttribution,
+      long[] outAttributionSize,
+      boolean[] outFound);
 
   public static native int mln_map_list_style_source_ids(long map, Object[] outSourceIds);
 

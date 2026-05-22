@@ -25,6 +25,7 @@ import org.maplibre.nativejni.geo.Vec3;
 import org.maplibre.nativejni.internal.access.InternalAccess;
 import org.maplibre.nativejni.runtime.RuntimeHandle;
 import org.maplibre.nativejni.style.LocationIndicatorImageKind;
+import org.maplibre.nativejni.style.SourceInfo;
 import org.maplibre.nativejni.style.SourceType;
 import org.maplibre.nativejni.test.NativeTestSupport;
 
@@ -233,6 +234,12 @@ class MapHandleTest {
         assertTrue(map.removeStyleSource("vector-source"));
         map.addRasterSourceUrl("raster-source", "https://example.com/raster.json");
         assertEquals(SourceType.RASTER, map.styleSourceType("raster-source").orElseThrow());
+        SourceInfo rasterInfo = map.styleSourceInfo("raster-source").orElseThrow();
+        assertEquals(SourceType.RASTER, rasterInfo.type());
+        assertEquals(SourceType.RASTER.nativeValue(), rasterInfo.nativeType());
+        assertFalse(rasterInfo.volatileSource());
+        assertTrue(rasterInfo.attribution().isEmpty());
+        assertTrue(map.styleSourceInfo("missing-source").isEmpty());
         assertTrue(map.removeStyleSource("raster-source"));
         map.addRasterDemSourceUrl("raster-dem-source", "https://example.com/raster-dem.json");
         assertEquals(SourceType.RASTER_DEM, map.styleSourceType("raster-dem-source").orElseThrow());

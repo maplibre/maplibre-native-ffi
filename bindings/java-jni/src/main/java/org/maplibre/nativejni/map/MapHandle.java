@@ -1,6 +1,7 @@
 package org.maplibre.nativejni.map;
 
 import java.lang.foreign.MemorySegment;
+import java.nio.charset.StandardCharsets;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Objects;
@@ -142,7 +143,47 @@ public final class MapHandle implements AutoCloseable {
   }
 
   public Optional<SourceInfo> styleSourceInfo(String sourceId) {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    var sourceIdValue = Objects.requireNonNull(sourceId, "sourceId");
+    var outInfo = new int[1];
+    var outFlags = new boolean[3];
+    var outSizes = new long[1];
+    Status.check(
+        StyleNative.mln_map_get_style_source_info(
+            state.requireLiveAddress(), sourceIdValue, outInfo, outFlags, outSizes));
+    if (!outFlags[0]) {
+      return Optional.empty();
+    }
+    var attribution = Optional.<String>empty();
+    if (outFlags[2]) {
+      var attributionSize = Math.toIntExact(outSizes[0]);
+      if (attributionSize == 0) {
+        attribution = Optional.of("");
+      } else {
+        var outAttribution = new byte[attributionSize];
+        var outAttributionSize = new long[1];
+        var outAttributionFound = new boolean[1];
+        Status.check(
+            StyleNative.mln_map_copy_style_source_attribution(
+                state.requireLiveAddress(),
+                sourceIdValue,
+                outAttribution,
+                outAttributionSize,
+                outAttributionFound));
+        if (!outAttributionFound[0]) {
+          return Optional.empty();
+        }
+        attribution =
+            Optional.of(
+                new String(
+                    outAttribution,
+                    0,
+                    Math.toIntExact(outAttributionSize[0]),
+                    StandardCharsets.UTF_8));
+      }
+    }
+    return Optional.of(
+        new SourceInfo(SourceType.fromNative(outInfo[0]), outInfo[0], outFlags[1], attribution));
   }
 
   public List<String> styleSourceIds() {

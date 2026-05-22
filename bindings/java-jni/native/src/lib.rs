@@ -3,7 +3,7 @@
 //! This crate owns JNI registration and delegates shared ABI adaptation to the
 //! Rust binding crates.
 
-use std::ffi::{CString, c_void};
+use std::ffi::{CString, c_char, c_void};
 use std::panic::{AssertUnwindSafe, catch_unwind};
 
 use jni::objects::{
@@ -268,8 +268,6 @@ mod registration {
             "mln_style_id_list_get",
             "mln_style_id_list_destroy",
             "mln_map_add_style_source_json",
-            "mln_map_get_style_source_info",
-            "mln_map_copy_style_source_attribution",
             "mln_map_add_geojson_source_data",
             "mln_map_set_geojson_source_data",
             "mln_map_add_vector_source_tiles",
@@ -314,6 +312,16 @@ mod registration {
             name: "mln_map_get_style_source_type".into(),
             sig: "(JLjava/lang/String;[I[Z)I".into(),
             fn_ptr: map_get_style_source_type as *mut c_void,
+        });
+        style_methods.push(NativeMethod {
+            name: "mln_map_get_style_source_info".into(),
+            sig: "(JLjava/lang/String;[I[Z[J)I".into(),
+            fn_ptr: map_get_style_source_info as *mut c_void,
+        });
+        style_methods.push(NativeMethod {
+            name: "mln_map_copy_style_source_attribution".into(),
+            sig: "(JLjava/lang/String;[B[J[Z)I".into(),
+            fn_ptr: map_copy_style_source_attribution as *mut c_void,
         });
         style_methods.push(NativeMethod {
             name: "mln_map_list_style_source_ids".into(),
@@ -1795,6 +1803,144 @@ extern "system" fn map_get_style_source_type(
                     .is_err())
         {
             return sys::MLN_STATUS_INVALID_ARGUMENT;
+        }
+        result
+    }))
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+extern "system" fn map_get_style_source_info(
+    mut env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    map: jlong,
+    source_id: JString<'_>,
+    out_info: JIntArray<'_>,
+    out_flags: JBooleanArray<'_>,
+    out_sizes: JLongArray<'_>,
+) -> jint {
+    catch_unwind(AssertUnwindSafe(|| {
+        if out_info.is_null()
+            || out_flags.is_null()
+            || out_sizes.is_null()
+            || env.get_array_length(&out_info).unwrap_or(0) < 1
+            || env.get_array_length(&out_flags).unwrap_or(0) < 3
+            || env.get_array_length(&out_sizes).unwrap_or(0) < 1
+        {
+            return sys::MLN_STATUS_INVALID_ARGUMENT;
+        }
+        let (source_id, source_id_view) = match string_view(&mut env, &source_id) {
+            Ok(value) => value,
+            Err(status) => return status,
+        };
+        let _source_id = source_id;
+        let mut info = sys::mln_style_source_info {
+            size: std::mem::size_of::<sys::mln_style_source_info>() as u32,
+            type_: 0,
+            id_size: 0,
+            is_volatile: false,
+            has_attribution: false,
+            attribution_size: 0,
+        };
+        let mut found = false;
+        let result = unsafe {
+            sys::mln_map_get_style_source_info(
+                map as *mut sys::mln_map,
+                source_id_view,
+                &mut info,
+                &mut found,
+            )
+        };
+        if result == sys::MLN_STATUS_OK
+            && (env
+                .set_int_array_region(&out_info, 0, &[info.type_ as jint])
+                .is_err()
+                || env
+                    .set_boolean_array_region(
+                        &out_flags,
+                        0,
+                        &[
+                            jboolean::from(found),
+                            jboolean::from(info.is_volatile),
+                            jboolean::from(info.has_attribution),
+                        ],
+                    )
+                    .is_err()
+                || env
+                    .set_long_array_region(&out_sizes, 0, &[info.attribution_size as jlong])
+                    .is_err())
+        {
+            return sys::MLN_STATUS_INVALID_ARGUMENT;
+        }
+        result
+    }))
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+extern "system" fn map_copy_style_source_attribution(
+    mut env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    map: jlong,
+    source_id: JString<'_>,
+    out_attribution: JByteArray<'_>,
+    out_attribution_size: JLongArray<'_>,
+    out_found: JBooleanArray<'_>,
+) -> jint {
+    catch_unwind(AssertUnwindSafe(|| {
+        if out_attribution.is_null()
+            || out_attribution_size.is_null()
+            || out_found.is_null()
+            || env.get_array_length(&out_attribution_size).unwrap_or(0) < 1
+            || env.get_array_length(&out_found).unwrap_or(0) < 1
+        {
+            return sys::MLN_STATUS_INVALID_ARGUMENT;
+        }
+        let capacity = env.get_array_length(&out_attribution).unwrap_or(-1);
+        if capacity < 0 {
+            return sys::MLN_STATUS_INVALID_ARGUMENT;
+        }
+        let (source_id, source_id_view) = match string_view(&mut env, &source_id) {
+            Ok(value) => value,
+            Err(status) => return status,
+        };
+        let _source_id = source_id;
+        let mut buffer = vec![0_i8; capacity as usize];
+        let mut attribution_size = 0_usize;
+        let mut found = false;
+        let out_ptr = if buffer.is_empty() {
+            std::ptr::null_mut()
+        } else {
+            buffer.as_mut_ptr() as *mut c_char
+        };
+        let result = unsafe {
+            sys::mln_map_copy_style_source_attribution(
+                map as *mut sys::mln_map,
+                source_id_view,
+                out_ptr,
+                buffer.len(),
+                &mut attribution_size,
+                &mut found,
+            )
+        };
+        if result == sys::MLN_STATUS_OK {
+            if attribution_size > buffer.len() {
+                return sys::MLN_STATUS_INVALID_ARGUMENT;
+            }
+            if attribution_size > 0
+                && env
+                    .set_byte_array_region(&out_attribution, 0, &buffer[..attribution_size])
+                    .is_err()
+            {
+                return sys::MLN_STATUS_INVALID_ARGUMENT;
+            }
+            if env
+                .set_long_array_region(&out_attribution_size, 0, &[attribution_size as jlong])
+                .is_err()
+                || env
+                    .set_boolean_array_region(&out_found, 0, &[jboolean::from(found)])
+                    .is_err()
+            {
+                return sys::MLN_STATUS_INVALID_ARGUMENT;
+            }
         }
         result
     }))
