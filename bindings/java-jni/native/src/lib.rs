@@ -259,53 +259,108 @@ mod registration {
                 "mln_feature_extension_result_destroy",
             ],
         )?;
-        register_no_arg_status_class(
+        let mut render_session_methods = no_arg_status_methods(&[
+            "mln_render_session_set_feature_state",
+            "mln_render_session_get_feature_state",
+            "mln_render_session_remove_feature_state",
+            "mln_json_snapshot_get",
+            "mln_json_snapshot_destroy",
+        ]);
+        render_session_methods.push(NativeMethod {
+            name: "mln_render_session_resize".into(),
+            sig: "(JIID)I".into(),
+            fn_ptr: render_session_resize as *mut c_void,
+        });
+        render_session_methods.push(NativeMethod {
+            name: "mln_render_session_render_update".into(),
+            sig: "(J)I".into(),
+            fn_ptr: render_session_render_update as *mut c_void,
+        });
+        render_session_methods.push(NativeMethod {
+            name: "mln_render_session_detach".into(),
+            sig: "(J)I".into(),
+            fn_ptr: render_session_detach as *mut c_void,
+        });
+        render_session_methods.push(NativeMethod {
+            name: "mln_render_session_destroy".into(),
+            sig: "(J)I".into(),
+            fn_ptr: render_session_destroy as *mut c_void,
+        });
+        render_session_methods.push(NativeMethod {
+            name: "mln_render_session_reduce_memory_use".into(),
+            sig: "(J)I".into(),
+            fn_ptr: render_session_reduce_memory_use as *mut c_void,
+        });
+        render_session_methods.push(NativeMethod {
+            name: "mln_render_session_clear_data".into(),
+            sig: "(J)I".into(),
+            fn_ptr: render_session_clear_data as *mut c_void,
+        });
+        render_session_methods.push(NativeMethod {
+            name: "mln_render_session_dump_debug_logs".into(),
+            sig: "(J)I".into(),
+            fn_ptr: render_session_dump_debug_logs as *mut c_void,
+        });
+        register_methods(
             vm,
             "org/maplibre/nativejni/internal/bridge/RenderSessionNative",
-            &[
-                "mln_render_session_resize",
-                "mln_render_session_render_update",
-                "mln_render_session_detach",
-                "mln_render_session_destroy",
-                "mln_render_session_reduce_memory_use",
-                "mln_render_session_clear_data",
-                "mln_render_session_dump_debug_logs",
-                "mln_render_session_set_feature_state",
-                "mln_render_session_get_feature_state",
-                "mln_render_session_remove_feature_state",
-                "mln_json_snapshot_get",
-                "mln_json_snapshot_destroy",
-            ],
+            render_session_methods,
         )?;
-        register_no_arg_status_class(
+        let mut surface_methods = no_arg_status_methods(&[
+            "mln_metal_surface_descriptor_default",
+            "mln_vulkan_surface_descriptor_default",
+        ]);
+        surface_methods.push(NativeMethod {
+            name: "mln_metal_surface_attach".into(),
+            sig: "(JIIDJJ[J)I".into(),
+            fn_ptr: metal_surface_attach as *mut c_void,
+        });
+        surface_methods.push(NativeMethod {
+            name: "mln_vulkan_surface_attach".into(),
+            sig: "(JIIDJJJJIJ[J)I".into(),
+            fn_ptr: vulkan_surface_attach as *mut c_void,
+        });
+        register_methods(
             vm,
             "org/maplibre/nativejni/internal/bridge/SurfaceNative",
-            &[
-                "mln_metal_surface_descriptor_default",
-                "mln_vulkan_surface_descriptor_default",
-                "mln_metal_surface_attach",
-                "mln_vulkan_surface_attach",
-            ],
+            surface_methods,
         )?;
-        register_no_arg_status_class(
+        let mut texture_methods = no_arg_status_methods(&[
+            "mln_metal_owned_texture_descriptor_default",
+            "mln_metal_borrowed_texture_descriptor_default",
+            "mln_vulkan_owned_texture_descriptor_default",
+            "mln_vulkan_borrowed_texture_descriptor_default",
+            "mln_texture_image_info_default",
+            "mln_texture_read_premultiplied_rgba8",
+            "mln_metal_owned_texture_acquire_frame",
+            "mln_metal_owned_texture_release_frame",
+            "mln_vulkan_owned_texture_acquire_frame",
+            "mln_vulkan_owned_texture_release_frame",
+        ]);
+        texture_methods.push(NativeMethod {
+            name: "mln_metal_owned_texture_attach".into(),
+            sig: "(JIIDJ[J)I".into(),
+            fn_ptr: metal_owned_texture_attach as *mut c_void,
+        });
+        texture_methods.push(NativeMethod {
+            name: "mln_metal_borrowed_texture_attach".into(),
+            sig: "(JIIDJ[J)I".into(),
+            fn_ptr: metal_borrowed_texture_attach as *mut c_void,
+        });
+        texture_methods.push(NativeMethod {
+            name: "mln_vulkan_owned_texture_attach".into(),
+            sig: "(JIIDJJJJI[J)I".into(),
+            fn_ptr: vulkan_owned_texture_attach as *mut c_void,
+        });
+        texture_methods.push(NativeMethod {
+            name: "mln_vulkan_borrowed_texture_attach".into(),
+            sig: "(JIIDJJJJIJJIILjava/lang/Integer;[J)I".into(),
+            fn_ptr: vulkan_borrowed_texture_attach as *mut c_void,
+        });
+        register_methods(
             vm,
             "org/maplibre/nativejni/internal/bridge/TextureNative",
-            &[
-                "mln_metal_owned_texture_descriptor_default",
-                "mln_metal_borrowed_texture_descriptor_default",
-                "mln_vulkan_owned_texture_descriptor_default",
-                "mln_vulkan_borrowed_texture_descriptor_default",
-                "mln_texture_image_info_default",
-                "mln_metal_owned_texture_attach",
-                "mln_metal_borrowed_texture_attach",
-                "mln_vulkan_owned_texture_attach",
-                "mln_vulkan_borrowed_texture_attach",
-                "mln_texture_read_premultiplied_rgba8",
-                "mln_metal_owned_texture_acquire_frame",
-                "mln_metal_owned_texture_release_frame",
-                "mln_vulkan_owned_texture_acquire_frame",
-                "mln_vulkan_owned_texture_release_frame",
-            ],
+            texture_methods,
         )?;
         let mut style_methods = no_arg_status_methods(&[
             "mln_style_tile_source_options_default",
@@ -5408,6 +5463,305 @@ fn string_view(
         size: string.as_bytes().len(),
     };
     Ok((string, view))
+}
+
+extern "system" fn render_session_resize(
+    _env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    session: jlong,
+    width: jint,
+    height: jint,
+    scale_factor: jdouble,
+) -> jint {
+    catch_unwind(|| unsafe {
+        sys::mln_render_session_resize(
+            session as *mut sys::mln_render_session,
+            width as u32,
+            height as u32,
+            scale_factor,
+        )
+    })
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+extern "system" fn render_session_render_update(
+    _env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    session: jlong,
+) -> jint {
+    render_session_unary(session, sys::mln_render_session_render_update)
+}
+
+extern "system" fn render_session_detach(
+    _env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    session: jlong,
+) -> jint {
+    render_session_unary(session, sys::mln_render_session_detach)
+}
+
+extern "system" fn render_session_destroy(
+    _env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    session: jlong,
+) -> jint {
+    render_session_unary(session, sys::mln_render_session_destroy)
+}
+
+extern "system" fn render_session_reduce_memory_use(
+    _env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    session: jlong,
+) -> jint {
+    render_session_unary(session, sys::mln_render_session_reduce_memory_use)
+}
+
+extern "system" fn render_session_clear_data(
+    _env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    session: jlong,
+) -> jint {
+    render_session_unary(session, sys::mln_render_session_clear_data)
+}
+
+extern "system" fn render_session_dump_debug_logs(
+    _env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    session: jlong,
+) -> jint {
+    render_session_unary(session, sys::mln_render_session_dump_debug_logs)
+}
+
+fn render_session_unary(
+    session: jlong,
+    operation: unsafe extern "C" fn(*mut sys::mln_render_session) -> sys::mln_status,
+) -> jint {
+    catch_unwind(|| unsafe { operation(session as *mut sys::mln_render_session) })
+        .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+extern "system" fn metal_owned_texture_attach(
+    env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    map: jlong,
+    width: jint,
+    height: jint,
+    scale_factor: jdouble,
+    device: jlong,
+    out_session: JLongArray<'_>,
+) -> jint {
+    attach_render_session(env, out_session, |out| unsafe {
+        let mut descriptor = sys::mln_metal_owned_texture_descriptor_default();
+        fill_extent(&mut descriptor.extent, width, height, scale_factor);
+        descriptor.context.device = native_pointer(device);
+        sys::mln_metal_owned_texture_attach(map as *mut sys::mln_map, &descriptor, out)
+    })
+}
+
+extern "system" fn metal_borrowed_texture_attach(
+    env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    map: jlong,
+    width: jint,
+    height: jint,
+    scale_factor: jdouble,
+    texture: jlong,
+    out_session: JLongArray<'_>,
+) -> jint {
+    attach_render_session(env, out_session, |out| unsafe {
+        let mut descriptor = sys::mln_metal_borrowed_texture_descriptor_default();
+        fill_extent(&mut descriptor.extent, width, height, scale_factor);
+        descriptor.texture = native_pointer(texture);
+        sys::mln_metal_borrowed_texture_attach(map as *mut sys::mln_map, &descriptor, out)
+    })
+}
+
+extern "system" fn metal_surface_attach(
+    env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    map: jlong,
+    width: jint,
+    height: jint,
+    scale_factor: jdouble,
+    device: jlong,
+    layer: jlong,
+    out_session: JLongArray<'_>,
+) -> jint {
+    attach_render_session(env, out_session, |out| unsafe {
+        let mut descriptor = sys::mln_metal_surface_descriptor_default();
+        fill_extent(&mut descriptor.extent, width, height, scale_factor);
+        descriptor.context.device = native_pointer(device);
+        descriptor.layer = native_pointer(layer);
+        sys::mln_metal_surface_attach(map as *mut sys::mln_map, &descriptor, out)
+    })
+}
+
+extern "system" fn vulkan_owned_texture_attach(
+    env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    map: jlong,
+    width: jint,
+    height: jint,
+    scale_factor: jdouble,
+    instance: jlong,
+    physical_device: jlong,
+    device: jlong,
+    graphics_queue: jlong,
+    graphics_queue_family_index: jint,
+    out_session: JLongArray<'_>,
+) -> jint {
+    attach_render_session(env, out_session, |out| unsafe {
+        let mut descriptor = sys::mln_vulkan_owned_texture_descriptor_default();
+        fill_extent(&mut descriptor.extent, width, height, scale_factor);
+        fill_vulkan_context(
+            &mut descriptor.context,
+            instance,
+            physical_device,
+            device,
+            graphics_queue,
+            graphics_queue_family_index,
+        );
+        sys::mln_vulkan_owned_texture_attach(map as *mut sys::mln_map, &descriptor, out)
+    })
+}
+
+extern "system" fn vulkan_borrowed_texture_attach(
+    mut env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    map: jlong,
+    width: jint,
+    height: jint,
+    scale_factor: jdouble,
+    instance: jlong,
+    physical_device: jlong,
+    device: jlong,
+    graphics_queue: jlong,
+    graphics_queue_family_index: jint,
+    image: jlong,
+    image_view: jlong,
+    format: jint,
+    initial_layout: jint,
+    final_layout: JObject<'_>,
+    out_session: JLongArray<'_>,
+) -> jint {
+    let final_layout = match optional_integer(&mut env, &final_layout) {
+        Ok(value) => value,
+        Err(status) => return status,
+    };
+    attach_render_session(env, out_session, |out| unsafe {
+        let mut descriptor = sys::mln_vulkan_borrowed_texture_descriptor_default();
+        fill_extent(&mut descriptor.extent, width, height, scale_factor);
+        fill_vulkan_context(
+            &mut descriptor.context,
+            instance,
+            physical_device,
+            device,
+            graphics_queue,
+            graphics_queue_family_index,
+        );
+        descriptor.image = native_pointer(image);
+        descriptor.image_view = native_pointer(image_view);
+        descriptor.format = format as u32;
+        descriptor.initial_layout = initial_layout as u32;
+        if let Some(final_layout) = final_layout {
+            descriptor.final_layout = final_layout;
+        }
+        sys::mln_vulkan_borrowed_texture_attach(map as *mut sys::mln_map, &descriptor, out)
+    })
+}
+
+extern "system" fn vulkan_surface_attach(
+    env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    map: jlong,
+    width: jint,
+    height: jint,
+    scale_factor: jdouble,
+    instance: jlong,
+    physical_device: jlong,
+    device: jlong,
+    graphics_queue: jlong,
+    graphics_queue_family_index: jint,
+    surface: jlong,
+    out_session: JLongArray<'_>,
+) -> jint {
+    attach_render_session(env, out_session, |out| unsafe {
+        let mut descriptor = sys::mln_vulkan_surface_descriptor_default();
+        fill_extent(&mut descriptor.extent, width, height, scale_factor);
+        fill_vulkan_context(
+            &mut descriptor.context,
+            instance,
+            physical_device,
+            device,
+            graphics_queue,
+            graphics_queue_family_index,
+        );
+        descriptor.surface = native_pointer(surface);
+        sys::mln_vulkan_surface_attach(map as *mut sys::mln_map, &descriptor, out)
+    })
+}
+
+fn attach_render_session(
+    env: JNIEnv<'_>,
+    out_session: JLongArray<'_>,
+    operation: impl FnOnce(*mut *mut sys::mln_render_session) -> sys::mln_status,
+) -> jint {
+    catch_unwind(AssertUnwindSafe(|| {
+        if out_session.is_null() || env.get_array_length(&out_session).unwrap_or(0) < 1 {
+            return sys::MLN_STATUS_INVALID_ARGUMENT;
+        }
+        let mut session: *mut sys::mln_render_session = std::ptr::null_mut();
+        let result = operation(&mut session);
+        if result == sys::MLN_STATUS_OK
+            && env
+                .set_long_array_region(&out_session, 0, &[session as jlong])
+                .is_err()
+        {
+            return sys::MLN_STATUS_NATIVE_ERROR;
+        }
+        result
+    }))
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+fn fill_extent(
+    extent: &mut sys::mln_render_target_extent,
+    width: jint,
+    height: jint,
+    scale_factor: jdouble,
+) {
+    extent.width = width as u32;
+    extent.height = height as u32;
+    extent.scale_factor = scale_factor;
+}
+
+fn fill_vulkan_context(
+    context: &mut sys::mln_vulkan_context_descriptor,
+    instance: jlong,
+    physical_device: jlong,
+    device: jlong,
+    graphics_queue: jlong,
+    graphics_queue_family_index: jint,
+) {
+    context.instance = native_pointer(instance);
+    context.physical_device = native_pointer(physical_device);
+    context.device = native_pointer(device);
+    context.graphics_queue = native_pointer(graphics_queue);
+    context.graphics_queue_family_index = graphics_queue_family_index as u32;
+}
+
+fn native_pointer(value: jlong) -> *mut c_void {
+    value as usize as *mut c_void
+}
+
+fn optional_integer(env: &mut JNIEnv<'_>, value: &JObject<'_>) -> Result<Option<u32>, jint> {
+    if value.is_null() {
+        return Ok(None);
+    }
+    env.call_method(value, "intValue", "()I", &[])
+        .and_then(|value| value.i())
+        .map(|value| Some(value as u32))
+        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)
 }
 
 extern "system" fn map_set_debug_options(

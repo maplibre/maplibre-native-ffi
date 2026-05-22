@@ -806,28 +806,28 @@ public final class MapHandle implements AutoCloseable {
   }
 
   public RenderSessionHandle attachMetalOwnedTexture(MetalOwnedTextureDescriptor descriptor) {
-    throw unsupported();
+    return RenderSessionHandle.attachMetalOwnedTexture(this, descriptor);
   }
 
   public RenderSessionHandle attachMetalBorrowedTexture(MetalBorrowedTextureDescriptor descriptor) {
-    throw unsupported();
+    return RenderSessionHandle.attachMetalBorrowedTexture(this, descriptor);
   }
 
   public RenderSessionHandle attachVulkanOwnedTexture(VulkanOwnedTextureDescriptor descriptor) {
-    throw unsupported();
+    return RenderSessionHandle.attachVulkanOwnedTexture(this, descriptor);
   }
 
   public RenderSessionHandle attachVulkanBorrowedTexture(
       VulkanBorrowedTextureDescriptor descriptor) {
-    throw unsupported();
+    return RenderSessionHandle.attachVulkanBorrowedTexture(this, descriptor);
   }
 
   public RenderSessionHandle attachMetalSurface(MetalSurfaceDescriptor descriptor) {
-    throw unsupported();
+    return RenderSessionHandle.attachMetalSurface(this, descriptor);
   }
 
   public RenderSessionHandle attachVulkanSurface(VulkanSurfaceDescriptor descriptor) {
-    throw unsupported();
+    return RenderSessionHandle.attachVulkanSurface(this, descriptor);
   }
 
   public void requestRepaint() {
