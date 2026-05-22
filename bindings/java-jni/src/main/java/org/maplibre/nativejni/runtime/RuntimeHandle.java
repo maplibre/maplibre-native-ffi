@@ -53,8 +53,21 @@ public final class RuntimeHandle implements AutoCloseable {
     Status.check(RuntimeNative.mln_runtime_run_once(state.requireLiveAddress()));
   }
 
+  private <T> OfflineOperationHandle<T> offlineOperation(
+      long operationId, OfflineOperationKind kind, OfflineOperationResultKind resultKind) {
+    return new OfflineOperationHandle<>(this, operationId, kind, resultKind);
+  }
+
   public OfflineOperationHandle<Void> startAmbientCacheOperation(AmbientCacheOperation operation) {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    var outOperationId = new long[1];
+    Status.check(
+        RuntimeNative.mln_runtime_run_ambient_cache_operation_start(
+            state.requireLiveAddress(),
+            Objects.requireNonNull(operation, "operation").nativeValue(),
+            outOperationId));
+    return offlineOperation(
+        outOperationId[0], OfflineOperationKind.AMBIENT_CACHE, OfflineOperationResultKind.NONE);
   }
 
   public OfflineOperationHandle<OfflineRegionInfo> startCreateOfflineRegion(
@@ -137,7 +150,16 @@ public final class RuntimeHandle implements AutoCloseable {
   }
 
   public void discardOfflineOperation(OfflineOperationHandle<?> operation) {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    Objects.requireNonNull(operation, "operation");
+    if (operation.isClosed()) {
+      return;
+    }
+    var operationId = operation.requireLive(this);
+    Status.check(
+        RuntimeNative.mln_runtime_offline_operation_discard(
+            state.requireLiveAddress(), operationId));
+    operation.markConsumed();
   }
 
   public void setResourceTransform(ResourceTransformCallback callback) {

@@ -24,9 +24,10 @@ public final class RuntimeNative {
 
   public static native int mln_runtime_clear_resource_transform();
 
-  public static native int mln_runtime_run_ambient_cache_operation_start();
+  public static native int mln_runtime_run_ambient_cache_operation_start(
+      long runtime, int operation, long[] outOperationId);
 
-  public static native int mln_runtime_offline_operation_discard();
+  public static native int mln_runtime_offline_operation_discard(long runtime, long operationId);
 
   public static native int mln_runtime_destroy(long runtime);
 

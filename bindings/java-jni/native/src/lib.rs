@@ -327,8 +327,6 @@ mod registration {
             "mln_resource_request_release",
             "mln_runtime_set_resource_transform",
             "mln_runtime_clear_resource_transform",
-            "mln_runtime_run_ambient_cache_operation_start",
-            "mln_runtime_offline_operation_discard",
         ]);
         methods.push(NativeMethod {
             name: "mln_runtime_create".into(),
@@ -349,6 +347,16 @@ mod registration {
             name: "mln_runtime_poll_event".into(),
             sig: "(J[J[I[Z[D[Ljava/lang/String;)I".into(),
             fn_ptr: runtime_poll_event as *mut c_void,
+        });
+        methods.push(NativeMethod {
+            name: "mln_runtime_run_ambient_cache_operation_start".into(),
+            sig: "(JI[J)I".into(),
+            fn_ptr: runtime_run_ambient_cache_operation_start as *mut c_void,
+        });
+        methods.push(NativeMethod {
+            name: "mln_runtime_offline_operation_discard".into(),
+            sig: "(JJ)I".into(),
+            fn_ptr: runtime_offline_operation_discard as *mut c_void,
         });
         methods.push(NativeMethod {
             name: "mln_network_status_get".into(),
@@ -666,6 +674,52 @@ extern "system" fn runtime_destroy(_env: JNIEnv<'_>, _class: JClass<'_>, runtime
 extern "system" fn runtime_run_once(_env: JNIEnv<'_>, _class: JClass<'_>, runtime: jlong) -> jint {
     catch_unwind(|| unsafe { sys::mln_runtime_run_once(runtime as *mut sys::mln_runtime) })
         .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+extern "system" fn runtime_run_ambient_cache_operation_start(
+    env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    runtime: jlong,
+    operation: jint,
+    out_operation_id: JLongArray<'_>,
+) -> jint {
+    catch_unwind(AssertUnwindSafe(|| {
+        if out_operation_id.is_null() || env.get_array_length(&out_operation_id).unwrap_or(0) < 1 {
+            return sys::MLN_STATUS_INVALID_ARGUMENT;
+        }
+        let mut operation_id: sys::mln_offline_operation_id = 0;
+        let result = unsafe {
+            sys::mln_runtime_run_ambient_cache_operation_start(
+                runtime as *mut sys::mln_runtime,
+                operation as u32,
+                &mut operation_id,
+            )
+        };
+        if result == sys::MLN_STATUS_OK
+            && env
+                .set_long_array_region(&out_operation_id, 0, &[operation_id as jlong])
+                .is_err()
+        {
+            return sys::MLN_STATUS_INVALID_ARGUMENT;
+        }
+        result
+    }))
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+extern "system" fn runtime_offline_operation_discard(
+    _env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    runtime: jlong,
+    operation_id: jlong,
+) -> jint {
+    catch_unwind(|| unsafe {
+        sys::mln_runtime_offline_operation_discard(
+            runtime as *mut sys::mln_runtime,
+            operation_id as sys::mln_offline_operation_id,
+        )
+    })
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
 }
 
 extern "system" fn runtime_poll_event(

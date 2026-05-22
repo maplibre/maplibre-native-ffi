@@ -30,6 +30,22 @@ class RuntimeHandleTest {
   }
 
   @Test
+  void startsAndDiscardsAmbientCacheOperation() {
+    try (var runtime = RuntimeHandle.create()) {
+      var operation = runtime.startAmbientCacheOperation(AmbientCacheOperation.CLEAR);
+
+      assertFalse(operation.isClosed());
+      assertTrue(operation.id() != 0);
+      assertTrue(operation.kind() == OfflineOperationKind.AMBIENT_CACHE);
+      assertTrue(operation.resultKind() == OfflineOperationResultKind.NONE);
+
+      runtime.discardOfflineOperation(operation);
+      assertTrue(operation.isClosed());
+      runtime.discardOfflineOperation(operation);
+    }
+  }
+
+  @Test
   void pollEventReturnsEmptyWhenNativeQueueIsEmpty() {
     try (var runtime = RuntimeHandle.create()) {
       runtime.runOnce();
