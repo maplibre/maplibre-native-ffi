@@ -49,7 +49,8 @@ public final class TextureNative {
       Integer finalLayout,
       long[] outSession);
 
-  public static native int mln_texture_read_premultiplied_rgba8();
+  public static native int mln_texture_read_premultiplied_rgba8(
+      long session, byte[] outData, int[] outInfo, long[] outByteLength);
 
   public static native int mln_metal_owned_texture_acquire_frame();
 

@@ -44,6 +44,18 @@ public final class NativeBuffer implements AutoCloseable {
     return segment;
   }
 
+  synchronized void putByteArray(byte[] bytes, long requiredBytes) {
+    ensureCapacity(requiredBytes);
+    if (requiredBytes > bytes.length) {
+      throw new IllegalArgumentException("source byte array is smaller than required byte length");
+    }
+    if (requiredBytes > 0) {
+      segment
+          .asSlice(0, requiredBytes)
+          .copyFrom(MemorySegment.ofArray(bytes).asSlice(0, requiredBytes));
+    }
+  }
+
   synchronized void ensureCapacity(long requiredBytes) {
     ensureOpen();
     if (byteLength < requiredBytes) {

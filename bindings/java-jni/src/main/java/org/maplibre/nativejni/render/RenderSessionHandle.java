@@ -1,8 +1,10 @@
 package org.maplibre.nativejni.render;
 
 import java.lang.foreign.MemorySegment;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
+import org.maplibre.nativejni.error.MaplibreStatus;
 import org.maplibre.nativejni.geo.Feature;
 import org.maplibre.nativejni.internal.access.InternalAccess;
 import org.maplibre.nativejni.internal.bridge.QueryNative;
@@ -264,15 +266,48 @@ public final class RenderSessionHandle implements AutoCloseable {
   }
 
   public TextureImageInfo textureImageInfo() {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    var outInfo = new int[3];
+    var outByteLength = new long[1];
+    var status =
+        TextureNative.mln_texture_read_premultiplied_rgba8(
+            state.requireLiveAddress(), null, outInfo, outByteLength);
+    var info = textureImageInfo(outInfo, outByteLength);
+    if (status == MaplibreStatus.OK.nativeCode()
+        || (status == MaplibreStatus.INVALID_ARGUMENT.nativeCode() && info.byteLength() > 0)) {
+      return info;
+    }
+    Status.check(status);
+    throw new AssertionError("unreachable");
   }
 
   public TextureImageInfo readPremultipliedRgba8(NativeBuffer buffer) {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    Objects.requireNonNull(buffer, "buffer");
+    synchronized (buffer) {
+      var capacity = Math.toIntExact(buffer.byteLength());
+      var bytes = new byte[capacity];
+      var outInfo = new int[3];
+      var outByteLength = new long[1];
+      Status.check(
+          TextureNative.mln_texture_read_premultiplied_rgba8(
+              state.requireLiveAddress(), bytes, outInfo, outByteLength));
+      var info = textureImageInfo(outInfo, outByteLength);
+      buffer.putByteArray(bytes, info.byteLength());
+      return info;
+    }
   }
 
   public PremultipliedRgba8Image readPremultipliedRgba8() {
-    throw unsupported();
+    var info = textureImageInfo();
+    try (var buffer = NativeBuffer.allocate(info.byteLength())) {
+      var readInfo = readPremultipliedRgba8(buffer);
+      return new PremultipliedRgba8Image(
+          readInfo.width(),
+          readInfo.height(),
+          readInfo.stride(),
+          Arrays.copyOf(buffer.toByteArray(), Math.toIntExact(readInfo.byteLength())));
+    }
   }
 
   public MetalOwnedTextureFrameHandle acquireMetalOwnedTextureFrame() {
@@ -281,6 +316,10 @@ public final class RenderSessionHandle implements AutoCloseable {
 
   public VulkanOwnedTextureFrameHandle acquireVulkanOwnedTextureFrame() {
     throw unsupported();
+  }
+
+  private static TextureImageInfo textureImageInfo(int[] info, long[] byteLength) {
+    return new TextureImageInfo(info[0], info[1], info[2], byteLength[0]);
   }
 
   private List<QueriedFeature> queryRenderedFeaturesInternal(

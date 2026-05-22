@@ -379,12 +379,16 @@ mod registration {
             "mln_vulkan_owned_texture_descriptor_default",
             "mln_vulkan_borrowed_texture_descriptor_default",
             "mln_texture_image_info_default",
-            "mln_texture_read_premultiplied_rgba8",
             "mln_metal_owned_texture_acquire_frame",
             "mln_metal_owned_texture_release_frame",
             "mln_vulkan_owned_texture_acquire_frame",
             "mln_vulkan_owned_texture_release_frame",
         ]);
+        texture_methods.push(NativeMethod {
+            name: "mln_texture_read_premultiplied_rgba8".into(),
+            sig: "(J[B[I[J)I".into(),
+            fn_ptr: texture_read_premultiplied_rgba8 as *mut c_void,
+        });
         texture_methods.push(NativeMethod {
             name: "mln_metal_owned_texture_attach".into(),
             sig: "(JIIDJ[J)I".into(),
@@ -6694,6 +6698,75 @@ extern "system" fn vulkan_surface_attach(
         descriptor.surface = native_pointer(surface);
         sys::mln_vulkan_surface_attach(map as *mut sys::mln_map, &descriptor, out)
     })
+}
+
+extern "system" fn texture_read_premultiplied_rgba8(
+    env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    session: jlong,
+    out_data: JByteArray<'_>,
+    out_info: JIntArray<'_>,
+    out_byte_length: JLongArray<'_>,
+) -> jint {
+    catch_unwind(AssertUnwindSafe(|| {
+        if out_info.is_null()
+            || out_byte_length.is_null()
+            || env.get_array_length(&out_info).unwrap_or(0) < 3
+            || env.get_array_length(&out_byte_length).unwrap_or(0) < 1
+        {
+            return sys::MLN_STATUS_INVALID_ARGUMENT;
+        }
+        let capacity = if out_data.is_null() {
+            0
+        } else {
+            match env.get_array_length(&out_data) {
+                Ok(value) if value >= 0 => value as usize,
+                _ => return sys::MLN_STATUS_INVALID_ARGUMENT,
+            }
+        };
+        let mut buffer = vec![0_u8; capacity];
+        let mut info = unsafe { sys::mln_texture_image_info_default() };
+        let result = unsafe {
+            sys::mln_texture_read_premultiplied_rgba8(
+                session as *mut sys::mln_render_session,
+                if buffer.is_empty() {
+                    std::ptr::null_mut()
+                } else {
+                    buffer.as_mut_ptr()
+                },
+                buffer.len(),
+                &mut info,
+            )
+        };
+        if result == sys::MLN_STATUS_OK && !out_data.is_null() && info.byte_length > 0 {
+            if info.byte_length > buffer.len() {
+                return sys::MLN_STATUS_INVALID_ARGUMENT;
+            }
+            let signed: Vec<i8> = buffer[..info.byte_length]
+                .iter()
+                .copied()
+                .map(|value| value as i8)
+                .collect();
+            if env.set_byte_array_region(&out_data, 0, &signed).is_err() {
+                return sys::MLN_STATUS_INVALID_ARGUMENT;
+            }
+        }
+        if env
+            .set_int_array_region(
+                &out_info,
+                0,
+                &[info.width as jint, info.height as jint, info.stride as jint],
+            )
+            .is_err()
+            || env
+                .set_long_array_region(&out_byte_length, 0, &[info.byte_length as jlong])
+                .is_err()
+        {
+            return sys::MLN_STATUS_INVALID_ARGUMENT;
+        }
+        result
+    }))
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
 }
 
 fn attach_render_session(
