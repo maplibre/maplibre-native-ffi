@@ -424,6 +424,9 @@ backend = "core:rust"
 version = "6.3.1"
 backend = "core:swift"
 
+[tools.swift."platforms.macos-arm64"]
+checksum = "blake3:7c85377fa6d9bdbeec3f6724522835c59d31483906d5bee41ec41807eff0ab00"
+
 [[tools.zig]]
 version = "0.16.0"
 backend = "core:zig"
