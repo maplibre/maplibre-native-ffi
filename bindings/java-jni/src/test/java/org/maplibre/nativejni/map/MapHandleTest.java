@@ -17,6 +17,7 @@ import org.maplibre.nativejni.camera.CameraOptions;
 import org.maplibre.nativejni.camera.EdgeInsets;
 import org.maplibre.nativejni.camera.FreeCameraOptions;
 import org.maplibre.nativejni.error.InvalidStateException;
+import org.maplibre.nativejni.geo.Geometry;
 import org.maplibre.nativejni.geo.LatLng;
 import org.maplibre.nativejni.geo.LatLngBounds;
 import org.maplibre.nativejni.geo.Quaternion;
@@ -233,6 +234,12 @@ class MapHandleTest {
             map.cameraForLatLngs(List.of(bounds.southwest(), bounds.northeast()));
         assertTrue(coordinatesCamera.hasCenter());
         assertTrue(coordinatesCamera.hasZoom());
+
+        var geometryCamera =
+            map.cameraForGeometry(
+                Geometry.lineString(List.of(bounds.southwest(), bounds.northeast())), fit);
+        assertTrue(geometryCamera.hasCenter());
+        assertTrue(geometryCamera.hasZoom());
 
         var visibleBounds = map.latLngBoundsForCamera(new CameraOptions().center(0, 0).zoom(1));
         assertTrue(Double.isFinite(visibleBounds.southwest().latitude()));

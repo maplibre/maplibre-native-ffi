@@ -132,7 +132,14 @@ public final class CameraNative {
       boolean[] outCameraFields,
       double[] outCameraValues);
 
-  public static native int mln_map_camera_for_geometry();
+  public static native int mln_map_camera_for_geometry(
+      long map,
+      org.maplibre.nativejni.geo.Geometry geometry,
+      boolean hasFitOptions,
+      boolean[] fitFields,
+      double[] fitValues,
+      boolean[] outCameraFields,
+      double[] outCameraValues);
 
   public static native int mln_map_lat_lng_bounds_for_camera(
       long map, boolean[] cameraFields, double[] cameraValues, double[] outBounds);

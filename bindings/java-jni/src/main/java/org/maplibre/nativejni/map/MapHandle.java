@@ -1170,11 +1170,12 @@ public final class MapHandle implements AutoCloseable {
   }
 
   public CameraOptions cameraForGeometry(Geometry geometry) {
-    throw unsupported();
+    return cameraForGeometryInternal(geometry, null, false);
   }
 
   public CameraOptions cameraForGeometry(Geometry geometry, CameraFitOptions fitOptions) {
-    throw unsupported();
+    return cameraForGeometryInternal(
+        geometry, Objects.requireNonNull(fitOptions, "fitOptions"), true);
   }
 
   public LatLngBounds latLngBoundsForCamera(CameraOptions camera) {
@@ -1224,6 +1225,24 @@ public final class MapHandle implements AutoCloseable {
         CameraNative.mln_map_camera_for_lat_lngs(
             state.requireLiveAddress(),
             coordinateValues,
+            hasFitOptions,
+            nativeFit.fields(),
+            nativeFit.values(),
+            fields,
+            values));
+    return cameraFromNative(fields, values);
+  }
+
+  private CameraOptions cameraForGeometryInternal(
+      Geometry geometry, CameraFitOptions fitOptions, boolean hasFitOptions) {
+    NativeLibrary.ensureLoaded();
+    var nativeFit = fitToNative(fitOptions, hasFitOptions);
+    var fields = new boolean[CAMERA_FIELD_COUNT];
+    var values = new double[CAMERA_VALUE_COUNT];
+    Status.check(
+        CameraNative.mln_map_camera_for_geometry(
+            state.requireLiveAddress(),
+            Objects.requireNonNull(geometry, "geometry"),
             hasFitOptions,
             nativeFit.fields(),
             nativeFit.values(),

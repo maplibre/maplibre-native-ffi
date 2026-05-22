@@ -13,7 +13,9 @@ use jni::objects::{
 };
 use jni::sys::{JNI_VERSION_1_8, jboolean, jint, jlong, jstring};
 use jni::{JNIEnv, JavaVM, NativeMethod};
+use maplibre_native_core::LatLng as CoreLatLng;
 use maplibre_native_core::error::capture_thread_diagnostic;
+use maplibre_native_core::geometry as core_geometry;
 use maplibre_native_core::json as core_json;
 use maplibre_native_sys as sys;
 
@@ -790,7 +792,6 @@ mod registration {
             "mln_projection_mode_default",
             "mln_map_viewport_options_default",
             "mln_map_tile_options_default",
-            "mln_map_camera_for_geometry",
         ]);
         methods.push(NativeMethod {
             name: "mln_map_set_debug_options".into(),
@@ -851,6 +852,11 @@ mod registration {
             name: "mln_map_camera_for_lat_lngs".into(),
             sig: "(J[DZ[Z[D[Z[D)I".into(),
             fn_ptr: map_camera_for_lat_lngs as *mut c_void,
+        });
+        methods.push(NativeMethod {
+            name: "mln_map_camera_for_geometry".into(),
+            sig: "(JLorg/maplibre/nativejni/geo/Geometry;Z[Z[D[Z[D)I".into(),
+            fn_ptr: map_camera_for_geometry as *mut c_void,
         });
         methods.push(NativeMethod {
             name: "mln_map_lat_lng_bounds_for_camera".into(),
@@ -4059,6 +4065,161 @@ fn java_json_list<'local>(
     Ok(values)
 }
 
+fn java_native_geometry<'local>(
+    env: &mut JNIEnv<'local>,
+    value: &JObject<'local>,
+) -> Result<core_geometry::NativeGeometry, jint> {
+    let value = java_geometry(env, value, 0)?;
+    core_geometry::geometry_try_to_native(&value).map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)
+}
+
+fn java_geometry<'local>(
+    env: &mut JNIEnv<'local>,
+    value: &JObject<'local>,
+    depth: usize,
+) -> Result<core_geometry::Geometry, jint> {
+    if value.is_null() || depth > core_geometry::MAX_GEOMETRY_COLLECTION_DEPTH {
+        return Err(sys::MLN_STATUS_INVALID_ARGUMENT);
+    }
+    if env
+        .is_instance_of(value, "org/maplibre/nativejni/geo/Geometry$Empty")
+        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?
+    {
+        return Ok(core_geometry::Geometry::Empty);
+    }
+    if env
+        .is_instance_of(value, "org/maplibre/nativejni/geo/Geometry$Point")
+        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?
+    {
+        let coordinate = env
+            .call_method(
+                value,
+                "coordinate",
+                "()Lorg/maplibre/nativejni/geo/LatLng;",
+                &[],
+            )
+            .and_then(|value| value.l())
+            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
+        return java_lat_lng(env, &coordinate).map(core_geometry::Geometry::Point);
+    }
+    if env
+        .is_instance_of(value, "org/maplibre/nativejni/geo/Geometry$LineString")
+        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?
+    {
+        let coordinates = java_object_list_method(env, value, "coordinates")?;
+        return java_lat_lng_list(env, &coordinates).map(core_geometry::Geometry::LineString);
+    }
+    if env
+        .is_instance_of(value, "org/maplibre/nativejni/geo/Geometry$Polygon")
+        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?
+    {
+        let rings = java_object_list_method(env, value, "rings")?;
+        return java_lat_lng_nested_list(env, &rings).map(core_geometry::Geometry::Polygon);
+    }
+    if env
+        .is_instance_of(value, "org/maplibre/nativejni/geo/Geometry$MultiPoint")
+        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?
+    {
+        let coordinates = java_object_list_method(env, value, "coordinates")?;
+        return java_lat_lng_list(env, &coordinates).map(core_geometry::Geometry::MultiPoint);
+    }
+    if env
+        .is_instance_of(value, "org/maplibre/nativejni/geo/Geometry$MultiLineString")
+        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?
+    {
+        let lines = java_object_list_method(env, value, "lines")?;
+        return java_lat_lng_nested_list(env, &lines).map(core_geometry::Geometry::MultiLineString);
+    }
+    if env
+        .is_instance_of(value, "org/maplibre/nativejni/geo/Geometry$MultiPolygon")
+        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?
+    {
+        let polygons = java_object_list_method(env, value, "polygons")?;
+        return java_lat_lng_deep_list(env, &polygons).map(core_geometry::Geometry::MultiPolygon);
+    }
+    if env
+        .is_instance_of(value, "org/maplibre/nativejni/geo/Geometry$Collection")
+        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?
+    {
+        let geometries = java_object_list_method(env, value, "geometries")?;
+        let size = java_list_size(env, &geometries)?;
+        let mut values = Vec::with_capacity(size);
+        for index in 0..size {
+            let child = java_list_get(env, &geometries, index)?;
+            values.push(java_geometry(env, &child, depth + 1)?);
+        }
+        return Ok(core_geometry::Geometry::GeometryCollection(values));
+    }
+    Err(sys::MLN_STATUS_INVALID_ARGUMENT)
+}
+
+fn java_lat_lng<'local>(
+    env: &mut JNIEnv<'local>,
+    value: &JObject<'local>,
+) -> Result<CoreLatLng, jint> {
+    if value.is_null() {
+        return Err(sys::MLN_STATUS_INVALID_ARGUMENT);
+    }
+    let latitude = env
+        .call_method(value, "latitude", "()D", &[])
+        .and_then(|value| value.d())
+        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
+    let longitude = env
+        .call_method(value, "longitude", "()D", &[])
+        .and_then(|value| value.d())
+        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
+    Ok(CoreLatLng::new(latitude, longitude))
+}
+
+fn java_lat_lng_list<'local>(
+    env: &mut JNIEnv<'local>,
+    list: &JObject<'local>,
+) -> Result<Vec<CoreLatLng>, jint> {
+    let size = java_list_size(env, list)?;
+    let mut values = Vec::with_capacity(size);
+    for index in 0..size {
+        let value = java_list_get(env, list, index)?;
+        values.push(java_lat_lng(env, &value)?);
+    }
+    Ok(values)
+}
+
+fn java_lat_lng_nested_list<'local>(
+    env: &mut JNIEnv<'local>,
+    list: &JObject<'local>,
+) -> Result<Vec<Vec<CoreLatLng>>, jint> {
+    let size = java_list_size(env, list)?;
+    let mut values = Vec::with_capacity(size);
+    for index in 0..size {
+        let value = java_list_get(env, list, index)?;
+        values.push(java_lat_lng_list(env, &value)?);
+    }
+    Ok(values)
+}
+
+fn java_lat_lng_deep_list<'local>(
+    env: &mut JNIEnv<'local>,
+    list: &JObject<'local>,
+) -> Result<Vec<Vec<Vec<CoreLatLng>>>, jint> {
+    let size = java_list_size(env, list)?;
+    let mut values = Vec::with_capacity(size);
+    for index in 0..size {
+        let value = java_list_get(env, list, index)?;
+        values.push(java_lat_lng_nested_list(env, &value)?);
+    }
+    Ok(values)
+}
+
+fn java_object_list_method<'local>(
+    env: &mut JNIEnv<'local>,
+    value: &JObject<'local>,
+    method: &str,
+) -> Result<JObject<'local>, jint> {
+    env.call_method(value, method, "()Ljava/util/List;", &[])
+        .and_then(|value| value.l())
+        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)
+}
+
 fn java_list_size<'local>(env: &mut JNIEnv<'local>, list: &JObject<'local>) -> Result<usize, jint> {
     if list.is_null() {
         return Err(sys::MLN_STATUS_INVALID_ARGUMENT);
@@ -4382,6 +4543,47 @@ extern "system" fn map_camera_for_lat_lngs(
                 map as *mut sys::mln_map,
                 coordinates.as_ptr(),
                 coordinates.len(),
+                camera_fit_ptr(&fit_options),
+                &mut camera,
+            )
+        };
+        if result != sys::MLN_STATUS_OK {
+            return result;
+        }
+        write_camera_arrays(&env, &out_camera_fields, &out_camera_values, &camera)
+    }))
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+extern "system" fn map_camera_for_geometry<'local>(
+    mut env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    map: jlong,
+    geometry: JObject<'local>,
+    has_fit_options: jboolean,
+    fit_fields: JBooleanArray<'local>,
+    fit_values: JDoubleArray<'local>,
+    out_camera_fields: JBooleanArray<'local>,
+    out_camera_values: JDoubleArray<'local>,
+) -> jint {
+    catch_unwind(AssertUnwindSafe(|| {
+        if !camera_arrays_are_valid(&env, &out_camera_fields, &out_camera_values) {
+            return sys::MLN_STATUS_INVALID_ARGUMENT;
+        }
+        let geometry = match java_native_geometry(&mut env, &geometry) {
+            Ok(value) => value,
+            Err(status) => return status,
+        };
+        let fit_options =
+            match optional_camera_fit_options(&env, has_fit_options, &fit_fields, &fit_values) {
+                Ok(value) => value,
+                Err(status) => return status,
+            };
+        let mut camera = unsafe { sys::mln_camera_options_default() };
+        let result = unsafe {
+            sys::mln_map_camera_for_geometry(
+                map as *mut sys::mln_map,
+                geometry.as_ptr(),
                 camera_fit_ptr(&fit_options),
                 &mut camera,
             )
