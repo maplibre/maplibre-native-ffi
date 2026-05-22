@@ -63,6 +63,9 @@ runs:
 
     - name: Install mise toolchain
       uses: jdx/mise-action@1648a7812b9aeae629881980618f079932869151 # v4.0.1
+      env:
+        # Prefer lockfile URLs over GitHub/aqua API lookups to avoid rate limits.
+        MISE_LOCKED: "1"
       with:
         # TODO: unpin after mise/pixi resolve SLSA verification for Pixi's
         # binary-only release attestations.
@@ -70,7 +73,7 @@ runs:
         # https://github.com/prefix-dev/pixi/issues/6133
         version: 2026.5.7
         cache: true
-        cache_key_prefix: mise-v2
+        cache_key_prefix: mise-v3
         install: true
 
     # The mise action may restore Rust metadata without all rustup-managed

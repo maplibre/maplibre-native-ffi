@@ -5,6 +5,7 @@
 experimental_monorepo_root = true
 
 [settings]
+lockfile = true
 pin = true
 experimental = true
 python.uv_venv_auto = "create|source"
