@@ -7,6 +7,7 @@ import java.util.Set;
 import org.maplibre.nativejni.geo.LatLng;
 import org.maplibre.nativejni.geo.ProjectedMeters;
 import org.maplibre.nativejni.internal.bridge.BaseNative;
+import org.maplibre.nativejni.internal.bridge.ProjectionNative;
 import org.maplibre.nativejni.internal.bridge.RuntimeNative;
 import org.maplibre.nativejni.internal.loader.NativeLibrary;
 import org.maplibre.nativejni.internal.status.Status;
@@ -96,15 +97,21 @@ public final class Maplibre {
   public static ProjectedMeters projectedMetersForLatLng(LatLng coordinate) {
     NativeLibrary.ensureLoaded();
     Objects.requireNonNull(coordinate, "coordinate");
-    throw new UnsupportedOperationException(
-        "projectedMetersForLatLng is not implemented by the JNI bridge yet");
+    var outMeters = new double[2];
+    Status.check(
+        ProjectionNative.mln_projected_meters_for_lat_lng(
+            coordinate.latitude(), coordinate.longitude(), outMeters));
+    return new ProjectedMeters(outMeters[0], outMeters[1]);
   }
 
   /** Converts spherical Mercator projected meters to a geographic coordinate. */
   public static LatLng latLngForProjectedMeters(ProjectedMeters meters) {
     NativeLibrary.ensureLoaded();
     Objects.requireNonNull(meters, "meters");
-    throw new UnsupportedOperationException(
-        "latLngForProjectedMeters is not implemented by the JNI bridge yet");
+    var outCoordinate = new double[2];
+    Status.check(
+        ProjectionNative.mln_lat_lng_for_projected_meters(
+            meters.northing(), meters.easting(), outCoordinate));
+    return new LatLng(outCoordinate[0], outCoordinate[1]);
   }
 }

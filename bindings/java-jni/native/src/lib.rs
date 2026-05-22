@@ -528,10 +528,6 @@ mod registration {
             "mln_map_projection_set_camera",
             "mln_map_projection_set_visible_coordinates",
             "mln_map_projection_set_visible_geometry",
-            "mln_map_projection_pixel_for_lat_lng",
-            "mln_map_projection_lat_lng_for_pixel",
-            "mln_projected_meters_for_lat_lng",
-            "mln_lat_lng_for_projected_meters",
         ]);
         methods.push(NativeMethod {
             name: "mln_map_projection_create".into(),
@@ -542,6 +538,26 @@ mod registration {
             name: "mln_map_projection_destroy".into(),
             sig: "(J)I".into(),
             fn_ptr: projection_destroy as *mut c_void,
+        });
+        methods.push(NativeMethod {
+            name: "mln_map_projection_pixel_for_lat_lng".into(),
+            sig: "(JDD[D)I".into(),
+            fn_ptr: projection_pixel_for_lat_lng as *mut c_void,
+        });
+        methods.push(NativeMethod {
+            name: "mln_map_projection_lat_lng_for_pixel".into(),
+            sig: "(JDD[D)I".into(),
+            fn_ptr: projection_lat_lng_for_pixel as *mut c_void,
+        });
+        methods.push(NativeMethod {
+            name: "mln_projected_meters_for_lat_lng".into(),
+            sig: "(DD[D)I".into(),
+            fn_ptr: projected_meters_for_lat_lng as *mut c_void,
+        });
+        methods.push(NativeMethod {
+            name: "mln_lat_lng_for_projected_meters".into(),
+            sig: "(DD[D)I".into(),
+            fn_ptr: lat_lng_for_projected_meters as *mut c_void,
         });
         register_methods(
             vm,
@@ -1316,6 +1332,121 @@ extern "system" fn projection_destroy(
     catch_unwind(|| unsafe {
         sys::mln_map_projection_destroy(projection as *mut sys::mln_map_projection)
     })
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+extern "system" fn projection_pixel_for_lat_lng(
+    env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    projection: jlong,
+    latitude: f64,
+    longitude: f64,
+    out_point: JDoubleArray<'_>,
+) -> jint {
+    projection_get_double_pair(env, out_point, |out| unsafe {
+        let mut point = sys::mln_screen_point { x: 0.0, y: 0.0 };
+        let result = sys::mln_map_projection_pixel_for_lat_lng(
+            projection as *mut sys::mln_map_projection,
+            sys::mln_lat_lng {
+                latitude,
+                longitude,
+            },
+            &mut point,
+        );
+        out[0] = point.x;
+        out[1] = point.y;
+        result
+    })
+}
+
+extern "system" fn projection_lat_lng_for_pixel(
+    env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    projection: jlong,
+    x: f64,
+    y: f64,
+    out_coordinate: JDoubleArray<'_>,
+) -> jint {
+    projection_get_double_pair(env, out_coordinate, |out| unsafe {
+        let mut coordinate = sys::mln_lat_lng {
+            latitude: 0.0,
+            longitude: 0.0,
+        };
+        let result = sys::mln_map_projection_lat_lng_for_pixel(
+            projection as *mut sys::mln_map_projection,
+            sys::mln_screen_point { x, y },
+            &mut coordinate,
+        );
+        out[0] = coordinate.latitude;
+        out[1] = coordinate.longitude;
+        result
+    })
+}
+
+extern "system" fn projected_meters_for_lat_lng(
+    env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    latitude: f64,
+    longitude: f64,
+    out_meters: JDoubleArray<'_>,
+) -> jint {
+    projection_get_double_pair(env, out_meters, |out| unsafe {
+        let mut meters = sys::mln_projected_meters {
+            northing: 0.0,
+            easting: 0.0,
+        };
+        let result = sys::mln_projected_meters_for_lat_lng(
+            sys::mln_lat_lng {
+                latitude,
+                longitude,
+            },
+            &mut meters,
+        );
+        out[0] = meters.northing;
+        out[1] = meters.easting;
+        result
+    })
+}
+
+extern "system" fn lat_lng_for_projected_meters(
+    env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    northing: f64,
+    easting: f64,
+    out_coordinate: JDoubleArray<'_>,
+) -> jint {
+    projection_get_double_pair(env, out_coordinate, |out| unsafe {
+        let mut coordinate = sys::mln_lat_lng {
+            latitude: 0.0,
+            longitude: 0.0,
+        };
+        let result = sys::mln_lat_lng_for_projected_meters(
+            sys::mln_projected_meters { northing, easting },
+            &mut coordinate,
+        );
+        out[0] = coordinate.latitude;
+        out[1] = coordinate.longitude;
+        result
+    })
+}
+
+fn projection_get_double_pair(
+    env: JNIEnv<'_>,
+    out_array: JDoubleArray<'_>,
+    fill: impl FnOnce(&mut [f64; 2]) -> sys::mln_status,
+) -> jint {
+    catch_unwind(AssertUnwindSafe(|| {
+        if out_array.is_null() || env.get_array_length(&out_array).unwrap_or(0) < 2 {
+            return sys::MLN_STATUS_INVALID_ARGUMENT;
+        }
+        let mut out = [0.0_f64; 2];
+        let result = fill(&mut out);
+        if result == sys::MLN_STATUS_OK && env.set_double_array_region(&out_array, 0, &out).is_err()
+        {
+            return sys::MLN_STATUS_INVALID_ARGUMENT;
+        }
+        result
+    }))
     .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
 }
 

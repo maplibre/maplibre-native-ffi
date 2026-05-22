@@ -53,11 +53,23 @@ public final class MapProjectionHandle implements AutoCloseable {
   }
 
   public ScreenPoint pixelForLatLng(LatLng coordinate) {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    Objects.requireNonNull(coordinate, "coordinate");
+    var outPoint = new double[2];
+    Status.check(
+        ProjectionNative.mln_map_projection_pixel_for_lat_lng(
+            state.requireLiveAddress(), coordinate.latitude(), coordinate.longitude(), outPoint));
+    return new ScreenPoint(outPoint[0], outPoint[1]);
   }
 
   public LatLng latLngForPixel(ScreenPoint point) {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    Objects.requireNonNull(point, "point");
+    var outCoordinate = new double[2];
+    Status.check(
+        ProjectionNative.mln_map_projection_lat_lng_for_pixel(
+            state.requireLiveAddress(), point.x(), point.y(), outCoordinate));
+    return new LatLng(outCoordinate[0], outCoordinate[1]);
   }
 
   public void close() {

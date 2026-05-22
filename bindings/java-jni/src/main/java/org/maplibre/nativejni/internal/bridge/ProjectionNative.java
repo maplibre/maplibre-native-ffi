@@ -16,11 +16,15 @@ public final class ProjectionNative {
 
   public static native int mln_map_projection_set_visible_geometry();
 
-  public static native int mln_map_projection_pixel_for_lat_lng();
+  public static native int mln_map_projection_pixel_for_lat_lng(
+      long projection, double latitude, double longitude, double[] outPoint);
 
-  public static native int mln_map_projection_lat_lng_for_pixel();
+  public static native int mln_map_projection_lat_lng_for_pixel(
+      long projection, double x, double y, double[] outCoordinate);
 
-  public static native int mln_projected_meters_for_lat_lng();
+  public static native int mln_projected_meters_for_lat_lng(
+      double latitude, double longitude, double[] outMeters);
 
-  public static native int mln_lat_lng_for_projected_meters();
+  public static native int mln_lat_lng_for_projected_meters(
+      double northing, double easting, double[] outCoordinate);
 }

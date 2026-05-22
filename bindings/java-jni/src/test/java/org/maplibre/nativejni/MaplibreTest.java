@@ -10,6 +10,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.maplibre.nativejni.error.InvalidArgumentException;
 import org.maplibre.nativejni.error.MaplibreStatus;
+import org.maplibre.nativejni.geo.LatLng;
 import org.maplibre.nativejni.internal.bridge.BaseNative;
 import org.maplibre.nativejni.internal.bridge.RuntimeNative;
 import org.maplibre.nativejni.internal.status.Status;
@@ -52,6 +53,17 @@ class MaplibreTest {
 
     Maplibre.setNetworkStatus(NetworkStatus.ONLINE);
     assertEquals(NetworkStatus.ONLINE, Maplibre.networkStatus());
+  }
+
+  @Test
+  void roundTripsProjectedMeters() {
+    var coordinate = new LatLng(37.7749, -122.4194);
+
+    var meters = Maplibre.projectedMetersForLatLng(coordinate);
+    var roundTrip = Maplibre.latLngForProjectedMeters(meters);
+
+    assertEquals(coordinate.latitude(), roundTrip.latitude(), 1.0e-9);
+    assertEquals(coordinate.longitude(), roundTrip.longitude(), 1.0e-9);
   }
 
   @Test
