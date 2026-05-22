@@ -35,11 +35,6 @@ public final class RuntimeHandle implements AutoCloseable {
     this.state = new HandleState("RuntimeHandle", handle);
   }
 
-  private static UnsupportedOperationException unsupported() {
-    return new UnsupportedOperationException(
-        "RuntimeHandle is not implemented by the JNI bridge yet");
-  }
-
   public static RuntimeHandle create() {
     return create(new RuntimeOptions());
   }
@@ -436,10 +431,6 @@ public final class RuntimeHandle implements AutoCloseable {
       liveMaps.remove(sourceAddress, reference);
     }
     return map;
-  }
-
-  static MemorySegment offlineOperationCompletedPayload(MemorySegment event) {
-    throw unsupported();
   }
 
   private static void closeQuietly(AutoCloseable closeable) {

@@ -21,11 +21,6 @@ public final class MapProjectionHandle implements AutoCloseable {
     this.state = new HandleState("MapProjectionHandle", handle);
   }
 
-  private static UnsupportedOperationException unsupported() {
-    return new UnsupportedOperationException(
-        "MapProjectionHandle is not implemented by the JNI bridge yet");
-  }
-
   public static MapProjectionHandle create(MapHandle map) {
     Objects.requireNonNull(map, "map");
     NativeLibrary.ensureLoaded();

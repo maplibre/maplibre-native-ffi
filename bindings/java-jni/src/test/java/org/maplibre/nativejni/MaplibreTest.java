@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.EnumSet;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -14,6 +15,7 @@ import org.maplibre.nativejni.geo.LatLng;
 import org.maplibre.nativejni.internal.bridge.BaseNative;
 import org.maplibre.nativejni.internal.bridge.RuntimeNative;
 import org.maplibre.nativejni.internal.status.Status;
+import org.maplibre.nativejni.log.LogSeverity;
 import org.maplibre.nativejni.runtime.NetworkStatus;
 import org.maplibre.nativejni.test.NativeTestSupport;
 
@@ -27,10 +29,12 @@ class MaplibreTest {
   }
 
   @AfterEach
-  void restoreNetworkStatus() {
+  void restoreProcessState() {
     if (originalNetworkStatus != null) {
       Maplibre.setNetworkStatus(originalNetworkStatus);
     }
+    Maplibre.clearLogCallback();
+    Maplibre.restoreDefaultAsyncLogSeverities();
   }
 
   @Test
@@ -64,6 +68,18 @@ class MaplibreTest {
 
     assertEquals(coordinate.latitude(), roundTrip.latitude(), 1.0e-9);
     assertEquals(coordinate.longitude(), roundTrip.longitude(), 1.0e-9);
+  }
+
+  @Test
+  void installsAndClearsLogCallback() {
+    Maplibre.setLogCallback(record -> true);
+    Maplibre.clearLogCallback();
+  }
+
+  @Test
+  void configuresAsyncLogSeverities() {
+    Maplibre.setAsyncLogSeverities(EnumSet.of(LogSeverity.ERROR));
+    Maplibre.restoreDefaultAsyncLogSeverities();
   }
 
   @Test

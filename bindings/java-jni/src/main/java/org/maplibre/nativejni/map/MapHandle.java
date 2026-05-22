@@ -79,10 +79,6 @@ public final class MapHandle implements AutoCloseable {
     runtime.registerMap(InternalAccess.INSTANCE, this);
   }
 
-  private static UnsupportedOperationException unsupported() {
-    return new UnsupportedOperationException("MapHandle is not implemented by the JNI bridge yet");
-  }
-
   public static MapHandle create(RuntimeHandle runtime, MapOptions options) {
     Objects.requireNonNull(runtime, "runtime");
     Objects.requireNonNull(options, "options");

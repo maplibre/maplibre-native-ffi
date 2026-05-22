@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use std::ffi::{CStr, CString, c_char, c_void};
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::ptr::NonNull;
-use std::sync::Mutex;
+use std::sync::{LazyLock, Mutex};
 use std::thread::ThreadId;
 
 use jni::objects::{
@@ -80,6 +80,13 @@ const DOUBLE_COUNT: usize = 2;
 const STRING_MESSAGE: i32 = 0;
 const STRING_PAYLOAD: i32 = 1;
 const STRING_COUNT: i32 = 2;
+
+struct LogCallbackState {
+    vm: JavaVM,
+    callback: GlobalRef,
+}
+
+static LOG_CALLBACK_STATE: LazyLock<Mutex<Option<usize>>> = LazyLock::new(|| Mutex::new(None));
 
 struct CustomGeometrySourceState {
     vm: JavaVM,
@@ -250,13 +257,25 @@ mod registration {
     pub(super) fn register_natives(vm: &JavaVM) -> jni::errors::Result<()> {
         register_legacy_bridge(vm)?;
         register_base(vm)?;
-        register_no_arg_status_class(
+        register_methods(
             vm,
             "org/maplibre/nativejni/internal/bridge/LogNative",
-            &[
-                "mln_log_set_callback",
-                "mln_log_clear_callback",
-                "mln_log_set_async_severity_mask",
+            vec![
+                NativeMethod {
+                    name: "mln_log_set_callback".into(),
+                    sig: "(Lorg/maplibre/nativejni/log/LogCallback;)I".into(),
+                    fn_ptr: log_set_callback as *mut c_void,
+                },
+                NativeMethod {
+                    name: "mln_log_clear_callback".into(),
+                    sig: "()I".into(),
+                    fn_ptr: log_clear_callback as *mut c_void,
+                },
+                NativeMethod {
+                    name: "mln_log_set_async_severity_mask".into(),
+                    sig: "(I)I".into(),
+                    fn_ptr: log_set_async_severity_mask as *mut c_void,
+                },
             ],
         )?;
         register_runtime(vm)?;
@@ -1269,14 +1288,6 @@ mod registration {
         )
     }
 
-    fn register_no_arg_status_class(
-        vm: &JavaVM,
-        class_name: &str,
-        names: &[&str],
-    ) -> jni::errors::Result<()> {
-        register_methods(vm, class_name, no_arg_status_methods(names))
-    }
-
     fn no_arg_status_methods(names: &[&str]) -> Vec<NativeMethod> {
         names
             .iter()
@@ -1334,6 +1345,168 @@ extern "system" fn network_status_get(
 extern "system" fn network_status_set(_env: JNIEnv<'_>, _class: JClass<'_>, status: jint) -> jint {
     catch_unwind(|| unsafe { sys::mln_network_status_set(status as sys::mln_network_status) })
         .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+extern "system" fn log_set_callback<'local>(
+    env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    callback: JObject<'local>,
+) -> jint {
+    catch_unwind(AssertUnwindSafe(|| {
+        if callback.is_null() {
+            return sys::MLN_STATUS_INVALID_ARGUMENT;
+        }
+        let vm = match env.get_java_vm() {
+            Ok(value) => value,
+            Err(_) => return sys::MLN_STATUS_NATIVE_ERROR,
+        };
+        let callback = match env.new_global_ref(callback) {
+            Ok(value) => value,
+            Err(_) => return sys::MLN_STATUS_INVALID_ARGUMENT,
+        };
+        let state = Box::new(LogCallbackState { vm, callback });
+        let state_ptr = Box::into_raw(state);
+        let result =
+            unsafe { sys::mln_log_set_callback(Some(log_callback), state_ptr.cast::<c_void>()) };
+        if result != sys::MLN_STATUS_OK {
+            unsafe {
+                drop(Box::from_raw(state_ptr));
+            }
+            return result;
+        }
+        let previous = match LOG_CALLBACK_STATE.lock() {
+            Ok(mut current) => current.replace(state_ptr as usize),
+            Err(_) => return sys::MLN_STATUS_NATIVE_ERROR,
+        };
+        drop_log_callback_state(previous);
+        result
+    }))
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+extern "system" fn log_clear_callback(_env: JNIEnv<'_>, _class: JClass<'_>) -> jint {
+    catch_unwind(|| {
+        let result = unsafe { sys::mln_log_clear_callback() };
+        if result != sys::MLN_STATUS_OK {
+            return result;
+        }
+        let previous = match LOG_CALLBACK_STATE.lock() {
+            Ok(mut current) => current.take(),
+            Err(_) => return sys::MLN_STATUS_NATIVE_ERROR,
+        };
+        drop_log_callback_state(previous);
+        result
+    })
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+extern "system" fn log_set_async_severity_mask(
+    _env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    mask: jint,
+) -> jint {
+    catch_unwind(|| unsafe { sys::mln_log_set_async_severity_mask(mask as u32) })
+        .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+unsafe extern "C" fn log_callback(
+    user_data: *mut c_void,
+    severity: u32,
+    event: u32,
+    code: i64,
+    message: *const c_char,
+) -> u32 {
+    catch_unwind(AssertUnwindSafe(|| {
+        if user_data.is_null() {
+            return 0;
+        }
+        let state = unsafe { &*(user_data as *mut LogCallbackState) };
+        let mut env = match state.vm.attach_current_thread() {
+            Ok(value) => value,
+            Err(_) => return 0,
+        };
+        invoke_log_callback(&mut env, state, severity, event, code, message).unwrap_or(0)
+    }))
+    .unwrap_or(0)
+}
+
+fn invoke_log_callback(
+    env: &mut JNIEnv<'_>,
+    state: &LogCallbackState,
+    severity: u32,
+    event: u32,
+    code: i64,
+    message: *const c_char,
+) -> Result<u32, ()> {
+    let severity_object = env
+        .call_static_method(
+            "org/maplibre/nativejni/log/LogSeverity",
+            "fromNative",
+            "(I)Lorg/maplibre/nativejni/log/LogSeverity;",
+            &[JValue::Int(severity as jint)],
+        )
+        .and_then(|value| value.l())
+        .map_err(|_| {
+            let _ = env.exception_clear();
+        })?;
+    let event_object = env
+        .call_static_method(
+            "org/maplibre/nativejni/log/LogEvent",
+            "fromNative",
+            "(I)Lorg/maplibre/nativejni/log/LogEvent;",
+            &[JValue::Int(event as jint)],
+        )
+        .and_then(|value| value.l())
+        .map_err(|_| {
+            let _ = env.exception_clear();
+        })?;
+    let message_object = if message.is_null() {
+        env.new_string("")
+    } else {
+        let message = unsafe { CStr::from_ptr(message) }
+            .to_str()
+            .map_err(|_| ())?;
+        env.new_string(message)
+    }
+    .map_err(|_| {
+        let _ = env.exception_clear();
+    })?;
+    let record = env
+        .new_object(
+            "org/maplibre/nativejni/log/LogRecord",
+            "(Lorg/maplibre/nativejni/log/LogSeverity;ILorg/maplibre/nativejni/log/LogEvent;IJLjava/lang/String;)V",
+            &[
+                JValue::Object(&severity_object),
+                JValue::Int(severity as jint),
+                JValue::Object(&event_object),
+                JValue::Int(event as jint),
+                JValue::Long(code as jlong),
+                JValue::Object(&message_object),
+            ],
+        )
+        .map_err(|_| {
+            let _ = env.exception_clear();
+        })?;
+    let consumed = env
+        .call_method(
+            state.callback.as_obj(),
+            "log",
+            "(Lorg/maplibre/nativejni/log/LogRecord;)Z",
+            &[JValue::Object(&record)],
+        )
+        .and_then(|value| value.z())
+        .map_err(|_| {
+            let _ = env.exception_clear();
+        })?;
+    Ok(if consumed { 1 } else { 0 })
+}
+
+fn drop_log_callback_state(state: Option<usize>) {
+    if let Some(state) = state {
+        unsafe {
+            drop(Box::from_raw(state as *mut LogCallbackState));
+        }
+    }
 }
 
 extern "system" fn runtime_create(

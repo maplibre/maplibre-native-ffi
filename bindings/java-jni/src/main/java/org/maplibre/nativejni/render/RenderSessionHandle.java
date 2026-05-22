@@ -34,11 +34,6 @@ public final class RenderSessionHandle implements AutoCloseable {
     this.state = new HandleState("RenderSessionHandle", handle, map);
   }
 
-  private static UnsupportedOperationException unsupported() {
-    return new UnsupportedOperationException(
-        "RenderSessionHandle is not implemented by the JNI bridge yet");
-  }
-
   public static RenderSessionHandle attachMetalOwnedTexture(
       MapHandle map, MetalOwnedTextureDescriptor descriptor) {
     NativeLibrary.ensureLoaded();

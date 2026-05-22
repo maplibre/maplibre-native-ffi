@@ -7,8 +7,10 @@ import java.util.Set;
 import org.maplibre.nativejni.geo.LatLng;
 import org.maplibre.nativejni.geo.ProjectedMeters;
 import org.maplibre.nativejni.internal.bridge.BaseNative;
+import org.maplibre.nativejni.internal.bridge.LogNative;
 import org.maplibre.nativejni.internal.bridge.ProjectionNative;
 import org.maplibre.nativejni.internal.bridge.RuntimeNative;
+import org.maplibre.nativejni.internal.callback.LogCallbackState;
 import org.maplibre.nativejni.internal.loader.NativeLibrary;
 import org.maplibre.nativejni.internal.status.Status;
 import org.maplibre.nativejni.log.LogCallback;
@@ -64,33 +66,31 @@ public final class Maplibre {
    * <p>See {@link LogCallback} for callback threading and exception-containment rules.
    */
   public static void setLogCallback(LogCallback callback) {
-    Objects.requireNonNull(callback, "callback");
-    throw new UnsupportedOperationException(
-        "setLogCallback is not implemented by the JNI bridge yet");
+    LogCallbackState.set(Objects.requireNonNull(callback, "callback"));
   }
 
   /** Clears the process-global native log callback. */
   public static void clearLogCallback() {
-    throw new UnsupportedOperationException(
-        "clearLogCallback is not implemented by the JNI bridge yet");
+    LogCallbackState.clear();
   }
 
   /** Configures severities that native logging may dispatch asynchronously. */
   public static void setAsyncLogSeverities(Set<LogSeverity> severities) {
     NativeLibrary.ensureLoaded();
     Objects.requireNonNull(severities, "severities");
+    var mask = 0;
     for (var severity : severities) {
-      Objects.requireNonNull(severity, "severity");
+      mask |= Objects.requireNonNull(severity, "severity").nativeMask();
     }
-    throw new UnsupportedOperationException(
-        "setAsyncLogSeverities is not implemented by the JNI bridge yet");
+    Status.check(LogNative.mln_log_set_async_severity_mask(mask));
   }
 
   /** Restores the native default async log severity mask. */
   public static void restoreDefaultAsyncLogSeverities() {
     NativeLibrary.ensureLoaded();
-    throw new UnsupportedOperationException(
-        "restoreDefaultAsyncLogSeverities is not implemented by the JNI bridge yet");
+    Status.check(
+        LogNative.mln_log_set_async_severity_mask(
+            LogSeverity.INFO.nativeMask() | LogSeverity.WARNING.nativeMask()));
   }
 
   /** Converts a geographic coordinate to spherical Mercator projected meters. */
