@@ -17,6 +17,8 @@ import org.maplibre.nativejni.camera.CameraOptions;
 import org.maplibre.nativejni.camera.EdgeInsets;
 import org.maplibre.nativejni.camera.FreeCameraOptions;
 import org.maplibre.nativejni.error.InvalidStateException;
+import org.maplibre.nativejni.geo.Feature;
+import org.maplibre.nativejni.geo.GeoJson;
 import org.maplibre.nativejni.geo.Geometry;
 import org.maplibre.nativejni.geo.LatLng;
 import org.maplibre.nativejni.geo.LatLngBounds;
@@ -311,6 +313,18 @@ class MapHandleTest {
         map.setGeoJsonSourceUrl("geojson-source", "https://example.com/updated.geojson");
         assertTrue(map.removeStyleSource("geojson-source"));
         assertFalse(map.removeStyleSource("geojson-source"));
+        map.addGeoJsonSourceData(
+            "geojson-data-source",
+            GeoJson.featureCollection(
+                List.of(
+                    new Feature(
+                        Geometry.point(new LatLng(0.25, 0.5)),
+                        List.of(new JsonValue.Member("name", JsonValue.of("one")))))));
+        assertEquals(SourceType.GEOJSON, map.styleSourceType("geojson-data-source").orElseThrow());
+        map.setGeoJsonSourceData(
+            "geojson-data-source",
+            GeoJson.geometry(Geometry.lineString(List.of(new LatLng(0, 0), new LatLng(1, 1)))));
+        assertTrue(map.removeStyleSource("geojson-data-source"));
         map.addStyleSourceJson(
             "json-geojson-source",
             JsonValue.object(

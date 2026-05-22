@@ -210,7 +210,12 @@ public final class MapHandle implements AutoCloseable {
   }
 
   public void addGeoJsonSourceData(String sourceId, GeoJson data) {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    Status.check(
+        StyleNative.mln_map_add_geojson_source_data(
+            state.requireLiveAddress(),
+            Objects.requireNonNull(sourceId, "sourceId"),
+            Objects.requireNonNull(data, "data")));
   }
 
   public void setGeoJsonSourceUrl(String sourceId, String url) {
@@ -223,7 +228,12 @@ public final class MapHandle implements AutoCloseable {
   }
 
   public void setGeoJsonSourceData(String sourceId, GeoJson data) {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    Status.check(
+        StyleNative.mln_map_set_geojson_source_data(
+            state.requireLiveAddress(),
+            Objects.requireNonNull(sourceId, "sourceId"),
+            Objects.requireNonNull(data, "data")));
   }
 
   public void addCustomGeometrySource(String sourceId, CustomGeometrySourceOptions options) {

@@ -46,11 +46,13 @@ public final class StyleNative {
 
   public static native int mln_map_add_geojson_source_url(long map, String sourceId, String url);
 
-  public static native int mln_map_add_geojson_source_data();
+  public static native int mln_map_add_geojson_source_data(
+      long map, String sourceId, org.maplibre.nativejni.geo.GeoJson data);
 
   public static native int mln_map_set_geojson_source_url(long map, String sourceId, String url);
 
-  public static native int mln_map_set_geojson_source_data();
+  public static native int mln_map_set_geojson_source_data(
+      long map, String sourceId, org.maplibre.nativejni.geo.GeoJson data);
 
   public static native int mln_map_add_vector_source_url(
       long map,

@@ -15,6 +15,7 @@ use jni::sys::{JNI_VERSION_1_8, jboolean, jint, jlong, jstring};
 use jni::{JNIEnv, JavaVM, NativeMethod};
 use maplibre_native_core::LatLng as CoreLatLng;
 use maplibre_native_core::error::capture_thread_diagnostic;
+use maplibre_native_core::geojson as core_geojson;
 use maplibre_native_core::geometry as core_geometry;
 use maplibre_native_core::json as core_json;
 use maplibre_native_sys as sys;
@@ -302,8 +303,6 @@ mod registration {
             "mln_style_id_list_count",
             "mln_style_id_list_get",
             "mln_style_id_list_destroy",
-            "mln_map_add_geojson_source_data",
-            "mln_map_set_geojson_source_data",
             "mln_map_add_custom_geometry_source",
             "mln_map_set_custom_geometry_source_tile_data",
             "mln_map_invalidate_custom_geometry_source_tile",
@@ -353,6 +352,16 @@ mod registration {
             name: "mln_map_set_geojson_source_url".into(),
             sig: "(JLjava/lang/String;Ljava/lang/String;)I".into(),
             fn_ptr: map_set_geojson_source_url as *mut c_void,
+        });
+        style_methods.push(NativeMethod {
+            name: "mln_map_add_geojson_source_data".into(),
+            sig: "(JLjava/lang/String;Lorg/maplibre/nativejni/geo/GeoJson;)I".into(),
+            fn_ptr: map_add_geojson_source_data as *mut c_void,
+        });
+        style_methods.push(NativeMethod {
+            name: "mln_map_set_geojson_source_data".into(),
+            sig: "(JLjava/lang/String;Lorg/maplibre/nativejni/geo/GeoJson;)I".into(),
+            fn_ptr: map_set_geojson_source_data as *mut c_void,
         });
         style_methods.push(NativeMethod {
             name: "mln_map_add_vector_source_url".into(),
@@ -1960,6 +1969,63 @@ extern "system" fn map_set_geojson_source_url(
         url,
         sys::mln_map_set_geojson_source_url,
     )
+}
+
+extern "system" fn map_add_geojson_source_data<'local>(
+    env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    map: jlong,
+    source_id: JString<'local>,
+    data: JObject<'local>,
+) -> jint {
+    map_geojson_source_data(
+        env,
+        map,
+        source_id,
+        data,
+        sys::mln_map_add_geojson_source_data,
+    )
+}
+
+extern "system" fn map_set_geojson_source_data<'local>(
+    env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    map: jlong,
+    source_id: JString<'local>,
+    data: JObject<'local>,
+) -> jint {
+    map_geojson_source_data(
+        env,
+        map,
+        source_id,
+        data,
+        sys::mln_map_set_geojson_source_data,
+    )
+}
+
+fn map_geojson_source_data<'local>(
+    mut env: JNIEnv<'local>,
+    map: jlong,
+    source_id: JString<'local>,
+    data: JObject<'local>,
+    operation: unsafe extern "C" fn(
+        *mut sys::mln_map,
+        sys::mln_string_view,
+        *const sys::mln_geojson,
+    ) -> sys::mln_status,
+) -> jint {
+    catch_unwind(AssertUnwindSafe(|| {
+        let (_source_id, source_id) = match string_view(&mut env, &source_id) {
+            Ok(value) => value,
+            Err(status) => return status,
+        };
+        let data = match java_native_geojson(&mut env, &data) {
+            Ok(value) => value,
+            Err(status) => return status,
+        };
+        unsafe { operation(map as *mut sys::mln_map, source_id, data.as_ptr()) }
+    }))
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
 }
 
 extern "system" fn map_add_vector_source_url(
@@ -4027,26 +4093,7 @@ fn java_json_value<'local>(
             .call_method(value, "members", "()Ljava/util/List;", &[])
             .and_then(|value| value.l())
             .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
-        let size = java_list_size(env, &list)?;
-        let mut members = Vec::with_capacity(size);
-        for index in 0..size {
-            let member = java_list_get(env, &list, index)?;
-            let key = java_string_method(env, &member, "key")?;
-            let member_value = env
-                .call_method(
-                    &member,
-                    "value",
-                    "()Lorg/maplibre/nativejni/json/JsonValue;",
-                    &[],
-                )
-                .and_then(|value| value.l())
-                .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
-            members.push(core_json::JsonMember::new(
-                key,
-                java_json_value(env, &member_value, depth + 1)?,
-            ));
-        }
-        return Ok(core_json::JsonValue::Object(members));
+        return java_json_members_list(env, &list, depth + 1).map(core_json::JsonValue::Object);
     }
     Err(sys::MLN_STATUS_INVALID_ARGUMENT)
 }
@@ -4063,6 +4110,188 @@ fn java_json_list<'local>(
         values.push(java_json_value(env, &value, depth)?);
     }
     Ok(values)
+}
+
+fn java_json_members_list<'local>(
+    env: &mut JNIEnv<'local>,
+    list: &JObject<'local>,
+    depth: usize,
+) -> Result<Vec<core_json::JsonMember>, jint> {
+    let size = java_list_size(env, list)?;
+    let mut members = Vec::with_capacity(size);
+    for index in 0..size {
+        let member = java_list_get(env, list, index)?;
+        let key = java_string_method(env, &member, "key")?;
+        let member_value = env
+            .call_method(
+                &member,
+                "value",
+                "()Lorg/maplibre/nativejni/json/JsonValue;",
+                &[],
+            )
+            .and_then(|value| value.l())
+            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
+        members.push(core_json::JsonMember::new(
+            key,
+            java_json_value(env, &member_value, depth)?,
+        ));
+    }
+    Ok(members)
+}
+
+fn java_native_geojson<'local>(
+    env: &mut JNIEnv<'local>,
+    value: &JObject<'local>,
+) -> Result<core_geojson::NativeGeoJson, jint> {
+    let value = java_geojson(env, value)?;
+    core_geojson::geojson_try_to_native(&value).map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)
+}
+
+fn java_geojson<'local>(
+    env: &mut JNIEnv<'local>,
+    value: &JObject<'local>,
+) -> Result<core_geojson::GeoJson, jint> {
+    if value.is_null() {
+        return Err(sys::MLN_STATUS_INVALID_ARGUMENT);
+    }
+    if env
+        .is_instance_of(value, "org/maplibre/nativejni/geo/GeoJson$GeometryValue")
+        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?
+    {
+        let geometry = env
+            .call_method(
+                value,
+                "geometry",
+                "()Lorg/maplibre/nativejni/geo/Geometry;",
+                &[],
+            )
+            .and_then(|value| value.l())
+            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
+        return java_geometry(env, &geometry, 0).map(core_geojson::GeoJson::Geometry);
+    }
+    if env
+        .is_instance_of(value, "org/maplibre/nativejni/geo/GeoJson$FeatureValue")
+        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?
+    {
+        let feature = env
+            .call_method(
+                value,
+                "feature",
+                "()Lorg/maplibre/nativejni/geo/Feature;",
+                &[],
+            )
+            .and_then(|value| value.l())
+            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
+        return java_feature(env, &feature, 0).map(core_geojson::GeoJson::Feature);
+    }
+    if env
+        .is_instance_of(
+            value,
+            "org/maplibre/nativejni/geo/GeoJson$FeatureCollection",
+        )
+        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?
+    {
+        let features = java_object_list_method(env, value, "features")?;
+        let size = java_list_size(env, &features)?;
+        let mut values = Vec::with_capacity(size);
+        for index in 0..size {
+            let feature = java_list_get(env, &features, index)?;
+            values.push(java_feature(env, &feature, 1)?);
+        }
+        return Ok(core_geojson::GeoJson::FeatureCollection(values));
+    }
+    Err(sys::MLN_STATUS_INVALID_ARGUMENT)
+}
+
+fn java_feature<'local>(
+    env: &mut JNIEnv<'local>,
+    value: &JObject<'local>,
+    depth: usize,
+) -> Result<core_geojson::Feature, jint> {
+    if value.is_null() {
+        return Err(sys::MLN_STATUS_INVALID_ARGUMENT);
+    }
+    let geometry = env
+        .call_method(
+            value,
+            "geometry",
+            "()Lorg/maplibre/nativejni/geo/Geometry;",
+            &[],
+        )
+        .and_then(|value| value.l())
+        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
+    let properties = java_object_list_method(env, value, "properties")?;
+    let identifier = env
+        .call_method(
+            value,
+            "identifier",
+            "()Lorg/maplibre/nativejni/geo/FeatureIdentifier;",
+            &[],
+        )
+        .and_then(|value| value.l())
+        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
+    Ok(core_geojson::Feature::new(
+        java_geometry(env, &geometry, depth + 1)?,
+        java_json_members_list(env, &properties, depth + 1)?,
+    )
+    .with_identifier(java_feature_identifier(env, &identifier)?))
+}
+
+fn java_feature_identifier<'local>(
+    env: &mut JNIEnv<'local>,
+    value: &JObject<'local>,
+) -> Result<core_geojson::FeatureIdentifier, jint> {
+    if value.is_null()
+        || env
+            .is_instance_of(value, "org/maplibre/nativejni/geo/FeatureIdentifier$Null")
+            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?
+    {
+        return Ok(core_geojson::FeatureIdentifier::Null);
+    }
+    if env
+        .is_instance_of(value, "org/maplibre/nativejni/geo/FeatureIdentifier$UInt")
+        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?
+    {
+        return env
+            .call_method(value, "value", "()J", &[])
+            .and_then(|value| value.j())
+            .map(|value| core_geojson::FeatureIdentifier::UInt(value as u64))
+            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT);
+    }
+    if env
+        .is_instance_of(value, "org/maplibre/nativejni/geo/FeatureIdentifier$Int")
+        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?
+    {
+        return env
+            .call_method(value, "value", "()J", &[])
+            .and_then(|value| value.j())
+            .map(core_geojson::FeatureIdentifier::Int)
+            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT);
+    }
+    if env
+        .is_instance_of(
+            value,
+            "org/maplibre/nativejni/geo/FeatureIdentifier$DoubleValue",
+        )
+        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?
+    {
+        return env
+            .call_method(value, "value", "()D", &[])
+            .and_then(|value| value.d())
+            .map(core_geojson::FeatureIdentifier::Double)
+            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT);
+    }
+    if env
+        .is_instance_of(
+            value,
+            "org/maplibre/nativejni/geo/FeatureIdentifier$StringValue",
+        )
+        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?
+    {
+        return java_string_method(env, value, "value")
+            .map(core_geojson::FeatureIdentifier::String);
+    }
+    Err(sys::MLN_STATUS_INVALID_ARGUMENT)
 }
 
 fn java_native_geometry<'local>(
