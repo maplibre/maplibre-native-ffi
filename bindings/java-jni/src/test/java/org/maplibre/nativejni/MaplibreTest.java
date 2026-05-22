@@ -4,10 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
-import java.nio.file.Files;
-import java.nio.file.Path;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -15,22 +12,16 @@ import org.maplibre.nativejni.error.InvalidArgumentException;
 import org.maplibre.nativejni.error.MaplibreStatus;
 import org.maplibre.nativejni.internal.bridge.BaseNative;
 import org.maplibre.nativejni.internal.bridge.RuntimeNative;
-import org.maplibre.nativejni.internal.loader.NativeLibrary;
 import org.maplibre.nativejni.internal.status.Status;
 import org.maplibre.nativejni.runtime.NetworkStatus;
+import org.maplibre.nativejni.test.NativeTestSupport;
 
 class MaplibreTest {
   private static NetworkStatus originalNetworkStatus;
 
   @BeforeAll
   static void loadNativeLibrary() {
-    var libraryPath = System.getProperty(NativeLibrary.LIBRARY_PATH_PROPERTY);
-    assumeTrue(
-        libraryPath != null && !libraryPath.isBlank(),
-        () -> "Set -D" + NativeLibrary.LIBRARY_PATH_PROPERTY + " to a built JNI bridge library");
-    assumeTrue(
-        Files.isRegularFile(Path.of(libraryPath)), () -> "Missing JNI bridge: " + libraryPath);
-    Maplibre.loadNativeLibrary(Path.of(libraryPath));
+    NativeTestSupport.loadNativeLibraryOrSkip();
     originalNetworkStatus = Maplibre.networkStatus();
   }
 

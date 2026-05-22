@@ -10,7 +10,7 @@ public final class RuntimeNative {
 
   public static native int mln_runtime_options_default();
 
-  public static native int mln_runtime_create();
+  public static native int mln_runtime_create(long[] outRuntime);
 
   public static native int mln_runtime_set_resource_provider();
 
@@ -28,9 +28,9 @@ public final class RuntimeNative {
 
   public static native int mln_runtime_offline_operation_discard();
 
-  public static native int mln_runtime_destroy();
+  public static native int mln_runtime_destroy(long runtime);
 
-  public static native int mln_runtime_run_once();
+  public static native int mln_runtime_run_once(long runtime);
 
   public static native int mln_runtime_poll_event();
 }

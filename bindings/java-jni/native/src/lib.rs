@@ -6,7 +6,7 @@
 use std::ffi::c_void;
 use std::panic::{AssertUnwindSafe, catch_unwind};
 
-use jni::objects::{JClass, JIntArray, JObject};
+use jni::objects::{JClass, JIntArray, JLongArray, JObject};
 use jni::sys::{JNI_VERSION_1_8, jint, jlong, jstring};
 use jni::{JNIEnv, JavaVM, NativeMethod};
 use maplibre_native_core::error::capture_thread_diagnostic;
@@ -67,19 +67,7 @@ mod registration {
                 "mln_offline_region_list_destroy",
             ],
         )?;
-        register_no_arg_status_class(
-            vm,
-            "org/maplibre/nativejni/internal/bridge/MapNative",
-            &[
-                "mln_map_options_default",
-                "mln_map_create",
-                "mln_map_request_repaint",
-                "mln_map_request_still_image",
-                "mln_map_destroy",
-                "mln_map_set_style_url",
-                "mln_map_set_style_json",
-            ],
-        )?;
+        register_map(vm)?;
         register_no_arg_status_class(
             vm,
             "org/maplibre/nativejni/internal/bridge/CameraNative",
@@ -132,22 +120,7 @@ mod registration {
                 "mln_map_lat_lngs_for_pixels",
             ],
         )?;
-        register_no_arg_status_class(
-            vm,
-            "org/maplibre/nativejni/internal/bridge/ProjectionNative",
-            &[
-                "mln_map_projection_create",
-                "mln_map_projection_destroy",
-                "mln_map_projection_get_camera",
-                "mln_map_projection_set_camera",
-                "mln_map_projection_set_visible_coordinates",
-                "mln_map_projection_set_visible_geometry",
-                "mln_map_projection_pixel_for_lat_lng",
-                "mln_map_projection_lat_lng_for_pixel",
-                "mln_projected_meters_for_lat_lng",
-                "mln_lat_lng_for_projected_meters",
-            ],
-        )?;
+        register_projection(vm)?;
         register_no_arg_status_class(
             vm,
             "org/maplibre/nativejni/internal/bridge/QueryNative",
@@ -346,7 +319,6 @@ mod registration {
     fn register_runtime(vm: &JavaVM) -> jni::errors::Result<()> {
         let mut methods = no_arg_status_methods(&[
             "mln_runtime_options_default",
-            "mln_runtime_create",
             "mln_runtime_set_resource_provider",
             "mln_resource_request_complete",
             "mln_resource_request_cancelled",
@@ -355,10 +327,23 @@ mod registration {
             "mln_runtime_clear_resource_transform",
             "mln_runtime_run_ambient_cache_operation_start",
             "mln_runtime_offline_operation_discard",
-            "mln_runtime_destroy",
-            "mln_runtime_run_once",
             "mln_runtime_poll_event",
         ]);
+        methods.push(NativeMethod {
+            name: "mln_runtime_create".into(),
+            sig: "([J)I".into(),
+            fn_ptr: runtime_create as *mut c_void,
+        });
+        methods.push(NativeMethod {
+            name: "mln_runtime_destroy".into(),
+            sig: "(J)I".into(),
+            fn_ptr: runtime_destroy as *mut c_void,
+        });
+        methods.push(NativeMethod {
+            name: "mln_runtime_run_once".into(),
+            sig: "(J)I".into(),
+            fn_ptr: runtime_run_once as *mut c_void,
+        });
         methods.push(NativeMethod {
             name: "mln_network_status_get".into(),
             sig: "([I)I".into(),
@@ -372,6 +357,59 @@ mod registration {
         register_methods(
             vm,
             "org/maplibre/nativejni/internal/bridge/RuntimeNative",
+            methods,
+        )
+    }
+
+    fn register_map(vm: &JavaVM) -> jni::errors::Result<()> {
+        let mut methods = no_arg_status_methods(&[
+            "mln_map_options_default",
+            "mln_map_request_repaint",
+            "mln_map_request_still_image",
+            "mln_map_set_style_url",
+            "mln_map_set_style_json",
+        ]);
+        methods.push(NativeMethod {
+            name: "mln_map_create".into(),
+            sig: "(JIIDI[J)I".into(),
+            fn_ptr: map_create as *mut c_void,
+        });
+        methods.push(NativeMethod {
+            name: "mln_map_destroy".into(),
+            sig: "(J)I".into(),
+            fn_ptr: map_destroy as *mut c_void,
+        });
+        register_methods(
+            vm,
+            "org/maplibre/nativejni/internal/bridge/MapNative",
+            methods,
+        )
+    }
+
+    fn register_projection(vm: &JavaVM) -> jni::errors::Result<()> {
+        let mut methods = no_arg_status_methods(&[
+            "mln_map_projection_get_camera",
+            "mln_map_projection_set_camera",
+            "mln_map_projection_set_visible_coordinates",
+            "mln_map_projection_set_visible_geometry",
+            "mln_map_projection_pixel_for_lat_lng",
+            "mln_map_projection_lat_lng_for_pixel",
+            "mln_projected_meters_for_lat_lng",
+            "mln_lat_lng_for_projected_meters",
+        ]);
+        methods.push(NativeMethod {
+            name: "mln_map_projection_create".into(),
+            sig: "(J[J)I".into(),
+            fn_ptr: projection_create as *mut c_void,
+        });
+        methods.push(NativeMethod {
+            name: "mln_map_projection_destroy".into(),
+            sig: "(J)I".into(),
+            fn_ptr: projection_destroy as *mut c_void,
+        });
+        register_methods(
+            vm,
+            "org/maplibre/nativejni/internal/bridge/ProjectionNative",
             methods,
         )
     }
@@ -441,6 +479,121 @@ extern "system" fn network_status_get(
 extern "system" fn network_status_set(_env: JNIEnv<'_>, _class: JClass<'_>, status: jint) -> jint {
     catch_unwind(|| unsafe { sys::mln_network_status_set(status as sys::mln_network_status) })
         .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+extern "system" fn runtime_create(
+    env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    out_runtime: JLongArray<'_>,
+) -> jint {
+    catch_unwind(AssertUnwindSafe(|| {
+        if out_runtime.is_null() || env.get_array_length(&out_runtime).unwrap_or(0) < 1 {
+            return sys::MLN_STATUS_INVALID_ARGUMENT;
+        }
+
+        let options = unsafe { sys::mln_runtime_options_default() };
+        let mut runtime: *mut sys::mln_runtime = std::ptr::null_mut();
+        let result = unsafe { sys::mln_runtime_create(&options, &mut runtime) };
+        if result == sys::MLN_STATUS_OK
+            && env
+                .set_long_array_region(&out_runtime, 0, &[runtime as jlong])
+                .is_err()
+        {
+            return sys::MLN_STATUS_INVALID_ARGUMENT;
+        }
+        result
+    }))
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+extern "system" fn runtime_destroy(_env: JNIEnv<'_>, _class: JClass<'_>, runtime: jlong) -> jint {
+    catch_unwind(|| unsafe { sys::mln_runtime_destroy(runtime as *mut sys::mln_runtime) })
+        .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+extern "system" fn runtime_run_once(_env: JNIEnv<'_>, _class: JClass<'_>, runtime: jlong) -> jint {
+    catch_unwind(|| unsafe { sys::mln_runtime_run_once(runtime as *mut sys::mln_runtime) })
+        .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+extern "system" fn map_create(
+    env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    runtime: jlong,
+    width: jint,
+    height: jint,
+    scale_factor: f64,
+    map_mode: jint,
+    out_map: JLongArray<'_>,
+) -> jint {
+    catch_unwind(AssertUnwindSafe(|| {
+        if out_map.is_null() || env.get_array_length(&out_map).unwrap_or(0) < 1 {
+            return sys::MLN_STATUS_INVALID_ARGUMENT;
+        }
+        if width < 0 || height < 0 {
+            return sys::MLN_STATUS_INVALID_ARGUMENT;
+        }
+
+        let mut options = unsafe { sys::mln_map_options_default() };
+        options.width = width as u32;
+        options.height = height as u32;
+        options.scale_factor = scale_factor;
+        options.map_mode = map_mode as u32;
+        let mut map: *mut sys::mln_map = std::ptr::null_mut();
+        let result =
+            unsafe { sys::mln_map_create(runtime as *mut sys::mln_runtime, &options, &mut map) };
+        if result == sys::MLN_STATUS_OK
+            && env
+                .set_long_array_region(&out_map, 0, &[map as jlong])
+                .is_err()
+        {
+            return sys::MLN_STATUS_INVALID_ARGUMENT;
+        }
+        result
+    }))
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+extern "system" fn map_destroy(_env: JNIEnv<'_>, _class: JClass<'_>, map: jlong) -> jint {
+    catch_unwind(|| unsafe { sys::mln_map_destroy(map as *mut sys::mln_map) })
+        .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+extern "system" fn projection_create(
+    env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    map: jlong,
+    out_projection: JLongArray<'_>,
+) -> jint {
+    catch_unwind(AssertUnwindSafe(|| {
+        if out_projection.is_null() || env.get_array_length(&out_projection).unwrap_or(0) < 1 {
+            return sys::MLN_STATUS_INVALID_ARGUMENT;
+        }
+
+        let mut projection: *mut sys::mln_map_projection = std::ptr::null_mut();
+        let result =
+            unsafe { sys::mln_map_projection_create(map as *mut sys::mln_map, &mut projection) };
+        if result == sys::MLN_STATUS_OK
+            && env
+                .set_long_array_region(&out_projection, 0, &[projection as jlong])
+                .is_err()
+        {
+            return sys::MLN_STATUS_INVALID_ARGUMENT;
+        }
+        result
+    }))
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
+extern "system" fn projection_destroy(
+    _env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    projection: jlong,
+) -> jint {
+    catch_unwind(|| unsafe {
+        sys::mln_map_projection_destroy(projection as *mut sys::mln_map_projection)
+    })
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
 }
 
 extern "system" fn thread_last_error_message(env: JNIEnv<'_>, _class: JClass<'_>) -> jstring {

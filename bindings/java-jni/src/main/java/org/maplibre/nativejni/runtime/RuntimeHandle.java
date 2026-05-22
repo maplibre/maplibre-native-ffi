@@ -3,8 +3,13 @@ package org.maplibre.nativejni.runtime;
 import java.lang.foreign.MemorySegment;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import org.maplibre.nativejni.internal.access.InternalAccess;
+import org.maplibre.nativejni.internal.bridge.RuntimeNative;
+import org.maplibre.nativejni.internal.lifecycle.HandleState;
+import org.maplibre.nativejni.internal.loader.NativeLibrary;
+import org.maplibre.nativejni.internal.status.Status;
 import org.maplibre.nativejni.map.MapHandle;
 import org.maplibre.nativejni.offline.OfflineRegionDefinition;
 import org.maplibre.nativejni.offline.OfflineRegionDownloadState;
@@ -15,21 +20,32 @@ import org.maplibre.nativejni.resource.ResourceTransformCallback;
 
 /** API-parity scaffold for the Java JNI binding. */
 public final class RuntimeHandle implements AutoCloseable {
+  private final HandleState state;
+
+  private RuntimeHandle(long handle) {
+    this.state = new HandleState("RuntimeHandle", handle);
+  }
+
   private static UnsupportedOperationException unsupported() {
     return new UnsupportedOperationException(
         "RuntimeHandle is not implemented by the JNI bridge yet");
   }
 
   public static RuntimeHandle create() {
-    throw unsupported();
+    return create(new RuntimeOptions());
   }
 
   public static RuntimeHandle create(RuntimeOptions options) {
-    throw unsupported();
+    Objects.requireNonNull(options, "options");
+    NativeLibrary.ensureLoaded();
+    var outRuntime = new long[1];
+    Status.check(RuntimeNative.mln_runtime_create(outRuntime));
+    return new RuntimeHandle(outRuntime[0]);
   }
 
   public void runOnce() {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    Status.check(RuntimeNative.mln_runtime_run_once(state.requireLiveAddress()));
   }
 
   public OfflineOperationHandle<Void> startAmbientCacheOperation(AmbientCacheOperation operation) {
@@ -136,31 +152,34 @@ public final class RuntimeHandle implements AutoCloseable {
   }
 
   public void close() {
-    throw unsupported();
+    state.closeOnce(RuntimeNative::mln_runtime_destroy);
   }
 
   public boolean isClosed() {
-    throw unsupported();
+    return state.isReleased();
   }
 
   public MemorySegment nativeHandle(InternalAccess access) {
-    throw unsupported();
+    Objects.requireNonNull(access, "access");
+    return state.requireLiveSegment();
   }
 
   MemorySegment nativeHandle() {
-    throw unsupported();
+    return state.requireLiveSegment();
   }
 
   long nativeAddress() {
-    throw unsupported();
+    return state.requireLiveAddress();
   }
 
   public void registerMap(InternalAccess access, MapHandle map) {
-    throw unsupported();
+    Objects.requireNonNull(access, "access");
+    Objects.requireNonNull(map, "map");
   }
 
   public void unregisterMap(InternalAccess access, MapHandle map) {
-    throw unsupported();
+    Objects.requireNonNull(access, "access");
+    Objects.requireNonNull(map, "map");
   }
 
   static MemorySegment offlineOperationCompletedPayload(MemorySegment event) {

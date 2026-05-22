@@ -4,9 +4,9 @@ package org.maplibre.nativejni.internal.bridge;
 public final class ProjectionNative {
   private ProjectionNative() {}
 
-  public static native int mln_map_projection_create();
+  public static native int mln_map_projection_create(long map, long[] outProjection);
 
-  public static native int mln_map_projection_destroy();
+  public static native int mln_map_projection_destroy(long projection);
 
   public static native int mln_map_projection_get_camera();
 

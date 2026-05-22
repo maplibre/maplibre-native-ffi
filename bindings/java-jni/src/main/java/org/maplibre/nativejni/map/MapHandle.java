@@ -3,6 +3,7 @@ package org.maplibre.nativejni.map;
 import java.lang.foreign.MemorySegment;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import org.maplibre.nativejni.camera.AnimationOptions;
@@ -17,6 +18,10 @@ import org.maplibre.nativejni.geo.LatLng;
 import org.maplibre.nativejni.geo.LatLngBounds;
 import org.maplibre.nativejni.geo.ScreenPoint;
 import org.maplibre.nativejni.internal.access.InternalAccess;
+import org.maplibre.nativejni.internal.bridge.MapNative;
+import org.maplibre.nativejni.internal.lifecycle.HandleState;
+import org.maplibre.nativejni.internal.loader.NativeLibrary;
+import org.maplibre.nativejni.internal.status.Status;
 import org.maplibre.nativejni.json.JsonValue;
 import org.maplibre.nativejni.render.MetalBorrowedTextureDescriptor;
 import org.maplibre.nativejni.render.MetalOwnedTextureDescriptor;
@@ -38,12 +43,35 @@ import org.maplibre.nativejni.style.TileSourceOptions;
 
 /** API-parity scaffold for the Java JNI binding. */
 public final class MapHandle implements AutoCloseable {
+  private final RuntimeHandle runtime;
+  private final HandleState state;
+
+  private MapHandle(RuntimeHandle runtime, long handle) {
+    this.runtime = Objects.requireNonNull(runtime, "runtime");
+    this.state = new HandleState("MapHandle", handle, runtime);
+    runtime.registerMap(InternalAccess.INSTANCE, this);
+  }
+
   private static UnsupportedOperationException unsupported() {
     return new UnsupportedOperationException("MapHandle is not implemented by the JNI bridge yet");
   }
 
   public static MapHandle create(RuntimeHandle runtime, MapOptions options) {
-    throw unsupported();
+    Objects.requireNonNull(runtime, "runtime");
+    Objects.requireNonNull(options, "options");
+    NativeLibrary.ensureLoaded();
+    var outMap = new long[1];
+    Status.check(
+        MapNative.mln_map_create(
+            runtime.nativeHandle(InternalAccess.INSTANCE).address(),
+            options.width() == null ? 512 : options.width(),
+            options.height() == null ? 512 : options.height(),
+            options.scaleFactor() == null ? 1.0 : options.scaleFactor(),
+            options.mapMode() == null
+                ? MapMode.CONTINUOUS.nativeValue()
+                : options.mapMode().nativeValue(),
+            outMap));
+    return new MapHandle(runtime, outMap[0]);
   }
 
   public void setStyleUrl(String url) {
@@ -553,46 +581,47 @@ public final class MapHandle implements AutoCloseable {
   }
 
   public MapProjectionHandle createProjection() {
-    throw unsupported();
+    return MapProjectionHandle.create(this);
   }
 
   public void close() {
-    throw unsupported();
+    state.closeOnce(
+        MapNative::mln_map_destroy, () -> runtime.unregisterMap(InternalAccess.INSTANCE, this));
   }
 
   public boolean isClosed() {
-    throw unsupported();
+    return state.isReleased();
   }
 
   public RuntimeHandle runtime() {
-    throw unsupported();
+    return runtime;
   }
 
   public MemorySegment nativeHandle(InternalAccess access) {
-    throw unsupported();
+    Objects.requireNonNull(access, "access");
+    return state.requireLiveSegment();
   }
 
   MemorySegment nativeHandle() {
-    throw unsupported();
+    return state.requireLiveSegment();
   }
 
   public long nativeAddress(InternalAccess access) {
-    throw unsupported();
+    Objects.requireNonNull(access, "access");
+    return state.requireLiveAddress();
   }
 
   long nativeAddress() {
-    throw unsupported();
+    return state.requireLiveAddress();
   }
 
   public void releaseDetachedCustomGeometrySources(InternalAccess access) {
-    throw unsupported();
+    Objects.requireNonNull(access, "access");
   }
 
-  void releaseDetachedCustomGeometrySources() {
-    throw unsupported();
-  }
+  void releaseDetachedCustomGeometrySources() {}
 
   int customGeometrySourceCountForTesting() {
-    throw unsupported();
+    return 0;
   }
 }
