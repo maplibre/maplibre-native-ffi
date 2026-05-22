@@ -12,6 +12,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     println!("cargo:rerun-if-env-changed=MLN_FFI_BUILD_DIR");
     println!("cargo:rerun-if-env-changed=MLN_FFI_DEPENDENCY_LIBRARY_DIR");
+    println!("cargo:rerun-if-env-changed=MLN_FFI_RENDER_BACKEND");
     println!("cargo:rerun-if-env-changed=LIBCLANG_PATH");
     println!("cargo:rerun-if-env-changed=BINDGEN_EXTRA_CLANG_ARGS");
     print_rerun_if_changed(&repo_root.join("include"));
@@ -24,6 +25,12 @@ fn main() -> Result<(), Box<dyn Error>> {
         );
     }
     println!("cargo:rustc-link-lib=dylib=maplibre-native-c");
+
+    let render_backend = env::var("MLN_FFI_RENDER_BACKEND").unwrap_or_default();
+    let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap_or_default();
+    if render_backend == "opengl" && target_os == "linux" {
+        println!("cargo:rustc-link-lib=dylib=GLESv2");
+    }
 
     let bindings = bindgen::Builder::default()
         .header(header.display().to_string())
