@@ -241,9 +241,16 @@ class MapHandleTest {
         assertTrue(map.styleLayerExists("background-layer"));
         assertTrue(map.styleLayerIds().contains("background-layer"));
         assertEquals("background", map.styleLayerType("background-layer").orElseThrow());
+        map.setStyleJson(
+            "{\"version\":8,\"sources\":{},\"layers\":[{\"id\":\"first-layer\",\"type\":\"background\"},{\"id\":\"second-layer\",\"type\":\"background\"}]}");
+        map.moveStyleLayer("second-layer", "first-layer");
+        List<String> movedLayerIds = map.styleLayerIds();
+        assertTrue(movedLayerIds.indexOf("second-layer") < movedLayerIds.indexOf("first-layer"));
+        map.moveStyleLayer("second-layer");
+        assertTrue(map.styleLayerIds().contains("second-layer"));
         assertTrue(map.styleLayerType("missing-layer").isEmpty());
-        assertTrue(map.removeStyleLayer("background-layer"));
-        assertFalse(map.removeStyleLayer("background-layer"));
+        assertTrue(map.removeStyleLayer("first-layer"));
+        assertFalse(map.removeStyleLayer("first-layer"));
         map.setStyleUrl("https://example.com/style.json");
         map.requestRepaint();
         assertThrows(InvalidStateException.class, map::requestStillImage);

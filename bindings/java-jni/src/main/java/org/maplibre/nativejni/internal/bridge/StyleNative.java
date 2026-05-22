@@ -114,7 +114,7 @@ public final class StyleNative {
 
   public static native int mln_map_list_style_layer_ids(long map, Object[] outLayerIds);
 
-  public static native int mln_map_move_style_layer();
+  public static native int mln_map_move_style_layer(long map, String layerId, String beforeLayerId);
 
   public static native int mln_map_get_style_layer_json();
 

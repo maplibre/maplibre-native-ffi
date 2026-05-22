@@ -298,7 +298,6 @@ mod registration {
             "mln_map_set_location_indicator_accuracy_radius",
             "mln_map_set_location_indicator_image_name",
             "mln_map_add_style_layer_json",
-            "mln_map_move_style_layer",
             "mln_map_get_style_layer_json",
             "mln_map_set_style_light_json",
             "mln_map_set_style_light_property",
@@ -372,6 +371,11 @@ mod registration {
             name: "mln_map_list_style_layer_ids".into(),
             sig: "(J[Ljava/lang/Object;)I".into(),
             fn_ptr: map_list_style_layer_ids as *mut c_void,
+        });
+        style_methods.push(NativeMethod {
+            name: "mln_map_move_style_layer".into(),
+            sig: "(JLjava/lang/String;Ljava/lang/String;)I".into(),
+            fn_ptr: map_move_style_layer as *mut c_void,
         });
         register_methods(
             vm,
@@ -1810,6 +1814,35 @@ extern "system" fn map_list_style_layer_ids(
     out_layer_ids: JObjectArray<'_>,
 ) -> jint {
     map_list_style_ids(env, map, out_layer_ids, sys::mln_map_list_style_layer_ids)
+}
+
+extern "system" fn map_move_style_layer(
+    mut env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    map: jlong,
+    layer_id: JString<'_>,
+    before_layer_id: JString<'_>,
+) -> jint {
+    catch_unwind(AssertUnwindSafe(|| {
+        let (layer_id_storage, layer_id_view) = match string_view(&mut env, &layer_id) {
+            Ok(value) => value,
+            Err(status) => return status,
+        };
+        let (before_layer_id_storage, before_layer_id_view) =
+            match string_view(&mut env, &before_layer_id) {
+                Ok(value) => value,
+                Err(status) => return status,
+            };
+        let _keep_alive = (layer_id_storage, before_layer_id_storage);
+        unsafe {
+            sys::mln_map_move_style_layer(
+                map as *mut sys::mln_map,
+                layer_id_view,
+                before_layer_id_view,
+            )
+        }
+    }))
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
 }
 
 extern "system" fn map_remove_style_layer(

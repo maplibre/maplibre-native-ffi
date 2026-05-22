@@ -398,11 +398,16 @@ public final class MapHandle implements AutoCloseable {
   }
 
   public void moveStyleLayer(String layerId) {
-    throw unsupported();
+    moveStyleLayer(layerId, "");
   }
 
   public void moveStyleLayer(String layerId, String beforeLayerId) {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    Status.check(
+        StyleNative.mln_map_move_style_layer(
+            state.requireLiveAddress(),
+            Objects.requireNonNull(layerId, "layerId"),
+            Objects.requireNonNull(beforeLayerId, "beforeLayerId")));
   }
 
   public Optional<JsonValue> styleLayerJson(String layerId) {
