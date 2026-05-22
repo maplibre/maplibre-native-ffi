@@ -320,6 +320,11 @@ class MapHandleTest {
             updatedImageCoordinates, map.imageSourceCoordinates("image-source").orElseThrow());
         assertTrue(map.imageSourceCoordinates("missing-image-source").isEmpty());
         assertTrue(map.removeStyleSource("image-source"));
+        map.addImageSourceImage("inline-image-source", imageCoordinates, styleImage);
+        assertEquals(SourceType.IMAGE, map.styleSourceType("inline-image-source").orElseThrow());
+        map.setImageSourceImage(
+            "inline-image-source", new PremultipliedRgba8Image(1, 1, 4, new byte[] {5, 6, 7, 8}));
+        assertTrue(map.removeStyleSource("inline-image-source"));
         map.setStyleJson(
             "{\"version\":8,\"sources\":{},\"layers\":[{\"id\":\"background-layer\",\"type\":\"background\"}]}");
         assertTrue(map.styleLayerExists("background-layer"));

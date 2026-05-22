@@ -139,11 +139,19 @@ public final class StyleNative {
   public static native int mln_map_add_image_source_url(
       long map, String sourceId, double[] coordinates, String url);
 
-  public static native int mln_map_add_image_source_image();
+  public static native int mln_map_add_image_source_image(
+      long map,
+      String sourceId,
+      double[] coordinates,
+      int width,
+      int height,
+      int stride,
+      byte[] pixels);
 
   public static native int mln_map_set_image_source_url(long map, String sourceId, String url);
 
-  public static native int mln_map_set_image_source_image();
+  public static native int mln_map_set_image_source_image(
+      long map, String sourceId, int width, int height, int stride, byte[] pixels);
 
   public static native int mln_map_set_image_source_coordinates(
       long map, String sourceId, double[] coordinates);

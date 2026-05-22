@@ -446,7 +446,17 @@ public final class MapHandle implements AutoCloseable {
 
   public void addImageSourceImage(
       String sourceId, List<LatLng> coordinates, PremultipliedRgba8Image image) {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    Objects.requireNonNull(image, "image");
+    Status.check(
+        StyleNative.mln_map_add_image_source_image(
+            state.requireLiveAddress(),
+            Objects.requireNonNull(sourceId, "sourceId"),
+            coordinateArray(coordinates, "coordinates"),
+            image.width(),
+            image.height(),
+            image.stride(),
+            image.pixels()));
   }
 
   public void setImageSourceUrl(String sourceId, String url) {
@@ -459,7 +469,16 @@ public final class MapHandle implements AutoCloseable {
   }
 
   public void setImageSourceImage(String sourceId, PremultipliedRgba8Image image) {
-    throw unsupported();
+    NativeLibrary.ensureLoaded();
+    Objects.requireNonNull(image, "image");
+    Status.check(
+        StyleNative.mln_map_set_image_source_image(
+            state.requireLiveAddress(),
+            Objects.requireNonNull(sourceId, "sourceId"),
+            image.width(),
+            image.height(),
+            image.stride(),
+            image.pixels()));
   }
 
   public void setImageSourceCoordinates(String sourceId, List<LatLng> coordinates) {

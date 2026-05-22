@@ -274,8 +274,6 @@ mod registration {
             "mln_map_set_custom_geometry_source_tile_data",
             "mln_map_invalidate_custom_geometry_source_tile",
             "mln_map_invalidate_custom_geometry_source_region",
-            "mln_map_add_image_source_image",
-            "mln_map_set_image_source_image",
             "mln_map_add_style_layer_json",
             "mln_map_get_style_layer_json",
             "mln_map_set_style_light_json",
@@ -387,9 +385,19 @@ mod registration {
             fn_ptr: map_add_image_source_url as *mut c_void,
         });
         style_methods.push(NativeMethod {
+            name: "mln_map_add_image_source_image".into(),
+            sig: "(JLjava/lang/String;[DIII[B)I".into(),
+            fn_ptr: map_add_image_source_image as *mut c_void,
+        });
+        style_methods.push(NativeMethod {
             name: "mln_map_set_image_source_url".into(),
             sig: "(JLjava/lang/String;Ljava/lang/String;)I".into(),
             fn_ptr: map_set_image_source_url as *mut c_void,
+        });
+        style_methods.push(NativeMethod {
+            name: "mln_map_set_image_source_image".into(),
+            sig: "(JLjava/lang/String;III[B)I".into(),
+            fn_ptr: map_set_image_source_image as *mut c_void,
         });
         style_methods.push(NativeMethod {
             name: "mln_map_set_image_source_coordinates".into(),
@@ -2492,6 +2500,44 @@ extern "system" fn map_set_style_image(
     .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
 }
 
+fn premultiplied_rgba8_image(
+    env: &JNIEnv<'_>,
+    pixels: &JByteArray<'_>,
+    width: jint,
+    height: jint,
+    stride: jint,
+) -> Result<(sys::mln_premultiplied_rgba8_image, Vec<i8>), jint> {
+    if pixels.is_null() || width < 0 || height < 0 || stride < 0 {
+        return Err(sys::MLN_STATUS_INVALID_ARGUMENT);
+    }
+    let pixel_count = env
+        .get_array_length(pixels)
+        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
+    if pixel_count < 0 {
+        return Err(sys::MLN_STATUS_INVALID_ARGUMENT);
+    }
+    let mut pixel_values = vec![0_i8; pixel_count as usize];
+    if env
+        .get_byte_array_region(pixels, 0, &mut pixel_values)
+        .is_err()
+    {
+        return Err(sys::MLN_STATUS_INVALID_ARGUMENT);
+    }
+    let image = sys::mln_premultiplied_rgba8_image {
+        size: std::mem::size_of::<sys::mln_premultiplied_rgba8_image>() as u32,
+        width: width as u32,
+        height: height as u32,
+        stride: stride as u32,
+        pixels: if pixel_values.is_empty() {
+            std::ptr::null()
+        } else {
+            pixel_values.as_ptr() as *const u8
+        },
+        byte_length: pixel_values.len(),
+    };
+    Ok((image, pixel_values))
+}
+
 extern "system" fn map_remove_style_image(
     env: JNIEnv<'_>,
     _class: JClass<'_>,
@@ -2742,6 +2788,52 @@ extern "system" fn map_add_image_source_url(
     .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
 }
 
+extern "system" fn map_add_image_source_image(
+    mut env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    map: jlong,
+    source_id: JString<'_>,
+    coordinates: JDoubleArray<'_>,
+    width: jint,
+    height: jint,
+    stride: jint,
+    pixels: JByteArray<'_>,
+) -> jint {
+    catch_unwind(AssertUnwindSafe(|| {
+        let (source_id_storage, source_id_view) = match string_view(&mut env, &source_id) {
+            Ok(value) => value,
+            Err(status) => return status,
+        };
+        let coordinate_values = match read_nonempty_coordinate_pairs(&env, &coordinates) {
+            Ok(value) => value,
+            Err(status) => return status,
+        };
+        let coordinates: Vec<_> = coordinate_values
+            .chunks_exact(2)
+            .map(|pair| sys::mln_lat_lng {
+                latitude: pair[0],
+                longitude: pair[1],
+            })
+            .collect();
+        let (image, image_pixels) =
+            match premultiplied_rgba8_image(&env, &pixels, width, height, stride) {
+                Ok(value) => value,
+                Err(status) => return status,
+            };
+        let _keep_alive = (source_id_storage, image_pixels);
+        unsafe {
+            sys::mln_map_add_image_source_image(
+                map as *mut sys::mln_map,
+                source_id_view,
+                coordinates.as_ptr(),
+                coordinates.len(),
+                &image,
+            )
+        }
+    }))
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+}
+
 extern "system" fn map_set_image_source_url(
     env: JNIEnv<'_>,
     _class: JClass<'_>,
@@ -2750,6 +2842,35 @@ extern "system" fn map_set_image_source_url(
     url: JString<'_>,
 ) -> jint {
     map_style_source_url(env, map, source_id, url, sys::mln_map_set_image_source_url)
+}
+
+extern "system" fn map_set_image_source_image(
+    env: JNIEnv<'_>,
+    _class: JClass<'_>,
+    map: jlong,
+    source_id: JString<'_>,
+    width: jint,
+    height: jint,
+    stride: jint,
+    pixels: JByteArray<'_>,
+) -> jint {
+    catch_unwind(AssertUnwindSafe(|| {
+        let mut env = env;
+        let (source_id_storage, source_id_view) = match string_view(&mut env, &source_id) {
+            Ok(value) => value,
+            Err(status) => return status,
+        };
+        let (image, image_pixels) =
+            match premultiplied_rgba8_image(&env, &pixels, width, height, stride) {
+                Ok(value) => value,
+                Err(status) => return status,
+            };
+        let _keep_alive = (source_id_storage, image_pixels);
+        unsafe {
+            sys::mln_map_set_image_source_image(map as *mut sys::mln_map, source_id_view, &image)
+        }
+    }))
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
 }
 
 extern "system" fn map_set_image_source_coordinates(
