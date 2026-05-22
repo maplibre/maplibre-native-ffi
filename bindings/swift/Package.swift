@@ -36,7 +36,7 @@ let package = Package(
     ),
     .testTarget(
       name: "MaplibreNativeTests",
-      dependencies: ["MaplibreNative"]
+      dependencies: ["MaplibreNative", "MaplibreNativeSupport"]
     ),
   ]
 )

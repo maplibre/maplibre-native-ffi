@@ -13,6 +13,14 @@ public final class NativeHandleState: @unchecked Sendable {
     self.pointer = pointer
   }
 
+  deinit {
+    if let pointer = lock.withLock({ pointer }) {
+      NativeHandleLeakReporter.report(
+        NativeHandleLeak(typeName: typeName, address: UInt(bitPattern: pointer))
+      )
+    }
+  }
+
   public var isClosed: Bool {
     lock.withLock { pointer == nil }
   }
