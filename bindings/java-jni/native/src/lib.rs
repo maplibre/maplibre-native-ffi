@@ -1379,9 +1379,13 @@ extern "system" fn network_status_set(_env: JNIEnv<'_>, _class: JClass<'_>, stat
 }
 
 extern "system" fn test_panic_status(_env: JNIEnv<'_>, _class: JClass<'_>) -> jint {
-    catch_unwind(|| panic!("intentional JNI panic-boundary test"))
+    let previous_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(|_| {}));
+    let result = catch_unwind(|| panic!("intentional JNI panic-boundary test"))
         .map(|_: ()| sys::MLN_STATUS_OK)
-        .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
+        .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR);
+    std::panic::set_hook(previous_hook);
+    result
 }
 
 extern "system" fn test_create_many_local_strings(
