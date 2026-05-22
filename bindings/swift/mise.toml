@@ -1,0 +1,11 @@
+[tasks.build]
+depends = ["//:ensure-native-library"]
+run = 'swift build --scratch-path ".build/$MLN_FFI_VARIANT"'
+
+[tasks.test]
+depends = ["//:ensure-native-library"]
+run = 'swift test --scratch-path ".build/$MLN_FFI_VARIANT"'
+
+[tasks.ci]
+depends = ["test"]
+run = 'swift package describe --type json >/dev/null'

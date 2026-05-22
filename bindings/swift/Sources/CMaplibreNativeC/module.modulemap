@@ -1,0 +1,4 @@
+module CMaplibreNativeC [system] {
+  umbrella header "include/maplibre_native_c.h"
+  export *
+}
