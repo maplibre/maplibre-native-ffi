@@ -17,13 +17,13 @@ public enum TileLodMode : uint { Default = 0, Distance = 1 }
 public enum DebugOptions : uint
 {
     None = 0,
-    TileBorders = 1u << 0,
-    ParseStatus = 1u << 1,
-    Timestamps = 1u << 2,
-    Collision = 1u << 3,
-    Overdraw = 1u << 4,
-    StencilClip = 1u << 5,
-    DepthBuffer = 1u << 6,
+    TileBorders = 1u << 1,
+    ParseStatus = 1u << 2,
+    Timestamps = 1u << 3,
+    Collision = 1u << 4,
+    Overdraw = 1u << 5,
+    StencilClip = 1u << 6,
+    DepthBuffer = 1u << 7,
 }
 
 /// <summary>Tile operation reported in runtime tile events.</summary>

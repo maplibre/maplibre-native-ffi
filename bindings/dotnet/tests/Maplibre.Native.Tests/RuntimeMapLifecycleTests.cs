@@ -25,6 +25,23 @@ public sealed class RuntimeMapLifecycleTests
     }
 
     [Fact]
+    public void MapDebugSettingsRoundTripThroughNativeMap()
+    {
+        NativeLibraryTestSupport.SkipUnlessNativeLibraryIsAvailable();
+        using var runtime = RuntimeHandle.Create();
+        using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
+
+        var options = DebugOptions.TileBorders | DebugOptions.ParseStatus;
+        map.SetDebugOptions(options);
+        map.SetRenderingStatsViewEnabled(true);
+
+        Assert.Equal(options, map.GetDebugOptions());
+        Assert.True(map.GetRenderingStatsViewEnabled());
+        _ = map.IsFullyLoaded();
+        map.DumpDebugLogs();
+    }
+
+    [Fact]
     public void MethodsRejectClosedMapBeforeNativeCall()
     {
         NativeLibraryTestSupport.SkipUnlessNativeLibraryIsAvailable();

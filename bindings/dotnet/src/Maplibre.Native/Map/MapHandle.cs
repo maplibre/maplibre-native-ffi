@@ -44,6 +44,54 @@ public sealed unsafe class MapHandle : IDisposable
         NativeStatus.Check(NativeMethods.mln_map_request_repaint(Pointer));
     }
 
+    /// <summary>Requests an asynchronous still-image render for a static map.</summary>
+    public void RequestStillImage()
+    {
+        NativeStatus.Check(NativeMethods.mln_map_request_still_image(Pointer));
+    }
+
+    /// <summary>Sets native debug drawing options.</summary>
+    public void SetDebugOptions(DebugOptions options)
+    {
+        NativeStatus.Check(NativeMethods.mln_map_set_debug_options(Pointer, (uint)options));
+    }
+
+    /// <summary>Gets native debug drawing options.</summary>
+    public DebugOptions GetDebugOptions()
+    {
+        uint options = 0;
+        NativeStatus.Check(NativeMethods.mln_map_get_debug_options(Pointer, &options));
+        return (DebugOptions)options;
+    }
+
+    /// <summary>Shows or hides the built-in rendering statistics overlay.</summary>
+    public void SetRenderingStatsViewEnabled(bool enabled)
+    {
+        NativeStatus.Check(NativeMethods.mln_map_set_rendering_stats_view_enabled(Pointer, enabled ? (byte)1 : (byte)0));
+    }
+
+    /// <summary>Whether the built-in rendering statistics overlay is enabled.</summary>
+    public bool GetRenderingStatsViewEnabled()
+    {
+        bool enabled = false;
+        NativeStatus.Check(NativeMethods.mln_map_get_rendering_stats_view_enabled(Pointer, &enabled));
+        return enabled;
+    }
+
+    /// <summary>Whether the native map reports all required resources loaded.</summary>
+    public bool IsFullyLoaded()
+    {
+        bool loaded = false;
+        NativeStatus.Check(NativeMethods.mln_map_is_fully_loaded(Pointer, &loaded));
+        return loaded;
+    }
+
+    /// <summary>Asks the native map to write debug logs through the native log system.</summary>
+    public void DumpDebugLogs()
+    {
+        NativeStatus.Check(NativeMethods.mln_map_dump_debug_logs(Pointer));
+    }
+
     /// <summary>Loads a style URL through MapLibre Native style APIs.</summary>
     public void SetStyleUrl(string url)
     {
