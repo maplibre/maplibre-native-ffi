@@ -6,6 +6,23 @@ package capi
 #cgo CFLAGS: -std=c2x
 #include <stdlib.h>
 #include "maplibre_native_c.h"
+
+static inline mln_offline_region_definition mln_go_offline_tile_pyramid_region_definition(
+  const char* style_url, mln_lat_lng_bounds bounds, double min_zoom, double max_zoom,
+  float pixel_ratio, bool include_ideographs
+) {
+  mln_offline_region_definition definition;
+  definition.size = sizeof(mln_offline_region_definition);
+  definition.type = MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID;
+  definition.data.tile_pyramid.size = sizeof(mln_offline_tile_pyramid_region_definition);
+  definition.data.tile_pyramid.style_url = style_url;
+  definition.data.tile_pyramid.bounds = bounds;
+  definition.data.tile_pyramid.min_zoom = min_zoom;
+  definition.data.tile_pyramid.max_zoom = max_zoom;
+  definition.data.tile_pyramid.pixel_ratio = pixel_ratio;
+  definition.data.tile_pyramid.include_ideographs = include_ideographs;
+  return definition;
+}
 */
 import "C"
 import "unsafe"
@@ -50,6 +67,22 @@ type ScreenPoint struct {
 type ProjectedMeters struct {
 	Northing float64
 	Easting  float64
+}
+
+// LatLngBounds is a geographic bounds rectangle in degrees.
+type LatLngBounds struct {
+	Southwest LatLng
+	Northeast LatLng
+}
+
+// OfflineTilePyramidRegionDefinition contains tile-pyramid offline region data.
+type OfflineTilePyramidRegionDefinition struct {
+	StyleURL          string
+	Bounds            LatLngBounds
+	MinZoom           float64
+	MaxZoom           float64
+	PixelRatio        float32
+	IncludeIdeographs bool
 }
 
 // RuntimeEvent is a copied native runtime event.
@@ -232,6 +265,38 @@ const (
 	AmbientCacheOperationClear         uint32 = uint32(C.MLN_AMBIENT_CACHE_OPERATION_CLEAR)
 )
 
+const (
+	OfflineRegionDefinitionTilePyramid uint32 = uint32(C.MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID)
+	OfflineRegionDefinitionGeometry    uint32 = uint32(C.MLN_OFFLINE_REGION_DEFINITION_GEOMETRY)
+)
+
+const (
+	OfflineRegionDownloadInactive uint32 = uint32(C.MLN_OFFLINE_REGION_DOWNLOAD_INACTIVE)
+	OfflineRegionDownloadActive   uint32 = uint32(C.MLN_OFFLINE_REGION_DOWNLOAD_ACTIVE)
+)
+
+const (
+	OfflineOperationAmbientCache           uint32 = uint32(C.MLN_OFFLINE_OPERATION_AMBIENT_CACHE)
+	OfflineOperationRegionCreate           uint32 = uint32(C.MLN_OFFLINE_OPERATION_REGION_CREATE)
+	OfflineOperationRegionGet              uint32 = uint32(C.MLN_OFFLINE_OPERATION_REGION_GET)
+	OfflineOperationRegionsList            uint32 = uint32(C.MLN_OFFLINE_OPERATION_REGIONS_LIST)
+	OfflineOperationRegionsMergeDatabase   uint32 = uint32(C.MLN_OFFLINE_OPERATION_REGIONS_MERGE_DATABASE)
+	OfflineOperationRegionUpdateMetadata   uint32 = uint32(C.MLN_OFFLINE_OPERATION_REGION_UPDATE_METADATA)
+	OfflineOperationRegionGetStatus        uint32 = uint32(C.MLN_OFFLINE_OPERATION_REGION_GET_STATUS)
+	OfflineOperationRegionSetObserved      uint32 = uint32(C.MLN_OFFLINE_OPERATION_REGION_SET_OBSERVED)
+	OfflineOperationRegionSetDownloadState uint32 = uint32(C.MLN_OFFLINE_OPERATION_REGION_SET_DOWNLOAD_STATE)
+	OfflineOperationRegionInvalidate       uint32 = uint32(C.MLN_OFFLINE_OPERATION_REGION_INVALIDATE)
+	OfflineOperationRegionDelete           uint32 = uint32(C.MLN_OFFLINE_OPERATION_REGION_DELETE)
+)
+
+const (
+	OfflineOperationResultNone           uint32 = uint32(C.MLN_OFFLINE_OPERATION_RESULT_NONE)
+	OfflineOperationResultRegion         uint32 = uint32(C.MLN_OFFLINE_OPERATION_RESULT_REGION)
+	OfflineOperationResultOptionalRegion uint32 = uint32(C.MLN_OFFLINE_OPERATION_RESULT_OPTIONAL_REGION)
+	OfflineOperationResultRegionList     uint32 = uint32(C.MLN_OFFLINE_OPERATION_RESULT_REGION_LIST)
+	OfflineOperationResultRegionStatus   uint32 = uint32(C.MLN_OFFLINE_OPERATION_RESULT_REGION_STATUS)
+)
+
 // CVersion returns the linked native C ABI contract version.
 func CVersion() uint32 {
 	return uint32(C.mln_c_version())
@@ -314,6 +379,177 @@ func RuntimeOfflineOperationDiscard(runtime *Runtime, operationID uint64) Status
 		(*C.mln_runtime)(unsafe.Pointer(runtime)),
 		C.mln_offline_operation_id(operationID),
 	))
+}
+
+// RuntimeOfflineRegionCreateStart starts creating a tile-pyramid offline region.
+func RuntimeOfflineRegionCreateStart(runtime *Runtime, definition OfflineTilePyramidRegionDefinition, metadata []byte, out *uint64) Status {
+	styleURL := C.CString(definition.StyleURL)
+	defer C.free(unsafe.Pointer(styleURL))
+	rawDefinition := C.mln_go_offline_tile_pyramid_region_definition(
+		styleURL,
+		latLngBoundsToC(definition.Bounds),
+		C.double(definition.MinZoom),
+		C.double(definition.MaxZoom),
+		C.float(definition.PixelRatio),
+		C.bool(definition.IncludeIdeographs),
+	)
+	metadataPointer, metadataSize := bytesToC(metadata)
+	defer freeOptional(metadataPointer)
+	var rawID C.mln_offline_operation_id
+	status := Status(C.mln_runtime_offline_region_create_start(
+		(*C.mln_runtime)(unsafe.Pointer(runtime)),
+		&rawDefinition,
+		(*C.uint8_t)(metadataPointer),
+		metadataSize,
+		&rawID,
+	))
+	if status == StatusOK {
+		*out = uint64(rawID)
+	}
+	return status
+}
+
+// RuntimeOfflineRegionGetStart starts getting an offline region by ID.
+func RuntimeOfflineRegionGetStart(runtime *Runtime, regionID int64, out *uint64) Status {
+	var rawID C.mln_offline_operation_id
+	status := Status(C.mln_runtime_offline_region_get_start(
+		(*C.mln_runtime)(unsafe.Pointer(runtime)),
+		C.mln_offline_region_id(regionID),
+		&rawID,
+	))
+	if status == StatusOK {
+		*out = uint64(rawID)
+	}
+	return status
+}
+
+// RuntimeOfflineRegionsListStart starts listing offline regions.
+func RuntimeOfflineRegionsListStart(runtime *Runtime, out *uint64) Status {
+	var rawID C.mln_offline_operation_id
+	status := Status(C.mln_runtime_offline_regions_list_start((*C.mln_runtime)(unsafe.Pointer(runtime)), &rawID))
+	if status == StatusOK {
+		*out = uint64(rawID)
+	}
+	return status
+}
+
+// RuntimeOfflineRegionsMergeDatabaseStart starts merging a side database.
+func RuntimeOfflineRegionsMergeDatabaseStart(runtime *Runtime, path string, out *uint64) Status {
+	cPath := C.CString(path)
+	defer C.free(unsafe.Pointer(cPath))
+	var rawID C.mln_offline_operation_id
+	status := Status(C.mln_runtime_offline_regions_merge_database_start(
+		(*C.mln_runtime)(unsafe.Pointer(runtime)),
+		cPath,
+		&rawID,
+	))
+	if status == StatusOK {
+		*out = uint64(rawID)
+	}
+	return status
+}
+
+// RuntimeOfflineRegionUpdateMetadataStart starts updating offline region metadata.
+func RuntimeOfflineRegionUpdateMetadataStart(runtime *Runtime, regionID int64, metadata []byte, out *uint64) Status {
+	metadataPointer, metadataSize := bytesToC(metadata)
+	defer freeOptional(metadataPointer)
+	var rawID C.mln_offline_operation_id
+	status := Status(C.mln_runtime_offline_region_update_metadata_start(
+		(*C.mln_runtime)(unsafe.Pointer(runtime)),
+		C.mln_offline_region_id(regionID),
+		(*C.uint8_t)(metadataPointer),
+		metadataSize,
+		&rawID,
+	))
+	if status == StatusOK {
+		*out = uint64(rawID)
+	}
+	return status
+}
+
+// RuntimeOfflineRegionGetStatusStart starts getting offline region status.
+func RuntimeOfflineRegionGetStatusStart(runtime *Runtime, regionID int64, out *uint64) Status {
+	var rawID C.mln_offline_operation_id
+	status := Status(C.mln_runtime_offline_region_get_status_start(
+		(*C.mln_runtime)(unsafe.Pointer(runtime)),
+		C.mln_offline_region_id(regionID),
+		&rawID,
+	))
+	if status == StatusOK {
+		*out = uint64(rawID)
+	}
+	return status
+}
+
+// RuntimeOfflineRegionSetObservedStart starts setting observation state.
+func RuntimeOfflineRegionSetObservedStart(runtime *Runtime, regionID int64, observed bool, out *uint64) Status {
+	var rawID C.mln_offline_operation_id
+	status := Status(C.mln_runtime_offline_region_set_observed_start(
+		(*C.mln_runtime)(unsafe.Pointer(runtime)),
+		C.mln_offline_region_id(regionID),
+		C.bool(observed),
+		&rawID,
+	))
+	if status == StatusOK {
+		*out = uint64(rawID)
+	}
+	return status
+}
+
+// RuntimeOfflineRegionSetDownloadStateStart starts setting download state.
+func RuntimeOfflineRegionSetDownloadStateStart(runtime *Runtime, regionID int64, state uint32, out *uint64) Status {
+	var rawID C.mln_offline_operation_id
+	status := Status(C.mln_runtime_offline_region_set_download_state_start(
+		(*C.mln_runtime)(unsafe.Pointer(runtime)),
+		C.mln_offline_region_id(regionID),
+		C.uint32_t(state),
+		&rawID,
+	))
+	if status == StatusOK {
+		*out = uint64(rawID)
+	}
+	return status
+}
+
+// RuntimeOfflineRegionInvalidateStart starts invalidating an offline region.
+func RuntimeOfflineRegionInvalidateStart(runtime *Runtime, regionID int64, out *uint64) Status {
+	var rawID C.mln_offline_operation_id
+	status := Status(C.mln_runtime_offline_region_invalidate_start(
+		(*C.mln_runtime)(unsafe.Pointer(runtime)),
+		C.mln_offline_region_id(regionID),
+		&rawID,
+	))
+	if status == StatusOK {
+		*out = uint64(rawID)
+	}
+	return status
+}
+
+// RuntimeOfflineRegionDeleteStart starts deleting an offline region.
+func RuntimeOfflineRegionDeleteStart(runtime *Runtime, regionID int64, out *uint64) Status {
+	var rawID C.mln_offline_operation_id
+	status := Status(C.mln_runtime_offline_region_delete_start(
+		(*C.mln_runtime)(unsafe.Pointer(runtime)),
+		C.mln_offline_region_id(regionID),
+		&rawID,
+	))
+	if status == StatusOK {
+		*out = uint64(rawID)
+	}
+	return status
+}
+
+func bytesToC(bytes []byte) (unsafe.Pointer, C.size_t) {
+	if len(bytes) == 0 {
+		return nil, 0
+	}
+	return C.CBytes(bytes), C.size_t(len(bytes))
+}
+
+func freeOptional(pointer unsafe.Pointer) {
+	if pointer != nil {
+		C.free(pointer)
+	}
 }
 
 // RuntimeDestroy destroys a runtime handle.
@@ -497,6 +733,13 @@ func latLngToC(coordinate LatLng) C.mln_lat_lng {
 
 func latLngFromC(coordinate C.mln_lat_lng) LatLng {
 	return LatLng{Latitude: float64(coordinate.latitude), Longitude: float64(coordinate.longitude)}
+}
+
+func latLngBoundsToC(bounds LatLngBounds) C.mln_lat_lng_bounds {
+	return C.mln_lat_lng_bounds{
+		southwest: latLngToC(bounds.Southwest),
+		northeast: latLngToC(bounds.Northeast),
+	}
 }
 
 func screenPointToC(point ScreenPoint) C.mln_screen_point {

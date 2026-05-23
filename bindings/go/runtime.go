@@ -28,12 +28,47 @@ const (
 	AmbientCacheOperationClear         AmbientCacheOperation = AmbientCacheOperation(capi.AmbientCacheOperationClear)
 )
 
+// OfflineOperationKind identifies a native offline operation kind.
+type OfflineOperationKind uint32
+
+const (
+	OfflineOperationAmbientCache           OfflineOperationKind = OfflineOperationKind(capi.OfflineOperationAmbientCache)
+	OfflineOperationRegionCreate           OfflineOperationKind = OfflineOperationKind(capi.OfflineOperationRegionCreate)
+	OfflineOperationRegionGet              OfflineOperationKind = OfflineOperationKind(capi.OfflineOperationRegionGet)
+	OfflineOperationRegionsList            OfflineOperationKind = OfflineOperationKind(capi.OfflineOperationRegionsList)
+	OfflineOperationRegionsMergeDatabase   OfflineOperationKind = OfflineOperationKind(capi.OfflineOperationRegionsMergeDatabase)
+	OfflineOperationRegionUpdateMetadata   OfflineOperationKind = OfflineOperationKind(capi.OfflineOperationRegionUpdateMetadata)
+	OfflineOperationRegionGetStatus        OfflineOperationKind = OfflineOperationKind(capi.OfflineOperationRegionGetStatus)
+	OfflineOperationRegionSetObserved      OfflineOperationKind = OfflineOperationKind(capi.OfflineOperationRegionSetObserved)
+	OfflineOperationRegionSetDownloadState OfflineOperationKind = OfflineOperationKind(capi.OfflineOperationRegionSetDownloadState)
+	OfflineOperationRegionInvalidate       OfflineOperationKind = OfflineOperationKind(capi.OfflineOperationRegionInvalidate)
+	OfflineOperationRegionDelete           OfflineOperationKind = OfflineOperationKind(capi.OfflineOperationRegionDelete)
+)
+
+// OfflineOperationResultKind identifies the expected result shape for an
+// offline operation.
+type OfflineOperationResultKind uint32
+
+const (
+	OfflineOperationResultNone           OfflineOperationResultKind = OfflineOperationResultKind(capi.OfflineOperationResultNone)
+	OfflineOperationResultRegion         OfflineOperationResultKind = OfflineOperationResultKind(capi.OfflineOperationResultRegion)
+	OfflineOperationResultOptionalRegion OfflineOperationResultKind = OfflineOperationResultKind(capi.OfflineOperationResultOptionalRegion)
+	OfflineOperationResultRegionList     OfflineOperationResultKind = OfflineOperationResultKind(capi.OfflineOperationResultRegionList)
+	OfflineOperationResultRegionStatus   OfflineOperationResultKind = OfflineOperationResultKind(capi.OfflineOperationResultRegionStatus)
+)
+
 // OfflineOperationHandle owns a runtime-scoped offline operation token.
 type OfflineOperationHandle[T any] struct {
-	runtime *RuntimeHandle
-	id      uint64
-	mu      sync.Mutex
-	live    bool
+	runtime    *RuntimeHandle
+	id         uint64
+	kind       OfflineOperationKind
+	resultKind OfflineOperationResultKind
+	mu         sync.Mutex
+	live       bool
+}
+
+func newOfflineOperationHandle[T any](runtime *RuntimeHandle, id uint64, kind OfflineOperationKind, resultKind OfflineOperationResultKind) *OfflineOperationHandle[T] {
+	return &OfflineOperationHandle[T]{runtime: runtime, id: id, kind: kind, resultKind: resultKind, live: true}
 }
 
 // ID returns the native offline operation ID.
@@ -44,6 +79,26 @@ func (operation *OfflineOperationHandle[T]) ID() uint64 {
 	operation.mu.Lock()
 	defer operation.mu.Unlock()
 	return operation.id
+}
+
+// Kind returns the native offline operation kind.
+func (operation *OfflineOperationHandle[T]) Kind() OfflineOperationKind {
+	if operation == nil {
+		return 0
+	}
+	operation.mu.Lock()
+	defer operation.mu.Unlock()
+	return operation.kind
+}
+
+// ResultKind returns the expected native result shape.
+func (operation *OfflineOperationHandle[T]) ResultKind() OfflineOperationResultKind {
+	if operation == nil {
+		return 0
+	}
+	operation.mu.Lock()
+	defer operation.mu.Unlock()
+	return operation.resultKind
 }
 
 // Discard drops runtime-owned state for this operation. The operation remains
@@ -325,7 +380,7 @@ func (runtime *RuntimeHandle) StartAmbientCacheOperation(operation AmbientCacheO
 	}); err != nil {
 		return nil, err
 	}
-	return &OfflineOperationHandle[struct{}]{runtime: runtime, id: id, live: true}, nil
+	return newOfflineOperationHandle[struct{}](runtime, id, OfflineOperationAmbientCache, OfflineOperationResultNone), nil
 }
 
 // SetResourceProvider installs or replaces the runtime-scoped network resource

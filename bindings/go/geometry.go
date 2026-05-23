@@ -20,6 +20,12 @@ type ProjectedMeters struct {
 	Easting  float64
 }
 
+// LatLngBounds is a geographic bounds rectangle in degrees.
+type LatLngBounds struct {
+	Southwest LatLng
+	Northeast LatLng
+}
+
 func (coordinate LatLng) toCAPI() capi.LatLng {
 	return capi.LatLng{Latitude: coordinate.Latitude, Longitude: coordinate.Longitude}
 }
@@ -42,4 +48,8 @@ func (meters ProjectedMeters) toCAPI() capi.ProjectedMeters {
 
 func projectedMetersFromCAPI(meters capi.ProjectedMeters) ProjectedMeters {
 	return ProjectedMeters{Northing: meters.Northing, Easting: meters.Easting}
+}
+
+func (bounds LatLngBounds) toCAPI() capi.LatLngBounds {
+	return capi.LatLngBounds{Southwest: bounds.Southwest.toCAPI(), Northeast: bounds.Northeast.toCAPI()}
 }

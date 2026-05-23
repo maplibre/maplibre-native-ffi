@@ -158,6 +158,123 @@ func TestRuntimeAmbientCacheOperationRejectsUnknownOperation(t *testing.T) {
 	}
 }
 
+func testOfflineTileDefinition() OfflineTilePyramidRegionDefinition {
+	return OfflineTilePyramidRegionDefinition{
+		StyleURL: "http://example.com/offline-style.json",
+		Bounds: LatLngBounds{
+			Southwest: LatLng{Latitude: -1, Longitude: -2},
+			Northeast: LatLng{Latitude: 1, Longitude: 2},
+		},
+		MinZoom:           0,
+		MaxZoom:           1,
+		PixelRatio:        1,
+		IncludeIdeographs: true,
+	}
+}
+
+func requireDiscardOfflineOperation[T any](t *testing.T, operation *OfflineOperationHandle[T], kind OfflineOperationKind, resultKind OfflineOperationResultKind) {
+	t.Helper()
+	if operation.ID() == 0 {
+		t.Fatal("operation ID is zero")
+	}
+	if operation.Kind() != kind || operation.ResultKind() != resultKind {
+		t.Fatalf("operation kind/result = %v/%v, want %v/%v", operation.Kind(), operation.ResultKind(), kind, resultKind)
+	}
+	if err := operation.Discard(); err != nil {
+		t.Fatalf("Discard(): %v", err)
+	}
+}
+
+func TestOfflineRegionStartOperationsReturnTypedHandles(t *testing.T) {
+	runtime, err := NewRuntime()
+	if err != nil {
+		t.Fatalf("NewRuntime(): %v", err)
+	}
+	defer func() {
+		if err := runtime.Close(); err != nil {
+			t.Errorf("Close(): %v", err)
+		}
+	}()
+
+	create, err := runtime.StartCreateOfflineRegion(testOfflineTileDefinition(), []byte{1, 2, 3})
+	if err != nil {
+		t.Fatalf("StartCreateOfflineRegion(): %v", err)
+	}
+	requireDiscardOfflineOperation(t, create, OfflineOperationRegionCreate, OfflineOperationResultRegion)
+
+	get, err := runtime.StartOfflineRegion(1)
+	if err != nil {
+		t.Fatalf("StartOfflineRegion(): %v", err)
+	}
+	requireDiscardOfflineOperation(t, get, OfflineOperationRegionGet, OfflineOperationResultOptionalRegion)
+
+	list, err := runtime.StartOfflineRegions()
+	if err != nil {
+		t.Fatalf("StartOfflineRegions(): %v", err)
+	}
+	requireDiscardOfflineOperation(t, list, OfflineOperationRegionsList, OfflineOperationResultRegionList)
+
+	update, err := runtime.StartUpdateOfflineRegionMetadata(1, []byte{4, 5, 6})
+	if err != nil {
+		t.Fatalf("StartUpdateOfflineRegionMetadata(): %v", err)
+	}
+	requireDiscardOfflineOperation(t, update, OfflineOperationRegionUpdateMetadata, OfflineOperationResultRegion)
+
+	status, err := runtime.StartOfflineRegionStatus(1)
+	if err != nil {
+		t.Fatalf("StartOfflineRegionStatus(): %v", err)
+	}
+	requireDiscardOfflineOperation(t, status, OfflineOperationRegionGetStatus, OfflineOperationResultRegionStatus)
+
+	observed, err := runtime.StartSetOfflineRegionObserved(1, true)
+	if err != nil {
+		t.Fatalf("StartSetOfflineRegionObserved(): %v", err)
+	}
+	requireDiscardOfflineOperation(t, observed, OfflineOperationRegionSetObserved, OfflineOperationResultNone)
+
+	download, err := runtime.StartSetOfflineRegionDownloadState(1, OfflineRegionDownloadInactive)
+	if err != nil {
+		t.Fatalf("StartSetOfflineRegionDownloadState(): %v", err)
+	}
+	requireDiscardOfflineOperation(t, download, OfflineOperationRegionSetDownloadState, OfflineOperationResultNone)
+
+	invalidate, err := runtime.StartInvalidateOfflineRegion(1)
+	if err != nil {
+		t.Fatalf("StartInvalidateOfflineRegion(): %v", err)
+	}
+	requireDiscardOfflineOperation(t, invalidate, OfflineOperationRegionInvalidate, OfflineOperationResultNone)
+
+	deleteOperation, err := runtime.StartDeleteOfflineRegion(1)
+	if err != nil {
+		t.Fatalf("StartDeleteOfflineRegion(): %v", err)
+	}
+	requireDiscardOfflineOperation(t, deleteOperation, OfflineOperationRegionDelete, OfflineOperationResultNone)
+}
+
+func TestOfflineRegionStartOperationsValidateGoInputs(t *testing.T) {
+	runtime, err := NewRuntime()
+	if err != nil {
+		t.Fatalf("NewRuntime(): %v", err)
+	}
+	defer func() {
+		if err := runtime.Close(); err != nil {
+			t.Errorf("Close(): %v", err)
+		}
+	}()
+
+	definition := testOfflineTileDefinition()
+	definition.StyleURL = "http://example.com/\x00style.json"
+	if _, err := runtime.StartCreateOfflineRegion(definition, nil); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("StartCreateOfflineRegion embedded NUL error = %v, want ErrInvalidArgument", err)
+	}
+	if _, err := runtime.StartMergeOfflineRegionsDatabase("/tmp/\x00side.db"); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("StartMergeOfflineRegionsDatabase embedded NUL error = %v, want ErrInvalidArgument", err)
+	}
+	if _, err := runtime.StartSetOfflineRegionDownloadState(1, OfflineRegionDownloadState(999_999)); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("StartSetOfflineRegionDownloadState unknown error = %v, want ErrInvalidArgument", err)
+	}
+}
+
 func TestRuntimeResourceProviderLifecycle(t *testing.T) {
 	runtime, err := NewRuntime()
 	if err != nil {
