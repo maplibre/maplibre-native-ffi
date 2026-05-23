@@ -4,6 +4,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import org.maplibre.nativeffi.camera.AnimationOptions
 import org.maplibre.nativeffi.camera.CameraOptions
 import org.maplibre.nativeffi.camera.EdgeInsets
 import org.maplibre.nativeffi.runtime.RuntimeHandle
@@ -35,7 +36,26 @@ class MapCameraControlsTest {
         assertTrue(tileOptions.hasPrefetchZoomDelta())
         assertTrue(tileOptions.hasLodMode())
 
-        map.jumpTo(CameraOptions().center(0.0, 0.0).zoom(1.0))
+        val cameraOptions = CameraOptions().center(0.0, 0.0).zoom(1.0)
+        val animation = AnimationOptions().durationMillis(0.0)
+        map.jumpTo(cameraOptions)
+        map.easeTo(cameraOptions, animation)
+        map.flyTo(cameraOptions, animation)
+        map.moveBy(0.0, 0.0)
+        map.moveByAnimated(0.0, 0.0, animation)
+        map.scaleBy(1.0)
+        map.scaleByAnimated(1.0, animation)
+        map.rotateBy(
+          org.maplibre.nativeffi.geo.ScreenPoint(0.0, 0.0),
+          org.maplibre.nativeffi.geo.ScreenPoint(0.0, 0.0),
+        )
+        map.rotateByAnimated(
+          org.maplibre.nativeffi.geo.ScreenPoint(0.0, 0.0),
+          org.maplibre.nativeffi.geo.ScreenPoint(0.0, 0.0),
+          animation,
+        )
+        map.pitchBy(0.0)
+        map.pitchByAnimated(0.0, animation)
         val camera = map.camera()
         assertTrue(camera.hasCenter())
         assertTrue(camera.hasZoom())

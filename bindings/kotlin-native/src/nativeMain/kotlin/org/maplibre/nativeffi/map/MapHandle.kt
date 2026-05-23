@@ -11,12 +11,16 @@ import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.pointed
 import kotlinx.cinterop.ptr
 import kotlinx.cinterop.value
+import org.maplibre.nativeffi.camera.AnimationOptions
 import org.maplibre.nativeffi.camera.CameraOptions
+import org.maplibre.nativeffi.geo.ScreenPoint
 import org.maplibre.nativeffi.internal.c.mln_camera_options_default
 import org.maplibre.nativeffi.internal.c.mln_map_cancel_transitions
 import org.maplibre.nativeffi.internal.c.mln_map_create
 import org.maplibre.nativeffi.internal.c.mln_map_destroy
 import org.maplibre.nativeffi.internal.c.mln_map_dump_debug_logs
+import org.maplibre.nativeffi.internal.c.mln_map_ease_to
+import org.maplibre.nativeffi.internal.c.mln_map_fly_to
 import org.maplibre.nativeffi.internal.c.mln_map_get_camera
 import org.maplibre.nativeffi.internal.c.mln_map_get_debug_options
 import org.maplibre.nativeffi.internal.c.mln_map_get_rendering_stats_view_enabled
@@ -24,10 +28,18 @@ import org.maplibre.nativeffi.internal.c.mln_map_get_tile_options
 import org.maplibre.nativeffi.internal.c.mln_map_get_viewport_options
 import org.maplibre.nativeffi.internal.c.mln_map_is_fully_loaded
 import org.maplibre.nativeffi.internal.c.mln_map_jump_to
+import org.maplibre.nativeffi.internal.c.mln_map_move_by
+import org.maplibre.nativeffi.internal.c.mln_map_move_by_animated
 import org.maplibre.nativeffi.internal.c.mln_map_options
 import org.maplibre.nativeffi.internal.c.mln_map_options_default
+import org.maplibre.nativeffi.internal.c.mln_map_pitch_by
+import org.maplibre.nativeffi.internal.c.mln_map_pitch_by_animated
 import org.maplibre.nativeffi.internal.c.mln_map_request_repaint
 import org.maplibre.nativeffi.internal.c.mln_map_request_still_image
+import org.maplibre.nativeffi.internal.c.mln_map_rotate_by
+import org.maplibre.nativeffi.internal.c.mln_map_rotate_by_animated
+import org.maplibre.nativeffi.internal.c.mln_map_scale_by
+import org.maplibre.nativeffi.internal.c.mln_map_scale_by_animated
 import org.maplibre.nativeffi.internal.c.mln_map_set_debug_options
 import org.maplibre.nativeffi.internal.c.mln_map_set_rendering_stats_view_enabled
 import org.maplibre.nativeffi.internal.c.mln_map_set_style_json
@@ -39,6 +51,7 @@ import org.maplibre.nativeffi.internal.c.mln_map_viewport_options_default
 import org.maplibre.nativeffi.internal.lifecycle.HandleState
 import org.maplibre.nativeffi.internal.memory.MemoryUtil
 import org.maplibre.nativeffi.internal.status.Status
+import org.maplibre.nativeffi.internal.struct.CoreStructs
 import org.maplibre.nativeffi.internal.struct.MapStructs
 import org.maplibre.nativeffi.runtime.RuntimeHandle
 
@@ -134,6 +147,145 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
   public fun jumpTo(camera: CameraOptions) {
     memScoped {
       Status.check(mln_map_jump_to(state.requireLive(), MapStructs.cameraOptions(camera, this)))
+    }
+  }
+
+  public fun easeTo(camera: CameraOptions) {
+    easeTo(camera, null)
+  }
+
+  public fun easeTo(camera: CameraOptions, animation: AnimationOptions?) {
+    memScoped {
+      Status.check(
+        mln_map_ease_to(
+          state.requireLive(),
+          MapStructs.cameraOptions(camera, this),
+          animation?.let { MapStructs.animationOptions(it, this) },
+        )
+      )
+    }
+  }
+
+  public fun flyTo(camera: CameraOptions) {
+    flyTo(camera, null)
+  }
+
+  public fun flyTo(camera: CameraOptions, animation: AnimationOptions?) {
+    memScoped {
+      Status.check(
+        mln_map_fly_to(
+          state.requireLive(),
+          MapStructs.cameraOptions(camera, this),
+          animation?.let { MapStructs.animationOptions(it, this) },
+        )
+      )
+    }
+  }
+
+  public fun moveBy(deltaX: Double, deltaY: Double) {
+    Status.check(mln_map_move_by(state.requireLive(), deltaX, deltaY))
+  }
+
+  public fun moveByAnimated(deltaX: Double, deltaY: Double) {
+    moveByAnimated(deltaX, deltaY, null)
+  }
+
+  public fun moveByAnimated(deltaX: Double, deltaY: Double, animation: AnimationOptions?) {
+    memScoped {
+      Status.check(
+        mln_map_move_by_animated(
+          state.requireLive(),
+          deltaX,
+          deltaY,
+          animation?.let { MapStructs.animationOptions(it, this) },
+        )
+      )
+    }
+  }
+
+  public fun scaleBy(scale: Double) {
+    scaleBy(scale, null)
+  }
+
+  public fun scaleBy(scale: Double, anchor: ScreenPoint?) {
+    Status.check(
+      mln_map_scale_by(state.requireLive(), scale, anchor?.let { CoreStructs.screenPoint(it) })
+    )
+  }
+
+  public fun scaleByAnimated(scale: Double) {
+    scaleByAnimated(scale, null, null)
+  }
+
+  public fun scaleByAnimated(scale: Double, anchor: ScreenPoint?) {
+    scaleByAnimated(scale, anchor, null)
+  }
+
+  public fun scaleByAnimated(scale: Double, animation: AnimationOptions?) {
+    scaleByAnimated(scale, null, animation)
+  }
+
+  public fun scaleByAnimated(scale: Double, anchor: ScreenPoint?, animation: AnimationOptions?) {
+    memScoped {
+      Status.check(
+        mln_map_scale_by_animated(
+          state.requireLive(),
+          scale,
+          anchor?.let { CoreStructs.screenPoint(it) },
+          animation?.let { MapStructs.animationOptions(it, this) },
+        )
+      )
+    }
+  }
+
+  public fun rotateBy(first: ScreenPoint, second: ScreenPoint) {
+    Status.check(
+      mln_map_rotate_by(
+        state.requireLive(),
+        CoreStructs.screenPoint(first),
+        CoreStructs.screenPoint(second),
+      )
+    )
+  }
+
+  public fun rotateByAnimated(first: ScreenPoint, second: ScreenPoint) {
+    rotateByAnimated(first, second, null)
+  }
+
+  public fun rotateByAnimated(
+    first: ScreenPoint,
+    second: ScreenPoint,
+    animation: AnimationOptions?,
+  ) {
+    memScoped {
+      Status.check(
+        mln_map_rotate_by_animated(
+          state.requireLive(),
+          CoreStructs.screenPoint(first),
+          CoreStructs.screenPoint(second),
+          animation?.let { MapStructs.animationOptions(it, this) },
+        )
+      )
+    }
+  }
+
+  public fun pitchBy(pitch: Double) {
+    Status.check(mln_map_pitch_by(state.requireLive(), pitch))
+  }
+
+  public fun pitchByAnimated(pitch: Double) {
+    pitchByAnimated(pitch, null)
+  }
+
+  public fun pitchByAnimated(pitch: Double, animation: AnimationOptions?) {
+    memScoped {
+      Status.check(
+        mln_map_pitch_by_animated(
+          state.requireLive(),
+          pitch,
+          animation?.let { MapStructs.animationOptions(it, this) },
+        )
+      )
     }
   }
 

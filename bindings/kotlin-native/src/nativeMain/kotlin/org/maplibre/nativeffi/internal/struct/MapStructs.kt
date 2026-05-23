@@ -5,7 +5,12 @@ import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.MemScope
 import kotlinx.cinterop.alloc
 import kotlinx.cinterop.ptr
+import org.maplibre.nativeffi.camera.AnimationOptions
 import org.maplibre.nativeffi.camera.CameraOptions
+import org.maplibre.nativeffi.internal.c.MLN_ANIMATION_OPTION_DURATION
+import org.maplibre.nativeffi.internal.c.MLN_ANIMATION_OPTION_EASING
+import org.maplibre.nativeffi.internal.c.MLN_ANIMATION_OPTION_MIN_ZOOM
+import org.maplibre.nativeffi.internal.c.MLN_ANIMATION_OPTION_VELOCITY
 import org.maplibre.nativeffi.internal.c.MLN_CAMERA_OPTION_ANCHOR
 import org.maplibre.nativeffi.internal.c.MLN_CAMERA_OPTION_BEARING
 import org.maplibre.nativeffi.internal.c.MLN_CAMERA_OPTION_CENTER
@@ -28,6 +33,8 @@ import org.maplibre.nativeffi.internal.c.MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE
 import org.maplibre.nativeffi.internal.c.MLN_PROJECTION_MODE_AXONOMETRIC
 import org.maplibre.nativeffi.internal.c.MLN_PROJECTION_MODE_X_SKEW
 import org.maplibre.nativeffi.internal.c.MLN_PROJECTION_MODE_Y_SKEW
+import org.maplibre.nativeffi.internal.c.mln_animation_options
+import org.maplibre.nativeffi.internal.c.mln_animation_options_default
 import org.maplibre.nativeffi.internal.c.mln_camera_options
 import org.maplibre.nativeffi.internal.c.mln_camera_options_default
 import org.maplibre.nativeffi.internal.c.mln_map_tile_options
@@ -47,6 +54,31 @@ import org.maplibre.nativeffi.map.ViewportOptions
 /** Materializes map and camera descriptors at the C boundary. */
 @OptIn(ExperimentalForeignApi::class)
 internal object MapStructs {
+  fun animationOptions(value: AnimationOptions, scope: MemScope): CPointer<mln_animation_options> {
+    val native = scope.alloc<mln_animation_options>()
+    mln_animation_options_default().place(native.ptr)
+    value.durationMillis?.let {
+      native.fields = native.fields or MLN_ANIMATION_OPTION_DURATION
+      native.duration_ms = it
+    }
+    value.velocity?.let {
+      native.fields = native.fields or MLN_ANIMATION_OPTION_VELOCITY
+      native.velocity = it
+    }
+    value.minZoom?.let {
+      native.fields = native.fields or MLN_ANIMATION_OPTION_MIN_ZOOM
+      native.min_zoom = it
+    }
+    value.easing?.let {
+      native.fields = native.fields or MLN_ANIMATION_OPTION_EASING
+      native.easing.x1 = it.x1
+      native.easing.y1 = it.y1
+      native.easing.x2 = it.x2
+      native.easing.y2 = it.y2
+    }
+    return native.ptr
+  }
+
   fun cameraOptions(value: CameraOptions, scope: MemScope): CPointer<mln_camera_options> {
     val native = scope.alloc<mln_camera_options>()
     mln_camera_options_default().place(native.ptr)
