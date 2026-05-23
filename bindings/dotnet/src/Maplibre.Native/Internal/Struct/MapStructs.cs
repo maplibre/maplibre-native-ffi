@@ -201,6 +201,135 @@ internal static class MapStructs
         return native;
     }
 
+    internal static mln_bound_options ToNative(BoundOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        var native = NativeMethods.mln_bound_options_default();
+        if (options.Bounds is { } bounds)
+        {
+            native.fields |= (uint)mln_bound_option_field.MLN_BOUND_OPTION_BOUNDS;
+            native.bounds = ToNative(bounds);
+        }
+        if (options.MinimumZoom is { } minimumZoom)
+        {
+            native.fields |= (uint)mln_bound_option_field.MLN_BOUND_OPTION_MIN_ZOOM;
+            native.min_zoom = minimumZoom;
+        }
+        if (options.MaximumZoom is { } maximumZoom)
+        {
+            native.fields |= (uint)mln_bound_option_field.MLN_BOUND_OPTION_MAX_ZOOM;
+            native.max_zoom = maximumZoom;
+        }
+        if (options.MinimumPitch is { } minimumPitch)
+        {
+            native.fields |= (uint)mln_bound_option_field.MLN_BOUND_OPTION_MIN_PITCH;
+            native.min_pitch = minimumPitch;
+        }
+        if (options.MaximumPitch is { } maximumPitch)
+        {
+            native.fields |= (uint)mln_bound_option_field.MLN_BOUND_OPTION_MAX_PITCH;
+            native.max_pitch = maximumPitch;
+        }
+        return native;
+    }
+
+    internal static BoundOptions BoundOptionsFromNative(mln_bound_options native)
+    {
+        var options = new BoundOptions();
+        if (Has(native.fields, mln_bound_option_field.MLN_BOUND_OPTION_BOUNDS))
+        {
+            options.Bounds = FromNative(native.bounds);
+        }
+        if (Has(native.fields, mln_bound_option_field.MLN_BOUND_OPTION_MIN_ZOOM))
+        {
+            options.MinimumZoom = native.min_zoom;
+        }
+        if (Has(native.fields, mln_bound_option_field.MLN_BOUND_OPTION_MAX_ZOOM))
+        {
+            options.MaximumZoom = native.max_zoom;
+        }
+        if (Has(native.fields, mln_bound_option_field.MLN_BOUND_OPTION_MIN_PITCH))
+        {
+            options.MinimumPitch = native.min_pitch;
+        }
+        if (Has(native.fields, mln_bound_option_field.MLN_BOUND_OPTION_MAX_PITCH))
+        {
+            options.MaximumPitch = native.max_pitch;
+        }
+        return options;
+    }
+
+    internal static mln_free_camera_options ToNative(FreeCameraOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        var native = NativeMethods.mln_free_camera_options_default();
+        if (options.Position is { } position)
+        {
+            native.fields |= (uint)mln_free_camera_option_field.MLN_FREE_CAMERA_OPTION_POSITION;
+            native.position = ToNative(position);
+        }
+        if (options.Orientation is { } orientation)
+        {
+            native.fields |= (uint)mln_free_camera_option_field.MLN_FREE_CAMERA_OPTION_ORIENTATION;
+            native.orientation = ToNative(orientation);
+        }
+        return native;
+    }
+
+    internal static FreeCameraOptions FreeCameraOptionsFromNative(mln_free_camera_options native)
+    {
+        var options = new FreeCameraOptions();
+        if (Has(native.fields, mln_free_camera_option_field.MLN_FREE_CAMERA_OPTION_POSITION))
+        {
+            options.Position = FromNative(native.position);
+        }
+        if (Has(native.fields, mln_free_camera_option_field.MLN_FREE_CAMERA_OPTION_ORIENTATION))
+        {
+            options.Orientation = FromNative(native.orientation);
+        }
+        return options;
+    }
+
+    internal static mln_projection_mode ToNative(ProjectionModeOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        var native = NativeMethods.mln_projection_mode_default();
+        if (options.Axonometric is { } axonometric)
+        {
+            native.fields |= (uint)mln_projection_mode_field.MLN_PROJECTION_MODE_AXONOMETRIC;
+            native.axonometric = axonometric ? (byte)1 : (byte)0;
+        }
+        if (options.XSkew is { } xSkew)
+        {
+            native.fields |= (uint)mln_projection_mode_field.MLN_PROJECTION_MODE_X_SKEW;
+            native.x_skew = xSkew;
+        }
+        if (options.YSkew is { } ySkew)
+        {
+            native.fields |= (uint)mln_projection_mode_field.MLN_PROJECTION_MODE_Y_SKEW;
+            native.y_skew = ySkew;
+        }
+        return native;
+    }
+
+    internal static ProjectionModeOptions ProjectionModeOptionsFromNative(mln_projection_mode native)
+    {
+        var options = new ProjectionModeOptions();
+        if (Has(native.fields, mln_projection_mode_field.MLN_PROJECTION_MODE_AXONOMETRIC))
+        {
+            options.Axonometric = native.axonometric != 0;
+        }
+        if (Has(native.fields, mln_projection_mode_field.MLN_PROJECTION_MODE_X_SKEW))
+        {
+            options.XSkew = native.x_skew;
+        }
+        if (Has(native.fields, mln_projection_mode_field.MLN_PROJECTION_MODE_Y_SKEW))
+        {
+            options.YSkew = native.y_skew;
+        }
+        return options;
+    }
+
     internal static ViewportOptions ViewportOptionsFromNative(mln_map_viewport_options native)
     {
         var options = new ViewportOptions();
@@ -291,6 +420,9 @@ internal static class MapStructs
     }
 
     private static bool Has(uint fields, mln_camera_option_field field) => (fields & (uint)field) != 0;
+    private static bool Has(uint fields, mln_bound_option_field field) => (fields & (uint)field) != 0;
+    private static bool Has(uint fields, mln_free_camera_option_field field) => (fields & (uint)field) != 0;
+    private static bool Has(uint fields, mln_projection_mode_field field) => (fields & (uint)field) != 0;
     private static bool Has(uint fields, mln_map_viewport_option_field field) => (fields & (uint)field) != 0;
     private static bool Has(uint fields, mln_map_tile_option_field field) => (fields & (uint)field) != 0;
 }

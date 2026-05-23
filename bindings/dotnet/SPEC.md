@@ -116,7 +116,8 @@ The scaffold implements one proof slice:
   the public API.
 - `RuntimeHandle` and `MapHandle` establish the close-once owner-thread handle
   pattern over generated C declarations, including runtime event polling and map
-  camera/transition/viewport/tile/debug option calls.
+  camera/transition/bounds/free-camera/projection/viewport/tile/debug option
+  calls.
 - `NativeUtf8String` rejects embedded NUL values and owns temporary UTF-8 C
   string storage for call-boundary inputs.
 - Public value, descriptor, enum, and placeholder handle types exist across the
@@ -127,10 +128,11 @@ The scaffold implements one proof slice:
   require the native library.
 - Native-library tests cover the C ABI version call, projection helper
   round-tripping, runtime event polling, map camera/viewport/tile option
-  round-tripping, camera transition command adaptation, runtime/map close
-  behavior, map debug option round-tripping, closed-wrapper validation,
-  process-global log callback installation/clearing, and native status
-  diagnostic mapping when run through `mise run //bindings/dotnet:test`.
+  round-tripping, camera transition command adaptation, bounds/projection/free
+  camera adaptation, runtime/map close behavior, map debug option
+  round-tripping, closed-wrapper validation, process-global log callback
+  installation/clearing, and native status diagnostic mapping when run through
+  `mise run //bindings/dotnet:test`.
 - `PublicApiSurfaceTests` keeps representative public concept types present as
   the binding surface expands.
 

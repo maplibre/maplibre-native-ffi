@@ -274,6 +274,69 @@ public sealed unsafe class MapHandle : IDisposable
         NativeStatus.Check(NativeMethods.mln_map_cancel_transitions(Pointer));
     }
 
+    /// <summary>Calculates geographic bounds for a camera.</summary>
+    public LatLngBounds LatLngBoundsForCamera(CameraOptions camera)
+    {
+        var nativeCamera = MapStructs.ToNative(camera);
+        mln_lat_lng_bounds bounds = default;
+        NativeStatus.Check(NativeMethods.mln_map_lat_lng_bounds_for_camera(Pointer, &nativeCamera, &bounds));
+        return MapStructs.FromNative(bounds);
+    }
+
+    /// <summary>Calculates unwrapped geographic bounds for a camera.</summary>
+    public LatLngBounds LatLngBoundsForCameraUnwrapped(CameraOptions camera)
+    {
+        var nativeCamera = MapStructs.ToNative(camera);
+        mln_lat_lng_bounds bounds = default;
+        NativeStatus.Check(NativeMethods.mln_map_lat_lng_bounds_for_camera_unwrapped(Pointer, &nativeCamera, &bounds));
+        return MapStructs.FromNative(bounds);
+    }
+
+    /// <summary>Gets map bounds constraints.</summary>
+    public BoundOptions GetBounds()
+    {
+        var options = NativeMethods.mln_bound_options_default();
+        NativeStatus.Check(NativeMethods.mln_map_get_bounds(Pointer, &options));
+        return MapStructs.BoundOptionsFromNative(options);
+    }
+
+    /// <summary>Sets map bounds constraints, applying only non-null descriptor fields.</summary>
+    public void SetBounds(BoundOptions options)
+    {
+        var nativeOptions = MapStructs.ToNative(options);
+        NativeStatus.Check(NativeMethods.mln_map_set_bounds(Pointer, &nativeOptions));
+    }
+
+    /// <summary>Gets free-camera options.</summary>
+    public FreeCameraOptions GetFreeCameraOptions()
+    {
+        var options = NativeMethods.mln_free_camera_options_default();
+        NativeStatus.Check(NativeMethods.mln_map_get_free_camera_options(Pointer, &options));
+        return MapStructs.FreeCameraOptionsFromNative(options);
+    }
+
+    /// <summary>Sets free-camera options, applying only non-null descriptor fields.</summary>
+    public void SetFreeCameraOptions(FreeCameraOptions options)
+    {
+        var nativeOptions = MapStructs.ToNative(options);
+        NativeStatus.Check(NativeMethods.mln_map_set_free_camera_options(Pointer, &nativeOptions));
+    }
+
+    /// <summary>Gets projection mode options.</summary>
+    public ProjectionModeOptions GetProjectionMode()
+    {
+        var mode = NativeMethods.mln_projection_mode_default();
+        NativeStatus.Check(NativeMethods.mln_map_get_projection_mode(Pointer, &mode));
+        return MapStructs.ProjectionModeOptionsFromNative(mode);
+    }
+
+    /// <summary>Sets projection mode options, applying only non-null descriptor fields.</summary>
+    public void SetProjectionMode(ProjectionModeOptions mode)
+    {
+        var nativeMode = MapStructs.ToNative(mode);
+        NativeStatus.Check(NativeMethods.mln_map_set_projection_mode(Pointer, &nativeMode));
+    }
+
     /// <summary>Loads a style URL through MapLibre Native style APIs.</summary>
     public void SetStyleUrl(string url)
     {
