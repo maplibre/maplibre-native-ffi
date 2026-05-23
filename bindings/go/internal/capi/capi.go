@@ -230,6 +230,45 @@ static inline mln_geojson mln_go_geojson_feature_collection(const mln_feature* f
   return geojson;
 }
 
+static inline mln_screen_box mln_go_screen_box(mln_screen_point min, mln_screen_point max) {
+  mln_screen_box box;
+  box.min = min;
+  box.max = max;
+  return box;
+}
+
+static inline uint32_t mln_go_geometry_type(const mln_geometry* geometry) { return geometry->type; }
+static inline mln_lat_lng mln_go_geometry_point_value(const mln_geometry* geometry) { return geometry->data.point; }
+static inline size_t mln_go_coordinate_span_count(mln_coordinate_span span) { return span.coordinate_count; }
+static inline mln_lat_lng mln_go_coordinate_span_get(mln_coordinate_span span, size_t index) { return span.coordinates[index]; }
+static inline mln_coordinate_span mln_go_geometry_line_string_value(const mln_geometry* geometry) { return geometry->data.line_string; }
+static inline mln_coordinate_span mln_go_geometry_multi_point_value(const mln_geometry* geometry) { return geometry->data.multi_point; }
+static inline size_t mln_go_geometry_polygon_ring_count(const mln_geometry* geometry) { return geometry->data.polygon.ring_count; }
+static inline mln_coordinate_span mln_go_geometry_polygon_ring_get(const mln_geometry* geometry, size_t index) { return geometry->data.polygon.rings[index]; }
+static inline size_t mln_go_geometry_multi_line_count(const mln_geometry* geometry) { return geometry->data.multi_line_string.line_count; }
+static inline mln_coordinate_span mln_go_geometry_multi_line_get(const mln_geometry* geometry, size_t index) { return geometry->data.multi_line_string.lines[index]; }
+static inline size_t mln_go_geometry_multi_polygon_count(const mln_geometry* geometry) { return geometry->data.multi_polygon.polygon_count; }
+static inline size_t mln_go_polygon_geometry_ring_count(mln_polygon_geometry polygon) { return polygon.ring_count; }
+static inline mln_coordinate_span mln_go_polygon_geometry_ring_get(mln_polygon_geometry polygon, size_t index) { return polygon.rings[index]; }
+static inline mln_polygon_geometry mln_go_geometry_multi_polygon_get(const mln_geometry* geometry, size_t index) { return geometry->data.multi_polygon.polygons[index]; }
+static inline size_t mln_go_geometry_collection_count(const mln_geometry* geometry) { return geometry->data.geometry_collection.geometry_count; }
+static inline const mln_geometry* mln_go_geometry_collection_get(const mln_geometry* geometry, size_t index) { return &geometry->data.geometry_collection.geometries[index]; }
+
+static inline const mln_geometry* mln_go_feature_geometry(const mln_feature* feature) { return feature->geometry; }
+static inline size_t mln_go_feature_property_count(const mln_feature* feature) { return feature->property_count; }
+static inline mln_string_view mln_go_feature_property_key(const mln_feature* feature, size_t index) { return feature->properties[index].key; }
+static inline const mln_json_value* mln_go_feature_property_value(const mln_feature* feature, size_t index) { return feature->properties[index].value; }
+static inline uint32_t mln_go_feature_identifier_type(const mln_feature* feature) { return feature->identifier_type; }
+static inline uint64_t mln_go_feature_identifier_uint(const mln_feature* feature) { return feature->identifier.uint_value; }
+static inline int64_t mln_go_feature_identifier_int(const mln_feature* feature) { return feature->identifier.int_value; }
+static inline double mln_go_feature_identifier_double(const mln_feature* feature) { return feature->identifier.double_value; }
+static inline mln_string_view mln_go_feature_identifier_string(const mln_feature* feature) { return feature->identifier.string_value; }
+
+static inline uint32_t mln_go_feature_extension_result_type(const mln_feature_extension_result_info* info) { return info->type; }
+static inline const mln_json_value* mln_go_feature_extension_result_value(const mln_feature_extension_result_info* info) { return info->data.value; }
+static inline size_t mln_go_feature_extension_result_feature_count(const mln_feature_extension_result_info* info) { return info->data.feature_collection.feature_count; }
+static inline const mln_feature* mln_go_feature_extension_result_feature_get(const mln_feature_extension_result_info* info, size_t index) { return &info->data.feature_collection.features[index]; }
+
 static inline mln_offline_region_definition mln_go_offline_tile_pyramid_region_definition(
   const char* style_url, mln_lat_lng_bounds bounds, double min_zoom, double max_zoom,
   float pixel_ratio, bool include_ideographs
@@ -283,6 +322,12 @@ type StyleIDList struct{ _ byte }
 
 // JSONSnapshot is an opaque native JSON snapshot handle.
 type JSONSnapshot struct{ _ byte }
+
+// FeatureQueryResult is an opaque native feature query result handle.
+type FeatureQueryResult struct{ _ byte }
+
+// FeatureExtensionResult is an opaque native feature extension result handle.
+type FeatureExtensionResult struct{ _ byte }
 
 // RuntimeOptions contains semantic runtime creation options.
 type RuntimeOptions struct {
@@ -444,6 +489,52 @@ type StyleImageInfo struct {
 	ByteLength uint64
 	PixelRatio float32
 	SDF        bool
+}
+
+// ScreenBox is a screen-space query rectangle.
+type ScreenBox struct {
+	Min ScreenPoint
+	Max ScreenPoint
+}
+
+// RenderedQueryGeometry contains a rendered feature query geometry descriptor.
+type RenderedQueryGeometry struct {
+	Type   uint32
+	Point  ScreenPoint
+	Box    ScreenBox
+	Points []ScreenPoint
+}
+
+// RenderedFeatureQueryOptions contains rendered feature query options.
+type RenderedFeatureQueryOptions struct {
+	Fields   uint32
+	LayerIDs []string
+	Filter   any
+}
+
+// SourceFeatureQueryOptions contains source feature query options.
+type SourceFeatureQueryOptions struct {
+	Fields         uint32
+	SourceLayerIDs []string
+	Filter         any
+}
+
+// QueryFeature contains one copied queried feature.
+type QueryFeature struct {
+	Feature          Feature
+	SourceID         string
+	HasSourceID      bool
+	SourceLayerID    string
+	HasSourceLayerID bool
+	State            any
+	HasState         bool
+}
+
+// FeatureExtensionResultInfo contains a copied feature extension result.
+type FeatureExtensionResultInfo struct {
+	Type     uint32
+	Value    any
+	Features []Feature
 }
 
 // Geometry contains a semantic GeoJSON geometry descriptor.
@@ -950,6 +1041,36 @@ const (
 	GeoJSONTypeGeometry          uint32 = uint32(C.MLN_GEOJSON_TYPE_GEOMETRY)
 	GeoJSONTypeFeature           uint32 = uint32(C.MLN_GEOJSON_TYPE_FEATURE)
 	GeoJSONTypeFeatureCollection uint32 = uint32(C.MLN_GEOJSON_TYPE_FEATURE_COLLECTION)
+)
+
+const (
+	FeatureIdentifierTypeNull   uint32 = uint32(C.MLN_FEATURE_IDENTIFIER_TYPE_NULL)
+	FeatureIdentifierTypeUint   uint32 = uint32(C.MLN_FEATURE_IDENTIFIER_TYPE_UINT)
+	FeatureIdentifierTypeInt    uint32 = uint32(C.MLN_FEATURE_IDENTIFIER_TYPE_INT)
+	FeatureIdentifierTypeDouble uint32 = uint32(C.MLN_FEATURE_IDENTIFIER_TYPE_DOUBLE)
+	FeatureIdentifierTypeString uint32 = uint32(C.MLN_FEATURE_IDENTIFIER_TYPE_STRING)
+)
+
+const (
+	RenderedQueryGeometryTypePoint      uint32 = uint32(C.MLN_RENDERED_QUERY_GEOMETRY_TYPE_POINT)
+	RenderedQueryGeometryTypeBox        uint32 = uint32(C.MLN_RENDERED_QUERY_GEOMETRY_TYPE_BOX)
+	RenderedQueryGeometryTypeLineString uint32 = uint32(C.MLN_RENDERED_QUERY_GEOMETRY_TYPE_LINE_STRING)
+)
+
+const (
+	RenderedFeatureQueryOptionLayerIDs uint32 = uint32(C.MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS)
+	SourceFeatureQueryOptionLayerIDs   uint32 = uint32(C.MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS)
+)
+
+const (
+	QueriedFeatureSourceID      uint32 = uint32(C.MLN_QUERIED_FEATURE_SOURCE_ID)
+	QueriedFeatureSourceLayerID uint32 = uint32(C.MLN_QUERIED_FEATURE_SOURCE_LAYER_ID)
+	QueriedFeatureState         uint32 = uint32(C.MLN_QUERIED_FEATURE_STATE)
+)
+
+const (
+	FeatureExtensionResultTypeValue             uint32 = uint32(C.MLN_FEATURE_EXTENSION_RESULT_TYPE_VALUE)
+	FeatureExtensionResultTypeFeatureCollection uint32 = uint32(C.MLN_FEATURE_EXTENSION_RESULT_TYPE_FEATURE_COLLECTION)
 )
 
 const (
@@ -1672,6 +1793,88 @@ func RenderSessionClearData(session *RenderSession) Status {
 // RenderSessionDumpDebugLogs dumps render-session debug logs.
 func RenderSessionDumpDebugLogs(session *RenderSession) Status {
 	return Status(C.mln_render_session_dump_debug_logs((*C.mln_render_session)(unsafe.Pointer(session))))
+}
+
+// RenderSessionQueryRenderedFeatures queries rendered features and copies the result.
+func RenderSessionQueryRenderedFeatures(session *RenderSession, geometry RenderedQueryGeometry, options *RenderedFeatureQueryOptions, out *[]QueryFeature) (Status, error) {
+	rawGeometry, geometryAllocation := renderedQueryGeometryToC(geometry)
+	defer C.free(geometryAllocation)
+	rawOptions, rawOptionsPointer, err := renderedFeatureQueryOptionsToC(options)
+	defer rawOptions.free()
+	if err != nil {
+		return StatusInvalidArgument, err
+	}
+	var result *C.mln_feature_query_result
+	status := Status(C.mln_render_session_query_rendered_features((*C.mln_render_session)(unsafe.Pointer(session)), &rawGeometry, rawOptionsPointer, &result))
+	if status != StatusOK {
+		return status, nil
+	}
+	defer C.mln_feature_query_result_destroy(result)
+	features, copyStatus, err := featureQueryResultToSlice(result)
+	if copyStatus == StatusOK {
+		*out = features
+	}
+	return copyStatus, err
+}
+
+// RenderSessionQuerySourceFeatures queries source features and copies the result.
+func RenderSessionQuerySourceFeatures(session *RenderSession, sourceID string, options *SourceFeatureQueryOptions, out *[]QueryFeature) (Status, error) {
+	sourceView := newStringView(sourceID)
+	defer sourceView.free()
+	rawOptions, rawOptionsPointer, err := sourceFeatureQueryOptionsToC(options)
+	defer rawOptions.free()
+	if err != nil {
+		return StatusInvalidArgument, err
+	}
+	var result *C.mln_feature_query_result
+	status := Status(C.mln_render_session_query_source_features((*C.mln_render_session)(unsafe.Pointer(session)), sourceView.raw(), rawOptionsPointer, &result))
+	if status != StatusOK {
+		return status, nil
+	}
+	defer C.mln_feature_query_result_destroy(result)
+	features, copyStatus, err := featureQueryResultToSlice(result)
+	if copyStatus == StatusOK {
+		*out = features
+	}
+	return copyStatus, err
+}
+
+// RenderSessionQueryFeatureExtensions queries a feature extension and copies the result.
+func RenderSessionQueryFeatureExtensions(session *RenderSession, sourceID string, feature Feature, extension string, extensionField string, arguments any, out *FeatureExtensionResultInfo) (Status, error) {
+	sourceView := newStringView(sourceID)
+	defer sourceView.free()
+	extensionView := newStringView(extension)
+	defer extensionView.free()
+	fieldView := newStringView(extensionField)
+	defer fieldView.free()
+	geoJSONMaterializer := newGeoJSONMaterializer()
+	defer geoJSONMaterializer.free()
+	rawFeature, err := geoJSONMaterializer.feature(feature)
+	if err != nil {
+		return StatusInvalidArgument, err
+	}
+	jsonMaterializer := newJSONMaterializer()
+	defer jsonMaterializer.free()
+	var rawArguments *C.mln_json_value
+	if arguments != nil {
+		value, err := jsonMaterializer.value(arguments)
+		if err != nil {
+			return StatusInvalidArgument, err
+		}
+		rawArguments = (*C.mln_json_value)(jsonMaterializer.alloc(C.size_t(unsafe.Sizeof(C.mln_json_value{}))))
+		*rawArguments = value
+	}
+	var result *C.mln_feature_extension_result
+	status := Status(C.mln_render_session_query_feature_extensions((*C.mln_render_session)(unsafe.Pointer(session)), sourceView.raw(), &rawFeature, extensionView.raw(), fieldView.raw(), rawArguments, &result))
+	if status != StatusOK {
+		return status, nil
+	}
+	defer C.mln_feature_extension_result_destroy(result)
+	info, copyStatus, err := featureExtensionResultToInfo(result)
+	if copyStatus == StatusOK {
+		*out = info
+	}
+	return copyStatus, err
 }
 
 // MetalOwnedTextureAttach attaches a Metal session-owned texture target to a map.
@@ -2789,6 +2992,18 @@ type rawStyleTileSourceOptions struct {
 	attribution stringView
 }
 
+type rawRenderedFeatureQueryOptions struct {
+	value        C.mln_rendered_feature_query_options
+	layerIDs     stringViewArray
+	materializer *jsonMaterializer
+}
+
+type rawSourceFeatureQueryOptions struct {
+	value          C.mln_source_feature_query_options
+	sourceLayerIDs stringViewArray
+	materializer   *jsonMaterializer
+}
+
 func newStringView(value string) stringView {
 	if len(value) == 0 {
 		return stringView{}
@@ -2887,6 +3102,82 @@ func styleTileSourceOptionsToCPointer(options *StyleTileSourceOptions) (rawStyle
 
 func (raw rawStyleTileSourceOptions) free() {
 	raw.attribution.free()
+}
+
+func renderedQueryGeometryToC(geometry RenderedQueryGeometry) (C.mln_rendered_query_geometry, unsafe.Pointer) {
+	switch geometry.Type {
+	case RenderedQueryGeometryTypePoint:
+		return C.mln_rendered_query_geometry_point(screenPointToC(geometry.Point)), nil
+	case RenderedQueryGeometryTypeBox:
+		return C.mln_rendered_query_geometry_box(C.mln_go_screen_box(screenPointToC(geometry.Box.Min), screenPointToC(geometry.Box.Max))), nil
+	case RenderedQueryGeometryTypeLineString:
+		rawPoints, count := screenPointSliceToCPointer(geometry.Points)
+		return C.mln_rendered_query_geometry_line_string(rawPoints, count), unsafe.Pointer(rawPoints)
+	default:
+		return C.mln_rendered_query_geometry{size: C.uint32_t(unsafe.Sizeof(C.mln_rendered_query_geometry{})), _type: C.uint32_t(geometry.Type)}, nil
+	}
+}
+
+func renderedFeatureQueryOptionsToC(options *RenderedFeatureQueryOptions) (rawRenderedFeatureQueryOptions, *C.mln_rendered_feature_query_options, error) {
+	if options == nil {
+		return rawRenderedFeatureQueryOptions{}, nil, nil
+	}
+	raw := rawRenderedFeatureQueryOptions{value: C.mln_rendered_feature_query_options_default()}
+	raw.value.fields = C.uint32_t(options.Fields)
+	if options.Fields&RenderedFeatureQueryOptionLayerIDs != 0 {
+		raw.layerIDs = newStringViewArray(options.LayerIDs)
+		raw.value.layer_ids = raw.layerIDs.data
+		raw.value.layer_id_count = C.size_t(raw.layerIDs.count)
+	}
+	if options.Filter != nil {
+		raw.materializer = newJSONMaterializer()
+		filter, err := raw.materializer.value(options.Filter)
+		if err != nil {
+			raw.free()
+			return rawRenderedFeatureQueryOptions{}, nil, err
+		}
+		raw.value.filter = (*C.mln_json_value)(raw.materializer.alloc(C.size_t(unsafe.Sizeof(C.mln_json_value{}))))
+		*(*C.mln_json_value)(unsafe.Pointer(raw.value.filter)) = filter
+	}
+	return raw, &raw.value, nil
+}
+
+func (raw rawRenderedFeatureQueryOptions) free() {
+	raw.layerIDs.free()
+	if raw.materializer != nil {
+		raw.materializer.free()
+	}
+}
+
+func sourceFeatureQueryOptionsToC(options *SourceFeatureQueryOptions) (rawSourceFeatureQueryOptions, *C.mln_source_feature_query_options, error) {
+	if options == nil {
+		return rawSourceFeatureQueryOptions{}, nil, nil
+	}
+	raw := rawSourceFeatureQueryOptions{value: C.mln_source_feature_query_options_default()}
+	raw.value.fields = C.uint32_t(options.Fields)
+	if options.Fields&SourceFeatureQueryOptionLayerIDs != 0 {
+		raw.sourceLayerIDs = newStringViewArray(options.SourceLayerIDs)
+		raw.value.source_layer_ids = raw.sourceLayerIDs.data
+		raw.value.source_layer_id_count = C.size_t(raw.sourceLayerIDs.count)
+	}
+	if options.Filter != nil {
+		raw.materializer = newJSONMaterializer()
+		filter, err := raw.materializer.value(options.Filter)
+		if err != nil {
+			raw.free()
+			return rawSourceFeatureQueryOptions{}, nil, err
+		}
+		raw.value.filter = (*C.mln_json_value)(raw.materializer.alloc(C.size_t(unsafe.Sizeof(C.mln_json_value{}))))
+		*(*C.mln_json_value)(unsafe.Pointer(raw.value.filter)) = filter
+	}
+	return raw, &raw.value, nil
+}
+
+func (raw rawSourceFeatureQueryOptions) free() {
+	raw.sourceLayerIDs.free()
+	if raw.materializer != nil {
+		raw.materializer.free()
+	}
 }
 
 type jsonMaterializer struct {
@@ -3281,6 +3572,199 @@ func jsonValueFromC(value *C.mln_json_value) (any, error) {
 	}
 }
 
+func featureQueryResultToSlice(result *C.mln_feature_query_result) ([]QueryFeature, Status, error) {
+	var rawCount C.size_t
+	status := Status(C.mln_feature_query_result_count(result, &rawCount))
+	if status != StatusOK {
+		return nil, status, nil
+	}
+	features := make([]QueryFeature, int(rawCount))
+	for i := range features {
+		rawFeature := C.mln_queried_feature{size: C.uint32_t(unsafe.Sizeof(C.mln_queried_feature{}))}
+		status := Status(C.mln_feature_query_result_get(result, C.size_t(i), &rawFeature))
+		if status != StatusOK {
+			return nil, status, nil
+		}
+		feature, err := queriedFeatureFromC(rawFeature)
+		if err != nil {
+			return nil, StatusNativeError, err
+		}
+		features[i] = feature
+	}
+	return features, StatusOK, nil
+}
+
+func queriedFeatureFromC(raw C.mln_queried_feature) (QueryFeature, error) {
+	feature, err := featureFromC(&raw.feature)
+	if err != nil {
+		return QueryFeature{}, err
+	}
+	out := QueryFeature{Feature: feature}
+	fields := uint32(raw.fields)
+	if fields&QueriedFeatureSourceID != 0 {
+		out.HasSourceID = true
+		out.SourceID = stringViewFromC(raw.source_id)
+	}
+	if fields&QueriedFeatureSourceLayerID != 0 {
+		out.HasSourceLayerID = true
+		out.SourceLayerID = stringViewFromC(raw.source_layer_id)
+	}
+	if fields&QueriedFeatureState != 0 {
+		state, err := jsonValueFromC((*C.mln_json_value)(unsafe.Pointer(raw.state)))
+		if err != nil {
+			return QueryFeature{}, err
+		}
+		out.HasState = true
+		out.State = state
+	}
+	return out, nil
+}
+
+func featureExtensionResultToInfo(result *C.mln_feature_extension_result) (FeatureExtensionResultInfo, Status, error) {
+	raw := C.mln_feature_extension_result_info{size: C.uint32_t(unsafe.Sizeof(C.mln_feature_extension_result_info{}))}
+	status := Status(C.mln_feature_extension_result_get(result, &raw))
+	if status != StatusOK {
+		return FeatureExtensionResultInfo{}, status, nil
+	}
+	out := FeatureExtensionResultInfo{Type: uint32(C.mln_go_feature_extension_result_type(&raw))}
+	switch out.Type {
+	case FeatureExtensionResultTypeValue:
+		value, err := jsonValueFromC((*C.mln_json_value)(unsafe.Pointer(C.mln_go_feature_extension_result_value(&raw))))
+		if err != nil {
+			return FeatureExtensionResultInfo{}, StatusNativeError, err
+		}
+		out.Value = value
+	case FeatureExtensionResultTypeFeatureCollection:
+		count := int(C.mln_go_feature_extension_result_feature_count(&raw))
+		out.Features = make([]Feature, count)
+		for i := range out.Features {
+			feature, err := featureFromC((*C.mln_feature)(unsafe.Pointer(C.mln_go_feature_extension_result_feature_get(&raw, C.size_t(i)))))
+			if err != nil {
+				return FeatureExtensionResultInfo{}, StatusNativeError, err
+			}
+			out.Features[i] = feature
+		}
+	default:
+		return FeatureExtensionResultInfo{}, StatusNativeError, fmt.Errorf("unknown feature extension result type %d", out.Type)
+	}
+	return out, StatusOK, nil
+}
+
+func featureFromC(feature *C.mln_feature) (Feature, error) {
+	geometry, err := geometryFromC(C.mln_go_feature_geometry(feature))
+	if err != nil {
+		return Feature{}, err
+	}
+	properties := make(map[string]any, int(C.mln_go_feature_property_count(feature)))
+	for i := 0; i < int(C.mln_go_feature_property_count(feature)); i++ {
+		value, err := jsonValueFromC((*C.mln_json_value)(unsafe.Pointer(C.mln_go_feature_property_value(feature, C.size_t(i)))))
+		if err != nil {
+			return Feature{}, err
+		}
+		properties[stringViewFromC(C.mln_go_feature_property_key(feature, C.size_t(i)))] = value
+	}
+	identifier, err := featureIdentifierFromC(feature)
+	if err != nil {
+		return Feature{}, err
+	}
+	return Feature{Geometry: geometry, Properties: properties, Identifier: identifier}, nil
+}
+
+func featureIdentifierFromC(feature *C.mln_feature) (any, error) {
+	switch uint32(C.mln_go_feature_identifier_type(feature)) {
+	case FeatureIdentifierTypeNull:
+		return nil, nil
+	case FeatureIdentifierTypeUint:
+		return uint64(C.mln_go_feature_identifier_uint(feature)), nil
+	case FeatureIdentifierTypeInt:
+		return int64(C.mln_go_feature_identifier_int(feature)), nil
+	case FeatureIdentifierTypeDouble:
+		return float64(C.mln_go_feature_identifier_double(feature)), nil
+	case FeatureIdentifierTypeString:
+		return stringViewFromC(C.mln_go_feature_identifier_string(feature)), nil
+	default:
+		return nil, fmt.Errorf("unknown feature identifier type %d", uint32(C.mln_go_feature_identifier_type(feature)))
+	}
+}
+
+func geometryFromC(geometry *C.mln_geometry) (Geometry, error) {
+	if geometry == nil {
+		return Geometry{}, fmt.Errorf("nil geometry")
+	}
+	typeValue := uint32(C.mln_go_geometry_type(geometry))
+	out := Geometry{Type: typeValue}
+	switch typeValue {
+	case GeometryTypeEmpty:
+		return out, nil
+	case GeometryTypePoint:
+		out.Point = latLngFromC(C.mln_go_geometry_point_value(geometry))
+	case GeometryTypeLineString:
+		out.Points = coordinateSpanFromC(C.mln_go_geometry_line_string_value(geometry))
+	case GeometryTypePolygon:
+		out.Lines = polygonRingsFromC(geometry)
+	case GeometryTypeMultiPoint:
+		out.Points = coordinateSpanFromC(C.mln_go_geometry_multi_point_value(geometry))
+	case GeometryTypeMultiLineString:
+		out.Lines = multiLineFromC(geometry)
+	case GeometryTypeMultiPolygon:
+		out.Polygons = multiPolygonFromC(geometry)
+	case GeometryTypeGeometryCollection:
+		count := int(C.mln_go_geometry_collection_count(geometry))
+		out.Geometries = make([]Geometry, count)
+		for i := range out.Geometries {
+			child, err := geometryFromC((*C.mln_geometry)(unsafe.Pointer(C.mln_go_geometry_collection_get(geometry, C.size_t(i)))))
+			if err != nil {
+				return Geometry{}, err
+			}
+			out.Geometries[i] = child
+		}
+	default:
+		return Geometry{}, fmt.Errorf("unknown geometry type %d", typeValue)
+	}
+	return out, nil
+}
+
+func coordinateSpanFromC(span C.mln_coordinate_span) []LatLng {
+	count := int(C.mln_go_coordinate_span_count(span))
+	out := make([]LatLng, count)
+	for i := range out {
+		out[i] = latLngFromC(C.mln_go_coordinate_span_get(span, C.size_t(i)))
+	}
+	return out
+}
+
+func polygonRingsFromC(geometry *C.mln_geometry) [][]LatLng {
+	count := int(C.mln_go_geometry_polygon_ring_count(geometry))
+	out := make([][]LatLng, count)
+	for i := range out {
+		out[i] = coordinateSpanFromC(C.mln_go_geometry_polygon_ring_get(geometry, C.size_t(i)))
+	}
+	return out
+}
+
+func multiLineFromC(geometry *C.mln_geometry) [][]LatLng {
+	count := int(C.mln_go_geometry_multi_line_count(geometry))
+	out := make([][]LatLng, count)
+	for i := range out {
+		out[i] = coordinateSpanFromC(C.mln_go_geometry_multi_line_get(geometry, C.size_t(i)))
+	}
+	return out
+}
+
+func multiPolygonFromC(geometry *C.mln_geometry) [][][]LatLng {
+	count := int(C.mln_go_geometry_multi_polygon_count(geometry))
+	out := make([][][]LatLng, count)
+	for i := range out {
+		polygon := C.mln_go_geometry_multi_polygon_get(geometry, C.size_t(i))
+		ringCount := int(C.mln_go_polygon_geometry_ring_count(polygon))
+		out[i] = make([][]LatLng, ringCount)
+		for j := range out[i] {
+			out[i][j] = coordinateSpanFromC(C.mln_go_polygon_geometry_ring_get(polygon, C.size_t(j)))
+		}
+	}
+	return out
+}
+
 func latLngToC(coordinate LatLng) C.mln_lat_lng {
 	return C.mln_lat_lng{latitude: C.double(coordinate.Latitude), longitude: C.double(coordinate.Longitude)}
 }
@@ -3361,6 +3845,17 @@ func latLngBoundsFromC(bounds C.mln_lat_lng_bounds) LatLngBounds {
 
 func screenPointToC(point ScreenPoint) C.mln_screen_point {
 	return C.mln_screen_point{x: C.double(point.X), y: C.double(point.Y)}
+}
+
+func screenPointSliceToCPointer(points []ScreenPoint) (*C.mln_screen_point, C.size_t) {
+	if len(points) == 0 {
+		return nil, 0
+	}
+	rawPoints := (*C.mln_screen_point)(C.malloc(C.size_t(len(points)) * C.size_t(unsafe.Sizeof(C.mln_screen_point{}))))
+	for i, point := range points {
+		*(*C.mln_screen_point)(unsafe.Add(unsafe.Pointer(rawPoints), uintptr(i)*unsafe.Sizeof(C.mln_screen_point{}))) = screenPointToC(point)
+	}
+	return rawPoints, C.size_t(len(points))
 }
 
 func edgeInsetsToC(insets EdgeInsets) C.mln_edge_insets {
