@@ -125,8 +125,8 @@ The scaffold implements one proof slice:
   calls, map coordinate conversion, projection snapshot handles, offline
   operation start/discard tokens, resource provider callbacks, resource
   transform callbacks, JSON materialization, and style source/layer JSON
-  operations, style source metadata/listing, style layer listing, style JSON
-  snapshots, layer properties, and layer filters.
+  operations, style source URL/tile APIs, style source metadata/listing, style
+  layer listing, style JSON snapshots, layer properties, and layer filters.
 - `NativeUtf8String` rejects embedded NUL values and owns temporary UTF-8 C
   string storage for call-boundary inputs.
 - Public value, descriptor, enum, and placeholder handle types exist across the
@@ -142,8 +142,9 @@ The scaffold implements one proof slice:
 - Resource transform tests cover request copying, replacement URL lifetime,
   exception conversion, and install/replace/clear behavior.
 - Style JSON tests cover JSON materialization, finite-number validation, style
-  source/layer JSON native adaptation, style source metadata/listing, style
-  layer listing, style JSON snapshots, layer properties, and layer filters.
+  source/layer JSON native adaptation, style source URL/tile APIs, style source
+  metadata/listing, style layer listing, style JSON snapshots, layer properties,
+  and layer filters.
 - Native-library tests cover the C ABI version call, projection helper
   round-tripping, runtime event polling, offline operation start/discard, map
   camera/fit/viewport/tile option round-tripping, camera transition command

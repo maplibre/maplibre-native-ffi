@@ -576,6 +576,82 @@ public sealed unsafe class MapHandle : IDisposable
         return CopyStyleIdList(list);
     }
 
+    /// <summary>Adds a GeoJSON source that loads data from a URL.</summary>
+    public void AddGeoJsonSourceUrl(string sourceId, string url)
+    {
+        using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
+        using var nativeUrl = NativeStringView.From(url, nameof(url));
+        NativeStatus.Check(NativeMethods.mln_map_add_geojson_source_url(Pointer, nativeSourceId.Value, nativeUrl.Value));
+    }
+
+    /// <summary>Updates a GeoJSON source to load data from a URL.</summary>
+    public void SetGeoJsonSourceUrl(string sourceId, string url)
+    {
+        using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
+        using var nativeUrl = NativeStringView.From(url, nameof(url));
+        NativeStatus.Check(NativeMethods.mln_map_set_geojson_source_url(Pointer, nativeSourceId.Value, nativeUrl.Value));
+    }
+
+    /// <summary>Adds a vector source that loads TileJSON from a URL.</summary>
+    public void AddVectorSourceUrl(string sourceId, string url, TileSourceOptions? options = null)
+    {
+        using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
+        using var nativeUrl = NativeStringView.From(url, nameof(url));
+        using var nativeOptions = options is null ? null : NativeTileSourceOptions.From(options);
+        var optionsValue = nativeOptions?.Value ?? default;
+        NativeStatus.Check(NativeMethods.mln_map_add_vector_source_url(Pointer, nativeSourceId.Value, nativeUrl.Value, nativeOptions is null ? null : &optionsValue));
+    }
+
+    /// <summary>Adds a vector source from inline tile URL templates.</summary>
+    public void AddVectorSourceTiles(string sourceId, IReadOnlyList<string> tiles, TileSourceOptions? options = null)
+    {
+        using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
+        using var nativeTiles = NativeStringViewArray.From(tiles, nameof(tiles));
+        using var nativeOptions = options is null ? null : NativeTileSourceOptions.From(options);
+        var optionsValue = nativeOptions?.Value ?? default;
+        NativeStatus.Check(NativeMethods.mln_map_add_vector_source_tiles(Pointer, nativeSourceId.Value, nativeTiles.Count == 0 ? null : nativeTiles.Pointer, nativeTiles.Count, nativeOptions is null ? null : &optionsValue));
+    }
+
+    /// <summary>Adds a raster source that loads TileJSON from a URL.</summary>
+    public void AddRasterSourceUrl(string sourceId, string url, TileSourceOptions? options = null)
+    {
+        using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
+        using var nativeUrl = NativeStringView.From(url, nameof(url));
+        using var nativeOptions = options is null ? null : NativeTileSourceOptions.From(options);
+        var optionsValue = nativeOptions?.Value ?? default;
+        NativeStatus.Check(NativeMethods.mln_map_add_raster_source_url(Pointer, nativeSourceId.Value, nativeUrl.Value, nativeOptions is null ? null : &optionsValue));
+    }
+
+    /// <summary>Adds a raster source from inline tile URL templates.</summary>
+    public void AddRasterSourceTiles(string sourceId, IReadOnlyList<string> tiles, TileSourceOptions? options = null)
+    {
+        using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
+        using var nativeTiles = NativeStringViewArray.From(tiles, nameof(tiles));
+        using var nativeOptions = options is null ? null : NativeTileSourceOptions.From(options);
+        var optionsValue = nativeOptions?.Value ?? default;
+        NativeStatus.Check(NativeMethods.mln_map_add_raster_source_tiles(Pointer, nativeSourceId.Value, nativeTiles.Count == 0 ? null : nativeTiles.Pointer, nativeTiles.Count, nativeOptions is null ? null : &optionsValue));
+    }
+
+    /// <summary>Adds a raster DEM source that loads TileJSON from a URL.</summary>
+    public void AddRasterDemSourceUrl(string sourceId, string url, TileSourceOptions? options = null)
+    {
+        using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
+        using var nativeUrl = NativeStringView.From(url, nameof(url));
+        using var nativeOptions = options is null ? null : NativeTileSourceOptions.From(options);
+        var optionsValue = nativeOptions?.Value ?? default;
+        NativeStatus.Check(NativeMethods.mln_map_add_raster_dem_source_url(Pointer, nativeSourceId.Value, nativeUrl.Value, nativeOptions is null ? null : &optionsValue));
+    }
+
+    /// <summary>Adds a raster DEM source from inline tile URL templates.</summary>
+    public void AddRasterDemSourceTiles(string sourceId, IReadOnlyList<string> tiles, TileSourceOptions? options = null)
+    {
+        using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
+        using var nativeTiles = NativeStringViewArray.From(tiles, nameof(tiles));
+        using var nativeOptions = options is null ? null : NativeTileSourceOptions.From(options);
+        var optionsValue = nativeOptions?.Value ?? default;
+        NativeStatus.Check(NativeMethods.mln_map_add_raster_dem_source_tiles(Pointer, nativeSourceId.Value, nativeTiles.Count == 0 ? null : nativeTiles.Pointer, nativeTiles.Count, nativeOptions is null ? null : &optionsValue));
+    }
+
     /// <summary>Adds a style layer from a JSON-like value.</summary>
     public void AddStyleLayerJson(JsonValue layerJson, string beforeLayerId = "")
     {

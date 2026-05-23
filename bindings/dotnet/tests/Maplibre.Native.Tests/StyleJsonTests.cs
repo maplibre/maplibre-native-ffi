@@ -38,6 +38,34 @@ public sealed unsafe class StyleJsonTests
     }
 
     [Fact]
+    public void UrlAndTileSourceApisAdaptThroughNativeMap()
+    {
+        NativeLibraryTestSupport.SkipUnlessNativeLibraryIsAvailable();
+        using var runtime = RuntimeHandle.Create();
+        using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
+        map.SetStyleJson("{\"version\":8,\"sources\":{},\"layers\":[]}");
+
+        map.AddGeoJsonSourceUrl("geo-url", "https://example.test/data.geojson");
+        map.SetGeoJsonSourceUrl("geo-url", "https://example.test/other.geojson");
+        map.AddVectorSourceTiles("vector-tiles", ["https://example.test/vector/{z}/{x}/{y}.pbf"], new TileSourceOptions
+        {
+            MinimumZoom = 1,
+            MaximumZoom = 12,
+            Attribution = "Vector attribution",
+            Scheme = TileScheme.Xyz,
+            VectorEncoding = VectorTileEncoding.Mvt,
+        });
+        map.AddRasterSourceTiles("raster-tiles", ["https://example.test/raster/{z}/{x}/{y}.png"], new TileSourceOptions { TileSize = 256 });
+        map.AddRasterDemSourceTiles("dem-tiles", ["https://example.test/dem/{z}/{x}/{y}.png"], new TileSourceOptions { RasterEncoding = RasterDemEncoding.Mapbox });
+
+        Assert.Equal(SourceType.GeoJson, map.StyleSourceType("geo-url"));
+        Assert.Equal(SourceType.Vector, map.StyleSourceType("vector-tiles"));
+        Assert.Equal(SourceType.Raster, map.StyleSourceType("raster-tiles"));
+        Assert.Equal(SourceType.RasterDem, map.StyleSourceType("dem-tiles"));
+        Assert.Equal("Vector attribution", map.StyleSourceInfo("vector-tiles")?.Attribution);
+    }
+
+    [Fact]
     public void LayerJsonPropertiesAndFiltersAdaptThroughNativeMap()
     {
         NativeLibraryTestSupport.SkipUnlessNativeLibraryIsAvailable();
