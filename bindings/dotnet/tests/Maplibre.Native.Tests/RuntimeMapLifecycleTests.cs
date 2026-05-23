@@ -42,6 +42,33 @@ public sealed class RuntimeMapLifecycleTests
     }
 
     [Fact]
+    public void OwnerThreadViolationMapsToWrongThreadException()
+    {
+        NativeLibraryTestSupport.SkipUnlessNativeLibraryIsAvailable();
+        using var runtime = RuntimeHandle.Create();
+        using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
+        Exception? thrown = null;
+
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                map.RequestRepaint();
+            }
+            catch (Exception error)
+            {
+                thrown = error;
+            }
+        });
+        thread.Start();
+        thread.Join();
+
+        var wrongThread = Assert.IsType<WrongThreadException>(thrown);
+        Assert.Equal(MaplibreStatus.WrongThread, wrongThread.Status);
+        Assert.Equal((int)MaplibreStatus.WrongThread, wrongThread.RawStatus);
+    }
+
+    [Fact]
     public void MethodsRejectClosedMapBeforeNativeCall()
     {
         NativeLibraryTestSupport.SkipUnlessNativeLibraryIsAvailable();

@@ -14,6 +14,8 @@ namespace Maplibre.Native.Runtime;
 public sealed unsafe class RuntimeHandle : IDisposable
 {
     private readonly Lock callbackGate = new();
+    private readonly Lock mapGate = new();
+    private readonly Dictionary<nint, WeakReference<Map.MapHandle>> liveMaps = [];
     private readonly NativeHandleState<mln_runtime> state;
     private ResourceProviderState? resourceProviderState;
     private ResourceTransformState? resourceTransformState;
@@ -282,6 +284,51 @@ public sealed unsafe class RuntimeHandle : IDisposable
     private OfflineOperationHandle OfflineOperation(ulong operationId, OfflineOperationKind kind, OfflineOperationResultKind resultKind) =>
         new(this, operationId, kind, resultKind);
 
+    internal void RegisterMap(Map.MapHandle map)
+    {
+        ArgumentNullException.ThrowIfNull(map);
+        lock (mapGate)
+        {
+            liveMaps[map.NativeAddress] = new WeakReference<Map.MapHandle>(map);
+        }
+    }
+
+    internal void UnregisterMap(Map.MapHandle map)
+    {
+        ArgumentNullException.ThrowIfNull(map);
+        lock (mapGate)
+        {
+            if (liveMaps.TryGetValue(map.NativeAddress, out var reference) && reference.TryGetTarget(out var target) && ReferenceEquals(target, map))
+            {
+                liveMaps.Remove(map.NativeAddress);
+            }
+        }
+    }
+
+    private Map.MapHandle? MapFor(nint address)
+    {
+        if (address == 0)
+        {
+            return null;
+        }
+
+        lock (mapGate)
+        {
+            if (!liveMaps.TryGetValue(address, out var reference))
+            {
+                return null;
+            }
+
+            if (reference.TryGetTarget(out var map))
+            {
+                return map;
+            }
+
+            liveMaps.Remove(address);
+            return null;
+        }
+    }
+
     /// <summary>Runs one pending owner-thread task for this runtime.</summary>
     public void RunOnce()
     {
@@ -294,7 +341,7 @@ public sealed unsafe class RuntimeHandle : IDisposable
         var raw = RuntimeStructs.EmptyNativeEvent();
         var hasEvent = false;
         NativeStatus.Check(NativeMethods.mln_runtime_poll_event(Pointer, &raw, &hasEvent));
-        return hasEvent ? RuntimeStructs.ReadEvent(raw) : null;
+        return hasEvent ? RuntimeStructs.ReadEvent(raw, this, MapFor) : null;
     }
 
     /// <summary>Destroys the runtime on its owner thread.</summary>

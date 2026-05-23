@@ -1,4 +1,5 @@
 using System.Text;
+using Maplibre.Native.Error;
 using Maplibre.Native.Internal.C;
 using Maplibre.Native.Internal.Callback;
 using Maplibre.Native.Resource;
@@ -61,6 +62,22 @@ public sealed unsafe class ResourceProviderTests
         Assert.Equal(DateTimeOffset.FromUnixTimeMilliseconds(5678), copiedRequest.PriorExpires);
         Assert.Equal("etag-1", copiedRequest.PriorEtag);
         Assert.Equal(42u, copiedRequest.PriorDataSize);
+    }
+
+    [Fact]
+    public void PassThroughFinalizationClosesRequestHandleBeforeNativeRelease()
+    {
+        var handle = new ResourceRequestHandle((mln_resource_request_handle*)1234);
+
+        var decision = handle.FinishProviderDecision(ResourceProviderDecision.PassThrough);
+
+        Assert.Equal((uint)ResourceProviderDecision.PassThrough, decision);
+        Assert.True(handle.IsClosed);
+        var completeError = Assert.Throws<InvalidStateException>(() => handle.Complete(ResourceResponse.NoContent()));
+        Assert.Equal(MaplibreStatus.InvalidState, completeError.Status);
+        var cancelledError = Assert.Throws<InvalidStateException>(() => handle.IsCancelled());
+        Assert.Equal(MaplibreStatus.InvalidState, cancelledError.Status);
+        handle.Close();
     }
 
     [Fact]

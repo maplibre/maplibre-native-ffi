@@ -32,6 +32,31 @@ public sealed class CustomGeometrySourceTests
     }
 
     [Fact]
+    public async Task CustomGeometryDisposeKeepsHandleAliveUntilActiveCallbackExits()
+    {
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var state = new CustomGeometrySourceState(new CustomGeometrySourceOptions
+        {
+            FetchTile = _ =>
+            {
+                entered.SetResult();
+                release.Task.GetAwaiter().GetResult();
+            },
+        });
+
+        var worker = Task.Run(() => state.FetchForTest(new CanonicalTileId(1, 2, 3)), TestContext.Current.CancellationToken);
+        await entered.Task.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+
+        state.Dispose();
+
+        Assert.True(state.IsHandleAllocatedForTest);
+        release.SetResult();
+        await worker.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+        Assert.False(state.IsHandleAllocatedForTest);
+    }
+
+    [Fact]
     public void CustomGeometrySourceApisAdaptThroughNativeMap()
     {
         NativeLibraryTestSupport.SkipUnlessNativeLibraryIsAvailable();

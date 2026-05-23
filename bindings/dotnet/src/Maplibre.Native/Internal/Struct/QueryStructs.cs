@@ -85,7 +85,7 @@ internal sealed unsafe class NativeRenderedFeatureQueryOptions : IDisposable
     {
         ArgumentNullException.ThrowIfNull(options);
         var filter = options.Filter is null ? null : NativeJsonValue.From(options.Filter);
-        var native = new NativeRenderedFeatureQueryOptions(NativeMethods.mln_rendered_feature_query_options_default(), filter);
+        var native = new NativeRenderedFeatureQueryOptions(new mln_rendered_feature_query_options { size = (uint)sizeof(mln_rendered_feature_query_options) }, filter);
         try
         {
             var value = native.Value;
@@ -150,7 +150,7 @@ internal sealed unsafe class NativeSourceFeatureQueryOptions : IDisposable
     {
         ArgumentNullException.ThrowIfNull(options);
         var filter = options.Filter is null ? null : NativeJsonValue.From(options.Filter);
-        var native = new NativeSourceFeatureQueryOptions(NativeMethods.mln_source_feature_query_options_default(), filter);
+        var native = new NativeSourceFeatureQueryOptions(new mln_source_feature_query_options { size = (uint)sizeof(mln_source_feature_query_options) }, filter);
         try
         {
             var value = native.Value;

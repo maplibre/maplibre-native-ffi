@@ -17,12 +17,14 @@ namespace Maplibre.Native.Map;
 public sealed unsafe class MapHandle : IDisposable
 {
     private readonly RuntimeHandle runtime;
+    private readonly nint nativeAddress;
     private readonly NativeHandleState<mln_map> state;
     private readonly Dictionary<string, CustomGeometrySourceState> customGeometrySources = [];
 
     private MapHandle(RuntimeHandle runtime, mln_map* handle)
     {
         this.runtime = runtime;
+        nativeAddress = (nint)handle;
         state = new NativeHandleState<mln_map>(
             handle,
             static handle => NativeMethods.mln_map_destroy(handle),
@@ -38,10 +40,14 @@ public sealed unsafe class MapHandle : IDisposable
         mln_map* map = null;
 
         NativeStatus.Check(NativeMethods.mln_map_create(runtime.Pointer, &nativeOptions, &map));
-        return new MapHandle(runtime, map);
+        var handle = new MapHandle(runtime, map);
+        runtime.RegisterMap(handle);
+        return handle;
     }
 
     internal mln_map* Pointer => state.Pointer;
+
+    internal nint NativeAddress => nativeAddress;
 
     /// <summary>Whether this wrapper has successfully closed its native handle.</summary>
     public bool IsClosed => state.IsClosed;
@@ -1081,6 +1087,7 @@ public sealed unsafe class MapHandle : IDisposable
     public void Close()
     {
         state.Close();
+        runtime.UnregisterMap(this);
         ClearCustomGeometrySources();
     }
 
@@ -1136,6 +1143,7 @@ public sealed unsafe class MapHandle : IDisposable
     {
         if (state.TryClose())
         {
+            runtime.UnregisterMap(this);
             ClearCustomGeometrySources();
         }
         GC.KeepAlive(runtime);

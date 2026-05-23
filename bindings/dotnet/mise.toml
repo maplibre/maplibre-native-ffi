@@ -8,5 +8,8 @@ run = "dotnet build Maplibre.Native.slnx"
 depends = ["//:ensure-native-library"]
 run = "dotnet test Maplibre.Native.slnx"
 
+[tasks.format]
+run = "dotnet format Maplibre.Native.slnx --verify-no-changes --verbosity minimal"
+
 [tasks.ci]
-depends = [":test"]
+depends = [":format", ":test"]

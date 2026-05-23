@@ -12,14 +12,19 @@ namespace Maplibre.Native.Internal.Struct;
 
 internal static unsafe class RuntimeStructs
 {
-    internal static RuntimeEvent ReadEvent(in mln_runtime_event raw)
+    internal static RuntimeEvent ReadEvent(in mln_runtime_event raw) =>
+        ReadEvent(raw, null, _ => null);
+
+    internal static RuntimeEvent ReadEvent(in mln_runtime_event raw, RuntimeHandle? runtimeSource, Func<nint, MapHandle?> mapSource)
     {
+        var sourceType = (RuntimeEventSourceType)raw.source_type;
         return new RuntimeEvent(
             (RuntimeEventType)raw.type,
             raw.type,
-            (RuntimeEventSourceType)raw.source_type,
+            sourceType,
             raw.source_type,
-            (nint)raw.source,
+            sourceType == RuntimeEventSourceType.Runtime ? runtimeSource : null,
+            sourceType == RuntimeEventSourceType.Map ? mapSource((nint)raw.source) : null,
             raw.code,
             raw.payload_type,
             ReadPayload(raw.payload_type, raw.payload, raw.payload_size),
@@ -35,17 +40,20 @@ internal static unsafe class RuntimeStructs
 
         return (mln_runtime_event_payload_type)payloadType switch
         {
-            mln_runtime_event_payload_type.MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME => ReadRenderFrame((mln_runtime_event_render_frame*)payload),
-            mln_runtime_event_payload_type.MLN_RUNTIME_EVENT_PAYLOAD_RENDER_MAP => ReadRenderMap((mln_runtime_event_render_map*)payload),
-            mln_runtime_event_payload_type.MLN_RUNTIME_EVENT_PAYLOAD_STYLE_IMAGE_MISSING => ReadStyleImageMissing((mln_runtime_event_style_image_missing*)payload),
-            mln_runtime_event_payload_type.MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION => ReadTileAction((mln_runtime_event_tile_action*)payload),
-            mln_runtime_event_payload_type.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS => ReadOfflineRegionStatus((mln_runtime_event_offline_region_status*)payload),
-            mln_runtime_event_payload_type.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR => ReadOfflineRegionResponseError((mln_runtime_event_offline_region_response_error*)payload),
-            mln_runtime_event_payload_type.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT => ReadOfflineRegionTileCountLimit((mln_runtime_event_offline_region_tile_count_limit*)payload),
-            mln_runtime_event_payload_type.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_OPERATION_COMPLETED => ReadOfflineOperationCompleted((mln_runtime_event_offline_operation_completed*)payload),
+            mln_runtime_event_payload_type.MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME when HasPayload<mln_runtime_event_render_frame>(payloadSize) => ReadRenderFrame((mln_runtime_event_render_frame*)payload),
+            mln_runtime_event_payload_type.MLN_RUNTIME_EVENT_PAYLOAD_RENDER_MAP when HasPayload<mln_runtime_event_render_map>(payloadSize) => ReadRenderMap((mln_runtime_event_render_map*)payload),
+            mln_runtime_event_payload_type.MLN_RUNTIME_EVENT_PAYLOAD_STYLE_IMAGE_MISSING when HasPayload<mln_runtime_event_style_image_missing>(payloadSize) => ReadStyleImageMissing((mln_runtime_event_style_image_missing*)payload),
+            mln_runtime_event_payload_type.MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION when HasPayload<mln_runtime_event_tile_action>(payloadSize) => ReadTileAction((mln_runtime_event_tile_action*)payload),
+            mln_runtime_event_payload_type.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS when HasPayload<mln_runtime_event_offline_region_status>(payloadSize) => ReadOfflineRegionStatus((mln_runtime_event_offline_region_status*)payload),
+            mln_runtime_event_payload_type.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR when HasPayload<mln_runtime_event_offline_region_response_error>(payloadSize) => ReadOfflineRegionResponseError((mln_runtime_event_offline_region_response_error*)payload),
+            mln_runtime_event_payload_type.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT when HasPayload<mln_runtime_event_offline_region_tile_count_limit>(payloadSize) => ReadOfflineRegionTileCountLimit((mln_runtime_event_offline_region_tile_count_limit*)payload),
+            mln_runtime_event_payload_type.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_OPERATION_COMPLETED when HasPayload<mln_runtime_event_offline_operation_completed>(payloadSize) => ReadOfflineOperationCompleted((mln_runtime_event_offline_operation_completed*)payload),
             _ => new RuntimeEventPayload.Unknown(payloadType, payloadSize),
         };
     }
+
+    private static bool HasPayload<T>(nuint payloadSize)
+        where T : unmanaged => payloadSize >= (nuint)sizeof(T);
 
     private static RuntimeEventPayload.RenderFrame ReadRenderFrame(mln_runtime_event_render_frame* payload) =>
         new((RenderMode)payload->mode, payload->mode, payload->needs_repaint != 0, payload->placement_changed != 0, RenderingStats(payload->stats));

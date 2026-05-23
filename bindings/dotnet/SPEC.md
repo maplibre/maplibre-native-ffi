@@ -146,8 +146,6 @@ The scaffold implements one proof slice:
 - ClangSharp-generated files in `Generated/*.g.cs` cover the public C headers.
 - `GeneratedLayoutTests` verifies layout-sensitive binding facts that do not
   require the native library.
-- Custom geometry source tests cover callback tile-ID copying, exception
-  swallowing, descriptor materialization, and native custom source operations.
 - GeoJSON source tests cover geometry/feature materialization and native GeoJSON
   source data adaptation.
 - Offline struct tests cover offline region definition materialization, copied
@@ -157,6 +155,9 @@ The scaffold implements one proof slice:
 - Render session tests cover surface/texture descriptor materialization, texture
   image info copying, texture frame invalidation, and feature-state selector
   materialization.
+- Custom geometry source tests cover callback tile-ID copying, exception
+  swallowing, descriptor materialization, delayed callback-state release, and
+  native custom source operations.
 - Resource provider tests cover request copying, decision conversion, exception
   conversion, and install/replace behavior.
 - Resource response tests cover byte cloning and native completion descriptor
@@ -178,8 +179,9 @@ The scaffold implements one proof slice:
   map coordinate conversion, projection snapshot lifecycle, visible-geometry
   fitting, and coordinate conversion, runtime/map close behavior, map debug
   option round-tripping, closed-wrapper validation, process-global log callback
-  installation/clearing, and native status diagnostic mapping when run through
-  `mise run //bindings/dotnet:test`.
+  installation/clearing, native status diagnostic mapping, wrong-thread
+  propagation, and resource request pass-through lifecycle handling when run
+  through `mise run //bindings/dotnet:test`.
 - `PublicApiSurfaceTests` keeps representative public concept types present as
   the binding surface expands.
 
@@ -199,7 +201,8 @@ Implemented tasks:
 | `mise run //bindings/dotnet:generate` | Refresh ClangSharp declarations from `include/maplibre_native_c/*.h`. |
 | `mise run //bindings/dotnet:build`    | Build `Maplibre.Native.slnx`.                                         |
 | `mise run //bindings/dotnet:test`     | Run current .NET tests.                                               |
-| `mise run //bindings/dotnet:ci`       | Run the binding's current CI check slice.                             |
+| `mise run //bindings/dotnet:format`   | Verify C# formatting for the solution.                                |
+| `mise run //bindings/dotnet:ci`       | Run formatting and the binding's current CI check slice.              |
 | `dotnet build Maplibre.Native.slnx`   | Build the .NET solution from this folder.                             |
 | `dotnet test Maplibre.Native.slnx`    | Run the .NET solution tests from this folder.                         |
 
@@ -797,9 +800,10 @@ this list with `include/maplibre_native_c/*.h` during coverage reviews.
 - `mln_vulkan_owned_texture_acquire_frame`
 - `mln_vulkan_owned_texture_release_frame`
 
-Render surface/texture descriptor defaults are covered by generated interop.
-Public C# materializers size-initialize those descriptors directly because their
-C defaults carry only ABI size and zeroed backend handles.
+Query option and render surface/texture descriptor defaults are covered by
+generated interop. Public C# materializers size-initialize those descriptors
+directly because their C defaults carry only ABI size and zeroed optional fields
+or backend handles.
 
 ## Testing plan
 

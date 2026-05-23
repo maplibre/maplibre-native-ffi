@@ -9,8 +9,9 @@ internal sealed unsafe class CustomGeometrySourceState : IDisposable
 {
     private readonly Lock gate = new();
     private readonly CustomGeometrySourceOptions options;
-    private readonly GCHandle handle;
+    private GCHandle handle;
     private bool closed;
+    private bool handleFreed;
     private int activeCallbacks;
 
     internal CustomGeometrySourceState(CustomGeometrySourceOptions options)
@@ -65,6 +66,8 @@ internal sealed unsafe class CustomGeometrySourceState : IDisposable
             return descriptor;
         }
     }
+
+    internal bool IsHandleAllocatedForTest => handle.IsAllocated;
 
     internal void FetchForTest(CanonicalTileId tileId) => InvokeFetch(tileId);
     internal void CancelForTest(CanonicalTileId tileId) => InvokeCancel(tileId);
@@ -158,6 +161,7 @@ internal sealed unsafe class CustomGeometrySourceState : IDisposable
         lock (gate)
         {
             activeCallbacks--;
+            FreeHandleIfReadyLocked();
         }
     }
 
@@ -166,16 +170,18 @@ internal sealed unsafe class CustomGeometrySourceState : IDisposable
         lock (gate)
         {
             closed = true;
-            if (activeCallbacks != 0)
-            {
-                // The C API waits for in-flight callbacks before source removal returns.
-                // If a direct test races disposal, keep the GCHandle alive until callbacks exit.
-            }
+            FreeHandleIfReadyLocked();
+        }
+    }
+
+    private void FreeHandleIfReadyLocked()
+    {
+        if (!closed || activeCallbacks != 0 || handleFreed || !handle.IsAllocated)
+        {
+            return;
         }
 
-        if (handle.IsAllocated)
-        {
-            handle.Free();
-        }
+        handle.Free();
+        handleFreed = true;
     }
 }

@@ -34,10 +34,32 @@ public sealed unsafe class RuntimeEventTests
 
             Assert.Equal(RuntimeEventType.MapRenderMapFinished, copied.Type);
             Assert.Equal("hello", copied.Message);
+            Assert.Null(copied.RuntimeSource);
+            Assert.Null(copied.MapSource);
             var renderMap = Assert.IsType<RuntimeEventPayload.RenderMap>(copied.Payload);
             Assert.Equal(RenderMode.Full, renderMap.Mode);
             Assert.Equal((uint)mln_render_mode.MLN_RENDER_MODE_FULL, renderMap.RawMode);
         }
+    }
+
+    [Fact]
+    public void UndersizedKnownPayloadBecomesUnknown()
+    {
+        var payload = new mln_runtime_event_render_frame
+        {
+            size = (uint)Unsafe.SizeOf<mln_runtime_event_render_frame>(),
+            mode = (uint)mln_render_mode.MLN_RENDER_MODE_FULL,
+        };
+        var raw = RuntimeStructs.EmptyNativeEvent();
+        raw.payload_type = (uint)mln_runtime_event_payload_type.MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME;
+        raw.payload = &payload;
+        raw.payload_size = 1;
+
+        var copied = RuntimeStructs.ReadEvent(raw);
+
+        var unknown = Assert.IsType<RuntimeEventPayload.Unknown>(copied.Payload);
+        Assert.Equal((uint)mln_runtime_event_payload_type.MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME, unknown.RawPayloadType);
+        Assert.Equal(1u, unknown.PayloadSize);
     }
 
     [Fact]
