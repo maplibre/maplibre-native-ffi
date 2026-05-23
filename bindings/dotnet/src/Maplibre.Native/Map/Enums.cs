@@ -29,13 +29,13 @@ public enum DebugOptions : uint
 /// <summary>Tile operation reported in runtime tile events.</summary>
 public enum TileOperation : uint
 {
-    Null = 0,
-    RequestedFromCache = 1,
-    RequestedFromNetwork = 2,
+    RequestedFromCache = 0,
+    RequestedFromNetwork = 1,
+    LoadFromNetwork = 2,
     LoadFromCache = 3,
-    LoadFromNetwork = 4,
-    StartParse = 5,
-    EndParse = 6,
-    Error = 7,
-    Cancelled = 8,
+    StartParse = 4,
+    EndParse = 5,
+    Error = 6,
+    Cancelled = 7,
+    Null = 8,
 }

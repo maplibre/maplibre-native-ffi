@@ -2,6 +2,7 @@ using Maplibre.Native.Internal.C;
 using Maplibre.Native.Internal.Handle;
 using Maplibre.Native.Internal.Loader;
 using Maplibre.Native.Internal.Status;
+using Maplibre.Native.Internal.Struct;
 
 namespace Maplibre.Native.Runtime;
 
@@ -40,6 +41,15 @@ public sealed unsafe class RuntimeHandle : IDisposable
     public void RunOnce()
     {
         NativeStatus.Check(NativeMethods.mln_runtime_run_once(Pointer));
+    }
+
+    /// <summary>Polls and copies the next runtime event, when one is queued.</summary>
+    public RuntimeEvent? PollEvent()
+    {
+        var raw = RuntimeStructs.EmptyNativeEvent();
+        var hasEvent = false;
+        NativeStatus.Check(NativeMethods.mln_runtime_poll_event(Pointer, &raw, &hasEvent));
+        return hasEvent ? RuntimeStructs.ReadEvent(raw) : null;
     }
 
     /// <summary>Destroys the runtime on its owner thread.</summary>

@@ -74,6 +74,7 @@ bindings/dotnet/
     Internal/Loader/NativeLibraryLoader.cs
     Internal/Memory/NativeUtf8String.cs
     Internal/Status/NativeStatus.cs
+    Internal/Struct/*.cs
     Camera/*.cs
     Geo/*.cs
     Json/*.cs
@@ -93,6 +94,7 @@ bindings/dotnet/
     NativeStatusTests.cs
     NativeUtf8StringTests.cs
     PublicApiSurfaceTests.cs
+    RuntimeEventTests.cs
     Maplibre.Native.Tests.csproj
 ```
 
@@ -122,9 +124,10 @@ The scaffold implements one proof slice:
 - `GeneratedLayoutTests` verifies layout-sensitive binding facts that do not
   require the native library.
 - Native-library tests cover the C ABI version call, projection helper
-  round-tripping, runtime/map close behavior, closed-wrapper validation,
-  process-global log callback installation/clearing, and native status
-  diagnostic mapping when run through `mise run //bindings/dotnet:test`.
+  round-tripping, runtime event polling, runtime/map close behavior,
+  closed-wrapper validation, process-global log callback installation/clearing,
+  and native status diagnostic mapping when run through
+  `mise run //bindings/dotnet:test`.
 - `PublicApiSurfaceTests` keeps representative public concept types present as
   the binding surface expands.
 

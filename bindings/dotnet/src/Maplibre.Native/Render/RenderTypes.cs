@@ -1,6 +1,6 @@
 namespace Maplibre.Native.Render;
 
-public enum RenderMode : uint { Full = 0, Partial = 1 }
+public enum RenderMode : uint { Partial = 0, Full = 1 }
 
 public readonly record struct RenderTargetExtent(uint Width, uint Height, double ScaleFactor);
 public readonly record struct TextureImageInfo(uint Width, uint Height, uint Stride, ulong ByteLength);

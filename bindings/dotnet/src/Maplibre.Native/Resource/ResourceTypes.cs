@@ -5,7 +5,7 @@ public enum ResourceLoadingMethod : uint { All = 0, CacheOnly = 1, NetworkOnly =
 public enum ResourcePriority : uint { Regular = 0, Low = 1 }
 public enum ResourceUsage : uint { Online = 0, Offline = 1 }
 public enum ResourceStoragePolicy : uint { Permanent = 0, Volatile = 1 }
-public enum ResourceResponseStatus : uint { Ok = 0, NoContent = 1, NotModified = 2, Error = 3 }
+public enum ResourceResponseStatus : uint { Ok = 0, Error = 1, NoContent = 2, NotModified = 3 }
 public enum ResourceErrorReason : uint { None = 0, NotFound = 1, Server = 2, Connection = 3, RateLimit = 4, Other = 5 }
 public enum ResourceProviderDecision : uint { PassThrough = 0, Handle = 1 }
 
