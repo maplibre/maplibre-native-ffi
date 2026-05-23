@@ -5,6 +5,8 @@ import kotlinx.cinterop.BooleanVar
 import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.CPointerVarOf
 import kotlinx.cinterop.ExperimentalForeignApi
+import kotlinx.cinterop.UIntVar
+import kotlinx.cinterop.ULongVar
 import kotlinx.cinterop.alloc
 import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.ptr
@@ -13,12 +15,16 @@ import kotlinx.cinterop.sizeOf
 import kotlinx.cinterop.toLong
 import kotlinx.cinterop.value
 import org.maplibre.nativeffi.internal.c.MLN_RUNTIME_OPTION_MAXIMUM_CACHE_SIZE
+import org.maplibre.nativeffi.internal.c.mln_network_status_get
+import org.maplibre.nativeffi.internal.c.mln_network_status_set
 import org.maplibre.nativeffi.internal.c.mln_runtime_create
 import org.maplibre.nativeffi.internal.c.mln_runtime_destroy
 import org.maplibre.nativeffi.internal.c.mln_runtime_event
+import org.maplibre.nativeffi.internal.c.mln_runtime_offline_operation_discard
 import org.maplibre.nativeffi.internal.c.mln_runtime_options
 import org.maplibre.nativeffi.internal.c.mln_runtime_options_default
 import org.maplibre.nativeffi.internal.c.mln_runtime_poll_event
+import org.maplibre.nativeffi.internal.c.mln_runtime_run_ambient_cache_operation_start
 import org.maplibre.nativeffi.internal.c.mln_runtime_run_once
 import org.maplibre.nativeffi.internal.lifecycle.HandleState
 import org.maplibre.nativeffi.internal.memory.MemoryUtil
@@ -34,6 +40,31 @@ public class RuntimeHandle private constructor(handle: CPointer<mln_runtime>) : 
 
   public fun runOnce() {
     Status.check(mln_runtime_run_once(state.requireLive()))
+  }
+
+  public fun startAmbientCacheOperation(
+    operation: AmbientCacheOperation
+  ): OfflineOperationHandle<Unit> = memScoped {
+    val outOperationId = alloc<ULongVar>()
+    Status.check(
+      mln_runtime_run_ambient_cache_operation_start(
+        state.requireLive(),
+        operation.nativeValue,
+        outOperationId.ptr,
+      )
+    )
+    OfflineOperationHandle(
+      this@RuntimeHandle,
+      outOperationId.value,
+      OfflineOperationKind.AMBIENT_CACHE,
+      OfflineOperationResultKind.NONE,
+    )
+  }
+
+  internal fun discardOfflineOperation(operation: OfflineOperationHandle<*>) {
+    val id = operation.requireLive(this)
+    Status.check(mln_runtime_offline_operation_discard(state.requireLive(), id))
+    operation.markConsumed()
   }
 
   public fun pollEvent(): RuntimeEvent? = memScoped {
@@ -85,6 +116,16 @@ public class RuntimeHandle private constructor(handle: CPointer<mln_runtime>) : 
   }
 
   public companion object {
+    public fun networkStatus(): NetworkStatus = memScoped {
+      val outStatus = alloc<UIntVar>()
+      Status.check(mln_network_status_get(outStatus.ptr))
+      NetworkStatus.fromNative(outStatus.value)
+    }
+
+    public fun setNetworkStatus(status: NetworkStatus) {
+      Status.check(mln_network_status_set(status.nativeValue))
+    }
+
     public fun create(): RuntimeHandle = create(RuntimeOptions())
 
     public fun create(options: RuntimeOptions): RuntimeHandle = memScoped {
