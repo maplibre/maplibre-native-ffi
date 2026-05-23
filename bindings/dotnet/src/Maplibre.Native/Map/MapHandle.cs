@@ -815,6 +815,61 @@ public sealed unsafe class MapHandle : IDisposable
         return result;
     }
 
+    /// <summary>Adds a hillshade layer for a raster DEM source.</summary>
+    public void AddHillshadeLayer(string layerId, string sourceId, string beforeLayerId = "")
+    {
+        using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));
+        using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
+        using var nativeBeforeLayerId = NativeStringView.From(beforeLayerId, nameof(beforeLayerId));
+        NativeStatus.Check(NativeMethods.mln_map_add_hillshade_layer(Pointer, nativeLayerId.Value, nativeSourceId.Value, nativeBeforeLayerId.Value));
+    }
+
+    /// <summary>Adds a color-relief layer for a raster DEM source.</summary>
+    public void AddColorReliefLayer(string layerId, string sourceId, string beforeLayerId = "")
+    {
+        using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));
+        using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
+        using var nativeBeforeLayerId = NativeStringView.From(beforeLayerId, nameof(beforeLayerId));
+        NativeStatus.Check(NativeMethods.mln_map_add_color_relief_layer(Pointer, nativeLayerId.Value, nativeSourceId.Value, nativeBeforeLayerId.Value));
+    }
+
+    /// <summary>Adds a source-free location indicator layer.</summary>
+    public void AddLocationIndicatorLayer(string layerId, string beforeLayerId = "")
+    {
+        using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));
+        using var nativeBeforeLayerId = NativeStringView.From(beforeLayerId, nameof(beforeLayerId));
+        NativeStatus.Check(NativeMethods.mln_map_add_location_indicator_layer(Pointer, nativeLayerId.Value, nativeBeforeLayerId.Value));
+    }
+
+    /// <summary>Sets a location indicator layer location.</summary>
+    public void SetLocationIndicatorLocation(string layerId, LatLng coordinate, double altitude)
+    {
+        using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));
+        NativeStatus.Check(NativeMethods.mln_map_set_location_indicator_location(Pointer, nativeLayerId.Value, CoreStructs.ToNative(coordinate), altitude));
+    }
+
+    /// <summary>Sets a location indicator layer bearing in degrees.</summary>
+    public void SetLocationIndicatorBearing(string layerId, double bearing)
+    {
+        using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));
+        NativeStatus.Check(NativeMethods.mln_map_set_location_indicator_bearing(Pointer, nativeLayerId.Value, bearing));
+    }
+
+    /// <summary>Sets a location indicator layer accuracy radius in logical pixels.</summary>
+    public void SetLocationIndicatorAccuracyRadius(string layerId, double radius)
+    {
+        using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));
+        NativeStatus.Check(NativeMethods.mln_map_set_location_indicator_accuracy_radius(Pointer, nativeLayerId.Value, radius));
+    }
+
+    /// <summary>Sets a location indicator layer image-name property.</summary>
+    public void SetLocationIndicatorImageName(string layerId, LocationIndicatorImageKind imageKind, string imageId)
+    {
+        using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));
+        using var nativeImageId = NativeStringView.From(imageId, nameof(imageId));
+        NativeStatus.Check(NativeMethods.mln_map_set_location_indicator_image_name(Pointer, nativeLayerId.Value, (uint)imageKind, nativeImageId.Value));
+    }
+
     /// <summary>Adds a style layer from a JSON-like value.</summary>
     public void AddStyleLayerJson(JsonValue layerJson, string beforeLayerId = "")
     {
