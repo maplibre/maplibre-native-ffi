@@ -137,6 +137,23 @@ type CameraOptions struct {
 	FieldOfView    float64
 }
 
+// UnitBezier contains cubic easing curve control points.
+type UnitBezier struct {
+	X1 float64
+	Y1 float64
+	X2 float64
+	Y2 float64
+}
+
+// AnimationOptions contains semantic camera animation controls.
+type AnimationOptions struct {
+	Fields     uint32
+	DurationMS float64
+	Velocity   float64
+	MinZoom    float64
+	Easing     UnitBezier
+}
+
 // OfflineTilePyramidRegionDefinition contains tile-pyramid offline region data.
 type OfflineTilePyramidRegionDefinition struct {
 	StyleURL          string
@@ -305,6 +322,13 @@ const (
 	CameraOptionAnchor         uint32 = uint32(C.MLN_CAMERA_OPTION_ANCHOR)
 	CameraOptionRoll           uint32 = uint32(C.MLN_CAMERA_OPTION_ROLL)
 	CameraOptionFOV            uint32 = uint32(C.MLN_CAMERA_OPTION_FOV)
+)
+
+const (
+	AnimationOptionDuration uint32 = uint32(C.MLN_ANIMATION_OPTION_DURATION)
+	AnimationOptionVelocity uint32 = uint32(C.MLN_ANIMATION_OPTION_VELOCITY)
+	AnimationOptionMinZoom  uint32 = uint32(C.MLN_ANIMATION_OPTION_MIN_ZOOM)
+	AnimationOptionEasing   uint32 = uint32(C.MLN_ANIMATION_OPTION_EASING)
 )
 
 const (
@@ -1172,9 +1196,32 @@ func MapJumpTo(m *Map, camera CameraOptions) Status {
 	return Status(C.mln_map_jump_to((*C.mln_map)(unsafe.Pointer(m)), &raw))
 }
 
+// MapEaseTo applies a camera ease transition command.
+func MapEaseTo(m *Map, camera CameraOptions, animation *AnimationOptions) Status {
+	rawCamera := cameraOptionsToC(camera)
+	rawAnimation, rawAnimationPointer := animationOptionsToCPointer(animation)
+	_ = rawAnimation
+	return Status(C.mln_map_ease_to((*C.mln_map)(unsafe.Pointer(m)), &rawCamera, rawAnimationPointer))
+}
+
+// MapFlyTo applies a camera fly transition command.
+func MapFlyTo(m *Map, camera CameraOptions, animation *AnimationOptions) Status {
+	rawCamera := cameraOptionsToC(camera)
+	rawAnimation, rawAnimationPointer := animationOptionsToCPointer(animation)
+	_ = rawAnimation
+	return Status(C.mln_map_fly_to((*C.mln_map)(unsafe.Pointer(m)), &rawCamera, rawAnimationPointer))
+}
+
 // MapMoveBy applies a screen-space pan command.
 func MapMoveBy(m *Map, delta ScreenPoint) Status {
 	return Status(C.mln_map_move_by((*C.mln_map)(unsafe.Pointer(m)), C.double(delta.X), C.double(delta.Y)))
+}
+
+// MapMoveByAnimated applies an animated screen-space pan command.
+func MapMoveByAnimated(m *Map, delta ScreenPoint, animation *AnimationOptions) Status {
+	rawAnimation, rawAnimationPointer := animationOptionsToCPointer(animation)
+	_ = rawAnimation
+	return Status(C.mln_map_move_by_animated((*C.mln_map)(unsafe.Pointer(m)), C.double(delta.X), C.double(delta.Y), rawAnimationPointer))
 }
 
 // MapScaleBy applies a screen-space zoom command.
@@ -1188,14 +1235,41 @@ func MapScaleBy(m *Map, scale float64, anchor *ScreenPoint) Status {
 	return Status(C.mln_map_scale_by((*C.mln_map)(unsafe.Pointer(m)), C.double(scale), rawAnchorPointer))
 }
 
+// MapScaleByAnimated applies an animated screen-space zoom command.
+func MapScaleByAnimated(m *Map, scale float64, anchor *ScreenPoint, animation *AnimationOptions) Status {
+	var rawAnchor C.mln_screen_point
+	var rawAnchorPointer *C.mln_screen_point
+	if anchor != nil {
+		rawAnchor = screenPointToC(*anchor)
+		rawAnchorPointer = &rawAnchor
+	}
+	rawAnimation, rawAnimationPointer := animationOptionsToCPointer(animation)
+	_ = rawAnimation
+	return Status(C.mln_map_scale_by_animated((*C.mln_map)(unsafe.Pointer(m)), C.double(scale), rawAnchorPointer, rawAnimationPointer))
+}
+
 // MapRotateBy applies a screen-space rotate command.
 func MapRotateBy(m *Map, first ScreenPoint, second ScreenPoint) Status {
 	return Status(C.mln_map_rotate_by((*C.mln_map)(unsafe.Pointer(m)), screenPointToC(first), screenPointToC(second)))
 }
 
+// MapRotateByAnimated applies an animated screen-space rotate command.
+func MapRotateByAnimated(m *Map, first ScreenPoint, second ScreenPoint, animation *AnimationOptions) Status {
+	rawAnimation, rawAnimationPointer := animationOptionsToCPointer(animation)
+	_ = rawAnimation
+	return Status(C.mln_map_rotate_by_animated((*C.mln_map)(unsafe.Pointer(m)), screenPointToC(first), screenPointToC(second), rawAnimationPointer))
+}
+
 // MapPitchBy applies a pitch delta command.
 func MapPitchBy(m *Map, pitch float64) Status {
 	return Status(C.mln_map_pitch_by((*C.mln_map)(unsafe.Pointer(m)), C.double(pitch)))
+}
+
+// MapPitchByAnimated applies an animated pitch delta command.
+func MapPitchByAnimated(m *Map, pitch float64, animation *AnimationOptions) Status {
+	rawAnimation, rawAnimationPointer := animationOptionsToCPointer(animation)
+	_ = rawAnimation
+	return Status(C.mln_map_pitch_by_animated((*C.mln_map)(unsafe.Pointer(m)), C.double(pitch), rawAnimationPointer))
 }
 
 // MapCancelTransitions cancels active camera transitions.
@@ -1365,6 +1439,29 @@ func cameraOptionsFromC(options C.mln_camera_options) CameraOptions {
 		Roll:           float64(options.roll),
 		FieldOfView:    float64(options.field_of_view),
 	}
+}
+
+func animationOptionsToC(options AnimationOptions) C.mln_animation_options {
+	raw := C.mln_animation_options_default()
+	raw.fields = C.uint32_t(options.Fields)
+	raw.duration_ms = C.double(options.DurationMS)
+	raw.velocity = C.double(options.Velocity)
+	raw.min_zoom = C.double(options.MinZoom)
+	raw.easing = C.mln_unit_bezier{
+		x1: C.double(options.Easing.X1),
+		y1: C.double(options.Easing.Y1),
+		x2: C.double(options.Easing.X2),
+		y2: C.double(options.Easing.Y2),
+	}
+	return raw
+}
+
+func animationOptionsToCPointer(options *AnimationOptions) (C.mln_animation_options, *C.mln_animation_options) {
+	if options == nil {
+		return C.mln_animation_options{}, nil
+	}
+	raw := animationOptionsToC(*options)
+	return raw, &raw
 }
 
 func screenPointFromC(point C.mln_screen_point) ScreenPoint {

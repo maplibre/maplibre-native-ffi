@@ -125,6 +125,80 @@ func cameraOptionsFromCAPI(raw capi.CameraOptions) CameraOptions {
 	return options
 }
 
+// UnitBezier contains cubic easing curve control points.
+type UnitBezier struct {
+	X1 float64
+	Y1 float64
+	X2 float64
+	Y2 float64
+}
+
+// AnimationOptions configures camera transition animation behavior.
+type AnimationOptions struct {
+	DurationMS *float64
+	Velocity   *float64
+	MinZoom    *float64
+	Easing     *UnitBezier
+}
+
+// WithDuration returns a copy that sets the duration in milliseconds.
+func (options AnimationOptions) WithDurationMS(durationMS float64) AnimationOptions {
+	options.DurationMS = new(float64)
+	*options.DurationMS = durationMS
+	return options
+}
+
+// WithVelocity returns a copy that sets the fly-to velocity in screenfuls per
+// second.
+func (options AnimationOptions) WithVelocity(velocity float64) AnimationOptions {
+	options.Velocity = new(float64)
+	*options.Velocity = velocity
+	return options
+}
+
+// WithMinZoom returns a copy that sets the peak zoom for fly-to transitions.
+func (options AnimationOptions) WithMinZoom(minZoom float64) AnimationOptions {
+	options.MinZoom = new(float64)
+	*options.MinZoom = minZoom
+	return options
+}
+
+// WithEasing returns a copy that sets the cubic easing curve.
+func (options AnimationOptions) WithEasing(easing UnitBezier) AnimationOptions {
+	options.Easing = new(UnitBezier)
+	*options.Easing = easing
+	return options
+}
+
+func (options AnimationOptions) toCAPI() capi.AnimationOptions {
+	var raw capi.AnimationOptions
+	if options.DurationMS != nil {
+		raw.Fields |= capi.AnimationOptionDuration
+		raw.DurationMS = *options.DurationMS
+	}
+	if options.Velocity != nil {
+		raw.Fields |= capi.AnimationOptionVelocity
+		raw.Velocity = *options.Velocity
+	}
+	if options.MinZoom != nil {
+		raw.Fields |= capi.AnimationOptionMinZoom
+		raw.MinZoom = *options.MinZoom
+	}
+	if options.Easing != nil {
+		raw.Fields |= capi.AnimationOptionEasing
+		raw.Easing = capi.UnitBezier{X1: options.Easing.X1, Y1: options.Easing.Y1, X2: options.Easing.X2, Y2: options.Easing.Y2}
+	}
+	return raw
+}
+
+func animationOptionsToCAPI(options *AnimationOptions) *capi.AnimationOptions {
+	if options == nil {
+		return nil
+	}
+	raw := options.toCAPI()
+	return &raw
+}
+
 // NorthOrientation controls which screen edge points north.
 type NorthOrientation uint32
 

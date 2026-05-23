@@ -229,6 +229,28 @@ func (m *MapHandle) JumpTo(camera CameraOptions) error {
 	return checkNative(func() capi.Status { return capi.MapJumpTo(ptr, camera.toCAPI()) })
 }
 
+// EaseTo applies a camera ease transition command. Passing nil animation uses
+// the native default animation options.
+func (m *MapHandle) EaseTo(camera CameraOptions, animation *AnimationOptions) error {
+	ptr, err := m.ptr()
+	if err != nil {
+		return err
+	}
+	defer m.state.KeepAlive()
+	return checkNative(func() capi.Status { return capi.MapEaseTo(ptr, camera.toCAPI(), animationOptionsToCAPI(animation)) })
+}
+
+// FlyTo applies a camera fly transition command. Passing nil animation uses the
+// native default animation options.
+func (m *MapHandle) FlyTo(camera CameraOptions, animation *AnimationOptions) error {
+	ptr, err := m.ptr()
+	if err != nil {
+		return err
+	}
+	defer m.state.KeepAlive()
+	return checkNative(func() capi.Status { return capi.MapFlyTo(ptr, camera.toCAPI(), animationOptionsToCAPI(animation)) })
+}
+
 // MoveBy applies a screen-space pan command.
 func (m *MapHandle) MoveBy(delta ScreenPoint) error {
 	ptr, err := m.ptr()
@@ -237,6 +259,19 @@ func (m *MapHandle) MoveBy(delta ScreenPoint) error {
 	}
 	defer m.state.KeepAlive()
 	return checkNative(func() capi.Status { return capi.MapMoveBy(ptr, delta.toCAPI()) })
+}
+
+// MoveByAnimated applies an animated screen-space pan command. Passing nil
+// animation uses the native default animation options.
+func (m *MapHandle) MoveByAnimated(delta ScreenPoint, animation *AnimationOptions) error {
+	ptr, err := m.ptr()
+	if err != nil {
+		return err
+	}
+	defer m.state.KeepAlive()
+	return checkNative(func() capi.Status {
+		return capi.MapMoveByAnimated(ptr, delta.toCAPI(), animationOptionsToCAPI(animation))
+	})
 }
 
 // ScaleBy applies a screen-space zoom command. Passing nil anchor uses the
@@ -255,6 +290,24 @@ func (m *MapHandle) ScaleBy(scale float64, anchor *ScreenPoint) error {
 	return checkNative(func() capi.Status { return capi.MapScaleBy(ptr, scale, rawAnchor) })
 }
 
+// ScaleByAnimated applies an animated screen-space zoom command. Passing nil
+// anchor or animation uses the native default for that option.
+func (m *MapHandle) ScaleByAnimated(scale float64, anchor *ScreenPoint, animation *AnimationOptions) error {
+	ptr, err := m.ptr()
+	if err != nil {
+		return err
+	}
+	defer m.state.KeepAlive()
+	var rawAnchor *capi.ScreenPoint
+	if anchor != nil {
+		converted := anchor.toCAPI()
+		rawAnchor = &converted
+	}
+	return checkNative(func() capi.Status {
+		return capi.MapScaleByAnimated(ptr, scale, rawAnchor, animationOptionsToCAPI(animation))
+	})
+}
+
 // RotateBy applies a screen-space rotate command.
 func (m *MapHandle) RotateBy(first ScreenPoint, second ScreenPoint) error {
 	ptr, err := m.ptr()
@@ -265,6 +318,19 @@ func (m *MapHandle) RotateBy(first ScreenPoint, second ScreenPoint) error {
 	return checkNative(func() capi.Status { return capi.MapRotateBy(ptr, first.toCAPI(), second.toCAPI()) })
 }
 
+// RotateByAnimated applies an animated screen-space rotate command. Passing nil
+// animation uses the native default animation options.
+func (m *MapHandle) RotateByAnimated(first ScreenPoint, second ScreenPoint, animation *AnimationOptions) error {
+	ptr, err := m.ptr()
+	if err != nil {
+		return err
+	}
+	defer m.state.KeepAlive()
+	return checkNative(func() capi.Status {
+		return capi.MapRotateByAnimated(ptr, first.toCAPI(), second.toCAPI(), animationOptionsToCAPI(animation))
+	})
+}
+
 // PitchBy applies a pitch delta command.
 func (m *MapHandle) PitchBy(pitch float64) error {
 	ptr, err := m.ptr()
@@ -273,6 +339,17 @@ func (m *MapHandle) PitchBy(pitch float64) error {
 	}
 	defer m.state.KeepAlive()
 	return checkNative(func() capi.Status { return capi.MapPitchBy(ptr, pitch) })
+}
+
+// PitchByAnimated applies an animated pitch delta command. Passing nil
+// animation uses the native default animation options.
+func (m *MapHandle) PitchByAnimated(pitch float64, animation *AnimationOptions) error {
+	ptr, err := m.ptr()
+	if err != nil {
+		return err
+	}
+	defer m.state.KeepAlive()
+	return checkNative(func() capi.Status { return capi.MapPitchByAnimated(ptr, pitch, animationOptionsToCAPI(animation)) })
 }
 
 // CancelTransitions cancels active camera transitions.

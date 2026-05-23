@@ -716,6 +716,57 @@ func TestMapCameraCommandsUseNativeABI(t *testing.T) {
 	}
 }
 
+func TestMapAnimatedCameraCommandsUseOptionalAnimationOptions(t *testing.T) {
+	runtime, err := NewRuntime()
+	if err != nil {
+		t.Fatalf("NewRuntime(): %v", err)
+	}
+	m, err := runtime.NewMapWithOptions(NewMapOptions(512, 512, 1))
+	if err != nil {
+		_ = runtime.Close()
+		t.Fatalf("NewMapWithOptions(): %v", err)
+	}
+	defer func() {
+		if err := m.CancelTransitions(); err != nil {
+			t.Errorf("CancelTransitions(): %v", err)
+		}
+		if err := m.Close(); err != nil {
+			t.Errorf("Map Close(): %v", err)
+		}
+		if err := runtime.Close(); err != nil {
+			t.Errorf("Runtime Close(): %v", err)
+		}
+	}()
+
+	camera := CameraOptions{}.
+		WithCenter(LatLng{Latitude: 1, Longitude: 2}).
+		WithZoom(1)
+	animation := AnimationOptions{}.
+		WithDurationMS(0).
+		WithVelocity(1.2).
+		WithMinZoom(0).
+		WithEasing(UnitBezier{X1: 0.25, Y1: 0.1, X2: 0.25, Y2: 1})
+	if err := m.EaseTo(camera, &animation); err != nil {
+		t.Fatalf("EaseTo(): %v", err)
+	}
+	if err := m.FlyTo(camera, nil); err != nil {
+		t.Fatalf("FlyTo(nil animation): %v", err)
+	}
+	if err := m.MoveByAnimated(ScreenPoint{X: 1, Y: 1}, &animation); err != nil {
+		t.Fatalf("MoveByAnimated(): %v", err)
+	}
+	anchor := ScreenPoint{X: 256, Y: 256}
+	if err := m.ScaleByAnimated(1.01, &anchor, nil); err != nil {
+		t.Fatalf("ScaleByAnimated(nil animation): %v", err)
+	}
+	if err := m.RotateByAnimated(ScreenPoint{X: 100, Y: 100}, ScreenPoint{X: 110, Y: 100}, &animation); err != nil {
+		t.Fatalf("RotateByAnimated(): %v", err)
+	}
+	if err := m.PitchByAnimated(0.5, &animation); err != nil {
+		t.Fatalf("PitchByAnimated(): %v", err)
+	}
+}
+
 func TestMapCameraCommandsReportNativeValidation(t *testing.T) {
 	runtime, err := NewRuntime()
 	if err != nil {
@@ -737,6 +788,10 @@ func TestMapCameraCommandsReportNativeValidation(t *testing.T) {
 
 	if err := m.ScaleBy(0, nil); !errors.Is(err, ErrInvalidArgument) {
 		t.Fatalf("ScaleBy(0) error = %v, want ErrInvalidArgument", err)
+	}
+	invalidAnimation := AnimationOptions{}.WithDurationMS(-1)
+	if err := m.MoveByAnimated(ScreenPoint{}, &invalidAnimation); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("MoveByAnimated(invalid animation) error = %v, want ErrInvalidArgument", err)
 	}
 }
 
