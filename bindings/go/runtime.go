@@ -1,8 +1,11 @@
 package maplibre
 
 import (
+	"errors"
+
 	"github.com/maplibre/maplibre-native-ffi/bindings/go/internal/capi"
 	"github.com/maplibre/maplibre-native-ffi/bindings/go/internal/handle"
+	"github.com/maplibre/maplibre-native-ffi/bindings/go/internal/memory"
 )
 
 // NetworkStatus is MapLibre Native's process-global network reachability mode.
@@ -12,6 +15,45 @@ const (
 	NetworkStatusOnline  NetworkStatus = NetworkStatus(capi.NetworkStatusOnline)
 	NetworkStatusOffline NetworkStatus = NetworkStatus(capi.NetworkStatusOffline)
 )
+
+// RuntimeOptions configures runtime creation.
+type RuntimeOptions struct {
+	AssetPath        string
+	CachePath        string
+	MaximumCacheSize *uint64
+}
+
+// WithMaximumCacheSize returns a copy with an explicit maximum ambient cache
+// size.
+func (options RuntimeOptions) WithMaximumCacheSize(size uint64) RuntimeOptions {
+	options.MaximumCacheSize = new(uint64)
+	*options.MaximumCacheSize = size
+	return options
+}
+
+func (options RuntimeOptions) validate() error {
+	if _, err := memory.NewCString(options.AssetPath); err != nil {
+		if errors.Is(err, memory.EmbeddedNulError()) {
+			return newBindingError(ErrInvalidArgument, "RuntimeOptions.AssetPath contains embedded NUL")
+		}
+		return err
+	}
+	if _, err := memory.NewCString(options.CachePath); err != nil {
+		if errors.Is(err, memory.EmbeddedNulError()) {
+			return newBindingError(ErrInvalidArgument, "RuntimeOptions.CachePath contains embedded NUL")
+		}
+		return err
+	}
+	return nil
+}
+
+func (options RuntimeOptions) toCAPI() capi.RuntimeOptions {
+	return capi.RuntimeOptions{
+		AssetPath:        options.AssetPath,
+		CachePath:        options.CachePath,
+		MaximumCacheSize: options.MaximumCacheSize,
+	}
+}
 
 // RuntimeEventType identifies a runtime event kind.
 type RuntimeEventType uint32
@@ -126,8 +168,23 @@ func rawNetworkStatusForSet(status NetworkStatus) (uint32, error) {
 
 // NewRuntime creates a runtime on the current OS thread using native defaults.
 func NewRuntime() (*RuntimeHandle, error) {
+	return createRuntime(capi.RuntimeCreateDefault)
+}
+
+// NewRuntimeWithOptions creates a runtime on the current OS thread using
+// explicit options.
+func NewRuntimeWithOptions(options RuntimeOptions) (*RuntimeHandle, error) {
+	if err := options.validate(); err != nil {
+		return nil, err
+	}
+	return createRuntime(func(out **capi.Runtime) capi.Status {
+		return capi.RuntimeCreate(options.toCAPI(), out)
+	})
+}
+
+func createRuntime(create func(**capi.Runtime) capi.Status) (*RuntimeHandle, error) {
 	var runtime *capi.Runtime
-	if err := checkNative(func() capi.Status { return capi.RuntimeCreateDefault(&runtime) }); err != nil {
+	if err := checkNative(func() capi.Status { return create(&runtime) }); err != nil {
 		return nil, err
 	}
 	state, err := handle.New(runtime, "RuntimeHandle")

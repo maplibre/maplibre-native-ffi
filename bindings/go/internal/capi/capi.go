@@ -4,6 +4,7 @@ package capi
 
 /*
 #cgo CFLAGS: -std=c2x
+#include <stdlib.h>
 #include "maplibre_native_c.h"
 */
 import "C"
@@ -17,6 +18,13 @@ type Map struct{ _ byte }
 
 // Projection is an opaque native map projection handle.
 type Projection struct{ _ byte }
+
+// RuntimeOptions contains semantic runtime creation options.
+type RuntimeOptions struct {
+	AssetPath        string
+	CachePath        string
+	MaximumCacheSize *uint64
+}
 
 // MapOptions contains semantic map creation options.
 type MapOptions struct {
@@ -75,6 +83,10 @@ const (
 const (
 	NetworkStatusOnline  uint32 = uint32(C.MLN_NETWORK_STATUS_ONLINE)
 	NetworkStatusOffline uint32 = uint32(C.MLN_NETWORK_STATUS_OFFLINE)
+)
+
+const (
+	RuntimeOptionMaximumCacheSize uint32 = uint32(C.MLN_RUNTIME_OPTION_MAXIMUM_CACHE_SIZE)
 )
 
 const (
@@ -193,6 +205,28 @@ func ThreadLastErrorMessage() string {
 func RuntimeCreateDefault(out **Runtime) Status {
 	var raw *C.mln_runtime
 	status := Status(C.mln_runtime_create(nil, &raw))
+	if status == StatusOK {
+		*out = (*Runtime)(unsafe.Pointer(raw))
+	}
+	return status
+}
+
+// RuntimeCreate creates a runtime with explicit options.
+func RuntimeCreate(options RuntimeOptions, out **Runtime) Status {
+	rawOptions := C.mln_runtime_options_default()
+	assetPath := C.CString(options.AssetPath)
+	defer C.free(unsafe.Pointer(assetPath))
+	cachePath := C.CString(options.CachePath)
+	defer C.free(unsafe.Pointer(cachePath))
+	rawOptions.asset_path = assetPath
+	rawOptions.cache_path = cachePath
+	if options.MaximumCacheSize != nil {
+		rawOptions.flags |= C.uint32_t(RuntimeOptionMaximumCacheSize)
+		rawOptions.maximum_cache_size = C.uint64_t(*options.MaximumCacheSize)
+	}
+
+	var raw *C.mln_runtime
+	status := Status(C.mln_runtime_create(&rawOptions, &raw))
 	if status == StatusOK {
 		*out = (*Runtime)(unsafe.Pointer(raw))
 	}

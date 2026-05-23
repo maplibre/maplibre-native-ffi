@@ -98,6 +98,23 @@ func TestProjectedMetersHelpersRoundTrip(t *testing.T) {
 	}
 }
 
+func TestRuntimeCreateWithOptions(t *testing.T) {
+	runtime, err := NewRuntimeWithOptions(RuntimeOptions{CachePath: ":memory:"}.WithMaximumCacheSize(0))
+	if err != nil {
+		t.Fatalf("NewRuntimeWithOptions(): %v", err)
+	}
+	if err := runtime.Close(); err != nil {
+		t.Fatalf("Close(): %v", err)
+	}
+}
+
+func TestRuntimeOptionsRejectEmbeddedNUL(t *testing.T) {
+	_, err := NewRuntimeWithOptions(RuntimeOptions{AssetPath: "asset\x00root"})
+	if !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("NewRuntimeWithOptions embedded NUL error = %v, want ErrInvalidArgument", err)
+	}
+}
+
 func TestRuntimeCreateRunOnceAndClose(t *testing.T) {
 	runtime, err := NewRuntime()
 	if err != nil {
