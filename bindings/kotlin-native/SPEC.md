@@ -239,7 +239,6 @@ those choices keep the low-level contract intact.
 
 ### `render`
 
-- `FrameScope`
 - `MetalBorrowedTextureDescriptor`
 - `MetalContextDescriptor`
 - `MetalOwnedTextureDescriptor`
@@ -331,6 +330,7 @@ Implement these Kotlin/Native support files:
 | `internal.struct.RuntimeStructs`              | Runtime options, events, and offline operation data.                                                         |
 | `internal.struct.StyleStructs`                | Style source, image, layer, and custom geometry conversion.                                                  |
 | `internal.struct.ValueStructs`                | JSON value-tree conversion and native snapshot copying.                                                      |
+| `render.FrameScope`                           | Module-internal render frame invalidation state matching Java FFM package-private support.                   |
 
 ## Cinterop coverage map
 
