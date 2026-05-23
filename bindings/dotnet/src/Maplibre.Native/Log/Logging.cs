@@ -37,8 +37,14 @@ public enum LogSeverityMask : uint
     All = Info | Warning | Error,
 }
 
-/// <summary>Copied log record.</summary>
-public sealed record LogRecord(LogSeverity Severity, LogEvent Event, string? Code, string Message);
+/// <summary>Copied MapLibre Native log record delivered to a log callback.</summary>
+public sealed record LogRecord(
+    LogSeverity Severity,
+    uint RawSeverity,
+    LogEvent Event,
+    uint RawEvent,
+    long Code,
+    string Message);
 
 /// <summary>Log callback delegate.</summary>
 public delegate void LogCallback(LogRecord record);

@@ -1,6 +1,7 @@
 using Maplibre.Native.Error;
 using Maplibre.Native.Geo;
 using Maplibre.Native.Internal.C;
+using Maplibre.Native.Internal.Callback;
 using Maplibre.Native.Internal.Loader;
 using Maplibre.Native.Internal.Status;
 using Maplibre.Native.Internal.Struct;
@@ -59,6 +60,18 @@ public static unsafe class Maplibre
 
         NativeLibraryLoader.EnsureLoaded();
         NativeStatus.Check(NativeMethods.MlnNetworkStatusSet(status.RawValue));
+    }
+
+    /// <summary>Installs or replaces the process-global native log callback.</summary>
+    public static void SetLogCallback(LogCallback callback)
+    {
+        LogCallbackState.Set(callback);
+    }
+
+    /// <summary>Clears the process-global native log callback.</summary>
+    public static void ClearLogCallback()
+    {
+        LogCallbackState.Clear();
     }
 
     /// <summary>Configures severities that native logging may dispatch asynchronously.</summary>
