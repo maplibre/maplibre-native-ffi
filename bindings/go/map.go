@@ -205,6 +205,86 @@ func (m *MapHandle) DumpDebugLogs() error {
 	return checkNative(func() capi.Status { return capi.MapDumpDebugLogs(ptr) })
 }
 
+// Camera returns the current camera snapshot.
+func (m *MapHandle) Camera() (CameraOptions, error) {
+	ptr, err := m.ptr()
+	if err != nil {
+		return CameraOptions{}, err
+	}
+	defer m.state.KeepAlive()
+	var raw capi.CameraOptions
+	if err := checkNative(func() capi.Status { return capi.MapGetCamera(ptr, &raw) }); err != nil {
+		return CameraOptions{}, err
+	}
+	return cameraOptionsFromCAPI(raw), nil
+}
+
+// JumpTo applies a camera jump command.
+func (m *MapHandle) JumpTo(camera CameraOptions) error {
+	ptr, err := m.ptr()
+	if err != nil {
+		return err
+	}
+	defer m.state.KeepAlive()
+	return checkNative(func() capi.Status { return capi.MapJumpTo(ptr, camera.toCAPI()) })
+}
+
+// MoveBy applies a screen-space pan command.
+func (m *MapHandle) MoveBy(delta ScreenPoint) error {
+	ptr, err := m.ptr()
+	if err != nil {
+		return err
+	}
+	defer m.state.KeepAlive()
+	return checkNative(func() capi.Status { return capi.MapMoveBy(ptr, delta.toCAPI()) })
+}
+
+// ScaleBy applies a screen-space zoom command. Passing nil anchor uses the
+// native default zoom anchor.
+func (m *MapHandle) ScaleBy(scale float64, anchor *ScreenPoint) error {
+	ptr, err := m.ptr()
+	if err != nil {
+		return err
+	}
+	defer m.state.KeepAlive()
+	var rawAnchor *capi.ScreenPoint
+	if anchor != nil {
+		converted := anchor.toCAPI()
+		rawAnchor = &converted
+	}
+	return checkNative(func() capi.Status { return capi.MapScaleBy(ptr, scale, rawAnchor) })
+}
+
+// RotateBy applies a screen-space rotate command.
+func (m *MapHandle) RotateBy(first ScreenPoint, second ScreenPoint) error {
+	ptr, err := m.ptr()
+	if err != nil {
+		return err
+	}
+	defer m.state.KeepAlive()
+	return checkNative(func() capi.Status { return capi.MapRotateBy(ptr, first.toCAPI(), second.toCAPI()) })
+}
+
+// PitchBy applies a pitch delta command.
+func (m *MapHandle) PitchBy(pitch float64) error {
+	ptr, err := m.ptr()
+	if err != nil {
+		return err
+	}
+	defer m.state.KeepAlive()
+	return checkNative(func() capi.Status { return capi.MapPitchBy(ptr, pitch) })
+}
+
+// CancelTransitions cancels active camera transitions.
+func (m *MapHandle) CancelTransitions() error {
+	ptr, err := m.ptr()
+	if err != nil {
+		return err
+	}
+	defer m.state.KeepAlive()
+	return checkNative(func() capi.Status { return capi.MapCancelTransitions(ptr) })
+}
+
 // ViewportOptions returns live map viewport and render-transform controls.
 func (m *MapHandle) ViewportOptions() (ViewportOptions, error) {
 	ptr, err := m.ptr()

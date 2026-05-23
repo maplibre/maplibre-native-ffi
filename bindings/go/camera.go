@@ -2,6 +2,129 @@ package maplibre
 
 import "github.com/maplibre/maplibre-native-ffi/bindings/go/internal/capi"
 
+// CameraOptions configures map camera snapshots and commands.
+type CameraOptions struct {
+	Center         *LatLng
+	CenterAltitude *float64
+	Padding        *EdgeInsets
+	Anchor         *ScreenPoint
+	Zoom           *float64
+	Bearing        *float64
+	Pitch          *float64
+	Roll           *float64
+	FieldOfView    *float64
+}
+
+// WithCenter returns a copy that sets the center coordinate.
+func (options CameraOptions) WithCenter(center LatLng) CameraOptions {
+	options.Center = new(LatLng)
+	*options.Center = center
+	return options
+}
+
+// WithZoom returns a copy that sets the zoom field.
+func (options CameraOptions) WithZoom(zoom float64) CameraOptions {
+	options.Zoom = new(float64)
+	*options.Zoom = zoom
+	return options
+}
+
+// WithBearing returns a copy that sets the bearing field.
+func (options CameraOptions) WithBearing(bearing float64) CameraOptions {
+	options.Bearing = new(float64)
+	*options.Bearing = bearing
+	return options
+}
+
+// WithPitch returns a copy that sets the pitch field.
+func (options CameraOptions) WithPitch(pitch float64) CameraOptions {
+	options.Pitch = new(float64)
+	*options.Pitch = pitch
+	return options
+}
+
+func (options CameraOptions) toCAPI() capi.CameraOptions {
+	var raw capi.CameraOptions
+	if options.Center != nil {
+		raw.Fields |= capi.CameraOptionCenter
+		raw.Center = options.Center.toCAPI()
+	}
+	if options.CenterAltitude != nil {
+		raw.Fields |= capi.CameraOptionCenterAltitude
+		raw.CenterAltitude = *options.CenterAltitude
+	}
+	if options.Padding != nil {
+		raw.Fields |= capi.CameraOptionPadding
+		raw.Padding = options.Padding.toCAPI()
+	}
+	if options.Anchor != nil {
+		raw.Fields |= capi.CameraOptionAnchor
+		raw.Anchor = options.Anchor.toCAPI()
+	}
+	if options.Zoom != nil {
+		raw.Fields |= capi.CameraOptionZoom
+		raw.Zoom = *options.Zoom
+	}
+	if options.Bearing != nil {
+		raw.Fields |= capi.CameraOptionBearing
+		raw.Bearing = *options.Bearing
+	}
+	if options.Pitch != nil {
+		raw.Fields |= capi.CameraOptionPitch
+		raw.Pitch = *options.Pitch
+	}
+	if options.Roll != nil {
+		raw.Fields |= capi.CameraOptionRoll
+		raw.Roll = *options.Roll
+	}
+	if options.FieldOfView != nil {
+		raw.Fields |= capi.CameraOptionFOV
+		raw.FieldOfView = *options.FieldOfView
+	}
+	return raw
+}
+
+func cameraOptionsFromCAPI(raw capi.CameraOptions) CameraOptions {
+	var options CameraOptions
+	if raw.Fields&capi.CameraOptionCenter != 0 {
+		value := latLngFromCAPI(raw.Center)
+		options.Center = &value
+	}
+	if raw.Fields&capi.CameraOptionCenterAltitude != 0 {
+		value := raw.CenterAltitude
+		options.CenterAltitude = &value
+	}
+	if raw.Fields&capi.CameraOptionPadding != 0 {
+		value := edgeInsetsFromCAPI(raw.Padding)
+		options.Padding = &value
+	}
+	if raw.Fields&capi.CameraOptionAnchor != 0 {
+		value := screenPointFromCAPI(raw.Anchor)
+		options.Anchor = &value
+	}
+	if raw.Fields&capi.CameraOptionZoom != 0 {
+		value := raw.Zoom
+		options.Zoom = &value
+	}
+	if raw.Fields&capi.CameraOptionBearing != 0 {
+		value := raw.Bearing
+		options.Bearing = &value
+	}
+	if raw.Fields&capi.CameraOptionPitch != 0 {
+		value := raw.Pitch
+		options.Pitch = &value
+	}
+	if raw.Fields&capi.CameraOptionRoll != 0 {
+		value := raw.Roll
+		options.Roll = &value
+	}
+	if raw.Fields&capi.CameraOptionFOV != 0 {
+		value := raw.FieldOfView
+		options.FieldOfView = &value
+	}
+	return options
+}
+
 // NorthOrientation controls which screen edge points north.
 type NorthOrientation uint32
 

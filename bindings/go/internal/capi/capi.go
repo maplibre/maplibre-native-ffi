@@ -123,6 +123,20 @@ type ProjectionModeOptions struct {
 	YSkew       float64
 }
 
+// CameraOptions contains semantic camera snapshot and command fields.
+type CameraOptions struct {
+	Fields         uint32
+	Center         LatLng
+	CenterAltitude float64
+	Padding        EdgeInsets
+	Anchor         ScreenPoint
+	Zoom           float64
+	Bearing        float64
+	Pitch          float64
+	Roll           float64
+	FieldOfView    float64
+}
+
 // OfflineTilePyramidRegionDefinition contains tile-pyramid offline region data.
 type OfflineTilePyramidRegionDefinition struct {
 	StyleURL          string
@@ -279,6 +293,18 @@ const (
 	ProjectionModeAxonometric uint32 = uint32(C.MLN_PROJECTION_MODE_AXONOMETRIC)
 	ProjectionModeXSkew       uint32 = uint32(C.MLN_PROJECTION_MODE_X_SKEW)
 	ProjectionModeYSkew       uint32 = uint32(C.MLN_PROJECTION_MODE_Y_SKEW)
+)
+
+const (
+	CameraOptionCenter         uint32 = uint32(C.MLN_CAMERA_OPTION_CENTER)
+	CameraOptionZoom           uint32 = uint32(C.MLN_CAMERA_OPTION_ZOOM)
+	CameraOptionBearing        uint32 = uint32(C.MLN_CAMERA_OPTION_BEARING)
+	CameraOptionPitch          uint32 = uint32(C.MLN_CAMERA_OPTION_PITCH)
+	CameraOptionCenterAltitude uint32 = uint32(C.MLN_CAMERA_OPTION_CENTER_ALTITUDE)
+	CameraOptionPadding        uint32 = uint32(C.MLN_CAMERA_OPTION_PADDING)
+	CameraOptionAnchor         uint32 = uint32(C.MLN_CAMERA_OPTION_ANCHOR)
+	CameraOptionRoll           uint32 = uint32(C.MLN_CAMERA_OPTION_ROLL)
+	CameraOptionFOV            uint32 = uint32(C.MLN_CAMERA_OPTION_FOV)
 )
 
 const (
@@ -1130,6 +1156,53 @@ func MapSetProjectionMode(m *Map, options ProjectionModeOptions) Status {
 	return Status(C.mln_map_set_projection_mode((*C.mln_map)(unsafe.Pointer(m)), &raw))
 }
 
+// MapGetCamera copies the current camera snapshot.
+func MapGetCamera(m *Map, out *CameraOptions) Status {
+	raw := C.mln_camera_options{size: C.uint32_t(unsafe.Sizeof(C.mln_camera_options{}))}
+	status := Status(C.mln_map_get_camera((*C.mln_map)(unsafe.Pointer(m)), &raw))
+	if status == StatusOK {
+		*out = cameraOptionsFromC(raw)
+	}
+	return status
+}
+
+// MapJumpTo applies a camera jump command.
+func MapJumpTo(m *Map, camera CameraOptions) Status {
+	raw := cameraOptionsToC(camera)
+	return Status(C.mln_map_jump_to((*C.mln_map)(unsafe.Pointer(m)), &raw))
+}
+
+// MapMoveBy applies a screen-space pan command.
+func MapMoveBy(m *Map, delta ScreenPoint) Status {
+	return Status(C.mln_map_move_by((*C.mln_map)(unsafe.Pointer(m)), C.double(delta.X), C.double(delta.Y)))
+}
+
+// MapScaleBy applies a screen-space zoom command.
+func MapScaleBy(m *Map, scale float64, anchor *ScreenPoint) Status {
+	var rawAnchor C.mln_screen_point
+	var rawAnchorPointer *C.mln_screen_point
+	if anchor != nil {
+		rawAnchor = screenPointToC(*anchor)
+		rawAnchorPointer = &rawAnchor
+	}
+	return Status(C.mln_map_scale_by((*C.mln_map)(unsafe.Pointer(m)), C.double(scale), rawAnchorPointer))
+}
+
+// MapRotateBy applies a screen-space rotate command.
+func MapRotateBy(m *Map, first ScreenPoint, second ScreenPoint) Status {
+	return Status(C.mln_map_rotate_by((*C.mln_map)(unsafe.Pointer(m)), screenPointToC(first), screenPointToC(second)))
+}
+
+// MapPitchBy applies a pitch delta command.
+func MapPitchBy(m *Map, pitch float64) Status {
+	return Status(C.mln_map_pitch_by((*C.mln_map)(unsafe.Pointer(m)), C.double(pitch)))
+}
+
+// MapCancelTransitions cancels active camera transitions.
+func MapCancelTransitions(m *Map) Status {
+	return Status(C.mln_map_cancel_transitions((*C.mln_map)(unsafe.Pointer(m))))
+}
+
 // MapProjectionCreate creates a standalone projection helper from a map.
 func MapProjectionCreate(m *Map, out **Projection) Status {
 	var raw *C.mln_map_projection
@@ -1260,6 +1333,37 @@ func projectionModeOptionsFromC(options C.mln_projection_mode) ProjectionModeOpt
 		Axonometric: bool(options.axonometric),
 		XSkew:       float64(options.x_skew),
 		YSkew:       float64(options.y_skew),
+	}
+}
+
+func cameraOptionsToC(options CameraOptions) C.mln_camera_options {
+	raw := C.mln_camera_options_default()
+	raw.fields = C.uint32_t(options.Fields)
+	raw.latitude = C.double(options.Center.Latitude)
+	raw.longitude = C.double(options.Center.Longitude)
+	raw.center_altitude = C.double(options.CenterAltitude)
+	raw.padding = edgeInsetsToC(options.Padding)
+	raw.anchor = screenPointToC(options.Anchor)
+	raw.zoom = C.double(options.Zoom)
+	raw.bearing = C.double(options.Bearing)
+	raw.pitch = C.double(options.Pitch)
+	raw.roll = C.double(options.Roll)
+	raw.field_of_view = C.double(options.FieldOfView)
+	return raw
+}
+
+func cameraOptionsFromC(options C.mln_camera_options) CameraOptions {
+	return CameraOptions{
+		Fields:         uint32(options.fields),
+		Center:         LatLng{Latitude: float64(options.latitude), Longitude: float64(options.longitude)},
+		CenterAltitude: float64(options.center_altitude),
+		Padding:        edgeInsetsFromC(options.padding),
+		Anchor:         screenPointFromC(options.anchor),
+		Zoom:           float64(options.zoom),
+		Bearing:        float64(options.bearing),
+		Pitch:          float64(options.pitch),
+		Roll:           float64(options.roll),
+		FieldOfView:    float64(options.field_of_view),
 	}
 }
 

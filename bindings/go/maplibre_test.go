@@ -664,6 +664,82 @@ func TestMapDebugOptionsRejectUnknownBits(t *testing.T) {
 	}
 }
 
+func TestMapCameraCommandsUseNativeABI(t *testing.T) {
+	runtime, err := NewRuntime()
+	if err != nil {
+		t.Fatalf("NewRuntime(): %v", err)
+	}
+	m, err := runtime.NewMapWithOptions(NewMapOptions(512, 512, 1))
+	if err != nil {
+		_ = runtime.Close()
+		t.Fatalf("NewMapWithOptions(): %v", err)
+	}
+	defer func() {
+		if err := m.Close(); err != nil {
+			t.Errorf("Map Close(): %v", err)
+		}
+		if err := runtime.Close(); err != nil {
+			t.Errorf("Runtime Close(): %v", err)
+		}
+	}()
+
+	camera := CameraOptions{}.
+		WithCenter(LatLng{Latitude: 10, Longitude: 20}).
+		WithZoom(2).
+		WithBearing(15).
+		WithPitch(20)
+	if err := m.JumpTo(camera); err != nil {
+		t.Fatalf("JumpTo(): %v", err)
+	}
+	gotCamera, err := m.Camera()
+	if err != nil {
+		t.Fatalf("Camera(): %v", err)
+	}
+	if gotCamera.Center == nil || gotCamera.Zoom == nil {
+		t.Fatalf("Camera() missing expected fields: %#v", gotCamera)
+	}
+	if err := m.MoveBy(ScreenPoint{X: 1, Y: 2}); err != nil {
+		t.Fatalf("MoveBy(): %v", err)
+	}
+	anchor := ScreenPoint{X: 256, Y: 256}
+	if err := m.ScaleBy(1.1, &anchor); err != nil {
+		t.Fatalf("ScaleBy(): %v", err)
+	}
+	if err := m.RotateBy(ScreenPoint{X: 100, Y: 100}, ScreenPoint{X: 120, Y: 110}); err != nil {
+		t.Fatalf("RotateBy(): %v", err)
+	}
+	if err := m.PitchBy(1); err != nil {
+		t.Fatalf("PitchBy(): %v", err)
+	}
+	if err := m.CancelTransitions(); err != nil {
+		t.Fatalf("CancelTransitions(): %v", err)
+	}
+}
+
+func TestMapCameraCommandsReportNativeValidation(t *testing.T) {
+	runtime, err := NewRuntime()
+	if err != nil {
+		t.Fatalf("NewRuntime(): %v", err)
+	}
+	m, err := runtime.NewMap()
+	if err != nil {
+		_ = runtime.Close()
+		t.Fatalf("NewMap(): %v", err)
+	}
+	defer func() {
+		if err := m.Close(); err != nil {
+			t.Errorf("Map Close(): %v", err)
+		}
+		if err := runtime.Close(); err != nil {
+			t.Errorf("Runtime Close(): %v", err)
+		}
+	}()
+
+	if err := m.ScaleBy(0, nil); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("ScaleBy(0) error = %v, want ErrInvalidArgument", err)
+	}
+}
+
 func TestMapViewportTileAndProjectionOptionsRoundTrip(t *testing.T) {
 	runtime, err := NewRuntime()
 	if err != nil {
