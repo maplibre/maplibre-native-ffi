@@ -108,6 +108,25 @@ public sealed unsafe class RuntimeHandle : IDisposable
         return OfflineOperation(operationId, OfflineOperationKind.AmbientCache, OfflineOperationResultKind.None);
     }
 
+    /// <summary>Starts an offline region creation operation.</summary>
+    public OfflineOperationHandle StartCreateOfflineRegion(OfflineRegionDefinition definition, byte[] metadata)
+    {
+        ArgumentNullException.ThrowIfNull(metadata);
+        using var nativeDefinition = NativeOfflineRegionDefinition.From(definition);
+        var definitionValue = nativeDefinition.Value;
+        ulong operationId = 0;
+        fixed (byte* metadataPointer = metadata)
+        {
+            NativeStatus.Check(NativeMethods.mln_runtime_offline_region_create_start(
+                Pointer,
+                &definitionValue,
+                metadata.Length == 0 ? null : metadataPointer,
+                (nuint)metadata.Length,
+                &operationId));
+        }
+        return OfflineOperation(operationId, OfflineOperationKind.RegionCreate, OfflineOperationResultKind.Region);
+    }
+
     /// <summary>Starts an offline region lookup operation.</summary>
     public OfflineOperationHandle StartOfflineRegion(long id)
     {
@@ -132,6 +151,23 @@ public sealed unsafe class RuntimeHandle : IDisposable
         ulong operationId = 0;
         NativeStatus.Check(NativeMethods.mln_runtime_offline_regions_merge_database_start(Pointer, nativePath.Pointer, &operationId));
         return OfflineOperation(operationId, OfflineOperationKind.RegionsMergeDatabase, OfflineOperationResultKind.RegionList);
+    }
+
+    /// <summary>Starts an offline region metadata update operation.</summary>
+    public OfflineOperationHandle StartUpdateOfflineRegionMetadata(long id, byte[] metadata)
+    {
+        ArgumentNullException.ThrowIfNull(metadata);
+        ulong operationId = 0;
+        fixed (byte* metadataPointer = metadata)
+        {
+            NativeStatus.Check(NativeMethods.mln_runtime_offline_region_update_metadata_start(
+                Pointer,
+                id,
+                metadata.Length == 0 ? null : metadataPointer,
+                (nuint)metadata.Length,
+                &operationId));
+        }
+        return OfflineOperation(operationId, OfflineOperationKind.RegionUpdateMetadata, OfflineOperationResultKind.Region);
     }
 
     /// <summary>Starts an offline region status lookup operation.</summary>
@@ -172,6 +208,67 @@ public sealed unsafe class RuntimeHandle : IDisposable
         ulong operationId = 0;
         NativeStatus.Check(NativeMethods.mln_runtime_offline_region_delete_start(Pointer, id, &operationId));
         return OfflineOperation(operationId, OfflineOperationKind.RegionDelete, OfflineOperationResultKind.None);
+    }
+
+    public OfflineRegionInfo TakeCreateOfflineRegionResult(OfflineOperationHandle operation)
+    {
+        ArgumentNullException.ThrowIfNull(operation);
+        var operationId = operation.RequireLive(this, OfflineOperationKind.RegionCreate, OfflineOperationResultKind.Region);
+        mln_offline_region_snapshot* snapshot = null;
+        NativeStatus.Check(NativeMethods.mln_runtime_offline_region_create_take_result(Pointer, operationId, &snapshot));
+        operation.MarkConsumed();
+        return OfflineStructs.ReadSnapshot(snapshot);
+    }
+
+    public OfflineRegionInfo? TakeOfflineRegionResult(OfflineOperationHandle operation)
+    {
+        ArgumentNullException.ThrowIfNull(operation);
+        var operationId = operation.RequireLive(this, OfflineOperationKind.RegionGet, OfflineOperationResultKind.OptionalRegion);
+        mln_offline_region_snapshot* snapshot = null;
+        bool found = false;
+        NativeStatus.Check(NativeMethods.mln_runtime_offline_region_get_take_result(Pointer, operationId, &snapshot, &found));
+        operation.MarkConsumed();
+        return found ? OfflineStructs.ReadSnapshot(snapshot) : null;
+    }
+
+    public IReadOnlyList<OfflineRegionInfo> TakeOfflineRegionsResult(OfflineOperationHandle operation)
+    {
+        ArgumentNullException.ThrowIfNull(operation);
+        var operationId = operation.RequireLive(this, OfflineOperationKind.RegionsList, OfflineOperationResultKind.RegionList);
+        mln_offline_region_list* list = null;
+        NativeStatus.Check(NativeMethods.mln_runtime_offline_regions_list_take_result(Pointer, operationId, &list));
+        operation.MarkConsumed();
+        return OfflineStructs.ReadList(list);
+    }
+
+    public IReadOnlyList<OfflineRegionInfo> TakeMergeOfflineRegionsDatabaseResult(OfflineOperationHandle operation)
+    {
+        ArgumentNullException.ThrowIfNull(operation);
+        var operationId = operation.RequireLive(this, OfflineOperationKind.RegionsMergeDatabase, OfflineOperationResultKind.RegionList);
+        mln_offline_region_list* list = null;
+        NativeStatus.Check(NativeMethods.mln_runtime_offline_regions_merge_database_take_result(Pointer, operationId, &list));
+        operation.MarkConsumed();
+        return OfflineStructs.ReadList(list);
+    }
+
+    public OfflineRegionInfo TakeUpdateOfflineRegionMetadataResult(OfflineOperationHandle operation)
+    {
+        ArgumentNullException.ThrowIfNull(operation);
+        var operationId = operation.RequireLive(this, OfflineOperationKind.RegionUpdateMetadata, OfflineOperationResultKind.Region);
+        mln_offline_region_snapshot* snapshot = null;
+        NativeStatus.Check(NativeMethods.mln_runtime_offline_region_update_metadata_take_result(Pointer, operationId, &snapshot));
+        operation.MarkConsumed();
+        return OfflineStructs.ReadSnapshot(snapshot);
+    }
+
+    public OfflineRegionStatus TakeOfflineRegionStatusResult(OfflineOperationHandle operation)
+    {
+        ArgumentNullException.ThrowIfNull(operation);
+        var operationId = operation.RequireLive(this, OfflineOperationKind.RegionGetStatus, OfflineOperationResultKind.RegionStatus);
+        var status = new mln_offline_region_status { size = (uint)sizeof(mln_offline_region_status) };
+        NativeStatus.Check(NativeMethods.mln_runtime_offline_region_get_status_take_result(Pointer, operationId, &status));
+        operation.MarkConsumed();
+        return OfflineStructs.ReadStatus(status);
     }
 
     internal void DiscardOfflineOperation(OfflineOperationHandle operation)
