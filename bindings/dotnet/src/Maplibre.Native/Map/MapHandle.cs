@@ -1094,7 +1094,19 @@ public sealed unsafe class MapHandle : IDisposable
 
     internal void ReleaseDetachedCustomGeometrySources()
     {
-        ClearCustomGeometrySources();
+        foreach (var (sourceId, sourceState) in customGeometrySources.ToArray())
+        {
+            var sourceType = StyleSourceType(sourceId);
+            if (sourceType == SourceType.CustomVector)
+            {
+                continue;
+            }
+
+            if (customGeometrySources.Remove(sourceId))
+            {
+                sourceState.Dispose();
+            }
+        }
     }
 
     private void ClearCustomGeometrySources()

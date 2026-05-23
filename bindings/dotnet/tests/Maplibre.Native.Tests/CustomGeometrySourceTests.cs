@@ -93,7 +93,7 @@ public sealed class CustomGeometrySourceTests
     }
 
     [Fact]
-    public void SetStyleUrlKeepsCustomGeometryCallbacksUntilStyleReplacementCompletes()
+    public void DetachedCustomGeometryCleanupKeepsActiveCustomVectorSources()
     {
         NativeLibraryTestSupport.SkipUnlessNativeLibraryIsAvailable();
         using var runtime = RuntimeHandle.Create();
@@ -101,10 +101,47 @@ public sealed class CustomGeometrySourceTests
         map.SetStyleJson("{\"version\":8,\"sources\":{},\"layers\":[]}");
         map.AddCustomGeometrySource("custom", new CustomGeometrySourceOptions { FetchTile = _ => { } });
 
-        map.SetStyleUrl("https://example.test/style.json");
+        map.ReleaseDetachedCustomGeometrySources();
 
         Assert.Equal(1, map.CustomGeometrySourceCountForTest);
-        map.ReleaseDetachedCustomGeometrySources();
+        Assert.Equal(SourceType.CustomVector, map.StyleSourceType("custom"));
+    }
+
+    [Fact]
+    public void StaleStyleLoadedEventKeepsStillAttachedCustomGeometrySource()
+    {
+        NativeLibraryTestSupport.SkipUnlessNativeLibraryIsAvailable();
+        using var runtime = RuntimeHandle.Create();
+        using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
+        map.SetStyleJson("{\"version\":8,\"sources\":{},\"layers\":[]}");
+        map.AddCustomGeometrySource("custom", new CustomGeometrySourceOptions { FetchTile = _ => { } });
+
+        for (var attempt = 0; attempt < 8; attempt++)
+        {
+            var runtimeEvent = runtime.PollEvent();
+            if (runtimeEvent?.Type == RuntimeEventType.MapStyleLoaded)
+            {
+                break;
+            }
+            runtime.RunOnce();
+        }
+
+        Assert.Equal(1, map.CustomGeometrySourceCountForTest);
+        Assert.Equal(SourceType.CustomVector, map.StyleSourceType("custom"));
+    }
+
+    [Fact]
+    public void InlineStyleReplacementReleasesCustomGeometryCallbacks()
+    {
+        NativeLibraryTestSupport.SkipUnlessNativeLibraryIsAvailable();
+        using var runtime = RuntimeHandle.Create();
+        using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
+        map.SetStyleJson("{\"version\":8,\"sources\":{},\"layers\":[]}");
+        map.AddCustomGeometrySource("custom", new CustomGeometrySourceOptions { FetchTile = _ => { } });
+
+        map.SetStyleJson("{\"version\":8,\"sources\":{},\"layers\":[]}");
+
         Assert.Equal(0, map.CustomGeometrySourceCountForTest);
+        Assert.False(map.StyleSourceExists("custom"));
     }
 }
