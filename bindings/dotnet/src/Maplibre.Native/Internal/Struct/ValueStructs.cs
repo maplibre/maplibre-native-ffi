@@ -2,9 +2,78 @@ using System.Runtime.InteropServices;
 using System.Text;
 using Maplibre.Native.Error;
 using Maplibre.Native.Internal.C;
+using Maplibre.Native.Internal.Status;
 using Maplibre.Native.Json;
 
 namespace Maplibre.Native.Internal.Struct;
+
+internal static unsafe class ValueStructs
+{
+    internal static JsonValue? ReadJsonSnapshot(mln_json_snapshot* snapshot)
+    {
+        if (snapshot is null)
+        {
+            return null;
+        }
+
+        try
+        {
+            mln_json_value* value = null;
+            NativeStatus.Check(NativeMethods.mln_json_snapshot_get(snapshot, &value));
+            return value is null ? null : ReadJsonValue(value);
+        }
+        finally
+        {
+            NativeMethods.mln_json_snapshot_destroy(snapshot);
+        }
+    }
+
+    internal static JsonValue ReadJsonValue(mln_json_value* value)
+    {
+        if (value is null)
+        {
+            return JsonValue.Null.Instance;
+        }
+
+        return (mln_json_value_type)value->type switch
+        {
+            mln_json_value_type.MLN_JSON_VALUE_TYPE_NULL => JsonValue.Null.Instance,
+            mln_json_value_type.MLN_JSON_VALUE_TYPE_BOOL => new JsonValue.Bool(value->data.bool_value != 0),
+            mln_json_value_type.MLN_JSON_VALUE_TYPE_UINT => new JsonValue.UInt(value->data.uint_value),
+            mln_json_value_type.MLN_JSON_VALUE_TYPE_INT => new JsonValue.Int(value->data.int_value),
+            mln_json_value_type.MLN_JSON_VALUE_TYPE_DOUBLE => new JsonValue.Double(value->data.double_value),
+            mln_json_value_type.MLN_JSON_VALUE_TYPE_STRING => new JsonValue.String(RuntimeStructs.CopyUtf8(value->data.string_value.data, value->data.string_value.size)),
+            mln_json_value_type.MLN_JSON_VALUE_TYPE_ARRAY => ReadArray(value->data.array_value),
+            mln_json_value_type.MLN_JSON_VALUE_TYPE_OBJECT => ReadObject(value->data.object_value),
+            _ => JsonValue.Null.Instance,
+        };
+    }
+
+    private static JsonValue.Array ReadArray(mln_json_array array)
+    {
+        var values = new JsonValue[checked((int)array.value_count)];
+        for (var index = 0; index < values.Length; index++)
+        {
+            values[index] = ReadJsonValue(&array.values[index]);
+        }
+
+        return new JsonValue.Array(values);
+    }
+
+    private static JsonValue.Object ReadObject(mln_json_object obj)
+    {
+        var members = new JsonMember[checked((int)obj.member_count)];
+        for (var index = 0; index < members.Length; index++)
+        {
+            var member = obj.members[index];
+            members[index] = new JsonMember(
+                RuntimeStructs.CopyUtf8(member.key.data, member.key.size),
+                ReadJsonValue(member.value));
+        }
+
+        return new JsonValue.Object(members);
+    }
+}
 
 internal sealed unsafe class NativeStringView : IDisposable
 {

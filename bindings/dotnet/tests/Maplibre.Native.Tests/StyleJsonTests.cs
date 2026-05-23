@@ -38,6 +38,35 @@ public sealed unsafe class StyleJsonTests
     }
 
     [Fact]
+    public void LayerJsonPropertiesAndFiltersAdaptThroughNativeMap()
+    {
+        NativeLibraryTestSupport.SkipUnlessNativeLibraryIsAvailable();
+        using var runtime = RuntimeHandle.Create();
+        using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
+        map.SetStyleJson("{\"version\":8,\"sources\":{},\"layers\":[]}");
+        map.AddStyleSourceJson("geo", GeoJsonSource());
+        map.AddStyleLayerJson(new JsonValue.Object([
+            new JsonMember("id", new JsonValue.String("fill")),
+            new JsonMember("type", new JsonValue.String("fill")),
+            new JsonMember("source", new JsonValue.String("geo")),
+        ]));
+
+        map.SetLayerProperty("fill", "fill-opacity", new JsonValue.Double(0.5));
+        map.SetLayerFilter("fill", new JsonValue.Array([
+            new JsonValue.String("=="),
+            new JsonValue.String("kind"),
+            new JsonValue.String("park"),
+        ]));
+
+        Assert.Equal(new JsonValue.Double(0.5), map.GetLayerProperty("fill", "fill-opacity"));
+        Assert.IsType<JsonValue.Object>(map.GetStyleLayerJson("fill"));
+        Assert.IsType<JsonValue.Array>(map.GetLayerFilter("fill"));
+
+        map.SetLayerFilter("fill", null);
+        Assert.Null(map.GetLayerFilter("fill"));
+    }
+
+    [Fact]
     public void StyleSourceAndLayerJsonAdaptThroughNativeMap()
     {
         NativeLibraryTestSupport.SkipUnlessNativeLibraryIsAvailable();

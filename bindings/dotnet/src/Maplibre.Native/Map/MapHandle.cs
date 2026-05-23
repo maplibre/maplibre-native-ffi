@@ -557,11 +557,83 @@ public sealed unsafe class MapHandle : IDisposable
         return found ? RuntimeStructs.CopyUtf8(layerType.data, layerType.size) : null;
     }
 
+    /// <summary>Moves a style layer before another layer, or to the top when beforeLayerId is empty.</summary>
+    public void MoveStyleLayer(string layerId, string beforeLayerId = "")
+    {
+        using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));
+        using var nativeBeforeLayerId = NativeStringView.From(beforeLayerId, nameof(beforeLayerId));
+        NativeStatus.Check(NativeMethods.mln_map_move_style_layer(Pointer, nativeLayerId.Value, nativeBeforeLayerId.Value));
+    }
+
+    /// <summary>Gets a full style-spec layer JSON snapshot when the layer exists.</summary>
+    public JsonValue? GetStyleLayerJson(string layerId)
+    {
+        using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));
+        mln_json_snapshot* snapshot = null;
+        bool found = false;
+        NativeStatus.Check(NativeMethods.mln_map_get_style_layer_json(Pointer, nativeLayerId.Value, &snapshot, &found));
+        return found ? ValueStructs.ReadJsonSnapshot(snapshot) : null;
+    }
+
     /// <summary>Sets the style light document from a JSON-like value.</summary>
     public void SetStyleLightJson(JsonValue lightJson)
     {
         using var nativeJson = NativeJsonValue.From(lightJson);
         NativeStatus.Check(NativeMethods.mln_map_set_style_light_json(Pointer, nativeJson.Pointer));
+    }
+
+    /// <summary>Sets one style light property from a JSON-like value.</summary>
+    public void SetStyleLightProperty(string propertyName, JsonValue value)
+    {
+        using var nativePropertyName = NativeStringView.From(propertyName, nameof(propertyName));
+        using var nativeValue = NativeJsonValue.From(value);
+        NativeStatus.Check(NativeMethods.mln_map_set_style_light_property(Pointer, nativePropertyName.Value, nativeValue.Pointer));
+    }
+
+    /// <summary>Gets one style light property snapshot, or null when undefined.</summary>
+    public JsonValue? GetStyleLightProperty(string propertyName)
+    {
+        using var nativePropertyName = NativeStringView.From(propertyName, nameof(propertyName));
+        mln_json_snapshot* snapshot = null;
+        NativeStatus.Check(NativeMethods.mln_map_get_style_light_property(Pointer, nativePropertyName.Value, &snapshot));
+        return ValueStructs.ReadJsonSnapshot(snapshot);
+    }
+
+    /// <summary>Sets one layer property from a JSON-like value.</summary>
+    public void SetLayerProperty(string layerId, string propertyName, JsonValue value)
+    {
+        using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));
+        using var nativePropertyName = NativeStringView.From(propertyName, nameof(propertyName));
+        using var nativeValue = NativeJsonValue.From(value);
+        NativeStatus.Check(NativeMethods.mln_map_set_layer_property(Pointer, nativeLayerId.Value, nativePropertyName.Value, nativeValue.Pointer));
+    }
+
+    /// <summary>Gets one layer property snapshot, or null when undefined.</summary>
+    public JsonValue? GetLayerProperty(string layerId, string propertyName)
+    {
+        using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));
+        using var nativePropertyName = NativeStringView.From(propertyName, nameof(propertyName));
+        mln_json_snapshot* snapshot = null;
+        NativeStatus.Check(NativeMethods.mln_map_get_layer_property(Pointer, nativeLayerId.Value, nativePropertyName.Value, &snapshot));
+        return ValueStructs.ReadJsonSnapshot(snapshot);
+    }
+
+    /// <summary>Sets or clears one layer filter from a JSON-like value.</summary>
+    public void SetLayerFilter(string layerId, JsonValue? filter)
+    {
+        using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));
+        using var nativeFilter = filter is null ? null : NativeJsonValue.From(filter);
+        NativeStatus.Check(NativeMethods.mln_map_set_layer_filter(Pointer, nativeLayerId.Value, nativeFilter?.Pointer));
+    }
+
+    /// <summary>Gets one layer filter snapshot, or null when no filter exists.</summary>
+    public JsonValue? GetLayerFilter(string layerId)
+    {
+        using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));
+        mln_json_snapshot* snapshot = null;
+        NativeStatus.Check(NativeMethods.mln_map_get_layer_filter(Pointer, nativeLayerId.Value, &snapshot));
+        var value = ValueStructs.ReadJsonSnapshot(snapshot);
+        return value is JsonValue.Null ? null : value;
     }
 
     /// <summary>Destroys the map on its owner thread.</summary>
