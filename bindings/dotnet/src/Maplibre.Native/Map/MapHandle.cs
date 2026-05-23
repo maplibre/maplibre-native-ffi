@@ -1,7 +1,9 @@
+using Maplibre.Native.Camera;
 using Maplibre.Native.Internal.C;
 using Maplibre.Native.Internal.Handle;
 using Maplibre.Native.Internal.Memory;
 using Maplibre.Native.Internal.Status;
+using Maplibre.Native.Internal.Struct;
 using Maplibre.Native.Runtime;
 
 namespace Maplibre.Native.Map;
@@ -90,6 +92,51 @@ public sealed unsafe class MapHandle : IDisposable
     public void DumpDebugLogs()
     {
         NativeStatus.Check(NativeMethods.mln_map_dump_debug_logs(Pointer));
+    }
+
+    /// <summary>Gets the map's viewport options.</summary>
+    public ViewportOptions GetViewportOptions()
+    {
+        var options = NativeMethods.mln_map_viewport_options_default();
+        NativeStatus.Check(NativeMethods.mln_map_get_viewport_options(Pointer, &options));
+        return MapStructs.ViewportOptionsFromNative(options);
+    }
+
+    /// <summary>Sets viewport options, applying only non-null descriptor fields.</summary>
+    public void SetViewportOptions(ViewportOptions options)
+    {
+        var nativeOptions = MapStructs.ToNative(options);
+        NativeStatus.Check(NativeMethods.mln_map_set_viewport_options(Pointer, &nativeOptions));
+    }
+
+    /// <summary>Gets tile tuning options.</summary>
+    public TileOptions GetTileOptions()
+    {
+        var options = NativeMethods.mln_map_tile_options_default();
+        NativeStatus.Check(NativeMethods.mln_map_get_tile_options(Pointer, &options));
+        return MapStructs.TileOptionsFromNative(options);
+    }
+
+    /// <summary>Sets tile tuning options, applying only non-null descriptor fields.</summary>
+    public void SetTileOptions(TileOptions options)
+    {
+        var nativeOptions = MapStructs.ToNative(options);
+        NativeStatus.Check(NativeMethods.mln_map_set_tile_options(Pointer, &nativeOptions));
+    }
+
+    /// <summary>Gets the current camera descriptor.</summary>
+    public CameraOptions GetCamera()
+    {
+        var camera = NativeMethods.mln_camera_options_default();
+        NativeStatus.Check(NativeMethods.mln_map_get_camera(Pointer, &camera));
+        return MapStructs.CameraOptionsFromNative(camera);
+    }
+
+    /// <summary>Moves immediately to the camera descriptor, applying only non-null fields.</summary>
+    public void JumpTo(CameraOptions camera)
+    {
+        var nativeCamera = MapStructs.ToNative(camera);
+        NativeStatus.Check(NativeMethods.mln_map_jump_to(Pointer, &nativeCamera));
     }
 
     /// <summary>Loads a style URL through MapLibre Native style APIs.</summary>

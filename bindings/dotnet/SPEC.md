@@ -88,6 +88,7 @@ bindings/dotnet/
     Style/*.cs
   tests/Maplibre.Native.Tests/
     GeneratedLayoutTests.cs
+    MapCameraOptionsTests.cs
     MaplibreTests.cs
     NativeHandleStateTests.cs
     NativeLibraryTestSupport.cs
@@ -114,7 +115,8 @@ The scaffold implements one proof slice:
 - `NativePointer` is a borrowed opaque address value with no memory access in
   the public API.
 - `RuntimeHandle` and `MapHandle` establish the close-once owner-thread handle
-  pattern over generated C declarations.
+  pattern over generated C declarations, including runtime event polling and map
+  camera/viewport/tile/debug option calls.
 - `NativeUtf8String` rejects embedded NUL values and owns temporary UTF-8 C
   string storage for call-boundary inputs.
 - Public value, descriptor, enum, and placeholder handle types exist across the
@@ -124,9 +126,10 @@ The scaffold implements one proof slice:
 - `GeneratedLayoutTests` verifies layout-sensitive binding facts that do not
   require the native library.
 - Native-library tests cover the C ABI version call, projection helper
-  round-tripping, runtime event polling, runtime/map close behavior, map debug
-  option round-tripping, closed-wrapper validation, process-global log callback
-  installation/clearing, and native status diagnostic mapping when run through
+  round-tripping, runtime event polling, map camera/viewport/tile option
+  round-tripping, runtime/map close behavior, map debug option round-tripping,
+  closed-wrapper validation, process-global log callback installation/clearing,
+  and native status diagnostic mapping when run through
   `mise run //bindings/dotnet:test`.
 - `PublicApiSurfaceTests` keeps representative public concept types present as
   the binding surface expands.
