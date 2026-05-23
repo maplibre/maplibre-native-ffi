@@ -1,4 +1,3 @@
-import MaplibreNativeSupport
 
 public enum Maplibre {
   public static func cVersion() -> UInt32 {

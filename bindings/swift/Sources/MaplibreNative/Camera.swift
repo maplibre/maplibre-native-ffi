@@ -1,4 +1,3 @@
-import MaplibreNativeSupport
 
 public struct CameraOptions: Equatable, Sendable {
   public var center: LatLng?

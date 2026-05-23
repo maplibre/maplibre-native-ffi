@@ -1,5 +1,4 @@
 import Foundation
-import MaplibreNativeSupport
 
 public enum AmbientCacheOperation: UInt32, Sendable, Hashable {
   case resetDatabase = 1

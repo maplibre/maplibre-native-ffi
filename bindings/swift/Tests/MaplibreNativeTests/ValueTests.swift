@@ -2,7 +2,6 @@ import CMaplibreNativeC
 import Testing
 
 @testable import MaplibreNative
-@testable import MaplibreNativeSupport
 
 @Test func jsonValueMaterializesNestedObjectDescriptors() throws {
   let arena = NativeJSONArena()

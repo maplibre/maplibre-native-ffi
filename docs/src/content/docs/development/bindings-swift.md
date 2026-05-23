@@ -13,13 +13,13 @@ Resources:
 ## Architecture
 
 The Swift binding uses Swift's C importer over the public C headers. Keep the
-importer private and expose one low-level Swift package product. The binding
-adapts ownership, diagnostics, callbacks, copied values, and render targets;
-adapters own scheduling, SDK, rendering, and app policy. Use a private C target
-for the imported header, an internal Swift support target for status conversion,
-diagnostics, descriptor materializers, handle state, callbacks, and copied
-results, and a public Swift target for handles, descriptors, events, errors, and
-backend interop values.
+importer as an implementation dependency and expose one low-level Swift package
+product. The binding adapts ownership, diagnostics, callbacks, copied values,
+and render targets; adapters own scheduling, SDK, rendering, and app policy. Use
+one public Swift target for handles, descriptors, events, errors, and backend
+interop values, with status conversion, diagnostics, descriptor materializers,
+handle state, callbacks, and copied-result helpers kept as internal
+implementation files in that target.
 
 Do not export C importer symbols. Raw pointers, imported C structs, field masks,
 function pointers, and `@convention(c)` trampolines stay internal. Public

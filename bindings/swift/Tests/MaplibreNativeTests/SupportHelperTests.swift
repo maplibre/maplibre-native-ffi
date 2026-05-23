@@ -2,7 +2,8 @@ import CMaplibreNativeC
 import Foundation
 import Testing
 
-@testable import MaplibreNativeSupport
+@testable import MaplibreNative
+
 
 private final class LockedBox<Value>: @unchecked Sendable {
   private let lock = NSLock()

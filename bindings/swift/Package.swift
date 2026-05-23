@@ -17,12 +17,8 @@ let package = Package(
       name: "CMaplibreNativeC"
     ),
     .target(
-      name: "MaplibreNativeSupport",
-      dependencies: ["CMaplibreNativeC"]
-    ),
-    .target(
       name: "MaplibreNative",
-      dependencies: ["MaplibreNativeSupport"],
+      dependencies: ["CMaplibreNativeC"],
       linkerSettings: [
         .unsafeFlags([
           "-L\(nativeBuildDir)",
@@ -36,7 +32,7 @@ let package = Package(
     ),
     .testTarget(
       name: "MaplibreNativeTests",
-      dependencies: ["MaplibreNative", "MaplibreNativeSupport"]
+      dependencies: ["MaplibreNative", "CMaplibreNativeC"]
     ),
   ]
 )

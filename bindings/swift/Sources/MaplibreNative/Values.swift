@@ -1,5 +1,4 @@
 import Foundation
-import MaplibreNativeSupport
 
 public enum JSONValue: Equatable, Sendable {
   case null

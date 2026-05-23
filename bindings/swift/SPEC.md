@@ -40,8 +40,8 @@ callbacks, copied values, and native backend handles. Higher-level SwiftUI,
 UIKit, AppKit, async, actor, and view-lifecycle adapters belong above this
 package.
 
-The public Swift module is `MaplibreNative`. The private C importer module is
-`CMaplibreNativeC`. The internal support module is `MaplibreNativeSupport`. Only
+The public Swift module is `MaplibreNative`. The C importer target is
+`CMaplibreNativeC` and is used only as an implementation dependency. Only
 `MaplibreNative` is a package product.
 
 ## Current implementation
@@ -53,24 +53,6 @@ bindings/swift/
   mise.toml
   Sources/CMaplibreNativeC/
     module.modulemap
-  Sources/MaplibreNativeSupport/
-    CAPI.swift
-    LoggingCallbacks.swift
-    MapStructs.swift
-    NativeDescriptor.swift
-    NativeHandleLeakReporter.swift
-    NativeHandleState.swift
-    NativeMemory.swift
-    NativeResultGuard.swift
-    NativeStatus.swift
-    NativeString.swift
-    OfflineStructs.swift
-    QueryStructs.swift
-    RenderStructs.swift
-    ResourceCallbacks.swift
-    RuntimeStructs.swift
-    StyleStructs.swift
-    ValueStructs.swift
   Sources/MaplibreNative/
     Camera.swift
     CameraAdvanced.swift
@@ -91,6 +73,24 @@ bindings/swift/
     Runtime.swift
     Style.swift
     Values.swift
+    Support/
+      CAPI.swift
+      LoggingCallbacks.swift
+      MapStructs.swift
+      NativeDescriptor.swift
+      NativeHandleLeakReporter.swift
+      NativeHandleState.swift
+      NativeMemory.swift
+      NativeResultGuard.swift
+      NativeStatus.swift
+      NativeString.swift
+      OfflineStructs.swift
+      QueryStructs.swift
+      RenderStructs.swift
+      ResourceCallbacks.swift
+      RuntimeStructs.swift
+      StyleStructs.swift
+      ValueStructs.swift
   Tests/MaplibreNativeTests/
     CameraAdvancedTests.swift
     LoggingTests.swift
@@ -107,17 +107,17 @@ bindings/swift/
 ```
 
 The implementation covers the full C API map below. The public module exposes
-Swift descriptors, copied value types, handle classes, and callback closures;
-raw imported C symbols stay inside `MaplibreNativeSupport`.
+Swift descriptors, copied value types, handle classes, and callback closures.
+Raw imported C symbols stay in internal implementation files under
+`Sources/MaplibreNative/Support` and do not appear in public signatures.
 
 ## Build artifacts and tasks
 
-| Artifact          | Path                            | Contents                                                                         |
-| ----------------- | ------------------------------- | -------------------------------------------------------------------------------- |
-| Swift package     | `bindings/swift`                | Public Swift binding, private C importer, internal support, tests.               |
-| C importer module | `Sources/CMaplibreNativeC`      | SwiftPM system library target that imports `include/maplibre_native_c.h`.        |
-| Support module    | `Sources/MaplibreNativeSupport` | C calls, status capture, handle state, descriptor materializers, callback boxes. |
-| Public module     | `Sources/MaplibreNative`        | Handles, values, descriptors, errors, callbacks, and backend interop values.     |
+| Artifact          | Path                       | Contents                                                                    |
+| ----------------- | -------------------------- | --------------------------------------------------------------------------- |
+| Swift package     | `bindings/swift`           | Public Swift binding, C importer implementation dependency, and tests.      |
+| C importer target | `Sources/CMaplibreNativeC` | SwiftPM system library target that imports `include/maplibre_native_c.h`.   |
+| Public module     | `Sources/MaplibreNative`   | Public API plus internal C boundary, materializers, callbacks, and helpers. |
 
 Implemented tasks:
 
@@ -137,24 +137,11 @@ that directory as an rpath for local tests and examples.
 ### `CMaplibreNativeC`
 
 The C target imports the public umbrella header through SwiftPM's system library
-mechanism. It has no public package product. Code outside
-`MaplibreNativeSupport` does not import it.
-
-### `MaplibreNativeSupport`
-
-The support module owns raw C interaction:
-
-- direct calls to imported `mln_*` functions;
-- immediate thread-local diagnostic capture after non-OK statuses;
-- conversion from imported C enums and structs into Swift-friendly raw values;
-- native handle state and close-once helpers;
-- descriptor materializers and copied-result readers;
-- `@convention(c)` callback trampolines and retained Swift callback boxes.
-
-Support declarations use the narrowest access that Swift module boundaries
-allow. Symbols consumed by `MaplibreNative` may be `public`, but the package
-does not vend this module as a product. Types from this module do not appear in
-public `MaplibreNative` signatures.
+mechanism. It has no public package product. `MaplibreNative` imports it from
+internal implementation files, using Swift access control to keep C symbols out
+of public API signatures. SwiftPM source-package consumers may still resolve the
+C target by name through the dependency graph; renaming or hiding it more
+aggressively is deferred to packaging work.
 
 ### `MaplibreNative`
 
@@ -167,7 +154,9 @@ The public module owns Swift API policy:
 - `OptionSet`, enum, and unknown-value mappings;
 - `NativePointer` as a borrowed opaque address value;
 - callback protocols, closures, and resource request handle APIs;
-- non-`Sendable` owner-thread handle classes and `Sendable` copied values.
+- non-`Sendable` owner-thread handle classes and `Sendable` copied values;
+- internal C calls, status capture, descriptor materializers, callback boxes,
+  and copied-result readers.
 
 ## Swift public API inventory
 
@@ -212,7 +201,9 @@ the split improves locality, but module-level concepts stay stable.
 
 ## Internal implementation inventory
 
-`Sources/MaplibreNativeSupport` contains the raw C boundary:
+`Sources/MaplibreNative/Support` contains the raw C boundary inside the
+`MaplibreNative` target. These files use internal declarations so the public API
+remains the Swift facade:
 
 | File                             | Contents                                                                                      |
 | -------------------------------- | --------------------------------------------------------------------------------------------- |
@@ -237,7 +228,7 @@ the split improves locality, but module-level concepts stay stable.
 ## C API coverage map
 
 Every public C function listed here has a Swift implementation in
-`MaplibreNative` or an internal support implementation used by public Swift
+`MaplibreNative` or internal support implementation files used by public Swift
 APIs. No coverage item currently needs an unsupported-reason entry. Reviewers
 compare this list with `include/maplibre_native_c/*.h` during coverage reviews.
 

@@ -1,11 +1,11 @@
 import Foundation
 
-public final class NativeHandleState: @unchecked Sendable {
+final class NativeHandleState: @unchecked Sendable {
   private let typeName: String
   private let lock = NSLock()
   private var pointer: OpaquePointer?
 
-  public init(typeName: String, pointer: OpaquePointer?) throws {
+  init(typeName: String, pointer: OpaquePointer?) throws {
     guard let pointer else {
       throw NativeStatusFailure(rawStatus: 0, diagnostic: "\(typeName) native handle is null")
     }
@@ -21,11 +21,11 @@ public final class NativeHandleState: @unchecked Sendable {
     }
   }
 
-  public var isClosed: Bool {
+  var isClosed: Bool {
     lock.withLock { pointer == nil }
   }
 
-  public func requireLive() throws -> OpaquePointer {
+  func requireLive() throws -> OpaquePointer {
     try lock.withLock {
       guard let pointer else {
         throw NativeStatusFailure(rawStatus: 0, diagnostic: "\(typeName) is closed")
@@ -34,7 +34,7 @@ public final class NativeHandleState: @unchecked Sendable {
     }
   }
 
-  public func closeOnce(_ destroy: (OpaquePointer) throws -> Void) throws {
+  func closeOnce(_ destroy: (OpaquePointer) throws -> Void) throws {
     let livePointer = lock.withLock {
       guard let pointer else { return nil as OpaquePointer? }
       return pointer

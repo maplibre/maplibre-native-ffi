@@ -3,7 +3,6 @@ import Foundation
 import Testing
 
 @testable import MaplibreNative
-@testable import MaplibreNativeSupport
 
 @Test func offlineRegionDefinitionsMaterializeTileAndGeometryDescriptors() throws {
   let tileDefinition = OfflineRegionDefinition.tilePyramid(

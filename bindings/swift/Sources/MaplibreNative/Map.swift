@@ -1,4 +1,3 @@
-import MaplibreNativeSupport
 
 public enum MapMode: UInt32, Sendable, Hashable {
   case continuous = 0

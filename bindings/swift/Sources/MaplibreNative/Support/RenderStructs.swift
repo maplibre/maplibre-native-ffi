@@ -1,11 +1,11 @@
-import CMaplibreNativeC
+internal import CMaplibreNativeC
 
-public struct NativeRenderTargetExtent: Equatable, Sendable {
-  public let width: UInt32
-  public let height: UInt32
-  public let scaleFactor: Double
+struct NativeRenderTargetExtent: Equatable, Sendable {
+  let width: UInt32
+  let height: UInt32
+  let scaleFactor: Double
 
-  public init(width: UInt32, height: UInt32, scaleFactor: Double) {
+  init(width: UInt32, height: UInt32, scaleFactor: Double) {
     self.width = width
     self.height = height
     self.scaleFactor = scaleFactor
@@ -21,10 +21,10 @@ public struct NativeRenderTargetExtent: Equatable, Sendable {
   }
 }
 
-public struct NativeMetalContextDescriptor: Equatable, Sendable {
-  public let deviceAddress: UInt
+struct NativeMetalContextDescriptor: Equatable, Sendable {
+  let deviceAddress: UInt
 
-  public init(deviceAddress: UInt = 0) {
+  init(deviceAddress: UInt = 0) {
     self.deviceAddress = deviceAddress
   }
 
@@ -36,14 +36,14 @@ public struct NativeMetalContextDescriptor: Equatable, Sendable {
   }
 }
 
-public struct NativeVulkanContextDescriptor: Equatable, Sendable {
-  public let instanceAddress: UInt
-  public let physicalDeviceAddress: UInt
-  public let deviceAddress: UInt
-  public let graphicsQueueAddress: UInt
-  public let graphicsQueueFamilyIndex: UInt32
+struct NativeVulkanContextDescriptor: Equatable, Sendable {
+  let instanceAddress: UInt
+  let physicalDeviceAddress: UInt
+  let deviceAddress: UInt
+  let graphicsQueueAddress: UInt
+  let graphicsQueueFamilyIndex: UInt32
 
-  public init(
+  init(
     instanceAddress: UInt,
     physicalDeviceAddress: UInt,
     deviceAddress: UInt,
@@ -69,18 +69,18 @@ public struct NativeVulkanContextDescriptor: Equatable, Sendable {
   }
 }
 
-public struct NativeMetalSurfaceDescriptorInput: Equatable, Sendable {
-  public let extent: NativeRenderTargetExtent
-  public let context: NativeMetalContextDescriptor
-  public let layerAddress: UInt
+struct NativeMetalSurfaceDescriptorInput: Equatable, Sendable {
+  let extent: NativeRenderTargetExtent
+  let context: NativeMetalContextDescriptor
+  let layerAddress: UInt
 
-  public init(extent: NativeRenderTargetExtent, context: NativeMetalContextDescriptor, layerAddress: UInt) {
+  init(extent: NativeRenderTargetExtent, context: NativeMetalContextDescriptor, layerAddress: UInt) {
     self.extent = extent
     self.context = context
     self.layerAddress = layerAddress
   }
 
-  public func withNativeDescriptor<Result>(
+  func withNativeDescriptor<Result>(
     _ body: (UnsafePointer<mln_metal_surface_descriptor>) throws -> Result
   ) throws -> Result {
     var descriptor = CAPI.metalSurfaceDescriptorDefault()
@@ -91,18 +91,18 @@ public struct NativeMetalSurfaceDescriptorInput: Equatable, Sendable {
   }
 }
 
-public struct NativeVulkanSurfaceDescriptorInput: Equatable, Sendable {
-  public let extent: NativeRenderTargetExtent
-  public let context: NativeVulkanContextDescriptor
-  public let surfaceAddress: UInt
+struct NativeVulkanSurfaceDescriptorInput: Equatable, Sendable {
+  let extent: NativeRenderTargetExtent
+  let context: NativeVulkanContextDescriptor
+  let surfaceAddress: UInt
 
-  public init(extent: NativeRenderTargetExtent, context: NativeVulkanContextDescriptor, surfaceAddress: UInt) {
+  init(extent: NativeRenderTargetExtent, context: NativeVulkanContextDescriptor, surfaceAddress: UInt) {
     self.extent = extent
     self.context = context
     self.surfaceAddress = surfaceAddress
   }
 
-  public func withNativeDescriptor<Result>(
+  func withNativeDescriptor<Result>(
     _ body: (UnsafePointer<mln_vulkan_surface_descriptor>) throws -> Result
   ) throws -> Result {
     var descriptor = CAPI.vulkanSurfaceDescriptorDefault()
@@ -113,13 +113,13 @@ public struct NativeVulkanSurfaceDescriptorInput: Equatable, Sendable {
   }
 }
 
-public struct NativeTextureImageInfo: Equatable, Sendable {
-  public let width: UInt32
-  public let height: UInt32
-  public let stride: UInt32
-  public let byteLength: Int
+struct NativeTextureImageInfo: Equatable, Sendable {
+  let width: UInt32
+  let height: UInt32
+  let stride: UInt32
+  let byteLength: Int
 
-  public init(_ raw: mln_texture_image_info) {
+  init(_ raw: mln_texture_image_info) {
     width = raw.width
     height = raw.height
     stride = raw.stride
@@ -127,16 +127,16 @@ public struct NativeTextureImageInfo: Equatable, Sendable {
   }
 }
 
-public struct NativeMetalOwnedTextureDescriptorInput: Equatable, Sendable {
-  public let extent: NativeRenderTargetExtent
-  public let context: NativeMetalContextDescriptor
+struct NativeMetalOwnedTextureDescriptorInput: Equatable, Sendable {
+  let extent: NativeRenderTargetExtent
+  let context: NativeMetalContextDescriptor
 
-  public init(extent: NativeRenderTargetExtent, context: NativeMetalContextDescriptor) {
+  init(extent: NativeRenderTargetExtent, context: NativeMetalContextDescriptor) {
     self.extent = extent
     self.context = context
   }
 
-  public func withNativeDescriptor<Result>(
+  func withNativeDescriptor<Result>(
     _ body: (UnsafePointer<mln_metal_owned_texture_descriptor>) throws -> Result
   ) throws -> Result {
     var descriptor = CAPI.metalOwnedTextureDescriptorDefault()
@@ -146,16 +146,16 @@ public struct NativeMetalOwnedTextureDescriptorInput: Equatable, Sendable {
   }
 }
 
-public struct NativeMetalBorrowedTextureDescriptorInput: Equatable, Sendable {
-  public let extent: NativeRenderTargetExtent
-  public let textureAddress: UInt
+struct NativeMetalBorrowedTextureDescriptorInput: Equatable, Sendable {
+  let extent: NativeRenderTargetExtent
+  let textureAddress: UInt
 
-  public init(extent: NativeRenderTargetExtent, textureAddress: UInt) {
+  init(extent: NativeRenderTargetExtent, textureAddress: UInt) {
     self.extent = extent
     self.textureAddress = textureAddress
   }
 
-  public func withNativeDescriptor<Result>(
+  func withNativeDescriptor<Result>(
     _ body: (UnsafePointer<mln_metal_borrowed_texture_descriptor>) throws -> Result
   ) throws -> Result {
     var descriptor = CAPI.metalBorrowedTextureDescriptorDefault()
@@ -165,16 +165,16 @@ public struct NativeMetalBorrowedTextureDescriptorInput: Equatable, Sendable {
   }
 }
 
-public struct NativeVulkanOwnedTextureDescriptorInput: Equatable, Sendable {
-  public let extent: NativeRenderTargetExtent
-  public let context: NativeVulkanContextDescriptor
+struct NativeVulkanOwnedTextureDescriptorInput: Equatable, Sendable {
+  let extent: NativeRenderTargetExtent
+  let context: NativeVulkanContextDescriptor
 
-  public init(extent: NativeRenderTargetExtent, context: NativeVulkanContextDescriptor) {
+  init(extent: NativeRenderTargetExtent, context: NativeVulkanContextDescriptor) {
     self.extent = extent
     self.context = context
   }
 
-  public func withNativeDescriptor<Result>(
+  func withNativeDescriptor<Result>(
     _ body: (UnsafePointer<mln_vulkan_owned_texture_descriptor>) throws -> Result
   ) throws -> Result {
     var descriptor = CAPI.vulkanOwnedTextureDescriptorDefault()
@@ -184,16 +184,16 @@ public struct NativeVulkanOwnedTextureDescriptorInput: Equatable, Sendable {
   }
 }
 
-public struct NativeVulkanBorrowedTextureDescriptorInput: Equatable, Sendable {
-  public let extent: NativeRenderTargetExtent
-  public let context: NativeVulkanContextDescriptor
-  public let imageAddress: UInt
-  public let imageViewAddress: UInt
-  public let format: UInt32
-  public let initialLayout: UInt32
-  public let finalLayout: UInt32
+struct NativeVulkanBorrowedTextureDescriptorInput: Equatable, Sendable {
+  let extent: NativeRenderTargetExtent
+  let context: NativeVulkanContextDescriptor
+  let imageAddress: UInt
+  let imageViewAddress: UInt
+  let format: UInt32
+  let initialLayout: UInt32
+  let finalLayout: UInt32
 
-  public init(
+  init(
     extent: NativeRenderTargetExtent,
     context: NativeVulkanContextDescriptor,
     imageAddress: UInt,
@@ -211,7 +211,7 @@ public struct NativeVulkanBorrowedTextureDescriptorInput: Equatable, Sendable {
     self.finalLayout = finalLayout
   }
 
-  public func withNativeDescriptor<Result>(
+  func withNativeDescriptor<Result>(
     _ body: (UnsafePointer<mln_vulkan_borrowed_texture_descriptor>) throws -> Result
   ) throws -> Result {
     var descriptor = CAPI.vulkanBorrowedTextureDescriptorDefault()
@@ -226,18 +226,18 @@ public struct NativeVulkanBorrowedTextureDescriptorInput: Equatable, Sendable {
   }
 }
 
-public struct NativeMetalOwnedTextureFrame {
-  public var raw: mln_metal_owned_texture_frame
+struct NativeMetalOwnedTextureFrame {
+  var raw: mln_metal_owned_texture_frame
 
-  public init(_ raw: mln_metal_owned_texture_frame) {
+  init(_ raw: mln_metal_owned_texture_frame) {
     self.raw = raw
   }
 }
 
-public struct NativeVulkanOwnedTextureFrame {
-  public var raw: mln_vulkan_owned_texture_frame
+struct NativeVulkanOwnedTextureFrame {
+  var raw: mln_vulkan_owned_texture_frame
 
-  public init(_ raw: mln_vulkan_owned_texture_frame) {
+  init(_ raw: mln_vulkan_owned_texture_frame) {
     self.raw = raw
   }
 }

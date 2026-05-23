@@ -1,4 +1,3 @@
-import MaplibreNativeSupport
 
 public struct ProjectedMeters: Equatable, Sendable {
   public let northing: Double

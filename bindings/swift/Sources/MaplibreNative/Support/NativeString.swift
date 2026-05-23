@@ -1,19 +1,19 @@
-import CMaplibreNativeC
+internal import CMaplibreNativeC
 
-public struct NativeStringError: Error, Equatable, Sendable {
-  public let message: String
+struct NativeStringError: Error, Equatable, Sendable {
+  let message: String
 
-  public init(_ message: String) {
+  init(_ message: String) {
     self.message = message
   }
 }
 
-public enum NativeString {
-  public static func copyUTF8(data: UnsafePointer<CChar>?, size: UInt) throws -> String {
+enum NativeString {
+  static func copyUTF8(data: UnsafePointer<CChar>?, size: UInt) throws -> String {
     try copyUTF8(data: data, size: Int(size))
   }
 
-  public static func copyUTF8(data: UnsafePointer<CChar>?, size: Int) throws -> String {
+  static func copyUTF8(data: UnsafePointer<CChar>?, size: Int) throws -> String {
     guard size > 0 else { return "" }
     guard let data else {
       throw NativeStringError("UTF-8 string view has nil data with non-zero size")
@@ -25,11 +25,11 @@ public enum NativeString {
     return String(decoding: bytes, as: UTF8.self)
   }
 
-  public static func copyCString(_ data: UnsafePointer<CChar>?) -> String {
+  static func copyCString(_ data: UnsafePointer<CChar>?) -> String {
     data.map { String(cString: $0) } ?? ""
   }
 
-  public static func withOptionalCString<Result>(
+  static func withOptionalCString<Result>(
     _ text: String?,
     _ body: (UnsafePointer<CChar>?) throws -> Result
   ) throws -> Result {
@@ -39,7 +39,7 @@ public enum NativeString {
     return try withCString(text, body)
   }
 
-  public static func withCString<Result>(
+  static func withCString<Result>(
     _ text: String,
     _ body: (UnsafePointer<CChar>) throws -> Result
   ) throws -> Result {
@@ -49,7 +49,7 @@ public enum NativeString {
     return try text.withCString(body)
   }
 
-  public static func withStringView<Result>(
+  static func withStringView<Result>(
     _ text: String,
     _ body: (mln_string_view) throws -> Result
   ) throws -> Result {

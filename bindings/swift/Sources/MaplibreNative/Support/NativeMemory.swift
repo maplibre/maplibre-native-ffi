@@ -1,5 +1,5 @@
-public enum NativeMemory {
-  public static func withTemporary<Value, Result>(
+enum NativeMemory {
+  static func withTemporary<Value, Result>(
     _ initialValue: Value,
     _ body: (UnsafeMutablePointer<Value>) throws -> Result
   ) throws -> (value: Value, result: Result) {
@@ -8,7 +8,7 @@ public enum NativeMemory {
     return (value, result)
   }
 
-  public static func withTemporaryArray<Element, Result>(
+  static func withTemporaryArray<Element, Result>(
     _ values: [Element],
     _ body: (UnsafePointer<Element>?, Int) throws -> Result
   ) throws -> Result {
@@ -17,7 +17,7 @@ public enum NativeMemory {
     }
   }
 
-  public static func withTemporaryMutableBytes<Result>(
+  static func withTemporaryMutableBytes<Result>(
     _ bytes: inout [UInt8],
     _ body: (UnsafeMutablePointer<UInt8>?, Int) throws -> Result
   ) throws -> Result {

@@ -2,7 +2,6 @@ import CMaplibreNativeC
 import Testing
 
 @testable import MaplibreNative
-@testable import MaplibreNativeSupport
 
 @Test func advancedCameraDescriptorsMaterializeFieldMasks() throws {
   try CameraFitOptions(padding: EdgeInsets(top: 1, left: 2, bottom: 3, right: 4), bearing: 5, pitch: 6)

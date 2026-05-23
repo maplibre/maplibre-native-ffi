@@ -1,17 +1,17 @@
-import CMaplibreNativeC
+internal import CMaplibreNativeC
 
-public struct NativeRuntimeOptionsInput: Sendable, Equatable {
-  public var assetPath: String?
-  public var cachePath: String?
-  public var maximumCacheSize: UInt64?
+struct NativeRuntimeOptionsInput: Sendable, Equatable {
+  var assetPath: String?
+  var cachePath: String?
+  var maximumCacheSize: UInt64?
 
-  public init(assetPath: String? = nil, cachePath: String? = nil, maximumCacheSize: UInt64? = nil) {
+  init(assetPath: String? = nil, cachePath: String? = nil, maximumCacheSize: UInt64? = nil) {
     self.assetPath = assetPath
     self.cachePath = cachePath
     self.maximumCacheSize = maximumCacheSize
   }
 
-  public func withNativeOptions<Result>(
+  func withNativeOptions<Result>(
     _ body: (UnsafePointer<mln_runtime_options>) throws -> Result
   ) throws -> Result {
     try NativeString.withOptionalCString(assetPath) { assetPath in
@@ -29,14 +29,14 @@ public struct NativeRuntimeOptionsInput: Sendable, Equatable {
   }
 }
 
-public struct NativeRenderingStats: Equatable, Sendable {
-  public let encodingTime: Double
-  public let renderingTime: Double
-  public let frameCount: Int64
-  public let drawCallCount: Int64
-  public let totalDrawCallCount: Int64
+struct NativeRenderingStats: Equatable, Sendable {
+  let encodingTime: Double
+  let renderingTime: Double
+  let frameCount: Int64
+  let drawCallCount: Int64
+  let totalDrawCallCount: Int64
 
-  public init(_ raw: mln_rendering_stats) {
+  init(_ raw: mln_rendering_stats) {
     encodingTime = raw.encoding_time
     renderingTime = raw.rendering_time
     frameCount = raw.frame_count
@@ -45,13 +45,13 @@ public struct NativeRenderingStats: Equatable, Sendable {
   }
 }
 
-public struct NativeRenderFrameEvent: Equatable, Sendable {
-  public let mode: UInt32
-  public let needsRepaint: Bool
-  public let placementChanged: Bool
-  public let stats: NativeRenderingStats
+struct NativeRenderFrameEvent: Equatable, Sendable {
+  let mode: UInt32
+  let needsRepaint: Bool
+  let placementChanged: Bool
+  let stats: NativeRenderingStats
 
-  public init(_ raw: mln_runtime_event_render_frame) {
+  init(_ raw: mln_runtime_event_render_frame) {
     mode = raw.mode
     needsRepaint = raw.needs_repaint
     placementChanged = raw.placement_changed
@@ -59,22 +59,22 @@ public struct NativeRenderFrameEvent: Equatable, Sendable {
   }
 }
 
-public struct NativeRenderMapEvent: Equatable, Sendable {
-  public let mode: UInt32
+struct NativeRenderMapEvent: Equatable, Sendable {
+  let mode: UInt32
 
-  public init(_ raw: mln_runtime_event_render_map) {
+  init(_ raw: mln_runtime_event_render_map) {
     mode = raw.mode
   }
 }
 
-public struct NativeTileId: Equatable, Sendable {
-  public let overscaledZ: UInt32
-  public let wrap: Int32
-  public let canonicalZ: UInt32
-  public let canonicalX: UInt32
-  public let canonicalY: UInt32
+struct NativeTileId: Equatable, Sendable {
+  let overscaledZ: UInt32
+  let wrap: Int32
+  let canonicalZ: UInt32
+  let canonicalX: UInt32
+  let canonicalY: UInt32
 
-  public init(_ raw: mln_tile_id) {
+  init(_ raw: mln_tile_id) {
     overscaledZ = raw.overscaled_z
     wrap = raw.wrap
     canonicalZ = raw.canonical_z
@@ -83,30 +83,30 @@ public struct NativeTileId: Equatable, Sendable {
   }
 }
 
-public struct NativeTileActionEvent: Equatable, Sendable {
-  public let operation: UInt32
-  public let tileId: NativeTileId
-  public let sourceId: String
+struct NativeTileActionEvent: Equatable, Sendable {
+  let operation: UInt32
+  let tileId: NativeTileId
+  let sourceId: String
 
-  public init(_ raw: mln_runtime_event_tile_action) throws {
+  init(_ raw: mln_runtime_event_tile_action) throws {
     operation = raw.operation
     tileId = NativeTileId(raw.tile_id)
     sourceId = try NativeString.copyUTF8(data: raw.source_id, size: raw.source_id_size)
   }
 }
 
-public struct NativeOfflineRegionStatus: Equatable, Sendable {
-  public let downloadState: UInt32
-  public let completedResourceCount: UInt64
-  public let completedResourceSize: UInt64
-  public let completedTileCount: UInt64
-  public let requiredTileCount: UInt64
-  public let completedTileSize: UInt64
-  public let requiredResourceCount: UInt64
-  public let requiredResourceCountIsPrecise: Bool
-  public let complete: Bool
+struct NativeOfflineRegionStatus: Equatable, Sendable {
+  let downloadState: UInt32
+  let completedResourceCount: UInt64
+  let completedResourceSize: UInt64
+  let completedTileCount: UInt64
+  let requiredTileCount: UInt64
+  let completedTileSize: UInt64
+  let requiredResourceCount: UInt64
+  let requiredResourceCountIsPrecise: Bool
+  let complete: Bool
 
-  public init(_ raw: mln_offline_region_status) {
+  init(_ raw: mln_offline_region_status) {
     downloadState = raw.download_state
     completedResourceCount = raw.completed_resource_count
     completedResourceSize = raw.completed_resource_size
@@ -119,44 +119,44 @@ public struct NativeOfflineRegionStatus: Equatable, Sendable {
   }
 }
 
-public struct NativeOfflineRegionStatusEvent: Equatable, Sendable {
-  public let regionId: Int64
-  public let status: NativeOfflineRegionStatus
+struct NativeOfflineRegionStatusEvent: Equatable, Sendable {
+  let regionId: Int64
+  let status: NativeOfflineRegionStatus
 
-  public init(_ raw: mln_runtime_event_offline_region_status) {
+  init(_ raw: mln_runtime_event_offline_region_status) {
     regionId = raw.region_id
     status = NativeOfflineRegionStatus(raw.status)
   }
 }
 
-public struct NativeOfflineRegionResponseErrorEvent: Equatable, Sendable {
-  public let regionId: Int64
-  public let reason: UInt32
+struct NativeOfflineRegionResponseErrorEvent: Equatable, Sendable {
+  let regionId: Int64
+  let reason: UInt32
 
-  public init(_ raw: mln_runtime_event_offline_region_response_error) {
+  init(_ raw: mln_runtime_event_offline_region_response_error) {
     regionId = raw.region_id
     reason = raw.reason
   }
 }
 
-public struct NativeOfflineRegionTileCountLimitEvent: Equatable, Sendable {
-  public let regionId: Int64
-  public let limit: UInt64
+struct NativeOfflineRegionTileCountLimitEvent: Equatable, Sendable {
+  let regionId: Int64
+  let limit: UInt64
 
-  public init(_ raw: mln_runtime_event_offline_region_tile_count_limit) {
+  init(_ raw: mln_runtime_event_offline_region_tile_count_limit) {
     regionId = raw.region_id
     limit = raw.limit
   }
 }
 
-public struct NativeOfflineOperationCompletedEvent: Equatable, Sendable {
-  public let operationId: UInt64
-  public let operationKind: UInt32
-  public let resultKind: UInt32
-  public let resultStatus: Int32
-  public let found: Bool
+struct NativeOfflineOperationCompletedEvent: Equatable, Sendable {
+  let operationId: UInt64
+  let operationKind: UInt32
+  let resultKind: UInt32
+  let resultStatus: Int32
+  let found: Bool
 
-  public init(_ raw: mln_runtime_event_offline_operation_completed) {
+  init(_ raw: mln_runtime_event_offline_operation_completed) {
     operationId = raw.operation_id
     operationKind = raw.operation_kind
     resultKind = raw.result_kind
@@ -165,7 +165,7 @@ public struct NativeOfflineOperationCompletedEvent: Equatable, Sendable {
   }
 }
 
-public enum NativeRuntimeEventPayload: Equatable, Sendable {
+enum NativeRuntimeEventPayload: Equatable, Sendable {
   case none
   case renderFrame(NativeRenderFrameEvent)
   case renderMap(NativeRenderMapEvent)
@@ -178,15 +178,15 @@ public enum NativeRuntimeEventPayload: Equatable, Sendable {
   case unknown(type: UInt32, byteCount: Int)
 }
 
-public struct NativeRuntimeEvent: Equatable, Sendable {
-  public let type: UInt32
-  public let sourceType: UInt32
-  public let sourceAddress: UInt
-  public let code: Int32
-  public let message: String
-  public let payload: NativeRuntimeEventPayload
+struct NativeRuntimeEvent: Equatable, Sendable {
+  let type: UInt32
+  let sourceType: UInt32
+  let sourceAddress: UInt
+  let code: Int32
+  let message: String
+  let payload: NativeRuntimeEventPayload
 
-  public init(_ raw: mln_runtime_event) throws {
+  init(_ raw: mln_runtime_event) throws {
     type = raw.type
     sourceType = raw.source_type
     sourceAddress = UInt(bitPattern: raw.source)

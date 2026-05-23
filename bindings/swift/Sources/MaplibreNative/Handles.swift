@@ -1,4 +1,3 @@
-import MaplibreNativeSupport
 
 class NativeHandleBox {
   private let state: NativeHandleState

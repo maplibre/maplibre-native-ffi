@@ -1,4 +1,3 @@
-import MaplibreNativeSupport
 
 public struct LatLng: Equatable, Sendable {
   public var latitude: Double

@@ -3,7 +3,6 @@ import Foundation
 import Testing
 
 @testable import MaplibreNative
-@testable import MaplibreNativeSupport
 
 private final class ResourceCounters: @unchecked Sendable {
   private let lock = NSLock()

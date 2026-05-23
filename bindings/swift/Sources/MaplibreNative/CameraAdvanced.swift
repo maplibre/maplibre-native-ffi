@@ -1,4 +1,3 @@
-import MaplibreNativeSupport
 
 public struct CameraFitOptions: Equatable, Sendable {
   public var padding: EdgeInsets?

@@ -1,35 +1,35 @@
-import CMaplibreNativeC
+internal import CMaplibreNativeC
 
-public struct NativeLatLngBounds: Equatable, Sendable {
-  public let southwest: NativeLatLng
-  public let northeast: NativeLatLng
+struct NativeLatLngBounds: Equatable, Sendable {
+  let southwest: NativeLatLng
+  let northeast: NativeLatLng
 
-  public init(southwest: NativeLatLng, northeast: NativeLatLng) {
+  init(southwest: NativeLatLng, northeast: NativeLatLng) {
     self.southwest = southwest
     self.northeast = northeast
   }
 
-  public init(_ raw: mln_lat_lng_bounds) {
+  init(_ raw: mln_lat_lng_bounds) {
     southwest = NativeLatLng(raw.southwest)
     northeast = NativeLatLng(raw.northeast)
   }
 
-  public var native: mln_lat_lng_bounds {
+  var native: mln_lat_lng_bounds {
     mln_lat_lng_bounds(southwest: southwest.native, northeast: northeast.native)
   }
 }
 
-public struct NativeStyleTileSourceOptions: Equatable, Sendable {
-  public var minZoom: Double?
-  public var maxZoom: Double?
-  public var attribution: String?
-  public var scheme: UInt32?
-  public var bounds: NativeLatLngBounds?
-  public var tileSize: UInt32?
-  public var vectorEncoding: UInt32?
-  public var rasterEncoding: UInt32?
+struct NativeStyleTileSourceOptions: Equatable, Sendable {
+  var minZoom: Double?
+  var maxZoom: Double?
+  var attribution: String?
+  var scheme: UInt32?
+  var bounds: NativeLatLngBounds?
+  var tileSize: UInt32?
+  var vectorEncoding: UInt32?
+  var rasterEncoding: UInt32?
 
-  public init(
+  init(
     minZoom: Double? = nil,
     maxZoom: Double? = nil,
     attribution: String? = nil,
@@ -49,7 +49,7 @@ public struct NativeStyleTileSourceOptions: Equatable, Sendable {
     self.rasterEncoding = rasterEncoding
   }
 
-  public func withNativeOptions<Result>(
+  func withNativeOptions<Result>(
     _ body: (UnsafePointer<mln_style_tile_source_options>?) throws -> Result
   ) throws -> Result {
     if minZoom == nil, maxZoom == nil, attribution == nil, scheme == nil, bounds == nil, tileSize == nil,
@@ -95,42 +95,42 @@ public struct NativeStyleTileSourceOptions: Equatable, Sendable {
   }
 }
 
-public struct NativeCanonicalTileID: Equatable, Sendable {
-  public let z: UInt32
-  public let x: UInt32
-  public let y: UInt32
+struct NativeCanonicalTileID: Equatable, Sendable {
+  let z: UInt32
+  let x: UInt32
+  let y: UInt32
 
-  public init(z: UInt32, x: UInt32, y: UInt32) {
+  init(z: UInt32, x: UInt32, y: UInt32) {
     self.z = z
     self.x = x
     self.y = y
   }
 
-  public init(_ raw: mln_canonical_tile_id) {
+  init(_ raw: mln_canonical_tile_id) {
     z = raw.z
     x = raw.x
     y = raw.y
   }
 
-  public var native: mln_canonical_tile_id {
+  var native: mln_canonical_tile_id {
     mln_canonical_tile_id(z: z, x: x, y: y)
   }
 }
 
-public struct NativePremultipliedRGBA8Image: Equatable, Sendable {
-  public let width: UInt32
-  public let height: UInt32
-  public let stride: UInt32
-  public let pixels: [UInt8]
+struct NativePremultipliedRGBA8Image: Equatable, Sendable {
+  let width: UInt32
+  let height: UInt32
+  let stride: UInt32
+  let pixels: [UInt8]
 
-  public init(width: UInt32, height: UInt32, stride: UInt32, pixels: [UInt8]) {
+  init(width: UInt32, height: UInt32, stride: UInt32, pixels: [UInt8]) {
     self.width = width
     self.height = height
     self.stride = stride
     self.pixels = pixels
   }
 
-  public func withNativeImage<Result>(
+  func withNativeImage<Result>(
     _ body: (UnsafePointer<mln_premultiplied_rgba8_image>) throws -> Result
   ) throws -> Result {
     try pixels.withUnsafeBufferPointer { pixels in
@@ -145,16 +145,16 @@ public struct NativePremultipliedRGBA8Image: Equatable, Sendable {
   }
 }
 
-public struct NativeStyleImageOptions: Equatable, Sendable {
-  public let pixelRatio: Float?
-  public let sdf: Bool?
+struct NativeStyleImageOptions: Equatable, Sendable {
+  let pixelRatio: Float?
+  let sdf: Bool?
 
-  public init(pixelRatio: Float? = nil, sdf: Bool? = nil) {
+  init(pixelRatio: Float? = nil, sdf: Bool? = nil) {
     self.pixelRatio = pixelRatio
     self.sdf = sdf
   }
 
-  public func withNativeOptions<Result>(
+  func withNativeOptions<Result>(
     _ body: (UnsafePointer<mln_style_image_options>) throws -> Result
   ) throws -> Result {
     var options = mln_style_image_options_default()
@@ -170,26 +170,26 @@ public struct NativeStyleImageOptions: Equatable, Sendable {
   }
 }
 
-public final class NativeCustomGeometrySourceCallbacks: @unchecked Sendable {
-  public typealias TileCallback = @Sendable (NativeCanonicalTileID) -> Void
+final class NativeCustomGeometrySourceCallbacks: @unchecked Sendable {
+  typealias TileCallback = @Sendable (NativeCanonicalTileID) -> Void
 
   private let fetchTile: TileCallback
   private let cancelTile: TileCallback?
 
-  public init(fetchTile: @escaping TileCallback, cancelTile: TileCallback? = nil) {
+  init(fetchTile: @escaping TileCallback, cancelTile: TileCallback? = nil) {
     self.fetchTile = fetchTile
     self.cancelTile = cancelTile
   }
 
-  public var unmanagedPointer: UnsafeMutableRawPointer {
+  var unmanagedPointer: UnsafeMutableRawPointer {
     Unmanaged.passUnretained(self).toOpaque()
   }
 
-  public func fetched(_ tileId: mln_canonical_tile_id) {
+  func fetched(_ tileId: mln_canonical_tile_id) {
     fetchTile(NativeCanonicalTileID(tileId))
   }
 
-  public func cancelled(_ tileId: mln_canonical_tile_id) {
+  func cancelled(_ tileId: mln_canonical_tile_id) {
     cancelTile?(NativeCanonicalTileID(tileId))
   }
 }
@@ -204,17 +204,17 @@ private func customGeometryCancelTileCallback(_ userData: UnsafeMutableRawPointe
   Unmanaged<NativeCustomGeometrySourceCallbacks>.fromOpaque(userData).takeUnretainedValue().cancelled(tileId)
 }
 
-public struct NativeCustomGeometrySourceOptions: Sendable {
-  public let callbacks: NativeCustomGeometrySourceCallbacks
-  public var minZoom: Double?
-  public var maxZoom: Double?
-  public var tolerance: Double?
-  public var tileSize: UInt32?
-  public var buffer: UInt32?
-  public var clip: Bool?
-  public var wrap: Bool?
+struct NativeCustomGeometrySourceOptions: Sendable {
+  let callbacks: NativeCustomGeometrySourceCallbacks
+  var minZoom: Double?
+  var maxZoom: Double?
+  var tolerance: Double?
+  var tileSize: UInt32?
+  var buffer: UInt32?
+  var clip: Bool?
+  var wrap: Bool?
 
-  public init(
+  init(
     callbacks: NativeCustomGeometrySourceCallbacks,
     minZoom: Double? = nil,
     maxZoom: Double? = nil,
@@ -234,7 +234,7 @@ public struct NativeCustomGeometrySourceOptions: Sendable {
     self.wrap = wrap
   }
 
-  public func withNativeOptions<Result>(
+  func withNativeOptions<Result>(
     _ body: (UnsafePointer<mln_custom_geometry_source_options>) throws -> Result
   ) throws -> Result {
     var options = mln_custom_geometry_source_options_default()
@@ -273,15 +273,15 @@ public struct NativeCustomGeometrySourceOptions: Sendable {
   }
 }
 
-public struct NativeStyleImageInfo: Equatable, Sendable {
-  public let width: UInt32
-  public let height: UInt32
-  public let stride: UInt32
-  public let byteLength: Int
-  public let pixelRatio: Float
-  public let sdf: Bool
+struct NativeStyleImageInfo: Equatable, Sendable {
+  let width: UInt32
+  let height: UInt32
+  let stride: UInt32
+  let byteLength: Int
+  let pixelRatio: Float
+  let sdf: Bool
 
-  public init(_ raw: mln_style_image_info) {
+  init(_ raw: mln_style_image_info) {
     width = raw.width
     height = raw.height
     stride = raw.stride
@@ -291,14 +291,14 @@ public struct NativeStyleImageInfo: Equatable, Sendable {
   }
 }
 
-public struct NativeStyleSourceInfo: Equatable, Sendable {
-  public let type: UInt32
-  public let idSize: Int
-  public let isVolatile: Bool
-  public let hasAttribution: Bool
-  public let attributionSize: Int
+struct NativeStyleSourceInfo: Equatable, Sendable {
+  let type: UInt32
+  let idSize: Int
+  let isVolatile: Bool
+  let hasAttribution: Bool
+  let attributionSize: Int
 
-  public init(_ raw: mln_style_source_info) {
+  init(_ raw: mln_style_source_info) {
     type = raw.type
     idSize = raw.id_size
     isVolatile = raw.is_volatile

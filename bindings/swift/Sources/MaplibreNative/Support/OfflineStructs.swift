@@ -1,23 +1,23 @@
-import CMaplibreNativeC
+internal import CMaplibreNativeC
 import Foundation
 
-public enum NativeAmbientCacheOperation: UInt32, Sendable, Hashable {
+enum NativeAmbientCacheOperation: UInt32, Sendable, Hashable {
   case resetDatabase = 1
   case packDatabase = 2
   case invalidate = 3
   case clear = 4
 }
 
-public enum NativeOfflineRegionDownloadState: UInt32, Sendable, Hashable {
+enum NativeOfflineRegionDownloadState: UInt32, Sendable, Hashable {
   case inactive = 0
   case active = 1
 }
 
-public enum NativeOfflineRegionDefinition: Equatable, Sendable {
+enum NativeOfflineRegionDefinition: Equatable, Sendable {
   case tilePyramid(styleURL: String, bounds: NativeLatLngBounds, minZoom: Double, maxZoom: Double, pixelRatio: Float, includeIdeographs: Bool)
   case geometry(styleURL: String, geometry: NativeGeometry, minZoom: Double, maxZoom: Double, pixelRatio: Float, includeIdeographs: Bool)
 
-  public func withNativeDefinition<Result>(_ body: (UnsafePointer<mln_offline_region_definition>) throws -> Result) throws -> Result {
+  func withNativeDefinition<Result>(_ body: (UnsafePointer<mln_offline_region_definition>) throws -> Result) throws -> Result {
     let arena = NativeJSONArena()
     var definition = mln_offline_region_definition()
     definition.size = UInt32(MemoryLayout<mln_offline_region_definition>.size)
@@ -53,7 +53,7 @@ public enum NativeOfflineRegionDefinition: Equatable, Sendable {
     }
   }
 
-  public init(copying raw: mln_offline_region_definition) throws {
+  init(copying raw: mln_offline_region_definition) throws {
     switch raw.type {
     case MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID.rawValue:
       let value = raw.data.tile_pyramid
@@ -81,12 +81,12 @@ public enum NativeOfflineRegionDefinition: Equatable, Sendable {
   }
 }
 
-public struct NativeOfflineRegionInfo: Equatable, Sendable {
-  public let id: Int64
-  public let definition: NativeOfflineRegionDefinition
-  public let metadata: Data
+struct NativeOfflineRegionInfo: Equatable, Sendable {
+  let id: Int64
+  let definition: NativeOfflineRegionDefinition
+  let metadata: Data
 
-  public init(copying raw: mln_offline_region_info) throws {
+  init(copying raw: mln_offline_region_info) throws {
     id = raw.id
     definition = try NativeOfflineRegionDefinition(copying: raw.definition)
     if raw.metadata_size == 0 {

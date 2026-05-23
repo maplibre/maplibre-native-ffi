@@ -1,13 +1,13 @@
-import CMaplibreNativeC
+internal import CMaplibreNativeC
 import Foundation
 
-public struct NativeLogRecord: Equatable, Sendable {
-  public let severity: UInt32
-  public let event: UInt32
-  public let code: Int64
-  public let message: String
+struct NativeLogRecord: Equatable, Sendable {
+  let severity: UInt32
+  let event: UInt32
+  let code: Int64
+  let message: String
 
-  public init(severity: UInt32, event: UInt32, code: Int64, message: String) {
+  init(severity: UInt32, event: UInt32, code: Int64, message: String) {
     self.severity = severity
     self.event = event
     self.code = code
@@ -49,12 +49,12 @@ private func logCallbackTrampoline(
   return box.invoke(record) ? 1 : 0
 }
 
-public enum LoggingCallbackState {
+enum LoggingCallbackState {
   private static let lock = NSLock()
   private nonisolated(unsafe) static var retainedBox: Unmanaged<LogCallbackBox>?
   private nonisolated(unsafe) static var boxDeinitHandlerForTesting: (@Sendable () -> Void)?
 
-  public static func set(_ callback: @escaping @Sendable (NativeLogRecord) -> Bool) throws {
+  static func set(_ callback: @escaping @Sendable (NativeLogRecord) -> Bool) throws {
     let replacement = Unmanaged.passRetained(LogCallbackBox(callback))
     do {
       try CAPI.setLogCallback(logCallbackTrampoline, userData: replacement.toOpaque())
@@ -71,7 +71,7 @@ public enum LoggingCallbackState {
     previous?.release()
   }
 
-  public static func clear() throws {
+  static func clear() throws {
     try CAPI.clearLogCallback()
     let previous = lock.withLock {
       let previous = retainedBox
@@ -81,12 +81,12 @@ public enum LoggingCallbackState {
     previous?.release()
   }
 
-  public static func invokeForTesting(_ record: NativeLogRecord) -> Bool? {
+  static func invokeForTesting(_ record: NativeLogRecord) -> Bool? {
     let box = lock.withLock { retainedBox?.takeUnretainedValue() }
     return box?.invoke(record)
   }
 
-  public static func setBoxDeinitHandlerForTesting(_ handler: (@Sendable () -> Void)?) {
+  static func setBoxDeinitHandlerForTesting(_ handler: (@Sendable () -> Void)?) {
     lock.withLock {
       boxDeinitHandlerForTesting = handler
     }

@@ -1,4 +1,3 @@
-import MaplibreNativeSupport
 
 public enum StyleSourceType: UInt32, Sendable, Hashable {
   case unknown = 0

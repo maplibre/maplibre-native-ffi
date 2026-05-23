@@ -1,5 +1,4 @@
 import Foundation
-import MaplibreNativeSupport
 
 public struct RuntimeOptions: Equatable, Sendable {
   public var assetPath: String?

@@ -2,7 +2,6 @@ import CMaplibreNativeC
 import Testing
 
 @testable import MaplibreNative
-@testable import MaplibreNativeSupport
 
 @Test func tileSourceOptionsMaterializeFieldMaskAndStringViews() throws {
   let options = StyleTileSourceOptions(

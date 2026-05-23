@@ -1,4 +1,3 @@
-import MaplibreNativeSupport
 
 public enum RenderedQueryGeometry: Equatable, Sendable {
   case point(ScreenPoint)

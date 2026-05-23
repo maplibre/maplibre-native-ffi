@@ -1,5 +1,4 @@
 import Foundation
-import MaplibreNativeSupport
 
 public struct RenderTargetExtent: Equatable, Sendable {
   public var width: UInt32

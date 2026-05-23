@@ -1,4 +1,3 @@
-import MaplibreNativeSupport
 
 public enum LogSeverity: Sendable, Hashable {
   case info

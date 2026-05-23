@@ -1,5 +1,4 @@
 import Foundation
-import MaplibreNativeSupport
 
 public enum ResourceKind: Sendable, Hashable {
   case unknown(UInt32)

@@ -1,4 +1,3 @@
-import MaplibreNativeSupport
 
 public enum MaplibreErrorKind: Sendable, Equatable {
   case invalidArgument

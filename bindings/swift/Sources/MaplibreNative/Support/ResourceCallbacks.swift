@@ -1,25 +1,25 @@
-import CMaplibreNativeC
+internal import CMaplibreNativeC
 import Foundation
 
-public struct NativeByteRange: Equatable, Sendable {
-  public let start: UInt64
-  public let end: UInt64
+struct NativeByteRange: Equatable, Sendable {
+  let start: UInt64
+  let end: UInt64
 }
 
-public struct NativeResourceRequest: Equatable, Sendable {
-  public let url: String
-  public let kind: UInt32
-  public let loadingMethod: UInt32
-  public let priority: UInt32
-  public let usage: UInt32
-  public let storagePolicy: UInt32
-  public let range: NativeByteRange?
-  public let priorModifiedUnixMilliseconds: Int64?
-  public let priorExpiresUnixMilliseconds: Int64?
-  public let priorEtag: String?
-  public let priorData: [UInt8]
+struct NativeResourceRequest: Equatable, Sendable {
+  let url: String
+  let kind: UInt32
+  let loadingMethod: UInt32
+  let priority: UInt32
+  let usage: UInt32
+  let storagePolicy: UInt32
+  let range: NativeByteRange?
+  let priorModifiedUnixMilliseconds: Int64?
+  let priorExpiresUnixMilliseconds: Int64?
+  let priorEtag: String?
+  let priorData: [UInt8]
 
-  public init(_ raw: mln_resource_request) throws {
+  init(_ raw: mln_resource_request) throws {
     url = NativeString.copyCString(raw.url)
     kind = raw.kind
     loadingMethod = raw.loading_method
@@ -38,18 +38,18 @@ public struct NativeResourceRequest: Equatable, Sendable {
   }
 }
 
-public struct NativeResourceResponseInput: Equatable, Sendable {
-  public let status: UInt32
-  public let errorReason: UInt32
-  public let bytes: [UInt8]
-  public let errorMessage: String?
-  public let mustRevalidate: Bool
-  public let modifiedUnixMilliseconds: Int64?
-  public let expiresUnixMilliseconds: Int64?
-  public let etag: String?
-  public let retryAfterUnixMilliseconds: Int64?
+struct NativeResourceResponseInput: Equatable, Sendable {
+  let status: UInt32
+  let errorReason: UInt32
+  let bytes: [UInt8]
+  let errorMessage: String?
+  let mustRevalidate: Bool
+  let modifiedUnixMilliseconds: Int64?
+  let expiresUnixMilliseconds: Int64?
+  let etag: String?
+  let retryAfterUnixMilliseconds: Int64?
 
-  public init(
+  init(
     status: UInt32,
     errorReason: UInt32,
     bytes: [UInt8] = [],
@@ -71,7 +71,7 @@ public struct NativeResourceResponseInput: Equatable, Sendable {
     self.retryAfterUnixMilliseconds = retryAfterUnixMilliseconds
   }
 
-  public func withNativeResponse<Result>(
+  func withNativeResponse<Result>(
     _ body: (UnsafePointer<mln_resource_response>) throws -> Result
   ) throws -> Result {
     try NativeString.withOptionalCString(errorMessage) { errorMessage in
@@ -99,12 +99,12 @@ public struct NativeResourceResponseInput: Equatable, Sendable {
   }
 }
 
-public struct NativeResourceRequestHandleFunctions: Sendable {
-  public let complete: @Sendable (OpaquePointer, NativeResourceResponseInput) throws -> Void
-  public let cancelled: @Sendable (OpaquePointer) throws -> Bool
-  public let release: @Sendable (OpaquePointer?) -> Void
+struct NativeResourceRequestHandleFunctions: Sendable {
+  let complete: @Sendable (OpaquePointer, NativeResourceResponseInput) throws -> Void
+  let cancelled: @Sendable (OpaquePointer) throws -> Bool
+  let release: @Sendable (OpaquePointer?) -> Void
 
-  public init(
+  init(
     complete: @escaping @Sendable (OpaquePointer, NativeResourceResponseInput) throws -> Void,
     cancelled: @escaping @Sendable (OpaquePointer) throws -> Bool,
     release: @escaping @Sendable (OpaquePointer?) -> Void
@@ -114,7 +114,7 @@ public struct NativeResourceRequestHandleFunctions: Sendable {
     self.release = release
   }
 
-  public static let native = Self(
+  static let native = Self(
     complete: { handle, response in
       try response.withNativeResponse { nativeResponse in
         try CAPI.completeResourceRequest(handle, nativeResponse)
@@ -129,7 +129,7 @@ public struct NativeResourceRequestHandleFunctions: Sendable {
   )
 }
 
-public final class NativeResourceRequestHandleState: @unchecked Sendable {
+final class NativeResourceRequestHandleState: @unchecked Sendable {
   private let functions: NativeResourceRequestHandleFunctions
   private let condition = NSCondition()
   private var pointer: OpaquePointer?
@@ -138,7 +138,7 @@ public final class NativeResourceRequestHandleState: @unchecked Sendable {
   private var releaseRequested = false
   private var inFlightOperations = 0
 
-  public init(
+  init(
     pointer: OpaquePointer?,
     functions: NativeResourceRequestHandleFunctions = .native
   ) throws {
@@ -153,7 +153,7 @@ public final class NativeResourceRequestHandleState: @unchecked Sendable {
     release()
   }
 
-  public func markProviderReturnedHandle() {
+  func markProviderReturnedHandle() {
     let handle = condition.withLock {
       providerReturnedHandle = true
       return takeReleasableHandleLocked()
@@ -163,7 +163,7 @@ public final class NativeResourceRequestHandleState: @unchecked Sendable {
     }
   }
 
-  public func complete(_ response: NativeResourceResponseInput) throws {
+  func complete(_ response: NativeResourceResponseInput) throws {
     let handle = try beginCompletionOperation()
     do {
       try functions.complete(handle, response)
@@ -174,13 +174,13 @@ public final class NativeResourceRequestHandleState: @unchecked Sendable {
     finishNativeOperation()
   }
 
-  public func isCancelled() throws -> Bool {
+  func isCancelled() throws -> Bool {
     let handle = try beginNativeOperation()
     defer { finishNativeOperation() }
     return try functions.cancelled(handle)
   }
 
-  public func release() {
+  func release() {
     let handle = condition.withLock {
       releaseRequested = true
       while providerReturnedHandle, inFlightOperations > 0 {
@@ -237,9 +237,9 @@ public final class NativeResourceRequestHandleState: @unchecked Sendable {
   }
 }
 
-public struct NativeResourceTransformRequest: Equatable, Sendable {
-  public let kind: UInt32
-  public let url: String
+struct NativeResourceTransformRequest: Equatable, Sendable {
+  let kind: UInt32
+  let url: String
 }
 
 private final class NativeResourceTransformBox: @unchecked Sendable {
@@ -297,10 +297,10 @@ private func resourceTransformTrampoline(
   return box.invoke(kind: kind, url: url, outResponse: outResponse)
 }
 
-public final class NativeResourceTransformState: @unchecked Sendable {
+final class NativeResourceTransformState: @unchecked Sendable {
   private let retainedBox: Unmanaged<NativeResourceTransformBox>
 
-  public init(_ callback: @escaping @Sendable (NativeResourceTransformRequest) -> String?) {
+  init(_ callback: @escaping @Sendable (NativeResourceTransformRequest) -> String?) {
     retainedBox = Unmanaged.passRetained(NativeResourceTransformBox(callback))
   }
 
@@ -308,7 +308,7 @@ public final class NativeResourceTransformState: @unchecked Sendable {
     retainedBox.release()
   }
 
-  public func invokeForTesting(kind: UInt32, url: String) -> (status: Int32, replacement: String?) {
+  func invokeForTesting(kind: UInt32, url: String) -> (status: Int32, replacement: String?) {
     var response = mln_resource_transform_response()
     let status = url.withCString { url in
       retainedBox.takeUnretainedValue().invoke(kind: kind, url: url, outResponse: &response)
@@ -316,7 +316,7 @@ public final class NativeResourceTransformState: @unchecked Sendable {
     return (status.rawValue, response.url.map { String(cString: $0) })
   }
 
-  public func withDescriptor<Result>(
+  func withDescriptor<Result>(
     _ body: (UnsafePointer<mln_resource_transform>) throws -> Result
   ) throws -> Result {
     var transform = mln_resource_transform()
@@ -367,10 +367,10 @@ private func resourceProviderTrampoline(
   return box.invoke(request: request, handle: handle)
 }
 
-public final class NativeResourceProviderState: @unchecked Sendable {
+final class NativeResourceProviderState: @unchecked Sendable {
   private let retainedBox: Unmanaged<NativeResourceProviderBox>
 
-  public init(
+  init(
     handleFunctions: NativeResourceRequestHandleFunctions = .native,
     _ callback: @escaping @Sendable (NativeResourceRequest, NativeResourceRequestHandleState) -> UInt32
   ) {
@@ -383,13 +383,13 @@ public final class NativeResourceProviderState: @unchecked Sendable {
     retainedBox.release()
   }
 
-  public func invokeForTesting(request: mln_resource_request, handle: OpaquePointer?) -> UInt32 {
+  func invokeForTesting(request: mln_resource_request, handle: OpaquePointer?) -> UInt32 {
     withUnsafePointer(to: request) { request in
       retainedBox.takeUnretainedValue().invoke(request: request, handle: handle)
     }
   }
 
-  public func withDescriptor<Result>(
+  func withDescriptor<Result>(
     _ body: (UnsafePointer<mln_resource_provider>) throws -> Result
   ) throws -> Result {
     var provider = mln_resource_provider()

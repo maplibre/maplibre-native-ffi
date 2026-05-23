@@ -1,12 +1,12 @@
 import Foundation
 
-public final class NativeResultGuard: @unchecked Sendable {
+final class NativeResultGuard: @unchecked Sendable {
   private let typeName: String
   private let destroy: @Sendable (OpaquePointer) -> Void
   private let lock = NSLock()
   private var pointer: OpaquePointer?
 
-  public init(
+  init(
     typeName: String,
     pointer: OpaquePointer?,
     destroy: @escaping @Sendable (OpaquePointer) -> Void
@@ -23,7 +23,7 @@ public final class NativeResultGuard: @unchecked Sendable {
     close()
   }
 
-  public func requireLive() throws -> OpaquePointer {
+  func requireLive() throws -> OpaquePointer {
     try lock.withLock {
       guard let pointer else {
         throw NativeStatusFailure(rawStatus: 0, diagnostic: "\(typeName) is closed")
@@ -32,7 +32,7 @@ public final class NativeResultGuard: @unchecked Sendable {
     }
   }
 
-  public func close() {
+  func close() {
     let livePointer = lock.withLock {
       let livePointer = pointer
       pointer = nil

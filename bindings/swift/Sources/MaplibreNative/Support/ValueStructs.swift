@@ -1,7 +1,7 @@
-import CMaplibreNativeC
+internal import CMaplibreNativeC
 import Foundation
 
-public enum NativeJSONValue: Equatable, Sendable {
+enum NativeJSONValue: Equatable, Sendable {
   case null
   case bool(Bool)
   case uint(UInt64)
@@ -11,7 +11,7 @@ public enum NativeJSONValue: Equatable, Sendable {
   case array([NativeJSONValue])
   case object([NativeJSONMember])
 
-  public init(copying raw: mln_json_value) throws {
+  init(copying raw: mln_json_value) throws {
     switch raw.type {
     case MLN_JSON_VALUE_TYPE_NULL.rawValue:
       self = .null
@@ -43,22 +43,22 @@ public enum NativeJSONValue: Equatable, Sendable {
   }
 }
 
-public struct NativeJSONMember: Equatable, Sendable {
-  public let key: String
-  public let value: NativeJSONValue
+struct NativeJSONMember: Equatable, Sendable {
+  let key: String
+  let value: NativeJSONValue
 
-  public init(key: String, value: NativeJSONValue) {
+  init(key: String, value: NativeJSONValue) {
     self.key = key
     self.value = value
   }
 
-  public init(copying raw: mln_json_member) throws {
+  init(copying raw: mln_json_member) throws {
     key = try NativeString.copyUTF8(data: raw.key.data, size: raw.key.size)
     value = try NativeJSONValue(copying: raw.value.pointee)
   }
 }
 
-public final class NativeJSONArena {
+final class NativeJSONArena {
   private var strings: [ContiguousArray<UInt8>] = []
   private var values: [UnsafeMutablePointer<mln_json_value>] = []
   private var arrays: [UnsafeMutableBufferPointer<mln_json_value>] = []
@@ -71,7 +71,7 @@ public final class NativeJSONArena {
   private var features: [UnsafeMutablePointer<mln_feature>] = []
   private var featureArrays: [UnsafeMutableBufferPointer<mln_feature>] = []
 
-  public init() {}
+  init() {}
 
   deinit {
     for value in values {
@@ -116,7 +116,7 @@ public final class NativeJSONArena {
     }
   }
 
-  public func view(_ text: String) -> mln_string_view {
+  func view(_ text: String) -> mln_string_view {
     let bytes = ContiguousArray(text.utf8)
     strings.append(bytes)
     return strings.withUnsafeBufferPointer { storage in
@@ -130,14 +130,14 @@ public final class NativeJSONArena {
     }
   }
 
-  public func allocate(_ value: NativeJSONValue) -> UnsafePointer<mln_json_value> {
+  func allocate(_ value: NativeJSONValue) -> UnsafePointer<mln_json_value> {
     let pointer = UnsafeMutablePointer<mln_json_value>.allocate(capacity: 1)
     pointer.initialize(to: nativeValue(value))
     values.append(pointer)
     return UnsafePointer(pointer)
   }
 
-  public func nativeValue(_ value: NativeJSONValue) -> mln_json_value {
+  func nativeValue(_ value: NativeJSONValue) -> mln_json_value {
     var raw = mln_json_value()
     raw.size = UInt32(MemoryLayout<mln_json_value>.size)
     switch value {
@@ -179,14 +179,14 @@ public final class NativeJSONArena {
     return raw
   }
 
-  public func allocateGeometry(_ geometry: NativeGeometry) -> UnsafePointer<mln_geometry> {
+  func allocateGeometry(_ geometry: NativeGeometry) -> UnsafePointer<mln_geometry> {
     let pointer = UnsafeMutablePointer<mln_geometry>.allocate(capacity: 1)
     pointer.initialize(to: nativeGeometry(geometry))
     geometries.append(pointer)
     return UnsafePointer(pointer)
   }
 
-  public func nativeGeometry(_ geometry: NativeGeometry) -> mln_geometry {
+  func nativeGeometry(_ geometry: NativeGeometry) -> mln_geometry {
     var raw = mln_geometry()
     raw.size = UInt32(MemoryLayout<mln_geometry>.size)
     switch geometry {
@@ -217,14 +217,14 @@ public final class NativeJSONArena {
     return raw
   }
 
-  public func allocateFeature(_ feature: NativeFeature) -> UnsafePointer<mln_feature> {
+  func allocateFeature(_ feature: NativeFeature) -> UnsafePointer<mln_feature> {
     let pointer = UnsafeMutablePointer<mln_feature>.allocate(capacity: 1)
     pointer.initialize(to: nativeFeature(feature))
     features.append(pointer)
     return UnsafePointer(pointer)
   }
 
-  public func nativeFeature(_ feature: NativeFeature) -> mln_feature {
+  func nativeFeature(_ feature: NativeFeature) -> mln_feature {
     var raw = mln_feature()
     raw.size = UInt32(MemoryLayout<mln_feature>.size)
     raw.geometry = allocateGeometry(feature.geometry)
@@ -256,7 +256,7 @@ public final class NativeJSONArena {
     return raw
   }
 
-  public func withNativeGeoJSON<Result>(
+  func withNativeGeoJSON<Result>(
     _ geoJSON: NativeGeoJSON,
     _ body: (UnsafePointer<mln_geojson>) throws -> Result
   ) throws -> Result {
@@ -334,7 +334,7 @@ public final class NativeJSONArena {
   }
 }
 
-public enum NativeGeometry: Equatable, Sendable {
+enum NativeGeometry: Equatable, Sendable {
   case empty
   case point(NativeLatLng)
   case lineString([NativeLatLng])
@@ -344,7 +344,7 @@ public enum NativeGeometry: Equatable, Sendable {
   case multiPolygon([[[NativeLatLng]]])
   case geometryCollection([NativeGeometry])
 
-  public init(copying raw: mln_geometry) throws {
+  init(copying raw: mln_geometry) throws {
     switch raw.type {
     case MLN_GEOMETRY_TYPE_EMPTY.rawValue:
       self = .empty
@@ -387,7 +387,7 @@ public enum NativeGeometry: Equatable, Sendable {
   }
 }
 
-public enum NativeFeatureIdentifier: Equatable, Sendable {
+enum NativeFeatureIdentifier: Equatable, Sendable {
   case none
   case uint(UInt64)
   case int(Int64)
@@ -395,12 +395,12 @@ public enum NativeFeatureIdentifier: Equatable, Sendable {
   case string(String)
 }
 
-public struct NativeFeature: Equatable, Sendable {
-  public let geometry: NativeGeometry
-  public let properties: [NativeJSONMember]
-  public let identifier: NativeFeatureIdentifier
+struct NativeFeature: Equatable, Sendable {
+  let geometry: NativeGeometry
+  let properties: [NativeJSONMember]
+  let identifier: NativeFeatureIdentifier
 
-  public init(
+  init(
     geometry: NativeGeometry,
     properties: [NativeJSONMember] = [],
     identifier: NativeFeatureIdentifier = .none
@@ -410,7 +410,7 @@ public struct NativeFeature: Equatable, Sendable {
     self.identifier = identifier
   }
 
-  public init(copying raw: mln_feature) throws {
+  init(copying raw: mln_feature) throws {
     geometry = try NativeGeometry(copying: raw.geometry.pointee)
     properties = try (0..<raw.property_count).map { index in
       try NativeJSONMember(copying: raw.properties![index])
@@ -432,26 +432,26 @@ public struct NativeFeature: Equatable, Sendable {
   }
 }
 
-public enum NativeGeoJSON: Equatable, Sendable {
+enum NativeGeoJSON: Equatable, Sendable {
   case geometry(NativeGeometry)
   case feature(NativeFeature)
   case featureCollection([NativeFeature])
 }
 
-public struct NativeQueriedFeature: Equatable, Sendable {
-  public let feature: NativeFeature
-  public let sourceId: String?
-  public let sourceLayerId: String?
-  public let state: NativeJSONValue?
+struct NativeQueriedFeature: Equatable, Sendable {
+  let feature: NativeFeature
+  let sourceId: String?
+  let sourceLayerId: String?
+  let state: NativeJSONValue?
 
-  public init(feature: NativeFeature, sourceId: String? = nil, sourceLayerId: String? = nil, state: NativeJSONValue? = nil) {
+  init(feature: NativeFeature, sourceId: String? = nil, sourceLayerId: String? = nil, state: NativeJSONValue? = nil) {
     self.feature = feature
     self.sourceId = sourceId
     self.sourceLayerId = sourceLayerId
     self.state = state
   }
 
-  public init(copying raw: mln_queried_feature) throws {
+  init(copying raw: mln_queried_feature) throws {
     feature = try NativeFeature(copying: raw.feature)
     sourceId = (raw.fields & MLN_QUERIED_FEATURE_SOURCE_ID.rawValue) != 0
       ? try NativeString.copyUTF8(data: raw.source_id.data, size: raw.source_id.size)
@@ -465,11 +465,11 @@ public struct NativeQueriedFeature: Equatable, Sendable {
   }
 }
 
-public enum NativeFeatureExtensionResult: Equatable, Sendable {
+enum NativeFeatureExtensionResult: Equatable, Sendable {
   case value(NativeJSONValue)
   case featureCollection([NativeFeature])
 
-  public init(copying raw: mln_feature_extension_result_info) throws {
+  init(copying raw: mln_feature_extension_result_info) throws {
     switch raw.type {
     case MLN_FEATURE_EXTENSION_RESULT_TYPE_VALUE.rawValue:
       self = .value(try NativeJSONValue(copying: raw.data.value.pointee))
