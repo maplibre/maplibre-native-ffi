@@ -68,6 +68,17 @@ public final class MapProjectionHandle {
     }
   }
 
+  public func setVisibleGeometry(_ geometry: Geometry, padding: EdgeInsets = EdgeInsets(top: 0, left: 0, bottom: 0, right: 0)) throws {
+    try mapNativeFailure {
+      let arena = NativeJSONArena()
+      try CAPI.mapProjectionSetVisibleGeometry(
+        try handle.requireLive(),
+        geometry: arena.allocateGeometry(geometry.nativeGeometry),
+        padding: padding.nativeInput.native
+      )
+    }
+  }
+
   public func pixel(for coordinate: LatLng) throws -> ScreenPoint {
     try mapNativeFailure {
       ScreenPoint(native: NativeScreenPoint(try CAPI.mapProjectionPixelForLatLng(

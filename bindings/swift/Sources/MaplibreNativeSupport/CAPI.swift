@@ -152,6 +152,80 @@ public enum CAPI {
     mln_animation_options_default()
   }
 
+  public static func cameraFitOptionsDefault() -> mln_camera_fit_options {
+    mln_camera_fit_options_default()
+  }
+
+  public static func boundOptionsDefault() -> mln_bound_options {
+    mln_bound_options_default()
+  }
+
+  public static func freeCameraOptionsDefault() -> mln_free_camera_options {
+    mln_free_camera_options_default()
+  }
+
+  public static func projectionModeDefault() -> mln_projection_mode {
+    mln_projection_mode_default()
+  }
+
+  public static func mapViewportOptionsDefault() -> mln_map_viewport_options {
+    mln_map_viewport_options_default()
+  }
+
+  public static func mapTileOptionsDefault() -> mln_map_tile_options {
+    mln_map_tile_options_default()
+  }
+
+  public static func mapSetDebugOptions(_ map: OpaquePointer, options: UInt32) throws {
+    try checkStatus(mln_map_set_debug_options(map, options))
+  }
+
+  public static func mapGetDebugOptions(_ map: OpaquePointer) throws -> UInt32 {
+    try NativeMemory.withTemporary(UInt32(0)) { options in
+      try checkStatus(mln_map_get_debug_options(map, options))
+    }.value
+  }
+
+  public static func mapSetRenderingStatsViewEnabled(_ map: OpaquePointer, enabled: Bool) throws {
+    try checkStatus(mln_map_set_rendering_stats_view_enabled(map, enabled))
+  }
+
+  public static func mapGetRenderingStatsViewEnabled(_ map: OpaquePointer) throws -> Bool {
+    try NativeMemory.withTemporary(false) { enabled in
+      try checkStatus(mln_map_get_rendering_stats_view_enabled(map, enabled))
+    }.value
+  }
+
+  public static func mapIsFullyLoaded(_ map: OpaquePointer) throws -> Bool {
+    try NativeMemory.withTemporary(false) { loaded in
+      try checkStatus(mln_map_is_fully_loaded(map, loaded))
+    }.value
+  }
+
+  public static func mapDumpDebugLogs(_ map: OpaquePointer) throws {
+    try checkStatus(mln_map_dump_debug_logs(map))
+  }
+
+  public static func mapGetViewportOptions(_ map: OpaquePointer) throws -> mln_map_viewport_options {
+    var options = mapViewportOptionsDefault()
+    try checkStatus(mln_map_get_viewport_options(map, &options))
+    return options
+  }
+
+  public static func mapSetViewportOptions(_ map: OpaquePointer, options: UnsafePointer<mln_map_viewport_options>) throws {
+    try checkStatus(mln_map_set_viewport_options(map, options))
+  }
+
+  public static func mapGetTileOptions(_ map: OpaquePointer) throws -> mln_map_tile_options {
+    var options = mapTileOptionsDefault()
+    try checkStatus(mln_map_get_tile_options(map, &options))
+    return options
+  }
+
+  public static func mapSetTileOptions(_ map: OpaquePointer, options: UnsafePointer<mln_map_tile_options>) throws {
+    try checkStatus(mln_map_set_tile_options(map, options))
+  }
+
   public static func mapGetCamera(_ map: OpaquePointer) throws -> mln_camera_options {
     var camera = cameraOptionsDefault()
     try checkStatus(mln_map_get_camera(map, &camera))
@@ -168,6 +242,14 @@ public enum CAPI {
     _ animation: UnsafePointer<mln_animation_options>?
   ) throws {
     try checkStatus(mln_map_ease_to(map, camera, animation))
+  }
+
+  public static func mapFlyTo(
+    _ map: OpaquePointer,
+    _ camera: UnsafePointer<mln_camera_options>,
+    _ animation: UnsafePointer<mln_animation_options>?
+  ) throws {
+    try checkStatus(mln_map_fly_to(map, camera, animation))
   }
 
   public static func mapMoveBy(_ map: OpaquePointer, deltaX: Double, deltaY: Double) throws {
@@ -200,8 +282,132 @@ public enum CAPI {
     try checkStatus(mln_map_scale_by_animated(map, scale, anchor, animation))
   }
 
+  public static func mapRotateBy(_ map: OpaquePointer, first: NativeScreenPoint, second: NativeScreenPoint) throws {
+    try checkStatus(mln_map_rotate_by(map, first.native, second.native))
+  }
+
+  public static func mapRotateByAnimated(
+    _ map: OpaquePointer,
+    first: NativeScreenPoint,
+    second: NativeScreenPoint,
+    animation: UnsafePointer<mln_animation_options>?
+  ) throws {
+    try checkStatus(mln_map_rotate_by_animated(map, first.native, second.native, animation))
+  }
+
+  public static func mapPitchBy(_ map: OpaquePointer, pitch: Double) throws {
+    try checkStatus(mln_map_pitch_by(map, pitch))
+  }
+
+  public static func mapPitchByAnimated(_ map: OpaquePointer, pitch: Double, animation: UnsafePointer<mln_animation_options>?) throws {
+    try checkStatus(mln_map_pitch_by_animated(map, pitch, animation))
+  }
+
   public static func mapCancelTransitions(_ map: OpaquePointer) throws {
     try checkStatus(mln_map_cancel_transitions(map))
+  }
+
+  public static func mapCameraForLatLngBounds(_ map: OpaquePointer, bounds: NativeLatLngBounds, fitOptions: UnsafePointer<mln_camera_fit_options>?) throws -> mln_camera_options {
+    var camera = cameraOptionsDefault()
+    try checkStatus(mln_map_camera_for_lat_lng_bounds(map, bounds.native, fitOptions, &camera))
+    return camera
+  }
+
+  public static func mapCameraForLatLngs(_ map: OpaquePointer, coordinates: UnsafePointer<mln_lat_lng>?, count: Int, fitOptions: UnsafePointer<mln_camera_fit_options>?) throws -> mln_camera_options {
+    var camera = cameraOptionsDefault()
+    try checkStatus(mln_map_camera_for_lat_lngs(map, coordinates, count, fitOptions, &camera))
+    return camera
+  }
+
+  public static func mapCameraForGeometry(_ map: OpaquePointer, geometry: UnsafePointer<mln_geometry>, fitOptions: UnsafePointer<mln_camera_fit_options>?) throws -> mln_camera_options {
+    var camera = cameraOptionsDefault()
+    try checkStatus(mln_map_camera_for_geometry(map, geometry, fitOptions, &camera))
+    return camera
+  }
+
+  public static func mapLatLngBoundsForCamera(_ map: OpaquePointer, camera: UnsafePointer<mln_camera_options>, unwrapped: Bool) throws -> NativeLatLngBounds {
+    let output = try NativeMemory.withTemporary(mln_lat_lng_bounds()) { bounds in
+      if unwrapped {
+        try checkStatus(mln_map_lat_lng_bounds_for_camera_unwrapped(map, camera, bounds))
+      } else {
+        try checkStatus(mln_map_lat_lng_bounds_for_camera(map, camera, bounds))
+      }
+    }
+    return NativeLatLngBounds(output.value)
+  }
+
+  public static func mapGetBounds(_ map: OpaquePointer) throws -> mln_bound_options {
+    var bounds = boundOptionsDefault()
+    try checkStatus(mln_map_get_bounds(map, &bounds))
+    return bounds
+  }
+
+  public static func mapSetBounds(_ map: OpaquePointer, bounds: UnsafePointer<mln_bound_options>) throws {
+    try checkStatus(mln_map_set_bounds(map, bounds))
+  }
+
+  public static func mapGetFreeCameraOptions(_ map: OpaquePointer) throws -> mln_free_camera_options {
+    var options = freeCameraOptionsDefault()
+    try checkStatus(mln_map_get_free_camera_options(map, &options))
+    return options
+  }
+
+  public static func mapSetFreeCameraOptions(_ map: OpaquePointer, options: UnsafePointer<mln_free_camera_options>) throws {
+    try checkStatus(mln_map_set_free_camera_options(map, options))
+  }
+
+  public static func mapGetProjectionMode(_ map: OpaquePointer) throws -> mln_projection_mode {
+    var mode = projectionModeDefault()
+    try checkStatus(mln_map_get_projection_mode(map, &mode))
+    return mode
+  }
+
+  public static func mapSetProjectionMode(_ map: OpaquePointer, mode: UnsafePointer<mln_projection_mode>) throws {
+    try checkStatus(mln_map_set_projection_mode(map, mode))
+  }
+
+  public static func mapPixelForLatLng(_ map: OpaquePointer, coordinate: NativeLatLng) throws -> NativeScreenPoint {
+    let output = try NativeMemory.withTemporary(mln_screen_point()) { point in
+      try checkStatus(mln_map_pixel_for_lat_lng(map, coordinate.native, point))
+    }
+    return NativeScreenPoint(output.value)
+  }
+
+  public static func mapLatLngForPixel(_ map: OpaquePointer, point: NativeScreenPoint) throws -> NativeLatLng {
+    let output = try NativeMemory.withTemporary(mln_lat_lng()) { coordinate in
+      try checkStatus(mln_map_lat_lng_for_pixel(map, point.native, coordinate))
+    }
+    return NativeLatLng(output.value)
+  }
+
+  public static func mapPixelsForLatLngs(_ map: OpaquePointer, coordinates: UnsafePointer<mln_lat_lng>?, count: Int, outPoints: UnsafeMutablePointer<mln_screen_point>?) throws {
+    try checkStatus(mln_map_pixels_for_lat_lngs(map, coordinates, count, outPoints))
+  }
+
+  public static func mapLatLngsForPixels(_ map: OpaquePointer, points: UnsafePointer<mln_screen_point>?, count: Int, outCoordinates: UnsafeMutablePointer<mln_lat_lng>?) throws {
+    try checkStatus(mln_map_lat_lngs_for_pixels(map, points, count, outCoordinates))
+  }
+
+  public static func mapPixelsForLatLngs(_ map: OpaquePointer, coordinates: [NativeLatLng]) throws -> [NativeScreenPoint] {
+    let rawCoordinates = coordinates.map(\.native)
+    var rawPoints = [mln_screen_point](repeating: mln_screen_point(), count: rawCoordinates.count)
+    try rawCoordinates.withUnsafeBufferPointer { coordinates in
+      try rawPoints.withUnsafeMutableBufferPointer { points in
+        try mapPixelsForLatLngs(map, coordinates: coordinates.baseAddress, count: coordinates.count, outPoints: points.baseAddress)
+      }
+    }
+    return rawPoints.map(NativeScreenPoint.init)
+  }
+
+  public static func mapLatLngsForPixels(_ map: OpaquePointer, points: [NativeScreenPoint]) throws -> [NativeLatLng] {
+    let rawPoints = points.map(\.native)
+    var rawCoordinates = [mln_lat_lng](repeating: mln_lat_lng(), count: rawPoints.count)
+    try rawPoints.withUnsafeBufferPointer { points in
+      try rawCoordinates.withUnsafeMutableBufferPointer { coordinates in
+        try mapLatLngsForPixels(map, points: points.baseAddress, count: points.count, outCoordinates: coordinates.baseAddress)
+      }
+    }
+    return rawCoordinates.map(NativeLatLng.init)
   }
 
   public static func createMapProjection(_ map: OpaquePointer) throws -> OpaquePointer {
@@ -238,6 +444,14 @@ public enum CAPI {
     padding: mln_edge_insets
   ) throws {
     try checkStatus(mln_map_projection_set_visible_coordinates(projection, coordinates, count, padding))
+  }
+
+  public static func mapProjectionSetVisibleGeometry(
+    _ projection: OpaquePointer,
+    geometry: UnsafePointer<mln_geometry>,
+    padding: mln_edge_insets
+  ) throws {
+    try checkStatus(mln_map_projection_set_visible_geometry(projection, geometry, padding))
   }
 
   public static func mapProjectionPixelForLatLng(
