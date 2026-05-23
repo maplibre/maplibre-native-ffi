@@ -44,7 +44,7 @@ The public Swift module is `MaplibreNative`. The private C importer module is
 `CMaplibreNativeC`. The internal support module is `MaplibreNativeSupport`. Only
 `MaplibreNative` is a package product.
 
-## Current scaffold
+## Current implementation
 
 ```text
 bindings/swift/
@@ -52,14 +52,28 @@ bindings/swift/
   Package.swift
   mise.toml
   Sources/CMaplibreNativeC/
-    include/maplibre_native_c.h
     module.modulemap
   Sources/MaplibreNativeSupport/
     CAPI.swift
+    LoggingCallbacks.swift
+    MapStructs.swift
+    NativeDescriptor.swift
+    NativeHandleLeakReporter.swift
     NativeHandleState.swift
+    NativeMemory.swift
+    NativeResultGuard.swift
     NativeStatus.swift
+    NativeString.swift
+    OfflineStructs.swift
+    QueryStructs.swift
+    RenderStructs.swift
+    ResourceCallbacks.swift
+    RuntimeStructs.swift
+    StyleStructs.swift
+    ValueStructs.swift
   Sources/MaplibreNative/
     Camera.swift
+    CameraAdvanced.swift
     Geometry.swift
     Handles.swift
     Logging.swift
@@ -68,6 +82,7 @@ bindings/swift/
     MaplibreError.swift
     NativePointer.swift
     NetworkStatus.swift
+    Offline.swift
     Projection.swift
     Query.swift
     Render.swift
@@ -75,20 +90,25 @@ bindings/swift/
     Resource.swift
     Runtime.swift
     Style.swift
+    Values.swift
   Tests/MaplibreNativeTests/
+    CameraAdvancedTests.swift
+    LoggingTests.swift
+    MapHandleTests.swift
     MaplibreTests.swift
+    OfflineTests.swift
+    ProjectionTests.swift
+    QueryTests.swift
+    RenderTests.swift
+    RuntimeTests.swift
+    StyleTests.swift
+    SupportHelperTests.swift
+    ValueTests.swift
 ```
 
-The scaffold implements one proof slice:
-
-- `Maplibre.cVersion()` calls `mln_c_version()`.
-- `Maplibre.supportedRenderBackends()` preserves backend mask bits in a Swift
-  `OptionSet`.
-- `Maplibre.networkStatus()` and `Maplibre.setNetworkStatus(_:)` cross the real
-  C ABI and translate native status failures into `MaplibreError`.
-- `NativePointer` is a borrowed opaque address value with no memory access in
-  public API.
-- `NativeHandleState` records the close-once pattern for future handle classes.
+The implementation covers the full C API map below. The public module exposes
+Swift descriptors, copied value types, handle classes, and callback closures;
+raw imported C symbols stay inside `MaplibreNativeSupport`.
 
 ## Build artifacts and tasks
 
@@ -192,35 +212,34 @@ the split improves locality, but module-level concepts stay stable.
 
 ## Internal implementation inventory
 
-Implement these support files under `Sources/MaplibreNativeSupport`:
+`Sources/MaplibreNativeSupport` contains the raw C boundary:
 
-| File                            | Contents                                                                                           |
-| ------------------------------- | -------------------------------------------------------------------------------------------------- |
-| `CAPI.swift`                    | Thin curated functions that call imported C symbols and return Swift raw values.                   |
-| `NativeStatus.swift`            | Status checking, diagnostic capture, native failure payloads.                                      |
-| `NativeHandleState.swift`       | Pointer storage, released state, parent retention hooks, close-once behavior, leak reporting hook. |
-| `NativeString.swift`            | UTF-8 and string-view storage, embedded-NUL rejection for C string inputs.                         |
-| `NativeMemory.swift`            | Scoped temporary storage helpers for arrays, bytes, out-pointers, and descriptor graphs.           |
-| `CoreStructs.swift`             | Core values: coordinates, bounds, screen points, tile IDs, image info, rendering stats.            |
-| `CameraStructs.swift`           | Camera, animation, bounds, viewport, tile, and projection mode materializers.                      |
-| `RuntimeStructs.swift`          | Runtime options, copied runtime events, offline operation results.                                 |
-| `MapStructs.swift`              | Map options, source metadata, camera/map result readers.                                           |
-| `QueryStructs.swift`            | Query descriptors and copied query result readers.                                                 |
-| `RenderStructs.swift`           | Render target descriptors, native buffers, texture frames, readback helpers.                       |
-| `ResourceStructs.swift`         | Resource request/response and transform conversion.                                                |
-| `StyleStructs.swift`            | Style source, image, layer, light, and custom geometry conversion.                                 |
-| `ValueStructs.swift`            | JSON, GeoJSON, feature, geometry, and property value conversion.                                   |
-| `CallbackBox.swift`             | Retained Swift callback box base, active-upcall accounting, teardown rules.                        |
-| `LoggingCallbacks.swift`        | Process-global logging trampoline and callback state.                                              |
-| `ResourceCallbacks.swift`       | Runtime resource transform/provider trampolines and request handle state.                          |
-| `CustomGeometryCallbacks.swift` | Map/style-scoped custom geometry trampolines and delayed release.                                  |
-| `FrameScope.swift`              | Session-owned texture frame active-state checks and scoped `NativePointer` conversion.             |
+| File                             | Contents                                                                                      |
+| -------------------------------- | --------------------------------------------------------------------------------------------- |
+| `CAPI.swift`                     | Thin curated functions that call imported C symbols and return Swift raw values.              |
+| `NativeStatus.swift`             | Status checking, diagnostic capture, native failure payloads.                                 |
+| `NativeHandleState.swift`        | Pointer storage, released state, close-once behavior, and leak reporting hook.                |
+| `NativeHandleLeakReporter.swift` | Leak reporting utility for native handle boxes.                                               |
+| `NativeString.swift`             | UTF-8 and string-view storage, embedded-NUL rejection for C string inputs.                    |
+| `NativeMemory.swift`             | Scoped temporary storage helpers for arrays, bytes, out-pointers, and descriptor graphs.      |
+| `NativeDescriptor.swift`         | Scoped native pointer materialization for backend descriptors.                                |
+| `NativeResultGuard.swift`        | Exactly-once release helper for result handles.                                               |
+| `MapStructs.swift`               | Core coordinates plus map, camera, bounds, viewport, tile, and projection-mode materializers. |
+| `RuntimeStructs.swift`           | Runtime options, copied runtime events, and offline event payloads.                           |
+| `OfflineStructs.swift`           | Offline region definitions and copied region results.                                         |
+| `QueryStructs.swift`             | Query descriptors, feature-state selectors, and copied query result readers.                  |
+| `RenderStructs.swift`            | Render target descriptors, native buffers, texture frames, and readback helpers.              |
+| `ResourceCallbacks.swift`        | Runtime resource transform/provider trampolines and request handle state.                     |
+| `LoggingCallbacks.swift`         | Process-global logging trampoline and callback state.                                         |
+| `StyleStructs.swift`             | Style source, image, layer, light, and custom geometry conversion and callback retention.     |
+| `ValueStructs.swift`             | JSON, GeoJSON, feature, geometry, and property value conversion.                              |
 
 ## C API coverage map
 
-Every public C function listed here needs a Swift implementation or a recorded
-unsupported reason before the binding leaves draft status. Reviewers compare
-this list with `include/maplibre_native_c/*.h` during coverage reviews.
+Every public C function listed here has a Swift implementation in
+`MaplibreNative` or an internal support implementation used by public Swift
+APIs. No coverage item currently needs an unsupported-reason entry. Reviewers
+compare this list with `include/maplibre_native_c/*.h` during coverage reviews.
 
 ### Base and diagnostics
 
@@ -469,18 +488,11 @@ this list with `include/maplibre_native_c/*.h` during coverage reviews.
 
 ## Swift example migration target
 
-`examples/swift-map` currently imports its own raw C module and manages raw
-`OpaquePointer` handles directly. As the binding fills in, migrate the example
-in slices:
-
-1. Replace `CAPIError` and `checkCAPI` with `MaplibreError` and public throwing
-   APIs.
-2. Replace process-global calls with `Maplibre` entry points.
-3. Replace runtime, map, and render session raw pointers with `RuntimeHandle`,
-   `MapHandle`, and `RenderSessionHandle`.
-4. Replace raw camera and render descriptors with Swift descriptor values.
-5. Keep AppKit, SwiftUI, Metal layer ownership, timers, and input policy in the
-   example; they stay outside the low-level binding.
+`examples/swift-map` depends on the `MaplibreNative` product and no longer
+defines a raw C importer target. The example uses `RuntimeHandle`, `MapHandle`,
+`RenderSessionHandle`, Swift camera descriptors, and Swift render descriptors.
+AppKit, SwiftUI, Metal layer ownership, timers, and input policy remain in the
+example because they stay outside the low-level binding.
 
 ## Testing map
 
@@ -497,47 +509,54 @@ on Swift-owned behavior:
 - frame handle active-state invalidation;
 - render readback into caller-owned storage.
 
-Initial tests cover the proof slice. Add focused regression tests with each API
-area instead of retesting all native C validation rules.
+The current test suite covers the proof slice, support helpers, logging,
+runtime/resource callbacks, map/camera/projection controls, render targets,
+query/style/value conversion, custom geometry callbacks, and offline result
+copying. Tests focus on binding-owned behavior instead of retesting all native C
+validation rules.
 
 ## Implementation milestones
 
-1. Keep the proof slice green: ABI version, supported backends, network status,
-   `MaplibreError`, and `NativePointer`.
-2. Implement shared support helpers: string storage, temporary memory,
+1. Complete: proof slice APIs stay green: ABI version, supported backends,
+   network status, `MaplibreError`, and `NativePointer`.
+2. Complete: shared support helpers cover string storage, temporary memory,
    descriptor materialization, copied-result guards, and native handle state
    leak reporting.
-3. Implement process-global logging and callback trampoline retention.
-4. Implement runtime creation, pumping, event polling, resource transforms, and
-   resource providers.
-5. Implement map creation, style loading, camera descriptors, and the camera API
-   used by `examples/swift-map`.
-6. Implement `MapProjectionHandle` and projection helper functions.
-7. Implement render sessions, Metal/Vulkan surface descriptors, texture targets,
-   readback, and frame handles.
-8. Implement query, style, JSON, GeoJSON, image, and custom geometry APIs.
-9. Implement offline operation handles and copied offline results.
-10. Migrate `examples/swift-map` from raw C imports to `MaplibreNative`.
-11. Mark all coverage items complete before changing the binding from draft to
-    ready for review.
+3. Complete: process-global logging wraps C callbacks and retains callback
+   state.
+4. Complete: runtime creation, pumping, event polling, resource transforms, and
+   resource providers are implemented.
+5. Complete: map creation, style loading, camera descriptors, and the camera API
+   used by `examples/swift-map` are public Swift APIs.
+6. Complete: `MapProjectionHandle` and projection helper functions are
+   implemented.
+7. Complete: render sessions, Metal/Vulkan surface descriptors, texture targets,
+   readback, and frame handles are implemented.
+8. Complete: query, style, JSON, GeoJSON, image, and custom geometry APIs are
+   implemented.
+9. Complete: offline operation start/take/discard flows and copied offline
+   results are implemented.
+10. Complete: `examples/swift-map` builds against `MaplibreNative` instead of
+    raw C imports.
+11. Complete: the coverage map has no missing Swift implementation entries.
 
 ## Completion checklist
 
-- [ ] `MaplibreNative` exposes no imported C symbols, raw C structs, field
+- [x] `MaplibreNative` exposes no imported C symbols, raw C structs, field
       masks, or callback trampolines in public API.
-- [ ] Every long-lived native object has a final `*Handle` class with
+- [x] Every long-lived native object has a final `*Handle` class with
       `close() throws` and documented owner-thread behavior.
-- [ ] Every C function in the coverage map has a Swift implementation or a
+- [x] Every C function in the coverage map has a Swift implementation or a
       recorded unsupported reason.
-- [ ] Native failures map to `MaplibreError` with raw status and copied
+- [x] Native failures map to `MaplibreError` with raw status and copied
       diagnostics.
-- [ ] Swift descriptors own semantic fields; support materializers write C
+- [x] Swift descriptors own semantic fields; support materializers write C
       `size` and mask fields.
-- [ ] Callback boxes release exactly once after their C owner scope and active
+- [x] Callback boxes release exactly once after their C owner scope and active
       upcalls finish.
-- [ ] Session-owned texture frame values reject use after frame close.
-- [ ] `examples/swift-map` builds against `MaplibreNative` instead of raw C
+- [x] Session-owned texture frame values reject use after frame close.
+- [x] `examples/swift-map` builds against `MaplibreNative` instead of raw C
       imports.
-- [ ] `mise run //bindings/swift:build` passes.
-- [ ] `mise run //bindings/swift:test` passes.
-- [ ] `mise run //bindings/swift:ci` passes.
+- [x] `mise run //bindings/swift:build` passes.
+- [x] `mise run //bindings/swift:test` passes.
+- [x] `mise run //bindings/swift:ci` passes.
