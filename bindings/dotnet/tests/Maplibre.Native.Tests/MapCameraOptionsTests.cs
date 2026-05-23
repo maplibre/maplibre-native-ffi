@@ -8,6 +8,14 @@ namespace Maplibre.Native.Tests;
 
 public sealed class MapCameraOptionsTests
 {
+    private const int CoordinatePrecision = 10;
+
+    private static void AssertClose(LatLng expected, LatLng actual)
+    {
+        Assert.Equal(expected.Latitude, actual.Latitude, CoordinatePrecision);
+        Assert.Equal(expected.Longitude, actual.Longitude, CoordinatePrecision);
+    }
+
     [Fact]
     public void ViewportAndTileOptionsRoundTripThroughNativeMap()
     {
@@ -87,6 +95,49 @@ public sealed class MapCameraOptionsTests
         var unwrappedBounds = map.LatLngBoundsForCameraUnwrapped(new CameraOptions { Center = new LatLng(0, 0), Zoom = 1 });
         Assert.True(visibleBounds.Southwest.Latitude <= visibleBounds.Northeast.Latitude);
         Assert.True(unwrappedBounds.Southwest.Latitude <= unwrappedBounds.Northeast.Latitude);
+    }
+
+    [Fact]
+    public void CoordinateProjectionRoundTripsThroughNativeMap()
+    {
+        NativeLibraryTestSupport.SkipUnlessNativeLibraryIsAvailable();
+        using var runtime = RuntimeHandle.Create();
+        using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
+        var coordinate = new LatLng(12.5, 34.25);
+
+        var point = map.PixelForLatLng(coordinate);
+        AssertClose(coordinate, map.LatLngForPixel(point));
+
+        var points = map.PixelsForLatLngs([coordinate, new LatLng(0, 0)]);
+        Assert.Equal(2, points.Length);
+        var coordinates = map.LatLngsForPixels(points);
+        Assert.Equal(2, coordinates.Length);
+        AssertClose(coordinate, coordinates[0]);
+        AssertClose(new LatLng(0, 0), coordinates[1]);
+
+        Assert.Empty(map.PixelsForLatLngs([]));
+        Assert.Empty(map.LatLngsForPixels([]));
+    }
+
+    [Fact]
+    public void ProjectionSnapshotSupportsCameraAndCoordinateConversions()
+    {
+        NativeLibraryTestSupport.SkipUnlessNativeLibraryIsAvailable();
+        using var runtime = RuntimeHandle.Create();
+        using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
+        using var projection = map.CreateProjection();
+        var coordinate = new LatLng(12.5, 34.25);
+
+        projection.SetCamera(new CameraOptions { Center = new LatLng(0, 0), Zoom = 1 });
+        projection.SetVisibleCoordinates([new LatLng(-10, -20), new LatLng(10, 20)], new EdgeInsets(1, 2, 3, 4));
+
+        var camera = projection.GetCamera();
+        Assert.NotNull(camera.Center);
+        var point = projection.PixelForLatLng(coordinate);
+        AssertClose(coordinate, projection.LatLngForPixel(point));
+
+        projection.Close();
+        Assert.True(projection.IsClosed);
     }
 
     [Fact]

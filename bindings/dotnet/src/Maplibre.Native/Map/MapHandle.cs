@@ -322,6 +322,90 @@ public sealed unsafe class MapHandle : IDisposable
         NativeStatus.Check(NativeMethods.mln_map_set_free_camera_options(Pointer, &nativeOptions));
     }
 
+    /// <summary>Converts a geographic coordinate to a screen pixel using the current map projection.</summary>
+    public ScreenPoint PixelForLatLng(LatLng coordinate)
+    {
+        var nativeCoordinate = CoreStructs.ToNative(coordinate);
+        mln_screen_point point = default;
+        NativeStatus.Check(NativeMethods.mln_map_pixel_for_lat_lng(Pointer, nativeCoordinate, &point));
+        return MapStructs.FromNative(point);
+    }
+
+    /// <summary>Converts a screen pixel to a geographic coordinate using the current map projection.</summary>
+    public LatLng LatLngForPixel(ScreenPoint point)
+    {
+        var nativePoint = MapStructs.ToNative(point);
+        mln_lat_lng coordinate = default;
+        NativeStatus.Check(NativeMethods.mln_map_lat_lng_for_pixel(Pointer, nativePoint, &coordinate));
+        return CoreStructs.FromNative(coordinate);
+    }
+
+    /// <summary>Converts geographic coordinates to screen pixels using the current map projection.</summary>
+    public ScreenPoint[] PixelsForLatLngs(IReadOnlyList<LatLng> coordinates)
+    {
+        ArgumentNullException.ThrowIfNull(coordinates);
+        if (coordinates.Count == 0)
+        {
+            return [];
+        }
+
+        var nativeCoordinates = new mln_lat_lng[coordinates.Count];
+        var points = new mln_screen_point[coordinates.Count];
+        for (var index = 0; index < coordinates.Count; index++)
+        {
+            nativeCoordinates[index] = CoreStructs.ToNative(coordinates[index]);
+        }
+
+        fixed (mln_lat_lng* coordinatesPointer = nativeCoordinates)
+        fixed (mln_screen_point* pointsPointer = points)
+        {
+            NativeStatus.Check(NativeMethods.mln_map_pixels_for_lat_lngs(Pointer, coordinatesPointer, (nuint)nativeCoordinates.Length, pointsPointer));
+        }
+
+        var result = new ScreenPoint[points.Length];
+        for (var index = 0; index < result.Length; index++)
+        {
+            result[index] = MapStructs.FromNative(points[index]);
+        }
+        return result;
+    }
+
+    /// <summary>Converts screen pixels to geographic coordinates using the current map projection.</summary>
+    public LatLng[] LatLngsForPixels(IReadOnlyList<ScreenPoint> points)
+    {
+        ArgumentNullException.ThrowIfNull(points);
+        if (points.Count == 0)
+        {
+            return [];
+        }
+
+        var nativePoints = new mln_screen_point[points.Count];
+        var coordinates = new mln_lat_lng[points.Count];
+        for (var index = 0; index < points.Count; index++)
+        {
+            nativePoints[index] = MapStructs.ToNative(points[index]);
+        }
+
+        fixed (mln_screen_point* pointsPointer = nativePoints)
+        fixed (mln_lat_lng* coordinatesPointer = coordinates)
+        {
+            NativeStatus.Check(NativeMethods.mln_map_lat_lngs_for_pixels(Pointer, pointsPointer, (nuint)nativePoints.Length, coordinatesPointer));
+        }
+
+        var result = new LatLng[coordinates.Length];
+        for (var index = 0; index < result.Length; index++)
+        {
+            result[index] = CoreStructs.FromNative(coordinates[index]);
+        }
+        return result;
+    }
+
+    /// <summary>Creates a standalone projection snapshot from the map's current camera state.</summary>
+    public MapProjectionHandle CreateProjection()
+    {
+        return MapProjectionHandle.Create(this);
+    }
+
     /// <summary>Gets projection mode options.</summary>
     public ProjectionModeOptions GetProjectionMode()
     {
