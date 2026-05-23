@@ -53,6 +53,50 @@ func (projection *MapProjectionHandle) Close() error {
 	})
 }
 
+// Camera returns this projection helper's camera snapshot.
+func (projection *MapProjectionHandle) Camera() (CameraOptions, error) {
+	ptr, err := projection.ptr()
+	if err != nil {
+		return CameraOptions{}, err
+	}
+	defer projection.state.KeepAlive()
+
+	var camera capi.CameraOptions
+	if err := checkNative(func() capi.Status { return capi.MapProjectionGetCamera(ptr, &camera) }); err != nil {
+		return CameraOptions{}, err
+	}
+	return cameraOptionsFromCAPI(camera), nil
+}
+
+// SetCamera applies selected camera fields to this projection helper.
+func (projection *MapProjectionHandle) SetCamera(camera CameraOptions) error {
+	ptr, err := projection.ptr()
+	if err != nil {
+		return err
+	}
+	defer projection.state.KeepAlive()
+
+	return checkNative(func() capi.Status { return capi.MapProjectionSetCamera(ptr, camera.toCAPI()) })
+}
+
+// SetVisibleCoordinates updates this projection helper's camera to fit
+// coordinates inside padding.
+func (projection *MapProjectionHandle) SetVisibleCoordinates(coordinates []LatLng, padding EdgeInsets) error {
+	ptr, err := projection.ptr()
+	if err != nil {
+		return err
+	}
+	defer projection.state.KeepAlive()
+
+	rawCoordinates := make([]capi.LatLng, len(coordinates))
+	for i, coordinate := range coordinates {
+		rawCoordinates[i] = coordinate.toCAPI()
+	}
+	return checkNative(func() capi.Status {
+		return capi.MapProjectionSetVisibleCoordinates(ptr, rawCoordinates, padding.toCAPI())
+	})
+}
+
 // PixelForLatLng converts a geographic coordinate to a logical screen point.
 func (projection *MapProjectionHandle) PixelForLatLng(coordinate LatLng) (ScreenPoint, error) {
 	ptr, err := projection.ptr()

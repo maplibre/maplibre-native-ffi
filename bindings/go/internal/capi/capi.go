@@ -1439,6 +1439,39 @@ func MapProjectionDestroy(projection *Projection) Status {
 	return Status(C.mln_map_projection_destroy((*C.mln_map_projection)(unsafe.Pointer(projection))))
 }
 
+// MapProjectionGetCamera copies the projection helper camera snapshot.
+func MapProjectionGetCamera(projection *Projection, out *CameraOptions) Status {
+	raw := C.mln_camera_options{size: C.uint32_t(unsafe.Sizeof(C.mln_camera_options{}))}
+	status := Status(C.mln_map_projection_get_camera((*C.mln_map_projection)(unsafe.Pointer(projection)), &raw))
+	if status == StatusOK {
+		*out = cameraOptionsFromC(raw)
+	}
+	return status
+}
+
+// MapProjectionSetCamera applies selected camera fields to the projection helper.
+func MapProjectionSetCamera(projection *Projection, camera CameraOptions) Status {
+	raw := cameraOptionsToC(camera)
+	return Status(C.mln_map_projection_set_camera((*C.mln_map_projection)(unsafe.Pointer(projection)), &raw))
+}
+
+// MapProjectionSetVisibleCoordinates updates the helper camera to fit coordinates.
+func MapProjectionSetVisibleCoordinates(projection *Projection, coordinates []LatLng, padding EdgeInsets) Status {
+	if len(coordinates) == 0 {
+		return Status(C.mln_map_projection_set_visible_coordinates((*C.mln_map_projection)(unsafe.Pointer(projection)), nil, 0, edgeInsetsToC(padding)))
+	}
+	rawCoordinates := make([]C.mln_lat_lng, len(coordinates))
+	for i, coordinate := range coordinates {
+		rawCoordinates[i] = latLngToC(coordinate)
+	}
+	return Status(C.mln_map_projection_set_visible_coordinates(
+		(*C.mln_map_projection)(unsafe.Pointer(projection)),
+		&rawCoordinates[0],
+		C.size_t(len(rawCoordinates)),
+		edgeInsetsToC(padding),
+	))
+}
+
 // MapProjectionPixelForLatLng converts a coordinate to a screen point.
 func MapProjectionPixelForLatLng(projection *Projection, coordinate LatLng, out *ScreenPoint) Status {
 	var rawPoint C.mln_screen_point
