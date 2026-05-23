@@ -4,6 +4,8 @@ plugins { kotlin("multiplatform") version "2.2.21" }
 
 repositories { mavenCentral() }
 
+val nativeBuildDir = providers.environmentVariable("MLN_FFI_BUILD_DIR").orNull
+
 kotlin {
   compilerOptions { freeCompilerArgs.add("-Xexpect-actual-classes") }
 
@@ -20,6 +22,15 @@ kotlin {
     }
 
   targets.withType<KotlinNativeTarget>().configureEach {
+    if (nativeBuildDir != null) {
+      binaries.all {
+        linkerOpts("-L$nativeBuildDir", "-lmaplibre-native-c")
+        if (hostOs.contains("mac")) {
+          linkerOpts("-Wl,-rpath,$nativeBuildDir")
+        }
+      }
+    }
+
     compilations.getByName("main") {
       cinterops {
         val maplibreNativeC by creating {
