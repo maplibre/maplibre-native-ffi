@@ -25,6 +25,8 @@ public sealed class TileSourceOptions
 
 public sealed class CustomGeometrySourceOptions
 {
+    public CustomGeometrySourceCallback? FetchTile { get; set; }
+    public CustomGeometrySourceCallback? CancelTile { get; set; }
     public uint? TileSize { get; set; }
     public double? MinimumZoom { get; set; }
     public double? MaximumZoom { get; set; }

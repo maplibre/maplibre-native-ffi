@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using Maplibre.Native.Geo;
 using Maplibre.Native.Internal.C;
 using Maplibre.Native.Render;
 using Maplibre.Native.Style;
@@ -143,6 +144,13 @@ internal static class StyleStructs
 
     internal static StyleImageInfo FromNative(mln_style_image_info info) =>
         new(info.width, info.height, info.stride, info.byte_length, info.pixel_ratio, info.sdf != 0);
+
+    internal static mln_canonical_tile_id ToNative(CanonicalTileId tileId) => new()
+    {
+        z = tileId.Z,
+        x = tileId.X,
+        y = tileId.Y,
+    };
 }
 
 internal sealed unsafe class NativeStringViewArray : IDisposable

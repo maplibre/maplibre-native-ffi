@@ -1,6 +1,7 @@
 using Maplibre.Native.Camera;
 using Maplibre.Native.Geo;
 using Maplibre.Native.Internal.C;
+using Maplibre.Native.Internal.Callback;
 using Maplibre.Native.Internal.Handle;
 using Maplibre.Native.Internal.Memory;
 using Maplibre.Native.Internal.Status;
@@ -17,6 +18,7 @@ public sealed unsafe class MapHandle : IDisposable
 {
     private readonly RuntimeHandle runtime;
     private readonly NativeHandleState<mln_map> state;
+    private readonly Dictionary<string, CustomGeometrySourceState> customGeometrySources = [];
 
     private MapHandle(RuntimeHandle runtime, mln_map* handle)
     {
@@ -476,6 +478,7 @@ public sealed unsafe class MapHandle : IDisposable
         ArgumentNullException.ThrowIfNull(url);
         using var nativeUrl = NativeUtf8String.FromNullableString(url, nameof(url));
         NativeStatus.Check(NativeMethods.mln_map_set_style_url(Pointer, nativeUrl.Pointer));
+        ClearCustomGeometrySources();
     }
 
     /// <summary>Loads inline style JSON through MapLibre Native style APIs.</summary>
@@ -484,6 +487,7 @@ public sealed unsafe class MapHandle : IDisposable
         ArgumentNullException.ThrowIfNull(json);
         using var nativeJson = NativeUtf8String.FromNullableString(json, nameof(json));
         NativeStatus.Check(NativeMethods.mln_map_set_style_json(Pointer, nativeJson.Pointer));
+        ClearCustomGeometrySources();
     }
 
     /// <summary>Adds a style source from a JSON-like value.</summary>
@@ -500,6 +504,10 @@ public sealed unsafe class MapHandle : IDisposable
         using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
         bool removed = false;
         NativeStatus.Check(NativeMethods.mln_map_remove_style_source(Pointer, nativeSourceId.Value, &removed));
+        if (removed && customGeometrySources.Remove(sourceId, out var state))
+        {
+            state.Dispose();
+        }
         return removed;
     }
 
@@ -607,6 +615,52 @@ public sealed unsafe class MapHandle : IDisposable
         using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
         using var nativeData = NativeGeoJson.From(data);
         NativeStatus.Check(NativeMethods.mln_map_set_geojson_source_data(Pointer, nativeSourceId.Value, nativeData.Pointer));
+    }
+
+    /// <summary>Adds a custom geometry source with tile callbacks.</summary>
+    public void AddCustomGeometrySource(string sourceId, CustomGeometrySourceOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
+        var sourceState = new CustomGeometrySourceState(options);
+        try
+        {
+            var descriptor = sourceState.Descriptor;
+            NativeStatus.Check(NativeMethods.mln_map_add_custom_geometry_source(Pointer, nativeSourceId.Value, &descriptor));
+            if (customGeometrySources.Remove(sourceId, out var previous))
+            {
+                previous.Dispose();
+            }
+            customGeometrySources[sourceId] = sourceState;
+        }
+        catch
+        {
+            sourceState.Dispose();
+            throw;
+        }
+    }
+
+    /// <summary>Sets custom geometry source tile data.</summary>
+    public void SetCustomGeometrySourceTileData(string sourceId, CanonicalTileId tileId, GeoJson data)
+    {
+        using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
+        using var nativeData = NativeGeoJson.From(data);
+        var nativeTileId = StyleStructs.ToNative(tileId);
+        NativeStatus.Check(NativeMethods.mln_map_set_custom_geometry_source_tile_data(Pointer, nativeSourceId.Value, nativeTileId, nativeData.Pointer));
+    }
+
+    /// <summary>Invalidates one custom geometry source tile.</summary>
+    public void InvalidateCustomGeometrySourceTile(string sourceId, CanonicalTileId tileId)
+    {
+        using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
+        NativeStatus.Check(NativeMethods.mln_map_invalidate_custom_geometry_source_tile(Pointer, nativeSourceId.Value, StyleStructs.ToNative(tileId)));
+    }
+
+    /// <summary>Invalidates custom geometry source tiles that intersect bounds.</summary>
+    public void InvalidateCustomGeometrySourceRegion(string sourceId, LatLngBounds bounds)
+    {
+        using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
+        NativeStatus.Check(NativeMethods.mln_map_invalidate_custom_geometry_source_region(Pointer, nativeSourceId.Value, MapStructs.ToNative(bounds)));
     }
 
     /// <summary>Adds a vector source that loads TileJSON from a URL.</summary>
@@ -1013,6 +1067,16 @@ public sealed unsafe class MapHandle : IDisposable
     public void Close()
     {
         state.Close();
+        ClearCustomGeometrySources();
+    }
+
+    private void ClearCustomGeometrySources()
+    {
+        foreach (var source in customGeometrySources.Values)
+        {
+            source.Dispose();
+        }
+        customGeometrySources.Clear();
     }
 
     private static mln_lat_lng[] ToNativeCoordinates(IReadOnlyList<LatLng> coordinates, string parameterName)
@@ -1056,7 +1120,10 @@ public sealed unsafe class MapHandle : IDisposable
     /// <inheritdoc />
     public void Dispose()
     {
-        state.TryClose();
+        if (state.TryClose())
+        {
+            ClearCustomGeometrySources();
+        }
         GC.KeepAlive(runtime);
     }
 }
