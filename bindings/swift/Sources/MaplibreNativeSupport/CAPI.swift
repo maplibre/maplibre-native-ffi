@@ -272,4 +272,181 @@ public enum CAPI {
     }
     return NativeLatLng(output.value)
   }
+
+  public static func renderSessionResize(
+    _ session: OpaquePointer,
+    width: UInt32,
+    height: UInt32,
+    scaleFactor: Double
+  ) throws {
+    try checkStatus(mln_render_session_resize(session, width, height, scaleFactor))
+  }
+
+  public static func renderSessionRenderUpdate(_ session: OpaquePointer) throws {
+    try checkStatus(mln_render_session_render_update(session))
+  }
+
+  public static func renderSessionDetach(_ session: OpaquePointer) throws {
+    try checkStatus(mln_render_session_detach(session))
+  }
+
+  public static func renderSessionDestroy(_ session: OpaquePointer) throws {
+    try checkStatus(mln_render_session_destroy(session))
+  }
+
+  public static func renderSessionReduceMemoryUse(_ session: OpaquePointer) throws {
+    try checkStatus(mln_render_session_reduce_memory_use(session))
+  }
+
+  public static func renderSessionClearData(_ session: OpaquePointer) throws {
+    try checkStatus(mln_render_session_clear_data(session))
+  }
+
+  public static func renderSessionDumpDebugLogs(_ session: OpaquePointer) throws {
+    try checkStatus(mln_render_session_dump_debug_logs(session))
+  }
+
+  public static func metalSurfaceDescriptorDefault() -> mln_metal_surface_descriptor {
+    mln_metal_surface_descriptor_default()
+  }
+
+  public static func vulkanSurfaceDescriptorDefault() -> mln_vulkan_surface_descriptor {
+    mln_vulkan_surface_descriptor_default()
+  }
+
+  public static func metalOwnedTextureDescriptorDefault() -> mln_metal_owned_texture_descriptor {
+    mln_metal_owned_texture_descriptor_default()
+  }
+
+  public static func metalBorrowedTextureDescriptorDefault() -> mln_metal_borrowed_texture_descriptor {
+    mln_metal_borrowed_texture_descriptor_default()
+  }
+
+  public static func vulkanOwnedTextureDescriptorDefault() -> mln_vulkan_owned_texture_descriptor {
+    mln_vulkan_owned_texture_descriptor_default()
+  }
+
+  public static func vulkanBorrowedTextureDescriptorDefault() -> mln_vulkan_borrowed_texture_descriptor {
+    mln_vulkan_borrowed_texture_descriptor_default()
+  }
+
+  public static func textureImageInfoDefault() -> mln_texture_image_info {
+    mln_texture_image_info_default()
+  }
+
+  public static func metalSurfaceAttach(
+    map: OpaquePointer,
+    descriptor: UnsafePointer<mln_metal_surface_descriptor>
+  ) throws -> OpaquePointer {
+    let output = try NativeMemory.withTemporary(Optional<OpaquePointer>.none) { session in
+      try checkStatus(mln_metal_surface_attach(map, descriptor, session))
+    }
+    guard let session = output.value else {
+      throw NativeStatusFailure(rawStatus: 0, diagnostic: "mln_metal_surface_attach returned a null session")
+    }
+    return session
+  }
+
+  public static func vulkanSurfaceAttach(
+    map: OpaquePointer,
+    descriptor: UnsafePointer<mln_vulkan_surface_descriptor>
+  ) throws -> OpaquePointer {
+    let output = try NativeMemory.withTemporary(Optional<OpaquePointer>.none) { session in
+      try checkStatus(mln_vulkan_surface_attach(map, descriptor, session))
+    }
+    guard let session = output.value else {
+      throw NativeStatusFailure(rawStatus: 0, diagnostic: "mln_vulkan_surface_attach returned a null session")
+    }
+    return session
+  }
+
+  public static func textureReadPremultipliedRGBA8(
+    session: OpaquePointer,
+    data: UnsafeMutablePointer<UInt8>?,
+    capacity: Int
+  ) throws -> mln_texture_image_info {
+    var info = textureImageInfoDefault()
+    try checkStatus(mln_texture_read_premultiplied_rgba8(session, data, capacity, &info))
+    return info
+  }
+
+  public static func metalOwnedTextureAttach(
+    map: OpaquePointer,
+    descriptor: UnsafePointer<mln_metal_owned_texture_descriptor>
+  ) throws -> OpaquePointer {
+    let output = try NativeMemory.withTemporary(Optional<OpaquePointer>.none) { session in
+      try checkStatus(mln_metal_owned_texture_attach(map, descriptor, session))
+    }
+    guard let session = output.value else {
+      throw NativeStatusFailure(rawStatus: 0, diagnostic: "mln_metal_owned_texture_attach returned a null session")
+    }
+    return session
+  }
+
+  public static func metalBorrowedTextureAttach(
+    map: OpaquePointer,
+    descriptor: UnsafePointer<mln_metal_borrowed_texture_descriptor>
+  ) throws -> OpaquePointer {
+    let output = try NativeMemory.withTemporary(Optional<OpaquePointer>.none) { session in
+      try checkStatus(mln_metal_borrowed_texture_attach(map, descriptor, session))
+    }
+    guard let session = output.value else {
+      throw NativeStatusFailure(rawStatus: 0, diagnostic: "mln_metal_borrowed_texture_attach returned a null session")
+    }
+    return session
+  }
+
+  public static func vulkanOwnedTextureAttach(
+    map: OpaquePointer,
+    descriptor: UnsafePointer<mln_vulkan_owned_texture_descriptor>
+  ) throws -> OpaquePointer {
+    let output = try NativeMemory.withTemporary(Optional<OpaquePointer>.none) { session in
+      try checkStatus(mln_vulkan_owned_texture_attach(map, descriptor, session))
+    }
+    guard let session = output.value else {
+      throw NativeStatusFailure(rawStatus: 0, diagnostic: "mln_vulkan_owned_texture_attach returned a null session")
+    }
+    return session
+  }
+
+  public static func vulkanBorrowedTextureAttach(
+    map: OpaquePointer,
+    descriptor: UnsafePointer<mln_vulkan_borrowed_texture_descriptor>
+  ) throws -> OpaquePointer {
+    let output = try NativeMemory.withTemporary(Optional<OpaquePointer>.none) { session in
+      try checkStatus(mln_vulkan_borrowed_texture_attach(map, descriptor, session))
+    }
+    guard let session = output.value else {
+      throw NativeStatusFailure(rawStatus: 0, diagnostic: "mln_vulkan_borrowed_texture_attach returned a null session")
+    }
+    return session
+  }
+
+  public static func metalOwnedTextureAcquireFrame(_ session: OpaquePointer) throws -> mln_metal_owned_texture_frame {
+    var frame = mln_metal_owned_texture_frame()
+    frame.size = UInt32(MemoryLayout<mln_metal_owned_texture_frame>.size)
+    try checkStatus(mln_metal_owned_texture_acquire_frame(session, &frame))
+    return frame
+  }
+
+  public static func metalOwnedTextureReleaseFrame(
+    _ session: OpaquePointer,
+    frame: UnsafePointer<mln_metal_owned_texture_frame>
+  ) throws {
+    try checkStatus(mln_metal_owned_texture_release_frame(session, frame))
+  }
+
+  public static func vulkanOwnedTextureAcquireFrame(_ session: OpaquePointer) throws -> mln_vulkan_owned_texture_frame {
+    var frame = mln_vulkan_owned_texture_frame()
+    frame.size = UInt32(MemoryLayout<mln_vulkan_owned_texture_frame>.size)
+    try checkStatus(mln_vulkan_owned_texture_acquire_frame(session, &frame))
+    return frame
+  }
+
+  public static func vulkanOwnedTextureReleaseFrame(
+    _ session: OpaquePointer,
+    frame: UnsafePointer<mln_vulkan_owned_texture_frame>
+  ) throws {
+    try checkStatus(mln_vulkan_owned_texture_release_frame(session, frame))
+  }
 }

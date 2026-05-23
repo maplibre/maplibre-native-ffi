@@ -1,10 +1,14 @@
 public struct NativePointer: Sendable, Hashable, CustomStringConvertible {
   public static let null = NativePointer(bitPattern: 0)
 
-  private let bitPattern: UInt
+  let bitPattern: UInt
 
   public init(bitPattern: UInt) {
     self.bitPattern = bitPattern
+  }
+
+  public var addressBitPattern: UInt {
+    bitPattern
   }
 
   public var isNull: Bool {
