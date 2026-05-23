@@ -1,15 +1,19 @@
 using Maplibre.Native.Internal.C;
+using Maplibre.Native.Internal.Callback;
 using Maplibre.Native.Internal.Handle;
 using Maplibre.Native.Internal.Loader;
 using Maplibre.Native.Internal.Status;
 using Maplibre.Native.Internal.Struct;
+using Maplibre.Native.Resource;
 
 namespace Maplibre.Native.Runtime;
 
 /// <summary>Owner-thread runtime handle for MapLibre Native work and event polling.</summary>
 public sealed unsafe class RuntimeHandle : IDisposable
 {
+    private readonly Lock callbackGate = new();
     private readonly NativeHandleState<mln_runtime> state;
+    private ResourceTransformState? resourceTransformState;
 
     private RuntimeHandle(mln_runtime* handle)
     {
@@ -37,6 +41,40 @@ public sealed unsafe class RuntimeHandle : IDisposable
     /// <summary>Whether this wrapper has successfully closed its native handle.</summary>
     public bool IsClosed => state.IsClosed;
 
+    /// <summary>Installs or replaces the runtime-scoped resource transform callback.</summary>
+    public void SetResourceTransform(ResourceTransformCallback callback)
+    {
+        var replacement = new ResourceTransformState(callback);
+        lock (callbackGate)
+        {
+            try
+            {
+                var descriptor = replacement.Descriptor;
+                NativeStatus.Check(NativeMethods.mln_runtime_set_resource_transform(Pointer, &descriptor));
+                var previous = resourceTransformState;
+                resourceTransformState = replacement;
+                previous?.Dispose();
+            }
+            catch
+            {
+                replacement.Dispose();
+                throw;
+            }
+        }
+    }
+
+    /// <summary>Clears the runtime-scoped resource transform callback.</summary>
+    public void ClearResourceTransform()
+    {
+        lock (callbackGate)
+        {
+            NativeStatus.Check(NativeMethods.mln_runtime_clear_resource_transform(Pointer));
+            var previous = resourceTransformState;
+            resourceTransformState = null;
+            previous?.Dispose();
+        }
+    }
+
     /// <summary>Runs one pending owner-thread task for this runtime.</summary>
     public void RunOnce()
     {
@@ -56,11 +94,25 @@ public sealed unsafe class RuntimeHandle : IDisposable
     public void Close()
     {
         state.Close();
+        DisposeCallbackState();
     }
 
     /// <inheritdoc />
     public void Dispose()
     {
-        state.TryClose();
+        if (state.TryClose())
+        {
+            DisposeCallbackState();
+        }
+    }
+
+    private void DisposeCallbackState()
+    {
+        lock (callbackGate)
+        {
+            var transform = resourceTransformState;
+            resourceTransformState = null;
+            transform?.Dispose();
+        }
     }
 }
