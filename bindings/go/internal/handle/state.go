@@ -2,6 +2,7 @@ package handle
 
 import (
 	"fmt"
+	"log"
 	"runtime"
 	"sync"
 
@@ -25,7 +26,11 @@ func New[T any](ptr *T, typeName string, parents ...any) (*State[T], error) {
 	if ptr == nil {
 		return nil, fmt.Errorf("%s pointer is nil", typeName)
 	}
-	return &State[T]{ptr: ptr, typeName: typeName, parents: parents}, nil
+	state := &State[T]{ptr: ptr, typeName: typeName, parents: parents}
+	runtime.SetFinalizer(state, func(state *State[T]) {
+		state.reportLeakIfLive()
+	})
+	return state, nil
 }
 
 // Ptr returns the native pointer and whether the handle is still live.
@@ -61,8 +66,19 @@ func (state *State[T]) Close(destroy DestroyFunc[T]) capi.Status {
 		state.ptr = nil
 	}
 	state.mu.Unlock()
+	runtime.SetFinalizer(state, nil)
 	state.KeepAlive()
 	return capi.StatusOK
+}
+
+func (state *State[T]) reportLeakIfLive() {
+	state.mu.Lock()
+	live := state.ptr != nil
+	typeName := state.typeName
+	state.mu.Unlock()
+	if live {
+		log.Printf("maplibre: leaked %s; call Close on its owner thread", typeName)
+	}
 }
 
 // KeepAlive keeps the handle state and retained parents reachable until this

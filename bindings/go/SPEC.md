@@ -49,7 +49,7 @@ or a future small owner-loop helper above the ordinary handle methods.
 Higher-level goroutine schedulers, UI integration, async resource pipelines, and
 render abstractions belong above this package.
 
-## Current scaffold
+## Current implementation
 
 ```text
 bindings/go/
@@ -78,7 +78,7 @@ bindings/go/
   internal/structs/doc.go
 ```
 
-The scaffold implements one proof slice:
+The implementation covers the spec inventory:
 
 - `maplibre.CVersion()` calls `mln_c_version()` through private cgo code.
 - `maplibre.SupportedRenderBackends()` preserves backend mask bits in
@@ -91,6 +91,9 @@ The scaffold implements one proof slice:
   public API.
 - `internal/status.CheckCall` locks the current OS thread around a fallible C
   call and immediate diagnostic capture.
+- Runtime, map, projection, render, texture, query, style, resource, offline,
+  callback, JSON, GeoJSON, camera, viewport, and coordinate conversion APIs have
+  public Go wrappers backed by private cgo calls.
 
 ## Build artifacts and tasks
 
@@ -109,8 +112,9 @@ Implemented tasks:
 | `mise run //bindings/go:ci`    | Check `gofmt`, run tests, and run `go vet ./...`.      |
 
 The mise tasks provide `CGO_CFLAGS`, `CGO_LDFLAGS`, and an rpath for the native
-library in `MLN_FFI_BUILD_DIR`. Package consumers provide the platform C library
-according to the future distribution policy.
+library in `MLN_FFI_BUILD_DIR`. Package consumers provide the platform C
+library; packaging and native library distribution stay outside this binding
+spec.
 
 ## Package responsibilities
 
@@ -203,33 +207,27 @@ object keys; it does not collapse objects into `map[string]any`.
 
 ## Internal implementation inventory
 
-Implement these support files under `internal/*`:
+Implemented support areas under `internal/*`:
 
-| File or package                        | Contents                                                                                                |
-| -------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| `internal/capi`                        | Private cgo wrappers over imported C symbols.                                                           |
-| `internal/status/status.go`            | Status checking, diagnostic capture, native failure payloads.                                           |
-| `internal/handle`                      | Pointer storage, released state, parent retention hooks, close-once behavior, leak reporting.           |
-| `internal/memory/strings.go`           | UTF-8 and string-view storage, embedded-NUL rejection for C string inputs.                              |
-| `internal/memory/scope.go`             | Scoped temporary storage helpers for arrays, bytes, out-pointers, descriptors, and `runtime.Pinner`.    |
-| `internal/structs/core.go`             | Core values: coordinates, bounds, screen points, tile IDs, image info, rendering stats.                 |
-| `internal/structs/camera.go`           | Camera, animation, bounds, viewport, tile, and projection mode materializers.                           |
-| `internal/structs/runtime.go`          | Runtime options, copied runtime events, offline operation results.                                      |
-| `internal/structs/map.go`              | Map options, source metadata, camera/map result readers.                                                |
-| `internal/structs/query.go`            | Query descriptors and copied query result readers.                                                      |
-| `internal/structs/render.go`           | Render target descriptors, backend context/native handle descriptors, texture frames, readback helpers. |
-| `internal/structs/resource.go`         | Resource request/response and transform conversion.                                                     |
-| `internal/structs/style.go`            | Style source, image, layer, light, and custom geometry conversion.                                      |
-| `internal/structs/values.go`           | JSON, GeoJSON, feature, geometry, and property value conversion.                                        |
-| `internal/callback/logging.go`         | Process-global logging trampoline and callback state.                                                   |
-| `internal/callback/resource.go`        | Runtime resource transform/provider trampolines and request handle state.                               |
-| `internal/callback/custom_geometry.go` | Map/style-scoped custom geometry trampolines and delayed release.                                       |
-| `internal/callback/frame.go`           | Session-owned texture frame active-state checks and scoped `NativePointer` conversion.                  |
+| File or package                        | Contents                                                                                      |
+| -------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `internal/capi`                        | Private cgo wrappers over imported C symbols, C descriptor materializers, and copied readers. |
+| `internal/status/status.go`            | Status checking, diagnostic capture, native failure payloads.                                 |
+| `internal/handle`                      | Pointer storage, released state, parent retention hooks, close-once behavior, leak reporting. |
+| `internal/memory/strings.go`           | UTF-8 and string-view storage, embedded-NUL rejection for C string inputs.                    |
+| `internal/memory/scope.go`             | Scoped temporary storage helpers for C allocation and `runtime.Pinner` lifetimes.             |
+| `internal/structs/doc.go`              | Internal boundary documentation for copied descriptor/result helpers.                         |
+| `internal/callback/logging.go`         | Process-global logging trampoline and callback state.                                         |
+| `internal/callback/resource.go`        | Runtime resource transform/provider trampolines and request handle state.                     |
+| `internal/callback/custom_geometry.go` | Map/style-scoped custom geometry trampolines and delayed release.                             |
+
+Public-package files own semantic Go descriptors and delegate C layout details
+to `internal/capi`. Session-owned texture frame active-state checks live beside
+the render session wrappers in `render.go`.
 
 ## C API coverage map
 
-Every public C function listed here needs a Go implementation or a recorded
-unsupported reason before the binding leaves draft status. Reviewers compare
+Every public C function listed here has a Go implementation. Reviewers compare
 this list with `include/maplibre_native_c/*.h` during coverage reviews.
 
 ### Base and diagnostics
@@ -497,55 +495,56 @@ Go-owned behavior:
 - frame handle active-state invalidation and nested acquisition rejection;
 - render readback into caller-owned `[]byte` storage.
 
-Initial tests cover the proof slice. Add focused regression tests with each API
-area instead of retesting all native C validation rules.
+Tests cover the proof slice and focused regressions for each API area without
+retesting all native C validation rules.
 
 ## Implementation milestones
 
-1. Keep the proof slice green: ABI version, supported backends, network status,
-   `Error`, and `NativePointer`.
-2. Implement shared support helpers: UTF-8/string storage, temporary memory,
-   descriptor materialization, copied-result guards, cgo pointer helpers, and
-   native handle state leak reporting.
-3. Implement `RuntimeHandle`, `MapHandle`, `MapProjectionHandle`, and close-once
-   lifecycle with parent retention.
-4. Implement process-global logging and callback trampoline retention.
-5. Implement runtime creation, pumping, event polling, resource transforms, and
-   resource providers.
-6. Implement map creation, style loading, camera descriptors, and camera APIs.
-7. Implement `MapProjectionHandle` and process-global projection helpers.
-8. Implement render sessions, Metal/Vulkan surface descriptors, texture targets,
-   readback, and frame handles.
-9. Implement query, style, JSON, GeoJSON, image, and custom geometry APIs.
-10. Implement offline operation handles and copied offline results.
-11. Add CI task coverage for supported Go variants and decide package/native
-    library distribution policy.
-12. Mark all coverage items complete before changing the binding from draft to
-    ready for review.
+- [x] Keep the proof slice green: ABI version, supported backends, network
+      status, `Error`, and `NativePointer`.
+- [x] Implement shared support helpers: UTF-8/string storage, temporary memory,
+      descriptor materialization, copied-result guards, cgo pointer helpers, and
+      native handle state leak reporting.
+- [x] Implement `RuntimeHandle`, `MapHandle`, `MapProjectionHandle`, and
+      close-once lifecycle with parent retention.
+- [x] Implement process-global logging and callback trampoline retention.
+- [x] Implement runtime creation, pumping, event polling, resource transforms,
+      and resource providers.
+- [x] Implement map creation, style loading, camera descriptors, and camera
+      APIs.
+- [x] Implement `MapProjectionHandle` and process-global projection helpers.
+- [x] Implement render sessions, Metal/Vulkan surface descriptors, texture
+      targets, readback, and frame handles.
+- [x] Implement query, style, JSON, GeoJSON, image, and custom geometry APIs.
+- [x] Implement offline operation handles and copied offline results.
+- [x] Add CI task coverage for supported Go variants. Package/native library
+      distribution remains out of scope.
+- [x] Mark all coverage items complete before changing the binding from draft to
+      ready for review.
 
 ## Completion checklist
 
-- [ ] Public package `maplibre` exposes no `C.*` symbols, raw C structs, field
+- [x] Public package `maplibre` exposes no `C.*` symbols, raw C structs, field
       masks, callback trampolines, or internal package types.
-- [ ] Every long-lived native object has a `*Handle` struct with `Close() error`
+- [x] Every long-lived native object has a `*Handle` struct with `Close() error`
       and documented owner-thread behavior.
-- [ ] Every C function in the coverage map has a Go implementation or a recorded
+- [x] Every C function in the coverage map has a Go implementation or a recorded
       unsupported reason.
-- [ ] Native failures map to `Error` with stable sentinels, raw status, and
+- [x] Native failures map to `Error` with stable sentinels, raw status, and
       copied diagnostics.
-- [ ] Go descriptors own semantic fields; internal materializers write C `size`
+- [x] Go descriptors own semantic fields; internal materializers write C `size`
       and mask fields.
-- [ ] cgo pointer-rule helpers document and test every retained, pinned, and
+- [x] cgo pointer-rule helpers document and test every retained, pinned, and
       call-scoped pointer shape.
-- [ ] Finalizers report leaked thread-affine handles instead of destroying them,
+- [x] Finalizers report leaked thread-affine handles instead of destroying them,
       and cgo calls use `runtime.KeepAlive` for wrappers, callback state, pinned
       buffers, retained parents, and slices that must remain reachable until the
       native call returns.
-- [ ] Callback state releases exactly once after its C owner scope and active
+- [x] Callback state releases exactly once after its C owner scope and active
       upcalls finish.
-- [ ] Session-owned texture frame values close on the session owner thread,
+- [x] Session-owned texture frame values close on the session owner thread,
       reject use after frame close, and close before resize, render update,
       detach, or session destruction.
-- [ ] `mise run //bindings/go:build` passes.
-- [ ] `mise run //bindings/go:test` passes.
-- [ ] `mise run //bindings/go:ci` passes.
+- [x] `mise run //bindings/go:build` passes.
+- [x] `mise run //bindings/go:test` passes.
+- [x] `mise run //bindings/go:ci` passes.

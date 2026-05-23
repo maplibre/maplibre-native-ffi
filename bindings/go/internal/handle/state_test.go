@@ -1,6 +1,9 @@
 package handle
 
 import (
+	"bytes"
+	"log"
+	"strings"
 	"sync/atomic"
 	"testing"
 
@@ -91,5 +94,57 @@ func TestStateKeepsParentsReachable(t *testing.T) {
 	state.KeepAlive()
 	if got := state.TypeName(); got != "test_handle" {
 		t.Fatalf("TypeName() = %q, want test_handle", got)
+	}
+}
+
+func TestStateLeakReportDoesNotDestroyHandle(t *testing.T) {
+	native := &testNativeHandle{value: 1}
+	state, err := New(native, "test_handle")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var buf bytes.Buffer
+	oldWriter := log.Writer()
+	oldFlags := log.Flags()
+	log.SetOutput(&buf)
+	log.SetFlags(0)
+	defer func() {
+		log.SetOutput(oldWriter)
+		log.SetFlags(oldFlags)
+	}()
+
+	state.reportLeakIfLive()
+	if got := buf.String(); !strings.Contains(got, "maplibre: leaked test_handle") {
+		t.Fatalf("leak report = %q, want leaked test_handle", got)
+	}
+	if ptr, live := state.Ptr(); !live || ptr != native {
+		t.Fatalf("Ptr() after leak report = %p, %v; want live native pointer", ptr, live)
+	}
+}
+
+func TestStateLeakReportIgnoresClosedHandle(t *testing.T) {
+	native := &testNativeHandle{value: 1}
+	state, err := New(native, "test_handle")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if status := state.Close(func(*testNativeHandle) capi.Status { return capi.StatusOK }); status != capi.StatusOK {
+		t.Fatalf("Close status = %d, want OK", status)
+	}
+
+	var buf bytes.Buffer
+	oldWriter := log.Writer()
+	oldFlags := log.Flags()
+	log.SetOutput(&buf)
+	log.SetFlags(0)
+	defer func() {
+		log.SetOutput(oldWriter)
+		log.SetFlags(oldFlags)
+	}()
+
+	state.reportLeakIfLive()
+	if got := buf.String(); got != "" {
+		t.Fatalf("leak report after close = %q, want empty", got)
 	}
 }
