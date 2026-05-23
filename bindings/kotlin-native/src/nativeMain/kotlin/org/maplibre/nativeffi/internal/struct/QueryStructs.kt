@@ -3,28 +3,48 @@ package org.maplibre.nativeffi.internal.struct
 import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.MemScope
+import kotlinx.cinterop.ULongVar
 import kotlinx.cinterop.alloc
 import kotlinx.cinterop.allocArray
 import kotlinx.cinterop.get
+import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.ptr
 import kotlinx.cinterop.sizeOf
+import kotlinx.cinterop.value
+import org.maplibre.nativeffi.geo.Feature
 import org.maplibre.nativeffi.geo.ScreenBox
+import org.maplibre.nativeffi.internal.c.MLN_FEATURE_EXTENSION_RESULT_TYPE_FEATURE_COLLECTION
+import org.maplibre.nativeffi.internal.c.MLN_FEATURE_EXTENSION_RESULT_TYPE_VALUE
 import org.maplibre.nativeffi.internal.c.MLN_FEATURE_STATE_SELECTOR_FEATURE_ID
 import org.maplibre.nativeffi.internal.c.MLN_FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID
 import org.maplibre.nativeffi.internal.c.MLN_FEATURE_STATE_SELECTOR_STATE_KEY
+import org.maplibre.nativeffi.internal.c.MLN_QUERIED_FEATURE_SOURCE_ID
+import org.maplibre.nativeffi.internal.c.MLN_QUERIED_FEATURE_SOURCE_LAYER_ID
+import org.maplibre.nativeffi.internal.c.MLN_QUERIED_FEATURE_STATE
 import org.maplibre.nativeffi.internal.c.MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS
 import org.maplibre.nativeffi.internal.c.MLN_RENDERED_QUERY_GEOMETRY_TYPE_BOX
 import org.maplibre.nativeffi.internal.c.MLN_RENDERED_QUERY_GEOMETRY_TYPE_LINE_STRING
 import org.maplibre.nativeffi.internal.c.MLN_RENDERED_QUERY_GEOMETRY_TYPE_POINT
 import org.maplibre.nativeffi.internal.c.MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS
+import org.maplibre.nativeffi.internal.c.mln_feature_collection
+import org.maplibre.nativeffi.internal.c.mln_feature_extension_result_destroy
+import org.maplibre.nativeffi.internal.c.mln_feature_extension_result_get
+import org.maplibre.nativeffi.internal.c.mln_feature_extension_result_info
+import org.maplibre.nativeffi.internal.c.mln_feature_query_result_count
+import org.maplibre.nativeffi.internal.c.mln_feature_query_result_destroy
+import org.maplibre.nativeffi.internal.c.mln_feature_query_result_get
 import org.maplibre.nativeffi.internal.c.mln_feature_state_selector
+import org.maplibre.nativeffi.internal.c.mln_queried_feature
 import org.maplibre.nativeffi.internal.c.mln_rendered_feature_query_options
 import org.maplibre.nativeffi.internal.c.mln_rendered_feature_query_options_default
 import org.maplibre.nativeffi.internal.c.mln_rendered_query_geometry
 import org.maplibre.nativeffi.internal.c.mln_source_feature_query_options
 import org.maplibre.nativeffi.internal.c.mln_source_feature_query_options_default
 import org.maplibre.nativeffi.internal.c.mln_string_view
+import org.maplibre.nativeffi.internal.status.Status
+import org.maplibre.nativeffi.query.FeatureExtensionResult
 import org.maplibre.nativeffi.query.FeatureStateSelector
+import org.maplibre.nativeffi.query.QueriedFeature
 import org.maplibre.nativeffi.query.RenderedFeatureQueryOptions
 import org.maplibre.nativeffi.query.RenderedQueryGeometry
 import org.maplibre.nativeffi.query.SourceFeatureQueryOptions
@@ -32,6 +52,46 @@ import org.maplibre.nativeffi.query.SourceFeatureQueryOptions
 /** Materializes feature query descriptors at the C boundary. */
 @OptIn(ExperimentalForeignApi::class)
 internal object QueryStructs {
+  fun featureQueryResult(
+    result: CPointer<cnames.structs.mln_feature_query_result>
+  ): List<QueriedFeature> =
+    try {
+      memScoped {
+        val outCount = alloc<ULongVar>()
+        Status.check(mln_feature_query_result_count(result, outCount.ptr))
+        List(outCount.value.toInt()) { index ->
+          val outFeature = alloc<mln_queried_feature>()
+          outFeature.size = sizeOf<mln_queried_feature>().toUInt()
+          Status.check(mln_feature_query_result_get(result, index.toULong(), outFeature.ptr))
+          queriedFeature(outFeature)
+        }
+      }
+    } finally {
+      mln_feature_query_result_destroy(result)
+    }
+
+  fun featureExtensionResult(
+    result: CPointer<cnames.structs.mln_feature_extension_result>
+  ): FeatureExtensionResult =
+    try {
+      memScoped {
+        val info = alloc<mln_feature_extension_result_info>()
+        info.size = sizeOf<mln_feature_extension_result_info>().toUInt()
+        Status.check(mln_feature_extension_result_get(result, info.ptr))
+        when (info.type) {
+          MLN_FEATURE_EXTENSION_RESULT_TYPE_VALUE ->
+            FeatureExtensionResult.Value(ValueStructs.jsonSnapshot(info.data.value))
+          MLN_FEATURE_EXTENSION_RESULT_TYPE_FEATURE_COLLECTION ->
+            FeatureExtensionResult.FeatureCollection(
+              featureCollection(info.data.feature_collection)
+            )
+          else -> FeatureExtensionResult.Unknown(info.type)
+        }
+      }
+    } finally {
+      mln_feature_extension_result_destroy(result)
+    }
+
   fun renderedQueryGeometry(
     value: RenderedQueryGeometry,
     scope: MemScope,
@@ -114,6 +174,34 @@ internal object QueryStructs {
     }
     return native.ptr
   }
+
+  private fun queriedFeature(value: mln_queried_feature): QueriedFeature {
+    val fields = value.fields
+    val sourceId =
+      if ((fields and MLN_QUERIED_FEATURE_SOURCE_ID) != 0U) CoreStructs.stringView(value.source_id)
+      else null
+    val sourceLayerId =
+      if ((fields and MLN_QUERIED_FEATURE_SOURCE_LAYER_ID) != 0U)
+        CoreStructs.stringView(value.source_layer_id)
+      else null
+    val state =
+      if ((fields and MLN_QUERIED_FEATURE_STATE) != 0U && value.state != null) {
+        ValueStructs.jsonSnapshot(value.state)
+      } else {
+        null
+      }
+    return QueriedFeature(
+      ValueStructs.featureSnapshot(value.feature.ptr),
+      sourceId,
+      sourceLayerId,
+      state,
+    )
+  }
+
+  private fun featureCollection(value: mln_feature_collection): List<Feature> =
+    List(value.feature_count.toInt()) { index ->
+      ValueStructs.featureSnapshot(value.features!![index].ptr)
+    }
 
   private fun setScreenBox(
     native: org.maplibre.nativeffi.internal.c.mln_screen_box,
