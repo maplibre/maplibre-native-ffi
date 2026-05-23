@@ -2,6 +2,7 @@ package org.maplibre.nativeffi.resource
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlinx.cinterop.ByteVar
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.alloc
@@ -10,6 +11,7 @@ import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.pointed
 import kotlinx.cinterop.ptr
 import kotlinx.cinterop.reinterpret
+import org.maplibre.nativeffi.error.InvalidStateException
 import org.maplibre.nativeffi.internal.c.mln_resource_request
 import org.maplibre.nativeffi.internal.callback.ResourceProviderState
 import org.maplibre.nativeffi.internal.struct.ResourceStructs
@@ -69,6 +71,42 @@ class ResourceProviderStateTest {
       assertEquals(true, native.has_modified)
       assertEquals(true, native.has_expires)
       assertEquals(true, native.has_retry_after)
+    }
+  }
+
+  @Test
+  fun requestHandleReleasesProviderOwnedHandleOnceAndRejectsAfterClose() {
+    memScoped {
+      var releases = 0
+      val fakeHandle =
+        alloc<ByteVar>().ptr.reinterpret<cnames.structs.mln_resource_request_handle>()
+      val handle = ResourceRequestHandle(fakeHandle) { releases++ }
+
+      assertEquals(
+        ResourceProviderDecision.HANDLE.nativeValue,
+        handle.finishProviderDecision(ResourceProviderDecision.HANDLE),
+      )
+      handle.close()
+      handle.close()
+      assertEquals(1, releases)
+      assertFailsWith<InvalidStateException> { handle.complete(ResourceResponse.noContent()) }
+    }
+  }
+
+  @Test
+  fun passThroughDecisionLetsNativeOwnRelease() {
+    memScoped {
+      var releases = 0
+      val fakeHandle =
+        alloc<ByteVar>().ptr.reinterpret<cnames.structs.mln_resource_request_handle>()
+      val handle = ResourceRequestHandle(fakeHandle) { releases++ }
+
+      assertEquals(
+        ResourceProviderDecision.PASS_THROUGH.nativeValue,
+        handle.finishProviderDecision(ResourceProviderDecision.PASS_THROUGH),
+      )
+      handle.close()
+      assertEquals(0, releases)
     }
   }
 
