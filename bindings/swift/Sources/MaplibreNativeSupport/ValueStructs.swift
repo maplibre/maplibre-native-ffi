@@ -63,6 +63,11 @@ public final class NativeJSONArena {
   private var values: [UnsafeMutablePointer<mln_json_value>] = []
   private var arrays: [UnsafeMutableBufferPointer<mln_json_value>] = []
   private var members: [UnsafeMutableBufferPointer<mln_json_member>] = []
+  private var coordinateArrays: [UnsafeMutableBufferPointer<mln_lat_lng>] = []
+  private var coordinateSpans: [UnsafeMutableBufferPointer<mln_coordinate_span>] = []
+  private var geometries: [UnsafeMutablePointer<mln_geometry>] = []
+  private var features: [UnsafeMutablePointer<mln_feature>] = []
+  private var featureArrays: [UnsafeMutableBufferPointer<mln_feature>] = []
 
   public init() {}
 
@@ -78,6 +83,26 @@ public final class NativeJSONArena {
     for memberArray in members {
       memberArray.baseAddress?.deinitialize(count: memberArray.count)
       memberArray.baseAddress?.deallocate()
+    }
+    for coordinateArray in coordinateArrays {
+      coordinateArray.baseAddress?.deinitialize(count: coordinateArray.count)
+      coordinateArray.baseAddress?.deallocate()
+    }
+    for spanArray in coordinateSpans {
+      spanArray.baseAddress?.deinitialize(count: spanArray.count)
+      spanArray.baseAddress?.deallocate()
+    }
+    for geometry in geometries {
+      geometry.deinitialize(count: 1)
+      geometry.deallocate()
+    }
+    for feature in features {
+      feature.deinitialize(count: 1)
+      feature.deallocate()
+    }
+    for featureArray in featureArrays {
+      featureArray.baseAddress?.deinitialize(count: featureArray.count)
+      featureArray.baseAddress?.deallocate()
     }
   }
 
@@ -142,6 +167,118 @@ public final class NativeJSONArena {
       raw.data.object_value = mln_json_object(members: UnsafePointer(buffer), member_count: object.count)
     }
     return raw
+  }
+
+  public func allocateGeometry(_ geometry: NativeGeometry) -> UnsafePointer<mln_geometry> {
+    let pointer = UnsafeMutablePointer<mln_geometry>.allocate(capacity: 1)
+    pointer.initialize(to: nativeGeometry(geometry))
+    geometries.append(pointer)
+    return UnsafePointer(pointer)
+  }
+
+  public func nativeGeometry(_ geometry: NativeGeometry) -> mln_geometry {
+    var raw = mln_geometry()
+    raw.size = UInt32(MemoryLayout<mln_geometry>.size)
+    switch geometry {
+    case .empty:
+      raw.type = MLN_GEOMETRY_TYPE_EMPTY.rawValue
+    case .point(let point):
+      raw.type = MLN_GEOMETRY_TYPE_POINT.rawValue
+      raw.data.point = point.native
+    case .lineString(let coordinates):
+      raw.type = MLN_GEOMETRY_TYPE_LINE_STRING.rawValue
+      raw.data.line_string = coordinateSpan(coordinates)
+    case .polygon(let rings):
+      raw.type = MLN_GEOMETRY_TYPE_POLYGON.rawValue
+      raw.data.polygon = polygonGeometry(rings)
+    }
+    return raw
+  }
+
+  public func allocateFeature(_ feature: NativeFeature) -> UnsafePointer<mln_feature> {
+    let pointer = UnsafeMutablePointer<mln_feature>.allocate(capacity: 1)
+    pointer.initialize(to: nativeFeature(feature))
+    features.append(pointer)
+    return UnsafePointer(pointer)
+  }
+
+  public func nativeFeature(_ feature: NativeFeature) -> mln_feature {
+    var raw = mln_feature()
+    raw.size = UInt32(MemoryLayout<mln_feature>.size)
+    raw.geometry = allocateGeometry(feature.geometry)
+    if !feature.properties.isEmpty {
+      let buffer = UnsafeMutablePointer<mln_json_member>.allocate(capacity: feature.properties.count)
+      for (index, member) in feature.properties.enumerated() {
+        buffer.advanced(by: index).initialize(to: mln_json_member(key: view(member.key), value: allocate(member.value)))
+      }
+      members.append(UnsafeMutableBufferPointer(start: buffer, count: feature.properties.count))
+      raw.properties = UnsafePointer(buffer)
+      raw.property_count = feature.properties.count
+    }
+    switch feature.identifier {
+    case .none:
+      raw.identifier_type = MLN_FEATURE_IDENTIFIER_TYPE_NULL.rawValue
+    case .uint(let value):
+      raw.identifier_type = MLN_FEATURE_IDENTIFIER_TYPE_UINT.rawValue
+      raw.identifier.uint_value = value
+    case .int(let value):
+      raw.identifier_type = MLN_FEATURE_IDENTIFIER_TYPE_INT.rawValue
+      raw.identifier.int_value = value
+    case .double(let value):
+      raw.identifier_type = MLN_FEATURE_IDENTIFIER_TYPE_DOUBLE.rawValue
+      raw.identifier.double_value = value
+    case .string(let value):
+      raw.identifier_type = MLN_FEATURE_IDENTIFIER_TYPE_STRING.rawValue
+      raw.identifier.string_value = view(value)
+    }
+    return raw
+  }
+
+  public func withNativeGeoJSON<Result>(
+    _ geoJSON: NativeGeoJSON,
+    _ body: (UnsafePointer<mln_geojson>) throws -> Result
+  ) throws -> Result {
+    var raw = mln_geojson()
+    raw.size = UInt32(MemoryLayout<mln_geojson>.size)
+    switch geoJSON {
+    case .geometry(let geometry):
+      raw.type = MLN_GEOJSON_TYPE_GEOMETRY.rawValue
+      raw.data.geometry = allocateGeometry(geometry)
+    case .feature(let feature):
+      raw.type = MLN_GEOJSON_TYPE_FEATURE.rawValue
+      raw.data.feature = allocateFeature(feature)
+    case .featureCollection(let features):
+      raw.type = MLN_GEOJSON_TYPE_FEATURE_COLLECTION.rawValue
+      if !features.isEmpty {
+        let buffer = UnsafeMutablePointer<mln_feature>.allocate(capacity: features.count)
+        for (index, feature) in features.enumerated() {
+          buffer.advanced(by: index).initialize(to: nativeFeature(feature))
+        }
+        featureArrays.append(UnsafeMutableBufferPointer(start: buffer, count: features.count))
+        raw.data.feature_collection = mln_feature_collection(features: UnsafePointer(buffer), feature_count: features.count)
+      }
+    }
+    return try withUnsafePointer(to: &raw, body)
+  }
+
+  private func coordinateSpan(_ coordinates: [NativeLatLng]) -> mln_coordinate_span {
+    guard !coordinates.isEmpty else { return mln_coordinate_span(coordinates: nil, coordinate_count: 0) }
+    let buffer = UnsafeMutablePointer<mln_lat_lng>.allocate(capacity: coordinates.count)
+    for (index, coordinate) in coordinates.enumerated() {
+      buffer.advanced(by: index).initialize(to: coordinate.native)
+    }
+    coordinateArrays.append(UnsafeMutableBufferPointer(start: buffer, count: coordinates.count))
+    return mln_coordinate_span(coordinates: UnsafePointer(buffer), coordinate_count: coordinates.count)
+  }
+
+  private func polygonGeometry(_ rings: [[NativeLatLng]]) -> mln_polygon_geometry {
+    guard !rings.isEmpty else { return mln_polygon_geometry(rings: nil, ring_count: 0) }
+    let buffer = UnsafeMutablePointer<mln_coordinate_span>.allocate(capacity: rings.count)
+    for (index, ring) in rings.enumerated() {
+      buffer.advanced(by: index).initialize(to: coordinateSpan(ring))
+    }
+    coordinateSpans.append(UnsafeMutableBufferPointer(start: buffer, count: rings.count))
+    return mln_polygon_geometry(rings: UnsafePointer(buffer), ring_count: rings.count)
   }
 }
 

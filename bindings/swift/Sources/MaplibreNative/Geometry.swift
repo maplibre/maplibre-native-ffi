@@ -38,6 +38,25 @@ public struct ScreenPoint: Equatable, Sendable {
   }
 }
 
+public struct LatLngBounds: Equatable, Sendable {
+  public var southwest: LatLng
+  public var northeast: LatLng
+
+  public init(southwest: LatLng, northeast: LatLng) {
+    self.southwest = southwest
+    self.northeast = northeast
+  }
+
+  init(native: NativeLatLngBounds) {
+    southwest = LatLng(native: native.southwest)
+    northeast = LatLng(native: native.northeast)
+  }
+
+  var nativeInput: NativeLatLngBounds {
+    NativeLatLngBounds(southwest: southwest.nativeInput, northeast: northeast.nativeInput)
+  }
+}
+
 public struct EdgeInsets: Equatable, Sendable {
   public var top: Double
   public var left: Double

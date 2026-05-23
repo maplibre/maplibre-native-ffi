@@ -1,0 +1,90 @@
+import CMaplibreNativeC
+import Testing
+
+@testable import MaplibreNative
+@testable import MaplibreNativeSupport
+
+@Test func tileSourceOptionsMaterializeFieldMaskAndStringViews() throws {
+  let options = StyleTileSourceOptions(
+    minZoom: 1,
+    maxZoom: 12,
+    attribution: "© data",
+    scheme: .tms,
+    bounds: LatLngBounds(
+      southwest: LatLng(latitude: -1, longitude: -2),
+      northeast: LatLng(latitude: 3, longitude: 4)
+    ),
+    tileSize: 256,
+    vectorEncoding: .mlt,
+    rasterEncoding: .terrarium
+  )
+
+  try options.nativeOptions.withNativeOptions { native in
+    #expect(native != nil)
+    #expect((native!.pointee.fields & MLN_STYLE_TILE_SOURCE_OPTION_MIN_ZOOM.rawValue) != 0)
+    #expect((native!.pointee.fields & MLN_STYLE_TILE_SOURCE_OPTION_ATTRIBUTION.rawValue) != 0)
+    #expect(native!.pointee.min_zoom == 1)
+    #expect(native!.pointee.max_zoom == 12)
+    #expect(native!.pointee.scheme == MLN_STYLE_TILE_SCHEME_TMS.rawValue)
+    #expect(native!.pointee.bounds.southwest.latitude == -1)
+    #expect(native!.pointee.tile_size == 256)
+    #expect(native!.pointee.vector_encoding == MLN_STYLE_VECTOR_TILE_ENCODING_MLT.rawValue)
+    #expect(native!.pointee.raster_encoding == MLN_STYLE_RASTER_DEM_ENCODING_TERRARIUM.rawValue)
+    let attribution = try NativeString.copyUTF8(data: native!.pointee.attribution.data, size: native!.pointee.attribution.size)
+    #expect(attribution == "© data")
+  }
+}
+
+@Test func styleImageDescriptorsMaterializeScopedPixelsAndOptions() throws {
+  let image = StyleRGBA8Image(width: 1, height: 1, stride: 4, pixels: [1, 2, 3, 4])
+
+  try image.nativeImage.withNativeImage { native in
+    #expect(native.pointee.width == 1)
+    #expect(native.pointee.height == 1)
+    #expect(native.pointee.stride == 4)
+    #expect(native.pointee.byte_length == 4)
+    #expect(native.pointee.pixels![2] == 3)
+  }
+
+  try StyleImageOptions(pixelRatio: 2, sdf: true).nativeOptions.withNativeOptions { options in
+    #expect((options.pointee.fields & MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO.rawValue) != 0)
+    #expect((options.pointee.fields & MLN_STYLE_IMAGE_OPTION_SDF.rawValue) != 0)
+    #expect(options.pointee.pixel_ratio == 2)
+    #expect(options.pointee.sdf)
+  }
+}
+
+@Test func geoJSONFeatureMaterializesNativeDescriptorTree() throws {
+  let geoJSON = GeoJSON.feature(Feature(
+    geometry: .polygon([[LatLng(latitude: 1, longitude: 2), LatLng(latitude: 3, longitude: 4)]]),
+    properties: [JSONMember(key: "name", value: .string("shape"))],
+    identifier: .uint(7)
+  ))
+
+  let arena = NativeJSONArena()
+  try arena.withNativeGeoJSON(geoJSON.nativeGeoJSON) { native in
+    #expect(native.pointee.type == MLN_GEOJSON_TYPE_FEATURE.rawValue)
+    #expect(native.pointee.data.feature!.pointee.identifier_type == MLN_FEATURE_IDENTIFIER_TYPE_UINT.rawValue)
+    #expect(native.pointee.data.feature!.pointee.identifier.uint_value == 7)
+    #expect(native.pointee.data.feature!.pointee.geometry.pointee.type == MLN_GEOMETRY_TYPE_POLYGON.rawValue)
+    #expect(native.pointee.data.feature!.pointee.geometry.pointee.data.polygon.ring_count == 1)
+    #expect(native.pointee.data.feature!.pointee.property_count == 1)
+  }
+}
+
+@Test func closedMapRejectsStyleCallsThroughSwiftHandleState() throws {
+  let runtime = try RuntimeHandle()
+  defer { try? runtime.close() }
+  let map = try MapHandle(runtime: runtime, options: MapOptions(width: 1, height: 1))
+  try map.close()
+
+  do {
+    _ = try map.styleLayerIds()
+    Issue.record("closed map should throw")
+  } catch let error as MaplibreError {
+    #expect(error.kind == .invalidState)
+    #expect(error.rawStatus == nil)
+  } catch {
+    Issue.record("unexpected error: \(error)")
+  }
+}
