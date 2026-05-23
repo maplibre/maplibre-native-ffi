@@ -1332,9 +1332,9 @@ mod registration {
         )
     }
 
-    // These C helper functions are tracked in SPEC.md as Java-side replacements.
-    // They remain registered so coverage drift is visible, but Java public APIs
-    // use binding-owned values or copied snapshots instead of these raw helpers.
+    // These C helper functions remain registered as intentionally unsupported
+    // JNI placeholders. Java public APIs use binding-owned values or copied
+    // snapshots instead of these raw helpers.
     fn recorded_unsupported_status_methods(names: &[&str]) -> Vec<NativeMethod> {
         names
             .iter()
