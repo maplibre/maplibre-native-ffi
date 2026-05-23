@@ -1,5 +1,9 @@
 package capi
 
+// This file holds unexported helpers for runtime_event_test.go. Go rejects cgo
+// declarations in *_test.go files for this package on supported platforms, so
+// the helpers live in the normal package build; keep them small and test-only.
+
 /*
 #include <stdlib.h>
 #include <maplibre_native_c/runtime.h>
