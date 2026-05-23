@@ -1,5 +1,5 @@
 import AppKit
-import CMapLibreNativeC
+import MaplibreNative
 import QuartzCore
 
 @MainActor
@@ -101,7 +101,7 @@ final class MetalMapView: NSView {
     handleInput { map in try input.keyDown(event, map: map, viewport: viewport) }
   }
 
-  private func handleInput(_ action: (OpaquePointer) throws -> Bool) {
+  private func handleInput(_ action: (MapHandle) throws -> Bool) {
     guard let map = mapState?.map else { return }
     do {
       if try action(map) { renderPending = true }
