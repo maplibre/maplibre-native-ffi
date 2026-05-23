@@ -6,6 +6,11 @@ namespace Maplibre.Native.Internal.Status;
 
 internal static unsafe class NativeStatus
 {
+    internal static void Check(mln_status status)
+    {
+        Check((int)status);
+    }
+
     internal static void Check(int rawStatus)
     {
         if (rawStatus == (int)MaplibreStatus.Ok)
@@ -48,9 +53,16 @@ internal static unsafe class NativeStatus
 
     private static string CaptureDiagnostic()
     {
-        var message = NativeMethods.MlnThreadLastErrorMessage();
-        return message is null
-            ? string.Empty
-            : Marshal.PtrToStringUTF8((nint)message) ?? string.Empty;
+        try
+        {
+            var message = NativeMethods.MlnThreadLastErrorMessage();
+            return message is null
+                ? string.Empty
+                : Marshal.PtrToStringUTF8((nint)message) ?? string.Empty;
+        }
+        catch (DllNotFoundException)
+        {
+            return string.Empty;
+        }
     }
 }

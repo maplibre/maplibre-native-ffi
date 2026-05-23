@@ -70,10 +70,21 @@ bindings/dotnet/
       NativeAttributes.cs
       README.md
     Internal/C/NativeMethods.cs
+    Internal/Handle/NativeHandleState.cs
     Internal/Loader/NativeLibraryLoader.cs
+    Internal/Memory/NativeUtf8String.cs
     Internal/Status/NativeStatus.cs
+    Map/
+      MapHandle.cs
+      MapMode.cs
+      MapOptions.cs
+    Runtime/
+      RuntimeHandle.cs
+      RuntimeOptions.cs
   tests/Maplibre.Native.Tests/
     GeneratedLayoutTests.cs
+    NativeHandleStateTests.cs
+    NativeUtf8StringTests.cs
     Maplibre.Native.Tests.csproj
 ```
 
@@ -92,6 +103,10 @@ The scaffold implements one proof slice:
   non-OK status.
 - `NativePointer` is a borrowed opaque address value with no memory access in
   the public API.
+- `RuntimeHandle` and `MapHandle` establish the close-once owner-thread handle
+  pattern over generated C declarations.
+- `NativeUtf8String` rejects embedded NUL values and owns temporary UTF-8 C
+  string storage for call-boundary inputs.
 - ClangSharp-generated files in `Generated/*.g.cs` cover the public C headers.
 - `GeneratedLayoutTests` verifies layout-sensitive binding facts that do not
   require the native library.
