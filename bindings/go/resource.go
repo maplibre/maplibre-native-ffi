@@ -128,12 +128,19 @@ type ResourceTransformRequest struct {
 	URL     string
 }
 
-// ResourceTransformCallback rewrites network resource URLs. Return
-// replace=false or an empty URL to keep the original URL.
+// ResourceTransformCallback rewrites network resource URLs. Native code may
+// invoke it on worker or network threads. The request data is copied for Go; do
+// not call MapLibre map/runtime APIs from the callback. Return replace=false or
+// an empty URL to keep the original URL. Panics or invalid replacement URLs are
+// treated as no rewrite.
 type ResourceTransformCallback func(ResourceTransformRequest) (replacementURL string, replace bool)
 
-// ResourceProviderCallback intercepts network resource requests. If it returns
-// ResourceProviderDecisionHandle, complete or close the provided handle.
+// ResourceProviderCallback intercepts network resource requests. Native code may
+// invoke it on worker or network threads. The request data is copied for Go; do
+// not call MapLibre map/runtime APIs from the callback. If it returns
+// ResourceProviderDecisionHandle, complete or close the provided handle from a
+// C-permitted thread. Panics return an unknown decision unless the handle was
+// already completed.
 type ResourceProviderCallback func(ResourceRequest, *ResourceRequestHandle) ResourceProviderDecision
 
 // ResourceRequestHandle owns a provider-selected native request handle.
@@ -152,6 +159,9 @@ func newResourceRequestHandle(state *callback.ResourceRequestHandle) *ResourceRe
 func (handle *ResourceRequestHandle) Complete(response ResourceResponse) error {
 	if handle == nil || handle.state == nil {
 		return newBindingError(ErrInvalidArgument, "ResourceRequestHandle is nil")
+	}
+	if err := validateResourceResponse(response); err != nil {
+		return err
 	}
 	return checkNative(func() capi.Status {
 		return handle.state.Complete(callback.ResourceResponse{
@@ -193,4 +203,14 @@ func (handle *ResourceRequestHandle) Close() {
 		return
 	}
 	handle.state.Close()
+}
+
+func validateResourceResponse(response ResourceResponse) error {
+	if err := validateCStringArgument("resource response error message", response.ErrorMessage); err != nil {
+		return err
+	}
+	if err := validateCStringArgument("resource response ETag", response.ETag); err != nil {
+		return err
+	}
+	return nil
 }

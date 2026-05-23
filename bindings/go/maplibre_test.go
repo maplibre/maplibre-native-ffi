@@ -413,6 +413,18 @@ func TestRuntimeResourceProviderLifecycle(t *testing.T) {
 	}
 }
 
+func TestResourceResponseRejectsEmbeddedNULStrings(t *testing.T) {
+	if err := validateResourceResponse(ResourceResponse{ErrorMessage: "bad\x00tail"}); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("ErrorMessage embedded NUL error = %v, want ErrInvalidArgument", err)
+	}
+	if err := validateResourceResponse(ResourceResponse{ETag: "etag\x00tail"}); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("ETag embedded NUL error = %v, want ErrInvalidArgument", err)
+	}
+	if err := validateResourceResponse(ResourceResponse{ErrorMessage: "bad", ETag: "etag"}); err != nil {
+		t.Fatalf("valid resource response error = %v", err)
+	}
+}
+
 func TestRuntimeResourceProviderRejectsNilCallback(t *testing.T) {
 	runtime, err := NewRuntime()
 	if err != nil {

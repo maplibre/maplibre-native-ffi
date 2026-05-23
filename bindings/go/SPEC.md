@@ -180,9 +180,10 @@ the split improves locality, but the single public package stays stable.
 | `logging.go`    | `LogCallback`, `LogEvent`, `LogRecord`, `LogSeverity`, `LogSeverityMask`, process-global callback registration.                    |
 | `handles.go`    | Shared public handle documentation or small helper interfaces when needed.                                                         |
 
-JSON and GeoJSON values copy into owned Go value trees. The canonical native
-JSON representation preserves integer width, object member order, and duplicate
-object keys; it does not collapse objects into `map[string]any`.
+JSON and GeoJSON values copy into owned Go value trees. Public JSON objects use
+`map[string]any`, so duplicate object keys collapse and member iteration order
+is not stable; scalar conversions preserve integer width where the Go value
+carries that width.
 
 ## Public type map
 

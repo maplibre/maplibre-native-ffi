@@ -328,19 +328,13 @@ func (session *RenderSessionHandle) ptr() (*capi.RenderSession, error) {
 	return ptr, nil
 }
 
-func (session *RenderSessionHandle) ensureNoAcquiredFrame() error {
+func (session *RenderSessionHandle) withNoAcquiredFrame(call func() error) error {
 	session.mu.Lock()
 	defer session.mu.Unlock()
 	if session.frame {
 		return newBindingError(ErrInvalidState, "texture frame is still acquired")
 	}
-	return nil
-}
-
-func (session *RenderSessionHandle) markFrameAcquired() {
-	session.mu.Lock()
-	session.frame = true
-	session.mu.Unlock()
+	return call()
 }
 
 func (session *RenderSessionHandle) markFrameReleased() {
@@ -355,12 +349,11 @@ func (session *RenderSessionHandle) Resize(extent RenderTargetExtent) error {
 	if err != nil {
 		return err
 	}
-	if err := session.ensureNoAcquiredFrame(); err != nil {
-		return err
-	}
 	defer session.state.KeepAlive()
 	defer session.parent.state.KeepAlive()
-	return checkNative(func() capi.Status { return capi.RenderSessionResize(ptr, extent.toCAPI()) })
+	return session.withNoAcquiredFrame(func() error {
+		return checkNative(func() capi.Status { return capi.RenderSessionResize(ptr, extent.toCAPI()) })
+	})
 }
 
 // RenderUpdate renders one frame/update into the attached render target.
@@ -369,12 +362,11 @@ func (session *RenderSessionHandle) RenderUpdate() error {
 	if err != nil {
 		return err
 	}
-	if err := session.ensureNoAcquiredFrame(); err != nil {
-		return err
-	}
 	defer session.state.KeepAlive()
 	defer session.parent.state.KeepAlive()
-	return checkNative(func() capi.Status { return capi.RenderSessionRenderUpdate(ptr) })
+	return session.withNoAcquiredFrame(func() error {
+		return checkNative(func() capi.Status { return capi.RenderSessionRenderUpdate(ptr) })
+	})
 }
 
 // Detach detaches the render target from the session.
@@ -383,12 +375,11 @@ func (session *RenderSessionHandle) Detach() error {
 	if err != nil {
 		return err
 	}
-	if err := session.ensureNoAcquiredFrame(); err != nil {
-		return err
-	}
 	defer session.state.KeepAlive()
 	defer session.parent.state.KeepAlive()
-	return checkNative(func() capi.Status { return capi.RenderSessionDetach(ptr) })
+	return session.withNoAcquiredFrame(func() error {
+		return checkNative(func() capi.Status { return capi.RenderSessionDetach(ptr) })
+	})
 }
 
 // ReduceMemoryUse asks the render session to release cached render resources.
@@ -477,16 +468,18 @@ func (session *RenderSessionHandle) AcquireMetalTextureFrame() (*MetalOwnedTextu
 	if err != nil {
 		return nil, err
 	}
-	if err := session.ensureNoAcquiredFrame(); err != nil {
-		return nil, err
-	}
 	defer session.state.KeepAlive()
 	defer session.parent.state.KeepAlive()
+	session.mu.Lock()
+	defer session.mu.Unlock()
+	if session.frame {
+		return nil, newBindingError(ErrInvalidState, "texture frame is still acquired")
+	}
 	var rawFrame capi.MetalOwnedTextureFrame
 	if err := checkNative(func() capi.Status { return capi.MetalOwnedTextureAcquireFrame(ptr, &rawFrame) }); err != nil {
 		return nil, err
 	}
-	session.markFrameAcquired()
+	session.frame = true
 	return &MetalOwnedTextureFrame{
 		Generation:  rawFrame.Generation,
 		Width:       rawFrame.Width,
@@ -506,16 +499,18 @@ func (session *RenderSessionHandle) AcquireVulkanTextureFrame() (*VulkanOwnedTex
 	if err != nil {
 		return nil, err
 	}
-	if err := session.ensureNoAcquiredFrame(); err != nil {
-		return nil, err
-	}
 	defer session.state.KeepAlive()
 	defer session.parent.state.KeepAlive()
+	session.mu.Lock()
+	defer session.mu.Unlock()
+	if session.frame {
+		return nil, newBindingError(ErrInvalidState, "texture frame is still acquired")
+	}
 	var rawFrame capi.VulkanOwnedTextureFrame
 	if err := checkNative(func() capi.Status { return capi.VulkanOwnedTextureAcquireFrame(ptr, &rawFrame) }); err != nil {
 		return nil, err
 	}
-	session.markFrameAcquired()
+	session.frame = true
 	return &VulkanOwnedTextureFrame{
 		Generation:  rawFrame.Generation,
 		Width:       rawFrame.Width,
@@ -537,11 +532,10 @@ func (frame *MetalOwnedTextureFrame) Close() error {
 		return newBindingError(ErrInvalidArgument, "MetalOwnedTextureFrame is nil")
 	}
 	frame.mu.Lock()
+	defer frame.mu.Unlock()
 	if frame.closed {
-		frame.mu.Unlock()
 		return nil
 	}
-	frame.mu.Unlock()
 	ptr, err := frame.session.ptr()
 	if err != nil {
 		return err
@@ -551,9 +545,7 @@ func (frame *MetalOwnedTextureFrame) Close() error {
 	if err := checkNative(func() capi.Status { return capi.MetalOwnedTextureReleaseFrame(ptr, frame.raw) }); err != nil {
 		return err
 	}
-	frame.mu.Lock()
 	frame.closed = true
-	frame.mu.Unlock()
 	frame.session.markFrameReleased()
 	return nil
 }
@@ -564,11 +556,10 @@ func (frame *VulkanOwnedTextureFrame) Close() error {
 		return newBindingError(ErrInvalidArgument, "VulkanOwnedTextureFrame is nil")
 	}
 	frame.mu.Lock()
+	defer frame.mu.Unlock()
 	if frame.closed {
-		frame.mu.Unlock()
 		return nil
 	}
-	frame.mu.Unlock()
 	ptr, err := frame.session.ptr()
 	if err != nil {
 		return err
@@ -578,9 +569,7 @@ func (frame *VulkanOwnedTextureFrame) Close() error {
 	if err := checkNative(func() capi.Status { return capi.VulkanOwnedTextureReleaseFrame(ptr, frame.raw) }); err != nil {
 		return err
 	}
-	frame.mu.Lock()
 	frame.closed = true
-	frame.mu.Unlock()
 	frame.session.markFrameReleased()
 	return nil
 }
@@ -592,9 +581,8 @@ func (session *RenderSessionHandle) Close() error {
 	if session == nil || session.state == nil {
 		return newBindingError(ErrInvalidArgument, "RenderSessionHandle is nil")
 	}
-	if err := session.ensureNoAcquiredFrame(); err != nil {
-		return err
-	}
 	defer session.parent.state.KeepAlive()
-	return checkNative(func() capi.Status { return session.state.Close(capi.RenderSessionDestroy) })
+	return session.withNoAcquiredFrame(func() error {
+		return checkNative(func() capi.Status { return session.state.Close(capi.RenderSessionDestroy) })
+	})
 }

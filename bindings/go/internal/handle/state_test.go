@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"log"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 
@@ -80,6 +81,38 @@ func TestStateFailedCloseLeavesHandleLiveForRetry(t *testing.T) {
 	}
 	if got := calls.Load(); got != 2 {
 		t.Fatalf("destroy calls = %d, want 2", got)
+	}
+}
+
+func TestStateConcurrentCloseDestroysOnce(t *testing.T) {
+	native := &testNativeHandle{value: 1}
+	state, err := New(native, "test_handle")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	const goroutines = 8
+	var calls atomic.Int32
+	var wg sync.WaitGroup
+	start := make(chan struct{})
+	for i := 0; i < goroutines; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			<-start
+			if status := state.Close(func(*testNativeHandle) capi.Status {
+				calls.Add(1)
+				return capi.StatusOK
+			}); status != capi.StatusOK {
+				t.Errorf("Close status = %d, want OK", status)
+			}
+		}()
+	}
+	close(start)
+	wg.Wait()
+
+	if got := calls.Load(); got != 1 {
+		t.Fatalf("destroy calls = %d, want 1", got)
 	}
 }
 

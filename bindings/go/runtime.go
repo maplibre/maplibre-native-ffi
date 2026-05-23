@@ -438,7 +438,9 @@ func (runtime *RuntimeHandle) StartAmbientCacheOperation(operation AmbientCacheO
 }
 
 // SetResourceProvider installs or replaces the runtime-scoped network resource
-// provider. Configure it before creating maps from this runtime.
+// provider. Configure it before creating maps from this runtime. Native code may
+// invoke the provider on worker or network threads, so callbacks must be
+// thread-safe and must not call MapLibre map/runtime APIs.
 func (runtime *RuntimeHandle) SetResourceProvider(provider ResourceProviderCallback) error {
 	if provider == nil {
 		return newBindingError(ErrInvalidArgument, "ResourceProviderCallback is nil")
@@ -495,7 +497,8 @@ func (runtime *RuntimeHandle) releaseResourceProvider() {
 }
 
 // SetResourceTransform installs or replaces the runtime-scoped network URL
-// transform.
+// transform. Native code may invoke the transform on worker or network threads,
+// so callbacks must be thread-safe and must not call MapLibre map/runtime APIs.
 func (runtime *RuntimeHandle) SetResourceTransform(transform ResourceTransformCallback) error {
 	if transform == nil {
 		return newBindingError(ErrInvalidArgument, "ResourceTransformCallback is nil")

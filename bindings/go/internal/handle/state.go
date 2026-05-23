@@ -50,22 +50,21 @@ func (state *State[T]) IsClosed() bool {
 func (state *State[T]) Close(destroy DestroyFunc[T]) capi.Status {
 	state.mu.Lock()
 	ptr := state.ptr
-	state.mu.Unlock()
 	if ptr == nil {
+		state.mu.Unlock()
 		return capi.StatusOK
 	}
 
 	status := destroy(ptr)
+	if status == capi.StatusOK {
+		state.ptr = nil
+	}
+	state.mu.Unlock()
+
 	if status != capi.StatusOK {
 		state.KeepAlive()
 		return status
 	}
-
-	state.mu.Lock()
-	if state.ptr == ptr {
-		state.ptr = nil
-	}
-	state.mu.Unlock()
 	runtime.SetFinalizer(state, nil)
 	state.KeepAlive()
 	return capi.StatusOK

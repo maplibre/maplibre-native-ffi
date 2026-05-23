@@ -57,8 +57,9 @@ type LogRecord struct {
 	Message  string
 }
 
-// LogCallback receives copied native log records. Returning true consumes the
-// record. Returning false lets MapLibre Native's platform logger handle it.
+// LogCallback receives copied native log records. Native code may invoke it on
+// worker threads. Returning true consumes the record. Returning false, panicking,
+// or installing no callback lets MapLibre Native's platform logger handle it.
 type LogCallback func(LogRecord) bool
 
 // SetLogCallback installs or replaces the process-global native log callback.
