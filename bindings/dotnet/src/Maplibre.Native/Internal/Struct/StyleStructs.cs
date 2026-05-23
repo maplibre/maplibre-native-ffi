@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices;
 using Maplibre.Native.Internal.C;
+using Maplibre.Native.Render;
 using Maplibre.Native.Style;
 
 namespace Maplibre.Native.Internal.Struct;
@@ -78,6 +79,70 @@ internal sealed unsafe class NativeTileSourceOptions : IDisposable
     {
         attribution?.Dispose();
     }
+}
+
+internal sealed unsafe class NativeStyleImage : IDisposable
+{
+    private readonly nint pixels;
+
+    private NativeStyleImage(mln_premultiplied_rgba8_image value, nint pixels)
+    {
+        Value = value;
+        this.pixels = pixels;
+    }
+
+    internal mln_premultiplied_rgba8_image Value { get; }
+
+    internal static NativeStyleImage From(PremultipliedRgba8Image image)
+    {
+        ArgumentNullException.ThrowIfNull(image);
+        var bytes = image.Bytes ?? [];
+        var pixels = bytes.Length == 0 ? 0 : (nint)NativeMemory.Alloc((nuint)bytes.Length);
+        if (pixels != 0)
+        {
+            Marshal.Copy(bytes, 0, pixels, bytes.Length);
+        }
+
+        var info = image.Info;
+        var native = NativeMethods.mln_premultiplied_rgba8_image_default();
+        native.width = info.Width;
+        native.height = info.Height;
+        native.stride = info.Stride;
+        native.byte_length = (nuint)bytes.Length;
+        native.pixels = (byte*)pixels;
+        return new NativeStyleImage(native, pixels);
+    }
+
+    public void Dispose()
+    {
+        if (pixels != 0)
+        {
+            NativeMemory.Free((void*)pixels);
+        }
+    }
+}
+
+internal static class StyleStructs
+{
+    internal static mln_style_image_options ToNative(StyleImageOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        var native = NativeMethods.mln_style_image_options_default();
+        if (options.PixelRatio is { } pixelRatio)
+        {
+            native.fields |= (uint)mln_style_image_option_field.MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO;
+            native.pixel_ratio = pixelRatio;
+        }
+        if (options.Sdf is { } sdf)
+        {
+            native.fields |= (uint)mln_style_image_option_field.MLN_STYLE_IMAGE_OPTION_SDF;
+            native.sdf = sdf ? (byte)1 : (byte)0;
+        }
+        return native;
+    }
+
+    internal static StyleImageInfo FromNative(mln_style_image_info info) =>
+        new(info.width, info.height, info.stride, info.byte_length, info.pixel_ratio, info.sdf != 0);
 }
 
 internal sealed unsafe class NativeStringViewArray : IDisposable

@@ -6,6 +6,7 @@ using Maplibre.Native.Internal.Memory;
 using Maplibre.Native.Internal.Status;
 using Maplibre.Native.Internal.Struct;
 using Maplibre.Native.Json;
+using Maplibre.Native.Render;
 using Maplibre.Native.Runtime;
 using Maplibre.Native.Style;
 
@@ -650,6 +651,90 @@ public sealed unsafe class MapHandle : IDisposable
         using var nativeOptions = options is null ? null : NativeTileSourceOptions.From(options);
         var optionsValue = nativeOptions?.Value ?? default;
         NativeStatus.Check(NativeMethods.mln_map_add_raster_dem_source_tiles(Pointer, nativeSourceId.Value, nativeTiles.Count == 0 ? null : nativeTiles.Pointer, nativeTiles.Count, nativeOptions is null ? null : &optionsValue));
+    }
+
+    /// <summary>Sets or replaces a style image.</summary>
+    public void SetStyleImage(string imageId, StyleImage image)
+    {
+        ArgumentNullException.ThrowIfNull(image);
+        SetStyleImage(imageId, image.Image, image.Options);
+    }
+
+    /// <summary>Sets or replaces a style image.</summary>
+    public void SetStyleImage(string imageId, PremultipliedRgba8Image image, StyleImageOptions? options = null)
+    {
+        using var nativeImageId = NativeStringView.From(imageId, nameof(imageId));
+        using var nativeImage = NativeStyleImage.From(image);
+        var imageValue = nativeImage.Value;
+        var nativeOptions = options is null ? default : StyleStructs.ToNative(options);
+        NativeStatus.Check(NativeMethods.mln_map_set_style_image(Pointer, nativeImageId.Value, &imageValue, options is null ? null : &nativeOptions));
+    }
+
+    /// <summary>Removes a style image and reports whether it existed.</summary>
+    public bool RemoveStyleImage(string imageId)
+    {
+        using var nativeImageId = NativeStringView.From(imageId, nameof(imageId));
+        bool removed = false;
+        NativeStatus.Check(NativeMethods.mln_map_remove_style_image(Pointer, nativeImageId.Value, &removed));
+        return removed;
+    }
+
+    /// <summary>Whether a style image exists.</summary>
+    public bool StyleImageExists(string imageId)
+    {
+        using var nativeImageId = NativeStringView.From(imageId, nameof(imageId));
+        bool exists = false;
+        NativeStatus.Check(NativeMethods.mln_map_style_image_exists(Pointer, nativeImageId.Value, &exists));
+        return exists;
+    }
+
+    /// <summary>Gets style image metadata when the image exists.</summary>
+    public StyleImageInfo? StyleImageInfo(string imageId)
+    {
+        using var nativeImageId = NativeStringView.From(imageId, nameof(imageId));
+        var info = NativeMethods.mln_style_image_info_default();
+        bool found = false;
+        NativeStatus.Check(NativeMethods.mln_map_get_style_image_info(Pointer, nativeImageId.Value, &info, &found));
+        return found ? StyleStructs.FromNative(info) : null;
+    }
+
+    /// <summary>Copies a style image as premultiplied RGBA8 pixels when it exists.</summary>
+    public StyleImage? CopyStyleImagePremultipliedRgba8(string imageId)
+    {
+        var info = StyleImageInfo(imageId);
+        if (info is null)
+        {
+            return null;
+        }
+
+        using var nativeImageId = NativeStringView.From(imageId, nameof(imageId));
+        var bytes = new byte[checked((int)info.ByteLength)];
+        nuint byteLength = 0;
+        bool found = false;
+        fixed (byte* bytesPointer = bytes)
+        {
+            NativeStatus.Check(NativeMethods.mln_map_copy_style_image_premultiplied_rgba8(
+                Pointer,
+                nativeImageId.Value,
+                bytes.Length == 0 ? null : bytesPointer,
+                (nuint)bytes.Length,
+                &byteLength,
+                &found));
+        }
+
+        if (!found)
+        {
+            return null;
+        }
+
+        if (byteLength != (nuint)bytes.Length)
+        {
+            Array.Resize(ref bytes, checked((int)byteLength));
+        }
+
+        return new StyleImage(
+            new PremultipliedRgba8Image(bytes, new TextureImageInfo(info.Width, info.Height, info.Stride, (ulong)byteLength)),
+            new StyleImageOptions { PixelRatio = info.PixelRatio, Sdf = info.Sdf });
     }
 
     /// <summary>Adds a style layer from a JSON-like value.</summary>

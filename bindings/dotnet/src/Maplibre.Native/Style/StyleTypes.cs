@@ -35,7 +35,7 @@ public sealed class CustomGeometrySourceOptions
 }
 
 public sealed record StyleImage(PremultipliedRgba8Image Image, StyleImageOptions Options);
-public sealed record StyleImageInfo(uint Width, uint Height, float PixelRatio, bool Sdf);
+public sealed record StyleImageInfo(uint Width, uint Height, uint Stride, ulong ByteLength, float PixelRatio, bool Sdf);
 
 public sealed class StyleImageOptions
 {

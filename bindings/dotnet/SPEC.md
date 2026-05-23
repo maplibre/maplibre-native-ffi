@@ -100,6 +100,7 @@ bindings/dotnet/
     ResourceTransformTests.cs
     RuntimeEventTests.cs
     RuntimeOfflineOperationTests.cs
+    StyleImageTests.cs
     StyleJsonTests.cs
     Maplibre.Native.Tests.csproj
 ```
@@ -126,7 +127,8 @@ The scaffold implements one proof slice:
   operation start/discard tokens, resource provider callbacks, resource
   transform callbacks, JSON materialization, and style source/layer JSON
   operations, style source URL/tile APIs, style source metadata/listing, style
-  layer listing, style JSON snapshots, layer properties, and layer filters.
+  layer listing, style image APIs, style JSON snapshots, layer properties, and
+  layer filters.
 - `NativeUtf8String` rejects embedded NUL values and owns temporary UTF-8 C
   string storage for call-boundary inputs.
 - Public value, descriptor, enum, and placeholder handle types exist across the
@@ -141,6 +143,8 @@ The scaffold implements one proof slice:
   materialization.
 - Resource transform tests cover request copying, replacement URL lifetime,
   exception conversion, and install/replace/clear behavior.
+- Style image tests cover image descriptor materialization, metadata, pixel
+  copying, and removal.
 - Style JSON tests cover JSON materialization, finite-number validation, style
   source/layer JSON native adaptation, style source URL/tile APIs, style source
   metadata/listing, style layer listing, style JSON snapshots, layer properties,
