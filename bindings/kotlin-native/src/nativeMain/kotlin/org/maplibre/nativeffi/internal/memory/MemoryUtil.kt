@@ -5,6 +5,7 @@ import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.MemScope
 import kotlinx.cinterop.cstr
+import kotlinx.cinterop.toCValues
 
 /** Memory helpers for Kotlin/Native C ABI calls. */
 @OptIn(ExperimentalForeignApi::class)
@@ -18,5 +19,11 @@ internal object MemoryUtil {
   fun cString(scope: MemScope, value: String): CPointer<ByteVar> {
     requireValidCString(value)
     return value.cstr.getPointer(scope)
+  }
+
+  /** Allocates UTF-8 bytes for an explicit-length C string view. */
+  fun utf8Bytes(scope: MemScope, value: String): CPointer<ByteVar>? {
+    val bytes = value.encodeToByteArray()
+    return if (bytes.isEmpty()) null else bytes.toCValues().getPointer(scope)
   }
 }
