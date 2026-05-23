@@ -26,17 +26,36 @@ public sealed record ResourceRequest(
 
 public sealed record ResourceTransformRequest(ResourceKind Kind, string Url);
 
+/// <summary>Mutable descriptor used to complete a resource provider request.</summary>
 public sealed class ResourceResponse
 {
-    public ResourceResponseStatus Status { get; set; } = ResourceResponseStatus.Ok;
+    private byte[] bytes = [];
+
+    public ResourceResponse(ResourceResponseStatus status = ResourceResponseStatus.Ok)
+    {
+        Status = status;
+    }
+
+    public static ResourceResponse Ok(ReadOnlySpan<byte> bytes) => new(ResourceResponseStatus.Ok) { Bytes = bytes.ToArray() };
+    public static ResourceResponse NoContent() => new(ResourceResponseStatus.NoContent);
+    public static ResourceResponse NotModified() => new(ResourceResponseStatus.NotModified);
+    public static ResourceResponse Error(ResourceErrorReason reason, string? message) => new(ResourceResponseStatus.Error) { ErrorReason = reason, ErrorMessage = message };
+
+    public ResourceResponseStatus Status { get; set; }
     public ResourceErrorReason ErrorReason { get; set; } = ResourceErrorReason.None;
-    public byte[] Bytes { get; set; } = [];
-    public string? Etag { get; set; }
-    public string? Modified { get; set; }
-    public string? Expires { get; set; }
+
+    public byte[] Bytes
+    {
+        get => (byte[])bytes.Clone();
+        set => bytes = value is null ? [] : (byte[])value.Clone();
+    }
+
+    public string? ErrorMessage { get; set; }
     public bool MustRevalidate { get; set; }
-    public bool NoContent { get; set; }
-    public bool NotModified { get; set; }
+    public DateTimeOffset? Modified { get; set; }
+    public DateTimeOffset? Expires { get; set; }
+    public string? Etag { get; set; }
+    public DateTimeOffset? RetryAfter { get; set; }
 }
 
 public delegate ResourceProviderDecision ResourceProviderCallback(ResourceRequest request, ResourceRequestHandle handle);
