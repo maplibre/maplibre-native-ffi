@@ -325,6 +325,20 @@ public sealed unsafe class MapHandle : IDisposable
         return MapStructs.CameraOptionsFromNative(camera);
     }
 
+    /// <summary>Calculates a camera that fits geographic geometry and fit options.</summary>
+    public CameraOptions CameraForGeometry(Geometry geometry, CameraFitOptions? fitOptions = null)
+    {
+        using var nativeGeometry = NativeGeometry.From(geometry);
+        var nativeFitOptions = fitOptions is null ? default : MapStructs.ToNative(fitOptions);
+        var camera = NativeMethods.mln_camera_options_default();
+        NativeStatus.Check(NativeMethods.mln_map_camera_for_geometry(
+            Pointer,
+            nativeGeometry.Pointer,
+            fitOptions is null ? null : &nativeFitOptions,
+            &camera));
+        return MapStructs.CameraOptionsFromNative(camera);
+    }
+
     /// <summary>Calculates geographic bounds for a camera.</summary>
     public LatLngBounds LatLngBoundsForCamera(CameraOptions camera)
     {

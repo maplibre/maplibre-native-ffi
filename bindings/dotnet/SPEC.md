@@ -142,9 +142,8 @@ The scaffold implements one proof slice:
   filters.
 - `NativeUtf8String` rejects embedded NUL values and owns temporary UTF-8 C
   string storage for call-boundary inputs.
-- Public value, descriptor, enum, and placeholder handle types exist across the
-  concept namespaces so future method slices can fill behavior without changing
-  the broad API shape.
+- Public value, descriptor, enum, and handle types exist across the concept
+  namespaces with raw C/ABI details kept internal.
 - ClangSharp-generated files in `Generated/*.g.cs` cover the public C headers.
 - `GeneratedLayoutTests` verifies layout-sensitive binding facts that do not
   require the native library.
@@ -176,11 +175,12 @@ The scaffold implements one proof slice:
 - Native-library tests cover the C ABI version call, projection helper
   round-tripping, runtime event polling, offline operation start/discard, map
   camera/fit/viewport/tile option round-tripping, camera transition command
-  adaptation, bounds/projection/free camera adaptation, map coordinate
-  conversion, projection snapshot lifecycle and coordinate conversion,
-  runtime/map close behavior, map debug option round-tripping, closed-wrapper
-  validation, process-global log callback installation/clearing, and native
-  status diagnostic mapping when run through `mise run //bindings/dotnet:test`.
+  adaptation, bounds/projection/free camera adaptation, geometry camera fitting,
+  map coordinate conversion, projection snapshot lifecycle, visible-geometry
+  fitting, and coordinate conversion, runtime/map close behavior, map debug
+  option round-tripping, closed-wrapper validation, process-global log callback
+  installation/clearing, and native status diagnostic mapping when run through
+  `mise run //bindings/dotnet:test`.
 - `PublicApiSurfaceTests` keeps representative public concept types present as
   the binding surface expands.
 
@@ -797,6 +797,10 @@ this list with `include/maplibre_native_c/*.h` during coverage reviews.
 - `mln_metal_owned_texture_release_frame`
 - `mln_vulkan_owned_texture_acquire_frame`
 - `mln_vulkan_owned_texture_release_frame`
+
+Render surface/texture descriptor defaults are covered by generated interop.
+Public C# materializers size-initialize those descriptors directly because their
+C defaults carry only ABI size and zeroed backend handles.
 
 ## Testing plan
 

@@ -66,11 +66,14 @@ public sealed class MapCameraOptionsTests
 
         var boundsCamera = map.CameraForLatLngBounds(bounds, fit);
         var coordinatesCamera = map.CameraForLatLngs([bounds.Southwest, bounds.Northeast], fit);
+        var geometryCamera = map.CameraForGeometry(new Geometry.LineString([bounds.Southwest, bounds.Northeast]), fit);
 
         Assert.NotNull(boundsCamera.Center);
         Assert.NotNull(boundsCamera.Zoom);
         Assert.NotNull(coordinatesCamera.Center);
         Assert.NotNull(coordinatesCamera.Zoom);
+        Assert.NotNull(geometryCamera.Center);
+        Assert.NotNull(geometryCamera.Zoom);
     }
 
     [Fact]
@@ -148,6 +151,7 @@ public sealed class MapCameraOptionsTests
 
         projection.SetCamera(new CameraOptions { Center = new LatLng(0, 0), Zoom = 1 });
         projection.SetVisibleCoordinates([new LatLng(-10, -20), new LatLng(10, 20)], new EdgeInsets(1, 2, 3, 4));
+        projection.SetVisibleGeometry(new Geometry.LineString([new LatLng(-10, -20), new LatLng(10, 20)]), new EdgeInsets(1, 2, 3, 4));
 
         var camera = projection.GetCamera();
         Assert.NotNull(camera.Center);

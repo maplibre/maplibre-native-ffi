@@ -71,6 +71,14 @@ public sealed unsafe class MapProjectionHandle : IDisposable
         }
     }
 
+    /// <summary>Sets a camera that makes the supplied geometry visible with padding.</summary>
+    public void SetVisibleGeometry(Geometry geometry, EdgeInsets padding)
+    {
+        using var nativeGeometry = NativeGeometry.From(geometry);
+        var nativePadding = MapStructs.ToNative(padding);
+        NativeStatus.Check(NativeMethods.mln_map_projection_set_visible_geometry(Pointer, nativeGeometry.Pointer, nativePadding));
+    }
+
     /// <summary>Converts a geographic coordinate to a screen pixel using this projection snapshot.</summary>
     public ScreenPoint PixelForLatLng(LatLng coordinate)
     {
