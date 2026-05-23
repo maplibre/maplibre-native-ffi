@@ -99,6 +99,7 @@ bindings/dotnet/
     ResourceResponseTests.cs
     ResourceTransformTests.cs
     RuntimeEventTests.cs
+    RuntimeOfflineOperationTests.cs
     Maplibre.Native.Tests.csproj
 ```
 
@@ -120,8 +121,9 @@ The scaffold implements one proof slice:
 - `RuntimeHandle` and `MapHandle` establish the close-once owner-thread handle
   pattern over generated C declarations, including runtime event polling, map
   camera/fit/transition/bounds/free-camera/projection/viewport/tile/debug option
-  calls, map coordinate conversion, projection snapshot handles, resource
-  provider callbacks, and resource transform callbacks.
+  calls, map coordinate conversion, projection snapshot handles, offline
+  operation start/discard tokens, resource provider callbacks, and resource
+  transform callbacks.
 - `NativeUtf8String` rejects embedded NUL values and owns temporary UTF-8 C
   string storage for call-boundary inputs.
 - Public value, descriptor, enum, and placeholder handle types exist across the
@@ -137,13 +139,13 @@ The scaffold implements one proof slice:
 - Resource transform tests cover request copying, replacement URL lifetime,
   exception conversion, and install/replace/clear behavior.
 - Native-library tests cover the C ABI version call, projection helper
-  round-tripping, runtime event polling, map camera/fit/viewport/tile option
-  round-tripping, camera transition command adaptation, bounds/projection/free
-  camera adaptation, map coordinate conversion, projection snapshot lifecycle
-  and coordinate conversion, runtime/map close behavior, map debug option
-  round-tripping, closed-wrapper validation, process-global log callback
-  installation/clearing, and native status diagnostic mapping when run through
-  `mise run //bindings/dotnet:test`.
+  round-tripping, runtime event polling, offline operation start/discard, map
+  camera/fit/viewport/tile option round-tripping, camera transition command
+  adaptation, bounds/projection/free camera adaptation, map coordinate
+  conversion, projection snapshot lifecycle and coordinate conversion,
+  runtime/map close behavior, map debug option round-tripping, closed-wrapper
+  validation, process-global log callback installation/clearing, and native
+  status diagnostic mapping when run through `mise run //bindings/dotnet:test`.
 - `PublicApiSurfaceTests` keeps representative public concept types present as
   the binding surface expands.
 
