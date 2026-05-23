@@ -115,6 +115,70 @@ func TestRuntimeOptionsRejectEmbeddedNUL(t *testing.T) {
 	}
 }
 
+func TestRuntimeResourceProviderLifecycle(t *testing.T) {
+	runtime, err := NewRuntime()
+	if err != nil {
+		t.Fatalf("NewRuntime(): %v", err)
+	}
+	if err := runtime.SetResourceProvider(func(ResourceRequest, *ResourceRequestHandle) ResourceProviderDecision {
+		return ResourceProviderDecisionPassThrough
+	}); err != nil {
+		_ = runtime.Close()
+		t.Fatalf("SetResourceProvider(): %v", err)
+	}
+	if err := runtime.SetResourceProvider(func(ResourceRequest, *ResourceRequestHandle) ResourceProviderDecision {
+		return ResourceProviderDecisionPassThrough
+	}); err != nil {
+		_ = runtime.Close()
+		t.Fatalf("SetResourceProvider(replace): %v", err)
+	}
+	if err := runtime.Close(); err != nil {
+		t.Fatalf("Close(): %v", err)
+	}
+}
+
+func TestRuntimeResourceProviderRejectsNilCallback(t *testing.T) {
+	runtime, err := NewRuntime()
+	if err != nil {
+		t.Fatalf("NewRuntime(): %v", err)
+	}
+	defer func() {
+		if err := runtime.Close(); err != nil {
+			t.Errorf("Close(): %v", err)
+		}
+	}()
+
+	if err := runtime.SetResourceProvider(nil); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("SetResourceProvider(nil) error = %v, want ErrInvalidArgument", err)
+	}
+}
+
+func TestRuntimeResourceProviderRequiresNoLiveMaps(t *testing.T) {
+	runtime, err := NewRuntime()
+	if err != nil {
+		t.Fatalf("NewRuntime(): %v", err)
+	}
+	m, err := runtime.NewMap()
+	if err != nil {
+		_ = runtime.Close()
+		t.Fatalf("NewMap(): %v", err)
+	}
+	defer func() {
+		if err := m.Close(); err != nil {
+			t.Errorf("Map Close(): %v", err)
+		}
+		if err := runtime.Close(); err != nil {
+			t.Errorf("Runtime Close(): %v", err)
+		}
+	}()
+
+	if err := runtime.SetResourceProvider(func(ResourceRequest, *ResourceRequestHandle) ResourceProviderDecision {
+		return ResourceProviderDecisionPassThrough
+	}); !errors.Is(err, ErrInvalidState) {
+		t.Fatalf("SetResourceProvider() with live map error = %v, want ErrInvalidState", err)
+	}
+}
+
 func TestRuntimeResourceTransformLifecycle(t *testing.T) {
 	runtime, err := NewRuntime()
 	if err != nil {

@@ -126,6 +126,8 @@ type RuntimeHandle struct {
 
 	resourceTransformMu sync.Mutex
 	resourceTransform   *callback.ResourceTransformState
+	resourceProviderMu  sync.Mutex
+	resourceProvider    *callback.ResourceProviderState
 }
 
 // String returns a diagnostic name for the status.
@@ -251,6 +253,63 @@ func runtimeEventFromCAPI(event capi.RuntimeEvent) *RuntimeEvent {
 	}
 }
 
+// SetResourceProvider installs or replaces the runtime-scoped network resource
+// provider. Configure it before creating maps from this runtime.
+func (runtime *RuntimeHandle) SetResourceProvider(provider ResourceProviderCallback) error {
+	if provider == nil {
+		return newBindingError(ErrInvalidArgument, "ResourceProviderCallback is nil")
+	}
+	ptr, err := runtime.ptr()
+	if err != nil {
+		return err
+	}
+	defer runtime.state.KeepAlive()
+
+	var replacement *callback.ResourceProviderState
+	if err := checkNative(func() capi.Status {
+		state, status := callback.SetResourceProvider(ptr, func(request callback.ResourceRequest, handle *callback.ResourceRequestHandle) uint32 {
+			decision := provider(ResourceRequest{
+				URL:                 request.URL,
+				Kind:                ResourceKind(request.Kind),
+				RawKind:             request.Kind,
+				LoadingMethod:       ResourceLoadingMethod(request.LoadingMethod),
+				Priority:            ResourcePriority(request.Priority),
+				Usage:               ResourceUsage(request.Usage),
+				StoragePolicy:       ResourceStoragePolicy(request.StoragePolicy),
+				HasRange:            request.HasRange,
+				RangeStart:          request.RangeStart,
+				RangeEnd:            request.RangeEnd,
+				HasPriorModified:    request.HasPriorModified,
+				PriorModifiedUnixMS: request.PriorModifiedUnixMS,
+				HasPriorExpires:     request.HasPriorExpires,
+				PriorExpiresUnixMS:  request.PriorExpiresUnixMS,
+				PriorETag:           request.PriorETag,
+				PriorData:           request.PriorData,
+			}, newResourceRequestHandle(handle))
+			return uint32(decision)
+		})
+		replacement = state
+		return status
+	}); err != nil {
+		return err
+	}
+
+	runtime.resourceProviderMu.Lock()
+	previous := runtime.resourceProvider
+	runtime.resourceProvider = replacement
+	runtime.resourceProviderMu.Unlock()
+	previous.Release()
+	return nil
+}
+
+func (runtime *RuntimeHandle) releaseResourceProvider() {
+	runtime.resourceProviderMu.Lock()
+	previous := runtime.resourceProvider
+	runtime.resourceProvider = nil
+	runtime.resourceProviderMu.Unlock()
+	previous.Release()
+}
+
 // SetResourceTransform installs or replaces the runtime-scoped network URL
 // transform.
 func (runtime *RuntimeHandle) SetResourceTransform(transform ResourceTransformCallback) error {
@@ -350,5 +409,6 @@ func (runtime *RuntimeHandle) Close() error {
 		return err
 	}
 	runtime.releaseResourceTransform()
+	runtime.releaseResourceProvider()
 	return nil
 }

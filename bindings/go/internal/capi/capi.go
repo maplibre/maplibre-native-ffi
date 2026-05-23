@@ -182,6 +182,49 @@ const (
 	ResourceKindImage       uint32 = uint32(C.MLN_RESOURCE_KIND_IMAGE)
 )
 
+const (
+	ResourceLoadingMethodAll         uint32 = uint32(C.MLN_RESOURCE_LOADING_METHOD_ALL)
+	ResourceLoadingMethodCacheOnly   uint32 = uint32(C.MLN_RESOURCE_LOADING_METHOD_CACHE_ONLY)
+	ResourceLoadingMethodNetworkOnly uint32 = uint32(C.MLN_RESOURCE_LOADING_METHOD_NETWORK_ONLY)
+)
+
+const (
+	ResourcePriorityRegular uint32 = uint32(C.MLN_RESOURCE_PRIORITY_REGULAR)
+	ResourcePriorityLow     uint32 = uint32(C.MLN_RESOURCE_PRIORITY_LOW)
+)
+
+const (
+	ResourceUsageOnline  uint32 = uint32(C.MLN_RESOURCE_USAGE_ONLINE)
+	ResourceUsageOffline uint32 = uint32(C.MLN_RESOURCE_USAGE_OFFLINE)
+)
+
+const (
+	ResourceStoragePolicyPermanent uint32 = uint32(C.MLN_RESOURCE_STORAGE_POLICY_PERMANENT)
+	ResourceStoragePolicyVolatile  uint32 = uint32(C.MLN_RESOURCE_STORAGE_POLICY_VOLATILE)
+)
+
+const (
+	ResourceResponseStatusOK          uint32 = uint32(C.MLN_RESOURCE_RESPONSE_STATUS_OK)
+	ResourceResponseStatusError       uint32 = uint32(C.MLN_RESOURCE_RESPONSE_STATUS_ERROR)
+	ResourceResponseStatusNoContent   uint32 = uint32(C.MLN_RESOURCE_RESPONSE_STATUS_NO_CONTENT)
+	ResourceResponseStatusNotModified uint32 = uint32(C.MLN_RESOURCE_RESPONSE_STATUS_NOT_MODIFIED)
+)
+
+const (
+	ResourceErrorReasonNone       uint32 = uint32(C.MLN_RESOURCE_ERROR_REASON_NONE)
+	ResourceErrorReasonNotFound   uint32 = uint32(C.MLN_RESOURCE_ERROR_REASON_NOT_FOUND)
+	ResourceErrorReasonServer     uint32 = uint32(C.MLN_RESOURCE_ERROR_REASON_SERVER)
+	ResourceErrorReasonConnection uint32 = uint32(C.MLN_RESOURCE_ERROR_REASON_CONNECTION)
+	ResourceErrorReasonRateLimit  uint32 = uint32(C.MLN_RESOURCE_ERROR_REASON_RATE_LIMIT)
+	ResourceErrorReasonOther      uint32 = uint32(C.MLN_RESOURCE_ERROR_REASON_OTHER)
+)
+
+const (
+	ResourceProviderDecisionPassThrough uint32 = uint32(C.MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH)
+	ResourceProviderDecisionHandle      uint32 = uint32(C.MLN_RESOURCE_PROVIDER_DECISION_HANDLE)
+	ResourceProviderDecisionUnknown     uint32 = ^uint32(0)
+)
+
 // CVersion returns the linked native C ABI contract version.
 func CVersion() uint32 {
 	return uint32(C.mln_c_version())

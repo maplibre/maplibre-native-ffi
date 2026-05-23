@@ -40,3 +40,23 @@ func goMaplibreResourceTransform(userData unsafe.Pointer, kind C.uint32_t, url *
 	}
 	return C.mln_status(capi.StatusOK)
 }
+
+//export goMaplibreResourceProvider
+func goMaplibreResourceProvider(userData unsafe.Pointer, request *C.mln_resource_request, rawHandle *C.mln_resource_request_handle) (decision C.uint32_t) {
+	defer func() {
+		if recover() != nil {
+			decision = C.uint32_t(capi.ResourceProviderDecisionUnknown)
+		}
+	}()
+
+	handle, status := newResourceRequestHandle(rawHandle)
+	if status != capi.StatusOK {
+		return C.uint32_t(capi.ResourceProviderDecisionUnknown)
+	}
+	stateHandle := cgo.Handle(uintptr(userData))
+	state, ok := stateHandle.Value().(*ResourceProviderState)
+	if !ok || state == nil {
+		return C.uint32_t(handle.finishProviderException())
+	}
+	return C.uint32_t(handle.invokeProvider(state, request))
+}
