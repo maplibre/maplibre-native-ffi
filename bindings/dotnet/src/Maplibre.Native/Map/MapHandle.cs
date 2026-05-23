@@ -5,7 +5,9 @@ using Maplibre.Native.Internal.Handle;
 using Maplibre.Native.Internal.Memory;
 using Maplibre.Native.Internal.Status;
 using Maplibre.Native.Internal.Struct;
+using Maplibre.Native.Json;
 using Maplibre.Native.Runtime;
+using Maplibre.Native.Style;
 
 namespace Maplibre.Native.Map;
 
@@ -481,6 +483,85 @@ public sealed unsafe class MapHandle : IDisposable
         ArgumentNullException.ThrowIfNull(json);
         using var nativeJson = NativeUtf8String.FromNullableString(json, nameof(json));
         NativeStatus.Check(NativeMethods.mln_map_set_style_json(Pointer, nativeJson.Pointer));
+    }
+
+    /// <summary>Adds a style source from a JSON-like value.</summary>
+    public void AddStyleSourceJson(string sourceId, JsonValue sourceJson)
+    {
+        using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
+        using var nativeJson = NativeJsonValue.From(sourceJson);
+        NativeStatus.Check(NativeMethods.mln_map_add_style_source_json(Pointer, nativeSourceId.Value, nativeJson.Pointer));
+    }
+
+    /// <summary>Removes a style source and reports whether it existed.</summary>
+    public bool RemoveStyleSource(string sourceId)
+    {
+        using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
+        bool removed = false;
+        NativeStatus.Check(NativeMethods.mln_map_remove_style_source(Pointer, nativeSourceId.Value, &removed));
+        return removed;
+    }
+
+    /// <summary>Whether a style source exists.</summary>
+    public bool StyleSourceExists(string sourceId)
+    {
+        using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
+        bool exists = false;
+        NativeStatus.Check(NativeMethods.mln_map_style_source_exists(Pointer, nativeSourceId.Value, &exists));
+        return exists;
+    }
+
+    /// <summary>Gets a style source type when the source exists.</summary>
+    public SourceType? StyleSourceType(string sourceId)
+    {
+        using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
+        uint sourceType = 0;
+        bool found = false;
+        NativeStatus.Check(NativeMethods.mln_map_get_style_source_type(Pointer, nativeSourceId.Value, &sourceType, &found));
+        return found ? (SourceType)sourceType : null;
+    }
+
+    /// <summary>Adds a style layer from a JSON-like value.</summary>
+    public void AddStyleLayerJson(JsonValue layerJson, string beforeLayerId = "")
+    {
+        using var nativeJson = NativeJsonValue.From(layerJson);
+        using var nativeBeforeLayerId = NativeStringView.From(beforeLayerId, nameof(beforeLayerId));
+        NativeStatus.Check(NativeMethods.mln_map_add_style_layer_json(Pointer, nativeJson.Pointer, nativeBeforeLayerId.Value));
+    }
+
+    /// <summary>Removes a style layer and reports whether it existed.</summary>
+    public bool RemoveStyleLayer(string layerId)
+    {
+        using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));
+        bool removed = false;
+        NativeStatus.Check(NativeMethods.mln_map_remove_style_layer(Pointer, nativeLayerId.Value, &removed));
+        return removed;
+    }
+
+    /// <summary>Whether a style layer exists.</summary>
+    public bool StyleLayerExists(string layerId)
+    {
+        using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));
+        bool exists = false;
+        NativeStatus.Check(NativeMethods.mln_map_style_layer_exists(Pointer, nativeLayerId.Value, &exists));
+        return exists;
+    }
+
+    /// <summary>Gets a style layer type when the layer exists.</summary>
+    public string? StyleLayerType(string layerId)
+    {
+        using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));
+        mln_string_view layerType = default;
+        bool found = false;
+        NativeStatus.Check(NativeMethods.mln_map_get_style_layer_type(Pointer, nativeLayerId.Value, &layerType, &found));
+        return found ? RuntimeStructs.CopyUtf8(layerType.data, layerType.size) : null;
+    }
+
+    /// <summary>Sets the style light document from a JSON-like value.</summary>
+    public void SetStyleLightJson(JsonValue lightJson)
+    {
+        using var nativeJson = NativeJsonValue.From(lightJson);
+        NativeStatus.Check(NativeMethods.mln_map_set_style_light_json(Pointer, nativeJson.Pointer));
     }
 
     /// <summary>Destroys the map on its owner thread.</summary>

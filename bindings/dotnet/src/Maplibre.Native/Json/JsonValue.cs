@@ -3,6 +3,8 @@ namespace Maplibre.Native.Json;
 /// <summary>JSON-like value tree that preserves integer width and object order.</summary>
 public abstract record JsonValue
 {
+    public const int MaxDepth = 64;
+
     private JsonValue() { }
 
     public sealed record Null : JsonValue
