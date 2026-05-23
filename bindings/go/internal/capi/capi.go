@@ -23,6 +23,18 @@ static inline mln_offline_region_definition mln_go_offline_tile_pyramid_region_d
   definition.data.tile_pyramid.include_ideographs = include_ideographs;
   return definition;
 }
+
+static inline uint32_t mln_go_offline_region_info_definition_type(
+  const mln_offline_region_info* info
+) {
+  return info->definition.type;
+}
+
+static inline mln_offline_tile_pyramid_region_definition mln_go_offline_region_info_tile_pyramid(
+  const mln_offline_region_info* info
+) {
+  return info->definition.data.tile_pyramid;
+}
 */
 import "C"
 import "unsafe"
@@ -83,6 +95,27 @@ type OfflineTilePyramidRegionDefinition struct {
 	MaxZoom           float64
 	PixelRatio        float32
 	IncludeIdeographs bool
+}
+
+// OfflineRegionInfo is a copied native offline region snapshot.
+type OfflineRegionInfo struct {
+	ID             int64
+	DefinitionType uint32
+	TilePyramid    OfflineTilePyramidRegionDefinition
+	Metadata       []byte
+}
+
+// OfflineRegionStatus is a copied native offline region status snapshot.
+type OfflineRegionStatus struct {
+	DownloadState                  uint32
+	CompletedResourceCount         uint64
+	CompletedResourceSize          uint64
+	CompletedTileCount             uint64
+	RequiredTileCount              uint64
+	CompletedTileSize              uint64
+	RequiredResourceCount          uint64
+	RequiredResourceCountIsPrecise bool
+	Complete                       bool
 }
 
 // RuntimeEvent is a copied native runtime event.
@@ -539,6 +572,169 @@ func RuntimeOfflineRegionDeleteStart(runtime *Runtime, regionID int64, out *uint
 	return status
 }
 
+// RuntimeOfflineRegionCreateTakeResult takes and copies a create result.
+func RuntimeOfflineRegionCreateTakeResult(runtime *Runtime, operationID uint64, out *OfflineRegionInfo) Status {
+	var snapshot *C.mln_offline_region_snapshot
+	status := Status(C.mln_runtime_offline_region_create_take_result(
+		(*C.mln_runtime)(unsafe.Pointer(runtime)),
+		C.mln_offline_operation_id(operationID),
+		&snapshot,
+	))
+	if status != StatusOK {
+		return status
+	}
+	defer C.mln_offline_region_snapshot_destroy(snapshot)
+	return offlineRegionSnapshotCopy(snapshot, out)
+}
+
+// RuntimeOfflineRegionGetTakeResult takes and copies an optional get result.
+func RuntimeOfflineRegionGetTakeResult(runtime *Runtime, operationID uint64, out *OfflineRegionInfo, found *bool) Status {
+	var snapshot *C.mln_offline_region_snapshot
+	var rawFound C.bool
+	status := Status(C.mln_runtime_offline_region_get_take_result(
+		(*C.mln_runtime)(unsafe.Pointer(runtime)),
+		C.mln_offline_operation_id(operationID),
+		&snapshot,
+		&rawFound,
+	))
+	if status != StatusOK {
+		return status
+	}
+	*found = bool(rawFound)
+	if !bool(rawFound) {
+		*out = OfflineRegionInfo{}
+		return StatusOK
+	}
+	defer C.mln_offline_region_snapshot_destroy(snapshot)
+	return offlineRegionSnapshotCopy(snapshot, out)
+}
+
+// RuntimeOfflineRegionsListTakeResult takes and copies a list result.
+func RuntimeOfflineRegionsListTakeResult(runtime *Runtime, operationID uint64, out *[]OfflineRegionInfo) Status {
+	var list *C.mln_offline_region_list
+	status := Status(C.mln_runtime_offline_regions_list_take_result(
+		(*C.mln_runtime)(unsafe.Pointer(runtime)),
+		C.mln_offline_operation_id(operationID),
+		&list,
+	))
+	if status != StatusOK {
+		return status
+	}
+	defer C.mln_offline_region_list_destroy(list)
+	return offlineRegionListCopy(list, out)
+}
+
+// RuntimeOfflineRegionsMergeDatabaseTakeResult takes and copies a merge result.
+func RuntimeOfflineRegionsMergeDatabaseTakeResult(runtime *Runtime, operationID uint64, out *[]OfflineRegionInfo) Status {
+	var list *C.mln_offline_region_list
+	status := Status(C.mln_runtime_offline_regions_merge_database_take_result(
+		(*C.mln_runtime)(unsafe.Pointer(runtime)),
+		C.mln_offline_operation_id(operationID),
+		&list,
+	))
+	if status != StatusOK {
+		return status
+	}
+	defer C.mln_offline_region_list_destroy(list)
+	return offlineRegionListCopy(list, out)
+}
+
+// RuntimeOfflineRegionUpdateMetadataTakeResult takes and copies an update result.
+func RuntimeOfflineRegionUpdateMetadataTakeResult(runtime *Runtime, operationID uint64, out *OfflineRegionInfo) Status {
+	var snapshot *C.mln_offline_region_snapshot
+	status := Status(C.mln_runtime_offline_region_update_metadata_take_result(
+		(*C.mln_runtime)(unsafe.Pointer(runtime)),
+		C.mln_offline_operation_id(operationID),
+		&snapshot,
+	))
+	if status != StatusOK {
+		return status
+	}
+	defer C.mln_offline_region_snapshot_destroy(snapshot)
+	return offlineRegionSnapshotCopy(snapshot, out)
+}
+
+// RuntimeOfflineRegionGetStatusTakeResult takes and copies a status result.
+func RuntimeOfflineRegionGetStatusTakeResult(runtime *Runtime, operationID uint64, out *OfflineRegionStatus) Status {
+	rawStatus := C.mln_offline_region_status{size: C.uint32_t(unsafe.Sizeof(C.mln_offline_region_status{}))}
+	status := Status(C.mln_runtime_offline_region_get_status_take_result(
+		(*C.mln_runtime)(unsafe.Pointer(runtime)),
+		C.mln_offline_operation_id(operationID),
+		&rawStatus,
+	))
+	if status == StatusOK {
+		*out = offlineRegionStatusFromC(rawStatus)
+	}
+	return status
+}
+
+func offlineRegionSnapshotCopy(snapshot *C.mln_offline_region_snapshot, out *OfflineRegionInfo) Status {
+	rawInfo := C.mln_offline_region_info{size: C.uint32_t(unsafe.Sizeof(C.mln_offline_region_info{}))}
+	status := Status(C.mln_offline_region_snapshot_get(snapshot, &rawInfo))
+	if status == StatusOK {
+		*out = offlineRegionInfoFromC(rawInfo)
+	}
+	return status
+}
+
+func offlineRegionListCopy(list *C.mln_offline_region_list, out *[]OfflineRegionInfo) Status {
+	var count C.size_t
+	status := Status(C.mln_offline_region_list_count(list, &count))
+	if status != StatusOK {
+		return status
+	}
+	regions := make([]OfflineRegionInfo, 0, int(count))
+	for index := C.size_t(0); index < count; index++ {
+		rawInfo := C.mln_offline_region_info{size: C.uint32_t(unsafe.Sizeof(C.mln_offline_region_info{}))}
+		status := Status(C.mln_offline_region_list_get(list, index, &rawInfo))
+		if status != StatusOK {
+			return status
+		}
+		regions = append(regions, offlineRegionInfoFromC(rawInfo))
+	}
+	*out = regions
+	return StatusOK
+}
+
+func offlineRegionInfoFromC(info C.mln_offline_region_info) OfflineRegionInfo {
+	copied := OfflineRegionInfo{
+		ID:             int64(info.id),
+		DefinitionType: uint32(C.mln_go_offline_region_info_definition_type(&info)),
+	}
+	if info.metadata != nil && info.metadata_size > 0 {
+		copied.Metadata = C.GoBytes(unsafe.Pointer(info.metadata), C.int(info.metadata_size))
+	}
+	if copied.DefinitionType == OfflineRegionDefinitionTilePyramid {
+		copied.TilePyramid = offlineTilePyramidDefinitionFromC(C.mln_go_offline_region_info_tile_pyramid(&info))
+	}
+	return copied
+}
+
+func offlineTilePyramidDefinitionFromC(definition C.mln_offline_tile_pyramid_region_definition) OfflineTilePyramidRegionDefinition {
+	return OfflineTilePyramidRegionDefinition{
+		StyleURL:          C.GoString(definition.style_url),
+		Bounds:            latLngBoundsFromC(definition.bounds),
+		MinZoom:           float64(definition.min_zoom),
+		MaxZoom:           float64(definition.max_zoom),
+		PixelRatio:        float32(definition.pixel_ratio),
+		IncludeIdeographs: bool(definition.include_ideographs),
+	}
+}
+
+func offlineRegionStatusFromC(status C.mln_offline_region_status) OfflineRegionStatus {
+	return OfflineRegionStatus{
+		DownloadState:                  uint32(status.download_state),
+		CompletedResourceCount:         uint64(status.completed_resource_count),
+		CompletedResourceSize:          uint64(status.completed_resource_size),
+		CompletedTileCount:             uint64(status.completed_tile_count),
+		RequiredTileCount:              uint64(status.required_tile_count),
+		CompletedTileSize:              uint64(status.completed_tile_size),
+		RequiredResourceCount:          uint64(status.required_resource_count),
+		RequiredResourceCountIsPrecise: bool(status.required_resource_count_is_precise),
+		Complete:                       bool(status.complete),
+	}
+}
+
 func bytesToC(bytes []byte) (unsafe.Pointer, C.size_t) {
 	if len(bytes) == 0 {
 		return nil, 0
@@ -740,6 +936,10 @@ func latLngBoundsToC(bounds LatLngBounds) C.mln_lat_lng_bounds {
 		southwest: latLngToC(bounds.Southwest),
 		northeast: latLngToC(bounds.Northeast),
 	}
+}
+
+func latLngBoundsFromC(bounds C.mln_lat_lng_bounds) LatLngBounds {
+	return LatLngBounds{Southwest: latLngFromC(bounds.southwest), Northeast: latLngFromC(bounds.northeast)}
 }
 
 func screenPointToC(point ScreenPoint) C.mln_screen_point {

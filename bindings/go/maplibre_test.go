@@ -4,6 +4,7 @@ import (
 	"errors"
 	stdruntime "runtime"
 	"testing"
+	"time"
 )
 
 func TestCVersionUsesNativeABI(t *testing.T) {
@@ -249,6 +250,73 @@ func TestOfflineRegionStartOperationsReturnTypedHandles(t *testing.T) {
 		t.Fatalf("StartDeleteOfflineRegion(): %v", err)
 	}
 	requireDiscardOfflineOperation(t, deleteOperation, OfflineOperationRegionDelete, OfflineOperationResultNone)
+}
+
+func waitTakeOfflineOperation[T any](t *testing.T, runtime *RuntimeHandle, operation *OfflineOperationHandle[T]) T {
+	t.Helper()
+	for range make([]struct{}, 5000) {
+		if err := runtime.RunOnce(); err != nil {
+			t.Fatalf("RunOnce(): %v", err)
+		}
+		result, err := operation.Take()
+		if err == nil {
+			return result
+		}
+		if !errors.Is(err, ErrInvalidState) {
+			t.Fatalf("Take(): %v", err)
+		}
+		time.Sleep(time.Millisecond)
+	}
+	t.Fatal("offline operation did not complete")
+	var zero T
+	return zero
+}
+
+func TestOfflineCreateAndListTakeResultsCopyNativeData(t *testing.T) {
+	stdruntime.LockOSThread()
+	defer stdruntime.UnlockOSThread()
+
+	runtime, err := NewRuntime()
+	if err != nil {
+		t.Fatalf("NewRuntime(): %v", err)
+	}
+	defer func() {
+		if err := runtime.Close(); err != nil {
+			t.Errorf("Close(): %v", err)
+		}
+	}()
+
+	metadata := []byte{9, 8, 7}
+	create, err := runtime.StartCreateOfflineRegion(testOfflineTileDefinition(), metadata)
+	if err != nil {
+		t.Fatalf("StartCreateOfflineRegion(): %v", err)
+	}
+	info := waitTakeOfflineOperation(t, runtime, create)
+	if info.ID == 0 {
+		t.Fatal("created offline region ID is zero")
+	}
+	if !errors.Is(create.Discard(), ErrInvalidArgument) {
+		t.Fatal("Discard() after Take did not report closed operation")
+	}
+	if got := info.Metadata; len(got) != len(metadata) || got[0] != metadata[0] || got[1] != metadata[1] || got[2] != metadata[2] {
+		t.Fatalf("metadata = %v, want %v", got, metadata)
+	}
+	tile, ok := info.Definition.(OfflineTilePyramidRegionDefinition)
+	if !ok {
+		t.Fatalf("definition = %T, want OfflineTilePyramidRegionDefinition", info.Definition)
+	}
+	if tile.StyleURL != testOfflineTileDefinition().StyleURL {
+		t.Fatalf("StyleURL = %q, want %q", tile.StyleURL, testOfflineTileDefinition().StyleURL)
+	}
+
+	list, err := runtime.StartOfflineRegions()
+	if err != nil {
+		t.Fatalf("StartOfflineRegions(): %v", err)
+	}
+	regions := waitTakeOfflineOperation(t, runtime, list)
+	if len(regions) == 0 {
+		t.Fatal("offline region list is empty after creating a region")
+	}
 }
 
 func TestOfflineRegionStartOperationsValidateGoInputs(t *testing.T) {
