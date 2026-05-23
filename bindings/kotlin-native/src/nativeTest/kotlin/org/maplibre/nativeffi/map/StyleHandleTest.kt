@@ -11,6 +11,7 @@ import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.json.JsonValue
 import org.maplibre.nativeffi.render.PremultipliedRgba8Image
 import org.maplibre.nativeffi.runtime.RuntimeHandle
+import org.maplibre.nativeffi.style.LocationIndicatorImageKind
 import org.maplibre.nativeffi.style.RasterDemEncoding
 import org.maplibre.nativeffi.style.SourceType
 import org.maplibre.nativeffi.style.StyleImageOptions
@@ -90,6 +91,12 @@ class StyleHandleTest {
       assertTrue(map.styleImageExists("dot"))
       assertEquals(2.0f, map.styleImageInfo("dot")?.pixelRatio)
       assertEquals(image, map.styleImage("dot")?.image)
+      map.addLocationIndicatorLayer("location")
+      assertEquals("location-indicator", map.styleLayerType("location"))
+      map.setLocationIndicatorLocation("location", LatLng(0.0, 0.0), 0.0)
+      map.setLocationIndicatorBearing("location", 45.0)
+      map.setLocationIndicatorAccuracyRadius("location", 10.0)
+      map.setLocationIndicatorImageName("location", LocationIndicatorImageKind.TOP, "dot")
       assertTrue(map.removeStyleImage("dot"))
       assertFalse(map.styleImageExists("dot"))
     } finally {
@@ -156,6 +163,10 @@ class StyleHandleTest {
         TileSourceOptions().tileSize(512U).rasterDemEncoding(RasterDemEncoding.TERRARIUM),
       )
       assertEquals(SourceType.RASTER_DEM, map.styleSourceType("dem"))
+      map.addHillshadeLayer("hillshade", "dem")
+      assertEquals("hillshade", map.styleLayerType("hillshade"))
+      map.addColorReliefLayer("relief", "dem")
+      assertEquals("color-relief", map.styleLayerType("relief"))
     } finally {
       map.close()
       runtime.close()

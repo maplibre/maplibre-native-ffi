@@ -32,10 +32,13 @@ import org.maplibre.nativeffi.internal.c.mln_bound_options_default
 import org.maplibre.nativeffi.internal.c.mln_camera_options_default
 import org.maplibre.nativeffi.internal.c.mln_free_camera_options_default
 import org.maplibre.nativeffi.internal.c.mln_lat_lng
+import org.maplibre.nativeffi.internal.c.mln_map_add_color_relief_layer
 import org.maplibre.nativeffi.internal.c.mln_map_add_geojson_source_data
 import org.maplibre.nativeffi.internal.c.mln_map_add_geojson_source_url
+import org.maplibre.nativeffi.internal.c.mln_map_add_hillshade_layer
 import org.maplibre.nativeffi.internal.c.mln_map_add_image_source_image
 import org.maplibre.nativeffi.internal.c.mln_map_add_image_source_url
+import org.maplibre.nativeffi.internal.c.mln_map_add_location_indicator_layer
 import org.maplibre.nativeffi.internal.c.mln_map_add_raster_dem_source_tiles
 import org.maplibre.nativeffi.internal.c.mln_map_add_raster_dem_source_url
 import org.maplibre.nativeffi.internal.c.mln_map_add_raster_source_tiles
@@ -103,6 +106,10 @@ import org.maplibre.nativeffi.internal.c.mln_map_set_image_source_image
 import org.maplibre.nativeffi.internal.c.mln_map_set_image_source_url
 import org.maplibre.nativeffi.internal.c.mln_map_set_layer_filter
 import org.maplibre.nativeffi.internal.c.mln_map_set_layer_property
+import org.maplibre.nativeffi.internal.c.mln_map_set_location_indicator_accuracy_radius
+import org.maplibre.nativeffi.internal.c.mln_map_set_location_indicator_bearing
+import org.maplibre.nativeffi.internal.c.mln_map_set_location_indicator_image_name
+import org.maplibre.nativeffi.internal.c.mln_map_set_location_indicator_location
 import org.maplibre.nativeffi.internal.c.mln_map_set_projection_mode
 import org.maplibre.nativeffi.internal.c.mln_map_set_rendering_stats_view_enabled
 import org.maplibre.nativeffi.internal.c.mln_map_set_style_image
@@ -131,6 +138,7 @@ import org.maplibre.nativeffi.internal.struct.ValueStructs
 import org.maplibre.nativeffi.json.JsonValue
 import org.maplibre.nativeffi.render.PremultipliedRgba8Image
 import org.maplibre.nativeffi.runtime.RuntimeHandle
+import org.maplibre.nativeffi.style.LocationIndicatorImageKind
 import org.maplibre.nativeffi.style.SourceInfo
 import org.maplibre.nativeffi.style.SourceType
 import org.maplibre.nativeffi.style.StyleImage
@@ -581,6 +589,110 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
           state.requireLive(),
           ValueStructs.jsonValue(layerJson, this),
           CoreStructs.stringView(beforeLayerId, this),
+        )
+      )
+    }
+  }
+
+  public fun addHillshadeLayer(layerId: String, sourceId: String) {
+    addHillshadeLayer(layerId, sourceId, "")
+  }
+
+  public fun addHillshadeLayer(layerId: String, sourceId: String, beforeLayerId: String) {
+    memScoped {
+      Status.check(
+        mln_map_add_hillshade_layer(
+          state.requireLive(),
+          CoreStructs.stringView(layerId, this),
+          CoreStructs.stringView(sourceId, this),
+          CoreStructs.stringView(beforeLayerId, this),
+        )
+      )
+    }
+  }
+
+  public fun addColorReliefLayer(layerId: String, sourceId: String) {
+    addColorReliefLayer(layerId, sourceId, "")
+  }
+
+  public fun addColorReliefLayer(layerId: String, sourceId: String, beforeLayerId: String) {
+    memScoped {
+      Status.check(
+        mln_map_add_color_relief_layer(
+          state.requireLive(),
+          CoreStructs.stringView(layerId, this),
+          CoreStructs.stringView(sourceId, this),
+          CoreStructs.stringView(beforeLayerId, this),
+        )
+      )
+    }
+  }
+
+  public fun addLocationIndicatorLayer(layerId: String) {
+    addLocationIndicatorLayer(layerId, "")
+  }
+
+  public fun addLocationIndicatorLayer(layerId: String, beforeLayerId: String) {
+    memScoped {
+      Status.check(
+        mln_map_add_location_indicator_layer(
+          state.requireLive(),
+          CoreStructs.stringView(layerId, this),
+          CoreStructs.stringView(beforeLayerId, this),
+        )
+      )
+    }
+  }
+
+  public fun setLocationIndicatorLocation(layerId: String, coordinate: LatLng, altitude: Double) {
+    memScoped {
+      Status.check(
+        mln_map_set_location_indicator_location(
+          state.requireLive(),
+          CoreStructs.stringView(layerId, this),
+          CoreStructs.latLng(coordinate),
+          altitude,
+        )
+      )
+    }
+  }
+
+  public fun setLocationIndicatorBearing(layerId: String, bearing: Double) {
+    memScoped {
+      Status.check(
+        mln_map_set_location_indicator_bearing(
+          state.requireLive(),
+          CoreStructs.stringView(layerId, this),
+          bearing,
+        )
+      )
+    }
+  }
+
+  public fun setLocationIndicatorAccuracyRadius(layerId: String, radius: Double) {
+    memScoped {
+      Status.check(
+        mln_map_set_location_indicator_accuracy_radius(
+          state.requireLive(),
+          CoreStructs.stringView(layerId, this),
+          radius,
+        )
+      )
+    }
+  }
+
+  public fun setLocationIndicatorImageName(
+    layerId: String,
+    imageKind: LocationIndicatorImageKind,
+    imageId: String,
+  ) {
+    memScoped {
+      Status.check(
+        mln_map_set_location_indicator_image_name(
+          state.requireLive(),
+          CoreStructs.stringView(layerId, this),
+          imageKind.nativeValue,
+          CoreStructs.stringView(imageId, this),
         )
       )
     }
