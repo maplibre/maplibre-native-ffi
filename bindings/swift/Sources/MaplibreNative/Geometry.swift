@@ -28,6 +28,11 @@ public struct ScreenPoint: Equatable, Sendable {
     self.y = y
   }
 
+  init(native: NativeScreenPoint) {
+    x = native.x
+    y = native.y
+  }
+
   var nativeInput: NativeScreenPoint {
     NativeScreenPoint(x: x, y: y)
   }

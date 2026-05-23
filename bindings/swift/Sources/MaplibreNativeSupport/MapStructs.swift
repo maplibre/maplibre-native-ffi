@@ -28,8 +28,32 @@ public struct NativeScreenPoint: Equatable, Sendable {
     self.y = y
   }
 
+  public init(_ raw: mln_screen_point) {
+    x = raw.x
+    y = raw.y
+  }
+
   public var native: mln_screen_point {
     mln_screen_point(x: x, y: y)
+  }
+}
+
+public struct NativeProjectedMeters: Equatable, Sendable {
+  public let northing: Double
+  public let easting: Double
+
+  public init(northing: Double, easting: Double) {
+    self.northing = northing
+    self.easting = easting
+  }
+
+  public init(_ raw: mln_projected_meters) {
+    northing = raw.northing
+    easting = raw.easting
+  }
+
+  public var native: mln_projected_meters {
+    mln_projected_meters(northing: northing, easting: easting)
   }
 }
 

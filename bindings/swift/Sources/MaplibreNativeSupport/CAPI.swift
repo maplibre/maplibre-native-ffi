@@ -202,4 +202,74 @@ public enum CAPI {
   public static func mapCancelTransitions(_ map: OpaquePointer) throws {
     try checkStatus(mln_map_cancel_transitions(map))
   }
+
+  public static func createMapProjection(_ map: OpaquePointer) throws -> OpaquePointer {
+    let output = try NativeMemory.withTemporary(Optional<OpaquePointer>.none) { projection in
+      try checkStatus(mln_map_projection_create(map, projection))
+    }
+    guard let projection = output.value else {
+      throw NativeStatusFailure(rawStatus: 0, diagnostic: "mln_map_projection_create returned a null projection")
+    }
+    return projection
+  }
+
+  public static func destroyMapProjection(_ projection: OpaquePointer) throws {
+    try checkStatus(mln_map_projection_destroy(projection))
+  }
+
+  public static func mapProjectionGetCamera(_ projection: OpaquePointer) throws -> mln_camera_options {
+    var camera = cameraOptionsDefault()
+    try checkStatus(mln_map_projection_get_camera(projection, &camera))
+    return camera
+  }
+
+  public static func mapProjectionSetCamera(
+    _ projection: OpaquePointer,
+    _ camera: UnsafePointer<mln_camera_options>
+  ) throws {
+    try checkStatus(mln_map_projection_set_camera(projection, camera))
+  }
+
+  public static func mapProjectionSetVisibleCoordinates(
+    _ projection: OpaquePointer,
+    coordinates: UnsafePointer<mln_lat_lng>,
+    count: Int,
+    padding: mln_edge_insets
+  ) throws {
+    try checkStatus(mln_map_projection_set_visible_coordinates(projection, coordinates, count, padding))
+  }
+
+  public static func mapProjectionPixelForLatLng(
+    _ projection: OpaquePointer,
+    coordinate: mln_lat_lng
+  ) throws -> mln_screen_point {
+    let output = try NativeMemory.withTemporary(mln_screen_point()) { point in
+      try checkStatus(mln_map_projection_pixel_for_lat_lng(projection, coordinate, point))
+    }
+    return output.value
+  }
+
+  public static func mapProjectionLatLngForPixel(
+    _ projection: OpaquePointer,
+    point: mln_screen_point
+  ) throws -> mln_lat_lng {
+    let output = try NativeMemory.withTemporary(mln_lat_lng()) { coordinate in
+      try checkStatus(mln_map_projection_lat_lng_for_pixel(projection, point, coordinate))
+    }
+    return output.value
+  }
+
+  public static func projectedMetersForLatLng(_ coordinate: NativeLatLng) throws -> NativeProjectedMeters {
+    let output = try NativeMemory.withTemporary(mln_projected_meters()) { meters in
+      try checkStatus(mln_projected_meters_for_lat_lng(coordinate.native, meters))
+    }
+    return NativeProjectedMeters(output.value)
+  }
+
+  public static func latLngForProjectedMeters(_ meters: NativeProjectedMeters) throws -> NativeLatLng {
+    let output = try NativeMemory.withTemporary(mln_lat_lng()) { coordinate in
+      try checkStatus(mln_lat_lng_for_projected_meters(meters.native, coordinate))
+    }
+    return NativeLatLng(output.value)
+  }
 }
