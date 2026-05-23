@@ -32,6 +32,7 @@ public struct MapOptions: Equatable, Sendable {
 public final class MapHandle {
   private let runtime: RuntimeHandle
   private let handle: NativeHandleBox
+  var customGeometrySourceCallbacks: [String: NativeCustomGeometrySourceCallbacks] = [:]
 
   public init(runtime: RuntimeHandle, options: MapOptions) throws {
     let pointer = try mapNativeFailure {
@@ -59,6 +60,7 @@ public final class MapHandle {
     try handle.closeOnce { pointer in
       try CAPI.destroyMap(pointer)
     }
+    customGeometrySourceCallbacks.removeAll()
   }
 
   public func setStyleURL(_ url: String) throws {

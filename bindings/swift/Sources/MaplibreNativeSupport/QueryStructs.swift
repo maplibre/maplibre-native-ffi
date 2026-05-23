@@ -85,6 +85,40 @@ public struct NativeSourceFeatureQueryOptions: Equatable, Sendable {
   }
 }
 
+public struct NativeFeatureStateSelector: Equatable, Sendable {
+  public let sourceId: String
+  public let sourceLayerId: String?
+  public let featureId: String?
+  public let stateKey: String?
+
+  public init(sourceId: String, sourceLayerId: String? = nil, featureId: String? = nil, stateKey: String? = nil) {
+    self.sourceId = sourceId
+    self.sourceLayerId = sourceLayerId
+    self.featureId = featureId
+    self.stateKey = stateKey
+  }
+
+  public func withNativeSelector<Result>(_ body: (UnsafePointer<mln_feature_state_selector>) throws -> Result) throws -> Result {
+    let arena = NativeJSONArena()
+    var selector = mln_feature_state_selector()
+    selector.size = UInt32(MemoryLayout<mln_feature_state_selector>.size)
+    selector.source_id = arena.view(sourceId)
+    if let sourceLayerId {
+      selector.fields |= MLN_FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID.rawValue
+      selector.source_layer_id = arena.view(sourceLayerId)
+    }
+    if let featureId {
+      selector.fields |= MLN_FEATURE_STATE_SELECTOR_FEATURE_ID.rawValue
+      selector.feature_id = arena.view(featureId)
+    }
+    if let stateKey {
+      selector.fields |= MLN_FEATURE_STATE_SELECTOR_STATE_KEY.rawValue
+      selector.state_key = arena.view(stateKey)
+    }
+    return try withUnsafePointer(to: &selector, body)
+  }
+}
+
 public struct NativeFeatureQueryResultReader {
   public let handle: OpaquePointer
 

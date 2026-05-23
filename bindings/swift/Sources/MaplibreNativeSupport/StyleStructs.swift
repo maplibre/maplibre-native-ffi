@@ -170,6 +170,109 @@ public struct NativeStyleImageOptions: Equatable, Sendable {
   }
 }
 
+public final class NativeCustomGeometrySourceCallbacks: @unchecked Sendable {
+  public typealias TileCallback = @Sendable (NativeCanonicalTileID) -> Void
+
+  private let fetchTile: TileCallback
+  private let cancelTile: TileCallback?
+
+  public init(fetchTile: @escaping TileCallback, cancelTile: TileCallback? = nil) {
+    self.fetchTile = fetchTile
+    self.cancelTile = cancelTile
+  }
+
+  public var unmanagedPointer: UnsafeMutableRawPointer {
+    Unmanaged.passUnretained(self).toOpaque()
+  }
+
+  public func fetched(_ tileId: mln_canonical_tile_id) {
+    fetchTile(NativeCanonicalTileID(tileId))
+  }
+
+  public func cancelled(_ tileId: mln_canonical_tile_id) {
+    cancelTile?(NativeCanonicalTileID(tileId))
+  }
+}
+
+private func customGeometryFetchTileCallback(_ userData: UnsafeMutableRawPointer?, _ tileId: mln_canonical_tile_id) {
+  guard let userData else { return }
+  Unmanaged<NativeCustomGeometrySourceCallbacks>.fromOpaque(userData).takeUnretainedValue().fetched(tileId)
+}
+
+private func customGeometryCancelTileCallback(_ userData: UnsafeMutableRawPointer?, _ tileId: mln_canonical_tile_id) {
+  guard let userData else { return }
+  Unmanaged<NativeCustomGeometrySourceCallbacks>.fromOpaque(userData).takeUnretainedValue().cancelled(tileId)
+}
+
+public struct NativeCustomGeometrySourceOptions: Sendable {
+  public let callbacks: NativeCustomGeometrySourceCallbacks
+  public var minZoom: Double?
+  public var maxZoom: Double?
+  public var tolerance: Double?
+  public var tileSize: UInt32?
+  public var buffer: UInt32?
+  public var clip: Bool?
+  public var wrap: Bool?
+
+  public init(
+    callbacks: NativeCustomGeometrySourceCallbacks,
+    minZoom: Double? = nil,
+    maxZoom: Double? = nil,
+    tolerance: Double? = nil,
+    tileSize: UInt32? = nil,
+    buffer: UInt32? = nil,
+    clip: Bool? = nil,
+    wrap: Bool? = nil
+  ) {
+    self.callbacks = callbacks
+    self.minZoom = minZoom
+    self.maxZoom = maxZoom
+    self.tolerance = tolerance
+    self.tileSize = tileSize
+    self.buffer = buffer
+    self.clip = clip
+    self.wrap = wrap
+  }
+
+  public func withNativeOptions<Result>(
+    _ body: (UnsafePointer<mln_custom_geometry_source_options>) throws -> Result
+  ) throws -> Result {
+    var options = mln_custom_geometry_source_options_default()
+    options.fetch_tile = customGeometryFetchTileCallback
+    options.cancel_tile = customGeometryCancelTileCallback
+    options.user_data = callbacks.unmanagedPointer
+    if let minZoom {
+      options.fields |= MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MIN_ZOOM.rawValue
+      options.min_zoom = minZoom
+    }
+    if let maxZoom {
+      options.fields |= MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MAX_ZOOM.rawValue
+      options.max_zoom = maxZoom
+    }
+    if let tolerance {
+      options.fields |= MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TOLERANCE.rawValue
+      options.tolerance = tolerance
+    }
+    if let tileSize {
+      options.fields |= MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TILE_SIZE.rawValue
+      options.tile_size = tileSize
+    }
+    if let buffer {
+      options.fields |= MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_BUFFER.rawValue
+      options.buffer = buffer
+    }
+    if let clip {
+      options.fields |= MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_CLIP.rawValue
+      options.clip = clip
+    }
+    if let wrap {
+      options.fields |= MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_WRAP.rawValue
+      options.wrap = wrap
+    }
+    return try withUnsafePointer(to: &options, body)
+  }
+}
+
 public struct NativeStyleImageInfo: Equatable, Sendable {
   public let width: UInt32
   public let height: UInt32

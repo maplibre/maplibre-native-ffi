@@ -51,6 +51,26 @@ import Testing
   }
 }
 
+@Test func featureStateSelectorMaterializesOptionalFields() throws {
+  let selector = FeatureStateSelector(sourceId: "source", sourceLayerId: "layer", featureId: "id", stateKey: "hover")
+
+  try selector.nativeSelector.withNativeSelector { native in
+    #expect(native.pointee.fields == (
+      MLN_FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID.rawValue |
+        MLN_FEATURE_STATE_SELECTOR_FEATURE_ID.rawValue |
+        MLN_FEATURE_STATE_SELECTOR_STATE_KEY.rawValue
+    ))
+    let sourceId = try NativeString.copyUTF8(data: native.pointee.source_id.data, size: native.pointee.source_id.size)
+    let sourceLayerId = try NativeString.copyUTF8(data: native.pointee.source_layer_id.data, size: native.pointee.source_layer_id.size)
+    let featureId = try NativeString.copyUTF8(data: native.pointee.feature_id.data, size: native.pointee.feature_id.size)
+    let stateKey = try NativeString.copyUTF8(data: native.pointee.state_key.data, size: native.pointee.state_key.size)
+    #expect(sourceId == "source")
+    #expect(sourceLayerId == "layer")
+    #expect(featureId == "id")
+    #expect(stateKey == "hover")
+  }
+}
+
 @Test func queriedFeatureCopiesNestedFeatureStateAndSourceMetadata() throws {
   let arena = NativeJSONArena()
   var geometry = mln_geometry()

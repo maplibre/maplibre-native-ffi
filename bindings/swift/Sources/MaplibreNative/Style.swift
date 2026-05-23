@@ -147,6 +147,77 @@ public enum LocationIndicatorImageKind: UInt32, Sendable, Hashable {
   case shadow = 2
 }
 
+public struct CanonicalTileID: Equatable, Sendable {
+  public let z: UInt32
+  public let x: UInt32
+  public let y: UInt32
+
+  public init(z: UInt32, x: UInt32, y: UInt32) {
+    self.z = z
+    self.x = x
+    self.y = y
+  }
+
+  init(native: NativeCanonicalTileID) {
+    z = native.z
+    x = native.x
+    y = native.y
+  }
+
+  var nativeTileID: NativeCanonicalTileID {
+    NativeCanonicalTileID(z: z, x: x, y: y)
+  }
+}
+
+public struct CustomGeometrySourceOptions: Sendable {
+  public typealias TileCallback = @Sendable (CanonicalTileID) -> Void
+
+  public var fetchTile: TileCallback
+  public var cancelTile: TileCallback?
+  public var minZoom: Double?
+  public var maxZoom: Double?
+  public var tolerance: Double?
+  public var tileSize: UInt32?
+  public var buffer: UInt32?
+  public var clip: Bool?
+  public var wrap: Bool?
+
+  public init(
+    fetchTile: @escaping TileCallback,
+    cancelTile: TileCallback? = nil,
+    minZoom: Double? = nil,
+    maxZoom: Double? = nil,
+    tolerance: Double? = nil,
+    tileSize: UInt32? = nil,
+    buffer: UInt32? = nil,
+    clip: Bool? = nil,
+    wrap: Bool? = nil
+  ) {
+    self.fetchTile = fetchTile
+    self.cancelTile = cancelTile
+    self.minZoom = minZoom
+    self.maxZoom = maxZoom
+    self.tolerance = tolerance
+    self.tileSize = tileSize
+    self.buffer = buffer
+    self.clip = clip
+    self.wrap = wrap
+  }
+
+  func nativeOptions(callbacks: NativeCustomGeometrySourceCallbacks) -> NativeCustomGeometrySourceOptions {
+    NativeCustomGeometrySourceOptions(
+      callbacks: callbacks,
+      minZoom: minZoom,
+      maxZoom: maxZoom,
+      tolerance: tolerance,
+      tileSize: tileSize,
+      buffer: buffer,
+      clip: clip,
+      wrap: wrap
+    )
+  }
+}
+
 extension MapHandle {
   public func addStyleSourceJSON(sourceId: String, sourceJSON: JSONValue) throws {
     try mapNativeFailure {
@@ -162,7 +233,9 @@ extension MapHandle {
   @discardableResult public func removeStyleSource(_ sourceId: String) throws -> Bool {
     try mapNativeFailure {
       let arena = NativeJSONArena()
-      return try CAPI.mapRemoveStyleSource(try requireLivePointer(), sourceId: arena.view(sourceId))
+      let removed = try CAPI.mapRemoveStyleSource(try requireLivePointer(), sourceId: arena.view(sourceId))
+      if removed { customGeometrySourceCallbacks.removeValue(forKey: sourceId) }
+      return removed
     }
   }
 
@@ -252,6 +325,49 @@ extension MapHandle {
 
   public func addRasterDEMSourceTiles(sourceId: String, tiles: [String], options: StyleTileSourceOptions = StyleTileSourceOptions()) throws {
     try addTileListSource(sourceId: sourceId, tiles: tiles, options: options.nativeOptions, add: CAPI.mapAddRasterDEMSourceTiles)
+  }
+
+  public func addCustomGeometrySource(sourceId: String, options: CustomGeometrySourceOptions) throws {
+    let fetchTile: NativeCustomGeometrySourceCallbacks.TileCallback = { tileId in
+      options.fetchTile(CanonicalTileID(native: tileId))
+    }
+    let cancelTile: NativeCustomGeometrySourceCallbacks.TileCallback?
+    if let callback = options.cancelTile {
+      cancelTile = { tileId in callback(CanonicalTileID(native: tileId)) }
+    } else {
+      cancelTile = nil
+    }
+    let callbacks = NativeCustomGeometrySourceCallbacks(fetchTile: fetchTile, cancelTile: cancelTile)
+    try mapNativeFailure {
+      let arena = NativeJSONArena()
+      try options.nativeOptions(callbacks: callbacks).withNativeOptions { nativeOptions in
+        try CAPI.mapAddCustomGeometrySource(try requireLivePointer(), sourceId: arena.view(sourceId), options: nativeOptions)
+      }
+      customGeometrySourceCallbacks[sourceId] = callbacks
+    }
+  }
+
+  public func setCustomGeometrySourceTileData(sourceId: String, tileId: CanonicalTileID, data: GeoJSON) throws {
+    try mapNativeFailure {
+      let arena = NativeJSONArena()
+      try arena.withNativeGeoJSON(data.nativeGeoJSON) { data in
+        try CAPI.mapSetCustomGeometrySourceTileData(try requireLivePointer(), sourceId: arena.view(sourceId), tileId: tileId.nativeTileID, data: data)
+      }
+    }
+  }
+
+  public func invalidateCustomGeometrySourceTile(sourceId: String, tileId: CanonicalTileID) throws {
+    try mapNativeFailure {
+      let arena = NativeJSONArena()
+      try CAPI.mapInvalidateCustomGeometrySourceTile(try requireLivePointer(), sourceId: arena.view(sourceId), tileId: tileId.nativeTileID)
+    }
+  }
+
+  public func invalidateCustomGeometrySourceRegion(sourceId: String, bounds: LatLngBounds) throws {
+    try mapNativeFailure {
+      let arena = NativeJSONArena()
+      try CAPI.mapInvalidateCustomGeometrySourceRegion(try requireLivePointer(), sourceId: arena.view(sourceId), bounds: bounds.nativeInput)
+    }
   }
 
   public func setStyleImage(imageId: String, image: StyleRGBA8Image, options: StyleImageOptions = StyleImageOptions()) throws {

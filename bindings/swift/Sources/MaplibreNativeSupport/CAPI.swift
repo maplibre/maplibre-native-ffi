@@ -621,6 +621,22 @@ public enum CAPI {
     try checkStatus(mln_map_add_raster_dem_source_tiles(map, sourceId, tiles, count, options))
   }
 
+  public static func mapAddCustomGeometrySource(_ map: OpaquePointer, sourceId: mln_string_view, options: UnsafePointer<mln_custom_geometry_source_options>) throws {
+    try checkStatus(mln_map_add_custom_geometry_source(map, sourceId, options))
+  }
+
+  public static func mapSetCustomGeometrySourceTileData(_ map: OpaquePointer, sourceId: mln_string_view, tileId: NativeCanonicalTileID, data: UnsafePointer<mln_geojson>) throws {
+    try checkStatus(mln_map_set_custom_geometry_source_tile_data(map, sourceId, tileId.native, data))
+  }
+
+  public static func mapInvalidateCustomGeometrySourceTile(_ map: OpaquePointer, sourceId: mln_string_view, tileId: NativeCanonicalTileID) throws {
+    try checkStatus(mln_map_invalidate_custom_geometry_source_tile(map, sourceId, tileId.native))
+  }
+
+  public static func mapInvalidateCustomGeometrySourceRegion(_ map: OpaquePointer, sourceId: mln_string_view, bounds: NativeLatLngBounds) throws {
+    try checkStatus(mln_map_invalidate_custom_geometry_source_region(map, sourceId, bounds.native))
+  }
+
   public static func mapSetStyleImage(_ map: OpaquePointer, imageId: mln_string_view, image: UnsafePointer<mln_premultiplied_rgba8_image>, options: UnsafePointer<mln_style_image_options>) throws {
     try checkStatus(mln_map_set_style_image(map, imageId, image, options))
   }
@@ -811,5 +827,50 @@ public enum CAPI {
     guard let snapshot else { return nil }
     defer { jsonSnapshotDestroy(snapshot) }
     return try jsonSnapshotCopyValue(snapshot)
+  }
+
+  public static func renderSessionQueryFeatureExtensions(
+    session: OpaquePointer,
+    sourceId: mln_string_view,
+    feature: UnsafePointer<mln_feature>,
+    extensionName: mln_string_view,
+    extensionField: mln_string_view,
+    arguments: UnsafePointer<mln_json_value>?
+  ) throws -> OpaquePointer {
+    let output = try NativeMemory.withTemporary(Optional<OpaquePointer>.none) { result in
+      try checkStatus(mln_render_session_query_feature_extensions(session, sourceId, feature, extensionName, extensionField, arguments, result))
+    }
+    guard let result = output.value else {
+      throw NativeStatusFailure(rawStatus: 0, diagnostic: "feature extension query returned a null result")
+    }
+    return result
+  }
+
+  public static func featureExtensionResultCopy(_ result: OpaquePointer) throws -> NativeFeatureExtensionResult {
+    var info = mln_feature_extension_result_info()
+    info.size = UInt32(MemoryLayout<mln_feature_extension_result_info>.size)
+    try checkStatus(mln_feature_extension_result_get(result, &info))
+    return try NativeFeatureExtensionResult(copying: info)
+  }
+
+  public static func featureExtensionResultDestroy(_ result: OpaquePointer) {
+    mln_feature_extension_result_destroy(result)
+  }
+
+  public static func renderSessionSetFeatureState(_ session: OpaquePointer, selector: UnsafePointer<mln_feature_state_selector>, state: UnsafePointer<mln_json_value>) throws {
+    try checkStatus(mln_render_session_set_feature_state(session, selector, state))
+  }
+
+  public static func renderSessionGetFeatureState(_ session: OpaquePointer, selector: UnsafePointer<mln_feature_state_selector>) throws -> NativeJSONValue? {
+    let snapshot = try NativeMemory.withTemporary(Optional<OpaquePointer>.none) { snapshot in
+      try checkStatus(mln_render_session_get_feature_state(session, selector, snapshot))
+    }.value
+    guard let snapshot else { return nil }
+    defer { jsonSnapshotDestroy(snapshot) }
+    return try jsonSnapshotCopyValue(snapshot)
+  }
+
+  public static func renderSessionRemoveFeatureState(_ session: OpaquePointer, selector: UnsafePointer<mln_feature_state_selector>) throws {
+    try checkStatus(mln_render_session_remove_feature_state(session, selector))
   }
 }

@@ -72,6 +72,46 @@ import Testing
   }
 }
 
+@Test func customGeometryOptionsRetainAndInvokeTileCallbacks() throws {
+  final class TileBox: @unchecked Sendable {
+    var fetched: [NativeCanonicalTileID] = []
+    var cancelled: [NativeCanonicalTileID] = []
+  }
+
+  let box = TileBox()
+  let callbacks = NativeCustomGeometrySourceCallbacks(
+    fetchTile: { box.fetched.append($0) },
+    cancelTile: { box.cancelled.append($0) }
+  )
+  let options = NativeCustomGeometrySourceOptions(
+    callbacks: callbacks,
+    minZoom: 1,
+    maxZoom: 10,
+    tolerance: 0.5,
+    tileSize: 256,
+    buffer: 8,
+    clip: true,
+    wrap: false
+  )
+
+  try options.withNativeOptions { native in
+    #expect((native.pointee.fields & MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MIN_ZOOM.rawValue) != 0)
+    #expect((native.pointee.fields & MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_WRAP.rawValue) != 0)
+    #expect(native.pointee.min_zoom == 1)
+    #expect(native.pointee.max_zoom == 10)
+    #expect(native.pointee.tolerance == 0.5)
+    #expect(native.pointee.tile_size == 256)
+    #expect(native.pointee.buffer == 8)
+    #expect(native.pointee.clip)
+    #expect(!native.pointee.wrap)
+    native.pointee.fetch_tile!(native.pointee.user_data, mln_canonical_tile_id(z: 1, x: 2, y: 3))
+    native.pointee.cancel_tile!(native.pointee.user_data, mln_canonical_tile_id(z: 4, x: 5, y: 6))
+  }
+
+  #expect(box.fetched == [NativeCanonicalTileID(z: 1, x: 2, y: 3)])
+  #expect(box.cancelled == [NativeCanonicalTileID(z: 4, x: 5, y: 6)])
+}
+
 @Test func closedMapRejectsStyleCallsThroughSwiftHandleState() throws {
   let runtime = try RuntimeHandle()
   defer { try? runtime.close() }

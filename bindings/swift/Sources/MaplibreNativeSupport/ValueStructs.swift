@@ -390,4 +390,19 @@ public struct NativeQueriedFeature: Equatable, Sendable {
 public enum NativeFeatureExtensionResult: Equatable, Sendable {
   case value(NativeJSONValue)
   case featureCollection([NativeFeature])
+
+  public init(copying raw: mln_feature_extension_result_info) throws {
+    switch raw.type {
+    case MLN_FEATURE_EXTENSION_RESULT_TYPE_VALUE.rawValue:
+      self = .value(try NativeJSONValue(copying: raw.data.value.pointee))
+    case MLN_FEATURE_EXTENSION_RESULT_TYPE_FEATURE_COLLECTION.rawValue:
+      let collection = raw.data.feature_collection
+      let features = try (0..<collection.feature_count).map { index in
+        try NativeFeature(copying: collection.features![index])
+      }
+      self = .featureCollection(features)
+    default:
+      throw NativeStatusFailure(rawStatus: 0, diagnostic: "unknown feature extension result type \(raw.type)")
+    }
+  }
 }

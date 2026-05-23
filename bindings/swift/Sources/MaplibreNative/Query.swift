@@ -42,6 +42,24 @@ public struct SourceFeatureQueryOptions: Equatable, Sendable {
   }
 }
 
+public struct FeatureStateSelector: Equatable, Sendable {
+  public var sourceId: String
+  public var sourceLayerId: String?
+  public var featureId: String?
+  public var stateKey: String?
+
+  public init(sourceId: String, sourceLayerId: String? = nil, featureId: String? = nil, stateKey: String? = nil) {
+    self.sourceId = sourceId
+    self.sourceLayerId = sourceLayerId
+    self.featureId = featureId
+    self.stateKey = stateKey
+  }
+
+  var nativeSelector: NativeFeatureStateSelector {
+    NativeFeatureStateSelector(sourceId: sourceId, sourceLayerId: sourceLayerId, featureId: featureId, stateKey: stateKey)
+  }
+}
+
 public struct QueriedFeature: Equatable, Sendable {
   public let feature: Feature
   public let sourceId: String?
@@ -104,6 +122,18 @@ extension Feature {
   }
 }
 
+public enum FeatureExtensionResult: Equatable, Sendable {
+  case value(JSONValue)
+  case featureCollection([Feature])
+
+  init(native: NativeFeatureExtensionResult) {
+    switch native {
+    case .value(let value): self = .value(JSONValue(native: value))
+    case .featureCollection(let features): self = .featureCollection(features.map(Feature.init(native:)))
+    }
+  }
+}
+
 extension RenderSessionHandle {
   public func queryRenderedFeatures(
     geometry: RenderedQueryGeometry,
@@ -139,6 +169,53 @@ extension RenderSessionHandle {
         )
         defer { CAPI.featureQueryResultDestroy(result) }
         return try NativeFeatureQueryResultReader(handle: result).copyFeatures().map(QueriedFeature.init(native:))
+      }
+    }
+  }
+
+  public func queryFeatureExtension(
+    sourceId: String,
+    feature: Feature,
+    extensionName: String,
+    extensionField: String,
+    arguments: JSONValue? = nil
+  ) throws -> FeatureExtensionResult {
+    try mapNativeFailure {
+      let arena = NativeJSONArena()
+      let result = try CAPI.renderSessionQueryFeatureExtensions(
+        session: try requireLivePointer(),
+        sourceId: arena.view(sourceId),
+        feature: arena.allocateFeature(feature.nativeFeature),
+        extensionName: arena.view(extensionName),
+        extensionField: arena.view(extensionField),
+        arguments: arguments.map { arena.allocate($0.nativeValue) }
+      )
+      defer { CAPI.featureExtensionResultDestroy(result) }
+      return try FeatureExtensionResult(native: CAPI.featureExtensionResultCopy(result))
+    }
+  }
+
+  public func setFeatureState(selector: FeatureStateSelector, state: JSONValue) throws {
+    try mapNativeFailure {
+      let arena = NativeJSONArena()
+      try selector.nativeSelector.withNativeSelector { selector in
+        try CAPI.renderSessionSetFeatureState(try requireLivePointer(), selector: selector, state: arena.allocate(state.nativeValue))
+      }
+    }
+  }
+
+  public func featureState(selector: FeatureStateSelector) throws -> JSONValue? {
+    try mapNativeFailure {
+      try selector.nativeSelector.withNativeSelector { selector in
+        try CAPI.renderSessionGetFeatureState(try requireLivePointer(), selector: selector).map(JSONValue.init(native:))
+      }
+    }
+  }
+
+  public func removeFeatureState(selector: FeatureStateSelector) throws {
+    try mapNativeFailure {
+      try selector.nativeSelector.withNativeSelector { selector in
+        try CAPI.renderSessionRemoveFeatureState(try requireLivePointer(), selector: selector)
       }
     }
   }
