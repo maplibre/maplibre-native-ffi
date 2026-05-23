@@ -190,6 +190,16 @@ const (
 )
 
 const (
+	MapDebugTileBorders uint32 = uint32(C.MLN_MAP_DEBUG_TILE_BORDERS)
+	MapDebugParseStatus uint32 = uint32(C.MLN_MAP_DEBUG_PARSE_STATUS)
+	MapDebugTimestamps  uint32 = uint32(C.MLN_MAP_DEBUG_TIMESTAMPS)
+	MapDebugCollision   uint32 = uint32(C.MLN_MAP_DEBUG_COLLISION)
+	MapDebugOverdraw    uint32 = uint32(C.MLN_MAP_DEBUG_OVERDRAW)
+	MapDebugStencilClip uint32 = uint32(C.MLN_MAP_DEBUG_STENCIL_CLIP)
+	MapDebugDepthBuffer uint32 = uint32(C.MLN_MAP_DEBUG_DEPTH_BUFFER)
+)
+
+const (
 	LogSeverityInfo    uint32 = uint32(C.MLN_LOG_SEVERITY_INFO)
 	LogSeverityWarning uint32 = uint32(C.MLN_LOG_SEVERITY_WARNING)
 	LogSeverityError   uint32 = uint32(C.MLN_LOG_SEVERITY_ERROR)
@@ -927,6 +937,51 @@ func MapSetStyleJSON(m *Map, json string) Status {
 	cJSON := C.CString(json)
 	defer C.free(unsafe.Pointer(cJSON))
 	return Status(C.mln_map_set_style_json((*C.mln_map)(unsafe.Pointer(m)), cJSON))
+}
+
+// MapSetDebugOptions sets the map debug overlay mask.
+func MapSetDebugOptions(m *Map, options uint32) Status {
+	return Status(C.mln_map_set_debug_options((*C.mln_map)(unsafe.Pointer(m)), C.uint32_t(options)))
+}
+
+// MapGetDebugOptions gets the map debug overlay mask.
+func MapGetDebugOptions(m *Map, out *uint32) Status {
+	var raw C.uint32_t
+	status := Status(C.mln_map_get_debug_options((*C.mln_map)(unsafe.Pointer(m)), &raw))
+	if status == StatusOK {
+		*out = uint32(raw)
+	}
+	return status
+}
+
+// MapSetRenderingStatsViewEnabled enables or disables the rendering stats overlay.
+func MapSetRenderingStatsViewEnabled(m *Map, enabled bool) Status {
+	return Status(C.mln_map_set_rendering_stats_view_enabled((*C.mln_map)(unsafe.Pointer(m)), C.bool(enabled)))
+}
+
+// MapGetRenderingStatsViewEnabled gets whether the rendering stats overlay is enabled.
+func MapGetRenderingStatsViewEnabled(m *Map, out *bool) Status {
+	var raw C.bool
+	status := Status(C.mln_map_get_rendering_stats_view_enabled((*C.mln_map)(unsafe.Pointer(m)), &raw))
+	if status == StatusOK {
+		*out = bool(raw)
+	}
+	return status
+}
+
+// MapIsFullyLoaded gets whether native considers the map fully loaded.
+func MapIsFullyLoaded(m *Map, out *bool) Status {
+	var raw C.bool
+	status := Status(C.mln_map_is_fully_loaded((*C.mln_map)(unsafe.Pointer(m)), &raw))
+	if status == StatusOK {
+		*out = bool(raw)
+	}
+	return status
+}
+
+// MapDumpDebugLogs dumps native debug logs.
+func MapDumpDebugLogs(m *Map) Status {
+	return Status(C.mln_map_dump_debug_logs((*C.mln_map)(unsafe.Pointer(m))))
 }
 
 // MapProjectionCreate creates a standalone projection helper from a map.

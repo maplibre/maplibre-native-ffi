@@ -596,6 +596,74 @@ func TestMapCommandsAndStyleLoadingUseNativeABI(t *testing.T) {
 	}
 }
 
+func TestMapDebugAndStatusHelpersUseNativeABI(t *testing.T) {
+	runtime, err := NewRuntime()
+	if err != nil {
+		t.Fatalf("NewRuntime(): %v", err)
+	}
+	m, err := runtime.NewMap()
+	if err != nil {
+		_ = runtime.Close()
+		t.Fatalf("NewMap(): %v", err)
+	}
+	defer func() {
+		if err := m.Close(); err != nil {
+			t.Errorf("Map Close(): %v", err)
+		}
+		if err := runtime.Close(); err != nil {
+			t.Errorf("Runtime Close(): %v", err)
+		}
+	}()
+
+	options := MapDebugTileBorders | MapDebugCollision
+	if err := m.SetDebugOptions(options); err != nil {
+		t.Fatalf("SetDebugOptions(): %v", err)
+	}
+	got, err := m.DebugOptions()
+	if err != nil {
+		t.Fatalf("DebugOptions(): %v", err)
+	}
+	if !got.Has(options) {
+		t.Fatalf("DebugOptions() = %v, want bits %v", got, options)
+	}
+	if err := m.SetRenderingStatsViewEnabled(true); err != nil {
+		t.Fatalf("SetRenderingStatsViewEnabled(true): %v", err)
+	}
+	if got, err := m.RenderingStatsViewEnabled(); err != nil || !got {
+		t.Fatalf("RenderingStatsViewEnabled() = %v, %v; want true, nil", got, err)
+	}
+	if _, err := m.IsFullyLoaded(); err != nil {
+		t.Fatalf("IsFullyLoaded(): %v", err)
+	}
+	if err := m.DumpDebugLogs(); err != nil {
+		t.Fatalf("DumpDebugLogs(): %v", err)
+	}
+}
+
+func TestMapDebugOptionsRejectUnknownBits(t *testing.T) {
+	runtime, err := NewRuntime()
+	if err != nil {
+		t.Fatalf("NewRuntime(): %v", err)
+	}
+	m, err := runtime.NewMap()
+	if err != nil {
+		_ = runtime.Close()
+		t.Fatalf("NewMap(): %v", err)
+	}
+	defer func() {
+		if err := m.Close(); err != nil {
+			t.Errorf("Map Close(): %v", err)
+		}
+		if err := runtime.Close(); err != nil {
+			t.Errorf("Runtime Close(): %v", err)
+		}
+	}()
+
+	if err := m.SetDebugOptions(MapDebugOptions(1 << 31)); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("SetDebugOptions(unknown) error = %v, want ErrInvalidArgument", err)
+	}
+}
+
 func TestMapStyleStringsRejectEmbeddedNUL(t *testing.T) {
 	runtime, err := NewRuntime()
 	if err != nil {

@@ -17,6 +17,24 @@ const (
 	MapModeTile       MapMode = MapMode(capi.MapModeTile)
 )
 
+// MapDebugOptions is a mask of native map debug overlays.
+type MapDebugOptions uint32
+
+const (
+	MapDebugTileBorders MapDebugOptions = MapDebugOptions(capi.MapDebugTileBorders)
+	MapDebugParseStatus MapDebugOptions = MapDebugOptions(capi.MapDebugParseStatus)
+	MapDebugTimestamps  MapDebugOptions = MapDebugOptions(capi.MapDebugTimestamps)
+	MapDebugCollision   MapDebugOptions = MapDebugOptions(capi.MapDebugCollision)
+	MapDebugOverdraw    MapDebugOptions = MapDebugOptions(capi.MapDebugOverdraw)
+	MapDebugStencilClip MapDebugOptions = MapDebugOptions(capi.MapDebugStencilClip)
+	MapDebugDepthBuffer MapDebugOptions = MapDebugOptions(capi.MapDebugDepthBuffer)
+)
+
+// Has reports whether all requested debug overlay bits are set.
+func (options MapDebugOptions) Has(requested MapDebugOptions) bool {
+	return options&requested == requested
+}
+
 // MapOptions configures map creation.
 type MapOptions struct {
 	Width       uint32
@@ -110,6 +128,81 @@ func (m *MapHandle) SetStyleJSON(json string) error {
 	}
 	defer m.state.KeepAlive()
 	return checkNative(func() capi.Status { return capi.MapSetStyleJSON(ptr, json) })
+}
+
+// SetDebugOptions applies MapLibre debug overlay mask bits to a map.
+func (m *MapHandle) SetDebugOptions(options MapDebugOptions) error {
+	ptr, err := m.ptr()
+	if err != nil {
+		return err
+	}
+	defer m.state.KeepAlive()
+	return checkNative(func() capi.Status { return capi.MapSetDebugOptions(ptr, uint32(options)) })
+}
+
+// DebugOptions returns the current MapLibre debug overlay mask bits.
+func (m *MapHandle) DebugOptions() (MapDebugOptions, error) {
+	ptr, err := m.ptr()
+	if err != nil {
+		return 0, err
+	}
+	defer m.state.KeepAlive()
+	var raw uint32
+	if err := checkNative(func() capi.Status { return capi.MapGetDebugOptions(ptr, &raw) }); err != nil {
+		return 0, err
+	}
+	return MapDebugOptions(raw), nil
+}
+
+// SetRenderingStatsViewEnabled enables or disables MapLibre's rendering stats
+// overlay view.
+func (m *MapHandle) SetRenderingStatsViewEnabled(enabled bool) error {
+	ptr, err := m.ptr()
+	if err != nil {
+		return err
+	}
+	defer m.state.KeepAlive()
+	return checkNative(func() capi.Status { return capi.MapSetRenderingStatsViewEnabled(ptr, enabled) })
+}
+
+// RenderingStatsViewEnabled reports whether MapLibre's rendering stats overlay
+// view is enabled.
+func (m *MapHandle) RenderingStatsViewEnabled() (bool, error) {
+	ptr, err := m.ptr()
+	if err != nil {
+		return false, err
+	}
+	defer m.state.KeepAlive()
+	var enabled bool
+	if err := checkNative(func() capi.Status { return capi.MapGetRenderingStatsViewEnabled(ptr, &enabled) }); err != nil {
+		return false, err
+	}
+	return enabled, nil
+}
+
+// IsFullyLoaded reports whether MapLibre currently considers the map fully
+// loaded.
+func (m *MapHandle) IsFullyLoaded() (bool, error) {
+	ptr, err := m.ptr()
+	if err != nil {
+		return false, err
+	}
+	defer m.state.KeepAlive()
+	var loaded bool
+	if err := checkNative(func() capi.Status { return capi.MapIsFullyLoaded(ptr, &loaded) }); err != nil {
+		return false, err
+	}
+	return loaded, nil
+}
+
+// DumpDebugLogs dumps map debug logs through MapLibre Native logging.
+func (m *MapHandle) DumpDebugLogs() error {
+	ptr, err := m.ptr()
+	if err != nil {
+		return err
+	}
+	defer m.state.KeepAlive()
+	return checkNative(func() capi.Status { return capi.MapDumpDebugLogs(ptr) })
 }
 
 // Close destroys this map. A successful close makes later calls no-ops. A
