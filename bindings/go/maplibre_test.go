@@ -1032,6 +1032,17 @@ func TestRenderSessionNilHandleAndInvalidSurfaceDescriptor(t *testing.T) {
 	if err := nilSession.RenderUpdate(); !errors.Is(err, ErrInvalidArgument) {
 		t.Fatalf("nil RenderSessionHandle RenderUpdate() error = %v, want ErrInvalidArgument", err)
 	}
+	if _, err := nilSession.ReadPremultipliedRGBA8Into(nil); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("nil RenderSessionHandle ReadPremultipliedRGBA8Into() error = %v, want ErrInvalidArgument", err)
+	}
+	var nilMetalFrame *MetalOwnedTextureFrame
+	if err := nilMetalFrame.Close(); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("nil MetalOwnedTextureFrame Close() error = %v, want ErrInvalidArgument", err)
+	}
+	var nilVulkanFrame *VulkanOwnedTextureFrame
+	if err := nilVulkanFrame.Close(); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("nil VulkanOwnedTextureFrame Close() error = %v, want ErrInvalidArgument", err)
+	}
 
 	runtime, err := NewRuntime()
 	if err != nil {
@@ -1056,6 +1067,30 @@ func TestRenderSessionNilHandleAndInvalidSurfaceDescriptor(t *testing.T) {
 	})
 	if !errors.Is(err, ErrInvalidArgument) && !errors.Is(err, ErrUnsupported) {
 		t.Fatalf("AttachMetalSurface(invalid descriptor) error = %v, want ErrInvalidArgument or ErrUnsupported", err)
+	}
+	_, err = m.AttachMetalOwnedTexture(MetalOwnedTextureDescriptor{
+		Extent: RenderTargetExtent{Width: 64, Height: 64, ScaleFactor: 1},
+	})
+	if !errors.Is(err, ErrInvalidArgument) && !errors.Is(err, ErrUnsupported) {
+		t.Fatalf("AttachMetalOwnedTexture(invalid descriptor) error = %v, want ErrInvalidArgument or ErrUnsupported", err)
+	}
+	_, err = m.AttachMetalBorrowedTexture(MetalBorrowedTextureDescriptor{
+		Extent: RenderTargetExtent{Width: 64, Height: 64, ScaleFactor: 1},
+	})
+	if !errors.Is(err, ErrInvalidArgument) && !errors.Is(err, ErrUnsupported) {
+		t.Fatalf("AttachMetalBorrowedTexture(invalid descriptor) error = %v, want ErrInvalidArgument or ErrUnsupported", err)
+	}
+	_, err = m.AttachVulkanOwnedTexture(VulkanOwnedTextureDescriptor{
+		Extent: RenderTargetExtent{Width: 64, Height: 64, ScaleFactor: 1},
+	})
+	if !errors.Is(err, ErrInvalidArgument) && !errors.Is(err, ErrUnsupported) {
+		t.Fatalf("AttachVulkanOwnedTexture(invalid descriptor) error = %v, want ErrInvalidArgument or ErrUnsupported", err)
+	}
+	_, err = m.AttachVulkanBorrowedTexture(VulkanBorrowedTextureDescriptor{
+		Extent: RenderTargetExtent{Width: 64, Height: 64, ScaleFactor: 1},
+	})
+	if !errors.Is(err, ErrInvalidArgument) && !errors.Is(err, ErrUnsupported) {
+		t.Fatalf("AttachVulkanBorrowedTexture(invalid descriptor) error = %v, want ErrInvalidArgument or ErrUnsupported", err)
 	}
 }
 

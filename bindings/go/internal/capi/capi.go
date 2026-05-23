@@ -123,6 +123,69 @@ type VulkanSurfaceDescriptor struct {
 	Surface uintptr
 }
 
+// MetalOwnedTextureDescriptor contains Metal owned-texture attachment fields.
+type MetalOwnedTextureDescriptor struct {
+	Extent  RenderTargetExtent
+	Context MetalContextDescriptor
+}
+
+// MetalBorrowedTextureDescriptor contains Metal borrowed-texture attachment fields.
+type MetalBorrowedTextureDescriptor struct {
+	Extent  RenderTargetExtent
+	Texture uintptr
+}
+
+// VulkanOwnedTextureDescriptor contains Vulkan owned-texture attachment fields.
+type VulkanOwnedTextureDescriptor struct {
+	Extent  RenderTargetExtent
+	Context VulkanContextDescriptor
+}
+
+// VulkanBorrowedTextureDescriptor contains Vulkan borrowed-texture attachment fields.
+type VulkanBorrowedTextureDescriptor struct {
+	Extent        RenderTargetExtent
+	Context       VulkanContextDescriptor
+	Image         uintptr
+	ImageView     uintptr
+	Format        uint32
+	InitialLayout uint32
+	FinalLayout   uint32
+}
+
+// TextureImageInfo contains CPU readback metadata.
+type TextureImageInfo struct {
+	Width      uint32
+	Height     uint32
+	Stride     uint32
+	ByteLength uint64
+}
+
+// MetalOwnedTextureFrame is a copied Metal owned texture frame descriptor.
+type MetalOwnedTextureFrame struct {
+	Generation  uint64
+	Width       uint32
+	Height      uint32
+	ScaleFactor float64
+	FrameID     uint64
+	Texture     uintptr
+	Device      uintptr
+	PixelFormat uint64
+}
+
+// VulkanOwnedTextureFrame is a copied Vulkan owned texture frame descriptor.
+type VulkanOwnedTextureFrame struct {
+	Generation  uint64
+	Width       uint32
+	Height      uint32
+	ScaleFactor float64
+	FrameID     uint64
+	Image       uintptr
+	ImageView   uintptr
+	Device      uintptr
+	Format      uint32
+	Layout      uint32
+}
+
 // ProjectedMeters is a spherical Mercator coordinate in meters.
 type ProjectedMeters struct {
 	Northing float64
@@ -1213,6 +1276,94 @@ func RenderSessionDumpDebugLogs(session *RenderSession) Status {
 	return Status(C.mln_render_session_dump_debug_logs((*C.mln_render_session)(unsafe.Pointer(session))))
 }
 
+// MetalOwnedTextureAttach attaches a Metal session-owned texture target to a map.
+func MetalOwnedTextureAttach(m *Map, descriptor MetalOwnedTextureDescriptor, out **RenderSession) Status {
+	rawDescriptor := metalOwnedTextureDescriptorToC(descriptor)
+	var rawSession *C.mln_render_session
+	status := Status(C.mln_metal_owned_texture_attach((*C.mln_map)(unsafe.Pointer(m)), &rawDescriptor, &rawSession))
+	if status == StatusOK {
+		*out = (*RenderSession)(unsafe.Pointer(rawSession))
+	}
+	return status
+}
+
+// MetalBorrowedTextureAttach attaches a Metal caller-owned texture target to a map.
+func MetalBorrowedTextureAttach(m *Map, descriptor MetalBorrowedTextureDescriptor, out **RenderSession) Status {
+	rawDescriptor := metalBorrowedTextureDescriptorToC(descriptor)
+	var rawSession *C.mln_render_session
+	status := Status(C.mln_metal_borrowed_texture_attach((*C.mln_map)(unsafe.Pointer(m)), &rawDescriptor, &rawSession))
+	if status == StatusOK {
+		*out = (*RenderSession)(unsafe.Pointer(rawSession))
+	}
+	return status
+}
+
+// VulkanOwnedTextureAttach attaches a Vulkan session-owned texture target to a map.
+func VulkanOwnedTextureAttach(m *Map, descriptor VulkanOwnedTextureDescriptor, out **RenderSession) Status {
+	rawDescriptor := vulkanOwnedTextureDescriptorToC(descriptor)
+	var rawSession *C.mln_render_session
+	status := Status(C.mln_vulkan_owned_texture_attach((*C.mln_map)(unsafe.Pointer(m)), &rawDescriptor, &rawSession))
+	if status == StatusOK {
+		*out = (*RenderSession)(unsafe.Pointer(rawSession))
+	}
+	return status
+}
+
+// VulkanBorrowedTextureAttach attaches a Vulkan caller-owned texture target to a map.
+func VulkanBorrowedTextureAttach(m *Map, descriptor VulkanBorrowedTextureDescriptor, out **RenderSession) Status {
+	rawDescriptor := vulkanBorrowedTextureDescriptorToC(descriptor)
+	var rawSession *C.mln_render_session
+	status := Status(C.mln_vulkan_borrowed_texture_attach((*C.mln_map)(unsafe.Pointer(m)), &rawDescriptor, &rawSession))
+	if status == StatusOK {
+		*out = (*RenderSession)(unsafe.Pointer(rawSession))
+	}
+	return status
+}
+
+// TextureReadPremultipliedRGBA8 reads texture session pixels into caller storage.
+func TextureReadPremultipliedRGBA8(session *RenderSession, buffer []byte, out *TextureImageInfo) Status {
+	var rawInfo C.mln_texture_image_info = C.mln_texture_image_info_default()
+	var data *C.uint8_t
+	if len(buffer) > 0 {
+		data = (*C.uint8_t)(unsafe.Pointer(&buffer[0]))
+	}
+	status := Status(C.mln_texture_read_premultiplied_rgba8((*C.mln_render_session)(unsafe.Pointer(session)), data, C.size_t(len(buffer)), &rawInfo))
+	*out = textureImageInfoFromC(rawInfo)
+	return status
+}
+
+// MetalOwnedTextureAcquireFrame acquires a Metal owned texture frame.
+func MetalOwnedTextureAcquireFrame(session *RenderSession, out *MetalOwnedTextureFrame) Status {
+	rawFrame := C.mln_metal_owned_texture_frame{size: C.uint32_t(unsafe.Sizeof(C.mln_metal_owned_texture_frame{}))}
+	status := Status(C.mln_metal_owned_texture_acquire_frame((*C.mln_render_session)(unsafe.Pointer(session)), &rawFrame))
+	if status == StatusOK {
+		*out = metalOwnedTextureFrameFromC(rawFrame)
+	}
+	return status
+}
+
+// MetalOwnedTextureReleaseFrame releases a Metal owned texture frame.
+func MetalOwnedTextureReleaseFrame(session *RenderSession, frame MetalOwnedTextureFrame) Status {
+	rawFrame := metalOwnedTextureFrameToC(frame)
+	return Status(C.mln_metal_owned_texture_release_frame((*C.mln_render_session)(unsafe.Pointer(session)), &rawFrame))
+}
+
+// VulkanOwnedTextureAcquireFrame acquires a Vulkan owned texture frame.
+func VulkanOwnedTextureAcquireFrame(session *RenderSession, out *VulkanOwnedTextureFrame) Status {
+	rawFrame := C.mln_vulkan_owned_texture_frame{size: C.uint32_t(unsafe.Sizeof(C.mln_vulkan_owned_texture_frame{}))}
+	status := Status(C.mln_vulkan_owned_texture_acquire_frame((*C.mln_render_session)(unsafe.Pointer(session)), &rawFrame))
+	if status == StatusOK {
+		*out = vulkanOwnedTextureFrameFromC(rawFrame)
+	}
+	return status
+}
+
+// VulkanOwnedTextureReleaseFrame releases a Vulkan owned texture frame.
+func VulkanOwnedTextureReleaseFrame(session *RenderSession, frame VulkanOwnedTextureFrame) Status {
+	rawFrame := vulkanOwnedTextureFrameToC(frame)
+	return Status(C.mln_vulkan_owned_texture_release_frame((*C.mln_render_session)(unsafe.Pointer(session)), &rawFrame))
+}
+
 // MapSetStyleURL loads a style URL.
 func MapSetStyleURL(m *Map, url string) Status {
 	cURL := C.CString(url)
@@ -1693,6 +1844,106 @@ func vulkanSurfaceDescriptorToC(descriptor VulkanSurfaceDescriptor) C.mln_vulkan
 	raw.extent = renderTargetExtentToC(descriptor.Extent)
 	raw.context = vulkanContextDescriptorToC(descriptor.Context)
 	raw.surface = C.mln_go_ptr(C.uintptr_t(descriptor.Surface))
+	return raw
+}
+
+func metalOwnedTextureDescriptorToC(descriptor MetalOwnedTextureDescriptor) C.mln_metal_owned_texture_descriptor {
+	raw := C.mln_metal_owned_texture_descriptor_default()
+	raw.extent = renderTargetExtentToC(descriptor.Extent)
+	raw.context = metalContextDescriptorToC(descriptor.Context)
+	return raw
+}
+
+func metalBorrowedTextureDescriptorToC(descriptor MetalBorrowedTextureDescriptor) C.mln_metal_borrowed_texture_descriptor {
+	raw := C.mln_metal_borrowed_texture_descriptor_default()
+	raw.extent = renderTargetExtentToC(descriptor.Extent)
+	raw.texture = C.mln_go_ptr(C.uintptr_t(descriptor.Texture))
+	return raw
+}
+
+func vulkanOwnedTextureDescriptorToC(descriptor VulkanOwnedTextureDescriptor) C.mln_vulkan_owned_texture_descriptor {
+	raw := C.mln_vulkan_owned_texture_descriptor_default()
+	raw.extent = renderTargetExtentToC(descriptor.Extent)
+	raw.context = vulkanContextDescriptorToC(descriptor.Context)
+	return raw
+}
+
+func vulkanBorrowedTextureDescriptorToC(descriptor VulkanBorrowedTextureDescriptor) C.mln_vulkan_borrowed_texture_descriptor {
+	raw := C.mln_vulkan_borrowed_texture_descriptor_default()
+	raw.extent = renderTargetExtentToC(descriptor.Extent)
+	raw.context = vulkanContextDescriptorToC(descriptor.Context)
+	raw.image = C.mln_go_ptr(C.uintptr_t(descriptor.Image))
+	raw.image_view = C.mln_go_ptr(C.uintptr_t(descriptor.ImageView))
+	raw.format = C.uint32_t(descriptor.Format)
+	raw.initial_layout = C.uint32_t(descriptor.InitialLayout)
+	raw.final_layout = C.uint32_t(descriptor.FinalLayout)
+	return raw
+}
+
+func textureImageInfoFromC(info C.mln_texture_image_info) TextureImageInfo {
+	return TextureImageInfo{
+		Width:      uint32(info.width),
+		Height:     uint32(info.height),
+		Stride:     uint32(info.stride),
+		ByteLength: uint64(info.byte_length),
+	}
+}
+
+func metalOwnedTextureFrameFromC(frame C.mln_metal_owned_texture_frame) MetalOwnedTextureFrame {
+	return MetalOwnedTextureFrame{
+		Generation:  uint64(frame.generation),
+		Width:       uint32(frame.width),
+		Height:      uint32(frame.height),
+		ScaleFactor: float64(frame.scale_factor),
+		FrameID:     uint64(frame.frame_id),
+		Texture:     uintptr(frame.texture),
+		Device:      uintptr(frame.device),
+		PixelFormat: uint64(frame.pixel_format),
+	}
+}
+
+func metalOwnedTextureFrameToC(frame MetalOwnedTextureFrame) C.mln_metal_owned_texture_frame {
+	raw := C.mln_metal_owned_texture_frame{}
+	raw.size = C.uint32_t(unsafe.Sizeof(C.mln_metal_owned_texture_frame{}))
+	raw.generation = C.uint64_t(frame.Generation)
+	raw.width = C.uint32_t(frame.Width)
+	raw.height = C.uint32_t(frame.Height)
+	raw.scale_factor = C.double(frame.ScaleFactor)
+	raw.frame_id = C.uint64_t(frame.FrameID)
+	raw.texture = C.mln_go_ptr(C.uintptr_t(frame.Texture))
+	raw.device = C.mln_go_ptr(C.uintptr_t(frame.Device))
+	raw.pixel_format = C.uint64_t(frame.PixelFormat)
+	return raw
+}
+
+func vulkanOwnedTextureFrameFromC(frame C.mln_vulkan_owned_texture_frame) VulkanOwnedTextureFrame {
+	return VulkanOwnedTextureFrame{
+		Generation:  uint64(frame.generation),
+		Width:       uint32(frame.width),
+		Height:      uint32(frame.height),
+		ScaleFactor: float64(frame.scale_factor),
+		FrameID:     uint64(frame.frame_id),
+		Image:       uintptr(frame.image),
+		ImageView:   uintptr(frame.image_view),
+		Device:      uintptr(frame.device),
+		Format:      uint32(frame.format),
+		Layout:      uint32(frame.layout),
+	}
+}
+
+func vulkanOwnedTextureFrameToC(frame VulkanOwnedTextureFrame) C.mln_vulkan_owned_texture_frame {
+	raw := C.mln_vulkan_owned_texture_frame{}
+	raw.size = C.uint32_t(unsafe.Sizeof(C.mln_vulkan_owned_texture_frame{}))
+	raw.generation = C.uint64_t(frame.Generation)
+	raw.width = C.uint32_t(frame.Width)
+	raw.height = C.uint32_t(frame.Height)
+	raw.scale_factor = C.double(frame.ScaleFactor)
+	raw.frame_id = C.uint64_t(frame.FrameID)
+	raw.image = C.mln_go_ptr(C.uintptr_t(frame.Image))
+	raw.image_view = C.mln_go_ptr(C.uintptr_t(frame.ImageView))
+	raw.device = C.mln_go_ptr(C.uintptr_t(frame.Device))
+	raw.format = C.uint32_t(frame.Format)
+	raw.layout = C.uint32_t(frame.Layout)
 	return raw
 }
 

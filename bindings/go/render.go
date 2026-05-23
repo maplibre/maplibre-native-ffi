@@ -1,8 +1,12 @@
 package maplibre
 
 import (
+	"runtime"
+	"sync"
+
 	"github.com/maplibre/maplibre-native-ffi/bindings/go/internal/capi"
 	"github.com/maplibre/maplibre-native-ffi/bindings/go/internal/handle"
+	internalstatus "github.com/maplibre/maplibre-native-ffi/bindings/go/internal/status"
 )
 
 // RenderBackendMask preserves the render backend bits reported by the native
@@ -33,6 +37,14 @@ type RenderTargetExtent struct {
 	ScaleFactor float64
 }
 
+// TextureImageInfo describes CPU readback image metadata.
+type TextureImageInfo struct {
+	Width      uint32
+	Height     uint32
+	Stride     uint32
+	ByteLength uint64
+}
+
 // MetalContextDescriptor contains Metal backend context handles.
 type MetalContextDescriptor struct {
 	Device NativePointer
@@ -61,14 +73,83 @@ type VulkanSurfaceDescriptor struct {
 	Surface NativePointer
 }
 
+// MetalOwnedTextureDescriptor describes a Metal session-owned texture render target.
+type MetalOwnedTextureDescriptor struct {
+	Extent  RenderTargetExtent
+	Context MetalContextDescriptor
+}
+
+// MetalBorrowedTextureDescriptor describes a Metal caller-owned texture render target.
+type MetalBorrowedTextureDescriptor struct {
+	Extent  RenderTargetExtent
+	Texture NativePointer
+}
+
+// VulkanOwnedTextureDescriptor describes a Vulkan session-owned texture render target.
+type VulkanOwnedTextureDescriptor struct {
+	Extent  RenderTargetExtent
+	Context VulkanContextDescriptor
+}
+
+// VulkanBorrowedTextureDescriptor describes a Vulkan caller-owned texture render target.
+type VulkanBorrowedTextureDescriptor struct {
+	Extent        RenderTargetExtent
+	Context       VulkanContextDescriptor
+	Image         NativePointer
+	ImageView     NativePointer
+	Format        uint32
+	InitialLayout uint32
+	FinalLayout   uint32
+}
+
 // RenderSessionHandle owns a map render session.
 type RenderSessionHandle struct {
 	state  *handle.State[capi.RenderSession]
 	parent *MapHandle
+	mu     sync.Mutex
+	frame  bool
+}
+
+// MetalOwnedTextureFrame is an acquired session-owned Metal texture frame.
+type MetalOwnedTextureFrame struct {
+	Generation  uint64
+	Width       uint32
+	Height      uint32
+	ScaleFactor float64
+	Texture     NativePointer
+	Device      NativePointer
+	PixelFormat uint64
+
+	session *RenderSessionHandle
+	raw     capi.MetalOwnedTextureFrame
+	mu      sync.Mutex
+	closed  bool
+}
+
+// VulkanOwnedTextureFrame is an acquired session-owned Vulkan texture frame.
+type VulkanOwnedTextureFrame struct {
+	Generation  uint64
+	Width       uint32
+	Height      uint32
+	ScaleFactor float64
+	Image       NativePointer
+	ImageView   NativePointer
+	Device      NativePointer
+	Format      uint32
+	Layout      uint32
+
+	session *RenderSessionHandle
+	raw     capi.VulkanOwnedTextureFrame
+	mu      sync.Mutex
+	closed  bool
 }
 
 func (extent RenderTargetExtent) toCAPI() capi.RenderTargetExtent {
 	return capi.RenderTargetExtent{Width: extent.Width, Height: extent.Height, ScaleFactor: extent.ScaleFactor}
+}
+
+func textureImageInfoFromCAPI(info capi.TextureImageInfo) TextureImageInfo {
+	return TextureImageInfo{Width: info.Width, Height: info.Height, Stride: info.Stride, ByteLength: info.ByteLength}
 }
 
 func (descriptor MetalSurfaceDescriptor) toCAPI() capi.MetalSurfaceDescriptor {
@@ -95,6 +176,57 @@ func (descriptor VulkanSurfaceDescriptor) toCAPI() capi.VulkanSurfaceDescriptor 
 	}
 }
 
+func (descriptor MetalOwnedTextureDescriptor) toCAPI() capi.MetalOwnedTextureDescriptor {
+	return capi.MetalOwnedTextureDescriptor{
+		Extent:  descriptor.Extent.toCAPI(),
+		Context: capi.MetalContextDescriptor{Device: uintptr(descriptor.Context.Device)},
+	}
+}
+
+func (descriptor MetalBorrowedTextureDescriptor) toCAPI() capi.MetalBorrowedTextureDescriptor {
+	return capi.MetalBorrowedTextureDescriptor{
+		Extent:  descriptor.Extent.toCAPI(),
+		Texture: uintptr(descriptor.Texture),
+	}
+}
+
+func (descriptor VulkanOwnedTextureDescriptor) toCAPI() capi.VulkanOwnedTextureDescriptor {
+	return capi.VulkanOwnedTextureDescriptor{
+		Extent:  descriptor.Extent.toCAPI(),
+		Context: descriptor.Context.toCAPI(),
+	}
+}
+
+func (descriptor VulkanBorrowedTextureDescriptor) toCAPI() capi.VulkanBorrowedTextureDescriptor {
+	return capi.VulkanBorrowedTextureDescriptor{
+		Extent:        descriptor.Extent.toCAPI(),
+		Context:       descriptor.Context.toCAPI(),
+		Image:         uintptr(descriptor.Image),
+		ImageView:     uintptr(descriptor.ImageView),
+		Format:        descriptor.Format,
+		InitialLayout: descriptor.InitialLayout,
+		FinalLayout:   descriptor.FinalLayout,
+	}
+}
+
+func (context VulkanContextDescriptor) toCAPI() capi.VulkanContextDescriptor {
+	return capi.VulkanContextDescriptor{
+		Instance:                 uintptr(context.Instance),
+		PhysicalDevice:           uintptr(context.PhysicalDevice),
+		Device:                   uintptr(context.Device),
+		GraphicsQueue:            uintptr(context.GraphicsQueue),
+		GraphicsQueueFamilyIndex: context.GraphicsQueueFamilyIndex,
+	}
+}
+
+func newRenderSessionHandle(parent *MapHandle, session *capi.RenderSession) (*RenderSessionHandle, error) {
+	state, err := handle.New(session, "RenderSessionHandle", parent)
+	if err != nil {
+		return nil, newBindingError(ErrInvalidArgument, err.Error())
+	}
+	return &RenderSessionHandle{state: state, parent: parent}, nil
+}
+
 // AttachMetalSurface attaches a Metal native surface render target to this map.
 func (m *MapHandle) AttachMetalSurface(descriptor MetalSurfaceDescriptor) (*RenderSessionHandle, error) {
 	ptr, err := m.ptr()
@@ -107,11 +239,7 @@ func (m *MapHandle) AttachMetalSurface(descriptor MetalSurfaceDescriptor) (*Rend
 	if err := checkNative(func() capi.Status { return capi.MetalSurfaceAttach(ptr, descriptor.toCAPI(), &session) }); err != nil {
 		return nil, err
 	}
-	state, err := handle.New(session, "RenderSessionHandle")
-	if err != nil {
-		return nil, newBindingError(ErrInvalidArgument, err.Error())
-	}
-	return &RenderSessionHandle{state: state, parent: m}, nil
+	return newRenderSessionHandle(m, session)
 }
 
 // AttachVulkanSurface attaches a Vulkan native surface render target to this map.
@@ -126,11 +254,67 @@ func (m *MapHandle) AttachVulkanSurface(descriptor VulkanSurfaceDescriptor) (*Re
 	if err := checkNative(func() capi.Status { return capi.VulkanSurfaceAttach(ptr, descriptor.toCAPI(), &session) }); err != nil {
 		return nil, err
 	}
-	state, err := handle.New(session, "RenderSessionHandle")
+	return newRenderSessionHandle(m, session)
+}
+
+// AttachMetalOwnedTexture attaches a Metal session-owned texture render target.
+func (m *MapHandle) AttachMetalOwnedTexture(descriptor MetalOwnedTextureDescriptor) (*RenderSessionHandle, error) {
+	ptr, err := m.ptr()
 	if err != nil {
-		return nil, newBindingError(ErrInvalidArgument, err.Error())
+		return nil, err
 	}
-	return &RenderSessionHandle{state: state, parent: m}, nil
+	defer m.state.KeepAlive()
+
+	var session *capi.RenderSession
+	if err := checkNative(func() capi.Status { return capi.MetalOwnedTextureAttach(ptr, descriptor.toCAPI(), &session) }); err != nil {
+		return nil, err
+	}
+	return newRenderSessionHandle(m, session)
+}
+
+// AttachMetalBorrowedTexture attaches a Metal caller-owned texture render target.
+func (m *MapHandle) AttachMetalBorrowedTexture(descriptor MetalBorrowedTextureDescriptor) (*RenderSessionHandle, error) {
+	ptr, err := m.ptr()
+	if err != nil {
+		return nil, err
+	}
+	defer m.state.KeepAlive()
+
+	var session *capi.RenderSession
+	if err := checkNative(func() capi.Status { return capi.MetalBorrowedTextureAttach(ptr, descriptor.toCAPI(), &session) }); err != nil {
+		return nil, err
+	}
+	return newRenderSessionHandle(m, session)
+}
+
+// AttachVulkanOwnedTexture attaches a Vulkan session-owned texture render target.
+func (m *MapHandle) AttachVulkanOwnedTexture(descriptor VulkanOwnedTextureDescriptor) (*RenderSessionHandle, error) {
+	ptr, err := m.ptr()
+	if err != nil {
+		return nil, err
+	}
+	defer m.state.KeepAlive()
+
+	var session *capi.RenderSession
+	if err := checkNative(func() capi.Status { return capi.VulkanOwnedTextureAttach(ptr, descriptor.toCAPI(), &session) }); err != nil {
+		return nil, err
+	}
+	return newRenderSessionHandle(m, session)
+}
+
+// AttachVulkanBorrowedTexture attaches a Vulkan caller-owned texture render target.
+func (m *MapHandle) AttachVulkanBorrowedTexture(descriptor VulkanBorrowedTextureDescriptor) (*RenderSessionHandle, error) {
+	ptr, err := m.ptr()
+	if err != nil {
+		return nil, err
+	}
+	defer m.state.KeepAlive()
+
+	var session *capi.RenderSession
+	if err := checkNative(func() capi.Status { return capi.VulkanBorrowedTextureAttach(ptr, descriptor.toCAPI(), &session) }); err != nil {
+		return nil, err
+	}
+	return newRenderSessionHandle(m, session)
 }
 
 func (session *RenderSessionHandle) ptr() (*capi.RenderSession, error) {
@@ -144,10 +328,34 @@ func (session *RenderSessionHandle) ptr() (*capi.RenderSession, error) {
 	return ptr, nil
 }
 
+func (session *RenderSessionHandle) ensureNoAcquiredFrame() error {
+	session.mu.Lock()
+	defer session.mu.Unlock()
+	if session.frame {
+		return newBindingError(ErrInvalidState, "texture frame is still acquired")
+	}
+	return nil
+}
+
+func (session *RenderSessionHandle) markFrameAcquired() {
+	session.mu.Lock()
+	session.frame = true
+	session.mu.Unlock()
+}
+
+func (session *RenderSessionHandle) markFrameReleased() {
+	session.mu.Lock()
+	session.frame = false
+	session.mu.Unlock()
+}
+
 // Resize changes the render session target extent.
 func (session *RenderSessionHandle) Resize(extent RenderTargetExtent) error {
 	ptr, err := session.ptr()
 	if err != nil {
+		return err
+	}
+	if err := session.ensureNoAcquiredFrame(); err != nil {
 		return err
 	}
 	defer session.state.KeepAlive()
@@ -161,6 +369,9 @@ func (session *RenderSessionHandle) RenderUpdate() error {
 	if err != nil {
 		return err
 	}
+	if err := session.ensureNoAcquiredFrame(); err != nil {
+		return err
+	}
 	defer session.state.KeepAlive()
 	defer session.parent.state.KeepAlive()
 	return checkNative(func() capi.Status { return capi.RenderSessionRenderUpdate(ptr) })
@@ -170,6 +381,9 @@ func (session *RenderSessionHandle) RenderUpdate() error {
 func (session *RenderSessionHandle) Detach() error {
 	ptr, err := session.ptr()
 	if err != nil {
+		return err
+	}
+	if err := session.ensureNoAcquiredFrame(); err != nil {
 		return err
 	}
 	defer session.state.KeepAlive()
@@ -210,12 +424,176 @@ func (session *RenderSessionHandle) DumpDebugLogs() error {
 	return checkNative(func() capi.Status { return capi.RenderSessionDumpDebugLogs(ptr) })
 }
 
+// ReadPremultipliedRGBA8 reads the latest session-owned texture frame into a
+// new byte slice.
+func (session *RenderSessionHandle) ReadPremultipliedRGBA8() ([]byte, TextureImageInfo, error) {
+	ptr, err := session.ptr()
+	if err != nil {
+		return nil, TextureImageInfo{}, err
+	}
+	defer session.state.KeepAlive()
+	defer session.parent.state.KeepAlive()
+
+	var rawInfo capi.TextureImageInfo
+	failure := internalstatus.CheckCall(func() capi.Status {
+		return capi.TextureReadPremultipliedRGBA8(ptr, nil, &rawInfo)
+	})
+	info := textureImageInfoFromCAPI(rawInfo)
+	if failure == nil {
+		return nil, info, nil
+	}
+	if failure.Status != capi.StatusInvalidArgument || info.ByteLength == 0 {
+		return nil, info, newStatusError(failure)
+	}
+	buffer := make([]byte, info.ByteLength)
+	info, err = session.ReadPremultipliedRGBA8Into(buffer)
+	if err != nil {
+		return nil, info, err
+	}
+	return buffer, info, nil
+}
+
+// ReadPremultipliedRGBA8Into reads the latest session-owned texture frame into
+// caller-owned storage.
+func (session *RenderSessionHandle) ReadPremultipliedRGBA8Into(buffer []byte) (TextureImageInfo, error) {
+	ptr, err := session.ptr()
+	if err != nil {
+		return TextureImageInfo{}, err
+	}
+	defer session.state.KeepAlive()
+	defer session.parent.state.KeepAlive()
+	var rawInfo capi.TextureImageInfo
+	if err := checkNative(func() capi.Status { return capi.TextureReadPremultipliedRGBA8(ptr, buffer, &rawInfo) }); err != nil {
+		runtime.KeepAlive(buffer)
+		return textureImageInfoFromCAPI(rawInfo), err
+	}
+	runtime.KeepAlive(buffer)
+	return textureImageInfoFromCAPI(rawInfo), nil
+}
+
+// AcquireMetalTextureFrame acquires the latest Metal session-owned texture frame.
+func (session *RenderSessionHandle) AcquireMetalTextureFrame() (*MetalOwnedTextureFrame, error) {
+	ptr, err := session.ptr()
+	if err != nil {
+		return nil, err
+	}
+	if err := session.ensureNoAcquiredFrame(); err != nil {
+		return nil, err
+	}
+	defer session.state.KeepAlive()
+	defer session.parent.state.KeepAlive()
+	var rawFrame capi.MetalOwnedTextureFrame
+	if err := checkNative(func() capi.Status { return capi.MetalOwnedTextureAcquireFrame(ptr, &rawFrame) }); err != nil {
+		return nil, err
+	}
+	session.markFrameAcquired()
+	return &MetalOwnedTextureFrame{
+		Generation:  rawFrame.Generation,
+		Width:       rawFrame.Width,
+		Height:      rawFrame.Height,
+		ScaleFactor: rawFrame.ScaleFactor,
+		Texture:     NativePointer(rawFrame.Texture),
+		Device:      NativePointer(rawFrame.Device),
+		PixelFormat: rawFrame.PixelFormat,
+		session:     session,
+		raw:         rawFrame,
+	}, nil
+}
+
+// AcquireVulkanTextureFrame acquires the latest Vulkan session-owned texture frame.
+func (session *RenderSessionHandle) AcquireVulkanTextureFrame() (*VulkanOwnedTextureFrame, error) {
+	ptr, err := session.ptr()
+	if err != nil {
+		return nil, err
+	}
+	if err := session.ensureNoAcquiredFrame(); err != nil {
+		return nil, err
+	}
+	defer session.state.KeepAlive()
+	defer session.parent.state.KeepAlive()
+	var rawFrame capi.VulkanOwnedTextureFrame
+	if err := checkNative(func() capi.Status { return capi.VulkanOwnedTextureAcquireFrame(ptr, &rawFrame) }); err != nil {
+		return nil, err
+	}
+	session.markFrameAcquired()
+	return &VulkanOwnedTextureFrame{
+		Generation:  rawFrame.Generation,
+		Width:       rawFrame.Width,
+		Height:      rawFrame.Height,
+		ScaleFactor: rawFrame.ScaleFactor,
+		Image:       NativePointer(rawFrame.Image),
+		ImageView:   NativePointer(rawFrame.ImageView),
+		Device:      NativePointer(rawFrame.Device),
+		Format:      rawFrame.Format,
+		Layout:      rawFrame.Layout,
+		session:     session,
+		raw:         rawFrame,
+	}, nil
+}
+
+// Close releases this acquired Metal texture frame. A second Close is a no-op.
+func (frame *MetalOwnedTextureFrame) Close() error {
+	if frame == nil || frame.session == nil {
+		return newBindingError(ErrInvalidArgument, "MetalOwnedTextureFrame is nil")
+	}
+	frame.mu.Lock()
+	if frame.closed {
+		frame.mu.Unlock()
+		return nil
+	}
+	frame.mu.Unlock()
+	ptr, err := frame.session.ptr()
+	if err != nil {
+		return err
+	}
+	defer frame.session.state.KeepAlive()
+	defer frame.session.parent.state.KeepAlive()
+	if err := checkNative(func() capi.Status { return capi.MetalOwnedTextureReleaseFrame(ptr, frame.raw) }); err != nil {
+		return err
+	}
+	frame.mu.Lock()
+	frame.closed = true
+	frame.mu.Unlock()
+	frame.session.markFrameReleased()
+	return nil
+}
+
+// Close releases this acquired Vulkan texture frame. A second Close is a no-op.
+func (frame *VulkanOwnedTextureFrame) Close() error {
+	if frame == nil || frame.session == nil {
+		return newBindingError(ErrInvalidArgument, "VulkanOwnedTextureFrame is nil")
+	}
+	frame.mu.Lock()
+	if frame.closed {
+		frame.mu.Unlock()
+		return nil
+	}
+	frame.mu.Unlock()
+	ptr, err := frame.session.ptr()
+	if err != nil {
+		return err
+	}
+	defer frame.session.state.KeepAlive()
+	defer frame.session.parent.state.KeepAlive()
+	if err := checkNative(func() capi.Status { return capi.VulkanOwnedTextureReleaseFrame(ptr, frame.raw) }); err != nil {
+		return err
+	}
+	frame.mu.Lock()
+	frame.closed = true
+	frame.mu.Unlock()
+	frame.session.markFrameReleased()
+	return nil
+}
+
 // Close destroys this render session. A successful close makes later calls
 // no-ops. A failed close leaves the native handle live so callers can retry on
 // the owner thread.
 func (session *RenderSessionHandle) Close() error {
 	if session == nil || session.state == nil {
 		return newBindingError(ErrInvalidArgument, "RenderSessionHandle is nil")
+	}
+	if err := session.ensureNoAcquiredFrame(); err != nil {
+		return err
 	}
 	defer session.parent.state.KeepAlive()
 	return checkNative(func() capi.Status { return session.state.Close(capi.RenderSessionDestroy) })
