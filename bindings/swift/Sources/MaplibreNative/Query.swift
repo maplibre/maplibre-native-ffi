@@ -96,6 +96,10 @@ extension Geometry {
     case .point(let point): self = .point(LatLng(native: point))
     case .lineString(let coordinates): self = .lineString(coordinates.map(LatLng.init(native:)))
     case .polygon(let rings): self = .polygon(rings.map { $0.map(LatLng.init(native:)) })
+    case .multiPoint(let coordinates): self = .multiPoint(coordinates.map(LatLng.init(native:)))
+    case .multiLineString(let lines): self = .multiLineString(lines.map { $0.map(LatLng.init(native:)) })
+    case .multiPolygon(let polygons): self = .multiPolygon(polygons.map { $0.map { $0.map(LatLng.init(native:)) } })
+    case .geometryCollection(let geometries): self = .geometryCollection(geometries.map(Geometry.init(native:)))
     }
   }
 }

@@ -339,10 +339,6 @@ public final class RuntimeHandle {
     handle = try NativeHandleBox(typeName: "RuntimeHandle", pointer: pointer)
   }
 
-  deinit {
-    try? close()
-  }
-
   public var isClosed: Bool {
     handle.isClosed
   }

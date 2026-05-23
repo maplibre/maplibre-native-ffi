@@ -35,6 +35,25 @@ import Testing
   }
 }
 
+@Test func styleSourceInfoPreservesAbsentAttribution() {
+  var raw = mln_style_source_info()
+  raw.type = MLN_STYLE_SOURCE_TYPE_VECTOR.rawValue
+  raw.id_size = 6
+  raw.is_volatile = true
+  raw.has_attribution = false
+  raw.attribution_size = 12
+
+  let native = NativeStyleSourceInfo(raw)
+  let publicInfo = StyleSourceInfo(native: native)
+
+  #expect(native.hasAttribution == false)
+  #expect(native.attributionSize == 12)
+  #expect(publicInfo.type == .vector)
+  #expect(publicInfo.isVolatile)
+  #expect(publicInfo.hasAttribution == false)
+  #expect(publicInfo.attributionSize == 12)
+}
+
 @Test func styleImageDescriptorsMaterializeScopedPixelsAndOptions() throws {
   let image = StyleRGBA8Image(width: 1, height: 1, stride: 4, pixels: [1, 2, 3, 4])
 

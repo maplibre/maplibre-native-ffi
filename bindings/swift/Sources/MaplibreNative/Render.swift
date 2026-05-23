@@ -211,10 +211,6 @@ public final class RenderSessionHandle {
     handle = try NativeHandleBox(typeName: "RenderSessionHandle", pointer: pointer)
   }
 
-  deinit {
-    try? close()
-  }
-
   public var isClosed: Bool {
     handle.isClosed
   }
@@ -297,6 +293,88 @@ public final class RenderSessionHandle {
   }
 }
 
+public final class MetalOwnedTextureFrameView {
+  private let texturePointer: NativePointer
+  private let devicePointer: NativePointer
+  private let isFrameLive: () -> Bool
+  private var active = true
+
+  fileprivate init(texture: NativePointer, device: NativePointer, isFrameLive: @escaping () -> Bool) {
+    texturePointer = texture
+    devicePointer = device
+    self.isFrameLive = isFrameLive
+  }
+
+  fileprivate func invalidate() {
+    active = false
+  }
+
+  public var texture: NativePointer {
+    get throws {
+      guard active else {
+        throw MaplibreError(kind: .invalidState, rawStatus: nil, diagnostic: "Metal texture frame scope has ended")
+      }
+      guard isFrameLive() else {
+        throw MaplibreError(kind: .invalidState, rawStatus: nil, diagnostic: "Metal texture frame is closed")
+      }
+      return texturePointer
+    }
+  }
+
+  public var device: NativePointer {
+    get throws {
+      guard active else {
+        throw MaplibreError(kind: .invalidState, rawStatus: nil, diagnostic: "Metal texture frame scope has ended")
+      }
+      guard isFrameLive() else {
+        throw MaplibreError(kind: .invalidState, rawStatus: nil, diagnostic: "Metal texture frame is closed")
+      }
+      return devicePointer
+    }
+  }
+}
+
+public final class VulkanOwnedTextureFrameView {
+  private let imagePointer: NativePointer
+  private let imageViewPointer: NativePointer
+  private let isFrameLive: () -> Bool
+  private var active = true
+
+  fileprivate init(image: NativePointer, imageView: NativePointer, isFrameLive: @escaping () -> Bool) {
+    imagePointer = image
+    imageViewPointer = imageView
+    self.isFrameLive = isFrameLive
+  }
+
+  fileprivate func invalidate() {
+    active = false
+  }
+
+  public var image: NativePointer {
+    get throws {
+      guard active else {
+        throw MaplibreError(kind: .invalidState, rawStatus: nil, diagnostic: "Vulkan texture frame scope has ended")
+      }
+      guard isFrameLive() else {
+        throw MaplibreError(kind: .invalidState, rawStatus: nil, diagnostic: "Vulkan texture frame is closed")
+      }
+      return imagePointer
+    }
+  }
+
+  public var imageView: NativePointer {
+    get throws {
+      guard active else {
+        throw MaplibreError(kind: .invalidState, rawStatus: nil, diagnostic: "Vulkan texture frame scope has ended")
+      }
+      guard isFrameLive() else {
+        throw MaplibreError(kind: .invalidState, rawStatus: nil, diagnostic: "Vulkan texture frame is closed")
+      }
+      return imageViewPointer
+    }
+  }
+}
+
 public final class MetalOwnedTextureFrameHandle {
   private let releaseFrame: (inout NativeMetalOwnedTextureFrame) throws -> Void
   private var frame: NativeMetalOwnedTextureFrame?
@@ -319,29 +397,28 @@ public final class MetalOwnedTextureFrameHandle {
   }
 
   deinit {
-    try? close()
+    if let frame {
+      NativeHandleLeakReporter.report(
+        NativeHandleLeak(typeName: "MetalOwnedTextureFrameHandle", address: UInt(bitPattern: frame.raw.texture))
+      )
+    }
   }
 
   public var isClosed: Bool {
     frame == nil
   }
 
-  public var texture: NativePointer {
-    get throws {
-      guard let frame else {
-        throw MaplibreError(kind: .invalidState, rawStatus: nil, diagnostic: "Metal texture frame is closed")
-      }
-      return NativePointer(bitPattern: UInt(bitPattern: frame.raw.texture))
+  public func withBackendPointers<Result>(_ body: (MetalOwnedTextureFrameView) throws -> Result) throws -> Result {
+    guard let frame else {
+      throw MaplibreError(kind: .invalidState, rawStatus: nil, diagnostic: "Metal texture frame is closed")
     }
-  }
-
-  public var device: NativePointer {
-    get throws {
-      guard let frame else {
-        throw MaplibreError(kind: .invalidState, rawStatus: nil, diagnostic: "Metal texture frame is closed")
-      }
-      return NativePointer(bitPattern: UInt(bitPattern: frame.raw.device))
-    }
+    let view = MetalOwnedTextureFrameView(
+      texture: NativePointer(bitPattern: UInt(bitPattern: frame.raw.texture)),
+      device: NativePointer(bitPattern: UInt(bitPattern: frame.raw.device)),
+      isFrameLive: { [weak self] in self?.frame != nil }
+    )
+    defer { view.invalidate() }
+    return try body(view)
   }
 
   public func close() throws {
@@ -375,29 +452,28 @@ public final class VulkanOwnedTextureFrameHandle {
   }
 
   deinit {
-    try? close()
+    if let frame {
+      NativeHandleLeakReporter.report(
+        NativeHandleLeak(typeName: "VulkanOwnedTextureFrameHandle", address: UInt(bitPattern: frame.raw.image))
+      )
+    }
   }
 
   public var isClosed: Bool {
     frame == nil
   }
 
-  public var image: NativePointer {
-    get throws {
-      guard let frame else {
-        throw MaplibreError(kind: .invalidState, rawStatus: nil, diagnostic: "Vulkan texture frame is closed")
-      }
-      return NativePointer(bitPattern: UInt(bitPattern: frame.raw.image))
+  public func withBackendPointers<Result>(_ body: (VulkanOwnedTextureFrameView) throws -> Result) throws -> Result {
+    guard let frame else {
+      throw MaplibreError(kind: .invalidState, rawStatus: nil, diagnostic: "Vulkan texture frame is closed")
     }
-  }
-
-  public var imageView: NativePointer {
-    get throws {
-      guard let frame else {
-        throw MaplibreError(kind: .invalidState, rawStatus: nil, diagnostic: "Vulkan texture frame is closed")
-      }
-      return NativePointer(bitPattern: UInt(bitPattern: frame.raw.image_view))
-    }
+    let view = VulkanOwnedTextureFrameView(
+      image: NativePointer(bitPattern: UInt(bitPattern: frame.raw.image)),
+      imageView: NativePointer(bitPattern: UInt(bitPattern: frame.raw.image_view)),
+      isFrameLive: { [weak self] in self?.frame != nil }
+    )
+    defer { view.invalidate() }
+    return try body(view)
   }
 
   public func close() throws {

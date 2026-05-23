@@ -130,12 +130,14 @@ public struct StyleSourceInfo: Equatable, Sendable {
   public let type: StyleSourceType
   public let idSize: Int
   public let isVolatile: Bool
+  public let hasAttribution: Bool
   public let attributionSize: Int
 
   init(native: NativeStyleSourceInfo) {
     type = StyleSourceType(rawValue: native.type) ?? .unknown
     idSize = native.idSize
     isVolatile = native.isVolatile
+    hasAttribution = native.hasAttribution
     attributionSize = native.attributionSize
   }
 }
@@ -264,6 +266,7 @@ extension MapHandle {
       let arena = NativeJSONArena()
       let sourceIdView = arena.view(sourceId)
       guard let info = try CAPI.mapGetStyleSourceInfo(try requireLivePointer(), sourceId: sourceIdView) else { return nil }
+      guard info.hasAttribution else { return nil }
       return try CAPI.mapCopyStyleSourceAttribution(try requireLivePointer(), sourceId: sourceIdView, capacity: info.attributionSize).0
     }
   }

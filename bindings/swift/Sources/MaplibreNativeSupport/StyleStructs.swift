@@ -295,12 +295,14 @@ public struct NativeStyleSourceInfo: Equatable, Sendable {
   public let type: UInt32
   public let idSize: Int
   public let isVolatile: Bool
+  public let hasAttribution: Bool
   public let attributionSize: Int
 
   public init(_ raw: mln_style_source_info) {
     type = raw.type
     idSize = raw.id_size
     isVolatile = raw.is_volatile
-    attributionSize = raw.has_attribution ? raw.attribution_size : 0
+    hasAttribution = raw.has_attribution
+    attributionSize = raw.attribution_size
   }
 }

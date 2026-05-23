@@ -98,6 +98,30 @@ private final class LockedBox<Value>: @unchecked Sendable {
   #expect(closes.read { $0 } == 1)
 }
 
+@Test func nativeHandleStateAllowsRetryAfterFailedClose() throws {
+  struct CloseFailure: Error {}
+
+  let closes = LockedBox(0)
+  let state = try NativeHandleState(typeName: "test_handle", pointer: OpaquePointer(bitPattern: 0x4))
+
+  do {
+    try state.closeOnce { _ in
+      closes.update { $0 += 1 }
+      throw CloseFailure()
+    }
+    Issue.record("failed close should throw")
+  } catch is CloseFailure {}
+
+  #expect(!state.isClosed)
+
+  try state.closeOnce { _ in
+    closes.update { $0 += 1 }
+  }
+
+  #expect(state.isClosed)
+  #expect(closes.read { $0 } == 2)
+}
+
 @Test func nativeHandleStateReportsLeaksWithoutDestroying() throws {
   let leaks = LockedBox([NativeHandleLeak]())
   NativeHandleLeakReporter.setHandler { leak in

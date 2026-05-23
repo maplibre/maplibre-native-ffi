@@ -35,3 +35,28 @@ import Testing
   #expect(feature.nativeFeature.properties.count == 1)
   #expect(geoJSON.nativeGeoJSON == .feature(feature.nativeFeature))
 }
+
+@Test func geometryMaterializesAndCopiesAllCVariants() throws {
+  let geometry = Geometry.geometryCollection([
+    .multiPoint([LatLng(latitude: 1, longitude: 2), LatLng(latitude: 3, longitude: 4)]),
+    .multiLineString([
+      [LatLng(latitude: 5, longitude: 6), LatLng(latitude: 7, longitude: 8)],
+      [LatLng(latitude: 9, longitude: 10)],
+    ]),
+    .multiPolygon([[
+      [LatLng(latitude: 11, longitude: 12), LatLng(latitude: 13, longitude: 14), LatLng(latitude: 11, longitude: 12)],
+    ]]),
+  ])
+
+  let arena = NativeJSONArena()
+  let raw = arena.nativeGeometry(geometry.nativeGeometry)
+
+  #expect(raw.type == MLN_GEOMETRY_TYPE_GEOMETRY_COLLECTION.rawValue)
+  #expect(raw.data.geometry_collection.geometry_count == 3)
+  #expect(raw.data.geometry_collection.geometries![0].type == MLN_GEOMETRY_TYPE_MULTI_POINT.rawValue)
+  #expect(raw.data.geometry_collection.geometries![1].type == MLN_GEOMETRY_TYPE_MULTI_LINE_STRING.rawValue)
+  #expect(raw.data.geometry_collection.geometries![2].type == MLN_GEOMETRY_TYPE_MULTI_POLYGON.rawValue)
+
+  let copiedNative = try NativeGeometry(copying: raw)
+  #expect(Geometry(native: copiedNative) == geometry)
+}

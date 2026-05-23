@@ -44,6 +44,10 @@ public enum Geometry: Equatable, Sendable {
   case point(LatLng)
   case lineString([LatLng])
   case polygon([[LatLng]])
+  case multiPoint([LatLng])
+  case multiLineString([[LatLng]])
+  case multiPolygon([[[LatLng]]])
+  case geometryCollection([Geometry])
 
   var nativeGeometry: NativeGeometry {
     switch self {
@@ -51,6 +55,10 @@ public enum Geometry: Equatable, Sendable {
     case .point(let point): .point(point.nativeInput)
     case .lineString(let coordinates): .lineString(coordinates.map(\.nativeInput))
     case .polygon(let rings): .polygon(rings.map { $0.map(\.nativeInput) })
+    case .multiPoint(let coordinates): .multiPoint(coordinates.map(\.nativeInput))
+    case .multiLineString(let lines): .multiLineString(lines.map { $0.map(\.nativeInput) })
+    case .multiPolygon(let polygons): .multiPolygon(polygons.map { $0.map { $0.map(\.nativeInput) } })
+    case .geometryCollection(let geometries): .geometryCollection(geometries.map(\.nativeGeometry))
     }
   }
 }

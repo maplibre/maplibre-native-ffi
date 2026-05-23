@@ -200,7 +200,7 @@ the split improves locality, but module-level concepts stay stable.
 | `mln_map_projection*`               | `final class MapProjectionHandle`; standalone snapshot after creation.                                                                |
 | `mln_render_session*`               | `final class RenderSessionHandle`; retains `MapHandle`.                                                                               |
 | `mln_resource_request_handle*`      | `final class ResourceRequestHandle`; `Sendable` only if synchronized and completion is C-permitted from any thread.                   |
-| Session-owned texture frame handles | `final class MetalOwnedTextureFrameHandle` and `VulkanOwnedTextureFrameHandle`; frame-scoped pointer access.                          |
+| Session-owned texture frame handles | `final class MetalOwnedTextureFrameHandle` and `VulkanOwnedTextureFrameHandle`; scoped view access to backend pointers.               |
 | C option structs                    | Swift descriptor structs; materializers set `size`, masks, pointers, and nested storage.                                              |
 | C field masks                       | Swift optionals, explicit clear methods, or small presence wrappers; C masks stay internal.                                           |
 | Closed enum domains                 | Swift enums with explicit raw conversion helpers.                                                                                     |
@@ -506,14 +506,14 @@ on Swift-owned behavior:
 - embedded-NUL rejection and scoped UTF-8 storage;
 - callback box synchronization and exactly-once release;
 - copied runtime events and query/style result payloads;
-- frame handle active-state invalidation;
-- render readback into caller-owned storage.
+- frame handle scoped-view invalidation and active-state invalidation.
 
 The current test suite covers the proof slice, support helpers, logging,
 runtime/resource callbacks, map/camera/projection controls, render targets,
 query/style/value conversion, custom geometry callbacks, and offline result
-copying. Tests focus on binding-owned behavior instead of retesting all native C
-validation rules.
+copying. Render readback is exposed as caller-owned mutable storage and relies
+on the C ABI tests for native pixel-copy validation. Tests focus on
+binding-owned behavior instead of retesting all native C validation rules.
 
 ## Implementation milestones
 

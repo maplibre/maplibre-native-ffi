@@ -18,6 +18,19 @@ private final class RenderCounter: @unchecked Sendable {
   }
 }
 
+private final class RenderLeakBox: @unchecked Sendable {
+  private let lock = NSLock()
+  private var leaks: [NativeHandleLeak] = []
+
+  func append(_ leak: NativeHandleLeak) {
+    lock.withLock { leaks.append(leak) }
+  }
+
+  func value() -> [NativeHandleLeak] {
+    lock.withLock { leaks }
+  }
+}
+
 @Test func renderTargetDescriptorsMaterializeNativePointersAndExtents() throws {
   let extent = RenderTargetExtent(width: 640, height: 480, scaleFactor: 2)
   let metalSurface = MetalSurfaceDescriptor(
@@ -73,15 +86,29 @@ private final class RenderCounter: @unchecked Sendable {
     releases.increment()
   }
 
-  #expect(try frame.texture == NativePointer(bitPattern: 0x1234))
-  #expect(try frame.device == NativePointer(bitPattern: 0x5678))
+  var capturedView: MetalOwnedTextureFrameView?
+  try frame.withBackendPointers { view in
+    capturedView = view
+    let texture = try view.texture
+    let device = try view.device
+    #expect(texture == NativePointer(bitPattern: 0x1234))
+    #expect(device == NativePointer(bitPattern: 0x5678))
+  }
+  do {
+    _ = try capturedView?.texture
+    Issue.record("frame view access after scope should throw")
+  } catch let error as MaplibreError {
+    #expect(error.kind == .invalidState)
+    #expect(error.rawStatus == nil)
+  }
+
   try frame.close()
   try frame.close()
 
   #expect(frame.isClosed)
   #expect(releases.value() == 1)
   do {
-    _ = try frame.texture
+    try frame.withBackendPointers { _ in }
     Issue.record("closed frame access should throw")
   } catch let error as MaplibreError {
     #expect(error.kind == .invalidState)
@@ -99,18 +126,54 @@ private final class RenderCounter: @unchecked Sendable {
     releases.increment()
   }
 
-  #expect(try frame.image == NativePointer(bitPattern: 0x1234))
-  #expect(try frame.imageView == NativePointer(bitPattern: 0x5678))
+  var capturedView: VulkanOwnedTextureFrameView?
+  try frame.withBackendPointers { view in
+    capturedView = view
+    let image = try view.image
+    let imageView = try view.imageView
+    #expect(image == NativePointer(bitPattern: 0x1234))
+    #expect(imageView == NativePointer(bitPattern: 0x5678))
+  }
+  do {
+    _ = try capturedView?.image
+    Issue.record("frame view access after scope should throw")
+  } catch let error as MaplibreError {
+    #expect(error.kind == .invalidState)
+    #expect(error.rawStatus == nil)
+  }
+
   try frame.close()
   try frame.close()
 
   #expect(frame.isClosed)
   #expect(releases.value() == 1)
   do {
-    _ = try frame.image
+    try frame.withBackendPointers { _ in }
     Issue.record("closed frame access should throw")
   } catch let error as MaplibreError {
     #expect(error.kind == .invalidState)
     #expect(error.rawStatus == nil)
   }
+}
+
+@Test func textureFrameDeinitReportsLeakWithoutRelease() throws {
+  let releases = RenderCounter()
+  let leaks = RenderLeakBox()
+  NativeHandleLeakReporter.setHandler { leak in
+    leaks.append(leak)
+  }
+  defer { NativeHandleLeakReporter.resetHandler() }
+
+  do {
+    var raw = mln_metal_owned_texture_frame()
+    raw.size = UInt32(MemoryLayout<mln_metal_owned_texture_frame>.size)
+    raw.texture = UnsafeMutableRawPointer(bitPattern: 0x1234)
+    raw.device = UnsafeMutableRawPointer(bitPattern: 0x5678)
+    _ = MetalOwnedTextureFrameHandle(frame: NativeMetalOwnedTextureFrame(raw)) { _ in
+      releases.increment()
+    }
+  }
+
+  #expect(releases.value() == 0)
+  #expect(leaks.value() == [NativeHandleLeak(typeName: "MetalOwnedTextureFrameHandle", address: 0x1234)])
 }

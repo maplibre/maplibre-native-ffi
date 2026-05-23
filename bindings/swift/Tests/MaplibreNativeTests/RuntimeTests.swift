@@ -64,6 +64,29 @@ private final class ResourceCounters: @unchecked Sendable {
   #expect(result.replacement == "https://example.invalid/tile")
 }
 
+@Test func resourceRequestHandleRejectsSecondCompletionBeforeCallingNative() throws {
+  let counters = ResourceCounters()
+  let functions = NativeResourceRequestHandleFunctions(
+    complete: { _, _ in counters.completed() },
+    cancelled: { _ in false },
+    release: { _ in counters.released() }
+  )
+  let state = try NativeResourceRequestHandleState(pointer: OpaquePointer(bitPattern: 0x5), functions: functions)
+
+  try state.complete(NativeResourceResponseInput(status: ResourceResponseStatus.ok.rawValue, errorReason: ResourceErrorReason.none.rawValue))
+  do {
+    try state.complete(NativeResourceResponseInput(status: ResourceResponseStatus.ok.rawValue, errorReason: ResourceErrorReason.none.rawValue))
+    Issue.record("second completion should throw")
+  } catch let failure as NativeStatusFailure {
+    #expect(failure.diagnostic.contains("already completed"))
+  }
+
+  state.markProviderReturnedHandle()
+
+  #expect(counters.snapshot().complete == 1)
+  #expect(counters.snapshot().release == 1)
+}
+
 @Test func resourceProviderCallbackCopiesRequestAndCompletesHandledRequest() throws {
   let counters = ResourceCounters()
   let functions = NativeResourceRequestHandleFunctions(

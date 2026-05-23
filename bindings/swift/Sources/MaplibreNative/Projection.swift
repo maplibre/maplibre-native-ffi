@@ -20,10 +20,6 @@ public final class MapProjectionHandle {
     handle = try NativeHandleBox(typeName: "MapProjectionHandle", pointer: pointer)
   }
 
-  deinit {
-    try? close()
-  }
-
   public var isClosed: Bool {
     handle.isClosed
   }

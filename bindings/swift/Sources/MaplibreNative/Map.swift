@@ -44,10 +44,6 @@ public final class MapHandle {
     handle = try NativeHandleBox(typeName: "MapHandle", pointer: pointer)
   }
 
-  deinit {
-    try? close()
-  }
-
   public var isClosed: Bool {
     handle.isClosed
   }

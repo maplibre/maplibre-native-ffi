@@ -65,7 +65,9 @@ public final class NativeJSONArena {
   private var members: [UnsafeMutableBufferPointer<mln_json_member>] = []
   private var coordinateArrays: [UnsafeMutableBufferPointer<mln_lat_lng>] = []
   private var coordinateSpans: [UnsafeMutableBufferPointer<mln_coordinate_span>] = []
+  private var polygonArrays: [UnsafeMutableBufferPointer<mln_polygon_geometry>] = []
   private var geometries: [UnsafeMutablePointer<mln_geometry>] = []
+  private var geometryArrays: [UnsafeMutableBufferPointer<mln_geometry>] = []
   private var features: [UnsafeMutablePointer<mln_feature>] = []
   private var featureArrays: [UnsafeMutableBufferPointer<mln_feature>] = []
 
@@ -92,9 +94,17 @@ public final class NativeJSONArena {
       spanArray.baseAddress?.deinitialize(count: spanArray.count)
       spanArray.baseAddress?.deallocate()
     }
+    for polygonArray in polygonArrays {
+      polygonArray.baseAddress?.deinitialize(count: polygonArray.count)
+      polygonArray.baseAddress?.deallocate()
+    }
     for geometry in geometries {
       geometry.deinitialize(count: 1)
       geometry.deallocate()
+    }
+    for geometryArray in geometryArrays {
+      geometryArray.baseAddress?.deinitialize(count: geometryArray.count)
+      geometryArray.baseAddress?.deallocate()
     }
     for feature in features {
       feature.deinitialize(count: 1)
@@ -191,6 +201,18 @@ public final class NativeJSONArena {
     case .polygon(let rings):
       raw.type = MLN_GEOMETRY_TYPE_POLYGON.rawValue
       raw.data.polygon = polygonGeometry(rings)
+    case .multiPoint(let coordinates):
+      raw.type = MLN_GEOMETRY_TYPE_MULTI_POINT.rawValue
+      raw.data.multi_point = coordinateSpan(coordinates)
+    case .multiLineString(let lines):
+      raw.type = MLN_GEOMETRY_TYPE_MULTI_LINE_STRING.rawValue
+      raw.data.multi_line_string = multiLineGeometry(lines)
+    case .multiPolygon(let polygons):
+      raw.type = MLN_GEOMETRY_TYPE_MULTI_POLYGON.rawValue
+      raw.data.multi_polygon = multiPolygonGeometry(polygons)
+    case .geometryCollection(let geometries):
+      raw.type = MLN_GEOMETRY_TYPE_GEOMETRY_COLLECTION.rawValue
+      raw.data.geometry_collection = geometryCollection(geometries)
     }
     return raw
   }
@@ -280,6 +302,36 @@ public final class NativeJSONArena {
     coordinateSpans.append(UnsafeMutableBufferPointer(start: buffer, count: rings.count))
     return mln_polygon_geometry(rings: UnsafePointer(buffer), ring_count: rings.count)
   }
+
+  private func multiLineGeometry(_ lines: [[NativeLatLng]]) -> mln_multi_line_geometry {
+    guard !lines.isEmpty else { return mln_multi_line_geometry(lines: nil, line_count: 0) }
+    let buffer = UnsafeMutablePointer<mln_coordinate_span>.allocate(capacity: lines.count)
+    for (index, line) in lines.enumerated() {
+      buffer.advanced(by: index).initialize(to: coordinateSpan(line))
+    }
+    coordinateSpans.append(UnsafeMutableBufferPointer(start: buffer, count: lines.count))
+    return mln_multi_line_geometry(lines: UnsafePointer(buffer), line_count: lines.count)
+  }
+
+  private func multiPolygonGeometry(_ polygons: [[[NativeLatLng]]]) -> mln_multi_polygon_geometry {
+    guard !polygons.isEmpty else { return mln_multi_polygon_geometry(polygons: nil, polygon_count: 0) }
+    let buffer = UnsafeMutablePointer<mln_polygon_geometry>.allocate(capacity: polygons.count)
+    for (index, polygon) in polygons.enumerated() {
+      buffer.advanced(by: index).initialize(to: polygonGeometry(polygon))
+    }
+    polygonArrays.append(UnsafeMutableBufferPointer(start: buffer, count: polygons.count))
+    return mln_multi_polygon_geometry(polygons: UnsafePointer(buffer), polygon_count: polygons.count)
+  }
+
+  private func geometryCollection(_ geometries: [NativeGeometry]) -> mln_geometry_collection {
+    guard !geometries.isEmpty else { return mln_geometry_collection(geometries: nil, geometry_count: 0) }
+    let buffer = UnsafeMutablePointer<mln_geometry>.allocate(capacity: geometries.count)
+    for (index, geometry) in geometries.enumerated() {
+      buffer.advanced(by: index).initialize(to: nativeGeometry(geometry))
+    }
+    geometryArrays.append(UnsafeMutableBufferPointer(start: buffer, count: geometries.count))
+    return mln_geometry_collection(geometries: UnsafePointer(buffer), geometry_count: geometries.count)
+  }
 }
 
 public enum NativeGeometry: Equatable, Sendable {
@@ -287,6 +339,10 @@ public enum NativeGeometry: Equatable, Sendable {
   case point(NativeLatLng)
   case lineString([NativeLatLng])
   case polygon([[NativeLatLng]])
+  case multiPoint([NativeLatLng])
+  case multiLineString([[NativeLatLng]])
+  case multiPolygon([[[NativeLatLng]]])
+  case geometryCollection([NativeGeometry])
 
   public init(copying raw: mln_geometry) throws {
     switch raw.type {
@@ -295,16 +351,38 @@ public enum NativeGeometry: Equatable, Sendable {
     case MLN_GEOMETRY_TYPE_POINT.rawValue:
       self = .point(NativeLatLng(raw.data.point))
     case MLN_GEOMETRY_TYPE_LINE_STRING.rawValue:
-      let span = raw.data.line_string
-      self = .lineString((0..<span.coordinate_count).map { NativeLatLng(span.coordinates![$0]) })
+      self = .lineString(Self.copyCoordinateSpan(raw.data.line_string))
     case MLN_GEOMETRY_TYPE_POLYGON.rawValue:
-      let polygon = raw.data.polygon
-      self = .polygon((0..<polygon.ring_count).map { ringIndex in
-        let ring = polygon.rings![ringIndex]
-        return (0..<ring.coordinate_count).map { NativeLatLng(ring.coordinates![$0]) }
+      self = .polygon(Self.copyPolygon(raw.data.polygon))
+    case MLN_GEOMETRY_TYPE_MULTI_POINT.rawValue:
+      self = .multiPoint(Self.copyCoordinateSpan(raw.data.multi_point))
+    case MLN_GEOMETRY_TYPE_MULTI_LINE_STRING.rawValue:
+      let multiLine = raw.data.multi_line_string
+      self = .multiLineString((0..<multiLine.line_count).map { lineIndex in
+        Self.copyCoordinateSpan(multiLine.lines![lineIndex])
+      })
+    case MLN_GEOMETRY_TYPE_MULTI_POLYGON.rawValue:
+      let multiPolygon = raw.data.multi_polygon
+      self = .multiPolygon((0..<multiPolygon.polygon_count).map { polygonIndex in
+        Self.copyPolygon(multiPolygon.polygons![polygonIndex])
+      })
+    case MLN_GEOMETRY_TYPE_GEOMETRY_COLLECTION.rawValue:
+      let collection = raw.data.geometry_collection
+      self = .geometryCollection(try (0..<collection.geometry_count).map { geometryIndex in
+        try NativeGeometry(copying: collection.geometries![geometryIndex])
       })
     default:
       throw NativeStatusFailure(rawStatus: 0, diagnostic: "unsupported geometry type \(raw.type)")
+    }
+  }
+
+  private static func copyCoordinateSpan(_ span: mln_coordinate_span) -> [NativeLatLng] {
+    (0..<span.coordinate_count).map { NativeLatLng(span.coordinates![$0]) }
+  }
+
+  private static func copyPolygon(_ polygon: mln_polygon_geometry) -> [[NativeLatLng]] {
+    (0..<polygon.ring_count).map { ringIndex in
+      copyCoordinateSpan(polygon.rings![ringIndex])
     }
   }
 }

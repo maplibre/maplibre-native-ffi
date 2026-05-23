@@ -135,6 +135,7 @@ public final class NativeResourceRequestHandleState: @unchecked Sendable {
   private var pointer: OpaquePointer?
   private var providerReturnedHandle = false
   private var completed = false
+  private var completionInFlight = false
 
   public init(
     pointer: OpaquePointer?,
@@ -152,19 +153,35 @@ public final class NativeResourceRequestHandleState: @unchecked Sendable {
   }
 
   public func markProviderReturnedHandle() {
-    lock.withLock {
+    let handle = lock.withLock {
       providerReturnedHandle = true
+      return takeReleasableHandleLocked()
     }
-    releaseIfCompletedAfterProviderReturn()
+    if let handle {
+      functions.release(handle)
+    }
   }
 
   public func complete(_ response: NativeResourceResponseInput) throws {
-    let handle = try requireLive()
-    try functions.complete(handle, response)
-    lock.withLock {
+    let handle = try lock.withLock {
+      guard let pointer else {
+        throw NativeStatusFailure(rawStatus: 0, diagnostic: "resource request handle is closed")
+      }
+      guard !completed else {
+        throw NativeStatusFailure(rawStatus: 0, diagnostic: "resource request handle is already completed")
+      }
       completed = true
+      completionInFlight = true
+      return pointer
     }
-    releaseIfCompletedAfterProviderReturn()
+
+    do {
+      try functions.complete(handle, response)
+    } catch {
+      finishCompletion()
+      throw error
+    }
+    finishCompletion()
   }
 
   public func isCancelled() throws -> Bool {
@@ -173,7 +190,7 @@ public final class NativeResourceRequestHandleState: @unchecked Sendable {
 
   public func release() {
     let handle = lock.withLock {
-      guard providerReturnedHandle else { return nil as OpaquePointer? }
+      guard providerReturnedHandle, !completionInFlight else { return nil as OpaquePointer? }
       let handle = pointer
       pointer = nil
       return handle
@@ -192,11 +209,21 @@ public final class NativeResourceRequestHandleState: @unchecked Sendable {
     }
   }
 
-  private func releaseIfCompletedAfterProviderReturn() {
-    let shouldRelease = lock.withLock { providerReturnedHandle && completed }
-    if shouldRelease {
-      release()
+  private func finishCompletion() {
+    let handle = lock.withLock {
+      completionInFlight = false
+      return takeReleasableHandleLocked()
     }
+    if let handle {
+      functions.release(handle)
+    }
+  }
+
+  private func takeReleasableHandleLocked() -> OpaquePointer? {
+    guard providerReturnedHandle, completed, !completionInFlight else { return nil }
+    let handle = pointer
+    pointer = nil
+    return handle
   }
 }
 
