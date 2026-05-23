@@ -15,6 +15,35 @@ type Runtime struct{ _ byte }
 // Map is an opaque native map handle.
 type Map struct{ _ byte }
 
+// Projection is an opaque native map projection handle.
+type Projection struct{ _ byte }
+
+// MapOptions contains semantic map creation options.
+type MapOptions struct {
+	Width       uint32
+	Height      uint32
+	ScaleFactor float64
+	MapMode     uint32
+}
+
+// LatLng is a geographic coordinate in degrees.
+type LatLng struct {
+	Latitude  float64
+	Longitude float64
+}
+
+// ScreenPoint is a logical pixel coordinate.
+type ScreenPoint struct {
+	X float64
+	Y float64
+}
+
+// ProjectedMeters is a spherical Mercator coordinate in meters.
+type ProjectedMeters struct {
+	Northing float64
+	Easting  float64
+}
+
 // Status is the raw C status value returned by fallible C API calls.
 type Status int32
 
@@ -35,6 +64,12 @@ const (
 const (
 	NetworkStatusOnline  uint32 = uint32(C.MLN_NETWORK_STATUS_ONLINE)
 	NetworkStatusOffline uint32 = uint32(C.MLN_NETWORK_STATUS_OFFLINE)
+)
+
+const (
+	MapModeContinuous uint32 = uint32(C.MLN_MAP_MODE_CONTINUOUS)
+	MapModeStatic     uint32 = uint32(C.MLN_MAP_MODE_STATIC)
+	MapModeTile       uint32 = uint32(C.MLN_MAP_MODE_TILE)
 )
 
 // CVersion returns the linked native C ABI contract version.
@@ -90,10 +125,20 @@ func RuntimeRunOnce(runtime *Runtime) Status {
 // MapCreateDefault creates a map with native default options.
 func MapCreateDefault(runtime *Runtime, out **Map) Status {
 	options := C.mln_map_options_default()
+	return MapCreate(runtime, mapOptionsFromC(options), out)
+}
+
+// MapCreate creates a map with explicit options.
+func MapCreate(runtime *Runtime, options MapOptions, out **Map) Status {
+	rawOptions := C.mln_map_options_default()
+	rawOptions.width = C.uint32_t(options.Width)
+	rawOptions.height = C.uint32_t(options.Height)
+	rawOptions.scale_factor = C.double(options.ScaleFactor)
+	rawOptions.map_mode = C.uint32_t(options.MapMode)
 	var raw *C.mln_map
 	status := Status(C.mln_map_create(
 		(*C.mln_runtime)(unsafe.Pointer(runtime)),
-		&options,
+		&rawOptions,
 		&raw,
 	))
 	if status == StatusOK {
@@ -102,7 +147,106 @@ func MapCreateDefault(runtime *Runtime, out **Map) Status {
 	return status
 }
 
+func mapOptionsFromC(options C.mln_map_options) MapOptions {
+	return MapOptions{
+		Width:       uint32(options.width),
+		Height:      uint32(options.height),
+		ScaleFactor: float64(options.scale_factor),
+		MapMode:     uint32(options.map_mode),
+	}
+}
+
 // MapDestroy destroys a map handle.
 func MapDestroy(m *Map) Status {
 	return Status(C.mln_map_destroy((*C.mln_map)(unsafe.Pointer(m))))
+}
+
+// MapProjectionCreate creates a standalone projection helper from a map.
+func MapProjectionCreate(m *Map, out **Projection) Status {
+	var raw *C.mln_map_projection
+	status := Status(C.mln_map_projection_create(
+		(*C.mln_map)(unsafe.Pointer(m)),
+		&raw,
+	))
+	if status == StatusOK {
+		*out = (*Projection)(unsafe.Pointer(raw))
+	}
+	return status
+}
+
+// MapProjectionDestroy destroys a projection helper.
+func MapProjectionDestroy(projection *Projection) Status {
+	return Status(C.mln_map_projection_destroy((*C.mln_map_projection)(unsafe.Pointer(projection))))
+}
+
+// MapProjectionPixelForLatLng converts a coordinate to a screen point.
+func MapProjectionPixelForLatLng(projection *Projection, coordinate LatLng, out *ScreenPoint) Status {
+	var rawPoint C.mln_screen_point
+	status := Status(C.mln_map_projection_pixel_for_lat_lng(
+		(*C.mln_map_projection)(unsafe.Pointer(projection)),
+		latLngToC(coordinate),
+		&rawPoint,
+	))
+	if status == StatusOK {
+		*out = screenPointFromC(rawPoint)
+	}
+	return status
+}
+
+// MapProjectionLatLngForPixel converts a screen point to a coordinate.
+func MapProjectionLatLngForPixel(projection *Projection, point ScreenPoint, out *LatLng) Status {
+	var rawCoordinate C.mln_lat_lng
+	status := Status(C.mln_map_projection_lat_lng_for_pixel(
+		(*C.mln_map_projection)(unsafe.Pointer(projection)),
+		screenPointToC(point),
+		&rawCoordinate,
+	))
+	if status == StatusOK {
+		*out = latLngFromC(rawCoordinate)
+	}
+	return status
+}
+
+// ProjectedMetersForLatLng converts a coordinate to projected meters.
+func ProjectedMetersForLatLng(coordinate LatLng, out *ProjectedMeters) Status {
+	var rawMeters C.mln_projected_meters
+	status := Status(C.mln_projected_meters_for_lat_lng(latLngToC(coordinate), &rawMeters))
+	if status == StatusOK {
+		*out = projectedMetersFromC(rawMeters)
+	}
+	return status
+}
+
+// LatLngForProjectedMeters converts projected meters to a coordinate.
+func LatLngForProjectedMeters(meters ProjectedMeters, out *LatLng) Status {
+	var rawCoordinate C.mln_lat_lng
+	status := Status(C.mln_lat_lng_for_projected_meters(projectedMetersToC(meters), &rawCoordinate))
+	if status == StatusOK {
+		*out = latLngFromC(rawCoordinate)
+	}
+	return status
+}
+
+func latLngToC(coordinate LatLng) C.mln_lat_lng {
+	return C.mln_lat_lng{latitude: C.double(coordinate.Latitude), longitude: C.double(coordinate.Longitude)}
+}
+
+func latLngFromC(coordinate C.mln_lat_lng) LatLng {
+	return LatLng{Latitude: float64(coordinate.latitude), Longitude: float64(coordinate.longitude)}
+}
+
+func screenPointToC(point ScreenPoint) C.mln_screen_point {
+	return C.mln_screen_point{x: C.double(point.X), y: C.double(point.Y)}
+}
+
+func screenPointFromC(point C.mln_screen_point) ScreenPoint {
+	return ScreenPoint{X: float64(point.x), Y: float64(point.y)}
+}
+
+func projectedMetersToC(meters ProjectedMeters) C.mln_projected_meters {
+	return C.mln_projected_meters{northing: C.double(meters.Northing), easting: C.double(meters.Easting)}
+}
+
+func projectedMetersFromC(meters C.mln_projected_meters) ProjectedMeters {
+	return ProjectedMeters{Northing: float64(meters.northing), Easting: float64(meters.easting)}
 }

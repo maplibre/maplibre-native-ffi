@@ -97,6 +97,19 @@ func (runtime *RuntimeHandle) RunOnce() error {
 
 // NewMap creates a map owned by this runtime with native default options.
 func (runtime *RuntimeHandle) NewMap() (*MapHandle, error) {
+	return runtime.createMap(func(ptr *capi.Runtime, out **capi.Map) capi.Status {
+		return capi.MapCreateDefault(ptr, out)
+	})
+}
+
+// NewMapWithOptions creates a map owned by this runtime with explicit options.
+func (runtime *RuntimeHandle) NewMapWithOptions(options MapOptions) (*MapHandle, error) {
+	return runtime.createMap(func(ptr *capi.Runtime, out **capi.Map) capi.Status {
+		return capi.MapCreate(ptr, options.toCAPI(), out)
+	})
+}
+
+func (runtime *RuntimeHandle) createMap(create func(*capi.Runtime, **capi.Map) capi.Status) (*MapHandle, error) {
 	ptr, err := runtime.ptr()
 	if err != nil {
 		return nil, err
@@ -104,7 +117,7 @@ func (runtime *RuntimeHandle) NewMap() (*MapHandle, error) {
 	defer runtime.state.KeepAlive()
 
 	var m *capi.Map
-	if err := checkNative(func() capi.Status { return capi.MapCreateDefault(ptr, &m) }); err != nil {
+	if err := checkNative(func() capi.Status { return create(ptr, &m) }); err != nil {
 		return nil, err
 	}
 	state, err := handle.New(m, "MapHandle", runtime)

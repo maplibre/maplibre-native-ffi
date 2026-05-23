@@ -58,6 +58,24 @@ func TestNetworkStatusRoundTripsThroughNativeABI(t *testing.T) {
 	}
 }
 
+func TestProjectedMetersHelpersRoundTrip(t *testing.T) {
+	coordinate := LatLng{Latitude: 45, Longitude: -122}
+	meters, err := ProjectedMetersForLatLng(coordinate)
+	if err != nil {
+		t.Fatalf("ProjectedMetersForLatLng(): %v", err)
+	}
+	roundTripped, err := LatLngForProjectedMeters(meters)
+	if err != nil {
+		t.Fatalf("LatLngForProjectedMeters(): %v", err)
+	}
+	if diff := roundTripped.Latitude - coordinate.Latitude; diff < -1e-9 || diff > 1e-9 {
+		t.Fatalf("latitude round trip = %f, want %f", roundTripped.Latitude, coordinate.Latitude)
+	}
+	if diff := roundTripped.Longitude - coordinate.Longitude; diff < -1e-9 || diff > 1e-9 {
+		t.Fatalf("longitude round trip = %f, want %f", roundTripped.Longitude, coordinate.Longitude)
+	}
+}
+
 func TestRuntimeCreateRunOnceAndClose(t *testing.T) {
 	runtime, err := NewRuntime()
 	if err != nil {
@@ -103,6 +121,60 @@ func TestRuntimeMapLifecycle(t *testing.T) {
 	}
 	if err := runtime.Close(); err != nil {
 		t.Fatalf("Runtime Close(): %v", err)
+	}
+}
+
+func TestMapProjectionSnapshotOutlivesMap(t *testing.T) {
+	runtime, err := NewRuntime()
+	if err != nil {
+		t.Fatalf("NewRuntime(): %v", err)
+	}
+	m, err := runtime.NewMapWithOptions(NewMapOptions(512, 512, 1))
+	if err != nil {
+		_ = runtime.Close()
+		t.Fatalf("NewMapWithOptions(): %v", err)
+	}
+	projection, err := m.NewProjection()
+	if err != nil {
+		_ = m.Close()
+		_ = runtime.Close()
+		t.Fatalf("NewProjection(): %v", err)
+	}
+	if err := m.Close(); err != nil {
+		_ = projection.Close()
+		_ = runtime.Close()
+		t.Fatalf("Map Close(): %v", err)
+	}
+	if err := runtime.Close(); err != nil {
+		_ = projection.Close()
+		t.Fatalf("Runtime Close(): %v", err)
+	}
+
+	coordinate := LatLng{Latitude: 0, Longitude: 0}
+	point, err := projection.PixelForLatLng(coordinate)
+	if err != nil {
+		_ = projection.Close()
+		t.Fatalf("PixelForLatLng(): %v", err)
+	}
+	roundTripped, err := projection.LatLngForPixel(point)
+	if err != nil {
+		_ = projection.Close()
+		t.Fatalf("LatLngForPixel(): %v", err)
+	}
+	if diff := roundTripped.Latitude - coordinate.Latitude; diff < -1e-7 || diff > 1e-7 {
+		t.Fatalf("latitude round trip = %f, want %f", roundTripped.Latitude, coordinate.Latitude)
+	}
+	if diff := roundTripped.Longitude - coordinate.Longitude; diff < -1e-7 || diff > 1e-7 {
+		t.Fatalf("longitude round trip = %f, want %f", roundTripped.Longitude, coordinate.Longitude)
+	}
+	if err := projection.Close(); err != nil {
+		t.Fatalf("Projection Close(): %v", err)
+	}
+	if err := projection.Close(); err != nil {
+		t.Fatalf("second Projection Close(): %v", err)
+	}
+	if _, err := projection.PixelForLatLng(coordinate); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("PixelForLatLng() after close error = %v, want ErrInvalidArgument", err)
 	}
 }
 
