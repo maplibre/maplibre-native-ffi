@@ -51,32 +51,10 @@ render abstractions belong above this package.
 
 ## Current implementation
 
-```text
-bindings/go/
-  SPEC.md
-  go.mod
-  mise.toml
-  camera.go
-  errors.go
-  geometry.go
-  handles.go
-  logging.go
-  map.go
-  maplibre.go
-  maplibre_test.go
-  projection.go
-  query.go
-  render.go
-  resource.go
-  runtime.go
-  style.go
-  internal/capi/capi.go
-  internal/callback/doc.go
-  internal/handle/doc.go
-  internal/memory/doc.go
-  internal/status/status.go
-  internal/structs/doc.go
-```
+`bindings/go` contains the public `maplibre` package, focused Go tests, and
+private `internal/*` packages for cgo calls, callbacks, handle state, memory,
+status, and copied-structure helpers. The exact file list may change as the
+binding evolves; the package inventory below defines the required areas.
 
 The implementation covers the spec inventory:
 

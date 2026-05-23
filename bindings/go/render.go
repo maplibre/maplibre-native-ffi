@@ -111,6 +111,9 @@ type RenderSessionHandle struct {
 }
 
 // MetalOwnedTextureFrame is an acquired session-owned Metal texture frame.
+// Backend handles are borrowed and remain valid only until Close. Close the
+// frame on the render session owner thread before resizing, rendering, reading
+// back, detaching, closing the session, or acquiring another frame.
 type MetalOwnedTextureFrame struct {
 	Generation  uint64
 	Width       uint32
@@ -127,6 +130,9 @@ type MetalOwnedTextureFrame struct {
 }
 
 // VulkanOwnedTextureFrame is an acquired session-owned Vulkan texture frame.
+// Backend handles are borrowed and remain valid only until Close. Close the
+// frame on the render session owner thread before resizing, rendering, reading
+// back, detaching, closing the session, or acquiring another frame.
 type VulkanOwnedTextureFrame struct {
 	Generation  uint64
 	Width       uint32
@@ -462,7 +468,9 @@ func (session *RenderSessionHandle) ReadPremultipliedRGBA8Into(buffer []byte) (T
 	return textureImageInfoFromCAPI(rawInfo), nil
 }
 
-// AcquireMetalTextureFrame acquires the latest Metal session-owned texture frame.
+// AcquireMetalTextureFrame acquires the latest Metal session-owned texture
+// frame. While the frame is live, resize, render update, detach, readback,
+// session close, and another frame acquire are invalid.
 func (session *RenderSessionHandle) AcquireMetalTextureFrame() (*MetalOwnedTextureFrame, error) {
 	ptr, err := session.ptr()
 	if err != nil {
@@ -493,7 +501,9 @@ func (session *RenderSessionHandle) AcquireMetalTextureFrame() (*MetalOwnedTextu
 	}, nil
 }
 
-// AcquireVulkanTextureFrame acquires the latest Vulkan session-owned texture frame.
+// AcquireVulkanTextureFrame acquires the latest Vulkan session-owned texture
+// frame. While the frame is live, resize, render update, detach, readback,
+// session close, and another frame acquire are invalid.
 func (session *RenderSessionHandle) AcquireVulkanTextureFrame() (*VulkanOwnedTextureFrame, error) {
 	ptr, err := session.ptr()
 	if err != nil {
@@ -526,7 +536,9 @@ func (session *RenderSessionHandle) AcquireVulkanTextureFrame() (*VulkanOwnedTex
 	}, nil
 }
 
-// Close releases this acquired Metal texture frame. A second Close is a no-op.
+// Close releases this acquired Metal texture frame on the session owner thread.
+// A second Close is a no-op after a successful release; failed releases remain
+// retryable.
 func (frame *MetalOwnedTextureFrame) Close() error {
 	if frame == nil || frame.session == nil {
 		return newBindingError(ErrInvalidArgument, "MetalOwnedTextureFrame is nil")
@@ -550,7 +562,9 @@ func (frame *MetalOwnedTextureFrame) Close() error {
 	return nil
 }
 
-// Close releases this acquired Vulkan texture frame. A second Close is a no-op.
+// Close releases this acquired Vulkan texture frame on the session owner
+// thread. A second Close is a no-op after a successful release; failed releases
+// remain retryable.
 func (frame *VulkanOwnedTextureFrame) Close() error {
 	if frame == nil || frame.session == nil {
 		return newBindingError(ErrInvalidArgument, "VulkanOwnedTextureFrame is nil")

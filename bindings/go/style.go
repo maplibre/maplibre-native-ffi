@@ -140,10 +140,15 @@ func styleTileSourceOptionsToCAPI(options *StyleTileSourceOptions) *capi.StyleTi
 	return &raw
 }
 
-// CustomGeometryTileCallback receives custom geometry tile requests.
+// CustomGeometryTileCallback receives custom geometry tile requests. Native
+// code may invoke it on worker threads and may race it with owner-thread map
+// calls. The callback must be thread-safe, must not call MapLibre map APIs
+// directly, and should queue SetCustomGeometrySourceTileData or invalidation
+// work back to the map owner thread. Panics are recovered and ignored.
 type CustomGeometryTileCallback func(CanonicalTileID)
 
-// CustomGeometrySourceOptions configures a custom geometry source.
+// CustomGeometrySourceOptions configures a custom geometry source. CancelTile is
+// best-effort and may be repeated or race with FetchTile.
 type CustomGeometrySourceOptions struct {
 	FetchTile  CustomGeometryTileCallback
 	CancelTile CustomGeometryTileCallback
@@ -326,6 +331,9 @@ func (m *MapHandle) SetGeoJSONSourceData(sourceID string, data GeoJSON) error {
 }
 
 // AddCustomGeometrySource adds a custom geometry source to the current style.
+// Callback state remains valid until source removal, style replacement, or map
+// close; URL style replacement completes asynchronously when the new style
+// loads.
 func (m *MapHandle) AddCustomGeometrySource(sourceID string, options CustomGeometrySourceOptions) error {
 	if options.FetchTile == nil {
 		return newBindingError(ErrInvalidArgument, "CustomGeometrySourceOptions.FetchTile is nil")
