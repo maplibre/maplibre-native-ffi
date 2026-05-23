@@ -1507,6 +1507,18 @@ func TestQueryDescriptorsAndHandleErrors(t *testing.T) {
 	if _, err := session.QuerySourceFeatures("source", &SourceFeatureQueryOptions{SourceLayerIDs: []string{"layer"}, Filter: []any{"==", "kind", "park"}}); !errors.Is(err, ErrInvalidArgument) {
 		t.Fatalf("QuerySourceFeatures(nil session) error = %v, want ErrInvalidArgument", err)
 	}
+	featureID := "id"
+	stateKey := "selected"
+	selector := FeatureStateSelector{SourceID: "source", FeatureID: &featureID, StateKey: &stateKey}
+	if err := session.SetFeatureState(selector, map[string]any{"hover": true}); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("SetFeatureState(nil session) error = %v, want ErrInvalidArgument", err)
+	}
+	if _, err := session.FeatureState(selector); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("FeatureState(nil session) error = %v, want ErrInvalidArgument", err)
+	}
+	if err := session.RemoveFeatureState(selector); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("RemoveFeatureState(nil session) error = %v, want ErrInvalidArgument", err)
+	}
 	feature := Feature{Geometry: PointGeometry(LatLng{Latitude: 1, Longitude: 2}), Properties: map[string]any{"kind": "park"}, Identifier: "id"}
 	if _, err := session.QueryFeatureExtensions("source", feature, "supercluster", "children", map[string]any{"limit": uint64(1)}); !errors.Is(err, ErrInvalidArgument) {
 		t.Fatalf("QueryFeatureExtensions(nil session) error = %v, want ErrInvalidArgument", err)

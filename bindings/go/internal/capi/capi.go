@@ -519,6 +519,15 @@ type SourceFeatureQueryOptions struct {
 	Filter         any
 }
 
+// FeatureStateSelector selects feature state by source, feature, and key.
+type FeatureStateSelector struct {
+	Fields        uint32
+	SourceID      string
+	SourceLayerID string
+	FeatureID     string
+	StateKey      string
+}
+
 // QueryFeature contains one copied queried feature.
 type QueryFeature struct {
 	Feature          Feature
@@ -1060,6 +1069,12 @@ const (
 const (
 	RenderedFeatureQueryOptionLayerIDs uint32 = uint32(C.MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS)
 	SourceFeatureQueryOptionLayerIDs   uint32 = uint32(C.MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS)
+)
+
+const (
+	FeatureStateSelectorSourceLayerID uint32 = uint32(C.MLN_FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID)
+	FeatureStateSelectorFeatureID     uint32 = uint32(C.MLN_FEATURE_STATE_SELECTOR_FEATURE_ID)
+	FeatureStateSelectorStateKey      uint32 = uint32(C.MLN_FEATURE_STATE_SELECTOR_STATE_KEY)
 )
 
 const (
@@ -1837,6 +1852,38 @@ func RenderSessionQuerySourceFeatures(session *RenderSession, sourceID string, o
 		*out = features
 	}
 	return copyStatus, err
+}
+
+// RenderSessionSetFeatureState sets per-feature state on a render source.
+func RenderSessionSetFeatureState(session *RenderSession, selector FeatureStateSelector, state map[string]any) (Status, error) {
+	rawSelector := featureStateSelectorToC(selector)
+	defer rawSelector.free()
+	materializer := newJSONMaterializer()
+	defer materializer.free()
+	rawState, err := materializer.value(state)
+	if err != nil {
+		return StatusInvalidArgument, err
+	}
+	return Status(C.mln_render_session_set_feature_state((*C.mln_render_session)(unsafe.Pointer(session)), &rawSelector.value, &rawState)), nil
+}
+
+// RenderSessionGetFeatureState copies per-feature state from a render source.
+func RenderSessionGetFeatureState(session *RenderSession, selector FeatureStateSelector, out *any) Status {
+	rawSelector := featureStateSelectorToC(selector)
+	defer rawSelector.free()
+	var snapshot *C.mln_json_snapshot
+	status := Status(C.mln_render_session_get_feature_state((*C.mln_render_session)(unsafe.Pointer(session)), &rawSelector.value, &snapshot))
+	if status != StatusOK {
+		return status
+	}
+	return jsonSnapshotToValue(snapshot, out)
+}
+
+// RenderSessionRemoveFeatureState removes per-feature state from a render source.
+func RenderSessionRemoveFeatureState(session *RenderSession, selector FeatureStateSelector) Status {
+	rawSelector := featureStateSelectorToC(selector)
+	defer rawSelector.free()
+	return Status(C.mln_render_session_remove_feature_state((*C.mln_render_session)(unsafe.Pointer(session)), &rawSelector.value))
 }
 
 // RenderSessionQueryFeatureExtensions queries a feature extension and copies the result.
@@ -3004,6 +3051,14 @@ type rawSourceFeatureQueryOptions struct {
 	materializer   *jsonMaterializer
 }
 
+type rawFeatureStateSelector struct {
+	value         C.mln_feature_state_selector
+	sourceID      stringView
+	sourceLayerID stringView
+	featureID     stringView
+	stateKey      stringView
+}
+
 func newStringView(value string) stringView {
 	if len(value) == 0 {
 		return stringView{}
@@ -3178,6 +3233,32 @@ func (raw rawSourceFeatureQueryOptions) free() {
 	if raw.materializer != nil {
 		raw.materializer.free()
 	}
+}
+
+func featureStateSelectorToC(selector FeatureStateSelector) rawFeatureStateSelector {
+	raw := rawFeatureStateSelector{value: C.mln_feature_state_selector{size: C.uint32_t(unsafe.Sizeof(C.mln_feature_state_selector{})), fields: C.uint32_t(selector.Fields)}}
+	raw.sourceID = newStringView(selector.SourceID)
+	raw.value.source_id = raw.sourceID.raw()
+	if selector.Fields&FeatureStateSelectorSourceLayerID != 0 {
+		raw.sourceLayerID = newStringView(selector.SourceLayerID)
+		raw.value.source_layer_id = raw.sourceLayerID.raw()
+	}
+	if selector.Fields&FeatureStateSelectorFeatureID != 0 {
+		raw.featureID = newStringView(selector.FeatureID)
+		raw.value.feature_id = raw.featureID.raw()
+	}
+	if selector.Fields&FeatureStateSelectorStateKey != 0 {
+		raw.stateKey = newStringView(selector.StateKey)
+		raw.value.state_key = raw.stateKey.raw()
+	}
+	return raw
+}
+
+func (raw rawFeatureStateSelector) free() {
+	raw.sourceID.free()
+	raw.sourceLayerID.free()
+	raw.featureID.free()
+	raw.stateKey.free()
 }
 
 type jsonMaterializer struct {

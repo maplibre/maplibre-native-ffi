@@ -99,6 +99,31 @@ type QueriedFeature struct {
 	HasState         bool
 }
 
+// FeatureStateSelector selects feature state by source, feature, and key.
+type FeatureStateSelector struct {
+	SourceID      string
+	SourceLayerID *string
+	FeatureID     *string
+	StateKey      *string
+}
+
+func (selector FeatureStateSelector) toCAPI() capi.FeatureStateSelector {
+	raw := capi.FeatureStateSelector{SourceID: selector.SourceID}
+	if selector.SourceLayerID != nil {
+		raw.Fields |= capi.FeatureStateSelectorSourceLayerID
+		raw.SourceLayerID = *selector.SourceLayerID
+	}
+	if selector.FeatureID != nil {
+		raw.Fields |= capi.FeatureStateSelectorFeatureID
+		raw.FeatureID = *selector.FeatureID
+	}
+	if selector.StateKey != nil {
+		raw.Fields |= capi.FeatureStateSelectorStateKey
+		raw.StateKey = *selector.StateKey
+	}
+	return raw
+}
+
 // FeatureExtensionResultType identifies a feature extension result shape.
 type FeatureExtensionResultType uint32
 
@@ -193,6 +218,50 @@ func featureExtensionResultFromCAPI(result capi.FeatureExtensionResultInfo) Feat
 		out.Features[i] = featureFromCAPI(feature)
 	}
 	return out
+}
+
+// SetFeatureState sets per-feature state on a render source. The state value is
+// copied before the call returns.
+func (session *RenderSessionHandle) SetFeatureState(selector FeatureStateSelector, state map[string]any) error {
+	ptr, err := session.ptr()
+	if err != nil {
+		return err
+	}
+	defer session.state.KeepAlive()
+	var materialErr error
+	err = checkNative(func() capi.Status {
+		var status capi.Status
+		status, materialErr = capi.RenderSessionSetFeatureState(ptr, selector.toCAPI(), state)
+		return status
+	})
+	if materialErr != nil {
+		return newBindingError(ErrInvalidArgument, materialErr.Error())
+	}
+	return err
+}
+
+// FeatureState returns copied per-feature state from a render source.
+func (session *RenderSessionHandle) FeatureState(selector FeatureStateSelector) (any, error) {
+	ptr, err := session.ptr()
+	if err != nil {
+		return nil, err
+	}
+	defer session.state.KeepAlive()
+	var value any
+	if err := checkNative(func() capi.Status { return capi.RenderSessionGetFeatureState(ptr, selector.toCAPI(), &value) }); err != nil {
+		return nil, err
+	}
+	return value, nil
+}
+
+// RemoveFeatureState removes per-feature state from a render source.
+func (session *RenderSessionHandle) RemoveFeatureState(selector FeatureStateSelector) error {
+	ptr, err := session.ptr()
+	if err != nil {
+		return err
+	}
+	defer session.state.KeepAlive()
+	return checkNative(func() capi.Status { return capi.RenderSessionRemoveFeatureState(ptr, selector.toCAPI()) })
 }
 
 // QueryRenderedFeatures queries rendered features from the latest render session state.
