@@ -1231,6 +1231,60 @@ func TestStyleSourceURLAndTileBindings(t *testing.T) {
 	}
 }
 
+func TestGeoJSONSourceDataDescriptors(t *testing.T) {
+	runtime, err := NewRuntime()
+	if err != nil {
+		t.Fatalf("NewRuntime(): %v", err)
+	}
+	m, err := runtime.NewMap()
+	if err != nil {
+		_ = runtime.Close()
+		t.Fatalf("NewMap(): %v", err)
+	}
+	defer func() {
+		if err := m.Close(); err != nil {
+			t.Errorf("Map Close(): %v", err)
+		}
+		if err := runtime.Close(); err != nil {
+			t.Errorf("Runtime Close(): %v", err)
+		}
+	}()
+
+	if err := m.SetStyleJSON(`{"version":8,"sources":{},"layers":[]}`); err != nil {
+		t.Fatalf("SetStyleJSON(empty style): %v", err)
+	}
+	points := []LatLng{{Latitude: 1, Longitude: 2}, {Latitude: 3, Longitude: 4}}
+	properties := map[string]any{"name": "before", "rank": int64(7)}
+	data := GeoJSONFeatureCollection([]Feature{{
+		Geometry:   LineStringGeometry(points),
+		Properties: properties,
+		Identifier: "feature-1",
+	}})
+	if err := m.AddGeoJSONSourceData("geojson-data", data); err != nil {
+		t.Fatalf("AddGeoJSONSourceData(): %v", err)
+	}
+	points[0] = LatLng{Latitude: 90, Longitude: 90}
+	properties["name"] = "after"
+	if err := m.SetGeoJSONSourceData("geojson-data", GeoJSON{Type: GeoJSONTypeGeometry, Geometry: PointGeometry(LatLng{Latitude: 5, Longitude: 6})}); err != nil {
+		t.Fatalf("SetGeoJSONSourceData(): %v", err)
+	}
+	sourceType, found, err := m.StyleSourceType("geojson-data")
+	if err != nil {
+		t.Fatalf("StyleSourceType(geojson-data): %v", err)
+	}
+	if !found || sourceType != StyleSourceTypeGeoJSON {
+		t.Fatalf("StyleSourceType(geojson-data) = (%v, %v), want GeoJSON true", sourceType, found)
+	}
+	badID := GeoJSONFeatureCollection([]Feature{{Geometry: PointGeometry(LatLng{}), Identifier: struct{}{}}})
+	if err := m.AddGeoJSONSourceData("bad-geojson-data", badID); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("AddGeoJSONSourceData(unsupported id) error = %v, want ErrInvalidArgument", err)
+	}
+	badGeometry := GeoJSON{Type: GeoJSONTypeGeometry, Geometry: Geometry{Type: GeometryType(999)}}
+	if err := m.AddGeoJSONSourceData("bad-geometry", badGeometry); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("AddGeoJSONSourceData(unsupported geometry) error = %v, want ErrInvalidArgument", err)
+	}
+}
+
 func TestAddStyleSourceJSONCopiesGoJSONDescriptor(t *testing.T) {
 	runtime, err := NewRuntime()
 	if err != nil {

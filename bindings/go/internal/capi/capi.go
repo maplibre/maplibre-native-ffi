@@ -93,6 +93,143 @@ static inline size_t mln_go_json_object_count(const mln_json_value* value) { ret
 static inline mln_string_view mln_go_json_object_key(const mln_json_value* value, size_t index) { return value->data.object_value.members[index].key; }
 static inline const mln_json_value* mln_go_json_object_value(const mln_json_value* value, size_t index) { return value->data.object_value.members[index].value; }
 
+static inline mln_geometry mln_go_geometry_empty(void) {
+  mln_geometry geometry;
+  geometry.size = sizeof(mln_geometry);
+  geometry.type = MLN_GEOMETRY_TYPE_EMPTY;
+  return geometry;
+}
+
+static inline mln_geometry mln_go_geometry_point(mln_lat_lng point) {
+  mln_geometry geometry;
+  geometry.size = sizeof(mln_geometry);
+  geometry.type = MLN_GEOMETRY_TYPE_POINT;
+  geometry.data.point = point;
+  return geometry;
+}
+
+static inline mln_coordinate_span mln_go_coordinate_span(const mln_lat_lng* coordinates, size_t count) {
+  mln_coordinate_span span;
+  span.coordinates = coordinates;
+  span.coordinate_count = count;
+  return span;
+}
+
+static inline mln_geometry mln_go_geometry_line_string(mln_coordinate_span span) {
+  mln_geometry geometry;
+  geometry.size = sizeof(mln_geometry);
+  geometry.type = MLN_GEOMETRY_TYPE_LINE_STRING;
+  geometry.data.line_string = span;
+  return geometry;
+}
+
+static inline mln_geometry mln_go_geometry_polygon(const mln_coordinate_span* rings, size_t count) {
+  mln_geometry geometry;
+  geometry.size = sizeof(mln_geometry);
+  geometry.type = MLN_GEOMETRY_TYPE_POLYGON;
+  geometry.data.polygon.rings = rings;
+  geometry.data.polygon.ring_count = count;
+  return geometry;
+}
+
+static inline mln_geometry mln_go_geometry_multi_point(mln_coordinate_span span) {
+  mln_geometry geometry;
+  geometry.size = sizeof(mln_geometry);
+  geometry.type = MLN_GEOMETRY_TYPE_MULTI_POINT;
+  geometry.data.multi_point = span;
+  return geometry;
+}
+
+static inline mln_geometry mln_go_geometry_multi_line_string(const mln_coordinate_span* lines, size_t count) {
+  mln_geometry geometry;
+  geometry.size = sizeof(mln_geometry);
+  geometry.type = MLN_GEOMETRY_TYPE_MULTI_LINE_STRING;
+  geometry.data.multi_line_string.lines = lines;
+  geometry.data.multi_line_string.line_count = count;
+  return geometry;
+}
+
+static inline mln_geometry mln_go_geometry_multi_polygon(const mln_polygon_geometry* polygons, size_t count) {
+  mln_geometry geometry;
+  geometry.size = sizeof(mln_geometry);
+  geometry.type = MLN_GEOMETRY_TYPE_MULTI_POLYGON;
+  geometry.data.multi_polygon.polygons = polygons;
+  geometry.data.multi_polygon.polygon_count = count;
+  return geometry;
+}
+
+static inline mln_geometry mln_go_geometry_collection(const mln_geometry* geometries, size_t count) {
+  mln_geometry geometry;
+  geometry.size = sizeof(mln_geometry);
+  geometry.type = MLN_GEOMETRY_TYPE_GEOMETRY_COLLECTION;
+  geometry.data.geometry_collection.geometries = geometries;
+  geometry.data.geometry_collection.geometry_count = count;
+  return geometry;
+}
+
+static inline mln_feature mln_go_feature_null(const mln_geometry* geometry, const mln_json_member* properties, size_t count) {
+  mln_feature feature;
+  feature.size = sizeof(mln_feature);
+  feature.geometry = geometry;
+  feature.properties = properties;
+  feature.property_count = count;
+  feature.identifier_type = MLN_FEATURE_IDENTIFIER_TYPE_NULL;
+  return feature;
+}
+
+static inline mln_feature mln_go_feature_uint(const mln_geometry* geometry, const mln_json_member* properties, size_t count, uint64_t id) {
+  mln_feature feature = mln_go_feature_null(geometry, properties, count);
+  feature.identifier_type = MLN_FEATURE_IDENTIFIER_TYPE_UINT;
+  feature.identifier.uint_value = id;
+  return feature;
+}
+
+static inline mln_feature mln_go_feature_int(const mln_geometry* geometry, const mln_json_member* properties, size_t count, int64_t id) {
+  mln_feature feature = mln_go_feature_null(geometry, properties, count);
+  feature.identifier_type = MLN_FEATURE_IDENTIFIER_TYPE_INT;
+  feature.identifier.int_value = id;
+  return feature;
+}
+
+static inline mln_feature mln_go_feature_double(const mln_geometry* geometry, const mln_json_member* properties, size_t count, double id) {
+  mln_feature feature = mln_go_feature_null(geometry, properties, count);
+  feature.identifier_type = MLN_FEATURE_IDENTIFIER_TYPE_DOUBLE;
+  feature.identifier.double_value = id;
+  return feature;
+}
+
+static inline mln_feature mln_go_feature_string(const mln_geometry* geometry, const mln_json_member* properties, size_t count, mln_string_view id) {
+  mln_feature feature = mln_go_feature_null(geometry, properties, count);
+  feature.identifier_type = MLN_FEATURE_IDENTIFIER_TYPE_STRING;
+  feature.identifier.string_value = id;
+  return feature;
+}
+
+static inline mln_geojson mln_go_geojson_geometry(const mln_geometry* geometry) {
+  mln_geojson geojson;
+  geojson.size = sizeof(mln_geojson);
+  geojson.type = MLN_GEOJSON_TYPE_GEOMETRY;
+  geojson.data.geometry = geometry;
+  return geojson;
+}
+
+static inline mln_geojson mln_go_geojson_feature(const mln_feature* feature) {
+  mln_geojson geojson;
+  geojson.size = sizeof(mln_geojson);
+  geojson.type = MLN_GEOJSON_TYPE_FEATURE;
+  geojson.data.feature = feature;
+  return geojson;
+}
+
+static inline mln_geojson mln_go_geojson_feature_collection(const mln_feature* features, size_t count) {
+  mln_geojson geojson;
+  geojson.size = sizeof(mln_geojson);
+  geojson.type = MLN_GEOJSON_TYPE_FEATURE_COLLECTION;
+  geojson.data.feature_collection.features = features;
+  geojson.data.feature_collection.feature_count = count;
+  return geojson;
+}
+
 static inline mln_offline_region_definition mln_go_offline_tile_pyramid_region_definition(
   const char* style_url, mln_lat_lng_bounds bounds, double min_zoom, double max_zoom,
   float pixel_ratio, bool include_ideographs
@@ -274,6 +411,31 @@ type StyleTileSourceOptions struct {
 	TileSize       uint32
 	VectorEncoding uint32
 	RasterEncoding uint32
+}
+
+// Geometry contains a semantic GeoJSON geometry descriptor.
+type Geometry struct {
+	Type       uint32
+	Point      LatLng
+	Points     []LatLng
+	Lines      [][]LatLng
+	Polygons   [][][]LatLng
+	Geometries []Geometry
+}
+
+// Feature contains a semantic GeoJSON feature descriptor.
+type Feature struct {
+	Geometry   Geometry
+	Properties map[string]any
+	Identifier any
+}
+
+// GeoJSON contains a semantic GeoJSON root descriptor.
+type GeoJSON struct {
+	Type     uint32
+	Geometry Geometry
+	Feature  Feature
+	Features []Feature
 }
 
 // MetalOwnedTextureFrame is a copied Metal owned texture frame descriptor.
@@ -738,6 +900,23 @@ const (
 	JSONValueTypeString uint32 = uint32(C.MLN_JSON_VALUE_TYPE_STRING)
 	JSONValueTypeArray  uint32 = uint32(C.MLN_JSON_VALUE_TYPE_ARRAY)
 	JSONValueTypeObject uint32 = uint32(C.MLN_JSON_VALUE_TYPE_OBJECT)
+)
+
+const (
+	GeometryTypeEmpty              uint32 = uint32(C.MLN_GEOMETRY_TYPE_EMPTY)
+	GeometryTypePoint              uint32 = uint32(C.MLN_GEOMETRY_TYPE_POINT)
+	GeometryTypeLineString         uint32 = uint32(C.MLN_GEOMETRY_TYPE_LINE_STRING)
+	GeometryTypePolygon            uint32 = uint32(C.MLN_GEOMETRY_TYPE_POLYGON)
+	GeometryTypeMultiPoint         uint32 = uint32(C.MLN_GEOMETRY_TYPE_MULTI_POINT)
+	GeometryTypeMultiLineString    uint32 = uint32(C.MLN_GEOMETRY_TYPE_MULTI_LINE_STRING)
+	GeometryTypeMultiPolygon       uint32 = uint32(C.MLN_GEOMETRY_TYPE_MULTI_POLYGON)
+	GeometryTypeGeometryCollection uint32 = uint32(C.MLN_GEOMETRY_TYPE_GEOMETRY_COLLECTION)
+)
+
+const (
+	GeoJSONTypeGeometry          uint32 = uint32(C.MLN_GEOJSON_TYPE_GEOMETRY)
+	GeoJSONTypeFeature           uint32 = uint32(C.MLN_GEOJSON_TYPE_FEATURE)
+	GeoJSONTypeFeatureCollection uint32 = uint32(C.MLN_GEOJSON_TYPE_FEATURE_COLLECTION)
 )
 
 const (
@@ -1559,6 +1738,32 @@ func MapSetGeoJSONSourceURL(m *Map, sourceID string, url string) Status {
 	urlView := newStringView(url)
 	defer urlView.free()
 	return Status(C.mln_map_set_geojson_source_url((*C.mln_map)(unsafe.Pointer(m)), sourceView.raw(), urlView.raw()))
+}
+
+// MapAddGeoJSONSourceData adds a GeoJSON source with inline data.
+func MapAddGeoJSONSourceData(m *Map, sourceID string, data GeoJSON) (Status, error) {
+	sourceView := newStringView(sourceID)
+	defer sourceView.free()
+	materializer := newGeoJSONMaterializer()
+	defer materializer.free()
+	rawData, err := materializer.geoJSON(data)
+	if err != nil {
+		return StatusInvalidArgument, err
+	}
+	return Status(C.mln_map_add_geojson_source_data((*C.mln_map)(unsafe.Pointer(m)), sourceView.raw(), &rawData)), nil
+}
+
+// MapSetGeoJSONSourceData updates a GeoJSON source with inline data.
+func MapSetGeoJSONSourceData(m *Map, sourceID string, data GeoJSON) (Status, error) {
+	sourceView := newStringView(sourceID)
+	defer sourceView.free()
+	materializer := newGeoJSONMaterializer()
+	defer materializer.free()
+	rawData, err := materializer.geoJSON(data)
+	if err != nil {
+		return StatusInvalidArgument, err
+	}
+	return Status(C.mln_map_set_geojson_source_data((*C.mln_map)(unsafe.Pointer(m)), sourceView.raw(), &rawData)), nil
 }
 
 // MapAddVectorSourceURL adds a vector source with a TileJSON URL.
@@ -2511,22 +2716,238 @@ func (materializer *jsonMaterializer) array(values []any) (C.mln_json_value, err
 }
 
 func (materializer *jsonMaterializer) object(members map[string]any) (C.mln_json_value, error) {
+	rawMembers, count, err := materializer.members(members)
+	if err != nil {
+		return C.mln_json_value{}, err
+	}
+	return C.mln_go_json_object(rawMembers, count), nil
+}
+
+func (materializer *jsonMaterializer) members(members map[string]any) (*C.mln_json_member, C.size_t, error) {
 	if len(members) == 0 {
-		return C.mln_go_json_object(nil, 0), nil
+		return nil, 0, nil
 	}
 	rawMembers := (*C.mln_json_member)(materializer.alloc(C.size_t(len(members)) * C.size_t(unsafe.Sizeof(C.mln_json_member{}))))
 	i := 0
 	for key, item := range members {
 		rawValue, err := materializer.value(item)
 		if err != nil {
-			return C.mln_json_value{}, err
+			return nil, 0, err
 		}
 		valuePtr := (*C.mln_json_value)(materializer.alloc(C.size_t(unsafe.Sizeof(C.mln_json_value{}))))
 		*valuePtr = rawValue
 		*(*C.mln_json_member)(unsafe.Add(unsafe.Pointer(rawMembers), uintptr(i)*unsafe.Sizeof(C.mln_json_member{}))) = C.mln_go_json_member(materializer.bytes(key), valuePtr)
 		i++
 	}
-	return C.mln_go_json_object(rawMembers, C.size_t(len(members))), nil
+	return rawMembers, C.size_t(len(members)), nil
+}
+
+type geoJSONMaterializer struct {
+	json *jsonMaterializer
+}
+
+func newGeoJSONMaterializer() *geoJSONMaterializer {
+	return &geoJSONMaterializer{json: newJSONMaterializer()}
+}
+
+func (materializer *geoJSONMaterializer) free() {
+	materializer.json.free()
+}
+
+func (materializer *geoJSONMaterializer) alloc(size C.size_t) unsafe.Pointer {
+	return materializer.json.alloc(size)
+}
+
+func (materializer *geoJSONMaterializer) geoJSON(data GeoJSON) (C.mln_geojson, error) {
+	switch data.Type {
+	case GeoJSONTypeGeometry:
+		geometry, err := materializer.geometryPtr(data.Geometry)
+		if err != nil {
+			return C.mln_geojson{}, err
+		}
+		return C.mln_go_geojson_geometry(geometry), nil
+	case GeoJSONTypeFeature:
+		feature, err := materializer.featurePtr(data.Feature)
+		if err != nil {
+			return C.mln_geojson{}, err
+		}
+		return C.mln_go_geojson_feature(feature), nil
+	case GeoJSONTypeFeatureCollection:
+		features, err := materializer.features(data.Features)
+		if err != nil {
+			return C.mln_geojson{}, err
+		}
+		return C.mln_go_geojson_feature_collection(features, C.size_t(len(data.Features))), nil
+	default:
+		return C.mln_geojson{}, fmt.Errorf("unsupported GeoJSON type %d", data.Type)
+	}
+}
+
+func (materializer *geoJSONMaterializer) geometryPtr(geometry Geometry) (*C.mln_geometry, error) {
+	raw, err := materializer.geometry(geometry)
+	if err != nil {
+		return nil, err
+	}
+	ptr := (*C.mln_geometry)(materializer.alloc(C.size_t(unsafe.Sizeof(C.mln_geometry{}))))
+	*ptr = raw
+	return ptr, nil
+}
+
+func (materializer *geoJSONMaterializer) geometry(geometry Geometry) (C.mln_geometry, error) {
+	switch geometry.Type {
+	case GeometryTypeEmpty:
+		return C.mln_go_geometry_empty(), nil
+	case GeometryTypePoint:
+		return C.mln_go_geometry_point(latLngToC(geometry.Point)), nil
+	case GeometryTypeLineString:
+		return C.mln_go_geometry_line_string(materializer.coordinateSpan(geometry.Points)), nil
+	case GeometryTypePolygon:
+		rings := materializer.coordinateSpans(geometry.Lines)
+		return C.mln_go_geometry_polygon(rings, C.size_t(len(geometry.Lines))), nil
+	case GeometryTypeMultiPoint:
+		return C.mln_go_geometry_multi_point(materializer.coordinateSpan(geometry.Points)), nil
+	case GeometryTypeMultiLineString:
+		lines := materializer.coordinateSpans(geometry.Lines)
+		return C.mln_go_geometry_multi_line_string(lines, C.size_t(len(geometry.Lines))), nil
+	case GeometryTypeMultiPolygon:
+		polygons := materializer.polygonGeometries(geometry.Polygons)
+		return C.mln_go_geometry_multi_polygon(polygons, C.size_t(len(geometry.Polygons))), nil
+	case GeometryTypeGeometryCollection:
+		geometries, err := materializer.geometries(geometry.Geometries)
+		if err != nil {
+			return C.mln_geometry{}, err
+		}
+		return C.mln_go_geometry_collection(geometries, C.size_t(len(geometry.Geometries))), nil
+	default:
+		return C.mln_geometry{}, fmt.Errorf("unsupported geometry type %d", geometry.Type)
+	}
+}
+
+func (materializer *geoJSONMaterializer) coordinateSpan(points []LatLng) C.mln_coordinate_span {
+	if len(points) == 0 {
+		return C.mln_go_coordinate_span(nil, 0)
+	}
+	rawPoints := (*C.mln_lat_lng)(materializer.alloc(C.size_t(len(points)) * C.size_t(unsafe.Sizeof(C.mln_lat_lng{}))))
+	for i, point := range points {
+		*(*C.mln_lat_lng)(unsafe.Add(unsafe.Pointer(rawPoints), uintptr(i)*unsafe.Sizeof(C.mln_lat_lng{}))) = latLngToC(point)
+	}
+	return C.mln_go_coordinate_span(rawPoints, C.size_t(len(points)))
+}
+
+func (materializer *geoJSONMaterializer) coordinateSpans(lines [][]LatLng) *C.mln_coordinate_span {
+	if len(lines) == 0 {
+		return nil
+	}
+	rawLines := (*C.mln_coordinate_span)(materializer.alloc(C.size_t(len(lines)) * C.size_t(unsafe.Sizeof(C.mln_coordinate_span{}))))
+	for i, line := range lines {
+		*(*C.mln_coordinate_span)(unsafe.Add(unsafe.Pointer(rawLines), uintptr(i)*unsafe.Sizeof(C.mln_coordinate_span{}))) = materializer.coordinateSpan(line)
+	}
+	return rawLines
+}
+
+func (materializer *geoJSONMaterializer) polygonGeometries(polygons [][][]LatLng) *C.mln_polygon_geometry {
+	if len(polygons) == 0 {
+		return nil
+	}
+	rawPolygons := (*C.mln_polygon_geometry)(materializer.alloc(C.size_t(len(polygons)) * C.size_t(unsafe.Sizeof(C.mln_polygon_geometry{}))))
+	for i, polygon := range polygons {
+		rings := materializer.coordinateSpans(polygon)
+		*(*C.mln_polygon_geometry)(unsafe.Add(unsafe.Pointer(rawPolygons), uintptr(i)*unsafe.Sizeof(C.mln_polygon_geometry{}))) = C.mln_polygon_geometry{
+			rings:      rings,
+			ring_count: C.size_t(len(polygon)),
+		}
+	}
+	return rawPolygons
+}
+
+func (materializer *geoJSONMaterializer) geometries(geometries []Geometry) (*C.mln_geometry, error) {
+	if len(geometries) == 0 {
+		return nil, nil
+	}
+	rawGeometries := (*C.mln_geometry)(materializer.alloc(C.size_t(len(geometries)) * C.size_t(unsafe.Sizeof(C.mln_geometry{}))))
+	for i, geometry := range geometries {
+		rawGeometry, err := materializer.geometry(geometry)
+		if err != nil {
+			return nil, err
+		}
+		*(*C.mln_geometry)(unsafe.Add(unsafe.Pointer(rawGeometries), uintptr(i)*unsafe.Sizeof(C.mln_geometry{}))) = rawGeometry
+	}
+	return rawGeometries, nil
+}
+
+func (materializer *geoJSONMaterializer) featurePtr(feature Feature) (*C.mln_feature, error) {
+	raw, err := materializer.feature(feature)
+	if err != nil {
+		return nil, err
+	}
+	ptr := (*C.mln_feature)(materializer.alloc(C.size_t(unsafe.Sizeof(C.mln_feature{}))))
+	*ptr = raw
+	return ptr, nil
+}
+
+func (materializer *geoJSONMaterializer) feature(feature Feature) (C.mln_feature, error) {
+	geometry, err := materializer.geometryPtr(feature.Geometry)
+	if err != nil {
+		return C.mln_feature{}, err
+	}
+	properties, propertyCount, err := materializer.json.members(feature.Properties)
+	if err != nil {
+		return C.mln_feature{}, err
+	}
+	switch id := feature.Identifier.(type) {
+	case nil:
+		return C.mln_go_feature_null(geometry, properties, propertyCount), nil
+	case uint:
+		return C.mln_go_feature_uint(geometry, properties, propertyCount, C.uint64_t(id)), nil
+	case uint8:
+		return C.mln_go_feature_uint(geometry, properties, propertyCount, C.uint64_t(id)), nil
+	case uint16:
+		return C.mln_go_feature_uint(geometry, properties, propertyCount, C.uint64_t(id)), nil
+	case uint32:
+		return C.mln_go_feature_uint(geometry, properties, propertyCount, C.uint64_t(id)), nil
+	case uint64:
+		return C.mln_go_feature_uint(geometry, properties, propertyCount, C.uint64_t(id)), nil
+	case int:
+		return C.mln_go_feature_int(geometry, properties, propertyCount, C.int64_t(id)), nil
+	case int8:
+		return C.mln_go_feature_int(geometry, properties, propertyCount, C.int64_t(id)), nil
+	case int16:
+		return C.mln_go_feature_int(geometry, properties, propertyCount, C.int64_t(id)), nil
+	case int32:
+		return C.mln_go_feature_int(geometry, properties, propertyCount, C.int64_t(id)), nil
+	case int64:
+		return C.mln_go_feature_int(geometry, properties, propertyCount, C.int64_t(id)), nil
+	case float32:
+		value := float64(id)
+		if math.IsNaN(value) || math.IsInf(value, 0) {
+			return C.mln_feature{}, fmt.Errorf("feature identifier float must be finite")
+		}
+		return C.mln_go_feature_double(geometry, properties, propertyCount, C.double(value)), nil
+	case float64:
+		if math.IsNaN(id) || math.IsInf(id, 0) {
+			return C.mln_feature{}, fmt.Errorf("feature identifier float must be finite")
+		}
+		return C.mln_go_feature_double(geometry, properties, propertyCount, C.double(id)), nil
+	case string:
+		return C.mln_go_feature_string(geometry, properties, propertyCount, materializer.json.bytes(id)), nil
+	default:
+		return C.mln_feature{}, fmt.Errorf("unsupported feature identifier type %T", feature.Identifier)
+	}
+}
+
+func (materializer *geoJSONMaterializer) features(features []Feature) (*C.mln_feature, error) {
+	if len(features) == 0 {
+		return nil, nil
+	}
+	rawFeatures := (*C.mln_feature)(materializer.alloc(C.size_t(len(features)) * C.size_t(unsafe.Sizeof(C.mln_feature{}))))
+	for i, feature := range features {
+		rawFeature, err := materializer.feature(feature)
+		if err != nil {
+			return nil, err
+		}
+		*(*C.mln_feature)(unsafe.Add(unsafe.Pointer(rawFeatures), uintptr(i)*unsafe.Sizeof(C.mln_feature{}))) = rawFeature
+	}
+	return rawFeatures, nil
 }
 
 func jsonSnapshotToValue(snapshot *C.mln_json_snapshot, outValue *any) Status {

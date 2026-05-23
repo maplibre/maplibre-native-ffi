@@ -165,6 +165,46 @@ func (m *MapHandle) SetGeoJSONSourceURL(sourceID string, url string) error {
 	return checkNative(func() capi.Status { return capi.MapSetGeoJSONSourceURL(ptr, sourceID, url) })
 }
 
+// AddGeoJSONSourceData adds a GeoJSON source with inline data. Accepted data is
+// copied into MapLibre Native before the call returns.
+func (m *MapHandle) AddGeoJSONSourceData(sourceID string, data GeoJSON) error {
+	ptr, err := m.ptr()
+	if err != nil {
+		return err
+	}
+	defer m.state.KeepAlive()
+	var materialErr error
+	err = checkNative(func() capi.Status {
+		var status capi.Status
+		status, materialErr = capi.MapAddGeoJSONSourceData(ptr, sourceID, data.toCAPI())
+		return status
+	})
+	if materialErr != nil {
+		return newBindingError(ErrInvalidArgument, materialErr.Error())
+	}
+	return err
+}
+
+// SetGeoJSONSourceData updates a GeoJSON source with inline data. Accepted data
+// is copied into MapLibre Native before the call returns.
+func (m *MapHandle) SetGeoJSONSourceData(sourceID string, data GeoJSON) error {
+	ptr, err := m.ptr()
+	if err != nil {
+		return err
+	}
+	defer m.state.KeepAlive()
+	var materialErr error
+	err = checkNative(func() capi.Status {
+		var status capi.Status
+		status, materialErr = capi.MapSetGeoJSONSourceData(ptr, sourceID, data.toCAPI())
+		return status
+	})
+	if materialErr != nil {
+		return newBindingError(ErrInvalidArgument, materialErr.Error())
+	}
+	return err
+}
+
 // AddVectorSourceURL adds a vector source with a TileJSON URL.
 func (m *MapHandle) AddVectorSourceURL(sourceID string, url string, options *StyleTileSourceOptions) error {
 	ptr, err := m.ptr()

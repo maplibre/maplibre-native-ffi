@@ -49,6 +49,74 @@ type LatLngBounds struct {
 	Northeast LatLng
 }
 
+// GeometryType identifies the shape stored in a Geometry descriptor.
+type GeometryType uint32
+
+const (
+	GeometryTypeEmpty              GeometryType = GeometryType(capi.GeometryTypeEmpty)
+	GeometryTypePoint              GeometryType = GeometryType(capi.GeometryTypePoint)
+	GeometryTypeLineString         GeometryType = GeometryType(capi.GeometryTypeLineString)
+	GeometryTypePolygon            GeometryType = GeometryType(capi.GeometryTypePolygon)
+	GeometryTypeMultiPoint         GeometryType = GeometryType(capi.GeometryTypeMultiPoint)
+	GeometryTypeMultiLineString    GeometryType = GeometryType(capi.GeometryTypeMultiLineString)
+	GeometryTypeMultiPolygon       GeometryType = GeometryType(capi.GeometryTypeMultiPolygon)
+	GeometryTypeGeometryCollection GeometryType = GeometryType(capi.GeometryTypeGeometryCollection)
+)
+
+// Geometry is a GeoJSON geometry descriptor.
+type Geometry struct {
+	Type       GeometryType
+	Point      LatLng
+	Points     []LatLng
+	Lines      [][]LatLng
+	Polygons   [][][]LatLng
+	Geometries []Geometry
+}
+
+// Feature is a GeoJSON feature descriptor.
+type Feature struct {
+	Geometry   Geometry
+	Properties map[string]any
+	Identifier any
+}
+
+// GeoJSONType identifies the root GeoJSON descriptor variant.
+type GeoJSONType uint32
+
+const (
+	GeoJSONTypeGeometry          GeoJSONType = GeoJSONType(capi.GeoJSONTypeGeometry)
+	GeoJSONTypeFeature           GeoJSONType = GeoJSONType(capi.GeoJSONTypeFeature)
+	GeoJSONTypeFeatureCollection GeoJSONType = GeoJSONType(capi.GeoJSONTypeFeatureCollection)
+)
+
+// GeoJSON is a GeoJSON geometry, feature, or feature collection descriptor.
+type GeoJSON struct {
+	Type     GeoJSONType
+	Geometry Geometry
+	Feature  Feature
+	Features []Feature
+}
+
+// PointGeometry returns a point geometry descriptor.
+func PointGeometry(point LatLng) Geometry {
+	return Geometry{Type: GeometryTypePoint, Point: point}
+}
+
+// LineStringGeometry returns a line string geometry descriptor.
+func LineStringGeometry(points []LatLng) Geometry {
+	return Geometry{Type: GeometryTypeLineString, Points: points}
+}
+
+// PolygonGeometry returns a polygon geometry descriptor.
+func PolygonGeometry(rings [][]LatLng) Geometry {
+	return Geometry{Type: GeometryTypePolygon, Lines: rings}
+}
+
+// GeoJSONFeatureCollection returns a feature collection GeoJSON descriptor.
+func GeoJSONFeatureCollection(features []Feature) GeoJSON {
+	return GeoJSON{Type: GeoJSONTypeFeatureCollection, Features: features}
+}
+
 func (coordinate LatLng) toCAPI() capi.LatLng {
 	return capi.LatLng{Latitude: coordinate.Latitude, Longitude: coordinate.Longitude}
 }
@@ -103,4 +171,68 @@ func (bounds LatLngBounds) toCAPI() capi.LatLngBounds {
 
 func latLngBoundsFromCAPI(bounds capi.LatLngBounds) LatLngBounds {
 	return LatLngBounds{Southwest: latLngFromCAPI(bounds.Southwest), Northeast: latLngFromCAPI(bounds.Northeast)}
+}
+
+func (geometry Geometry) toCAPI() capi.Geometry {
+	return capi.Geometry{
+		Type:       uint32(geometry.Type),
+		Point:      geometry.Point.toCAPI(),
+		Points:     latLngSliceToCAPI(geometry.Points),
+		Lines:      latLngLinesToCAPI(geometry.Lines),
+		Polygons:   latLngPolygonsToCAPI(geometry.Polygons),
+		Geometries: geometriesToCAPI(geometry.Geometries),
+	}
+}
+
+func (feature Feature) toCAPI() capi.Feature {
+	return capi.Feature{Geometry: feature.Geometry.toCAPI(), Properties: feature.Properties, Identifier: feature.Identifier}
+}
+
+func (geojson GeoJSON) toCAPI() capi.GeoJSON {
+	return capi.GeoJSON{
+		Type:     uint32(geojson.Type),
+		Geometry: geojson.Geometry.toCAPI(),
+		Feature:  geojson.Feature.toCAPI(),
+		Features: featuresToCAPI(geojson.Features),
+	}
+}
+
+func latLngSliceToCAPI(points []LatLng) []capi.LatLng {
+	out := make([]capi.LatLng, len(points))
+	for i, point := range points {
+		out[i] = point.toCAPI()
+	}
+	return out
+}
+
+func latLngLinesToCAPI(lines [][]LatLng) [][]capi.LatLng {
+	out := make([][]capi.LatLng, len(lines))
+	for i, line := range lines {
+		out[i] = latLngSliceToCAPI(line)
+	}
+	return out
+}
+
+func latLngPolygonsToCAPI(polygons [][][]LatLng) [][][]capi.LatLng {
+	out := make([][][]capi.LatLng, len(polygons))
+	for i, polygon := range polygons {
+		out[i] = latLngLinesToCAPI(polygon)
+	}
+	return out
+}
+
+func geometriesToCAPI(geometries []Geometry) []capi.Geometry {
+	out := make([]capi.Geometry, len(geometries))
+	for i, geometry := range geometries {
+		out[i] = geometry.toCAPI()
+	}
+	return out
+}
+
+func featuresToCAPI(features []Feature) []capi.Feature {
+	out := make([]capi.Feature, len(features))
+	for i, feature := range features {
+		out[i] = feature.toCAPI()
+	}
+	return out
 }
