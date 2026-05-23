@@ -71,16 +71,48 @@ loop.
   package/platform, so the hook remains a normal unexported package file with an
   explanatory test-only comment.
 
+## Deferred finding interview outcomes
+
+These findings were out of scope for the completed review loop because they
+needed explicit lifetime or API decisions. The follow-up interview resolved the
+next design direction for each finding without implementing the changes.
+
+### Resource-transform replacement URL storage
+
+Direction: investigate native ownership before changing Go storage. The desired
+contract is that native code copies a replacement URL during the transform
+callback. If inspection shows native already does this, Go can bound replacement
+URL storage to the callback scope. If native still borrows past the callback,
+first assess whether making C/C++ copy immediately is small and ABI-compatible.
+If that native change is broad, keep Go's conservative retention and document
+the required C lifetime change for a later design pass.
+
+### Custom geometry callbacks after asynchronous `SetStyleURL`
+
+Decision: mirror the Java FFM binding lifecycle. Go should retain custom
+geometry callback state on the map, release it on explicit source removal,
+`SetStyleJSON`, and map close, and release detached custom geometry sources
+after asynchronous `SetStyleURL` when `RuntimeHandle.PollEvent` observes
+`RuntimeEventMapStyleLoaded`. This requires a runtime map registry so the event
+source can be mapped back to its `MapHandle`.
+
+Cleanup should be best-effort, matching Java FFM. On
+`RuntimeEventMapStyleLoaded`, query each retained custom geometry source.
+Release callback state when the source is missing or its current type is not
+`StyleSourceTypeCustomVector`. If a source-type query fails, keep the callback
+state for a later event or map close; `PollEvent` should still deliver the event
+rather than fail because cleanup had a query error.
+
 ## User-input-needed findings
 
-These are recorded for future design work rather than silently implemented in
-this review loop. They require explicit C/Go lifetime or API decisions before a
-safe bounded implementation.
+The interview resolved the preferred directions above. Implementation still
+requires code changes and validation, so these items remain deferred until a
+follow-up implementation pass.
 
-- Bounded resource-transform replacement URL storage needs an explicit C/Go
-  lifetime design.
-- URL-style custom-geometry callback release timing after asynchronous
-  `SetStyleURL` needs lifecycle/API design input.
+- Bounded resource-transform replacement URL storage needs native ownership
+  investigation before Go storage changes.
+- URL-style custom-geometry callback release should mirror Java FFM with
+  event-driven, best-effort cleanup after `RuntimeEventMapStyleLoaded`.
 
 ## Final no-actionable review evidence
 
