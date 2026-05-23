@@ -7,6 +7,8 @@ package capi
 #include <stdlib.h>
 #include "maplibre_native_c.h"
 
+static inline void* mln_go_ptr(uintptr_t value) { return (void*)value; }
+
 static inline mln_offline_region_definition mln_go_offline_tile_pyramid_region_definition(
   const char* style_url, mln_lat_lng_bounds bounds, double min_zoom, double max_zoom,
   float pixel_ratio, bool include_ideographs
@@ -48,6 +50,9 @@ type Map struct{ _ byte }
 // Projection is an opaque native map projection handle.
 type Projection struct{ _ byte }
 
+// RenderSession is an opaque native render session handle.
+type RenderSession struct{ _ byte }
+
 // RuntimeOptions contains semantic runtime creation options.
 type RuntimeOptions struct {
 	AssetPath        string
@@ -81,6 +86,41 @@ type EdgeInsets struct {
 	Left   float64
 	Bottom float64
 	Right  float64
+}
+
+// RenderTargetExtent is a logical render target extent.
+type RenderTargetExtent struct {
+	Width       uint32
+	Height      uint32
+	ScaleFactor float64
+}
+
+// MetalContextDescriptor contains Metal backend context handles.
+type MetalContextDescriptor struct {
+	Device uintptr
+}
+
+// VulkanContextDescriptor contains Vulkan backend context handles.
+type VulkanContextDescriptor struct {
+	Instance                 uintptr
+	PhysicalDevice           uintptr
+	Device                   uintptr
+	GraphicsQueue            uintptr
+	GraphicsQueueFamilyIndex uint32
+}
+
+// MetalSurfaceDescriptor contains Metal surface attachment fields.
+type MetalSurfaceDescriptor struct {
+	Extent  RenderTargetExtent
+	Context MetalContextDescriptor
+	Layer   uintptr
+}
+
+// VulkanSurfaceDescriptor contains Vulkan surface attachment fields.
+type VulkanSurfaceDescriptor struct {
+	Extent  RenderTargetExtent
+	Context VulkanContextDescriptor
+	Surface uintptr
 }
 
 // ProjectedMeters is a spherical Mercator coordinate in meters.
@@ -1116,6 +1156,63 @@ func MapDestroy(m *Map) Status {
 	return Status(C.mln_map_destroy((*C.mln_map)(unsafe.Pointer(m))))
 }
 
+// MetalSurfaceAttach attaches a Metal surface render target to a map.
+func MetalSurfaceAttach(m *Map, descriptor MetalSurfaceDescriptor, out **RenderSession) Status {
+	rawDescriptor := metalSurfaceDescriptorToC(descriptor)
+	var rawSession *C.mln_render_session
+	status := Status(C.mln_metal_surface_attach((*C.mln_map)(unsafe.Pointer(m)), &rawDescriptor, &rawSession))
+	if status == StatusOK {
+		*out = (*RenderSession)(unsafe.Pointer(rawSession))
+	}
+	return status
+}
+
+// VulkanSurfaceAttach attaches a Vulkan surface render target to a map.
+func VulkanSurfaceAttach(m *Map, descriptor VulkanSurfaceDescriptor, out **RenderSession) Status {
+	rawDescriptor := vulkanSurfaceDescriptorToC(descriptor)
+	var rawSession *C.mln_render_session
+	status := Status(C.mln_vulkan_surface_attach((*C.mln_map)(unsafe.Pointer(m)), &rawDescriptor, &rawSession))
+	if status == StatusOK {
+		*out = (*RenderSession)(unsafe.Pointer(rawSession))
+	}
+	return status
+}
+
+// RenderSessionResize resizes a render session target.
+func RenderSessionResize(session *RenderSession, extent RenderTargetExtent) Status {
+	return Status(C.mln_render_session_resize((*C.mln_render_session)(unsafe.Pointer(session)), C.uint32_t(extent.Width), C.uint32_t(extent.Height), C.double(extent.ScaleFactor)))
+}
+
+// RenderSessionRenderUpdate renders one frame/update into the attached target.
+func RenderSessionRenderUpdate(session *RenderSession) Status {
+	return Status(C.mln_render_session_render_update((*C.mln_render_session)(unsafe.Pointer(session))))
+}
+
+// RenderSessionDetach detaches a render session target.
+func RenderSessionDetach(session *RenderSession) Status {
+	return Status(C.mln_render_session_detach((*C.mln_render_session)(unsafe.Pointer(session))))
+}
+
+// RenderSessionDestroy destroys a render session.
+func RenderSessionDestroy(session *RenderSession) Status {
+	return Status(C.mln_render_session_destroy((*C.mln_render_session)(unsafe.Pointer(session))))
+}
+
+// RenderSessionReduceMemoryUse asks the session to reduce memory use.
+func RenderSessionReduceMemoryUse(session *RenderSession) Status {
+	return Status(C.mln_render_session_reduce_memory_use((*C.mln_render_session)(unsafe.Pointer(session))))
+}
+
+// RenderSessionClearData clears render-session data.
+func RenderSessionClearData(session *RenderSession) Status {
+	return Status(C.mln_render_session_clear_data((*C.mln_render_session)(unsafe.Pointer(session))))
+}
+
+// RenderSessionDumpDebugLogs dumps render-session debug logs.
+func RenderSessionDumpDebugLogs(session *RenderSession) Status {
+	return Status(C.mln_render_session_dump_debug_logs((*C.mln_render_session)(unsafe.Pointer(session))))
+}
+
 // MapSetStyleURL loads a style URL.
 func MapSetStyleURL(m *Map, url string) Status {
 	cURL := C.CString(url)
@@ -1554,6 +1651,49 @@ func edgeInsetsToC(insets EdgeInsets) C.mln_edge_insets {
 
 func edgeInsetsFromC(insets C.mln_edge_insets) EdgeInsets {
 	return EdgeInsets{Top: float64(insets.top), Left: float64(insets.left), Bottom: float64(insets.bottom), Right: float64(insets.right)}
+}
+
+func renderTargetExtentToC(extent RenderTargetExtent) C.mln_render_target_extent {
+	raw := C.mln_render_target_extent{}
+	raw.size = C.uint32_t(unsafe.Sizeof(C.mln_render_target_extent{}))
+	raw.width = C.uint32_t(extent.Width)
+	raw.height = C.uint32_t(extent.Height)
+	raw.scale_factor = C.double(extent.ScaleFactor)
+	return raw
+}
+
+func metalContextDescriptorToC(context MetalContextDescriptor) C.mln_metal_context_descriptor {
+	raw := C.mln_metal_context_descriptor{}
+	raw.size = C.uint32_t(unsafe.Sizeof(C.mln_metal_context_descriptor{}))
+	raw.device = C.mln_go_ptr(C.uintptr_t(context.Device))
+	return raw
+}
+
+func vulkanContextDescriptorToC(context VulkanContextDescriptor) C.mln_vulkan_context_descriptor {
+	raw := C.mln_vulkan_context_descriptor{}
+	raw.size = C.uint32_t(unsafe.Sizeof(C.mln_vulkan_context_descriptor{}))
+	raw.instance = C.mln_go_ptr(C.uintptr_t(context.Instance))
+	raw.physical_device = C.mln_go_ptr(C.uintptr_t(context.PhysicalDevice))
+	raw.device = C.mln_go_ptr(C.uintptr_t(context.Device))
+	raw.graphics_queue = C.mln_go_ptr(C.uintptr_t(context.GraphicsQueue))
+	raw.graphics_queue_family_index = C.uint32_t(context.GraphicsQueueFamilyIndex)
+	return raw
+}
+
+func metalSurfaceDescriptorToC(descriptor MetalSurfaceDescriptor) C.mln_metal_surface_descriptor {
+	raw := C.mln_metal_surface_descriptor_default()
+	raw.extent = renderTargetExtentToC(descriptor.Extent)
+	raw.context = metalContextDescriptorToC(descriptor.Context)
+	raw.layer = C.mln_go_ptr(C.uintptr_t(descriptor.Layer))
+	return raw
+}
+
+func vulkanSurfaceDescriptorToC(descriptor VulkanSurfaceDescriptor) C.mln_vulkan_surface_descriptor {
+	raw := C.mln_vulkan_surface_descriptor_default()
+	raw.extent = renderTargetExtentToC(descriptor.Extent)
+	raw.context = vulkanContextDescriptorToC(descriptor.Context)
+	raw.surface = C.mln_go_ptr(C.uintptr_t(descriptor.Surface))
+	return raw
 }
 
 func viewportOptionsFromC(options C.mln_map_viewport_options) ViewportOptions {
