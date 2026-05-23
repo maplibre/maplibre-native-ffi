@@ -32,10 +32,10 @@ public static unsafe class Maplibre
     }
 
     /// <summary>Returns the render backends compiled into the native library.</summary>
-    public static RenderBackend SupportedRenderBackends()
+    public static Render.RenderBackend SupportedRenderBackends()
     {
         NativeLibraryLoader.EnsureLoaded();
-        return (RenderBackend)NativeMethods.MlnSupportedRenderBackendMask();
+        return (Render.RenderBackend)NativeMethods.MlnSupportedRenderBackendMask();
     }
 
     /// <summary>Reads MapLibre Native's process-global network status.</summary>

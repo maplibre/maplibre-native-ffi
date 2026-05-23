@@ -56,7 +56,6 @@ bindings/dotnet/
     Maplibre.cs
     NativePointer.cs
     NetworkStatus.cs
-    RenderBackend.cs
     Error/
       InvalidArgumentException.cs
       InvalidStateException.cs
