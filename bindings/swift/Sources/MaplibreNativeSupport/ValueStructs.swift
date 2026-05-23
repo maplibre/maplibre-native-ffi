@@ -10,6 +10,37 @@ public enum NativeJSONValue: Equatable, Sendable {
   case string(String)
   case array([NativeJSONValue])
   case object([NativeJSONMember])
+
+  public init(copying raw: mln_json_value) throws {
+    switch raw.type {
+    case MLN_JSON_VALUE_TYPE_NULL.rawValue:
+      self = .null
+    case MLN_JSON_VALUE_TYPE_BOOL.rawValue:
+      self = .bool(raw.data.bool_value)
+    case MLN_JSON_VALUE_TYPE_UINT.rawValue:
+      self = .uint(raw.data.uint_value)
+    case MLN_JSON_VALUE_TYPE_INT.rawValue:
+      self = .int(raw.data.int_value)
+    case MLN_JSON_VALUE_TYPE_DOUBLE.rawValue:
+      self = .double(raw.data.double_value)
+    case MLN_JSON_VALUE_TYPE_STRING.rawValue:
+      self = .string(try NativeString.copyUTF8(data: raw.data.string_value.data, size: raw.data.string_value.size))
+    case MLN_JSON_VALUE_TYPE_ARRAY.rawValue:
+      let array = raw.data.array_value
+      let values = (0..<array.value_count).map { index in
+        array.values![index]
+      }
+      self = .array(try values.map { try NativeJSONValue(copying: $0) })
+    case MLN_JSON_VALUE_TYPE_OBJECT.rawValue:
+      let object = raw.data.object_value
+      let members = try (0..<object.member_count).map { index in
+        try NativeJSONMember(copying: object.members![index])
+      }
+      self = .object(members)
+    default:
+      throw NativeStatusFailure(rawStatus: 0, diagnostic: "unknown JSON value type \(raw.type)")
+    }
+  }
 }
 
 public struct NativeJSONMember: Equatable, Sendable {
@@ -19,6 +50,11 @@ public struct NativeJSONMember: Equatable, Sendable {
   public init(key: String, value: NativeJSONValue) {
     self.key = key
     self.value = value
+  }
+
+  public init(copying raw: mln_json_member) throws {
+    key = try NativeString.copyUTF8(data: raw.key.data, size: raw.key.size)
+    value = try NativeJSONValue(copying: raw.value.pointee)
   }
 }
 
@@ -114,6 +150,26 @@ public enum NativeGeometry: Equatable, Sendable {
   case point(NativeLatLng)
   case lineString([NativeLatLng])
   case polygon([[NativeLatLng]])
+
+  public init(copying raw: mln_geometry) throws {
+    switch raw.type {
+    case MLN_GEOMETRY_TYPE_EMPTY.rawValue:
+      self = .empty
+    case MLN_GEOMETRY_TYPE_POINT.rawValue:
+      self = .point(NativeLatLng(raw.data.point))
+    case MLN_GEOMETRY_TYPE_LINE_STRING.rawValue:
+      let span = raw.data.line_string
+      self = .lineString((0..<span.coordinate_count).map { NativeLatLng(span.coordinates![$0]) })
+    case MLN_GEOMETRY_TYPE_POLYGON.rawValue:
+      let polygon = raw.data.polygon
+      self = .polygon((0..<polygon.ring_count).map { ringIndex in
+        let ring = polygon.rings![ringIndex]
+        return (0..<ring.coordinate_count).map { NativeLatLng(ring.coordinates![$0]) }
+      })
+    default:
+      throw NativeStatusFailure(rawStatus: 0, diagnostic: "unsupported geometry type \(raw.type)")
+    }
+  }
 }
 
 public enum NativeFeatureIdentifier: Equatable, Sendable {
@@ -138,6 +194,27 @@ public struct NativeFeature: Equatable, Sendable {
     self.properties = properties
     self.identifier = identifier
   }
+
+  public init(copying raw: mln_feature) throws {
+    geometry = try NativeGeometry(copying: raw.geometry.pointee)
+    properties = try (0..<raw.property_count).map { index in
+      try NativeJSONMember(copying: raw.properties![index])
+    }
+    switch raw.identifier_type {
+    case MLN_FEATURE_IDENTIFIER_TYPE_NULL.rawValue:
+      identifier = .none
+    case MLN_FEATURE_IDENTIFIER_TYPE_UINT.rawValue:
+      identifier = .uint(raw.identifier.uint_value)
+    case MLN_FEATURE_IDENTIFIER_TYPE_INT.rawValue:
+      identifier = .int(raw.identifier.int_value)
+    case MLN_FEATURE_IDENTIFIER_TYPE_DOUBLE.rawValue:
+      identifier = .double(raw.identifier.double_value)
+    case MLN_FEATURE_IDENTIFIER_TYPE_STRING.rawValue:
+      identifier = .string(try NativeString.copyUTF8(data: raw.identifier.string_value.data, size: raw.identifier.string_value.size))
+    default:
+      throw NativeStatusFailure(rawStatus: 0, diagnostic: "unknown feature identifier type \(raw.identifier_type)")
+    }
+  }
 }
 
 public enum NativeGeoJSON: Equatable, Sendable {
@@ -151,6 +228,26 @@ public struct NativeQueriedFeature: Equatable, Sendable {
   public let sourceId: String?
   public let sourceLayerId: String?
   public let state: NativeJSONValue?
+
+  public init(feature: NativeFeature, sourceId: String? = nil, sourceLayerId: String? = nil, state: NativeJSONValue? = nil) {
+    self.feature = feature
+    self.sourceId = sourceId
+    self.sourceLayerId = sourceLayerId
+    self.state = state
+  }
+
+  public init(copying raw: mln_queried_feature) throws {
+    feature = try NativeFeature(copying: raw.feature)
+    sourceId = (raw.fields & MLN_QUERIED_FEATURE_SOURCE_ID.rawValue) != 0
+      ? try NativeString.copyUTF8(data: raw.source_id.data, size: raw.source_id.size)
+      : nil
+    sourceLayerId = (raw.fields & MLN_QUERIED_FEATURE_SOURCE_LAYER_ID.rawValue) != 0
+      ? try NativeString.copyUTF8(data: raw.source_layer_id.data, size: raw.source_layer_id.size)
+      : nil
+    state = (raw.fields & MLN_QUERIED_FEATURE_STATE.rawValue) != 0 && raw.state != nil
+      ? try NativeJSONValue(copying: raw.state.pointee)
+      : nil
+  }
 }
 
 public enum NativeFeatureExtensionResult: Equatable, Sendable {

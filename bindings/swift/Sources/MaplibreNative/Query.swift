@@ -1,2 +1,145 @@
-// Rendered, source, and extension query descriptors and copied result values
-// will live here.
+import MaplibreNativeSupport
+
+public enum RenderedQueryGeometry: Equatable, Sendable {
+  case point(ScreenPoint)
+  case box(min: ScreenPoint, max: ScreenPoint)
+  case lineString([ScreenPoint])
+
+  var nativeGeometry: NativeRenderedQueryGeometry {
+    switch self {
+    case .point(let point): .point(point.nativeInput)
+    case .box(let min, let max): .box(min: min.nativeInput, max: max.nativeInput)
+    case .lineString(let points): .lineString(points.map(\.nativeInput))
+    }
+  }
+}
+
+public struct RenderedFeatureQueryOptions: Equatable, Sendable {
+  public var layerIds: [String]
+  public var filter: JSONValue?
+
+  public init(layerIds: [String] = [], filter: JSONValue? = nil) {
+    self.layerIds = layerIds
+    self.filter = filter
+  }
+
+  var nativeOptions: NativeRenderedFeatureQueryOptions {
+    NativeRenderedFeatureQueryOptions(layerIds: layerIds, filter: filter?.nativeValue)
+  }
+}
+
+public struct SourceFeatureQueryOptions: Equatable, Sendable {
+  public var sourceLayerIds: [String]
+  public var filter: JSONValue?
+
+  public init(sourceLayerIds: [String] = [], filter: JSONValue? = nil) {
+    self.sourceLayerIds = sourceLayerIds
+    self.filter = filter
+  }
+
+  var nativeOptions: NativeSourceFeatureQueryOptions {
+    NativeSourceFeatureQueryOptions(sourceLayerIds: sourceLayerIds, filter: filter?.nativeValue)
+  }
+}
+
+public struct QueriedFeature: Equatable, Sendable {
+  public let feature: Feature
+  public let sourceId: String?
+  public let sourceLayerId: String?
+  public let state: JSONValue?
+
+  init(native: NativeQueriedFeature) {
+    feature = Feature(native: native.feature)
+    sourceId = native.sourceId
+    sourceLayerId = native.sourceLayerId
+    state = native.state.map(JSONValue.init(native:))
+  }
+}
+
+extension JSONValue {
+  init(native: NativeJSONValue) {
+    switch native {
+    case .null: self = .null
+    case .bool(let value): self = .bool(value)
+    case .uint(let value): self = .uint(value)
+    case .int(let value): self = .int(value)
+    case .double(let value): self = .double(value)
+    case .string(let value): self = .string(value)
+    case .array(let values): self = .array(values.map(JSONValue.init(native:)))
+    case .object(let members): self = .object(members.map { JSONMember(key: $0.key, value: JSONValue(native: $0.value)) })
+    }
+  }
+}
+
+extension Geometry {
+  init(native: NativeGeometry) {
+    switch native {
+    case .empty: self = .empty
+    case .point(let point): self = .point(LatLng(native: point))
+    case .lineString(let coordinates): self = .lineString(coordinates.map(LatLng.init(native:)))
+    case .polygon(let rings): self = .polygon(rings.map { $0.map(LatLng.init(native:)) })
+    }
+  }
+}
+
+extension FeatureIdentifier {
+  init(native: NativeFeatureIdentifier) {
+    switch native {
+    case .none: self = .none
+    case .uint(let value): self = .uint(value)
+    case .int(let value): self = .int(value)
+    case .double(let value): self = .double(value)
+    case .string(let value): self = .string(value)
+    }
+  }
+}
+
+extension Feature {
+  init(native: NativeFeature) {
+    self.init(
+      geometry: Geometry(native: native.geometry),
+      properties: native.properties.map { JSONMember(key: $0.key, value: JSONValue(native: $0.value)) },
+      identifier: FeatureIdentifier(native: native.identifier)
+    )
+  }
+}
+
+extension RenderSessionHandle {
+  public func queryRenderedFeatures(
+    geometry: RenderedQueryGeometry,
+    options: RenderedFeatureQueryOptions = RenderedFeatureQueryOptions()
+  ) throws -> [QueriedFeature] {
+    try mapNativeFailure {
+      try geometry.nativeGeometry.withNativeGeometry { nativeGeometry in
+        try options.nativeOptions.withNativeOptions { nativeOptions in
+          let result = try CAPI.renderSessionQueryRenderedFeatures(
+            session: try requireLivePointer(),
+            geometry: nativeGeometry,
+            options: nativeOptions
+          )
+          defer { CAPI.featureQueryResultDestroy(result) }
+          return try NativeFeatureQueryResultReader(handle: result).copyFeatures().map(QueriedFeature.init(native:))
+        }
+      }
+    }
+  }
+
+  public func querySourceFeatures(
+    sourceId: String,
+    options: SourceFeatureQueryOptions = SourceFeatureQueryOptions()
+  ) throws -> [QueriedFeature] {
+    try mapNativeFailure {
+      let arena = NativeJSONArena()
+      let sourceId = arena.view(sourceId)
+      return try options.nativeOptions.withNativeOptions { nativeOptions in
+        let result = try CAPI.renderSessionQuerySourceFeatures(
+          session: try requireLivePointer(),
+          sourceId: sourceId,
+          options: nativeOptions
+        )
+        defer { CAPI.featureQueryResultDestroy(result) }
+        return try NativeFeatureQueryResultReader(handle: result).copyFeatures().map(QueriedFeature.init(native:))
+      }
+    }
+  }
+}

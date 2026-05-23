@@ -449,4 +449,50 @@ public enum CAPI {
   ) throws {
     try checkStatus(mln_vulkan_owned_texture_release_frame(session, frame))
   }
+
+  public static func renderSessionQueryRenderedFeatures(
+    session: OpaquePointer,
+    geometry: UnsafePointer<mln_rendered_query_geometry>,
+    options: UnsafePointer<mln_rendered_feature_query_options>?
+  ) throws -> OpaquePointer {
+    let output = try NativeMemory.withTemporary(Optional<OpaquePointer>.none) { result in
+      try checkStatus(mln_render_session_query_rendered_features(session, geometry, options, result))
+    }
+    guard let result = output.value else {
+      throw NativeStatusFailure(rawStatus: 0, diagnostic: "rendered feature query returned a null result")
+    }
+    return result
+  }
+
+  public static func renderSessionQuerySourceFeatures(
+    session: OpaquePointer,
+    sourceId: mln_string_view,
+    options: UnsafePointer<mln_source_feature_query_options>?
+  ) throws -> OpaquePointer {
+    let output = try NativeMemory.withTemporary(Optional<OpaquePointer>.none) { result in
+      try checkStatus(mln_render_session_query_source_features(session, sourceId, options, result))
+    }
+    guard let result = output.value else {
+      throw NativeStatusFailure(rawStatus: 0, diagnostic: "source feature query returned a null result")
+    }
+    return result
+  }
+
+  public static func featureQueryResultCount(_ result: OpaquePointer) throws -> Int {
+    let output = try NativeMemory.withTemporary(0) { count in
+      try checkStatus(mln_feature_query_result_count(result, count))
+    }
+    return output.value
+  }
+
+  public static func featureQueryResultGet(_ result: OpaquePointer, index: Int) throws -> NativeQueriedFeature {
+    var feature = mln_queried_feature()
+    feature.size = UInt32(MemoryLayout<mln_queried_feature>.size)
+    try checkStatus(mln_feature_query_result_get(result, index, &feature))
+    return try NativeQueriedFeature(copying: feature)
+  }
+
+  public static func featureQueryResultDestroy(_ result: OpaquePointer) {
+    mln_feature_query_result_destroy(result)
+  }
 }
