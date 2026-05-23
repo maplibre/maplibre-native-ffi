@@ -1,8 +1,11 @@
 # Generated declarations
 
-ClangSharp-generated C declarations will live in this directory. Keep generated
+ClangSharp-generated C declarations live in this directory. Keep generated
 constants, layouts, opaque pointer types, and raw functions internal to the
 binding.
 
-The current scaffold uses a small handwritten `LibraryImport` slice in
-`Internal/C/NativeMethods.cs` until the ClangSharp generation task lands.
+Refresh them with:
+
+```sh
+mise run //bindings/dotnet:generate
+```

@@ -1,5 +1,11 @@
+[tasks.generate]
+run = "scripts/generate-clangsharp.sh"
+
 [tasks.build]
 run = "dotnet build Maplibre.Native.slnx"
 
+[tasks.test]
+run = "dotnet test Maplibre.Native.slnx"
+
 [tasks.ci]
-depends = [":build"]
+depends = [":test"]

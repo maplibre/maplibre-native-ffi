@@ -47,8 +47,10 @@ this package.
 ```text
 bindings/dotnet/
   SPEC.md
+  dotnet-tools.json
   Maplibre.Native.slnx
   mise.toml
+  scripts/generate-clangsharp.sh
   src/Maplibre.Native/
     Maplibre.Native.csproj
     Maplibre.cs
@@ -63,10 +65,16 @@ bindings/dotnet/
       NativeErrorException.cs
       UnsupportedFeatureException.cs
       WrongThreadException.cs
-    Generated/README.md
+    Generated/
+      *.g.cs
+      NativeAttributes.cs
+      README.md
     Internal/C/NativeMethods.cs
     Internal/Loader/NativeLibraryLoader.cs
     Internal/Status/NativeStatus.cs
+  tests/Maplibre.Native.Tests/
+    GeneratedLayoutTests.cs
+    Maplibre.Native.Tests.csproj
 ```
 
 The scaffold implements one proof slice:
@@ -84,31 +92,35 @@ The scaffold implements one proof slice:
   non-OK status.
 - `NativePointer` is a borrowed opaque address value with no memory access in
   the public API.
-- `Generated/README.md` reserves the location for future ClangSharp output.
+- ClangSharp-generated files in `Generated/*.g.cs` cover the public C headers.
+- `GeneratedLayoutTests` verifies layout-sensitive binding facts that do not
+  require the native library.
 
 ## Build artifacts and tasks
 
-| Artifact          | Path                            | Contents                                                                   |
-| ----------------- | ------------------------------- | -------------------------------------------------------------------------- |
-| .NET solution     | `bindings/dotnet`               | Binding solution and mise task root.                                       |
-| Public library    | `src/Maplibre.Native`           | Public C# API, internal interop, loader, status conversion, future tests.  |
-| Generated C layer | `src/Maplibre.Native/Generated` | Reserved for future ClangSharp declarations kept internal to the assembly. |
+| Artifact          | Path                            | Contents                                                                  |
+| ----------------- | ------------------------------- | ------------------------------------------------------------------------- |
+| .NET solution     | `bindings/dotnet`               | Binding solution and mise task root.                                      |
+| Public library    | `src/Maplibre.Native`           | Public C# API, internal interop, loader, status conversion, future tests. |
+| Generated C layer | `src/Maplibre.Native/Generated` | ClangSharp declarations kept internal to the assembly.                    |
+| Test project      | `tests/Maplibre.Native.Tests`   | Binding tests and generated layout smoke tests.                           |
 
 Implemented tasks:
 
-| Task                                | Required behavior                         |
-| ----------------------------------- | ----------------------------------------- |
-| `mise run //bindings/dotnet:build`  | Build `Maplibre.Native.slnx`.             |
-| `mise run //bindings/dotnet:ci`     | Run the binding's current CI check slice. |
-| `dotnet build Maplibre.Native.slnx` | Build the .NET library from this folder.  |
+| Task                                  | Required behavior                                                     |
+| ------------------------------------- | --------------------------------------------------------------------- |
+| `mise run //bindings/dotnet:generate` | Refresh ClangSharp declarations from `include/maplibre_native_c/*.h`. |
+| `mise run //bindings/dotnet:build`    | Build `Maplibre.Native.slnx`.                                         |
+| `mise run //bindings/dotnet:test`     | Run current .NET tests.                                               |
+| `mise run //bindings/dotnet:ci`       | Run the binding's current CI check slice.                             |
+| `dotnet build Maplibre.Native.slnx`   | Build the .NET solution from this folder.                             |
+| `dotnet test Maplibre.Native.slnx`    | Run the .NET solution tests from this folder.                         |
 
 Planned tasks:
 
-| Task                                  | Required behavior                                                        |
-| ------------------------------------- | ------------------------------------------------------------------------ |
-| `mise run //bindings/dotnet:generate` | Refresh ClangSharp declarations from `include/maplibre_native_c.h`.      |
-| `mise run //bindings/dotnet:test`     | Build the native library and run .NET tests against the real C artifact. |
-| `mise run //bindings/dotnet:pack`     | Produce the NuGet package after native artifact distribution is defined. |
+| Task                              | Required behavior                                                        |
+| --------------------------------- | ------------------------------------------------------------------------ |
+| `mise run //bindings/dotnet:pack` | Produce the NuGet package after native artifact distribution is defined. |
 
 Package consumers provide the platform C library according to the future native
 artifact policy. Local tests load the repository build artifact selected by
@@ -187,11 +199,11 @@ Binding-owned validation failures that do not come from C use the matching
 Record C#-specific differences here. Keep the `None` row only when the binding
 intentionally mirrors the public C ABI coverage for all supported features.
 
-| Item                   | Difference or omission                                                                  | Reason                                                                            | User-visible behavior                                                                                   | Tests/docs impact                                       |
-| ---------------------- | --------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
-| Finalizers             | Thread-affine handles use leak reporting, not finalizer destruction.                    | The .NET finalizer and `SafeHandle.ReleaseHandle()` may run on arbitrary threads. | `Close()` reports native destruction errors; `Dispose()` performs best-effort cleanup without throwing. | Tests cover close retry and leak-reporting hooks.       |
-| Generated C layer      | The initial scaffold uses handwritten `LibraryImport` declarations for the proof slice. | ClangSharp generation needs a dedicated task and include policy.                  | Public API is unaffected. Raw declarations remain internal.                                             | `generate` and layout tests land before broad coverage. |
-| NuGet native artifacts | Native artifact packaging is pending.                                                   | Repository CI first proves binding behavior against built artifacts.              | Consumers load a local or system native library.                                                        | Pack and install docs land with artifact policy.        |
+| Item                   | Difference or omission                                                                                                 | Reason                                                                                                     | User-visible behavior                                                                                   | Tests/docs impact                                    |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| Finalizers             | Thread-affine handles use leak reporting, not finalizer destruction.                                                   | The .NET finalizer and `SafeHandle.ReleaseHandle()` may run on arbitrary threads.                          | `Close()` reports native destruction errors; `Dispose()` performs best-effort cleanup without throwing. | Tests cover close retry and leak-reporting hooks.    |
+| Generated C layer      | ClangSharp output uses generated `DllImport` declarations while the proof-slice handwritten calls use `LibraryImport`. | ClangSharp is the selected declaration generator; handwritten source-generated imports cover curated gaps. | Public API is unaffected. Raw declarations remain internal.                                             | Layout tests cover generated ABI shape smoke checks. |
+| NuGet native artifacts | Native artifact packaging is pending.                                                                                  | Repository CI first proves binding behavior against built artifacts.                                       | Consumers load a local or system native library.                                                        | Pack and install docs land with artifact policy.     |
 
 ## Public API inventory
 
