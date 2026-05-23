@@ -1,8 +1,11 @@
 package maplibre
 
 import (
+	"errors"
+
 	"github.com/maplibre/maplibre-native-ffi/bindings/go/internal/capi"
 	"github.com/maplibre/maplibre-native-ffi/bindings/go/internal/handle"
+	"github.com/maplibre/maplibre-native-ffi/bindings/go/internal/memory"
 )
 
 // MapMode selects the native map rendering mode.
@@ -51,6 +54,62 @@ func (m *MapHandle) ptr() (*capi.Map, error) {
 		return nil, newBindingError(ErrInvalidArgument, "MapHandle is closed")
 	}
 	return ptr, nil
+}
+
+func validateCStringArgument(name string, value string) error {
+	if _, err := memory.NewCString(value); err != nil {
+		if errors.Is(err, memory.EmbeddedNulError()) {
+			return newBindingError(ErrInvalidArgument, name+" contains embedded NUL")
+		}
+		return err
+	}
+	return nil
+}
+
+// RequestRepaint requests a repaint for a continuous map.
+func (m *MapHandle) RequestRepaint() error {
+	ptr, err := m.ptr()
+	if err != nil {
+		return err
+	}
+	defer m.state.KeepAlive()
+	return checkNative(func() capi.Status { return capi.MapRequestRepaint(ptr) })
+}
+
+// RequestStillImage requests one still image for a static or tile map.
+func (m *MapHandle) RequestStillImage() error {
+	ptr, err := m.ptr()
+	if err != nil {
+		return err
+	}
+	defer m.state.KeepAlive()
+	return checkNative(func() capi.Status { return capi.MapRequestStillImage(ptr) })
+}
+
+// SetStyleURL loads a style URL through MapLibre Native style APIs.
+func (m *MapHandle) SetStyleURL(url string) error {
+	if err := validateCStringArgument("style URL", url); err != nil {
+		return err
+	}
+	ptr, err := m.ptr()
+	if err != nil {
+		return err
+	}
+	defer m.state.KeepAlive()
+	return checkNative(func() capi.Status { return capi.MapSetStyleURL(ptr, url) })
+}
+
+// SetStyleJSON loads inline style JSON through MapLibre Native style APIs.
+func (m *MapHandle) SetStyleJSON(json string) error {
+	if err := validateCStringArgument("style JSON", json); err != nil {
+		return err
+	}
+	ptr, err := m.ptr()
+	if err != nil {
+		return err
+	}
+	defer m.state.KeepAlive()
+	return checkNative(func() capi.Status { return capi.MapSetStyleJSON(ptr, json) })
 }
 
 // Close destroys this map. A successful close makes later calls no-ops. A

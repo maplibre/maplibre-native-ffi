@@ -168,6 +168,75 @@ func TestRuntimeMapLifecycle(t *testing.T) {
 	}
 }
 
+const minimalStyleJSON = `{
+  "version": 8,
+  "name": "go-binding-style-test",
+  "sources": {},
+  "layers": [
+    {"id":"background","type":"background","paint":{"background-color":"#d8f1ff"}}
+  ]
+}`
+
+func TestMapCommandsAndStyleLoadingUseNativeABI(t *testing.T) {
+	runtime, err := NewRuntime()
+	if err != nil {
+		t.Fatalf("NewRuntime(): %v", err)
+	}
+	m, err := runtime.NewMap()
+	if err != nil {
+		_ = runtime.Close()
+		t.Fatalf("NewMap(): %v", err)
+	}
+	defer func() {
+		if err := m.Close(); err != nil {
+			t.Errorf("Map Close(): %v", err)
+		}
+		if err := runtime.Close(); err != nil {
+			t.Errorf("Runtime Close(): %v", err)
+		}
+	}()
+
+	if err := m.RequestRepaint(); err != nil {
+		t.Fatalf("RequestRepaint(): %v", err)
+	}
+	if err := m.RequestStillImage(); !errors.Is(err, ErrInvalidState) {
+		t.Fatalf("RequestStillImage() on continuous map error = %v, want ErrInvalidState", err)
+	}
+	if err := m.SetStyleJSON(minimalStyleJSON); err != nil {
+		t.Fatalf("SetStyleJSON(): %v", err)
+	}
+	if err := m.SetStyleURL("http://example.com/style.json"); err != nil {
+		t.Fatalf("SetStyleURL(): %v", err)
+	}
+}
+
+func TestMapStyleStringsRejectEmbeddedNUL(t *testing.T) {
+	runtime, err := NewRuntime()
+	if err != nil {
+		t.Fatalf("NewRuntime(): %v", err)
+	}
+	m, err := runtime.NewMap()
+	if err != nil {
+		_ = runtime.Close()
+		t.Fatalf("NewMap(): %v", err)
+	}
+	defer func() {
+		if err := m.Close(); err != nil {
+			t.Errorf("Map Close(): %v", err)
+		}
+		if err := runtime.Close(); err != nil {
+			t.Errorf("Runtime Close(): %v", err)
+		}
+	}()
+
+	if err := m.SetStyleURL("http://example.com/\x00style.json"); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("SetStyleURL embedded NUL error = %v, want ErrInvalidArgument", err)
+	}
+	if err := m.SetStyleJSON("{\x00}"); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("SetStyleJSON embedded NUL error = %v, want ErrInvalidArgument", err)
+	}
+}
+
 func TestMapProjectionSnapshotOutlivesMap(t *testing.T) {
 	runtime, err := NewRuntime()
 	if err != nil {

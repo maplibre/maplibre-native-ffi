@@ -313,9 +313,33 @@ func mapOptionsFromC(options C.mln_map_options) MapOptions {
 	}
 }
 
+// MapRequestRepaint requests a repaint for a continuous map.
+func MapRequestRepaint(m *Map) Status {
+	return Status(C.mln_map_request_repaint((*C.mln_map)(unsafe.Pointer(m))))
+}
+
+// MapRequestStillImage requests one still image for a static or tile map.
+func MapRequestStillImage(m *Map) Status {
+	return Status(C.mln_map_request_still_image((*C.mln_map)(unsafe.Pointer(m))))
+}
+
 // MapDestroy destroys a map handle.
 func MapDestroy(m *Map) Status {
 	return Status(C.mln_map_destroy((*C.mln_map)(unsafe.Pointer(m))))
+}
+
+// MapSetStyleURL loads a style URL.
+func MapSetStyleURL(m *Map, url string) Status {
+	cURL := C.CString(url)
+	defer C.free(unsafe.Pointer(cURL))
+	return Status(C.mln_map_set_style_url((*C.mln_map)(unsafe.Pointer(m)), cURL))
+}
+
+// MapSetStyleJSON loads inline style JSON.
+func MapSetStyleJSON(m *Map, json string) Status {
+	cJSON := C.CString(json)
+	defer C.free(unsafe.Pointer(cJSON))
+	return Status(C.mln_map_set_style_json((*C.mln_map)(unsafe.Pointer(m)), cJSON))
 }
 
 // MapProjectionCreate creates a standalone projection helper from a map.
