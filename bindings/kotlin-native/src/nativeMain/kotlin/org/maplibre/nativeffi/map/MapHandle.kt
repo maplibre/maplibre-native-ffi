@@ -1,31 +1,40 @@
 package org.maplibre.nativeffi.map
 
 import cnames.structs.mln_map
+import cnames.structs.mln_style_id_list
 import kotlinx.cinterop.BooleanVar
+import kotlinx.cinterop.ByteVar
 import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.CPointerVarOf
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.UIntVar
+import kotlinx.cinterop.ULongVar
 import kotlinx.cinterop.alloc
 import kotlinx.cinterop.allocArray
 import kotlinx.cinterop.get
 import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.pointed
 import kotlinx.cinterop.ptr
+import kotlinx.cinterop.readBytes
+import kotlinx.cinterop.sizeOf
 import kotlinx.cinterop.value
 import org.maplibre.nativeffi.camera.AnimationOptions
 import org.maplibre.nativeffi.camera.BoundOptions
 import org.maplibre.nativeffi.camera.CameraOptions
 import org.maplibre.nativeffi.camera.FreeCameraOptions
+import org.maplibre.nativeffi.geo.GeoJson
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.ScreenPoint
 import org.maplibre.nativeffi.internal.c.mln_bound_options_default
 import org.maplibre.nativeffi.internal.c.mln_camera_options_default
 import org.maplibre.nativeffi.internal.c.mln_free_camera_options_default
 import org.maplibre.nativeffi.internal.c.mln_lat_lng
+import org.maplibre.nativeffi.internal.c.mln_map_add_geojson_source_data
+import org.maplibre.nativeffi.internal.c.mln_map_add_geojson_source_url
 import org.maplibre.nativeffi.internal.c.mln_map_add_style_layer_json
 import org.maplibre.nativeffi.internal.c.mln_map_add_style_source_json
 import org.maplibre.nativeffi.internal.c.mln_map_cancel_transitions
+import org.maplibre.nativeffi.internal.c.mln_map_copy_style_source_attribution
 import org.maplibre.nativeffi.internal.c.mln_map_create
 import org.maplibre.nativeffi.internal.c.mln_map_destroy
 import org.maplibre.nativeffi.internal.c.mln_map_dump_debug_logs
@@ -37,12 +46,15 @@ import org.maplibre.nativeffi.internal.c.mln_map_get_debug_options
 import org.maplibre.nativeffi.internal.c.mln_map_get_free_camera_options
 import org.maplibre.nativeffi.internal.c.mln_map_get_projection_mode
 import org.maplibre.nativeffi.internal.c.mln_map_get_rendering_stats_view_enabled
+import org.maplibre.nativeffi.internal.c.mln_map_get_style_source_info
+import org.maplibre.nativeffi.internal.c.mln_map_get_style_source_type
 import org.maplibre.nativeffi.internal.c.mln_map_get_tile_options
 import org.maplibre.nativeffi.internal.c.mln_map_get_viewport_options
 import org.maplibre.nativeffi.internal.c.mln_map_is_fully_loaded
 import org.maplibre.nativeffi.internal.c.mln_map_jump_to
 import org.maplibre.nativeffi.internal.c.mln_map_lat_lng_for_pixel
 import org.maplibre.nativeffi.internal.c.mln_map_lat_lngs_for_pixels
+import org.maplibre.nativeffi.internal.c.mln_map_list_style_source_ids
 import org.maplibre.nativeffi.internal.c.mln_map_move_by
 import org.maplibre.nativeffi.internal.c.mln_map_move_by_animated
 import org.maplibre.nativeffi.internal.c.mln_map_options
@@ -62,6 +74,8 @@ import org.maplibre.nativeffi.internal.c.mln_map_scale_by_animated
 import org.maplibre.nativeffi.internal.c.mln_map_set_bounds
 import org.maplibre.nativeffi.internal.c.mln_map_set_debug_options
 import org.maplibre.nativeffi.internal.c.mln_map_set_free_camera_options
+import org.maplibre.nativeffi.internal.c.mln_map_set_geojson_source_data
+import org.maplibre.nativeffi.internal.c.mln_map_set_geojson_source_url
 import org.maplibre.nativeffi.internal.c.mln_map_set_layer_filter
 import org.maplibre.nativeffi.internal.c.mln_map_set_layer_property
 import org.maplibre.nativeffi.internal.c.mln_map_set_projection_mode
@@ -78,14 +92,18 @@ import org.maplibre.nativeffi.internal.c.mln_map_tile_options_default
 import org.maplibre.nativeffi.internal.c.mln_map_viewport_options_default
 import org.maplibre.nativeffi.internal.c.mln_projection_mode_default
 import org.maplibre.nativeffi.internal.c.mln_screen_point
+import org.maplibre.nativeffi.internal.c.mln_style_source_info
 import org.maplibre.nativeffi.internal.lifecycle.HandleState
 import org.maplibre.nativeffi.internal.memory.MemoryUtil
 import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.internal.struct.CoreStructs
 import org.maplibre.nativeffi.internal.struct.MapStructs
+import org.maplibre.nativeffi.internal.struct.StyleStructs
 import org.maplibre.nativeffi.internal.struct.ValueStructs
 import org.maplibre.nativeffi.json.JsonValue
 import org.maplibre.nativeffi.runtime.RuntimeHandle
+import org.maplibre.nativeffi.style.SourceInfo
+import org.maplibre.nativeffi.style.SourceType
 
 /** Owned native map handle. Close it on the map owner thread. */
 @OptIn(ExperimentalForeignApi::class)
@@ -137,6 +155,115 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
       )
     )
     outExists.value
+  }
+
+  public fun styleSourceType(sourceId: String): SourceType? = memScoped {
+    val outType = alloc<UIntVar>()
+    val outFound = alloc<BooleanVar>()
+    Status.check(
+      mln_map_get_style_source_type(
+        state.requireLive(),
+        CoreStructs.stringView(sourceId, this),
+        outType.ptr,
+        outFound.ptr,
+      )
+    )
+    if (outFound.value) SourceType.fromNative(outType.value) else null
+  }
+
+  public fun styleSourceInfo(sourceId: String): SourceInfo? = memScoped {
+    val outInfo = alloc<mln_style_source_info>()
+    outInfo.size = sizeOf<mln_style_source_info>().toUInt()
+    val outFound = alloc<BooleanVar>()
+    Status.check(
+      mln_map_get_style_source_info(
+        state.requireLive(),
+        CoreStructs.stringView(sourceId, this),
+        outInfo.ptr,
+        outFound.ptr,
+      )
+    )
+    if (!outFound.value) return@memScoped null
+    val attribution = copyStyleSourceAttribution(sourceId, outInfo)
+    StyleStructs.sourceInfo(outInfo, attribution)
+  }
+
+  public fun styleSourceIds(): List<String> = memScoped {
+    val outList = alloc<CPointerVarOf<CPointer<mln_style_id_list>>>()
+    outList.value = null
+    Status.check(mln_map_list_style_source_ids(state.requireLive(), outList.ptr))
+    StyleStructs.styleIdList(requireNotNull(outList.value))
+  }
+
+  public fun addGeoJsonSourceUrl(sourceId: String, url: String) {
+    memScoped {
+      Status.check(
+        mln_map_add_geojson_source_url(
+          state.requireLive(),
+          CoreStructs.stringView(sourceId, this),
+          CoreStructs.stringView(url, this),
+        )
+      )
+    }
+  }
+
+  public fun addGeoJsonSourceData(sourceId: String, data: GeoJson) {
+    memScoped {
+      Status.check(
+        mln_map_add_geojson_source_data(
+          state.requireLive(),
+          CoreStructs.stringView(sourceId, this),
+          ValueStructs.geoJson(data, this),
+        )
+      )
+    }
+  }
+
+  public fun setGeoJsonSourceUrl(sourceId: String, url: String) {
+    memScoped {
+      Status.check(
+        mln_map_set_geojson_source_url(
+          state.requireLive(),
+          CoreStructs.stringView(sourceId, this),
+          CoreStructs.stringView(url, this),
+        )
+      )
+    }
+  }
+
+  public fun setGeoJsonSourceData(sourceId: String, data: GeoJson) {
+    memScoped {
+      Status.check(
+        mln_map_set_geojson_source_data(
+          state.requireLive(),
+          CoreStructs.stringView(sourceId, this),
+          ValueStructs.geoJson(data, this),
+        )
+      )
+    }
+  }
+
+  private fun copyStyleSourceAttribution(sourceId: String, info: mln_style_source_info): String? {
+    if (!info.has_attribution) return null
+    if (info.attribution_size == 0UL) return ""
+    return memScoped {
+      val outAttribution = allocArray<ByteVar>(info.attribution_size.toInt())
+      val outAttributionSize = alloc<ULongVar>()
+      val outFound = alloc<BooleanVar>()
+      Status.check(
+        mln_map_copy_style_source_attribution(
+          state.requireLive(),
+          CoreStructs.stringView(sourceId, this),
+          outAttribution,
+          info.attribution_size,
+          outAttributionSize.ptr,
+          outFound.ptr,
+        )
+      )
+      if (outFound.value)
+        outAttribution.readBytes(outAttributionSize.value.toInt()).decodeToString()
+      else null
+    }
   }
 
   public fun addStyleLayerJson(layerJson: JsonValue) {
