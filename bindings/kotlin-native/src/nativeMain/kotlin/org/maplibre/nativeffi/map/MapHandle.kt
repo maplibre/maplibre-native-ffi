@@ -25,14 +25,17 @@ import org.maplibre.nativeffi.camera.AnimationOptions
 import org.maplibre.nativeffi.camera.BoundOptions
 import org.maplibre.nativeffi.camera.CameraOptions
 import org.maplibre.nativeffi.camera.FreeCameraOptions
+import org.maplibre.nativeffi.geo.CanonicalTileId
 import org.maplibre.nativeffi.geo.GeoJson
 import org.maplibre.nativeffi.geo.LatLng
+import org.maplibre.nativeffi.geo.LatLngBounds
 import org.maplibre.nativeffi.geo.ScreenPoint
 import org.maplibre.nativeffi.internal.c.mln_bound_options_default
 import org.maplibre.nativeffi.internal.c.mln_camera_options_default
 import org.maplibre.nativeffi.internal.c.mln_free_camera_options_default
 import org.maplibre.nativeffi.internal.c.mln_lat_lng
 import org.maplibre.nativeffi.internal.c.mln_map_add_color_relief_layer
+import org.maplibre.nativeffi.internal.c.mln_map_add_custom_geometry_source
 import org.maplibre.nativeffi.internal.c.mln_map_add_geojson_source_data
 import org.maplibre.nativeffi.internal.c.mln_map_add_geojson_source_url
 import org.maplibre.nativeffi.internal.c.mln_map_add_hillshade_layer
@@ -72,6 +75,8 @@ import org.maplibre.nativeffi.internal.c.mln_map_get_style_source_info
 import org.maplibre.nativeffi.internal.c.mln_map_get_style_source_type
 import org.maplibre.nativeffi.internal.c.mln_map_get_tile_options
 import org.maplibre.nativeffi.internal.c.mln_map_get_viewport_options
+import org.maplibre.nativeffi.internal.c.mln_map_invalidate_custom_geometry_source_region
+import org.maplibre.nativeffi.internal.c.mln_map_invalidate_custom_geometry_source_tile
 import org.maplibre.nativeffi.internal.c.mln_map_is_fully_loaded
 import org.maplibre.nativeffi.internal.c.mln_map_jump_to
 import org.maplibre.nativeffi.internal.c.mln_map_lat_lng_for_pixel
@@ -97,6 +102,7 @@ import org.maplibre.nativeffi.internal.c.mln_map_rotate_by_animated
 import org.maplibre.nativeffi.internal.c.mln_map_scale_by
 import org.maplibre.nativeffi.internal.c.mln_map_scale_by_animated
 import org.maplibre.nativeffi.internal.c.mln_map_set_bounds
+import org.maplibre.nativeffi.internal.c.mln_map_set_custom_geometry_source_tile_data
 import org.maplibre.nativeffi.internal.c.mln_map_set_debug_options
 import org.maplibre.nativeffi.internal.c.mln_map_set_free_camera_options
 import org.maplibre.nativeffi.internal.c.mln_map_set_geojson_source_data
@@ -138,6 +144,7 @@ import org.maplibre.nativeffi.internal.struct.ValueStructs
 import org.maplibre.nativeffi.json.JsonValue
 import org.maplibre.nativeffi.render.PremultipliedRgba8Image
 import org.maplibre.nativeffi.runtime.RuntimeHandle
+import org.maplibre.nativeffi.style.CustomGeometrySourceOptions
 import org.maplibre.nativeffi.style.LocationIndicatorImageKind
 import org.maplibre.nativeffi.style.SourceInfo
 import org.maplibre.nativeffi.style.SourceType
@@ -151,6 +158,7 @@ import org.maplibre.nativeffi.style.TileSourceOptions
 public class MapHandle
 private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map>) : AutoCloseable {
   private val state = HandleState("MapHandle", handle, runtime)
+  private val customGeometrySources = mutableMapOf<String, CustomGeometrySourceState>()
 
   public fun setStyleUrl(url: String) {
     MemoryUtil.requireValidCString(url)
@@ -160,6 +168,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
   public fun setStyleJson(json: String) {
     MemoryUtil.requireValidCString(json)
     Status.check(mln_map_set_style_json(state.requireLive(), json))
+    clearCustomGeometrySources()
   }
 
   public fun addStyleSourceJson(sourceId: String, sourceJson: JsonValue) {
@@ -183,7 +192,9 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
         outRemoved.ptr,
       )
     )
-    outRemoved.value
+    val removed = outRemoved.value
+    if (removed) closeCustomGeometrySource(sourceId)
+    removed
   }
 
   public fun styleSourceExists(sourceId: String): Boolean = memScoped {
@@ -282,6 +293,77 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
         )
       )
     }
+  }
+
+  public fun addCustomGeometrySource(sourceId: String, options: CustomGeometrySourceOptions) {
+    val sourceState = CustomGeometrySourceState(options)
+    try {
+      memScoped {
+        Status.check(
+          mln_map_add_custom_geometry_source(
+            state.requireLive(),
+            CoreStructs.stringView(sourceId, this),
+            sourceState.descriptor(),
+          )
+        )
+      }
+      customGeometrySources.put(sourceId, sourceState)?.close()
+    } catch (error: Throwable) {
+      sourceState.close()
+      throw error
+    }
+  }
+
+  public fun setCustomGeometrySourceTileData(
+    sourceId: String,
+    tileId: CanonicalTileId,
+    data: GeoJson,
+  ) {
+    memScoped {
+      Status.check(
+        mln_map_set_custom_geometry_source_tile_data(
+          state.requireLive(),
+          CoreStructs.stringView(sourceId, this),
+          StyleStructs.canonicalTileId(tileId),
+          ValueStructs.geoJson(data, this),
+        )
+      )
+    }
+  }
+
+  public fun invalidateCustomGeometrySourceTile(sourceId: String, tileId: CanonicalTileId) {
+    memScoped {
+      Status.check(
+        mln_map_invalidate_custom_geometry_source_tile(
+          state.requireLive(),
+          CoreStructs.stringView(sourceId, this),
+          StyleStructs.canonicalTileId(tileId),
+        )
+      )
+    }
+  }
+
+  public fun invalidateCustomGeometrySourceRegion(sourceId: String, bounds: LatLngBounds) {
+    memScoped {
+      Status.check(
+        mln_map_invalidate_custom_geometry_source_region(
+          state.requireLive(),
+          CoreStructs.stringView(sourceId, this),
+          CoreStructs.latLngBounds(bounds),
+        )
+      )
+    }
+  }
+
+  internal fun customGeometrySourceCountForTesting(): Int = customGeometrySources.size
+
+  private fun closeCustomGeometrySource(sourceId: String) {
+    customGeometrySources.remove(sourceId)?.close()
+  }
+
+  private fun clearCustomGeometrySources() {
+    customGeometrySources.values.forEach { it.close() }
+    customGeometrySources.clear()
   }
 
   public fun addVectorSourceUrl(sourceId: String, url: String, options: TileSourceOptions? = null) {
@@ -1186,7 +1268,10 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
   public fun createProjection(): MapProjectionHandle = MapProjectionHandle.create(this)
 
   override fun close() {
-    state.closeOnce(::mln_map_destroy) { runtime.unregisterMap(this) }
+    state.closeOnce(::mln_map_destroy) {
+      clearCustomGeometrySources()
+      runtime.unregisterMap(this)
+    }
   }
 
   public fun isClosed(): Boolean = state.isReleased()

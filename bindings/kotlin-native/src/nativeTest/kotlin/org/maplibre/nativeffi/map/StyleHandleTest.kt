@@ -4,13 +4,17 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import org.maplibre.nativeffi.geo.CanonicalTileId
 import org.maplibre.nativeffi.geo.Feature
 import org.maplibre.nativeffi.geo.GeoJson
 import org.maplibre.nativeffi.geo.Geometry
 import org.maplibre.nativeffi.geo.LatLng
+import org.maplibre.nativeffi.geo.LatLngBounds
 import org.maplibre.nativeffi.json.JsonValue
 import org.maplibre.nativeffi.render.PremultipliedRgba8Image
 import org.maplibre.nativeffi.runtime.RuntimeHandle
+import org.maplibre.nativeffi.style.CustomGeometrySourceCallback
+import org.maplibre.nativeffi.style.CustomGeometrySourceOptions
 import org.maplibre.nativeffi.style.LocationIndicatorImageKind
 import org.maplibre.nativeffi.style.RasterDemEncoding
 import org.maplibre.nativeffi.style.SourceType
@@ -20,6 +24,46 @@ import org.maplibre.nativeffi.style.TileSourceOptions
 import org.maplibre.nativeffi.style.VectorTileEncoding
 
 class StyleHandleTest {
+  @Test
+  fun customGeometrySourceApisKeepCallbackStateMapScoped() {
+    val runtime = RuntimeHandle.create()
+    val map = MapHandle.create(runtime, MapOptions().size(128, 128))
+    try {
+      map.setStyleJson("{\"version\":8,\"sources\":{},\"layers\":[]}")
+      map.addCustomGeometrySource(
+        "custom",
+        CustomGeometrySourceOptions(
+            object : CustomGeometrySourceCallback {
+              override fun fetchTile(tileId: CanonicalTileId) = Unit
+            }
+          )
+          .minZoom(0.0)
+          .maxZoom(4.0)
+          .tileSize(256U)
+          .buffer(8U)
+          .clip(true)
+          .wrap(false),
+      )
+      assertEquals(1, map.customGeometrySourceCountForTesting())
+      assertEquals(SourceType.CUSTOM_VECTOR, map.styleSourceType("custom"))
+      map.setCustomGeometrySourceTileData(
+        "custom",
+        CanonicalTileId(0U, 0U, 0U),
+        GeoJson.featureCollection(emptyList()),
+      )
+      map.invalidateCustomGeometrySourceTile("custom", CanonicalTileId(0U, 0U, 0U))
+      map.invalidateCustomGeometrySourceRegion(
+        "custom",
+        LatLngBounds(LatLng(0.0, 0.0), LatLng(1.0, 1.0)),
+      )
+      assertTrue(map.removeStyleSource("custom"))
+      assertEquals(0, map.customGeometrySourceCountForTesting())
+    } finally {
+      map.close()
+      runtime.close()
+    }
+  }
+
   @Test
   fun styleSourceAndLayerJsonApisCallNativeAndCopyDescriptors() {
     val runtime = RuntimeHandle.create()

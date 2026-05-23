@@ -2,16 +2,19 @@ package org.maplibre.nativeffi.internal.struct
 
 import cnames.structs.mln_style_id_list
 import kotlinx.cinterop.CPointer
+import kotlinx.cinterop.CValue
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.MemScope
 import kotlinx.cinterop.ULongVar
 import kotlinx.cinterop.alloc
 import kotlinx.cinterop.allocArray
+import kotlinx.cinterop.cValue
 import kotlinx.cinterop.get
 import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.ptr
 import kotlinx.cinterop.toCValues
 import kotlinx.cinterop.value
+import org.maplibre.nativeffi.geo.CanonicalTileId
 import org.maplibre.nativeffi.internal.c.MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO
 import org.maplibre.nativeffi.internal.c.MLN_STYLE_IMAGE_OPTION_SDF
 import org.maplibre.nativeffi.internal.c.MLN_STYLE_TILE_SOURCE_OPTION_ATTRIBUTION
@@ -22,6 +25,7 @@ import org.maplibre.nativeffi.internal.c.MLN_STYLE_TILE_SOURCE_OPTION_RASTER_ENC
 import org.maplibre.nativeffi.internal.c.MLN_STYLE_TILE_SOURCE_OPTION_SCHEME
 import org.maplibre.nativeffi.internal.c.MLN_STYLE_TILE_SOURCE_OPTION_TILE_SIZE
 import org.maplibre.nativeffi.internal.c.MLN_STYLE_TILE_SOURCE_OPTION_VECTOR_ENCODING
+import org.maplibre.nativeffi.internal.c.mln_canonical_tile_id
 import org.maplibre.nativeffi.internal.c.mln_premultiplied_rgba8_image
 import org.maplibre.nativeffi.internal.c.mln_premultiplied_rgba8_image_default
 import org.maplibre.nativeffi.internal.c.mln_string_view
@@ -45,6 +49,15 @@ import org.maplibre.nativeffi.style.TileSourceOptions
 /** Copies style-owned list and metadata handles into Kotlin values. */
 @OptIn(ExperimentalForeignApi::class, ExperimentalUnsignedTypes::class)
 internal object StyleStructs {
+  fun canonicalTileId(value: CanonicalTileId): CValue<mln_canonical_tile_id> = cValue {
+    z = value.z
+    x = value.x
+    y = value.y
+  }
+
+  fun canonicalTileId(value: mln_canonical_tile_id): CanonicalTileId =
+    CanonicalTileId(value.z, value.x, value.y)
+
   fun premultipliedRgba8Image(
     value: PremultipliedRgba8Image,
     scope: MemScope,
