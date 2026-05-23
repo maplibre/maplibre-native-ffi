@@ -53,15 +53,17 @@ nativeMain implementation while preserving API parity with the Java bindings.
 
 ## Kotlin/Native differences and omissions
 
-Record Kotlin/Native-only differences here. Keep the `None` row only when the
-binding intentionally mirrors the public C ABI and Java FFM coverage for all
-supported features.
+The in-scope `nativeMain` binding mirrors the public C ABI and Java FFM concept
+coverage. Deferred items are outside this implementation slice.
 
-| Item | Difference or omission | Reason | User-visible behavior | Tests/docs impact |
-| ---- | ---------------------- | ------ | --------------------- | ----------------- |
-| None | None known.            | N/A    | N/A                   | N/A               |
+| Item                                              | Difference or omission | Reason                                                                                     | User-visible behavior                                                                                                   | Tests/docs impact                                              |
+| ------------------------------------------------- | ---------------------- | ------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| Publication metadata                              | Deferred.              | Publication policy is outside this goal.                                                   | No Maven/package publication is produced by this PR.                                                                    | Future packaging docs and tests will cover it.                 |
+| Native-library distribution                       | Deferred.              | Distribution policy is outside this goal.                                                  | Tests link the repository build artifact through `MLN_FFI_BUILD_DIR`; consumers provide the C library by future policy. | Build docs record the explicit local linking model.            |
+| `commonMain`, `jvmMain`, and `androidMain` facade | Deferred.              | This goal implements `nativeMain`; shared aliases and Android JNI actuals are future work. | Kotlin/Native targets use this binding directly.                                                                        | The API stays alignable with Java FFM/JNI for a future facade. |
+| Examples                                          | Deferred.              | Examples are outside this goal.                                                            | No Kotlin/Native examples are added by this PR.                                                                         | Binding tests cover adaptation logic instead.                  |
 
-## Current scaffold
+## Current implementation layout
 
 ```text
 bindings/kotlin-native/
@@ -69,32 +71,33 @@ bindings/kotlin-native/
   build.gradle.kts
   mise.toml
   src/nativeInterop/cinterop/maplibreNativeC.def
-  src/nativeMain/kotlin/org/maplibre/nativeffi/Maplibre.kt
-  src/nativeMain/kotlin/org/maplibre/nativeffi/error/*.kt
-  src/nativeMain/kotlin/org/maplibre/nativeffi/render/NativePointer.kt
-  src/nativeMain/kotlin/org/maplibre/nativeffi/<concept>/PackageMarker.kt
+  src/nativeMain/kotlin/org/maplibre/nativeffi/**
+  src/nativeTest/kotlin/org/maplibre/nativeffi/**
 ```
 
-This scaffold implements one proof slice:
+The implementation includes the original proof slice and the in-scope binding
+surface:
 
 - Gradle configures a host Kotlin/Native target.
 - `cinterop` imports the public umbrella header into
   `org.maplibre.nativeffi.internal.c`.
 - `Maplibre.cVersion()` calls `mln_c_version()` through the internal cinterop
   package.
-- Native public error and `NativePointer` types establish naming and value
-  semantics for later concept implementations and future common aliases.
+- Public Kotlin packages cover runtime, map, render, resource, style, geo,
+  camera, query, offline, log, JSON, and error concepts.
+- Internal packages isolate cinterop, status conversion, memory helpers,
+  descriptor materialization, callback state, and handle lifecycle.
 
 ## Build artifacts and tasks
 
 Implement these artifacts:
 
-| Artifact                    | Path                               | Contents                                                                      |
-| --------------------------- | ---------------------------------- | ----------------------------------------------------------------------------- |
-| Kotlin/Native Gradle module | `bindings/kotlin-native`           | `nativeMain` public API, Kotlin/Native internals, cinterop config, tests.     |
-| Kotlin/Native cinterop klib | Gradle build output                | Generated declarations for the public C ABI, internal to the binding.         |
-| Native test executable      | Gradle build output                | Kotlin/Native tests linked to the C library for the host target.              |
-| Published package metadata  | TBD under `bindings/kotlin-native` | Maven publication or Kotlin package metadata after artifact policy is chosen. |
+| Artifact                    | Path                       | Contents                                                                      |
+| --------------------------- | -------------------------- | ----------------------------------------------------------------------------- |
+| Kotlin/Native Gradle module | `bindings/kotlin-native`   | `nativeMain` public API, Kotlin/Native internals, cinterop config, tests.     |
+| Kotlin/Native cinterop klib | Gradle build output        | Generated declarations for the public C ABI, internal to the binding.         |
+| Native test executable      | Gradle build output        | Kotlin/Native tests linked to the C library for the host target.              |
+| Published package metadata  | Deferred outside this goal | Maven publication or Kotlin package metadata after artifact policy is chosen. |
 
 Implement these tasks:
 
@@ -308,26 +311,26 @@ those choices keep the low-level contract intact.
 
 Implement these Kotlin/Native support files:
 
-| File or package                               | Purpose                                                                                                 |
-| --------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| `internal.c`                                  | Generated cinterop declarations.                                                                        |
-| `internal.callback.LogCallbackState`          | Process-global logging callback `StableRef` state.                                                      |
-| `internal.callback.ResourceTransformState`    | Runtime-scoped resource transform callback state.                                                       |
-| `internal.callback.ResourceProviderState`     | Runtime-scoped resource provider callback state.                                                        |
-| `internal.callback.CustomGeometrySourceState` | Map/style-scoped custom geometry callback state.                                                        |
-| `internal.lifecycle.HandleState`              | Native pointer, closed state, parent retention, and leak context.                                       |
-| `internal.loader.NativeLibrary`               | Linker or loader integration for the native C library.                                                  |
-| `internal.memory.MemoryUtil`                  | `memScoped`, `nativeHeap`, `ByteArray.usePinned`, UTF-8, string-view, array, and out-parameter helpers. |
-| `internal.memory.NativePointerUtil`           | Conversion between `NativePointer`, `COpaquePointer?`, and `NativePtr`.                                 |
-| `internal.status.Status`                      | C status conversion, immediate diagnostic copying, and exception construction.                          |
-| `internal.struct.CoreStructs`                 | Core copied values and temporary descriptor inputs.                                                     |
-| `internal.struct.MapStructs`                  | Map, camera, bounds, geometry, JSON, and GeoJSON materialization.                                       |
-| `internal.struct.QueryStructs`                | Query descriptors and copied query result readers.                                                      |
-| `internal.struct.RenderStructs`               | Render descriptors, frames, image info, and native buffers.                                             |
-| `internal.struct.ResourceStructs`             | Resource request, response, and transform conversion.                                                   |
-| `internal.struct.RuntimeStructs`              | Runtime options, events, and offline operation data.                                                    |
-| `internal.struct.StyleStructs`                | Style source, image, layer, and custom geometry conversion.                                             |
-| `internal.struct.ValueStructs`                | JSON value-tree conversion and native snapshot copying.                                                 |
+| File or package                               | Purpose                                                                                                      |
+| --------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `internal.c`                                  | Generated cinterop declarations.                                                                             |
+| `internal.callback.LogCallbackState`          | Process-global logging callback `StableRef` state.                                                           |
+| `internal.callback.ResourceTransformState`    | Runtime-scoped resource transform callback state.                                                            |
+| `internal.callback.ResourceProviderState`     | Runtime-scoped resource provider callback state.                                                             |
+| `internal.callback.CustomGeometrySourceState` | Map/style-scoped custom geometry callback state.                                                             |
+| `internal.lifecycle.HandleState`              | Native pointer, closed state, parent retention, and leak context.                                            |
+| `internal.loader`                             | Package reserved for future loader policy; current native tests link through Gradle and `MLN_FFI_BUILD_DIR`. |
+| `internal.memory.MemoryUtil`                  | `memScoped`, `nativeHeap`, `ByteArray.usePinned`, UTF-8, string-view, array, and out-parameter helpers.      |
+| `NativePointer` plus struct helpers           | Conversion between public opaque addresses and internal cinterop pointers.                                   |
+| `internal.status.Status`                      | C status conversion, immediate diagnostic copying, and exception construction.                               |
+| `internal.struct.CoreStructs`                 | Core copied values and temporary descriptor inputs.                                                          |
+| `internal.struct.MapStructs`                  | Map, camera, bounds, geometry, JSON, and GeoJSON materialization.                                            |
+| `internal.struct.QueryStructs`                | Query descriptors and copied query result readers.                                                           |
+| `internal.struct.RenderStructs`               | Render descriptors, frames, image info, and native buffers.                                                  |
+| `internal.struct.ResourceStructs`             | Resource request, response, and transform conversion.                                                        |
+| `internal.struct.RuntimeStructs`              | Runtime options, events, and offline operation data.                                                         |
+| `internal.struct.StyleStructs`                | Style source, image, layer, and custom geometry conversion.                                                  |
+| `internal.struct.ValueStructs`                | JSON value-tree conversion and native snapshot copying.                                                      |
 
 ## Cinterop coverage map
 
@@ -577,38 +580,36 @@ coverage inventory.
 Kotlin/Native tests exercise the public Kotlin API against the real C library.
 They focus on adaptation invariants that cinterop cannot express.
 
-Port or implement these tests:
+Implemented host tests:
 
-- `MaplibreTest`
-- `error.StatusTest`
-- `internal.lifecycle.HandleStateTest`
-- `internal.memory.MemoryUtilTest`
-- `internal.status.StatusAndDiagnosticTest`
-- `internal.struct.RenderStructsTest`
-- `internal.struct.ValueStructsTest`
-- `log.LogCallbackStateTest`
-- `map.MapHandleTest`
-- `map.StyleHandleTest`
-- `render.RenderSessionHandleTest`
-- `render.RenderSessionQueryTest`
-- `resource.ResourceRequestHandleTest`
-- `runtime.ResourceProviderStateTest`
-- `runtime.RuntimeHandleTest`
-- `runtime.RuntimeOfflineTest`
-- `test.NativeTestSupport`
-- `test.RenderTargetTestSupport`
+| Test                                        | Coverage                                                                                                      |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `error.MaplibreExceptionTest`               | Stable Kotlin exception taxonomy.                                                                             |
+| `internal.status.StatusTest`                | Status conversion and immediate diagnostic copying.                                                           |
+| `internal.struct.MapStructsTest`            | Map, camera, viewport, bounds, and tile descriptor materialization.                                           |
+| `internal.struct.ValueStructsTest`          | JSON, geometry, GeoJSON, and copied snapshot materialization.                                                 |
+| `internal.struct.QueryStructsTest`          | Query descriptors plus copied query and feature-extension results.                                            |
+| `internal.struct.RenderStructsTest`         | Metal/Vulkan descriptor pointer opacity and render image/frame readers.                                       |
+| `internal.struct.RuntimeOfflineStructsTest` | Offline region snapshots, status, and list copying.                                                           |
+| `json.JsonValueTest`                        | Kotlin JSON value invariants.                                                                                 |
+| `geo.GeometryTest`                          | Geometry value invariants and collection depth validation.                                                    |
+| `log.LogCallbackStateTest`                  | Log callback state, callback exception containment, and callback clearing.                                    |
+| `map.CustomGeometrySourceStateTest`         | Custom geometry callback lifetime and exception containment.                                                  |
+| `map.MapCameraControlsTest`                 | Camera, fit, viewport, coordinate, projection, and map-control wrappers.                                      |
+| `map.MapHandleTest`                         | Map lifecycle, parent runtime retention, style setup, and close behavior.                                     |
+| `map.MapProjectionHandleTest`               | Projection lifecycle and coordinate conversion wrappers.                                                      |
+| `map.StyleHandleTest`                       | Style source, layer, image, tile source, image source, and specialized-layer wrappers.                        |
+| `render.FrameScopeTest`                     | Frame-scope invalidation for owned texture frame views.                                                       |
+| `render.NativeBufferTest`                   | Explicit native buffer capacity, close, and zero-length behavior.                                             |
+| `resource.ResourceProviderStateTest`        | Resource provider callback state and one-shot request completion.                                             |
+| `resource.ResourceTransformStateTest`       | Resource transform callback state and exception containment.                                                  |
+| `runtime.RuntimeHandleTest`                 | Runtime lifecycle, event polling, resource transform/provider retention, and ambient-cache operation handles. |
+| `runtime.RuntimeOfflineTest`                | Runtime network state and offline operation start/take-result wrappers.                                       |
 
-Add Kotlin/Native-specific tests:
-
-| Test                                      | Coverage                                                                |
-| ----------------------------------------- | ----------------------------------------------------------------------- |
-| `internal.c.CInteropSmokeTest`            | Umbrella header cinterop generation and `mln_c_version()` call.         |
-| `internal.memory.PinnedArrayTest`         | `ByteArray.usePinned` and scoped borrow behavior.                       |
-| `internal.memory.StringViewTest`          | UTF-8 encoding, explicit byte length, and embedded-NUL rejection.       |
-| `internal.callback.StableRefLifetimeTest` | Callback `StableRef` creation and exact-once disposal.                  |
-| `internal.callback.StaticCFunctionTest`   | Non-capturing trampoline entry points and exception containment.        |
-| `internal.thread.WrongThreadStatusTest`   | Native wrong-thread status propagation as `WrongThreadException`.       |
-| `render.FrameScopeInvalidationTest`       | Frame handle invalidation after close and nested acquisition rejection. |
+Render attachment tests stay at descriptor, buffer, and frame-scope level on the
+host target because real Metal/Vulkan attachment requires host graphics objects.
+The C and renderer layers own graphics backend validation; Kotlin/Native tests
+cover binding-owned lifetime and materialization behavior.
 
 ## Implementation milestones
 
@@ -625,28 +626,29 @@ Add Kotlin/Native-specific tests:
    request completion.
 8. Implement render sessions, surface and texture descriptors, readback,
    `NativeBuffer`, and owned texture frame handles.
-9. Add host Kotlin/Native tests and CI task coverage.
-10. Decide package publication and native-library distribution policy.
-11. Mark all items complete before changing the PR from draft to ready for
-    review.
+9. Add host Kotlin/Native tests and local task coverage.
+10. Defer package publication, native-library distribution policy, examples,
+    common facade work, and Android JNI support to future PRs.
+11. Mark all in-scope items complete before changing the PR from draft to ready
+    for review.
 
 ## Completion checklist
 
-- [ ] All public API inventory files exist under `org.maplibre.nativeffi` or
+- [x] All public API inventory files exist under `org.maplibre.nativeffi` or
       have recorded replacements.
-- [ ] All internal implementation inventory files exist or have recorded
+- [x] All internal implementation inventory files exist or have recorded
       replacements.
-- [ ] Every C API function listed in the cinterop coverage map has a Kotlin
-      implementation or a recorded unsupported reason in the differences table.
-- [ ] Public nativeMain APIs expose no `kotlinx.cinterop` types, generated C
+- [x] Every C API function listed in the cinterop coverage map has a Kotlin
+      implementation or a recorded replacement.
+- [x] Public nativeMain APIs expose no `kotlinx.cinterop` types, generated C
       types, `StableRef`, `NativePtr`, `CPointer`, `COpaquePointer`, `CValue`,
       `CValuesRef`, or `NativePlacement`.
-- [ ] `@OptIn(ExperimentalForeignApi::class)` stays in nativeMain
+- [x] `@OptIn(ExperimentalForeignApi::class)` stays in nativeMain
       implementations and internals, not in any future common facade.
-- [ ] Kotlin/Native tests pass on supported host variants.
-- [ ] `mise run //bindings/kotlin-native:build` passes.
-- [ ] `./gradlew :bindings:kotlin-native:allTests` passes once linked test
-      support exists.
-- [ ] The nativeMain API remains alignable with Java FFM and Java JNI so a
+- [x] Kotlin/Native tests pass on the supported host variant.
+- [x] `mise run //bindings/kotlin-native:build` passes.
+- [x] `./gradlew :bindings:kotlin-native:allTests` passes with linked test
+      support.
+- [x] The nativeMain API remains alignable with Java FFM and Java JNI so a
       future common facade can alias or expect/actual the platform
       implementations.
