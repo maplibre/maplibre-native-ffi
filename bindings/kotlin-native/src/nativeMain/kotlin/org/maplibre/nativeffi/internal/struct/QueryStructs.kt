@@ -1,11 +1,13 @@
 package org.maplibre.nativeffi.internal.struct
 
 import kotlinx.cinterop.CPointer
+import kotlinx.cinterop.CValue
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.MemScope
 import kotlinx.cinterop.ULongVar
 import kotlinx.cinterop.alloc
 import kotlinx.cinterop.allocArray
+import kotlinx.cinterop.cValue
 import kotlinx.cinterop.get
 import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.ptr
@@ -22,9 +24,6 @@ import org.maplibre.nativeffi.internal.c.MLN_QUERIED_FEATURE_SOURCE_ID
 import org.maplibre.nativeffi.internal.c.MLN_QUERIED_FEATURE_SOURCE_LAYER_ID
 import org.maplibre.nativeffi.internal.c.MLN_QUERIED_FEATURE_STATE
 import org.maplibre.nativeffi.internal.c.MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS
-import org.maplibre.nativeffi.internal.c.MLN_RENDERED_QUERY_GEOMETRY_TYPE_BOX
-import org.maplibre.nativeffi.internal.c.MLN_RENDERED_QUERY_GEOMETRY_TYPE_LINE_STRING
-import org.maplibre.nativeffi.internal.c.MLN_RENDERED_QUERY_GEOMETRY_TYPE_POINT
 import org.maplibre.nativeffi.internal.c.MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS
 import org.maplibre.nativeffi.internal.c.mln_feature_collection
 import org.maplibre.nativeffi.internal.c.mln_feature_extension_result_destroy
@@ -38,6 +37,10 @@ import org.maplibre.nativeffi.internal.c.mln_queried_feature
 import org.maplibre.nativeffi.internal.c.mln_rendered_feature_query_options
 import org.maplibre.nativeffi.internal.c.mln_rendered_feature_query_options_default
 import org.maplibre.nativeffi.internal.c.mln_rendered_query_geometry
+import org.maplibre.nativeffi.internal.c.mln_rendered_query_geometry_box
+import org.maplibre.nativeffi.internal.c.mln_rendered_query_geometry_line_string
+import org.maplibre.nativeffi.internal.c.mln_rendered_query_geometry_point
+import org.maplibre.nativeffi.internal.c.mln_screen_box
 import org.maplibre.nativeffi.internal.c.mln_source_feature_query_options
 import org.maplibre.nativeffi.internal.c.mln_source_feature_query_options_default
 import org.maplibre.nativeffi.internal.c.mln_string_view
@@ -97,22 +100,17 @@ internal object QueryStructs {
     scope: MemScope,
   ): CPointer<mln_rendered_query_geometry> {
     val native = scope.alloc<mln_rendered_query_geometry>()
-    native.size = sizeOf<mln_rendered_query_geometry>().toUInt()
     when (value) {
-      is RenderedQueryGeometry.Point -> {
-        native.type = MLN_RENDERED_QUERY_GEOMETRY_TYPE_POINT
-        native.data.point.x = value.point.x
-        native.data.point.y = value.point.y
-      }
-      is RenderedQueryGeometry.Box -> {
-        native.type = MLN_RENDERED_QUERY_GEOMETRY_TYPE_BOX
-        setScreenBox(native.data.box, value.box)
-      }
-      is RenderedQueryGeometry.LineString -> {
-        native.type = MLN_RENDERED_QUERY_GEOMETRY_TYPE_LINE_STRING
-        native.data.line_string.points = CoreStructs.screenPointArray(value.points, scope)
-        native.data.line_string.point_count = value.points.size.toULong()
-      }
+      is RenderedQueryGeometry.Point ->
+        mln_rendered_query_geometry_point(CoreStructs.screenPoint(value.point)).place(native.ptr)
+      is RenderedQueryGeometry.Box ->
+        mln_rendered_query_geometry_box(screenBox(value.box)).place(native.ptr)
+      is RenderedQueryGeometry.LineString ->
+        mln_rendered_query_geometry_line_string(
+            CoreStructs.screenPointArray(value.points, scope),
+            value.points.size.toULong(),
+          )
+          .place(native.ptr)
     }
     return native.ptr
   }
@@ -203,14 +201,11 @@ internal object QueryStructs {
       ValueStructs.featureSnapshot(value.features!![index].ptr)
     }
 
-  private fun setScreenBox(
-    native: org.maplibre.nativeffi.internal.c.mln_screen_box,
-    value: ScreenBox,
-  ) {
-    native.min.x = value.min.x
-    native.min.y = value.min.y
-    native.max.x = value.max.x
-    native.max.y = value.max.y
+  private fun screenBox(value: ScreenBox): CValue<mln_screen_box> = cValue {
+    min.x = value.min.x
+    min.y = value.min.y
+    max.x = value.max.x
+    max.y = value.max.y
   }
 
   private fun stringViewArray(values: List<String>, scope: MemScope): CPointer<mln_string_view>? {

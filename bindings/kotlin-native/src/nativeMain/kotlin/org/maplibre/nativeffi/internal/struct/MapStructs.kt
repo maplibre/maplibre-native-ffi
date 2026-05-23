@@ -7,6 +7,7 @@ import kotlinx.cinterop.alloc
 import kotlinx.cinterop.ptr
 import org.maplibre.nativeffi.camera.AnimationOptions
 import org.maplibre.nativeffi.camera.BoundOptions
+import org.maplibre.nativeffi.camera.CameraFitOptions
 import org.maplibre.nativeffi.camera.CameraOptions
 import org.maplibre.nativeffi.camera.FreeCameraOptions
 import org.maplibre.nativeffi.internal.c.MLN_ANIMATION_OPTION_DURATION
@@ -18,6 +19,9 @@ import org.maplibre.nativeffi.internal.c.MLN_BOUND_OPTION_MAX_PITCH
 import org.maplibre.nativeffi.internal.c.MLN_BOUND_OPTION_MAX_ZOOM
 import org.maplibre.nativeffi.internal.c.MLN_BOUND_OPTION_MIN_PITCH
 import org.maplibre.nativeffi.internal.c.MLN_BOUND_OPTION_MIN_ZOOM
+import org.maplibre.nativeffi.internal.c.MLN_CAMERA_FIT_OPTION_BEARING
+import org.maplibre.nativeffi.internal.c.MLN_CAMERA_FIT_OPTION_PADDING
+import org.maplibre.nativeffi.internal.c.MLN_CAMERA_FIT_OPTION_PITCH
 import org.maplibre.nativeffi.internal.c.MLN_CAMERA_OPTION_ANCHOR
 import org.maplibre.nativeffi.internal.c.MLN_CAMERA_OPTION_BEARING
 import org.maplibre.nativeffi.internal.c.MLN_CAMERA_OPTION_CENTER
@@ -46,6 +50,8 @@ import org.maplibre.nativeffi.internal.c.mln_animation_options
 import org.maplibre.nativeffi.internal.c.mln_animation_options_default
 import org.maplibre.nativeffi.internal.c.mln_bound_options
 import org.maplibre.nativeffi.internal.c.mln_bound_options_default
+import org.maplibre.nativeffi.internal.c.mln_camera_fit_options
+import org.maplibre.nativeffi.internal.c.mln_camera_fit_options_default
 import org.maplibre.nativeffi.internal.c.mln_camera_options
 import org.maplibre.nativeffi.internal.c.mln_camera_options_default
 import org.maplibre.nativeffi.internal.c.mln_free_camera_options
@@ -135,6 +141,27 @@ internal object MapStructs {
     value.fieldOfView?.let {
       native.fields = native.fields or MLN_CAMERA_OPTION_FOV
       native.field_of_view = it
+    }
+    return native.ptr
+  }
+
+  fun cameraFitOptions(value: CameraFitOptions, scope: MemScope): CPointer<mln_camera_fit_options> {
+    val native = scope.alloc<mln_camera_fit_options>()
+    mln_camera_fit_options_default().place(native.ptr)
+    value.padding?.let {
+      native.fields = native.fields or MLN_CAMERA_FIT_OPTION_PADDING
+      native.padding.top = it.top
+      native.padding.left = it.left
+      native.padding.bottom = it.bottom
+      native.padding.right = it.right
+    }
+    value.bearing?.let {
+      native.fields = native.fields or MLN_CAMERA_FIT_OPTION_BEARING
+      native.bearing = it
+    }
+    value.pitch?.let {
+      native.fields = native.fields or MLN_CAMERA_FIT_OPTION_PITCH
+      native.pitch = it
     }
     return native.ptr
   }

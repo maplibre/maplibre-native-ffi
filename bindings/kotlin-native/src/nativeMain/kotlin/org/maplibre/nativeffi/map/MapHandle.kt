@@ -23,10 +23,12 @@ import kotlinx.cinterop.sizeOf
 import kotlinx.cinterop.value
 import org.maplibre.nativeffi.camera.AnimationOptions
 import org.maplibre.nativeffi.camera.BoundOptions
+import org.maplibre.nativeffi.camera.CameraFitOptions
 import org.maplibre.nativeffi.camera.CameraOptions
 import org.maplibre.nativeffi.camera.FreeCameraOptions
 import org.maplibre.nativeffi.geo.CanonicalTileId
 import org.maplibre.nativeffi.geo.GeoJson
+import org.maplibre.nativeffi.geo.Geometry
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.LatLngBounds
 import org.maplibre.nativeffi.geo.ScreenPoint
@@ -34,6 +36,7 @@ import org.maplibre.nativeffi.internal.c.mln_bound_options_default
 import org.maplibre.nativeffi.internal.c.mln_camera_options_default
 import org.maplibre.nativeffi.internal.c.mln_free_camera_options_default
 import org.maplibre.nativeffi.internal.c.mln_lat_lng
+import org.maplibre.nativeffi.internal.c.mln_lat_lng_bounds
 import org.maplibre.nativeffi.internal.c.mln_map_add_color_relief_layer
 import org.maplibre.nativeffi.internal.c.mln_map_add_custom_geometry_source
 import org.maplibre.nativeffi.internal.c.mln_map_add_geojson_source_data
@@ -50,6 +53,9 @@ import org.maplibre.nativeffi.internal.c.mln_map_add_style_layer_json
 import org.maplibre.nativeffi.internal.c.mln_map_add_style_source_json
 import org.maplibre.nativeffi.internal.c.mln_map_add_vector_source_tiles
 import org.maplibre.nativeffi.internal.c.mln_map_add_vector_source_url
+import org.maplibre.nativeffi.internal.c.mln_map_camera_for_geometry
+import org.maplibre.nativeffi.internal.c.mln_map_camera_for_lat_lng_bounds
+import org.maplibre.nativeffi.internal.c.mln_map_camera_for_lat_lngs
 import org.maplibre.nativeffi.internal.c.mln_map_cancel_transitions
 import org.maplibre.nativeffi.internal.c.mln_map_copy_style_image_premultiplied_rgba8
 import org.maplibre.nativeffi.internal.c.mln_map_copy_style_source_attribution
@@ -79,6 +85,8 @@ import org.maplibre.nativeffi.internal.c.mln_map_invalidate_custom_geometry_sour
 import org.maplibre.nativeffi.internal.c.mln_map_invalidate_custom_geometry_source_tile
 import org.maplibre.nativeffi.internal.c.mln_map_is_fully_loaded
 import org.maplibre.nativeffi.internal.c.mln_map_jump_to
+import org.maplibre.nativeffi.internal.c.mln_map_lat_lng_bounds_for_camera
+import org.maplibre.nativeffi.internal.c.mln_map_lat_lng_bounds_for_camera_unwrapped
 import org.maplibre.nativeffi.internal.c.mln_map_lat_lng_for_pixel
 import org.maplibre.nativeffi.internal.c.mln_map_lat_lngs_for_pixels
 import org.maplibre.nativeffi.internal.c.mln_map_list_style_layer_ids
@@ -1176,6 +1184,86 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
 
   public fun cancelTransitions() {
     Status.check(mln_map_cancel_transitions(state.requireLive()))
+  }
+
+  public fun cameraForLatLngBounds(bounds: LatLngBounds): CameraOptions =
+    cameraForLatLngBounds(bounds, null)
+
+  public fun cameraForLatLngBounds(
+    bounds: LatLngBounds,
+    fitOptions: CameraFitOptions?,
+  ): CameraOptions = memScoped {
+    val outCamera = mln_camera_options_default().getPointer(this)
+    Status.check(
+      mln_map_camera_for_lat_lng_bounds(
+        state.requireLive(),
+        CoreStructs.latLngBounds(bounds),
+        fitOptions?.let { MapStructs.cameraFitOptions(it, this) },
+        outCamera,
+      )
+    )
+    MapStructs.cameraOptions(outCamera.pointed)
+  }
+
+  public fun cameraForLatLngs(coordinates: List<LatLng>): CameraOptions =
+    cameraForLatLngs(coordinates, null)
+
+  public fun cameraForLatLngs(
+    coordinates: List<LatLng>,
+    fitOptions: CameraFitOptions?,
+  ): CameraOptions = memScoped {
+    val outCamera = mln_camera_options_default().getPointer(this)
+    Status.check(
+      mln_map_camera_for_lat_lngs(
+        state.requireLive(),
+        CoreStructs.latLngArray(coordinates, this),
+        coordinates.size.toULong(),
+        fitOptions?.let { MapStructs.cameraFitOptions(it, this) },
+        outCamera,
+      )
+    )
+    MapStructs.cameraOptions(outCamera.pointed)
+  }
+
+  public fun cameraForGeometry(geometry: Geometry): CameraOptions =
+    cameraForGeometry(geometry, null)
+
+  public fun cameraForGeometry(geometry: Geometry, fitOptions: CameraFitOptions?): CameraOptions =
+    memScoped {
+      val outCamera = mln_camera_options_default().getPointer(this)
+      Status.check(
+        mln_map_camera_for_geometry(
+          state.requireLive(),
+          ValueStructs.geometry(geometry, this),
+          fitOptions?.let { MapStructs.cameraFitOptions(it, this) },
+          outCamera,
+        )
+      )
+      MapStructs.cameraOptions(outCamera.pointed)
+    }
+
+  public fun latLngBoundsForCamera(camera: CameraOptions): LatLngBounds = memScoped {
+    val outBounds = alloc<mln_lat_lng_bounds>()
+    Status.check(
+      mln_map_lat_lng_bounds_for_camera(
+        state.requireLive(),
+        MapStructs.cameraOptions(camera, this),
+        outBounds.ptr,
+      )
+    )
+    CoreStructs.latLngBounds(outBounds)
+  }
+
+  public fun latLngBoundsForCameraUnwrapped(camera: CameraOptions): LatLngBounds = memScoped {
+    val outBounds = alloc<mln_lat_lng_bounds>()
+    Status.check(
+      mln_map_lat_lng_bounds_for_camera_unwrapped(
+        state.requireLive(),
+        MapStructs.cameraOptions(camera, this),
+        outBounds.ptr,
+      )
+    )
+    CoreStructs.latLngBounds(outBounds)
   }
 
   public fun bounds(): BoundOptions = memScoped {

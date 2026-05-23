@@ -6,9 +6,11 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import org.maplibre.nativeffi.camera.AnimationOptions
 import org.maplibre.nativeffi.camera.BoundOptions
+import org.maplibre.nativeffi.camera.CameraFitOptions
 import org.maplibre.nativeffi.camera.CameraOptions
 import org.maplibre.nativeffi.camera.EdgeInsets
 import org.maplibre.nativeffi.camera.FreeCameraOptions
+import org.maplibre.nativeffi.geo.Geometry
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.LatLngBounds
 import org.maplibre.nativeffi.geo.Quaternion
@@ -66,7 +68,15 @@ class MapCameraControlsTest {
         assertTrue(camera.hasCenter())
         assertTrue(camera.hasZoom())
         map.cancelTransitions()
-        map.setBounds(BoundOptions().bounds(LatLngBounds(LatLng(-10.0, -10.0), LatLng(10.0, 10.0))))
+        val fitOptions = CameraFitOptions().padding(EdgeInsets.ZERO).bearing(0.0).pitch(0.0)
+        val bounds = LatLngBounds(LatLng(-10.0, -10.0), LatLng(10.0, 10.0))
+        map.cameraForLatLngBounds(bounds)
+        map.cameraForLatLngBounds(bounds, fitOptions)
+        map.cameraForLatLngs(listOf(LatLng(-1.0, -1.0), LatLng(1.0, 1.0)), fitOptions)
+        map.cameraForGeometry(Geometry.point(LatLng(0.0, 0.0)), fitOptions)
+        map.latLngBoundsForCamera(cameraOptions)
+        map.latLngBoundsForCameraUnwrapped(cameraOptions)
+        map.setBounds(BoundOptions().bounds(bounds))
         assertTrue(map.bounds().hasBounds())
         map.setFreeCameraOptions(
           FreeCameraOptions()
