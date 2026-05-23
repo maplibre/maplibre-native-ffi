@@ -664,6 +664,97 @@ func TestMapDebugOptionsRejectUnknownBits(t *testing.T) {
 	}
 }
 
+func TestMapViewportTileAndProjectionOptionsRoundTrip(t *testing.T) {
+	runtime, err := NewRuntime()
+	if err != nil {
+		t.Fatalf("NewRuntime(): %v", err)
+	}
+	m, err := runtime.NewMap()
+	if err != nil {
+		_ = runtime.Close()
+		t.Fatalf("NewMap(): %v", err)
+	}
+	defer func() {
+		if err := m.Close(); err != nil {
+			t.Errorf("Map Close(): %v", err)
+		}
+		if err := runtime.Close(); err != nil {
+			t.Errorf("Runtime Close(): %v", err)
+		}
+	}()
+
+	viewport := ViewportOptions{}.
+		WithNorthOrientation(NorthOrientationUp).
+		WithConstrainMode(ConstrainModeWidthAndHeight).
+		WithViewportMode(ViewportModeDefault).
+		WithFrustumOffset(EdgeInsets{Top: 1, Left: 2, Bottom: 3, Right: 4})
+	if err := m.SetViewportOptions(viewport); err != nil {
+		t.Fatalf("SetViewportOptions(): %v", err)
+	}
+	gotViewport, err := m.ViewportOptions()
+	if err != nil {
+		t.Fatalf("ViewportOptions(): %v", err)
+	}
+	if gotViewport.NorthOrientation == nil || *gotViewport.NorthOrientation != NorthOrientationUp {
+		t.Fatalf("ViewportOptions().NorthOrientation = %v", gotViewport.NorthOrientation)
+	}
+	if gotViewport.FrustumOffset == nil || *gotViewport.FrustumOffset != (EdgeInsets{Top: 1, Left: 2, Bottom: 3, Right: 4}) {
+		t.Fatalf("ViewportOptions().FrustumOffset = %#v", gotViewport.FrustumOffset)
+	}
+
+	tileOptions := TileOptions{}.
+		WithPrefetchZoomDelta(2).
+		WithLODMode(TileLODModeDefault)
+	if err := m.SetTileOptions(tileOptions); err != nil {
+		t.Fatalf("SetTileOptions(): %v", err)
+	}
+	gotTileOptions, err := m.TileOptions()
+	if err != nil {
+		t.Fatalf("TileOptions(): %v", err)
+	}
+	if gotTileOptions.PrefetchZoomDelta == nil || *gotTileOptions.PrefetchZoomDelta != 2 {
+		t.Fatalf("TileOptions().PrefetchZoomDelta = %v", gotTileOptions.PrefetchZoomDelta)
+	}
+
+	projectionMode := ProjectionModeOptions{}.
+		WithAxonometric(true).
+		WithSkew(0.5, 0.25)
+	if err := m.SetProjectionMode(projectionMode); err != nil {
+		t.Fatalf("SetProjectionMode(): %v", err)
+	}
+	gotProjectionMode, err := m.ProjectionMode()
+	if err != nil {
+		t.Fatalf("ProjectionMode(): %v", err)
+	}
+	if gotProjectionMode.Axonometric == nil || !*gotProjectionMode.Axonometric {
+		t.Fatalf("ProjectionMode().Axonometric = %v", gotProjectionMode.Axonometric)
+	}
+}
+
+func TestTileOptionsRejectInvalidPrefetchZoomDelta(t *testing.T) {
+	runtime, err := NewRuntime()
+	if err != nil {
+		t.Fatalf("NewRuntime(): %v", err)
+	}
+	m, err := runtime.NewMap()
+	if err != nil {
+		_ = runtime.Close()
+		t.Fatalf("NewMap(): %v", err)
+	}
+	defer func() {
+		if err := m.Close(); err != nil {
+			t.Errorf("Map Close(): %v", err)
+		}
+		if err := runtime.Close(); err != nil {
+			t.Errorf("Runtime Close(): %v", err)
+		}
+	}()
+
+	if err := m.SetTileOptions(TileOptions{}.WithPrefetchZoomDelta(256)); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("SetTileOptions(invalid prefetch) error = %v, want ErrInvalidArgument", err)
+	}
+}
+
 func TestMapStyleStringsRejectEmbeddedNUL(t *testing.T) {
 	runtime, err := NewRuntime()
 	if err != nil {

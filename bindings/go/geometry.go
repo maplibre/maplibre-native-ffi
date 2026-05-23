@@ -14,6 +14,14 @@ type ScreenPoint struct {
 	Y float64
 }
 
+// EdgeInsets is a screen-space inset in logical map pixels.
+type EdgeInsets struct {
+	Top    float64
+	Left   float64
+	Bottom float64
+	Right  float64
+}
+
 // ProjectedMeters is a spherical Mercator coordinate in meters.
 type ProjectedMeters struct {
 	Northing float64
@@ -36,6 +44,14 @@ func latLngFromCAPI(coordinate capi.LatLng) LatLng {
 
 func (point ScreenPoint) toCAPI() capi.ScreenPoint {
 	return capi.ScreenPoint{X: point.X, Y: point.Y}
+}
+
+func (insets EdgeInsets) toCAPI() capi.EdgeInsets {
+	return capi.EdgeInsets{Top: insets.Top, Left: insets.Left, Bottom: insets.Bottom, Right: insets.Right}
+}
+
+func edgeInsetsFromCAPI(insets capi.EdgeInsets) EdgeInsets {
+	return EdgeInsets{Top: insets.Top, Left: insets.Left, Bottom: insets.Bottom, Right: insets.Right}
 }
 
 func screenPointFromCAPI(point capi.ScreenPoint) ScreenPoint {

@@ -75,6 +75,14 @@ type ScreenPoint struct {
 	Y float64
 }
 
+// EdgeInsets is a screen-space inset in logical map pixels.
+type EdgeInsets struct {
+	Top    float64
+	Left   float64
+	Bottom float64
+	Right  float64
+}
+
 // ProjectedMeters is a spherical Mercator coordinate in meters.
 type ProjectedMeters struct {
 	Northing float64
@@ -85,6 +93,34 @@ type ProjectedMeters struct {
 type LatLngBounds struct {
 	Southwest LatLng
 	Northeast LatLng
+}
+
+// ViewportOptions contains semantic viewport and render-transform controls.
+type ViewportOptions struct {
+	Fields           uint32
+	NorthOrientation uint32
+	ConstrainMode    uint32
+	ViewportMode     uint32
+	FrustumOffset    EdgeInsets
+}
+
+// TileOptions contains semantic tile prefetch and LOD controls.
+type TileOptions struct {
+	Fields            uint32
+	PrefetchZoomDelta uint32
+	LODMinRadius      float64
+	LODScale          float64
+	LODPitchThreshold float64
+	LODZoomShift      float64
+	LODMode           uint32
+}
+
+// ProjectionModeOptions contains semantic axonometric projection controls.
+type ProjectionModeOptions struct {
+	Fields      uint32
+	Axonometric bool
+	XSkew       float64
+	YSkew       float64
 }
 
 // OfflineTilePyramidRegionDefinition contains tile-pyramid offline region data.
@@ -197,6 +233,52 @@ const (
 	MapDebugOverdraw    uint32 = uint32(C.MLN_MAP_DEBUG_OVERDRAW)
 	MapDebugStencilClip uint32 = uint32(C.MLN_MAP_DEBUG_STENCIL_CLIP)
 	MapDebugDepthBuffer uint32 = uint32(C.MLN_MAP_DEBUG_DEPTH_BUFFER)
+)
+
+const (
+	NorthOrientationUp    uint32 = uint32(C.MLN_NORTH_ORIENTATION_UP)
+	NorthOrientationRight uint32 = uint32(C.MLN_NORTH_ORIENTATION_RIGHT)
+	NorthOrientationDown  uint32 = uint32(C.MLN_NORTH_ORIENTATION_DOWN)
+	NorthOrientationLeft  uint32 = uint32(C.MLN_NORTH_ORIENTATION_LEFT)
+)
+
+const (
+	ConstrainModeNone           uint32 = uint32(C.MLN_CONSTRAIN_MODE_NONE)
+	ConstrainModeHeightOnly     uint32 = uint32(C.MLN_CONSTRAIN_MODE_HEIGHT_ONLY)
+	ConstrainModeWidthAndHeight uint32 = uint32(C.MLN_CONSTRAIN_MODE_WIDTH_AND_HEIGHT)
+	ConstrainModeScreen         uint32 = uint32(C.MLN_CONSTRAIN_MODE_SCREEN)
+)
+
+const (
+	ViewportModeDefault  uint32 = uint32(C.MLN_VIEWPORT_MODE_DEFAULT)
+	ViewportModeFlippedY uint32 = uint32(C.MLN_VIEWPORT_MODE_FLIPPED_Y)
+)
+
+const (
+	ViewportOptionNorthOrientation uint32 = uint32(C.MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION)
+	ViewportOptionConstrainMode    uint32 = uint32(C.MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE)
+	ViewportOptionViewportMode     uint32 = uint32(C.MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE)
+	ViewportOptionFrustumOffset    uint32 = uint32(C.MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET)
+)
+
+const (
+	TileLODModeDefault  uint32 = uint32(C.MLN_TILE_LOD_MODE_DEFAULT)
+	TileLODModeDistance uint32 = uint32(C.MLN_TILE_LOD_MODE_DISTANCE)
+)
+
+const (
+	TileOptionPrefetchZoomDelta uint32 = uint32(C.MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA)
+	TileOptionLODMinRadius      uint32 = uint32(C.MLN_MAP_TILE_OPTION_LOD_MIN_RADIUS)
+	TileOptionLODScale          uint32 = uint32(C.MLN_MAP_TILE_OPTION_LOD_SCALE)
+	TileOptionLODPitchThreshold uint32 = uint32(C.MLN_MAP_TILE_OPTION_LOD_PITCH_THRESHOLD)
+	TileOptionLODZoomShift      uint32 = uint32(C.MLN_MAP_TILE_OPTION_LOD_ZOOM_SHIFT)
+	TileOptionLODMode           uint32 = uint32(C.MLN_MAP_TILE_OPTION_LOD_MODE)
+)
+
+const (
+	ProjectionModeAxonometric uint32 = uint32(C.MLN_PROJECTION_MODE_AXONOMETRIC)
+	ProjectionModeXSkew       uint32 = uint32(C.MLN_PROJECTION_MODE_X_SKEW)
+	ProjectionModeYSkew       uint32 = uint32(C.MLN_PROJECTION_MODE_Y_SKEW)
 )
 
 const (
@@ -984,6 +1066,70 @@ func MapDumpDebugLogs(m *Map) Status {
 	return Status(C.mln_map_dump_debug_logs((*C.mln_map)(unsafe.Pointer(m))))
 }
 
+// MapGetViewportOptions copies live viewport controls.
+func MapGetViewportOptions(m *Map, out *ViewportOptions) Status {
+	raw := C.mln_map_viewport_options{size: C.uint32_t(unsafe.Sizeof(C.mln_map_viewport_options{}))}
+	status := Status(C.mln_map_get_viewport_options((*C.mln_map)(unsafe.Pointer(m)), &raw))
+	if status == StatusOK {
+		*out = viewportOptionsFromC(raw)
+	}
+	return status
+}
+
+// MapSetViewportOptions applies selected viewport controls.
+func MapSetViewportOptions(m *Map, options ViewportOptions) Status {
+	raw := C.mln_map_viewport_options_default()
+	raw.fields = C.uint32_t(options.Fields)
+	raw.north_orientation = C.uint32_t(options.NorthOrientation)
+	raw.constrain_mode = C.uint32_t(options.ConstrainMode)
+	raw.viewport_mode = C.uint32_t(options.ViewportMode)
+	raw.frustum_offset = edgeInsetsToC(options.FrustumOffset)
+	return Status(C.mln_map_set_viewport_options((*C.mln_map)(unsafe.Pointer(m)), &raw))
+}
+
+// MapGetTileOptions copies tile prefetch and LOD controls.
+func MapGetTileOptions(m *Map, out *TileOptions) Status {
+	raw := C.mln_map_tile_options{size: C.uint32_t(unsafe.Sizeof(C.mln_map_tile_options{}))}
+	status := Status(C.mln_map_get_tile_options((*C.mln_map)(unsafe.Pointer(m)), &raw))
+	if status == StatusOK {
+		*out = tileOptionsFromC(raw)
+	}
+	return status
+}
+
+// MapSetTileOptions applies selected tile prefetch and LOD controls.
+func MapSetTileOptions(m *Map, options TileOptions) Status {
+	raw := C.mln_map_tile_options_default()
+	raw.fields = C.uint32_t(options.Fields)
+	raw.prefetch_zoom_delta = C.uint32_t(options.PrefetchZoomDelta)
+	raw.lod_min_radius = C.double(options.LODMinRadius)
+	raw.lod_scale = C.double(options.LODScale)
+	raw.lod_pitch_threshold = C.double(options.LODPitchThreshold)
+	raw.lod_zoom_shift = C.double(options.LODZoomShift)
+	raw.lod_mode = C.uint32_t(options.LODMode)
+	return Status(C.mln_map_set_tile_options((*C.mln_map)(unsafe.Pointer(m)), &raw))
+}
+
+// MapGetProjectionMode copies axonometric rendering options.
+func MapGetProjectionMode(m *Map, out *ProjectionModeOptions) Status {
+	raw := C.mln_projection_mode{size: C.uint32_t(unsafe.Sizeof(C.mln_projection_mode{}))}
+	status := Status(C.mln_map_get_projection_mode((*C.mln_map)(unsafe.Pointer(m)), &raw))
+	if status == StatusOK {
+		*out = projectionModeOptionsFromC(raw)
+	}
+	return status
+}
+
+// MapSetProjectionMode applies axonometric rendering options.
+func MapSetProjectionMode(m *Map, options ProjectionModeOptions) Status {
+	raw := C.mln_projection_mode_default()
+	raw.fields = C.uint32_t(options.Fields)
+	raw.axonometric = C.bool(options.Axonometric)
+	raw.x_skew = C.double(options.XSkew)
+	raw.y_skew = C.double(options.YSkew)
+	return Status(C.mln_map_set_projection_mode((*C.mln_map)(unsafe.Pointer(m)), &raw))
+}
+
 // MapProjectionCreate creates a standalone projection helper from a map.
 func MapProjectionCreate(m *Map, out **Projection) Status {
 	var raw *C.mln_map_projection
@@ -1071,6 +1217,50 @@ func latLngBoundsFromC(bounds C.mln_lat_lng_bounds) LatLngBounds {
 
 func screenPointToC(point ScreenPoint) C.mln_screen_point {
 	return C.mln_screen_point{x: C.double(point.X), y: C.double(point.Y)}
+}
+
+func edgeInsetsToC(insets EdgeInsets) C.mln_edge_insets {
+	return C.mln_edge_insets{
+		top:    C.double(insets.Top),
+		left:   C.double(insets.Left),
+		bottom: C.double(insets.Bottom),
+		right:  C.double(insets.Right),
+	}
+}
+
+func edgeInsetsFromC(insets C.mln_edge_insets) EdgeInsets {
+	return EdgeInsets{Top: float64(insets.top), Left: float64(insets.left), Bottom: float64(insets.bottom), Right: float64(insets.right)}
+}
+
+func viewportOptionsFromC(options C.mln_map_viewport_options) ViewportOptions {
+	return ViewportOptions{
+		Fields:           uint32(options.fields),
+		NorthOrientation: uint32(options.north_orientation),
+		ConstrainMode:    uint32(options.constrain_mode),
+		ViewportMode:     uint32(options.viewport_mode),
+		FrustumOffset:    edgeInsetsFromC(options.frustum_offset),
+	}
+}
+
+func tileOptionsFromC(options C.mln_map_tile_options) TileOptions {
+	return TileOptions{
+		Fields:            uint32(options.fields),
+		PrefetchZoomDelta: uint32(options.prefetch_zoom_delta),
+		LODMinRadius:      float64(options.lod_min_radius),
+		LODScale:          float64(options.lod_scale),
+		LODPitchThreshold: float64(options.lod_pitch_threshold),
+		LODZoomShift:      float64(options.lod_zoom_shift),
+		LODMode:           uint32(options.lod_mode),
+	}
+}
+
+func projectionModeOptionsFromC(options C.mln_projection_mode) ProjectionModeOptions {
+	return ProjectionModeOptions{
+		Fields:      uint32(options.fields),
+		Axonometric: bool(options.axonometric),
+		XSkew:       float64(options.x_skew),
+		YSkew:       float64(options.y_skew),
+	}
 }
 
 func screenPointFromC(point C.mln_screen_point) ScreenPoint {

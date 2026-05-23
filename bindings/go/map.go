@@ -205,6 +205,79 @@ func (m *MapHandle) DumpDebugLogs() error {
 	return checkNative(func() capi.Status { return capi.MapDumpDebugLogs(ptr) })
 }
 
+// ViewportOptions returns live map viewport and render-transform controls.
+func (m *MapHandle) ViewportOptions() (ViewportOptions, error) {
+	ptr, err := m.ptr()
+	if err != nil {
+		return ViewportOptions{}, err
+	}
+	defer m.state.KeepAlive()
+	var raw capi.ViewportOptions
+	if err := checkNative(func() capi.Status { return capi.MapGetViewportOptions(ptr, &raw) }); err != nil {
+		return ViewportOptions{}, err
+	}
+	return viewportOptionsFromCAPI(raw), nil
+}
+
+// SetViewportOptions applies selected live map viewport and render-transform
+// controls.
+func (m *MapHandle) SetViewportOptions(options ViewportOptions) error {
+	ptr, err := m.ptr()
+	if err != nil {
+		return err
+	}
+	defer m.state.KeepAlive()
+	return checkNative(func() capi.Status { return capi.MapSetViewportOptions(ptr, options.toCAPI()) })
+}
+
+// TileOptions returns tile prefetch and LOD tuning controls.
+func (m *MapHandle) TileOptions() (TileOptions, error) {
+	ptr, err := m.ptr()
+	if err != nil {
+		return TileOptions{}, err
+	}
+	defer m.state.KeepAlive()
+	var raw capi.TileOptions
+	if err := checkNative(func() capi.Status { return capi.MapGetTileOptions(ptr, &raw) }); err != nil {
+		return TileOptions{}, err
+	}
+	return tileOptionsFromCAPI(raw), nil
+}
+
+// SetTileOptions applies selected tile prefetch and LOD tuning controls.
+func (m *MapHandle) SetTileOptions(options TileOptions) error {
+	ptr, err := m.ptr()
+	if err != nil {
+		return err
+	}
+	defer m.state.KeepAlive()
+	return checkNative(func() capi.Status { return capi.MapSetTileOptions(ptr, options.toCAPI()) })
+}
+
+// ProjectionMode returns current axonometric rendering options.
+func (m *MapHandle) ProjectionMode() (ProjectionModeOptions, error) {
+	ptr, err := m.ptr()
+	if err != nil {
+		return ProjectionModeOptions{}, err
+	}
+	defer m.state.KeepAlive()
+	var raw capi.ProjectionModeOptions
+	if err := checkNative(func() capi.Status { return capi.MapGetProjectionMode(ptr, &raw) }); err != nil {
+		return ProjectionModeOptions{}, err
+	}
+	return projectionModeOptionsFromCAPI(raw), nil
+}
+
+// SetProjectionMode applies axonometric rendering option fields.
+func (m *MapHandle) SetProjectionMode(options ProjectionModeOptions) error {
+	ptr, err := m.ptr()
+	if err != nil {
+		return err
+	}
+	defer m.state.KeepAlive()
+	return checkNative(func() capi.Status { return capi.MapSetProjectionMode(ptr, options.toCAPI()) })
+}
+
 // Close destroys this map. A successful close makes later calls no-ops. A
 // failed close leaves the native handle live so callers can retry on the owner
 // thread.
