@@ -1,22 +1,45 @@
 package org.maplibre.nativeffi.map
 
 import cnames.structs.mln_map
+import kotlinx.cinterop.BooleanVar
 import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.CPointerVarOf
 import kotlinx.cinterop.ExperimentalForeignApi
+import kotlinx.cinterop.UIntVar
 import kotlinx.cinterop.alloc
 import kotlinx.cinterop.memScoped
+import kotlinx.cinterop.pointed
 import kotlinx.cinterop.ptr
 import kotlinx.cinterop.value
+import org.maplibre.nativeffi.camera.CameraOptions
+import org.maplibre.nativeffi.internal.c.mln_camera_options_default
+import org.maplibre.nativeffi.internal.c.mln_map_cancel_transitions
 import org.maplibre.nativeffi.internal.c.mln_map_create
 import org.maplibre.nativeffi.internal.c.mln_map_destroy
+import org.maplibre.nativeffi.internal.c.mln_map_dump_debug_logs
+import org.maplibre.nativeffi.internal.c.mln_map_get_camera
+import org.maplibre.nativeffi.internal.c.mln_map_get_debug_options
+import org.maplibre.nativeffi.internal.c.mln_map_get_rendering_stats_view_enabled
+import org.maplibre.nativeffi.internal.c.mln_map_get_tile_options
+import org.maplibre.nativeffi.internal.c.mln_map_get_viewport_options
+import org.maplibre.nativeffi.internal.c.mln_map_is_fully_loaded
+import org.maplibre.nativeffi.internal.c.mln_map_jump_to
 import org.maplibre.nativeffi.internal.c.mln_map_options
 import org.maplibre.nativeffi.internal.c.mln_map_options_default
+import org.maplibre.nativeffi.internal.c.mln_map_request_repaint
+import org.maplibre.nativeffi.internal.c.mln_map_request_still_image
+import org.maplibre.nativeffi.internal.c.mln_map_set_debug_options
+import org.maplibre.nativeffi.internal.c.mln_map_set_rendering_stats_view_enabled
 import org.maplibre.nativeffi.internal.c.mln_map_set_style_json
 import org.maplibre.nativeffi.internal.c.mln_map_set_style_url
+import org.maplibre.nativeffi.internal.c.mln_map_set_tile_options
+import org.maplibre.nativeffi.internal.c.mln_map_set_viewport_options
+import org.maplibre.nativeffi.internal.c.mln_map_tile_options_default
+import org.maplibre.nativeffi.internal.c.mln_map_viewport_options_default
 import org.maplibre.nativeffi.internal.lifecycle.HandleState
 import org.maplibre.nativeffi.internal.memory.MemoryUtil
 import org.maplibre.nativeffi.internal.status.Status
+import org.maplibre.nativeffi.internal.struct.MapStructs
 import org.maplibre.nativeffi.runtime.RuntimeHandle
 
 /** Owned native map handle. Close it on the map owner thread. */
@@ -33,6 +56,89 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
   public fun setStyleJson(json: String) {
     MemoryUtil.requireValidCString(json)
     Status.check(mln_map_set_style_json(state.requireLive(), json))
+  }
+
+  public fun requestRepaint() {
+    Status.check(mln_map_request_repaint(state.requireLive()))
+  }
+
+  public fun requestStillImage() {
+    Status.check(mln_map_request_still_image(state.requireLive()))
+  }
+
+  public fun setDebugOptions(options: Set<DebugOption>) {
+    val mask = options.fold(0U) { acc, option -> acc or option.nativeMask }
+    Status.check(mln_map_set_debug_options(state.requireLive(), mask))
+  }
+
+  public fun debugOptions(): Set<DebugOption> = memScoped {
+    val outOptions = alloc<UIntVar>()
+    Status.check(mln_map_get_debug_options(state.requireLive(), outOptions.ptr))
+    DebugOption.entries.filterTo(mutableSetOf()) { (outOptions.value and it.nativeMask) != 0U }
+  }
+
+  public fun setRenderingStatsViewEnabled(enabled: Boolean) {
+    Status.check(mln_map_set_rendering_stats_view_enabled(state.requireLive(), enabled))
+  }
+
+  public fun isRenderingStatsViewEnabled(): Boolean = memScoped {
+    val outEnabled = alloc<BooleanVar>()
+    Status.check(mln_map_get_rendering_stats_view_enabled(state.requireLive(), outEnabled.ptr))
+    outEnabled.value
+  }
+
+  public fun isFullyLoaded(): Boolean = memScoped {
+    val outLoaded = alloc<BooleanVar>()
+    Status.check(mln_map_is_fully_loaded(state.requireLive(), outLoaded.ptr))
+    outLoaded.value
+  }
+
+  public fun dumpDebugLogs() {
+    Status.check(mln_map_dump_debug_logs(state.requireLive()))
+  }
+
+  public fun viewportOptions(): ViewportOptions = memScoped {
+    val outOptions = mln_map_viewport_options_default().getPointer(this)
+    Status.check(mln_map_get_viewport_options(state.requireLive(), outOptions))
+    MapStructs.viewportOptions(outOptions.pointed)
+  }
+
+  public fun setViewportOptions(options: ViewportOptions) {
+    memScoped {
+      Status.check(
+        mln_map_set_viewport_options(state.requireLive(), MapStructs.viewportOptions(options, this))
+      )
+    }
+  }
+
+  public fun tileOptions(): TileOptions = memScoped {
+    val outOptions = mln_map_tile_options_default().getPointer(this)
+    Status.check(mln_map_get_tile_options(state.requireLive(), outOptions))
+    MapStructs.tileOptions(outOptions.pointed)
+  }
+
+  public fun setTileOptions(options: TileOptions) {
+    memScoped {
+      Status.check(
+        mln_map_set_tile_options(state.requireLive(), MapStructs.tileOptions(options, this))
+      )
+    }
+  }
+
+  public fun camera(): CameraOptions = memScoped {
+    val outCamera = mln_camera_options_default().getPointer(this)
+    Status.check(mln_map_get_camera(state.requireLive(), outCamera))
+    MapStructs.cameraOptions(outCamera.pointed)
+  }
+
+  public fun jumpTo(camera: CameraOptions) {
+    memScoped {
+      Status.check(mln_map_jump_to(state.requireLive(), MapStructs.cameraOptions(camera, this)))
+    }
+  }
+
+  public fun cancelTransitions() {
+    Status.check(mln_map_cancel_transitions(state.requireLive()))
   }
 
   override fun close() {
