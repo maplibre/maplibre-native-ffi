@@ -5,6 +5,34 @@ summarizes the code-review rounds, applied fixes, rejected/deferred findings,
 user-input-needed findings, and validation used to close the iterative review
 loop.
 
+## Follow-up review-loop state
+
+- Branch: `golang`, pushed to `origin/golang`.
+- Deferred outcome implementation commit: `bda2f6d`
+  (`Implement Go deferred
+  review outcomes`). It implements the
+  resource-transform URL storage and asynchronous `SetStyleURL` custom-geometry
+  cleanup decisions recorded below.
+- Follow-up fix commit: `568df3c` (`Refine Go deferred review outcomes`). It
+  clears the resource-transform per-thread C URL storage at the start of each
+  bridge callback and documents that async style-URL custom-geometry cleanup
+  happens when callers poll runtime events and observe
+  `RuntimeEventMapStyleLoaded`.
+- Follow-up automated validation after `568df3c` passed:
+  - `gofmt -w bindings/go` passed.
+  - `dprint fmt --allow-no-files GO_BINDINGS_REVIEW_LOOP.md bindings/go/SPEC.md
+    bindings/go/style.go`
+    passed.
+  - `mise run //bindings/go:ci` passed.
+  - `git diff --check origin/main...HEAD` passed during review.
+  - `git diff --check` passed before committing `568df3c`.
+  - `git status --short --branch` reported a clean branch matching
+    `origin/golang` after push.
+- Follow-up review loop: implementation Round 1 identified two actionable polish
+  items; implementation Round 2 reviewed `568df3c` with correctness,
+  tests/validation, and maintainability/API-docs reviewers. All three reported
+  no actionable findings remaining.
+
 ## Prior review-loop state
 
 - Branch: `golang`, pushed to `origin/golang`.
@@ -85,7 +113,9 @@ The Go binding now uses a C bridge callback with per-thread replacement URL
 storage. The Go callback returns a call-scoped C string, the C bridge copies it
 into thread-local storage before returning to native, and native copies that
 thread-local URL before the next callback can reuse the same thread-local slot.
-This removes the previous unbounded Go-side append-only URL retention.
+The bridge clears the previous per-thread URL at the start of every callback, so
+later no-replacement or error callbacks do not keep stale storage alive. This
+removes the previous unbounded Go-side append-only URL retention.
 
 ### Custom geometry callbacks after asynchronous `SetStyleURL`
 
@@ -105,9 +135,28 @@ cleanup had a query error.
 
 ## User-input-needed findings
 
-The interview resolved the preferred directions above, and the first
-implementation pass applied them. No currently recorded deferred finding is
+The interview resolved the preferred directions above, and the follow-up
+implementation passes applied them. No currently recorded deferred finding is
 waiting on user input.
+
+## Follow-up no-actionable review evidence
+
+Implementation Round 2 reviewer conclusions after `568df3c`:
+
+- Correctness/ownership/cgo/concurrency: no actionable findings remained;
+  resource-transform URL lifetime, stale thread-local cleanup, temporary Go
+  callback string freeing, runtime map registry wiring, and custom geometry
+  cleanup paths were checked.
+- Tests/validation/CI: no actionable findings remained;
+  `mise run
+  //bindings/go:ci`, `git diff --check origin/main...HEAD`, uncached
+  Go tests under the mise/CGO environment, and targeted resource-transform and
+  async `SetStyleURL` tests were reported passing.
+- Maintainability/API docs/SPEC accuracy/scope hygiene: no actionable findings
+  remained; this record's reframing, public custom-geometry cleanup docs, and
+  SPEC notes were checked for consistency.
+
+No implementation Round 2 source/doc fixes were needed.
 
 ## Prior no-actionable review evidence
 
