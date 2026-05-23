@@ -35,6 +35,24 @@ import Testing
   #expect(map.isClosed)
 }
 
+@Test func styleURLRejectsEmbeddedNULAsPublicInvalidArgument() throws {
+  let runtime = try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
+  defer { try? runtime.close() }
+  let map = try MapHandle(runtime: runtime, options: MapOptions(width: 64, height: 64))
+  defer { try? map.close() }
+
+  do {
+    try map.setStyleURL("https://example.test/style\0oops")
+    Issue.record("embedded NUL should throw")
+  } catch let error as MaplibreError {
+    #expect(error.kind == .invalidArgument)
+    #expect(error.rawStatus == nil)
+    #expect(error.diagnostic.contains("embedded NUL"))
+  } catch {
+    Issue.record("unexpected error: \(error)")
+  }
+}
+
 @Test func closedMapReportsSwiftOwnedStateError() throws {
   let runtime = try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
   defer { try? runtime.close() }

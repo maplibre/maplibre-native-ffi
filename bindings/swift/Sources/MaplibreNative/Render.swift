@@ -408,7 +408,7 @@ public final class MetalOwnedTextureFrameHandle {
     frame == nil
   }
 
-  public func withBackendPointers<Result>(_ body: (MetalOwnedTextureFrameView) throws -> Result) throws -> Result {
+  public func withBackendPointers(_ body: (MetalOwnedTextureFrameView) throws -> Void) throws {
     guard let frame else {
       throw MaplibreError(kind: .invalidState, rawStatus: nil, diagnostic: "Metal texture frame is closed")
     }
@@ -418,7 +418,7 @@ public final class MetalOwnedTextureFrameHandle {
       isFrameLive: { [weak self] in self?.frame != nil }
     )
     defer { view.invalidate() }
-    return try body(view)
+    try body(view)
   }
 
   public func close() throws {
@@ -463,7 +463,7 @@ public final class VulkanOwnedTextureFrameHandle {
     frame == nil
   }
 
-  public func withBackendPointers<Result>(_ body: (VulkanOwnedTextureFrameView) throws -> Result) throws -> Result {
+  public func withBackendPointers(_ body: (VulkanOwnedTextureFrameView) throws -> Void) throws {
     guard let frame else {
       throw MaplibreError(kind: .invalidState, rawStatus: nil, diagnostic: "Vulkan texture frame is closed")
     }
@@ -473,7 +473,7 @@ public final class VulkanOwnedTextureFrameHandle {
       isFrameLive: { [weak self] in self?.frame != nil }
     )
     defer { view.invalidate() }
-    return try body(view)
+    try body(view)
   }
 
   public func close() throws {

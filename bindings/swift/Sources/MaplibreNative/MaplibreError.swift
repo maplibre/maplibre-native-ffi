@@ -56,5 +56,7 @@ func mapNativeFailure<T>(_ body: () throws -> T) throws -> T {
     return try body()
   } catch let failure as NativeStatusFailure {
     throw MaplibreError.fromNativeFailure(failure)
+  } catch let error as NativeStringError {
+    throw MaplibreError.invalidArgument(error.message)
   }
 }

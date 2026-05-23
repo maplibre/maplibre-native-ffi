@@ -131,11 +131,12 @@ public struct NativeResourceRequestHandleFunctions: Sendable {
 
 public final class NativeResourceRequestHandleState: @unchecked Sendable {
   private let functions: NativeResourceRequestHandleFunctions
-  private let lock = NSLock()
+  private let condition = NSCondition()
   private var pointer: OpaquePointer?
   private var providerReturnedHandle = false
   private var completed = false
-  private var completionInFlight = false
+  private var releaseRequested = false
+  private var inFlightOperations = 0
 
   public init(
     pointer: OpaquePointer?,
@@ -153,7 +154,7 @@ public final class NativeResourceRequestHandleState: @unchecked Sendable {
   }
 
   public func markProviderReturnedHandle() {
-    let handle = lock.withLock {
+    let handle = condition.withLock {
       providerReturnedHandle = true
       return takeReleasableHandleLocked()
     }
@@ -163,55 +164,28 @@ public final class NativeResourceRequestHandleState: @unchecked Sendable {
   }
 
   public func complete(_ response: NativeResourceResponseInput) throws {
-    let handle = try lock.withLock {
-      guard let pointer else {
-        throw NativeStatusFailure(rawStatus: 0, diagnostic: "resource request handle is closed")
-      }
-      guard !completed else {
-        throw NativeStatusFailure(rawStatus: 0, diagnostic: "resource request handle is already completed")
-      }
-      completed = true
-      completionInFlight = true
-      return pointer
-    }
-
+    let handle = try beginCompletionOperation()
     do {
       try functions.complete(handle, response)
     } catch {
-      finishCompletion()
+      finishNativeOperation()
       throw error
     }
-    finishCompletion()
+    finishNativeOperation()
   }
 
   public func isCancelled() throws -> Bool {
-    try functions.cancelled(requireLive())
+    let handle = try beginNativeOperation()
+    defer { finishNativeOperation() }
+    return try functions.cancelled(handle)
   }
 
   public func release() {
-    let handle = lock.withLock {
-      guard providerReturnedHandle, !completionInFlight else { return nil as OpaquePointer? }
-      let handle = pointer
-      pointer = nil
-      return handle
-    }
-    if let handle {
-      functions.release(handle)
-    }
-  }
-
-  private func requireLive() throws -> OpaquePointer {
-    try lock.withLock {
-      guard let pointer else {
-        throw NativeStatusFailure(rawStatus: 0, diagnostic: "resource request handle is closed")
+    let handle = condition.withLock {
+      releaseRequested = true
+      while providerReturnedHandle, inFlightOperations > 0 {
+        condition.wait()
       }
-      return pointer
-    }
-  }
-
-  private func finishCompletion() {
-    let handle = lock.withLock {
-      completionInFlight = false
       return takeReleasableHandleLocked()
     }
     if let handle {
@@ -219,8 +193,44 @@ public final class NativeResourceRequestHandleState: @unchecked Sendable {
     }
   }
 
+  private func beginNativeOperation() throws -> OpaquePointer {
+    try condition.withLock {
+      guard !releaseRequested, let pointer else {
+        throw NativeStatusFailure(rawStatus: 0, diagnostic: "resource request handle is closed")
+      }
+      inFlightOperations += 1
+      return pointer
+    }
+  }
+
+  private func beginCompletionOperation() throws -> OpaquePointer {
+    try condition.withLock {
+      guard !releaseRequested, let pointer else {
+        throw NativeStatusFailure(rawStatus: 0, diagnostic: "resource request handle is closed")
+      }
+      guard !completed else {
+        throw NativeStatusFailure(rawStatus: 0, diagnostic: "resource request handle is already completed")
+      }
+      completed = true
+      inFlightOperations += 1
+      return pointer
+    }
+  }
+
+  private func finishNativeOperation() {
+    let handle = condition.withLock {
+      inFlightOperations -= 1
+      let handle = takeReleasableHandleLocked()
+      condition.broadcast()
+      return handle
+    }
+    if let handle {
+      functions.release(handle)
+    }
+  }
+
   private func takeReleasableHandleLocked() -> OpaquePointer? {
-    guard providerReturnedHandle, completed, !completionInFlight else { return nil }
+    guard providerReturnedHandle, inFlightOperations == 0, completed || releaseRequested else { return nil }
     let handle = pointer
     pointer = nil
     return handle
