@@ -823,7 +823,9 @@ in small slices that prove binding-owned behavior:
 
 ## Draft status
 
-The binding is scaffolded. It leaves draft status when every C API coverage item
-has a C# implementation or a recorded unsupported reason, generated interop and
-layout checks run in CI, and tests cover the binding-owned lifetime, status,
-callback, memory, and render-frame invariants listed above.
+The non-packaging binding scope is implemented for draft review: generated
+interop covers the public C headers, public wrappers cover the C API coverage
+map with raw ABI details kept internal, and tests exercise the binding-owned
+lifetime, status, callback, memory, query/offline, and render-frame invariants
+listed above. Package production, native artifact distribution, publication, and
+the GUI example map remain future work outside this PR.
