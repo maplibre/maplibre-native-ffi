@@ -1165,6 +1165,66 @@ func TestStyleSourceMetadataForMissingSources(t *testing.T) {
 	}
 }
 
+func TestStyleLayerMetadataForMissingLayers(t *testing.T) {
+	runtime, err := NewRuntime()
+	if err != nil {
+		t.Fatalf("NewRuntime(): %v", err)
+	}
+	m, err := runtime.NewMap()
+	if err != nil {
+		_ = runtime.Close()
+		t.Fatalf("NewMap(): %v", err)
+	}
+	defer func() {
+		if err := m.Close(); err != nil {
+			t.Errorf("Map Close(): %v", err)
+		}
+		if err := runtime.Close(); err != nil {
+			t.Errorf("Runtime Close(): %v", err)
+		}
+	}()
+
+	if err := m.SetStyleJSON(`{"version":8,"sources":{},"layers":[]}`); err != nil {
+		t.Fatalf("SetStyleJSON(empty style): %v", err)
+	}
+	ids, err := m.StyleLayerIDs()
+	if err != nil {
+		t.Fatalf("StyleLayerIDs(): %v", err)
+	}
+	for _, id := range ids {
+		if id == "missing" {
+			t.Fatalf("StyleLayerIDs() unexpectedly contains missing layer: %v", ids)
+		}
+	}
+	exists, err := m.StyleLayerExists("missing")
+	if err != nil {
+		t.Fatalf("StyleLayerExists(): %v", err)
+	}
+	if exists {
+		t.Fatalf("StyleLayerExists(missing) = true, want false")
+	}
+	layerType, found, err := m.StyleLayerType("missing")
+	if err != nil {
+		t.Fatalf("StyleLayerType(): %v", err)
+	}
+	if found || layerType != "" {
+		t.Fatalf("StyleLayerType(missing) = (%q, %v), want empty false", layerType, found)
+	}
+	removed, err := m.RemoveStyleLayer("missing")
+	if err != nil {
+		t.Fatalf("RemoveStyleLayer(): %v", err)
+	}
+	if removed {
+		t.Fatalf("RemoveStyleLayer(missing) = true, want false")
+	}
+	if err := m.MoveStyleLayer("missing", ""); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("MoveStyleLayer(missing) error = %v, want ErrInvalidArgument", err)
+	}
+	if _, err := m.StyleLayerExists(""); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("StyleLayerExists(empty) error = %v, want ErrInvalidArgument", err)
+	}
+}
+
 func TestMapProjectionCameraAndVisibleCoordinates(t *testing.T) {
 	runtime, err := NewRuntime()
 	if err != nil {

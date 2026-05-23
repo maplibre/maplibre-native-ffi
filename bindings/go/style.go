@@ -129,3 +129,72 @@ func (m *MapHandle) StyleSourceIDs() ([]string, error) {
 	}
 	return ids, nil
 }
+
+// RemoveStyleLayer removes one style layer by ID and reports whether it was
+// present.
+func (m *MapHandle) RemoveStyleLayer(layerID string) (bool, error) {
+	ptr, err := m.ptr()
+	if err != nil {
+		return false, err
+	}
+	defer m.state.KeepAlive()
+	var removed bool
+	if err := checkNative(func() capi.Status { return capi.MapRemoveStyleLayer(ptr, layerID, &removed) }); err != nil {
+		return false, err
+	}
+	return removed, nil
+}
+
+// StyleLayerExists reports whether one style layer ID exists.
+func (m *MapHandle) StyleLayerExists(layerID string) (bool, error) {
+	ptr, err := m.ptr()
+	if err != nil {
+		return false, err
+	}
+	defer m.state.KeepAlive()
+	var exists bool
+	if err := checkNative(func() capi.Status { return capi.MapStyleLayerExists(ptr, layerID, &exists) }); err != nil {
+		return false, err
+	}
+	return exists, nil
+}
+
+// StyleLayerType returns a layer type string and whether the layer exists.
+func (m *MapHandle) StyleLayerType(layerID string) (string, bool, error) {
+	ptr, err := m.ptr()
+	if err != nil {
+		return "", false, err
+	}
+	defer m.state.KeepAlive()
+	var layerType string
+	var found bool
+	if err := checkNative(func() capi.Status { return capi.MapGetStyleLayerType(ptr, layerID, &layerType, &found) }); err != nil {
+		return "", false, err
+	}
+	return layerType, found, nil
+}
+
+// StyleLayerIDs returns copied layer IDs in style order.
+func (m *MapHandle) StyleLayerIDs() ([]string, error) {
+	ptr, err := m.ptr()
+	if err != nil {
+		return nil, err
+	}
+	defer m.state.KeepAlive()
+	var ids []string
+	if err := checkNative(func() capi.Status { return capi.MapListStyleLayerIDs(ptr, &ids) }); err != nil {
+		return nil, err
+	}
+	return ids, nil
+}
+
+// MoveStyleLayer moves one style layer before another layer. Passing an empty
+// beforeLayerID moves layerID to the top of the style order.
+func (m *MapHandle) MoveStyleLayer(layerID string, beforeLayerID string) error {
+	ptr, err := m.ptr()
+	if err != nil {
+		return err
+	}
+	defer m.state.KeepAlive()
+	return checkNative(func() capi.Status { return capi.MapMoveStyleLayer(ptr, layerID, beforeLayerID) })
+}

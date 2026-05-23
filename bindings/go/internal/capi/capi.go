@@ -1484,24 +1484,64 @@ func MapListStyleSourceIDs(m *Map, outIDs *[]string) Status {
 	if status != StatusOK {
 		return status
 	}
-	defer C.mln_style_id_list_destroy(rawList)
+	return copyStyleIDList(rawList, outIDs)
+}
 
-	var rawCount C.size_t
-	status = Status(C.mln_style_id_list_count(rawList, &rawCount))
+// MapRemoveStyleLayer removes one style layer by ID.
+func MapRemoveStyleLayer(m *Map, layerID string, outRemoved *bool) Status {
+	view := newStringView(layerID)
+	defer view.free()
+	var rawRemoved C.bool
+	status := Status(C.mln_map_remove_style_layer((*C.mln_map)(unsafe.Pointer(m)), view.raw(), &rawRemoved))
+	if status == StatusOK {
+		*outRemoved = bool(rawRemoved)
+	}
+	return status
+}
+
+// MapStyleLayerExists reports whether one style layer ID exists.
+func MapStyleLayerExists(m *Map, layerID string, outExists *bool) Status {
+	view := newStringView(layerID)
+	defer view.free()
+	var rawExists C.bool
+	status := Status(C.mln_map_style_layer_exists((*C.mln_map)(unsafe.Pointer(m)), view.raw(), &rawExists))
+	if status == StatusOK {
+		*outExists = bool(rawExists)
+	}
+	return status
+}
+
+// MapGetStyleLayerType gets one style layer type string.
+func MapGetStyleLayerType(m *Map, layerID string, outLayerType *string, outFound *bool) Status {
+	view := newStringView(layerID)
+	defer view.free()
+	var rawLayerType C.mln_string_view
+	var rawFound C.bool
+	status := Status(C.mln_map_get_style_layer_type((*C.mln_map)(unsafe.Pointer(m)), view.raw(), &rawLayerType, &rawFound))
+	if status == StatusOK {
+		*outLayerType = stringViewFromC(rawLayerType)
+		*outFound = bool(rawFound)
+	}
+	return status
+}
+
+// MapListStyleLayerIDs copies style layer IDs.
+func MapListStyleLayerIDs(m *Map, outIDs *[]string) Status {
+	var rawList *C.mln_style_id_list
+	status := Status(C.mln_map_list_style_layer_ids((*C.mln_map)(unsafe.Pointer(m)), &rawList))
 	if status != StatusOK {
 		return status
 	}
-	ids := make([]string, int(rawCount))
-	for i := range ids {
-		var rawID C.mln_string_view
-		status = Status(C.mln_style_id_list_get(rawList, C.size_t(i), &rawID))
-		if status != StatusOK {
-			return status
-		}
-		ids[i] = stringViewFromC(rawID)
-	}
-	*outIDs = ids
-	return StatusOK
+	return copyStyleIDList(rawList, outIDs)
+}
+
+// MapMoveStyleLayer moves one style layer before another layer or to the top.
+func MapMoveStyleLayer(m *Map, layerID string, beforeLayerID string) Status {
+	layerView := newStringView(layerID)
+	defer layerView.free()
+	beforeView := newStringView(beforeLayerID)
+	defer beforeView.free()
+	return Status(C.mln_map_move_style_layer((*C.mln_map)(unsafe.Pointer(m)), layerView.raw(), beforeView.raw()))
 }
 
 // MapSetDebugOptions sets the map debug overlay mask.
@@ -1921,6 +1961,26 @@ func stringViewFromC(view C.mln_string_view) string {
 		return ""
 	}
 	return C.GoStringN(view.data, C.int(view.size))
+}
+
+func copyStyleIDList(rawList *C.mln_style_id_list, outIDs *[]string) Status {
+	defer C.mln_style_id_list_destroy(rawList)
+	var rawCount C.size_t
+	status := Status(C.mln_style_id_list_count(rawList, &rawCount))
+	if status != StatusOK {
+		return status
+	}
+	ids := make([]string, int(rawCount))
+	for i := range ids {
+		var rawID C.mln_string_view
+		status = Status(C.mln_style_id_list_get(rawList, C.size_t(i), &rawID))
+		if status != StatusOK {
+			return status
+		}
+		ids[i] = stringViewFromC(rawID)
+	}
+	*outIDs = ids
+	return StatusOK
 }
 
 func styleSourceInfoFromC(info C.mln_style_source_info) StyleSourceInfo {
