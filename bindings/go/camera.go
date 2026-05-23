@@ -141,7 +141,7 @@ type AnimationOptions struct {
 	Easing     *UnitBezier
 }
 
-// WithDuration returns a copy that sets the duration in milliseconds.
+// WithDurationMS returns a copy that sets the duration in milliseconds.
 func (options AnimationOptions) WithDurationMS(durationMS float64) AnimationOptions {
 	options.DurationMS = new(float64)
 	*options.DurationMS = durationMS

@@ -7,16 +7,17 @@ loop.
 
 ## Final state
 
-- Latest reviewed/pushed commit: `b7f63ce` (`Document Go C payload test hook`).
+- Latest reviewed/pushed commit: `bad766f` (`Record Go review loop findings`).
 - Branch: `golang`, pushed to `origin/golang`.
 - Final automated validation after the latest commit:
   - `mise run //bindings/go:ci` passed.
   - `git diff --check origin/main...HEAD` passed.
   - `git status --short --branch` reported a clean branch matching
     `origin/golang`.
-- Final code-review loop: Round 9 completed with correctness, tests/validation,
-  and maintainability/API-docs reviewers. All three reported no actionable
-  findings remaining.
+- Final code-review loop: Round 10 completed with correctness, tests/validation,
+  and maintainability/API-docs reviewers. All three found no code-level
+  actionable findings; the only record-accuracy finding was applied in the next
+  commit.
 
 ## Applied findings by round
 
@@ -42,7 +43,9 @@ loop.
   runtime event payload structs and verifies Go copying.
 - Round 8: documented why the cgo runtime-event test hook lives in a non-test
   file and must remain small/test-only.
-- Round 9: final review-only loop; no fixes needed.
+- Round 9: review-only loop; no code fixes needed.
+- Round 10: final completion review after preserving this tracked record; fixed
+  stale record metadata and one stale public doc comment.
 
 ## Rejected or deferred findings
 
@@ -68,9 +71,14 @@ safe bounded implementation.
 
 ## Final no-actionable review evidence
 
-Round 9 reviewer conclusions:
+Round 10 reviewer conclusions:
 
-- Correctness/ownership/cgo/concurrency: no actionable findings remain.
-- Tests/validation/CI: no actionable findings remain.
-- Maintainability/API docs/SPEC accuracy/scope hygiene: no actionable findings
-  remain.
+- Correctness/ownership/cgo/concurrency: no Go binding code issue remained; the
+  tracked review record needed its latest-commit/final-round metadata refreshed.
+- Tests/validation/CI: no tests or CI issue remained; the tracked review record
+  needed its latest-commit/final-round metadata refreshed.
+- Maintainability/API docs/SPEC accuracy/scope hygiene: the tracked review
+  record needed its latest-commit/final-round metadata refreshed, and one stale
+  `WithDurationMS` doc comment needed correction.
+
+Those Round 10 record/doc findings were applied after the review.
