@@ -122,7 +122,8 @@ The scaffold implements one proof slice:
 - `GeneratedLayoutTests` verifies layout-sensitive binding facts that do not
   require the native library.
 - Native-library tests cover the C ABI version call, projection helper
-  round-tripping, and native status diagnostic mapping when run through
+  round-tripping, runtime/map close behavior, closed-wrapper validation, and
+  native status diagnostic mapping when run through
   `mise run //bindings/dotnet:test`.
 - `PublicApiSurfaceTests` keeps representative public concept types present as
   the binding surface expands.
