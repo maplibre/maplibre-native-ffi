@@ -198,6 +198,52 @@ func (options CustomGeometrySourceOptions) toCallback() callback.CustomGeometryS
 	return raw
 }
 
+// PremultipliedRGBA8Image contains caller-owned premultiplied RGBA8 pixels.
+type PremultipliedRGBA8Image struct {
+	Width      uint32
+	Height     uint32
+	Stride     uint32
+	Pixels     []byte
+	ByteLength uint64
+}
+
+// StyleImageOptions configures a runtime style image.
+type StyleImageOptions struct {
+	PixelRatio *float32
+	SDF        *bool
+}
+
+func (options StyleImageOptions) toCAPI() capi.StyleImageOptions {
+	var raw capi.StyleImageOptions
+	if options.PixelRatio != nil {
+		raw.Fields |= capi.StyleImageOptionPixelRatio
+		raw.PixelRatio = *options.PixelRatio
+	}
+	if options.SDF != nil {
+		raw.Fields |= capi.StyleImageOptionSDF
+		raw.SDF = *options.SDF
+	}
+	return raw
+}
+
+// StyleImageInfo contains copied runtime style image metadata.
+type StyleImageInfo struct {
+	Width      uint32
+	Height     uint32
+	Stride     uint32
+	ByteLength uint64
+	PixelRatio float32
+	SDF        bool
+}
+
+func (image PremultipliedRGBA8Image) toCAPI() capi.PremultipliedRGBA8Image {
+	return capi.PremultipliedRGBA8Image{Width: image.Width, Height: image.Height, Stride: image.Stride, Pixels: image.Pixels, ByteLength: image.ByteLength}
+}
+
+func styleImageInfoFromCAPI(info capi.StyleImageInfo) StyleImageInfo {
+	return StyleImageInfo{Width: info.Width, Height: info.Height, Stride: info.Stride, ByteLength: info.ByteLength, PixelRatio: info.PixelRatio, SDF: info.SDF}
+}
+
 func styleSourceInfoFromCAPI(info capi.StyleSourceInfo) StyleSourceInfo {
 	return StyleSourceInfo{
 		Type:            StyleSourceType(info.Type),
@@ -338,6 +384,90 @@ func (m *MapHandle) InvalidateCustomGeometrySourceRegion(sourceID string, bounds
 	return checkNative(func() capi.Status {
 		return capi.MapInvalidateCustomGeometrySourceRegion(ptr, sourceID, bounds.toCAPI())
 	})
+}
+
+// SetStyleImage sets or replaces one runtime style image.
+func (m *MapHandle) SetStyleImage(imageID string, image PremultipliedRGBA8Image, options StyleImageOptions) error {
+	ptr, err := m.ptr()
+	if err != nil {
+		return err
+	}
+	defer m.state.KeepAlive()
+	return checkNative(func() capi.Status { return capi.MapSetStyleImage(ptr, imageID, image.toCAPI(), options.toCAPI()) })
+}
+
+// RemoveStyleImage removes one runtime style image and reports whether it existed.
+func (m *MapHandle) RemoveStyleImage(imageID string) (bool, error) {
+	ptr, err := m.ptr()
+	if err != nil {
+		return false, err
+	}
+	defer m.state.KeepAlive()
+	var removed bool
+	if err := checkNative(func() capi.Status { return capi.MapRemoveStyleImage(ptr, imageID, &removed) }); err != nil {
+		return false, err
+	}
+	return removed, nil
+}
+
+// StyleImageExists reports whether one runtime style image exists.
+func (m *MapHandle) StyleImageExists(imageID string) (bool, error) {
+	ptr, err := m.ptr()
+	if err != nil {
+		return false, err
+	}
+	defer m.state.KeepAlive()
+	var exists bool
+	if err := checkNative(func() capi.Status { return capi.MapStyleImageExists(ptr, imageID, &exists) }); err != nil {
+		return false, err
+	}
+	return exists, nil
+}
+
+// StyleImageInfo returns copied metadata for one runtime style image.
+func (m *MapHandle) StyleImageInfo(imageID string) (StyleImageInfo, bool, error) {
+	ptr, err := m.ptr()
+	if err != nil {
+		return StyleImageInfo{}, false, err
+	}
+	defer m.state.KeepAlive()
+	var info capi.StyleImageInfo
+	var found bool
+	if err := checkNative(func() capi.Status { return capi.MapGetStyleImageInfo(ptr, imageID, &info, &found) }); err != nil {
+		return StyleImageInfo{}, false, err
+	}
+	return styleImageInfoFromCAPI(info), found, nil
+}
+
+// StyleImagePremultipliedRGBA8 returns copied tightly packed premultiplied RGBA8 pixels.
+func (m *MapHandle) StyleImagePremultipliedRGBA8(imageID string) ([]byte, bool, error) {
+	info, found, err := m.StyleImageInfo(imageID)
+	if err != nil || !found {
+		return nil, found, err
+	}
+	pixels := make([]byte, int(info.ByteLength))
+	byteLength, found, err := m.StyleImagePremultipliedRGBA8Into(imageID, pixels)
+	if err != nil {
+		return nil, found, err
+	}
+	return pixels[:int(byteLength)], found, nil
+}
+
+// StyleImagePremultipliedRGBA8Into copies tightly packed premultiplied RGBA8 pixels into buffer.
+func (m *MapHandle) StyleImagePremultipliedRGBA8Into(imageID string, buffer []byte) (uint64, bool, error) {
+	ptr, err := m.ptr()
+	if err != nil {
+		return 0, false, err
+	}
+	defer m.state.KeepAlive()
+	var byteLength uint64
+	var found bool
+	if err := checkNative(func() capi.Status {
+		return capi.MapCopyStyleImagePremultipliedRGBA8(ptr, imageID, buffer, &byteLength, &found)
+	}); err != nil {
+		return byteLength, found, err
+	}
+	return byteLength, found, nil
 }
 
 // AddVectorSourceURL adds a vector source with a TileJSON URL.

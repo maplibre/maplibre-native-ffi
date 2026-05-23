@@ -420,6 +420,32 @@ type CanonicalTileID struct {
 	Y uint32
 }
 
+// PremultipliedRGBA8Image contains caller-owned premultiplied RGBA8 pixels.
+type PremultipliedRGBA8Image struct {
+	Width      uint32
+	Height     uint32
+	Stride     uint32
+	Pixels     []byte
+	ByteLength uint64
+}
+
+// StyleImageOptions contains runtime style image options.
+type StyleImageOptions struct {
+	Fields     uint32
+	PixelRatio float32
+	SDF        bool
+}
+
+// StyleImageInfo contains runtime style image metadata.
+type StyleImageInfo struct {
+	Width      uint32
+	Height     uint32
+	Stride     uint32
+	ByteLength uint64
+	PixelRatio float32
+	SDF        bool
+}
+
 // Geometry contains a semantic GeoJSON geometry descriptor.
 type Geometry struct {
 	Type       uint32
@@ -945,6 +971,11 @@ const (
 	CustomGeometrySourceOptionBuffer    uint32 = uint32(C.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_BUFFER)
 	CustomGeometrySourceOptionClip      uint32 = uint32(C.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_CLIP)
 	CustomGeometrySourceOptionWrap      uint32 = uint32(C.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_WRAP)
+)
+
+const (
+	StyleImageOptionPixelRatio uint32 = uint32(C.MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO)
+	StyleImageOptionSDF        uint32 = uint32(C.MLN_STYLE_IMAGE_OPTION_SDF)
 )
 
 const (
@@ -1808,6 +1839,72 @@ func MapInvalidateCustomGeometrySourceRegion(m *Map, sourceID string, bounds Lat
 	sourceView := newStringView(sourceID)
 	defer sourceView.free()
 	return Status(C.mln_map_invalidate_custom_geometry_source_region((*C.mln_map)(unsafe.Pointer(m)), sourceView.raw(), latLngBoundsToC(bounds)))
+}
+
+// MapSetStyleImage sets one runtime style image.
+func MapSetStyleImage(m *Map, imageID string, image PremultipliedRGBA8Image, options StyleImageOptions) Status {
+	imageView := newStringView(imageID)
+	defer imageView.free()
+	rawImage, imageAllocation := premultipliedRGBA8ImageToC(image)
+	defer C.free(imageAllocation)
+	rawOptions := styleImageOptionsToC(options)
+	return Status(C.mln_map_set_style_image((*C.mln_map)(unsafe.Pointer(m)), imageView.raw(), &rawImage, &rawOptions))
+}
+
+// MapRemoveStyleImage removes one runtime style image.
+func MapRemoveStyleImage(m *Map, imageID string, outRemoved *bool) Status {
+	imageView := newStringView(imageID)
+	defer imageView.free()
+	var rawRemoved C.bool
+	status := Status(C.mln_map_remove_style_image((*C.mln_map)(unsafe.Pointer(m)), imageView.raw(), &rawRemoved))
+	if status == StatusOK {
+		*outRemoved = bool(rawRemoved)
+	}
+	return status
+}
+
+// MapStyleImageExists reports whether one runtime style image exists.
+func MapStyleImageExists(m *Map, imageID string, outExists *bool) Status {
+	imageView := newStringView(imageID)
+	defer imageView.free()
+	var rawExists C.bool
+	status := Status(C.mln_map_style_image_exists((*C.mln_map)(unsafe.Pointer(m)), imageView.raw(), &rawExists))
+	if status == StatusOK {
+		*outExists = bool(rawExists)
+	}
+	return status
+}
+
+// MapGetStyleImageInfo copies fixed metadata for one runtime style image.
+func MapGetStyleImageInfo(m *Map, imageID string, outInfo *StyleImageInfo, outFound *bool) Status {
+	imageView := newStringView(imageID)
+	defer imageView.free()
+	rawInfo := C.mln_style_image_info_default()
+	var rawFound C.bool
+	status := Status(C.mln_map_get_style_image_info((*C.mln_map)(unsafe.Pointer(m)), imageView.raw(), &rawInfo, &rawFound))
+	if status == StatusOK {
+		*outInfo = styleImageInfoFromC(rawInfo)
+		*outFound = bool(rawFound)
+	}
+	return status
+}
+
+// MapCopyStyleImagePremultipliedRGBA8 copies tightly packed premultiplied RGBA8 pixels.
+func MapCopyStyleImagePremultipliedRGBA8(m *Map, imageID string, buffer []byte, outByteLength *uint64, outFound *bool) Status {
+	imageView := newStringView(imageID)
+	defer imageView.free()
+	var data *C.uint8_t
+	if len(buffer) > 0 {
+		data = (*C.uint8_t)(unsafe.Pointer(&buffer[0]))
+	}
+	var rawByteLength C.size_t
+	var rawFound C.bool
+	status := Status(C.mln_map_copy_style_image_premultiplied_rgba8((*C.mln_map)(unsafe.Pointer(m)), imageView.raw(), data, C.size_t(len(buffer)), &rawByteLength, &rawFound))
+	if status == StatusOK || status == StatusInvalidArgument {
+		*outByteLength = uint64(rawByteLength)
+		*outFound = bool(rawFound)
+	}
+	return status
 }
 
 // MapAddVectorSourceURL adds a vector source with a TileJSON URL.
@@ -3059,6 +3156,39 @@ func latLngToC(coordinate LatLng) C.mln_lat_lng {
 
 func canonicalTileIDToC(tileID CanonicalTileID) C.mln_canonical_tile_id {
 	return C.mln_canonical_tile_id{z: C.uint32_t(tileID.Z), x: C.uint32_t(tileID.X), y: C.uint32_t(tileID.Y)}
+}
+
+func premultipliedRGBA8ImageToC(image PremultipliedRGBA8Image) (C.mln_premultiplied_rgba8_image, unsafe.Pointer) {
+	raw := C.mln_premultiplied_rgba8_image_default()
+	raw.width = C.uint32_t(image.Width)
+	raw.height = C.uint32_t(image.Height)
+	raw.stride = C.uint32_t(image.Stride)
+	var allocation unsafe.Pointer
+	if len(image.Pixels) > 0 {
+		allocation = C.CBytes(image.Pixels)
+		raw.pixels = (*C.uint8_t)(allocation)
+	}
+	raw.byte_length = C.size_t(len(image.Pixels))
+	return raw, allocation
+}
+
+func styleImageOptionsToC(options StyleImageOptions) C.mln_style_image_options {
+	raw := C.mln_style_image_options_default()
+	raw.fields = C.uint32_t(options.Fields)
+	raw.pixel_ratio = C.float(options.PixelRatio)
+	raw.sdf = C.bool(options.SDF)
+	return raw
+}
+
+func styleImageInfoFromC(info C.mln_style_image_info) StyleImageInfo {
+	return StyleImageInfo{
+		Width:      uint32(info.width),
+		Height:     uint32(info.height),
+		Stride:     uint32(info.stride),
+		ByteLength: uint64(info.byte_length),
+		PixelRatio: float32(info.pixel_ratio),
+		SDF:        bool(info.sdf),
+	}
 }
 
 func latLngFromC(coordinate C.mln_lat_lng) LatLng {

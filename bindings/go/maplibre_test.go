@@ -1354,6 +1354,68 @@ func TestCustomGeometrySourceDescriptors(t *testing.T) {
 	}
 }
 
+func TestStyleImageCopiesPixelsAndMetadata(t *testing.T) {
+	runtime, err := NewRuntime()
+	if err != nil {
+		t.Fatalf("NewRuntime(): %v", err)
+	}
+	m, err := runtime.NewMap()
+	if err != nil {
+		_ = runtime.Close()
+		t.Fatalf("NewMap(): %v", err)
+	}
+	defer func() {
+		if err := m.Close(); err != nil {
+			t.Errorf("Map Close(): %v", err)
+		}
+		if err := runtime.Close(); err != nil {
+			t.Errorf("Runtime Close(): %v", err)
+		}
+	}()
+
+	if err := m.SetStyleJSON(`{"version":8,"sources":{},"layers":[]}`); err != nil {
+		t.Fatalf("SetStyleJSON(empty style): %v", err)
+	}
+	pixels := []byte{255, 0, 0, 255}
+	pixelRatio := float32(2)
+	sdf := true
+	if err := m.SetStyleImage("marker", PremultipliedRGBA8Image{Width: 1, Height: 1, Stride: 4, Pixels: pixels}, StyleImageOptions{PixelRatio: &pixelRatio, SDF: &sdf}); err != nil {
+		t.Fatalf("SetStyleImage(): %v", err)
+	}
+	pixels[0] = 0
+	exists, err := m.StyleImageExists("marker")
+	if err != nil {
+		t.Fatalf("StyleImageExists(marker): %v", err)
+	}
+	if !exists {
+		t.Fatal("StyleImageExists(marker)=false, want true")
+	}
+	info, found, err := m.StyleImageInfo("marker")
+	if err != nil {
+		t.Fatalf("StyleImageInfo(marker): %v", err)
+	}
+	if !found || info.Width != 1 || info.Height != 1 || info.Stride != 4 || info.ByteLength != 4 || info.PixelRatio != pixelRatio || info.SDF != sdf {
+		t.Fatalf("StyleImageInfo(marker) = (%+v, %v), want copied 1x1 image metadata", info, found)
+	}
+	copied, found, err := m.StyleImagePremultipliedRGBA8("marker")
+	if err != nil {
+		t.Fatalf("StyleImagePremultipliedRGBA8(marker): %v", err)
+	}
+	if !found || len(copied) != 4 || copied[0] != 255 || copied[1] != 0 || copied[2] != 0 || copied[3] != 255 {
+		t.Fatalf("StyleImagePremultipliedRGBA8(marker) = (%v, %v), want original copied pixels", copied, found)
+	}
+	removed, err := m.RemoveStyleImage("marker")
+	if err != nil {
+		t.Fatalf("RemoveStyleImage(marker): %v", err)
+	}
+	if !removed {
+		t.Fatal("RemoveStyleImage(marker)=false, want true")
+	}
+	if err := m.SetStyleImage("bad-marker", PremultipliedRGBA8Image{Width: 1, Height: 1, Stride: 4}, StyleImageOptions{}); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("SetStyleImage(empty pixels) error = %v, want ErrInvalidArgument", err)
+	}
+}
+
 func TestAddStyleSourceJSONCopiesGoJSONDescriptor(t *testing.T) {
 	runtime, err := NewRuntime()
 	if err != nil {
