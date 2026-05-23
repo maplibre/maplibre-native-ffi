@@ -2,6 +2,7 @@ package maplibre
 
 import (
 	"errors"
+	stdruntime "runtime"
 	"testing"
 )
 
@@ -54,6 +55,80 @@ func TestNetworkStatusRoundTripsThroughNativeABI(t *testing.T) {
 	}
 	if got, err := CurrentNetworkStatus(); err != nil || got != NetworkStatusOnline {
 		t.Fatalf("CurrentNetworkStatus() = %v, %v; want online, nil", got, err)
+	}
+}
+
+func TestRuntimeCreateRunOnceAndClose(t *testing.T) {
+	runtime, err := NewRuntime()
+	if err != nil {
+		t.Fatalf("NewRuntime(): %v", err)
+	}
+	if err := runtime.RunOnce(); err != nil {
+		t.Fatalf("RunOnce(): %v", err)
+	}
+	if err := runtime.Close(); err != nil {
+		t.Fatalf("Close(): %v", err)
+	}
+	if err := runtime.Close(); err != nil {
+		t.Fatalf("second Close(): %v", err)
+	}
+	if _, err := runtime.NewMap(); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("NewMap() after Close error = %v, want ErrInvalidArgument", err)
+	}
+}
+
+func TestRuntimeMapLifecycle(t *testing.T) {
+	runtime, err := NewRuntime()
+	if err != nil {
+		t.Fatalf("NewRuntime(): %v", err)
+	}
+
+	m, err := runtime.NewMap()
+	if err != nil {
+		_ = runtime.Close()
+		t.Fatalf("NewMap(): %v", err)
+	}
+	if err := runtime.Close(); !errors.Is(err, ErrInvalidState) {
+		_ = m.Close()
+		_ = runtime.Close()
+		t.Fatalf("Close() with live map error = %v, want ErrInvalidState", err)
+	}
+	if err := m.Close(); err != nil {
+		_ = runtime.Close()
+		t.Fatalf("Map Close(): %v", err)
+	}
+	if err := m.Close(); err != nil {
+		_ = runtime.Close()
+		t.Fatalf("second Map Close(): %v", err)
+	}
+	if err := runtime.Close(); err != nil {
+		t.Fatalf("Runtime Close(): %v", err)
+	}
+}
+
+func TestRuntimeCloseWrongThreadLeavesHandleRetryable(t *testing.T) {
+	stdruntime.LockOSThread()
+	defer stdruntime.UnlockOSThread()
+
+	runtime, err := NewRuntime()
+	if err != nil {
+		t.Fatalf("NewRuntime(): %v", err)
+	}
+
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- runtime.Close()
+	}()
+	if err := <-errCh; !errors.Is(err, ErrWrongThread) {
+		_ = runtime.Close()
+		t.Fatalf("Close() from another thread error = %v, want ErrWrongThread", err)
+	}
+	if err := runtime.RunOnce(); err != nil {
+		_ = runtime.Close()
+		t.Fatalf("RunOnce() after failed close: %v", err)
+	}
+	if err := runtime.Close(); err != nil {
+		t.Fatalf("Close() on owner thread after failed close: %v", err)
 	}
 }
 
