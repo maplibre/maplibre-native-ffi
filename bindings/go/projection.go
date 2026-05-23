@@ -88,13 +88,29 @@ func (projection *MapProjectionHandle) SetVisibleCoordinates(coordinates []LatLn
 	}
 	defer projection.state.KeepAlive()
 
-	rawCoordinates := make([]capi.LatLng, len(coordinates))
-	for i, coordinate := range coordinates {
-		rawCoordinates[i] = coordinate.toCAPI()
-	}
 	return checkNative(func() capi.Status {
-		return capi.MapProjectionSetVisibleCoordinates(ptr, rawCoordinates, padding.toCAPI())
+		return capi.MapProjectionSetVisibleCoordinates(ptr, latLngSliceToCAPI(coordinates), padding.toCAPI())
 	})
+}
+
+// SetVisibleGeometry updates this projection helper's camera to fit geometry
+// inside padding.
+func (projection *MapProjectionHandle) SetVisibleGeometry(geometry Geometry, padding EdgeInsets) error {
+	ptr, err := projection.ptr()
+	if err != nil {
+		return err
+	}
+	defer projection.state.KeepAlive()
+	var materialErr error
+	err = checkNative(func() capi.Status {
+		var status capi.Status
+		status, materialErr = capi.MapProjectionSetVisibleGeometry(ptr, geometry.toCAPI(), padding.toCAPI())
+		return status
+	})
+	if materialErr != nil {
+		return newBindingError(ErrInvalidArgument, materialErr.Error())
+	}
+	return err
 }
 
 // PixelForLatLng converts a geographic coordinate to a logical screen point.

@@ -224,6 +224,22 @@ func latLngSliceFromCAPI(points []capi.LatLng) []LatLng {
 	return out
 }
 
+func screenPointSliceToCAPI(points []ScreenPoint) []capi.ScreenPoint {
+	out := make([]capi.ScreenPoint, len(points))
+	for i, point := range points {
+		out[i] = point.toCAPI()
+	}
+	return out
+}
+
+func screenPointSliceFromCAPI(points []capi.ScreenPoint) []ScreenPoint {
+	out := make([]ScreenPoint, len(points))
+	for i, point := range points {
+		out[i] = screenPointFromCAPI(point)
+	}
+	return out
+}
+
 func latLngLinesToCAPI(lines [][]LatLng) [][]capi.LatLng {
 	out := make([][]capi.LatLng, len(lines))
 	for i, line := range lines {

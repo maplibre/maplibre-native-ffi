@@ -2853,21 +2853,34 @@ func MapCameraForLatLngBounds(m *Map, bounds LatLngBounds, fitOptions *CameraFit
 
 // MapCameraForLatLngs computes a camera that fits geographic coordinates.
 func MapCameraForLatLngs(m *Map, coordinates []LatLng, fitOptions *CameraFitOptions, out *CameraOptions) Status {
-	if len(coordinates) == 0 {
-		return Status(C.mln_map_camera_for_lat_lngs((*C.mln_map)(unsafe.Pointer(m)), nil, 0, nil, nil))
-	}
-	rawCoordinates := make([]C.mln_lat_lng, len(coordinates))
-	for i, coordinate := range coordinates {
-		rawCoordinates[i] = latLngToC(coordinate)
-	}
+	rawCoordinates, coordinateCount := latLngSliceToCPointer(coordinates)
+	defer C.free(unsafe.Pointer(rawCoordinates))
 	rawFitOptions, rawFitOptionsPointer := cameraFitOptionsToCPointer(fitOptions)
 	_ = rawFitOptions
 	rawCamera := C.mln_camera_options{size: C.uint32_t(unsafe.Sizeof(C.mln_camera_options{}))}
-	status := Status(C.mln_map_camera_for_lat_lngs((*C.mln_map)(unsafe.Pointer(m)), &rawCoordinates[0], C.size_t(len(rawCoordinates)), rawFitOptionsPointer, &rawCamera))
+	status := Status(C.mln_map_camera_for_lat_lngs((*C.mln_map)(unsafe.Pointer(m)), rawCoordinates, coordinateCount, rawFitOptionsPointer, &rawCamera))
 	if status == StatusOK {
 		*out = cameraOptionsFromC(rawCamera)
 	}
 	return status
+}
+
+// MapCameraForGeometry computes a camera that fits a geometry.
+func MapCameraForGeometry(m *Map, geometry Geometry, fitOptions *CameraFitOptions, out *CameraOptions) (Status, error) {
+	materializer := newGeoJSONMaterializer()
+	defer materializer.free()
+	rawGeometry, err := materializer.geometryPtr(geometry)
+	if err != nil {
+		return StatusInvalidArgument, err
+	}
+	rawFitOptions, rawFitOptionsPointer := cameraFitOptionsToCPointer(fitOptions)
+	_ = rawFitOptions
+	rawCamera := C.mln_camera_options{size: C.uint32_t(unsafe.Sizeof(C.mln_camera_options{}))}
+	status := Status(C.mln_map_camera_for_geometry((*C.mln_map)(unsafe.Pointer(m)), rawGeometry, rawFitOptionsPointer, &rawCamera))
+	if status == StatusOK {
+		*out = cameraOptionsFromC(rawCamera)
+	}
+	return status, nil
 }
 
 // MapLatLngBoundsForCamera computes wrapped geographic bounds for a camera.
@@ -2924,6 +2937,58 @@ func MapSetFreeCameraOptions(m *Map, options FreeCameraOptions) Status {
 	return Status(C.mln_map_set_free_camera_options((*C.mln_map)(unsafe.Pointer(m)), &raw))
 }
 
+// MapPixelForLatLng converts a geographic coordinate to a logical screen point.
+func MapPixelForLatLng(m *Map, coordinate LatLng, out *ScreenPoint) Status {
+	var rawPoint C.mln_screen_point
+	status := Status(C.mln_map_pixel_for_lat_lng((*C.mln_map)(unsafe.Pointer(m)), latLngToC(coordinate), &rawPoint))
+	if status == StatusOK {
+		*out = screenPointFromC(rawPoint)
+	}
+	return status
+}
+
+// MapLatLngForPixel converts a logical screen point to a geographic coordinate.
+func MapLatLngForPixel(m *Map, point ScreenPoint, out *LatLng) Status {
+	var rawCoordinate C.mln_lat_lng
+	status := Status(C.mln_map_lat_lng_for_pixel((*C.mln_map)(unsafe.Pointer(m)), screenPointToC(point), &rawCoordinate))
+	if status == StatusOK {
+		*out = latLngFromC(rawCoordinate)
+	}
+	return status
+}
+
+// MapPixelsForLatLngs converts geographic coordinates to logical screen points.
+func MapPixelsForLatLngs(m *Map, coordinates []LatLng, out *[]ScreenPoint) Status {
+	rawCoordinates, coordinateCount := latLngSliceToCPointer(coordinates)
+	defer C.free(unsafe.Pointer(rawCoordinates))
+	var rawPoints *C.mln_screen_point
+	if len(coordinates) > 0 {
+		rawPoints = (*C.mln_screen_point)(C.malloc(C.size_t(len(coordinates)) * C.size_t(unsafe.Sizeof(C.mln_screen_point{}))))
+		defer C.free(unsafe.Pointer(rawPoints))
+	}
+	status := Status(C.mln_map_pixels_for_lat_lngs((*C.mln_map)(unsafe.Pointer(m)), rawCoordinates, coordinateCount, rawPoints))
+	if status == StatusOK {
+		*out = screenPointSliceFromC(rawPoints, len(coordinates))
+	}
+	return status
+}
+
+// MapLatLngsForPixels converts logical screen points to geographic coordinates.
+func MapLatLngsForPixels(m *Map, points []ScreenPoint, out *[]LatLng) Status {
+	rawPoints, pointCount := screenPointSliceToCPointer(points)
+	defer C.free(unsafe.Pointer(rawPoints))
+	var rawCoordinates *C.mln_lat_lng
+	if len(points) > 0 {
+		rawCoordinates = (*C.mln_lat_lng)(C.malloc(C.size_t(len(points)) * C.size_t(unsafe.Sizeof(C.mln_lat_lng{}))))
+		defer C.free(unsafe.Pointer(rawCoordinates))
+	}
+	status := Status(C.mln_map_lat_lngs_for_pixels((*C.mln_map)(unsafe.Pointer(m)), rawPoints, pointCount, rawCoordinates))
+	if status == StatusOK {
+		*out = latLngSliceFromC(rawCoordinates, len(points))
+	}
+	return status
+}
+
 // MapProjectionCreate creates a standalone projection helper from a map.
 func MapProjectionCreate(m *Map, out **Projection) Status {
 	var raw *C.mln_map_projection
@@ -2960,19 +3025,25 @@ func MapProjectionSetCamera(projection *Projection, camera CameraOptions) Status
 
 // MapProjectionSetVisibleCoordinates updates the helper camera to fit coordinates.
 func MapProjectionSetVisibleCoordinates(projection *Projection, coordinates []LatLng, padding EdgeInsets) Status {
-	if len(coordinates) == 0 {
-		return Status(C.mln_map_projection_set_visible_coordinates((*C.mln_map_projection)(unsafe.Pointer(projection)), nil, 0, edgeInsetsToC(padding)))
-	}
-	rawCoordinates := make([]C.mln_lat_lng, len(coordinates))
-	for i, coordinate := range coordinates {
-		rawCoordinates[i] = latLngToC(coordinate)
-	}
+	rawCoordinates, coordinateCount := latLngSliceToCPointer(coordinates)
+	defer C.free(unsafe.Pointer(rawCoordinates))
 	return Status(C.mln_map_projection_set_visible_coordinates(
 		(*C.mln_map_projection)(unsafe.Pointer(projection)),
-		&rawCoordinates[0],
-		C.size_t(len(rawCoordinates)),
+		rawCoordinates,
+		coordinateCount,
 		edgeInsetsToC(padding),
 	))
+}
+
+// MapProjectionSetVisibleGeometry updates the helper camera to fit geometry.
+func MapProjectionSetVisibleGeometry(projection *Projection, geometry Geometry, padding EdgeInsets) (Status, error) {
+	materializer := newGeoJSONMaterializer()
+	defer materializer.free()
+	rawGeometry, err := materializer.geometryPtr(geometry)
+	if err != nil {
+		return StatusInvalidArgument, err
+	}
+	return Status(C.mln_map_projection_set_visible_geometry((*C.mln_map_projection)(unsafe.Pointer(projection)), rawGeometry, edgeInsetsToC(padding))), nil
 }
 
 // MapProjectionPixelForLatLng converts a coordinate to a screen point.
@@ -3937,6 +4008,17 @@ func screenPointSliceToCPointer(points []ScreenPoint) (*C.mln_screen_point, C.si
 		*(*C.mln_screen_point)(unsafe.Add(unsafe.Pointer(rawPoints), uintptr(i)*unsafe.Sizeof(C.mln_screen_point{}))) = screenPointToC(point)
 	}
 	return rawPoints, C.size_t(len(points))
+}
+
+func screenPointSliceFromC(points *C.mln_screen_point, count int) []ScreenPoint {
+	if points == nil || count == 0 {
+		return nil
+	}
+	out := make([]ScreenPoint, count)
+	for i := range out {
+		out[i] = screenPointFromC(*(*C.mln_screen_point)(unsafe.Add(unsafe.Pointer(points), uintptr(i)*unsafe.Sizeof(C.mln_screen_point{}))))
+	}
+	return out
 }
 
 func edgeInsetsToC(insets EdgeInsets) C.mln_edge_insets {

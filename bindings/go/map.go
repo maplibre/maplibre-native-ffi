@@ -397,13 +397,33 @@ func (m *MapHandle) CameraForLatLngs(coordinates []LatLng, fitOptions *CameraFit
 	}
 	defer m.state.KeepAlive()
 	var raw capi.CameraOptions
-	rawCoordinates := make([]capi.LatLng, len(coordinates))
-	for i, coordinate := range coordinates {
-		rawCoordinates[i] = coordinate.toCAPI()
-	}
 	if err := checkNative(func() capi.Status {
-		return capi.MapCameraForLatLngs(ptr, rawCoordinates, cameraFitOptionsToCAPI(fitOptions), &raw)
+		return capi.MapCameraForLatLngs(ptr, latLngSliceToCAPI(coordinates), cameraFitOptionsToCAPI(fitOptions), &raw)
 	}); err != nil {
+		return CameraOptions{}, err
+	}
+	return cameraOptionsFromCAPI(raw), nil
+}
+
+// CameraForGeometry computes a camera that fits a geometry. Passing nil
+// fitOptions uses native default fitting options.
+func (m *MapHandle) CameraForGeometry(geometry Geometry, fitOptions *CameraFitOptions) (CameraOptions, error) {
+	ptr, err := m.ptr()
+	if err != nil {
+		return CameraOptions{}, err
+	}
+	defer m.state.KeepAlive()
+	var raw capi.CameraOptions
+	var materialErr error
+	err = checkNative(func() capi.Status {
+		var status capi.Status
+		status, materialErr = capi.MapCameraForGeometry(ptr, geometry.toCAPI(), cameraFitOptionsToCAPI(fitOptions), &raw)
+		return status
+	})
+	if materialErr != nil {
+		return CameraOptions{}, newBindingError(ErrInvalidArgument, materialErr.Error())
+	}
+	if err != nil {
 		return CameraOptions{}, err
 	}
 	return cameraOptionsFromCAPI(raw), nil
@@ -559,6 +579,66 @@ func (m *MapHandle) SetProjectionMode(options ProjectionModeOptions) error {
 	}
 	defer m.state.KeepAlive()
 	return checkNative(func() capi.Status { return capi.MapSetProjectionMode(ptr, options.toCAPI()) })
+}
+
+// PixelForLatLng converts a geographic coordinate to a logical screen point for
+// the current map.
+func (m *MapHandle) PixelForLatLng(coordinate LatLng) (ScreenPoint, error) {
+	ptr, err := m.ptr()
+	if err != nil {
+		return ScreenPoint{}, err
+	}
+	defer m.state.KeepAlive()
+	var raw capi.ScreenPoint
+	if err := checkNative(func() capi.Status { return capi.MapPixelForLatLng(ptr, coordinate.toCAPI(), &raw) }); err != nil {
+		return ScreenPoint{}, err
+	}
+	return screenPointFromCAPI(raw), nil
+}
+
+// LatLngForPixel converts a logical screen point to a geographic coordinate for
+// the current map.
+func (m *MapHandle) LatLngForPixel(point ScreenPoint) (LatLng, error) {
+	ptr, err := m.ptr()
+	if err != nil {
+		return LatLng{}, err
+	}
+	defer m.state.KeepAlive()
+	var raw capi.LatLng
+	if err := checkNative(func() capi.Status { return capi.MapLatLngForPixel(ptr, point.toCAPI(), &raw) }); err != nil {
+		return LatLng{}, err
+	}
+	return latLngFromCAPI(raw), nil
+}
+
+// PixelsForLatLngs converts geographic coordinates to logical screen points for
+// the current map.
+func (m *MapHandle) PixelsForLatLngs(coordinates []LatLng) ([]ScreenPoint, error) {
+	ptr, err := m.ptr()
+	if err != nil {
+		return nil, err
+	}
+	defer m.state.KeepAlive()
+	var raw []capi.ScreenPoint
+	if err := checkNative(func() capi.Status { return capi.MapPixelsForLatLngs(ptr, latLngSliceToCAPI(coordinates), &raw) }); err != nil {
+		return nil, err
+	}
+	return screenPointSliceFromCAPI(raw), nil
+}
+
+// LatLngsForPixels converts logical screen points to geographic coordinates for
+// the current map.
+func (m *MapHandle) LatLngsForPixels(points []ScreenPoint) ([]LatLng, error) {
+	ptr, err := m.ptr()
+	if err != nil {
+		return nil, err
+	}
+	defer m.state.KeepAlive()
+	var raw []capi.LatLng
+	if err := checkNative(func() capi.Status { return capi.MapLatLngsForPixels(ptr, screenPointSliceToCAPI(points), &raw) }); err != nil {
+		return nil, err
+	}
+	return latLngSliceFromCAPI(raw), nil
 }
 
 func (m *MapHandle) releaseCustomGeometrySource(sourceID string) {

@@ -148,14 +148,6 @@ func (geometry RenderedQueryGeometry) toCAPI() capi.RenderedQueryGeometry {
 	}
 }
 
-func screenPointSliceToCAPI(points []ScreenPoint) []capi.ScreenPoint {
-	out := make([]capi.ScreenPoint, len(points))
-	for i, point := range points {
-		out[i] = point.toCAPI()
-	}
-	return out
-}
-
 func queriedFeaturesFromCAPI(features []capi.QueryFeature) []QueriedFeature {
 	out := make([]QueriedFeature, len(features))
 	for i, feature := range features {
