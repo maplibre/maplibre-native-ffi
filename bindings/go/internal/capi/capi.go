@@ -81,6 +81,18 @@ static inline mln_json_value mln_go_json_object(const mln_json_member* members, 
   return value;
 }
 
+static inline uint32_t mln_go_json_type(const mln_json_value* value) { return value->type; }
+static inline bool mln_go_json_bool_value(const mln_json_value* value) { return value->data.bool_value; }
+static inline uint64_t mln_go_json_uint_value(const mln_json_value* value) { return value->data.uint_value; }
+static inline int64_t mln_go_json_int_value(const mln_json_value* value) { return value->data.int_value; }
+static inline double mln_go_json_double_value(const mln_json_value* value) { return value->data.double_value; }
+static inline mln_string_view mln_go_json_string_value(const mln_json_value* value) { return value->data.string_value; }
+static inline size_t mln_go_json_array_count(const mln_json_value* value) { return value->data.array_value.value_count; }
+static inline const mln_json_value* mln_go_json_array_get(const mln_json_value* value, size_t index) { return &value->data.array_value.values[index]; }
+static inline size_t mln_go_json_object_count(const mln_json_value* value) { return value->data.object_value.member_count; }
+static inline mln_string_view mln_go_json_object_key(const mln_json_value* value, size_t index) { return value->data.object_value.members[index].key; }
+static inline const mln_json_value* mln_go_json_object_value(const mln_json_value* value, size_t index) { return value->data.object_value.members[index].value; }
+
 static inline mln_offline_region_definition mln_go_offline_tile_pyramid_region_definition(
   const char* style_url, mln_lat_lng_bounds bounds, double min_zoom, double max_zoom,
   float pixel_ratio, bool include_ideographs
@@ -131,6 +143,9 @@ type RenderSession struct{ _ byte }
 
 // StyleIDList is an opaque native style ID list handle.
 type StyleIDList struct{ _ byte }
+
+// JSONSnapshot is an opaque native JSON snapshot handle.
+type JSONSnapshot struct{ _ byte }
 
 // RuntimeOptions contains semantic runtime creation options.
 type RuntimeOptions struct {
@@ -699,6 +714,17 @@ const (
 	StyleSourceTypeVideo        uint32 = uint32(C.MLN_STYLE_SOURCE_TYPE_VIDEO)
 	StyleSourceTypeAnnotations  uint32 = uint32(C.MLN_STYLE_SOURCE_TYPE_ANNOTATIONS)
 	StyleSourceTypeCustomVector uint32 = uint32(C.MLN_STYLE_SOURCE_TYPE_CUSTOM_VECTOR)
+)
+
+const (
+	JSONValueTypeNull   uint32 = uint32(C.MLN_JSON_VALUE_TYPE_NULL)
+	JSONValueTypeBool   uint32 = uint32(C.MLN_JSON_VALUE_TYPE_BOOL)
+	JSONValueTypeUint   uint32 = uint32(C.MLN_JSON_VALUE_TYPE_UINT)
+	JSONValueTypeInt    uint32 = uint32(C.MLN_JSON_VALUE_TYPE_INT)
+	JSONValueTypeDouble uint32 = uint32(C.MLN_JSON_VALUE_TYPE_DOUBLE)
+	JSONValueTypeString uint32 = uint32(C.MLN_JSON_VALUE_TYPE_STRING)
+	JSONValueTypeArray  uint32 = uint32(C.MLN_JSON_VALUE_TYPE_ARRAY)
+	JSONValueTypeObject uint32 = uint32(C.MLN_JSON_VALUE_TYPE_OBJECT)
 )
 
 const (
@@ -1576,6 +1602,19 @@ func MapListStyleSourceIDs(m *Map, outIDs *[]string) Status {
 	return copyStyleIDList(rawList, outIDs)
 }
 
+// MapAddStyleLayerJSON adds one style layer from a style-spec JSON object.
+func MapAddStyleLayerJSON(m *Map, layerJSON any, beforeLayerID string) (Status, error) {
+	beforeView := newStringView(beforeLayerID)
+	defer beforeView.free()
+	materializer := newJSONMaterializer()
+	defer materializer.free()
+	rawJSON, err := materializer.value(layerJSON)
+	if err != nil {
+		return StatusInvalidArgument, err
+	}
+	return Status(C.mln_map_add_style_layer_json((*C.mln_map)(unsafe.Pointer(m)), &rawJSON, beforeView.raw())), nil
+}
+
 // MapRemoveStyleLayer removes one style layer by ID.
 func MapRemoveStyleLayer(m *Map, layerID string, outRemoved *bool) Status {
 	view := newStringView(layerID)
@@ -1631,6 +1670,117 @@ func MapMoveStyleLayer(m *Map, layerID string, beforeLayerID string) Status {
 	beforeView := newStringView(beforeLayerID)
 	defer beforeView.free()
 	return Status(C.mln_map_move_style_layer((*C.mln_map)(unsafe.Pointer(m)), layerView.raw(), beforeView.raw()))
+}
+
+// MapGetStyleLayerJSON copies one style layer as a style-spec JSON object.
+func MapGetStyleLayerJSON(m *Map, layerID string, outValue *any, outFound *bool) Status {
+	layerView := newStringView(layerID)
+	defer layerView.free()
+	var rawSnapshot *C.mln_json_snapshot
+	var rawFound C.bool
+	status := Status(C.mln_map_get_style_layer_json((*C.mln_map)(unsafe.Pointer(m)), layerView.raw(), &rawSnapshot, &rawFound))
+	if status != StatusOK {
+		return status
+	}
+	*outFound = bool(rawFound)
+	if !bool(rawFound) {
+		*outValue = nil
+		return StatusOK
+	}
+	return jsonSnapshotToValue(rawSnapshot, outValue)
+}
+
+// MapSetStyleLightJSON sets the style light from a style-spec JSON object.
+func MapSetStyleLightJSON(m *Map, lightJSON any) (Status, error) {
+	materializer := newJSONMaterializer()
+	defer materializer.free()
+	rawJSON, err := materializer.value(lightJSON)
+	if err != nil {
+		return StatusInvalidArgument, err
+	}
+	return Status(C.mln_map_set_style_light_json((*C.mln_map)(unsafe.Pointer(m)), &rawJSON)), nil
+}
+
+// MapSetStyleLightProperty sets one style light property.
+func MapSetStyleLightProperty(m *Map, propertyName string, value any) (Status, error) {
+	propertyView := newStringView(propertyName)
+	defer propertyView.free()
+	materializer := newJSONMaterializer()
+	defer materializer.free()
+	rawValue, err := materializer.value(value)
+	if err != nil {
+		return StatusInvalidArgument, err
+	}
+	return Status(C.mln_map_set_style_light_property((*C.mln_map)(unsafe.Pointer(m)), propertyView.raw(), &rawValue)), nil
+}
+
+// MapGetStyleLightProperty copies one style light property.
+func MapGetStyleLightProperty(m *Map, propertyName string, outValue *any) Status {
+	propertyView := newStringView(propertyName)
+	defer propertyView.free()
+	var rawSnapshot *C.mln_json_snapshot
+	status := Status(C.mln_map_get_style_light_property((*C.mln_map)(unsafe.Pointer(m)), propertyView.raw(), &rawSnapshot))
+	if status != StatusOK {
+		return status
+	}
+	return jsonSnapshotToValue(rawSnapshot, outValue)
+}
+
+// MapSetLayerProperty sets one layer property.
+func MapSetLayerProperty(m *Map, layerID string, propertyName string, value any) (Status, error) {
+	layerView := newStringView(layerID)
+	defer layerView.free()
+	propertyView := newStringView(propertyName)
+	defer propertyView.free()
+	materializer := newJSONMaterializer()
+	defer materializer.free()
+	rawValue, err := materializer.value(value)
+	if err != nil {
+		return StatusInvalidArgument, err
+	}
+	return Status(C.mln_map_set_layer_property((*C.mln_map)(unsafe.Pointer(m)), layerView.raw(), propertyView.raw(), &rawValue)), nil
+}
+
+// MapGetLayerProperty copies one layer property.
+func MapGetLayerProperty(m *Map, layerID string, propertyName string, outValue *any) Status {
+	layerView := newStringView(layerID)
+	defer layerView.free()
+	propertyView := newStringView(propertyName)
+	defer propertyView.free()
+	var rawSnapshot *C.mln_json_snapshot
+	status := Status(C.mln_map_get_layer_property((*C.mln_map)(unsafe.Pointer(m)), layerView.raw(), propertyView.raw(), &rawSnapshot))
+	if status != StatusOK {
+		return status
+	}
+	return jsonSnapshotToValue(rawSnapshot, outValue)
+}
+
+// MapSetLayerFilter sets or clears one layer filter.
+func MapSetLayerFilter(m *Map, layerID string, filter any) (Status, error) {
+	layerView := newStringView(layerID)
+	defer layerView.free()
+	if filter == nil {
+		return Status(C.mln_map_set_layer_filter((*C.mln_map)(unsafe.Pointer(m)), layerView.raw(), nil)), nil
+	}
+	materializer := newJSONMaterializer()
+	defer materializer.free()
+	rawFilter, err := materializer.value(filter)
+	if err != nil {
+		return StatusInvalidArgument, err
+	}
+	return Status(C.mln_map_set_layer_filter((*C.mln_map)(unsafe.Pointer(m)), layerView.raw(), &rawFilter)), nil
+}
+
+// MapGetLayerFilter copies one layer filter.
+func MapGetLayerFilter(m *Map, layerID string, outValue *any) Status {
+	layerView := newStringView(layerID)
+	defer layerView.free()
+	var rawSnapshot *C.mln_json_snapshot
+	status := Status(C.mln_map_get_layer_filter((*C.mln_map)(unsafe.Pointer(m)), layerView.raw(), &rawSnapshot))
+	if status != StatusOK {
+		return status
+	}
+	return jsonSnapshotToValue(rawSnapshot, outValue)
 }
 
 // MapSetDebugOptions sets the map debug overlay mask.
@@ -2197,6 +2347,65 @@ func (materializer *jsonMaterializer) object(members map[string]any) (C.mln_json
 		i++
 	}
 	return C.mln_go_json_object(rawMembers, C.size_t(len(members))), nil
+}
+
+func jsonSnapshotToValue(snapshot *C.mln_json_snapshot, outValue *any) Status {
+	defer C.mln_json_snapshot_destroy(snapshot)
+	var rawValue *C.mln_json_value
+	status := Status(C.mln_json_snapshot_get(snapshot, (**C.mln_json_value)(unsafe.Pointer(&rawValue))))
+	if status != StatusOK {
+		return status
+	}
+	value, err := jsonValueFromC(rawValue)
+	if err != nil {
+		return StatusNativeError
+	}
+	*outValue = value
+	return StatusOK
+}
+
+func jsonValueFromC(value *C.mln_json_value) (any, error) {
+	if value == nil {
+		return nil, nil
+	}
+	switch uint32(C.mln_go_json_type(value)) {
+	case JSONValueTypeNull:
+		return nil, nil
+	case JSONValueTypeBool:
+		return bool(C.mln_go_json_bool_value(value)), nil
+	case JSONValueTypeUint:
+		return uint64(C.mln_go_json_uint_value(value)), nil
+	case JSONValueTypeInt:
+		return int64(C.mln_go_json_int_value(value)), nil
+	case JSONValueTypeDouble:
+		return float64(C.mln_go_json_double_value(value)), nil
+	case JSONValueTypeString:
+		return stringViewFromC(C.mln_go_json_string_value(value)), nil
+	case JSONValueTypeArray:
+		count := int(C.mln_go_json_array_count(value))
+		items := make([]any, count)
+		for i := range items {
+			item, err := jsonValueFromC((*C.mln_json_value)(unsafe.Pointer(C.mln_go_json_array_get(value, C.size_t(i)))))
+			if err != nil {
+				return nil, err
+			}
+			items[i] = item
+		}
+		return items, nil
+	case JSONValueTypeObject:
+		count := int(C.mln_go_json_object_count(value))
+		members := make(map[string]any, count)
+		for i := 0; i < count; i++ {
+			item, err := jsonValueFromC((*C.mln_json_value)(unsafe.Pointer(C.mln_go_json_object_value(value, C.size_t(i)))))
+			if err != nil {
+				return nil, err
+			}
+			members[stringViewFromC(C.mln_go_json_object_key(value, C.size_t(i)))] = item
+		}
+		return members, nil
+	default:
+		return nil, fmt.Errorf("unknown JSON value type %d", uint32(C.mln_go_json_type(value)))
+	}
 }
 
 func latLngToC(coordinate LatLng) C.mln_lat_lng {

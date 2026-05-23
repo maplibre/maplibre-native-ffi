@@ -151,6 +151,26 @@ func (m *MapHandle) StyleSourceIDs() ([]string, error) {
 	return ids, nil
 }
 
+// AddStyleLayerJSON adds one style layer from a style-spec layer JSON object.
+// Passing an empty beforeLayerID appends the layer.
+func (m *MapHandle) AddStyleLayerJSON(layerJSON any, beforeLayerID string) error {
+	ptr, err := m.ptr()
+	if err != nil {
+		return err
+	}
+	defer m.state.KeepAlive()
+	var materialErr error
+	err = checkNative(func() capi.Status {
+		var status capi.Status
+		status, materialErr = capi.MapAddStyleLayerJSON(ptr, layerJSON, beforeLayerID)
+		return status
+	})
+	if materialErr != nil {
+		return newBindingError(ErrInvalidArgument, materialErr.Error())
+	}
+	return err
+}
+
 // RemoveStyleLayer removes one style layer by ID and reports whether it was
 // present.
 func (m *MapHandle) RemoveStyleLayer(layerID string) (bool, error) {
@@ -218,4 +238,141 @@ func (m *MapHandle) MoveStyleLayer(layerID string, beforeLayerID string) error {
 	}
 	defer m.state.KeepAlive()
 	return checkNative(func() capi.Status { return capi.MapMoveStyleLayer(ptr, layerID, beforeLayerID) })
+}
+
+// StyleLayerJSON returns one copied style layer as a style-spec JSON object and
+// whether the layer exists.
+func (m *MapHandle) StyleLayerJSON(layerID string) (any, bool, error) {
+	ptr, err := m.ptr()
+	if err != nil {
+		return nil, false, err
+	}
+	defer m.state.KeepAlive()
+	var value any
+	var found bool
+	if err := checkNative(func() capi.Status { return capi.MapGetStyleLayerJSON(ptr, layerID, &value, &found) }); err != nil {
+		return nil, false, err
+	}
+	return value, found, nil
+}
+
+// SetStyleLightJSON sets the style light from a style-spec light JSON object.
+func (m *MapHandle) SetStyleLightJSON(lightJSON any) error {
+	ptr, err := m.ptr()
+	if err != nil {
+		return err
+	}
+	defer m.state.KeepAlive()
+	var materialErr error
+	err = checkNative(func() capi.Status {
+		var status capi.Status
+		status, materialErr = capi.MapSetStyleLightJSON(ptr, lightJSON)
+		return status
+	})
+	if materialErr != nil {
+		return newBindingError(ErrInvalidArgument, materialErr.Error())
+	}
+	return err
+}
+
+// SetStyleLightProperty sets one style light property.
+func (m *MapHandle) SetStyleLightProperty(propertyName string, value any) error {
+	ptr, err := m.ptr()
+	if err != nil {
+		return err
+	}
+	defer m.state.KeepAlive()
+	var materialErr error
+	err = checkNative(func() capi.Status {
+		var status capi.Status
+		status, materialErr = capi.MapSetStyleLightProperty(ptr, propertyName, value)
+		return status
+	})
+	if materialErr != nil {
+		return newBindingError(ErrInvalidArgument, materialErr.Error())
+	}
+	return err
+}
+
+// StyleLightProperty returns one copied style light property as a style-spec
+// JSON value.
+func (m *MapHandle) StyleLightProperty(propertyName string) (any, error) {
+	ptr, err := m.ptr()
+	if err != nil {
+		return nil, err
+	}
+	defer m.state.KeepAlive()
+	var value any
+	if err := checkNative(func() capi.Status { return capi.MapGetStyleLightProperty(ptr, propertyName, &value) }); err != nil {
+		return nil, err
+	}
+	return value, nil
+}
+
+// SetLayerProperty sets one style layer property.
+func (m *MapHandle) SetLayerProperty(layerID string, propertyName string, value any) error {
+	ptr, err := m.ptr()
+	if err != nil {
+		return err
+	}
+	defer m.state.KeepAlive()
+	var materialErr error
+	err = checkNative(func() capi.Status {
+		var status capi.Status
+		status, materialErr = capi.MapSetLayerProperty(ptr, layerID, propertyName, value)
+		return status
+	})
+	if materialErr != nil {
+		return newBindingError(ErrInvalidArgument, materialErr.Error())
+	}
+	return err
+}
+
+// LayerProperty returns one copied style layer property as a style-spec JSON
+// value.
+func (m *MapHandle) LayerProperty(layerID string, propertyName string) (any, error) {
+	ptr, err := m.ptr()
+	if err != nil {
+		return nil, err
+	}
+	defer m.state.KeepAlive()
+	var value any
+	if err := checkNative(func() capi.Status { return capi.MapGetLayerProperty(ptr, layerID, propertyName, &value) }); err != nil {
+		return nil, err
+	}
+	return value, nil
+}
+
+// SetLayerFilter sets or clears one style layer filter. Passing nil clears the
+// filter.
+func (m *MapHandle) SetLayerFilter(layerID string, filter any) error {
+	ptr, err := m.ptr()
+	if err != nil {
+		return err
+	}
+	defer m.state.KeepAlive()
+	var materialErr error
+	err = checkNative(func() capi.Status {
+		var status capi.Status
+		status, materialErr = capi.MapSetLayerFilter(ptr, layerID, filter)
+		return status
+	})
+	if materialErr != nil {
+		return newBindingError(ErrInvalidArgument, materialErr.Error())
+	}
+	return err
+}
+
+// LayerFilter returns one copied style layer filter as a style-spec JSON value.
+func (m *MapHandle) LayerFilter(layerID string) (any, error) {
+	ptr, err := m.ptr()
+	if err != nil {
+		return nil, err
+	}
+	defer m.state.KeepAlive()
+	var value any
+	if err := checkNative(func() capi.Status { return capi.MapGetLayerFilter(ptr, layerID, &value) }); err != nil {
+		return nil, err
+	}
+	return value, nil
 }
