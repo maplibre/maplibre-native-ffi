@@ -106,6 +106,11 @@ func TestRuntimeCreateRunOnceAndClose(t *testing.T) {
 	if err := runtime.RunOnce(); err != nil {
 		t.Fatalf("RunOnce(): %v", err)
 	}
+	if event, err := runtime.PollEvent(); err != nil {
+		t.Fatalf("PollEvent(): %v", err)
+	} else if event != nil && event.PayloadSize > 0 && event.PayloadType == RuntimeEventPayloadNone {
+		t.Fatalf("PollEvent() payload metadata inconsistent: %#v", event)
+	}
 	if err := runtime.Close(); err != nil {
 		t.Fatalf("Close(): %v", err)
 	}

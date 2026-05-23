@@ -13,6 +13,69 @@ const (
 	NetworkStatusOffline NetworkStatus = NetworkStatus(capi.NetworkStatusOffline)
 )
 
+// RuntimeEventType identifies a runtime event kind.
+type RuntimeEventType uint32
+
+const (
+	RuntimeEventMapCameraWillChange                 RuntimeEventType = RuntimeEventType(capi.RuntimeEventMapCameraWillChange)
+	RuntimeEventMapCameraIsChanging                 RuntimeEventType = RuntimeEventType(capi.RuntimeEventMapCameraIsChanging)
+	RuntimeEventMapCameraDidChange                  RuntimeEventType = RuntimeEventType(capi.RuntimeEventMapCameraDidChange)
+	RuntimeEventMapStyleLoaded                      RuntimeEventType = RuntimeEventType(capi.RuntimeEventMapStyleLoaded)
+	RuntimeEventMapLoadingStarted                   RuntimeEventType = RuntimeEventType(capi.RuntimeEventMapLoadingStarted)
+	RuntimeEventMapLoadingFinished                  RuntimeEventType = RuntimeEventType(capi.RuntimeEventMapLoadingFinished)
+	RuntimeEventMapLoadingFailed                    RuntimeEventType = RuntimeEventType(capi.RuntimeEventMapLoadingFailed)
+	RuntimeEventMapIdle                             RuntimeEventType = RuntimeEventType(capi.RuntimeEventMapIdle)
+	RuntimeEventMapRenderUpdateAvailable            RuntimeEventType = RuntimeEventType(capi.RuntimeEventMapRenderUpdateAvailable)
+	RuntimeEventMapRenderError                      RuntimeEventType = RuntimeEventType(capi.RuntimeEventMapRenderError)
+	RuntimeEventMapStillImageFinished               RuntimeEventType = RuntimeEventType(capi.RuntimeEventMapStillImageFinished)
+	RuntimeEventMapStillImageFailed                 RuntimeEventType = RuntimeEventType(capi.RuntimeEventMapStillImageFailed)
+	RuntimeEventMapRenderFrameStarted               RuntimeEventType = RuntimeEventType(capi.RuntimeEventMapRenderFrameStarted)
+	RuntimeEventMapRenderFrameFinished              RuntimeEventType = RuntimeEventType(capi.RuntimeEventMapRenderFrameFinished)
+	RuntimeEventMapRenderMapStarted                 RuntimeEventType = RuntimeEventType(capi.RuntimeEventMapRenderMapStarted)
+	RuntimeEventMapRenderMapFinished                RuntimeEventType = RuntimeEventType(capi.RuntimeEventMapRenderMapFinished)
+	RuntimeEventMapStyleImageMissing                RuntimeEventType = RuntimeEventType(capi.RuntimeEventMapStyleImageMissing)
+	RuntimeEventMapTileAction                       RuntimeEventType = RuntimeEventType(capi.RuntimeEventMapTileAction)
+	RuntimeEventOfflineRegionStatusChanged          RuntimeEventType = RuntimeEventType(capi.RuntimeEventOfflineRegionStatusChanged)
+	RuntimeEventOfflineRegionResponseError          RuntimeEventType = RuntimeEventType(capi.RuntimeEventOfflineRegionResponseError)
+	RuntimeEventOfflineRegionTileCountLimitExceeded RuntimeEventType = RuntimeEventType(capi.RuntimeEventOfflineRegionTileCountLimitExceeded)
+	RuntimeEventOfflineOperationCompleted           RuntimeEventType = RuntimeEventType(capi.RuntimeEventOfflineOperationCompleted)
+)
+
+// RuntimeEventSourceType identifies the native handle kind that emitted an event.
+type RuntimeEventSourceType uint32
+
+const (
+	RuntimeEventSourceRuntime RuntimeEventSourceType = RuntimeEventSourceType(capi.RuntimeEventSourceRuntime)
+	RuntimeEventSourceMap     RuntimeEventSourceType = RuntimeEventSourceType(capi.RuntimeEventSourceMap)
+)
+
+// RuntimeEventPayloadType identifies the copied event payload shape.
+type RuntimeEventPayloadType uint32
+
+const (
+	RuntimeEventPayloadNone                        RuntimeEventPayloadType = RuntimeEventPayloadType(capi.RuntimeEventPayloadNone)
+	RuntimeEventPayloadRenderFrame                 RuntimeEventPayloadType = RuntimeEventPayloadType(capi.RuntimeEventPayloadRenderFrame)
+	RuntimeEventPayloadRenderMap                   RuntimeEventPayloadType = RuntimeEventPayloadType(capi.RuntimeEventPayloadRenderMap)
+	RuntimeEventPayloadStyleImageMissing           RuntimeEventPayloadType = RuntimeEventPayloadType(capi.RuntimeEventPayloadStyleImageMissing)
+	RuntimeEventPayloadTileAction                  RuntimeEventPayloadType = RuntimeEventPayloadType(capi.RuntimeEventPayloadTileAction)
+	RuntimeEventPayloadOfflineRegionStatus         RuntimeEventPayloadType = RuntimeEventPayloadType(capi.RuntimeEventPayloadOfflineRegionStatus)
+	RuntimeEventPayloadOfflineRegionResponseError  RuntimeEventPayloadType = RuntimeEventPayloadType(capi.RuntimeEventPayloadOfflineRegionResponseError)
+	RuntimeEventPayloadOfflineRegionTileCountLimit RuntimeEventPayloadType = RuntimeEventPayloadType(capi.RuntimeEventPayloadOfflineRegionTileCountLimit)
+	RuntimeEventPayloadOfflineOperationCompleted   RuntimeEventPayloadType = RuntimeEventPayloadType(capi.RuntimeEventPayloadOfflineOperationCompleted)
+)
+
+// RuntimeEvent is a copied runtime event. Payload-specific copied structs are
+// added alongside their feature areas; unknown payloads preserve raw metadata.
+type RuntimeEvent struct {
+	Type        RuntimeEventType
+	SourceType  RuntimeEventSourceType
+	Source      uintptr
+	Code        int32
+	PayloadType RuntimeEventPayloadType
+	PayloadSize uintptr
+	Message     string
+}
+
 // RuntimeHandle owns scheduler state and event storage for one owner thread.
 type RuntimeHandle struct {
 	state *handle.State[capi.Runtime]
@@ -93,6 +156,37 @@ func (runtime *RuntimeHandle) RunOnce() error {
 	}
 	defer runtime.state.KeepAlive()
 	return checkNative(func() capi.Status { return capi.RuntimeRunOnce(ptr) })
+}
+
+// PollEvent polls one queued runtime event and copies it into a Go value.
+func (runtime *RuntimeHandle) PollEvent() (*RuntimeEvent, error) {
+	ptr, err := runtime.ptr()
+	if err != nil {
+		return nil, err
+	}
+	defer runtime.state.KeepAlive()
+
+	var rawEvent capi.RuntimeEvent
+	var hasEvent bool
+	if err := checkNative(func() capi.Status { return capi.RuntimePollEvent(ptr, &rawEvent, &hasEvent) }); err != nil {
+		return nil, err
+	}
+	if !hasEvent {
+		return nil, nil
+	}
+	return runtimeEventFromCAPI(rawEvent), nil
+}
+
+func runtimeEventFromCAPI(event capi.RuntimeEvent) *RuntimeEvent {
+	return &RuntimeEvent{
+		Type:        RuntimeEventType(event.Type),
+		SourceType:  RuntimeEventSourceType(event.SourceType),
+		Source:      event.Source,
+		Code:        event.Code,
+		PayloadType: RuntimeEventPayloadType(event.PayloadType),
+		PayloadSize: event.PayloadSize,
+		Message:     event.Message,
+	}
 }
 
 // NewMap creates a map owned by this runtime with native default options.

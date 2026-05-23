@@ -44,6 +44,17 @@ type ProjectedMeters struct {
 	Easting  float64
 }
 
+// RuntimeEvent is a copied native runtime event.
+type RuntimeEvent struct {
+	Type        uint32
+	SourceType  uint32
+	Source      uintptr
+	Code        int32
+	PayloadType uint32
+	PayloadSize uintptr
+	Message     string
+}
+
 // Status is the raw C status value returned by fallible C API calls.
 type Status int32
 
@@ -106,6 +117,48 @@ const (
 	LogEventTiming      uint32 = uint32(C.MLN_LOG_EVENT_TIMING)
 )
 
+const (
+	RuntimeEventMapCameraWillChange                 uint32 = uint32(C.MLN_RUNTIME_EVENT_MAP_CAMERA_WILL_CHANGE)
+	RuntimeEventMapCameraIsChanging                 uint32 = uint32(C.MLN_RUNTIME_EVENT_MAP_CAMERA_IS_CHANGING)
+	RuntimeEventMapCameraDidChange                  uint32 = uint32(C.MLN_RUNTIME_EVENT_MAP_CAMERA_DID_CHANGE)
+	RuntimeEventMapStyleLoaded                      uint32 = uint32(C.MLN_RUNTIME_EVENT_MAP_STYLE_LOADED)
+	RuntimeEventMapLoadingStarted                   uint32 = uint32(C.MLN_RUNTIME_EVENT_MAP_LOADING_STARTED)
+	RuntimeEventMapLoadingFinished                  uint32 = uint32(C.MLN_RUNTIME_EVENT_MAP_LOADING_FINISHED)
+	RuntimeEventMapLoadingFailed                    uint32 = uint32(C.MLN_RUNTIME_EVENT_MAP_LOADING_FAILED)
+	RuntimeEventMapIdle                             uint32 = uint32(C.MLN_RUNTIME_EVENT_MAP_IDLE)
+	RuntimeEventMapRenderUpdateAvailable            uint32 = uint32(C.MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE)
+	RuntimeEventMapRenderError                      uint32 = uint32(C.MLN_RUNTIME_EVENT_MAP_RENDER_ERROR)
+	RuntimeEventMapStillImageFinished               uint32 = uint32(C.MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FINISHED)
+	RuntimeEventMapStillImageFailed                 uint32 = uint32(C.MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FAILED)
+	RuntimeEventMapRenderFrameStarted               uint32 = uint32(C.MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_STARTED)
+	RuntimeEventMapRenderFrameFinished              uint32 = uint32(C.MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED)
+	RuntimeEventMapRenderMapStarted                 uint32 = uint32(C.MLN_RUNTIME_EVENT_MAP_RENDER_MAP_STARTED)
+	RuntimeEventMapRenderMapFinished                uint32 = uint32(C.MLN_RUNTIME_EVENT_MAP_RENDER_MAP_FINISHED)
+	RuntimeEventMapStyleImageMissing                uint32 = uint32(C.MLN_RUNTIME_EVENT_MAP_STYLE_IMAGE_MISSING)
+	RuntimeEventMapTileAction                       uint32 = uint32(C.MLN_RUNTIME_EVENT_MAP_TILE_ACTION)
+	RuntimeEventOfflineRegionStatusChanged          uint32 = uint32(C.MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED)
+	RuntimeEventOfflineRegionResponseError          uint32 = uint32(C.MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR)
+	RuntimeEventOfflineRegionTileCountLimitExceeded uint32 = uint32(C.MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED)
+	RuntimeEventOfflineOperationCompleted           uint32 = uint32(C.MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED)
+)
+
+const (
+	RuntimeEventSourceRuntime uint32 = uint32(C.MLN_RUNTIME_EVENT_SOURCE_RUNTIME)
+	RuntimeEventSourceMap     uint32 = uint32(C.MLN_RUNTIME_EVENT_SOURCE_MAP)
+)
+
+const (
+	RuntimeEventPayloadNone                        uint32 = uint32(C.MLN_RUNTIME_EVENT_PAYLOAD_NONE)
+	RuntimeEventPayloadRenderFrame                 uint32 = uint32(C.MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME)
+	RuntimeEventPayloadRenderMap                   uint32 = uint32(C.MLN_RUNTIME_EVENT_PAYLOAD_RENDER_MAP)
+	RuntimeEventPayloadStyleImageMissing           uint32 = uint32(C.MLN_RUNTIME_EVENT_PAYLOAD_STYLE_IMAGE_MISSING)
+	RuntimeEventPayloadTileAction                  uint32 = uint32(C.MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION)
+	RuntimeEventPayloadOfflineRegionStatus         uint32 = uint32(C.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS)
+	RuntimeEventPayloadOfflineRegionResponseError  uint32 = uint32(C.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR)
+	RuntimeEventPayloadOfflineRegionTileCountLimit uint32 = uint32(C.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT)
+	RuntimeEventPayloadOfflineOperationCompleted   uint32 = uint32(C.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_OPERATION_COMPLETED)
+)
+
 // CVersion returns the linked native C ABI contract version.
 func CVersion() uint32 {
 	return uint32(C.mln_c_version())
@@ -154,6 +207,42 @@ func RuntimeDestroy(runtime *Runtime) Status {
 // RuntimeRunOnce runs one pending owner-thread task for a runtime.
 func RuntimeRunOnce(runtime *Runtime) Status {
 	return Status(C.mln_runtime_run_once((*C.mln_runtime)(unsafe.Pointer(runtime))))
+}
+
+// RuntimePollEvent polls and copies one runtime event.
+func RuntimePollEvent(runtime *Runtime, out *RuntimeEvent, hasEvent *bool) Status {
+	rawEvent := C.mln_runtime_event{size: C.uint32_t(unsafe.Sizeof(C.mln_runtime_event{}))}
+	var rawHasEvent C.bool
+	status := Status(C.mln_runtime_poll_event(
+		(*C.mln_runtime)(unsafe.Pointer(runtime)),
+		&rawEvent,
+		&rawHasEvent,
+	))
+	if status == StatusOK {
+		*hasEvent = bool(rawHasEvent)
+		if bool(rawHasEvent) {
+			*out = runtimeEventFromC(rawEvent)
+		} else {
+			*out = RuntimeEvent{}
+		}
+	}
+	return status
+}
+
+func runtimeEventFromC(event C.mln_runtime_event) RuntimeEvent {
+	message := ""
+	if event.message != nil && event.message_size > 0 {
+		message = C.GoStringN(event.message, C.int(event.message_size))
+	}
+	return RuntimeEvent{
+		Type:        uint32(event._type),
+		SourceType:  uint32(event.source_type),
+		Source:      uintptr(event.source),
+		Code:        int32(event.code),
+		PayloadType: uint32(event.payload_type),
+		PayloadSize: uintptr(event.payload_size),
+		Message:     message,
+	}
 }
 
 // MapCreateDefault creates a map with native default options.
