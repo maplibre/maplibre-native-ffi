@@ -521,6 +521,61 @@ public sealed unsafe class MapHandle : IDisposable
         return found ? (SourceType)sourceType : null;
     }
 
+    /// <summary>Gets fixed style source metadata when the source exists.</summary>
+    public SourceInfo? StyleSourceInfo(string sourceId)
+    {
+        using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
+        var info = new mln_style_source_info { size = (uint)sizeof(mln_style_source_info) };
+        bool found = false;
+        NativeStatus.Check(NativeMethods.mln_map_get_style_source_info(Pointer, nativeSourceId.Value, &info, &found));
+        if (!found)
+        {
+            return null;
+        }
+
+        string? attribution = null;
+        if (info.has_attribution != 0)
+        {
+            attribution = string.Empty;
+            if (info.attribution_size > 0)
+            {
+                var buffer = new byte[checked((int)info.attribution_size)];
+                nuint attributionSize = 0;
+                bool attributionFound = false;
+                fixed (byte* bufferPointer = buffer)
+                {
+                    NativeStatus.Check(NativeMethods.mln_map_copy_style_source_attribution(
+                        Pointer,
+                        nativeSourceId.Value,
+                        (sbyte*)bufferPointer,
+                        (nuint)buffer.Length,
+                        &attributionSize,
+                        &attributionFound));
+                }
+
+                if (!attributionFound)
+                {
+                    return null;
+                }
+
+                fixed (byte* bufferPointer = buffer)
+                {
+                    attribution = RuntimeStructs.CopyUtf8((sbyte*)bufferPointer, attributionSize);
+                }
+            }
+        }
+
+        return new SourceInfo(sourceId, (SourceType)info.type, info.type, info.is_volatile != 0, attribution);
+    }
+
+    /// <summary>Lists style source IDs in style order.</summary>
+    public string[] StyleSourceIds()
+    {
+        mln_style_id_list* list = null;
+        NativeStatus.Check(NativeMethods.mln_map_list_style_source_ids(Pointer, &list));
+        return CopyStyleIdList(list);
+    }
+
     /// <summary>Adds a style layer from a JSON-like value.</summary>
     public void AddStyleLayerJson(JsonValue layerJson, string beforeLayerId = "")
     {
@@ -555,6 +610,14 @@ public sealed unsafe class MapHandle : IDisposable
         bool found = false;
         NativeStatus.Check(NativeMethods.mln_map_get_style_layer_type(Pointer, nativeLayerId.Value, &layerType, &found));
         return found ? RuntimeStructs.CopyUtf8(layerType.data, layerType.size) : null;
+    }
+
+    /// <summary>Lists style layer IDs in style order.</summary>
+    public string[] StyleLayerIds()
+    {
+        mln_style_id_list* list = null;
+        NativeStatus.Check(NativeMethods.mln_map_list_style_layer_ids(Pointer, &list));
+        return CopyStyleIdList(list);
     }
 
     /// <summary>Moves a style layer before another layer, or to the top when beforeLayerId is empty.</summary>
@@ -640,6 +703,33 @@ public sealed unsafe class MapHandle : IDisposable
     public void Close()
     {
         state.Close();
+    }
+
+    private static string[] CopyStyleIdList(mln_style_id_list* list)
+    {
+        if (list is null)
+        {
+            return [];
+        }
+
+        try
+        {
+            nuint count = 0;
+            NativeStatus.Check(NativeMethods.mln_style_id_list_count(list, &count));
+            var ids = new string[checked((int)count)];
+            for (var index = 0; index < ids.Length; index++)
+            {
+                mln_string_view id = default;
+                NativeStatus.Check(NativeMethods.mln_style_id_list_get(list, (nuint)index, &id));
+                ids[index] = RuntimeStructs.CopyUtf8(id.data, id.size);
+            }
+
+            return ids;
+        }
+        finally
+        {
+            NativeMethods.mln_style_id_list_destroy(list);
+        }
     }
 
     /// <inheritdoc />

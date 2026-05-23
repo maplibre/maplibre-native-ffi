@@ -77,6 +77,12 @@ public sealed unsafe class StyleJsonTests
         map.AddStyleSourceJson("geo", GeoJsonSource());
         Assert.True(map.StyleSourceExists("geo"));
         Assert.Equal(SourceType.GeoJson, map.StyleSourceType("geo"));
+        Assert.Contains("geo", map.StyleSourceIds());
+        var sourceInfo = map.StyleSourceInfo("geo");
+        Assert.NotNull(sourceInfo);
+        Assert.Equal("geo", sourceInfo.Id);
+        Assert.Equal(SourceType.GeoJson, sourceInfo.Type);
+        Assert.Null(sourceInfo.Attribution);
 
         map.AddStyleLayerJson(new JsonValue.Object([
             new JsonMember("id", new JsonValue.String("background")),
@@ -84,6 +90,7 @@ public sealed unsafe class StyleJsonTests
         ]));
         Assert.True(map.StyleLayerExists("background"));
         Assert.Equal("background", map.StyleLayerType("background"));
+        Assert.Contains("background", map.StyleLayerIds());
 
         Assert.True(map.RemoveStyleLayer("background"));
         Assert.True(map.RemoveStyleSource("geo"));

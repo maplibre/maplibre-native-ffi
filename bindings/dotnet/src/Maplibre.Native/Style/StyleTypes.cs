@@ -9,7 +9,7 @@ public enum VectorTileEncoding : uint { Mvt = 0, Mlt = 1 }
 public enum RasterDemEncoding : uint { Mapbox = 0, Terrarium = 1 }
 public enum LocationIndicatorImageKind : uint { Top = 0, Bearing = 1, Shadow = 2 }
 
-public sealed record SourceInfo(string Id, SourceType Type, string? Attribution);
+public sealed record SourceInfo(string Id, SourceType Type, uint RawType, bool IsVolatile, string? Attribution);
 
 public sealed class TileSourceOptions
 {
