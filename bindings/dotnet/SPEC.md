@@ -83,7 +83,10 @@ bindings/dotnet/
       RuntimeOptions.cs
   tests/Maplibre.Native.Tests/
     GeneratedLayoutTests.cs
+    MaplibreTests.cs
     NativeHandleStateTests.cs
+    NativeLibraryTestSupport.cs
+    NativeStatusTests.cs
     NativeUtf8StringTests.cs
     Maplibre.Native.Tests.csproj
 ```
@@ -110,6 +113,8 @@ The scaffold implements one proof slice:
 - ClangSharp-generated files in `Generated/*.g.cs` cover the public C headers.
 - `GeneratedLayoutTests` verifies layout-sensitive binding facts that do not
   require the native library.
+- Native-library tests cover the C ABI version call and native status diagnostic
+  mapping when run through `mise run //bindings/dotnet:test`.
 
 ## Build artifacts and tasks
 

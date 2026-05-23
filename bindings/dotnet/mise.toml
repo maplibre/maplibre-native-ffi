@@ -5,6 +5,7 @@ run = "scripts/generate-clangsharp.sh"
 run = "dotnet build Maplibre.Native.slnx"
 
 [tasks.test]
+depends = ["//:ensure-native-library"]
 run = "dotnet test Maplibre.Native.slnx"
 
 [tasks.ci]
