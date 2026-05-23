@@ -142,7 +142,14 @@ import org.maplibre.nativeffi.internal.struct.MapStructs
 import org.maplibre.nativeffi.internal.struct.StyleStructs
 import org.maplibre.nativeffi.internal.struct.ValueStructs
 import org.maplibre.nativeffi.json.JsonValue
+import org.maplibre.nativeffi.render.MetalBorrowedTextureDescriptor
+import org.maplibre.nativeffi.render.MetalOwnedTextureDescriptor
+import org.maplibre.nativeffi.render.MetalSurfaceDescriptor
 import org.maplibre.nativeffi.render.PremultipliedRgba8Image
+import org.maplibre.nativeffi.render.RenderSessionHandle
+import org.maplibre.nativeffi.render.VulkanBorrowedTextureDescriptor
+import org.maplibre.nativeffi.render.VulkanOwnedTextureDescriptor
+import org.maplibre.nativeffi.render.VulkanSurfaceDescriptor
 import org.maplibre.nativeffi.runtime.RuntimeHandle
 import org.maplibre.nativeffi.style.CustomGeometrySourceOptions
 import org.maplibre.nativeffi.style.LocationIndicatorImageKind
@@ -1264,6 +1271,27 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     )
     CoreStructs.latLngArray(outCoordinates, points.size)
   }
+
+  public fun attachMetalOwnedTexture(descriptor: MetalOwnedTextureDescriptor): RenderSessionHandle =
+    RenderSessionHandle.attachMetalOwnedTexture(this, descriptor)
+
+  public fun attachMetalBorrowedTexture(
+    descriptor: MetalBorrowedTextureDescriptor
+  ): RenderSessionHandle = RenderSessionHandle.attachMetalBorrowedTexture(this, descriptor)
+
+  public fun attachVulkanOwnedTexture(
+    descriptor: VulkanOwnedTextureDescriptor
+  ): RenderSessionHandle = RenderSessionHandle.attachVulkanOwnedTexture(this, descriptor)
+
+  public fun attachVulkanBorrowedTexture(
+    descriptor: VulkanBorrowedTextureDescriptor
+  ): RenderSessionHandle = RenderSessionHandle.attachVulkanBorrowedTexture(this, descriptor)
+
+  public fun attachMetalSurface(descriptor: MetalSurfaceDescriptor): RenderSessionHandle =
+    RenderSessionHandle.attachMetalSurface(this, descriptor)
+
+  public fun attachVulkanSurface(descriptor: VulkanSurfaceDescriptor): RenderSessionHandle =
+    RenderSessionHandle.attachVulkanSurface(this, descriptor)
 
   public fun createProjection(): MapProjectionHandle = MapProjectionHandle.create(this)
 

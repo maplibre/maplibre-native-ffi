@@ -4,16 +4,22 @@ import kotlinx.cinterop.ExperimentalForeignApi
 import org.maplibre.nativeffi.internal.c.MLN_LOG_SEVERITY_MASK_DEFAULT
 import org.maplibre.nativeffi.internal.c.mln_c_version
 import org.maplibre.nativeffi.internal.c.mln_log_set_async_severity_mask
+import org.maplibre.nativeffi.internal.c.mln_supported_render_backend_mask
 import org.maplibre.nativeffi.internal.callback.LogCallbackState
 import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.log.LogCallback
 import org.maplibre.nativeffi.log.LogSeverity
+import org.maplibre.nativeffi.render.RenderBackend
 
 /** Process-global entry points for the Kotlin/Native binding. */
 @OptIn(ExperimentalForeignApi::class)
 public object Maplibre {
   /** Returns the native C ABI contract version. */
   public fun cVersion(): UInt = mln_c_version()
+
+  /** Returns the render backends compiled into the loaded native library. */
+  public fun supportedRenderBackends(): Set<RenderBackend> =
+    RenderBackend.fromMask(mln_supported_render_backend_mask())
 
   /** Installs or replaces the process-global native log callback. */
   public fun setLogCallback(callback: LogCallback) {

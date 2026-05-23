@@ -125,7 +125,7 @@ internal object ValueStructs {
     return readFeature(value.pointed)
   }
 
-  private fun feature(value: Feature, scope: MemScope): CPointer<mln_feature> {
+  fun feature(value: Feature, scope: MemScope): CPointer<mln_feature> {
     val native = scope.alloc<mln_feature>()
     writeFeature(native, value, scope)
     return native.ptr
