@@ -12,6 +12,22 @@ internal static class NativeLibraryLoader
 
     private static readonly object Gate = new();
     private static bool installed;
+    private static nint explicitHandle;
+
+    internal static void Load(string libraryPath)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(libraryPath);
+        EnsureLoaded();
+        lock (Gate)
+        {
+            if (explicitHandle != 0)
+            {
+                return;
+            }
+
+            explicitHandle = NativeLibrary.Load(libraryPath);
+        }
+    }
 
     internal static void EnsureLoaded()
     {
@@ -42,6 +58,11 @@ internal static class NativeLibraryLoader
         if (libraryName != NativeMethods.LibraryName)
         {
             return 0;
+        }
+
+        if (explicitHandle != 0)
+        {
+            return explicitHandle;
         }
 
         foreach (var path in CandidatePaths())

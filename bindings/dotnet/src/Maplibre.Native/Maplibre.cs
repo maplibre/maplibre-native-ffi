@@ -1,13 +1,28 @@
 using Maplibre.Native.Error;
+using Maplibre.Native.Geo;
 using Maplibre.Native.Internal.C;
 using Maplibre.Native.Internal.Loader;
 using Maplibre.Native.Internal.Status;
+using Maplibre.Native.Internal.Struct;
+using Maplibre.Native.Log;
 
 namespace Maplibre.Native;
 
 /// <summary>Process-global MapLibre Native FFI entry points.</summary>
-public static class Maplibre
+public static unsafe class Maplibre
 {
+    /// <summary>Loads the native library using the binding's standard lookup order.</summary>
+    public static void LoadNativeLibrary()
+    {
+        NativeLibraryLoader.EnsureLoaded();
+    }
+
+    /// <summary>Loads the native library from an exact file path.</summary>
+    public static void LoadNativeLibrary(string libraryPath)
+    {
+        NativeLibraryLoader.Load(libraryPath);
+    }
+
     /// <summary>Returns the native C ABI contract version.</summary>
     public static uint CVersion()
     {
@@ -44,5 +59,42 @@ public static class Maplibre
 
         NativeLibraryLoader.EnsureLoaded();
         NativeStatus.Check(NativeMethods.MlnNetworkStatusSet(status.RawValue));
+    }
+
+    /// <summary>Configures severities that native logging may dispatch asynchronously.</summary>
+    public static void SetAsyncLogSeverities(LogSeverityMask severities)
+    {
+        NativeLibraryLoader.EnsureLoaded();
+        NativeStatus.Check(NativeMethods.mln_log_set_async_severity_mask((uint)severities));
+    }
+
+    /// <summary>Restores the native default async log severity mask.</summary>
+    public static void RestoreDefaultAsyncLogSeverities()
+    {
+        NativeLibraryLoader.EnsureLoaded();
+        NativeStatus.Check(NativeMethods.mln_log_set_async_severity_mask(
+            (uint)mln_log_severity_mask.MLN_LOG_SEVERITY_MASK_DEFAULT));
+    }
+
+    /// <summary>Converts a geographic coordinate to Spherical Mercator projected meters.</summary>
+    public static ProjectedMeters ProjectedMetersForLatLng(LatLng coordinate)
+    {
+        NativeLibraryLoader.EnsureLoaded();
+        var output = new mln_projected_meters();
+        NativeStatus.Check(NativeMethods.mln_projected_meters_for_lat_lng(
+            CoreStructs.ToNative(coordinate),
+            &output));
+        return CoreStructs.FromNative(output);
+    }
+
+    /// <summary>Converts Spherical Mercator projected meters to a geographic coordinate.</summary>
+    public static LatLng LatLngForProjectedMeters(ProjectedMeters meters)
+    {
+        NativeLibraryLoader.EnsureLoaded();
+        var output = new mln_lat_lng();
+        NativeStatus.Check(NativeMethods.mln_lat_lng_for_projected_meters(
+            CoreStructs.ToNative(meters),
+            &output));
+        return CoreStructs.FromNative(output);
     }
 }

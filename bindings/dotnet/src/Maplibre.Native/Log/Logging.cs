@@ -6,23 +6,23 @@ public enum LogSeverity : uint { Info = 1, Warning = 2, Error = 3 }
 /// <summary>Log event domain.</summary>
 public enum LogEvent : uint
 {
-    General = 1,
-    Setup = 2,
-    Shader = 3,
-    ParseStyle = 4,
-    ParseTile = 5,
-    Sprite = 6,
-    Image = 7,
-    Glyph = 8,
-    Database = 9,
-    HttpRequest = 10,
-    Render = 11,
-    Style = 12,
-    OpenGl = 13,
-    Android = 14,
-    Jni = 15,
+    General = 0,
+    Setup = 1,
+    Shader = 2,
+    ParseStyle = 3,
+    ParseTile = 4,
+    Render = 5,
+    Style = 6,
+    Database = 7,
+    HttpRequest = 8,
+    Sprite = 9,
+    Image = 10,
+    OpenGl = 11,
+    Jni = 12,
+    Android = 13,
+    Crash = 14,
+    Glyph = 15,
     Timing = 16,
-    Crash = 17,
 }
 
 /// <summary>Log severity mask.</summary>
@@ -30,9 +30,10 @@ public enum LogEvent : uint
 public enum LogSeverityMask : uint
 {
     None = 0,
-    Info = 1u << 0,
-    Warning = 1u << 1,
-    Error = 1u << 2,
+    Info = 1u << (int)LogSeverity.Info,
+    Warning = 1u << (int)LogSeverity.Warning,
+    Error = 1u << (int)LogSeverity.Error,
+    Default = Info | Warning,
     All = Info | Warning | Error,
 }
 

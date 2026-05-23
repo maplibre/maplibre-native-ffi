@@ -14,6 +14,19 @@ public sealed class MaplibreTests
     }
 
     [Fact]
+    public void ProjectionHelpersRoundTripThroughNativeLibrary()
+    {
+        NativeLibraryTestSupport.SkipUnlessNativeLibraryIsAvailable();
+        var coordinate = new Geo.LatLng(45.0, -122.0);
+
+        var meters = Maplibre.ProjectedMetersForLatLng(coordinate);
+        var roundTripped = Maplibre.LatLngForProjectedMeters(meters);
+
+        Assert.True(Math.Abs(roundTripped.Latitude - coordinate.Latitude) < 1e-9);
+        Assert.True(Math.Abs(roundTripped.Longitude - coordinate.Longitude) < 1e-9);
+    }
+
+    [Fact]
     public void UnknownNetworkStatusIsRejectedBeforeNativeCall()
     {
         var status = NetworkStatus.FromRaw(999_999);
