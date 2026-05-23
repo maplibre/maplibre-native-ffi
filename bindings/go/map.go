@@ -362,6 +362,98 @@ func (m *MapHandle) CancelTransitions() error {
 	return checkNative(func() capi.Status { return capi.MapCancelTransitions(ptr) })
 }
 
+// CameraForLatLngBounds computes a camera that fits geographic bounds. Passing
+// nil fitOptions uses native default fitting options.
+func (m *MapHandle) CameraForLatLngBounds(bounds LatLngBounds, fitOptions *CameraFitOptions) (CameraOptions, error) {
+	ptr, err := m.ptr()
+	if err != nil {
+		return CameraOptions{}, err
+	}
+	defer m.state.KeepAlive()
+	var raw capi.CameraOptions
+	if err := checkNative(func() capi.Status {
+		return capi.MapCameraForLatLngBounds(ptr, bounds.toCAPI(), cameraFitOptionsToCAPI(fitOptions), &raw)
+	}); err != nil {
+		return CameraOptions{}, err
+	}
+	return cameraOptionsFromCAPI(raw), nil
+}
+
+// CameraForLatLngs computes a camera that fits geographic coordinates. Passing
+// nil fitOptions uses native default fitting options.
+func (m *MapHandle) CameraForLatLngs(coordinates []LatLng, fitOptions *CameraFitOptions) (CameraOptions, error) {
+	ptr, err := m.ptr()
+	if err != nil {
+		return CameraOptions{}, err
+	}
+	defer m.state.KeepAlive()
+	var raw capi.CameraOptions
+	rawCoordinates := make([]capi.LatLng, len(coordinates))
+	for i, coordinate := range coordinates {
+		rawCoordinates[i] = coordinate.toCAPI()
+	}
+	if err := checkNative(func() capi.Status {
+		return capi.MapCameraForLatLngs(ptr, rawCoordinates, cameraFitOptionsToCAPI(fitOptions), &raw)
+	}); err != nil {
+		return CameraOptions{}, err
+	}
+	return cameraOptionsFromCAPI(raw), nil
+}
+
+// LatLngBoundsForCamera computes wrapped geographic bounds for a camera in the
+// current viewport.
+func (m *MapHandle) LatLngBoundsForCamera(camera CameraOptions) (LatLngBounds, error) {
+	ptr, err := m.ptr()
+	if err != nil {
+		return LatLngBounds{}, err
+	}
+	defer m.state.KeepAlive()
+	var raw capi.LatLngBounds
+	if err := checkNative(func() capi.Status { return capi.MapLatLngBoundsForCamera(ptr, camera.toCAPI(), &raw) }); err != nil {
+		return LatLngBounds{}, err
+	}
+	return latLngBoundsFromCAPI(raw), nil
+}
+
+// LatLngBoundsForCameraUnwrapped computes unwrapped geographic bounds for a
+// camera in the current viewport.
+func (m *MapHandle) LatLngBoundsForCameraUnwrapped(camera CameraOptions) (LatLngBounds, error) {
+	ptr, err := m.ptr()
+	if err != nil {
+		return LatLngBounds{}, err
+	}
+	defer m.state.KeepAlive()
+	var raw capi.LatLngBounds
+	if err := checkNative(func() capi.Status { return capi.MapLatLngBoundsForCameraUnwrapped(ptr, camera.toCAPI(), &raw) }); err != nil {
+		return LatLngBounds{}, err
+	}
+	return latLngBoundsFromCAPI(raw), nil
+}
+
+// Bounds returns map camera constraint options.
+func (m *MapHandle) Bounds() (BoundOptions, error) {
+	ptr, err := m.ptr()
+	if err != nil {
+		return BoundOptions{}, err
+	}
+	defer m.state.KeepAlive()
+	var raw capi.BoundOptions
+	if err := checkNative(func() capi.Status { return capi.MapGetBounds(ptr, &raw) }); err != nil {
+		return BoundOptions{}, err
+	}
+	return boundOptionsFromCAPI(raw), nil
+}
+
+// SetBounds applies selected map camera constraint options.
+func (m *MapHandle) SetBounds(options BoundOptions) error {
+	ptr, err := m.ptr()
+	if err != nil {
+		return err
+	}
+	defer m.state.KeepAlive()
+	return checkNative(func() capi.Status { return capi.MapSetBounds(ptr, options.toCAPI()) })
+}
+
 // ViewportOptions returns live map viewport and render-transform controls.
 func (m *MapHandle) ViewportOptions() (ViewportOptions, error) {
 	ptr, err := m.ptr()

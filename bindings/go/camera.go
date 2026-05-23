@@ -199,6 +199,153 @@ func animationOptionsToCAPI(options *AnimationOptions) *capi.AnimationOptions {
 	return &raw
 }
 
+// CameraFitOptions configures camera fitting queries.
+type CameraFitOptions struct {
+	Padding *EdgeInsets
+	Bearing *float64
+	Pitch   *float64
+}
+
+// WithPadding returns a copy that sets fit padding.
+func (options CameraFitOptions) WithPadding(padding EdgeInsets) CameraFitOptions {
+	options.Padding = new(EdgeInsets)
+	*options.Padding = padding
+	return options
+}
+
+// WithBearing returns a copy that sets fit bearing.
+func (options CameraFitOptions) WithBearing(bearing float64) CameraFitOptions {
+	options.Bearing = new(float64)
+	*options.Bearing = bearing
+	return options
+}
+
+// WithPitch returns a copy that sets fit pitch.
+func (options CameraFitOptions) WithPitch(pitch float64) CameraFitOptions {
+	options.Pitch = new(float64)
+	*options.Pitch = pitch
+	return options
+}
+
+func (options CameraFitOptions) toCAPI() capi.CameraFitOptions {
+	var raw capi.CameraFitOptions
+	if options.Padding != nil {
+		raw.Fields |= capi.CameraFitOptionPadding
+		raw.Padding = options.Padding.toCAPI()
+	}
+	if options.Bearing != nil {
+		raw.Fields |= capi.CameraFitOptionBearing
+		raw.Bearing = *options.Bearing
+	}
+	if options.Pitch != nil {
+		raw.Fields |= capi.CameraFitOptionPitch
+		raw.Pitch = *options.Pitch
+	}
+	return raw
+}
+
+func cameraFitOptionsToCAPI(options *CameraFitOptions) *capi.CameraFitOptions {
+	if options == nil {
+		return nil
+	}
+	raw := options.toCAPI()
+	return &raw
+}
+
+// BoundOptions configures map camera constraints.
+type BoundOptions struct {
+	Bounds   *LatLngBounds
+	MinZoom  *float64
+	MaxZoom  *float64
+	MinPitch *float64
+	MaxPitch *float64
+}
+
+// WithBounds returns a copy that sets geographic camera constraints.
+func (options BoundOptions) WithBounds(bounds LatLngBounds) BoundOptions {
+	options.Bounds = new(LatLngBounds)
+	*options.Bounds = bounds
+	return options
+}
+
+// WithMinZoom returns a copy that sets minimum zoom.
+func (options BoundOptions) WithMinZoom(minZoom float64) BoundOptions {
+	options.MinZoom = new(float64)
+	*options.MinZoom = minZoom
+	return options
+}
+
+// WithMaxZoom returns a copy that sets maximum zoom.
+func (options BoundOptions) WithMaxZoom(maxZoom float64) BoundOptions {
+	options.MaxZoom = new(float64)
+	*options.MaxZoom = maxZoom
+	return options
+}
+
+// WithMinPitch returns a copy that sets minimum pitch.
+func (options BoundOptions) WithMinPitch(minPitch float64) BoundOptions {
+	options.MinPitch = new(float64)
+	*options.MinPitch = minPitch
+	return options
+}
+
+// WithMaxPitch returns a copy that sets maximum pitch.
+func (options BoundOptions) WithMaxPitch(maxPitch float64) BoundOptions {
+	options.MaxPitch = new(float64)
+	*options.MaxPitch = maxPitch
+	return options
+}
+
+func (options BoundOptions) toCAPI() capi.BoundOptions {
+	var raw capi.BoundOptions
+	if options.Bounds != nil {
+		raw.Fields |= capi.BoundOptionBounds
+		raw.Bounds = options.Bounds.toCAPI()
+	}
+	if options.MinZoom != nil {
+		raw.Fields |= capi.BoundOptionMinZoom
+		raw.MinZoom = *options.MinZoom
+	}
+	if options.MaxZoom != nil {
+		raw.Fields |= capi.BoundOptionMaxZoom
+		raw.MaxZoom = *options.MaxZoom
+	}
+	if options.MinPitch != nil {
+		raw.Fields |= capi.BoundOptionMinPitch
+		raw.MinPitch = *options.MinPitch
+	}
+	if options.MaxPitch != nil {
+		raw.Fields |= capi.BoundOptionMaxPitch
+		raw.MaxPitch = *options.MaxPitch
+	}
+	return raw
+}
+
+func boundOptionsFromCAPI(raw capi.BoundOptions) BoundOptions {
+	var options BoundOptions
+	if raw.Fields&capi.BoundOptionBounds != 0 {
+		value := latLngBoundsFromCAPI(raw.Bounds)
+		options.Bounds = &value
+	}
+	if raw.Fields&capi.BoundOptionMinZoom != 0 {
+		value := raw.MinZoom
+		options.MinZoom = &value
+	}
+	if raw.Fields&capi.BoundOptionMaxZoom != 0 {
+		value := raw.MaxZoom
+		options.MaxZoom = &value
+	}
+	if raw.Fields&capi.BoundOptionMinPitch != 0 {
+		value := raw.MinPitch
+		options.MinPitch = &value
+	}
+	if raw.Fields&capi.BoundOptionMaxPitch != 0 {
+		value := raw.MaxPitch
+		options.MaxPitch = &value
+	}
+	return options
+}
+
 // NorthOrientation controls which screen edge points north.
 type NorthOrientation uint32
 

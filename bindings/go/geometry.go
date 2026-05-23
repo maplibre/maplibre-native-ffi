@@ -69,3 +69,7 @@ func projectedMetersFromCAPI(meters capi.ProjectedMeters) ProjectedMeters {
 func (bounds LatLngBounds) toCAPI() capi.LatLngBounds {
 	return capi.LatLngBounds{Southwest: bounds.Southwest.toCAPI(), Northeast: bounds.Northeast.toCAPI()}
 }
+
+func latLngBoundsFromCAPI(bounds capi.LatLngBounds) LatLngBounds {
+	return LatLngBounds{Southwest: latLngFromCAPI(bounds.Southwest), Northeast: latLngFromCAPI(bounds.Northeast)}
+}

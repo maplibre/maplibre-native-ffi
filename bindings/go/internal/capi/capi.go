@@ -154,6 +154,24 @@ type AnimationOptions struct {
 	Easing     UnitBezier
 }
 
+// CameraFitOptions contains semantic camera fit controls.
+type CameraFitOptions struct {
+	Fields  uint32
+	Padding EdgeInsets
+	Bearing float64
+	Pitch   float64
+}
+
+// BoundOptions contains semantic map camera constraint fields.
+type BoundOptions struct {
+	Fields   uint32
+	Bounds   LatLngBounds
+	MinZoom  float64
+	MaxZoom  float64
+	MinPitch float64
+	MaxPitch float64
+}
+
 // OfflineTilePyramidRegionDefinition contains tile-pyramid offline region data.
 type OfflineTilePyramidRegionDefinition struct {
 	StyleURL          string
@@ -329,6 +347,20 @@ const (
 	AnimationOptionVelocity uint32 = uint32(C.MLN_ANIMATION_OPTION_VELOCITY)
 	AnimationOptionMinZoom  uint32 = uint32(C.MLN_ANIMATION_OPTION_MIN_ZOOM)
 	AnimationOptionEasing   uint32 = uint32(C.MLN_ANIMATION_OPTION_EASING)
+)
+
+const (
+	CameraFitOptionPadding uint32 = uint32(C.MLN_CAMERA_FIT_OPTION_PADDING)
+	CameraFitOptionBearing uint32 = uint32(C.MLN_CAMERA_FIT_OPTION_BEARING)
+	CameraFitOptionPitch   uint32 = uint32(C.MLN_CAMERA_FIT_OPTION_PITCH)
+)
+
+const (
+	BoundOptionBounds   uint32 = uint32(C.MLN_BOUND_OPTION_BOUNDS)
+	BoundOptionMinZoom  uint32 = uint32(C.MLN_BOUND_OPTION_MIN_ZOOM)
+	BoundOptionMaxZoom  uint32 = uint32(C.MLN_BOUND_OPTION_MAX_ZOOM)
+	BoundOptionMinPitch uint32 = uint32(C.MLN_BOUND_OPTION_MIN_PITCH)
+	BoundOptionMaxPitch uint32 = uint32(C.MLN_BOUND_OPTION_MAX_PITCH)
 )
 
 const (
@@ -1277,6 +1309,75 @@ func MapCancelTransitions(m *Map) Status {
 	return Status(C.mln_map_cancel_transitions((*C.mln_map)(unsafe.Pointer(m))))
 }
 
+// MapCameraForLatLngBounds computes a camera that fits geographic bounds.
+func MapCameraForLatLngBounds(m *Map, bounds LatLngBounds, fitOptions *CameraFitOptions, out *CameraOptions) Status {
+	rawFitOptions, rawFitOptionsPointer := cameraFitOptionsToCPointer(fitOptions)
+	_ = rawFitOptions
+	rawCamera := C.mln_camera_options{size: C.uint32_t(unsafe.Sizeof(C.mln_camera_options{}))}
+	status := Status(C.mln_map_camera_for_lat_lng_bounds((*C.mln_map)(unsafe.Pointer(m)), latLngBoundsToC(bounds), rawFitOptionsPointer, &rawCamera))
+	if status == StatusOK {
+		*out = cameraOptionsFromC(rawCamera)
+	}
+	return status
+}
+
+// MapCameraForLatLngs computes a camera that fits geographic coordinates.
+func MapCameraForLatLngs(m *Map, coordinates []LatLng, fitOptions *CameraFitOptions, out *CameraOptions) Status {
+	if len(coordinates) == 0 {
+		return Status(C.mln_map_camera_for_lat_lngs((*C.mln_map)(unsafe.Pointer(m)), nil, 0, nil, nil))
+	}
+	rawCoordinates := make([]C.mln_lat_lng, len(coordinates))
+	for i, coordinate := range coordinates {
+		rawCoordinates[i] = latLngToC(coordinate)
+	}
+	rawFitOptions, rawFitOptionsPointer := cameraFitOptionsToCPointer(fitOptions)
+	_ = rawFitOptions
+	rawCamera := C.mln_camera_options{size: C.uint32_t(unsafe.Sizeof(C.mln_camera_options{}))}
+	status := Status(C.mln_map_camera_for_lat_lngs((*C.mln_map)(unsafe.Pointer(m)), &rawCoordinates[0], C.size_t(len(rawCoordinates)), rawFitOptionsPointer, &rawCamera))
+	if status == StatusOK {
+		*out = cameraOptionsFromC(rawCamera)
+	}
+	return status
+}
+
+// MapLatLngBoundsForCamera computes wrapped geographic bounds for a camera.
+func MapLatLngBoundsForCamera(m *Map, camera CameraOptions, out *LatLngBounds) Status {
+	rawCamera := cameraOptionsToC(camera)
+	var rawBounds C.mln_lat_lng_bounds
+	status := Status(C.mln_map_lat_lng_bounds_for_camera((*C.mln_map)(unsafe.Pointer(m)), &rawCamera, &rawBounds))
+	if status == StatusOK {
+		*out = latLngBoundsFromC(rawBounds)
+	}
+	return status
+}
+
+// MapLatLngBoundsForCameraUnwrapped computes unwrapped geographic bounds for a camera.
+func MapLatLngBoundsForCameraUnwrapped(m *Map, camera CameraOptions, out *LatLngBounds) Status {
+	rawCamera := cameraOptionsToC(camera)
+	var rawBounds C.mln_lat_lng_bounds
+	status := Status(C.mln_map_lat_lng_bounds_for_camera_unwrapped((*C.mln_map)(unsafe.Pointer(m)), &rawCamera, &rawBounds))
+	if status == StatusOK {
+		*out = latLngBoundsFromC(rawBounds)
+	}
+	return status
+}
+
+// MapGetBounds copies map camera constraint options.
+func MapGetBounds(m *Map, out *BoundOptions) Status {
+	raw := C.mln_bound_options{size: C.uint32_t(unsafe.Sizeof(C.mln_bound_options{}))}
+	status := Status(C.mln_map_get_bounds((*C.mln_map)(unsafe.Pointer(m)), &raw))
+	if status == StatusOK {
+		*out = boundOptionsFromC(raw)
+	}
+	return status
+}
+
+// MapSetBounds applies selected map camera constraint options.
+func MapSetBounds(m *Map, options BoundOptions) Status {
+	raw := boundOptionsToC(options)
+	return Status(C.mln_map_set_bounds((*C.mln_map)(unsafe.Pointer(m)), &raw))
+}
+
 // MapProjectionCreate creates a standalone projection helper from a map.
 func MapProjectionCreate(m *Map, out **Projection) Status {
 	var raw *C.mln_map_projection
@@ -1462,6 +1563,45 @@ func animationOptionsToCPointer(options *AnimationOptions) (C.mln_animation_opti
 	}
 	raw := animationOptionsToC(*options)
 	return raw, &raw
+}
+
+func cameraFitOptionsToC(options CameraFitOptions) C.mln_camera_fit_options {
+	raw := C.mln_camera_fit_options_default()
+	raw.fields = C.uint32_t(options.Fields)
+	raw.padding = edgeInsetsToC(options.Padding)
+	raw.bearing = C.double(options.Bearing)
+	raw.pitch = C.double(options.Pitch)
+	return raw
+}
+
+func cameraFitOptionsToCPointer(options *CameraFitOptions) (C.mln_camera_fit_options, *C.mln_camera_fit_options) {
+	if options == nil {
+		return C.mln_camera_fit_options{}, nil
+	}
+	raw := cameraFitOptionsToC(*options)
+	return raw, &raw
+}
+
+func boundOptionsToC(options BoundOptions) C.mln_bound_options {
+	raw := C.mln_bound_options_default()
+	raw.fields = C.uint32_t(options.Fields)
+	raw.bounds = latLngBoundsToC(options.Bounds)
+	raw.min_zoom = C.double(options.MinZoom)
+	raw.max_zoom = C.double(options.MaxZoom)
+	raw.min_pitch = C.double(options.MinPitch)
+	raw.max_pitch = C.double(options.MaxPitch)
+	return raw
+}
+
+func boundOptionsFromC(options C.mln_bound_options) BoundOptions {
+	return BoundOptions{
+		Fields:   uint32(options.fields),
+		Bounds:   latLngBoundsFromC(options.bounds),
+		MinZoom:  float64(options.min_zoom),
+		MaxZoom:  float64(options.max_zoom),
+		MinPitch: float64(options.min_pitch),
+		MaxPitch: float64(options.max_pitch),
+	}
 }
 
 func screenPointFromC(point C.mln_screen_point) ScreenPoint {

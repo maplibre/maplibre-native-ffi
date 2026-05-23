@@ -283,10 +283,6 @@ func offlineRegionInfoFromCAPI(info capi.OfflineRegionInfo) OfflineRegionInfo {
 	return copied
 }
 
-func latLngBoundsFromCAPI(bounds capi.LatLngBounds) LatLngBounds {
-	return LatLngBounds{Southwest: latLngFromCAPI(bounds.Southwest), Northeast: latLngFromCAPI(bounds.Northeast)}
-}
-
 func offlineRegionStatusFromCAPI(status capi.OfflineRegionStatus) OfflineRegionStatus {
 	return OfflineRegionStatus{
 		DownloadState:                  OfflineRegionDownloadState(status.DownloadState),

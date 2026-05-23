@@ -767,6 +767,73 @@ func TestMapAnimatedCameraCommandsUseOptionalAnimationOptions(t *testing.T) {
 	}
 }
 
+func TestMapCameraFitAndBoundsHelpers(t *testing.T) {
+	runtime, err := NewRuntime()
+	if err != nil {
+		t.Fatalf("NewRuntime(): %v", err)
+	}
+	m, err := runtime.NewMapWithOptions(NewMapOptions(512, 512, 1))
+	if err != nil {
+		_ = runtime.Close()
+		t.Fatalf("NewMapWithOptions(): %v", err)
+	}
+	defer func() {
+		if err := m.Close(); err != nil {
+			t.Errorf("Map Close(): %v", err)
+		}
+		if err := runtime.Close(); err != nil {
+			t.Errorf("Runtime Close(): %v", err)
+		}
+	}()
+
+	bounds := LatLngBounds{
+		Southwest: LatLng{Latitude: -10, Longitude: -20},
+		Northeast: LatLng{Latitude: 10, Longitude: 20},
+	}
+	fitOptions := CameraFitOptions{}.
+		WithPadding(EdgeInsets{Top: 4, Left: 3, Bottom: 2, Right: 1}).
+		WithBearing(0).
+		WithPitch(0)
+	camera, err := m.CameraForLatLngBounds(bounds, &fitOptions)
+	if err != nil {
+		t.Fatalf("CameraForLatLngBounds(): %v", err)
+	}
+	if camera.Center == nil || camera.Zoom == nil {
+		t.Fatalf("CameraForLatLngBounds() missing expected fields: %#v", camera)
+	}
+	camera, err = m.CameraForLatLngs([]LatLng{bounds.Southwest, bounds.Northeast}, nil)
+	if err != nil {
+		t.Fatalf("CameraForLatLngs(): %v", err)
+	}
+	wrapped, err := m.LatLngBoundsForCamera(camera)
+	if err != nil {
+		t.Fatalf("LatLngBoundsForCamera(): %v", err)
+	}
+	if wrapped.Southwest.Latitude > wrapped.Northeast.Latitude {
+		t.Fatalf("LatLngBoundsForCamera() inverted latitude bounds: %#v", wrapped)
+	}
+	if _, err := m.LatLngBoundsForCameraUnwrapped(camera); err != nil {
+		t.Fatalf("LatLngBoundsForCameraUnwrapped(): %v", err)
+	}
+
+	constraints := BoundOptions{}.
+		WithBounds(bounds).
+		WithMinZoom(0).
+		WithMaxZoom(20).
+		WithMinPitch(0).
+		WithMaxPitch(60)
+	if err := m.SetBounds(constraints); err != nil {
+		t.Fatalf("SetBounds(): %v", err)
+	}
+	gotConstraints, err := m.Bounds()
+	if err != nil {
+		t.Fatalf("Bounds(): %v", err)
+	}
+	if gotConstraints.Bounds == nil || *gotConstraints.Bounds != bounds {
+		t.Fatalf("Bounds().Bounds = %#v, want %#v", gotConstraints.Bounds, bounds)
+	}
+}
+
 func TestMapCameraCommandsReportNativeValidation(t *testing.T) {
 	runtime, err := NewRuntime()
 	if err != nil {
@@ -792,6 +859,13 @@ func TestMapCameraCommandsReportNativeValidation(t *testing.T) {
 	invalidAnimation := AnimationOptions{}.WithDurationMS(-1)
 	if err := m.MoveByAnimated(ScreenPoint{}, &invalidAnimation); !errors.Is(err, ErrInvalidArgument) {
 		t.Fatalf("MoveByAnimated(invalid animation) error = %v, want ErrInvalidArgument", err)
+	}
+	if _, err := m.CameraForLatLngs(nil, nil); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("CameraForLatLngs(nil) error = %v, want ErrInvalidArgument", err)
+	}
+	invalidBounds := BoundOptions{}.WithMinZoom(3).WithMaxZoom(2)
+	if err := m.SetBounds(invalidBounds); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("SetBounds(invalid min/max) error = %v, want ErrInvalidArgument", err)
 	}
 }
 
