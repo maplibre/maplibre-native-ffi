@@ -7,17 +7,23 @@ loop.
 
 ## Final state
 
-- Latest reviewed/pushed commit: `bad766f` (`Record Go review loop findings`).
 - Branch: `golang`, pushed to `origin/golang`.
-- Final automated validation after the latest commit:
+- Latest fully reviewed non-record commit: `82ce49e`
+  (`Refresh Go review loop
+  record`). If this file is later adjusted by a
+  record-only commit, that commit cannot self-reference its own final hash;
+  treat the containing commit as the current record commit and `82ce49e` as the
+  latest reviewed source/doc fix.
+- Final automated validation after the latest source/doc fix:
   - `mise run //bindings/go:ci` passed.
   - `git diff --check origin/main...HEAD` passed.
   - `git status --short --branch` reported a clean branch matching
     `origin/golang`.
-- Final code-review loop: Round 10 completed with correctness, tests/validation,
-  and maintainability/API-docs reviewers. All three found no code-level
-  actionable findings; the only record-accuracy finding was applied in the next
-  commit.
+- Final code-review loop: Round 11 completed with correctness, tests/validation,
+  and maintainability/API-docs reviewers. All three found no Go binding code,
+  validation, or API-doc findings remaining; the only record-accuracy finding
+  was to make this tracked record avoid stale latest-commit/final-round
+  metadata, which this record-only update applies.
 
 ## Applied findings by round
 
@@ -44,8 +50,11 @@ loop.
 - Round 8: documented why the cgo runtime-event test hook lives in a non-test
   file and must remain small/test-only.
 - Round 9: review-only loop; no code fixes needed.
-- Round 10: final completion review after preserving this tracked record; fixed
-  stale record metadata and one stale public doc comment.
+- Round 10: completion review after preserving this tracked record; fixed stale
+  record metadata and one stale public doc comment.
+- Round 11: final post-refresh review; no Go binding code, validation, or
+  API-doc findings remained. The only issue was this record's stale exact commit
+  and final-round wording, addressed by this record-only update.
 
 ## Rejected or deferred findings
 
@@ -71,14 +80,14 @@ safe bounded implementation.
 
 ## Final no-actionable review evidence
 
-Round 10 reviewer conclusions:
+Round 11 reviewer conclusions:
 
 - Correctness/ownership/cgo/concurrency: no Go binding code issue remained; the
-  tracked review record needed its latest-commit/final-round metadata refreshed.
+  tracked review record needed stale exact-commit/final-round wording refreshed.
 - Tests/validation/CI: no tests or CI issue remained; the tracked review record
-  needed its latest-commit/final-round metadata refreshed.
-- Maintainability/API docs/SPEC accuracy/scope hygiene: the tracked review
-  record needed its latest-commit/final-round metadata refreshed, and one stale
-  `WithDurationMS` doc comment needed correction.
+  needed stale exact-commit/final-round wording refreshed.
+- Maintainability/API docs/SPEC accuracy/scope hygiene: no API-doc issue
+  remained; the tracked review record needed stale exact-commit/final-round
+  wording refreshed.
 
-Those Round 10 record/doc findings were applied after the review.
+Those Round 11 record findings were applied by this record-only update.
