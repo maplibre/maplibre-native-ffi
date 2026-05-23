@@ -381,7 +381,7 @@ public class RuntimeHandle private constructor(handle: CPointer<mln_runtime>) : 
     resultKind: OfflineOperationResultKind,
   ): OfflineOperationHandle<T> = OfflineOperationHandle(this, operationId, kind, resultKind)
 
-  internal fun discardOfflineOperation(operation: OfflineOperationHandle<*>) {
+  public fun discardOfflineOperation(operation: OfflineOperationHandle<*>) {
     val id = operation.requireLive(this)
     Status.check(mln_runtime_offline_operation_discard(state.requireLive(), id))
     operation.markConsumed()

@@ -135,6 +135,7 @@ class StyleHandleTest {
       assertTrue(map.styleImageExists("dot"))
       assertEquals(2.0f, map.styleImageInfo("dot")?.pixelRatio)
       assertEquals(image, map.styleImage("dot")?.image)
+      assertEquals(image, map.copyStyleImagePremultipliedRgba8("dot")?.image)
       map.addLocationIndicatorLayer("location")
       assertEquals("location-indicator", map.styleLayerType("location"))
       map.setLocationIndicatorLocation("location", LatLng(0.0, 0.0), 0.0)

@@ -10,6 +10,7 @@ import org.maplibre.nativeffi.runtime.NetworkStatus
 class MaplibreTest {
   @Test
   fun processGlobalNetworkStatusAndProjectionHelpersMatchNativeAbi() {
+    Maplibre.loadNativeLibrary()
     Maplibre.cVersion()
     Maplibre.supportedRenderBackends()
 

@@ -537,6 +537,8 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     if (outFound.value) StyleStructs.styleImageInfo(outInfo.pointed) else null
   }
 
+  public fun copyStyleImagePremultipliedRgba8(imageId: String): StyleImage? = styleImage(imageId)
+
   public fun styleImage(imageId: String): StyleImage? = memScoped {
     val info = styleImageInfo(imageId) ?: return@memScoped null
     val outPixels = allocArray<UByteVar>(info.byteLength.toInt())
