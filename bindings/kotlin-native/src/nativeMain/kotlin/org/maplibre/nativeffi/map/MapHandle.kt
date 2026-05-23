@@ -8,6 +8,7 @@ import kotlinx.cinterop.ByteVar
 import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.CPointerVarOf
 import kotlinx.cinterop.ExperimentalForeignApi
+import kotlinx.cinterop.UByteVar
 import kotlinx.cinterop.UIntVar
 import kotlinx.cinterop.ULongVar
 import kotlinx.cinterop.alloc
@@ -17,6 +18,7 @@ import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.pointed
 import kotlinx.cinterop.ptr
 import kotlinx.cinterop.readBytes
+import kotlinx.cinterop.reinterpret
 import kotlinx.cinterop.sizeOf
 import kotlinx.cinterop.value
 import org.maplibre.nativeffi.camera.AnimationOptions
@@ -41,6 +43,7 @@ import org.maplibre.nativeffi.internal.c.mln_map_add_style_source_json
 import org.maplibre.nativeffi.internal.c.mln_map_add_vector_source_tiles
 import org.maplibre.nativeffi.internal.c.mln_map_add_vector_source_url
 import org.maplibre.nativeffi.internal.c.mln_map_cancel_transitions
+import org.maplibre.nativeffi.internal.c.mln_map_copy_style_image_premultiplied_rgba8
 import org.maplibre.nativeffi.internal.c.mln_map_copy_style_source_attribution
 import org.maplibre.nativeffi.internal.c.mln_map_create
 import org.maplibre.nativeffi.internal.c.mln_map_destroy
@@ -55,6 +58,7 @@ import org.maplibre.nativeffi.internal.c.mln_map_get_layer_filter
 import org.maplibre.nativeffi.internal.c.mln_map_get_layer_property
 import org.maplibre.nativeffi.internal.c.mln_map_get_projection_mode
 import org.maplibre.nativeffi.internal.c.mln_map_get_rendering_stats_view_enabled
+import org.maplibre.nativeffi.internal.c.mln_map_get_style_image_info
 import org.maplibre.nativeffi.internal.c.mln_map_get_style_layer_json
 import org.maplibre.nativeffi.internal.c.mln_map_get_style_layer_type
 import org.maplibre.nativeffi.internal.c.mln_map_get_style_light_property
@@ -77,6 +81,7 @@ import org.maplibre.nativeffi.internal.c.mln_map_pitch_by
 import org.maplibre.nativeffi.internal.c.mln_map_pitch_by_animated
 import org.maplibre.nativeffi.internal.c.mln_map_pixel_for_lat_lng
 import org.maplibre.nativeffi.internal.c.mln_map_pixels_for_lat_lngs
+import org.maplibre.nativeffi.internal.c.mln_map_remove_style_image
 import org.maplibre.nativeffi.internal.c.mln_map_remove_style_layer
 import org.maplibre.nativeffi.internal.c.mln_map_remove_style_source
 import org.maplibre.nativeffi.internal.c.mln_map_request_repaint
@@ -94,18 +99,21 @@ import org.maplibre.nativeffi.internal.c.mln_map_set_layer_filter
 import org.maplibre.nativeffi.internal.c.mln_map_set_layer_property
 import org.maplibre.nativeffi.internal.c.mln_map_set_projection_mode
 import org.maplibre.nativeffi.internal.c.mln_map_set_rendering_stats_view_enabled
+import org.maplibre.nativeffi.internal.c.mln_map_set_style_image
 import org.maplibre.nativeffi.internal.c.mln_map_set_style_json
 import org.maplibre.nativeffi.internal.c.mln_map_set_style_light_json
 import org.maplibre.nativeffi.internal.c.mln_map_set_style_light_property
 import org.maplibre.nativeffi.internal.c.mln_map_set_style_url
 import org.maplibre.nativeffi.internal.c.mln_map_set_tile_options
 import org.maplibre.nativeffi.internal.c.mln_map_set_viewport_options
+import org.maplibre.nativeffi.internal.c.mln_map_style_image_exists
 import org.maplibre.nativeffi.internal.c.mln_map_style_layer_exists
 import org.maplibre.nativeffi.internal.c.mln_map_style_source_exists
 import org.maplibre.nativeffi.internal.c.mln_map_tile_options_default
 import org.maplibre.nativeffi.internal.c.mln_map_viewport_options_default
 import org.maplibre.nativeffi.internal.c.mln_projection_mode_default
 import org.maplibre.nativeffi.internal.c.mln_screen_point
+import org.maplibre.nativeffi.internal.c.mln_style_image_info_default
 import org.maplibre.nativeffi.internal.c.mln_style_source_info
 import org.maplibre.nativeffi.internal.lifecycle.HandleState
 import org.maplibre.nativeffi.internal.memory.MemoryUtil
@@ -115,9 +123,13 @@ import org.maplibre.nativeffi.internal.struct.MapStructs
 import org.maplibre.nativeffi.internal.struct.StyleStructs
 import org.maplibre.nativeffi.internal.struct.ValueStructs
 import org.maplibre.nativeffi.json.JsonValue
+import org.maplibre.nativeffi.render.PremultipliedRgba8Image
 import org.maplibre.nativeffi.runtime.RuntimeHandle
 import org.maplibre.nativeffi.style.SourceInfo
 import org.maplibre.nativeffi.style.SourceType
+import org.maplibre.nativeffi.style.StyleImage
+import org.maplibre.nativeffi.style.StyleImageInfo
+import org.maplibre.nativeffi.style.StyleImageOptions
 import org.maplibre.nativeffi.style.TileSourceOptions
 
 /** Owned native map handle. Close it on the map owner thread. */
@@ -353,6 +365,93 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
         )
       )
     }
+  }
+
+  public fun setStyleImage(imageId: String, image: PremultipliedRgba8Image) {
+    setStyleImage(imageId, image, StyleImageOptions())
+  }
+
+  public fun setStyleImage(
+    imageId: String,
+    image: PremultipliedRgba8Image,
+    options: StyleImageOptions,
+  ) {
+    memScoped {
+      Status.check(
+        mln_map_set_style_image(
+          state.requireLive(),
+          CoreStructs.stringView(imageId, this),
+          StyleStructs.premultipliedRgba8Image(image, this),
+          StyleStructs.styleImageOptions(options, this),
+        )
+      )
+    }
+  }
+
+  public fun removeStyleImage(imageId: String): Boolean = memScoped {
+    val outRemoved = alloc<BooleanVar>()
+    Status.check(
+      mln_map_remove_style_image(
+        state.requireLive(),
+        CoreStructs.stringView(imageId, this),
+        outRemoved.ptr,
+      )
+    )
+    outRemoved.value
+  }
+
+  public fun styleImageExists(imageId: String): Boolean = memScoped {
+    val outExists = alloc<BooleanVar>()
+    Status.check(
+      mln_map_style_image_exists(
+        state.requireLive(),
+        CoreStructs.stringView(imageId, this),
+        outExists.ptr,
+      )
+    )
+    outExists.value
+  }
+
+  public fun styleImageInfo(imageId: String): StyleImageInfo? = memScoped {
+    val outInfo = mln_style_image_info_default().getPointer(this)
+    val outFound = alloc<BooleanVar>()
+    Status.check(
+      mln_map_get_style_image_info(
+        state.requireLive(),
+        CoreStructs.stringView(imageId, this),
+        outInfo,
+        outFound.ptr,
+      )
+    )
+    if (outFound.value) StyleStructs.styleImageInfo(outInfo.pointed) else null
+  }
+
+  public fun styleImage(imageId: String): StyleImage? = memScoped {
+    val info = styleImageInfo(imageId) ?: return@memScoped null
+    val outPixels = allocArray<UByteVar>(info.byteLength.toInt())
+    val outByteLength = alloc<ULongVar>()
+    val outFound = alloc<BooleanVar>()
+    Status.check(
+      mln_map_copy_style_image_premultiplied_rgba8(
+        state.requireLive(),
+        CoreStructs.stringView(imageId, this),
+        outPixels,
+        info.byteLength,
+        outByteLength.ptr,
+        outFound.ptr,
+      )
+    )
+    if (!outFound.value) return@memScoped null
+    StyleImage(
+      PremultipliedRgba8Image(
+        info.width,
+        info.height,
+        info.stride,
+        outPixels.reinterpret<kotlinx.cinterop.ByteVar>().readBytes(outByteLength.value.toInt()),
+      ),
+      info.pixelRatio,
+      info.sdf,
+    )
   }
 
   private fun copyStyleSourceAttribution(sourceId: String, info: mln_style_source_info): String? {

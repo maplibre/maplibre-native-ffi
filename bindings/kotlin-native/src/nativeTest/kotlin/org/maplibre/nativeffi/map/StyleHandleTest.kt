@@ -9,9 +9,11 @@ import org.maplibre.nativeffi.geo.GeoJson
 import org.maplibre.nativeffi.geo.Geometry
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.json.JsonValue
+import org.maplibre.nativeffi.render.PremultipliedRgba8Image
 import org.maplibre.nativeffi.runtime.RuntimeHandle
 import org.maplibre.nativeffi.style.RasterDemEncoding
 import org.maplibre.nativeffi.style.SourceType
+import org.maplibre.nativeffi.style.StyleImageOptions
 import org.maplibre.nativeffi.style.TileScheme
 import org.maplibre.nativeffi.style.TileSourceOptions
 import org.maplibre.nativeffi.style.VectorTileEncoding
@@ -71,6 +73,25 @@ class StyleHandleTest {
       assertFalse(map.styleLayerExists("park-circles"))
       assertTrue(map.removeStyleSource("parks"))
       assertFalse(map.styleSourceExists("parks"))
+    } finally {
+      map.close()
+      runtime.close()
+    }
+  }
+
+  @Test
+  fun styleImageApisCopyPixelsAndMetadata() {
+    val runtime = RuntimeHandle.create()
+    val map = MapHandle.create(runtime, MapOptions().size(128, 128))
+    try {
+      map.setStyleJson("{\"version\":8,\"sources\":{},\"layers\":[]}")
+      val image = PremultipliedRgba8Image(1U, 1U, 4U, byteArrayOf(1, 2, 3, 4))
+      map.setStyleImage("dot", image, StyleImageOptions().pixelRatio(2.0f).sdf(true))
+      assertTrue(map.styleImageExists("dot"))
+      assertEquals(2.0f, map.styleImageInfo("dot")?.pixelRatio)
+      assertEquals(image, map.styleImage("dot")?.image)
+      assertTrue(map.removeStyleImage("dot"))
+      assertFalse(map.styleImageExists("dot"))
     } finally {
       map.close()
       runtime.close()

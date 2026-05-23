@@ -1,0 +1,40 @@
+package org.maplibre.nativeffi.render
+
+/** Caller-owned premultiplied RGBA8 pixels. */
+public class PremultipliedRgba8Image(
+  public val width: UInt,
+  public val height: UInt,
+  public val stride: UInt,
+  pixels: ByteArray,
+) {
+  public val pixels: ByteArray = pixels.copyOf()
+
+  init {
+    require(width > 0U && height > 0U) { "width and height must be positive" }
+    val rowBytes = width.toLong() * 4L
+    require(stride.toLong() >= rowBytes) { "stride must be at least width * 4" }
+    val requiredBytes =
+      if (height == 1U) rowBytes else (height.toLong() - 1L) * stride.toLong() + rowBytes
+    require(pixels.size.toLong() >= requiredBytes) {
+      "pixels length must include every row's pixel bytes"
+    }
+  }
+
+  override fun equals(other: Any?): Boolean =
+    other is PremultipliedRgba8Image &&
+      width == other.width &&
+      height == other.height &&
+      stride == other.stride &&
+      pixels.contentEquals(other.pixels)
+
+  override fun hashCode(): Int {
+    var result = width.hashCode()
+    result = 31 * result + height.hashCode()
+    result = 31 * result + stride.hashCode()
+    result = 31 * result + pixels.contentHashCode()
+    return result
+  }
+
+  override fun toString(): String =
+    "PremultipliedRgba8Image(width=$width, height=$height, stride=$stride, pixels=${pixels.size} bytes)"
+}
