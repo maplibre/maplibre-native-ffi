@@ -355,6 +355,10 @@ public final class RuntimeHandle {
     resourceProvider = nil
   }
 
+  func requireLivePointer() throws -> OpaquePointer {
+    try handle.requireLive()
+  }
+
   public func runOnce() throws {
     try mapNativeFailure {
       try CAPI.runtimeRunOnce(try handle.requireLive())
