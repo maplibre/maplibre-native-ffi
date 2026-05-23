@@ -13,6 +13,7 @@ class RuntimeHandleTest {
 
     assertFalse(runtime.isClosed())
     runtime.runOnce()
+    runtime.pollEvent()
     runtime.close()
 
     assertTrue(runtime.isClosed())

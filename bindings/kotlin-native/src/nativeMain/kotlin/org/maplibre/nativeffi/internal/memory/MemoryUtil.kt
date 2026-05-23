@@ -5,6 +5,7 @@ import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.MemScope
 import kotlinx.cinterop.cstr
+import kotlinx.cinterop.readBytes
 import kotlinx.cinterop.toCValues
 
 /** Memory helpers for Kotlin/Native C ABI calls. */
@@ -26,4 +27,8 @@ internal object MemoryUtil {
     val bytes = value.encodeToByteArray()
     return if (bytes.isEmpty()) null else bytes.toCValues().getPointer(scope)
   }
+
+  /** Copies explicit-length UTF-8 bytes from C-owned storage. */
+  fun copyStringView(data: CPointer<ByteVar>?, size: ULong): String =
+    if (data == null || size == 0UL) "" else data.readBytes(size.toInt()).decodeToString()
 }

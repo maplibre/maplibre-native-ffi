@@ -1,30 +1,66 @@
 package org.maplibre.nativeffi.runtime
 
 import cnames.structs.mln_runtime
+import kotlinx.cinterop.BooleanVar
 import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.CPointerVarOf
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.alloc
 import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.ptr
+import kotlinx.cinterop.rawValue
+import kotlinx.cinterop.sizeOf
+import kotlinx.cinterop.toLong
 import kotlinx.cinterop.value
 import org.maplibre.nativeffi.internal.c.MLN_RUNTIME_OPTION_MAXIMUM_CACHE_SIZE
 import org.maplibre.nativeffi.internal.c.mln_runtime_create
 import org.maplibre.nativeffi.internal.c.mln_runtime_destroy
+import org.maplibre.nativeffi.internal.c.mln_runtime_event
 import org.maplibre.nativeffi.internal.c.mln_runtime_options
 import org.maplibre.nativeffi.internal.c.mln_runtime_options_default
+import org.maplibre.nativeffi.internal.c.mln_runtime_poll_event
 import org.maplibre.nativeffi.internal.c.mln_runtime_run_once
 import org.maplibre.nativeffi.internal.lifecycle.HandleState
 import org.maplibre.nativeffi.internal.memory.MemoryUtil
 import org.maplibre.nativeffi.internal.status.Status
+import org.maplibre.nativeffi.internal.struct.RuntimeStructs
+import org.maplibre.nativeffi.map.MapHandle
 
 /** Owned native runtime handle. Close it on the owner thread. */
 @OptIn(ExperimentalForeignApi::class)
 public class RuntimeHandle private constructor(handle: CPointer<mln_runtime>) : AutoCloseable {
   private val state = HandleState("RuntimeHandle", handle)
+  private val liveMaps = mutableMapOf<Long, MapHandle>()
 
   public fun runOnce() {
     Status.check(mln_runtime_run_once(state.requireLive()))
+  }
+
+  public fun pollEvent(): RuntimeEvent? = memScoped {
+    val event = alloc<mln_runtime_event>()
+    event.size = sizeOf<mln_runtime_event>().toUInt()
+    val hasEvent = alloc<BooleanVar>()
+    hasEvent.value = false
+    Status.check(mln_runtime_poll_event(state.requireLive(), event.ptr, hasEvent.ptr))
+    if (!hasEvent.value) {
+      return@memScoped null
+    }
+
+    val sourceType = RuntimeEventSourceType.fromNative(event.source_type)
+    val sourceAddress = event.source?.rawValue?.toLong()
+    RuntimeEvent(
+      RuntimeEventType.fromNative(event.type),
+      event.type,
+      sourceType,
+      event.source_type,
+      if (sourceType == RuntimeEventSourceType.RUNTIME) this@RuntimeHandle else null,
+      if (sourceType == RuntimeEventSourceType.MAP && sourceAddress != null) liveMaps[sourceAddress]
+      else null,
+      event.code,
+      event.payload_type,
+      RuntimeStructs.payload(event),
+      RuntimeStructs.message(event),
+    )
   }
 
   override fun close() {
@@ -36,6 +72,17 @@ public class RuntimeHandle private constructor(handle: CPointer<mln_runtime>) : 
   internal fun nativeHandle(): CPointer<mln_runtime> = state.requireLive()
 
   internal fun nativeAddress(): Long = state.address()
+
+  internal fun registerMap(map: MapHandle) {
+    liveMaps[map.nativeAddress()] = map
+  }
+
+  internal fun unregisterMap(map: MapHandle) {
+    val address = map.nativeAddress()
+    if (liveMaps[address] === map) {
+      liveMaps.remove(address)
+    }
+  }
 
   public companion object {
     public fun create(): RuntimeHandle = create(RuntimeOptions())

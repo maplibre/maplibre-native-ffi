@@ -36,7 +36,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
   }
 
   override fun close() {
-    state.closeOnce(::mln_map_destroy)
+    state.closeOnce(::mln_map_destroy) { runtime.unregisterMap(this) }
   }
 
   public fun isClosed(): Boolean = state.isReleased()
@@ -59,7 +59,9 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
       val outMap = alloc<CPointerVarOf<CPointer<mln_map>>>()
       outMap.value = null
       Status.check(mln_map_create(runtime.nativeHandle(), nativeOptions.ptr, outMap.ptr))
-      MapHandle(runtime, requireNotNull(outMap.value) { "mln_map_create returned null" })
+      val map = MapHandle(runtime, requireNotNull(outMap.value) { "mln_map_create returned null" })
+      runtime.registerMap(map)
+      map
     }
   }
 }

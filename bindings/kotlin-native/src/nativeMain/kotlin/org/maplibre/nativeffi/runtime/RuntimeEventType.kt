@@ -1,0 +1,33 @@
+package org.maplibre.nativeffi.runtime
+
+/** Runtime event type copied from the native event queue. */
+public enum class RuntimeEventType(internal val nativeValue: UInt) {
+  MAP_CAMERA_WILL_CHANGE(1U),
+  MAP_CAMERA_IS_CHANGING(2U),
+  MAP_CAMERA_DID_CHANGE(3U),
+  MAP_STYLE_LOADED(4U),
+  MAP_LOADING_STARTED(5U),
+  MAP_LOADING_FINISHED(6U),
+  MAP_LOADING_FAILED(7U),
+  MAP_IDLE(8U),
+  MAP_RENDER_UPDATE_AVAILABLE(9U),
+  MAP_RENDER_ERROR(10U),
+  MAP_STILL_IMAGE_FINISHED(11U),
+  MAP_STILL_IMAGE_FAILED(12U),
+  MAP_RENDER_FRAME_STARTED(13U),
+  MAP_RENDER_FRAME_FINISHED(14U),
+  MAP_RENDER_MAP_STARTED(15U),
+  MAP_RENDER_MAP_FINISHED(16U),
+  MAP_STYLE_IMAGE_MISSING(17U),
+  MAP_TILE_ACTION(18U),
+  OFFLINE_REGION_STATUS_CHANGED(19U),
+  OFFLINE_REGION_RESPONSE_ERROR(20U),
+  OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED(21U),
+  OFFLINE_OPERATION_COMPLETED(22U),
+  UNKNOWN(UInt.MAX_VALUE);
+
+  public companion object {
+    public fun fromNative(nativeValue: UInt): RuntimeEventType =
+      entries.firstOrNull { it.nativeValue == nativeValue } ?: UNKNOWN
+  }
+}

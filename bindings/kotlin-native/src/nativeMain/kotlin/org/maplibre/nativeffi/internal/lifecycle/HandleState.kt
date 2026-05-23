@@ -15,13 +15,15 @@ internal class HandleState<T : CPointed>(
   vararg parents: Any,
 ) {
   @Suppress("unused") private val parents: Array<out Any> = parents
-  private var handle: CPointer<T>? = requireNotNull(handle) { "$typeName native handle is null" }
+  private val address =
+    requireNotNull(handle) { "$typeName native handle is null" }.rawValue.toLong()
+  private var handle: CPointer<T>? = handle
 
   fun requireLive(): CPointer<T> = handle ?: throw Status.released(typeName)
 
   fun isReleased(): Boolean = handle == null
 
-  fun address(): Long = requireLive().rawValue.toLong()
+  fun address(): Long = address
 
   fun closeOnce(destroy: (CPointer<T>) -> Int) {
     closeOnce(destroy) {}
