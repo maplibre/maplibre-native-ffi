@@ -5,22 +5,20 @@ summarizes the code-review rounds, applied fixes, rejected/deferred findings,
 user-input-needed findings, and validation used to close the iterative review
 loop.
 
-## Final state
+## Prior review-loop state
 
 - Branch: `golang`, pushed to `origin/golang`.
-- Latest fully reviewed non-record commit: `4aec32e`
-  (`Correct Go texture frame
-  spec names`). If this file is later adjusted by a
-  record-only commit, that commit cannot self-reference its own final hash;
-  treat the containing commit as the current record commit and `4aec32e` as the
-  latest reviewed source/doc fix.
-- Final automated validation after the latest source/doc fix:
+- The original review loop reached no-actionable state at Round 13 after commit
+  `4aec32e` (`Correct Go texture frame spec names`). Later commits implement the
+  previously deferred outcome decisions and start a new review loop over those
+  changes.
+- Round 13 automated validation passed:
   - `mise run //bindings/go:ci` passed.
   - `git diff --check origin/main...HEAD` passed.
   - `git status --short --branch` reported a clean branch matching
     `origin/golang`.
-- Final code-review loop: Round 13 completed with correctness, tests/validation,
-  and maintainability/API-docs reviewers. All three reported no actionable
+- Round 13 completed with correctness, tests/validation, and
+  maintainability/API-docs reviewers. All three reported no actionable
   source/doc findings remaining.
 
 ## Applied findings by round
@@ -111,7 +109,7 @@ The interview resolved the preferred directions above, and the first
 implementation pass applied them. No currently recorded deferred finding is
 waiting on user input.
 
-## Final no-actionable review evidence
+## Prior no-actionable review evidence
 
 Round 13 reviewer conclusions:
 

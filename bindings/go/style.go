@@ -332,8 +332,9 @@ func (m *MapHandle) SetGeoJSONSourceData(sourceID string, data GeoJSON) error {
 
 // AddCustomGeometrySource adds a custom geometry source to the current style.
 // Callback state remains valid until source removal, style replacement, or map
-// close; URL style replacement completes asynchronously when the new style
-// loads.
+// close. URL style replacement completes asynchronously; after SetStyleURL,
+// detached custom geometry callback state is released when RuntimeHandle.PollEvent
+// observes RuntimeEventMapStyleLoaded for this map.
 func (m *MapHandle) AddCustomGeometrySource(sourceID string, options CustomGeometrySourceOptions) error {
 	if options.FetchTile == nil {
 		return newBindingError(ErrInvalidArgument, "CustomGeometrySourceOptions.FetchTile is nil")

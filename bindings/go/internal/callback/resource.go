@@ -33,6 +33,9 @@ static inline char* mln_go_copy_c_string(const char* value) {
 }
 
 static mln_status mln_go_resource_transform_callback(void* user_data, uint32_t kind, const char* url, mln_resource_transform_response* out_response) {
+  free(mln_go_resource_transform_thread_url);
+  mln_go_resource_transform_thread_url = NULL;
+
   if (out_response == NULL) {
     return MLN_STATUS_INVALID_ARGUMENT;
   }
@@ -54,7 +57,6 @@ static mln_status mln_go_resource_transform_callback(void* user_data, uint32_t k
     return MLN_STATUS_NATIVE_ERROR;
   }
 
-  free(mln_go_resource_transform_thread_url);
   mln_go_resource_transform_thread_url = copied;
   out_response->url = mln_go_resource_transform_thread_url;
   return MLN_STATUS_OK;
