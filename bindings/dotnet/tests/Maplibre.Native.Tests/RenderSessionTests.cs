@@ -47,6 +47,59 @@ public sealed unsafe class RenderSessionTests
     }
 
     [Fact]
+    public void TextureDescriptorsMaterializeOpaquePointersAndExtent()
+    {
+        var metalOwned = RenderStructs.ToNative(new MetalOwnedTextureDescriptor
+        {
+            Extent = new RenderTargetExtent(128, 64, 2),
+            Context = new MetalContextDescriptor { Device = new NativePointer(10) },
+        });
+        Assert.Equal(128u, metalOwned.extent.width);
+        Assert.Equal(64u, metalOwned.extent.height);
+        Assert.Equal(10, (nint)metalOwned.context.device);
+
+        var metalBorrowed = RenderStructs.ToNative(new MetalBorrowedTextureDescriptor
+        {
+            Extent = new RenderTargetExtent(128, 64, 2),
+            Texture = new NativePointer(20),
+        });
+        Assert.Equal(20, (nint)metalBorrowed.texture);
+
+        var vulkanOwned = RenderStructs.ToNative(new VulkanOwnedTextureDescriptor
+        {
+            Extent = new RenderTargetExtent(256, 128, 1),
+            Context = new VulkanContextDescriptor { Device = new NativePointer(30) },
+        });
+        Assert.Equal(256u, vulkanOwned.extent.width);
+        Assert.Equal(30, (nint)vulkanOwned.context.device);
+
+        var vulkanBorrowed = RenderStructs.ToNative(new VulkanBorrowedTextureDescriptor
+        {
+            Extent = new RenderTargetExtent(256, 128, 1),
+            Image = new NativePointer(40),
+            Format = 50,
+            FinalLayout = 60,
+        });
+        Assert.Equal(40, (nint)vulkanBorrowed.image);
+        Assert.Equal(50u, vulkanBorrowed.format);
+        Assert.Equal(60u, vulkanBorrowed.final_layout);
+    }
+
+    [Fact]
+    public void TextureImageInfoCopiesNativeFields()
+    {
+        var info = RenderStructs.FromNative(new mln_texture_image_info
+        {
+            width = 1,
+            height = 2,
+            stride = 4,
+            byte_length = 8,
+        });
+
+        Assert.Equal(new TextureImageInfo(1, 2, 4, 8), info);
+    }
+
+    [Fact]
     public void FeatureStateSelectorMaterializesOptionalFields()
     {
         using var selector = NativeFeatureStateSelector.From(new FeatureStateSelector

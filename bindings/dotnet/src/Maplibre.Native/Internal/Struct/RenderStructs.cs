@@ -49,6 +49,48 @@ internal static unsafe class RenderStructs
         native.surface = (void*)descriptor.Surface.Address;
         return native;
     }
+
+    internal static mln_metal_owned_texture_descriptor ToNative(MetalOwnedTextureDescriptor descriptor)
+    {
+        ArgumentNullException.ThrowIfNull(descriptor);
+        var native = NativeMethods.mln_metal_owned_texture_descriptor_default();
+        native.extent = ToNative(descriptor.Extent);
+        native.context = ToNative(descriptor.Context);
+        return native;
+    }
+
+    internal static mln_metal_borrowed_texture_descriptor ToNative(MetalBorrowedTextureDescriptor descriptor)
+    {
+        ArgumentNullException.ThrowIfNull(descriptor);
+        var native = NativeMethods.mln_metal_borrowed_texture_descriptor_default();
+        native.extent = ToNative(descriptor.Extent);
+        native.texture = (void*)descriptor.Texture.Address;
+        return native;
+    }
+
+    internal static mln_vulkan_owned_texture_descriptor ToNative(VulkanOwnedTextureDescriptor descriptor)
+    {
+        ArgumentNullException.ThrowIfNull(descriptor);
+        var native = NativeMethods.mln_vulkan_owned_texture_descriptor_default();
+        native.extent = ToNative(descriptor.Extent);
+        native.context = ToNative(descriptor.Context);
+        return native;
+    }
+
+    internal static mln_vulkan_borrowed_texture_descriptor ToNative(VulkanBorrowedTextureDescriptor descriptor)
+    {
+        ArgumentNullException.ThrowIfNull(descriptor);
+        var native = NativeMethods.mln_vulkan_borrowed_texture_descriptor_default();
+        native.extent = ToNative(descriptor.Extent);
+        native.context = ToNative(descriptor.Context);
+        native.image = (void*)descriptor.Image.Address;
+        native.format = descriptor.Format;
+        native.final_layout = descriptor.FinalLayout;
+        return native;
+    }
+
+    internal static TextureImageInfo FromNative(mln_texture_image_info info) =>
+        new(info.width, info.height, info.stride, (ulong)info.byte_length);
 }
 
 internal sealed class NativeFeatureStateSelector : IDisposable
