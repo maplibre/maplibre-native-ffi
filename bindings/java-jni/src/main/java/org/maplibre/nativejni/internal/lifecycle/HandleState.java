@@ -1,6 +1,5 @@
 package org.maplibre.nativejni.internal.lifecycle;
 
-import java.lang.foreign.MemorySegment;
 import java.lang.ref.Cleaner;
 import java.util.Objects;
 import org.maplibre.nativejni.internal.status.Status;
@@ -35,10 +34,6 @@ public final class HandleState {
       throw Status.released(typeName);
     }
     return address;
-  }
-
-  public synchronized MemorySegment requireLiveSegment() {
-    return MemorySegment.ofAddress(requireLiveAddress());
   }
 
   public synchronized boolean isReleased() {

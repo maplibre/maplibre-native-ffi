@@ -7,10 +7,10 @@ import java.util.Objects;
 public final class NativeLibrary {
   public static final String LIBRARY_PATH_PROPERTY = "org.maplibre.nativejni.library.path";
   public static final String LIBRARY_PATH_ENV = "MAPLIBRE_NATIVE_JNI_LIBRARY_PATH";
-  public static final String LIBRARY_NAME = "maplibre-native-jni";
+  public static final String LIBRARY_NAME = "maplibre_native_jni";
 
   private static final Object LOCK = new Object();
-  private static boolean loaded;
+  private static volatile boolean loaded;
 
   private NativeLibrary() {}
 

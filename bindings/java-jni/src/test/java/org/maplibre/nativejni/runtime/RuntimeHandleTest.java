@@ -46,6 +46,9 @@ class RuntimeHandleTest {
     assertThrows(
         InvalidArgumentException.class,
         () -> RuntimeHandle.create(new RuntimeOptions().assetPath("asset\0path")));
+    assertThrows(
+        InvalidArgumentException.class,
+        () -> RuntimeHandle.create(new RuntimeOptions().maximumCacheSize(-1)));
   }
 
   @Test
@@ -62,6 +65,17 @@ class RuntimeHandleTest {
       assertTrue(operation.isClosed());
       runtime.discardOfflineOperation(operation);
     }
+  }
+
+  @Test
+  void discardAfterRuntimeCloseConsumesOperationAndRethrows() {
+    var runtime = RuntimeHandle.create();
+    var operation = runtime.startAmbientCacheOperation(AmbientCacheOperation.CLEAR);
+    runtime.close();
+
+    assertThrows(InvalidStateException.class, () -> runtime.discardOfflineOperation(operation));
+    assertTrue(operation.isClosed());
+    runtime.discardOfflineOperation(operation);
   }
 
   @Test

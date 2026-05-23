@@ -6,6 +6,7 @@ license.workspace = true
 repository.workspace = true
 
 [lib]
+name = "maplibre_native_jni"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]

@@ -1,6 +1,5 @@
 package org.maplibre.nativejni.render;
 
-import java.lang.foreign.MemorySegment;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
@@ -42,7 +41,7 @@ public final class RenderSessionHandle implements AutoCloseable {
     var outSession = new long[1];
     Status.check(
         TextureNative.mln_metal_owned_texture_attach(
-            map.nativeAddress(InternalAccess.INSTANCE),
+            InternalAccess.INSTANCE.nativeAddress(map),
             value.extent().width(),
             value.extent().height(),
             value.extent().scaleFactor(),
@@ -59,7 +58,7 @@ public final class RenderSessionHandle implements AutoCloseable {
     var outSession = new long[1];
     Status.check(
         TextureNative.mln_metal_borrowed_texture_attach(
-            map.nativeAddress(InternalAccess.INSTANCE),
+            InternalAccess.INSTANCE.nativeAddress(map),
             value.extent().width(),
             value.extent().height(),
             value.extent().scaleFactor(),
@@ -77,7 +76,7 @@ public final class RenderSessionHandle implements AutoCloseable {
     var outSession = new long[1];
     Status.check(
         TextureNative.mln_vulkan_owned_texture_attach(
-            map.nativeAddress(InternalAccess.INSTANCE),
+            InternalAccess.INSTANCE.nativeAddress(map),
             value.extent().width(),
             value.extent().height(),
             value.extent().scaleFactor(),
@@ -99,7 +98,7 @@ public final class RenderSessionHandle implements AutoCloseable {
     var outSession = new long[1];
     Status.check(
         TextureNative.mln_vulkan_borrowed_texture_attach(
-            map.nativeAddress(InternalAccess.INSTANCE),
+            InternalAccess.INSTANCE.nativeAddress(map),
             value.extent().width(),
             value.extent().height(),
             value.extent().scaleFactor(),
@@ -125,7 +124,7 @@ public final class RenderSessionHandle implements AutoCloseable {
     var outSession = new long[1];
     Status.check(
         SurfaceNative.mln_metal_surface_attach(
-            map.nativeAddress(InternalAccess.INSTANCE),
+            InternalAccess.INSTANCE.nativeAddress(map),
             value.extent().width(),
             value.extent().height(),
             value.extent().scaleFactor(),
@@ -144,7 +143,7 @@ public final class RenderSessionHandle implements AutoCloseable {
     var outSession = new long[1];
     Status.check(
         SurfaceNative.mln_vulkan_surface_attach(
-            map.nativeAddress(InternalAccess.INSTANCE),
+            InternalAccess.INSTANCE.nativeAddress(map),
             value.extent().width(),
             value.extent().height(),
             value.extent().scaleFactor(),
@@ -276,6 +275,13 @@ public final class RenderSessionHandle implements AutoCloseable {
     throw new AssertionError("unreachable");
   }
 
+  /**
+   * Reads into a caller-owned buffer.
+   *
+   * <p>Use {@link #textureImageInfo()} first when sizing reusable buffers; undersized buffers throw
+   * {@link org.maplibre.nativejni.error.InvalidArgumentException} after native reports the required
+   * layout.
+   */
   public TextureImageInfo readPremultipliedRgba8(NativeBuffer buffer) {
     NativeLibrary.ensureLoaded();
     Objects.requireNonNull(buffer, "buffer");
@@ -305,6 +311,15 @@ public final class RenderSessionHandle implements AutoCloseable {
     }
   }
 
+  /**
+   * Acquires an explicit Metal session-owned texture frame handle.
+   *
+   * <p>This advanced API is intended for integrations that submit GPU work using the returned
+   * texture and need to release it after that work completes. The returned handle must be closed on
+   * the render session owner thread after GPU work using {@link MetalOwnedTextureFrame#texture()}
+   * has completed. While the handle is open, the native session rejects resize, render, detach,
+   * destroy, and second-acquire operations.
+   */
   public MetalOwnedTextureFrameHandle acquireMetalOwnedTextureFrame() {
     NativeLibrary.ensureLoaded();
     var longs = new long[5];
@@ -332,6 +347,15 @@ public final class RenderSessionHandle implements AutoCloseable {
             longs[4]));
   }
 
+  /**
+   * Acquires an explicit Vulkan session-owned texture frame handle.
+   *
+   * <p>This advanced API is intended for integrations that submit GPU work using the returned image
+   * and need to release it after an external fence signals. The returned handle must be closed on
+   * the render session owner thread after GPU work using {@link VulkanOwnedTextureFrame#image()} or
+   * {@link VulkanOwnedTextureFrame#imageView()} has completed. While the handle is open, the native
+   * session rejects resize, render, detach, destroy, and second-acquire operations.
+   */
   public VulkanOwnedTextureFrameHandle acquireVulkanOwnedTextureFrame() {
     NativeLibrary.ensureLoaded();
     var longs = new long[5];
@@ -406,10 +430,6 @@ public final class RenderSessionHandle implements AutoCloseable {
 
   public MapHandle map() {
     return map;
-  }
-
-  MemorySegment nativeHandle() {
-    return state.requireLiveSegment();
   }
 
   long nativeAddress() {

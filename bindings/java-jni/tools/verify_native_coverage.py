@@ -63,6 +63,22 @@ def spec_recorded_unsupported_methods() -> set[str]:
     return set(re.findall(r"- `(mln_\w+)`:", section))
 
 
+def direct_invalid_argument_returns() -> list[tuple[int, str]]:
+    text = RUST_BRIDGE.read_text(encoding="utf-8")
+    direct_returns: list[tuple[int, str]] = []
+    current_function: str | None = None
+    for line_number, line in enumerate(text.splitlines(), start=1):
+        function = re.match(r"fn\s+(\w+)", line)
+        if function:
+            current_function = function.group(1)
+        if (
+            "sys::MLN_STATUS_INVALID_ARGUMENT" in line
+            and current_function != "jni_invalid_argument"
+        ):
+            direct_returns.append((line_number, line.strip()))
+    return direct_returns
+
+
 def main() -> int:
     groups = parse_coverage_map()
     rust_methods = rust_registered_methods()
@@ -71,12 +87,23 @@ def main() -> int:
     missing_classes: list[str] = []
     missing_java: list[tuple[str, str]] = []
     missing_rust: list[tuple[str, str]] = []
+    covered_methods = {
+        function for functions in groups.values() for function in functions
+    }
+    java_methods_by_name = {
+        method
+        for path in JAVA_BRIDGE_ROOT.glob("*.java")
+        for method in java_native_methods(path)
+    }
+    extra_java = sorted(java_methods_by_name - covered_methods)
+    extra_rust = sorted(rust_methods - covered_methods)
     undocumented_unsupported = sorted(
         unsupported_methods - recorded_unsupported_methods
     )
     stale_recorded_unsupported = sorted(
         recorded_unsupported_methods - unsupported_methods
     )
+    direct_invalid_returns = direct_invalid_argument_returns()
 
     for group, functions in groups.items():
         java_path = JAVA_BRIDGE_ROOT / f"{group}.java"
@@ -98,8 +125,11 @@ def main() -> int:
         missing_classes
         or missing_java
         or missing_rust
+        or extra_java
+        or extra_rust
         or undocumented_unsupported
         or stale_recorded_unsupported
+        or direct_invalid_returns
     ):
         if missing_classes:
             print("Missing Java native coverage classes:", file=sys.stderr)
@@ -113,6 +143,16 @@ def main() -> int:
             print("Missing Rust JNI registrations:", file=sys.stderr)
             for group, function in missing_rust:
                 print(f"  {group}.{function}", file=sys.stderr)
+        if extra_java:
+            print(
+                "Java native declarations missing from SPEC coverage:", file=sys.stderr
+            )
+            for function in extra_java:
+                print(f"  {function}", file=sys.stderr)
+        if extra_rust:
+            print("Rust JNI registrations missing from SPEC coverage:", file=sys.stderr)
+            for function in extra_rust:
+                print(f"  {function}", file=sys.stderr)
         if undocumented_unsupported:
             print(
                 "Rust unsupported registrations missing SPEC reasons:", file=sys.stderr
@@ -126,6 +166,13 @@ def main() -> int:
             )
             for function in stale_recorded_unsupported:
                 print(f"  {function}", file=sys.stderr)
+        if direct_invalid_returns:
+            print(
+                "Direct JNI MLN_STATUS_INVALID_ARGUMENT returns bypass diagnostics:",
+                file=sys.stderr,
+            )
+            for line_number, line in direct_invalid_returns:
+                print(f"  {RUST_BRIDGE}:{line_number}: {line}", file=sys.stderr)
         return 1
 
     total = sum(len(functions) for functions in groups.values())

@@ -1,13 +1,16 @@
 package org.maplibre.nativejni.render;
 
-import java.lang.foreign.Arena;
-import java.lang.foreign.MemorySegment;
-import java.lang.foreign.ValueLayout;
+import java.nio.ByteBuffer;
 
-/** Explicit off-heap byte buffer for reusable native readback and upload storage. */
+/**
+ * Explicit off-heap byte buffer for reusable native readback and upload storage.
+ *
+ * <p>The JNI implementation stores bytes in a direct {@link ByteBuffer}, so capacity is limited to
+ * {@link Integer#MAX_VALUE} bytes. Closing the buffer invalidates this wrapper immediately; the JVM
+ * releases the direct-buffer memory according to its own buffer and garbage-collection lifecycle.
+ */
 public final class NativeBuffer implements AutoCloseable {
-  private final Arena arena;
-  private final MemorySegment segment;
+  private final ByteBuffer buffer;
   private final long byteLength;
 
   private boolean closed;
@@ -16,9 +19,11 @@ public final class NativeBuffer implements AutoCloseable {
     if (byteLength < 0) {
       throw new IllegalArgumentException("byteLength must be non-negative");
     }
-    this.arena = Arena.ofShared();
+    if (byteLength > Integer.MAX_VALUE) {
+      throw new IllegalArgumentException("byteLength must be at most Integer.MAX_VALUE");
+    }
     this.byteLength = byteLength;
-    this.segment = byteLength == 0 ? MemorySegment.NULL : arena.allocate(byteLength);
+    this.buffer = ByteBuffer.allocateDirect(Math.toIntExact(byteLength));
   }
 
   public static NativeBuffer allocate(long byteLength) {
@@ -33,15 +38,11 @@ public final class NativeBuffer implements AutoCloseable {
   public synchronized byte[] toByteArray() {
     ensureOpen();
     var length = Math.toIntExact(byteLength);
-    if (length == 0) {
-      return new byte[0];
-    }
-    return segment.toArray(ValueLayout.JAVA_BYTE);
-  }
-
-  synchronized MemorySegment segment() {
-    ensureOpen();
-    return segment;
+    var bytes = new byte[length];
+    var duplicate = buffer.asReadOnlyBuffer();
+    duplicate.position(0);
+    duplicate.get(bytes);
+    return bytes;
   }
 
   synchronized void putByteArray(byte[] bytes, long requiredBytes) {
@@ -50,9 +51,9 @@ public final class NativeBuffer implements AutoCloseable {
       throw new IllegalArgumentException("source byte array is smaller than required byte length");
     }
     if (requiredBytes > 0) {
-      segment
-          .asSlice(0, requiredBytes)
-          .copyFrom(MemorySegment.ofArray(bytes).asSlice(0, requiredBytes));
+      var duplicate = buffer.duplicate();
+      duplicate.position(0);
+      duplicate.put(bytes, 0, Math.toIntExact(requiredBytes));
     }
   }
 
@@ -71,10 +72,6 @@ public final class NativeBuffer implements AutoCloseable {
 
   @Override
   public synchronized void close() {
-    if (closed) {
-      return;
-    }
     closed = true;
-    arena.close();
   }
 }

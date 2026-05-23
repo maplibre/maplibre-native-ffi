@@ -55,37 +55,38 @@ The package root is `org.maplibre.nativejni`. The Java module is
 Record JNI-only differences here. Keep the `None` row only when Java JNI
 intentionally mirrors Java FFM and the public C ABI for all supported features.
 
-| Item                                         | Difference or omission                                                                   | Reason                                                                                                                            | User-visible behavior                                                                                                                                                          | Tests/docs impact                                                                                                          |
-| -------------------------------------------- | ---------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------- |
-| JVM native distribution packaging            | Out of scope for this implementation pass.                                               | Existing bindings currently build, test, and support local examples without published per-platform native distribution artifacts. | JVM users load the locally built JNI bridge through `org.maplibre.nativejni.library.path`, `MAPLIBRE_NATIVE_JNI_LIBRARY_PATH`, or `System.loadLibrary("maplibre-native-jni")`. | Local JVM build, native build, and loader tests cover the supported path.                                                  |
-| Android/AAR packaging and Android load tests | Out of scope for this implementation pass.                                               | The repository does not yet define an Android packaging target or supported Android ABI test runner for this binding.             | Android artifacts are not produced by `bindings/java-jni`; Android load behavior is not claimed for this pass.                                                                 | The completion checklist records Android packaging and load tests as unsupported until an Android packaging target exists. |
-| Internal C default/descriptor helpers        | Replaced by Java-side value construction for this implementation pass.                   | Java JNI owns copied descriptor/value classes and does not expose raw C descriptor allocation.                                    | Public Java constructors/builders provide the same local binding inputs without requiring callers to allocate C defaults.                                                      | The native coverage map records each replaced helper.                                                                      |
-| Internal C result/list/snapshot helpers      | Replaced by Rust-side copy-and-destroy adapters for this implementation pass.            | Java JNI returns copied Java objects and does not expose raw C result, list, or snapshot handles.                                 | Query, JSON snapshot, style-list, and offline result APIs return Java values directly.                                                                                         | The native coverage map records each replaced helper.                                                                      |
-| Rust bridge module split                     | Replaced by a consolidated `native/src/lib.rs` bridge file for this implementation pass. | The current bridge is easier to audit as one file while the API surface is still stabilizing.                                     | No user-visible behavior difference.                                                                                                                                           | The Rust bridge inventory records `lib.rs` as the replacement for the planned module split.                                |
+| Item                                         | Difference or omission                                                                                                                                        | Reason                                                                                                                                                 | User-visible behavior                                                                                                                                                                                                                                                                    | Tests/docs impact                                                                                                          |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| JVM native distribution packaging            | Out of scope for this implementation pass.                                                                                                                    | Existing bindings currently build, test, and support local examples without published per-platform native distribution artifacts.                      | JVM users load the locally built JNI bridge through `org.maplibre.nativejni.library.path`, `MAPLIBRE_NATIVE_JNI_LIBRARY_PATH`, or `System.loadLibrary("maplibre_native_jni")`.                                                                                                           | Local JVM build, native build, and loader tests cover property, environment, and `System.loadLibrary` lookup paths.        |
+| Android/AAR packaging and Android load tests | Out of scope for this implementation pass.                                                                                                                    | The repository does not yet define an Android packaging target or supported Android ABI test runner for this binding.                                  | Android artifacts are not produced by `bindings/java-jni`; Android load behavior is not claimed for this pass.                                                                                                                                                                           | The completion checklist records Android packaging and load tests as unsupported until an Android packaging target exists. |
+| Internal C default/descriptor helpers        | Replaced by Java-side value construction for this implementation pass.                                                                                        | Java JNI owns copied descriptor/value classes and does not expose raw C descriptor allocation.                                                         | Public Java constructors/builders provide the same local binding inputs without requiring callers to allocate C defaults.                                                                                                                                                                | The native coverage map records each replaced helper.                                                                      |
+| Internal C result/list/snapshot helpers      | Replaced by Rust-side copy-and-destroy adapters for this implementation pass.                                                                                 | Java JNI returns copied Java objects and does not expose raw C result, list, or snapshot handles.                                                      | Query, JSON snapshot, style-list, and offline result APIs return Java values directly.                                                                                                                                                                                                   | The native coverage map records each replaced helper.                                                                      |
+| Rust bridge module split                     | Replaced by a consolidated `native/src/lib.rs` bridge file for this implementation pass.                                                                      | The current bridge is easier to audit as one file while the API surface is still stabilizing.                                                          | No user-visible behavior difference.                                                                                                                                                                                                                                                     | The Rust bridge inventory records `lib.rs` as the replacement for the planned module split.                                |
+| `NativeBuffer` JNI readback storage          | Uses temporary Java/native byte storage before copying into the caller-owned direct buffer, with direct-buffer capacity limited to `Integer.MAX_VALUE` bytes. | The current JNI bridge keeps direct-buffer pointer access internal until readback plumbing is split out, and Java direct buffers use `int` capacities. | Callers still pass a reusable `NativeBuffer` and receive copied readback bytes; oversized allocations fail with `IllegalArgumentException`; `close()` invalidates the wrapper while direct-buffer memory remains JVM-managed; this pass does not claim zero-copy direct-buffer readback. | Render buffer tests cover sizing, close invalidation, capacity rejection, and copied readback behavior.                    |
+| Internal access-token overloads              | Some `InternalAccess` overloads are package-private in JNI where Java FFM keeps public token-gated overloads.                                                 | The `internal.access` package is unexported and JNI keeps these test/bridge seams out of public Javadocs.                                              | Public user APIs are unchanged; internal callers in the package can still use the overloads.                                                                                                                                                                                             | The public inventory verifier ignores recorded `InternalAccess` overload differences.                                      |
 
-## Current scaffold
+## Current implementation snapshot
 
 ```text
 bindings/java-jni/
   SPEC.md
+  REVIEW.md
   build.gradle.kts
   mise.toml
   native/Cargo.toml
   native/src/lib.rs
   src/main/java/module-info.java
-  src/main/java/org/maplibre/nativejni/Maplibre.java
-  src/main/java/org/maplibre/nativejni/error/*.java
-  src/main/java/org/maplibre/nativejni/render/NativePointer.java
-  src/main/java/org/maplibre/nativejni/internal/bridge/NativeBridge.java
-  src/main/java/org/maplibre/nativejni/internal/loader/NativeLibrary.java
+  src/main/java/org/maplibre/nativejni/**
+  src/test/java/org/maplibre/nativejni/**
+  tools/jni_library_path.py
+  tools/verify_*.py
 ```
 
-This abbreviated tree omits package markers and `package-info.java`
-placeholders. The scaffold implements one proof slice:
-
-- `Maplibre.loadNativeLibrary()` loads `maplibre-native-jni`.
-- `JNI_OnLoad` registers `NativeBridge.cVersion()` explicitly.
-- `Maplibre.cVersion()` calls `mln_c_version()` through Rust JNI code.
+The branch implements the Java FFM public inventory under the JNI package root,
+curated internal bridge declarations, Java-side lifecycle/status/struct helpers,
+a consolidated Rust JNI bridge in `native/src/lib.rs`, local JVM loading, and
+Java/JNI adaptation tests. JVM native distribution packaging and Android/AAR
+packaging remain recorded omissions for this implementation pass.
 
 ## Build artifacts and tasks
 
@@ -100,19 +101,27 @@ Implement these artifacts:
 
 Implement these tasks:
 
-| Task                                        | Required behavior                                       |
-| ------------------------------------------- | ------------------------------------------------------- |
-| `mise run //bindings/java-jni:build`        | Build Java sources and run Java checks.                 |
-| `mise run //bindings/java-jni:native:build` | Build `maplibre-native-jni` after the C library exists. |
-| `./gradlew :bindings:java-jni:javadoc`      | Validate public Javadocs.                               |
-| `cargo check -p maplibre-native-jni`        | Type-check the Rust bridge crate.                       |
-| `cargo test -p maplibre-native-jni`         | Run bridge unit tests once test modules exist.          |
+| Task                                        | Required behavior                                                                             |
+| ------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `mise run //bindings/java-jni:build`        | Build the JNI bridge, then build Java sources and run Java checks with native tests required. |
+| `mise run //bindings/java-jni:verify`       | Verify SPEC public inventory, internal inventory, and native coverage maps.                   |
+| `mise run //bindings/java-jni:native:build` | Build `maplibre-native-jni` after the C library exists.                                       |
+| `mise run //bindings/java-jni:test:native`  | Run Java tests with the locally built JNI bridge loaded by exact path.                        |
+| `mise run //bindings/java-jni:check`        | Run Java JNI branch-readiness checks.                                                         |
+| `./gradlew :bindings:java-jni:javadoc`      | Validate public Javadocs.                                                                     |
+| `cargo check -p maplibre-native-jni`        | Type-check the Rust bridge crate.                                                             |
+| `cargo test -p maplibre-native-jni`         | Run bridge unit tests once test modules exist.                                                |
 
 Native library lookup stays implemented by `internal.loader.NativeLibrary`:
 
 1. exact JNI bridge file from `org.maplibre.nativejni.library.path`;
 2. exact JNI bridge file from `MAPLIBRE_NATIVE_JNI_LIBRARY_PATH`;
-3. `System.loadLibrary("maplibre-native-jni")`.
+3. `System.loadLibrary("maplibre_native_jni")`, matching the Cargo `cdylib`
+   artifact name.
+
+Java runtimes that restrict native access may require launch flags such as
+`--enable-native-access=ALL-UNNAMED` for tests or applications that call the JNI
+loader. The Java JNI Gradle test task sets this flag for its test JVMs.
 
 ## Java package map
 
@@ -137,6 +146,7 @@ org.maplibre.nativejni.style
 Create these internal packages. They remain unexported:
 
 ```text
+org.maplibre.nativejni.internal.access
 org.maplibre.nativejni.internal.bridge
 org.maplibre.nativejni.internal.callback
 org.maplibre.nativejni.internal.lifecycle
@@ -319,8 +329,10 @@ state:
 
 | JNI file                                   | Purpose                                                                                                                                                                                                                                    | FFM analogue                                |
 | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------- |
+| `internal.access.InternalAccess`           | Cross-package token for internal handle access that remains outside exported module packages.                                                                                                                                              | `internal.access.InternalAccess`.           |
 | `internal.bridge.NativeBridge`             | Generated or curated `native` declarations.                                                                                                                                                                                                | `internal.c` jextract output.               |
 | `internal.bridge.*Native`                  | Concept-specific native declarations: `BaseNative`, `LogNative`, `RuntimeNative`, `MapNative`, `CameraNative`, `ProjectionNative`, `QueryNative`, `RenderSessionNative`, `SurfaceNative`, `TextureNative`, `StyleNative`, `OfflineNative`. | `internal.c.MapLibreNativeC`.               |
+| `internal.bridge.JniTestNative`            | JNI-only test hooks registered with the bridge and excluded from C ABI coverage.                                                                                                                                                           | JNI-specific test support.                  |
 | `internal.callback.LogCallbackState`       | Process-global log callback global-reference state.                                                                                                                                                                                        | `internal.callback.LogCallbackState`.       |
 | `internal.callback.ResourceTransformState` | Runtime-scoped resource transform callback state.                                                                                                                                                                                          | `internal.callback.ResourceTransformState`. |
 | `runtime.ResourceProviderState`            | Package-private runtime-scoped resource provider callback state.                                                                                                                                                                           | `runtime.ResourceProviderState`.            |
@@ -344,32 +356,32 @@ current implementation records the single `lib.rs` file as the replacement for
 the planned module split; future refactors may split these responsibilities
 without changing the Java API.
 
-| Module                            | Contents                                                                      |
-| --------------------------------- | ----------------------------------------------------------------------------- |
-| `lib.rs`                          | `JNI_OnLoad`, top-level registration, panic boundary.                         |
-| `jvm.rs`                          | `JavaVM` storage, thread attach/detach helpers, Android class-loader support. |
-| `registration.rs`                 | Class lookup and `JNINativeMethod` registration tables.                       |
-| `classes.rs`                      | Cached class, constructor, method, and field IDs.                             |
-| `errors.rs`                       | Java exception creation from `maplibre-native-core` errors.                   |
-| `strings.rs`                      | Java string to standard UTF-8 conversion, embedded-NUL rejection.             |
-| `refs.rs`                         | Local frame, global reference, weak-global reference helpers.                 |
-| `handles.rs`                      | Pointer boxing/unboxing, closed-state interop, handle release helpers.        |
-| `values.rs`                       | Java records/enums/JSON/geometry construction helpers.                        |
-| `callbacks/logging.rs`            | Log callback trampoline and global state.                                     |
-| `callbacks/resource_transform.rs` | Resource transform trampoline and response storage.                           |
-| `callbacks/resource_provider.rs`  | Resource provider trampoline and request handles.                             |
-| `callbacks/custom_geometry.rs`    | Custom geometry trampoline and active-upcall accounting.                      |
-| `base.rs`                         | C version, supported render backends, diagnostics.                            |
-| `runtime.rs`                      | Runtime, events, resource provider/transform, ambient cache.                  |
-| `offline.rs`                      | Offline operation start/take/discard and copied results.                      |
-| `map.rs`                          | Map lifecycle, style loading, repaint/still-image requests.                   |
-| `camera.rs`                       | Camera, viewport, tile, bounds, debug, and projection-mode calls.             |
-| `projection.rs`                   | `MapProjectionHandle` calls and coordinate conversions.                       |
-| `query.rs`                        | Rendered/source/extension queries and copied result readers.                  |
-| `render_session.rs`               | Session lifecycle, feature state, JSON snapshots.                             |
-| `surface.rs`                      | Metal/Vulkan surface attachment.                                              |
-| `texture.rs`                      | Metal/Vulkan texture attachment, readback, frame acquire/release.             |
-| `style.rs`                        | Sources, layers, images, light, properties, filters, custom geometry.         |
+| Responsibility / future split label | Contents                                                                      |
+| ----------------------------------- | ----------------------------------------------------------------------------- |
+| `lib.rs`                            | `JNI_OnLoad`, top-level registration, panic boundary.                         |
+| `jvm.rs`                            | `JavaVM` storage, thread attach/detach helpers, Android class-loader support. |
+| `registration.rs`                   | Class lookup and `JNINativeMethod` registration tables.                       |
+| `classes.rs`                        | Cached class, constructor, method, and field IDs.                             |
+| `errors.rs`                         | Java exception creation from `maplibre-native-core` errors.                   |
+| `strings.rs`                        | Java string to standard UTF-8 conversion, embedded-NUL rejection.             |
+| `refs.rs`                           | Local frame, global reference, weak-global reference helpers.                 |
+| `handles.rs`                        | Pointer boxing/unboxing, closed-state interop, handle release helpers.        |
+| `values.rs`                         | Java records/enums/JSON/geometry construction helpers.                        |
+| `callbacks/logging.rs`              | Log callback trampoline and global state.                                     |
+| `callbacks/resource_transform.rs`   | Resource transform trampoline and response storage.                           |
+| `callbacks/resource_provider.rs`    | Resource provider trampoline and request handles.                             |
+| `callbacks/custom_geometry.rs`      | Custom geometry trampoline and active-upcall accounting.                      |
+| `base.rs`                           | C version, supported render backends, diagnostics.                            |
+| `runtime.rs`                        | Runtime, events, resource provider/transform, ambient cache.                  |
+| `offline.rs`                        | Offline operation start/take/discard and copied results.                      |
+| `map.rs`                            | Map lifecycle, style loading, repaint/still-image requests.                   |
+| `camera.rs`                         | Camera, viewport, tile, bounds, debug, and projection-mode calls.             |
+| `projection.rs`                     | `MapProjectionHandle` calls and coordinate conversions.                       |
+| `query.rs`                          | Rendered/source/extension queries and copied result readers.                  |
+| `render_session.rs`                 | Session lifecycle, feature state, JSON snapshots.                             |
+| `surface.rs`                        | Metal/Vulkan surface attachment.                                              |
+| `texture.rs`                        | Metal/Vulkan texture attachment, readback, frame acquire/release.             |
+| `style.rs`                          | Sources, layers, images, light, properties, filters, custom geometry.         |
 
 Bridge code may call `maplibre-native-sys` directly only for JNI trampoline glue
 or missing `maplibre-native-core` adapters. If two bridge modules need the same
@@ -495,8 +507,10 @@ through Java-owned values or Rust copy adapters instead of raw C helper handles.
 - `mln_resource_request_complete`
 - `mln_resource_request_cancelled`
 - `mln_resource_request_release`
+- `mln_resource_provider_state_destroy` (JNI-owned callback state helper)
 - `mln_runtime_set_resource_transform`
 - `mln_runtime_clear_resource_transform`
+- `mln_resource_transform_state_destroy` (JNI-owned callback state helper)
 - `mln_runtime_run_ambient_cache_operation_start`
 - `mln_runtime_offline_operation_discard`
 - `mln_runtime_destroy`
@@ -685,6 +699,7 @@ through Java-owned values or Rust copy adapters instead of raw C helper handles.
 - `mln_map_set_custom_geometry_source_tile_data`
 - `mln_map_invalidate_custom_geometry_source_tile`
 - `mln_map_invalidate_custom_geometry_source_region`
+- `mln_custom_geometry_source_state_destroy` (JNI-owned callback state helper)
 - `mln_map_set_style_image`
 - `mln_map_remove_style_image`
 - `mln_map_style_image_exists`
@@ -732,12 +747,17 @@ this task.
 - `MaplibreTest`
 - `internal.callback.LogCallbackStateTest`
 - `internal.callback.ResourceTransformStateTest`
+- `internal.lifecycle.HandleStateTest`
 - `internal.loader.NativeLibraryTest`
 - `internal.status.StatusAndMemoryTest`
+- `internal.struct.DescriptorStructsTest`
 - `internal.struct.RenderStructsTest`
+- `internal.struct.RuntimeEventStructsTest`
 - `internal.struct.ValueStructsTest`
 - `map.MapHandleTest`
+- `map.MapProjectionHandleTest`
 - `map.StyleHandleTest`
+- `render.NativeBufferTest`
 - `render.RenderSessionHandleTest`
 - `render.RenderSessionQueryTest`
 - `resource.ResourceRequestHandleTest`
@@ -749,20 +769,20 @@ this task.
 
 Add JNI-specific tests:
 
-| Test                                      | Coverage                                                                    |
-| ----------------------------------------- | --------------------------------------------------------------------------- |
-| `internal.bridge.NativeRegistrationTest`  | `JNI_OnLoad` explicit registration and artifact mismatch failures.          |
-| `internal.bridge.PanicBoundaryTest`       | Rust panic containment before JNI return.                                   |
-| `internal.refs.GlobalReferenceTest`       | Callback global references release exactly once.                            |
-| `internal.refs.LocalFrameTest`            | Loops creating Java objects use bounded local references.                   |
-| `internal.strings.StandardUtf8Test`       | Standard UTF-8 conversion and modified-UTF-8 avoidance.                     |
-| `internal.jvm.NativeThreadAttachmentTest` | Attach/detach behavior for MapLibre-created threads.                        |
-| `android.AndroidLoadTest`                 | Android library loading and class-loader behavior, where Android tests run. |
+| Test                                      | Coverage                                                                                   |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `internal.bridge.NativeRegistrationTest`  | `JNI_OnLoad` explicit registration and artifact mismatch failures.                         |
+| `internal.bridge.PanicBoundaryTest`       | Rust panic containment before JNI return.                                                  |
+| `internal.refs.GlobalReferenceTest`       | Callback global references release exactly once.                                           |
+| `internal.refs.LocalFrameTest`            | Loops creating Java objects use bounded local references.                                  |
+| `internal.strings.StandardUtf8Test`       | Standard UTF-8 conversion and modified-UTF-8 avoidance.                                    |
+| `internal.jvm.NativeThreadAttachmentTest` | Attach/detach behavior for MapLibre-created threads.                                       |
+| `android.AndroidLoadTest`                 | Records Android loading as out of scope for this JVM suite until an Android runner exists. |
 
 ## Implementation milestones
 
 1. Replace package markers with the full public Java parity inventory.
-2. Complete the bridge proof slice: ABI version, supported backends, network
+2. Implement base bridge coverage: ABI version, supported backends, network
    status get/set, status-to-exception conversion, and diagnostic capture.
 3. Add Java native declarations and Rust registration scaffolding for all C ABI
    functions in the coverage map.
@@ -793,9 +813,13 @@ Add JNI-specific tests:
 - [x] JVM native distribution packaging and Android/AAR packaging/load tests are
       recorded as out of scope until packaging targets exist.
 - [x] `mise run //bindings/java-jni:build` passes.
+- [x] `mise run //bindings/java-jni:verify` passes.
 - [x] `mise run //bindings/java-jni:native:build` passes.
+- [x] `mise run //bindings/java-jni:test:native` passes.
+- [x] `mise run //bindings/java-jni:check` passes.
 - [x] `cargo test -p maplibre-native-jni` passes.
 - [x] `./gradlew :bindings:java-jni:javadoc` passes.
 - [x] Kotlin common facade compatibility has been checked against the Kotlin
       binding conventions when the facade is available.
-- [x] Local JVM native loading works through the documented loader paths.
+- [x] Local JVM native loading works through exact-path property,
+      environment-variable, and `System.loadLibrary` lookup paths.

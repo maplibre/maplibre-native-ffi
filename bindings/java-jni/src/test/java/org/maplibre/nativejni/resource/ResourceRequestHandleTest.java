@@ -3,7 +3,6 @@ package org.maplibre.nativejni.resource;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
-import java.lang.foreign.MemorySegment;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 import org.maplibre.nativejni.error.InvalidStateException;
@@ -12,9 +11,7 @@ class ResourceRequestHandleTest {
   @Test
   void passThroughDecisionLetsNativeReleaseHandle() {
     var releaseCount = new AtomicInteger();
-    var handle =
-        new ResourceRequestHandle(
-            MemorySegment.ofAddress(0x1234), ignored -> releaseCount.incrementAndGet());
+    var handle = new ResourceRequestHandle(0x1234, ignored -> releaseCount.incrementAndGet());
 
     assertEquals(
         ResourceProviderDecision.PASS_THROUGH.nativeValue(),
@@ -28,9 +25,7 @@ class ResourceRequestHandleTest {
   @Test
   void handleDecisionReleasesExactlyOnceOnClose() {
     var releaseCount = new AtomicInteger();
-    var handle =
-        new ResourceRequestHandle(
-            MemorySegment.ofAddress(0x1234), ignored -> releaseCount.incrementAndGet());
+    var handle = new ResourceRequestHandle(0x1234, ignored -> releaseCount.incrementAndGet());
 
     assertEquals(
         ResourceProviderDecision.HANDLE.nativeValue(),

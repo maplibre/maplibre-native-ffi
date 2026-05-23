@@ -7,7 +7,9 @@ import java.util.Objects;
  *
  * <p>This is an advanced API for render integrations that must submit GPU work and release the
  * MapLibre-owned texture only after that work no longer samples it. The frame and its native
- * pointers stay valid until {@link #close()}.
+ * pointers stay valid until {@link #close()}. Callers must synchronize GPU use before closing the
+ * handle, close it on the render session owner thread, and close it before resizing, rendering
+ * another update, detaching, or closing the render session.
  */
 public final class MetalOwnedTextureFrameHandle implements AutoCloseable {
   private final RenderSessionHandle session;

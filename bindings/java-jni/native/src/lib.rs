@@ -3,11 +3,13 @@
 //! This crate owns JNI registration and delegates shared ABI adaptation to the
 //! Rust binding crates.
 
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::ffi::{CStr, CString, c_char, c_void};
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::ptr::NonNull;
-use std::sync::{LazyLock, Mutex};
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Arc, LazyLock, Mutex};
 use std::thread::ThreadId;
 
 use jni::objects::{
@@ -81,23 +83,37 @@ const STRING_MESSAGE: i32 = 0;
 const STRING_PAYLOAD: i32 = 1;
 const STRING_COUNT: i32 = 2;
 
+thread_local! {
+    static JNI_THREAD_DIAGNOSTIC: RefCell<Option<String>> = const { RefCell::new(None) };
+}
+
 struct LogCallbackState {
     vm: JavaVM,
     callback: GlobalRef,
 }
 
-static LOG_CALLBACK_STATE: LazyLock<Mutex<Option<usize>>> = LazyLock::new(|| Mutex::new(None));
+struct LogCallbackRegistry {
+    current: Option<usize>,
+    states: HashMap<usize, Arc<LogCallbackState>>,
+}
+
+static NEXT_LOG_CALLBACK_STATE_ID: AtomicUsize = AtomicUsize::new(1);
+static LOG_CALLBACK_STATE: LazyLock<Mutex<LogCallbackRegistry>> = LazyLock::new(|| {
+    Mutex::new(LogCallbackRegistry {
+        current: None,
+        states: HashMap::new(),
+    })
+});
 
 struct CustomGeometrySourceState {
     vm: JavaVM,
     callback: GlobalRef,
-    lifecycle: Mutex<CustomGeometrySourceLifecycle>,
 }
 
-struct CustomGeometrySourceLifecycle {
-    active_callbacks: usize,
-    close_requested: bool,
-}
+static NEXT_CUSTOM_GEOMETRY_SOURCE_STATE_ID: AtomicUsize = AtomicUsize::new(1);
+static CUSTOM_GEOMETRY_SOURCE_STATES: LazyLock<
+    Mutex<HashMap<usize, Arc<CustomGeometrySourceState>>>,
+> = LazyLock::new(|| Mutex::new(HashMap::new()));
 
 struct ResourceTransformState {
     vm: JavaVM,
@@ -1356,7 +1372,9 @@ extern "system" fn network_status_get(
 ) -> jint {
     catch_unwind(AssertUnwindSafe(|| {
         if out_status.is_null() || env.get_array_length(&out_status).unwrap_or(0) < 1 {
-            return sys::MLN_STATUS_INVALID_ARGUMENT;
+            return jni_invalid_argument(
+                "network status output array must contain at least one element",
+            );
         }
 
         let mut status: sys::mln_network_status = 0;
@@ -1366,7 +1384,7 @@ extern "system" fn network_status_get(
                 .set_int_array_region(&out_status, 0, &[status as jint])
                 .is_err()
         {
-            return sys::MLN_STATUS_INVALID_ARGUMENT;
+            return jni_invalid_argument("failed to write network status output array");
         }
         result
     }))
@@ -1395,7 +1413,7 @@ extern "system" fn test_create_many_local_strings(
 ) -> jint {
     catch_unwind(AssertUnwindSafe(|| {
         if count < 0 {
-            return sys::MLN_STATUS_INVALID_ARGUMENT;
+            return jni_invalid_argument("JNI invalid argument");
         }
         for index in 0..count {
             let value = match env.new_string(format!("local-{index}")) {
@@ -1455,7 +1473,7 @@ extern "system" fn log_set_callback<'local>(
 ) -> jint {
     catch_unwind(AssertUnwindSafe(|| {
         if callback.is_null() {
-            return sys::MLN_STATUS_INVALID_ARGUMENT;
+            return jni_invalid_argument("JNI invalid argument");
         }
         let vm = match env.get_java_vm() {
             Ok(value) => value,
@@ -1463,23 +1481,32 @@ extern "system" fn log_set_callback<'local>(
         };
         let callback = match env.new_global_ref(callback) {
             Ok(value) => value,
-            Err(_) => return sys::MLN_STATUS_INVALID_ARGUMENT,
+            Err(_) => return jni_invalid_argument("JNI invalid argument"),
         };
-        let state = Box::new(LogCallbackState { vm, callback });
-        let state_ptr = Box::into_raw(state);
-        let result =
-            unsafe { sys::mln_log_set_callback(Some(log_callback), state_ptr.cast::<c_void>()) };
-        if result != sys::MLN_STATUS_OK {
-            unsafe {
-                drop(Box::from_raw(state_ptr));
+        let state_id = NEXT_LOG_CALLBACK_STATE_ID.fetch_add(1, Ordering::Relaxed);
+        match LOG_CALLBACK_STATE.lock() {
+            Ok(mut registry) => {
+                registry
+                    .states
+                    .insert(state_id, Arc::new(LogCallbackState { vm, callback }));
             }
-            return result;
-        }
-        let previous = match LOG_CALLBACK_STATE.lock() {
-            Ok(mut current) => current.replace(state_ptr as usize),
             Err(_) => return sys::MLN_STATUS_NATIVE_ERROR,
-        };
-        drop_log_callback_state(previous);
+        }
+        let result =
+            unsafe { sys::mln_log_set_callback(Some(log_callback), state_id as *mut c_void) };
+        match LOG_CALLBACK_STATE.lock() {
+            Ok(mut registry) => {
+                if result == sys::MLN_STATUS_OK {
+                    if let Some(previous) = registry.current.replace(state_id) {
+                        registry.states.remove(&previous);
+                    }
+                } else {
+                    registry.states.remove(&state_id);
+                    return result;
+                }
+            }
+            Err(_) => return sys::MLN_STATUS_NATIVE_ERROR,
+        }
         result
     }))
     .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
@@ -1491,11 +1518,14 @@ extern "system" fn log_clear_callback(_env: JNIEnv<'_>, _class: JClass<'_>) -> j
         if result != sys::MLN_STATUS_OK {
             return result;
         }
-        let previous = match LOG_CALLBACK_STATE.lock() {
-            Ok(mut current) => current.take(),
+        match LOG_CALLBACK_STATE.lock() {
+            Ok(mut registry) => {
+                if let Some(previous) = registry.current.take() {
+                    registry.states.remove(&previous);
+                }
+            }
             Err(_) => return sys::MLN_STATUS_NATIVE_ERROR,
-        };
-        drop_log_callback_state(previous);
+        }
         result
     })
     .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
@@ -1521,12 +1551,20 @@ unsafe extern "C" fn log_callback(
         if user_data.is_null() {
             return 0;
         }
-        let state = unsafe { &*(user_data as *mut LogCallbackState) };
+        let state_id = user_data as usize;
+        let state = match LOG_CALLBACK_STATE
+            .lock()
+            .ok()
+            .and_then(|registry| registry.states.get(&state_id).cloned())
+        {
+            Some(value) => value,
+            None => return 0,
+        };
         let mut env = match state.vm.attach_current_thread() {
             Ok(value) => value,
             Err(_) => return 0,
         };
-        invoke_log_callback(&mut env, state, severity, event, code, message).unwrap_or(0)
+        invoke_log_callback(&mut env, state.as_ref(), severity, event, code, message).unwrap_or(0)
     }))
     .unwrap_or(0)
 }
@@ -1602,14 +1640,6 @@ fn invoke_log_callback(
     Ok(if consumed { 1 } else { 0 })
 }
 
-fn drop_log_callback_state(state: Option<usize>) {
-    if let Some(state) = state {
-        unsafe {
-            drop(Box::from_raw(state as *mut LogCallbackState));
-        }
-    }
-}
-
 extern "system" fn runtime_create<'local>(
     mut env: JNIEnv<'local>,
     _class: JClass<'local>,
@@ -1621,7 +1651,7 @@ extern "system" fn runtime_create<'local>(
             || out_runtime.is_null()
             || env.get_array_length(&out_runtime).unwrap_or(0) < 1
         {
-            return sys::MLN_STATUS_INVALID_ARGUMENT;
+            return jni_invalid_argument("JNI invalid argument");
         }
 
         let mut options_value = unsafe { sys::mln_runtime_options_default() };
@@ -1650,8 +1680,9 @@ extern "system" fn runtime_create<'local>(
                 .call_method(&options, "maximumCacheSize", "()J", &[])
                 .and_then(|value| value.j())
             {
-                Ok(value) => value as u64,
-                Err(_) => return sys::MLN_STATUS_INVALID_ARGUMENT,
+                Ok(value) if value >= 0 => value as u64,
+                Ok(_) => return jni_invalid_argument("maximum cache size must be non-negative"),
+                Err(_) => return jni_invalid_argument("JNI invalid argument"),
             };
         }
 
@@ -1665,7 +1696,7 @@ extern "system" fn runtime_create<'local>(
             unsafe {
                 sys::mln_runtime_destroy(runtime);
             }
-            return sys::MLN_STATUS_INVALID_ARGUMENT;
+            return jni_invalid_argument("JNI invalid argument");
         }
         result
     }))
@@ -1694,7 +1725,7 @@ extern "system" fn runtime_set_resource_provider<'local>(
             || out_state.is_null()
             || env.get_array_length(&out_state).unwrap_or(0) < 1
         {
-            return sys::MLN_STATUS_INVALID_ARGUMENT;
+            return jni_invalid_argument("JNI invalid argument");
         }
         let vm = match env.get_java_vm() {
             Ok(value) => value,
@@ -1702,7 +1733,7 @@ extern "system" fn runtime_set_resource_provider<'local>(
         };
         let callback = match env.new_global_ref(callback) {
             Ok(value) => value,
-            Err(_) => return sys::MLN_STATUS_INVALID_ARGUMENT,
+            Err(_) => return jni_invalid_argument("JNI invalid argument"),
         };
         let state = Box::new(ResourceProviderState { vm, callback });
         let state_ptr = Box::into_raw(state);
@@ -1818,7 +1849,7 @@ extern "system" fn resource_request_cancelled(
 ) -> jint {
     catch_unwind(AssertUnwindSafe(|| {
         if out_cancelled.is_null() || env.get_array_length(&out_cancelled).unwrap_or(0) < 1 {
-            return sys::MLN_STATUS_INVALID_ARGUMENT;
+            return jni_invalid_argument("JNI invalid argument");
         }
         let mut cancelled = false;
         let result = unsafe {
@@ -1832,7 +1863,7 @@ extern "system" fn resource_request_cancelled(
                 .set_boolean_array_region(&out_cancelled, 0, &[jboolean::from(cancelled)])
                 .is_err()
         {
-            return sys::MLN_STATUS_INVALID_ARGUMENT;
+            return jni_invalid_argument("JNI invalid argument");
         }
         result
     }))
@@ -1920,7 +1951,7 @@ fn java_resource_request<'local>(
                     JValue::Long(request.range_end as jlong),
                 ],
             )
-            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
+            .map_err(|_| jni_invalid_argument("JNI invalid argument"))?;
         java_optional_object(env, Some(&range))?
     } else {
         java_optional_object(env, None)?
@@ -1945,12 +1976,12 @@ fn java_resource_request<'local>(
     };
     let prior_data = if request.prior_data.is_null() || request.prior_data_size == 0 {
         env.byte_array_from_slice(&[])
-            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?
+            .map_err(|_| jni_invalid_argument("JNI invalid argument"))?
     } else {
         let bytes =
             unsafe { std::slice::from_raw_parts(request.prior_data, request.prior_data_size) };
         env.byte_array_from_slice(bytes)
-            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?
+            .map_err(|_| jni_invalid_argument("JNI invalid argument"))?
     };
     env.new_object(
         "org/maplibre/nativejni/resource/ResourceRequest",
@@ -1974,7 +2005,7 @@ fn java_resource_request<'local>(
             JValue::Object(&prior_data),
         ],
     )
-    .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)
+    .map_err(|_| jni_invalid_argument("JNI invalid argument"))
 }
 
 fn java_enum_from_native<'local>(
@@ -1989,7 +2020,7 @@ fn java_enum_from_native<'local>(
         &[JValue::Int(value)],
     )
     .and_then(|value| value.l())
-    .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)
+    .map_err(|_| jni_invalid_argument("JNI invalid argument"))
 }
 
 fn java_string_from_c_ptr<'local>(
@@ -1997,13 +2028,13 @@ fn java_string_from_c_ptr<'local>(
     value: *const c_char,
 ) -> Result<JString<'local>, jint> {
     if value.is_null() {
-        return Err(sys::MLN_STATUS_INVALID_ARGUMENT);
+        return Err(jni_invalid_argument("JNI invalid argument"));
     }
     let value = unsafe { CStr::from_ptr(value) }
         .to_str()
-        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
+        .map_err(|_| jni_invalid_argument("JNI invalid argument"))?;
     env.new_string(value)
-        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)
+        .map_err(|_| jni_invalid_argument("JNI invalid argument"))
 }
 
 fn java_optional_long<'local>(
@@ -2020,7 +2051,7 @@ fn java_optional_long<'local>(
                     &[JValue::Long(value)],
                 )
                 .and_then(|value| value.l())
-                .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
+                .map_err(|_| jni_invalid_argument("JNI invalid argument"))?;
             java_optional_object(env, Some(&value))
         }
         None => java_optional_object(env, None),
@@ -2032,16 +2063,16 @@ fn native_resource_response<'local>(
     response: &JObject<'local>,
 ) -> Result<NativeResourceResponse, jint> {
     if response.is_null() {
-        return Err(sys::MLN_STATUS_INVALID_ARGUMENT);
+        return Err(jni_invalid_argument("JNI invalid argument"));
     }
     let bytes = env
         .call_method(response, "bytes", "()[B", &[])
         .and_then(|value| value.l())
         .map(JByteArray::from)
-        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
+        .map_err(|_| jni_invalid_argument("JNI invalid argument"))?;
     let bytes = env
         .convert_byte_array(&bytes)
-        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
+        .map_err(|_| jni_invalid_argument("JNI invalid argument"))?;
     let error_message = java_nullable_string_method(env, response, "errorMessage")?;
     let etag = java_nullable_string_method(env, response, "etag")?;
     let mut raw = sys::mln_resource_response {
@@ -2095,7 +2126,7 @@ fn java_int_method<'local>(
 ) -> Result<jint, jint> {
     env.call_method(value, method, "()I", &[])
         .and_then(|value| value.i())
-        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)
+        .map_err(|_| jni_invalid_argument("JNI invalid argument"))
 }
 
 fn java_double_method<'local>(
@@ -2105,7 +2136,7 @@ fn java_double_method<'local>(
 ) -> Result<f64, jint> {
     env.call_method(value, method, "()D", &[])
         .and_then(|value| value.d())
-        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)
+        .map_err(|_| jni_invalid_argument("JNI invalid argument"))
 }
 
 fn java_float_method<'local>(
@@ -2115,7 +2146,7 @@ fn java_float_method<'local>(
 ) -> Result<f32, jint> {
     env.call_method(value, method, "()F", &[])
         .and_then(|value| value.f())
-        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)
+        .map_err(|_| jni_invalid_argument("JNI invalid argument"))
 }
 
 fn java_latitude<'local>(env: &mut JNIEnv<'local>, value: &JObject<'local>) -> Result<f64, jint> {
@@ -2134,17 +2165,17 @@ fn java_nullable_string_method<'local>(
     let value = env
         .call_method(value, method, "()Ljava/lang/String;", &[])
         .and_then(|value| value.l())
-        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
+        .map_err(|_| jni_invalid_argument("JNI invalid argument"))?;
     if value.is_null() {
         return Ok(None);
     }
     let value = JString::from(value);
     let value = env
         .get_string(&value)
-        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
+        .map_err(|_| jni_invalid_argument("JNI invalid argument"))?;
     CString::new(String::from(value))
         .map(Some)
-        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)
+        .map_err(|_| jni_invalid_argument("JNI invalid argument"))
 }
 
 fn java_nullable_long_method<'local>(
@@ -2155,14 +2186,14 @@ fn java_nullable_long_method<'local>(
     let value = env
         .call_method(value, method, "()Ljava/lang/Long;", &[])
         .and_then(|value| value.l())
-        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
+        .map_err(|_| jni_invalid_argument("JNI invalid argument"))?;
     if value.is_null() {
         return Ok(None);
     }
     env.call_method(&value, "longValue", "()J", &[])
         .and_then(|value| value.j())
         .map(Some)
-        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)
+        .map_err(|_| jni_invalid_argument("JNI invalid argument"))
 }
 
 extern "system" fn runtime_set_resource_transform<'local>(
@@ -2177,7 +2208,7 @@ extern "system" fn runtime_set_resource_transform<'local>(
             || out_state.is_null()
             || env.get_array_length(&out_state).unwrap_or(0) < 1
         {
-            return sys::MLN_STATUS_INVALID_ARGUMENT;
+            return jni_invalid_argument("JNI invalid argument");
         }
         let vm = match env.get_java_vm() {
             Ok(value) => value,
@@ -2185,7 +2216,7 @@ extern "system" fn runtime_set_resource_transform<'local>(
         };
         let callback = match env.new_global_ref(callback) {
             Ok(value) => value,
-            Err(_) => return sys::MLN_STATUS_INVALID_ARGUMENT,
+            Err(_) => return jni_invalid_argument("JNI invalid argument"),
         };
         let state = Box::new(ResourceTransformState {
             vm,
@@ -2249,7 +2280,7 @@ unsafe extern "C" fn resource_transform_callback(
 ) -> sys::mln_status {
     catch_unwind(AssertUnwindSafe(|| {
         if user_data.is_null() || url.is_null() || out_response.is_null() {
-            return sys::MLN_STATUS_INVALID_ARGUMENT;
+            return jni_invalid_argument("JNI invalid argument");
         }
         unsafe {
             (*out_response).size =
@@ -2281,7 +2312,7 @@ unsafe extern "C" fn resource_transform_callback(
             }
         };
         if replacement.is_null() {
-            return sys::MLN_STATUS_INVALID_ARGUMENT;
+            return jni_invalid_argument("JNI invalid argument");
         }
         let present = match env
             .call_method(&replacement, "isPresent", "()Z", &[])
@@ -2308,14 +2339,14 @@ unsafe extern "C" fn resource_transform_callback(
         };
         let value = match env.get_string(&value) {
             Ok(value) => String::from(value),
-            Err(_) => return sys::MLN_STATUS_INVALID_ARGUMENT,
+            Err(_) => return jni_invalid_argument("JNI invalid argument"),
         };
         if value.is_empty() {
             return sys::MLN_STATUS_OK;
         }
         let value = match CString::new(value) {
             Ok(value) => value,
-            Err(_) => return sys::MLN_STATUS_INVALID_ARGUMENT,
+            Err(_) => return jni_invalid_argument("JNI invalid argument"),
         };
         let pointer = value.as_ptr();
         match state.response_storage.lock() {
@@ -2345,13 +2376,13 @@ fn java_resource_transform_request<'local>(
             &[JValue::Int(kind as jint)],
         )
         .and_then(|value| value.l())
-        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
+        .map_err(|_| jni_invalid_argument("JNI invalid argument"))?;
     let url = unsafe { CStr::from_ptr(url) }
         .to_str()
-        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
+        .map_err(|_| jni_invalid_argument("JNI invalid argument"))?;
     let url = env
         .new_string(url)
-        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
+        .map_err(|_| jni_invalid_argument("JNI invalid argument"))?;
     env.new_object(
         "org/maplibre/nativejni/resource/ResourceTransformRequest",
         "(Lorg/maplibre/nativejni/resource/ResourceKind;ILjava/lang/String;)V",
@@ -2361,7 +2392,7 @@ fn java_resource_transform_request<'local>(
             JValue::Object(&url),
         ],
     )
-    .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)
+    .map_err(|_| jni_invalid_argument("JNI invalid argument"))
 }
 
 extern "system" fn runtime_run_ambient_cache_operation_start(
@@ -2373,7 +2404,7 @@ extern "system" fn runtime_run_ambient_cache_operation_start(
 ) -> jint {
     catch_unwind(AssertUnwindSafe(|| {
         if out_operation_id.is_null() || env.get_array_length(&out_operation_id).unwrap_or(0) < 1 {
-            return sys::MLN_STATUS_INVALID_ARGUMENT;
+            return jni_invalid_argument("JNI invalid argument");
         }
         let mut operation_id: sys::mln_offline_operation_id = 0;
         let result = unsafe {
@@ -2388,7 +2419,7 @@ extern "system" fn runtime_run_ambient_cache_operation_start(
                 .set_long_array_region(&out_operation_id, 0, &[operation_id as jlong])
                 .is_err()
         {
-            return sys::MLN_STATUS_INVALID_ARGUMENT;
+            return jni_invalid_argument("JNI invalid argument");
         }
         result
     }))
@@ -2420,11 +2451,11 @@ extern "system" fn offline_region_create_start<'local>(
 ) -> jint {
     catch_unwind(AssertUnwindSafe(|| {
         if definition.is_null() || metadata.is_null() {
-            return sys::MLN_STATUS_INVALID_ARGUMENT;
+            return jni_invalid_argument("JNI invalid argument");
         }
         let metadata = match env.convert_byte_array(&metadata) {
             Ok(value) => value,
-            Err(_) => return sys::MLN_STATUS_INVALID_ARGUMENT,
+            Err(_) => return jni_invalid_argument("JNI invalid argument"),
         };
         if env
             .is_instance_of(
@@ -2439,7 +2470,7 @@ extern "system" fn offline_region_create_start<'local>(
             };
             let style_url = match CString::new(style_url) {
                 Ok(value) => value,
-                Err(_) => return sys::MLN_STATUS_INVALID_ARGUMENT,
+                Err(_) => return jni_invalid_argument("JNI invalid argument"),
             };
             let bounds = match env
                 .call_method(
@@ -2451,7 +2482,7 @@ extern "system" fn offline_region_create_start<'local>(
                 .and_then(|value| value.l())
             {
                 Ok(value) => value,
-                Err(_) => return sys::MLN_STATUS_INVALID_ARGUMENT,
+                Err(_) => return jni_invalid_argument("JNI invalid argument"),
             };
             let southwest = match env
                 .call_method(
@@ -2463,7 +2494,7 @@ extern "system" fn offline_region_create_start<'local>(
                 .and_then(|value| value.l())
             {
                 Ok(value) => value,
-                Err(_) => return sys::MLN_STATUS_INVALID_ARGUMENT,
+                Err(_) => return jni_invalid_argument("JNI invalid argument"),
             };
             let northeast = match env
                 .call_method(
@@ -2475,7 +2506,7 @@ extern "system" fn offline_region_create_start<'local>(
                 .and_then(|value| value.l())
             {
                 Ok(value) => value,
-                Err(_) => return sys::MLN_STATUS_INVALID_ARGUMENT,
+                Err(_) => return jni_invalid_argument("JNI invalid argument"),
             };
             let tile_pyramid = sys::mln_offline_tile_pyramid_region_definition {
                 size: std::mem::size_of::<sys::mln_offline_tile_pyramid_region_definition>() as u32,
@@ -2555,7 +2586,7 @@ extern "system" fn offline_region_create_start<'local>(
             };
             let style_url = match CString::new(style_url) {
                 Ok(value) => value,
-                Err(_) => return sys::MLN_STATUS_INVALID_ARGUMENT,
+                Err(_) => return jni_invalid_argument("JNI invalid argument"),
             };
             let geometry = match env
                 .call_method(
@@ -2567,11 +2598,11 @@ extern "system" fn offline_region_create_start<'local>(
                 .and_then(|value| value.l())
             {
                 Ok(value) => value,
-                Err(_) => return sys::MLN_STATUS_INVALID_ARGUMENT,
+                Err(_) => return jni_invalid_argument("JNI invalid argument"),
             };
             let geometry = match java_geometry(&mut env, &geometry, 0).and_then(|value| {
                 core_geometry::geometry_try_to_native(&value)
-                    .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)
+                    .map_err(|_| jni_invalid_argument("JNI invalid argument"))
             }) {
                 Ok(value) => value,
                 Err(status) => return status,
@@ -2622,7 +2653,7 @@ extern "system" fn offline_region_create_start<'local>(
                 )
             });
         }
-        sys::MLN_STATUS_INVALID_ARGUMENT
+        jni_invalid_argument("JNI invalid argument")
     }))
     .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
 }
@@ -2687,11 +2718,11 @@ extern "system" fn offline_region_update_metadata_start(
 ) -> jint {
     catch_unwind(AssertUnwindSafe(|| {
         if metadata.is_null() {
-            return sys::MLN_STATUS_INVALID_ARGUMENT;
+            return jni_invalid_argument("JNI invalid argument");
         }
         let metadata = match env.convert_byte_array(&metadata) {
             Ok(metadata) => metadata,
-            Err(_) => return sys::MLN_STATUS_INVALID_ARGUMENT,
+            Err(_) => return jni_invalid_argument("JNI invalid argument"),
         };
         offline_start_with_out(env, out_operation_id, |out| unsafe {
             sys::mln_runtime_offline_region_update_metadata_start(
@@ -2824,7 +2855,7 @@ extern "system" fn offline_region_get_take_result<'local>(
             || env.get_array_length(&out_region).unwrap_or(0) < 1
             || env.get_array_length(&out_found).unwrap_or(0) < 1
         {
-            return sys::MLN_STATUS_INVALID_ARGUMENT;
+            return jni_invalid_argument("JNI invalid argument");
         }
         let mut snapshot: *mut sys::mln_offline_region_snapshot = std::ptr::null_mut();
         let mut found = false;
@@ -2843,7 +2874,7 @@ extern "system" fn offline_region_get_take_result<'local>(
             .set_boolean_array_region(&out_found, 0, &[jboolean::from(found)])
             .is_err()
         {
-            return sys::MLN_STATUS_INVALID_ARGUMENT;
+            return jni_invalid_argument("JNI invalid argument");
         }
         if found {
             offline_region_snapshot_to_array(&mut env, snapshot, &out_region)
@@ -2915,7 +2946,7 @@ fn offline_region_snapshot_take_result<'local>(
 ) -> jint {
     catch_unwind(AssertUnwindSafe(|| {
         if out_region.is_null() || env.get_array_length(out_region).unwrap_or(0) < 1 {
-            return sys::MLN_STATUS_INVALID_ARGUMENT;
+            return jni_invalid_argument("JNI invalid argument");
         }
         let mut snapshot: *mut sys::mln_offline_region_snapshot = std::ptr::null_mut();
         let result = unsafe {
@@ -2946,7 +2977,7 @@ fn offline_region_list_take_result<'local>(
 ) -> jint {
     catch_unwind(AssertUnwindSafe(|| {
         if out_regions.is_null() || env.get_array_length(out_regions).unwrap_or(0) < 1 {
-            return sys::MLN_STATUS_INVALID_ARGUMENT;
+            return jni_invalid_argument("JNI invalid argument");
         }
         let mut list: *mut sys::mln_offline_region_list = std::ptr::null_mut();
         let result = unsafe {
@@ -2960,18 +2991,18 @@ fn offline_region_list_take_result<'local>(
             return result;
         }
         let Some(list) = NonNull::new(list) else {
-            return sys::MLN_STATUS_INVALID_ARGUMENT;
+            return jni_invalid_argument("JNI invalid argument");
         };
         let regions = match unsafe { core_runtime::copy_offline_region_list(list) } {
             Ok(value) => value,
-            Err(_) => return sys::MLN_STATUS_INVALID_ARGUMENT,
+            Err(_) => return jni_invalid_argument("JNI invalid argument"),
         };
         let array = match java_offline_region_info_array(env, &regions) {
             Ok(value) => value,
             Err(status) => return status,
         };
         if env.set_object_array_element(out_regions, 0, array).is_err() {
-            sys::MLN_STATUS_INVALID_ARGUMENT
+            jni_invalid_argument("JNI invalid argument")
         } else {
             sys::MLN_STATUS_OK
         }
@@ -2985,18 +3016,18 @@ fn offline_region_snapshot_to_array<'local>(
     out_region: &JObjectArray<'local>,
 ) -> jint {
     let Some(snapshot) = NonNull::new(snapshot) else {
-        return sys::MLN_STATUS_INVALID_ARGUMENT;
+        return jni_invalid_argument("JNI invalid argument");
     };
     let region = match unsafe { core_runtime::copy_offline_region_snapshot(snapshot) } {
         Ok(value) => value,
-        Err(_) => return sys::MLN_STATUS_INVALID_ARGUMENT,
+        Err(_) => return jni_invalid_argument("JNI invalid argument"),
     };
     let region = match java_offline_region_info_object(env, &region) {
         Ok(value) => value,
         Err(status) => return status,
     };
     if env.set_object_array_element(out_region, 0, region).is_err() {
-        sys::MLN_STATUS_INVALID_ARGUMENT
+        jni_invalid_argument("JNI invalid argument")
     } else {
         sys::MLN_STATUS_OK
     }
@@ -3019,7 +3050,7 @@ extern "system" fn offline_region_get_status_take_result(
             || env.get_array_length(&ints).unwrap_or(0) < 1
             || env.get_array_length(&booleans).unwrap_or(0) < 2
         {
-            return sys::MLN_STATUS_INVALID_ARGUMENT;
+            return jni_invalid_argument("JNI invalid argument");
         }
         let mut status = sys::mln_offline_region_status {
             size: std::mem::size_of::<sys::mln_offline_region_status>() as u32,
@@ -3069,7 +3100,7 @@ extern "system" fn offline_region_get_status_take_result(
                     )
                     .is_err())
         {
-            return sys::MLN_STATUS_INVALID_ARGUMENT;
+            return jni_invalid_argument("JNI invalid argument");
         }
         result
     }))
@@ -3083,7 +3114,7 @@ fn offline_start_with_out(
 ) -> jint {
     catch_unwind(AssertUnwindSafe(|| {
         if out_operation_id.is_null() || env.get_array_length(&out_operation_id).unwrap_or(0) < 1 {
-            return sys::MLN_STATUS_INVALID_ARGUMENT;
+            return jni_invalid_argument("JNI invalid argument");
         }
         let mut operation_id: sys::mln_offline_operation_id = 0;
         let result = start(&mut operation_id);
@@ -3092,7 +3123,7 @@ fn offline_start_with_out(
                 .set_long_array_region(&out_operation_id, 0, &[operation_id as jlong])
                 .is_err()
         {
-            return sys::MLN_STATUS_INVALID_ARGUMENT;
+            return jni_invalid_argument("JNI invalid argument");
         }
         result
     }))
@@ -3111,7 +3142,7 @@ extern "system" fn runtime_poll_event(
 ) -> jint {
     catch_unwind(AssertUnwindSafe(|| {
         if !runtime_event_arrays_are_valid(&env, &longs, &ints, &booleans, &doubles, &strings) {
-            return sys::MLN_STATUS_INVALID_ARGUMENT;
+            return jni_invalid_argument("JNI invalid argument");
         }
 
         let mut event: sys::mln_runtime_event = unsafe { std::mem::zeroed() };
@@ -3140,7 +3171,7 @@ extern "system" fn runtime_poll_event(
             {
                 sys::MLN_STATUS_OK
             } else {
-                sys::MLN_STATUS_INVALID_ARGUMENT
+                jni_invalid_argument("JNI invalid argument")
             };
         }
 
@@ -3172,12 +3203,12 @@ extern "system" fn runtime_poll_event(
             })
             .is_err()
         {
-            return sys::MLN_STATUS_INVALID_ARGUMENT;
+            return jni_invalid_argument("JNI invalid argument");
         }
 
         let payload_string = payload_string(&event);
         if set_string_array_element(&env, &strings, STRING_PAYLOAD, payload_string).is_err() {
-            return sys::MLN_STATUS_INVALID_ARGUMENT;
+            return jni_invalid_argument("JNI invalid argument");
         }
         sys::MLN_STATUS_OK
     }))
@@ -3383,10 +3414,10 @@ extern "system" fn map_create(
 ) -> jint {
     catch_unwind(AssertUnwindSafe(|| {
         if out_map.is_null() || env.get_array_length(&out_map).unwrap_or(0) < 1 {
-            return sys::MLN_STATUS_INVALID_ARGUMENT;
+            return jni_invalid_argument("map output array must contain at least one element");
         }
         if width < 0 || height < 0 {
-            return sys::MLN_STATUS_INVALID_ARGUMENT;
+            return jni_invalid_argument("map width and height must be non-negative");
         }
 
         let mut options = unsafe { sys::mln_map_options_default() };
@@ -3402,7 +3433,7 @@ extern "system" fn map_create(
                 .set_long_array_region(&out_map, 0, &[map as jlong])
                 .is_err()
         {
-            return sys::MLN_STATUS_INVALID_ARGUMENT;
+            return jni_invalid_argument("JNI invalid argument");
         }
         result
     }))
@@ -3454,15 +3485,15 @@ fn map_set_style_string(
 ) -> jint {
     catch_unwind(AssertUnwindSafe(|| {
         if value.is_null() {
-            return sys::MLN_STATUS_INVALID_ARGUMENT;
+            return jni_invalid_argument("JNI invalid argument");
         }
         let java_string = match env.get_string(&value) {
             Ok(value) => value,
-            Err(_) => return sys::MLN_STATUS_INVALID_ARGUMENT,
+            Err(_) => return jni_invalid_argument("JNI invalid argument"),
         };
         let string = match CString::new(String::from(java_string)) {
             Ok(value) => value,
-            Err(_) => return sys::MLN_STATUS_INVALID_ARGUMENT,
+            Err(_) => return jni_invalid_argument("JNI invalid argument"),
         };
         unsafe { setter(map as *mut sys::mln_map, string.as_ptr()) }
     }))
@@ -3609,7 +3640,7 @@ extern "system" fn map_add_custom_geometry_source<'local>(
             || out_state.is_null()
             || env.get_array_length(&out_state).unwrap_or(0) < 1
         {
-            return sys::MLN_STATUS_INVALID_ARGUMENT;
+            return jni_invalid_argument("JNI invalid argument");
         }
         let (source_id_storage, source_id_view) = match string_view(&mut env, &source_id) {
             Ok(value) => value,
@@ -3626,20 +3657,20 @@ extern "system" fn map_add_custom_geometry_source<'local>(
         };
         let callback = match env.new_global_ref(callback) {
             Ok(value) => value,
-            Err(_) => return sys::MLN_STATUS_INVALID_ARGUMENT,
+            Err(_) => return jni_invalid_argument("JNI invalid argument"),
         };
-        let state = Box::new(CustomGeometrySourceState {
-            vm,
-            callback,
-            lifecycle: Mutex::new(CustomGeometrySourceLifecycle {
-                active_callbacks: 0,
-                close_requested: false,
-            }),
-        });
-        let state_ptr = Box::into_raw(state);
+        let state_id = NEXT_CUSTOM_GEOMETRY_SOURCE_STATE_ID.fetch_add(1, Ordering::Relaxed);
+        let state = Arc::new(CustomGeometrySourceState { vm, callback });
+        if CUSTOM_GEOMETRY_SOURCE_STATES
+            .lock()
+            .map(|mut states| states.insert(state_id, state))
+            .is_err()
+        {
+            return sys::MLN_STATUS_NATIVE_ERROR;
+        }
         options.fetch_tile = Some(custom_geometry_source_fetch_tile);
         options.cancel_tile = Some(custom_geometry_source_cancel_tile);
-        options.user_data = state_ptr.cast::<c_void>();
+        options.user_data = state_id as *mut c_void;
         let _keep_alive = source_id_storage;
         let result = unsafe {
             sys::mln_map_add_custom_geometry_source(
@@ -3650,15 +3681,13 @@ extern "system" fn map_add_custom_geometry_source<'local>(
         };
         if result == sys::MLN_STATUS_OK {
             if env
-                .set_long_array_region(&out_state, 0, &[state_ptr as jlong])
+                .set_long_array_region(&out_state, 0, &[state_id as jlong])
                 .is_err()
             {
                 return sys::MLN_STATUS_NATIVE_ERROR;
             }
-        } else {
-            unsafe {
-                drop(Box::from_raw(state_ptr));
-            }
+        } else if let Ok(mut states) = CUSTOM_GEOMETRY_SOURCE_STATES.lock() {
+            states.remove(&state_id);
         }
         result
     }))
@@ -3776,9 +3805,7 @@ extern "system" fn custom_geometry_source_state_destroy(
     if state == 0 {
         return;
     }
-    unsafe {
-        request_custom_geometry_source_state_drop(state as *mut CustomGeometrySourceState);
-    }
+    request_custom_geometry_source_state_drop(state as usize);
 }
 
 unsafe extern "C" fn custom_geometry_source_fetch_tile(
@@ -3803,13 +3830,17 @@ fn custom_geometry_source_tile_callback(
     if user_data.is_null() {
         return;
     }
-    let state = user_data.cast::<CustomGeometrySourceState>();
-    let state_ref = unsafe { &*state };
-    if !enter_custom_geometry_source_callback(state_ref) {
-        return;
-    }
+    let state_id = user_data as usize;
+    let state = match CUSTOM_GEOMETRY_SOURCE_STATES
+        .lock()
+        .ok()
+        .and_then(|states| states.get(&state_id).cloned())
+    {
+        Some(value) => value,
+        None => return,
+    };
     let callback_result = catch_unwind(AssertUnwindSafe(|| {
-        let mut env = match state_ref.vm.attach_current_thread() {
+        let mut env = match state.vm.attach_current_thread() {
             Ok(value) => value,
             Err(_) => return,
         };
@@ -3826,7 +3857,7 @@ fn custom_geometry_source_tile_callback(
             Err(_) => return,
         };
         let _ = env.call_method(
-            state_ref.callback.as_obj(),
+            state.callback.as_obj(),
             method,
             "(Lorg/maplibre/nativejni/geo/CanonicalTileId;)V",
             &[JValue::Object(&tile)],
@@ -3836,55 +3867,14 @@ fn custom_geometry_source_tile_callback(
         }
     }));
     let _ = callback_result;
-    exit_custom_geometry_source_callback(state);
 }
 
-fn enter_custom_geometry_source_callback(state: &CustomGeometrySourceState) -> bool {
-    let Ok(mut lifecycle) = state.lifecycle.lock() else {
-        return false;
-    };
-    if lifecycle.close_requested {
-        return false;
-    }
-    lifecycle.active_callbacks += 1;
-    true
-}
-
-fn exit_custom_geometry_source_callback(state: *mut CustomGeometrySourceState) {
-    let should_drop = unsafe {
-        let state_ref = &*state;
-        let Ok(mut lifecycle) = state_ref.lifecycle.lock() else {
-            return;
-        };
-        lifecycle.active_callbacks = lifecycle.active_callbacks.saturating_sub(1);
-        lifecycle.close_requested && lifecycle.active_callbacks == 0
-    };
-    if should_drop {
-        unsafe {
-            drop(Box::from_raw(state));
-        }
-    }
-}
-
-unsafe fn request_custom_geometry_source_state_drop(state: *mut CustomGeometrySourceState) {
-    if state.is_null() {
+fn request_custom_geometry_source_state_drop(state_id: usize) {
+    if state_id == 0 {
         return;
     }
-    let should_drop = {
-        let state_ref = unsafe { &*state };
-        let Ok(mut lifecycle) = state_ref.lifecycle.lock() else {
-            return;
-        };
-        if lifecycle.close_requested {
-            return;
-        }
-        lifecycle.close_requested = true;
-        lifecycle.active_callbacks == 0
-    };
-    if should_drop {
-        unsafe {
-            drop(Box::from_raw(state));
-        }
+    if let Ok(mut states) = CUSTOM_GEOMETRY_SOURCE_STATES.lock() {
+        states.remove(&state_id);
     }
 }
 
@@ -3898,7 +3888,7 @@ fn read_custom_geometry_source_options(
         || env.get_array_length(fields).unwrap_or(0) < 7
         || env.get_array_length(values).unwrap_or(0) < 7
     {
-        return Err(sys::MLN_STATUS_INVALID_ARGUMENT);
+        return Err(jni_invalid_argument("JNI invalid argument"));
     }
     let mut field_values = [0 as jboolean; 7];
     let mut option_values = [0.0_f64; 7];
@@ -3909,7 +3899,7 @@ fn read_custom_geometry_source_options(
             .get_double_array_region(values, 0, &mut option_values)
             .is_err()
     {
-        return Err(sys::MLN_STATUS_INVALID_ARGUMENT);
+        return Err(jni_invalid_argument("JNI invalid argument"));
     }
     let mut options = unsafe { sys::mln_custom_geometry_source_options_default() };
     if field_values[0] != 0 {
@@ -3925,10 +3915,20 @@ fn read_custom_geometry_source_options(
         options.tolerance = option_values[2];
     }
     if field_values[3] != 0 {
+        if option_values[3] < 0.0 {
+            return Err(jni_invalid_argument(
+                "custom geometry tile size must be non-negative",
+            ));
+        }
         options.fields |= sys::MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TILE_SIZE;
         options.tile_size = option_values[3] as u32;
     }
     if field_values[4] != 0 {
+        if option_values[4] < 0.0 {
+            return Err(jni_invalid_argument(
+                "custom geometry buffer must be non-negative",
+            ));
+        }
         options.fields |= sys::MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_BUFFER;
         options.buffer = option_values[4] as u32;
     }
@@ -3954,7 +3954,7 @@ fn canonical_tile_id(
         || tile_x > u32::MAX as jlong
         || tile_y > u32::MAX as jlong
     {
-        return Err(sys::MLN_STATUS_INVALID_ARGUMENT);
+        return Err(jni_invalid_argument("JNI invalid argument"));
     }
     Ok(sys::mln_canonical_tile_id {
         z: tile_z as u32,
@@ -4113,11 +4113,11 @@ fn map_tile_source_tiles(
 ) -> jint {
     catch_unwind(AssertUnwindSafe(|| {
         if tiles.is_null() {
-            return sys::MLN_STATUS_INVALID_ARGUMENT;
+            return jni_invalid_argument("JNI invalid argument");
         }
         let tile_count = match env.get_array_length(&tiles) {
             Ok(value) if value >= 0 => value as usize,
-            _ => return sys::MLN_STATUS_INVALID_ARGUMENT,
+            _ => return jni_invalid_argument("JNI invalid argument"),
         };
         let (source_id, source_id_view) = match string_view(&mut env, &source_id) {
             Ok(value) => value,
@@ -4137,7 +4137,7 @@ fn map_tile_source_tiles(
         for index in 0..tile_count {
             let tile = match env.get_object_array_element(&tiles, index as i32) {
                 Ok(value) => JString::from(value),
-                Err(_) => return sys::MLN_STATUS_INVALID_ARGUMENT,
+                Err(_) => return jni_invalid_argument("JNI invalid argument"),
             };
             let (tile_storage_value, tile_view) = match string_view(&mut env, &tile) {
                 Ok(value) => value,
@@ -4215,7 +4215,7 @@ fn read_tile_source_options(
         || env.get_array_length(fields).unwrap_or(0) < 8
         || env.get_array_length(values).unwrap_or(0) < 10
     {
-        return Err(sys::MLN_STATUS_INVALID_ARGUMENT);
+        return Err(jni_invalid_argument("JNI invalid argument"));
     }
     let mut field_values = [0 as jboolean; 8];
     let mut option_values = [0.0_f64; 10];
@@ -4226,7 +4226,7 @@ fn read_tile_source_options(
             .get_double_array_region(values, 0, &mut option_values)
             .is_err()
     {
-        return Err(sys::MLN_STATUS_INVALID_ARGUMENT);
+        return Err(jni_invalid_argument("JNI invalid argument"));
     }
     let mut options = unsafe { sys::mln_style_tile_source_options_default() };
     let mut attribution_storage = None;
@@ -4262,6 +4262,11 @@ fn read_tile_source_options(
         };
     }
     if field_values[5] != 0 {
+        if option_values[7] < 0.0 {
+            return Err(jni_invalid_argument(
+                "tile source tile size must be non-negative",
+            ));
+        }
         options.fields |= sys::MLN_STYLE_TILE_SOURCE_OPTION_TILE_SIZE;
         options.tile_size = option_values[7] as u32;
     }
@@ -4349,7 +4354,7 @@ extern "system" fn map_get_style_source_type(
             || env.get_array_length(&out_source_type).unwrap_or(0) < 1
             || env.get_array_length(&out_found).unwrap_or(0) < 1
         {
-            return sys::MLN_STATUS_INVALID_ARGUMENT;
+            return jni_invalid_argument("JNI invalid argument");
         }
         let (source_id, source_id_view) = match string_view(&mut env, &source_id) {
             Ok(value) => value,
@@ -4374,7 +4379,7 @@ extern "system" fn map_get_style_source_type(
                     .set_boolean_array_region(&out_found, 0, &[jboolean::from(found)])
                     .is_err())
         {
-            return sys::MLN_STATUS_INVALID_ARGUMENT;
+            return jni_invalid_argument("JNI invalid argument");
         }
         result
     }))
@@ -4398,7 +4403,7 @@ extern "system" fn map_get_style_source_info(
             || env.get_array_length(&out_flags).unwrap_or(0) < 3
             || env.get_array_length(&out_sizes).unwrap_or(0) < 1
         {
-            return sys::MLN_STATUS_INVALID_ARGUMENT;
+            return jni_invalid_argument("JNI invalid argument");
         }
         let (source_id, source_id_view) = match string_view(&mut env, &source_id) {
             Ok(value) => value,
@@ -4441,7 +4446,7 @@ extern "system" fn map_get_style_source_info(
                     .set_long_array_region(&out_sizes, 0, &[info.attribution_size as jlong])
                     .is_err())
         {
-            return sys::MLN_STATUS_INVALID_ARGUMENT;
+            return jni_invalid_argument("JNI invalid argument");
         }
         result
     }))
@@ -4464,11 +4469,11 @@ extern "system" fn map_copy_style_source_attribution(
             || env.get_array_length(&out_attribution_size).unwrap_or(0) < 1
             || env.get_array_length(&out_found).unwrap_or(0) < 1
         {
-            return sys::MLN_STATUS_INVALID_ARGUMENT;
+            return jni_invalid_argument("JNI invalid argument");
         }
         let capacity = env.get_array_length(&out_attribution).unwrap_or(-1);
         if capacity < 0 {
-            return sys::MLN_STATUS_INVALID_ARGUMENT;
+            return jni_invalid_argument("JNI invalid argument");
         }
         let (source_id, source_id_view) = match string_view(&mut env, &source_id) {
             Ok(value) => value,
@@ -4495,14 +4500,14 @@ extern "system" fn map_copy_style_source_attribution(
         };
         if result == sys::MLN_STATUS_OK {
             if attribution_size > buffer.len() {
-                return sys::MLN_STATUS_INVALID_ARGUMENT;
+                return jni_invalid_argument("JNI invalid argument");
             }
             if attribution_size > 0
                 && env
                     .set_byte_array_region(&out_attribution, 0, &buffer[..attribution_size])
                     .is_err()
             {
-                return sys::MLN_STATUS_INVALID_ARGUMENT;
+                return jni_invalid_argument("JNI invalid argument");
             }
             if env
                 .set_long_array_region(&out_attribution_size, 0, &[attribution_size as jlong])
@@ -4511,7 +4516,7 @@ extern "system" fn map_copy_style_source_attribution(
                     .set_boolean_array_region(&out_found, 0, &[jboolean::from(found)])
                     .is_err()
             {
-                return sys::MLN_STATUS_INVALID_ARGUMENT;
+                return jni_invalid_argument("JNI invalid argument");
             }
         }
         result
@@ -4532,7 +4537,7 @@ fn map_style_source_bool(
 ) -> jint {
     catch_unwind(AssertUnwindSafe(|| {
         if out_value.is_null() || env.get_array_length(&out_value).unwrap_or(0) < 1 {
-            return sys::MLN_STATUS_INVALID_ARGUMENT;
+            return jni_invalid_argument("JNI invalid argument");
         }
         let (source_id, source_id_view) = match string_view(&mut env, &source_id) {
             Ok(value) => value,
@@ -4546,7 +4551,7 @@ fn map_style_source_bool(
                 .set_boolean_array_region(&out_value, 0, &[jboolean::from(value)])
                 .is_err()
         {
-            return sys::MLN_STATUS_INVALID_ARGUMENT;
+            return jni_invalid_argument("JNI invalid argument");
         }
         result
     }))
@@ -4578,18 +4583,18 @@ extern "system" fn map_set_style_image(
 ) -> jint {
     catch_unwind(AssertUnwindSafe(|| {
         if pixels.is_null() || width < 0 || height < 0 || stride < 0 {
-            return sys::MLN_STATUS_INVALID_ARGUMENT;
+            return jni_invalid_argument("JNI invalid argument");
         }
         let pixel_count = match env.get_array_length(&pixels) {
             Ok(value) if value >= 0 => value as usize,
-            _ => return sys::MLN_STATUS_INVALID_ARGUMENT,
+            _ => return jni_invalid_argument("JNI invalid argument"),
         };
         let mut pixel_values = vec![0_i8; pixel_count];
         if env
             .get_byte_array_region(&pixels, 0, &mut pixel_values)
             .is_err()
         {
-            return sys::MLN_STATUS_INVALID_ARGUMENT;
+            return jni_invalid_argument("JNI invalid argument");
         }
         let (image_id_storage, image_id_view) = match string_view(&mut env, &image_id) {
             Ok(value) => value,
@@ -4632,20 +4637,20 @@ fn premultiplied_rgba8_image(
     stride: jint,
 ) -> Result<(sys::mln_premultiplied_rgba8_image, Vec<i8>), jint> {
     if pixels.is_null() || width < 0 || height < 0 || stride < 0 {
-        return Err(sys::MLN_STATUS_INVALID_ARGUMENT);
+        return Err(jni_invalid_argument("JNI invalid argument"));
     }
     let pixel_count = env
         .get_array_length(pixels)
-        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
+        .map_err(|_| jni_invalid_argument("JNI invalid argument"))?;
     if pixel_count < 0 {
-        return Err(sys::MLN_STATUS_INVALID_ARGUMENT);
+        return Err(jni_invalid_argument("JNI invalid argument"));
     }
     let mut pixel_values = vec![0_i8; pixel_count as usize];
     if env
         .get_byte_array_region(pixels, 0, &mut pixel_values)
         .is_err()
     {
-        return Err(sys::MLN_STATUS_INVALID_ARGUMENT);
+        return Err(jni_invalid_argument("JNI invalid argument"));
     }
     let image = sys::mln_premultiplied_rgba8_image {
         size: std::mem::size_of::<sys::mln_premultiplied_rgba8_image>() as u32,
@@ -4707,7 +4712,7 @@ fn map_style_image_bool(
 ) -> jint {
     catch_unwind(AssertUnwindSafe(|| {
         if out_value.is_null() || env.get_array_length(&out_value).unwrap_or(0) < 1 {
-            return sys::MLN_STATUS_INVALID_ARGUMENT;
+            return jni_invalid_argument("JNI invalid argument");
         }
         let (image_id_storage, image_id_view) = match string_view(&mut env, &image_id) {
             Ok(value) => value,
@@ -4721,7 +4726,7 @@ fn map_style_image_bool(
                 .set_boolean_array_region(&out_value, 0, &[jboolean::from(value)])
                 .is_err()
         {
-            return sys::MLN_STATUS_INVALID_ARGUMENT;
+            return jni_invalid_argument("JNI invalid argument");
         }
         result
     }))
@@ -4748,7 +4753,7 @@ extern "system" fn map_get_style_image_info(
             || env.get_array_length(&out_pixel_ratio).unwrap_or(0) < 1
             || env.get_array_length(&out_flags).unwrap_or(0) < 2
         {
-            return sys::MLN_STATUS_INVALID_ARGUMENT;
+            return jni_invalid_argument("JNI invalid argument");
         }
         let (image_id_storage, image_id_view) = match string_view(&mut env, &image_id) {
             Ok(value) => value,
@@ -4787,7 +4792,7 @@ extern "system" fn map_get_style_image_info(
                     )
                     .is_err())
         {
-            return sys::MLN_STATUS_INVALID_ARGUMENT;
+            return jni_invalid_argument("JNI invalid argument");
         }
         result
     }))
@@ -4810,11 +4815,11 @@ extern "system" fn map_copy_style_image_premultiplied_rgba8(
             || env.get_array_length(&out_byte_length).unwrap_or(0) < 1
             || env.get_array_length(&out_found).unwrap_or(0) < 1
         {
-            return sys::MLN_STATUS_INVALID_ARGUMENT;
+            return jni_invalid_argument("JNI invalid argument");
         }
         let capacity = match env.get_array_length(&out_pixels) {
             Ok(value) if value >= 0 => value as usize,
-            _ => return sys::MLN_STATUS_INVALID_ARGUMENT,
+            _ => return jni_invalid_argument("JNI invalid argument"),
         };
         let (image_id_storage, image_id_view) = match string_view(&mut env, &image_id) {
             Ok(value) => value,
@@ -4840,7 +4845,7 @@ extern "system" fn map_copy_style_image_premultiplied_rgba8(
         };
         if result == sys::MLN_STATUS_OK {
             if byte_length > buffer.len() {
-                return sys::MLN_STATUS_INVALID_ARGUMENT;
+                return jni_invalid_argument("JNI invalid argument");
             }
             if byte_length > 0 {
                 let signed_pixels: Vec<i8> = buffer[..byte_length]
@@ -4852,7 +4857,7 @@ extern "system" fn map_copy_style_image_premultiplied_rgba8(
                     .set_byte_array_region(&out_pixels, 0, &signed_pixels)
                     .is_err()
                 {
-                    return sys::MLN_STATUS_INVALID_ARGUMENT;
+                    return jni_invalid_argument("JNI invalid argument");
                 }
             }
             if env
@@ -4862,7 +4867,7 @@ extern "system" fn map_copy_style_image_premultiplied_rgba8(
                     .set_boolean_array_region(&out_found, 0, &[jboolean::from(found)])
                     .is_err()
             {
-                return sys::MLN_STATUS_INVALID_ARGUMENT;
+                return jni_invalid_argument("JNI invalid argument");
             }
         }
         result
@@ -5049,11 +5054,11 @@ extern "system" fn map_get_image_source_coordinates(
             || env.get_array_length(&out_coordinate_count).unwrap_or(0) < 1
             || env.get_array_length(&out_found).unwrap_or(0) < 1
         {
-            return sys::MLN_STATUS_INVALID_ARGUMENT;
+            return jni_invalid_argument("JNI invalid argument");
         }
         let capacity_values = match env.get_array_length(&out_coordinates) {
             Ok(value) if value >= 0 && value % 2 == 0 => value as usize,
-            _ => return sys::MLN_STATUS_INVALID_ARGUMENT,
+            _ => return jni_invalid_argument("JNI invalid argument"),
         };
         let coordinate_capacity = capacity_values / 2;
         let (source_id_storage, source_id_view) = match string_view(&mut env, &source_id) {
@@ -5086,7 +5091,7 @@ extern "system" fn map_get_image_source_coordinates(
         };
         if result == sys::MLN_STATUS_OK {
             if coordinate_count > coordinates.len() {
-                return sys::MLN_STATUS_INVALID_ARGUMENT;
+                return jni_invalid_argument("JNI invalid argument");
             }
             let mut values = vec![0.0_f64; coordinate_count * 2];
             for (index, coordinate) in coordinates.iter().take(coordinate_count).enumerate() {
@@ -5104,7 +5109,7 @@ extern "system" fn map_get_image_source_coordinates(
                     .set_boolean_array_region(&out_found, 0, &[jboolean::from(found)])
                     .is_err()
             {
-                return sys::MLN_STATUS_INVALID_ARGUMENT;
+                return jni_invalid_argument("JNI invalid argument");
             }
         }
         result
@@ -5506,7 +5511,7 @@ extern "system" fn map_get_style_layer_json<'local>(
             || env.get_array_length(&out_json).unwrap_or(0) < 1
             || env.get_array_length(&out_found).unwrap_or(0) < 1
         {
-            return sys::MLN_STATUS_INVALID_ARGUMENT;
+            return jni_invalid_argument("JNI invalid argument");
         }
         let (_layer_id, layer_id) = match string_view(&mut env, &layer_id) {
             Ok(value) => value,
@@ -5529,7 +5534,7 @@ extern "system" fn map_get_style_layer_json<'local>(
             .set_boolean_array_region(&out_found, 0, &[jboolean::from(found)])
             .is_err()
         {
-            return sys::MLN_STATUS_INVALID_ARGUMENT;
+            return jni_invalid_argument("JNI invalid argument");
         }
         if found {
             copy_json_snapshot_to_array(&mut env, snapshot, &out_json)
@@ -5648,7 +5653,7 @@ fn map_style_layer_bool(
 ) -> jint {
     catch_unwind(AssertUnwindSafe(|| {
         if out_value.is_null() || env.get_array_length(&out_value).unwrap_or(0) < 1 {
-            return sys::MLN_STATUS_INVALID_ARGUMENT;
+            return jni_invalid_argument("JNI invalid argument");
         }
         let (layer_id, layer_id_view) = match string_view(&mut env, &layer_id) {
             Ok(value) => value,
@@ -5662,7 +5667,7 @@ fn map_style_layer_bool(
                 .set_boolean_array_region(&out_value, 0, &[jboolean::from(value)])
                 .is_err()
         {
-            return sys::MLN_STATUS_INVALID_ARGUMENT;
+            return jni_invalid_argument("JNI invalid argument");
         }
         result
     }))
@@ -5683,7 +5688,7 @@ extern "system" fn map_get_style_layer_type(
             || env.get_array_length(&out_layer_type).unwrap_or(0) < 1
             || env.get_array_length(&out_found).unwrap_or(0) < 1
         {
-            return sys::MLN_STATUS_INVALID_ARGUMENT;
+            return jni_invalid_argument("JNI invalid argument");
         }
         let (layer_id, layer_id_view) = match string_view(&mut env, &layer_id) {
             Ok(value) => value,
@@ -5710,12 +5715,12 @@ extern "system" fn map_get_style_layer_type(
             .set_boolean_array_region(&out_found, 0, &[jboolean::from(found)])
             .is_err()
         {
-            return sys::MLN_STATUS_INVALID_ARGUMENT;
+            return jni_invalid_argument("JNI invalid argument");
         }
         if found {
             let layer_type = unsafe { copy_string(layer_type.data, layer_type.size) };
             if set_string_array_element(&env, &out_layer_type, 0, layer_type).is_err() {
-                return sys::MLN_STATUS_INVALID_ARGUMENT;
+                return jni_invalid_argument("JNI invalid argument");
             }
         }
         sys::MLN_STATUS_OK
@@ -5734,7 +5739,7 @@ fn map_list_style_ids(
 ) -> jint {
     catch_unwind(AssertUnwindSafe(|| {
         if out_ids.is_null() || env.get_array_length(&out_ids).unwrap_or(0) < 1 {
-            return sys::MLN_STATUS_INVALID_ARGUMENT;
+            return jni_invalid_argument("JNI invalid argument");
         }
         let mut list: *mut sys::mln_style_id_list = std::ptr::null_mut();
         let result = unsafe { list_function(map as *mut sys::mln_map, &mut list) };
@@ -5749,11 +5754,11 @@ fn map_list_style_ids(
         }
         let string_class = match env.find_class("java/lang/String") {
             Ok(value) => value,
-            Err(_) => return sys::MLN_STATUS_INVALID_ARGUMENT,
+            Err(_) => return jni_invalid_argument("JNI invalid argument"),
         };
         let ids = match env.new_object_array(count as i32, string_class, JObject::null()) {
             Ok(value) => value,
-            Err(_) => return sys::MLN_STATUS_INVALID_ARGUMENT,
+            Err(_) => return jni_invalid_argument("JNI invalid argument"),
         };
         for index in 0..count {
             let mut id = sys::mln_string_view {
@@ -5769,11 +5774,11 @@ fn map_list_style_ids(
             })
             .is_err()
             {
-                return sys::MLN_STATUS_INVALID_ARGUMENT;
+                return jni_invalid_argument("JNI invalid argument");
             }
         }
         if env.set_object_array_element(&out_ids, 0, &ids).is_err() {
-            sys::MLN_STATUS_INVALID_ARGUMENT
+            jni_invalid_argument("JNI invalid argument")
         } else {
             sys::MLN_STATUS_OK
         }
@@ -5795,7 +5800,7 @@ fn copy_json_snapshot_property_to_array<'local>(
     get_snapshot: impl FnOnce(*mut *mut sys::mln_json_snapshot) -> sys::mln_status,
 ) -> jint {
     if out_json.is_null() || env.get_array_length(out_json).unwrap_or(0) < 1 {
-        return sys::MLN_STATUS_INVALID_ARGUMENT;
+        return jni_invalid_argument("JNI invalid argument");
     }
     let mut snapshot: *mut sys::mln_json_snapshot = std::ptr::null_mut();
     let result = get_snapshot(&mut snapshot);
@@ -5813,7 +5818,7 @@ fn copy_json_snapshot_to_array<'local>(
     let value = unsafe { core_json::copy_json_snapshot(NonNull::new(snapshot)) };
     let value = match value {
         Ok(value) => value,
-        Err(_) => return sys::MLN_STATUS_INVALID_ARGUMENT,
+        Err(_) => return jni_invalid_argument("JNI invalid argument"),
     };
     let Some(value) = value else {
         return sys::MLN_STATUS_OK;
@@ -5823,7 +5828,7 @@ fn copy_json_snapshot_to_array<'local>(
         Err(status) => return status,
     };
     if env.set_object_array_element(out_json, 0, value).is_err() {
-        sys::MLN_STATUS_INVALID_ARGUMENT
+        jni_invalid_argument("JNI invalid argument")
     } else {
         sys::MLN_STATUS_OK
     }
@@ -5841,45 +5846,45 @@ fn java_json_value_object<'local>(
                 "Lorg/maplibre/nativejni/json/JsonValue$Null;",
             )
             .and_then(|value| value.l())
-            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT),
+            .map_err(|_| jni_invalid_argument("JNI invalid argument")),
         core_json::JsonValue::Bool(value) => env
             .new_object(
                 "org/maplibre/nativejni/json/JsonValue$Bool",
                 "(Z)V",
                 &[JValue::Bool(jboolean::from(*value))],
             )
-            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT),
+            .map_err(|_| jni_invalid_argument("JNI invalid argument")),
         core_json::JsonValue::UInt(value) => env
             .new_object(
                 "org/maplibre/nativejni/json/JsonValue$UInt",
                 "(J)V",
                 &[JValue::Long(*value as jlong)],
             )
-            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT),
+            .map_err(|_| jni_invalid_argument("JNI invalid argument")),
         core_json::JsonValue::Int(value) => env
             .new_object(
                 "org/maplibre/nativejni/json/JsonValue$Int",
                 "(J)V",
                 &[JValue::Long(*value as jlong)],
             )
-            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT),
+            .map_err(|_| jni_invalid_argument("JNI invalid argument")),
         core_json::JsonValue::Double(value) => env
             .new_object(
                 "org/maplibre/nativejni/json/JsonValue$DoubleValue",
                 "(D)V",
                 &[JValue::Double(*value)],
             )
-            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT),
+            .map_err(|_| jni_invalid_argument("JNI invalid argument")),
         core_json::JsonValue::String(value) => {
             let value = env
                 .new_string(value)
-                .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
+                .map_err(|_| jni_invalid_argument("JNI invalid argument"))?;
             env.new_object(
                 "org/maplibre/nativejni/json/JsonValue$StringValue",
                 "(Ljava/lang/String;)V",
                 &[JValue::Object(&value)],
             )
-            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)
+            .map_err(|_| jni_invalid_argument("JNI invalid argument"))
         }
         core_json::JsonValue::Array(values) => {
             let list = java_array_list(env)?;
@@ -5892,14 +5897,14 @@ fn java_json_value_object<'local>(
                 "(Ljava/util/List;)V",
                 &[JValue::Object(&list)],
             )
-            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)
+            .map_err(|_| jni_invalid_argument("JNI invalid argument"))
         }
         core_json::JsonValue::Object(members) => {
             let list = java_array_list(env)?;
             for member in members {
                 let key = env
                     .new_string(&member.key)
-                    .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
+                    .map_err(|_| jni_invalid_argument("JNI invalid argument"))?;
                 let value = java_json_value_object(env, &member.value)?;
                 let member = env
                     .new_object(
@@ -5907,7 +5912,7 @@ fn java_json_value_object<'local>(
                         "(Ljava/lang/String;Lorg/maplibre/nativejni/json/JsonValue;)V",
                         &[JValue::Object(&key), JValue::Object(&value)],
                     )
-                    .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
+                    .map_err(|_| jni_invalid_argument("JNI invalid argument"))?;
                 java_array_list_add(env, &list, &member)?;
             }
             env.new_object(
@@ -5915,15 +5920,15 @@ fn java_json_value_object<'local>(
                 "(Ljava/util/List;)V",
                 &[JValue::Object(&list)],
             )
-            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)
+            .map_err(|_| jni_invalid_argument("JNI invalid argument"))
         }
-        _ => Err(sys::MLN_STATUS_INVALID_ARGUMENT),
+        _ => Err(jni_invalid_argument("JNI invalid argument")),
     }
 }
 
 fn java_array_list<'local>(env: &mut JNIEnv<'local>) -> Result<JObject<'local>, jint> {
     env.new_object("java/util/ArrayList", "()V", &[])
-        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)
+        .map_err(|_| jni_invalid_argument("JNI invalid argument"))
 }
 
 fn java_array_list_add<'local>(
@@ -5938,7 +5943,7 @@ fn java_array_list_add<'local>(
         &[JValue::Object(value)],
     )
     .map(|_| ())
-    .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)
+    .map_err(|_| jni_invalid_argument("JNI invalid argument"))
 }
 
 fn java_native_json_value<'local>(
@@ -5946,7 +5951,8 @@ fn java_native_json_value<'local>(
     value: &JObject<'local>,
 ) -> Result<core_json::NativeJsonValue, jint> {
     let value = java_json_value(env, value, 0)?;
-    core_json::json_value_try_to_native(&value).map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)
+    core_json::json_value_try_to_native(&value)
+        .map_err(|_| jni_invalid_argument("JNI invalid argument"))
 }
 
 fn java_json_value<'local>(
@@ -5955,82 +5961,82 @@ fn java_json_value<'local>(
     depth: usize,
 ) -> Result<core_json::JsonValue, jint> {
     if value.is_null() || depth > core_json::MAX_JSON_DESCRIPTOR_DEPTH {
-        return Err(sys::MLN_STATUS_INVALID_ARGUMENT);
+        return Err(jni_invalid_argument("JNI invalid argument"));
     }
     if env
         .is_instance_of(value, "org/maplibre/nativejni/json/JsonValue$Null")
-        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?
+        .map_err(|_| jni_invalid_argument("JNI invalid argument"))?
     {
         return Ok(core_json::JsonValue::Null);
     }
     if env
         .is_instance_of(value, "org/maplibre/nativejni/json/JsonValue$Bool")
-        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?
+        .map_err(|_| jni_invalid_argument("JNI invalid argument"))?
     {
         return env
             .call_method(value, "value", "()Z", &[])
             .and_then(|value| value.z())
             .map(core_json::JsonValue::Bool)
-            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT);
+            .map_err(|_| jni_invalid_argument("JNI invalid argument"));
     }
     if env
         .is_instance_of(value, "org/maplibre/nativejni/json/JsonValue$UInt")
-        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?
+        .map_err(|_| jni_invalid_argument("JNI invalid argument"))?
     {
         return env
             .call_method(value, "value", "()J", &[])
             .and_then(|value| value.j())
             .map(|value| core_json::JsonValue::UInt(value as u64))
-            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT);
+            .map_err(|_| jni_invalid_argument("JNI invalid argument"));
     }
     if env
         .is_instance_of(value, "org/maplibre/nativejni/json/JsonValue$Int")
-        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?
+        .map_err(|_| jni_invalid_argument("JNI invalid argument"))?
     {
         return env
             .call_method(value, "value", "()J", &[])
             .and_then(|value| value.j())
             .map(core_json::JsonValue::Int)
-            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT);
+            .map_err(|_| jni_invalid_argument("JNI invalid argument"));
     }
     if env
         .is_instance_of(value, "org/maplibre/nativejni/json/JsonValue$DoubleValue")
-        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?
+        .map_err(|_| jni_invalid_argument("JNI invalid argument"))?
     {
         return env
             .call_method(value, "value", "()D", &[])
             .and_then(|value| value.d())
             .map(core_json::JsonValue::Double)
-            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT);
+            .map_err(|_| jni_invalid_argument("JNI invalid argument"));
     }
     if env
         .is_instance_of(value, "org/maplibre/nativejni/json/JsonValue$StringValue")
-        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?
+        .map_err(|_| jni_invalid_argument("JNI invalid argument"))?
     {
         return java_string_method(env, value, "value").map(core_json::JsonValue::String);
     }
     if env
         .is_instance_of(value, "org/maplibre/nativejni/json/JsonValue$Array")
-        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?
+        .map_err(|_| jni_invalid_argument("JNI invalid argument"))?
     {
         let list = env
             .call_method(value, "values", "()Ljava/util/List;", &[])
             .and_then(|value| value.l())
-            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
+            .map_err(|_| jni_invalid_argument("JNI invalid argument"))?;
         let values = java_json_list(env, &list, depth + 1)?;
         return Ok(core_json::JsonValue::Array(values));
     }
     if env
         .is_instance_of(value, "org/maplibre/nativejni/json/JsonValue$ObjectValue")
-        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?
+        .map_err(|_| jni_invalid_argument("JNI invalid argument"))?
     {
         let list = env
             .call_method(value, "members", "()Ljava/util/List;", &[])
             .and_then(|value| value.l())
-            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
+            .map_err(|_| jni_invalid_argument("JNI invalid argument"))?;
         return java_json_members_list(env, &list, depth + 1).map(core_json::JsonValue::Object);
     }
-    Err(sys::MLN_STATUS_INVALID_ARGUMENT)
+    Err(jni_invalid_argument("JNI invalid argument"))
 }
 
 fn java_json_list<'local>(
@@ -6065,7 +6071,7 @@ fn java_json_members_list<'local>(
                 &[],
             )
             .and_then(|value| value.l())
-            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
+            .map_err(|_| jni_invalid_argument("JNI invalid argument"))?;
         members.push(core_json::JsonMember::new(
             key,
             java_json_value(env, &member_value, depth)?,
@@ -6080,14 +6086,14 @@ fn java_offline_region_info_array<'local>(
 ) -> Result<JObjectArray<'local>, jint> {
     let class = env
         .find_class("org/maplibre/nativejni/offline/OfflineRegionInfo")
-        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
+        .map_err(|_| jni_invalid_argument("JNI invalid argument"))?;
     let array = env
         .new_object_array(regions.len() as i32, class, JObject::null())
-        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
+        .map_err(|_| jni_invalid_argument("JNI invalid argument"))?;
     for (index, region) in regions.iter().enumerate() {
         let region = java_offline_region_info_object(env, region)?;
         env.set_object_array_element(&array, index as i32, region)
-            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
+            .map_err(|_| jni_invalid_argument("JNI invalid argument"))?;
     }
     Ok(array)
 }
@@ -6099,7 +6105,7 @@ fn java_offline_region_info_object<'local>(
     let definition = java_offline_region_definition_object(env, &region.definition)?;
     let metadata = env
         .byte_array_from_slice(&region.metadata)
-        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
+        .map_err(|_| jni_invalid_argument("JNI invalid argument"))?;
     env.new_object(
         "org/maplibre/nativejni/offline/OfflineRegionInfo",
         "(JLorg/maplibre/nativejni/offline/OfflineRegionDefinition;[B)V",
@@ -6109,7 +6115,7 @@ fn java_offline_region_info_object<'local>(
             JValue::Object(&metadata),
         ],
     )
-    .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)
+    .map_err(|_| jni_invalid_argument("JNI invalid argument"))
 }
 
 fn java_offline_region_definition_object<'local>(
@@ -6127,7 +6133,7 @@ fn java_offline_region_definition_object<'local>(
         } => {
             let style_url = env
                 .new_string(style_url)
-                .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
+                .map_err(|_| jni_invalid_argument("JNI invalid argument"))?;
             let bounds = java_lat_lng_bounds_object(env, bounds)?;
             env.new_object(
                 "org/maplibre/nativejni/offline/OfflineRegionDefinition$TilePyramid",
@@ -6141,7 +6147,7 @@ fn java_offline_region_definition_object<'local>(
                     JValue::Bool(jboolean::from(*include_ideographs)),
                 ],
             )
-            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)
+            .map_err(|_| jni_invalid_argument("JNI invalid argument"))
         }
         core_runtime::OfflineRegionDefinition::GeometryRegion {
             style_url,
@@ -6153,7 +6159,7 @@ fn java_offline_region_definition_object<'local>(
         } => {
             let style_url = env
                 .new_string(style_url)
-                .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
+                .map_err(|_| jni_invalid_argument("JNI invalid argument"))?;
             let geometry = java_geometry_object(env, geometry)?;
             env.new_object(
                 "org/maplibre/nativejni/offline/OfflineRegionDefinition$GeometryRegion",
@@ -6167,9 +6173,9 @@ fn java_offline_region_definition_object<'local>(
                     JValue::Bool(jboolean::from(*include_ideographs)),
                 ],
             )
-            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)
+            .map_err(|_| jni_invalid_argument("JNI invalid argument"))
         }
-        _ => Err(sys::MLN_STATUS_INVALID_ARGUMENT),
+        _ => Err(jni_invalid_argument("JNI invalid argument")),
     }
 }
 
@@ -6185,7 +6191,7 @@ fn java_lat_lng_object<'local>(
             JValue::Double(coordinate.longitude),
         ],
     )
-    .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)
+    .map_err(|_| jni_invalid_argument("JNI invalid argument"))
 }
 
 fn java_lat_lng_bounds_object<'local>(
@@ -6199,7 +6205,7 @@ fn java_lat_lng_bounds_object<'local>(
         "(Lorg/maplibre/nativejni/geo/LatLng;Lorg/maplibre/nativejni/geo/LatLng;)V",
         &[JValue::Object(&southwest), JValue::Object(&northeast)],
     )
-    .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)
+    .map_err(|_| jni_invalid_argument("JNI invalid argument"))
 }
 
 fn java_geometry_object<'local>(
@@ -6214,7 +6220,7 @@ fn java_geometry_object<'local>(
                 "Lorg/maplibre/nativejni/geo/Geometry$Empty;",
             )
             .and_then(|value| value.l())
-            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT),
+            .map_err(|_| jni_invalid_argument("JNI invalid argument")),
         core_geometry::Geometry::Point(coordinate) => {
             let coordinate = java_lat_lng_object(env, *coordinate)?;
             env.new_object(
@@ -6222,7 +6228,7 @@ fn java_geometry_object<'local>(
                 "(Lorg/maplibre/nativejni/geo/LatLng;)V",
                 &[JValue::Object(&coordinate)],
             )
-            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)
+            .map_err(|_| jni_invalid_argument("JNI invalid argument"))
         }
         core_geometry::Geometry::LineString(coordinates) => {
             let coordinates = java_lat_lng_object_list(env, coordinates)?;
@@ -6231,7 +6237,7 @@ fn java_geometry_object<'local>(
                 "(Ljava/util/List;)V",
                 &[JValue::Object(&coordinates)],
             )
-            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)
+            .map_err(|_| jni_invalid_argument("JNI invalid argument"))
         }
         core_geometry::Geometry::Polygon(rings) => {
             let rings = java_nested_lat_lng_object_list(env, rings)?;
@@ -6240,7 +6246,7 @@ fn java_geometry_object<'local>(
                 "(Ljava/util/List;)V",
                 &[JValue::Object(&rings)],
             )
-            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)
+            .map_err(|_| jni_invalid_argument("JNI invalid argument"))
         }
         core_geometry::Geometry::MultiPoint(coordinates) => {
             let coordinates = java_lat_lng_object_list(env, coordinates)?;
@@ -6249,7 +6255,7 @@ fn java_geometry_object<'local>(
                 "(Ljava/util/List;)V",
                 &[JValue::Object(&coordinates)],
             )
-            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)
+            .map_err(|_| jni_invalid_argument("JNI invalid argument"))
         }
         core_geometry::Geometry::MultiLineString(lines) => {
             let lines = java_nested_lat_lng_object_list(env, lines)?;
@@ -6258,7 +6264,7 @@ fn java_geometry_object<'local>(
                 "(Ljava/util/List;)V",
                 &[JValue::Object(&lines)],
             )
-            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)
+            .map_err(|_| jni_invalid_argument("JNI invalid argument"))
         }
         core_geometry::Geometry::MultiPolygon(polygons) => {
             let polygons = java_deep_lat_lng_object_list(env, polygons)?;
@@ -6267,7 +6273,7 @@ fn java_geometry_object<'local>(
                 "(Ljava/util/List;)V",
                 &[JValue::Object(&polygons)],
             )
-            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)
+            .map_err(|_| jni_invalid_argument("JNI invalid argument"))
         }
         core_geometry::Geometry::GeometryCollection(geometries) => {
             let list = java_array_list(env)?;
@@ -6280,9 +6286,9 @@ fn java_geometry_object<'local>(
                 "(Ljava/util/List;)V",
                 &[JValue::Object(&list)],
             )
-            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)
+            .map_err(|_| jni_invalid_argument("JNI invalid argument"))
         }
-        _ => Err(sys::MLN_STATUS_INVALID_ARGUMENT),
+        _ => Err(jni_invalid_argument("JNI invalid argument")),
     }
 }
 
@@ -6327,7 +6333,8 @@ fn java_native_geojson<'local>(
     value: &JObject<'local>,
 ) -> Result<core_geojson::NativeGeoJson, jint> {
     let value = java_geojson(env, value)?;
-    core_geojson::geojson_try_to_native(&value).map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)
+    core_geojson::geojson_try_to_native(&value)
+        .map_err(|_| jni_invalid_argument("JNI invalid argument"))
 }
 
 fn java_geojson<'local>(
@@ -6335,11 +6342,11 @@ fn java_geojson<'local>(
     value: &JObject<'local>,
 ) -> Result<core_geojson::GeoJson, jint> {
     if value.is_null() {
-        return Err(sys::MLN_STATUS_INVALID_ARGUMENT);
+        return Err(jni_invalid_argument("JNI invalid argument"));
     }
     if env
         .is_instance_of(value, "org/maplibre/nativejni/geo/GeoJson$GeometryValue")
-        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?
+        .map_err(|_| jni_invalid_argument("JNI invalid argument"))?
     {
         let geometry = env
             .call_method(
@@ -6349,12 +6356,12 @@ fn java_geojson<'local>(
                 &[],
             )
             .and_then(|value| value.l())
-            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
+            .map_err(|_| jni_invalid_argument("JNI invalid argument"))?;
         return java_geometry(env, &geometry, 0).map(core_geojson::GeoJson::Geometry);
     }
     if env
         .is_instance_of(value, "org/maplibre/nativejni/geo/GeoJson$FeatureValue")
-        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?
+        .map_err(|_| jni_invalid_argument("JNI invalid argument"))?
     {
         let feature = env
             .call_method(
@@ -6364,7 +6371,7 @@ fn java_geojson<'local>(
                 &[],
             )
             .and_then(|value| value.l())
-            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
+            .map_err(|_| jni_invalid_argument("JNI invalid argument"))?;
         return java_feature(env, &feature, 0).map(core_geojson::GeoJson::Feature);
     }
     if env
@@ -6372,7 +6379,7 @@ fn java_geojson<'local>(
             value,
             "org/maplibre/nativejni/geo/GeoJson$FeatureCollection",
         )
-        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?
+        .map_err(|_| jni_invalid_argument("JNI invalid argument"))?
     {
         let features = java_object_list_method(env, value, "features")?;
         let size = java_list_size(env, &features)?;
@@ -6383,7 +6390,7 @@ fn java_geojson<'local>(
         }
         return Ok(core_geojson::GeoJson::FeatureCollection(values));
     }
-    Err(sys::MLN_STATUS_INVALID_ARGUMENT)
+    Err(jni_invalid_argument("JNI invalid argument"))
 }
 
 fn java_feature<'local>(
@@ -6392,7 +6399,7 @@ fn java_feature<'local>(
     depth: usize,
 ) -> Result<core_geojson::Feature, jint> {
     if value.is_null() {
-        return Err(sys::MLN_STATUS_INVALID_ARGUMENT);
+        return Err(jni_invalid_argument("JNI invalid argument"));
     }
     let geometry = env
         .call_method(
@@ -6402,7 +6409,7 @@ fn java_feature<'local>(
             &[],
         )
         .and_then(|value| value.l())
-        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
+        .map_err(|_| jni_invalid_argument("JNI invalid argument"))?;
     let properties = java_object_list_method(env, value, "properties")?;
     let identifier = env
         .call_method(
@@ -6412,7 +6419,7 @@ fn java_feature<'local>(
             &[],
         )
         .and_then(|value| value.l())
-        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
+        .map_err(|_| jni_invalid_argument("JNI invalid argument"))?;
     Ok(core_geojson::Feature::new(
         java_geometry(env, &geometry, depth + 1)?,
         java_json_members_list(env, &properties, depth + 1)?,
@@ -6427,54 +6434,54 @@ fn java_feature_identifier<'local>(
     if value.is_null()
         || env
             .is_instance_of(value, "org/maplibre/nativejni/geo/FeatureIdentifier$Null")
-            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?
+            .map_err(|_| jni_invalid_argument("JNI invalid argument"))?
     {
         return Ok(core_geojson::FeatureIdentifier::Null);
     }
     if env
         .is_instance_of(value, "org/maplibre/nativejni/geo/FeatureIdentifier$UInt")
-        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?
+        .map_err(|_| jni_invalid_argument("JNI invalid argument"))?
     {
         return env
             .call_method(value, "value", "()J", &[])
             .and_then(|value| value.j())
             .map(|value| core_geojson::FeatureIdentifier::UInt(value as u64))
-            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT);
+            .map_err(|_| jni_invalid_argument("JNI invalid argument"));
     }
     if env
         .is_instance_of(value, "org/maplibre/nativejni/geo/FeatureIdentifier$Int")
-        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?
+        .map_err(|_| jni_invalid_argument("JNI invalid argument"))?
     {
         return env
             .call_method(value, "value", "()J", &[])
             .and_then(|value| value.j())
             .map(core_geojson::FeatureIdentifier::Int)
-            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT);
+            .map_err(|_| jni_invalid_argument("JNI invalid argument"));
     }
     if env
         .is_instance_of(
             value,
             "org/maplibre/nativejni/geo/FeatureIdentifier$DoubleValue",
         )
-        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?
+        .map_err(|_| jni_invalid_argument("JNI invalid argument"))?
     {
         return env
             .call_method(value, "value", "()D", &[])
             .and_then(|value| value.d())
             .map(core_geojson::FeatureIdentifier::Double)
-            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT);
+            .map_err(|_| jni_invalid_argument("JNI invalid argument"));
     }
     if env
         .is_instance_of(
             value,
             "org/maplibre/nativejni/geo/FeatureIdentifier$StringValue",
         )
-        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?
+        .map_err(|_| jni_invalid_argument("JNI invalid argument"))?
     {
         return java_string_method(env, value, "value")
             .map(core_geojson::FeatureIdentifier::String);
     }
-    Err(sys::MLN_STATUS_INVALID_ARGUMENT)
+    Err(jni_invalid_argument("JNI invalid argument"))
 }
 
 fn java_native_geometry<'local>(
@@ -6482,7 +6489,8 @@ fn java_native_geometry<'local>(
     value: &JObject<'local>,
 ) -> Result<core_geometry::NativeGeometry, jint> {
     let value = java_geometry(env, value, 0)?;
-    core_geometry::geometry_try_to_native(&value).map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)
+    core_geometry::geometry_try_to_native(&value)
+        .map_err(|_| jni_invalid_argument("JNI invalid argument"))
 }
 
 fn java_geometry<'local>(
@@ -6491,17 +6499,17 @@ fn java_geometry<'local>(
     depth: usize,
 ) -> Result<core_geometry::Geometry, jint> {
     if value.is_null() || depth > core_geometry::MAX_GEOMETRY_COLLECTION_DEPTH {
-        return Err(sys::MLN_STATUS_INVALID_ARGUMENT);
+        return Err(jni_invalid_argument("JNI invalid argument"));
     }
     if env
         .is_instance_of(value, "org/maplibre/nativejni/geo/Geometry$Empty")
-        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?
+        .map_err(|_| jni_invalid_argument("JNI invalid argument"))?
     {
         return Ok(core_geometry::Geometry::Empty);
     }
     if env
         .is_instance_of(value, "org/maplibre/nativejni/geo/Geometry$Point")
-        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?
+        .map_err(|_| jni_invalid_argument("JNI invalid argument"))?
     {
         let coordinate = env
             .call_method(
@@ -6511,47 +6519,47 @@ fn java_geometry<'local>(
                 &[],
             )
             .and_then(|value| value.l())
-            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
+            .map_err(|_| jni_invalid_argument("JNI invalid argument"))?;
         return java_lat_lng(env, &coordinate).map(core_geometry::Geometry::Point);
     }
     if env
         .is_instance_of(value, "org/maplibre/nativejni/geo/Geometry$LineString")
-        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?
+        .map_err(|_| jni_invalid_argument("JNI invalid argument"))?
     {
         let coordinates = java_object_list_method(env, value, "coordinates")?;
         return java_lat_lng_list(env, &coordinates).map(core_geometry::Geometry::LineString);
     }
     if env
         .is_instance_of(value, "org/maplibre/nativejni/geo/Geometry$Polygon")
-        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?
+        .map_err(|_| jni_invalid_argument("JNI invalid argument"))?
     {
         let rings = java_object_list_method(env, value, "rings")?;
         return java_lat_lng_nested_list(env, &rings).map(core_geometry::Geometry::Polygon);
     }
     if env
         .is_instance_of(value, "org/maplibre/nativejni/geo/Geometry$MultiPoint")
-        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?
+        .map_err(|_| jni_invalid_argument("JNI invalid argument"))?
     {
         let coordinates = java_object_list_method(env, value, "coordinates")?;
         return java_lat_lng_list(env, &coordinates).map(core_geometry::Geometry::MultiPoint);
     }
     if env
         .is_instance_of(value, "org/maplibre/nativejni/geo/Geometry$MultiLineString")
-        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?
+        .map_err(|_| jni_invalid_argument("JNI invalid argument"))?
     {
         let lines = java_object_list_method(env, value, "lines")?;
         return java_lat_lng_nested_list(env, &lines).map(core_geometry::Geometry::MultiLineString);
     }
     if env
         .is_instance_of(value, "org/maplibre/nativejni/geo/Geometry$MultiPolygon")
-        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?
+        .map_err(|_| jni_invalid_argument("JNI invalid argument"))?
     {
         let polygons = java_object_list_method(env, value, "polygons")?;
         return java_lat_lng_deep_list(env, &polygons).map(core_geometry::Geometry::MultiPolygon);
     }
     if env
         .is_instance_of(value, "org/maplibre/nativejni/geo/Geometry$Collection")
-        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?
+        .map_err(|_| jni_invalid_argument("JNI invalid argument"))?
     {
         let geometries = java_object_list_method(env, value, "geometries")?;
         let size = java_list_size(env, &geometries)?;
@@ -6562,7 +6570,7 @@ fn java_geometry<'local>(
         }
         return Ok(core_geometry::Geometry::GeometryCollection(values));
     }
-    Err(sys::MLN_STATUS_INVALID_ARGUMENT)
+    Err(jni_invalid_argument("JNI invalid argument"))
 }
 
 fn java_lat_lng<'local>(
@@ -6570,16 +6578,16 @@ fn java_lat_lng<'local>(
     value: &JObject<'local>,
 ) -> Result<CoreLatLng, jint> {
     if value.is_null() {
-        return Err(sys::MLN_STATUS_INVALID_ARGUMENT);
+        return Err(jni_invalid_argument("JNI invalid argument"));
     }
     let latitude = env
         .call_method(value, "latitude", "()D", &[])
         .and_then(|value| value.d())
-        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
+        .map_err(|_| jni_invalid_argument("JNI invalid argument"))?;
     let longitude = env
         .call_method(value, "longitude", "()D", &[])
         .and_then(|value| value.d())
-        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
+        .map_err(|_| jni_invalid_argument("JNI invalid argument"))?;
     Ok(CoreLatLng::new(latitude, longitude))
 }
 
@@ -6629,19 +6637,19 @@ fn java_object_list_method<'local>(
 ) -> Result<JObject<'local>, jint> {
     env.call_method(value, method, "()Ljava/util/List;", &[])
         .and_then(|value| value.l())
-        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)
+        .map_err(|_| jni_invalid_argument("JNI invalid argument"))
 }
 
 fn java_list_size<'local>(env: &mut JNIEnv<'local>, list: &JObject<'local>) -> Result<usize, jint> {
     if list.is_null() {
-        return Err(sys::MLN_STATUS_INVALID_ARGUMENT);
+        return Err(jni_invalid_argument("JNI invalid argument"));
     }
     let size = env
         .call_method(list, "size", "()I", &[])
         .and_then(|value| value.i())
-        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
+        .map_err(|_| jni_invalid_argument("JNI invalid argument"))?;
     if size < 0 {
-        Err(sys::MLN_STATUS_INVALID_ARGUMENT)
+        Err(jni_invalid_argument("JNI invalid argument"))
     } else {
         Ok(size as usize)
     }
@@ -6659,7 +6667,7 @@ fn java_list_get<'local>(
         &[JValue::Int(index as jint)],
     )
     .and_then(|value| value.l())
-    .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)
+    .map_err(|_| jni_invalid_argument("JNI invalid argument"))
 }
 
 fn java_string_method<'local>(
@@ -6670,24 +6678,38 @@ fn java_string_method<'local>(
     let value = env
         .call_method(object, method, "()Ljava/lang/String;", &[])
         .and_then(|value| value.l())
-        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
+        .map_err(|_| jni_invalid_argument("JNI invalid argument"))?;
     if value.is_null() {
-        return Err(sys::MLN_STATUS_INVALID_ARGUMENT);
+        return Err(jni_invalid_argument("JNI invalid argument"));
     }
     let value = JString::from(value);
     env.get_string(&value)
         .map(String::from)
-        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)
+        .map_err(|_| jni_invalid_argument("JNI invalid argument"))
 }
 
 fn jstring_to_cstring(env: &mut JNIEnv<'_>, value: &JString<'_>) -> Result<CString, jint> {
     if value.is_null() {
-        return Err(sys::MLN_STATUS_INVALID_ARGUMENT);
+        return Err(jni_invalid_argument("Java string must not be null"));
     }
     let string = env
         .get_string(value)
-        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
-    CString::new(string.to_bytes()).map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)
+        .map_err(|_| jni_invalid_argument("failed to read Java string"))?;
+    CString::new(String::from(string))
+        .map_err(|_| jni_invalid_argument("Java string contains embedded NUL"))
+}
+
+fn jni_invalid_argument(message: impl Into<String>) -> jint {
+    JNI_THREAD_DIAGNOSTIC.with(|diagnostic| {
+        *diagnostic.borrow_mut() = Some(message.into());
+    });
+    sys::MLN_STATUS_INVALID_ARGUMENT
+}
+
+fn capture_jni_or_c_thread_diagnostic() -> String {
+    JNI_THREAD_DIAGNOSTIC
+        .with(|diagnostic| diagnostic.borrow_mut().take())
+        .unwrap_or_else(capture_thread_diagnostic)
 }
 
 fn string_view(
@@ -6695,13 +6717,13 @@ fn string_view(
     value: &JString<'_>,
 ) -> Result<(CString, sys::mln_string_view), jint> {
     if value.is_null() {
-        return Err(sys::MLN_STATUS_INVALID_ARGUMENT);
+        return Err(jni_invalid_argument("Java string must not be null"));
     }
     let java_string = env
         .get_string(value)
-        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
-    let string =
-        CString::new(String::from(java_string)).map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
+        .map_err(|_| jni_invalid_argument("failed to read Java string"))?;
+    let string = CString::new(String::from(java_string))
+        .map_err(|_| jni_invalid_argument("Java string contains embedded NUL"))?;
     let view = sys::mln_string_view {
         data: string.as_ptr(),
         size: string.as_bytes().len(),
@@ -6717,13 +6739,18 @@ extern "system" fn render_session_resize(
     height: jint,
     scale_factor: jdouble,
 ) -> jint {
-    catch_unwind(|| unsafe {
-        sys::mln_render_session_resize(
-            session as *mut sys::mln_render_session,
-            width as u32,
-            height as u32,
-            scale_factor,
-        )
+    catch_unwind(|| {
+        if let Err(status) = validate_extent(width, height, scale_factor) {
+            return status;
+        }
+        unsafe {
+            sys::mln_render_session_resize(
+                session as *mut sys::mln_render_session,
+                width as u32,
+                height as u32,
+                scale_factor,
+            )
+        }
     })
     .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
 }
@@ -6813,7 +6840,7 @@ extern "system" fn render_session_get_feature_state<'local>(
 ) -> jint {
     catch_unwind(AssertUnwindSafe(|| {
         if out_state.is_null() || env.get_array_length(&out_state).unwrap_or(0) < 1 {
-            return sys::MLN_STATUS_INVALID_ARGUMENT;
+            return jni_invalid_argument("JNI invalid argument");
         }
         let selector = match java_feature_state_selector(&mut env, &selector) {
             Ok(value) => value,
@@ -6878,7 +6905,9 @@ extern "system" fn metal_owned_texture_attach(
 ) -> jint {
     attach_render_session(env, out_session, |out| unsafe {
         let mut descriptor = sys::mln_metal_owned_texture_descriptor_default();
-        fill_extent(&mut descriptor.extent, width, height, scale_factor);
+        if let Err(status) = fill_extent(&mut descriptor.extent, width, height, scale_factor) {
+            return status;
+        }
         descriptor.context.device = native_pointer(device);
         sys::mln_metal_owned_texture_attach(map as *mut sys::mln_map, &descriptor, out)
     })
@@ -6896,7 +6925,9 @@ extern "system" fn metal_borrowed_texture_attach(
 ) -> jint {
     attach_render_session(env, out_session, |out| unsafe {
         let mut descriptor = sys::mln_metal_borrowed_texture_descriptor_default();
-        fill_extent(&mut descriptor.extent, width, height, scale_factor);
+        if let Err(status) = fill_extent(&mut descriptor.extent, width, height, scale_factor) {
+            return status;
+        }
         descriptor.texture = native_pointer(texture);
         sys::mln_metal_borrowed_texture_attach(map as *mut sys::mln_map, &descriptor, out)
     })
@@ -6915,7 +6946,9 @@ extern "system" fn metal_surface_attach(
 ) -> jint {
     attach_render_session(env, out_session, |out| unsafe {
         let mut descriptor = sys::mln_metal_surface_descriptor_default();
-        fill_extent(&mut descriptor.extent, width, height, scale_factor);
+        if let Err(status) = fill_extent(&mut descriptor.extent, width, height, scale_factor) {
+            return status;
+        }
         descriptor.context.device = native_pointer(device);
         descriptor.layer = native_pointer(layer);
         sys::mln_metal_surface_attach(map as *mut sys::mln_map, &descriptor, out)
@@ -6938,15 +6971,19 @@ extern "system" fn vulkan_owned_texture_attach(
 ) -> jint {
     attach_render_session(env, out_session, |out| unsafe {
         let mut descriptor = sys::mln_vulkan_owned_texture_descriptor_default();
-        fill_extent(&mut descriptor.extent, width, height, scale_factor);
-        fill_vulkan_context(
+        if let Err(status) = fill_extent(&mut descriptor.extent, width, height, scale_factor) {
+            return status;
+        }
+        if let Err(status) = fill_vulkan_context(
             &mut descriptor.context,
             instance,
             physical_device,
             device,
             graphics_queue,
             graphics_queue_family_index,
-        );
+        ) {
+            return status;
+        }
         sys::mln_vulkan_owned_texture_attach(map as *mut sys::mln_map, &descriptor, out)
     })
 }
@@ -6970,30 +7007,48 @@ extern "system" fn vulkan_borrowed_texture_attach(
     final_layout: JObject<'_>,
     out_session: JLongArray<'_>,
 ) -> jint {
-    let final_layout = match optional_integer(&mut env, &final_layout) {
-        Ok(value) => value,
-        Err(status) => return status,
-    };
-    attach_render_session(env, out_session, |out| unsafe {
-        let mut descriptor = sys::mln_vulkan_borrowed_texture_descriptor_default();
-        fill_extent(&mut descriptor.extent, width, height, scale_factor);
-        fill_vulkan_context(
-            &mut descriptor.context,
-            instance,
-            physical_device,
-            device,
-            graphics_queue,
-            graphics_queue_family_index,
-        );
-        descriptor.image = native_pointer(image);
-        descriptor.image_view = native_pointer(image_view);
-        descriptor.format = format as u32;
-        descriptor.initial_layout = initial_layout as u32;
-        if let Some(final_layout) = final_layout {
-            descriptor.final_layout = final_layout;
-        }
-        sys::mln_vulkan_borrowed_texture_attach(map as *mut sys::mln_map, &descriptor, out)
-    })
+    catch_unwind(AssertUnwindSafe(|| {
+        let final_layout = match optional_integer(&mut env, &final_layout) {
+            Ok(value) => value,
+            Err(status) => return status,
+        };
+        attach_render_session(env, out_session, |out| unsafe {
+            let mut descriptor = sys::mln_vulkan_borrowed_texture_descriptor_default();
+            if let Err(status) = fill_extent(&mut descriptor.extent, width, height, scale_factor) {
+                return status;
+            }
+            if let Err(status) = fill_vulkan_context(
+                &mut descriptor.context,
+                instance,
+                physical_device,
+                device,
+                graphics_queue,
+                graphics_queue_family_index,
+            ) {
+                return status;
+            }
+            let format = match non_negative_u32(format, "Vulkan format must be non-negative") {
+                Ok(value) => value,
+                Err(status) => return status,
+            };
+            let initial_layout = match non_negative_u32(
+                initial_layout,
+                "Vulkan image layout must be non-negative",
+            ) {
+                Ok(value) => value,
+                Err(status) => return status,
+            };
+            descriptor.image = native_pointer(image);
+            descriptor.image_view = native_pointer(image_view);
+            descriptor.format = format;
+            descriptor.initial_layout = initial_layout;
+            if let Some(final_layout) = final_layout {
+                descriptor.final_layout = final_layout;
+            }
+            sys::mln_vulkan_borrowed_texture_attach(map as *mut sys::mln_map, &descriptor, out)
+        })
+    }))
+    .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
 }
 
 extern "system" fn vulkan_surface_attach(
@@ -7013,15 +7068,19 @@ extern "system" fn vulkan_surface_attach(
 ) -> jint {
     attach_render_session(env, out_session, |out| unsafe {
         let mut descriptor = sys::mln_vulkan_surface_descriptor_default();
-        fill_extent(&mut descriptor.extent, width, height, scale_factor);
-        fill_vulkan_context(
+        if let Err(status) = fill_extent(&mut descriptor.extent, width, height, scale_factor) {
+            return status;
+        }
+        if let Err(status) = fill_vulkan_context(
             &mut descriptor.context,
             instance,
             physical_device,
             device,
             graphics_queue,
             graphics_queue_family_index,
-        );
+        ) {
+            return status;
+        }
         descriptor.surface = native_pointer(surface);
         sys::mln_vulkan_surface_attach(map as *mut sys::mln_map, &descriptor, out)
     })
@@ -7041,14 +7100,14 @@ extern "system" fn texture_read_premultiplied_rgba8(
             || env.get_array_length(&out_info).unwrap_or(0) < 3
             || env.get_array_length(&out_byte_length).unwrap_or(0) < 1
         {
-            return sys::MLN_STATUS_INVALID_ARGUMENT;
+            return jni_invalid_argument("JNI invalid argument");
         }
         let capacity = if out_data.is_null() {
             0
         } else {
             match env.get_array_length(&out_data) {
                 Ok(value) if value >= 0 => value as usize,
-                _ => return sys::MLN_STATUS_INVALID_ARGUMENT,
+                _ => return jni_invalid_argument("JNI invalid argument"),
             }
         };
         let mut buffer = vec![0_u8; capacity];
@@ -7067,7 +7126,7 @@ extern "system" fn texture_read_premultiplied_rgba8(
         };
         if result == sys::MLN_STATUS_OK && !out_data.is_null() && info.byte_length > 0 {
             if info.byte_length > buffer.len() {
-                return sys::MLN_STATUS_INVALID_ARGUMENT;
+                return jni_invalid_argument("JNI invalid argument");
             }
             let signed: Vec<i8> = buffer[..info.byte_length]
                 .iter()
@@ -7075,7 +7134,7 @@ extern "system" fn texture_read_premultiplied_rgba8(
                 .map(|value| value as i8)
                 .collect();
             if env.set_byte_array_region(&out_data, 0, &signed).is_err() {
-                return sys::MLN_STATUS_INVALID_ARGUMENT;
+                return jni_invalid_argument("JNI invalid argument");
             }
         }
         if env
@@ -7089,7 +7148,7 @@ extern "system" fn texture_read_premultiplied_rgba8(
                 .set_long_array_region(&out_byte_length, 0, &[info.byte_length as jlong])
                 .is_err()
         {
-            return sys::MLN_STATUS_INVALID_ARGUMENT;
+            return jni_invalid_argument("JNI invalid argument");
         }
         result
     }))
@@ -7106,7 +7165,7 @@ extern "system" fn metal_owned_texture_acquire_frame(
 ) -> jint {
     catch_unwind(AssertUnwindSafe(|| {
         if !frame_arrays_valid(&env, &out_longs, &out_ints, &out_doubles, 5, 2, 1) {
-            return sys::MLN_STATUS_INVALID_ARGUMENT;
+            return jni_invalid_argument("JNI invalid argument");
         }
         let mut frame = sys::mln_metal_owned_texture_frame {
             size: std::mem::size_of::<sys::mln_metal_owned_texture_frame>() as u32,
@@ -7150,7 +7209,7 @@ extern "system" fn metal_owned_texture_acquire_frame(
                     .set_double_array_region(&out_doubles, 0, &[frame.scale_factor])
                     .is_err()
             {
-                return sys::MLN_STATUS_INVALID_ARGUMENT;
+                return jni_invalid_argument("JNI invalid argument");
             }
         }
         result
@@ -7203,7 +7262,7 @@ extern "system" fn vulkan_owned_texture_acquire_frame(
 ) -> jint {
     catch_unwind(AssertUnwindSafe(|| {
         if !frame_arrays_valid(&env, &out_longs, &out_ints, &out_doubles, 5, 4, 1) {
-            return sys::MLN_STATUS_INVALID_ARGUMENT;
+            return jni_invalid_argument("JNI invalid argument");
         }
         let mut frame = sys::mln_vulkan_owned_texture_frame {
             size: std::mem::size_of::<sys::mln_vulkan_owned_texture_frame>() as u32,
@@ -7254,7 +7313,7 @@ extern "system" fn vulkan_owned_texture_acquire_frame(
                     .set_double_array_region(&out_doubles, 0, &[frame.scale_factor])
                     .is_err()
             {
-                return sys::MLN_STATUS_INVALID_ARGUMENT;
+                return jni_invalid_argument("JNI invalid argument");
             }
         }
         result
@@ -7334,7 +7393,7 @@ fn read_frame_arrays(
         int_count as i32,
         double_count as i32,
     ) {
-        return Err(sys::MLN_STATUS_INVALID_ARGUMENT);
+        return Err(jni_invalid_argument("JNI invalid argument"));
     }
     let mut long_values = vec![0 as jlong; long_count];
     let mut int_values = vec![0 as jint; int_count];
@@ -7347,7 +7406,7 @@ fn read_frame_arrays(
             .get_double_array_region(doubles, 0, &mut double_values)
             .is_err()
     {
-        return Err(sys::MLN_STATUS_INVALID_ARGUMENT);
+        return Err(jni_invalid_argument("JNI invalid argument"));
     }
     Ok((long_values, int_values, double_values))
 }
@@ -7359,7 +7418,7 @@ fn attach_render_session(
 ) -> jint {
     catch_unwind(AssertUnwindSafe(|| {
         if out_session.is_null() || env.get_array_length(&out_session).unwrap_or(0) < 1 {
-            return sys::MLN_STATUS_INVALID_ARGUMENT;
+            return jni_invalid_argument("JNI invalid argument");
         }
         let mut session: *mut sys::mln_render_session = std::ptr::null_mut();
         let result = operation(&mut session);
@@ -7375,15 +7434,37 @@ fn attach_render_session(
     .unwrap_or(sys::MLN_STATUS_NATIVE_ERROR)
 }
 
+fn validate_extent(width: jint, height: jint, scale_factor: jdouble) -> Result<(), jint> {
+    if width <= 0 || height <= 0 {
+        return Err(jni_invalid_argument(
+            "render target dimensions must be positive",
+        ));
+    }
+    if !scale_factor.is_finite() || scale_factor <= 0.0 {
+        return Err(jni_invalid_argument("render target scale must be positive"));
+    }
+    let max_java_dimension = jint::MAX as f64;
+    if (width as f64 * scale_factor) > max_java_dimension
+        || (height as f64 * scale_factor) > max_java_dimension
+    {
+        return Err(jni_invalid_argument(
+            "scaled render target dimensions exceed Java int range",
+        ));
+    }
+    Ok(())
+}
+
 fn fill_extent(
     extent: &mut sys::mln_render_target_extent,
     width: jint,
     height: jint,
     scale_factor: jdouble,
-) {
+) -> Result<(), jint> {
+    validate_extent(width, height, scale_factor)?;
     extent.width = width as u32;
     extent.height = height as u32;
     extent.scale_factor = scale_factor;
+    Ok(())
 }
 
 fn fill_vulkan_context(
@@ -7393,12 +7474,24 @@ fn fill_vulkan_context(
     device: jlong,
     graphics_queue: jlong,
     graphics_queue_family_index: jint,
-) {
+) -> Result<(), jint> {
     context.instance = native_pointer(instance);
     context.physical_device = native_pointer(physical_device);
     context.device = native_pointer(device);
     context.graphics_queue = native_pointer(graphics_queue);
-    context.graphics_queue_family_index = graphics_queue_family_index as u32;
+    context.graphics_queue_family_index = non_negative_u32(
+        graphics_queue_family_index,
+        "Vulkan graphics queue family index must be non-negative",
+    )?;
+    Ok(())
+}
+
+fn non_negative_u32(value: jint, message: &'static str) -> Result<u32, jint> {
+    if value < 0 {
+        Err(jni_invalid_argument(message))
+    } else {
+        Ok(value as u32)
+    }
 }
 
 fn native_pointer(value: jlong) -> *mut c_void {
@@ -7411,8 +7504,8 @@ fn optional_integer(env: &mut JNIEnv<'_>, value: &JObject<'_>) -> Result<Option<
     }
     env.call_method(value, "intValue", "()I", &[])
         .and_then(|value| value.i())
-        .map(|value| Some(value as u32))
-        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)
+        .map_err(|_| jni_invalid_argument("JNI invalid argument"))
+        .and_then(|value| non_negative_u32(value, "Java integer must be non-negative").map(Some))
 }
 
 extern "system" fn render_session_query_rendered_features<'local>(
@@ -7425,7 +7518,7 @@ extern "system" fn render_session_query_rendered_features<'local>(
 ) -> jint {
     catch_unwind(AssertUnwindSafe(|| {
         if out_features.is_null() || env.get_array_length(&out_features).unwrap_or(0) < 1 {
-            return sys::MLN_STATUS_INVALID_ARGUMENT;
+            return jni_invalid_argument("JNI invalid argument");
         }
         let geometry = match java_rendered_query_geometry(&mut env, &geometry) {
             Ok(value) => value,
@@ -7446,7 +7539,7 @@ extern "system" fn render_session_query_rendered_features<'local>(
             .transpose()
         {
             Ok(value) => value,
-            Err(_) => return sys::MLN_STATUS_INVALID_ARGUMENT,
+            Err(_) => return jni_invalid_argument("JNI invalid argument"),
         };
         let mut result: *mut sys::mln_feature_query_result = std::ptr::null_mut();
         let status = unsafe {
@@ -7477,7 +7570,7 @@ extern "system" fn render_session_query_source_features<'local>(
 ) -> jint {
     catch_unwind(AssertUnwindSafe(|| {
         if out_features.is_null() || env.get_array_length(&out_features).unwrap_or(0) < 1 {
-            return sys::MLN_STATUS_INVALID_ARGUMENT;
+            return jni_invalid_argument("JNI invalid argument");
         }
         let (source_id_storage, source_id_view) = match string_view(&mut env, &source_id) {
             Ok(value) => value,
@@ -7497,7 +7590,7 @@ extern "system" fn render_session_query_source_features<'local>(
             .transpose()
         {
             Ok(value) => value,
-            Err(_) => return sys::MLN_STATUS_INVALID_ARGUMENT,
+            Err(_) => return jni_invalid_argument("JNI invalid argument"),
         };
         let mut result: *mut sys::mln_feature_query_result = std::ptr::null_mut();
         let _keep_alive = source_id_storage;
@@ -7532,7 +7625,7 @@ extern "system" fn render_session_query_feature_extensions<'local>(
 ) -> jint {
     catch_unwind(AssertUnwindSafe(|| {
         if out_result.is_null() || env.get_array_length(&out_result).unwrap_or(0) < 1 {
-            return sys::MLN_STATUS_INVALID_ARGUMENT;
+            return jni_invalid_argument("JNI invalid argument");
         }
         let (source_id_storage, source_id_view) = match string_view(&mut env, &source_id) {
             Ok(value) => value,
@@ -7544,7 +7637,7 @@ extern "system" fn render_session_query_feature_extensions<'local>(
         };
         let feature = match core_geojson::feature_try_to_native(&feature, 0) {
             Ok(value) => value,
-            Err(_) => return sys::MLN_STATUS_INVALID_ARGUMENT,
+            Err(_) => return jni_invalid_argument("JNI invalid argument"),
         };
         let (extension_storage, extension_view) = match string_view(&mut env, &extension) {
             Ok(value) => value,
@@ -7591,18 +7684,18 @@ fn java_feature_query_result_object<'local>(
     out_features: &JObjectArray<'local>,
 ) -> jint {
     let Some(result) = NonNull::new(result) else {
-        return sys::MLN_STATUS_INVALID_ARGUMENT;
+        return jni_invalid_argument("JNI invalid argument");
     };
     let features = match unsafe { core_query::copy_feature_query_result(result) } {
         Ok(value) => value,
-        Err(_) => return sys::MLN_STATUS_INVALID_ARGUMENT,
+        Err(_) => return jni_invalid_argument("JNI invalid argument"),
     };
     let list = match java_queried_feature_list(env, &features) {
         Ok(value) => value,
         Err(status) => return status,
     };
     if env.set_object_array_element(out_features, 0, list).is_err() {
-        sys::MLN_STATUS_INVALID_ARGUMENT
+        jni_invalid_argument("JNI invalid argument")
     } else {
         sys::MLN_STATUS_OK
     }
@@ -7614,18 +7707,18 @@ fn java_feature_extension_result_object<'local>(
     out_result: &JObjectArray<'local>,
 ) -> jint {
     let Some(result) = NonNull::new(result) else {
-        return sys::MLN_STATUS_INVALID_ARGUMENT;
+        return jni_invalid_argument("JNI invalid argument");
     };
     let result = match unsafe { core_query::copy_feature_extension_result(result) } {
         Ok(value) => value,
-        Err(_) => return sys::MLN_STATUS_INVALID_ARGUMENT,
+        Err(_) => return jni_invalid_argument("JNI invalid argument"),
     };
     let object = match java_feature_extension_result(env, &result) {
         Ok(value) => value,
         Err(status) => return status,
     };
     if env.set_object_array_element(out_result, 0, object).is_err() {
-        sys::MLN_STATUS_INVALID_ARGUMENT
+        jni_invalid_argument("JNI invalid argument")
     } else {
         sys::MLN_STATUS_OK
     }
@@ -7636,14 +7729,14 @@ fn java_rendered_query_geometry<'local>(
     value: &JObject<'local>,
 ) -> Result<core_query::RenderedQueryGeometry, jint> {
     if value.is_null() {
-        return Err(sys::MLN_STATUS_INVALID_ARGUMENT);
+        return Err(jni_invalid_argument("JNI invalid argument"));
     }
     if env
         .is_instance_of(
             value,
             "org/maplibre/nativejni/query/RenderedQueryGeometry$Point",
         )
-        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?
+        .map_err(|_| jni_invalid_argument("JNI invalid argument"))?
     {
         let point = env
             .call_method(
@@ -7653,7 +7746,7 @@ fn java_rendered_query_geometry<'local>(
                 &[],
             )
             .and_then(|value| value.l())
-            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
+            .map_err(|_| jni_invalid_argument("JNI invalid argument"))?;
         return java_screen_point(env, &point).map(core_query::RenderedQueryGeometry::Point);
     }
     if env
@@ -7661,7 +7754,7 @@ fn java_rendered_query_geometry<'local>(
             value,
             "org/maplibre/nativejni/query/RenderedQueryGeometry$Box",
         )
-        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?
+        .map_err(|_| jni_invalid_argument("JNI invalid argument"))?
     {
         let box_value = env
             .call_method(
@@ -7671,7 +7764,7 @@ fn java_rendered_query_geometry<'local>(
                 &[],
             )
             .and_then(|value| value.l())
-            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
+            .map_err(|_| jni_invalid_argument("JNI invalid argument"))?;
         let min = env
             .call_method(
                 &box_value,
@@ -7680,7 +7773,7 @@ fn java_rendered_query_geometry<'local>(
                 &[],
             )
             .and_then(|value| value.l())
-            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
+            .map_err(|_| jni_invalid_argument("JNI invalid argument"))?;
         let max = env
             .call_method(
                 &box_value,
@@ -7689,7 +7782,7 @@ fn java_rendered_query_geometry<'local>(
                 &[],
             )
             .and_then(|value| value.l())
-            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
+            .map_err(|_| jni_invalid_argument("JNI invalid argument"))?;
         return Ok(core_query::RenderedQueryGeometry::Box(CoreScreenBox::new(
             java_screen_point(env, &min)?,
             java_screen_point(env, &max)?,
@@ -7700,7 +7793,7 @@ fn java_rendered_query_geometry<'local>(
             value,
             "org/maplibre/nativejni/query/RenderedQueryGeometry$LineString",
         )
-        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?
+        .map_err(|_| jni_invalid_argument("JNI invalid argument"))?
     {
         let points = java_object_list_method(env, value, "points")?;
         let size = java_list_size(env, &points)?;
@@ -7711,7 +7804,7 @@ fn java_rendered_query_geometry<'local>(
         }
         return Ok(core_query::RenderedQueryGeometry::LineString(values));
     }
-    Err(sys::MLN_STATUS_INVALID_ARGUMENT)
+    Err(jni_invalid_argument("JNI invalid argument"))
 }
 
 fn java_screen_point<'local>(
@@ -7719,16 +7812,16 @@ fn java_screen_point<'local>(
     point: &JObject<'local>,
 ) -> Result<CoreScreenPoint, jint> {
     if point.is_null() {
-        return Err(sys::MLN_STATUS_INVALID_ARGUMENT);
+        return Err(jni_invalid_argument("JNI invalid argument"));
     }
     let x = env
         .call_method(point, "x", "()D", &[])
         .and_then(|value| value.d())
-        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
+        .map_err(|_| jni_invalid_argument("JNI invalid argument"))?;
     let y = env
         .call_method(point, "y", "()D", &[])
         .and_then(|value| value.d())
-        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
+        .map_err(|_| jni_invalid_argument("JNI invalid argument"))?;
     Ok(CoreScreenPoint::new(x, y))
 }
 
@@ -7737,7 +7830,7 @@ fn java_feature_state_selector<'local>(
     value: &JObject<'local>,
 ) -> Result<core_query::FeatureStateSelector, jint> {
     if value.is_null() {
-        return Err(sys::MLN_STATUS_INVALID_ARGUMENT);
+        return Err(jni_invalid_argument("JNI invalid argument"));
     }
     let mut selector =
         core_query::FeatureStateSelector::new(java_string_method(env, value, "sourceId")?);
@@ -7750,7 +7843,7 @@ fn java_feature_state_selector<'local>(
     if java_boolean_method(env, value, "hasStateKey")? {
         selector = match selector.with_state_key(java_string_method(env, value, "stateKey")?) {
             Ok(value) => value,
-            Err(_) => return Err(sys::MLN_STATUS_INVALID_ARGUMENT),
+            Err(_) => return Err(jni_invalid_argument("JNI invalid argument")),
         };
     }
     Ok(selector)
@@ -7773,7 +7866,7 @@ fn java_rendered_feature_query_options<'local>(
                 &[],
             )
             .and_then(|value| value.l())
-            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
+            .map_err(|_| jni_invalid_argument("JNI invalid argument"))?;
         options = options.with_filter(java_json_value(env, &filter, 0)?);
     }
     Ok(options)
@@ -7797,7 +7890,7 @@ fn java_source_feature_query_options<'local>(
                 &[],
             )
             .and_then(|value| value.l())
-            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
+            .map_err(|_| jni_invalid_argument("JNI invalid argument"))?;
         options = options.with_filter(java_json_value(env, &filter, 0)?);
     }
     Ok(options)
@@ -7839,7 +7932,7 @@ fn java_queried_feature_object<'local>(
             JValue::Object(&state),
         ],
     )
-    .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)
+    .map_err(|_| jni_invalid_argument("JNI invalid argument"))
 }
 
 fn java_feature_extension_result<'local>(
@@ -7854,7 +7947,7 @@ fn java_feature_extension_result<'local>(
                 "(Lorg/maplibre/nativejni/json/JsonValue;)V",
                 &[JValue::Object(&value)],
             )
-            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)
+            .map_err(|_| jni_invalid_argument("JNI invalid argument"))
         }
         core_query::FeatureExtensionResult::FeatureCollection(features) => {
             let list = java_feature_object_list(env, features)?;
@@ -7863,7 +7956,7 @@ fn java_feature_extension_result<'local>(
                 "(Ljava/util/List;)V",
                 &[JValue::Object(&list)],
             )
-            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)
+            .map_err(|_| jni_invalid_argument("JNI invalid argument"))
         }
         core_query::FeatureExtensionResult::Unknown(raw_type) => env
             .new_object(
@@ -7871,8 +7964,8 @@ fn java_feature_extension_result<'local>(
                 "(I)V",
                 &[JValue::Int(*raw_type as jint)],
             )
-            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT),
-        _ => Err(sys::MLN_STATUS_INVALID_ARGUMENT),
+            .map_err(|_| jni_invalid_argument("JNI invalid argument")),
+        _ => Err(jni_invalid_argument("JNI invalid argument")),
     }
 }
 
@@ -7904,7 +7997,7 @@ fn java_feature_object_from_core<'local>(
             JValue::Object(&identifier),
         ],
     )
-    .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)
+    .map_err(|_| jni_invalid_argument("JNI invalid argument"))
 }
 
 fn java_json_member_object_list<'local>(
@@ -7915,7 +8008,7 @@ fn java_json_member_object_list<'local>(
     for member in members {
         let key = env
             .new_string(&member.key)
-            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
+            .map_err(|_| jni_invalid_argument("JNI invalid argument"))?;
         let value = java_json_value_object(env, &member.value)?;
         let member = env
             .new_object(
@@ -7923,7 +8016,7 @@ fn java_json_member_object_list<'local>(
                 "(Ljava/lang/String;Lorg/maplibre/nativejni/json/JsonValue;)V",
                 &[JValue::Object(&key), JValue::Object(&value)],
             )
-            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
+            .map_err(|_| jni_invalid_argument("JNI invalid argument"))?;
         java_array_list_add(env, &list, &member)?;
     }
     Ok(list)
@@ -7941,40 +8034,40 @@ fn java_feature_identifier_object<'local>(
                 "Lorg/maplibre/nativejni/geo/FeatureIdentifier$Null;",
             )
             .and_then(|value| value.l())
-            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT),
+            .map_err(|_| jni_invalid_argument("JNI invalid argument")),
         core_geojson::FeatureIdentifier::UInt(value) => env
             .new_object(
                 "org/maplibre/nativejni/geo/FeatureIdentifier$UInt",
                 "(J)V",
                 &[JValue::Long(*value as jlong)],
             )
-            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT),
+            .map_err(|_| jni_invalid_argument("JNI invalid argument")),
         core_geojson::FeatureIdentifier::Int(value) => env
             .new_object(
                 "org/maplibre/nativejni/geo/FeatureIdentifier$Int",
                 "(J)V",
                 &[JValue::Long(*value as jlong)],
             )
-            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT),
+            .map_err(|_| jni_invalid_argument("JNI invalid argument")),
         core_geojson::FeatureIdentifier::Double(value) => env
             .new_object(
                 "org/maplibre/nativejni/geo/FeatureIdentifier$DoubleValue",
                 "(D)V",
                 &[JValue::Double(*value)],
             )
-            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT),
+            .map_err(|_| jni_invalid_argument("JNI invalid argument")),
         core_geojson::FeatureIdentifier::String(value) => {
             let value = env
                 .new_string(value)
-                .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
+                .map_err(|_| jni_invalid_argument("JNI invalid argument"))?;
             env.new_object(
                 "org/maplibre/nativejni/geo/FeatureIdentifier$StringValue",
                 "(Ljava/lang/String;)V",
                 &[JValue::Object(&value)],
             )
-            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)
+            .map_err(|_| jni_invalid_argument("JNI invalid argument"))
         }
-        _ => Err(sys::MLN_STATUS_INVALID_ARGUMENT),
+        _ => Err(jni_invalid_argument("JNI invalid argument")),
     }
 }
 
@@ -7986,7 +8079,7 @@ fn java_optional_string<'local>(
         Some(value) => {
             let value = env
                 .new_string(value)
-                .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
+                .map_err(|_| jni_invalid_argument("JNI invalid argument"))?;
             java_optional_object(env, Some(&value))
         }
         None => java_optional_object(env, None),
@@ -8006,11 +8099,11 @@ fn java_optional_object<'local>(
                 &[JValue::Object(value)],
             )
             .and_then(|value| value.l())
-            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT),
+            .map_err(|_| jni_invalid_argument("JNI invalid argument")),
         None => env
             .call_static_method("java/util/Optional", "empty", "()Ljava/util/Optional;", &[])
             .and_then(|value| value.l())
-            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT),
+            .map_err(|_| jni_invalid_argument("JNI invalid argument")),
     }
 }
 
@@ -8021,7 +8114,7 @@ fn java_boolean_method<'local>(
 ) -> Result<bool, jint> {
     env.call_method(value, method, "()Z", &[])
         .and_then(|value| value.z())
-        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)
+        .map_err(|_| jni_invalid_argument("JNI invalid argument"))
 }
 
 fn java_string_list_method<'local>(
@@ -8036,7 +8129,7 @@ fn java_string_list_method<'local>(
         let value = JString::from(java_list_get(env, &list, index)?);
         let value = env
             .get_string(&value)
-            .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
+            .map_err(|_| jni_invalid_argument("JNI invalid argument"))?;
         strings.push(String::from(value));
     }
     Ok(strings)
@@ -8062,7 +8155,7 @@ extern "system" fn map_get_debug_options(
 ) -> jint {
     catch_unwind(AssertUnwindSafe(|| {
         if out_options.is_null() || env.get_array_length(&out_options).unwrap_or(0) < 1 {
-            return sys::MLN_STATUS_INVALID_ARGUMENT;
+            return jni_invalid_argument("JNI invalid argument");
         }
         let mut options = 0_u32;
         let result =
@@ -8072,7 +8165,7 @@ extern "system" fn map_get_debug_options(
                 .set_int_array_region(&out_options, 0, &[options as jint])
                 .is_err()
         {
-            return sys::MLN_STATUS_INVALID_ARGUMENT;
+            return jni_invalid_argument("JNI invalid argument");
         }
         result
     }))
@@ -8129,7 +8222,7 @@ extern "system" fn map_get_viewport_options(
 ) -> jint {
     catch_unwind(AssertUnwindSafe(|| {
         if !viewport_arrays_are_valid(&env, &out_fields, &out_ints, &out_values) {
-            return sys::MLN_STATUS_INVALID_ARGUMENT;
+            return jni_invalid_argument("JNI invalid argument");
         }
         let mut options = unsafe { sys::mln_map_viewport_options_default() };
         let result =
@@ -8170,7 +8263,7 @@ extern "system" fn map_get_tile_options(
 ) -> jint {
     catch_unwind(AssertUnwindSafe(|| {
         if !tile_arrays_are_valid(&env, &out_fields, &out_ints, &out_values) {
-            return sys::MLN_STATUS_INVALID_ARGUMENT;
+            return jni_invalid_argument("JNI invalid argument");
         }
         let mut options = unsafe { sys::mln_map_tile_options_default() };
         let result =
@@ -8218,7 +8311,7 @@ extern "system" fn map_camera_for_lat_lng_bounds(
 ) -> jint {
     catch_unwind(AssertUnwindSafe(|| {
         if !camera_arrays_are_valid(&env, &out_camera_fields, &out_camera_values) {
-            return sys::MLN_STATUS_INVALID_ARGUMENT;
+            return jni_invalid_argument("JNI invalid argument");
         }
         let fit_options =
             match optional_camera_fit_options(&env, has_fit_options, &fit_fields, &fit_values) {
@@ -8264,7 +8357,7 @@ extern "system" fn map_camera_for_lat_lngs(
 ) -> jint {
     catch_unwind(AssertUnwindSafe(|| {
         if !camera_arrays_are_valid(&env, &out_camera_fields, &out_camera_values) {
-            return sys::MLN_STATUS_INVALID_ARGUMENT;
+            return jni_invalid_argument("JNI invalid argument");
         }
         let coordinate_values = match read_nonempty_coordinate_pairs(&env, &coordinates) {
             Ok(value) => value,
@@ -8313,7 +8406,7 @@ extern "system" fn map_camera_for_geometry<'local>(
 ) -> jint {
     catch_unwind(AssertUnwindSafe(|| {
         if !camera_arrays_are_valid(&env, &out_camera_fields, &out_camera_values) {
-            return sys::MLN_STATUS_INVALID_ARGUMENT;
+            return jni_invalid_argument("JNI invalid argument");
         }
         let geometry = match java_native_geometry(&mut env, &geometry) {
             Ok(value) => value,
@@ -8391,7 +8484,7 @@ fn map_lat_lng_bounds_for_camera_impl(
 ) -> jint {
     catch_unwind(AssertUnwindSafe(|| {
         if out_bounds.is_null() || env.get_array_length(&out_bounds).unwrap_or(0) < 4 {
-            return sys::MLN_STATUS_INVALID_ARGUMENT;
+            return jni_invalid_argument("JNI invalid argument");
         }
         let camera = match read_camera_options(&env, &camera_fields, &camera_values) {
             Ok(camera) => camera,
@@ -8424,7 +8517,7 @@ fn map_lat_lng_bounds_for_camera_impl(
             )
             .is_err()
         {
-            sys::MLN_STATUS_INVALID_ARGUMENT
+            jni_invalid_argument("JNI invalid argument")
         } else {
             sys::MLN_STATUS_OK
         }
@@ -8441,7 +8534,7 @@ extern "system" fn map_get_free_camera_options(
 ) -> jint {
     catch_unwind(AssertUnwindSafe(|| {
         if !free_camera_arrays_are_valid(&env, &out_fields, &out_values) {
-            return sys::MLN_STATUS_INVALID_ARGUMENT;
+            return jni_invalid_argument("JNI invalid argument");
         }
         let mut options = unsafe { sys::mln_free_camera_options_default() };
         let result =
@@ -8481,7 +8574,7 @@ extern "system" fn map_get_projection_mode(
 ) -> jint {
     catch_unwind(AssertUnwindSafe(|| {
         if !projection_mode_arrays_are_valid(&env, &out_fields, &out_booleans, &out_values) {
-            return sys::MLN_STATUS_INVALID_ARGUMENT;
+            return jni_invalid_argument("JNI invalid argument");
         }
         let mut mode = unsafe { sys::mln_projection_mode_default() };
         let result =
@@ -8521,7 +8614,7 @@ extern "system" fn map_get_bounds(
 ) -> jint {
     catch_unwind(AssertUnwindSafe(|| {
         if !bound_arrays_are_valid(&env, &out_fields, &out_values) {
-            return sys::MLN_STATUS_INVALID_ARGUMENT;
+            return jni_invalid_argument("JNI invalid argument");
         }
         let mut bounds = unsafe { sys::mln_bound_options_default() };
         let result = unsafe { sys::mln_map_get_bounds(map as *mut sys::mln_map, &mut bounds) };
@@ -8559,7 +8652,7 @@ extern "system" fn map_get_camera(
 ) -> jint {
     catch_unwind(AssertUnwindSafe(|| {
         if !camera_arrays_are_valid(&env, &out_fields, &out_values) {
-            return sys::MLN_STATUS_INVALID_ARGUMENT;
+            return jni_invalid_argument("JNI invalid argument");
         }
         let mut camera = unsafe { sys::mln_camera_options_default() };
         let result = unsafe { sys::mln_map_get_camera(map as *mut sys::mln_map, &mut camera) };
@@ -8793,7 +8886,7 @@ fn read_viewport_options(
     values: &JDoubleArray<'_>,
 ) -> Result<sys::mln_map_viewport_options, jint> {
     if !viewport_arrays_are_valid(env, fields, ints, values) {
-        return Err(sys::MLN_STATUS_INVALID_ARGUMENT);
+        return Err(jni_invalid_argument("JNI invalid argument"));
     }
     let mut field_values = [0 as jboolean; VIEWPORT_FIELD_COUNT];
     let mut int_values = [0 as jint; VIEWPORT_INT_COUNT];
@@ -8806,7 +8899,7 @@ fn read_viewport_options(
             .get_double_array_region(values, 0, &mut option_values)
             .is_err()
     {
-        return Err(sys::MLN_STATUS_INVALID_ARGUMENT);
+        return Err(jni_invalid_argument("JNI invalid argument"));
     }
     let mut options = unsafe { sys::mln_map_viewport_options_default() };
     if field_values[VIEWPORT_FIELD_NORTH_ORIENTATION] != 0 {
@@ -8863,7 +8956,7 @@ fn write_viewport_arrays(
             .set_double_array_region(values, 0, &option_values)
             .is_err()
     {
-        sys::MLN_STATUS_INVALID_ARGUMENT
+        jni_invalid_argument("JNI invalid argument")
     } else {
         sys::MLN_STATUS_OK
     }
@@ -8876,7 +8969,7 @@ fn read_tile_options(
     values: &JDoubleArray<'_>,
 ) -> Result<sys::mln_map_tile_options, jint> {
     if !tile_arrays_are_valid(env, fields, ints, values) {
-        return Err(sys::MLN_STATUS_INVALID_ARGUMENT);
+        return Err(jni_invalid_argument("JNI invalid argument"));
     }
     let mut field_values = [0 as jboolean; TILE_FIELD_COUNT];
     let mut int_values = [0 as jint; TILE_INT_COUNT];
@@ -8889,7 +8982,7 @@ fn read_tile_options(
             .get_double_array_region(values, 0, &mut option_values)
             .is_err()
     {
-        return Err(sys::MLN_STATUS_INVALID_ARGUMENT);
+        return Err(jni_invalid_argument("JNI invalid argument"));
     }
     let mut options = unsafe { sys::mln_map_tile_options_default() };
     if field_values[TILE_FIELD_PREFETCH_ZOOM_DELTA] != 0 {
@@ -8952,7 +9045,7 @@ fn write_tile_arrays(
             .set_double_array_region(values, 0, &option_values)
             .is_err()
     {
-        sys::MLN_STATUS_INVALID_ARGUMENT
+        jni_invalid_argument("JNI invalid argument")
     } else {
         sys::MLN_STATUS_OK
     }
@@ -8964,7 +9057,7 @@ fn read_camera_fit_options(
     values: &JDoubleArray<'_>,
 ) -> Result<sys::mln_camera_fit_options, jint> {
     if !camera_fit_arrays_are_valid(env, fields, values) {
-        return Err(sys::MLN_STATUS_INVALID_ARGUMENT);
+        return Err(jni_invalid_argument("JNI invalid argument"));
     }
     let mut field_values = [0 as jboolean; FIT_FIELD_COUNT];
     let mut option_values = [0.0_f64; FIT_VALUE_COUNT];
@@ -8975,7 +9068,7 @@ fn read_camera_fit_options(
             .get_double_array_region(values, 0, &mut option_values)
             .is_err()
     {
-        return Err(sys::MLN_STATUS_INVALID_ARGUMENT);
+        return Err(jni_invalid_argument("JNI invalid argument"));
     }
     let mut options = unsafe { sys::mln_camera_fit_options_default() };
     if field_values[FIT_FIELD_PADDING] != 0 {
@@ -9002,7 +9095,7 @@ fn read_free_camera_options(
     values: &JDoubleArray<'_>,
 ) -> Result<sys::mln_free_camera_options, jint> {
     if !free_camera_arrays_are_valid(env, fields, values) {
-        return Err(sys::MLN_STATUS_INVALID_ARGUMENT);
+        return Err(jni_invalid_argument("JNI invalid argument"));
     }
     let mut field_values = [0 as jboolean; FREE_CAMERA_FIELD_COUNT];
     let mut option_values = [0.0_f64; FREE_CAMERA_VALUE_COUNT];
@@ -9013,7 +9106,7 @@ fn read_free_camera_options(
             .get_double_array_region(values, 0, &mut option_values)
             .is_err()
     {
-        return Err(sys::MLN_STATUS_INVALID_ARGUMENT);
+        return Err(jni_invalid_argument("JNI invalid argument"));
     }
     let mut options = unsafe { sys::mln_free_camera_options_default() };
     if field_values[FREE_CAMERA_FIELD_POSITION] != 0 {
@@ -9058,7 +9151,7 @@ fn write_free_camera_arrays(
             .set_double_array_region(values, 0, &option_values)
             .is_err()
     {
-        sys::MLN_STATUS_INVALID_ARGUMENT
+        jni_invalid_argument("JNI invalid argument")
     } else {
         sys::MLN_STATUS_OK
     }
@@ -9071,7 +9164,7 @@ fn read_projection_mode(
     values: &JDoubleArray<'_>,
 ) -> Result<sys::mln_projection_mode, jint> {
     if !projection_mode_arrays_are_valid(env, fields, booleans, values) {
-        return Err(sys::MLN_STATUS_INVALID_ARGUMENT);
+        return Err(jni_invalid_argument("JNI invalid argument"));
     }
     let mut field_values = [0 as jboolean; PROJECTION_MODE_FIELD_COUNT];
     let mut boolean_values = [0 as jboolean; PROJECTION_MODE_BOOLEAN_COUNT];
@@ -9086,7 +9179,7 @@ fn read_projection_mode(
             .get_double_array_region(values, 0, &mut option_values)
             .is_err()
     {
-        return Err(sys::MLN_STATUS_INVALID_ARGUMENT);
+        return Err(jni_invalid_argument("JNI invalid argument"));
     }
     let mut mode = unsafe { sys::mln_projection_mode_default() };
     if field_values[PROJECTION_MODE_FIELD_AXONOMETRIC] != 0 {
@@ -9128,7 +9221,7 @@ fn write_projection_mode_arrays(
             .set_double_array_region(values, 0, &option_values)
             .is_err()
     {
-        sys::MLN_STATUS_INVALID_ARGUMENT
+        jni_invalid_argument("JNI invalid argument")
     } else {
         sys::MLN_STATUS_OK
     }
@@ -9140,7 +9233,7 @@ fn read_bound_options(
     values: &JDoubleArray<'_>,
 ) -> Result<sys::mln_bound_options, jint> {
     if !bound_arrays_are_valid(env, fields, values) {
-        return Err(sys::MLN_STATUS_INVALID_ARGUMENT);
+        return Err(jni_invalid_argument("JNI invalid argument"));
     }
     let mut field_values = [0 as jboolean; BOUND_FIELD_COUNT];
     let mut option_values = [0.0_f64; BOUND_VALUE_COUNT];
@@ -9151,7 +9244,7 @@ fn read_bound_options(
             .get_double_array_region(values, 0, &mut option_values)
             .is_err()
     {
-        return Err(sys::MLN_STATUS_INVALID_ARGUMENT);
+        return Err(jni_invalid_argument("JNI invalid argument"));
     }
 
     let mut bounds = unsafe { sys::mln_bound_options_default() };
@@ -9215,7 +9308,7 @@ fn write_bound_arrays(
             .set_double_array_region(values, 0, &option_values)
             .is_err()
     {
-        sys::MLN_STATUS_INVALID_ARGUMENT
+        jni_invalid_argument("JNI invalid argument")
     } else {
         sys::MLN_STATUS_OK
     }
@@ -9227,7 +9320,7 @@ fn read_camera_options(
     values: &JDoubleArray<'_>,
 ) -> Result<sys::mln_camera_options, jint> {
     if !camera_arrays_are_valid(env, fields, values) {
-        return Err(sys::MLN_STATUS_INVALID_ARGUMENT);
+        return Err(jni_invalid_argument("JNI invalid argument"));
     }
     let mut field_values = [0 as jboolean; CAMERA_FIELD_COUNT];
     let mut option_values = [0.0_f64; CAMERA_VALUE_COUNT];
@@ -9238,7 +9331,7 @@ fn read_camera_options(
             .get_double_array_region(values, 0, &mut option_values)
             .is_err()
     {
-        return Err(sys::MLN_STATUS_INVALID_ARGUMENT);
+        return Err(jni_invalid_argument("JNI invalid argument"));
     }
 
     let mut camera = unsafe { sys::mln_camera_options_default() };
@@ -9334,7 +9427,7 @@ fn write_camera_arrays(
             .set_double_array_region(values, 0, &option_values)
             .is_err()
     {
-        sys::MLN_STATUS_INVALID_ARGUMENT
+        jni_invalid_argument("JNI invalid argument")
     } else {
         sys::MLN_STATUS_OK
     }
@@ -9367,7 +9460,7 @@ fn read_animation_options(
     values: &JDoubleArray<'_>,
 ) -> Result<sys::mln_animation_options, jint> {
     if !animation_arrays_are_valid(env, fields, values) {
-        return Err(sys::MLN_STATUS_INVALID_ARGUMENT);
+        return Err(jni_invalid_argument("JNI invalid argument"));
     }
     let mut field_values = [0 as jboolean; ANIMATION_FIELD_COUNT];
     let mut option_values = [0.0_f64; ANIMATION_VALUE_COUNT];
@@ -9378,7 +9471,7 @@ fn read_animation_options(
             .get_double_array_region(values, 0, &mut option_values)
             .is_err()
     {
-        return Err(sys::MLN_STATUS_INVALID_ARGUMENT);
+        return Err(jni_invalid_argument("JNI invalid argument"));
     }
 
     let mut animation = unsafe { sys::mln_animation_options_default() };
@@ -9412,7 +9505,7 @@ fn map_get_bool(
 ) -> jint {
     catch_unwind(AssertUnwindSafe(|| {
         if out_value.is_null() || env.get_array_length(&out_value).unwrap_or(0) < 1 {
-            return sys::MLN_STATUS_INVALID_ARGUMENT;
+            return jni_invalid_argument("JNI invalid argument");
         }
         let mut value = false;
         let result = unsafe { getter(map as *mut sys::mln_map, &mut value) };
@@ -9421,7 +9514,7 @@ fn map_get_bool(
                 .set_boolean_array_region(&out_value, 0, &[jboolean::from(value)])
                 .is_err()
         {
-            return sys::MLN_STATUS_INVALID_ARGUMENT;
+            return jni_invalid_argument("JNI invalid argument");
         }
         result
     }))
@@ -9733,7 +9826,7 @@ extern "system" fn map_pixels_for_lat_lngs(
             .set_double_array_region(&out_points, 0, &point_values)
             .is_err()
         {
-            sys::MLN_STATUS_INVALID_ARGUMENT
+            jni_invalid_argument("JNI invalid argument")
         } else {
             sys::MLN_STATUS_OK
         }
@@ -9796,7 +9889,7 @@ extern "system" fn map_lat_lngs_for_pixels(
             .set_double_array_region(&out_coordinates, 0, &coordinate_values)
             .is_err()
         {
-            sys::MLN_STATUS_INVALID_ARGUMENT
+            jni_invalid_argument("JNI invalid argument")
         } else {
             sys::MLN_STATUS_OK
         }
@@ -9809,17 +9902,17 @@ fn read_nonempty_coordinate_pairs(
     input: &JDoubleArray<'_>,
 ) -> Result<Vec<f64>, jint> {
     if input.is_null() {
-        return Err(sys::MLN_STATUS_INVALID_ARGUMENT);
+        return Err(jni_invalid_argument("JNI invalid argument"));
     }
     let input_length = env
         .get_array_length(input)
-        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
+        .map_err(|_| jni_invalid_argument("JNI invalid argument"))?;
     if input_length <= 0 || input_length % 2 != 0 {
-        return Err(sys::MLN_STATUS_INVALID_ARGUMENT);
+        return Err(jni_invalid_argument("JNI invalid argument"));
     }
     let mut values = vec![0.0_f64; input_length as usize];
     if env.get_double_array_region(input, 0, &mut values).is_err() {
-        return Err(sys::MLN_STATUS_INVALID_ARGUMENT);
+        return Err(jni_invalid_argument("JNI invalid argument"));
     }
     Ok(values)
 }
@@ -9829,11 +9922,11 @@ fn read_edge_insets(
     input: &JDoubleArray<'_>,
 ) -> Result<sys::mln_edge_insets, jint> {
     if input.is_null() || env.get_array_length(input).unwrap_or(0) < 4 {
-        return Err(sys::MLN_STATUS_INVALID_ARGUMENT);
+        return Err(jni_invalid_argument("JNI invalid argument"));
     }
     let mut values = [0.0_f64; 4];
     if env.get_double_array_region(input, 0, &mut values).is_err() {
-        return Err(sys::MLN_STATUS_INVALID_ARGUMENT);
+        return Err(jni_invalid_argument("JNI invalid argument"));
     }
     Ok(sys::mln_edge_insets {
         top: values[0],
@@ -9849,20 +9942,20 @@ fn read_double_pairs(
     output: &JDoubleArray<'_>,
 ) -> Result<Vec<f64>, jint> {
     if input.is_null() || output.is_null() {
-        return Err(sys::MLN_STATUS_INVALID_ARGUMENT);
+        return Err(jni_invalid_argument("JNI invalid argument"));
     }
     let input_length = env
         .get_array_length(input)
-        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
+        .map_err(|_| jni_invalid_argument("JNI invalid argument"))?;
     let output_length = env
         .get_array_length(output)
-        .map_err(|_| sys::MLN_STATUS_INVALID_ARGUMENT)?;
+        .map_err(|_| jni_invalid_argument("JNI invalid argument"))?;
     if input_length < 0 || input_length % 2 != 0 || output_length < input_length {
-        return Err(sys::MLN_STATUS_INVALID_ARGUMENT);
+        return Err(jni_invalid_argument("JNI invalid argument"));
     }
     let mut values = vec![0.0_f64; input_length as usize];
     if env.get_double_array_region(input, 0, &mut values).is_err() {
-        return Err(sys::MLN_STATUS_INVALID_ARGUMENT);
+        return Err(jni_invalid_argument("JNI invalid argument"));
     }
     Ok(values)
 }
@@ -9875,7 +9968,7 @@ extern "system" fn projection_create(
 ) -> jint {
     catch_unwind(AssertUnwindSafe(|| {
         if out_projection.is_null() || env.get_array_length(&out_projection).unwrap_or(0) < 1 {
-            return sys::MLN_STATUS_INVALID_ARGUMENT;
+            return jni_invalid_argument("JNI invalid argument");
         }
 
         let mut projection: *mut sys::mln_map_projection = std::ptr::null_mut();
@@ -9886,7 +9979,7 @@ extern "system" fn projection_create(
                 .set_long_array_region(&out_projection, 0, &[projection as jlong])
                 .is_err()
         {
-            return sys::MLN_STATUS_INVALID_ARGUMENT;
+            return jni_invalid_argument("JNI invalid argument");
         }
         result
     }))
@@ -9913,7 +10006,7 @@ extern "system" fn projection_get_camera(
 ) -> jint {
     catch_unwind(AssertUnwindSafe(|| {
         if !camera_arrays_are_valid(&env, &out_fields, &out_values) {
-            return sys::MLN_STATUS_INVALID_ARGUMENT;
+            return jni_invalid_argument("JNI invalid argument");
         }
         let mut camera = unsafe { sys::mln_camera_options_default() };
         let result = unsafe {
@@ -10113,13 +10206,13 @@ fn projection_get_double_pair(
 ) -> jint {
     catch_unwind(AssertUnwindSafe(|| {
         if out_array.is_null() || env.get_array_length(&out_array).unwrap_or(0) < 2 {
-            return sys::MLN_STATUS_INVALID_ARGUMENT;
+            return jni_invalid_argument("JNI invalid argument");
         }
         let mut out = [0.0_f64; 2];
         let result = fill(&mut out);
         if result == sys::MLN_STATUS_OK && env.set_double_array_region(&out_array, 0, &out).is_err()
         {
-            return sys::MLN_STATUS_INVALID_ARGUMENT;
+            return jni_invalid_argument("JNI invalid argument");
         }
         result
     }))
@@ -10128,7 +10221,7 @@ fn projection_get_double_pair(
 
 extern "system" fn thread_last_error_message(env: JNIEnv<'_>, _class: JClass<'_>) -> jstring {
     catch_unwind(AssertUnwindSafe(|| {
-        let diagnostic = capture_thread_diagnostic();
+        let diagnostic = capture_jni_or_c_thread_diagnostic();
         match env.new_string(diagnostic) {
             Ok(message) => message.into_raw(),
             Err(_) => JObject::null().into_raw(),

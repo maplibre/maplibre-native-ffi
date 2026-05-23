@@ -1,6 +1,41 @@
 [tasks.build]
-run = "../../gradlew :bindings:java-jni:build"
+depends = ["//bindings/java-jni:native:build"]
+run = '''
+JNI_LIBRARY_PATH="$(python3 tools/jni_library_path.py)"
+../../gradlew :bindings:java-jni:build --rerun-tasks \
+  -Dorg.maplibre.nativejni.library.path="$JNI_LIBRARY_PATH" \
+  -Dorg.maplibre.nativejni.tests.requireNative=true
+'''
+
+[tasks.verify]
+description = "Verify Java JNI SPEC inventories and native coverage."
+run = [
+  "python3 tools/verify_public_inventory.py",
+  "python3 tools/verify_internal_struct_inventory.py",
+  "python3 tools/verify_native_coverage.py",
+]
 
 [tasks."native:build"]
 depends = ["//:ensure-native-library"]
 run = "cargo build -p maplibre-native-jni"
+
+[tasks."test:native"]
+description = "Run Java JNI tests with the locally built JNI bridge loaded by exact path."
+depends = ["//bindings/java-jni:native:build"]
+run = '''
+JNI_LIBRARY_PATH="$(python3 tools/jni_library_path.py)"
+../../gradlew :bindings:java-jni:test --rerun-tasks \
+  -Dorg.maplibre.nativejni.library.path="$JNI_LIBRARY_PATH" \
+  -Dorg.maplibre.nativejni.tests.requireNative=true
+'''
+
+[tasks.check]
+description = "Run Java JNI branch-readiness checks."
+run = [
+  { task = "verify" },
+  { task = "native:build" },
+  "cargo check -p maplibre-native-jni",
+  "cargo test -p maplibre-native-jni",
+  { task = "test:native" },
+  "../../gradlew :bindings:java-jni:javadoc",
+]

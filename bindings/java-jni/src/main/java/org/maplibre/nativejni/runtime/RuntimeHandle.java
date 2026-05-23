@@ -1,12 +1,12 @@
 package org.maplibre.nativejni.runtime;
 
-import java.lang.foreign.MemorySegment;
 import java.lang.ref.WeakReference;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import org.maplibre.nativejni.error.InvalidStateException;
 import org.maplibre.nativejni.internal.access.InternalAccess;
 import org.maplibre.nativejni.internal.bridge.OfflineNative;
 import org.maplibre.nativejni.internal.bridge.RuntimeNative;
@@ -23,7 +23,7 @@ import org.maplibre.nativejni.offline.OfflineRegionStatus;
 import org.maplibre.nativejni.resource.ResourceProviderCallback;
 import org.maplibre.nativejni.resource.ResourceTransformCallback;
 
-/** API-parity scaffold for the Java JNI binding. */
+/** Owned native runtime handle. Close it on the owner thread. */
 public final class RuntimeHandle implements AutoCloseable {
   private final HandleState state;
   private final ConcurrentHashMap<Long, WeakReference<MapHandle>> liveMaps =
@@ -316,9 +316,14 @@ public final class RuntimeHandle implements AutoCloseable {
       return;
     }
     var operationId = operation.requireLive(this);
-    Status.check(
-        RuntimeNative.mln_runtime_offline_operation_discard(
-            state.requireLiveAddress(), operationId));
+    long runtimeAddress;
+    try {
+      runtimeAddress = state.requireLiveAddress();
+    } catch (InvalidStateException error) {
+      operation.markConsumed();
+      throw error;
+    }
+    Status.check(RuntimeNative.mln_runtime_offline_operation_discard(runtimeAddress, operationId));
     operation.markConsumed();
   }
 
@@ -375,9 +380,7 @@ public final class RuntimeHandle implements AutoCloseable {
         RuntimeStructs.runtimeEvent(
             longs, ints, booleans, doubles, strings, runtimeSource, mapSource);
     if (event.type() == RuntimeEventType.MAP_STYLE_LOADED) {
-      event
-          .mapSource()
-          .ifPresent(map -> map.releaseDetachedCustomGeometrySources(InternalAccess.INSTANCE));
+      event.mapSource().ifPresent(InternalAccess.INSTANCE::releaseDetachedCustomGeometrySources);
     }
     return Optional.of(event);
   }
@@ -397,27 +400,16 @@ public final class RuntimeHandle implements AutoCloseable {
     return state.isReleased();
   }
 
-  public MemorySegment nativeHandle(InternalAccess access) {
-    Objects.requireNonNull(access, "access");
-    return state.requireLiveSegment();
-  }
-
-  MemorySegment nativeHandle() {
-    return state.requireLiveSegment();
-  }
-
   long nativeAddress() {
     return state.requireLiveAddress();
   }
 
-  public void registerMap(InternalAccess access, MapHandle map) {
-    Objects.requireNonNull(access, "access");
+  void registerMap(MapHandle map) {
     Objects.requireNonNull(map, "map");
-    liveMaps.put(map.nativeAddress(InternalAccess.INSTANCE), new WeakReference<>(map));
+    liveMaps.put(InternalAccess.INSTANCE.nativeAddress(map), new WeakReference<>(map));
   }
 
-  public void unregisterMap(InternalAccess access, MapHandle map) {
-    Objects.requireNonNull(access, "access");
+  void unregisterMap(MapHandle map) {
     Objects.requireNonNull(map, "map");
     liveMaps.entrySet().removeIf(entry -> entry.getValue().get() == map);
   }

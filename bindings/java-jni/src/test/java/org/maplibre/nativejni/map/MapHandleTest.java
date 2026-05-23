@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -17,6 +18,7 @@ import org.maplibre.nativejni.camera.CameraFitOptions;
 import org.maplibre.nativejni.camera.CameraOptions;
 import org.maplibre.nativejni.camera.EdgeInsets;
 import org.maplibre.nativejni.camera.FreeCameraOptions;
+import org.maplibre.nativejni.error.InvalidArgumentException;
 import org.maplibre.nativejni.error.InvalidStateException;
 import org.maplibre.nativejni.geo.CanonicalTileId;
 import org.maplibre.nativejni.geo.Feature;
@@ -27,10 +29,11 @@ import org.maplibre.nativejni.geo.LatLngBounds;
 import org.maplibre.nativejni.geo.Quaternion;
 import org.maplibre.nativejni.geo.ScreenPoint;
 import org.maplibre.nativejni.geo.Vec3;
-import org.maplibre.nativejni.internal.access.InternalAccess;
+import org.maplibre.nativejni.internal.bridge.StyleNative;
 import org.maplibre.nativejni.json.JsonValue;
 import org.maplibre.nativejni.render.PremultipliedRgba8Image;
 import org.maplibre.nativejni.runtime.RuntimeHandle;
+import org.maplibre.nativejni.runtime.RuntimeOptions;
 import org.maplibre.nativejni.style.CustomGeometrySourceOptions;
 import org.maplibre.nativejni.style.LocationIndicatorImageKind;
 import org.maplibre.nativejni.style.RasterDemEncoding;
@@ -55,12 +58,53 @@ class MapHandleTest {
 
       assertFalse(map.isClosed());
       assertSame(runtime, map.runtime());
-      assertTrue(map.nativeAddress(InternalAccess.INSTANCE) != 0);
+      assertTrue(map.nativeAddress() != 0);
 
       map.close();
       assertTrue(map.isClosed());
       map.close();
-      assertThrows(InvalidStateException.class, () -> map.nativeAddress(InternalAccess.INSTANCE));
+      assertThrows(InvalidStateException.class, map::nativeAddress);
+    }
+  }
+
+  @Test
+  void invalidDimensionsReportSpecificJniDiagnostic() {
+    assertThrows(
+        InvalidArgumentException.class,
+        () -> RuntimeHandle.create(new RuntimeOptions().assetPath("asset\0path")));
+
+    try (var runtime = RuntimeHandle.create()) {
+      var error =
+          assertThrows(
+              InvalidArgumentException.class,
+              () -> MapHandle.create(runtime, new MapOptions().size(-1, 1)));
+      assertTrue(error.diagnostic().contains("width and height"));
+    }
+  }
+
+  @Test
+  void sourceOptionsRejectNegativeIntegralOptionsBeforeCast() {
+    try (var runtime = RuntimeHandle.create()) {
+      try (var map = MapHandle.create(runtime, new MapOptions().size(64, 64))) {
+        assertThrows(
+            InvalidArgumentException.class,
+            () ->
+                map.addVectorSourceUrl(
+                    "negative-tile-size",
+                    "https://example.com/vector.json",
+                    new TileSourceOptions().tileSize(-1)));
+        assertThrows(
+            InvalidArgumentException.class,
+            () ->
+                map.addCustomGeometrySource(
+                    "negative-buffer", new CustomGeometrySourceOptions(tileId -> {}).buffer(-1)));
+        assertThrows(
+            InvalidArgumentException.class,
+            () ->
+                map.addCustomGeometrySource(
+                    "negative-custom-tile-size",
+                    new CustomGeometrySourceOptions(tileId -> {}).tileSize(-1)));
+      }
     }
   }
 
@@ -354,6 +398,8 @@ class MapHandleTest {
                 .wrap(false));
         assertEquals(1, map.customGeometrySourceCountForTesting());
         assertEquals(SourceType.CUSTOM_VECTOR, map.styleSourceType("custom-source").orElseThrow());
+        var customState = customGeometrySourceState(map, "custom-source");
+        var customStateAddress = customState.address();
         var customTile = new CanonicalTileId(0, 0, 0);
         map.setCustomGeometrySourceTileData(
             "custom-source", customTile, GeoJson.featureCollection(List.of()));
@@ -362,6 +408,7 @@ class MapHandleTest {
             "custom-source", new LatLngBounds(new LatLng(-1.0, -2.0), new LatLng(1.0, 2.0)));
         assertTrue(map.removeStyleSource("custom-source"));
         assertEquals(0, map.customGeometrySourceCountForTesting());
+        StyleNative.mln_custom_geometry_source_state_destroy(customStateAddress);
 
         map.addVectorSourceUrl(
             "vector-source",
@@ -500,6 +547,19 @@ class MapHandleTest {
         map.requestRepaint();
         assertThrows(InvalidStateException.class, map::requestStillImage);
       }
+    }
+  }
+
+  @SuppressWarnings("unchecked")
+  private static CustomGeometrySourceState customGeometrySourceState(
+      MapHandle map, String sourceId) {
+    try {
+      var field = MapHandle.class.getDeclaredField("customGeometrySources");
+      field.setAccessible(true);
+      var states = (Map<String, CustomGeometrySourceState>) field.get(map);
+      return states.get(sourceId);
+    } catch (ReflectiveOperationException error) {
+      throw new AssertionError(error);
     }
   }
 }

@@ -22,30 +22,31 @@ final class GlobalReferenceTest {
   }
 
   @Test
-  void logCallbackGlobalReferencesReleaseOnReplaceAndClear() {
+  void logCallbackGlobalReferencesReleaseAfterReplaceAndClear() {
     var first = installCallback();
     var second = installCallback();
 
-    awaitCleared(first);
+    assertReleased(first);
     Maplibre.clearLogCallback();
-    awaitCleared(second);
+    assertReleased(second);
   }
 
   private static WeakReference<LogCallback> installCallback() {
-    LogCallback callback =
-        new LogCallback() {
-          @Override
-          public boolean log(org.maplibre.nativejni.log.LogRecord record) {
-            return true;
-          }
-        };
+    LogCallback callback = new CapturingLogCallback(new Object());
     var reference = new WeakReference<>(callback);
     Maplibre.setLogCallback(callback);
     return reference;
   }
 
-  private static void awaitCleared(WeakReference<?> reference) {
-    for (var i = 0; i < 20 && reference.get() != null; i++) {
+  private record CapturingLogCallback(Object marker) implements LogCallback {
+    @Override
+    public boolean log(org.maplibre.nativejni.log.LogRecord record) {
+      return marker != null;
+    }
+  }
+
+  private static void assertReleased(WeakReference<?> reference) {
+    for (var i = 0; i < 20; i++) {
       System.gc();
       try {
         Thread.sleep(10);

@@ -8,7 +8,7 @@ import org.maplibre.nativejni.internal.loader.NativeLibrary;
 final class AndroidLoadTest {
   @Test
   void androidPackagingIsDocumentedAsOutOfScopeForThisJvmSuite() {
-    assertTrue(NativeLibrary.LIBRARY_NAME.contains("maplibre-native-jni"));
+    assertTrue(NativeLibrary.LIBRARY_NAME.contains("maplibre_native_jni"));
     assertTrue(System.getProperty("java.vm.name", "").length() > 0);
   }
 }

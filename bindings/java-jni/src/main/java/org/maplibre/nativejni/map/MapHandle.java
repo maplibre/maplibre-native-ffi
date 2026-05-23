@@ -1,6 +1,5 @@
 package org.maplibre.nativejni.map;
 
-import java.lang.foreign.MemorySegment;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.EnumSet;
@@ -51,7 +50,7 @@ import org.maplibre.nativejni.style.StyleImageInfo;
 import org.maplibre.nativejni.style.StyleImageOptions;
 import org.maplibre.nativejni.style.TileSourceOptions;
 
-/** API-parity scaffold for the Java JNI binding. */
+/** Owned native map handle. Close it on the map owner thread. */
 public final class MapHandle implements AutoCloseable {
   static final int CAMERA_FIELD_COUNT = 9;
   static final int CAMERA_VALUE_COUNT = 14;
@@ -76,7 +75,7 @@ public final class MapHandle implements AutoCloseable {
   private MapHandle(RuntimeHandle runtime, long handle) {
     this.runtime = Objects.requireNonNull(runtime, "runtime");
     this.state = new HandleState("MapHandle", handle, runtime);
-    runtime.registerMap(InternalAccess.INSTANCE, this);
+    InternalAccess.INSTANCE.registerMap(runtime, this);
   }
 
   public static MapHandle create(RuntimeHandle runtime, MapOptions options) {
@@ -86,7 +85,7 @@ public final class MapHandle implements AutoCloseable {
     var outMap = new long[1];
     Status.check(
         MapNative.mln_map_create(
-            runtime.nativeHandle(InternalAccess.INSTANCE).address(),
+            InternalAccess.INSTANCE.nativeAddress(runtime),
             options.width() == null ? 512 : options.width(),
             options.height() == null ? 512 : options.height(),
             options.scaleFactor() == null ? 1.0 : options.scaleFactor(),
@@ -1728,7 +1727,7 @@ public final class MapHandle implements AutoCloseable {
         MapNative::mln_map_destroy,
         () -> {
           clearCustomGeometrySources();
-          runtime.unregisterMap(InternalAccess.INSTANCE, this);
+          InternalAccess.INSTANCE.unregisterMap(runtime, this);
         });
   }
 
@@ -1740,27 +1739,8 @@ public final class MapHandle implements AutoCloseable {
     return runtime;
   }
 
-  public MemorySegment nativeHandle(InternalAccess access) {
-    Objects.requireNonNull(access, "access");
-    return state.requireLiveSegment();
-  }
-
-  MemorySegment nativeHandle() {
-    return state.requireLiveSegment();
-  }
-
-  public long nativeAddress(InternalAccess access) {
-    Objects.requireNonNull(access, "access");
-    return state.requireLiveAddress();
-  }
-
   long nativeAddress() {
     return state.requireLiveAddress();
-  }
-
-  public void releaseDetachedCustomGeometrySources(InternalAccess access) {
-    Objects.requireNonNull(access, "access");
-    releaseDetachedCustomGeometrySources();
   }
 
   void releaseDetachedCustomGeometrySources() {

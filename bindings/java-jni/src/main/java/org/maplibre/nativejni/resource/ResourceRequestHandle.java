@@ -1,6 +1,5 @@
 package org.maplibre.nativejni.resource;
 
-import java.lang.foreign.MemorySegment;
 import java.lang.ref.Cleaner;
 import java.util.Objects;
 import java.util.function.Consumer;
@@ -11,7 +10,13 @@ import org.maplibre.nativejni.internal.bridge.RuntimeNative;
 import org.maplibre.nativejni.internal.status.Status;
 import org.maplibre.nativejni.internal.struct.ResourceStructs;
 
-/** Owned handle for a resource provider request that Java chose to handle. */
+/**
+ * Owned handle for a resource provider request that Java chose to handle.
+ *
+ * <p>Call {@link #complete(ResourceResponse)} to send a response, or {@link #close()} when a
+ * handled request will not receive one. Successful completion releases the native provider
+ * reference, so a completed handle rejects further use. Closing is harmless after completion.
+ */
 public final class ResourceRequestHandle implements AutoCloseable {
   private static final Cleaner CLEANER = Cleaner.create();
 
@@ -22,22 +27,12 @@ public final class ResourceRequestHandle implements AutoCloseable {
   private boolean closed;
   private boolean completed;
 
-  public ResourceRequestHandle(InternalAccess access, MemorySegment handle) {
-    this(address(handle));
-    Objects.requireNonNull(access, "access");
-  }
-
-  ResourceRequestHandle(MemorySegment handle) {
-    this(address(handle));
-  }
-
-  ResourceRequestHandle(MemorySegment handle, Consumer<MemorySegment> releaser) {
-    this(address(handle), address -> releaser.accept(MemorySegment.ofAddress(address)));
-    Objects.requireNonNull(releaser, "releaser");
+  ResourceRequestHandle(long handle, Consumer<Long> releaser) {
+    this(handle, consumerReleaser(releaser));
   }
 
   ResourceRequestHandle(long handle) {
-    this(handle, RuntimeNative::mln_resource_request_release);
+    this(handle, (LongReleaser) RuntimeNative::mln_resource_request_release);
   }
 
   private ResourceRequestHandle(long handle, LongReleaser releaser) {
@@ -83,7 +78,7 @@ public final class ResourceRequestHandle implements AutoCloseable {
     }
   }
 
-  public synchronized int finishProviderDecision(
+  synchronized int finishProviderDecision(
       InternalAccess access, ResourceProviderDecision decision) {
     Objects.requireNonNull(access, "access");
     return finishProviderDecision(decision);
@@ -103,7 +98,7 @@ public final class ResourceRequestHandle implements AutoCloseable {
     return ResourceProviderDecision.PASS_THROUGH.nativeValue();
   }
 
-  public synchronized int finishProviderException(InternalAccess access) {
+  synchronized int finishProviderException(InternalAccess access) {
     Objects.requireNonNull(access, "access");
     return finishProviderException();
   }
@@ -135,8 +130,9 @@ public final class ResourceRequestHandle implements AutoCloseable {
     }
   }
 
-  private static long address(MemorySegment handle) {
-    return Objects.requireNonNull(handle, "handle").address();
+  private static LongReleaser consumerReleaser(Consumer<Long> releaser) {
+    Objects.requireNonNull(releaser, "releaser");
+    return releaser::accept;
   }
 
   @FunctionalInterface

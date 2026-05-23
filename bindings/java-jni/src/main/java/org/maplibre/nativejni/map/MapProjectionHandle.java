@@ -13,7 +13,7 @@ import org.maplibre.nativejni.internal.lifecycle.HandleState;
 import org.maplibre.nativejni.internal.loader.NativeLibrary;
 import org.maplibre.nativejni.internal.status.Status;
 
-/** API-parity scaffold for the Java JNI binding. */
+/** Owned standalone projection snapshot created from a map. */
 public final class MapProjectionHandle implements AutoCloseable {
   private final HandleState state;
 
@@ -27,7 +27,7 @@ public final class MapProjectionHandle implements AutoCloseable {
     var outProjection = new long[1];
     Status.check(
         ProjectionNative.mln_map_projection_create(
-            map.nativeAddress(InternalAccess.INSTANCE), outProjection));
+            InternalAccess.INSTANCE.nativeAddress(map), outProjection));
     return new MapProjectionHandle(outProjection[0]);
   }
 
