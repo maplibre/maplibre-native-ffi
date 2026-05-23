@@ -46,7 +46,9 @@ import org.maplibre.nativeffi.internal.c.mln_runtime_options_default
 import org.maplibre.nativeffi.internal.c.mln_runtime_poll_event
 import org.maplibre.nativeffi.internal.c.mln_runtime_run_ambient_cache_operation_start
 import org.maplibre.nativeffi.internal.c.mln_runtime_run_once
+import org.maplibre.nativeffi.internal.c.mln_runtime_set_resource_provider
 import org.maplibre.nativeffi.internal.c.mln_runtime_set_resource_transform
+import org.maplibre.nativeffi.internal.callback.ResourceProviderState
 import org.maplibre.nativeffi.internal.callback.ResourceTransformState
 import org.maplibre.nativeffi.internal.lifecycle.HandleState
 import org.maplibre.nativeffi.internal.memory.MemoryUtil
@@ -57,6 +59,7 @@ import org.maplibre.nativeffi.offline.OfflineRegionDefinition
 import org.maplibre.nativeffi.offline.OfflineRegionDownloadState
 import org.maplibre.nativeffi.offline.OfflineRegionInfo
 import org.maplibre.nativeffi.offline.OfflineRegionStatus
+import org.maplibre.nativeffi.resource.ResourceProviderCallback
 import org.maplibre.nativeffi.resource.ResourceTransformCallback
 
 /** Owned native runtime handle. Close it on the owner thread. */
@@ -65,6 +68,7 @@ public class RuntimeHandle private constructor(handle: CPointer<mln_runtime>) : 
   private val state = HandleState("RuntimeHandle", handle)
   private val liveMaps = mutableMapOf<Long, MapHandle>()
   private var resourceTransformState: ResourceTransformState? = null
+  private var resourceProviderState: ResourceProviderState? = null
 
   public fun runOnce() {
     Status.check(mln_runtime_run_once(state.requireLive()))
@@ -383,6 +387,20 @@ public class RuntimeHandle private constructor(handle: CPointer<mln_runtime>) : 
     operation.markConsumed()
   }
 
+  public fun setResourceProvider(callback: ResourceProviderCallback) {
+    val replacement = ResourceProviderState(callback)
+    val previous: ResourceProviderState?
+    try {
+      Status.check(mln_runtime_set_resource_provider(state.requireLive(), replacement.descriptor()))
+      previous = resourceProviderState
+      resourceProviderState = replacement
+    } catch (error: Throwable) {
+      replacement.close()
+      throw error
+    }
+    previous?.close()
+  }
+
   public fun setResourceTransform(callback: ResourceTransformCallback) {
     val replacement = ResourceTransformState(callback)
     val previous: ResourceTransformState?
@@ -435,7 +453,9 @@ public class RuntimeHandle private constructor(handle: CPointer<mln_runtime>) : 
 
   override fun close() {
     state.closeOnce(::mln_runtime_destroy) {
+      resourceProviderState?.close()
       resourceTransformState?.close()
+      resourceProviderState = null
       resourceTransformState = null
     }
   }
