@@ -9,6 +9,78 @@ package capi
 
 static inline void* mln_go_ptr(uintptr_t value) { return (void*)value; }
 
+static inline mln_json_value mln_go_json_null(void) {
+  mln_json_value value;
+  value.size = sizeof(mln_json_value);
+  value.type = MLN_JSON_VALUE_TYPE_NULL;
+  return value;
+}
+
+static inline mln_json_value mln_go_json_bool(bool raw) {
+  mln_json_value value;
+  value.size = sizeof(mln_json_value);
+  value.type = MLN_JSON_VALUE_TYPE_BOOL;
+  value.data.bool_value = raw;
+  return value;
+}
+
+static inline mln_json_value mln_go_json_uint(uint64_t raw) {
+  mln_json_value value;
+  value.size = sizeof(mln_json_value);
+  value.type = MLN_JSON_VALUE_TYPE_UINT;
+  value.data.uint_value = raw;
+  return value;
+}
+
+static inline mln_json_value mln_go_json_int(int64_t raw) {
+  mln_json_value value;
+  value.size = sizeof(mln_json_value);
+  value.type = MLN_JSON_VALUE_TYPE_INT;
+  value.data.int_value = raw;
+  return value;
+}
+
+static inline mln_json_value mln_go_json_double(double raw) {
+  mln_json_value value;
+  value.size = sizeof(mln_json_value);
+  value.type = MLN_JSON_VALUE_TYPE_DOUBLE;
+  value.data.double_value = raw;
+  return value;
+}
+
+static inline mln_json_value mln_go_json_string(mln_string_view raw) {
+  mln_json_value value;
+  value.size = sizeof(mln_json_value);
+  value.type = MLN_JSON_VALUE_TYPE_STRING;
+  value.data.string_value = raw;
+  return value;
+}
+
+static inline mln_json_value mln_go_json_array(const mln_json_value* values, size_t count) {
+  mln_json_value value;
+  value.size = sizeof(mln_json_value);
+  value.type = MLN_JSON_VALUE_TYPE_ARRAY;
+  value.data.array_value.values = values;
+  value.data.array_value.value_count = count;
+  return value;
+}
+
+static inline mln_json_member mln_go_json_member(mln_string_view key, const mln_json_value* raw) {
+  mln_json_member member;
+  member.key = key;
+  member.value = raw;
+  return member;
+}
+
+static inline mln_json_value mln_go_json_object(const mln_json_member* members, size_t count) {
+  mln_json_value value;
+  value.size = sizeof(mln_json_value);
+  value.type = MLN_JSON_VALUE_TYPE_OBJECT;
+  value.data.object_value.members = members;
+  value.data.object_value.member_count = count;
+  return value;
+}
+
 static inline mln_offline_region_definition mln_go_offline_tile_pyramid_region_definition(
   const char* style_url, mln_lat_lng_bounds bounds, double min_zoom, double max_zoom,
   float pixel_ratio, bool include_ideographs
@@ -39,7 +111,11 @@ static inline mln_offline_tile_pyramid_region_definition mln_go_offline_region_i
 }
 */
 import "C"
-import "unsafe"
+import (
+	"fmt"
+	"math"
+	"unsafe"
+)
 
 // Runtime is an opaque native runtime handle.
 type Runtime struct{ _ byte }
@@ -1402,6 +1478,19 @@ func MapSetStyleJSON(m *Map, json string) Status {
 	return Status(C.mln_map_set_style_json((*C.mln_map)(unsafe.Pointer(m)), cJSON))
 }
 
+// MapAddStyleSourceJSON adds one style source from a style-spec JSON object.
+func MapAddStyleSourceJSON(m *Map, sourceID string, sourceJSON any) (Status, error) {
+	view := newStringView(sourceID)
+	defer view.free()
+	materializer := newJSONMaterializer()
+	defer materializer.free()
+	rawJSON, err := materializer.value(sourceJSON)
+	if err != nil {
+		return StatusInvalidArgument, err
+	}
+	return Status(C.mln_map_add_style_source_json((*C.mln_map)(unsafe.Pointer(m)), view.raw(), &rawJSON)), nil
+}
+
 // MapRemoveStyleSource removes one style source by ID.
 func MapRemoveStyleSource(m *Map, sourceID string, outRemoved *bool) Status {
 	view := newStringView(sourceID)
@@ -1991,6 +2080,123 @@ func styleSourceInfoFromC(info C.mln_style_source_info) StyleSourceInfo {
 		HasAttribution:  bool(info.has_attribution),
 		AttributionSize: uint64(info.attribution_size),
 	}
+}
+
+type jsonMaterializer struct {
+	allocations []unsafe.Pointer
+}
+
+func newJSONMaterializer() *jsonMaterializer {
+	return &jsonMaterializer{}
+}
+
+func (materializer *jsonMaterializer) free() {
+	for i := len(materializer.allocations) - 1; i >= 0; i-- {
+		C.free(materializer.allocations[i])
+	}
+}
+
+func (materializer *jsonMaterializer) alloc(size C.size_t) unsafe.Pointer {
+	ptr := C.malloc(size)
+	materializer.allocations = append(materializer.allocations, ptr)
+	return ptr
+}
+
+func (materializer *jsonMaterializer) bytes(value string) C.mln_string_view {
+	if len(value) == 0 {
+		return C.mln_string_view{}
+	}
+	ptr := C.CBytes([]byte(value))
+	materializer.allocations = append(materializer.allocations, ptr)
+	return C.mln_string_view{data: (*C.char)(ptr), size: C.size_t(len(value))}
+}
+
+func (materializer *jsonMaterializer) value(value any) (C.mln_json_value, error) {
+	switch typed := value.(type) {
+	case nil:
+		return C.mln_go_json_null(), nil
+	case bool:
+		return C.mln_go_json_bool(C.bool(typed)), nil
+	case string:
+		return C.mln_go_json_string(materializer.bytes(typed)), nil
+	case int:
+		return C.mln_go_json_int(C.int64_t(typed)), nil
+	case int8:
+		return C.mln_go_json_int(C.int64_t(typed)), nil
+	case int16:
+		return C.mln_go_json_int(C.int64_t(typed)), nil
+	case int32:
+		return C.mln_go_json_int(C.int64_t(typed)), nil
+	case int64:
+		return C.mln_go_json_int(C.int64_t(typed)), nil
+	case uint:
+		return C.mln_go_json_uint(C.uint64_t(typed)), nil
+	case uint8:
+		return C.mln_go_json_uint(C.uint64_t(typed)), nil
+	case uint16:
+		return C.mln_go_json_uint(C.uint64_t(typed)), nil
+	case uint32:
+		return C.mln_go_json_uint(C.uint64_t(typed)), nil
+	case uint64:
+		return C.mln_go_json_uint(C.uint64_t(typed)), nil
+	case float32:
+		return materializer.float(float64(typed))
+	case float64:
+		return materializer.float(typed)
+	case []any:
+		return materializer.array(typed)
+	case []string:
+		values := make([]any, len(typed))
+		for i, item := range typed {
+			values[i] = item
+		}
+		return materializer.array(values)
+	case map[string]any:
+		return materializer.object(typed)
+	default:
+		return C.mln_json_value{}, fmt.Errorf("unsupported JSON value type %T", value)
+	}
+}
+
+func (materializer *jsonMaterializer) float(value float64) (C.mln_json_value, error) {
+	if math.IsNaN(value) || math.IsInf(value, 0) {
+		return C.mln_json_value{}, fmt.Errorf("JSON double value must be finite")
+	}
+	return C.mln_go_json_double(C.double(value)), nil
+}
+
+func (materializer *jsonMaterializer) array(values []any) (C.mln_json_value, error) {
+	if len(values) == 0 {
+		return C.mln_go_json_array(nil, 0), nil
+	}
+	rawValues := (*C.mln_json_value)(materializer.alloc(C.size_t(len(values)) * C.size_t(unsafe.Sizeof(C.mln_json_value{}))))
+	for i, item := range values {
+		rawValue, err := materializer.value(item)
+		if err != nil {
+			return C.mln_json_value{}, err
+		}
+		*(*C.mln_json_value)(unsafe.Add(unsafe.Pointer(rawValues), uintptr(i)*unsafe.Sizeof(C.mln_json_value{}))) = rawValue
+	}
+	return C.mln_go_json_array(rawValues, C.size_t(len(values))), nil
+}
+
+func (materializer *jsonMaterializer) object(members map[string]any) (C.mln_json_value, error) {
+	if len(members) == 0 {
+		return C.mln_go_json_object(nil, 0), nil
+	}
+	rawMembers := (*C.mln_json_member)(materializer.alloc(C.size_t(len(members)) * C.size_t(unsafe.Sizeof(C.mln_json_member{}))))
+	i := 0
+	for key, item := range members {
+		rawValue, err := materializer.value(item)
+		if err != nil {
+			return C.mln_json_value{}, err
+		}
+		valuePtr := (*C.mln_json_value)(materializer.alloc(C.size_t(unsafe.Sizeof(C.mln_json_value{}))))
+		*valuePtr = rawValue
+		*(*C.mln_json_member)(unsafe.Add(unsafe.Pointer(rawMembers), uintptr(i)*unsafe.Sizeof(C.mln_json_member{}))) = C.mln_go_json_member(materializer.bytes(key), valuePtr)
+		i++
+	}
+	return C.mln_go_json_object(rawMembers, C.size_t(len(members))), nil
 }
 
 func latLngToC(coordinate LatLng) C.mln_lat_lng {

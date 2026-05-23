@@ -36,6 +36,27 @@ func styleSourceInfoFromCAPI(info capi.StyleSourceInfo) StyleSourceInfo {
 	}
 }
 
+// AddStyleSourceJSON adds one style source from a style-spec source JSON object.
+// sourceJSON may contain nil, bool, string, integer, finite float, []any, and
+// map[string]any values.
+func (m *MapHandle) AddStyleSourceJSON(sourceID string, sourceJSON any) error {
+	ptr, err := m.ptr()
+	if err != nil {
+		return err
+	}
+	defer m.state.KeepAlive()
+	var materialErr error
+	err = checkNative(func() capi.Status {
+		var status capi.Status
+		status, materialErr = capi.MapAddStyleSourceJSON(ptr, sourceID, sourceJSON)
+		return status
+	})
+	if materialErr != nil {
+		return newBindingError(ErrInvalidArgument, materialErr.Error())
+	}
+	return err
+}
+
 // RemoveStyleSource removes one style source by ID and reports whether it was
 // present.
 func (m *MapHandle) RemoveStyleSource(sourceID string) (bool, error) {

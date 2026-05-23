@@ -1165,6 +1165,66 @@ func TestStyleSourceMetadataForMissingSources(t *testing.T) {
 	}
 }
 
+func TestAddStyleSourceJSONCopiesGoJSONDescriptor(t *testing.T) {
+	runtime, err := NewRuntime()
+	if err != nil {
+		t.Fatalf("NewRuntime(): %v", err)
+	}
+	m, err := runtime.NewMap()
+	if err != nil {
+		_ = runtime.Close()
+		t.Fatalf("NewMap(): %v", err)
+	}
+	defer func() {
+		if err := m.Close(); err != nil {
+			t.Errorf("Map Close(): %v", err)
+		}
+		if err := runtime.Close(); err != nil {
+			t.Errorf("Runtime Close(): %v", err)
+		}
+	}()
+
+	if err := m.SetStyleJSON(`{"version":8,"sources":{},"layers":[]}`); err != nil {
+		t.Fatalf("SetStyleJSON(empty style): %v", err)
+	}
+	source := map[string]any{
+		"type": "geojson",
+		"data": map[string]any{
+			"type":     "FeatureCollection",
+			"features": []any{},
+		},
+		"attribution": "unit-test",
+	}
+	if err := m.AddStyleSourceJSON("go-json-source", source); err != nil {
+		t.Fatalf("AddStyleSourceJSON(): %v", err)
+	}
+	source["type"] = "mutated-after-call"
+	exists, err := m.StyleSourceExists("go-json-source")
+	if err != nil {
+		t.Fatalf("StyleSourceExists(): %v", err)
+	}
+	if !exists {
+		t.Fatalf("StyleSourceExists(go-json-source) = false, want true")
+	}
+	sourceType, found, err := m.StyleSourceType("go-json-source")
+	if err != nil {
+		t.Fatalf("StyleSourceType(): %v", err)
+	}
+	if !found || sourceType != StyleSourceTypeGeoJSON {
+		t.Fatalf("StyleSourceType(go-json-source) = (%v, %v), want GeoJSON true", sourceType, found)
+	}
+	info, found, err := m.StyleSourceInfo("go-json-source")
+	if err != nil {
+		t.Fatalf("StyleSourceInfo(): %v", err)
+	}
+	if !found || info.IDSize != uint64(len("go-json-source")) {
+		t.Fatalf("StyleSourceInfo(go-json-source) = (%#v, %v), want copied ID size", info, found)
+	}
+	if err := m.AddStyleSourceJSON("bad-json-source", map[string]any{"type": make(chan int)}); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("AddStyleSourceJSON(unsupported Go value) error = %v, want ErrInvalidArgument", err)
+	}
+}
+
 func TestStyleLayerMetadataForMissingLayers(t *testing.T) {
 	runtime, err := NewRuntime()
 	if err != nil {
