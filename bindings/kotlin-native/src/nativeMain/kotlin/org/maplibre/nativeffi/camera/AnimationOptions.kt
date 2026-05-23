@@ -16,11 +16,17 @@ public class AnimationOptions {
 
   public fun hasDurationMillis(): Boolean = durationMillis != null
 
+  public fun hasDurationMs(): Boolean = hasDurationMillis()
+
   public fun durationMillis(durationMillis: Double): AnimationOptions = apply {
     this.durationMillis = durationMillis
   }
 
+  public fun durationMs(durationMs: Double): AnimationOptions = durationMillis(durationMs)
+
   public fun clearDurationMillis(): AnimationOptions = apply { durationMillis = null }
+
+  public fun clearDurationMs(): AnimationOptions = clearDurationMillis()
 
   public fun hasVelocity(): Boolean = velocity != null
 
