@@ -454,6 +454,31 @@ func (m *MapHandle) SetBounds(options BoundOptions) error {
 	return checkNative(func() capi.Status { return capi.MapSetBounds(ptr, options.toCAPI()) })
 }
 
+// FreeCameraOptions returns current free camera position and orientation.
+func (m *MapHandle) FreeCameraOptions() (FreeCameraOptions, error) {
+	ptr, err := m.ptr()
+	if err != nil {
+		return FreeCameraOptions{}, err
+	}
+	defer m.state.KeepAlive()
+	var raw capi.FreeCameraOptions
+	if err := checkNative(func() capi.Status { return capi.MapGetFreeCameraOptions(ptr, &raw) }); err != nil {
+		return FreeCameraOptions{}, err
+	}
+	return freeCameraOptionsFromCAPI(raw), nil
+}
+
+// SetFreeCameraOptions applies selected free camera position and orientation
+// fields.
+func (m *MapHandle) SetFreeCameraOptions(options FreeCameraOptions) error {
+	ptr, err := m.ptr()
+	if err != nil {
+		return err
+	}
+	defer m.state.KeepAlive()
+	return checkNative(func() capi.Status { return capi.MapSetFreeCameraOptions(ptr, options.toCAPI()) })
+}
+
 // ViewportOptions returns live map viewport and render-transform controls.
 func (m *MapHandle) ViewportOptions() (ViewportOptions, error) {
 	ptr, err := m.ptr()

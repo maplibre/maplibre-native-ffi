@@ -28,6 +28,21 @@ type ProjectedMeters struct {
 	Easting  float64
 }
 
+// Vec3 is a three-component vector.
+type Vec3 struct {
+	X float64
+	Y float64
+	Z float64
+}
+
+// Quaternion stores x, y, z, w components.
+type Quaternion struct {
+	X float64
+	Y float64
+	Z float64
+	W float64
+}
+
 // LatLngBounds is a geographic bounds rectangle in degrees.
 type LatLngBounds struct {
 	Southwest LatLng
@@ -64,6 +79,22 @@ func (meters ProjectedMeters) toCAPI() capi.ProjectedMeters {
 
 func projectedMetersFromCAPI(meters capi.ProjectedMeters) ProjectedMeters {
 	return ProjectedMeters{Northing: meters.Northing, Easting: meters.Easting}
+}
+
+func (vector Vec3) toCAPI() capi.Vec3 {
+	return capi.Vec3{X: vector.X, Y: vector.Y, Z: vector.Z}
+}
+
+func vec3FromCAPI(vector capi.Vec3) Vec3 {
+	return Vec3{X: vector.X, Y: vector.Y, Z: vector.Z}
+}
+
+func (quaternion Quaternion) toCAPI() capi.Quaternion {
+	return capi.Quaternion{X: quaternion.X, Y: quaternion.Y, Z: quaternion.Z, W: quaternion.W}
+}
+
+func quaternionFromCAPI(quaternion capi.Quaternion) Quaternion {
+	return Quaternion{X: quaternion.X, Y: quaternion.Y, Z: quaternion.Z, W: quaternion.W}
 }
 
 func (bounds LatLngBounds) toCAPI() capi.LatLngBounds {

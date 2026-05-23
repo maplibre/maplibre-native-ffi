@@ -346,6 +346,52 @@ func boundOptionsFromCAPI(raw capi.BoundOptions) BoundOptions {
 	return options
 }
 
+// FreeCameraOptions configures camera position and orientation directly.
+type FreeCameraOptions struct {
+	Position    *Vec3
+	Orientation *Quaternion
+}
+
+// WithPosition returns a copy that sets free camera position.
+func (options FreeCameraOptions) WithPosition(position Vec3) FreeCameraOptions {
+	options.Position = new(Vec3)
+	*options.Position = position
+	return options
+}
+
+// WithOrientation returns a copy that sets free camera orientation.
+func (options FreeCameraOptions) WithOrientation(orientation Quaternion) FreeCameraOptions {
+	options.Orientation = new(Quaternion)
+	*options.Orientation = orientation
+	return options
+}
+
+func (options FreeCameraOptions) toCAPI() capi.FreeCameraOptions {
+	var raw capi.FreeCameraOptions
+	if options.Position != nil {
+		raw.Fields |= capi.FreeCameraOptionPosition
+		raw.Position = options.Position.toCAPI()
+	}
+	if options.Orientation != nil {
+		raw.Fields |= capi.FreeCameraOptionOrientation
+		raw.Orientation = options.Orientation.toCAPI()
+	}
+	return raw
+}
+
+func freeCameraOptionsFromCAPI(raw capi.FreeCameraOptions) FreeCameraOptions {
+	var options FreeCameraOptions
+	if raw.Fields&capi.FreeCameraOptionPosition != 0 {
+		value := vec3FromCAPI(raw.Position)
+		options.Position = &value
+	}
+	if raw.Fields&capi.FreeCameraOptionOrientation != 0 {
+		value := quaternionFromCAPI(raw.Orientation)
+		options.Orientation = &value
+	}
+	return options
+}
+
 // NorthOrientation controls which screen edge points north.
 type NorthOrientation uint32
 

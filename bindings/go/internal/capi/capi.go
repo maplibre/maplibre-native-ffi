@@ -172,6 +172,28 @@ type BoundOptions struct {
 	MaxPitch float64
 }
 
+// Vec3 is a three-component vector.
+type Vec3 struct {
+	X float64
+	Y float64
+	Z float64
+}
+
+// Quaternion stores x, y, z, w components.
+type Quaternion struct {
+	X float64
+	Y float64
+	Z float64
+	W float64
+}
+
+// FreeCameraOptions contains semantic free camera fields.
+type FreeCameraOptions struct {
+	Fields      uint32
+	Position    Vec3
+	Orientation Quaternion
+}
+
 // OfflineTilePyramidRegionDefinition contains tile-pyramid offline region data.
 type OfflineTilePyramidRegionDefinition struct {
 	StyleURL          string
@@ -361,6 +383,11 @@ const (
 	BoundOptionMaxZoom  uint32 = uint32(C.MLN_BOUND_OPTION_MAX_ZOOM)
 	BoundOptionMinPitch uint32 = uint32(C.MLN_BOUND_OPTION_MIN_PITCH)
 	BoundOptionMaxPitch uint32 = uint32(C.MLN_BOUND_OPTION_MAX_PITCH)
+)
+
+const (
+	FreeCameraOptionPosition    uint32 = uint32(C.MLN_FREE_CAMERA_OPTION_POSITION)
+	FreeCameraOptionOrientation uint32 = uint32(C.MLN_FREE_CAMERA_OPTION_ORIENTATION)
 )
 
 const (
@@ -1378,6 +1405,22 @@ func MapSetBounds(m *Map, options BoundOptions) Status {
 	return Status(C.mln_map_set_bounds((*C.mln_map)(unsafe.Pointer(m)), &raw))
 }
 
+// MapGetFreeCameraOptions copies the current free camera options.
+func MapGetFreeCameraOptions(m *Map, out *FreeCameraOptions) Status {
+	raw := C.mln_free_camera_options{size: C.uint32_t(unsafe.Sizeof(C.mln_free_camera_options{}))}
+	status := Status(C.mln_map_get_free_camera_options((*C.mln_map)(unsafe.Pointer(m)), &raw))
+	if status == StatusOK {
+		*out = freeCameraOptionsFromC(raw)
+	}
+	return status
+}
+
+// MapSetFreeCameraOptions applies selected free camera options.
+func MapSetFreeCameraOptions(m *Map, options FreeCameraOptions) Status {
+	raw := freeCameraOptionsToC(options)
+	return Status(C.mln_map_set_free_camera_options((*C.mln_map)(unsafe.Pointer(m)), &raw))
+}
+
 // MapProjectionCreate creates a standalone projection helper from a map.
 func MapProjectionCreate(m *Map, out **Projection) Status {
 	var raw *C.mln_map_projection
@@ -1602,6 +1645,38 @@ func boundOptionsFromC(options C.mln_bound_options) BoundOptions {
 		MinPitch: float64(options.min_pitch),
 		MaxPitch: float64(options.max_pitch),
 	}
+}
+
+func freeCameraOptionsToC(options FreeCameraOptions) C.mln_free_camera_options {
+	raw := C.mln_free_camera_options_default()
+	raw.fields = C.uint32_t(options.Fields)
+	raw.position = vec3ToC(options.Position)
+	raw.orientation = quaternionToC(options.Orientation)
+	return raw
+}
+
+func freeCameraOptionsFromC(options C.mln_free_camera_options) FreeCameraOptions {
+	return FreeCameraOptions{
+		Fields:      uint32(options.fields),
+		Position:    vec3FromC(options.position),
+		Orientation: quaternionFromC(options.orientation),
+	}
+}
+
+func vec3ToC(vector Vec3) C.mln_vec3 {
+	return C.mln_vec3{x: C.double(vector.X), y: C.double(vector.Y), z: C.double(vector.Z)}
+}
+
+func vec3FromC(vector C.mln_vec3) Vec3 {
+	return Vec3{X: float64(vector.x), Y: float64(vector.y), Z: float64(vector.z)}
+}
+
+func quaternionToC(quaternion Quaternion) C.mln_quaternion {
+	return C.mln_quaternion{x: C.double(quaternion.X), y: C.double(quaternion.Y), z: C.double(quaternion.Z), w: C.double(quaternion.W)}
+}
+
+func quaternionFromC(quaternion C.mln_quaternion) Quaternion {
+	return Quaternion{X: float64(quaternion.x), Y: float64(quaternion.y), Z: float64(quaternion.z), W: float64(quaternion.w)}
 }
 
 func screenPointFromC(point C.mln_screen_point) ScreenPoint {
