@@ -216,6 +216,14 @@ func latLngSliceToCAPI(points []LatLng) []capi.LatLng {
 	return out
 }
 
+func latLngSliceFromCAPI(points []capi.LatLng) []LatLng {
+	out := make([]LatLng, len(points))
+	for i, point := range points {
+		out[i] = latLngFromCAPI(point)
+	}
+	return out
+}
+
 func latLngLinesToCAPI(lines [][]LatLng) [][]capi.LatLng {
 	out := make([][]capi.LatLng, len(lines))
 	for i, line := range lines {

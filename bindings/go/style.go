@@ -470,6 +470,77 @@ func (m *MapHandle) StyleImagePremultipliedRGBA8Into(imageID string, buffer []by
 	return byteLength, found, nil
 }
 
+// AddImageSourceURL adds an image source that loads its image from a URL.
+func (m *MapHandle) AddImageSourceURL(sourceID string, coordinates []LatLng, url string) error {
+	ptr, err := m.ptr()
+	if err != nil {
+		return err
+	}
+	defer m.state.KeepAlive()
+	return checkNative(func() capi.Status {
+		return capi.MapAddImageSourceURL(ptr, sourceID, latLngSliceToCAPI(coordinates), url)
+	})
+}
+
+// AddImageSourceImage adds an image source with inline image pixels.
+func (m *MapHandle) AddImageSourceImage(sourceID string, coordinates []LatLng, image PremultipliedRGBA8Image) error {
+	ptr, err := m.ptr()
+	if err != nil {
+		return err
+	}
+	defer m.state.KeepAlive()
+	return checkNative(func() capi.Status {
+		return capi.MapAddImageSourceImage(ptr, sourceID, latLngSliceToCAPI(coordinates), image.toCAPI())
+	})
+}
+
+// SetImageSourceURL updates an image source to load its image from a URL.
+func (m *MapHandle) SetImageSourceURL(sourceID string, url string) error {
+	ptr, err := m.ptr()
+	if err != nil {
+		return err
+	}
+	defer m.state.KeepAlive()
+	return checkNative(func() capi.Status { return capi.MapSetImageSourceURL(ptr, sourceID, url) })
+}
+
+// SetImageSourceImage updates an image source with inline image pixels.
+func (m *MapHandle) SetImageSourceImage(sourceID string, image PremultipliedRGBA8Image) error {
+	ptr, err := m.ptr()
+	if err != nil {
+		return err
+	}
+	defer m.state.KeepAlive()
+	return checkNative(func() capi.Status { return capi.MapSetImageSourceImage(ptr, sourceID, image.toCAPI()) })
+}
+
+// SetImageSourceCoordinates updates image source coordinates.
+func (m *MapHandle) SetImageSourceCoordinates(sourceID string, coordinates []LatLng) error {
+	ptr, err := m.ptr()
+	if err != nil {
+		return err
+	}
+	defer m.state.KeepAlive()
+	return checkNative(func() capi.Status {
+		return capi.MapSetImageSourceCoordinates(ptr, sourceID, latLngSliceToCAPI(coordinates))
+	})
+}
+
+// ImageSourceCoordinates returns copied image source coordinates.
+func (m *MapHandle) ImageSourceCoordinates(sourceID string) ([]LatLng, bool, error) {
+	ptr, err := m.ptr()
+	if err != nil {
+		return nil, false, err
+	}
+	defer m.state.KeepAlive()
+	var coordinates []capi.LatLng
+	var found bool
+	if err := checkNative(func() capi.Status { return capi.MapGetImageSourceCoordinates(ptr, sourceID, &coordinates, &found) }); err != nil {
+		return nil, false, err
+	}
+	return latLngSliceFromCAPI(coordinates), found, nil
+}
+
 // AddVectorSourceURL adds a vector source with a TileJSON URL.
 func (m *MapHandle) AddVectorSourceURL(sourceID string, url string, options *StyleTileSourceOptions) error {
 	ptr, err := m.ptr()

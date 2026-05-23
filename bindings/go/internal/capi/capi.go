@@ -1907,6 +1907,70 @@ func MapCopyStyleImagePremultipliedRGBA8(m *Map, imageID string, buffer []byte, 
 	return status
 }
 
+// MapAddImageSourceURL adds an image source that loads from a URL.
+func MapAddImageSourceURL(m *Map, sourceID string, coordinates []LatLng, url string) Status {
+	sourceView := newStringView(sourceID)
+	defer sourceView.free()
+	urlView := newStringView(url)
+	defer urlView.free()
+	rawCoordinates, coordinateCount := latLngSliceToCPointer(coordinates)
+	defer C.free(unsafe.Pointer(rawCoordinates))
+	return Status(C.mln_map_add_image_source_url((*C.mln_map)(unsafe.Pointer(m)), sourceView.raw(), rawCoordinates, coordinateCount, urlView.raw()))
+}
+
+// MapAddImageSourceImage adds an image source with inline image pixels.
+func MapAddImageSourceImage(m *Map, sourceID string, coordinates []LatLng, image PremultipliedRGBA8Image) Status {
+	sourceView := newStringView(sourceID)
+	defer sourceView.free()
+	rawCoordinates, coordinateCount := latLngSliceToCPointer(coordinates)
+	defer C.free(unsafe.Pointer(rawCoordinates))
+	rawImage, imageAllocation := premultipliedRGBA8ImageToC(image)
+	defer C.free(imageAllocation)
+	return Status(C.mln_map_add_image_source_image((*C.mln_map)(unsafe.Pointer(m)), sourceView.raw(), rawCoordinates, coordinateCount, &rawImage))
+}
+
+// MapSetImageSourceURL updates an image source to load from a URL.
+func MapSetImageSourceURL(m *Map, sourceID string, url string) Status {
+	sourceView := newStringView(sourceID)
+	defer sourceView.free()
+	urlView := newStringView(url)
+	defer urlView.free()
+	return Status(C.mln_map_set_image_source_url((*C.mln_map)(unsafe.Pointer(m)), sourceView.raw(), urlView.raw()))
+}
+
+// MapSetImageSourceImage updates an image source with inline image pixels.
+func MapSetImageSourceImage(m *Map, sourceID string, image PremultipliedRGBA8Image) Status {
+	sourceView := newStringView(sourceID)
+	defer sourceView.free()
+	rawImage, imageAllocation := premultipliedRGBA8ImageToC(image)
+	defer C.free(imageAllocation)
+	return Status(C.mln_map_set_image_source_image((*C.mln_map)(unsafe.Pointer(m)), sourceView.raw(), &rawImage))
+}
+
+// MapSetImageSourceCoordinates updates image source coordinates.
+func MapSetImageSourceCoordinates(m *Map, sourceID string, coordinates []LatLng) Status {
+	sourceView := newStringView(sourceID)
+	defer sourceView.free()
+	rawCoordinates, coordinateCount := latLngSliceToCPointer(coordinates)
+	defer C.free(unsafe.Pointer(rawCoordinates))
+	return Status(C.mln_map_set_image_source_coordinates((*C.mln_map)(unsafe.Pointer(m)), sourceView.raw(), rawCoordinates, coordinateCount))
+}
+
+// MapGetImageSourceCoordinates copies image source coordinates.
+func MapGetImageSourceCoordinates(m *Map, sourceID string, outCoordinates *[]LatLng, outFound *bool) Status {
+	sourceView := newStringView(sourceID)
+	defer sourceView.free()
+	var rawCoordinates [4]C.mln_lat_lng
+	var rawCount C.size_t
+	var rawFound C.bool
+	status := Status(C.mln_map_get_image_source_coordinates((*C.mln_map)(unsafe.Pointer(m)), sourceView.raw(), &rawCoordinates[0], C.size_t(len(rawCoordinates)), &rawCount, &rawFound))
+	if status == StatusOK {
+		*outFound = bool(rawFound)
+		*outCoordinates = latLngSliceFromC(&rawCoordinates[0], int(rawCount))
+	}
+	return status
+}
+
 // MapAddVectorSourceURL adds a vector source with a TileJSON URL.
 func MapAddVectorSourceURL(m *Map, sourceID string, url string, options *StyleTileSourceOptions) Status {
 	sourceView := newStringView(sourceID)
@@ -3200,6 +3264,28 @@ func latLngBoundsToC(bounds LatLngBounds) C.mln_lat_lng_bounds {
 		southwest: latLngToC(bounds.Southwest),
 		northeast: latLngToC(bounds.Northeast),
 	}
+}
+
+func latLngSliceToCPointer(coordinates []LatLng) (*C.mln_lat_lng, C.size_t) {
+	if len(coordinates) == 0 {
+		return nil, 0
+	}
+	rawCoordinates := (*C.mln_lat_lng)(C.malloc(C.size_t(len(coordinates)) * C.size_t(unsafe.Sizeof(C.mln_lat_lng{}))))
+	for i, coordinate := range coordinates {
+		*(*C.mln_lat_lng)(unsafe.Add(unsafe.Pointer(rawCoordinates), uintptr(i)*unsafe.Sizeof(C.mln_lat_lng{}))) = latLngToC(coordinate)
+	}
+	return rawCoordinates, C.size_t(len(coordinates))
+}
+
+func latLngSliceFromC(coordinates *C.mln_lat_lng, count int) []LatLng {
+	if coordinates == nil || count == 0 {
+		return nil
+	}
+	out := make([]LatLng, count)
+	for i := range out {
+		out[i] = latLngFromC(*(*C.mln_lat_lng)(unsafe.Add(unsafe.Pointer(coordinates), uintptr(i)*unsafe.Sizeof(C.mln_lat_lng{}))))
+	}
+	return out
 }
 
 func latLngBoundsFromC(bounds C.mln_lat_lng_bounds) LatLngBounds {
