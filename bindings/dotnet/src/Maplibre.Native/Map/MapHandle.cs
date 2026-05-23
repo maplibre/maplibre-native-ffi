@@ -498,7 +498,6 @@ public sealed unsafe class MapHandle : IDisposable
         ArgumentNullException.ThrowIfNull(url);
         using var nativeUrl = NativeUtf8String.FromNullableString(url, nameof(url));
         NativeStatus.Check(NativeMethods.mln_map_set_style_url(Pointer, nativeUrl.Pointer));
-        ClearCustomGeometrySources();
     }
 
     /// <summary>Loads inline style JSON through MapLibre Native style APIs.</summary>
@@ -1088,6 +1087,13 @@ public sealed unsafe class MapHandle : IDisposable
     {
         state.Close();
         runtime.UnregisterMap(this);
+        ClearCustomGeometrySources();
+    }
+
+    internal int CustomGeometrySourceCountForTest => customGeometrySources.Count;
+
+    internal void ReleaseDetachedCustomGeometrySources()
+    {
         ClearCustomGeometrySources();
     }
 

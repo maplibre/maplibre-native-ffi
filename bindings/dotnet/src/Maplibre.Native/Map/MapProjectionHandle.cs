@@ -10,12 +10,10 @@ namespace Maplibre.Native.Map;
 /// <summary>Owner-thread projection snapshot handle.</summary>
 public sealed unsafe class MapProjectionHandle : IDisposable
 {
-    private readonly MapHandle map;
     private readonly NativeHandleState<mln_map_projection> state;
 
-    private MapProjectionHandle(MapHandle map, mln_map_projection* handle)
+    private MapProjectionHandle(mln_map_projection* handle)
     {
-        this.map = map;
         state = new NativeHandleState<mln_map_projection>(
             handle,
             static handle => NativeMethods.mln_map_projection_destroy(handle),
@@ -27,7 +25,7 @@ public sealed unsafe class MapProjectionHandle : IDisposable
         ArgumentNullException.ThrowIfNull(map);
         mln_map_projection* projection = null;
         NativeStatus.Check(NativeMethods.mln_map_projection_create(map.Pointer, &projection));
-        return new MapProjectionHandle(map, projection);
+        return new MapProjectionHandle(projection);
     }
 
     internal mln_map_projection* Pointer => state.Pointer;
@@ -107,6 +105,5 @@ public sealed unsafe class MapProjectionHandle : IDisposable
     public void Dispose()
     {
         state.TryClose();
-        GC.KeepAlive(map);
     }
 }

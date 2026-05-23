@@ -116,7 +116,9 @@ public sealed unsafe class ResourceRequestHandle : IDisposable
             }
 
             MarkNativeWillReleaseLocked();
-            return (uint)ResourceProviderDecision.PassThrough;
+            return decision == ResourceProviderDecision.PassThrough
+                ? (uint)ResourceProviderDecision.PassThrough
+                : uint.MaxValue;
         }
     }
 

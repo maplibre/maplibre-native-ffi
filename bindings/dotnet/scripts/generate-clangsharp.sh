@@ -76,7 +76,7 @@ for header in "${headers[@]}"; do
 
   (
     cd "$binding_dir"
-    dotnet "${args[@]}" || true
+    dotnet "${args[@]}"
   )
 
   if [[ ! -s "$output_dir/$header.g.cs" ]]; then

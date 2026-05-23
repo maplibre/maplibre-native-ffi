@@ -25,11 +25,24 @@ internal static unsafe class ResourceStructs
             request->has_prior_modified != 0 ? DateTimeOffset.FromUnixTimeMilliseconds(request->prior_modified_unix_ms) : null,
             request->has_prior_expires != 0 ? DateTimeOffset.FromUnixTimeMilliseconds(request->prior_expires_unix_ms) : null,
             CopyNullableUtf8(request->prior_etag),
-            request->prior_data_size == 0 ? null : request->prior_data_size);
+            request->prior_data_size == 0 ? null : request->prior_data_size,
+            CopyBytes(request->prior_data, request->prior_data_size));
     }
 
     private static string CopyUtf8(sbyte* value) => value is null ? string.Empty : Marshal.PtrToStringUTF8((nint)value) ?? string.Empty;
     private static string? CopyNullableUtf8(sbyte* value) => value is null ? null : Marshal.PtrToStringUTF8((nint)value);
+
+    private static byte[]? CopyBytes(byte* value, nuint byteLength)
+    {
+        if (value is null || byteLength == 0)
+        {
+            return null;
+        }
+
+        var bytes = new byte[checked((int)byteLength)];
+        Marshal.Copy((nint)value, bytes, 0, bytes.Length);
+        return bytes;
+    }
 }
 
 internal sealed unsafe class NativeResourceResponse : IDisposable

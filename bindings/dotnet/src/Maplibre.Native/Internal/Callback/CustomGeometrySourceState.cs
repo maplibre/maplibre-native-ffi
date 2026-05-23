@@ -9,6 +9,8 @@ internal sealed unsafe class CustomGeometrySourceState : IDisposable
 {
     private readonly Lock gate = new();
     private readonly CustomGeometrySourceOptions options;
+    private readonly CustomGeometrySourceCallback fetchTile;
+    private readonly CustomGeometrySourceCallback? cancelTile;
     private GCHandle handle;
     private bool closed;
     private bool handleFreed;
@@ -17,6 +19,8 @@ internal sealed unsafe class CustomGeometrySourceState : IDisposable
     internal CustomGeometrySourceState(CustomGeometrySourceOptions options)
     {
         this.options = options ?? throw new ArgumentNullException(nameof(options));
+        fetchTile = options.FetchTile ?? throw new ArgumentException("Custom geometry source FetchTile callback is required.", nameof(options));
+        cancelTile = options.CancelTile;
         handle = GCHandle.Alloc(this);
     }
 
@@ -109,7 +113,7 @@ internal sealed unsafe class CustomGeometrySourceState : IDisposable
 
         try
         {
-            options.FetchTile?.Invoke(tileId);
+            fetchTile.Invoke(tileId);
         }
         catch
         {
@@ -130,7 +134,7 @@ internal sealed unsafe class CustomGeometrySourceState : IDisposable
 
         try
         {
-            options.CancelTile?.Invoke(tileId);
+            cancelTile?.Invoke(tileId);
         }
         catch
         {

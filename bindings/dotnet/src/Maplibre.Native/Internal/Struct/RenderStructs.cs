@@ -6,13 +6,26 @@ namespace Maplibre.Native.Internal.Struct;
 
 internal static unsafe class RenderStructs
 {
-    internal static mln_render_target_extent ToNative(RenderTargetExtent extent) => new()
+    private const uint DefaultRenderTargetWidth = 256;
+    private const uint DefaultRenderTargetHeight = 256;
+    private const double DefaultRenderTargetScaleFactor = 1.0;
+    private const uint VulkanImageLayoutShaderReadOnlyOptimal = 5;
+
+    internal static mln_render_target_extent ToNative(RenderTargetExtent extent)
     {
-        size = (uint)sizeof(mln_render_target_extent),
-        width = extent.Width,
-        height = extent.Height,
-        scale_factor = extent.ScaleFactor,
-    };
+        if (extent == default)
+        {
+            extent = new RenderTargetExtent(DefaultRenderTargetWidth, DefaultRenderTargetHeight, DefaultRenderTargetScaleFactor);
+        }
+
+        return new mln_render_target_extent
+        {
+            size = (uint)sizeof(mln_render_target_extent),
+            width = extent.Width,
+            height = extent.Height,
+            scale_factor = extent.ScaleFactor,
+        };
+    }
 
     internal static mln_metal_context_descriptor ToNative(MetalContextDescriptor? context) => new()
     {
@@ -87,7 +100,7 @@ internal static unsafe class RenderStructs
         native.image_view = (void*)descriptor.ImageView.Address;
         native.format = descriptor.Format;
         native.initial_layout = descriptor.InitialLayout;
-        native.final_layout = descriptor.FinalLayout;
+        native.final_layout = descriptor.FinalLayout == 0 ? VulkanImageLayoutShaderReadOnlyOptimal : descriptor.FinalLayout;
         return native;
     }
 

@@ -23,8 +23,10 @@ public sealed unsafe class ResourceProviderTests
 
         var url = Encoding.UTF8.GetBytes("https://example.test/tile\0");
         var etag = Encoding.UTF8.GetBytes("etag-1\0");
+        var priorData = new byte[] { 1, 2, 3 };
         fixed (byte* urlPointer = url)
         fixed (byte* etagPointer = etag)
+        fixed (byte* priorDataPointer = priorData)
         {
             var request = new mln_resource_request
             {
@@ -42,7 +44,8 @@ public sealed unsafe class ResourceProviderTests
                 has_prior_expires = 1,
                 prior_expires_unix_ms = 5678,
                 prior_etag = (sbyte*)etagPointer,
-                prior_data_size = 42,
+                prior_data = priorDataPointer,
+                prior_data_size = (nuint)priorData.Length,
             };
 
             var decision = state.HandleForTest(&request);
@@ -61,7 +64,8 @@ public sealed unsafe class ResourceProviderTests
         Assert.Equal(DateTimeOffset.FromUnixTimeMilliseconds(1234), copiedRequest.PriorModified);
         Assert.Equal(DateTimeOffset.FromUnixTimeMilliseconds(5678), copiedRequest.PriorExpires);
         Assert.Equal("etag-1", copiedRequest.PriorEtag);
-        Assert.Equal(42u, copiedRequest.PriorDataSize);
+        Assert.Equal(3u, copiedRequest.PriorDataSize);
+        Assert.Equal([1, 2, 3], copiedRequest.PriorData);
     }
 
     [Fact]
@@ -78,6 +82,17 @@ public sealed unsafe class ResourceProviderTests
         var cancelledError = Assert.Throws<InvalidStateException>(() => handle.IsCancelled());
         Assert.Equal(MaplibreStatus.InvalidState, cancelledError.Status);
         handle.Close();
+    }
+
+    [Fact]
+    public void UnknownProviderDecisionReturnsErrorDecisionPath()
+    {
+        var handle = new ResourceRequestHandle((mln_resource_request_handle*)1234);
+
+        var decision = handle.FinishProviderDecision((ResourceProviderDecision)999);
+
+        Assert.Equal(uint.MaxValue, decision);
+        Assert.True(handle.IsClosed);
     }
 
     [Fact]

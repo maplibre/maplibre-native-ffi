@@ -341,7 +341,17 @@ public sealed unsafe class RuntimeHandle : IDisposable
         var raw = RuntimeStructs.EmptyNativeEvent();
         var hasEvent = false;
         NativeStatus.Check(NativeMethods.mln_runtime_poll_event(Pointer, &raw, &hasEvent));
-        return hasEvent ? RuntimeStructs.ReadEvent(raw, this, MapFor) : null;
+        if (!hasEvent)
+        {
+            return null;
+        }
+
+        var runtimeEvent = RuntimeStructs.ReadEvent(raw, this, MapFor);
+        if (runtimeEvent.Type == RuntimeEventType.MapStyleLoaded)
+        {
+            runtimeEvent.MapSource?.ReleaseDetachedCustomGeometrySources();
+        }
+        return runtimeEvent;
     }
 
     /// <summary>Destroys the runtime on its owner thread.</summary>

@@ -8,6 +8,16 @@ namespace Maplibre.Native.Tests;
 public sealed class RuntimeMapLifecycleTests
 {
     [Fact]
+    public void DefaultMapOptionsPreserveNativeCreationDefaults()
+    {
+        NativeLibraryTestSupport.SkipUnlessNativeLibraryIsAvailable();
+        using var runtime = RuntimeHandle.Create();
+        using var map = MapHandle.Create(runtime);
+
+        Assert.False(map.IsClosed);
+    }
+
+    [Fact]
     public void RuntimeAndMapCloseDeterministically()
     {
         NativeLibraryTestSupport.SkipUnlessNativeLibraryIsAvailable();

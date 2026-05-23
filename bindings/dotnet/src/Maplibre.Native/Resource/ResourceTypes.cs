@@ -22,7 +22,8 @@ public sealed record ResourceRequest(
     DateTimeOffset? PriorModified,
     DateTimeOffset? PriorExpires,
     string? PriorEtag,
-    ulong? PriorDataSize);
+    ulong? PriorDataSize,
+    byte[]? PriorData);
 
 public sealed record ResourceTransformRequest(ResourceKind Kind, string Url);
 

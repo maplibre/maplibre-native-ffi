@@ -435,7 +435,6 @@ low-level contract intact.
 ### `Runtime`
 
 - `AmbientCacheOperation`
-- `NetworkStatus`
 - `OfflineOperationHandle`
 - `OfflineOperationKind`
 - `OfflineOperationResultKind`
@@ -803,10 +802,10 @@ this list with `include/maplibre_native_c/*.h` during coverage reviews.
 - `mln_vulkan_owned_texture_acquire_frame`
 - `mln_vulkan_owned_texture_release_frame`
 
-Query option and render surface/texture descriptor defaults are covered by
-generated interop. Public C# materializers size-initialize those descriptors
-directly because their C defaults carry only ABI size and zeroed optional fields
-or backend handles.
+Query option defaults are covered by generated interop and size-initialized in
+public C# materializers. Render surface/texture materializers preserve native
+render target defaults for omitted extents and Vulkan borrowed texture final
+layout while keeping generated default helpers internal.
 
 ## Testing plan
 

@@ -32,6 +32,13 @@ public sealed class CustomGeometrySourceTests
     }
 
     [Fact]
+    public void CustomGeometrySourceRequiresFetchTileCallback()
+    {
+        var error = Assert.Throws<ArgumentException>(() => new CustomGeometrySourceState(new CustomGeometrySourceOptions()));
+        Assert.Equal("options", error.ParamName);
+    }
+
+    [Fact]
     public async Task CustomGeometryDisposeKeepsHandleAliveUntilActiveCallbackExits()
     {
         var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -83,5 +90,21 @@ public sealed class CustomGeometrySourceTests
 
         Assert.Equal(SourceType.CustomVector, map.StyleSourceType("custom"));
         Assert.True(map.RemoveStyleSource("custom"));
+    }
+
+    [Fact]
+    public void SetStyleUrlKeepsCustomGeometryCallbacksUntilStyleReplacementCompletes()
+    {
+        NativeLibraryTestSupport.SkipUnlessNativeLibraryIsAvailable();
+        using var runtime = RuntimeHandle.Create();
+        using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
+        map.SetStyleJson("{\"version\":8,\"sources\":{},\"layers\":[]}");
+        map.AddCustomGeometrySource("custom", new CustomGeometrySourceOptions { FetchTile = _ => { } });
+
+        map.SetStyleUrl("https://example.test/style.json");
+
+        Assert.Equal(1, map.CustomGeometrySourceCountForTest);
+        map.ReleaseDetachedCustomGeometrySources();
+        Assert.Equal(0, map.CustomGeometrySourceCountForTest);
     }
 }

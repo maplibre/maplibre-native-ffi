@@ -90,6 +90,25 @@ public sealed unsafe class RenderSessionTests
     }
 
     [Fact]
+    public void RenderDescriptorsPreserveNativeDefaultsWhenExtentOmitted()
+    {
+        var metal = RenderStructs.ToNative(new MetalSurfaceDescriptor { Layer = new NativePointer(1) });
+        Assert.Equal(256u, metal.extent.width);
+        Assert.Equal(256u, metal.extent.height);
+        Assert.Equal(1, metal.extent.scale_factor);
+
+        var vulkanBorrowed = RenderStructs.ToNative(new VulkanBorrowedTextureDescriptor
+        {
+            Image = new NativePointer(2),
+            ImageView = new NativePointer(3),
+        });
+        Assert.Equal(256u, vulkanBorrowed.extent.width);
+        Assert.Equal(256u, vulkanBorrowed.extent.height);
+        Assert.Equal(1, vulkanBorrowed.extent.scale_factor);
+        Assert.Equal(5u, vulkanBorrowed.final_layout);
+    }
+
+    [Fact]
     public void TextureImageInfoCopiesNativeFields()
     {
         var info = RenderStructs.FromNative(new mln_texture_image_info
