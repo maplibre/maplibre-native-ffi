@@ -98,6 +98,8 @@ internal object CoreStructs {
     size = value.encodeToByteArray().size.toULong()
   }
 
+  fun stringView(value: mln_string_view): String = MemoryUtil.copyStringView(value.data, value.size)
+
   fun setStringView(native: mln_string_view, value: String, scope: MemScope) {
     native.data = MemoryUtil.utf8Bytes(scope, value)
     native.size = value.encodeToByteArray().size.toULong()

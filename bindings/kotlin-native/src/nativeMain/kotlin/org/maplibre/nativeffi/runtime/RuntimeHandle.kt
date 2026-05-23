@@ -21,6 +21,16 @@ import org.maplibre.nativeffi.internal.c.mln_runtime_create
 import org.maplibre.nativeffi.internal.c.mln_runtime_destroy
 import org.maplibre.nativeffi.internal.c.mln_runtime_event
 import org.maplibre.nativeffi.internal.c.mln_runtime_offline_operation_discard
+import org.maplibre.nativeffi.internal.c.mln_runtime_offline_region_create_start
+import org.maplibre.nativeffi.internal.c.mln_runtime_offline_region_delete_start
+import org.maplibre.nativeffi.internal.c.mln_runtime_offline_region_get_start
+import org.maplibre.nativeffi.internal.c.mln_runtime_offline_region_get_status_start
+import org.maplibre.nativeffi.internal.c.mln_runtime_offline_region_invalidate_start
+import org.maplibre.nativeffi.internal.c.mln_runtime_offline_region_set_download_state_start
+import org.maplibre.nativeffi.internal.c.mln_runtime_offline_region_set_observed_start
+import org.maplibre.nativeffi.internal.c.mln_runtime_offline_region_update_metadata_start
+import org.maplibre.nativeffi.internal.c.mln_runtime_offline_regions_list_start
+import org.maplibre.nativeffi.internal.c.mln_runtime_offline_regions_merge_database_start
 import org.maplibre.nativeffi.internal.c.mln_runtime_options
 import org.maplibre.nativeffi.internal.c.mln_runtime_options_default
 import org.maplibre.nativeffi.internal.c.mln_runtime_poll_event
@@ -31,6 +41,10 @@ import org.maplibre.nativeffi.internal.memory.MemoryUtil
 import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.internal.struct.RuntimeStructs
 import org.maplibre.nativeffi.map.MapHandle
+import org.maplibre.nativeffi.offline.OfflineRegionDefinition
+import org.maplibre.nativeffi.offline.OfflineRegionDownloadState
+import org.maplibre.nativeffi.offline.OfflineRegionInfo
+import org.maplibre.nativeffi.offline.OfflineRegionStatus
 
 /** Owned native runtime handle. Close it on the owner thread. */
 @OptIn(ExperimentalForeignApi::class)
@@ -53,13 +67,175 @@ public class RuntimeHandle private constructor(handle: CPointer<mln_runtime>) : 
         outOperationId.ptr,
       )
     )
-    OfflineOperationHandle(
-      this@RuntimeHandle,
+    offlineOperation(
       outOperationId.value,
       OfflineOperationKind.AMBIENT_CACHE,
       OfflineOperationResultKind.NONE,
     )
   }
+
+  public fun startCreateOfflineRegion(
+    definition: OfflineRegionDefinition,
+    metadata: ByteArray,
+  ): OfflineOperationHandle<OfflineRegionInfo> = memScoped {
+    val outOperationId = alloc<ULongVar>()
+    Status.check(
+      mln_runtime_offline_region_create_start(
+        state.requireLive(),
+        RuntimeStructs.offlineRegionDefinition(definition, this),
+        RuntimeStructs.metadata(metadata, this),
+        metadata.size.toULong(),
+        outOperationId.ptr,
+      )
+    )
+    offlineOperation(
+      outOperationId.value,
+      OfflineOperationKind.REGION_CREATE,
+      OfflineOperationResultKind.REGION,
+    )
+  }
+
+  public fun startOfflineRegion(id: Long): OfflineOperationHandle<OfflineRegionInfo?> = memScoped {
+    val outOperationId = alloc<ULongVar>()
+    Status.check(mln_runtime_offline_region_get_start(state.requireLive(), id, outOperationId.ptr))
+    offlineOperation(
+      outOperationId.value,
+      OfflineOperationKind.REGION_GET,
+      OfflineOperationResultKind.OPTIONAL_REGION,
+    )
+  }
+
+  public fun startOfflineRegions(): OfflineOperationHandle<List<OfflineRegionInfo>> = memScoped {
+    val outOperationId = alloc<ULongVar>()
+    Status.check(mln_runtime_offline_regions_list_start(state.requireLive(), outOperationId.ptr))
+    offlineOperation(
+      outOperationId.value,
+      OfflineOperationKind.REGIONS_LIST,
+      OfflineOperationResultKind.REGION_LIST,
+    )
+  }
+
+  public fun startMergeOfflineRegionsDatabase(
+    path: String
+  ): OfflineOperationHandle<List<OfflineRegionInfo>> = memScoped {
+    val outOperationId = alloc<ULongVar>()
+    Status.check(
+      mln_runtime_offline_regions_merge_database_start(
+        state.requireLive(),
+        path,
+        outOperationId.ptr,
+      )
+    )
+    offlineOperation(
+      outOperationId.value,
+      OfflineOperationKind.REGIONS_MERGE_DATABASE,
+      OfflineOperationResultKind.REGION_LIST,
+    )
+  }
+
+  public fun startUpdateOfflineRegionMetadata(
+    id: Long,
+    metadata: ByteArray,
+  ): OfflineOperationHandle<OfflineRegionInfo> = memScoped {
+    val outOperationId = alloc<ULongVar>()
+    Status.check(
+      mln_runtime_offline_region_update_metadata_start(
+        state.requireLive(),
+        id,
+        RuntimeStructs.metadata(metadata, this),
+        metadata.size.toULong(),
+        outOperationId.ptr,
+      )
+    )
+    offlineOperation(
+      outOperationId.value,
+      OfflineOperationKind.REGION_UPDATE_METADATA,
+      OfflineOperationResultKind.REGION,
+    )
+  }
+
+  public fun startOfflineRegionStatus(id: Long): OfflineOperationHandle<OfflineRegionStatus> =
+    memScoped {
+      val outOperationId = alloc<ULongVar>()
+      Status.check(
+        mln_runtime_offline_region_get_status_start(state.requireLive(), id, outOperationId.ptr)
+      )
+      offlineOperation(
+        outOperationId.value,
+        OfflineOperationKind.REGION_GET_STATUS,
+        OfflineOperationResultKind.REGION_STATUS,
+      )
+    }
+
+  public fun startSetOfflineRegionObserved(
+    id: Long,
+    observed: Boolean,
+  ): OfflineOperationHandle<Unit> = memScoped {
+    val outOperationId = alloc<ULongVar>()
+    Status.check(
+      mln_runtime_offline_region_set_observed_start(
+        state.requireLive(),
+        id,
+        observed,
+        outOperationId.ptr,
+      )
+    )
+    offlineOperation(
+      outOperationId.value,
+      OfflineOperationKind.REGION_SET_OBSERVED,
+      OfflineOperationResultKind.NONE,
+    )
+  }
+
+  public fun startSetOfflineRegionDownloadState(
+    id: Long,
+    downloadState: OfflineRegionDownloadState,
+  ): OfflineOperationHandle<Unit> = memScoped {
+    val outOperationId = alloc<ULongVar>()
+    Status.check(
+      mln_runtime_offline_region_set_download_state_start(
+        state.requireLive(),
+        id,
+        downloadState.nativeValue,
+        outOperationId.ptr,
+      )
+    )
+    offlineOperation(
+      outOperationId.value,
+      OfflineOperationKind.REGION_SET_DOWNLOAD_STATE,
+      OfflineOperationResultKind.NONE,
+    )
+  }
+
+  public fun startInvalidateOfflineRegion(id: Long): OfflineOperationHandle<Unit> = memScoped {
+    val outOperationId = alloc<ULongVar>()
+    Status.check(
+      mln_runtime_offline_region_invalidate_start(state.requireLive(), id, outOperationId.ptr)
+    )
+    offlineOperation(
+      outOperationId.value,
+      OfflineOperationKind.REGION_INVALIDATE,
+      OfflineOperationResultKind.NONE,
+    )
+  }
+
+  public fun startDeleteOfflineRegion(id: Long): OfflineOperationHandle<Unit> = memScoped {
+    val outOperationId = alloc<ULongVar>()
+    Status.check(
+      mln_runtime_offline_region_delete_start(state.requireLive(), id, outOperationId.ptr)
+    )
+    offlineOperation(
+      outOperationId.value,
+      OfflineOperationKind.REGION_DELETE,
+      OfflineOperationResultKind.NONE,
+    )
+  }
+
+  private fun <T> offlineOperation(
+    operationId: ULong,
+    kind: OfflineOperationKind,
+    resultKind: OfflineOperationResultKind,
+  ): OfflineOperationHandle<T> = OfflineOperationHandle(this, operationId, kind, resultKind)
 
   internal fun discardOfflineOperation(operation: OfflineOperationHandle<*>) {
     val id = operation.requireLive(this)

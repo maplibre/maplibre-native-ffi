@@ -6,6 +6,7 @@ import kotlinx.cinterop.MemScope
 import kotlinx.cinterop.alloc
 import kotlinx.cinterop.allocArray
 import kotlinx.cinterop.get
+import kotlinx.cinterop.pointed
 import kotlinx.cinterop.ptr
 import kotlinx.cinterop.sizeOf
 import org.maplibre.nativeffi.geo.Feature
@@ -86,6 +87,21 @@ internal object ValueStructs {
       }
     }
     return native.ptr
+  }
+
+  fun jsonSnapshot(value: CPointer<mln_json_value>?): JsonValue {
+    require(value != null) { "JSON value pointer must not be null" }
+    return readJson(value.pointed)
+  }
+
+  fun geometrySnapshot(value: CPointer<mln_geometry>?): Geometry {
+    require(value != null) { "Geometry pointer must not be null" }
+    return readGeometry(value.pointed)
+  }
+
+  fun featureSnapshot(value: CPointer<mln_feature>?): Feature {
+    require(value != null) { "Feature pointer must not be null" }
+    return readFeature(value.pointed)
   }
 
   private fun feature(value: Feature, scope: MemScope): CPointer<mln_feature> {
@@ -270,4 +286,90 @@ internal object ValueStructs {
     native.latitude = coordinate.latitude
     native.longitude = coordinate.longitude
   }
+
+  private fun readJson(native: mln_json_value): JsonValue =
+    when (native.type) {
+      MLN_JSON_VALUE_TYPE_NULL -> JsonValue.Null
+      MLN_JSON_VALUE_TYPE_BOOL -> JsonValue.Bool(native.data.bool_value)
+      MLN_JSON_VALUE_TYPE_UINT -> JsonValue.UInt(native.data.uint_value)
+      MLN_JSON_VALUE_TYPE_INT -> JsonValue.IntValue(native.data.int_value)
+      MLN_JSON_VALUE_TYPE_DOUBLE -> JsonValue.DoubleValue(native.data.double_value)
+      MLN_JSON_VALUE_TYPE_STRING ->
+        JsonValue.StringValue(CoreStructs.stringView(native.data.string_value))
+      MLN_JSON_VALUE_TYPE_ARRAY ->
+        JsonValue.Array(
+          List(native.data.array_value.value_count.toInt()) { index ->
+            readJson(native.data.array_value.values!![index])
+          }
+        )
+      MLN_JSON_VALUE_TYPE_OBJECT ->
+        JsonValue.ObjectValue(
+          List(native.data.object_value.member_count.toInt()) { index ->
+            val member = native.data.object_value.members!![index]
+            JsonValue.Member(CoreStructs.stringView(member.key), jsonSnapshot(member.value))
+          }
+        )
+      else -> error("Unknown JSON value type ${native.type}")
+    }
+
+  private fun readGeometry(native: mln_geometry): Geometry =
+    when (native.type) {
+      MLN_GEOMETRY_TYPE_EMPTY -> Geometry.Empty
+      MLN_GEOMETRY_TYPE_POINT -> Geometry.Point(CoreStructs.latLng(native.data.point))
+      MLN_GEOMETRY_TYPE_LINE_STRING ->
+        Geometry.LineString(readCoordinateSpan(native.data.line_string))
+      MLN_GEOMETRY_TYPE_POLYGON -> Geometry.Polygon(readPolygon(native.data.polygon))
+      MLN_GEOMETRY_TYPE_MULTI_POINT ->
+        Geometry.MultiPoint(readCoordinateSpan(native.data.multi_point))
+      MLN_GEOMETRY_TYPE_MULTI_LINE_STRING ->
+        Geometry.MultiLineString(
+          List(native.data.multi_line_string.line_count.toInt()) { index ->
+            readCoordinateSpan(native.data.multi_line_string.lines!![index])
+          }
+        )
+      MLN_GEOMETRY_TYPE_MULTI_POLYGON ->
+        Geometry.MultiPolygon(
+          List(native.data.multi_polygon.polygon_count.toInt()) { index ->
+            readPolygon(native.data.multi_polygon.polygons!![index])
+          }
+        )
+      MLN_GEOMETRY_TYPE_GEOMETRY_COLLECTION ->
+        Geometry.Collection(
+          List(native.data.geometry_collection.geometry_count.toInt()) { index ->
+            readGeometry(native.data.geometry_collection.geometries!![index])
+          }
+        )
+      else -> error("Unknown geometry type ${native.type}")
+    }
+
+  private fun readFeature(native: mln_feature): Feature {
+    val properties =
+      List(native.property_count.toInt()) { index ->
+        val member = native.properties!![index]
+        JsonValue.Member(CoreStructs.stringView(member.key), jsonSnapshot(member.value))
+      }
+    return Feature(
+      readGeometry(native.geometry!!.pointed),
+      properties,
+      readFeatureIdentifier(native),
+    )
+  }
+
+  private fun readFeatureIdentifier(native: mln_feature): FeatureIdentifier =
+    when (native.identifier_type) {
+      MLN_FEATURE_IDENTIFIER_TYPE_NULL -> FeatureIdentifier.Null
+      MLN_FEATURE_IDENTIFIER_TYPE_UINT -> FeatureIdentifier.UInt(native.identifier.uint_value)
+      MLN_FEATURE_IDENTIFIER_TYPE_INT -> FeatureIdentifier.IntValue(native.identifier.int_value)
+      MLN_FEATURE_IDENTIFIER_TYPE_DOUBLE ->
+        FeatureIdentifier.DoubleValue(native.identifier.double_value)
+      MLN_FEATURE_IDENTIFIER_TYPE_STRING ->
+        FeatureIdentifier.StringValue(CoreStructs.stringView(native.identifier.string_value))
+      else -> FeatureIdentifier.Null
+    }
+
+  private fun readCoordinateSpan(native: mln_coordinate_span): List<LatLng> =
+    CoreStructs.latLngArray(native.coordinates, native.coordinate_count.toInt())
+
+  private fun readPolygon(native: mln_polygon_geometry): List<List<LatLng>> =
+    List(native.ring_count.toInt()) { index -> readCoordinateSpan(native.rings!![index]) }
 }

@@ -2,10 +2,19 @@ package org.maplibre.nativeffi.internal.struct
 
 import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.ExperimentalForeignApi
+import kotlinx.cinterop.MemScope
+import kotlinx.cinterop.alloc
 import kotlinx.cinterop.pointed
+import kotlinx.cinterop.ptr
+import kotlinx.cinterop.readBytes
 import kotlinx.cinterop.reinterpret
+import kotlinx.cinterop.sizeOf
+import kotlinx.cinterop.toCValues
+import kotlinx.cinterop.toKString
 import org.maplibre.nativeffi.geo.CanonicalTileId
 import org.maplibre.nativeffi.geo.TileId
+import org.maplibre.nativeffi.internal.c.MLN_OFFLINE_REGION_DEFINITION_GEOMETRY
+import org.maplibre.nativeffi.internal.c.MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID
 import org.maplibre.nativeffi.internal.c.MLN_RUNTIME_EVENT_PAYLOAD_NONE
 import org.maplibre.nativeffi.internal.c.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_OPERATION_COMPLETED
 import org.maplibre.nativeffi.internal.c.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR
@@ -15,6 +24,8 @@ import org.maplibre.nativeffi.internal.c.MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME
 import org.maplibre.nativeffi.internal.c.MLN_RUNTIME_EVENT_PAYLOAD_RENDER_MAP
 import org.maplibre.nativeffi.internal.c.MLN_RUNTIME_EVENT_PAYLOAD_STYLE_IMAGE_MISSING
 import org.maplibre.nativeffi.internal.c.MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION
+import org.maplibre.nativeffi.internal.c.mln_offline_region_definition
+import org.maplibre.nativeffi.internal.c.mln_offline_region_info
 import org.maplibre.nativeffi.internal.c.mln_offline_region_status
 import org.maplibre.nativeffi.internal.c.mln_runtime_event
 import org.maplibre.nativeffi.internal.c.mln_runtime_event_offline_operation_completed
@@ -28,7 +39,9 @@ import org.maplibre.nativeffi.internal.c.mln_runtime_event_tile_action
 import org.maplibre.nativeffi.internal.memory.MemoryUtil
 import org.maplibre.nativeffi.map.RenderingStats
 import org.maplibre.nativeffi.map.TileOperation
+import org.maplibre.nativeffi.offline.OfflineRegionDefinition
 import org.maplibre.nativeffi.offline.OfflineRegionDownloadState
+import org.maplibre.nativeffi.offline.OfflineRegionInfo
 import org.maplibre.nativeffi.offline.OfflineRegionStatus
 import org.maplibre.nativeffi.render.RenderMode
 import org.maplibre.nativeffi.resource.ResourceErrorReason
@@ -37,7 +50,7 @@ import org.maplibre.nativeffi.runtime.OfflineOperationResultKind
 import org.maplibre.nativeffi.runtime.RuntimeEventPayload
 
 /** Copies runtime event payloads out of native event storage. */
-@OptIn(ExperimentalForeignApi::class)
+@OptIn(ExperimentalForeignApi::class, ExperimentalUnsignedTypes::class)
 internal object RuntimeStructs {
   fun message(event: mln_runtime_event): String =
     MemoryUtil.copyStringView(event.message, event.message_size)
@@ -171,6 +184,86 @@ internal object RuntimeStructs {
       value.found,
     )
   }
+
+  fun metadata(
+    value: ByteArray,
+    scope: MemScope,
+  ): kotlinx.cinterop.CPointer<kotlinx.cinterop.UByteVar>? =
+    if (value.isEmpty()) null else value.toUByteArray().toCValues().getPointer(scope)
+
+  fun offlineRegionDefinition(
+    value: OfflineRegionDefinition,
+    scope: MemScope,
+  ): CPointer<mln_offline_region_definition> {
+    val native = scope.alloc<mln_offline_region_definition>()
+    native.size = sizeOf<mln_offline_region_definition>().toUInt()
+    when (value) {
+      is OfflineRegionDefinition.TilePyramid -> {
+        native.type = MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID
+        native.data.tile_pyramid.size =
+          sizeOf<org.maplibre.nativeffi.internal.c.mln_offline_tile_pyramid_region_definition>()
+            .toUInt()
+        native.data.tile_pyramid.style_url = MemoryUtil.cString(scope, value.styleUrl)
+        native.data.tile_pyramid.bounds.southwest.latitude = value.bounds.southwest.latitude
+        native.data.tile_pyramid.bounds.southwest.longitude = value.bounds.southwest.longitude
+        native.data.tile_pyramid.bounds.northeast.latitude = value.bounds.northeast.latitude
+        native.data.tile_pyramid.bounds.northeast.longitude = value.bounds.northeast.longitude
+        native.data.tile_pyramid.min_zoom = value.minZoom
+        native.data.tile_pyramid.max_zoom = value.maxZoom
+        native.data.tile_pyramid.pixel_ratio = value.pixelRatio
+        native.data.tile_pyramid.include_ideographs = value.includeIdeographs
+      }
+      is OfflineRegionDefinition.GeometryRegion -> {
+        native.type = MLN_OFFLINE_REGION_DEFINITION_GEOMETRY
+        native.data.geometry.size =
+          sizeOf<org.maplibre.nativeffi.internal.c.mln_offline_geometry_region_definition>()
+            .toUInt()
+        native.data.geometry.style_url = MemoryUtil.cString(scope, value.styleUrl)
+        native.data.geometry.geometry = ValueStructs.geometry(value.geometry, scope)
+        native.data.geometry.min_zoom = value.minZoom
+        native.data.geometry.max_zoom = value.maxZoom
+        native.data.geometry.pixel_ratio = value.pixelRatio
+        native.data.geometry.include_ideographs = value.includeIdeographs
+      }
+    }
+    return native.ptr
+  }
+
+  fun offlineRegionInfo(value: mln_offline_region_info): OfflineRegionInfo =
+    OfflineRegionInfo(
+      value.id,
+      offlineRegionDefinition(value.definition),
+      value.metadata?.readBytes(value.metadata_size.toInt()) ?: ByteArray(0),
+    )
+
+  private fun offlineRegionDefinition(
+    value: mln_offline_region_definition
+  ): OfflineRegionDefinition =
+    when (value.type) {
+      MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID -> {
+        val definition = value.data.tile_pyramid
+        OfflineRegionDefinition.TilePyramid(
+          definition.style_url?.toKString() ?: "",
+          CoreStructs.latLngBounds(definition.bounds),
+          definition.min_zoom,
+          definition.max_zoom,
+          definition.pixel_ratio,
+          definition.include_ideographs,
+        )
+      }
+      MLN_OFFLINE_REGION_DEFINITION_GEOMETRY -> {
+        val definition = value.data.geometry
+        OfflineRegionDefinition.GeometryRegion(
+          definition.style_url?.toKString() ?: "",
+          ValueStructs.geometrySnapshot(definition.geometry),
+          definition.min_zoom,
+          definition.max_zoom,
+          definition.pixel_ratio,
+          definition.include_ideographs,
+        )
+      }
+      else -> error("Unknown offline region definition type ${value.type}")
+    }
 
   fun offlineRegionStatus(value: mln_offline_region_status): OfflineRegionStatus =
     OfflineRegionStatus(
