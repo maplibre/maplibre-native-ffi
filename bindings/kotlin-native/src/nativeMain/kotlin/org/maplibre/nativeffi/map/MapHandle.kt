@@ -23,6 +23,8 @@ import org.maplibre.nativeffi.internal.c.mln_bound_options_default
 import org.maplibre.nativeffi.internal.c.mln_camera_options_default
 import org.maplibre.nativeffi.internal.c.mln_free_camera_options_default
 import org.maplibre.nativeffi.internal.c.mln_lat_lng
+import org.maplibre.nativeffi.internal.c.mln_map_add_style_layer_json
+import org.maplibre.nativeffi.internal.c.mln_map_add_style_source_json
 import org.maplibre.nativeffi.internal.c.mln_map_cancel_transitions
 import org.maplibre.nativeffi.internal.c.mln_map_create
 import org.maplibre.nativeffi.internal.c.mln_map_destroy
@@ -49,6 +51,8 @@ import org.maplibre.nativeffi.internal.c.mln_map_pitch_by
 import org.maplibre.nativeffi.internal.c.mln_map_pitch_by_animated
 import org.maplibre.nativeffi.internal.c.mln_map_pixel_for_lat_lng
 import org.maplibre.nativeffi.internal.c.mln_map_pixels_for_lat_lngs
+import org.maplibre.nativeffi.internal.c.mln_map_remove_style_layer
+import org.maplibre.nativeffi.internal.c.mln_map_remove_style_source
 import org.maplibre.nativeffi.internal.c.mln_map_request_repaint
 import org.maplibre.nativeffi.internal.c.mln_map_request_still_image
 import org.maplibre.nativeffi.internal.c.mln_map_rotate_by
@@ -58,12 +62,18 @@ import org.maplibre.nativeffi.internal.c.mln_map_scale_by_animated
 import org.maplibre.nativeffi.internal.c.mln_map_set_bounds
 import org.maplibre.nativeffi.internal.c.mln_map_set_debug_options
 import org.maplibre.nativeffi.internal.c.mln_map_set_free_camera_options
+import org.maplibre.nativeffi.internal.c.mln_map_set_layer_filter
+import org.maplibre.nativeffi.internal.c.mln_map_set_layer_property
 import org.maplibre.nativeffi.internal.c.mln_map_set_projection_mode
 import org.maplibre.nativeffi.internal.c.mln_map_set_rendering_stats_view_enabled
 import org.maplibre.nativeffi.internal.c.mln_map_set_style_json
+import org.maplibre.nativeffi.internal.c.mln_map_set_style_light_json
+import org.maplibre.nativeffi.internal.c.mln_map_set_style_light_property
 import org.maplibre.nativeffi.internal.c.mln_map_set_style_url
 import org.maplibre.nativeffi.internal.c.mln_map_set_tile_options
 import org.maplibre.nativeffi.internal.c.mln_map_set_viewport_options
+import org.maplibre.nativeffi.internal.c.mln_map_style_layer_exists
+import org.maplibre.nativeffi.internal.c.mln_map_style_source_exists
 import org.maplibre.nativeffi.internal.c.mln_map_tile_options_default
 import org.maplibre.nativeffi.internal.c.mln_map_viewport_options_default
 import org.maplibre.nativeffi.internal.c.mln_projection_mode_default
@@ -73,6 +83,8 @@ import org.maplibre.nativeffi.internal.memory.MemoryUtil
 import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.internal.struct.CoreStructs
 import org.maplibre.nativeffi.internal.struct.MapStructs
+import org.maplibre.nativeffi.internal.struct.ValueStructs
+import org.maplibre.nativeffi.json.JsonValue
 import org.maplibre.nativeffi.runtime.RuntimeHandle
 
 /** Owned native map handle. Close it on the map owner thread. */
@@ -89,6 +101,127 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
   public fun setStyleJson(json: String) {
     MemoryUtil.requireValidCString(json)
     Status.check(mln_map_set_style_json(state.requireLive(), json))
+  }
+
+  public fun addStyleSourceJson(sourceId: String, sourceJson: JsonValue) {
+    memScoped {
+      Status.check(
+        mln_map_add_style_source_json(
+          state.requireLive(),
+          CoreStructs.stringView(sourceId, this),
+          ValueStructs.jsonValue(sourceJson, this),
+        )
+      )
+    }
+  }
+
+  public fun removeStyleSource(sourceId: String): Boolean = memScoped {
+    val outRemoved = alloc<BooleanVar>()
+    Status.check(
+      mln_map_remove_style_source(
+        state.requireLive(),
+        CoreStructs.stringView(sourceId, this),
+        outRemoved.ptr,
+      )
+    )
+    outRemoved.value
+  }
+
+  public fun styleSourceExists(sourceId: String): Boolean = memScoped {
+    val outExists = alloc<BooleanVar>()
+    Status.check(
+      mln_map_style_source_exists(
+        state.requireLive(),
+        CoreStructs.stringView(sourceId, this),
+        outExists.ptr,
+      )
+    )
+    outExists.value
+  }
+
+  public fun addStyleLayerJson(layerJson: JsonValue) {
+    addStyleLayerJson(layerJson, "")
+  }
+
+  public fun addStyleLayerJson(layerJson: JsonValue, beforeLayerId: String) {
+    memScoped {
+      Status.check(
+        mln_map_add_style_layer_json(
+          state.requireLive(),
+          ValueStructs.jsonValue(layerJson, this),
+          CoreStructs.stringView(beforeLayerId, this),
+        )
+      )
+    }
+  }
+
+  public fun removeStyleLayer(layerId: String): Boolean = memScoped {
+    val outRemoved = alloc<BooleanVar>()
+    Status.check(
+      mln_map_remove_style_layer(
+        state.requireLive(),
+        CoreStructs.stringView(layerId, this),
+        outRemoved.ptr,
+      )
+    )
+    outRemoved.value
+  }
+
+  public fun styleLayerExists(layerId: String): Boolean = memScoped {
+    val outExists = alloc<BooleanVar>()
+    Status.check(
+      mln_map_style_layer_exists(
+        state.requireLive(),
+        CoreStructs.stringView(layerId, this),
+        outExists.ptr,
+      )
+    )
+    outExists.value
+  }
+
+  public fun setStyleLightJson(lightJson: JsonValue) {
+    memScoped {
+      Status.check(
+        mln_map_set_style_light_json(state.requireLive(), ValueStructs.jsonValue(lightJson, this))
+      )
+    }
+  }
+
+  public fun setStyleLightProperty(propertyName: String, value: JsonValue) {
+    memScoped {
+      Status.check(
+        mln_map_set_style_light_property(
+          state.requireLive(),
+          CoreStructs.stringView(propertyName, this),
+          ValueStructs.jsonValue(value, this),
+        )
+      )
+    }
+  }
+
+  public fun setLayerProperty(layerId: String, propertyName: String, value: JsonValue) {
+    memScoped {
+      Status.check(
+        mln_map_set_layer_property(
+          state.requireLive(),
+          CoreStructs.stringView(layerId, this),
+          CoreStructs.stringView(propertyName, this),
+          ValueStructs.jsonValue(value, this),
+        )
+      )
+    }
+  }
+
+  public fun setLayerFilter(layerId: String, filter: JsonValue) {
+    memScoped {
+      Status.check(
+        mln_map_set_layer_filter(
+          state.requireLive(),
+          CoreStructs.stringView(layerId, this),
+          ValueStructs.jsonValue(filter, this),
+        )
+      )
+    }
   }
 
   public fun requestRepaint() {
