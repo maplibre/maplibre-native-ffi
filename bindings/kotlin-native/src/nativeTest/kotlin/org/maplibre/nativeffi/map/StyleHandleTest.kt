@@ -99,6 +99,33 @@ class StyleHandleTest {
   }
 
   @Test
+  fun imageSourceApisCopyCoordinatesAndPixels() {
+    val runtime = RuntimeHandle.create()
+    val map = MapHandle.create(runtime, MapOptions().size(128, 128))
+    val coordinates = listOf(LatLng(1.0, 1.0), LatLng(1.0, 2.0), LatLng(0.0, 2.0), LatLng(0.0, 1.0))
+    try {
+      map.setStyleJson("{\"version\":8,\"sources\":{},\"layers\":[]}")
+      map.addImageSourceImage(
+        "overlay",
+        coordinates,
+        PremultipliedRgba8Image(1U, 1U, 4U, byteArrayOf(4, 3, 2, 1)),
+      )
+      assertEquals(SourceType.IMAGE, map.styleSourceType("overlay"))
+      assertEquals(coordinates, map.imageSourceCoordinates("overlay"))
+      val moved = coordinates.reversed()
+      map.setImageSourceCoordinates("overlay", moved)
+      assertEquals(moved, map.imageSourceCoordinates("overlay"))
+      map.setImageSourceImage(
+        "overlay",
+        PremultipliedRgba8Image(1U, 1U, 4U, byteArrayOf(1, 1, 1, 1)),
+      )
+    } finally {
+      map.close()
+      runtime.close()
+    }
+  }
+
+  @Test
   fun tileSourceApisMaterializeOptionsAndTileUrlLists() {
     val runtime = RuntimeHandle.create()
     val map = MapHandle.create(runtime, MapOptions().size(128, 128))

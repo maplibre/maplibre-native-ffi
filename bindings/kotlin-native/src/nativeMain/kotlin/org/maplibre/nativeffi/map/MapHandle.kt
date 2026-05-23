@@ -34,6 +34,8 @@ import org.maplibre.nativeffi.internal.c.mln_free_camera_options_default
 import org.maplibre.nativeffi.internal.c.mln_lat_lng
 import org.maplibre.nativeffi.internal.c.mln_map_add_geojson_source_data
 import org.maplibre.nativeffi.internal.c.mln_map_add_geojson_source_url
+import org.maplibre.nativeffi.internal.c.mln_map_add_image_source_image
+import org.maplibre.nativeffi.internal.c.mln_map_add_image_source_url
 import org.maplibre.nativeffi.internal.c.mln_map_add_raster_dem_source_tiles
 import org.maplibre.nativeffi.internal.c.mln_map_add_raster_dem_source_url
 import org.maplibre.nativeffi.internal.c.mln_map_add_raster_source_tiles
@@ -54,6 +56,7 @@ import org.maplibre.nativeffi.internal.c.mln_map_get_bounds
 import org.maplibre.nativeffi.internal.c.mln_map_get_camera
 import org.maplibre.nativeffi.internal.c.mln_map_get_debug_options
 import org.maplibre.nativeffi.internal.c.mln_map_get_free_camera_options
+import org.maplibre.nativeffi.internal.c.mln_map_get_image_source_coordinates
 import org.maplibre.nativeffi.internal.c.mln_map_get_layer_filter
 import org.maplibre.nativeffi.internal.c.mln_map_get_layer_property
 import org.maplibre.nativeffi.internal.c.mln_map_get_projection_mode
@@ -95,6 +98,9 @@ import org.maplibre.nativeffi.internal.c.mln_map_set_debug_options
 import org.maplibre.nativeffi.internal.c.mln_map_set_free_camera_options
 import org.maplibre.nativeffi.internal.c.mln_map_set_geojson_source_data
 import org.maplibre.nativeffi.internal.c.mln_map_set_geojson_source_url
+import org.maplibre.nativeffi.internal.c.mln_map_set_image_source_coordinates
+import org.maplibre.nativeffi.internal.c.mln_map_set_image_source_image
+import org.maplibre.nativeffi.internal.c.mln_map_set_image_source_url
 import org.maplibre.nativeffi.internal.c.mln_map_set_layer_filter
 import org.maplibre.nativeffi.internal.c.mln_map_set_layer_property
 import org.maplibre.nativeffi.internal.c.mln_map_set_projection_mode
@@ -452,6 +458,93 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
       info.pixelRatio,
       info.sdf,
     )
+  }
+
+  public fun addImageSourceUrl(sourceId: String, coordinates: List<LatLng>, url: String) {
+    memScoped {
+      Status.check(
+        mln_map_add_image_source_url(
+          state.requireLive(),
+          CoreStructs.stringView(sourceId, this),
+          CoreStructs.latLngArray(coordinates, this),
+          coordinates.size.toULong(),
+          CoreStructs.stringView(url, this),
+        )
+      )
+    }
+  }
+
+  public fun addImageSourceImage(
+    sourceId: String,
+    coordinates: List<LatLng>,
+    image: PremultipliedRgba8Image,
+  ) {
+    memScoped {
+      Status.check(
+        mln_map_add_image_source_image(
+          state.requireLive(),
+          CoreStructs.stringView(sourceId, this),
+          CoreStructs.latLngArray(coordinates, this),
+          coordinates.size.toULong(),
+          StyleStructs.premultipliedRgba8Image(image, this),
+        )
+      )
+    }
+  }
+
+  public fun setImageSourceUrl(sourceId: String, url: String) {
+    memScoped {
+      Status.check(
+        mln_map_set_image_source_url(
+          state.requireLive(),
+          CoreStructs.stringView(sourceId, this),
+          CoreStructs.stringView(url, this),
+        )
+      )
+    }
+  }
+
+  public fun setImageSourceImage(sourceId: String, image: PremultipliedRgba8Image) {
+    memScoped {
+      Status.check(
+        mln_map_set_image_source_image(
+          state.requireLive(),
+          CoreStructs.stringView(sourceId, this),
+          StyleStructs.premultipliedRgba8Image(image, this),
+        )
+      )
+    }
+  }
+
+  public fun setImageSourceCoordinates(sourceId: String, coordinates: List<LatLng>) {
+    memScoped {
+      Status.check(
+        mln_map_set_image_source_coordinates(
+          state.requireLive(),
+          CoreStructs.stringView(sourceId, this),
+          CoreStructs.latLngArray(coordinates, this),
+          coordinates.size.toULong(),
+        )
+      )
+    }
+  }
+
+  public fun imageSourceCoordinates(sourceId: String): List<LatLng>? = memScoped {
+    val outCoordinates = allocArray<mln_lat_lng>(4)
+    val outCoordinateCount = alloc<ULongVar>()
+    val outFound = alloc<BooleanVar>()
+    Status.check(
+      mln_map_get_image_source_coordinates(
+        state.requireLive(),
+        CoreStructs.stringView(sourceId, this),
+        outCoordinates,
+        4UL,
+        outCoordinateCount.ptr,
+        outFound.ptr,
+      )
+    )
+    if (outFound.value) CoreStructs.latLngArray(outCoordinates, outCoordinateCount.value.toInt())
+    else null
   }
 
   private fun copyStyleSourceAttribution(sourceId: String, info: mln_style_source_info): String? {
