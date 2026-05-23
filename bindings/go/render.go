@@ -122,6 +122,20 @@ type RenderSessionHandle struct {
 	frame  bool
 }
 
+type metalOwnedTextureFrameState struct {
+	session *RenderSessionHandle
+	raw     capi.MetalOwnedTextureFrame
+	mu      sync.Mutex
+	closed  bool
+}
+
+type vulkanOwnedTextureFrameState struct {
+	session *RenderSessionHandle
+	raw     capi.VulkanOwnedTextureFrame
+	mu      sync.Mutex
+	closed  bool
+}
+
 // MetalOwnedTextureFrame is an acquired session-owned Metal texture frame.
 // Backend handles are borrowed and remain valid only until Close. Close the
 // frame on the render session owner thread before resizing, rendering, reading
@@ -135,10 +149,7 @@ type MetalOwnedTextureFrame struct {
 	Device      NativePointer
 	PixelFormat uint64
 
-	session *RenderSessionHandle
-	raw     capi.MetalOwnedTextureFrame
-	mu      sync.Mutex
-	closed  bool
+	state *metalOwnedTextureFrameState
 }
 
 // VulkanOwnedTextureFrame is an acquired session-owned Vulkan texture frame.
@@ -156,10 +167,7 @@ type VulkanOwnedTextureFrame struct {
 	Format      uint32
 	Layout      uint32
 
-	session *RenderSessionHandle
-	raw     capi.VulkanOwnedTextureFrame
-	mu      sync.Mutex
-	closed  bool
+	state *vulkanOwnedTextureFrameState
 }
 
 func (extent RenderTargetExtent) toCAPI() capi.RenderTargetExtent {
@@ -450,19 +458,24 @@ func (session *RenderSessionHandle) ReadPremultipliedRGBA8() ([]byte, TextureIma
 	defer session.state.KeepAlive()
 	defer session.parent.state.KeepAlive()
 
-	var rawInfo capi.TextureImageInfo
-	failure := internalstatus.CheckCall(func() capi.Status {
-		return capi.TextureReadPremultipliedRGBA8(ptr, nil, &rawInfo)
+	var buffer []byte
+	var info TextureImageInfo
+	err = session.withNoAcquiredFrame(func() error {
+		var rawInfo capi.TextureImageInfo
+		failure := internalstatus.CheckCall(func() capi.Status {
+			return capi.TextureReadPremultipliedRGBA8(ptr, nil, &rawInfo)
+		})
+		info = textureImageInfoFromCAPI(rawInfo)
+		if failure == nil {
+			return nil
+		}
+		if failure.Status != capi.StatusInvalidArgument || info.ByteLength == 0 {
+			return newStatusError(failure)
+		}
+		buffer = make([]byte, info.ByteLength)
+		info, err = session.readPremultipliedRGBA8IntoLocked(ptr, buffer)
+		return err
 	})
-	info := textureImageInfoFromCAPI(rawInfo)
-	if failure == nil {
-		return nil, info, nil
-	}
-	if failure.Status != capi.StatusInvalidArgument || info.ByteLength == 0 {
-		return nil, info, newStatusError(failure)
-	}
-	buffer := make([]byte, info.ByteLength)
-	info, err = session.ReadPremultipliedRGBA8Into(buffer)
 	if err != nil {
 		return nil, info, err
 	}
@@ -478,6 +491,16 @@ func (session *RenderSessionHandle) ReadPremultipliedRGBA8Into(buffer []byte) (T
 	}
 	defer session.state.KeepAlive()
 	defer session.parent.state.KeepAlive()
+	var info TextureImageInfo
+	err = session.withNoAcquiredFrame(func() error {
+		var readErr error
+		info, readErr = session.readPremultipliedRGBA8IntoLocked(ptr, buffer)
+		return readErr
+	})
+	return info, err
+}
+
+func (session *RenderSessionHandle) readPremultipliedRGBA8IntoLocked(ptr *capi.RenderSession, buffer []byte) (TextureImageInfo, error) {
 	var rawInfo capi.TextureImageInfo
 	if err := checkNative(func() capi.Status { return capi.TextureReadPremultipliedRGBA8(ptr, buffer, &rawInfo) }); err != nil {
 		runtime.KeepAlive(buffer)
@@ -515,8 +538,7 @@ func (session *RenderSessionHandle) AcquireMetalTextureFrame() (*MetalOwnedTextu
 		Texture:     NativePointer(rawFrame.Texture),
 		Device:      NativePointer(rawFrame.Device),
 		PixelFormat: rawFrame.PixelFormat,
-		session:     session,
-		raw:         rawFrame,
+		state:       &metalOwnedTextureFrameState{session: session, raw: rawFrame},
 	}, nil
 }
 
@@ -550,8 +572,7 @@ func (session *RenderSessionHandle) AcquireVulkanTextureFrame() (*VulkanOwnedTex
 		Device:      NativePointer(rawFrame.Device),
 		Format:      rawFrame.Format,
 		Layout:      rawFrame.Layout,
-		session:     session,
-		raw:         rawFrame,
+		state:       &vulkanOwnedTextureFrameState{session: session, raw: rawFrame},
 	}, nil
 }
 
@@ -559,25 +580,26 @@ func (session *RenderSessionHandle) AcquireVulkanTextureFrame() (*VulkanOwnedTex
 // A second Close is a no-op after a successful release; failed releases remain
 // retryable.
 func (frame *MetalOwnedTextureFrame) Close() error {
-	if frame == nil || frame.session == nil {
+	if frame == nil || frame.state == nil || frame.state.session == nil {
 		return newBindingError(ErrInvalidArgument, "MetalOwnedTextureFrame is nil")
 	}
-	frame.mu.Lock()
-	defer frame.mu.Unlock()
-	if frame.closed {
+	state := frame.state
+	state.mu.Lock()
+	defer state.mu.Unlock()
+	if state.closed {
 		return nil
 	}
-	ptr, err := frame.session.ptr()
+	ptr, err := state.session.ptr()
 	if err != nil {
 		return err
 	}
-	defer frame.session.state.KeepAlive()
-	defer frame.session.parent.state.KeepAlive()
-	if err := checkNative(func() capi.Status { return capi.MetalOwnedTextureReleaseFrame(ptr, frame.raw) }); err != nil {
+	defer state.session.state.KeepAlive()
+	defer state.session.parent.state.KeepAlive()
+	if err := checkNative(func() capi.Status { return capi.MetalOwnedTextureReleaseFrame(ptr, state.raw) }); err != nil {
 		return err
 	}
-	frame.closed = true
-	frame.session.markFrameReleased()
+	state.closed = true
+	state.session.markFrameReleased()
 	return nil
 }
 
@@ -585,25 +607,26 @@ func (frame *MetalOwnedTextureFrame) Close() error {
 // thread. A second Close is a no-op after a successful release; failed releases
 // remain retryable.
 func (frame *VulkanOwnedTextureFrame) Close() error {
-	if frame == nil || frame.session == nil {
+	if frame == nil || frame.state == nil || frame.state.session == nil {
 		return newBindingError(ErrInvalidArgument, "VulkanOwnedTextureFrame is nil")
 	}
-	frame.mu.Lock()
-	defer frame.mu.Unlock()
-	if frame.closed {
+	state := frame.state
+	state.mu.Lock()
+	defer state.mu.Unlock()
+	if state.closed {
 		return nil
 	}
-	ptr, err := frame.session.ptr()
+	ptr, err := state.session.ptr()
 	if err != nil {
 		return err
 	}
-	defer frame.session.state.KeepAlive()
-	defer frame.session.parent.state.KeepAlive()
-	if err := checkNative(func() capi.Status { return capi.VulkanOwnedTextureReleaseFrame(ptr, frame.raw) }); err != nil {
+	defer state.session.state.KeepAlive()
+	defer state.session.parent.state.KeepAlive()
+	if err := checkNative(func() capi.Status { return capi.VulkanOwnedTextureReleaseFrame(ptr, state.raw) }); err != nil {
 		return err
 	}
-	frame.closed = true
-	frame.session.markFrameReleased()
+	state.closed = true
+	state.session.markFrameReleased()
 	return nil
 }
 
