@@ -894,8 +894,22 @@ public enum CAPI {
     try checkStatus(mln_map_add_image_source_url(map, sourceId, coordinates, count, url))
   }
 
+  public static func mapAddImageSourceURL(_ map: OpaquePointer, sourceId: mln_string_view, coordinates: [NativeLatLng], url: mln_string_view) throws {
+    let rawCoordinates = coordinates.map(\.native)
+    try rawCoordinates.withUnsafeBufferPointer { coordinates in
+      try mapAddImageSourceURL(map, sourceId: sourceId, coordinates: coordinates.baseAddress, count: coordinates.count, url: url)
+    }
+  }
+
   public static func mapAddImageSourceImage(_ map: OpaquePointer, sourceId: mln_string_view, coordinates: UnsafePointer<mln_lat_lng>?, count: Int, image: UnsafePointer<mln_premultiplied_rgba8_image>) throws {
     try checkStatus(mln_map_add_image_source_image(map, sourceId, coordinates, count, image))
+  }
+
+  public static func mapAddImageSourceImage(_ map: OpaquePointer, sourceId: mln_string_view, coordinates: [NativeLatLng], image: UnsafePointer<mln_premultiplied_rgba8_image>) throws {
+    let rawCoordinates = coordinates.map(\.native)
+    try rawCoordinates.withUnsafeBufferPointer { coordinates in
+      try mapAddImageSourceImage(map, sourceId: sourceId, coordinates: coordinates.baseAddress, count: coordinates.count, image: image)
+    }
   }
 
   public static func mapSetImageSourceURL(_ map: OpaquePointer, sourceId: mln_string_view, url: mln_string_view) throws {
@@ -908,6 +922,13 @@ public enum CAPI {
 
   public static func mapSetImageSourceCoordinates(_ map: OpaquePointer, sourceId: mln_string_view, coordinates: UnsafePointer<mln_lat_lng>?, count: Int) throws {
     try checkStatus(mln_map_set_image_source_coordinates(map, sourceId, coordinates, count))
+  }
+
+  public static func mapSetImageSourceCoordinates(_ map: OpaquePointer, sourceId: mln_string_view, coordinates: [NativeLatLng]) throws {
+    let rawCoordinates = coordinates.map(\.native)
+    try rawCoordinates.withUnsafeBufferPointer { coordinates in
+      try mapSetImageSourceCoordinates(map, sourceId: sourceId, coordinates: coordinates.baseAddress, count: coordinates.count)
+    }
   }
 
   public static func mapGetImageSourceCoordinates(_ map: OpaquePointer, sourceId: mln_string_view) throws -> [NativeLatLng]? {

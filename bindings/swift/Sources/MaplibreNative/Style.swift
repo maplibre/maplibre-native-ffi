@@ -1,4 +1,3 @@
-import CMaplibreNativeC
 import MaplibreNativeSupport
 
 public enum StyleSourceType: UInt32, Sendable, Hashable {
@@ -274,8 +273,9 @@ extension MapHandle {
   }
 
   public func addGeoJSONSourceURL(sourceId: String, url: String) throws {
-    try withStringViews(sourceId, url) { sourceId, url in
-      try CAPI.mapAddGeoJSONSourceURL(try requireLivePointer(), sourceId: sourceId, url: url)
+    try mapNativeFailure {
+      let arena = NativeJSONArena()
+      try CAPI.mapAddGeoJSONSourceURL(try requireLivePointer(), sourceId: arena.view(sourceId), url: arena.view(url))
     }
   }
 
@@ -289,8 +289,9 @@ extension MapHandle {
   }
 
   public func setGeoJSONSourceURL(sourceId: String, url: String) throws {
-    try withStringViews(sourceId, url) { sourceId, url in
-      try CAPI.mapSetGeoJSONSourceURL(try requireLivePointer(), sourceId: sourceId, url: url)
+    try mapNativeFailure {
+      let arena = NativeJSONArena()
+      try CAPI.mapSetGeoJSONSourceURL(try requireLivePointer(), sourceId: arena.view(sourceId), url: arena.view(url))
     }
   }
 
@@ -304,27 +305,66 @@ extension MapHandle {
   }
 
   public func addVectorSourceURL(sourceId: String, url: String, options: StyleTileSourceOptions = StyleTileSourceOptions()) throws {
-    try addTileURLSource(sourceId: sourceId, url: url, options: options.nativeOptions, add: CAPI.mapAddVectorSourceURL)
+    try mapNativeFailure {
+      let arena = NativeJSONArena()
+      try options.nativeOptions.withNativeOptions { options in
+        try CAPI.mapAddVectorSourceURL(try requireLivePointer(), sourceId: arena.view(sourceId), url: arena.view(url), options: options)
+      }
+    }
   }
 
   public func addVectorSourceTiles(sourceId: String, tiles: [String], options: StyleTileSourceOptions = StyleTileSourceOptions()) throws {
-    try addTileListSource(sourceId: sourceId, tiles: tiles, options: options.nativeOptions, add: CAPI.mapAddVectorSourceTiles)
+    try mapNativeFailure {
+      let arena = NativeJSONArena()
+      let tileViews = tiles.map { arena.view($0) }
+      try tileViews.withUnsafeBufferPointer { tiles in
+        try options.nativeOptions.withNativeOptions { options in
+          try CAPI.mapAddVectorSourceTiles(try requireLivePointer(), sourceId: arena.view(sourceId), tiles: tiles.baseAddress, count: tiles.count, options: options)
+        }
+      }
+    }
   }
 
   public func addRasterSourceURL(sourceId: String, url: String, options: StyleTileSourceOptions = StyleTileSourceOptions()) throws {
-    try addTileURLSource(sourceId: sourceId, url: url, options: options.nativeOptions, add: CAPI.mapAddRasterSourceURL)
+    try mapNativeFailure {
+      let arena = NativeJSONArena()
+      try options.nativeOptions.withNativeOptions { options in
+        try CAPI.mapAddRasterSourceURL(try requireLivePointer(), sourceId: arena.view(sourceId), url: arena.view(url), options: options)
+      }
+    }
   }
 
   public func addRasterSourceTiles(sourceId: String, tiles: [String], options: StyleTileSourceOptions = StyleTileSourceOptions()) throws {
-    try addTileListSource(sourceId: sourceId, tiles: tiles, options: options.nativeOptions, add: CAPI.mapAddRasterSourceTiles)
+    try mapNativeFailure {
+      let arena = NativeJSONArena()
+      let tileViews = tiles.map { arena.view($0) }
+      try tileViews.withUnsafeBufferPointer { tiles in
+        try options.nativeOptions.withNativeOptions { options in
+          try CAPI.mapAddRasterSourceTiles(try requireLivePointer(), sourceId: arena.view(sourceId), tiles: tiles.baseAddress, count: tiles.count, options: options)
+        }
+      }
+    }
   }
 
   public func addRasterDEMSourceURL(sourceId: String, url: String, options: StyleTileSourceOptions = StyleTileSourceOptions()) throws {
-    try addTileURLSource(sourceId: sourceId, url: url, options: options.nativeOptions, add: CAPI.mapAddRasterDEMSourceURL)
+    try mapNativeFailure {
+      let arena = NativeJSONArena()
+      try options.nativeOptions.withNativeOptions { options in
+        try CAPI.mapAddRasterDEMSourceURL(try requireLivePointer(), sourceId: arena.view(sourceId), url: arena.view(url), options: options)
+      }
+    }
   }
 
   public func addRasterDEMSourceTiles(sourceId: String, tiles: [String], options: StyleTileSourceOptions = StyleTileSourceOptions()) throws {
-    try addTileListSource(sourceId: sourceId, tiles: tiles, options: options.nativeOptions, add: CAPI.mapAddRasterDEMSourceTiles)
+    try mapNativeFailure {
+      let arena = NativeJSONArena()
+      let tileViews = tiles.map { arena.view($0) }
+      try tileViews.withUnsafeBufferPointer { tiles in
+        try options.nativeOptions.withNativeOptions { options in
+          try CAPI.mapAddRasterDEMSourceTiles(try requireLivePointer(), sourceId: arena.view(sourceId), tiles: tiles.baseAddress, count: tiles.count, options: options)
+        }
+      }
+    }
   }
 
   public func addCustomGeometrySource(sourceId: String, options: CustomGeometrySourceOptions) throws {
@@ -413,27 +453,25 @@ extension MapHandle {
   }
 
   public func addImageSourceURL(sourceId: String, coordinates: [LatLng], url: String) throws {
-    try withImageSourceCoordinates(coordinates) { coordinates, count in
-      try withStringViews(sourceId, url) { sourceId, url in
-        try CAPI.mapAddImageSourceURL(try requireLivePointer(), sourceId: sourceId, coordinates: coordinates, count: count, url: url)
-      }
+    try mapNativeFailure {
+      let arena = NativeJSONArena()
+      try CAPI.mapAddImageSourceURL(try requireLivePointer(), sourceId: arena.view(sourceId), coordinates: coordinates.map(\.nativeInput), url: arena.view(url))
     }
   }
 
   public func addImageSourceImage(sourceId: String, coordinates: [LatLng], image: StyleRGBA8Image) throws {
-    try withImageSourceCoordinates(coordinates) { coordinates, count in
-      try mapNativeFailure {
-        let arena = NativeJSONArena()
-        try image.nativeImage.withNativeImage { image in
-          try CAPI.mapAddImageSourceImage(try requireLivePointer(), sourceId: arena.view(sourceId), coordinates: coordinates, count: count, image: image)
-        }
+    try mapNativeFailure {
+      let arena = NativeJSONArena()
+      try image.nativeImage.withNativeImage { image in
+        try CAPI.mapAddImageSourceImage(try requireLivePointer(), sourceId: arena.view(sourceId), coordinates: coordinates.map(\.nativeInput), image: image)
       }
     }
   }
 
   public func setImageSourceURL(sourceId: String, url: String) throws {
-    try withStringViews(sourceId, url) { sourceId, url in
-      try CAPI.mapSetImageSourceURL(try requireLivePointer(), sourceId: sourceId, url: url)
+    try mapNativeFailure {
+      let arena = NativeJSONArena()
+      try CAPI.mapSetImageSourceURL(try requireLivePointer(), sourceId: arena.view(sourceId), url: arena.view(url))
     }
   }
 
@@ -447,11 +485,9 @@ extension MapHandle {
   }
 
   public func setImageSourceCoordinates(sourceId: String, coordinates: [LatLng]) throws {
-    try withImageSourceCoordinates(coordinates) { coordinates, count in
-      try mapNativeFailure {
-        let arena = NativeJSONArena()
-        try CAPI.mapSetImageSourceCoordinates(try requireLivePointer(), sourceId: arena.view(sourceId), coordinates: coordinates, count: count)
-      }
+    try mapNativeFailure {
+      let arena = NativeJSONArena()
+      try CAPI.mapSetImageSourceCoordinates(try requireLivePointer(), sourceId: arena.view(sourceId), coordinates: coordinates.map(\.nativeInput))
     }
   }
 
@@ -463,11 +499,17 @@ extension MapHandle {
   }
 
   public func addHillshadeLayer(layerId: String, sourceId: String, beforeLayerId: String? = nil) throws {
-    try withLayerPlacement(layerId: layerId, sourceId: sourceId, beforeLayerId: beforeLayerId, add: CAPI.mapAddHillshadeLayer)
+    try mapNativeFailure {
+      let arena = NativeJSONArena()
+      try CAPI.mapAddHillshadeLayer(try requireLivePointer(), layerId: arena.view(layerId), sourceId: arena.view(sourceId), beforeLayerId: arena.view(beforeLayerId ?? ""))
+    }
   }
 
   public func addColorReliefLayer(layerId: String, sourceId: String, beforeLayerId: String? = nil) throws {
-    try withLayerPlacement(layerId: layerId, sourceId: sourceId, beforeLayerId: beforeLayerId, add: CAPI.mapAddColorReliefLayer)
+    try mapNativeFailure {
+      let arena = NativeJSONArena()
+      try CAPI.mapAddColorReliefLayer(try requireLivePointer(), layerId: arena.view(layerId), sourceId: arena.view(sourceId), beforeLayerId: arena.view(beforeLayerId ?? ""))
+    }
   }
 
   public func addLocationIndicatorLayer(layerId: String, beforeLayerId: String? = nil) throws {
@@ -499,8 +541,9 @@ extension MapHandle {
   }
 
   public func setLocationIndicatorImageName(layerId: String, kind: LocationIndicatorImageKind, imageId: String) throws {
-    try withStringViews(layerId, imageId) { layerId, imageId in
-      try CAPI.mapSetLocationIndicatorImageName(try requireLivePointer(), layerId: layerId, imageKind: kind.rawValue, imageId: imageId)
+    try mapNativeFailure {
+      let arena = NativeJSONArena()
+      try CAPI.mapSetLocationIndicatorImageName(try requireLivePointer(), layerId: arena.view(layerId), imageKind: kind.rawValue, imageId: arena.view(imageId))
     }
   }
 
@@ -599,62 +642,4 @@ extension MapHandle {
     }
   }
 
-  private func withStringViews<Result>(_ first: String, _ second: String, _ body: (mln_string_view, mln_string_view) throws -> Result) throws -> Result {
-    try mapNativeFailure {
-      let arena = NativeJSONArena()
-      return try body(arena.view(first), arena.view(second))
-    }
-  }
-
-  private func addTileURLSource(
-    sourceId: String,
-    url: String,
-    options: NativeStyleTileSourceOptions,
-    add: (OpaquePointer, mln_string_view, mln_string_view, UnsafePointer<mln_style_tile_source_options>?) throws -> Void
-  ) throws {
-    try withStringViews(sourceId, url) { sourceId, url in
-      try options.withNativeOptions { options in
-        try add(try requireLivePointer(), sourceId, url, options)
-      }
-    }
-  }
-
-  private func addTileListSource(
-    sourceId: String,
-    tiles: [String],
-    options: NativeStyleTileSourceOptions,
-    add: (OpaquePointer, mln_string_view, UnsafePointer<mln_string_view>?, Int, UnsafePointer<mln_style_tile_source_options>?) throws -> Void
-  ) throws {
-    try mapNativeFailure {
-      let arena = NativeJSONArena()
-      let tileViews = tiles.map { arena.view($0) }
-      try tileViews.withUnsafeBufferPointer { tiles in
-        try options.withNativeOptions { options in
-          try add(try requireLivePointer(), arena.view(sourceId), tiles.baseAddress, tiles.count, options)
-        }
-      }
-    }
-  }
-
-  private func withImageSourceCoordinates<Result>(
-    _ coordinates: [LatLng],
-    _ body: (UnsafePointer<mln_lat_lng>?, Int) throws -> Result
-  ) throws -> Result {
-    let nativeCoordinates = coordinates.map { $0.nativeInput.native }
-    return try nativeCoordinates.withUnsafeBufferPointer { coordinates in
-      try body(coordinates.baseAddress, coordinates.count)
-    }
-  }
-
-  private func withLayerPlacement(
-    layerId: String,
-    sourceId: String,
-    beforeLayerId: String?,
-    add: (OpaquePointer, mln_string_view, mln_string_view, mln_string_view) throws -> Void
-  ) throws {
-    try mapNativeFailure {
-      let arena = NativeJSONArena()
-      try add(try requireLivePointer(), arena.view(layerId), arena.view(sourceId), arena.view(beforeLayerId ?? ""))
-    }
-  }
 }
