@@ -994,6 +994,12 @@ const (
 )
 
 const (
+	LocationIndicatorImageKindTop     uint32 = uint32(C.MLN_LOCATION_INDICATOR_IMAGE_KIND_TOP)
+	LocationIndicatorImageKindBearing uint32 = uint32(C.MLN_LOCATION_INDICATOR_IMAGE_KIND_BEARING)
+	LocationIndicatorImageKindShadow  uint32 = uint32(C.MLN_LOCATION_INDICATOR_IMAGE_KIND_SHADOW)
+)
+
+const (
 	ResourceResponseStatusOK          uint32 = uint32(C.MLN_RESOURCE_RESPONSE_STATUS_OK)
 	ResourceResponseStatusError       uint32 = uint32(C.MLN_RESOURCE_RESPONSE_STATUS_ERROR)
 	ResourceResponseStatusNoContent   uint32 = uint32(C.MLN_RESOURCE_RESPONSE_STATUS_NO_CONTENT)
@@ -2035,6 +2041,67 @@ func MapAddRasterDEMSourceTiles(m *Map, sourceID string, tiles []string, options
 	rawOptions, rawOptionsPointer := styleTileSourceOptionsToCPointer(options)
 	defer rawOptions.free()
 	return Status(C.mln_map_add_raster_dem_source_tiles((*C.mln_map)(unsafe.Pointer(m)), sourceView.raw(), rawTiles.data, C.size_t(rawTiles.count), rawOptionsPointer))
+}
+
+// MapAddHillshadeLayer adds a hillshade layer for a raster DEM source.
+func MapAddHillshadeLayer(m *Map, layerID string, sourceID string, beforeLayerID string) Status {
+	layerView := newStringView(layerID)
+	defer layerView.free()
+	sourceView := newStringView(sourceID)
+	defer sourceView.free()
+	beforeView := newStringView(beforeLayerID)
+	defer beforeView.free()
+	return Status(C.mln_map_add_hillshade_layer((*C.mln_map)(unsafe.Pointer(m)), layerView.raw(), sourceView.raw(), beforeView.raw()))
+}
+
+// MapAddColorReliefLayer adds a color-relief layer for a raster DEM source.
+func MapAddColorReliefLayer(m *Map, layerID string, sourceID string, beforeLayerID string) Status {
+	layerView := newStringView(layerID)
+	defer layerView.free()
+	sourceView := newStringView(sourceID)
+	defer sourceView.free()
+	beforeView := newStringView(beforeLayerID)
+	defer beforeView.free()
+	return Status(C.mln_map_add_color_relief_layer((*C.mln_map)(unsafe.Pointer(m)), layerView.raw(), sourceView.raw(), beforeView.raw()))
+}
+
+// MapAddLocationIndicatorLayer adds a source-free location indicator layer.
+func MapAddLocationIndicatorLayer(m *Map, layerID string, beforeLayerID string) Status {
+	layerView := newStringView(layerID)
+	defer layerView.free()
+	beforeView := newStringView(beforeLayerID)
+	defer beforeView.free()
+	return Status(C.mln_map_add_location_indicator_layer((*C.mln_map)(unsafe.Pointer(m)), layerView.raw(), beforeView.raw()))
+}
+
+// MapSetLocationIndicatorLocation sets a location indicator layer location.
+func MapSetLocationIndicatorLocation(m *Map, layerID string, coordinate LatLng, altitude float64) Status {
+	layerView := newStringView(layerID)
+	defer layerView.free()
+	return Status(C.mln_map_set_location_indicator_location((*C.mln_map)(unsafe.Pointer(m)), layerView.raw(), latLngToC(coordinate), C.double(altitude)))
+}
+
+// MapSetLocationIndicatorBearing sets a location indicator layer bearing.
+func MapSetLocationIndicatorBearing(m *Map, layerID string, bearing float64) Status {
+	layerView := newStringView(layerID)
+	defer layerView.free()
+	return Status(C.mln_map_set_location_indicator_bearing((*C.mln_map)(unsafe.Pointer(m)), layerView.raw(), C.double(bearing)))
+}
+
+// MapSetLocationIndicatorAccuracyRadius sets a location indicator layer accuracy radius.
+func MapSetLocationIndicatorAccuracyRadius(m *Map, layerID string, radius float64) Status {
+	layerView := newStringView(layerID)
+	defer layerView.free()
+	return Status(C.mln_map_set_location_indicator_accuracy_radius((*C.mln_map)(unsafe.Pointer(m)), layerView.raw(), C.double(radius)))
+}
+
+// MapSetLocationIndicatorImageName sets one location indicator image-name property.
+func MapSetLocationIndicatorImageName(m *Map, layerID string, imageKind uint32, imageID string) Status {
+	layerView := newStringView(layerID)
+	defer layerView.free()
+	imageView := newStringView(imageID)
+	defer imageView.free()
+	return Status(C.mln_map_set_location_indicator_image_name((*C.mln_map)(unsafe.Pointer(m)), layerView.raw(), C.uint32_t(imageKind), imageView.raw()))
 }
 
 // MapAddStyleSourceJSON adds one style source from a style-spec JSON object.

@@ -1487,6 +1487,86 @@ func TestImageSourceCopiesPixelsAndCoordinates(t *testing.T) {
 	}
 }
 
+func TestDedicatedStyleLayerHelpers(t *testing.T) {
+	runtime, err := NewRuntime()
+	if err != nil {
+		t.Fatalf("NewRuntime(): %v", err)
+	}
+	m, err := runtime.NewMap()
+	if err != nil {
+		_ = runtime.Close()
+		t.Fatalf("NewMap(): %v", err)
+	}
+	defer func() {
+		if err := m.Close(); err != nil {
+			t.Errorf("Map Close(): %v", err)
+		}
+		if err := runtime.Close(); err != nil {
+			t.Errorf("Runtime Close(): %v", err)
+		}
+	}()
+
+	if err := m.SetStyleJSON(`{"version":8,"sources":{},"layers":[]}`); err != nil {
+		t.Fatalf("SetStyleJSON(empty style): %v", err)
+	}
+	demOptions := StyleTileSourceOptions{}.WithTileSize(512).WithRasterEncoding(StyleRasterDEMEncodingMapbox)
+	if err := m.AddRasterDEMSourceTiles("dem", []string{"https://example.com/dem/{z}/{x}/{y}.png"}, &demOptions); err != nil {
+		t.Fatalf("AddRasterDEMSourceTiles(): %v", err)
+	}
+	if err := m.AddHillshadeLayer("hillshade", "dem", ""); err != nil {
+		t.Fatalf("AddHillshadeLayer(): %v", err)
+	}
+	if err := m.AddColorReliefLayer("relief", "dem", "hillshade"); err != nil {
+		t.Fatalf("AddColorReliefLayer(): %v", err)
+	}
+	if err := m.AddLocationIndicatorLayer("location", ""); err != nil {
+		t.Fatalf("AddLocationIndicatorLayer(): %v", err)
+	}
+	if err := m.SetLocationIndicatorLocation("location", LatLng{Latitude: 1, Longitude: 2}, 3); err != nil {
+		t.Fatalf("SetLocationIndicatorLocation(): %v", err)
+	}
+	if err := m.SetLocationIndicatorBearing("location", 45); err != nil {
+		t.Fatalf("SetLocationIndicatorBearing(): %v", err)
+	}
+	if err := m.SetLocationIndicatorAccuracyRadius("location", 12); err != nil {
+		t.Fatalf("SetLocationIndicatorAccuracyRadius(): %v", err)
+	}
+	if err := m.SetLocationIndicatorImageName("location", LocationIndicatorImageKindTop, "marker"); err != nil {
+		t.Fatalf("SetLocationIndicatorImageName(): %v", err)
+	}
+	checks := map[string]string{
+		"hillshade": "hillshade",
+		"relief":    "color-relief",
+		"location":  "location-indicator",
+	}
+	for id, wantType := range checks {
+		gotType, found, err := m.StyleLayerType(id)
+		if err != nil {
+			t.Fatalf("StyleLayerType(%s): %v", id, err)
+		}
+		if !found || gotType != wantType {
+			t.Fatalf("StyleLayerType(%s) = (%q, %v), want %q true", id, gotType, found, wantType)
+		}
+	}
+	ids, err := m.StyleLayerIDs()
+	if err != nil {
+		t.Fatalf("StyleLayerIDs(): %v", err)
+	}
+	positions := make(map[string]int, len(ids))
+	for i, id := range ids {
+		positions[id] = i
+	}
+	if positions["relief"] >= positions["hillshade"] || positions["location"] <= positions["hillshade"] {
+		t.Fatalf("StyleLayerIDs() = %v, want relief before hillshade and location after hillshade", ids)
+	}
+	if err := m.SetLocationIndicatorImageName("location", LocationIndicatorImageKind(99), "bad"); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("SetLocationIndicatorImageName(invalid kind) error = %v, want ErrInvalidArgument", err)
+	}
+	if err := m.AddHillshadeLayer("bad-hillshade", "missing", ""); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("AddHillshadeLayer(missing source) error = %v, want ErrInvalidArgument", err)
+	}
+}
+
 func TestAddStyleSourceJSONCopiesGoJSONDescriptor(t *testing.T) {
 	runtime, err := NewRuntime()
 	if err != nil {

@@ -244,6 +244,15 @@ func styleImageInfoFromCAPI(info capi.StyleImageInfo) StyleImageInfo {
 	return StyleImageInfo{Width: info.Width, Height: info.Height, Stride: info.Stride, ByteLength: info.ByteLength, PixelRatio: info.PixelRatio, SDF: info.SDF}
 }
 
+// LocationIndicatorImageKind identifies an image-name slot on a location indicator layer.
+type LocationIndicatorImageKind uint32
+
+const (
+	LocationIndicatorImageKindTop     LocationIndicatorImageKind = LocationIndicatorImageKind(capi.LocationIndicatorImageKindTop)
+	LocationIndicatorImageKindBearing LocationIndicatorImageKind = LocationIndicatorImageKind(capi.LocationIndicatorImageKindBearing)
+	LocationIndicatorImageKindShadow  LocationIndicatorImageKind = LocationIndicatorImageKind(capi.LocationIndicatorImageKindShadow)
+)
+
 func styleSourceInfoFromCAPI(info capi.StyleSourceInfo) StyleSourceInfo {
 	return StyleSourceInfo{
 		Type:            StyleSourceType(info.Type),
@@ -729,6 +738,83 @@ func (m *MapHandle) StyleSourceIDs() ([]string, error) {
 		return nil, err
 	}
 	return ids, nil
+}
+
+// AddHillshadeLayer adds a hillshade layer for a raster DEM source. Passing an
+// empty beforeLayerID appends the layer.
+func (m *MapHandle) AddHillshadeLayer(layerID string, sourceID string, beforeLayerID string) error {
+	ptr, err := m.ptr()
+	if err != nil {
+		return err
+	}
+	defer m.state.KeepAlive()
+	return checkNative(func() capi.Status { return capi.MapAddHillshadeLayer(ptr, layerID, sourceID, beforeLayerID) })
+}
+
+// AddColorReliefLayer adds a color-relief layer for a raster DEM source.
+// Passing an empty beforeLayerID appends the layer.
+func (m *MapHandle) AddColorReliefLayer(layerID string, sourceID string, beforeLayerID string) error {
+	ptr, err := m.ptr()
+	if err != nil {
+		return err
+	}
+	defer m.state.KeepAlive()
+	return checkNative(func() capi.Status { return capi.MapAddColorReliefLayer(ptr, layerID, sourceID, beforeLayerID) })
+}
+
+// AddLocationIndicatorLayer adds a source-free location indicator layer. Passing
+// an empty beforeLayerID appends the layer.
+func (m *MapHandle) AddLocationIndicatorLayer(layerID string, beforeLayerID string) error {
+	ptr, err := m.ptr()
+	if err != nil {
+		return err
+	}
+	defer m.state.KeepAlive()
+	return checkNative(func() capi.Status { return capi.MapAddLocationIndicatorLayer(ptr, layerID, beforeLayerID) })
+}
+
+// SetLocationIndicatorLocation sets a location indicator layer location.
+func (m *MapHandle) SetLocationIndicatorLocation(layerID string, coordinate LatLng, altitude float64) error {
+	ptr, err := m.ptr()
+	if err != nil {
+		return err
+	}
+	defer m.state.KeepAlive()
+	return checkNative(func() capi.Status {
+		return capi.MapSetLocationIndicatorLocation(ptr, layerID, coordinate.toCAPI(), altitude)
+	})
+}
+
+// SetLocationIndicatorBearing sets a location indicator layer bearing in degrees.
+func (m *MapHandle) SetLocationIndicatorBearing(layerID string, bearing float64) error {
+	ptr, err := m.ptr()
+	if err != nil {
+		return err
+	}
+	defer m.state.KeepAlive()
+	return checkNative(func() capi.Status { return capi.MapSetLocationIndicatorBearing(ptr, layerID, bearing) })
+}
+
+// SetLocationIndicatorAccuracyRadius sets a location indicator layer accuracy radius.
+func (m *MapHandle) SetLocationIndicatorAccuracyRadius(layerID string, radius float64) error {
+	ptr, err := m.ptr()
+	if err != nil {
+		return err
+	}
+	defer m.state.KeepAlive()
+	return checkNative(func() capi.Status { return capi.MapSetLocationIndicatorAccuracyRadius(ptr, layerID, radius) })
+}
+
+// SetLocationIndicatorImageName sets one location indicator image-name property.
+func (m *MapHandle) SetLocationIndicatorImageName(layerID string, imageKind LocationIndicatorImageKind, imageID string) error {
+	ptr, err := m.ptr()
+	if err != nil {
+		return err
+	}
+	defer m.state.KeepAlive()
+	return checkNative(func() capi.Status {
+		return capi.MapSetLocationIndicatorImageName(ptr, layerID, uint32(imageKind), imageID)
+	})
 }
 
 // AddStyleLayerJSON adds one style layer from a style-spec layer JSON object.
