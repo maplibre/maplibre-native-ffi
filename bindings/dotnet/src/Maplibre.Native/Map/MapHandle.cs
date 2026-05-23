@@ -274,6 +274,52 @@ public sealed unsafe class MapHandle : IDisposable
         NativeStatus.Check(NativeMethods.mln_map_cancel_transitions(Pointer));
     }
 
+    /// <summary>Calculates a camera that fits geographic bounds.</summary>
+    public CameraOptions CameraForLatLngBounds(LatLngBounds bounds)
+    {
+        return CameraForLatLngBounds(bounds, fitOptions: null);
+    }
+
+    /// <summary>Calculates a camera that fits geographic bounds and fit options.</summary>
+    public CameraOptions CameraForLatLngBounds(LatLngBounds bounds, CameraFitOptions? fitOptions)
+    {
+        var nativeBounds = MapStructs.ToNative(bounds);
+        var nativeFitOptions = fitOptions is null ? default : MapStructs.ToNative(fitOptions);
+        var camera = NativeMethods.mln_camera_options_default();
+        NativeStatus.Check(NativeMethods.mln_map_camera_for_lat_lng_bounds(Pointer, nativeBounds, fitOptions is null ? null : &nativeFitOptions, &camera));
+        return MapStructs.CameraOptionsFromNative(camera);
+    }
+
+    /// <summary>Calculates a camera that fits geographic coordinates.</summary>
+    public CameraOptions CameraForLatLngs(IReadOnlyList<LatLng> coordinates)
+    {
+        return CameraForLatLngs(coordinates, fitOptions: null);
+    }
+
+    /// <summary>Calculates a camera that fits geographic coordinates and fit options.</summary>
+    public CameraOptions CameraForLatLngs(IReadOnlyList<LatLng> coordinates, CameraFitOptions? fitOptions)
+    {
+        ArgumentNullException.ThrowIfNull(coordinates);
+        var nativeCoordinates = new mln_lat_lng[coordinates.Count];
+        for (var index = 0; index < coordinates.Count; index++)
+        {
+            nativeCoordinates[index] = CoreStructs.ToNative(coordinates[index]);
+        }
+
+        var nativeFitOptions = fitOptions is null ? default : MapStructs.ToNative(fitOptions);
+        var camera = NativeMethods.mln_camera_options_default();
+        fixed (mln_lat_lng* coordinatesPointer = nativeCoordinates)
+        {
+            NativeStatus.Check(NativeMethods.mln_map_camera_for_lat_lngs(
+                Pointer,
+                nativeCoordinates.Length == 0 ? null : coordinatesPointer,
+                (nuint)nativeCoordinates.Length,
+                fitOptions is null ? null : &nativeFitOptions,
+                &camera));
+        }
+        return MapStructs.CameraOptionsFromNative(camera);
+    }
+
     /// <summary>Calculates geographic bounds for a camera.</summary>
     public LatLngBounds LatLngBoundsForCamera(CameraOptions camera)
     {

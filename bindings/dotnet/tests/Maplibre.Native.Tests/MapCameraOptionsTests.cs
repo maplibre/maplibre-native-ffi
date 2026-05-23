@@ -56,6 +56,24 @@ public sealed class MapCameraOptionsTests
     }
 
     [Fact]
+    public void CameraFitHelpersCopyDescriptorsThroughNativeMap()
+    {
+        NativeLibraryTestSupport.SkipUnlessNativeLibraryIsAvailable();
+        using var runtime = RuntimeHandle.Create();
+        using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
+        var bounds = new LatLngBounds(new LatLng(-10, -20), new LatLng(10, 20));
+        var fit = new CameraFitOptions { Padding = new EdgeInsets(1, 2, 3, 4), Bearing = 5, Pitch = 10 };
+
+        var boundsCamera = map.CameraForLatLngBounds(bounds, fit);
+        var coordinatesCamera = map.CameraForLatLngs([bounds.Southwest, bounds.Northeast], fit);
+
+        Assert.NotNull(boundsCamera.Center);
+        Assert.NotNull(boundsCamera.Zoom);
+        Assert.NotNull(coordinatesCamera.Center);
+        Assert.NotNull(coordinatesCamera.Zoom);
+    }
+
+    [Fact]
     public void BoundsAndProjectionOptionsRoundTripThroughNativeMap()
     {
         NativeLibraryTestSupport.SkipUnlessNativeLibraryIsAvailable();

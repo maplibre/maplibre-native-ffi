@@ -105,6 +105,28 @@ internal static class MapStructs
         return native;
     }
 
+    internal static mln_camera_fit_options ToNative(CameraFitOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        var native = NativeMethods.mln_camera_fit_options_default();
+        if (options.Padding is { } padding)
+        {
+            native.fields |= (uint)mln_camera_fit_option_field.MLN_CAMERA_FIT_OPTION_PADDING;
+            native.padding = ToNative(padding);
+        }
+        if (options.Bearing is { } bearing)
+        {
+            native.fields |= (uint)mln_camera_fit_option_field.MLN_CAMERA_FIT_OPTION_BEARING;
+            native.bearing = bearing;
+        }
+        if (options.Pitch is { } pitch)
+        {
+            native.fields |= (uint)mln_camera_fit_option_field.MLN_CAMERA_FIT_OPTION_PITCH;
+            native.pitch = pitch;
+        }
+        return native;
+    }
+
     internal static mln_animation_options ToNative(AnimationOptions options)
     {
         ArgumentNullException.ThrowIfNull(options);

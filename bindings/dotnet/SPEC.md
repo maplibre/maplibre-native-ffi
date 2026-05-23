@@ -116,7 +116,7 @@ The scaffold implements one proof slice:
   the public API.
 - `RuntimeHandle` and `MapHandle` establish the close-once owner-thread handle
   pattern over generated C declarations, including runtime event polling, map
-  camera/transition/bounds/free-camera/projection/viewport/tile/debug option
+  camera/fit/transition/bounds/free-camera/projection/viewport/tile/debug option
   calls, map coordinate conversion, and projection snapshot handles.
 - `NativeUtf8String` rejects embedded NUL values and owns temporary UTF-8 C
   string storage for call-boundary inputs.
@@ -127,7 +127,7 @@ The scaffold implements one proof slice:
 - `GeneratedLayoutTests` verifies layout-sensitive binding facts that do not
   require the native library.
 - Native-library tests cover the C ABI version call, projection helper
-  round-tripping, runtime event polling, map camera/viewport/tile option
+  round-tripping, runtime event polling, map camera/fit/viewport/tile option
   round-tripping, camera transition command adaptation, bounds/projection/free
   camera adaptation, map coordinate conversion, projection snapshot lifecycle
   and coordinate conversion, runtime/map close behavior, map debug option
