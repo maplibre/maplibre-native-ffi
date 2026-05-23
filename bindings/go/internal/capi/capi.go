@@ -171,6 +171,17 @@ const (
 	RuntimeEventPayloadOfflineOperationCompleted   uint32 = uint32(C.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_OPERATION_COMPLETED)
 )
 
+const (
+	ResourceKindUnknown     uint32 = uint32(C.MLN_RESOURCE_KIND_UNKNOWN)
+	ResourceKindStyle       uint32 = uint32(C.MLN_RESOURCE_KIND_STYLE)
+	ResourceKindSource      uint32 = uint32(C.MLN_RESOURCE_KIND_SOURCE)
+	ResourceKindTile        uint32 = uint32(C.MLN_RESOURCE_KIND_TILE)
+	ResourceKindGlyphs      uint32 = uint32(C.MLN_RESOURCE_KIND_GLYPHS)
+	ResourceKindSpriteImage uint32 = uint32(C.MLN_RESOURCE_KIND_SPRITE_IMAGE)
+	ResourceKindSpriteJSON  uint32 = uint32(C.MLN_RESOURCE_KIND_SPRITE_JSON)
+	ResourceKindImage       uint32 = uint32(C.MLN_RESOURCE_KIND_IMAGE)
+)
+
 // CVersion returns the linked native C ABI contract version.
 func CVersion() uint32 {
 	return uint32(C.mln_c_version())

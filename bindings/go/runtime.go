@@ -2,7 +2,9 @@ package maplibre
 
 import (
 	"errors"
+	"sync"
 
+	"github.com/maplibre/maplibre-native-ffi/bindings/go/internal/callback"
 	"github.com/maplibre/maplibre-native-ffi/bindings/go/internal/capi"
 	"github.com/maplibre/maplibre-native-ffi/bindings/go/internal/handle"
 	"github.com/maplibre/maplibre-native-ffi/bindings/go/internal/memory"
@@ -121,6 +123,9 @@ type RuntimeEvent struct {
 // RuntimeHandle owns scheduler state and event storage for one owner thread.
 type RuntimeHandle struct {
 	state *handle.State[capi.Runtime]
+
+	resourceTransformMu sync.Mutex
+	resourceTransform   *callback.ResourceTransformState
 }
 
 // String returns a diagnostic name for the status.
@@ -246,6 +251,60 @@ func runtimeEventFromCAPI(event capi.RuntimeEvent) *RuntimeEvent {
 	}
 }
 
+// SetResourceTransform installs or replaces the runtime-scoped network URL
+// transform.
+func (runtime *RuntimeHandle) SetResourceTransform(transform ResourceTransformCallback) error {
+	if transform == nil {
+		return newBindingError(ErrInvalidArgument, "ResourceTransformCallback is nil")
+	}
+	ptr, err := runtime.ptr()
+	if err != nil {
+		return err
+	}
+	defer runtime.state.KeepAlive()
+
+	var replacement *callback.ResourceTransformState
+	if err := checkNative(func() capi.Status {
+		state, status := callback.SetResourceTransform(ptr, func(kind uint32, url string) (string, bool) {
+			return transform(ResourceTransformRequest{Kind: ResourceKind(kind), RawKind: kind, URL: url})
+		})
+		replacement = state
+		return status
+	}); err != nil {
+		return err
+	}
+
+	runtime.resourceTransformMu.Lock()
+	previous := runtime.resourceTransform
+	runtime.resourceTransform = replacement
+	runtime.resourceTransformMu.Unlock()
+	previous.Release()
+	return nil
+}
+
+// ClearResourceTransform clears the runtime-scoped network URL transform.
+func (runtime *RuntimeHandle) ClearResourceTransform() error {
+	ptr, err := runtime.ptr()
+	if err != nil {
+		return err
+	}
+	defer runtime.state.KeepAlive()
+
+	if err := checkNative(func() capi.Status { return callback.ClearResourceTransform(ptr) }); err != nil {
+		return err
+	}
+	runtime.releaseResourceTransform()
+	return nil
+}
+
+func (runtime *RuntimeHandle) releaseResourceTransform() {
+	runtime.resourceTransformMu.Lock()
+	previous := runtime.resourceTransform
+	runtime.resourceTransform = nil
+	runtime.resourceTransformMu.Unlock()
+	previous.Release()
+}
+
 // NewMap creates a map owned by this runtime with native default options.
 func (runtime *RuntimeHandle) NewMap() (*MapHandle, error) {
 	return runtime.createMap(func(ptr *capi.Runtime, out **capi.Map) capi.Status {
@@ -285,7 +344,11 @@ func (runtime *RuntimeHandle) Close() error {
 	if runtime == nil || runtime.state == nil {
 		return newBindingError(ErrInvalidArgument, "RuntimeHandle is nil")
 	}
-	return checkNative(func() capi.Status {
+	if err := checkNative(func() capi.Status {
 		return runtime.state.Close(capi.RuntimeDestroy)
-	})
+	}); err != nil {
+		return err
+	}
+	runtime.releaseResourceTransform()
+	return nil
 }

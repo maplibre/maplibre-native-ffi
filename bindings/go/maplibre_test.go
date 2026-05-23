@@ -115,6 +115,52 @@ func TestRuntimeOptionsRejectEmbeddedNUL(t *testing.T) {
 	}
 }
 
+func TestRuntimeResourceTransformLifecycle(t *testing.T) {
+	runtime, err := NewRuntime()
+	if err != nil {
+		t.Fatalf("NewRuntime(): %v", err)
+	}
+	if err := runtime.SetResourceTransform(func(request ResourceTransformRequest) (string, bool) {
+		return request.URL + "?first", true
+	}); err != nil {
+		_ = runtime.Close()
+		t.Fatalf("SetResourceTransform(): %v", err)
+	}
+	if err := runtime.SetResourceTransform(func(request ResourceTransformRequest) (string, bool) {
+		return "", false
+	}); err != nil {
+		_ = runtime.Close()
+		t.Fatalf("SetResourceTransform(replace): %v", err)
+	}
+	if err := runtime.ClearResourceTransform(); err != nil {
+		_ = runtime.Close()
+		t.Fatalf("ClearResourceTransform(): %v", err)
+	}
+	if err := runtime.ClearResourceTransform(); err != nil {
+		_ = runtime.Close()
+		t.Fatalf("second ClearResourceTransform(): %v", err)
+	}
+	if err := runtime.Close(); err != nil {
+		t.Fatalf("Close(): %v", err)
+	}
+}
+
+func TestRuntimeResourceTransformRejectsNilCallback(t *testing.T) {
+	runtime, err := NewRuntime()
+	if err != nil {
+		t.Fatalf("NewRuntime(): %v", err)
+	}
+	defer func() {
+		if err := runtime.Close(); err != nil {
+			t.Errorf("Close(): %v", err)
+		}
+	}()
+
+	if err := runtime.SetResourceTransform(nil); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("SetResourceTransform(nil) error = %v, want ErrInvalidArgument", err)
+	}
+}
+
 func TestRuntimeCreateRunOnceAndClose(t *testing.T) {
 	runtime, err := NewRuntime()
 	if err != nil {
