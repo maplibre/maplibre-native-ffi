@@ -1,0 +1,159 @@
+import Foundation
+import MaplibreNativeSupport
+
+public enum AmbientCacheOperation: UInt32, Sendable, Hashable {
+  case resetDatabase = 1
+  case packDatabase = 2
+  case invalidate = 3
+  case clear = 4
+}
+
+public enum OfflineRegionDownloadState: UInt32, Sendable, Hashable {
+  case inactive = 0
+  case active = 1
+}
+
+public enum OfflineRegionDefinition: Equatable, Sendable {
+  case tilePyramid(styleURL: String, bounds: LatLngBounds, minZoom: Double, maxZoom: Double, pixelRatio: Float, includeIdeographs: Bool)
+  case geometry(styleURL: String, geometry: Geometry, minZoom: Double, maxZoom: Double, pixelRatio: Float, includeIdeographs: Bool)
+
+  var nativeDefinition: NativeOfflineRegionDefinition {
+    switch self {
+    case .tilePyramid(let styleURL, let bounds, let minZoom, let maxZoom, let pixelRatio, let includeIdeographs):
+      .tilePyramid(
+        styleURL: styleURL,
+        bounds: bounds.nativeInput,
+        minZoom: minZoom,
+        maxZoom: maxZoom,
+        pixelRatio: pixelRatio,
+        includeIdeographs: includeIdeographs
+      )
+    case .geometry(let styleURL, let geometry, let minZoom, let maxZoom, let pixelRatio, let includeIdeographs):
+      .geometry(
+        styleURL: styleURL,
+        geometry: geometry.nativeGeometry,
+        minZoom: minZoom,
+        maxZoom: maxZoom,
+        pixelRatio: pixelRatio,
+        includeIdeographs: includeIdeographs
+      )
+    }
+  }
+
+  init(native: NativeOfflineRegionDefinition) {
+    switch native {
+    case .tilePyramid(let styleURL, let bounds, let minZoom, let maxZoom, let pixelRatio, let includeIdeographs):
+      self = .tilePyramid(
+        styleURL: styleURL,
+        bounds: LatLngBounds(native: bounds),
+        minZoom: minZoom,
+        maxZoom: maxZoom,
+        pixelRatio: pixelRatio,
+        includeIdeographs: includeIdeographs
+      )
+    case .geometry(let styleURL, let geometry, let minZoom, let maxZoom, let pixelRatio, let includeIdeographs):
+      self = .geometry(
+        styleURL: styleURL,
+        geometry: Geometry(native: geometry),
+        minZoom: minZoom,
+        maxZoom: maxZoom,
+        pixelRatio: pixelRatio,
+        includeIdeographs: includeIdeographs
+      )
+    }
+  }
+}
+
+public struct OfflineRegionInfo: Equatable, Sendable {
+  public let id: Int64
+  public let definition: OfflineRegionDefinition
+  public let metadata: Data
+
+  init(native: NativeOfflineRegionInfo) {
+    id = native.id
+    definition = OfflineRegionDefinition(native: native.definition)
+    metadata = native.metadata
+  }
+}
+
+extension RuntimeHandle {
+  public func runAmbientCacheOperationStart(_ operation: AmbientCacheOperation) throws -> UInt64 {
+    try mapNativeFailure {
+      try CAPI.runtimeRunAmbientCacheOperationStart(try requireLivePointer(), operation: operation.rawValue)
+    }
+  }
+
+  public func discardOfflineOperation(_ operationId: UInt64) throws {
+    try mapNativeFailure {
+      try CAPI.runtimeOfflineOperationDiscard(try requireLivePointer(), operationId: operationId)
+    }
+  }
+
+  public func offlineRegionCreateStart(definition: OfflineRegionDefinition, metadata: Data = Data()) throws -> UInt64 {
+    try mapNativeFailure {
+      try definition.nativeDefinition.withNativeDefinition { definition in
+        try CAPI.runtimeOfflineRegionCreateStart(try requireLivePointer(), definition: definition, metadata: metadata)
+      }
+    }
+  }
+
+  public func offlineRegionGetStart(regionId: Int64) throws -> UInt64 {
+    try mapNativeFailure { try CAPI.runtimeOfflineRegionGetStart(try requireLivePointer(), regionId: regionId) }
+  }
+
+  public func offlineRegionsListStart() throws -> UInt64 {
+    try mapNativeFailure { try CAPI.runtimeOfflineRegionsListStart(try requireLivePointer()) }
+  }
+
+  public func offlineRegionsMergeDatabaseStart(sideDatabasePath: String) throws -> UInt64 {
+    try mapNativeFailure { try CAPI.runtimeOfflineRegionsMergeDatabaseStart(try requireLivePointer(), sideDatabasePath: sideDatabasePath) }
+  }
+
+  public func offlineRegionUpdateMetadataStart(regionId: Int64, metadata: Data) throws -> UInt64 {
+    try mapNativeFailure { try CAPI.runtimeOfflineRegionUpdateMetadataStart(try requireLivePointer(), regionId: regionId, metadata: metadata) }
+  }
+
+  public func offlineRegionGetStatusStart(regionId: Int64) throws -> UInt64 {
+    try mapNativeFailure { try CAPI.runtimeOfflineRegionGetStatusStart(try requireLivePointer(), regionId: regionId) }
+  }
+
+  public func offlineRegionSetObservedStart(regionId: Int64, observed: Bool) throws -> UInt64 {
+    try mapNativeFailure { try CAPI.runtimeOfflineRegionSetObservedStart(try requireLivePointer(), regionId: regionId, observed: observed) }
+  }
+
+  public func offlineRegionSetDownloadStateStart(regionId: Int64, state: OfflineRegionDownloadState) throws -> UInt64 {
+    try mapNativeFailure { try CAPI.runtimeOfflineRegionSetDownloadStateStart(try requireLivePointer(), regionId: regionId, state: state.rawValue) }
+  }
+
+  public func offlineRegionInvalidateStart(regionId: Int64) throws -> UInt64 {
+    try mapNativeFailure { try CAPI.runtimeOfflineRegionInvalidateStart(try requireLivePointer(), regionId: regionId) }
+  }
+
+  public func offlineRegionDeleteStart(regionId: Int64) throws -> UInt64 {
+    try mapNativeFailure { try CAPI.runtimeOfflineRegionDeleteStart(try requireLivePointer(), regionId: regionId) }
+  }
+
+  public func offlineRegionCreateTakeResult(operationId: UInt64) throws -> OfflineRegionInfo {
+    try mapNativeFailure { try OfflineRegionInfo(native: CAPI.runtimeOfflineRegionCreateTakeResult(try requireLivePointer(), operationId: operationId)) }
+  }
+
+  public func offlineRegionGetTakeResult(operationId: UInt64) throws -> OfflineRegionInfo? {
+    try mapNativeFailure { try CAPI.runtimeOfflineRegionGetTakeResult(try requireLivePointer(), operationId: operationId).map(OfflineRegionInfo.init(native:)) }
+  }
+
+  public func offlineRegionsListTakeResult(operationId: UInt64) throws -> [OfflineRegionInfo] {
+    try mapNativeFailure { try CAPI.runtimeOfflineRegionsListTakeResult(try requireLivePointer(), operationId: operationId).map(OfflineRegionInfo.init(native:)) }
+  }
+
+  public func offlineRegionsMergeDatabaseTakeResult(operationId: UInt64) throws -> [OfflineRegionInfo] {
+    try mapNativeFailure { try CAPI.runtimeOfflineRegionsMergeDatabaseTakeResult(try requireLivePointer(), operationId: operationId).map(OfflineRegionInfo.init(native:)) }
+  }
+
+  public func offlineRegionUpdateMetadataTakeResult(operationId: UInt64) throws -> OfflineRegionInfo {
+    try mapNativeFailure { try OfflineRegionInfo(native: CAPI.runtimeOfflineRegionUpdateMetadataTakeResult(try requireLivePointer(), operationId: operationId)) }
+  }
+
+  public func offlineRegionGetStatusTakeResult(operationId: UInt64) throws -> OfflineRegionStatus {
+    try mapNativeFailure { try OfflineRegionStatus(native: CAPI.runtimeOfflineRegionGetStatusTakeResult(try requireLivePointer(), operationId: operationId)) }
+  }
+}
