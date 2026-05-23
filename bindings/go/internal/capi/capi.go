@@ -751,6 +751,49 @@ type RuntimeEvent struct {
 	Payload     any
 }
 
+// RenderingStats is copied render-frame statistics.
+type RenderingStats struct {
+	EncodingTime       float64
+	RenderingTime      float64
+	FrameCount         int64
+	DrawCallCount      int64
+	TotalDrawCallCount int64
+}
+
+// TileID is a copied overscaled/canonical tile identifier.
+type TileID struct {
+	OverscaledZ uint32
+	Wrap        int32
+	CanonicalZ  uint32
+	CanonicalX  uint32
+	CanonicalY  uint32
+}
+
+// RuntimeEventRenderFramePayload is a copied render-frame event payload.
+type RuntimeEventRenderFramePayload struct {
+	Mode             uint32
+	NeedsRepaint     bool
+	PlacementChanged bool
+	Stats            RenderingStats
+}
+
+// RuntimeEventRenderMapPayload is a copied render-map event payload.
+type RuntimeEventRenderMapPayload struct {
+	Mode uint32
+}
+
+// RuntimeEventStyleImageMissingPayload is a copied style-image-missing event payload.
+type RuntimeEventStyleImageMissingPayload struct {
+	ImageID string
+}
+
+// RuntimeEventTileActionPayload is a copied tile-action event payload.
+type RuntimeEventTileActionPayload struct {
+	Operation uint32
+	TileID    TileID
+	SourceID  string
+}
+
 // RuntimeEventOfflineRegionStatusPayload is a copied offline status event payload.
 type RuntimeEventOfflineRegionStatusPayload struct {
 	RegionID int64
@@ -978,6 +1021,23 @@ const (
 	RuntimeEventPayloadOfflineRegionResponseError  uint32 = uint32(C.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR)
 	RuntimeEventPayloadOfflineRegionTileCountLimit uint32 = uint32(C.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT)
 	RuntimeEventPayloadOfflineOperationCompleted   uint32 = uint32(C.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_OPERATION_COMPLETED)
+)
+
+const (
+	RenderModePartial uint32 = uint32(C.MLN_RENDER_MODE_PARTIAL)
+	RenderModeFull    uint32 = uint32(C.MLN_RENDER_MODE_FULL)
+)
+
+const (
+	TileOperationRequestedFromCache   uint32 = uint32(C.MLN_TILE_OPERATION_REQUESTED_FROM_CACHE)
+	TileOperationRequestedFromNetwork uint32 = uint32(C.MLN_TILE_OPERATION_REQUESTED_FROM_NETWORK)
+	TileOperationLoadFromNetwork      uint32 = uint32(C.MLN_TILE_OPERATION_LOAD_FROM_NETWORK)
+	TileOperationLoadFromCache        uint32 = uint32(C.MLN_TILE_OPERATION_LOAD_FROM_CACHE)
+	TileOperationStartParse           uint32 = uint32(C.MLN_TILE_OPERATION_START_PARSE)
+	TileOperationEndParse             uint32 = uint32(C.MLN_TILE_OPERATION_END_PARSE)
+	TileOperationError                uint32 = uint32(C.MLN_TILE_OPERATION_ERROR)
+	TileOperationCancelled            uint32 = uint32(C.MLN_TILE_OPERATION_CANCELLED)
+	TileOperationNull                 uint32 = uint32(C.MLN_TILE_OPERATION_NULL)
 )
 
 const (
@@ -1666,6 +1726,39 @@ func runtimeEventFromC(event C.mln_runtime_event) RuntimeEvent {
 
 func runtimeEventPayloadFromC(event C.mln_runtime_event) any {
 	switch uint32(event.payload_type) {
+	case RuntimeEventPayloadRenderFrame:
+		if event.payload_size < C.size_t(unsafe.Sizeof(C.mln_runtime_event_render_frame{})) {
+			return nil
+		}
+		payload := (*C.mln_runtime_event_render_frame)(event.payload)
+		return RuntimeEventRenderFramePayload{
+			Mode:             uint32(payload.mode),
+			NeedsRepaint:     bool(payload.needs_repaint),
+			PlacementChanged: bool(payload.placement_changed),
+			Stats:            renderingStatsFromC(payload.stats),
+		}
+	case RuntimeEventPayloadRenderMap:
+		if event.payload_size < C.size_t(unsafe.Sizeof(C.mln_runtime_event_render_map{})) {
+			return nil
+		}
+		payload := (*C.mln_runtime_event_render_map)(event.payload)
+		return RuntimeEventRenderMapPayload{Mode: uint32(payload.mode)}
+	case RuntimeEventPayloadStyleImageMissing:
+		if event.payload_size < C.size_t(unsafe.Sizeof(C.mln_runtime_event_style_image_missing{})) {
+			return nil
+		}
+		payload := (*C.mln_runtime_event_style_image_missing)(event.payload)
+		return RuntimeEventStyleImageMissingPayload{ImageID: stringViewFromC(C.mln_string_view{data: payload.image_id, size: payload.image_id_size})}
+	case RuntimeEventPayloadTileAction:
+		if event.payload_size < C.size_t(unsafe.Sizeof(C.mln_runtime_event_tile_action{})) {
+			return nil
+		}
+		payload := (*C.mln_runtime_event_tile_action)(event.payload)
+		return RuntimeEventTileActionPayload{
+			Operation: uint32(payload.operation),
+			TileID:    tileIDFromC(payload.tile_id),
+			SourceID:  stringViewFromC(C.mln_string_view{data: payload.source_id, size: payload.source_id_size}),
+		}
 	case RuntimeEventPayloadOfflineRegionStatus:
 		if event.payload_size < C.size_t(unsafe.Sizeof(C.mln_runtime_event_offline_region_status{})) {
 			return nil
@@ -1701,6 +1794,26 @@ func runtimeEventPayloadFromC(event C.mln_runtime_event) any {
 		}
 	default:
 		return nil
+	}
+}
+
+func renderingStatsFromC(stats C.mln_rendering_stats) RenderingStats {
+	return RenderingStats{
+		EncodingTime:       float64(stats.encoding_time),
+		RenderingTime:      float64(stats.rendering_time),
+		FrameCount:         int64(stats.frame_count),
+		DrawCallCount:      int64(stats.draw_call_count),
+		TotalDrawCallCount: int64(stats.total_draw_call_count),
+	}
+}
+
+func tileIDFromC(tileID C.mln_tile_id) TileID {
+	return TileID{
+		OverscaledZ: uint32(tileID.overscaled_z),
+		Wrap:        int32(tileID.wrap),
+		CanonicalZ:  uint32(tileID.canonical_z),
+		CanonicalX:  uint32(tileID.canonical_x),
+		CanonicalY:  uint32(tileID.canonical_y),
 	}
 }
 

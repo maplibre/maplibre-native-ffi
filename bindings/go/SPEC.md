@@ -114,12 +114,16 @@ limited to APIs whose C contract accepts opaque backend handles.
 
 ### `internal/capi`
 
-The cgo package owns raw C interaction:
+The cgo package owns most raw C interaction:
 
-- `import "C"` blocks and direct calls to `mln_*` functions;
+- direct wrappers for ordinary `mln_*` functions;
 - raw C status constants and enum/mask constants needed by support code;
 - narrow wrappers that copy primitive outputs into Go-owned storage;
 - no public package product outside the module's `internal` boundary.
+
+`internal/callback` is the deliberate exception for callback-owner APIs and
+trampolines whose C function pointer types, `runtime/cgo.Handle` tokens, and
+release hooks need to live beside the exported trampoline functions.
 
 ### `internal/status`
 
@@ -167,7 +171,7 @@ carries that width.
 
 | C or shared concept                 | Go type shape                                                                                                                                                                                                                                    |
 | ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `mln_runtime*`                      | `type RuntimeHandle struct` with private state and `Close() error`; retains callback state and map registry.                                                                                                                                     |
+| `mln_runtime*`                      | `type RuntimeHandle struct` with private state and `Close() error`; retains runtime-owned callback state.                                                                                                                                        |
 | `mln_map*`                          | `type MapHandle struct`; retains `*RuntimeHandle`.                                                                                                                                                                                               |
 | `mln_map_projection*`               | `type MapProjectionHandle struct`; standalone snapshot after creation.                                                                                                                                                                           |
 | `mln_render_session*`               | `type RenderSessionHandle struct`; retains `*MapHandle`.                                                                                                                                                                                         |

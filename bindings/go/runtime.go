@@ -233,6 +233,75 @@ type RuntimeEvent struct {
 	Payload     any
 }
 
+// RenderMode identifies a render observer mode.
+type RenderMode uint32
+
+const (
+	RenderModePartial RenderMode = RenderMode(capi.RenderModePartial)
+	RenderModeFull    RenderMode = RenderMode(capi.RenderModeFull)
+)
+
+// TileOperation identifies a tile observer operation.
+type TileOperation uint32
+
+const (
+	TileOperationRequestedFromCache   TileOperation = TileOperation(capi.TileOperationRequestedFromCache)
+	TileOperationRequestedFromNetwork TileOperation = TileOperation(capi.TileOperationRequestedFromNetwork)
+	TileOperationLoadFromNetwork      TileOperation = TileOperation(capi.TileOperationLoadFromNetwork)
+	TileOperationLoadFromCache        TileOperation = TileOperation(capi.TileOperationLoadFromCache)
+	TileOperationStartParse           TileOperation = TileOperation(capi.TileOperationStartParse)
+	TileOperationEndParse             TileOperation = TileOperation(capi.TileOperationEndParse)
+	TileOperationError                TileOperation = TileOperation(capi.TileOperationError)
+	TileOperationCancelled            TileOperation = TileOperation(capi.TileOperationCancelled)
+	TileOperationNull                 TileOperation = TileOperation(capi.TileOperationNull)
+)
+
+// RenderingStats is copied render-frame statistics.
+type RenderingStats struct {
+	EncodingTime       float64
+	RenderingTime      float64
+	FrameCount         int64
+	DrawCallCount      int64
+	TotalDrawCallCount int64
+}
+
+// TileID is a copied overscaled/canonical tile identifier.
+type TileID struct {
+	OverscaledZ uint32
+	Wrap        int32
+	CanonicalZ  uint32
+	CanonicalX  uint32
+	CanonicalY  uint32
+}
+
+// RuntimeEventRenderFramePayload is a copied render-frame event payload.
+type RuntimeEventRenderFramePayload struct {
+	Mode             RenderMode
+	RawMode          uint32
+	NeedsRepaint     bool
+	PlacementChanged bool
+	Stats            RenderingStats
+}
+
+// RuntimeEventRenderMapPayload is a copied render-map event payload.
+type RuntimeEventRenderMapPayload struct {
+	Mode    RenderMode
+	RawMode uint32
+}
+
+// RuntimeEventStyleImageMissingPayload is a copied style-image-missing event payload.
+type RuntimeEventStyleImageMissingPayload struct {
+	ImageID string
+}
+
+// RuntimeEventTileActionPayload is a copied tile-action event payload.
+type RuntimeEventTileActionPayload struct {
+	Operation    TileOperation
+	RawOperation uint32
+	TileID       TileID
+	SourceID     string
+}
+
 // RuntimeEventOfflineRegionStatusPayload is a copied offline status event payload.
 type RuntimeEventOfflineRegionStatusPayload struct {
 	RegionID OfflineRegionID
@@ -400,6 +469,25 @@ func runtimeEventFromCAPI(event capi.RuntimeEvent) *RuntimeEvent {
 
 func runtimeEventPayloadFromCAPI(payload any) any {
 	switch payload := payload.(type) {
+	case capi.RuntimeEventRenderFramePayload:
+		return RuntimeEventRenderFramePayload{
+			Mode:             RenderMode(payload.Mode),
+			RawMode:          payload.Mode,
+			NeedsRepaint:     payload.NeedsRepaint,
+			PlacementChanged: payload.PlacementChanged,
+			Stats:            renderingStatsFromCAPI(payload.Stats),
+		}
+	case capi.RuntimeEventRenderMapPayload:
+		return RuntimeEventRenderMapPayload{Mode: RenderMode(payload.Mode), RawMode: payload.Mode}
+	case capi.RuntimeEventStyleImageMissingPayload:
+		return RuntimeEventStyleImageMissingPayload{ImageID: payload.ImageID}
+	case capi.RuntimeEventTileActionPayload:
+		return RuntimeEventTileActionPayload{
+			Operation:    TileOperation(payload.Operation),
+			RawOperation: payload.Operation,
+			TileID:       tileIDFromCAPI(payload.TileID),
+			SourceID:     payload.SourceID,
+		}
 	case capi.RuntimeEventOfflineRegionStatusPayload:
 		return RuntimeEventOfflineRegionStatusPayload{RegionID: OfflineRegionID(payload.RegionID), Status: offlineRegionStatusFromCAPI(payload.Status)}
 	case capi.RuntimeEventOfflineRegionResponseErrorPayload:
@@ -416,6 +504,26 @@ func runtimeEventPayloadFromCAPI(payload any) any {
 		}
 	default:
 		return nil
+	}
+}
+
+func renderingStatsFromCAPI(stats capi.RenderingStats) RenderingStats {
+	return RenderingStats{
+		EncodingTime:       stats.EncodingTime,
+		RenderingTime:      stats.RenderingTime,
+		FrameCount:         stats.FrameCount,
+		DrawCallCount:      stats.DrawCallCount,
+		TotalDrawCallCount: stats.TotalDrawCallCount,
+	}
+}
+
+func tileIDFromCAPI(tileID capi.TileID) TileID {
+	return TileID{
+		OverscaledZ: tileID.OverscaledZ,
+		Wrap:        tileID.Wrap,
+		CanonicalZ:  tileID.CanonicalZ,
+		CanonicalX:  tileID.CanonicalX,
+		CanonicalY:  tileID.CanonicalY,
 	}
 }
 
