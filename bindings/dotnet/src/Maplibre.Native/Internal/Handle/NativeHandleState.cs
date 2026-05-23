@@ -29,6 +29,20 @@ internal sealed unsafe class NativeHandleState<T>
         address = (nint)handle;
     }
 
+    ~NativeHandleState()
+    {
+        var current = address;
+        if (current != 0)
+        {
+            NativeLeakReporter.Report(new NativeLeakReport(
+                NativeLeakReportKind.LeakedHandle,
+                typeName,
+                current,
+                null,
+                $"Leaked {typeName} native handle 0x{current:x}; call Close() on the owner thread before releasing the wrapper."));
+        }
+    }
+
     internal bool IsClosed => address == 0;
 
     internal T* Pointer
@@ -58,6 +72,7 @@ internal sealed unsafe class NativeHandleState<T>
 
         NativeStatus.Check(destroy(handle));
         address = 0;
+        GC.SuppressFinalize(this);
     }
 
     internal bool TryClose()
@@ -68,12 +83,20 @@ internal sealed unsafe class NativeHandleState<T>
             return true;
         }
 
-        if (destroy(handle) != mln_status.MLN_STATUS_OK)
+        var status = destroy(handle);
+        if (status != mln_status.MLN_STATUS_OK)
         {
+            NativeLeakReporter.Report(new NativeLeakReport(
+                NativeLeakReportKind.DisposeFailed,
+                typeName,
+                address,
+                status,
+                $"Dispose could not close {typeName} native handle 0x{address:x}; native destroy returned {status}. Call Close() on the owner thread to observe the error and retry."));
             return false;
         }
 
         address = 0;
+        GC.SuppressFinalize(this);
         return true;
     }
 }

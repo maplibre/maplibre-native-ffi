@@ -126,7 +126,8 @@ The scaffold implements one proof slice:
 - `NativePointer` is a borrowed opaque address value with no memory access in
   the public API.
 - `RuntimeHandle` and `MapHandle` establish the close-once owner-thread handle
-  pattern over generated C declarations, including runtime event polling, map
+  pattern with leak/failure reporting over generated C declarations, including
+  runtime event polling, map
   camera/fit/transition/bounds/free-camera/projection/viewport/tile/debug option
   calls, map coordinate conversion, projection snapshot handles, offline
   operation start/discard tokens, resource provider callbacks, resource
@@ -150,6 +151,8 @@ The scaffold implements one proof slice:
   source data adaptation.
 - Offline struct tests cover offline region definition materialization, copied
   offline region info metadata, and offline status conversion.
+- Native handle tests cover close-once success, fallible-close retry,
+  best-effort dispose failure reporting, and finalizer leak-reporting hooks.
 - Query tests cover query geometry/options materialization and copied queried
   feature data.
 - Render session tests cover surface/texture descriptor materialization, texture
@@ -505,15 +508,15 @@ their data into .NET values and release native handles in `finally`.
 
 Implement these support files under `src/Maplibre.Native/Internal`:
 
-| Area       | Contents                                                                                              |
-| ---------- | ----------------------------------------------------------------------------------------------------- |
-| `C`        | Generated or curated raw C declarations, constants, layouts, opaque pointer types, and raw functions. |
-| `Loader`   | Native library lookup, exact path loading, build-directory loading, and package artifact loading.     |
-| `Status`   | Status mapping, diagnostic capture, and exception creation.                                           |
-| `Handle`   | Pointer storage, released state, parent retention hooks, close-once behavior, and leak reporting.     |
-| `Memory`   | Scoped native memory, UTF-8 strings, string views, arrays, out-pointers, and reusable buffers.        |
-| `Struct`   | Descriptor materializers and copied-result readers for each concept area.                             |
-| `Callback` | Static unmanaged thunks, retained callback state, active-upcall accounting, and teardown rules.       |
+| Area       | Contents                                                                                                                               |
+| ---------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `C`        | Generated or curated raw C declarations, constants, layouts, opaque pointer types, and raw functions.                                  |
+| `Loader`   | Native library lookup, exact path loading, build-directory loading, and package artifact loading.                                      |
+| `Status`   | Status mapping, diagnostic capture, and exception creation.                                                                            |
+| `Handle`   | Pointer storage, released state, parent retention hooks, close-once behavior, dispose-failure reporting, and finalizer leak reporting. |
+| `Memory`   | Scoped native memory, UTF-8 strings, string views, arrays, out-pointers, and reusable buffers.                                         |
+| `Struct`   | Descriptor materializers and copied-result readers for each concept area.                                                              |
+| `Callback` | Static unmanaged thunks, retained callback state, active-upcall accounting, and teardown rules.                                        |
 
 ## Callback implementation map
 
