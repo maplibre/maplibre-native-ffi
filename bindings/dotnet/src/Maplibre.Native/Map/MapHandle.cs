@@ -737,6 +737,84 @@ public sealed unsafe class MapHandle : IDisposable
             new StyleImageOptions { PixelRatio = info.PixelRatio, Sdf = info.Sdf });
     }
 
+    /// <summary>Adds an image source that loads image data from a URL.</summary>
+    public void AddImageSourceUrl(string sourceId, IReadOnlyList<LatLng> coordinates, string url)
+    {
+        using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
+        using var nativeUrl = NativeStringView.From(url, nameof(url));
+        var nativeCoordinates = ToNativeCoordinates(coordinates, nameof(coordinates));
+        fixed (mln_lat_lng* coordinatesPointer = nativeCoordinates)
+        {
+            NativeStatus.Check(NativeMethods.mln_map_add_image_source_url(Pointer, nativeSourceId.Value, coordinatesPointer, (nuint)nativeCoordinates.Length, nativeUrl.Value));
+        }
+    }
+
+    /// <summary>Adds an image source with inline premultiplied RGBA8 image data.</summary>
+    public void AddImageSourceImage(string sourceId, IReadOnlyList<LatLng> coordinates, PremultipliedRgba8Image image)
+    {
+        using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
+        using var nativeImage = NativeStyleImage.From(image);
+        var imageValue = nativeImage.Value;
+        var nativeCoordinates = ToNativeCoordinates(coordinates, nameof(coordinates));
+        fixed (mln_lat_lng* coordinatesPointer = nativeCoordinates)
+        {
+            NativeStatus.Check(NativeMethods.mln_map_add_image_source_image(Pointer, nativeSourceId.Value, coordinatesPointer, (nuint)nativeCoordinates.Length, &imageValue));
+        }
+    }
+
+    /// <summary>Updates an image source to load image data from a URL.</summary>
+    public void SetImageSourceUrl(string sourceId, string url)
+    {
+        using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
+        using var nativeUrl = NativeStringView.From(url, nameof(url));
+        NativeStatus.Check(NativeMethods.mln_map_set_image_source_url(Pointer, nativeSourceId.Value, nativeUrl.Value));
+    }
+
+    /// <summary>Updates an image source with inline premultiplied RGBA8 image data.</summary>
+    public void SetImageSourceImage(string sourceId, PremultipliedRgba8Image image)
+    {
+        using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
+        using var nativeImage = NativeStyleImage.From(image);
+        var imageValue = nativeImage.Value;
+        NativeStatus.Check(NativeMethods.mln_map_set_image_source_image(Pointer, nativeSourceId.Value, &imageValue));
+    }
+
+    /// <summary>Updates image source coordinates.</summary>
+    public void SetImageSourceCoordinates(string sourceId, IReadOnlyList<LatLng> coordinates)
+    {
+        using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
+        var nativeCoordinates = ToNativeCoordinates(coordinates, nameof(coordinates));
+        fixed (mln_lat_lng* coordinatesPointer = nativeCoordinates)
+        {
+            NativeStatus.Check(NativeMethods.mln_map_set_image_source_coordinates(Pointer, nativeSourceId.Value, coordinatesPointer, (nuint)nativeCoordinates.Length));
+        }
+    }
+
+    /// <summary>Gets image source coordinates when the source exists.</summary>
+    public LatLng[]? GetImageSourceCoordinates(string sourceId)
+    {
+        using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
+        var coordinates = new mln_lat_lng[4];
+        nuint coordinateCount = 0;
+        bool found = false;
+        fixed (mln_lat_lng* coordinatesPointer = coordinates)
+        {
+            NativeStatus.Check(NativeMethods.mln_map_get_image_source_coordinates(Pointer, nativeSourceId.Value, coordinatesPointer, (nuint)coordinates.Length, &coordinateCount, &found));
+        }
+
+        if (!found)
+        {
+            return null;
+        }
+
+        var result = new LatLng[checked((int)coordinateCount)];
+        for (var index = 0; index < result.Length; index++)
+        {
+            result[index] = CoreStructs.FromNative(coordinates[index]);
+        }
+        return result;
+    }
+
     /// <summary>Adds a style layer from a JSON-like value.</summary>
     public void AddStyleLayerJson(JsonValue layerJson, string beforeLayerId = "")
     {
@@ -864,6 +942,17 @@ public sealed unsafe class MapHandle : IDisposable
     public void Close()
     {
         state.Close();
+    }
+
+    private static mln_lat_lng[] ToNativeCoordinates(IReadOnlyList<LatLng> coordinates, string parameterName)
+    {
+        ArgumentNullException.ThrowIfNull(coordinates, parameterName);
+        var nativeCoordinates = new mln_lat_lng[coordinates.Count];
+        for (var index = 0; index < coordinates.Count; index++)
+        {
+            nativeCoordinates[index] = CoreStructs.ToNative(coordinates[index]);
+        }
+        return nativeCoordinates;
     }
 
     private static string[] CopyStyleIdList(mln_style_id_list* list)

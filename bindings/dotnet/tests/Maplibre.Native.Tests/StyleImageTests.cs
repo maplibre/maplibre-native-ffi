@@ -1,3 +1,4 @@
+using Maplibre.Native.Geo;
 using Maplibre.Native.Map;
 using Maplibre.Native.Render;
 using Maplibre.Native.Runtime;
@@ -8,6 +9,41 @@ namespace Maplibre.Native.Tests;
 
 public sealed class StyleImageTests
 {
+    [Fact]
+    public void ImageSourceApisAdaptCoordinatesAndImagesThroughNativeMap()
+    {
+        NativeLibraryTestSupport.SkipUnlessNativeLibraryIsAvailable();
+        using var runtime = RuntimeHandle.Create();
+        using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
+        map.SetStyleJson("{\"version\":8,\"sources\":{},\"layers\":[]}");
+        var coordinates = new[]
+        {
+            new LatLng(10, 10),
+            new LatLng(10, 20),
+            new LatLng(0, 20),
+            new LatLng(0, 10),
+        };
+        var updatedCoordinates = new[]
+        {
+            new LatLng(20, 20),
+            new LatLng(20, 30),
+            new LatLng(10, 30),
+            new LatLng(10, 20),
+        };
+        var image = new PremultipliedRgba8Image([0, 255, 0, 255], new TextureImageInfo(1, 1, 4, 4));
+
+        map.AddImageSourceUrl("image-url", coordinates, "https://example.test/image.png");
+        map.SetImageSourceUrl("image-url", "https://example.test/other.png");
+        map.SetImageSourceCoordinates("image-url", updatedCoordinates);
+        map.AddImageSourceImage("image-inline", coordinates, image);
+        map.SetImageSourceImage("image-inline", image);
+
+        Assert.Equal(SourceType.Image, map.StyleSourceType("image-url"));
+        Assert.Equal(SourceType.Image, map.StyleSourceType("image-inline"));
+        Assert.Equal(updatedCoordinates, map.GetImageSourceCoordinates("image-url"));
+        Assert.Equal(coordinates, map.GetImageSourceCoordinates("image-inline"));
+    }
+
     [Fact]
     public void StyleImageRoundTripsMetadataAndPixelsThroughNativeMap()
     {
