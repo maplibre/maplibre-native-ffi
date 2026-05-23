@@ -33,7 +33,7 @@ internal static unsafe class RenderStructs
     internal static mln_metal_surface_descriptor ToNative(MetalSurfaceDescriptor descriptor)
     {
         ArgumentNullException.ThrowIfNull(descriptor);
-        var native = NativeMethods.mln_metal_surface_descriptor_default();
+        var native = new mln_metal_surface_descriptor { size = (uint)sizeof(mln_metal_surface_descriptor) };
         native.extent = ToNative(descriptor.Extent);
         native.context = ToNative(descriptor.Context);
         native.layer = (void*)descriptor.Layer.Address;
@@ -43,7 +43,7 @@ internal static unsafe class RenderStructs
     internal static mln_vulkan_surface_descriptor ToNative(VulkanSurfaceDescriptor descriptor)
     {
         ArgumentNullException.ThrowIfNull(descriptor);
-        var native = NativeMethods.mln_vulkan_surface_descriptor_default();
+        var native = new mln_vulkan_surface_descriptor { size = (uint)sizeof(mln_vulkan_surface_descriptor) };
         native.extent = ToNative(descriptor.Extent);
         native.context = ToNative(descriptor.Context);
         native.surface = (void*)descriptor.Surface.Address;
@@ -53,7 +53,7 @@ internal static unsafe class RenderStructs
     internal static mln_metal_owned_texture_descriptor ToNative(MetalOwnedTextureDescriptor descriptor)
     {
         ArgumentNullException.ThrowIfNull(descriptor);
-        var native = NativeMethods.mln_metal_owned_texture_descriptor_default();
+        var native = new mln_metal_owned_texture_descriptor { size = (uint)sizeof(mln_metal_owned_texture_descriptor) };
         native.extent = ToNative(descriptor.Extent);
         native.context = ToNative(descriptor.Context);
         return native;
@@ -62,7 +62,7 @@ internal static unsafe class RenderStructs
     internal static mln_metal_borrowed_texture_descriptor ToNative(MetalBorrowedTextureDescriptor descriptor)
     {
         ArgumentNullException.ThrowIfNull(descriptor);
-        var native = NativeMethods.mln_metal_borrowed_texture_descriptor_default();
+        var native = new mln_metal_borrowed_texture_descriptor { size = (uint)sizeof(mln_metal_borrowed_texture_descriptor) };
         native.extent = ToNative(descriptor.Extent);
         native.texture = (void*)descriptor.Texture.Address;
         return native;
@@ -71,7 +71,7 @@ internal static unsafe class RenderStructs
     internal static mln_vulkan_owned_texture_descriptor ToNative(VulkanOwnedTextureDescriptor descriptor)
     {
         ArgumentNullException.ThrowIfNull(descriptor);
-        var native = NativeMethods.mln_vulkan_owned_texture_descriptor_default();
+        var native = new mln_vulkan_owned_texture_descriptor { size = (uint)sizeof(mln_vulkan_owned_texture_descriptor) };
         native.extent = ToNative(descriptor.Extent);
         native.context = ToNative(descriptor.Context);
         return native;
@@ -80,17 +80,45 @@ internal static unsafe class RenderStructs
     internal static mln_vulkan_borrowed_texture_descriptor ToNative(VulkanBorrowedTextureDescriptor descriptor)
     {
         ArgumentNullException.ThrowIfNull(descriptor);
-        var native = NativeMethods.mln_vulkan_borrowed_texture_descriptor_default();
+        var native = new mln_vulkan_borrowed_texture_descriptor { size = (uint)sizeof(mln_vulkan_borrowed_texture_descriptor) };
         native.extent = ToNative(descriptor.Extent);
         native.context = ToNative(descriptor.Context);
         native.image = (void*)descriptor.Image.Address;
+        native.image_view = (void*)descriptor.ImageView.Address;
         native.format = descriptor.Format;
+        native.initial_layout = descriptor.InitialLayout;
         native.final_layout = descriptor.FinalLayout;
         return native;
     }
 
     internal static TextureImageInfo FromNative(mln_texture_image_info info) =>
         new(info.width, info.height, info.stride, (ulong)info.byte_length);
+
+    internal static MetalOwnedTextureFrame FromNative(mln_metal_owned_texture_frame frame, FrameScope scope) =>
+        new(
+            scope,
+            frame.generation,
+            frame.width,
+            frame.height,
+            frame.scale_factor,
+            frame.frame_id,
+            new NativePointer((nint)frame.texture),
+            new NativePointer((nint)frame.device),
+            frame.pixel_format);
+
+    internal static VulkanOwnedTextureFrame FromNative(mln_vulkan_owned_texture_frame frame, FrameScope scope) =>
+        new(
+            scope,
+            frame.generation,
+            frame.width,
+            frame.height,
+            frame.scale_factor,
+            frame.frame_id,
+            new NativePointer((nint)frame.image),
+            new NativePointer((nint)frame.image_view),
+            new NativePointer((nint)frame.device),
+            frame.format,
+            frame.layout);
 }
 
 internal sealed class NativeFeatureStateSelector : IDisposable

@@ -97,6 +97,7 @@ bindings/dotnet/
     NativeStatusTests.cs
     NativeUtf8StringTests.cs
     PublicApiSurfaceTests.cs
+    QueryStructTests.cs
     RenderSessionTests.cs
     ResourceProviderTests.cs
     ResourceResponseTests.cs
@@ -134,8 +135,9 @@ The scaffold implements one proof slice:
   layer listing, style image APIs, image source APIs, typed DEM/location layer
   helpers, custom geometry source callbacks/APIs, GeoJSON/geometry
   materialization, GeoJSON source data APIs, render session lifecycle/feature
-  state wrappers, render surface/texture descriptor materialization, texture
-  read wrappers, style JSON snapshots, layer properties, and layer filters.
+  state wrappers, query wrappers/results, render surface/texture descriptor
+  materialization, texture read/frame wrappers, style JSON snapshots, layer
+  properties, and layer filters.
 - `NativeUtf8String` rejects embedded NUL values and owns temporary UTF-8 C
   string storage for call-boundary inputs.
 - Public value, descriptor, enum, and placeholder handle types exist across the
@@ -148,8 +150,11 @@ The scaffold implements one proof slice:
   swallowing, descriptor materialization, and native custom source operations.
 - GeoJSON source tests cover geometry/feature materialization and native GeoJSON
   source data adaptation.
+- Query tests cover query geometry/options materialization and copied queried
+  feature data.
 - Render session tests cover surface/texture descriptor materialization, texture
-  image info copying, and feature-state selector materialization.
+  image info copying, texture frame invalidation, and feature-state selector
+  materialization.
 - Resource provider tests cover request copying, decision conversion, exception
   conversion, and install/replace behavior.
 - Resource response tests cover byte cloning and native completion descriptor

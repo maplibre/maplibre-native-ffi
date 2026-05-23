@@ -77,11 +77,15 @@ public sealed unsafe class RenderSessionTests
         {
             Extent = new RenderTargetExtent(256, 128, 1),
             Image = new NativePointer(40),
+            ImageView = new NativePointer(45),
             Format = 50,
+            InitialLayout = 55,
             FinalLayout = 60,
         });
         Assert.Equal(40, (nint)vulkanBorrowed.image);
+        Assert.Equal(45, (nint)vulkanBorrowed.image_view);
         Assert.Equal(50u, vulkanBorrowed.format);
+        Assert.Equal(55u, vulkanBorrowed.initial_layout);
         Assert.Equal(60u, vulkanBorrowed.final_layout);
     }
 
@@ -97,6 +101,22 @@ public sealed unsafe class RenderSessionTests
         });
 
         Assert.Equal(new TextureImageInfo(1, 2, 4, 8), info);
+    }
+
+    [Fact]
+    public void TextureFramePropertiesRejectUseAfterScopeClose()
+    {
+        var metalScope = new FrameScope(nameof(MetalOwnedTextureFrame));
+        var metal = new MetalOwnedTextureFrame(metalScope, 1, 2, 3, 4, 5, new NativePointer(6), new NativePointer(7), 8);
+        Assert.Equal(6, metal.Texture.Address);
+        metalScope.Dispose();
+        Assert.Throws<ObjectDisposedException>(() => metal.Texture);
+
+        var vulkanScope = new FrameScope(nameof(VulkanOwnedTextureFrame));
+        var vulkan = new VulkanOwnedTextureFrame(vulkanScope, 1, 2, 3, 4, 5, new NativePointer(6), new NativePointer(7), new NativePointer(8), 9, 10);
+        Assert.Equal(7, vulkan.ImageView.Address);
+        vulkanScope.Dispose();
+        Assert.Throws<ObjectDisposedException>(() => vulkan.ImageView);
     }
 
     [Fact]

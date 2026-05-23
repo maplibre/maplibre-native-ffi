@@ -1,3 +1,5 @@
+using System.Runtime.InteropServices;
+using Maplibre.Native.Geo;
 using Maplibre.Native.Internal.C;
 using Maplibre.Native.Internal.Handle;
 using Maplibre.Native.Internal.Status;
@@ -135,9 +137,41 @@ public sealed unsafe class RenderSessionHandle : IDisposable
         NativeStatus.Check(NativeMethods.mln_render_session_remove_feature_state(Pointer, &selectorValue));
     }
 
+    public IReadOnlyList<QueriedFeature> QueryRenderedFeatures(RenderedQueryGeometry geometry) =>
+        QueryRenderedFeaturesCore(geometry, null);
+
+    public IReadOnlyList<QueriedFeature> QueryRenderedFeatures(RenderedQueryGeometry geometry, RenderedFeatureQueryOptions options) =>
+        QueryRenderedFeaturesCore(geometry, options ?? throw new ArgumentNullException(nameof(options)));
+
+    public IReadOnlyList<QueriedFeature> QuerySourceFeatures(string sourceId) =>
+        QuerySourceFeaturesCore(sourceId, null);
+
+    public IReadOnlyList<QueriedFeature> QuerySourceFeatures(string sourceId, SourceFeatureQueryOptions options) =>
+        QuerySourceFeaturesCore(sourceId, options ?? throw new ArgumentNullException(nameof(options)));
+
+    public FeatureExtensionResult QueryFeatureExtension(string sourceId, Feature feature, string extension, string extensionField, JsonValue? arguments = null)
+    {
+        using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
+        using var nativeFeature = NativeFeature.From(feature);
+        using var nativeExtension = NativeStringView.From(extension, nameof(extension));
+        using var nativeExtensionField = NativeStringView.From(extensionField, nameof(extensionField));
+        using var nativeArguments = arguments is null ? null : NativeJsonValue.From(arguments);
+        var featureValue = nativeFeature.Value;
+        mln_feature_extension_result* result = null;
+        NativeStatus.Check(NativeMethods.mln_render_session_query_feature_extensions(
+            Pointer,
+            nativeSourceId.Value,
+            &featureValue,
+            nativeExtension.Value,
+            nativeExtensionField.Value,
+            nativeArguments?.Pointer,
+            &result));
+        return QueryStructs.ReadFeatureExtensionResult(result);
+    }
+
     public TextureImageInfo TextureImageInfo()
     {
-        var info = NativeMethods.mln_texture_image_info_default();
+        var info = new mln_texture_image_info { size = (uint)sizeof(mln_texture_image_info) };
         var status = NativeMethods.mln_texture_read_premultiplied_rgba8(Pointer, null, 0, &info);
         var copied = RenderStructs.FromNative(info);
         if (status == mln_status.MLN_STATUS_OK || (status == mln_status.MLN_STATUS_INVALID_ARGUMENT && copied.ByteLength > 0))
@@ -152,7 +186,7 @@ public sealed unsafe class RenderSessionHandle : IDisposable
     public TextureImageInfo ReadPremultipliedRgba8(NativeBuffer buffer)
     {
         ArgumentNullException.ThrowIfNull(buffer);
-        var info = NativeMethods.mln_texture_image_info_default();
+        var info = new mln_texture_image_info { size = (uint)sizeof(mln_texture_image_info) };
         fixed (byte* data = buffer.Span)
         {
             NativeStatus.Check(NativeMethods.mln_texture_read_premultiplied_rgba8(Pointer, buffer.ByteLength == 0 ? null : data, buffer.ByteLength, &info));
@@ -166,6 +200,87 @@ public sealed unsafe class RenderSessionHandle : IDisposable
         using var buffer = new NativeBuffer((nuint)info.ByteLength);
         var readInfo = ReadPremultipliedRgba8(buffer);
         return new PremultipliedRgba8Image(buffer.Span.ToArray(), readInfo);
+    }
+
+    public MetalOwnedTextureFrameHandle AcquireMetalOwnedTextureFrame()
+    {
+        var pointer = (mln_metal_owned_texture_frame*)NativeMemory.AllocZeroed((nuint)sizeof(mln_metal_owned_texture_frame));
+        pointer->size = (uint)sizeof(mln_metal_owned_texture_frame);
+        try
+        {
+            NativeStatus.Check(NativeMethods.mln_metal_owned_texture_acquire_frame(Pointer, pointer));
+            var scope = new FrameScope(nameof(MetalOwnedTextureFrame));
+            var frame = RenderStructs.FromNative(*pointer, scope);
+            return new MetalOwnedTextureFrameHandle(this, pointer, scope, frame);
+        }
+        catch
+        {
+            NativeMemory.Free(pointer);
+            throw;
+        }
+    }
+
+    public VulkanOwnedTextureFrameHandle AcquireVulkanOwnedTextureFrame()
+    {
+        var pointer = (mln_vulkan_owned_texture_frame*)NativeMemory.AllocZeroed((nuint)sizeof(mln_vulkan_owned_texture_frame));
+        pointer->size = (uint)sizeof(mln_vulkan_owned_texture_frame);
+        try
+        {
+            NativeStatus.Check(NativeMethods.mln_vulkan_owned_texture_acquire_frame(Pointer, pointer));
+            var scope = new FrameScope(nameof(VulkanOwnedTextureFrame));
+            var frame = RenderStructs.FromNative(*pointer, scope);
+            return new VulkanOwnedTextureFrameHandle(this, pointer, scope, frame);
+        }
+        catch
+        {
+            NativeMemory.Free(pointer);
+            throw;
+        }
+    }
+
+    internal void ReleaseMetalFrame(mln_metal_owned_texture_frame* frame)
+    {
+        NativeStatus.Check(NativeMethods.mln_metal_owned_texture_release_frame(Pointer, frame));
+    }
+
+    internal void ReleaseVulkanFrame(mln_vulkan_owned_texture_frame* frame)
+    {
+        NativeStatus.Check(NativeMethods.mln_vulkan_owned_texture_release_frame(Pointer, frame));
+    }
+
+    private IReadOnlyList<QueriedFeature> QueryRenderedFeaturesCore(RenderedQueryGeometry geometry, RenderedFeatureQueryOptions? options)
+    {
+        using var nativeGeometry = NativeRenderedQueryGeometry.From(geometry);
+        using var nativeOptions = options is null ? null : NativeRenderedFeatureQueryOptions.From(options);
+        var geometryValue = nativeGeometry.Value;
+        mln_feature_query_result* result = null;
+        if (nativeOptions is null)
+        {
+            NativeStatus.Check(NativeMethods.mln_render_session_query_rendered_features(Pointer, &geometryValue, null, &result));
+        }
+        else
+        {
+            var optionsValue = nativeOptions.Value;
+            NativeStatus.Check(NativeMethods.mln_render_session_query_rendered_features(Pointer, &geometryValue, &optionsValue, &result));
+        }
+        return QueryStructs.ReadFeatureQueryResult(result);
+    }
+
+    private IReadOnlyList<QueriedFeature> QuerySourceFeaturesCore(string sourceId, SourceFeatureQueryOptions? options)
+    {
+        using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
+        using var nativeOptions = options is null ? null : NativeSourceFeatureQueryOptions.From(options);
+        mln_feature_query_result* result = null;
+        if (nativeOptions is null)
+        {
+            NativeStatus.Check(NativeMethods.mln_render_session_query_source_features(Pointer, nativeSourceId.Value, null, &result));
+        }
+        else
+        {
+            var optionsValue = nativeOptions.Value;
+            NativeStatus.Check(NativeMethods.mln_render_session_query_source_features(Pointer, nativeSourceId.Value, &optionsValue, &result));
+        }
+        return QueryStructs.ReadFeatureQueryResult(result);
     }
 
     /// <summary>Destroys the render session on the map owner thread.</summary>
@@ -182,22 +297,99 @@ public sealed unsafe class RenderSessionHandle : IDisposable
     }
 }
 
-public sealed class MetalOwnedTextureFrameHandle : IDisposable
+public sealed unsafe class MetalOwnedTextureFrameHandle : IDisposable
 {
+    private readonly RenderSessionHandle session;
+    private readonly mln_metal_owned_texture_frame* pointer;
+    private readonly FrameScope scope;
+
+    internal MetalOwnedTextureFrameHandle(RenderSessionHandle session, mln_metal_owned_texture_frame* pointer, FrameScope scope, MetalOwnedTextureFrame frame)
+    {
+        this.session = session;
+        this.pointer = pointer;
+        this.scope = scope;
+        Frame = frame;
+    }
+
     public bool IsClosed { get; private set; }
-    public MetalOwnedTextureFrame Frame => IsClosed ? throw new ObjectDisposedException(nameof(MetalOwnedTextureFrameHandle)) : default;
-    public void Dispose() => IsClosed = true;
+
+    public MetalOwnedTextureFrame Frame { get; }
+
+    public void Close()
+    {
+        if (IsClosed)
+        {
+            return;
+        }
+        session.ReleaseMetalFrame(pointer);
+        IsClosed = true;
+        scope.Dispose();
+        NativeMemory.Free(pointer);
+    }
+
+    public void Dispose()
+    {
+        Close();
+    }
 }
 
-public sealed class VulkanOwnedTextureFrameHandle : IDisposable
+public sealed unsafe class VulkanOwnedTextureFrameHandle : IDisposable
 {
+    private readonly RenderSessionHandle session;
+    private readonly mln_vulkan_owned_texture_frame* pointer;
+    private readonly FrameScope scope;
+
+    internal VulkanOwnedTextureFrameHandle(RenderSessionHandle session, mln_vulkan_owned_texture_frame* pointer, FrameScope scope, VulkanOwnedTextureFrame frame)
+    {
+        this.session = session;
+        this.pointer = pointer;
+        this.scope = scope;
+        Frame = frame;
+    }
+
     public bool IsClosed { get; private set; }
-    public VulkanOwnedTextureFrame Frame => IsClosed ? throw new ObjectDisposedException(nameof(VulkanOwnedTextureFrameHandle)) : default;
-    public void Dispose() => IsClosed = true;
+
+    public VulkanOwnedTextureFrame Frame { get; }
+
+    public void Close()
+    {
+        if (IsClosed)
+        {
+            return;
+        }
+        session.ReleaseVulkanFrame(pointer);
+        IsClosed = true;
+        scope.Dispose();
+        NativeMemory.Free(pointer);
+    }
+
+    public void Dispose()
+    {
+        Close();
+    }
 }
 
 public sealed class FrameScope : IDisposable
 {
+    private readonly string owner;
+
+    internal FrameScope(string owner)
+    {
+        this.owner = owner;
+    }
+
     public bool IsClosed { get; private set; }
-    public void Dispose() => IsClosed = true;
+
+    internal void EnsureActive()
+    {
+        if (IsClosed)
+        {
+            throw new ObjectDisposedException(owner);
+        }
+    }
+
+    public void Dispose()
+    {
+        IsClosed = true;
+    }
 }

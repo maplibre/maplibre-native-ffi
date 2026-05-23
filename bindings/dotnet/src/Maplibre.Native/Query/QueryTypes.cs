@@ -38,4 +38,5 @@ public abstract record FeatureExtensionResult
     private FeatureExtensionResult() { }
     public sealed record Value(JsonValue Json) : FeatureExtensionResult;
     public sealed record FeatureCollection(IReadOnlyList<Feature> Features) : FeatureExtensionResult;
+    public sealed record Unknown(uint RawType) : FeatureExtensionResult;
 }
