@@ -6,18 +6,38 @@ import kotlinx.cinterop.CPointerVarOf
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.alloc
 import kotlinx.cinterop.memScoped
+import kotlinx.cinterop.pointed
 import kotlinx.cinterop.ptr
 import kotlinx.cinterop.value
+import org.maplibre.nativeffi.camera.CameraOptions
+import org.maplibre.nativeffi.internal.c.mln_camera_options_default
 import org.maplibre.nativeffi.internal.c.mln_map_projection_create
 import org.maplibre.nativeffi.internal.c.mln_map_projection_destroy
+import org.maplibre.nativeffi.internal.c.mln_map_projection_get_camera
+import org.maplibre.nativeffi.internal.c.mln_map_projection_set_camera
 import org.maplibre.nativeffi.internal.lifecycle.HandleState
 import org.maplibre.nativeffi.internal.status.Status
+import org.maplibre.nativeffi.internal.struct.MapStructs
 
 /** Owned standalone projection snapshot created from a map. */
 @OptIn(ExperimentalForeignApi::class)
 public class MapProjectionHandle private constructor(handle: CPointer<mln_map_projection>) :
   AutoCloseable {
   private val state = HandleState("MapProjectionHandle", handle)
+
+  public fun camera(): CameraOptions = memScoped {
+    val outCamera = mln_camera_options_default().getPointer(this)
+    Status.check(mln_map_projection_get_camera(state.requireLive(), outCamera))
+    MapStructs.cameraOptions(outCamera.pointed)
+  }
+
+  public fun setCamera(camera: CameraOptions) {
+    memScoped {
+      Status.check(
+        mln_map_projection_set_camera(state.requireLive(), MapStructs.cameraOptions(camera, this))
+      )
+    }
+  }
 
   override fun close() {
     state.closeOnce(::mln_map_projection_destroy)

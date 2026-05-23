@@ -5,6 +5,7 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlinx.cinterop.ExperimentalForeignApi
+import org.maplibre.nativeffi.camera.CameraOptions
 import org.maplibre.nativeffi.error.InvalidStateException
 import org.maplibre.nativeffi.runtime.RuntimeHandle
 
@@ -18,6 +19,10 @@ class MapProjectionHandleTest {
       val projection = MapProjectionHandle.create(map)
 
       assertFalse(projection.isClosed())
+      projection.setCamera(CameraOptions().center(0.0, 0.0).zoom(2.0))
+      val camera = projection.camera()
+      kotlin.test.assertTrue(camera.hasCenter())
+      kotlin.test.assertTrue(camera.hasZoom())
       map.close()
       projection.close()
 
