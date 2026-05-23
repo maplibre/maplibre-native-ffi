@@ -59,7 +59,8 @@ type VulkanContextDescriptor struct {
 	GraphicsQueueFamilyIndex uint32
 }
 
-// MetalSurfaceDescriptor describes a Metal-backed surface render target.
+// MetalSurfaceDescriptor describes a Metal-backed surface render target. The
+// session retains the layer and optional device while attached.
 type MetalSurfaceDescriptor struct {
 	Extent  RenderTargetExtent
 	Context MetalContextDescriptor
@@ -67,6 +68,9 @@ type MetalSurfaceDescriptor struct {
 }
 
 // VulkanSurfaceDescriptor describes a Vulkan-backed surface render target.
+// Vulkan handles are borrowed and must remain valid until detach or session
+// close. The device must support swapchain presentation on the graphics queue
+// family for Surface.
 type VulkanSurfaceDescriptor struct {
 	Extent  RenderTargetExtent
 	Context VulkanContextDescriptor
@@ -79,19 +83,27 @@ type MetalOwnedTextureDescriptor struct {
 	Context MetalContextDescriptor
 }
 
-// MetalBorrowedTextureDescriptor describes a Metal caller-owned texture render target.
+// MetalBorrowedTextureDescriptor describes a Metal caller-owned texture render
+// target. The caller keeps Texture valid until detach or session close and
+// synchronizes all use outside this session.
 type MetalBorrowedTextureDescriptor struct {
 	Extent  RenderTargetExtent
 	Texture NativePointer
 }
 
-// VulkanOwnedTextureDescriptor describes a Vulkan session-owned texture render target.
+// VulkanOwnedTextureDescriptor describes a Vulkan session-owned texture render
+// target. Vulkan context handles are borrowed and must remain valid until detach
+// or session close.
 type VulkanOwnedTextureDescriptor struct {
 	Extent  RenderTargetExtent
 	Context VulkanContextDescriptor
 }
 
-// VulkanBorrowedTextureDescriptor describes a Vulkan caller-owned texture render target.
+// VulkanBorrowedTextureDescriptor describes a Vulkan caller-owned texture render
+// target. The caller keeps Image and ImageView valid until detach or session
+// close, manages queue-family ownership, makes the image available in
+// InitialLayout before each RenderUpdate, avoids concurrent use during the
+// update, and observes FinalLayout after RenderUpdate returns.
 type VulkanBorrowedTextureDescriptor struct {
 	Extent        RenderTargetExtent
 	Context       VulkanContextDescriptor
@@ -234,6 +246,7 @@ func newRenderSessionHandle(parent *MapHandle, session *capi.RenderSession) (*Re
 }
 
 // AttachMetalSurface attaches a Metal native surface render target to this map.
+// The returned session is owner-thread affine to the map owner thread.
 func (m *MapHandle) AttachMetalSurface(descriptor MetalSurfaceDescriptor) (*RenderSessionHandle, error) {
 	ptr, err := m.ptr()
 	if err != nil {
@@ -248,7 +261,9 @@ func (m *MapHandle) AttachMetalSurface(descriptor MetalSurfaceDescriptor) (*Rend
 	return newRenderSessionHandle(m, session)
 }
 
-// AttachVulkanSurface attaches a Vulkan native surface render target to this map.
+// AttachVulkanSurface attaches a Vulkan native surface render target to this
+// map. The returned session is owner-thread affine to the map owner thread, and
+// borrowed Vulkan handles must outlive detach or session close.
 func (m *MapHandle) AttachVulkanSurface(descriptor VulkanSurfaceDescriptor) (*RenderSessionHandle, error) {
 	ptr, err := m.ptr()
 	if err != nil {
@@ -278,7 +293,9 @@ func (m *MapHandle) AttachMetalOwnedTexture(descriptor MetalOwnedTextureDescript
 	return newRenderSessionHandle(m, session)
 }
 
-// AttachMetalBorrowedTexture attaches a Metal caller-owned texture render target.
+// AttachMetalBorrowedTexture attaches a Metal caller-owned texture render
+// target. The caller keeps the texture valid until detach or session close and
+// synchronizes external use.
 func (m *MapHandle) AttachMetalBorrowedTexture(descriptor MetalBorrowedTextureDescriptor) (*RenderSessionHandle, error) {
 	ptr, err := m.ptr()
 	if err != nil {
@@ -308,7 +325,9 @@ func (m *MapHandle) AttachVulkanOwnedTexture(descriptor VulkanOwnedTextureDescri
 	return newRenderSessionHandle(m, session)
 }
 
-// AttachVulkanBorrowedTexture attaches a Vulkan caller-owned texture render target.
+// AttachVulkanBorrowedTexture attaches a Vulkan caller-owned texture render
+// target. The caller owns image lifetime, queue-family ownership, image layout
+// transitions, and external synchronization around each RenderUpdate.
 func (m *MapHandle) AttachVulkanBorrowedTexture(descriptor VulkanBorrowedTextureDescriptor) (*RenderSessionHandle, error) {
 	ptr, err := m.ptr()
 	if err != nil {
