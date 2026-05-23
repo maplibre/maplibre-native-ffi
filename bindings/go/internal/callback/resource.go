@@ -114,6 +114,18 @@ func invokeResourceTransformForTest(state *ResourceTransformState, kind uint32, 
 	return C.GoString((*C.char)(pointer)), true, status
 }
 
+func invokeResourceTransformTrampolineForTest(state *ResourceTransformState, kind uint32, url string) capi.Status {
+	rawURL := C.CString(url)
+	defer C.free(unsafe.Pointer(rawURL))
+	var response C.mln_resource_transform_response
+	return capi.Status(goMaplibreResourceTransform(
+		C.mln_go_resource_handle_to_pointer(C.uintptr_t(state.handle)),
+		C.uint32_t(kind),
+		rawURL,
+		&response,
+	))
+}
+
 // ResourceRequest is the copied internal shape for provider callbacks.
 type ResourceRequest struct {
 	URL                 string
@@ -343,6 +355,23 @@ func resourceRequestFromC(request *C.mln_resource_request) ResourceRequest {
 		copied.PriorData = C.GoBytes(unsafe.Pointer(request.prior_data), C.int(request.prior_data_size))
 	}
 	return copied
+}
+
+func invokeResourceProviderTrampolineForTest(state *ResourceProviderState) uint32 {
+	rawURL := C.CString("https://example.com/style.json")
+	defer C.free(unsafe.Pointer(rawURL))
+	rawHandle := C.malloc(1)
+	defer C.free(rawHandle)
+	rawRequest := C.mln_resource_request{
+		size: C.uint32_t(unsafe.Sizeof(C.mln_resource_request{})),
+		url:  rawURL,
+		kind: C.uint32_t(capi.ResourceKindStyle),
+	}
+	return uint32(goMaplibreResourceProvider(
+		C.mln_go_resource_handle_to_pointer(C.uintptr_t(state.handle)),
+		&rawRequest,
+		(*C.mln_resource_request_handle)(rawHandle),
+	))
 }
 
 func resourceResponseToC(response ResourceResponse) (C.mln_resource_response, []unsafe.Pointer) {

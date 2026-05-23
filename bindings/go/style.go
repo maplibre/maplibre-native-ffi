@@ -1,6 +1,8 @@
 package maplibre
 
 import (
+	"runtime"
+
 	"github.com/maplibre/maplibre-native-ffi/bindings/go/internal/callback"
 	"github.com/maplibre/maplibre-native-ffi/bindings/go/internal/capi"
 )
@@ -474,8 +476,10 @@ func (m *MapHandle) StyleImagePremultipliedRGBA8Into(imageID string, buffer []by
 	if err := checkNative(func() capi.Status {
 		return capi.MapCopyStyleImagePremultipliedRGBA8(ptr, imageID, buffer, &byteLength, &found)
 	}); err != nil {
+		runtime.KeepAlive(buffer)
 		return byteLength, found, err
 	}
+	runtime.KeepAlive(buffer)
 	return byteLength, found, nil
 }
 

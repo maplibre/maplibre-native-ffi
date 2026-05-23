@@ -3,6 +3,7 @@ package callback
 /*
 #cgo CFLAGS: -std=c2x
 #include <stdint.h>
+#include <stdlib.h>
 #include "maplibre_native_c.h"
 
 extern uint32_t goMaplibreLogCallback(void* user_data, uint32_t severity, uint32_t event, int64_t code, const char* message);
@@ -15,6 +16,7 @@ import "C"
 import (
 	"runtime/cgo"
 	"sync"
+	"unsafe"
 
 	"github.com/maplibre/maplibre-native-ffi/bindings/go/internal/capi"
 )
@@ -85,4 +87,19 @@ func ClearLogCallback() capi.Status {
 // SetAsyncLogSeverityMask sets the native asynchronous logging severity mask.
 func SetAsyncLogSeverityMask(mask uint32) capi.Status {
 	return capi.Status(C.mln_log_set_async_severity_mask(C.uint32_t(mask)))
+}
+
+func invokeLogCallbackForTest(callback LogCallback) uint32 {
+	state := &logCallbackState{callback: callback}
+	handle := cgo.NewHandle(state)
+	defer handle.Delete()
+	message := C.CString("test message")
+	defer C.free(unsafe.Pointer(message))
+	return uint32(goMaplibreLogCallback(
+		C.mln_go_handle_to_pointer(C.uintptr_t(handle)),
+		C.uint32_t(capi.LogSeverityInfo),
+		C.uint32_t(capi.LogEventGeneral),
+		0,
+		message,
+	))
 }

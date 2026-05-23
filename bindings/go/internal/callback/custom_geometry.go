@@ -114,3 +114,13 @@ func (state *CustomGeometrySourceState) invokeCancel(tileID CanonicalTileID) {
 func canonicalTileIDFromC(tileID C.mln_canonical_tile_id) CanonicalTileID {
 	return CanonicalTileID{Z: uint32(tileID.z), X: uint32(tileID.x), Y: uint32(tileID.y)}
 }
+
+func invokeCustomGeometryFetchForTest(callback CustomGeometryTileCallback) {
+	state := &CustomGeometrySourceState{fetchTile: callback}
+	state.handle = cgo.NewHandle(state)
+	defer state.Release()
+	goMaplibreCustomGeometryFetchTile(
+		C.mln_go_custom_geometry_handle_to_pointer(C.uintptr_t(state.handle)),
+		C.mln_canonical_tile_id{z: 1, x: 2, y: 3},
+	)
+}

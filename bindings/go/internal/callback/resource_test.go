@@ -1,6 +1,7 @@
 package callback
 
 import (
+	"runtime/cgo"
 	"testing"
 
 	"github.com/maplibre/maplibre-native-ffi/bindings/go/internal/capi"
@@ -45,6 +46,29 @@ func TestResourceTransformStateRejectsEmbeddedNULReplacement(t *testing.T) {
 	_, _, status := invokeResourceTransformForTest(state, capi.ResourceKindStyle, "https://example.com/style.json")
 	if status != capi.StatusInvalidArgument {
 		t.Fatalf("status = %v, want StatusInvalidArgument", status)
+	}
+}
+
+func TestResourceTransformTrampolineRecoversPanic(t *testing.T) {
+	state := newResourceTransformState(func(uint32, string) (string, bool) {
+		panic("boom")
+	})
+	defer state.Release()
+
+	if status := invokeResourceTransformTrampolineForTest(state, capi.ResourceKindStyle, "https://example.com/style.json"); status != capi.StatusNativeError {
+		t.Fatalf("status = %v, want StatusNativeError", status)
+	}
+}
+
+func TestResourceProviderTrampolineRecoversPanic(t *testing.T) {
+	state := &ResourceProviderState{callback: func(ResourceRequest, *ResourceRequestHandle) uint32 {
+		panic("boom")
+	}}
+	state.handle = cgo.NewHandle(state)
+	defer state.Release()
+
+	if decision := invokeResourceProviderTrampolineForTest(state); decision != capi.ResourceProviderDecisionUnknown {
+		t.Fatalf("decision = %v, want ResourceProviderDecisionUnknown", decision)
 	}
 }
 
