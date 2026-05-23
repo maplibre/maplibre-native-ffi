@@ -1,5 +1,6 @@
 package org.maplibre.nativeffi.map
 
+import cnames.structs.mln_json_snapshot
 import cnames.structs.mln_map
 import cnames.structs.mln_style_id_list
 import kotlinx.cinterop.BooleanVar
@@ -50,8 +51,13 @@ import org.maplibre.nativeffi.internal.c.mln_map_get_bounds
 import org.maplibre.nativeffi.internal.c.mln_map_get_camera
 import org.maplibre.nativeffi.internal.c.mln_map_get_debug_options
 import org.maplibre.nativeffi.internal.c.mln_map_get_free_camera_options
+import org.maplibre.nativeffi.internal.c.mln_map_get_layer_filter
+import org.maplibre.nativeffi.internal.c.mln_map_get_layer_property
 import org.maplibre.nativeffi.internal.c.mln_map_get_projection_mode
 import org.maplibre.nativeffi.internal.c.mln_map_get_rendering_stats_view_enabled
+import org.maplibre.nativeffi.internal.c.mln_map_get_style_layer_json
+import org.maplibre.nativeffi.internal.c.mln_map_get_style_layer_type
+import org.maplibre.nativeffi.internal.c.mln_map_get_style_light_property
 import org.maplibre.nativeffi.internal.c.mln_map_get_style_source_info
 import org.maplibre.nativeffi.internal.c.mln_map_get_style_source_type
 import org.maplibre.nativeffi.internal.c.mln_map_get_tile_options
@@ -60,9 +66,11 @@ import org.maplibre.nativeffi.internal.c.mln_map_is_fully_loaded
 import org.maplibre.nativeffi.internal.c.mln_map_jump_to
 import org.maplibre.nativeffi.internal.c.mln_map_lat_lng_for_pixel
 import org.maplibre.nativeffi.internal.c.mln_map_lat_lngs_for_pixels
+import org.maplibre.nativeffi.internal.c.mln_map_list_style_layer_ids
 import org.maplibre.nativeffi.internal.c.mln_map_list_style_source_ids
 import org.maplibre.nativeffi.internal.c.mln_map_move_by
 import org.maplibre.nativeffi.internal.c.mln_map_move_by_animated
+import org.maplibre.nativeffi.internal.c.mln_map_move_style_layer
 import org.maplibre.nativeffi.internal.c.mln_map_options
 import org.maplibre.nativeffi.internal.c.mln_map_options_default
 import org.maplibre.nativeffi.internal.c.mln_map_pitch_by
@@ -410,6 +418,58 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     outExists.value
   }
 
+  public fun styleLayerType(layerId: String): String? = memScoped {
+    val outType = alloc<org.maplibre.nativeffi.internal.c.mln_string_view>()
+    val outFound = alloc<BooleanVar>()
+    Status.check(
+      mln_map_get_style_layer_type(
+        state.requireLive(),
+        CoreStructs.stringView(layerId, this),
+        outType.ptr,
+        outFound.ptr,
+      )
+    )
+    if (outFound.value) CoreStructs.stringView(outType) else null
+  }
+
+  public fun styleLayerIds(): List<String> = memScoped {
+    val outList = alloc<CPointerVarOf<CPointer<mln_style_id_list>>>()
+    outList.value = null
+    Status.check(mln_map_list_style_layer_ids(state.requireLive(), outList.ptr))
+    StyleStructs.styleIdList(requireNotNull(outList.value))
+  }
+
+  public fun moveStyleLayer(layerId: String) {
+    moveStyleLayer(layerId, "")
+  }
+
+  public fun moveStyleLayer(layerId: String, beforeLayerId: String) {
+    memScoped {
+      Status.check(
+        mln_map_move_style_layer(
+          state.requireLive(),
+          CoreStructs.stringView(layerId, this),
+          CoreStructs.stringView(beforeLayerId, this),
+        )
+      )
+    }
+  }
+
+  public fun styleLayerJson(layerId: String): JsonValue? = memScoped {
+    val outLayer = alloc<CPointerVarOf<CPointer<mln_json_snapshot>>>()
+    val outFound = alloc<BooleanVar>()
+    outLayer.value = null
+    Status.check(
+      mln_map_get_style_layer_json(
+        state.requireLive(),
+        CoreStructs.stringView(layerId, this),
+        outLayer.ptr,
+        outFound.ptr,
+      )
+    )
+    if (outFound.value) ValueStructs.jsonSnapshotHandle(outLayer.value) else null
+  }
+
   public fun setStyleLightJson(lightJson: JsonValue) {
     memScoped {
       Status.check(
@@ -430,6 +490,19 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     }
   }
 
+  public fun styleLightProperty(propertyName: String): JsonValue? = memScoped {
+    val outValue = alloc<CPointerVarOf<CPointer<mln_json_snapshot>>>()
+    outValue.value = null
+    Status.check(
+      mln_map_get_style_light_property(
+        state.requireLive(),
+        CoreStructs.stringView(propertyName, this),
+        outValue.ptr,
+      )
+    )
+    ValueStructs.jsonSnapshotHandle(outValue.value)
+  }
+
   public fun setLayerProperty(layerId: String, propertyName: String, value: JsonValue) {
     memScoped {
       Status.check(
@@ -443,6 +516,20 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     }
   }
 
+  public fun layerProperty(layerId: String, propertyName: String): JsonValue? = memScoped {
+    val outValue = alloc<CPointerVarOf<CPointer<mln_json_snapshot>>>()
+    outValue.value = null
+    Status.check(
+      mln_map_get_layer_property(
+        state.requireLive(),
+        CoreStructs.stringView(layerId, this),
+        CoreStructs.stringView(propertyName, this),
+        outValue.ptr,
+      )
+    )
+    ValueStructs.jsonSnapshotHandle(outValue.value)
+  }
+
   public fun setLayerFilter(layerId: String, filter: JsonValue) {
     memScoped {
       Status.check(
@@ -453,6 +540,27 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
         )
       )
     }
+  }
+
+  public fun clearLayerFilter(layerId: String) {
+    memScoped {
+      Status.check(
+        mln_map_set_layer_filter(state.requireLive(), CoreStructs.stringView(layerId, this), null)
+      )
+    }
+  }
+
+  public fun layerFilter(layerId: String): JsonValue? = memScoped {
+    val outFilter = alloc<CPointerVarOf<CPointer<mln_json_snapshot>>>()
+    outFilter.value = null
+    Status.check(
+      mln_map_get_layer_filter(
+        state.requireLive(),
+        CoreStructs.stringView(layerId, this),
+        outFilter.ptr,
+      )
+    )
+    ValueStructs.jsonSnapshotHandle(outFilter.value)
   }
 
   public fun requestRepaint() {

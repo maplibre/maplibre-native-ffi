@@ -55,11 +55,18 @@ class StyleHandleTest {
         )
       )
       assertTrue(map.styleLayerExists("park-circles"))
+      assertEquals("circle", map.styleLayerType("park-circles"))
+      assertTrue(map.styleLayerIds().contains("park-circles"))
+      assertTrue(map.styleLayerJson("park-circles") is JsonValue.ObjectValue)
+      map.moveStyleLayer("park-circles")
       map.setLayerProperty("park-circles", "circle-radius", JsonValue.of(5.0))
+      assertTrue(map.layerProperty("park-circles", "circle-radius") != null)
       map.setLayerFilter(
         "park-circles",
         JsonValue.array(listOf(JsonValue.of("has"), JsonValue.of("kind"))),
       )
+      assertTrue(map.layerFilter("park-circles") != null)
+      map.clearLayerFilter("park-circles")
       assertTrue(map.removeStyleLayer("park-circles"))
       assertFalse(map.styleLayerExists("park-circles"))
       assertTrue(map.removeStyleSource("parks"))

@@ -1,14 +1,18 @@
 package org.maplibre.nativeffi.internal.struct
 
+import cnames.structs.mln_json_snapshot
 import kotlinx.cinterop.CPointer
+import kotlinx.cinterop.CPointerVarOf
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.MemScope
 import kotlinx.cinterop.alloc
 import kotlinx.cinterop.allocArray
 import kotlinx.cinterop.get
+import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.pointed
 import kotlinx.cinterop.ptr
 import kotlinx.cinterop.sizeOf
+import kotlinx.cinterop.value
 import org.maplibre.nativeffi.geo.Feature
 import org.maplibre.nativeffi.geo.FeatureIdentifier
 import org.maplibre.nativeffi.geo.GeoJson
@@ -43,9 +47,12 @@ import org.maplibre.nativeffi.internal.c.mln_feature
 import org.maplibre.nativeffi.internal.c.mln_geojson
 import org.maplibre.nativeffi.internal.c.mln_geometry
 import org.maplibre.nativeffi.internal.c.mln_json_member
+import org.maplibre.nativeffi.internal.c.mln_json_snapshot_destroy
+import org.maplibre.nativeffi.internal.c.mln_json_snapshot_get
 import org.maplibre.nativeffi.internal.c.mln_json_value
 import org.maplibre.nativeffi.internal.c.mln_lat_lng
 import org.maplibre.nativeffi.internal.c.mln_polygon_geometry
+import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.json.JsonValue
 
 /** Materializes JSON, geometry, and GeoJSON descriptor graphs at the C boundary. */
@@ -92,6 +99,20 @@ internal object ValueStructs {
   fun jsonSnapshot(value: CPointer<mln_json_value>?): JsonValue {
     require(value != null) { "JSON value pointer must not be null" }
     return readJson(value.pointed)
+  }
+
+  fun jsonSnapshotHandle(snapshot: CPointer<mln_json_snapshot>?): JsonValue? {
+    if (snapshot == null) return null
+    return try {
+      memScoped {
+        val outValue = alloc<CPointerVarOf<CPointer<mln_json_value>>>()
+        outValue.value = null
+        Status.check(mln_json_snapshot_get(snapshot, outValue.ptr))
+        outValue.value?.let(::jsonSnapshot)
+      }
+    } finally {
+      mln_json_snapshot_destroy(snapshot)
+    }
   }
 
   fun geometrySnapshot(value: CPointer<mln_geometry>?): Geometry {
