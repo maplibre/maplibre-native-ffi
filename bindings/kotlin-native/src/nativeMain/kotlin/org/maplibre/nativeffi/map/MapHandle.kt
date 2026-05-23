@@ -12,17 +12,24 @@ import kotlinx.cinterop.pointed
 import kotlinx.cinterop.ptr
 import kotlinx.cinterop.value
 import org.maplibre.nativeffi.camera.AnimationOptions
+import org.maplibre.nativeffi.camera.BoundOptions
 import org.maplibre.nativeffi.camera.CameraOptions
+import org.maplibre.nativeffi.camera.FreeCameraOptions
 import org.maplibre.nativeffi.geo.ScreenPoint
+import org.maplibre.nativeffi.internal.c.mln_bound_options_default
 import org.maplibre.nativeffi.internal.c.mln_camera_options_default
+import org.maplibre.nativeffi.internal.c.mln_free_camera_options_default
 import org.maplibre.nativeffi.internal.c.mln_map_cancel_transitions
 import org.maplibre.nativeffi.internal.c.mln_map_create
 import org.maplibre.nativeffi.internal.c.mln_map_destroy
 import org.maplibre.nativeffi.internal.c.mln_map_dump_debug_logs
 import org.maplibre.nativeffi.internal.c.mln_map_ease_to
 import org.maplibre.nativeffi.internal.c.mln_map_fly_to
+import org.maplibre.nativeffi.internal.c.mln_map_get_bounds
 import org.maplibre.nativeffi.internal.c.mln_map_get_camera
 import org.maplibre.nativeffi.internal.c.mln_map_get_debug_options
+import org.maplibre.nativeffi.internal.c.mln_map_get_free_camera_options
+import org.maplibre.nativeffi.internal.c.mln_map_get_projection_mode
 import org.maplibre.nativeffi.internal.c.mln_map_get_rendering_stats_view_enabled
 import org.maplibre.nativeffi.internal.c.mln_map_get_tile_options
 import org.maplibre.nativeffi.internal.c.mln_map_get_viewport_options
@@ -40,7 +47,10 @@ import org.maplibre.nativeffi.internal.c.mln_map_rotate_by
 import org.maplibre.nativeffi.internal.c.mln_map_rotate_by_animated
 import org.maplibre.nativeffi.internal.c.mln_map_scale_by
 import org.maplibre.nativeffi.internal.c.mln_map_scale_by_animated
+import org.maplibre.nativeffi.internal.c.mln_map_set_bounds
 import org.maplibre.nativeffi.internal.c.mln_map_set_debug_options
+import org.maplibre.nativeffi.internal.c.mln_map_set_free_camera_options
+import org.maplibre.nativeffi.internal.c.mln_map_set_projection_mode
 import org.maplibre.nativeffi.internal.c.mln_map_set_rendering_stats_view_enabled
 import org.maplibre.nativeffi.internal.c.mln_map_set_style_json
 import org.maplibre.nativeffi.internal.c.mln_map_set_style_url
@@ -48,6 +58,7 @@ import org.maplibre.nativeffi.internal.c.mln_map_set_tile_options
 import org.maplibre.nativeffi.internal.c.mln_map_set_viewport_options
 import org.maplibre.nativeffi.internal.c.mln_map_tile_options_default
 import org.maplibre.nativeffi.internal.c.mln_map_viewport_options_default
+import org.maplibre.nativeffi.internal.c.mln_projection_mode_default
 import org.maplibre.nativeffi.internal.lifecycle.HandleState
 import org.maplibre.nativeffi.internal.memory.MemoryUtil
 import org.maplibre.nativeffi.internal.status.Status
@@ -292,6 +303,54 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
   public fun cancelTransitions() {
     Status.check(mln_map_cancel_transitions(state.requireLive()))
   }
+
+  public fun bounds(): BoundOptions = memScoped {
+    val outOptions = mln_bound_options_default().getPointer(this)
+    Status.check(mln_map_get_bounds(state.requireLive(), outOptions))
+    MapStructs.boundOptions(outOptions.pointed)
+  }
+
+  public fun setBounds(options: BoundOptions) {
+    memScoped {
+      Status.check(mln_map_set_bounds(state.requireLive(), MapStructs.boundOptions(options, this)))
+    }
+  }
+
+  public fun freeCameraOptions(): FreeCameraOptions = memScoped {
+    val outOptions = mln_free_camera_options_default().getPointer(this)
+    Status.check(mln_map_get_free_camera_options(state.requireLive(), outOptions))
+    MapStructs.freeCameraOptions(outOptions.pointed)
+  }
+
+  public fun setFreeCameraOptions(options: FreeCameraOptions) {
+    memScoped {
+      Status.check(
+        mln_map_set_free_camera_options(
+          state.requireLive(),
+          MapStructs.freeCameraOptions(options, this),
+        )
+      )
+    }
+  }
+
+  public fun projectionMode(): ProjectionModeOptions = memScoped {
+    val outMode = mln_projection_mode_default().getPointer(this)
+    Status.check(mln_map_get_projection_mode(state.requireLive(), outMode))
+    MapStructs.projectionModeOptions(outMode.pointed)
+  }
+
+  public fun setProjectionMode(mode: ProjectionModeOptions) {
+    memScoped {
+      Status.check(
+        mln_map_set_projection_mode(
+          state.requireLive(),
+          MapStructs.projectionModeOptions(mode, this),
+        )
+      )
+    }
+  }
+
+  public fun createProjection(): MapProjectionHandle = MapProjectionHandle.create(this)
 
   override fun close() {
     state.closeOnce(::mln_map_destroy) { runtime.unregisterMap(this) }

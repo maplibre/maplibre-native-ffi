@@ -6,11 +6,18 @@ import kotlinx.cinterop.MemScope
 import kotlinx.cinterop.alloc
 import kotlinx.cinterop.ptr
 import org.maplibre.nativeffi.camera.AnimationOptions
+import org.maplibre.nativeffi.camera.BoundOptions
 import org.maplibre.nativeffi.camera.CameraOptions
+import org.maplibre.nativeffi.camera.FreeCameraOptions
 import org.maplibre.nativeffi.internal.c.MLN_ANIMATION_OPTION_DURATION
 import org.maplibre.nativeffi.internal.c.MLN_ANIMATION_OPTION_EASING
 import org.maplibre.nativeffi.internal.c.MLN_ANIMATION_OPTION_MIN_ZOOM
 import org.maplibre.nativeffi.internal.c.MLN_ANIMATION_OPTION_VELOCITY
+import org.maplibre.nativeffi.internal.c.MLN_BOUND_OPTION_BOUNDS
+import org.maplibre.nativeffi.internal.c.MLN_BOUND_OPTION_MAX_PITCH
+import org.maplibre.nativeffi.internal.c.MLN_BOUND_OPTION_MAX_ZOOM
+import org.maplibre.nativeffi.internal.c.MLN_BOUND_OPTION_MIN_PITCH
+import org.maplibre.nativeffi.internal.c.MLN_BOUND_OPTION_MIN_ZOOM
 import org.maplibre.nativeffi.internal.c.MLN_CAMERA_OPTION_ANCHOR
 import org.maplibre.nativeffi.internal.c.MLN_CAMERA_OPTION_BEARING
 import org.maplibre.nativeffi.internal.c.MLN_CAMERA_OPTION_CENTER
@@ -20,6 +27,8 @@ import org.maplibre.nativeffi.internal.c.MLN_CAMERA_OPTION_PADDING
 import org.maplibre.nativeffi.internal.c.MLN_CAMERA_OPTION_PITCH
 import org.maplibre.nativeffi.internal.c.MLN_CAMERA_OPTION_ROLL
 import org.maplibre.nativeffi.internal.c.MLN_CAMERA_OPTION_ZOOM
+import org.maplibre.nativeffi.internal.c.MLN_FREE_CAMERA_OPTION_ORIENTATION
+import org.maplibre.nativeffi.internal.c.MLN_FREE_CAMERA_OPTION_POSITION
 import org.maplibre.nativeffi.internal.c.MLN_MAP_TILE_OPTION_LOD_MIN_RADIUS
 import org.maplibre.nativeffi.internal.c.MLN_MAP_TILE_OPTION_LOD_MODE
 import org.maplibre.nativeffi.internal.c.MLN_MAP_TILE_OPTION_LOD_PITCH_THRESHOLD
@@ -35,8 +44,12 @@ import org.maplibre.nativeffi.internal.c.MLN_PROJECTION_MODE_X_SKEW
 import org.maplibre.nativeffi.internal.c.MLN_PROJECTION_MODE_Y_SKEW
 import org.maplibre.nativeffi.internal.c.mln_animation_options
 import org.maplibre.nativeffi.internal.c.mln_animation_options_default
+import org.maplibre.nativeffi.internal.c.mln_bound_options
+import org.maplibre.nativeffi.internal.c.mln_bound_options_default
 import org.maplibre.nativeffi.internal.c.mln_camera_options
 import org.maplibre.nativeffi.internal.c.mln_camera_options_default
+import org.maplibre.nativeffi.internal.c.mln_free_camera_options
+import org.maplibre.nativeffi.internal.c.mln_free_camera_options_default
 import org.maplibre.nativeffi.internal.c.mln_map_tile_options
 import org.maplibre.nativeffi.internal.c.mln_map_tile_options_default
 import org.maplibre.nativeffi.internal.c.mln_map_viewport_options
@@ -124,6 +137,88 @@ internal object MapStructs {
       native.field_of_view = it
     }
     return native.ptr
+  }
+
+  fun boundOptions(value: BoundOptions, scope: MemScope): CPointer<mln_bound_options> {
+    val native = scope.alloc<mln_bound_options>()
+    mln_bound_options_default().place(native.ptr)
+    value.bounds?.let {
+      native.fields = native.fields or MLN_BOUND_OPTION_BOUNDS
+      native.bounds.southwest.latitude = it.southwest.latitude
+      native.bounds.southwest.longitude = it.southwest.longitude
+      native.bounds.northeast.latitude = it.northeast.latitude
+      native.bounds.northeast.longitude = it.northeast.longitude
+    }
+    value.minZoom?.let {
+      native.fields = native.fields or MLN_BOUND_OPTION_MIN_ZOOM
+      native.min_zoom = it
+    }
+    value.maxZoom?.let {
+      native.fields = native.fields or MLN_BOUND_OPTION_MAX_ZOOM
+      native.max_zoom = it
+    }
+    value.minPitch?.let {
+      native.fields = native.fields or MLN_BOUND_OPTION_MIN_PITCH
+      native.min_pitch = it
+    }
+    value.maxPitch?.let {
+      native.fields = native.fields or MLN_BOUND_OPTION_MAX_PITCH
+      native.max_pitch = it
+    }
+    return native.ptr
+  }
+
+  fun boundOptions(value: mln_bound_options): BoundOptions {
+    val options = BoundOptions()
+    if ((value.fields and MLN_BOUND_OPTION_BOUNDS) != 0U)
+      options.bounds(CoreStructs.latLngBounds(value.bounds))
+    if ((value.fields and MLN_BOUND_OPTION_MIN_ZOOM) != 0U) options.minZoom(value.min_zoom)
+    if ((value.fields and MLN_BOUND_OPTION_MAX_ZOOM) != 0U) options.maxZoom(value.max_zoom)
+    if ((value.fields and MLN_BOUND_OPTION_MIN_PITCH) != 0U) options.minPitch(value.min_pitch)
+    if ((value.fields and MLN_BOUND_OPTION_MAX_PITCH) != 0U) options.maxPitch(value.max_pitch)
+    return options
+  }
+
+  fun freeCameraOptions(
+    value: FreeCameraOptions,
+    scope: MemScope,
+  ): CPointer<mln_free_camera_options> {
+    val native = scope.alloc<mln_free_camera_options>()
+    mln_free_camera_options_default().place(native.ptr)
+    value.position?.let {
+      native.fields = native.fields or MLN_FREE_CAMERA_OPTION_POSITION
+      native.position.x = it.x
+      native.position.y = it.y
+      native.position.z = it.z
+    }
+    value.orientation?.let {
+      native.fields = native.fields or MLN_FREE_CAMERA_OPTION_ORIENTATION
+      native.orientation.x = it.x
+      native.orientation.y = it.y
+      native.orientation.z = it.z
+      native.orientation.w = it.w
+    }
+    return native.ptr
+  }
+
+  fun freeCameraOptions(value: mln_free_camera_options): FreeCameraOptions {
+    val options = FreeCameraOptions()
+    if ((value.fields and MLN_FREE_CAMERA_OPTION_POSITION) != 0U) {
+      options.position(
+        org.maplibre.nativeffi.geo.Vec3(value.position.x, value.position.y, value.position.z)
+      )
+    }
+    if ((value.fields and MLN_FREE_CAMERA_OPTION_ORIENTATION) != 0U) {
+      options.orientation(
+        org.maplibre.nativeffi.geo.Quaternion(
+          value.orientation.x,
+          value.orientation.y,
+          value.orientation.z,
+          value.orientation.w,
+        )
+      )
+    }
+    return options
   }
 
   fun viewportOptions(value: ViewportOptions, scope: MemScope): CPointer<mln_map_viewport_options> {

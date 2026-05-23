@@ -5,8 +5,14 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import org.maplibre.nativeffi.camera.AnimationOptions
+import org.maplibre.nativeffi.camera.BoundOptions
 import org.maplibre.nativeffi.camera.CameraOptions
 import org.maplibre.nativeffi.camera.EdgeInsets
+import org.maplibre.nativeffi.camera.FreeCameraOptions
+import org.maplibre.nativeffi.geo.LatLng
+import org.maplibre.nativeffi.geo.LatLngBounds
+import org.maplibre.nativeffi.geo.Quaternion
+import org.maplibre.nativeffi.geo.Vec3
 import org.maplibre.nativeffi.runtime.RuntimeHandle
 
 class MapCameraControlsTest {
@@ -60,6 +66,19 @@ class MapCameraControlsTest {
         assertTrue(camera.hasCenter())
         assertTrue(camera.hasZoom())
         map.cancelTransitions()
+        map.setBounds(BoundOptions().bounds(LatLngBounds(LatLng(-10.0, -10.0), LatLng(10.0, 10.0))))
+        assertTrue(map.bounds().hasBounds())
+        map.setFreeCameraOptions(
+          FreeCameraOptions()
+            .position(Vec3(0.0, 0.0, 0.0))
+            .orientation(Quaternion(0.0, 0.0, 0.0, 1.0))
+        )
+        val freeCamera = map.freeCameraOptions()
+        assertTrue(freeCamera.hasPosition())
+        assertTrue(freeCamera.hasOrientation())
+        map.setProjectionMode(ProjectionModeOptions().axonometric(false))
+        assertTrue(map.projectionMode().hasAxonometric())
+        map.createProjection().close()
         map.dumpDebugLogs()
       } finally {
         map.close()
