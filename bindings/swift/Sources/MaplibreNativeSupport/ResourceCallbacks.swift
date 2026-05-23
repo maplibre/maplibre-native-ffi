@@ -1,0 +1,364 @@
+import CMaplibreNativeC
+import Foundation
+
+public struct NativeByteRange: Equatable, Sendable {
+  public let start: UInt64
+  public let end: UInt64
+}
+
+public struct NativeResourceRequest: Equatable, Sendable {
+  public let url: String
+  public let kind: UInt32
+  public let loadingMethod: UInt32
+  public let priority: UInt32
+  public let usage: UInt32
+  public let storagePolicy: UInt32
+  public let range: NativeByteRange?
+  public let priorModifiedUnixMilliseconds: Int64?
+  public let priorExpiresUnixMilliseconds: Int64?
+  public let priorEtag: String?
+  public let priorData: [UInt8]
+
+  public init(_ raw: mln_resource_request) throws {
+    url = NativeString.copyCString(raw.url)
+    kind = raw.kind
+    loadingMethod = raw.loading_method
+    priority = raw.priority
+    usage = raw.usage
+    storagePolicy = raw.storage_policy
+    range = raw.has_range ? NativeByteRange(start: raw.range_start, end: raw.range_end) : nil
+    priorModifiedUnixMilliseconds = raw.has_prior_modified ? raw.prior_modified_unix_ms : nil
+    priorExpiresUnixMilliseconds = raw.has_prior_expires ? raw.prior_expires_unix_ms : nil
+    priorEtag = raw.prior_etag.map { String(cString: $0) }
+    if raw.prior_data_size > 0, let priorData = raw.prior_data {
+      self.priorData = Array(UnsafeBufferPointer(start: priorData, count: raw.prior_data_size))
+    } else {
+      priorData = []
+    }
+  }
+}
+
+public struct NativeResourceResponseInput: Equatable, Sendable {
+  public let status: UInt32
+  public let errorReason: UInt32
+  public let bytes: [UInt8]
+  public let errorMessage: String?
+  public let mustRevalidate: Bool
+  public let modifiedUnixMilliseconds: Int64?
+  public let expiresUnixMilliseconds: Int64?
+  public let etag: String?
+  public let retryAfterUnixMilliseconds: Int64?
+
+  public init(
+    status: UInt32,
+    errorReason: UInt32,
+    bytes: [UInt8] = [],
+    errorMessage: String? = nil,
+    mustRevalidate: Bool = false,
+    modifiedUnixMilliseconds: Int64? = nil,
+    expiresUnixMilliseconds: Int64? = nil,
+    etag: String? = nil,
+    retryAfterUnixMilliseconds: Int64? = nil
+  ) {
+    self.status = status
+    self.errorReason = errorReason
+    self.bytes = bytes
+    self.errorMessage = errorMessage
+    self.mustRevalidate = mustRevalidate
+    self.modifiedUnixMilliseconds = modifiedUnixMilliseconds
+    self.expiresUnixMilliseconds = expiresUnixMilliseconds
+    self.etag = etag
+    self.retryAfterUnixMilliseconds = retryAfterUnixMilliseconds
+  }
+
+  public func withNativeResponse<Result>(
+    _ body: (UnsafePointer<mln_resource_response>) throws -> Result
+  ) throws -> Result {
+    try NativeString.withOptionalCString(errorMessage) { errorMessage in
+      try NativeString.withOptionalCString(etag) { etag in
+        try bytes.withUnsafeBufferPointer { bytes in
+          var response = mln_resource_response()
+          response.size = UInt32(MemoryLayout<mln_resource_response>.size)
+          response.status = status
+          response.error_reason = errorReason
+          response.bytes = bytes.baseAddress
+          response.byte_count = bytes.count
+          response.error_message = errorMessage
+          response.must_revalidate = mustRevalidate
+          response.has_modified = modifiedUnixMilliseconds != nil
+          response.modified_unix_ms = modifiedUnixMilliseconds ?? 0
+          response.has_expires = expiresUnixMilliseconds != nil
+          response.expires_unix_ms = expiresUnixMilliseconds ?? 0
+          response.etag = etag
+          response.has_retry_after = retryAfterUnixMilliseconds != nil
+          response.retry_after_unix_ms = retryAfterUnixMilliseconds ?? 0
+          return try withUnsafePointer(to: &response, body)
+        }
+      }
+    }
+  }
+}
+
+public struct NativeResourceRequestHandleFunctions: Sendable {
+  public let complete: @Sendable (OpaquePointer, NativeResourceResponseInput) throws -> Void
+  public let cancelled: @Sendable (OpaquePointer) throws -> Bool
+  public let release: @Sendable (OpaquePointer?) -> Void
+
+  public init(
+    complete: @escaping @Sendable (OpaquePointer, NativeResourceResponseInput) throws -> Void,
+    cancelled: @escaping @Sendable (OpaquePointer) throws -> Bool,
+    release: @escaping @Sendable (OpaquePointer?) -> Void
+  ) {
+    self.complete = complete
+    self.cancelled = cancelled
+    self.release = release
+  }
+
+  public static let native = Self(
+    complete: { handle, response in
+      try response.withNativeResponse { nativeResponse in
+        try CAPI.completeResourceRequest(handle, nativeResponse)
+      }
+    },
+    cancelled: { handle in
+      try CAPI.resourceRequestCancelled(handle)
+    },
+    release: { handle in
+      CAPI.releaseResourceRequest(handle)
+    }
+  )
+}
+
+public final class NativeResourceRequestHandleState: @unchecked Sendable {
+  private let functions: NativeResourceRequestHandleFunctions
+  private let lock = NSLock()
+  private var pointer: OpaquePointer?
+  private var providerReturnedHandle = false
+  private var completed = false
+
+  public init(
+    pointer: OpaquePointer?,
+    functions: NativeResourceRequestHandleFunctions = .native
+  ) throws {
+    guard let pointer else {
+      throw NativeStatusFailure(rawStatus: 0, diagnostic: "resource request handle is null")
+    }
+    self.pointer = pointer
+    self.functions = functions
+  }
+
+  deinit {
+    release()
+  }
+
+  public func markProviderReturnedHandle() {
+    lock.withLock {
+      providerReturnedHandle = true
+    }
+    releaseIfCompletedAfterProviderReturn()
+  }
+
+  public func complete(_ response: NativeResourceResponseInput) throws {
+    let handle = try requireLive()
+    try functions.complete(handle, response)
+    lock.withLock {
+      completed = true
+    }
+    releaseIfCompletedAfterProviderReturn()
+  }
+
+  public func isCancelled() throws -> Bool {
+    try functions.cancelled(requireLive())
+  }
+
+  public func release() {
+    let handle = lock.withLock {
+      guard providerReturnedHandle else { return nil as OpaquePointer? }
+      let handle = pointer
+      pointer = nil
+      return handle
+    }
+    if let handle {
+      functions.release(handle)
+    }
+  }
+
+  private func requireLive() throws -> OpaquePointer {
+    try lock.withLock {
+      guard let pointer else {
+        throw NativeStatusFailure(rawStatus: 0, diagnostic: "resource request handle is closed")
+      }
+      return pointer
+    }
+  }
+
+  private func releaseIfCompletedAfterProviderReturn() {
+    let shouldRelease = lock.withLock { providerReturnedHandle && completed }
+    if shouldRelease {
+      release()
+    }
+  }
+}
+
+public struct NativeResourceTransformRequest: Equatable, Sendable {
+  public let kind: UInt32
+  public let url: String
+}
+
+private final class NativeResourceTransformBox: @unchecked Sendable {
+  private let callback: @Sendable (NativeResourceTransformRequest) -> String?
+  private let lock = NSLock()
+  private var responseStorage: [UnsafeMutablePointer<CChar>] = []
+
+  init(_ callback: @escaping @Sendable (NativeResourceTransformRequest) -> String?) {
+    self.callback = callback
+  }
+
+  deinit {
+    lock.withLock {
+      for pointer in responseStorage {
+        free(pointer)
+      }
+      responseStorage.removeAll()
+    }
+  }
+
+  func invoke(
+    kind: UInt32,
+    url: UnsafePointer<CChar>?,
+    outResponse: UnsafeMutablePointer<mln_resource_transform_response>?
+  ) -> mln_status {
+    guard let outResponse else { return MLN_STATUS_INVALID_ARGUMENT }
+    outResponse.pointee = mln_resource_transform_response()
+    outResponse.pointee.size = UInt32(MemoryLayout<mln_resource_transform_response>.size)
+    let request = NativeResourceTransformRequest(kind: kind, url: NativeString.copyCString(url))
+    guard let replacement = callback(request), !replacement.isEmpty else {
+      return MLN_STATUS_OK
+    }
+    if replacement.utf8.contains(0) {
+      return MLN_STATUS_INVALID_ARGUMENT
+    }
+    guard let storage = strdup(replacement) else {
+      return MLN_STATUS_NATIVE_ERROR
+    }
+    lock.withLock {
+      responseStorage.append(storage)
+    }
+    outResponse.pointee.url = UnsafePointer(storage)
+    return MLN_STATUS_OK
+  }
+}
+
+private func resourceTransformTrampoline(
+  userData: UnsafeMutableRawPointer?,
+  kind: UInt32,
+  url: UnsafePointer<CChar>?,
+  outResponse: UnsafeMutablePointer<mln_resource_transform_response>?
+) -> mln_status {
+  guard let userData else { return MLN_STATUS_INVALID_ARGUMENT }
+  let box = Unmanaged<NativeResourceTransformBox>.fromOpaque(userData).takeUnretainedValue()
+  return box.invoke(kind: kind, url: url, outResponse: outResponse)
+}
+
+public final class NativeResourceTransformState: @unchecked Sendable {
+  private let retainedBox: Unmanaged<NativeResourceTransformBox>
+
+  public init(_ callback: @escaping @Sendable (NativeResourceTransformRequest) -> String?) {
+    retainedBox = Unmanaged.passRetained(NativeResourceTransformBox(callback))
+  }
+
+  deinit {
+    retainedBox.release()
+  }
+
+  public func invokeForTesting(kind: UInt32, url: String) -> (status: Int32, replacement: String?) {
+    var response = mln_resource_transform_response()
+    let status = url.withCString { url in
+      retainedBox.takeUnretainedValue().invoke(kind: kind, url: url, outResponse: &response)
+    }
+    return (status.rawValue, response.url.map { String(cString: $0) })
+  }
+
+  public func withDescriptor<Result>(
+    _ body: (UnsafePointer<mln_resource_transform>) throws -> Result
+  ) throws -> Result {
+    var transform = mln_resource_transform()
+    transform.size = UInt32(MemoryLayout<mln_resource_transform>.size)
+    transform.callback = resourceTransformTrampoline
+    transform.user_data = retainedBox.toOpaque()
+    return try withUnsafePointer(to: &transform, body)
+  }
+}
+
+private final class NativeResourceProviderBox: @unchecked Sendable {
+  private let callback: @Sendable (NativeResourceRequest, NativeResourceRequestHandleState) -> UInt32
+  private let handleFunctions: NativeResourceRequestHandleFunctions
+
+  init(
+    handleFunctions: NativeResourceRequestHandleFunctions,
+    callback: @escaping @Sendable (NativeResourceRequest, NativeResourceRequestHandleState) -> UInt32
+  ) {
+    self.handleFunctions = handleFunctions
+    self.callback = callback
+  }
+
+  func invoke(
+    request: UnsafePointer<mln_resource_request>?,
+    handle: OpaquePointer?
+  ) -> UInt32 {
+    guard let request,
+      let state = try? NativeResourceRequestHandleState(pointer: handle, functions: handleFunctions),
+      let copiedRequest = try? NativeResourceRequest(request.pointee)
+    else {
+      return UInt32.max
+    }
+    let decision = callback(copiedRequest, state)
+    if decision == MLN_RESOURCE_PROVIDER_DECISION_HANDLE.rawValue {
+      state.markProviderReturnedHandle()
+    }
+    return decision
+  }
+}
+
+private func resourceProviderTrampoline(
+  userData: UnsafeMutableRawPointer?,
+  request: UnsafePointer<mln_resource_request>?,
+  handle: OpaquePointer?
+) -> UInt32 {
+  guard let userData else { return UInt32.max }
+  let box = Unmanaged<NativeResourceProviderBox>.fromOpaque(userData).takeUnretainedValue()
+  return box.invoke(request: request, handle: handle)
+}
+
+public final class NativeResourceProviderState: @unchecked Sendable {
+  private let retainedBox: Unmanaged<NativeResourceProviderBox>
+
+  public init(
+    handleFunctions: NativeResourceRequestHandleFunctions = .native,
+    _ callback: @escaping @Sendable (NativeResourceRequest, NativeResourceRequestHandleState) -> UInt32
+  ) {
+    retainedBox = Unmanaged.passRetained(
+      NativeResourceProviderBox(handleFunctions: handleFunctions, callback: callback)
+    )
+  }
+
+  deinit {
+    retainedBox.release()
+  }
+
+  public func invokeForTesting(request: mln_resource_request, handle: OpaquePointer?) -> UInt32 {
+    withUnsafePointer(to: request) { request in
+      retainedBox.takeUnretainedValue().invoke(request: request, handle: handle)
+    }
+  }
+
+  public func withDescriptor<Result>(
+    _ body: (UnsafePointer<mln_resource_provider>) throws -> Result
+  ) throws -> Result {
+    var provider = mln_resource_provider()
+    provider.size = UInt32(MemoryLayout<mln_resource_provider>.size)
+    provider.callback = resourceProviderTrampoline
+    provider.user_data = retainedBox.toOpaque()
+    return try withUnsafePointer(to: &provider, body)
+  }
+}

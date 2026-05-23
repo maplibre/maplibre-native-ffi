@@ -9,6 +9,32 @@ public struct NativeStringError: Error, Equatable, Sendable {
 }
 
 public enum NativeString {
+  public static func copyUTF8(data: UnsafePointer<CChar>?, size: Int) throws -> String {
+    guard size > 0 else { return "" }
+    guard let data else {
+      throw NativeStringError("UTF-8 string view has nil data with non-zero size")
+    }
+    let bytes = UnsafeBufferPointer(
+      start: UnsafeRawPointer(data).assumingMemoryBound(to: UInt8.self),
+      count: size
+    )
+    return String(decoding: bytes, as: UTF8.self)
+  }
+
+  public static func copyCString(_ data: UnsafePointer<CChar>?) -> String {
+    data.map { String(cString: $0) } ?? ""
+  }
+
+  public static func withOptionalCString<Result>(
+    _ text: String?,
+    _ body: (UnsafePointer<CChar>?) throws -> Result
+  ) throws -> Result {
+    guard let text else {
+      return try body(nil)
+    }
+    return try withCString(text, body)
+  }
+
   public static func withCString<Result>(
     _ text: String,
     _ body: (UnsafePointer<CChar>) throws -> Result
