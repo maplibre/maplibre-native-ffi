@@ -413,6 +413,13 @@ type StyleTileSourceOptions struct {
 	RasterEncoding uint32
 }
 
+// CanonicalTileID identifies one canonical tile.
+type CanonicalTileID struct {
+	Z uint32
+	X uint32
+	Y uint32
+}
+
 // Geometry contains a semantic GeoJSON geometry descriptor.
 type Geometry struct {
 	Type       uint32
@@ -928,6 +935,16 @@ const (
 	StyleTileSourceOptionTileSize       uint32 = uint32(C.MLN_STYLE_TILE_SOURCE_OPTION_TILE_SIZE)
 	StyleTileSourceOptionVectorEncoding uint32 = uint32(C.MLN_STYLE_TILE_SOURCE_OPTION_VECTOR_ENCODING)
 	StyleTileSourceOptionRasterEncoding uint32 = uint32(C.MLN_STYLE_TILE_SOURCE_OPTION_RASTER_ENCODING)
+)
+
+const (
+	CustomGeometrySourceOptionMinZoom   uint32 = uint32(C.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MIN_ZOOM)
+	CustomGeometrySourceOptionMaxZoom   uint32 = uint32(C.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MAX_ZOOM)
+	CustomGeometrySourceOptionTolerance uint32 = uint32(C.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TOLERANCE)
+	CustomGeometrySourceOptionTileSize  uint32 = uint32(C.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TILE_SIZE)
+	CustomGeometrySourceOptionBuffer    uint32 = uint32(C.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_BUFFER)
+	CustomGeometrySourceOptionClip      uint32 = uint32(C.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_CLIP)
+	CustomGeometrySourceOptionWrap      uint32 = uint32(C.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_WRAP)
 )
 
 const (
@@ -1764,6 +1781,33 @@ func MapSetGeoJSONSourceData(m *Map, sourceID string, data GeoJSON) (Status, err
 		return StatusInvalidArgument, err
 	}
 	return Status(C.mln_map_set_geojson_source_data((*C.mln_map)(unsafe.Pointer(m)), sourceView.raw(), &rawData)), nil
+}
+
+// MapSetCustomGeometrySourceTileData sets custom geometry source data for one tile.
+func MapSetCustomGeometrySourceTileData(m *Map, sourceID string, tileID CanonicalTileID, data GeoJSON) (Status, error) {
+	sourceView := newStringView(sourceID)
+	defer sourceView.free()
+	materializer := newGeoJSONMaterializer()
+	defer materializer.free()
+	rawData, err := materializer.geoJSON(data)
+	if err != nil {
+		return StatusInvalidArgument, err
+	}
+	return Status(C.mln_map_set_custom_geometry_source_tile_data((*C.mln_map)(unsafe.Pointer(m)), sourceView.raw(), canonicalTileIDToC(tileID), &rawData)), nil
+}
+
+// MapInvalidateCustomGeometrySourceTile invalidates custom geometry source data for one tile.
+func MapInvalidateCustomGeometrySourceTile(m *Map, sourceID string, tileID CanonicalTileID) Status {
+	sourceView := newStringView(sourceID)
+	defer sourceView.free()
+	return Status(C.mln_map_invalidate_custom_geometry_source_tile((*C.mln_map)(unsafe.Pointer(m)), sourceView.raw(), canonicalTileIDToC(tileID)))
+}
+
+// MapInvalidateCustomGeometrySourceRegion invalidates custom geometry source data inside one region.
+func MapInvalidateCustomGeometrySourceRegion(m *Map, sourceID string, bounds LatLngBounds) Status {
+	sourceView := newStringView(sourceID)
+	defer sourceView.free()
+	return Status(C.mln_map_invalidate_custom_geometry_source_region((*C.mln_map)(unsafe.Pointer(m)), sourceView.raw(), latLngBoundsToC(bounds)))
 }
 
 // MapAddVectorSourceURL adds a vector source with a TileJSON URL.
@@ -3011,6 +3055,10 @@ func jsonValueFromC(value *C.mln_json_value) (any, error) {
 
 func latLngToC(coordinate LatLng) C.mln_lat_lng {
 	return C.mln_lat_lng{latitude: C.double(coordinate.Latitude), longitude: C.double(coordinate.Longitude)}
+}
+
+func canonicalTileIDToC(tileID CanonicalTileID) C.mln_canonical_tile_id {
+	return C.mln_canonical_tile_id{z: C.uint32_t(tileID.Z), x: C.uint32_t(tileID.X), y: C.uint32_t(tileID.Y)}
 }
 
 func latLngFromC(coordinate C.mln_lat_lng) LatLng {

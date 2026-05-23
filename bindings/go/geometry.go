@@ -49,6 +49,13 @@ type LatLngBounds struct {
 	Northeast LatLng
 }
 
+// CanonicalTileID identifies one canonical tile.
+type CanonicalTileID struct {
+	Z uint32
+	X uint32
+	Y uint32
+}
+
 // GeometryType identifies the shape stored in a Geometry descriptor.
 type GeometryType uint32
 
@@ -171,6 +178,10 @@ func (bounds LatLngBounds) toCAPI() capi.LatLngBounds {
 
 func latLngBoundsFromCAPI(bounds capi.LatLngBounds) LatLngBounds {
 	return LatLngBounds{Southwest: latLngFromCAPI(bounds.Southwest), Northeast: latLngFromCAPI(bounds.Northeast)}
+}
+
+func (tileID CanonicalTileID) toCAPI() capi.CanonicalTileID {
+	return capi.CanonicalTileID{Z: tileID.Z, X: tileID.X, Y: tileID.Y}
 }
 
 func (geometry Geometry) toCAPI() capi.Geometry {

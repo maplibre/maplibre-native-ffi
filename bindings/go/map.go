@@ -2,7 +2,9 @@ package maplibre
 
 import (
 	"errors"
+	"sync"
 
+	"github.com/maplibre/maplibre-native-ffi/bindings/go/internal/callback"
 	"github.com/maplibre/maplibre-native-ffi/bindings/go/internal/capi"
 	"github.com/maplibre/maplibre-native-ffi/bindings/go/internal/handle"
 	"github.com/maplibre/maplibre-native-ffi/bindings/go/internal/memory"
@@ -61,6 +63,9 @@ func (options MapOptions) toCAPI() capi.MapOptions {
 type MapHandle struct {
 	state   *handle.State[capi.Map]
 	runtime *RuntimeHandle
+
+	customGeometryMu      sync.Mutex
+	customGeometrySources map[string]*callback.CustomGeometrySourceState
 }
 
 func (m *MapHandle) ptr() (*capi.Map, error) {
@@ -127,7 +132,11 @@ func (m *MapHandle) SetStyleJSON(json string) error {
 		return err
 	}
 	defer m.state.KeepAlive()
-	return checkNative(func() capi.Status { return capi.MapSetStyleJSON(ptr, json) })
+	if err := checkNative(func() capi.Status { return capi.MapSetStyleJSON(ptr, json) }); err != nil {
+		return err
+	}
+	m.releaseCustomGeometrySources()
+	return nil
 }
 
 // SetDebugOptions applies MapLibre debug overlay mask bits to a map.
@@ -552,6 +561,24 @@ func (m *MapHandle) SetProjectionMode(options ProjectionModeOptions) error {
 	return checkNative(func() capi.Status { return capi.MapSetProjectionMode(ptr, options.toCAPI()) })
 }
 
+func (m *MapHandle) releaseCustomGeometrySource(sourceID string) {
+	m.customGeometryMu.Lock()
+	state := m.customGeometrySources[sourceID]
+	delete(m.customGeometrySources, sourceID)
+	m.customGeometryMu.Unlock()
+	state.Release()
+}
+
+func (m *MapHandle) releaseCustomGeometrySources() {
+	m.customGeometryMu.Lock()
+	states := m.customGeometrySources
+	m.customGeometrySources = nil
+	m.customGeometryMu.Unlock()
+	for _, state := range states {
+		state.Release()
+	}
+}
+
 // Close destroys this map. A successful close makes later calls no-ops. A
 // failed close leaves the native handle live so callers can retry on the owner
 // thread.
@@ -564,7 +591,11 @@ func (m *MapHandle) Close() error {
 			m.runtime.state.KeepAlive()
 		}
 	}()
-	return checkNative(func() capi.Status {
+	if err := checkNative(func() capi.Status {
 		return m.state.Close(capi.MapDestroy)
-	})
+	}); err != nil {
+		return err
+	}
+	m.releaseCustomGeometrySources()
+	return nil
 }

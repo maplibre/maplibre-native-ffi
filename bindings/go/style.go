@@ -1,6 +1,9 @@
 package maplibre
 
-import "github.com/maplibre/maplibre-native-ffi/bindings/go/internal/capi"
+import (
+	"github.com/maplibre/maplibre-native-ffi/bindings/go/internal/callback"
+	"github.com/maplibre/maplibre-native-ffi/bindings/go/internal/capi"
+)
 
 // StyleSourceType identifies a native style source kind.
 type StyleSourceType uint32
@@ -135,6 +138,66 @@ func styleTileSourceOptionsToCAPI(options *StyleTileSourceOptions) *capi.StyleTi
 	return &raw
 }
 
+// CustomGeometryTileCallback receives custom geometry tile requests.
+type CustomGeometryTileCallback func(CanonicalTileID)
+
+// CustomGeometrySourceOptions configures a custom geometry source.
+type CustomGeometrySourceOptions struct {
+	FetchTile  CustomGeometryTileCallback
+	CancelTile CustomGeometryTileCallback
+	MinZoom    *float64
+	MaxZoom    *float64
+	Tolerance  *float64
+	TileSize   *uint32
+	Buffer     *uint32
+	Clip       *bool
+	Wrap       *bool
+}
+
+func (options CustomGeometrySourceOptions) toCallback() callback.CustomGeometrySourceOptions {
+	raw := callback.CustomGeometrySourceOptions{
+		FetchTile: func(tileID callback.CanonicalTileID) {
+			if options.FetchTile != nil {
+				options.FetchTile(CanonicalTileID{Z: tileID.Z, X: tileID.X, Y: tileID.Y})
+			}
+		},
+	}
+	if options.CancelTile != nil {
+		raw.CancelTile = func(tileID callback.CanonicalTileID) {
+			options.CancelTile(CanonicalTileID{Z: tileID.Z, X: tileID.X, Y: tileID.Y})
+		}
+	}
+	if options.MinZoom != nil {
+		raw.Fields |= capi.CustomGeometrySourceOptionMinZoom
+		raw.MinZoom = *options.MinZoom
+	}
+	if options.MaxZoom != nil {
+		raw.Fields |= capi.CustomGeometrySourceOptionMaxZoom
+		raw.MaxZoom = *options.MaxZoom
+	}
+	if options.Tolerance != nil {
+		raw.Fields |= capi.CustomGeometrySourceOptionTolerance
+		raw.Tolerance = *options.Tolerance
+	}
+	if options.TileSize != nil {
+		raw.Fields |= capi.CustomGeometrySourceOptionTileSize
+		raw.TileSize = *options.TileSize
+	}
+	if options.Buffer != nil {
+		raw.Fields |= capi.CustomGeometrySourceOptionBuffer
+		raw.Buffer = *options.Buffer
+	}
+	if options.Clip != nil {
+		raw.Fields |= capi.CustomGeometrySourceOptionClip
+		raw.Clip = *options.Clip
+	}
+	if options.Wrap != nil {
+		raw.Fields |= capi.CustomGeometrySourceOptionWrap
+		raw.Wrap = *options.Wrap
+	}
+	return raw
+}
+
 func styleSourceInfoFromCAPI(info capi.StyleSourceInfo) StyleSourceInfo {
 	return StyleSourceInfo{
 		Type:            StyleSourceType(info.Type),
@@ -203,6 +266,78 @@ func (m *MapHandle) SetGeoJSONSourceData(sourceID string, data GeoJSON) error {
 		return newBindingError(ErrInvalidArgument, materialErr.Error())
 	}
 	return err
+}
+
+// AddCustomGeometrySource adds a custom geometry source to the current style.
+func (m *MapHandle) AddCustomGeometrySource(sourceID string, options CustomGeometrySourceOptions) error {
+	if options.FetchTile == nil {
+		return newBindingError(ErrInvalidArgument, "CustomGeometrySourceOptions.FetchTile is nil")
+	}
+	ptr, err := m.ptr()
+	if err != nil {
+		return err
+	}
+	defer m.state.KeepAlive()
+
+	var replacement *callback.CustomGeometrySourceState
+	if err := checkNative(func() capi.Status {
+		state, status := callback.AddCustomGeometrySource(ptr, sourceID, options.toCallback())
+		replacement = state
+		return status
+	}); err != nil {
+		return err
+	}
+
+	m.customGeometryMu.Lock()
+	if m.customGeometrySources == nil {
+		m.customGeometrySources = make(map[string]*callback.CustomGeometrySourceState)
+	}
+	previous := m.customGeometrySources[sourceID]
+	m.customGeometrySources[sourceID] = replacement
+	m.customGeometryMu.Unlock()
+	previous.Release()
+	return nil
+}
+
+// SetCustomGeometrySourceTileData sets custom geometry data for one tile.
+func (m *MapHandle) SetCustomGeometrySourceTileData(sourceID string, tileID CanonicalTileID, data GeoJSON) error {
+	ptr, err := m.ptr()
+	if err != nil {
+		return err
+	}
+	defer m.state.KeepAlive()
+	var materialErr error
+	err = checkNative(func() capi.Status {
+		var status capi.Status
+		status, materialErr = capi.MapSetCustomGeometrySourceTileData(ptr, sourceID, tileID.toCAPI(), data.toCAPI())
+		return status
+	})
+	if materialErr != nil {
+		return newBindingError(ErrInvalidArgument, materialErr.Error())
+	}
+	return err
+}
+
+// InvalidateCustomGeometrySourceTile invalidates custom geometry data for one tile.
+func (m *MapHandle) InvalidateCustomGeometrySourceTile(sourceID string, tileID CanonicalTileID) error {
+	ptr, err := m.ptr()
+	if err != nil {
+		return err
+	}
+	defer m.state.KeepAlive()
+	return checkNative(func() capi.Status { return capi.MapInvalidateCustomGeometrySourceTile(ptr, sourceID, tileID.toCAPI()) })
+}
+
+// InvalidateCustomGeometrySourceRegion invalidates custom geometry data inside one geographic region.
+func (m *MapHandle) InvalidateCustomGeometrySourceRegion(sourceID string, bounds LatLngBounds) error {
+	ptr, err := m.ptr()
+	if err != nil {
+		return err
+	}
+	defer m.state.KeepAlive()
+	return checkNative(func() capi.Status {
+		return capi.MapInvalidateCustomGeometrySourceRegion(ptr, sourceID, bounds.toCAPI())
+	})
 }
 
 // AddVectorSourceURL adds a vector source with a TileJSON URL.
@@ -309,6 +444,9 @@ func (m *MapHandle) RemoveStyleSource(sourceID string) (bool, error) {
 	var removed bool
 	if err := checkNative(func() capi.Status { return capi.MapRemoveStyleSource(ptr, sourceID, &removed) }); err != nil {
 		return false, err
+	}
+	if removed {
+		m.releaseCustomGeometrySource(sourceID)
 	}
 	return removed, nil
 }
