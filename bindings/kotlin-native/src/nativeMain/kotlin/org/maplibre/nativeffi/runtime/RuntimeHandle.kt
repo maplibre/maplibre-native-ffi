@@ -1,5 +1,7 @@
 package org.maplibre.nativeffi.runtime
 
+import cnames.structs.mln_offline_region_list
+import cnames.structs.mln_offline_region_snapshot
 import cnames.structs.mln_runtime
 import kotlinx.cinterop.BooleanVar
 import kotlinx.cinterop.CPointer
@@ -17,20 +19,27 @@ import kotlinx.cinterop.value
 import org.maplibre.nativeffi.internal.c.MLN_RUNTIME_OPTION_MAXIMUM_CACHE_SIZE
 import org.maplibre.nativeffi.internal.c.mln_network_status_get
 import org.maplibre.nativeffi.internal.c.mln_network_status_set
+import org.maplibre.nativeffi.internal.c.mln_offline_region_status
 import org.maplibre.nativeffi.internal.c.mln_runtime_create
 import org.maplibre.nativeffi.internal.c.mln_runtime_destroy
 import org.maplibre.nativeffi.internal.c.mln_runtime_event
 import org.maplibre.nativeffi.internal.c.mln_runtime_offline_operation_discard
 import org.maplibre.nativeffi.internal.c.mln_runtime_offline_region_create_start
+import org.maplibre.nativeffi.internal.c.mln_runtime_offline_region_create_take_result
 import org.maplibre.nativeffi.internal.c.mln_runtime_offline_region_delete_start
 import org.maplibre.nativeffi.internal.c.mln_runtime_offline_region_get_start
 import org.maplibre.nativeffi.internal.c.mln_runtime_offline_region_get_status_start
+import org.maplibre.nativeffi.internal.c.mln_runtime_offline_region_get_status_take_result
+import org.maplibre.nativeffi.internal.c.mln_runtime_offline_region_get_take_result
 import org.maplibre.nativeffi.internal.c.mln_runtime_offline_region_invalidate_start
 import org.maplibre.nativeffi.internal.c.mln_runtime_offline_region_set_download_state_start
 import org.maplibre.nativeffi.internal.c.mln_runtime_offline_region_set_observed_start
 import org.maplibre.nativeffi.internal.c.mln_runtime_offline_region_update_metadata_start
+import org.maplibre.nativeffi.internal.c.mln_runtime_offline_region_update_metadata_take_result
 import org.maplibre.nativeffi.internal.c.mln_runtime_offline_regions_list_start
+import org.maplibre.nativeffi.internal.c.mln_runtime_offline_regions_list_take_result
 import org.maplibre.nativeffi.internal.c.mln_runtime_offline_regions_merge_database_start
+import org.maplibre.nativeffi.internal.c.mln_runtime_offline_regions_merge_database_take_result
 import org.maplibre.nativeffi.internal.c.mln_runtime_options
 import org.maplibre.nativeffi.internal.c.mln_runtime_options_default
 import org.maplibre.nativeffi.internal.c.mln_runtime_poll_event
@@ -229,6 +238,132 @@ public class RuntimeHandle private constructor(handle: CPointer<mln_runtime>) : 
       OfflineOperationKind.REGION_DELETE,
       OfflineOperationResultKind.NONE,
     )
+  }
+
+  public fun takeCreateOfflineRegionResult(
+    operation: OfflineOperationHandle<OfflineRegionInfo>
+  ): OfflineRegionInfo = memScoped {
+    val outRegion = alloc<CPointerVarOf<CPointer<mln_offline_region_snapshot>>>()
+    outRegion.value = null
+    val operationId =
+      operation.requireLive(
+        this@RuntimeHandle,
+        OfflineOperationKind.REGION_CREATE,
+        OfflineOperationResultKind.REGION,
+      )
+    Status.check(
+      mln_runtime_offline_region_create_take_result(state.requireLive(), operationId, outRegion.ptr)
+    )
+    operation.markConsumed()
+    RuntimeStructs.offlineRegionSnapshot(requireNotNull(outRegion.value))
+  }
+
+  public fun takeOfflineRegionResult(
+    operation: OfflineOperationHandle<OfflineRegionInfo?>
+  ): OfflineRegionInfo? = memScoped {
+    val outRegion = alloc<CPointerVarOf<CPointer<mln_offline_region_snapshot>>>()
+    val outFound = alloc<BooleanVar>()
+    outRegion.value = null
+    val operationId =
+      operation.requireLive(
+        this@RuntimeHandle,
+        OfflineOperationKind.REGION_GET,
+        OfflineOperationResultKind.OPTIONAL_REGION,
+      )
+    Status.check(
+      mln_runtime_offline_region_get_take_result(
+        state.requireLive(),
+        operationId,
+        outRegion.ptr,
+        outFound.ptr,
+      )
+    )
+    operation.markConsumed()
+    if (!outFound.value) null
+    else RuntimeStructs.offlineRegionSnapshot(requireNotNull(outRegion.value))
+  }
+
+  public fun takeOfflineRegionsResult(
+    operation: OfflineOperationHandle<List<OfflineRegionInfo>>
+  ): List<OfflineRegionInfo> = memScoped {
+    val outRegions = alloc<CPointerVarOf<CPointer<mln_offline_region_list>>>()
+    outRegions.value = null
+    val operationId =
+      operation.requireLive(
+        this@RuntimeHandle,
+        OfflineOperationKind.REGIONS_LIST,
+        OfflineOperationResultKind.REGION_LIST,
+      )
+    Status.check(
+      mln_runtime_offline_regions_list_take_result(state.requireLive(), operationId, outRegions.ptr)
+    )
+    operation.markConsumed()
+    RuntimeStructs.offlineRegionList(requireNotNull(outRegions.value))
+  }
+
+  public fun takeMergeOfflineRegionsDatabaseResult(
+    operation: OfflineOperationHandle<List<OfflineRegionInfo>>
+  ): List<OfflineRegionInfo> = memScoped {
+    val outRegions = alloc<CPointerVarOf<CPointer<mln_offline_region_list>>>()
+    outRegions.value = null
+    val operationId =
+      operation.requireLive(
+        this@RuntimeHandle,
+        OfflineOperationKind.REGIONS_MERGE_DATABASE,
+        OfflineOperationResultKind.REGION_LIST,
+      )
+    Status.check(
+      mln_runtime_offline_regions_merge_database_take_result(
+        state.requireLive(),
+        operationId,
+        outRegions.ptr,
+      )
+    )
+    operation.markConsumed()
+    RuntimeStructs.offlineRegionList(requireNotNull(outRegions.value))
+  }
+
+  public fun takeUpdateOfflineRegionMetadataResult(
+    operation: OfflineOperationHandle<OfflineRegionInfo>
+  ): OfflineRegionInfo = memScoped {
+    val outRegion = alloc<CPointerVarOf<CPointer<mln_offline_region_snapshot>>>()
+    outRegion.value = null
+    val operationId =
+      operation.requireLive(
+        this@RuntimeHandle,
+        OfflineOperationKind.REGION_UPDATE_METADATA,
+        OfflineOperationResultKind.REGION,
+      )
+    Status.check(
+      mln_runtime_offline_region_update_metadata_take_result(
+        state.requireLive(),
+        operationId,
+        outRegion.ptr,
+      )
+    )
+    operation.markConsumed()
+    RuntimeStructs.offlineRegionSnapshot(requireNotNull(outRegion.value))
+  }
+
+  public fun takeOfflineRegionStatusResult(
+    operation: OfflineOperationHandle<OfflineRegionStatus>
+  ): OfflineRegionStatus = memScoped {
+    val outStatus = alloc<mln_offline_region_status>()
+    val operationId =
+      operation.requireLive(
+        this@RuntimeHandle,
+        OfflineOperationKind.REGION_GET_STATUS,
+        OfflineOperationResultKind.REGION_STATUS,
+      )
+    Status.check(
+      mln_runtime_offline_region_get_status_take_result(
+        state.requireLive(),
+        operationId,
+        outStatus.ptr,
+      )
+    )
+    operation.markConsumed()
+    RuntimeStructs.offlineRegionStatus(outStatus)
   }
 
   private fun <T> offlineOperation(

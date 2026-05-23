@@ -5,6 +5,7 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import org.maplibre.nativeffi.error.InvalidStateException
+import org.maplibre.nativeffi.offline.OfflineRegionInfo
 
 class RuntimeHandleTest {
   @Test
@@ -19,5 +20,23 @@ class RuntimeHandleTest {
     assertTrue(runtime.isClosed())
     runtime.close()
     assertFailsWith<InvalidStateException> { runtime.runOnce() }
+  }
+
+  @Test
+  fun offlineOperationTakeMethodsValidateExpectedOperationKindBeforeNativeCall() {
+    val runtime = RuntimeHandle.create()
+    val operation =
+      OfflineOperationHandle<OfflineRegionInfo>(
+        runtime,
+        1UL,
+        OfflineOperationKind.AMBIENT_CACHE,
+        OfflineOperationResultKind.NONE,
+      )
+    try {
+      assertFailsWith<InvalidStateException> { runtime.takeCreateOfflineRegionResult(operation) }
+    } finally {
+      operation.markConsumed()
+      runtime.close()
+    }
   }
 }

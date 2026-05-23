@@ -3,7 +3,9 @@ package org.maplibre.nativeffi.internal.struct
 import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.MemScope
+import kotlinx.cinterop.ULongVar
 import kotlinx.cinterop.alloc
+import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.pointed
 import kotlinx.cinterop.ptr
 import kotlinx.cinterop.readBytes
@@ -11,6 +13,7 @@ import kotlinx.cinterop.reinterpret
 import kotlinx.cinterop.sizeOf
 import kotlinx.cinterop.toCValues
 import kotlinx.cinterop.toKString
+import kotlinx.cinterop.value
 import org.maplibre.nativeffi.geo.CanonicalTileId
 import org.maplibre.nativeffi.geo.TileId
 import org.maplibre.nativeffi.internal.c.MLN_OFFLINE_REGION_DEFINITION_GEOMETRY
@@ -26,6 +29,11 @@ import org.maplibre.nativeffi.internal.c.MLN_RUNTIME_EVENT_PAYLOAD_STYLE_IMAGE_M
 import org.maplibre.nativeffi.internal.c.MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION
 import org.maplibre.nativeffi.internal.c.mln_offline_region_definition
 import org.maplibre.nativeffi.internal.c.mln_offline_region_info
+import org.maplibre.nativeffi.internal.c.mln_offline_region_list_count
+import org.maplibre.nativeffi.internal.c.mln_offline_region_list_destroy
+import org.maplibre.nativeffi.internal.c.mln_offline_region_list_get
+import org.maplibre.nativeffi.internal.c.mln_offline_region_snapshot_destroy
+import org.maplibre.nativeffi.internal.c.mln_offline_region_snapshot_get
 import org.maplibre.nativeffi.internal.c.mln_offline_region_status
 import org.maplibre.nativeffi.internal.c.mln_runtime_event
 import org.maplibre.nativeffi.internal.c.mln_runtime_event_offline_operation_completed
@@ -37,6 +45,7 @@ import org.maplibre.nativeffi.internal.c.mln_runtime_event_render_map
 import org.maplibre.nativeffi.internal.c.mln_runtime_event_style_image_missing
 import org.maplibre.nativeffi.internal.c.mln_runtime_event_tile_action
 import org.maplibre.nativeffi.internal.memory.MemoryUtil
+import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.map.RenderingStats
 import org.maplibre.nativeffi.map.TileOperation
 import org.maplibre.nativeffi.offline.OfflineRegionDefinition
@@ -228,6 +237,38 @@ internal object RuntimeStructs {
     }
     return native.ptr
   }
+
+  fun offlineRegionSnapshot(
+    snapshot: CPointer<cnames.structs.mln_offline_region_snapshot>
+  ): OfflineRegionInfo =
+    try {
+      memScoped {
+        val info = alloc<mln_offline_region_info>()
+        info.size = sizeOf<mln_offline_region_info>().toUInt()
+        Status.check(mln_offline_region_snapshot_get(snapshot, info.ptr))
+        offlineRegionInfo(info)
+      }
+    } finally {
+      mln_offline_region_snapshot_destroy(snapshot)
+    }
+
+  fun offlineRegionList(
+    list: CPointer<cnames.structs.mln_offline_region_list>
+  ): List<OfflineRegionInfo> =
+    try {
+      memScoped {
+        val outCount = alloc<ULongVar>()
+        Status.check(mln_offline_region_list_count(list, outCount.ptr))
+        List(outCount.value.toInt()) { index ->
+          val info = alloc<mln_offline_region_info>()
+          info.size = sizeOf<mln_offline_region_info>().toUInt()
+          Status.check(mln_offline_region_list_get(list, index.toULong(), info.ptr))
+          offlineRegionInfo(info)
+        }
+      }
+    } finally {
+      mln_offline_region_list_destroy(list)
+    }
 
   fun offlineRegionInfo(value: mln_offline_region_info): OfflineRegionInfo =
     OfflineRegionInfo(

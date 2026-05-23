@@ -35,6 +35,21 @@ internal constructor(
     return id
   }
 
+  internal fun requireLive(
+    expectedRuntime: RuntimeHandle,
+    expectedKind: OfflineOperationKind,
+    expectedResultKind: OfflineOperationResultKind,
+  ): ULong {
+    val operationId = requireLive(expectedRuntime)
+    if (kind != expectedKind || resultKind != expectedResultKind) {
+      throw InvalidStateException(
+        MaplibreStatus.INVALID_STATE.nativeCode,
+        "OfflineOperationHandle has kind $kind/$resultKind, expected $expectedKind/$expectedResultKind",
+      )
+    }
+    return operationId
+  }
+
   internal fun markConsumed() {
     closed = true
   }
