@@ -18,6 +18,63 @@ const (
 	NetworkStatusOffline NetworkStatus = NetworkStatus(capi.NetworkStatusOffline)
 )
 
+// AmbientCacheOperation selects a native ambient cache maintenance operation.
+type AmbientCacheOperation uint32
+
+const (
+	AmbientCacheOperationResetDatabase AmbientCacheOperation = AmbientCacheOperation(capi.AmbientCacheOperationResetDatabase)
+	AmbientCacheOperationPackDatabase  AmbientCacheOperation = AmbientCacheOperation(capi.AmbientCacheOperationPackDatabase)
+	AmbientCacheOperationInvalidate    AmbientCacheOperation = AmbientCacheOperation(capi.AmbientCacheOperationInvalidate)
+	AmbientCacheOperationClear         AmbientCacheOperation = AmbientCacheOperation(capi.AmbientCacheOperationClear)
+)
+
+// OfflineOperationHandle owns a runtime-scoped offline operation token.
+type OfflineOperationHandle[T any] struct {
+	runtime *RuntimeHandle
+	id      uint64
+	mu      sync.Mutex
+	live    bool
+}
+
+// ID returns the native offline operation ID.
+func (operation *OfflineOperationHandle[T]) ID() uint64 {
+	if operation == nil {
+		return 0
+	}
+	operation.mu.Lock()
+	defer operation.mu.Unlock()
+	return operation.id
+}
+
+// Discard drops runtime-owned state for this operation. The operation remains
+// retryable when native discard fails.
+func (operation *OfflineOperationHandle[T]) Discard() error {
+	if operation == nil || operation.runtime == nil {
+		return newBindingError(ErrInvalidArgument, "OfflineOperationHandle is nil")
+	}
+	operation.mu.Lock()
+	if !operation.live {
+		operation.mu.Unlock()
+		return newBindingError(ErrInvalidArgument, "OfflineOperationHandle is closed")
+	}
+	id := operation.id
+	operation.mu.Unlock()
+
+	ptr, err := operation.runtime.ptr()
+	if err != nil {
+		return err
+	}
+	defer operation.runtime.state.KeepAlive()
+	if err := checkNative(func() capi.Status { return capi.RuntimeOfflineOperationDiscard(ptr, id) }); err != nil {
+		return err
+	}
+
+	operation.mu.Lock()
+	operation.live = false
+	operation.mu.Unlock()
+	return nil
+}
+
 // RuntimeOptions configures runtime creation.
 type RuntimeOptions struct {
 	AssetPath        string
@@ -251,6 +308,24 @@ func runtimeEventFromCAPI(event capi.RuntimeEvent) *RuntimeEvent {
 		PayloadSize: event.PayloadSize,
 		Message:     event.Message,
 	}
+}
+
+// StartAmbientCacheOperation starts a native ambient cache maintenance
+// operation.
+func (runtime *RuntimeHandle) StartAmbientCacheOperation(operation AmbientCacheOperation) (*OfflineOperationHandle[struct{}], error) {
+	ptr, err := runtime.ptr()
+	if err != nil {
+		return nil, err
+	}
+	defer runtime.state.KeepAlive()
+
+	var id uint64
+	if err := checkNative(func() capi.Status {
+		return capi.RuntimeRunAmbientCacheOperationStart(ptr, uint32(operation), &id)
+	}); err != nil {
+		return nil, err
+	}
+	return &OfflineOperationHandle[struct{}]{runtime: runtime, id: id, live: true}, nil
 }
 
 // SetResourceProvider installs or replaces the runtime-scoped network resource

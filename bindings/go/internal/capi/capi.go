@@ -225,6 +225,13 @@ const (
 	ResourceProviderDecisionUnknown     uint32 = ^uint32(0)
 )
 
+const (
+	AmbientCacheOperationResetDatabase uint32 = uint32(C.MLN_AMBIENT_CACHE_OPERATION_RESET_DATABASE)
+	AmbientCacheOperationPackDatabase  uint32 = uint32(C.MLN_AMBIENT_CACHE_OPERATION_PACK_DATABASE)
+	AmbientCacheOperationInvalidate    uint32 = uint32(C.MLN_AMBIENT_CACHE_OPERATION_INVALIDATE)
+	AmbientCacheOperationClear         uint32 = uint32(C.MLN_AMBIENT_CACHE_OPERATION_CLEAR)
+)
+
 // CVersion returns the linked native C ABI contract version.
 func CVersion() uint32 {
 	return uint32(C.mln_c_version())
@@ -285,6 +292,28 @@ func RuntimeCreate(options RuntimeOptions, out **Runtime) Status {
 		*out = (*Runtime)(unsafe.Pointer(raw))
 	}
 	return status
+}
+
+// RuntimeRunAmbientCacheOperationStart starts an ambient cache operation.
+func RuntimeRunAmbientCacheOperationStart(runtime *Runtime, operation uint32, out *uint64) Status {
+	var raw C.mln_offline_operation_id
+	status := Status(C.mln_runtime_run_ambient_cache_operation_start(
+		(*C.mln_runtime)(unsafe.Pointer(runtime)),
+		C.uint32_t(operation),
+		&raw,
+	))
+	if status == StatusOK {
+		*out = uint64(raw)
+	}
+	return status
+}
+
+// RuntimeOfflineOperationDiscard discards runtime-owned operation state.
+func RuntimeOfflineOperationDiscard(runtime *Runtime, operationID uint64) Status {
+	return Status(C.mln_runtime_offline_operation_discard(
+		(*C.mln_runtime)(unsafe.Pointer(runtime)),
+		C.mln_offline_operation_id(operationID),
+	))
 }
 
 // RuntimeDestroy destroys a runtime handle.
