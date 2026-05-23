@@ -220,8 +220,8 @@ const (
 	RuntimeEventPayloadOfflineOperationCompleted   RuntimeEventPayloadType = RuntimeEventPayloadType(capi.RuntimeEventPayloadOfflineOperationCompleted)
 )
 
-// RuntimeEvent is a copied runtime event. Payload-specific copied structs are
-// added alongside their feature areas; unknown payloads preserve raw metadata.
+// RuntimeEvent is a copied runtime event. Unknown payloads preserve raw
+// metadata and leave Payload nil.
 type RuntimeEvent struct {
 	Type        RuntimeEventType
 	SourceType  RuntimeEventSourceType
@@ -230,6 +230,38 @@ type RuntimeEvent struct {
 	PayloadType RuntimeEventPayloadType
 	PayloadSize uintptr
 	Message     string
+	Payload     any
+}
+
+// RuntimeEventOfflineRegionStatusPayload is a copied offline status event payload.
+type RuntimeEventOfflineRegionStatusPayload struct {
+	RegionID OfflineRegionID
+	Status   OfflineRegionStatus
+}
+
+// RuntimeEventOfflineRegionResponseErrorPayload is a copied offline response
+// error event payload.
+type RuntimeEventOfflineRegionResponseErrorPayload struct {
+	RegionID  OfflineRegionID
+	Reason    ResourceErrorReason
+	RawReason uint32
+}
+
+// RuntimeEventOfflineRegionTileCountLimitPayload is a copied offline tile-count
+// limit event payload.
+type RuntimeEventOfflineRegionTileCountLimitPayload struct {
+	RegionID OfflineRegionID
+	Limit    uint64
+}
+
+// RuntimeEventOfflineOperationCompletedPayload is a copied offline operation
+// completion event payload.
+type RuntimeEventOfflineOperationCompletedPayload struct {
+	OperationID   uint64
+	OperationKind OfflineOperationKind
+	ResultKind    OfflineOperationResultKind
+	ResultStatus  int32
+	Found         bool
 }
 
 // RuntimeHandle owns scheduler state and event storage for one owner thread.
@@ -362,6 +394,28 @@ func runtimeEventFromCAPI(event capi.RuntimeEvent) *RuntimeEvent {
 		PayloadType: RuntimeEventPayloadType(event.PayloadType),
 		PayloadSize: event.PayloadSize,
 		Message:     event.Message,
+		Payload:     runtimeEventPayloadFromCAPI(event.Payload),
+	}
+}
+
+func runtimeEventPayloadFromCAPI(payload any) any {
+	switch payload := payload.(type) {
+	case capi.RuntimeEventOfflineRegionStatusPayload:
+		return RuntimeEventOfflineRegionStatusPayload{RegionID: OfflineRegionID(payload.RegionID), Status: offlineRegionStatusFromCAPI(payload.Status)}
+	case capi.RuntimeEventOfflineRegionResponseErrorPayload:
+		return RuntimeEventOfflineRegionResponseErrorPayload{RegionID: OfflineRegionID(payload.RegionID), Reason: ResourceErrorReason(payload.Reason), RawReason: payload.Reason}
+	case capi.RuntimeEventOfflineRegionTileCountLimitPayload:
+		return RuntimeEventOfflineRegionTileCountLimitPayload{RegionID: OfflineRegionID(payload.RegionID), Limit: payload.Limit}
+	case capi.RuntimeEventOfflineOperationCompletedPayload:
+		return RuntimeEventOfflineOperationCompletedPayload{
+			OperationID:   payload.OperationID,
+			OperationKind: OfflineOperationKind(payload.OperationKind),
+			ResultKind:    OfflineOperationResultKind(payload.ResultKind),
+			ResultStatus:  payload.ResultStatus,
+			Found:         payload.Found,
+		}
+	default:
+		return nil
 	}
 }
 

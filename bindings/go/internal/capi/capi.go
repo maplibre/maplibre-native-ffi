@@ -127,6 +127,34 @@ type RuntimeEvent struct {
 	PayloadType uint32
 	PayloadSize uintptr
 	Message     string
+	Payload     any
+}
+
+// RuntimeEventOfflineRegionStatusPayload is a copied offline status event payload.
+type RuntimeEventOfflineRegionStatusPayload struct {
+	RegionID int64
+	Status   OfflineRegionStatus
+}
+
+// RuntimeEventOfflineRegionResponseErrorPayload is a copied offline response error payload.
+type RuntimeEventOfflineRegionResponseErrorPayload struct {
+	RegionID int64
+	Reason   uint32
+}
+
+// RuntimeEventOfflineRegionTileCountLimitPayload is a copied offline tile-count limit payload.
+type RuntimeEventOfflineRegionTileCountLimitPayload struct {
+	RegionID int64
+	Limit    uint64
+}
+
+// RuntimeEventOfflineOperationCompletedPayload is a copied offline operation completion payload.
+type RuntimeEventOfflineOperationCompletedPayload struct {
+	OperationID   uint64
+	OperationKind uint32
+	ResultKind    uint32
+	ResultStatus  int32
+	Found         bool
 }
 
 // Status is the raw C status value returned by fallible C API calls.
@@ -783,7 +811,7 @@ func runtimeEventFromC(event C.mln_runtime_event) RuntimeEvent {
 	if event.message != nil && event.message_size > 0 {
 		message = C.GoStringN(event.message, C.int(event.message_size))
 	}
-	return RuntimeEvent{
+	copied := RuntimeEvent{
 		Type:        uint32(event._type),
 		SourceType:  uint32(event.source_type),
 		Source:      uintptr(event.source),
@@ -791,6 +819,50 @@ func runtimeEventFromC(event C.mln_runtime_event) RuntimeEvent {
 		PayloadType: uint32(event.payload_type),
 		PayloadSize: uintptr(event.payload_size),
 		Message:     message,
+	}
+	if event.payload != nil {
+		copied.Payload = runtimeEventPayloadFromC(event)
+	}
+	return copied
+}
+
+func runtimeEventPayloadFromC(event C.mln_runtime_event) any {
+	switch uint32(event.payload_type) {
+	case RuntimeEventPayloadOfflineRegionStatus:
+		if event.payload_size < C.size_t(unsafe.Sizeof(C.mln_runtime_event_offline_region_status{})) {
+			return nil
+		}
+		payload := (*C.mln_runtime_event_offline_region_status)(event.payload)
+		return RuntimeEventOfflineRegionStatusPayload{
+			RegionID: int64(payload.region_id),
+			Status:   offlineRegionStatusFromC(payload.status),
+		}
+	case RuntimeEventPayloadOfflineRegionResponseError:
+		if event.payload_size < C.size_t(unsafe.Sizeof(C.mln_runtime_event_offline_region_response_error{})) {
+			return nil
+		}
+		payload := (*C.mln_runtime_event_offline_region_response_error)(event.payload)
+		return RuntimeEventOfflineRegionResponseErrorPayload{RegionID: int64(payload.region_id), Reason: uint32(payload.reason)}
+	case RuntimeEventPayloadOfflineRegionTileCountLimit:
+		if event.payload_size < C.size_t(unsafe.Sizeof(C.mln_runtime_event_offline_region_tile_count_limit{})) {
+			return nil
+		}
+		payload := (*C.mln_runtime_event_offline_region_tile_count_limit)(event.payload)
+		return RuntimeEventOfflineRegionTileCountLimitPayload{RegionID: int64(payload.region_id), Limit: uint64(payload.limit)}
+	case RuntimeEventPayloadOfflineOperationCompleted:
+		if event.payload_size < C.size_t(unsafe.Sizeof(C.mln_runtime_event_offline_operation_completed{})) {
+			return nil
+		}
+		payload := (*C.mln_runtime_event_offline_operation_completed)(event.payload)
+		return RuntimeEventOfflineOperationCompletedPayload{
+			OperationID:   uint64(payload.operation_id),
+			OperationKind: uint32(payload.operation_kind),
+			ResultKind:    uint32(payload.result_kind),
+			ResultStatus:  int32(payload.result_status),
+			Found:         bool(payload.found),
+		}
+	default:
+		return nil
 	}
 }
 

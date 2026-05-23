@@ -319,6 +319,54 @@ func TestOfflineCreateAndListTakeResultsCopyNativeData(t *testing.T) {
 	}
 }
 
+func TestOfflineOperationCompletedEventCopiesPayload(t *testing.T) {
+	stdruntime.LockOSThread()
+	defer stdruntime.UnlockOSThread()
+
+	runtime, err := NewRuntime()
+	if err != nil {
+		t.Fatalf("NewRuntime(): %v", err)
+	}
+	defer func() {
+		if err := runtime.Close(); err != nil {
+			t.Errorf("Close(): %v", err)
+		}
+	}()
+
+	operation, err := runtime.StartOfflineRegions()
+	if err != nil {
+		t.Fatalf("StartOfflineRegions(): %v", err)
+	}
+	for range make([]struct{}, 5000) {
+		if err := runtime.RunOnce(); err != nil {
+			t.Fatalf("RunOnce(): %v", err)
+		}
+		event, err := runtime.PollEvent()
+		if err != nil {
+			t.Fatalf("PollEvent(): %v", err)
+		}
+		if event == nil {
+			time.Sleep(time.Millisecond)
+			continue
+		}
+		payload, ok := event.Payload.(RuntimeEventOfflineOperationCompletedPayload)
+		if !ok {
+			continue
+		}
+		if payload.OperationID != operation.ID() {
+			continue
+		}
+		if payload.OperationKind != OfflineOperationRegionsList || payload.ResultKind != OfflineOperationResultRegionList || payload.ResultStatus != 0 {
+			t.Fatalf("payload = %#v", payload)
+		}
+		if err := operation.Discard(); err != nil {
+			t.Fatalf("Discard(): %v", err)
+		}
+		return
+	}
+	t.Fatal("offline completion event was not reported")
+}
+
 func TestOfflineRegionStartOperationsValidateGoInputs(t *testing.T) {
 	runtime, err := NewRuntime()
 	if err != nil {
