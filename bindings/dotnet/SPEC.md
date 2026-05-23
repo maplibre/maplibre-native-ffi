@@ -88,6 +88,7 @@ bindings/dotnet/
     Style/*.cs
   tests/Maplibre.Native.Tests/
     GeneratedLayoutTests.cs
+    GeoJsonSourceTests.cs
     MapCameraOptionsTests.cs
     MaplibreTests.cs
     NativeHandleStateTests.cs
@@ -129,7 +130,8 @@ The scaffold implements one proof slice:
   transform callbacks, JSON materialization, and style source/layer JSON
   operations, style source URL/tile APIs, style source metadata/listing, style
   layer listing, style image APIs, image source APIs, typed DEM/location layer
-  helpers, style JSON snapshots, layer properties, and layer filters.
+  helpers, GeoJSON/geometry materialization, GeoJSON source data APIs, style
+  JSON snapshots, layer properties, and layer filters.
 - `NativeUtf8String` rejects embedded NUL values and owns temporary UTF-8 C
   string storage for call-boundary inputs.
 - Public value, descriptor, enum, and placeholder handle types exist across the
@@ -138,6 +140,8 @@ The scaffold implements one proof slice:
 - ClangSharp-generated files in `Generated/*.g.cs` cover the public C headers.
 - `GeneratedLayoutTests` verifies layout-sensitive binding facts that do not
   require the native library.
+- GeoJSON source tests cover geometry/feature materialization and native GeoJSON
+  source data adaptation.
 - Resource provider tests cover request copying, decision conversion, exception
   conversion, and install/replace behavior.
 - Resource response tests cover byte cloning and native completion descriptor

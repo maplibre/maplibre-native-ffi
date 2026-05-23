@@ -593,6 +593,22 @@ public sealed unsafe class MapHandle : IDisposable
         NativeStatus.Check(NativeMethods.mln_map_set_geojson_source_url(Pointer, nativeSourceId.Value, nativeUrl.Value));
     }
 
+    /// <summary>Adds a GeoJSON source with inline data.</summary>
+    public void AddGeoJsonSourceData(string sourceId, GeoJson data)
+    {
+        using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
+        using var nativeData = NativeGeoJson.From(data);
+        NativeStatus.Check(NativeMethods.mln_map_add_geojson_source_data(Pointer, nativeSourceId.Value, nativeData.Pointer));
+    }
+
+    /// <summary>Updates a GeoJSON source with inline data.</summary>
+    public void SetGeoJsonSourceData(string sourceId, GeoJson data)
+    {
+        using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
+        using var nativeData = NativeGeoJson.From(data);
+        NativeStatus.Check(NativeMethods.mln_map_set_geojson_source_data(Pointer, nativeSourceId.Value, nativeData.Pointer));
+    }
+
     /// <summary>Adds a vector source that loads TileJSON from a URL.</summary>
     public void AddVectorSourceUrl(string sourceId, string url, TileSourceOptions? options = null)
     {
