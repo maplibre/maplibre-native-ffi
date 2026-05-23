@@ -26,6 +26,115 @@ type StyleSourceInfo struct {
 	AttributionSize uint64
 }
 
+// StyleTileScheme selects tile URL coordinate scheme.
+type StyleTileScheme uint32
+
+const (
+	StyleTileSchemeXYZ StyleTileScheme = StyleTileScheme(capi.StyleTileSchemeXYZ)
+	StyleTileSchemeTMS StyleTileScheme = StyleTileScheme(capi.StyleTileSchemeTMS)
+)
+
+// StyleVectorTileEncoding selects vector tile encoding.
+type StyleVectorTileEncoding uint32
+
+const (
+	StyleVectorTileEncodingMVT StyleVectorTileEncoding = StyleVectorTileEncoding(capi.StyleVectorTileEncodingMVT)
+	StyleVectorTileEncodingMLT StyleVectorTileEncoding = StyleVectorTileEncoding(capi.StyleVectorTileEncodingMLT)
+)
+
+// StyleRasterDEMEncoding selects raster DEM tile encoding.
+type StyleRasterDEMEncoding uint32
+
+const (
+	StyleRasterDEMEncodingMapbox    StyleRasterDEMEncoding = StyleRasterDEMEncoding(capi.StyleRasterDEMEncodingMapbox)
+	StyleRasterDEMEncodingTerrarium StyleRasterDEMEncoding = StyleRasterDEMEncoding(capi.StyleRasterDEMEncodingTerrarium)
+)
+
+// StyleTileSourceOptions configures vector, raster, and raster DEM sources.
+type StyleTileSourceOptions struct {
+	MinZoom        *float64
+	MaxZoom        *float64
+	Attribution    *string
+	Scheme         *StyleTileScheme
+	Bounds         *LatLngBounds
+	TileSize       *uint32
+	VectorEncoding *StyleVectorTileEncoding
+	RasterEncoding *StyleRasterDEMEncoding
+}
+
+// WithTileSize returns a copy that sets raster tile size.
+func (options StyleTileSourceOptions) WithTileSize(tileSize uint32) StyleTileSourceOptions {
+	options.TileSize = new(uint32)
+	*options.TileSize = tileSize
+	return options
+}
+
+// WithAttribution returns a copy that sets source attribution.
+func (options StyleTileSourceOptions) WithAttribution(attribution string) StyleTileSourceOptions {
+	options.Attribution = new(string)
+	*options.Attribution = attribution
+	return options
+}
+
+// WithVectorEncoding returns a copy that sets vector tile encoding.
+func (options StyleTileSourceOptions) WithVectorEncoding(encoding StyleVectorTileEncoding) StyleTileSourceOptions {
+	options.VectorEncoding = new(StyleVectorTileEncoding)
+	*options.VectorEncoding = encoding
+	return options
+}
+
+// WithRasterEncoding returns a copy that sets raster DEM encoding.
+func (options StyleTileSourceOptions) WithRasterEncoding(encoding StyleRasterDEMEncoding) StyleTileSourceOptions {
+	options.RasterEncoding = new(StyleRasterDEMEncoding)
+	*options.RasterEncoding = encoding
+	return options
+}
+
+func (options StyleTileSourceOptions) toCAPI() capi.StyleTileSourceOptions {
+	var raw capi.StyleTileSourceOptions
+	if options.MinZoom != nil {
+		raw.Fields |= capi.StyleTileSourceOptionMinZoom
+		raw.MinZoom = *options.MinZoom
+	}
+	if options.MaxZoom != nil {
+		raw.Fields |= capi.StyleTileSourceOptionMaxZoom
+		raw.MaxZoom = *options.MaxZoom
+	}
+	if options.Attribution != nil {
+		raw.Fields |= capi.StyleTileSourceOptionAttribution
+		raw.Attribution = *options.Attribution
+	}
+	if options.Scheme != nil {
+		raw.Fields |= capi.StyleTileSourceOptionScheme
+		raw.Scheme = uint32(*options.Scheme)
+	}
+	if options.Bounds != nil {
+		raw.Fields |= capi.StyleTileSourceOptionBounds
+		raw.Bounds = options.Bounds.toCAPI()
+	}
+	if options.TileSize != nil {
+		raw.Fields |= capi.StyleTileSourceOptionTileSize
+		raw.TileSize = *options.TileSize
+	}
+	if options.VectorEncoding != nil {
+		raw.Fields |= capi.StyleTileSourceOptionVectorEncoding
+		raw.VectorEncoding = uint32(*options.VectorEncoding)
+	}
+	if options.RasterEncoding != nil {
+		raw.Fields |= capi.StyleTileSourceOptionRasterEncoding
+		raw.RasterEncoding = uint32(*options.RasterEncoding)
+	}
+	return raw
+}
+
+func styleTileSourceOptionsToCAPI(options *StyleTileSourceOptions) *capi.StyleTileSourceOptions {
+	if options == nil {
+		return nil
+	}
+	raw := options.toCAPI()
+	return &raw
+}
+
 func styleSourceInfoFromCAPI(info capi.StyleSourceInfo) StyleSourceInfo {
 	return StyleSourceInfo{
 		Type:            StyleSourceType(info.Type),
@@ -34,6 +143,98 @@ func styleSourceInfoFromCAPI(info capi.StyleSourceInfo) StyleSourceInfo {
 		HasAttribution:  info.HasAttribution,
 		AttributionSize: info.AttributionSize,
 	}
+}
+
+// AddGeoJSONSourceURL adds a GeoJSON source that loads from a URL.
+func (m *MapHandle) AddGeoJSONSourceURL(sourceID string, url string) error {
+	ptr, err := m.ptr()
+	if err != nil {
+		return err
+	}
+	defer m.state.KeepAlive()
+	return checkNative(func() capi.Status { return capi.MapAddGeoJSONSourceURL(ptr, sourceID, url) })
+}
+
+// SetGeoJSONSourceURL updates a GeoJSON source to load from a URL.
+func (m *MapHandle) SetGeoJSONSourceURL(sourceID string, url string) error {
+	ptr, err := m.ptr()
+	if err != nil {
+		return err
+	}
+	defer m.state.KeepAlive()
+	return checkNative(func() capi.Status { return capi.MapSetGeoJSONSourceURL(ptr, sourceID, url) })
+}
+
+// AddVectorSourceURL adds a vector source with a TileJSON URL.
+func (m *MapHandle) AddVectorSourceURL(sourceID string, url string, options *StyleTileSourceOptions) error {
+	ptr, err := m.ptr()
+	if err != nil {
+		return err
+	}
+	defer m.state.KeepAlive()
+	return checkNative(func() capi.Status {
+		return capi.MapAddVectorSourceURL(ptr, sourceID, url, styleTileSourceOptionsToCAPI(options))
+	})
+}
+
+// AddVectorSourceTiles adds a vector source with inline tile URLs.
+func (m *MapHandle) AddVectorSourceTiles(sourceID string, tiles []string, options *StyleTileSourceOptions) error {
+	ptr, err := m.ptr()
+	if err != nil {
+		return err
+	}
+	defer m.state.KeepAlive()
+	return checkNative(func() capi.Status {
+		return capi.MapAddVectorSourceTiles(ptr, sourceID, tiles, styleTileSourceOptionsToCAPI(options))
+	})
+}
+
+// AddRasterSourceURL adds a raster source with a TileJSON URL.
+func (m *MapHandle) AddRasterSourceURL(sourceID string, url string, options *StyleTileSourceOptions) error {
+	ptr, err := m.ptr()
+	if err != nil {
+		return err
+	}
+	defer m.state.KeepAlive()
+	return checkNative(func() capi.Status {
+		return capi.MapAddRasterSourceURL(ptr, sourceID, url, styleTileSourceOptionsToCAPI(options))
+	})
+}
+
+// AddRasterSourceTiles adds a raster source with inline tile URLs.
+func (m *MapHandle) AddRasterSourceTiles(sourceID string, tiles []string, options *StyleTileSourceOptions) error {
+	ptr, err := m.ptr()
+	if err != nil {
+		return err
+	}
+	defer m.state.KeepAlive()
+	return checkNative(func() capi.Status {
+		return capi.MapAddRasterSourceTiles(ptr, sourceID, tiles, styleTileSourceOptionsToCAPI(options))
+	})
+}
+
+// AddRasterDEMSourceURL adds a raster DEM source with a TileJSON URL.
+func (m *MapHandle) AddRasterDEMSourceURL(sourceID string, url string, options *StyleTileSourceOptions) error {
+	ptr, err := m.ptr()
+	if err != nil {
+		return err
+	}
+	defer m.state.KeepAlive()
+	return checkNative(func() capi.Status {
+		return capi.MapAddRasterDEMSourceURL(ptr, sourceID, url, styleTileSourceOptionsToCAPI(options))
+	})
+}
+
+// AddRasterDEMSourceTiles adds a raster DEM source with inline tile URLs.
+func (m *MapHandle) AddRasterDEMSourceTiles(sourceID string, tiles []string, options *StyleTileSourceOptions) error {
+	ptr, err := m.ptr()
+	if err != nil {
+		return err
+	}
+	defer m.state.KeepAlive()
+	return checkNative(func() capi.Status {
+		return capi.MapAddRasterDEMSourceTiles(ptr, sourceID, tiles, styleTileSourceOptionsToCAPI(options))
+	})
 }
 
 // AddStyleSourceJSON adds one style source from a style-spec source JSON object.

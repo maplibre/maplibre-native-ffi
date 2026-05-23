@@ -263,6 +263,19 @@ type StyleSourceInfo struct {
 	AttributionSize uint64
 }
 
+// StyleTileSourceOptions contains semantic vector/raster tile source options.
+type StyleTileSourceOptions struct {
+	Fields         uint32
+	MinZoom        float64
+	MaxZoom        float64
+	Attribution    string
+	Scheme         uint32
+	Bounds         LatLngBounds
+	TileSize       uint32
+	VectorEncoding uint32
+	RasterEncoding uint32
+}
+
 // MetalOwnedTextureFrame is a copied Metal owned texture frame descriptor.
 type MetalOwnedTextureFrame struct {
 	Generation  uint64
@@ -725,6 +738,32 @@ const (
 	JSONValueTypeString uint32 = uint32(C.MLN_JSON_VALUE_TYPE_STRING)
 	JSONValueTypeArray  uint32 = uint32(C.MLN_JSON_VALUE_TYPE_ARRAY)
 	JSONValueTypeObject uint32 = uint32(C.MLN_JSON_VALUE_TYPE_OBJECT)
+)
+
+const (
+	StyleTileSourceOptionMinZoom        uint32 = uint32(C.MLN_STYLE_TILE_SOURCE_OPTION_MIN_ZOOM)
+	StyleTileSourceOptionMaxZoom        uint32 = uint32(C.MLN_STYLE_TILE_SOURCE_OPTION_MAX_ZOOM)
+	StyleTileSourceOptionAttribution    uint32 = uint32(C.MLN_STYLE_TILE_SOURCE_OPTION_ATTRIBUTION)
+	StyleTileSourceOptionScheme         uint32 = uint32(C.MLN_STYLE_TILE_SOURCE_OPTION_SCHEME)
+	StyleTileSourceOptionBounds         uint32 = uint32(C.MLN_STYLE_TILE_SOURCE_OPTION_BOUNDS)
+	StyleTileSourceOptionTileSize       uint32 = uint32(C.MLN_STYLE_TILE_SOURCE_OPTION_TILE_SIZE)
+	StyleTileSourceOptionVectorEncoding uint32 = uint32(C.MLN_STYLE_TILE_SOURCE_OPTION_VECTOR_ENCODING)
+	StyleTileSourceOptionRasterEncoding uint32 = uint32(C.MLN_STYLE_TILE_SOURCE_OPTION_RASTER_ENCODING)
+)
+
+const (
+	StyleTileSchemeXYZ uint32 = uint32(C.MLN_STYLE_TILE_SCHEME_XYZ)
+	StyleTileSchemeTMS uint32 = uint32(C.MLN_STYLE_TILE_SCHEME_TMS)
+)
+
+const (
+	StyleVectorTileEncodingMVT uint32 = uint32(C.MLN_STYLE_VECTOR_TILE_ENCODING_MVT)
+	StyleVectorTileEncodingMLT uint32 = uint32(C.MLN_STYLE_VECTOR_TILE_ENCODING_MLT)
+)
+
+const (
+	StyleRasterDEMEncodingMapbox    uint32 = uint32(C.MLN_STYLE_RASTER_DEM_ENCODING_MAPBOX)
+	StyleRasterDEMEncodingTerrarium uint32 = uint32(C.MLN_STYLE_RASTER_DEM_ENCODING_TERRARIUM)
 )
 
 const (
@@ -1504,6 +1543,90 @@ func MapSetStyleJSON(m *Map, json string) Status {
 	return Status(C.mln_map_set_style_json((*C.mln_map)(unsafe.Pointer(m)), cJSON))
 }
 
+// MapAddGeoJSONSourceURL adds a GeoJSON source that loads from a URL.
+func MapAddGeoJSONSourceURL(m *Map, sourceID string, url string) Status {
+	sourceView := newStringView(sourceID)
+	defer sourceView.free()
+	urlView := newStringView(url)
+	defer urlView.free()
+	return Status(C.mln_map_add_geojson_source_url((*C.mln_map)(unsafe.Pointer(m)), sourceView.raw(), urlView.raw()))
+}
+
+// MapSetGeoJSONSourceURL updates a GeoJSON source to load from a URL.
+func MapSetGeoJSONSourceURL(m *Map, sourceID string, url string) Status {
+	sourceView := newStringView(sourceID)
+	defer sourceView.free()
+	urlView := newStringView(url)
+	defer urlView.free()
+	return Status(C.mln_map_set_geojson_source_url((*C.mln_map)(unsafe.Pointer(m)), sourceView.raw(), urlView.raw()))
+}
+
+// MapAddVectorSourceURL adds a vector source with a TileJSON URL.
+func MapAddVectorSourceURL(m *Map, sourceID string, url string, options *StyleTileSourceOptions) Status {
+	sourceView := newStringView(sourceID)
+	defer sourceView.free()
+	urlView := newStringView(url)
+	defer urlView.free()
+	rawOptions, rawOptionsPointer := styleTileSourceOptionsToCPointer(options)
+	defer rawOptions.free()
+	return Status(C.mln_map_add_vector_source_url((*C.mln_map)(unsafe.Pointer(m)), sourceView.raw(), urlView.raw(), rawOptionsPointer))
+}
+
+// MapAddVectorSourceTiles adds a vector source with inline tile URLs.
+func MapAddVectorSourceTiles(m *Map, sourceID string, tiles []string, options *StyleTileSourceOptions) Status {
+	sourceView := newStringView(sourceID)
+	defer sourceView.free()
+	rawTiles := newStringViewArray(tiles)
+	defer rawTiles.free()
+	rawOptions, rawOptionsPointer := styleTileSourceOptionsToCPointer(options)
+	defer rawOptions.free()
+	return Status(C.mln_map_add_vector_source_tiles((*C.mln_map)(unsafe.Pointer(m)), sourceView.raw(), rawTiles.data, C.size_t(rawTiles.count), rawOptionsPointer))
+}
+
+// MapAddRasterSourceURL adds a raster source with a TileJSON URL.
+func MapAddRasterSourceURL(m *Map, sourceID string, url string, options *StyleTileSourceOptions) Status {
+	sourceView := newStringView(sourceID)
+	defer sourceView.free()
+	urlView := newStringView(url)
+	defer urlView.free()
+	rawOptions, rawOptionsPointer := styleTileSourceOptionsToCPointer(options)
+	defer rawOptions.free()
+	return Status(C.mln_map_add_raster_source_url((*C.mln_map)(unsafe.Pointer(m)), sourceView.raw(), urlView.raw(), rawOptionsPointer))
+}
+
+// MapAddRasterSourceTiles adds a raster source with inline tile URLs.
+func MapAddRasterSourceTiles(m *Map, sourceID string, tiles []string, options *StyleTileSourceOptions) Status {
+	sourceView := newStringView(sourceID)
+	defer sourceView.free()
+	rawTiles := newStringViewArray(tiles)
+	defer rawTiles.free()
+	rawOptions, rawOptionsPointer := styleTileSourceOptionsToCPointer(options)
+	defer rawOptions.free()
+	return Status(C.mln_map_add_raster_source_tiles((*C.mln_map)(unsafe.Pointer(m)), sourceView.raw(), rawTiles.data, C.size_t(rawTiles.count), rawOptionsPointer))
+}
+
+// MapAddRasterDEMSourceURL adds a raster DEM source with a TileJSON URL.
+func MapAddRasterDEMSourceURL(m *Map, sourceID string, url string, options *StyleTileSourceOptions) Status {
+	sourceView := newStringView(sourceID)
+	defer sourceView.free()
+	urlView := newStringView(url)
+	defer urlView.free()
+	rawOptions, rawOptionsPointer := styleTileSourceOptionsToCPointer(options)
+	defer rawOptions.free()
+	return Status(C.mln_map_add_raster_dem_source_url((*C.mln_map)(unsafe.Pointer(m)), sourceView.raw(), urlView.raw(), rawOptionsPointer))
+}
+
+// MapAddRasterDEMSourceTiles adds a raster DEM source with inline tile URLs.
+func MapAddRasterDEMSourceTiles(m *Map, sourceID string, tiles []string, options *StyleTileSourceOptions) Status {
+	sourceView := newStringView(sourceID)
+	defer sourceView.free()
+	rawTiles := newStringViewArray(tiles)
+	defer rawTiles.free()
+	rawOptions, rawOptionsPointer := styleTileSourceOptionsToCPointer(options)
+	defer rawOptions.free()
+	return Status(C.mln_map_add_raster_dem_source_tiles((*C.mln_map)(unsafe.Pointer(m)), sourceView.raw(), rawTiles.data, C.size_t(rawTiles.count), rawOptionsPointer))
+}
+
 // MapAddStyleSourceJSON adds one style source from a style-spec JSON object.
 func MapAddStyleSourceJSON(m *Map, sourceID string, sourceJSON any) (Status, error) {
 	view := newStringView(sourceID)
@@ -2178,6 +2301,17 @@ type stringView struct {
 	size int
 }
 
+type stringViewArray struct {
+	views []stringView
+	data  *C.mln_string_view
+	count int
+}
+
+type rawStyleTileSourceOptions struct {
+	value       C.mln_style_tile_source_options
+	attribution stringView
+}
+
 func newStringView(value string) stringView {
 	if len(value) == 0 {
 		return stringView{}
@@ -2192,6 +2326,28 @@ func (view stringView) raw() C.mln_string_view {
 func (view stringView) free() {
 	if view.data != nil {
 		C.free(view.data)
+	}
+}
+
+func newStringViewArray(values []string) stringViewArray {
+	if len(values) == 0 {
+		return stringViewArray{}
+	}
+	raw := (*C.mln_string_view)(C.malloc(C.size_t(len(values)) * C.size_t(unsafe.Sizeof(C.mln_string_view{}))))
+	views := make([]stringView, len(values))
+	for i, value := range values {
+		views[i] = newStringView(value)
+		*(*C.mln_string_view)(unsafe.Add(unsafe.Pointer(raw), uintptr(i)*unsafe.Sizeof(C.mln_string_view{}))) = views[i].raw()
+	}
+	return stringViewArray{views: views, data: raw, count: len(values)}
+}
+
+func (array stringViewArray) free() {
+	for _, view := range array.views {
+		view.free()
+	}
+	if array.data != nil {
+		C.free(unsafe.Pointer(array.data))
 	}
 }
 
@@ -2230,6 +2386,30 @@ func styleSourceInfoFromC(info C.mln_style_source_info) StyleSourceInfo {
 		HasAttribution:  bool(info.has_attribution),
 		AttributionSize: uint64(info.attribution_size),
 	}
+}
+
+func styleTileSourceOptionsToCPointer(options *StyleTileSourceOptions) (rawStyleTileSourceOptions, *C.mln_style_tile_source_options) {
+	if options == nil {
+		return rawStyleTileSourceOptions{}, nil
+	}
+	raw := rawStyleTileSourceOptions{value: C.mln_style_tile_source_options_default()}
+	raw.value.fields = C.uint32_t(options.Fields)
+	raw.value.min_zoom = C.double(options.MinZoom)
+	raw.value.max_zoom = C.double(options.MaxZoom)
+	if options.Fields&StyleTileSourceOptionAttribution != 0 {
+		raw.attribution = newStringView(options.Attribution)
+		raw.value.attribution = raw.attribution.raw()
+	}
+	raw.value.scheme = C.uint32_t(options.Scheme)
+	raw.value.bounds = latLngBoundsToC(options.Bounds)
+	raw.value.tile_size = C.uint32_t(options.TileSize)
+	raw.value.vector_encoding = C.uint32_t(options.VectorEncoding)
+	raw.value.raster_encoding = C.uint32_t(options.RasterEncoding)
+	return raw, &raw.value
+}
+
+func (raw rawStyleTileSourceOptions) free() {
+	raw.attribution.free()
 }
 
 type jsonMaterializer struct {

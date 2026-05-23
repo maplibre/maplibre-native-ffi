@@ -1165,6 +1165,72 @@ func TestStyleSourceMetadataForMissingSources(t *testing.T) {
 	}
 }
 
+func TestStyleSourceURLAndTileBindings(t *testing.T) {
+	runtime, err := NewRuntime()
+	if err != nil {
+		t.Fatalf("NewRuntime(): %v", err)
+	}
+	m, err := runtime.NewMap()
+	if err != nil {
+		_ = runtime.Close()
+		t.Fatalf("NewMap(): %v", err)
+	}
+	defer func() {
+		if err := m.Close(); err != nil {
+			t.Errorf("Map Close(): %v", err)
+		}
+		if err := runtime.Close(); err != nil {
+			t.Errorf("Runtime Close(): %v", err)
+		}
+	}()
+
+	if err := m.SetStyleJSON(`{"version":8,"sources":{},"layers":[]}`); err != nil {
+		t.Fatalf("SetStyleJSON(empty style): %v", err)
+	}
+	if err := m.AddGeoJSONSourceURL("geojson-url", "asset://fixtures/points.geojson"); err != nil {
+		t.Fatalf("AddGeoJSONSourceURL(): %v", err)
+	}
+	if err := m.SetGeoJSONSourceURL("geojson-url", "asset://fixtures/points-2.geojson"); err != nil {
+		t.Fatalf("SetGeoJSONSourceURL(): %v", err)
+	}
+	tileOptions := StyleTileSourceOptions{}.
+		WithTileSize(256).
+		WithAttribution("unit attribution")
+	if err := m.AddVectorSourceTiles("vector-tiles", []string{"https://example.com/vector/{z}/{x}/{y}.pbf"}, &tileOptions); err != nil {
+		t.Fatalf("AddVectorSourceTiles(): %v", err)
+	}
+	if err := m.AddRasterSourceURL("raster-url", "https://example.com/raster.json", &tileOptions); err != nil {
+		t.Fatalf("AddRasterSourceURL(): %v", err)
+	}
+	demOptions := StyleTileSourceOptions{}.
+		WithTileSize(512).
+		WithRasterEncoding(StyleRasterDEMEncodingTerrarium)
+	if err := m.AddRasterDEMSourceTiles("dem-tiles", []string{"https://example.com/dem/{z}/{x}/{y}.png"}, &demOptions); err != nil {
+		t.Fatalf("AddRasterDEMSourceTiles(): %v", err)
+	}
+	checks := map[string]StyleSourceType{
+		"geojson-url":  StyleSourceTypeGeoJSON,
+		"vector-tiles": StyleSourceTypeVector,
+		"raster-url":   StyleSourceTypeRaster,
+		"dem-tiles":    StyleSourceTypeRasterDEM,
+	}
+	for id, wantType := range checks {
+		gotType, found, err := m.StyleSourceType(id)
+		if err != nil {
+			t.Fatalf("StyleSourceType(%s): %v", id, err)
+		}
+		if !found || gotType != wantType {
+			t.Fatalf("StyleSourceType(%s) = (%v, %v), want %v true", id, gotType, found, wantType)
+		}
+	}
+	if err := m.AddVectorSourceTiles("bad-vector", nil, nil); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("AddVectorSourceTiles(nil) error = %v, want ErrInvalidArgument", err)
+	}
+	if err := m.AddGeoJSONSourceURL("", "asset://fixtures/points.geojson"); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("AddGeoJSONSourceURL(empty id) error = %v, want ErrInvalidArgument", err)
+	}
+}
+
 func TestAddStyleSourceJSONCopiesGoJSONDescriptor(t *testing.T) {
 	runtime, err := NewRuntime()
 	if err != nil {
