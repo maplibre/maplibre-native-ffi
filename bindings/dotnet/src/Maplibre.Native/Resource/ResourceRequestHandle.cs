@@ -10,7 +10,10 @@ public sealed unsafe class ResourceRequestHandle : IDisposable
 {
     private readonly object gate = new();
     private mln_resource_request_handle* handle;
-    private bool completedOrReleased;
+    private bool providerDecisionFinalized;
+    private bool releaseAccountedFor;
+    private bool closed;
+    private bool completed;
 
     internal ResourceRequestHandle(mln_resource_request_handle* handle)
     {
@@ -29,22 +32,35 @@ public sealed unsafe class ResourceRequestHandle : IDisposable
         {
             lock (gate)
             {
-                return completedOrReleased;
+                return closed;
             }
         }
     }
 
-    /// <summary>Completes the native request and releases this wrapper's native reference.</summary>
+    /// <summary>Completes the native request. Successful completion closes this wrapper.</summary>
     public void Complete(ResourceResponse response)
     {
         ArgumentNullException.ThrowIfNull(response);
         lock (gate)
         {
+            if (completed)
+            {
+                throw new InvalidStateException(
+                    MaplibreStatus.InvalidState,
+                    null,
+                    "ResourceRequestHandle is already completed.");
+            }
+
             ThrowIfClosed();
             using var nativeResponse = NativeResourceResponse.From(response);
             var value = nativeResponse.Value;
             NativeStatus.Check(NativeMethods.mln_resource_request_complete(handle, &value));
-            ReleaseLocked();
+            completed = true;
+            closed = true;
+            if (providerDecisionFinalized)
+            {
+                ReleaseIfOwnedLocked();
+            }
         }
     }
 
@@ -65,12 +81,16 @@ public sealed unsafe class ResourceRequestHandle : IDisposable
     {
         lock (gate)
         {
-            if (completedOrReleased)
+            if (closed)
             {
                 return;
             }
 
-            ReleaseLocked();
+            closed = true;
+            if (providerDecisionFinalized)
+            {
+                ReleaseIfOwnedLocked();
+            }
         }
     }
 
@@ -80,16 +100,74 @@ public sealed unsafe class ResourceRequestHandle : IDisposable
         Close();
     }
 
-    private void ReleaseLocked()
+    internal uint FinishProviderDecision(ResourceProviderDecision decision)
     {
-        NativeMethods.mln_resource_request_release(handle);
+        lock (gate)
+        {
+            if (completed || decision == ResourceProviderDecision.Handle)
+            {
+                providerDecisionFinalized = true;
+                if (closed)
+                {
+                    ReleaseIfOwnedLocked();
+                }
+
+                return (uint)ResourceProviderDecision.Handle;
+            }
+
+            MarkNativeWillReleaseLocked();
+            return (uint)ResourceProviderDecision.PassThrough;
+        }
+    }
+
+    internal uint FinishProviderException()
+    {
+        lock (gate)
+        {
+            if (completed)
+            {
+                providerDecisionFinalized = true;
+                if (closed)
+                {
+                    ReleaseIfOwnedLocked();
+                }
+
+                return (uint)ResourceProviderDecision.Handle;
+            }
+
+            MarkNativeWillReleaseLocked();
+            return uint.MaxValue;
+        }
+    }
+
+    private void ReleaseIfOwnedLocked()
+    {
+        if (releaseAccountedFor)
+        {
+            return;
+        }
+
+        releaseAccountedFor = true;
+        var current = handle;
         handle = null;
-        completedOrReleased = true;
+        if (current is not null)
+        {
+            NativeMethods.mln_resource_request_release(current);
+        }
+        closed = true;
+    }
+
+    private void MarkNativeWillReleaseLocked()
+    {
+        providerDecisionFinalized = true;
+        releaseAccountedFor = true;
+        handle = null;
+        closed = true;
     }
 
     private void ThrowIfClosed()
     {
-        if (completedOrReleased)
+        if (closed || handle is null)
         {
             throw new InvalidStateException(
                 MaplibreStatus.InvalidState,

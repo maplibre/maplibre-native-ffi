@@ -95,6 +95,7 @@ bindings/dotnet/
     NativeStatusTests.cs
     NativeUtf8StringTests.cs
     PublicApiSurfaceTests.cs
+    ResourceProviderTests.cs
     ResourceResponseTests.cs
     ResourceTransformTests.cs
     RuntimeEventTests.cs
@@ -119,8 +120,8 @@ The scaffold implements one proof slice:
 - `RuntimeHandle` and `MapHandle` establish the close-once owner-thread handle
   pattern over generated C declarations, including runtime event polling, map
   camera/fit/transition/bounds/free-camera/projection/viewport/tile/debug option
-  calls, map coordinate conversion, projection snapshot handles, and resource
-  transform callbacks.
+  calls, map coordinate conversion, projection snapshot handles, resource
+  provider callbacks, and resource transform callbacks.
 - `NativeUtf8String` rejects embedded NUL values and owns temporary UTF-8 C
   string storage for call-boundary inputs.
 - Public value, descriptor, enum, and placeholder handle types exist across the
@@ -129,6 +130,8 @@ The scaffold implements one proof slice:
 - ClangSharp-generated files in `Generated/*.g.cs` cover the public C headers.
 - `GeneratedLayoutTests` verifies layout-sensitive binding facts that do not
   require the native library.
+- Resource provider tests cover request copying, decision conversion, exception
+  conversion, and install/replace behavior.
 - Resource response tests cover byte cloning and native completion descriptor
   materialization.
 - Resource transform tests cover request copying, replacement URL lifetime,

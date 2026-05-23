@@ -13,6 +13,7 @@ public sealed unsafe class RuntimeHandle : IDisposable
 {
     private readonly Lock callbackGate = new();
     private readonly NativeHandleState<mln_runtime> state;
+    private ResourceProviderState? resourceProviderState;
     private ResourceTransformState? resourceTransformState;
 
     private RuntimeHandle(mln_runtime* handle)
@@ -40,6 +41,28 @@ public sealed unsafe class RuntimeHandle : IDisposable
 
     /// <summary>Whether this wrapper has successfully closed its native handle.</summary>
     public bool IsClosed => state.IsClosed;
+
+    /// <summary>Installs or replaces the runtime-scoped resource provider callback.</summary>
+    public void SetResourceProvider(ResourceProviderCallback callback)
+    {
+        var replacement = new ResourceProviderState(callback);
+        lock (callbackGate)
+        {
+            try
+            {
+                var descriptor = replacement.Descriptor;
+                NativeStatus.Check(NativeMethods.mln_runtime_set_resource_provider(Pointer, &descriptor));
+                var previous = resourceProviderState;
+                resourceProviderState = replacement;
+                previous?.Dispose();
+            }
+            catch
+            {
+                replacement.Dispose();
+                throw;
+            }
+        }
+    }
 
     /// <summary>Installs or replaces the runtime-scoped resource transform callback.</summary>
     public void SetResourceTransform(ResourceTransformCallback callback)
@@ -110,8 +133,11 @@ public sealed unsafe class RuntimeHandle : IDisposable
     {
         lock (callbackGate)
         {
+            var provider = resourceProviderState;
             var transform = resourceTransformState;
+            resourceProviderState = null;
             resourceTransformState = null;
+            provider?.Dispose();
             transform?.Dispose();
         }
     }
