@@ -1,5 +1,8 @@
 package org.maplibre.nativeffi.internal.callback
 
+import kotlin.concurrent.atomics.AtomicInt
+import kotlin.concurrent.atomics.AtomicReference
+import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlinx.cinterop.ByteVar
 import kotlinx.cinterop.COpaquePointer
 import kotlinx.cinterop.CPointer
@@ -23,13 +26,13 @@ import org.maplibre.nativeffi.resource.ResourceTransformCallback
 import org.maplibre.nativeffi.resource.ResourceTransformRequest
 
 /** Owns runtime-scoped resource transform callback state. */
-@OptIn(ExperimentalForeignApi::class)
+@OptIn(ExperimentalForeignApi::class, ExperimentalAtomicApi::class)
 internal class ResourceTransformState(private val callback: ResourceTransformCallback) :
   AutoCloseable {
   private val selfRef = StableRef.create(this)
   private val descriptor = nativeHeap.alloc<mln_resource_transform>()
-  private var responseUrl: CPointer<ByteVar>? = null
-  private var closed = false
+  private val responseUrls = AtomicReference<ResponseUrlNode?>(null)
+  private val closed = AtomicInt(0)
 
   init {
     descriptor.size = kotlinx.cinterop.sizeOf<mln_resource_transform>().toUInt()
@@ -44,9 +47,8 @@ internal class ResourceTransformState(private val callback: ResourceTransformCal
     url: CPointer<ByteVar>?,
     outResponse: CPointer<mln_resource_transform_response>?,
   ): Int {
-    if (closed || outResponse == null) return MaplibreStatus.INVALID_ARGUMENT.nativeCode
+    if (closed.load() != 0 || outResponse == null) return MaplibreStatus.INVALID_ARGUMENT.nativeCode
     return try {
-      clearResponseUrl()
       outResponse.pointed.size = kotlinx.cinterop.sizeOf<mln_resource_transform_response>().toUInt()
       outResponse.pointed.url = null
       val request =
@@ -57,7 +59,8 @@ internal class ResourceTransformState(private val callback: ResourceTransformCal
         )
       val replacement = callback.transform(request)
       if (!replacement.isNullOrEmpty()) {
-        responseUrl = allocateCString(replacement)
+        val responseUrl = allocateCString(replacement)
+        retainResponseUrl(responseUrl)
         outResponse.pointed.url = responseUrl
       }
       MaplibreStatus.OK.nativeCode
@@ -69,25 +72,40 @@ internal class ResourceTransformState(private val callback: ResourceTransformCal
   }
 
   override fun close() {
-    if (closed) return
-    closed = true
-    clearResponseUrl()
+    if (!closed.compareAndSet(0, 1)) return
+    clearResponseUrls()
     selfRef.dispose()
     nativeHeap.free(descriptor.rawPtr)
   }
 
-  private fun clearResponseUrl() {
-    responseUrl?.let { nativeHeap.free(it.rawValue) }
-    responseUrl = null
+  private fun retainResponseUrl(pointer: CPointer<ByteVar>) {
+    var current = responseUrls.load()
+    while (!responseUrls.compareAndSet(current, ResponseUrlNode(pointer, current))) {
+      current = responseUrls.load()
+    }
+  }
+
+  private fun clearResponseUrls() {
+    var current = responseUrls.load()
+    while (!responseUrls.compareAndSet(current, null)) {
+      current = responseUrls.load()
+    }
+    while (current != null) {
+      nativeHeap.free(current.pointer.rawValue)
+      current = current.next
+    }
   }
 
   private fun allocateCString(value: String): CPointer<ByteVar> {
+    MemoryUtil.requireValidCString(value)
     val bytes = value.encodeToByteArray()
     val pointer = nativeHeap.allocArray<ByteVar>(bytes.size + 1)
     bytes.forEachIndexed { index, byte -> pointer[index] = byte }
     pointer[bytes.size] = 0
     return pointer
   }
+
+  private class ResponseUrlNode(val pointer: CPointer<ByteVar>, val next: ResponseUrlNode?)
 }
 
 @OptIn(ExperimentalForeignApi::class)

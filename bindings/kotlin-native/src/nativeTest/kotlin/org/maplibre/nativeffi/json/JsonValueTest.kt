@@ -17,5 +17,6 @@ class JsonValueTest {
     assertEquals(listOf("name", "name"), value.members.map { it.key })
     assertEquals(JsonValue.StringValue("first"), value.members[0].value)
     assertEquals(JsonValue.StringValue("second"), value.members[1].value)
+    assertEquals(value, JsonValue.`object`(value.members))
   }
 }

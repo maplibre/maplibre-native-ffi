@@ -1,7 +1,7 @@
 package org.maplibre.nativeffi.runtime
 
 /** Runtime event type copied from the native event queue. */
-public enum class RuntimeEventType(internal val nativeValue: UInt) {
+public enum class RuntimeEventType(public val nativeValue: UInt) {
   MAP_CAMERA_WILL_CHANGE(1U),
   MAP_CAMERA_IS_CHANGING(2U),
   MAP_CAMERA_DID_CHANGE(3U),

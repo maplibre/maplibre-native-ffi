@@ -1,7 +1,7 @@
 package org.maplibre.nativeffi.map
 
 /** Map rendering modes used when creating a map. */
-public enum class MapMode(internal val nativeValue: UInt) {
+public enum class MapMode(public val nativeValue: UInt) {
   CONTINUOUS(0U),
   STATIC(1U),
   TILE(2U),

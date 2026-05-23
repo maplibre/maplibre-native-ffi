@@ -1,7 +1,7 @@
 package org.maplibre.nativeffi.map
 
 /** Tile level-of-detail algorithm used by map tile options. */
-public enum class TileLodMode(internal val nativeValue: UInt) {
+public enum class TileLodMode(public val nativeValue: UInt) {
   DEFAULT(0U),
   DISTANCE(1U),
   UNKNOWN(UInt.MAX_VALUE);

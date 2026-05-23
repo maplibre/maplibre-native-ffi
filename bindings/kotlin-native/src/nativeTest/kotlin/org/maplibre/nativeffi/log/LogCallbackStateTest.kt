@@ -38,7 +38,7 @@ class LogCallbackStateTest {
 
   @Test
   fun logSeverityMasksRejectUnknownInputs() {
-    assertEquals(1U shl 1, LogSeverity.INFO.nativeMask())
-    kotlin.test.assertFailsWith<IllegalArgumentException> { LogSeverity.UNKNOWN.nativeMask() }
+    assertEquals(1U shl 1, LogSeverity.INFO.nativeMask)
+    kotlin.test.assertFailsWith<IllegalArgumentException> { LogSeverity.UNKNOWN.nativeMask }
   }
 }

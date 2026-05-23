@@ -1,7 +1,7 @@
 package org.maplibre.nativeffi.map
 
 /** Tile operation reported by runtime tile action events. */
-public enum class TileOperation(internal val nativeValue: UInt) {
+public enum class TileOperation(public val nativeValue: UInt) {
   REQUESTED_FROM_CACHE(0U),
   REQUESTED_FROM_NETWORK(1U),
   LOAD_FROM_NETWORK(2U),

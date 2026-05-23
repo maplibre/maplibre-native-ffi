@@ -1,7 +1,7 @@
 package org.maplibre.nativeffi.map
 
 /** Constraint mode used by map viewport options. */
-public enum class ConstrainMode(internal val nativeValue: UInt) {
+public enum class ConstrainMode(public val nativeValue: UInt) {
   NONE(0U),
   HEIGHT_ONLY(1U),
   WIDTH_AND_HEIGHT(2U),

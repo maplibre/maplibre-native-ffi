@@ -1,7 +1,7 @@
 package org.maplibre.nativeffi.resource
 
 /** Resource error reason copied from native events. */
-public enum class ResourceErrorReason(internal val nativeValue: UInt) {
+public enum class ResourceErrorReason(public val nativeValue: UInt) {
   NONE(0U),
   NOT_FOUND(1U),
   SERVER(2U),

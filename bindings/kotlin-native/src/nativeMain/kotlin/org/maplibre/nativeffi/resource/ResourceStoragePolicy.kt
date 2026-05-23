@@ -1,7 +1,7 @@
 package org.maplibre.nativeffi.resource
 
 /** Resource storage policy copied from a native resource request. */
-public enum class ResourceStoragePolicy(internal val nativeValue: UInt) {
+public enum class ResourceStoragePolicy(public val nativeValue: UInt) {
   PERMANENT(0U),
   VOLATILE(1U),
   UNKNOWN(UInt.MAX_VALUE);

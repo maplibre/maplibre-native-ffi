@@ -1,7 +1,7 @@
 package org.maplibre.nativeffi.style
 
 /** Style source type values returned by native style metadata. */
-public enum class SourceType(internal val nativeValue: UInt) {
+public enum class SourceType(public val nativeValue: UInt) {
   UNKNOWN(0U),
   VECTOR(1U),
   RASTER(2U),

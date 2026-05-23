@@ -1,7 +1,7 @@
 package org.maplibre.nativeffi.resource
 
 /** Resource kind reported to runtime resource callbacks. */
-public enum class ResourceKind(internal val nativeValue: UInt) {
+public enum class ResourceKind(public val nativeValue: UInt) {
   UNKNOWN(0U),
   STYLE(1U),
   SOURCE(2U),

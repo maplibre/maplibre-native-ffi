@@ -62,6 +62,8 @@ coverage. Deferred items are outside this implementation slice.
 | Native-library distribution                       | Deferred.              | Distribution policy is outside this goal.                                                  | Tests link the repository build artifact through `MLN_FFI_BUILD_DIR`; consumers provide the C library by future policy. | Build docs record the explicit local linking model.            |
 | `commonMain`, `jvmMain`, and `androidMain` facade | Deferred.              | This goal implements `nativeMain`; shared aliases and Android JNI actuals are future work. | Kotlin/Native targets use this binding directly.                                                                        | The API stays alignable with Java FFM/JNI for a future facade. |
 | Exact-path dynamic library loading                | Deferred.              | Kotlin/Native direct cinterop links native symbols at host binary load time.               | `Maplibre.loadNativeLibrary()` is a no-op parity helper; exact-path loading has no API in this slice.                   | Future packaging work will define dynamic loading if needed.   |
+| `JsonValue.object` factory name                   | Kotlin replacement.    | `object` is a Kotlin keyword.                                                              | Use `JsonValue.obj(...)`; a backticked parity alias is also available.                                                  | Tests cover both factory names.                                |
+| `JsonValue.Int` and `FeatureIdentifier.Int` names | Kotlin replacement.    | `Int` conflicts with Kotlin's built-in numeric type in normal source use.                  | Use `IntValue` nested value types and `of(Long)` factories.                                                             | Value materializer tests cover integer values.                 |
 | Examples                                          | Deferred.              | Examples are outside this goal.                                                            | No Kotlin/Native examples are added by this PR.                                                                         | Binding tests cover adaptation logic instead.                  |
 
 ## Current implementation layout
@@ -311,27 +313,27 @@ those choices keep the low-level contract intact.
 
 Implement these Kotlin/Native support files:
 
-| File or package                               | Purpose                                                                                                      |
-| --------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| `internal.c`                                  | Generated cinterop declarations.                                                                             |
-| `internal.callback.LogCallbackState`          | Process-global logging callback `StableRef` state.                                                           |
-| `internal.callback.ResourceTransformState`    | Runtime-scoped resource transform callback state.                                                            |
-| `internal.callback.ResourceProviderState`     | Runtime-scoped resource provider callback state.                                                             |
-| `internal.callback.CustomGeometrySourceState` | Map/style-scoped custom geometry callback state.                                                             |
-| `internal.lifecycle.HandleState`              | Native pointer, closed state, parent retention, and leak context.                                            |
-| `internal.loader`                             | Package reserved for future loader policy; current native tests link through Gradle and `MLN_FFI_BUILD_DIR`. |
-| `internal.memory.MemoryUtil`                  | `memScoped`, `nativeHeap`, `ByteArray.usePinned`, UTF-8, string-view, array, and out-parameter helpers.      |
-| `NativePointer` plus struct helpers           | Conversion between public opaque addresses and internal cinterop pointers.                                   |
-| `internal.status.Status`                      | C status conversion, immediate diagnostic copying, and exception construction.                               |
-| `internal.struct.CoreStructs`                 | Core copied values and temporary descriptor inputs.                                                          |
-| `internal.struct.MapStructs`                  | Map, camera, bounds, geometry, JSON, and GeoJSON materialization.                                            |
-| `internal.struct.QueryStructs`                | Query descriptors and copied query result readers.                                                           |
-| `internal.struct.RenderStructs`               | Render descriptors, frames, image info, and native buffers.                                                  |
-| `internal.struct.ResourceStructs`             | Resource request, response, and transform conversion.                                                        |
-| `internal.struct.RuntimeStructs`              | Runtime options, events, and offline operation data.                                                         |
-| `internal.struct.StyleStructs`                | Style source, image, layer, and custom geometry conversion.                                                  |
-| `internal.struct.ValueStructs`                | JSON value-tree conversion and native snapshot copying.                                                      |
-| `render.FrameScope`                           | Module-internal render frame invalidation state matching Java FFM package-private support.                   |
+| File or package                            | Purpose                                                                                                      |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------ |
+| `internal.c`                               | Generated cinterop declarations.                                                                             |
+| `internal.callback.LogCallbackState`       | Process-global logging callback `StableRef` state.                                                           |
+| `internal.callback.ResourceTransformState` | Runtime-scoped resource transform callback state.                                                            |
+| `internal.callback.ResourceProviderState`  | Runtime-scoped resource provider callback state.                                                             |
+| `map.CustomGeometrySourceState`            | Map/style-scoped custom geometry callback state; lives beside public map custom geometry API.                |
+| `internal.lifecycle.HandleState`           | Native pointer, closed state, parent retention, and leak context.                                            |
+| `internal.loader`                          | Package reserved for future loader policy; current native tests link through Gradle and `MLN_FFI_BUILD_DIR`. |
+| `internal.memory.MemoryUtil`               | `memScoped`, `nativeHeap`, `ByteArray.usePinned`, UTF-8, string-view, array, and out-parameter helpers.      |
+| `NativePointer` plus struct helpers        | Conversion between public opaque addresses and internal cinterop pointers.                                   |
+| `internal.status.Status`                   | C status conversion, immediate diagnostic copying, and exception construction.                               |
+| `internal.struct.CoreStructs`              | Core copied values and temporary descriptor inputs.                                                          |
+| `internal.struct.MapStructs`               | Map, camera, bounds, geometry, JSON, and GeoJSON materialization.                                            |
+| `internal.struct.QueryStructs`             | Query descriptors and copied query result readers.                                                           |
+| `internal.struct.RenderStructs`            | Render descriptors, frames, image info, and native buffers.                                                  |
+| `internal.struct.ResourceStructs`          | Resource request, response, and transform conversion.                                                        |
+| `internal.struct.RuntimeStructs`           | Runtime options, events, and offline operation data.                                                         |
+| `internal.struct.StyleStructs`             | Style source, image, layer, and custom geometry conversion.                                                  |
+| `internal.struct.ValueStructs`             | JSON value-tree conversion and native snapshot copying.                                                      |
+| `render.FrameScope`                        | Module-internal render frame invalidation state matching Java FFM package-private support.                   |
 
 ## Cinterop coverage map
 

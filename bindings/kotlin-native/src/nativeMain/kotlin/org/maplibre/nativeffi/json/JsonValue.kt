@@ -43,5 +43,7 @@ public sealed interface JsonValue {
     public fun array(values: List<JsonValue>): Array = Array(values)
 
     public fun obj(members: List<Member>): ObjectValue = ObjectValue(members)
+
+    public fun `object`(members: List<Member>): ObjectValue = obj(members)
   }
 }

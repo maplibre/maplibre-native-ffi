@@ -94,6 +94,24 @@ class ResourceProviderStateTest {
   }
 
   @Test
+  fun providerOwnedHandleClosedBeforeDecisionReleasesAfterDecisionExactlyOnce() {
+    memScoped {
+      var releases = 0
+      val fakeHandle =
+        alloc<ByteVar>().ptr.reinterpret<cnames.structs.mln_resource_request_handle>()
+      val handle = ResourceRequestHandle(fakeHandle) { releases++ }
+
+      handle.close()
+      assertEquals(
+        ResourceProviderDecision.HANDLE.nativeValue,
+        handle.finishProviderDecision(ResourceProviderDecision.HANDLE),
+      )
+      handle.close()
+      assertEquals(1, releases)
+    }
+  }
+
+  @Test
   fun passThroughDecisionLetsNativeOwnRelease() {
     memScoped {
       var releases = 0

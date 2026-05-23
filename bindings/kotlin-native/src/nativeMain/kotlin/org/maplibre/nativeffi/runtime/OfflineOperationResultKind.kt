@@ -1,7 +1,7 @@
 package org.maplibre.nativeffi.runtime
 
 /** Offline operation result kind reported by completion events. */
-public enum class OfflineOperationResultKind(internal val nativeValue: UInt) {
+public enum class OfflineOperationResultKind(public val nativeValue: UInt) {
   NONE(0U),
   REGION(1U),
   OPTIONAL_REGION(2U),

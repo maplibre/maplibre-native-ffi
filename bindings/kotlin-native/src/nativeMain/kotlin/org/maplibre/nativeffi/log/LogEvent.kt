@@ -1,7 +1,7 @@
 package org.maplibre.nativeffi.log
 
 /** Category for a Maplibre Native log record. */
-public enum class LogEvent(internal val nativeValue: UInt) {
+public enum class LogEvent(public val nativeValue: UInt) {
   GENERAL(0U),
   SETUP(1U),
   SHADER(2U),

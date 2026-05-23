@@ -1,7 +1,7 @@
 package org.maplibre.nativeffi.resource
 
 /** Status for a resource provider response. */
-public enum class ResourceResponseStatus(internal val nativeValue: UInt) {
+public enum class ResourceResponseStatus(public val nativeValue: UInt) {
   OK(0U),
   ERROR(1U),
   NO_CONTENT(2U),

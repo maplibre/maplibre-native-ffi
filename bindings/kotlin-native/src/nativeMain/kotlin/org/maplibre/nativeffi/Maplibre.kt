@@ -64,7 +64,7 @@ public object Maplibre {
 
   /** Configures severities that native logging may dispatch asynchronously. */
   public fun setAsyncLogSeverities(severities: Set<LogSeverity>) {
-    val mask = severities.fold(0U) { acc, severity -> acc or severity.nativeMask() }
+    val mask = severities.fold(0U) { acc, severity -> acc or severity.nativeMask }
     Status.check(mln_log_set_async_severity_mask(mask))
   }
 

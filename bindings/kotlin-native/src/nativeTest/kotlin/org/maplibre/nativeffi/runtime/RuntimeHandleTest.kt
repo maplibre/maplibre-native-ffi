@@ -6,6 +6,9 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import org.maplibre.nativeffi.error.InvalidStateException
 import org.maplibre.nativeffi.offline.OfflineRegionInfo
+import org.maplibre.nativeffi.resource.ResourceProviderCallback
+import org.maplibre.nativeffi.resource.ResourceProviderDecision
+import org.maplibre.nativeffi.resource.ResourceTransformCallback
 
 class RuntimeHandleTest {
   @Test
@@ -20,6 +23,26 @@ class RuntimeHandleTest {
     assertTrue(runtime.isClosed())
     runtime.close()
     assertFailsWith<InvalidStateException> { runtime.runOnce() }
+  }
+
+  @Test
+  fun resourceProviderAndTransformReplacementPathsRetainAndClearCallbackState() {
+    val runtime = RuntimeHandle.create()
+    try {
+      runtime.setResourceTransform(ResourceTransformCallback { request -> request.url })
+      runtime.setResourceTransform(ResourceTransformCallback { null })
+      runtime.clearResourceTransform()
+      runtime.clearResourceTransform()
+
+      runtime.setResourceProvider(
+        ResourceProviderCallback { _, _ -> ResourceProviderDecision.PASS_THROUGH }
+      )
+      runtime.setResourceProvider(
+        ResourceProviderCallback { _, _ -> ResourceProviderDecision.PASS_THROUGH }
+      )
+    } finally {
+      runtime.close()
+    }
   }
 
   @Test
