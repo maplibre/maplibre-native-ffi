@@ -72,6 +72,40 @@ const (
 	MapModeTile       uint32 = uint32(C.MLN_MAP_MODE_TILE)
 )
 
+const (
+	LogSeverityInfo    uint32 = uint32(C.MLN_LOG_SEVERITY_INFO)
+	LogSeverityWarning uint32 = uint32(C.MLN_LOG_SEVERITY_WARNING)
+	LogSeverityError   uint32 = uint32(C.MLN_LOG_SEVERITY_ERROR)
+)
+
+const (
+	LogSeverityMaskInfo    uint32 = uint32(C.MLN_LOG_SEVERITY_MASK_INFO)
+	LogSeverityMaskWarning uint32 = uint32(C.MLN_LOG_SEVERITY_MASK_WARNING)
+	LogSeverityMaskError   uint32 = uint32(C.MLN_LOG_SEVERITY_MASK_ERROR)
+	LogSeverityMaskDefault uint32 = uint32(C.MLN_LOG_SEVERITY_MASK_DEFAULT)
+	LogSeverityMaskAll     uint32 = uint32(C.MLN_LOG_SEVERITY_MASK_ALL)
+)
+
+const (
+	LogEventGeneral     uint32 = uint32(C.MLN_LOG_EVENT_GENERAL)
+	LogEventSetup       uint32 = uint32(C.MLN_LOG_EVENT_SETUP)
+	LogEventShader      uint32 = uint32(C.MLN_LOG_EVENT_SHADER)
+	LogEventParseStyle  uint32 = uint32(C.MLN_LOG_EVENT_PARSE_STYLE)
+	LogEventParseTile   uint32 = uint32(C.MLN_LOG_EVENT_PARSE_TILE)
+	LogEventRender      uint32 = uint32(C.MLN_LOG_EVENT_RENDER)
+	LogEventStyle       uint32 = uint32(C.MLN_LOG_EVENT_STYLE)
+	LogEventDatabase    uint32 = uint32(C.MLN_LOG_EVENT_DATABASE)
+	LogEventHTTPRequest uint32 = uint32(C.MLN_LOG_EVENT_HTTP_REQUEST)
+	LogEventSprite      uint32 = uint32(C.MLN_LOG_EVENT_SPRITE)
+	LogEventImage       uint32 = uint32(C.MLN_LOG_EVENT_IMAGE)
+	LogEventOpenGL      uint32 = uint32(C.MLN_LOG_EVENT_OPENGL)
+	LogEventJNI         uint32 = uint32(C.MLN_LOG_EVENT_JNI)
+	LogEventAndroid     uint32 = uint32(C.MLN_LOG_EVENT_ANDROID)
+	LogEventCrash       uint32 = uint32(C.MLN_LOG_EVENT_CRASH)
+	LogEventGlyph       uint32 = uint32(C.MLN_LOG_EVENT_GLYPH)
+	LogEventTiming      uint32 = uint32(C.MLN_LOG_EVENT_TIMING)
+)
+
 // CVersion returns the linked native C ABI contract version.
 func CVersion() uint32 {
 	return uint32(C.mln_c_version())
