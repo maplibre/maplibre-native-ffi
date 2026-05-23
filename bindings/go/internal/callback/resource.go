@@ -4,6 +4,7 @@ package callback
 #cgo CFLAGS: -std=c2x
 #include <stdlib.h>
 #include <stdint.h>
+#include <string.h>
 #include "maplibre_native_c.h"
 
 extern mln_status goMaplibreResourceTransform(void* user_data, uint32_t kind, const char* url, mln_resource_transform_response* out_response);
@@ -11,6 +12,56 @@ extern uint32_t goMaplibreResourceProvider(void* user_data, const mln_resource_r
 
 static inline void* mln_go_resource_handle_to_pointer(uintptr_t handle) {
   return (void*)handle;
+}
+
+// Native copies out_response->url immediately after the callback returns. The
+// C bridge keeps one replacement URL per callback thread so Go can free its
+// call-scoped C string before returning to native without exposing a dangling
+// pointer to the native copy step.
+static _Thread_local char* mln_go_resource_transform_thread_url;
+
+static inline char* mln_go_copy_c_string(const char* value) {
+  if (value == NULL) {
+    return NULL;
+  }
+  size_t size = strlen(value) + 1;
+  char* copy = (char*)malloc(size);
+  if (copy != NULL) {
+    memcpy(copy, value, size);
+  }
+  return copy;
+}
+
+static mln_status mln_go_resource_transform_callback(void* user_data, uint32_t kind, const char* url, mln_resource_transform_response* out_response) {
+  if (out_response == NULL) {
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  out_response->size = sizeof(mln_resource_transform_response);
+  out_response->url = NULL;
+
+  mln_resource_transform_response temporary = {
+    .size = sizeof(mln_resource_transform_response), .url = NULL
+  };
+  mln_status status = goMaplibreResourceTransform(user_data, kind, url, &temporary);
+  if (status != MLN_STATUS_OK || temporary.url == NULL || temporary.url[0] == '\0') {
+    free((void*)temporary.url);
+    return status;
+  }
+
+  char* copied = mln_go_copy_c_string(temporary.url);
+  free((void*)temporary.url);
+  if (copied == NULL) {
+    return MLN_STATUS_NATIVE_ERROR;
+  }
+
+  free(mln_go_resource_transform_thread_url);
+  mln_go_resource_transform_thread_url = copied;
+  out_response->url = mln_go_resource_transform_thread_url;
+  return MLN_STATUS_OK;
+}
+
+static inline mln_resource_transform_callback mln_go_resource_transform_callback_pointer(void) {
+  return (mln_resource_transform_callback)mln_go_resource_transform_callback;
 }
 */
 import "C"
@@ -31,9 +82,7 @@ type ResourceTransformState struct {
 	callback ResourceTransformCallback
 	handle   cgo.Handle
 
-	mu      sync.Mutex
-	strings []unsafe.Pointer
-	once    sync.Once
+	once sync.Once
 }
 
 func newResourceTransformState(callback ResourceTransformCallback) *ResourceTransformState {
@@ -50,7 +99,7 @@ func SetResourceTransform(runtime *capi.Runtime, callback ResourceTransformCallb
 	state := newResourceTransformState(callback)
 	descriptor := C.mln_resource_transform{
 		size:      C.uint32_t(unsafe.Sizeof(C.mln_resource_transform{})),
-		callback:  (C.mln_resource_transform_callback)(C.goMaplibreResourceTransform),
+		callback:  C.mln_go_resource_transform_callback_pointer(),
 		user_data: C.mln_go_resource_handle_to_pointer(C.uintptr_t(state.handle)),
 	}
 	status := capi.Status(C.mln_runtime_set_resource_transform(
@@ -76,12 +125,6 @@ func (state *ResourceTransformState) Release() {
 	}
 	state.once.Do(func() {
 		state.handle.Delete()
-		state.mu.Lock()
-		defer state.mu.Unlock()
-		for _, pointer := range state.strings {
-			C.free(pointer)
-		}
-		state.strings = nil
 	})
 }
 
@@ -99,11 +142,7 @@ func (state *ResourceTransformState) invoke(kind uint32, url string) (unsafe.Poi
 	}
 
 	cString := C.CString(replacement)
-	pointer := unsafe.Pointer(cString)
-	state.mu.Lock()
-	state.strings = append(state.strings, pointer)
-	state.mu.Unlock()
-	return pointer, capi.StatusOK
+	return unsafe.Pointer(cString), capi.StatusOK
 }
 
 func invokeResourceTransformForTest(state *ResourceTransformState, kind uint32, url string) (string, bool, capi.Status) {
@@ -111,19 +150,29 @@ func invokeResourceTransformForTest(state *ResourceTransformState, kind uint32, 
 	if pointer == nil || status != capi.StatusOK {
 		return "", false, status
 	}
+	defer C.free(pointer)
 	return C.GoString((*C.char)(pointer)), true, status
 }
 
 func invokeResourceTransformTrampolineForTest(state *ResourceTransformState, kind uint32, url string) capi.Status {
+	_, _, status := invokeResourceTransformTrampolineReplacementForTest(state, kind, url)
+	return status
+}
+
+func invokeResourceTransformTrampolineReplacementForTest(state *ResourceTransformState, kind uint32, url string) (string, bool, capi.Status) {
 	rawURL := C.CString(url)
 	defer C.free(unsafe.Pointer(rawURL))
 	var response C.mln_resource_transform_response
-	return capi.Status(goMaplibreResourceTransform(
+	status := capi.Status(C.mln_go_resource_transform_callback(
 		C.mln_go_resource_handle_to_pointer(C.uintptr_t(state.handle)),
 		C.uint32_t(kind),
 		rawURL,
 		&response,
 	))
+	if response.url == nil || status != capi.StatusOK {
+		return "", false, status
+	}
+	return C.GoString(response.url), true, status
 }
 
 // ResourceRequest is the copied internal shape for provider callbacks.

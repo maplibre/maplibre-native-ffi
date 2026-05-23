@@ -3,6 +3,7 @@ package maplibre
 import (
 	"errors"
 	"sync"
+	"unsafe"
 
 	"github.com/maplibre/maplibre-native-ffi/bindings/go/internal/callback"
 	"github.com/maplibre/maplibre-native-ffi/bindings/go/internal/capi"
@@ -341,6 +342,8 @@ type RuntimeHandle struct {
 	resourceTransform   *callback.ResourceTransformState
 	resourceProviderMu  sync.Mutex
 	resourceProvider    *callback.ResourceProviderState
+	mapsMu              sync.Mutex
+	maps                map[uintptr]*MapHandle
 }
 
 // String returns a diagnostic name for the status.
@@ -451,7 +454,9 @@ func (runtime *RuntimeHandle) PollEvent() (*RuntimeEvent, error) {
 	if !hasEvent {
 		return nil, nil
 	}
-	return runtimeEventFromCAPI(rawEvent), nil
+	event := runtimeEventFromCAPI(rawEvent)
+	runtime.handleEventSideEffects(event)
+	return event, nil
 }
 
 func runtimeEventFromCAPI(event capi.RuntimeEvent) *RuntimeEvent {
@@ -465,6 +470,47 @@ func runtimeEventFromCAPI(event capi.RuntimeEvent) *RuntimeEvent {
 		Message:     event.Message,
 		Payload:     runtimeEventPayloadFromCAPI(event.Payload),
 	}
+}
+
+func (runtime *RuntimeHandle) handleEventSideEffects(event *RuntimeEvent) {
+	if event == nil || event.Type != RuntimeEventMapStyleLoaded || event.SourceType != RuntimeEventSourceMap {
+		return
+	}
+	m := runtime.mapForEventSource(event.Source)
+	if m != nil {
+		m.releaseDetachedCustomGeometrySources()
+	}
+}
+
+func (runtime *RuntimeHandle) registerMap(m *MapHandle) {
+	if runtime == nil || m == nil || m.state == nil {
+		return
+	}
+	runtime.mapsMu.Lock()
+	if runtime.maps == nil {
+		runtime.maps = make(map[uintptr]*MapHandle)
+	}
+	runtime.maps[m.nativeAddress] = m
+	runtime.mapsMu.Unlock()
+}
+
+func (runtime *RuntimeHandle) unregisterMap(m *MapHandle) {
+	if runtime == nil || m == nil || m.state == nil {
+		return
+	}
+	runtime.mapsMu.Lock()
+	delete(runtime.maps, m.nativeAddress)
+	runtime.mapsMu.Unlock()
+}
+
+func (runtime *RuntimeHandle) mapForEventSource(source uintptr) *MapHandle {
+	if runtime == nil || source == 0 {
+		return nil
+	}
+	runtime.mapsMu.Lock()
+	m := runtime.maps[source]
+	runtime.mapsMu.Unlock()
+	return m
 }
 
 func runtimeEventPayloadFromCAPI(payload any) any {
@@ -680,15 +726,17 @@ func (runtime *RuntimeHandle) createMap(create func(*capi.Runtime, **capi.Map) c
 	}
 	defer runtime.state.KeepAlive()
 
-	var m *capi.Map
-	if err := checkNative(func() capi.Status { return create(ptr, &m) }); err != nil {
+	var rawMap *capi.Map
+	if err := checkNative(func() capi.Status { return create(ptr, &rawMap) }); err != nil {
 		return nil, err
 	}
-	state, err := handle.New(m, "MapHandle", runtime)
+	state, err := handle.New(rawMap, "MapHandle", runtime)
 	if err != nil {
 		return nil, newBindingError(ErrInvalidArgument, err.Error())
 	}
-	return &MapHandle{state: state, runtime: runtime}, nil
+	m := &MapHandle{state: state, runtime: runtime, nativeAddress: uintptr(unsafe.Pointer(rawMap))}
+	runtime.registerMap(m)
+	return m, nil
 }
 
 // Close destroys this runtime. A successful close makes later calls no-ops. A
@@ -705,5 +753,8 @@ func (runtime *RuntimeHandle) Close() error {
 	}
 	runtime.releaseResourceTransform()
 	runtime.releaseResourceProvider()
+	runtime.mapsMu.Lock()
+	runtime.maps = nil
+	runtime.mapsMu.Unlock()
 	return nil
 }

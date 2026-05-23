@@ -25,6 +25,18 @@ func TestResourceTransformStateCopiesReplacementURL(t *testing.T) {
 	}
 }
 
+func TestResourceTransformTrampolineCopiesReplacementToThreadStorage(t *testing.T) {
+	state := newResourceTransformState(func(uint32, string) (string, bool) {
+		return "https://example.com/replacement", true
+	})
+	defer state.Release()
+
+	replacement, replaced, status := invokeResourceTransformTrampolineReplacementForTest(state, capi.ResourceKindStyle, "https://example.com/style.json")
+	if status != capi.StatusOK || !replaced || replacement != "https://example.com/replacement" {
+		t.Fatalf("invoke = %q, %v, %v", replacement, replaced, status)
+	}
+}
+
 func TestResourceTransformStateNoReplacement(t *testing.T) {
 	state := newResourceTransformState(func(uint32, string) (string, bool) {
 		return "", false

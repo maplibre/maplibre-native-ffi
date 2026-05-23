@@ -71,48 +71,45 @@ loop.
   package/platform, so the hook remains a normal unexported package file with an
   explanatory test-only comment.
 
-## Deferred finding interview outcomes
+## Deferred finding interview outcomes and implementation
 
 These findings were out of scope for the completed review loop because they
 needed explicit lifetime or API decisions. The follow-up interview resolved the
-next design direction for each finding without implementing the changes.
+next design direction for each finding, and the first implementation pass
+applied those decisions.
 
 ### Resource-transform replacement URL storage
 
-Direction: investigate native ownership before changing Go storage. The desired
-contract is that native code copies a replacement URL during the transform
-callback. If inspection shows native already does this, Go can bound replacement
-URL storage to the callback scope. If native still borrows past the callback,
-first assess whether making C/C++ copy immediately is small and ABI-compatible.
-If that native change is broad, keep Go's conservative retention and document
-the required C lifetime change for a later design pass.
+Decision: investigate native ownership before changing Go storage. Native
+`invoke_resource_transform` copies `out_response->url` into a `std::string`
+during the same transform invocation, immediately after the callback returns.
+The Go binding now uses a C bridge callback with per-thread replacement URL
+storage. The Go callback returns a call-scoped C string, the C bridge copies it
+into thread-local storage before returning to native, and native copies that
+thread-local URL before the next callback can reuse the same thread-local slot.
+This removes the previous unbounded Go-side append-only URL retention.
 
 ### Custom geometry callbacks after asynchronous `SetStyleURL`
 
-Decision: mirror the Java FFM binding lifecycle. Go should retain custom
-geometry callback state on the map, release it on explicit source removal,
-`SetStyleJSON`, and map close, and release detached custom geometry sources
+Decision: mirror the Java FFM binding lifecycle. Go now retains custom geometry
+callback state on the map, releases it on explicit source removal,
+`SetStyleJSON`, and map close, and releases detached custom geometry sources
 after asynchronous `SetStyleURL` when `RuntimeHandle.PollEvent` observes
-`RuntimeEventMapStyleLoaded`. This requires a runtime map registry so the event
-source can be mapped back to its `MapHandle`.
+`RuntimeEventMapStyleLoaded`. Runtime handles keep a private map registry so the
+event source can be mapped back to its `MapHandle`.
 
-Cleanup should be best-effort, matching Java FFM. On
-`RuntimeEventMapStyleLoaded`, query each retained custom geometry source.
-Release callback state when the source is missing or its current type is not
-`StyleSourceTypeCustomVector`. If a source-type query fails, keep the callback
-state for a later event or map close; `PollEvent` should still deliver the event
-rather than fail because cleanup had a query error.
+Cleanup is best-effort, matching Java FFM. On `RuntimeEventMapStyleLoaded`, Go
+queries each retained custom geometry source. It releases callback state when
+the source is missing or its current type is not `StyleSourceTypeCustomVector`.
+If a source-type query fails, Go keeps the callback state for a later event or
+map close; `PollEvent` still delivers the event rather than failing because
+cleanup had a query error.
 
 ## User-input-needed findings
 
-The interview resolved the preferred directions above. Implementation still
-requires code changes and validation, so these items remain deferred until a
-follow-up implementation pass.
-
-- Bounded resource-transform replacement URL storage needs native ownership
-  investigation before Go storage changes.
-- URL-style custom-geometry callback release should mirror Java FFM with
-  event-driven, best-effort cleanup after `RuntimeEventMapStyleLoaded`.
+The interview resolved the preferred directions above, and the first
+implementation pass applied them. No currently recorded deferred finding is
+waiting on user input.
 
 ## Final no-actionable review evidence
 

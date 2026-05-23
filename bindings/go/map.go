@@ -61,8 +61,9 @@ func (options MapOptions) toCAPI() capi.MapOptions {
 
 // MapHandle owns map state for one RuntimeHandle.
 type MapHandle struct {
-	state   *handle.State[capi.Map]
-	runtime *RuntimeHandle
+	state         *handle.State[capi.Map]
+	runtime       *RuntimeHandle
+	nativeAddress uintptr
 
 	customGeometryMu      sync.Mutex
 	customGeometrySources map[string]*callback.CustomGeometrySourceState
@@ -649,6 +650,46 @@ func (m *MapHandle) releaseCustomGeometrySource(sourceID string) {
 	state.Release()
 }
 
+func (m *MapHandle) releaseDetachedCustomGeometrySources() {
+	ptr, err := m.ptr()
+	if err != nil {
+		return
+	}
+	defer m.state.KeepAlive()
+
+	m.customGeometryMu.Lock()
+	sources := make(map[string]*callback.CustomGeometrySourceState, len(m.customGeometrySources))
+	for sourceID, state := range m.customGeometrySources {
+		sources[sourceID] = state
+	}
+	m.customGeometryMu.Unlock()
+
+	for sourceID, state := range sources {
+		var sourceType uint32
+		var found bool
+		if err := checkNative(func() capi.Status { return capi.MapGetStyleSourceType(ptr, sourceID, &sourceType, &found) }); err != nil {
+			continue
+		}
+		if found && StyleSourceType(sourceType) == StyleSourceTypeCustomVector {
+			continue
+		}
+		m.customGeometryMu.Lock()
+		if m.customGeometrySources[sourceID] == state {
+			delete(m.customGeometrySources, sourceID)
+			m.customGeometryMu.Unlock()
+			state.Release()
+			continue
+		}
+		m.customGeometryMu.Unlock()
+	}
+}
+
+func (m *MapHandle) customGeometrySourceCountForTesting() int {
+	m.customGeometryMu.Lock()
+	defer m.customGeometryMu.Unlock()
+	return len(m.customGeometrySources)
+}
+
 func (m *MapHandle) releaseCustomGeometrySources() {
 	m.customGeometryMu.Lock()
 	states := m.customGeometrySources
@@ -675,6 +716,9 @@ func (m *MapHandle) Close() error {
 		return m.state.Close(capi.MapDestroy)
 	}); err != nil {
 		return err
+	}
+	if m.runtime != nil {
+		m.runtime.unregisterMap(m)
 	}
 	m.releaseCustomGeometrySources()
 	return nil
