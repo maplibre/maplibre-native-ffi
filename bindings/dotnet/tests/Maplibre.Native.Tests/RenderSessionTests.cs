@@ -1,0 +1,70 @@
+using Maplibre.Native.Internal.C;
+using Maplibre.Native.Internal.Struct;
+using Maplibre.Native.Query;
+using Maplibre.Native.Render;
+using Xunit;
+
+namespace Maplibre.Native.Tests;
+
+public sealed unsafe class RenderSessionTests
+{
+    [Fact]
+    public void SurfaceDescriptorsMaterializeOpaquePointersAndExtent()
+    {
+        var metal = RenderStructs.ToNative(new MetalSurfaceDescriptor
+        {
+            Extent = new RenderTargetExtent(320, 240, 2),
+            Layer = new NativePointer(123),
+            Context = new MetalContextDescriptor { Device = new NativePointer(456) },
+        });
+        Assert.Equal(320u, metal.extent.width);
+        Assert.Equal(240u, metal.extent.height);
+        Assert.Equal(2, metal.extent.scale_factor);
+        Assert.Equal(123, (nint)metal.layer);
+        Assert.Equal(456, (nint)metal.context.device);
+
+        var vulkan = RenderStructs.ToNative(new VulkanSurfaceDescriptor
+        {
+            Extent = new RenderTargetExtent(640, 480, 1),
+            Surface = new NativePointer(111),
+            Context = new VulkanContextDescriptor
+            {
+                Instance = new NativePointer(222),
+                PhysicalDevice = new NativePointer(333),
+                Device = new NativePointer(444),
+                Queue = new NativePointer(555),
+                GraphicsQueueFamilyIndex = 7,
+            },
+        });
+        Assert.Equal(640u, vulkan.extent.width);
+        Assert.Equal(480u, vulkan.extent.height);
+        Assert.Equal(111, (nint)vulkan.surface);
+        Assert.Equal(222, (nint)vulkan.context.instance);
+        Assert.Equal(333, (nint)vulkan.context.physical_device);
+        Assert.Equal(444, (nint)vulkan.context.device);
+        Assert.Equal(555, (nint)vulkan.context.graphics_queue);
+        Assert.Equal(7u, vulkan.context.graphics_queue_family_index);
+    }
+
+    [Fact]
+    public void FeatureStateSelectorMaterializesOptionalFields()
+    {
+        using var selector = NativeFeatureStateSelector.From(new FeatureStateSelector
+        {
+            SourceId = "source",
+            SourceLayerId = "layer",
+            FeatureId = "feature",
+            StateKey = "hover",
+        });
+
+        var value = selector.Value;
+        Assert.Equal((uint)(
+            mln_feature_state_selector_field.MLN_FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID |
+            mln_feature_state_selector_field.MLN_FEATURE_STATE_SELECTOR_FEATURE_ID |
+            mln_feature_state_selector_field.MLN_FEATURE_STATE_SELECTOR_STATE_KEY), value.fields);
+        Assert.Equal("source", RuntimeStructs.CopyUtf8(value.source_id.data, value.source_id.size));
+        Assert.Equal("layer", RuntimeStructs.CopyUtf8(value.source_layer_id.data, value.source_layer_id.size));
+        Assert.Equal("feature", RuntimeStructs.CopyUtf8(value.feature_id.data, value.feature_id.size));
+        Assert.Equal("hover", RuntimeStructs.CopyUtf8(value.state_key.data, value.state_key.size));
+    }
+}
