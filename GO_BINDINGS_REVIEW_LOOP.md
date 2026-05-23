@@ -8,22 +8,20 @@ loop.
 ## Final state
 
 - Branch: `golang`, pushed to `origin/golang`.
-- Latest fully reviewed non-record commit: `82ce49e`
-  (`Refresh Go review loop
-  record`). If this file is later adjusted by a
+- Latest fully reviewed non-record commit: `4aec32e`
+  (`Correct Go texture frame
+  spec names`). If this file is later adjusted by a
   record-only commit, that commit cannot self-reference its own final hash;
-  treat the containing commit as the current record commit and `82ce49e` as the
+  treat the containing commit as the current record commit and `4aec32e` as the
   latest reviewed source/doc fix.
 - Final automated validation after the latest source/doc fix:
   - `mise run //bindings/go:ci` passed.
   - `git diff --check origin/main...HEAD` passed.
   - `git status --short --branch` reported a clean branch matching
     `origin/golang`.
-- Final code-review loop: Round 11 completed with correctness, tests/validation,
-  and maintainability/API-docs reviewers. All three found no Go binding code,
-  validation, or API-doc findings remaining; the only record-accuracy finding
-  was to make this tracked record avoid stale latest-commit/final-round
-  metadata, which this record-only update applies.
+- Final code-review loop: Round 13 completed with correctness, tests/validation,
+  and maintainability/API-docs reviewers. All three reported no actionable
+  source/doc findings remaining.
 
 ## Applied findings by round
 
@@ -52,9 +50,15 @@ loop.
 - Round 9: review-only loop; no code fixes needed.
 - Round 10: completion review after preserving this tracked record; fixed stale
   record metadata and one stale public doc comment.
-- Round 11: final post-refresh review; no Go binding code, validation, or
-  API-doc findings remained. The only issue was this record's stale exact commit
-  and final-round wording, addressed by this record-only update.
+- Round 11: post-refresh review; no Go binding code, validation, or API-doc
+  findings remained. The only issue was this record's stale exact commit and
+  final-round wording, addressed by a record-only update.
+- Round 12: final-final review found one small SPEC accuracy issue; corrected
+  session-owned texture frame type names from non-existent `*Handle` names to
+  `MetalOwnedTextureFrame` and `VulkanOwnedTextureFrame`.
+- Round 13: final source/doc review after the SPEC correction; correctness,
+  tests/validation/CI, and maintainability/API-docs reviewers all reported no
+  actionable source/doc findings remaining.
 
 ## Rejected or deferred findings
 
@@ -80,14 +84,17 @@ safe bounded implementation.
 
 ## Final no-actionable review evidence
 
-Round 11 reviewer conclusions:
+Round 13 reviewer conclusions:
 
-- Correctness/ownership/cgo/concurrency: no Go binding code issue remained; the
-  tracked review record needed stale exact-commit/final-round wording refreshed.
-- Tests/validation/CI: no tests or CI issue remained; the tracked review record
-  needed stale exact-commit/final-round wording refreshed.
-- Maintainability/API docs/SPEC accuracy/scope hygiene: no API-doc issue
-  remained; the tracked review record needed stale exact-commit/final-round
-  wording refreshed.
+- Correctness/ownership/cgo/concurrency: no actionable source/doc findings
+  remained; handle ownership, render frame guards, callback/resource ownership,
+  runtime event copying, and the SPEC texture frame name correction were
+  checked.
+- Tests/validation/CI: no actionable findings remained;
+  `mise run
+  //bindings/go:ci`, `git diff --check origin/main...HEAD`, and
+  clean branch status were verified, and Go CI/test coverage was inspected.
+- Maintainability/API docs/SPEC accuracy/scope hygiene: no actionable findings
+  remained; the SPEC texture frame names now match the public Go types.
 
-Those Round 11 record findings were applied by this record-only update.
+No Round 13 source/doc fixes were needed.
