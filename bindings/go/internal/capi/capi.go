@@ -53,6 +53,9 @@ type Projection struct{ _ byte }
 // RenderSession is an opaque native render session handle.
 type RenderSession struct{ _ byte }
 
+// StyleIDList is an opaque native style ID list handle.
+type StyleIDList struct{ _ byte }
+
 // RuntimeOptions contains semantic runtime creation options.
 type RuntimeOptions struct {
 	AssetPath        string
@@ -158,6 +161,15 @@ type TextureImageInfo struct {
 	Height     uint32
 	Stride     uint32
 	ByteLength uint64
+}
+
+// StyleSourceInfo contains fixed metadata for one style source.
+type StyleSourceInfo struct {
+	Type            uint32
+	IDSize          uint64
+	IsVolatile      bool
+	HasAttribution  bool
+	AttributionSize uint64
 }
 
 // MetalOwnedTextureFrame is a copied Metal owned texture frame descriptor.
@@ -599,6 +611,18 @@ const (
 const (
 	ResourceStoragePolicyPermanent uint32 = uint32(C.MLN_RESOURCE_STORAGE_POLICY_PERMANENT)
 	ResourceStoragePolicyVolatile  uint32 = uint32(C.MLN_RESOURCE_STORAGE_POLICY_VOLATILE)
+)
+
+const (
+	StyleSourceTypeUnknown      uint32 = uint32(C.MLN_STYLE_SOURCE_TYPE_UNKNOWN)
+	StyleSourceTypeVector       uint32 = uint32(C.MLN_STYLE_SOURCE_TYPE_VECTOR)
+	StyleSourceTypeRaster       uint32 = uint32(C.MLN_STYLE_SOURCE_TYPE_RASTER)
+	StyleSourceTypeRasterDEM    uint32 = uint32(C.MLN_STYLE_SOURCE_TYPE_RASTER_DEM)
+	StyleSourceTypeGeoJSON      uint32 = uint32(C.MLN_STYLE_SOURCE_TYPE_GEOJSON)
+	StyleSourceTypeImage        uint32 = uint32(C.MLN_STYLE_SOURCE_TYPE_IMAGE)
+	StyleSourceTypeVideo        uint32 = uint32(C.MLN_STYLE_SOURCE_TYPE_VIDEO)
+	StyleSourceTypeAnnotations  uint32 = uint32(C.MLN_STYLE_SOURCE_TYPE_ANNOTATIONS)
+	StyleSourceTypeCustomVector uint32 = uint32(C.MLN_STYLE_SOURCE_TYPE_CUSTOM_VECTOR)
 )
 
 const (
@@ -1378,6 +1402,108 @@ func MapSetStyleJSON(m *Map, json string) Status {
 	return Status(C.mln_map_set_style_json((*C.mln_map)(unsafe.Pointer(m)), cJSON))
 }
 
+// MapRemoveStyleSource removes one style source by ID.
+func MapRemoveStyleSource(m *Map, sourceID string, outRemoved *bool) Status {
+	view := newStringView(sourceID)
+	defer view.free()
+	var rawRemoved C.bool
+	status := Status(C.mln_map_remove_style_source((*C.mln_map)(unsafe.Pointer(m)), view.raw(), &rawRemoved))
+	if status == StatusOK {
+		*outRemoved = bool(rawRemoved)
+	}
+	return status
+}
+
+// MapStyleSourceExists reports whether one style source ID exists.
+func MapStyleSourceExists(m *Map, sourceID string, outExists *bool) Status {
+	view := newStringView(sourceID)
+	defer view.free()
+	var rawExists C.bool
+	status := Status(C.mln_map_style_source_exists((*C.mln_map)(unsafe.Pointer(m)), view.raw(), &rawExists))
+	if status == StatusOK {
+		*outExists = bool(rawExists)
+	}
+	return status
+}
+
+// MapGetStyleSourceType gets one style source type.
+func MapGetStyleSourceType(m *Map, sourceID string, outSourceType *uint32, outFound *bool) Status {
+	view := newStringView(sourceID)
+	defer view.free()
+	var rawType C.uint32_t
+	var rawFound C.bool
+	status := Status(C.mln_map_get_style_source_type((*C.mln_map)(unsafe.Pointer(m)), view.raw(), &rawType, &rawFound))
+	if status == StatusOK {
+		*outSourceType = uint32(rawType)
+		*outFound = bool(rawFound)
+	}
+	return status
+}
+
+// MapGetStyleSourceInfo copies fixed metadata for one style source.
+func MapGetStyleSourceInfo(m *Map, sourceID string, outInfo *StyleSourceInfo, outFound *bool) Status {
+	view := newStringView(sourceID)
+	defer view.free()
+	rawInfo := C.mln_style_source_info{size: C.uint32_t(unsafe.Sizeof(C.mln_style_source_info{}))}
+	var rawFound C.bool
+	status := Status(C.mln_map_get_style_source_info((*C.mln_map)(unsafe.Pointer(m)), view.raw(), &rawInfo, &rawFound))
+	if status == StatusOK {
+		*outInfo = styleSourceInfoFromC(rawInfo)
+		*outFound = bool(rawFound)
+	}
+	return status
+}
+
+// MapCopyStyleSourceAttribution copies one style source attribution.
+func MapCopyStyleSourceAttribution(m *Map, sourceID string, capacity int, outAttribution *string, outFound *bool) Status {
+	view := newStringView(sourceID)
+	defer view.free()
+	var buffer unsafe.Pointer
+	if capacity > 0 {
+		buffer = C.malloc(C.size_t(capacity))
+		defer C.free(buffer)
+	}
+	var rawSize C.size_t
+	var rawFound C.bool
+	status := Status(C.mln_map_copy_style_source_attribution((*C.mln_map)(unsafe.Pointer(m)), view.raw(), (*C.char)(buffer), C.size_t(capacity), &rawSize, &rawFound))
+	if status == StatusOK {
+		*outFound = bool(rawFound)
+		if rawSize == 0 {
+			*outAttribution = ""
+		} else {
+			*outAttribution = C.GoStringN((*C.char)(buffer), C.int(rawSize))
+		}
+	}
+	return status
+}
+
+// MapListStyleSourceIDs copies style source IDs.
+func MapListStyleSourceIDs(m *Map, outIDs *[]string) Status {
+	var rawList *C.mln_style_id_list
+	status := Status(C.mln_map_list_style_source_ids((*C.mln_map)(unsafe.Pointer(m)), &rawList))
+	if status != StatusOK {
+		return status
+	}
+	defer C.mln_style_id_list_destroy(rawList)
+
+	var rawCount C.size_t
+	status = Status(C.mln_style_id_list_count(rawList, &rawCount))
+	if status != StatusOK {
+		return status
+	}
+	ids := make([]string, int(rawCount))
+	for i := range ids {
+		var rawID C.mln_string_view
+		status = Status(C.mln_style_id_list_get(rawList, C.size_t(i), &rawID))
+		if status != StatusOK {
+			return status
+		}
+		ids[i] = stringViewFromC(rawID)
+	}
+	*outIDs = ids
+	return StatusOK
+}
+
 // MapSetDebugOptions sets the map debug overlay mask.
 func MapSetDebugOptions(m *Map, options uint32) Status {
 	return Status(C.mln_map_set_debug_options((*C.mln_map)(unsafe.Pointer(m)), C.uint32_t(options)))
@@ -1766,6 +1892,45 @@ func LatLngForProjectedMeters(meters ProjectedMeters, out *LatLng) Status {
 		*out = latLngFromC(rawCoordinate)
 	}
 	return status
+}
+
+type stringView struct {
+	data unsafe.Pointer
+	size int
+}
+
+func newStringView(value string) stringView {
+	if len(value) == 0 {
+		return stringView{}
+	}
+	return stringView{data: C.CBytes([]byte(value)), size: len(value)}
+}
+
+func (view stringView) raw() C.mln_string_view {
+	return C.mln_string_view{data: (*C.char)(view.data), size: C.size_t(view.size)}
+}
+
+func (view stringView) free() {
+	if view.data != nil {
+		C.free(view.data)
+	}
+}
+
+func stringViewFromC(view C.mln_string_view) string {
+	if view.data == nil || view.size == 0 {
+		return ""
+	}
+	return C.GoStringN(view.data, C.int(view.size))
+}
+
+func styleSourceInfoFromC(info C.mln_style_source_info) StyleSourceInfo {
+	return StyleSourceInfo{
+		Type:            uint32(info._type),
+		IDSize:          uint64(info.id_size),
+		IsVolatile:      bool(info.is_volatile),
+		HasAttribution:  bool(info.has_attribution),
+		AttributionSize: uint64(info.attribution_size),
+	}
 }
 
 func latLngToC(coordinate LatLng) C.mln_lat_lng {

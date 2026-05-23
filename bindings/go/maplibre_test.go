@@ -1094,6 +1094,77 @@ func TestRenderSessionNilHandleAndInvalidSurfaceDescriptor(t *testing.T) {
 	}
 }
 
+func TestStyleSourceMetadataForMissingSources(t *testing.T) {
+	runtime, err := NewRuntime()
+	if err != nil {
+		t.Fatalf("NewRuntime(): %v", err)
+	}
+	m, err := runtime.NewMap()
+	if err != nil {
+		_ = runtime.Close()
+		t.Fatalf("NewMap(): %v", err)
+	}
+	defer func() {
+		if err := m.Close(); err != nil {
+			t.Errorf("Map Close(): %v", err)
+		}
+		if err := runtime.Close(); err != nil {
+			t.Errorf("Runtime Close(): %v", err)
+		}
+	}()
+
+	if err := m.SetStyleJSON(`{"version":8,"sources":{},"layers":[]}`); err != nil {
+		t.Fatalf("SetStyleJSON(empty style): %v", err)
+	}
+	ids, err := m.StyleSourceIDs()
+	if err != nil {
+		t.Fatalf("StyleSourceIDs(): %v", err)
+	}
+	for _, id := range ids {
+		if id == "missing" {
+			t.Fatalf("StyleSourceIDs() unexpectedly contains missing source: %v", ids)
+		}
+	}
+	exists, err := m.StyleSourceExists("missing")
+	if err != nil {
+		t.Fatalf("StyleSourceExists(): %v", err)
+	}
+	if exists {
+		t.Fatalf("StyleSourceExists(missing) = true, want false")
+	}
+	sourceType, found, err := m.StyleSourceType("missing")
+	if err != nil {
+		t.Fatalf("StyleSourceType(): %v", err)
+	}
+	if found || sourceType != StyleSourceTypeUnknown {
+		t.Fatalf("StyleSourceType(missing) = (%v, %v), want (unknown, false)", sourceType, found)
+	}
+	_, found, err = m.StyleSourceInfo("missing")
+	if err != nil {
+		t.Fatalf("StyleSourceInfo(): %v", err)
+	}
+	if found {
+		t.Fatalf("StyleSourceInfo(missing) found = true, want false")
+	}
+	attribution, found, err := m.StyleSourceAttribution("missing")
+	if err != nil {
+		t.Fatalf("StyleSourceAttribution(): %v", err)
+	}
+	if found || attribution != "" {
+		t.Fatalf("StyleSourceAttribution(missing) = (%q, %v), want empty false", attribution, found)
+	}
+	removed, err := m.RemoveStyleSource("missing")
+	if err != nil {
+		t.Fatalf("RemoveStyleSource(): %v", err)
+	}
+	if removed {
+		t.Fatalf("RemoveStyleSource(missing) = true, want false")
+	}
+	if _, err := m.StyleSourceExists(""); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("StyleSourceExists(empty) error = %v, want ErrInvalidArgument", err)
+	}
+}
+
 func TestMapProjectionCameraAndVisibleCoordinates(t *testing.T) {
 	runtime, err := NewRuntime()
 	if err != nil {
