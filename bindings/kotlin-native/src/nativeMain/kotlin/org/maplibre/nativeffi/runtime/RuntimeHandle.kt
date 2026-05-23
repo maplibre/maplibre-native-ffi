@@ -20,6 +20,7 @@ import org.maplibre.nativeffi.internal.c.MLN_RUNTIME_OPTION_MAXIMUM_CACHE_SIZE
 import org.maplibre.nativeffi.internal.c.mln_network_status_get
 import org.maplibre.nativeffi.internal.c.mln_network_status_set
 import org.maplibre.nativeffi.internal.c.mln_offline_region_status
+import org.maplibre.nativeffi.internal.c.mln_runtime_clear_resource_transform
 import org.maplibre.nativeffi.internal.c.mln_runtime_create
 import org.maplibre.nativeffi.internal.c.mln_runtime_destroy
 import org.maplibre.nativeffi.internal.c.mln_runtime_event
@@ -45,6 +46,8 @@ import org.maplibre.nativeffi.internal.c.mln_runtime_options_default
 import org.maplibre.nativeffi.internal.c.mln_runtime_poll_event
 import org.maplibre.nativeffi.internal.c.mln_runtime_run_ambient_cache_operation_start
 import org.maplibre.nativeffi.internal.c.mln_runtime_run_once
+import org.maplibre.nativeffi.internal.c.mln_runtime_set_resource_transform
+import org.maplibre.nativeffi.internal.callback.ResourceTransformState
 import org.maplibre.nativeffi.internal.lifecycle.HandleState
 import org.maplibre.nativeffi.internal.memory.MemoryUtil
 import org.maplibre.nativeffi.internal.status.Status
@@ -54,12 +57,14 @@ import org.maplibre.nativeffi.offline.OfflineRegionDefinition
 import org.maplibre.nativeffi.offline.OfflineRegionDownloadState
 import org.maplibre.nativeffi.offline.OfflineRegionInfo
 import org.maplibre.nativeffi.offline.OfflineRegionStatus
+import org.maplibre.nativeffi.resource.ResourceTransformCallback
 
 /** Owned native runtime handle. Close it on the owner thread. */
 @OptIn(ExperimentalForeignApi::class)
 public class RuntimeHandle private constructor(handle: CPointer<mln_runtime>) : AutoCloseable {
   private val state = HandleState("RuntimeHandle", handle)
   private val liveMaps = mutableMapOf<Long, MapHandle>()
+  private var resourceTransformState: ResourceTransformState? = null
 
   public fun runOnce() {
     Status.check(mln_runtime_run_once(state.requireLive()))
@@ -378,6 +383,29 @@ public class RuntimeHandle private constructor(handle: CPointer<mln_runtime>) : 
     operation.markConsumed()
   }
 
+  public fun setResourceTransform(callback: ResourceTransformCallback) {
+    val replacement = ResourceTransformState(callback)
+    val previous: ResourceTransformState?
+    try {
+      Status.check(
+        mln_runtime_set_resource_transform(state.requireLive(), replacement.descriptor())
+      )
+      previous = resourceTransformState
+      resourceTransformState = replacement
+    } catch (error: Throwable) {
+      replacement.close()
+      throw error
+    }
+    previous?.close()
+  }
+
+  public fun clearResourceTransform() {
+    Status.check(mln_runtime_clear_resource_transform(state.requireLive()))
+    val previous = resourceTransformState
+    resourceTransformState = null
+    previous?.close()
+  }
+
   public fun pollEvent(): RuntimeEvent? = memScoped {
     val event = alloc<mln_runtime_event>()
     event.size = sizeOf<mln_runtime_event>().toUInt()
@@ -406,7 +434,10 @@ public class RuntimeHandle private constructor(handle: CPointer<mln_runtime>) : 
   }
 
   override fun close() {
-    state.closeOnce(::mln_runtime_destroy)
+    state.closeOnce(::mln_runtime_destroy) {
+      resourceTransformState?.close()
+      resourceTransformState = null
+    }
   }
 
   public fun isClosed(): Boolean = state.isReleased()
