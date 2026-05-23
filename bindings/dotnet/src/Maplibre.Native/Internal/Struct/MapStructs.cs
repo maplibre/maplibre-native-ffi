@@ -105,6 +105,33 @@ internal static class MapStructs
         return native;
     }
 
+    internal static mln_animation_options ToNative(AnimationOptions options)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        var native = NativeMethods.mln_animation_options_default();
+        if (options.Duration is { } duration)
+        {
+            native.fields |= (uint)mln_animation_option_field.MLN_ANIMATION_OPTION_DURATION;
+            native.duration_ms = duration;
+        }
+        if (options.Velocity is { } velocity)
+        {
+            native.fields |= (uint)mln_animation_option_field.MLN_ANIMATION_OPTION_VELOCITY;
+            native.velocity = velocity;
+        }
+        if (options.MinimumZoom is { } minimumZoom)
+        {
+            native.fields |= (uint)mln_animation_option_field.MLN_ANIMATION_OPTION_MIN_ZOOM;
+            native.min_zoom = minimumZoom;
+        }
+        if (options.Easing is { } easing)
+        {
+            native.fields |= (uint)mln_animation_option_field.MLN_ANIMATION_OPTION_EASING;
+            native.easing = new mln_unit_bezier { x1 = easing.X1, y1 = easing.Y1, x2 = easing.X2, y2 = easing.Y2 };
+        }
+        return native;
+    }
+
     internal static CameraOptions CameraOptionsFromNative(mln_camera_options native)
     {
         var options = new CameraOptions();

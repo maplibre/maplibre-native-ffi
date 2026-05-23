@@ -48,6 +48,37 @@ public sealed class MapCameraOptionsTests
     }
 
     [Fact]
+    public void CameraTransitionCommandsAcceptOptionalAnimationDescriptors()
+    {
+        NativeLibraryTestSupport.SkipUnlessNativeLibraryIsAvailable();
+        using var runtime = RuntimeHandle.Create();
+        using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
+        var camera = new CameraOptions { Center = new LatLng(0, 0), Zoom = 1 };
+        var animation = new AnimationOptions { Duration = 0, MinimumZoom = 0, Easing = new UnitBezier(0, 0, 1, 1) };
+
+        map.EaseTo(camera);
+        map.EaseTo(camera, animation);
+        map.FlyTo(camera);
+        map.FlyTo(camera, animation);
+        map.MoveBy(0, 0);
+        map.MoveByAnimated(0, 0);
+        map.MoveByAnimated(0, 0, animation);
+        map.ScaleBy(1);
+        map.ScaleBy(1, new ScreenPoint(256, 256));
+        map.ScaleByAnimated(1);
+        map.ScaleByAnimated(1, new ScreenPoint(256, 256));
+        map.ScaleByAnimated(1, animation);
+        map.ScaleByAnimated(1, new ScreenPoint(256, 256), animation);
+        map.RotateBy(new ScreenPoint(0, 0), new ScreenPoint(1, 1));
+        map.RotateByAnimated(new ScreenPoint(0, 0), new ScreenPoint(1, 1));
+        map.RotateByAnimated(new ScreenPoint(0, 0), new ScreenPoint(1, 1), animation);
+        map.PitchBy(0);
+        map.PitchByAnimated(0);
+        map.PitchByAnimated(0, animation);
+        map.CancelTransitions();
+    }
+
+    [Fact]
     public void JumpToAppliesCameraFieldsThroughNativeMap()
     {
         NativeLibraryTestSupport.SkipUnlessNativeLibraryIsAvailable();

@@ -1,4 +1,5 @@
 using Maplibre.Native.Camera;
+using Maplibre.Native.Geo;
 using Maplibre.Native.Internal.C;
 using Maplibre.Native.Internal.Handle;
 using Maplibre.Native.Internal.Memory;
@@ -137,6 +138,140 @@ public sealed unsafe class MapHandle : IDisposable
     {
         var nativeCamera = MapStructs.ToNative(camera);
         NativeStatus.Check(NativeMethods.mln_map_jump_to(Pointer, &nativeCamera));
+    }
+
+    /// <summary>Eases to the camera descriptor.</summary>
+    public void EaseTo(CameraOptions camera)
+    {
+        EaseTo(camera, animation: null);
+    }
+
+    /// <summary>Eases to the camera descriptor with animation options.</summary>
+    public void EaseTo(CameraOptions camera, AnimationOptions? animation)
+    {
+        var nativeCamera = MapStructs.ToNative(camera);
+        var nativeAnimation = animation is null ? default : MapStructs.ToNative(animation);
+        NativeStatus.Check(NativeMethods.mln_map_ease_to(Pointer, &nativeCamera, animation is null ? null : &nativeAnimation));
+    }
+
+    /// <summary>Flies to the camera descriptor.</summary>
+    public void FlyTo(CameraOptions camera)
+    {
+        FlyTo(camera, animation: null);
+    }
+
+    /// <summary>Flies to the camera descriptor with animation options.</summary>
+    public void FlyTo(CameraOptions camera, AnimationOptions? animation)
+    {
+        var nativeCamera = MapStructs.ToNative(camera);
+        var nativeAnimation = animation is null ? default : MapStructs.ToNative(animation);
+        NativeStatus.Check(NativeMethods.mln_map_fly_to(Pointer, &nativeCamera, animation is null ? null : &nativeAnimation));
+    }
+
+    /// <summary>Moves the map by a screen delta.</summary>
+    public void MoveBy(double deltaX, double deltaY)
+    {
+        NativeStatus.Check(NativeMethods.mln_map_move_by(Pointer, deltaX, deltaY));
+    }
+
+    /// <summary>Moves the map by a screen delta with default animation.</summary>
+    public void MoveByAnimated(double deltaX, double deltaY)
+    {
+        MoveByAnimated(deltaX, deltaY, animation: null);
+    }
+
+    /// <summary>Moves the map by a screen delta with animation options.</summary>
+    public void MoveByAnimated(double deltaX, double deltaY, AnimationOptions? animation)
+    {
+        var nativeAnimation = animation is null ? default : MapStructs.ToNative(animation);
+        NativeStatus.Check(NativeMethods.mln_map_move_by_animated(Pointer, deltaX, deltaY, animation is null ? null : &nativeAnimation));
+    }
+
+    /// <summary>Scales the map around its default anchor.</summary>
+    public void ScaleBy(double scale)
+    {
+        ScaleBy(scale, anchor: null);
+    }
+
+    /// <summary>Scales the map around a screen anchor.</summary>
+    public void ScaleBy(double scale, ScreenPoint? anchor)
+    {
+        var nativeAnchor = anchor is { } value ? MapStructs.ToNative(value) : default;
+        NativeStatus.Check(NativeMethods.mln_map_scale_by(Pointer, scale, anchor.HasValue ? &nativeAnchor : null));
+    }
+
+    /// <summary>Scales the map around its default anchor with default animation.</summary>
+    public void ScaleByAnimated(double scale)
+    {
+        ScaleByAnimated(scale, anchor: null, animation: null);
+    }
+
+    /// <summary>Scales the map around a screen anchor with default animation.</summary>
+    public void ScaleByAnimated(double scale, ScreenPoint anchor)
+    {
+        ScaleByAnimated(scale, anchor, animation: null);
+    }
+
+    /// <summary>Scales the map around its default anchor with animation options.</summary>
+    public void ScaleByAnimated(double scale, AnimationOptions animation)
+    {
+        ScaleByAnimated(scale, anchor: null, animation);
+    }
+
+    /// <summary>Scales the map around a screen anchor with animation options.</summary>
+    public void ScaleByAnimated(double scale, ScreenPoint? anchor, AnimationOptions? animation)
+    {
+        var nativeAnchor = anchor is { } anchorValue ? MapStructs.ToNative(anchorValue) : default;
+        var nativeAnimation = animation is null ? default : MapStructs.ToNative(animation);
+        NativeStatus.Check(NativeMethods.mln_map_scale_by_animated(Pointer, scale, anchor.HasValue ? &nativeAnchor : null, animation is null ? null : &nativeAnimation));
+    }
+
+    /// <summary>Rotates around two screen points.</summary>
+    public void RotateBy(ScreenPoint first, ScreenPoint second)
+    {
+        var nativeFirst = MapStructs.ToNative(first);
+        var nativeSecond = MapStructs.ToNative(second);
+        NativeStatus.Check(NativeMethods.mln_map_rotate_by(Pointer, nativeFirst, nativeSecond));
+    }
+
+    /// <summary>Rotates around two screen points with default animation.</summary>
+    public void RotateByAnimated(ScreenPoint first, ScreenPoint second)
+    {
+        RotateByAnimated(first, second, animation: null);
+    }
+
+    /// <summary>Rotates around two screen points with animation options.</summary>
+    public void RotateByAnimated(ScreenPoint first, ScreenPoint second, AnimationOptions? animation)
+    {
+        var nativeFirst = MapStructs.ToNative(first);
+        var nativeSecond = MapStructs.ToNative(second);
+        var nativeAnimation = animation is null ? default : MapStructs.ToNative(animation);
+        NativeStatus.Check(NativeMethods.mln_map_rotate_by_animated(Pointer, nativeFirst, nativeSecond, animation is null ? null : &nativeAnimation));
+    }
+
+    /// <summary>Pitches the map by a delta in degrees.</summary>
+    public void PitchBy(double pitch)
+    {
+        NativeStatus.Check(NativeMethods.mln_map_pitch_by(Pointer, pitch));
+    }
+
+    /// <summary>Pitches the map by a delta in degrees with default animation.</summary>
+    public void PitchByAnimated(double pitch)
+    {
+        PitchByAnimated(pitch, animation: null);
+    }
+
+    /// <summary>Pitches the map by a delta in degrees with animation options.</summary>
+    public void PitchByAnimated(double pitch, AnimationOptions? animation)
+    {
+        var nativeAnimation = animation is null ? default : MapStructs.ToNative(animation);
+        NativeStatus.Check(NativeMethods.mln_map_pitch_by_animated(Pointer, pitch, animation is null ? null : &nativeAnimation));
+    }
+
+    /// <summary>Cancels in-flight camera transitions.</summary>
+    public void CancelTransitions()
+    {
+        NativeStatus.Check(NativeMethods.mln_map_cancel_transitions(Pointer));
     }
 
     /// <summary>Loads a style URL through MapLibre Native style APIs.</summary>
