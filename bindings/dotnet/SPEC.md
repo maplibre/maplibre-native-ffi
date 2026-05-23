@@ -74,13 +74,17 @@ bindings/dotnet/
     Internal/Loader/NativeLibraryLoader.cs
     Internal/Memory/NativeUtf8String.cs
     Internal/Status/NativeStatus.cs
-    Map/
-      MapHandle.cs
-      MapMode.cs
-      MapOptions.cs
-    Runtime/
-      RuntimeHandle.cs
-      RuntimeOptions.cs
+    Camera/*.cs
+    Geo/*.cs
+    Json/*.cs
+    Log/*.cs
+    Map/*.cs
+    Offline/*.cs
+    Query/*.cs
+    Render/*.cs
+    Resource/*.cs
+    Runtime/*.cs
+    Style/*.cs
   tests/Maplibre.Native.Tests/
     GeneratedLayoutTests.cs
     MaplibreTests.cs
@@ -88,6 +92,7 @@ bindings/dotnet/
     NativeLibraryTestSupport.cs
     NativeStatusTests.cs
     NativeUtf8StringTests.cs
+    PublicApiSurfaceTests.cs
     Maplibre.Native.Tests.csproj
 ```
 
@@ -110,11 +115,16 @@ The scaffold implements one proof slice:
   pattern over generated C declarations.
 - `NativeUtf8String` rejects embedded NUL values and owns temporary UTF-8 C
   string storage for call-boundary inputs.
+- Public value, descriptor, enum, and placeholder handle types exist across the
+  concept namespaces so future method slices can fill behavior without changing
+  the broad API shape.
 - ClangSharp-generated files in `Generated/*.g.cs` cover the public C headers.
 - `GeneratedLayoutTests` verifies layout-sensitive binding facts that do not
   require the native library.
 - Native-library tests cover the C ABI version call and native status diagnostic
   mapping when run through `mise run //bindings/dotnet:test`.
+- `PublicApiSurfaceTests` keeps representative public concept types present as
+  the binding surface expands.
 
 ## Build artifacts and tasks
 
@@ -292,34 +302,21 @@ low-level contract intact.
 
 - `ConstrainMode`
 - `DebugOptions`
-- `LocationIndicatorImageKind`
 - `MapHandle`
 - `MapMode`
 - `MapOptions`
 - `MapProjectionHandle`
-- `MapTileOptions`
-- `MapViewportOptions`
 - `NorthOrientation`
-- `RasterDemEncoding`
+- `ProjectionModeOptions`
 - `RenderingStats`
-- `SourceInfo`
-- `SourceType`
-- `StyleImage`
-- `StyleImageInfo`
-- `StyleImageOptions`
 - `TileLodMode`
 - `TileOperation`
-- `TileScheme`
-- `TileSourceOptions`
-- `VectorTileEncoding`
+- `TileOptions`
 - `ViewportMode`
+- `ViewportOptions`
 
 ### `Offline`
 
-- `AmbientCacheOperation`
-- `OfflineOperationHandle`
-- `OfflineOperationKind`
-- `OfflineOperationResultKind`
 - `OfflineRegionDefinition`
 - `OfflineRegionDownloadState`
 - `OfflineRegionInfo`
@@ -374,17 +371,34 @@ low-level contract intact.
 
 ### `Runtime`
 
+- `AmbientCacheOperation`
+- `NetworkStatus`
+- `OfflineOperationHandle`
+- `OfflineOperationKind`
+- `OfflineOperationResultKind`
 - `RuntimeEvent`
 - `RuntimeEventPayload`
-- `RuntimeEventSource`
+- `RuntimeEventSourceType`
 - `RuntimeEventType`
 - `RuntimeHandle`
 - `RuntimeOptions`
 
 ### `Style`
 
-- Style source, layer, image, light, property, filter, and custom geometry
-  source APIs following the C API coverage map below.
+- `CustomGeometrySourceCallback`
+- `CustomGeometrySourceOptions`
+- `LocationIndicatorImageKind`
+- `RasterDemEncoding`
+- `SourceInfo`
+- `SourceType`
+- `StyleImage`
+- `StyleImageInfo`
+- `StyleImageOptions`
+- `TileScheme`
+- `TileSourceOptions`
+- `VectorTileEncoding`
+- Style layer, light, property, and filter APIs following the C API coverage map
+  below.
 
 ## Public type map
 
