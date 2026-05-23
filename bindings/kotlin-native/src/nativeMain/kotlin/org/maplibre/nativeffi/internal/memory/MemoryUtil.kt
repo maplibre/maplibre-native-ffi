@@ -7,6 +7,7 @@ import kotlinx.cinterop.MemScope
 import kotlinx.cinterop.cstr
 import kotlinx.cinterop.readBytes
 import kotlinx.cinterop.toCValues
+import kotlinx.cinterop.toKString
 
 /** Memory helpers for Kotlin/Native C ABI calls. */
 @OptIn(ExperimentalForeignApi::class)
@@ -31,4 +32,7 @@ internal object MemoryUtil {
   /** Copies explicit-length UTF-8 bytes from C-owned storage. */
   fun copyStringView(data: CPointer<ByteVar>?, size: ULong): String =
     if (data == null || size == 0UL) "" else data.readBytes(size.toInt()).decodeToString()
+
+  /** Copies a null-terminated UTF-8 C string from C-owned storage. */
+  fun copyCString(data: CPointer<ByteVar>?): String = data?.toKString() ?: ""
 }
