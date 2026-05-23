@@ -31,8 +31,14 @@ import org.maplibre.nativeffi.internal.c.mln_free_camera_options_default
 import org.maplibre.nativeffi.internal.c.mln_lat_lng
 import org.maplibre.nativeffi.internal.c.mln_map_add_geojson_source_data
 import org.maplibre.nativeffi.internal.c.mln_map_add_geojson_source_url
+import org.maplibre.nativeffi.internal.c.mln_map_add_raster_dem_source_tiles
+import org.maplibre.nativeffi.internal.c.mln_map_add_raster_dem_source_url
+import org.maplibre.nativeffi.internal.c.mln_map_add_raster_source_tiles
+import org.maplibre.nativeffi.internal.c.mln_map_add_raster_source_url
 import org.maplibre.nativeffi.internal.c.mln_map_add_style_layer_json
 import org.maplibre.nativeffi.internal.c.mln_map_add_style_source_json
+import org.maplibre.nativeffi.internal.c.mln_map_add_vector_source_tiles
+import org.maplibre.nativeffi.internal.c.mln_map_add_vector_source_url
 import org.maplibre.nativeffi.internal.c.mln_map_cancel_transitions
 import org.maplibre.nativeffi.internal.c.mln_map_copy_style_source_attribution
 import org.maplibre.nativeffi.internal.c.mln_map_create
@@ -104,6 +110,7 @@ import org.maplibre.nativeffi.json.JsonValue
 import org.maplibre.nativeffi.runtime.RuntimeHandle
 import org.maplibre.nativeffi.style.SourceInfo
 import org.maplibre.nativeffi.style.SourceType
+import org.maplibre.nativeffi.style.TileSourceOptions
 
 /** Owned native map handle. Close it on the map owner thread. */
 @OptIn(ExperimentalForeignApi::class)
@@ -238,6 +245,103 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
           state.requireLive(),
           CoreStructs.stringView(sourceId, this),
           ValueStructs.geoJson(data, this),
+        )
+      )
+    }
+  }
+
+  public fun addVectorSourceUrl(sourceId: String, url: String, options: TileSourceOptions? = null) {
+    memScoped {
+      Status.check(
+        mln_map_add_vector_source_url(
+          state.requireLive(),
+          CoreStructs.stringView(sourceId, this),
+          CoreStructs.stringView(url, this),
+          StyleStructs.tileSourceOptions(options, this),
+        )
+      )
+    }
+  }
+
+  public fun addVectorSourceTiles(
+    sourceId: String,
+    tiles: List<String>,
+    options: TileSourceOptions? = null,
+  ) {
+    memScoped {
+      Status.check(
+        mln_map_add_vector_source_tiles(
+          state.requireLive(),
+          CoreStructs.stringView(sourceId, this),
+          StyleStructs.stringViewArray(tiles, this),
+          tiles.size.toULong(),
+          StyleStructs.tileSourceOptions(options, this),
+        )
+      )
+    }
+  }
+
+  public fun addRasterSourceUrl(sourceId: String, url: String, options: TileSourceOptions? = null) {
+    memScoped {
+      Status.check(
+        mln_map_add_raster_source_url(
+          state.requireLive(),
+          CoreStructs.stringView(sourceId, this),
+          CoreStructs.stringView(url, this),
+          StyleStructs.tileSourceOptions(options, this),
+        )
+      )
+    }
+  }
+
+  public fun addRasterSourceTiles(
+    sourceId: String,
+    tiles: List<String>,
+    options: TileSourceOptions? = null,
+  ) {
+    memScoped {
+      Status.check(
+        mln_map_add_raster_source_tiles(
+          state.requireLive(),
+          CoreStructs.stringView(sourceId, this),
+          StyleStructs.stringViewArray(tiles, this),
+          tiles.size.toULong(),
+          StyleStructs.tileSourceOptions(options, this),
+        )
+      )
+    }
+  }
+
+  public fun addRasterDemSourceUrl(
+    sourceId: String,
+    url: String,
+    options: TileSourceOptions? = null,
+  ) {
+    memScoped {
+      Status.check(
+        mln_map_add_raster_dem_source_url(
+          state.requireLive(),
+          CoreStructs.stringView(sourceId, this),
+          CoreStructs.stringView(url, this),
+          StyleStructs.tileSourceOptions(options, this),
+        )
+      )
+    }
+  }
+
+  public fun addRasterDemSourceTiles(
+    sourceId: String,
+    tiles: List<String>,
+    options: TileSourceOptions? = null,
+  ) {
+    memScoped {
+      Status.check(
+        mln_map_add_raster_dem_source_tiles(
+          state.requireLive(),
+          CoreStructs.stringView(sourceId, this),
+          StyleStructs.stringViewArray(tiles, this),
+          tiles.size.toULong(),
+          StyleStructs.tileSourceOptions(options, this),
         )
       )
     }

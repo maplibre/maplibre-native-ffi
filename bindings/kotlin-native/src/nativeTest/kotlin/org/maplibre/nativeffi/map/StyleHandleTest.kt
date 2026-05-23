@@ -10,7 +10,11 @@ import org.maplibre.nativeffi.geo.Geometry
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.json.JsonValue
 import org.maplibre.nativeffi.runtime.RuntimeHandle
+import org.maplibre.nativeffi.style.RasterDemEncoding
 import org.maplibre.nativeffi.style.SourceType
+import org.maplibre.nativeffi.style.TileScheme
+import org.maplibre.nativeffi.style.TileSourceOptions
+import org.maplibre.nativeffi.style.VectorTileEncoding
 
 class StyleHandleTest {
   @Test
@@ -60,6 +64,43 @@ class StyleHandleTest {
       assertFalse(map.styleLayerExists("park-circles"))
       assertTrue(map.removeStyleSource("parks"))
       assertFalse(map.styleSourceExists("parks"))
+    } finally {
+      map.close()
+      runtime.close()
+    }
+  }
+
+  @Test
+  fun tileSourceApisMaterializeOptionsAndTileUrlLists() {
+    val runtime = RuntimeHandle.create()
+    val map = MapHandle.create(runtime, MapOptions().size(128, 128))
+    try {
+      map.setStyleJson("{\"version\":8,\"sources\":{},\"layers\":[]}")
+      map.addVectorSourceTiles(
+        "vector",
+        listOf("https://example.com/vector/{z}/{x}/{y}.pbf"),
+        TileSourceOptions()
+          .minZoom(0.0)
+          .maxZoom(14.0)
+          .attribution("vector attribution")
+          .scheme(TileScheme.XYZ)
+          .tileSize(512U)
+          .vectorEncoding(VectorTileEncoding.MVT),
+      )
+      assertEquals(SourceType.VECTOR, map.styleSourceType("vector"))
+      assertEquals("vector attribution", map.styleSourceInfo("vector")?.attribution)
+      map.addRasterSourceTiles(
+        "raster",
+        listOf("https://example.com/raster/{z}/{x}/{y}.png"),
+        TileSourceOptions().tileSize(256U).scheme(TileScheme.TMS),
+      )
+      assertEquals(SourceType.RASTER, map.styleSourceType("raster"))
+      map.addRasterDemSourceTiles(
+        "dem",
+        listOf("https://example.com/dem/{z}/{x}/{y}.png"),
+        TileSourceOptions().tileSize(512U).rasterDemEncoding(RasterDemEncoding.TERRARIUM),
+      )
+      assertEquals(SourceType.RASTER_DEM, map.styleSourceType("dem"))
     } finally {
       map.close()
       runtime.close()
