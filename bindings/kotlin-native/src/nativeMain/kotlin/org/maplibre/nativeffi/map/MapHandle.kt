@@ -7,6 +7,8 @@ import kotlinx.cinterop.CPointerVarOf
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.UIntVar
 import kotlinx.cinterop.alloc
+import kotlinx.cinterop.allocArray
+import kotlinx.cinterop.get
 import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.pointed
 import kotlinx.cinterop.ptr
@@ -15,10 +17,12 @@ import org.maplibre.nativeffi.camera.AnimationOptions
 import org.maplibre.nativeffi.camera.BoundOptions
 import org.maplibre.nativeffi.camera.CameraOptions
 import org.maplibre.nativeffi.camera.FreeCameraOptions
+import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.ScreenPoint
 import org.maplibre.nativeffi.internal.c.mln_bound_options_default
 import org.maplibre.nativeffi.internal.c.mln_camera_options_default
 import org.maplibre.nativeffi.internal.c.mln_free_camera_options_default
+import org.maplibre.nativeffi.internal.c.mln_lat_lng
 import org.maplibre.nativeffi.internal.c.mln_map_cancel_transitions
 import org.maplibre.nativeffi.internal.c.mln_map_create
 import org.maplibre.nativeffi.internal.c.mln_map_destroy
@@ -35,12 +39,16 @@ import org.maplibre.nativeffi.internal.c.mln_map_get_tile_options
 import org.maplibre.nativeffi.internal.c.mln_map_get_viewport_options
 import org.maplibre.nativeffi.internal.c.mln_map_is_fully_loaded
 import org.maplibre.nativeffi.internal.c.mln_map_jump_to
+import org.maplibre.nativeffi.internal.c.mln_map_lat_lng_for_pixel
+import org.maplibre.nativeffi.internal.c.mln_map_lat_lngs_for_pixels
 import org.maplibre.nativeffi.internal.c.mln_map_move_by
 import org.maplibre.nativeffi.internal.c.mln_map_move_by_animated
 import org.maplibre.nativeffi.internal.c.mln_map_options
 import org.maplibre.nativeffi.internal.c.mln_map_options_default
 import org.maplibre.nativeffi.internal.c.mln_map_pitch_by
 import org.maplibre.nativeffi.internal.c.mln_map_pitch_by_animated
+import org.maplibre.nativeffi.internal.c.mln_map_pixel_for_lat_lng
+import org.maplibre.nativeffi.internal.c.mln_map_pixels_for_lat_lngs
 import org.maplibre.nativeffi.internal.c.mln_map_request_repaint
 import org.maplibre.nativeffi.internal.c.mln_map_request_still_image
 import org.maplibre.nativeffi.internal.c.mln_map_rotate_by
@@ -59,6 +67,7 @@ import org.maplibre.nativeffi.internal.c.mln_map_set_viewport_options
 import org.maplibre.nativeffi.internal.c.mln_map_tile_options_default
 import org.maplibre.nativeffi.internal.c.mln_map_viewport_options_default
 import org.maplibre.nativeffi.internal.c.mln_projection_mode_default
+import org.maplibre.nativeffi.internal.c.mln_screen_point
 import org.maplibre.nativeffi.internal.lifecycle.HandleState
 import org.maplibre.nativeffi.internal.memory.MemoryUtil
 import org.maplibre.nativeffi.internal.status.Status
@@ -348,6 +357,54 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
         )
       )
     }
+  }
+
+  public fun pixelForLatLng(coordinate: LatLng): ScreenPoint = memScoped {
+    val outPoint = alloc<mln_screen_point>()
+    Status.check(
+      mln_map_pixel_for_lat_lng(state.requireLive(), CoreStructs.latLng(coordinate), outPoint.ptr)
+    )
+    CoreStructs.screenPoint(outPoint)
+  }
+
+  public fun latLngForPixel(point: ScreenPoint): LatLng = memScoped {
+    val outCoordinate = alloc<mln_lat_lng>()
+    Status.check(
+      mln_map_lat_lng_for_pixel(
+        state.requireLive(),
+        CoreStructs.screenPoint(point),
+        outCoordinate.ptr,
+      )
+    )
+    CoreStructs.latLng(outCoordinate)
+  }
+
+  public fun pixelsForLatLngs(coordinates: List<LatLng>): List<ScreenPoint> = memScoped {
+    if (coordinates.isEmpty()) return@memScoped emptyList()
+    val outPoints = allocArray<mln_screen_point>(coordinates.size)
+    Status.check(
+      mln_map_pixels_for_lat_lngs(
+        state.requireLive(),
+        CoreStructs.latLngArray(coordinates, this),
+        coordinates.size.toULong(),
+        outPoints,
+      )
+    )
+    CoreStructs.screenPointArray(outPoints, coordinates.size)
+  }
+
+  public fun latLngsForPixels(points: List<ScreenPoint>): List<LatLng> = memScoped {
+    if (points.isEmpty()) return@memScoped emptyList()
+    val outCoordinates = allocArray<mln_lat_lng>(points.size)
+    Status.check(
+      mln_map_lat_lngs_for_pixels(
+        state.requireLive(),
+        CoreStructs.screenPointArray(points, this),
+        points.size.toULong(),
+        outCoordinates,
+      )
+    )
+    CoreStructs.latLngArray(outCoordinates, points.size)
   }
 
   public fun createProjection(): MapProjectionHandle = MapProjectionHandle.create(this)

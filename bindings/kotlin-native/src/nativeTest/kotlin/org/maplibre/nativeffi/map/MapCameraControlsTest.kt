@@ -78,6 +78,10 @@ class MapCameraControlsTest {
         assertTrue(freeCamera.hasOrientation())
         map.setProjectionMode(ProjectionModeOptions().axonometric(false))
         assertTrue(map.projectionMode().hasAxonometric())
+        val point = map.pixelForLatLng(LatLng(0.0, 0.0))
+        map.latLngForPixel(point)
+        assertEquals(2, map.pixelsForLatLngs(listOf(LatLng(0.0, 0.0), LatLng(1.0, 1.0))).size)
+        assertEquals(2, map.latLngsForPixels(listOf(point, point)).size)
         map.createProjection().close()
         map.dumpDebugLogs()
       } finally {

@@ -6,7 +6,10 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlinx.cinterop.ExperimentalForeignApi
 import org.maplibre.nativeffi.camera.CameraOptions
+import org.maplibre.nativeffi.camera.EdgeInsets
 import org.maplibre.nativeffi.error.InvalidStateException
+import org.maplibre.nativeffi.geo.Geometry
+import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.runtime.RuntimeHandle
 
 @OptIn(ExperimentalForeignApi::class)
@@ -23,6 +26,15 @@ class MapProjectionHandleTest {
       val camera = projection.camera()
       kotlin.test.assertTrue(camera.hasCenter())
       kotlin.test.assertTrue(camera.hasZoom())
+      projection.setVisibleCoordinates(listOf(LatLng(0.0, 0.0), LatLng(1.0, 1.0)), EdgeInsets.ZERO)
+      projection.setVisibleGeometry(
+        Geometry.lineString(listOf(LatLng(0.0, 0.0), LatLng(1.0, 1.0))),
+        EdgeInsets.ZERO,
+      )
+      val point = projection.pixelForLatLng(LatLng(0.0, 0.0))
+      projection.latLngForPixel(point)
+      val meters = MapProjectionHandle.projectedMetersForLatLng(LatLng(0.0, 0.0))
+      MapProjectionHandle.latLngForProjectedMeters(meters)
       map.close()
       projection.close()
 
