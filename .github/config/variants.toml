@@ -18,29 +18,24 @@ requires = { platform = ["linux", "macos", "windows"], backend = ["metal", "vulk
 
 [examples.lwjgl-map]
 task = "//examples/lwjgl-map:build"
-requires = { platform = ["linux", "macos"], backend = ["vulkan"] }
+requires = { platform = ["linux", "macos", "windows"], backend = ["vulkan"] }
 
 [examples.rust-map]
 task = "//examples/rust-map:ci"
-requires = { platform = ["linux"], backend = ["vulkan"] }
+requires = { platform = ["linux", "macos", "windows"], backend = ["vulkan"] }
 
 [examples.zig-readback]
 task = "//examples/zig-readback:run"
-requires = { platform = ["linux", "macos"], backend = ["metal", "vulkan"] }
-
-# Windows Vulkan readback builds, but runtime readback currently crashes.
-[examples.zig-readback-windows-build]
-task = "//examples/zig-readback:build"
-requires = { platform = ["windows"], backend = ["vulkan"] }
+requires = { platform = ["linux", "macos", "windows"], backend = ["metal", "vulkan"] }
 
 [bindings.java-ffm]
 task = "//bindings/java-ffm:build"
-requires = { platform = ["linux", "macos"] }
+requires = { platform = ["linux", "macos", "windows"] }
 
 [bindings.rust]
 task = "//bindings/rust:ci"
-requires = { platform = ["linux", "macos"] }
+requires = { platform = ["linux", "macos", "windows"] }
 
 [bindings.zig]
 task = "//bindings/zig:ci"
-requires = { platform = ["linux", "macos"], backend = ["metal", "vulkan"] }
+requires = { platform = ["linux", "macos", "windows"], backend = ["metal", "vulkan"] }
