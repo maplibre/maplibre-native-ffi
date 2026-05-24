@@ -11,9 +11,9 @@ pin = true
 experimental = true
 python.uv_venv_auto = "create|source"
 windows_default_file_shell_args = '"C:/Program Files/Git/bin/bash.exe"'
-windows_default_inline_shell_args = 'pixi run --locked -x "C:/Program Files/Git/bin/bash.exe" -lc'
+windows_default_inline_shell_args = 'pixi run --locked -x "C:/Program Files/Git/bin/bash.exe" -e -lc'
 unix_default_file_shell_args = "bash"
-unix_default_inline_shell_args = "pixi run --locked -x bash -lc"
+unix_default_inline_shell_args = "pixi run --locked -x bash -e -lc"
 # On Windows, the Microsoft Store Python alias in WindowsApps can appear before
 # mise-managed Python. Keep mise tool paths first so file tasks run pinned tools.
 activate_aggressive = true
