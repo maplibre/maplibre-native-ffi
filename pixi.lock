@@ -403,7 +403,7 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/win-64/bzip2-1.0.8-h0ad9c76_9.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/clang-format-19.1.7-default_hac490eb_9.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/clang-tools-19.1.7-default_hac490eb_9.conda
-      - conda: https://conda.anaconda.org/conda-forge/win-64/cmake-4.0.2-hff78f93_0.conda
+      - conda: https://conda.anaconda.org/conda-forge/win-64/cmake-4.3.2-hdcbee5b_0.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/cxx-compiler-1.11.0-h1c1089f_0.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/dlfcn-win32-1.4.2-hac47afa_0.conda
       - conda: https://conda.anaconda.org/conda-forge/win-64/doxygen-1.13.2-hbf3f430_0.conda
@@ -5538,23 +5538,23 @@ packages:
   license_family: Apache
   size: 312003159
   timestamp: 1778465948822
-- conda: https://conda.anaconda.org/conda-forge/win-64/cmake-4.0.2-hff78f93_0.conda
-  sha256: 7051953d675669c7b72b6c04cae19b43deadf2169d733a5ad39455d7c429ccdc
-  md5: 6f79befc305ed7a99f52989fa34a007e
+- conda: https://conda.anaconda.org/conda-forge/win-64/cmake-4.3.2-hdcbee5b_0.conda
+  sha256: 517c6c6ded915b5ad6b4dac2d35a5ab2383a33011e6bc18a21058c27b8187099
+  md5: a4d609ce79895c878eb414c758083168
   depends:
   - bzip2 >=1.0.8,<2.0a0
-  - libcurl >=8.13.0,<9.0a0
-  - libexpat >=2.7.0,<3.0a0
-  - liblzma >=5.8.1,<6.0a0
-  - libuv >=1.50.0,<2.0a0
-  - libzlib >=1.3.1,<2.0a0
+  - libcurl >=8.19.0,<9.0a0
+  - libexpat >=2.7.5,<3.0a0
+  - liblzma >=5.8.3,<6.0a0
+  - libuv >=1.51.0,<2.0a0
+  - libzlib >=1.3.2,<2.0a0
   - ucrt >=10.0.20348.0
-  - vc14_runtime >=14.29.30139
+  - vc14_runtime >=14.44.35208
   - zstd >=1.5.7,<1.6.0a0
   license: BSD-3-Clause
   license_family: BSD
-  size: 14329556
-  timestamp: 1746496587445
+  size: 16090645
+  timestamp: 1776800923287
 - conda: https://conda.anaconda.org/conda-forge/win-64/cxx-compiler-1.11.0-h1c1089f_0.conda
   sha256: c888f4fe9ec117c1c01bfaa4c722ca475ebbb341c92d1718afa088bb0d710619
   md5: 4d94d3c01add44dc9d24359edf447507
