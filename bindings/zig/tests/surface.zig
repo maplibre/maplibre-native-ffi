@@ -95,6 +95,8 @@ test "surface public descriptors report invalid native arguments" {
                 .device = fake,
                 .graphics_queue = fake,
                 .graphics_queue_family_index = 0,
+                .get_instance_proc_addr = null,
+                .get_device_proc_addr = null,
             },
             .surface = fake,
         };
@@ -119,6 +121,8 @@ test "unsupported public surface backends report unsupported" {
                 .device = fake,
                 .graphics_queue = fake,
                 .graphics_queue_family_index = 0,
+                .get_instance_proc_addr = null,
+                .get_device_proc_addr = null,
             },
             .surface = fake,
         }));

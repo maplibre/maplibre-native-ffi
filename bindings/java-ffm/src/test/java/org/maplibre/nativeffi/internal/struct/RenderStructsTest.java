@@ -32,11 +32,12 @@ final class RenderStructsTest {
     var metalContext = new MetalContextDescriptor(NativePointer.ofAddress(0x1234));
     var vulkanContext =
         new VulkanContextDescriptor(
-            NativePointer.ofAddress(0x10),
-            NativePointer.ofAddress(0x20),
-            NativePointer.ofAddress(0x30),
-            NativePointer.ofAddress(0x40),
-            7);
+                NativePointer.ofAddress(0x10),
+                NativePointer.ofAddress(0x20),
+                NativePointer.ofAddress(0x30),
+                NativePointer.ofAddress(0x40),
+                7)
+            .procAddresses(NativePointer.ofAddress(0x50), NativePointer.ofAddress(0x60));
 
     try (var arena = Arena.ofConfined()) {
       var metalOwnedTexture =
@@ -150,6 +151,12 @@ final class RenderStructsTest {
     assertEquals(
         expected.graphicsQueueFamilyIndex(),
         mln_vulkan_context_descriptor.graphics_queue_family_index(segment));
+    assertPointer(
+        expected.getInstanceProcAddr().address(),
+        mln_vulkan_context_descriptor.get_instance_proc_addr(segment));
+    assertPointer(
+        expected.getDeviceProcAddr().address(),
+        mln_vulkan_context_descriptor.get_device_proc_addr(segment));
   }
 
   private static void assertPointer(long expectedAddress, MemorySegment segment) {

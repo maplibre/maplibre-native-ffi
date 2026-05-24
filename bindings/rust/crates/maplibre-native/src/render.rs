@@ -222,6 +222,8 @@ pub struct VulkanContextDescriptor {
     pub device: NativePointer,
     pub graphics_queue: NativePointer,
     pub graphics_queue_family_index: u32,
+    pub get_instance_proc_addr: NativePointer,
+    pub get_device_proc_addr: NativePointer,
 }
 
 impl VulkanContextDescriptor {
@@ -239,7 +241,19 @@ impl VulkanContextDescriptor {
             device,
             graphics_queue,
             graphics_queue_family_index,
+            get_instance_proc_addr: NativePointer::NULL,
+            get_device_proc_addr: NativePointer::NULL,
         }
+    }
+
+    pub fn with_proc_addresses(
+        mut self,
+        get_instance_proc_addr: NativePointer,
+        get_device_proc_addr: NativePointer,
+    ) -> Self {
+        self.get_instance_proc_addr = get_instance_proc_addr;
+        self.get_device_proc_addr = get_device_proc_addr;
+        self
     }
 
     pub(crate) fn to_core(&self) -> maplibre_core::render::VulkanContextDescriptorFields {
@@ -249,6 +263,8 @@ impl VulkanContextDescriptor {
             device: self.device.as_void_ptr(),
             graphics_queue: self.graphics_queue.as_void_ptr(),
             graphics_queue_family_index: self.graphics_queue_family_index,
+            get_instance_proc_addr: self.get_instance_proc_addr.as_void_ptr(),
+            get_device_proc_addr: self.get_device_proc_addr.as_void_ptr(),
         }
     }
 }

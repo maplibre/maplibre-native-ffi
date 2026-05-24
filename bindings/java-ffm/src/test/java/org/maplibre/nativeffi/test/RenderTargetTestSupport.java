@@ -188,7 +188,12 @@ public final class RenderTargetTestSupport implements AutoCloseable {
 
     static VulkanTestContext create() {
       if (VK.getFunctionProvider() == null) {
-        VK.create();
+        var loader = System.getenv("MLN_FFI_SOFTWARE_VULKAN_LOADER");
+        if (loader == null || loader.isBlank()) {
+          VK.create();
+        } else {
+          VK.create(loader);
+        }
       }
       var context = new VulkanTestContext();
       try {
@@ -204,11 +209,16 @@ public final class RenderTargetTestSupport implements AutoCloseable {
 
     VulkanContextDescriptor descriptor() {
       return new VulkanContextDescriptor(
-          NativePointer.ofAddress(instance.address()),
-          NativePointer.ofAddress(physicalDevice.address()),
-          NativePointer.ofAddress(device.address()),
-          NativePointer.ofAddress(graphicsQueue.address()),
-          graphicsQueueFamilyIndex);
+              NativePointer.ofAddress(instance.address()),
+              NativePointer.ofAddress(physicalDevice.address()),
+              NativePointer.ofAddress(device.address()),
+              NativePointer.ofAddress(graphicsQueue.address()),
+              graphicsQueueFamilyIndex)
+          .procAddresses(
+              NativePointer.ofAddress(
+                  VK.getFunctionProvider().getFunctionAddress("vkGetInstanceProcAddr")),
+              NativePointer.ofAddress(
+                  VK.getFunctionProvider().getFunctionAddress("vkGetDeviceProcAddr")));
     }
 
     private void createInstance() {
