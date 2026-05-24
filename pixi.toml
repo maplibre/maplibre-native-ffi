@@ -70,7 +70,7 @@ vulkan-tools = ">=1.4.341,<2"
 
 # Native libraries linked by project code, examples, and vendored MapLibre Native.
 icu = ">=78,<79"
-libcurl = ">=8,<9"
+libcurl = ">=8,<8.20"
 libjpeg-turbo = ">=3.1,<4"
 libpng = ">=1.6,<2"
 libuv = ">=1,<2"
@@ -94,6 +94,5 @@ moltenvk = ">=1.4.1,<2"
 
 [target.win-64.dependencies]
 dlfcn-win32 = ">=1.4,<2"
-libcurl = "==8.13.0"
 # Provides Mesa's lavapipe Vulkan ICD for Windows machines without a hardware GPU.
 mesalib = ">=26.0.3,<27"
