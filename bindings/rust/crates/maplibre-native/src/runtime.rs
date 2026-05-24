@@ -903,8 +903,16 @@ mod tests {
 
     #[test]
     fn runtime_ambient_cache_operations_use_real_c_abi() {
-        let runtime =
-            RuntimeHandle::with_options(&RuntimeOptions::new().with_maximum_cache_size(0)).unwrap();
+        let base = unique_temp_dir("maplibre-rust-ambient-cache");
+        let cache = base.join("ambient.db");
+        std::fs::create_dir_all(&base).unwrap();
+
+        let runtime = RuntimeHandle::with_options(
+            &RuntimeOptions::new()
+                .with_cache_path(cache.to_string_lossy())
+                .with_maximum_cache_size(0),
+        )
+        .unwrap();
 
         for operation in [
             AmbientCacheOperation::PackDatabase,
@@ -919,6 +927,7 @@ mod tests {
         }
 
         runtime.close().unwrap();
+        std::fs::remove_dir_all(base).unwrap();
     }
 
     #[test]
