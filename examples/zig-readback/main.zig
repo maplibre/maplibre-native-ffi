@@ -11,16 +11,7 @@ const vk = if (build_options.supports_vulkan) @cImport({
 
 const width = 512;
 const height = 512;
-const style_json =
-    \\{
-    \\  "version": 8,
-    \\  "name": "zig-readback",
-    \\  "sources": {},
-    \\  "layers": [
-    \\    {"id":"background","type":"background","paint":{"background-color":"#d8f1ff"}}
-    \\  ]
-    \\}
-;
+const style_url = "https://tiles.openfreemap.org/styles/bright";
 
 pub fn main(init_args: std.process.Init) !void {
     const allocator = init_args.gpa;
@@ -40,7 +31,7 @@ pub fn main(init_args: std.process.Init) !void {
         .width = width,
         .height = height,
         .scale_factor = 1.0,
-        .mode = .continuous,
+        .mode = .static,
     });
     defer map.close() catch {};
 
@@ -51,7 +42,8 @@ pub fn main(init_args: std.process.Init) !void {
     const texture = &texture_target.session;
 
     try setInitialCamera(&map);
-    try map.setStyleJson(allocator, style_json);
+    try map.setStyleUrl(allocator, style_url);
+    try map.requestStillImage();
     try renderTexture(&runtime, &map, texture);
 
     var image = try texture.readPremultipliedRgba8(allocator);
@@ -276,25 +268,31 @@ fn renderTexture(
     texture: *maplibre.RenderSessionHandle,
 ) !void {
     const map_id = try map.id();
-    for (0..10_000) |_| {
+    var rendered_frame = false;
+    for (0..5_000) |_| {
         try runtime.runOnce();
         while (try runtime.pollEvent()) |event| {
             if (event.source_type != .map or event.source_id == null or !std.meta.eql(event.source_id.?, map_id)) continue;
             switch (event.event_type) {
+                .map_render_update_available => {
+                    texture.renderUpdate() catch |err| switch (err) {
+                        error.InvalidState => continue,
+                        else => return err,
+                    };
+                    rendered_frame = true;
+                },
+                .map_still_image_finished => {
+                    if (!rendered_frame) return error.StillImageFinishedWithoutFrame;
+                    return;
+                },
                 .map_loading_failed => return error.MapLoadingFailed,
                 .map_render_error => return error.MapRenderFailed,
+                .map_still_image_failed => return error.StillImageFailed,
                 else => {},
             }
         }
 
-        texture.renderUpdate() catch |err| switch (err) {
-            error.InvalidState => {
-                std.Thread.yield() catch {};
-                continue;
-            },
-            else => return err,
-        };
-        return;
+        std.Thread.yield() catch {};
     }
     return error.RenderTimedOut;
 }
