@@ -92,3 +92,4 @@ moltenvk = ">=1.4.1,<2"
 
 [target.win-64.dependencies]
 dlfcn-win32 = ">=1.4,<2"
+libcurl = "==8.13.0"

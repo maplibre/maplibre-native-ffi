@@ -44,7 +44,7 @@ pub fn main(init_args: std.process.Init) !void {
     try setInitialCamera(&map);
     try map.setStyleUrl(allocator, style_url);
     try map.requestStillImage();
-    try renderTexture(&runtime, &map, texture);
+    try renderTexture(init_args.io, &runtime, &map, texture);
 
     var image = try texture.readPremultipliedRgba8(allocator);
     defer image.deinit();
@@ -263,13 +263,15 @@ fn setInitialCamera(map: *maplibre.MapHandle) !void {
 }
 
 fn renderTexture(
+    io: std.Io,
     runtime: *maplibre.RuntimeHandle,
     map: *maplibre.MapHandle,
     texture: *maplibre.RenderSessionHandle,
 ) !void {
     const map_id = try map.id();
     var rendered_frame = false;
-    for (0..5_000) |_| {
+    const started = std.Io.Clock.awake.now(io);
+    while (started.durationTo(std.Io.Clock.awake.now(io)).toNanoseconds() < 5 * std.time.ns_per_s) {
         try runtime.runOnce();
         while (try runtime.pollEvent()) |event| {
             if (event.source_type != .map or event.source_id == null or !std.meta.eql(event.source_id.?, map_id)) continue;
@@ -292,7 +294,7 @@ fn renderTexture(
             }
         }
 
-        std.Thread.yield() catch {};
+        try io.sleep(.fromMilliseconds(10), .awake);
     }
     return error.RenderTimedOut;
 }
