@@ -5,9 +5,11 @@ const testing = std.testing;
 const support = @import("support.zig");
 const c = support.c;
 
-extern fn usleep(useconds: c_uint) c_int;
-
 const offline_style_url = "http://example.com/offline-style.json";
+
+fn sleepOneMillisecond() !void {
+    try testing.io.sleep(.fromMilliseconds(1), .awake);
+}
 
 fn emptyEvent() c.mln_runtime_event {
     return .{
@@ -36,7 +38,7 @@ fn waitForOfflineOperation(runtime: *c.mln_runtime, operation_id: c.mln_offline_
             const payload: *const c.mln_runtime_event_offline_operation_completed = @ptrCast(@alignCast(event.payload orelse return error.MissingPayload));
             if (payload.operation_id == operation_id) return payload.*;
         }
-        _ = usleep(1000);
+        try sleepOneMillisecond();
     }
     return error.OperationNotCompleted;
 }
@@ -232,7 +234,7 @@ test "offline take result before polling removes queued completion event" {
             break;
         }
         try testing.expectEqual(c.MLN_STATUS_INVALID_STATE, take_status);
-        _ = usleep(1000);
+        try sleepOneMillisecond();
     }
     try testing.expect(took_result);
     const snapshot_handle = snapshot orelse return error.MissingSnapshot;
