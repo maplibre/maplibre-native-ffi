@@ -49,6 +49,8 @@ LIBCLANG_PATH = "%CONDA_PREFIX%\\Library\\bin"
 MLN_FFI_DEPENDENCY_INCLUDE_DIR = "%CONDA_PREFIX%\\Library\\include"
 MLN_FFI_DEPENDENCY_LIBRARY_DIR = "%CONDA_PREFIX%\\Library\\lib"
 RUSTFLAGS = "-L native=%CONDA_PREFIX%\\Library\\lib"
+# Add Pixi's lavapipe ICD as a fallback for Windows CI without hiding hardware drivers.
+VK_ADD_DRIVER_FILES = "%CONDA_PREFIX%\\Library\\share\\vulkan\\icd.d\\lvp_icd.x86_64.json"
 
 [feature.format.dependencies]
 # Formatting stays on a single clang-format version across platforms.
@@ -93,3 +95,5 @@ moltenvk = ">=1.4.1,<2"
 [target.win-64.dependencies]
 dlfcn-win32 = ">=1.4,<2"
 libcurl = "==8.13.0"
+# Provides Mesa's lavapipe Vulkan ICD for Windows machines without a hardware GPU.
+mesalib = ">=26.0.3,<27"
