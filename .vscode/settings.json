@@ -3,5 +3,6 @@
   "editor.defaultFormatter": "dprint.dprint",
   "git.ignoreSubmodules": true,
   "git.detectSubmodules": false,
-  "python.defaultInterpreterPath": "${workspaceFolder}/.venv"
+  "python.defaultInterpreterPath": "${workspaceFolder}/.venv",
+  "json.schemaDownload.trustedDomains": { "https://dprint.dev": true }
 }
