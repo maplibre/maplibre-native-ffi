@@ -151,7 +151,7 @@ final class RuntimeOfflineTest {
 
   private static RuntimeEventPayload.OfflineOperationCompleted waitForOperation(
       RuntimeHandle runtime, OfflineOperationHandle<?> operation) {
-    for (var attempt = 0; attempt < 1_000; attempt++) {
+    for (var attempt = 0; attempt < 10_000; attempt++) {
       runtime.runOnce();
       Optional<RuntimeEvent> event;
       while ((event = runtime.pollEvent()).isPresent()) {

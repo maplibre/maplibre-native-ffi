@@ -16,6 +16,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-env-changed=BINDGEN_EXTRA_CLANG_ARGS");
     print_rerun_if_changed(&repo_root.join("include"));
 
+    set_repo_libclang_path(&repo_root);
+
     println!("cargo:rustc-link-search=native={}", build_dir.display());
     if let Some(dependency_library_dir) = dependency_library_dir() {
         println!(
@@ -46,6 +48,27 @@ fn main() -> Result<(), Box<dyn Error>> {
 
 fn dependency_library_dir() -> Option<PathBuf> {
     env::var_os("MLN_FFI_DEPENDENCY_LIBRARY_DIR").map(PathBuf::from)
+}
+
+fn set_repo_libclang_path(repo_root: &Path) {
+    if env::var("LIBCLANG_PATH").is_ok_and(|value| !value.is_empty()) {
+        return;
+    }
+
+    let libclang_path = if cfg!(windows) {
+        repo_root.join(".pixi/envs/default/Library/bin")
+    } else {
+        repo_root.join(".pixi/envs/default/lib")
+    };
+    if !libclang_path.exists() {
+        return;
+    }
+
+    // SAFETY: this build script sets LIBCLANG_PATH before bindgen starts and
+    // before any other threads are created in this process.
+    unsafe {
+        env::set_var("LIBCLANG_PATH", libclang_path);
+    }
 }
 
 fn repo_root_from_manifest_dir(manifest_dir: &Path) -> Result<PathBuf, Box<dyn Error>> {

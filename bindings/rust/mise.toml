@@ -1,17 +1,14 @@
 [tasks.build]
 depends = ["//:ensure-native-library"]
 dir = "{{env.MLN_FFI_REPO_ROOT}}"
-env.LIBCLANG_PATH = "{{env.MLN_FFI_REPO_ROOT}}/.pixi/envs/default/{% if os() == \"windows\" %}Library/bin{% else %}lib{% endif %}"
 run = "pixi run --locked cargo build -p maplibre-native-sys -p maplibre-native-core -p maplibre-native"
 
 [tasks.test]
 depends = ["//:ensure-native-library"]
 dir = "{{env.MLN_FFI_REPO_ROOT}}"
-env.LIBCLANG_PATH = "{{env.MLN_FFI_REPO_ROOT}}/.pixi/envs/default/{% if os() == \"windows\" %}Library/bin{% else %}lib{% endif %}"
-run = "pixi run --locked cargo test -p maplibre-native-sys -p maplibre-native-core -p maplibre-native"
+run = "pixi run --locked cargo test -p maplibre-native-sys -p maplibre-native-core -p maplibre-native -- --test-threads=1"
 
 [tasks.ci]
 depends = [":test"]
 dir = "{{env.MLN_FFI_REPO_ROOT}}"
-env.LIBCLANG_PATH = "{{env.MLN_FFI_REPO_ROOT}}/.pixi/envs/default/{% if os() == \"windows\" %}Library/bin{% else %}lib{% endif %}"
 run = "pixi run --locked cargo clippy -p maplibre-native-sys -p maplibre-native-core -p maplibre-native --all-targets -- -D warnings"
