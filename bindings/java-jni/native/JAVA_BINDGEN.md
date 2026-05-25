@@ -19,13 +19,10 @@ introducing public generated Java APIs. It proved these paths:
 - callback lifecycle: install and clear the log callback while Rust owns the
   global reference and releases it exactly once.
 
-The spike also exposed two integration requirements that this branch preserves:
-
-- `java-bindgen-macro` needs to parse the JNI crate manifest rather than the
-  workspace virtual manifest.
-- `java-bindgen` needs `class` and `method` attributes so generated symbols can
-  target the existing internal bridge classes and preserve the crafted public
-  Java API.
+The spike also exposed one integration requirement that this branch preserves:
+`java-bindgen-macro` needs to parse the JNI crate manifest rather than the
+workspace virtual manifest. The dependency points at a small fork branch with
+that manifest lookup fix so this repository does not vendor the macro source.
 
 The temporary spike files were removed after the rewrite. The permanent test
 suite keeps the same safety coverage through `RuntimeHandleTest`,
@@ -37,8 +34,9 @@ suite keeps the same safety coverage through `RuntimeHandleTest`,
 `build.rs` scans the internal bridge declarations in
 `src/main/java/org/maplibre/nativejni/internal/bridge` and emits a Rust source
 file in `OUT_DIR`. That generated file declares small wrapper functions
-annotated with `#[java_bindgen(...)]`. The vendored `java-bindgen-macro` then
-emits named JNI exports for the existing bridge classes and methods.
+annotated with `#[java_bindgen(...)]`. The macro emits named JNI exports for the
+generated wrapper functions, and `build.rs` registers those function pointers to
+the existing bridge classes and methods.
 
 The Rust bridge keeps the hand-written adapter functions behind those exports.
 Those functions own the safety-sensitive parts of the boundary: status mapping,

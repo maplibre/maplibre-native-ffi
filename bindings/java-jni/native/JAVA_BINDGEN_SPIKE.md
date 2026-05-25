@@ -28,13 +28,14 @@ The spike succeeded and showed that `java-bindgen` could generate the exported
 JNI entry point while the existing Rust adapters preserved ownership,
 diagnostics, callbacks, and panic boundaries.
 
-It also found two integration requirements:
+It also found one integration requirement: the upstream macro parsed the
+workspace root manifest, which is virtual in this repository. The JNI crate now
+uses a fork branch where the macro reads `CARGO_MANIFEST_DIR/Cargo.toml`.
 
-- The upstream macro parsed the workspace root manifest, which is virtual in
-  this repository. The vendored macro now reads `CARGO_MANIFEST_DIR/Cargo.toml`.
-- The upstream macro generated method names from Rust function names only. The
-  vendored macro now accepts `class` and `method` attributes so generated
-  exports target the existing internal Java bridge declarations.
+An earlier prototype also tried custom `class` and `method` macro attributes for
+exact JNI symbol targeting. The final implementation does not need those
+attributes because generated load-time registration maps arbitrary generated
+wrapper symbols to the existing internal Java bridge declarations.
 
 The failed path was `java-pack`; it was not needed for this JNI boundary rewrite
 and failed with `Command java-pack: command new-test alias t is duplicated`.
