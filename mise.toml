@@ -78,6 +78,8 @@ postinstall = [
   "git submodule update --init --recursive --depth 1 third_party/maplibre-native",
   "hk install --mise --quiet",
   "pixi install --locked --quiet",
+  # conda-forge ships libclang-13.dll, but clang-sys on Windows searches for libclang.dll.
+  "{% if os() == \"windows\" %}cp \"$CONDA_PREFIX/Library/bin/libclang-13.dll\" \"$CONDA_PREFIX/Library/bin/libclang.dll\"{% endif %}",
   "uv sync --locked --quiet",
   "cd docs && pnpm install --frozen-lockfile --loglevel warn",
 ]
