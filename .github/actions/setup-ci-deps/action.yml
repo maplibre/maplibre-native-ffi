@@ -74,10 +74,28 @@ runs:
       run: |
         $libclangPath = Join-Path $env:GITHUB_WORKSPACE ".pixi\envs\default\Library\bin"
         $libclangDll = Join-Path $libclangPath "libclang.dll"
-        if (Test-Path $libclangDll) {
-          "LIBCLANG_PATH=$libclangPath" >> $env:GITHUB_ENV
+
+        if (-not (Test-Path $libclangDll)) {
+          $versionedDll = Get-ChildItem -LiteralPath $libclangPath -Filter "libclang-*.dll" -ErrorAction SilentlyContinue |
+            Select-Object -First 1
+          if ($versionedDll) {
+            Copy-Item -LiteralPath $versionedDll.FullName -Destination $libclangDll -Force
+          }
+        }
+
+        $candidatePaths = @(
+          $libclangPath,
+          "$env:ProgramFiles\LLVM\bin",
+          "${env:ProgramFiles(x86)}\LLVM\bin",
+          "C:\msys64\clang64\bin",
+          "C:\msys64\mingw64\bin"
+        ) | Where-Object { $_ -and (Test-Path (Join-Path $_ "libclang.dll")) }
+
+        if ($candidatePaths) {
+          "LIBCLANG_PATH=$($candidatePaths[0])" >> $env:GITHUB_ENV
+          Write-Host "LIBCLANG_PATH=$($candidatePaths[0])"
         } else {
-          Write-Warning "Missing Pixi libclang.dll at $libclangDll"
+          Write-Warning "Could not find libclang.dll in Pixi or known Windows runner LLVM paths"
         }
 
     - name: Register Windows Vulkan CI lavapipe ICD
