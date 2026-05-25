@@ -1,5 +1,14 @@
 #pragma once
 
+#include <bit>
+
+#ifndef VULKAN_HPP_DISPATCH_LOADER_DYNAMIC
+#define VULKAN_HPP_DISPATCH_LOADER_DYNAMIC 1
+#endif
+#ifndef VULKAN_HPP_NO_DEFAULT_DISPATCHER
+#define VULKAN_HPP_NO_DEFAULT_DISPATCHER
+#endif
+
 #include <vulkan/vulkan.hpp>
 #include <vulkan/vulkan_core.h>
 
@@ -11,7 +20,7 @@ inline auto vulkan_get_instance_proc_addr(
   const mln_vulkan_context_descriptor& context
 ) noexcept -> PFN_vkGetInstanceProcAddr {
   if (context.get_instance_proc_addr != nullptr) {
-    return reinterpret_cast<PFN_vkGetInstanceProcAddr>(
+    return std::bit_cast<PFN_vkGetInstanceProcAddr>(
       context.get_instance_proc_addr
     );
   }
@@ -22,9 +31,7 @@ inline auto vulkan_get_device_proc_addr(
   const mln_vulkan_context_descriptor& context
 ) noexcept -> PFN_vkGetDeviceProcAddr {
   if (context.get_device_proc_addr != nullptr) {
-    return reinterpret_cast<PFN_vkGetDeviceProcAddr>(
-      context.get_device_proc_addr
-    );
+    return std::bit_cast<PFN_vkGetDeviceProcAddr>(context.get_device_proc_addr);
   }
   return nullptr;
 }
@@ -32,7 +39,7 @@ inline auto vulkan_get_device_proc_addr(
 inline auto vulkan_dispatch_loader(
   const mln_vulkan_context_descriptor& context
 ) noexcept -> vk::DispatchLoaderDynamic {
-  return vk::DispatchLoaderDynamic(vulkan_get_instance_proc_addr(context));
+  return {vulkan_get_instance_proc_addr(context)};
 }
 
 inline auto vulkan_init_instance_dispatch(

@@ -232,12 +232,12 @@ impl Drop for VulkanTestContext {
 }
 
 fn load_vulkan_entry() -> std::result::Result<ash::Entry, Box<dyn StdError>> {
-    if let Some(loader) = std::env::var_os("MLN_FFI_SOFTWARE_VULKAN_LOADER") {
-        if !loader.is_empty() {
-            // SAFETY: Test contexts explicitly opt into the loader path provided
-            // by the repository environment for software/headless Vulkan.
-            return unsafe { ash::Entry::load_from(loader) }.map_err(Into::into);
-        }
+    if let Some(loader) = std::env::var_os("MLN_FFI_SOFTWARE_VULKAN_LOADER")
+        && !loader.is_empty()
+    {
+        // SAFETY: Test contexts explicitly opt into the loader path provided
+        // by the repository environment for software/headless Vulkan.
+        return unsafe { ash::Entry::load_from(loader) }.map_err(Into::into);
     }
 
     // SAFETY: Loading the Vulkan loader is delegated to ash.
