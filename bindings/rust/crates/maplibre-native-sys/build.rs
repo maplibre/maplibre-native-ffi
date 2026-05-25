@@ -16,11 +16,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo:rerun-if-env-changed=BINDGEN_EXTRA_CLANG_ARGS");
     print_rerun_if_changed(&repo_root.join("include"));
 
-    let dependency_library_dir = dependency_library_dir();
-    set_repo_libclang_path(&repo_root, dependency_library_dir.as_deref());
-
     println!("cargo:rustc-link-search=native={}", build_dir.display());
-    if let Some(dependency_library_dir) = dependency_library_dir {
+    if let Some(dependency_library_dir) = dependency_library_dir() {
         println!(
             "cargo:rustc-link-search=native={}",
             dependency_library_dir.display()
@@ -49,52 +46,6 @@ fn main() -> Result<(), Box<dyn Error>> {
 
 fn dependency_library_dir() -> Option<PathBuf> {
     env::var_os("MLN_FFI_DEPENDENCY_LIBRARY_DIR").map(PathBuf::from)
-}
-
-fn set_repo_libclang_path(repo_root: &Path, dependency_library_dir: Option<&Path>) {
-    if env::var("LIBCLANG_PATH").is_ok_and(|value| !value.is_empty()) {
-        return;
-    }
-
-    for libclang_path in libclang_path_candidates(repo_root, dependency_library_dir) {
-        if has_libclang(&libclang_path) {
-            // SAFETY: this build script sets LIBCLANG_PATH before bindgen starts
-            // and before any other threads are created in this process.
-            unsafe {
-                env::set_var("LIBCLANG_PATH", libclang_path);
-            }
-            return;
-        }
-    }
-}
-
-fn libclang_path_candidates(
-    repo_root: &Path,
-    dependency_library_dir: Option<&Path>,
-) -> Vec<PathBuf> {
-    let mut candidates = Vec::new();
-    if let Some(dependency_library_dir) = dependency_library_dir {
-        if cfg!(windows) {
-            if let Some(parent) = dependency_library_dir.parent() {
-                candidates.push(parent.join("bin"));
-            }
-        } else {
-            candidates.push(dependency_library_dir.to_path_buf());
-        }
-    }
-    candidates.push(if cfg!(windows) {
-        repo_root.join(".pixi/envs/default/Library/bin")
-    } else {
-        repo_root.join(".pixi/envs/default/lib")
-    });
-    candidates
-}
-
-fn has_libclang(path: &Path) -> bool {
-    if cfg!(windows) {
-        return path.join("libclang.dll").is_file() || path.join("clang.dll").is_file();
-    }
-    path.join("libclang.so").is_file() || path.join("libclang.dylib").is_file()
 }
 
 fn repo_root_from_manifest_dir(manifest_dir: &Path) -> Result<PathBuf, Box<dyn Error>> {
