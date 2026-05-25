@@ -10,6 +10,10 @@ name = "maplibre_native_jni"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
+java-bindgen = "0.1.0-alpha.4"
 jni = "0.21.1"
 maplibre-native-core = { path = "../../rust/crates/maplibre-native-core" }
 maplibre-native-sys = { path = "../../rust/crates/maplibre-native-sys" }
+
+[package.metadata.java-bindgen]
+package = "org.maplibre.nativejni.internal.bridge"

@@ -31,9 +31,9 @@ shared Rust adaptation crates described in the
 [Rust binding conventions](/maplibre-native-ffi/development/bindings-rust/). The
 shared Rust adaptation layer owns C status conversion, descriptor
 materialization, copied native results, and reusable callback support. The JNI
-bridge Rust code owns Java callback trampolines, class lookup, method
-registration, references, exceptions, thread attachment, panic containment, and
-JVM or Android entry points.
+bridge Rust code owns Java callback trampolines, generated native exports, class
+lookup, references, exceptions, thread attachment, panic containment, and JVM or
+Android entry points.
 
 Keep raw JNI details internal. `JNIEnv`, `JavaVM`, `jclass`, `jobject`, JNI
 reference handles, raw `long` native pointers, and Rust `jni` crate values do
@@ -44,16 +44,18 @@ classes, `AutoCloseable` handles, exceptions, callbacks, buffers, and
 ## Code Organization
 
 Use a JNI-specific package root with concept grouping parallel to Java FFM. Keep
-JNI-specific declarations, method metadata, reference helpers, and registration
-code under internal packages and the Rust bridge crate. Generated assistance is
-useful for coverage: a java-bindgen-style tool may generate Java `native`
-declarations, JNI method tables, and Rust registration stubs from public C API
-metadata plus binding rules. Public Java types remain curated so naming,
+JNI-specific declarations, method metadata, reference helpers, and generated
+boundary code under internal packages and the Rust bridge crate. Generated
+assistance is useful for coverage: a java-bindgen-style tool may generate Java
+`native` declarations, exported JNI symbols, and Rust adapter stubs from public
+C API metadata plus binding rules. Public Java types remain curated so naming,
 lifetime, and error behavior stay aligned with Java FFM.
 
-Use explicit native-method registration from `JNI_OnLoad` so generated method
-tables and cached IDs fail fast when artifacts do not match. Avoid relying on
-JNI's name-mangled lookup for broad API coverage.
+Use generated JNI boundary code for broad API coverage so Java declarations,
+exported symbols, and Rust adapters stay mechanically aligned. Generate
+native-method registration metadata from the same declarations when load-time
+artifact validation matters; generated named exports remain useful as the
+function targets behind that registration.
 
 ## Public Types and Errors
 
@@ -95,9 +97,9 @@ coroutine confinement while preserving native thread identity across related
 calls.
 
 Native threads that call into Java must attach to the JVM first. The bridge
-stores the `JavaVM` from `JNI_OnLoad`, attaches MapLibre worker, network,
-logging, or render-related threads before Java callbacks, and detaches only
-threads that the bridge attached. It never detaches Java-created threads.
+stores a `JavaVM` with owner-scoped callback state, attaches MapLibre worker,
+network, logging, or render-related threads before Java callbacks, and detaches
+only threads that the bridge attached. It never detaches Java-created threads.
 
 ## JNI Memory and Strings
 

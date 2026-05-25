@@ -16,7 +16,7 @@ final class NativeRegistrationTest {
   }
 
   @Test
-  void explicitlyRegisteredMethodsAreCallable() {
+  void generatedNativeExportsAreCallable() {
     assertTrue(BaseNative.mln_c_version() >= 0);
     assertEquals(MaplibreStatus.OK.nativeCode(), JniTestNative.createManyLocalStrings(1));
   }

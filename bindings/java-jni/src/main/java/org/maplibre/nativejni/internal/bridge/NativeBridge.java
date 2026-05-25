@@ -1,6 +1,6 @@
 package org.maplibre.nativejni.internal.bridge;
 
-/** JNI method declarations registered by the Rust bridge from {@code JNI_OnLoad}. */
+/** Legacy JNI bridge declarations backed by generated native exports and registration metadata. */
 public final class NativeBridge {
   private NativeBridge() {}
 
