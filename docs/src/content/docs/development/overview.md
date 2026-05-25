@@ -91,6 +91,7 @@ Preview the generated matrices locally:
 ```bash
 mise run ci:matrix native --pretty
 mise run ci:matrix examples --pretty
+mise run ci:matrix bindings --pretty
 ```
 
 ## How Tools Fit Together
