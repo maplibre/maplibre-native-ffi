@@ -529,7 +529,7 @@ const NativeDynamicLibrary = if (build_options.supports_vulkan) struct {
             GetProcAddress(self.handle, name.ptr)
         else
             dlsym(self.handle, name.ptr);
-        return @ptrCast(symbol orelse return null);
+        return @ptrCast(@alignCast(symbol orelse return null));
     }
 } else struct {};
 
