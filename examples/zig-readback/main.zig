@@ -317,7 +317,7 @@ const NativeDynamicLibrary = if (build_options.supports_vulkan) struct {
             const handle = LoadLibraryA(path) orelse return error.VulkanLoaderUnavailable;
             return .{ .handle = handle };
         }
-        const handle = posixDlopen(path, 2) orelse return error.VulkanLoaderUnavailable;
+        const handle = dlopen(path, 2) orelse return error.VulkanLoaderUnavailable;
         return .{ .handle = handle };
     }
 
@@ -325,7 +325,7 @@ const NativeDynamicLibrary = if (build_options.supports_vulkan) struct {
         if (builtin.os.tag == .windows) {
             _ = FreeLibrary(self.handle);
         } else {
-            _ = posixDlclose(self.handle);
+            _ = dlclose(self.handle);
         }
     }
 
@@ -333,7 +333,7 @@ const NativeDynamicLibrary = if (build_options.supports_vulkan) struct {
         const symbol = if (builtin.os.tag == .windows)
             GetProcAddress(self.handle, name.ptr)
         else
-            posixDlsym(self.handle, name.ptr);
+            dlsym(self.handle, name.ptr);
         return @ptrCast(symbol orelse return null);
     }
 } else struct {};
@@ -342,9 +342,9 @@ extern "kernel32" fn LoadLibraryA(lpLibFileName: [*:0]const u8) callconv(.winapi
 extern "kernel32" fn GetProcAddress(hModule: *anyopaque, lpProcName: [*:0]const u8) callconv(.winapi) ?*anyopaque;
 extern "kernel32" fn FreeLibrary(hLibModule: *anyopaque) callconv(.winapi) c_int;
 
-extern "c" fn posixDlopen(filename: [*:0]const u8, flags: c_int) ?*anyopaque;
-extern "c" fn posixDlsym(handle: *anyopaque, symbol: [*:0]const u8) ?*anyopaque;
-extern "c" fn posixDlclose(handle: *anyopaque) c_int;
+extern "c" fn dlopen(filename: [*:0]const u8, flags: c_int) ?*anyopaque;
+extern "c" fn dlsym(handle: *anyopaque, symbol: [*:0]const u8) ?*anyopaque;
+extern "c" fn dlclose(handle: *anyopaque) c_int;
 
 fn softwareVulkanLoaderPath() ?[]const u8 {
     if (!build_options.supports_vulkan) return null;

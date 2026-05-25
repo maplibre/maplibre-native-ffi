@@ -3,9 +3,11 @@
 #include <bit>
 
 #ifndef VULKAN_HPP_DISPATCH_LOADER_DYNAMIC
+// NOLINTNEXTLINE(cppcoreguidelines-macro-usage)
 #define VULKAN_HPP_DISPATCH_LOADER_DYNAMIC 1
 #endif
 #ifndef VULKAN_HPP_NO_DEFAULT_DISPATCHER
+// NOLINTNEXTLINE(cppcoreguidelines-macro-usage)
 #define VULKAN_HPP_NO_DEFAULT_DISPATCHER
 #endif
 
