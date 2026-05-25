@@ -156,6 +156,10 @@ run = [
   "git diff --cached --exit-code -- . ':(exclude)mise.lock'",
 ]
 
+[tasks."ci:vulkan-info"]
+description = "Print the active Vulkan loader and driver summary."
+run = "vulkaninfo --summary"
+
 [tasks."ci:prepare-native-artifact"]
 run = [
   "rm -rf ci-artifact",

@@ -78,6 +78,11 @@ runs:
         }
         "VK_DRIVER_FILES=$driverManifest" >> $env:GITHUB_ENV
 
+    - name: Diagnose Vulkan setup
+      if: ${{ contains(env.MISE_ENV, 'vulkan') }}
+      shell: bash
+      run: mise run ci:vulkan-info
+
     # The mise action may restore Rust metadata without all rustup-managed
     # component files. Repair the toolchain only when rustup cannot add the
     # configured components or the component binaries still cannot run.
