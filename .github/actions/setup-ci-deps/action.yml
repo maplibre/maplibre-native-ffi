@@ -68,6 +68,18 @@ runs:
         cache_key_prefix: mise-v2
         install: true
 
+    - name: Set Windows libclang path
+      if: ${{ runner.os == 'Windows' }}
+      shell: pwsh
+      run: |
+        $libclangPath = Join-Path $env:GITHUB_WORKSPACE ".pixi\envs\default\Library\bin"
+        $libclangDll = Join-Path $libclangPath "libclang.dll"
+        if (Test-Path $libclangDll) {
+          "LIBCLANG_PATH=$libclangPath" >> $env:GITHUB_ENV
+        } else {
+          Write-Warning "Missing Pixi libclang.dll at $libclangDll"
+        }
+
     - name: Register Windows Vulkan CI lavapipe ICD
       if: ${{ runner.os == 'Windows' && contains(env.MISE_ENV, 'vulkan') }}
       shell: pwsh
