@@ -188,12 +188,7 @@ public final class RenderTargetTestSupport implements AutoCloseable {
 
     static VulkanTestContext create() {
       if (VK.getFunctionProvider() == null) {
-        var loader = System.getenv("MLN_FFI_SOFTWARE_VULKAN_LOADER");
-        if (loader == null || loader.isBlank()) {
-          VK.create();
-        } else {
-          VK.create(loader);
-        }
+        VK.create();
       }
       var context = new VulkanTestContext();
       try {

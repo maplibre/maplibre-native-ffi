@@ -227,7 +227,6 @@ const VulkanAttachContext = if (build_options.supports_vulkan) struct {
 } else struct {};
 
 const VulkanDispatch = if (build_options.supports_vulkan) struct {
-    loader: ?NativeDynamicLibrary = null,
     get_instance_proc_addr: vk.PFN_vkGetInstanceProcAddr,
     get_device_proc_addr: vk.PFN_vkGetDeviceProcAddr,
     create_instance: vk.PFN_vkCreateInstance,
@@ -242,20 +241,6 @@ const VulkanDispatch = if (build_options.supports_vulkan) struct {
     get_device_queue: vk.PFN_vkGetDeviceQueue = null,
 
     fn init() !VulkanDispatch {
-        if (softwareVulkanLoaderPath()) |loader_path| {
-            var loader = try NativeDynamicLibrary.openZ(@ptrCast(loader_path.ptr));
-            errdefer loader.close();
-            const get_instance_proc_addr = loader.lookup(vk.PFN_vkGetInstanceProcAddr, "vkGetInstanceProcAddr") orelse return error.VulkanLoaderSymbolMissing;
-            const create_instance = try loadGlobal(vk.PFN_vkCreateInstance, get_instance_proc_addr, "vkCreateInstance");
-            const get_device_proc_addr = loader.lookup(vk.PFN_vkGetDeviceProcAddr, "vkGetDeviceProcAddr");
-            return .{
-                .loader = loader,
-                .get_instance_proc_addr = get_instance_proc_addr,
-                .get_device_proc_addr = get_device_proc_addr,
-                .create_instance = create_instance,
-            };
-        }
-
         return .{
             .get_instance_proc_addr = vk.vkGetInstanceProcAddr,
             .get_device_proc_addr = vk.vkGetDeviceProcAddr,
@@ -272,91 +257,12 @@ const VulkanDispatch = if (build_options.supports_vulkan) struct {
         };
     }
 
-    fn deinit(self: *VulkanDispatch) void {
-        if (self.loader) |*loader| loader.close();
-        self.loader = null;
-    }
+    fn deinit(_: *VulkanDispatch) void {}
 
-    fn loadInstanceFunctions(self: *VulkanDispatch, instance: vk.VkInstance) void {
-        if (self.loader == null) return;
-        self.get_device_proc_addr = self.get_device_proc_addr orelse loadInstance(vk.PFN_vkGetDeviceProcAddr, self.get_instance_proc_addr, instance, "vkGetDeviceProcAddr") catch null;
-        self.destroy_instance = loadInstance(vk.PFN_vkDestroyInstance, self.get_instance_proc_addr, instance, "vkDestroyInstance") catch null;
-        self.enumerate_physical_devices = loadInstance(vk.PFN_vkEnumeratePhysicalDevices, self.get_instance_proc_addr, instance, "vkEnumeratePhysicalDevices") catch null;
-        self.get_physical_device_queue_family_properties = loadInstance(vk.PFN_vkGetPhysicalDeviceQueueFamilyProperties, self.get_instance_proc_addr, instance, "vkGetPhysicalDeviceQueueFamilyProperties") catch null;
-        self.get_physical_device_features = loadInstance(vk.PFN_vkGetPhysicalDeviceFeatures, self.get_instance_proc_addr, instance, "vkGetPhysicalDeviceFeatures") catch null;
-        self.enumerate_device_extension_properties = loadInstance(vk.PFN_vkEnumerateDeviceExtensionProperties, self.get_instance_proc_addr, instance, "vkEnumerateDeviceExtensionProperties") catch null;
-        self.create_device = loadInstance(vk.PFN_vkCreateDevice, self.get_instance_proc_addr, instance, "vkCreateDevice") catch null;
-    }
+    fn loadInstanceFunctions(_: *VulkanDispatch, _: vk.VkInstance) void {}
 
-    fn loadDeviceFunctions(self: *VulkanDispatch, device: vk.VkDevice) void {
-        if (self.loader == null) return;
-        self.destroy_device = loadDevice(vk.PFN_vkDestroyDevice, self.get_device_proc_addr, device, "vkDestroyDevice") catch null;
-        self.device_wait_idle = loadDevice(vk.PFN_vkDeviceWaitIdle, self.get_device_proc_addr, device, "vkDeviceWaitIdle") catch null;
-        self.get_device_queue = loadDevice(vk.PFN_vkGetDeviceQueue, self.get_device_proc_addr, device, "vkGetDeviceQueue") catch null;
-    }
+    fn loadDeviceFunctions(_: *VulkanDispatch, _: vk.VkDevice) void {}
 } else struct {};
-
-const NativeDynamicLibrary = if (build_options.supports_vulkan) struct {
-    handle: *anyopaque,
-
-    fn openZ(path: [*:0]const u8) !NativeDynamicLibrary {
-        if (builtin.os.tag == .windows) {
-            const handle = LoadLibraryA(path) orelse return error.VulkanLoaderUnavailable;
-            return .{ .handle = handle };
-        }
-        const handle = dlopen(path, 2) orelse return error.VulkanLoaderUnavailable;
-        return .{ .handle = handle };
-    }
-
-    fn close(self: *NativeDynamicLibrary) void {
-        if (builtin.os.tag == .windows) {
-            _ = FreeLibrary(self.handle);
-        } else {
-            _ = dlclose(self.handle);
-        }
-    }
-
-    fn lookup(self: *NativeDynamicLibrary, comptime T: type, name: [:0]const u8) ?std.meta.Child(T) {
-        const symbol = if (builtin.os.tag == .windows)
-            GetProcAddress(self.handle, name.ptr)
-        else
-            dlsym(self.handle, name.ptr);
-        return @ptrCast(@alignCast(symbol orelse return null));
-    }
-} else struct {};
-
-extern "kernel32" fn LoadLibraryA(lpLibFileName: [*:0]const u8) callconv(.winapi) ?*anyopaque;
-extern "kernel32" fn GetProcAddress(hModule: *anyopaque, lpProcName: [*:0]const u8) callconv(.winapi) ?*anyopaque;
-extern "kernel32" fn FreeLibrary(hLibModule: *anyopaque) callconv(.winapi) c_int;
-
-extern "c" fn dlopen(filename: [*:0]const u8, flags: c_int) ?*anyopaque;
-extern "c" fn dlsym(handle: *anyopaque, symbol: [*:0]const u8) ?*anyopaque;
-extern "c" fn dlclose(handle: *anyopaque) c_int;
-
-fn softwareVulkanLoaderPath() ?[]const u8 {
-    if (!build_options.supports_vulkan) return null;
-    const value = std.c.getenv("MLN_FFI_SOFTWARE_VULKAN_LOADER") orelse return null;
-    const path = std.mem.span(value);
-    return if (path.len == 0) null else path;
-}
-
-fn loadGlobal(comptime T: type, get_instance_proc_addr: if (build_options.supports_vulkan) vk.PFN_vkGetInstanceProcAddr else ?*anyopaque, name: [:0]const u8) !std.meta.Child(T) {
-    if (!build_options.supports_vulkan) return error.VulkanLoaderSymbolMissing;
-    const symbol = get_instance_proc_addr.?(null, name.ptr) orelse return error.VulkanLoaderSymbolMissing;
-    return @ptrCast(symbol);
-}
-
-fn loadInstance(comptime T: type, get_instance_proc_addr: if (build_options.supports_vulkan) vk.PFN_vkGetInstanceProcAddr else ?*anyopaque, instance: if (build_options.supports_vulkan) vk.VkInstance else ?*anyopaque, name: [:0]const u8) !std.meta.Child(T) {
-    if (!build_options.supports_vulkan) return error.VulkanLoaderSymbolMissing;
-    const symbol = get_instance_proc_addr.?(instance, name.ptr) orelse return error.VulkanLoaderSymbolMissing;
-    return @ptrCast(symbol);
-}
-
-fn loadDevice(comptime T: type, get_device_proc_addr: if (build_options.supports_vulkan) vk.PFN_vkGetDeviceProcAddr else ?*anyopaque, device: if (build_options.supports_vulkan) vk.VkDevice else ?*anyopaque, name: [:0]const u8) !std.meta.Child(T) {
-    if (!build_options.supports_vulkan) return error.VulkanLoaderSymbolMissing;
-    const symbol = get_device_proc_addr.?(device, name.ptr) orelse return error.VulkanLoaderSymbolMissing;
-    return @ptrCast(symbol);
-}
 
 fn nativeFunctionPointer(function: anytype) *anyopaque {
     return @ptrFromInt(@intFromPtr(function.?));

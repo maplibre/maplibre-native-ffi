@@ -23,7 +23,6 @@ RUSTFLAGS = "-C link-arg=-Wl,-rpath,$CONDA_PREFIX/lib -C link-arg=-Wl,-rpath,$ML
 
 [target.linux.activation.env]
 LD_LIBRARY_PATH = "$CONDA_PREFIX/lib"
-MLN_FFI_SOFTWARE_VULKAN_LOADER = "$CONDA_PREFIX/lib/libvulkan.so.1"
 MLN_FFI_SYSTEM_ROOT = "$CONDA_BUILD_SYSROOT"
 RUSTFLAGS = "-C link-arg=-Wl,-rpath,$CONDA_PREFIX/lib -C link-arg=-Wl,-rpath-link,$CONDA_PREFIX/lib -C link-arg=-Wl,-rpath,$MLN_FFI_BUILD_DIR"
 
@@ -49,7 +48,6 @@ VK_ADD_DRIVER_FILES = "$CONDA_PREFIX/share/vulkan/icd.d/lvp_icd.aarch64.json"
 LIBCLANG_PATH = "%CONDA_PREFIX%\\Library\\bin"
 MLN_FFI_DEPENDENCY_INCLUDE_DIR = "%CONDA_PREFIX%\\Library\\include"
 MLN_FFI_DEPENDENCY_LIBRARY_DIR = "%CONDA_PREFIX%\\Library\\lib"
-MLN_FFI_SOFTWARE_VULKAN_LOADER = "%CONDA_PREFIX%\\Library\\bin\\vulkan-1.dll"
 RUSTFLAGS = "-L native=%CONDA_PREFIX%\\Library\\lib"
 VK_ADD_DRIVER_FILES = "%CONDA_PREFIX%\\Library\\share\\vulkan\\icd.d\\lvp_icd.x86_64.json"
 
