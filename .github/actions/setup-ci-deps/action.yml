@@ -68,7 +68,7 @@ runs:
         cache_key_prefix: mise-v2
         install: true
 
-    - name: Force Windows Vulkan CI to lavapipe
+    - name: Register Windows Vulkan CI lavapipe ICD
       if: ${{ runner.os == 'Windows' && contains(env.MISE_ENV, 'vulkan') }}
       shell: pwsh
       run: |
@@ -76,7 +76,10 @@ runs:
         if (-not (Test-Path $driverManifest)) {
           throw "Missing lavapipe Vulkan ICD manifest: $driverManifest"
         }
-        "VK_DRIVER_FILES=$driverManifest" >> $env:GITHUB_ENV
+
+        $driverKey = "HKLM:\SOFTWARE\Khronos\Vulkan\Drivers"
+        New-Item -Path $driverKey -Force | Out-Null
+        New-ItemProperty -Path $driverKey -Name $driverManifest -PropertyType DWord -Value 0 -Force | Out-Null
 
     - name: Diagnose Vulkan setup
       if: ${{ contains(env.MISE_ENV, 'vulkan') }}
