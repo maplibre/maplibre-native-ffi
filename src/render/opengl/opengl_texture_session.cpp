@@ -683,7 +683,7 @@ class OpenGLTextureBackend final : public mbgl::gl::RendererBackend,
   mln_opengl_context_descriptor context_{};
   uint32_t borrowed_texture_ = 0;
   void* render_context_ = nullptr;
-  mbgl::Size resource_size{};
+  mbgl::Size resource_size_{};
 
 #if defined(_WIN32)
   void* previous_device_context_ = nullptr;
