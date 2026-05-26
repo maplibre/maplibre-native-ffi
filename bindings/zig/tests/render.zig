@@ -13,7 +13,11 @@ const vk = if (build_options.supports_vulkan) @cImport({
     @cInclude("vulkan/vulkan.h");
 }) else struct {};
 
-const gl = if (build_options.supports_opengl and builtin.os.tag == .windows) @import("gl") else struct {};
+const egl = if (build_options.supports_opengl and builtin.os.tag == .linux) @cImport({
+    @cInclude("EGL/egl.h");
+}) else struct {};
+
+const gl = if (build_options.supports_opengl and (builtin.os.tag == .windows or builtin.os.tag == .linux)) @import("gl") else struct {};
 const wgl_test = if (build_options.supports_opengl and builtin.os.tag == .windows) @import("wgl_test_context") else struct {};
 
 const cluster_style_json =
@@ -278,9 +282,9 @@ fn fakeOpenGLContext() maplibre.OpenGLContextDescriptor {
     };
 }
 
-const supports_test_owned_texture = build_options.supports_metal or build_options.supports_vulkan or (build_options.supports_opengl and builtin.os.tag == .windows);
+const supports_test_owned_texture = build_options.supports_metal or build_options.supports_vulkan or build_options.supports_opengl;
 
-const TestOwnedTextureContext = if (build_options.supports_vulkan) VulkanAttachContext else if (build_options.supports_opengl and builtin.os.tag == .windows) WglAttachContext else if (build_options.supports_metal) struct {
+const TestOwnedTextureContext = if (build_options.supports_vulkan) VulkanAttachContext else if (build_options.supports_opengl and builtin.os.tag == .windows) WglAttachContext else if (build_options.supports_opengl and builtin.os.tag == .linux) EglAttachContext else if (build_options.supports_metal) struct {
     device: *anyopaque,
 
     pub fn init() !@This() {
@@ -291,18 +295,6 @@ const TestOwnedTextureContext = if (build_options.supports_vulkan) VulkanAttachC
 
     pub fn descriptor(self: *const @This()) maplibre.MetalContextDescriptor {
         return .{ .device = .{ .ptr = self.device } };
-    }
-} else if (build_options.supports_opengl) struct {
-    pub fn init() !@This() {
-        // TODO(linux): Add an EGL pbuffer/context helper for Zig binding
-        // tests on a Linux machine with the CI EGL/llvmpipe stack.
-        return error.SkipZigTest;
-    }
-
-    pub fn deinit(_: *@This()) void {}
-
-    pub fn descriptor(_: *const @This()) maplibre.OpenGLContextDescriptor {
-        unreachable;
     }
 } else struct {};
 
@@ -370,6 +362,229 @@ const WglBorrowedTexture = if (build_options.supports_opengl and builtin.os.tag 
 
     pub fn readRGBA8(self: *const WglBorrowedTexture, pixels: []u8) !void {
         try self.context.context.readRgbaTexture(self.texture, pixels);
+    }
+} else struct {};
+
+fn GlProc(comptime name: []const u8) type {
+    if (!build_options.supports_opengl or builtin.os.tag != .linux) return void;
+    return @TypeOf(@field(@as(gl.ProcTable, undefined), name));
+}
+
+fn glProcName(comptime command: []const u8) [:0]const u8 {
+    return "gl" ++ command;
+}
+
+const EglProcs = if (build_options.supports_opengl and builtin.os.tag == .linux) struct {
+    BindTexture: GlProc("BindTexture"),
+    BindFramebuffer: GlProc("BindFramebuffer"),
+    CheckFramebufferStatus: GlProc("CheckFramebufferStatus"),
+    DeleteTextures: GlProc("DeleteTextures"),
+    DeleteFramebuffers: GlProc("DeleteFramebuffers"),
+    FramebufferTexture2D: GlProc("FramebufferTexture2D"),
+    GenTextures: GlProc("GenTextures"),
+    GenFramebuffers: GlProc("GenFramebuffers"),
+    GetError: GlProc("GetError"),
+    ReadPixels: GlProc("ReadPixels"),
+    TexImage2D: GlProc("TexImage2D"),
+    TexParameteri: GlProc("TexParameteri"),
+
+    fn init() !EglProcs {
+        var procs: EglProcs = undefined;
+        inline for (.{
+            "BindTexture",
+            "BindFramebuffer",
+            "CheckFramebufferStatus",
+            "DeleteTextures",
+            "DeleteFramebuffers",
+            "FramebufferTexture2D",
+            "GenTextures",
+            "GenFramebuffers",
+            "GetError",
+            "ReadPixels",
+            "TexImage2D",
+            "TexParameteri",
+        }) |command| {
+            @field(procs, command) = @ptrCast(egl.eglGetProcAddress(glProcName(command)) orelse return error.SkipZigTest);
+        }
+        return procs;
+    }
+} else struct {};
+
+const EglAttachContext = if (build_options.supports_opengl and builtin.os.tag == .linux) struct {
+    display: egl.EGLDisplay,
+    config: egl.EGLConfig,
+    egl_surface: egl.EGLSurface,
+    share_context: egl.EGLContext,
+    procs: EglProcs,
+
+    pub fn init() !EglAttachContext {
+        return initWithSize(8, 8);
+    }
+
+    pub fn initWithSize(width: u32, height: u32) !EglAttachContext {
+        const display = egl.eglGetDisplay(egl.EGL_DEFAULT_DISPLAY);
+        if (display == egl.EGL_NO_DISPLAY) return error.SkipZigTest;
+        errdefer _ = egl.eglTerminate(display);
+
+        var major: egl.EGLint = 0;
+        var minor: egl.EGLint = 0;
+        if (egl.eglInitialize(display, &major, &minor) == egl.EGL_FALSE) return error.SkipZigTest;
+        if (egl.eglBindAPI(egl.EGL_OPENGL_ES_API) == egl.EGL_FALSE) return error.SkipZigTest;
+
+        const config_attributes = [_]egl.EGLint{
+            egl.EGL_SURFACE_TYPE,    egl.EGL_PBUFFER_BIT,
+            egl.EGL_RENDERABLE_TYPE, egl.EGL_OPENGL_ES3_BIT,
+            egl.EGL_RED_SIZE,        8,
+            egl.EGL_GREEN_SIZE,      8,
+            egl.EGL_BLUE_SIZE,       8,
+            egl.EGL_ALPHA_SIZE,      8,
+            egl.EGL_DEPTH_SIZE,      24,
+            egl.EGL_STENCIL_SIZE,    8,
+            egl.EGL_NONE,
+        };
+        var config: egl.EGLConfig = null;
+        var config_count: egl.EGLint = 0;
+        if (egl.eglChooseConfig(display, &config_attributes, &config, 1, &config_count) == egl.EGL_FALSE or
+            config_count == 0 or config == null)
+        {
+            return error.SkipZigTest;
+        }
+
+        const context_attributes = [_]egl.EGLint{
+            egl.EGL_CONTEXT_CLIENT_VERSION, 3,
+            egl.EGL_NONE,
+        };
+        const share_context = egl.eglCreateContext(display, config, egl.EGL_NO_CONTEXT, &context_attributes);
+        if (share_context == egl.EGL_NO_CONTEXT) return error.SkipZigTest;
+        errdefer _ = egl.eglDestroyContext(display, share_context);
+
+        const surface_attributes = [_]egl.EGLint{
+            egl.EGL_WIDTH,  @intCast(width),
+            egl.EGL_HEIGHT, @intCast(height),
+            egl.EGL_NONE,
+        };
+        const pbuffer = egl.eglCreatePbufferSurface(display, config, &surface_attributes);
+        if (pbuffer == egl.EGL_NO_SURFACE) return error.SkipZigTest;
+        errdefer _ = egl.eglDestroySurface(display, pbuffer);
+
+        if (egl.eglMakeCurrent(display, pbuffer, pbuffer, share_context) == egl.EGL_FALSE) return error.SkipZigTest;
+        return .{
+            .display = display,
+            .config = config,
+            .egl_surface = pbuffer,
+            .share_context = share_context,
+            .procs = try EglProcs.init(),
+        };
+    }
+
+    pub fn deinit(self: *EglAttachContext) void {
+        _ = egl.eglMakeCurrent(self.display, egl.EGL_NO_SURFACE, egl.EGL_NO_SURFACE, egl.EGL_NO_CONTEXT);
+        _ = egl.eglDestroySurface(self.display, self.egl_surface);
+        _ = egl.eglDestroyContext(self.display, self.share_context);
+        _ = egl.eglTerminate(self.display);
+    }
+
+    pub fn makeCurrent(self: *const EglAttachContext) !void {
+        if (egl.eglMakeCurrent(self.display, self.egl_surface, self.egl_surface, self.share_context) == egl.EGL_FALSE) return error.SkipZigTest;
+    }
+
+    pub fn descriptor(self: *const EglAttachContext) maplibre.OpenGLContextDescriptor {
+        return .{ .egl = .{
+            .display = .{ .ptr = @ptrCast(self.display.?) },
+            .config = .{ .ptr = @ptrCast(self.config.?) },
+            .share_context = .{ .ptr = @ptrCast(self.share_context.?) },
+            .get_proc_address = null,
+        } };
+    }
+
+    pub fn surface(self: *const EglAttachContext) maplibre.NativePointer {
+        return .{ .ptr = @ptrCast(self.egl_surface.?) };
+    }
+
+    pub fn createRgbaTexture(self: *const EglAttachContext, width: u32, height: u32) !gl.uint {
+        try self.makeCurrent();
+
+        var texture: gl.uint = 0;
+        self.procs.GenTextures(1, @ptrCast(&texture));
+        if (texture == 0) return error.SkipZigTest;
+        errdefer self.procs.DeleteTextures(1, @ptrCast(&texture));
+
+        self.procs.BindTexture(gl.TEXTURE_2D, texture);
+        self.procs.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+        self.procs.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+        self.procs.TexImage2D(
+            gl.TEXTURE_2D,
+            0,
+            gl.RGBA8,
+            @intCast(width),
+            @intCast(height),
+            0,
+            gl.RGBA,
+            gl.UNSIGNED_BYTE,
+            null,
+        );
+        self.procs.BindTexture(gl.TEXTURE_2D, 0);
+        try testing.expectEqual(@as(gl.@"enum", gl.NO_ERROR), self.procs.GetError());
+        return texture;
+    }
+
+    pub fn destroyTexture(self: *const EglAttachContext, texture: gl.uint) void {
+        self.procs.DeleteTextures(1, @ptrCast(&texture));
+    }
+
+    pub fn readRgbaTexture(self: *const EglAttachContext, texture: gl.uint, width: u32, height: u32, pixels: []u8) !void {
+        try self.makeCurrent();
+        var framebuffer: gl.uint = 0;
+        self.procs.GenFramebuffers(1, @ptrCast(&framebuffer));
+        if (framebuffer == 0) return error.SkipZigTest;
+        defer self.procs.DeleteFramebuffers(1, @ptrCast(&framebuffer));
+        self.procs.BindFramebuffer(gl.FRAMEBUFFER, framebuffer);
+        defer self.procs.BindFramebuffer(gl.FRAMEBUFFER, 0);
+        self.procs.FramebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, texture, 0);
+        try testing.expectEqual(@as(gl.@"enum", gl.FRAMEBUFFER_COMPLETE), self.procs.CheckFramebufferStatus(gl.FRAMEBUFFER));
+        self.procs.ReadPixels(0, 0, @intCast(width), @intCast(height), gl.RGBA, gl.UNSIGNED_BYTE, pixels.ptr);
+        try testing.expectEqual(@as(gl.@"enum", gl.NO_ERROR), self.procs.GetError());
+    }
+
+    pub fn readSurfaceRGBA8(self: *const EglAttachContext, width: u32, height: u32, pixels: []u8) !void {
+        try self.makeCurrent();
+        self.procs.ReadPixels(0, 0, @intCast(width), @intCast(height), gl.RGBA, gl.UNSIGNED_BYTE, pixels.ptr);
+        try testing.expectEqual(@as(gl.@"enum", gl.NO_ERROR), self.procs.GetError());
+    }
+} else struct {};
+
+const OpenGLBorrowedTexture = if (build_options.supports_opengl and builtin.os.tag == .windows) WglBorrowedTexture else if (build_options.supports_opengl and builtin.os.tag == .linux) struct {
+    context: EglAttachContext,
+    texture: gl.uint,
+    width: u32,
+    height: u32,
+
+    pub fn create(width: u32, height: u32) !@This() {
+        var context = try EglAttachContext.initWithSize(width, height);
+        errdefer context.deinit();
+        const texture = try context.createRgbaTexture(width, height);
+        return .{ .context = context, .texture = texture, .width = width, .height = height };
+    }
+
+    pub fn deinit(self: *@This()) void {
+        if (self.texture != 0) {
+            self.context.destroyTexture(self.texture);
+            self.texture = 0;
+        }
+        self.context.deinit();
+    }
+
+    pub fn descriptor(self: *const @This()) maplibre.OpenGLBorrowedTextureDescriptor {
+        return .{
+            .extent = .{ .width = self.width, .height = self.height },
+            .context = self.context.descriptor(),
+            .texture = self.texture,
+            .target = gl.TEXTURE_2D,
+        };
+    }
+
+    pub fn readRGBA8(self: *const @This(), pixels: []u8) !void {
+        try self.context.readRgbaTexture(self.texture, self.width, self.height, pixels);
     }
 } else struct {};
 
@@ -1058,10 +1273,10 @@ test "OpenGL texture and surface descriptors validate through public bindings" {
     }));
 }
 
-test "OpenGL WGL owned texture frame scopes public binding access" {
-    if (!build_options.supports_opengl or builtin.os.tag != .windows) return error.SkipZigTest;
+test "OpenGL owned texture frame scopes public binding access" {
+    if (!build_options.supports_opengl) return error.SkipZigTest;
 
-    var context = try WglAttachContext.init();
+    var context = try TestOwnedTextureContext.init();
     defer context.deinit();
 
     var runtime = try maplibre.RuntimeHandle.init(null);
@@ -1108,10 +1323,10 @@ test "OpenGL WGL owned texture frame scopes public binding access" {
     try session.close();
 }
 
-test "OpenGL WGL borrowed texture renders through public bindings" {
-    if (!build_options.supports_opengl or builtin.os.tag != .windows) return error.SkipZigTest;
+test "OpenGL borrowed texture renders through public bindings" {
+    if (!build_options.supports_opengl) return error.SkipZigTest;
 
-    var borrowed = try WglBorrowedTexture.create(128, 128);
+    var borrowed = try OpenGLBorrowedTexture.create(128, 128);
     defer borrowed.deinit();
 
     var runtime = try maplibre.RuntimeHandle.init(null);
@@ -1137,10 +1352,10 @@ test "OpenGL WGL borrowed texture renders through public bindings" {
     try testing.expectError(error.Unsupported, session.readPremultipliedRgba8(testing.allocator));
 }
 
-test "OpenGL WGL surface renders through public bindings" {
-    if (!build_options.supports_opengl or builtin.os.tag != .windows) return error.SkipZigTest;
+test "OpenGL surface renders through public bindings" {
+    if (!build_options.supports_opengl) return error.SkipZigTest;
 
-    var context = try WglAttachContext.initWithSize(128, 128);
+    var context = try TestOwnedTextureContext.initWithSize(128, 128);
     defer context.deinit();
 
     var runtime = try maplibre.RuntimeHandle.init(null);

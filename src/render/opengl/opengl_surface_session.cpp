@@ -338,8 +338,6 @@ class OpenGLSurfaceBackend final : public mbgl::gl::RendererBackend,
   }
 #elif defined(__linux__)
   void create_egl_context() {
-    // TODO(linux): validate EGL window-surface presentation on the user's
-    // Linux workstation with the same Mesa/llvmpipe provider used in CI.
     auto* const display =
       static_cast<EGLDisplay>(descriptor_.context.data.egl.display);
     auto* const config =

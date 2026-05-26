@@ -1,5 +1,34 @@
 package org.maplibre.nativeffi.test;
 
+import static org.lwjgl.egl.EGL10.EGL_ALPHA_SIZE;
+import static org.lwjgl.egl.EGL10.EGL_BLUE_SIZE;
+import static org.lwjgl.egl.EGL10.EGL_DEPTH_SIZE;
+import static org.lwjgl.egl.EGL10.EGL_GREEN_SIZE;
+import static org.lwjgl.egl.EGL10.EGL_HEIGHT;
+import static org.lwjgl.egl.EGL10.EGL_NONE;
+import static org.lwjgl.egl.EGL10.EGL_NO_CONTEXT;
+import static org.lwjgl.egl.EGL10.EGL_NO_DISPLAY;
+import static org.lwjgl.egl.EGL10.EGL_NO_SURFACE;
+import static org.lwjgl.egl.EGL10.EGL_PBUFFER_BIT;
+import static org.lwjgl.egl.EGL10.EGL_RED_SIZE;
+import static org.lwjgl.egl.EGL10.EGL_STENCIL_SIZE;
+import static org.lwjgl.egl.EGL10.EGL_SURFACE_TYPE;
+import static org.lwjgl.egl.EGL10.EGL_WIDTH;
+import static org.lwjgl.egl.EGL10.eglChooseConfig;
+import static org.lwjgl.egl.EGL10.eglCreateContext;
+import static org.lwjgl.egl.EGL10.eglCreatePbufferSurface;
+import static org.lwjgl.egl.EGL10.eglDestroyContext;
+import static org.lwjgl.egl.EGL10.eglDestroySurface;
+import static org.lwjgl.egl.EGL10.eglGetDisplay;
+import static org.lwjgl.egl.EGL10.eglInitialize;
+import static org.lwjgl.egl.EGL10.eglMakeCurrent;
+import static org.lwjgl.egl.EGL10.eglTerminate;
+import static org.lwjgl.egl.EGL12.EGL_RENDERABLE_TYPE;
+import static org.lwjgl.egl.EGL13.EGL_CONTEXT_CLIENT_VERSION;
+import static org.lwjgl.egl.EGL14.EGL_DEFAULT_DISPLAY;
+import static org.lwjgl.egl.EGL14.EGL_OPENGL_ES_API;
+import static org.lwjgl.egl.EGL14.eglBindAPI;
+import static org.lwjgl.egl.EGL15.EGL_OPENGL_ES3_BIT;
 import static org.lwjgl.glfw.GLFW.GLFW_CLIENT_API;
 import static org.lwjgl.glfw.GLFW.GLFW_FALSE;
 import static org.lwjgl.glfw.GLFW.GLFW_OPENGL_API;
@@ -66,7 +95,11 @@ import java.util.Locale;
 import java.util.Set;
 import org.lwjgl.BufferUtils;
 import org.lwjgl.PointerBuffer;
+import org.lwjgl.egl.EGL;
 import org.lwjgl.opengl.GL;
+import org.lwjgl.opengles.GLES;
+import org.lwjgl.opengles.GLES20;
+import org.lwjgl.opengles.GLES30;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.VK;
 import org.lwjgl.vulkan.VkApplicationInfo;
@@ -82,6 +115,7 @@ import org.lwjgl.vulkan.VkQueue;
 import org.lwjgl.vulkan.VkQueueFamilyProperties;
 import org.maplibre.nativeffi.Maplibre;
 import org.maplibre.nativeffi.map.MapHandle;
+import org.maplibre.nativeffi.render.EglContextDescriptor;
 import org.maplibre.nativeffi.render.MetalContextDescriptor;
 import org.maplibre.nativeffi.render.MetalOwnedTextureDescriptor;
 import org.maplibre.nativeffi.render.NativePointer;
@@ -190,7 +224,7 @@ public final class RenderTargetTestSupport implements AutoCloseable {
               new OpenGLSurfaceDescriptor()
                   .extent(extent)
                   .context(context.descriptor())
-                  .surface(NativePointer.ofAddress(context.hdc))),
+                  .surface(context.surface())),
           context);
     } catch (RuntimeException | Error error) {
       closeContextAfterAttachFailure(context, error);
@@ -295,14 +329,26 @@ public final class RenderTargetTestSupport implements AutoCloseable {
     protected long window;
     protected long hdc;
     protected long hglrc;
+    protected long eglDisplay;
+    protected long eglConfig;
+    protected long eglSurface;
+    protected long eglContext;
+    protected boolean egl;
     protected boolean closed;
 
     static OpenGLTestContext create(int width, int height) {
-      if (!System.getProperty("os.name").toLowerCase(Locale.ROOT).contains("windows")) {
-        // TODO(linux): Add an EGL pbuffer/context helper for Java OpenGL
-        // binding tests on a Linux machine with the CI EGL/llvmpipe stack.
-        throw new IllegalStateException("OpenGL test context is only available on Windows WGL");
+      var osName = System.getProperty("os.name").toLowerCase(Locale.ROOT);
+      if (osName.contains("windows")) {
+        return createWgl(width, height);
       }
+      if (osName.contains("linux")) {
+        return createEgl(width, height);
+      }
+      throw new IllegalStateException(
+          "OpenGL test context is only available on Windows WGL or Linux EGL");
+    }
+
+    private static OpenGLTestContext createWgl(int width, int height) {
       if (!Maplibre.supportedOpenGLContextProviders().contains(OpenGLContextProvider.WGL)) {
         throw new IllegalStateException("Native library does not support WGL");
       }
@@ -336,20 +382,112 @@ public final class RenderTargetTestSupport implements AutoCloseable {
       }
     }
 
-    final WglContextDescriptor descriptor() {
+    private static OpenGLTestContext createEgl(int width, int height) {
+      if (!Maplibre.supportedOpenGLContextProviders().contains(OpenGLContextProvider.EGL)) {
+        throw new IllegalStateException("Native library does not support EGL");
+      }
+
+      var context = new OpenGLTestContext();
+      context.egl = true;
+      context.eglDisplay = eglGetDisplay(EGL_DEFAULT_DISPLAY);
+      if (context.eglDisplay == EGL_NO_DISPLAY) {
+        throw new IllegalStateException("EGL display unavailable");
+      }
+      try (var stack = MemoryStack.stackPush()) {
+        var major = stack.mallocInt(1);
+        var minor = stack.mallocInt(1);
+        if (!eglInitialize(context.eglDisplay, major, minor)) {
+          throw new IllegalStateException("EGL initialization failed");
+        }
+        EGL.createDisplayCapabilities(context.eglDisplay, major.get(0), minor.get(0));
+        if (!eglBindAPI(EGL_OPENGL_ES_API)) {
+          throw new IllegalStateException("EGL OpenGL ES API binding failed");
+        }
+
+        var configAttributes =
+            stack.ints(
+                EGL_SURFACE_TYPE,
+                EGL_PBUFFER_BIT,
+                EGL_RENDERABLE_TYPE,
+                EGL_OPENGL_ES3_BIT,
+                EGL_RED_SIZE,
+                8,
+                EGL_GREEN_SIZE,
+                8,
+                EGL_BLUE_SIZE,
+                8,
+                EGL_ALPHA_SIZE,
+                8,
+                EGL_DEPTH_SIZE,
+                24,
+                EGL_STENCIL_SIZE,
+                8,
+                EGL_NONE);
+        var configs = stack.mallocPointer(1);
+        var configCount = stack.mallocInt(1);
+        if (!eglChooseConfig(context.eglDisplay, configAttributes, configs, configCount)
+            || configCount.get(0) == 0) {
+          throw new IllegalStateException("EGL config unavailable");
+        }
+        context.eglConfig = configs.get(0);
+
+        var contextAttributes = stack.ints(EGL_CONTEXT_CLIENT_VERSION, 3, EGL_NONE);
+        context.eglContext =
+            eglCreateContext(
+                context.eglDisplay, context.eglConfig, EGL_NO_CONTEXT, contextAttributes);
+        if (context.eglContext == EGL_NO_CONTEXT) {
+          throw new IllegalStateException("EGL context creation failed");
+        }
+
+        var surfaceAttributes = stack.ints(EGL_WIDTH, width, EGL_HEIGHT, height, EGL_NONE);
+        context.eglSurface =
+            eglCreatePbufferSurface(context.eglDisplay, context.eglConfig, surfaceAttributes);
+        if (context.eglSurface == EGL_NO_SURFACE) {
+          throw new IllegalStateException("EGL pbuffer creation failed");
+        }
+
+        context.makeCurrent();
+        return context;
+      } catch (RuntimeException error) {
+        context.close();
+        throw error;
+      }
+    }
+
+    final org.maplibre.nativeffi.render.OpenGLContextDescriptor descriptor() {
+      if (egl) {
+        return new EglContextDescriptor(
+            NativePointer.ofAddress(eglDisplay),
+            NativePointer.ofAddress(eglConfig),
+            NativePointer.ofAddress(eglContext));
+      }
       return new WglContextDescriptor(NativePointer.ofAddress(hdc), NativePointer.ofAddress(hglrc));
+    }
+
+    final NativePointer surface() {
+      if (egl) {
+        return NativePointer.ofAddress(eglSurface);
+      }
+      return NativePointer.ofAddress(hdc);
     }
 
     final void makeCurrent() {
       if (closed) {
         throw new IllegalStateException("OpenGL test context is closed");
       }
-      glfwMakeContextCurrent(window);
-      GL.createCapabilities();
+      if (egl) {
+        if (!eglMakeCurrent(eglDisplay, eglSurface, eglSurface, eglContext)) {
+          throw new IllegalStateException("EGL make-current failed");
+        }
+        GLES.createCapabilities();
+      } else {
+        glfwMakeContextCurrent(window);
+        GL.createCapabilities();
+      }
     }
 
     final void checkGlError(String operation) {
-      var error = glGetError();
+      var error = egl ? GLES20.glGetError() : glGetError();
       if (error != GL_NO_ERROR) {
         throw new IllegalStateException(
             operation + " failed with OpenGL error 0x%x".formatted(error));
@@ -359,8 +497,12 @@ public final class RenderTargetTestSupport implements AutoCloseable {
     final byte[] readSurfaceRgba(int width, int height) {
       makeCurrent();
       var pixels = BufferUtils.createByteBuffer(width * height * 4);
-      glReadBuffer(GL_FRONT);
-      glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
+      if (egl) {
+        GLES20.glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
+      } else {
+        glReadBuffer(GL_FRONT);
+        glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
+      }
       checkGlError("read OpenGL surface");
       var bytes = new byte[pixels.capacity()];
       pixels.get(0, bytes);
@@ -373,7 +515,22 @@ public final class RenderTargetTestSupport implements AutoCloseable {
         return;
       }
       closed = true;
-      if (window != NULL) {
+      if (egl) {
+        if (eglDisplay != EGL_NO_DISPLAY) {
+          eglMakeCurrent(eglDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
+          if (eglSurface != EGL_NO_SURFACE) {
+            eglDestroySurface(eglDisplay, eglSurface);
+            eglSurface = EGL_NO_SURFACE;
+          }
+          if (eglContext != EGL_NO_CONTEXT) {
+            eglDestroyContext(eglDisplay, eglContext);
+            eglContext = EGL_NO_CONTEXT;
+          }
+          eglTerminate(eglDisplay);
+          eglDisplay = EGL_NO_DISPLAY;
+        }
+        GLES.setCapabilities(null);
+      } else if (window != NULL) {
         if (hdc != NULL) {
           releaseDc(glfwGetWin32Window(window), hdc);
           hdc = NULL;
@@ -439,9 +596,18 @@ public final class RenderTargetTestSupport implements AutoCloseable {
       context.window = base.window;
       context.hdc = base.hdc;
       context.hglrc = base.hglrc;
+      context.eglDisplay = base.eglDisplay;
+      context.eglConfig = base.eglConfig;
+      context.eglSurface = base.eglSurface;
+      context.eglContext = base.eglContext;
+      context.egl = base.egl;
       base.window = NULL;
       base.hdc = NULL;
       base.hglrc = NULL;
+      base.eglDisplay = EGL_NO_DISPLAY;
+      base.eglConfig = NULL;
+      base.eglSurface = EGL_NO_SURFACE;
+      base.eglContext = EGL_NO_CONTEXT;
       base.closed = true;
       context.width = width;
       context.height = height;
@@ -461,9 +627,9 @@ public final class RenderTargetTestSupport implements AutoCloseable {
     byte[] readRgba() {
       makeCurrent();
       var pixels = BufferUtils.createByteBuffer(width * height * 4);
-      glBindTexture(GL_TEXTURE_2D, texture);
-      glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
-      glBindTexture(GL_TEXTURE_2D, 0);
+      bindTexture(texture);
+      readTexture(pixels);
+      bindTexture(0);
       checkGlError("read OpenGL borrowed texture");
       var bytes = new byte[pixels.capacity()];
       pixels.get(0, bytes);
@@ -474,7 +640,11 @@ public final class RenderTargetTestSupport implements AutoCloseable {
     public void close() {
       if (texture != 0) {
         makeCurrent();
-        glDeleteTextures(texture);
+        if (egl) {
+          GLES20.glDeleteTextures(texture);
+        } else {
+          glDeleteTextures(texture);
+        }
         texture = 0;
       }
       super.close();
@@ -482,22 +652,76 @@ public final class RenderTargetTestSupport implements AutoCloseable {
 
     private void createTexture() {
       makeCurrent();
-      texture = glGenTextures();
-      glBindTexture(GL_TEXTURE_2D, texture);
-      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-      glTexImage2D(
-          GL_TEXTURE_2D,
-          0,
-          GL_RGBA8,
-          width,
-          height,
-          0,
-          GL_RGBA,
-          GL_UNSIGNED_BYTE,
-          (ByteBuffer) null);
-      glBindTexture(GL_TEXTURE_2D, 0);
+      texture = egl ? GLES20.glGenTextures() : glGenTextures();
+      bindTexture(texture);
+      texParameteri(GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+      texParameteri(GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+      texImage2D();
+      bindTexture(0);
       checkGlError("create OpenGL borrowed texture");
+    }
+
+    private void bindTexture(int texture) {
+      if (egl) {
+        GLES20.glBindTexture(GL_TEXTURE_2D, texture);
+      } else {
+        glBindTexture(GL_TEXTURE_2D, texture);
+      }
+    }
+
+    private void texParameteri(int parameterName, int value) {
+      if (egl) {
+        GLES20.glTexParameteri(GL_TEXTURE_2D, parameterName, value);
+      } else {
+        glTexParameteri(GL_TEXTURE_2D, parameterName, value);
+      }
+    }
+
+    private void texImage2D() {
+      if (egl) {
+        GLES30.glTexImage2D(
+            GL_TEXTURE_2D,
+            0,
+            GL_RGBA8,
+            width,
+            height,
+            0,
+            GL_RGBA,
+            GL_UNSIGNED_BYTE,
+            (ByteBuffer) null);
+      } else {
+        glTexImage2D(
+            GL_TEXTURE_2D,
+            0,
+            GL_RGBA8,
+            width,
+            height,
+            0,
+            GL_RGBA,
+            GL_UNSIGNED_BYTE,
+            (ByteBuffer) null);
+      }
+    }
+
+    private void readTexture(ByteBuffer pixels) {
+      if (egl) {
+        var framebuffer = GLES20.glGenFramebuffers();
+        GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, framebuffer);
+        try {
+          GLES20.glFramebufferTexture2D(
+              GLES20.GL_FRAMEBUFFER, GLES20.GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture, 0);
+          if (GLES20.glCheckFramebufferStatus(GLES20.GL_FRAMEBUFFER)
+              != GLES20.GL_FRAMEBUFFER_COMPLETE) {
+            throw new IllegalStateException("OpenGL ES borrowed texture framebuffer incomplete");
+          }
+          GLES20.glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
+        } finally {
+          GLES20.glBindFramebuffer(GLES20.GL_FRAMEBUFFER, 0);
+          GLES20.glDeleteFramebuffers(framebuffer);
+        }
+      } else {
+        glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
+      }
     }
   }
 

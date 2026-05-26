@@ -271,8 +271,6 @@ const OpenGLAttachContext = if (build_options.supports_opengl and builtin.os.tag
         errdefer _ = egl.eglDestroySurface(display, surface);
 
         if (egl.eglMakeCurrent(display, surface, surface, share_context) == egl.EGL_FALSE) return error.EglUnavailable;
-        // TODO(linux): Validate this pbuffer config on the Linux Mesa/llvmpipe
-        // environment, including whether OpenGL ES 3 is always advertised.
         return .{
             .display = display,
             .config = config,

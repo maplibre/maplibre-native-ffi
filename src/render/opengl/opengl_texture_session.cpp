@@ -581,8 +581,6 @@ class OpenGLTextureBackend final : public mbgl::gl::RendererBackend,
   }
 #elif defined(__linux__)
   void create_egl_context() {
-    // TODO(linux): validate this path on a Linux workstation with the same EGL
-    // provider used by the host bindings, including Mesa/llvmpipe.
     auto* const display = static_cast<EGLDisplay>(context_.data.egl.display);
     auto* const config = static_cast<EGLConfig>(context_.data.egl.config);
     auto* const share_context =
@@ -601,8 +599,6 @@ class OpenGLTextureBackend final : public mbgl::gl::RendererBackend,
       throw std::runtime_error("Creating OpenGL EGL context failed");
     }
 
-    // TODO(linux): decide whether a surfaceless context is viable for all
-    // supported EGL stacks; pbuffer is conservative but needs config coverage.
     const EGLint surface_attributes[] = {
       EGL_WIDTH, 8, EGL_HEIGHT, 8, EGL_LARGEST_PBUFFER, EGL_TRUE, EGL_NONE
     };

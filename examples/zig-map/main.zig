@@ -40,8 +40,6 @@ pub fn main(init_args: std.process.Init) !void {
             std.debug.print("SDL_GL_SetAttribute failed: {s}\n", .{std.mem.span(c.SDL_GetError())});
             return types.AppError.BackendSetupFailed;
         }
-        // TODO(linux): Confirm these SDL GL attributes select Mesa EGL/GLES on
-        // the Linux llvmpipe environment used for OpenGL validation.
     }
 
     const window_flags = Backend.window_flags |

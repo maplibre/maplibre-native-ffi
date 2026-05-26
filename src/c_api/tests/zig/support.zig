@@ -168,8 +168,6 @@ const OpenGLAttachContext = if (build_options.supports_opengl and builtin.os.tag
         errdefer _ = egl.eglDestroySurface(display, surface);
 
         if (egl.eglMakeCurrent(display, surface, surface, share_context) == egl.EGL_FALSE) return error.SkipZigTest;
-        // TODO(linux): Validate this EGL helper on the Linux Mesa/llvmpipe
-        // environment before depending on it for non-Windows OpenGL CI signal.
         return .{
             .display = display,
             .config = config,

@@ -276,16 +276,21 @@ fn addBindingTests(b: *std.Build, options: BuildOptions, maplibre_native: *std.B
     const tests = addTestCompile(b, options, b.path("tests/main.zig"));
     tests.root_module.addImport("maplibre_native", maplibre_native);
     addRenderBackendOptions(b, tests.root_module, options.render_backend);
-    if (options.render_backend == .opengl and options.target.result.os.tag == .windows) {
-        const gl_bindings = zigglgen.generateBindingsModule(b, .{ .api = .gl, .version = .@"3.0" });
-        const wgl_test_context = b.createModule(.{
-            .root_source_file = b.path("../../src/zig_test_support/wgl_context.zig"),
-            .target = options.target,
-            .optimize = options.optimize,
-        });
-        wgl_test_context.addImport("gl", gl_bindings);
+    if (options.render_backend == .opengl) {
+        const gl_bindings = zigglgen.generateBindingsModule(b, if (options.target.result.os.tag == .linux)
+            .{ .api = .gles, .version = .@"3.0" }
+        else
+            .{ .api = .gl, .version = .@"3.0" });
         tests.root_module.addImport("gl", gl_bindings);
-        tests.root_module.addImport("wgl_test_context", wgl_test_context);
+        if (options.target.result.os.tag == .windows) {
+            const wgl_test_context = b.createModule(.{
+                .root_source_file = b.path("../../src/zig_test_support/wgl_context.zig"),
+                .target = options.target,
+                .optimize = options.optimize,
+            });
+            wgl_test_context.addImport("gl", gl_bindings);
+            tests.root_module.addImport("wgl_test_context", wgl_test_context);
+        }
     }
     if (options.render_backend == .metal) {
         tests.root_module.addCSourceFile(.{ .file = b.path("tests/metal_support_macos.m") });

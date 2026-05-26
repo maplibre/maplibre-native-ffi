@@ -398,8 +398,6 @@ fn platformContext(window: *c.SDL_Window) !OpenGLContext.Platform {
                 logSdlError("SDL_EGL_GetWindowSurface failed");
                 return types.AppError.BackendSetupFailed;
             };
-            // TODO(linux): Validate SDL's EGL display/config/surface handoff on
-            // the Linux Mesa/llvmpipe environment.
             return .{ .egl = .{
                 .display = display,
                 .config = config,
