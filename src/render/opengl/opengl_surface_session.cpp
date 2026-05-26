@@ -217,7 +217,10 @@ class OpenGLSurfaceBackend final : public mbgl::gl::RendererBackend,
       descriptor_.context.data.egl.get_proc_address
     );
     if (loader != nullptr) {
-      return reinterpret_cast<mbgl::gl::ProcAddress>(loader(name));
+      auto* proc = loader(name);
+      if (proc != nullptr) {
+        return reinterpret_cast<mbgl::gl::ProcAddress>(proc);
+      }
     }
     return reinterpret_cast<mbgl::gl::ProcAddress>(eglGetProcAddress(name));
 #else
@@ -293,16 +296,7 @@ class OpenGLSurfaceBackend final : public mbgl::gl::RendererBackend,
     previous_render_context_ = nullptr;
 #elif defined(__linux__)
     restore_previous_egl_api();
-    eglMakeCurrent(
-      static_cast<EGLDisplay>(previous_display_),
-      static_cast<EGLSurface>(previous_draw_surface_),
-      static_cast<EGLSurface>(previous_read_surface_),
-      static_cast<EGLContext>(previous_context_)
-    );
-    previous_display_ = nullptr;
-    previous_draw_surface_ = nullptr;
-    previous_read_surface_ = nullptr;
-    previous_context_ = nullptr;
+    restore_previous_egl_context();
 #endif
   }
 
@@ -352,6 +346,28 @@ class OpenGLSurfaceBackend final : public mbgl::gl::RendererBackend,
       eglBindAPI(previous_api_);
       previous_api_ = EGL_NONE;
     }
+  }
+
+  void restore_previous_egl_context() {
+    const auto had_previous_display = previous_display_ != nullptr;
+    auto* const display =
+      had_previous_display
+        ? static_cast<EGLDisplay>(previous_display_)
+        : static_cast<EGLDisplay>(descriptor_.context.data.egl.display);
+    auto* const draw_surface =
+      had_previous_display ? static_cast<EGLSurface>(previous_draw_surface_)
+                           : EGL_NO_SURFACE;
+    auto* const read_surface =
+      had_previous_display ? static_cast<EGLSurface>(previous_read_surface_)
+                           : EGL_NO_SURFACE;
+    auto* const context = had_previous_display
+                            ? static_cast<EGLContext>(previous_context_)
+                            : EGL_NO_CONTEXT;
+    (void)eglMakeCurrent(display, draw_surface, read_surface, context);
+    previous_display_ = nullptr;
+    previous_draw_surface_ = nullptr;
+    previous_read_surface_ = nullptr;
+    previous_context_ = nullptr;
   }
 
   void destroy_native_context() {
