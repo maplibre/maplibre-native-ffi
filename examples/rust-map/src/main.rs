@@ -2,6 +2,8 @@
 
 mod app;
 mod input;
+mod opengl;
+mod opengl_texture_compositor;
 mod render_target;
 mod viewport;
 mod vulkan;
@@ -11,7 +13,7 @@ use std::error::Error;
 use std::time::{Duration, Instant};
 
 use app::App;
-use render_target::Mode;
+use render_target::{Backend, Mode};
 use winit::dpi::LogicalSize;
 use winit::event::Event;
 use winit::event_loop::{ControlFlow, EventLoop};
@@ -21,20 +23,17 @@ const INITIAL_WIDTH: u32 = 1280;
 const INITIAL_HEIGHT: u32 = 720;
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let mode = parse_args(std::env::args().skip(1))?;
-    if !maplibre_native::supported_render_backends()
-        .contains(maplibre_native::RenderBackendMask::VULKAN)
-    {
-        return Err("the loaded MapLibre native library does not support Vulkan".into());
-    }
+    let options = parse_args(std::env::args().skip(1))?;
+    let backend = options.backend.unwrap_or_else(Backend::choose_default);
+    backend.ensure_supported()?;
 
     let event_loop = EventLoop::new()?;
     let window = WindowBuilder::new()
-        .with_title("MapLibre Rust Vulkan Map")
+        .with_title(format!("MapLibre Rust {} Map", backend.cli_name()))
         .with_inner_size(LogicalSize::new(INITIAL_WIDTH, INITIAL_HEIGHT))
         .with_resizable(true)
         .build(&event_loop)?;
-    let mut app = App::new(window, mode)?;
+    let mut app = App::new(window, backend, options.mode)?;
 
     app.print_status();
     event_loop.run(move |event, target| {
@@ -53,10 +52,13 @@ fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn parse_args(args: impl IntoIterator<Item = String>) -> Result<Mode, Box<dyn Error>> {
+fn parse_args(args: impl IntoIterator<Item = String>) -> Result<Options, Box<dyn Error>> {
+    let mut backend = None;
     let mut mode = Mode::OwnedTexture;
     for arg in args {
-        if let Some(value) = arg.strip_prefix("--render-target=") {
+        if let Some(value) = arg.strip_prefix("--backend=") {
+            backend = Some(Backend::parse(value)?);
+        } else if let Some(value) = arg.strip_prefix("--render-target=") {
             mode = Mode::parse(value)?;
         } else if !arg.starts_with('-') {
             mode = Mode::parse(&arg)?;
@@ -64,5 +66,10 @@ fn parse_args(args: impl IntoIterator<Item = String>) -> Result<Mode, Box<dyn Er
             return Err(format!("unknown argument: {arg}").into());
         }
     }
-    Ok(mode)
+    Ok(Options { backend, mode })
+}
+
+struct Options {
+    backend: Option<Backend>,
+    mode: Mode,
 }

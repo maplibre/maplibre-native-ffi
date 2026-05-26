@@ -8,9 +8,8 @@ use winit::event_loop::EventLoopWindowTarget;
 use winit::window::Window;
 
 use crate::input::Controller;
-use crate::render_target::{Mode, RenderTarget};
+use crate::render_target::{Backend, BackendContext, Mode, RenderTarget};
 use crate::viewport::Viewport;
-use crate::vulkan::VulkanContext;
 
 const STYLE_URL: &str = "https://tiles.openfreemap.org/styles/bright";
 
@@ -18,7 +17,7 @@ pub struct App {
     target: Option<RenderTarget>,
     map: Option<maplibre_native::MapHandle>,
     runtime: Option<RuntimeHandle>,
-    vulkan: VulkanContext,
+    backend_context: BackendContext,
     window: Window,
     viewport: Viewport,
     input: Controller,
@@ -26,11 +25,12 @@ pub struct App {
     viewport_dirty: bool,
     closed: bool,
     mode: Mode,
+    backend: Backend,
 }
 
 impl App {
-    pub fn new(window: Window, mode: Mode) -> Result<Self, Box<dyn Error>> {
-        let vulkan = VulkanContext::new(&window)?;
+    pub fn new(window: Window, backend: Backend, mode: Mode) -> Result<Self, Box<dyn Error>> {
+        let backend_context = BackendContext::new(backend, &window)?;
         let viewport = Viewport::from_window(&window);
         if viewport.is_empty() {
             return Err("window has no drawable extent".into());
@@ -66,7 +66,7 @@ impl App {
             }
         };
         viewport.log("initial viewport");
-        let target = match RenderTarget::attach(mode, &map, &vulkan, viewport) {
+        let target = match RenderTarget::attach(mode, &map, &backend_context, viewport) {
             Ok(target) => target,
             Err(error) => {
                 return Err(startup_error(
@@ -90,7 +90,7 @@ impl App {
             target: Some(target),
             map: Some(map),
             runtime: Some(runtime),
-            vulkan,
+            backend_context,
             window,
             viewport,
             input: Controller::default(),
@@ -98,11 +98,16 @@ impl App {
             viewport_dirty: false,
             closed: false,
             mode,
+            backend,
         })
     }
 
     pub fn print_status(&self) {
-        println!("MapLibre Rust Vulkan map example running. Close the window to exit.");
+        println!(
+            "MapLibre Rust {} map example running. Close the window to exit.",
+            self.backend.cli_name()
+        );
+        println!("rust-map backend: {}", self.backend.cli_name());
         println!("rust-map render target: {}", self.mode.cli_name());
         println!("render target status: {}", self.mode.status());
         Controller::print_controls();
@@ -247,10 +252,10 @@ impl App {
         self.viewport_dirty = false;
 
         let mut first_error = self
-            .vulkan
+            .backend_context
             .wait_idle()
             .err()
-            .map(|error| format!("Vulkan device wait idle failed: {error:?}"));
+            .map(|error| format!("backend wait-idle failed: {error}"));
 
         if let Some(target) = self.target.take()
             && let Err(error) = target.close()
