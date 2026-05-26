@@ -40,6 +40,49 @@ assert_not_impl_any!(OpenGLOwnedTextureFrameHandle: Send, Sync);
 const FEATURE_STATE_STYLE_JSON: &str = r#"{"version":8,"sources":{"point":{"type":"geojson","data":{"type":"FeatureCollection","features":[{"type":"Feature","id":"feature-1","properties":{},"geometry":{"type":"Point","coordinates":[0,0]}}]}}},"layers":[{"id":"circle","type":"circle","source":"point","paint":{"circle-radius":["case",["boolean",["feature-state","hover"],false],10,5]}}]}"#;
 const QUERY_STYLE_JSON: &str = r##"{"version":8,"sources":{"point":{"type":"geojson","data":{"type":"FeatureCollection","features":[{"type":"Feature","id":"feature-1","geometry":{"type":"Point","coordinates":[-122.4194,37.7749]},"properties":{"kind":"capital","visible":true}}]}}},"layers":[{"id":"background","type":"background","paint":{"background-color":"#d8f1ff"}},{"id":"point-circle","type":"circle","source":"point","paint":{"circle-color":"#f97316","circle-radius":12}}]}"##;
 const CLUSTER_STYLE_JSON: &str = r##"{"version":8,"sources":{"cluster-source":{"type":"geojson","cluster":true,"data":{"type":"FeatureCollection","features":[{"type":"Feature","geometry":{"type":"Point","coordinates":[0.0,0.0]},"properties":{"name":"one"}},{"type":"Feature","geometry":{"type":"Point","coordinates":[0.001,0.001]},"properties":{"name":"two"}},{"type":"Feature","geometry":{"type":"Point","coordinates":[0.002,0.002]},"properties":{"name":"three"}}]}}},"layers":[{"id":"background","type":"background","paint":{"background-color":"#ffffff"}},{"id":"cluster-circle","type":"circle","source":"cluster-source","filter":["has","point_count"],"paint":{"circle-color":"#2563eb","circle-radius":20}}]}"##;
+#[cfg(target_os = "windows")]
+const GL_NO_ERROR: u32 = 0;
+const GL_TEXTURE_2D: u32 = 0x0de1;
+#[cfg(target_os = "windows")]
+const GL_RGBA: u32 = 0x1908;
+#[cfg(target_os = "windows")]
+const GL_UNSIGNED_BYTE: u32 = 0x1401;
+#[cfg(target_os = "windows")]
+const GL_RGBA8: i32 = 0x8058;
+#[cfg(target_os = "windows")]
+const GL_TEXTURE_MAG_FILTER: u32 = 0x2800;
+#[cfg(target_os = "windows")]
+const GL_TEXTURE_MIN_FILTER: u32 = 0x2801;
+#[cfg(target_os = "windows")]
+const GL_NEAREST: i32 = 0x2600;
+
+#[cfg(target_os = "windows")]
+#[link(name = "opengl32")]
+unsafe extern "system" {
+    fn glBindTexture(target: u32, texture: u32);
+    fn glDeleteTextures(n: i32, textures: *const u32);
+    fn glGenTextures(n: i32, textures: *mut u32);
+    fn glGetError() -> u32;
+    fn glGetTexImage(
+        target: u32,
+        level: i32,
+        format: u32,
+        type_: u32,
+        pixels: *mut std::ffi::c_void,
+    );
+    fn glTexImage2D(
+        target: u32,
+        level: i32,
+        internal_format: i32,
+        width: i32,
+        height: i32,
+        border: i32,
+        format: u32,
+        type_: u32,
+        pixels: *const std::ffi::c_void,
+    );
+    fn glTexParameteri(target: u32, pname: u32, param: i32);
+}
 
 fn create_owned_texture_session(
     map: &MapHandle,
@@ -96,6 +139,24 @@ fn create_opengl_surface_session(
         context.surface(),
     ))?;
     Ok((context, session))
+}
+
+fn create_opengl_borrowed_texture_session(
+    map: &MapHandle,
+    extent: RenderTargetExtent,
+) -> std::result::Result<(OpenGLBorrowedTexture, RenderSessionHandle), Box<dyn StdError>> {
+    let backends = crate::supported_render_backends();
+    if !backends.contains(RenderBackendMask::OPENGL) {
+        return Err("native library does not support OpenGL borrowed texture sessions".into());
+    }
+    let texture = OpenGLBorrowedTexture::new(extent.width, extent.height)?;
+    let session = map.attach_opengl_borrowed_texture(&OpenGLBorrowedTextureDescriptor::new(
+        extent,
+        texture.descriptor(),
+        texture.name(),
+        GL_TEXTURE_2D,
+    ))?;
+    Ok((texture, session))
 }
 
 #[allow(dead_code)]
@@ -333,6 +394,51 @@ impl OpenGLTestContext {
             unreachable!("OpenGL test surfaces are only available on Windows WGL")
         }
     }
+
+    fn make_current(&self) -> std::result::Result<(), Box<dyn StdError>> {
+        #[cfg(target_os = "windows")]
+        {
+            // SAFETY: The WGL handles belong to this helper and remain live for
+            // its lifetime.
+            if unsafe {
+                wglMakeCurrent(
+                    self.device_context.as_ptr::<std::ffi::c_void>(),
+                    self.share_context.as_ptr::<std::ffi::c_void>(),
+                )
+            } == 0
+            {
+                Err("wglMakeCurrent failed".into())
+            } else {
+                Ok(())
+            }
+        }
+
+        #[cfg(not(target_os = "windows"))]
+        {
+            // TODO(linux): Make the EGL context current for Rust OpenGL helpers.
+            Err("OpenGL make-current helper is only available on Windows WGL".into())
+        }
+    }
+
+    fn check_gl_error(&self, operation: &str) -> std::result::Result<(), Box<dyn StdError>> {
+        #[cfg(target_os = "windows")]
+        {
+            // SAFETY: A current context exists when callers check GL state.
+            let error = unsafe { glGetError() };
+            if error == GL_NO_ERROR {
+                Ok(())
+            } else {
+                Err(format!("{operation} failed with OpenGL error 0x{error:x}").into())
+            }
+        }
+
+        #[cfg(not(target_os = "windows"))]
+        {
+            let _ = operation;
+            // TODO(linux): Check EGL/OpenGL errors once the Linux helper exists.
+            Err("OpenGL error checking is only available on Windows WGL".into())
+        }
+    }
 }
 
 #[cfg(target_os = "windows")]
@@ -346,6 +452,112 @@ impl Drop for OpenGLTestContext {
             let _ = wglMakeCurrent(std::ptr::null_mut(), std::ptr::null_mut());
             wglDeleteContext(hglrc);
             ReleaseDC(self.window.hwnd, hdc);
+        }
+    }
+}
+
+struct OpenGLBorrowedTexture {
+    context: OpenGLTestContext,
+    texture: u32,
+    width: u32,
+    height: u32,
+}
+
+impl OpenGLBorrowedTexture {
+    fn new(width: u32, height: u32) -> std::result::Result<Self, Box<dyn StdError>> {
+        let context = OpenGLTestContext::new()?;
+        #[cfg(target_os = "windows")]
+        {
+            context.make_current()?;
+            let mut texture = 0;
+            // SAFETY: A current WGL context exists on this thread, and the
+            // texture object stays in the context share group for this helper's lifetime.
+            unsafe {
+                glGenTextures(1, &mut texture);
+                glBindTexture(GL_TEXTURE_2D, texture);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+                glTexImage2D(
+                    GL_TEXTURE_2D,
+                    0,
+                    GL_RGBA8,
+                    width as i32,
+                    height as i32,
+                    0,
+                    GL_RGBA,
+                    GL_UNSIGNED_BYTE,
+                    std::ptr::null(),
+                );
+                glBindTexture(GL_TEXTURE_2D, 0);
+            }
+            context.check_gl_error("create borrowed texture")?;
+            Ok(Self {
+                context,
+                texture,
+                width,
+                height,
+            })
+        }
+
+        #[cfg(not(target_os = "windows"))]
+        {
+            let _ = (context, width, height);
+            // TODO(linux): Allocate an EGL-shared GL texture for Rust binding
+            // borrowed-texture tests once the Linux EGL helper is validated.
+            Err("OpenGL borrowed texture helper is only available on Windows WGL".into())
+        }
+    }
+
+    fn descriptor(&self) -> OpenGLContextDescriptor {
+        self.context.descriptor()
+    }
+
+    fn name(&self) -> u32 {
+        self.texture
+    }
+
+    fn read_rgba(&self) -> std::result::Result<Vec<u8>, Box<dyn StdError>> {
+        #[cfg(target_os = "windows")]
+        {
+            self.context.make_current()?;
+            let mut pixels = vec![0_u8; self.width as usize * self.height as usize * 4];
+            // SAFETY: The texture belongs to the current context share group,
+            // and pixels points to enough writable storage for the RGBA8 image.
+            unsafe {
+                glBindTexture(GL_TEXTURE_2D, self.texture);
+                glGetTexImage(
+                    GL_TEXTURE_2D,
+                    0,
+                    GL_RGBA,
+                    GL_UNSIGNED_BYTE,
+                    pixels.as_mut_ptr().cast(),
+                );
+                glBindTexture(GL_TEXTURE_2D, 0);
+            }
+            self.context.check_gl_error("read borrowed texture")?;
+            Ok(pixels)
+        }
+
+        #[cfg(not(target_os = "windows"))]
+        {
+            // TODO(linux): Read back from the EGL texture helper once it exists.
+            Err("OpenGL borrowed texture readback is only available on Windows WGL".into())
+        }
+    }
+}
+
+impl Drop for OpenGLBorrowedTexture {
+    fn drop(&mut self) {
+        #[cfg(target_os = "windows")]
+        {
+            if self.texture != 0 && self.context.make_current().is_ok() {
+                // SAFETY: The texture was created by this helper in the current
+                // context share group and has not been deleted yet.
+                unsafe {
+                    glDeleteTextures(1, &self.texture);
+                }
+                self.texture = 0;
+            }
         }
     }
 }
@@ -724,6 +936,37 @@ fn opengl_surface_session_renders_with_platform_context() {
         RuntimeEventType::MapRenderUpdateAvailable
     ));
     session.render_update().unwrap();
+
+    session.close().unwrap();
+    map.close().unwrap();
+    runtime.close().unwrap();
+}
+
+#[test]
+fn opengl_borrowed_texture_session_renders_with_platform_context() {
+    let runtime = RuntimeHandle::new().unwrap();
+    let map = MapHandle::with_options(&runtime, &MapOptions::new(128, 128, 1.0)).unwrap();
+
+    let Ok((texture, session)) =
+        create_opengl_borrowed_texture_session(&map, RenderTargetExtent::new(128, 128, 1.0))
+    else {
+        map.close().unwrap();
+        runtime.close().unwrap();
+        return;
+    };
+
+    map.set_style_json(QUERY_STYLE_JSON).unwrap();
+    assert!(wait_for_runtime_event(
+        &runtime,
+        RuntimeEventType::MapRenderUpdateAvailable
+    ));
+    session.render_update().unwrap();
+
+    let error = session.acquire_opengl_owned_texture_frame().unwrap_err();
+    assert_eq!(error.kind(), ErrorKind::Unsupported);
+
+    let pixels = texture.read_rgba().unwrap();
+    assert!(pixels.iter().any(|byte| *byte != 0));
 
     session.close().unwrap();
     map.close().unwrap();
