@@ -1,20 +1,3 @@
 [tasks.build]
-depends = ["//bindings/java-jni:native:build"]
-run = "../../gradlew :bindings:java-jni:build --rerun-tasks -Dorg.maplibre.nativejni.tests.requireNative=true"
-
-[tasks."native:build"]
 depends = ["//:ensure-native-library"]
-run = "../../gradlew :bindings:java-jni:copyJavaCppNative --rerun-tasks"
-
-[tasks."test:native"]
-description = "Run Java JNI tests with the JavaCPP bridge generated from the C ABI."
-depends = ["//bindings/java-jni:native:build"]
-run = "../../gradlew :bindings:java-jni:test --rerun-tasks -Dorg.maplibre.nativejni.tests.requireNative=true"
-
-[tasks.check]
-description = "Run Java JNI branch-readiness checks."
-run = [
-  { task = "native:build" },
-  { task = "test:native" },
-  "../../gradlew :bindings:java-jni:javadoc",
-]
+run = "../../gradlew :bindings:java-jni:build"

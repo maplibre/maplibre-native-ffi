@@ -15,6 +15,27 @@ dependencies {
 
 tasks.withType<JavaCompile>().configureEach { options.release = 25 }
 
+fun javaCppPlatform(): String {
+  var osName = System.getProperty("os.name").lowercase()
+  var osArch = System.getProperty("os.arch").lowercase()
+  osName =
+    when {
+      osName.startsWith("mac") || osName.startsWith("darwin") -> "macosx"
+      osName.startsWith("win") -> "windows"
+      osName.startsWith("linux") -> "linux"
+      else -> throw GradleException("Unsupported JavaCPP platform: $osName")
+    }
+  osArch =
+    when (osArch) {
+      "amd64",
+      "x86_64" -> "x86_64"
+      "aarch64",
+      "arm64" -> "arm64"
+      else -> throw GradleException("Unsupported JavaCPP architecture: $osArch")
+    }
+  return "$osName-$osArch"
+}
+
 val generatedJavaCppSources = layout.buildDirectory.dir("generated/sources/javacpp/main/java")
 val javaCppConfigClasses = layout.buildDirectory.dir("classes/javacppConfig")
 
@@ -55,12 +76,12 @@ val generateJavaCppBindings =
 
 tasks.named<JavaCompile>("compileJava") { dependsOn(generateJavaCppBindings) }
 
-val nativeBuildDir =
-  providers
-    .environmentVariable("MLN_FFI_BUILD_DIR")
-    .orElse(rootProject.layout.projectDirectory.dir("build/macos-arm64-metal").asFile.absolutePath)
-
-val javaCppNativeOutputDir = layout.buildDirectory.dir("classes/java/main")
+val nativeBuildDir = providers.environmentVariable("MLN_FFI_BUILD_DIR")
+val javaCppPlatformName = javaCppPlatform()
+val jniBridgeLibrary =
+  layout.buildDirectory.file(
+    "classes/java/main/org/maplibre/nativejni/internal/javacpp/$javaCppPlatformName/${System.mapLibraryName("jniMaplibreNativeC")}"
+  )
 
 val buildJavaCppNative =
   tasks.register<JavaExec>("buildJavaCppNative") {
@@ -78,58 +99,37 @@ val buildJavaCppNative =
     inputs.files(sourceSets.main.get().output.classesDirs)
     inputs.dir(rootProject.layout.projectDirectory.dir("include"))
     inputs.dir(nativeBuildDir)
-    outputs.dir(javaCppNativeOutputDir)
+    outputs.file(jniBridgeLibrary)
+    mustRunAfter(tasks.named("compileTestJava"))
   }
 
-val copyJavaCppNative =
-  tasks.register<Copy>("copyJavaCppNative") {
-    dependsOn(buildJavaCppNative)
-    from(javaCppNativeOutputDir) { include("**/${System.mapLibraryName("jniMaplibreNativeC")}") }
-    into(javaCppNativeOutputDir)
-    includeEmptyDirs = false
-    duplicatesStrategy = DuplicatesStrategy.INCLUDE
-    eachFile { path = name }
-  }
-
-val javaCppNativeLibraryPath = javaCppNativeOutputDir.map {
-  it.file(System.mapLibraryName("jniMaplibreNativeC")).asFile.absolutePath
-}
-
-tasks.named<Jar>("jar") { dependsOn(copyJavaCppNative) }
-
-tasks.named<JavaCompile>("compileTestJava") { dependsOn(copyJavaCppNative) }
+tasks.named<Jar>("jar") { dependsOn(buildJavaCppNative) }
 
 tasks.named<Javadoc>("javadoc") {
+  dependsOn(tasks.classes)
+  val main = sourceSets.main.get()
+  source =
+    main.allJava.matching {
+      exclude("org/maplibre/nativejni/internal/**")
+      exclude("module-info.java")
+    }
+  classpath = main.compileClasspath + main.output
+  modularity.inferModulePath.set(false)
   isFailOnError = true
   options {
     encoding = "UTF-8"
     (this as StandardJavadocDocletOptions).apply {
       links("https://docs.oracle.com/en/java/javase/25/docs/api/")
-      addBooleanOption("Xdoclint:none", true)
-      addStringOption("exclude", "org.maplibre.nativejni.internal:*")
     }
   }
 }
 
-val nativeJniLibraryPath = providers.systemProperty("org.maplibre.nativejni.library.path")
-val nativeJniLibraryEnv = providers.environmentVariable("MAPLIBRE_NATIVE_JNI_LIBRARY_PATH")
-val javaLibraryPath = providers.systemProperty("java.library.path")
-val requireNativeTests = providers.systemProperty("org.maplibre.nativejni.tests.requireNative")
+val jniLibraryPathProperty = "org.maplibre.nativejni.library.path"
 
 tasks.withType<Test>().configureEach {
-  dependsOn(copyJavaCppNative)
+  dependsOn(buildJavaCppNative)
   useJUnitPlatform()
   jvmArgs("--enable-native-access=ALL-UNNAMED")
-  inputs.property("org.maplibre.nativejni.library.path", nativeJniLibraryPath.orElse(""))
-  inputs.property("MAPLIBRE_NATIVE_JNI_LIBRARY_PATH", nativeJniLibraryEnv.orElse(""))
-  inputs.property("java.library.path", javaLibraryPath.orElse(""))
-  inputs.property("org.maplibre.nativejni.tests.requireNative", requireNativeTests.orElse(""))
-  systemProperty(
-    "org.maplibre.nativejni.library.path",
-    nativeJniLibraryPath.orElse(javaCppNativeLibraryPath).get(),
-  )
-  javaLibraryPath.orNull?.let { systemProperty("java.library.path", it) }
-  requireNativeTests.orNull?.let {
-    systemProperty("org.maplibre.nativejni.tests.requireNative", it)
-  }
+  systemProperty(jniLibraryPathProperty, jniBridgeLibrary.get().asFile.absolutePath)
+  inputs.file(jniBridgeLibrary).withPropertyName("jniBridgeLibrary")
 }

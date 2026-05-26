@@ -37,6 +37,10 @@ requires = { platform = ["windows"], backend = ["vulkan"] }
 task = "//bindings/java-ffm:build"
 requires = { platform = ["linux", "macos"] }
 
+[bindings.java-jni]
+task = "//bindings/java-jni:build"
+requires = { platform = ["linux", "macos"] }
+
 [bindings.rust]
 task = "//bindings/rust:ci"
 requires = { platform = ["linux", "macos"] }
