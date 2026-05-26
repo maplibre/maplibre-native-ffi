@@ -30,16 +30,16 @@ returns `0`.
 The C API covers most of the MapLibre Native API surface. Advanced extension
 APIs, including custom layers and shader registry access, are not yet included.
 
-Legend: 🟢 built and tested in CI; ❌ not yet implemented; `-` not applicable on
-that platform.
+Legend: 🟢 built and tested in CI; 🟡 implemented with validation still in
+progress; ❌ not yet implemented; `-` not applicable on that platform.
 
-| Platform | OpenGL            | Vulkan            | Metal             | WebGPU            |
-| -------- | ----------------- | ----------------- | ----------------- | ----------------- |
-| Linux    | ❌ [#23][issue-23] | 🟢                | -                 | ❌ [#37][issue-37] |
-| Android  | ❌ [#24][issue-24] | ❌ [#24][issue-24] | -                 | ❌ [#37][issue-37] |
-| macOS    | -                 | 🟢                | 🟢                | ❌ [#37][issue-37] |
-| iOS      | -                 | -                 | ❌ [#25][issue-25] | ❌ [#37][issue-37] |
-| Windows  | ❌ [#22][issue-22] | 🟢                | -                 | ❌ [#37][issue-37] |
+| Platform | OpenGL                 | Vulkan            | Metal             | WebGPU            |
+| -------- | ---------------------- | ----------------- | ----------------- | ----------------- |
+| Linux    | 🟡 EGL [#23][issue-23] | 🟢                | -                 | ❌ [#37][issue-37] |
+| Android  | ❌ [#24][issue-24]      | ❌ [#24][issue-24] | -                 | ❌ [#37][issue-37] |
+| macOS    | -                      | 🟢                | 🟢                | ❌ [#37][issue-37] |
+| iOS      | -                      | -                 | ❌ [#25][issue-25] | ❌ [#37][issue-37] |
+| Windows  | 🟢 WGL [#22][issue-22] | 🟢                | -                 | ❌ [#37][issue-37] |
 
 ### Language bindings
 

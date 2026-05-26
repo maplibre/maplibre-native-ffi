@@ -57,6 +57,23 @@ available. Set `MISE_ENV=<variant>` before `mise run ...`, or pass
 `mise -E <variant> run ...`, to build, test, or run examples for another
 platform and render backend.
 
+Render backend variants live in `.mise/config.*.toml` profiles. The current
+native OpenGL profiles are:
+
+- `windows-x64-wgl` for OpenGL with WGL on Windows.
+- `linux-x64-egl` for OpenGL with EGL on Linux x64.
+- `linux-arm64-egl` for OpenGL with EGL on Linux arm64.
+
+Use the profile name with `mise -E`:
+
+```bash
+mise -E windows-x64-wgl run test
+mise -E windows-x64-wgl run //examples/zig-readback:run
+```
+
+Linux EGL profiles are present for implementation and CI wiring. Validate them
+on Linux before treating a Linux EGL change as complete.
+
 ## Common Commands
 
 ```bash
@@ -80,7 +97,7 @@ mise run //docs:build
 
 GitHub Actions builds native artifacts and examples for the variants described
 by the mise profiles, such as `.mise/config.linux-x64-vulkan.toml` and
-`.mise/config.macos-arm64-metal.toml`. The CI matrix generator reads each
+`.mise/config.windows-x64-wgl.toml`. The CI matrix generator reads each
 profile's platform, architecture, and render backend metadata.
 
 Use `.github/config/variants.toml` to configure CI matrix policy: runner
@@ -116,6 +133,11 @@ libraries, C/C++ tooling, and build tools that participate in CMake
 configuration or native package discovery. CMake, Ninja, pkg-config, shader
 tools, and clang tooling live in Pixi for that reason. Pixi runs
 [CMake](https://cmake.org/), and CMake builds the native C/C++ library.
+
+Mise profiles select dependency environments and backend variants. Inner build
+files such as CMake, Cargo, Gradle, and Zig build scripts consume the resulting
+environment values and paths; keep Pixi and mise policy at the repository task
+layer.
 
 Language package managers own dependencies inside their ecosystems. For example,
 `uv` owns Python package dependencies, `pnpm` owns Node package dependencies,
