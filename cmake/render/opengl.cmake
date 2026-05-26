@@ -26,19 +26,11 @@ function(mln_configure_opengl_backend target)
       SYSTEM
       PRIVATE ${PROJECT_SOURCE_DIR}/third_party/khronos/include)
 
-    if(MSVC)
-      set(MLN_FFI_WGL_FORCE_INCLUDES
-          /FI${PROJECT_SOURCE_DIR}/third_party/khronos/include/GLES3/gl3.h
-          /FI${PROJECT_SOURCE_DIR}/third_party/khronos/include/GL/wglext.h)
-    else()
-      set(MLN_FFI_WGL_FORCE_INCLUDES
-          -include${PROJECT_SOURCE_DIR}/third_party/khronos/include/GLES3/gl3.h
-          -include${PROJECT_SOURCE_DIR}/third_party/khronos/include/GL/wglext.h)
-    endif()
-
     set_source_files_properties(
       ${MLN_SOURCE_DIR}/platform/windows/src/headless_backend_wgl.cpp
-      PROPERTIES COMPILE_OPTIONS "${MLN_FFI_WGL_FORCE_INCLUDES}")
+      PROPERTIES
+        COMPILE_OPTIONS
+        "/FI${PROJECT_SOURCE_DIR}/third_party/khronos/include/GLES3/gl3.h;/FI${PROJECT_SOURCE_DIR}/third_party/khronos/include/GL/wglext.h")
     target_link_libraries(${target} PRIVATE OpenGL::GL Gdi32 User32)
   else()
     message(
