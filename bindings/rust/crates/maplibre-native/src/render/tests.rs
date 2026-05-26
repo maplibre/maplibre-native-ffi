@@ -221,7 +221,7 @@ impl OpenGLTestContext {
             .with_depth_size(24)
             .with_stencil_size(8);
         let (window, config) = DisplayBuilder::new()
-            .with_preference(ApiPreference::PreferEgl)
+            .with_preference(opengl_api_preference())
             .with_window_attributes(Some(window_attributes))
             .build(&event_loop, template, |configs| {
                 configs
@@ -312,6 +312,17 @@ impl Drop for OpenGLTestContext {
         unsafe {
             ReleaseDC(self.hwnd, self.hdc);
         }
+    }
+}
+
+fn opengl_api_preference() -> ApiPreference {
+    #[cfg(target_os = "linux")]
+    {
+        ApiPreference::PreferEgl
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        ApiPreference::FallbackEgl
     }
 }
 
