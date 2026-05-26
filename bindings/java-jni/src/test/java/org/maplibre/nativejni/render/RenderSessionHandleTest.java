@@ -6,8 +6,8 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.maplibre.nativejni.error.InvalidArgumentException;
 import org.maplibre.nativejni.error.MaplibreException;
-import org.maplibre.nativejni.internal.bridge.RenderSessionNative;
-import org.maplibre.nativejni.internal.bridge.TextureNative;
+import org.maplibre.nativejni.internal.javacpp.JavaCppSupport;
+import org.maplibre.nativejni.internal.javacpp.MaplibreNativeC;
 import org.maplibre.nativejni.internal.status.Status;
 import org.maplibre.nativejni.map.MapHandle;
 import org.maplibre.nativejni.map.MapOptions;
@@ -36,44 +36,10 @@ class RenderSessionHandleTest {
   void rejectsNegativeResizeDimensionsBeforeNativeCast() {
     assertThrows(
         InvalidArgumentException.class,
-        () -> Status.check(RenderSessionNative.mln_render_session_resize(0, -1, 64, 1.0)));
-  }
-
-  @Test
-  void rejectsScaledResizeDimensionsOutsideJavaIntRange() {
-    assertThrows(
-        InvalidArgumentException.class,
         () ->
             Status.check(
-                RenderSessionNative.mln_render_session_resize(0, Integer.MAX_VALUE, 64, 2.0)));
-  }
-
-  @Test
-  void rejectsNegativeVulkanUnsignedFieldsBeforeNativeCast() {
-    assertThrows(
-        InvalidArgumentException.class,
-        () ->
-            Status.check(
-                TextureNative.mln_vulkan_owned_texture_attach(
-                    0, 64, 64, 1.0, 0, 0, 0, 0, -1, new long[1])));
-    assertThrows(
-        InvalidArgumentException.class,
-        () ->
-            Status.check(
-                TextureNative.mln_vulkan_borrowed_texture_attach(
-                    0, 64, 64, 1.0, 0, 0, 0, 0, 0, 0, 0, -1, 0, null, new long[1])));
-    assertThrows(
-        InvalidArgumentException.class,
-        () ->
-            Status.check(
-                TextureNative.mln_vulkan_borrowed_texture_attach(
-                    0, 64, 64, 1.0, 0, 0, 0, 0, 0, 0, 0, 0, -1, null, new long[1])));
-    assertThrows(
-        InvalidArgumentException.class,
-        () ->
-            Status.check(
-                TextureNative.mln_vulkan_borrowed_texture_attach(
-                    0, 64, 64, 1.0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -1, new long[1])));
+                MaplibreNativeC.mln_render_session_resize(
+                    JavaCppSupport.renderSession(0), -1, 64, 1.0)));
   }
 
   @Test

@@ -5,6 +5,8 @@ import java.util.ArrayList;
 import java.util.List;
 import org.bytedeco.javacpp.BytePointer;
 import org.bytedeco.javacpp.Pointer;
+import org.maplibre.nativejni.geo.Geometry;
+import org.maplibre.nativejni.geo.LatLng;
 import org.maplibre.nativejni.json.JsonValue;
 import org.maplibre.nativejni.json.JsonValue.Member;
 
@@ -22,6 +24,10 @@ public final class JavaCppValues {
 
   public static StringViewsScope stringViews(String[] values) {
     return new StringViewsScope(values);
+  }
+
+  public static GeometryScope geometry(Geometry value) {
+    return new GeometryScope(value);
   }
 
   public static JsonValue jsonValue(MaplibreNativeC.mln_json_value value) {
@@ -122,6 +128,147 @@ public final class JavaCppValues {
       for (var i = views.size() - 1; i >= 0; i--) {
         views.get(i).close();
       }
+    }
+  }
+
+  public static final class GeometryScope implements AutoCloseable {
+    private final List<Pointer> owned = new ArrayList<>();
+    private final MaplibreNativeC.mln_geometry root;
+
+    private GeometryScope(Geometry value) {
+      this.root = geometry(value);
+    }
+
+    public MaplibreNativeC.mln_geometry value() {
+      return root;
+    }
+
+    @Override
+    public void close() {
+      for (var i = owned.size() - 1; i >= 0; i--) {
+        owned.get(i).close();
+      }
+    }
+
+    private <T extends Pointer> T own(T pointer) {
+      owned.add(pointer);
+      return pointer;
+    }
+
+    private MaplibreNativeC.mln_geometry geometry(Geometry value) {
+      var out = own(new MaplibreNativeC.mln_geometry());
+      out.size(out.sizeof());
+      switch (value) {
+        case Geometry.Empty ignored -> out.type(MaplibreNativeC.MLN_GEOMETRY_TYPE_EMPTY);
+        case Geometry.Point node -> {
+          out.type(MaplibreNativeC.MLN_GEOMETRY_TYPE_POINT);
+          out.data_point(coordinate(node.coordinate()));
+        }
+        case Geometry.LineString node -> {
+          out.type(MaplibreNativeC.MLN_GEOMETRY_TYPE_LINE_STRING);
+          out.data_line_string(coordinateSpan(node.coordinates()));
+        }
+        case Geometry.Polygon node -> {
+          out.type(MaplibreNativeC.MLN_GEOMETRY_TYPE_POLYGON);
+          out.data_polygon(polygon(node.rings()));
+        }
+        case Geometry.MultiPoint node -> {
+          out.type(MaplibreNativeC.MLN_GEOMETRY_TYPE_MULTI_POINT);
+          out.data_multi_point(coordinateSpan(node.coordinates()));
+        }
+        case Geometry.MultiLineString node -> {
+          out.type(MaplibreNativeC.MLN_GEOMETRY_TYPE_MULTI_LINE_STRING);
+          out.data_multi_line_string(multiLine(node.lines()));
+        }
+        case Geometry.MultiPolygon node -> {
+          out.type(MaplibreNativeC.MLN_GEOMETRY_TYPE_MULTI_POLYGON);
+          out.data_multi_polygon(multiPolygon(node.polygons()));
+        }
+        case Geometry.Collection node -> {
+          out.type(MaplibreNativeC.MLN_GEOMETRY_TYPE_GEOMETRY_COLLECTION);
+          var geometries = node.geometries();
+          var collection = own(new MaplibreNativeC.mln_geometry_collection());
+          if (!geometries.isEmpty()) {
+            var nativeGeometries = own(new MaplibreNativeC.mln_geometry(geometries.size()));
+            for (var i = 0; i < geometries.size(); i++) {
+              nativeGeometries.position(i).put(geometry(geometries.get(i)));
+            }
+            nativeGeometries.position(0);
+            collection.geometries(nativeGeometries);
+          }
+          collection.geometry_count(geometries.size());
+          out.data_geometry_collection(collection);
+        }
+      }
+      return out;
+    }
+
+    private MaplibreNativeC.mln_coordinate_span coordinateSpan(List<LatLng> values) {
+      var span = own(new MaplibreNativeC.mln_coordinate_span());
+      if (!values.isEmpty()) {
+        var nativeCoordinates = own(new MaplibreNativeC.mln_lat_lng(values.size()));
+        for (var i = 0; i < values.size(); i++) {
+          var coordinate = values.get(i);
+          nativeCoordinates
+              .position(i)
+              .latitude(coordinate.latitude())
+              .longitude(coordinate.longitude());
+        }
+        nativeCoordinates.position(0);
+        span.coordinates(nativeCoordinates);
+      }
+      span.coordinate_count(values.size());
+      return span;
+    }
+
+    private MaplibreNativeC.mln_polygon_geometry polygon(List<List<LatLng>> rings) {
+      var out = own(new MaplibreNativeC.mln_polygon_geometry());
+      if (!rings.isEmpty()) {
+        var nativeRings = own(new MaplibreNativeC.mln_coordinate_span(rings.size()));
+        for (var i = 0; i < rings.size(); i++) {
+          nativeRings.position(i).put(coordinateSpan(rings.get(i)));
+        }
+        nativeRings.position(0);
+        out.rings(nativeRings);
+      }
+      out.ring_count(rings.size());
+      return out;
+    }
+
+    private MaplibreNativeC.mln_multi_line_geometry multiLine(List<List<LatLng>> lines) {
+      var out = own(new MaplibreNativeC.mln_multi_line_geometry());
+      if (!lines.isEmpty()) {
+        var nativeLines = own(new MaplibreNativeC.mln_coordinate_span(lines.size()));
+        for (var i = 0; i < lines.size(); i++) {
+          nativeLines.position(i).put(coordinateSpan(lines.get(i)));
+        }
+        nativeLines.position(0);
+        out.lines(nativeLines);
+      }
+      out.line_count(lines.size());
+      return out;
+    }
+
+    private MaplibreNativeC.mln_multi_polygon_geometry multiPolygon(
+        List<List<List<LatLng>>> polygons) {
+      var out = own(new MaplibreNativeC.mln_multi_polygon_geometry());
+      if (!polygons.isEmpty()) {
+        var nativePolygons = own(new MaplibreNativeC.mln_polygon_geometry(polygons.size()));
+        for (var i = 0; i < polygons.size(); i++) {
+          nativePolygons.position(i).put(polygon(polygons.get(i)));
+        }
+        nativePolygons.position(0);
+        out.polygons(nativePolygons);
+      }
+      out.polygon_count(polygons.size());
+      return out;
+    }
+
+    private MaplibreNativeC.mln_lat_lng coordinate(LatLng value) {
+      var out = own(new MaplibreNativeC.mln_lat_lng());
+      out.latitude(value.latitude());
+      out.longitude(value.longitude());
+      return out;
     }
   }
 

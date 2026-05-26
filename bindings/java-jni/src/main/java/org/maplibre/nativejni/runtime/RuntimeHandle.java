@@ -6,14 +6,17 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import org.bytedeco.javacpp.BoolPointer;
+import org.bytedeco.javacpp.PointerPointer;
 import org.maplibre.nativejni.error.InvalidStateException;
 import org.maplibre.nativejni.internal.access.InternalAccess;
-import org.maplibre.nativejni.internal.bridge.OfflineNative;
-import org.maplibre.nativejni.internal.bridge.RuntimeNative;
 import org.maplibre.nativejni.internal.callback.ResourceTransformState;
+import org.maplibre.nativejni.internal.javacpp.JavaCppSupport;
+import org.maplibre.nativejni.internal.javacpp.MaplibreNativeC;
 import org.maplibre.nativejni.internal.lifecycle.HandleState;
 import org.maplibre.nativejni.internal.loader.NativeLibrary;
 import org.maplibre.nativejni.internal.status.Status;
+import org.maplibre.nativejni.internal.struct.OfflineStructs;
 import org.maplibre.nativejni.internal.struct.RuntimeStructs;
 import org.maplibre.nativejni.map.MapHandle;
 import org.maplibre.nativejni.offline.OfflineRegionDefinition;
@@ -42,15 +45,32 @@ public final class RuntimeHandle implements AutoCloseable {
   public static RuntimeHandle create(RuntimeOptions options) {
     Objects.requireNonNull(options, "options");
     NativeLibrary.ensureLoaded();
-    var outRuntime = new long[1];
-    Status.check(
-        RuntimeNative.mln_runtime_create(RuntimeStructs.runtimeOptions(options), outRuntime));
-    return new RuntimeHandle(outRuntime[0]);
+    validateRuntimeOptions(options);
+    try (var nativeOptions = RuntimeStructs.nativeRuntimeOptions(options)) {
+      var outRuntime = new PointerPointer<MaplibreNativeC.mln_runtime>(1);
+      Status.check(MaplibreNativeC.mln_runtime_create(nativeOptions.options(), outRuntime));
+      return new RuntimeHandle(
+          JavaCppSupport.outAddress(outRuntime, MaplibreNativeC.mln_runtime.class));
+    }
+  }
+
+  private static void validateRuntimeOptions(RuntimeOptions options) {
+    var value = RuntimeStructs.runtimeOptions(options);
+    if ((value.assetPath() != null && value.assetPath().indexOf('\0') >= 0)
+        || (value.cachePath() != null && value.cachePath().indexOf('\0') >= 0)) {
+      JavaCppSupport.setThreadDiagnostic("runtime option path contains embedded NUL");
+      Status.check(MaplibreNativeC.MLN_STATUS_INVALID_ARGUMENT);
+    }
+    if (value.hasMaximumCacheSize() && value.maximumCacheSize() < 0) {
+      JavaCppSupport.setThreadDiagnostic("maximum cache size must be non-negative");
+      Status.check(MaplibreNativeC.MLN_STATUS_INVALID_ARGUMENT);
+    }
   }
 
   public void runOnce() {
     NativeLibrary.ensureLoaded();
-    Status.check(RuntimeNative.mln_runtime_run_once(state.requireLiveAddress()));
+    Status.check(
+        MaplibreNativeC.mln_runtime_run_once(JavaCppSupport.runtime(state.requireLiveAddress())));
   }
 
   private <T> OfflineOperationHandle<T> offlineOperation(
@@ -62,8 +82,8 @@ public final class RuntimeHandle implements AutoCloseable {
     NativeLibrary.ensureLoaded();
     var outOperationId = new long[1];
     Status.check(
-        RuntimeNative.mln_runtime_run_ambient_cache_operation_start(
-            state.requireLiveAddress(),
+        MaplibreNativeC.mln_runtime_run_ambient_cache_operation_start(
+            JavaCppSupport.runtime(state.requireLiveAddress()),
             Objects.requireNonNull(operation, "operation").nativeValue(),
             outOperationId));
     return offlineOperation(
@@ -75,12 +95,15 @@ public final class RuntimeHandle implements AutoCloseable {
     NativeLibrary.ensureLoaded();
     Objects.requireNonNull(definition, "definition");
     var outOperationId = new long[1];
-    Status.check(
-        OfflineNative.mln_runtime_offline_region_create_start(
-            state.requireLiveAddress(),
-            definition,
-            Objects.requireNonNull(metadata, "metadata"),
-            outOperationId));
+    try (var nativeDefinition = new OfflineStructs.DefinitionScope(definition)) {
+      Status.check(
+          MaplibreNativeC.mln_runtime_offline_region_create_start(
+              JavaCppSupport.runtime(state.requireLiveAddress()),
+              nativeDefinition.definition(),
+              Objects.requireNonNull(metadata, "metadata"),
+              metadata.length,
+              outOperationId));
+    }
     return offlineOperation(
         outOperationId[0], OfflineOperationKind.REGION_CREATE, OfflineOperationResultKind.REGION);
   }
@@ -89,8 +112,8 @@ public final class RuntimeHandle implements AutoCloseable {
     NativeLibrary.ensureLoaded();
     var outOperationId = new long[1];
     Status.check(
-        OfflineNative.mln_runtime_offline_region_get_start(
-            state.requireLiveAddress(), id, outOperationId));
+        MaplibreNativeC.mln_runtime_offline_region_get_start(
+            JavaCppSupport.runtime(state.requireLiveAddress()), id, outOperationId));
     return offlineOperation(
         outOperationId[0],
         OfflineOperationKind.REGION_GET,
@@ -101,8 +124,8 @@ public final class RuntimeHandle implements AutoCloseable {
     NativeLibrary.ensureLoaded();
     var outOperationId = new long[1];
     Status.check(
-        OfflineNative.mln_runtime_offline_regions_list_start(
-            state.requireLiveAddress(), outOperationId));
+        MaplibreNativeC.mln_runtime_offline_regions_list_start(
+            JavaCppSupport.runtime(state.requireLiveAddress()), outOperationId));
     return offlineOperation(
         outOperationId[0],
         OfflineOperationKind.REGIONS_LIST,
@@ -118,9 +141,14 @@ public final class RuntimeHandle implements AutoCloseable {
       String path) {
     NativeLibrary.ensureLoaded();
     var outOperationId = new long[1];
+    var pathValue = Objects.requireNonNull(path, "path");
+    if (pathValue.indexOf('\0') >= 0) {
+      JavaCppSupport.setThreadDiagnostic("side database path contains embedded NUL");
+      Status.check(MaplibreNativeC.MLN_STATUS_INVALID_ARGUMENT);
+    }
     Status.check(
-        OfflineNative.mln_runtime_offline_regions_merge_database_start(
-            state.requireLiveAddress(), Objects.requireNonNull(path, "path"), outOperationId));
+        MaplibreNativeC.mln_runtime_offline_regions_merge_database_start(
+            JavaCppSupport.runtime(state.requireLiveAddress()), pathValue, outOperationId));
     return offlineOperation(
         outOperationId[0],
         OfflineOperationKind.REGIONS_MERGE_DATABASE,
@@ -132,10 +160,11 @@ public final class RuntimeHandle implements AutoCloseable {
     NativeLibrary.ensureLoaded();
     var outOperationId = new long[1];
     Status.check(
-        OfflineNative.mln_runtime_offline_region_update_metadata_start(
-            state.requireLiveAddress(),
+        MaplibreNativeC.mln_runtime_offline_region_update_metadata_start(
+            JavaCppSupport.runtime(state.requireLiveAddress()),
             id,
             Objects.requireNonNull(metadata, "metadata"),
+            metadata.length,
             outOperationId));
     return offlineOperation(
         outOperationId[0],
@@ -147,8 +176,8 @@ public final class RuntimeHandle implements AutoCloseable {
     NativeLibrary.ensureLoaded();
     var outOperationId = new long[1];
     Status.check(
-        OfflineNative.mln_runtime_offline_region_get_status_start(
-            state.requireLiveAddress(), id, outOperationId));
+        MaplibreNativeC.mln_runtime_offline_region_get_status_start(
+            JavaCppSupport.runtime(state.requireLiveAddress()), id, outOperationId));
     return offlineOperation(
         outOperationId[0],
         OfflineOperationKind.REGION_GET_STATUS,
@@ -159,8 +188,8 @@ public final class RuntimeHandle implements AutoCloseable {
     NativeLibrary.ensureLoaded();
     var outOperationId = new long[1];
     Status.check(
-        OfflineNative.mln_runtime_offline_region_set_observed_start(
-            state.requireLiveAddress(), id, observed, outOperationId));
+        MaplibreNativeC.mln_runtime_offline_region_set_observed_start(
+            JavaCppSupport.runtime(state.requireLiveAddress()), id, observed, outOperationId));
     return offlineOperation(
         outOperationId[0],
         OfflineOperationKind.REGION_SET_OBSERVED,
@@ -172,8 +201,8 @@ public final class RuntimeHandle implements AutoCloseable {
     NativeLibrary.ensureLoaded();
     var outOperationId = new long[1];
     Status.check(
-        OfflineNative.mln_runtime_offline_region_set_download_state_start(
-            state.requireLiveAddress(),
+        MaplibreNativeC.mln_runtime_offline_region_set_download_state_start(
+            JavaCppSupport.runtime(state.requireLiveAddress()),
             id,
             Objects.requireNonNull(downloadState, "downloadState").nativeValue(),
             outOperationId));
@@ -187,8 +216,8 @@ public final class RuntimeHandle implements AutoCloseable {
     NativeLibrary.ensureLoaded();
     var outOperationId = new long[1];
     Status.check(
-        OfflineNative.mln_runtime_offline_region_invalidate_start(
-            state.requireLiveAddress(), id, outOperationId));
+        MaplibreNativeC.mln_runtime_offline_region_invalidate_start(
+            JavaCppSupport.runtime(state.requireLiveAddress()), id, outOperationId));
     return offlineOperation(
         outOperationId[0], OfflineOperationKind.REGION_INVALIDATE, OfflineOperationResultKind.NONE);
   }
@@ -197,8 +226,8 @@ public final class RuntimeHandle implements AutoCloseable {
     NativeLibrary.ensureLoaded();
     var outOperationId = new long[1];
     Status.check(
-        OfflineNative.mln_runtime_offline_region_delete_start(
-            state.requireLiveAddress(), id, outOperationId));
+        MaplibreNativeC.mln_runtime_offline_region_delete_start(
+            JavaCppSupport.runtime(state.requireLiveAddress()), id, outOperationId));
     return offlineOperation(
         outOperationId[0], OfflineOperationKind.REGION_DELETE, OfflineOperationResultKind.NONE);
   }
@@ -210,12 +239,13 @@ public final class RuntimeHandle implements AutoCloseable {
     var operationId =
         operation.requireLive(
             this, OfflineOperationKind.REGION_CREATE, OfflineOperationResultKind.REGION);
-    var outRegion = new Object[1];
+    var outSnapshot = new PointerPointer<MaplibreNativeC.mln_offline_region_snapshot>(1);
     Status.check(
-        OfflineNative.mln_runtime_offline_region_create_take_result(
-            state.requireLiveAddress(), operationId, outRegion));
+        MaplibreNativeC.mln_runtime_offline_region_create_take_result(
+            JavaCppSupport.runtime(state.requireLiveAddress()), operationId, outSnapshot));
+    var region = OfflineStructs.offlineRegionSnapshot(outSnapshot);
     operation.markConsumed();
-    return (OfflineRegionInfo) outRegion[0];
+    return region;
   }
 
   public Optional<OfflineRegionInfo> takeOfflineRegionResult(
@@ -225,13 +255,18 @@ public final class RuntimeHandle implements AutoCloseable {
     var operationId =
         operation.requireLive(
             this, OfflineOperationKind.REGION_GET, OfflineOperationResultKind.OPTIONAL_REGION);
-    var outRegion = new Object[1];
-    var outFound = new boolean[1];
-    Status.check(
-        OfflineNative.mln_runtime_offline_region_get_take_result(
-            state.requireLiveAddress(), operationId, outRegion, outFound));
-    operation.markConsumed();
-    return outFound[0] ? Optional.of((OfflineRegionInfo) outRegion[0]) : Optional.empty();
+    try (var found = new BoolPointer(1)) {
+      var outSnapshot = new PointerPointer<MaplibreNativeC.mln_offline_region_snapshot>(1);
+      Status.check(
+          MaplibreNativeC.mln_runtime_offline_region_get_take_result(
+              JavaCppSupport.runtime(state.requireLiveAddress()), operationId, outSnapshot, found));
+      var region =
+          found.get()
+              ? Optional.of(OfflineStructs.offlineRegionSnapshot(outSnapshot))
+              : Optional.<OfflineRegionInfo>empty();
+      operation.markConsumed();
+      return region;
+    }
   }
 
   public List<OfflineRegionInfo> takeOfflineRegionsResult(
@@ -241,12 +276,13 @@ public final class RuntimeHandle implements AutoCloseable {
     var operationId =
         operation.requireLive(
             this, OfflineOperationKind.REGIONS_LIST, OfflineOperationResultKind.REGION_LIST);
-    var outRegions = new Object[1];
+    var outList = new PointerPointer<MaplibreNativeC.mln_offline_region_list>(1);
     Status.check(
-        OfflineNative.mln_runtime_offline_regions_list_take_result(
-            state.requireLiveAddress(), operationId, outRegions));
+        MaplibreNativeC.mln_runtime_offline_regions_list_take_result(
+            JavaCppSupport.runtime(state.requireLiveAddress()), operationId, outList));
+    var regions = OfflineStructs.offlineRegionList(outList);
     operation.markConsumed();
-    return List.of((OfflineRegionInfo[]) outRegions[0]);
+    return regions;
   }
 
   public List<OfflineRegionInfo> takeMergeOfflineRegionsDatabaseResult(
@@ -258,12 +294,13 @@ public final class RuntimeHandle implements AutoCloseable {
             this,
             OfflineOperationKind.REGIONS_MERGE_DATABASE,
             OfflineOperationResultKind.REGION_LIST);
-    var outRegions = new Object[1];
+    var outList = new PointerPointer<MaplibreNativeC.mln_offline_region_list>(1);
     Status.check(
-        OfflineNative.mln_runtime_offline_regions_merge_database_take_result(
-            state.requireLiveAddress(), operationId, outRegions));
+        MaplibreNativeC.mln_runtime_offline_regions_merge_database_take_result(
+            JavaCppSupport.runtime(state.requireLiveAddress()), operationId, outList));
+    var regions = OfflineStructs.offlineRegionList(outList);
     operation.markConsumed();
-    return List.of((OfflineRegionInfo[]) outRegions[0]);
+    return regions;
   }
 
   public OfflineRegionInfo takeUpdateOfflineRegionMetadataResult(
@@ -273,40 +310,43 @@ public final class RuntimeHandle implements AutoCloseable {
     var operationId =
         operation.requireLive(
             this, OfflineOperationKind.REGION_UPDATE_METADATA, OfflineOperationResultKind.REGION);
-    var outRegion = new Object[1];
+    var outSnapshot = new PointerPointer<MaplibreNativeC.mln_offline_region_snapshot>(1);
     Status.check(
-        OfflineNative.mln_runtime_offline_region_update_metadata_take_result(
-            state.requireLiveAddress(), operationId, outRegion));
+        MaplibreNativeC.mln_runtime_offline_region_update_metadata_take_result(
+            JavaCppSupport.runtime(state.requireLiveAddress()), operationId, outSnapshot));
+    var region = OfflineStructs.offlineRegionSnapshot(outSnapshot);
     operation.markConsumed();
-    return (OfflineRegionInfo) outRegion[0];
+    return region;
   }
 
   public OfflineRegionStatus takeOfflineRegionStatusResult(
       OfflineOperationHandle<OfflineRegionStatus> operation) {
     NativeLibrary.ensureLoaded();
     Objects.requireNonNull(operation, "operation");
-    var longs = new long[6];
-    var ints = new int[1];
-    var booleans = new boolean[2];
     var operationId =
         operation.requireLive(
             this, OfflineOperationKind.REGION_GET_STATUS, OfflineOperationResultKind.REGION_STATUS);
+    var status = new MaplibreNativeC.mln_offline_region_status();
+    status.size(status.sizeof());
     Status.check(
-        OfflineNative.mln_runtime_offline_region_get_status_take_result(
-            state.requireLiveAddress(), operationId, longs, ints, booleans));
+        MaplibreNativeC.mln_runtime_offline_region_get_status_take_result(
+            JavaCppSupport.runtime(state.requireLiveAddress()), operationId, status));
     operation.markConsumed();
-    var rawDownloadState = ints[0];
-    return new OfflineRegionStatus(
-        OfflineRegionDownloadState.fromNative(rawDownloadState),
-        rawDownloadState,
-        longs[0],
-        longs[1],
-        longs[2],
-        longs[3],
-        longs[4],
-        longs[5],
-        booleans[0],
-        booleans[1]);
+    var rawDownloadState = status.download_state();
+    var regionStatus =
+        new OfflineRegionStatus(
+            OfflineRegionDownloadState.fromNative(rawDownloadState),
+            rawDownloadState,
+            status.completed_resource_count(),
+            status.completed_resource_size(),
+            status.completed_tile_count(),
+            status.required_tile_count(),
+            status.completed_tile_size(),
+            status.required_resource_count(),
+            status.required_resource_count_is_precise(),
+            status.complete());
+    status.close();
+    return regionStatus;
   }
 
   public void discardOfflineOperation(OfflineOperationHandle<?> operation) {
@@ -323,35 +363,39 @@ public final class RuntimeHandle implements AutoCloseable {
       operation.markConsumed();
       throw error;
     }
-    Status.check(RuntimeNative.mln_runtime_offline_operation_discard(runtimeAddress, operationId));
+    Status.check(
+        MaplibreNativeC.mln_runtime_offline_operation_discard(
+            JavaCppSupport.runtime(runtimeAddress), operationId));
     operation.markConsumed();
   }
 
   public void setResourceTransform(ResourceTransformCallback callback) {
     NativeLibrary.ensureLoaded();
-    var outState = new long[1];
+    var replacement = new ResourceTransformState(Objects.requireNonNull(callback, "callback"));
     Status.check(
-        RuntimeNative.mln_runtime_set_resource_transform(
-            state.requireLiveAddress(), Objects.requireNonNull(callback, "callback"), outState));
+        MaplibreNativeC.mln_runtime_set_resource_transform(
+            JavaCppSupport.runtime(state.requireLiveAddress()), replacement.transform()));
     closeQuietly(resourceTransform);
-    resourceTransform = new ResourceTransformState(outState[0]);
+    resourceTransform = replacement;
   }
 
   public void clearResourceTransform() {
     NativeLibrary.ensureLoaded();
-    Status.check(RuntimeNative.mln_runtime_clear_resource_transform(state.requireLiveAddress()));
+    Status.check(
+        MaplibreNativeC.mln_runtime_clear_resource_transform(
+            JavaCppSupport.runtime(state.requireLiveAddress())));
     closeQuietly(resourceTransform);
     resourceTransform = null;
   }
 
   public void setResourceProvider(ResourceProviderCallback callback) {
     NativeLibrary.ensureLoaded();
-    var outState = new long[1];
+    var replacement = new ResourceProviderState(Objects.requireNonNull(callback, "callback"));
     Status.check(
-        RuntimeNative.mln_runtime_set_resource_provider(
-            state.requireLiveAddress(), Objects.requireNonNull(callback, "callback"), outState));
+        MaplibreNativeC.mln_runtime_set_resource_provider(
+            JavaCppSupport.runtime(state.requireLiveAddress()), replacement.provider()));
     closeQuietly(resourceProvider);
-    resourceProvider = new ResourceProviderState(outState[0]);
+    resourceProvider = replacement;
   }
 
   public Optional<RuntimeEvent> pollEvent() {
@@ -361,9 +405,16 @@ public final class RuntimeHandle implements AutoCloseable {
     var booleans = new boolean[RuntimeStructs.BOOLEAN_COUNT];
     var doubles = new double[RuntimeStructs.DOUBLE_COUNT];
     var strings = new String[RuntimeStructs.STRING_COUNT];
+    var nativeEvent = new MaplibreNativeC.mln_runtime_event();
+    nativeEvent.size(nativeEvent.sizeof());
+    var hasEvent = new boolean[1];
     Status.check(
-        RuntimeNative.mln_runtime_poll_event(
-            state.requireLiveAddress(), longs, ints, booleans, doubles, strings));
+        MaplibreNativeC.mln_runtime_poll_event(
+            JavaCppSupport.runtime(state.requireLiveAddress()), nativeEvent, hasEvent));
+    booleans[RuntimeStructs.BOOLEAN_HAS_EVENT] = hasEvent[0];
+    if (hasEvent[0]) {
+      RuntimeStructs.copyEvent(nativeEvent, longs, ints, booleans, doubles, strings);
+    }
     if (!booleans[RuntimeStructs.BOOLEAN_HAS_EVENT]) {
       return Optional.empty();
     }
@@ -380,14 +431,16 @@ public final class RuntimeHandle implements AutoCloseable {
         RuntimeStructs.runtimeEvent(
             longs, ints, booleans, doubles, strings, runtimeSource, mapSource);
     if (event.type() == RuntimeEventType.MAP_STYLE_LOADED) {
-      event.mapSource().ifPresent(InternalAccess.INSTANCE::releaseDetachedCustomGeometrySources);
+      event
+          .mapSource()
+          .ifPresent(map -> map.releaseDetachedCustomGeometrySources(InternalAccess.INSTANCE));
     }
     return Optional.of(event);
   }
 
   public void close() {
     state.closeOnce(
-        RuntimeNative::mln_runtime_destroy,
+        address -> MaplibreNativeC.mln_runtime_destroy(JavaCppSupport.runtime(address)),
         () -> {
           closeQuietly(resourceTransform);
           resourceTransform = null;
@@ -400,16 +453,23 @@ public final class RuntimeHandle implements AutoCloseable {
     return state.isReleased();
   }
 
+  public long nativeAddress(InternalAccess access) {
+    Objects.requireNonNull(access, "access");
+    return nativeAddress();
+  }
+
   long nativeAddress() {
     return state.requireLiveAddress();
   }
 
-  void registerMap(MapHandle map) {
+  public void registerMap(InternalAccess access, MapHandle map) {
+    Objects.requireNonNull(access, "access");
     Objects.requireNonNull(map, "map");
-    liveMaps.put(InternalAccess.INSTANCE.nativeAddress(map), new WeakReference<>(map));
+    liveMaps.put(map.nativeAddress(InternalAccess.INSTANCE), new WeakReference<>(map));
   }
 
-  void unregisterMap(MapHandle map) {
+  public void unregisterMap(InternalAccess access, MapHandle map) {
+    Objects.requireNonNull(access, "access");
     Objects.requireNonNull(map, "map");
     liveMaps.entrySet().removeIf(entry -> entry.getValue().get() == map);
   }

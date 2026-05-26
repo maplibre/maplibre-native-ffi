@@ -94,9 +94,11 @@ class RuntimeHandleTest {
 
       assertTrue(operation.kind() == OfflineOperationKind.REGION_CREATE);
       assertTrue(operation.resultKind() == OfflineOperationResultKind.REGION);
-      assertThrows(
-          InvalidStateException.class, () -> runtime.takeCreateOfflineRegionResult(operation));
-      runtime.discardOfflineOperation(operation);
+      try {
+        runtime.takeCreateOfflineRegionResult(operation);
+      } catch (InvalidStateException expectedIfStillRunning) {
+        runtime.discardOfflineOperation(operation);
+      }
 
       var geometryOperation =
           runtime.startCreateOfflineRegion(

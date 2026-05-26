@@ -10,7 +10,7 @@ import java.nio.file.Files;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.maplibre.nativejni.error.InvalidArgumentException;
-import org.maplibre.nativejni.internal.bridge.RuntimeNative;
+import org.maplibre.nativejni.internal.javacpp.MaplibreNativeC;
 import org.maplibre.nativejni.internal.status.Status;
 import org.maplibre.nativejni.runtime.OfflineOperationKind;
 import org.maplibre.nativejni.runtime.RuntimeHandle;
@@ -59,7 +59,7 @@ final class StandardUtf8Test {
     var nativeException =
         assertThrows(
             InvalidArgumentException.class,
-            () -> Status.check(RuntimeNative.mln_network_status_set(999_999)));
+            () -> Status.check(MaplibreNativeC.mln_network_status_set(999_999)));
     assertTrue(nativeException.diagnostic().contains("network status"));
 
     try (var runtime = RuntimeHandle.create()) {

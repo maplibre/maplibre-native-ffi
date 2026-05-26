@@ -6,7 +6,8 @@ import java.util.function.Consumer;
 import org.maplibre.nativejni.error.InvalidStateException;
 import org.maplibre.nativejni.error.MaplibreStatus;
 import org.maplibre.nativejni.internal.access.InternalAccess;
-import org.maplibre.nativejni.internal.bridge.RuntimeNative;
+import org.maplibre.nativejni.internal.javacpp.JavaCppSupport;
+import org.maplibre.nativejni.internal.javacpp.MaplibreNativeC;
 import org.maplibre.nativejni.internal.status.Status;
 import org.maplibre.nativejni.internal.struct.ResourceStructs;
 
@@ -31,8 +32,18 @@ public final class ResourceRequestHandle implements AutoCloseable {
     this(handle, consumerReleaser(releaser));
   }
 
+  public ResourceRequestHandle(InternalAccess access, long handle) {
+    this(handle);
+    Objects.requireNonNull(access, "access");
+  }
+
   ResourceRequestHandle(long handle) {
-    this(handle, (LongReleaser) RuntimeNative::mln_resource_request_release);
+    this(
+        handle,
+        (LongReleaser)
+            address ->
+                MaplibreNativeC.mln_resource_request_release(
+                    JavaCppSupport.resourceRequestHandle(address)));
   }
 
   private ResourceRequestHandle(long handle, LongReleaser releaser) {
@@ -50,9 +61,12 @@ public final class ResourceRequestHandle implements AutoCloseable {
           MaplibreStatus.INVALID_STATE.nativeCode(), "ResourceRequestHandle is already completed");
     }
     requireLive();
-    Status.check(
-        RuntimeNative.mln_resource_request_complete(
-            handle, ResourceStructs.resourceResponse(Objects.requireNonNull(response))));
+    try (var nativeResponse =
+        ResourceStructs.nativeResourceResponse(Objects.requireNonNull(response))) {
+      Status.check(
+          MaplibreNativeC.mln_resource_request_complete(
+              JavaCppSupport.resourceRequestHandle(handle), nativeResponse.response()));
+    }
     completed = true;
     closed = true;
     if (decisionFinalized) {
@@ -63,7 +77,9 @@ public final class ResourceRequestHandle implements AutoCloseable {
   public synchronized boolean isCancelled() {
     requireLive();
     var outCancelled = new boolean[1];
-    Status.check(RuntimeNative.mln_resource_request_cancelled(handle, outCancelled));
+    Status.check(
+        MaplibreNativeC.mln_resource_request_cancelled(
+            JavaCppSupport.resourceRequestHandle(handle), outCancelled));
     return outCancelled[0];
   }
 
@@ -78,7 +94,7 @@ public final class ResourceRequestHandle implements AutoCloseable {
     }
   }
 
-  synchronized int finishProviderDecision(
+  public synchronized int finishProviderDecision(
       InternalAccess access, ResourceProviderDecision decision) {
     Objects.requireNonNull(access, "access");
     return finishProviderDecision(decision);
@@ -98,7 +114,7 @@ public final class ResourceRequestHandle implements AutoCloseable {
     return ResourceProviderDecision.PASS_THROUGH.nativeValue();
   }
 
-  synchronized int finishProviderException(InternalAccess access) {
+  public synchronized int finishProviderException(InternalAccess access) {
     Objects.requireNonNull(access, "access");
     return finishProviderException();
   }

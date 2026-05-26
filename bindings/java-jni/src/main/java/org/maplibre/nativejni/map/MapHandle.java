@@ -9,6 +9,10 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import org.bytedeco.javacpp.BoolPointer;
+import org.bytedeco.javacpp.BytePointer;
+import org.bytedeco.javacpp.PointerPointer;
+import org.bytedeco.javacpp.SizeTPointer;
 import org.maplibre.nativejni.camera.AnimationOptions;
 import org.maplibre.nativejni.camera.BoundOptions;
 import org.maplibre.nativejni.camera.CameraFitOptions;
@@ -24,13 +28,14 @@ import org.maplibre.nativejni.geo.Quaternion;
 import org.maplibre.nativejni.geo.ScreenPoint;
 import org.maplibre.nativejni.geo.Vec3;
 import org.maplibre.nativejni.internal.access.InternalAccess;
-import org.maplibre.nativejni.internal.bridge.CameraNative;
-import org.maplibre.nativejni.internal.bridge.MapNative;
-import org.maplibre.nativejni.internal.bridge.StyleNative;
+import org.maplibre.nativejni.internal.javacpp.JavaCppSupport;
+import org.maplibre.nativejni.internal.javacpp.JavaCppValues;
+import org.maplibre.nativejni.internal.javacpp.MaplibreNativeC;
 import org.maplibre.nativejni.internal.lifecycle.HandleState;
 import org.maplibre.nativejni.internal.loader.NativeLibrary;
 import org.maplibre.nativejni.internal.status.Status;
 import org.maplibre.nativejni.internal.struct.MapStructs;
+import org.maplibre.nativejni.internal.struct.StyleStructs;
 import org.maplibre.nativejni.json.JsonValue;
 import org.maplibre.nativejni.render.MetalBorrowedTextureDescriptor;
 import org.maplibre.nativejni.render.MetalOwnedTextureDescriptor;
@@ -65,8 +70,6 @@ public final class MapHandle implements AutoCloseable {
   private static final int PROJECTION_MODE_VALUE_COUNT = 2;
   private static final int ANIMATION_FIELD_COUNT = 4;
   private static final int ANIMATION_VALUE_COUNT = 7;
-  private static final int CUSTOM_GEOMETRY_FIELD_COUNT = 7;
-  private static final int CUSTOM_GEOMETRY_VALUE_COUNT = 7;
 
   private final RuntimeHandle runtime;
   private final HandleState state;
@@ -75,56 +78,84 @@ public final class MapHandle implements AutoCloseable {
   private MapHandle(RuntimeHandle runtime, long handle) {
     this.runtime = Objects.requireNonNull(runtime, "runtime");
     this.state = new HandleState("MapHandle", handle, runtime);
-    InternalAccess.INSTANCE.registerMap(runtime, this);
+    runtime.registerMap(InternalAccess.INSTANCE, this);
   }
 
   public static MapHandle create(RuntimeHandle runtime, MapOptions options) {
     Objects.requireNonNull(runtime, "runtime");
     Objects.requireNonNull(options, "options");
     NativeLibrary.ensureLoaded();
-    var outMap = new long[1];
+    if ((options.width() != null && options.width() < 0)
+        || (options.height() != null && options.height() < 0)) {
+      JavaCppSupport.setThreadDiagnostic("width and height must be non-negative");
+      Status.check(MaplibreNativeC.MLN_STATUS_INVALID_ARGUMENT);
+    }
+    var nativeOptions = MaplibreNativeC.mln_map_options_default();
+    if (options.width() != null) {
+      nativeOptions.width(options.width());
+    }
+    if (options.height() != null) {
+      nativeOptions.height(options.height());
+    }
+    if (options.scaleFactor() != null) {
+      nativeOptions.scale_factor(options.scaleFactor());
+    }
+    if (options.mapMode() != null) {
+      nativeOptions.map_mode(options.mapMode().nativeValue());
+    }
+    var outMap = new PointerPointer<MaplibreNativeC.mln_map>(1);
     Status.check(
-        MapNative.mln_map_create(
-            InternalAccess.INSTANCE.nativeAddress(runtime),
-            options.width() == null ? 512 : options.width(),
-            options.height() == null ? 512 : options.height(),
-            options.scaleFactor() == null ? 1.0 : options.scaleFactor(),
-            options.mapMode() == null
-                ? MapMode.CONTINUOUS.nativeValue()
-                : options.mapMode().nativeValue(),
+        MaplibreNativeC.mln_map_create(
+            JavaCppSupport.runtime(runtime.nativeAddress(InternalAccess.INSTANCE)),
+            nativeOptions,
             outMap));
-    return new MapHandle(runtime, outMap[0]);
+    return new MapHandle(runtime, JavaCppSupport.outAddress(outMap, MaplibreNativeC.mln_map.class));
   }
 
   public void setStyleUrl(String url) {
     NativeLibrary.ensureLoaded();
-    Status.check(
-        MapNative.mln_map_set_style_url(state.requireLiveAddress(), Objects.requireNonNull(url)));
+    var nativeUrl = JavaCppSupport.utf8(Objects.requireNonNull(url));
+    try {
+      Status.check(
+          MaplibreNativeC.mln_map_set_style_url(
+              JavaCppSupport.map(state.requireLiveAddress()), nativeUrl));
+    } finally {
+      nativeUrl.close();
+    }
   }
 
   public void setStyleJson(String json) {
     NativeLibrary.ensureLoaded();
-    Status.check(
-        MapNative.mln_map_set_style_json(state.requireLiveAddress(), Objects.requireNonNull(json)));
-    clearCustomGeometrySources();
+    var nativeJson = JavaCppSupport.utf8(Objects.requireNonNull(json));
+    try {
+      Status.check(
+          MaplibreNativeC.mln_map_set_style_json(
+              JavaCppSupport.map(state.requireLiveAddress()), nativeJson));
+      clearCustomGeometrySources();
+    } finally {
+      nativeJson.close();
+    }
   }
 
   public void addStyleSourceJson(String sourceId, JsonValue sourceJson) {
     NativeLibrary.ensureLoaded();
-    Status.check(
-        StyleNative.mln_map_add_style_source_json(
-            state.requireLiveAddress(),
-            Objects.requireNonNull(sourceId, "sourceId"),
-            Objects.requireNonNull(sourceJson, "sourceJson")));
+    try (var source = JavaCppValues.stringView(Objects.requireNonNull(sourceId, "sourceId"));
+        var json = JavaCppValues.json(Objects.requireNonNull(sourceJson, "sourceJson"))) {
+      Status.check(
+          MaplibreNativeC.mln_map_add_style_source_json(
+              JavaCppSupport.map(state.requireLiveAddress()), source.view(), json.value()));
+    }
   }
 
   public boolean removeStyleSource(String sourceId) {
     NativeLibrary.ensureLoaded();
     var outRemoved = new boolean[1];
     var sourceIdValue = Objects.requireNonNull(sourceId, "sourceId");
-    Status.check(
-        StyleNative.mln_map_remove_style_source(
-            state.requireLiveAddress(), sourceIdValue, outRemoved));
+    try (var source = JavaCppValues.stringView(sourceIdValue)) {
+      Status.check(
+          MaplibreNativeC.mln_map_remove_style_source(
+              JavaCppSupport.map(state.requireLiveAddress()), source.view(), outRemoved));
+    }
     if (outRemoved[0]) {
       closeCustomGeometrySource(sourceIdValue);
     }
@@ -134,9 +165,11 @@ public final class MapHandle implements AutoCloseable {
   public boolean styleSourceExists(String sourceId) {
     NativeLibrary.ensureLoaded();
     var outExists = new boolean[1];
-    Status.check(
-        StyleNative.mln_map_style_source_exists(
-            state.requireLiveAddress(), Objects.requireNonNull(sourceId, "sourceId"), outExists));
+    try (var source = JavaCppValues.stringView(Objects.requireNonNull(sourceId, "sourceId"))) {
+      Status.check(
+          MaplibreNativeC.mln_map_style_source_exists(
+              JavaCppSupport.map(state.requireLiveAddress()), source.view(), outExists));
+    }
     return outExists[0];
   }
 
@@ -144,157 +177,192 @@ public final class MapHandle implements AutoCloseable {
     NativeLibrary.ensureLoaded();
     var outSourceType = new int[1];
     var outFound = new boolean[1];
-    Status.check(
-        StyleNative.mln_map_get_style_source_type(
-            state.requireLiveAddress(),
-            Objects.requireNonNull(sourceId, "sourceId"),
-            outSourceType,
-            outFound));
+    try (var source = JavaCppValues.stringView(Objects.requireNonNull(sourceId, "sourceId"))) {
+      Status.check(
+          MaplibreNativeC.mln_map_get_style_source_type(
+              JavaCppSupport.map(state.requireLiveAddress()),
+              source.view(),
+              outSourceType,
+              outFound));
+    }
     return outFound[0] ? Optional.of(SourceType.fromNative(outSourceType[0])) : Optional.empty();
   }
 
   public Optional<SourceInfo> styleSourceInfo(String sourceId) {
     NativeLibrary.ensureLoaded();
     var sourceIdValue = Objects.requireNonNull(sourceId, "sourceId");
-    var outInfo = new int[1];
-    var outFlags = new boolean[3];
-    var outSizes = new long[1];
-    Status.check(
-        StyleNative.mln_map_get_style_source_info(
-            state.requireLiveAddress(), sourceIdValue, outInfo, outFlags, outSizes));
-    if (!outFlags[0]) {
-      return Optional.empty();
-    }
-    var attribution = Optional.<String>empty();
-    if (outFlags[2]) {
-      var attributionSize = Math.toIntExact(outSizes[0]);
-      if (attributionSize == 0) {
-        attribution = Optional.of("");
-      } else {
-        var outAttribution = new byte[attributionSize];
-        var outAttributionSize = new long[1];
-        var outAttributionFound = new boolean[1];
-        Status.check(
-            StyleNative.mln_map_copy_style_source_attribution(
-                state.requireLiveAddress(),
-                sourceIdValue,
-                outAttribution,
-                outAttributionSize,
-                outAttributionFound));
-        if (!outAttributionFound[0]) {
-          return Optional.empty();
-        }
-        attribution =
-            Optional.of(
-                new String(
-                    outAttribution,
-                    0,
-                    Math.toIntExact(outAttributionSize[0]),
-                    StandardCharsets.UTF_8));
+    try (var source = JavaCppValues.stringView(sourceIdValue)) {
+      var outInfo = new MaplibreNativeC.mln_style_source_info();
+      outInfo.size(outInfo.sizeof());
+      var outFound = new boolean[1];
+      Status.check(
+          MaplibreNativeC.mln_map_get_style_source_info(
+              JavaCppSupport.map(state.requireLiveAddress()), source.view(), outInfo, outFound));
+      if (!outFound[0]) {
+        return Optional.empty();
       }
+      var attribution = Optional.<String>empty();
+      if (outInfo.has_attribution()) {
+        var attributionSize = Math.toIntExact(outInfo.attribution_size());
+        if (attributionSize == 0) {
+          attribution = Optional.of("");
+        } else {
+          var outAttribution = new byte[attributionSize];
+          var outAttributionFound = new boolean[1];
+          try (var out = new BytePointer(attributionSize);
+              var outSize = new SizeTPointer(1)) {
+            Status.check(
+                MaplibreNativeC.mln_map_copy_style_source_attribution(
+                    JavaCppSupport.map(state.requireLiveAddress()),
+                    source.view(),
+                    out,
+                    attributionSize,
+                    outSize,
+                    outAttributionFound));
+            if (!outAttributionFound[0]) {
+              return Optional.empty();
+            }
+            out.get(outAttribution, 0, Math.toIntExact(outSize.get()));
+            attribution =
+                Optional.of(
+                    new String(
+                        outAttribution, 0, Math.toIntExact(outSize.get()), StandardCharsets.UTF_8));
+          }
+        }
+      }
+      return Optional.of(
+          new SourceInfo(
+              SourceType.fromNative(outInfo.type()),
+              outInfo.type(),
+              outInfo.is_volatile(),
+              attribution));
     }
-    return Optional.of(
-        new SourceInfo(SourceType.fromNative(outInfo[0]), outInfo[0], outFlags[1], attribution));
   }
 
   public List<String> styleSourceIds() {
     NativeLibrary.ensureLoaded();
-    var outSourceIds = new Object[1];
+    var outList = new PointerPointer<MaplibreNativeC.mln_style_id_list>(1);
     Status.check(
-        StyleNative.mln_map_list_style_source_ids(state.requireLiveAddress(), outSourceIds));
-    return List.of((String[]) outSourceIds[0]);
+        MaplibreNativeC.mln_map_list_style_source_ids(
+            JavaCppSupport.map(state.requireLiveAddress()), outList));
+    var list =
+        new MaplibreNativeC.mln_style_id_list(
+            JavaCppSupport.pointer(
+                JavaCppSupport.outAddress(outList, MaplibreNativeC.mln_style_id_list.class)));
+    return List.of(StyleStructs.styleIdList(list));
   }
 
   public void addGeoJsonSourceUrl(String sourceId, String url) {
     NativeLibrary.ensureLoaded();
-    Status.check(
-        StyleNative.mln_map_add_geojson_source_url(
-            state.requireLiveAddress(),
-            Objects.requireNonNull(sourceId, "sourceId"),
-            Objects.requireNonNull(url, "url")));
+    try (var source = JavaCppValues.stringView(Objects.requireNonNull(sourceId, "sourceId"));
+        var nativeUrl = JavaCppValues.stringView(Objects.requireNonNull(url, "url"))) {
+      Status.check(
+          MaplibreNativeC.mln_map_add_geojson_source_url(
+              JavaCppSupport.map(state.requireLiveAddress()), source.view(), nativeUrl.view()));
+    }
   }
 
   public void addGeoJsonSourceData(String sourceId, GeoJson data) {
     NativeLibrary.ensureLoaded();
-    Status.check(
-        StyleNative.mln_map_add_geojson_source_data(
-            state.requireLiveAddress(),
-            Objects.requireNonNull(sourceId, "sourceId"),
-            Objects.requireNonNull(data, "data")));
+    try (var source = JavaCppValues.stringView(Objects.requireNonNull(sourceId, "sourceId"));
+        var nativeData = StyleStructs.geoJson(Objects.requireNonNull(data, "data"))) {
+      Status.check(
+          MaplibreNativeC.mln_map_add_geojson_source_data(
+              JavaCppSupport.map(state.requireLiveAddress()), source.view(), nativeData.value()));
+    }
   }
 
   public void setGeoJsonSourceUrl(String sourceId, String url) {
     NativeLibrary.ensureLoaded();
-    Status.check(
-        StyleNative.mln_map_set_geojson_source_url(
-            state.requireLiveAddress(),
-            Objects.requireNonNull(sourceId, "sourceId"),
-            Objects.requireNonNull(url, "url")));
+    try (var source = JavaCppValues.stringView(Objects.requireNonNull(sourceId, "sourceId"));
+        var nativeUrl = JavaCppValues.stringView(Objects.requireNonNull(url, "url"))) {
+      Status.check(
+          MaplibreNativeC.mln_map_set_geojson_source_url(
+              JavaCppSupport.map(state.requireLiveAddress()), source.view(), nativeUrl.view()));
+    }
   }
 
   public void setGeoJsonSourceData(String sourceId, GeoJson data) {
     NativeLibrary.ensureLoaded();
-    Status.check(
-        StyleNative.mln_map_set_geojson_source_data(
-            state.requireLiveAddress(),
-            Objects.requireNonNull(sourceId, "sourceId"),
-            Objects.requireNonNull(data, "data")));
+    try (var source = JavaCppValues.stringView(Objects.requireNonNull(sourceId, "sourceId"));
+        var nativeData = StyleStructs.geoJson(Objects.requireNonNull(data, "data"))) {
+      Status.check(
+          MaplibreNativeC.mln_map_set_geojson_source_data(
+              JavaCppSupport.map(state.requireLiveAddress()), source.view(), nativeData.value()));
+    }
   }
 
   public void addCustomGeometrySource(String sourceId, CustomGeometrySourceOptions options) {
     NativeLibrary.ensureLoaded();
     var copiedSourceId = Objects.requireNonNull(sourceId, "sourceId");
-    var nativeOptions = customGeometrySourceOptions(Objects.requireNonNull(options, "options"));
-    var outState = new long[1];
-    Status.check(
-        StyleNative.mln_map_add_custom_geometry_source(
-            state.requireLiveAddress(),
-            copiedSourceId,
-            options.callback(),
-            nativeOptions.fields(),
-            nativeOptions.values(),
-            outState));
-    closeQuietly(
-        customGeometrySources.put(copiedSourceId, new CustomGeometrySourceState(outState[0])));
+    var copiedOptions = Objects.requireNonNull(options, "options");
+    if ((copiedOptions.hasTileSize() && copiedOptions.tileSize() < 0)
+        || (copiedOptions.hasBuffer() && copiedOptions.buffer() < 0)) {
+      JavaCppSupport.setThreadDiagnostic(
+          "custom geometry source unsigned options must be non-negative");
+      Status.check(MaplibreNativeC.MLN_STATUS_INVALID_ARGUMENT);
+    }
+    var sourceState = new CustomGeometrySourceState(copiedOptions);
+    try (var nativeSourceId = JavaCppValues.stringView(copiedSourceId)) {
+      Status.check(
+          MaplibreNativeC.mln_map_add_custom_geometry_source(
+              JavaCppSupport.map(state.requireLiveAddress()),
+              nativeSourceId.view(),
+              sourceState.descriptor()));
+      closeQuietly(customGeometrySources.put(copiedSourceId, sourceState));
+    } catch (RuntimeException | Error error) {
+      closeQuietly(sourceState);
+      throw error;
+    }
   }
 
   public void setCustomGeometrySourceTileData(
       String sourceId, CanonicalTileId tileId, GeoJson data) {
     NativeLibrary.ensureLoaded();
     Objects.requireNonNull(tileId, "tileId");
-    Status.check(
-        StyleNative.mln_map_set_custom_geometry_source_tile_data(
-            state.requireLiveAddress(),
-            Objects.requireNonNull(sourceId, "sourceId"),
-            tileId.z(),
-            tileId.x(),
-            tileId.y(),
-            Objects.requireNonNull(data, "data")));
+    checkCanonicalTile(tileId.x(), tileId.y());
+    try (var source = JavaCppValues.stringView(Objects.requireNonNull(sourceId, "sourceId"));
+        var nativeTileId = StyleStructs.canonicalTileId(tileId.z(), tileId.x(), tileId.y());
+        var nativeData = StyleStructs.geoJson(Objects.requireNonNull(data, "data"))) {
+      Status.check(
+          MaplibreNativeC.mln_map_set_custom_geometry_source_tile_data(
+              JavaCppSupport.map(state.requireLiveAddress()),
+              source.view(),
+              nativeTileId.tileId(),
+              nativeData.value()));
+    }
   }
 
   public void invalidateCustomGeometrySourceTile(String sourceId, CanonicalTileId tileId) {
     NativeLibrary.ensureLoaded();
     Objects.requireNonNull(tileId, "tileId");
-    Status.check(
-        StyleNative.mln_map_invalidate_custom_geometry_source_tile(
-            state.requireLiveAddress(),
-            Objects.requireNonNull(sourceId, "sourceId"),
-            tileId.z(),
-            tileId.x(),
-            tileId.y()));
+    checkCanonicalTile(tileId.x(), tileId.y());
+    try (var source = JavaCppValues.stringView(Objects.requireNonNull(sourceId, "sourceId"));
+        var nativeTileId = StyleStructs.canonicalTileId(tileId.z(), tileId.x(), tileId.y())) {
+      Status.check(
+          MaplibreNativeC.mln_map_invalidate_custom_geometry_source_tile(
+              JavaCppSupport.map(state.requireLiveAddress()),
+              source.view(),
+              nativeTileId.tileId()));
+    }
   }
 
   public void invalidateCustomGeometrySourceRegion(String sourceId, LatLngBounds bounds) {
     NativeLibrary.ensureLoaded();
     Objects.requireNonNull(bounds, "bounds");
-    Status.check(
-        StyleNative.mln_map_invalidate_custom_geometry_source_region(
-            state.requireLiveAddress(),
-            Objects.requireNonNull(sourceId, "sourceId"),
-            bounds.southwest().latitude(),
-            bounds.southwest().longitude(),
-            bounds.northeast().latitude(),
-            bounds.northeast().longitude()));
+    try (var source = JavaCppValues.stringView(Objects.requireNonNull(sourceId, "sourceId"));
+        var nativeBounds =
+            StyleStructs.latLngBounds(
+                bounds.southwest().latitude(),
+                bounds.southwest().longitude(),
+                bounds.northeast().latitude(),
+                bounds.northeast().longitude())) {
+      Status.check(
+          MaplibreNativeC.mln_map_invalidate_custom_geometry_source_region(
+              JavaCppSupport.map(state.requireLiveAddress()),
+              source.view(),
+              nativeBounds.bounds()));
+    }
   }
 
   public void addVectorSourceUrl(String sourceId, String url) {
@@ -304,14 +372,19 @@ public final class MapHandle implements AutoCloseable {
   public void addVectorSourceUrl(String sourceId, String url, TileSourceOptions options) {
     NativeLibrary.ensureLoaded();
     var nativeOptions = tileSourceOptions(options);
-    Status.check(
-        StyleNative.mln_map_add_vector_source_url(
-            state.requireLiveAddress(),
-            Objects.requireNonNull(sourceId, "sourceId"),
-            Objects.requireNonNull(url, "url"),
-            nativeOptions.fields(),
-            nativeOptions.values(),
-            nativeOptions.attribution()));
+    checkTileSourceOptions(nativeOptions);
+    try (var source = JavaCppValues.stringView(Objects.requireNonNull(sourceId, "sourceId"));
+        var nativeUrl = JavaCppValues.stringView(Objects.requireNonNull(url, "url"));
+        var nativeTileOptions =
+            StyleStructs.tileSourceOptions(
+                nativeOptions.fields(), nativeOptions.values(), nativeOptions.attribution())) {
+      Status.check(
+          MaplibreNativeC.mln_map_add_vector_source_url(
+              JavaCppSupport.map(state.requireLiveAddress()),
+              source.view(),
+              nativeUrl.view(),
+              nativeTileOptions.options()));
+    }
   }
 
   public void addVectorSourceTiles(String sourceId, List<String> tiles) {
@@ -321,14 +394,20 @@ public final class MapHandle implements AutoCloseable {
   public void addVectorSourceTiles(String sourceId, List<String> tiles, TileSourceOptions options) {
     NativeLibrary.ensureLoaded();
     var nativeOptions = tileSourceOptions(options);
-    Status.check(
-        StyleNative.mln_map_add_vector_source_tiles(
-            state.requireLiveAddress(),
-            Objects.requireNonNull(sourceId, "sourceId"),
-            stringArray(tiles, "tiles"),
-            nativeOptions.fields(),
-            nativeOptions.values(),
-            nativeOptions.attribution()));
+    checkTileSourceOptions(nativeOptions);
+    try (var source = JavaCppValues.stringView(Objects.requireNonNull(sourceId, "sourceId"));
+        var nativeTiles = JavaCppValues.stringViews(stringArray(tiles, "tiles"));
+        var nativeTileOptions =
+            StyleStructs.tileSourceOptions(
+                nativeOptions.fields(), nativeOptions.values(), nativeOptions.attribution())) {
+      Status.check(
+          MaplibreNativeC.mln_map_add_vector_source_tiles(
+              JavaCppSupport.map(state.requireLiveAddress()),
+              source.view(),
+              nativeTiles.views(),
+              nativeTiles.count(),
+              nativeTileOptions.options()));
+    }
   }
 
   public void addRasterSourceUrl(String sourceId, String url) {
@@ -338,14 +417,19 @@ public final class MapHandle implements AutoCloseable {
   public void addRasterSourceUrl(String sourceId, String url, TileSourceOptions options) {
     NativeLibrary.ensureLoaded();
     var nativeOptions = tileSourceOptions(options);
-    Status.check(
-        StyleNative.mln_map_add_raster_source_url(
-            state.requireLiveAddress(),
-            Objects.requireNonNull(sourceId, "sourceId"),
-            Objects.requireNonNull(url, "url"),
-            nativeOptions.fields(),
-            nativeOptions.values(),
-            nativeOptions.attribution()));
+    checkTileSourceOptions(nativeOptions);
+    try (var source = JavaCppValues.stringView(Objects.requireNonNull(sourceId, "sourceId"));
+        var nativeUrl = JavaCppValues.stringView(Objects.requireNonNull(url, "url"));
+        var nativeTileOptions =
+            StyleStructs.tileSourceOptions(
+                nativeOptions.fields(), nativeOptions.values(), nativeOptions.attribution())) {
+      Status.check(
+          MaplibreNativeC.mln_map_add_raster_source_url(
+              JavaCppSupport.map(state.requireLiveAddress()),
+              source.view(),
+              nativeUrl.view(),
+              nativeTileOptions.options()));
+    }
   }
 
   public void addRasterSourceTiles(String sourceId, List<String> tiles) {
@@ -355,14 +439,20 @@ public final class MapHandle implements AutoCloseable {
   public void addRasterSourceTiles(String sourceId, List<String> tiles, TileSourceOptions options) {
     NativeLibrary.ensureLoaded();
     var nativeOptions = tileSourceOptions(options);
-    Status.check(
-        StyleNative.mln_map_add_raster_source_tiles(
-            state.requireLiveAddress(),
-            Objects.requireNonNull(sourceId, "sourceId"),
-            stringArray(tiles, "tiles"),
-            nativeOptions.fields(),
-            nativeOptions.values(),
-            nativeOptions.attribution()));
+    checkTileSourceOptions(nativeOptions);
+    try (var source = JavaCppValues.stringView(Objects.requireNonNull(sourceId, "sourceId"));
+        var nativeTiles = JavaCppValues.stringViews(stringArray(tiles, "tiles"));
+        var nativeTileOptions =
+            StyleStructs.tileSourceOptions(
+                nativeOptions.fields(), nativeOptions.values(), nativeOptions.attribution())) {
+      Status.check(
+          MaplibreNativeC.mln_map_add_raster_source_tiles(
+              JavaCppSupport.map(state.requireLiveAddress()),
+              source.view(),
+              nativeTiles.views(),
+              nativeTiles.count(),
+              nativeTileOptions.options()));
+    }
   }
 
   public void addRasterDemSourceUrl(String sourceId, String url) {
@@ -372,14 +462,19 @@ public final class MapHandle implements AutoCloseable {
   public void addRasterDemSourceUrl(String sourceId, String url, TileSourceOptions options) {
     NativeLibrary.ensureLoaded();
     var nativeOptions = tileSourceOptions(options);
-    Status.check(
-        StyleNative.mln_map_add_raster_dem_source_url(
-            state.requireLiveAddress(),
-            Objects.requireNonNull(sourceId, "sourceId"),
-            Objects.requireNonNull(url, "url"),
-            nativeOptions.fields(),
-            nativeOptions.values(),
-            nativeOptions.attribution()));
+    checkTileSourceOptions(nativeOptions);
+    try (var source = JavaCppValues.stringView(Objects.requireNonNull(sourceId, "sourceId"));
+        var nativeUrl = JavaCppValues.stringView(Objects.requireNonNull(url, "url"));
+        var nativeTileOptions =
+            StyleStructs.tileSourceOptions(
+                nativeOptions.fields(), nativeOptions.values(), nativeOptions.attribution())) {
+      Status.check(
+          MaplibreNativeC.mln_map_add_raster_dem_source_url(
+              JavaCppSupport.map(state.requireLiveAddress()),
+              source.view(),
+              nativeUrl.view(),
+              nativeTileOptions.options()));
+    }
   }
 
   public void addRasterDemSourceTiles(String sourceId, List<String> tiles) {
@@ -390,14 +485,20 @@ public final class MapHandle implements AutoCloseable {
       String sourceId, List<String> tiles, TileSourceOptions options) {
     NativeLibrary.ensureLoaded();
     var nativeOptions = tileSourceOptions(options);
-    Status.check(
-        StyleNative.mln_map_add_raster_dem_source_tiles(
-            state.requireLiveAddress(),
-            Objects.requireNonNull(sourceId, "sourceId"),
-            stringArray(tiles, "tiles"),
-            nativeOptions.fields(),
-            nativeOptions.values(),
-            nativeOptions.attribution()));
+    checkTileSourceOptions(nativeOptions);
+    try (var source = JavaCppValues.stringView(Objects.requireNonNull(sourceId, "sourceId"));
+        var nativeTiles = JavaCppValues.stringViews(stringArray(tiles, "tiles"));
+        var nativeTileOptions =
+            StyleStructs.tileSourceOptions(
+                nativeOptions.fields(), nativeOptions.values(), nativeOptions.attribution())) {
+      Status.check(
+          MaplibreNativeC.mln_map_add_raster_dem_source_tiles(
+              JavaCppSupport.map(state.requireLiveAddress()),
+              source.view(),
+              nativeTiles.views(),
+              nativeTiles.count(),
+              nativeTileOptions.options()));
+    }
   }
 
   public void setStyleImage(String imageId, PremultipliedRgba8Image image) {
@@ -408,62 +509,75 @@ public final class MapHandle implements AutoCloseable {
       String imageId, PremultipliedRgba8Image image, StyleImageOptions options) {
     NativeLibrary.ensureLoaded();
     Objects.requireNonNull(image, "image");
-    Status.check(
-        StyleNative.mln_map_set_style_image(
-            state.requireLiveAddress(),
-            Objects.requireNonNull(imageId, "imageId"),
-            image.width(),
-            image.height(),
-            image.stride(),
-            image.pixels(),
-            options != null && options.hasPixelRatio(),
-            options != null && options.hasPixelRatio() ? options.pixelRatio() : 1.0,
-            options != null && options.hasSdf(),
-            options != null && options.hasSdf() && options.sdf()));
+    try (var id = JavaCppValues.stringView(Objects.requireNonNull(imageId, "imageId"));
+        var nativeImage =
+            StyleStructs.premultipliedRgba8Image(
+                image.width(), image.height(), image.stride(), image.pixels())) {
+      var nativeOptions = MaplibreNativeC.mln_style_image_options_default();
+      try {
+        var fields = 0;
+        if (options != null && options.hasPixelRatio()) {
+          fields |= MaplibreNativeC.MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO;
+          nativeOptions.pixel_ratio(options.pixelRatio());
+        }
+        if (options != null && options.hasSdf()) {
+          fields |= MaplibreNativeC.MLN_STYLE_IMAGE_OPTION_SDF;
+          nativeOptions.sdf(options.sdf());
+        }
+        nativeOptions.fields(fields);
+        Status.check(
+            MaplibreNativeC.mln_map_set_style_image(
+                JavaCppSupport.map(state.requireLiveAddress()),
+                id.view(),
+                nativeImage.image(),
+                nativeOptions));
+      } finally {
+        nativeOptions.close();
+      }
+    }
   }
 
   public boolean removeStyleImage(String imageId) {
     NativeLibrary.ensureLoaded();
     var outRemoved = new boolean[1];
-    Status.check(
-        StyleNative.mln_map_remove_style_image(
-            state.requireLiveAddress(), Objects.requireNonNull(imageId, "imageId"), outRemoved));
+    try (var id = JavaCppValues.stringView(Objects.requireNonNull(imageId, "imageId"))) {
+      Status.check(
+          MaplibreNativeC.mln_map_remove_style_image(
+              JavaCppSupport.map(state.requireLiveAddress()), id.view(), outRemoved));
+    }
     return outRemoved[0];
   }
 
   public boolean styleImageExists(String imageId) {
     NativeLibrary.ensureLoaded();
     var outExists = new boolean[1];
-    Status.check(
-        StyleNative.mln_map_style_image_exists(
-            state.requireLiveAddress(), Objects.requireNonNull(imageId, "imageId"), outExists));
+    try (var id = JavaCppValues.stringView(Objects.requireNonNull(imageId, "imageId"))) {
+      Status.check(
+          MaplibreNativeC.mln_map_style_image_exists(
+              JavaCppSupport.map(state.requireLiveAddress()), id.view(), outExists));
+    }
     return outExists[0];
   }
 
   public Optional<StyleImageInfo> styleImageInfo(String imageId) {
     NativeLibrary.ensureLoaded();
-    var outInfo = new int[3];
-    var outByteLength = new long[1];
-    var outPixelRatio = new double[1];
-    var outFlags = new boolean[2];
-    Status.check(
-        StyleNative.mln_map_get_style_image_info(
-            state.requireLiveAddress(),
-            Objects.requireNonNull(imageId, "imageId"),
-            outInfo,
-            outByteLength,
-            outPixelRatio,
-            outFlags));
-    return outFlags[0]
-        ? Optional.of(
-            new StyleImageInfo(
-                outInfo[0],
-                outInfo[1],
-                outInfo[2],
-                outByteLength[0],
-                (float) outPixelRatio[0],
-                outFlags[1]))
-        : Optional.empty();
+    try (var id = JavaCppValues.stringView(Objects.requireNonNull(imageId, "imageId"))) {
+      var info = MaplibreNativeC.mln_style_image_info_default();
+      var outFound = new boolean[1];
+      Status.check(
+          MaplibreNativeC.mln_map_get_style_image_info(
+              JavaCppSupport.map(state.requireLiveAddress()), id.view(), info, outFound));
+      return outFound[0]
+          ? Optional.of(
+              new StyleImageInfo(
+                  info.width(),
+                  info.height(),
+                  info.stride(),
+                  info.byte_length(),
+                  info.pixel_ratio(),
+                  info.sdf()))
+          : Optional.empty();
+    }
   }
 
   public Optional<StyleImage> copyStyleImagePremultipliedRgba8(String imageId) {
@@ -473,15 +587,19 @@ public final class MapHandle implements AutoCloseable {
     }
     var imageInfo = info.orElseThrow();
     var outPixels = new byte[Math.toIntExact(imageInfo.byteLength())];
-    var outByteLength = new long[1];
     var outFound = new boolean[1];
-    Status.check(
-        StyleNative.mln_map_copy_style_image_premultiplied_rgba8(
-            state.requireLiveAddress(),
-            Objects.requireNonNull(imageId, "imageId"),
-            outPixels,
-            outByteLength,
-            outFound));
+    try (var id = JavaCppValues.stringView(Objects.requireNonNull(imageId, "imageId"))) {
+      try (var outByteLength = new SizeTPointer(1)) {
+        Status.check(
+            MaplibreNativeC.mln_map_copy_style_image_premultiplied_rgba8(
+                JavaCppSupport.map(state.requireLiveAddress()),
+                id.view(),
+                outPixels,
+                outPixels.length,
+                outByteLength,
+                outFound));
+      }
+    }
     if (!outFound[0]) {
       return Optional.empty();
     }
@@ -495,58 +613,75 @@ public final class MapHandle implements AutoCloseable {
 
   public void addImageSourceUrl(String sourceId, List<LatLng> coordinates, String url) {
     NativeLibrary.ensureLoaded();
-    Status.check(
-        StyleNative.mln_map_add_image_source_url(
-            state.requireLiveAddress(),
-            Objects.requireNonNull(sourceId, "sourceId"),
-            coordinateArray(coordinates, "coordinates"),
-            Objects.requireNonNull(url, "url")));
+    try (var source = JavaCppValues.stringView(Objects.requireNonNull(sourceId, "sourceId"));
+        var nativeCoordinates =
+            StyleStructs.latLngArray(coordinateArray(coordinates, "coordinates"));
+        var nativeUrl = JavaCppValues.stringView(Objects.requireNonNull(url, "url"))) {
+      Status.check(
+          MaplibreNativeC.mln_map_add_image_source_url(
+              JavaCppSupport.map(state.requireLiveAddress()),
+              source.view(),
+              nativeCoordinates.coordinates(),
+              nativeCoordinates.count(),
+              nativeUrl.view()));
+    }
   }
 
   public void addImageSourceImage(
       String sourceId, List<LatLng> coordinates, PremultipliedRgba8Image image) {
     NativeLibrary.ensureLoaded();
     Objects.requireNonNull(image, "image");
-    Status.check(
-        StyleNative.mln_map_add_image_source_image(
-            state.requireLiveAddress(),
-            Objects.requireNonNull(sourceId, "sourceId"),
-            coordinateArray(coordinates, "coordinates"),
-            image.width(),
-            image.height(),
-            image.stride(),
-            image.pixels()));
+    try (var source = JavaCppValues.stringView(Objects.requireNonNull(sourceId, "sourceId"));
+        var nativeCoordinates =
+            StyleStructs.latLngArray(coordinateArray(coordinates, "coordinates"));
+        var nativeImage =
+            StyleStructs.premultipliedRgba8Image(
+                image.width(), image.height(), image.stride(), image.pixels())) {
+      Status.check(
+          MaplibreNativeC.mln_map_add_image_source_image(
+              JavaCppSupport.map(state.requireLiveAddress()),
+              source.view(),
+              nativeCoordinates.coordinates(),
+              nativeCoordinates.count(),
+              nativeImage.image()));
+    }
   }
 
   public void setImageSourceUrl(String sourceId, String url) {
     NativeLibrary.ensureLoaded();
-    Status.check(
-        StyleNative.mln_map_set_image_source_url(
-            state.requireLiveAddress(),
-            Objects.requireNonNull(sourceId, "sourceId"),
-            Objects.requireNonNull(url, "url")));
+    try (var source = JavaCppValues.stringView(Objects.requireNonNull(sourceId, "sourceId"));
+        var nativeUrl = JavaCppValues.stringView(Objects.requireNonNull(url, "url"))) {
+      Status.check(
+          MaplibreNativeC.mln_map_set_image_source_url(
+              JavaCppSupport.map(state.requireLiveAddress()), source.view(), nativeUrl.view()));
+    }
   }
 
   public void setImageSourceImage(String sourceId, PremultipliedRgba8Image image) {
     NativeLibrary.ensureLoaded();
     Objects.requireNonNull(image, "image");
-    Status.check(
-        StyleNative.mln_map_set_image_source_image(
-            state.requireLiveAddress(),
-            Objects.requireNonNull(sourceId, "sourceId"),
-            image.width(),
-            image.height(),
-            image.stride(),
-            image.pixels()));
+    try (var source = JavaCppValues.stringView(Objects.requireNonNull(sourceId, "sourceId"));
+        var nativeImage =
+            StyleStructs.premultipliedRgba8Image(
+                image.width(), image.height(), image.stride(), image.pixels())) {
+      Status.check(
+          MaplibreNativeC.mln_map_set_image_source_image(
+              JavaCppSupport.map(state.requireLiveAddress()), source.view(), nativeImage.image()));
+    }
   }
 
   public void setImageSourceCoordinates(String sourceId, List<LatLng> coordinates) {
     NativeLibrary.ensureLoaded();
-    Status.check(
-        StyleNative.mln_map_set_image_source_coordinates(
-            state.requireLiveAddress(),
-            Objects.requireNonNull(sourceId, "sourceId"),
-            coordinateArray(coordinates, "coordinates")));
+    try (var source = JavaCppValues.stringView(Objects.requireNonNull(sourceId, "sourceId"));
+        var nativeCoordinates =
+            StyleStructs.latLngArray(coordinateArray(coordinates, "coordinates"))) {
+      Status.check(
+          MaplibreNativeC.mln_map_set_image_source_coordinates(
+              JavaCppSupport.map(state.requireLiveAddress()),
+              source.view(),
+              nativeCoordinates.coordinates(),
+              nativeCoordinates.count()));
+    }
   }
 
   public Optional<List<LatLng>> imageSourceCoordinates(String sourceId) {
@@ -554,13 +689,20 @@ public final class MapHandle implements AutoCloseable {
     var outCoordinates = new double[8];
     var outCoordinateCount = new long[1];
     var outFound = new boolean[1];
-    Status.check(
-        StyleNative.mln_map_get_image_source_coordinates(
-            state.requireLiveAddress(),
-            Objects.requireNonNull(sourceId, "sourceId"),
-            outCoordinates,
-            outCoordinateCount,
-            outFound));
+    try (var source = JavaCppValues.stringView(Objects.requireNonNull(sourceId, "sourceId"));
+        var nativeCoordinates = new StyleStructs.LatLngArrayScope(4);
+        var nativeCoordinateCount = new SizeTPointer(1)) {
+      Status.check(
+          MaplibreNativeC.mln_map_get_image_source_coordinates(
+              JavaCppSupport.map(state.requireLiveAddress()),
+              source.view(),
+              nativeCoordinates.coordinates(),
+              nativeCoordinates.count(),
+              nativeCoordinateCount,
+              outFound));
+      outCoordinateCount[0] = nativeCoordinateCount.get();
+      nativeCoordinates.copyTo(outCoordinates, outCoordinateCount[0]);
+    }
     if (!outFound[0]) {
       return Optional.empty();
     }
@@ -577,11 +719,13 @@ public final class MapHandle implements AutoCloseable {
 
   public void addStyleLayerJson(JsonValue layerJson, String beforeLayerId) {
     NativeLibrary.ensureLoaded();
-    Status.check(
-        StyleNative.mln_map_add_style_layer_json(
-            state.requireLiveAddress(),
-            Objects.requireNonNull(layerJson, "layerJson"),
-            Objects.requireNonNull(beforeLayerId, "beforeLayerId")));
+    try (var layer = JavaCppValues.json(Objects.requireNonNull(layerJson, "layerJson"));
+        var before =
+            JavaCppValues.stringView(Objects.requireNonNull(beforeLayerId, "beforeLayerId"))) {
+      Status.check(
+          MaplibreNativeC.mln_map_add_style_layer_json(
+              JavaCppSupport.map(state.requireLiveAddress()), layer.value(), before.view()));
+    }
   }
 
   public void addHillshadeLayer(String layerId, String sourceId) {
@@ -590,12 +734,17 @@ public final class MapHandle implements AutoCloseable {
 
   public void addHillshadeLayer(String layerId, String sourceId, String beforeLayerId) {
     NativeLibrary.ensureLoaded();
-    Status.check(
-        StyleNative.mln_map_add_hillshade_layer(
-            state.requireLiveAddress(),
-            Objects.requireNonNull(layerId, "layerId"),
-            Objects.requireNonNull(sourceId, "sourceId"),
-            Objects.requireNonNull(beforeLayerId, "beforeLayerId")));
+    try (var layer = JavaCppValues.stringView(Objects.requireNonNull(layerId, "layerId"));
+        var source = JavaCppValues.stringView(Objects.requireNonNull(sourceId, "sourceId"));
+        var before =
+            JavaCppValues.stringView(Objects.requireNonNull(beforeLayerId, "beforeLayerId"))) {
+      Status.check(
+          MaplibreNativeC.mln_map_add_hillshade_layer(
+              JavaCppSupport.map(state.requireLiveAddress()),
+              layer.view(),
+              source.view(),
+              before.view()));
+    }
   }
 
   public void addColorReliefLayer(String layerId, String sourceId) {
@@ -604,12 +753,17 @@ public final class MapHandle implements AutoCloseable {
 
   public void addColorReliefLayer(String layerId, String sourceId, String beforeLayerId) {
     NativeLibrary.ensureLoaded();
-    Status.check(
-        StyleNative.mln_map_add_color_relief_layer(
-            state.requireLiveAddress(),
-            Objects.requireNonNull(layerId, "layerId"),
-            Objects.requireNonNull(sourceId, "sourceId"),
-            Objects.requireNonNull(beforeLayerId, "beforeLayerId")));
+    try (var layer = JavaCppValues.stringView(Objects.requireNonNull(layerId, "layerId"));
+        var source = JavaCppValues.stringView(Objects.requireNonNull(sourceId, "sourceId"));
+        var before =
+            JavaCppValues.stringView(Objects.requireNonNull(beforeLayerId, "beforeLayerId"))) {
+      Status.check(
+          MaplibreNativeC.mln_map_add_color_relief_layer(
+              JavaCppSupport.map(state.requireLiveAddress()),
+              layer.view(),
+              source.view(),
+              before.view()));
+    }
   }
 
   public void addLocationIndicatorLayer(String layerId) {
@@ -618,86 +772,114 @@ public final class MapHandle implements AutoCloseable {
 
   public void addLocationIndicatorLayer(String layerId, String beforeLayerId) {
     NativeLibrary.ensureLoaded();
-    Status.check(
-        StyleNative.mln_map_add_location_indicator_layer(
-            state.requireLiveAddress(),
-            Objects.requireNonNull(layerId, "layerId"),
-            Objects.requireNonNull(beforeLayerId, "beforeLayerId")));
+    try (var layer = JavaCppValues.stringView(Objects.requireNonNull(layerId, "layerId"));
+        var before =
+            JavaCppValues.stringView(Objects.requireNonNull(beforeLayerId, "beforeLayerId"))) {
+      Status.check(
+          MaplibreNativeC.mln_map_add_location_indicator_layer(
+              JavaCppSupport.map(state.requireLiveAddress()), layer.view(), before.view()));
+    }
   }
 
   public void setLocationIndicatorLocation(String layerId, LatLng coordinate, double altitude) {
     NativeLibrary.ensureLoaded();
     Objects.requireNonNull(coordinate, "coordinate");
-    Status.check(
-        StyleNative.mln_map_set_location_indicator_location(
-            state.requireLiveAddress(),
-            Objects.requireNonNull(layerId, "layerId"),
-            coordinate.latitude(),
-            coordinate.longitude(),
-            altitude));
+    try (var layer = JavaCppValues.stringView(Objects.requireNonNull(layerId, "layerId"))) {
+      var nativeCoordinate = new MaplibreNativeC.mln_lat_lng();
+      nativeCoordinate.latitude(coordinate.latitude());
+      nativeCoordinate.longitude(coordinate.longitude());
+      Status.check(
+          MaplibreNativeC.mln_map_set_location_indicator_location(
+              JavaCppSupport.map(state.requireLiveAddress()),
+              layer.view(),
+              nativeCoordinate,
+              altitude));
+      nativeCoordinate.close();
+    }
   }
 
   public void setLocationIndicatorBearing(String layerId, double bearing) {
     NativeLibrary.ensureLoaded();
-    Status.check(
-        StyleNative.mln_map_set_location_indicator_bearing(
-            state.requireLiveAddress(), Objects.requireNonNull(layerId, "layerId"), bearing));
+    try (var layer = JavaCppValues.stringView(Objects.requireNonNull(layerId, "layerId"))) {
+      Status.check(
+          MaplibreNativeC.mln_map_set_location_indicator_bearing(
+              JavaCppSupport.map(state.requireLiveAddress()), layer.view(), bearing));
+    }
   }
 
   public void setLocationIndicatorAccuracyRadius(String layerId, double radius) {
     NativeLibrary.ensureLoaded();
-    Status.check(
-        StyleNative.mln_map_set_location_indicator_accuracy_radius(
-            state.requireLiveAddress(), Objects.requireNonNull(layerId, "layerId"), radius));
+    try (var layer = JavaCppValues.stringView(Objects.requireNonNull(layerId, "layerId"))) {
+      Status.check(
+          MaplibreNativeC.mln_map_set_location_indicator_accuracy_radius(
+              JavaCppSupport.map(state.requireLiveAddress()), layer.view(), radius));
+    }
   }
 
   public void setLocationIndicatorImageName(
       String layerId, LocationIndicatorImageKind imageKind, String imageId) {
     NativeLibrary.ensureLoaded();
-    Status.check(
-        StyleNative.mln_map_set_location_indicator_image_name(
-            state.requireLiveAddress(),
-            Objects.requireNonNull(layerId, "layerId"),
-            Objects.requireNonNull(imageKind, "imageKind").nativeValue(),
-            Objects.requireNonNull(imageId, "imageId")));
+    try (var layer = JavaCppValues.stringView(Objects.requireNonNull(layerId, "layerId"));
+        var image = JavaCppValues.stringView(Objects.requireNonNull(imageId, "imageId"))) {
+      Status.check(
+          MaplibreNativeC.mln_map_set_location_indicator_image_name(
+              JavaCppSupport.map(state.requireLiveAddress()),
+              layer.view(),
+              Objects.requireNonNull(imageKind, "imageKind").nativeValue(),
+              image.view()));
+    }
   }
 
   public boolean removeStyleLayer(String layerId) {
     NativeLibrary.ensureLoaded();
     var outRemoved = new boolean[1];
-    Status.check(
-        StyleNative.mln_map_remove_style_layer(
-            state.requireLiveAddress(), Objects.requireNonNull(layerId, "layerId"), outRemoved));
+    try (var layer = JavaCppValues.stringView(Objects.requireNonNull(layerId, "layerId"))) {
+      Status.check(
+          MaplibreNativeC.mln_map_remove_style_layer(
+              JavaCppSupport.map(state.requireLiveAddress()), layer.view(), outRemoved));
+    }
     return outRemoved[0];
   }
 
   public boolean styleLayerExists(String layerId) {
     NativeLibrary.ensureLoaded();
     var outExists = new boolean[1];
-    Status.check(
-        StyleNative.mln_map_style_layer_exists(
-            state.requireLiveAddress(), Objects.requireNonNull(layerId, "layerId"), outExists));
+    try (var layer = JavaCppValues.stringView(Objects.requireNonNull(layerId, "layerId"))) {
+      Status.check(
+          MaplibreNativeC.mln_map_style_layer_exists(
+              JavaCppSupport.map(state.requireLiveAddress()), layer.view(), outExists));
+    }
     return outExists[0];
   }
 
   public Optional<String> styleLayerType(String layerId) {
     NativeLibrary.ensureLoaded();
-    var outLayerType = new String[1];
+    var outLayerType = new MaplibreNativeC.mln_string_view();
     var outFound = new boolean[1];
-    Status.check(
-        StyleNative.mln_map_get_style_layer_type(
-            state.requireLiveAddress(),
-            Objects.requireNonNull(layerId, "layerId"),
-            outLayerType,
-            outFound));
-    return outFound[0] ? Optional.of(outLayerType[0]) : Optional.empty();
+    try (var layer = JavaCppValues.stringView(Objects.requireNonNull(layerId, "layerId"))) {
+      Status.check(
+          MaplibreNativeC.mln_map_get_style_layer_type(
+              JavaCppSupport.map(state.requireLiveAddress()),
+              layer.view(),
+              outLayerType,
+              outFound));
+      return outFound[0] ? Optional.of(JavaCppValues.string(outLayerType)) : Optional.empty();
+    } finally {
+      outLayerType.close();
+    }
   }
 
   public List<String> styleLayerIds() {
     NativeLibrary.ensureLoaded();
-    var outLayerIds = new Object[1];
-    Status.check(StyleNative.mln_map_list_style_layer_ids(state.requireLiveAddress(), outLayerIds));
-    return List.of((String[]) outLayerIds[0]);
+    var outList = new PointerPointer<MaplibreNativeC.mln_style_id_list>(1);
+    Status.check(
+        MaplibreNativeC.mln_map_list_style_layer_ids(
+            JavaCppSupport.map(state.requireLiveAddress()), outList));
+    var list =
+        new MaplibreNativeC.mln_style_id_list(
+            JavaCppSupport.pointer(
+                JavaCppSupport.outAddress(outList, MaplibreNativeC.mln_style_id_list.class)));
+    return List.of(StyleStructs.styleIdList(list));
   }
 
   public void moveStyleLayer(String layerId) {
@@ -706,98 +888,122 @@ public final class MapHandle implements AutoCloseable {
 
   public void moveStyleLayer(String layerId, String beforeLayerId) {
     NativeLibrary.ensureLoaded();
-    Status.check(
-        StyleNative.mln_map_move_style_layer(
-            state.requireLiveAddress(),
-            Objects.requireNonNull(layerId, "layerId"),
-            Objects.requireNonNull(beforeLayerId, "beforeLayerId")));
+    try (var layer = JavaCppValues.stringView(Objects.requireNonNull(layerId, "layerId"));
+        var before =
+            JavaCppValues.stringView(Objects.requireNonNull(beforeLayerId, "beforeLayerId"))) {
+      Status.check(
+          MaplibreNativeC.mln_map_move_style_layer(
+              JavaCppSupport.map(state.requireLiveAddress()), layer.view(), before.view()));
+    }
   }
 
   public Optional<JsonValue> styleLayerJson(String layerId) {
     NativeLibrary.ensureLoaded();
-    var outJson = new Object[1];
-    var outFound = new boolean[1];
-    Status.check(
-        StyleNative.mln_map_get_style_layer_json(
-            state.requireLiveAddress(),
-            Objects.requireNonNull(layerId, "layerId"),
-            outJson,
-            outFound));
-    return outFound[0] ? Optional.of((JsonValue) outJson[0]) : Optional.empty();
+    try (var layer = JavaCppValues.stringView(Objects.requireNonNull(layerId, "layerId"));
+        var outFound = new BoolPointer(1)) {
+      var outSnapshot = new PointerPointer<MaplibreNativeC.mln_json_snapshot>(1);
+      Status.check(
+          MaplibreNativeC.mln_map_get_style_layer_json(
+              JavaCppSupport.map(state.requireLiveAddress()), layer.view(), outSnapshot, outFound));
+      return outFound.get()
+          ? Optional.of(StyleStructs.jsonSnapshot(outSnapshot))
+          : Optional.empty();
+    }
   }
 
   public void setStyleLightJson(JsonValue lightJson) {
     NativeLibrary.ensureLoaded();
-    Status.check(
-        StyleNative.mln_map_set_style_light_json(
-            state.requireLiveAddress(), Objects.requireNonNull(lightJson, "lightJson")));
+    try (var light = JavaCppValues.json(Objects.requireNonNull(lightJson, "lightJson"))) {
+      Status.check(
+          MaplibreNativeC.mln_map_set_style_light_json(
+              JavaCppSupport.map(state.requireLiveAddress()), light.value()));
+    }
   }
 
   public void setStyleLightProperty(String propertyName, JsonValue value) {
     NativeLibrary.ensureLoaded();
-    Status.check(
-        StyleNative.mln_map_set_style_light_property(
-            state.requireLiveAddress(),
-            Objects.requireNonNull(propertyName, "propertyName"),
-            Objects.requireNonNull(value, "value")));
+    try (var property =
+            JavaCppValues.stringView(Objects.requireNonNull(propertyName, "propertyName"));
+        var nativeValue = JavaCppValues.json(Objects.requireNonNull(value, "value"))) {
+      Status.check(
+          MaplibreNativeC.mln_map_set_style_light_property(
+              JavaCppSupport.map(state.requireLiveAddress()),
+              property.view(),
+              nativeValue.value()));
+    }
   }
 
   public Optional<JsonValue> styleLightProperty(String propertyName) {
     NativeLibrary.ensureLoaded();
-    var outJson = new Object[1];
-    Status.check(
-        StyleNative.mln_map_get_style_light_property(
-            state.requireLiveAddress(),
-            Objects.requireNonNull(propertyName, "propertyName"),
-            outJson));
-    return Optional.ofNullable((JsonValue) outJson[0]);
+    try (var property =
+        JavaCppValues.stringView(Objects.requireNonNull(propertyName, "propertyName"))) {
+      var outSnapshot = new PointerPointer<MaplibreNativeC.mln_json_snapshot>(1);
+      Status.check(
+          MaplibreNativeC.mln_map_get_style_light_property(
+              JavaCppSupport.map(state.requireLiveAddress()), property.view(), outSnapshot));
+      return Optional.ofNullable(StyleStructs.jsonSnapshot(outSnapshot));
+    }
   }
 
   public void setLayerProperty(String layerId, String propertyName, JsonValue value) {
     NativeLibrary.ensureLoaded();
-    Status.check(
-        StyleNative.mln_map_set_layer_property(
-            state.requireLiveAddress(),
-            Objects.requireNonNull(layerId, "layerId"),
-            Objects.requireNonNull(propertyName, "propertyName"),
-            Objects.requireNonNull(value, "value")));
+    try (var layer = JavaCppValues.stringView(Objects.requireNonNull(layerId, "layerId"));
+        var property =
+            JavaCppValues.stringView(Objects.requireNonNull(propertyName, "propertyName"));
+        var nativeValue = JavaCppValues.json(Objects.requireNonNull(value, "value"))) {
+      Status.check(
+          MaplibreNativeC.mln_map_set_layer_property(
+              JavaCppSupport.map(state.requireLiveAddress()),
+              layer.view(),
+              property.view(),
+              nativeValue.value()));
+    }
   }
 
   public Optional<JsonValue> layerProperty(String layerId, String propertyName) {
     NativeLibrary.ensureLoaded();
-    var outJson = new Object[1];
-    Status.check(
-        StyleNative.mln_map_get_layer_property(
-            state.requireLiveAddress(),
-            Objects.requireNonNull(layerId, "layerId"),
-            Objects.requireNonNull(propertyName, "propertyName"),
-            outJson));
-    return Optional.ofNullable((JsonValue) outJson[0]);
+    try (var layer = JavaCppValues.stringView(Objects.requireNonNull(layerId, "layerId"));
+        var property =
+            JavaCppValues.stringView(Objects.requireNonNull(propertyName, "propertyName"))) {
+      var outSnapshot = new PointerPointer<MaplibreNativeC.mln_json_snapshot>(1);
+      Status.check(
+          MaplibreNativeC.mln_map_get_layer_property(
+              JavaCppSupport.map(state.requireLiveAddress()),
+              layer.view(),
+              property.view(),
+              outSnapshot));
+      return Optional.ofNullable(StyleStructs.jsonSnapshot(outSnapshot));
+    }
   }
 
   public void setLayerFilter(String layerId, JsonValue filter) {
     NativeLibrary.ensureLoaded();
-    Status.check(
-        StyleNative.mln_map_set_layer_filter(
-            state.requireLiveAddress(),
-            Objects.requireNonNull(layerId, "layerId"),
-            Objects.requireNonNull(filter, "filter")));
+    try (var layer = JavaCppValues.stringView(Objects.requireNonNull(layerId, "layerId"));
+        var nativeFilter = JavaCppValues.json(Objects.requireNonNull(filter, "filter"))) {
+      Status.check(
+          MaplibreNativeC.mln_map_set_layer_filter(
+              JavaCppSupport.map(state.requireLiveAddress()), layer.view(), nativeFilter.value()));
+    }
   }
 
   public void clearLayerFilter(String layerId) {
     NativeLibrary.ensureLoaded();
-    Status.check(
-        StyleNative.mln_map_set_layer_filter(
-            state.requireLiveAddress(), Objects.requireNonNull(layerId, "layerId"), null));
+    try (var layer = JavaCppValues.stringView(Objects.requireNonNull(layerId, "layerId"))) {
+      Status.check(
+          MaplibreNativeC.mln_map_set_layer_filter(
+              JavaCppSupport.map(state.requireLiveAddress()), layer.view(), null));
+    }
   }
 
   public Optional<JsonValue> layerFilter(String layerId) {
     NativeLibrary.ensureLoaded();
-    var outJson = new Object[1];
-    Status.check(
-        StyleNative.mln_map_get_layer_filter(
-            state.requireLiveAddress(), Objects.requireNonNull(layerId, "layerId"), outJson));
-    return Optional.ofNullable((JsonValue) outJson[0]);
+    try (var layer = JavaCppValues.stringView(Objects.requireNonNull(layerId, "layerId"))) {
+      var outSnapshot = new PointerPointer<MaplibreNativeC.mln_json_snapshot>(1);
+      Status.check(
+          MaplibreNativeC.mln_map_get_layer_filter(
+              JavaCppSupport.map(state.requireLiveAddress()), layer.view(), outSnapshot));
+      return Optional.ofNullable(StyleStructs.jsonSnapshot(outSnapshot));
+    }
   }
 
   public RenderSessionHandle attachMetalOwnedTexture(MetalOwnedTextureDescriptor descriptor) {
@@ -827,12 +1033,15 @@ public final class MapHandle implements AutoCloseable {
 
   public void requestRepaint() {
     NativeLibrary.ensureLoaded();
-    Status.check(MapNative.mln_map_request_repaint(state.requireLiveAddress()));
+    Status.check(
+        MaplibreNativeC.mln_map_request_repaint(JavaCppSupport.map(state.requireLiveAddress())));
   }
 
   public void requestStillImage() {
     NativeLibrary.ensureLoaded();
-    Status.check(MapNative.mln_map_request_still_image(state.requireLiveAddress()));
+    Status.check(
+        MaplibreNativeC.mln_map_request_still_image(
+            JavaCppSupport.map(state.requireLiveAddress())));
   }
 
   public void setDebugOptions(Set<DebugOption> options) {
@@ -842,13 +1051,17 @@ public final class MapHandle implements AutoCloseable {
     for (var option : options) {
       mask |= Objects.requireNonNull(option, "option").nativeMask();
     }
-    Status.check(CameraNative.mln_map_set_debug_options(state.requireLiveAddress(), mask));
+    Status.check(
+        MaplibreNativeC.mln_map_set_debug_options(
+            JavaCppSupport.map(state.requireLiveAddress()), mask));
   }
 
   public EnumSet<DebugOption> debugOptions() {
     NativeLibrary.ensureLoaded();
     var outOptions = new int[1];
-    Status.check(CameraNative.mln_map_get_debug_options(state.requireLiveAddress(), outOptions));
+    Status.check(
+        MaplibreNativeC.mln_map_get_debug_options(
+            JavaCppSupport.map(state.requireLiveAddress()), outOptions));
     var options = EnumSet.noneOf(DebugOption.class);
     for (var option : DebugOption.values()) {
       if ((outOptions[0] & option.nativeMask()) != 0) {
@@ -861,50 +1074,58 @@ public final class MapHandle implements AutoCloseable {
   public void setRenderingStatsViewEnabled(boolean enabled) {
     NativeLibrary.ensureLoaded();
     Status.check(
-        CameraNative.mln_map_set_rendering_stats_view_enabled(state.requireLiveAddress(), enabled));
+        MaplibreNativeC.mln_map_set_rendering_stats_view_enabled(
+            JavaCppSupport.map(state.requireLiveAddress()), enabled));
   }
 
   public boolean isRenderingStatsViewEnabled() {
     NativeLibrary.ensureLoaded();
     var outEnabled = new boolean[1];
     Status.check(
-        CameraNative.mln_map_get_rendering_stats_view_enabled(
-            state.requireLiveAddress(), outEnabled));
+        MaplibreNativeC.mln_map_get_rendering_stats_view_enabled(
+            JavaCppSupport.map(state.requireLiveAddress()), outEnabled));
     return outEnabled[0];
   }
 
   public boolean isFullyLoaded() {
     NativeLibrary.ensureLoaded();
     var outLoaded = new boolean[1];
-    Status.check(CameraNative.mln_map_is_fully_loaded(state.requireLiveAddress(), outLoaded));
+    Status.check(
+        MaplibreNativeC.mln_map_is_fully_loaded(
+            JavaCppSupport.map(state.requireLiveAddress()), outLoaded));
     return outLoaded[0];
   }
 
   public void dumpDebugLogs() {
     NativeLibrary.ensureLoaded();
-    Status.check(CameraNative.mln_map_dump_debug_logs(state.requireLiveAddress()));
+    Status.check(
+        MaplibreNativeC.mln_map_dump_debug_logs(JavaCppSupport.map(state.requireLiveAddress())));
   }
 
   public ViewportOptions viewportOptions() {
     NativeLibrary.ensureLoaded();
-    var fields = new boolean[4];
-    var ints = new int[3];
-    var values = new double[4];
+    var nativeOptions = MaplibreNativeC.mln_map_viewport_options_default();
     Status.check(
-        CameraNative.mln_map_get_viewport_options(
-            state.requireLiveAddress(), fields, ints, values));
+        MaplibreNativeC.mln_map_get_viewport_options(
+            JavaCppSupport.map(state.requireLiveAddress()), nativeOptions));
+    var fields = nativeOptions.fields();
     var options = new ViewportOptions();
-    if (fields[0]) {
-      options.northOrientation(NorthOrientation.fromNative(ints[0]));
+    if ((fields & MaplibreNativeC.MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION) != 0) {
+      options.northOrientation(NorthOrientation.fromNative(nativeOptions.north_orientation()));
     }
-    if (fields[1]) {
-      options.constrainMode(ConstrainMode.fromNative(ints[1]));
+    if ((fields & MaplibreNativeC.MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE) != 0) {
+      options.constrainMode(ConstrainMode.fromNative(nativeOptions.constrain_mode()));
     }
-    if (fields[2]) {
-      options.viewportMode(ViewportMode.fromNative(ints[2]));
+    if ((fields & MaplibreNativeC.MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE) != 0) {
+      options.viewportMode(ViewportMode.fromNative(nativeOptions.viewport_mode()));
     }
-    if (fields[3]) {
-      options.frustumOffset(new EdgeInsets(values[0], values[1], values[2], values[3]));
+    if ((fields & MaplibreNativeC.MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET) != 0) {
+      options.frustumOffset(
+          new EdgeInsets(
+              nativeOptions.frustum_offset().top(),
+              nativeOptions.frustum_offset().left(),
+              nativeOptions.frustum_offset().bottom(),
+              nativeOptions.frustum_offset().right()));
     }
     return options;
   }
@@ -912,52 +1133,60 @@ public final class MapHandle implements AutoCloseable {
   public void setViewportOptions(ViewportOptions options) {
     NativeLibrary.ensureLoaded();
     Objects.requireNonNull(options, "options");
-    var fields = new boolean[4];
-    var ints = new int[3];
-    var values = new double[4];
-    fields[0] = options.hasNorthOrientation();
-    ints[0] = fields[0] ? options.northOrientation().nativeValue() : 0;
-    fields[1] = options.hasConstrainMode();
-    ints[1] = fields[1] ? options.constrainMode().nativeValue() : 0;
-    fields[2] = options.hasViewportMode();
-    ints[2] = fields[2] ? options.viewportMode().nativeValue() : 0;
-    fields[3] = options.hasFrustumOffset();
-    if (fields[3]) {
-      values[0] = options.frustumOffset().top();
-      values[1] = options.frustumOffset().left();
-      values[2] = options.frustumOffset().bottom();
-      values[3] = options.frustumOffset().right();
+    var nativeOptions = MaplibreNativeC.mln_map_viewport_options_default();
+    var fields = 0;
+    if (options.hasNorthOrientation()) {
+      fields |= MaplibreNativeC.MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION;
+      nativeOptions.north_orientation(options.northOrientation().nativeValue());
     }
+    if (options.hasConstrainMode()) {
+      fields |= MaplibreNativeC.MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE;
+      nativeOptions.constrain_mode(options.constrainMode().nativeValue());
+    }
+    if (options.hasViewportMode()) {
+      fields |= MaplibreNativeC.MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE;
+      nativeOptions.viewport_mode(options.viewportMode().nativeValue());
+    }
+    if (options.hasFrustumOffset()) {
+      fields |= MaplibreNativeC.MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET;
+      nativeOptions.frustum_offset(
+          new MaplibreNativeC.mln_edge_insets()
+              .top(options.frustumOffset().top())
+              .left(options.frustumOffset().left())
+              .bottom(options.frustumOffset().bottom())
+              .right(options.frustumOffset().right()));
+    }
+    nativeOptions.fields(fields);
     Status.check(
-        CameraNative.mln_map_set_viewport_options(
-            state.requireLiveAddress(), fields, ints, values));
+        MaplibreNativeC.mln_map_set_viewport_options(
+            JavaCppSupport.map(state.requireLiveAddress()), nativeOptions));
   }
 
   public TileOptions tileOptions() {
     NativeLibrary.ensureLoaded();
-    var fields = new boolean[6];
-    var ints = new int[2];
-    var values = new double[4];
+    var nativeOptions = MaplibreNativeC.mln_map_tile_options_default();
     Status.check(
-        CameraNative.mln_map_get_tile_options(state.requireLiveAddress(), fields, ints, values));
+        MaplibreNativeC.mln_map_get_tile_options(
+            JavaCppSupport.map(state.requireLiveAddress()), nativeOptions));
+    var fields = nativeOptions.fields();
     var options = new TileOptions();
-    if (fields[0]) {
-      options.prefetchZoomDelta(ints[0]);
+    if ((fields & MaplibreNativeC.MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA) != 0) {
+      options.prefetchZoomDelta(nativeOptions.prefetch_zoom_delta());
     }
-    if (fields[1]) {
-      options.lodMinRadius(values[0]);
+    if ((fields & MaplibreNativeC.MLN_MAP_TILE_OPTION_LOD_MIN_RADIUS) != 0) {
+      options.lodMinRadius(nativeOptions.lod_min_radius());
     }
-    if (fields[2]) {
-      options.lodScale(values[1]);
+    if ((fields & MaplibreNativeC.MLN_MAP_TILE_OPTION_LOD_SCALE) != 0) {
+      options.lodScale(nativeOptions.lod_scale());
     }
-    if (fields[3]) {
-      options.lodPitchThreshold(values[2]);
+    if ((fields & MaplibreNativeC.MLN_MAP_TILE_OPTION_LOD_PITCH_THRESHOLD) != 0) {
+      options.lodPitchThreshold(nativeOptions.lod_pitch_threshold());
     }
-    if (fields[4]) {
-      options.lodZoomShift(values[3]);
+    if ((fields & MaplibreNativeC.MLN_MAP_TILE_OPTION_LOD_ZOOM_SHIFT) != 0) {
+      options.lodZoomShift(nativeOptions.lod_zoom_shift());
     }
-    if (fields[5]) {
-      options.lodMode(TileLodMode.fromNative(ints[1]));
+    if ((fields & MaplibreNativeC.MLN_MAP_TILE_OPTION_LOD_MODE) != 0) {
+      options.lodMode(TileLodMode.fromNative(nativeOptions.lod_mode()));
     }
     return options;
   }
@@ -965,39 +1194,53 @@ public final class MapHandle implements AutoCloseable {
   public void setTileOptions(TileOptions options) {
     NativeLibrary.ensureLoaded();
     Objects.requireNonNull(options, "options");
-    var fields = new boolean[6];
-    var ints = new int[2];
-    var values = new double[4];
-    fields[0] = options.hasPrefetchZoomDelta();
-    ints[0] = fields[0] ? options.prefetchZoomDelta() : 0;
-    fields[1] = options.hasLodMinRadius();
-    values[0] = fields[1] ? options.lodMinRadius() : 0.0;
-    fields[2] = options.hasLodScale();
-    values[1] = fields[2] ? options.lodScale() : 0.0;
-    fields[3] = options.hasLodPitchThreshold();
-    values[2] = fields[3] ? options.lodPitchThreshold() : 0.0;
-    fields[4] = options.hasLodZoomShift();
-    values[3] = fields[4] ? options.lodZoomShift() : 0.0;
-    fields[5] = options.hasLodMode();
-    ints[1] = fields[5] ? options.lodMode().nativeValue() : 0;
+    var nativeOptions = MaplibreNativeC.mln_map_tile_options_default();
+    var fields = 0;
+    if (options.hasPrefetchZoomDelta()) {
+      fields |= MaplibreNativeC.MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA;
+      nativeOptions.prefetch_zoom_delta(options.prefetchZoomDelta());
+    }
+    if (options.hasLodMinRadius()) {
+      fields |= MaplibreNativeC.MLN_MAP_TILE_OPTION_LOD_MIN_RADIUS;
+      nativeOptions.lod_min_radius(options.lodMinRadius());
+    }
+    if (options.hasLodScale()) {
+      fields |= MaplibreNativeC.MLN_MAP_TILE_OPTION_LOD_SCALE;
+      nativeOptions.lod_scale(options.lodScale());
+    }
+    if (options.hasLodPitchThreshold()) {
+      fields |= MaplibreNativeC.MLN_MAP_TILE_OPTION_LOD_PITCH_THRESHOLD;
+      nativeOptions.lod_pitch_threshold(options.lodPitchThreshold());
+    }
+    if (options.hasLodZoomShift()) {
+      fields |= MaplibreNativeC.MLN_MAP_TILE_OPTION_LOD_ZOOM_SHIFT;
+      nativeOptions.lod_zoom_shift(options.lodZoomShift());
+    }
+    if (options.hasLodMode()) {
+      fields |= MaplibreNativeC.MLN_MAP_TILE_OPTION_LOD_MODE;
+      nativeOptions.lod_mode(options.lodMode().nativeValue());
+    }
+    nativeOptions.fields(fields);
     Status.check(
-        CameraNative.mln_map_set_tile_options(state.requireLiveAddress(), fields, ints, values));
+        MaplibreNativeC.mln_map_set_tile_options(
+            JavaCppSupport.map(state.requireLiveAddress()), nativeOptions));
   }
 
   public CameraOptions camera() {
     NativeLibrary.ensureLoaded();
-    var fields = new boolean[CAMERA_FIELD_COUNT];
-    var values = new double[CAMERA_VALUE_COUNT];
-    Status.check(CameraNative.mln_map_get_camera(state.requireLiveAddress(), fields, values));
-    return cameraFromNative(fields, values);
+    var outCamera = MaplibreNativeC.mln_camera_options_default();
+    Status.check(
+        MaplibreNativeC.mln_map_get_camera(
+            JavaCppSupport.map(state.requireLiveAddress()), outCamera));
+    return MapStructs.cameraOptions(outCamera);
   }
 
   public void jumpTo(CameraOptions camera) {
     NativeLibrary.ensureLoaded();
-    var nativeCamera = cameraToNative(camera);
+    var nativeCamera = MapStructs.nativeCameraOptions(camera);
     Status.check(
-        CameraNative.mln_map_jump_to(
-            state.requireLiveAddress(), nativeCamera.fields(), nativeCamera.values()));
+        MaplibreNativeC.mln_map_jump_to(
+            JavaCppSupport.map(state.requireLiveAddress()), nativeCamera));
   }
 
   public void easeTo(CameraOptions camera) {
@@ -1018,7 +1261,9 @@ public final class MapHandle implements AutoCloseable {
 
   public void moveBy(double deltaX, double deltaY) {
     NativeLibrary.ensureLoaded();
-    Status.check(CameraNative.mln_map_move_by(state.requireLiveAddress(), deltaX, deltaY));
+    Status.check(
+        MaplibreNativeC.mln_map_move_by(
+            JavaCppSupport.map(state.requireLiveAddress()), deltaX, deltaY));
   }
 
   public void moveByAnimated(double deltaX, double deltaY) {
@@ -1064,8 +1309,10 @@ public final class MapHandle implements AutoCloseable {
     Objects.requireNonNull(first, "first");
     Objects.requireNonNull(second, "second");
     Status.check(
-        CameraNative.mln_map_rotate_by(
-            state.requireLiveAddress(), first.x(), first.y(), second.x(), second.y()));
+        MaplibreNativeC.mln_map_rotate_by(
+            JavaCppSupport.map(state.requireLiveAddress()),
+            new MaplibreNativeC.mln_screen_point().x(first.x()).y(first.y()),
+            new MaplibreNativeC.mln_screen_point().x(second.x()).y(second.y())));
   }
 
   public void rotateByAnimated(ScreenPoint first, ScreenPoint second) {
@@ -1078,7 +1325,8 @@ public final class MapHandle implements AutoCloseable {
 
   public void pitchBy(double pitch) {
     NativeLibrary.ensureLoaded();
-    Status.check(CameraNative.mln_map_pitch_by(state.requireLiveAddress(), pitch));
+    Status.check(
+        MaplibreNativeC.mln_map_pitch_by(JavaCppSupport.map(state.requireLiveAddress()), pitch));
   }
 
   public void pitchByAnimated(double pitch) {
@@ -1091,51 +1339,37 @@ public final class MapHandle implements AutoCloseable {
 
   public void cancelTransitions() {
     NativeLibrary.ensureLoaded();
-    Status.check(CameraNative.mln_map_cancel_transitions(state.requireLiveAddress()));
+    Status.check(
+        MaplibreNativeC.mln_map_cancel_transitions(JavaCppSupport.map(state.requireLiveAddress())));
   }
 
   private void easeToInternal(
       CameraOptions camera, AnimationOptions animation, boolean hasAnimation) {
     NativeLibrary.ensureLoaded();
-    var nativeCamera = cameraToNative(camera);
-    var nativeAnimation = animationToNative(animation, hasAnimation);
+    var nativeCamera = MapStructs.nativeCameraOptions(camera);
+    var nativeAnimation = nativeAnimation(animationToNative(animation, hasAnimation), hasAnimation);
     Status.check(
-        CameraNative.mln_map_ease_to(
-            state.requireLiveAddress(),
-            nativeCamera.fields(),
-            nativeCamera.values(),
-            hasAnimation,
-            nativeAnimation.fields(),
-            nativeAnimation.values()));
+        MaplibreNativeC.mln_map_ease_to(
+            JavaCppSupport.map(state.requireLiveAddress()), nativeCamera, nativeAnimation));
   }
 
   private void flyToInternal(
       CameraOptions camera, AnimationOptions animation, boolean hasAnimation) {
     NativeLibrary.ensureLoaded();
-    var nativeCamera = cameraToNative(camera);
-    var nativeAnimation = animationToNative(animation, hasAnimation);
+    var nativeCamera = MapStructs.nativeCameraOptions(camera);
+    var nativeAnimation = nativeAnimation(animationToNative(animation, hasAnimation), hasAnimation);
     Status.check(
-        CameraNative.mln_map_fly_to(
-            state.requireLiveAddress(),
-            nativeCamera.fields(),
-            nativeCamera.values(),
-            hasAnimation,
-            nativeAnimation.fields(),
-            nativeAnimation.values()));
+        MaplibreNativeC.mln_map_fly_to(
+            JavaCppSupport.map(state.requireLiveAddress()), nativeCamera, nativeAnimation));
   }
 
   private void moveByAnimatedInternal(
       double deltaX, double deltaY, AnimationOptions animation, boolean hasAnimation) {
     NativeLibrary.ensureLoaded();
-    var nativeAnimation = animationToNative(animation, hasAnimation);
+    var nativeAnimation = nativeAnimation(animationToNative(animation, hasAnimation), hasAnimation);
     Status.check(
-        CameraNative.mln_map_move_by_animated(
-            state.requireLiveAddress(),
-            deltaX,
-            deltaY,
-            hasAnimation,
-            nativeAnimation.fields(),
-            nativeAnimation.values()));
+        MaplibreNativeC.mln_map_move_by_animated(
+            JavaCppSupport.map(state.requireLiveAddress()), deltaX, deltaY, nativeAnimation));
   }
 
   private void scaleByInternal(double scale, ScreenPoint anchor, boolean animated) {
@@ -1148,8 +1382,10 @@ public final class MapHandle implements AutoCloseable {
     var anchorX = hasAnchor ? anchor.x() : 0;
     var anchorY = hasAnchor ? anchor.y() : 0;
     Status.check(
-        CameraNative.mln_map_scale_by(
-            state.requireLiveAddress(), scale, hasAnchor, anchorX, anchorY));
+        MaplibreNativeC.mln_map_scale_by(
+            JavaCppSupport.map(state.requireLiveAddress()),
+            scale,
+            hasAnchor ? new MaplibreNativeC.mln_screen_point().x(anchorX).y(anchorY) : null));
   }
 
   private void scaleByAnimatedInternal(
@@ -1161,17 +1397,13 @@ public final class MapHandle implements AutoCloseable {
     NativeLibrary.ensureLoaded();
     var anchorX = hasAnchor ? anchor.x() : 0;
     var anchorY = hasAnchor ? anchor.y() : 0;
-    var nativeAnimation = animationToNative(animation, hasAnimation);
+    var nativeAnimation = nativeAnimation(animationToNative(animation, hasAnimation), hasAnimation);
     Status.check(
-        CameraNative.mln_map_scale_by_animated(
-            state.requireLiveAddress(),
+        MaplibreNativeC.mln_map_scale_by_animated(
+            JavaCppSupport.map(state.requireLiveAddress()),
             scale,
-            hasAnchor,
-            anchorX,
-            anchorY,
-            hasAnimation,
-            nativeAnimation.fields(),
-            nativeAnimation.values()));
+            hasAnchor ? new MaplibreNativeC.mln_screen_point().x(anchorX).y(anchorY) : null,
+            nativeAnimation));
   }
 
   private void rotateByAnimatedInternal(
@@ -1179,30 +1411,22 @@ public final class MapHandle implements AutoCloseable {
     NativeLibrary.ensureLoaded();
     Objects.requireNonNull(first, "first");
     Objects.requireNonNull(second, "second");
-    var nativeAnimation = animationToNative(animation, hasAnimation);
+    var nativeAnimation = nativeAnimation(animationToNative(animation, hasAnimation), hasAnimation);
     Status.check(
-        CameraNative.mln_map_rotate_by_animated(
-            state.requireLiveAddress(),
-            first.x(),
-            first.y(),
-            second.x(),
-            second.y(),
-            hasAnimation,
-            nativeAnimation.fields(),
-            nativeAnimation.values()));
+        MaplibreNativeC.mln_map_rotate_by_animated(
+            JavaCppSupport.map(state.requireLiveAddress()),
+            new MaplibreNativeC.mln_screen_point().x(first.x()).y(first.y()),
+            new MaplibreNativeC.mln_screen_point().x(second.x()).y(second.y()),
+            nativeAnimation));
   }
 
   private void pitchByAnimatedInternal(
       double pitch, AnimationOptions animation, boolean hasAnimation) {
     NativeLibrary.ensureLoaded();
-    var nativeAnimation = animationToNative(animation, hasAnimation);
+    var nativeAnimation = nativeAnimation(animationToNative(animation, hasAnimation), hasAnimation);
     Status.check(
-        CameraNative.mln_map_pitch_by_animated(
-            state.requireLiveAddress(),
-            pitch,
-            hasAnimation,
-            nativeAnimation.fields(),
-            nativeAnimation.values()));
+        MaplibreNativeC.mln_map_pitch_by_animated(
+            JavaCppSupport.map(state.requireLiveAddress()), pitch, nativeAnimation));
   }
 
   public CameraOptions cameraForLatLngBounds(LatLngBounds bounds) {
@@ -1244,130 +1468,153 @@ public final class MapHandle implements AutoCloseable {
       LatLngBounds bounds, CameraFitOptions fitOptions, boolean hasFitOptions) {
     NativeLibrary.ensureLoaded();
     Objects.requireNonNull(bounds, "bounds");
-    var nativeFit = fitToNative(fitOptions, hasFitOptions);
-    var fields = new boolean[CAMERA_FIELD_COUNT];
-    var values = new double[CAMERA_VALUE_COUNT];
+    var nativeFit = nativeFit(fitToNative(fitOptions, hasFitOptions), hasFitOptions);
+    var outCamera = MaplibreNativeC.mln_camera_options_default();
     Status.check(
-        CameraNative.mln_map_camera_for_lat_lng_bounds(
-            state.requireLiveAddress(),
-            bounds.southwest().latitude(),
-            bounds.southwest().longitude(),
-            bounds.northeast().latitude(),
-            bounds.northeast().longitude(),
-            hasFitOptions,
-            nativeFit.fields(),
-            nativeFit.values(),
-            fields,
-            values));
-    return cameraFromNative(fields, values);
+        MaplibreNativeC.mln_map_camera_for_lat_lng_bounds(
+            JavaCppSupport.map(state.requireLiveAddress()),
+            nativeLatLngBounds(
+                bounds.southwest().latitude(),
+                bounds.southwest().longitude(),
+                bounds.northeast().latitude(),
+                bounds.northeast().longitude()),
+            nativeFit,
+            outCamera));
+    return MapStructs.cameraOptions(outCamera);
   }
 
   private CameraOptions cameraForLatLngsInternal(
       List<LatLng> coordinates, CameraFitOptions fitOptions, boolean hasFitOptions) {
     NativeLibrary.ensureLoaded();
-    Objects.requireNonNull(coordinates, "coordinates");
-    var coordinateValues = new double[coordinates.size() * 2];
-    for (var index = 0; index < coordinates.size(); index++) {
-      var coordinate = Objects.requireNonNull(coordinates.get(index), "coordinate");
-      coordinateValues[index * 2] = coordinate.latitude();
-      coordinateValues[index * 2 + 1] = coordinate.longitude();
+    var copiedCoordinates = List.copyOf(Objects.requireNonNull(coordinates, "coordinates"));
+    var nativeFit = nativeFit(fitToNative(fitOptions, hasFitOptions), hasFitOptions);
+    try (var nativeCoordinates =
+        org.maplibre.nativejni.internal.struct.CoreStructs.latLngArray(copiedCoordinates)) {
+      var outCamera = MaplibreNativeC.mln_camera_options_default();
+      Status.check(
+          MaplibreNativeC.mln_map_camera_for_lat_lngs(
+              JavaCppSupport.map(state.requireLiveAddress()),
+              nativeCoordinates.coordinates(),
+              nativeCoordinates.count(),
+              nativeFit,
+              outCamera));
+      return MapStructs.cameraOptions(outCamera);
     }
-    var nativeFit = fitToNative(fitOptions, hasFitOptions);
-    var fields = new boolean[CAMERA_FIELD_COUNT];
-    var values = new double[CAMERA_VALUE_COUNT];
-    Status.check(
-        CameraNative.mln_map_camera_for_lat_lngs(
-            state.requireLiveAddress(),
-            coordinateValues,
-            hasFitOptions,
-            nativeFit.fields(),
-            nativeFit.values(),
-            fields,
-            values));
-    return cameraFromNative(fields, values);
   }
 
   private CameraOptions cameraForGeometryInternal(
       Geometry geometry, CameraFitOptions fitOptions, boolean hasFitOptions) {
     NativeLibrary.ensureLoaded();
-    var nativeFit = fitToNative(fitOptions, hasFitOptions);
-    var fields = new boolean[CAMERA_FIELD_COUNT];
-    var values = new double[CAMERA_VALUE_COUNT];
-    Status.check(
-        CameraNative.mln_map_camera_for_geometry(
-            state.requireLiveAddress(),
-            Objects.requireNonNull(geometry, "geometry"),
-            hasFitOptions,
-            nativeFit.fields(),
-            nativeFit.values(),
-            fields,
-            values));
-    return cameraFromNative(fields, values);
+    var nativeFit = nativeFit(fitToNative(fitOptions, hasFitOptions), hasFitOptions);
+    try (var nativeGeometry =
+        JavaCppValues.geometry(Objects.requireNonNull(geometry, "geometry"))) {
+      var outCamera = MaplibreNativeC.mln_camera_options_default();
+      Status.check(
+          MaplibreNativeC.mln_map_camera_for_geometry(
+              JavaCppSupport.map(state.requireLiveAddress()),
+              nativeGeometry.value(),
+              nativeFit,
+              outCamera));
+      return MapStructs.cameraOptions(outCamera);
+    }
   }
 
   private LatLngBounds latLngBoundsForCameraInternal(CameraOptions camera, boolean unwrapped) {
     NativeLibrary.ensureLoaded();
-    var nativeCamera = cameraToNative(camera);
-    var boundsValues = new double[4];
+    var nativeCamera = MapStructs.nativeCameraOptions(camera);
+    var outBounds = new MaplibreNativeC.mln_lat_lng_bounds();
     var status =
         unwrapped
-            ? CameraNative.mln_map_lat_lng_bounds_for_camera_unwrapped(
-                state.requireLiveAddress(),
-                nativeCamera.fields(),
-                nativeCamera.values(),
-                boundsValues)
-            : CameraNative.mln_map_lat_lng_bounds_for_camera(
-                state.requireLiveAddress(),
-                nativeCamera.fields(),
-                nativeCamera.values(),
-                boundsValues);
+            ? MaplibreNativeC.mln_map_lat_lng_bounds_for_camera_unwrapped(
+                JavaCppSupport.map(state.requireLiveAddress()), nativeCamera, outBounds)
+            : MaplibreNativeC.mln_map_lat_lng_bounds_for_camera(
+                JavaCppSupport.map(state.requireLiveAddress()), nativeCamera, outBounds);
     Status.check(status);
-    return new LatLngBounds(
-        new LatLng(boundsValues[0], boundsValues[1]), new LatLng(boundsValues[2], boundsValues[3]));
+    return latLngBounds(outBounds);
   }
 
   public BoundOptions bounds() {
     NativeLibrary.ensureLoaded();
-    var fields = new boolean[BOUND_FIELD_COUNT];
-    var values = new double[BOUND_VALUE_COUNT];
-    Status.check(CameraNative.mln_map_get_bounds(state.requireLiveAddress(), fields, values));
-    return boundsFromNative(fields, values);
+    var outBounds = MaplibreNativeC.mln_bound_options_default();
+    Status.check(
+        MaplibreNativeC.mln_map_get_bounds(
+            JavaCppSupport.map(state.requireLiveAddress()), outBounds));
+    var fields = outBounds.fields();
+    var nativeBounds = outBounds.bounds();
+    return boundsFromNative(
+        new boolean[] {
+          (fields & MaplibreNativeC.MLN_BOUND_OPTION_BOUNDS) != 0,
+          (fields & MaplibreNativeC.MLN_BOUND_OPTION_MIN_ZOOM) != 0,
+          (fields & MaplibreNativeC.MLN_BOUND_OPTION_MAX_ZOOM) != 0,
+          (fields & MaplibreNativeC.MLN_BOUND_OPTION_MIN_PITCH) != 0,
+          (fields & MaplibreNativeC.MLN_BOUND_OPTION_MAX_PITCH) != 0
+        },
+        new double[] {
+          nativeBounds.southwest().latitude(),
+          nativeBounds.southwest().longitude(),
+          nativeBounds.northeast().latitude(),
+          nativeBounds.northeast().longitude(),
+          outBounds.min_zoom(),
+          outBounds.max_zoom(),
+          outBounds.min_pitch(),
+          outBounds.max_pitch()
+        });
   }
 
   public void setBounds(BoundOptions options) {
     NativeLibrary.ensureLoaded();
-    var nativeBounds = boundsToNative(options);
+    var nativeBounds = nativeBounds(boundsToNative(options));
     Status.check(
-        CameraNative.mln_map_set_bounds(
-            state.requireLiveAddress(), nativeBounds.fields(), nativeBounds.values()));
+        MaplibreNativeC.mln_map_set_bounds(
+            JavaCppSupport.map(state.requireLiveAddress()), nativeBounds));
   }
 
   public FreeCameraOptions freeCameraOptions() {
     NativeLibrary.ensureLoaded();
-    var fields = new boolean[FREE_CAMERA_FIELD_COUNT];
-    var values = new double[FREE_CAMERA_VALUE_COUNT];
+    var outFreeCamera = MaplibreNativeC.mln_free_camera_options_default();
     Status.check(
-        CameraNative.mln_map_get_free_camera_options(state.requireLiveAddress(), fields, values));
-    return freeCameraFromNative(fields, values);
+        MaplibreNativeC.mln_map_get_free_camera_options(
+            JavaCppSupport.map(state.requireLiveAddress()), outFreeCamera));
+    var fields = outFreeCamera.fields();
+    return freeCameraFromNative(
+        new boolean[] {
+          (fields & MaplibreNativeC.MLN_FREE_CAMERA_OPTION_POSITION) != 0,
+          (fields & MaplibreNativeC.MLN_FREE_CAMERA_OPTION_ORIENTATION) != 0
+        },
+        new double[] {
+          outFreeCamera._position().x(),
+          outFreeCamera._position().y(),
+          outFreeCamera._position().z(),
+          outFreeCamera.orientation().x(),
+          outFreeCamera.orientation().y(),
+          outFreeCamera.orientation().z(),
+          outFreeCamera.orientation().w()
+        });
   }
 
   public void setFreeCameraOptions(FreeCameraOptions options) {
     NativeLibrary.ensureLoaded();
-    var nativeFreeCamera = freeCameraToNative(options);
+    var nativeFreeCamera = nativeFreeCamera(freeCameraToNative(options));
     Status.check(
-        CameraNative.mln_map_set_free_camera_options(
-            state.requireLiveAddress(), nativeFreeCamera.fields(), nativeFreeCamera.values()));
+        MaplibreNativeC.mln_map_set_free_camera_options(
+            JavaCppSupport.map(state.requireLiveAddress()), nativeFreeCamera));
   }
 
   public ProjectionModeOptions projectionMode() {
     NativeLibrary.ensureLoaded();
-    var fields = new boolean[PROJECTION_MODE_FIELD_COUNT];
-    var booleans = new boolean[PROJECTION_MODE_BOOLEAN_COUNT];
-    var values = new double[PROJECTION_MODE_VALUE_COUNT];
+    var outMode = MaplibreNativeC.mln_projection_mode_default();
     Status.check(
-        CameraNative.mln_map_get_projection_mode(
-            state.requireLiveAddress(), fields, booleans, values));
-    return projectionModeFromNative(fields, booleans, values);
+        MaplibreNativeC.mln_map_get_projection_mode(
+            JavaCppSupport.map(state.requireLiveAddress()), outMode));
+    var fields = outMode.fields();
+    return projectionModeFromNative(
+        new boolean[] {
+          (fields & MaplibreNativeC.MLN_PROJECTION_MODE_AXONOMETRIC) != 0,
+          (fields & MaplibreNativeC.MLN_PROJECTION_MODE_X_SKEW) != 0,
+          (fields & MaplibreNativeC.MLN_PROJECTION_MODE_Y_SKEW) != 0
+        },
+        new boolean[] {outMode.axonometric()},
+        new double[] {outMode.x_skew(), outMode.y_skew()});
   }
 
   public void setProjectionMode(ProjectionModeOptions mode) {
@@ -1382,67 +1629,100 @@ public final class MapHandle implements AutoCloseable {
     values[0] = mode.hasXSkew() ? mode.xSkew() : 0;
     fields[2] = mode.hasYSkew();
     values[1] = mode.hasYSkew() ? mode.ySkew() : 0;
+    var nativeMode = MaplibreNativeC.mln_projection_mode_default();
+    var nativeFields = 0;
+    if (fields[0]) {
+      nativeFields |= MaplibreNativeC.MLN_PROJECTION_MODE_AXONOMETRIC;
+      nativeMode.axonometric(booleans[0]);
+    }
+    if (fields[1]) {
+      nativeFields |= MaplibreNativeC.MLN_PROJECTION_MODE_X_SKEW;
+      nativeMode.x_skew(values[0]);
+    }
+    if (fields[2]) {
+      nativeFields |= MaplibreNativeC.MLN_PROJECTION_MODE_Y_SKEW;
+      nativeMode.y_skew(values[1]);
+    }
+    nativeMode.fields(nativeFields);
     Status.check(
-        CameraNative.mln_map_set_projection_mode(
-            state.requireLiveAddress(), fields, booleans, values));
+        MaplibreNativeC.mln_map_set_projection_mode(
+            JavaCppSupport.map(state.requireLiveAddress()), nativeMode));
   }
 
   public ScreenPoint pixelForLatLng(LatLng coordinate) {
     NativeLibrary.ensureLoaded();
     Objects.requireNonNull(coordinate, "coordinate");
-    var outPoint = new double[2];
+    var outPoint = new MaplibreNativeC.mln_screen_point();
     Status.check(
-        CameraNative.mln_map_pixel_for_lat_lng(
-            state.requireLiveAddress(), coordinate.latitude(), coordinate.longitude(), outPoint));
-    return new ScreenPoint(outPoint[0], outPoint[1]);
+        MaplibreNativeC.mln_map_pixel_for_lat_lng(
+            JavaCppSupport.map(state.requireLiveAddress()),
+            new MaplibreNativeC.mln_lat_lng()
+                .latitude(coordinate.latitude())
+                .longitude(coordinate.longitude()),
+            outPoint));
+    return new ScreenPoint(outPoint.x(), outPoint.y());
   }
 
   public LatLng latLngForPixel(ScreenPoint point) {
     NativeLibrary.ensureLoaded();
     Objects.requireNonNull(point, "point");
-    var outCoordinate = new double[2];
+    var outCoordinate = new MaplibreNativeC.mln_lat_lng();
     Status.check(
-        CameraNative.mln_map_lat_lng_for_pixel(
-            state.requireLiveAddress(), point.x(), point.y(), outCoordinate));
-    return new LatLng(outCoordinate[0], outCoordinate[1]);
+        MaplibreNativeC.mln_map_lat_lng_for_pixel(
+            JavaCppSupport.map(state.requireLiveAddress()),
+            new MaplibreNativeC.mln_screen_point().x(point.x()).y(point.y()),
+            outCoordinate));
+    return new LatLng(outCoordinate.latitude(), outCoordinate.longitude());
   }
 
   public List<ScreenPoint> pixelsForLatLngs(List<LatLng> coordinates) {
     NativeLibrary.ensureLoaded();
-    Objects.requireNonNull(coordinates, "coordinates");
-    var coordinateValues = new double[coordinates.size() * 2];
-    for (var index = 0; index < coordinates.size(); index++) {
-      var coordinate = Objects.requireNonNull(coordinates.get(index), "coordinate");
-      coordinateValues[index * 2] = coordinate.latitude();
-      coordinateValues[index * 2 + 1] = coordinate.longitude();
+    var copiedCoordinates = List.copyOf(Objects.requireNonNull(coordinates, "coordinates"));
+    try (var nativeCoordinates =
+        org.maplibre.nativejni.internal.struct.CoreStructs.latLngArray(copiedCoordinates)) {
+      var outPoints =
+          copiedCoordinates.isEmpty()
+              ? null
+              : new MaplibreNativeC.mln_screen_point(copiedCoordinates.size());
+      Status.check(
+          MaplibreNativeC.mln_map_pixels_for_lat_lngs(
+              JavaCppSupport.map(state.requireLiveAddress()),
+              nativeCoordinates.coordinates(),
+              nativeCoordinates.count(),
+              outPoints));
+      var points = new java.util.ArrayList<ScreenPoint>(copiedCoordinates.size());
+      for (var index = 0; index < copiedCoordinates.size(); index++) {
+        var point = outPoints.getPointer(index);
+        points.add(new ScreenPoint(point.x(), point.y()));
+      }
+      return List.copyOf(points);
     }
-    var pointValues = new double[coordinateValues.length];
-    Status.check(
-        CameraNative.mln_map_pixels_for_lat_lngs(
-            state.requireLiveAddress(), coordinateValues, pointValues));
-    var points = new java.util.ArrayList<ScreenPoint>(coordinates.size());
-    for (var index = 0; index < coordinates.size(); index++) {
-      points.add(new ScreenPoint(pointValues[index * 2], pointValues[index * 2 + 1]));
-    }
-    return List.copyOf(points);
   }
 
   public List<LatLng> latLngsForPixels(List<ScreenPoint> points) {
     NativeLibrary.ensureLoaded();
-    Objects.requireNonNull(points, "points");
-    var pointValues = new double[points.size() * 2];
-    for (var index = 0; index < points.size(); index++) {
-      var point = Objects.requireNonNull(points.get(index), "point");
-      pointValues[index * 2] = point.x();
-      pointValues[index * 2 + 1] = point.y();
+    var copiedPoints = List.copyOf(Objects.requireNonNull(points, "points"));
+    var nativePoints =
+        copiedPoints.isEmpty() ? null : new MaplibreNativeC.mln_screen_point(copiedPoints.size());
+    for (var index = 0; index < copiedPoints.size(); index++) {
+      var point = Objects.requireNonNull(copiedPoints.get(index), "point");
+      nativePoints.position(index).x(point.x()).y(point.y());
     }
-    var coordinateValues = new double[pointValues.length];
+    if (nativePoints != null) {
+      nativePoints.position(0);
+    }
+    var outCoordinates =
+        copiedPoints.isEmpty() ? null : new MaplibreNativeC.mln_lat_lng(copiedPoints.size());
     Status.check(
-        CameraNative.mln_map_lat_lngs_for_pixels(
-            state.requireLiveAddress(), pointValues, coordinateValues));
-    var coordinates = new java.util.ArrayList<LatLng>(points.size());
-    for (var index = 0; index < points.size(); index++) {
-      coordinates.add(new LatLng(coordinateValues[index * 2], coordinateValues[index * 2 + 1]));
+        MaplibreNativeC.mln_map_lat_lngs_for_pixels(
+            JavaCppSupport.map(state.requireLiveAddress()),
+            nativePoints,
+            copiedPoints.size(),
+            outCoordinates));
+    var coordinates = new java.util.ArrayList<LatLng>(copiedPoints.size());
+    for (var index = 0; index < copiedPoints.size(); index++) {
+      var coordinate = outCoordinates.getPointer(index);
+      coordinates.add(new LatLng(coordinate.latitude(), coordinate.longitude()));
     }
     return List.copyOf(coordinates);
   }
@@ -1646,6 +1926,134 @@ public final class MapHandle implements AutoCloseable {
     return new NativeOptions(fields, values);
   }
 
+  private static MaplibreNativeC.mln_animation_options nativeAnimation(
+      NativeOptions animation, boolean hasAnimation) {
+    if (!hasAnimation) {
+      return null;
+    }
+    var out = MaplibreNativeC.mln_animation_options_default();
+    var fields = 0;
+    if (animation.fields()[0]) {
+      fields |= MaplibreNativeC.MLN_ANIMATION_OPTION_DURATION;
+      out.duration_ms(animation.values()[0]);
+    }
+    if (animation.fields()[1]) {
+      fields |= MaplibreNativeC.MLN_ANIMATION_OPTION_VELOCITY;
+      out.velocity(animation.values()[1]);
+    }
+    if (animation.fields()[2]) {
+      fields |= MaplibreNativeC.MLN_ANIMATION_OPTION_MIN_ZOOM;
+      out.min_zoom(animation.values()[2]);
+    }
+    if (animation.fields()[3]) {
+      fields |= MaplibreNativeC.MLN_ANIMATION_OPTION_EASING;
+      out.easing(
+          new MaplibreNativeC.mln_unit_bezier()
+              .x1(animation.values()[3])
+              .y1(animation.values()[4])
+              .x2(animation.values()[5])
+              .y2(animation.values()[6]));
+    }
+    out.fields(fields);
+    return out;
+  }
+
+  private static MaplibreNativeC.mln_camera_fit_options nativeFit(
+      NativeOptions fit, boolean hasFit) {
+    if (!hasFit) {
+      return null;
+    }
+    var out = MaplibreNativeC.mln_camera_fit_options_default();
+    var fields = 0;
+    if (fit.fields()[0]) {
+      fields |= MaplibreNativeC.MLN_CAMERA_FIT_OPTION_PADDING;
+      out.padding(
+          new MaplibreNativeC.mln_edge_insets()
+              .top(fit.values()[0])
+              .left(fit.values()[1])
+              .bottom(fit.values()[2])
+              .right(fit.values()[3]));
+    }
+    if (fit.fields()[1]) {
+      fields |= MaplibreNativeC.MLN_CAMERA_FIT_OPTION_BEARING;
+      out.bearing(fit.values()[4]);
+    }
+    if (fit.fields()[2]) {
+      fields |= MaplibreNativeC.MLN_CAMERA_FIT_OPTION_PITCH;
+      out.pitch(fit.values()[5]);
+    }
+    out.fields(fields);
+    return out;
+  }
+
+  private static MaplibreNativeC.mln_bound_options nativeBounds(NativeOptions bounds) {
+    var out = MaplibreNativeC.mln_bound_options_default();
+    var fields = 0;
+    if (bounds.fields()[0]) {
+      fields |= MaplibreNativeC.MLN_BOUND_OPTION_BOUNDS;
+      out.bounds(
+          nativeLatLngBounds(
+              bounds.values()[0], bounds.values()[1], bounds.values()[2], bounds.values()[3]));
+    }
+    if (bounds.fields()[1]) {
+      fields |= MaplibreNativeC.MLN_BOUND_OPTION_MIN_ZOOM;
+      out.min_zoom(bounds.values()[4]);
+    }
+    if (bounds.fields()[2]) {
+      fields |= MaplibreNativeC.MLN_BOUND_OPTION_MAX_ZOOM;
+      out.max_zoom(bounds.values()[5]);
+    }
+    if (bounds.fields()[3]) {
+      fields |= MaplibreNativeC.MLN_BOUND_OPTION_MIN_PITCH;
+      out.min_pitch(bounds.values()[6]);
+    }
+    if (bounds.fields()[4]) {
+      fields |= MaplibreNativeC.MLN_BOUND_OPTION_MAX_PITCH;
+      out.max_pitch(bounds.values()[7]);
+    }
+    out.fields(fields);
+    return out;
+  }
+
+  private static MaplibreNativeC.mln_lat_lng_bounds nativeLatLngBounds(
+      double swLat, double swLon, double neLat, double neLon) {
+    var out = new MaplibreNativeC.mln_lat_lng_bounds();
+    out.southwest().latitude(swLat).longitude(swLon);
+    out.northeast().latitude(neLat).longitude(neLon);
+    return out;
+  }
+
+  private static LatLngBounds latLngBounds(MaplibreNativeC.mln_lat_lng_bounds bounds) {
+    return new LatLngBounds(
+        new LatLng(bounds.southwest().latitude(), bounds.southwest().longitude()),
+        new LatLng(bounds.northeast().latitude(), bounds.northeast().longitude()));
+  }
+
+  private static MaplibreNativeC.mln_free_camera_options nativeFreeCamera(
+      NativeOptions freeCamera) {
+    var out = MaplibreNativeC.mln_free_camera_options_default();
+    var fields = 0;
+    if (freeCamera.fields()[0]) {
+      fields |= MaplibreNativeC.MLN_FREE_CAMERA_OPTION_POSITION;
+      out._position(
+          new MaplibreNativeC.mln_vec3()
+              .x(freeCamera.values()[0])
+              .y(freeCamera.values()[1])
+              .z(freeCamera.values()[2]));
+    }
+    if (freeCamera.fields()[1]) {
+      fields |= MaplibreNativeC.MLN_FREE_CAMERA_OPTION_ORIENTATION;
+      out.orientation(
+          new MaplibreNativeC.mln_quaternion()
+              .x(freeCamera.values()[3])
+              .y(freeCamera.values()[4])
+              .z(freeCamera.values()[5])
+              .w(freeCamera.values()[6]));
+    }
+    out.fields(fields);
+    return out;
+  }
+
   private static String[] stringArray(List<String> values, String name) {
     Objects.requireNonNull(values, name);
     return values.stream()
@@ -1662,6 +2070,20 @@ public final class MapHandle implements AutoCloseable {
       values[index * 2 + 1] = coordinate.longitude();
     }
     return values;
+  }
+
+  private static void checkCanonicalTile(long x, long y) {
+    if (x < 0 || y < 0 || x > 0xffff_ffffL || y > 0xffff_ffffL) {
+      JavaCppSupport.setThreadDiagnostic("canonical tile x and y must fit uint32");
+      Status.check(MaplibreNativeC.MLN_STATUS_INVALID_ARGUMENT);
+    }
+  }
+
+  private static void checkTileSourceOptions(NativeTileSourceOptions options) {
+    if (options.fields().length > 5 && options.fields()[5] && options.values()[7] < 0) {
+      JavaCppSupport.setThreadDiagnostic("tile size must be non-negative");
+      Status.check(MaplibreNativeC.MLN_STATUS_INVALID_ARGUMENT);
+    }
   }
 
   private static NativeTileSourceOptions tileSourceOptions(TileSourceOptions options) {
@@ -1694,26 +2116,6 @@ public final class MapHandle implements AutoCloseable {
     return new NativeTileSourceOptions(fields, values, attribution);
   }
 
-  private static NativeOptions customGeometrySourceOptions(CustomGeometrySourceOptions options) {
-    var fields = new boolean[CUSTOM_GEOMETRY_FIELD_COUNT];
-    var values = new double[CUSTOM_GEOMETRY_VALUE_COUNT];
-    fields[0] = options.hasMinZoom();
-    values[0] = fields[0] ? options.minZoom() : 0.0;
-    fields[1] = options.hasMaxZoom();
-    values[1] = fields[1] ? options.maxZoom() : 0.0;
-    fields[2] = options.hasTolerance();
-    values[2] = fields[2] ? options.tolerance() : 0.0;
-    fields[3] = options.hasTileSize();
-    values[3] = fields[3] ? options.tileSize() : 0.0;
-    fields[4] = options.hasBuffer();
-    values[4] = fields[4] ? options.buffer() : 0.0;
-    fields[5] = options.hasClip();
-    values[5] = fields[5] && options.clip() ? 1.0 : 0.0;
-    fields[6] = options.hasWrap();
-    values[6] = fields[6] && options.wrap() ? 1.0 : 0.0;
-    return new NativeOptions(fields, values);
-  }
-
   record NativeOptions(boolean[] fields, double[] values) {}
 
   record NativeTileSourceOptions(boolean[] fields, double[] values, String attribution) {}
@@ -1724,10 +2126,10 @@ public final class MapHandle implements AutoCloseable {
 
   public void close() {
     state.closeOnce(
-        MapNative::mln_map_destroy,
+        address -> MaplibreNativeC.mln_map_destroy(JavaCppSupport.map(address)),
         () -> {
           clearCustomGeometrySources();
-          InternalAccess.INSTANCE.unregisterMap(runtime, this);
+          runtime.unregisterMap(InternalAccess.INSTANCE, this);
         });
   }
 
@@ -1739,8 +2141,18 @@ public final class MapHandle implements AutoCloseable {
     return runtime;
   }
 
+  public long nativeAddress(InternalAccess access) {
+    Objects.requireNonNull(access, "access");
+    return nativeAddress();
+  }
+
   long nativeAddress() {
     return state.requireLiveAddress();
+  }
+
+  public void releaseDetachedCustomGeometrySources(InternalAccess access) {
+    Objects.requireNonNull(access, "access");
+    releaseDetachedCustomGeometrySources();
   }
 
   void releaseDetachedCustomGeometrySources() {

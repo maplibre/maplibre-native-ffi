@@ -6,11 +6,8 @@ import java.util.Objects;
 import java.util.Set;
 import org.maplibre.nativejni.geo.LatLng;
 import org.maplibre.nativejni.geo.ProjectedMeters;
-import org.maplibre.nativejni.internal.bridge.BaseNative;
-import org.maplibre.nativejni.internal.bridge.LogNative;
-import org.maplibre.nativejni.internal.bridge.ProjectionNative;
-import org.maplibre.nativejni.internal.bridge.RuntimeNative;
 import org.maplibre.nativejni.internal.callback.LogCallbackState;
+import org.maplibre.nativejni.internal.javacpp.MaplibreNativeC;
 import org.maplibre.nativejni.internal.loader.NativeLibrary;
 import org.maplibre.nativejni.internal.status.Status;
 import org.maplibre.nativejni.log.LogCallback;
@@ -35,20 +32,20 @@ public final class Maplibre {
   /** Returns the native C ABI contract version. */
   public static long cVersion() {
     NativeLibrary.ensureLoaded();
-    return BaseNative.mln_c_version();
+    return MaplibreNativeC.mln_c_version();
   }
 
   /** Returns the render backends compiled into the loaded native library. */
   public static EnumSet<RenderBackend> supportedRenderBackends() {
     NativeLibrary.ensureLoaded();
-    return RenderBackend.fromMask(BaseNative.mln_supported_render_backend_mask());
+    return RenderBackend.fromMask(MaplibreNativeC.mln_supported_render_backend_mask());
   }
 
   /** Reads Maplibre Native's process-global network status. */
   public static NetworkStatus networkStatus() {
     NativeLibrary.ensureLoaded();
     var out = new int[1];
-    Status.check(RuntimeNative.mln_network_status_get(out));
+    Status.check(MaplibreNativeC.mln_network_status_get(out));
     return NetworkStatus.fromNative(out[0]);
   }
 
@@ -56,7 +53,7 @@ public final class Maplibre {
   public static void setNetworkStatus(NetworkStatus status) {
     NativeLibrary.ensureLoaded();
     Status.check(
-        RuntimeNative.mln_network_status_set(
+        MaplibreNativeC.mln_network_status_set(
             Objects.requireNonNull(status, "status").nativeValue()));
   }
 
@@ -82,14 +79,14 @@ public final class Maplibre {
     for (var severity : severities) {
       mask |= Objects.requireNonNull(severity, "severity").nativeMask();
     }
-    Status.check(LogNative.mln_log_set_async_severity_mask(mask));
+    Status.check(MaplibreNativeC.mln_log_set_async_severity_mask(mask));
   }
 
   /** Restores the native default async log severity mask. */
   public static void restoreDefaultAsyncLogSeverities() {
     NativeLibrary.ensureLoaded();
     Status.check(
-        LogNative.mln_log_set_async_severity_mask(
+        MaplibreNativeC.mln_log_set_async_severity_mask(
             LogSeverity.INFO.nativeMask() | LogSeverity.WARNING.nativeMask()));
   }
 
@@ -97,21 +94,25 @@ public final class Maplibre {
   public static ProjectedMeters projectedMetersForLatLng(LatLng coordinate) {
     NativeLibrary.ensureLoaded();
     Objects.requireNonNull(coordinate, "coordinate");
-    var outMeters = new double[2];
-    Status.check(
-        ProjectionNative.mln_projected_meters_for_lat_lng(
-            coordinate.latitude(), coordinate.longitude(), outMeters));
-    return new ProjectedMeters(outMeters[0], outMeters[1]);
+    var nativeCoordinate =
+        new MaplibreNativeC.mln_lat_lng()
+            .latitude(coordinate.latitude())
+            .longitude(coordinate.longitude());
+    var outMeters = new MaplibreNativeC.mln_projected_meters();
+    Status.check(MaplibreNativeC.mln_projected_meters_for_lat_lng(nativeCoordinate, outMeters));
+    return new ProjectedMeters(outMeters.northing(), outMeters.easting());
   }
 
   /** Converts spherical Mercator projected meters to a geographic coordinate. */
   public static LatLng latLngForProjectedMeters(ProjectedMeters meters) {
     NativeLibrary.ensureLoaded();
     Objects.requireNonNull(meters, "meters");
-    var outCoordinate = new double[2];
-    Status.check(
-        ProjectionNative.mln_lat_lng_for_projected_meters(
-            meters.northing(), meters.easting(), outCoordinate));
-    return new LatLng(outCoordinate[0], outCoordinate[1]);
+    var nativeMeters =
+        new MaplibreNativeC.mln_projected_meters()
+            .northing(meters.northing())
+            .easting(meters.easting());
+    var outCoordinate = new MaplibreNativeC.mln_lat_lng();
+    Status.check(MaplibreNativeC.mln_lat_lng_for_projected_meters(nativeMeters, outCoordinate));
+    return new LatLng(outCoordinate.latitude(), outCoordinate.longitude());
   }
 }

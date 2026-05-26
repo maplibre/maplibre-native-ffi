@@ -1,4 +1,4 @@
-package org.maplibre.nativejni.internal.bridge;
+package org.maplibre.nativejni.internal.struct;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -17,90 +17,48 @@ import org.maplibre.nativejni.internal.javacpp.JavaCppValues;
 import org.maplibre.nativejni.internal.javacpp.MaplibreNativeC;
 import org.maplibre.nativejni.json.JsonValue;
 import org.maplibre.nativejni.query.FeatureExtensionResult;
+import org.maplibre.nativejni.query.FeatureStateSelector;
 import org.maplibre.nativejni.query.QueriedFeature;
 import org.maplibre.nativejni.query.RenderedFeatureQueryOptions;
 import org.maplibre.nativejni.query.RenderedQueryGeometry;
 import org.maplibre.nativejni.query.SourceFeatureQueryOptions;
 
-/** JavaCPP-backed declarations for the QueryNative C API coverage group. */
-public final class QueryNative {
-  private QueryNative() {}
+/** JavaCPP-backed materializers and readers for query-related JNI calls. */
+public final class QueryStructs {
+  private QueryStructs() {}
 
-  public static int mln_render_session_query_rendered_features(
-      long session,
-      RenderedQueryGeometry geometry,
-      RenderedFeatureQueryOptions options,
-      Object[] outFeatures) {
-    try (var nativeGeometry = new RenderedGeometryScope(geometry);
-        var nativeOptions = new RenderedOptionsScope(options)) {
-      var outResult = new PointerPointer<MaplibreNativeC.mln_feature_query_result>(1);
-      var status =
-          MaplibreNativeC.mln_render_session_query_rendered_features(
-              JavaCppSupport.renderSession(session),
-              nativeGeometry.geometry(),
-              nativeOptions.options(),
-              outResult);
-      return status == MaplibreNativeC.MLN_STATUS_OK
-          ? copyFeatureQueryResult(outResult, outFeatures)
-          : status;
+  public static SelectorScope featureStateSelector(FeatureStateSelector value) {
+    return new SelectorScope(value);
+  }
+
+  public static JsonValue jsonSnapshot(long snapshotAddress) {
+    if (snapshotAddress == 0) {
+      return null;
+    }
+    var snapshot = new MaplibreNativeC.mln_json_snapshot(JavaCppSupport.pointer(snapshotAddress));
+    try {
+      var outValue = new PointerPointer<MaplibreNativeC.mln_json_value>(1);
+      var status = MaplibreNativeC.mln_json_snapshot_get(snapshot, outValue);
+      org.maplibre.nativejni.internal.status.Status.check(status);
+      var valueAddress = JavaCppSupport.outAddress(outValue, MaplibreNativeC.mln_json_value.class);
+      return valueAddress == 0
+          ? null
+          : JavaCppValues.jsonValue(
+              new MaplibreNativeC.mln_json_value(JavaCppSupport.pointer(valueAddress)));
+    } finally {
+      MaplibreNativeC.mln_json_snapshot_destroy(snapshot);
     }
   }
 
-  public static int mln_render_session_query_source_features(
-      long session, String sourceId, SourceFeatureQueryOptions options, Object[] outFeatures) {
-    try (var source = JavaCppValues.stringView(sourceId);
-        var nativeOptions = new SourceOptionsScope(options)) {
-      var outResult = new PointerPointer<MaplibreNativeC.mln_feature_query_result>(1);
-      var status =
-          MaplibreNativeC.mln_render_session_query_source_features(
-              JavaCppSupport.renderSession(session),
-              source.view(),
-              nativeOptions.options(),
-              outResult);
-      return status == MaplibreNativeC.MLN_STATUS_OK
-          ? copyFeatureQueryResult(outResult, outFeatures)
-          : status;
-    }
-  }
-
-  public static int mln_render_session_query_feature_extensions(
-      long session,
-      String sourceId,
-      Feature feature,
-      String extension,
-      String extensionField,
-      JsonValue arguments,
-      Object[] outResult) {
-    try (var source = JavaCppValues.stringView(sourceId);
-        var nativeFeature = new FeatureScope(feature);
-        var nativeExtension = JavaCppValues.stringView(extension);
-        var nativeExtensionField = JavaCppValues.stringView(extensionField);
-        var nativeArguments = arguments == null ? null : JavaCppValues.json(arguments)) {
-      var nativeOut = new PointerPointer<MaplibreNativeC.mln_feature_extension_result>(1);
-      var status =
-          MaplibreNativeC.mln_render_session_query_feature_extensions(
-              JavaCppSupport.renderSession(session),
-              source.view(),
-              nativeFeature.feature(),
-              nativeExtension.view(),
-              nativeExtensionField.view(),
-              nativeArguments == null ? null : nativeArguments.value(),
-              nativeOut);
-      return status == MaplibreNativeC.MLN_STATUS_OK
-          ? copyFeatureExtensionResult(nativeOut, outResult)
-          : status;
-    }
-  }
-
-  private static int copyFeatureQueryResult(
-      PointerPointer<MaplibreNativeC.mln_feature_query_result> outResult, Object[] outFeatures) {
+  public static List<QueriedFeature> featureQueryResult(
+      PointerPointer<MaplibreNativeC.mln_feature_query_result> outResult) {
     var resultAddress =
         JavaCppSupport.outAddress(outResult, MaplibreNativeC.mln_feature_query_result.class);
     var result =
         new MaplibreNativeC.mln_feature_query_result(JavaCppSupport.pointer(resultAddress));
     try (var count = new SizeTPointer(1)) {
       var status = MaplibreNativeC.mln_feature_query_result_count(result, count);
-      if (status != MaplibreNativeC.MLN_STATUS_OK) return status;
+      org.maplibre.nativejni.internal.status.Status.check(status);
       var features = new QueriedFeature[Math.toIntExact(count.get())];
       for (var i = 0; i < features.length; i++) {
         var feature = new MaplibreNativeC.mln_queried_feature();
@@ -108,21 +66,19 @@ public final class QueryNative {
         status = MaplibreNativeC.mln_feature_query_result_get(result, i, feature);
         if (status != MaplibreNativeC.MLN_STATUS_OK) {
           feature.close();
-          return status;
+          org.maplibre.nativejni.internal.status.Status.check(status);
         }
         features[i] = queriedFeature(feature);
         feature.close();
       }
-      outFeatures[0] = features;
-      return MaplibreNativeC.MLN_STATUS_OK;
+      return List.of(features);
     } finally {
       MaplibreNativeC.mln_feature_query_result_destroy(result);
     }
   }
 
-  private static int copyFeatureExtensionResult(
-      PointerPointer<MaplibreNativeC.mln_feature_extension_result> outResult,
-      Object[] outJavaResult) {
+  public static FeatureExtensionResult featureExtensionResult(
+      PointerPointer<MaplibreNativeC.mln_feature_extension_result> outResult) {
     var resultAddress =
         JavaCppSupport.outAddress(outResult, MaplibreNativeC.mln_feature_extension_result.class);
     var result =
@@ -131,11 +87,10 @@ public final class QueryNative {
       var info = new MaplibreNativeC.mln_feature_extension_result_info();
       info.size(info.sizeof());
       var status = MaplibreNativeC.mln_feature_extension_result_get(result, info);
-      if (status == MaplibreNativeC.MLN_STATUS_OK) {
-        outJavaResult[0] = extensionResult(info);
-      }
+      org.maplibre.nativejni.internal.status.Status.check(status);
+      var javaResult = extensionResult(info);
       info.close();
-      return status;
+      return javaResult;
     } finally {
       MaplibreNativeC.mln_feature_extension_result_destroy(result);
     }
@@ -276,11 +231,11 @@ public final class QueryNative {
     return out;
   }
 
-  private static final class RenderedGeometryScope implements AutoCloseable {
+  public static final class RenderedGeometryScope implements AutoCloseable {
     private final ArrayList<Pointer> owned = new ArrayList<>();
     private final MaplibreNativeC.mln_rendered_query_geometry geometry;
 
-    RenderedGeometryScope(RenderedQueryGeometry value) {
+    public RenderedGeometryScope(RenderedQueryGeometry value) {
       if (value instanceof RenderedQueryGeometry.Point node) {
         geometry = MaplibreNativeC.mln_rendered_query_geometry_point(own(point(node.point())));
       } else if (value instanceof RenderedQueryGeometry.Box node) {
@@ -294,7 +249,7 @@ public final class QueryNative {
       }
     }
 
-    MaplibreNativeC.mln_rendered_query_geometry geometry() {
+    public MaplibreNativeC.mln_rendered_query_geometry geometry() {
       return geometry;
     }
 
@@ -326,12 +281,12 @@ public final class QueryNative {
     }
   }
 
-  private static final class RenderedOptionsScope implements AutoCloseable {
+  public static final class RenderedOptionsScope implements AutoCloseable {
     private final JavaCppValues.StringViewsScope layerIds;
     private final JavaCppValues.JsonScope filter;
     private final MaplibreNativeC.mln_rendered_feature_query_options options;
 
-    RenderedOptionsScope(RenderedFeatureQueryOptions value) {
+    public RenderedOptionsScope(RenderedFeatureQueryOptions value) {
       options = MaplibreNativeC.mln_rendered_feature_query_options_default();
       int fields = 0;
       layerIds =
@@ -348,7 +303,7 @@ public final class QueryNative {
       options.fields(fields);
     }
 
-    MaplibreNativeC.mln_rendered_feature_query_options options() {
+    public MaplibreNativeC.mln_rendered_feature_query_options options() {
       return options;
     }
 
@@ -360,12 +315,58 @@ public final class QueryNative {
     }
   }
 
-  private static final class SourceOptionsScope implements AutoCloseable {
+  public static final class SelectorScope implements AutoCloseable {
+    private final JavaCppValues.StringViewScope sourceId;
+    private final JavaCppValues.StringViewScope sourceLayerId;
+    private final JavaCppValues.StringViewScope featureId;
+    private final JavaCppValues.StringViewScope stateKey;
+    private final MaplibreNativeC.mln_feature_state_selector selector;
+
+    private SelectorScope(FeatureStateSelector value) {
+      this.sourceId = JavaCppValues.stringView(value.sourceId());
+      this.sourceLayerId =
+          value.hasSourceLayerId() ? JavaCppValues.stringView(value.sourceLayerId()) : null;
+      this.featureId = value.hasFeatureId() ? JavaCppValues.stringView(value.featureId()) : null;
+      this.stateKey = value.hasStateKey() ? JavaCppValues.stringView(value.stateKey()) : null;
+      this.selector = new MaplibreNativeC.mln_feature_state_selector();
+      selector.size(selector.sizeof());
+      selector.source_id(sourceId.view());
+      int fields = 0;
+      if (sourceLayerId != null) {
+        fields |= MaplibreNativeC.MLN_FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID;
+        selector.source_layer_id(sourceLayerId.view());
+      }
+      if (featureId != null) {
+        fields |= MaplibreNativeC.MLN_FEATURE_STATE_SELECTOR_FEATURE_ID;
+        selector.feature_id(featureId.view());
+      }
+      if (stateKey != null) {
+        fields |= MaplibreNativeC.MLN_FEATURE_STATE_SELECTOR_STATE_KEY;
+        selector.state_key(stateKey.view());
+      }
+      selector.fields(fields);
+    }
+
+    public MaplibreNativeC.mln_feature_state_selector selector() {
+      return selector;
+    }
+
+    @Override
+    public void close() {
+      selector.close();
+      if (stateKey != null) stateKey.close();
+      if (featureId != null) featureId.close();
+      if (sourceLayerId != null) sourceLayerId.close();
+      sourceId.close();
+    }
+  }
+
+  public static final class SourceOptionsScope implements AutoCloseable {
     private final JavaCppValues.StringViewsScope sourceLayerIds;
     private final JavaCppValues.JsonScope filter;
     private final MaplibreNativeC.mln_source_feature_query_options options;
 
-    SourceOptionsScope(SourceFeatureQueryOptions value) {
+    public SourceOptionsScope(SourceFeatureQueryOptions value) {
       options = MaplibreNativeC.mln_source_feature_query_options_default();
       int fields = 0;
       sourceLayerIds =
@@ -382,7 +383,7 @@ public final class QueryNative {
       options.fields(fields);
     }
 
-    MaplibreNativeC.mln_source_feature_query_options options() {
+    public MaplibreNativeC.mln_source_feature_query_options options() {
       return options;
     }
 
@@ -394,17 +395,17 @@ public final class QueryNative {
     }
   }
 
-  private static final class FeatureScope implements AutoCloseable {
+  public static final class FeatureScope implements AutoCloseable {
     private final ArrayList<Pointer> owned = new ArrayList<>();
     private final ArrayList<JavaCppValues.StringViewScope> strings = new ArrayList<>();
     private final ArrayList<JavaCppValues.JsonScope> values = new ArrayList<>();
     private final MaplibreNativeC.mln_feature feature;
 
-    FeatureScope(Feature value) {
+    public FeatureScope(Feature value) {
       feature = feature(value);
     }
 
-    MaplibreNativeC.mln_feature feature() {
+    public MaplibreNativeC.mln_feature feature() {
       return feature;
     }
 

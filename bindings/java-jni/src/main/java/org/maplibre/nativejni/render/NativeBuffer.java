@@ -45,16 +45,11 @@ public final class NativeBuffer implements AutoCloseable {
     return bytes;
   }
 
-  synchronized void putByteArray(byte[] bytes, long requiredBytes) {
-    ensureCapacity(requiredBytes);
-    if (requiredBytes > bytes.length) {
-      throw new IllegalArgumentException("source byte array is smaller than required byte length");
-    }
-    if (requiredBytes > 0) {
-      var duplicate = buffer.duplicate();
-      duplicate.position(0);
-      duplicate.put(bytes, 0, Math.toIntExact(requiredBytes));
-    }
+  synchronized ByteBuffer borrowBuffer() {
+    ensureOpen();
+    var duplicate = buffer.duplicate();
+    duplicate.position(0);
+    return duplicate;
   }
 
   synchronized void ensureCapacity(long requiredBytes) {

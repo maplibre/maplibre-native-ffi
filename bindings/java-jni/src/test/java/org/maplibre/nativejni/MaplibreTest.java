@@ -12,8 +12,7 @@ import org.junit.jupiter.api.Test;
 import org.maplibre.nativejni.error.InvalidArgumentException;
 import org.maplibre.nativejni.error.MaplibreStatus;
 import org.maplibre.nativejni.geo.LatLng;
-import org.maplibre.nativejni.internal.bridge.BaseNative;
-import org.maplibre.nativejni.internal.bridge.RuntimeNative;
+import org.maplibre.nativejni.internal.javacpp.MaplibreNativeC;
 import org.maplibre.nativejni.internal.status.Status;
 import org.maplibre.nativejni.log.LogSeverity;
 import org.maplibre.nativejni.runtime.NetworkStatus;
@@ -47,7 +46,7 @@ class MaplibreTest {
     assertEquals(
         Maplibre.supportedRenderBackends(),
         org.maplibre.nativejni.render.RenderBackend.fromMask(
-            BaseNative.mln_supported_render_backend_mask()));
+            MaplibreNativeC.mln_supported_render_backend_mask()));
   }
 
   @Test
@@ -87,7 +86,7 @@ class MaplibreTest {
     var exception =
         assertThrows(
             InvalidArgumentException.class,
-            () -> Status.check(RuntimeNative.mln_network_status_set(999_999)));
+            () -> Status.check(MaplibreNativeC.mln_network_status_set(999_999)));
 
     assertEquals(MaplibreStatus.INVALID_ARGUMENT, exception.status());
     assertEquals(MaplibreStatus.INVALID_ARGUMENT.nativeCode(), exception.nativeStatusCode());

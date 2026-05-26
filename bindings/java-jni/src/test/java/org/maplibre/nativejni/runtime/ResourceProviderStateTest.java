@@ -14,8 +14,8 @@ final class ResourceProviderStateTest {
   }
 
   @Test
-  void rejectsZeroNativeStateAddress() {
-    assertThrows(IllegalArgumentException.class, () -> new ResourceProviderState(0));
+  void rejectsNullCallback() {
+    assertThrows(NullPointerException.class, () -> new ResourceProviderState(null));
   }
 
   @Test

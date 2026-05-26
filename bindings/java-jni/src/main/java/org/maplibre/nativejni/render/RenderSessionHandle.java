@@ -3,16 +3,17 @@ package org.maplibre.nativejni.render;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
+import org.bytedeco.javacpp.PointerPointer;
 import org.maplibre.nativejni.error.MaplibreStatus;
 import org.maplibre.nativejni.geo.Feature;
 import org.maplibre.nativejni.internal.access.InternalAccess;
-import org.maplibre.nativejni.internal.bridge.QueryNative;
-import org.maplibre.nativejni.internal.bridge.RenderSessionNative;
-import org.maplibre.nativejni.internal.bridge.SurfaceNative;
-import org.maplibre.nativejni.internal.bridge.TextureNative;
+import org.maplibre.nativejni.internal.javacpp.JavaCppSupport;
+import org.maplibre.nativejni.internal.javacpp.JavaCppValues;
+import org.maplibre.nativejni.internal.javacpp.MaplibreNativeC;
 import org.maplibre.nativejni.internal.lifecycle.HandleState;
 import org.maplibre.nativejni.internal.loader.NativeLibrary;
 import org.maplibre.nativejni.internal.status.Status;
+import org.maplibre.nativejni.internal.struct.QueryStructs;
 import org.maplibre.nativejni.internal.struct.RenderStructs;
 import org.maplibre.nativejni.json.JsonValue;
 import org.maplibre.nativejni.map.MapHandle;
@@ -37,183 +38,160 @@ public final class RenderSessionHandle implements AutoCloseable {
       MapHandle map, MetalOwnedTextureDescriptor descriptor) {
     NativeLibrary.ensureLoaded();
     Objects.requireNonNull(map, "map");
-    var value = RenderStructs.metalOwnedTextureDescriptor(descriptor);
-    var outSession = new long[1];
+    var outSession = new PointerPointer<MaplibreNativeC.mln_render_session>(1);
     Status.check(
-        TextureNative.mln_metal_owned_texture_attach(
-            InternalAccess.INSTANCE.nativeAddress(map),
-            value.extent().width(),
-            value.extent().height(),
-            value.extent().scaleFactor(),
-            value.context().device(),
+        MaplibreNativeC.mln_metal_owned_texture_attach(
+            JavaCppSupport.map(map.nativeAddress(InternalAccess.INSTANCE)),
+            RenderStructs.nativeMetalOwnedTextureDescriptor(descriptor),
             outSession));
-    return new RenderSessionHandle(map, outSession[0]);
+    return new RenderSessionHandle(map, sessionAddress(outSession));
   }
 
   public static RenderSessionHandle attachMetalBorrowedTexture(
       MapHandle map, MetalBorrowedTextureDescriptor descriptor) {
     NativeLibrary.ensureLoaded();
     Objects.requireNonNull(map, "map");
-    var value = RenderStructs.metalBorrowedTextureDescriptor(descriptor);
-    var outSession = new long[1];
+    var outSession = new PointerPointer<MaplibreNativeC.mln_render_session>(1);
     Status.check(
-        TextureNative.mln_metal_borrowed_texture_attach(
-            InternalAccess.INSTANCE.nativeAddress(map),
-            value.extent().width(),
-            value.extent().height(),
-            value.extent().scaleFactor(),
-            value.texture(),
+        MaplibreNativeC.mln_metal_borrowed_texture_attach(
+            JavaCppSupport.map(map.nativeAddress(InternalAccess.INSTANCE)),
+            RenderStructs.nativeMetalBorrowedTextureDescriptor(descriptor),
             outSession));
-    return new RenderSessionHandle(map, outSession[0]);
+    return new RenderSessionHandle(map, sessionAddress(outSession));
   }
 
   public static RenderSessionHandle attachVulkanOwnedTexture(
       MapHandle map, VulkanOwnedTextureDescriptor descriptor) {
     NativeLibrary.ensureLoaded();
     Objects.requireNonNull(map, "map");
-    var value = RenderStructs.vulkanOwnedTextureDescriptor(descriptor);
-    var context = value.context();
-    var outSession = new long[1];
+    var outSession = new PointerPointer<MaplibreNativeC.mln_render_session>(1);
     Status.check(
-        TextureNative.mln_vulkan_owned_texture_attach(
-            InternalAccess.INSTANCE.nativeAddress(map),
-            value.extent().width(),
-            value.extent().height(),
-            value.extent().scaleFactor(),
-            context.instance(),
-            context.physicalDevice(),
-            context.device(),
-            context.graphicsQueue(),
-            context.graphicsQueueFamilyIndex(),
+        MaplibreNativeC.mln_vulkan_owned_texture_attach(
+            JavaCppSupport.map(map.nativeAddress(InternalAccess.INSTANCE)),
+            RenderStructs.nativeVulkanOwnedTextureDescriptor(descriptor),
             outSession));
-    return new RenderSessionHandle(map, outSession[0]);
+    return new RenderSessionHandle(map, sessionAddress(outSession));
   }
 
   public static RenderSessionHandle attachVulkanBorrowedTexture(
       MapHandle map, VulkanBorrowedTextureDescriptor descriptor) {
     NativeLibrary.ensureLoaded();
     Objects.requireNonNull(map, "map");
-    var value = RenderStructs.vulkanBorrowedTextureDescriptor(descriptor);
-    var context = value.context();
-    var outSession = new long[1];
+    var outSession = new PointerPointer<MaplibreNativeC.mln_render_session>(1);
     Status.check(
-        TextureNative.mln_vulkan_borrowed_texture_attach(
-            InternalAccess.INSTANCE.nativeAddress(map),
-            value.extent().width(),
-            value.extent().height(),
-            value.extent().scaleFactor(),
-            context.instance(),
-            context.physicalDevice(),
-            context.device(),
-            context.graphicsQueue(),
-            context.graphicsQueueFamilyIndex(),
-            value.image(),
-            value.imageView(),
-            value.format(),
-            value.initialLayout(),
-            value.finalLayout(),
+        MaplibreNativeC.mln_vulkan_borrowed_texture_attach(
+            JavaCppSupport.map(map.nativeAddress(InternalAccess.INSTANCE)),
+            RenderStructs.nativeVulkanBorrowedTextureDescriptor(descriptor),
             outSession));
-    return new RenderSessionHandle(map, outSession[0]);
+    return new RenderSessionHandle(map, sessionAddress(outSession));
   }
 
   public static RenderSessionHandle attachMetalSurface(
       MapHandle map, MetalSurfaceDescriptor descriptor) {
     NativeLibrary.ensureLoaded();
     Objects.requireNonNull(map, "map");
-    var value = RenderStructs.metalSurfaceDescriptor(descriptor);
-    var outSession = new long[1];
+    var outSession = new PointerPointer<MaplibreNativeC.mln_render_session>(1);
     Status.check(
-        SurfaceNative.mln_metal_surface_attach(
-            InternalAccess.INSTANCE.nativeAddress(map),
-            value.extent().width(),
-            value.extent().height(),
-            value.extent().scaleFactor(),
-            value.context().device(),
-            value.layer(),
+        MaplibreNativeC.mln_metal_surface_attach(
+            JavaCppSupport.map(map.nativeAddress(InternalAccess.INSTANCE)),
+            RenderStructs.nativeMetalSurfaceDescriptor(descriptor),
             outSession));
-    return new RenderSessionHandle(map, outSession[0]);
+    return new RenderSessionHandle(map, sessionAddress(outSession));
   }
 
   public static RenderSessionHandle attachVulkanSurface(
       MapHandle map, VulkanSurfaceDescriptor descriptor) {
     NativeLibrary.ensureLoaded();
     Objects.requireNonNull(map, "map");
-    var value = RenderStructs.vulkanSurfaceDescriptor(descriptor);
-    var context = value.context();
-    var outSession = new long[1];
+    var outSession = new PointerPointer<MaplibreNativeC.mln_render_session>(1);
     Status.check(
-        SurfaceNative.mln_vulkan_surface_attach(
-            InternalAccess.INSTANCE.nativeAddress(map),
-            value.extent().width(),
-            value.extent().height(),
-            value.extent().scaleFactor(),
-            context.instance(),
-            context.physicalDevice(),
-            context.device(),
-            context.graphicsQueue(),
-            context.graphicsQueueFamilyIndex(),
-            value.surface(),
+        MaplibreNativeC.mln_vulkan_surface_attach(
+            JavaCppSupport.map(map.nativeAddress(InternalAccess.INSTANCE)),
+            RenderStructs.nativeVulkanSurfaceDescriptor(descriptor),
             outSession));
-    return new RenderSessionHandle(map, outSession[0]);
+    return new RenderSessionHandle(map, sessionAddress(outSession));
   }
 
   public void resize(int width, int height, double scaleFactor) {
     NativeLibrary.ensureLoaded();
     Status.check(
-        RenderSessionNative.mln_render_session_resize(
-            state.requireLiveAddress(), width, height, scaleFactor));
+        MaplibreNativeC.mln_render_session_resize(
+            JavaCppSupport.renderSession(state.requireLiveAddress()), width, height, scaleFactor));
   }
 
   public void renderUpdate() {
     NativeLibrary.ensureLoaded();
-    Status.check(RenderSessionNative.mln_render_session_render_update(state.requireLiveAddress()));
+    Status.check(
+        MaplibreNativeC.mln_render_session_render_update(
+            JavaCppSupport.renderSession(state.requireLiveAddress())));
   }
 
   public void detach() {
     NativeLibrary.ensureLoaded();
-    Status.check(RenderSessionNative.mln_render_session_detach(state.requireLiveAddress()));
+    Status.check(
+        MaplibreNativeC.mln_render_session_detach(
+            JavaCppSupport.renderSession(state.requireLiveAddress())));
   }
 
   public void reduceMemoryUse() {
     NativeLibrary.ensureLoaded();
     Status.check(
-        RenderSessionNative.mln_render_session_reduce_memory_use(state.requireLiveAddress()));
+        MaplibreNativeC.mln_render_session_reduce_memory_use(
+            JavaCppSupport.renderSession(state.requireLiveAddress())));
   }
 
   public void clearData() {
     NativeLibrary.ensureLoaded();
-    Status.check(RenderSessionNative.mln_render_session_clear_data(state.requireLiveAddress()));
+    Status.check(
+        MaplibreNativeC.mln_render_session_clear_data(
+            JavaCppSupport.renderSession(state.requireLiveAddress())));
   }
 
   public void dumpDebugLogs() {
     NativeLibrary.ensureLoaded();
     Status.check(
-        RenderSessionNative.mln_render_session_dump_debug_logs(state.requireLiveAddress()));
+        MaplibreNativeC.mln_render_session_dump_debug_logs(
+            JavaCppSupport.renderSession(state.requireLiveAddress())));
   }
 
   public void setFeatureState(FeatureStateSelector selector, JsonValue value) {
     NativeLibrary.ensureLoaded();
-    Status.check(
-        RenderSessionNative.mln_render_session_set_feature_state(
-            state.requireLiveAddress(),
-            Objects.requireNonNull(selector, "selector"),
-            Objects.requireNonNull(value, "value")));
+    try (var nativeSelector =
+            QueryStructs.featureStateSelector(Objects.requireNonNull(selector, "selector"));
+        var nativeValue = JavaCppValues.json(Objects.requireNonNull(value, "value"))) {
+      Status.check(
+          MaplibreNativeC.mln_render_session_set_feature_state(
+              JavaCppSupport.renderSession(state.requireLiveAddress()),
+              nativeSelector.selector(),
+              nativeValue.value()));
+    }
   }
 
   public JsonValue getFeatureState(FeatureStateSelector selector) {
     NativeLibrary.ensureLoaded();
-    var outState = new Object[1];
-    Status.check(
-        RenderSessionNative.mln_render_session_get_feature_state(
-            state.requireLiveAddress(), Objects.requireNonNull(selector, "selector"), outState));
-    return outState[0] == null ? JsonValue.object(List.of()) : (JsonValue) outState[0];
+    try (var nativeSelector =
+        QueryStructs.featureStateSelector(Objects.requireNonNull(selector, "selector"))) {
+      var outState = new PointerPointer<MaplibreNativeC.mln_json_snapshot>(1);
+      Status.check(
+          MaplibreNativeC.mln_render_session_get_feature_state(
+              JavaCppSupport.renderSession(state.requireLiveAddress()),
+              nativeSelector.selector(),
+              outState));
+      var state =
+          QueryStructs.jsonSnapshot(
+              JavaCppSupport.outAddress(outState, MaplibreNativeC.mln_json_snapshot.class));
+      return state == null ? JsonValue.object(List.of()) : state;
+    }
   }
 
   public void removeFeatureState(FeatureStateSelector selector) {
     NativeLibrary.ensureLoaded();
-    Status.check(
-        RenderSessionNative.mln_render_session_remove_feature_state(
-            state.requireLiveAddress(), Objects.requireNonNull(selector, "selector")));
+    try (var nativeSelector =
+        QueryStructs.featureStateSelector(Objects.requireNonNull(selector, "selector"))) {
+      Status.check(
+          MaplibreNativeC.mln_render_session_remove_feature_state(
+              JavaCppSupport.renderSession(state.requireLiveAddress()), nativeSelector.selector()));
+    }
   }
 
   public List<QueriedFeature> queryRenderedFeatures(RenderedQueryGeometry geometry) {
@@ -246,27 +224,38 @@ public final class RenderSessionHandle implements AutoCloseable {
       String extensionField,
       JsonValue arguments) {
     NativeLibrary.ensureLoaded();
-    var outResult = new Object[1];
-    Status.check(
-        QueryNative.mln_render_session_query_feature_extensions(
-            state.requireLiveAddress(),
-            Objects.requireNonNull(sourceId, "sourceId"),
-            Objects.requireNonNull(feature, "feature"),
-            Objects.requireNonNull(extension, "extension"),
-            Objects.requireNonNull(extensionField, "extensionField"),
-            arguments,
-            outResult));
-    return (FeatureExtensionResult) outResult[0];
+    try (var source = JavaCppValues.stringView(Objects.requireNonNull(sourceId, "sourceId"));
+        var nativeFeature =
+            new QueryStructs.FeatureScope(Objects.requireNonNull(feature, "feature"));
+        var nativeExtension =
+            JavaCppValues.stringView(Objects.requireNonNull(extension, "extension"));
+        var nativeExtensionField =
+            JavaCppValues.stringView(Objects.requireNonNull(extensionField, "extensionField"));
+        var nativeArguments = arguments == null ? null : JavaCppValues.json(arguments)) {
+      var outResult = new PointerPointer<MaplibreNativeC.mln_feature_extension_result>(1);
+      Status.check(
+          MaplibreNativeC.mln_render_session_query_feature_extensions(
+              JavaCppSupport.renderSession(state.requireLiveAddress()),
+              source.view(),
+              nativeFeature.feature(),
+              nativeExtension.view(),
+              nativeExtensionField.view(),
+              nativeArguments == null ? null : nativeArguments.value(),
+              outResult));
+      return QueryStructs.featureExtensionResult(outResult);
+    }
   }
 
   public TextureImageInfo textureImageInfo() {
     NativeLibrary.ensureLoaded();
-    var outInfo = new int[3];
-    var outByteLength = new long[1];
+    var outInfo = MaplibreNativeC.mln_texture_image_info_default();
     var status =
-        TextureNative.mln_texture_read_premultiplied_rgba8(
-            state.requireLiveAddress(), null, outInfo, outByteLength);
-    var info = textureImageInfo(outInfo, outByteLength);
+        MaplibreNativeC.mln_texture_read_premultiplied_rgba8(
+            JavaCppSupport.renderSession(state.requireLiveAddress()),
+            (org.bytedeco.javacpp.BytePointer) null,
+            0,
+            outInfo);
+    var info = RenderStructs.textureImageInfo(outInfo);
     if (status == MaplibreStatus.OK.nativeCode()
         || (status == MaplibreStatus.INVALID_ARGUMENT.nativeCode() && info.byteLength() > 0)) {
       return info;
@@ -286,16 +275,15 @@ public final class RenderSessionHandle implements AutoCloseable {
     NativeLibrary.ensureLoaded();
     Objects.requireNonNull(buffer, "buffer");
     synchronized (buffer) {
-      var capacity = Math.toIntExact(buffer.byteLength());
-      var bytes = new byte[capacity];
-      var outInfo = new int[3];
-      var outByteLength = new long[1];
+      var capacity = buffer.byteLength();
+      var outInfo = MaplibreNativeC.mln_texture_image_info_default();
       Status.check(
-          TextureNative.mln_texture_read_premultiplied_rgba8(
-              state.requireLiveAddress(), bytes, outInfo, outByteLength));
-      var info = textureImageInfo(outInfo, outByteLength);
-      buffer.putByteArray(bytes, info.byteLength());
-      return info;
+          MaplibreNativeC.mln_texture_read_premultiplied_rgba8(
+              JavaCppSupport.renderSession(state.requireLiveAddress()),
+              buffer.borrowBuffer(),
+              capacity,
+              outInfo));
+      return RenderStructs.textureImageInfo(outInfo);
     }
   }
 
@@ -322,29 +310,26 @@ public final class RenderSessionHandle implements AutoCloseable {
    */
   public MetalOwnedTextureFrameHandle acquireMetalOwnedTextureFrame() {
     NativeLibrary.ensureLoaded();
-    var longs = new long[5];
-    var ints = new int[2];
-    var doubles = new double[1];
+    var nativeFrame = new MaplibreNativeC.mln_metal_owned_texture_frame();
+    nativeFrame.size(nativeFrame.sizeof());
     Status.check(
-        TextureNative.mln_metal_owned_texture_acquire_frame(
-            state.requireLiveAddress(), longs, ints, doubles));
+        MaplibreNativeC.mln_metal_owned_texture_acquire_frame(
+            JavaCppSupport.renderSession(state.requireLiveAddress()), nativeFrame));
     var scope = new FrameScope();
     return new MetalOwnedTextureFrameHandle(
         this,
-        longs,
-        ints,
-        doubles,
+        nativeFrame,
         scope,
         new MetalOwnedTextureFrame(
             scope,
-            longs[0],
-            ints[0],
-            ints[1],
-            doubles[0],
-            longs[1],
-            NativePointer.scoped(longs[2], scope),
-            NativePointer.scoped(longs[3], scope),
-            longs[4]));
+            nativeFrame.generation(),
+            nativeFrame.width(),
+            nativeFrame.height(),
+            nativeFrame.scale_factor(),
+            nativeFrame.frame_id(),
+            NativePointer.scoped(address(nativeFrame.texture()), scope),
+            NativePointer.scoped(address(nativeFrame.device()), scope),
+            nativeFrame.pixel_format()));
   }
 
   /**
@@ -358,70 +343,77 @@ public final class RenderSessionHandle implements AutoCloseable {
    */
   public VulkanOwnedTextureFrameHandle acquireVulkanOwnedTextureFrame() {
     NativeLibrary.ensureLoaded();
-    var longs = new long[5];
-    var ints = new int[4];
-    var doubles = new double[1];
+    var nativeFrame = new MaplibreNativeC.mln_vulkan_owned_texture_frame();
+    nativeFrame.size(nativeFrame.sizeof());
     Status.check(
-        TextureNative.mln_vulkan_owned_texture_acquire_frame(
-            state.requireLiveAddress(), longs, ints, doubles));
+        MaplibreNativeC.mln_vulkan_owned_texture_acquire_frame(
+            JavaCppSupport.renderSession(state.requireLiveAddress()), nativeFrame));
     var scope = new FrameScope();
     return new VulkanOwnedTextureFrameHandle(
         this,
-        longs,
-        ints,
-        doubles,
+        nativeFrame,
         scope,
         new VulkanOwnedTextureFrame(
             scope,
-            longs[0],
-            ints[0],
-            ints[1],
-            doubles[0],
-            longs[1],
-            NativePointer.scoped(longs[2], scope),
-            NativePointer.scoped(longs[3], scope),
-            NativePointer.scoped(longs[4], scope),
-            ints[2],
-            ints[3]));
+            nativeFrame.generation(),
+            nativeFrame.width(),
+            nativeFrame.height(),
+            nativeFrame.scale_factor(),
+            nativeFrame.frame_id(),
+            NativePointer.scoped(address(nativeFrame.image()), scope),
+            NativePointer.scoped(address(nativeFrame.image_view()), scope),
+            NativePointer.scoped(address(nativeFrame.device()), scope),
+            nativeFrame.format(),
+            nativeFrame.layout()));
   }
 
-  private static TextureImageInfo textureImageInfo(int[] info, long[] byteLength) {
-    return new TextureImageInfo(info[0], info[1], info[2], byteLength[0]);
+  private static long sessionAddress(
+      PointerPointer<MaplibreNativeC.mln_render_session> outSession) {
+    return JavaCppSupport.outAddress(outSession, MaplibreNativeC.mln_render_session.class);
+  }
+
+  private static long address(org.bytedeco.javacpp.Pointer pointer) {
+    return pointer == null || pointer.isNull() ? 0 : pointer.address();
   }
 
   private List<QueriedFeature> queryRenderedFeaturesInternal(
       RenderedQueryGeometry geometry, RenderedFeatureQueryOptions options) {
     NativeLibrary.ensureLoaded();
-    var outFeatures = new Object[1];
-    Status.check(
-        QueryNative.mln_render_session_query_rendered_features(
-            state.requireLiveAddress(),
-            Objects.requireNonNull(geometry, "geometry"),
-            options,
-            outFeatures));
-    @SuppressWarnings("unchecked")
-    var features = (List<QueriedFeature>) outFeatures[0];
-    return features;
+    try (var nativeGeometry =
+            new QueryStructs.RenderedGeometryScope(Objects.requireNonNull(geometry, "geometry"));
+        var nativeOptions = new QueryStructs.RenderedOptionsScope(options)) {
+      var outResult = new PointerPointer<MaplibreNativeC.mln_feature_query_result>(1);
+      Status.check(
+          MaplibreNativeC.mln_render_session_query_rendered_features(
+              JavaCppSupport.renderSession(state.requireLiveAddress()),
+              nativeGeometry.geometry(),
+              nativeOptions.options(),
+              outResult));
+      return QueryStructs.featureQueryResult(outResult);
+    }
   }
 
   private List<QueriedFeature> querySourceFeaturesInternal(
       String sourceId, SourceFeatureQueryOptions options) {
     NativeLibrary.ensureLoaded();
-    var outFeatures = new Object[1];
-    Status.check(
-        QueryNative.mln_render_session_query_source_features(
-            state.requireLiveAddress(),
-            Objects.requireNonNull(sourceId, "sourceId"),
-            options,
-            outFeatures));
-    @SuppressWarnings("unchecked")
-    var features = (List<QueriedFeature>) outFeatures[0];
-    return features;
+    try (var source = JavaCppValues.stringView(Objects.requireNonNull(sourceId, "sourceId"));
+        var nativeOptions = new QueryStructs.SourceOptionsScope(options)) {
+      var outResult = new PointerPointer<MaplibreNativeC.mln_feature_query_result>(1);
+      Status.check(
+          MaplibreNativeC.mln_render_session_query_source_features(
+              JavaCppSupport.renderSession(state.requireLiveAddress()),
+              source.view(),
+              nativeOptions.options(),
+              outResult));
+      return QueryStructs.featureQueryResult(outResult);
+    }
   }
 
   public void close() {
     NativeLibrary.ensureLoaded();
-    state.closeOnce(RenderSessionNative::mln_render_session_destroy);
+    state.closeOnce(
+        address ->
+            MaplibreNativeC.mln_render_session_destroy(JavaCppSupport.renderSession(address)));
   }
 
   public boolean isClosed() {
@@ -436,11 +428,12 @@ public final class RenderSessionHandle implements AutoCloseable {
     return state.requireLiveAddress();
   }
 
-  void releaseMetalFrame(long[] longs, int[] ints, double[] doubles, Throwable callbackFailure) {
+  void releaseMetalFrame(
+      MaplibreNativeC.mln_metal_owned_texture_frame frame, Throwable callbackFailure) {
     try {
       Status.check(
-          TextureNative.mln_metal_owned_texture_release_frame(
-              state.requireLiveAddress(), longs, ints, doubles));
+          MaplibreNativeC.mln_metal_owned_texture_release_frame(
+              JavaCppSupport.renderSession(state.requireLiveAddress()), frame));
     } catch (Throwable releaseFailure) {
       if (callbackFailure != null) {
         callbackFailure.addSuppressed(releaseFailure);
@@ -450,11 +443,12 @@ public final class RenderSessionHandle implements AutoCloseable {
     }
   }
 
-  void releaseVulkanFrame(long[] longs, int[] ints, double[] doubles, Throwable callbackFailure) {
+  void releaseVulkanFrame(
+      MaplibreNativeC.mln_vulkan_owned_texture_frame frame, Throwable callbackFailure) {
     try {
       Status.check(
-          TextureNative.mln_vulkan_owned_texture_release_frame(
-              state.requireLiveAddress(), longs, ints, doubles));
+          MaplibreNativeC.mln_vulkan_owned_texture_release_frame(
+              JavaCppSupport.renderSession(state.requireLiveAddress()), frame));
     } catch (Throwable releaseFailure) {
       if (callbackFailure != null) {
         callbackFailure.addSuppressed(releaseFailure);

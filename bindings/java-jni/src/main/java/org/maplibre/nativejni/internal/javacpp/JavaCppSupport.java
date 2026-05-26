@@ -1,13 +1,28 @@
 package org.maplibre.nativejni.internal.javacpp;
 
 import java.nio.charset.StandardCharsets;
+import java.util.Optional;
 import org.bytedeco.javacpp.BytePointer;
 import org.bytedeco.javacpp.Pointer;
 import org.bytedeco.javacpp.PointerPointer;
 
 /** Small helpers for adapting the curated Java API to JavaCPP's generated C layer. */
 public final class JavaCppSupport {
+  private static final ThreadLocal<String> JAVA_DIAGNOSTIC = new ThreadLocal<>();
+
   private JavaCppSupport() {}
+
+  public static void setThreadDiagnostic(String diagnostic) {
+    JAVA_DIAGNOSTIC.set(diagnostic);
+  }
+
+  public static Optional<String> takeThreadDiagnostic() {
+    var diagnostic = JAVA_DIAGNOSTIC.get();
+    if (diagnostic != null) {
+      JAVA_DIAGNOSTIC.remove();
+    }
+    return Optional.ofNullable(diagnostic);
+  }
 
   public static String cString(BytePointer pointer) {
     return pointer == null || pointer.isNull() ? "" : pointer.getString(StandardCharsets.UTF_8);

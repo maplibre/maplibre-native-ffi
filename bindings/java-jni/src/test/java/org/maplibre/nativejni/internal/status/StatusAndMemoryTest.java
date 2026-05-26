@@ -8,7 +8,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.maplibre.nativejni.error.InvalidArgumentException;
 import org.maplibre.nativejni.error.MaplibreStatus;
-import org.maplibre.nativejni.internal.bridge.RuntimeNative;
+import org.maplibre.nativejni.internal.javacpp.MaplibreNativeC;
 import org.maplibre.nativejni.render.NativePointer;
 import org.maplibre.nativejni.test.NativeTestSupport;
 
@@ -23,7 +23,7 @@ final class StatusAndMemoryTest {
     var error =
         assertThrows(
             InvalidArgumentException.class,
-            () -> Status.check(RuntimeNative.mln_network_status_set(999_999)));
+            () -> Status.check(MaplibreNativeC.mln_network_status_set(999_999)));
     assertEquals(MaplibreStatus.INVALID_ARGUMENT, error.status());
     assertTrue(error.diagnostic().contains("network status"));
   }

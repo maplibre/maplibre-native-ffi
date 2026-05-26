@@ -2,16 +2,21 @@ package org.maplibre.nativejni.map;
 
 import java.util.List;
 import java.util.Objects;
+import org.bytedeco.javacpp.PointerPointer;
 import org.maplibre.nativejni.camera.CameraOptions;
 import org.maplibre.nativejni.camera.EdgeInsets;
 import org.maplibre.nativejni.geo.Geometry;
 import org.maplibre.nativejni.geo.LatLng;
 import org.maplibre.nativejni.geo.ScreenPoint;
 import org.maplibre.nativejni.internal.access.InternalAccess;
-import org.maplibre.nativejni.internal.bridge.ProjectionNative;
+import org.maplibre.nativejni.internal.javacpp.JavaCppSupport;
+import org.maplibre.nativejni.internal.javacpp.JavaCppValues;
+import org.maplibre.nativejni.internal.javacpp.MaplibreNativeC;
 import org.maplibre.nativejni.internal.lifecycle.HandleState;
 import org.maplibre.nativejni.internal.loader.NativeLibrary;
 import org.maplibre.nativejni.internal.status.Status;
+import org.maplibre.nativejni.internal.struct.CoreStructs;
+import org.maplibre.nativejni.internal.struct.MapStructs;
 
 /** Owned standalone projection snapshot created from a map. */
 public final class MapProjectionHandle implements AutoCloseable {
@@ -24,80 +29,93 @@ public final class MapProjectionHandle implements AutoCloseable {
   public static MapProjectionHandle create(MapHandle map) {
     Objects.requireNonNull(map, "map");
     NativeLibrary.ensureLoaded();
-    var outProjection = new long[1];
+    var outProjection = new PointerPointer<MaplibreNativeC.mln_map_projection>(1);
     Status.check(
-        ProjectionNative.mln_map_projection_create(
-            InternalAccess.INSTANCE.nativeAddress(map), outProjection));
-    return new MapProjectionHandle(outProjection[0]);
+        MaplibreNativeC.mln_map_projection_create(
+            JavaCppSupport.map(map.nativeAddress(InternalAccess.INSTANCE)), outProjection));
+    return new MapProjectionHandle(
+        JavaCppSupport.outAddress(outProjection, MaplibreNativeC.mln_map_projection.class));
   }
 
   public CameraOptions camera() {
     NativeLibrary.ensureLoaded();
-    var fields = new boolean[MapHandle.CAMERA_FIELD_COUNT];
-    var values = new double[MapHandle.CAMERA_VALUE_COUNT];
+    var outCamera = MaplibreNativeC.mln_camera_options_default();
     Status.check(
-        ProjectionNative.mln_map_projection_get_camera(state.requireLiveAddress(), fields, values));
-    return MapHandle.cameraFromNative(fields, values);
+        MaplibreNativeC.mln_map_projection_get_camera(
+            JavaCppSupport.projection(state.requireLiveAddress()), outCamera));
+    return MapStructs.cameraOptions(outCamera);
   }
 
   public void setCamera(CameraOptions camera) {
     NativeLibrary.ensureLoaded();
-    var nativeCamera = MapHandle.cameraToNative(camera);
-    Status.check(
-        ProjectionNative.mln_map_projection_set_camera(
-            state.requireLiveAddress(), nativeCamera.fields(), nativeCamera.values()));
+    Objects.requireNonNull(camera, "camera");
+    var nativeCamera = MapStructs.nativeCameraOptions(camera);
+    try {
+      Status.check(
+          MaplibreNativeC.mln_map_projection_set_camera(
+              JavaCppSupport.projection(state.requireLiveAddress()), nativeCamera));
+    } finally {
+      nativeCamera.close();
+    }
   }
 
   public void setVisibleCoordinates(List<LatLng> coordinates, EdgeInsets padding) {
     NativeLibrary.ensureLoaded();
     Objects.requireNonNull(coordinates, "coordinates");
     Objects.requireNonNull(padding, "padding");
-    var coordinateValues = new double[coordinates.size() * 2];
-    for (var index = 0; index < coordinates.size(); index++) {
-      var coordinate = Objects.requireNonNull(coordinates.get(index), "coordinate");
-      coordinateValues[index * 2] = coordinate.latitude();
-      coordinateValues[index * 2 + 1] = coordinate.longitude();
+    var copiedCoordinates = List.copyOf(coordinates);
+    try (var nativeCoordinates = CoreStructs.latLngArray(copiedCoordinates);
+        var nativePadding = CoreStructs.nativeEdgeInsets(padding)) {
+      Status.check(
+          MaplibreNativeC.mln_map_projection_set_visible_coordinates(
+              JavaCppSupport.projection(state.requireLiveAddress()),
+              nativeCoordinates.coordinates(),
+              nativeCoordinates.count(),
+              nativePadding));
     }
-    var paddingValues =
-        new double[] {padding.top(), padding.left(), padding.bottom(), padding.right()};
-    Status.check(
-        ProjectionNative.mln_map_projection_set_visible_coordinates(
-            state.requireLiveAddress(), coordinateValues, paddingValues));
   }
 
   public void setVisibleGeometry(Geometry geometry, EdgeInsets padding) {
     NativeLibrary.ensureLoaded();
     Objects.requireNonNull(geometry, "geometry");
     Objects.requireNonNull(padding, "padding");
-    var paddingValues =
-        new double[] {padding.top(), padding.left(), padding.bottom(), padding.right()};
-    Status.check(
-        ProjectionNative.mln_map_projection_set_visible_geometry(
-            state.requireLiveAddress(), geometry, paddingValues));
+    try (var nativeGeometry = JavaCppValues.geometry(geometry);
+        var nativePadding = CoreStructs.nativeEdgeInsets(padding)) {
+      Status.check(
+          MaplibreNativeC.mln_map_projection_set_visible_geometry(
+              JavaCppSupport.projection(state.requireLiveAddress()),
+              nativeGeometry.value(),
+              nativePadding));
+    }
   }
 
   public ScreenPoint pixelForLatLng(LatLng coordinate) {
     NativeLibrary.ensureLoaded();
     Objects.requireNonNull(coordinate, "coordinate");
-    var outPoint = new double[2];
-    Status.check(
-        ProjectionNative.mln_map_projection_pixel_for_lat_lng(
-            state.requireLiveAddress(), coordinate.latitude(), coordinate.longitude(), outPoint));
-    return new ScreenPoint(outPoint[0], outPoint[1]);
+    try (var nativeCoordinate = CoreStructs.nativeLatLng(coordinate)) {
+      var outPoint = new MaplibreNativeC.mln_screen_point();
+      Status.check(
+          MaplibreNativeC.mln_map_projection_pixel_for_lat_lng(
+              JavaCppSupport.projection(state.requireLiveAddress()), nativeCoordinate, outPoint));
+      return CoreStructs.screenPoint(outPoint);
+    }
   }
 
   public LatLng latLngForPixel(ScreenPoint point) {
     NativeLibrary.ensureLoaded();
     Objects.requireNonNull(point, "point");
-    var outCoordinate = new double[2];
-    Status.check(
-        ProjectionNative.mln_map_projection_lat_lng_for_pixel(
-            state.requireLiveAddress(), point.x(), point.y(), outCoordinate));
-    return new LatLng(outCoordinate[0], outCoordinate[1]);
+    try (var nativePoint = CoreStructs.nativeScreenPoint(point)) {
+      var outCoordinate = new MaplibreNativeC.mln_lat_lng();
+      Status.check(
+          MaplibreNativeC.mln_map_projection_lat_lng_for_pixel(
+              JavaCppSupport.projection(state.requireLiveAddress()), nativePoint, outCoordinate));
+      return CoreStructs.latLng(outCoordinate);
+    }
   }
 
   public void close() {
-    state.closeOnce(ProjectionNative::mln_map_projection_destroy);
+    state.closeOnce(
+        address -> MaplibreNativeC.mln_map_projection_destroy(JavaCppSupport.projection(address)));
   }
 
   public boolean isClosed() {

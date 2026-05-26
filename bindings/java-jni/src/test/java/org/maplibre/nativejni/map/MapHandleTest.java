@@ -8,7 +8,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.EnumSet;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -29,7 +28,6 @@ import org.maplibre.nativejni.geo.LatLngBounds;
 import org.maplibre.nativejni.geo.Quaternion;
 import org.maplibre.nativejni.geo.ScreenPoint;
 import org.maplibre.nativejni.geo.Vec3;
-import org.maplibre.nativejni.internal.bridge.StyleNative;
 import org.maplibre.nativejni.json.JsonValue;
 import org.maplibre.nativejni.render.PremultipliedRgba8Image;
 import org.maplibre.nativejni.runtime.RuntimeHandle;
@@ -398,8 +396,6 @@ class MapHandleTest {
                 .wrap(false));
         assertEquals(1, map.customGeometrySourceCountForTesting());
         assertEquals(SourceType.CUSTOM_VECTOR, map.styleSourceType("custom-source").orElseThrow());
-        var customState = customGeometrySourceState(map, "custom-source");
-        var customStateAddress = customState.address();
         var customTile = new CanonicalTileId(0, 0, 0);
         map.setCustomGeometrySourceTileData(
             "custom-source", customTile, GeoJson.featureCollection(List.of()));
@@ -408,7 +404,6 @@ class MapHandleTest {
             "custom-source", new LatLngBounds(new LatLng(-1.0, -2.0), new LatLng(1.0, 2.0)));
         assertTrue(map.removeStyleSource("custom-source"));
         assertEquals(0, map.customGeometrySourceCountForTesting());
-        StyleNative.mln_custom_geometry_source_state_destroy(customStateAddress);
 
         map.addVectorSourceUrl(
             "vector-source",
@@ -547,19 +542,6 @@ class MapHandleTest {
         map.requestRepaint();
         assertThrows(InvalidStateException.class, map::requestStillImage);
       }
-    }
-  }
-
-  @SuppressWarnings("unchecked")
-  private static CustomGeometrySourceState customGeometrySourceState(
-      MapHandle map, String sourceId) {
-    try {
-      var field = MapHandle.class.getDeclaredField("customGeometrySources");
-      field.setAccessible(true);
-      var states = (Map<String, CustomGeometrySourceState>) field.get(map);
-      return states.get(sourceId);
-    } catch (ReflectiveOperationException error) {
-      throw new AssertionError(error);
     }
   }
 }

@@ -6,6 +6,7 @@ import org.maplibre.nativejni.camera.BoundOptions;
 import org.maplibre.nativejni.camera.CameraFitOptions;
 import org.maplibre.nativejni.camera.CameraOptions;
 import org.maplibre.nativejni.camera.FreeCameraOptions;
+import org.maplibre.nativejni.internal.javacpp.MaplibreNativeC;
 import org.maplibre.nativejni.map.MapMode;
 import org.maplibre.nativejni.map.MapOptions;
 
@@ -103,6 +104,96 @@ public final class MapStructs {
         options.hasRoll() ? options.roll() : 0,
         options.hasFieldOfView(),
         options.hasFieldOfView() ? options.fieldOfView() : 0);
+  }
+
+  public static MaplibreNativeC.mln_camera_options nativeCameraOptions(CameraOptions options) {
+    var value = cameraOptions(options);
+    var camera = MaplibreNativeC.mln_camera_options_default();
+    var fields = 0;
+    if (value.hasCenter()) {
+      fields |= MaplibreNativeC.MLN_CAMERA_OPTION_CENTER;
+      camera.latitude(value.center().latitude()).longitude(value.center().longitude());
+    }
+    if (value.hasCenterAltitude()) {
+      fields |= MaplibreNativeC.MLN_CAMERA_OPTION_CENTER_ALTITUDE;
+      camera.center_altitude(value.centerAltitude());
+    }
+    if (value.hasPadding()) {
+      fields |= MaplibreNativeC.MLN_CAMERA_OPTION_PADDING;
+      camera.padding(
+          new MaplibreNativeC.mln_edge_insets()
+              .top(value.padding().top())
+              .left(value.padding().left())
+              .bottom(value.padding().bottom())
+              .right(value.padding().right()));
+    }
+    if (value.hasAnchor()) {
+      fields |= MaplibreNativeC.MLN_CAMERA_OPTION_ANCHOR;
+      camera.anchor(
+          new MaplibreNativeC.mln_screen_point().x(value.anchor().x()).y(value.anchor().y()));
+    }
+    if (value.hasZoom()) {
+      fields |= MaplibreNativeC.MLN_CAMERA_OPTION_ZOOM;
+      camera.zoom(value.zoom());
+    }
+    if (value.hasBearing()) {
+      fields |= MaplibreNativeC.MLN_CAMERA_OPTION_BEARING;
+      camera.bearing(value.bearing());
+    }
+    if (value.hasPitch()) {
+      fields |= MaplibreNativeC.MLN_CAMERA_OPTION_PITCH;
+      camera.pitch(value.pitch());
+    }
+    if (value.hasRoll()) {
+      fields |= MaplibreNativeC.MLN_CAMERA_OPTION_ROLL;
+      camera.roll(value.roll());
+    }
+    if (value.hasFieldOfView()) {
+      fields |= MaplibreNativeC.MLN_CAMERA_OPTION_FOV;
+      camera.field_of_view(value.fieldOfView());
+    }
+    camera.fields(fields);
+    return camera;
+  }
+
+  public static CameraOptions cameraOptions(MaplibreNativeC.mln_camera_options camera) {
+    Objects.requireNonNull(camera, "camera");
+    var fields = camera.fields();
+    var options = new CameraOptions();
+    if ((fields & MaplibreNativeC.MLN_CAMERA_OPTION_CENTER) != 0) {
+      options.center(camera.latitude(), camera.longitude());
+    }
+    if ((fields & MaplibreNativeC.MLN_CAMERA_OPTION_CENTER_ALTITUDE) != 0) {
+      options.centerAltitude(camera.center_altitude());
+    }
+    if ((fields & MaplibreNativeC.MLN_CAMERA_OPTION_PADDING) != 0) {
+      options.padding(
+          new org.maplibre.nativejni.camera.EdgeInsets(
+              camera.padding().top(),
+              camera.padding().left(),
+              camera.padding().bottom(),
+              camera.padding().right()));
+    }
+    if ((fields & MaplibreNativeC.MLN_CAMERA_OPTION_ANCHOR) != 0) {
+      options.anchor(
+          new org.maplibre.nativejni.geo.ScreenPoint(camera.anchor().x(), camera.anchor().y()));
+    }
+    if ((fields & MaplibreNativeC.MLN_CAMERA_OPTION_ZOOM) != 0) {
+      options.zoom(camera.zoom());
+    }
+    if ((fields & MaplibreNativeC.MLN_CAMERA_OPTION_BEARING) != 0) {
+      options.bearing(camera.bearing());
+    }
+    if ((fields & MaplibreNativeC.MLN_CAMERA_OPTION_PITCH) != 0) {
+      options.pitch(camera.pitch());
+    }
+    if ((fields & MaplibreNativeC.MLN_CAMERA_OPTION_ROLL) != 0) {
+      options.roll(camera.roll());
+    }
+    if ((fields & MaplibreNativeC.MLN_CAMERA_OPTION_FOV) != 0) {
+      options.fieldOfView(camera.field_of_view());
+    }
+    return options;
   }
 
   public static AnimationOptionsValue animationOptions(AnimationOptions options) {

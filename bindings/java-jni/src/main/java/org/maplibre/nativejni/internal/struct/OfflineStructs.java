@@ -1,4 +1,4 @@
-package org.maplibre.nativejni.internal.bridge;
+package org.maplibre.nativejni.internal.struct;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -14,158 +14,12 @@ import org.maplibre.nativejni.internal.javacpp.MaplibreNativeC;
 import org.maplibre.nativejni.offline.OfflineRegionDefinition;
 import org.maplibre.nativejni.offline.OfflineRegionInfo;
 
-/** JavaCPP-backed declarations for the OfflineNative C API coverage group. */
-public final class OfflineNative {
-  private OfflineNative() {}
+/** JavaCPP-backed materializers and readers for offline region JNI calls. */
+public final class OfflineStructs {
+  private OfflineStructs() {}
 
-  public static int mln_runtime_offline_region_create_start(
-      long runtime, OfflineRegionDefinition definition, byte[] metadata, long[] outOperationId) {
-    try (var nativeDefinition = new DefinitionScope(definition)) {
-      return MaplibreNativeC.mln_runtime_offline_region_create_start(
-          JavaCppSupport.runtime(runtime),
-          nativeDefinition.definition(),
-          metadata,
-          metadata == null ? 0 : metadata.length,
-          outOperationId);
-    }
-  }
-
-  public static int mln_runtime_offline_region_get_start(
-      long runtime, long regionId, long[] outOperationId) {
-    return MaplibreNativeC.mln_runtime_offline_region_get_start(
-        JavaCppSupport.runtime(runtime), regionId, outOperationId);
-  }
-
-  public static int mln_runtime_offline_regions_list_start(long runtime, long[] outOperationId) {
-    return MaplibreNativeC.mln_runtime_offline_regions_list_start(
-        JavaCppSupport.runtime(runtime), outOperationId);
-  }
-
-  public static int mln_runtime_offline_regions_merge_database_start(
-      long runtime, String sideDatabasePath, long[] outOperationId) {
-    if (sideDatabasePath != null && sideDatabasePath.indexOf('\0') >= 0) {
-      BaseNative.setThreadDiagnostic("side database path contains embedded NUL");
-      return MaplibreNativeC.MLN_STATUS_INVALID_ARGUMENT;
-    }
-    return MaplibreNativeC.mln_runtime_offline_regions_merge_database_start(
-        JavaCppSupport.runtime(runtime), sideDatabasePath, outOperationId);
-  }
-
-  public static int mln_runtime_offline_region_update_metadata_start(
-      long runtime, long regionId, byte[] metadata, long[] outOperationId) {
-    return MaplibreNativeC.mln_runtime_offline_region_update_metadata_start(
-        JavaCppSupport.runtime(runtime),
-        regionId,
-        metadata,
-        metadata == null ? 0 : metadata.length,
-        outOperationId);
-  }
-
-  public static int mln_runtime_offline_region_get_status_start(
-      long runtime, long regionId, long[] outOperationId) {
-    return MaplibreNativeC.mln_runtime_offline_region_get_status_start(
-        JavaCppSupport.runtime(runtime), regionId, outOperationId);
-  }
-
-  public static int mln_runtime_offline_region_set_observed_start(
-      long runtime, long regionId, boolean observed, long[] outOperationId) {
-    return MaplibreNativeC.mln_runtime_offline_region_set_observed_start(
-        JavaCppSupport.runtime(runtime), regionId, observed, outOperationId);
-  }
-
-  public static int mln_runtime_offline_region_set_download_state_start(
-      long runtime, long regionId, int downloadState, long[] outOperationId) {
-    return MaplibreNativeC.mln_runtime_offline_region_set_download_state_start(
-        JavaCppSupport.runtime(runtime), regionId, downloadState, outOperationId);
-  }
-
-  public static int mln_runtime_offline_region_invalidate_start(
-      long runtime, long regionId, long[] outOperationId) {
-    return MaplibreNativeC.mln_runtime_offline_region_invalidate_start(
-        JavaCppSupport.runtime(runtime), regionId, outOperationId);
-  }
-
-  public static int mln_runtime_offline_region_delete_start(
-      long runtime, long regionId, long[] outOperationId) {
-    return MaplibreNativeC.mln_runtime_offline_region_delete_start(
-        JavaCppSupport.runtime(runtime), regionId, outOperationId);
-  }
-
-  public static int mln_runtime_offline_region_create_take_result(
-      long runtime, long operationId, Object[] outRegion) {
-    var outSnapshot = new PointerPointer<MaplibreNativeC.mln_offline_region_snapshot>(1);
-    var status =
-        MaplibreNativeC.mln_runtime_offline_region_create_take_result(
-            JavaCppSupport.runtime(runtime), operationId, outSnapshot);
-    return status == MaplibreNativeC.MLN_STATUS_OK ? copySnapshot(outSnapshot, outRegion) : status;
-  }
-
-  public static int mln_runtime_offline_region_get_take_result(
-      long runtime, long operationId, Object[] outRegion, boolean[] outFound) {
-    try (var found = new org.bytedeco.javacpp.BoolPointer(1)) {
-      var outSnapshot = new PointerPointer<MaplibreNativeC.mln_offline_region_snapshot>(1);
-      var status =
-          MaplibreNativeC.mln_runtime_offline_region_get_take_result(
-              JavaCppSupport.runtime(runtime), operationId, outSnapshot, found);
-      outFound[0] = found.get();
-      if (status == MaplibreNativeC.MLN_STATUS_OK && outFound[0]) {
-        status = copySnapshot(outSnapshot, outRegion);
-      }
-      return status;
-    }
-  }
-
-  public static int mln_runtime_offline_regions_list_take_result(
-      long runtime, long operationId, Object[] outRegions) {
-    var outList = new PointerPointer<MaplibreNativeC.mln_offline_region_list>(1);
-    var status =
-        MaplibreNativeC.mln_runtime_offline_regions_list_take_result(
-            JavaCppSupport.runtime(runtime), operationId, outList);
-    return status == MaplibreNativeC.MLN_STATUS_OK ? copyList(outList, outRegions) : status;
-  }
-
-  public static int mln_runtime_offline_regions_merge_database_take_result(
-      long runtime, long operationId, Object[] outRegions) {
-    var outList = new PointerPointer<MaplibreNativeC.mln_offline_region_list>(1);
-    var status =
-        MaplibreNativeC.mln_runtime_offline_regions_merge_database_take_result(
-            JavaCppSupport.runtime(runtime), operationId, outList);
-    return status == MaplibreNativeC.MLN_STATUS_OK ? copyList(outList, outRegions) : status;
-  }
-
-  public static int mln_runtime_offline_region_update_metadata_take_result(
-      long runtime, long operationId, Object[] outRegion) {
-    var outSnapshot = new PointerPointer<MaplibreNativeC.mln_offline_region_snapshot>(1);
-    var status =
-        MaplibreNativeC.mln_runtime_offline_region_update_metadata_take_result(
-            JavaCppSupport.runtime(runtime), operationId, outSnapshot);
-    return status == MaplibreNativeC.MLN_STATUS_OK ? copySnapshot(outSnapshot, outRegion) : status;
-  }
-
-  public static int mln_runtime_offline_region_get_status_take_result(
-      long runtime, long operationId, long[] longs, int[] ints, boolean[] booleans) {
-    var status = new MaplibreNativeC.mln_offline_region_status();
-    status.size(status.sizeof());
-    var nativeStatus =
-        MaplibreNativeC.mln_runtime_offline_region_get_status_take_result(
-            JavaCppSupport.runtime(runtime), operationId, status);
-    if (nativeStatus == MaplibreNativeC.MLN_STATUS_OK) {
-      ints[0] = status.download_state();
-      longs[0] = status.completed_resource_count();
-      longs[1] = status.completed_resource_size();
-      longs[2] = status.completed_tile_count();
-      longs[3] = status.required_tile_count();
-      longs[4] = status.completed_tile_size();
-      longs[5] = status.required_resource_count();
-      booleans[0] = status.required_resource_count_is_precise();
-      booleans[1] = status.complete();
-    }
-    status.close();
-    return nativeStatus;
-  }
-
-  private static int copySnapshot(
-      PointerPointer<MaplibreNativeC.mln_offline_region_snapshot> outSnapshot, Object[] outRegion) {
+  public static OfflineRegionInfo offlineRegionSnapshot(
+      PointerPointer<MaplibreNativeC.mln_offline_region_snapshot> outSnapshot) {
     var snapshotAddress =
         JavaCppSupport.outAddress(outSnapshot, MaplibreNativeC.mln_offline_region_snapshot.class);
     var snapshot =
@@ -174,40 +28,36 @@ public final class OfflineNative {
       var info = new MaplibreNativeC.mln_offline_region_info();
       info.size(info.sizeof());
       var status = MaplibreNativeC.mln_offline_region_snapshot_get(snapshot, info);
-      if (status == MaplibreNativeC.MLN_STATUS_OK) {
-        outRegion[0] = regionInfo(info);
-      }
+      org.maplibre.nativejni.internal.status.Status.check(status);
+      var region = regionInfo(info);
       info.close();
-      return status;
+      return region;
     } finally {
       MaplibreNativeC.mln_offline_region_snapshot_destroy(snapshot);
     }
   }
 
-  private static int copyList(
-      PointerPointer<MaplibreNativeC.mln_offline_region_list> outList, Object[] outRegions) {
+  public static List<OfflineRegionInfo> offlineRegionList(
+      PointerPointer<MaplibreNativeC.mln_offline_region_list> outList) {
     var listAddress =
         JavaCppSupport.outAddress(outList, MaplibreNativeC.mln_offline_region_list.class);
     var list = new MaplibreNativeC.mln_offline_region_list(JavaCppSupport.pointer(listAddress));
     try (var count = new SizeTPointer(1)) {
       var status = MaplibreNativeC.mln_offline_region_list_count(list, count);
-      if (status != MaplibreNativeC.MLN_STATUS_OK) {
-        return status;
-      }
-      var regions = new OfflineRegionInfo[Math.toIntExact(count.get())];
-      for (var i = 0; i < regions.length; i++) {
+      org.maplibre.nativejni.internal.status.Status.check(status);
+      var regions = new ArrayList<OfflineRegionInfo>(Math.toIntExact(count.get()));
+      for (var i = 0; i < Math.toIntExact(count.get()); i++) {
         var info = new MaplibreNativeC.mln_offline_region_info();
         info.size(info.sizeof());
         status = MaplibreNativeC.mln_offline_region_list_get(list, i, info);
         if (status != MaplibreNativeC.MLN_STATUS_OK) {
           info.close();
-          return status;
+          org.maplibre.nativejni.internal.status.Status.check(status);
         }
-        regions[i] = regionInfo(info);
+        regions.add(regionInfo(info));
         info.close();
       }
-      outRegions[0] = regions;
-      return MaplibreNativeC.MLN_STATUS_OK;
+      return List.copyOf(regions);
     } finally {
       MaplibreNativeC.mln_offline_region_list_destroy(list);
     }
@@ -335,12 +185,12 @@ public final class OfflineNative {
     return geometries;
   }
 
-  private static final class DefinitionScope implements AutoCloseable {
+  public static final class DefinitionScope implements AutoCloseable {
     private final ArrayList<Pointer> owned = new ArrayList<>();
     private final MaplibreNativeC.mln_offline_region_definition definition;
     private final GeometryScope geometryScope;
 
-    DefinitionScope(OfflineRegionDefinition value) {
+    public DefinitionScope(OfflineRegionDefinition value) {
       definition = own(new MaplibreNativeC.mln_offline_region_definition());
       definition.size(definition.sizeof());
       if (value instanceof OfflineRegionDefinition.TilePyramid tilePyramid) {
@@ -356,7 +206,7 @@ public final class OfflineNative {
       }
     }
 
-    MaplibreNativeC.mln_offline_region_definition definition() {
+    public MaplibreNativeC.mln_offline_region_definition definition() {
       return definition;
     }
 

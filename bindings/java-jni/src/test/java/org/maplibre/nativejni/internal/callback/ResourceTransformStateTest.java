@@ -15,8 +15,8 @@ final class ResourceTransformStateTest {
   }
 
   @Test
-  void rejectsZeroNativeStateAddress() {
-    assertThrows(IllegalArgumentException.class, () -> new ResourceTransformState(0));
+  void rejectsNullCallback() {
+    assertThrows(NullPointerException.class, () -> new ResourceTransformState(null));
   }
 
   @Test

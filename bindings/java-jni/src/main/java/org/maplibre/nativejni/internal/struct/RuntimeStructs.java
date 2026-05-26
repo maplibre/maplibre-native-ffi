@@ -3,7 +3,11 @@ package org.maplibre.nativejni.internal.struct;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalLong;
+import org.bytedeco.javacpp.BytePointer;
+import org.bytedeco.javacpp.Pointer;
 import org.maplibre.nativejni.geo.TileId;
+import org.maplibre.nativejni.internal.javacpp.JavaCppSupport;
+import org.maplibre.nativejni.internal.javacpp.MaplibreNativeC;
 import org.maplibre.nativejni.map.MapHandle;
 import org.maplibre.nativejni.map.RenderingStats;
 import org.maplibre.nativejni.map.TileOperation;
@@ -96,6 +100,116 @@ public final class RuntimeStructs {
         options.cachePath(),
         maximumCacheSize.isPresent(),
         maximumCacheSize.orElse(0));
+  }
+
+  public static NativeRuntimeOptionsScope nativeRuntimeOptions(RuntimeOptions options) {
+    return new NativeRuntimeOptionsScope(runtimeOptions(options));
+  }
+
+  public static void copyEvent(
+      MaplibreNativeC.mln_runtime_event event,
+      long[] longs,
+      int[] ints,
+      boolean[] booleans,
+      double[] doubles,
+      String[] strings) {
+    ints[INT_EVENT_TYPE] = event.type();
+    ints[INT_SOURCE_TYPE] = event.source_type();
+    longs[LONG_SOURCE_ADDRESS] = event.source() == null ? 0 : event.source().address();
+    ints[INT_CODE] = event.code();
+    ints[INT_PAYLOAD_TYPE] = event.payload_type();
+    longs[LONG_PAYLOAD_SIZE] = event.payload_size();
+    strings[STRING_MESSAGE] = JavaCppSupport.cString(event.message());
+    ints[INT_PAYLOAD_AVAILABLE] = event.payload() == null || event.payload().isNull() ? 0 : 1;
+    if (ints[INT_PAYLOAD_AVAILABLE] == 0) {
+      return;
+    }
+    switch (event.payload_type()) {
+      case PAYLOAD_RENDER_FRAME -> copyRenderFrame(event.payload(), longs, ints, booleans, doubles);
+      case PAYLOAD_RENDER_MAP -> copyRenderMap(event.payload(), ints);
+      case PAYLOAD_STYLE_IMAGE_MISSING -> copyStyleImageMissing(event.payload(), strings);
+      case PAYLOAD_TILE_ACTION -> copyTileAction(event.payload(), longs, ints, strings);
+      case PAYLOAD_OFFLINE_REGION_STATUS ->
+          copyOfflineStatus(event.payload(), longs, ints, booleans);
+      case PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR ->
+          copyOfflineResponseError(event.payload(), longs, ints);
+      case PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT -> copyOfflineTileLimit(event.payload(), longs);
+      case PAYLOAD_OFFLINE_OPERATION_COMPLETED ->
+          copyOfflineOperation(event.payload(), longs, ints, booleans);
+      default -> ints[INT_PAYLOAD_AVAILABLE] = 0;
+    }
+  }
+
+  private static void copyRenderFrame(
+      Pointer payload, long[] longs, int[] ints, boolean[] booleans, double[] doubles) {
+    var frame = new MaplibreNativeC.mln_runtime_event_render_frame(payload);
+    ints[INT_RENDER_MODE] = frame.mode();
+    booleans[BOOLEAN_NEEDS_REPAINT] = frame.needs_repaint();
+    booleans[BOOLEAN_PLACEMENT_CHANGED] = frame.placement_changed();
+    doubles[DOUBLE_ENCODING_TIME] = frame.stats().encoding_time();
+    doubles[DOUBLE_RENDERING_TIME] = frame.stats().rendering_time();
+    longs[LONG_FRAME_COUNT] = frame.stats().frame_count();
+    longs[LONG_DRAW_CALL_COUNT] = frame.stats().draw_call_count();
+    longs[LONG_TOTAL_DRAW_CALL_COUNT] = frame.stats().total_draw_call_count();
+  }
+
+  private static void copyRenderMap(Pointer payload, int[] ints) {
+    ints[INT_RENDER_MODE] = new MaplibreNativeC.mln_runtime_event_render_map(payload).mode();
+  }
+
+  private static void copyStyleImageMissing(Pointer payload, String[] strings) {
+    strings[STRING_PAYLOAD] =
+        JavaCppSupport.cString(
+            new MaplibreNativeC.mln_runtime_event_style_image_missing(payload).image_id());
+  }
+
+  private static void copyTileAction(Pointer payload, long[] longs, int[] ints, String[] strings) {
+    var action = new MaplibreNativeC.mln_runtime_event_tile_action(payload);
+    ints[INT_TILE_OPERATION] = action.operation();
+    longs[LONG_TILE_OVERSCALED_Z] = action.tile_id().overscaled_z();
+    ints[INT_TILE_WRAP] = action.tile_id().wrap();
+    longs[LONG_TILE_CANONICAL_Z] = action.tile_id().canonical_z();
+    longs[LONG_TILE_CANONICAL_X] = action.tile_id().canonical_x();
+    longs[LONG_TILE_CANONICAL_Y] = action.tile_id().canonical_y();
+    strings[STRING_PAYLOAD] = JavaCppSupport.cString(action.source_id());
+  }
+
+  private static void copyOfflineStatus(
+      Pointer payload, long[] longs, int[] ints, boolean[] booleans) {
+    var status = new MaplibreNativeC.mln_runtime_event_offline_region_status(payload);
+    longs[LONG_REGION_ID] = status.region_id();
+    ints[INT_OFFLINE_DOWNLOAD_STATE] = status.status().download_state();
+    longs[LONG_COMPLETED_RESOURCE_COUNT] = status.status().completed_resource_count();
+    longs[LONG_COMPLETED_RESOURCE_SIZE] = status.status().completed_resource_size();
+    longs[LONG_COMPLETED_TILE_COUNT] = status.status().completed_tile_count();
+    longs[LONG_REQUIRED_TILE_COUNT] = status.status().required_tile_count();
+    longs[LONG_COMPLETED_TILE_SIZE] = status.status().completed_tile_size();
+    longs[LONG_REQUIRED_RESOURCE_COUNT] = status.status().required_resource_count();
+    booleans[BOOLEAN_REQUIRED_RESOURCE_COUNT_IS_PRECISE] =
+        status.status().required_resource_count_is_precise();
+    booleans[BOOLEAN_COMPLETE] = status.status().complete();
+  }
+
+  private static void copyOfflineResponseError(Pointer payload, long[] longs, int[] ints) {
+    var error = new MaplibreNativeC.mln_runtime_event_offline_region_response_error(payload);
+    longs[LONG_REGION_ID] = error.region_id();
+    ints[INT_RESOURCE_ERROR_REASON] = error.reason();
+  }
+
+  private static void copyOfflineTileLimit(Pointer payload, long[] longs) {
+    var limit = new MaplibreNativeC.mln_runtime_event_offline_region_tile_count_limit(payload);
+    longs[LONG_REGION_ID] = limit.region_id();
+    longs[LONG_LIMIT] = limit.limit();
+  }
+
+  private static void copyOfflineOperation(
+      Pointer payload, long[] longs, int[] ints, boolean[] booleans) {
+    var operation = new MaplibreNativeC.mln_runtime_event_offline_operation_completed(payload);
+    longs[LONG_OPERATION_ID] = operation.operation_id();
+    ints[INT_OFFLINE_OPERATION_KIND] = operation.operation_kind();
+    ints[INT_OFFLINE_RESULT_KIND] = operation.result_kind();
+    ints[INT_OFFLINE_RESULT_STATUS] = operation.result_status();
+    booleans[BOOLEAN_FOUND] = operation.found();
   }
 
   public static RuntimeEvent runtimeEvent(
@@ -242,5 +356,52 @@ public final class RuntimeStructs {
 
   private static String nullToEmpty(String value) {
     return value == null ? "" : value;
+  }
+
+  public static final class NativeRuntimeOptionsScope implements AutoCloseable {
+    private final MaplibreNativeC.mln_runtime_options options;
+    private final BytePointer assetPath;
+    private final BytePointer cachePath;
+
+    private NativeRuntimeOptionsScope(RuntimeOptionsValue value) {
+      if (containsNul(value.assetPath()) || containsNul(value.cachePath())) {
+        JavaCppSupport.setThreadDiagnostic("runtime option path contains embedded NUL");
+        throw new IllegalArgumentException("runtime option path contains embedded NUL");
+      }
+      if (value.hasMaximumCacheSize() && value.maximumCacheSize() < 0) {
+        JavaCppSupport.setThreadDiagnostic("maximum cache size must be non-negative");
+        throw new IllegalArgumentException("maximum cache size must be non-negative");
+      }
+      options = MaplibreNativeC.mln_runtime_options_default();
+      assetPath = JavaCppSupport.utf8(value.assetPath());
+      cachePath = JavaCppSupport.utf8(value.cachePath());
+      options.asset_path(assetPath);
+      options.cache_path(cachePath);
+      if (value.hasMaximumCacheSize()) {
+        options.flags(options.flags() | MaplibreNativeC.MLN_RUNTIME_OPTION_MAXIMUM_CACHE_SIZE);
+        options.maximum_cache_size(value.maximumCacheSize());
+      }
+    }
+
+    public MaplibreNativeC.mln_runtime_options options() {
+      return options;
+    }
+
+    @Override
+    public void close() {
+      options.close();
+      close(assetPath);
+      close(cachePath);
+    }
+
+    private static boolean containsNul(String value) {
+      return value != null && value.indexOf('\0') >= 0;
+    }
+
+    private static void close(Pointer pointer) {
+      if (pointer != null) {
+        pointer.close();
+      }
+    }
   }
 }

@@ -3,7 +3,8 @@ package org.maplibre.nativejni.internal.status;
 import org.maplibre.nativejni.error.InvalidStateException;
 import org.maplibre.nativejni.error.MaplibreException;
 import org.maplibre.nativejni.error.MaplibreStatus;
-import org.maplibre.nativejni.internal.bridge.BaseNative;
+import org.maplibre.nativejni.internal.javacpp.JavaCppSupport;
+import org.maplibre.nativejni.internal.javacpp.MaplibreNativeC;
 
 /** Converts native status codes into public Java exceptions. */
 public final class Status {
@@ -23,6 +24,7 @@ public final class Status {
   }
 
   public static String captureDiagnostic() {
-    return BaseNative.mln_thread_last_error_message();
+    return JavaCppSupport.takeThreadDiagnostic()
+        .orElseGet(() -> JavaCppSupport.cString(MaplibreNativeC.mln_thread_last_error_message()));
   }
 }

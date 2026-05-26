@@ -1,6 +1,7 @@
 package org.maplibre.nativejni.render;
 
 import java.util.Objects;
+import org.maplibre.nativejni.internal.javacpp.MaplibreNativeC;
 
 /**
  * Explicit handle for a Metal session-owned texture frame.
@@ -13,24 +14,18 @@ import java.util.Objects;
  */
 public final class MetalOwnedTextureFrameHandle implements AutoCloseable {
   private final RenderSessionHandle session;
-  private final long[] longs;
-  private final int[] ints;
-  private final double[] doubles;
+  private final MaplibreNativeC.mln_metal_owned_texture_frame nativeFrame;
   private final FrameScope scope;
   private final MetalOwnedTextureFrame frame;
   private boolean closed;
 
   MetalOwnedTextureFrameHandle(
       RenderSessionHandle session,
-      long[] longs,
-      int[] ints,
-      double[] doubles,
+      MaplibreNativeC.mln_metal_owned_texture_frame nativeFrame,
       FrameScope scope,
       MetalOwnedTextureFrame frame) {
     this.session = Objects.requireNonNull(session, "session");
-    this.longs = Objects.requireNonNull(longs, "longs").clone();
-    this.ints = Objects.requireNonNull(ints, "ints").clone();
-    this.doubles = Objects.requireNonNull(doubles, "doubles").clone();
+    this.nativeFrame = Objects.requireNonNull(nativeFrame, "nativeFrame");
     this.scope = Objects.requireNonNull(scope, "scope");
     this.frame = Objects.requireNonNull(frame, "frame");
   }
@@ -49,9 +44,10 @@ public final class MetalOwnedTextureFrameHandle implements AutoCloseable {
     if (closed) {
       return;
     }
-    session.releaseMetalFrame(longs, ints, doubles, null);
+    session.releaseMetalFrame(nativeFrame, null);
     closed = true;
     scope.close();
+    nativeFrame.close();
   }
 
   private void ensureOpen() {

@@ -41,10 +41,12 @@ main layers are:
 internal javacpp layer
   Generated JavaCPP declarations and presets for the public C headers.
 
-internal bridge/support layer
+internal support layer
   Small handwritten adapters that materialize JavaCPP structs, copy snapshots,
   translate statuses and diagnostics, load native libraries, and manage
-  callback lifetimes.
+  callback lifetimes. Public handles call generated JavaCPP C declarations
+  directly and use these adapters only for scoped values, copied results, and
+  callback ownership.
 
 public binding layer
   Low-level Java API with stable names, ownership rules, diagnostics, and
@@ -68,10 +70,10 @@ transfers no ownership.
 
 Native calls translate non-OK C statuses to unchecked `MaplibreException`
 subclasses carrying `MaplibreStatus`, the raw status code, and the copied
-thread-local diagnostic. The bridge reads diagnostics on the same native thread
-immediately after the failing C call. C++ exceptions and panics are contained by
-the C ABI. Java callbacks catch Java exceptions and errors before returning
-through a JavaCPP callback path.
+thread-local diagnostic. The JNI support layer reads diagnostics on the same
+native thread immediately after the failing C call. C++ exceptions and panics
+are contained by the C ABI. Java callbacks catch Java exceptions and errors
+before returning through a JavaCPP callback path.
 
 ## Handles and Threading
 
@@ -103,8 +105,8 @@ handwritten adapters keep native snapshots, result handles, and list handles
 internal: they copy contents into Java records or lists and release native
 handles in cleanup paths.
 
-Public Java strings are Unicode strings. The C API expects standard UTF-8. The
-bridge converts Java strings to UTF-8 bytes, rejects embedded NUL for
+Public Java strings are Unicode strings. The C API expects standard UTF-8. JNI
+support converts Java strings to UTF-8 bytes, rejects embedded NUL for
 null-terminated C inputs, and passes explicit byte lengths for string-view
 fields. Avoid modified UTF-8 for C API text.
 
