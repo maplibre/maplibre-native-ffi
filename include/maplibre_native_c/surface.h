@@ -131,40 +131,25 @@ MLN_API mln_status mln_vulkan_surface_attach(
 /**
  * Attaches an OpenGL native surface render target to a map.
  *
- * The map
- * may have at most one live render session. The session and
- * every
+ * The map may have at most one live render session. The session and every
  * surface-session call are owner-thread affine to the map owner thread.
- * The
- * session renders to descriptor->surface and presents through the selected
- *
+ * The session renders to descriptor->surface and presents through the selected
  * context provider. WGL surfaces present with SwapBuffers(HDC), and EGL
- *
  * surfaces present with eglSwapBuffers(EGLDisplay, EGLSurface). OpenGL context
-
- * * handles are borrowed and must remain valid until detach or destroy. On
- *
+ * handles are borrowed and must remain valid until detach or destroy. On
  * success, *out_session receives a handle the caller destroys with
- *
  * mln_render_session_destroy().
  *
  * Returns:
  * - MLN_STATUS_OK on success.
-
- * * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, descriptor is
-
- * *   null or invalid, out_session is null, or *out_session is not null.
- * -
- * MLN_STATUS_INVALID_STATE when the map already has a render session.
- * -
- * MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
- *
- * thread.
- * - MLN_STATUS_UNSUPPORTED when OpenGL surface sessions are not
- * supported by
+ * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, descriptor is
+ *   null or invalid, out_session is null, or *out_session is not null.
+ * - MLN_STATUS_INVALID_STATE when the map already has a render session.
+ * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
+ *   thread.
+ * - MLN_STATUS_UNSUPPORTED when OpenGL surface sessions are not supported by
  *   this build.
- * - MLN_STATUS_NATIVE_ERROR when an internal
- * exception is converted to status.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_opengl_surface_attach(
   mln_map* map, const mln_opengl_surface_descriptor* descriptor,

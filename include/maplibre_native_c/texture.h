@@ -356,39 +356,25 @@ MLN_API mln_status mln_vulkan_borrowed_texture_attach(
 
 /**
  * Attaches an OpenGL texture render target owned by the session to a map.
-
- * *
- * The map may have at most one live render session. The session and
  *
- * every texture-session call are owner-thread affine to the map owner thread.
-
- * * The session creates an OpenGL texture in a context that shares objects
- * with
- * descriptor->context. Host sampling may use the acquired texture from
- * a
- * context in the same share group after acquire succeeds and before
- * release.
- * On success, *out_session receives a handle the caller destroys
- * with
+ * The map may have at most one live render session. The session and every
+ * texture-session call are owner-thread affine to the map owner thread.
+ * The session creates an OpenGL texture in a context that shares objects with
+ * descriptor->context. Host sampling may use the acquired texture from a
+ * context in the same share group after acquire succeeds and before release.
+ * On success, *out_session receives a handle the caller destroys with
  * mln_render_session_destroy().
  *
  * Returns:
- * - MLN_STATUS_OK on
- * success.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live,
- * descriptor is
- *   null or invalid, out_session is null, or *out_session is
- * not null.
- * - MLN_STATUS_INVALID_STATE when the map already has a render
- * session.
- * - MLN_STATUS_WRONG_THREAD when called from a thread other than
- * the map owner
+ * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, descriptor is
+ *   null or invalid, out_session is null, or *out_session is not null.
+ * - MLN_STATUS_INVALID_STATE when the map already has a render session.
+ * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
  *   thread.
- * - MLN_STATUS_UNSUPPORTED when OpenGL texture
- * sessions are not supported by
+ * - MLN_STATUS_UNSUPPORTED when OpenGL texture sessions are not supported by
  *   this build.
- * - MLN_STATUS_NATIVE_ERROR
- * when an internal exception is converted to status.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_opengl_owned_texture_attach(
   mln_map* map, const mln_opengl_owned_texture_descriptor* descriptor,
@@ -398,37 +384,23 @@ MLN_API mln_status mln_opengl_owned_texture_attach(
 /**
  * Attaches an OpenGL caller-owned texture render target to a map.
  *
- * The
- * map may have at most one live render session. The session and
- * every
+ * The map may have at most one live render session. The session and every
  * texture-session call are owner-thread affine to the map owner thread.
- * The
- * session renders into descriptor->texture. The caller owns the texture,
- *
+ * The session renders into descriptor->texture. The caller owns the texture,
  * keeps it valid until detach or destroy, and synchronizes any use outside
- * this
- * session. On success, *out_session receives a handle the caller
- * destroys with
- * mln_render_session_destroy().
+ * this session. On success, *out_session receives a handle the caller destroys
+ * with mln_render_session_destroy().
  *
  * Returns:
- * -
- * MLN_STATUS_OK on success.
- * - MLN_STATUS_INVALID_ARGUMENT when map is null
- * or not live, descriptor is
- *   null or invalid, out_session is null, or
- * *out_session is not null.
- * - MLN_STATUS_INVALID_STATE when the map already
- * has a render session.
- * - MLN_STATUS_WRONG_THREAD when called from a thread
- * other than the map owner
+ * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, descriptor is
+ *   null or invalid, out_session is null, or *out_session is not null.
+ * - MLN_STATUS_INVALID_STATE when the map already has a render session.
+ * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
  *   thread.
- * - MLN_STATUS_UNSUPPORTED when OpenGL
- * borrowed texture sessions are not
+ * - MLN_STATUS_UNSUPPORTED when OpenGL borrowed texture sessions are not
  *   supported by this build.
- * -
- * MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
-
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_opengl_borrowed_texture_attach(
   mln_map* map, const mln_opengl_borrowed_texture_descriptor* descriptor,
@@ -552,37 +524,24 @@ MLN_API mln_status mln_vulkan_owned_texture_release_frame(
 /**
  * Acquires the most recently rendered OpenGL texture frame.
  *
- * Use this
- * function with sessions created by
+ * Use this function with sessions created by
  * mln_opengl_owned_texture_attach().
  *
- *
  * The returned texture object is borrowed and remains valid only until
- *
  * mln_opengl_owned_texture_release_frame() is called for the same frame.
- *
  * While acquired, resize, render update, detach, destroy, and a second acquire
-
- * * return MLN_STATUS_INVALID_STATE.
+ * return MLN_STATUS_INVALID_STATE.
  *
  * Returns:
- * - MLN_STATUS_OK on
- * success.
- * - MLN_STATUS_INVALID_ARGUMENT when session is null or not live,
- * out_frame is
+ * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_INVALID_ARGUMENT when session is null or not live, out_frame is
  *   null, or out_frame->size is too small.
- * -
- * MLN_STATUS_INVALID_STATE when the session is detached, no rendered frame is
-
- * *   available, or a texture frame is already acquired.
- * -
- * MLN_STATUS_WRONG_THREAD when called from a thread other than the session
- *
- * owner thread.
- * - MLN_STATUS_UNSUPPORTED when session cannot expose an
- * OpenGL texture frame.
- * - MLN_STATUS_NATIVE_ERROR when an internal exception
- * is converted to status.
+ * - MLN_STATUS_INVALID_STATE when the session is detached, no rendered frame is
+ *   available, or a texture frame is already acquired.
+ * - MLN_STATUS_WRONG_THREAD when called from a thread other than the session
+ *   owner thread.
+ * - MLN_STATUS_UNSUPPORTED when session cannot expose an OpenGL texture frame.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_opengl_owned_texture_acquire_frame(
   mln_render_session* session, mln_opengl_owned_texture_frame* out_frame
@@ -590,26 +549,18 @@ MLN_API mln_status mln_opengl_owned_texture_acquire_frame(
 
 /**
  * Releases an OpenGL texture frame acquired from a session-owned texture
- *
  * target.
  *
  * Returns:
  * - MLN_STATUS_OK on success.
- * -
- * MLN_STATUS_INVALID_ARGUMENT when session is null or not live, frame is
- *
- * null, frame->size is too small, or frame identity does not match the
- *
- * acquired frame.
- * - MLN_STATUS_INVALID_STATE when no texture frame is
- * currently acquired.
- * - MLN_STATUS_WRONG_THREAD when called from a thread
- * other than the session
+ * - MLN_STATUS_INVALID_ARGUMENT when session is null or not live, frame is
+ *   null, frame->size is too small, or frame identity does not match the
+ *   acquired frame.
+ * - MLN_STATUS_INVALID_STATE when no texture frame is currently acquired.
+ * - MLN_STATUS_WRONG_THREAD when called from a thread other than the session
  *   owner thread.
- * - MLN_STATUS_UNSUPPORTED when
- * session cannot release an OpenGL texture frame.
- * - MLN_STATUS_NATIVE_ERROR
- * when an internal exception is converted to status.
+ * - MLN_STATUS_UNSUPPORTED when session cannot release an OpenGL texture frame.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
  */
 MLN_API mln_status mln_opengl_owned_texture_release_frame(
   mln_render_session* session, const mln_opengl_owned_texture_frame* frame

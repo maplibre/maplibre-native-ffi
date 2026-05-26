@@ -453,9 +453,6 @@ class OpenGLTextureBackend final : public mbgl::gl::RendererBackend,
     }
     auto* module = GetModuleHandleA("opengl32.dll");
     if (module == nullptr) {
-      module = LoadLibraryA("opengl32.dll");
-    }
-    if (module == nullptr) {
       return nullptr;
     }
     return reinterpret_cast<mbgl::gl::ProcAddress>(

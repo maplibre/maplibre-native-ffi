@@ -1,4 +1,6 @@
 function(mln_configure_opengl_backend target)
+  target_compile_definitions(${target} PRIVATE MLN_RENDER_BACKEND_OPENGL=1)
+
   set(MLN_FFI_VENDOR_OPENGL_SOURCES
       ${MLN_SOURCE_DIR}/platform/default/src/mbgl/gl/headless_backend.cpp)
 

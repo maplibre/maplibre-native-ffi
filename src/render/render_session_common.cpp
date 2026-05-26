@@ -63,16 +63,8 @@ auto opengl_context_descriptor_default() noexcept
   -> mln_opengl_context_descriptor {
   auto result = mln_opengl_context_descriptor{
     .size = sizeof(mln_opengl_context_descriptor),
-    .platform = MLN_OPENGL_CONTEXT_PLATFORM_EGL,
-    .data = {
-      .egl = mln_egl_context_descriptor{
-        .size = sizeof(mln_egl_context_descriptor),
-        .display = nullptr,
-        .config = nullptr,
-        .share_context = nullptr,
-        .get_proc_address = nullptr,
-      },
-    },
+    .platform = MLN_OPENGL_CONTEXT_PLATFORM_UNSPECIFIED,
+    .data = {},
   };
 #if defined(_WIN32)
   result.platform = MLN_OPENGL_CONTEXT_PLATFORM_WGL;

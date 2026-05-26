@@ -60,6 +60,8 @@ typedef enum mln_opengl_context_provider_flag : uint32_t {
 
 /** OpenGL platform context provider used by a context descriptor. */
 typedef enum mln_opengl_context_platform : uint32_t {
+  /** No OpenGL context provider is selected. */
+  MLN_OPENGL_CONTEXT_PLATFORM_UNSPECIFIED = 0u,
   MLN_OPENGL_CONTEXT_PLATFORM_WGL = 1u,
   MLN_OPENGL_CONTEXT_PLATFORM_EGL = 2u,
 } mln_opengl_context_platform;
