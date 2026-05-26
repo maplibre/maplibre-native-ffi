@@ -53,8 +53,7 @@ public binding layer
 
 Generate broad C/JNI coverage from the public C headers with JavaCPP. Handwrite
 only the adapters that preserve Java API shape, value copying, ownership, and
-error behavior. The workspace marker crate keeps contributor validation commands
-addressable without participating in the production bridge.
+error behavior.
 
 ## Public Types and Errors
 

@@ -15,6 +15,46 @@ dependencies {
 
 tasks.withType<JavaCompile>().configureEach { options.release = 25 }
 
+val generatedJavaCppSources = layout.buildDirectory.dir("generated/sources/javacpp/main/java")
+val javaCppConfigClasses = layout.buildDirectory.dir("classes/javacppConfig")
+
+sourceSets.named("main") { java.srcDir(generatedJavaCppSources) }
+
+val compileJavaCppConfig =
+  tasks.register<JavaCompile>("compileJavaCppConfig") {
+    source("src/main/java/org/maplibre/nativejni/internal/javacpp/MaplibreNativeCConfig.java")
+    classpath = configurations.compileClasspath.get()
+    destinationDirectory = javaCppConfigClasses
+    options.release = 25
+  }
+
+val generateJavaCppBindings =
+  tasks.register<JavaExec>("generateJavaCppBindings") {
+    group = "build"
+    description = "Generates JavaCPP declarations for the MapLibre Native C ABI."
+    dependsOn(compileJavaCppConfig)
+    classpath = files(javaCppConfigClasses) + configurations.compileClasspath.get()
+    mainClass = "org.bytedeco.javacpp.tools.Builder"
+    args(
+      "-classpath",
+      classpath.asPath,
+      "-Dplatform.includepath=${rootProject.layout.projectDirectory.dir("include").asFile.absolutePath}",
+      "-d",
+      generatedJavaCppSources.get().asFile.absolutePath,
+      "-nogenerate",
+      "org.maplibre.nativejni.internal.javacpp.MaplibreNativeCConfig",
+    )
+    inputs.file("src/main/java/org/maplibre/nativejni/internal/javacpp/MaplibreNativeCConfig.java")
+    inputs.dir(rootProject.layout.projectDirectory.dir("include"))
+    outputs.file(
+      generatedJavaCppSources.map {
+        it.file("org/maplibre/nativejni/internal/javacpp/MaplibreNativeC.java")
+      }
+    )
+  }
+
+tasks.named<JavaCompile>("compileJava") { dependsOn(generateJavaCppBindings) }
+
 val nativeBuildDir =
   providers
     .environmentVariable("MLN_FFI_BUILD_DIR")

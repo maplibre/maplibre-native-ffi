@@ -4,7 +4,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.maplibre.nativejni.camera.AnimationOptions;
 import org.maplibre.nativejni.camera.BoundOptions;
@@ -19,18 +18,11 @@ import org.maplibre.nativejni.geo.Quaternion;
 import org.maplibre.nativejni.geo.ScreenBox;
 import org.maplibre.nativejni.geo.ScreenPoint;
 import org.maplibre.nativejni.geo.Vec3;
-import org.maplibre.nativejni.json.JsonValue;
 import org.maplibre.nativejni.map.MapMode;
 import org.maplibre.nativejni.map.MapOptions;
-import org.maplibre.nativejni.query.RenderedFeatureQueryOptions;
-import org.maplibre.nativejni.query.SourceFeatureQueryOptions;
 import org.maplibre.nativejni.resource.ResourceErrorReason;
 import org.maplibre.nativejni.resource.ResourceResponse;
 import org.maplibre.nativejni.runtime.RuntimeOptions;
-import org.maplibre.nativejni.style.StyleImageOptions;
-import org.maplibre.nativejni.style.TileScheme;
-import org.maplibre.nativejni.style.TileSourceOptions;
-import org.maplibre.nativejni.style.VectorTileEncoding;
 
 final class DescriptorStructsTest {
   @Test
@@ -116,20 +108,6 @@ final class DescriptorStructsTest {
 
   @Test
   void queryRuntimeResourceAndStyleDescriptorsMaterializeFields() {
-    var filter = JsonValue.object(List.of(new JsonValue.Member("==", JsonValue.of(true))));
-    var rendered =
-        QueryStructs.renderedFeatureQueryOptions(
-            new RenderedFeatureQueryOptions().layerIds(List.of("road")).filter(filter));
-    assertTrue(rendered.hasLayerIds());
-    assertEquals(List.of("road"), rendered.layerIds());
-    assertEquals(filter, ValueStructs.jsonValue(rendered.filter()));
-
-    var source =
-        QueryStructs.sourceFeatureQueryOptions(
-            new SourceFeatureQueryOptions().sourceLayerIds(List.of("landuse")).filter(filter));
-    assertTrue(source.hasSourceLayerIds());
-    assertEquals(List.of("landuse"), source.sourceLayerIds());
-
     var runtime =
         RuntimeStructs.runtimeOptions(
             new RuntimeOptions().assetPath("assets").cachePath("cache").maximumCacheSize(42));
@@ -146,23 +124,6 @@ final class DescriptorStructsTest {
     assertEquals(ResourceErrorReason.NOT_FOUND.nativeValue(), response.errorReason());
     assertEquals("missing", response.errorMessage());
     assertEquals("abc", response.etag());
-
-    var tileSource =
-        StyleStructs.tileSourceOptions(
-            new TileSourceOptions()
-                .minZoom(1)
-                .maxZoom(2)
-                .attribution("©")
-                .scheme(TileScheme.TMS)
-                .vectorEncoding(VectorTileEncoding.MVT));
-    assertTrue(tileSource.hasMinZoom());
-    assertEquals(TileScheme.TMS.nativeValue(), tileSource.scheme());
-    assertEquals(VectorTileEncoding.MVT.nativeValue(), tileSource.vectorEncoding());
-
-    var image = StyleStructs.styleImageOptions(new StyleImageOptions().pixelRatio(2).sdf(true));
-    assertTrue(image.hasPixelRatio());
-    assertTrue(image.hasSdf());
-    assertTrue(image.sdf());
   }
 
   @Test

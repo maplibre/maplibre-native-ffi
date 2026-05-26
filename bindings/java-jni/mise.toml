@@ -15,8 +15,6 @@ run = "../../gradlew :bindings:java-jni:test --rerun-tasks -Dorg.maplibre.native
 description = "Run Java JNI branch-readiness checks."
 run = [
   { task = "native:build" },
-  "cargo check -p maplibre-native-jni",
-  "cargo test -p maplibre-native-jni",
   { task = "test:native" },
   "../../gradlew :bindings:java-jni:javadoc",
 ]
