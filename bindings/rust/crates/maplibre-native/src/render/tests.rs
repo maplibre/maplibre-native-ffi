@@ -1,27 +1,40 @@
 use std::error::Error as StdError;
 use std::ffi::{CStr, CString};
+use std::num::NonZeroU32;
 use std::time::Duration;
 
 use ash::vk;
 use ash::vk::Handle;
+use glow::HasContext;
+use glutin::config::ConfigTemplateBuilder;
+#[cfg(target_os = "linux")]
+use glutin::config::{AsRawConfig, RawConfig};
+use glutin::context::{
+    AsRawContext, ContextApi, ContextAttributesBuilder, PossiblyCurrentContext, RawContext, Version,
+};
+#[cfg(target_os = "linux")]
+use glutin::display::{AsRawDisplay, RawDisplay};
+use glutin::display::{GetGlDisplay, GlDisplay};
+use glutin::prelude::*;
+#[cfg(target_os = "linux")]
+use glutin::surface::{AsRawSurface, RawSurface};
+use glutin::surface::{Surface, SurfaceAttributesBuilder, WindowSurface};
+use glutin_winit::{ApiPreference, DisplayBuilder};
 use static_assertions::assert_not_impl_any;
 #[cfg(target_os = "windows")]
 use windows_sys::Win32::Foundation::HWND;
 #[cfg(target_os = "windows")]
-use windows_sys::Win32::Graphics::Gdi::{GetDC, ReleaseDC};
+use windows_sys::Win32::Graphics::Gdi::{GetDC, HDC, ReleaseDC};
+use winit::dpi::PhysicalSize;
+use winit::event_loop::EventLoop;
 #[cfg(target_os = "windows")]
-use windows_sys::Win32::Graphics::OpenGL::{
-    ChoosePixelFormat, PFD_DOUBLEBUFFER, PFD_DRAW_TO_WINDOW, PFD_MAIN_PLANE, PFD_SUPPORT_OPENGL,
-    PFD_TYPE_RGBA, PIXELFORMATDESCRIPTOR, SetPixelFormat, wglCreateContext, wglDeleteContext,
-    wglGetProcAddress, wglMakeCurrent,
-};
+use winit::platform::windows::EventLoopBuilderExtWindows;
+#[cfg(target_os = "linux")]
+use winit::platform::x11::EventLoopBuilderExtX11;
 #[cfg(target_os = "windows")]
-use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
-#[cfg(target_os = "windows")]
-use windows_sys::Win32::UI::WindowsAndMessaging::{
-    CS_OWNDC, CreateWindowExW, DefWindowProcW, DestroyWindow, RegisterClassW, WNDCLASSW,
-    WS_OVERLAPPEDWINDOW,
-};
+use winit::raw_window_handle::Win32WindowHandle;
+use winit::raw_window_handle::{HasWindowHandle, RawWindowHandle};
+use winit::window::{Window, WindowAttributes};
 
 use super::*;
 use crate::{
@@ -40,52 +53,6 @@ assert_not_impl_any!(OpenGLOwnedTextureFrameHandle: Send, Sync);
 const FEATURE_STATE_STYLE_JSON: &str = r#"{"version":8,"sources":{"point":{"type":"geojson","data":{"type":"FeatureCollection","features":[{"type":"Feature","id":"feature-1","properties":{},"geometry":{"type":"Point","coordinates":[0,0]}}]}}},"layers":[{"id":"circle","type":"circle","source":"point","paint":{"circle-radius":["case",["boolean",["feature-state","hover"],false],10,5]}}]}"#;
 const QUERY_STYLE_JSON: &str = r##"{"version":8,"sources":{"point":{"type":"geojson","data":{"type":"FeatureCollection","features":[{"type":"Feature","id":"feature-1","geometry":{"type":"Point","coordinates":[-122.4194,37.7749]},"properties":{"kind":"capital","visible":true}}]}}},"layers":[{"id":"background","type":"background","paint":{"background-color":"#d8f1ff"}},{"id":"point-circle","type":"circle","source":"point","paint":{"circle-color":"#f97316","circle-radius":12}}]}"##;
 const CLUSTER_STYLE_JSON: &str = r##"{"version":8,"sources":{"cluster-source":{"type":"geojson","cluster":true,"data":{"type":"FeatureCollection","features":[{"type":"Feature","geometry":{"type":"Point","coordinates":[0.0,0.0]},"properties":{"name":"one"}},{"type":"Feature","geometry":{"type":"Point","coordinates":[0.001,0.001]},"properties":{"name":"two"}},{"type":"Feature","geometry":{"type":"Point","coordinates":[0.002,0.002]},"properties":{"name":"three"}}]}}},"layers":[{"id":"background","type":"background","paint":{"background-color":"#ffffff"}},{"id":"cluster-circle","type":"circle","source":"cluster-source","filter":["has","point_count"],"paint":{"circle-color":"#2563eb","circle-radius":20}}]}"##;
-#[cfg(target_os = "windows")]
-const GL_NO_ERROR: u32 = 0;
-const GL_TEXTURE_2D: u32 = 0x0de1;
-#[cfg(target_os = "windows")]
-const GL_RGBA: u32 = 0x1908;
-#[cfg(target_os = "windows")]
-const GL_UNSIGNED_BYTE: u32 = 0x1401;
-#[cfg(target_os = "windows")]
-const GL_RGBA8: i32 = 0x8058;
-#[cfg(target_os = "windows")]
-const GL_TEXTURE_MAG_FILTER: u32 = 0x2800;
-#[cfg(target_os = "windows")]
-const GL_TEXTURE_MIN_FILTER: u32 = 0x2801;
-#[cfg(target_os = "windows")]
-const GL_NEAREST: i32 = 0x2600;
-
-// Keep this to the OpenGL 1.1 symbols exported by opengl32.dll; adding a GL
-// loader crate here would only support the Windows test helper.
-#[cfg(target_os = "windows")]
-#[link(name = "opengl32")]
-unsafe extern "system" {
-    fn glBindTexture(target: u32, texture: u32);
-    fn glDeleteTextures(n: i32, textures: *const u32);
-    fn glGenTextures(n: i32, textures: *mut u32);
-    fn glGetError() -> u32;
-    fn glGetTexImage(
-        target: u32,
-        level: i32,
-        format: u32,
-        type_: u32,
-        pixels: *mut std::ffi::c_void,
-    );
-    fn glTexImage2D(
-        target: u32,
-        level: i32,
-        internal_format: i32,
-        width: i32,
-        height: i32,
-        border: i32,
-        format: u32,
-        type_: u32,
-        pixels: *const std::ffi::c_void,
-    );
-    fn glTexParameteri(target: u32, pname: u32, param: i32);
-}
-
 fn create_owned_texture_session(
     map: &MapHandle,
     extent: RenderTargetExtent,
@@ -156,7 +123,7 @@ fn create_opengl_borrowed_texture_session(
         extent,
         texture.descriptor(),
         texture.name(),
-        GL_TEXTURE_2D,
+        glow::TEXTURE_2D,
     ))?;
     Ok((texture, session))
 }
@@ -221,224 +188,117 @@ impl MetalTestContext {
     }
 }
 
-#[cfg(target_os = "windows")]
-struct WglWindow {
-    hwnd: HWND,
-}
-
-#[cfg(target_os = "windows")]
-impl WglWindow {
-    fn new() -> std::result::Result<Self, Box<dyn StdError>> {
-        let class_name: Vec<u16> = "MaplibreNativeRustWglTest\0".encode_utf16().collect();
-        // SAFETY: Passing null requests the current process module handle.
-        let hinstance = unsafe { GetModuleHandleW(std::ptr::null()) };
-        if hinstance.is_null() {
-            return Err("GetModuleHandleW returned null".into());
-        }
-        let class = WNDCLASSW {
-            style: CS_OWNDC,
-            lpfnWndProc: Some(DefWindowProcW),
-            hInstance: hinstance,
-            lpszClassName: class_name.as_ptr(),
-            ..unsafe { std::mem::zeroed() }
-        };
-        // SAFETY: class points to stable storage for the duration of the call.
-        let _ = unsafe { RegisterClassW(&class) };
-        // SAFETY: The class was registered above or by an earlier test in this process.
-        let hwnd = unsafe {
-            CreateWindowExW(
-                0,
-                class_name.as_ptr(),
-                class_name.as_ptr(),
-                WS_OVERLAPPEDWINDOW,
-                0,
-                0,
-                8,
-                8,
-                std::ptr::null_mut(),
-                std::ptr::null_mut(),
-                hinstance,
-                std::ptr::null(),
-            )
-        };
-        if hwnd.is_null() {
-            return Err("CreateWindowExW returned null".into());
-        }
-        Ok(Self { hwnd })
-    }
-}
-
-#[cfg(target_os = "windows")]
-impl Drop for WglWindow {
-    fn drop(&mut self) {
-        // SAFETY: hwnd belongs to this helper window.
-        unsafe {
-            DestroyWindow(self.hwnd);
-        }
-    }
-}
-
 struct OpenGLTestContext {
+    descriptor: OpenGLContextDescriptor,
+    surface_handle: NativePointer,
+    gl: glow::Context,
+    context: PossiblyCurrentContext,
+    surface: Surface<WindowSurface>,
+    _window: Window,
+    _event_loop: EventLoop<()>,
     #[cfg(target_os = "windows")]
-    window: WglWindow,
+    hwnd: HWND,
     #[cfg(target_os = "windows")]
-    device_context: NativePointer,
-    #[cfg(target_os = "windows")]
-    share_context: NativePointer,
+    hdc: HDC,
 }
 
 impl OpenGLTestContext {
     fn new() -> std::result::Result<Self, Box<dyn StdError>> {
+        let mut event_loop_builder = EventLoop::builder();
         #[cfg(target_os = "windows")]
-        {
-            let window = WglWindow::new()?;
-            // SAFETY: hwnd is a live helper window with CS_OWNDC.
-            let hdc = unsafe { GetDC(window.hwnd) };
-            if hdc.is_null() {
-                return Err("GetDC returned null".into());
-            }
-            let pfd = PIXELFORMATDESCRIPTOR {
-                nSize: std::mem::size_of::<PIXELFORMATDESCRIPTOR>() as u16,
-                nVersion: 1,
-                dwFlags: PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER,
-                iPixelType: PFD_TYPE_RGBA,
-                cColorBits: 32,
-                cDepthBits: 24,
-                cStencilBits: 8,
-                iLayerType: PFD_MAIN_PLANE as u8,
-                ..unsafe { std::mem::zeroed() }
-            };
-            // SAFETY: hdc is live and pfd points to initialized storage.
-            let pixel_format = unsafe { ChoosePixelFormat(hdc, &pfd) };
-            if pixel_format == 0 {
-                // SAFETY: hdc came from this window.
-                unsafe {
-                    ReleaseDC(window.hwnd, hdc);
-                }
-                return Err("ChoosePixelFormat returned 0".into());
-            }
-            // SAFETY: hdc is live and pfd describes the selected pixel format.
-            if unsafe { SetPixelFormat(hdc, pixel_format, &pfd) } == 0 {
-                unsafe {
-                    ReleaseDC(window.hwnd, hdc);
-                }
-                return Err("SetPixelFormat failed".into());
-            }
-            // SAFETY: hdc has an OpenGL-capable pixel format.
-            let hglrc = unsafe { wglCreateContext(hdc) };
-            if hglrc.is_null() {
-                unsafe {
-                    ReleaseDC(window.hwnd, hdc);
-                }
-                return Err("wglCreateContext returned null".into());
-            }
-            // SAFETY: Make the host context current once so WGL extension
-            // lookups and texture share-group behavior are available.
-            if unsafe { wglMakeCurrent(hdc, hglrc) } == 0 {
-                unsafe {
-                    wglDeleteContext(hglrc);
-                    ReleaseDC(window.hwnd, hdc);
-                }
-                return Err("wglMakeCurrent failed".into());
-            }
-            Ok(Self {
-                window,
-                // SAFETY: The WGL handles remain live for the test context lifetime.
-                device_context: unsafe { NativePointer::from_ptr(hdc) },
-                share_context: unsafe { NativePointer::from_ptr(hglrc) },
-            })
-        }
-
+        event_loop_builder.with_any_thread(true);
         #[cfg(target_os = "linux")]
-        {
-            // TODO(linux): Add an EGL pbuffer/context helper for Rust OpenGL
-            // binding tests on a Linux machine with the CI EGL/llvmpipe stack.
-            Err("OpenGL EGL test context is not available in Rust tests yet".into())
-        }
+        event_loop_builder.with_any_thread(true);
+        let event_loop = event_loop_builder.build()?;
 
-        #[cfg(not(any(target_os = "windows", target_os = "linux")))]
-        {
-            Err("OpenGL test context is only available on Windows WGL".into())
-        }
+        let window_attributes = WindowAttributes::default()
+            .with_visible(false)
+            .with_inner_size(PhysicalSize::new(8, 8));
+        let template = ConfigTemplateBuilder::new()
+            .with_alpha_size(8)
+            .with_depth_size(24)
+            .with_stencil_size(8);
+        let (window, config) = DisplayBuilder::new()
+            .with_preference(ApiPreference::PreferEgl)
+            .with_window_attributes(Some(window_attributes))
+            .build(&event_loop, template, |configs| {
+                configs
+                    .max_by_key(|config| config.num_samples())
+                    .expect("glutin returned no OpenGL configs")
+            })?;
+        let window = window.ok_or("glutin did not create a test window")?;
+        let raw_window_handle = window.window_handle()?.as_raw();
+
+        let context_attributes = ContextAttributesBuilder::new()
+            .with_context_api(ContextApi::OpenGl(Some(Version::new(3, 0))))
+            .build(Some(raw_window_handle));
+        let display = config.display();
+        // SAFETY: raw_window_handle comes from a live winit window and config
+        // was selected from the same glutin display.
+        let not_current = unsafe { display.create_context(&config, &context_attributes)? };
+
+        let surface_attributes = SurfaceAttributesBuilder::<WindowSurface>::new().build(
+            raw_window_handle,
+            NonZeroU32::new(8).unwrap(),
+            NonZeroU32::new(8).unwrap(),
+        );
+        // SAFETY: raw_window_handle comes from a live winit window and the
+        // surface attributes were built for that window.
+        let surface = unsafe { display.create_window_surface(&config, &surface_attributes)? };
+        let context = not_current.make_current(&surface)?;
+        let gl = unsafe {
+            glow::Context::from_loader_function(|symbol| {
+                let symbol = CString::new(symbol).expect("GL symbol names do not contain NULs");
+                display.get_proc_address(&symbol).cast()
+            })
+        };
+
+        #[cfg(target_os = "windows")]
+        let hwnd = hwnd_from_window(&window)?;
+        #[cfg(target_os = "windows")]
+        let hdc = hdc_from_hwnd(hwnd)?;
+        #[cfg(target_os = "windows")]
+        let device_context = unsafe { NativePointer::from_ptr(hdc) };
+        #[cfg(not(target_os = "windows"))]
+        let device_context = NativePointer::NULL;
+
+        let descriptor = opengl_context_descriptor_from_glutin(&config, &context, device_context)?;
+        let surface_handle = opengl_surface_handle_from_glutin(&surface, device_context)?;
+
+        Ok(Self {
+            descriptor,
+            surface_handle,
+            gl,
+            context,
+            surface,
+            #[cfg(target_os = "windows")]
+            hwnd,
+            #[cfg(target_os = "windows")]
+            hdc,
+            _window: window,
+            _event_loop: event_loop,
+        })
     }
 
     fn descriptor(&self) -> OpenGLContextDescriptor {
-        #[cfg(target_os = "windows")]
-        {
-            OpenGLContextDescriptor::wgl(
-                WglContextDescriptor::new(self.device_context, self.share_context)
-                    .with_proc_address(unsafe {
-                        NativePointer::from_address(wglGetProcAddress as *const () as usize)
-                    }),
-            )
-        }
-
-        #[cfg(not(target_os = "windows"))]
-        {
-            unreachable!("OpenGLTestContext::new is only implemented on Windows")
-        }
+        self.descriptor.clone()
     }
 
     fn surface(&self) -> NativePointer {
-        #[cfg(target_os = "windows")]
-        {
-            self.device_context
-        }
-
-        #[cfg(target_os = "linux")]
-        {
-            // TODO(linux): Return an EGLSurface once the Rust EGL helper exists.
-            unreachable!("OpenGLTestContext::new is not implemented on Linux yet")
-        }
-
-        #[cfg(not(any(target_os = "windows", target_os = "linux")))]
-        {
-            unreachable!("OpenGL test surfaces are only available on Windows WGL")
-        }
+        self.surface_handle
     }
 
     fn make_current(&self) -> std::result::Result<(), Box<dyn StdError>> {
-        #[cfg(target_os = "windows")]
-        {
-            // SAFETY: The WGL handles belong to this helper and remain live for
-            // its lifetime.
-            if unsafe {
-                wglMakeCurrent(
-                    self.device_context.as_ptr::<std::ffi::c_void>(),
-                    self.share_context.as_ptr::<std::ffi::c_void>(),
-                )
-            } == 0
-            {
-                Err("wglMakeCurrent failed".into())
-            } else {
-                Ok(())
-            }
-        }
-
-        #[cfg(not(target_os = "windows"))]
-        {
-            // TODO(linux): Make the EGL context current for Rust OpenGL helpers.
-            Err("OpenGL make-current helper is only available on Windows WGL".into())
-        }
+        self.context.make_current(&self.surface)?;
+        Ok(())
     }
 
     fn check_gl_error(&self, operation: &str) -> std::result::Result<(), Box<dyn StdError>> {
-        #[cfg(target_os = "windows")]
-        {
-            // SAFETY: A current context exists when callers check GL state.
-            let error = unsafe { glGetError() };
-            if error == GL_NO_ERROR {
-                Ok(())
-            } else {
-                Err(format!("{operation} failed with OpenGL error 0x{error:x}").into())
-            }
-        }
-
-        #[cfg(not(target_os = "windows"))]
-        {
-            let _ = operation;
-            // TODO(linux): Check EGL/OpenGL errors once the Linux helper exists.
-            Err("OpenGL error checking is only available on Windows WGL".into())
+        let error = unsafe { self.gl.get_error() };
+        if error == glow::NO_ERROR {
+            Ok(())
+        } else {
+            Err(format!("{operation} failed with OpenGL error 0x{error:x}").into())
         }
     }
 }
@@ -446,21 +306,105 @@ impl OpenGLTestContext {
 #[cfg(target_os = "windows")]
 impl Drop for OpenGLTestContext {
     fn drop(&mut self) {
-        // SAFETY: Handles belong to this test context and are released in
-        // dependency order after waiting for current-context teardown.
+        // SAFETY: hdc was acquired from this window with GetDC.
         unsafe {
-            let hdc = self.device_context.as_ptr::<std::ffi::c_void>();
-            let hglrc = self.share_context.as_ptr::<std::ffi::c_void>();
-            let _ = wglMakeCurrent(std::ptr::null_mut(), std::ptr::null_mut());
-            wglDeleteContext(hglrc);
-            ReleaseDC(self.window.hwnd, hdc);
+            ReleaseDC(self.hwnd, self.hdc);
         }
     }
 }
 
+fn opengl_context_descriptor_from_glutin(
+    _config: &glutin::config::Config,
+    context: &PossiblyCurrentContext,
+    device_context: NativePointer,
+) -> std::result::Result<OpenGLContextDescriptor, Box<dyn StdError>> {
+    #[cfg(target_os = "windows")]
+    {
+        let RawContext::Wgl(raw_context) = context.raw_context() else {
+            return Err("glutin did not create a WGL context".into());
+        };
+        let share_context = unsafe { NativePointer::from_ptr(raw_context.cast_mut()) };
+        Ok(OpenGLContextDescriptor::wgl(WglContextDescriptor::new(
+            device_context,
+            share_context,
+        )))
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        let _ = device_context;
+        let RawDisplay::Egl(raw_display) = _config.display().raw_display() else {
+            return Err("glutin did not create an EGL display".into());
+        };
+        let RawConfig::Egl(raw_config) = _config.raw_config() else {
+            return Err("glutin did not choose an EGL config".into());
+        };
+        let RawContext::Egl(raw_context) = context.raw_context() else {
+            return Err("glutin did not create an EGL context".into());
+        };
+        Ok(OpenGLContextDescriptor::egl(EglContextDescriptor::new(
+            unsafe { NativePointer::from_ptr(raw_display.cast_mut()) },
+            unsafe { NativePointer::from_ptr(raw_config.cast_mut()) },
+            unsafe { NativePointer::from_ptr(raw_context.cast_mut()) },
+        )))
+    }
+
+    #[cfg(not(any(target_os = "windows", target_os = "linux")))]
+    {
+        let _ = (_config, context, device_context);
+        Err("OpenGL test context is only available on Windows WGL and Linux EGL".into())
+    }
+}
+
+fn opengl_surface_handle_from_glutin(
+    surface: &Surface<WindowSurface>,
+    device_context: NativePointer,
+) -> std::result::Result<NativePointer, Box<dyn StdError>> {
+    #[cfg(target_os = "windows")]
+    {
+        let _ = surface;
+        Ok(device_context)
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        let _ = device_context;
+        let RawSurface::Egl(raw_surface) = surface.raw_surface() else {
+            return Err("glutin did not create an EGL surface".into());
+        };
+        Ok(unsafe { NativePointer::from_ptr(raw_surface.cast_mut()) })
+    }
+
+    #[cfg(not(any(target_os = "windows", target_os = "linux")))]
+    {
+        let _ = (surface, device_context);
+        Err("OpenGL test surfaces are only available on Windows WGL and Linux EGL".into())
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn hdc_from_hwnd(hwnd: HWND) -> std::result::Result<HDC, Box<dyn StdError>> {
+    // SAFETY: hwnd comes from a live winit window.
+    let hdc = unsafe { GetDC(hwnd) };
+    if hdc.is_null() {
+        Err("GetDC returned null".into())
+    } else {
+        Ok(hdc)
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn hwnd_from_window(window: &Window) -> std::result::Result<HWND, Box<dyn StdError>> {
+    let RawWindowHandle::Win32(Win32WindowHandle { hwnd, .. }) = window.window_handle()?.as_raw()
+    else {
+        return Err("winit did not return a Win32 window handle".into());
+    };
+    Ok(hwnd.get() as HWND)
+}
+
 struct OpenGLBorrowedTexture {
     context: OpenGLTestContext,
-    texture: u32,
+    texture: Option<glow::NativeTexture>,
     width: u32,
     height: u32,
 }
@@ -468,46 +412,41 @@ struct OpenGLBorrowedTexture {
 impl OpenGLBorrowedTexture {
     fn new(width: u32, height: u32) -> std::result::Result<Self, Box<dyn StdError>> {
         let context = OpenGLTestContext::new()?;
-        #[cfg(target_os = "windows")]
-        {
-            context.make_current()?;
-            let mut texture = 0;
-            // SAFETY: A current WGL context exists on this thread, and the
-            // texture object stays in the context share group for this helper's lifetime.
-            unsafe {
-                glGenTextures(1, &mut texture);
-                glBindTexture(GL_TEXTURE_2D, texture);
-                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-                glTexImage2D(
-                    GL_TEXTURE_2D,
-                    0,
-                    GL_RGBA8,
-                    width as i32,
-                    height as i32,
-                    0,
-                    GL_RGBA,
-                    GL_UNSIGNED_BYTE,
-                    std::ptr::null(),
-                );
-                glBindTexture(GL_TEXTURE_2D, 0);
-            }
-            context.check_gl_error("create borrowed texture")?;
-            Ok(Self {
-                context,
-                texture,
-                width,
-                height,
-            })
-        }
-
-        #[cfg(not(target_os = "windows"))]
-        {
-            let _ = (context, width, height);
-            // TODO(linux): Allocate an EGL-shared GL texture for Rust binding
-            // borrowed-texture tests once the Linux EGL helper is validated.
-            Err("OpenGL borrowed texture helper is only available on Windows WGL".into())
-        }
+        context.make_current()?;
+        let texture = unsafe {
+            let texture = context.gl.create_texture()?;
+            context.gl.bind_texture(glow::TEXTURE_2D, Some(texture));
+            context.gl.tex_parameter_i32(
+                glow::TEXTURE_2D,
+                glow::TEXTURE_MIN_FILTER,
+                glow::NEAREST as i32,
+            );
+            context.gl.tex_parameter_i32(
+                glow::TEXTURE_2D,
+                glow::TEXTURE_MAG_FILTER,
+                glow::NEAREST as i32,
+            );
+            context.gl.tex_image_2d(
+                glow::TEXTURE_2D,
+                0,
+                glow::RGBA8 as i32,
+                width as i32,
+                height as i32,
+                0,
+                glow::RGBA,
+                glow::UNSIGNED_BYTE,
+                glow::PixelUnpackData::Slice(None),
+            );
+            context.gl.bind_texture(glow::TEXTURE_2D, None);
+            texture
+        };
+        context.check_gl_error("create borrowed texture")?;
+        Ok(Self {
+            context,
+            texture: Some(texture),
+            width,
+            height,
+        })
     }
 
     fn descriptor(&self) -> OpenGLContextDescriptor {
@@ -515,50 +454,35 @@ impl OpenGLBorrowedTexture {
     }
 
     fn name(&self) -> u32 {
-        self.texture
+        self.texture.map(|texture| texture.0.get()).unwrap_or(0)
     }
 
     fn read_rgba(&self) -> std::result::Result<Vec<u8>, Box<dyn StdError>> {
-        #[cfg(target_os = "windows")]
-        {
-            self.context.make_current()?;
-            let mut pixels = vec![0_u8; self.width as usize * self.height as usize * 4];
-            // SAFETY: The texture belongs to the current context share group,
-            // and pixels points to enough writable storage for the RGBA8 image.
-            unsafe {
-                glBindTexture(GL_TEXTURE_2D, self.texture);
-                glGetTexImage(
-                    GL_TEXTURE_2D,
-                    0,
-                    GL_RGBA,
-                    GL_UNSIGNED_BYTE,
-                    pixels.as_mut_ptr().cast(),
-                );
-                glBindTexture(GL_TEXTURE_2D, 0);
-            }
-            self.context.check_gl_error("read borrowed texture")?;
-            Ok(pixels)
+        self.context.make_current()?;
+        let mut pixels = vec![0_u8; self.width as usize * self.height as usize * 4];
+        unsafe {
+            self.context.gl.bind_texture(glow::TEXTURE_2D, self.texture);
+            self.context.gl.get_tex_image(
+                glow::TEXTURE_2D,
+                0,
+                glow::RGBA,
+                glow::UNSIGNED_BYTE,
+                glow::PixelPackData::Slice(Some(&mut pixels)),
+            );
+            self.context.gl.bind_texture(glow::TEXTURE_2D, None);
         }
-
-        #[cfg(not(target_os = "windows"))]
-        {
-            // TODO(linux): Read back from the EGL texture helper once it exists.
-            Err("OpenGL borrowed texture readback is only available on Windows WGL".into())
-        }
+        self.context.check_gl_error("read borrowed texture")?;
+        Ok(pixels)
     }
 }
 
 impl Drop for OpenGLBorrowedTexture {
     fn drop(&mut self) {
-        #[cfg(target_os = "windows")]
+        if let Some(texture) = self.texture.take()
+            && self.context.make_current().is_ok()
         {
-            if self.texture != 0 && self.context.make_current().is_ok() {
-                // SAFETY: The texture was created by this helper in the current
-                // context share group and has not been deleted yet.
-                unsafe {
-                    glDeleteTextures(1, &self.texture);
-                }
-                self.texture = 0;
+            unsafe {
+                self.context.gl.delete_texture(texture);
             }
         }
     }
@@ -920,10 +844,10 @@ fn opengl_owned_texture_session_attaches_with_platform_context() {
     let frame = session.acquire_opengl_owned_texture_frame().unwrap();
     assert_eq!(frame.frame().unwrap().width, 32);
     assert_eq!(frame.frame().unwrap().height, 16);
-    assert_eq!(frame.frame().unwrap().target, GL_TEXTURE_2D);
-    assert_eq!(frame.frame().unwrap().internal_format, GL_RGBA8 as u32);
-    assert_eq!(frame.frame().unwrap().format, GL_RGBA);
-    assert_eq!(frame.frame().unwrap().type_, GL_UNSIGNED_BYTE);
+    assert_eq!(frame.frame().unwrap().target, glow::TEXTURE_2D);
+    assert_eq!(frame.frame().unwrap().internal_format, glow::RGBA8);
+    assert_eq!(frame.frame().unwrap().format, glow::RGBA);
+    assert_eq!(frame.frame().unwrap().type_, glow::UNSIGNED_BYTE);
     assert!(!frame.texture().unwrap().is_zero());
     frame.close().unwrap();
 
@@ -1458,7 +1382,7 @@ fn opengl_attach_calls_report_unsupported_when_backend_unavailable() {
             RenderTargetExtent::new(32, 16, 1.0),
             opengl_context.clone(),
             1,
-            GL_TEXTURE_2D,
+            glow::TEXTURE_2D,
         ))
         .unwrap_err();
     assert_eq!(error.kind(), ErrorKind::Unsupported);
