@@ -4,6 +4,7 @@
 
 const build_options = @import("build_options");
 const builtin = @import("builtin");
+const gl = if (builtin.os.tag == .windows) @import("gl") else struct {};
 const std = @import("std");
 const testing = @import("std").testing;
 const support = @import("support.zig");
@@ -23,10 +24,6 @@ const wgl = if (builtin.os.tag == .windows) struct {
     const WPARAM = usize;
     const LPARAM = isize;
     const LRESULT = isize;
-    const GLenum = c_uint;
-    const GLint = c_int;
-    const GLsizei = c_int;
-    const GLuint = c_uint;
 
     const HDC = *opaque {};
     const HGLRC = *opaque {};
@@ -84,20 +81,10 @@ const wgl = if (builtin.os.tag == .windows) struct {
     const PFD_TYPE_RGBA = 0;
     const PFD_MAIN_PLANE = 0;
     const WS_OVERLAPPEDWINDOW = 0x00cf0000;
-    const GL_NO_ERROR = 0;
-    const GL_FRONT = 0x0404;
-    const GL_TEXTURE_2D = 0x0de1;
-    const GL_RGBA = 0x1908;
-    const GL_RGBA8 = 0x8058;
-    const GL_UNSIGNED_BYTE = 0x1401;
-    const GL_TEXTURE_MAG_FILTER = 0x2800;
-    const GL_TEXTURE_MIN_FILTER = 0x2801;
-    const GL_TEXTURE_WRAP_S = 0x2802;
-    const GL_TEXTURE_WRAP_T = 0x2803;
-    const GL_LINEAR = 0x2601;
-    const GL_CLAMP = 0x2900;
 
     extern "kernel32" fn GetModuleHandleA(lpModuleName: ?LPCSTR) callconv(.winapi) ?HINSTANCE;
+    extern "kernel32" fn GetProcAddress(hModule: HINSTANCE, lpProcName: LPCSTR) callconv(.winapi) ?*anyopaque;
+    extern "kernel32" fn LoadLibraryA(lpLibFileName: LPCSTR) callconv(.winapi) ?HINSTANCE;
     extern "user32" fn RegisterClassA(lpWndClass: *const WNDCLASSA) callconv(.winapi) u16;
     extern "user32" fn CreateWindowExA(
         dwExStyle: DWORD,
@@ -123,28 +110,56 @@ const wgl = if (builtin.os.tag == .windows) struct {
     extern "opengl32" fn wglDeleteContext(hglrc: HGLRC) callconv(.winapi) BOOL;
     extern "opengl32" fn wglGetProcAddress(name: LPCSTR) callconv(.winapi) ?*anyopaque;
     extern "opengl32" fn wglMakeCurrent(hdc: ?HDC, hglrc: ?HGLRC) callconv(.winapi) BOOL;
-    extern "opengl32" fn glBindTexture(target: GLenum, texture: GLuint) callconv(.winapi) void;
-    extern "opengl32" fn glDeleteTextures(n: GLsizei, textures: *const GLuint) callconv(.winapi) void;
-    extern "opengl32" fn glGenTextures(n: GLsizei, textures: *GLuint) callconv(.winapi) void;
-    extern "opengl32" fn glGetError() callconv(.winapi) GLenum;
-    extern "opengl32" fn glGetTexImage(target: GLenum, level: GLint, format: GLenum, @"type": GLenum, pixels: *anyopaque) callconv(.winapi) void;
-    extern "opengl32" fn glReadBuffer(src: GLenum) callconv(.winapi) void;
-    extern "opengl32" fn glReadPixels(x: GLint, y: GLint, width: GLsizei, height: GLsizei, format: GLenum, @"type": GLenum, pixels: *anyopaque) callconv(.winapi) void;
-    extern "opengl32" fn glTexImage2D(
-        target: GLenum,
-        level: GLint,
-        internalformat: GLint,
-        width: GLsizei,
-        height: GLsizei,
-        border: GLint,
-        format: GLenum,
-        @"type": GLenum,
-        pixels: ?*const anyopaque,
-    ) callconv(.winapi) void;
-    extern "opengl32" fn glTexParameteri(target: GLenum, pname: GLenum, param: GLint) callconv(.winapi) void;
 
     fn windowProc(hWnd: HWND, msg: UINT, wParam: WPARAM, lParam: LPARAM) callconv(.winapi) LRESULT {
         return DefWindowProcA(hWnd, msg, wParam, lParam);
+    }
+
+    fn getProcAddress(name: [*:0]const u8) ?gl.PROC {
+        if (wglGetProcAddress(name)) |proc| return @ptrCast(proc);
+        const module = GetModuleHandleA("opengl32.dll") orelse LoadLibraryA("opengl32.dll") orelse return null;
+        return @ptrCast(GetProcAddress(module, name) orelse return null);
+    }
+} else struct {};
+
+const gl_texture_2d = 0x0de1;
+
+fn GlProc(comptime name: []const u8) type {
+    if (builtin.os.tag != .windows) return void;
+    return @TypeOf(@field(@as(gl.ProcTable, undefined), name));
+}
+
+fn glProcName(comptime command: []const u8) [:0]const u8 {
+    return "gl" ++ command;
+}
+
+const WglTestProcs = if (builtin.os.tag == .windows) struct {
+    BindTexture: GlProc("BindTexture"),
+    DeleteTextures: GlProc("DeleteTextures"),
+    GenTextures: GlProc("GenTextures"),
+    GetError: GlProc("GetError"),
+    GetTexImage: GlProc("GetTexImage"),
+    ReadBuffer: GlProc("ReadBuffer"),
+    ReadPixels: GlProc("ReadPixels"),
+    TexImage2D: GlProc("TexImage2D"),
+    TexParameteri: GlProc("TexParameteri"),
+
+    fn init() !WglTestProcs {
+        var procs: WglTestProcs = undefined;
+        inline for (.{
+            "BindTexture",
+            "DeleteTextures",
+            "GenTextures",
+            "GetError",
+            "GetTexImage",
+            "ReadBuffer",
+            "ReadPixels",
+            "TexImage2D",
+            "TexParameteri",
+        }) |command| {
+            @field(procs, command) = @ptrCast(wgl.getProcAddress(glProcName(command)) orelse return error.SkipZigTest);
+        }
+        return procs;
     }
 } else struct {};
 
@@ -313,6 +328,7 @@ const WglTestContext = if (builtin.os.tag == .windows) struct {
     window: wgl.HWND,
     device_context: wgl.HDC,
     share_context: wgl.HGLRC,
+    procs: WglTestProcs,
 
     pub fn init() !WglTestContext {
         return initWithSize(8, 8);
@@ -366,11 +382,13 @@ const WglTestContext = if (builtin.os.tag == .windows) struct {
         const share_context = wgl.wglCreateContext(device_context) orelse return error.SkipZigTest;
         errdefer _ = wgl.wglDeleteContext(share_context);
         if (wgl.wglMakeCurrent(device_context, share_context) == 0) return error.SkipZigTest;
+        const procs = try WglTestProcs.init();
 
         return .{
             .window = window,
             .device_context = device_context,
             .share_context = share_context,
+            .procs = procs,
         };
     }
 
@@ -396,50 +414,50 @@ const WglTestContext = if (builtin.os.tag == .windows) struct {
         };
     }
 
-    pub fn createRgbaTexture(self: *const WglTestContext, width: u32, height: u32) !wgl.GLuint {
+    pub fn createRgbaTexture(self: *const WglTestContext, width: u32, height: u32) !gl.uint {
         if (wgl.wglMakeCurrent(self.device_context, self.share_context) == 0) return error.SkipZigTest;
 
-        var texture: wgl.GLuint = 0;
-        wgl.glGenTextures(1, &texture);
+        var texture: gl.uint = 0;
+        self.procs.GenTextures(1, @ptrCast(&texture));
         if (texture == 0) return error.SkipZigTest;
-        errdefer wgl.glDeleteTextures(1, &texture);
+        errdefer self.procs.DeleteTextures(1, @ptrCast(&texture));
 
-        wgl.glBindTexture(wgl.GL_TEXTURE_2D, texture);
-        wgl.glTexParameteri(wgl.GL_TEXTURE_2D, wgl.GL_TEXTURE_MIN_FILTER, wgl.GL_LINEAR);
-        wgl.glTexParameteri(wgl.GL_TEXTURE_2D, wgl.GL_TEXTURE_MAG_FILTER, wgl.GL_LINEAR);
-        wgl.glTexParameteri(wgl.GL_TEXTURE_2D, wgl.GL_TEXTURE_WRAP_S, wgl.GL_CLAMP);
-        wgl.glTexParameteri(wgl.GL_TEXTURE_2D, wgl.GL_TEXTURE_WRAP_T, wgl.GL_CLAMP);
-        wgl.glTexImage2D(
-            wgl.GL_TEXTURE_2D,
+        self.procs.BindTexture(gl.TEXTURE_2D, texture);
+        self.procs.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        self.procs.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        self.procs.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP);
+        self.procs.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP);
+        self.procs.TexImage2D(
+            gl.TEXTURE_2D,
             0,
-            wgl.GL_RGBA,
+            gl.RGBA,
             @intCast(width),
             @intCast(height),
             0,
-            wgl.GL_RGBA,
-            wgl.GL_UNSIGNED_BYTE,
+            gl.RGBA,
+            gl.UNSIGNED_BYTE,
             null,
         );
-        try testing.expectEqual(@as(wgl.GLenum, wgl.GL_NO_ERROR), wgl.glGetError());
+        try testing.expectEqual(@as(gl.@"enum", gl.NO_ERROR), self.procs.GetError());
         return texture;
     }
 
-    pub fn destroyTexture(_: *const WglTestContext, texture: wgl.GLuint) void {
-        wgl.glDeleteTextures(1, &texture);
+    pub fn destroyTexture(self: *const WglTestContext, texture: gl.uint) void {
+        self.procs.DeleteTextures(1, @ptrCast(&texture));
     }
 
-    pub fn readRgbaTexture(self: *const WglTestContext, texture: wgl.GLuint, pixels: []u8) !void {
+    pub fn readRgbaTexture(self: *const WglTestContext, texture: gl.uint, pixels: []u8) !void {
         if (wgl.wglMakeCurrent(self.device_context, self.share_context) == 0) return error.SkipZigTest;
-        wgl.glBindTexture(wgl.GL_TEXTURE_2D, texture);
-        wgl.glGetTexImage(wgl.GL_TEXTURE_2D, 0, wgl.GL_RGBA, wgl.GL_UNSIGNED_BYTE, pixels.ptr);
-        try testing.expectEqual(@as(wgl.GLenum, wgl.GL_NO_ERROR), wgl.glGetError());
+        self.procs.BindTexture(gl.TEXTURE_2D, texture);
+        self.procs.GetTexImage(gl.TEXTURE_2D, 0, gl.RGBA, gl.UNSIGNED_BYTE, pixels.ptr);
+        try testing.expectEqual(@as(gl.@"enum", gl.NO_ERROR), self.procs.GetError());
     }
 
     pub fn readSurfaceRgba(self: *const WglTestContext, width: u32, height: u32, pixels: []u8) !void {
         if (wgl.wglMakeCurrent(self.device_context, self.share_context) == 0) return error.SkipZigTest;
-        wgl.glReadBuffer(wgl.GL_FRONT);
-        wgl.glReadPixels(0, 0, @intCast(width), @intCast(height), wgl.GL_RGBA, wgl.GL_UNSIGNED_BYTE, pixels.ptr);
-        try testing.expectEqual(@as(wgl.GLenum, wgl.GL_NO_ERROR), wgl.glGetError());
+        self.procs.ReadBuffer(gl.FRONT);
+        self.procs.ReadPixels(0, 0, @intCast(width), @intCast(height), gl.RGBA, gl.UNSIGNED_BYTE, pixels.ptr);
+        try testing.expectEqual(@as(gl.@"enum", gl.NO_ERROR), self.procs.GetError());
     }
 } else struct {};
 
@@ -608,10 +626,10 @@ test "OpenGL WGL owned texture renders through raw C ABI" {
     try testing.expectEqual(c.MLN_STATUS_OK, c.mln_opengl_owned_texture_acquire_frame(handle, &frame));
     try testing.expectEqual(@as(u32, 256), frame.width);
     try testing.expectEqual(@as(u32, 256), frame.height);
-    try testing.expectEqual(@as(u32, 0x0de1), frame.target);
-    try testing.expectEqual(@as(u32, wgl.GL_RGBA8), frame.internal_format);
-    try testing.expectEqual(@as(u32, wgl.GL_RGBA), frame.format);
-    try testing.expectEqual(@as(u32, wgl.GL_UNSIGNED_BYTE), frame.type);
+    try testing.expectEqual(@as(u32, gl_texture_2d), frame.target);
+    try testing.expectEqual(@as(u32, gl.RGBA8), frame.internal_format);
+    try testing.expectEqual(@as(u32, gl.RGBA), frame.format);
+    try testing.expectEqual(@as(u32, gl.UNSIGNED_BYTE), frame.type);
     try testing.expect(frame.texture != 0);
     try testing.expectEqual(c.MLN_STATUS_INVALID_STATE, c.mln_texture_read_premultiplied_rgba8(handle, pixels.ptr, pixels.len, &image_info));
     try testing.expectEqual(c.MLN_STATUS_OK, c.mln_opengl_owned_texture_release_frame(handle, &frame));
@@ -637,7 +655,7 @@ test "OpenGL WGL borrowed texture renders through raw C ABI" {
     descriptor.extent.scale_factor = 1.0;
     descriptor.context = wgl_context.descriptor();
     descriptor.texture = texture;
-    descriptor.target = wgl.GL_TEXTURE_2D;
+    descriptor.target = gl.TEXTURE_2D;
 
     var session: ?*c.mln_render_session = null;
     try testing.expectEqual(c.MLN_STATUS_OK, c.mln_opengl_borrowed_texture_attach(map, &descriptor, &session));

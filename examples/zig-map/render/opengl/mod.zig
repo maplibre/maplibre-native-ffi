@@ -3,157 +3,85 @@ const builtin = @import("builtin");
 
 const c = @import("../../c.zig").c;
 const diagnostics = @import("../../diagnostics.zig");
+const gl = @import("gl");
 const maplibre = @import("maplibre_native");
 const render_target = @import("../../render_target.zig");
 const types = @import("../../types.zig");
 
 pub const OpenGLBackend = PlatformOpenGLBackend;
 
-// Modern OpenGL entry points are loaded from the active SDL GL context so this
-// example works across WGL and EGL instead of linking to one platform library.
-const gl = struct {
-    const GLenum = c_uint;
-    const GLint = c_int;
-    const GLsizei = c_int;
-    const GLuint = c_uint;
-    const GLbitfield = c_uint;
-    const GLfloat = f32;
-    const GLdouble = f64;
-    const GLchar = u8;
-    const GLboolean = u8;
-
-    const COLOR_BUFFER_BIT: GLbitfield = 0x0000_4000;
-    const COMPILE_STATUS: GLenum = 0x8b81;
-    const CULL_FACE: GLenum = 0x0b44;
-    const DEPTH_TEST: GLenum = 0x0b71;
-    const FALSE: GLint = 0;
-    const FRAMEBUFFER: GLenum = 0x8d40;
-    const FRAGMENT_SHADER: GLenum = 0x8b30;
-    const LINEAR: GLint = 0x2601;
-    const LINK_STATUS: GLenum = 0x8b82;
-    const MODELVIEW: GLenum = 0x1700;
-    const NO_ERROR: GLenum = 0;
-    const PROJECTION: GLenum = 0x1701;
-    const QUADS: GLenum = 0x0007;
-    const RGBA: GLenum = 0x1908;
-    const SCISSOR_TEST: GLenum = 0x0c11;
-    const TEXTURE0: GLenum = 0x84c0;
-    const TEXTURE_2D: GLenum = 0x0de1;
-    const TEXTURE_MAG_FILTER: GLenum = 0x2800;
-    const TEXTURE_MIN_FILTER: GLenum = 0x2801;
-    const TRIANGLES: GLenum = 0x0004;
-    const UNSIGNED_BYTE: GLenum = 0x1401;
-    const VERTEX_SHADER: GLenum = 0x8b31;
-};
-
-const gl_callconv = if (builtin.os.tag == .windows)
-    std.builtin.CallingConvention.winapi
-else
-    std.builtin.CallingConvention.c;
-
-const GLActiveTextureProc = *const fn (gl.GLenum) callconv(gl_callconv) void;
-const GLAttachShaderProc = *const fn (gl.GLuint, gl.GLuint) callconv(gl_callconv) void;
-const GLBindFramebufferProc = *const fn (gl.GLenum, gl.GLuint) callconv(gl_callconv) void;
-const GLBindTextureProc = *const fn (gl.GLenum, gl.GLuint) callconv(gl_callconv) void;
-const GLBindVertexArrayProc = *const fn (gl.GLuint) callconv(gl_callconv) void;
-const GLClearProc = *const fn (gl.GLbitfield) callconv(gl_callconv) void;
-const GLClearColorProc = *const fn (gl.GLfloat, gl.GLfloat, gl.GLfloat, gl.GLfloat) callconv(gl_callconv) void;
-const GLCompileShaderProc = *const fn (gl.GLuint) callconv(gl_callconv) void;
-const GLCreateProgramProc = *const fn () callconv(gl_callconv) gl.GLuint;
-const GLCreateShaderProc = *const fn (gl.GLenum) callconv(gl_callconv) gl.GLuint;
-const GLDeleteProgramProc = *const fn (gl.GLuint) callconv(gl_callconv) void;
-const GLDeleteShaderProc = *const fn (gl.GLuint) callconv(gl_callconv) void;
-const GLDeleteTexturesProc = *const fn (gl.GLsizei, *const gl.GLuint) callconv(gl_callconv) void;
-const GLDeleteVertexArraysProc = *const fn (gl.GLsizei, *const gl.GLuint) callconv(gl_callconv) void;
-const GLDisableProc = *const fn (gl.GLenum) callconv(gl_callconv) void;
-const GLDrawArraysProc = *const fn (gl.GLenum, gl.GLint, gl.GLsizei) callconv(gl_callconv) void;
-const GLFinishProc = *const fn () callconv(gl_callconv) void;
-const GLGenTexturesProc = *const fn (gl.GLsizei, *gl.GLuint) callconv(gl_callconv) void;
-const GLGenVertexArraysProc = *const fn (gl.GLsizei, *gl.GLuint) callconv(gl_callconv) void;
-const GLGetErrorProc = *const fn () callconv(gl_callconv) gl.GLenum;
-const GLGetProgramInfoLogProc = *const fn (gl.GLuint, gl.GLsizei, *gl.GLsizei, [*]gl.GLchar) callconv(gl_callconv) void;
-const GLGetProgramIvProc = *const fn (gl.GLuint, gl.GLenum, *gl.GLint) callconv(gl_callconv) void;
-const GLGetShaderInfoLogProc = *const fn (gl.GLuint, gl.GLsizei, *gl.GLsizei, [*]gl.GLchar) callconv(gl_callconv) void;
-const GLGetShaderIvProc = *const fn (gl.GLuint, gl.GLenum, *gl.GLint) callconv(gl_callconv) void;
-const GLGetUniformLocationProc = *const fn (gl.GLuint, [*:0]const gl.GLchar) callconv(gl_callconv) gl.GLint;
-const GLLinkProgramProc = *const fn (gl.GLuint) callconv(gl_callconv) void;
-const GLShaderSourceProc = *const fn (gl.GLuint, gl.GLsizei, [*]const [*]const gl.GLchar, *const gl.GLint) callconv(gl_callconv) void;
-const GLTexImage2DProc = *const fn (gl.GLenum, gl.GLint, gl.GLint, gl.GLsizei, gl.GLsizei, gl.GLint, gl.GLenum, gl.GLenum, ?*const anyopaque) callconv(gl_callconv) void;
-const GLTexParameteriProc = *const fn (gl.GLenum, gl.GLenum, gl.GLint) callconv(gl_callconv) void;
-const GLUniform1iProc = *const fn (gl.GLint, gl.GLint) callconv(gl_callconv) void;
-const GLUseProgramProc = *const fn (gl.GLuint) callconv(gl_callconv) void;
-const GLViewportProc = *const fn (gl.GLint, gl.GLint, gl.GLsizei, gl.GLsizei) callconv(gl_callconv) void;
+fn GlProc(comptime name: []const u8) type {
+    return @TypeOf(@field(@as(gl.ProcTable, undefined), name));
+}
 
 const OpenGLCompositorProcs = struct {
-    active_texture: GLActiveTextureProc,
-    attach_shader: GLAttachShaderProc,
-    bind_framebuffer: GLBindFramebufferProc,
-    bind_texture: GLBindTextureProc,
-    bind_vertex_array: GLBindVertexArrayProc,
-    clear: GLClearProc,
-    clear_color: GLClearColorProc,
-    compile_shader: GLCompileShaderProc,
-    create_program: GLCreateProgramProc,
-    create_shader: GLCreateShaderProc,
-    delete_program: GLDeleteProgramProc,
-    delete_shader: GLDeleteShaderProc,
-    delete_textures: GLDeleteTexturesProc,
-    delete_vertex_arrays: GLDeleteVertexArraysProc,
-    disable: GLDisableProc,
-    draw_arrays: GLDrawArraysProc,
-    finish: GLFinishProc,
-    gen_textures: GLGenTexturesProc,
-    gen_vertex_arrays: GLGenVertexArraysProc,
-    get_error: GLGetErrorProc,
-    get_program_info_log: GLGetProgramInfoLogProc,
-    get_program_iv: GLGetProgramIvProc,
-    get_shader_info_log: GLGetShaderInfoLogProc,
-    get_shader_iv: GLGetShaderIvProc,
-    get_uniform_location: GLGetUniformLocationProc,
-    link_program: GLLinkProgramProc,
-    shader_source: GLShaderSourceProc,
-    tex_image_2d: GLTexImage2DProc,
-    tex_parameter_i: GLTexParameteriProc,
-    uniform_1i: GLUniform1iProc,
-    use_program: GLUseProgramProc,
-    viewport: GLViewportProc,
+    ActiveTexture: GlProc("ActiveTexture"),
+    AttachShader: GlProc("AttachShader"),
+    BindFramebuffer: GlProc("BindFramebuffer"),
+    BindTexture: GlProc("BindTexture"),
+    BindVertexArray: GlProc("BindVertexArray"),
+    Clear: GlProc("Clear"),
+    ClearColor: GlProc("ClearColor"),
+    CompileShader: GlProc("CompileShader"),
+    CreateProgram: GlProc("CreateProgram"),
+    CreateShader: GlProc("CreateShader"),
+    DeleteProgram: GlProc("DeleteProgram"),
+    DeleteShader: GlProc("DeleteShader"),
+    DeleteTextures: GlProc("DeleteTextures"),
+    DeleteVertexArrays: GlProc("DeleteVertexArrays"),
+    Disable: GlProc("Disable"),
+    DrawArrays: GlProc("DrawArrays"),
+    Finish: GlProc("Finish"),
+    GenTextures: GlProc("GenTextures"),
+    GenVertexArrays: GlProc("GenVertexArrays"),
+    GetError: GlProc("GetError"),
+    GetProgramInfoLog: GlProc("GetProgramInfoLog"),
+    GetProgramiv: GlProc("GetProgramiv"),
+    GetShaderInfoLog: GlProc("GetShaderInfoLog"),
+    GetShaderiv: GlProc("GetShaderiv"),
+    GetUniformLocation: GlProc("GetUniformLocation"),
+    LinkProgram: GlProc("LinkProgram"),
+    ShaderSource: GlProc("ShaderSource"),
+    TexImage2D: GlProc("TexImage2D"),
+    TexParameteri: GlProc("TexParameteri"),
+    Uniform1i: GlProc("Uniform1i"),
+    UseProgram: GlProc("UseProgram"),
+    Viewport: GlProc("Viewport"),
+};
 
-    fn load() !OpenGLCompositorProcs {
-        return .{
-            .active_texture = try loadGlProc(GLActiveTextureProc, "glActiveTexture"),
-            .attach_shader = try loadGlProc(GLAttachShaderProc, "glAttachShader"),
-            .bind_framebuffer = try loadGlProc(GLBindFramebufferProc, "glBindFramebuffer"),
-            .bind_texture = try loadGlProc(GLBindTextureProc, "glBindTexture"),
-            .bind_vertex_array = try loadGlProc(GLBindVertexArrayProc, "glBindVertexArray"),
-            .clear = try loadGlProc(GLClearProc, "glClear"),
-            .clear_color = try loadGlProc(GLClearColorProc, "glClearColor"),
-            .compile_shader = try loadGlProc(GLCompileShaderProc, "glCompileShader"),
-            .create_program = try loadGlProc(GLCreateProgramProc, "glCreateProgram"),
-            .create_shader = try loadGlProc(GLCreateShaderProc, "glCreateShader"),
-            .delete_program = try loadGlProc(GLDeleteProgramProc, "glDeleteProgram"),
-            .delete_shader = try loadGlProc(GLDeleteShaderProc, "glDeleteShader"),
-            .delete_textures = try loadGlProc(GLDeleteTexturesProc, "glDeleteTextures"),
-            .delete_vertex_arrays = try loadGlProc(GLDeleteVertexArraysProc, "glDeleteVertexArrays"),
-            .disable = try loadGlProc(GLDisableProc, "glDisable"),
-            .draw_arrays = try loadGlProc(GLDrawArraysProc, "glDrawArrays"),
-            .finish = try loadGlProc(GLFinishProc, "glFinish"),
-            .gen_textures = try loadGlProc(GLGenTexturesProc, "glGenTextures"),
-            .gen_vertex_arrays = try loadGlProc(GLGenVertexArraysProc, "glGenVertexArrays"),
-            .get_error = try loadGlProc(GLGetErrorProc, "glGetError"),
-            .get_program_info_log = try loadGlProc(GLGetProgramInfoLogProc, "glGetProgramInfoLog"),
-            .get_program_iv = try loadGlProc(GLGetProgramIvProc, "glGetProgramiv"),
-            .get_shader_info_log = try loadGlProc(GLGetShaderInfoLogProc, "glGetShaderInfoLog"),
-            .get_shader_iv = try loadGlProc(GLGetShaderIvProc, "glGetShaderiv"),
-            .get_uniform_location = try loadGlProc(GLGetUniformLocationProc, "glGetUniformLocation"),
-            .link_program = try loadGlProc(GLLinkProgramProc, "glLinkProgram"),
-            .shader_source = try loadGlProc(GLShaderSourceProc, "glShaderSource"),
-            .tex_image_2d = try loadGlProc(GLTexImage2DProc, "glTexImage2D"),
-            .tex_parameter_i = try loadGlProc(GLTexParameteriProc, "glTexParameteri"),
-            .uniform_1i = try loadGlProc(GLUniform1iProc, "glUniform1i"),
-            .use_program = try loadGlProc(GLUseProgramProc, "glUseProgram"),
-            .viewport = try loadGlProc(GLViewportProc, "glViewport"),
-        };
-    }
+const required_gl_commands = .{
+    "ActiveTexture",
+    "AttachShader",
+    "BindFramebuffer",
+    "BindTexture",
+    "BindVertexArray",
+    "Clear",
+    "ClearColor",
+    "CompileShader",
+    "CreateProgram",
+    "CreateShader",
+    "DeleteProgram",
+    "DeleteShader",
+    "DeleteTextures",
+    "DeleteVertexArrays",
+    "Disable",
+    "DrawArrays",
+    "Finish",
+    "GenTextures",
+    "GenVertexArrays",
+    "GetError",
+    "GetProgramInfoLog",
+    "GetProgramiv",
+    "GetShaderInfoLog",
+    "GetShaderiv",
+    "GetUniformLocation",
+    "LinkProgram",
+    "ShaderSource",
+    "TexImage2D",
+    "TexParameteri",
+    "Uniform1i",
+    "UseProgram",
+    "Viewport",
 };
 
 const desktop_texture_vertex_shader =
@@ -207,25 +135,37 @@ fn loadGlProc(comptime T: type, name: [:0]const u8) !T {
     return @ptrCast(proc);
 }
 
-fn createTextureProgram(procs: OpenGLCompositorProcs) !gl.GLuint {
+fn glProcName(comptime command: []const u8) [:0]const u8 {
+    return "gl" ++ command;
+}
+
+fn loadOpenGLCompositorProcs() !OpenGLCompositorProcs {
+    var procs: OpenGLCompositorProcs = undefined;
+    inline for (required_gl_commands) |command| {
+        @field(procs, command) = try loadGlProc(@TypeOf(@field(procs, command)), glProcName(command));
+    }
+    return procs;
+}
+
+fn createTextureProgram(procs: OpenGLCompositorProcs) !gl.uint {
     const vertex_source = if (builtin.os.tag == .linux) gles_texture_vertex_shader else desktop_texture_vertex_shader;
     const fragment_source = if (builtin.os.tag == .linux) gles_texture_fragment_shader else desktop_texture_fragment_shader;
 
     const vertex = try compileShader(procs, gl.VERTEX_SHADER, vertex_source, "texture vertex shader");
-    defer procs.delete_shader(vertex);
+    defer procs.DeleteShader(vertex);
     const fragment = try compileShader(procs, gl.FRAGMENT_SHADER, fragment_source, "texture fragment shader");
-    defer procs.delete_shader(fragment);
+    defer procs.DeleteShader(fragment);
 
-    const program = procs.create_program();
+    const program = procs.CreateProgram();
     if (program == 0) return types.AppError.BackendSetupFailed;
-    procs.attach_shader(program, vertex);
-    procs.attach_shader(program, fragment);
-    procs.link_program(program);
-    var linked: gl.GLint = 0;
-    procs.get_program_iv(program, gl.LINK_STATUS, &linked);
+    procs.AttachShader(program, vertex);
+    procs.AttachShader(program, fragment);
+    procs.LinkProgram(program);
+    var linked: gl.int = 0;
+    procs.GetProgramiv(program, gl.LINK_STATUS, @ptrCast(&linked));
     if (linked == gl.FALSE) {
         logProgramInfoLog(procs, program, "OpenGL compositor program link failed");
-        procs.delete_program(program);
+        procs.DeleteProgram(program);
         return types.AppError.BackendSetupFailed;
     }
     return program;
@@ -233,20 +173,20 @@ fn createTextureProgram(procs: OpenGLCompositorProcs) !gl.GLuint {
 
 fn compileShader(
     procs: OpenGLCompositorProcs,
-    kind: gl.GLenum,
+    kind: gl.@"enum",
     source: []const u8,
     name: []const u8,
-) !gl.GLuint {
-    const shader = procs.create_shader(kind);
+) !gl.uint {
+    const shader = procs.CreateShader(kind);
     if (shader == 0) return types.AppError.BackendSetupFailed;
-    errdefer procs.delete_shader(shader);
+    errdefer procs.DeleteShader(shader);
 
-    const sources = [_][*]const gl.GLchar{source.ptr};
-    const lengths = [_]gl.GLint{@intCast(source.len)};
-    procs.shader_source(shader, 1, sources[0..].ptr, &lengths[0]);
-    procs.compile_shader(shader);
-    var compiled: gl.GLint = 0;
-    procs.get_shader_iv(shader, gl.COMPILE_STATUS, &compiled);
+    const sources = [_][*]const gl.char{source.ptr};
+    const lengths = [_]gl.int{@intCast(source.len)};
+    procs.ShaderSource(shader, 1, sources[0..].ptr, lengths[0..].ptr);
+    procs.CompileShader(shader);
+    var compiled: gl.int = 0;
+    procs.GetShaderiv(shader, gl.COMPILE_STATUS, @ptrCast(&compiled));
     if (compiled == gl.FALSE) {
         logShaderInfoLog(procs, shader, name);
         return types.AppError.BackendSetupFailed;
@@ -254,26 +194,26 @@ fn compileShader(
     return shader;
 }
 
-fn logShaderInfoLog(procs: OpenGLCompositorProcs, shader: gl.GLuint, name: []const u8) void {
-    var buffer: [1024]gl.GLchar = undefined;
-    var length: gl.GLsizei = 0;
-    procs.get_shader_info_log(shader, @intCast(buffer.len), &length, buffer[0..].ptr);
+fn logShaderInfoLog(procs: OpenGLCompositorProcs, shader: gl.uint, name: []const u8) void {
+    var buffer: [1024]gl.char = undefined;
+    var length: gl.sizei = 0;
+    procs.GetShaderInfoLog(shader, @intCast(buffer.len), &length, buffer[0..].ptr);
     const log = buffer[0..@min(@as(usize, @intCast(length)), buffer.len)];
     std.debug.print("OpenGL compositor {s} compile failed: {s}\n", .{ name, log });
 }
 
-fn logProgramInfoLog(procs: OpenGLCompositorProcs, program: gl.GLuint, message: []const u8) void {
-    var buffer: [1024]gl.GLchar = undefined;
-    var length: gl.GLsizei = 0;
-    procs.get_program_info_log(program, @intCast(buffer.len), &length, buffer[0..].ptr);
+fn logProgramInfoLog(procs: OpenGLCompositorProcs, program: gl.uint, message: []const u8) void {
+    var buffer: [1024]gl.char = undefined;
+    var length: gl.sizei = 0;
+    procs.GetProgramInfoLog(program, @intCast(buffer.len), &length, buffer[0..].ptr);
     const log = buffer[0..@min(@as(usize, @intCast(length)), buffer.len)];
     std.debug.print("{s}: {s}\n", .{ message, log });
 }
 
-const gl_texture_target = gl.TEXTURE_2D;
-const gl_internal_format = gl.RGBA;
-const gl_pixel_format = gl.RGBA;
-const gl_pixel_type = gl.UNSIGNED_BYTE;
+const gl_texture_target: gl.@"enum" = gl.TEXTURE_2D;
+const gl_internal_format: gl.int = gl.RGBA;
+const gl_pixel_format: gl.@"enum" = gl.RGBA;
+const gl_pixel_type: gl.@"enum" = gl.UNSIGNED_BYTE;
 
 const PlatformOpenGLBackend = union(enum) {
     pub const window_flags = c.SDL_WINDOW_OPENGL;
@@ -474,23 +414,23 @@ const OpenGLTextureCompositor = struct {
     context: OpenGLContext,
     viewport: types.Viewport,
     procs: OpenGLCompositorProcs,
-    program: gl.GLuint,
-    vertex_array: gl.GLuint,
+    program: gl.uint,
+    vertex_array: gl.uint,
 
     fn init(window: *c.SDL_Window, viewport: types.Viewport) !OpenGLTextureCompositor {
         var context = try OpenGLContext.init(window);
         errdefer context.deinit();
-        const procs = try OpenGLCompositorProcs.load();
+        const procs = try loadOpenGLCompositorProcs();
         const program = try createTextureProgram(procs);
-        errdefer procs.delete_program(program);
-        var vertex_array: gl.GLuint = 0;
-        procs.gen_vertex_arrays(1, &vertex_array);
+        errdefer procs.DeleteProgram(program);
+        var vertex_array: gl.uint = 0;
+        procs.GenVertexArrays(1, @ptrCast(&vertex_array));
         if (vertex_array == 0) return types.AppError.BackendSetupFailed;
-        errdefer if (vertex_array != 0) procs.delete_vertex_arrays(1, &vertex_array);
-        procs.use_program(program);
-        const sampler = procs.get_uniform_location(program, "map_texture");
-        if (sampler >= 0) procs.uniform_1i(sampler, 0);
-        procs.use_program(0);
+        errdefer if (vertex_array != 0) procs.DeleteVertexArrays(1, @ptrCast(&vertex_array));
+        procs.UseProgram(program);
+        const sampler = procs.GetUniformLocation(program, "map_texture");
+        if (sampler >= 0) procs.Uniform1i(sampler, 0);
+        procs.UseProgram(0);
         try checkGlError(procs, "initialize OpenGL texture compositor");
         return .{
             .context = context,
@@ -503,13 +443,13 @@ const OpenGLTextureCompositor = struct {
 
     fn deinit(self: *OpenGLTextureCompositor) void {
         self.context.makeCurrent() catch {};
-        self.procs.finish();
+        self.procs.Finish();
         if (self.vertex_array != 0) {
-            self.procs.delete_vertex_arrays(1, &self.vertex_array);
+            self.procs.DeleteVertexArrays(1, @ptrCast(&self.vertex_array));
             self.vertex_array = 0;
         }
         if (self.program != 0) {
-            self.procs.delete_program(self.program);
+            self.procs.DeleteProgram(self.program);
             self.program = 0;
         }
         self.context.deinit();
@@ -522,35 +462,35 @@ const OpenGLTextureCompositor = struct {
 
     fn finishFrame(self: *OpenGLTextureCompositor) !void {
         try self.context.makeCurrent();
-        self.procs.finish();
+        self.procs.Finish();
     }
 
-    fn drawTexture(self: *OpenGLTextureCompositor, texture: gl.GLuint) !bool {
+    fn drawTexture(self: *OpenGLTextureCompositor, texture: gl.uint) !bool {
         try self.context.makeCurrent();
         try self.drawTextureQuad(texture);
         try self.context.swapWindow();
         return true;
     }
 
-    fn drawTextureQuad(self: *OpenGLTextureCompositor, texture: gl.GLuint) !void {
+    fn drawTextureQuad(self: *OpenGLTextureCompositor, texture: gl.uint) !void {
         clearGlErrors(self.procs);
-        self.procs.bind_framebuffer(gl.FRAMEBUFFER, 0);
-        self.procs.disable(gl.CULL_FACE);
-        self.procs.disable(gl.DEPTH_TEST);
-        self.procs.disable(gl.SCISSOR_TEST);
-        self.procs.viewport(0, 0, @intCast(self.viewport.physical_width), @intCast(self.viewport.physical_height));
-        self.procs.clear_color(0.08, 0.09, 0.11, 1.0);
-        self.procs.clear(gl.COLOR_BUFFER_BIT);
-        self.procs.use_program(self.program);
-        self.procs.bind_vertex_array(self.vertex_array);
-        self.procs.active_texture(gl.TEXTURE0);
-        self.procs.bind_texture(gl_texture_target, texture);
-        self.procs.tex_parameter_i(gl_texture_target, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-        self.procs.tex_parameter_i(gl_texture_target, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-        self.procs.draw_arrays(gl.TRIANGLES, 0, 3);
-        self.procs.bind_texture(gl_texture_target, 0);
-        self.procs.bind_vertex_array(0);
-        self.procs.use_program(0);
+        self.procs.BindFramebuffer(gl.FRAMEBUFFER, 0);
+        self.procs.Disable(gl.CULL_FACE);
+        self.procs.Disable(gl.DEPTH_TEST);
+        self.procs.Disable(gl.SCISSOR_TEST);
+        self.procs.Viewport(0, 0, @intCast(self.viewport.physical_width), @intCast(self.viewport.physical_height));
+        self.procs.ClearColor(0.08, 0.09, 0.11, 1.0);
+        self.procs.Clear(gl.COLOR_BUFFER_BIT);
+        self.procs.UseProgram(self.program);
+        self.procs.BindVertexArray(self.vertex_array);
+        self.procs.ActiveTexture(gl.TEXTURE0);
+        self.procs.BindTexture(gl_texture_target, texture);
+        self.procs.TexParameteri(gl_texture_target, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        self.procs.TexParameteri(gl_texture_target, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        self.procs.DrawArrays(gl.TRIANGLES, 0, 3);
+        self.procs.BindTexture(gl_texture_target, 0);
+        self.procs.BindVertexArray(0);
+        self.procs.UseProgram(0);
         try checkGlError(self.procs, "draw OpenGL texture");
     }
 };
@@ -609,19 +549,19 @@ const OpenGLOwnedTextureBackend = struct {
 };
 
 const BorrowedTexture = struct {
-    texture: gl.GLuint,
+    texture: gl.uint,
 
     fn init(context: *const OpenGLContext, procs: OpenGLCompositorProcs, viewport: types.Viewport) !BorrowedTexture {
         try context.makeCurrent();
-        var texture: gl.GLuint = 0;
-        procs.gen_textures(1, &texture);
-        procs.bind_texture(gl_texture_target, texture);
-        procs.tex_parameter_i(gl_texture_target, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-        procs.tex_parameter_i(gl_texture_target, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-        procs.tex_image_2d(
+        var texture: gl.uint = 0;
+        procs.GenTextures(1, @ptrCast(&texture));
+        procs.BindTexture(gl_texture_target, texture);
+        procs.TexParameteri(gl_texture_target, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        procs.TexParameteri(gl_texture_target, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        procs.TexImage2D(
             gl_texture_target,
             0,
-            @intCast(gl_internal_format),
+            gl_internal_format,
             @intCast(viewport.physical_width),
             @intCast(viewport.physical_height),
             0,
@@ -629,7 +569,7 @@ const BorrowedTexture = struct {
             gl_pixel_type,
             null,
         );
-        procs.bind_texture(gl_texture_target, 0);
+        procs.BindTexture(gl_texture_target, 0);
         try checkGlError(procs, "create OpenGL borrowed texture");
         return .{ .texture = texture };
     }
@@ -637,7 +577,7 @@ const BorrowedTexture = struct {
     fn deinit(self: *BorrowedTexture, context: *const OpenGLContext, procs: OpenGLCompositorProcs) void {
         if (self.texture == 0) return;
         context.makeCurrent() catch {};
-        procs.delete_textures(1, &self.texture);
+        procs.DeleteTextures(1, @ptrCast(&self.texture));
         self.texture = 0;
     }
 };
@@ -709,7 +649,7 @@ const OpenGLSurfaceBackend = struct {
         errdefer context.deinit();
         return .{
             .context = context,
-            .procs = try OpenGLCompositorProcs.load(),
+            .procs = try loadOpenGLCompositorProcs(),
         };
     }
 
@@ -721,7 +661,7 @@ const OpenGLSurfaceBackend = struct {
 
     fn finishFrame(self: *OpenGLSurfaceBackend) !void {
         try self.context.makeCurrent();
-        self.procs.finish();
+        self.procs.Finish();
     }
 
     fn attachRenderTarget(
@@ -742,14 +682,14 @@ const OpenGLSurfaceBackend = struct {
 };
 
 fn checkGlError(procs: OpenGLCompositorProcs, operation: []const u8) !void {
-    const gl_error = procs.get_error();
+    const gl_error = procs.GetError();
     if (gl_error == gl.NO_ERROR) return;
     std.debug.print("{s} failed with OpenGL error 0x{x}\n", .{ operation, gl_error });
     return types.AppError.BackendSetupFailed;
 }
 
 fn clearGlErrors(procs: OpenGLCompositorProcs) void {
-    while (procs.get_error() != gl.NO_ERROR) {}
+    while (procs.GetError() != gl.NO_ERROR) {}
 }
 
 fn logSdlError(message: []const u8) void {

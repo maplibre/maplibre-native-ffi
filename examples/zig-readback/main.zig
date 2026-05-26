@@ -13,108 +13,9 @@ const egl = if (build_options.supports_opengl and builtin.os.tag == .linux) @cIm
     @cInclude("EGL/egl.h");
 }) else struct {};
 
-// Zig 0.16 cannot translate the Windows SDK WGL headers reliably with MSVC, so
-// keep this to the small ABI subset needed to create a shared context.
-const wgl = if (build_options.supports_opengl and builtin.os.tag == .windows) struct {
-    const BOOL = c_int;
-    const BYTE = u8;
-    const DWORD = u32;
-    const INT = c_int;
-    const LPCSTR = [*:0]const u8;
-    const UINT = u32;
-    const WORD = u16;
-    const WPARAM = usize;
-    const LPARAM = isize;
-    const LRESULT = isize;
-
-    const HDC = *opaque {};
-    const HGLRC = *opaque {};
-    const HINSTANCE = *opaque {};
-    const HWND = *opaque {};
-
-    const WNDPROC = ?*const fn (HWND, UINT, WPARAM, LPARAM) callconv(.winapi) LRESULT;
-
-    const WNDCLASSA = extern struct {
-        style: UINT,
-        lpfnWndProc: WNDPROC,
-        cbClsExtra: INT,
-        cbWndExtra: INT,
-        hInstance: ?HINSTANCE,
-        hIcon: ?*opaque {},
-        hCursor: ?*opaque {},
-        hbrBackground: ?*opaque {},
-        lpszMenuName: ?LPCSTR,
-        lpszClassName: ?LPCSTR,
-    };
-
-    const PIXELFORMATDESCRIPTOR = extern struct {
-        nSize: WORD,
-        nVersion: WORD,
-        dwFlags: DWORD,
-        iPixelType: BYTE,
-        cColorBits: BYTE,
-        cRedBits: BYTE,
-        cRedShift: BYTE,
-        cGreenBits: BYTE,
-        cGreenShift: BYTE,
-        cBlueBits: BYTE,
-        cBlueShift: BYTE,
-        cAlphaBits: BYTE,
-        cAlphaShift: BYTE,
-        cAccumBits: BYTE,
-        cAccumRedBits: BYTE,
-        cAccumGreenBits: BYTE,
-        cAccumBlueBits: BYTE,
-        cAccumAlphaBits: BYTE,
-        cDepthBits: BYTE,
-        cStencilBits: BYTE,
-        cAuxBuffers: BYTE,
-        iLayerType: BYTE,
-        bReserved: BYTE,
-        dwLayerMask: DWORD,
-        dwVisibleMask: DWORD,
-        dwDamageMask: DWORD,
-    };
-
-    const CS_OWNDC = 0x0020;
-    const PFD_DOUBLEBUFFER = 0x00000001;
-    const PFD_DRAW_TO_WINDOW = 0x00000004;
-    const PFD_SUPPORT_OPENGL = 0x00000020;
-    const PFD_TYPE_RGBA = 0;
-    const PFD_MAIN_PLANE = 0;
-    const WS_OVERLAPPEDWINDOW = 0x00cf0000;
-
-    extern "kernel32" fn GetModuleHandleA(lpModuleName: ?LPCSTR) callconv(.winapi) ?HINSTANCE;
-    extern "user32" fn RegisterClassA(lpWndClass: *const WNDCLASSA) callconv(.winapi) u16;
-    extern "user32" fn CreateWindowExA(
-        dwExStyle: DWORD,
-        lpClassName: LPCSTR,
-        lpWindowName: LPCSTR,
-        dwStyle: DWORD,
-        x: INT,
-        y: INT,
-        nWidth: INT,
-        nHeight: INT,
-        hWndParent: ?HWND,
-        hMenu: ?*opaque {},
-        hInstance: ?HINSTANCE,
-        lpParam: ?*anyopaque,
-    ) callconv(.winapi) ?HWND;
-    extern "user32" fn DefWindowProcA(hWnd: HWND, msg: UINT, wParam: WPARAM, lParam: LPARAM) callconv(.winapi) LRESULT;
-    extern "user32" fn DestroyWindow(hWnd: HWND) callconv(.winapi) BOOL;
-    extern "user32" fn GetDC(hWnd: HWND) callconv(.winapi) ?HDC;
-    extern "user32" fn ReleaseDC(hWnd: HWND, hDC: HDC) callconv(.winapi) INT;
-    extern "gdi32" fn ChoosePixelFormat(hdc: HDC, ppfd: *const PIXELFORMATDESCRIPTOR) callconv(.winapi) INT;
-    extern "gdi32" fn SetPixelFormat(hdc: HDC, format: INT, ppfd: *const PIXELFORMATDESCRIPTOR) callconv(.winapi) BOOL;
-    extern "opengl32" fn wglCreateContext(hdc: HDC) callconv(.winapi) ?HGLRC;
-    extern "opengl32" fn wglDeleteContext(hglrc: HGLRC) callconv(.winapi) BOOL;
-    extern "opengl32" fn wglGetProcAddress(name: LPCSTR) callconv(.winapi) ?*anyopaque;
-    extern "opengl32" fn wglMakeCurrent(hdc: ?HDC, hglrc: ?HGLRC) callconv(.winapi) BOOL;
-
-    fn windowProc(hWnd: HWND, msg: UINT, wParam: WPARAM, lParam: LPARAM) callconv(.winapi) LRESULT {
-        return DefWindowProcA(hWnd, msg, wParam, lParam);
-    }
-} else struct {};
+const sdl = if (build_options.supports_opengl and builtin.os.tag == .windows) @cImport({
+    @cInclude("SDL3/SDL.h");
+}) else struct {};
 
 const width = 512;
 const height = 512;
@@ -265,77 +166,56 @@ const OwnedTextureTarget = struct {
 };
 
 const OpenGLAttachContext = if (build_options.supports_opengl and builtin.os.tag == .windows) struct {
-    window: wgl.HWND,
-    device_context: wgl.HDC,
-    share_context: wgl.HGLRC,
+    window: *sdl.SDL_Window,
+    context: sdl.SDL_GLContext,
+    device_context: *anyopaque,
 
     fn init() !OpenGLAttachContext {
-        const class_name = "MaplibreNativeZigReadbackWgl";
-        const module = wgl.GetModuleHandleA(null) orelse return error.WglUnavailable;
+        // WGL contexts need a Win32 device context with a selected pixel
+        // format. SDL gives us a hidden helper window for that without showing
+        // UI, but this is not truly surfaceless like the Linux EGL pbuffer path.
+        if (!sdl.SDL_Init(sdl.SDL_INIT_VIDEO)) return error.WglUnavailable;
+        errdefer sdl.SDL_Quit();
 
-        var window_class = std.mem.zeroes(wgl.WNDCLASSA);
-        window_class.style = wgl.CS_OWNDC;
-        window_class.lpfnWndProc = wgl.windowProc;
-        window_class.hInstance = module;
-        window_class.lpszClassName = class_name;
-        _ = wgl.RegisterClassA(&window_class);
-
-        const window = wgl.CreateWindowExA(
-            0,
-            class_name,
-            class_name,
-            wgl.WS_OVERLAPPEDWINDOW,
-            0,
-            0,
+        const window = sdl.SDL_CreateWindow(
+            "MapLibre Zig Readback WGL",
             8,
             8,
-            null,
-            null,
-            module,
+            sdl.SDL_WINDOW_OPENGL | sdl.SDL_WINDOW_HIDDEN,
+        ) orelse return error.WglUnavailable;
+        errdefer sdl.SDL_DestroyWindow(window);
+
+        const context = sdl.SDL_GL_CreateContext(window) orelse return error.WglUnavailable;
+        errdefer _ = sdl.SDL_GL_DestroyContext(context);
+        if (!sdl.SDL_GL_MakeCurrent(window, context)) return error.WglUnavailable;
+
+        const properties = sdl.SDL_GetWindowProperties(window);
+        if (properties == 0) return error.WglUnavailable;
+        const device_context = sdl.SDL_GetPointerProperty(
+            properties,
+            sdl.SDL_PROP_WINDOW_WIN32_HDC_POINTER,
             null,
         ) orelse return error.WglUnavailable;
-        errdefer _ = wgl.DestroyWindow(window);
-
-        const device_context = wgl.GetDC(window) orelse return error.WglUnavailable;
-        errdefer _ = wgl.ReleaseDC(window, device_context);
-
-        var pixel_format_descriptor = std.mem.zeroes(wgl.PIXELFORMATDESCRIPTOR);
-        pixel_format_descriptor.nSize = @intCast(@sizeOf(wgl.PIXELFORMATDESCRIPTOR));
-        pixel_format_descriptor.nVersion = 1;
-        pixel_format_descriptor.dwFlags = wgl.PFD_DRAW_TO_WINDOW | wgl.PFD_SUPPORT_OPENGL | wgl.PFD_DOUBLEBUFFER;
-        pixel_format_descriptor.iPixelType = wgl.PFD_TYPE_RGBA;
-        pixel_format_descriptor.cColorBits = 32;
-        pixel_format_descriptor.cDepthBits = 24;
-        pixel_format_descriptor.cStencilBits = 8;
-        pixel_format_descriptor.iLayerType = wgl.PFD_MAIN_PLANE;
-
-        const pixel_format = wgl.ChoosePixelFormat(device_context, &pixel_format_descriptor);
-        if (pixel_format == 0) return error.WglUnavailable;
-        if (wgl.SetPixelFormat(device_context, pixel_format, &pixel_format_descriptor) == 0) return error.WglUnavailable;
-
-        const share_context = wgl.wglCreateContext(device_context) orelse return error.WglUnavailable;
-        errdefer _ = wgl.wglDeleteContext(share_context);
-        if (wgl.wglMakeCurrent(device_context, share_context) == 0) return error.WglUnavailable;
 
         return .{
             .window = window,
+            .context = context,
             .device_context = device_context,
-            .share_context = share_context,
         };
     }
 
     fn deinit(self: *OpenGLAttachContext) void {
-        _ = wgl.wglMakeCurrent(null, null);
-        _ = wgl.wglDeleteContext(self.share_context);
-        _ = wgl.ReleaseDC(self.window, self.device_context);
-        _ = wgl.DestroyWindow(self.window);
+        _ = sdl.SDL_GL_MakeCurrent(self.window, null);
+        _ = sdl.SDL_GL_DestroyContext(self.context);
+        sdl.SDL_DestroyWindow(self.window);
+        sdl.SDL_Quit();
     }
 
     fn descriptor(self: *const OpenGLAttachContext) maplibre.OpenGLContextDescriptor {
         return .{ .wgl = .{
             .device_context = .{ .ptr = @ptrCast(self.device_context) },
-            .share_context = .{ .ptr = @ptrCast(self.share_context) },
-            .get_proc_address = .{ .ptr = @ptrCast(@constCast(&wgl.wglGetProcAddress)) },
+            .share_context = .{ .ptr = @ptrCast(self.context) },
+            .get_proc_address = .{ .ptr = @ptrCast(@constCast(&sdl.SDL_GL_GetProcAddress)) },
         } };
     }
 } else if (build_options.supports_opengl and builtin.os.tag == .linux) struct {

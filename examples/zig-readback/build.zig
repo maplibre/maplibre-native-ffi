@@ -21,6 +21,14 @@ fn maplibreNativeModule(b: *std.Build, options: BuildOptions) *std.Build.Module 
     });
 }
 
+fn addSdlTranslateCWorkarounds(module: *std.Build.Module, target: std.Build.ResolvedTarget) void {
+    if (target.result.os.tag != .windows or target.result.abi != .msvc) return;
+
+    module.addCMacro("SIZE_MAX", "((size_t)-1)");
+    module.addCMacro("SDL_SINT64_C(c)", "c##LL");
+    module.addCMacro("SDL_UINT64_C(c)", "c##ULL");
+}
+
 fn addReadbackExample(b: *std.Build, options: BuildOptions) *std.Build.Step.Compile {
     const example = b.addExecutable(.{
         .name = "zig-readback",
@@ -33,6 +41,14 @@ fn addReadbackExample(b: *std.Build, options: BuildOptions) *std.Build.Step.Comp
 
     maplibre_build.addRenderBackendOptions(b, example.root_module, options.render_backend);
     maplibre_build.addIncludePaths(example.root_module, options.include_dirs);
+    if (options.render_backend == .opengl and options.target.result.os.tag == .windows) {
+        addSdlTranslateCWorkarounds(example.root_module, options.target);
+        if (options.dependency_library_dir) |dependency_library_dir| {
+            example.root_module.addLibraryPath(dependency_library_dir);
+            example.root_module.addRPath(dependency_library_dir);
+        }
+        example.root_module.linkSystemLibrary("SDL3", .{});
+    }
     example.root_module.addImport("maplibre_native", maplibreNativeModule(b, options));
     maplibre_build.linkRenderBackend(b, example.root_module, .{
         .target = options.target,
