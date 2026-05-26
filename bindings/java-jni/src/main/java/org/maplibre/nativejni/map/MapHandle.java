@@ -113,7 +113,7 @@ public final class MapHandle implements AutoCloseable {
 
   public void setStyleUrl(String url) {
     NativeLibrary.ensureLoaded();
-    var nativeUrl = JavaCppSupport.utf8(Objects.requireNonNull(url));
+    var nativeUrl = JavaCppSupport.utf8(Objects.requireNonNull(url, "url"));
     try {
       Status.check(
           MaplibreNativeC.mln_map_set_style_url(
@@ -125,7 +125,7 @@ public final class MapHandle implements AutoCloseable {
 
   public void setStyleJson(String json) {
     NativeLibrary.ensureLoaded();
-    var nativeJson = JavaCppSupport.utf8(Objects.requireNonNull(json));
+    var nativeJson = JavaCppSupport.utf8(Objects.requireNonNull(json, "json"));
     try {
       Status.check(
           MaplibreNativeC.mln_map_set_style_json(
