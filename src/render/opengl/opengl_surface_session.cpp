@@ -1,9 +1,39 @@
+#include <cstdint>
+#include <memory>
+#include <stdexcept>
+#include <utility>
+
+#include <mbgl/gfx/backend_scope.hpp>
+#include <mbgl/gfx/renderable.hpp>
+#include <mbgl/gl/context.hpp>
+#include <mbgl/gl/renderable_resource.hpp>
+#include <mbgl/gl/renderer_backend.hpp>
+#include <mbgl/util/size.hpp>
+
+#if defined(_WIN32)
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN 1
+#endif
+#include <Windows.h>
+#elif defined(__linux__)
+#include <EGL/egl.h>
+#endif
+
 #include "diagnostics/diagnostics.hpp"
 #include "map/map.hpp"
 #include "render/render_session_common.hpp"
 #include "render/surface_session.hpp"
 
 namespace {
+
+#if defined(_WIN32)
+using WglCreateContextAttribs = HGLRC(WINAPI*)(HDC, HGLRC, const int*);
+constexpr auto wgl_context_major_version_arb = 0x2091;
+constexpr auto wgl_context_minor_version_arb = 0x2092;
+constexpr auto wgl_context_profile_mask_arb = 0x9126;
+constexpr auto wgl_context_compatibility_profile_bit_arb = 0x00000002;
+#endif
+
 auto validate_metal_surface_descriptor(
   const mln_metal_surface_descriptor* descriptor
 ) -> mln_status {
@@ -80,6 +110,303 @@ auto validate_opengl_surface_descriptor(
   }
   return MLN_STATUS_OK;
 }
+
+class OpenGLSurfaceBackend final : public mbgl::gl::RendererBackend,
+                                   public mbgl::gfx::Renderable {
+ private:
+  class OpenGLSurfaceRenderableResource final
+      : public mbgl::gl::RenderableResource {
+   public:
+    explicit OpenGLSurfaceRenderableResource(OpenGLSurfaceBackend& backend_)
+        : backend(backend_) {}
+
+    void bind() override {
+      backend.setFramebufferBinding(0);
+      backend.setViewport(0, 0, backend.getSize());
+      backend.setScissorTest(0, 0, 0, 0);
+    }
+
+    void swap() override { backend.swap_surface(); }
+
+   private:
+    OpenGLSurfaceBackend& backend;
+  };
+
+ public:
+  OpenGLSurfaceBackend(
+    const mln_opengl_surface_descriptor& descriptor, mbgl::Size size
+  )
+      : mbgl::gl::RendererBackend(mbgl::gfx::ContextMode::Shared),
+        mbgl::gfx::Renderable(
+          size, std::make_unique<OpenGLSurfaceRenderableResource>(*this)
+        ),
+        descriptor_(descriptor) {}
+
+  OpenGLSurfaceBackend(const OpenGLSurfaceBackend&) = delete;
+  auto operator=(const OpenGLSurfaceBackend&) -> OpenGLSurfaceBackend& = delete;
+  OpenGLSurfaceBackend(OpenGLSurfaceBackend&&) = delete;
+  auto operator=(OpenGLSurfaceBackend&&) -> OpenGLSurfaceBackend& = delete;
+
+  ~OpenGLSurfaceBackend() override {
+    if (render_context_ != nullptr) {
+      auto guard = mbgl::gfx::BackendScope{
+        *this, mbgl::gfx::BackendScope::ScopeType::Implicit
+      };
+      resource.reset();
+      context.reset();
+    } else {
+      resource.reset();
+      context.reset();
+    }
+    getThreadPool().runRenderJobs(true);
+    destroy_native_context();
+  }
+
+  auto getDefaultRenderable() -> mbgl::gfx::Renderable& override {
+    return *this;
+  }
+
+  void resize(mbgl::Size size_) { size = size_; }
+
+  void updateAssumedState() override {
+    assumeFramebufferBinding(0);
+    assumeViewport(0, 0, size);
+    assumeScissorTest(0, 0, 0, 0);
+  }
+
+  void swap_surface() {
+#if defined(_WIN32)
+    if (SwapBuffers(static_cast<HDC>(descriptor_.surface)) == 0) {
+      throw std::runtime_error("Swapping OpenGL WGL surface buffers failed");
+    }
+#elif defined(__linux__)
+    if (
+      eglSwapBuffers(
+        static_cast<EGLDisplay>(descriptor_.context.data.egl.display),
+        static_cast<EGLSurface>(descriptor_.surface)
+      ) == EGL_FALSE
+    ) {
+      throw std::runtime_error("Swapping OpenGL EGL surface buffers failed");
+    }
+#else
+    throw std::runtime_error("OpenGL context provider is unsupported");
+#endif
+  }
+
+ private:
+  auto getExtensionFunctionPointer(const char* name)
+    -> mbgl::gl::ProcAddress override {
+#if defined(_WIN32)
+    using GetProcAddressFunction = PROC(WINAPI*)(LPCSTR);
+    auto* loader = reinterpret_cast<GetProcAddressFunction>(
+      descriptor_.context.data.wgl.get_proc_address
+    );
+    if (loader != nullptr) {
+      return reinterpret_cast<mbgl::gl::ProcAddress>(loader(name));
+    }
+    auto* proc = wglGetProcAddress(name);
+    if (proc != nullptr) {
+      return reinterpret_cast<mbgl::gl::ProcAddress>(proc);
+    }
+    auto* module = GetModuleHandleA("opengl32.dll");
+    if (module == nullptr) {
+      module = LoadLibraryA("opengl32.dll");
+    }
+    if (module == nullptr) {
+      return nullptr;
+    }
+    return reinterpret_cast<mbgl::gl::ProcAddress>(
+      GetProcAddress(module, name)
+    );
+#elif defined(__linux__)
+    using GetProcAddressFunction = void* (*)(const char*);
+    auto* loader = reinterpret_cast<GetProcAddressFunction>(
+      descriptor_.context.data.egl.get_proc_address
+    );
+    if (loader != nullptr) {
+      return reinterpret_cast<mbgl::gl::ProcAddress>(loader(name));
+    }
+    return reinterpret_cast<mbgl::gl::ProcAddress>(eglGetProcAddress(name));
+#else
+    (void)name;
+    return nullptr;
+#endif
+  }
+
+  void activate() override {
+#if defined(_WIN32)
+    previous_device_context_ = wglGetCurrentDC();
+    previous_render_context_ = wglGetCurrentContext();
+    if (render_context_ == nullptr) {
+      create_wgl_context();
+    }
+    if (
+      wglMakeCurrent(
+        static_cast<HDC>(descriptor_.surface),
+        static_cast<HGLRC>(render_context_)
+      ) == 0
+    ) {
+      throw std::runtime_error("Switching OpenGL WGL context failed");
+    }
+#elif defined(__linux__)
+    previous_display_ = eglGetCurrentDisplay();
+    previous_draw_surface_ = eglGetCurrentSurface(EGL_DRAW);
+    previous_read_surface_ = eglGetCurrentSurface(EGL_READ);
+    previous_context_ = eglGetCurrentContext();
+    if (render_context_ == nullptr) {
+      create_egl_context();
+    }
+    if (
+      eglMakeCurrent(
+        static_cast<EGLDisplay>(descriptor_.context.data.egl.display),
+        static_cast<EGLSurface>(descriptor_.surface),
+        static_cast<EGLSurface>(descriptor_.surface),
+        static_cast<EGLContext>(render_context_)
+      ) == EGL_FALSE
+    ) {
+      throw std::runtime_error("Switching OpenGL EGL context failed");
+    }
+#else
+    throw std::runtime_error("OpenGL context provider is unsupported");
+#endif
+  }
+
+  void deactivate() override {
+#if defined(_WIN32)
+    wglMakeCurrent(
+      static_cast<HDC>(previous_device_context_),
+      static_cast<HGLRC>(previous_render_context_)
+    );
+    previous_device_context_ = nullptr;
+    previous_render_context_ = nullptr;
+#elif defined(__linux__)
+    eglMakeCurrent(
+      static_cast<EGLDisplay>(previous_display_),
+      static_cast<EGLSurface>(previous_draw_surface_),
+      static_cast<EGLSurface>(previous_read_surface_),
+      static_cast<EGLContext>(previous_context_)
+    );
+    previous_display_ = nullptr;
+    previous_draw_surface_ = nullptr;
+    previous_read_surface_ = nullptr;
+    previous_context_ = nullptr;
+#endif
+  }
+
+#if defined(_WIN32)
+  void create_wgl_context() {
+    auto* const surface_context = static_cast<HDC>(descriptor_.surface);
+    auto* const share_context =
+      static_cast<HGLRC>(descriptor_.context.data.wgl.share_context);
+
+    auto* context_attribs = reinterpret_cast<WglCreateContextAttribs>(
+      getExtensionFunctionPointer("wglCreateContextAttribsARB")
+    );
+    if (context_attribs != nullptr) {
+      const int attributes[] = {
+        wgl_context_major_version_arb,
+        3,
+        wgl_context_minor_version_arb,
+        0,
+        wgl_context_profile_mask_arb,
+        wgl_context_compatibility_profile_bit_arb,
+        0
+      };
+      render_context_ =
+        context_attribs(surface_context, share_context, attributes);
+    }
+    if (render_context_ == nullptr) {
+      render_context_ = wglCreateContext(surface_context);
+      if (render_context_ == nullptr) {
+        throw std::runtime_error("Creating OpenGL WGL context failed");
+      }
+      if (
+        wglShareLists(share_context, static_cast<HGLRC>(render_context_)) == 0
+      ) {
+        wglDeleteContext(static_cast<HGLRC>(render_context_));
+        render_context_ = nullptr;
+        throw std::runtime_error("Sharing OpenGL WGL context failed");
+      }
+    }
+  }
+
+  void destroy_native_context() {
+    if (render_context_ != nullptr) {
+      wglDeleteContext(static_cast<HGLRC>(render_context_));
+      render_context_ = nullptr;
+    }
+  }
+#elif defined(__linux__)
+  void create_egl_context() {
+    // TODO(linux): validate EGL window-surface presentation on the user's
+    // Linux workstation with the same Mesa/llvmpipe provider used in CI.
+    auto* const display =
+      static_cast<EGLDisplay>(descriptor_.context.data.egl.display);
+    auto* const config =
+      static_cast<EGLConfig>(descriptor_.context.data.egl.config);
+    auto* const share_context =
+      static_cast<EGLContext>(descriptor_.context.data.egl.share_context);
+    if (eglBindAPI(EGL_OPENGL_ES_API) == EGL_FALSE) {
+      throw std::runtime_error("Binding EGL OpenGL ES API failed");
+    }
+
+    const EGLint context_attributes[] = {
+      EGL_CONTEXT_CLIENT_VERSION, 3, EGL_NONE
+    };
+    render_context_ =
+      eglCreateContext(display, config, share_context, context_attributes);
+    if (render_context_ == EGL_NO_CONTEXT) {
+      render_context_ = nullptr;
+      throw std::runtime_error("Creating OpenGL EGL context failed");
+    }
+  }
+
+  void destroy_native_context() {
+    auto* const display =
+      static_cast<EGLDisplay>(descriptor_.context.data.egl.display);
+    if (render_context_ != nullptr) {
+      eglDestroyContext(display, static_cast<EGLContext>(render_context_));
+      render_context_ = nullptr;
+    }
+  }
+#else
+  void destroy_native_context() {}
+#endif
+
+  mln_opengl_surface_descriptor descriptor_{};
+  void* render_context_ = nullptr;
+
+#if defined(_WIN32)
+  void* previous_device_context_ = nullptr;
+  void* previous_render_context_ = nullptr;
+#elif defined(__linux__)
+  void* previous_display_ = nullptr;
+  void* previous_draw_surface_ = nullptr;
+  void* previous_read_surface_ = nullptr;
+  void* previous_context_ = nullptr;
+#endif
+};
+
+class OpenGLSurfaceSessionBackend final
+    : public mln::core::SurfaceSessionBackend {
+ public:
+  OpenGLSurfaceSessionBackend(
+    const mln_opengl_surface_descriptor& descriptor, mbgl::Size size
+  )
+      : backend_(descriptor, size) {}
+
+  auto renderer_backend() -> mbgl::gfx::RendererBackend& override {
+    return backend_;
+  }
+
+  void resize(uint32_t physical_width, uint32_t physical_height) override {
+    backend_.resize(mbgl::Size{physical_width, physical_height});
+  }
+
+ private:
+  OpenGLSurfaceBackend backend_;
+};
+
 }  // namespace
 
 namespace mln::core {
@@ -156,8 +483,22 @@ auto opengl_surface_attach(
   if (physical_status != MLN_STATUS_OK) {
     return physical_status;
   }
-  set_thread_error("OpenGL surface sessions are not implemented yet");
-  return MLN_STATUS_UNSUPPORTED;
+
+  auto session = std::make_unique<mln_render_session>();
+  session->map = map;
+  session->owner_thread = map_owner_thread(map);
+  set_session_extent(*session, descriptor->extent);
+  session->surface.backend = std::make_unique<OpenGLSurfaceSessionBackend>(
+    *descriptor, mbgl::Size{session->physical_width, session->physical_height}
+  );
+  return attach_render_session(
+    std::move(session), out_session, RenderSessionKind::Surface,
+    RenderSessionAttachMessages{
+      .null_session = "surface session must not be null",
+      .null_output = "out_session must not be null",
+      .non_null_output = "out_session must point to a null handle"
+    }
+  );
 }
 
 }  // namespace mln::core

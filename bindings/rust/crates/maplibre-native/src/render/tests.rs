@@ -81,6 +81,23 @@ fn create_opengl_owned_texture_session(
     Ok((context, session))
 }
 
+fn create_opengl_surface_session(
+    map: &MapHandle,
+    extent: RenderTargetExtent,
+) -> std::result::Result<(OpenGLTestContext, RenderSessionHandle), Box<dyn StdError>> {
+    let backends = crate::supported_render_backends();
+    if !backends.contains(RenderBackendMask::OPENGL) {
+        return Err("native library does not support OpenGL surface sessions".into());
+    }
+    let context = OpenGLTestContext::new()?;
+    let session = map.attach_opengl_surface(&OpenGLSurfaceDescriptor::new(
+        extent,
+        context.descriptor(),
+        context.surface(),
+    ))?;
+    Ok((context, session))
+}
+
 #[allow(dead_code)]
 enum OwnedTextureTestContext {
     Metal(MetalTestContext),
@@ -296,6 +313,24 @@ impl OpenGLTestContext {
         #[cfg(not(target_os = "windows"))]
         {
             unreachable!("OpenGLTestContext::new is only implemented on Windows")
+        }
+    }
+
+    fn surface(&self) -> NativePointer {
+        #[cfg(target_os = "windows")]
+        {
+            self.device_context
+        }
+
+        #[cfg(target_os = "linux")]
+        {
+            // TODO(linux): Return an EGLSurface once the Rust EGL helper exists.
+            unreachable!("OpenGLTestContext::new is not implemented on Linux yet")
+        }
+
+        #[cfg(not(any(target_os = "windows", target_os = "linux")))]
+        {
+            unreachable!("OpenGL test surfaces are only available on Windows WGL")
         }
     }
 }
@@ -664,6 +699,31 @@ fn opengl_owned_texture_session_attaches_with_platform_context() {
         error.kind(),
         ErrorKind::InvalidState | ErrorKind::Unsupported
     ));
+
+    session.close().unwrap();
+    map.close().unwrap();
+    runtime.close().unwrap();
+}
+
+#[test]
+fn opengl_surface_session_renders_with_platform_context() {
+    let runtime = RuntimeHandle::new().unwrap();
+    let map = MapHandle::with_options(&runtime, &MapOptions::new(64, 64, 1.0)).unwrap();
+
+    let Ok((_context, session)) =
+        create_opengl_surface_session(&map, RenderTargetExtent::new(32, 16, 1.0))
+    else {
+        map.close().unwrap();
+        runtime.close().unwrap();
+        return;
+    };
+
+    map.set_style_json(QUERY_STYLE_JSON).unwrap();
+    assert!(wait_for_runtime_event(
+        &runtime,
+        RuntimeEventType::MapRenderUpdateAvailable
+    ));
+    session.render_update().unwrap();
 
     session.close().unwrap();
     map.close().unwrap();
