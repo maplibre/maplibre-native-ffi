@@ -62,8 +62,12 @@ public final class ResourceTransformState implements AutoCloseable {
   public synchronized void close() {
     if (!closed) {
       closed = true;
-      responseStorages.forEach((thread, storage) -> storage.close());
-      responseStorages.clear();
+      responseStorages.forEach(
+          (thread, storage) -> {
+            if (responseStorages.remove(thread, storage)) {
+              storage.close();
+            }
+          });
       transform.close();
       nativeCallback.close();
     }
