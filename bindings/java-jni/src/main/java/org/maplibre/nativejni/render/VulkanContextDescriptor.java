@@ -9,6 +9,8 @@ public final class VulkanContextDescriptor {
   private NativePointer device = NativePointer.NULL;
   private NativePointer graphicsQueue = NativePointer.NULL;
   private int graphicsQueueFamilyIndex;
+  private NativePointer getInstanceProcAddr = NativePointer.NULL;
+  private NativePointer getDeviceProcAddr = NativePointer.NULL;
 
   public VulkanContextDescriptor() {}
 
@@ -68,5 +70,28 @@ public final class VulkanContextDescriptor {
   public VulkanContextDescriptor graphicsQueueFamilyIndex(int index) {
     this.graphicsQueueFamilyIndex = index;
     return this;
+  }
+
+  public NativePointer getInstanceProcAddr() {
+    return getInstanceProcAddr;
+  }
+
+  public VulkanContextDescriptor getInstanceProcAddr(NativePointer getInstanceProcAddr) {
+    this.getInstanceProcAddr = Objects.requireNonNull(getInstanceProcAddr, "getInstanceProcAddr");
+    return this;
+  }
+
+  public NativePointer getDeviceProcAddr() {
+    return getDeviceProcAddr;
+  }
+
+  public VulkanContextDescriptor getDeviceProcAddr(NativePointer getDeviceProcAddr) {
+    this.getDeviceProcAddr = Objects.requireNonNull(getDeviceProcAddr, "getDeviceProcAddr");
+    return this;
+  }
+
+  public VulkanContextDescriptor procAddresses(
+      NativePointer getInstanceProcAddr, NativePointer getDeviceProcAddr) {
+    return getInstanceProcAddr(getInstanceProcAddr).getDeviceProcAddr(getDeviceProcAddr);
   }
 }

@@ -28,7 +28,9 @@ public final class RenderStructs {
       long physicalDevice,
       long device,
       long graphicsQueue,
-      int graphicsQueueFamilyIndex) {}
+      int graphicsQueueFamilyIndex,
+      long getInstanceProcAddr,
+      long getDeviceProcAddr) {}
 
   public record MetalOwnedTextureValue(ExtentValue extent, MetalContextValue context) {}
 
@@ -66,7 +68,9 @@ public final class RenderStructs {
         address(context.physicalDevice()),
         address(context.device()),
         address(context.graphicsQueue()),
-        context.graphicsQueueFamilyIndex());
+        context.graphicsQueueFamilyIndex(),
+        address(context.getInstanceProcAddr()),
+        address(context.getDeviceProcAddr()));
   }
 
   public static MetalOwnedTextureValue metalOwnedTextureDescriptor(
@@ -199,6 +203,8 @@ public final class RenderStructs {
     out.device(JavaCppSupport.pointerOrNull(context.device()));
     out.graphics_queue(JavaCppSupport.pointerOrNull(context.graphicsQueue()));
     out.graphics_queue_family_index(context.graphicsQueueFamilyIndex());
+    out.get_instance_proc_addr(JavaCppSupport.pointerOrNull(context.getInstanceProcAddr()));
+    out.get_device_proc_addr(JavaCppSupport.pointerOrNull(context.getDeviceProcAddr()));
   }
 
   private static long address(NativePointer pointer) {

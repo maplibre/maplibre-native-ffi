@@ -21,11 +21,12 @@ final class RenderStructsTest {
     var metalContext = new MetalContextDescriptor(NativePointer.ofAddress(0x1234));
     var vulkanContext =
         new VulkanContextDescriptor(
-            NativePointer.ofAddress(0x10),
-            NativePointer.ofAddress(0x20),
-            NativePointer.ofAddress(0x30),
-            NativePointer.ofAddress(0x40),
-            7);
+                NativePointer.ofAddress(0x10),
+                NativePointer.ofAddress(0x20),
+                NativePointer.ofAddress(0x30),
+                NativePointer.ofAddress(0x40),
+                7)
+            .procAddresses(NativePointer.ofAddress(0x41), NativePointer.ofAddress(0x42));
 
     var metalOwnedTexture =
         RenderStructs.metalOwnedTextureDescriptor(
@@ -99,5 +100,7 @@ final class RenderStructsTest {
     assertEquals(expected.device().address(), value.device());
     assertEquals(expected.graphicsQueue().address(), value.graphicsQueue());
     assertEquals(expected.graphicsQueueFamilyIndex(), value.graphicsQueueFamilyIndex());
+    assertEquals(expected.getInstanceProcAddr().address(), value.getInstanceProcAddr());
+    assertEquals(expected.getDeviceProcAddr().address(), value.getDeviceProcAddr());
   }
 }
