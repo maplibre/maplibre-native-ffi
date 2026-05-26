@@ -5,7 +5,7 @@ Audience: Java JNI binding contributors and reviewers. Category: explanation.
 ## Purpose
 
 Evaluate JavaCPP as the generated C/JNI bridge over the MapLibre Native C ABI
-before replacing the java-bindgen/Rust JNI production path.
+before replacing the previous generator stack.
 
 ## Scope Covered
 
@@ -59,8 +59,8 @@ reduction_percent=48.6
 ```
 
 The count excludes generated JavaCPP declarations and build output. It includes
-handwritten Java JNI internal adapters/support, the compatibility native crate,
-and binding-local build glue.
+handwritten Java JNI internal adapters/support, the workspace marker crate, and
+binding-local build glue.
 
 ## Follow-up Risks
 

@@ -2,9 +2,8 @@
 """Measure project-maintained Java JNI bridge code.
 
 The count intentionally excludes generated JavaCPP declarations and build output.
-It includes handwritten Java JNI internal adapters/support, the compatibility
-native crate, and binding-local build glue that replaced the prior Rust JNI
-bridge generation stack.
+It includes handwritten Java JNI internal adapters/support, the workspace marker
+crate, and binding-local build glue.
 """
 
 from __future__ import annotations

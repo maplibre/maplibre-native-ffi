@@ -27,9 +27,9 @@ Kotlin Multiplatform `commonMain` can provide the shared facade for common
 declarations and actual implementations.
 
 Keep generated JavaCPP details internal. `org.bytedeco.javacpp.Pointer`, JavaCPP
-generated structs, generated `native` declarations, raw JNI handles, and raw
-`long` native pointers stay inside internal packages. Public APIs use Java
-values, records, descriptor classes, `AutoCloseable` handles, exceptions,
+generated structs, generated C entry-point declarations, implementation handles,
+and raw `long` native pointers stay inside internal packages. Public APIs use
+Java values, records, descriptor classes, `AutoCloseable` handles, exceptions,
 callbacks, buffers, and `NativePointer`.
 
 ## Code Organization
@@ -53,8 +53,8 @@ public binding layer
 
 Generate broad C/JNI coverage from the public C headers with JavaCPP. Handwrite
 only the adapters that preserve Java API shape, value copying, ownership, and
-error behavior. The Rust JNI crate is a compatibility validation target, not the
-production bridge generation path.
+error behavior. The workspace marker crate keeps contributor validation commands
+addressable without participating in the production bridge.
 
 ## Public Types and Errors
 
@@ -99,7 +99,7 @@ released when the owner clears, replaces, or destroys the callback.
 
 ## JNI Memory and Strings
 
-JavaCPP generated code owns the raw JNI frame mechanics for direct C calls. The
+JavaCPP generated code owns the JNI frame mechanics for direct C calls. The
 handwritten adapters keep native snapshots, result handles, and list handles
 internal: they copy contents into Java records or lists and release native
 handles in cleanup paths.
