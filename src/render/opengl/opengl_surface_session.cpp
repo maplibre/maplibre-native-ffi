@@ -209,7 +209,10 @@ class OpenGLSurfaceBackend final : public mbgl::gl::RendererBackend,
       descriptor_.context.data.wgl.get_proc_address
     );
     if (loader != nullptr) {
-      return reinterpret_cast<mbgl::gl::ProcAddress>(loader(name));
+      auto* proc = loader(name);
+      if (is_valid_wgl_proc_address(proc)) {
+        return reinterpret_cast<mbgl::gl::ProcAddress>(proc);
+      }
     }
     auto* proc = wglGetProcAddress(name);
     if (is_valid_wgl_proc_address(proc)) {
@@ -334,9 +337,19 @@ class OpenGLSurfaceBackend final : public mbgl::gl::RendererBackend,
       if (render_context_ == nullptr) {
         throw std::runtime_error("Creating OpenGL WGL context failed");
       }
+      const auto share_context_was_current =
+        static_cast<HGLRC>(previous_render_context_) == share_context;
+      if (share_context_was_current && wglMakeCurrent(nullptr, nullptr) == 0) {
+        wglDeleteContext(static_cast<HGLRC>(render_context_));
+        render_context_ = nullptr;
+        throw std::runtime_error("Releasing current WGL context failed");
+      }
       if (
         wglShareLists(share_context, static_cast<HGLRC>(render_context_)) == 0
       ) {
+        if (share_context_was_current) {
+          wglMakeCurrent(surface_context, share_context);
+        }
         wglDeleteContext(static_cast<HGLRC>(render_context_));
         render_context_ = nullptr;
         throw std::runtime_error("Sharing OpenGL WGL context failed");
