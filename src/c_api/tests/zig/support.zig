@@ -16,14 +16,8 @@ const egl = if (build_options.supports_opengl and builtin.os.tag == .linux) @cIm
 }) else struct {};
 
 const egl_platform_surfaceless_mesa = 0x31dd;
-const egl_platform_device_ext = 0x313f;
-const EglDeviceExt = if (build_options.supports_opengl and builtin.os.tag == .linux) ?*anyopaque else void;
 const EglGetPlatformDisplayExt = if (build_options.supports_opengl and builtin.os.tag == .linux)
     *const fn (egl.EGLenum, ?*anyopaque, ?*const egl.EGLint) callconv(.c) egl.EGLDisplay
-else
-    void;
-const EglQueryDevicesExt = if (build_options.supports_opengl and builtin.os.tag == .linux)
-    *const fn (egl.EGLint, [*]EglDeviceExt, *egl.EGLint) callconv(.c) egl.EGLBoolean
 else
     void;
 
@@ -192,35 +186,10 @@ const OpenGLAttachContext = if (build_options.supports_opengl and builtin.os.tag
     }
 
     fn initDisplay() !egl.EGLDisplay {
-        if (initializeDisplay(egl.eglGetDisplay(egl.EGL_DEFAULT_DISPLAY))) |display| {
-            return display;
-        } else |_| {}
-
-        const get_platform_display = try getPlatformDisplayFunction();
-        if (initializeDisplay(get_platform_display(egl_platform_surfaceless_mesa, null, null))) |display| {
-            return display;
-        } else |_| {}
-        return initializeDeviceDisplay(get_platform_display);
-    }
-
-    fn getPlatformDisplayFunction() !EglGetPlatformDisplayExt {
-        return @ptrCast(egl.eglGetProcAddress("eglGetPlatformDisplayEXT") orelse return error.SkipZigTest);
-    }
-
-    fn initializeDeviceDisplay(get_platform_display: EglGetPlatformDisplayExt) !egl.EGLDisplay {
-        const query_devices: EglQueryDevicesExt = @ptrCast(
-            egl.eglGetProcAddress("eglQueryDevicesEXT") orelse return error.SkipZigTest,
+        const get_platform_display: EglGetPlatformDisplayExt = @ptrCast(
+            egl.eglGetProcAddress("eglGetPlatformDisplayEXT") orelse return error.SkipZigTest,
         );
-        var devices: [8]EglDeviceExt = undefined;
-        var device_count: egl.EGLint = 0;
-        if (query_devices(devices.len, devices[0..].ptr, &device_count) == egl.EGL_FALSE) return error.SkipZigTest;
-        const clamped_count = @min(@as(usize, @intCast(device_count)), devices.len);
-        for (devices[0..clamped_count]) |device| {
-            if (initializeDisplay(get_platform_display(egl_platform_device_ext, device, null))) |display| {
-                return display;
-            } else |_| {}
-        }
-        return error.SkipZigTest;
+        return initializeDisplay(get_platform_display(egl_platform_surfaceless_mesa, null, null));
     }
 
     fn initializeDisplay(display: egl.EGLDisplay) !egl.EGLDisplay {
