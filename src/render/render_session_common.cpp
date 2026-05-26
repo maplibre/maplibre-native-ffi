@@ -2,6 +2,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <exception>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -62,11 +63,12 @@ auto opengl_context_descriptor_default() noexcept
   -> mln_opengl_context_descriptor {
   auto result = mln_opengl_context_descriptor{
     .size = sizeof(mln_opengl_context_descriptor),
-    .platform = static_cast<mln_opengl_context_platform>(0),
+    .platform = MLN_OPENGL_CONTEXT_PLATFORM_EGL,
     .data = {
-      .wgl = mln_wgl_context_descriptor{
-        .size = sizeof(mln_wgl_context_descriptor),
-        .device_context = nullptr,
+      .egl = mln_egl_context_descriptor{
+        .size = sizeof(mln_egl_context_descriptor),
+        .display = nullptr,
+        .config = nullptr,
         .share_context = nullptr,
         .get_proc_address = nullptr,
       },

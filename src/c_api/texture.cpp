@@ -5,6 +5,7 @@
 
 #include "c_api/boundary.hpp"
 #include "maplibre_native_c.h"
+#include "render/render_session_common.hpp"
 #include "render/texture_session.hpp"
 
 auto mln_metal_owned_texture_descriptor_default(void) noexcept

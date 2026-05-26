@@ -10,7 +10,6 @@ struct mln_render_session;
 namespace mln::core {
 
 auto supported_render_backend_mask() noexcept -> uint32_t;
-auto opengl_supported_context_provider_mask() noexcept -> uint32_t;
 auto metal_owned_texture_descriptor_default() noexcept
   -> mln_metal_owned_texture_descriptor;
 auto metal_borrowed_texture_descriptor_default() noexcept
@@ -19,10 +18,6 @@ auto vulkan_owned_texture_descriptor_default() noexcept
   -> mln_vulkan_owned_texture_descriptor;
 auto vulkan_borrowed_texture_descriptor_default() noexcept
   -> mln_vulkan_borrowed_texture_descriptor;
-auto opengl_owned_texture_descriptor_default() noexcept
-  -> mln_opengl_owned_texture_descriptor;
-auto opengl_borrowed_texture_descriptor_default() noexcept
-  -> mln_opengl_borrowed_texture_descriptor;
 auto texture_image_info_default() noexcept -> mln_texture_image_info;
 auto validate_texture(mln_render_session* texture) -> mln_status;
 auto validate_live_attached_texture(mln_render_session* texture) -> mln_status;
