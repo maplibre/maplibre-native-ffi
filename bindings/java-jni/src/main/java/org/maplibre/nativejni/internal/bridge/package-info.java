@@ -1,2 +1,2 @@
-/** Raw JNI bridge declarations backed by generated native exports and registration metadata. */
+/** Internal adapters from the curated Java API to the generated JavaCPP C ABI bindings. */
 package org.maplibre.nativejni.internal.bridge;

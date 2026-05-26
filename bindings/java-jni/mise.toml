@@ -1,41 +1,15 @@
 [tasks.build]
 depends = ["//bindings/java-jni:native:build"]
-run = '''
-library_filename() {
-  case "$(uname -s)" in
-    Darwin*) echo "libmaplibre_native_jni.dylib" ;;
-    MINGW*|MSYS*|CYGWIN*) echo "maplibre_native_jni.dll" ;;
-    *) echo "libmaplibre_native_jni.so" ;;
-  esac
-}
-TARGET_DIR="${CARGO_TARGET_DIR:-../../target}"
-JNI_LIBRARY_PATH="$TARGET_DIR/debug/$(library_filename)"
-../../gradlew :bindings:java-jni:build --rerun-tasks \
-  -Dorg.maplibre.nativejni.library.path="$JNI_LIBRARY_PATH" \
-  -Dorg.maplibre.nativejni.tests.requireNative=true
-'''
+run = "../../gradlew :bindings:java-jni:build --rerun-tasks -Dorg.maplibre.nativejni.tests.requireNative=true"
 
 [tasks."native:build"]
 depends = ["//:ensure-native-library"]
-run = "cargo build -p maplibre-native-jni"
+run = "../../gradlew :bindings:java-jni:copyJavaCppNative --rerun-tasks"
 
 [tasks."test:native"]
-description = "Run Java JNI tests with the locally built JNI bridge loaded by exact path."
+description = "Run Java JNI tests with the JavaCPP bridge generated from the C ABI."
 depends = ["//bindings/java-jni:native:build"]
-run = '''
-library_filename() {
-  case "$(uname -s)" in
-    Darwin*) echo "libmaplibre_native_jni.dylib" ;;
-    MINGW*|MSYS*|CYGWIN*) echo "maplibre_native_jni.dll" ;;
-    *) echo "libmaplibre_native_jni.so" ;;
-  esac
-}
-TARGET_DIR="${CARGO_TARGET_DIR:-../../target}"
-JNI_LIBRARY_PATH="$TARGET_DIR/debug/$(library_filename)"
-../../gradlew :bindings:java-jni:test --rerun-tasks \
-  -Dorg.maplibre.nativejni.library.path="$JNI_LIBRARY_PATH" \
-  -Dorg.maplibre.nativejni.tests.requireNative=true
-'''
+run = "../../gradlew :bindings:java-jni:test --rerun-tasks -Dorg.maplibre.nativejni.tests.requireNative=true"
 
 [tasks.check]
 description = "Run Java JNI branch-readiness checks."

@@ -1,4 +1,6 @@
 module org.maplibre.nativejni {
+  requires org.bytedeco.javacpp;
+
   exports org.maplibre.nativejni;
   exports org.maplibre.nativejni.camera;
   exports org.maplibre.nativejni.error;

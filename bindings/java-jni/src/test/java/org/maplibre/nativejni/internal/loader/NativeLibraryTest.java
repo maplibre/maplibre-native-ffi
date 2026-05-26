@@ -24,11 +24,10 @@ final class NativeLibraryTest {
   void exposesDocumentedLookupInputs() {
     assertFalse(NativeLibrary.LIBRARY_PATH_PROPERTY.isBlank());
     assertFalse(NativeLibrary.LIBRARY_PATH_ENV.isBlank());
-    assertEquals("maplibre_native_jni", NativeLibrary.LIBRARY_NAME);
+    assertEquals("jniMaplibreNativeC", NativeLibrary.LIBRARY_NAME);
     assertTrue(
         File.separatorChar == '\\'
-            || System.mapLibraryName(NativeLibrary.LIBRARY_NAME)
-                .contains("libmaplibre_native_jni"));
+            || System.mapLibraryName(NativeLibrary.LIBRARY_NAME).contains("libjniMaplibreNativeC"));
   }
 
   @Test
@@ -40,6 +39,16 @@ final class NativeLibraryTest {
   @Test
   void subprocessLoadsThroughSystemProperty() throws Exception {
     assertLoaderSmoke(List.of("-D" + NativeLibrary.LIBRARY_PATH_PROPERTY + "=" + libraryPath()));
+  }
+
+  @Test
+  void subprocessLoadsExactPath() throws Exception {
+    assertLoaderSmoke(List.of(), libraryPath());
+  }
+
+  @Test
+  void subprocessRejectsBadExactPath() throws Exception {
+    assertLoaderSmokeFails(List.of(), Path.of(libraryPath()).resolveSibling("missing-jni-bridge"));
   }
 
   @Test
@@ -78,7 +87,27 @@ final class NativeLibraryTest {
     assertLoaderSmoke(javaArguments, null, null);
   }
 
+  private static void assertLoaderSmoke(List<String> javaArguments, String exactPath)
+      throws Exception {
+    assertLoaderSmoke(javaArguments, null, null, exactPath, 0);
+  }
+
   private static void assertLoaderSmoke(List<String> javaArguments, String envName, String envValue)
+      throws Exception {
+    assertLoaderSmoke(javaArguments, envName, envValue, null, 0);
+  }
+
+  private static void assertLoaderSmokeFails(List<String> javaArguments, Path exactPath)
+      throws Exception {
+    assertLoaderSmoke(javaArguments, null, null, exactPath.toString(), 1);
+  }
+
+  private static void assertLoaderSmoke(
+      List<String> javaArguments,
+      String envName,
+      String envValue,
+      String exactPath,
+      int expectedExit)
       throws Exception {
     var javaExecutable =
         Path.of(System.getProperty("java.home"), "bin", isWindows() ? "java.exe" : "java");
@@ -89,6 +118,9 @@ final class NativeLibraryTest {
     command.add(System.getProperty("java.class.path"));
     command.addAll(javaArguments);
     command.add(LoaderSmoke.class.getName());
+    if (exactPath != null) {
+      command.add(exactPath);
+    }
 
     var processBuilder = new ProcessBuilder(command).redirectErrorStream(true);
     if (envName != null) {
@@ -96,7 +128,7 @@ final class NativeLibraryTest {
     }
     var process = processBuilder.start();
     var output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
-    assertEquals(0, process.waitFor(), output);
+    assertEquals(expectedExit, process.waitFor(), output);
   }
 
   private static boolean isWindows() {
@@ -107,7 +139,11 @@ final class NativeLibraryTest {
     private LoaderSmoke() {}
 
     public static void main(String[] args) {
-      Maplibre.loadNativeLibrary();
+      if (args.length == 0) {
+        Maplibre.loadNativeLibrary();
+      } else {
+        NativeLibrary.load(Path.of(args[0]));
+      }
       if (Maplibre.cVersion() < 0) {
         throw new IllegalStateException("invalid C ABI version");
       }

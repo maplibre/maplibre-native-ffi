@@ -23,6 +23,18 @@ class ResourceRequestHandleTest {
   }
 
   @Test
+  void providerExceptionMarksNativeReleaseAndClosesHandle() {
+    var releaseCount = new AtomicInteger();
+    var handle = new ResourceRequestHandle(0x1234, ignored -> releaseCount.incrementAndGet());
+
+    assertEquals(-1, handle.finishProviderException());
+    handle.close();
+
+    assertEquals(0, releaseCount.get());
+    assertThrows(InvalidStateException.class, handle::isCancelled);
+  }
+
+  @Test
   void handleDecisionReleasesExactlyOnceOnClose() {
     var releaseCount = new AtomicInteger();
     var handle = new ResourceRequestHandle(0x1234, ignored -> releaseCount.incrementAndGet());

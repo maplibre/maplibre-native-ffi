@@ -1,13 +1,16 @@
 package org.maplibre.nativejni.internal.loader;
 
+import java.io.File;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Objects;
+import org.maplibre.nativejni.internal.javacpp.MaplibreNativeC;
 
-/** Loads the JNI bridge library exactly once per class loader. */
+/** Loads the JavaCPP JNI bridge library exactly once per class loader. */
 public final class NativeLibrary {
   public static final String LIBRARY_PATH_PROPERTY = "org.maplibre.nativejni.library.path";
   public static final String LIBRARY_PATH_ENV = "MAPLIBRE_NATIVE_JNI_LIBRARY_PATH";
-  public static final String LIBRARY_NAME = "maplibre_native_jni";
+  public static final String LIBRARY_NAME = "jniMaplibreNativeC";
 
   private static final Object LOCK = new Object();
   private static volatile boolean loaded;
@@ -29,12 +32,15 @@ public final class NativeLibrary {
       if (configuredPath == null || configuredPath.isBlank()) {
         configuredPath = System.getenv(LIBRARY_PATH_ENV);
       }
-      if (configuredPath == null || configuredPath.isBlank()) {
-        System.loadLibrary(LIBRARY_NAME);
-      } else {
-        System.load(Path.of(configuredPath).toAbsolutePath().toString());
+      if (configuredPath != null && !configuredPath.isBlank()) {
+        var path = Path.of(configuredPath).toAbsolutePath();
+        if (Files.isRegularFile(path)) {
+          loadExact(path);
+          return;
+        }
+        prependJavaLibraryPath(path);
       }
-      loaded = true;
+      loadJavaCppBridge();
     }
   }
 
@@ -44,8 +50,30 @@ public final class NativeLibrary {
       if (loaded) {
         return;
       }
-      System.load(libraryPath.toAbsolutePath().toString());
-      loaded = true;
+      loadExact(libraryPath.toAbsolutePath());
+    }
+  }
+
+  private static void loadExact(Path libraryPath) {
+    System.load(libraryPath.toString());
+    loaded = true;
+  }
+
+  private static void loadJavaCppBridge() {
+    MaplibreNativeC.mln_c_version();
+    loaded = true;
+  }
+
+  private static void prependJavaLibraryPath(Path directory) {
+    if (directory == null) {
+      return;
+    }
+    var path = System.getProperty("java.library.path", "");
+    var prefix = directory.toString();
+    if (path.isBlank()) {
+      System.setProperty("java.library.path", prefix);
+    } else if (!path.equals(prefix) && !path.startsWith(prefix + File.pathSeparator)) {
+      System.setProperty("java.library.path", prefix + File.pathSeparator + path);
     }
   }
 }
