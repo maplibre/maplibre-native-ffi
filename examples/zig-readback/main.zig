@@ -11,16 +11,7 @@ const vk = if (build_options.supports_vulkan) @cImport({
 
 const width = 512;
 const height = 512;
-const style_json =
-    \\{
-    \\  "version": 8,
-    \\  "name": "zig-readback",
-    \\  "sources": {},
-    \\  "layers": [
-    \\    {"id":"background","type":"background","paint":{"background-color":"#d8f1ff"}}
-    \\  ]
-    \\}
-;
+const style_url = "https://tiles.openfreemap.org/styles/bright";
 
 pub fn main(init_args: std.process.Init) !void {
     const allocator = init_args.gpa;
@@ -40,7 +31,7 @@ pub fn main(init_args: std.process.Init) !void {
         .width = width,
         .height = height,
         .scale_factor = 1.0,
-        .mode = .continuous,
+        .mode = .static,
     });
     defer map.close() catch {};
 
@@ -51,8 +42,9 @@ pub fn main(init_args: std.process.Init) !void {
     const texture = &texture_target.session;
 
     try setInitialCamera(&map);
-    try map.setStyleJson(allocator, style_json);
-    try renderTexture(&runtime, &map, texture);
+    try map.setStyleUrl(allocator, style_url);
+    try map.requestStillImage();
+    try renderTexture(init_args.io, &runtime, &map, texture);
 
     var image = try texture.readPremultipliedRgba8(allocator);
     defer image.deinit();
@@ -130,6 +122,7 @@ const OwnedTextureTarget = struct {
 };
 
 const VulkanAttachContext = if (build_options.supports_vulkan) struct {
+    dispatch: VulkanDispatch,
     instance: vk.VkInstance,
     physical_device: vk.VkPhysicalDevice,
     device: vk.VkDevice,
@@ -137,6 +130,9 @@ const VulkanAttachContext = if (build_options.supports_vulkan) struct {
     queue_family_index: u32,
 
     fn init() !VulkanAttachContext {
+        var dispatch = try VulkanDispatch.init();
+        errdefer dispatch.deinit();
+
         var app_info = std.mem.zeroes(vk.VkApplicationInfo);
         app_info.sType = vk.VK_STRUCTURE_TYPE_APPLICATION_INFO;
         app_info.pApplicationName = "maplibre-native-zig-readback";
@@ -156,25 +152,26 @@ const VulkanAttachContext = if (build_options.supports_vulkan) struct {
         }
 
         var instance: vk.VkInstance = null;
-        try expectVk(vk.vkCreateInstance(&instance_info, null, &instance));
-        errdefer vk.vkDestroyInstance(instance, null);
+        try expectVk(dispatch.create_instance.?(&instance_info, null, &instance));
+        dispatch.loadInstanceFunctions(instance);
+        errdefer dispatch.destroy_instance.?(instance, null);
 
         var physical_device_count: u32 = 0;
-        try expectVk(vk.vkEnumeratePhysicalDevices(instance, &physical_device_count, null));
+        try expectVk(dispatch.enumerate_physical_devices.?(instance, &physical_device_count, null));
         if (physical_device_count == 0) return error.NoVulkanPhysicalDevice;
 
         var physical_devices_buffer: [16]vk.VkPhysicalDevice = undefined;
         if (physical_device_count > physical_devices_buffer.len) physical_device_count = physical_devices_buffer.len;
-        try expectVk(vk.vkEnumeratePhysicalDevices(instance, &physical_device_count, &physical_devices_buffer));
+        try expectVk(dispatch.enumerate_physical_devices.?(instance, &physical_device_count, &physical_devices_buffer));
 
         for (physical_devices_buffer[0..physical_device_count]) |physical_device| {
             var queue_family_count: u32 = 0;
-            vk.vkGetPhysicalDeviceQueueFamilyProperties(physical_device, &queue_family_count, null);
+            dispatch.get_physical_device_queue_family_properties.?(physical_device, &queue_family_count, null);
             if (queue_family_count == 0) continue;
 
             var queue_families_buffer: [32]vk.VkQueueFamilyProperties = undefined;
             if (queue_family_count > queue_families_buffer.len) queue_family_count = queue_families_buffer.len;
-            vk.vkGetPhysicalDeviceQueueFamilyProperties(physical_device, &queue_family_count, &queue_families_buffer);
+            dispatch.get_physical_device_queue_family_properties.?(physical_device, &queue_family_count, &queue_families_buffer);
 
             for (queue_families_buffer[0..queue_family_count], 0..) |queue_family, index| {
                 if ((queue_family.queueFlags & vk.VK_QUEUE_GRAPHICS_BIT) == 0 or queue_family.queueCount == 0) continue;
@@ -187,13 +184,13 @@ const VulkanAttachContext = if (build_options.supports_vulkan) struct {
                 queue_info.pQueuePriorities = &priority;
 
                 var supported_features = std.mem.zeroes(vk.VkPhysicalDeviceFeatures);
-                vk.vkGetPhysicalDeviceFeatures(physical_device, &supported_features);
+                dispatch.get_physical_device_features.?(physical_device, &supported_features);
                 var features = std.mem.zeroes(vk.VkPhysicalDeviceFeatures);
                 features.samplerAnisotropy = supported_features.samplerAnisotropy;
                 features.wideLines = supported_features.wideLines;
 
                 const portability_subset_extensions = [_][*c]const u8{"VK_KHR_portability_subset"};
-                const enabled_device_extensions = if (try hasDeviceExtension(physical_device, "VK_KHR_portability_subset"))
+                const enabled_device_extensions = if (try hasDeviceExtension(&dispatch, physical_device, "VK_KHR_portability_subset"))
                     portability_subset_extensions[0..]
                 else
                     portability_subset_extensions[0..0];
@@ -207,11 +204,13 @@ const VulkanAttachContext = if (build_options.supports_vulkan) struct {
                 device_info.pEnabledFeatures = &features;
 
                 var device: vk.VkDevice = null;
-                if (vk.vkCreateDevice(physical_device, &device_info, null, &device) != vk.VK_SUCCESS) continue;
+                if (dispatch.create_device.?(physical_device, &device_info, null, &device) != vk.VK_SUCCESS) continue;
+                dispatch.loadDeviceFunctions(device);
 
                 var queue: vk.VkQueue = null;
-                vk.vkGetDeviceQueue(device, @intCast(index), 0, &queue);
+                dispatch.get_device_queue.?(device, @intCast(index), 0, &queue);
                 return .{
+                    .dispatch = dispatch,
                     .instance = instance,
                     .physical_device = physical_device,
                     .device = device,
@@ -225,8 +224,9 @@ const VulkanAttachContext = if (build_options.supports_vulkan) struct {
     }
 
     fn deinit(self: *VulkanAttachContext) void {
-        vk.vkDestroyDevice(self.device, null);
-        vk.vkDestroyInstance(self.instance, null);
+        self.dispatch.destroy_device.?(self.device, null);
+        self.dispatch.destroy_instance.?(self.instance, null);
+        self.dispatch.deinit();
     }
 
     fn descriptor(self: *const VulkanAttachContext) maplibre.VulkanContextDescriptor {
@@ -236,19 +236,61 @@ const VulkanAttachContext = if (build_options.supports_vulkan) struct {
             .device = .{ .ptr = @ptrCast(self.device.?) },
             .graphics_queue = .{ .ptr = @ptrCast(self.queue.?) },
             .graphics_queue_family_index = self.queue_family_index,
+            .get_instance_proc_addr = nativeFunctionPointer(self.dispatch.get_instance_proc_addr),
+            .get_device_proc_addr = nativeFunctionPointer(self.dispatch.get_device_proc_addr),
         };
     }
 } else struct {};
 
-fn hasDeviceExtension(physical_device: if (build_options.supports_vulkan) vk.VkPhysicalDevice else ?*anyopaque, name: [*c]const u8) !bool {
+const VulkanDispatch = if (build_options.supports_vulkan) struct {
+    get_instance_proc_addr: vk.PFN_vkGetInstanceProcAddr,
+    get_device_proc_addr: vk.PFN_vkGetDeviceProcAddr,
+    create_instance: vk.PFN_vkCreateInstance,
+    destroy_instance: vk.PFN_vkDestroyInstance = null,
+    enumerate_physical_devices: vk.PFN_vkEnumeratePhysicalDevices = null,
+    get_physical_device_queue_family_properties: vk.PFN_vkGetPhysicalDeviceQueueFamilyProperties = null,
+    get_physical_device_features: vk.PFN_vkGetPhysicalDeviceFeatures = null,
+    enumerate_device_extension_properties: vk.PFN_vkEnumerateDeviceExtensionProperties = null,
+    create_device: vk.PFN_vkCreateDevice = null,
+    destroy_device: vk.PFN_vkDestroyDevice = null,
+    get_device_queue: vk.PFN_vkGetDeviceQueue = null,
+
+    fn init() !VulkanDispatch {
+        return .{
+            .get_instance_proc_addr = vk.vkGetInstanceProcAddr,
+            .get_device_proc_addr = vk.vkGetDeviceProcAddr,
+            .create_instance = vk.vkCreateInstance,
+            .destroy_instance = vk.vkDestroyInstance,
+            .enumerate_physical_devices = vk.vkEnumeratePhysicalDevices,
+            .get_physical_device_queue_family_properties = vk.vkGetPhysicalDeviceQueueFamilyProperties,
+            .get_physical_device_features = vk.vkGetPhysicalDeviceFeatures,
+            .enumerate_device_extension_properties = vk.vkEnumerateDeviceExtensionProperties,
+            .create_device = vk.vkCreateDevice,
+            .destroy_device = vk.vkDestroyDevice,
+            .get_device_queue = vk.vkGetDeviceQueue,
+        };
+    }
+
+    fn deinit(_: *VulkanDispatch) void {}
+
+    fn loadInstanceFunctions(_: *VulkanDispatch, _: vk.VkInstance) void {}
+
+    fn loadDeviceFunctions(_: *VulkanDispatch, _: vk.VkDevice) void {}
+} else struct {};
+
+fn nativeFunctionPointer(function: anytype) maplibre.NativePointer {
+    return .{ .ptr = @ptrFromInt(@intFromPtr(function.?)) };
+}
+
+fn hasDeviceExtension(dispatch: *const VulkanDispatch, physical_device: if (build_options.supports_vulkan) vk.VkPhysicalDevice else ?*anyopaque, name: [*c]const u8) !bool {
     if (!build_options.supports_vulkan) return false;
 
     var count: u32 = 0;
-    try expectVk(vk.vkEnumerateDeviceExtensionProperties(physical_device, null, &count, null));
+    try expectVk(dispatch.enumerate_device_extension_properties.?(physical_device, null, &count, null));
 
     var properties_buffer: [256]vk.VkExtensionProperties = undefined;
     if (count > properties_buffer.len) count = properties_buffer.len;
-    try expectVk(vk.vkEnumerateDeviceExtensionProperties(physical_device, null, &count, &properties_buffer));
+    try expectVk(dispatch.enumerate_device_extension_properties.?(physical_device, null, &count, &properties_buffer));
 
     const expected = std.mem.span(name);
     for (properties_buffer[0..count]) |property| {
@@ -271,30 +313,38 @@ fn setInitialCamera(map: *maplibre.MapHandle) !void {
 }
 
 fn renderTexture(
+    io: std.Io,
     runtime: *maplibre.RuntimeHandle,
     map: *maplibre.MapHandle,
     texture: *maplibre.RenderSessionHandle,
 ) !void {
     const map_id = try map.id();
-    for (0..10_000) |_| {
+    var rendered_frame = false;
+    const started = std.Io.Clock.awake.now(io);
+    while (started.durationTo(std.Io.Clock.awake.now(io)).toNanoseconds() < 5 * std.time.ns_per_s) {
         try runtime.runOnce();
         while (try runtime.pollEvent()) |event| {
             if (event.source_type != .map or event.source_id == null or !std.meta.eql(event.source_id.?, map_id)) continue;
             switch (event.event_type) {
+                .map_render_update_available => {
+                    texture.renderUpdate() catch |err| switch (err) {
+                        error.InvalidState => continue,
+                        else => return err,
+                    };
+                    rendered_frame = true;
+                },
+                .map_still_image_finished => {
+                    if (!rendered_frame) return error.StillImageFinishedWithoutFrame;
+                    return;
+                },
                 .map_loading_failed => return error.MapLoadingFailed,
                 .map_render_error => return error.MapRenderFailed,
+                .map_still_image_failed => return error.StillImageFailed,
                 else => {},
             }
         }
 
-        texture.renderUpdate() catch |err| switch (err) {
-            error.InvalidState => {
-                std.Thread.yield() catch {};
-                continue;
-            },
-            else => return err,
-        };
-        return;
+        try io.sleep(.fromMilliseconds(10), .awake);
     }
     return error.RenderTimedOut;
 }

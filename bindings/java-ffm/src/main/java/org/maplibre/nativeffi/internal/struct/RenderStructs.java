@@ -129,6 +129,10 @@ public final class RenderStructs {
     mln_vulkan_context_descriptor.graphics_queue(segment, pointer(context.graphicsQueue()));
     mln_vulkan_context_descriptor.graphics_queue_family_index(
         segment, context.graphicsQueueFamilyIndex());
+    mln_vulkan_context_descriptor.get_instance_proc_addr(
+        segment, pointer(context.getInstanceProcAddr()));
+    mln_vulkan_context_descriptor.get_device_proc_addr(
+        segment, pointer(context.getDeviceProcAddr()));
   }
 
   private static MemorySegment pointer(NativePointer pointer) {

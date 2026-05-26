@@ -45,6 +45,11 @@ typedef struct mln_vulkan_context_descriptor {
   void* graphics_queue;
   /** Queue family index for graphics_queue. Must support graphics commands. */
   uint32_t graphics_queue_family_index;
+  /** PFN_vkGetInstanceProcAddr for the loader that created the Vulkan handles.
+   */
+  void* get_instance_proc_addr;
+  /** PFN_vkGetDeviceProcAddr for the loader that created the Vulkan device. */
+  void* get_device_proc_addr;
 } mln_vulkan_context_descriptor;
 
 #ifdef __cplusplus

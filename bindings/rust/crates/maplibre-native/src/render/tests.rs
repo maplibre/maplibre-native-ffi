@@ -204,6 +204,19 @@ impl VulkanTestContext {
             unsafe { NativePointer::from_address(self.graphics_queue.as_raw() as usize) },
             self.graphics_queue_family_index,
         )
+        .with_proc_addresses(
+            // SAFETY: Function pointers remain valid while the ash entry and instance are live.
+            unsafe {
+                NativePointer::from_address(
+                    self._entry.static_fn().get_instance_proc_addr as *const () as usize,
+                )
+            },
+            unsafe {
+                NativePointer::from_address(
+                    self.instance.fp_v1_0().get_device_proc_addr as *const () as usize,
+                )
+            },
+        )
     }
 }
 
@@ -219,8 +232,7 @@ impl Drop for VulkanTestContext {
 }
 
 fn load_vulkan_entry() -> std::result::Result<ash::Entry, Box<dyn StdError>> {
-    // SAFETY: Loading the Vulkan loader is delegated to ash. Repository tasks
-    // run through Pixi and expose the native library directory to this process.
+    // SAFETY: Loading the Vulkan loader is delegated to ash.
     unsafe { ash::Entry::load() }.map_err(Into::into)
 }
 
@@ -757,7 +769,8 @@ fn backend_specific_attach_calls_report_native_statuses() {
                 NativePointer::NULL,
                 NativePointer::NULL,
                 0,
-            ),
+            )
+            .with_proc_addresses(NativePointer::NULL, NativePointer::NULL),
             NativePointer::NULL,
         ))
         .unwrap_err();

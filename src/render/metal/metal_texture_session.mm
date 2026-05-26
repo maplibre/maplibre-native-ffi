@@ -424,6 +424,8 @@ auto vulkan_owned_texture_descriptor_default() noexcept
       .device = nullptr,
       .graphics_queue = nullptr,
       .graphics_queue_family_index = 0,
+      .get_instance_proc_addr = nullptr,
+      .get_device_proc_addr = nullptr,
     },
   };
 }
@@ -447,6 +449,8 @@ auto vulkan_borrowed_texture_descriptor_default() noexcept
         .device = nullptr,
         .graphics_queue = nullptr,
         .graphics_queue_family_index = 0,
+        .get_instance_proc_addr = nullptr,
+        .get_device_proc_addr = nullptr,
       },
     .image = nullptr,
     .image_view = nullptr,

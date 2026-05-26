@@ -58,11 +58,7 @@ jobs:
           key: mln-src-v2-${{ hashFiles('.gitmodules', 'cmake/mln_version.cmake') }}
       - uses: ./.github/actions/setup-ci-deps
       - run: mise run configure
-      # Windows builds successfully, but native tests/examples are runtime-broken for now.
-      - if: ${{ inputs.variant == 'windows-x64-vulkan' }}
-        run: mise run build
-      - if: ${{ inputs.variant != 'windows-x64-vulkan' }}
-        run: mise run test
+      - run: mise run test
       - run: mise run ci:prepare-native-artifact
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:

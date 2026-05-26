@@ -204,11 +204,16 @@ public final class RenderTargetTestSupport implements AutoCloseable {
 
     VulkanContextDescriptor descriptor() {
       return new VulkanContextDescriptor(
-          NativePointer.ofAddress(instance.address()),
-          NativePointer.ofAddress(physicalDevice.address()),
-          NativePointer.ofAddress(device.address()),
-          NativePointer.ofAddress(graphicsQueue.address()),
-          graphicsQueueFamilyIndex);
+              NativePointer.ofAddress(instance.address()),
+              NativePointer.ofAddress(physicalDevice.address()),
+              NativePointer.ofAddress(device.address()),
+              NativePointer.ofAddress(graphicsQueue.address()),
+              graphicsQueueFamilyIndex)
+          .procAddresses(
+              NativePointer.ofAddress(
+                  VK.getFunctionProvider().getFunctionAddress("vkGetInstanceProcAddr")),
+              NativePointer.ofAddress(
+                  VK.getFunctionProvider().getFunctionAddress("vkGetDeviceProcAddr")));
     }
 
     private void createInstance() {

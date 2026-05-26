@@ -286,6 +286,7 @@ fn createMovedMetalSessionWithFrame(device: *anyopaque) !struct {
 }
 
 const VulkanAttachContext = if (build_options.supports_vulkan) struct {
+    dispatch: VulkanDispatch,
     instance: vk.VkInstance,
     physical_device: vk.VkPhysicalDevice,
     device: vk.VkDevice,
@@ -293,6 +294,9 @@ const VulkanAttachContext = if (build_options.supports_vulkan) struct {
     queue_family_index: u32,
 
     pub fn init() !VulkanAttachContext {
+        var dispatch = try VulkanDispatch.init();
+        errdefer dispatch.deinit();
+
         var app_info = std.mem.zeroes(vk.VkApplicationInfo);
         app_info.sType = vk.VK_STRUCTURE_TYPE_APPLICATION_INFO;
         app_info.pApplicationName = "maplibre-native-zig-binding-tests";
@@ -312,25 +316,26 @@ const VulkanAttachContext = if (build_options.supports_vulkan) struct {
         }
 
         var instance: vk.VkInstance = null;
-        try expectVk(vk.vkCreateInstance(&instance_info, null, &instance));
-        errdefer vk.vkDestroyInstance(instance, null);
+        try expectVk(dispatch.create_instance.?(&instance_info, null, &instance));
+        dispatch.loadInstanceFunctions(instance);
+        errdefer dispatch.destroy_instance.?(instance, null);
 
         var physical_device_count: u32 = 0;
-        try expectVk(vk.vkEnumeratePhysicalDevices(instance, &physical_device_count, null));
+        try expectVk(dispatch.enumerate_physical_devices.?(instance, &physical_device_count, null));
         try testing.expect(physical_device_count != 0);
 
         const physical_devices = try testing.allocator.alloc(vk.VkPhysicalDevice, physical_device_count);
         defer testing.allocator.free(physical_devices);
-        try expectVk(vk.vkEnumeratePhysicalDevices(instance, &physical_device_count, physical_devices.ptr));
+        try expectVk(dispatch.enumerate_physical_devices.?(instance, &physical_device_count, physical_devices.ptr));
 
         for (physical_devices) |physical_device| {
             var queue_family_count: u32 = 0;
-            vk.vkGetPhysicalDeviceQueueFamilyProperties(physical_device, &queue_family_count, null);
+            dispatch.get_physical_device_queue_family_properties.?(physical_device, &queue_family_count, null);
             if (queue_family_count == 0) continue;
 
             const queue_families = try testing.allocator.alloc(vk.VkQueueFamilyProperties, queue_family_count);
             defer testing.allocator.free(queue_families);
-            vk.vkGetPhysicalDeviceQueueFamilyProperties(physical_device, &queue_family_count, queue_families.ptr);
+            dispatch.get_physical_device_queue_family_properties.?(physical_device, &queue_family_count, queue_families.ptr);
 
             for (queue_families, 0..) |queue_family, index| {
                 if ((queue_family.queueFlags & vk.VK_QUEUE_GRAPHICS_BIT) == 0 or queue_family.queueCount == 0) continue;
@@ -343,13 +348,13 @@ const VulkanAttachContext = if (build_options.supports_vulkan) struct {
                 queue_info.pQueuePriorities = &priority;
 
                 var supported_features = std.mem.zeroes(vk.VkPhysicalDeviceFeatures);
-                vk.vkGetPhysicalDeviceFeatures(physical_device, &supported_features);
+                dispatch.get_physical_device_features.?(physical_device, &supported_features);
                 var features = std.mem.zeroes(vk.VkPhysicalDeviceFeatures);
                 features.samplerAnisotropy = supported_features.samplerAnisotropy;
                 features.wideLines = supported_features.wideLines;
 
                 const portability_subset_extensions = [_][*c]const u8{"VK_KHR_portability_subset"};
-                const enabled_device_extensions = if (try hasDeviceExtension(physical_device, "VK_KHR_portability_subset"))
+                const enabled_device_extensions = if (try hasDeviceExtension(&dispatch, physical_device, "VK_KHR_portability_subset"))
                     portability_subset_extensions[0..]
                 else
                     portability_subset_extensions[0..0];
@@ -363,11 +368,13 @@ const VulkanAttachContext = if (build_options.supports_vulkan) struct {
                 device_info.pEnabledFeatures = &features;
 
                 var device: vk.VkDevice = null;
-                if (vk.vkCreateDevice(physical_device, &device_info, null, &device) != vk.VK_SUCCESS) continue;
+                if (dispatch.create_device.?(physical_device, &device_info, null, &device) != vk.VK_SUCCESS) continue;
+                dispatch.loadDeviceFunctions(device);
 
                 var queue: vk.VkQueue = null;
-                vk.vkGetDeviceQueue(device, @intCast(index), 0, &queue);
+                dispatch.get_device_queue.?(device, @intCast(index), 0, &queue);
                 return .{
+                    .dispatch = dispatch,
                     .instance = instance,
                     .physical_device = physical_device,
                     .device = device,
@@ -381,9 +388,10 @@ const VulkanAttachContext = if (build_options.supports_vulkan) struct {
     }
 
     pub fn deinit(self: *VulkanAttachContext) void {
-        _ = vk.vkDeviceWaitIdle(self.device);
-        vk.vkDestroyDevice(self.device, null);
-        vk.vkDestroyInstance(self.instance, null);
+        _ = self.dispatch.device_wait_idle.?(self.device);
+        self.dispatch.destroy_device.?(self.device, null);
+        self.dispatch.destroy_instance.?(self.instance, null);
+        self.dispatch.deinit();
     }
 
     pub fn descriptor(self: *const VulkanAttachContext) maplibre.VulkanContextDescriptor {
@@ -393,19 +401,81 @@ const VulkanAttachContext = if (build_options.supports_vulkan) struct {
             .device = .{ .ptr = @ptrCast(self.device.?) },
             .graphics_queue = .{ .ptr = @ptrCast(self.queue.?) },
             .graphics_queue_family_index = self.queue_family_index,
+            .get_instance_proc_addr = nativeFunctionPointer(self.dispatch.get_instance_proc_addr),
+            .get_device_proc_addr = nativeFunctionPointer(self.dispatch.get_device_proc_addr),
         };
     }
 } else struct {};
 
-fn hasDeviceExtension(physical_device: if (build_options.supports_vulkan) vk.VkPhysicalDevice else ?*anyopaque, name: [*c]const u8) !bool {
+const VulkanDispatch = if (build_options.supports_vulkan) struct {
+    get_instance_proc_addr: vk.PFN_vkGetInstanceProcAddr,
+    get_device_proc_addr: vk.PFN_vkGetDeviceProcAddr,
+    create_instance: vk.PFN_vkCreateInstance,
+    destroy_instance: vk.PFN_vkDestroyInstance = null,
+    enumerate_physical_devices: vk.PFN_vkEnumeratePhysicalDevices = null,
+    get_physical_device_queue_family_properties: vk.PFN_vkGetPhysicalDeviceQueueFamilyProperties = null,
+    get_physical_device_features: vk.PFN_vkGetPhysicalDeviceFeatures = null,
+    get_physical_device_memory_properties: vk.PFN_vkGetPhysicalDeviceMemoryProperties = null,
+    enumerate_device_extension_properties: vk.PFN_vkEnumerateDeviceExtensionProperties = null,
+    create_device: vk.PFN_vkCreateDevice = null,
+    destroy_device: vk.PFN_vkDestroyDevice = null,
+    device_wait_idle: vk.PFN_vkDeviceWaitIdle = null,
+    get_device_queue: vk.PFN_vkGetDeviceQueue = null,
+    create_image: vk.PFN_vkCreateImage = null,
+    destroy_image: vk.PFN_vkDestroyImage = null,
+    get_image_memory_requirements: vk.PFN_vkGetImageMemoryRequirements = null,
+    allocate_memory: vk.PFN_vkAllocateMemory = null,
+    free_memory: vk.PFN_vkFreeMemory = null,
+    bind_image_memory: vk.PFN_vkBindImageMemory = null,
+    create_image_view: vk.PFN_vkCreateImageView = null,
+    destroy_image_view: vk.PFN_vkDestroyImageView = null,
+
+    fn init() !VulkanDispatch {
+        return .{
+            .get_instance_proc_addr = vk.vkGetInstanceProcAddr,
+            .get_device_proc_addr = vk.vkGetDeviceProcAddr,
+            .create_instance = vk.vkCreateInstance,
+            .destroy_instance = vk.vkDestroyInstance,
+            .enumerate_physical_devices = vk.vkEnumeratePhysicalDevices,
+            .get_physical_device_queue_family_properties = vk.vkGetPhysicalDeviceQueueFamilyProperties,
+            .get_physical_device_features = vk.vkGetPhysicalDeviceFeatures,
+            .get_physical_device_memory_properties = vk.vkGetPhysicalDeviceMemoryProperties,
+            .enumerate_device_extension_properties = vk.vkEnumerateDeviceExtensionProperties,
+            .create_device = vk.vkCreateDevice,
+            .destroy_device = vk.vkDestroyDevice,
+            .device_wait_idle = vk.vkDeviceWaitIdle,
+            .get_device_queue = vk.vkGetDeviceQueue,
+            .create_image = vk.vkCreateImage,
+            .destroy_image = vk.vkDestroyImage,
+            .get_image_memory_requirements = vk.vkGetImageMemoryRequirements,
+            .allocate_memory = vk.vkAllocateMemory,
+            .free_memory = vk.vkFreeMemory,
+            .bind_image_memory = vk.vkBindImageMemory,
+            .create_image_view = vk.vkCreateImageView,
+            .destroy_image_view = vk.vkDestroyImageView,
+        };
+    }
+
+    fn deinit(_: *VulkanDispatch) void {}
+
+    fn loadInstanceFunctions(_: *VulkanDispatch, _: vk.VkInstance) void {}
+
+    fn loadDeviceFunctions(_: *VulkanDispatch, _: vk.VkDevice) void {}
+} else struct {};
+
+fn nativeFunctionPointer(function: anytype) maplibre.NativePointer {
+    return .{ .ptr = @ptrFromInt(@intFromPtr(function.?)) };
+}
+
+fn hasDeviceExtension(dispatch: *const VulkanDispatch, physical_device: if (build_options.supports_vulkan) vk.VkPhysicalDevice else ?*anyopaque, name: [*c]const u8) !bool {
     if (!build_options.supports_vulkan) return false;
 
     var count: u32 = 0;
-    try expectVk(vk.vkEnumerateDeviceExtensionProperties(physical_device, null, &count, null));
+    try expectVk(dispatch.enumerate_device_extension_properties.?(physical_device, null, &count, null));
 
     var properties_buffer: [256]vk.VkExtensionProperties = undefined;
     if (count > properties_buffer.len) count = properties_buffer.len;
-    try expectVk(vk.vkEnumerateDeviceExtensionProperties(physical_device, null, &count, &properties_buffer));
+    try expectVk(dispatch.enumerate_device_extension_properties.?(physical_device, null, &count, &properties_buffer));
 
     const expected = std.mem.span(name);
     for (properties_buffer[0..count]) |property| {
@@ -430,9 +500,9 @@ const VulkanBorrowedImage = if (build_options.supports_vulkan) struct {
         var memory: vk.VkDeviceMemory = null;
         var image_view: vk.VkImageView = null;
         errdefer {
-            if (image_view != null) vk.vkDestroyImageView(context.device, image_view, null);
-            if (image != null) vk.vkDestroyImage(context.device, image, null);
-            if (memory != null) vk.vkFreeMemory(context.device, memory, null);
+            if (image_view != null) context.dispatch.destroy_image_view.?(context.device, image_view, null);
+            if (image != null) context.dispatch.destroy_image.?(context.device, image, null);
+            if (memory != null) context.dispatch.free_memory.?(context.device, memory, null);
         }
 
         var image_info = std.mem.zeroes(vk.VkImageCreateInfo);
@@ -447,17 +517,17 @@ const VulkanBorrowedImage = if (build_options.supports_vulkan) struct {
         image_info.usage = vk.VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | vk.VK_IMAGE_USAGE_SAMPLED_BIT | vk.VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
         image_info.sharingMode = vk.VK_SHARING_MODE_EXCLUSIVE;
         image_info.initialLayout = vk.VK_IMAGE_LAYOUT_UNDEFINED;
-        try expectVk(vk.vkCreateImage(context.device, &image_info, null, &image));
+        try expectVk(context.dispatch.create_image.?(context.device, &image_info, null, &image));
 
         var requirements: vk.VkMemoryRequirements = undefined;
-        vk.vkGetImageMemoryRequirements(context.device, image, &requirements);
+        context.dispatch.get_image_memory_requirements.?(context.device, image, &requirements);
 
         var allocate_info = std.mem.zeroes(vk.VkMemoryAllocateInfo);
         allocate_info.sType = vk.VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
         allocate_info.allocationSize = requirements.size;
-        allocate_info.memoryTypeIndex = try findVulkanMemoryType(context.physical_device, requirements.memoryTypeBits, vk.VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-        try expectVk(vk.vkAllocateMemory(context.device, &allocate_info, null, &memory));
-        try expectVk(vk.vkBindImageMemory(context.device, image, memory, 0));
+        allocate_info.memoryTypeIndex = try findVulkanMemoryType(&context.dispatch, context.physical_device, requirements.memoryTypeBits, vk.VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+        try expectVk(context.dispatch.allocate_memory.?(context.device, &allocate_info, null, &memory));
+        try expectVk(context.dispatch.bind_image_memory.?(context.device, image, memory, 0));
 
         var view_info = std.mem.zeroes(vk.VkImageViewCreateInfo);
         view_info.sType = vk.VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
@@ -471,16 +541,16 @@ const VulkanBorrowedImage = if (build_options.supports_vulkan) struct {
             .baseArrayLayer = 0,
             .layerCount = 1,
         };
-        try expectVk(vk.vkCreateImageView(context.device, &view_info, null, &image_view));
+        try expectVk(context.dispatch.create_image_view.?(context.device, &view_info, null, &image_view));
 
         return .{ .context = context, .image = image, .image_view = image_view, .memory = memory, .width = width, .height = height };
     }
 
     pub fn deinit(self: *VulkanBorrowedImage) void {
-        _ = vk.vkDeviceWaitIdle(self.context.device);
-        vk.vkDestroyImageView(self.context.device, self.image_view, null);
-        vk.vkDestroyImage(self.context.device, self.image, null);
-        vk.vkFreeMemory(self.context.device, self.memory, null);
+        _ = self.context.dispatch.device_wait_idle.?(self.context.device);
+        self.context.dispatch.destroy_image_view.?(self.context.device, self.image_view, null);
+        self.context.dispatch.destroy_image.?(self.context.device, self.image, null);
+        self.context.dispatch.free_memory.?(self.context.device, self.memory, null);
         self.context.deinit();
     }
 
@@ -501,9 +571,9 @@ fn expectVk(result: if (build_options.supports_vulkan) vk.VkResult else i32) !vo
     if (build_options.supports_vulkan) try testing.expectEqual(vk.VK_SUCCESS, result);
 }
 
-fn findVulkanMemoryType(physical_device: if (build_options.supports_vulkan) vk.VkPhysicalDevice else ?*anyopaque, type_filter: u32, properties: if (build_options.supports_vulkan) vk.VkMemoryPropertyFlags else u32) !u32 {
+fn findVulkanMemoryType(dispatch: *const VulkanDispatch, physical_device: if (build_options.supports_vulkan) vk.VkPhysicalDevice else ?*anyopaque, type_filter: u32, properties: if (build_options.supports_vulkan) vk.VkMemoryPropertyFlags else u32) !u32 {
     var memory_properties: vk.VkPhysicalDeviceMemoryProperties = undefined;
-    vk.vkGetPhysicalDeviceMemoryProperties(physical_device, &memory_properties);
+    dispatch.get_physical_device_memory_properties.?(physical_device, &memory_properties);
 
     for (0..memory_properties.memoryTypeCount) |index| {
         const type_bit = @as(u32, 1) << @as(u5, @intCast(index));
@@ -770,6 +840,8 @@ test "unsupported backend owned texture attachment reports unsupported" {
                 .device = fake_pointer,
                 .graphics_queue = fake_pointer,
                 .graphics_queue_family_index = 0,
+                .get_instance_proc_addr = null,
+                .get_device_proc_addr = null,
             },
         }));
     }

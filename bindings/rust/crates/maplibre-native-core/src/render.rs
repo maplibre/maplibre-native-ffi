@@ -21,6 +21,8 @@ pub struct VulkanContextDescriptorFields {
     pub device: *mut c_void,
     pub graphics_queue: *mut c_void,
     pub graphics_queue_family_index: u32,
+    pub get_instance_proc_addr: *mut c_void,
+    pub get_device_proc_addr: *mut c_void,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -96,6 +98,8 @@ fn vulkan_context_descriptor_to_native(
         device: fields.device,
         graphics_queue: fields.graphics_queue,
         graphics_queue_family_index: fields.graphics_queue_family_index,
+        get_instance_proc_addr: fields.get_instance_proc_addr,
+        get_device_proc_addr: fields.get_device_proc_addr,
     }
 }
 
@@ -195,6 +199,8 @@ mod tests {
             device: ptr(base + 2),
             graphics_queue: ptr(base + 3),
             graphics_queue_family_index: base as u32 + 4,
+            get_instance_proc_addr: ptr(base + 20),
+            get_device_proc_addr: ptr(base + 21),
         }
     }
 
@@ -252,6 +258,8 @@ mod tests {
         );
         assert_eq!(surface.context.instance, ptr(1));
         assert_eq!(surface.context.graphics_queue_family_index, 5);
+        assert_eq!(surface.context.get_instance_proc_addr, ptr(21));
+        assert_eq!(surface.context.get_device_proc_addr, ptr(22));
         assert_eq!(surface.surface, ptr(6));
 
         let owned = vulkan_owned_texture_descriptor_to_native(VulkanOwnedTextureDescriptorFields {
@@ -264,6 +272,8 @@ mod tests {
         );
         assert_eq!(owned.context.instance, ptr(7));
         assert_eq!(owned.context.graphics_queue_family_index, 11);
+        assert_eq!(owned.context.get_instance_proc_addr, ptr(27));
+        assert_eq!(owned.context.get_device_proc_addr, ptr(28));
 
         let borrowed =
             vulkan_borrowed_texture_descriptor_to_native(VulkanBorrowedTextureDescriptorFields {

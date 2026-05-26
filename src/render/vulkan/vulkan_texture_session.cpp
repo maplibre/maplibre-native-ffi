@@ -15,6 +15,7 @@
 #include "maplibre_native_c/texture.h"
 #include "render/render_session_common.hpp"
 #include "render/texture_session.hpp"
+#include "render/vulkan/vulkan_dispatch.hpp"
 #include "render/vulkan/vulkan_texture_backend.hpp"
 
 namespace {
@@ -137,9 +138,20 @@ auto validate_vulkan_handles(
   auto* const physical_device =
     static_cast<VkPhysicalDevice>(descriptor.context.physical_device);
 
+  auto dispatcher = mln::core::vulkan_dispatch_loader(descriptor.context);
+  mln::core::vulkan_init_instance_dispatch(dispatcher, descriptor.context);
+  if (
+    dispatcher.vkEnumeratePhysicalDevices == nullptr ||
+    dispatcher.vkGetPhysicalDeviceQueueFamilyProperties == nullptr
+  ) {
+    mln::core::set_thread_error("Vulkan dispatch functions must resolve");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+
   auto physical_device_count = uint32_t{};
-  auto result =
-    ::vkEnumeratePhysicalDevices(instance, &physical_device_count, nullptr);
+  auto result = dispatcher.vkEnumeratePhysicalDevices(
+    instance, &physical_device_count, nullptr
+  );
   if (result != VK_SUCCESS || physical_device_count == 0) {
     mln::core::set_thread_error(
       "Vulkan instance must expose at least one physical device"
@@ -148,7 +160,7 @@ auto validate_vulkan_handles(
   }
 
   auto physical_devices = std::vector<VkPhysicalDevice>(physical_device_count);
-  result = ::vkEnumeratePhysicalDevices(
+  result = dispatcher.vkEnumeratePhysicalDevices(
     instance, &physical_device_count, physical_devices.data()
   );
   if (result != VK_SUCCESS) {
@@ -171,7 +183,7 @@ auto validate_vulkan_handles(
   }
 
   auto queue_family_count = uint32_t{};
-  ::vkGetPhysicalDeviceQueueFamilyProperties(
+  dispatcher.vkGetPhysicalDeviceQueueFamilyProperties(
     physical_device, &queue_family_count, nullptr
   );
   if (descriptor.context.graphics_queue_family_index >= queue_family_count) {
@@ -183,7 +195,7 @@ auto validate_vulkan_handles(
 
   auto queue_families =
     std::vector<VkQueueFamilyProperties>(queue_family_count);
-  ::vkGetPhysicalDeviceQueueFamilyProperties(
+  dispatcher.vkGetPhysicalDeviceQueueFamilyProperties(
     physical_device, &queue_family_count, queue_families.data()
   );
   const auto& queue_family =
@@ -274,6 +286,8 @@ auto vulkan_owned_texture_descriptor_default() noexcept
       .device = nullptr,
       .graphics_queue = nullptr,
       .graphics_queue_family_index = 0,
+      .get_instance_proc_addr = nullptr,
+      .get_device_proc_addr = nullptr,
     },
   };
 }
@@ -297,6 +311,8 @@ auto vulkan_borrowed_texture_descriptor_default() noexcept
         .device = nullptr,
         .graphics_queue = nullptr,
         .graphics_queue_family_index = 0,
+        .get_instance_proc_addr = nullptr,
+        .get_device_proc_addr = nullptr,
       },
     .image = nullptr,
     .image_view = nullptr,

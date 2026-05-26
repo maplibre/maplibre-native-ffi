@@ -53,6 +53,8 @@ pub const VulkanContextDescriptor = struct {
     device: NativePointer,
     graphics_queue: NativePointer,
     graphics_queue_family_index: u32,
+    get_instance_proc_addr: ?NativePointer = null,
+    get_device_proc_addr: ?NativePointer = null,
 };
 
 pub const MetalOwnedTextureDescriptor = struct {
@@ -906,6 +908,8 @@ fn vulkanContextToNative(context: VulkanContextDescriptor) c.mln_vulkan_context_
         .device = context.device.ptr,
         .graphics_queue = context.graphics_queue.ptr,
         .graphics_queue_family_index = context.graphics_queue_family_index,
+        .get_instance_proc_addr = if (context.get_instance_proc_addr) |pointer| pointer.ptr else null,
+        .get_device_proc_addr = if (context.get_device_proc_addr) |pointer| pointer.ptr else null,
     };
 }
 

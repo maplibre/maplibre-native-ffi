@@ -68,6 +68,24 @@ runs:
         cache_key_prefix: mise-v2
         install: true
 
+    - name: Register Windows Vulkan CI lavapipe ICD
+      if: ${{ runner.os == 'Windows' && contains(env.MISE_ENV, 'vulkan') }}
+      shell: pwsh
+      run: |
+        $driverManifest = Join-Path $env:GITHUB_WORKSPACE ".pixi\envs\default\Library\share\vulkan\icd.d\lvp_icd.x86_64.json"
+        if (-not (Test-Path $driverManifest)) {
+          throw "Missing lavapipe Vulkan ICD manifest: $driverManifest"
+        }
+
+        $driverKey = "HKLM:\SOFTWARE\Khronos\Vulkan\Drivers"
+        New-Item -Path $driverKey -Force | Out-Null
+        New-ItemProperty -Path $driverKey -Name $driverManifest -PropertyType DWord -Value 0 -Force | Out-Null
+
+    - name: Diagnose Vulkan setup
+      if: ${{ contains(env.MISE_ENV, 'vulkan') }}
+      shell: bash
+      run: mise run ci:vulkan-info
+
     # The mise action may restore Rust metadata without all rustup-managed
     # component files. Repair the toolchain only when rustup cannot add the
     # configured components or the component binaries still cannot run.
