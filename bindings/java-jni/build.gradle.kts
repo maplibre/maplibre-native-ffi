@@ -7,11 +7,38 @@ plugins { `java-library` }
 
 repositories { mavenCentral() }
 
+val lwjglVersion = "3.4.1"
+
+fun lwjglNativeClassifier(): String {
+  val os = System.getProperty("os.name").lowercase()
+  val arch = System.getProperty("os.arch").lowercase()
+  return when {
+    os.contains("mac") && (arch == "aarch64" || arch == "arm64") -> "natives-macos-arm64"
+    os.contains("mac") -> "natives-macos"
+    os.contains("linux") && (arch == "aarch64" || arch == "arm64") -> "natives-linux-arm64"
+    os.contains("linux") -> "natives-linux"
+    os.contains("windows") -> "natives-windows"
+    else -> throw GradleException("Unsupported LWJGL native platform: $os/$arch")
+  }
+}
+
+val lwjglNative = lwjglNativeClassifier()
+
 dependencies {
   implementation("org.bytedeco:javacpp:1.5.11")
 
   testImplementation(platform("org.junit:junit-bom:6.0.3"))
+  testImplementation(platform("org.lwjgl:lwjgl-bom:$lwjglVersion"))
   testImplementation("org.junit.jupiter:junit-jupiter")
+  testImplementation("org.lwjgl:lwjgl")
+  testImplementation("org.lwjgl:lwjgl-egl")
+  testImplementation("org.lwjgl:lwjgl-glfw")
+  testImplementation("org.lwjgl:lwjgl-opengl")
+  testImplementation("org.lwjgl:lwjgl-opengles")
+  testRuntimeOnly("org.lwjgl:lwjgl::$lwjglNative")
+  testRuntimeOnly("org.lwjgl:lwjgl-glfw::$lwjglNative")
+  testRuntimeOnly("org.lwjgl:lwjgl-opengl::$lwjglNative")
+  testRuntimeOnly("org.lwjgl:lwjgl-opengles::$lwjglNative")
   testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 

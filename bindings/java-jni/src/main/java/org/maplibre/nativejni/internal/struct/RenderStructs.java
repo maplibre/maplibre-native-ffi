@@ -3,17 +3,23 @@ package org.maplibre.nativejni.internal.struct;
 import java.util.Objects;
 import org.maplibre.nativejni.internal.javacpp.JavaCppSupport;
 import org.maplibre.nativejni.internal.javacpp.MaplibreNativeC;
+import org.maplibre.nativejni.render.EglContextDescriptor;
 import org.maplibre.nativejni.render.MetalBorrowedTextureDescriptor;
 import org.maplibre.nativejni.render.MetalContextDescriptor;
 import org.maplibre.nativejni.render.MetalOwnedTextureDescriptor;
 import org.maplibre.nativejni.render.MetalSurfaceDescriptor;
 import org.maplibre.nativejni.render.NativePointer;
+import org.maplibre.nativejni.render.OpenGLBorrowedTextureDescriptor;
+import org.maplibre.nativejni.render.OpenGLContextDescriptor;
+import org.maplibre.nativejni.render.OpenGLOwnedTextureDescriptor;
+import org.maplibre.nativejni.render.OpenGLSurfaceDescriptor;
 import org.maplibre.nativejni.render.RenderTargetExtent;
 import org.maplibre.nativejni.render.TextureImageInfo;
 import org.maplibre.nativejni.render.VulkanBorrowedTextureDescriptor;
 import org.maplibre.nativejni.render.VulkanContextDescriptor;
 import org.maplibre.nativejni.render.VulkanOwnedTextureDescriptor;
 import org.maplibre.nativejni.render.VulkanSurfaceDescriptor;
+import org.maplibre.nativejni.render.WglContextDescriptor;
 
 /** Internal materializers for render target descriptors and copied render values. */
 public final class RenderStructs {
@@ -31,6 +37,21 @@ public final class RenderStructs {
       int graphicsQueueFamilyIndex,
       long getInstanceProcAddr,
       long getDeviceProcAddr) {}
+
+  public record WglContextValue(long deviceContext, long shareContext, long getProcAddress)
+      implements OpenGLContextValue {}
+
+  public record EglContextValue(long display, long config, long shareContext, long getProcAddress)
+      implements OpenGLContextValue {}
+
+  public sealed interface OpenGLContextValue permits WglContextValue, EglContextValue {}
+
+  public record OpenGLOwnedTextureValue(ExtentValue extent, OpenGLContextValue context) {}
+
+  public record OpenGLBorrowedTextureValue(
+      ExtentValue extent, OpenGLContextValue context, int texture, int target) {}
+
+  public record OpenGLSurfaceValue(ExtentValue extent, OpenGLContextValue context, long surface) {}
 
   public record MetalOwnedTextureValue(ExtentValue extent, MetalContextValue context) {}
 
@@ -71,6 +92,23 @@ public final class RenderStructs {
         context.graphicsQueueFamilyIndex(),
         address(context.getInstanceProcAddr()),
         address(context.getDeviceProcAddr()));
+  }
+
+  public static OpenGLContextValue openglContext(OpenGLContextDescriptor context) {
+    Objects.requireNonNull(context, "context");
+    return switch (context) {
+      case WglContextDescriptor wgl ->
+          new WglContextValue(
+              address(wgl.deviceContext()),
+              address(wgl.shareContext()),
+              address(wgl.getProcAddress()));
+      case EglContextDescriptor egl ->
+          new EglContextValue(
+              address(egl.display()),
+              address(egl.config()),
+              address(egl.shareContext()),
+              address(egl.getProcAddress()));
+    };
   }
 
   public static MetalOwnedTextureValue metalOwnedTextureDescriptor(
@@ -120,6 +158,31 @@ public final class RenderStructs {
     return new VulkanSurfaceValue(
         extent(descriptor.extent()),
         vulkanContext(descriptor.context()),
+        address(descriptor.surface()));
+  }
+
+  public static OpenGLOwnedTextureValue openglOwnedTextureDescriptor(
+      OpenGLOwnedTextureDescriptor descriptor) {
+    Objects.requireNonNull(descriptor, "descriptor");
+    return new OpenGLOwnedTextureValue(
+        extent(descriptor.extent()), openglContext(descriptor.context()));
+  }
+
+  public static OpenGLBorrowedTextureValue openglBorrowedTextureDescriptor(
+      OpenGLBorrowedTextureDescriptor descriptor) {
+    Objects.requireNonNull(descriptor, "descriptor");
+    return new OpenGLBorrowedTextureValue(
+        extent(descriptor.extent()),
+        openglContext(descriptor.context()),
+        descriptor.texture(),
+        descriptor.target());
+  }
+
+  public static OpenGLSurfaceValue openglSurfaceDescriptor(OpenGLSurfaceDescriptor descriptor) {
+    Objects.requireNonNull(descriptor, "descriptor");
+    return new OpenGLSurfaceValue(
+        extent(descriptor.extent()),
+        openglContext(descriptor.context()),
         address(descriptor.surface()));
   }
 
@@ -186,6 +249,36 @@ public final class RenderStructs {
     return out;
   }
 
+  public static MaplibreNativeC.mln_opengl_owned_texture_descriptor
+      nativeOpenGLOwnedTextureDescriptor(OpenGLOwnedTextureDescriptor descriptor) {
+    var value = openglOwnedTextureDescriptor(descriptor);
+    var out = MaplibreNativeC.mln_opengl_owned_texture_descriptor_default();
+    setExtent(out.extent(), value.extent());
+    setOpenGLContext(out.context(), value.context());
+    return out;
+  }
+
+  public static MaplibreNativeC.mln_opengl_borrowed_texture_descriptor
+      nativeOpenGLBorrowedTextureDescriptor(OpenGLBorrowedTextureDescriptor descriptor) {
+    var value = openglBorrowedTextureDescriptor(descriptor);
+    var out = MaplibreNativeC.mln_opengl_borrowed_texture_descriptor_default();
+    setExtent(out.extent(), value.extent());
+    setOpenGLContext(out.context(), value.context());
+    out.texture(value.texture());
+    out.target(value.target());
+    return out;
+  }
+
+  public static MaplibreNativeC.mln_opengl_surface_descriptor nativeOpenGLSurfaceDescriptor(
+      OpenGLSurfaceDescriptor descriptor) {
+    var value = openglSurfaceDescriptor(descriptor);
+    var out = MaplibreNativeC.mln_opengl_surface_descriptor_default();
+    setExtent(out.extent(), value.extent());
+    setOpenGLContext(out.context(), value.context());
+    out.surface(JavaCppSupport.pointerOrNull(value.surface()));
+    return out;
+  }
+
   public static TextureImageInfo textureImageInfo(MaplibreNativeC.mln_texture_image_info info) {
     return new TextureImageInfo(info.width(), info.height(), info.stride(), info.byte_length());
   }
@@ -205,6 +298,38 @@ public final class RenderStructs {
     out.graphics_queue_family_index(context.graphicsQueueFamilyIndex());
     out.get_instance_proc_addr(JavaCppSupport.pointerOrNull(context.getInstanceProcAddr()));
     out.get_device_proc_addr(JavaCppSupport.pointerOrNull(context.getDeviceProcAddr()));
+  }
+
+  private static void setOpenGLContext(
+      MaplibreNativeC.mln_opengl_context_descriptor out, OpenGLContextValue context) {
+    out.size(out.sizeof());
+    switch (context) {
+      case WglContextValue wgl -> {
+        out.platform(MaplibreNativeC.MLN_OPENGL_CONTEXT_PLATFORM_WGL);
+        setWglContext(out.data_wgl(), wgl);
+      }
+      case EglContextValue egl -> {
+        out.platform(MaplibreNativeC.MLN_OPENGL_CONTEXT_PLATFORM_EGL);
+        setEglContext(out.data_egl(), egl);
+      }
+    }
+  }
+
+  private static void setWglContext(
+      MaplibreNativeC.mln_wgl_context_descriptor out, WglContextValue context) {
+    out.size(out.sizeof());
+    out.device_context(JavaCppSupport.pointerOrNull(context.deviceContext()));
+    out.share_context(JavaCppSupport.pointerOrNull(context.shareContext()));
+    out.get_proc_address(JavaCppSupport.pointerOrNull(context.getProcAddress()));
+  }
+
+  private static void setEglContext(
+      MaplibreNativeC.mln_egl_context_descriptor out, EglContextValue context) {
+    out.size(out.sizeof());
+    out.display(JavaCppSupport.pointerOrNull(context.display()));
+    out.config(JavaCppSupport.pointerOrNull(context.config()));
+    out.share_context(JavaCppSupport.pointerOrNull(context.shareContext()));
+    out.get_proc_address(JavaCppSupport.pointerOrNull(context.getProcAddress()));
   }
 
   private static long address(NativePointer pointer) {

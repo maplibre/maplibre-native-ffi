@@ -39,6 +39,9 @@ import org.maplibre.nativejni.json.JsonValue;
 import org.maplibre.nativejni.render.MetalBorrowedTextureDescriptor;
 import org.maplibre.nativejni.render.MetalOwnedTextureDescriptor;
 import org.maplibre.nativejni.render.MetalSurfaceDescriptor;
+import org.maplibre.nativejni.render.OpenGLBorrowedTextureDescriptor;
+import org.maplibre.nativejni.render.OpenGLOwnedTextureDescriptor;
+import org.maplibre.nativejni.render.OpenGLSurfaceDescriptor;
 import org.maplibre.nativejni.render.PremultipliedRgba8Image;
 import org.maplibre.nativejni.render.RenderSessionHandle;
 import org.maplibre.nativejni.render.VulkanBorrowedTextureDescriptor;
@@ -1021,12 +1024,25 @@ public final class MapHandle implements AutoCloseable {
     return RenderSessionHandle.attachVulkanBorrowedTexture(this, descriptor);
   }
 
+  public RenderSessionHandle attachOpenGLOwnedTexture(OpenGLOwnedTextureDescriptor descriptor) {
+    return RenderSessionHandle.attachOpenGLOwnedTexture(this, descriptor);
+  }
+
+  public RenderSessionHandle attachOpenGLBorrowedTexture(
+      OpenGLBorrowedTextureDescriptor descriptor) {
+    return RenderSessionHandle.attachOpenGLBorrowedTexture(this, descriptor);
+  }
+
   public RenderSessionHandle attachMetalSurface(MetalSurfaceDescriptor descriptor) {
     return RenderSessionHandle.attachMetalSurface(this, descriptor);
   }
 
   public RenderSessionHandle attachVulkanSurface(VulkanSurfaceDescriptor descriptor) {
     return RenderSessionHandle.attachVulkanSurface(this, descriptor);
+  }
+
+  public RenderSessionHandle attachOpenGLSurface(OpenGLSurfaceDescriptor descriptor) {
+    return RenderSessionHandle.attachOpenGLSurface(this, descriptor);
   }
 
   public void requestRepaint() {

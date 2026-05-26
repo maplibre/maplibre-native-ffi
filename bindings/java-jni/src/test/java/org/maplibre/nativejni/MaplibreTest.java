@@ -15,6 +15,7 @@ import org.maplibre.nativejni.geo.LatLng;
 import org.maplibre.nativejni.internal.javacpp.MaplibreNativeC;
 import org.maplibre.nativejni.internal.status.Status;
 import org.maplibre.nativejni.log.LogSeverity;
+import org.maplibre.nativejni.render.OpenGLContextProvider;
 import org.maplibre.nativejni.runtime.NetworkStatus;
 import org.maplibre.nativejni.test.NativeTestSupport;
 
@@ -47,6 +48,14 @@ class MaplibreTest {
         Maplibre.supportedRenderBackends(),
         org.maplibre.nativejni.render.RenderBackend.fromMask(
             MaplibreNativeC.mln_supported_render_backend_mask()));
+  }
+
+  @Test
+  void readsSupportedOpenGLContextProviders() {
+    assertEquals(
+        OpenGLContextProvider.fromMask(
+            MaplibreNativeC.mln_opengl_supported_context_provider_mask()),
+        Maplibre.supportedOpenGLContextProviders());
   }
 
   @Test
