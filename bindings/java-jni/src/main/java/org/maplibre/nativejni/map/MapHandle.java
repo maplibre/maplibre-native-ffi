@@ -1678,11 +1678,11 @@ public final class MapHandle implements AutoCloseable {
     NativeLibrary.ensureLoaded();
     var copiedCoordinates = List.copyOf(Objects.requireNonNull(coordinates, "coordinates"));
     try (var nativeCoordinates =
-        org.maplibre.nativejni.internal.struct.CoreStructs.latLngArray(copiedCoordinates)) {
-      var outPoints =
-          copiedCoordinates.isEmpty()
-              ? null
-              : new MaplibreNativeC.mln_screen_point(copiedCoordinates.size());
+            org.maplibre.nativejni.internal.struct.CoreStructs.latLngArray(copiedCoordinates);
+        var outPoints =
+            copiedCoordinates.isEmpty()
+                ? null
+                : new MaplibreNativeC.mln_screen_point(copiedCoordinates.size())) {
       Status.check(
           MaplibreNativeC.mln_map_pixels_for_lat_lngs(
               JavaCppSupport.map(state.requireLiveAddress()),
@@ -1701,29 +1701,32 @@ public final class MapHandle implements AutoCloseable {
   public List<LatLng> latLngsForPixels(List<ScreenPoint> points) {
     NativeLibrary.ensureLoaded();
     var copiedPoints = List.copyOf(Objects.requireNonNull(points, "points"));
-    var nativePoints =
-        copiedPoints.isEmpty() ? null : new MaplibreNativeC.mln_screen_point(copiedPoints.size());
-    for (var index = 0; index < copiedPoints.size(); index++) {
-      var point = Objects.requireNonNull(copiedPoints.get(index), "point");
-      nativePoints.position(index).x(point.x()).y(point.y());
+    try (var nativePoints =
+            copiedPoints.isEmpty()
+                ? null
+                : new MaplibreNativeC.mln_screen_point(copiedPoints.size());
+        var outCoordinates =
+            copiedPoints.isEmpty() ? null : new MaplibreNativeC.mln_lat_lng(copiedPoints.size())) {
+      for (var index = 0; index < copiedPoints.size(); index++) {
+        var point = Objects.requireNonNull(copiedPoints.get(index), "point");
+        nativePoints.position(index).x(point.x()).y(point.y());
+      }
+      if (nativePoints != null) {
+        nativePoints.position(0);
+      }
+      Status.check(
+          MaplibreNativeC.mln_map_lat_lngs_for_pixels(
+              JavaCppSupport.map(state.requireLiveAddress()),
+              nativePoints,
+              copiedPoints.size(),
+              outCoordinates));
+      var coordinates = new java.util.ArrayList<LatLng>(copiedPoints.size());
+      for (var index = 0; index < copiedPoints.size(); index++) {
+        var coordinate = outCoordinates.getPointer(index);
+        coordinates.add(new LatLng(coordinate.latitude(), coordinate.longitude()));
+      }
+      return List.copyOf(coordinates);
     }
-    if (nativePoints != null) {
-      nativePoints.position(0);
-    }
-    var outCoordinates =
-        copiedPoints.isEmpty() ? null : new MaplibreNativeC.mln_lat_lng(copiedPoints.size());
-    Status.check(
-        MaplibreNativeC.mln_map_lat_lngs_for_pixels(
-            JavaCppSupport.map(state.requireLiveAddress()),
-            nativePoints,
-            copiedPoints.size(),
-            outCoordinates));
-    var coordinates = new java.util.ArrayList<LatLng>(copiedPoints.size());
-    for (var index = 0; index < copiedPoints.size(); index++) {
-      var coordinate = outCoordinates.getPointer(index);
-      coordinates.add(new LatLng(coordinate.latitude(), coordinate.longitude()));
-    }
-    return List.copyOf(coordinates);
   }
 
   static NativeOptions cameraToNative(CameraOptions camera) {
