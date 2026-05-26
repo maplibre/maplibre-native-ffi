@@ -71,7 +71,7 @@ import Testing
 }
 
 @Test func queriedFeatureCopiesNestedFeatureStateAndSourceMetadata() throws {
-  let arena = NativeJSONArena()
+  let arena = NativeInputArena()
   var geometry = mln_geometry()
   geometry.size = UInt32(MemoryLayout<mln_geometry>.size)
   geometry.type = MLN_GEOMETRY_TYPE_POINT.rawValue

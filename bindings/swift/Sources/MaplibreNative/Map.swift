@@ -1,3 +1,12 @@
+import Foundation
+
+private final class WeakMapHandle {
+  weak var value: MapHandle?
+
+  init(_ value: MapHandle) {
+    self.value = value
+  }
+}
 
 public enum MapMode: UInt32, Sendable, Hashable {
   case continuous = 0
@@ -29,8 +38,13 @@ public struct MapOptions: Equatable, Sendable {
 }
 
 public final class MapHandle {
+  private static let registryLock = NSLock()
+  private nonisolated(unsafe) static var registry: [UInt: WeakMapHandle] = [:]
+
   private let runtime: RuntimeHandle
   private let handle: NativeHandleBox
+  private let nativeAddress: UInt
+  private var styleURLReplacementPending = false
   var customGeometrySourceCallbacks: [String: NativeCustomGeometrySourceCallbacks] = [:]
 
   public init(runtime: RuntimeHandle, options: MapOptions) throws {
@@ -40,7 +54,9 @@ public final class MapHandle {
       }
     }
     self.runtime = runtime
+    nativeAddress = UInt(bitPattern: pointer)
     handle = try NativeHandleBox(typeName: "MapHandle", pointer: pointer)
+    Self.register(self)
   }
 
   public var isClosed: Bool {
@@ -51,22 +67,60 @@ public final class MapHandle {
     try handle.requireLive()
   }
 
+  private static func register(_ map: MapHandle) {
+    registryLock.withLock {
+      registry[map.nativeAddress] = WeakMapHandle(map)
+    }
+  }
+
+  private static func unregister(_ nativeAddress: UInt) {
+    registryLock.withLock {
+      _ = registry.removeValue(forKey: nativeAddress)
+    }
+  }
+
+  static func handleRuntimeEvent(_ event: RuntimeEvent) {
+    guard event.type == .mapStyleLoaded,
+      case .map(let source) = event.source
+    else { return }
+
+    let map = registryLock.withLock { registry[source.addressBitPattern]?.value }
+    map?.releaseCallbacksForLoadedStyleURLIfNeeded()
+  }
+
+  private func retainCallbacksUntilPendingStyleURLLoads() {
+    styleURLReplacementPending = true
+  }
+
+  func releaseCallbacksForLoadedStyleURLIfNeeded() {
+    guard styleURLReplacementPending else { return }
+    for sourceId in customGeometrySourceCallbacks.keys {
+      guard (try? styleSourceExists(sourceId)) == false else { return }
+    }
+    styleURLReplacementPending = false
+    customGeometrySourceCallbacks.removeAll()
+  }
+
   public func close() throws {
     try handle.closeOnce { pointer in
       try CAPI.destroyMap(pointer)
     }
+    Self.unregister(nativeAddress)
     customGeometrySourceCallbacks.removeAll()
   }
 
   public func setStyleURL(_ url: String) throws {
     try mapNativeFailure {
       try CAPI.mapSetStyleURL(try handle.requireLive(), url)
+      retainCallbacksUntilPendingStyleURLLoads()
     }
   }
 
   public func setStyleJSON(_ json: String) throws {
     try mapNativeFailure {
       try CAPI.mapSetStyleJSON(try handle.requireLive(), json)
+      styleURLReplacementPending = false
+      customGeometrySourceCallbacks.removeAll()
     }
   }
 

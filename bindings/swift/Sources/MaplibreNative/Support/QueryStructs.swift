@@ -38,7 +38,7 @@ struct NativeRenderedFeatureQueryOptions: Equatable, Sendable {
     _ body: (UnsafePointer<mln_rendered_feature_query_options>?) throws -> Result
   ) throws -> Result {
     if layerIds.isEmpty, filter == nil { return try body(nil) }
-    let arena = NativeJSONArena()
+    let arena = NativeInputArena()
     let layerViews = layerIds.map { arena.view($0) }
     return try layerViews.withUnsafeBufferPointer { layerViews in
       var options = mln_rendered_feature_query_options_default()
@@ -68,7 +68,7 @@ struct NativeSourceFeatureQueryOptions: Equatable, Sendable {
     _ body: (UnsafePointer<mln_source_feature_query_options>?) throws -> Result
   ) throws -> Result {
     if sourceLayerIds.isEmpty, filter == nil { return try body(nil) }
-    let arena = NativeJSONArena()
+    let arena = NativeInputArena()
     let layerViews = sourceLayerIds.map { arena.view($0) }
     return try layerViews.withUnsafeBufferPointer { layerViews in
       var options = mln_source_feature_query_options_default()
@@ -99,7 +99,7 @@ struct NativeFeatureStateSelector: Equatable, Sendable {
   }
 
   func withNativeSelector<Result>(_ body: (UnsafePointer<mln_feature_state_selector>) throws -> Result) throws -> Result {
-    let arena = NativeJSONArena()
+    let arena = NativeInputArena()
     var selector = mln_feature_state_selector()
     selector.size = UInt32(MemoryLayout<mln_feature_state_selector>.size)
     selector.source_id = arena.view(sourceId)

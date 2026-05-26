@@ -15,14 +15,16 @@ struct Viewport: Equatable {
 
 @MainActor
 final class MapState {
-  nonisolated(unsafe) private(set) var runtime: RuntimeHandle
-  nonisolated(unsafe) private(set) var map: MapHandle
-  nonisolated(unsafe) private(set) var renderSession: RenderSessionHandle
+  private(set) var runtime: RuntimeHandle
+  private(set) var map: MapHandle
+  private(set) var renderSession: RenderSessionHandle
 
   init(viewport: Viewport, layer: CAMetalLayer) throws {
-    runtime = try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
+    let runtime = try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
+    var map: MapHandle?
+    var renderSession: RenderSessionHandle?
     do {
-      map = try MapHandle(
+      let createdMap = try MapHandle(
         runtime: runtime,
         options: MapOptions(
           width: viewport.logicalWidth,
@@ -31,24 +33,31 @@ final class MapState {
           mode: .continuous
         )
       )
-      try map.setStyleURL("https://tiles.openfreemap.org/styles/bright")
-      try map.jump(to: CameraOptions(
+      map = createdMap
+      try createdMap.setStyleURL("https://tiles.openfreemap.org/styles/bright")
+      try createdMap.jump(to: CameraOptions(
         center: LatLng(latitude: 37.7749, longitude: -122.4194),
         zoom: 13.0,
         bearing: 12.0,
         pitch: 30.0
       ))
-      renderSession = try map.attachMetalSurface(MetalSurfaceDescriptor(
+      let createdRenderSession = try createdMap.attachMetalSurface(MetalSurfaceDescriptor(
         extent: viewport.extent,
         layer: NativePointer(bitPattern: UInt(bitPattern: Unmanaged.passUnretained(layer).toOpaque()))
       ))
+      renderSession = createdRenderSession
+      self.runtime = runtime
+      self.map = createdMap
+      self.renderSession = createdRenderSession
     } catch {
+      try? renderSession?.close()
+      try? map?.close()
       try? runtime.close()
       throw error
     }
   }
 
-  deinit {
+  isolated deinit {
     try? renderSession.close()
     try? map.close()
     try? runtime.close()

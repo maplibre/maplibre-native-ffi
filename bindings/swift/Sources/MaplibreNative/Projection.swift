@@ -65,7 +65,7 @@ public final class MapProjectionHandle {
 
   public func setVisibleGeometry(_ geometry: Geometry, padding: EdgeInsets = EdgeInsets(top: 0, left: 0, bottom: 0, right: 0)) throws {
     try mapNativeFailure {
-      let arena = NativeJSONArena()
+      let arena = NativeInputArena()
       try CAPI.mapProjectionSetVisibleGeometry(
         try handle.requireLive(),
         geometry: arena.allocateGeometry(geometry.nativeGeometry),

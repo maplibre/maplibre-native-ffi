@@ -365,7 +365,9 @@ public final class RuntimeHandle {
       guard let event = try CAPI.runtimePollEvent(try handle.requireLive()) else {
         return nil
       }
-      return RuntimeEvent(native: try NativeRuntimeEvent(event))
+      let runtimeEvent = RuntimeEvent(native: try NativeRuntimeEvent(event))
+      MapHandle.handleRuntimeEvent(runtimeEvent)
+      return runtimeEvent
     }
   }
 

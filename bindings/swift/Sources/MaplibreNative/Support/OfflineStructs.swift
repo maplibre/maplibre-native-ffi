@@ -18,7 +18,7 @@ enum NativeOfflineRegionDefinition: Equatable, Sendable {
   case geometry(styleURL: String, geometry: NativeGeometry, minZoom: Double, maxZoom: Double, pixelRatio: Float, includeIdeographs: Bool)
 
   func withNativeDefinition<Result>(_ body: (UnsafePointer<mln_offline_region_definition>) throws -> Result) throws -> Result {
-    let arena = NativeJSONArena()
+    let arena = NativeInputArena()
     var definition = mln_offline_region_definition()
     definition.size = UInt32(MemoryLayout<mln_offline_region_definition>.size)
     switch self {

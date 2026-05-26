@@ -40,6 +40,25 @@ import Testing
   }
 }
 
+@Test func nativeCameraOptionsPreserveAbsentFieldMasks() throws {
+  var raw = CAPI.cameraOptionsDefault()
+  raw.fields = MLN_CAMERA_OPTION_ZOOM.rawValue
+  raw.latitude = 12
+  raw.longitude = 34
+  raw.zoom = 5
+  raw.bearing = 90
+
+  let camera = CameraOptions(native: NativeCameraOptionsInput(raw))
+  #expect(camera.center == nil)
+  #expect(camera.zoom == 5)
+  #expect(camera.bearing == nil)
+
+  try camera.nativeInput.withNativeOptions { native in
+    #expect(native.pointee.fields == MLN_CAMERA_OPTION_ZOOM.rawValue)
+    #expect(native.pointee.zoom == 5)
+  }
+}
+
 @Test func mapViewportTileAndProjectionDescriptorsMaterializeFieldMasks() throws {
   try ProjectionMode(axonometric: true, xSkew: 0.1, ySkew: 0.2).nativeInput.withNativeMode { native in
     #expect(native.pointee.fields == (

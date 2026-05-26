@@ -4,7 +4,7 @@ import Testing
 @testable import MaplibreNative
 
 @Test func jsonValueMaterializesNestedObjectDescriptors() throws {
-  let arena = NativeJSONArena()
+  let arena = NativeInputArena()
   let root = arena.nativeValue(.object([
     NativeJSONMember(key: "name", value: .string("map")),
     NativeJSONMember(key: "items", value: .array([.uint(1), .bool(true)])),
@@ -47,7 +47,7 @@ import Testing
     ]]),
   ])
 
-  let arena = NativeJSONArena()
+  let arena = NativeInputArena()
   let raw = arena.nativeGeometry(geometry.nativeGeometry)
 
   #expect(raw.type == MLN_GEOMETRY_TYPE_GEOMETRY_COLLECTION.rawValue)

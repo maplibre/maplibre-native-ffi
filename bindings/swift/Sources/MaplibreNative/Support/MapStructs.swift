@@ -141,15 +141,15 @@ struct NativeCameraOptionsInput: Equatable, Sendable {
   }
 
   init(_ raw: mln_camera_options) {
-    center = NativeLatLng(latitude: raw.latitude, longitude: raw.longitude)
-    zoom = raw.zoom
-    bearing = raw.bearing
-    pitch = raw.pitch
-    centerAltitude = raw.center_altitude
-    padding = NativeEdgeInsets(raw.padding)
-    anchor = NativeScreenPoint(x: raw.anchor.x, y: raw.anchor.y)
-    roll = raw.roll
-    fieldOfView = raw.field_of_view
+    center = (raw.fields & MLN_CAMERA_OPTION_CENTER.rawValue) != 0 ? NativeLatLng(latitude: raw.latitude, longitude: raw.longitude) : nil
+    zoom = (raw.fields & MLN_CAMERA_OPTION_ZOOM.rawValue) != 0 ? raw.zoom : nil
+    bearing = (raw.fields & MLN_CAMERA_OPTION_BEARING.rawValue) != 0 ? raw.bearing : nil
+    pitch = (raw.fields & MLN_CAMERA_OPTION_PITCH.rawValue) != 0 ? raw.pitch : nil
+    centerAltitude = (raw.fields & MLN_CAMERA_OPTION_CENTER_ALTITUDE.rawValue) != 0 ? raw.center_altitude : nil
+    padding = (raw.fields & MLN_CAMERA_OPTION_PADDING.rawValue) != 0 ? NativeEdgeInsets(raw.padding) : nil
+    anchor = (raw.fields & MLN_CAMERA_OPTION_ANCHOR.rawValue) != 0 ? NativeScreenPoint(x: raw.anchor.x, y: raw.anchor.y) : nil
+    roll = (raw.fields & MLN_CAMERA_OPTION_ROLL.rawValue) != 0 ? raw.roll : nil
+    fieldOfView = (raw.fields & MLN_CAMERA_OPTION_FOV.rawValue) != 0 ? raw.field_of_view : nil
   }
 
   func withNativeOptions<Result>(

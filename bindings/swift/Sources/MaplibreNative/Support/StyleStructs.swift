@@ -1,4 +1,5 @@
 internal import CMaplibreNativeC
+import Foundation
 
 struct NativeLatLngBounds: Equatable, Sendable {
   let southwest: NativeLatLng
@@ -57,7 +58,7 @@ struct NativeStyleTileSourceOptions: Equatable, Sendable {
     {
       return try body(nil)
     }
-    let arena = NativeJSONArena()
+    let arena = NativeInputArena()
     var options = mln_style_tile_source_options_default()
     if let minZoom {
       options.fields |= MLN_STYLE_TILE_SOURCE_OPTION_MIN_ZOOM.rawValue
@@ -170,38 +171,88 @@ struct NativeStyleImageOptions: Equatable, Sendable {
   }
 }
 
-final class NativeCustomGeometrySourceCallbacks: @unchecked Sendable {
+private final class NativeCustomGeometrySourceCallbackBox: @unchecked Sendable {
   typealias TileCallback = @Sendable (NativeCanonicalTileID) -> Void
 
   private let fetchTile: TileCallback
   private let cancelTile: TileCallback?
+  private let condition = NSCondition()
+  private var activeUpcalls = 0
+  private var retired = false
 
   init(fetchTile: @escaping TileCallback, cancelTile: TileCallback? = nil) {
     self.fetchTile = fetchTile
     self.cancelTile = cancelTile
   }
 
-  var unmanagedPointer: UnsafeMutableRawPointer {
-    Unmanaged.passUnretained(self).toOpaque()
-  }
-
   func fetched(_ tileId: mln_canonical_tile_id) {
+    guard beginUpcall() else { return }
+    defer { endUpcall() }
     fetchTile(NativeCanonicalTileID(tileId))
   }
 
   func cancelled(_ tileId: mln_canonical_tile_id) {
+    guard beginUpcall() else { return }
+    defer { endUpcall() }
     cancelTile?(NativeCanonicalTileID(tileId))
+  }
+
+  func retireAndWait() {
+    condition.lock()
+    retired = true
+    while activeUpcalls > 0 {
+      condition.wait()
+    }
+    condition.unlock()
+  }
+
+  private func beginUpcall() -> Bool {
+    condition.lock()
+    defer { condition.unlock() }
+    guard !retired else { return false }
+    activeUpcalls += 1
+    return true
+  }
+
+  private func endUpcall() {
+    condition.lock()
+    activeUpcalls -= 1
+    if activeUpcalls == 0 {
+      condition.broadcast()
+    }
+    condition.unlock()
+  }
+}
+
+final class NativeCustomGeometrySourceCallbacks: @unchecked Sendable {
+  typealias TileCallback = @Sendable (NativeCanonicalTileID) -> Void
+
+  private let retainedBox: Unmanaged<NativeCustomGeometrySourceCallbackBox>
+
+  init(fetchTile: @escaping TileCallback, cancelTile: TileCallback? = nil) {
+    retainedBox = Unmanaged.passRetained(
+      NativeCustomGeometrySourceCallbackBox(fetchTile: fetchTile, cancelTile: cancelTile)
+    )
+  }
+
+  deinit {
+    retainedBox.takeUnretainedValue().retireAndWait()
+    retainedBox.release()
+  }
+
+  var unmanagedPointer: UnsafeMutableRawPointer {
+    retainedBox.toOpaque()
   }
 }
 
 private func customGeometryFetchTileCallback(_ userData: UnsafeMutableRawPointer?, _ tileId: mln_canonical_tile_id) {
   guard let userData else { return }
-  Unmanaged<NativeCustomGeometrySourceCallbacks>.fromOpaque(userData).takeUnretainedValue().fetched(tileId)
+  Unmanaged<NativeCustomGeometrySourceCallbackBox>.fromOpaque(userData).takeUnretainedValue().fetched(tileId)
 }
 
 private func customGeometryCancelTileCallback(_ userData: UnsafeMutableRawPointer?, _ tileId: mln_canonical_tile_id) {
   guard let userData else { return }
-  Unmanaged<NativeCustomGeometrySourceCallbacks>.fromOpaque(userData).takeUnretainedValue().cancelled(tileId)
+  Unmanaged<NativeCustomGeometrySourceCallbackBox>.fromOpaque(userData).takeUnretainedValue().cancelled(tileId)
 }
 
 struct NativeCustomGeometrySourceOptions: Sendable {

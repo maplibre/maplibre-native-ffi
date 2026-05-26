@@ -1,6 +1,8 @@
 internal import CMaplibreNativeC
 import Foundation
 
+// Maintenance note: keep this C ABI facade centralized for this correctness branch.
+// Split it into domain extensions in a focused follow-up to avoid mechanical churn here.
 enum CAPI {
   static func cVersion() -> UInt32 {
     mln_c_version()

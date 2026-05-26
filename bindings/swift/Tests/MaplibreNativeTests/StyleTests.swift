@@ -1,4 +1,5 @@
 import CMaplibreNativeC
+import Foundation
 import Testing
 
 @testable import MaplibreNative
@@ -79,7 +80,7 @@ import Testing
     identifier: .uint(7)
   ))
 
-  let arena = NativeJSONArena()
+  let arena = NativeInputArena()
   try arena.withNativeGeoJSON(geoJSON.nativeGeoJSON) { native in
     #expect(native.pointee.type == MLN_GEOJSON_TYPE_FEATURE.rawValue)
     #expect(native.pointee.data.feature!.pointee.identifier_type == MLN_FEATURE_IDENTIFIER_TYPE_UINT.rawValue)
@@ -128,6 +129,92 @@ import Testing
 
   #expect(box.fetched == [NativeCanonicalTileID(z: 1, x: 2, y: 3)])
   #expect(box.cancelled == [NativeCanonicalTileID(z: 4, x: 5, y: 6)])
+}
+
+@Test func customGeometryCallbacksWaitForInFlightInvocationBeforeRelease() throws {
+  final class CallbackHolder: @unchecked Sendable {
+    private let lock = NSLock()
+    private var callbacks: NativeCustomGeometrySourceCallbacks?
+
+    init(_ callbacks: NativeCustomGeometrySourceCallbacks) {
+      self.callbacks = callbacks
+    }
+
+    func withCallbacks<Result>(_ body: (NativeCustomGeometrySourceCallbacks) throws -> Result) rethrows -> Result {
+      lock.lock()
+      let callbacks = callbacks!
+      lock.unlock()
+      return try body(callbacks)
+    }
+
+    func clear() {
+      lock.lock()
+      callbacks = nil
+      lock.unlock()
+    }
+  }
+
+  final class CallbackInvocation: @unchecked Sendable {
+    private let fetchTile: mln_custom_geometry_source_tile_callback
+    private let userDataAddress: UInt
+
+    init(fetchTile: @escaping mln_custom_geometry_source_tile_callback, userData: UnsafeMutableRawPointer) {
+      self.fetchTile = fetchTile
+      self.userDataAddress = UInt(bitPattern: userData)
+    }
+
+    func call() {
+      fetchTile(UnsafeMutableRawPointer(bitPattern: userDataAddress), mln_canonical_tile_id(z: 1, x: 2, y: 3))
+    }
+  }
+
+  let entered = DispatchSemaphore(value: 0)
+  let allowReturn = DispatchSemaphore(value: 0)
+  let invocationFinished = DispatchSemaphore(value: 0)
+  let releaseFinished = DispatchSemaphore(value: 0)
+
+  let holder = CallbackHolder(NativeCustomGeometrySourceCallbacks(fetchTile: { _ in
+    entered.signal()
+    allowReturn.wait()
+  }))
+  let invocation = try holder.withCallbacks { callbacks in
+    try NativeCustomGeometrySourceOptions(callbacks: callbacks).withNativeOptions { native in
+      CallbackInvocation(fetchTile: native.pointee.fetch_tile!, userData: native.pointee.user_data!)
+    }
+  }
+
+  DispatchQueue.global().async {
+    invocation.call()
+    invocationFinished.signal()
+  }
+  #expect(entered.wait(timeout: .now() + 1) == .success)
+
+  DispatchQueue.global().async {
+    holder.clear()
+    releaseFinished.signal()
+  }
+  #expect(releaseFinished.wait(timeout: .now() + 0.05) == .timedOut)
+
+  allowReturn.signal()
+  #expect(invocationFinished.wait(timeout: .now() + 1) == .success)
+  #expect(releaseFinished.wait(timeout: .now() + 1) == .success)
+}
+
+@Test func staleStyleLoadedEventDoesNotReleaseCallbacksWhileOldSourceExists() throws {
+  let runtime = try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
+  defer { try? runtime.close() }
+  let map = try MapHandle(runtime: runtime, options: MapOptions(width: 1, height: 1))
+  defer { try? map.close() }
+
+  try map.setStyleJSON("""
+    {"version":8,"sources":{},"layers":[]}
+    """)
+  try map.addCustomGeometrySource(sourceId: "custom", options: CustomGeometrySourceOptions(fetchTile: { _ in }))
+
+  try map.setStyleURL("https://tiles.openfreemap.org/styles/bright")
+  map.releaseCallbacksForLoadedStyleURLIfNeeded()
+
+  #expect(map.customGeometrySourceCallbacks["custom"] != nil)
 }
 
 @Test func closedMapRejectsStyleCallsThroughSwiftHandleState() throws {

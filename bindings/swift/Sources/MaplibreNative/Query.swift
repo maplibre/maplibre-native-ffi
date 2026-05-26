@@ -162,7 +162,7 @@ extension RenderSessionHandle {
     options: SourceFeatureQueryOptions = SourceFeatureQueryOptions()
   ) throws -> [QueriedFeature] {
     try mapNativeFailure {
-      let arena = NativeJSONArena()
+      let arena = NativeInputArena()
       let sourceId = arena.view(sourceId)
       return try options.nativeOptions.withNativeOptions { nativeOptions in
         let result = try CAPI.renderSessionQuerySourceFeatures(
@@ -184,7 +184,7 @@ extension RenderSessionHandle {
     arguments: JSONValue? = nil
   ) throws -> FeatureExtensionResult {
     try mapNativeFailure {
-      let arena = NativeJSONArena()
+      let arena = NativeInputArena()
       let result = try CAPI.renderSessionQueryFeatureExtensions(
         session: try requireLivePointer(),
         sourceId: arena.view(sourceId),
@@ -200,7 +200,7 @@ extension RenderSessionHandle {
 
   public func setFeatureState(selector: FeatureStateSelector, state: JSONValue) throws {
     try mapNativeFailure {
-      let arena = NativeJSONArena()
+      let arena = NativeInputArena()
       try selector.nativeSelector.withNativeSelector { selector in
         try CAPI.renderSessionSetFeatureState(try requireLivePointer(), selector: selector, state: arena.allocate(state.nativeValue))
       }

@@ -327,7 +327,7 @@ extension MapHandle {
 
   public func cameraForGeometry(_ geometry: Geometry, fitOptions: CameraFitOptions? = nil) throws -> CameraOptions {
     try mapNativeFailure {
-      let arena = NativeJSONArena()
+      let arena = NativeInputArena()
       return try (fitOptions?.nativeInput ?? NativeCameraFitOptionsInput()).withOptionalNativeOptions { fitOptions in
         CameraOptions(native: NativeCameraOptionsInput(try CAPI.mapCameraForGeometry(try requireLivePointer(), geometry: arena.allocateGeometry(geometry.nativeGeometry), fitOptions: fitOptions)))
       }

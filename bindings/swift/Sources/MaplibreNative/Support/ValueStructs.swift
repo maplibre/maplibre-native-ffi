@@ -58,7 +58,8 @@ struct NativeJSONMember: Equatable, Sendable {
   }
 }
 
-final class NativeJSONArena {
+/// Owns per-call native input storage whose pointers stay valid until the C call returns.
+final class NativeInputArena {
   private var strings: [ContiguousArray<UInt8>] = []
   private var values: [UnsafeMutablePointer<mln_json_value>] = []
   private var arrays: [UnsafeMutableBufferPointer<mln_json_value>] = []
