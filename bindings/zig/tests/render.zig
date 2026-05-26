@@ -46,6 +46,27 @@ test "supported render backend is exposed semantically" {
     if (build_options.supports_vulkan) try testing.expect(support_mask.vulkan);
 }
 
+test "supported OpenGL context providers are exposed semantically" {
+    const providers = maplibre.supportedOpenGLContextProviders();
+    if (!build_options.supports_opengl) {
+        try testing.expect(!providers.wgl);
+        try testing.expect(!providers.egl);
+    } else switch (builtin.os.tag) {
+        .windows => {
+            try testing.expect(providers.wgl);
+            try testing.expect(!providers.egl);
+        },
+        .linux => {
+            try testing.expect(!providers.wgl);
+            try testing.expect(providers.egl);
+        },
+        else => {
+            try testing.expect(!providers.wgl);
+            try testing.expect(!providers.egl);
+        },
+    }
+}
+
 fn expectFeaturePropertyString(feature: *const maplibre.QueriedFeature, key: []const u8, expected: []const u8) !void {
     for (feature.feature.properties) |property| {
         if (std.mem.eql(u8, property.key, key)) {
@@ -168,6 +189,7 @@ const RenderSessionThreadCall = enum {
     dump_debug_logs,
     close,
     acquire_metal_frame,
+    acquire_opengl_frame,
     acquire_vulkan_frame,
 };
 
@@ -182,6 +204,11 @@ fn callRenderSessionOnThread(session: *maplibre.RenderSessionHandle, call: Rende
         .close => session.close(),
         .acquire_metal_frame => blk: {
             var frame = session.acquireMetalOwnedTextureFrame() catch |err| break :blk err;
+            frame.release() catch {};
+            break :blk {};
+        },
+        .acquire_opengl_frame => blk: {
+            var frame = session.acquireOpenGLOwnedTextureFrame() catch |err| break :blk err;
             frame.release() catch {};
             break :blk {};
         },
@@ -209,6 +236,37 @@ fn expectRenderSessionCallWrongThread(session: *maplibre.RenderSessionHandle, ca
 const TestOwnedTextureDescriptor = struct {
     extent: maplibre.RenderTargetExtent = .{},
 };
+
+const gl_texture_2d = 0x0DE1;
+
+fn fakeNativePointer() maplibre.NativePointer {
+    return .{ .ptr = @ptrFromInt(1) };
+}
+
+fn fakeOpenGLContext() maplibre.OpenGLContextDescriptor {
+    const fake_pointer = fakeNativePointer();
+    return switch (builtin.os.tag) {
+        .windows => .{
+            .wgl = .{
+                .device_context = fake_pointer,
+                .share_context = fake_pointer,
+            },
+        },
+        .linux => .{
+            .egl = .{
+                .display = fake_pointer,
+                .config = fake_pointer,
+                .share_context = fake_pointer,
+            },
+        },
+        else => .{
+            .wgl = .{
+                .device_context = fake_pointer,
+                .share_context = fake_pointer,
+            },
+        },
+    };
+}
 
 const supports_test_owned_texture = build_options.supports_metal or build_options.supports_vulkan;
 
@@ -841,7 +899,7 @@ test "unsupported backend owned texture attachment reports unsupported" {
     var map = try maplibre.MapHandle.create(&runtime, .{});
     defer map.close() catch @panic("map close failed");
 
-    const fake_pointer = maplibre.NativePointer{ .ptr = @ptrFromInt(1) };
+    const fake_pointer = fakeNativePointer();
     if (build_options.supports_metal) {
         try testing.expectError(error.Unsupported, maplibre.attachVulkanOwnedTexture(&map, .{
             .context = .{
@@ -860,6 +918,40 @@ test "unsupported backend owned texture attachment reports unsupported" {
             .context = .{ .device = fake_pointer },
         }));
     }
+    if (!build_options.supports_opengl) {
+        try testing.expectError(error.Unsupported, maplibre.attachOpenGLOwnedTexture(&map, .{
+            .context = fakeOpenGLContext(),
+        }));
+    }
+}
+
+test "OpenGL texture and surface descriptors validate through public bindings" {
+    var runtime = try maplibre.RuntimeHandle.init(null);
+    defer runtime.close() catch @panic("runtime close failed");
+
+    var map = try maplibre.MapHandle.create(&runtime, .{});
+    defer map.close() catch @panic("map close failed");
+
+    const context = fakeOpenGLContext();
+    try testing.expectError(error.InvalidArgument, maplibre.attachOpenGLOwnedTexture(&map, .{
+        .extent = .{ .width = 0 },
+        .context = context,
+    }));
+    try testing.expectError(error.InvalidArgument, maplibre.attachOpenGLBorrowedTexture(&map, .{
+        .context = context,
+        .texture = 0,
+        .target = gl_texture_2d,
+    }));
+    try testing.expectError(error.InvalidArgument, maplibre.attachOpenGLBorrowedTexture(&map, .{
+        .context = context,
+        .texture = 1,
+        .target = 0,
+    }));
+    try testing.expectError(error.InvalidArgument, maplibre.attachOpenGLSurface(&map, .{
+        .extent = .{ .width = 0 },
+        .context = context,
+        .surface = fakeNativePointer(),
+    }));
 }
 
 test "Metal owned texture frame handle scopes native pointers" {
