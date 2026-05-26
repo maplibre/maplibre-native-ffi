@@ -10,6 +10,7 @@ import static org.junit.jupiter.api.Assertions.fail;
 import java.util.EnumSet;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.maplibre.nativeffi.Maplibre;
@@ -108,8 +109,7 @@ final class RenderSessionQueryTest {
 
     var runtime = RuntimeHandle.create();
     var map = MapHandle.create(runtime, new MapOptions().size(64, 64));
-    try (var target =
-        RenderTargetTestSupport.attachOwnedTexture(map, new RenderTargetExtent(64, 64, 1.0))) {
+    try (var target = assumeOwnedTextureTarget(map)) {
       var session = target.session();
       var selector = new FeatureStateSelector("point").featureId("feature-1");
       var state =
@@ -150,8 +150,7 @@ final class RenderSessionQueryTest {
 
     var runtime = RuntimeHandle.create();
     var map = MapHandle.create(runtime, new MapOptions().size(64, 64));
-    try (var target =
-        RenderTargetTestSupport.attachOwnedTexture(map, new RenderTargetExtent(64, 64, 1.0))) {
+    try (var target = assumeOwnedTextureTarget(map)) {
       var session = target.session();
       assertThrows(
           InvalidStateException.class,
@@ -205,8 +204,7 @@ final class RenderSessionQueryTest {
 
     var runtime = RuntimeHandle.create();
     var map = MapHandle.create(runtime, new MapOptions().size(64, 64));
-    try (var target =
-        RenderTargetTestSupport.attachOwnedTexture(map, new RenderTargetExtent(64, 64, 1.0))) {
+    try (var target = assumeOwnedTextureTarget(map)) {
       var session = target.session();
       loadClusterStyleAndRender(runtime, map, session);
       var queryPoint = map.pixelForLatLng(new LatLng(0.0, 0.0));
@@ -281,6 +279,15 @@ final class RenderSessionQueryTest {
     map.setStyleJson(CLUSTER_STYLE_JSON);
     for (var index = 0; index < 5; index++) {
       renderIfAvailable(runtime, map, session);
+    }
+  }
+
+  private static RenderTargetTestSupport assumeOwnedTextureTarget(MapHandle map) {
+    try {
+      return RenderTargetTestSupport.attachOwnedTexture(map, new RenderTargetExtent(64, 64, 1.0));
+    } catch (IllegalStateException error) {
+      Assumptions.assumeTrue(false, "Owned texture target unavailable: " + error.getMessage());
+      throw new AssertionError("unreachable");
     }
   }
 

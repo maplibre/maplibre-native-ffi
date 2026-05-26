@@ -17,6 +17,7 @@ import org.maplibre.nativeffi.internal.status.Status;
 import org.maplibre.nativeffi.internal.struct.CoreStructs;
 import org.maplibre.nativeffi.log.LogCallback;
 import org.maplibre.nativeffi.log.LogSeverity;
+import org.maplibre.nativeffi.render.OpenGLContextProvider;
 import org.maplibre.nativeffi.render.RenderBackend;
 import org.maplibre.nativeffi.runtime.NetworkStatus;
 
@@ -44,6 +45,13 @@ public final class Maplibre {
   public static EnumSet<RenderBackend> supportedRenderBackends() {
     NativeAccess.ensureLoaded();
     return RenderBackend.fromMask(MapLibreNativeC.mln_supported_render_backend_mask());
+  }
+
+  /** Returns the OpenGL context providers compiled into the loaded native library. */
+  public static EnumSet<OpenGLContextProvider> supportedOpenGLContextProviders() {
+    NativeAccess.ensureLoaded();
+    return OpenGLContextProvider.fromMask(
+        MapLibreNativeC.mln_opengl_supported_context_provider_mask());
   }
 
   /** Reads Maplibre Native's process-global network status. */

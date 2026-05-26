@@ -59,8 +59,7 @@ final class RenderSessionHandleTest {
 
     var runtime = RuntimeHandle.create();
     var map = MapHandle.create(runtime, new MapOptions().size(64, 64));
-    try (var target =
-        RenderTargetTestSupport.attachOwnedTexture(map, new RenderTargetExtent(32, 16, 1.0))) {
+    try (var target = assumeOwnedTextureTarget(map, new RenderTargetExtent(32, 16, 1.0))) {
       var activeSession = target.session();
       assertSame(map, activeSession.map());
       assertThrows(InvalidStateException.class, activeSession::textureImageInfo);
@@ -170,6 +169,10 @@ final class RenderSessionHandleTest {
     assertEquals(0, vulkanBorrowed.finalLayout());
     vulkanBorrowed.clearFinalLayout();
     assertFalse(vulkanBorrowed.hasFinalLayout());
+
+    var openglBorrowed = new OpenGLBorrowedTextureDescriptor().texture(12).target(0x0de1);
+    assertEquals(12, openglBorrowed.texture());
+    assertEquals(0x0de1, openglBorrowed.target());
   }
 
   @Test
@@ -192,14 +195,53 @@ final class RenderSessionHandleTest {
     assertThrows(IllegalStateException.class, escaped::address);
     assertThrows(IllegalStateException.class, frame::texture);
     assertThrows(IllegalStateException.class, frame::width);
+
+    var openglFrame =
+        new OpenGLOwnedTextureFrame(scope, 1, 2, 3, 1.0, 4, 5, 0x0de1, 0x8058, 0x1908, 0x1401);
+    assertThrows(IllegalStateException.class, openglFrame::texture);
+  }
+
+  @Test
+  void openglAttachMethodsReportNativeValidationErrors() {
+    var runtime = RuntimeHandle.create();
+    var map = MapHandle.create(runtime, new MapOptions().size(64, 64));
+    var context = new WglContextDescriptor();
+    try {
+      assertThrows(
+          InvalidArgumentException.class,
+          () ->
+              map.attachOpenGLOwnedTexture(
+                  new OpenGLOwnedTextureDescriptor()
+                      .extent(new RenderTargetExtent(0, 16, 1.0))
+                      .context(context)));
+      assertThrows(
+          InvalidArgumentException.class,
+          () ->
+              map.attachOpenGLBorrowedTexture(
+                  new OpenGLBorrowedTextureDescriptor()
+                      .extent(new RenderTargetExtent(32, 16, 1.0))
+                      .context(context)
+                      .texture(0)
+                      .target(0x0de1)));
+      assertThrows(
+          InvalidArgumentException.class,
+          () ->
+              map.attachOpenGLSurface(
+                  new OpenGLSurfaceDescriptor()
+                      .extent(new RenderTargetExtent(32, 16, 1.0))
+                      .context(context)
+                      .surface(NativePointer.NULL)));
+    } finally {
+      map.close();
+      runtime.close();
+    }
   }
 
   @Test
   void wrongThreadSessionCallAndCloseLeaveHandleLive() throws Exception {
     var runtime = RuntimeHandle.create();
     var map = MapHandle.create(runtime, new MapOptions().size(64, 64));
-    try (var target =
-        RenderTargetTestSupport.attachOwnedTexture(map, new RenderTargetExtent(64, 64, 1.0))) {
+    try (var target = assumeOwnedTextureTarget(map, new RenderTargetExtent(64, 64, 1.0))) {
       var session = target.session();
       assertWrongThread(runOnOtherThread(session::renderUpdate));
       assertWrongThread(runOnOtherThread(session::close));
@@ -239,6 +281,16 @@ final class RenderSessionHandleTest {
           map, new RenderTargetExtent(32, 16, 1.0));
     } catch (MaplibreException error) {
       Assumptions.assumeTrue(false, "Metal owned texture unavailable: " + error.getMessage());
+      throw new AssertionError("unreachable");
+    }
+  }
+
+  private static RenderTargetTestSupport assumeOwnedTextureTarget(
+      MapHandle map, RenderTargetExtent extent) {
+    try {
+      return RenderTargetTestSupport.attachOwnedTexture(map, extent);
+    } catch (IllegalStateException error) {
+      Assumptions.assumeTrue(false, "Owned texture target unavailable: " + error.getMessage());
       throw new AssertionError("unreachable");
     }
   }

@@ -15,6 +15,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.maplibre.nativeffi.Maplibre;
@@ -301,7 +302,7 @@ final class RuntimeHandleTest {
       var failedEvent = waitForMapEventRecord(runtime, map, RuntimeEventType.MAP_LOADING_FAILED);
       assertFalse(failedEvent.message().isBlank());
 
-      target = RenderTargetTestSupport.attachOwnedTexture(map, new RenderTargetExtent(64, 64, 1.0));
+      target = assumeOwnedTextureTarget(map);
       var session = target.session();
       map.setStyleJson(STYLE_JSON);
       waitForMapEvent(runtime, map, RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE);
@@ -323,6 +324,15 @@ final class RuntimeHandleTest {
       }
       map.close();
       runtime.close();
+    }
+  }
+
+  private static RenderTargetTestSupport assumeOwnedTextureTarget(MapHandle map) {
+    try {
+      return RenderTargetTestSupport.attachOwnedTexture(map, new RenderTargetExtent(64, 64, 1.0));
+    } catch (IllegalStateException error) {
+      Assumptions.assumeTrue(false, "Owned texture target unavailable: " + error.getMessage());
+      throw new AssertionError("unreachable");
     }
   }
 
