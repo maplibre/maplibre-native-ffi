@@ -1,4 +1,5 @@
 const std = @import("std");
+const builtin = @import("builtin");
 const build_options = @import("build_options");
 const objc = if (build_options.supports_metal) @import("objc") else struct {};
 
@@ -21,11 +22,27 @@ pub fn main(init_args: std.process.Init) !void {
     try maplibre.setLogCallback(.{ .handler = diagnostics.logRecord }, null);
     defer maplibre.clearLogCallback(null) catch {};
 
+    if (build_options.supports_opengl and builtin.os.tag == .linux) {
+        _ = c.SDL_SetHint(c.SDL_HINT_VIDEO_FORCE_EGL, "1");
+    }
+
     if (!c.SDL_Init(c.SDL_INIT_VIDEO)) {
         std.debug.print("SDL_Init failed: {s}\n", .{std.mem.span(c.SDL_GetError())});
         return types.AppError.SdlInitFailed;
     }
     defer c.SDL_Quit();
+
+    if (build_options.supports_opengl and builtin.os.tag == .linux) {
+        if (!c.SDL_GL_SetAttribute(c.SDL_GL_CONTEXT_PROFILE_MASK, c.SDL_GL_CONTEXT_PROFILE_ES) or
+            !c.SDL_GL_SetAttribute(c.SDL_GL_CONTEXT_MAJOR_VERSION, 3) or
+            !c.SDL_GL_SetAttribute(c.SDL_GL_CONTEXT_MINOR_VERSION, 0))
+        {
+            std.debug.print("SDL_GL_SetAttribute failed: {s}\n", .{std.mem.span(c.SDL_GetError())});
+            return types.AppError.BackendSetupFailed;
+        }
+        // TODO(linux): Confirm these SDL GL attributes select Mesa EGL/GLES on
+        // the Linux llvmpipe environment used for OpenGL validation.
+    }
 
     const window_flags = Backend.window_flags |
         c.SDL_WINDOW_RESIZABLE |

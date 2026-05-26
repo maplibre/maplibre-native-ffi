@@ -7,7 +7,7 @@ const maplibre = @import("maplibre_native");
 const render_target = @import("../../render_target.zig");
 const types = @import("../../types.zig");
 
-pub const OpenGLBackend = if (builtin.os.tag == .windows) WindowsOpenGLBackend else LinuxTodoOpenGLBackend;
+pub const OpenGLBackend = PlatformOpenGLBackend;
 
 const gl = struct {
     const GLenum = c_uint;
@@ -42,26 +42,6 @@ const gl = struct {
     const TRIANGLES: GLenum = 0x0004;
     const UNSIGNED_BYTE: GLenum = 0x1401;
     const VERTEX_SHADER: GLenum = 0x8b31;
-
-    extern "opengl32" fn glBegin(mode: GLenum) callconv(.winapi) void;
-    extern "opengl32" fn glBindTexture(target: GLenum, texture: GLuint) callconv(.winapi) void;
-    extern "opengl32" fn glClear(mask: GLbitfield) callconv(.winapi) void;
-    extern "opengl32" fn glClearColor(red: GLfloat, green: GLfloat, blue: GLfloat, alpha: GLfloat) callconv(.winapi) void;
-    extern "opengl32" fn glDeleteTextures(n: GLsizei, textures: *const GLuint) callconv(.winapi) void;
-    extern "opengl32" fn glDisable(cap: GLenum) callconv(.winapi) void;
-    extern "opengl32" fn glEnable(cap: GLenum) callconv(.winapi) void;
-    extern "opengl32" fn glEnd() callconv(.winapi) void;
-    extern "opengl32" fn glFinish() callconv(.winapi) void;
-    extern "opengl32" fn glGenTextures(n: GLsizei, textures: *GLuint) callconv(.winapi) void;
-    extern "opengl32" fn glGetError() callconv(.winapi) GLenum;
-    extern "opengl32" fn glLoadIdentity() callconv(.winapi) void;
-    extern "opengl32" fn glMatrixMode(mode: GLenum) callconv(.winapi) void;
-    extern "opengl32" fn glOrtho(left: GLdouble, right: GLdouble, bottom: GLdouble, top: GLdouble, z_near: GLdouble, z_far: GLdouble) callconv(.winapi) void;
-    extern "opengl32" fn glTexCoord2f(s: GLfloat, t: GLfloat) callconv(.winapi) void;
-    extern "opengl32" fn glTexImage2D(target: GLenum, level: GLint, internal_format: GLint, width: GLsizei, height: GLsizei, border: GLint, format: GLenum, @"type": GLenum, pixels: ?*const anyopaque) callconv(.winapi) void;
-    extern "opengl32" fn glTexParameteri(target: GLenum, pname: GLenum, param: GLint) callconv(.winapi) void;
-    extern "opengl32" fn glVertex2f(x: GLfloat, y: GLfloat) callconv(.winapi) void;
-    extern "opengl32" fn glViewport(x: GLint, y: GLint, width: GLsizei, height: GLsizei) callconv(.winapi) void;
 };
 
 const gl_callconv = if (builtin.os.tag == .windows)
@@ -72,15 +52,23 @@ else
 const GLActiveTextureProc = *const fn (gl.GLenum) callconv(gl_callconv) void;
 const GLAttachShaderProc = *const fn (gl.GLuint, gl.GLuint) callconv(gl_callconv) void;
 const GLBindFramebufferProc = *const fn (gl.GLenum, gl.GLuint) callconv(gl_callconv) void;
+const GLBindTextureProc = *const fn (gl.GLenum, gl.GLuint) callconv(gl_callconv) void;
 const GLBindVertexArrayProc = *const fn (gl.GLuint) callconv(gl_callconv) void;
+const GLClearProc = *const fn (gl.GLbitfield) callconv(gl_callconv) void;
+const GLClearColorProc = *const fn (gl.GLfloat, gl.GLfloat, gl.GLfloat, gl.GLfloat) callconv(gl_callconv) void;
 const GLCompileShaderProc = *const fn (gl.GLuint) callconv(gl_callconv) void;
 const GLCreateProgramProc = *const fn () callconv(gl_callconv) gl.GLuint;
 const GLCreateShaderProc = *const fn (gl.GLenum) callconv(gl_callconv) gl.GLuint;
 const GLDeleteProgramProc = *const fn (gl.GLuint) callconv(gl_callconv) void;
 const GLDeleteShaderProc = *const fn (gl.GLuint) callconv(gl_callconv) void;
+const GLDeleteTexturesProc = *const fn (gl.GLsizei, *const gl.GLuint) callconv(gl_callconv) void;
 const GLDeleteVertexArraysProc = *const fn (gl.GLsizei, *const gl.GLuint) callconv(gl_callconv) void;
+const GLDisableProc = *const fn (gl.GLenum) callconv(gl_callconv) void;
 const GLDrawArraysProc = *const fn (gl.GLenum, gl.GLint, gl.GLsizei) callconv(gl_callconv) void;
+const GLFinishProc = *const fn () callconv(gl_callconv) void;
+const GLGenTexturesProc = *const fn (gl.GLsizei, *gl.GLuint) callconv(gl_callconv) void;
 const GLGenVertexArraysProc = *const fn (gl.GLsizei, *gl.GLuint) callconv(gl_callconv) void;
+const GLGetErrorProc = *const fn () callconv(gl_callconv) gl.GLenum;
 const GLGetProgramInfoLogProc = *const fn (gl.GLuint, gl.GLsizei, *gl.GLsizei, [*]gl.GLchar) callconv(gl_callconv) void;
 const GLGetProgramIvProc = *const fn (gl.GLuint, gl.GLenum, *gl.GLint) callconv(gl_callconv) void;
 const GLGetShaderInfoLogProc = *const fn (gl.GLuint, gl.GLsizei, *gl.GLsizei, [*]gl.GLchar) callconv(gl_callconv) void;
@@ -88,22 +76,33 @@ const GLGetShaderIvProc = *const fn (gl.GLuint, gl.GLenum, *gl.GLint) callconv(g
 const GLGetUniformLocationProc = *const fn (gl.GLuint, [*:0]const gl.GLchar) callconv(gl_callconv) gl.GLint;
 const GLLinkProgramProc = *const fn (gl.GLuint) callconv(gl_callconv) void;
 const GLShaderSourceProc = *const fn (gl.GLuint, gl.GLsizei, [*]const [*]const gl.GLchar, *const gl.GLint) callconv(gl_callconv) void;
+const GLTexImage2DProc = *const fn (gl.GLenum, gl.GLint, gl.GLint, gl.GLsizei, gl.GLsizei, gl.GLint, gl.GLenum, gl.GLenum, ?*const anyopaque) callconv(gl_callconv) void;
+const GLTexParameteriProc = *const fn (gl.GLenum, gl.GLenum, gl.GLint) callconv(gl_callconv) void;
 const GLUniform1iProc = *const fn (gl.GLint, gl.GLint) callconv(gl_callconv) void;
 const GLUseProgramProc = *const fn (gl.GLuint) callconv(gl_callconv) void;
+const GLViewportProc = *const fn (gl.GLint, gl.GLint, gl.GLsizei, gl.GLsizei) callconv(gl_callconv) void;
 
 const OpenGLCompositorProcs = struct {
     active_texture: GLActiveTextureProc,
     attach_shader: GLAttachShaderProc,
     bind_framebuffer: GLBindFramebufferProc,
+    bind_texture: GLBindTextureProc,
     bind_vertex_array: GLBindVertexArrayProc,
+    clear: GLClearProc,
+    clear_color: GLClearColorProc,
     compile_shader: GLCompileShaderProc,
     create_program: GLCreateProgramProc,
     create_shader: GLCreateShaderProc,
     delete_program: GLDeleteProgramProc,
     delete_shader: GLDeleteShaderProc,
+    delete_textures: GLDeleteTexturesProc,
     delete_vertex_arrays: GLDeleteVertexArraysProc,
+    disable: GLDisableProc,
     draw_arrays: GLDrawArraysProc,
+    finish: GLFinishProc,
+    gen_textures: GLGenTexturesProc,
     gen_vertex_arrays: GLGenVertexArraysProc,
+    get_error: GLGetErrorProc,
     get_program_info_log: GLGetProgramInfoLogProc,
     get_program_iv: GLGetProgramIvProc,
     get_shader_info_log: GLGetShaderInfoLogProc,
@@ -111,23 +110,34 @@ const OpenGLCompositorProcs = struct {
     get_uniform_location: GLGetUniformLocationProc,
     link_program: GLLinkProgramProc,
     shader_source: GLShaderSourceProc,
+    tex_image_2d: GLTexImage2DProc,
+    tex_parameter_i: GLTexParameteriProc,
     uniform_1i: GLUniform1iProc,
     use_program: GLUseProgramProc,
+    viewport: GLViewportProc,
 
     fn load() !OpenGLCompositorProcs {
         return .{
             .active_texture = try loadGlProc(GLActiveTextureProc, "glActiveTexture"),
             .attach_shader = try loadGlProc(GLAttachShaderProc, "glAttachShader"),
             .bind_framebuffer = try loadGlProc(GLBindFramebufferProc, "glBindFramebuffer"),
+            .bind_texture = try loadGlProc(GLBindTextureProc, "glBindTexture"),
             .bind_vertex_array = try loadGlProc(GLBindVertexArrayProc, "glBindVertexArray"),
+            .clear = try loadGlProc(GLClearProc, "glClear"),
+            .clear_color = try loadGlProc(GLClearColorProc, "glClearColor"),
             .compile_shader = try loadGlProc(GLCompileShaderProc, "glCompileShader"),
             .create_program = try loadGlProc(GLCreateProgramProc, "glCreateProgram"),
             .create_shader = try loadGlProc(GLCreateShaderProc, "glCreateShader"),
             .delete_program = try loadGlProc(GLDeleteProgramProc, "glDeleteProgram"),
             .delete_shader = try loadGlProc(GLDeleteShaderProc, "glDeleteShader"),
+            .delete_textures = try loadGlProc(GLDeleteTexturesProc, "glDeleteTextures"),
             .delete_vertex_arrays = try loadGlProc(GLDeleteVertexArraysProc, "glDeleteVertexArrays"),
+            .disable = try loadGlProc(GLDisableProc, "glDisable"),
             .draw_arrays = try loadGlProc(GLDrawArraysProc, "glDrawArrays"),
+            .finish = try loadGlProc(GLFinishProc, "glFinish"),
+            .gen_textures = try loadGlProc(GLGenTexturesProc, "glGenTextures"),
             .gen_vertex_arrays = try loadGlProc(GLGenVertexArraysProc, "glGenVertexArrays"),
+            .get_error = try loadGlProc(GLGetErrorProc, "glGetError"),
             .get_program_info_log = try loadGlProc(GLGetProgramInfoLogProc, "glGetProgramInfoLog"),
             .get_program_iv = try loadGlProc(GLGetProgramIvProc, "glGetProgramiv"),
             .get_shader_info_log = try loadGlProc(GLGetShaderInfoLogProc, "glGetShaderInfoLog"),
@@ -135,13 +145,16 @@ const OpenGLCompositorProcs = struct {
             .get_uniform_location = try loadGlProc(GLGetUniformLocationProc, "glGetUniformLocation"),
             .link_program = try loadGlProc(GLLinkProgramProc, "glLinkProgram"),
             .shader_source = try loadGlProc(GLShaderSourceProc, "glShaderSource"),
+            .tex_image_2d = try loadGlProc(GLTexImage2DProc, "glTexImage2D"),
+            .tex_parameter_i = try loadGlProc(GLTexParameteriProc, "glTexParameteri"),
             .uniform_1i = try loadGlProc(GLUniform1iProc, "glUniform1i"),
             .use_program = try loadGlProc(GLUseProgramProc, "glUseProgram"),
+            .viewport = try loadGlProc(GLViewportProc, "glViewport"),
         };
     }
 };
 
-const texture_vertex_shader =
+const desktop_texture_vertex_shader =
     \\#version 130
     \\out vec2 out_uv;
     \\vec2 positions[3] = vec2[](vec2(-1.0, -1.0), vec2(3.0, -1.0), vec2(-1.0, 3.0));
@@ -152,8 +165,30 @@ const texture_vertex_shader =
     \\}
 ;
 
-const texture_fragment_shader =
+const desktop_texture_fragment_shader =
     \\#version 130
+    \\uniform sampler2D map_texture;
+    \\in vec2 out_uv;
+    \\out vec4 out_color;
+    \\void main() {
+    \\  out_color = texture(map_texture, out_uv);
+    \\}
+;
+
+const gles_texture_vertex_shader =
+    \\#version 300 es
+    \\out vec2 out_uv;
+    \\const vec2 positions[3] = vec2[3](vec2(-1.0, -1.0), vec2(3.0, -1.0), vec2(-1.0, 3.0));
+    \\const vec2 uvs[3] = vec2[3](vec2(0.0, 0.0), vec2(2.0, 0.0), vec2(0.0, 2.0));
+    \\void main() {
+    \\  gl_Position = vec4(positions[gl_VertexID], 0.0, 1.0);
+    \\  out_uv = uvs[gl_VertexID];
+    \\}
+;
+
+const gles_texture_fragment_shader =
+    \\#version 300 es
+    \\precision mediump float;
     \\uniform sampler2D map_texture;
     \\in vec2 out_uv;
     \\out vec4 out_color;
@@ -171,9 +206,12 @@ fn loadGlProc(comptime T: type, name: [:0]const u8) !T {
 }
 
 fn createTextureProgram(procs: OpenGLCompositorProcs) !gl.GLuint {
-    const vertex = try compileShader(procs, gl.VERTEX_SHADER, texture_vertex_shader, "texture vertex shader");
+    const vertex_source = if (builtin.os.tag == .linux) gles_texture_vertex_shader else desktop_texture_vertex_shader;
+    const fragment_source = if (builtin.os.tag == .linux) gles_texture_fragment_shader else desktop_texture_fragment_shader;
+
+    const vertex = try compileShader(procs, gl.VERTEX_SHADER, vertex_source, "texture vertex shader");
     defer procs.delete_shader(vertex);
-    const fragment = try compileShader(procs, gl.FRAGMENT_SHADER, texture_fragment_shader, "texture fragment shader");
+    const fragment = try compileShader(procs, gl.FRAGMENT_SHADER, fragment_source, "texture fragment shader");
     defer procs.delete_shader(fragment);
 
     const program = procs.create_program();
@@ -235,7 +273,7 @@ const gl_internal_format = gl.RGBA;
 const gl_pixel_format = gl.RGBA;
 const gl_pixel_type = gl.UNSIGNED_BYTE;
 
-const WindowsOpenGLBackend = union(enum) {
+const PlatformOpenGLBackend = union(enum) {
     pub const window_flags = c.SDL_WINDOW_OPENGL;
 
     owned_texture: OpenGLOwnedTextureBackend,
@@ -247,7 +285,7 @@ const WindowsOpenGLBackend = union(enum) {
         window: *c.SDL_Window,
         viewport: types.Viewport,
         mode: types.RenderTargetMode,
-    ) !WindowsOpenGLBackend {
+    ) !PlatformOpenGLBackend {
         _ = allocator;
         return switch (mode) {
             .owned_texture => .{ .owned_texture = try OpenGLOwnedTextureBackend.init(window, viewport) },
@@ -256,7 +294,7 @@ const WindowsOpenGLBackend = union(enum) {
         };
     }
 
-    pub fn deinit(self: *WindowsOpenGLBackend) void {
+    pub fn deinit(self: *PlatformOpenGLBackend) void {
         switch (self.*) {
             .owned_texture => |*backend| backend.deinit(),
             .borrowed_texture => |*backend| backend.deinit(),
@@ -264,7 +302,7 @@ const WindowsOpenGLBackend = union(enum) {
         }
     }
 
-    pub fn resize(self: *WindowsOpenGLBackend, viewport: types.Viewport) !void {
+    pub fn resize(self: *PlatformOpenGLBackend, viewport: types.Viewport) !void {
         switch (self.*) {
             .owned_texture => |*backend| try backend.resize(viewport),
             .borrowed_texture => |*backend| try backend.resize(viewport),
@@ -272,14 +310,14 @@ const WindowsOpenGLBackend = union(enum) {
         }
     }
 
-    pub fn needsRenderTargetReattachOnResize(self: *const WindowsOpenGLBackend) bool {
+    pub fn needsRenderTargetReattachOnResize(self: *const PlatformOpenGLBackend) bool {
         return switch (self.*) {
             .owned_texture, .native_surface => false,
             .borrowed_texture => true,
         };
     }
 
-    pub fn finishFrame(self: *WindowsOpenGLBackend) !void {
+    pub fn finishFrame(self: *PlatformOpenGLBackend) !void {
         switch (self.*) {
             .owned_texture => |*backend| try backend.finishFrame(),
             .borrowed_texture => |*backend| try backend.finishFrame(),
@@ -288,7 +326,7 @@ const WindowsOpenGLBackend = union(enum) {
     }
 
     pub fn attachRenderTarget(
-        self: *WindowsOpenGLBackend,
+        self: *PlatformOpenGLBackend,
         map: *maplibre.MapHandle,
         viewport: types.Viewport,
     ) !render_target.Session {
@@ -300,7 +338,7 @@ const WindowsOpenGLBackend = union(enum) {
     }
 
     pub fn drawTexture(
-        self: *WindowsOpenGLBackend,
+        self: *PlatformOpenGLBackend,
         texture: *maplibre.RenderSessionHandle,
         viewport: types.Viewport,
     ) !bool {
@@ -313,9 +351,20 @@ const WindowsOpenGLBackend = union(enum) {
 };
 
 const OpenGLContext = struct {
+    const Platform = union(enum) {
+        wgl: struct {
+            device_context: *anyopaque,
+        },
+        egl: struct {
+            display: *anyopaque,
+            config: *anyopaque,
+            surface: *anyopaque,
+        },
+    };
+
     window: *c.SDL_Window,
     context: c.SDL_GLContext,
-    device_context: *anyopaque,
+    platform: Platform,
 
     fn init(window: *c.SDL_Window) !OpenGLContext {
         const context = c.SDL_GL_CreateContext(window) orelse {
@@ -327,20 +376,11 @@ const OpenGLContext = struct {
             logSdlError("SDL_GL_MakeCurrent failed");
             return types.AppError.BackendSetupFailed;
         }
-        const properties = c.SDL_GetWindowProperties(window);
-        if (properties == 0) {
-            logSdlError("SDL_GetWindowProperties failed");
-            return types.AppError.BackendSetupFailed;
-        }
-        const device_context = c.SDL_GetPointerProperty(
-            properties,
-            c.SDL_PROP_WINDOW_WIN32_HDC_POINTER,
-            null,
-        ) orelse return types.AppError.BackendSetupFailed;
+        const platform = try platformContext(window);
         return .{
             .window = window,
             .context = context,
-            .device_context = device_context,
+            .platform = platform,
         };
     }
 
@@ -365,17 +405,68 @@ const OpenGLContext = struct {
     }
 
     fn descriptor(self: *const OpenGLContext) maplibre.OpenGLContextDescriptor {
-        return .{ .wgl = .{
-            .device_context = .{ .ptr = @ptrCast(self.device_context) },
-            .share_context = .{ .ptr = @ptrCast(self.context) },
-            .get_proc_address = null,
-        } };
+        return switch (self.platform) {
+            .wgl => |wgl| .{ .wgl = .{
+                .device_context = .{ .ptr = @ptrCast(wgl.device_context) },
+                .share_context = .{ .ptr = @ptrCast(self.context) },
+                .get_proc_address = null,
+            } },
+            .egl => |egl| .{ .egl = .{
+                .display = .{ .ptr = @ptrCast(egl.display) },
+                .config = .{ .ptr = @ptrCast(egl.config) },
+                .share_context = .{ .ptr = @ptrCast(self.context) },
+                .get_proc_address = null,
+            } },
+        };
     }
 
     fn surface(self: *const OpenGLContext) maplibre.NativePointer {
-        return .{ .ptr = @ptrCast(self.device_context) };
+        return switch (self.platform) {
+            .wgl => |wgl| .{ .ptr = @ptrCast(wgl.device_context) },
+            .egl => |egl| .{ .ptr = @ptrCast(egl.surface) },
+        };
     }
 };
+
+fn platformContext(window: *c.SDL_Window) !OpenGLContext.Platform {
+    switch (builtin.os.tag) {
+        .windows => {
+            const properties = c.SDL_GetWindowProperties(window);
+            if (properties == 0) {
+                logSdlError("SDL_GetWindowProperties failed");
+                return types.AppError.BackendSetupFailed;
+            }
+            const device_context = c.SDL_GetPointerProperty(
+                properties,
+                c.SDL_PROP_WINDOW_WIN32_HDC_POINTER,
+                null,
+            ) orelse return types.AppError.BackendSetupFailed;
+            return .{ .wgl = .{ .device_context = device_context } };
+        },
+        .linux => {
+            const display = c.SDL_EGL_GetCurrentDisplay() orelse {
+                logSdlError("SDL_EGL_GetCurrentDisplay failed");
+                return types.AppError.BackendSetupFailed;
+            };
+            const config = c.SDL_EGL_GetCurrentConfig() orelse {
+                logSdlError("SDL_EGL_GetCurrentConfig failed");
+                return types.AppError.BackendSetupFailed;
+            };
+            const surface = c.SDL_EGL_GetWindowSurface(window) orelse {
+                logSdlError("SDL_EGL_GetWindowSurface failed");
+                return types.AppError.BackendSetupFailed;
+            };
+            // TODO(linux): Validate SDL's EGL display/config/surface handoff on
+            // the Linux Mesa/llvmpipe environment.
+            return .{ .egl = .{
+                .display = display,
+                .config = config,
+                .surface = surface,
+            } };
+        },
+        else => return types.AppError.BackendSetupFailed,
+    }
+}
 
 const OpenGLTextureCompositor = struct {
     context: OpenGLContext,
@@ -398,7 +489,7 @@ const OpenGLTextureCompositor = struct {
         const sampler = procs.get_uniform_location(program, "map_texture");
         if (sampler >= 0) procs.uniform_1i(sampler, 0);
         procs.use_program(0);
-        try checkGlError("initialize OpenGL texture compositor");
+        try checkGlError(procs, "initialize OpenGL texture compositor");
         return .{
             .context = context,
             .viewport = viewport,
@@ -410,7 +501,7 @@ const OpenGLTextureCompositor = struct {
 
     fn deinit(self: *OpenGLTextureCompositor) void {
         self.context.makeCurrent() catch {};
-        gl.glFinish();
+        self.procs.finish();
         if (self.vertex_array != 0) {
             self.procs.delete_vertex_arrays(1, &self.vertex_array);
             self.vertex_array = 0;
@@ -429,7 +520,7 @@ const OpenGLTextureCompositor = struct {
 
     fn finishFrame(self: *OpenGLTextureCompositor) !void {
         try self.context.makeCurrent();
-        gl.glFinish();
+        self.procs.finish();
     }
 
     fn drawTexture(self: *OpenGLTextureCompositor, texture: gl.GLuint) !bool {
@@ -440,25 +531,25 @@ const OpenGLTextureCompositor = struct {
     }
 
     fn drawTextureQuad(self: *OpenGLTextureCompositor, texture: gl.GLuint) !void {
-        clearGlErrors();
+        clearGlErrors(self.procs);
         self.procs.bind_framebuffer(gl.FRAMEBUFFER, 0);
-        gl.glDisable(gl.CULL_FACE);
-        gl.glDisable(gl.DEPTH_TEST);
-        gl.glDisable(gl.SCISSOR_TEST);
-        gl.glViewport(0, 0, @intCast(self.viewport.physical_width), @intCast(self.viewport.physical_height));
-        gl.glClearColor(0.08, 0.09, 0.11, 1.0);
-        gl.glClear(gl.COLOR_BUFFER_BIT);
+        self.procs.disable(gl.CULL_FACE);
+        self.procs.disable(gl.DEPTH_TEST);
+        self.procs.disable(gl.SCISSOR_TEST);
+        self.procs.viewport(0, 0, @intCast(self.viewport.physical_width), @intCast(self.viewport.physical_height));
+        self.procs.clear_color(0.08, 0.09, 0.11, 1.0);
+        self.procs.clear(gl.COLOR_BUFFER_BIT);
         self.procs.use_program(self.program);
         self.procs.bind_vertex_array(self.vertex_array);
         self.procs.active_texture(gl.TEXTURE0);
-        gl.glBindTexture(gl_texture_target, texture);
-        gl.glTexParameteri(gl_texture_target, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-        gl.glTexParameteri(gl_texture_target, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        self.procs.bind_texture(gl_texture_target, texture);
+        self.procs.tex_parameter_i(gl_texture_target, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        self.procs.tex_parameter_i(gl_texture_target, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
         self.procs.draw_arrays(gl.TRIANGLES, 0, 3);
-        gl.glBindTexture(gl_texture_target, 0);
+        self.procs.bind_texture(gl_texture_target, 0);
         self.procs.bind_vertex_array(0);
         self.procs.use_program(0);
-        try checkGlError("draw OpenGL texture");
+        try checkGlError(self.procs, "draw OpenGL texture");
     }
 };
 
@@ -518,14 +609,14 @@ const OpenGLOwnedTextureBackend = struct {
 const BorrowedTexture = struct {
     texture: gl.GLuint,
 
-    fn init(context: *const OpenGLContext, viewport: types.Viewport) !BorrowedTexture {
+    fn init(context: *const OpenGLContext, procs: OpenGLCompositorProcs, viewport: types.Viewport) !BorrowedTexture {
         try context.makeCurrent();
         var texture: gl.GLuint = 0;
-        gl.glGenTextures(1, &texture);
-        gl.glBindTexture(gl_texture_target, texture);
-        gl.glTexParameteri(gl_texture_target, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-        gl.glTexParameteri(gl_texture_target, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-        gl.glTexImage2D(
+        procs.gen_textures(1, &texture);
+        procs.bind_texture(gl_texture_target, texture);
+        procs.tex_parameter_i(gl_texture_target, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        procs.tex_parameter_i(gl_texture_target, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        procs.tex_image_2d(
             gl_texture_target,
             0,
             @intCast(gl_internal_format),
@@ -536,15 +627,15 @@ const BorrowedTexture = struct {
             gl_pixel_type,
             null,
         );
-        gl.glBindTexture(gl_texture_target, 0);
-        try checkGlError("create OpenGL borrowed texture");
+        procs.bind_texture(gl_texture_target, 0);
+        try checkGlError(procs, "create OpenGL borrowed texture");
         return .{ .texture = texture };
     }
 
-    fn deinit(self: *BorrowedTexture, context: *const OpenGLContext) void {
+    fn deinit(self: *BorrowedTexture, context: *const OpenGLContext, procs: OpenGLCompositorProcs) void {
         if (self.texture == 0) return;
         context.makeCurrent() catch {};
-        gl.glDeleteTextures(1, &self.texture);
+        procs.delete_textures(1, &self.texture);
         self.texture = 0;
     }
 };
@@ -557,20 +648,20 @@ const OpenGLBorrowedTextureBackend = struct {
         var compositor = try OpenGLTextureCompositor.init(window, viewport);
         errdefer compositor.deinit();
         return .{
-            .borrowed_texture = try BorrowedTexture.init(&compositor.context, viewport),
+            .borrowed_texture = try BorrowedTexture.init(&compositor.context, compositor.procs, viewport),
             .compositor = compositor,
         };
     }
 
     fn deinit(self: *OpenGLBorrowedTextureBackend) void {
-        self.borrowed_texture.deinit(&self.compositor.context);
+        self.borrowed_texture.deinit(&self.compositor.context, self.compositor.procs);
         self.compositor.deinit();
     }
 
     fn resize(self: *OpenGLBorrowedTextureBackend, viewport: types.Viewport) !void {
-        var borrowed_texture = try BorrowedTexture.init(&self.compositor.context, viewport);
-        errdefer borrowed_texture.deinit(&self.compositor.context);
-        self.borrowed_texture.deinit(&self.compositor.context);
+        var borrowed_texture = try BorrowedTexture.init(&self.compositor.context, self.compositor.procs, viewport);
+        errdefer borrowed_texture.deinit(&self.compositor.context, self.compositor.procs);
+        self.borrowed_texture.deinit(&self.compositor.context, self.compositor.procs);
         self.borrowed_texture = borrowed_texture;
         try self.compositor.resize(viewport);
     }
@@ -608,10 +699,16 @@ const OpenGLBorrowedTextureBackend = struct {
 
 const OpenGLSurfaceBackend = struct {
     context: OpenGLContext,
+    procs: OpenGLCompositorProcs,
 
     fn init(window: *c.SDL_Window, viewport: types.Viewport) !OpenGLSurfaceBackend {
         _ = viewport;
-        return .{ .context = try OpenGLContext.init(window) };
+        var context = try OpenGLContext.init(window);
+        errdefer context.deinit();
+        return .{
+            .context = context,
+            .procs = try OpenGLCompositorProcs.load(),
+        };
     }
 
     fn deinit(self: *OpenGLSurfaceBackend) void {
@@ -622,7 +719,7 @@ const OpenGLSurfaceBackend = struct {
 
     fn finishFrame(self: *OpenGLSurfaceBackend) !void {
         try self.context.makeCurrent();
-        gl.glFinish();
+        self.procs.finish();
     }
 
     fn attachRenderTarget(
@@ -642,42 +739,15 @@ const OpenGLSurfaceBackend = struct {
     }
 };
 
-fn drawTextureQuad(texture: gl.GLuint, viewport: types.Viewport) void {
-    gl.glViewport(0, 0, @intCast(viewport.physical_width), @intCast(viewport.physical_height));
-    gl.glClearColor(0.08, 0.09, 0.11, 1.0);
-    gl.glClear(gl.COLOR_BUFFER_BIT);
-    gl.glMatrixMode(gl.PROJECTION);
-    gl.glLoadIdentity();
-    gl.glOrtho(-1.0, 1.0, -1.0, 1.0, -1.0, 1.0);
-    gl.glMatrixMode(gl.MODELVIEW);
-    gl.glLoadIdentity();
-    gl.glEnable(gl_texture_target);
-    gl.glBindTexture(gl_texture_target, texture);
-    gl.glTexParameteri(gl_texture_target, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    gl.glTexParameteri(gl_texture_target, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-    gl.glBegin(gl.QUADS);
-    gl.glTexCoord2f(0.0, 0.0);
-    gl.glVertex2f(-1.0, -1.0);
-    gl.glTexCoord2f(1.0, 0.0);
-    gl.glVertex2f(1.0, -1.0);
-    gl.glTexCoord2f(1.0, 1.0);
-    gl.glVertex2f(1.0, 1.0);
-    gl.glTexCoord2f(0.0, 1.0);
-    gl.glVertex2f(-1.0, 1.0);
-    gl.glEnd();
-    gl.glBindTexture(gl_texture_target, 0);
-    gl.glDisable(gl_texture_target);
-}
-
-fn checkGlError(operation: []const u8) !void {
-    const gl_error = gl.glGetError();
+fn checkGlError(procs: OpenGLCompositorProcs, operation: []const u8) !void {
+    const gl_error = procs.get_error();
     if (gl_error == gl.NO_ERROR) return;
     std.debug.print("{s} failed with OpenGL error 0x{x}\n", .{ operation, gl_error });
     return types.AppError.BackendSetupFailed;
 }
 
-fn clearGlErrors() void {
-    while (gl.glGetError() != gl.NO_ERROR) {}
+fn clearGlErrors(procs: OpenGLCompositorProcs) void {
+    while (procs.get_error() != gl.NO_ERROR) {}
 }
 
 fn logSdlError(message: []const u8) void {
@@ -685,43 +755,3 @@ fn logSdlError(message: []const u8) void {
     const details = if (err == null) "" else std.mem.span(err);
     std.debug.print("{s}: {s}\n", .{ message, details });
 }
-
-const LinuxTodoOpenGLBackend = struct {
-    pub const window_flags = c.SDL_WINDOW_OPENGL;
-
-    pub fn init(
-        allocator: std.mem.Allocator,
-        window: *c.SDL_Window,
-        viewport: types.Viewport,
-        mode: types.RenderTargetMode,
-    ) !LinuxTodoOpenGLBackend {
-        _ = allocator;
-        _ = window;
-        _ = viewport;
-        _ = mode;
-        // TODO(linux): Add EGL/SDL context and surface support for zig-map
-        // on a Linux machine with the Mesa/llvmpipe environment available.
-        return types.AppError.BackendSetupFailed;
-    }
-
-    pub fn deinit(_: *LinuxTodoOpenGLBackend) void {}
-    pub fn resize(_: *LinuxTodoOpenGLBackend, _: types.Viewport) !void {}
-    pub fn needsRenderTargetReattachOnResize(_: *const LinuxTodoOpenGLBackend) bool {
-        return false;
-    }
-    pub fn finishFrame(_: *LinuxTodoOpenGLBackend) !void {}
-    pub fn attachRenderTarget(
-        _: *LinuxTodoOpenGLBackend,
-        _: *maplibre.MapHandle,
-        _: types.Viewport,
-    ) !render_target.Session {
-        return types.AppError.BackendSetupFailed;
-    }
-    pub fn drawTexture(
-        _: *LinuxTodoOpenGLBackend,
-        _: *maplibre.RenderSessionHandle,
-        _: types.Viewport,
-    ) !bool {
-        return types.AppError.BackendDrawFailed;
-    }
-};

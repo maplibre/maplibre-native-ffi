@@ -9,6 +9,10 @@ const vk = if (build_options.supports_vulkan) @cImport({
     @cInclude("vulkan/vulkan.h");
 }) else struct {};
 
+const egl = if (build_options.supports_opengl and builtin.os.tag == .linux) @cImport({
+    @cInclude("EGL/egl.h");
+}) else struct {};
+
 const wgl = if (build_options.supports_opengl and builtin.os.tag == .windows) struct {
     const BOOL = c_int;
     const BYTE = u8;
@@ -323,16 +327,82 @@ const OpenGLAttachContext = if (build_options.supports_opengl and builtin.os.tag
         } };
     }
 } else if (build_options.supports_opengl and builtin.os.tag == .linux) struct {
+    display: egl.EGLDisplay,
+    config: egl.EGLConfig,
+    surface: egl.EGLSurface,
+    share_context: egl.EGLContext,
+
     fn init() !@This() {
-        // TODO(linux): create an EGL readback context here after validating the
-        // Mesa/llvmpipe config selection on a Linux workstation.
-        return error.EglReadbackContextTodo;
+        const display = egl.eglGetDisplay(egl.EGL_DEFAULT_DISPLAY);
+        if (display == egl.EGL_NO_DISPLAY) return error.EglUnavailable;
+        errdefer _ = egl.eglTerminate(display);
+
+        var major: egl.EGLint = 0;
+        var minor: egl.EGLint = 0;
+        if (egl.eglInitialize(display, &major, &minor) == egl.EGL_FALSE) return error.EglUnavailable;
+        if (egl.eglBindAPI(egl.EGL_OPENGL_ES_API) == egl.EGL_FALSE) return error.EglUnavailable;
+
+        const config_attributes = [_]egl.EGLint{
+            egl.EGL_SURFACE_TYPE,    egl.EGL_PBUFFER_BIT,
+            egl.EGL_RENDERABLE_TYPE, egl.EGL_OPENGL_ES3_BIT,
+            egl.EGL_RED_SIZE,        8,
+            egl.EGL_GREEN_SIZE,      8,
+            egl.EGL_BLUE_SIZE,       8,
+            egl.EGL_ALPHA_SIZE,      8,
+            egl.EGL_DEPTH_SIZE,      24,
+            egl.EGL_STENCIL_SIZE,    8,
+            egl.EGL_NONE,
+        };
+        var config: egl.EGLConfig = null;
+        var config_count: egl.EGLint = 0;
+        if (egl.eglChooseConfig(display, &config_attributes, &config, 1, &config_count) == egl.EGL_FALSE or
+            config_count == 0 or config == null)
+        {
+            return error.EglUnavailable;
+        }
+
+        const context_attributes = [_]egl.EGLint{
+            egl.EGL_CONTEXT_CLIENT_VERSION, 3,
+            egl.EGL_NONE,
+        };
+        const share_context = egl.eglCreateContext(display, config, egl.EGL_NO_CONTEXT, &context_attributes);
+        if (share_context == egl.EGL_NO_CONTEXT) return error.EglUnavailable;
+        errdefer _ = egl.eglDestroyContext(display, share_context);
+
+        const surface_attributes = [_]egl.EGLint{
+            egl.EGL_WIDTH,  8,
+            egl.EGL_HEIGHT, 8,
+            egl.EGL_NONE,
+        };
+        const surface = egl.eglCreatePbufferSurface(display, config, &surface_attributes);
+        if (surface == egl.EGL_NO_SURFACE) return error.EglUnavailable;
+        errdefer _ = egl.eglDestroySurface(display, surface);
+
+        if (egl.eglMakeCurrent(display, surface, surface, share_context) == egl.EGL_FALSE) return error.EglUnavailable;
+        // TODO(linux): Validate this pbuffer config on the Linux Mesa/llvmpipe
+        // environment, including whether OpenGL ES 3 is always advertised.
+        return .{
+            .display = display,
+            .config = config,
+            .surface = surface,
+            .share_context = share_context,
+        };
     }
 
-    fn deinit(_: *@This()) void {}
+    fn deinit(self: *@This()) void {
+        _ = egl.eglMakeCurrent(self.display, egl.EGL_NO_SURFACE, egl.EGL_NO_SURFACE, egl.EGL_NO_CONTEXT);
+        _ = egl.eglDestroySurface(self.display, self.surface);
+        _ = egl.eglDestroyContext(self.display, self.share_context);
+        _ = egl.eglTerminate(self.display);
+    }
 
-    fn descriptor(_: *const @This()) maplibre.OpenGLContextDescriptor {
-        unreachable;
+    fn descriptor(self: *const @This()) maplibre.OpenGLContextDescriptor {
+        return .{ .egl = .{
+            .display = .{ .ptr = @ptrCast(self.display.?) },
+            .config = .{ .ptr = @ptrCast(self.config.?) },
+            .share_context = .{ .ptr = @ptrCast(self.share_context.?) },
+            .get_proc_address = null,
+        } };
     }
 } else struct {};
 
