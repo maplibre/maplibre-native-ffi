@@ -2,19 +2,28 @@ package org.maplibre.nativeffi.internal.struct
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlinx.cinterop.ExperimentalForeignApi
+import kotlinx.cinterop.alloc
 import kotlinx.cinterop.get
 import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.pointed
+import kotlinx.cinterop.ptr
 import org.maplibre.nativeffi.geo.Feature
 import org.maplibre.nativeffi.geo.FeatureIdentifier
 import org.maplibre.nativeffi.geo.GeoJson
 import org.maplibre.nativeffi.geo.Geometry
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.internal.c.MLN_FEATURE_IDENTIFIER_TYPE_STRING
+import org.maplibre.nativeffi.internal.c.MLN_FEATURE_IDENTIFIER_TYPE_UINT
 import org.maplibre.nativeffi.internal.c.MLN_GEOJSON_TYPE_FEATURE
+import org.maplibre.nativeffi.internal.c.MLN_GEOMETRY_TYPE_EMPTY
 import org.maplibre.nativeffi.internal.c.MLN_GEOMETRY_TYPE_LINE_STRING
 import org.maplibre.nativeffi.internal.c.MLN_JSON_VALUE_TYPE_OBJECT
+import org.maplibre.nativeffi.internal.c.MLN_JSON_VALUE_TYPE_UINT
+import org.maplibre.nativeffi.internal.c.mln_feature
+import org.maplibre.nativeffi.internal.c.mln_geometry
+import org.maplibre.nativeffi.internal.c.mln_json_value
 import org.maplibre.nativeffi.json.JsonValue
 
 @OptIn(ExperimentalForeignApi::class)
@@ -22,7 +31,7 @@ class ValueStructsTest {
   @Test
   fun jsonMaterializerPreservesObjectOrderAndDuplicateKeys() {
     val json =
-      JsonValue.obj(
+      JsonValue.`object`(
         listOf(
           JsonValue.Member("name", JsonValue.of("first")),
           JsonValue.Member("name", JsonValue.of("second")),
@@ -48,6 +57,31 @@ class ValueStructsTest {
       assertEquals(2UL, native.data.line_string.coordinate_count)
       assertEquals(1.0, native.data.line_string.coordinates!![0].latitude)
       assertEquals(4.0, native.data.line_string.coordinates!![1].longitude)
+    }
+  }
+
+  @Test
+  fun jsonSnapshotRejectsUnsignedValuesThatDoNotFitJavaLong() {
+    memScoped {
+      val native = alloc<mln_json_value>()
+      native.type = MLN_JSON_VALUE_TYPE_UINT
+      native.data.uint_value = Long.MAX_VALUE.toULong() + 1UL
+
+      assertFailsWith<IllegalArgumentException> { ValueStructs.jsonSnapshot(native.ptr) }
+    }
+  }
+
+  @Test
+  fun featureSnapshotRejectsUnsignedIdentifiersThatDoNotFitJavaLong() {
+    memScoped {
+      val geometry = alloc<mln_geometry>()
+      geometry.type = MLN_GEOMETRY_TYPE_EMPTY
+      val feature = alloc<mln_feature>()
+      feature.geometry = geometry.ptr
+      feature.identifier_type = MLN_FEATURE_IDENTIFIER_TYPE_UINT
+      feature.identifier.uint_value = Long.MAX_VALUE.toULong() + 1UL
+
+      assertFailsWith<IllegalArgumentException> { ValueStructs.featureSnapshot(feature.ptr) }
     }
   }
 

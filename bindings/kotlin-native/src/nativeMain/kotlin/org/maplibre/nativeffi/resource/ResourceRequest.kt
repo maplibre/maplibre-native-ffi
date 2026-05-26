@@ -4,15 +4,15 @@ package org.maplibre.nativeffi.resource
 public class ResourceRequest(
   public val url: String,
   public val kind: ResourceKind,
-  public val rawKind: UInt,
+  public val rawKind: Int,
   public val loadingMethod: ResourceLoadingMethod,
-  public val rawLoadingMethod: UInt,
+  public val rawLoadingMethod: Int,
   public val priority: ResourcePriority,
-  public val rawPriority: UInt,
+  public val rawPriority: Int,
   public val usage: ResourceUsage,
-  public val rawUsage: UInt,
+  public val rawUsage: Int,
   public val storagePolicy: ResourceStoragePolicy,
-  public val rawStoragePolicy: UInt,
+  public val rawStoragePolicy: Int,
   public val range: ByteRange?,
   public val priorModifiedUnixMs: Long?,
   public val priorExpiresUnixMs: Long?,
@@ -21,5 +21,6 @@ public class ResourceRequest(
 ) {
   public val priorData: ByteArray = priorData.copyOf()
 
-  public data class ByteRange(public val start: ULong, public val end: ULong)
+  /** HTTP byte range. Values preserve native uint64 bit patterns in Java-compatible [Long]s. */
+  public data class ByteRange(public val start: Long, public val end: Long)
 }

@@ -1,17 +1,20 @@
 package org.maplibre.nativeffi.resource
 
 /** Resource error reason copied from native events. */
-public enum class ResourceErrorReason(public val nativeValue: UInt) {
-  NONE(0U),
-  NOT_FOUND(1U),
-  SERVER(2U),
-  CONNECTION(3U),
-  RATE_LIMIT(4U),
-  OTHER(5U),
-  UNKNOWN(UInt.MAX_VALUE);
+public enum class ResourceErrorReason(public val nativeValue: Int) {
+  NONE(0),
+  NOT_FOUND(1),
+  SERVER(2),
+  CONNECTION(3),
+  RATE_LIMIT(4),
+  OTHER(5),
+  UNKNOWN(-1);
 
   public companion object {
-    public fun fromNative(nativeValue: UInt): ResourceErrorReason =
+    internal fun fromNative(nativeValue: UInt): ResourceErrorReason =
+      fromNative(nativeValue.toInt())
+
+    public fun fromNative(nativeValue: Int): ResourceErrorReason =
       entries.firstOrNull { it.nativeValue == nativeValue } ?: UNKNOWN
   }
 }

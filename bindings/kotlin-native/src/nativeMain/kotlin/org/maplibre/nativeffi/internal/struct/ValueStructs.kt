@@ -151,9 +151,9 @@ internal object ValueStructs {
       FeatureIdentifier.Null -> native.identifier_type = MLN_FEATURE_IDENTIFIER_TYPE_NULL
       is FeatureIdentifier.UInt -> {
         native.identifier_type = MLN_FEATURE_IDENTIFIER_TYPE_UINT
-        native.identifier.uint_value = identifier.value
+        native.identifier.uint_value = identifier.value.toULong()
       }
-      is FeatureIdentifier.IntValue -> {
+      is FeatureIdentifier.Int -> {
         native.identifier_type = MLN_FEATURE_IDENTIFIER_TYPE_INT
         native.identifier.int_value = identifier.value
       }
@@ -181,9 +181,9 @@ internal object ValueStructs {
       }
       is JsonValue.UInt -> {
         native.type = MLN_JSON_VALUE_TYPE_UINT
-        native.data.uint_value = value.value
+        native.data.uint_value = value.value.toULong()
       }
-      is JsonValue.IntValue -> {
+      is JsonValue.Int -> {
         native.type = MLN_JSON_VALUE_TYPE_INT
         native.data.int_value = value.value
       }
@@ -312,20 +312,22 @@ internal object ValueStructs {
     when (native.type) {
       MLN_JSON_VALUE_TYPE_NULL -> JsonValue.Null
       MLN_JSON_VALUE_TYPE_BOOL -> JsonValue.Bool(native.data.bool_value)
-      MLN_JSON_VALUE_TYPE_UINT -> JsonValue.UInt(native.data.uint_value)
-      MLN_JSON_VALUE_TYPE_INT -> JsonValue.IntValue(native.data.int_value)
+      MLN_JSON_VALUE_TYPE_UINT ->
+        JsonValue.UInt(checkedLong(native.data.uint_value, "JSON unsigned value"))
+      MLN_JSON_VALUE_TYPE_INT -> JsonValue.Int(native.data.int_value)
       MLN_JSON_VALUE_TYPE_DOUBLE -> JsonValue.DoubleValue(native.data.double_value)
       MLN_JSON_VALUE_TYPE_STRING ->
         JsonValue.StringValue(CoreStructs.stringView(native.data.string_value))
       MLN_JSON_VALUE_TYPE_ARRAY ->
         JsonValue.Array(
-          List(native.data.array_value.value_count.toInt()) { index ->
+          List(checkedInt(native.data.array_value.value_count, "JSON array value count")) { index ->
             readJson(native.data.array_value.values!![index])
           }
         )
       MLN_JSON_VALUE_TYPE_OBJECT ->
         JsonValue.ObjectValue(
-          List(native.data.object_value.member_count.toInt()) { index ->
+          List(checkedInt(native.data.object_value.member_count, "JSON object member count")) {
+            index ->
             val member = native.data.object_value.members!![index]
             JsonValue.Member(CoreStructs.stringView(member.key), jsonSnapshot(member.value))
           }
@@ -344,19 +346,25 @@ internal object ValueStructs {
         Geometry.MultiPoint(readCoordinateSpan(native.data.multi_point))
       MLN_GEOMETRY_TYPE_MULTI_LINE_STRING ->
         Geometry.MultiLineString(
-          List(native.data.multi_line_string.line_count.toInt()) { index ->
+          List(
+            checkedInt(native.data.multi_line_string.line_count, "multi-line string line count")
+          ) { index ->
             readCoordinateSpan(native.data.multi_line_string.lines!![index])
           }
         )
       MLN_GEOMETRY_TYPE_MULTI_POLYGON ->
         Geometry.MultiPolygon(
-          List(native.data.multi_polygon.polygon_count.toInt()) { index ->
+          List(
+            checkedInt(native.data.multi_polygon.polygon_count, "multi-polygon polygon count")
+          ) { index ->
             readPolygon(native.data.multi_polygon.polygons!![index])
           }
         )
       MLN_GEOMETRY_TYPE_GEOMETRY_COLLECTION ->
         Geometry.Collection(
-          List(native.data.geometry_collection.geometry_count.toInt()) { index ->
+          List(
+            checkedInt(native.data.geometry_collection.geometry_count, "geometry collection count")
+          ) { index ->
             readGeometry(native.data.geometry_collection.geometries!![index])
           }
         )
@@ -365,7 +373,7 @@ internal object ValueStructs {
 
   private fun readFeature(native: mln_feature): Feature {
     val properties =
-      List(native.property_count.toInt()) { index ->
+      List(checkedInt(native.property_count, "feature property count")) { index ->
         val member = native.properties!![index]
         JsonValue.Member(CoreStructs.stringView(member.key), jsonSnapshot(member.value))
       }
@@ -376,11 +384,24 @@ internal object ValueStructs {
     )
   }
 
+  private fun checkedInt(value: ULong, name: String): Int {
+    require(value <= Int.MAX_VALUE.toULong()) { "$name exceeds Int.MAX_VALUE" }
+    return value.toInt()
+  }
+
+  private fun checkedLong(value: ULong, name: String): Long {
+    require(value <= Long.MAX_VALUE.toULong()) { "$name exceeds Long.MAX_VALUE" }
+    return value.toLong()
+  }
+
   private fun readFeatureIdentifier(native: mln_feature): FeatureIdentifier =
     when (native.identifier_type) {
       MLN_FEATURE_IDENTIFIER_TYPE_NULL -> FeatureIdentifier.Null
-      MLN_FEATURE_IDENTIFIER_TYPE_UINT -> FeatureIdentifier.UInt(native.identifier.uint_value)
-      MLN_FEATURE_IDENTIFIER_TYPE_INT -> FeatureIdentifier.IntValue(native.identifier.int_value)
+      MLN_FEATURE_IDENTIFIER_TYPE_UINT ->
+        FeatureIdentifier.UInt(
+          checkedLong(native.identifier.uint_value, "unsigned feature identifier")
+        )
+      MLN_FEATURE_IDENTIFIER_TYPE_INT -> FeatureIdentifier.Int(native.identifier.int_value)
       MLN_FEATURE_IDENTIFIER_TYPE_DOUBLE ->
         FeatureIdentifier.DoubleValue(native.identifier.double_value)
       MLN_FEATURE_IDENTIFIER_TYPE_STRING ->
@@ -389,8 +410,13 @@ internal object ValueStructs {
     }
 
   private fun readCoordinateSpan(native: mln_coordinate_span): List<LatLng> =
-    CoreStructs.latLngArray(native.coordinates, native.coordinate_count.toInt())
+    CoreStructs.latLngArray(
+      native.coordinates,
+      checkedInt(native.coordinate_count, "coordinate count"),
+    )
 
   private fun readPolygon(native: mln_polygon_geometry): List<List<LatLng>> =
-    List(native.ring_count.toInt()) { index -> readCoordinateSpan(native.rings!![index]) }
+    List(checkedInt(native.ring_count, "polygon ring count")) { index ->
+      readCoordinateSpan(native.rings!![index])
+    }
 }

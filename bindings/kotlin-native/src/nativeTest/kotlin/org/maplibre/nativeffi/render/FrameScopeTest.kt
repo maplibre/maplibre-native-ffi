@@ -11,21 +11,23 @@ class FrameScopeTest {
     val frame =
       MetalOwnedTextureFrame(
         scope,
-        1UL,
-        2U,
-        3U,
+        1L,
+        2,
+        3,
         2.0,
-        4UL,
-        NativePointer.ofAddress(0x10UL),
-        NativePointer.ofAddress(0x20UL),
-        80UL,
+        4L,
+        NativePointer.ofAddress(0x10L),
+        NativePointer.ofAddress(0x20L),
+        80L,
       )
 
-    assertEquals(2U, frame.width())
-    assertEquals(NativePointer.ofAddress(0x10UL), frame.texture())
+    assertEquals(2, frame.width())
+    assertEquals(NativePointer.ofAddress(0x10L), frame.texture())
+    val retainedTexture = NativePointer.scoped(0x10L, scope)
     scope.close()
     assertFailsWith<IllegalStateException> { frame.width() }
     assertFailsWith<IllegalStateException> { frame.texture() }
+    assertFailsWith<IllegalStateException> { retainedTexture.address }
   }
 
   @Test
@@ -34,20 +36,20 @@ class FrameScopeTest {
     val frame =
       VulkanOwnedTextureFrame(
         scope,
-        1UL,
-        2U,
-        3U,
+        1L,
+        2,
+        3,
         2.0,
-        4UL,
-        NativePointer.ofAddress(0x10UL),
-        NativePointer.ofAddress(0x20UL),
-        NativePointer.ofAddress(0x30UL),
-        44U,
-        5U,
+        4L,
+        NativePointer.ofAddress(0x10L),
+        NativePointer.ofAddress(0x20L),
+        NativePointer.ofAddress(0x30L),
+        44,
+        5,
       )
 
-    assertEquals(44U, frame.format())
-    assertEquals(NativePointer.ofAddress(0x20UL), frame.imageView())
+    assertEquals(44, frame.format())
+    assertEquals(NativePointer.ofAddress(0x20L), frame.imageView())
     scope.close()
     assertFailsWith<IllegalStateException> { frame.format() }
     assertFailsWith<IllegalStateException> { frame.imageView() }

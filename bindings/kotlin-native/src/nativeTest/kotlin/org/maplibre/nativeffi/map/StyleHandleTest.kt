@@ -4,14 +4,25 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import kotlinx.cinterop.BooleanVar
+import kotlinx.cinterop.ExperimentalForeignApi
+import kotlinx.cinterop.alloc
+import kotlinx.cinterop.memScoped
+import kotlinx.cinterop.ptr
+import kotlinx.cinterop.value
 import org.maplibre.nativeffi.geo.CanonicalTileId
 import org.maplibre.nativeffi.geo.Feature
 import org.maplibre.nativeffi.geo.GeoJson
 import org.maplibre.nativeffi.geo.Geometry
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.LatLngBounds
+import org.maplibre.nativeffi.internal.c.mln_map_remove_style_source
+import org.maplibre.nativeffi.internal.status.Status
+import org.maplibre.nativeffi.internal.struct.CoreStructs
 import org.maplibre.nativeffi.json.JsonValue
 import org.maplibre.nativeffi.render.PremultipliedRgba8Image
+import org.maplibre.nativeffi.runtime.RuntimeEventSourceType
+import org.maplibre.nativeffi.runtime.RuntimeEventType
 import org.maplibre.nativeffi.runtime.RuntimeHandle
 import org.maplibre.nativeffi.style.CustomGeometrySourceCallback
 import org.maplibre.nativeffi.style.CustomGeometrySourceOptions
@@ -23,6 +34,7 @@ import org.maplibre.nativeffi.style.TileScheme
 import org.maplibre.nativeffi.style.TileSourceOptions
 import org.maplibre.nativeffi.style.VectorTileEncoding
 
+@OptIn(ExperimentalForeignApi::class)
 class StyleHandleTest {
   @Test
   fun customGeometrySourceApisKeepCallbackStateMapScoped() {
@@ -39,8 +51,8 @@ class StyleHandleTest {
           )
           .minZoom(0.0)
           .maxZoom(4.0)
-          .tileSize(256U)
-          .buffer(8U)
+          .tileSize(256)
+          .buffer(8)
           .clip(true)
           .wrap(false),
       )
@@ -48,15 +60,94 @@ class StyleHandleTest {
       assertEquals(SourceType.CUSTOM_VECTOR, map.styleSourceType("custom"))
       map.setCustomGeometrySourceTileData(
         "custom",
-        CanonicalTileId(0U, 0U, 0U),
+        CanonicalTileId(0, 0, 0),
         GeoJson.featureCollection(emptyList()),
       )
-      map.invalidateCustomGeometrySourceTile("custom", CanonicalTileId(0U, 0U, 0U))
+      map.invalidateCustomGeometrySourceTile("custom", CanonicalTileId(0, 0, 0))
       map.invalidateCustomGeometrySourceRegion(
         "custom",
         LatLngBounds(LatLng(0.0, 0.0), LatLng(1.0, 1.0)),
       )
       assertTrue(map.removeStyleSource("custom"))
+      assertEquals(0, map.customGeometrySourceCountForTesting())
+    } finally {
+      map.close()
+      runtime.close()
+    }
+  }
+
+  @Test
+  fun mapStyleLoadedEventDropsCallbacksAfterNativeSourceDetaches() {
+    val runtime = RuntimeHandle.create()
+    val map = MapHandle.create(runtime, MapOptions().size(128, 128))
+    try {
+      map.setStyleJson("{\"version\":8,\"sources\":{},\"layers\":[]}")
+      map.addCustomGeometrySource(
+        "custom",
+        CustomGeometrySourceOptions(
+          object : CustomGeometrySourceCallback {
+            override fun fetchTile(tileId: CanonicalTileId) = Unit
+          }
+        ),
+      )
+      assertEquals(1, map.customGeometrySourceCountForTesting())
+
+      memScoped {
+        val outRemoved = alloc<BooleanVar>()
+        Status.check(
+          mln_map_remove_style_source(
+            map.nativeHandle(),
+            CoreStructs.stringView("custom", this),
+            outRemoved.ptr,
+          )
+        )
+        assertTrue(outRemoved.value)
+      }
+
+      val mapSource =
+        runtime.applyEventSideEffectsForTesting(
+          RuntimeEventType.MAP_STYLE_LOADED,
+          RuntimeEventSourceType.MAP,
+          map.nativeAddress(),
+        )
+
+      assertEquals(map, mapSource)
+      assertEquals(0, map.customGeometrySourceCountForTesting())
+    } finally {
+      map.close()
+      runtime.close()
+    }
+  }
+
+  @Test
+  fun releaseDetachedCustomGeometrySourcesDropsCallbacksAfterNativeSourceDetaches() {
+    val runtime = RuntimeHandle.create()
+    val map = MapHandle.create(runtime, MapOptions().size(128, 128))
+    try {
+      map.setStyleJson("{\"version\":8,\"sources\":{},\"layers\":[]}")
+      map.addCustomGeometrySource(
+        "custom",
+        CustomGeometrySourceOptions(
+          object : CustomGeometrySourceCallback {
+            override fun fetchTile(tileId: CanonicalTileId) = Unit
+          }
+        ),
+      )
+      assertEquals(1, map.customGeometrySourceCountForTesting())
+
+      memScoped {
+        val outRemoved = alloc<BooleanVar>()
+        Status.check(
+          mln_map_remove_style_source(
+            map.nativeHandle(),
+            CoreStructs.stringView("custom", this),
+            outRemoved.ptr,
+          )
+        )
+        assertTrue(outRemoved.value)
+      }
+      map.releaseDetachedCustomGeometrySources()
+
       assertEquals(0, map.customGeometrySourceCountForTesting())
     } finally {
       map.close()
@@ -72,12 +163,12 @@ class StyleHandleTest {
       map.setStyleJson("{\"version\":8,\"sources\":{},\"layers\":[]}")
       map.addStyleSourceJson(
         "parks",
-        JsonValue.obj(
+        JsonValue.`object`(
           listOf(
             JsonValue.Member("type", JsonValue.of("geojson")),
             JsonValue.Member(
               "data",
-              JsonValue.obj(
+              JsonValue.`object`(
                 listOf(
                   JsonValue.Member("type", JsonValue.of("FeatureCollection")),
                   JsonValue.Member("features", JsonValue.array(emptyList())),
@@ -93,7 +184,7 @@ class StyleHandleTest {
       assertTrue(map.styleSourceIds().contains("parks"))
 
       map.addStyleLayerJson(
-        JsonValue.obj(
+        JsonValue.`object`(
           listOf(
             JsonValue.Member("id", JsonValue.of("park-circles")),
             JsonValue.Member("type", JsonValue.of("circle")),
@@ -130,12 +221,12 @@ class StyleHandleTest {
     val map = MapHandle.create(runtime, MapOptions().size(128, 128))
     try {
       map.setStyleJson("{\"version\":8,\"sources\":{},\"layers\":[]}")
-      val image = PremultipliedRgba8Image(1U, 1U, 4U, byteArrayOf(1, 2, 3, 4))
+      val image = PremultipliedRgba8Image(1, 1, 4, byteArrayOf(1, 2, 3, 4))
       map.setStyleImage("dot", image, StyleImageOptions().pixelRatio(2.0f).sdf(true))
       assertTrue(map.styleImageExists("dot"))
       assertEquals(2.0f, map.styleImageInfo("dot")?.pixelRatio)
       assertEquals(image, map.styleImage("dot")?.image)
-      assertEquals(image, map.copyStyleImagePremultipliedRgba8("dot")?.image)
+      assertEquals(image, map.styleImage("dot")?.image)
       map.addLocationIndicatorLayer("location")
       assertEquals("location-indicator", map.styleLayerType("location"))
       map.setLocationIndicatorLocation("location", LatLng(0.0, 0.0), 0.0)
@@ -160,17 +251,14 @@ class StyleHandleTest {
       map.addImageSourceImage(
         "overlay",
         coordinates,
-        PremultipliedRgba8Image(1U, 1U, 4U, byteArrayOf(4, 3, 2, 1)),
+        PremultipliedRgba8Image(1, 1, 4, byteArrayOf(4, 3, 2, 1)),
       )
       assertEquals(SourceType.IMAGE, map.styleSourceType("overlay"))
       assertEquals(coordinates, map.imageSourceCoordinates("overlay"))
       val moved = coordinates.reversed()
       map.setImageSourceCoordinates("overlay", moved)
       assertEquals(moved, map.imageSourceCoordinates("overlay"))
-      map.setImageSourceImage(
-        "overlay",
-        PremultipliedRgba8Image(1U, 1U, 4U, byteArrayOf(1, 1, 1, 1)),
-      )
+      map.setImageSourceImage("overlay", PremultipliedRgba8Image(1, 1, 4, byteArrayOf(1, 1, 1, 1)))
     } finally {
       map.close()
       runtime.close()
@@ -191,7 +279,7 @@ class StyleHandleTest {
           .maxZoom(14.0)
           .attribution("vector attribution")
           .scheme(TileScheme.XYZ)
-          .tileSize(512U)
+          .tileSize(512)
           .vectorEncoding(VectorTileEncoding.MVT),
       )
       assertEquals(SourceType.VECTOR, map.styleSourceType("vector"))
@@ -199,13 +287,13 @@ class StyleHandleTest {
       map.addRasterSourceTiles(
         "raster",
         listOf("https://example.com/raster/{z}/{x}/{y}.png"),
-        TileSourceOptions().tileSize(256U).scheme(TileScheme.TMS),
+        TileSourceOptions().tileSize(256).scheme(TileScheme.TMS),
       )
       assertEquals(SourceType.RASTER, map.styleSourceType("raster"))
       map.addRasterDemSourceTiles(
         "dem",
         listOf("https://example.com/dem/{z}/{x}/{y}.png"),
-        TileSourceOptions().tileSize(512U).rasterDemEncoding(RasterDemEncoding.TERRARIUM),
+        TileSourceOptions().tileSize(512).rasterDemEncoding(RasterDemEncoding.TERRARIUM),
       )
       assertEquals(SourceType.RASTER_DEM, map.styleSourceType("dem"))
       map.addHillshadeLayer("hillshade", "dem")

@@ -1,13 +1,16 @@
 package org.maplibre.nativeffi.offline
 
 /** Offline region download state. */
-public enum class OfflineRegionDownloadState(public val nativeValue: UInt) {
-  INACTIVE(0U),
-  ACTIVE(1U),
-  UNKNOWN(UInt.MAX_VALUE);
+public enum class OfflineRegionDownloadState(public val nativeValue: Int) {
+  INACTIVE(0),
+  ACTIVE(1),
+  UNKNOWN(-1);
 
   public companion object {
-    public fun fromNative(nativeValue: UInt): OfflineRegionDownloadState =
+    internal fun fromNative(nativeValue: UInt): OfflineRegionDownloadState =
+      fromNative(nativeValue.toInt())
+
+    public fun fromNative(nativeValue: Int): OfflineRegionDownloadState =
       entries.firstOrNull { it.nativeValue == nativeValue } ?: UNKNOWN
   }
 }

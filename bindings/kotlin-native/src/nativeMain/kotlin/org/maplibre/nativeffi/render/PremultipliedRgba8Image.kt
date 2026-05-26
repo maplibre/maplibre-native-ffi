@@ -2,19 +2,19 @@ package org.maplibre.nativeffi.render
 
 /** Caller-owned premultiplied RGBA8 pixels. */
 public class PremultipliedRgba8Image(
-  public val width: UInt,
-  public val height: UInt,
-  public val stride: UInt,
+  public val width: Int,
+  public val height: Int,
+  public val stride: Int,
   pixels: ByteArray,
 ) {
   public val pixels: ByteArray = pixels.copyOf()
 
   init {
-    require(width > 0U && height > 0U) { "width and height must be positive" }
+    require(width > 0 && height > 0) { "width and height must be positive" }
+    require(stride >= 0) { "stride must be non-negative" }
     val rowBytes = width.toLong() * 4L
     require(stride.toLong() >= rowBytes) { "stride must be at least width * 4" }
-    val requiredBytes =
-      if (height == 1U) rowBytes else (height.toLong() - 1L) * stride.toLong() + rowBytes
+    val requiredBytes = if (height == 1) rowBytes else (height.toLong() - 1L) * stride + rowBytes
     require(pixels.size.toLong() >= requiredBytes) {
       "pixels length must include every row's pixel bytes"
     }

@@ -1,14 +1,16 @@
 package org.maplibre.nativeffi.map
 
 /** Map rendering modes used when creating a map. */
-public enum class MapMode(public val nativeValue: UInt) {
-  CONTINUOUS(0U),
-  STATIC(1U),
-  TILE(2U),
-  UNKNOWN(UInt.MAX_VALUE);
+public enum class MapMode(public val nativeValue: Int) {
+  CONTINUOUS(0),
+  STATIC(1),
+  TILE(2),
+  UNKNOWN(-1);
 
   public companion object {
-    public fun fromNative(nativeValue: UInt): MapMode =
+    internal fun fromNative(nativeValue: UInt): MapMode = fromNative(nativeValue.toInt())
+
+    public fun fromNative(nativeValue: Int): MapMode =
       entries.firstOrNull { it.nativeValue == nativeValue } ?: UNKNOWN
   }
 }

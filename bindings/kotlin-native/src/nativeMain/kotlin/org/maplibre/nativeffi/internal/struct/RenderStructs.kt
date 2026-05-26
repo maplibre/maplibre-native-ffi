@@ -13,7 +13,6 @@ import org.maplibre.nativeffi.internal.c.mln_metal_borrowed_texture_descriptor_d
 import org.maplibre.nativeffi.internal.c.mln_metal_context_descriptor
 import org.maplibre.nativeffi.internal.c.mln_metal_owned_texture_descriptor
 import org.maplibre.nativeffi.internal.c.mln_metal_owned_texture_descriptor_default
-import org.maplibre.nativeffi.internal.c.mln_metal_owned_texture_frame
 import org.maplibre.nativeffi.internal.c.mln_metal_surface_descriptor
 import org.maplibre.nativeffi.internal.c.mln_metal_surface_descriptor_default
 import org.maplibre.nativeffi.internal.c.mln_render_target_extent
@@ -23,7 +22,6 @@ import org.maplibre.nativeffi.internal.c.mln_vulkan_borrowed_texture_descriptor_
 import org.maplibre.nativeffi.internal.c.mln_vulkan_context_descriptor
 import org.maplibre.nativeffi.internal.c.mln_vulkan_owned_texture_descriptor
 import org.maplibre.nativeffi.internal.c.mln_vulkan_owned_texture_descriptor_default
-import org.maplibre.nativeffi.internal.c.mln_vulkan_owned_texture_frame
 import org.maplibre.nativeffi.internal.c.mln_vulkan_surface_descriptor
 import org.maplibre.nativeffi.internal.c.mln_vulkan_surface_descriptor_default
 import org.maplibre.nativeffi.render.MetalBorrowedTextureDescriptor
@@ -84,9 +82,9 @@ internal object RenderStructs {
     fillVulkanContext(native.context, descriptor.context)
     native.image = pointer(descriptor.image)
     native.image_view = pointer(descriptor.imageView)
-    native.format = descriptor.format
-    native.initial_layout = descriptor.initialLayout
-    descriptor.finalLayout?.let { native.final_layout = it }
+    native.format = descriptor.format.toUInt()
+    native.initial_layout = descriptor.initialLayout.toUInt()
+    descriptor.finalLayout?.let { native.final_layout = it.toUInt() }
     return native.ptr
   }
 
@@ -115,24 +113,27 @@ internal object RenderStructs {
   }
 
   fun textureImageInfo(value: mln_texture_image_info): TextureImageInfo =
-    TextureImageInfo(value.width, value.height, value.stride, value.byte_length)
+    TextureImageInfo(
+      checkedInt(value.width, "texture width"),
+      checkedInt(value.height, "texture height"),
+      checkedInt(value.stride, "texture stride"),
+      checkedLong(value.byte_length, "texture byte length"),
+    )
 
-  fun metalOwnedTextureFrame(scope: MemScope): CPointer<mln_metal_owned_texture_frame> {
-    val native = scope.alloc<mln_metal_owned_texture_frame>()
-    native.size = sizeOf<mln_metal_owned_texture_frame>().toUInt()
-    return native.ptr
+  private fun checkedInt(value: UInt, name: String): Int {
+    require(value <= Int.MAX_VALUE.toUInt()) { "$name exceeds Int.MAX_VALUE" }
+    return value.toInt()
   }
 
-  fun vulkanOwnedTextureFrame(scope: MemScope): CPointer<mln_vulkan_owned_texture_frame> {
-    val native = scope.alloc<mln_vulkan_owned_texture_frame>()
-    native.size = sizeOf<mln_vulkan_owned_texture_frame>().toUInt()
-    return native.ptr
+  private fun checkedLong(value: ULong, name: String): Long {
+    require(value <= Long.MAX_VALUE.toULong()) { "$name exceeds Long.MAX_VALUE" }
+    return value.toLong()
   }
 
   private fun fillExtent(native: mln_render_target_extent, extent: RenderTargetExtent) {
     native.size = sizeOf<mln_render_target_extent>().toUInt()
-    native.width = extent.width
-    native.height = extent.height
+    native.width = extent.width.toUInt()
+    native.height = extent.height.toUInt()
     native.scale_factor = extent.scaleFactor
   }
 
@@ -153,9 +154,9 @@ internal object RenderStructs {
     native.physical_device = pointer(context.physicalDevice)
     native.device = pointer(context.device)
     native.graphics_queue = pointer(context.graphicsQueue)
-    native.graphics_queue_family_index = context.graphicsQueueFamilyIndex
+    native.graphics_queue_family_index = context.graphicsQueueFamilyIndex.toUInt()
   }
 
   private fun pointer(pointer: NativePointer): kotlinx.cinterop.COpaquePointer? =
-    if (pointer.isNull) null else pointer.address.toLong().toCPointer()
+    if (pointer.isNull) null else pointer.address.toCPointer()
 }

@@ -76,11 +76,11 @@ internal class CustomGeometrySourceState(private val options: CustomGeometrySour
     }
     options.tileSize?.let {
       native.fields = native.fields or MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_TILE_SIZE
-      native.tile_size = it
+      native.tile_size = it.toUInt()
     }
     options.buffer?.let {
       native.fields = native.fields or MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_BUFFER
-      native.buffer = it
+      native.buffer = it.toUInt()
     }
     options.clip?.let {
       native.fields = native.fields or MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_CLIP

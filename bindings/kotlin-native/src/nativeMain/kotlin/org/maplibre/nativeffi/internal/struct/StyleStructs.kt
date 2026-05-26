@@ -50,13 +50,16 @@ import org.maplibre.nativeffi.style.TileSourceOptions
 @OptIn(ExperimentalForeignApi::class, ExperimentalUnsignedTypes::class)
 internal object StyleStructs {
   fun canonicalTileId(value: CanonicalTileId): CValue<mln_canonical_tile_id> = cValue {
-    z = value.z
-    x = value.x
-    y = value.y
+    require(value.z >= 0) { "canonical tile z must be non-negative" }
+    require(value.x in 0..UInt.MAX_VALUE.toLong()) { "canonical tile x is out of range" }
+    require(value.y in 0..UInt.MAX_VALUE.toLong()) { "canonical tile y is out of range" }
+    z = value.z.toUInt()
+    x = value.x.toUInt()
+    y = value.y.toUInt()
   }
 
   fun canonicalTileId(value: mln_canonical_tile_id): CanonicalTileId =
-    CanonicalTileId(value.z, value.x, value.y)
+    CanonicalTileId(checkedInt(value.z, "canonical tile z"), value.x.toLong(), value.y.toLong())
 
   fun premultipliedRgba8Image(
     value: PremultipliedRgba8Image,
@@ -64,9 +67,9 @@ internal object StyleStructs {
   ): CPointer<mln_premultiplied_rgba8_image> {
     val native = scope.alloc<mln_premultiplied_rgba8_image>()
     mln_premultiplied_rgba8_image_default().place(native.ptr)
-    native.width = value.width
-    native.height = value.height
-    native.stride = value.stride
+    native.width = value.width.toUInt()
+    native.height = value.height.toUInt()
+    native.stride = value.stride.toUInt()
     native.pixels = value.pixels.toUByteArray().toCValues().getPointer(scope)
     native.byte_length = value.pixels.size.toULong()
     return native.ptr
@@ -91,13 +94,28 @@ internal object StyleStructs {
 
   fun styleImageInfo(value: mln_style_image_info): StyleImageInfo =
     StyleImageInfo(
-      value.width,
-      value.height,
-      value.stride,
-      value.byte_length,
+      checkedInt(value.width, "style image width"),
+      checkedInt(value.height, "style image height"),
+      checkedInt(value.stride, "style image stride"),
+      checkedLong(value.byte_length, "style image byte length"),
       value.pixel_ratio,
       value.sdf,
     )
+
+  private fun checkedInt(value: UInt, name: String): Int {
+    require(value <= Int.MAX_VALUE.toUInt()) { "$name exceeds Int.MAX_VALUE" }
+    return value.toInt()
+  }
+
+  private fun checkedInt(value: ULong, name: String): Int {
+    require(value <= Int.MAX_VALUE.toULong()) { "$name exceeds Int.MAX_VALUE" }
+    return value.toInt()
+  }
+
+  private fun checkedLong(value: ULong, name: String): Long {
+    require(value <= Long.MAX_VALUE.toULong()) { "$name exceeds Long.MAX_VALUE" }
+    return value.toLong()
+  }
 
   fun tileSourceOptions(
     value: TileSourceOptions?,
@@ -120,7 +138,7 @@ internal object StyleStructs {
     }
     value.scheme?.let {
       native.fields = native.fields or MLN_STYLE_TILE_SOURCE_OPTION_SCHEME
-      native.scheme = it.nativeValue
+      native.scheme = it.nativeValue.toUInt()
     }
     value.bounds?.let {
       native.fields = native.fields or MLN_STYLE_TILE_SOURCE_OPTION_BOUNDS
@@ -131,15 +149,15 @@ internal object StyleStructs {
     }
     value.tileSize?.let {
       native.fields = native.fields or MLN_STYLE_TILE_SOURCE_OPTION_TILE_SIZE
-      native.tile_size = it
+      native.tile_size = it.toUInt()
     }
     value.vectorEncoding?.let {
       native.fields = native.fields or MLN_STYLE_TILE_SOURCE_OPTION_VECTOR_ENCODING
-      native.vector_encoding = it.nativeValue
+      native.vector_encoding = it.nativeValue.toUInt()
     }
     value.rasterDemEncoding?.let {
       native.fields = native.fields or MLN_STYLE_TILE_SOURCE_OPTION_RASTER_ENCODING
-      native.raster_encoding = it.nativeValue
+      native.raster_encoding = it.nativeValue.toUInt()
     }
     return native.ptr
   }
@@ -156,7 +174,7 @@ internal object StyleStructs {
       memScoped {
         val outCount = alloc<ULongVar>()
         Status.check(mln_style_id_list_count(list, outCount.ptr))
-        List(outCount.value.toInt()) { index ->
+        List(checkedInt(outCount.value, "style id count")) { index ->
           val outId = alloc<mln_string_view>()
           Status.check(mln_style_id_list_get(list, index.toULong(), outId.ptr))
           CoreStructs.stringView(outId)
@@ -167,5 +185,10 @@ internal object StyleStructs {
     }
 
   fun sourceInfo(value: mln_style_source_info, attribution: String?): SourceInfo =
-    SourceInfo(SourceType.fromNative(value.type), value.id_size, value.is_volatile, attribution)
+    SourceInfo(
+      SourceType.fromNative(value.type),
+      value.type.toInt(),
+      value.is_volatile,
+      attribution,
+    )
 }

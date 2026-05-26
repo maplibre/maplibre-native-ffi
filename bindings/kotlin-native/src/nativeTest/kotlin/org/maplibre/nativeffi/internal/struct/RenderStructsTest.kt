@@ -28,12 +28,12 @@ class RenderStructsTest {
   @Test
   fun metalDescriptorsMaterializeOpaquePointersAndExtents() {
     memScoped {
-      val extent = RenderTargetExtent(640U, 480U, 2.0)
+      val extent = RenderTargetExtent(640, 480, 2.0)
       val owned =
         RenderStructs.metalOwnedTextureDescriptor(
             MetalOwnedTextureDescriptor(
               extent,
-              MetalContextDescriptor(NativePointer.ofAddress(0x10UL)),
+              MetalContextDescriptor(NativePointer.ofAddress(0x10L)),
             ),
             this,
           )
@@ -44,7 +44,7 @@ class RenderStructsTest {
 
       val borrowed =
         RenderStructs.metalBorrowedTextureDescriptor(
-            MetalBorrowedTextureDescriptor(extent, NativePointer.ofAddress(0x20UL)),
+            MetalBorrowedTextureDescriptor(extent, NativePointer.ofAddress(0x20L)),
             this,
           )
           .pointed
@@ -55,7 +55,7 @@ class RenderStructsTest {
             MetalSurfaceDescriptor(
               extent,
               MetalContextDescriptor(),
-              NativePointer.ofAddress(0x30UL),
+              NativePointer.ofAddress(0x30L),
             ),
             this,
           )
@@ -69,23 +69,23 @@ class RenderStructsTest {
     memScoped {
       val context =
         VulkanContextDescriptor(
-          NativePointer.ofAddress(0x10UL),
-          NativePointer.ofAddress(0x20UL),
-          NativePointer.ofAddress(0x30UL),
-          NativePointer.ofAddress(0x40UL),
-          7U,
+          NativePointer.ofAddress(0x10L),
+          NativePointer.ofAddress(0x20L),
+          NativePointer.ofAddress(0x30L),
+          NativePointer.ofAddress(0x40L),
+          7,
         )
       val borrowed =
         RenderStructs.vulkanBorrowedTextureDescriptor(
             VulkanBorrowedTextureDescriptor(
                 RenderTargetExtent(),
                 context,
-                NativePointer.ofAddress(0x50UL),
+                NativePointer.ofAddress(0x50L),
               )
-              .imageView(NativePointer.ofAddress(0x60UL))
-              .format(44U)
-              .initialLayout(1U)
-              .finalLayout(2U),
+              .imageView(NativePointer.ofAddress(0x60L))
+              .format(44)
+              .initialLayout(1)
+              .finalLayout(2),
             this,
           )
           .pointed
@@ -96,7 +96,7 @@ class RenderStructsTest {
 
       val surface =
         RenderStructs.vulkanSurfaceDescriptor(
-            VulkanSurfaceDescriptor(RenderTargetExtent(), context, NativePointer.ofAddress(0x70UL)),
+            VulkanSurfaceDescriptor(RenderTargetExtent(), context, NativePointer.ofAddress(0x70L)),
             this,
           )
           .pointed

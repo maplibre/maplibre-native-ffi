@@ -27,65 +27,67 @@ import org.maplibre.nativeffi.runtime.NetworkStatus
 
 /** Process-global entry points for the Kotlin/Native binding. */
 @OptIn(ExperimentalForeignApi::class)
-public object Maplibre {
-  /** Native libraries are linked by the host binary for Kotlin/Native. */
-  public fun loadNativeLibrary() {
-    // Direct cinterop calls bind against the native library at link/load time.
-  }
+public class Maplibre private constructor() {
+  public companion object {
+    /** Native libraries are linked by the host binary for Kotlin/Native. */
+    public fun loadNativeLibrary() {
+      // Direct cinterop calls bind against the native library at link/load time.
+    }
 
-  /** Returns the native C ABI contract version. */
-  public fun cVersion(): UInt = mln_c_version()
+    /** Returns the native C ABI contract version. */
+    public fun cVersion(): Long = mln_c_version().toLong()
 
-  /** Returns the render backends compiled into the loaded native library. */
-  public fun supportedRenderBackends(): Set<RenderBackend> =
-    RenderBackend.fromMask(mln_supported_render_backend_mask())
+    /** Returns the render backends compiled into the loaded native library. */
+    public fun supportedRenderBackends(): Set<RenderBackend> =
+      RenderBackend.fromMask(mln_supported_render_backend_mask())
 
-  /** Reads Maplibre Native's process-global network status. */
-  public fun networkStatus(): NetworkStatus = memScoped {
-    val outStatus = alloc<kotlinx.cinterop.UIntVar>()
-    Status.check(mln_network_status_get(outStatus.ptr))
-    NetworkStatus.fromNative(outStatus.value)
-  }
+    /** Reads Maplibre Native's process-global network status. */
+    public fun networkStatus(): NetworkStatus = memScoped {
+      val outStatus = alloc<kotlinx.cinterop.UIntVar>()
+      Status.check(mln_network_status_get(outStatus.ptr))
+      NetworkStatus.fromNative(outStatus.value)
+    }
 
-  /** Sets Maplibre Native's process-global network status. */
-  public fun setNetworkStatus(status: NetworkStatus) {
-    Status.check(mln_network_status_set(status.nativeValue))
-  }
+    /** Sets Maplibre Native's process-global network status. */
+    public fun setNetworkStatus(status: NetworkStatus) {
+      Status.check(mln_network_status_set(status.nativeValue.toUInt()))
+    }
 
-  /** Installs or replaces the process-global native log callback. */
-  public fun setLogCallback(callback: LogCallback) {
-    LogCallbackState.set(callback)
-  }
+    /** Installs or replaces the process-global native log callback. */
+    public fun setLogCallback(callback: LogCallback) {
+      LogCallbackState.set(callback)
+    }
 
-  /** Clears the process-global native log callback. */
-  public fun clearLogCallback() {
-    LogCallbackState.clear()
-  }
+    /** Clears the process-global native log callback. */
+    public fun clearLogCallback() {
+      LogCallbackState.clear()
+    }
 
-  /** Configures severities that native logging may dispatch asynchronously. */
-  public fun setAsyncLogSeverities(severities: Set<LogSeverity>) {
-    val mask = severities.fold(0U) { acc, severity -> acc or severity.nativeMask }
-    Status.check(mln_log_set_async_severity_mask(mask))
-  }
+    /** Configures severities that native logging may dispatch asynchronously. */
+    public fun setAsyncLogSeverities(severities: Set<LogSeverity>) {
+      val mask = severities.fold(0) { acc, severity -> acc or severity.nativeMask }
+      Status.check(mln_log_set_async_severity_mask(mask.toUInt()))
+    }
 
-  /** Restores the native default async log severity mask. */
-  public fun restoreDefaultAsyncLogSeverities() {
-    Status.check(mln_log_set_async_severity_mask(MLN_LOG_SEVERITY_MASK_DEFAULT))
-  }
+    /** Restores the native default async log severity mask. */
+    public fun restoreDefaultAsyncLogSeverities() {
+      Status.check(mln_log_set_async_severity_mask(MLN_LOG_SEVERITY_MASK_DEFAULT))
+    }
 
-  /** Converts a geographic coordinate to spherical Mercator projected meters. */
-  public fun projectedMetersForLatLng(coordinate: LatLng): ProjectedMeters = memScoped {
-    val outMeters = alloc<mln_projected_meters>()
-    Status.check(mln_projected_meters_for_lat_lng(CoreStructs.latLng(coordinate), outMeters.ptr))
-    CoreStructs.projectedMeters(outMeters)
-  }
+    /** Converts a geographic coordinate to spherical Mercator projected meters. */
+    public fun projectedMetersForLatLng(coordinate: LatLng): ProjectedMeters = memScoped {
+      val outMeters = alloc<mln_projected_meters>()
+      Status.check(mln_projected_meters_for_lat_lng(CoreStructs.latLng(coordinate), outMeters.ptr))
+      CoreStructs.projectedMeters(outMeters)
+    }
 
-  /** Converts spherical Mercator projected meters to a geographic coordinate. */
-  public fun latLngForProjectedMeters(meters: ProjectedMeters): LatLng = memScoped {
-    val outCoordinate = alloc<mln_lat_lng>()
-    Status.check(
-      mln_lat_lng_for_projected_meters(CoreStructs.projectedMeters(meters), outCoordinate.ptr)
-    )
-    CoreStructs.latLng(outCoordinate)
+    /** Converts spherical Mercator projected meters to a geographic coordinate. */
+    public fun latLngForProjectedMeters(meters: ProjectedMeters): LatLng = memScoped {
+      val outCoordinate = alloc<mln_lat_lng>()
+      Status.check(
+        mln_lat_lng_for_projected_meters(CoreStructs.projectedMeters(meters), outCoordinate.ptr)
+      )
+      CoreStructs.latLng(outCoordinate)
+    }
   }
 }

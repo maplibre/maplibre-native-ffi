@@ -253,15 +253,15 @@ internal object MapStructs {
     mln_map_viewport_options_default().place(native.ptr)
     value.northOrientation?.let {
       native.fields = native.fields or MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION
-      native.north_orientation = it.nativeValue
+      native.north_orientation = it.nativeValue.toUInt()
     }
     value.constrainMode?.let {
       native.fields = native.fields or MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE
-      native.constrain_mode = it.nativeValue
+      native.constrain_mode = it.nativeValue.toUInt()
     }
     value.viewportMode?.let {
       native.fields = native.fields or MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE
-      native.viewport_mode = it.nativeValue
+      native.viewport_mode = it.nativeValue.toUInt()
     }
     value.frustumOffset?.let {
       native.fields = native.fields or MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET
@@ -295,7 +295,7 @@ internal object MapStructs {
     mln_map_tile_options_default().place(native.ptr)
     value.prefetchZoomDelta?.let {
       native.fields = native.fields or MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA
-      native.prefetch_zoom_delta = it
+      native.prefetch_zoom_delta = it.toUInt()
     }
     value.lodMinRadius?.let {
       native.fields = native.fields or MLN_MAP_TILE_OPTION_LOD_MIN_RADIUS
@@ -315,7 +315,7 @@ internal object MapStructs {
     }
     value.lodMode?.let {
       native.fields = native.fields or MLN_MAP_TILE_OPTION_LOD_MODE
-      native.lod_mode = it.nativeValue
+      native.lod_mode = it.nativeValue.toUInt()
     }
     return native.ptr
   }
@@ -323,7 +323,7 @@ internal object MapStructs {
   fun tileOptions(value: mln_map_tile_options): TileOptions {
     val options = TileOptions()
     if ((value.fields and MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA) != 0U) {
-      options.prefetchZoomDelta(value.prefetch_zoom_delta)
+      options.prefetchZoomDelta(value.prefetch_zoom_delta.toInt())
     }
     if ((value.fields and MLN_MAP_TILE_OPTION_LOD_MIN_RADIUS) != 0U) {
       options.lodMinRadius(value.lod_min_radius)

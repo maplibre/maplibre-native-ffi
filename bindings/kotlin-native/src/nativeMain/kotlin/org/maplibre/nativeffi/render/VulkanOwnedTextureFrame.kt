@@ -4,26 +4,28 @@ package org.maplibre.nativeffi.render
 public class VulkanOwnedTextureFrame
 internal constructor(
   private val scope: FrameScope,
-  private val generationValue: ULong,
-  private val widthValue: UInt,
-  private val heightValue: UInt,
+  private val generationValue: Long,
+  private val widthValue: Int,
+  private val heightValue: Int,
   private val scaleFactorValue: Double,
-  private val frameIdValue: ULong,
+  private val frameIdValue: Long,
   private val imageValue: NativePointer,
   private val imageViewValue: NativePointer,
   private val deviceValue: NativePointer,
-  private val formatValue: UInt,
-  private val layoutValue: UInt,
+  private val formatValue: Int,
+  private val layoutValue: Int,
 ) {
-  public fun generation(): ULong = checked { generationValue }
+  /** Session generation preserved as a native uint64 bit pattern in a Java-compatible [Long]. */
+  public fun generation(): Long = checked { generationValue }
 
-  public fun width(): UInt = checked { widthValue }
+  public fun width(): Int = checked { widthValue }
 
-  public fun height(): UInt = checked { heightValue }
+  public fun height(): Int = checked { heightValue }
 
   public fun scaleFactor(): Double = checked { scaleFactorValue }
 
-  public fun frameId(): ULong = checked { frameIdValue }
+  /** Opaque frame identity preserved as a native uint64 bit pattern in a Java-compatible [Long]. */
+  public fun frameId(): Long = checked { frameIdValue }
 
   public fun image(): NativePointer = checked { imageValue }
 
@@ -31,9 +33,9 @@ internal constructor(
 
   public fun device(): NativePointer = checked { deviceValue }
 
-  public fun format(): UInt = checked { formatValue }
+  public fun format(): Int = checked { formatValue }
 
-  public fun layout(): UInt = checked { layoutValue }
+  public fun layout(): Int = checked { layoutValue }
 
   private inline fun <T> checked(block: () -> T): T {
     scope.ensureActive()

@@ -7,7 +7,6 @@ import kotlinx.cinterop.BooleanVar
 import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.CPointerVarOf
 import kotlinx.cinterop.ExperimentalForeignApi
-import kotlinx.cinterop.UIntVar
 import kotlinx.cinterop.ULongVar
 import kotlinx.cinterop.alloc
 import kotlinx.cinterop.memScoped
@@ -17,8 +16,6 @@ import kotlinx.cinterop.sizeOf
 import kotlinx.cinterop.toLong
 import kotlinx.cinterop.value
 import org.maplibre.nativeffi.internal.c.MLN_RUNTIME_OPTION_MAXIMUM_CACHE_SIZE
-import org.maplibre.nativeffi.internal.c.mln_network_status_get
-import org.maplibre.nativeffi.internal.c.mln_network_status_set
 import org.maplibre.nativeffi.internal.c.mln_offline_region_status
 import org.maplibre.nativeffi.internal.c.mln_runtime_clear_resource_transform
 import org.maplibre.nativeffi.internal.c.mln_runtime_create
@@ -81,7 +78,7 @@ public class RuntimeHandle private constructor(handle: CPointer<mln_runtime>) : 
     Status.check(
       mln_runtime_run_ambient_cache_operation_start(
         state.requireLive(),
-        operation.nativeValue,
+        operation.nativeValue.toUInt(),
         outOperationId.ptr,
       )
     )
@@ -209,12 +206,15 @@ public class RuntimeHandle private constructor(handle: CPointer<mln_runtime>) : 
     id: Long,
     downloadState: OfflineRegionDownloadState,
   ): OfflineOperationHandle<Unit> = memScoped {
+    require(downloadState != OfflineRegionDownloadState.UNKNOWN) {
+      "downloadState must be a known value"
+    }
     val outOperationId = alloc<ULongVar>()
     Status.check(
       mln_runtime_offline_region_set_download_state_start(
         state.requireLive(),
         id,
-        downloadState.nativeValue,
+        downloadState.nativeValue.toUInt(),
         outOperationId.ptr,
       )
     )
@@ -434,18 +434,19 @@ public class RuntimeHandle private constructor(handle: CPointer<mln_runtime>) : 
       return@memScoped null
     }
 
+    val eventType = RuntimeEventType.fromNative(event.type)
     val sourceType = RuntimeEventSourceType.fromNative(event.source_type)
     val sourceAddress = event.source?.rawValue?.toLong()
+    val mapSource = applyEventSideEffects(eventType, sourceType, sourceAddress)
     RuntimeEvent(
-      RuntimeEventType.fromNative(event.type),
-      event.type,
+      eventType,
+      event.type.toInt(),
       sourceType,
-      event.source_type,
+      event.source_type.toInt(),
       if (sourceType == RuntimeEventSourceType.RUNTIME) this@RuntimeHandle else null,
-      if (sourceType == RuntimeEventSourceType.MAP && sourceAddress != null) liveMaps[sourceAddress]
-      else null,
+      mapSource,
       event.code,
-      event.payload_type,
+      event.payload_type.toInt(),
       RuntimeStructs.payload(event),
       RuntimeStructs.message(event),
     )
@@ -466,6 +467,26 @@ public class RuntimeHandle private constructor(handle: CPointer<mln_runtime>) : 
 
   internal fun nativeAddress(): Long = state.address()
 
+  internal fun applyEventSideEffectsForTesting(
+    eventType: RuntimeEventType,
+    sourceType: RuntimeEventSourceType,
+    sourceAddress: Long?,
+  ): MapHandle? = applyEventSideEffects(eventType, sourceType, sourceAddress)
+
+  private fun applyEventSideEffects(
+    eventType: RuntimeEventType,
+    sourceType: RuntimeEventSourceType,
+    sourceAddress: Long?,
+  ): MapHandle? {
+    val mapSource =
+      if (sourceType == RuntimeEventSourceType.MAP && sourceAddress != null) liveMaps[sourceAddress]
+      else null
+    if (eventType == RuntimeEventType.MAP_STYLE_LOADED) {
+      mapSource?.releaseDetachedCustomGeometrySources()
+    }
+    return mapSource
+  }
+
   internal fun registerMap(map: MapHandle) {
     liveMaps[map.nativeAddress()] = map
   }
@@ -478,16 +499,6 @@ public class RuntimeHandle private constructor(handle: CPointer<mln_runtime>) : 
   }
 
   public companion object {
-    public fun networkStatus(): NetworkStatus = memScoped {
-      val outStatus = alloc<UIntVar>()
-      Status.check(mln_network_status_get(outStatus.ptr))
-      NetworkStatus.fromNative(outStatus.value)
-    }
-
-    public fun setNetworkStatus(status: NetworkStatus) {
-      Status.check(mln_network_status_set(status.nativeValue))
-    }
-
     public fun create(): RuntimeHandle = create(RuntimeOptions())
 
     public fun create(options: RuntimeOptions): RuntimeHandle = memScoped {
@@ -496,6 +507,7 @@ public class RuntimeHandle private constructor(handle: CPointer<mln_runtime>) : 
       options.assetPath?.let { nativeOptions.asset_path = MemoryUtil.cString(this, it) }
       options.cachePath?.let { nativeOptions.cache_path = MemoryUtil.cString(this, it) }
       options.maximumCacheSize?.let {
+        require(it >= 0) { "maximumCacheSize must be non-negative" }
         nativeOptions.flags = nativeOptions.flags or MLN_RUNTIME_OPTION_MAXIMUM_CACHE_SIZE
         nativeOptions.maximum_cache_size = it.toULong()
       }

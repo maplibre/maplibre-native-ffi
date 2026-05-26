@@ -1,9 +1,9 @@
 package org.maplibre.nativeffi.style
 
-/** Fixed metadata for one style source. */
+/** Copied fixed metadata for one style source. */
 public data class SourceInfo(
   public val type: SourceType,
-  public val idSize: ULong,
-  public val isVolatile: Boolean,
+  public val nativeType: Int,
+  public val volatileSource: Boolean,
   public val attribution: String? = null,
 )

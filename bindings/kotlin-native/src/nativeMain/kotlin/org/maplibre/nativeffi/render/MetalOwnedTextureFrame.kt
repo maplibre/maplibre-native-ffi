@@ -4,30 +4,33 @@ package org.maplibre.nativeffi.render
 public class MetalOwnedTextureFrame
 internal constructor(
   private val scope: FrameScope,
-  private val generationValue: ULong,
-  private val widthValue: UInt,
-  private val heightValue: UInt,
+  private val generationValue: Long,
+  private val widthValue: Int,
+  private val heightValue: Int,
   private val scaleFactorValue: Double,
-  private val frameIdValue: ULong,
+  private val frameIdValue: Long,
   private val textureValue: NativePointer,
   private val deviceValue: NativePointer,
-  private val pixelFormatValue: ULong,
+  private val pixelFormatValue: Long,
 ) {
-  public fun generation(): ULong = checked { generationValue }
+  /** Session generation preserved as a native uint64 bit pattern in a Java-compatible [Long]. */
+  public fun generation(): Long = checked { generationValue }
 
-  public fun width(): UInt = checked { widthValue }
+  public fun width(): Int = checked { widthValue }
 
-  public fun height(): UInt = checked { heightValue }
+  public fun height(): Int = checked { heightValue }
 
   public fun scaleFactor(): Double = checked { scaleFactorValue }
 
-  public fun frameId(): ULong = checked { frameIdValue }
+  /** Opaque frame identity preserved as a native uint64 bit pattern in a Java-compatible [Long]. */
+  public fun frameId(): Long = checked { frameIdValue }
 
   public fun texture(): NativePointer = checked { textureValue }
 
   public fun device(): NativePointer = checked { deviceValue }
 
-  public fun pixelFormat(): ULong = checked { pixelFormatValue }
+  /** Backend-native Metal pixel format preserved as a native uint64 bit pattern. */
+  public fun pixelFormat(): Long = checked { pixelFormatValue }
 
   private inline fun <T> checked(block: () -> T): T {
     scope.ensureActive()

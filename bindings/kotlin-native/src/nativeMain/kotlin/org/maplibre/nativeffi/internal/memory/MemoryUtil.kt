@@ -30,8 +30,11 @@ internal object MemoryUtil {
   }
 
   /** Copies explicit-length UTF-8 bytes from C-owned storage. */
-  fun copyStringView(data: CPointer<ByteVar>?, size: ULong): String =
-    if (data == null || size == 0UL) "" else data.readBytes(size.toInt()).decodeToString()
+  fun copyStringView(data: CPointer<ByteVar>?, size: ULong): String {
+    if (data == null || size == 0UL) return ""
+    require(size <= Int.MAX_VALUE.toULong()) { "string view size exceeds Int.MAX_VALUE" }
+    return data.readBytes(size.toInt()).decodeToString()
+  }
 
   /** Copies a null-terminated UTF-8 C string from C-owned storage. */
   fun copyCString(data: CPointer<ByteVar>?): String = data?.toKString() ?: ""

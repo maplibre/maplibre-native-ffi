@@ -71,15 +71,7 @@ internal constructor(
   }
 
   internal fun finishProviderDecision(decision: ResourceProviderDecision): UInt = withLock {
-    if (completed || decision == ResourceProviderDecision.HANDLE) {
-      decisionFinalized = true
-      providerOwned = true
-      if (closed) releaseNative()
-      ResourceProviderDecision.HANDLE.nativeValue
-    } else {
-      markNativeWillRelease()
-      ResourceProviderDecision.PASS_THROUGH.nativeValue
-    }
+    finishProviderDecisionLocked(decision)
   }
 
   internal fun finishProviderException(): UInt = withLock {
@@ -93,10 +85,10 @@ internal constructor(
       decisionFinalized = true
       providerOwned = true
       if (closed) releaseNative()
-      ResourceProviderDecision.HANDLE.nativeValue
+      ResourceProviderDecision.HANDLE.nativeValue.toUInt()
     } else {
       markNativeWillRelease()
-      ResourceProviderDecision.PASS_THROUGH.nativeValue
+      ResourceProviderDecision.PASS_THROUGH.nativeValue.toUInt()
     }
   }
 

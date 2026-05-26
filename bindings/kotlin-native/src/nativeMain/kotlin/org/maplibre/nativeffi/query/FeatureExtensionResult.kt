@@ -9,5 +9,5 @@ public sealed interface FeatureExtensionResult {
 
   public data class FeatureCollection(public val features: List<Feature>) : FeatureExtensionResult
 
-  public data class Unknown(public val rawType: UInt) : FeatureExtensionResult
+  public data class Unknown(public val rawType: Int) : FeatureExtensionResult
 }

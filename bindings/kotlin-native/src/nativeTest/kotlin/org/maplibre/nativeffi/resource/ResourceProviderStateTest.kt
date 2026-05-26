@@ -32,15 +32,15 @@ class ResourceProviderStateTest {
       memScoped {
         val request = alloc<mln_resource_request>()
         request.url = "https://example.com/tile.pbf".cstr.getPointer(this)
-        request.kind = ResourceKind.TILE.nativeValue
-        request.loading_method = ResourceLoadingMethod.NETWORK_ONLY.nativeValue
-        request.priority = ResourcePriority.LOW.nativeValue
-        request.usage = ResourceUsage.ONLINE.nativeValue
-        request.storage_policy = ResourceStoragePolicy.VOLATILE.nativeValue
+        request.kind = ResourceKind.TILE.nativeValue.toUInt()
+        request.loading_method = ResourceLoadingMethod.NETWORK_ONLY.nativeValue.toUInt()
+        request.priority = ResourcePriority.LOW.nativeValue.toUInt()
+        request.usage = ResourceUsage.ONLINE.nativeValue.toUInt()
+        request.storage_policy = ResourceStoragePolicy.VOLATILE.nativeValue.toUInt()
         val fakeHandle =
           alloc<ByteVar>().ptr.reinterpret<cnames.structs.mln_resource_request_handle>()
         assertEquals(
-          ResourceProviderDecision.PASS_THROUGH.nativeValue,
+          ResourceProviderDecision.PASS_THROUGH.nativeValue.toUInt(),
           state.invoke(request.ptr, fakeHandle),
         )
       }
@@ -65,7 +65,7 @@ class ResourceProviderStateTest {
           .retryAfterUnixMs(30L)
           .mustRevalidate(true)
       val native = ResourceStructs.resourceResponse(response, this).pointed
-      assertEquals(ResourceResponseStatus.OK.nativeValue, native.status)
+      assertEquals(ResourceResponseStatus.OK.nativeValue.toUInt(), native.status)
       assertEquals(3UL, native.byte_count)
       assertEquals(true, native.must_revalidate)
       assertEquals(true, native.has_modified)
@@ -83,7 +83,7 @@ class ResourceProviderStateTest {
       val handle = ResourceRequestHandle(fakeHandle) { releases++ }
 
       assertEquals(
-        ResourceProviderDecision.HANDLE.nativeValue,
+        ResourceProviderDecision.HANDLE.nativeValue.toUInt(),
         handle.finishProviderDecision(ResourceProviderDecision.HANDLE),
       )
       handle.close()
@@ -103,7 +103,7 @@ class ResourceProviderStateTest {
 
       handle.close()
       assertEquals(
-        ResourceProviderDecision.HANDLE.nativeValue,
+        ResourceProviderDecision.HANDLE.nativeValue.toUInt(),
         handle.finishProviderDecision(ResourceProviderDecision.HANDLE),
       )
       handle.close()
@@ -120,7 +120,7 @@ class ResourceProviderStateTest {
       val handle = ResourceRequestHandle(fakeHandle) { releases++ }
 
       assertEquals(
-        ResourceProviderDecision.PASS_THROUGH.nativeValue,
+        ResourceProviderDecision.PASS_THROUGH.nativeValue.toUInt(),
         handle.finishProviderDecision(ResourceProviderDecision.PASS_THROUGH),
       )
       handle.close()

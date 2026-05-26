@@ -1,15 +1,17 @@
 package org.maplibre.nativeffi.map
 
 /** North orientation used by map viewport options. */
-public enum class NorthOrientation(public val nativeValue: UInt) {
-  UP(0U),
-  RIGHT(1U),
-  DOWN(2U),
-  LEFT(3U),
-  UNKNOWN(UInt.MAX_VALUE);
+public enum class NorthOrientation(public val nativeValue: Int) {
+  UP(0),
+  RIGHT(1),
+  DOWN(2),
+  LEFT(3),
+  UNKNOWN(-1);
 
   public companion object {
-    public fun fromNative(nativeValue: UInt): NorthOrientation =
+    internal fun fromNative(nativeValue: UInt): NorthOrientation = fromNative(nativeValue.toInt())
+
+    public fun fromNative(nativeValue: Int): NorthOrientation =
       entries.firstOrNull { it.nativeValue == nativeValue } ?: UNKNOWN
   }
 }

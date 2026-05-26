@@ -6,9 +6,14 @@ public sealed interface JsonValue {
 
   public data class Bool(public val value: Boolean) : JsonValue
 
-  public data class UInt(public val value: ULong) : JsonValue
+  /** Unsigned JSON integer stored as a non-negative [Long] for Java/common API alignment. */
+  public data class UInt(public val value: Long) : JsonValue {
+    init {
+      require(value >= 0) { "unsigned JSON value must be non-negative" }
+    }
+  }
 
-  public data class IntValue(public val value: Long) : JsonValue
+  public data class Int(public val value: Long) : JsonValue
 
   public data class DoubleValue(public val value: Double) : JsonValue
 
@@ -26,15 +31,15 @@ public sealed interface JsonValue {
   public data class Member(public val key: String, public val value: JsonValue)
 
   public companion object {
-    public const val MAX_DESCRIPTOR_DEPTH: Int = 64
+    public const val MAX_DESCRIPTOR_DEPTH: kotlin.Int = 64
 
     public fun nullValue(): Null = Null
 
     public fun of(value: Boolean): Bool = Bool(value)
 
-    public fun unsigned(value: ULong): UInt = UInt(value)
+    public fun unsigned(value: Long): UInt = UInt(value)
 
-    public fun of(value: Long): IntValue = IntValue(value)
+    public fun of(value: Long): Int = Int(value)
 
     public fun of(value: Double): DoubleValue = DoubleValue(value)
 
@@ -42,8 +47,6 @@ public sealed interface JsonValue {
 
     public fun array(values: List<JsonValue>): Array = Array(values)
 
-    public fun obj(members: List<Member>): ObjectValue = ObjectValue(members)
-
-    public fun `object`(members: List<Member>): ObjectValue = obj(members)
+    public fun `object`(members: List<Member>): ObjectValue = ObjectValue(members)
   }
 }

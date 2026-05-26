@@ -1,22 +1,25 @@
 package org.maplibre.nativeffi.runtime
 
 /** Offline operation kind reported by completion events. */
-public enum class OfflineOperationKind(public val nativeValue: UInt) {
-  AMBIENT_CACHE(1U),
-  REGION_CREATE(2U),
-  REGION_GET(3U),
-  REGIONS_LIST(4U),
-  REGIONS_MERGE_DATABASE(5U),
-  REGION_UPDATE_METADATA(6U),
-  REGION_GET_STATUS(7U),
-  REGION_SET_OBSERVED(8U),
-  REGION_SET_DOWNLOAD_STATE(9U),
-  REGION_INVALIDATE(10U),
-  REGION_DELETE(11U),
-  UNKNOWN(UInt.MAX_VALUE);
+public enum class OfflineOperationKind(public val nativeValue: Int) {
+  AMBIENT_CACHE(1),
+  REGION_CREATE(2),
+  REGION_GET(3),
+  REGIONS_LIST(4),
+  REGIONS_MERGE_DATABASE(5),
+  REGION_UPDATE_METADATA(6),
+  REGION_GET_STATUS(7),
+  REGION_SET_OBSERVED(8),
+  REGION_SET_DOWNLOAD_STATE(9),
+  REGION_INVALIDATE(10),
+  REGION_DELETE(11),
+  UNKNOWN(-1);
 
   public companion object {
-    public fun fromNative(nativeValue: UInt): OfflineOperationKind =
+    internal fun fromNative(nativeValue: UInt): OfflineOperationKind =
+      fromNative(nativeValue.toInt())
+
+    public fun fromNative(nativeValue: Int): OfflineOperationKind =
       entries.firstOrNull { it.nativeValue == nativeValue } ?: UNKNOWN
   }
 }

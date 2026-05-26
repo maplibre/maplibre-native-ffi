@@ -7,9 +7,9 @@ import kotlin.test.assertFailsWith
 class NativeBufferTest {
   @Test
   fun nativeBufferTracksCapacityAndRejectsAfterClose() {
-    val buffer = NativeBuffer.allocate(4UL)
+    val buffer = NativeBuffer.allocate(4L)
 
-    assertEquals(4UL, buffer.byteLength())
+    assertEquals(4L, buffer.byteLength())
     assertEquals(4, buffer.toByteArray().size)
     buffer.ensureCapacity(4UL)
     assertFailsWith<IllegalArgumentException> { buffer.ensureCapacity(5UL) }
@@ -21,8 +21,8 @@ class NativeBufferTest {
 
   @Test
   fun zeroLengthBufferHasNoBytes() {
-    NativeBuffer.allocate(0UL).use { buffer ->
-      assertEquals(0UL, buffer.byteLength())
+    NativeBuffer.allocate(0L).use { buffer ->
+      assertEquals(0L, buffer.byteLength())
       assertEquals(0, buffer.toByteArray().size)
     }
   }

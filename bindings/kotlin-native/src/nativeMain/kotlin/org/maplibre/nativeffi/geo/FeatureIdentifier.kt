@@ -4,9 +4,14 @@ package org.maplibre.nativeffi.geo
 public sealed interface FeatureIdentifier {
   public data object Null : FeatureIdentifier
 
-  public data class UInt(public val value: ULong) : FeatureIdentifier
+  /** Unsigned feature identifier stored as a non-negative [Long] for Java/common API alignment. */
+  public data class UInt(public val value: Long) : FeatureIdentifier {
+    init {
+      require(value >= 0) { "unsigned feature identifier must be non-negative" }
+    }
+  }
 
-  public data class IntValue(public val value: Long) : FeatureIdentifier
+  public data class Int(public val value: Long) : FeatureIdentifier
 
   public data class DoubleValue(public val value: Double) : FeatureIdentifier
 
@@ -15,9 +20,9 @@ public sealed interface FeatureIdentifier {
   public companion object {
     public fun nullValue(): Null = Null
 
-    public fun unsigned(value: ULong): UInt = UInt(value)
+    public fun unsigned(value: Long): UInt = UInt(value)
 
-    public fun of(value: Long): IntValue = IntValue(value)
+    public fun of(value: Long): Int = Int(value)
 
     public fun of(value: Double): DoubleValue = DoubleValue(value)
 

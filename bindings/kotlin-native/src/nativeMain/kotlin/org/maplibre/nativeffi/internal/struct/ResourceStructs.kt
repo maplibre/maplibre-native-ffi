@@ -31,28 +31,34 @@ internal object ResourceStructs {
     return ResourceRequest(
       MemoryUtil.copyCString(value.url),
       ResourceKind.fromNative(rawKind),
-      rawKind,
+      rawKind.toInt(),
       ResourceLoadingMethod.fromNative(rawLoadingMethod),
-      rawLoadingMethod,
+      rawLoadingMethod.toInt(),
       ResourcePriority.fromNative(rawPriority),
-      rawPriority,
+      rawPriority.toInt(),
       ResourceUsage.fromNative(rawUsage),
-      rawUsage,
+      rawUsage.toInt(),
       ResourceStoragePolicy.fromNative(rawStoragePolicy),
-      rawStoragePolicy,
-      if (value.has_range) ResourceRequest.ByteRange(value.range_start, value.range_end) else null,
+      rawStoragePolicy.toInt(),
+      if (value.has_range)
+        ResourceRequest.ByteRange(
+          uint64BitsToLong(value.range_start),
+          uint64BitsToLong(value.range_end),
+        )
+      else null,
       if (value.has_prior_modified) value.prior_modified_unix_ms else null,
       if (value.has_prior_expires) value.prior_expires_unix_ms else null,
       optionalCString(value.prior_etag),
-      value.prior_data?.readBytes(value.prior_data_size.toInt()) ?: ByteArray(0),
+      value.prior_data?.readBytes(checkedInt(value.prior_data_size, "prior data size"))
+        ?: ByteArray(0),
     )
   }
 
   fun resourceResponse(value: ResourceResponse, scope: MemScope): CPointer<mln_resource_response> {
     val native = scope.alloc<mln_resource_response>()
     native.size = kotlinx.cinterop.sizeOf<mln_resource_response>().toUInt()
-    native.status = value.status.nativeValue
-    native.error_reason = value.errorReason.nativeValue
+    native.status = value.status.nativeValue.toUInt()
+    native.error_reason = value.errorReason.nativeValue.toUInt()
     if (value.bytes.isNotEmpty()) {
       native.bytes = value.bytes.toUByteArray().toCValues().getPointer(scope)
       native.byte_count = value.bytes.size.toULong()
@@ -73,6 +79,13 @@ internal object ResourceStructs {
       native.retry_after_unix_ms = it
     }
     return native.ptr
+  }
+
+  private fun uint64BitsToLong(value: ULong): Long = value.toLong()
+
+  private fun checkedInt(value: ULong, name: String): Int {
+    require(value <= Int.MAX_VALUE.toULong()) { "$name exceeds Int.MAX_VALUE" }
+    return value.toInt()
   }
 
   private fun optionalCString(value: CPointer<ByteVar>?): String? =

@@ -1,13 +1,16 @@
 package org.maplibre.nativeffi.runtime
 
 /** Source kind for a copied runtime event. */
-public enum class RuntimeEventSourceType(public val nativeValue: UInt) {
-  RUNTIME(0U),
-  MAP(1U),
-  UNKNOWN(UInt.MAX_VALUE);
+public enum class RuntimeEventSourceType(public val nativeValue: Int) {
+  RUNTIME(0),
+  MAP(1),
+  UNKNOWN(-1);
 
   public companion object {
-    public fun fromNative(nativeValue: UInt): RuntimeEventSourceType =
+    internal fun fromNative(nativeValue: UInt): RuntimeEventSourceType =
+      fromNative(nativeValue.toInt())
+
+    public fun fromNative(nativeValue: Int): RuntimeEventSourceType =
       entries.firstOrNull { it.nativeValue == nativeValue } ?: UNKNOWN
   }
 }

@@ -6,8 +6,18 @@ public class VulkanContextDescriptor(
   public var physicalDevice: NativePointer = NativePointer.NULL,
   public var device: NativePointer = NativePointer.NULL,
   public var graphicsQueue: NativePointer = NativePointer.NULL,
-  public var graphicsQueueFamilyIndex: UInt = 0U,
+  graphicsQueueFamilyIndex: Int = 0,
 ) {
+  public var graphicsQueueFamilyIndex: Int = graphicsQueueFamilyIndex
+    set(value) {
+      require(value >= 0) { "graphicsQueueFamilyIndex must be non-negative" }
+      field = value
+    }
+
+  init {
+    require(graphicsQueueFamilyIndex >= 0) { "graphicsQueueFamilyIndex must be non-negative" }
+  }
+
   public fun instance(instance: NativePointer): VulkanContextDescriptor = apply {
     this.instance = instance
   }
@@ -22,7 +32,7 @@ public class VulkanContextDescriptor(
     this.graphicsQueue = graphicsQueue
   }
 
-  public fun graphicsQueueFamilyIndex(index: UInt): VulkanContextDescriptor = apply {
+  public fun graphicsQueueFamilyIndex(index: Int): VulkanContextDescriptor = apply {
     this.graphicsQueueFamilyIndex = index
   }
 }

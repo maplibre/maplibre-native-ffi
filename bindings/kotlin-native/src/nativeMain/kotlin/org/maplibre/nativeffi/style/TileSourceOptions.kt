@@ -19,7 +19,7 @@ public class TileSourceOptions {
   public var bounds: LatLngBounds? = null
     private set
 
-  public var tileSize: UInt? = null
+  public var tileSize: Int? = null
     private set
 
   public var vectorEncoding: VectorTileEncoding? = null
@@ -62,7 +62,10 @@ public class TileSourceOptions {
 
   public fun hasTileSize(): Boolean = tileSize != null
 
-  public fun tileSize(tileSize: UInt): TileSourceOptions = apply { this.tileSize = tileSize }
+  public fun tileSize(tileSize: Int): TileSourceOptions = apply {
+    require(tileSize >= 0) { "tileSize must be non-negative" }
+    this.tileSize = tileSize
+  }
 
   public fun clearTileSize(): TileSourceOptions = apply { tileSize = null }
 

@@ -11,18 +11,18 @@ import kotlinx.cinterop.readBytes
 /** Explicit off-heap byte buffer for reusable native readback and upload storage. */
 @OptIn(ExperimentalForeignApi::class)
 public class NativeBuffer
-private constructor(private val pointer: CPointer<ByteVar>?, private val length: ULong) :
+private constructor(private val pointer: CPointer<ByteVar>?, private val length: Long) :
   AutoCloseable {
   private var closed = false
 
-  public fun byteLength(): ULong {
+  public fun byteLength(): Long {
     ensureOpen()
     return length
   }
 
   public fun toByteArray(): ByteArray {
     ensureOpen()
-    return if (pointer == null || length == 0UL) ByteArray(0) else pointer.readBytes(length.toInt())
+    return if (pointer == null || length == 0L) ByteArray(0) else pointer.readBytes(length.toInt())
   }
 
   internal fun pointer(): CPointer<ByteVar>? {
@@ -32,7 +32,8 @@ private constructor(private val pointer: CPointer<ByteVar>?, private val length:
 
   internal fun ensureCapacity(requiredBytes: ULong) {
     ensureOpen()
-    require(length >= requiredBytes) { "buffer is smaller than required byte length" }
+    require(requiredBytes <= Long.MAX_VALUE.toULong()) { "required byte length is too large" }
+    require(length >= requiredBytes.toLong()) { "buffer is smaller than required byte length" }
   }
 
   private fun ensureOpen() {
@@ -46,9 +47,11 @@ private constructor(private val pointer: CPointer<ByteVar>?, private val length:
   }
 
   public companion object {
-    public fun allocate(byteLength: ULong): NativeBuffer {
+    public fun allocate(byteLength: Long): NativeBuffer {
+      require(byteLength >= 0) { "byteLength must be non-negative" }
+      require(byteLength <= Int.MAX_VALUE) { "byteLength exceeds Kotlin/Native allocation limit" }
       val pointer =
-        if (byteLength == 0UL) null else nativeHeap.allocArray<ByteVar>(byteLength.toInt())
+        if (byteLength == 0L) null else nativeHeap.allocArray<ByteVar>(byteLength.toInt())
       return NativeBuffer(pointer, byteLength)
     }
   }

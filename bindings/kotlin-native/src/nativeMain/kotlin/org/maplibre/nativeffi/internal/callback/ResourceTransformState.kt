@@ -1,7 +1,6 @@
 package org.maplibre.nativeffi.internal.callback
 
 import kotlin.concurrent.atomics.AtomicInt
-import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlinx.cinterop.ByteVar
 import kotlinx.cinterop.COpaquePointer
@@ -31,7 +30,8 @@ internal class ResourceTransformState(private val callback: ResourceTransformCal
   AutoCloseable {
   private val selfRef = StableRef.create(this)
   private val descriptor = nativeHeap.alloc<mln_resource_transform>()
-  private val responseUrls = AtomicReference<ResponseUrlNode?>(null)
+  private val responseUrlLock = AtomicInt(0)
+  private val responseUrls = mutableListOf<CPointer<ByteVar>>()
   private val closed = AtomicInt(0)
 
   init {
@@ -54,7 +54,7 @@ internal class ResourceTransformState(private val callback: ResourceTransformCal
       val request =
         ResourceTransformRequest(
           ResourceKind.fromNative(rawKind),
-          rawKind,
+          rawKind.toInt(),
           MemoryUtil.copyCString(url),
         )
       val replacement = callback.transform(request)
@@ -79,21 +79,40 @@ internal class ResourceTransformState(private val callback: ResourceTransformCal
   }
 
   private fun retainResponseUrl(pointer: CPointer<ByteVar>) {
-    var current = responseUrls.load()
-    while (!responseUrls.compareAndSet(current, ResponseUrlNode(pointer, current))) {
-      current = responseUrls.load()
+    withResponseUrlLock {
+      responseUrls += pointer
+      // The C API copies a replacement URL during the current transform invocation and bindings
+      // usually retain per-thread storage until a later callback. Kotlin/Native has no portable
+      // thread identity API across all native targets, so keep a bounded retirement window instead
+      // of retaining every transformed URL until runtime teardown.
+      while (responseUrls.size > MAX_RETAINED_RESPONSE_URLS) {
+        nativeHeap.free(responseUrls.removeAt(0).rawValue)
+      }
     }
   }
 
   private fun clearResponseUrls() {
-    var current = responseUrls.load()
-    while (!responseUrls.compareAndSet(current, null)) {
-      current = responseUrls.load()
+    val urls = withResponseUrlLock {
+      val copy = responseUrls.toList()
+      responseUrls.clear()
+      copy
     }
-    while (current != null) {
-      nativeHeap.free(current.pointer.rawValue)
-      current = current.next
+    urls.forEach { nativeHeap.free(it.rawValue) }
+  }
+
+  private inline fun <T> withResponseUrlLock(block: () -> T): T {
+    while (!responseUrlLock.compareAndSet(0, 1)) {
+      // Callback results can arrive from worker threads; protect native URL storage bookkeeping.
     }
+    try {
+      return block()
+    } finally {
+      responseUrlLock.store(0)
+    }
+  }
+
+  private companion object {
+    const val MAX_RETAINED_RESPONSE_URLS = 64
   }
 
   private fun allocateCString(value: String): CPointer<ByteVar> {
@@ -104,8 +123,6 @@ internal class ResourceTransformState(private val callback: ResourceTransformCal
     pointer[bytes.size] = 0
     return pointer
   }
-
-  private class ResponseUrlNode(val pointer: CPointer<ByteVar>, val next: ResponseUrlNode?)
 }
 
 @OptIn(ExperimentalForeignApi::class)

@@ -62,7 +62,7 @@ internal object QueryStructs {
       memScoped {
         val outCount = alloc<ULongVar>()
         Status.check(mln_feature_query_result_count(result, outCount.ptr))
-        List(outCount.value.toInt()) { index ->
+        List(checkedInt(outCount.value, "queried feature count")) { index ->
           val outFeature = alloc<mln_queried_feature>()
           outFeature.size = sizeOf<mln_queried_feature>().toUInt()
           Status.check(mln_feature_query_result_get(result, index.toULong(), outFeature.ptr))
@@ -88,7 +88,7 @@ internal object QueryStructs {
             FeatureExtensionResult.FeatureCollection(
               featureCollection(info.data.feature_collection)
             )
-          else -> FeatureExtensionResult.Unknown(info.type)
+          else -> FeatureExtensionResult.Unknown(info.type.toInt())
         }
       }
     } finally {
@@ -196,8 +196,13 @@ internal object QueryStructs {
     )
   }
 
+  private fun checkedInt(value: ULong, name: String): Int {
+    require(value <= Int.MAX_VALUE.toULong()) { "$name exceeds Int.MAX_VALUE" }
+    return value.toInt()
+  }
+
   private fun featureCollection(value: mln_feature_collection): List<Feature> =
-    List(value.feature_count.toInt()) { index ->
+    List(checkedInt(value.feature_count, "feature extension feature count")) { index ->
       ValueStructs.featureSnapshot(value.features!![index].ptr)
     }
 

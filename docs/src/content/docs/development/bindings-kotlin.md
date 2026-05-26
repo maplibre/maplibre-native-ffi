@@ -57,6 +57,34 @@ Public APIs use it only where the C API accepts opaque backend handles. Internal
 Kotlin/Native code converts between `NativePointer`, `COpaquePointer?`, and
 `NativePtr` at the cinterop boundary; `NativePtr` stays out of public APIs.
 
+## Maintaining Java and common API alignment
+
+When a Kotlin/Native type may become a `commonMain` actual implementation, keep
+its public names, value shapes, and numeric types close to the Java binding. Use
+signed `Int` and `Long` public values where Java uses them, then validate at the
+C boundary before converting to unsigned native fields. Reject negative sizes,
+counts, enum sentinels, and unsigned numeric inputs with clear exceptions
+instead of wrapping them.
+
+Use `Long` for native `uint64_t` values only in two cases:
+
+- numeric values that fit in Java's non-negative `long` range, such as
+  `JsonValue.UInt` and `FeatureIdentifier.UInt`; reject larger native snapshots
+  and negative public inputs;
+- opaque identifiers, backend values, or ranges that Java carries as raw bits,
+  such as offline operation IDs, render frame generation IDs, frame IDs, Metal
+  pixel formats, byte ranges, and native pointer addresses; document those
+  fields as bit-pattern values on the public API.
+
+Prefer the Java value shape when it is practical: `Maplibre` exposes process
+APIs through a class with companion methods, copied value trees use Java-aligned
+names, `TileId` and `CanonicalTileId` stay flattened, `SourceInfo` preserves the
+native type string, and `OfflineRegionStatus` carries both the mapped and raw
+download state. Kotlin descriptors may still use nullable properties and fluent
+setters where they express the same low-level optional-field contract. Keep any
+remaining platform-only types at the edge of rendering or callback ownership,
+and describe their lifetime in KDoc or this guide.
+
 ## Handles, Status, and Threading
 
 Each handle stores the native pointer, release state, parent references needed

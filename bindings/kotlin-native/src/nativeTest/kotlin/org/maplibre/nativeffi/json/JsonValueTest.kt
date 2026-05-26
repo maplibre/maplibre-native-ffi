@@ -7,7 +7,7 @@ class JsonValueTest {
   @Test
   fun objectValuesPreserveMemberOrderAndDuplicateKeys() {
     val value =
-      JsonValue.obj(
+      JsonValue.`object`(
         listOf(
           JsonValue.Member("name", JsonValue.of("first")),
           JsonValue.Member("name", JsonValue.of("second")),

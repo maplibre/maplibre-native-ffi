@@ -5,19 +5,33 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import org.maplibre.nativeffi.Maplibre
 import org.maplibre.nativeffi.error.InvalidStateException
+import org.maplibre.nativeffi.offline.OfflineRegionDownloadState
 
 class RuntimeOfflineTest {
   @Test
   fun processGlobalNetworkStatusRoundTrips() {
-    val original = RuntimeHandle.networkStatus()
+    val original = Maplibre.networkStatus()
     try {
-      RuntimeHandle.setNetworkStatus(NetworkStatus.OFFLINE)
-      assertEquals(NetworkStatus.OFFLINE, RuntimeHandle.networkStatus())
-      RuntimeHandle.setNetworkStatus(NetworkStatus.ONLINE)
-      assertEquals(NetworkStatus.ONLINE, RuntimeHandle.networkStatus())
+      Maplibre.setNetworkStatus(NetworkStatus.OFFLINE)
+      assertEquals(NetworkStatus.OFFLINE, Maplibre.networkStatus())
+      Maplibre.setNetworkStatus(NetworkStatus.ONLINE)
+      assertEquals(NetworkStatus.ONLINE, Maplibre.networkStatus())
     } finally {
-      RuntimeHandle.setNetworkStatus(original)
+      Maplibre.setNetworkStatus(original)
+    }
+  }
+
+  @Test
+  fun offlineDownloadStateRejectsUnknownSentinel() {
+    val runtime = RuntimeHandle.create()
+    try {
+      assertFailsWith<IllegalArgumentException> {
+        runtime.startSetOfflineRegionDownloadState(1, OfflineRegionDownloadState.UNKNOWN)
+      }
+    } finally {
+      runtime.close()
     }
   }
 

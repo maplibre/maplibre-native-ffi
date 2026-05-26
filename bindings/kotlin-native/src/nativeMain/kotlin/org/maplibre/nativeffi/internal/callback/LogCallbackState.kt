@@ -1,5 +1,7 @@
 package org.maplibre.nativeffi.internal.callback
 
+import kotlin.concurrent.atomics.AtomicInt
+import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlinx.cinterop.ByteVar
 import kotlinx.cinterop.COpaquePointer
 import kotlinx.cinterop.CPointer
@@ -17,23 +19,23 @@ import org.maplibre.nativeffi.log.LogRecord
 import org.maplibre.nativeffi.log.LogSeverity
 
 /** Owns process-global logging callback state. */
-@OptIn(ExperimentalForeignApi::class)
+@OptIn(ExperimentalForeignApi::class, ExperimentalAtomicApi::class)
 internal class LogCallbackState private constructor(private val callback: LogCallback) :
   AutoCloseable {
   private val selfRef = StableRef.create(this)
-  private var closed = false
+  private val closed = AtomicInt(0)
 
   fun userData(): COpaquePointer = selfRef.asCPointer()
 
   fun invoke(severity: UInt, event: UInt, code: Long, message: CPointer<ByteVar>?): UInt {
-    if (closed) return 0U
+    if (closed.load() != 0) return 0U
     return try {
       val record =
         LogRecord(
           LogSeverity.fromNative(severity),
-          severity,
+          severity.toInt(),
           LogEvent.fromNative(event),
-          event,
+          event.toInt(),
           code,
           MemoryUtil.copyCString(message),
         )
@@ -44,36 +46,61 @@ internal class LogCallbackState private constructor(private val callback: LogCal
   }
 
   override fun close() {
-    if (closed) return
-    closed = true
-    selfRef.dispose()
+    // Native logging can dispatch from worker threads. The C API stops future callbacks after
+    // replacement or clear, but it does not guarantee that an already-entered upcall has finished
+    // reading user_data. Keep the StableRef allocated after retirement and gate dispatch instead.
+    closed.store(1)
   }
 
   internal companion object {
+    private val lock = AtomicInt(0)
     private var current: LogCallbackState? = null
+    private val retired = mutableListOf<LogCallbackState>()
 
     fun set(callback: LogCallback) {
       val replacement = LogCallbackState(callback)
-      val previous: LogCallbackState?
+      var previous: LogCallbackState? = null
       try {
-        Status.check(mln_log_set_callback(staticCFunction(::logCallback), replacement.userData()))
-        previous = current
-        current = replacement
+        withLock {
+          Status.check(mln_log_set_callback(staticCFunction(::logCallback), replacement.userData()))
+          previous = current
+          current = replacement
+        }
       } catch (error: Throwable) {
         replacement.close()
         throw error
       }
-      previous?.close()
+      retire(previous)
     }
 
     fun clear() {
-      Status.check(mln_log_clear_callback())
-      val previous = current
-      current = null
-      previous?.close()
+      var previous: LogCallbackState? = null
+      withLock {
+        Status.check(mln_log_clear_callback())
+        previous = current
+        current = null
+      }
+      retire(previous)
     }
 
-    fun currentForTesting(): LogCallbackState? = current
+    fun currentForTesting(): LogCallbackState? = withLock { current }
+
+    private fun retire(state: LogCallbackState?) {
+      if (state == null) return
+      state.close()
+      withLock { retired += state }
+    }
+
+    private inline fun <T> withLock(block: () -> T): T {
+      while (!lock.compareAndSet(0, 1)) {
+        // Process-global logging callback replacement is rare; spin briefly.
+      }
+      try {
+        return block()
+      } finally {
+        lock.store(0)
+      }
+    }
   }
 }
 

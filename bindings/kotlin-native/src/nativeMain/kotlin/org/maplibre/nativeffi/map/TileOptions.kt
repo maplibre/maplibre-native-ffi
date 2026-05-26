@@ -2,7 +2,7 @@ package org.maplibre.nativeffi.map
 
 /** Mutable descriptor for tile prefetch and level-of-detail controls. */
 public class TileOptions {
-  public var prefetchZoomDelta: UInt? = null
+  public var prefetchZoomDelta: Int? = null
     private set
 
   public var lodMinRadius: Double? = null
@@ -22,12 +22,11 @@ public class TileOptions {
 
   public fun hasPrefetchZoomDelta(): Boolean = prefetchZoomDelta != null
 
-  public fun prefetchZoomDelta(prefetchZoomDelta: UInt): TileOptions = apply {
+  public fun prefetchZoomDelta(prefetchZoomDelta: Int): TileOptions {
+    require(prefetchZoomDelta >= 0) { "prefetchZoomDelta must be non-negative" }
     this.prefetchZoomDelta = prefetchZoomDelta
+    return this
   }
-
-  public fun prefetchZoomDelta(prefetchZoomDelta: Int): TileOptions =
-    prefetchZoomDelta(prefetchZoomDelta.toUInt())
 
   public fun clearPrefetchZoomDelta(): TileOptions = apply { prefetchZoomDelta = null }
 
@@ -63,7 +62,10 @@ public class TileOptions {
 
   public fun hasLodMode(): Boolean = lodMode != null
 
-  public fun lodMode(lodMode: TileLodMode): TileOptions = apply { this.lodMode = lodMode }
+  public fun lodMode(lodMode: TileLodMode): TileOptions = apply {
+    require(lodMode != TileLodMode.UNKNOWN) { "lodMode must be a known value" }
+    this.lodMode = lodMode
+  }
 
   public fun clearLodMode(): TileOptions = apply { lodMode = null }
 }

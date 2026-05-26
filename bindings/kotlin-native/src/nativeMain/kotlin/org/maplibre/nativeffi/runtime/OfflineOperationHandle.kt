@@ -7,14 +7,16 @@ import org.maplibre.nativeffi.error.MaplibreStatus
 public class OfflineOperationHandle<T>
 internal constructor(
   private val runtime: RuntimeHandle,
-  public val id: ULong,
+  private val nativeId: ULong,
   public val kind: OfflineOperationKind,
   public val resultKind: OfflineOperationResultKind,
 ) : AutoCloseable {
+  /** Native uint64 operation id preserved as a Java-compatible [Long] bit pattern. */
+  public val id: Long = uint64BitsToLong(nativeId)
   private var closed = false
 
   init {
-    require(id != 0UL) { "offline operation id must not be zero" }
+    require(nativeId != 0UL) { "offline operation id must not be zero" }
   }
 
   public fun isClosed(): Boolean = closed
@@ -32,7 +34,7 @@ internal constructor(
         "OfflineOperationHandle belongs to a different RuntimeHandle",
       )
     }
-    return id
+    return nativeId
   }
 
   internal fun requireLive(
@@ -57,4 +59,6 @@ internal constructor(
   override fun close() {
     runtime.discardOfflineOperation(this)
   }
+
+  private fun uint64BitsToLong(value: ULong): Long = value.toLong()
 }

@@ -1,4 +1,4 @@
 package org.maplibre.nativeffi.geo
 
-/** Canonical tile identity. */
-public data class CanonicalTileId(public val z: UInt, public val x: UInt, public val y: UInt)
+/** Canonical tile identity used by custom geometry source callbacks. */
+public data class CanonicalTileId(public val z: Int, public val x: Long, public val y: Long)

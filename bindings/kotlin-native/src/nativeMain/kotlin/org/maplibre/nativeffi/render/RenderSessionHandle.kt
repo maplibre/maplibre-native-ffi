@@ -68,8 +68,12 @@ private constructor(private val map: MapHandle, handle: CPointer<mln_render_sess
   AutoCloseable {
   private val state = HandleState("RenderSessionHandle", handle, map)
 
-  public fun resize(width: UInt, height: UInt, scaleFactor: Double) {
-    Status.check(mln_render_session_resize(state.requireLive(), width, height, scaleFactor))
+  public fun resize(width: Int, height: Int, scaleFactor: Double) {
+    require(width >= 0) { "width must be non-negative" }
+    require(height >= 0) { "height must be non-negative" }
+    Status.check(
+      mln_render_session_resize(state.requireLive(), width.toUInt(), height.toUInt(), scaleFactor)
+    )
   }
 
   public fun renderUpdate() {
@@ -114,7 +118,7 @@ private constructor(private val map: MapHandle, handle: CPointer<mln_render_sess
         outState.ptr,
       )
     )
-    ValueStructs.jsonSnapshotHandle(outState.value) ?: JsonValue.obj(emptyList())
+    ValueStructs.jsonSnapshotHandle(outState.value) ?: JsonValue.`object`(emptyList())
   }
 
   public fun removeFeatureState(selector: FeatureStateSelector) {
@@ -203,7 +207,7 @@ private constructor(private val map: MapHandle, handle: CPointer<mln_render_sess
     val outInfo = mln_texture_image_info_default().getPointer(this)
     val status = mln_texture_read_premultiplied_rgba8(state.requireLive(), null, 0UL, outInfo)
     val info = RenderStructs.textureImageInfo(outInfo.pointed)
-    if (status == 0 || (status == -1 && info.byteLength > 0UL)) {
+    if (status == 0 || (status == -1 && info.byteLength > 0L)) {
       info
     } else {
       Status.check(status)
@@ -218,7 +222,7 @@ private constructor(private val map: MapHandle, handle: CPointer<mln_render_sess
       mln_texture_read_premultiplied_rgba8(
         state.requireLive(),
         buffer.pointer()?.reinterpret<UByteVar>(),
-        capacity,
+        capacity.toULong(),
         outInfo,
       )
     )
@@ -300,14 +304,14 @@ private constructor(private val map: MapHandle, handle: CPointer<mln_render_sess
   ): MetalOwnedTextureFrame =
     MetalOwnedTextureFrame(
       scope,
-      value.generation,
-      value.width,
-      value.height,
+      uint64BitsToLong(value.generation),
+      checkedInt(value.width, "Metal frame width"),
+      checkedInt(value.height, "Metal frame height"),
       value.scale_factor,
-      value.frame_id,
-      pointer(value.texture),
-      pointer(value.device),
-      value.pixel_format,
+      uint64BitsToLong(value.frame_id),
+      scopedPointer(value.texture, scope),
+      scopedPointer(value.device, scope),
+      uint64BitsToLong(value.pixel_format),
     )
 
   private fun vulkanOwnedTextureFrame(
@@ -316,20 +320,30 @@ private constructor(private val map: MapHandle, handle: CPointer<mln_render_sess
   ): VulkanOwnedTextureFrame =
     VulkanOwnedTextureFrame(
       scope,
-      value.generation,
-      value.width,
-      value.height,
+      uint64BitsToLong(value.generation),
+      checkedInt(value.width, "Vulkan frame width"),
+      checkedInt(value.height, "Vulkan frame height"),
       value.scale_factor,
-      value.frame_id,
-      pointer(value.image),
-      pointer(value.image_view),
-      pointer(value.device),
-      value.format,
-      value.layout,
+      uint64BitsToLong(value.frame_id),
+      scopedPointer(value.image, scope),
+      scopedPointer(value.image_view, scope),
+      scopedPointer(value.device, scope),
+      value.format.toInt(),
+      value.layout.toInt(),
     )
 
-  private fun pointer(pointer: kotlinx.cinterop.COpaquePointer?): NativePointer =
-    pointer?.rawValue?.toLong()?.toULong()?.let(NativePointer::ofAddress) ?: NativePointer.NULL
+  private fun checkedInt(value: UInt, name: String): Int {
+    require(value <= Int.MAX_VALUE.toUInt()) { "$name exceeds Int.MAX_VALUE" }
+    return value.toInt()
+  }
+
+  private fun uint64BitsToLong(value: ULong): Long = value.toLong()
+
+  private fun scopedPointer(
+    pointer: kotlinx.cinterop.COpaquePointer?,
+    scope: FrameScope,
+  ): NativePointer =
+    pointer?.rawValue?.toLong()?.let { NativePointer.scoped(it, scope) } ?: NativePointer.NULL
 
   public companion object {
     public fun attachMetalOwnedTexture(

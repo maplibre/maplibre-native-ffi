@@ -20,6 +20,7 @@ public class RuntimeOptions {
   public fun clearCachePath(): RuntimeOptions = apply { cachePath = null }
 
   public fun maximumCacheSize(maximumCacheSize: Long): RuntimeOptions = apply {
+    require(maximumCacheSize >= 0) { "maximumCacheSize must be non-negative" }
     this.maximumCacheSize = maximumCacheSize
   }
 

@@ -11,10 +11,10 @@ public class CustomGeometrySourceOptions(public val callback: CustomGeometrySour
   public var tolerance: Double? = null
     private set
 
-  public var tileSize: UInt? = null
+  public var tileSize: Int? = null
     private set
 
-  public var buffer: UInt? = null
+  public var buffer: Int? = null
     private set
 
   public var clip: Boolean? = null
@@ -49,7 +49,8 @@ public class CustomGeometrySourceOptions(public val callback: CustomGeometrySour
 
   public fun hasTileSize(): Boolean = tileSize != null
 
-  public fun tileSize(tileSize: UInt): CustomGeometrySourceOptions = apply {
+  public fun tileSize(tileSize: Int): CustomGeometrySourceOptions = apply {
+    require(tileSize >= 0) { "tileSize must be non-negative" }
     this.tileSize = tileSize
   }
 
@@ -57,7 +58,10 @@ public class CustomGeometrySourceOptions(public val callback: CustomGeometrySour
 
   public fun hasBuffer(): Boolean = buffer != null
 
-  public fun buffer(buffer: UInt): CustomGeometrySourceOptions = apply { this.buffer = buffer }
+  public fun buffer(buffer: Int): CustomGeometrySourceOptions = apply {
+    require(buffer >= 0) { "buffer must be non-negative" }
+    this.buffer = buffer
+  }
 
   public fun clearBuffer(): CustomGeometrySourceOptions = apply { buffer = null }
 

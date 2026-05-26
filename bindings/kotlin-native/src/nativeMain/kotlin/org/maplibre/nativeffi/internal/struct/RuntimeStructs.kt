@@ -14,7 +14,6 @@ import kotlinx.cinterop.sizeOf
 import kotlinx.cinterop.toCValues
 import kotlinx.cinterop.toKString
 import kotlinx.cinterop.value
-import org.maplibre.nativeffi.geo.CanonicalTileId
 import org.maplibre.nativeffi.geo.TileId
 import org.maplibre.nativeffi.internal.c.MLN_OFFLINE_REGION_DEFINITION_GEOMETRY
 import org.maplibre.nativeffi.internal.c.MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID
@@ -65,34 +64,64 @@ internal object RuntimeStructs {
     MemoryUtil.copyStringView(event.message, event.message_size)
 
   fun payload(event: mln_runtime_event): RuntimeEventPayload {
-    val payload = event.payload ?: return RuntimeEventPayload.None
+    val payload = event.payload
+    if (payload == null) {
+      return if (event.payload_type == MLN_RUNTIME_EVENT_PAYLOAD_NONE) RuntimeEventPayload.None
+      else unknownPayload(event)
+    }
     return when (event.payload_type) {
       MLN_RUNTIME_EVENT_PAYLOAD_NONE -> RuntimeEventPayload.None
       MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME ->
-        renderFrame(payload.reinterpret<mln_runtime_event_render_frame>())
+        if (hasPayloadSize<mln_runtime_event_render_frame>(event)) {
+          renderFrame(payload.reinterpret<mln_runtime_event_render_frame>())
+        } else unknownPayload(event)
       MLN_RUNTIME_EVENT_PAYLOAD_RENDER_MAP ->
-        renderMap(payload.reinterpret<mln_runtime_event_render_map>())
+        if (hasPayloadSize<mln_runtime_event_render_map>(event)) {
+          renderMap(payload.reinterpret<mln_runtime_event_render_map>())
+        } else unknownPayload(event)
       MLN_RUNTIME_EVENT_PAYLOAD_STYLE_IMAGE_MISSING ->
-        styleImageMissing(payload.reinterpret<mln_runtime_event_style_image_missing>())
+        if (hasPayloadSize<mln_runtime_event_style_image_missing>(event)) {
+          styleImageMissing(payload.reinterpret<mln_runtime_event_style_image_missing>())
+        } else unknownPayload(event)
       MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION ->
-        tileAction(payload.reinterpret<mln_runtime_event_tile_action>())
+        if (hasPayloadSize<mln_runtime_event_tile_action>(event)) {
+          tileAction(payload.reinterpret<mln_runtime_event_tile_action>())
+        } else unknownPayload(event)
       MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS ->
-        offlineRegionStatus(payload.reinterpret<mln_runtime_event_offline_region_status>())
+        if (hasPayloadSize<mln_runtime_event_offline_region_status>(event)) {
+          offlineRegionStatus(payload.reinterpret<mln_runtime_event_offline_region_status>())
+        } else unknownPayload(event)
       MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR ->
-        offlineRegionResponseError(
-          payload.reinterpret<mln_runtime_event_offline_region_response_error>()
-        )
+        if (hasPayloadSize<mln_runtime_event_offline_region_response_error>(event)) {
+          offlineRegionResponseError(
+            payload.reinterpret<mln_runtime_event_offline_region_response_error>()
+          )
+        } else unknownPayload(event)
       MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT ->
-        offlineRegionTileCountLimit(
-          payload.reinterpret<mln_runtime_event_offline_region_tile_count_limit>()
-        )
+        if (hasPayloadSize<mln_runtime_event_offline_region_tile_count_limit>(event)) {
+          offlineRegionTileCountLimit(
+            payload.reinterpret<mln_runtime_event_offline_region_tile_count_limit>()
+          )
+        } else unknownPayload(event)
       MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_OPERATION_COMPLETED ->
-        offlineOperationCompleted(
-          payload.reinterpret<mln_runtime_event_offline_operation_completed>()
-        )
-      else -> RuntimeEventPayload.Unknown(event.payload_type, event.payload_size)
+        if (hasPayloadSize<mln_runtime_event_offline_operation_completed>(event)) {
+          offlineOperationCompleted(
+            payload.reinterpret<mln_runtime_event_offline_operation_completed>()
+          )
+        } else unknownPayload(event)
+      else -> unknownPayload(event)
     }
   }
+
+  private inline fun <reified T : kotlinx.cinterop.CVariable> hasPayloadSize(
+    event: mln_runtime_event
+  ): Boolean = event.payload_size >= sizeOf<T>().toULong()
+
+  private fun unknownPayload(event: mln_runtime_event): RuntimeEventPayload.Unknown =
+    RuntimeEventPayload.Unknown(
+      event.payload_type.toInt(),
+      checkedLong(event.payload_size, "payload size"),
+    )
 
   private fun renderFrame(
     payload: CPointer<mln_runtime_event_render_frame>
@@ -100,7 +129,7 @@ internal object RuntimeStructs {
     val value = payload.pointed
     return RuntimeEventPayload.RenderFrame(
       RenderMode.fromNative(value.mode),
-      value.mode,
+      value.mode.toInt(),
       value.needs_repaint,
       value.placement_changed,
       RenderingStats(
@@ -117,7 +146,7 @@ internal object RuntimeStructs {
     payload: CPointer<mln_runtime_event_render_map>
   ): RuntimeEventPayload.RenderMap {
     val value = payload.pointed
-    return RuntimeEventPayload.RenderMap(RenderMode.fromNative(value.mode), value.mode)
+    return RuntimeEventPayload.RenderMap(RenderMode.fromNative(value.mode), value.mode.toInt())
   }
 
   private fun styleImageMissing(
@@ -135,17 +164,15 @@ internal object RuntimeStructs {
     val value = payload.pointed
     val tileId =
       TileId(
-        value.tile_id.overscaled_z,
+        checkedLong(value.tile_id.overscaled_z.toULong(), "tile overscaled z"),
         value.tile_id.wrap,
-        CanonicalTileId(
-          value.tile_id.canonical_z,
-          value.tile_id.canonical_x,
-          value.tile_id.canonical_y,
-        ),
+        checkedLong(value.tile_id.canonical_z.toULong(), "tile canonical z"),
+        checkedLong(value.tile_id.canonical_x.toULong(), "tile canonical x"),
+        checkedLong(value.tile_id.canonical_y.toULong(), "tile canonical y"),
       )
     return RuntimeEventPayload.TileAction(
       TileOperation.fromNative(value.operation),
-      value.operation,
+      value.operation.toInt(),
       tileId,
       MemoryUtil.copyStringView(value.source_id, value.source_id_size),
     )
@@ -168,7 +195,7 @@ internal object RuntimeStructs {
     return RuntimeEventPayload.OfflineRegionResponseError(
       value.region_id,
       ResourceErrorReason.fromNative(value.reason),
-      value.reason,
+      value.reason.toInt(),
     )
   }
 
@@ -176,7 +203,10 @@ internal object RuntimeStructs {
     payload: CPointer<mln_runtime_event_offline_region_tile_count_limit>
   ): RuntimeEventPayload.OfflineRegionTileCountLimit {
     val value = payload.pointed
-    return RuntimeEventPayload.OfflineRegionTileCountLimit(value.region_id, value.limit)
+    return RuntimeEventPayload.OfflineRegionTileCountLimit(
+      value.region_id,
+      checkedLong(value.limit, "offline tile count limit"),
+    )
   }
 
   private fun offlineOperationCompleted(
@@ -184,15 +214,27 @@ internal object RuntimeStructs {
   ): RuntimeEventPayload.OfflineOperationCompleted {
     val value = payload.pointed
     return RuntimeEventPayload.OfflineOperationCompleted(
-      value.operation_id,
+      uint64BitsToLong(value.operation_id),
       OfflineOperationKind.fromNative(value.operation_kind),
-      value.operation_kind,
+      value.operation_kind.toInt(),
       OfflineOperationResultKind.fromNative(value.result_kind),
-      value.result_kind,
+      value.result_kind.toInt(),
       value.result_status,
       value.found,
     )
   }
+
+  private fun checkedInt(value: ULong, name: String): Int {
+    require(value <= Int.MAX_VALUE.toULong()) { "$name exceeds Int.MAX_VALUE" }
+    return value.toInt()
+  }
+
+  private fun checkedLong(value: ULong, name: String): Long {
+    require(value <= Long.MAX_VALUE.toULong()) { "$name exceeds Long.MAX_VALUE" }
+    return value.toLong()
+  }
+
+  private fun uint64BitsToLong(value: ULong): Long = value.toLong()
 
   fun metadata(
     value: ByteArray,
@@ -259,7 +301,7 @@ internal object RuntimeStructs {
       memScoped {
         val outCount = alloc<ULongVar>()
         Status.check(mln_offline_region_list_count(list, outCount.ptr))
-        List(outCount.value.toInt()) { index ->
+        List(checkedInt(outCount.value, "offline region count")) { index ->
           val info = alloc<mln_offline_region_info>()
           info.size = sizeOf<mln_offline_region_info>().toUInt()
           Status.check(mln_offline_region_list_get(list, index.toULong(), info.ptr))
@@ -274,7 +316,8 @@ internal object RuntimeStructs {
     OfflineRegionInfo(
       value.id,
       offlineRegionDefinition(value.definition),
-      value.metadata?.readBytes(value.metadata_size.toInt()) ?: ByteArray(0),
+      value.metadata?.readBytes(checkedInt(value.metadata_size, "offline metadata size"))
+        ?: ByteArray(0),
     )
 
   private fun offlineRegionDefinition(
@@ -309,12 +352,13 @@ internal object RuntimeStructs {
   fun offlineRegionStatus(value: mln_offline_region_status): OfflineRegionStatus =
     OfflineRegionStatus(
       OfflineRegionDownloadState.fromNative(value.download_state),
-      value.completed_resource_count,
-      value.completed_resource_size,
-      value.completed_tile_count,
-      value.required_tile_count,
-      value.completed_tile_size,
-      value.required_resource_count,
+      value.download_state.toInt(),
+      checkedLong(value.completed_resource_count, "completed resource count"),
+      checkedLong(value.completed_resource_size, "completed resource size"),
+      checkedLong(value.completed_tile_count, "completed tile count"),
+      checkedLong(value.required_tile_count, "required tile count"),
+      checkedLong(value.completed_tile_size, "completed tile size"),
+      checkedLong(value.required_resource_count, "required resource count"),
       value.required_resource_count_is_precise,
       value.complete,
     )

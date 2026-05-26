@@ -6,11 +6,28 @@ public class VulkanBorrowedTextureDescriptor(
   public var context: VulkanContextDescriptor = VulkanContextDescriptor(),
   public var image: NativePointer = NativePointer.NULL,
   public var imageView: NativePointer = NativePointer.NULL,
-  public var format: UInt = 0U,
-  public var initialLayout: UInt = 0U,
+  format: Int = 0,
+  initialLayout: Int = 0,
 ) {
-  public var finalLayout: UInt? = null
+  public var format: Int = format
+    set(value) {
+      require(value >= 0) { "format must be non-negative" }
+      field = value
+    }
+
+  public var initialLayout: Int = initialLayout
+    set(value) {
+      require(value >= 0) { "initialLayout must be non-negative" }
+      field = value
+    }
+
+  public var finalLayout: Int? = null
     private set
+
+  init {
+    require(format >= 0) { "format must be non-negative" }
+    require(initialLayout >= 0) { "initialLayout must be non-negative" }
+  }
 
   public fun extent(extent: RenderTargetExtent): VulkanBorrowedTextureDescriptor = apply {
     this.extent = extent
@@ -28,15 +45,16 @@ public class VulkanBorrowedTextureDescriptor(
     this.imageView = imageView
   }
 
-  public fun format(format: UInt): VulkanBorrowedTextureDescriptor = apply { this.format = format }
+  public fun format(format: Int): VulkanBorrowedTextureDescriptor = apply { this.format = format }
 
-  public fun initialLayout(initialLayout: UInt): VulkanBorrowedTextureDescriptor = apply {
+  public fun initialLayout(initialLayout: Int): VulkanBorrowedTextureDescriptor = apply {
     this.initialLayout = initialLayout
   }
 
   public fun hasFinalLayout(): Boolean = finalLayout != null
 
-  public fun finalLayout(finalLayout: UInt): VulkanBorrowedTextureDescriptor = apply {
+  public fun finalLayout(finalLayout: Int): VulkanBorrowedTextureDescriptor = apply {
+    require(finalLayout >= 0) { "finalLayout must be non-negative" }
     this.finalLayout = finalLayout
   }
 

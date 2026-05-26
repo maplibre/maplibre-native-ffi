@@ -381,6 +381,29 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     customGeometrySources.clear()
   }
 
+  internal fun releaseDetachedCustomGeometrySources() {
+    memScoped {
+      val iterator = customGeometrySources.iterator()
+      while (iterator.hasNext()) {
+        val entry = iterator.next()
+        val outType = alloc<UIntVar>()
+        val outFound = alloc<BooleanVar>()
+        val status =
+          mln_map_get_style_source_type(
+            state.requireLive(),
+            CoreStructs.stringView(entry.key, this),
+            outType.ptr,
+            outFound.ptr,
+          )
+        if (status != org.maplibre.nativeffi.error.MaplibreStatus.OK.nativeCode) continue
+        if (!outFound.value || SourceType.fromNative(outType.value) != SourceType.CUSTOM_VECTOR) {
+          entry.value.close()
+          iterator.remove()
+        }
+      }
+    }
+  }
+
   public fun addVectorSourceUrl(sourceId: String, url: String, options: TileSourceOptions? = null) {
     memScoped {
       Status.check(
@@ -537,11 +560,10 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     if (outFound.value) StyleStructs.styleImageInfo(outInfo.pointed) else null
   }
 
-  public fun copyStyleImagePremultipliedRgba8(imageId: String): StyleImage? = styleImage(imageId)
-
   public fun styleImage(imageId: String): StyleImage? = memScoped {
     val info = styleImageInfo(imageId) ?: return@memScoped null
-    val outPixels = allocArray<UByteVar>(info.byteLength.toInt())
+    val outPixels =
+      allocArray<UByteVar>(checkedInt(info.byteLength.toULong(), "style image byte length"))
     val outByteLength = alloc<ULongVar>()
     val outFound = alloc<BooleanVar>()
     Status.check(
@@ -549,7 +571,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
         state.requireLive(),
         CoreStructs.stringView(imageId, this),
         outPixels,
-        info.byteLength,
+        info.byteLength.toULong(),
         outByteLength.ptr,
         outFound.ptr,
       )
@@ -560,7 +582,9 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
         info.width,
         info.height,
         info.stride,
-        outPixels.reinterpret<kotlinx.cinterop.ByteVar>().readBytes(outByteLength.value.toInt()),
+        outPixels
+          .reinterpret<kotlinx.cinterop.ByteVar>()
+          .readBytes(checkedInt(outByteLength.value, "style image copied byte length")),
       ),
       info.pixelRatio,
       info.sdf,
@@ -650,7 +674,11 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
         outFound.ptr,
       )
     )
-    if (outFound.value) CoreStructs.latLngArray(outCoordinates, outCoordinateCount.value.toInt())
+    if (outFound.value)
+      CoreStructs.latLngArray(
+        outCoordinates,
+        checkedInt(outCoordinateCount.value, "image source coordinate count"),
+      )
     else null
   }
 
@@ -658,7 +686,8 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     if (!info.has_attribution) return null
     if (info.attribution_size == 0UL) return ""
     return memScoped {
-      val outAttribution = allocArray<ByteVar>(info.attribution_size.toInt())
+      val outAttribution =
+        allocArray<ByteVar>(checkedInt(info.attribution_size, "style source attribution size"))
       val outAttributionSize = alloc<ULongVar>()
       val outFound = alloc<BooleanVar>()
       Status.check(
@@ -672,7 +701,9 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
         )
       )
       if (outFound.value)
-        outAttribution.readBytes(outAttributionSize.value.toInt()).decodeToString()
+        outAttribution
+          .readBytes(checkedInt(outAttributionSize.value, "style source copied attribution size"))
+          .decodeToString()
       else null
     }
   }
@@ -790,7 +821,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
         mln_map_set_location_indicator_image_name(
           state.requireLive(),
           CoreStructs.stringView(layerId, this),
-          imageKind.nativeValue,
+          imageKind.nativeValue.toUInt(),
           CoreStructs.stringView(imageId, this),
         )
       )
@@ -842,11 +873,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     StyleStructs.styleIdList(requireNotNull(outList.value))
   }
 
-  public fun moveStyleLayer(layerId: String) {
-    moveStyleLayer(layerId, "")
-  }
-
-  public fun moveStyleLayer(layerId: String, beforeLayerId: String) {
+  public fun moveStyleLayer(layerId: String, beforeLayerId: String = "") {
     memScoped {
       Status.check(
         mln_map_move_style_layer(
@@ -975,14 +1002,16 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
   }
 
   public fun setDebugOptions(options: Set<DebugOption>) {
-    val mask = options.fold(0U) { acc, option -> acc or option.nativeMask }
-    Status.check(mln_map_set_debug_options(state.requireLive(), mask))
+    val mask = options.fold(0) { acc, option -> acc or option.nativeMask }
+    Status.check(mln_map_set_debug_options(state.requireLive(), mask.toUInt()))
   }
 
   public fun debugOptions(): Set<DebugOption> = memScoped {
     val outOptions = alloc<UIntVar>()
     Status.check(mln_map_get_debug_options(state.requireLive(), outOptions.ptr))
-    DebugOption.entries.filterTo(mutableSetOf()) { (outOptions.value and it.nativeMask) != 0U }
+    DebugOption.entries.filterTo(mutableSetOf()) {
+      (outOptions.value.toInt() and it.nativeMask) != 0
+    }
   }
 
   public fun setRenderingStatsViewEnabled(enabled: Boolean) {
@@ -1045,11 +1074,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     }
   }
 
-  public fun easeTo(camera: CameraOptions) {
-    easeTo(camera, null)
-  }
-
-  public fun easeTo(camera: CameraOptions, animation: AnimationOptions?) {
+  public fun easeTo(camera: CameraOptions, animation: AnimationOptions? = null) {
     memScoped {
       Status.check(
         mln_map_ease_to(
@@ -1061,11 +1086,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     }
   }
 
-  public fun flyTo(camera: CameraOptions) {
-    flyTo(camera, null)
-  }
-
-  public fun flyTo(camera: CameraOptions, animation: AnimationOptions?) {
+  public fun flyTo(camera: CameraOptions, animation: AnimationOptions? = null) {
     memScoped {
       Status.check(
         mln_map_fly_to(
@@ -1081,11 +1102,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     Status.check(mln_map_move_by(state.requireLive(), deltaX, deltaY))
   }
 
-  public fun moveByAnimated(deltaX: Double, deltaY: Double) {
-    moveByAnimated(deltaX, deltaY, null)
-  }
-
-  public fun moveByAnimated(deltaX: Double, deltaY: Double, animation: AnimationOptions?) {
+  public fun moveByAnimated(deltaX: Double, deltaY: Double, animation: AnimationOptions? = null) {
     memScoped {
       Status.check(
         mln_map_move_by_animated(
@@ -1098,11 +1115,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     }
   }
 
-  public fun scaleBy(scale: Double) {
-    scaleBy(scale, null)
-  }
-
-  public fun scaleBy(scale: Double, anchor: ScreenPoint?) {
+  public fun scaleBy(scale: Double, anchor: ScreenPoint? = null) {
     Status.check(
       mln_map_scale_by(state.requireLive(), scale, anchor?.let { CoreStructs.screenPoint(it) })
     )
@@ -1143,14 +1156,10 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     )
   }
 
-  public fun rotateByAnimated(first: ScreenPoint, second: ScreenPoint) {
-    rotateByAnimated(first, second, null)
-  }
-
   public fun rotateByAnimated(
     first: ScreenPoint,
     second: ScreenPoint,
-    animation: AnimationOptions?,
+    animation: AnimationOptions? = null,
   ) {
     memScoped {
       Status.check(
@@ -1168,11 +1177,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     Status.check(mln_map_pitch_by(state.requireLive(), pitch))
   }
 
-  public fun pitchByAnimated(pitch: Double) {
-    pitchByAnimated(pitch, null)
-  }
-
-  public fun pitchByAnimated(pitch: Double, animation: AnimationOptions?) {
+  public fun pitchByAnimated(pitch: Double, animation: AnimationOptions? = null) {
     memScoped {
       Status.check(
         mln_map_pitch_by_animated(
@@ -1188,12 +1193,9 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     Status.check(mln_map_cancel_transitions(state.requireLive()))
   }
 
-  public fun cameraForLatLngBounds(bounds: LatLngBounds): CameraOptions =
-    cameraForLatLngBounds(bounds, null)
-
   public fun cameraForLatLngBounds(
     bounds: LatLngBounds,
-    fitOptions: CameraFitOptions?,
+    fitOptions: CameraFitOptions? = null,
   ): CameraOptions = memScoped {
     val outCamera = mln_camera_options_default().getPointer(this)
     Status.check(
@@ -1207,12 +1209,9 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     MapStructs.cameraOptions(outCamera.pointed)
   }
 
-  public fun cameraForLatLngs(coordinates: List<LatLng>): CameraOptions =
-    cameraForLatLngs(coordinates, null)
-
   public fun cameraForLatLngs(
     coordinates: List<LatLng>,
-    fitOptions: CameraFitOptions?,
+    fitOptions: CameraFitOptions? = null,
   ): CameraOptions = memScoped {
     val outCamera = mln_camera_options_default().getPointer(this)
     Status.check(
@@ -1227,22 +1226,21 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     MapStructs.cameraOptions(outCamera.pointed)
   }
 
-  public fun cameraForGeometry(geometry: Geometry): CameraOptions =
-    cameraForGeometry(geometry, null)
-
-  public fun cameraForGeometry(geometry: Geometry, fitOptions: CameraFitOptions?): CameraOptions =
-    memScoped {
-      val outCamera = mln_camera_options_default().getPointer(this)
-      Status.check(
-        mln_map_camera_for_geometry(
-          state.requireLive(),
-          ValueStructs.geometry(geometry, this),
-          fitOptions?.let { MapStructs.cameraFitOptions(it, this) },
-          outCamera,
-        )
+  public fun cameraForGeometry(
+    geometry: Geometry,
+    fitOptions: CameraFitOptions? = null,
+  ): CameraOptions = memScoped {
+    val outCamera = mln_camera_options_default().getPointer(this)
+    Status.check(
+      mln_map_camera_for_geometry(
+        state.requireLive(),
+        ValueStructs.geometry(geometry, this),
+        fitOptions?.let { MapStructs.cameraFitOptions(it, this) },
+        outCamera,
       )
-      MapStructs.cameraOptions(outCamera.pointed)
-    }
+    )
+    MapStructs.cameraOptions(outCamera.pointed)
+  }
 
   public fun latLngBoundsForCamera(camera: CameraOptions): LatLngBounds = memScoped {
     val outBounds = alloc<mln_lat_lng_bounds>()
@@ -1400,14 +1398,19 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
 
   internal fun nativeAddress(): Long = state.address()
 
+  private fun checkedInt(value: ULong, name: String): Int {
+    require(value <= Int.MAX_VALUE.toULong()) { "$name exceeds Int.MAX_VALUE" }
+    return value.toInt()
+  }
+
   public companion object {
     public fun create(runtime: RuntimeHandle, options: MapOptions): MapHandle = memScoped {
       val nativeOptions = alloc<mln_map_options>()
       mln_map_options_default().place(nativeOptions.ptr)
-      options.width?.let { nativeOptions.width = it }
-      options.height?.let { nativeOptions.height = it }
+      options.width?.let { nativeOptions.width = it.toUInt() }
+      options.height?.let { nativeOptions.height = it.toUInt() }
       options.scaleFactor?.let { nativeOptions.scale_factor = it }
-      options.mapMode?.let { nativeOptions.map_mode = it.nativeValue }
+      options.mapMode?.let { nativeOptions.map_mode = it.nativeValue.toUInt() }
 
       val outMap = alloc<CPointerVarOf<CPointer<mln_map>>>()
       outMap.value = null

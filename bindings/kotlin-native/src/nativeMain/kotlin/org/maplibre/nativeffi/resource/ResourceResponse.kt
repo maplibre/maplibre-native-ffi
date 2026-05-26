@@ -27,6 +27,7 @@ public class ResourceResponse private constructor(public val status: ResourceRes
     private set
 
   public fun errorReason(errorReason: ResourceErrorReason): ResourceResponse = apply {
+    require(errorReason != ResourceErrorReason.UNKNOWN) { "errorReason must be a known value" }
     this.errorReason = errorReason
   }
 

@@ -1,28 +1,30 @@
 package org.maplibre.nativeffi.log
 
 /** Category for a Maplibre Native log record. */
-public enum class LogEvent(public val nativeValue: UInt) {
-  GENERAL(0U),
-  SETUP(1U),
-  SHADER(2U),
-  PARSE_STYLE(3U),
-  PARSE_TILE(4U),
-  RENDER(5U),
-  STYLE(6U),
-  DATABASE(7U),
-  HTTP_REQUEST(8U),
-  SPRITE(9U),
-  IMAGE(10U),
-  OPENGL(11U),
-  JNI(12U),
-  ANDROID(13U),
-  CRASH(14U),
-  GLYPH(15U),
-  TIMING(16U),
-  UNKNOWN(UInt.MAX_VALUE);
+public enum class LogEvent(public val nativeValue: Int) {
+  GENERAL(0),
+  SETUP(1),
+  SHADER(2),
+  PARSE_STYLE(3),
+  PARSE_TILE(4),
+  RENDER(5),
+  STYLE(6),
+  DATABASE(7),
+  HTTP_REQUEST(8),
+  SPRITE(9),
+  IMAGE(10),
+  OPENGL(11),
+  JNI(12),
+  ANDROID(13),
+  CRASH(14),
+  GLYPH(15),
+  TIMING(16),
+  UNKNOWN(-1);
 
   public companion object {
-    public fun fromNative(nativeValue: UInt): LogEvent =
+    internal fun fromNative(nativeValue: UInt): LogEvent = fromNative(nativeValue.toInt())
+
+    public fun fromNative(nativeValue: Int): LogEvent =
       entries.firstOrNull { it.nativeValue == nativeValue } ?: UNKNOWN
   }
 }

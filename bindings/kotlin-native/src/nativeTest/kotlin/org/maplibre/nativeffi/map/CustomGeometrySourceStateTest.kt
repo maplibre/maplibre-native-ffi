@@ -41,6 +41,6 @@ class CustomGeometrySourceStateTest {
     state.close()
     state.fetch(tile)
 
-    assertEquals(listOf(CanonicalTileId(1U, 2U, 3U), CanonicalTileId(1U, 2U, 3U)), received)
+    assertEquals(listOf(CanonicalTileId(1, 2, 3), CanonicalTileId(1, 2, 3)), received)
   }
 }
