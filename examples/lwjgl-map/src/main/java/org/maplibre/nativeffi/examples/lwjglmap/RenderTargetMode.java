@@ -16,8 +16,8 @@ enum RenderTargetMode {
 
   String status() {
     return switch (this) {
-      case OWNED_TEXTURE -> "samples MapLibre-owned Vulkan frames into the GLFW swapchain";
-      case NATIVE_SURFACE -> "renders directly to the GLFW Vulkan surface";
+      case OWNED_TEXTURE -> "samples MapLibre-owned frames into the GLFW swapchain";
+      case NATIVE_SURFACE -> "renders directly to the GLFW native surface";
     };
   }
 

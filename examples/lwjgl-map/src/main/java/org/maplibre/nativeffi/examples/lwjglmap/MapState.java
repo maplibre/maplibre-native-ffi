@@ -4,6 +4,8 @@ import org.maplibre.nativeffi.camera.CameraOptions;
 import org.maplibre.nativeffi.map.MapHandle;
 import org.maplibre.nativeffi.map.MapMode;
 import org.maplibre.nativeffi.map.MapOptions;
+import org.maplibre.nativeffi.render.OpenGLOwnedTextureDescriptor;
+import org.maplibre.nativeffi.render.OpenGLSurfaceDescriptor;
 import org.maplibre.nativeffi.render.RenderSessionHandle;
 import org.maplibre.nativeffi.render.RenderTargetExtent;
 import org.maplibre.nativeffi.render.VulkanContextDescriptor;
@@ -28,6 +30,16 @@ final class MapState implements AutoCloseable {
   }
 
   static MapState create(VulkanContext vulkan, Viewport viewport, RenderTargetMode mode) {
+    return create(
+        viewport, (map, currentViewport) -> attachRenderTarget(vulkan, map, currentViewport, mode));
+  }
+
+  static MapState create(OpenGLContext opengl, Viewport viewport, RenderTargetMode mode) {
+    return create(
+        viewport, (map, currentViewport) -> attachRenderTarget(opengl, map, currentViewport, mode));
+  }
+
+  private static MapState create(Viewport viewport, RenderTargetFactory targetFactory) {
     var runtime = RuntimeHandle.create(new RuntimeOptions().cachePath(":memory:"));
     var map =
         MapHandle.create(
@@ -38,7 +50,7 @@ final class MapState implements AutoCloseable {
                 .mapMode(MapMode.CONTINUOUS));
     RenderTarget target = null;
     try {
-      target = attachRenderTarget(vulkan, map, viewport, mode);
+      target = targetFactory.attach(map, viewport);
       map.setStyleUrl(STYLE_URL);
       map.jumpTo(
           new CameraOptions().center(37.7749, -122.4194).zoom(13.0).bearing(12.0).pitch(30.0));
@@ -100,6 +112,10 @@ final class MapState implements AutoCloseable {
     }
   }
 
+  private interface RenderTargetFactory {
+    RenderTarget attach(MapHandle map, Viewport viewport);
+  }
+
   private static RenderTarget attachRenderTarget(
       VulkanContext vulkan, MapHandle map, Viewport viewport, RenderTargetMode mode) {
     return switch (mode) {
@@ -117,6 +133,23 @@ final class MapState implements AutoCloseable {
     };
   }
 
+  private static RenderTarget attachRenderTarget(
+      OpenGLContext opengl, MapHandle map, Viewport viewport, RenderTargetMode mode) {
+    return switch (mode) {
+      case NATIVE_SURFACE -> {
+        var descriptor =
+            new OpenGLSurfaceDescriptor()
+                .extent(
+                    new RenderTargetExtent(
+                        viewport.width(), viewport.height(), viewport.scaleFactor()))
+                .context(opengl.descriptor())
+                .surface(opengl.surfacePointer());
+        yield new SurfaceRenderTarget(RenderSessionHandle.attachOpenGLSurface(map, descriptor));
+      }
+      case OWNED_TEXTURE -> attachOpenGLOwnedTextureRenderTarget(opengl, map, viewport);
+    };
+  }
+
   private static RenderTarget attachOwnedTextureRenderTarget(
       VulkanContext vulkan, MapHandle map, Viewport viewport) {
     var descriptor =
@@ -130,6 +163,38 @@ final class MapState implements AutoCloseable {
       session = RenderSessionHandle.attachVulkanOwnedTexture(map, descriptor);
       compositor = new VulkanTextureCompositor(vulkan, viewport);
       return new OwnedTextureRenderTarget(session, compositor);
+    } catch (RuntimeException error) {
+      if (compositor != null) {
+        try {
+          compositor.close();
+        } catch (RuntimeException cleanupError) {
+          error.addSuppressed(cleanupError);
+        }
+      }
+      if (session != null) {
+        try {
+          session.close();
+        } catch (RuntimeException cleanupError) {
+          error.addSuppressed(cleanupError);
+        }
+      }
+      throw error;
+    }
+  }
+
+  private static RenderTarget attachOpenGLOwnedTextureRenderTarget(
+      OpenGLContext opengl, MapHandle map, Viewport viewport) {
+    var descriptor =
+        new OpenGLOwnedTextureDescriptor()
+            .extent(
+                new RenderTargetExtent(viewport.width(), viewport.height(), viewport.scaleFactor()))
+            .context(opengl.descriptor());
+    RenderSessionHandle session = null;
+    OpenGLTextureCompositor compositor = null;
+    try {
+      session = RenderSessionHandle.attachOpenGLOwnedTexture(map, descriptor);
+      compositor = new OpenGLTextureCompositor(opengl, viewport);
+      return new OpenGLOwnedTextureRenderTarget(session, compositor);
     } catch (RuntimeException error) {
       if (compositor != null) {
         try {
@@ -188,6 +253,40 @@ final class MapState implements AutoCloseable {
     @Override
     public void close() {
       session.close();
+    }
+  }
+
+  private static final class OpenGLOwnedTextureRenderTarget implements RenderTarget {
+    private final RenderSessionHandle session;
+    private final OpenGLTextureCompositor compositor;
+
+    OpenGLOwnedTextureRenderTarget(
+        RenderSessionHandle session, OpenGLTextureCompositor compositor) {
+      this.session = session;
+      this.compositor = compositor;
+    }
+
+    @Override
+    public void resize(Viewport viewport) {
+      compositor.resize(viewport);
+      session.resize(viewport.width(), viewport.height(), viewport.scaleFactor());
+    }
+
+    @Override
+    public void renderUpdate() {
+      session.renderUpdate();
+      try (var frameHandle = session.acquireOpenGLOwnedTextureFrame()) {
+        compositor.draw(frameHandle);
+      }
+    }
+
+    @Override
+    public void close() {
+      try {
+        compositor.close();
+      } finally {
+        session.close();
+      }
     }
   }
 

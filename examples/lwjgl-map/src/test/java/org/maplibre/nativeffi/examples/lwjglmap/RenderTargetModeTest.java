@@ -22,9 +22,22 @@ final class RenderTargetModeTest {
   @Test
   void describesRenderTargets() {
     assertEquals(
-        "samples MapLibre-owned Vulkan frames into the GLFW swapchain",
+        "samples MapLibre-owned frames into the GLFW swapchain",
         RenderTargetMode.OWNED_TEXTURE.status());
     assertEquals(
-        "renders directly to the GLFW Vulkan surface", RenderTargetMode.NATIVE_SURFACE.status());
+        "renders directly to the GLFW native surface", RenderTargetMode.NATIVE_SURFACE.status());
+  }
+
+  @Test
+  void parsesExampleBackends() {
+    assertEquals(ExampleBackend.VULKAN, ExampleBackend.parse("vulkan"));
+    assertEquals(ExampleBackend.OPENGL, ExampleBackend.parse("opengl"));
+  }
+
+  @Test
+  void rejectsUnknownBackends() {
+    var error = assertThrows(IllegalArgumentException.class, () -> ExampleBackend.parse("metal"));
+
+    assertEquals("unknown backend 'metal'", error.getMessage());
   }
 }

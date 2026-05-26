@@ -7,16 +7,18 @@ import static org.lwjgl.glfw.GLFW.glfwSetWindowSizeCallback;
 import static org.lwjgl.glfw.GLFW.glfwWindowShouldClose;
 
 import org.maplibre.nativeffi.Maplibre;
+import org.maplibre.nativeffi.render.OpenGLContextProvider;
 import org.maplibre.nativeffi.render.RenderBackend;
 
 public final class Main {
   private Main() {}
 
   public static void main(String[] args) throws Exception {
-    var mode = parseArgs(args);
-    if (!Maplibre.supportedRenderBackends().contains(RenderBackend.VULKAN)) {
-      throw new IllegalStateException("The loaded MapLibre native library does not support Vulkan");
-    }
+    var options = parseArgs(args);
+    var backend = options.backend() != null ? options.backend() : chooseDefaultBackend();
+    var mode = options.renderTargetMode();
+    ensureBackendSupported(backend);
+    System.out.println("lwjgl-map backend: " + backend.cliName());
     System.out.println("lwjgl-map render target: " + mode.cliName());
     System.out.println("render target status: " + mode.status());
     var propertyPath = System.getProperty("org.maplibre.nativeffi.library.path");
@@ -24,38 +26,89 @@ public final class Main {
       System.out.println("MapLibre native library: " + propertyPath);
     }
 
-    try (var vulkan = VulkanContext.create("MapLibre LWJGL Map", 1280, 720)) {
-      var viewport = new ViewportHolder(Viewport.read(vulkan.window()));
-      try (var mapState = MapState.create(vulkan, viewport.value, mode);
-          var input = new InputController(vulkan.window(), mapState.map())) {
-        InputController.printControls();
-        installResizeCallbacks(vulkan.window(), viewport);
-        while (!glfwWindowShouldClose(vulkan.window())) {
-          glfwPollEvents();
-          if (viewport.consumeChanged()) {
-            mapState.resize(viewport.value);
-          }
-          var rendered = mapState.step();
-          if (!rendered) {
-            Thread.sleep(4);
-          }
+    switch (backend) {
+      case VULKAN -> {
+        try (var vulkan = VulkanContext.create("MapLibre LWJGL Map", 1280, 720)) {
+          run(vulkan.window(), MapState.create(vulkan, Viewport.read(vulkan.window()), mode));
+        }
+      }
+      case OPENGL -> {
+        try (var opengl = OpenGLContext.create("MapLibre LWJGL Map", 1280, 720)) {
+          run(opengl.window(), MapState.create(opengl, Viewport.read(opengl.window()), mode));
         }
       }
     }
   }
 
-  private static RenderTargetMode parseArgs(String[] args) {
+  private static void run(long window, MapState mapState) throws Exception {
+    var viewport = new ViewportHolder(Viewport.read(window));
+    try (mapState;
+        var input = new InputController(window, mapState.map())) {
+      InputController.printControls();
+      installResizeCallbacks(window, viewport);
+      while (!glfwWindowShouldClose(window)) {
+        glfwPollEvents();
+        if (viewport.consumeChanged()) {
+          mapState.resize(viewport.value);
+        }
+        var rendered = mapState.step();
+        if (!rendered) {
+          Thread.sleep(4);
+        }
+      }
+    }
+  }
+
+  private static Options parseArgs(String[] args) {
     var mode = RenderTargetMode.OWNED_TEXTURE;
+    ExampleBackend backend = null;
     for (var arg : args) {
       if (arg.startsWith("--render-target=")) {
         mode = RenderTargetMode.parse(arg.substring("--render-target=".length()));
+      } else if (arg.startsWith("--backend=")) {
+        backend = ExampleBackend.parse(arg.substring("--backend=".length()));
       } else if (!arg.startsWith("-")) {
         mode = RenderTargetMode.parse(arg);
       } else {
         throw new IllegalArgumentException("unknown argument: " + arg);
       }
     }
-    return mode;
+    return new Options(backend, mode);
+  }
+
+  private static ExampleBackend chooseDefaultBackend() {
+    var backends = Maplibre.supportedRenderBackends();
+    if (backends.contains(RenderBackend.VULKAN)) {
+      return ExampleBackend.VULKAN;
+    }
+    if (backends.contains(RenderBackend.OPENGL)) {
+      return ExampleBackend.OPENGL;
+    }
+    throw new IllegalStateException(
+        "The loaded MapLibre native library supports neither Vulkan nor OpenGL");
+  }
+
+  private static void ensureBackendSupported(ExampleBackend backend) {
+    var backends = Maplibre.supportedRenderBackends();
+    switch (backend) {
+      case VULKAN -> {
+        if (!backends.contains(RenderBackend.VULKAN)) {
+          throw new IllegalStateException(
+              "The loaded MapLibre native library does not support Vulkan");
+        }
+      }
+      case OPENGL -> {
+        if (!backends.contains(RenderBackend.OPENGL)) {
+          throw new IllegalStateException(
+              "The loaded MapLibre native library does not support OpenGL");
+        }
+        if (!Maplibre.supportedOpenGLContextProviders().contains(OpenGLContextProvider.WGL)) {
+          // TODO(linux): Accept EGL here after the LWJGL example has a Linux
+          // EGL context/surface path validated on a Linux machine.
+          throw new IllegalStateException("The OpenGL LWJGL example currently requires WGL");
+        }
+      }
+    }
   }
 
   private static void installResizeCallbacks(long window, ViewportHolder viewport) {
@@ -86,4 +139,6 @@ public final class Main {
       return result;
     }
   }
+
+  private record Options(ExampleBackend backend, RenderTargetMode renderTargetMode) {}
 }
