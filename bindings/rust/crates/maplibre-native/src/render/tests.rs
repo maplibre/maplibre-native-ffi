@@ -893,11 +893,7 @@ fn opengl_context_provider_mask_is_exposed_semantically() {
 #[test]
 fn opengl_owned_texture_session_attaches_with_platform_context() {
     let runtime = RuntimeHandle::new().unwrap();
-    let map = MapHandle::with_options(
-        &runtime,
-        &MapOptions::new(64, 64, 1.0).with_mode(MapMode::Static),
-    )
-    .unwrap();
+    let map = MapHandle::with_options(&runtime, &MapOptions::new(64, 64, 1.0)).unwrap();
     let Ok((_context, session)) =
         create_opengl_owned_texture_session(&map, RenderTargetExtent::new(32, 16, 1.0))
     else {
@@ -911,6 +907,23 @@ fn opengl_owned_texture_session_attaches_with_platform_context() {
         error.kind(),
         ErrorKind::InvalidState | ErrorKind::Unsupported
     ));
+
+    map.set_style_json(QUERY_STYLE_JSON).unwrap();
+    assert!(wait_for_runtime_event(
+        &runtime,
+        RuntimeEventType::MapRenderUpdateAvailable
+    ));
+    session.render_update().unwrap();
+
+    let frame = session.acquire_opengl_owned_texture_frame().unwrap();
+    assert_eq!(frame.frame().unwrap().width, 32);
+    assert_eq!(frame.frame().unwrap().height, 16);
+    assert_eq!(frame.frame().unwrap().target, GL_TEXTURE_2D);
+    assert_eq!(frame.frame().unwrap().internal_format, GL_RGBA8 as u32);
+    assert_eq!(frame.frame().unwrap().format, GL_RGBA);
+    assert_eq!(frame.frame().unwrap().type_, GL_UNSIGNED_BYTE);
+    assert!(!frame.texture().unwrap().is_zero());
+    frame.close().unwrap();
 
     session.close().unwrap();
     map.close().unwrap();

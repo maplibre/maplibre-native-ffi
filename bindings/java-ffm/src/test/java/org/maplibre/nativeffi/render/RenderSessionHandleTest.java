@@ -177,6 +177,10 @@ final class RenderSessionHandleTest {
       try (var frameHandle = activeSession.acquireOpenGLOwnedTextureFrame()) {
         frame = frameHandle.frame();
         assertEquals(32, frame.width());
+        assertEquals(0x0de1, frame.target());
+        assertEquals(0x8058, frame.internalFormat());
+        assertEquals(0x1908, frame.format());
+        assertEquals(0x1401, frame.type());
         assertTrue(frame.texture() != 0);
         assertFalse(frameHandle.isClosed());
         assertThrows(InvalidStateException.class, activeSession::renderUpdate);

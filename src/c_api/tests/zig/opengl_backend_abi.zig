@@ -86,6 +86,7 @@ const wgl = if (builtin.os.tag == .windows) struct {
     const GL_FRONT = 0x0404;
     const GL_TEXTURE_2D = 0x0de1;
     const GL_RGBA = 0x1908;
+    const GL_RGBA8 = 0x8058;
     const GL_UNSIGNED_BYTE = 0x1401;
     const GL_TEXTURE_MAG_FILTER = 0x2800;
     const GL_TEXTURE_MIN_FILTER = 0x2801;
@@ -561,6 +562,9 @@ test "OpenGL WGL owned texture renders through raw C ABI" {
     try testing.expectEqual(@as(u32, 256), frame.width);
     try testing.expectEqual(@as(u32, 256), frame.height);
     try testing.expectEqual(@as(u32, 0x0de1), frame.target);
+    try testing.expectEqual(@as(u32, wgl.GL_RGBA8), frame.internal_format);
+    try testing.expectEqual(@as(u32, wgl.GL_RGBA), frame.format);
+    try testing.expectEqual(@as(u32, wgl.GL_UNSIGNED_BYTE), frame.type);
     try testing.expect(frame.texture != 0);
     try testing.expectEqual(c.MLN_STATUS_INVALID_STATE, c.mln_texture_read_premultiplied_rgba8(handle, pixels.ptr, pixels.len, &image_info));
     try testing.expectEqual(c.MLN_STATUS_OK, c.mln_opengl_owned_texture_release_frame(handle, &frame));

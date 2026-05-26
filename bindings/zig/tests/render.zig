@@ -1288,6 +1288,9 @@ test "OpenGL WGL owned texture frame scopes public binding access" {
     try testing.expectEqual(@as(u32, 32), info.width);
     try testing.expectEqual(@as(u32, 32), info.height);
     try testing.expectEqual(@as(u32, wgl.GL_TEXTURE_2D), info.target);
+    try testing.expectEqual(@as(u32, wgl.GL_RGBA8), info.internal_format);
+    try testing.expectEqual(@as(u32, wgl.GL_RGBA), info.format);
+    try testing.expectEqual(@as(u32, wgl.GL_UNSIGNED_BYTE), info.type);
     try testing.expect(info.texture != 0);
 
     try testing.expectError(error.ActiveBorrow, session.renderUpdate());

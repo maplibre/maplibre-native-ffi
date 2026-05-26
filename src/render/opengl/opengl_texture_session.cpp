@@ -38,7 +38,7 @@
 namespace {
 
 constexpr auto opengl_texture_target = uint32_t{GL_TEXTURE_2D};
-constexpr auto opengl_internal_format = uint32_t{GL_RGBA};
+constexpr auto opengl_internal_format = uint32_t{GL_RGBA8};
 constexpr auto opengl_pixel_format = uint32_t{GL_RGBA};
 constexpr auto opengl_pixel_type = uint32_t{GL_UNSIGNED_BYTE};
 
