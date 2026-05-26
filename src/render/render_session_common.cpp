@@ -48,6 +48,158 @@ struct OwnedQueriedFeatureDescriptor {
   std::unique_ptr<OwnedJsonDescriptor> state;
 };
 
+auto opengl_supported_context_provider_mask() noexcept -> uint32_t {
+#if defined(MLN_RENDER_BACKEND_OPENGL) && defined(_WIN32)
+  return MLN_OPENGL_CONTEXT_PROVIDER_FLAG_WGL;
+#elif defined(MLN_RENDER_BACKEND_OPENGL) && defined(__linux__)
+  return MLN_OPENGL_CONTEXT_PROVIDER_FLAG_EGL;
+#else
+  return 0;
+#endif
+}
+
+auto opengl_context_descriptor_default() noexcept
+  -> mln_opengl_context_descriptor {
+  auto result = mln_opengl_context_descriptor{
+    .size = sizeof(mln_opengl_context_descriptor),
+    .platform = static_cast<mln_opengl_context_platform>(0),
+    .data = {
+      .wgl = mln_wgl_context_descriptor{
+        .size = sizeof(mln_wgl_context_descriptor),
+        .device_context = nullptr,
+        .share_context = nullptr,
+        .get_proc_address = nullptr,
+      },
+    },
+  };
+#if defined(_WIN32)
+  result.platform = MLN_OPENGL_CONTEXT_PLATFORM_WGL;
+  result.data.wgl = mln_wgl_context_descriptor{
+    .size = sizeof(mln_wgl_context_descriptor),
+    .device_context = nullptr,
+    .share_context = nullptr,
+    .get_proc_address = nullptr,
+  };
+#elif defined(__linux__)
+  result.platform = MLN_OPENGL_CONTEXT_PLATFORM_EGL;
+  result.data.egl = mln_egl_context_descriptor{
+    .size = sizeof(mln_egl_context_descriptor),
+    .display = nullptr,
+    .config = nullptr,
+    .share_context = nullptr,
+    .get_proc_address = nullptr,
+  };
+#endif
+  return result;
+}
+
+auto opengl_owned_texture_descriptor_default() noexcept
+  -> mln_opengl_owned_texture_descriptor {
+  return mln_opengl_owned_texture_descriptor{
+    .size = sizeof(mln_opengl_owned_texture_descriptor),
+    .extent =
+      mln_render_target_extent{
+        .size = sizeof(mln_render_target_extent),
+        .width = 256,
+        .height = 256,
+        .scale_factor = 1.0,
+      },
+    .context = opengl_context_descriptor_default(),
+  };
+}
+
+auto opengl_borrowed_texture_descriptor_default() noexcept
+  -> mln_opengl_borrowed_texture_descriptor {
+  return mln_opengl_borrowed_texture_descriptor{
+    .size = sizeof(mln_opengl_borrowed_texture_descriptor),
+    .extent =
+      mln_render_target_extent{
+        .size = sizeof(mln_render_target_extent),
+        .width = 256,
+        .height = 256,
+        .scale_factor = 1.0,
+      },
+    .context = opengl_context_descriptor_default(),
+    .texture = 0,
+    .target = 0,
+  };
+}
+
+auto opengl_surface_descriptor_default() noexcept
+  -> mln_opengl_surface_descriptor {
+  return mln_opengl_surface_descriptor{
+    .size = sizeof(mln_opengl_surface_descriptor),
+    .extent =
+      mln_render_target_extent{
+        .size = sizeof(mln_render_target_extent),
+        .width = 256,
+        .height = 256,
+        .scale_factor = 1.0,
+      },
+    .context = opengl_context_descriptor_default(),
+    .surface = nullptr,
+  };
+}
+
+auto validate_opengl_context(
+  const mln_opengl_context_descriptor& context, bool require_supported_provider
+) -> mln_status {
+  if (context.size < sizeof(mln_opengl_context_descriptor)) {
+    set_thread_error("mln_opengl_context_descriptor.size is too small");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+
+  if (context.platform == MLN_OPENGL_CONTEXT_PLATFORM_WGL) {
+    if (
+      require_supported_provider && (opengl_supported_context_provider_mask() &
+                                     MLN_OPENGL_CONTEXT_PROVIDER_FLAG_WGL) == 0
+    ) {
+      set_thread_error("OpenGL WGL context provider is not supported");
+      return MLN_STATUS_UNSUPPORTED;
+    }
+    if (context.data.wgl.size < sizeof(mln_wgl_context_descriptor)) {
+      set_thread_error("mln_wgl_context_descriptor.size is too small");
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
+    if (
+      context.data.wgl.device_context == nullptr ||
+      context.data.wgl.share_context == nullptr
+    ) {
+      set_thread_error("WGL device_context and share_context must not be null");
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
+    return MLN_STATUS_OK;
+  }
+
+  if (context.platform == MLN_OPENGL_CONTEXT_PLATFORM_EGL) {
+    if (
+      require_supported_provider && (opengl_supported_context_provider_mask() &
+                                     MLN_OPENGL_CONTEXT_PROVIDER_FLAG_EGL) == 0
+    ) {
+      set_thread_error("OpenGL EGL context provider is not supported");
+      return MLN_STATUS_UNSUPPORTED;
+    }
+    if (context.data.egl.size < sizeof(mln_egl_context_descriptor)) {
+      set_thread_error("mln_egl_context_descriptor.size is too small");
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
+    if (
+      context.data.egl.display == nullptr ||
+      context.data.egl.config == nullptr ||
+      context.data.egl.share_context == nullptr
+    ) {
+      set_thread_error(
+        "EGL display, config, and share_context must not be null"
+      );
+      return MLN_STATUS_INVALID_ARGUMENT;
+    }
+    return MLN_STATUS_OK;
+  }
+
+  set_thread_error("OpenGL context platform is invalid");
+  return MLN_STATUS_INVALID_ARGUMENT;
+}
+
 }  // namespace mln::core
 
 struct mln_feature_query_result {

@@ -52,6 +52,59 @@ typedef struct mln_vulkan_context_descriptor {
   void* get_device_proc_addr;
 } mln_vulkan_context_descriptor;
 
+/** OpenGL context providers supported by this build. */
+typedef enum mln_opengl_context_provider_flag : uint32_t {
+  MLN_OPENGL_CONTEXT_PROVIDER_FLAG_WGL = 1u << 0u,
+  MLN_OPENGL_CONTEXT_PROVIDER_FLAG_EGL = 1u << 1u,
+} mln_opengl_context_provider_flag;
+
+/** OpenGL platform context provider used by a context descriptor. */
+typedef enum mln_opengl_context_platform : uint32_t {
+  MLN_OPENGL_CONTEXT_PLATFORM_WGL = 1u,
+  MLN_OPENGL_CONTEXT_PLATFORM_EGL = 2u,
+} mln_opengl_context_platform;
+
+/** WGL context fields shared by OpenGL render targets on Windows. */
+typedef struct mln_wgl_context_descriptor {
+  uint32_t size;
+  /** Borrowed HDC used to create a shared session context. Required. */
+  void* device_context;
+  /** Borrowed HGLRC whose share group the session context joins. Required. */
+  void* share_context;
+  /** Optional wglGetProcAddress-compatible function for the host loader. */
+  void* get_proc_address;
+} mln_wgl_context_descriptor;
+
+/** EGL context fields shared by OpenGL render targets on Linux. */
+typedef struct mln_egl_context_descriptor {
+  uint32_t size;
+  /** Borrowed EGLDisplay. Required. */
+  void* display;
+  /** Borrowed EGLConfig used to create a shared session context. Required. */
+  void* config;
+  /** Borrowed EGLContext whose share group the session context joins. Required.
+   */
+  void* share_context;
+  /** Optional eglGetProcAddress-compatible function for the host loader. */
+  void* get_proc_address;
+} mln_egl_context_descriptor;
+
+/** OpenGL backend context fields shared by OpenGL render targets. */
+typedef struct mln_opengl_context_descriptor {
+  uint32_t size;
+  /** WGL or EGL context provider. */
+  mln_opengl_context_platform platform;
+  union {
+    mln_wgl_context_descriptor wgl;
+    mln_egl_context_descriptor egl;
+  } data;
+} mln_opengl_context_descriptor;
+
+/**
+ * Returns OpenGL context providers supported by this build.
+ */
+MLN_API uint32_t mln_opengl_supported_context_provider_mask(void) MLN_NOEXCEPT;
+
 #ifdef __cplusplus
 }
 #endif

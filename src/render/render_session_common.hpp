@@ -19,8 +19,13 @@ struct mln_render_session;
 namespace mln::core {
 
 enum class RenderSessionKind : uint8_t { Surface, Texture };
-enum class TextureSessionApi : uint8_t { Generic, Metal, Vulkan };
-enum class TextureSessionFrameKind : uint8_t { None, MetalOwned, VulkanOwned };
+enum class TextureSessionApi : uint8_t { Generic, Metal, OpenGL, Vulkan };
+enum class TextureSessionFrameKind : uint8_t {
+  None,
+  MetalOwned,
+  OpenGLOwned,
+  VulkanOwned
+};
 enum class TextureSessionMode : uint8_t { Owned, Borrowed };
 
 class SurfaceSessionBackend {
@@ -58,6 +63,13 @@ class TextureSessionBackend {
   }
   virtual auto acquire_vulkan_owned_frame(
     const mln_render_session& session, mln_vulkan_owned_texture_frame& out_frame
+  ) -> mln_status {
+    (void)session;
+    (void)out_frame;
+    return MLN_STATUS_UNSUPPORTED;
+  }
+  virtual auto acquire_opengl_owned_frame(
+    const mln_render_session& session, mln_opengl_owned_texture_frame& out_frame
   ) -> mln_status {
     (void)session;
     (void)out_frame;
@@ -185,6 +197,17 @@ inline auto validate_vulkan_context(
   }
   return MLN_STATUS_OK;
 }
+
+auto opengl_supported_context_provider_mask() noexcept -> uint32_t;
+auto opengl_context_descriptor_default() noexcept
+  -> mln_opengl_context_descriptor;
+auto opengl_owned_texture_descriptor_default() noexcept
+  -> mln_opengl_owned_texture_descriptor;
+auto opengl_borrowed_texture_descriptor_default() noexcept
+  -> mln_opengl_borrowed_texture_descriptor;
+auto validate_opengl_context(
+  const mln_opengl_context_descriptor& context, bool require_supported_provider
+) -> mln_status;
 
 inline auto set_session_extent(
   mln_render_session& session, const mln_render_target_extent& extent
