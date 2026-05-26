@@ -415,15 +415,16 @@ public final class RuntimeHandle implements AutoCloseable {
     var booleans = new boolean[RuntimeStructs.BOOLEAN_COUNT];
     var doubles = new double[RuntimeStructs.DOUBLE_COUNT];
     var strings = new String[RuntimeStructs.STRING_COUNT];
-    var nativeEvent = new MaplibreNativeC.mln_runtime_event();
-    nativeEvent.size(nativeEvent.sizeof());
-    var hasEvent = new boolean[1];
-    Status.check(
-        MaplibreNativeC.mln_runtime_poll_event(
-            JavaCppSupport.runtime(state.requireLiveAddress()), nativeEvent, hasEvent));
-    booleans[RuntimeStructs.BOOLEAN_HAS_EVENT] = hasEvent[0];
-    if (hasEvent[0]) {
-      RuntimeStructs.copyEvent(nativeEvent, longs, ints, booleans, doubles, strings);
+    try (var nativeEvent = new MaplibreNativeC.mln_runtime_event()) {
+      nativeEvent.size(nativeEvent.sizeof());
+      var hasEvent = new boolean[1];
+      Status.check(
+          MaplibreNativeC.mln_runtime_poll_event(
+              JavaCppSupport.runtime(state.requireLiveAddress()), nativeEvent, hasEvent));
+      booleans[RuntimeStructs.BOOLEAN_HAS_EVENT] = hasEvent[0];
+      if (hasEvent[0]) {
+        RuntimeStructs.copyEvent(nativeEvent, longs, ints, booleans, doubles, strings);
+      }
     }
     if (!booleans[RuntimeStructs.BOOLEAN_HAS_EVENT]) {
       return Optional.empty();

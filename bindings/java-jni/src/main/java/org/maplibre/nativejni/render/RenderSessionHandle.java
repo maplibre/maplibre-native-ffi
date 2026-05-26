@@ -177,10 +177,10 @@ public final class RenderSessionHandle implements AutoCloseable {
               JavaCppSupport.renderSession(state.requireLiveAddress()),
               nativeSelector.selector(),
               outState));
-      var state =
+      var jsonSnapshot =
           QueryStructs.jsonSnapshot(
               JavaCppSupport.outAddress(outState, MaplibreNativeC.mln_json_snapshot.class));
-      return state == null ? JsonValue.object(List.of()) : state;
+      return jsonSnapshot == null ? JsonValue.object(List.of()) : jsonSnapshot;
     }
   }
 
