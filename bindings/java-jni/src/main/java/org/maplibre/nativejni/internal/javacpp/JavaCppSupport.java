@@ -28,6 +28,15 @@ public final class JavaCppSupport {
     return pointer == null || pointer.isNull() ? "" : pointer.getString(StandardCharsets.UTF_8);
   }
 
+  public static String utf8String(BytePointer pointer, long byteLength) {
+    if (pointer == null || pointer.isNull() || byteLength == 0) {
+      return "";
+    }
+    var bytes = new byte[Math.toIntExact(byteLength)];
+    pointer.get(bytes, 0, bytes.length);
+    return new String(bytes, StandardCharsets.UTF_8);
+  }
+
   public static BytePointer utf8(String value) {
     return value == null ? null : new BytePointer(value, StandardCharsets.UTF_8);
   }

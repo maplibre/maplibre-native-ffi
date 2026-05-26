@@ -6,7 +6,10 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Optional;
+import org.bytedeco.javacpp.BytePointer;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.maplibre.nativejni.internal.javacpp.MaplibreNativeC;
 import org.maplibre.nativejni.map.TileOperation;
 import org.maplibre.nativejni.offline.OfflineRegionDownloadState;
 import org.maplibre.nativejni.render.RenderMode;
@@ -16,8 +19,14 @@ import org.maplibre.nativejni.runtime.OfflineOperationResultKind;
 import org.maplibre.nativejni.runtime.RuntimeEventPayload;
 import org.maplibre.nativejni.runtime.RuntimeEventSourceType;
 import org.maplibre.nativejni.runtime.RuntimeEventType;
+import org.maplibre.nativejni.test.NativeTestSupport;
 
 final class RuntimeEventStructsTest {
+  @BeforeAll
+  static void loadNativeLibrary() {
+    NativeTestSupport.loadNativeLibraryOrSkip();
+  }
+
   @Test
   void renderFramePayloadCopiesStatsAndFlags() {
     var longs = longs();
@@ -149,6 +158,55 @@ final class RuntimeEventStructsTest {
     assertSame(OfflineOperationKind.REGION_GET, completedPayload.operationKind());
     assertSame(OfflineOperationResultKind.OPTIONAL_REGION, completedPayload.resultKind());
     assertTrue(completedPayload.found());
+  }
+
+  @Test
+  void copyEventTreatsUndersizedPayloadAsUnknown() {
+    try (var event = new MaplibreNativeC.mln_runtime_event();
+        var payload = new BytePointer(1)) {
+      event.payload_type(RuntimeStructs.PAYLOAD_RENDER_MAP);
+      event.payload(payload);
+      event.payload_size(0);
+
+      var longs = longs();
+      var ints = new int[RuntimeStructs.INT_COUNT];
+      RuntimeStructs.copyEvent(event, longs, ints, booleans(), doubles(), strings());
+
+      assertEquals(0, ints[RuntimeStructs.INT_PAYLOAD_AVAILABLE]);
+      var unknown =
+          assertInstanceOf(
+              RuntimeEventPayload.Unknown.class,
+              RuntimeStructs.runtimeEventPayload(longs, ints, booleans(), doubles(), strings()));
+      assertEquals(RuntimeStructs.PAYLOAD_RENDER_MAP, unknown.rawPayloadType());
+      assertEquals(0, unknown.payloadSize());
+    }
+  }
+
+  @Test
+  void copyEventUsesExplicitStringSizes() {
+    var imageId = new byte[] {'i', 0, 'd'};
+    var message = new byte[] {'m', 0, 'g'};
+    try (var event = new MaplibreNativeC.mln_runtime_event();
+        var payload = new MaplibreNativeC.mln_runtime_event_style_image_missing();
+        var imageBytes = new BytePointer(imageId.length);
+        var messageBytes = new BytePointer(message.length)) {
+      imageBytes.put(imageId, 0, imageId.length).position(0);
+      messageBytes.put(message, 0, message.length).position(0);
+      payload.image_id(imageBytes);
+      payload.image_id_size(imageId.length);
+      event.payload_type(RuntimeStructs.PAYLOAD_STYLE_IMAGE_MISSING);
+      event.payload(payload);
+      event.payload_size(payload.sizeof());
+      event.message(messageBytes);
+      event.message_size(message.length);
+
+      var strings = strings();
+      RuntimeStructs.copyEvent(
+          event, longs(), new int[RuntimeStructs.INT_COUNT], booleans(), doubles(), strings);
+
+      assertEquals("i\0d", strings[RuntimeStructs.STRING_PAYLOAD]);
+      assertEquals("m\0g", strings[RuntimeStructs.STRING_MESSAGE]);
+    }
   }
 
   @Test

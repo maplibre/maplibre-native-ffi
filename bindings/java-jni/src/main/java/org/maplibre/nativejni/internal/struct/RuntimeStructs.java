@@ -119,25 +119,63 @@ public final class RuntimeStructs {
     ints[INT_CODE] = event.code();
     ints[INT_PAYLOAD_TYPE] = event.payload_type();
     longs[LONG_PAYLOAD_SIZE] = event.payload_size();
-    strings[STRING_MESSAGE] = JavaCppSupport.cString(event.message());
+    strings[STRING_MESSAGE] = JavaCppSupport.utf8String(event.message(), event.message_size());
     ints[INT_PAYLOAD_AVAILABLE] = event.payload() == null || event.payload().isNull() ? 0 : 1;
     if (ints[INT_PAYLOAD_AVAILABLE] == 0) {
       return;
     }
     switch (event.payload_type()) {
-      case PAYLOAD_RENDER_FRAME -> copyRenderFrame(event.payload(), longs, ints, booleans, doubles);
-      case PAYLOAD_RENDER_MAP -> copyRenderMap(event.payload(), ints);
-      case PAYLOAD_STYLE_IMAGE_MISSING -> copyStyleImageMissing(event.payload(), strings);
-      case PAYLOAD_TILE_ACTION -> copyTileAction(event.payload(), longs, ints, strings);
-      case PAYLOAD_OFFLINE_REGION_STATUS ->
+      case PAYLOAD_RENDER_FRAME -> {
+        if (payloadSizeAtLeast(event, PayloadSizes.RENDER_FRAME, ints)) {
+          copyRenderFrame(event.payload(), longs, ints, booleans, doubles);
+        }
+      }
+      case PAYLOAD_RENDER_MAP -> {
+        if (payloadSizeAtLeast(event, PayloadSizes.RENDER_MAP, ints)) {
+          copyRenderMap(event.payload(), ints);
+        }
+      }
+      case PAYLOAD_STYLE_IMAGE_MISSING -> {
+        if (payloadSizeAtLeast(event, PayloadSizes.STYLE_IMAGE_MISSING, ints)) {
+          copyStyleImageMissing(event.payload(), strings);
+        }
+      }
+      case PAYLOAD_TILE_ACTION -> {
+        if (payloadSizeAtLeast(event, PayloadSizes.TILE_ACTION, ints)) {
+          copyTileAction(event.payload(), longs, ints, strings);
+        }
+      }
+      case PAYLOAD_OFFLINE_REGION_STATUS -> {
+        if (payloadSizeAtLeast(event, PayloadSizes.OFFLINE_REGION_STATUS, ints)) {
           copyOfflineStatus(event.payload(), longs, ints, booleans);
-      case PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR ->
+        }
+      }
+      case PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR -> {
+        if (payloadSizeAtLeast(event, PayloadSizes.OFFLINE_REGION_RESPONSE_ERROR, ints)) {
           copyOfflineResponseError(event.payload(), longs, ints);
-      case PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT -> copyOfflineTileLimit(event.payload(), longs);
-      case PAYLOAD_OFFLINE_OPERATION_COMPLETED ->
+        }
+      }
+      case PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT -> {
+        if (payloadSizeAtLeast(event, PayloadSizes.OFFLINE_REGION_TILE_COUNT_LIMIT, ints)) {
+          copyOfflineTileLimit(event.payload(), longs);
+        }
+      }
+      case PAYLOAD_OFFLINE_OPERATION_COMPLETED -> {
+        if (payloadSizeAtLeast(event, PayloadSizes.OFFLINE_OPERATION_COMPLETED, ints)) {
           copyOfflineOperation(event.payload(), longs, ints, booleans);
+        }
+      }
       default -> ints[INT_PAYLOAD_AVAILABLE] = 0;
     }
+  }
+
+  private static boolean payloadSizeAtLeast(
+      MaplibreNativeC.mln_runtime_event event, long expectedSize, int[] ints) {
+    if (event.payload_size() >= expectedSize) {
+      return true;
+    }
+    ints[INT_PAYLOAD_AVAILABLE] = 0;
+    return false;
   }
 
   private static void copyRenderFrame(
@@ -158,9 +196,9 @@ public final class RuntimeStructs {
   }
 
   private static void copyStyleImageMissing(Pointer payload, String[] strings) {
+    var missing = new MaplibreNativeC.mln_runtime_event_style_image_missing(payload);
     strings[STRING_PAYLOAD] =
-        JavaCppSupport.cString(
-            new MaplibreNativeC.mln_runtime_event_style_image_missing(payload).image_id());
+        JavaCppSupport.utf8String(missing.image_id(), missing.image_id_size());
   }
 
   private static void copyTileAction(Pointer payload, long[] longs, int[] ints, String[] strings) {
@@ -171,7 +209,8 @@ public final class RuntimeStructs {
     longs[LONG_TILE_CANONICAL_Z] = action.tile_id().canonical_z();
     longs[LONG_TILE_CANONICAL_X] = action.tile_id().canonical_x();
     longs[LONG_TILE_CANONICAL_Y] = action.tile_id().canonical_y();
-    strings[STRING_PAYLOAD] = JavaCppSupport.cString(action.source_id());
+    strings[STRING_PAYLOAD] =
+        JavaCppSupport.utf8String(action.source_id(), action.source_id_size());
   }
 
   private static void copyOfflineStatus(
@@ -346,6 +385,33 @@ public final class RuntimeStructs {
         rawResultKind,
         ints[INT_OFFLINE_RESULT_STATUS],
         booleans[BOOLEAN_FOUND]);
+  }
+
+  private static final class PayloadSizes {
+    private static final long RENDER_FRAME =
+        sizeof(new MaplibreNativeC.mln_runtime_event_render_frame());
+    private static final long RENDER_MAP =
+        sizeof(new MaplibreNativeC.mln_runtime_event_render_map());
+    private static final long STYLE_IMAGE_MISSING =
+        sizeof(new MaplibreNativeC.mln_runtime_event_style_image_missing());
+    private static final long TILE_ACTION =
+        sizeof(new MaplibreNativeC.mln_runtime_event_tile_action());
+    private static final long OFFLINE_REGION_STATUS =
+        sizeof(new MaplibreNativeC.mln_runtime_event_offline_region_status());
+    private static final long OFFLINE_REGION_RESPONSE_ERROR =
+        sizeof(new MaplibreNativeC.mln_runtime_event_offline_region_response_error());
+    private static final long OFFLINE_REGION_TILE_COUNT_LIMIT =
+        sizeof(new MaplibreNativeC.mln_runtime_event_offline_region_tile_count_limit());
+    private static final long OFFLINE_OPERATION_COMPLETED =
+        sizeof(new MaplibreNativeC.mln_runtime_event_offline_operation_completed());
+
+    private PayloadSizes() {}
+
+    private static long sizeof(Pointer pointer) {
+      try (pointer) {
+        return pointer.sizeof();
+      }
+    }
   }
 
   private static void requireLength(int actual, int expected, String name) {
