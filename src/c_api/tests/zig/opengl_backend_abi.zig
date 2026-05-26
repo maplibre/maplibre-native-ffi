@@ -113,6 +113,71 @@ const wgl = if (builtin.os.tag == .windows) struct {
 
 const fake_handle: *anyopaque = @ptrFromInt(1);
 
+const raw_render_style_json =
+    \\{
+    \\  "version": 8,
+    \\  "name": "zig-raw-opengl-render-test",
+    \\  "sources": {},
+    \\  "layers": [
+    \\    {"id":"background","type":"background","paint":{"background-color":"#2c7fb8"}}
+    \\  ]
+    \\}
+;
+
+fn sleepOneMillisecond() !void {
+    try testing.io.sleep(.fromMilliseconds(1), .awake);
+}
+
+fn emptyEvent() c.mln_runtime_event {
+    return .{
+        .size = @sizeOf(c.mln_runtime_event),
+        .type = 0,
+        .source_type = c.MLN_RUNTIME_EVENT_SOURCE_RUNTIME,
+        .source = null,
+        .code = 0,
+        .payload_type = c.MLN_RUNTIME_EVENT_PAYLOAD_NONE,
+        .payload = null,
+        .payload_size = 0,
+        .message = null,
+        .message_size = 0,
+    };
+}
+
+fn waitForRenderedFrame(runtime: *c.mln_runtime, map: *c.mln_map, session: *c.mln_render_session) !void {
+    for (0..5000) |_| {
+        try testing.expectEqual(c.MLN_STATUS_OK, c.mln_runtime_run_once(runtime));
+        while (true) {
+            var event = emptyEvent();
+            var has_event = false;
+            try testing.expectEqual(c.MLN_STATUS_OK, c.mln_runtime_poll_event(runtime, &event, &has_event));
+            if (!has_event) break;
+            if (event.source_type != c.MLN_RUNTIME_EVENT_SOURCE_MAP or event.source != @as(?*anyopaque, @ptrCast(map))) continue;
+
+            switch (event.type) {
+                c.MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE => {
+                    const render_status = c.mln_render_session_render_update(session);
+                    if (render_status == c.MLN_STATUS_INVALID_STATE) continue;
+                    try testing.expectEqual(c.MLN_STATUS_OK, render_status);
+                    return;
+                },
+                c.MLN_RUNTIME_EVENT_MAP_LOADING_FAILED => return error.MapLoadingFailed,
+                c.MLN_RUNTIME_EVENT_MAP_RENDER_ERROR => return error.MapRenderFailed,
+                c.MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FAILED => return error.StillImageFailed,
+                else => {},
+            }
+        }
+        try sleepOneMillisecond();
+    }
+    return error.RenderTimedOut;
+}
+
+fn hasNonZeroByte(bytes: []const u8) bool {
+    for (bytes) |byte| {
+        if (byte != 0) return true;
+    }
+    return false;
+}
+
 fn configureContext(context: *c.mln_opengl_context_descriptor) void {
     if (builtin.os.tag == .windows) {
         context.platform = c.MLN_OPENGL_CONTEXT_PLATFORM_WGL;
@@ -339,7 +404,7 @@ test "OpenGL borrowed texture rejects unsafe raw descriptors" {
     try testing.expectEqual(@as(?*c.mln_render_session, null), texture);
 }
 
-test "OpenGL WGL owned texture attaches through raw C ABI" {
+test "OpenGL WGL owned texture renders through raw C ABI" {
     if (!build_options.supports_opengl or builtin.os.tag != .windows) return error.SkipZigTest;
 
     var wgl_context = try WglTestContext.init();
@@ -379,4 +444,40 @@ test "OpenGL WGL owned texture attaches through raw C ABI" {
     };
     try testing.expectEqual(c.MLN_STATUS_INVALID_STATE, c.mln_opengl_owned_texture_acquire_frame(handle, &frame));
     try testing.expectEqual(c.MLN_STATUS_INVALID_STATE, c.mln_opengl_owned_texture_release_frame(handle, &frame));
+
+    try testing.expectEqual(c.MLN_STATUS_OK, c.mln_map_set_style_json(map, raw_render_style_json));
+    try testing.expectEqual(c.MLN_STATUS_OK, c.mln_map_request_repaint(map));
+    try waitForRenderedFrame(runtime, map, handle);
+
+    image_info = c.mln_texture_image_info_default();
+    try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, c.mln_texture_read_premultiplied_rgba8(handle, null, 0, &image_info));
+    try testing.expectEqual(@as(u32, 256), image_info.width);
+    try testing.expectEqual(@as(u32, 256), image_info.height);
+    try testing.expectEqual(@as(u32, 256 * 4), image_info.stride);
+
+    const pixels = try testing.allocator.alloc(u8, image_info.byte_length);
+    defer testing.allocator.free(pixels);
+    try testing.expectEqual(c.MLN_STATUS_OK, c.mln_texture_read_premultiplied_rgba8(handle, pixels.ptr, pixels.len, &image_info));
+    try testing.expect(hasNonZeroByte(pixels));
+
+    frame = .{
+        .size = @sizeOf(c.mln_opengl_owned_texture_frame),
+        .generation = 0,
+        .width = 0,
+        .height = 0,
+        .scale_factor = 0.0,
+        .frame_id = 0,
+        .texture = 0,
+        .target = 0,
+        .internal_format = 0,
+        .format = 0,
+        .type = 0,
+    };
+    try testing.expectEqual(c.MLN_STATUS_OK, c.mln_opengl_owned_texture_acquire_frame(handle, &frame));
+    try testing.expectEqual(@as(u32, 256), frame.width);
+    try testing.expectEqual(@as(u32, 256), frame.height);
+    try testing.expectEqual(@as(u32, 0x0de1), frame.target);
+    try testing.expect(frame.texture != 0);
+    try testing.expectEqual(c.MLN_STATUS_INVALID_STATE, c.mln_texture_read_premultiplied_rgba8(handle, pixels.ptr, pixels.len, &image_info));
+    try testing.expectEqual(c.MLN_STATUS_OK, c.mln_opengl_owned_texture_release_frame(handle, &frame));
 }
