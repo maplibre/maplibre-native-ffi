@@ -44,10 +44,13 @@ public final class MetalOwnedTextureFrameHandle implements AutoCloseable {
     if (closed) {
       return;
     }
-    session.releaseMetalFrame(nativeFrame, null);
     closed = true;
-    scope.close();
-    nativeFrame.close();
+    try {
+      session.releaseMetalFrame(nativeFrame, null);
+    } finally {
+      scope.close();
+      nativeFrame.close();
+    }
   }
 
   private void ensureOpen() {
