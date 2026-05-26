@@ -9,7 +9,7 @@ public enum ResourceResponseStatus : uint { Ok = 0, Error = 1, NoContent = 2, No
 public enum ResourceErrorReason : uint { None = 0, NotFound = 1, Server = 2, Connection = 3, RateLimit = 4, Other = 5 }
 public enum ResourceProviderDecision : uint { PassThrough = 0, Handle = 1 }
 
-public readonly record struct ByteRange(ulong Offset, ulong Size);
+public readonly record struct ByteRange(ulong Start, ulong End);
 
 public sealed record ResourceRequest(
     ResourceKind Kind,

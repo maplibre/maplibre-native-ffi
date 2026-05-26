@@ -1,6 +1,7 @@
 using System.Runtime.InteropServices;
 using Maplibre.Native.Geo;
 using Maplibre.Native.Internal.C;
+using Maplibre.Native.Internal.Memory;
 using Maplibre.Native.Internal.Status;
 using Maplibre.Native.Json;
 using Maplibre.Native.Query;
@@ -34,8 +35,8 @@ internal sealed unsafe class NativeRenderedQueryGeometry : IDisposable
                 }), 0);
             case RenderedQueryGeometry.LineString line:
                 var count = line.Points.Count;
-                var allocation = count == 0 ? 0 : (nint)NativeMemory.Alloc((nuint)(sizeof(mln_screen_point) * count));
-                var nativePoints = (mln_screen_point*)allocation;
+                var nativePoints = NativeAllocation.AllocArray<mln_screen_point>(count);
+                var allocation = (nint)nativePoints;
                 for (var index = 0; index < count; index++)
                 {
                     nativePoints[index] = MapStructs.ToNative(line.Points[index]);
@@ -95,8 +96,8 @@ internal sealed unsafe class NativeRenderedFeatureQueryOptions : IDisposable
                 value.layer_id_count = (nuint)ids.Count;
                 if (ids.Count > 0)
                 {
-                    native.layerIdArray = (nint)NativeMemory.Alloc((nuint)(sizeof(mln_string_view) * ids.Count));
-                    var pointer = (mln_string_view*)native.layerIdArray;
+                    var pointer = NativeAllocation.AllocArray<mln_string_view>(ids.Count);
+                    native.layerIdArray = (nint)pointer;
                     for (var index = 0; index < ids.Count; index++)
                     {
                         var view = NativeStringView.From(ids[index], $"LayerIds[{index}]");
@@ -160,8 +161,8 @@ internal sealed unsafe class NativeSourceFeatureQueryOptions : IDisposable
                 value.source_layer_id_count = (nuint)ids.Count;
                 if (ids.Count > 0)
                 {
-                    native.sourceLayerIdArray = (nint)NativeMemory.Alloc((nuint)(sizeof(mln_string_view) * ids.Count));
-                    var pointer = (mln_string_view*)native.sourceLayerIdArray;
+                    var pointer = NativeAllocation.AllocArray<mln_string_view>(ids.Count);
+                    native.sourceLayerIdArray = (nint)pointer;
                     for (var index = 0; index < ids.Count; index++)
                     {
                         var view = NativeStringView.From(ids[index], $"SourceLayerIds[{index}]");

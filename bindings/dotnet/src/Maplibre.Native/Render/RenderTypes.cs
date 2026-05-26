@@ -11,7 +11,7 @@ public sealed class VulkanContextDescriptor { public NativePointer Instance { ge
 public sealed class MetalSurfaceDescriptor { public RenderTargetExtent Extent { get; set; } public NativePointer Layer { get; set; } public MetalContextDescriptor? Context { get; set; } }
 public sealed class VulkanSurfaceDescriptor { public RenderTargetExtent Extent { get; set; } public NativePointer Surface { get; set; } public VulkanContextDescriptor? Context { get; set; } }
 public sealed class MetalOwnedTextureDescriptor { public RenderTargetExtent Extent { get; set; } public MetalContextDescriptor? Context { get; set; } }
-public sealed class MetalBorrowedTextureDescriptor { public RenderTargetExtent Extent { get; set; } public NativePointer Texture { get; set; } public MetalContextDescriptor? Context { get; set; } }
+public sealed class MetalBorrowedTextureDescriptor { public RenderTargetExtent Extent { get; set; } public NativePointer Texture { get; set; } }
 public sealed class VulkanOwnedTextureDescriptor { public RenderTargetExtent Extent { get; set; } public VulkanContextDescriptor? Context { get; set; } }
 public sealed class VulkanBorrowedTextureDescriptor { public RenderTargetExtent Extent { get; set; } public NativePointer Image { get; set; } public NativePointer ImageView { get; set; } public VulkanContextDescriptor? Context { get; set; } public uint Format { get; set; } public uint InitialLayout { get; set; } public uint FinalLayout { get; set; } }
 

@@ -2,6 +2,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using Maplibre.Native.Error;
 using Maplibre.Native.Internal.C;
+using Maplibre.Native.Internal.Memory;
 using Maplibre.Native.Internal.Status;
 using Maplibre.Native.Json;
 
@@ -244,9 +245,9 @@ internal sealed unsafe class NativeJsonValue : IDisposable
 
     private T* Allocate<T>(int count) where T : unmanaged
     {
-        var allocation = NativeMemory.AllocZeroed((nuint)(sizeof(T) * count));
-        allocations.Add((nint)allocation);
-        return (T*)allocation;
+        var pointer = NativeAllocation.AllocZeroedArray<T>(count);
+        allocations.Add((nint)pointer);
+        return pointer;
     }
 
     public void Dispose()

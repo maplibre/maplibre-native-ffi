@@ -5,6 +5,8 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 binding_dir="$(cd "$script_dir/.." && pwd)"
 repo_root="$(cd "$binding_dir/../.." && pwd)"
 output_dir="$binding_dir/src/Maplibre.Native/Generated"
+tmp_output_dir="$(mktemp -d)"
+trap 'rm -rf "$tmp_output_dir"' EXIT
 
 rid=""
 case "$(uname -s)-$(uname -m)" in
@@ -53,7 +55,6 @@ headers=(
 )
 
 mkdir -p "$output_dir"
-rm -f "$output_dir"/*.g.cs
 
 for header in "${headers[@]}"; do
   args=(
@@ -63,10 +64,11 @@ for header in "${headers[@]}"; do
     -I "$repo_root/include/maplibre_native_c"
     -x c
     -std c2x
+    -D "__attribute__(x)="
     -n Maplibre.Native.Internal.C
     -m NativeMethods
     -l maplibre-native-c
-    -o "$output_dir/$header.g.cs"
+    -o "$tmp_output_dir/$header.g.cs"
     -c latest-codegen
     -was "*=internal"
   )
@@ -79,8 +81,11 @@ for header in "${headers[@]}"; do
     dotnet "${args[@]}"
   )
 
-  if [[ ! -s "$output_dir/$header.g.cs" ]]; then
+  if [[ ! -s "$tmp_output_dir/$header.g.cs" ]]; then
     echo "ClangSharp produced no output for $header.h" >&2
     exit 1
   fi
 done
+
+rm -f "$output_dir"/*.g.cs
+mv "$tmp_output_dir"/*.g.cs "$output_dir"/

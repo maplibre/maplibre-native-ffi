@@ -14,14 +14,28 @@ public sealed unsafe class NativeBuffer : IDisposable
     }
 
     public nuint ByteLength { get; }
-    public NativePointer Pointer => new(address);
-    public Span<byte> Span => new((void*)address, checked((int)ByteLength));
+    public NativePointer Pointer => new(AddressOrThrow());
+    public Span<byte> Span => new((void*)AddressOrThrow(), checked((int)ByteLength));
 
     public void Dispose()
     {
         var allocation = (void*)address;
-        if (allocation is null) return;
+        if (allocation is null)
+        {
+            return;
+        }
+
         address = 0;
         NativeMemory.Free(allocation);
+    }
+
+    private nint AddressOrThrow()
+    {
+        if (address == 0)
+        {
+            throw new ObjectDisposedException(nameof(NativeBuffer));
+        }
+
+        return address;
     }
 }

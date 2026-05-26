@@ -123,6 +123,23 @@ public sealed unsafe class RenderSessionTests
     }
 
     [Fact]
+    public void NativeBufferRejectsUseAfterDispose()
+    {
+        using var buffer = new NativeBuffer(4);
+        Assert.NotEqual(0, buffer.Pointer.Address);
+        Assert.Equal(4, buffer.Span.Length);
+
+        buffer.Dispose();
+
+        Assert.Throws<ObjectDisposedException>(() => buffer.Pointer);
+        Assert.Throws<ObjectDisposedException>(() =>
+        {
+            var span = buffer.Span;
+            _ = span.Length;
+        });
+    }
+
+    [Fact]
     public void TextureFramePropertiesRejectUseAfterScopeClose()
     {
         var metalScope = new FrameScope(nameof(MetalOwnedTextureFrame));

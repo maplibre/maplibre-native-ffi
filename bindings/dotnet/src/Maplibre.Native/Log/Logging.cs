@@ -46,5 +46,5 @@ public sealed record LogRecord(
     long Code,
     string Message);
 
-/// <summary>Log callback delegate.</summary>
-public delegate void LogCallback(LogRecord record);
+/// <summary>Log callback delegate. Return true to consume the record, or false to let native logging handle it.</summary>
+public delegate bool LogCallback(LogRecord record);

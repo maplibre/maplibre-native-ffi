@@ -1,6 +1,7 @@
 using System.Runtime.InteropServices;
 using Maplibre.Native.Geo;
 using Maplibre.Native.Internal.C;
+using Maplibre.Native.Internal.Memory;
 using Maplibre.Native.Render;
 using Maplibre.Native.Style;
 
@@ -171,7 +172,7 @@ internal sealed unsafe class NativeStringViewArray : IDisposable
     {
         ArgumentNullException.ThrowIfNull(strings, parameterName);
         var views = new NativeStringView[strings.Count];
-        var array = strings.Count == 0 ? 0 : (nint)NativeMemory.AllocZeroed((nuint)(sizeof(mln_string_view) * strings.Count));
+        var array = (nint)NativeAllocation.AllocZeroedArray<mln_string_view>(strings.Count);
         try
         {
             var pointer = (mln_string_view*)array;

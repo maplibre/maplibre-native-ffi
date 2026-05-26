@@ -61,6 +61,8 @@ public sealed unsafe class ResourceProviderTests
         Assert.Equal(ResourceUsage.Offline, copiedRequest.Usage);
         Assert.Equal(ResourceStoragePolicy.Volatile, copiedRequest.StoragePolicy);
         Assert.Equal(new ByteRange(10, 20), copiedRequest.Range);
+        Assert.Equal(10u, copiedRequest.Range?.Start);
+        Assert.Equal(20u, copiedRequest.Range?.End);
         Assert.Equal(DateTimeOffset.FromUnixTimeMilliseconds(1234), copiedRequest.PriorModified);
         Assert.Equal(DateTimeOffset.FromUnixTimeMilliseconds(5678), copiedRequest.PriorExpires);
         Assert.Equal("etag-1", copiedRequest.PriorEtag);

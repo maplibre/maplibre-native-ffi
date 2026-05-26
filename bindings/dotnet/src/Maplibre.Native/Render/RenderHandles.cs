@@ -238,15 +238,11 @@ public sealed unsafe class RenderSessionHandle : IDisposable
         }
     }
 
-    internal void ReleaseMetalFrame(mln_metal_owned_texture_frame* frame)
-    {
-        NativeStatus.Check(NativeMethods.mln_metal_owned_texture_release_frame(Pointer, frame));
-    }
+    internal mln_status ReleaseMetalFrame(mln_metal_owned_texture_frame* frame) =>
+        NativeMethods.mln_metal_owned_texture_release_frame(Pointer, frame);
 
-    internal void ReleaseVulkanFrame(mln_vulkan_owned_texture_frame* frame)
-    {
-        NativeStatus.Check(NativeMethods.mln_vulkan_owned_texture_release_frame(Pointer, frame));
-    }
+    internal mln_status ReleaseVulkanFrame(mln_vulkan_owned_texture_frame* frame) =>
+        NativeMethods.mln_vulkan_owned_texture_release_frame(Pointer, frame);
 
     private IReadOnlyList<QueriedFeature> QueryRenderedFeaturesCore(RenderedQueryGeometry geometry, RenderedFeatureQueryOptions? options)
     {
@@ -297,79 +293,110 @@ public sealed unsafe class RenderSessionHandle : IDisposable
     }
 }
 
-public sealed unsafe class MetalOwnedTextureFrameHandle : IDisposable
+internal unsafe delegate mln_status FrameRelease<T>(RenderSessionHandle session, T* frame)
+    where T : unmanaged;
+
+internal sealed unsafe class TextureFrameState<T>
+    where T : unmanaged
 {
     private readonly RenderSessionHandle session;
-    private readonly mln_metal_owned_texture_frame* pointer;
     private readonly FrameScope scope;
+    private readonly FrameRelease<T> release;
+    private readonly string typeName;
+    private T* pointer;
 
-    internal MetalOwnedTextureFrameHandle(RenderSessionHandle session, mln_metal_owned_texture_frame* pointer, FrameScope scope, MetalOwnedTextureFrame frame)
+    internal TextureFrameState(RenderSessionHandle session, T* pointer, FrameScope scope, FrameRelease<T> release, string typeName)
     {
         this.session = session;
         this.pointer = pointer;
         this.scope = scope;
-        Frame = frame;
+        this.release = release;
+        this.typeName = typeName;
     }
 
-    public bool IsClosed { get; private set; }
+    internal bool IsClosed => pointer is null;
 
-    public MetalOwnedTextureFrame Frame { get; }
-
-    public void Close()
+    internal void Close()
     {
-        if (IsClosed)
+        if (pointer is null)
         {
             return;
         }
-        session.ReleaseMetalFrame(pointer);
-        IsClosed = true;
-        scope.Dispose();
-        NativeMemory.Free(pointer);
+
+        NativeStatus.Check(release(session, pointer));
+        MarkClosed();
     }
 
-    public void Dispose()
+    internal void TryClose()
     {
-        Close();
+        if (pointer is null)
+        {
+            return;
+        }
+
+        var status = release(session, pointer);
+        if (status != mln_status.MLN_STATUS_OK)
+        {
+            NativeLeakReporter.Report(new NativeLeakReport(
+                NativeLeakReportKind.DisposeFailed,
+                typeName,
+                (nint)pointer,
+                status,
+                $"Dispose could not release {typeName} frame 0x{(nint)pointer:x}; native release returned {status}. Call Close() on the owner thread to observe the error and retry."));
+            return;
+        }
+
+        MarkClosed();
     }
+
+    private void MarkClosed()
+    {
+        var current = pointer;
+        pointer = null;
+        scope.Dispose();
+        NativeMemory.Free(current);
+    }
+}
+
+public sealed unsafe class MetalOwnedTextureFrameHandle : IDisposable
+{
+    private readonly TextureFrameState<mln_metal_owned_texture_frame> state;
+
+    internal MetalOwnedTextureFrameHandle(RenderSessionHandle session, mln_metal_owned_texture_frame* pointer, FrameScope scope, MetalOwnedTextureFrame frame)
+    {
+        state = new TextureFrameState<mln_metal_owned_texture_frame>(session, pointer, scope, static (session, frame) => session.ReleaseMetalFrame(frame), nameof(MetalOwnedTextureFrameHandle));
+        Frame = frame;
+    }
+
+    public bool IsClosed => state.IsClosed;
+
+    public MetalOwnedTextureFrame Frame { get; }
+
+    public void Close() => state.Close();
+
+    public void Dispose() => state.TryClose();
 }
 
 public sealed unsafe class VulkanOwnedTextureFrameHandle : IDisposable
 {
-    private readonly RenderSessionHandle session;
-    private readonly mln_vulkan_owned_texture_frame* pointer;
-    private readonly FrameScope scope;
+    private readonly TextureFrameState<mln_vulkan_owned_texture_frame> state;
 
     internal VulkanOwnedTextureFrameHandle(RenderSessionHandle session, mln_vulkan_owned_texture_frame* pointer, FrameScope scope, VulkanOwnedTextureFrame frame)
     {
-        this.session = session;
-        this.pointer = pointer;
-        this.scope = scope;
+        state = new TextureFrameState<mln_vulkan_owned_texture_frame>(session, pointer, scope, static (session, frame) => session.ReleaseVulkanFrame(frame), nameof(VulkanOwnedTextureFrameHandle));
         Frame = frame;
     }
 
-    public bool IsClosed { get; private set; }
+    public bool IsClosed => state.IsClosed;
 
     public VulkanOwnedTextureFrame Frame { get; }
 
-    public void Close()
-    {
-        if (IsClosed)
-        {
-            return;
-        }
-        session.ReleaseVulkanFrame(pointer);
-        IsClosed = true;
-        scope.Dispose();
-        NativeMemory.Free(pointer);
-    }
+    public void Close() => state.Close();
 
-    public void Dispose()
-    {
-        Close();
-    }
+    public void Dispose() => state.TryClose();
 }
 
-public sealed class FrameScope : IDisposable
+internal sealed class FrameScope : IDisposable
 {
     private readonly string owner;
 

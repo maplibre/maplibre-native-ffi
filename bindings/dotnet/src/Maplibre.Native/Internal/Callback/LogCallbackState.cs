@@ -66,14 +66,13 @@ internal sealed unsafe class LogCallbackState : IDisposable
             }
 
             var text = message is null ? string.Empty : Marshal.PtrToStringUTF8((nint)message) ?? string.Empty;
-            state.callback(new LogRecord(
+            return state.callback(new LogRecord(
                 (LogSeverity)severity,
                 severity,
                 (LogEvent)@event,
                 @event,
                 code,
-                text));
-            return 1;
+                text)) ? 1u : 0u;
         }
         catch
         {

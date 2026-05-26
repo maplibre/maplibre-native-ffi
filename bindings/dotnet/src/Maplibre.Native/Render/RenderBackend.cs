@@ -8,6 +8,3 @@ public enum RenderBackend : uint
     Metal = 1u << 0,
     Vulkan = 1u << 1,
 }
-
-/// <summary>Frame-scoped borrowed native pointer.</summary>
-public readonly record struct FrameNativePointer(NativePointer Pointer);

@@ -11,7 +11,7 @@ public sealed class LoggingTests
     {
         NativeLibraryTestSupport.SkipUnlessNativeLibraryIsAvailable();
 
-        Maplibre.SetLogCallback(_ => { });
+        Maplibre.SetLogCallback(_ => true);
         Maplibre.ClearLogCallback();
     }
 

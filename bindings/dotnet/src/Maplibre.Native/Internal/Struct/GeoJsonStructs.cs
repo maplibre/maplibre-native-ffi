@@ -1,6 +1,7 @@
 using System.Runtime.InteropServices;
 using Maplibre.Native.Geo;
 using Maplibre.Native.Internal.C;
+using Maplibre.Native.Internal.Memory;
 using Maplibre.Native.Json;
 
 namespace Maplibre.Native.Internal.Struct;
@@ -160,9 +161,9 @@ internal sealed unsafe class NativeGeometry : IDisposable
 
     private T* Allocate<T>(int count) where T : unmanaged
     {
-        var allocation = NativeMemory.AllocZeroed((nuint)(sizeof(T) * count));
-        allocations.Add((nint)allocation);
-        return (T*)allocation;
+        var pointer = NativeAllocation.AllocZeroedArray<T>(count);
+        allocations.Add((nint)pointer);
+        return pointer;
     }
 
     public void Dispose()
@@ -219,8 +220,8 @@ internal sealed unsafe class NativeFeature : IDisposable
             return;
         }
 
-        properties = (nint)NativeMemory.AllocZeroed((nuint)(sizeof(mln_json_member) * source.Count));
-        var pointer = (mln_json_member*)properties;
+        var pointer = NativeAllocation.AllocZeroedArray<mln_json_member>(source.Count);
+        properties = (nint)pointer;
         for (var index = 0; index < source.Count; index++)
         {
             var key = NativeStringView.From(source[index].Key, $"Properties[{index}].Key");
@@ -360,9 +361,9 @@ internal sealed unsafe class NativeGeoJson : IDisposable
 
     private T* Allocate<T>(int count) where T : unmanaged
     {
-        var allocation = NativeMemory.AllocZeroed((nuint)(sizeof(T) * count));
-        allocations.Add((nint)allocation);
-        return (T*)allocation;
+        var pointer = NativeAllocation.AllocZeroedArray<T>(count);
+        allocations.Add((nint)pointer);
+        return pointer;
     }
 
     public void Dispose()
