@@ -16,6 +16,7 @@ public final class NativeLibrary {
   private static final int EXPECTED_C_ABI_VERSION = 0;
   private static final Object LOCK = new Object();
   private static volatile boolean loaded;
+  private static Path loadedExactLibrary;
 
   private NativeLibrary() {}
 
@@ -57,24 +58,25 @@ public final class NativeLibrary {
   }
 
   private static void loadExact(Path libraryPath) {
-    System.load(libraryPath.toString());
-    checkCAbiVersion();
+    if (!libraryPath.equals(loadedExactLibrary)) {
+      System.load(libraryPath.toString());
+      loadedExactLibrary = libraryPath;
+    }
+    checkCAbiVersion(true);
     loaded = true;
   }
 
   private static void loadJavaCppBridge() {
-    checkCAbiVersion();
+    checkCAbiVersion(false);
     loaded = true;
   }
 
-  private static void checkCAbiVersion() {
+  private static void checkCAbiVersion(boolean exactLibraryLoaded) {
     final int version;
     try {
       version = MaplibreNativeC.mln_c_version();
     } catch (UnsatisfiedLinkError error) {
-      var missing =
-          new UnsatisfiedLinkError(
-              "Loaded native library does not expose the Maplibre C ABI symbols.");
+      var missing = new UnsatisfiedLinkError(loadFailureMessage(exactLibraryLoaded));
       missing.addSuppressed(error);
       throw missing;
     }
@@ -84,6 +86,18 @@ public final class NativeLibrary {
           "Unsupported Maplibre C ABI version %d; expected %d"
               .formatted(version, EXPECTED_C_ABI_VERSION));
     }
+  }
+
+  private static String loadFailureMessage(boolean exactLibraryLoaded) {
+    return exactLibraryLoaded
+        ? "Loaded native library does not expose the Maplibre C ABI symbols."
+        : "Unable to load the JavaCPP JNI bridge library. Set "
+            + LIBRARY_PATH_PROPERTY
+            + ", "
+            + LIBRARY_PATH_ENV
+            + ", or java.library.path for "
+            + LIBRARY_NAME
+            + ".";
   }
 
   private static void prependJavaLibraryPath(Path directory) {

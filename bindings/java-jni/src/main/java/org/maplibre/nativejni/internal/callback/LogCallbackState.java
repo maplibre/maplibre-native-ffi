@@ -42,13 +42,26 @@ public final class LogCallbackState {
             }
           }
         };
-    Status.check(MaplibreNativeC.mln_log_set_callback(nativeCallback, null));
+    try {
+      Status.check(MaplibreNativeC.mln_log_set_callback(nativeCallback, null));
+    } catch (RuntimeException | Error error) {
+      closeQuietly(nativeCallback);
+      throw error;
+    }
+    closeQuietly(currentCallback);
     currentCallback = nativeCallback;
   }
 
   public static synchronized void clear() {
     NativeLibrary.ensureLoaded();
     Status.check(MaplibreNativeC.mln_log_clear_callback());
+    closeQuietly(currentCallback);
     currentCallback = null;
+  }
+
+  private static void closeQuietly(MaplibreNativeC.mln_log_callback callback) {
+    if (callback != null) {
+      callback.close();
+    }
   }
 }
