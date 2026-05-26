@@ -13,128 +13,8 @@ const vk = if (build_options.supports_vulkan) @cImport({
     @cInclude("vulkan/vulkan.h");
 }) else struct {};
 
-const wgl = if (build_options.supports_opengl and builtin.os.tag == .windows) struct {
-    const BOOL = c_int;
-    const BYTE = u8;
-    const DWORD = u32;
-    const INT = c_int;
-    const LPCSTR = [*:0]const u8;
-    const UINT = u32;
-    const WORD = u16;
-    const WPARAM = usize;
-    const LPARAM = isize;
-    const LRESULT = isize;
-    const GLenum = c_uint;
-    const GLint = c_int;
-    const GLsizei = c_int;
-    const GLuint = c_uint;
-
-    const HDC = *opaque {};
-    const HGLRC = *opaque {};
-    const HINSTANCE = *opaque {};
-    const HWND = *opaque {};
-
-    const WNDPROC = ?*const fn (HWND, UINT, WPARAM, LPARAM) callconv(.winapi) LRESULT;
-
-    const WNDCLASSA = extern struct {
-        style: UINT,
-        lpfnWndProc: WNDPROC,
-        cbClsExtra: INT,
-        cbWndExtra: INT,
-        hInstance: ?HINSTANCE,
-        hIcon: ?*opaque {},
-        hCursor: ?*opaque {},
-        hbrBackground: ?*opaque {},
-        lpszMenuName: ?LPCSTR,
-        lpszClassName: ?LPCSTR,
-    };
-
-    const PIXELFORMATDESCRIPTOR = extern struct {
-        nSize: WORD,
-        nVersion: WORD,
-        dwFlags: DWORD,
-        iPixelType: BYTE,
-        cColorBits: BYTE,
-        cRedBits: BYTE,
-        cRedShift: BYTE,
-        cGreenBits: BYTE,
-        cGreenShift: BYTE,
-        cBlueBits: BYTE,
-        cBlueShift: BYTE,
-        cAlphaBits: BYTE,
-        cAlphaShift: BYTE,
-        cAccumBits: BYTE,
-        cAccumRedBits: BYTE,
-        cAccumGreenBits: BYTE,
-        cAccumBlueBits: BYTE,
-        cAccumAlphaBits: BYTE,
-        cDepthBits: BYTE,
-        cStencilBits: BYTE,
-        cAuxBuffers: BYTE,
-        iLayerType: BYTE,
-        bReserved: BYTE,
-        dwLayerMask: DWORD,
-        dwVisibleMask: DWORD,
-        dwDamageMask: DWORD,
-    };
-
-    const CS_OWNDC = 0x0020;
-    const PFD_DOUBLEBUFFER = 0x00000001;
-    const PFD_DRAW_TO_WINDOW = 0x00000004;
-    const PFD_SUPPORT_OPENGL = 0x00000020;
-    const PFD_TYPE_RGBA = 0;
-    const PFD_MAIN_PLANE = 0;
-    const WS_OVERLAPPEDWINDOW = 0x00cf0000;
-    const GL_NO_ERROR = 0;
-    const GL_FRONT = 0x0404;
-    const GL_TEXTURE_2D = 0x0de1;
-    const GL_RGBA = 0x1908;
-    const GL_RGBA8 = 0x8058;
-    const GL_UNSIGNED_BYTE = 0x1401;
-    const GL_TEXTURE_MAG_FILTER = 0x2800;
-    const GL_TEXTURE_MIN_FILTER = 0x2801;
-    const GL_LINEAR = 0x2601;
-
-    extern "kernel32" fn GetModuleHandleA(lpModuleName: ?LPCSTR) callconv(.winapi) ?HINSTANCE;
-    extern "user32" fn RegisterClassA(lpWndClass: *const WNDCLASSA) callconv(.winapi) u16;
-    extern "user32" fn CreateWindowExA(
-        dwExStyle: DWORD,
-        lpClassName: LPCSTR,
-        lpWindowName: LPCSTR,
-        dwStyle: DWORD,
-        x: INT,
-        y: INT,
-        nWidth: INT,
-        nHeight: INT,
-        hWndParent: ?HWND,
-        hMenu: ?*opaque {},
-        hInstance: ?HINSTANCE,
-        lpParam: ?*anyopaque,
-    ) callconv(.winapi) ?HWND;
-    extern "user32" fn DefWindowProcA(hWnd: HWND, msg: UINT, wParam: WPARAM, lParam: LPARAM) callconv(.winapi) LRESULT;
-    extern "user32" fn DestroyWindow(hWnd: HWND) callconv(.winapi) BOOL;
-    extern "user32" fn GetDC(hWnd: HWND) callconv(.winapi) ?HDC;
-    extern "user32" fn ReleaseDC(hWnd: HWND, hDC: HDC) callconv(.winapi) INT;
-    extern "gdi32" fn ChoosePixelFormat(hdc: HDC, ppfd: *const PIXELFORMATDESCRIPTOR) callconv(.winapi) INT;
-    extern "gdi32" fn SetPixelFormat(hdc: HDC, format: INT, ppfd: *const PIXELFORMATDESCRIPTOR) callconv(.winapi) BOOL;
-    extern "opengl32" fn wglCreateContext(hdc: HDC) callconv(.winapi) ?HGLRC;
-    extern "opengl32" fn wglDeleteContext(hglrc: HGLRC) callconv(.winapi) BOOL;
-    extern "opengl32" fn wglGetProcAddress(name: LPCSTR) callconv(.winapi) ?*anyopaque;
-    extern "opengl32" fn wglMakeCurrent(hdc: ?HDC, hglrc: ?HGLRC) callconv(.winapi) BOOL;
-    extern "opengl32" fn glBindTexture(target: GLenum, texture: GLuint) callconv(.winapi) void;
-    extern "opengl32" fn glDeleteTextures(n: GLsizei, textures: *const GLuint) callconv(.winapi) void;
-    extern "opengl32" fn glGenTextures(n: GLsizei, textures: *GLuint) callconv(.winapi) void;
-    extern "opengl32" fn glGetError() callconv(.winapi) GLenum;
-    extern "opengl32" fn glGetTexImage(target: GLenum, level: GLint, format: GLenum, @"type": GLenum, pixels: *anyopaque) callconv(.winapi) void;
-    extern "opengl32" fn glReadBuffer(src: GLenum) callconv(.winapi) void;
-    extern "opengl32" fn glReadPixels(x: GLint, y: GLint, width: GLsizei, height: GLsizei, format: GLenum, @"type": GLenum, pixels: *anyopaque) callconv(.winapi) void;
-    extern "opengl32" fn glTexImage2D(target: GLenum, level: GLint, internalformat: GLint, width: GLsizei, height: GLsizei, border: GLint, format: GLenum, @"type": GLenum, pixels: ?*const anyopaque) callconv(.winapi) void;
-    extern "opengl32" fn glTexParameteri(target: GLenum, pname: GLenum, param: GLint) callconv(.winapi) void;
-
-    fn windowProc(hWnd: HWND, msg: UINT, wParam: WPARAM, lParam: LPARAM) callconv(.winapi) LRESULT {
-        return DefWindowProcA(hWnd, msg, wParam, lParam);
-    }
-} else struct {};
+const gl = if (build_options.supports_opengl and builtin.os.tag == .windows) @import("gl") else struct {};
+const wgl_test = if (build_options.supports_opengl and builtin.os.tag == .windows) @import("wgl_test_context") else struct {};
 
 const cluster_style_json =
     \\{
@@ -367,7 +247,7 @@ const TestOwnedTextureDescriptor = struct {
     extent: maplibre.RenderTargetExtent = .{},
 };
 
-const gl_texture_2d = 0x0DE1;
+const gl_texture_2d = if (build_options.supports_opengl and builtin.os.tag == .windows) gl.TEXTURE_2D else 0x0DE1;
 
 fn fakeNativePointer() maplibre.NativePointer {
     return .{ .ptr = @ptrFromInt(1) };
@@ -427,136 +307,53 @@ const TestOwnedTextureContext = if (build_options.supports_vulkan) VulkanAttachC
 } else struct {};
 
 const WglAttachContext = if (build_options.supports_opengl and builtin.os.tag == .windows) struct {
-    window: wgl.HWND,
-    device_context: wgl.HDC,
-    share_context: wgl.HGLRC,
+    context: wgl_test.Context,
 
     pub fn init() !WglAttachContext {
         return initWithSize(32, 32);
     }
 
     pub fn initWithSize(width: u32, height: u32) !WglAttachContext {
-        const class_name = "MaplibreZigBindingWglTest";
-        const module = wgl.GetModuleHandleA(null) orelse return error.SkipZigTest;
-
-        var window_class = std.mem.zeroes(wgl.WNDCLASSA);
-        window_class.style = wgl.CS_OWNDC;
-        window_class.lpfnWndProc = wgl.windowProc;
-        window_class.hInstance = module;
-        window_class.lpszClassName = class_name;
-        _ = wgl.RegisterClassA(&window_class);
-
-        const window = wgl.CreateWindowExA(
-            0,
-            class_name,
-            class_name,
-            wgl.WS_OVERLAPPEDWINDOW,
-            0,
-            0,
-            @intCast(width),
-            @intCast(height),
-            null,
-            null,
-            module,
-            null,
-        ) orelse return error.SkipZigTest;
-        errdefer _ = wgl.DestroyWindow(window);
-
-        const device_context = wgl.GetDC(window) orelse return error.SkipZigTest;
-        errdefer _ = wgl.ReleaseDC(window, device_context);
-
-        var pixel_format_descriptor = std.mem.zeroes(wgl.PIXELFORMATDESCRIPTOR);
-        pixel_format_descriptor.nSize = @intCast(@sizeOf(wgl.PIXELFORMATDESCRIPTOR));
-        pixel_format_descriptor.nVersion = 1;
-        pixel_format_descriptor.dwFlags = wgl.PFD_DRAW_TO_WINDOW | wgl.PFD_SUPPORT_OPENGL | wgl.PFD_DOUBLEBUFFER;
-        pixel_format_descriptor.iPixelType = wgl.PFD_TYPE_RGBA;
-        pixel_format_descriptor.cColorBits = 32;
-        pixel_format_descriptor.cDepthBits = 24;
-        pixel_format_descriptor.cStencilBits = 8;
-        pixel_format_descriptor.iLayerType = wgl.PFD_MAIN_PLANE;
-
-        const pixel_format = wgl.ChoosePixelFormat(device_context, &pixel_format_descriptor);
-        if (pixel_format == 0) return error.SkipZigTest;
-        if (wgl.SetPixelFormat(device_context, pixel_format, &pixel_format_descriptor) == 0) return error.SkipZigTest;
-
-        const share_context = wgl.wglCreateContext(device_context) orelse return error.SkipZigTest;
-        errdefer _ = wgl.wglDeleteContext(share_context);
-        if (wgl.wglMakeCurrent(device_context, share_context) == 0) return error.SkipZigTest;
-
-        return .{
-            .window = window,
-            .device_context = device_context,
-            .share_context = share_context,
-        };
+        return .{ .context = try wgl_test.Context.initWithClassName("MaplibreZigBindingWglTest", width, height) };
     }
 
     pub fn deinit(self: *WglAttachContext) void {
-        _ = wgl.wglMakeCurrent(null, null);
-        _ = wgl.wglDeleteContext(self.share_context);
-        _ = wgl.ReleaseDC(self.window, self.device_context);
-        _ = wgl.DestroyWindow(self.window);
+        self.context.deinit();
     }
 
     pub fn descriptor(self: *const WglAttachContext) maplibre.OpenGLContextDescriptor {
         return .{ .wgl = .{
-            .device_context = .{ .ptr = @ptrCast(self.device_context) },
-            .share_context = .{ .ptr = @ptrCast(self.share_context) },
-            .get_proc_address = .{ .ptr = @ptrCast(@constCast(&wgl.wglGetProcAddress)) },
+            .device_context = .{ .ptr = self.context.deviceContextPointer() },
+            .share_context = .{ .ptr = self.context.shareContextPointer() },
+            .get_proc_address = .{ .ptr = wgl_test.Context.getProcAddressPointer() },
         } };
     }
 
     pub fn surface(self: *const WglAttachContext) maplibre.NativePointer {
-        return .{ .ptr = @ptrCast(self.device_context) };
+        return .{ .ptr = self.context.deviceContextPointer() };
     }
 
     pub fn readSurfaceRGBA8(self: *const WglAttachContext, width: u32, height: u32, pixels: []u8) !void {
-        if (wgl.wglMakeCurrent(self.device_context, self.share_context) == 0) return error.SkipZigTest;
-        wgl.glReadBuffer(wgl.GL_FRONT);
-        wgl.glReadPixels(0, 0, @intCast(width), @intCast(height), wgl.GL_RGBA, wgl.GL_UNSIGNED_BYTE, pixels.ptr);
-        try testing.expectEqual(@as(wgl.GLenum, wgl.GL_NO_ERROR), wgl.glGetError());
+        try self.context.readSurfaceRgba(width, height, pixels);
     }
 } else struct {};
 
 const WglBorrowedTexture = if (build_options.supports_opengl and builtin.os.tag == .windows) struct {
     context: WglAttachContext,
-    texture: wgl.GLuint,
+    texture: gl.uint,
     width: u32,
     height: u32,
 
     pub fn create(width: u32, height: u32) !WglBorrowedTexture {
         var context = try WglAttachContext.initWithSize(width, height);
         errdefer context.deinit();
-        if (wgl.wglMakeCurrent(context.device_context, context.share_context) == 0) return error.SkipZigTest;
-
-        var texture: wgl.GLuint = 0;
-        wgl.glGenTextures(1, &texture);
-        if (texture == 0) return error.SkipZigTest;
-        errdefer wgl.glDeleteTextures(1, &texture);
-
-        wgl.glBindTexture(wgl.GL_TEXTURE_2D, texture);
-        wgl.glTexParameteri(wgl.GL_TEXTURE_2D, wgl.GL_TEXTURE_MIN_FILTER, wgl.GL_LINEAR);
-        wgl.glTexParameteri(wgl.GL_TEXTURE_2D, wgl.GL_TEXTURE_MAG_FILTER, wgl.GL_LINEAR);
-        wgl.glTexImage2D(
-            wgl.GL_TEXTURE_2D,
-            0,
-            wgl.GL_RGBA8,
-            @intCast(width),
-            @intCast(height),
-            0,
-            wgl.GL_RGBA,
-            wgl.GL_UNSIGNED_BYTE,
-            null,
-        );
-        wgl.glBindTexture(wgl.GL_TEXTURE_2D, 0);
-        try testing.expectEqual(@as(wgl.GLenum, wgl.GL_NO_ERROR), wgl.glGetError());
-
+        const texture = try context.context.createRgbaTexture(width, height);
         return .{ .context = context, .texture = texture, .width = width, .height = height };
     }
 
     pub fn deinit(self: *WglBorrowedTexture) void {
         if (self.texture != 0) {
-            _ = wgl.wglMakeCurrent(self.context.device_context, self.context.share_context);
-            wgl.glDeleteTextures(1, &self.texture);
+            self.context.context.destroyTexture(self.texture);
             self.texture = 0;
         }
         self.context.deinit();
@@ -567,16 +364,12 @@ const WglBorrowedTexture = if (build_options.supports_opengl and builtin.os.tag 
             .extent = .{ .width = self.width, .height = self.height },
             .context = self.context.descriptor(),
             .texture = self.texture,
-            .target = wgl.GL_TEXTURE_2D,
+            .target = gl.TEXTURE_2D,
         };
     }
 
     pub fn readRGBA8(self: *const WglBorrowedTexture, pixels: []u8) !void {
-        if (wgl.wglMakeCurrent(self.context.device_context, self.context.share_context) == 0) return error.SkipZigTest;
-        wgl.glBindTexture(wgl.GL_TEXTURE_2D, self.texture);
-        wgl.glGetTexImage(wgl.GL_TEXTURE_2D, 0, wgl.GL_RGBA, wgl.GL_UNSIGNED_BYTE, pixels.ptr);
-        wgl.glBindTexture(wgl.GL_TEXTURE_2D, 0);
-        try testing.expectEqual(@as(wgl.GLenum, wgl.GL_NO_ERROR), wgl.glGetError());
+        try self.context.context.readRgbaTexture(self.texture, pixels);
     }
 } else struct {};
 
@@ -1297,10 +1090,10 @@ test "OpenGL WGL owned texture frame scopes public binding access" {
     const info = try frame.info();
     try testing.expectEqual(@as(u32, 32), info.width);
     try testing.expectEqual(@as(u32, 32), info.height);
-    try testing.expectEqual(@as(u32, wgl.GL_TEXTURE_2D), info.target);
-    try testing.expectEqual(@as(u32, wgl.GL_RGBA8), info.internal_format);
-    try testing.expectEqual(@as(u32, wgl.GL_RGBA), info.format);
-    try testing.expectEqual(@as(u32, wgl.GL_UNSIGNED_BYTE), info.type);
+    try testing.expectEqual(@as(u32, gl.TEXTURE_2D), info.target);
+    try testing.expectEqual(@as(u32, gl.RGBA8), info.internal_format);
+    try testing.expectEqual(@as(u32, gl.RGBA), info.format);
+    try testing.expectEqual(@as(u32, gl.UNSIGNED_BYTE), info.type);
     try testing.expect(info.texture != 0);
 
     try testing.expectError(error.ActiveBorrow, session.renderUpdate());
