@@ -10,6 +10,8 @@ const support = @import("support.zig");
 const common = @import("render_session_abi.zig");
 const c = support.c;
 
+// Zig 0.16 cannot translate the Windows SDK WGL headers reliably with MSVC, so
+// keep this to the small ABI subset needed by the raw C ABI tests.
 const wgl = if (builtin.os.tag == .windows) struct {
     const BOOL = c_int;
     const BYTE = u8;

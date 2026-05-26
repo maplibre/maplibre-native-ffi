@@ -14,11 +14,7 @@ requires = { platform = ["macos"], backend = ["metal"] }
 
 [examples.zig-map]
 task = "//examples/zig-map:build"
-requires = { platform = ["linux", "macos", "windows"], backend = ["metal", "vulkan"] }
-
-[examples.zig-map-opengl]
-task = "//examples/zig-map:build"
-requires = { platform = ["windows"], backend = ["opengl"] }
+requires = { platform = ["linux", "macos", "windows"], backend = ["metal", "opengl", "vulkan"] }
 
 [examples.lwjgl-map]
 task = "//examples/lwjgl-map:build"
@@ -30,32 +26,16 @@ requires = { platform = ["linux", "macos", "windows"], backend = ["vulkan"] }
 
 [examples.zig-readback]
 task = "//examples/zig-readback:run"
-requires = { platform = ["linux", "macos", "windows"], backend = ["metal", "vulkan"] }
-
-[examples.zig-readback-opengl]
-task = "//examples/zig-readback:run"
-requires = { platform = ["windows"], backend = ["opengl"] }
+requires = { platform = ["linux", "macos", "windows"], backend = ["metal", "opengl", "vulkan"] }
 
 [bindings.java-ffm]
 task = "//bindings/java-ffm:build"
-requires = { platform = ["linux", "macos", "windows"], backend = ["metal", "vulkan"] }
-
-[bindings.java-ffm-opengl]
-task = "//bindings/java-ffm:build"
-requires = { platform = ["windows"], backend = ["opengl"] }
+requires = { platform = ["linux", "macos", "windows"], backend = ["metal", "opengl", "vulkan"] }
 
 [bindings.rust]
 task = "//bindings/rust:ci"
-requires = { platform = ["linux", "macos", "windows"], backend = ["metal", "vulkan"] }
-
-[bindings.rust-opengl]
-task = "//bindings/rust:ci"
-requires = { platform = ["windows"], backend = ["opengl"] }
+requires = { platform = ["linux", "macos", "windows"], backend = ["metal", "opengl", "vulkan"] }
 
 [bindings.zig]
 task = "//bindings/zig:ci"
-requires = { platform = ["linux", "macos", "windows"], backend = ["metal", "vulkan"] }
-
-[bindings.zig-opengl]
-task = "//bindings/zig:ci"
-requires = { platform = ["windows"], backend = ["opengl"] }
+requires = { platform = ["linux", "macos", "windows"], backend = ["metal", "opengl", "vulkan"] }

@@ -11,9 +11,114 @@ const vk = if (build_options.supports_vulkan) @cImport({
     @cInclude("vulkan/vulkan.h");
 }) else struct {};
 
-extern "c" fn MTLCreateSystemDefaultDevice() ?*anyopaque;
+const egl = if (build_options.supports_opengl and builtin.os.tag == .linux) @cImport({
+    @cInclude("EGL/egl.h");
+}) else struct {};
 
-pub const supports_owned_texture_attach = build_options.supports_metal or build_options.supports_vulkan;
+// Zig 0.16 cannot translate the Windows SDK WGL headers reliably with MSVC, so
+// keep this to the small ABI subset needed to create a shared context.
+const wgl = if (build_options.supports_opengl and builtin.os.tag == .windows) struct {
+    const BOOL = c_int;
+    const BYTE = u8;
+    const DWORD = u32;
+    const INT = c_int;
+    const LPCSTR = [*:0]const u8;
+    const UINT = u32;
+    const WORD = u16;
+    const WPARAM = usize;
+    const LPARAM = isize;
+    const LRESULT = isize;
+
+    const HDC = *opaque {};
+    const HGLRC = *opaque {};
+    const HINSTANCE = *opaque {};
+    const HWND = *opaque {};
+
+    const WNDPROC = ?*const fn (HWND, UINT, WPARAM, LPARAM) callconv(.winapi) LRESULT;
+
+    const WNDCLASSA = extern struct {
+        style: UINT,
+        lpfnWndProc: WNDPROC,
+        cbClsExtra: INT,
+        cbWndExtra: INT,
+        hInstance: ?HINSTANCE,
+        hIcon: ?*opaque {},
+        hCursor: ?*opaque {},
+        hbrBackground: ?*opaque {},
+        lpszMenuName: ?LPCSTR,
+        lpszClassName: ?LPCSTR,
+    };
+
+    const PIXELFORMATDESCRIPTOR = extern struct {
+        nSize: WORD,
+        nVersion: WORD,
+        dwFlags: DWORD,
+        iPixelType: BYTE,
+        cColorBits: BYTE,
+        cRedBits: BYTE,
+        cRedShift: BYTE,
+        cGreenBits: BYTE,
+        cGreenShift: BYTE,
+        cBlueBits: BYTE,
+        cBlueShift: BYTE,
+        cAlphaBits: BYTE,
+        cAlphaShift: BYTE,
+        cAccumBits: BYTE,
+        cAccumRedBits: BYTE,
+        cAccumGreenBits: BYTE,
+        cAccumBlueBits: BYTE,
+        cAccumAlphaBits: BYTE,
+        cDepthBits: BYTE,
+        cStencilBits: BYTE,
+        cAuxBuffers: BYTE,
+        iLayerType: BYTE,
+        bReserved: BYTE,
+        dwLayerMask: DWORD,
+        dwVisibleMask: DWORD,
+        dwDamageMask: DWORD,
+    };
+
+    const CS_OWNDC = 0x0020;
+    const PFD_DOUBLEBUFFER = 0x00000001;
+    const PFD_DRAW_TO_WINDOW = 0x00000004;
+    const PFD_SUPPORT_OPENGL = 0x00000020;
+    const PFD_TYPE_RGBA = 0;
+    const PFD_MAIN_PLANE = 0;
+    const WS_OVERLAPPEDWINDOW = 0x00cf0000;
+
+    extern "kernel32" fn GetModuleHandleA(lpModuleName: ?LPCSTR) callconv(.winapi) ?HINSTANCE;
+    extern "user32" fn RegisterClassA(lpWndClass: *const WNDCLASSA) callconv(.winapi) u16;
+    extern "user32" fn CreateWindowExA(
+        dwExStyle: DWORD,
+        lpClassName: LPCSTR,
+        lpWindowName: LPCSTR,
+        dwStyle: DWORD,
+        x: INT,
+        y: INT,
+        nWidth: INT,
+        nHeight: INT,
+        hWndParent: ?HWND,
+        hMenu: ?*opaque {},
+        hInstance: ?HINSTANCE,
+        lpParam: ?*anyopaque,
+    ) callconv(.winapi) ?HWND;
+    extern "user32" fn DefWindowProcA(hWnd: HWND, msg: UINT, wParam: WPARAM, lParam: LPARAM) callconv(.winapi) LRESULT;
+    extern "user32" fn DestroyWindow(hWnd: HWND) callconv(.winapi) BOOL;
+    extern "user32" fn GetDC(hWnd: HWND) callconv(.winapi) ?HDC;
+    extern "user32" fn ReleaseDC(hWnd: HWND, hDC: HDC) callconv(.winapi) INT;
+    extern "gdi32" fn ChoosePixelFormat(hdc: HDC, ppfd: *const PIXELFORMATDESCRIPTOR) callconv(.winapi) INT;
+    extern "gdi32" fn SetPixelFormat(hdc: HDC, format: INT, ppfd: *const PIXELFORMATDESCRIPTOR) callconv(.winapi) BOOL;
+    extern "opengl32" fn wglCreateContext(hdc: HDC) callconv(.winapi) ?HGLRC;
+    extern "opengl32" fn wglDeleteContext(hglrc: HGLRC) callconv(.winapi) BOOL;
+    extern "opengl32" fn wglGetProcAddress(name: LPCSTR) callconv(.winapi) ?*anyopaque;
+    extern "opengl32" fn wglMakeCurrent(hdc: ?HDC, hglrc: ?HGLRC) callconv(.winapi) BOOL;
+
+    fn windowProc(hWnd: HWND, msg: UINT, wParam: WPARAM, lParam: LPARAM) callconv(.winapi) LRESULT {
+        return DefWindowProcA(hWnd, msg, wParam, lParam);
+    }
+} else struct {};
+
+extern "c" fn MTLCreateSystemDefaultDevice() ?*anyopaque;
 
 pub fn createRuntime() !*c.mln_runtime {
     var runtime: ?*c.mln_runtime = null;
@@ -39,8 +144,8 @@ pub fn destroyMap(map: *c.mln_map) void {
     testing.expectEqual(c.MLN_STATUS_OK, c.mln_map_destroy(map)) catch @panic("map destroy failed");
 }
 
-pub const OwnedTextureAttachContext = if (build_options.supports_vulkan) VulkanAttachContext else if (build_options.supports_metal) MetalAttachContext else struct {};
-pub const OwnedTextureDescriptor = if (build_options.supports_vulkan) c.mln_vulkan_owned_texture_descriptor else if (build_options.supports_metal) c.mln_metal_owned_texture_descriptor else struct {};
+pub const OwnedTextureAttachContext = if (build_options.supports_opengl) OpenGLAttachContext else if (build_options.supports_vulkan) VulkanAttachContext else if (build_options.supports_metal) MetalAttachContext else struct {};
+pub const OwnedTextureDescriptor = if (build_options.supports_opengl) c.mln_opengl_owned_texture_descriptor else if (build_options.supports_vulkan) c.mln_vulkan_owned_texture_descriptor else if (build_options.supports_metal) c.mln_metal_owned_texture_descriptor else struct {};
 
 pub fn ownedTextureDescriptor(context: *const OwnedTextureAttachContext) OwnedTextureDescriptor {
     var descriptor = defaultOwnedTextureDescriptor();
@@ -49,7 +154,9 @@ pub fn ownedTextureDescriptor(context: *const OwnedTextureAttachContext) OwnedTe
 }
 
 pub fn defaultOwnedTextureDescriptor() OwnedTextureDescriptor {
-    if (build_options.supports_vulkan) {
+    if (build_options.supports_opengl) {
+        return c.mln_opengl_owned_texture_descriptor_default();
+    } else if (build_options.supports_vulkan) {
         return c.mln_vulkan_owned_texture_descriptor_default();
     } else if (build_options.supports_metal) {
         return c.mln_metal_owned_texture_descriptor_default();
@@ -59,7 +166,9 @@ pub fn defaultOwnedTextureDescriptor() OwnedTextureDescriptor {
 }
 
 pub fn configureOwnedTextureDescriptor(descriptor: *OwnedTextureDescriptor, context: *const OwnedTextureAttachContext) void {
-    if (build_options.supports_vulkan) {
+    if (build_options.supports_opengl) {
+        descriptor.context = context.descriptor();
+    } else if (build_options.supports_vulkan) {
         descriptor.context = context.descriptor();
     } else if (build_options.supports_metal) {
         descriptor.context = context.descriptor();
@@ -73,7 +182,9 @@ pub fn attachOwnedTextureSession(map: *c.mln_map, descriptor: *const OwnedTextur
 }
 
 pub fn callOwnedTextureAttach(map: ?*c.mln_map, descriptor: ?*const OwnedTextureDescriptor, out_session: ?*?*c.mln_render_session) c.mln_status {
-    if (build_options.supports_vulkan) {
+    if (build_options.supports_opengl) {
+        return c.mln_opengl_owned_texture_attach(map, descriptor, out_session);
+    } else if (build_options.supports_vulkan) {
         return c.mln_vulkan_owned_texture_attach(map, descriptor, out_session);
     } else if (build_options.supports_metal) {
         return c.mln_metal_owned_texture_attach(map, descriptor, out_session);
@@ -81,6 +192,170 @@ pub fn callOwnedTextureAttach(map: ?*c.mln_map, descriptor: ?*const OwnedTexture
         unreachable;
     }
 }
+
+const OpenGLAttachContext = if (build_options.supports_opengl and builtin.os.tag == .windows) struct {
+    window: wgl.HWND,
+    device_context: wgl.HDC,
+    share_context: wgl.HGLRC,
+
+    pub fn init() !OpenGLAttachContext {
+        const class_name = "MaplibreNativeCAbiSupportWgl";
+        const module = wgl.GetModuleHandleA(null) orelse return error.SkipZigTest;
+
+        var window_class = std.mem.zeroes(wgl.WNDCLASSA);
+        window_class.style = wgl.CS_OWNDC;
+        window_class.lpfnWndProc = wgl.windowProc;
+        window_class.hInstance = module;
+        window_class.lpszClassName = class_name;
+        _ = wgl.RegisterClassA(&window_class);
+
+        const window = wgl.CreateWindowExA(
+            0,
+            class_name,
+            class_name,
+            wgl.WS_OVERLAPPEDWINDOW,
+            0,
+            0,
+            8,
+            8,
+            null,
+            null,
+            module,
+            null,
+        ) orelse return error.SkipZigTest;
+        errdefer _ = wgl.DestroyWindow(window);
+
+        const device_context = wgl.GetDC(window) orelse return error.SkipZigTest;
+        errdefer _ = wgl.ReleaseDC(window, device_context);
+
+        var pixel_format_descriptor = std.mem.zeroes(wgl.PIXELFORMATDESCRIPTOR);
+        pixel_format_descriptor.nSize = @intCast(@sizeOf(wgl.PIXELFORMATDESCRIPTOR));
+        pixel_format_descriptor.nVersion = 1;
+        pixel_format_descriptor.dwFlags = wgl.PFD_DRAW_TO_WINDOW | wgl.PFD_SUPPORT_OPENGL | wgl.PFD_DOUBLEBUFFER;
+        pixel_format_descriptor.iPixelType = wgl.PFD_TYPE_RGBA;
+        pixel_format_descriptor.cColorBits = 32;
+        pixel_format_descriptor.cDepthBits = 24;
+        pixel_format_descriptor.cStencilBits = 8;
+        pixel_format_descriptor.iLayerType = wgl.PFD_MAIN_PLANE;
+
+        const pixel_format = wgl.ChoosePixelFormat(device_context, &pixel_format_descriptor);
+        if (pixel_format == 0) return error.SkipZigTest;
+        if (wgl.SetPixelFormat(device_context, pixel_format, &pixel_format_descriptor) == 0) return error.SkipZigTest;
+
+        const share_context = wgl.wglCreateContext(device_context) orelse return error.SkipZigTest;
+        errdefer _ = wgl.wglDeleteContext(share_context);
+        if (wgl.wglMakeCurrent(device_context, share_context) == 0) return error.SkipZigTest;
+
+        return .{
+            .window = window,
+            .device_context = device_context,
+            .share_context = share_context,
+        };
+    }
+
+    pub fn deinit(self: *OpenGLAttachContext) void {
+        _ = wgl.wglMakeCurrent(null, null);
+        _ = wgl.wglDeleteContext(self.share_context);
+        _ = wgl.ReleaseDC(self.window, self.device_context);
+        _ = wgl.DestroyWindow(self.window);
+    }
+
+    pub fn descriptor(self: *const OpenGLAttachContext) c.mln_opengl_context_descriptor {
+        return .{
+            .size = @sizeOf(c.mln_opengl_context_descriptor),
+            .platform = c.MLN_OPENGL_CONTEXT_PLATFORM_WGL,
+            .data = .{ .wgl = .{
+                .size = @sizeOf(c.mln_wgl_context_descriptor),
+                .device_context = @ptrCast(self.device_context),
+                .share_context = @ptrCast(self.share_context),
+                .get_proc_address = @ptrCast(@constCast(&wgl.wglGetProcAddress)),
+            } },
+        };
+    }
+} else if (build_options.supports_opengl and builtin.os.tag == .linux) struct {
+    display: egl.EGLDisplay,
+    config: egl.EGLConfig,
+    surface: egl.EGLSurface,
+    share_context: egl.EGLContext,
+
+    pub fn init() !@This() {
+        const display = egl.eglGetDisplay(egl.EGL_DEFAULT_DISPLAY);
+        if (display == egl.EGL_NO_DISPLAY) return error.SkipZigTest;
+        errdefer _ = egl.eglTerminate(display);
+
+        var major: egl.EGLint = 0;
+        var minor: egl.EGLint = 0;
+        if (egl.eglInitialize(display, &major, &minor) == egl.EGL_FALSE) return error.SkipZigTest;
+        if (egl.eglBindAPI(egl.EGL_OPENGL_ES_API) == egl.EGL_FALSE) return error.SkipZigTest;
+
+        const config_attributes = [_]egl.EGLint{
+            egl.EGL_SURFACE_TYPE,    egl.EGL_PBUFFER_BIT,
+            egl.EGL_RENDERABLE_TYPE, egl.EGL_OPENGL_ES3_BIT,
+            egl.EGL_RED_SIZE,        8,
+            egl.EGL_GREEN_SIZE,      8,
+            egl.EGL_BLUE_SIZE,       8,
+            egl.EGL_ALPHA_SIZE,      8,
+            egl.EGL_DEPTH_SIZE,      24,
+            egl.EGL_STENCIL_SIZE,    8,
+            egl.EGL_NONE,
+        };
+        var config: egl.EGLConfig = null;
+        var config_count: egl.EGLint = 0;
+        if (egl.eglChooseConfig(display, &config_attributes, &config, 1, &config_count) == egl.EGL_FALSE or
+            config_count == 0 or config == null)
+        {
+            return error.SkipZigTest;
+        }
+
+        const context_attributes = [_]egl.EGLint{
+            egl.EGL_CONTEXT_CLIENT_VERSION, 3,
+            egl.EGL_NONE,
+        };
+        const share_context = egl.eglCreateContext(display, config, egl.EGL_NO_CONTEXT, &context_attributes);
+        if (share_context == egl.EGL_NO_CONTEXT) return error.SkipZigTest;
+        errdefer _ = egl.eglDestroyContext(display, share_context);
+
+        const surface_attributes = [_]egl.EGLint{
+            egl.EGL_WIDTH,  8,
+            egl.EGL_HEIGHT, 8,
+            egl.EGL_NONE,
+        };
+        const surface = egl.eglCreatePbufferSurface(display, config, &surface_attributes);
+        if (surface == egl.EGL_NO_SURFACE) return error.SkipZigTest;
+        errdefer _ = egl.eglDestroySurface(display, surface);
+
+        if (egl.eglMakeCurrent(display, surface, surface, share_context) == egl.EGL_FALSE) return error.SkipZigTest;
+        // TODO(linux): Validate this EGL helper on the Linux Mesa/llvmpipe
+        // environment before depending on it for non-Windows OpenGL CI signal.
+        return .{
+            .display = display,
+            .config = config,
+            .surface = surface,
+            .share_context = share_context,
+        };
+    }
+
+    pub fn deinit(self: *@This()) void {
+        _ = egl.eglMakeCurrent(self.display, egl.EGL_NO_SURFACE, egl.EGL_NO_SURFACE, egl.EGL_NO_CONTEXT);
+        _ = egl.eglDestroySurface(self.display, self.surface);
+        _ = egl.eglDestroyContext(self.display, self.share_context);
+        _ = egl.eglTerminate(self.display);
+    }
+
+    pub fn descriptor(self: *const @This()) c.mln_opengl_context_descriptor {
+        return .{
+            .size = @sizeOf(c.mln_opengl_context_descriptor),
+            .platform = c.MLN_OPENGL_CONTEXT_PLATFORM_EGL,
+            .data = .{ .egl = .{
+                .size = @sizeOf(c.mln_egl_context_descriptor),
+                .display = @ptrCast(self.display.?),
+                .config = @ptrCast(self.config.?),
+                .share_context = @ptrCast(self.share_context.?),
+                .get_proc_address = null,
+            } },
+        };
+    }
+} else struct {};
 
 const MetalAttachContext = struct {
     device: *anyopaque,

@@ -56,6 +56,8 @@ const GL_TEXTURE_MIN_FILTER: u32 = 0x2801;
 #[cfg(target_os = "windows")]
 const GL_NEAREST: i32 = 0x2600;
 
+// Keep this to the OpenGL 1.1 symbols exported by opengl32.dll; adding a GL
+// loader crate here would only support the Windows test helper.
 #[cfg(target_os = "windows")]
 #[link(name = "opengl32")]
 unsafe extern "system" {

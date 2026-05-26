@@ -14,7 +14,6 @@ fn attachTextureSession(map: *c.mln_map, context: *const support.OwnedTextureAtt
 }
 
 test "feature query validation rejects raw descriptor shapes" {
-    if (!support.supports_owned_texture_attach) return error.SkipZigTest;
     const runtime = try support.createRuntime();
     defer support.destroyRuntime(runtime);
     const map = try support.createMap(runtime);

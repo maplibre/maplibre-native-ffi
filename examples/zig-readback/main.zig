@@ -13,6 +13,8 @@ const egl = if (build_options.supports_opengl and builtin.os.tag == .linux) @cIm
     @cInclude("EGL/egl.h");
 }) else struct {};
 
+// Zig 0.16 cannot translate the Windows SDK WGL headers reliably with MSVC, so
+// keep this to the small ABI subset needed to create a shared context.
 const wgl = if (build_options.supports_opengl and builtin.os.tag == .windows) struct {
     const BOOL = c_int;
     const BYTE = u8;
@@ -176,21 +178,31 @@ fn logLatestDiagnostic(diagnostic_store: *const maplibre.DiagnosticStore) void {
 
 fn logAndValidateRenderBackend() !void {
     const support = maplibre.supportedRenderBackends();
-    std.debug.print("native render backends: {s}\n", .{renderBackendSupportLabel(support)});
+    var support_label_buffer: [32]u8 = undefined;
+    std.debug.print("native render backends: {s}\n", .{renderBackendSupportLabel(&support_label_buffer, support)});
     if (build_options.supports_metal and !support.metal) return error.NativeRenderBackendMismatch;
     if (build_options.supports_opengl and !support.opengl) return error.NativeRenderBackendMismatch;
     if (build_options.supports_vulkan and !support.vulkan) return error.NativeRenderBackendMismatch;
 }
 
-fn renderBackendSupportLabel(support: maplibre.RenderBackendSupport) []const u8 {
-    if (support.metal and support.opengl and support.vulkan) return "metal,opengl,vulkan";
-    if (support.metal and support.opengl) return "metal,opengl";
-    if (support.metal and support.vulkan) return "metal,vulkan";
-    if (support.opengl and support.vulkan) return "opengl,vulkan";
-    if (support.metal) return "metal";
-    if (support.opengl) return "opengl";
-    if (support.vulkan) return "vulkan";
-    return "none";
+fn renderBackendSupportLabel(buffer: []u8, support: maplibre.RenderBackendSupport) []const u8 {
+    var len: usize = 0;
+    var has_backend = false;
+    if (support.metal) appendBackendLabel(buffer, &len, &has_backend, "metal");
+    if (support.opengl) appendBackendLabel(buffer, &len, &has_backend, "opengl");
+    if (support.vulkan) appendBackendLabel(buffer, &len, &has_backend, "vulkan");
+    if (!has_backend) return "none";
+    return buffer[0..len];
+}
+
+fn appendBackendLabel(buffer: []u8, len: *usize, has_backend: *bool, label: []const u8) void {
+    if (has_backend.*) {
+        buffer[len.*] = ',';
+        len.* += 1;
+    }
+    @memcpy(buffer[len.*..][0..label.len], label);
+    len.* += label.len;
+    has_backend.* = true;
 }
 
 const OwnedTextureDescriptor = struct {

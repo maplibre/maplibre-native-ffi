@@ -9,6 +9,8 @@ const types = @import("../../types.zig");
 
 pub const OpenGLBackend = PlatformOpenGLBackend;
 
+// Modern OpenGL entry points are loaded from the active SDL GL context so this
+// example works across WGL and EGL instead of linking to one platform library.
 const gl = struct {
     const GLenum = c_uint;
     const GLint = c_int;
