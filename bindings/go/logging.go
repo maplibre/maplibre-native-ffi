@@ -1,17 +1,19 @@
 package maplibre
 
-import (
-	"github.com/maplibre/maplibre-native-ffi/bindings/go/internal/callback"
-	"github.com/maplibre/maplibre-native-ffi/bindings/go/internal/capi"
-)
+/*
+#include "maplibre_native_c.h"
+*/
+import "C"
+
+import "github.com/maplibre/maplibre-native-ffi/bindings/go/internal/callback"
 
 // LogSeverity is a native log severity.
 type LogSeverity uint32
 
 const (
-	LogSeverityInfo    LogSeverity = LogSeverity(capi.LogSeverityInfo)
-	LogSeverityWarning LogSeverity = LogSeverity(capi.LogSeverityWarning)
-	LogSeverityError   LogSeverity = LogSeverity(capi.LogSeverityError)
+	LogSeverityInfo    LogSeverity = LogSeverity(C.MLN_LOG_SEVERITY_INFO)
+	LogSeverityWarning LogSeverity = LogSeverity(C.MLN_LOG_SEVERITY_WARNING)
+	LogSeverityError   LogSeverity = LogSeverity(C.MLN_LOG_SEVERITY_ERROR)
 )
 
 // LogSeverityMask selects severities that native logging may dispatch
@@ -19,34 +21,34 @@ const (
 type LogSeverityMask uint32
 
 const (
-	LogSeverityMaskInfo    LogSeverityMask = LogSeverityMask(capi.LogSeverityMaskInfo)
-	LogSeverityMaskWarning LogSeverityMask = LogSeverityMask(capi.LogSeverityMaskWarning)
-	LogSeverityMaskError   LogSeverityMask = LogSeverityMask(capi.LogSeverityMaskError)
-	LogSeverityMaskDefault LogSeverityMask = LogSeverityMask(capi.LogSeverityMaskDefault)
-	LogSeverityMaskAll     LogSeverityMask = LogSeverityMask(capi.LogSeverityMaskAll)
+	LogSeverityMaskInfo    LogSeverityMask = LogSeverityMask(C.MLN_LOG_SEVERITY_MASK_INFO)
+	LogSeverityMaskWarning LogSeverityMask = LogSeverityMask(C.MLN_LOG_SEVERITY_MASK_WARNING)
+	LogSeverityMaskError   LogSeverityMask = LogSeverityMask(C.MLN_LOG_SEVERITY_MASK_ERROR)
+	LogSeverityMaskDefault LogSeverityMask = LogSeverityMask(C.MLN_LOG_SEVERITY_MASK_DEFAULT)
+	LogSeverityMaskAll     LogSeverityMask = LogSeverityMask(C.MLN_LOG_SEVERITY_MASK_ALL)
 )
 
 // LogEvent is a native log category.
 type LogEvent uint32
 
 const (
-	LogEventGeneral     LogEvent = LogEvent(capi.LogEventGeneral)
-	LogEventSetup       LogEvent = LogEvent(capi.LogEventSetup)
-	LogEventShader      LogEvent = LogEvent(capi.LogEventShader)
-	LogEventParseStyle  LogEvent = LogEvent(capi.LogEventParseStyle)
-	LogEventParseTile   LogEvent = LogEvent(capi.LogEventParseTile)
-	LogEventRender      LogEvent = LogEvent(capi.LogEventRender)
-	LogEventStyle       LogEvent = LogEvent(capi.LogEventStyle)
-	LogEventDatabase    LogEvent = LogEvent(capi.LogEventDatabase)
-	LogEventHTTPRequest LogEvent = LogEvent(capi.LogEventHTTPRequest)
-	LogEventSprite      LogEvent = LogEvent(capi.LogEventSprite)
-	LogEventImage       LogEvent = LogEvent(capi.LogEventImage)
-	LogEventOpenGL      LogEvent = LogEvent(capi.LogEventOpenGL)
-	LogEventJNI         LogEvent = LogEvent(capi.LogEventJNI)
-	LogEventAndroid     LogEvent = LogEvent(capi.LogEventAndroid)
-	LogEventCrash       LogEvent = LogEvent(capi.LogEventCrash)
-	LogEventGlyph       LogEvent = LogEvent(capi.LogEventGlyph)
-	LogEventTiming      LogEvent = LogEvent(capi.LogEventTiming)
+	LogEventGeneral     LogEvent = LogEvent(C.MLN_LOG_EVENT_GENERAL)
+	LogEventSetup       LogEvent = LogEvent(C.MLN_LOG_EVENT_SETUP)
+	LogEventShader      LogEvent = LogEvent(C.MLN_LOG_EVENT_SHADER)
+	LogEventParseStyle  LogEvent = LogEvent(C.MLN_LOG_EVENT_PARSE_STYLE)
+	LogEventParseTile   LogEvent = LogEvent(C.MLN_LOG_EVENT_PARSE_TILE)
+	LogEventRender      LogEvent = LogEvent(C.MLN_LOG_EVENT_RENDER)
+	LogEventStyle       LogEvent = LogEvent(C.MLN_LOG_EVENT_STYLE)
+	LogEventDatabase    LogEvent = LogEvent(C.MLN_LOG_EVENT_DATABASE)
+	LogEventHTTPRequest LogEvent = LogEvent(C.MLN_LOG_EVENT_HTTP_REQUEST)
+	LogEventSprite      LogEvent = LogEvent(C.MLN_LOG_EVENT_SPRITE)
+	LogEventImage       LogEvent = LogEvent(C.MLN_LOG_EVENT_IMAGE)
+	LogEventOpenGL      LogEvent = LogEvent(C.MLN_LOG_EVENT_OPENGL)
+	LogEventJNI         LogEvent = LogEvent(C.MLN_LOG_EVENT_JNI)
+	LogEventAndroid     LogEvent = LogEvent(C.MLN_LOG_EVENT_ANDROID)
+	LogEventCrash       LogEvent = LogEvent(C.MLN_LOG_EVENT_CRASH)
+	LogEventGlyph       LogEvent = LogEvent(C.MLN_LOG_EVENT_GLYPH)
+	LogEventTiming      LogEvent = LogEvent(C.MLN_LOG_EVENT_TIMING)
 )
 
 // LogRecord is a copied native log record.
@@ -69,7 +71,7 @@ func SetLogCallback(logCallback LogCallback) error {
 	if logCallback == nil {
 		return ClearLogCallback()
 	}
-	return checkNative(func() capi.Status {
+	return checkNative(func() int32 {
 		return callback.SetLogCallback(func(severity uint32, event uint32, code int64, message string) bool {
 			return logCallback(LogRecord{
 				Severity: LogSeverity(severity),
@@ -89,7 +91,7 @@ func ClearLogCallback() error {
 // SetAsyncLogSeverityMask controls which native log severities may dispatch
 // asynchronously.
 func SetAsyncLogSeverityMask(mask LogSeverityMask) error {
-	return checkNative(func() capi.Status {
+	return checkNative(func() int32 {
 		return callback.SetAsyncLogSeverityMask(uint32(mask))
 	})
 }

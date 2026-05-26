@@ -1,12 +1,17 @@
 package maplibre
 
+/*
+#include <stdlib.h>
+#include "maplibre_native_c.h"
+*/
+import "C"
+
 import (
 	"errors"
 	"sync"
 	"unsafe"
 
 	"github.com/maplibre/maplibre-native-ffi/bindings/go/internal/callback"
-	"github.com/maplibre/maplibre-native-ffi/bindings/go/internal/capi"
 	"github.com/maplibre/maplibre-native-ffi/bindings/go/internal/handle"
 	"github.com/maplibre/maplibre-native-ffi/bindings/go/internal/memory"
 )
@@ -15,35 +20,35 @@ import (
 type NetworkStatus uint32
 
 const (
-	NetworkStatusOnline  NetworkStatus = NetworkStatus(capi.NetworkStatusOnline)
-	NetworkStatusOffline NetworkStatus = NetworkStatus(capi.NetworkStatusOffline)
+	NetworkStatusOnline  NetworkStatus = NetworkStatus(C.MLN_NETWORK_STATUS_ONLINE)
+	NetworkStatusOffline NetworkStatus = NetworkStatus(C.MLN_NETWORK_STATUS_OFFLINE)
 )
 
 // AmbientCacheOperation selects a native ambient cache maintenance operation.
 type AmbientCacheOperation uint32
 
 const (
-	AmbientCacheOperationResetDatabase AmbientCacheOperation = AmbientCacheOperation(capi.AmbientCacheOperationResetDatabase)
-	AmbientCacheOperationPackDatabase  AmbientCacheOperation = AmbientCacheOperation(capi.AmbientCacheOperationPackDatabase)
-	AmbientCacheOperationInvalidate    AmbientCacheOperation = AmbientCacheOperation(capi.AmbientCacheOperationInvalidate)
-	AmbientCacheOperationClear         AmbientCacheOperation = AmbientCacheOperation(capi.AmbientCacheOperationClear)
+	AmbientCacheOperationResetDatabase AmbientCacheOperation = AmbientCacheOperation(C.MLN_AMBIENT_CACHE_OPERATION_RESET_DATABASE)
+	AmbientCacheOperationPackDatabase  AmbientCacheOperation = AmbientCacheOperation(C.MLN_AMBIENT_CACHE_OPERATION_PACK_DATABASE)
+	AmbientCacheOperationInvalidate    AmbientCacheOperation = AmbientCacheOperation(C.MLN_AMBIENT_CACHE_OPERATION_INVALIDATE)
+	AmbientCacheOperationClear         AmbientCacheOperation = AmbientCacheOperation(C.MLN_AMBIENT_CACHE_OPERATION_CLEAR)
 )
 
 // OfflineOperationKind identifies a native offline operation kind.
 type OfflineOperationKind uint32
 
 const (
-	OfflineOperationAmbientCache           OfflineOperationKind = OfflineOperationKind(capi.OfflineOperationAmbientCache)
-	OfflineOperationRegionCreate           OfflineOperationKind = OfflineOperationKind(capi.OfflineOperationRegionCreate)
-	OfflineOperationRegionGet              OfflineOperationKind = OfflineOperationKind(capi.OfflineOperationRegionGet)
-	OfflineOperationRegionsList            OfflineOperationKind = OfflineOperationKind(capi.OfflineOperationRegionsList)
-	OfflineOperationRegionsMergeDatabase   OfflineOperationKind = OfflineOperationKind(capi.OfflineOperationRegionsMergeDatabase)
-	OfflineOperationRegionUpdateMetadata   OfflineOperationKind = OfflineOperationKind(capi.OfflineOperationRegionUpdateMetadata)
-	OfflineOperationRegionGetStatus        OfflineOperationKind = OfflineOperationKind(capi.OfflineOperationRegionGetStatus)
-	OfflineOperationRegionSetObserved      OfflineOperationKind = OfflineOperationKind(capi.OfflineOperationRegionSetObserved)
-	OfflineOperationRegionSetDownloadState OfflineOperationKind = OfflineOperationKind(capi.OfflineOperationRegionSetDownloadState)
-	OfflineOperationRegionInvalidate       OfflineOperationKind = OfflineOperationKind(capi.OfflineOperationRegionInvalidate)
-	OfflineOperationRegionDelete           OfflineOperationKind = OfflineOperationKind(capi.OfflineOperationRegionDelete)
+	OfflineOperationAmbientCache           OfflineOperationKind = OfflineOperationKind(C.MLN_OFFLINE_OPERATION_AMBIENT_CACHE)
+	OfflineOperationRegionCreate           OfflineOperationKind = OfflineOperationKind(C.MLN_OFFLINE_OPERATION_REGION_CREATE)
+	OfflineOperationRegionGet              OfflineOperationKind = OfflineOperationKind(C.MLN_OFFLINE_OPERATION_REGION_GET)
+	OfflineOperationRegionsList            OfflineOperationKind = OfflineOperationKind(C.MLN_OFFLINE_OPERATION_REGIONS_LIST)
+	OfflineOperationRegionsMergeDatabase   OfflineOperationKind = OfflineOperationKind(C.MLN_OFFLINE_OPERATION_REGIONS_MERGE_DATABASE)
+	OfflineOperationRegionUpdateMetadata   OfflineOperationKind = OfflineOperationKind(C.MLN_OFFLINE_OPERATION_REGION_UPDATE_METADATA)
+	OfflineOperationRegionGetStatus        OfflineOperationKind = OfflineOperationKind(C.MLN_OFFLINE_OPERATION_REGION_GET_STATUS)
+	OfflineOperationRegionSetObserved      OfflineOperationKind = OfflineOperationKind(C.MLN_OFFLINE_OPERATION_REGION_SET_OBSERVED)
+	OfflineOperationRegionSetDownloadState OfflineOperationKind = OfflineOperationKind(C.MLN_OFFLINE_OPERATION_REGION_SET_DOWNLOAD_STATE)
+	OfflineOperationRegionInvalidate       OfflineOperationKind = OfflineOperationKind(C.MLN_OFFLINE_OPERATION_REGION_INVALIDATE)
+	OfflineOperationRegionDelete           OfflineOperationKind = OfflineOperationKind(C.MLN_OFFLINE_OPERATION_REGION_DELETE)
 )
 
 // OfflineOperationResultKind identifies the expected result shape for an
@@ -51,11 +56,11 @@ const (
 type OfflineOperationResultKind uint32
 
 const (
-	OfflineOperationResultNone           OfflineOperationResultKind = OfflineOperationResultKind(capi.OfflineOperationResultNone)
-	OfflineOperationResultRegion         OfflineOperationResultKind = OfflineOperationResultKind(capi.OfflineOperationResultRegion)
-	OfflineOperationResultOptionalRegion OfflineOperationResultKind = OfflineOperationResultKind(capi.OfflineOperationResultOptionalRegion)
-	OfflineOperationResultRegionList     OfflineOperationResultKind = OfflineOperationResultKind(capi.OfflineOperationResultRegionList)
-	OfflineOperationResultRegionStatus   OfflineOperationResultKind = OfflineOperationResultKind(capi.OfflineOperationResultRegionStatus)
+	OfflineOperationResultNone           OfflineOperationResultKind = OfflineOperationResultKind(C.MLN_OFFLINE_OPERATION_RESULT_NONE)
+	OfflineOperationResultRegion         OfflineOperationResultKind = OfflineOperationResultKind(C.MLN_OFFLINE_OPERATION_RESULT_REGION)
+	OfflineOperationResultOptionalRegion OfflineOperationResultKind = OfflineOperationResultKind(C.MLN_OFFLINE_OPERATION_RESULT_OPTIONAL_REGION)
+	OfflineOperationResultRegionList     OfflineOperationResultKind = OfflineOperationResultKind(C.MLN_OFFLINE_OPERATION_RESULT_REGION_LIST)
+	OfflineOperationResultRegionStatus   OfflineOperationResultKind = OfflineOperationResultKind(C.MLN_OFFLINE_OPERATION_RESULT_REGION_STATUS)
 )
 
 // OfflineOperationHandle owns a runtime-scoped offline operation token.
@@ -121,7 +126,9 @@ func (operation *OfflineOperationHandle[T]) Discard() error {
 		return err
 	}
 	defer operation.runtime.state.KeepAlive()
-	if err := checkNative(func() capi.Status { return capi.RuntimeOfflineOperationDiscard(ptr, id) }); err != nil {
+	if err := checkNative(func() int32 {
+		return int32(C.mln_runtime_offline_operation_discard((*C.mln_runtime)(unsafe.Pointer(ptr)), C.uint64_t(id)))
+	}); err != nil {
 		return err
 	}
 
@@ -162,63 +169,55 @@ func (options RuntimeOptions) validate() error {
 	return nil
 }
 
-func (options RuntimeOptions) toCAPI() capi.RuntimeOptions {
-	return capi.RuntimeOptions{
-		AssetPath:        options.AssetPath,
-		CachePath:        options.CachePath,
-		MaximumCacheSize: options.MaximumCacheSize,
-	}
-}
-
 // RuntimeEventType identifies a runtime event kind.
 type RuntimeEventType uint32
 
 const (
-	RuntimeEventMapCameraWillChange                 RuntimeEventType = RuntimeEventType(capi.RuntimeEventMapCameraWillChange)
-	RuntimeEventMapCameraIsChanging                 RuntimeEventType = RuntimeEventType(capi.RuntimeEventMapCameraIsChanging)
-	RuntimeEventMapCameraDidChange                  RuntimeEventType = RuntimeEventType(capi.RuntimeEventMapCameraDidChange)
-	RuntimeEventMapStyleLoaded                      RuntimeEventType = RuntimeEventType(capi.RuntimeEventMapStyleLoaded)
-	RuntimeEventMapLoadingStarted                   RuntimeEventType = RuntimeEventType(capi.RuntimeEventMapLoadingStarted)
-	RuntimeEventMapLoadingFinished                  RuntimeEventType = RuntimeEventType(capi.RuntimeEventMapLoadingFinished)
-	RuntimeEventMapLoadingFailed                    RuntimeEventType = RuntimeEventType(capi.RuntimeEventMapLoadingFailed)
-	RuntimeEventMapIdle                             RuntimeEventType = RuntimeEventType(capi.RuntimeEventMapIdle)
-	RuntimeEventMapRenderUpdateAvailable            RuntimeEventType = RuntimeEventType(capi.RuntimeEventMapRenderUpdateAvailable)
-	RuntimeEventMapRenderError                      RuntimeEventType = RuntimeEventType(capi.RuntimeEventMapRenderError)
-	RuntimeEventMapStillImageFinished               RuntimeEventType = RuntimeEventType(capi.RuntimeEventMapStillImageFinished)
-	RuntimeEventMapStillImageFailed                 RuntimeEventType = RuntimeEventType(capi.RuntimeEventMapStillImageFailed)
-	RuntimeEventMapRenderFrameStarted               RuntimeEventType = RuntimeEventType(capi.RuntimeEventMapRenderFrameStarted)
-	RuntimeEventMapRenderFrameFinished              RuntimeEventType = RuntimeEventType(capi.RuntimeEventMapRenderFrameFinished)
-	RuntimeEventMapRenderMapStarted                 RuntimeEventType = RuntimeEventType(capi.RuntimeEventMapRenderMapStarted)
-	RuntimeEventMapRenderMapFinished                RuntimeEventType = RuntimeEventType(capi.RuntimeEventMapRenderMapFinished)
-	RuntimeEventMapStyleImageMissing                RuntimeEventType = RuntimeEventType(capi.RuntimeEventMapStyleImageMissing)
-	RuntimeEventMapTileAction                       RuntimeEventType = RuntimeEventType(capi.RuntimeEventMapTileAction)
-	RuntimeEventOfflineRegionStatusChanged          RuntimeEventType = RuntimeEventType(capi.RuntimeEventOfflineRegionStatusChanged)
-	RuntimeEventOfflineRegionResponseError          RuntimeEventType = RuntimeEventType(capi.RuntimeEventOfflineRegionResponseError)
-	RuntimeEventOfflineRegionTileCountLimitExceeded RuntimeEventType = RuntimeEventType(capi.RuntimeEventOfflineRegionTileCountLimitExceeded)
-	RuntimeEventOfflineOperationCompleted           RuntimeEventType = RuntimeEventType(capi.RuntimeEventOfflineOperationCompleted)
+	RuntimeEventMapCameraWillChange                 RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_CAMERA_WILL_CHANGE)
+	RuntimeEventMapCameraIsChanging                 RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_CAMERA_IS_CHANGING)
+	RuntimeEventMapCameraDidChange                  RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_CAMERA_DID_CHANGE)
+	RuntimeEventMapStyleLoaded                      RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_STYLE_LOADED)
+	RuntimeEventMapLoadingStarted                   RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_LOADING_STARTED)
+	RuntimeEventMapLoadingFinished                  RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_LOADING_FINISHED)
+	RuntimeEventMapLoadingFailed                    RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_LOADING_FAILED)
+	RuntimeEventMapIdle                             RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_IDLE)
+	RuntimeEventMapRenderUpdateAvailable            RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_RENDER_UPDATE_AVAILABLE)
+	RuntimeEventMapRenderError                      RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_RENDER_ERROR)
+	RuntimeEventMapStillImageFinished               RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FINISHED)
+	RuntimeEventMapStillImageFailed                 RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_STILL_IMAGE_FAILED)
+	RuntimeEventMapRenderFrameStarted               RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_STARTED)
+	RuntimeEventMapRenderFrameFinished              RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_RENDER_FRAME_FINISHED)
+	RuntimeEventMapRenderMapStarted                 RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_RENDER_MAP_STARTED)
+	RuntimeEventMapRenderMapFinished                RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_RENDER_MAP_FINISHED)
+	RuntimeEventMapStyleImageMissing                RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_STYLE_IMAGE_MISSING)
+	RuntimeEventMapTileAction                       RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_MAP_TILE_ACTION)
+	RuntimeEventOfflineRegionStatusChanged          RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_OFFLINE_REGION_STATUS_CHANGED)
+	RuntimeEventOfflineRegionResponseError          RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_OFFLINE_REGION_RESPONSE_ERROR)
+	RuntimeEventOfflineRegionTileCountLimitExceeded RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED)
+	RuntimeEventOfflineOperationCompleted           RuntimeEventType = RuntimeEventType(C.MLN_RUNTIME_EVENT_OFFLINE_OPERATION_COMPLETED)
 )
 
 // RuntimeEventSourceType identifies the native handle kind that emitted an event.
 type RuntimeEventSourceType uint32
 
 const (
-	RuntimeEventSourceRuntime RuntimeEventSourceType = RuntimeEventSourceType(capi.RuntimeEventSourceRuntime)
-	RuntimeEventSourceMap     RuntimeEventSourceType = RuntimeEventSourceType(capi.RuntimeEventSourceMap)
+	RuntimeEventSourceRuntime RuntimeEventSourceType = RuntimeEventSourceType(C.MLN_RUNTIME_EVENT_SOURCE_RUNTIME)
+	RuntimeEventSourceMap     RuntimeEventSourceType = RuntimeEventSourceType(C.MLN_RUNTIME_EVENT_SOURCE_MAP)
 )
 
 // RuntimeEventPayloadType identifies the copied event payload shape.
 type RuntimeEventPayloadType uint32
 
 const (
-	RuntimeEventPayloadNone                        RuntimeEventPayloadType = RuntimeEventPayloadType(capi.RuntimeEventPayloadNone)
-	RuntimeEventPayloadRenderFrame                 RuntimeEventPayloadType = RuntimeEventPayloadType(capi.RuntimeEventPayloadRenderFrame)
-	RuntimeEventPayloadRenderMap                   RuntimeEventPayloadType = RuntimeEventPayloadType(capi.RuntimeEventPayloadRenderMap)
-	RuntimeEventPayloadStyleImageMissing           RuntimeEventPayloadType = RuntimeEventPayloadType(capi.RuntimeEventPayloadStyleImageMissing)
-	RuntimeEventPayloadTileAction                  RuntimeEventPayloadType = RuntimeEventPayloadType(capi.RuntimeEventPayloadTileAction)
-	RuntimeEventPayloadOfflineRegionStatus         RuntimeEventPayloadType = RuntimeEventPayloadType(capi.RuntimeEventPayloadOfflineRegionStatus)
-	RuntimeEventPayloadOfflineRegionResponseError  RuntimeEventPayloadType = RuntimeEventPayloadType(capi.RuntimeEventPayloadOfflineRegionResponseError)
-	RuntimeEventPayloadOfflineRegionTileCountLimit RuntimeEventPayloadType = RuntimeEventPayloadType(capi.RuntimeEventPayloadOfflineRegionTileCountLimit)
-	RuntimeEventPayloadOfflineOperationCompleted   RuntimeEventPayloadType = RuntimeEventPayloadType(capi.RuntimeEventPayloadOfflineOperationCompleted)
+	RuntimeEventPayloadNone                        RuntimeEventPayloadType = RuntimeEventPayloadType(C.MLN_RUNTIME_EVENT_PAYLOAD_NONE)
+	RuntimeEventPayloadRenderFrame                 RuntimeEventPayloadType = RuntimeEventPayloadType(C.MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME)
+	RuntimeEventPayloadRenderMap                   RuntimeEventPayloadType = RuntimeEventPayloadType(C.MLN_RUNTIME_EVENT_PAYLOAD_RENDER_MAP)
+	RuntimeEventPayloadStyleImageMissing           RuntimeEventPayloadType = RuntimeEventPayloadType(C.MLN_RUNTIME_EVENT_PAYLOAD_STYLE_IMAGE_MISSING)
+	RuntimeEventPayloadTileAction                  RuntimeEventPayloadType = RuntimeEventPayloadType(C.MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION)
+	RuntimeEventPayloadOfflineRegionStatus         RuntimeEventPayloadType = RuntimeEventPayloadType(C.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS)
+	RuntimeEventPayloadOfflineRegionResponseError  RuntimeEventPayloadType = RuntimeEventPayloadType(C.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR)
+	RuntimeEventPayloadOfflineRegionTileCountLimit RuntimeEventPayloadType = RuntimeEventPayloadType(C.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT)
+	RuntimeEventPayloadOfflineOperationCompleted   RuntimeEventPayloadType = RuntimeEventPayloadType(C.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_OPERATION_COMPLETED)
 )
 
 // RuntimeEvent is a copied runtime event. Unknown payloads preserve raw
@@ -238,23 +237,23 @@ type RuntimeEvent struct {
 type RenderMode uint32
 
 const (
-	RenderModePartial RenderMode = RenderMode(capi.RenderModePartial)
-	RenderModeFull    RenderMode = RenderMode(capi.RenderModeFull)
+	RenderModePartial RenderMode = RenderMode(C.MLN_RENDER_MODE_PARTIAL)
+	RenderModeFull    RenderMode = RenderMode(C.MLN_RENDER_MODE_FULL)
 )
 
 // TileOperation identifies a tile observer operation.
 type TileOperation uint32
 
 const (
-	TileOperationRequestedFromCache   TileOperation = TileOperation(capi.TileOperationRequestedFromCache)
-	TileOperationRequestedFromNetwork TileOperation = TileOperation(capi.TileOperationRequestedFromNetwork)
-	TileOperationLoadFromNetwork      TileOperation = TileOperation(capi.TileOperationLoadFromNetwork)
-	TileOperationLoadFromCache        TileOperation = TileOperation(capi.TileOperationLoadFromCache)
-	TileOperationStartParse           TileOperation = TileOperation(capi.TileOperationStartParse)
-	TileOperationEndParse             TileOperation = TileOperation(capi.TileOperationEndParse)
-	TileOperationError                TileOperation = TileOperation(capi.TileOperationError)
-	TileOperationCancelled            TileOperation = TileOperation(capi.TileOperationCancelled)
-	TileOperationNull                 TileOperation = TileOperation(capi.TileOperationNull)
+	TileOperationRequestedFromCache   TileOperation = TileOperation(C.MLN_TILE_OPERATION_REQUESTED_FROM_CACHE)
+	TileOperationRequestedFromNetwork TileOperation = TileOperation(C.MLN_TILE_OPERATION_REQUESTED_FROM_NETWORK)
+	TileOperationLoadFromNetwork      TileOperation = TileOperation(C.MLN_TILE_OPERATION_LOAD_FROM_NETWORK)
+	TileOperationLoadFromCache        TileOperation = TileOperation(C.MLN_TILE_OPERATION_LOAD_FROM_CACHE)
+	TileOperationStartParse           TileOperation = TileOperation(C.MLN_TILE_OPERATION_START_PARSE)
+	TileOperationEndParse             TileOperation = TileOperation(C.MLN_TILE_OPERATION_END_PARSE)
+	TileOperationError                TileOperation = TileOperation(C.MLN_TILE_OPERATION_ERROR)
+	TileOperationCancelled            TileOperation = TileOperation(C.MLN_TILE_OPERATION_CANCELLED)
+	TileOperationNull                 TileOperation = TileOperation(C.MLN_TILE_OPERATION_NULL)
 )
 
 // RenderingStats is copied render-frame statistics.
@@ -336,7 +335,7 @@ type RuntimeEventOfflineOperationCompletedPayload struct {
 
 // RuntimeHandle owns scheduler state and event storage for one owner thread.
 type RuntimeHandle struct {
-	state *handle.State[capi.Runtime]
+	state *handle.State[nativeRuntime]
 
 	resourceTransformMu sync.Mutex
 	resourceTransform   *callback.ResourceTransformState
@@ -360,8 +359,8 @@ func (status NetworkStatus) String() string {
 
 // CurrentNetworkStatus reads MapLibre Native's process-global network status.
 func CurrentNetworkStatus() (NetworkStatus, error) {
-	var raw uint32
-	if err := checkNative(func() capi.Status { return capi.NetworkStatusGet(&raw) }); err != nil {
+	var raw C.uint32_t
+	if err := checkNative(func() int32 { return int32(C.mln_network_status_get(&raw)) }); err != nil {
 		return 0, err
 	}
 	return NetworkStatus(raw), nil
@@ -377,7 +376,7 @@ func SetNetworkStatus(status NetworkStatus) error {
 }
 
 func networkStatusSetRaw(raw uint32) error {
-	return checkNative(func() capi.Status { return capi.NetworkStatusSet(raw) })
+	return checkNative(func() int32 { return int32(C.mln_network_status_set(C.uint32_t(raw))) })
 }
 
 func rawNetworkStatusForSet(status NetworkStatus) (uint32, error) {
@@ -391,7 +390,14 @@ func rawNetworkStatusForSet(status NetworkStatus) (uint32, error) {
 
 // NewRuntime creates a runtime on the current OS thread using native defaults.
 func NewRuntime() (*RuntimeHandle, error) {
-	return createRuntime(capi.RuntimeCreateDefault)
+	return createRuntime(func(out **nativeRuntime) int32 {
+		var raw *C.mln_runtime
+		status := int32(C.mln_runtime_create(nil, &raw))
+		if status == int32(C.MLN_STATUS_OK) {
+			*out = (*nativeRuntime)(unsafe.Pointer(raw))
+		}
+		return status
+	})
 }
 
 // NewRuntimeWithOptions creates a runtime on the current OS thread using
@@ -400,14 +406,31 @@ func NewRuntimeWithOptions(options RuntimeOptions) (*RuntimeHandle, error) {
 	if err := options.validate(); err != nil {
 		return nil, err
 	}
-	return createRuntime(func(out **capi.Runtime) capi.Status {
-		return capi.RuntimeCreate(options.toCAPI(), out)
+	return createRuntime(func(out **nativeRuntime) int32 {
+		rawOptions := C.mln_runtime_options_default()
+		assetPath := C.CString(options.AssetPath)
+		defer C.free(unsafe.Pointer(assetPath))
+		cachePath := C.CString(options.CachePath)
+		defer C.free(unsafe.Pointer(cachePath))
+		rawOptions.asset_path = assetPath
+		rawOptions.cache_path = cachePath
+		if options.MaximumCacheSize != nil {
+			rawOptions.flags |= C.uint32_t(C.MLN_RUNTIME_OPTION_MAXIMUM_CACHE_SIZE)
+			rawOptions.maximum_cache_size = C.uint64_t(*options.MaximumCacheSize)
+		}
+
+		var raw *C.mln_runtime
+		status := int32(C.mln_runtime_create(&rawOptions, &raw))
+		if status == int32(C.MLN_STATUS_OK) {
+			*out = (*nativeRuntime)(unsafe.Pointer(raw))
+		}
+		return status
 	})
 }
 
-func createRuntime(create func(**capi.Runtime) capi.Status) (*RuntimeHandle, error) {
-	var runtime *capi.Runtime
-	if err := checkNative(func() capi.Status { return create(&runtime) }); err != nil {
+func createRuntime(create func(**nativeRuntime) int32) (*RuntimeHandle, error) {
+	var runtime *nativeRuntime
+	if err := checkNative(func() int32 { return create(&runtime) }); err != nil {
 		return nil, err
 	}
 	state, err := handle.New(runtime, "RuntimeHandle")
@@ -417,7 +440,7 @@ func createRuntime(create func(**capi.Runtime) capi.Status) (*RuntimeHandle, err
 	return &RuntimeHandle{state: state}, nil
 }
 
-func (runtime *RuntimeHandle) ptr() (*capi.Runtime, error) {
+func (runtime *RuntimeHandle) ptr() (*nativeRuntime, error) {
 	if runtime == nil || runtime.state == nil {
 		return nil, newBindingError(ErrInvalidArgument, "RuntimeHandle is nil")
 	}
@@ -435,7 +458,9 @@ func (runtime *RuntimeHandle) RunOnce() error {
 		return err
 	}
 	defer runtime.state.KeepAlive()
-	return checkNative(func() capi.Status { return capi.RuntimeRunOnce(ptr) })
+	return checkNative(func() int32 {
+		return int32(C.mln_runtime_run_once((*C.mln_runtime)(unsafe.Pointer(ptr))))
+	})
 }
 
 // PollEvent polls one queued runtime event and copies it into a Go value.
@@ -446,29 +471,31 @@ func (runtime *RuntimeHandle) PollEvent() (*RuntimeEvent, error) {
 	}
 	defer runtime.state.KeepAlive()
 
-	var rawEvent capi.RuntimeEvent
-	var hasEvent bool
-	if err := checkNative(func() capi.Status { return capi.RuntimePollEvent(ptr, &rawEvent, &hasEvent) }); err != nil {
+	rawEvent := C.mln_runtime_event{size: C.uint32_t(unsafe.Sizeof(C.mln_runtime_event{}))}
+	var hasEvent C.bool
+	if err := checkNative(func() int32 {
+		return int32(C.mln_runtime_poll_event((*C.mln_runtime)(unsafe.Pointer(ptr)), &rawEvent, &hasEvent))
+	}); err != nil {
 		return nil, err
 	}
-	if !hasEvent {
+	if !bool(hasEvent) {
 		return nil, nil
 	}
-	event := runtimeEventFromCAPI(rawEvent)
+	event := runtimeEventFromC(rawEvent)
 	runtime.handleEventSideEffects(event)
 	return event, nil
 }
 
-func runtimeEventFromCAPI(event capi.RuntimeEvent) *RuntimeEvent {
+func runtimeEventFromC(event C.mln_runtime_event) *RuntimeEvent {
 	return &RuntimeEvent{
-		Type:        RuntimeEventType(event.Type),
-		SourceType:  RuntimeEventSourceType(event.SourceType),
-		Source:      event.Source,
-		Code:        event.Code,
-		PayloadType: RuntimeEventPayloadType(event.PayloadType),
-		PayloadSize: event.PayloadSize,
-		Message:     event.Message,
-		Payload:     runtimeEventPayloadFromCAPI(event.Payload),
+		Type:        RuntimeEventType(event._type),
+		SourceType:  RuntimeEventSourceType(event.source_type),
+		Source:      uintptr(event.source),
+		Code:        int32(event.code),
+		PayloadType: RuntimeEventPayloadType(event.payload_type),
+		PayloadSize: uintptr(event.payload_size),
+		Message:     goCharBytes(event.message, event.message_size),
+		Payload:     runtimeEventPayloadFromC(event),
 	}
 }
 
@@ -513,63 +540,92 @@ func (runtime *RuntimeHandle) mapForEventSource(source uintptr) *MapHandle {
 	return m
 }
 
-func runtimeEventPayloadFromCAPI(payload any) any {
-	switch payload := payload.(type) {
-	case capi.RuntimeEventRenderFramePayload:
+func runtimeEventPayloadFromC(event C.mln_runtime_event) any {
+	if event.payload == nil {
+		return nil
+	}
+	switch uint32(event.payload_type) {
+	case uint32(C.MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME):
+		payload := (*C.mln_runtime_event_render_frame)(event.payload)
+		mode := uint32(payload.mode)
 		return RuntimeEventRenderFramePayload{
-			Mode:             RenderMode(payload.Mode),
-			RawMode:          payload.Mode,
-			NeedsRepaint:     payload.NeedsRepaint,
-			PlacementChanged: payload.PlacementChanged,
-			Stats:            renderingStatsFromCAPI(payload.Stats),
+			Mode:             RenderMode(mode),
+			RawMode:          mode,
+			NeedsRepaint:     bool(payload.needs_repaint),
+			PlacementChanged: bool(payload.placement_changed),
+			Stats:            renderingStatsFromC(payload.stats),
 		}
-	case capi.RuntimeEventRenderMapPayload:
-		return RuntimeEventRenderMapPayload{Mode: RenderMode(payload.Mode), RawMode: payload.Mode}
-	case capi.RuntimeEventStyleImageMissingPayload:
-		return RuntimeEventStyleImageMissingPayload{ImageID: payload.ImageID}
-	case capi.RuntimeEventTileActionPayload:
+	case uint32(C.MLN_RUNTIME_EVENT_PAYLOAD_RENDER_MAP):
+		payload := (*C.mln_runtime_event_render_map)(event.payload)
+		mode := uint32(payload.mode)
+		return RuntimeEventRenderMapPayload{Mode: RenderMode(mode), RawMode: mode}
+	case uint32(C.MLN_RUNTIME_EVENT_PAYLOAD_STYLE_IMAGE_MISSING):
+		payload := (*C.mln_runtime_event_style_image_missing)(event.payload)
+		return RuntimeEventStyleImageMissingPayload{ImageID: goCharBytes(payload.image_id, payload.image_id_size)}
+	case uint32(C.MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION):
+		payload := (*C.mln_runtime_event_tile_action)(event.payload)
+		operation := uint32(payload.operation)
 		return RuntimeEventTileActionPayload{
-			Operation:    TileOperation(payload.Operation),
-			RawOperation: payload.Operation,
-			TileID:       tileIDFromCAPI(payload.TileID),
-			SourceID:     payload.SourceID,
+			Operation:    TileOperation(operation),
+			RawOperation: operation,
+			TileID:       tileIDFromC(payload.tile_id),
+			SourceID:     goCharBytes(payload.source_id, payload.source_id_size),
 		}
-	case capi.RuntimeEventOfflineRegionStatusPayload:
-		return RuntimeEventOfflineRegionStatusPayload{RegionID: OfflineRegionID(payload.RegionID), Status: offlineRegionStatusFromCAPI(payload.Status)}
-	case capi.RuntimeEventOfflineRegionResponseErrorPayload:
-		return RuntimeEventOfflineRegionResponseErrorPayload{RegionID: OfflineRegionID(payload.RegionID), Reason: ResourceErrorReason(payload.Reason), RawReason: payload.Reason}
-	case capi.RuntimeEventOfflineRegionTileCountLimitPayload:
-		return RuntimeEventOfflineRegionTileCountLimitPayload{RegionID: OfflineRegionID(payload.RegionID), Limit: payload.Limit}
-	case capi.RuntimeEventOfflineOperationCompletedPayload:
+	case uint32(C.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS):
+		payload := (*C.mln_runtime_event_offline_region_status)(event.payload)
+		return RuntimeEventOfflineRegionStatusPayload{RegionID: OfflineRegionID(payload.region_id), Status: offlineRegionStatusFromC(payload.status)}
+	case uint32(C.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR):
+		payload := (*C.mln_runtime_event_offline_region_response_error)(event.payload)
+		reason := uint32(payload.reason)
+		return RuntimeEventOfflineRegionResponseErrorPayload{RegionID: OfflineRegionID(payload.region_id), Reason: ResourceErrorReason(reason), RawReason: reason}
+	case uint32(C.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT):
+		payload := (*C.mln_runtime_event_offline_region_tile_count_limit)(event.payload)
+		return RuntimeEventOfflineRegionTileCountLimitPayload{RegionID: OfflineRegionID(payload.region_id), Limit: uint64(payload.limit)}
+	case uint32(C.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_OPERATION_COMPLETED):
+		payload := (*C.mln_runtime_event_offline_operation_completed)(event.payload)
 		return RuntimeEventOfflineOperationCompletedPayload{
-			OperationID:   payload.OperationID,
-			OperationKind: OfflineOperationKind(payload.OperationKind),
-			ResultKind:    OfflineOperationResultKind(payload.ResultKind),
-			ResultStatus:  payload.ResultStatus,
-			Found:         payload.Found,
+			OperationID:   uint64(payload.operation_id),
+			OperationKind: OfflineOperationKind(payload.operation_kind),
+			ResultKind:    OfflineOperationResultKind(payload.result_kind),
+			ResultStatus:  int32(payload.result_status),
+			Found:         bool(payload.found),
 		}
 	default:
 		return nil
 	}
 }
 
-func renderingStatsFromCAPI(stats capi.RenderingStats) RenderingStats {
+func renderingStatsFromC(stats C.mln_rendering_stats) RenderingStats {
 	return RenderingStats{
-		EncodingTime:       stats.EncodingTime,
-		RenderingTime:      stats.RenderingTime,
-		FrameCount:         stats.FrameCount,
-		DrawCallCount:      stats.DrawCallCount,
-		TotalDrawCallCount: stats.TotalDrawCallCount,
+		EncodingTime:       float64(stats.encoding_time),
+		RenderingTime:      float64(stats.rendering_time),
+		FrameCount:         int64(stats.frame_count),
+		DrawCallCount:      int64(stats.draw_call_count),
+		TotalDrawCallCount: int64(stats.total_draw_call_count),
 	}
 }
 
-func tileIDFromCAPI(tileID capi.TileID) TileID {
+func tileIDFromC(tileID C.mln_tile_id) TileID {
 	return TileID{
-		OverscaledZ: tileID.OverscaledZ,
-		Wrap:        tileID.Wrap,
-		CanonicalZ:  tileID.CanonicalZ,
-		CanonicalX:  tileID.CanonicalX,
-		CanonicalY:  tileID.CanonicalY,
+		OverscaledZ: uint32(tileID.overscaled_z),
+		Wrap:        int32(tileID.wrap),
+		CanonicalZ:  uint32(tileID.canonical_z),
+		CanonicalX:  uint32(tileID.canonical_x),
+		CanonicalY:  uint32(tileID.canonical_y),
+	}
+}
+
+func offlineRegionStatusFromC(status C.mln_offline_region_status) OfflineRegionStatus {
+	return OfflineRegionStatus{
+		DownloadState:                  OfflineRegionDownloadState(status.download_state),
+		CompletedResourceCount:         uint64(status.completed_resource_count),
+		CompletedResourceSize:          uint64(status.completed_resource_size),
+		CompletedTileCount:             uint64(status.completed_tile_count),
+		RequiredTileCount:              uint64(status.required_tile_count),
+		CompletedTileSize:              uint64(status.completed_tile_size),
+		RequiredResourceCount:          uint64(status.required_resource_count),
+		RequiredResourceCountIsPrecise: bool(status.required_resource_count_is_precise),
+		Complete:                       bool(status.complete),
 	}
 }
 
@@ -582,13 +638,16 @@ func (runtime *RuntimeHandle) StartAmbientCacheOperation(operation AmbientCacheO
 	}
 	defer runtime.state.KeepAlive()
 
-	var id uint64
-	if err := checkNative(func() capi.Status {
-		return capi.RuntimeRunAmbientCacheOperationStart(ptr, uint32(operation), &id)
+	var id C.mln_offline_operation_id
+	if err := checkNative(func() int32 {
+		return int32(C.mln_runtime_run_ambient_cache_operation_start((*C.mln_runtime)(unsafe.Pointer(ptr)), C.uint32_t(operation), &id))
 	}); err != nil {
 		return nil, err
 	}
-	return newOfflineOperationHandle[struct{}](runtime, id, OfflineOperationAmbientCache, OfflineOperationResultNone), nil
+	if id == 0 {
+		return nil, newBindingError(ErrInvalidState, "ambient cache operation did not return an ID")
+	}
+	return newOfflineOperationHandle[struct{}](runtime, uint64(id), OfflineOperationAmbientCache, OfflineOperationResultNone), nil
 }
 
 // SetResourceProvider installs or replaces the runtime-scoped network resource
@@ -606,8 +665,8 @@ func (runtime *RuntimeHandle) SetResourceProvider(provider ResourceProviderCallb
 	defer runtime.state.KeepAlive()
 
 	var replacement *callback.ResourceProviderState
-	if err := checkNative(func() capi.Status {
-		state, status := callback.SetResourceProvider(ptr, func(request callback.ResourceRequest, handle *callback.ResourceRequestHandle) uint32 {
+	if err := checkNative(func() int32 {
+		state, status := callback.SetResourceProvider(unsafe.Pointer(ptr), func(request callback.ResourceRequest, handle *callback.ResourceRequestHandle) uint32 {
 			decision := provider(ResourceRequest{
 				URL:                 request.URL,
 				Kind:                ResourceKind(request.Kind),
@@ -664,8 +723,8 @@ func (runtime *RuntimeHandle) SetResourceTransform(transform ResourceTransformCa
 	defer runtime.state.KeepAlive()
 
 	var replacement *callback.ResourceTransformState
-	if err := checkNative(func() capi.Status {
-		state, status := callback.SetResourceTransform(ptr, func(kind uint32, url string) (string, bool) {
+	if err := checkNative(func() int32 {
+		state, status := callback.SetResourceTransform(unsafe.Pointer(ptr), func(kind uint32, url string) (string, bool) {
 			return transform(ResourceTransformRequest{Kind: ResourceKind(kind), RawKind: kind, URL: url})
 		})
 		replacement = state
@@ -690,7 +749,7 @@ func (runtime *RuntimeHandle) ClearResourceTransform() error {
 	}
 	defer runtime.state.KeepAlive()
 
-	if err := checkNative(func() capi.Status { return callback.ClearResourceTransform(ptr) }); err != nil {
+	if err := checkNative(func() int32 { return callback.ClearResourceTransform(unsafe.Pointer(ptr)) }); err != nil {
 		return err
 	}
 	runtime.releaseResourceTransform()
@@ -707,27 +766,43 @@ func (runtime *RuntimeHandle) releaseResourceTransform() {
 
 // NewMap creates a map owned by this runtime with native default options.
 func (runtime *RuntimeHandle) NewMap() (*MapHandle, error) {
-	return runtime.createMap(func(ptr *capi.Runtime, out **capi.Map) capi.Status {
-		return capi.MapCreateDefault(ptr, out)
+	return runtime.createMap(func(ptr *nativeRuntime, out **nativeMap) int32 {
+		var raw *C.mln_map
+		status := int32(C.mln_map_create((*C.mln_runtime)(unsafe.Pointer(ptr)), nil, &raw))
+		if status == int32(C.MLN_STATUS_OK) {
+			*out = (*nativeMap)(unsafe.Pointer(raw))
+		}
+		return status
 	})
 }
 
 // NewMapWithOptions creates a map owned by this runtime with explicit options.
 func (runtime *RuntimeHandle) NewMapWithOptions(options MapOptions) (*MapHandle, error) {
-	return runtime.createMap(func(ptr *capi.Runtime, out **capi.Map) capi.Status {
-		return capi.MapCreate(ptr, options.toCAPI(), out)
+	return runtime.createMap(func(ptr *nativeRuntime, out **nativeMap) int32 {
+		rawOptions := C.mln_map_options_default()
+		rawOptions.width = C.uint32_t(options.Width)
+		rawOptions.height = C.uint32_t(options.Height)
+		rawOptions.scale_factor = C.double(options.ScaleFactor)
+		rawOptions.map_mode = C.uint32_t(options.Mode)
+
+		var raw *C.mln_map
+		status := int32(C.mln_map_create((*C.mln_runtime)(unsafe.Pointer(ptr)), &rawOptions, &raw))
+		if status == int32(C.MLN_STATUS_OK) {
+			*out = (*nativeMap)(unsafe.Pointer(raw))
+		}
+		return status
 	})
 }
 
-func (runtime *RuntimeHandle) createMap(create func(*capi.Runtime, **capi.Map) capi.Status) (*MapHandle, error) {
+func (runtime *RuntimeHandle) createMap(create func(*nativeRuntime, **nativeMap) int32) (*MapHandle, error) {
 	ptr, err := runtime.ptr()
 	if err != nil {
 		return nil, err
 	}
 	defer runtime.state.KeepAlive()
 
-	var rawMap *capi.Map
-	if err := checkNative(func() capi.Status { return create(ptr, &rawMap) }); err != nil {
+	var rawMap *nativeMap
+	if err := checkNative(func() int32 { return create(ptr, &rawMap) }); err != nil {
 		return nil, err
 	}
 	state, err := handle.New(rawMap, "MapHandle", runtime)
@@ -746,8 +821,10 @@ func (runtime *RuntimeHandle) Close() error {
 	if runtime == nil || runtime.state == nil {
 		return newBindingError(ErrInvalidArgument, "RuntimeHandle is nil")
 	}
-	if err := checkNative(func() capi.Status {
-		return runtime.state.Close(capi.RuntimeDestroy)
+	if err := checkNative(func() int32 {
+		return runtime.state.Close(func(ptr *nativeRuntime) int32 {
+			return int32(C.mln_runtime_destroy((*C.mln_runtime)(unsafe.Pointer(ptr))))
+		})
 	}); err != nil {
 		return err
 	}

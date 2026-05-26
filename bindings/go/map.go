@@ -1,11 +1,18 @@
 package maplibre
 
+/*
+#include <stdlib.h>
+
+#include "maplibre_native_c.h"
+*/
+import "C"
+
 import (
 	"errors"
 	"sync"
+	"unsafe"
 
 	"github.com/maplibre/maplibre-native-ffi/bindings/go/internal/callback"
-	"github.com/maplibre/maplibre-native-ffi/bindings/go/internal/capi"
 	"github.com/maplibre/maplibre-native-ffi/bindings/go/internal/handle"
 	"github.com/maplibre/maplibre-native-ffi/bindings/go/internal/memory"
 )
@@ -14,22 +21,22 @@ import (
 type MapMode uint32
 
 const (
-	MapModeContinuous MapMode = MapMode(capi.MapModeContinuous)
-	MapModeStatic     MapMode = MapMode(capi.MapModeStatic)
-	MapModeTile       MapMode = MapMode(capi.MapModeTile)
+	MapModeContinuous MapMode = MapMode(C.MLN_MAP_MODE_CONTINUOUS)
+	MapModeStatic     MapMode = MapMode(C.MLN_MAP_MODE_STATIC)
+	MapModeTile       MapMode = MapMode(C.MLN_MAP_MODE_TILE)
 )
 
 // MapDebugOptions is a mask of native map debug overlays.
 type MapDebugOptions uint32
 
 const (
-	MapDebugTileBorders MapDebugOptions = MapDebugOptions(capi.MapDebugTileBorders)
-	MapDebugParseStatus MapDebugOptions = MapDebugOptions(capi.MapDebugParseStatus)
-	MapDebugTimestamps  MapDebugOptions = MapDebugOptions(capi.MapDebugTimestamps)
-	MapDebugCollision   MapDebugOptions = MapDebugOptions(capi.MapDebugCollision)
-	MapDebugOverdraw    MapDebugOptions = MapDebugOptions(capi.MapDebugOverdraw)
-	MapDebugStencilClip MapDebugOptions = MapDebugOptions(capi.MapDebugStencilClip)
-	MapDebugDepthBuffer MapDebugOptions = MapDebugOptions(capi.MapDebugDepthBuffer)
+	MapDebugTileBorders MapDebugOptions = MapDebugOptions(C.MLN_MAP_DEBUG_TILE_BORDERS)
+	MapDebugParseStatus MapDebugOptions = MapDebugOptions(C.MLN_MAP_DEBUG_PARSE_STATUS)
+	MapDebugTimestamps  MapDebugOptions = MapDebugOptions(C.MLN_MAP_DEBUG_TIMESTAMPS)
+	MapDebugCollision   MapDebugOptions = MapDebugOptions(C.MLN_MAP_DEBUG_COLLISION)
+	MapDebugOverdraw    MapDebugOptions = MapDebugOptions(C.MLN_MAP_DEBUG_OVERDRAW)
+	MapDebugStencilClip MapDebugOptions = MapDebugOptions(C.MLN_MAP_DEBUG_STENCIL_CLIP)
+	MapDebugDepthBuffer MapDebugOptions = MapDebugOptions(C.MLN_MAP_DEBUG_DEPTH_BUFFER)
 )
 
 // Has reports whether all requested debug overlay bits are set.
@@ -50,18 +57,9 @@ func NewMapOptions(width, height uint32, scaleFactor float64) MapOptions {
 	return MapOptions{Width: width, Height: height, ScaleFactor: scaleFactor, Mode: MapModeContinuous}
 }
 
-func (options MapOptions) toCAPI() capi.MapOptions {
-	return capi.MapOptions{
-		Width:       options.Width,
-		Height:      options.Height,
-		ScaleFactor: options.ScaleFactor,
-		MapMode:     uint32(options.Mode),
-	}
-}
-
 // MapHandle owns map state for one RuntimeHandle.
 type MapHandle struct {
-	state         *handle.State[capi.Map]
+	state         *handle.State[nativeMap]
 	runtime       *RuntimeHandle
 	nativeAddress uintptr
 
@@ -69,7 +67,7 @@ type MapHandle struct {
 	customGeometrySources map[string]*callback.CustomGeometrySourceState
 }
 
-func (m *MapHandle) ptr() (*capi.Map, error) {
+func (m *MapHandle) ptr() (*nativeMap, error) {
 	if m == nil || m.state == nil {
 		return nil, newBindingError(ErrInvalidArgument, "MapHandle is nil")
 	}
@@ -97,7 +95,7 @@ func (m *MapHandle) RequestRepaint() error {
 		return err
 	}
 	defer m.state.KeepAlive()
-	return checkNative(func() capi.Status { return capi.MapRequestRepaint(ptr) })
+	return checkNative(func() int32 { return int32(C.mln_map_request_repaint((*C.mln_map)(unsafe.Pointer(ptr)))) })
 }
 
 // RequestStillImage requests one still image for a static or tile map.
@@ -107,7 +105,7 @@ func (m *MapHandle) RequestStillImage() error {
 		return err
 	}
 	defer m.state.KeepAlive()
-	return checkNative(func() capi.Status { return capi.MapRequestStillImage(ptr) })
+	return checkNative(func() int32 { return int32(C.mln_map_request_still_image((*C.mln_map)(unsafe.Pointer(ptr)))) })
 }
 
 // SetStyleURL loads a style URL through MapLibre Native style APIs.
@@ -120,7 +118,9 @@ func (m *MapHandle) SetStyleURL(url string) error {
 		return err
 	}
 	defer m.state.KeepAlive()
-	return checkNative(func() capi.Status { return capi.MapSetStyleURL(ptr, url) })
+	cURL := C.CString(url)
+	defer C.free(unsafe.Pointer(cURL))
+	return checkNative(func() int32 { return int32(C.mln_map_set_style_url((*C.mln_map)(unsafe.Pointer(ptr)), cURL)) })
 }
 
 // SetStyleJSON loads inline style JSON through MapLibre Native style APIs.
@@ -133,7 +133,9 @@ func (m *MapHandle) SetStyleJSON(json string) error {
 		return err
 	}
 	defer m.state.KeepAlive()
-	if err := checkNative(func() capi.Status { return capi.MapSetStyleJSON(ptr, json) }); err != nil {
+	cJSON := C.CString(json)
+	defer C.free(unsafe.Pointer(cJSON))
+	if err := checkNative(func() int32 { return int32(C.mln_map_set_style_json((*C.mln_map)(unsafe.Pointer(ptr)), cJSON)) }); err != nil {
 		return err
 	}
 	m.releaseCustomGeometrySources()
@@ -147,7 +149,9 @@ func (m *MapHandle) SetDebugOptions(options MapDebugOptions) error {
 		return err
 	}
 	defer m.state.KeepAlive()
-	return checkNative(func() capi.Status { return capi.MapSetDebugOptions(ptr, uint32(options)) })
+	return checkNative(func() int32 {
+		return int32(C.mln_map_set_debug_options((*C.mln_map)(unsafe.Pointer(ptr)), C.uint32_t(options)))
+	})
 }
 
 // DebugOptions returns the current MapLibre debug overlay mask bits.
@@ -157,8 +161,10 @@ func (m *MapHandle) DebugOptions() (MapDebugOptions, error) {
 		return 0, err
 	}
 	defer m.state.KeepAlive()
-	var raw uint32
-	if err := checkNative(func() capi.Status { return capi.MapGetDebugOptions(ptr, &raw) }); err != nil {
+	var raw C.uint32_t
+	if err := checkNative(func() int32 {
+		return int32(C.mln_map_get_debug_options((*C.mln_map)(unsafe.Pointer(ptr)), &raw))
+	}); err != nil {
 		return 0, err
 	}
 	return MapDebugOptions(raw), nil
@@ -172,7 +178,9 @@ func (m *MapHandle) SetRenderingStatsViewEnabled(enabled bool) error {
 		return err
 	}
 	defer m.state.KeepAlive()
-	return checkNative(func() capi.Status { return capi.MapSetRenderingStatsViewEnabled(ptr, enabled) })
+	return checkNative(func() int32 {
+		return int32(C.mln_map_set_rendering_stats_view_enabled((*C.mln_map)(unsafe.Pointer(ptr)), C.bool(enabled)))
+	})
 }
 
 // RenderingStatsViewEnabled reports whether MapLibre's rendering stats overlay
@@ -183,11 +191,13 @@ func (m *MapHandle) RenderingStatsViewEnabled() (bool, error) {
 		return false, err
 	}
 	defer m.state.KeepAlive()
-	var enabled bool
-	if err := checkNative(func() capi.Status { return capi.MapGetRenderingStatsViewEnabled(ptr, &enabled) }); err != nil {
+	var enabled C.bool
+	if err := checkNative(func() int32 {
+		return int32(C.mln_map_get_rendering_stats_view_enabled((*C.mln_map)(unsafe.Pointer(ptr)), &enabled))
+	}); err != nil {
 		return false, err
 	}
-	return enabled, nil
+	return bool(enabled), nil
 }
 
 // IsFullyLoaded reports whether MapLibre currently considers the map fully
@@ -198,11 +208,13 @@ func (m *MapHandle) IsFullyLoaded() (bool, error) {
 		return false, err
 	}
 	defer m.state.KeepAlive()
-	var loaded bool
-	if err := checkNative(func() capi.Status { return capi.MapIsFullyLoaded(ptr, &loaded) }); err != nil {
+	var loaded C.bool
+	if err := checkNative(func() int32 {
+		return int32(C.mln_map_is_fully_loaded((*C.mln_map)(unsafe.Pointer(ptr)), &loaded))
+	}); err != nil {
 		return false, err
 	}
-	return loaded, nil
+	return bool(loaded), nil
 }
 
 // DumpDebugLogs dumps map debug logs through MapLibre Native logging.
@@ -212,7 +224,7 @@ func (m *MapHandle) DumpDebugLogs() error {
 		return err
 	}
 	defer m.state.KeepAlive()
-	return checkNative(func() capi.Status { return capi.MapDumpDebugLogs(ptr) })
+	return checkNative(func() int32 { return int32(C.mln_map_dump_debug_logs((*C.mln_map)(unsafe.Pointer(ptr)))) })
 }
 
 // Camera returns the current camera snapshot.
@@ -222,11 +234,13 @@ func (m *MapHandle) Camera() (CameraOptions, error) {
 		return CameraOptions{}, err
 	}
 	defer m.state.KeepAlive()
-	var raw capi.CameraOptions
-	if err := checkNative(func() capi.Status { return capi.MapGetCamera(ptr, &raw) }); err != nil {
+	var raw C.mln_camera_options = C.mln_camera_options_default()
+	if err := checkNative(func() int32 {
+		return int32(C.mln_map_get_camera((*C.mln_map)(unsafe.Pointer(ptr)), &raw))
+	}); err != nil {
 		return CameraOptions{}, err
 	}
-	return cameraOptionsFromCAPI(raw), nil
+	return goCameraOptions(raw), nil
 }
 
 // JumpTo applies a camera jump command.
@@ -236,7 +250,10 @@ func (m *MapHandle) JumpTo(camera CameraOptions) error {
 		return err
 	}
 	defer m.state.KeepAlive()
-	return checkNative(func() capi.Status { return capi.MapJumpTo(ptr, camera.toCAPI()) })
+	rawCamera := cCameraOptions(camera)
+	return checkNative(func() int32 {
+		return int32(C.mln_map_jump_to((*C.mln_map)(unsafe.Pointer(ptr)), &rawCamera))
+	})
 }
 
 // EaseTo applies a camera ease transition command. Passing nil animation uses
@@ -247,7 +264,12 @@ func (m *MapHandle) EaseTo(camera CameraOptions, animation *AnimationOptions) er
 		return err
 	}
 	defer m.state.KeepAlive()
-	return checkNative(func() capi.Status { return capi.MapEaseTo(ptr, camera.toCAPI(), animationOptionsToCAPI(animation)) })
+	rawCamera := cCameraOptions(camera)
+	rawAnimation, rawAnimationPtr := cAnimationOptionsPointer(animation)
+	_ = rawAnimation
+	return checkNative(func() int32 {
+		return int32(C.mln_map_ease_to((*C.mln_map)(unsafe.Pointer(ptr)), &rawCamera, rawAnimationPtr))
+	})
 }
 
 // FlyTo applies a camera fly transition command. Passing nil animation uses the
@@ -258,7 +280,12 @@ func (m *MapHandle) FlyTo(camera CameraOptions, animation *AnimationOptions) err
 		return err
 	}
 	defer m.state.KeepAlive()
-	return checkNative(func() capi.Status { return capi.MapFlyTo(ptr, camera.toCAPI(), animationOptionsToCAPI(animation)) })
+	rawCamera := cCameraOptions(camera)
+	rawAnimation, rawAnimationPtr := cAnimationOptionsPointer(animation)
+	_ = rawAnimation
+	return checkNative(func() int32 {
+		return int32(C.mln_map_fly_to((*C.mln_map)(unsafe.Pointer(ptr)), &rawCamera, rawAnimationPtr))
+	})
 }
 
 // MoveBy applies a screen-space pan command.
@@ -268,7 +295,9 @@ func (m *MapHandle) MoveBy(delta ScreenPoint) error {
 		return err
 	}
 	defer m.state.KeepAlive()
-	return checkNative(func() capi.Status { return capi.MapMoveBy(ptr, delta.toCAPI()) })
+	return checkNative(func() int32 {
+		return int32(C.mln_map_move_by((*C.mln_map)(unsafe.Pointer(ptr)), C.double(delta.X), C.double(delta.Y)))
+	})
 }
 
 // MoveByAnimated applies an animated screen-space pan command. Passing nil
@@ -279,8 +308,15 @@ func (m *MapHandle) MoveByAnimated(delta ScreenPoint, animation *AnimationOption
 		return err
 	}
 	defer m.state.KeepAlive()
-	return checkNative(func() capi.Status {
-		return capi.MapMoveByAnimated(ptr, delta.toCAPI(), animationOptionsToCAPI(animation))
+	rawAnimation, rawAnimationPtr := cAnimationOptionsPointer(animation)
+	_ = rawAnimation
+	return checkNative(func() int32 {
+		return int32(C.mln_map_move_by_animated(
+			(*C.mln_map)(unsafe.Pointer(ptr)),
+			C.double(delta.X),
+			C.double(delta.Y),
+			rawAnimationPtr,
+		))
 	})
 }
 
@@ -292,12 +328,15 @@ func (m *MapHandle) ScaleBy(scale float64, anchor *ScreenPoint) error {
 		return err
 	}
 	defer m.state.KeepAlive()
-	var rawAnchor *capi.ScreenPoint
+	var rawAnchor C.mln_screen_point
+	var rawAnchorPtr *C.mln_screen_point
 	if anchor != nil {
-		converted := anchor.toCAPI()
-		rawAnchor = &converted
+		rawAnchor = cScreenPoint(*anchor)
+		rawAnchorPtr = &rawAnchor
 	}
-	return checkNative(func() capi.Status { return capi.MapScaleBy(ptr, scale, rawAnchor) })
+	return checkNative(func() int32 {
+		return int32(C.mln_map_scale_by((*C.mln_map)(unsafe.Pointer(ptr)), C.double(scale), rawAnchorPtr))
+	})
 }
 
 // ScaleByAnimated applies an animated screen-space zoom command. Passing nil
@@ -308,13 +347,21 @@ func (m *MapHandle) ScaleByAnimated(scale float64, anchor *ScreenPoint, animatio
 		return err
 	}
 	defer m.state.KeepAlive()
-	var rawAnchor *capi.ScreenPoint
+	var rawAnchor C.mln_screen_point
+	var rawAnchorPtr *C.mln_screen_point
 	if anchor != nil {
-		converted := anchor.toCAPI()
-		rawAnchor = &converted
+		rawAnchor = cScreenPoint(*anchor)
+		rawAnchorPtr = &rawAnchor
 	}
-	return checkNative(func() capi.Status {
-		return capi.MapScaleByAnimated(ptr, scale, rawAnchor, animationOptionsToCAPI(animation))
+	rawAnimation, rawAnimationPtr := cAnimationOptionsPointer(animation)
+	_ = rawAnimation
+	return checkNative(func() int32 {
+		return int32(C.mln_map_scale_by_animated(
+			(*C.mln_map)(unsafe.Pointer(ptr)),
+			C.double(scale),
+			rawAnchorPtr,
+			rawAnimationPtr,
+		))
 	})
 }
 
@@ -325,7 +372,9 @@ func (m *MapHandle) RotateBy(first ScreenPoint, second ScreenPoint) error {
 		return err
 	}
 	defer m.state.KeepAlive()
-	return checkNative(func() capi.Status { return capi.MapRotateBy(ptr, first.toCAPI(), second.toCAPI()) })
+	return checkNative(func() int32 {
+		return int32(C.mln_map_rotate_by((*C.mln_map)(unsafe.Pointer(ptr)), cScreenPoint(first), cScreenPoint(second)))
+	})
 }
 
 // RotateByAnimated applies an animated screen-space rotate command. Passing nil
@@ -336,8 +385,15 @@ func (m *MapHandle) RotateByAnimated(first ScreenPoint, second ScreenPoint, anim
 		return err
 	}
 	defer m.state.KeepAlive()
-	return checkNative(func() capi.Status {
-		return capi.MapRotateByAnimated(ptr, first.toCAPI(), second.toCAPI(), animationOptionsToCAPI(animation))
+	rawAnimation, rawAnimationPtr := cAnimationOptionsPointer(animation)
+	_ = rawAnimation
+	return checkNative(func() int32 {
+		return int32(C.mln_map_rotate_by_animated(
+			(*C.mln_map)(unsafe.Pointer(ptr)),
+			cScreenPoint(first),
+			cScreenPoint(second),
+			rawAnimationPtr,
+		))
 	})
 }
 
@@ -348,7 +404,9 @@ func (m *MapHandle) PitchBy(pitch float64) error {
 		return err
 	}
 	defer m.state.KeepAlive()
-	return checkNative(func() capi.Status { return capi.MapPitchBy(ptr, pitch) })
+	return checkNative(func() int32 {
+		return int32(C.mln_map_pitch_by((*C.mln_map)(unsafe.Pointer(ptr)), C.double(pitch)))
+	})
 }
 
 // PitchByAnimated applies an animated pitch delta command. Passing nil
@@ -359,7 +417,11 @@ func (m *MapHandle) PitchByAnimated(pitch float64, animation *AnimationOptions) 
 		return err
 	}
 	defer m.state.KeepAlive()
-	return checkNative(func() capi.Status { return capi.MapPitchByAnimated(ptr, pitch, animationOptionsToCAPI(animation)) })
+	rawAnimation, rawAnimationPtr := cAnimationOptionsPointer(animation)
+	_ = rawAnimation
+	return checkNative(func() int32 {
+		return int32(C.mln_map_pitch_by_animated((*C.mln_map)(unsafe.Pointer(ptr)), C.double(pitch), rawAnimationPtr))
+	})
 }
 
 // CancelTransitions cancels active camera transitions.
@@ -369,7 +431,7 @@ func (m *MapHandle) CancelTransitions() error {
 		return err
 	}
 	defer m.state.KeepAlive()
-	return checkNative(func() capi.Status { return capi.MapCancelTransitions(ptr) })
+	return checkNative(func() int32 { return int32(C.mln_map_cancel_transitions((*C.mln_map)(unsafe.Pointer(ptr)))) })
 }
 
 // CameraForLatLngBounds computes a camera that fits geographic bounds. Passing
@@ -380,13 +442,20 @@ func (m *MapHandle) CameraForLatLngBounds(bounds LatLngBounds, fitOptions *Camer
 		return CameraOptions{}, err
 	}
 	defer m.state.KeepAlive()
-	var raw capi.CameraOptions
-	if err := checkNative(func() capi.Status {
-		return capi.MapCameraForLatLngBounds(ptr, bounds.toCAPI(), cameraFitOptionsToCAPI(fitOptions), &raw)
+	var raw C.mln_camera_options = C.mln_camera_options_default()
+	rawFitOptions, rawFitOptionsPtr := cCameraFitOptionsPointer(fitOptions)
+	_ = rawFitOptions
+	if err := checkNative(func() int32 {
+		return int32(C.mln_map_camera_for_lat_lng_bounds(
+			(*C.mln_map)(unsafe.Pointer(ptr)),
+			cLatLngBounds(bounds),
+			rawFitOptionsPtr,
+			&raw,
+		))
 	}); err != nil {
 		return CameraOptions{}, err
 	}
-	return cameraOptionsFromCAPI(raw), nil
+	return goCameraOptions(raw), nil
 }
 
 // CameraForLatLngs computes a camera that fits geographic coordinates. Passing
@@ -397,13 +466,26 @@ func (m *MapHandle) CameraForLatLngs(coordinates []LatLng, fitOptions *CameraFit
 		return CameraOptions{}, err
 	}
 	defer m.state.KeepAlive()
-	var raw capi.CameraOptions
-	if err := checkNative(func() capi.Status {
-		return capi.MapCameraForLatLngs(ptr, latLngSliceToCAPI(coordinates), cameraFitOptionsToCAPI(fitOptions), &raw)
+	var raw C.mln_camera_options = C.mln_camera_options_default()
+	rawCoordinates := cLatLngSlice(coordinates)
+	var rawCoordinatesPtr *C.mln_lat_lng
+	if len(rawCoordinates) > 0 {
+		rawCoordinatesPtr = &rawCoordinates[0]
+	}
+	rawFitOptions, rawFitOptionsPtr := cCameraFitOptionsPointer(fitOptions)
+	_ = rawFitOptions
+	if err := checkNative(func() int32 {
+		return int32(C.mln_map_camera_for_lat_lngs(
+			(*C.mln_map)(unsafe.Pointer(ptr)),
+			rawCoordinatesPtr,
+			C.size_t(len(rawCoordinates)),
+			rawFitOptionsPtr,
+			&raw,
+		))
 	}); err != nil {
 		return CameraOptions{}, err
 	}
-	return cameraOptionsFromCAPI(raw), nil
+	return goCameraOptions(raw), nil
 }
 
 // CameraForGeometry computes a camera that fits a geometry. Passing nil
@@ -414,20 +496,26 @@ func (m *MapHandle) CameraForGeometry(geometry Geometry, fitOptions *CameraFitOp
 		return CameraOptions{}, err
 	}
 	defer m.state.KeepAlive()
-	var raw capi.CameraOptions
-	var materialErr error
-	err = checkNative(func() capi.Status {
-		var status capi.Status
-		status, materialErr = capi.MapCameraForGeometry(ptr, geometry.toCAPI(), cameraFitOptionsToCAPI(fitOptions), &raw)
-		return status
-	})
+	var raw C.mln_camera_options = C.mln_camera_options_default()
+	materializer := newCGeometryMaterializer()
+	defer materializer.free()
+	rawGeometry, materialErr := materializer.geometryPtr(geometry)
 	if materialErr != nil {
 		return CameraOptions{}, newBindingError(ErrInvalidArgument, materialErr.Error())
 	}
-	if err != nil {
+	rawFitOptions, rawFitOptionsPtr := cCameraFitOptionsPointer(fitOptions)
+	_ = rawFitOptions
+	if err := checkNative(func() int32 {
+		return int32(C.mln_map_camera_for_geometry(
+			(*C.mln_map)(unsafe.Pointer(ptr)),
+			rawGeometry,
+			rawFitOptionsPtr,
+			&raw,
+		))
+	}); err != nil {
 		return CameraOptions{}, err
 	}
-	return cameraOptionsFromCAPI(raw), nil
+	return goCameraOptions(raw), nil
 }
 
 // LatLngBoundsForCamera computes wrapped geographic bounds for a camera in the
@@ -438,11 +526,14 @@ func (m *MapHandle) LatLngBoundsForCamera(camera CameraOptions) (LatLngBounds, e
 		return LatLngBounds{}, err
 	}
 	defer m.state.KeepAlive()
-	var raw capi.LatLngBounds
-	if err := checkNative(func() capi.Status { return capi.MapLatLngBoundsForCamera(ptr, camera.toCAPI(), &raw) }); err != nil {
+	rawCamera := cCameraOptions(camera)
+	var raw C.mln_lat_lng_bounds
+	if err := checkNative(func() int32 {
+		return int32(C.mln_map_lat_lng_bounds_for_camera((*C.mln_map)(unsafe.Pointer(ptr)), &rawCamera, &raw))
+	}); err != nil {
 		return LatLngBounds{}, err
 	}
-	return latLngBoundsFromCAPI(raw), nil
+	return goLatLngBounds(raw), nil
 }
 
 // LatLngBoundsForCameraUnwrapped computes unwrapped geographic bounds for a
@@ -453,11 +544,14 @@ func (m *MapHandle) LatLngBoundsForCameraUnwrapped(camera CameraOptions) (LatLng
 		return LatLngBounds{}, err
 	}
 	defer m.state.KeepAlive()
-	var raw capi.LatLngBounds
-	if err := checkNative(func() capi.Status { return capi.MapLatLngBoundsForCameraUnwrapped(ptr, camera.toCAPI(), &raw) }); err != nil {
+	rawCamera := cCameraOptions(camera)
+	var raw C.mln_lat_lng_bounds
+	if err := checkNative(func() int32 {
+		return int32(C.mln_map_lat_lng_bounds_for_camera_unwrapped((*C.mln_map)(unsafe.Pointer(ptr)), &rawCamera, &raw))
+	}); err != nil {
 		return LatLngBounds{}, err
 	}
-	return latLngBoundsFromCAPI(raw), nil
+	return goLatLngBounds(raw), nil
 }
 
 // Bounds returns map camera constraint options.
@@ -467,11 +561,13 @@ func (m *MapHandle) Bounds() (BoundOptions, error) {
 		return BoundOptions{}, err
 	}
 	defer m.state.KeepAlive()
-	var raw capi.BoundOptions
-	if err := checkNative(func() capi.Status { return capi.MapGetBounds(ptr, &raw) }); err != nil {
+	var raw C.mln_bound_options = C.mln_bound_options_default()
+	if err := checkNative(func() int32 {
+		return int32(C.mln_map_get_bounds((*C.mln_map)(unsafe.Pointer(ptr)), &raw))
+	}); err != nil {
 		return BoundOptions{}, err
 	}
-	return boundOptionsFromCAPI(raw), nil
+	return goBoundOptions(raw), nil
 }
 
 // SetBounds applies selected map camera constraint options.
@@ -481,7 +577,10 @@ func (m *MapHandle) SetBounds(options BoundOptions) error {
 		return err
 	}
 	defer m.state.KeepAlive()
-	return checkNative(func() capi.Status { return capi.MapSetBounds(ptr, options.toCAPI()) })
+	rawOptions := cBoundOptions(options)
+	return checkNative(func() int32 {
+		return int32(C.mln_map_set_bounds((*C.mln_map)(unsafe.Pointer(ptr)), &rawOptions))
+	})
 }
 
 // FreeCameraOptions returns current free camera position and orientation.
@@ -491,11 +590,13 @@ func (m *MapHandle) FreeCameraOptions() (FreeCameraOptions, error) {
 		return FreeCameraOptions{}, err
 	}
 	defer m.state.KeepAlive()
-	var raw capi.FreeCameraOptions
-	if err := checkNative(func() capi.Status { return capi.MapGetFreeCameraOptions(ptr, &raw) }); err != nil {
+	var raw C.mln_free_camera_options = C.mln_free_camera_options_default()
+	if err := checkNative(func() int32 {
+		return int32(C.mln_map_get_free_camera_options((*C.mln_map)(unsafe.Pointer(ptr)), &raw))
+	}); err != nil {
 		return FreeCameraOptions{}, err
 	}
-	return freeCameraOptionsFromCAPI(raw), nil
+	return goFreeCameraOptions(raw), nil
 }
 
 // SetFreeCameraOptions applies selected free camera position and orientation
@@ -506,7 +607,10 @@ func (m *MapHandle) SetFreeCameraOptions(options FreeCameraOptions) error {
 		return err
 	}
 	defer m.state.KeepAlive()
-	return checkNative(func() capi.Status { return capi.MapSetFreeCameraOptions(ptr, options.toCAPI()) })
+	rawOptions := cFreeCameraOptions(options)
+	return checkNative(func() int32 {
+		return int32(C.mln_map_set_free_camera_options((*C.mln_map)(unsafe.Pointer(ptr)), &rawOptions))
+	})
 }
 
 // ViewportOptions returns live map viewport and render-transform controls.
@@ -516,11 +620,13 @@ func (m *MapHandle) ViewportOptions() (ViewportOptions, error) {
 		return ViewportOptions{}, err
 	}
 	defer m.state.KeepAlive()
-	var raw capi.ViewportOptions
-	if err := checkNative(func() capi.Status { return capi.MapGetViewportOptions(ptr, &raw) }); err != nil {
+	var raw C.mln_map_viewport_options = C.mln_map_viewport_options_default()
+	if err := checkNative(func() int32 {
+		return int32(C.mln_map_get_viewport_options((*C.mln_map)(unsafe.Pointer(ptr)), &raw))
+	}); err != nil {
 		return ViewportOptions{}, err
 	}
-	return viewportOptionsFromCAPI(raw), nil
+	return goViewportOptions(raw), nil
 }
 
 // SetViewportOptions applies selected live map viewport and render-transform
@@ -531,7 +637,10 @@ func (m *MapHandle) SetViewportOptions(options ViewportOptions) error {
 		return err
 	}
 	defer m.state.KeepAlive()
-	return checkNative(func() capi.Status { return capi.MapSetViewportOptions(ptr, options.toCAPI()) })
+	rawOptions := cViewportOptions(options)
+	return checkNative(func() int32 {
+		return int32(C.mln_map_set_viewport_options((*C.mln_map)(unsafe.Pointer(ptr)), &rawOptions))
+	})
 }
 
 // TileOptions returns tile prefetch and LOD tuning controls.
@@ -541,11 +650,13 @@ func (m *MapHandle) TileOptions() (TileOptions, error) {
 		return TileOptions{}, err
 	}
 	defer m.state.KeepAlive()
-	var raw capi.TileOptions
-	if err := checkNative(func() capi.Status { return capi.MapGetTileOptions(ptr, &raw) }); err != nil {
+	var raw C.mln_map_tile_options = C.mln_map_tile_options_default()
+	if err := checkNative(func() int32 {
+		return int32(C.mln_map_get_tile_options((*C.mln_map)(unsafe.Pointer(ptr)), &raw))
+	}); err != nil {
 		return TileOptions{}, err
 	}
-	return tileOptionsFromCAPI(raw), nil
+	return goTileOptions(raw), nil
 }
 
 // SetTileOptions applies selected tile prefetch and LOD tuning controls.
@@ -555,7 +666,10 @@ func (m *MapHandle) SetTileOptions(options TileOptions) error {
 		return err
 	}
 	defer m.state.KeepAlive()
-	return checkNative(func() capi.Status { return capi.MapSetTileOptions(ptr, options.toCAPI()) })
+	rawOptions := cTileOptions(options)
+	return checkNative(func() int32 {
+		return int32(C.mln_map_set_tile_options((*C.mln_map)(unsafe.Pointer(ptr)), &rawOptions))
+	})
 }
 
 // ProjectionMode returns current axonometric rendering options.
@@ -565,11 +679,13 @@ func (m *MapHandle) ProjectionMode() (ProjectionModeOptions, error) {
 		return ProjectionModeOptions{}, err
 	}
 	defer m.state.KeepAlive()
-	var raw capi.ProjectionModeOptions
-	if err := checkNative(func() capi.Status { return capi.MapGetProjectionMode(ptr, &raw) }); err != nil {
+	var raw C.mln_projection_mode = C.mln_projection_mode_default()
+	if err := checkNative(func() int32 {
+		return int32(C.mln_map_get_projection_mode((*C.mln_map)(unsafe.Pointer(ptr)), &raw))
+	}); err != nil {
 		return ProjectionModeOptions{}, err
 	}
-	return projectionModeOptionsFromCAPI(raw), nil
+	return goProjectionModeOptions(raw), nil
 }
 
 // SetProjectionMode applies axonometric rendering option fields.
@@ -579,7 +695,10 @@ func (m *MapHandle) SetProjectionMode(options ProjectionModeOptions) error {
 		return err
 	}
 	defer m.state.KeepAlive()
-	return checkNative(func() capi.Status { return capi.MapSetProjectionMode(ptr, options.toCAPI()) })
+	rawOptions := cProjectionModeOptions(options)
+	return checkNative(func() int32 {
+		return int32(C.mln_map_set_projection_mode((*C.mln_map)(unsafe.Pointer(ptr)), &rawOptions))
+	})
 }
 
 // PixelForLatLng converts a geographic coordinate to a logical screen point for
@@ -590,11 +709,13 @@ func (m *MapHandle) PixelForLatLng(coordinate LatLng) (ScreenPoint, error) {
 		return ScreenPoint{}, err
 	}
 	defer m.state.KeepAlive()
-	var raw capi.ScreenPoint
-	if err := checkNative(func() capi.Status { return capi.MapPixelForLatLng(ptr, coordinate.toCAPI(), &raw) }); err != nil {
+	var raw C.mln_screen_point
+	if err := checkNative(func() int32 {
+		return int32(C.mln_map_pixel_for_lat_lng((*C.mln_map)(unsafe.Pointer(ptr)), cLatLng(coordinate), &raw))
+	}); err != nil {
 		return ScreenPoint{}, err
 	}
-	return screenPointFromCAPI(raw), nil
+	return goScreenPoint(raw), nil
 }
 
 // LatLngForPixel converts a logical screen point to a geographic coordinate for
@@ -605,11 +726,13 @@ func (m *MapHandle) LatLngForPixel(point ScreenPoint) (LatLng, error) {
 		return LatLng{}, err
 	}
 	defer m.state.KeepAlive()
-	var raw capi.LatLng
-	if err := checkNative(func() capi.Status { return capi.MapLatLngForPixel(ptr, point.toCAPI(), &raw) }); err != nil {
+	var raw C.mln_lat_lng
+	if err := checkNative(func() int32 {
+		return int32(C.mln_map_lat_lng_for_pixel((*C.mln_map)(unsafe.Pointer(ptr)), cScreenPoint(point), &raw))
+	}); err != nil {
 		return LatLng{}, err
 	}
-	return latLngFromCAPI(raw), nil
+	return goLatLng(raw), nil
 }
 
 // PixelsForLatLngs converts geographic coordinates to logical screen points for
@@ -620,11 +743,25 @@ func (m *MapHandle) PixelsForLatLngs(coordinates []LatLng) ([]ScreenPoint, error
 		return nil, err
 	}
 	defer m.state.KeepAlive()
-	var raw []capi.ScreenPoint
-	if err := checkNative(func() capi.Status { return capi.MapPixelsForLatLngs(ptr, latLngSliceToCAPI(coordinates), &raw) }); err != nil {
+	rawCoordinates := cLatLngSlice(coordinates)
+	rawPoints := make([]C.mln_screen_point, len(coordinates))
+	var rawCoordinatesPtr *C.mln_lat_lng
+	var rawPointsPtr *C.mln_screen_point
+	if len(coordinates) > 0 {
+		rawCoordinatesPtr = &rawCoordinates[0]
+		rawPointsPtr = &rawPoints[0]
+	}
+	if err := checkNative(func() int32 {
+		return int32(C.mln_map_pixels_for_lat_lngs(
+			(*C.mln_map)(unsafe.Pointer(ptr)),
+			rawCoordinatesPtr,
+			C.size_t(len(coordinates)),
+			rawPointsPtr,
+		))
+	}); err != nil {
 		return nil, err
 	}
-	return screenPointSliceFromCAPI(raw), nil
+	return goScreenPointSlice(rawPoints), nil
 }
 
 // LatLngsForPixels converts logical screen points to geographic coordinates for
@@ -635,11 +772,25 @@ func (m *MapHandle) LatLngsForPixels(points []ScreenPoint) ([]LatLng, error) {
 		return nil, err
 	}
 	defer m.state.KeepAlive()
-	var raw []capi.LatLng
-	if err := checkNative(func() capi.Status { return capi.MapLatLngsForPixels(ptr, screenPointSliceToCAPI(points), &raw) }); err != nil {
+	rawPoints := cScreenPointSlice(points)
+	rawCoordinates := make([]C.mln_lat_lng, len(points))
+	var rawPointsPtr *C.mln_screen_point
+	var rawCoordinatesPtr *C.mln_lat_lng
+	if len(points) > 0 {
+		rawPointsPtr = &rawPoints[0]
+		rawCoordinatesPtr = &rawCoordinates[0]
+	}
+	if err := checkNative(func() int32 {
+		return int32(C.mln_map_lat_lngs_for_pixels(
+			(*C.mln_map)(unsafe.Pointer(ptr)),
+			rawPointsPtr,
+			C.size_t(len(points)),
+			rawCoordinatesPtr,
+		))
+	}); err != nil {
 		return nil, err
 	}
-	return latLngSliceFromCAPI(raw), nil
+	return goLatLngSlice(rawCoordinates), nil
 }
 
 func (m *MapHandle) releaseCustomGeometrySource(sourceID string) {
@@ -665,12 +816,17 @@ func (m *MapHandle) releaseDetachedCustomGeometrySources() {
 	m.customGeometryMu.Unlock()
 
 	for sourceID, state := range sources {
-		var sourceType uint32
-		var found bool
-		if err := checkNative(func() capi.Status { return capi.MapGetStyleSourceType(ptr, sourceID, &sourceType, &found) }); err != nil {
+		sourceView := newCStringView(sourceID)
+		var sourceType C.uint32_t
+		var found C.bool
+		err := checkNative(func() int32 {
+			return int32(C.mln_map_get_style_source_type((*C.mln_map)(unsafe.Pointer(ptr)), sourceView.raw(), &sourceType, &found))
+		})
+		sourceView.free()
+		if err != nil {
 			continue
 		}
-		if found && StyleSourceType(sourceType) == StyleSourceTypeCustomVector {
+		if bool(found) && StyleSourceType(sourceType) == StyleSourceTypeCustomVector {
 			continue
 		}
 		m.customGeometryMu.Lock()
@@ -712,8 +868,10 @@ func (m *MapHandle) Close() error {
 			m.runtime.state.KeepAlive()
 		}
 	}()
-	if err := checkNative(func() capi.Status {
-		return m.state.Close(capi.MapDestroy)
+	if err := checkNative(func() int32 {
+		return m.state.Close(func(ptr *nativeMap) int32 {
+			return int32(C.mln_map_destroy((*C.mln_map)(unsafe.Pointer(ptr))))
+		})
 	}); err != nil {
 		return err
 	}

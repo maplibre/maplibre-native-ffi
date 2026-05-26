@@ -1,6 +1,9 @@
 package maplibre
 
-import "github.com/maplibre/maplibre-native-ffi/bindings/go/internal/capi"
+/*
+#include "maplibre_native_c.h"
+*/
+import "C"
 
 // CameraOptions configures map camera snapshots and commands.
 type CameraOptions struct {
@@ -43,83 +46,84 @@ func (options CameraOptions) WithPitch(pitch float64) CameraOptions {
 	return options
 }
 
-func (options CameraOptions) toCAPI() capi.CameraOptions {
-	var raw capi.CameraOptions
+func cCameraOptions(options CameraOptions) C.mln_camera_options {
+	raw := C.mln_camera_options_default()
 	if options.Center != nil {
-		raw.Fields |= capi.CameraOptionCenter
-		raw.Center = options.Center.toCAPI()
+		raw.fields |= C.MLN_CAMERA_OPTION_CENTER
+		raw.latitude = C.double(options.Center.Latitude)
+		raw.longitude = C.double(options.Center.Longitude)
 	}
 	if options.CenterAltitude != nil {
-		raw.Fields |= capi.CameraOptionCenterAltitude
-		raw.CenterAltitude = *options.CenterAltitude
+		raw.fields |= C.MLN_CAMERA_OPTION_CENTER_ALTITUDE
+		raw.center_altitude = C.double(*options.CenterAltitude)
 	}
 	if options.Padding != nil {
-		raw.Fields |= capi.CameraOptionPadding
-		raw.Padding = options.Padding.toCAPI()
+		raw.fields |= C.MLN_CAMERA_OPTION_PADDING
+		raw.padding = cEdgeInsets(*options.Padding)
 	}
 	if options.Anchor != nil {
-		raw.Fields |= capi.CameraOptionAnchor
-		raw.Anchor = options.Anchor.toCAPI()
+		raw.fields |= C.MLN_CAMERA_OPTION_ANCHOR
+		raw.anchor = cScreenPoint(*options.Anchor)
 	}
 	if options.Zoom != nil {
-		raw.Fields |= capi.CameraOptionZoom
-		raw.Zoom = *options.Zoom
+		raw.fields |= C.MLN_CAMERA_OPTION_ZOOM
+		raw.zoom = C.double(*options.Zoom)
 	}
 	if options.Bearing != nil {
-		raw.Fields |= capi.CameraOptionBearing
-		raw.Bearing = *options.Bearing
+		raw.fields |= C.MLN_CAMERA_OPTION_BEARING
+		raw.bearing = C.double(*options.Bearing)
 	}
 	if options.Pitch != nil {
-		raw.Fields |= capi.CameraOptionPitch
-		raw.Pitch = *options.Pitch
+		raw.fields |= C.MLN_CAMERA_OPTION_PITCH
+		raw.pitch = C.double(*options.Pitch)
 	}
 	if options.Roll != nil {
-		raw.Fields |= capi.CameraOptionRoll
-		raw.Roll = *options.Roll
+		raw.fields |= C.MLN_CAMERA_OPTION_ROLL
+		raw.roll = C.double(*options.Roll)
 	}
 	if options.FieldOfView != nil {
-		raw.Fields |= capi.CameraOptionFOV
-		raw.FieldOfView = *options.FieldOfView
+		raw.fields |= C.MLN_CAMERA_OPTION_FOV
+		raw.field_of_view = C.double(*options.FieldOfView)
 	}
 	return raw
 }
 
-func cameraOptionsFromCAPI(raw capi.CameraOptions) CameraOptions {
+func goCameraOptions(raw C.mln_camera_options) CameraOptions {
 	var options CameraOptions
-	if raw.Fields&capi.CameraOptionCenter != 0 {
-		value := latLngFromCAPI(raw.Center)
+	if raw.fields&C.MLN_CAMERA_OPTION_CENTER != 0 {
+		value := LatLng{Latitude: float64(raw.latitude), Longitude: float64(raw.longitude)}
 		options.Center = &value
 	}
-	if raw.Fields&capi.CameraOptionCenterAltitude != 0 {
-		value := raw.CenterAltitude
+	if raw.fields&C.MLN_CAMERA_OPTION_CENTER_ALTITUDE != 0 {
+		value := float64(raw.center_altitude)
 		options.CenterAltitude = &value
 	}
-	if raw.Fields&capi.CameraOptionPadding != 0 {
-		value := edgeInsetsFromCAPI(raw.Padding)
+	if raw.fields&C.MLN_CAMERA_OPTION_PADDING != 0 {
+		value := goEdgeInsets(raw.padding)
 		options.Padding = &value
 	}
-	if raw.Fields&capi.CameraOptionAnchor != 0 {
-		value := screenPointFromCAPI(raw.Anchor)
+	if raw.fields&C.MLN_CAMERA_OPTION_ANCHOR != 0 {
+		value := goScreenPoint(raw.anchor)
 		options.Anchor = &value
 	}
-	if raw.Fields&capi.CameraOptionZoom != 0 {
-		value := raw.Zoom
+	if raw.fields&C.MLN_CAMERA_OPTION_ZOOM != 0 {
+		value := float64(raw.zoom)
 		options.Zoom = &value
 	}
-	if raw.Fields&capi.CameraOptionBearing != 0 {
-		value := raw.Bearing
+	if raw.fields&C.MLN_CAMERA_OPTION_BEARING != 0 {
+		value := float64(raw.bearing)
 		options.Bearing = &value
 	}
-	if raw.Fields&capi.CameraOptionPitch != 0 {
-		value := raw.Pitch
+	if raw.fields&C.MLN_CAMERA_OPTION_PITCH != 0 {
+		value := float64(raw.pitch)
 		options.Pitch = &value
 	}
-	if raw.Fields&capi.CameraOptionRoll != 0 {
-		value := raw.Roll
+	if raw.fields&C.MLN_CAMERA_OPTION_ROLL != 0 {
+		value := float64(raw.roll)
 		options.Roll = &value
 	}
-	if raw.Fields&capi.CameraOptionFOV != 0 {
-		value := raw.FieldOfView
+	if raw.fields&C.MLN_CAMERA_OPTION_FOV != 0 {
+		value := float64(raw.field_of_view)
 		options.FieldOfView = &value
 	}
 	return options
@@ -170,33 +174,38 @@ func (options AnimationOptions) WithEasing(easing UnitBezier) AnimationOptions {
 	return options
 }
 
-func (options AnimationOptions) toCAPI() capi.AnimationOptions {
-	var raw capi.AnimationOptions
+func cAnimationOptions(options AnimationOptions) C.mln_animation_options {
+	raw := C.mln_animation_options_default()
 	if options.DurationMS != nil {
-		raw.Fields |= capi.AnimationOptionDuration
-		raw.DurationMS = *options.DurationMS
+		raw.fields |= C.MLN_ANIMATION_OPTION_DURATION
+		raw.duration_ms = C.double(*options.DurationMS)
 	}
 	if options.Velocity != nil {
-		raw.Fields |= capi.AnimationOptionVelocity
-		raw.Velocity = *options.Velocity
+		raw.fields |= C.MLN_ANIMATION_OPTION_VELOCITY
+		raw.velocity = C.double(*options.Velocity)
 	}
 	if options.MinZoom != nil {
-		raw.Fields |= capi.AnimationOptionMinZoom
-		raw.MinZoom = *options.MinZoom
+		raw.fields |= C.MLN_ANIMATION_OPTION_MIN_ZOOM
+		raw.min_zoom = C.double(*options.MinZoom)
 	}
 	if options.Easing != nil {
-		raw.Fields |= capi.AnimationOptionEasing
-		raw.Easing = capi.UnitBezier{X1: options.Easing.X1, Y1: options.Easing.Y1, X2: options.Easing.X2, Y2: options.Easing.Y2}
+		raw.fields |= C.MLN_ANIMATION_OPTION_EASING
+		raw.easing = C.mln_unit_bezier{
+			x1: C.double(options.Easing.X1),
+			y1: C.double(options.Easing.Y1),
+			x2: C.double(options.Easing.X2),
+			y2: C.double(options.Easing.Y2),
+		}
 	}
 	return raw
 }
 
-func animationOptionsToCAPI(options *AnimationOptions) *capi.AnimationOptions {
+func cAnimationOptionsPointer(options *AnimationOptions) (C.mln_animation_options, *C.mln_animation_options) {
 	if options == nil {
-		return nil
+		return C.mln_animation_options{}, nil
 	}
-	raw := options.toCAPI()
-	return &raw
+	raw := cAnimationOptions(*options)
+	return raw, &raw
 }
 
 // CameraFitOptions configures camera fitting queries.
@@ -227,29 +236,29 @@ func (options CameraFitOptions) WithPitch(pitch float64) CameraFitOptions {
 	return options
 }
 
-func (options CameraFitOptions) toCAPI() capi.CameraFitOptions {
-	var raw capi.CameraFitOptions
+func cCameraFitOptions(options CameraFitOptions) C.mln_camera_fit_options {
+	raw := C.mln_camera_fit_options_default()
 	if options.Padding != nil {
-		raw.Fields |= capi.CameraFitOptionPadding
-		raw.Padding = options.Padding.toCAPI()
+		raw.fields |= C.MLN_CAMERA_FIT_OPTION_PADDING
+		raw.padding = cEdgeInsets(*options.Padding)
 	}
 	if options.Bearing != nil {
-		raw.Fields |= capi.CameraFitOptionBearing
-		raw.Bearing = *options.Bearing
+		raw.fields |= C.MLN_CAMERA_FIT_OPTION_BEARING
+		raw.bearing = C.double(*options.Bearing)
 	}
 	if options.Pitch != nil {
-		raw.Fields |= capi.CameraFitOptionPitch
-		raw.Pitch = *options.Pitch
+		raw.fields |= C.MLN_CAMERA_FIT_OPTION_PITCH
+		raw.pitch = C.double(*options.Pitch)
 	}
 	return raw
 }
 
-func cameraFitOptionsToCAPI(options *CameraFitOptions) *capi.CameraFitOptions {
+func cCameraFitOptionsPointer(options *CameraFitOptions) (C.mln_camera_fit_options, *C.mln_camera_fit_options) {
 	if options == nil {
-		return nil
+		return C.mln_camera_fit_options{}, nil
 	}
-	raw := options.toCAPI()
-	return &raw
+	raw := cCameraFitOptions(*options)
+	return raw, &raw
 }
 
 // BoundOptions configures map camera constraints.
@@ -296,51 +305,51 @@ func (options BoundOptions) WithMaxPitch(maxPitch float64) BoundOptions {
 	return options
 }
 
-func (options BoundOptions) toCAPI() capi.BoundOptions {
-	var raw capi.BoundOptions
+func cBoundOptions(options BoundOptions) C.mln_bound_options {
+	raw := C.mln_bound_options_default()
 	if options.Bounds != nil {
-		raw.Fields |= capi.BoundOptionBounds
-		raw.Bounds = options.Bounds.toCAPI()
+		raw.fields |= C.MLN_BOUND_OPTION_BOUNDS
+		raw.bounds = cLatLngBounds(*options.Bounds)
 	}
 	if options.MinZoom != nil {
-		raw.Fields |= capi.BoundOptionMinZoom
-		raw.MinZoom = *options.MinZoom
+		raw.fields |= C.MLN_BOUND_OPTION_MIN_ZOOM
+		raw.min_zoom = C.double(*options.MinZoom)
 	}
 	if options.MaxZoom != nil {
-		raw.Fields |= capi.BoundOptionMaxZoom
-		raw.MaxZoom = *options.MaxZoom
+		raw.fields |= C.MLN_BOUND_OPTION_MAX_ZOOM
+		raw.max_zoom = C.double(*options.MaxZoom)
 	}
 	if options.MinPitch != nil {
-		raw.Fields |= capi.BoundOptionMinPitch
-		raw.MinPitch = *options.MinPitch
+		raw.fields |= C.MLN_BOUND_OPTION_MIN_PITCH
+		raw.min_pitch = C.double(*options.MinPitch)
 	}
 	if options.MaxPitch != nil {
-		raw.Fields |= capi.BoundOptionMaxPitch
-		raw.MaxPitch = *options.MaxPitch
+		raw.fields |= C.MLN_BOUND_OPTION_MAX_PITCH
+		raw.max_pitch = C.double(*options.MaxPitch)
 	}
 	return raw
 }
 
-func boundOptionsFromCAPI(raw capi.BoundOptions) BoundOptions {
+func goBoundOptions(raw C.mln_bound_options) BoundOptions {
 	var options BoundOptions
-	if raw.Fields&capi.BoundOptionBounds != 0 {
-		value := latLngBoundsFromCAPI(raw.Bounds)
+	if raw.fields&C.MLN_BOUND_OPTION_BOUNDS != 0 {
+		value := goLatLngBounds(raw.bounds)
 		options.Bounds = &value
 	}
-	if raw.Fields&capi.BoundOptionMinZoom != 0 {
-		value := raw.MinZoom
+	if raw.fields&C.MLN_BOUND_OPTION_MIN_ZOOM != 0 {
+		value := float64(raw.min_zoom)
 		options.MinZoom = &value
 	}
-	if raw.Fields&capi.BoundOptionMaxZoom != 0 {
-		value := raw.MaxZoom
+	if raw.fields&C.MLN_BOUND_OPTION_MAX_ZOOM != 0 {
+		value := float64(raw.max_zoom)
 		options.MaxZoom = &value
 	}
-	if raw.Fields&capi.BoundOptionMinPitch != 0 {
-		value := raw.MinPitch
+	if raw.fields&C.MLN_BOUND_OPTION_MIN_PITCH != 0 {
+		value := float64(raw.min_pitch)
 		options.MinPitch = &value
 	}
-	if raw.Fields&capi.BoundOptionMaxPitch != 0 {
-		value := raw.MaxPitch
+	if raw.fields&C.MLN_BOUND_OPTION_MAX_PITCH != 0 {
+		value := float64(raw.max_pitch)
 		options.MaxPitch = &value
 	}
 	return options
@@ -366,27 +375,27 @@ func (options FreeCameraOptions) WithOrientation(orientation Quaternion) FreeCam
 	return options
 }
 
-func (options FreeCameraOptions) toCAPI() capi.FreeCameraOptions {
-	var raw capi.FreeCameraOptions
+func cFreeCameraOptions(options FreeCameraOptions) C.mln_free_camera_options {
+	raw := C.mln_free_camera_options_default()
 	if options.Position != nil {
-		raw.Fields |= capi.FreeCameraOptionPosition
-		raw.Position = options.Position.toCAPI()
+		raw.fields |= C.MLN_FREE_CAMERA_OPTION_POSITION
+		raw.position = cVec3(*options.Position)
 	}
 	if options.Orientation != nil {
-		raw.Fields |= capi.FreeCameraOptionOrientation
-		raw.Orientation = options.Orientation.toCAPI()
+		raw.fields |= C.MLN_FREE_CAMERA_OPTION_ORIENTATION
+		raw.orientation = cQuaternion(*options.Orientation)
 	}
 	return raw
 }
 
-func freeCameraOptionsFromCAPI(raw capi.FreeCameraOptions) FreeCameraOptions {
+func goFreeCameraOptions(raw C.mln_free_camera_options) FreeCameraOptions {
 	var options FreeCameraOptions
-	if raw.Fields&capi.FreeCameraOptionPosition != 0 {
-		value := vec3FromCAPI(raw.Position)
+	if raw.fields&C.MLN_FREE_CAMERA_OPTION_POSITION != 0 {
+		value := goVec3(raw.position)
 		options.Position = &value
 	}
-	if raw.Fields&capi.FreeCameraOptionOrientation != 0 {
-		value := quaternionFromCAPI(raw.Orientation)
+	if raw.fields&C.MLN_FREE_CAMERA_OPTION_ORIENTATION != 0 {
+		value := goQuaternion(raw.orientation)
 		options.Orientation = &value
 	}
 	return options
@@ -396,36 +405,36 @@ func freeCameraOptionsFromCAPI(raw capi.FreeCameraOptions) FreeCameraOptions {
 type NorthOrientation uint32
 
 const (
-	NorthOrientationUp    NorthOrientation = NorthOrientation(capi.NorthOrientationUp)
-	NorthOrientationRight NorthOrientation = NorthOrientation(capi.NorthOrientationRight)
-	NorthOrientationDown  NorthOrientation = NorthOrientation(capi.NorthOrientationDown)
-	NorthOrientationLeft  NorthOrientation = NorthOrientation(capi.NorthOrientationLeft)
+	NorthOrientationUp    NorthOrientation = NorthOrientation(C.MLN_NORTH_ORIENTATION_UP)
+	NorthOrientationRight NorthOrientation = NorthOrientation(C.MLN_NORTH_ORIENTATION_RIGHT)
+	NorthOrientationDown  NorthOrientation = NorthOrientation(C.MLN_NORTH_ORIENTATION_DOWN)
+	NorthOrientationLeft  NorthOrientation = NorthOrientation(C.MLN_NORTH_ORIENTATION_LEFT)
 )
 
 // ConstrainMode controls map panning constraints.
 type ConstrainMode uint32
 
 const (
-	ConstrainModeNone           ConstrainMode = ConstrainMode(capi.ConstrainModeNone)
-	ConstrainModeHeightOnly     ConstrainMode = ConstrainMode(capi.ConstrainModeHeightOnly)
-	ConstrainModeWidthAndHeight ConstrainMode = ConstrainMode(capi.ConstrainModeWidthAndHeight)
-	ConstrainModeScreen         ConstrainMode = ConstrainMode(capi.ConstrainModeScreen)
+	ConstrainModeNone           ConstrainMode = ConstrainMode(C.MLN_CONSTRAIN_MODE_NONE)
+	ConstrainModeHeightOnly     ConstrainMode = ConstrainMode(C.MLN_CONSTRAIN_MODE_HEIGHT_ONLY)
+	ConstrainModeWidthAndHeight ConstrainMode = ConstrainMode(C.MLN_CONSTRAIN_MODE_WIDTH_AND_HEIGHT)
+	ConstrainModeScreen         ConstrainMode = ConstrainMode(C.MLN_CONSTRAIN_MODE_SCREEN)
 )
 
 // ViewportMode controls viewport coordinate orientation.
 type ViewportMode uint32
 
 const (
-	ViewportModeDefault  ViewportMode = ViewportMode(capi.ViewportModeDefault)
-	ViewportModeFlippedY ViewportMode = ViewportMode(capi.ViewportModeFlippedY)
+	ViewportModeDefault  ViewportMode = ViewportMode(C.MLN_VIEWPORT_MODE_DEFAULT)
+	ViewportModeFlippedY ViewportMode = ViewportMode(C.MLN_VIEWPORT_MODE_FLIPPED_Y)
 )
 
 // TileLODMode selects the native tile LOD algorithm.
 type TileLODMode uint32
 
 const (
-	TileLODModeDefault  TileLODMode = TileLODMode(capi.TileLODModeDefault)
-	TileLODModeDistance TileLODMode = TileLODMode(capi.TileLODModeDistance)
+	TileLODModeDefault  TileLODMode = TileLODMode(C.MLN_TILE_LOD_MODE_DEFAULT)
+	TileLODModeDistance TileLODMode = TileLODMode(C.MLN_TILE_LOD_MODE_DISTANCE)
 )
 
 // ViewportOptions configures live viewport and render-transform controls.
@@ -464,43 +473,43 @@ func (options ViewportOptions) WithFrustumOffset(value EdgeInsets) ViewportOptio
 	return options
 }
 
-func (options ViewportOptions) toCAPI() capi.ViewportOptions {
-	var raw capi.ViewportOptions
+func cViewportOptions(options ViewportOptions) C.mln_map_viewport_options {
+	raw := C.mln_map_viewport_options_default()
 	if options.NorthOrientation != nil {
-		raw.Fields |= capi.ViewportOptionNorthOrientation
-		raw.NorthOrientation = uint32(*options.NorthOrientation)
+		raw.fields |= C.MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION
+		raw.north_orientation = C.uint32_t(*options.NorthOrientation)
 	}
 	if options.ConstrainMode != nil {
-		raw.Fields |= capi.ViewportOptionConstrainMode
-		raw.ConstrainMode = uint32(*options.ConstrainMode)
+		raw.fields |= C.MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE
+		raw.constrain_mode = C.uint32_t(*options.ConstrainMode)
 	}
 	if options.ViewportMode != nil {
-		raw.Fields |= capi.ViewportOptionViewportMode
-		raw.ViewportMode = uint32(*options.ViewportMode)
+		raw.fields |= C.MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE
+		raw.viewport_mode = C.uint32_t(*options.ViewportMode)
 	}
 	if options.FrustumOffset != nil {
-		raw.Fields |= capi.ViewportOptionFrustumOffset
-		raw.FrustumOffset = options.FrustumOffset.toCAPI()
+		raw.fields |= C.MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET
+		raw.frustum_offset = cEdgeInsets(*options.FrustumOffset)
 	}
 	return raw
 }
 
-func viewportOptionsFromCAPI(raw capi.ViewportOptions) ViewportOptions {
+func goViewportOptions(raw C.mln_map_viewport_options) ViewportOptions {
 	var options ViewportOptions
-	if raw.Fields&capi.ViewportOptionNorthOrientation != 0 {
-		value := NorthOrientation(raw.NorthOrientation)
+	if raw.fields&C.MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION != 0 {
+		value := NorthOrientation(raw.north_orientation)
 		options.NorthOrientation = &value
 	}
-	if raw.Fields&capi.ViewportOptionConstrainMode != 0 {
-		value := ConstrainMode(raw.ConstrainMode)
+	if raw.fields&C.MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE != 0 {
+		value := ConstrainMode(raw.constrain_mode)
 		options.ConstrainMode = &value
 	}
-	if raw.Fields&capi.ViewportOptionViewportMode != 0 {
-		value := ViewportMode(raw.ViewportMode)
+	if raw.fields&C.MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE != 0 {
+		value := ViewportMode(raw.viewport_mode)
 		options.ViewportMode = &value
 	}
-	if raw.Fields&capi.ViewportOptionFrustumOffset != 0 {
-		value := edgeInsetsFromCAPI(raw.FrustumOffset)
+	if raw.fields&C.MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET != 0 {
+		value := goEdgeInsets(raw.frustum_offset)
 		options.FrustumOffset = &value
 	}
 	return options
@@ -530,59 +539,59 @@ func (options TileOptions) WithLODMode(value TileLODMode) TileOptions {
 	return options
 }
 
-func (options TileOptions) toCAPI() capi.TileOptions {
-	var raw capi.TileOptions
+func cTileOptions(options TileOptions) C.mln_map_tile_options {
+	raw := C.mln_map_tile_options_default()
 	if options.PrefetchZoomDelta != nil {
-		raw.Fields |= capi.TileOptionPrefetchZoomDelta
-		raw.PrefetchZoomDelta = *options.PrefetchZoomDelta
+		raw.fields |= C.MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA
+		raw.prefetch_zoom_delta = C.uint32_t(*options.PrefetchZoomDelta)
 	}
 	if options.LODMinRadius != nil {
-		raw.Fields |= capi.TileOptionLODMinRadius
-		raw.LODMinRadius = *options.LODMinRadius
+		raw.fields |= C.MLN_MAP_TILE_OPTION_LOD_MIN_RADIUS
+		raw.lod_min_radius = C.double(*options.LODMinRadius)
 	}
 	if options.LODScale != nil {
-		raw.Fields |= capi.TileOptionLODScale
-		raw.LODScale = *options.LODScale
+		raw.fields |= C.MLN_MAP_TILE_OPTION_LOD_SCALE
+		raw.lod_scale = C.double(*options.LODScale)
 	}
 	if options.LODPitchThreshold != nil {
-		raw.Fields |= capi.TileOptionLODPitchThreshold
-		raw.LODPitchThreshold = *options.LODPitchThreshold
+		raw.fields |= C.MLN_MAP_TILE_OPTION_LOD_PITCH_THRESHOLD
+		raw.lod_pitch_threshold = C.double(*options.LODPitchThreshold)
 	}
 	if options.LODZoomShift != nil {
-		raw.Fields |= capi.TileOptionLODZoomShift
-		raw.LODZoomShift = *options.LODZoomShift
+		raw.fields |= C.MLN_MAP_TILE_OPTION_LOD_ZOOM_SHIFT
+		raw.lod_zoom_shift = C.double(*options.LODZoomShift)
 	}
 	if options.LODMode != nil {
-		raw.Fields |= capi.TileOptionLODMode
-		raw.LODMode = uint32(*options.LODMode)
+		raw.fields |= C.MLN_MAP_TILE_OPTION_LOD_MODE
+		raw.lod_mode = C.uint32_t(*options.LODMode)
 	}
 	return raw
 }
 
-func tileOptionsFromCAPI(raw capi.TileOptions) TileOptions {
+func goTileOptions(raw C.mln_map_tile_options) TileOptions {
 	var options TileOptions
-	if raw.Fields&capi.TileOptionPrefetchZoomDelta != 0 {
-		value := raw.PrefetchZoomDelta
+	if raw.fields&C.MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA != 0 {
+		value := uint32(raw.prefetch_zoom_delta)
 		options.PrefetchZoomDelta = &value
 	}
-	if raw.Fields&capi.TileOptionLODMinRadius != 0 {
-		value := raw.LODMinRadius
+	if raw.fields&C.MLN_MAP_TILE_OPTION_LOD_MIN_RADIUS != 0 {
+		value := float64(raw.lod_min_radius)
 		options.LODMinRadius = &value
 	}
-	if raw.Fields&capi.TileOptionLODScale != 0 {
-		value := raw.LODScale
+	if raw.fields&C.MLN_MAP_TILE_OPTION_LOD_SCALE != 0 {
+		value := float64(raw.lod_scale)
 		options.LODScale = &value
 	}
-	if raw.Fields&capi.TileOptionLODPitchThreshold != 0 {
-		value := raw.LODPitchThreshold
+	if raw.fields&C.MLN_MAP_TILE_OPTION_LOD_PITCH_THRESHOLD != 0 {
+		value := float64(raw.lod_pitch_threshold)
 		options.LODPitchThreshold = &value
 	}
-	if raw.Fields&capi.TileOptionLODZoomShift != 0 {
-		value := raw.LODZoomShift
+	if raw.fields&C.MLN_MAP_TILE_OPTION_LOD_ZOOM_SHIFT != 0 {
+		value := float64(raw.lod_zoom_shift)
 		options.LODZoomShift = &value
 	}
-	if raw.Fields&capi.TileOptionLODMode != 0 {
-		value := TileLODMode(raw.LODMode)
+	if raw.fields&C.MLN_MAP_TILE_OPTION_LOD_MODE != 0 {
+		value := TileLODMode(raw.lod_mode)
 		options.LODMode = &value
 	}
 	return options
@@ -611,35 +620,35 @@ func (options ProjectionModeOptions) WithSkew(x, y float64) ProjectionModeOption
 	return options
 }
 
-func (options ProjectionModeOptions) toCAPI() capi.ProjectionModeOptions {
-	var raw capi.ProjectionModeOptions
+func cProjectionModeOptions(options ProjectionModeOptions) C.mln_projection_mode {
+	raw := C.mln_projection_mode_default()
 	if options.Axonometric != nil {
-		raw.Fields |= capi.ProjectionModeAxonometric
-		raw.Axonometric = *options.Axonometric
+		raw.fields |= C.MLN_PROJECTION_MODE_AXONOMETRIC
+		raw.axonometric = C.bool(*options.Axonometric)
 	}
 	if options.XSkew != nil {
-		raw.Fields |= capi.ProjectionModeXSkew
-		raw.XSkew = *options.XSkew
+		raw.fields |= C.MLN_PROJECTION_MODE_X_SKEW
+		raw.x_skew = C.double(*options.XSkew)
 	}
 	if options.YSkew != nil {
-		raw.Fields |= capi.ProjectionModeYSkew
-		raw.YSkew = *options.YSkew
+		raw.fields |= C.MLN_PROJECTION_MODE_Y_SKEW
+		raw.y_skew = C.double(*options.YSkew)
 	}
 	return raw
 }
 
-func projectionModeOptionsFromCAPI(raw capi.ProjectionModeOptions) ProjectionModeOptions {
+func goProjectionModeOptions(raw C.mln_projection_mode) ProjectionModeOptions {
 	var options ProjectionModeOptions
-	if raw.Fields&capi.ProjectionModeAxonometric != 0 {
-		value := raw.Axonometric
+	if raw.fields&C.MLN_PROJECTION_MODE_AXONOMETRIC != 0 {
+		value := bool(raw.axonometric)
 		options.Axonometric = &value
 	}
-	if raw.Fields&capi.ProjectionModeXSkew != 0 {
-		value := raw.XSkew
+	if raw.fields&C.MLN_PROJECTION_MODE_X_SKEW != 0 {
+		value := float64(raw.x_skew)
 		options.XSkew = &value
 	}
-	if raw.Fields&capi.ProjectionModeYSkew != 0 {
-		value := raw.YSkew
+	if raw.fields&C.MLN_PROJECTION_MODE_Y_SKEW != 0 {
+		value := float64(raw.y_skew)
 		options.YSkew = &value
 	}
 	return options

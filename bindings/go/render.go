@@ -1,10 +1,15 @@
 package maplibre
 
+/*
+#include "maplibre_native_c.h"
+*/
+import "C"
+
 import (
 	"runtime"
 	"sync"
+	"unsafe"
 
-	"github.com/maplibre/maplibre-native-ffi/bindings/go/internal/capi"
 	"github.com/maplibre/maplibre-native-ffi/bindings/go/internal/handle"
 	internalstatus "github.com/maplibre/maplibre-native-ffi/bindings/go/internal/status"
 )
@@ -14,8 +19,8 @@ import (
 type RenderBackendMask uint32
 
 const (
-	RenderBackendMetal  RenderBackendMask = RenderBackendMask(capi.RenderBackendFlagMetal)
-	RenderBackendVulkan RenderBackendMask = RenderBackendMask(capi.RenderBackendFlagVulkan)
+	RenderBackendMetal  RenderBackendMask = RenderBackendMask(C.MLN_RENDER_BACKEND_FLAG_METAL)
+	RenderBackendVulkan RenderBackendMask = RenderBackendMask(C.MLN_RENDER_BACKEND_FLAG_VULKAN)
 )
 
 // Has reports whether all backend bits in backend are present.
@@ -116,7 +121,7 @@ type VulkanBorrowedTextureDescriptor struct {
 
 // RenderSessionHandle owns a map render session.
 type RenderSessionHandle struct {
-	state  *handle.State[capi.RenderSession]
+	state  *handle.State[nativeRenderSession]
 	parent *MapHandle
 	mu     sync.Mutex
 	frame  bool
@@ -124,14 +129,14 @@ type RenderSessionHandle struct {
 
 type metalOwnedTextureFrameState struct {
 	session *RenderSessionHandle
-	raw     capi.MetalOwnedTextureFrame
+	raw     C.mln_metal_owned_texture_frame
 	mu      sync.Mutex
 	closed  bool
 }
 
 type vulkanOwnedTextureFrameState struct {
 	session *RenderSessionHandle
-	raw     capi.VulkanOwnedTextureFrame
+	raw     C.mln_vulkan_owned_texture_frame
 	mu      sync.Mutex
 	closed  bool
 }
@@ -170,82 +175,80 @@ type VulkanOwnedTextureFrame struct {
 	state *vulkanOwnedTextureFrameState
 }
 
-func (extent RenderTargetExtent) toCAPI() capi.RenderTargetExtent {
-	return capi.RenderTargetExtent{Width: extent.Width, Height: extent.Height, ScaleFactor: extent.ScaleFactor}
-}
-
-func textureImageInfoFromCAPI(info capi.TextureImageInfo) TextureImageInfo {
-	return TextureImageInfo{Width: info.Width, Height: info.Height, Stride: info.Stride, ByteLength: info.ByteLength}
-}
-
-func (descriptor MetalSurfaceDescriptor) toCAPI() capi.MetalSurfaceDescriptor {
-	return capi.MetalSurfaceDescriptor{
-		Extent: descriptor.Extent.toCAPI(),
-		Context: capi.MetalContextDescriptor{
-			Device: uintptr(descriptor.Context.Device),
-		},
-		Layer: uintptr(descriptor.Layer),
+func (extent RenderTargetExtent) toC() C.mln_render_target_extent {
+	return C.mln_render_target_extent{
+		size:         C.uint32_t(unsafe.Sizeof(C.mln_render_target_extent{})),
+		width:        C.uint32_t(extent.Width),
+		height:       C.uint32_t(extent.Height),
+		scale_factor: C.double(extent.ScaleFactor),
 	}
 }
 
-func (descriptor VulkanSurfaceDescriptor) toCAPI() capi.VulkanSurfaceDescriptor {
-	return capi.VulkanSurfaceDescriptor{
-		Extent: descriptor.Extent.toCAPI(),
-		Context: capi.VulkanContextDescriptor{
-			Instance:                 uintptr(descriptor.Context.Instance),
-			PhysicalDevice:           uintptr(descriptor.Context.PhysicalDevice),
-			Device:                   uintptr(descriptor.Context.Device),
-			GraphicsQueue:            uintptr(descriptor.Context.GraphicsQueue),
-			GraphicsQueueFamilyIndex: descriptor.Context.GraphicsQueueFamilyIndex,
-		},
-		Surface: uintptr(descriptor.Surface),
+func textureImageInfoFromC(info C.mln_texture_image_info) TextureImageInfo {
+	return TextureImageInfo{Width: uint32(info.width), Height: uint32(info.height), Stride: uint32(info.stride), ByteLength: uint64(info.byte_length)}
+}
+
+func (descriptor MetalSurfaceDescriptor) toC() C.mln_metal_surface_descriptor {
+	raw := C.mln_metal_surface_descriptor_default()
+	raw.extent = descriptor.Extent.toC()
+	raw.context.device = unsafe.Pointer(uintptr(descriptor.Context.Device))
+	raw.layer = unsafe.Pointer(uintptr(descriptor.Layer))
+	return raw
+}
+
+func (descriptor VulkanSurfaceDescriptor) toC() C.mln_vulkan_surface_descriptor {
+	raw := C.mln_vulkan_surface_descriptor_default()
+	raw.extent = descriptor.Extent.toC()
+	raw.context = descriptor.Context.toC()
+	raw.surface = unsafe.Pointer(uintptr(descriptor.Surface))
+	return raw
+}
+
+func (descriptor MetalOwnedTextureDescriptor) toC() C.mln_metal_owned_texture_descriptor {
+	raw := C.mln_metal_owned_texture_descriptor_default()
+	raw.extent = descriptor.Extent.toC()
+	raw.context.device = unsafe.Pointer(uintptr(descriptor.Context.Device))
+	return raw
+}
+
+func (descriptor MetalBorrowedTextureDescriptor) toC() C.mln_metal_borrowed_texture_descriptor {
+	raw := C.mln_metal_borrowed_texture_descriptor_default()
+	raw.extent = descriptor.Extent.toC()
+	raw.texture = unsafe.Pointer(uintptr(descriptor.Texture))
+	return raw
+}
+
+func (descriptor VulkanOwnedTextureDescriptor) toC() C.mln_vulkan_owned_texture_descriptor {
+	raw := C.mln_vulkan_owned_texture_descriptor_default()
+	raw.extent = descriptor.Extent.toC()
+	raw.context = descriptor.Context.toC()
+	return raw
+}
+
+func (descriptor VulkanBorrowedTextureDescriptor) toC() C.mln_vulkan_borrowed_texture_descriptor {
+	raw := C.mln_vulkan_borrowed_texture_descriptor_default()
+	raw.extent = descriptor.Extent.toC()
+	raw.context = descriptor.Context.toC()
+	raw.image = unsafe.Pointer(uintptr(descriptor.Image))
+	raw.image_view = unsafe.Pointer(uintptr(descriptor.ImageView))
+	raw.format = C.uint32_t(descriptor.Format)
+	raw.initial_layout = C.uint32_t(descriptor.InitialLayout)
+	raw.final_layout = C.uint32_t(descriptor.FinalLayout)
+	return raw
+}
+
+func (context VulkanContextDescriptor) toC() C.mln_vulkan_context_descriptor {
+	return C.mln_vulkan_context_descriptor{
+		size:                        C.uint32_t(unsafe.Sizeof(C.mln_vulkan_context_descriptor{})),
+		instance:                    unsafe.Pointer(uintptr(context.Instance)),
+		physical_device:             unsafe.Pointer(uintptr(context.PhysicalDevice)),
+		device:                      unsafe.Pointer(uintptr(context.Device)),
+		graphics_queue:              unsafe.Pointer(uintptr(context.GraphicsQueue)),
+		graphics_queue_family_index: C.uint32_t(context.GraphicsQueueFamilyIndex),
 	}
 }
 
-func (descriptor MetalOwnedTextureDescriptor) toCAPI() capi.MetalOwnedTextureDescriptor {
-	return capi.MetalOwnedTextureDescriptor{
-		Extent:  descriptor.Extent.toCAPI(),
-		Context: capi.MetalContextDescriptor{Device: uintptr(descriptor.Context.Device)},
-	}
-}
-
-func (descriptor MetalBorrowedTextureDescriptor) toCAPI() capi.MetalBorrowedTextureDescriptor {
-	return capi.MetalBorrowedTextureDescriptor{
-		Extent:  descriptor.Extent.toCAPI(),
-		Texture: uintptr(descriptor.Texture),
-	}
-}
-
-func (descriptor VulkanOwnedTextureDescriptor) toCAPI() capi.VulkanOwnedTextureDescriptor {
-	return capi.VulkanOwnedTextureDescriptor{
-		Extent:  descriptor.Extent.toCAPI(),
-		Context: descriptor.Context.toCAPI(),
-	}
-}
-
-func (descriptor VulkanBorrowedTextureDescriptor) toCAPI() capi.VulkanBorrowedTextureDescriptor {
-	return capi.VulkanBorrowedTextureDescriptor{
-		Extent:        descriptor.Extent.toCAPI(),
-		Context:       descriptor.Context.toCAPI(),
-		Image:         uintptr(descriptor.Image),
-		ImageView:     uintptr(descriptor.ImageView),
-		Format:        descriptor.Format,
-		InitialLayout: descriptor.InitialLayout,
-		FinalLayout:   descriptor.FinalLayout,
-	}
-}
-
-func (context VulkanContextDescriptor) toCAPI() capi.VulkanContextDescriptor {
-	return capi.VulkanContextDescriptor{
-		Instance:                 uintptr(context.Instance),
-		PhysicalDevice:           uintptr(context.PhysicalDevice),
-		Device:                   uintptr(context.Device),
-		GraphicsQueue:            uintptr(context.GraphicsQueue),
-		GraphicsQueueFamilyIndex: context.GraphicsQueueFamilyIndex,
-	}
-}
-
-func newRenderSessionHandle(parent *MapHandle, session *capi.RenderSession) (*RenderSessionHandle, error) {
+func newRenderSessionHandle(parent *MapHandle, session *nativeRenderSession) (*RenderSessionHandle, error) {
 	state, err := handle.New(session, "RenderSessionHandle", parent)
 	if err != nil {
 		return nil, newBindingError(ErrInvalidArgument, err.Error())
@@ -262,11 +265,14 @@ func (m *MapHandle) AttachMetalSurface(descriptor MetalSurfaceDescriptor) (*Rend
 	}
 	defer m.state.KeepAlive()
 
-	var session *capi.RenderSession
-	if err := checkNative(func() capi.Status { return capi.MetalSurfaceAttach(ptr, descriptor.toCAPI(), &session) }); err != nil {
+	var session *C.mln_render_session
+	rawDescriptor := descriptor.toC()
+	if err := checkNative(func() int32 {
+		return int32(C.mln_metal_surface_attach((*C.mln_map)(unsafe.Pointer(ptr)), &rawDescriptor, &session))
+	}); err != nil {
 		return nil, err
 	}
-	return newRenderSessionHandle(m, session)
+	return newRenderSessionHandle(m, (*nativeRenderSession)(unsafe.Pointer(session)))
 }
 
 // AttachVulkanSurface attaches a Vulkan native surface render target to this
@@ -279,11 +285,14 @@ func (m *MapHandle) AttachVulkanSurface(descriptor VulkanSurfaceDescriptor) (*Re
 	}
 	defer m.state.KeepAlive()
 
-	var session *capi.RenderSession
-	if err := checkNative(func() capi.Status { return capi.VulkanSurfaceAttach(ptr, descriptor.toCAPI(), &session) }); err != nil {
+	var session *C.mln_render_session
+	rawDescriptor := descriptor.toC()
+	if err := checkNative(func() int32 {
+		return int32(C.mln_vulkan_surface_attach((*C.mln_map)(unsafe.Pointer(ptr)), &rawDescriptor, &session))
+	}); err != nil {
 		return nil, err
 	}
-	return newRenderSessionHandle(m, session)
+	return newRenderSessionHandle(m, (*nativeRenderSession)(unsafe.Pointer(session)))
 }
 
 // AttachMetalOwnedTexture attaches a Metal session-owned texture render target.
@@ -294,11 +303,14 @@ func (m *MapHandle) AttachMetalOwnedTexture(descriptor MetalOwnedTextureDescript
 	}
 	defer m.state.KeepAlive()
 
-	var session *capi.RenderSession
-	if err := checkNative(func() capi.Status { return capi.MetalOwnedTextureAttach(ptr, descriptor.toCAPI(), &session) }); err != nil {
+	var session *C.mln_render_session
+	rawDescriptor := descriptor.toC()
+	if err := checkNative(func() int32 {
+		return int32(C.mln_metal_owned_texture_attach((*C.mln_map)(unsafe.Pointer(ptr)), &rawDescriptor, &session))
+	}); err != nil {
 		return nil, err
 	}
-	return newRenderSessionHandle(m, session)
+	return newRenderSessionHandle(m, (*nativeRenderSession)(unsafe.Pointer(session)))
 }
 
 // AttachMetalBorrowedTexture attaches a Metal caller-owned texture render
@@ -311,11 +323,14 @@ func (m *MapHandle) AttachMetalBorrowedTexture(descriptor MetalBorrowedTextureDe
 	}
 	defer m.state.KeepAlive()
 
-	var session *capi.RenderSession
-	if err := checkNative(func() capi.Status { return capi.MetalBorrowedTextureAttach(ptr, descriptor.toCAPI(), &session) }); err != nil {
+	var session *C.mln_render_session
+	rawDescriptor := descriptor.toC()
+	if err := checkNative(func() int32 {
+		return int32(C.mln_metal_borrowed_texture_attach((*C.mln_map)(unsafe.Pointer(ptr)), &rawDescriptor, &session))
+	}); err != nil {
 		return nil, err
 	}
-	return newRenderSessionHandle(m, session)
+	return newRenderSessionHandle(m, (*nativeRenderSession)(unsafe.Pointer(session)))
 }
 
 // AttachVulkanOwnedTexture attaches a Vulkan session-owned texture render target.
@@ -326,11 +341,14 @@ func (m *MapHandle) AttachVulkanOwnedTexture(descriptor VulkanOwnedTextureDescri
 	}
 	defer m.state.KeepAlive()
 
-	var session *capi.RenderSession
-	if err := checkNative(func() capi.Status { return capi.VulkanOwnedTextureAttach(ptr, descriptor.toCAPI(), &session) }); err != nil {
+	var session *C.mln_render_session
+	rawDescriptor := descriptor.toC()
+	if err := checkNative(func() int32 {
+		return int32(C.mln_vulkan_owned_texture_attach((*C.mln_map)(unsafe.Pointer(ptr)), &rawDescriptor, &session))
+	}); err != nil {
 		return nil, err
 	}
-	return newRenderSessionHandle(m, session)
+	return newRenderSessionHandle(m, (*nativeRenderSession)(unsafe.Pointer(session)))
 }
 
 // AttachVulkanBorrowedTexture attaches a Vulkan caller-owned texture render
@@ -343,14 +361,17 @@ func (m *MapHandle) AttachVulkanBorrowedTexture(descriptor VulkanBorrowedTexture
 	}
 	defer m.state.KeepAlive()
 
-	var session *capi.RenderSession
-	if err := checkNative(func() capi.Status { return capi.VulkanBorrowedTextureAttach(ptr, descriptor.toCAPI(), &session) }); err != nil {
+	var session *C.mln_render_session
+	rawDescriptor := descriptor.toC()
+	if err := checkNative(func() int32 {
+		return int32(C.mln_vulkan_borrowed_texture_attach((*C.mln_map)(unsafe.Pointer(ptr)), &rawDescriptor, &session))
+	}); err != nil {
 		return nil, err
 	}
-	return newRenderSessionHandle(m, session)
+	return newRenderSessionHandle(m, (*nativeRenderSession)(unsafe.Pointer(session)))
 }
 
-func (session *RenderSessionHandle) ptr() (*capi.RenderSession, error) {
+func (session *RenderSessionHandle) ptr() (*nativeRenderSession, error) {
 	if session == nil || session.state == nil {
 		return nil, newBindingError(ErrInvalidArgument, "RenderSessionHandle is nil")
 	}
@@ -385,7 +406,9 @@ func (session *RenderSessionHandle) Resize(extent RenderTargetExtent) error {
 	defer session.state.KeepAlive()
 	defer session.parent.state.KeepAlive()
 	return session.withNoAcquiredFrame(func() error {
-		return checkNative(func() capi.Status { return capi.RenderSessionResize(ptr, extent.toCAPI()) })
+		return checkNative(func() int32 {
+			return int32(C.mln_render_session_resize((*C.mln_render_session)(unsafe.Pointer(ptr)), C.uint32_t(extent.Width), C.uint32_t(extent.Height), C.double(extent.ScaleFactor)))
+		})
 	})
 }
 
@@ -398,7 +421,9 @@ func (session *RenderSessionHandle) RenderUpdate() error {
 	defer session.state.KeepAlive()
 	defer session.parent.state.KeepAlive()
 	return session.withNoAcquiredFrame(func() error {
-		return checkNative(func() capi.Status { return capi.RenderSessionRenderUpdate(ptr) })
+		return checkNative(func() int32 {
+			return int32(C.mln_render_session_render_update((*C.mln_render_session)(unsafe.Pointer(ptr))))
+		})
 	})
 }
 
@@ -411,7 +436,7 @@ func (session *RenderSessionHandle) Detach() error {
 	defer session.state.KeepAlive()
 	defer session.parent.state.KeepAlive()
 	return session.withNoAcquiredFrame(func() error {
-		return checkNative(func() capi.Status { return capi.RenderSessionDetach(ptr) })
+		return checkNative(func() int32 { return int32(C.mln_render_session_detach((*C.mln_render_session)(unsafe.Pointer(ptr)))) })
 	})
 }
 
@@ -423,7 +448,9 @@ func (session *RenderSessionHandle) ReduceMemoryUse() error {
 	}
 	defer session.state.KeepAlive()
 	defer session.parent.state.KeepAlive()
-	return checkNative(func() capi.Status { return capi.RenderSessionReduceMemoryUse(ptr) })
+	return checkNative(func() int32 {
+		return int32(C.mln_render_session_reduce_memory_use((*C.mln_render_session)(unsafe.Pointer(ptr))))
+	})
 }
 
 // ClearData clears render-session data.
@@ -434,7 +461,9 @@ func (session *RenderSessionHandle) ClearData() error {
 	}
 	defer session.state.KeepAlive()
 	defer session.parent.state.KeepAlive()
-	return checkNative(func() capi.Status { return capi.RenderSessionClearData(ptr) })
+	return checkNative(func() int32 {
+		return int32(C.mln_render_session_clear_data((*C.mln_render_session)(unsafe.Pointer(ptr))))
+	})
 }
 
 // DumpDebugLogs dumps render-session debug logs.
@@ -445,7 +474,9 @@ func (session *RenderSessionHandle) DumpDebugLogs() error {
 	}
 	defer session.state.KeepAlive()
 	defer session.parent.state.KeepAlive()
-	return checkNative(func() capi.Status { return capi.RenderSessionDumpDebugLogs(ptr) })
+	return checkNative(func() int32 {
+		return int32(C.mln_render_session_dump_debug_logs((*C.mln_render_session)(unsafe.Pointer(ptr))))
+	})
 }
 
 // ReadPremultipliedRGBA8 reads the latest session-owned texture frame into a
@@ -461,15 +492,15 @@ func (session *RenderSessionHandle) ReadPremultipliedRGBA8() ([]byte, TextureIma
 	var buffer []byte
 	var info TextureImageInfo
 	err = session.withNoAcquiredFrame(func() error {
-		var rawInfo capi.TextureImageInfo
-		failure := internalstatus.CheckCall(func() capi.Status {
-			return capi.TextureReadPremultipliedRGBA8(ptr, nil, &rawInfo)
-		})
-		info = textureImageInfoFromCAPI(rawInfo)
+		rawInfo := C.mln_texture_image_info_default()
+		failure := internalstatus.CheckCall(func() int32 {
+			return int32(C.mln_texture_read_premultiplied_rgba8((*C.mln_render_session)(unsafe.Pointer(ptr)), nil, 0, &rawInfo))
+		}, threadLastErrorMessage)
+		info = textureImageInfoFromC(rawInfo)
 		if failure == nil {
 			return nil
 		}
-		if failure.Status != capi.StatusInvalidArgument || info.ByteLength == 0 {
+		if failure.Status != int32(C.MLN_STATUS_INVALID_ARGUMENT) || info.ByteLength == 0 {
 			return newStatusError(failure)
 		}
 		buffer = make([]byte, info.ByteLength)
@@ -500,14 +531,20 @@ func (session *RenderSessionHandle) ReadPremultipliedRGBA8Into(buffer []byte) (T
 	return info, err
 }
 
-func (session *RenderSessionHandle) readPremultipliedRGBA8IntoLocked(ptr *capi.RenderSession, buffer []byte) (TextureImageInfo, error) {
-	var rawInfo capi.TextureImageInfo
-	if err := checkNative(func() capi.Status { return capi.TextureReadPremultipliedRGBA8(ptr, buffer, &rawInfo) }); err != nil {
+func (session *RenderSessionHandle) readPremultipliedRGBA8IntoLocked(ptr *nativeRenderSession, buffer []byte) (TextureImageInfo, error) {
+	rawInfo := C.mln_texture_image_info_default()
+	var rawBuffer *C.uint8_t
+	if len(buffer) > 0 {
+		rawBuffer = (*C.uint8_t)(unsafe.Pointer(&buffer[0]))
+	}
+	if err := checkNative(func() int32 {
+		return int32(C.mln_texture_read_premultiplied_rgba8((*C.mln_render_session)(unsafe.Pointer(ptr)), rawBuffer, C.size_t(len(buffer)), &rawInfo))
+	}); err != nil {
 		runtime.KeepAlive(buffer)
-		return textureImageInfoFromCAPI(rawInfo), err
+		return textureImageInfoFromC(rawInfo), err
 	}
 	runtime.KeepAlive(buffer)
-	return textureImageInfoFromCAPI(rawInfo), nil
+	return textureImageInfoFromC(rawInfo), nil
 }
 
 // AcquireMetalTextureFrame acquires the latest Metal session-owned texture
@@ -525,19 +562,21 @@ func (session *RenderSessionHandle) AcquireMetalTextureFrame() (*MetalOwnedTextu
 	if session.frame {
 		return nil, newBindingError(ErrInvalidState, "texture frame is still acquired")
 	}
-	var rawFrame capi.MetalOwnedTextureFrame
-	if err := checkNative(func() capi.Status { return capi.MetalOwnedTextureAcquireFrame(ptr, &rawFrame) }); err != nil {
+	rawFrame := C.mln_metal_owned_texture_frame{size: C.uint32_t(unsafe.Sizeof(C.mln_metal_owned_texture_frame{}))}
+	if err := checkNative(func() int32 {
+		return int32(C.mln_metal_owned_texture_acquire_frame((*C.mln_render_session)(unsafe.Pointer(ptr)), &rawFrame))
+	}); err != nil {
 		return nil, err
 	}
 	session.frame = true
 	return &MetalOwnedTextureFrame{
-		Generation:  rawFrame.Generation,
-		Width:       rawFrame.Width,
-		Height:      rawFrame.Height,
-		ScaleFactor: rawFrame.ScaleFactor,
-		Texture:     NativePointer(rawFrame.Texture),
-		Device:      NativePointer(rawFrame.Device),
-		PixelFormat: rawFrame.PixelFormat,
+		Generation:  uint64(rawFrame.generation),
+		Width:       uint32(rawFrame.width),
+		Height:      uint32(rawFrame.height),
+		ScaleFactor: float64(rawFrame.scale_factor),
+		Texture:     NativePointer(uintptr(rawFrame.texture)),
+		Device:      NativePointer(uintptr(rawFrame.device)),
+		PixelFormat: uint64(rawFrame.pixel_format),
 		state:       &metalOwnedTextureFrameState{session: session, raw: rawFrame},
 	}, nil
 }
@@ -557,21 +596,23 @@ func (session *RenderSessionHandle) AcquireVulkanTextureFrame() (*VulkanOwnedTex
 	if session.frame {
 		return nil, newBindingError(ErrInvalidState, "texture frame is still acquired")
 	}
-	var rawFrame capi.VulkanOwnedTextureFrame
-	if err := checkNative(func() capi.Status { return capi.VulkanOwnedTextureAcquireFrame(ptr, &rawFrame) }); err != nil {
+	rawFrame := C.mln_vulkan_owned_texture_frame{size: C.uint32_t(unsafe.Sizeof(C.mln_vulkan_owned_texture_frame{}))}
+	if err := checkNative(func() int32 {
+		return int32(C.mln_vulkan_owned_texture_acquire_frame((*C.mln_render_session)(unsafe.Pointer(ptr)), &rawFrame))
+	}); err != nil {
 		return nil, err
 	}
 	session.frame = true
 	return &VulkanOwnedTextureFrame{
-		Generation:  rawFrame.Generation,
-		Width:       rawFrame.Width,
-		Height:      rawFrame.Height,
-		ScaleFactor: rawFrame.ScaleFactor,
-		Image:       NativePointer(rawFrame.Image),
-		ImageView:   NativePointer(rawFrame.ImageView),
-		Device:      NativePointer(rawFrame.Device),
-		Format:      rawFrame.Format,
-		Layout:      rawFrame.Layout,
+		Generation:  uint64(rawFrame.generation),
+		Width:       uint32(rawFrame.width),
+		Height:      uint32(rawFrame.height),
+		ScaleFactor: float64(rawFrame.scale_factor),
+		Image:       NativePointer(uintptr(rawFrame.image)),
+		ImageView:   NativePointer(uintptr(rawFrame.image_view)),
+		Device:      NativePointer(uintptr(rawFrame.device)),
+		Format:      uint32(rawFrame.format),
+		Layout:      uint32(rawFrame.layout),
 		state:       &vulkanOwnedTextureFrameState{session: session, raw: rawFrame},
 	}, nil
 }
@@ -595,7 +636,9 @@ func (frame *MetalOwnedTextureFrame) Close() error {
 	}
 	defer state.session.state.KeepAlive()
 	defer state.session.parent.state.KeepAlive()
-	if err := checkNative(func() capi.Status { return capi.MetalOwnedTextureReleaseFrame(ptr, state.raw) }); err != nil {
+	if err := checkNative(func() int32 {
+		return int32(C.mln_metal_owned_texture_release_frame((*C.mln_render_session)(unsafe.Pointer(ptr)), &state.raw))
+	}); err != nil {
 		return err
 	}
 	state.closed = true
@@ -622,7 +665,9 @@ func (frame *VulkanOwnedTextureFrame) Close() error {
 	}
 	defer state.session.state.KeepAlive()
 	defer state.session.parent.state.KeepAlive()
-	if err := checkNative(func() capi.Status { return capi.VulkanOwnedTextureReleaseFrame(ptr, state.raw) }); err != nil {
+	if err := checkNative(func() int32 {
+		return int32(C.mln_vulkan_owned_texture_release_frame((*C.mln_render_session)(unsafe.Pointer(ptr)), &state.raw))
+	}); err != nil {
 		return err
 	}
 	state.closed = true
@@ -639,6 +684,10 @@ func (session *RenderSessionHandle) Close() error {
 	}
 	defer session.parent.state.KeepAlive()
 	return session.withNoAcquiredFrame(func() error {
-		return checkNative(func() capi.Status { return session.state.Close(capi.RenderSessionDestroy) })
+		return checkNative(func() int32 {
+			return session.state.Close(func(ptr *nativeRenderSession) int32 {
+				return int32(C.mln_render_session_destroy((*C.mln_render_session)(unsafe.Pointer(ptr))))
+			})
+		})
 	})
 }

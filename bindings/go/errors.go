@@ -1,10 +1,14 @@
 package maplibre
 
+/*
+#include "maplibre_native_c.h"
+*/
+import "C"
+
 import (
 	"errors"
 	"fmt"
 
-	"github.com/maplibre/maplibre-native-ffi/bindings/go/internal/capi"
 	internalstatus "github.com/maplibre/maplibre-native-ffi/bindings/go/internal/status"
 )
 
@@ -83,25 +87,29 @@ func (e *Error) Diagnostic() string {
 	return e.diagnostic
 }
 
-func checkNative(call func() capi.Status) error {
-	failure := internalstatus.CheckCall(call)
+func checkNative[S ~int32](call func() S) error {
+	failure := internalstatus.CheckCall(call, threadLastErrorMessage)
 	if failure == nil {
 		return nil
 	}
 	return newStatusError(failure)
 }
 
-func kindForStatus(status capi.Status) error {
+func threadLastErrorMessage() string {
+	return C.GoString(C.mln_thread_last_error_message())
+}
+
+func kindForStatus(status int32) error {
 	switch status {
-	case capi.StatusInvalidArgument:
+	case int32(C.MLN_STATUS_INVALID_ARGUMENT):
 		return ErrInvalidArgument
-	case capi.StatusInvalidState:
+	case int32(C.MLN_STATUS_INVALID_STATE):
 		return ErrInvalidState
-	case capi.StatusWrongThread:
+	case int32(C.MLN_STATUS_WRONG_THREAD):
 		return ErrWrongThread
-	case capi.StatusUnsupported:
+	case int32(C.MLN_STATUS_UNSUPPORTED):
 		return ErrUnsupported
-	case capi.StatusNativeError:
+	case int32(C.MLN_STATUS_NATIVE_ERROR):
 		return ErrNative
 	default:
 		return ErrUnknownStatus

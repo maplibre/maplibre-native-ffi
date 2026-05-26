@@ -1,6 +1,9 @@
 package maplibre
 
-import "github.com/maplibre/maplibre-native-ffi/bindings/go/internal/capi"
+/*
+#include "maplibre_native_c.h"
+*/
+import "C"
 
 // LatLng is a geographic coordinate in degrees.
 type LatLng struct {
@@ -60,14 +63,14 @@ type CanonicalTileID struct {
 type GeometryType uint32
 
 const (
-	GeometryTypeEmpty              GeometryType = GeometryType(capi.GeometryTypeEmpty)
-	GeometryTypePoint              GeometryType = GeometryType(capi.GeometryTypePoint)
-	GeometryTypeLineString         GeometryType = GeometryType(capi.GeometryTypeLineString)
-	GeometryTypePolygon            GeometryType = GeometryType(capi.GeometryTypePolygon)
-	GeometryTypeMultiPoint         GeometryType = GeometryType(capi.GeometryTypeMultiPoint)
-	GeometryTypeMultiLineString    GeometryType = GeometryType(capi.GeometryTypeMultiLineString)
-	GeometryTypeMultiPolygon       GeometryType = GeometryType(capi.GeometryTypeMultiPolygon)
-	GeometryTypeGeometryCollection GeometryType = GeometryType(capi.GeometryTypeGeometryCollection)
+	GeometryTypeEmpty              GeometryType = GeometryType(C.MLN_GEOMETRY_TYPE_EMPTY)
+	GeometryTypePoint              GeometryType = GeometryType(C.MLN_GEOMETRY_TYPE_POINT)
+	GeometryTypeLineString         GeometryType = GeometryType(C.MLN_GEOMETRY_TYPE_LINE_STRING)
+	GeometryTypePolygon            GeometryType = GeometryType(C.MLN_GEOMETRY_TYPE_POLYGON)
+	GeometryTypeMultiPoint         GeometryType = GeometryType(C.MLN_GEOMETRY_TYPE_MULTI_POINT)
+	GeometryTypeMultiLineString    GeometryType = GeometryType(C.MLN_GEOMETRY_TYPE_MULTI_LINE_STRING)
+	GeometryTypeMultiPolygon       GeometryType = GeometryType(C.MLN_GEOMETRY_TYPE_MULTI_POLYGON)
+	GeometryTypeGeometryCollection GeometryType = GeometryType(C.MLN_GEOMETRY_TYPE_GEOMETRY_COLLECTION)
 )
 
 // Geometry is a GeoJSON geometry descriptor.
@@ -91,9 +94,9 @@ type Feature struct {
 type GeoJSONType uint32
 
 const (
-	GeoJSONTypeGeometry          GeoJSONType = GeoJSONType(capi.GeoJSONTypeGeometry)
-	GeoJSONTypeFeature           GeoJSONType = GeoJSONType(capi.GeoJSONTypeFeature)
-	GeoJSONTypeFeatureCollection GeoJSONType = GeoJSONType(capi.GeoJSONTypeFeatureCollection)
+	GeoJSONTypeGeometry          GeoJSONType = GeoJSONType(C.MLN_GEOJSON_TYPE_GEOMETRY)
+	GeoJSONTypeFeature           GeoJSONType = GeoJSONType(C.MLN_GEOJSON_TYPE_FEATURE)
+	GeoJSONTypeFeatureCollection GeoJSONType = GeoJSONType(C.MLN_GEOJSON_TYPE_FEATURE_COLLECTION)
 )
 
 // GeoJSON is a GeoJSON geometry, feature, or feature collection descriptor.
@@ -122,152 +125,4 @@ func PolygonGeometry(rings [][]LatLng) Geometry {
 // GeoJSONFeatureCollection returns a feature collection GeoJSON descriptor.
 func GeoJSONFeatureCollection(features []Feature) GeoJSON {
 	return GeoJSON{Type: GeoJSONTypeFeatureCollection, Features: features}
-}
-
-func (coordinate LatLng) toCAPI() capi.LatLng {
-	return capi.LatLng{Latitude: coordinate.Latitude, Longitude: coordinate.Longitude}
-}
-
-func latLngFromCAPI(coordinate capi.LatLng) LatLng {
-	return LatLng{Latitude: coordinate.Latitude, Longitude: coordinate.Longitude}
-}
-
-func (point ScreenPoint) toCAPI() capi.ScreenPoint {
-	return capi.ScreenPoint{X: point.X, Y: point.Y}
-}
-
-func (insets EdgeInsets) toCAPI() capi.EdgeInsets {
-	return capi.EdgeInsets{Top: insets.Top, Left: insets.Left, Bottom: insets.Bottom, Right: insets.Right}
-}
-
-func edgeInsetsFromCAPI(insets capi.EdgeInsets) EdgeInsets {
-	return EdgeInsets{Top: insets.Top, Left: insets.Left, Bottom: insets.Bottom, Right: insets.Right}
-}
-
-func screenPointFromCAPI(point capi.ScreenPoint) ScreenPoint {
-	return ScreenPoint{X: point.X, Y: point.Y}
-}
-
-func (meters ProjectedMeters) toCAPI() capi.ProjectedMeters {
-	return capi.ProjectedMeters{Northing: meters.Northing, Easting: meters.Easting}
-}
-
-func projectedMetersFromCAPI(meters capi.ProjectedMeters) ProjectedMeters {
-	return ProjectedMeters{Northing: meters.Northing, Easting: meters.Easting}
-}
-
-func (vector Vec3) toCAPI() capi.Vec3 {
-	return capi.Vec3{X: vector.X, Y: vector.Y, Z: vector.Z}
-}
-
-func vec3FromCAPI(vector capi.Vec3) Vec3 {
-	return Vec3{X: vector.X, Y: vector.Y, Z: vector.Z}
-}
-
-func (quaternion Quaternion) toCAPI() capi.Quaternion {
-	return capi.Quaternion{X: quaternion.X, Y: quaternion.Y, Z: quaternion.Z, W: quaternion.W}
-}
-
-func quaternionFromCAPI(quaternion capi.Quaternion) Quaternion {
-	return Quaternion{X: quaternion.X, Y: quaternion.Y, Z: quaternion.Z, W: quaternion.W}
-}
-
-func (bounds LatLngBounds) toCAPI() capi.LatLngBounds {
-	return capi.LatLngBounds{Southwest: bounds.Southwest.toCAPI(), Northeast: bounds.Northeast.toCAPI()}
-}
-
-func latLngBoundsFromCAPI(bounds capi.LatLngBounds) LatLngBounds {
-	return LatLngBounds{Southwest: latLngFromCAPI(bounds.Southwest), Northeast: latLngFromCAPI(bounds.Northeast)}
-}
-
-func (tileID CanonicalTileID) toCAPI() capi.CanonicalTileID {
-	return capi.CanonicalTileID{Z: tileID.Z, X: tileID.X, Y: tileID.Y}
-}
-
-func (geometry Geometry) toCAPI() capi.Geometry {
-	return capi.Geometry{
-		Type:       uint32(geometry.Type),
-		Point:      geometry.Point.toCAPI(),
-		Points:     latLngSliceToCAPI(geometry.Points),
-		Lines:      latLngLinesToCAPI(geometry.Lines),
-		Polygons:   latLngPolygonsToCAPI(geometry.Polygons),
-		Geometries: geometriesToCAPI(geometry.Geometries),
-	}
-}
-
-func (feature Feature) toCAPI() capi.Feature {
-	return capi.Feature{Geometry: feature.Geometry.toCAPI(), Properties: feature.Properties, Identifier: feature.Identifier}
-}
-
-func (geojson GeoJSON) toCAPI() capi.GeoJSON {
-	return capi.GeoJSON{
-		Type:     uint32(geojson.Type),
-		Geometry: geojson.Geometry.toCAPI(),
-		Feature:  geojson.Feature.toCAPI(),
-		Features: featuresToCAPI(geojson.Features),
-	}
-}
-
-func latLngSliceToCAPI(points []LatLng) []capi.LatLng {
-	out := make([]capi.LatLng, len(points))
-	for i, point := range points {
-		out[i] = point.toCAPI()
-	}
-	return out
-}
-
-func latLngSliceFromCAPI(points []capi.LatLng) []LatLng {
-	out := make([]LatLng, len(points))
-	for i, point := range points {
-		out[i] = latLngFromCAPI(point)
-	}
-	return out
-}
-
-func screenPointSliceToCAPI(points []ScreenPoint) []capi.ScreenPoint {
-	out := make([]capi.ScreenPoint, len(points))
-	for i, point := range points {
-		out[i] = point.toCAPI()
-	}
-	return out
-}
-
-func screenPointSliceFromCAPI(points []capi.ScreenPoint) []ScreenPoint {
-	out := make([]ScreenPoint, len(points))
-	for i, point := range points {
-		out[i] = screenPointFromCAPI(point)
-	}
-	return out
-}
-
-func latLngLinesToCAPI(lines [][]LatLng) [][]capi.LatLng {
-	out := make([][]capi.LatLng, len(lines))
-	for i, line := range lines {
-		out[i] = latLngSliceToCAPI(line)
-	}
-	return out
-}
-
-func latLngPolygonsToCAPI(polygons [][][]LatLng) [][][]capi.LatLng {
-	out := make([][][]capi.LatLng, len(polygons))
-	for i, polygon := range polygons {
-		out[i] = latLngLinesToCAPI(polygon)
-	}
-	return out
-}
-
-func geometriesToCAPI(geometries []Geometry) []capi.Geometry {
-	out := make([]capi.Geometry, len(geometries))
-	for i, geometry := range geometries {
-		out[i] = geometry.toCAPI()
-	}
-	return out
-}
-
-func featuresToCAPI(features []Feature) []capi.Feature {
-	out := make([]capi.Feature, len(features))
-	for i, feature := range features {
-		out[i] = feature.toCAPI()
-	}
-	return out
 }

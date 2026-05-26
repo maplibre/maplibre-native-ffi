@@ -4,22 +4,16 @@ package callback
 #cgo CFLAGS: -std=c2x
 #include <stdlib.h>
 #include <stdint.h>
-#include "maplibre_native_c.h"
+#include "../cgo_shim.h"
 
 extern void goMaplibreCustomGeometryFetchTile(void* user_data, mln_canonical_tile_id tile_id);
 extern void goMaplibreCustomGeometryCancelTile(void* user_data, mln_canonical_tile_id tile_id);
-
-static inline void* mln_go_custom_geometry_handle_to_pointer(uintptr_t handle) {
-  return (void*)handle;
-}
 */
 import "C"
 import (
 	"runtime/cgo"
 	"sync"
 	"unsafe"
-
-	"github.com/maplibre/maplibre-native-ffi/bindings/go/internal/capi"
 )
 
 // CanonicalTileID identifies one canonical tile for custom geometry callbacks.
@@ -55,9 +49,9 @@ type CustomGeometrySourceState struct {
 }
 
 // AddCustomGeometrySource installs a custom geometry source callback descriptor.
-func AddCustomGeometrySource(m *capi.Map, sourceID string, options CustomGeometrySourceOptions) (*CustomGeometrySourceState, capi.Status) {
+func AddCustomGeometrySource(m unsafe.Pointer, sourceID string, options CustomGeometrySourceOptions) (*CustomGeometrySourceState, int32) {
 	if options.FetchTile == nil {
-		return nil, capi.StatusInvalidArgument
+		return nil, int32(C.MLN_STATUS_INVALID_ARGUMENT)
 	}
 	state := &CustomGeometrySourceState{fetchTile: options.FetchTile, cancelTile: options.CancelTile}
 	state.handle = cgo.NewHandle(state)
@@ -72,7 +66,7 @@ func AddCustomGeometrySource(m *capi.Map, sourceID string, options CustomGeometr
 	if options.CancelTile != nil {
 		raw.cancel_tile = (C.mln_custom_geometry_source_tile_callback)(C.goMaplibreCustomGeometryCancelTile)
 	}
-	raw.user_data = C.mln_go_custom_geometry_handle_to_pointer(C.uintptr_t(state.handle))
+	raw.user_data = C.mln_go_handle_to_pointer(C.uintptr_t(state.handle))
 	raw.min_zoom = C.double(options.MinZoom)
 	raw.max_zoom = C.double(options.MaxZoom)
 	raw.tolerance = C.double(options.Tolerance)
@@ -81,12 +75,12 @@ func AddCustomGeometrySource(m *capi.Map, sourceID string, options CustomGeometr
 	raw.clip = C.bool(options.Clip)
 	raw.wrap = C.bool(options.Wrap)
 
-	status := capi.Status(C.mln_map_add_custom_geometry_source((*C.mln_map)(unsafe.Pointer(m)), sourceView, &raw))
-	if status != capi.StatusOK {
+	status := int32(C.mln_map_add_custom_geometry_source((*C.mln_map)(m), sourceView, &raw))
+	if status != int32(C.MLN_STATUS_OK) {
 		state.Release()
 		return nil, status
 	}
-	return state, capi.StatusOK
+	return state, int32(C.MLN_STATUS_OK)
 }
 
 // Release frees callback state after native no longer references it.
@@ -120,7 +114,7 @@ func invokeCustomGeometryFetchForTest(callback CustomGeometryTileCallback) {
 	state.handle = cgo.NewHandle(state)
 	defer state.Release()
 	goMaplibreCustomGeometryFetchTile(
-		C.mln_go_custom_geometry_handle_to_pointer(C.uintptr_t(state.handle)),
+		C.mln_go_handle_to_pointer(C.uintptr_t(state.handle)),
 		C.mln_canonical_tile_id{z: 1, x: 2, y: 3},
 	)
 }

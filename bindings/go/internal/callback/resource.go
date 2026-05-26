@@ -5,14 +5,10 @@ package callback
 #include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
-#include "maplibre_native_c.h"
+#include "../cgo_shim.h"
 
 extern mln_status goMaplibreResourceTransform(void* user_data, uint32_t kind, const char* url, mln_resource_transform_response* out_response);
 extern uint32_t goMaplibreResourceProvider(void* user_data, const mln_resource_request* request, mln_resource_request_handle* handle);
-
-static inline void* mln_go_resource_handle_to_pointer(uintptr_t handle) {
-  return (void*)handle;
-}
 
 // Native copies out_response->url immediately after the callback returns. The
 // C bridge keeps one replacement URL per callback thread so Go can free its
@@ -72,8 +68,6 @@ import (
 	"strings"
 	"sync"
 	"unsafe"
-
-	"github.com/maplibre/maplibre-native-ffi/bindings/go/internal/capi"
 )
 
 // ResourceTransformCallback is the internal shape for resource URL transforms.
@@ -94,30 +88,30 @@ func newResourceTransformState(callback ResourceTransformCallback) *ResourceTran
 }
 
 // SetResourceTransform installs or replaces a runtime-scoped resource transform.
-func SetResourceTransform(runtime *capi.Runtime, callback ResourceTransformCallback) (*ResourceTransformState, capi.Status) {
+func SetResourceTransform(runtime unsafe.Pointer, callback ResourceTransformCallback) (*ResourceTransformState, int32) {
 	if callback == nil {
-		return nil, capi.StatusInvalidArgument
+		return nil, int32(C.MLN_STATUS_INVALID_ARGUMENT)
 	}
 	state := newResourceTransformState(callback)
 	descriptor := C.mln_resource_transform{
 		size:      C.uint32_t(unsafe.Sizeof(C.mln_resource_transform{})),
 		callback:  C.mln_go_resource_transform_callback_pointer(),
-		user_data: C.mln_go_resource_handle_to_pointer(C.uintptr_t(state.handle)),
+		user_data: C.mln_go_handle_to_pointer(C.uintptr_t(state.handle)),
 	}
-	status := capi.Status(C.mln_runtime_set_resource_transform(
-		(*C.mln_runtime)(unsafe.Pointer(runtime)),
+	status := int32(C.mln_runtime_set_resource_transform(
+		(*C.mln_runtime)(runtime),
 		&descriptor,
 	))
-	if status != capi.StatusOK {
+	if status != int32(C.MLN_STATUS_OK) {
 		state.Release()
 		return nil, status
 	}
-	return state, capi.StatusOK
+	return state, int32(C.MLN_STATUS_OK)
 }
 
 // ClearResourceTransform clears the runtime-scoped resource transform.
-func ClearResourceTransform(runtime *capi.Runtime) capi.Status {
-	return capi.Status(C.mln_runtime_clear_resource_transform((*C.mln_runtime)(unsafe.Pointer(runtime))))
+func ClearResourceTransform(runtime unsafe.Pointer) int32 {
+	return int32(C.mln_runtime_clear_resource_transform((*C.mln_runtime)(runtime)))
 }
 
 // Release frees callback state after native no longer references it.
@@ -130,48 +124,48 @@ func (state *ResourceTransformState) Release() {
 	})
 }
 
-func (state *ResourceTransformState) invoke(kind uint32, url string) (unsafe.Pointer, capi.Status) {
+func (state *ResourceTransformState) invoke(kind uint32, url string) (unsafe.Pointer, int32) {
 	if state == nil || state.callback == nil {
-		return nil, capi.StatusInvalidArgument
+		return nil, int32(C.MLN_STATUS_INVALID_ARGUMENT)
 	}
 
 	replacement, replace := state.callback(kind, url)
 	if !replace || replacement == "" {
-		return nil, capi.StatusOK
+		return nil, int32(C.MLN_STATUS_OK)
 	}
 	if strings.ContainsRune(replacement, '\x00') {
-		return nil, capi.StatusInvalidArgument
+		return nil, int32(C.MLN_STATUS_INVALID_ARGUMENT)
 	}
 
 	cString := C.CString(replacement)
-	return unsafe.Pointer(cString), capi.StatusOK
+	return unsafe.Pointer(cString), int32(C.MLN_STATUS_OK)
 }
 
-func invokeResourceTransformForTest(state *ResourceTransformState, kind uint32, url string) (string, bool, capi.Status) {
+func invokeResourceTransformForTest(state *ResourceTransformState, kind uint32, url string) (string, bool, int32) {
 	pointer, status := state.invoke(kind, url)
-	if pointer == nil || status != capi.StatusOK {
+	if pointer == nil || status != int32(C.MLN_STATUS_OK) {
 		return "", false, status
 	}
 	defer C.free(pointer)
 	return C.GoString((*C.char)(pointer)), true, status
 }
 
-func invokeResourceTransformTrampolineForTest(state *ResourceTransformState, kind uint32, url string) capi.Status {
+func invokeResourceTransformTrampolineForTest(state *ResourceTransformState, kind uint32, url string) int32 {
 	_, _, status := invokeResourceTransformTrampolineReplacementForTest(state, kind, url)
 	return status
 }
 
-func invokeResourceTransformTrampolineReplacementForTest(state *ResourceTransformState, kind uint32, url string) (string, bool, capi.Status) {
+func invokeResourceTransformTrampolineReplacementForTest(state *ResourceTransformState, kind uint32, url string) (string, bool, int32) {
 	rawURL := C.CString(url)
 	defer C.free(unsafe.Pointer(rawURL))
 	var response C.mln_resource_transform_response
-	status := capi.Status(C.mln_go_resource_transform_callback(
-		C.mln_go_resource_handle_to_pointer(C.uintptr_t(state.handle)),
+	status := int32(C.mln_go_resource_transform_callback(
+		C.mln_go_handle_to_pointer(C.uintptr_t(state.handle)),
 		C.uint32_t(kind),
 		rawURL,
 		&response,
 	))
-	if response.url == nil || status != capi.StatusOK {
+	if response.url == nil || status != int32(C.MLN_STATUS_OK) {
 		return "", false, status
 	}
 	return C.GoString(response.url), true, status
@@ -234,26 +228,26 @@ type ResourceRequestHandle struct {
 }
 
 // SetResourceProvider installs or replaces a runtime-scoped resource provider.
-func SetResourceProvider(runtime *capi.Runtime, callback ResourceProviderCallback) (*ResourceProviderState, capi.Status) {
+func SetResourceProvider(runtime unsafe.Pointer, callback ResourceProviderCallback) (*ResourceProviderState, int32) {
 	if callback == nil {
-		return nil, capi.StatusInvalidArgument
+		return nil, int32(C.MLN_STATUS_INVALID_ARGUMENT)
 	}
 	state := &ResourceProviderState{callback: callback}
 	state.handle = cgo.NewHandle(state)
 	descriptor := C.mln_resource_provider{
 		size:      C.uint32_t(unsafe.Sizeof(C.mln_resource_provider{})),
 		callback:  (C.mln_resource_provider_callback)(C.goMaplibreResourceProvider),
-		user_data: C.mln_go_resource_handle_to_pointer(C.uintptr_t(state.handle)),
+		user_data: C.mln_go_handle_to_pointer(C.uintptr_t(state.handle)),
 	}
-	status := capi.Status(C.mln_runtime_set_resource_provider(
-		(*C.mln_runtime)(unsafe.Pointer(runtime)),
+	status := int32(C.mln_runtime_set_resource_provider(
+		(*C.mln_runtime)(runtime),
 		&descriptor,
 	))
-	if status != capi.StatusOK {
+	if status != int32(C.MLN_STATUS_OK) {
 		state.Release()
 		return nil, status
 	}
-	return state, capi.StatusOK
+	return state, int32(C.MLN_STATUS_OK)
 }
 
 // Release frees provider callback state after native no longer references it.
@@ -266,28 +260,28 @@ func (state *ResourceProviderState) Release() {
 	})
 }
 
-func newResourceRequestHandle(handle *C.mln_resource_request_handle) (*ResourceRequestHandle, capi.Status) {
+func newResourceRequestHandle(handle *C.mln_resource_request_handle) (*ResourceRequestHandle, int32) {
 	if handle == nil {
-		return nil, capi.StatusInvalidArgument
+		return nil, int32(C.MLN_STATUS_INVALID_ARGUMENT)
 	}
-	return &ResourceRequestHandle{handle: handle}, capi.StatusOK
+	return &ResourceRequestHandle{handle: handle}, int32(C.MLN_STATUS_OK)
 }
 
 // Complete completes the request with copied response data.
-func (handle *ResourceRequestHandle) Complete(response ResourceResponse) capi.Status {
+func (handle *ResourceRequestHandle) Complete(response ResourceResponse) int32 {
 	raw, allocations := resourceResponseToC(response)
 	defer freeAllocations(allocations)
 
 	handle.mu.Lock()
 	defer handle.mu.Unlock()
 	if handle.completed {
-		return capi.StatusInvalidState
+		return int32(C.MLN_STATUS_INVALID_STATE)
 	}
 	if handle.closed {
-		return capi.StatusInvalidArgument
+		return int32(C.MLN_STATUS_INVALID_ARGUMENT)
 	}
-	status := capi.Status(C.mln_resource_request_complete(handle.handle, &raw))
-	if status != capi.StatusOK {
+	status := int32(C.mln_resource_request_complete(handle.handle, &raw))
+	if status != int32(C.MLN_STATUS_OK) {
 		return status
 	}
 	handle.completed = true
@@ -295,18 +289,18 @@ func (handle *ResourceRequestHandle) Complete(response ResourceResponse) capi.St
 	if handle.decisionFinalized && handle.providerOwned {
 		handle.releaseIfOwnedLocked()
 	}
-	return capi.StatusOK
+	return int32(C.MLN_STATUS_OK)
 }
 
 // Cancelled reports whether native cancelled the request.
-func (handle *ResourceRequestHandle) Cancelled() (capi.Status, bool) {
+func (handle *ResourceRequestHandle) Cancelled() (int32, bool) {
 	handle.mu.Lock()
 	defer handle.mu.Unlock()
 	if handle.closed {
-		return capi.StatusInvalidArgument, false
+		return int32(C.MLN_STATUS_INVALID_ARGUMENT), false
 	}
 	var cancelled C.bool
-	status := capi.Status(C.mln_resource_request_cancelled(handle.handle, &cancelled))
+	status := int32(C.mln_resource_request_cancelled(handle.handle, &cancelled))
 	return status, bool(cancelled)
 }
 
@@ -331,22 +325,22 @@ func (handle *ResourceRequestHandle) finishProviderDecision(decision uint32) uin
 	defer handle.mu.Unlock()
 	if handle.decisionFinalized {
 		if handle.providerOwned {
-			return capi.ResourceProviderDecisionHandle
+			return uint32(C.MLN_RESOURCE_PROVIDER_DECISION_HANDLE)
 		}
-		return capi.ResourceProviderDecisionPassThrough
+		return uint32(C.MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH)
 	}
-	if handle.completed || decision == capi.ResourceProviderDecisionHandle {
+	if handle.completed || decision == uint32(C.MLN_RESOURCE_PROVIDER_DECISION_HANDLE) {
 		handle.decisionFinalized = true
 		handle.providerOwned = true
 		if handle.closed {
 			handle.releaseIfOwnedLocked()
 		}
-		return capi.ResourceProviderDecisionHandle
+		return uint32(C.MLN_RESOURCE_PROVIDER_DECISION_HANDLE)
 	}
 	handle.decisionFinalized = true
 	handle.releaseAccounted = true
 	handle.closed = true
-	return capi.ResourceProviderDecisionPassThrough
+	return uint32(C.MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH)
 }
 
 func (handle *ResourceRequestHandle) finishProviderException() uint32 {
@@ -359,9 +353,9 @@ func (handle *ResourceRequestHandle) finishProviderException() uint32 {
 	}
 	handle.mu.Unlock()
 	if completed {
-		return handle.finishProviderDecision(capi.ResourceProviderDecisionHandle)
+		return handle.finishProviderDecision(uint32(C.MLN_RESOURCE_PROVIDER_DECISION_HANDLE))
 	}
-	return capi.ResourceProviderDecisionUnknown
+	return ^uint32(0)
 }
 
 func (handle *ResourceRequestHandle) releaseIfOwnedLocked() {
@@ -416,10 +410,10 @@ func invokeResourceProviderTrampolineForTest(state *ResourceProviderState) uint3
 	rawRequest := C.mln_resource_request{
 		size: C.uint32_t(unsafe.Sizeof(C.mln_resource_request{})),
 		url:  rawURL,
-		kind: C.uint32_t(capi.ResourceKindStyle),
+		kind: C.uint32_t(C.MLN_RESOURCE_KIND_STYLE),
 	}
 	return uint32(goMaplibreResourceProvider(
-		C.mln_go_resource_handle_to_pointer(C.uintptr_t(state.handle)),
+		C.mln_go_handle_to_pointer(C.uintptr_t(state.handle)),
 		&rawRequest,
 		(*C.mln_resource_request_handle)(rawHandle),
 	))

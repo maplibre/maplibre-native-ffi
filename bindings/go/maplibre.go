@@ -2,15 +2,18 @@
 // API.
 package maplibre
 
-import "github.com/maplibre/maplibre-native-ffi/bindings/go/internal/capi"
+/*
+#include "maplibre_native_c.h"
+*/
+import "C"
 
 // CVersion returns the native C ABI contract version.
 func CVersion() uint32 {
-	return capi.CVersion()
+	return uint32(C.mln_c_version())
 }
 
 // SupportedRenderBackends returns the render backends compiled into the linked
 // native library.
 func SupportedRenderBackends() RenderBackendMask {
-	return RenderBackendMask(capi.SupportedRenderBackendMask())
+	return RenderBackendMask(C.mln_supported_render_backend_mask())
 }

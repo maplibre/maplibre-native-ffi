@@ -5,13 +5,11 @@ import (
 	"log"
 	"runtime"
 	"sync"
-
-	"github.com/maplibre/maplibre-native-ffi/bindings/go/internal/capi"
 )
 
 // DestroyFunc releases one owned native handle. A non-OK status leaves the
 // handle live so callers can retry on the correct owner thread.
-type DestroyFunc[T any] func(*T) capi.Status
+type DestroyFunc[T any] func(*T) int32
 
 // State stores close-once state for one owned native handle.
 type State[T any] struct {
@@ -47,27 +45,27 @@ func (state *State[T]) IsClosed() bool {
 }
 
 // Close calls destroy at most once after a successful native release.
-func (state *State[T]) Close(destroy DestroyFunc[T]) capi.Status {
+func (state *State[T]) Close(destroy DestroyFunc[T]) int32 {
 	state.mu.Lock()
 	ptr := state.ptr
 	if ptr == nil {
 		state.mu.Unlock()
-		return capi.StatusOK
+		return 0
 	}
 
 	status := destroy(ptr)
-	if status == capi.StatusOK {
+	if status == 0 {
 		state.ptr = nil
 	}
 	state.mu.Unlock()
 
-	if status != capi.StatusOK {
+	if status != 0 {
 		state.KeepAlive()
 		return status
 	}
 	runtime.SetFinalizer(state, nil)
 	state.KeepAlive()
-	return capi.StatusOK
+	return 0
 }
 
 func (state *State[T]) reportLeakIfLive() {

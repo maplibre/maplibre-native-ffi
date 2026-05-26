@@ -1,79 +1,83 @@
 package maplibre
 
+/*
+#include "maplibre_native_c.h"
+*/
+import "C"
+
 import (
 	stdruntime "runtime"
 
 	"github.com/maplibre/maplibre-native-ffi/bindings/go/internal/callback"
-	"github.com/maplibre/maplibre-native-ffi/bindings/go/internal/capi"
 )
 
 // ResourceKind identifies the native resource category for a request.
 type ResourceKind uint32
 
 const (
-	ResourceKindUnknown     ResourceKind = ResourceKind(capi.ResourceKindUnknown)
-	ResourceKindStyle       ResourceKind = ResourceKind(capi.ResourceKindStyle)
-	ResourceKindSource      ResourceKind = ResourceKind(capi.ResourceKindSource)
-	ResourceKindTile        ResourceKind = ResourceKind(capi.ResourceKindTile)
-	ResourceKindGlyphs      ResourceKind = ResourceKind(capi.ResourceKindGlyphs)
-	ResourceKindSpriteImage ResourceKind = ResourceKind(capi.ResourceKindSpriteImage)
-	ResourceKindSpriteJSON  ResourceKind = ResourceKind(capi.ResourceKindSpriteJSON)
-	ResourceKindImage       ResourceKind = ResourceKind(capi.ResourceKindImage)
+	ResourceKindUnknown     ResourceKind = ResourceKind(C.MLN_RESOURCE_KIND_UNKNOWN)
+	ResourceKindStyle       ResourceKind = ResourceKind(C.MLN_RESOURCE_KIND_STYLE)
+	ResourceKindSource      ResourceKind = ResourceKind(C.MLN_RESOURCE_KIND_SOURCE)
+	ResourceKindTile        ResourceKind = ResourceKind(C.MLN_RESOURCE_KIND_TILE)
+	ResourceKindGlyphs      ResourceKind = ResourceKind(C.MLN_RESOURCE_KIND_GLYPHS)
+	ResourceKindSpriteImage ResourceKind = ResourceKind(C.MLN_RESOURCE_KIND_SPRITE_IMAGE)
+	ResourceKindSpriteJSON  ResourceKind = ResourceKind(C.MLN_RESOURCE_KIND_SPRITE_JSON)
+	ResourceKindImage       ResourceKind = ResourceKind(C.MLN_RESOURCE_KIND_IMAGE)
 )
 
 // ResourceLoadingMethod identifies native cache/network loading policy.
 type ResourceLoadingMethod uint32
 
 const (
-	ResourceLoadingMethodAll         ResourceLoadingMethod = ResourceLoadingMethod(capi.ResourceLoadingMethodAll)
-	ResourceLoadingMethodCacheOnly   ResourceLoadingMethod = ResourceLoadingMethod(capi.ResourceLoadingMethodCacheOnly)
-	ResourceLoadingMethodNetworkOnly ResourceLoadingMethod = ResourceLoadingMethod(capi.ResourceLoadingMethodNetworkOnly)
+	ResourceLoadingMethodAll         ResourceLoadingMethod = ResourceLoadingMethod(C.MLN_RESOURCE_LOADING_METHOD_ALL)
+	ResourceLoadingMethodCacheOnly   ResourceLoadingMethod = ResourceLoadingMethod(C.MLN_RESOURCE_LOADING_METHOD_CACHE_ONLY)
+	ResourceLoadingMethodNetworkOnly ResourceLoadingMethod = ResourceLoadingMethod(C.MLN_RESOURCE_LOADING_METHOD_NETWORK_ONLY)
 )
 
 // ResourcePriority identifies native request priority.
 type ResourcePriority uint32
 
 const (
-	ResourcePriorityRegular ResourcePriority = ResourcePriority(capi.ResourcePriorityRegular)
-	ResourcePriorityLow     ResourcePriority = ResourcePriority(capi.ResourcePriorityLow)
+	ResourcePriorityRegular ResourcePriority = ResourcePriority(C.MLN_RESOURCE_PRIORITY_REGULAR)
+	ResourcePriorityLow     ResourcePriority = ResourcePriority(C.MLN_RESOURCE_PRIORITY_LOW)
 )
 
 // ResourceUsage identifies online or offline request use.
 type ResourceUsage uint32
 
 const (
-	ResourceUsageOnline  ResourceUsage = ResourceUsage(capi.ResourceUsageOnline)
-	ResourceUsageOffline ResourceUsage = ResourceUsage(capi.ResourceUsageOffline)
+	ResourceUsageOnline  ResourceUsage = ResourceUsage(C.MLN_RESOURCE_USAGE_ONLINE)
+	ResourceUsageOffline ResourceUsage = ResourceUsage(C.MLN_RESOURCE_USAGE_OFFLINE)
 )
 
 // ResourceStoragePolicy identifies native cache persistence policy.
 type ResourceStoragePolicy uint32
 
 const (
-	ResourceStoragePolicyPermanent ResourceStoragePolicy = ResourceStoragePolicy(capi.ResourceStoragePolicyPermanent)
-	ResourceStoragePolicyVolatile  ResourceStoragePolicy = ResourceStoragePolicy(capi.ResourceStoragePolicyVolatile)
+	ResourceStoragePolicyPermanent ResourceStoragePolicy = ResourceStoragePolicy(C.MLN_RESOURCE_STORAGE_POLICY_PERMANENT)
+	ResourceStoragePolicyVolatile  ResourceStoragePolicy = ResourceStoragePolicy(C.MLN_RESOURCE_STORAGE_POLICY_VOLATILE)
 )
 
 // ResourceResponseStatus identifies provider response status.
 type ResourceResponseStatus uint32
 
 const (
-	ResourceResponseStatusOK          ResourceResponseStatus = ResourceResponseStatus(capi.ResourceResponseStatusOK)
-	ResourceResponseStatusError       ResourceResponseStatus = ResourceResponseStatus(capi.ResourceResponseStatusError)
-	ResourceResponseStatusNoContent   ResourceResponseStatus = ResourceResponseStatus(capi.ResourceResponseStatusNoContent)
-	ResourceResponseStatusNotModified ResourceResponseStatus = ResourceResponseStatus(capi.ResourceResponseStatusNotModified)
+	ResourceResponseStatusOK          ResourceResponseStatus = ResourceResponseStatus(C.MLN_RESOURCE_RESPONSE_STATUS_OK)
+	ResourceResponseStatusError       ResourceResponseStatus = ResourceResponseStatus(C.MLN_RESOURCE_RESPONSE_STATUS_ERROR)
+	ResourceResponseStatusNoContent   ResourceResponseStatus = ResourceResponseStatus(C.MLN_RESOURCE_RESPONSE_STATUS_NO_CONTENT)
+	ResourceResponseStatusNotModified ResourceResponseStatus = ResourceResponseStatus(C.MLN_RESOURCE_RESPONSE_STATUS_NOT_MODIFIED)
 )
 
 // ResourceErrorReason identifies provider error categories.
 type ResourceErrorReason uint32
 
 const (
-	ResourceErrorReasonNone       ResourceErrorReason = ResourceErrorReason(capi.ResourceErrorReasonNone)
-	ResourceErrorReasonNotFound   ResourceErrorReason = ResourceErrorReason(capi.ResourceErrorReasonNotFound)
-	ResourceErrorReasonServer     ResourceErrorReason = ResourceErrorReason(capi.ResourceErrorReasonServer)
-	ResourceErrorReasonConnection ResourceErrorReason = ResourceErrorReason(capi.ResourceErrorReasonConnection)
-	ResourceErrorReasonRateLimit  ResourceErrorReason = ResourceErrorReason(capi.ResourceErrorReasonRateLimit)
-	ResourceErrorReasonOther      ResourceErrorReason = ResourceErrorReason(capi.ResourceErrorReasonOther)
+	ResourceErrorReasonNone       ResourceErrorReason = ResourceErrorReason(C.MLN_RESOURCE_ERROR_REASON_NONE)
+	ResourceErrorReasonNotFound   ResourceErrorReason = ResourceErrorReason(C.MLN_RESOURCE_ERROR_REASON_NOT_FOUND)
+	ResourceErrorReasonServer     ResourceErrorReason = ResourceErrorReason(C.MLN_RESOURCE_ERROR_REASON_SERVER)
+	ResourceErrorReasonConnection ResourceErrorReason = ResourceErrorReason(C.MLN_RESOURCE_ERROR_REASON_CONNECTION)
+	ResourceErrorReasonRateLimit  ResourceErrorReason = ResourceErrorReason(C.MLN_RESOURCE_ERROR_REASON_RATE_LIMIT)
+	ResourceErrorReasonOther      ResourceErrorReason = ResourceErrorReason(C.MLN_RESOURCE_ERROR_REASON_OTHER)
 )
 
 // ResourceProviderDecision selects whether native networking or the Go provider
@@ -81,8 +85,8 @@ const (
 type ResourceProviderDecision uint32
 
 const (
-	ResourceProviderDecisionPassThrough ResourceProviderDecision = ResourceProviderDecision(capi.ResourceProviderDecisionPassThrough)
-	ResourceProviderDecisionHandle      ResourceProviderDecision = ResourceProviderDecision(capi.ResourceProviderDecisionHandle)
+	ResourceProviderDecisionPassThrough ResourceProviderDecision = ResourceProviderDecision(C.MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH)
+	ResourceProviderDecisionHandle      ResourceProviderDecision = ResourceProviderDecision(C.MLN_RESOURCE_PROVIDER_DECISION_HANDLE)
 )
 
 // ResourceRequest is a copied native resource request.
@@ -163,8 +167,8 @@ func (handle *ResourceRequestHandle) Complete(response ResourceResponse) error {
 	if err := validateResourceResponse(response); err != nil {
 		return err
 	}
-	return checkNative(func() capi.Status {
-		return handle.state.Complete(callback.ResourceResponse{
+	return checkNative(func() int32 {
+		return int32(handle.state.Complete(callback.ResourceResponse{
 			Status:           uint32(response.Status),
 			ErrorReason:      uint32(response.ErrorReason),
 			Bytes:            response.Bytes,
@@ -177,7 +181,7 @@ func (handle *ResourceRequestHandle) Complete(response ResourceResponse) error {
 			ETag:             response.ETag,
 			HasRetryAfter:    response.HasRetryAfter,
 			RetryAfterUnixMS: response.RetryAfterUnixMS,
-		})
+		}))
 	})
 }
 
@@ -187,10 +191,10 @@ func (handle *ResourceRequestHandle) Cancelled() (bool, error) {
 		return false, newBindingError(ErrInvalidArgument, "ResourceRequestHandle is nil")
 	}
 	var cancelled bool
-	if err := checkNative(func() capi.Status {
+	if err := checkNative(func() int32 {
 		status, value := handle.state.Cancelled()
 		cancelled = value
-		return status
+		return int32(status)
 	}); err != nil {
 		return false, err
 	}

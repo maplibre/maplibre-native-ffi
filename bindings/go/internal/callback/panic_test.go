@@ -1,9 +1,10 @@
 package callback
 
-import (
-	"testing"
+import "testing"
 
-	"github.com/maplibre/maplibre-native-ffi/bindings/go/internal/capi"
+const (
+	testLogSeverityInfo uint32 = 1
+	testLogEventGeneral uint32 = 0
 )
 
 func TestLogCallbackTrampolineRecoversPanic(t *testing.T) {
@@ -27,7 +28,7 @@ func TestCustomGeometryTrampolineRecoversPanic(t *testing.T) {
 
 func TestLogCallbackTrampolineReturnsConsumed(t *testing.T) {
 	if consumed := invokeLogCallbackForTest(func(severity uint32, event uint32, code int64, message string) bool {
-		if severity != capi.LogSeverityInfo || event != capi.LogEventGeneral || code != 0 || message != "test message" {
+		if severity != testLogSeverityInfo || event != testLogEventGeneral || code != 0 || message != "test message" {
 			t.Fatalf("record = (%d, %d, %d, %q)", severity, event, code, message)
 		}
 		return true

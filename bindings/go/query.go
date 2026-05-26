@@ -1,14 +1,20 @@
 package maplibre
 
-import "github.com/maplibre/maplibre-native-ffi/bindings/go/internal/capi"
+/*
+#include "internal/cgo_geometry_shim.h"
+#include "internal/cgo_json_shim.h"
+*/
+import "C"
+
+import "unsafe"
 
 // RenderedQueryGeometryType identifies a rendered feature query geometry shape.
 type RenderedQueryGeometryType uint32
 
 const (
-	RenderedQueryGeometryTypePoint      RenderedQueryGeometryType = RenderedQueryGeometryType(capi.RenderedQueryGeometryTypePoint)
-	RenderedQueryGeometryTypeBox        RenderedQueryGeometryType = RenderedQueryGeometryType(capi.RenderedQueryGeometryTypeBox)
-	RenderedQueryGeometryTypeLineString RenderedQueryGeometryType = RenderedQueryGeometryType(capi.RenderedQueryGeometryTypeLineString)
+	RenderedQueryGeometryTypePoint      RenderedQueryGeometryType = RenderedQueryGeometryType(C.MLN_RENDERED_QUERY_GEOMETRY_TYPE_POINT)
+	RenderedQueryGeometryTypeBox        RenderedQueryGeometryType = RenderedQueryGeometryType(C.MLN_RENDERED_QUERY_GEOMETRY_TYPE_BOX)
+	RenderedQueryGeometryTypeLineString RenderedQueryGeometryType = RenderedQueryGeometryType(C.MLN_RENDERED_QUERY_GEOMETRY_TYPE_LINE_STRING)
 )
 
 // ScreenBox is a screen-space query rectangle.
@@ -46,46 +52,10 @@ type RenderedFeatureQueryOptions struct {
 	Filter   any
 }
 
-func (options RenderedFeatureQueryOptions) toCAPI() capi.RenderedFeatureQueryOptions {
-	var raw capi.RenderedFeatureQueryOptions
-	if options.LayerIDs != nil {
-		raw.Fields |= capi.RenderedFeatureQueryOptionLayerIDs
-		raw.LayerIDs = options.LayerIDs
-	}
-	raw.Filter = options.Filter
-	return raw
-}
-
-func renderedFeatureQueryOptionsToCAPI(options *RenderedFeatureQueryOptions) *capi.RenderedFeatureQueryOptions {
-	if options == nil {
-		return nil
-	}
-	raw := options.toCAPI()
-	return &raw
-}
-
 // SourceFeatureQueryOptions configures source feature queries.
 type SourceFeatureQueryOptions struct {
 	SourceLayerIDs []string
 	Filter         any
-}
-
-func (options SourceFeatureQueryOptions) toCAPI() capi.SourceFeatureQueryOptions {
-	var raw capi.SourceFeatureQueryOptions
-	if options.SourceLayerIDs != nil {
-		raw.Fields |= capi.SourceFeatureQueryOptionLayerIDs
-		raw.SourceLayerIDs = options.SourceLayerIDs
-	}
-	raw.Filter = options.Filter
-	return raw
-}
-
-func sourceFeatureQueryOptionsToCAPI(options *SourceFeatureQueryOptions) *capi.SourceFeatureQueryOptions {
-	if options == nil {
-		return nil
-	}
-	raw := options.toCAPI()
-	return &raw
 }
 
 // QueriedFeature contains one copied feature query result.
@@ -107,29 +77,51 @@ type FeatureStateSelector struct {
 	StateKey      *string
 }
 
-func (selector FeatureStateSelector) toCAPI() capi.FeatureStateSelector {
-	raw := capi.FeatureStateSelector{SourceID: selector.SourceID}
+type cFeatureStateSelector struct {
+	raw           C.mln_feature_state_selector
+	sourceID      cStringView
+	sourceLayerID cStringView
+	featureID     cStringView
+	stateKey      cStringView
+}
+
+func newCFeatureStateSelector(selector FeatureStateSelector) cFeatureStateSelector {
+	raw := cFeatureStateSelector{
+		raw:      C.mln_feature_state_selector{size: C.uint32_t(unsafe.Sizeof(C.mln_feature_state_selector{}))},
+		sourceID: newCStringView(selector.SourceID),
+	}
+	raw.raw.source_id = raw.sourceID.raw()
 	if selector.SourceLayerID != nil {
-		raw.Fields |= capi.FeatureStateSelectorSourceLayerID
-		raw.SourceLayerID = *selector.SourceLayerID
+		raw.raw.fields |= C.MLN_FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID
+		raw.sourceLayerID = newCStringView(*selector.SourceLayerID)
+		raw.raw.source_layer_id = raw.sourceLayerID.raw()
 	}
 	if selector.FeatureID != nil {
-		raw.Fields |= capi.FeatureStateSelectorFeatureID
-		raw.FeatureID = *selector.FeatureID
+		raw.raw.fields |= C.MLN_FEATURE_STATE_SELECTOR_FEATURE_ID
+		raw.featureID = newCStringView(*selector.FeatureID)
+		raw.raw.feature_id = raw.featureID.raw()
 	}
 	if selector.StateKey != nil {
-		raw.Fields |= capi.FeatureStateSelectorStateKey
-		raw.StateKey = *selector.StateKey
+		raw.raw.fields |= C.MLN_FEATURE_STATE_SELECTOR_STATE_KEY
+		raw.stateKey = newCStringView(*selector.StateKey)
+		raw.raw.state_key = raw.stateKey.raw()
 	}
 	return raw
+}
+
+func (selector cFeatureStateSelector) free() {
+	selector.sourceID.free()
+	selector.sourceLayerID.free()
+	selector.featureID.free()
+	selector.stateKey.free()
 }
 
 // FeatureExtensionResultType identifies a feature extension result shape.
 type FeatureExtensionResultType uint32
 
 const (
-	FeatureExtensionResultTypeValue             FeatureExtensionResultType = FeatureExtensionResultType(capi.FeatureExtensionResultTypeValue)
-	FeatureExtensionResultTypeFeatureCollection FeatureExtensionResultType = FeatureExtensionResultType(capi.FeatureExtensionResultTypeFeatureCollection)
+	FeatureExtensionResultTypeValue             FeatureExtensionResultType = FeatureExtensionResultType(C.MLN_FEATURE_EXTENSION_RESULT_TYPE_VALUE)
+	FeatureExtensionResultTypeFeatureCollection FeatureExtensionResultType = FeatureExtensionResultType(C.MLN_FEATURE_EXTENSION_RESULT_TYPE_FEATURE_COLLECTION)
 )
 
 // FeatureExtensionResult contains one copied feature extension result.
@@ -139,77 +131,285 @@ type FeatureExtensionResult struct {
 	Features []Feature
 }
 
-func (geometry RenderedQueryGeometry) toCAPI() capi.RenderedQueryGeometry {
-	return capi.RenderedQueryGeometry{
-		Type:   uint32(geometry.Type),
-		Point:  geometry.Point.toCAPI(),
-		Box:    capi.ScreenBox{Min: geometry.Box.Min.toCAPI(), Max: geometry.Box.Max.toCAPI()},
-		Points: screenPointSliceToCAPI(geometry.Points),
-	}
+type cRenderedQueryGeometry struct {
+	raw    C.mln_rendered_query_geometry
+	points []C.mln_screen_point
 }
 
-func queriedFeaturesFromCAPI(features []capi.QueryFeature) []QueriedFeature {
-	out := make([]QueriedFeature, len(features))
-	for i, feature := range features {
-		out[i] = QueriedFeature{
-			Feature:          featureFromCAPI(feature.Feature),
-			SourceID:         feature.SourceID,
-			HasSourceID:      feature.HasSourceID,
-			SourceLayerID:    feature.SourceLayerID,
-			HasSourceLayerID: feature.HasSourceLayerID,
-			State:            feature.State,
-			HasState:         feature.HasState,
+func newCRenderedQueryGeometry(geometry RenderedQueryGeometry) cRenderedQueryGeometry {
+	switch geometry.Type {
+	case RenderedQueryGeometryTypePoint:
+		return cRenderedQueryGeometry{raw: C.mln_rendered_query_geometry_point(cScreenPoint(geometry.Point))}
+	case RenderedQueryGeometryTypeBox:
+		box := C.mln_screen_box{min: cScreenPoint(geometry.Box.Min), max: cScreenPoint(geometry.Box.Max)}
+		return cRenderedQueryGeometry{raw: C.mln_rendered_query_geometry_box(box)}
+	case RenderedQueryGeometryTypeLineString:
+		points := cScreenPointSlice(geometry.Points)
+		var pointsPtr *C.mln_screen_point
+		if len(points) > 0 {
+			pointsPtr = &points[0]
 		}
+		return cRenderedQueryGeometry{raw: C.mln_rendered_query_geometry_line_string(pointsPtr, C.size_t(len(points))), points: points}
+	default:
+		return cRenderedQueryGeometry{raw: C.mln_rendered_query_geometry{size: C.uint32_t(unsafe.Sizeof(C.mln_rendered_query_geometry{})), _type: C.uint32_t(geometry.Type)}}
+	}
+}
+
+type cRenderedFeatureQueryOptions struct {
+	raw          C.mln_rendered_feature_query_options
+	layerIDs     cStringViewArray
+	materializer *cJSONMaterializer
+	filter       C.mln_json_value
+}
+
+func newCRenderedFeatureQueryOptions(options *RenderedFeatureQueryOptions) (*cRenderedFeatureQueryOptions, error) {
+	if options == nil {
+		return nil, nil
+	}
+	raw := &cRenderedFeatureQueryOptions{raw: C.mln_rendered_feature_query_options_default()}
+	if options.LayerIDs != nil {
+		raw.raw.fields |= C.MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS
+		raw.layerIDs = newCStringViewArray(options.LayerIDs)
+		raw.raw.layer_ids = raw.layerIDs.ptr()
+		raw.raw.layer_id_count = raw.layerIDs.count()
+	}
+	if options.Filter != nil {
+		raw.materializer = newCJSONMaterializer()
+		filter, err := raw.materializer.value(options.Filter)
+		if err != nil {
+			raw.free()
+			return nil, err
+		}
+		raw.filter = filter
+		raw.raw.filter = &raw.filter
+	}
+	return raw, nil
+}
+
+func (options *cRenderedFeatureQueryOptions) ptr() *C.mln_rendered_feature_query_options {
+	if options == nil {
+		return nil
+	}
+	return &options.raw
+}
+
+func (options *cRenderedFeatureQueryOptions) free() {
+	if options == nil {
+		return
+	}
+	options.layerIDs.free()
+	if options.materializer != nil {
+		options.materializer.free()
+	}
+}
+
+type cSourceFeatureQueryOptions struct {
+	raw          C.mln_source_feature_query_options
+	layerIDs     cStringViewArray
+	materializer *cJSONMaterializer
+	filter       C.mln_json_value
+}
+
+func newCSourceFeatureQueryOptions(options *SourceFeatureQueryOptions) (*cSourceFeatureQueryOptions, error) {
+	if options == nil {
+		return nil, nil
+	}
+	raw := &cSourceFeatureQueryOptions{raw: C.mln_source_feature_query_options_default()}
+	if options.SourceLayerIDs != nil {
+		raw.raw.fields |= C.MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS
+		raw.layerIDs = newCStringViewArray(options.SourceLayerIDs)
+		raw.raw.source_layer_ids = raw.layerIDs.ptr()
+		raw.raw.source_layer_id_count = raw.layerIDs.count()
+	}
+	if options.Filter != nil {
+		raw.materializer = newCJSONMaterializer()
+		filter, err := raw.materializer.value(options.Filter)
+		if err != nil {
+			raw.free()
+			return nil, err
+		}
+		raw.filter = filter
+		raw.raw.filter = &raw.filter
+	}
+	return raw, nil
+}
+
+func (options *cSourceFeatureQueryOptions) ptr() *C.mln_source_feature_query_options {
+	if options == nil {
+		return nil
+	}
+	return &options.raw
+}
+
+func (options *cSourceFeatureQueryOptions) free() {
+	if options == nil {
+		return
+	}
+	options.layerIDs.free()
+	if options.materializer != nil {
+		options.materializer.free()
+	}
+}
+
+func cFeatureQueryResultFeatures(result *C.mln_feature_query_result) ([]QueriedFeature, error) {
+	defer C.mln_feature_query_result_destroy(result)
+	var count C.size_t
+	if err := checkNative(func() int32 { return int32(C.mln_feature_query_result_count(result, &count)) }); err != nil {
+		return nil, err
+	}
+	features := make([]QueriedFeature, int(count))
+	for i := range features {
+		raw := C.mln_queried_feature{size: C.uint32_t(unsafe.Sizeof(C.mln_queried_feature{}))}
+		if err := checkNative(func() int32 { return int32(C.mln_feature_query_result_get(result, C.size_t(i), &raw)) }); err != nil {
+			return nil, err
+		}
+		feature, err := cQueriedFeature(raw)
+		if err != nil {
+			return nil, err
+		}
+		features[i] = feature
+	}
+	return features, nil
+}
+
+func cQueriedFeature(raw C.mln_queried_feature) (QueriedFeature, error) {
+	feature, err := cFeature(&raw.feature)
+	if err != nil {
+		return QueriedFeature{}, err
+	}
+	out := QueriedFeature{Feature: feature}
+	fields := uint32(raw.fields)
+	if fields&uint32(C.MLN_QUERIED_FEATURE_SOURCE_ID) != 0 {
+		out.HasSourceID = true
+		out.SourceID = goStringView(raw.source_id)
+	}
+	if fields&uint32(C.MLN_QUERIED_FEATURE_SOURCE_LAYER_ID) != 0 {
+		out.HasSourceLayerID = true
+		out.SourceLayerID = goStringView(raw.source_layer_id)
+	}
+	if fields&uint32(C.MLN_QUERIED_FEATURE_STATE) != 0 {
+		state, err := cJSONValue((*C.mln_json_value)(unsafe.Pointer(raw.state)))
+		if err != nil {
+			return QueriedFeature{}, newBindingError(ErrNative, err.Error())
+		}
+		out.HasState = true
+		out.State = state
+	}
+	return out, nil
+}
+
+func cFeature(feature *C.mln_feature) (Feature, error) {
+	geometry, err := cGeometry((*C.mln_geometry)(unsafe.Pointer(C.mln_go_feature_geometry(feature))))
+	if err != nil {
+		return Feature{}, err
+	}
+	out := Feature{Geometry: geometry, Properties: make(map[string]any, int(C.mln_go_feature_property_count(feature)))}
+	for i := 0; i < int(C.mln_go_feature_property_count(feature)); i++ {
+		value, err := cJSONValue((*C.mln_json_value)(unsafe.Pointer(C.mln_go_feature_property_value(feature, C.size_t(i)))))
+		if err != nil {
+			return Feature{}, newBindingError(ErrNative, err.Error())
+		}
+		out.Properties[goStringView(C.mln_go_feature_property_key(feature, C.size_t(i)))] = value
+	}
+	switch uint32(C.mln_go_feature_identifier_type(feature)) {
+	case C.MLN_FEATURE_IDENTIFIER_TYPE_NULL:
+		out.Identifier = nil
+	case C.MLN_FEATURE_IDENTIFIER_TYPE_UINT:
+		out.Identifier = uint64(C.mln_go_feature_identifier_uint(feature))
+	case C.MLN_FEATURE_IDENTIFIER_TYPE_INT:
+		out.Identifier = int64(C.mln_go_feature_identifier_int(feature))
+	case C.MLN_FEATURE_IDENTIFIER_TYPE_DOUBLE:
+		out.Identifier = float64(C.mln_go_feature_identifier_double(feature))
+	case C.MLN_FEATURE_IDENTIFIER_TYPE_STRING:
+		out.Identifier = goStringView(C.mln_go_feature_identifier_string(feature))
+	default:
+		return Feature{}, newBindingError(ErrNative, "unknown feature identifier type")
+	}
+	return out, nil
+}
+
+func cGeometry(geometry *C.mln_geometry) (Geometry, error) {
+	if geometry == nil {
+		return Geometry{}, nil
+	}
+	out := Geometry{Type: GeometryType(C.mln_go_geometry_type(geometry))}
+	switch out.Type {
+	case GeometryTypeEmpty:
+	case GeometryTypePoint:
+		out.Point = goLatLng(C.mln_go_geometry_point_value(geometry))
+	case GeometryTypeLineString:
+		out.Points = cCoordinateSpanSlice(C.mln_go_geometry_line_string_value(geometry))
+	case GeometryTypePolygon:
+		out.Lines = make([][]LatLng, int(C.mln_go_geometry_polygon_ring_count(geometry)))
+		for i := range out.Lines {
+			out.Lines[i] = cCoordinateSpanSlice(C.mln_go_geometry_polygon_ring_get(geometry, C.size_t(i)))
+		}
+	case GeometryTypeMultiPoint:
+		out.Points = cCoordinateSpanSlice(C.mln_go_geometry_multi_point_value(geometry))
+	case GeometryTypeMultiLineString:
+		out.Lines = make([][]LatLng, int(C.mln_go_geometry_multi_line_count(geometry)))
+		for i := range out.Lines {
+			out.Lines[i] = cCoordinateSpanSlice(C.mln_go_geometry_multi_line_get(geometry, C.size_t(i)))
+		}
+	case GeometryTypeMultiPolygon:
+		out.Polygons = make([][][]LatLng, int(C.mln_go_geometry_multi_polygon_count(geometry)))
+		for i := range out.Polygons {
+			polygon := C.mln_go_geometry_multi_polygon_get(geometry, C.size_t(i))
+			out.Polygons[i] = make([][]LatLng, int(C.mln_go_polygon_geometry_ring_count(polygon)))
+			for j := range out.Polygons[i] {
+				out.Polygons[i][j] = cCoordinateSpanSlice(C.mln_go_polygon_geometry_ring_get(polygon, C.size_t(j)))
+			}
+		}
+	case GeometryTypeGeometryCollection:
+		out.Geometries = make([]Geometry, int(C.mln_go_geometry_collection_count(geometry)))
+		for i := range out.Geometries {
+			child, err := cGeometry((*C.mln_geometry)(unsafe.Pointer(C.mln_go_geometry_collection_get(geometry, C.size_t(i)))))
+			if err != nil {
+				return Geometry{}, err
+			}
+			out.Geometries[i] = child
+		}
+	default:
+		return Geometry{}, newBindingError(ErrNative, "unknown geometry type")
+	}
+	return out, nil
+}
+
+func cCoordinateSpanSlice(span C.mln_coordinate_span) []LatLng {
+	out := make([]LatLng, int(C.mln_go_coordinate_span_count(span)))
+	for i := range out {
+		out[i] = goLatLng(C.mln_go_coordinate_span_get(span, C.size_t(i)))
 	}
 	return out
 }
 
-func featureFromCAPI(feature capi.Feature) Feature {
-	return Feature{Geometry: geometryFromCAPI(feature.Geometry), Properties: feature.Properties, Identifier: feature.Identifier}
-}
-
-func geometryFromCAPI(geometry capi.Geometry) Geometry {
-	return Geometry{
-		Type:       GeometryType(geometry.Type),
-		Point:      latLngFromCAPI(geometry.Point),
-		Points:     latLngSliceFromCAPI(geometry.Points),
-		Lines:      latLngLinesFromCAPI(geometry.Lines),
-		Polygons:   latLngPolygonsFromCAPI(geometry.Polygons),
-		Geometries: geometriesFromCAPI(geometry.Geometries),
+func cFeatureExtensionResult(result *C.mln_feature_extension_result) (FeatureExtensionResult, error) {
+	defer C.mln_feature_extension_result_destroy(result)
+	raw := C.mln_feature_extension_result_info{size: C.uint32_t(unsafe.Sizeof(C.mln_feature_extension_result_info{}))}
+	if err := checkNative(func() int32 { return int32(C.mln_feature_extension_result_get(result, &raw)) }); err != nil {
+		return FeatureExtensionResult{}, err
 	}
-}
-
-func latLngLinesFromCAPI(lines [][]capi.LatLng) [][]LatLng {
-	out := make([][]LatLng, len(lines))
-	for i, line := range lines {
-		out[i] = latLngSliceFromCAPI(line)
+	out := FeatureExtensionResult{Type: FeatureExtensionResultType(C.mln_go_feature_extension_result_type(&raw))}
+	switch out.Type {
+	case FeatureExtensionResultTypeValue:
+		value, err := cJSONValue((*C.mln_json_value)(unsafe.Pointer(C.mln_go_feature_extension_result_value(&raw))))
+		if err != nil {
+			return FeatureExtensionResult{}, newBindingError(ErrNative, err.Error())
+		}
+		out.Value = value
+	case FeatureExtensionResultTypeFeatureCollection:
+		out.Features = make([]Feature, int(C.mln_go_feature_extension_result_feature_count(&raw)))
+		for i := range out.Features {
+			feature, err := cFeature((*C.mln_feature)(unsafe.Pointer(C.mln_go_feature_extension_result_feature_get(&raw, C.size_t(i)))))
+			if err != nil {
+				return FeatureExtensionResult{}, err
+			}
+			out.Features[i] = feature
+		}
+	default:
+		return FeatureExtensionResult{}, newBindingError(ErrNative, "unknown feature extension result type")
 	}
-	return out
-}
-
-func latLngPolygonsFromCAPI(polygons [][][]capi.LatLng) [][][]LatLng {
-	out := make([][][]LatLng, len(polygons))
-	for i, polygon := range polygons {
-		out[i] = latLngLinesFromCAPI(polygon)
-	}
-	return out
-}
-
-func geometriesFromCAPI(geometries []capi.Geometry) []Geometry {
-	out := make([]Geometry, len(geometries))
-	for i, geometry := range geometries {
-		out[i] = geometryFromCAPI(geometry)
-	}
-	return out
-}
-
-func featureExtensionResultFromCAPI(result capi.FeatureExtensionResultInfo) FeatureExtensionResult {
-	out := FeatureExtensionResult{Type: FeatureExtensionResultType(result.Type), Value: result.Value}
-	out.Features = make([]Feature, len(result.Features))
-	for i, feature := range result.Features {
-		out.Features[i] = featureFromCAPI(feature)
-	}
-	return out
+	return out, nil
 }
 
 // SetFeatureState sets per-feature state on a render source. The state value is
@@ -220,16 +420,17 @@ func (session *RenderSessionHandle) SetFeatureState(selector FeatureStateSelecto
 		return err
 	}
 	defer session.state.KeepAlive()
-	var materialErr error
-	err = checkNative(func() capi.Status {
-		var status capi.Status
-		status, materialErr = capi.RenderSessionSetFeatureState(ptr, selector.toCAPI(), state)
-		return status
-	})
-	if materialErr != nil {
-		return newBindingError(ErrInvalidArgument, materialErr.Error())
+	rawSelector := newCFeatureStateSelector(selector)
+	defer rawSelector.free()
+	materializer := newCJSONMaterializer()
+	defer materializer.free()
+	rawState, err := materializer.value(state)
+	if err != nil {
+		return newBindingError(ErrInvalidArgument, err.Error())
 	}
-	return err
+	return checkNative(func() int32 {
+		return int32(C.mln_render_session_set_feature_state((*C.mln_render_session)(unsafe.Pointer(ptr)), &rawSelector.raw, &rawState))
+	})
 }
 
 // FeatureState returns copied per-feature state from a render source.
@@ -239,11 +440,15 @@ func (session *RenderSessionHandle) FeatureState(selector FeatureStateSelector) 
 		return nil, err
 	}
 	defer session.state.KeepAlive()
-	var value any
-	if err := checkNative(func() capi.Status { return capi.RenderSessionGetFeatureState(ptr, selector.toCAPI(), &value) }); err != nil {
+	rawSelector := newCFeatureStateSelector(selector)
+	defer rawSelector.free()
+	var snapshot *C.mln_json_snapshot
+	if err := checkNative(func() int32 {
+		return int32(C.mln_render_session_get_feature_state((*C.mln_render_session)(unsafe.Pointer(ptr)), &rawSelector.raw, &snapshot))
+	}); err != nil {
 		return nil, err
 	}
-	return value, nil
+	return cJSONSnapshotValue(snapshot)
 }
 
 // RemoveFeatureState removes per-feature state from a render source.
@@ -253,7 +458,11 @@ func (session *RenderSessionHandle) RemoveFeatureState(selector FeatureStateSele
 		return err
 	}
 	defer session.state.KeepAlive()
-	return checkNative(func() capi.Status { return capi.RenderSessionRemoveFeatureState(ptr, selector.toCAPI()) })
+	rawSelector := newCFeatureStateSelector(selector)
+	defer rawSelector.free()
+	return checkNative(func() int32 {
+		return int32(C.mln_render_session_remove_feature_state((*C.mln_render_session)(unsafe.Pointer(ptr)), &rawSelector.raw))
+	})
 }
 
 // QueryRenderedFeatures queries rendered features from the latest render session state.
@@ -263,17 +472,19 @@ func (session *RenderSessionHandle) QueryRenderedFeatures(geometry RenderedQuery
 		return nil, err
 	}
 	defer session.state.KeepAlive()
-	var features []capi.QueryFeature
-	var materialErr error
-	err = checkNative(func() capi.Status {
-		var status capi.Status
-		status, materialErr = capi.RenderSessionQueryRenderedFeatures(ptr, geometry.toCAPI(), renderedFeatureQueryOptionsToCAPI(options), &features)
-		return status
-	})
-	if materialErr != nil {
-		return nil, newBindingError(ErrInvalidArgument, materialErr.Error())
+	rawGeometry := newCRenderedQueryGeometry(geometry)
+	rawOptions, err := newCRenderedFeatureQueryOptions(options)
+	if err != nil {
+		return nil, newBindingError(ErrInvalidArgument, err.Error())
 	}
-	return queriedFeaturesFromCAPI(features), err
+	defer rawOptions.free()
+	var result *C.mln_feature_query_result
+	if err := checkNative(func() int32 {
+		return int32(C.mln_render_session_query_rendered_features((*C.mln_render_session)(unsafe.Pointer(ptr)), &rawGeometry.raw, rawOptions.ptr(), &result))
+	}); err != nil {
+		return nil, err
+	}
+	return cFeatureQueryResultFeatures(result)
 }
 
 // QuerySourceFeatures queries source features from the latest render session state.
@@ -283,17 +494,20 @@ func (session *RenderSessionHandle) QuerySourceFeatures(sourceID string, options
 		return nil, err
 	}
 	defer session.state.KeepAlive()
-	var features []capi.QueryFeature
-	var materialErr error
-	err = checkNative(func() capi.Status {
-		var status capi.Status
-		status, materialErr = capi.RenderSessionQuerySourceFeatures(ptr, sourceID, sourceFeatureQueryOptionsToCAPI(options), &features)
-		return status
-	})
-	if materialErr != nil {
-		return nil, newBindingError(ErrInvalidArgument, materialErr.Error())
+	sourceView := newCStringView(sourceID)
+	defer sourceView.free()
+	rawOptions, err := newCSourceFeatureQueryOptions(options)
+	if err != nil {
+		return nil, newBindingError(ErrInvalidArgument, err.Error())
 	}
-	return queriedFeaturesFromCAPI(features), err
+	defer rawOptions.free()
+	var result *C.mln_feature_query_result
+	if err := checkNative(func() int32 {
+		return int32(C.mln_render_session_query_source_features((*C.mln_render_session)(unsafe.Pointer(ptr)), sourceView.raw(), rawOptions.ptr(), &result))
+	}); err != nil {
+		return nil, err
+	}
+	return cFeatureQueryResultFeatures(result)
 }
 
 // QueryFeatureExtensions queries a feature extension from the latest render session state.
@@ -303,15 +517,41 @@ func (session *RenderSessionHandle) QueryFeatureExtensions(sourceID string, feat
 		return FeatureExtensionResult{}, err
 	}
 	defer session.state.KeepAlive()
-	var result capi.FeatureExtensionResultInfo
-	var materialErr error
-	err = checkNative(func() capi.Status {
-		var status capi.Status
-		status, materialErr = capi.RenderSessionQueryFeatureExtensions(ptr, sourceID, feature.toCAPI(), extension, extensionField, arguments, &result)
-		return status
-	})
-	if materialErr != nil {
-		return FeatureExtensionResult{}, newBindingError(ErrInvalidArgument, materialErr.Error())
+	sourceView := newCStringView(sourceID)
+	defer sourceView.free()
+	extensionView := newCStringView(extension)
+	defer extensionView.free()
+	extensionFieldView := newCStringView(extensionField)
+	defer extensionFieldView.free()
+	geojsonMaterializer := newCGeoJSONMaterializer()
+	defer geojsonMaterializer.free()
+	rawFeature, err := geojsonMaterializer.featurePtr(feature)
+	if err != nil {
+		return FeatureExtensionResult{}, newBindingError(ErrInvalidArgument, err.Error())
 	}
-	return featureExtensionResultFromCAPI(result), err
+	jsonMaterializer := newCJSONMaterializer()
+	defer jsonMaterializer.free()
+	var rawArguments *C.mln_json_value
+	if arguments != nil {
+		value, err := jsonMaterializer.value(arguments)
+		if err != nil {
+			return FeatureExtensionResult{}, newBindingError(ErrInvalidArgument, err.Error())
+		}
+		rawArguments = &value
+	}
+	var result *C.mln_feature_extension_result
+	if err := checkNative(func() int32 {
+		return int32(C.mln_render_session_query_feature_extensions(
+			(*C.mln_render_session)(unsafe.Pointer(ptr)),
+			sourceView.raw(),
+			rawFeature,
+			extensionView.raw(),
+			extensionFieldView.raw(),
+			rawArguments,
+			&result,
+		))
+	}); err != nil {
+		return FeatureExtensionResult{}, err
+	}
+	return cFeatureExtensionResult(result)
 }

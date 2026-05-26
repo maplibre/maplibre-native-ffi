@@ -7,8 +7,11 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+)
 
-	"github.com/maplibre/maplibre-native-ffi/bindings/go/internal/capi"
+const (
+	testStatusOK          int32 = 0
+	testStatusWrongThread int32 = -3
 )
 
 type testNativeHandle struct {
@@ -33,18 +36,18 @@ func TestStateCloseIsIdempotentAfterSuccess(t *testing.T) {
 	}
 
 	var calls atomic.Int32
-	destroy := func(ptr *testNativeHandle) capi.Status {
+	destroy := func(ptr *testNativeHandle) int32 {
 		if ptr != native {
 			t.Fatalf("destroy pointer = %p, want %p", ptr, native)
 		}
 		calls.Add(1)
-		return capi.StatusOK
+		return testStatusOK
 	}
 
-	if status := state.Close(destroy); status != capi.StatusOK {
+	if status := state.Close(destroy); status != testStatusOK {
 		t.Fatalf("first Close status = %d, want OK", status)
 	}
-	if status := state.Close(destroy); status != capi.StatusOK {
+	if status := state.Close(destroy); status != testStatusOK {
 		t.Fatalf("second Close status = %d, want OK", status)
 	}
 	if got := calls.Load(); got != 1 {
@@ -63,20 +66,20 @@ func TestStateFailedCloseLeavesHandleLiveForRetry(t *testing.T) {
 	}
 
 	var calls atomic.Int32
-	destroy := func(*testNativeHandle) capi.Status {
+	destroy := func(*testNativeHandle) int32 {
 		if calls.Add(1) == 1 {
-			return capi.StatusWrongThread
+			return testStatusWrongThread
 		}
-		return capi.StatusOK
+		return testStatusOK
 	}
 
-	if status := state.Close(destroy); status != capi.StatusWrongThread {
+	if status := state.Close(destroy); status != testStatusWrongThread {
 		t.Fatalf("first Close status = %d, want wrong-thread", status)
 	}
 	if ptr, live := state.Ptr(); !live || ptr != native {
 		t.Fatalf("Ptr() = %p, %v; want live native pointer", ptr, live)
 	}
-	if status := state.Close(destroy); status != capi.StatusOK {
+	if status := state.Close(destroy); status != testStatusOK {
 		t.Fatalf("second Close status = %d, want OK", status)
 	}
 	if got := calls.Load(); got != 2 {
@@ -100,10 +103,10 @@ func TestStateConcurrentCloseDestroysOnce(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			<-start
-			if status := state.Close(func(*testNativeHandle) capi.Status {
+			if status := state.Close(func(*testNativeHandle) int32 {
 				calls.Add(1)
-				return capi.StatusOK
-			}); status != capi.StatusOK {
+				return testStatusOK
+			}); status != testStatusOK {
 				t.Errorf("Close status = %d, want OK", status)
 			}
 		}()
@@ -162,7 +165,7 @@ func TestStateLeakReportIgnoresClosedHandle(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if status := state.Close(func(*testNativeHandle) capi.Status { return capi.StatusOK }); status != capi.StatusOK {
+	if status := state.Close(func(*testNativeHandle) int32 { return testStatusOK }); status != testStatusOK {
 		t.Fatalf("Close status = %d, want OK", status)
 	}
 
