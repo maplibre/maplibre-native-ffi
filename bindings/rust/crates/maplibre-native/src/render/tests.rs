@@ -9,9 +9,9 @@ use glow::HasContext;
 use glutin::config::ConfigTemplateBuilder;
 #[cfg(target_os = "linux")]
 use glutin::config::{AsRawConfig, RawConfig};
-use glutin::context::{
-    AsRawContext, ContextApi, ContextAttributesBuilder, PossiblyCurrentContext, RawContext, Version,
-};
+#[cfg(any(target_os = "windows", target_os = "linux"))]
+use glutin::context::{AsRawContext, RawContext};
+use glutin::context::{ContextApi, ContextAttributesBuilder, PossiblyCurrentContext, Version};
 #[cfg(target_os = "linux")]
 use glutin::display::{AsRawDisplay, RawDisplay};
 use glutin::display::{GetGlDisplay, GlDisplay};

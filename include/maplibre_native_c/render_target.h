@@ -88,7 +88,8 @@ typedef struct mln_egl_context_descriptor {
    * EGL_PBUFFER_BIT.
    */
   void* config;
-  /** Borrowed EGLContext whose share group the session context joins. Required.
+  /**
+   * Borrowed EGLContext whose share group the session context joins. Required.
    */
   void* share_context;
   /** Optional eglGetProcAddress-compatible function for the host loader. */

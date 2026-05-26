@@ -401,10 +401,12 @@ class OpenGLTextureBackend final : public mbgl::gl::RendererBackend,
   }
 
   auto getDefaultRenderable() -> mbgl::gfx::Renderable& override {
-    if (!resource) {
+    const auto current_size = getSize();
+    if (!resource || resource_size_ != current_size) {
       resource = std::make_unique<OpenGLTextureRenderableResource>(
-        getContext<mbgl::gl::Context>(), size, borrowed_texture_
+        getContext<mbgl::gl::Context>(), current_size, borrowed_texture_
       );
+      resource_size_ = current_size;
     }
     return *this;
   }
@@ -449,12 +451,8 @@ class OpenGLTextureBackend final : public mbgl::gl::RendererBackend,
     if (mln::core::opengl::is_valid_wgl_proc_address(proc)) {
       return reinterpret_cast<mbgl::gl::ProcAddress>(proc);
     }
-    auto* module = GetModuleHandleA("opengl32.dll");
-    if (module == nullptr) {
-      return nullptr;
-    }
     return reinterpret_cast<mbgl::gl::ProcAddress>(
-      GetProcAddress(module, name)
+      mln::core::opengl::get_opengl32_proc_address(name)
     );
 #elif defined(__linux__)
     using GetProcAddressFunction = void* (*)(const char*);
@@ -490,6 +488,7 @@ class OpenGLTextureBackend final : public mbgl::gl::RendererBackend,
       ) {
         throw std::runtime_error("Switching OpenGL WGL context failed");
       }
+      validate_wgl_context_support();
     } catch (...) {
       (void)wglMakeCurrent(
         static_cast<HDC>(previous_device_context_),
@@ -505,10 +504,12 @@ class OpenGLTextureBackend final : public mbgl::gl::RendererBackend,
     previous_read_surface_ = eglGetCurrentSurface(EGL_READ);
     previous_context_ = eglGetCurrentContext();
     previous_api_ = eglQueryAPI();
-    if (eglBindAPI(EGL_OPENGL_ES_API) == EGL_FALSE) {
-      throw std::runtime_error("Binding EGL OpenGL ES API failed");
-    }
     try {
+      const auto requested_api = share_context_api();
+      if (eglBindAPI(requested_api) == EGL_FALSE) {
+        throw std::runtime_error("Binding EGL OpenGL API failed");
+      }
+      active_api_ = requested_api;
       if (render_context_ == nullptr) {
         create_egl_context();
       }
@@ -522,7 +523,11 @@ class OpenGLTextureBackend final : public mbgl::gl::RendererBackend,
         throw std::runtime_error("Switching OpenGL EGL context failed");
       }
     } catch (...) {
+      if (active_api_ != EGL_NONE) {
+        release_current_egl_context();
+      }
       restore_previous_egl_api();
+      restore_previous_egl_context();
       throw;
     }
 #else
@@ -539,6 +544,7 @@ class OpenGLTextureBackend final : public mbgl::gl::RendererBackend,
     previous_device_context_ = nullptr;
     previous_render_context_ = nullptr;
 #elif defined(__linux__)
+    release_current_egl_context();
     restore_previous_egl_api();
     restore_previous_egl_context();
 #endif
@@ -560,6 +566,12 @@ class OpenGLTextureBackend final : public mbgl::gl::RendererBackend,
     );
   }
 
+  void validate_wgl_context_support() {
+    mln::core::opengl::validate_required_wgl_proc_addresses(
+      [this](const char* name) { return getExtensionFunctionPointer(name); }
+    );
+  }
+
   void destroy_native_context() {
     if (render_context_ != nullptr) {
       wglDeleteContext(static_cast<HGLRC>(render_context_));
@@ -573,9 +585,13 @@ class OpenGLTextureBackend final : public mbgl::gl::RendererBackend,
     auto* const share_context =
       static_cast<EGLContext>(context_.data.egl.share_context);
 
-    const EGLint context_attributes[] = {
+    const EGLint es_context_attributes[] = {
       EGL_CONTEXT_CLIENT_VERSION, 3, EGL_NONE
     };
+    const EGLint opengl_context_attributes[] = {EGL_NONE};
+    auto* const context_attributes = active_api_ == EGL_OPENGL_ES_API
+                                       ? es_context_attributes
+                                       : opengl_context_attributes;
     render_context_ =
       eglCreateContext(display, config, share_context, context_attributes);
     if (render_context_ == EGL_NO_CONTEXT) {
@@ -595,11 +611,37 @@ class OpenGLTextureBackend final : public mbgl::gl::RendererBackend,
     }
   }
 
+  auto share_context_api() -> EGLenum {
+    auto* const display = static_cast<EGLDisplay>(context_.data.egl.display);
+    auto* const share_context =
+      static_cast<EGLContext>(context_.data.egl.share_context);
+    auto client_type = EGLint{};
+    if (
+      eglQueryContext(
+        display, share_context, EGL_CONTEXT_CLIENT_TYPE, &client_type
+      ) == EGL_FALSE
+    ) {
+      throw std::runtime_error("Querying OpenGL EGL context API failed");
+    }
+    if (client_type == EGL_OPENGL_API || client_type == EGL_OPENGL_ES_API) {
+      return static_cast<EGLenum>(client_type);
+    }
+    throw std::runtime_error("OpenGL EGL context API is unsupported");
+  }
+
+  void release_current_egl_context() {
+    auto* const display = static_cast<EGLDisplay>(context_.data.egl.display);
+    (void)eglMakeCurrent(
+      display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT
+    );
+  }
+
   void restore_previous_egl_api() {
     if (previous_api_ != EGL_NONE) {
       eglBindAPI(previous_api_);
       previous_api_ = EGL_NONE;
     }
+    active_api_ = EGL_NONE;
   }
 
   void restore_previous_egl_context() {
@@ -641,6 +683,7 @@ class OpenGLTextureBackend final : public mbgl::gl::RendererBackend,
   mln_opengl_context_descriptor context_{};
   uint32_t borrowed_texture_ = 0;
   void* render_context_ = nullptr;
+  mbgl::Size resource_size{};
 
 #if defined(_WIN32)
   void* previous_device_context_ = nullptr;
@@ -652,6 +695,7 @@ class OpenGLTextureBackend final : public mbgl::gl::RendererBackend,
   void* previous_read_surface_ = nullptr;
   void* previous_context_ = nullptr;
   EGLenum previous_api_ = EGL_NONE;
+  EGLenum active_api_ = EGL_NONE;
 #endif
 };
 

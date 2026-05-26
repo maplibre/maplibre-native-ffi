@@ -53,12 +53,15 @@ class RenderSessionHandleTest {
       try (var map = MapHandle.create(runtime, new MapOptions().size(64, 64))) {
         var descriptor =
             new MetalOwnedTextureDescriptor().extent(new RenderTargetExtent(-1, 64, 1.0));
-        var openGLDescriptor =
-            new OpenGLOwnedTextureDescriptor().extent(new RenderTargetExtent(-1, 64, 1.0));
-
         assertThrows(InvalidArgumentException.class, () -> map.attachMetalOwnedTexture(descriptor));
-        assertThrows(
-            InvalidArgumentException.class, () -> map.attachOpenGLOwnedTexture(openGLDescriptor));
+        if (Maplibre.supportedRenderBackends().contains(RenderBackend.OPENGL)) {
+          var openGLDescriptor =
+              new OpenGLOwnedTextureDescriptor()
+                  .extent(new RenderTargetExtent(-1, 64, 1.0))
+                  .context(fakeSupportedOpenGLContext());
+          assertThrows(
+              InvalidArgumentException.class, () -> map.attachOpenGLOwnedTexture(openGLDescriptor));
+        }
       }
     }
   }

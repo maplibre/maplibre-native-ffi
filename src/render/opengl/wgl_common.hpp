@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <limits>
 #include <stdexcept>
+#include <string>
 
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN 1
@@ -23,6 +24,37 @@ inline auto is_valid_wgl_proc_address(PROC proc) -> bool {
   const auto address = reinterpret_cast<std::uintptr_t>(proc);
   return proc != nullptr && address > 3 &&
          address != std::numeric_limits<std::uintptr_t>::max();
+}
+
+inline auto get_opengl32_proc_address(const char* name) -> PROC {
+  auto* module = GetModuleHandleA("opengl32.dll");
+  if (module == nullptr) {
+    module = LoadLibraryA("opengl32.dll");
+  }
+  if (module == nullptr) {
+    return nullptr;
+  }
+  return reinterpret_cast<PROC>(GetProcAddress(module, name));
+}
+
+template <typename ResolveProc>
+inline void validate_required_wgl_proc_addresses(ResolveProc resolve_proc) {
+  const char* required_functions[] = {
+    "glBindFramebuffer",        "glBindRenderbuffer",
+    "glCheckFramebufferStatus", "glCreateProgram",
+    "glCreateShader",           "glDeleteFramebuffers",
+    "glDeleteRenderbuffers",    "glFramebufferRenderbuffer",
+    "glFramebufferTexture2D",   "glGenBuffers",
+    "glGenFramebuffers",        "glGenRenderbuffers",
+    "glRenderbufferStorage",
+  };
+  for (const auto* name : required_functions) {
+    if (resolve_proc(name) == nullptr) {
+      throw std::runtime_error(
+        std::string{"OpenGL WGL context is missing required function "} + name
+      );
+    }
+  }
 }
 
 inline auto create_shared_wgl_context(

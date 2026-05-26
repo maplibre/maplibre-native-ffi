@@ -49,8 +49,7 @@ typedef struct mln_opengl_surface_descriptor {
   /** Borrowed OpenGL context provider data. */
   mln_opengl_context_descriptor context;
   /**
-   * Borrowed platform surface handle. For WGL this is an HDC. For EGL
-   * this is
+   * Borrowed platform surface handle. For WGL this is an HDC. For EGL this is
    * an EGLSurface. Required.
    */
   void* surface;

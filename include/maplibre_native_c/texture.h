@@ -137,8 +137,7 @@ typedef struct mln_opengl_owned_texture_descriptor {
   /** Logical texture extent. */
   mln_render_target_extent extent;
   /**
-   * Borrowed OpenGL context provider data. The session creates and owns
-   * a
+   * Borrowed OpenGL context provider data. The session creates and owns a
    * context that shares texture objects with the host context.
    */
   mln_opengl_context_descriptor context;
@@ -150,8 +149,7 @@ typedef struct mln_opengl_borrowed_texture_descriptor {
   /** Logical texture extent. */
   mln_render_target_extent extent;
   /**
-   * Borrowed OpenGL context provider data. The texture must belong to
-   * this
+   * Borrowed OpenGL context provider data. The texture must belong to this
    * context or a context in the same share group.
    */
   mln_opengl_context_descriptor context;
@@ -201,7 +199,6 @@ typedef struct mln_texture_image_info {
 
 /**
  * Returns Metal owned-texture descriptor defaults for this C API version.
-
  */
 MLN_API mln_metal_owned_texture_descriptor
 mln_metal_owned_texture_descriptor_default(void) MLN_NOEXCEPT;
@@ -226,14 +223,12 @@ mln_vulkan_borrowed_texture_descriptor_default(void) MLN_NOEXCEPT;
 
 /**
  * Returns OpenGL owned-texture descriptor defaults for this C API version.
-
  */
 MLN_API mln_opengl_owned_texture_descriptor
 mln_opengl_owned_texture_descriptor_default(void) MLN_NOEXCEPT;
 
 /**
- * Returns OpenGL borrowed-texture descriptor defaults for this C API
- * version.
+ * Returns OpenGL borrowed-texture descriptor defaults for this C API version.
  */
 MLN_API mln_opengl_borrowed_texture_descriptor
 mln_opengl_borrowed_texture_descriptor_default(void) MLN_NOEXCEPT;
@@ -409,7 +404,6 @@ MLN_API mln_status mln_opengl_borrowed_texture_attach(
 
 /**
  * Reads the most recently rendered session-owned texture frame into
- *
  * caller-owned storage.
  *
  * The copied image is premultiplied RGBA8 in physical pixels. The function
@@ -524,8 +518,7 @@ MLN_API mln_status mln_vulkan_owned_texture_release_frame(
 /**
  * Acquires the most recently rendered OpenGL texture frame.
  *
- * Use this function with sessions created by
- * mln_opengl_owned_texture_attach().
+ * Use this function with sessions created by mln_opengl_owned_texture_attach().
  *
  * The returned texture object is borrowed and remains valid only until
  * mln_opengl_owned_texture_release_frame() is called for the same frame.
