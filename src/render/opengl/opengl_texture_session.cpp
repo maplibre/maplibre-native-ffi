@@ -3,6 +3,7 @@
 #include <memory>
 #include <optional>
 #include <stdexcept>
+#include <string>
 #include <utility>
 
 #include <mbgl/gfx/backend_scope.hpp>
@@ -269,10 +270,16 @@ class OpenGLTextureRenderableResource final
   ~OpenGLTextureRenderableResource() noexcept override = default;
 
   void bind() override {
-    ensure_resources();
-    context.bindFramebuffer = framebuffer_->framebuffer;
-    context.scissorTest = {0, 0, 0, 0};
-    context.viewport = {0, 0, size};
+    try {
+      ensure_resources();
+      context.bindFramebuffer = framebuffer_->framebuffer;
+      context.scissorTest = {0, 0, 0, 0};
+      context.viewport = {0, 0, size};
+    } catch (const std::exception& exception) {
+      throw std::runtime_error(
+        std::string{"binding OpenGL texture renderable: "} + exception.what()
+      );
+    }
   }
 
   void swap() override { context.finish(); }
@@ -296,6 +303,7 @@ class OpenGLTextureRenderableResource final
       return;
     }
 
+    auto texture_id = borrowed_texture_;
     if (borrowed_texture_ == 0) {
       texture_ = context.createTexture2D();
       texture_->setSize(size);
@@ -309,6 +317,7 @@ class OpenGLTextureRenderableResource final
          .wrapV = mbgl::gfx::TextureWrapType::Clamp}
       );
       texture_->create();
+      texture_id = static_cast<mbgl::gl::Texture2D&>(*texture_).getTextureID();
     }
 
     depth_stencil_ =
@@ -325,7 +334,7 @@ class OpenGLTextureRenderableResource final
     };
     context.bindFramebuffer = framebuffer.framebuffer;
     mbgl::platform::glFramebufferTexture2D(
-      GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture(), 0
+      GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture_id, 0
     );
     auto& depth_stencil_resource =
       depth_stencil_->getResource<mbgl::gl::RenderbufferResource>();

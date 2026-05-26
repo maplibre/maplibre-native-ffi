@@ -229,6 +229,12 @@ auto render_sessions() -> std::unordered_map<
   return value;
 }
 
+auto set_native_stage_error(const char* stage, const std::exception& exception)
+  -> void {
+  const auto message = std::string{stage} + ": " + exception.what();
+  mln::core::set_thread_error(message.c_str());
+}
+
 auto feature_query_result_mutex() -> std::mutex& {
   static auto value = std::mutex{};
   return value;
@@ -1011,13 +1017,23 @@ auto render_session_render_update(mln_render_session* session) -> mln_status {
   };
   map_run_render_jobs(session->map);
   if (session->renderer == nullptr) {
-    session->renderer = std::make_unique<mbgl::Renderer>(
-      *backend, static_cast<float>(session->scale_factor)
-    );
-    session->renderer->setObserver(map_renderer_observer(session->map));
+    try {
+      session->renderer = std::make_unique<mbgl::Renderer>(
+        *backend, static_cast<float>(session->scale_factor)
+      );
+      session->renderer->setObserver(map_renderer_observer(session->map));
+    } catch (const std::exception& exception) {
+      set_native_stage_error("creating renderer", exception);
+      return MLN_STATUS_NATIVE_ERROR;
+    }
   }
 
-  session->renderer->render(update);
+  try {
+    session->renderer->render(update);
+  } catch (const std::exception& exception) {
+    set_native_stage_error("rendering update", exception);
+    return MLN_STATUS_NATIVE_ERROR;
+  }
   if (session->kind == RenderSessionKind::Texture) {
     const auto after_status = session->texture.backend->after_render(*session);
     if (after_status != MLN_STATUS_OK) {
