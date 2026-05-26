@@ -213,6 +213,22 @@ fn hasNonZeroByte(bytes: []const u8) bool {
     return false;
 }
 
+fn emptyOpenGLOwnedTextureFrame() c.mln_opengl_owned_texture_frame {
+    return .{
+        .size = @sizeOf(c.mln_opengl_owned_texture_frame),
+        .generation = 0,
+        .width = 0,
+        .height = 0,
+        .scale_factor = 0.0,
+        .frame_id = 0,
+        .texture = 0,
+        .target = 0,
+        .internal_format = 0,
+        .format = 0,
+        .type = 0,
+    };
+}
+
 fn configureContext(context: *c.mln_opengl_context_descriptor) void {
     if (builtin.os.tag == .windows) {
         context.platform = c.MLN_OPENGL_CONTEXT_PLATFORM_WGL;
@@ -453,6 +469,35 @@ test "OpenGL provider mask matches OpenGL build platform" {
     }
 }
 
+test "OpenGL attach reports unsupported when backend is unavailable" {
+    if (build_options.supports_opengl) return error.SkipZigTest;
+
+    const runtime = try support.createRuntime();
+    defer support.destroyRuntime(runtime);
+    const map = try support.createMap(runtime);
+    defer support.destroyMap(map);
+
+    var session: ?*c.mln_render_session = null;
+
+    var owned = c.mln_opengl_owned_texture_descriptor_default();
+    configureContext(&owned.context);
+    try testing.expectEqual(c.MLN_STATUS_UNSUPPORTED, c.mln_opengl_owned_texture_attach(map, &owned, &session));
+    try testing.expectEqual(@as(?*c.mln_render_session, null), session);
+
+    var borrowed = c.mln_opengl_borrowed_texture_descriptor_default();
+    configureContext(&borrowed.context);
+    borrowed.texture = 1;
+    borrowed.target = 0x0de1;
+    try testing.expectEqual(c.MLN_STATUS_UNSUPPORTED, c.mln_opengl_borrowed_texture_attach(map, &borrowed, &session));
+    try testing.expectEqual(@as(?*c.mln_render_session, null), session);
+
+    var surface = c.mln_opengl_surface_descriptor_default();
+    configureContext(&surface.context);
+    surface.surface = fake_handle;
+    try testing.expectEqual(c.MLN_STATUS_UNSUPPORTED, c.mln_opengl_surface_attach(map, &surface, &session));
+    try testing.expectEqual(@as(?*c.mln_render_session, null), session);
+}
+
 test "OpenGL owned texture attach rejects unsafe raw inputs" {
     try common.expectAttachRejectsUnsafeInputs(OpenGLOwnedTexture);
 }
@@ -599,20 +644,9 @@ test "OpenGL WGL borrowed texture renders through raw C ABI" {
 
     var image_info = c.mln_texture_image_info_default();
     try testing.expectEqual(c.MLN_STATUS_UNSUPPORTED, c.mln_texture_read_premultiplied_rgba8(handle, null, 0, &image_info));
+    try testing.expectEqual(c.MLN_STATUS_UNSUPPORTED, c.mln_render_session_resize(handle, 128, 128, 1.0));
 
-    var frame = c.mln_opengl_owned_texture_frame{
-        .size = @sizeOf(c.mln_opengl_owned_texture_frame),
-        .generation = 0,
-        .width = 0,
-        .height = 0,
-        .scale_factor = 0.0,
-        .frame_id = 0,
-        .texture = 0,
-        .target = 0,
-        .internal_format = 0,
-        .format = 0,
-        .type = 0,
-    };
+    var frame = emptyOpenGLOwnedTextureFrame();
     try testing.expectEqual(c.MLN_STATUS_INVALID_STATE, c.mln_opengl_owned_texture_acquire_frame(handle, &frame));
 
     try testing.expectEqual(c.MLN_STATUS_OK, c.mln_map_set_style_json(map, raw_render_style_json));
@@ -627,19 +661,7 @@ test "OpenGL WGL borrowed texture renders through raw C ABI" {
 
     image_info = c.mln_texture_image_info_default();
     try testing.expectEqual(c.MLN_STATUS_UNSUPPORTED, c.mln_texture_read_premultiplied_rgba8(handle, null, 0, &image_info));
-    frame = .{
-        .size = @sizeOf(c.mln_opengl_owned_texture_frame),
-        .generation = 0,
-        .width = 0,
-        .height = 0,
-        .scale_factor = 0.0,
-        .frame_id = 0,
-        .texture = 0,
-        .target = 0,
-        .internal_format = 0,
-        .format = 0,
-        .type = 0,
-    };
+    frame = emptyOpenGLOwnedTextureFrame();
     try testing.expectEqual(c.MLN_STATUS_UNSUPPORTED, c.mln_opengl_owned_texture_acquire_frame(handle, &frame));
 }
 
@@ -665,6 +687,12 @@ test "OpenGL WGL surface renders through raw C ABI" {
     try testing.expectEqual(c.MLN_STATUS_OK, c.mln_opengl_surface_attach(map, &descriptor, &session));
     const handle = session orelse return error.SessionAttachFailed;
     defer testing.expectEqual(c.MLN_STATUS_OK, c.mln_render_session_destroy(handle)) catch @panic("render session destroy failed");
+
+    var image_info = c.mln_texture_image_info_default();
+    try testing.expectEqual(c.MLN_STATUS_UNSUPPORTED, c.mln_texture_read_premultiplied_rgba8(handle, null, 0, &image_info));
+    var frame = emptyOpenGLOwnedTextureFrame();
+    try testing.expectEqual(c.MLN_STATUS_UNSUPPORTED, c.mln_opengl_owned_texture_acquire_frame(handle, &frame));
+    try testing.expectEqual(c.MLN_STATUS_UNSUPPORTED, c.mln_opengl_owned_texture_release_frame(handle, &frame));
 
     try testing.expectEqual(c.MLN_STATUS_OK, c.mln_map_set_style_json(map, raw_render_style_json));
     try testing.expectEqual(c.MLN_STATUS_OK, c.mln_map_request_repaint(map));

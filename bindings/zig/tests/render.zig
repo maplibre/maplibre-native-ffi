@@ -1220,8 +1220,18 @@ test "unsupported backend owned texture attachment reports unsupported" {
         }));
     }
     if (!build_options.supports_opengl) {
+        const context = fakeOpenGLContext();
         try testing.expectError(error.Unsupported, maplibre.attachOpenGLOwnedTexture(&map, .{
-            .context = fakeOpenGLContext(),
+            .context = context,
+        }));
+        try testing.expectError(error.Unsupported, maplibre.attachOpenGLBorrowedTexture(&map, .{
+            .context = context,
+            .texture = 1,
+            .target = gl_texture_2d,
+        }));
+        try testing.expectError(error.Unsupported, maplibre.attachOpenGLSurface(&map, .{
+            .context = context,
+            .surface = fake_pointer,
         }));
     }
 }
