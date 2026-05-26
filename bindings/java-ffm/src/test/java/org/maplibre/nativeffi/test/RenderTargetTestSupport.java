@@ -12,6 +12,7 @@ import static org.lwjgl.glfw.GLFW.glfwMakeContextCurrent;
 import static org.lwjgl.glfw.GLFW.glfwWindowHint;
 import static org.lwjgl.glfw.GLFWNativeWGL.glfwGetWGLContext;
 import static org.lwjgl.glfw.GLFWNativeWin32.glfwGetWin32Window;
+import static org.lwjgl.opengl.GL11.GL_FRONT;
 import static org.lwjgl.opengl.GL11.GL_NEAREST;
 import static org.lwjgl.opengl.GL11.GL_NO_ERROR;
 import static org.lwjgl.opengl.GL11.GL_RGBA;
@@ -25,6 +26,8 @@ import static org.lwjgl.opengl.GL11.glDeleteTextures;
 import static org.lwjgl.opengl.GL11.glGenTextures;
 import static org.lwjgl.opengl.GL11.glGetError;
 import static org.lwjgl.opengl.GL11.glGetTexImage;
+import static org.lwjgl.opengl.GL11.glReadBuffer;
+import static org.lwjgl.opengl.GL11.glReadPixels;
 import static org.lwjgl.opengl.GL11.glTexImage2D;
 import static org.lwjgl.opengl.GL11.glTexParameteri;
 import static org.lwjgl.system.MemoryUtil.NULL;
@@ -85,6 +88,7 @@ import org.maplibre.nativeffi.render.NativePointer;
 import org.maplibre.nativeffi.render.OpenGLBorrowedTextureDescriptor;
 import org.maplibre.nativeffi.render.OpenGLContextProvider;
 import org.maplibre.nativeffi.render.OpenGLOwnedTextureDescriptor;
+import org.maplibre.nativeffi.render.OpenGLSurfaceDescriptor;
 import org.maplibre.nativeffi.render.RenderBackend;
 import org.maplibre.nativeffi.render.RenderSessionHandle;
 import org.maplibre.nativeffi.render.RenderTargetExtent;
@@ -177,6 +181,23 @@ public final class RenderTargetTestSupport implements AutoCloseable {
     }
   }
 
+  public static RenderTargetTestSupport attachOpenGLSurface(
+      MapHandle map, RenderTargetExtent extent) {
+    var context = OpenGLTestContext.create(extent.width(), extent.height());
+    try {
+      return new RenderTargetTestSupport(
+          map.attachOpenGLSurface(
+              new OpenGLSurfaceDescriptor()
+                  .extent(extent)
+                  .context(context.descriptor())
+                  .surface(NativePointer.ofAddress(context.hdc))),
+          context);
+    } catch (RuntimeException | Error error) {
+      closeContextAfterAttachFailure(context, error);
+      throw error;
+    }
+  }
+
   private static void closeContextAfterAttachFailure(AutoCloseable context, Throwable failure) {
     try {
       context.close();
@@ -200,6 +221,16 @@ public final class RenderTargetTestSupport implements AutoCloseable {
       return openglContext.readRgba();
     }
     throw new IllegalStateException("Render target is not an OpenGL borrowed texture");
+  }
+
+  public byte[] readOpenGLSurfaceRgba(int width, int height) {
+    if (closed) {
+      throw new IllegalStateException("RenderTargetTestSupport is closed");
+    }
+    if (context instanceof OpenGLTestContext openglContext) {
+      return openglContext.readSurfaceRgba(width, height);
+    }
+    throw new IllegalStateException("Render target is not an OpenGL surface");
   }
 
   @Override
@@ -323,6 +354,17 @@ public final class RenderTargetTestSupport implements AutoCloseable {
         throw new IllegalStateException(
             operation + " failed with OpenGL error 0x%x".formatted(error));
       }
+    }
+
+    final byte[] readSurfaceRgba(int width, int height) {
+      makeCurrent();
+      var pixels = BufferUtils.createByteBuffer(width * height * 4);
+      glReadBuffer(GL_FRONT);
+      glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
+      checkGlError("read OpenGL surface");
+      var bytes = new byte[pixels.capacity()];
+      pixels.get(0, bytes);
+      return bytes;
     }
 
     @Override

@@ -212,6 +212,28 @@ final class RenderSessionHandleTest {
   }
 
   @Test
+  void openglSurfaceSessionRendersThroughPublicBinding() throws Exception {
+    Maplibre.setLogCallback(record -> true);
+    Maplibre.setAsyncLogSeverities(EnumSet.noneOf(LogSeverity.class));
+
+    var runtime = RuntimeHandle.create();
+    var map = MapHandle.create(runtime, new MapOptions().size(128, 128));
+    try (var target = assumeOpenGLSurfaceTarget(map)) {
+      var activeSession = target.session();
+      map.setStyleJson(STYLE_JSON);
+      waitForMapEvent(runtime, map, RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE);
+      activeSession.renderUpdate();
+
+      assertThrows(
+          UnsupportedFeatureException.class, activeSession::acquireOpenGLOwnedTextureFrame);
+      assertTrue(hasNonZeroByte(target.readOpenGLSurfaceRgba(128, 128)));
+    } finally {
+      map.close();
+      runtime.close();
+    }
+  }
+
+  @Test
   void renderTargetDescriptorsTrackOptionalFields() {
     var vulkanBorrowed = new VulkanBorrowedTextureDescriptor();
     assertFalse(vulkanBorrowed.hasFinalLayout());
@@ -382,6 +404,19 @@ final class RenderSessionHandleTest {
           map, new RenderTargetExtent(128, 128, 1.0));
     } catch (MaplibreException | IllegalStateException error) {
       Assumptions.assumeTrue(false, "OpenGL borrowed texture unavailable: " + error.getMessage());
+      throw new AssertionError("unreachable");
+    }
+  }
+
+  private static RenderTargetTestSupport assumeOpenGLSurfaceTarget(MapHandle map) {
+    Assumptions.assumeTrue(
+        Maplibre.supportedRenderBackends().contains(RenderBackend.OPENGL),
+        "OpenGL surface unavailable in this native build");
+    try {
+      return RenderTargetTestSupport.attachOpenGLSurface(
+          map, new RenderTargetExtent(128, 128, 1.0));
+    } catch (MaplibreException | IllegalStateException error) {
+      Assumptions.assumeTrue(false, "OpenGL surface unavailable: " + error.getMessage());
       throw new AssertionError("unreachable");
     }
   }
