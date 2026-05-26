@@ -14,8 +14,14 @@ const egl = if (build_options.supports_opengl and builtin.os.tag == .linux) @cIm
 }) else struct {};
 
 const egl_platform_surfaceless_mesa = 0x31dd;
+const egl_platform_device_ext = 0x313f;
+const EglDeviceExt = if (build_options.supports_opengl and builtin.os.tag == .linux) ?*anyopaque else void;
 const EglGetPlatformDisplayExt = if (build_options.supports_opengl and builtin.os.tag == .linux)
     *const fn (egl.EGLenum, ?*anyopaque, ?*const egl.EGLint) callconv(.c) egl.EGLDisplay
+else
+    void;
+const EglQueryDevicesExt = if (build_options.supports_opengl and builtin.os.tag == .linux)
+    *const fn (egl.EGLint, [*]EglDeviceExt, *egl.EGLint) callconv(.c) egl.EGLBoolean
 else
     void;
 
@@ -52,9 +58,15 @@ pub fn main(init_args: std.process.Init) !void {
     });
     defer map.close() catch {};
 
-    var texture_target = try OwnedTextureTarget.attach(&map, .{
+    var texture_target = OwnedTextureTarget.attach(&map, .{
         .extent = .{ .width = width, .height = height, .scale_factor = 1.0 },
-    });
+    }) catch |err| {
+        if (isRenderTargetUnavailable(err)) {
+            std.debug.print("render target unavailable ({s}); skipping readback\n", .{@errorName(err)});
+            return;
+        }
+        return err;
+    };
     defer texture_target.close() catch {};
     const texture = &texture_target.session;
 
@@ -81,6 +93,18 @@ fn logLatestDiagnostic(diagnostic_store: *const maplibre.DiagnosticStore) void {
     std.debug.print("native diagnostic", .{});
     if (diagnostic.raw_status) |raw_status| std.debug.print(" ({d})", .{raw_status});
     std.debug.print(": {s}\n", .{diagnostic.message});
+}
+
+fn isRenderTargetUnavailable(err: anyerror) bool {
+    return switch (err) {
+        error.EglUnavailable,
+        error.MetalDeviceUnavailable,
+        error.NoUsableVulkanGraphicsQueue,
+        error.NoVulkanPhysicalDevice,
+        error.WglUnavailable,
+        => true,
+        else => false,
+    };
 }
 
 fn logAndValidateRenderBackend() !void {
@@ -293,10 +317,31 @@ const OpenGLAttachContext = if (build_options.supports_opengl and builtin.os.tag
             return display;
         } else |_| {}
 
-        const get_platform_display: EglGetPlatformDisplayExt = @ptrCast(
-            egl.eglGetProcAddress("eglGetPlatformDisplayEXT") orelse return error.EglUnavailable,
+        const get_platform_display = try getPlatformDisplayFunction();
+        if (initializeDisplay(get_platform_display(egl_platform_surfaceless_mesa, null, null))) |display| {
+            return display;
+        } else |_| {}
+        return initializeDeviceDisplay(get_platform_display);
+    }
+
+    fn getPlatformDisplayFunction() !EglGetPlatformDisplayExt {
+        return @ptrCast(egl.eglGetProcAddress("eglGetPlatformDisplayEXT") orelse return error.EglUnavailable);
+    }
+
+    fn initializeDeviceDisplay(get_platform_display: EglGetPlatformDisplayExt) !egl.EGLDisplay {
+        const query_devices: EglQueryDevicesExt = @ptrCast(
+            egl.eglGetProcAddress("eglQueryDevicesEXT") orelse return error.EglUnavailable,
         );
-        return initializeDisplay(get_platform_display(egl_platform_surfaceless_mesa, null, null));
+        var devices: [8]EglDeviceExt = undefined;
+        var device_count: egl.EGLint = 0;
+        if (query_devices(devices.len, devices[0..].ptr, &device_count) == egl.EGL_FALSE) return error.EglUnavailable;
+        const clamped_count = @min(@as(usize, @intCast(device_count)), devices.len);
+        for (devices[0..clamped_count]) |device| {
+            if (initializeDisplay(get_platform_display(egl_platform_device_ext, device, null))) |display| {
+                return display;
+            } else |_| {}
+        }
+        return error.EglUnavailable;
     }
 
     fn initializeDisplay(display: egl.EGLDisplay) !egl.EGLDisplay {
