@@ -41,12 +41,10 @@ dependencies {
   implementation(platform("org.lwjgl:lwjgl-bom:$lwjglVersion"))
   implementation("org.lwjgl:lwjgl")
   implementation("org.lwjgl:lwjgl-glfw")
-  implementation("org.lwjgl:lwjgl-opengl")
   implementation("org.lwjgl:lwjgl-vulkan")
   implementation("org.lwjgl:lwjgl-shaderc")
   runtimeOnly("org.lwjgl:lwjgl::$lwjglNative")
   runtimeOnly("org.lwjgl:lwjgl-glfw::$lwjglNative")
-  runtimeOnly("org.lwjgl:lwjgl-opengl::$lwjglNative")
   runtimeOnly("org.lwjgl:lwjgl-shaderc::$lwjglNative")
 
   testImplementation(platform("org.junit:junit-bom:6.0.3"))

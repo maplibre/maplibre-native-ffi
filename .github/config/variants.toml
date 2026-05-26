@@ -24,17 +24,9 @@ requires = { platform = ["windows"], backend = ["opengl"] }
 task = "//examples/lwjgl-map:build"
 requires = { platform = ["linux", "macos", "windows"], backend = ["vulkan"] }
 
-[examples.lwjgl-map-opengl]
-task = "//examples/lwjgl-map:build"
-requires = { platform = ["windows"], backend = ["opengl"] }
-
 [examples.rust-map]
 task = "//examples/rust-map:ci"
 requires = { platform = ["linux", "macos", "windows"], backend = ["vulkan"] }
-
-[examples.rust-map-opengl]
-task = "//examples/rust-map:ci"
-requires = { platform = ["windows"], backend = ["opengl"] }
 
 [examples.zig-readback]
 task = "//examples/zig-readback:run"

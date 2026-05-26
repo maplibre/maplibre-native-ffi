@@ -208,6 +208,9 @@ final class RenderSessionHandleTest {
 
       assertThrows(
           UnsupportedFeatureException.class, activeSession::acquireOpenGLOwnedTextureFrame);
+      assertThrows(UnsupportedFeatureException.class, activeSession::textureImageInfo);
+      assertThrows(UnsupportedFeatureException.class, activeSession::readPremultipliedRgba8);
+      assertThrows(UnsupportedFeatureException.class, () -> activeSession.resize(128, 128, 1.0));
       assertTrue(hasNonZeroByte(target.readOpenGLBorrowedTextureRgba()));
     } finally {
       map.close();
@@ -230,6 +233,8 @@ final class RenderSessionHandleTest {
 
       assertThrows(
           UnsupportedFeatureException.class, activeSession::acquireOpenGLOwnedTextureFrame);
+      assertThrows(UnsupportedFeatureException.class, activeSession::textureImageInfo);
+      assertThrows(UnsupportedFeatureException.class, activeSession::readPremultipliedRgba8);
       assertTrue(hasNonZeroByte(target.readOpenGLSurfaceRgba(128, 128)));
     } finally {
       map.close();
@@ -277,6 +282,46 @@ final class RenderSessionHandleTest {
     var openglFrame =
         new OpenGLOwnedTextureFrame(scope, 1, 2, 3, 1.0, 4, 5, 0x0de1, 0x8058, 0x1908, 0x1401);
     assertThrows(IllegalStateException.class, openglFrame::texture);
+  }
+
+  @Test
+  void openglAttachMethodsReportUnsupportedWhenBackendUnavailable() {
+    Assumptions.assumeFalse(
+        Maplibre.supportedRenderBackends().contains(RenderBackend.OPENGL),
+        "OpenGL native build exercises positive attach paths");
+
+    var runtime = RuntimeHandle.create();
+    var map = MapHandle.create(runtime, new MapOptions().size(64, 64));
+    var context = fakeWglContext();
+    try {
+      assertThrows(
+          UnsupportedFeatureException.class,
+          () ->
+              map.attachOpenGLOwnedTexture(
+                  new OpenGLOwnedTextureDescriptor()
+                      .extent(new RenderTargetExtent(32, 16, 1.0))
+                      .context(context)));
+      assertThrows(
+          UnsupportedFeatureException.class,
+          () ->
+              map.attachOpenGLBorrowedTexture(
+                  new OpenGLBorrowedTextureDescriptor()
+                      .extent(new RenderTargetExtent(32, 16, 1.0))
+                      .context(context)
+                      .texture(1)
+                      .target(0x0de1)));
+      assertThrows(
+          UnsupportedFeatureException.class,
+          () ->
+              map.attachOpenGLSurface(
+                  new OpenGLSurfaceDescriptor()
+                      .extent(new RenderTargetExtent(32, 16, 1.0))
+                      .context(context)
+                      .surface(NativePointer.ofAddress(1))));
+    } finally {
+      map.close();
+      runtime.close();
+    }
   }
 
   @Test
@@ -423,6 +468,11 @@ final class RenderSessionHandleTest {
       Assumptions.assumeTrue(false, "OpenGL surface unavailable: " + error.getMessage());
       throw new AssertionError("unreachable");
     }
+  }
+
+  private static WglContextDescriptor fakeWglContext() {
+    var fake = NativePointer.ofAddress(1);
+    return new WglContextDescriptor(fake, fake);
   }
 
   private static boolean hasNonZeroByte(byte[] bytes) {
