@@ -20,6 +20,7 @@ import org.maplibre.nativeffi.error.InvalidArgumentException;
 import org.maplibre.nativeffi.error.InvalidStateException;
 import org.maplibre.nativeffi.error.MaplibreException;
 import org.maplibre.nativeffi.error.MaplibreStatus;
+import org.maplibre.nativeffi.error.UnsupportedFeatureException;
 import org.maplibre.nativeffi.error.WrongThreadException;
 import org.maplibre.nativeffi.log.LogSeverity;
 import org.maplibre.nativeffi.map.MapHandle;
@@ -153,6 +154,57 @@ final class RenderSessionHandleTest {
       }
       assertThrows(IllegalStateException.class, frame::width);
       activeSession.renderUpdate();
+    } finally {
+      map.close();
+      runtime.close();
+    }
+  }
+
+  @Test
+  void openglOwnedTextureFrameHandleStaysActiveUntilClosed() throws Exception {
+    Maplibre.setLogCallback(record -> true);
+    Maplibre.setAsyncLogSeverities(EnumSet.noneOf(LogSeverity.class));
+
+    var runtime = RuntimeHandle.create();
+    var map = MapHandle.create(runtime, new MapOptions().size(64, 64));
+    try (var target = assumeOpenGLOwnedTextureTarget(map)) {
+      var activeSession = target.session();
+      map.setStyleJson(STYLE_JSON);
+      waitForMapEvent(runtime, map, RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE);
+      activeSession.renderUpdate();
+
+      OpenGLOwnedTextureFrame frame;
+      try (var frameHandle = activeSession.acquireOpenGLOwnedTextureFrame()) {
+        frame = frameHandle.frame();
+        assertEquals(32, frame.width());
+        assertTrue(frame.texture() != 0);
+        assertFalse(frameHandle.isClosed());
+        assertThrows(InvalidStateException.class, activeSession::renderUpdate);
+      }
+      assertThrows(IllegalStateException.class, frame::texture);
+      activeSession.renderUpdate();
+    } finally {
+      map.close();
+      runtime.close();
+    }
+  }
+
+  @Test
+  void openglBorrowedTextureSessionRendersThroughPublicBinding() throws Exception {
+    Maplibre.setLogCallback(record -> true);
+    Maplibre.setAsyncLogSeverities(EnumSet.noneOf(LogSeverity.class));
+
+    var runtime = RuntimeHandle.create();
+    var map = MapHandle.create(runtime, new MapOptions().size(128, 128));
+    try (var target = assumeOpenGLBorrowedTextureTarget(map)) {
+      var activeSession = target.session();
+      map.setStyleJson(STYLE_JSON);
+      waitForMapEvent(runtime, map, RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE);
+      activeSession.renderUpdate();
+
+      assertThrows(
+          UnsupportedFeatureException.class, activeSession::acquireOpenGLOwnedTextureFrame);
+      assertTrue(hasNonZeroByte(target.readOpenGLBorrowedTextureRgba()));
     } finally {
       map.close();
       runtime.close();
@@ -306,6 +358,41 @@ final class RenderSessionHandleTest {
       Assumptions.assumeTrue(false, "Vulkan owned texture unavailable: " + error.getMessage());
       throw new AssertionError("unreachable");
     }
+  }
+
+  private static RenderTargetTestSupport assumeOpenGLOwnedTextureTarget(MapHandle map) {
+    Assumptions.assumeTrue(
+        Maplibre.supportedRenderBackends().contains(RenderBackend.OPENGL),
+        "OpenGL owned texture unavailable in this native build");
+    try {
+      return RenderTargetTestSupport.attachOpenGLOwnedTexture(
+          map, new RenderTargetExtent(32, 16, 1.0));
+    } catch (MaplibreException | IllegalStateException error) {
+      Assumptions.assumeTrue(false, "OpenGL owned texture unavailable: " + error.getMessage());
+      throw new AssertionError("unreachable");
+    }
+  }
+
+  private static RenderTargetTestSupport assumeOpenGLBorrowedTextureTarget(MapHandle map) {
+    Assumptions.assumeTrue(
+        Maplibre.supportedRenderBackends().contains(RenderBackend.OPENGL),
+        "OpenGL borrowed texture unavailable in this native build");
+    try {
+      return RenderTargetTestSupport.attachOpenGLBorrowedTexture(
+          map, new RenderTargetExtent(128, 128, 1.0));
+    } catch (MaplibreException | IllegalStateException error) {
+      Assumptions.assumeTrue(false, "OpenGL borrowed texture unavailable: " + error.getMessage());
+      throw new AssertionError("unreachable");
+    }
+  }
+
+  private static boolean hasNonZeroByte(byte[] bytes) {
+    for (var value : bytes) {
+      if (value != 0) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private static Throwable runOnOtherThread(ThrowingRunnable action) throws InterruptedException {

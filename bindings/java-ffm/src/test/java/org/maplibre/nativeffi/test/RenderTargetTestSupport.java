@@ -1,5 +1,33 @@
 package org.maplibre.nativeffi.test;
 
+import static org.lwjgl.glfw.GLFW.GLFW_CLIENT_API;
+import static org.lwjgl.glfw.GLFW.GLFW_FALSE;
+import static org.lwjgl.glfw.GLFW.GLFW_OPENGL_API;
+import static org.lwjgl.glfw.GLFW.GLFW_VISIBLE;
+import static org.lwjgl.glfw.GLFW.glfwCreateWindow;
+import static org.lwjgl.glfw.GLFW.glfwDefaultWindowHints;
+import static org.lwjgl.glfw.GLFW.glfwDestroyWindow;
+import static org.lwjgl.glfw.GLFW.glfwInit;
+import static org.lwjgl.glfw.GLFW.glfwMakeContextCurrent;
+import static org.lwjgl.glfw.GLFW.glfwWindowHint;
+import static org.lwjgl.glfw.GLFWNativeWGL.glfwGetWGLContext;
+import static org.lwjgl.glfw.GLFWNativeWin32.glfwGetWin32Window;
+import static org.lwjgl.opengl.GL11.GL_NEAREST;
+import static org.lwjgl.opengl.GL11.GL_NO_ERROR;
+import static org.lwjgl.opengl.GL11.GL_RGBA;
+import static org.lwjgl.opengl.GL11.GL_RGBA8;
+import static org.lwjgl.opengl.GL11.GL_TEXTURE_2D;
+import static org.lwjgl.opengl.GL11.GL_TEXTURE_MAG_FILTER;
+import static org.lwjgl.opengl.GL11.GL_TEXTURE_MIN_FILTER;
+import static org.lwjgl.opengl.GL11.GL_UNSIGNED_BYTE;
+import static org.lwjgl.opengl.GL11.glBindTexture;
+import static org.lwjgl.opengl.GL11.glDeleteTextures;
+import static org.lwjgl.opengl.GL11.glGenTextures;
+import static org.lwjgl.opengl.GL11.glGetError;
+import static org.lwjgl.opengl.GL11.glGetTexImage;
+import static org.lwjgl.opengl.GL11.glTexImage2D;
+import static org.lwjgl.opengl.GL11.glTexParameteri;
+import static org.lwjgl.system.MemoryUtil.NULL;
 import static org.lwjgl.vulkan.KHRPortabilityEnumeration.VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
 import static org.lwjgl.vulkan.KHRPortabilityEnumeration.VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME;
 import static org.lwjgl.vulkan.KHRPortabilitySubset.VK_KHR_PORTABILITY_SUBSET_EXTENSION_NAME;
@@ -28,10 +56,14 @@ import java.lang.foreign.Linker;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.SymbolLookup;
 import java.lang.foreign.ValueLayout;
+import java.lang.invoke.MethodHandle;
+import java.nio.ByteBuffer;
 import java.util.LinkedHashSet;
 import java.util.Locale;
 import java.util.Set;
+import org.lwjgl.BufferUtils;
 import org.lwjgl.PointerBuffer;
+import org.lwjgl.opengl.GL;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.vulkan.VK;
 import org.lwjgl.vulkan.VkApplicationInfo;
@@ -50,11 +82,15 @@ import org.maplibre.nativeffi.map.MapHandle;
 import org.maplibre.nativeffi.render.MetalContextDescriptor;
 import org.maplibre.nativeffi.render.MetalOwnedTextureDescriptor;
 import org.maplibre.nativeffi.render.NativePointer;
+import org.maplibre.nativeffi.render.OpenGLBorrowedTextureDescriptor;
+import org.maplibre.nativeffi.render.OpenGLContextProvider;
+import org.maplibre.nativeffi.render.OpenGLOwnedTextureDescriptor;
 import org.maplibre.nativeffi.render.RenderBackend;
 import org.maplibre.nativeffi.render.RenderSessionHandle;
 import org.maplibre.nativeffi.render.RenderTargetExtent;
 import org.maplibre.nativeffi.render.VulkanContextDescriptor;
 import org.maplibre.nativeffi.render.VulkanOwnedTextureDescriptor;
+import org.maplibre.nativeffi.render.WglContextDescriptor;
 
 public final class RenderTargetTestSupport implements AutoCloseable {
   private final RenderSessionHandle session;
@@ -75,7 +111,10 @@ public final class RenderTargetTestSupport implements AutoCloseable {
     if (backends.contains(RenderBackend.VULKAN)) {
       return attachVulkanOwnedTexture(map, extent);
     }
-    throw new IllegalStateException("Native library does not support Metal or Vulkan");
+    if (backends.contains(RenderBackend.OPENGL)) {
+      return attachOpenGLOwnedTexture(map, extent);
+    }
+    throw new IllegalStateException("Native library does not support Metal, Vulkan, or OpenGL");
   }
 
   public static RenderTargetTestSupport attachMetalOwnedTexture(
@@ -106,6 +145,38 @@ public final class RenderTargetTestSupport implements AutoCloseable {
     }
   }
 
+  public static RenderTargetTestSupport attachOpenGLOwnedTexture(
+      MapHandle map, RenderTargetExtent extent) {
+    var context = OpenGLTestContext.create(8, 8);
+    try {
+      return new RenderTargetTestSupport(
+          map.attachOpenGLOwnedTexture(
+              new OpenGLOwnedTextureDescriptor().extent(extent).context(context.descriptor())),
+          context);
+    } catch (RuntimeException | Error error) {
+      closeContextAfterAttachFailure(context, error);
+      throw error;
+    }
+  }
+
+  public static RenderTargetTestSupport attachOpenGLBorrowedTexture(
+      MapHandle map, RenderTargetExtent extent) {
+    var context = OpenGLBorrowedTextureContext.create(extent.width(), extent.height());
+    try {
+      return new RenderTargetTestSupport(
+          map.attachOpenGLBorrowedTexture(
+              new OpenGLBorrowedTextureDescriptor()
+                  .extent(extent)
+                  .context(context.descriptor())
+                  .texture(context.texture())
+                  .target(GL_TEXTURE_2D)),
+          context);
+    } catch (RuntimeException | Error error) {
+      closeContextAfterAttachFailure(context, error);
+      throw error;
+    }
+  }
+
   private static void closeContextAfterAttachFailure(AutoCloseable context, Throwable failure) {
     try {
       context.close();
@@ -119,6 +190,16 @@ public final class RenderTargetTestSupport implements AutoCloseable {
       throw new IllegalStateException("RenderTargetTestSupport is closed");
     }
     return session;
+  }
+
+  public byte[] readOpenGLBorrowedTextureRgba() {
+    if (closed) {
+      throw new IllegalStateException("RenderTargetTestSupport is closed");
+    }
+    if (context instanceof OpenGLBorrowedTextureContext openglContext) {
+      return openglContext.readRgba();
+    }
+    throw new IllegalStateException("Render target is not an OpenGL borrowed texture");
   }
 
   @Override
@@ -177,6 +258,205 @@ public final class RenderTargetTestSupport implements AutoCloseable {
 
     @Override
     public void close() {}
+  }
+
+  private static class OpenGLTestContext implements AutoCloseable {
+    protected long window;
+    protected long hdc;
+    protected long hglrc;
+    protected boolean closed;
+
+    static OpenGLTestContext create(int width, int height) {
+      if (!System.getProperty("os.name").toLowerCase(Locale.ROOT).contains("windows")) {
+        // TODO(linux): Add an EGL pbuffer/context helper for Java OpenGL
+        // binding tests on a Linux machine with the CI EGL/llvmpipe stack.
+        throw new IllegalStateException("OpenGL test context is only available on Windows WGL");
+      }
+      if (!Maplibre.supportedOpenGLContextProviders().contains(OpenGLContextProvider.WGL)) {
+        throw new IllegalStateException("Native library does not support WGL");
+      }
+      if (!glfwInit()) {
+        throw new IllegalStateException("GLFW initialization failed");
+      }
+
+      glfwDefaultWindowHints();
+      glfwWindowHint(GLFW_CLIENT_API, GLFW_OPENGL_API);
+      glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
+      var window = glfwCreateWindow(width, height, "MapLibre Java WGL Test", NULL, NULL);
+      if (window == NULL) {
+        throw new IllegalStateException("GLFW OpenGL window creation failed");
+      }
+
+      var context = new OpenGLTestContext();
+      context.window = window;
+      try {
+        context.makeCurrent();
+        GL.createCapabilities();
+        var hwnd = glfwGetWin32Window(window);
+        context.hglrc = glfwGetWGLContext(window);
+        context.hdc = getDc(hwnd);
+        if (context.hdc == NULL || context.hglrc == NULL) {
+          throw new IllegalStateException("GLFW did not expose WGL handles");
+        }
+        return context;
+      } catch (RuntimeException error) {
+        context.close();
+        throw error;
+      }
+    }
+
+    final WglContextDescriptor descriptor() {
+      return new WglContextDescriptor(NativePointer.ofAddress(hdc), NativePointer.ofAddress(hglrc));
+    }
+
+    final void makeCurrent() {
+      if (closed) {
+        throw new IllegalStateException("OpenGL test context is closed");
+      }
+      glfwMakeContextCurrent(window);
+      GL.createCapabilities();
+    }
+
+    final void checkGlError(String operation) {
+      var error = glGetError();
+      if (error != GL_NO_ERROR) {
+        throw new IllegalStateException(
+            operation + " failed with OpenGL error 0x%x".formatted(error));
+      }
+    }
+
+    @Override
+    public void close() {
+      if (closed) {
+        return;
+      }
+      closed = true;
+      if (window != NULL) {
+        if (hdc != NULL) {
+          releaseDc(glfwGetWin32Window(window), hdc);
+          hdc = NULL;
+        }
+        GL.setCapabilities(null);
+        glfwMakeContextCurrent(NULL);
+        glfwDestroyWindow(window);
+        window = NULL;
+        hglrc = NULL;
+      }
+    }
+
+    private static long getDc(long hwnd) {
+      try {
+        var hdc = (MemorySegment) loadGetDc().invoke(MemorySegment.ofAddress(hwnd));
+        return hdc.address();
+      } catch (Throwable error) {
+        throw new IllegalStateException("GetDC failed", error);
+      }
+    }
+
+    private static void releaseDc(long hwnd, long hdc) {
+      try {
+        loadReleaseDc().invoke(MemorySegment.ofAddress(hwnd), MemorySegment.ofAddress(hdc));
+      } catch (Throwable error) {
+        throw new IllegalStateException("ReleaseDC failed", error);
+      }
+    }
+
+    private static MethodHandle loadGetDc() {
+      return loadUser32("GetDC", FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.ADDRESS));
+    }
+
+    private static MethodHandle loadReleaseDc() {
+      return loadUser32(
+          "ReleaseDC",
+          FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
+    }
+
+    private static MethodHandle loadUser32(String symbolName, FunctionDescriptor descriptor) {
+      try {
+        var symbol =
+            SymbolLookup.libraryLookup("user32", Arena.global())
+                .find(symbolName)
+                .orElseThrow(() -> new IllegalStateException(symbolName + " missing"));
+        return Linker.nativeLinker().downcallHandle(symbol, descriptor);
+      } catch (RuntimeException | Error error) {
+        throw error;
+      } catch (Throwable error) {
+        throw new IllegalStateException("Failed to load " + symbolName, error);
+      }
+    }
+  }
+
+  private static final class OpenGLBorrowedTextureContext extends OpenGLTestContext {
+    private int texture;
+    private int width;
+    private int height;
+
+    static OpenGLBorrowedTextureContext create(int width, int height) {
+      var base = OpenGLTestContext.create(width, height);
+      var context = new OpenGLBorrowedTextureContext();
+      context.window = base.window;
+      context.hdc = base.hdc;
+      context.hglrc = base.hglrc;
+      base.window = NULL;
+      base.hdc = NULL;
+      base.hglrc = NULL;
+      base.closed = true;
+      context.width = width;
+      context.height = height;
+      try {
+        context.createTexture();
+        return context;
+      } catch (RuntimeException error) {
+        context.close();
+        throw error;
+      }
+    }
+
+    int texture() {
+      return texture;
+    }
+
+    byte[] readRgba() {
+      makeCurrent();
+      var pixels = BufferUtils.createByteBuffer(width * height * 4);
+      glBindTexture(GL_TEXTURE_2D, texture);
+      glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
+      glBindTexture(GL_TEXTURE_2D, 0);
+      checkGlError("read OpenGL borrowed texture");
+      var bytes = new byte[pixels.capacity()];
+      pixels.get(0, bytes);
+      return bytes;
+    }
+
+    @Override
+    public void close() {
+      if (texture != 0) {
+        makeCurrent();
+        glDeleteTextures(texture);
+        texture = 0;
+      }
+      super.close();
+    }
+
+    private void createTexture() {
+      makeCurrent();
+      texture = glGenTextures();
+      glBindTexture(GL_TEXTURE_2D, texture);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+      glTexImage2D(
+          GL_TEXTURE_2D,
+          0,
+          GL_RGBA8,
+          width,
+          height,
+          0,
+          GL_RGBA,
+          GL_UNSIGNED_BYTE,
+          (ByteBuffer) null);
+      glBindTexture(GL_TEXTURE_2D, 0);
+      checkGlError("create OpenGL borrowed texture");
+    }
   }
 
   private static final class VulkanTestContext implements AutoCloseable {
