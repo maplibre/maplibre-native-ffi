@@ -74,6 +74,7 @@ test "Metal surface render acquires one drawable per frame through public bindin
 }
 
 test "surface public descriptors report invalid native arguments" {
+    if (!build_options.supports_metal and !build_options.supports_vulkan) return error.SkipZigTest;
     var runtime = try maplibre.RuntimeHandle.init(null);
     defer runtime.close() catch @panic("runtime close failed");
     var map = try maplibre.MapHandle.create(&runtime, .{});
@@ -107,6 +108,7 @@ test "surface public descriptors report invalid native arguments" {
 }
 
 test "unsupported public surface backends report unsupported" {
+    if (!build_options.supports_metal and !build_options.supports_vulkan) return error.SkipZigTest;
     var runtime = try maplibre.RuntimeHandle.init(null);
     defer runtime.close() catch @panic("runtime close failed");
     var map = try maplibre.MapHandle.create(&runtime, .{});

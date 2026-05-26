@@ -13,6 +13,8 @@ const vk = if (build_options.supports_vulkan) @cImport({
 
 extern "c" fn MTLCreateSystemDefaultDevice() ?*anyopaque;
 
+pub const supports_owned_texture_attach = build_options.supports_metal or build_options.supports_vulkan;
+
 pub fn createRuntime() !*c.mln_runtime {
     var runtime: ?*c.mln_runtime = null;
     var options = c.mln_runtime_options_default();

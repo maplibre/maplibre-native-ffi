@@ -26,6 +26,7 @@ pub const NativePointer = struct {
 
 pub const RenderBackendSupport = struct {
     metal: bool,
+    opengl: bool,
     vulkan: bool,
 };
 
@@ -33,6 +34,7 @@ pub fn supportedRenderBackends() RenderBackendSupport {
     const mask = c.mln_supported_render_backend_mask();
     return .{
         .metal = (mask & c.MLN_RENDER_BACKEND_FLAG_METAL) != 0,
+        .opengl = (mask & c.MLN_RENDER_BACKEND_FLAG_OPENGL) != 0,
         .vulkan = (mask & c.MLN_RENDER_BACKEND_FLAG_VULKAN) != 0,
     };
 }

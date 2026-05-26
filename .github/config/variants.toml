@@ -30,11 +30,11 @@ requires = { platform = ["linux", "macos", "windows"], backend = ["metal", "vulk
 
 [bindings.java-ffm]
 task = "//bindings/java-ffm:build"
-requires = { platform = ["linux", "macos", "windows"] }
+requires = { platform = ["linux", "macos", "windows"], backend = ["metal", "vulkan"] }
 
 [bindings.rust]
 task = "//bindings/rust:ci"
-requires = { platform = ["linux", "macos", "windows"] }
+requires = { platform = ["linux", "macos", "windows"], backend = ["metal", "vulkan"] }
 
 [bindings.zig]
 task = "//bindings/zig:ci"

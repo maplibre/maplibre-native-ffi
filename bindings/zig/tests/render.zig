@@ -40,8 +40,9 @@ const cluster_style_json =
 
 test "supported render backend is exposed semantically" {
     const support_mask = maplibre.supportedRenderBackends();
-    try testing.expect(support_mask.metal or support_mask.vulkan);
+    try testing.expect(support_mask.metal or support_mask.opengl or support_mask.vulkan);
     if (build_options.supports_metal) try testing.expect(support_mask.metal);
+    if (build_options.supports_opengl) try testing.expect(support_mask.opengl);
     if (build_options.supports_vulkan) try testing.expect(support_mask.vulkan);
 }
 
@@ -209,6 +210,8 @@ const TestOwnedTextureDescriptor = struct {
     extent: maplibre.RenderTargetExtent = .{},
 };
 
+const supports_test_owned_texture = build_options.supports_metal or build_options.supports_vulkan;
+
 const TestOwnedTextureContext = if (build_options.supports_vulkan) VulkanAttachContext else if (build_options.supports_metal) struct {
     device: *anyopaque,
 
@@ -239,6 +242,7 @@ const TestOwnedTextureSession = struct {
 };
 
 fn attachTestOwnedTexture(map: *maplibre.MapHandle, descriptor: TestOwnedTextureDescriptor) !TestOwnedTextureSession {
+    if (!supports_test_owned_texture) return error.SkipZigTest;
     var context = try TestOwnedTextureContext.init();
     errdefer context.deinit();
 
@@ -586,6 +590,7 @@ fn findVulkanMemoryType(dispatch: *const VulkanDispatch, physical_device: if (bu
 }
 
 test "owned texture render session lifecycle and readback" {
+    if (!supports_test_owned_texture) return error.SkipZigTest;
     var runtime = try maplibre.RuntimeHandle.init(null);
     defer runtime.close() catch @panic("runtime close failed");
 
@@ -630,6 +635,7 @@ test "owned texture render session lifecycle and readback" {
 }
 
 test "still-image map modes drive owned texture rendering" {
+    if (!supports_test_owned_texture) return error.SkipZigTest;
     inline for (.{ maplibre.MapMode.static, maplibre.MapMode.tile }) |mode| {
         var runtime = try maplibre.RuntimeHandle.init(null);
         defer runtime.close() catch @panic("runtime close failed");
@@ -647,6 +653,7 @@ test "still-image map modes drive owned texture rendering" {
 }
 
 test "owned texture attachment validates public descriptors" {
+    if (!supports_test_owned_texture) return error.SkipZigTest;
     var runtime = try maplibre.RuntimeHandle.init(null);
     defer runtime.close() catch @panic("runtime close failed");
 
@@ -663,6 +670,7 @@ test "owned texture attachment validates public descriptors" {
 }
 
 test "render session feature state set get and remove" {
+    if (!supports_test_owned_texture) return error.SkipZigTest;
     var runtime = try maplibre.RuntimeHandle.init(null);
     defer runtime.close() catch @panic("runtime close failed");
 
@@ -724,6 +732,7 @@ test "render session feature state set get and remove" {
 }
 
 test "render session queries rendered and source features" {
+    if (!supports_test_owned_texture) return error.SkipZigTest;
     var runtime = try maplibre.RuntimeHandle.init(null);
     defer runtime.close() catch @panic("runtime close failed");
 
@@ -768,6 +777,7 @@ test "render session queries rendered and source features" {
 }
 
 test "render session queries cluster feature extensions" {
+    if (!supports_test_owned_texture) return error.SkipZigTest;
     var runtime = try maplibre.RuntimeHandle.init(null);
     defer runtime.close() catch @panic("runtime close failed");
 
@@ -924,6 +934,7 @@ test "Metal owned texture frame release follows moved session wrapper" {
 }
 
 test "render session rejects wrong-thread calls through public bindings" {
+    if (!supports_test_owned_texture) return error.SkipZigTest;
     var runtime = try maplibre.RuntimeHandle.init(null);
     defer runtime.close() catch @panic("runtime close failed");
 

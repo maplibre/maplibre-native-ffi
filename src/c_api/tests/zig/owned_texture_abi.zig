@@ -6,6 +6,7 @@ const support = @import("support.zig");
 const c = support.c;
 
 test "owned texture attach rejects invalid arguments" {
+    if (!support.supports_owned_texture_attach) return error.SkipZigTest;
     var texture: ?*c.mln_render_session = null;
     var descriptor = support.defaultOwnedTextureDescriptor();
 
@@ -40,6 +41,7 @@ test "render session maintenance rejects null raw handles" {
 }
 
 test "render session rejects stale raw handles" {
+    if (!support.supports_owned_texture_attach) return error.SkipZigTest;
     const runtime = try support.createRuntime();
     defer support.destroyRuntime(runtime);
     const map = try support.createMap(runtime);
