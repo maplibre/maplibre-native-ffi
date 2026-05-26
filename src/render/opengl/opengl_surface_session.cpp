@@ -304,7 +304,8 @@ class OpenGLSurfaceBackend final : public mbgl::gl::RendererBackend,
 
 #if defined(_WIN32)
   void create_wgl_context() {
-    auto* const surface_context = static_cast<HDC>(descriptor_.surface);
+    auto* const device_context =
+      static_cast<HDC>(descriptor_.context.data.wgl.device_context);
     auto* const share_context =
       static_cast<HGLRC>(descriptor_.context.data.wgl.share_context);
     auto* context_attribs =
@@ -312,7 +313,7 @@ class OpenGLSurfaceBackend final : public mbgl::gl::RendererBackend,
         getExtensionFunctionPointer("wglCreateContextAttribsARB")
       );
     render_context_ = mln::core::opengl::create_shared_wgl_context(
-      surface_context, share_context,
+      device_context, share_context,
       static_cast<HGLRC>(previous_render_context_), context_attribs
     );
   }
