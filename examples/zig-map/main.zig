@@ -189,9 +189,9 @@ fn printUsage() void {
         \\Usage: zig build run -- --render-target=<mode>
         \\
         \\Modes:
-        \\  owned-texture     MapLibre-owned Metal/Vulkan texture APIs
-        \\  borrowed-texture  caller-owned Metal/Vulkan texture APIs
-        \\  native-surface  Metal/Vulkan native surface presentation APIs
+        \\  owned-texture     MapLibre-owned Metal/OpenGL/Vulkan texture APIs
+        \\  borrowed-texture  caller-owned Metal/OpenGL/Vulkan texture APIs
+        \\  native-surface  Metal/OpenGL/Vulkan native surface presentation APIs
         \\
     , .{});
 }
