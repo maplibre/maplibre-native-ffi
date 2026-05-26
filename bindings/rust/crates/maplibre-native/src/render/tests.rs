@@ -1426,3 +1426,50 @@ fn backend_specific_attach_calls_report_native_statuses() {
     map.close().unwrap();
     runtime.close().unwrap();
 }
+
+#[test]
+fn opengl_attach_calls_report_unsupported_when_backend_unavailable() {
+    if crate::supported_render_backends().contains(RenderBackendMask::OPENGL) {
+        return;
+    }
+
+    let runtime = RuntimeHandle::new().unwrap();
+    let map = MapHandle::with_options(
+        &runtime,
+        &MapOptions::new(64, 64, 1.0).with_mode(MapMode::Static),
+    )
+    .unwrap();
+    // SAFETY: Test uses dummy opaque addresses and never dereferences them.
+    let fake = unsafe { NativePointer::from_address(1) };
+    let opengl_context = OpenGLContextDescriptor::wgl(WglContextDescriptor::new(fake, fake));
+
+    let error = map
+        .attach_opengl_owned_texture(&OpenGLOwnedTextureDescriptor::new(
+            RenderTargetExtent::new(32, 16, 1.0),
+            opengl_context.clone(),
+        ))
+        .unwrap_err();
+    assert_eq!(error.kind(), ErrorKind::Unsupported);
+
+    let error = map
+        .attach_opengl_borrowed_texture(&OpenGLBorrowedTextureDescriptor::new(
+            RenderTargetExtent::new(32, 16, 1.0),
+            opengl_context.clone(),
+            1,
+            GL_TEXTURE_2D,
+        ))
+        .unwrap_err();
+    assert_eq!(error.kind(), ErrorKind::Unsupported);
+
+    let error = map
+        .attach_opengl_surface(&OpenGLSurfaceDescriptor::new(
+            RenderTargetExtent::new(32, 16, 1.0),
+            opengl_context,
+            fake,
+        ))
+        .unwrap_err();
+    assert_eq!(error.kind(), ErrorKind::Unsupported);
+
+    map.close().unwrap();
+    runtime.close().unwrap();
+}
