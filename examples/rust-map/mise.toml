@@ -24,5 +24,8 @@ run = 'cargo run -p rust-map -- --render-target="{{ usage.render_target }}"'
 [tasks."run:owned-texture"]
 run = [{ task = "run", args = ["owned-texture"] }]
 
+[tasks."run:borrowed-texture"]
+run = [{ task = "run", args = ["borrowed-texture"] }]
+
 [tasks."run:native-surface"]
 run = [{ task = "run", args = ["native-surface"] }]

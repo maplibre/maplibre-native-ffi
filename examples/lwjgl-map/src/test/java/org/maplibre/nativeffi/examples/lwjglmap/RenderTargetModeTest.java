@@ -9,6 +9,7 @@ final class RenderTargetModeTest {
   @Test
   void parsesSupportedCliNames() {
     assertEquals(RenderTargetMode.OWNED_TEXTURE, RenderTargetMode.parse("owned-texture"));
+    assertEquals(RenderTargetMode.BORROWED_TEXTURE, RenderTargetMode.parse("borrowed-texture"));
     assertEquals(RenderTargetMode.NATIVE_SURFACE, RenderTargetMode.parse("native-surface"));
   }
 
@@ -24,6 +25,8 @@ final class RenderTargetModeTest {
     assertEquals(
         "samples MapLibre-owned frames into the GLFW swapchain",
         RenderTargetMode.OWNED_TEXTURE.status());
+    assertEquals(
+        "renders into a caller-owned OpenGL texture", RenderTargetMode.BORROWED_TEXTURE.status());
     assertEquals(
         "renders directly to the GLFW native surface", RenderTargetMode.NATIVE_SURFACE.status());
   }

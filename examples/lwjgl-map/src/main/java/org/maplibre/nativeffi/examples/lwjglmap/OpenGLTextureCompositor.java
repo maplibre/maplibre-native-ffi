@@ -87,7 +87,13 @@ final class OpenGLTextureCompositor implements AutoCloseable {
     if (frame.texture() == 0 || frame.width() <= 0 || frame.height() <= 0) {
       throw new IllegalStateException("MapLibre returned an empty OpenGL owned texture frame");
     }
+    draw(frame.target(), frame.texture());
+  }
 
+  void draw(int target, int texture) {
+    if (texture == 0) {
+      throw new IllegalStateException("OpenGL texture name is 0");
+    }
     context.makeCurrent();
     glViewport(0, 0, viewport.framebufferWidth(), viewport.framebufferHeight());
     glClearColor(0.08f, 0.09f, 0.11f, 1.0f);
@@ -95,11 +101,11 @@ final class OpenGLTextureCompositor implements AutoCloseable {
     glUseProgram(program);
     glBindVertexArray(vertexArray);
     glActiveTexture(GL_TEXTURE0);
-    glBindTexture(frame.target(), frame.texture());
-    glTexParameteri(frame.target(), GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(frame.target(), GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glBindTexture(target, texture);
+    glTexParameteri(target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glDrawArrays(GL_TRIANGLES, 0, 3);
-    glBindTexture(frame.target(), 0);
+    glBindTexture(target, 0);
     glBindVertexArray(0);
     glUseProgram(0);
     context.swapBuffers();

@@ -1,13 +1,14 @@
 use maplibre_native::{
-    Error, ErrorKind, MapHandle, OpenGLContextDescriptor, OpenGLOwnedTextureDescriptor,
-    OpenGLSurfaceDescriptor, RenderBackendMask, RenderSessionHandle, RenderTargetExtent,
-    VulkanContextDescriptor, VulkanOwnedTextureDescriptor, VulkanSurfaceDescriptor,
+    Error, ErrorKind, MapHandle, OpenGLBorrowedTextureDescriptor, OpenGLContextDescriptor,
+    OpenGLOwnedTextureDescriptor, OpenGLSurfaceDescriptor, RenderBackendMask, RenderSessionHandle,
+    RenderTargetExtent, VulkanContextDescriptor, VulkanOwnedTextureDescriptor,
+    VulkanSurfaceDescriptor,
 };
 use std::error::Error as StdError;
 use winit::window::Window;
 
 use crate::opengl::OpenGLContext;
-use crate::opengl_texture_compositor::OpenGLTextureCompositor;
+use crate::opengl_texture_compositor::{OpenGLBorrowedTexture, OpenGLTextureCompositor};
 use crate::viewport::Viewport;
 use crate::vulkan::VulkanContext;
 use crate::vulkan_texture_compositor::VulkanTextureCompositor;
@@ -86,6 +87,7 @@ impl BackendContext {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Mode {
     OwnedTexture,
+    BorrowedTexture,
     NativeSurface,
 }
 
@@ -93,6 +95,7 @@ impl Mode {
     pub fn cli_name(self) -> &'static str {
         match self {
             Self::OwnedTexture => "owned-texture",
+            Self::BorrowedTexture => "borrowed-texture",
             Self::NativeSurface => "native-surface",
         }
     }
@@ -100,6 +103,7 @@ impl Mode {
     pub fn status(self) -> &'static str {
         match self {
             Self::OwnedTexture => "samples MapLibre-owned frames into the winit swapchain",
+            Self::BorrowedTexture => "renders into a caller-owned OpenGL texture",
             Self::NativeSurface => "renders directly to the winit native surface",
         }
     }
@@ -107,6 +111,7 @@ impl Mode {
     pub fn parse(value: &str) -> Result<Self, String> {
         match value {
             "owned-texture" => Ok(Self::OwnedTexture),
+            "borrowed-texture" => Ok(Self::BorrowedTexture),
             "native-surface" => Ok(Self::NativeSurface),
             _ => Err(format!("unknown render target '{value}'")),
         }
@@ -125,6 +130,11 @@ pub enum RenderTarget {
         session: RenderSessionHandle,
         compositor: Box<OpenGLTextureCompositor>,
     },
+    OpenGLBorrowedTexture {
+        session: RenderSessionHandle,
+        compositor: Box<OpenGLTextureCompositor>,
+        borrowed_texture: OpenGLBorrowedTexture,
+    },
     OpenGLNativeSurface {
         session: RenderSessionHandle,
     },
@@ -141,11 +151,17 @@ impl RenderTarget {
             (BackendContext::Vulkan(vulkan), Mode::OwnedTexture) => {
                 Self::attach_vulkan_owned_texture(map, vulkan, viewport)
             }
+            (BackendContext::Vulkan(_), Mode::BorrowedTexture) => Err(compositor_error(
+                "the Rust map borrowed-texture example is implemented for OpenGL",
+            )),
             (BackendContext::Vulkan(vulkan), Mode::NativeSurface) => {
                 Self::attach_vulkan_surface(map, vulkan, viewport)
             }
             (BackendContext::OpenGL(opengl), Mode::OwnedTexture) => {
                 Self::attach_opengl_owned_texture(map, opengl, viewport)
+            }
+            (BackendContext::OpenGL(opengl), Mode::BorrowedTexture) => {
+                Self::attach_opengl_borrowed_texture(map, opengl, viewport)
             }
             (BackendContext::OpenGL(opengl), Mode::NativeSurface) => {
                 Self::attach_opengl_surface(map, opengl, viewport)
@@ -186,12 +202,19 @@ impl RenderTarget {
                     viewport.scale_factor,
                 )
             }
+            Self::OpenGLBorrowedTexture { .. } => Err(compositor_error(
+                "borrowed texture render targets must be reattached after resize",
+            )),
             Self::OpenGLNativeSurface { session } => session.resize(
                 viewport.logical_width,
                 viewport.logical_height,
                 viewport.scale_factor,
             ),
         }
+    }
+
+    pub fn needs_reattach_on_resize(&self) -> bool {
+        matches!(self, Self::OpenGLBorrowedTexture { .. })
     }
 
     pub fn render_update(&mut self) -> maplibre_native::Result<()> {
@@ -235,6 +258,14 @@ impl RenderTarget {
                     )),
                 }
             }
+            Self::OpenGLBorrowedTexture {
+                session,
+                compositor,
+                borrowed_texture,
+            } => {
+                session.render_update()?;
+                compositor.draw_texture(borrowed_texture.target(), borrowed_texture.texture())
+            }
             Self::OpenGLNativeSurface { session } => session.render_update(),
         }
     }
@@ -275,6 +306,35 @@ impl RenderTarget {
                     append_error(
                         &mut close_error,
                         format!("render session close failed: {error}"),
+                    );
+                }
+                match close_error {
+                    Some(error) => Err(Box::new(compositor_error(error))),
+                    None => Ok(()),
+                }
+            }
+            Self::OpenGLBorrowedTexture {
+                session,
+                mut compositor,
+                mut borrowed_texture,
+            } => {
+                let mut close_error = None;
+                if let Err(error) = session.close() {
+                    append_error(
+                        &mut close_error,
+                        format!("render session close failed: {error}"),
+                    );
+                }
+                if let Err(error) = borrowed_texture.close() {
+                    append_error(
+                        &mut close_error,
+                        format!("OpenGL borrowed texture close failed: {error}"),
+                    );
+                }
+                if let Err(error) = compositor.close() {
+                    append_error(
+                        &mut close_error,
+                        format!("OpenGL texture compositor close failed: {error}"),
                     );
                 }
                 match close_error {
@@ -384,6 +444,60 @@ impl RenderTarget {
         Ok(Self::OpenGLOwnedTexture {
             session,
             compositor: Box::new(compositor),
+        })
+    }
+
+    fn attach_opengl_borrowed_texture(
+        map: &MapHandle,
+        opengl: &OpenGLContext,
+        viewport: Viewport,
+    ) -> maplibre_native::Result<Self> {
+        let borrowed_texture = OpenGLBorrowedTexture::new(opengl, viewport).map_err(|error| {
+            compositor_error(format!("OpenGL borrowed texture creation failed: {error}"))
+        })?;
+        let descriptor = OpenGLBorrowedTextureDescriptor::new(
+            RenderTargetExtent::new(
+                viewport.logical_width,
+                viewport.logical_height,
+                viewport.scale_factor,
+            ),
+            opengl_context_descriptor(opengl),
+            borrowed_texture.texture(),
+            borrowed_texture.target(),
+        );
+        let session = match map.attach_opengl_borrowed_texture(&descriptor) {
+            Ok(session) => session,
+            Err(error) => {
+                let mut borrowed_texture = borrowed_texture;
+                let mut message = format!("{error}");
+                if let Err(close_error) = borrowed_texture.close() {
+                    message.push_str(&format!(
+                        "; OpenGL borrowed texture cleanup failed: {close_error}"
+                    ));
+                }
+                return Err(Error::new(error.kind(), error.raw_status(), message));
+            }
+        };
+        let compositor = match OpenGLTextureCompositor::new(opengl, viewport) {
+            Ok(compositor) => compositor,
+            Err(error) => {
+                let mut message = format!("OpenGL texture compositor creation failed: {error}");
+                if let Err(close_error) = session.close() {
+                    message.push_str(&format!("; render session cleanup failed: {close_error}"));
+                }
+                let mut borrowed_texture = borrowed_texture;
+                if let Err(close_error) = borrowed_texture.close() {
+                    message.push_str(&format!(
+                        "; OpenGL borrowed texture cleanup failed: {close_error}"
+                    ));
+                }
+                return Err(compositor_error(message));
+            }
+        };
+        Ok(Self::OpenGLBorrowedTexture {
+            session,
+            compositor: Box::new(compositor),
+            borrowed_texture,
         })
     }
 

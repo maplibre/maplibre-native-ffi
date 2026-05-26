@@ -4,6 +4,7 @@ import org.maplibre.nativeffi.camera.CameraOptions;
 import org.maplibre.nativeffi.map.MapHandle;
 import org.maplibre.nativeffi.map.MapMode;
 import org.maplibre.nativeffi.map.MapOptions;
+import org.maplibre.nativeffi.render.OpenGLBorrowedTextureDescriptor;
 import org.maplibre.nativeffi.render.OpenGLOwnedTextureDescriptor;
 import org.maplibre.nativeffi.render.OpenGLSurfaceDescriptor;
 import org.maplibre.nativeffi.render.RenderSessionHandle;
@@ -20,13 +21,19 @@ final class MapState implements AutoCloseable {
 
   private final RuntimeHandle runtime;
   private final MapHandle map;
-  private final RenderTarget renderTarget;
+  private final RenderTargetFactory targetFactory;
+  private RenderTarget renderTarget;
   private boolean renderPending = true;
 
-  private MapState(RuntimeHandle runtime, MapHandle map, RenderTarget renderTarget) {
+  private MapState(
+      RuntimeHandle runtime,
+      MapHandle map,
+      RenderTarget renderTarget,
+      RenderTargetFactory targetFactory) {
     this.runtime = runtime;
     this.map = map;
     this.renderTarget = renderTarget;
+    this.targetFactory = targetFactory;
   }
 
   static MapState create(VulkanContext vulkan, Viewport viewport, RenderTargetMode mode) {
@@ -54,7 +61,7 @@ final class MapState implements AutoCloseable {
       map.setStyleUrl(STYLE_URL);
       map.jumpTo(
           new CameraOptions().center(37.7749, -122.4194).zoom(13.0).bearing(12.0).pitch(30.0));
-      return new MapState(runtime, map, target);
+      return new MapState(runtime, map, target, targetFactory);
     } catch (RuntimeException error) {
       if (target != null) {
         target.close();
@@ -70,7 +77,12 @@ final class MapState implements AutoCloseable {
   }
 
   void resize(Viewport viewport) {
-    renderTarget.resize(viewport);
+    if (renderTarget.needsReattachOnResize()) {
+      renderTarget.close();
+      renderTarget = targetFactory.attach(map, viewport);
+    } else {
+      renderTarget.resize(viewport);
+    }
     renderPending = true;
   }
 
@@ -130,6 +142,9 @@ final class MapState implements AutoCloseable {
         yield new SurfaceRenderTarget(RenderSessionHandle.attachVulkanSurface(map, descriptor));
       }
       case OWNED_TEXTURE -> attachOwnedTextureRenderTarget(vulkan, map, viewport);
+      case BORROWED_TEXTURE ->
+          throw new IllegalArgumentException(
+              "the LWJGL borrowed-texture example is implemented for OpenGL");
     };
   }
 
@@ -147,6 +162,7 @@ final class MapState implements AutoCloseable {
         yield new SurfaceRenderTarget(RenderSessionHandle.attachOpenGLSurface(map, descriptor));
       }
       case OWNED_TEXTURE -> attachOpenGLOwnedTextureRenderTarget(opengl, map, viewport);
+      case BORROWED_TEXTURE -> attachOpenGLBorrowedTextureRenderTarget(opengl, map, viewport);
     };
   }
 
@@ -214,6 +230,50 @@ final class MapState implements AutoCloseable {
     }
   }
 
+  private static RenderTarget attachOpenGLBorrowedTextureRenderTarget(
+      OpenGLContext opengl, MapHandle map, Viewport viewport) {
+    OpenGLBorrowedTexture borrowedTexture = null;
+    RenderSessionHandle session = null;
+    OpenGLTextureCompositor compositor = null;
+    try {
+      borrowedTexture = new OpenGLBorrowedTexture(opengl, viewport);
+      var descriptor =
+          new OpenGLBorrowedTextureDescriptor()
+              .extent(
+                  new RenderTargetExtent(
+                      viewport.width(), viewport.height(), viewport.scaleFactor()))
+              .context(opengl.descriptor())
+              .texture(borrowedTexture.texture())
+              .target(borrowedTexture.target());
+      session = RenderSessionHandle.attachOpenGLBorrowedTexture(map, descriptor);
+      compositor = new OpenGLTextureCompositor(opengl, viewport);
+      return new OpenGLBorrowedTextureRenderTarget(session, compositor, borrowedTexture);
+    } catch (RuntimeException error) {
+      if (compositor != null) {
+        try {
+          compositor.close();
+        } catch (RuntimeException cleanupError) {
+          error.addSuppressed(cleanupError);
+        }
+      }
+      if (session != null) {
+        try {
+          session.close();
+        } catch (RuntimeException cleanupError) {
+          error.addSuppressed(cleanupError);
+        }
+      }
+      if (borrowedTexture != null) {
+        try {
+          borrowedTexture.close();
+        } catch (RuntimeException cleanupError) {
+          error.addSuppressed(cleanupError);
+        }
+      }
+      throw error;
+    }
+  }
+
   private static VulkanContextDescriptor vulkanContextDescriptor(VulkanContext vulkan) {
     return new VulkanContextDescriptor(
             vulkan.instancePointer(),
@@ -225,6 +285,10 @@ final class MapState implements AutoCloseable {
   }
 
   private interface RenderTarget extends AutoCloseable {
+    default boolean needsReattachOnResize() {
+      return false;
+    }
+
     void resize(Viewport viewport);
 
     void renderUpdate();
@@ -286,6 +350,50 @@ final class MapState implements AutoCloseable {
         compositor.close();
       } finally {
         session.close();
+      }
+    }
+  }
+
+  private static final class OpenGLBorrowedTextureRenderTarget implements RenderTarget {
+    private final RenderSessionHandle session;
+    private final OpenGLTextureCompositor compositor;
+    private final OpenGLBorrowedTexture borrowedTexture;
+
+    OpenGLBorrowedTextureRenderTarget(
+        RenderSessionHandle session,
+        OpenGLTextureCompositor compositor,
+        OpenGLBorrowedTexture borrowedTexture) {
+      this.session = session;
+      this.compositor = compositor;
+      this.borrowedTexture = borrowedTexture;
+    }
+
+    @Override
+    public boolean needsReattachOnResize() {
+      return true;
+    }
+
+    @Override
+    public void resize(Viewport viewport) {
+      throw new IllegalStateException("borrowed texture render targets must be reattached");
+    }
+
+    @Override
+    public void renderUpdate() {
+      session.renderUpdate();
+      compositor.draw(borrowedTexture.target(), borrowedTexture.texture());
+    }
+
+    @Override
+    public void close() {
+      try {
+        session.close();
+      } finally {
+        try {
+          borrowedTexture.close();
+        } finally {
+          compositor.close();
+        }
       }
     }
   }

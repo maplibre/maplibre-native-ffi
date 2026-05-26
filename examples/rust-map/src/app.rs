@@ -172,10 +172,27 @@ impl App {
             self.render_pending = false;
             return Ok(());
         }
-        self.target
-            .as_mut()
+        if self
+            .target
+            .as_ref()
             .expect("render target is open")
-            .resize(next)?;
+            .needs_reattach_on_resize()
+        {
+            let old_target = self.target.take().expect("render target is open");
+            old_target.close()?;
+            let map = self.map.as_ref().expect("map is open");
+            self.target = Some(RenderTarget::attach(
+                self.mode,
+                map,
+                &self.backend_context,
+                next,
+            )?);
+        } else {
+            self.target
+                .as_mut()
+                .expect("render target is open")
+                .resize(next)?;
+        }
         self.map.as_ref().expect("map is open").request_repaint()?;
         self.render_pending = true;
         Ok(())
