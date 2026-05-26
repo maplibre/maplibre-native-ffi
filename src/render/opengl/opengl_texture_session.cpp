@@ -32,6 +32,7 @@
 #include "diagnostics/diagnostics.hpp"
 #include "map/map.hpp"
 #include "maplibre_native_c/base.h"
+#include "render/opengl/wgl_common.hpp"
 #include "render/render_session_common.hpp"
 #include "render/texture_session.hpp"
 
@@ -41,20 +42,6 @@ constexpr auto opengl_texture_target = uint32_t{GL_TEXTURE_2D};
 constexpr auto opengl_internal_format = uint32_t{GL_RGBA8};
 constexpr auto opengl_pixel_format = uint32_t{GL_RGBA};
 constexpr auto opengl_pixel_type = uint32_t{GL_UNSIGNED_BYTE};
-
-#if defined(_WIN32)
-using WglCreateContextAttribs = HGLRC(WINAPI*)(HDC, HGLRC, const int*);
-constexpr auto wgl_context_major_version_arb = 0x2091;
-constexpr auto wgl_context_minor_version_arb = 0x2092;
-constexpr auto wgl_context_profile_mask_arb = 0x9126;
-constexpr auto wgl_context_compatibility_profile_bit_arb = 0x00000002;
-
-bool is_valid_wgl_proc_address(PROC proc) {
-  const auto address = reinterpret_cast<std::uintptr_t>(proc);
-  return proc != nullptr && address > 3 &&
-         address != std::numeric_limits<std::uintptr_t>::max();
-}
-#endif
 
 auto validate_metal_owned_descriptor(
   const mln_metal_owned_texture_descriptor* descriptor
@@ -452,12 +439,12 @@ class OpenGLTextureBackend final : public mbgl::gl::RendererBackend,
     );
     if (loader != nullptr) {
       auto* proc = loader(name);
-      if (is_valid_wgl_proc_address(proc)) {
+      if (mln::core::opengl::is_valid_wgl_proc_address(proc)) {
         return reinterpret_cast<mbgl::gl::ProcAddress>(proc);
       }
     }
     auto* proc = wglGetProcAddress(name);
-    if (is_valid_wgl_proc_address(proc)) {
+    if (mln::core::opengl::is_valid_wgl_proc_address(proc)) {
       return reinterpret_cast<mbgl::gl::ProcAddress>(proc);
     }
     auto* module = GetModuleHandleA("opengl32.dll");
@@ -486,16 +473,26 @@ class OpenGLTextureBackend final : public mbgl::gl::RendererBackend,
 #if defined(_WIN32)
     previous_device_context_ = wglGetCurrentDC();
     previous_render_context_ = wglGetCurrentContext();
-    if (render_context_ == nullptr) {
-      create_wgl_context();
-    }
-    if (
-      wglMakeCurrent(
-        static_cast<HDC>(context_.data.wgl.device_context),
-        static_cast<HGLRC>(render_context_)
-      ) == 0
-    ) {
-      throw std::runtime_error("Switching OpenGL WGL context failed");
+    try {
+      if (render_context_ == nullptr) {
+        create_wgl_context();
+      }
+      if (
+        wglMakeCurrent(
+          static_cast<HDC>(context_.data.wgl.device_context),
+          static_cast<HGLRC>(render_context_)
+        ) == 0
+      ) {
+        throw std::runtime_error("Switching OpenGL WGL context failed");
+      }
+    } catch (...) {
+      (void)wglMakeCurrent(
+        static_cast<HDC>(previous_device_context_),
+        static_cast<HGLRC>(previous_render_context_)
+      );
+      previous_device_context_ = nullptr;
+      previous_render_context_ = nullptr;
+      throw;
     }
 #elif defined(__linux__)
     previous_display_ = eglGetCurrentDisplay();
@@ -557,46 +554,14 @@ class OpenGLTextureBackend final : public mbgl::gl::RendererBackend,
       static_cast<HDC>(context_.data.wgl.device_context);
     auto* const share_context =
       static_cast<HGLRC>(context_.data.wgl.share_context);
-
-    auto* context_attribs = reinterpret_cast<WglCreateContextAttribs>(
-      getExtensionFunctionPointer("wglCreateContextAttribsARB")
+    auto* context_attribs =
+      reinterpret_cast<mln::core::opengl::WglCreateContextAttribs>(
+        getExtensionFunctionPointer("wglCreateContextAttribsARB")
+      );
+    render_context_ = mln::core::opengl::create_shared_wgl_context(
+      device_context, share_context,
+      static_cast<HGLRC>(previous_render_context_), context_attribs
     );
-    if (context_attribs != nullptr) {
-      const int attributes[] = {
-        wgl_context_major_version_arb,
-        3,
-        wgl_context_minor_version_arb,
-        0,
-        wgl_context_profile_mask_arb,
-        wgl_context_compatibility_profile_bit_arb,
-        0
-      };
-      render_context_ =
-        context_attribs(device_context, share_context, attributes);
-    }
-    if (render_context_ == nullptr) {
-      render_context_ = wglCreateContext(device_context);
-      if (render_context_ == nullptr) {
-        throw std::runtime_error("Creating OpenGL WGL context failed");
-      }
-      const auto share_context_was_current =
-        static_cast<HGLRC>(previous_render_context_) == share_context;
-      if (share_context_was_current && wglMakeCurrent(nullptr, nullptr) == 0) {
-        wglDeleteContext(static_cast<HGLRC>(render_context_));
-        render_context_ = nullptr;
-        throw std::runtime_error("Releasing current WGL context failed");
-      }
-      if (
-        wglShareLists(share_context, static_cast<HGLRC>(render_context_)) == 0
-      ) {
-        if (share_context_was_current) {
-          wglMakeCurrent(device_context, share_context);
-        }
-        wglDeleteContext(static_cast<HGLRC>(render_context_));
-        render_context_ = nullptr;
-        throw std::runtime_error("Sharing OpenGL WGL context failed");
-      }
-    }
   }
 
   void destroy_native_context() {
