@@ -4,6 +4,7 @@ import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Objects;
+import org.maplibre.nativejni.error.NativeErrorException;
 import org.maplibre.nativejni.internal.javacpp.MaplibreNativeC;
 
 /** Loads the JavaCPP JNI bridge library exactly once per class loader. */
@@ -12,6 +13,7 @@ public final class NativeLibrary {
   public static final String LIBRARY_PATH_ENV = "MAPLIBRE_NATIVE_JNI_LIBRARY_PATH";
   public static final String LIBRARY_NAME = "jniMaplibreNativeC";
 
+  private static final int EXPECTED_C_ABI_VERSION = 0;
   private static final Object LOCK = new Object();
   private static volatile boolean loaded;
 
@@ -56,12 +58,32 @@ public final class NativeLibrary {
 
   private static void loadExact(Path libraryPath) {
     System.load(libraryPath.toString());
+    checkCAbiVersion();
     loaded = true;
   }
 
   private static void loadJavaCppBridge() {
-    MaplibreNativeC.mln_c_version();
+    checkCAbiVersion();
     loaded = true;
+  }
+
+  private static void checkCAbiVersion() {
+    final int version;
+    try {
+      version = MaplibreNativeC.mln_c_version();
+    } catch (UnsatisfiedLinkError error) {
+      var missing =
+          new UnsatisfiedLinkError(
+              "Loaded native library does not expose the Maplibre C ABI symbols.");
+      missing.addSuppressed(error);
+      throw missing;
+    }
+    if (version != EXPECTED_C_ABI_VERSION) {
+      throw new NativeErrorException(
+          0,
+          "Unsupported Maplibre C ABI version %d; expected %d"
+              .formatted(version, EXPECTED_C_ABI_VERSION));
+    }
   }
 
   private static void prependJavaLibraryPath(Path directory) {

@@ -47,7 +47,7 @@ public final class StyleStructs {
     }
     var snapshot = new MaplibreNativeC.mln_json_snapshot(JavaCppSupport.pointer(snapshotAddress));
     try {
-      var outValue = new PointerPointer<MaplibreNativeC.mln_json_value>(1);
+      var outValue = JavaCppSupport.outPointer(MaplibreNativeC.mln_json_value.class);
       var status = MaplibreNativeC.mln_json_snapshot_get(snapshot, outValue);
       org.maplibre.nativejni.internal.status.Status.check(status);
       var valueAddress = JavaCppSupport.outAddress(outValue, MaplibreNativeC.mln_json_value.class);

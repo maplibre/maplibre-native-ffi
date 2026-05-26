@@ -1,5 +1,7 @@
 import org.gradle.api.tasks.compile.JavaCompile
 import org.gradle.api.tasks.testing.Test
+import org.gradle.jvm.toolchain.JavaLanguageVersion
+import org.gradle.jvm.toolchain.JavaToolchainService
 
 plugins { `java-library` }
 
@@ -13,7 +15,13 @@ dependencies {
   testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
-tasks.withType<JavaCompile>().configureEach { options.release = 25 }
+val javaToolchains = project.extensions.getByType<JavaToolchainService>()
+val java25Compiler = javaToolchains.compilerFor { languageVersion = JavaLanguageVersion.of(25) }
+
+tasks.withType<JavaCompile>().configureEach {
+  javaCompiler = java25Compiler
+  options.release = 25
+}
 
 fun javaCppPlatform(): String {
   var osName = System.getProperty("os.name").lowercase()
@@ -46,6 +54,7 @@ val compileJavaCppConfig =
     source("src/main/java/org/maplibre/nativejni/internal/javacpp/MaplibreNativeCConfig.java")
     classpath = configurations.compileClasspath.get()
     destinationDirectory = javaCppConfigClasses
+    javaCompiler = java25Compiler
     options.release = 25
   }
 

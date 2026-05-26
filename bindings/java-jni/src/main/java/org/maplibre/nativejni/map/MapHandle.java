@@ -11,7 +11,6 @@ import java.util.Optional;
 import java.util.Set;
 import org.bytedeco.javacpp.BoolPointer;
 import org.bytedeco.javacpp.BytePointer;
-import org.bytedeco.javacpp.PointerPointer;
 import org.bytedeco.javacpp.SizeTPointer;
 import org.maplibre.nativejni.camera.AnimationOptions;
 import org.maplibre.nativejni.camera.BoundOptions;
@@ -103,7 +102,7 @@ public final class MapHandle implements AutoCloseable {
     if (options.mapMode() != null) {
       nativeOptions.map_mode(options.mapMode().nativeValue());
     }
-    var outMap = new PointerPointer<MaplibreNativeC.mln_map>(1);
+    var outMap = JavaCppSupport.outPointer(MaplibreNativeC.mln_map.class);
     Status.check(
         MaplibreNativeC.mln_map_create(
             JavaCppSupport.runtime(runtime.nativeAddress(InternalAccess.INSTANCE)),
@@ -241,7 +240,7 @@ public final class MapHandle implements AutoCloseable {
 
   public List<String> styleSourceIds() {
     NativeLibrary.ensureLoaded();
-    var outList = new PointerPointer<MaplibreNativeC.mln_style_id_list>(1);
+    var outList = JavaCppSupport.outPointer(MaplibreNativeC.mln_style_id_list.class);
     Status.check(
         MaplibreNativeC.mln_map_list_style_source_ids(
             JavaCppSupport.map(state.requireLiveAddress()), outList));
@@ -871,7 +870,7 @@ public final class MapHandle implements AutoCloseable {
 
   public List<String> styleLayerIds() {
     NativeLibrary.ensureLoaded();
-    var outList = new PointerPointer<MaplibreNativeC.mln_style_id_list>(1);
+    var outList = JavaCppSupport.outPointer(MaplibreNativeC.mln_style_id_list.class);
     Status.check(
         MaplibreNativeC.mln_map_list_style_layer_ids(
             JavaCppSupport.map(state.requireLiveAddress()), outList));
@@ -901,7 +900,7 @@ public final class MapHandle implements AutoCloseable {
     NativeLibrary.ensureLoaded();
     try (var layer = JavaCppValues.stringView(Objects.requireNonNull(layerId, "layerId"));
         var outFound = new BoolPointer(1)) {
-      var outSnapshot = new PointerPointer<MaplibreNativeC.mln_json_snapshot>(1);
+      var outSnapshot = JavaCppSupport.outPointer(MaplibreNativeC.mln_json_snapshot.class);
       Status.check(
           MaplibreNativeC.mln_map_get_style_layer_json(
               JavaCppSupport.map(state.requireLiveAddress()), layer.view(), outSnapshot, outFound));
@@ -937,7 +936,7 @@ public final class MapHandle implements AutoCloseable {
     NativeLibrary.ensureLoaded();
     try (var property =
         JavaCppValues.stringView(Objects.requireNonNull(propertyName, "propertyName"))) {
-      var outSnapshot = new PointerPointer<MaplibreNativeC.mln_json_snapshot>(1);
+      var outSnapshot = JavaCppSupport.outPointer(MaplibreNativeC.mln_json_snapshot.class);
       Status.check(
           MaplibreNativeC.mln_map_get_style_light_property(
               JavaCppSupport.map(state.requireLiveAddress()), property.view(), outSnapshot));
@@ -965,7 +964,7 @@ public final class MapHandle implements AutoCloseable {
     try (var layer = JavaCppValues.stringView(Objects.requireNonNull(layerId, "layerId"));
         var property =
             JavaCppValues.stringView(Objects.requireNonNull(propertyName, "propertyName"))) {
-      var outSnapshot = new PointerPointer<MaplibreNativeC.mln_json_snapshot>(1);
+      var outSnapshot = JavaCppSupport.outPointer(MaplibreNativeC.mln_json_snapshot.class);
       Status.check(
           MaplibreNativeC.mln_map_get_layer_property(
               JavaCppSupport.map(state.requireLiveAddress()),
@@ -998,7 +997,7 @@ public final class MapHandle implements AutoCloseable {
   public Optional<JsonValue> layerFilter(String layerId) {
     NativeLibrary.ensureLoaded();
     try (var layer = JavaCppValues.stringView(Objects.requireNonNull(layerId, "layerId"))) {
-      var outSnapshot = new PointerPointer<MaplibreNativeC.mln_json_snapshot>(1);
+      var outSnapshot = JavaCppSupport.outPointer(MaplibreNativeC.mln_json_snapshot.class);
       Status.check(
           MaplibreNativeC.mln_map_get_layer_filter(
               JavaCppSupport.map(state.requireLiveAddress()), layer.view(), outSnapshot));

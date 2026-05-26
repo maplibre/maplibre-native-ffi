@@ -2,7 +2,6 @@ package org.maplibre.nativejni.map;
 
 import java.util.List;
 import java.util.Objects;
-import org.bytedeco.javacpp.PointerPointer;
 import org.maplibre.nativejni.camera.CameraOptions;
 import org.maplibre.nativejni.camera.EdgeInsets;
 import org.maplibre.nativejni.geo.Geometry;
@@ -29,7 +28,7 @@ public final class MapProjectionHandle implements AutoCloseable {
   public static MapProjectionHandle create(MapHandle map) {
     Objects.requireNonNull(map, "map");
     NativeLibrary.ensureLoaded();
-    var outProjection = new PointerPointer<MaplibreNativeC.mln_map_projection>(1);
+    var outProjection = JavaCppSupport.outPointer(MaplibreNativeC.mln_map_projection.class);
     Status.check(
         MaplibreNativeC.mln_map_projection_create(
             JavaCppSupport.map(map.nativeAddress(InternalAccess.INSTANCE)), outProjection));

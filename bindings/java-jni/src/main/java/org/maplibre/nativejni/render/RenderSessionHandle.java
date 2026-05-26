@@ -38,7 +38,7 @@ public final class RenderSessionHandle implements AutoCloseable {
       MapHandle map, MetalOwnedTextureDescriptor descriptor) {
     NativeLibrary.ensureLoaded();
     Objects.requireNonNull(map, "map");
-    var outSession = new PointerPointer<MaplibreNativeC.mln_render_session>(1);
+    var outSession = JavaCppSupport.outPointer(MaplibreNativeC.mln_render_session.class);
     Status.check(
         MaplibreNativeC.mln_metal_owned_texture_attach(
             JavaCppSupport.map(map.nativeAddress(InternalAccess.INSTANCE)),
@@ -51,7 +51,7 @@ public final class RenderSessionHandle implements AutoCloseable {
       MapHandle map, MetalBorrowedTextureDescriptor descriptor) {
     NativeLibrary.ensureLoaded();
     Objects.requireNonNull(map, "map");
-    var outSession = new PointerPointer<MaplibreNativeC.mln_render_session>(1);
+    var outSession = JavaCppSupport.outPointer(MaplibreNativeC.mln_render_session.class);
     Status.check(
         MaplibreNativeC.mln_metal_borrowed_texture_attach(
             JavaCppSupport.map(map.nativeAddress(InternalAccess.INSTANCE)),
@@ -64,7 +64,7 @@ public final class RenderSessionHandle implements AutoCloseable {
       MapHandle map, VulkanOwnedTextureDescriptor descriptor) {
     NativeLibrary.ensureLoaded();
     Objects.requireNonNull(map, "map");
-    var outSession = new PointerPointer<MaplibreNativeC.mln_render_session>(1);
+    var outSession = JavaCppSupport.outPointer(MaplibreNativeC.mln_render_session.class);
     Status.check(
         MaplibreNativeC.mln_vulkan_owned_texture_attach(
             JavaCppSupport.map(map.nativeAddress(InternalAccess.INSTANCE)),
@@ -77,7 +77,7 @@ public final class RenderSessionHandle implements AutoCloseable {
       MapHandle map, VulkanBorrowedTextureDescriptor descriptor) {
     NativeLibrary.ensureLoaded();
     Objects.requireNonNull(map, "map");
-    var outSession = new PointerPointer<MaplibreNativeC.mln_render_session>(1);
+    var outSession = JavaCppSupport.outPointer(MaplibreNativeC.mln_render_session.class);
     Status.check(
         MaplibreNativeC.mln_vulkan_borrowed_texture_attach(
             JavaCppSupport.map(map.nativeAddress(InternalAccess.INSTANCE)),
@@ -90,7 +90,7 @@ public final class RenderSessionHandle implements AutoCloseable {
       MapHandle map, MetalSurfaceDescriptor descriptor) {
     NativeLibrary.ensureLoaded();
     Objects.requireNonNull(map, "map");
-    var outSession = new PointerPointer<MaplibreNativeC.mln_render_session>(1);
+    var outSession = JavaCppSupport.outPointer(MaplibreNativeC.mln_render_session.class);
     Status.check(
         MaplibreNativeC.mln_metal_surface_attach(
             JavaCppSupport.map(map.nativeAddress(InternalAccess.INSTANCE)),
@@ -103,7 +103,7 @@ public final class RenderSessionHandle implements AutoCloseable {
       MapHandle map, VulkanSurfaceDescriptor descriptor) {
     NativeLibrary.ensureLoaded();
     Objects.requireNonNull(map, "map");
-    var outSession = new PointerPointer<MaplibreNativeC.mln_render_session>(1);
+    var outSession = JavaCppSupport.outPointer(MaplibreNativeC.mln_render_session.class);
     Status.check(
         MaplibreNativeC.mln_vulkan_surface_attach(
             JavaCppSupport.map(map.nativeAddress(InternalAccess.INSTANCE)),
@@ -171,7 +171,7 @@ public final class RenderSessionHandle implements AutoCloseable {
     NativeLibrary.ensureLoaded();
     try (var nativeSelector =
         QueryStructs.featureStateSelector(Objects.requireNonNull(selector, "selector"))) {
-      var outState = new PointerPointer<MaplibreNativeC.mln_json_snapshot>(1);
+      var outState = JavaCppSupport.outPointer(MaplibreNativeC.mln_json_snapshot.class);
       Status.check(
           MaplibreNativeC.mln_render_session_get_feature_state(
               JavaCppSupport.renderSession(state.requireLiveAddress()),
@@ -232,7 +232,7 @@ public final class RenderSessionHandle implements AutoCloseable {
         var nativeExtensionField =
             JavaCppValues.stringView(Objects.requireNonNull(extensionField, "extensionField"));
         var nativeArguments = arguments == null ? null : JavaCppValues.json(arguments)) {
-      var outResult = new PointerPointer<MaplibreNativeC.mln_feature_extension_result>(1);
+      var outResult = JavaCppSupport.outPointer(MaplibreNativeC.mln_feature_extension_result.class);
       Status.check(
           MaplibreNativeC.mln_render_session_query_feature_extensions(
               JavaCppSupport.renderSession(state.requireLiveAddress()),
@@ -382,7 +382,7 @@ public final class RenderSessionHandle implements AutoCloseable {
     try (var nativeGeometry =
             new QueryStructs.RenderedGeometryScope(Objects.requireNonNull(geometry, "geometry"));
         var nativeOptions = new QueryStructs.RenderedOptionsScope(options)) {
-      var outResult = new PointerPointer<MaplibreNativeC.mln_feature_query_result>(1);
+      var outResult = JavaCppSupport.outPointer(MaplibreNativeC.mln_feature_query_result.class);
       Status.check(
           MaplibreNativeC.mln_render_session_query_rendered_features(
               JavaCppSupport.renderSession(state.requireLiveAddress()),
@@ -398,7 +398,7 @@ public final class RenderSessionHandle implements AutoCloseable {
     NativeLibrary.ensureLoaded();
     try (var source = JavaCppValues.stringView(Objects.requireNonNull(sourceId, "sourceId"));
         var nativeOptions = new QueryStructs.SourceOptionsScope(options)) {
-      var outResult = new PointerPointer<MaplibreNativeC.mln_feature_query_result>(1);
+      var outResult = JavaCppSupport.outPointer(MaplibreNativeC.mln_feature_query_result.class);
       Status.check(
           MaplibreNativeC.mln_render_session_query_source_features(
               JavaCppSupport.renderSession(state.requireLiveAddress()),

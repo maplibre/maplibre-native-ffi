@@ -1,6 +1,8 @@
 package org.maplibre.nativejni.internal.callback;
 
 import java.util.Objects;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import org.bytedeco.javacpp.BytePointer;
 import org.bytedeco.javacpp.Pointer;
 import org.maplibre.nativejni.internal.javacpp.JavaCppSupport;
@@ -13,6 +15,7 @@ import org.maplibre.nativejni.resource.ResourceTransformRequest;
 public final class ResourceTransformState implements AutoCloseable {
   private final ResourceTransformCallback callback;
   private final ThreadLocal<BytePointer> responseStorage = new ThreadLocal<>();
+  private final Set<BytePointer> responseStorages = ConcurrentHashMap.newKeySet();
   private final MaplibreNativeC.mln_resource_transform_callback nativeCallback;
   private final MaplibreNativeC.mln_resource_transform transform;
   private boolean closed;
@@ -28,17 +31,14 @@ public final class ResourceTransformState implements AutoCloseable {
               BytePointer url,
               MaplibreNativeC.mln_resource_transform_response response) {
             try {
-              var previous = responseStorage.get();
-              if (previous != null) {
-                previous.close();
-                responseStorage.remove();
-              }
+              closeCurrentResponseStorage();
               var transformed =
                   ResourceTransformState.this.callback.transform(
                       new ResourceTransformRequest(
                           ResourceKind.fromNative(kind), kind, JavaCppSupport.cString(url)));
               if (transformed.isPresent()) {
                 var storage = JavaCppSupport.utf8(transformed.get());
+                responseStorages.add(storage);
                 responseStorage.set(storage);
                 response.url(storage);
               } else {
@@ -65,13 +65,26 @@ public final class ResourceTransformState implements AutoCloseable {
   public synchronized void close() {
     if (!closed) {
       closed = true;
-      var storage = responseStorage.get();
-      if (storage != null) {
-        storage.close();
-        responseStorage.remove();
+      closeCurrentResponseStorage();
+      for (var storage : responseStorages) {
+        closeResponseStorage(storage);
       }
       transform.close();
       nativeCallback.close();
+    }
+  }
+
+  private void closeCurrentResponseStorage() {
+    var storage = responseStorage.get();
+    if (storage != null) {
+      closeResponseStorage(storage);
+      responseStorage.remove();
+    }
+  }
+
+  private void closeResponseStorage(BytePointer storage) {
+    if (responseStorages.remove(storage)) {
+      storage.close();
     }
   }
 }

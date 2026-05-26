@@ -60,6 +60,12 @@ public final class JavaCppSupport {
     return new MaplibreNativeC.mln_render_session(pointer(address));
   }
 
+  public static <T extends Pointer> PointerPointer<T> outPointer(Class<T> type) {
+    var out = new PointerPointer<T>(1);
+    out.put(0, (Pointer) null);
+    return out;
+  }
+
   @SuppressWarnings({"rawtypes", "unchecked"})
   public static long outAddress(PointerPointer<?> out, Class<? extends Pointer> type) {
     var pointer = ((PointerPointer) out).get((Class) type, 0);
