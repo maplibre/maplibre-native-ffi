@@ -425,7 +425,7 @@ class OpenGLTextureBackend final : public mbgl::gl::RendererBackend,
   }
 
   void updateAssumedState() override {
-    setFramebufferBinding(
+    assumeFramebufferBinding(
       mbgl::gl::RendererBackend::ImplicitFramebufferBinding
     );
   }
