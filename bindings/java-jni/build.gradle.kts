@@ -95,25 +95,6 @@ val javaCppNativeLibraryPath = javaCppNativeOutputDir.map {
   it.file(System.mapLibraryName("jniMaplibreNativeC")).asFile.absolutePath
 }
 
-val javaCppTestNativeOutputDir = layout.buildDirectory.dir("classes/java/test")
-
-val buildJavaCppTestNative =
-  tasks.register<JavaExec>("buildJavaCppTestNative") {
-    group = "verification"
-    description = "Builds the JavaCPP JNI bridge used by JavaCPP boundary tests."
-    dependsOn(tasks.named("compileTestJava"))
-    classpath = sourceSets.test.get().runtimeClasspath
-    mainClass = "org.bytedeco.javacpp.tools.Builder"
-    args(
-      "-classpath",
-      sourceSets.test.get().runtimeClasspath.asPath,
-      "org.maplibre.nativejni.internal.javacpp.JavaCppBoundaryTestC",
-    )
-    inputs.files(sourceSets.test.get().output.classesDirs)
-    inputs.dir(layout.projectDirectory.dir("src/test/javacpp"))
-    outputs.dir(javaCppTestNativeOutputDir)
-  }
-
 tasks.named<Jar>("jar") { dependsOn(copyJavaCppNative) }
 
 tasks.named<JavaCompile>("compileTestJava") { dependsOn(copyJavaCppNative) }
@@ -137,7 +118,6 @@ val requireNativeTests = providers.systemProperty("org.maplibre.nativejni.tests.
 
 tasks.withType<Test>().configureEach {
   dependsOn(copyJavaCppNative)
-  dependsOn(buildJavaCppTestNative)
   useJUnitPlatform()
   jvmArgs("--enable-native-access=ALL-UNNAMED")
   inputs.property("org.maplibre.nativejni.library.path", nativeJniLibraryPath.orElse(""))

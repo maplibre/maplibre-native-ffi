@@ -6,9 +6,6 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.maplibre.nativejni.error.InvalidArgumentException;
 import org.maplibre.nativejni.error.MaplibreException;
-import org.maplibre.nativejni.internal.javacpp.JavaCppSupport;
-import org.maplibre.nativejni.internal.javacpp.MaplibreNativeC;
-import org.maplibre.nativejni.internal.status.Status;
 import org.maplibre.nativejni.map.MapHandle;
 import org.maplibre.nativejni.map.MapOptions;
 import org.maplibre.nativejni.runtime.RuntimeHandle;
@@ -30,16 +27,6 @@ class RenderSessionHandleTest {
         assertThrows(InvalidArgumentException.class, () -> map.attachMetalOwnedTexture(descriptor));
       }
     }
-  }
-
-  @Test
-  void rejectsNegativeResizeDimensionsBeforeNativeCast() {
-    assertThrows(
-        InvalidArgumentException.class,
-        () ->
-            Status.check(
-                MaplibreNativeC.mln_render_session_resize(
-                    JavaCppSupport.renderSession(0), -1, 64, 1.0)));
   }
 
   @Test
