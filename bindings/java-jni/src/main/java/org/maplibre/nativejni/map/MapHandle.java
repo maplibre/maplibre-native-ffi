@@ -190,8 +190,8 @@ public final class MapHandle implements AutoCloseable {
   public Optional<SourceInfo> styleSourceInfo(String sourceId) {
     NativeLibrary.ensureLoaded();
     var sourceIdValue = Objects.requireNonNull(sourceId, "sourceId");
-    try (var source = JavaCppValues.stringView(sourceIdValue)) {
-      var outInfo = new MaplibreNativeC.mln_style_source_info();
+    try (var source = JavaCppValues.stringView(sourceIdValue);
+        var outInfo = new MaplibreNativeC.mln_style_source_info()) {
       outInfo.size(outInfo.sizeof());
       var outFound = new boolean[1];
       Status.check(
@@ -319,7 +319,7 @@ public final class MapHandle implements AutoCloseable {
       String sourceId, CanonicalTileId tileId, GeoJson data) {
     NativeLibrary.ensureLoaded();
     Objects.requireNonNull(tileId, "tileId");
-    checkCanonicalTile(tileId.x(), tileId.y());
+    checkCanonicalTile(tileId.z(), tileId.x(), tileId.y());
     try (var source = JavaCppValues.stringView(Objects.requireNonNull(sourceId, "sourceId"));
         var nativeTileId = StyleStructs.canonicalTileId(tileId.z(), tileId.x(), tileId.y());
         var nativeData = StyleStructs.geoJson(Objects.requireNonNull(data, "data"))) {
@@ -335,7 +335,7 @@ public final class MapHandle implements AutoCloseable {
   public void invalidateCustomGeometrySourceTile(String sourceId, CanonicalTileId tileId) {
     NativeLibrary.ensureLoaded();
     Objects.requireNonNull(tileId, "tileId");
-    checkCanonicalTile(tileId.x(), tileId.y());
+    checkCanonicalTile(tileId.z(), tileId.x(), tileId.y());
     try (var source = JavaCppValues.stringView(Objects.requireNonNull(sourceId, "sourceId"));
         var nativeTileId = StyleStructs.canonicalTileId(tileId.z(), tileId.x(), tileId.y())) {
       Status.check(
@@ -2073,9 +2073,9 @@ public final class MapHandle implements AutoCloseable {
     return values;
   }
 
-  private static void checkCanonicalTile(long x, long y) {
-    if (x < 0 || y < 0 || x > 0xffff_ffffL || y > 0xffff_ffffL) {
-      JavaCppSupport.setThreadDiagnostic("canonical tile x and y must fit uint32");
+  private static void checkCanonicalTile(int z, long x, long y) {
+    if (z < 0 || x < 0 || y < 0 || x > 0xffff_ffffL || y > 0xffff_ffffL) {
+      JavaCppSupport.setThreadDiagnostic("canonical tile z, x, and y must fit uint32");
       Status.check(MaplibreNativeC.MLN_STATUS_INVALID_ARGUMENT);
     }
   }

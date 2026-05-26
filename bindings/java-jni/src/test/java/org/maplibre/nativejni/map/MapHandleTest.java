@@ -400,6 +400,15 @@ class MapHandleTest {
         map.setCustomGeometrySourceTileData(
             "custom-source", customTile, GeoJson.featureCollection(List.of()));
         map.invalidateCustomGeometrySourceTile("custom-source", customTile);
+        var invalidZoomTile = new CanonicalTileId(-1, 0, 0);
+        assertThrows(
+            InvalidArgumentException.class,
+            () ->
+                map.setCustomGeometrySourceTileData(
+                    "custom-source", invalidZoomTile, GeoJson.featureCollection(List.of())));
+        assertThrows(
+            InvalidArgumentException.class,
+            () -> map.invalidateCustomGeometrySourceTile("custom-source", invalidZoomTile));
         map.invalidateCustomGeometrySourceRegion(
             "custom-source", new LatLngBounds(new LatLng(-1.0, -2.0), new LatLng(1.0, 2.0)));
         assertTrue(map.removeStyleSource("custom-source"));
