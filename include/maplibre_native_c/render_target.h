@@ -82,7 +82,11 @@ typedef struct mln_egl_context_descriptor {
   uint32_t size;
   /** Borrowed EGLDisplay. Required. */
   void* display;
-  /** Borrowed EGLConfig used to create a shared session context. Required. */
+  /**
+   * Borrowed EGLConfig used to create a shared session context. Required.
+   * OpenGL texture sessions require EGL_SURFACE_TYPE to include
+   * EGL_PBUFFER_BIT.
+   */
   void* config;
   /** Borrowed EGLContext whose share group the session context joins. Required.
    */

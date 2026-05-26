@@ -41,8 +41,11 @@ inline auto create_shared_wgl_context(
       0
     };
     render_context = context_attribs(device_context, share_context, attributes);
-  }
-  if (render_context != nullptr) {
+    if (render_context == nullptr) {
+      throw std::runtime_error(
+        "Creating OpenGL WGL context with attributes failed"
+      );
+    }
     return render_context;
   }
 
