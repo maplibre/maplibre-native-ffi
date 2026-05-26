@@ -68,6 +68,8 @@ inline auto create_shared_wgl_context(
     throw std::runtime_error("Sharing OpenGL WGL context failed");
   }
 
+  // Leave the share context uncurrent on success. The caller immediately binds
+  // the new render context and restores the previous context on failure.
   return render_context;
 }
 

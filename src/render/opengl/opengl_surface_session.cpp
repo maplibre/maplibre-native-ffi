@@ -141,15 +141,17 @@ class OpenGLSurfaceBackend final : public mbgl::gl::RendererBackend,
   auto operator=(OpenGLSurfaceBackend&&) -> OpenGLSurfaceBackend& = delete;
 
   ~OpenGLSurfaceBackend() override {
+    auto cleanup = [this] {
+      resource.reset();
+      context.reset();
+    };
     if (render_context_ != nullptr) {
       auto guard = mbgl::gfx::BackendScope{
         *this, mbgl::gfx::BackendScope::ScopeType::Implicit
       };
-      resource.reset();
-      context.reset();
+      cleanup();
     } else {
-      resource.reset();
-      context.reset();
+      cleanup();
     }
     getThreadPool().runRenderJobs(true);
     destroy_native_context();
