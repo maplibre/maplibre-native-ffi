@@ -83,6 +83,7 @@ const wgl = if (builtin.os.tag == .windows) struct {
     const PFD_MAIN_PLANE = 0;
     const WS_OVERLAPPEDWINDOW = 0x00cf0000;
     const GL_NO_ERROR = 0;
+    const GL_FRONT = 0x0404;
     const GL_TEXTURE_2D = 0x0de1;
     const GL_RGBA = 0x1908;
     const GL_UNSIGNED_BYTE = 0x1401;
@@ -124,6 +125,8 @@ const wgl = if (builtin.os.tag == .windows) struct {
     extern "opengl32" fn glGenTextures(n: GLsizei, textures: *GLuint) callconv(.winapi) void;
     extern "opengl32" fn glGetError() callconv(.winapi) GLenum;
     extern "opengl32" fn glGetTexImage(target: GLenum, level: GLint, format: GLenum, @"type": GLenum, pixels: *anyopaque) callconv(.winapi) void;
+    extern "opengl32" fn glReadBuffer(src: GLenum) callconv(.winapi) void;
+    extern "opengl32" fn glReadPixels(x: GLint, y: GLint, width: GLsizei, height: GLsizei, format: GLenum, @"type": GLenum, pixels: *anyopaque) callconv(.winapi) void;
     extern "opengl32" fn glTexImage2D(
         target: GLenum,
         level: GLint,
@@ -293,6 +296,10 @@ const WglTestContext = if (builtin.os.tag == .windows) struct {
     share_context: wgl.HGLRC,
 
     pub fn init() !WglTestContext {
+        return initWithSize(8, 8);
+    }
+
+    pub fn initWithSize(width: u32, height: u32) !WglTestContext {
         const class_name = "MaplibreNativeCAbiWglTest";
         const module = wgl.GetModuleHandleA(null);
         if (module == null) return error.SkipZigTest;
@@ -311,8 +318,8 @@ const WglTestContext = if (builtin.os.tag == .windows) struct {
             wgl.WS_OVERLAPPEDWINDOW,
             0,
             0,
-            8,
-            8,
+            @intCast(width),
+            @intCast(height),
             null,
             null,
             module,
@@ -406,6 +413,13 @@ const WglTestContext = if (builtin.os.tag == .windows) struct {
         if (wgl.wglMakeCurrent(self.device_context, self.share_context) == 0) return error.SkipZigTest;
         wgl.glBindTexture(wgl.GL_TEXTURE_2D, texture);
         wgl.glGetTexImage(wgl.GL_TEXTURE_2D, 0, wgl.GL_RGBA, wgl.GL_UNSIGNED_BYTE, pixels.ptr);
+        try testing.expectEqual(@as(wgl.GLenum, wgl.GL_NO_ERROR), wgl.glGetError());
+    }
+
+    pub fn readSurfaceRgba(self: *const WglTestContext, width: u32, height: u32, pixels: []u8) !void {
+        if (wgl.wglMakeCurrent(self.device_context, self.share_context) == 0) return error.SkipZigTest;
+        wgl.glReadBuffer(wgl.GL_FRONT);
+        wgl.glReadPixels(0, 0, @intCast(width), @intCast(height), wgl.GL_RGBA, wgl.GL_UNSIGNED_BYTE, pixels.ptr);
         try testing.expectEqual(@as(wgl.GLenum, wgl.GL_NO_ERROR), wgl.glGetError());
     }
 } else struct {};
@@ -623,4 +637,38 @@ test "OpenGL WGL borrowed texture renders through raw C ABI" {
         .type = 0,
     };
     try testing.expectEqual(c.MLN_STATUS_UNSUPPORTED, c.mln_opengl_owned_texture_acquire_frame(handle, &frame));
+}
+
+test "OpenGL WGL surface renders through raw C ABI" {
+    if (!build_options.supports_opengl or builtin.os.tag != .windows) return error.SkipZigTest;
+
+    var wgl_context = try WglTestContext.initWithSize(256, 256);
+    defer wgl_context.deinit();
+
+    const runtime = try support.createRuntime();
+    defer support.destroyRuntime(runtime);
+    const map = try support.createMap(runtime);
+    defer support.destroyMap(map);
+
+    var descriptor = c.mln_opengl_surface_descriptor_default();
+    descriptor.extent.width = 256;
+    descriptor.extent.height = 256;
+    descriptor.extent.scale_factor = 1.0;
+    descriptor.context = wgl_context.descriptor();
+    descriptor.surface = @ptrCast(wgl_context.device_context);
+
+    var session: ?*c.mln_render_session = null;
+    try testing.expectEqual(c.MLN_STATUS_OK, c.mln_opengl_surface_attach(map, &descriptor, &session));
+    const handle = session orelse return error.SessionAttachFailed;
+    defer testing.expectEqual(c.MLN_STATUS_OK, c.mln_render_session_destroy(handle)) catch @panic("render session destroy failed");
+
+    try testing.expectEqual(c.MLN_STATUS_OK, c.mln_map_set_style_json(map, raw_render_style_json));
+    try testing.expectEqual(c.MLN_STATUS_OK, c.mln_map_request_repaint(map));
+    try waitForRenderedFrame(runtime, map, handle);
+
+    const pixels = try testing.allocator.alloc(u8, 256 * 256 * 4);
+    defer testing.allocator.free(pixels);
+    @memset(pixels, 0);
+    try wgl_context.readSurfaceRgba(256, 256, pixels);
+    try testing.expect(hasNonZeroByte(pixels));
 }
