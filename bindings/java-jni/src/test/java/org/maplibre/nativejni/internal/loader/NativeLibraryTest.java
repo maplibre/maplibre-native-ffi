@@ -52,6 +52,16 @@ final class NativeLibraryTest {
   }
 
   @Test
+  void subprocessRejectsMissingConfiguredPropertyPath() throws Exception {
+    assertLoaderSmokeFails(
+        List.of(
+            "-D"
+                + NativeLibrary.LIBRARY_PATH_PROPERTY
+                + "="
+                + Path.of(libraryPath()).resolveSibling("missing-jni-bridge")));
+  }
+
+  @Test
   void subprocessLoadsThroughEnvironmentPath() throws Exception {
     assertLoaderSmoke(List.of(), NativeLibrary.LIBRARY_PATH_ENV, libraryPath());
   }
@@ -100,6 +110,10 @@ final class NativeLibraryTest {
   private static void assertLoaderSmokeFails(List<String> javaArguments, Path exactPath)
       throws Exception {
     assertLoaderSmoke(javaArguments, null, null, exactPath.toString(), 1);
+  }
+
+  private static void assertLoaderSmokeFails(List<String> javaArguments) throws Exception {
+    assertLoaderSmoke(javaArguments, null, null, null, 1);
   }
 
   private static void assertLoaderSmoke(

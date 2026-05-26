@@ -60,8 +60,13 @@ public final class LogCallbackState {
   }
 
   private static void closeQuietly(MaplibreNativeC.mln_log_callback callback) {
-    if (callback != null) {
+    if (callback == null) {
+      return;
+    }
+    try {
       callback.close();
+    } catch (Exception ignored) {
+      // Closing callback stubs is best-effort during replacement or teardown.
     }
   }
 }

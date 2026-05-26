@@ -41,7 +41,14 @@ public final class NativeLibrary {
           loadExact(path);
           return;
         }
-        prependJavaLibraryPath(path);
+        if (Files.isDirectory(path)) {
+          prependJavaLibraryPath(path);
+        } else if (Files.exists(path)) {
+          throw new UnsatisfiedLinkError(
+              "Configured library path exists but is not a regular file or directory: " + path);
+        } else {
+          throw new UnsatisfiedLinkError("Configured library path does not exist: " + path);
+        }
       }
       loadJavaCppBridge();
     }

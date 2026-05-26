@@ -538,12 +538,7 @@ class MapHandleTest {
         assertTrue(map.styleLayerType("missing-layer").isEmpty());
         assertTrue(map.removeStyleLayer("first-layer"));
         assertFalse(map.removeStyleLayer("first-layer"));
-        map.addCustomGeometrySource(
-            "custom-source-before-style-url",
-            new CustomGeometrySourceOptions(tileId -> {}).tileSize(512));
-        assertEquals(1, map.customGeometrySourceCountForTesting());
         map.setStyleUrl("https://example.com/style.json");
-        assertEquals(0, map.customGeometrySourceCountForTesting());
         map.requestRepaint();
         assertThrows(InvalidStateException.class, map::requestStillImage);
       }

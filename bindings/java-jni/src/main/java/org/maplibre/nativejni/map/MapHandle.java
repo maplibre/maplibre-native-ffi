@@ -118,7 +118,6 @@ public final class MapHandle implements AutoCloseable {
       Status.check(
           MaplibreNativeC.mln_map_set_style_url(
               JavaCppSupport.map(state.requireLiveAddress()), nativeUrl));
-      clearCustomGeometrySources();
     } finally {
       nativeUrl.close();
     }
