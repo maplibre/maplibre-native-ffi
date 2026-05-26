@@ -288,6 +288,17 @@ fn fakeOpenGLContext() maplibre.OpenGLContextDescriptor {
     };
 }
 
+fn fakeVulkanContext() maplibre.VulkanContextDescriptor {
+    const fake_pointer = fakeNativePointer();
+    return .{
+        .instance = fake_pointer,
+        .physical_device = fake_pointer,
+        .device = fake_pointer,
+        .graphics_queue = fake_pointer,
+        .graphics_queue_family_index = 0,
+    };
+}
+
 const supports_test_owned_texture = build_options.supports_metal or build_options.supports_vulkan or build_options.supports_opengl;
 
 const TestOwnedTextureContext = if (build_options.supports_vulkan) VulkanAttachContext else if (build_options.supports_opengl and builtin.os.tag == .windows) WglAttachContext else if (build_options.supports_opengl and builtin.os.tag == .linux) EglAttachContext else if (build_options.supports_metal) struct {
@@ -646,6 +657,28 @@ fn attachTestOwnedTexture(map: *maplibre.MapHandle, descriptor: TestOwnedTexture
     errdefer session.close() catch {};
 
     return .{ .context = context, .session = session };
+}
+
+fn expectInvalidOwnedTextureExtent(map: *maplibre.MapHandle, extent: maplibre.RenderTargetExtent) !void {
+    if (!supports_test_owned_texture) return error.SkipZigTest;
+    if (build_options.supports_vulkan) {
+        try testing.expectError(error.InvalidArgument, maplibre.attachVulkanOwnedTexture(map, .{
+            .extent = extent,
+            .context = fakeVulkanContext(),
+        }));
+    } else if (build_options.supports_opengl) {
+        try testing.expectError(error.InvalidArgument, maplibre.attachOpenGLOwnedTexture(map, .{
+            .extent = extent,
+            .context = fakeOpenGLContext(),
+        }));
+    } else if (build_options.supports_metal) {
+        try testing.expectError(error.InvalidArgument, maplibre.attachMetalOwnedTexture(map, .{
+            .extent = extent,
+            .context = .{ .device = fakeNativePointer() },
+        }));
+    } else {
+        unreachable;
+    }
 }
 
 fn createMovedMetalSessionWithFrame(device: *anyopaque) !struct {
@@ -1045,12 +1078,18 @@ test "owned texture attachment validates public descriptors" {
     var map = try maplibre.MapHandle.create(&runtime, .{});
     defer map.close() catch @panic("map close failed");
 
-    var availability = try TestOwnedTextureContext.init();
-    defer availability.deinit();
+    try expectInvalidOwnedTextureExtent(&map, .{ .width = 0 });
+    try expectInvalidOwnedTextureExtent(&map, .{ .height = 0 });
+    try expectInvalidOwnedTextureExtent(&map, .{ .scale_factor = 0 });
+}
 
-    try testing.expectError(error.InvalidArgument, attachTestOwnedTexture(&map, .{ .extent = .{ .width = 0 } }));
-    try testing.expectError(error.InvalidArgument, attachTestOwnedTexture(&map, .{ .extent = .{ .height = 0 } }));
-    try testing.expectError(error.InvalidArgument, attachTestOwnedTexture(&map, .{ .extent = .{ .scale_factor = 0 } }));
+test "owned texture attachment rejects another active session" {
+    if (!supports_test_owned_texture) return error.SkipZigTest;
+    var runtime = try maplibre.RuntimeHandle.init(null);
+    defer runtime.close() catch @panic("runtime close failed");
+
+    var map = try maplibre.MapHandle.create(&runtime, .{});
+    defer map.close() catch @panic("map close failed");
 
     var first = try attachTestOwnedTexture(&map, .{});
     defer first.close() catch {};

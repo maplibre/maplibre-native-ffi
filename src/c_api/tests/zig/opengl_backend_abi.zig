@@ -291,7 +291,6 @@ test "OpenGL WGL owned texture renders through raw C ABI" {
 
     var wgl_context = try wgl_test.Context.init();
     defer wgl_context.deinit();
-    if (!wgl_context.supportsMapLibreRendering()) return error.SkipZigTest;
 
     const runtime = try support.createRuntime();
     defer support.destroyRuntime(runtime);
@@ -373,7 +372,6 @@ test "OpenGL WGL borrowed texture renders through raw C ABI" {
 
     var wgl_context = try wgl_test.Context.init();
     defer wgl_context.deinit();
-    if (!wgl_context.supportsMapLibreRendering()) return error.SkipZigTest;
 
     const texture = try wgl_context.createRgbaTexture(256, 256);
     defer wgl_context.destroyTexture(texture);
@@ -424,7 +422,6 @@ test "OpenGL WGL surface renders through raw C ABI" {
 
     var wgl_context = try wgl_test.Context.initWithSize(256, 256);
     defer wgl_context.deinit();
-    if (!wgl_context.supportsMapLibreRendering()) return error.SkipZigTest;
 
     const runtime = try support.createRuntime();
     defer support.destroyRuntime(runtime);
