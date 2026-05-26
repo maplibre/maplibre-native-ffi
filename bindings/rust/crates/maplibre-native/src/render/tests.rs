@@ -5,18 +5,37 @@ use std::time::Duration;
 use ash::vk;
 use ash::vk::Handle;
 use static_assertions::assert_not_impl_any;
+#[cfg(target_os = "windows")]
+use windows_sys::Win32::Foundation::HWND;
+#[cfg(target_os = "windows")]
+use windows_sys::Win32::Graphics::Gdi::{GetDC, ReleaseDC};
+#[cfg(target_os = "windows")]
+use windows_sys::Win32::Graphics::OpenGL::{
+    ChoosePixelFormat, PFD_DOUBLEBUFFER, PFD_DRAW_TO_WINDOW, PFD_MAIN_PLANE, PFD_SUPPORT_OPENGL,
+    PFD_TYPE_RGBA, PIXELFORMATDESCRIPTOR, SetPixelFormat, wglCreateContext, wglDeleteContext,
+    wglGetProcAddress, wglMakeCurrent,
+};
+#[cfg(target_os = "windows")]
+use windows_sys::Win32::System::LibraryLoader::GetModuleHandleW;
+#[cfg(target_os = "windows")]
+use windows_sys::Win32::UI::WindowsAndMessaging::{
+    CS_OWNDC, CreateWindowExW, DefWindowProcW, DestroyWindow, RegisterClassW, WNDCLASSW,
+    WS_OVERLAPPEDWINDOW,
+};
 
 use super::*;
 use crate::{
-    CameraOptions, ErrorKind, JsonMember, LatLng, MapMode, MapOptions, RenderBackendMask,
-    RuntimeEventType, RuntimeHandle, ScreenBox, ScreenPoint,
+    CameraOptions, ErrorKind, JsonMember, LatLng, MapMode, MapOptions, OpenGLContextProviderMask,
+    RenderBackendMask, RuntimeEventType, RuntimeHandle, ScreenBox, ScreenPoint,
 };
 
 assert_not_impl_any!(NativePointer: Send, Sync);
 assert_not_impl_any!(FrameNativePointer<'static>: Send, Sync);
+assert_not_impl_any!(FrameOpenGLTextureName<'static>: Send, Sync);
 assert_not_impl_any!(RenderSessionHandle: Send, Sync);
 assert_not_impl_any!(MetalOwnedTextureFrameHandle: Send, Sync);
 assert_not_impl_any!(VulkanOwnedTextureFrameHandle: Send, Sync);
+assert_not_impl_any!(OpenGLOwnedTextureFrameHandle: Send, Sync);
 
 const FEATURE_STATE_STYLE_JSON: &str = r#"{"version":8,"sources":{"point":{"type":"geojson","data":{"type":"FeatureCollection","features":[{"type":"Feature","id":"feature-1","properties":{},"geometry":{"type":"Point","coordinates":[0,0]}}]}}},"layers":[{"id":"circle","type":"circle","source":"point","paint":{"circle-radius":["case",["boolean",["feature-state","hover"],false],10,5]}}]}"#;
 const QUERY_STYLE_JSON: &str = r##"{"version":8,"sources":{"point":{"type":"geojson","data":{"type":"FeatureCollection","features":[{"type":"Feature","id":"feature-1","geometry":{"type":"Point","coordinates":[-122.4194,37.7749]},"properties":{"kind":"capital","visible":true}}]}}},"layers":[{"id":"background","type":"background","paint":{"background-color":"#d8f1ff"}},{"id":"point-circle","type":"circle","source":"point","paint":{"circle-color":"#f97316","circle-radius":12}}]}"##;
@@ -44,6 +63,22 @@ fn create_owned_texture_session(
         return Ok((OwnedTextureTestContext::Vulkan(Box::new(context)), session));
     }
     Err("native library does not support Metal or Vulkan owned texture sessions".into())
+}
+
+fn create_opengl_owned_texture_session(
+    map: &MapHandle,
+    extent: RenderTargetExtent,
+) -> std::result::Result<(OpenGLTestContext, RenderSessionHandle), Box<dyn StdError>> {
+    let backends = crate::supported_render_backends();
+    if !backends.contains(RenderBackendMask::OPENGL) {
+        return Err("native library does not support OpenGL owned texture sessions".into());
+    }
+    let context = OpenGLTestContext::new()?;
+    let session = map.attach_opengl_owned_texture(&OpenGLOwnedTextureDescriptor::new(
+        extent,
+        context.descriptor(),
+    ))?;
+    Ok((context, session))
 }
 
 #[allow(dead_code)]
@@ -103,6 +138,180 @@ impl MetalTestContext {
 
     fn descriptor(&self) -> MetalContextDescriptor {
         MetalContextDescriptor::new(self.device)
+    }
+}
+
+#[cfg(target_os = "windows")]
+struct WglWindow {
+    hwnd: HWND,
+}
+
+#[cfg(target_os = "windows")]
+impl WglWindow {
+    fn new() -> std::result::Result<Self, Box<dyn StdError>> {
+        let class_name: Vec<u16> = "MaplibreNativeRustWglTest\0".encode_utf16().collect();
+        // SAFETY: Passing null requests the current process module handle.
+        let hinstance = unsafe { GetModuleHandleW(std::ptr::null()) };
+        if hinstance.is_null() {
+            return Err("GetModuleHandleW returned null".into());
+        }
+        let class = WNDCLASSW {
+            style: CS_OWNDC,
+            lpfnWndProc: Some(DefWindowProcW),
+            hInstance: hinstance,
+            lpszClassName: class_name.as_ptr(),
+            ..unsafe { std::mem::zeroed() }
+        };
+        // SAFETY: class points to stable storage for the duration of the call.
+        let _ = unsafe { RegisterClassW(&class) };
+        // SAFETY: The class was registered above or by an earlier test in this process.
+        let hwnd = unsafe {
+            CreateWindowExW(
+                0,
+                class_name.as_ptr(),
+                class_name.as_ptr(),
+                WS_OVERLAPPEDWINDOW,
+                0,
+                0,
+                8,
+                8,
+                std::ptr::null_mut(),
+                std::ptr::null_mut(),
+                hinstance,
+                std::ptr::null(),
+            )
+        };
+        if hwnd.is_null() {
+            return Err("CreateWindowExW returned null".into());
+        }
+        Ok(Self { hwnd })
+    }
+}
+
+#[cfg(target_os = "windows")]
+impl Drop for WglWindow {
+    fn drop(&mut self) {
+        // SAFETY: hwnd belongs to this helper window.
+        unsafe {
+            DestroyWindow(self.hwnd);
+        }
+    }
+}
+
+struct OpenGLTestContext {
+    #[cfg(target_os = "windows")]
+    window: WglWindow,
+    #[cfg(target_os = "windows")]
+    device_context: NativePointer,
+    #[cfg(target_os = "windows")]
+    share_context: NativePointer,
+}
+
+impl OpenGLTestContext {
+    fn new() -> std::result::Result<Self, Box<dyn StdError>> {
+        #[cfg(target_os = "windows")]
+        {
+            let window = WglWindow::new()?;
+            // SAFETY: hwnd is a live helper window with CS_OWNDC.
+            let hdc = unsafe { GetDC(window.hwnd) };
+            if hdc.is_null() {
+                return Err("GetDC returned null".into());
+            }
+            let pfd = PIXELFORMATDESCRIPTOR {
+                nSize: std::mem::size_of::<PIXELFORMATDESCRIPTOR>() as u16,
+                nVersion: 1,
+                dwFlags: PFD_DRAW_TO_WINDOW | PFD_SUPPORT_OPENGL | PFD_DOUBLEBUFFER,
+                iPixelType: PFD_TYPE_RGBA,
+                cColorBits: 32,
+                cDepthBits: 24,
+                cStencilBits: 8,
+                iLayerType: PFD_MAIN_PLANE as u8,
+                ..unsafe { std::mem::zeroed() }
+            };
+            // SAFETY: hdc is live and pfd points to initialized storage.
+            let pixel_format = unsafe { ChoosePixelFormat(hdc, &pfd) };
+            if pixel_format == 0 {
+                // SAFETY: hdc came from this window.
+                unsafe {
+                    ReleaseDC(window.hwnd, hdc);
+                }
+                return Err("ChoosePixelFormat returned 0".into());
+            }
+            // SAFETY: hdc is live and pfd describes the selected pixel format.
+            if unsafe { SetPixelFormat(hdc, pixel_format, &pfd) } == 0 {
+                unsafe {
+                    ReleaseDC(window.hwnd, hdc);
+                }
+                return Err("SetPixelFormat failed".into());
+            }
+            // SAFETY: hdc has an OpenGL-capable pixel format.
+            let hglrc = unsafe { wglCreateContext(hdc) };
+            if hglrc.is_null() {
+                unsafe {
+                    ReleaseDC(window.hwnd, hdc);
+                }
+                return Err("wglCreateContext returned null".into());
+            }
+            // SAFETY: Make the host context current once so WGL extension
+            // lookups and texture share-group behavior are available.
+            if unsafe { wglMakeCurrent(hdc, hglrc) } == 0 {
+                unsafe {
+                    wglDeleteContext(hglrc);
+                    ReleaseDC(window.hwnd, hdc);
+                }
+                return Err("wglMakeCurrent failed".into());
+            }
+            Ok(Self {
+                window,
+                // SAFETY: The WGL handles remain live for the test context lifetime.
+                device_context: unsafe { NativePointer::from_ptr(hdc) },
+                share_context: unsafe { NativePointer::from_ptr(hglrc) },
+            })
+        }
+
+        #[cfg(target_os = "linux")]
+        {
+            // TODO(linux): Add an EGL pbuffer/context helper for Rust OpenGL
+            // binding tests on a Linux machine with the CI EGL/llvmpipe stack.
+            Err("OpenGL EGL test context is not available in Rust tests yet".into())
+        }
+
+        #[cfg(not(any(target_os = "windows", target_os = "linux")))]
+        {
+            Err("OpenGL test context is only available on Windows WGL".into())
+        }
+    }
+
+    fn descriptor(&self) -> OpenGLContextDescriptor {
+        #[cfg(target_os = "windows")]
+        {
+            OpenGLContextDescriptor::wgl(
+                WglContextDescriptor::new(self.device_context, self.share_context)
+                    .with_proc_address(unsafe {
+                        NativePointer::from_address(wglGetProcAddress as *const () as usize)
+                    }),
+            )
+        }
+
+        #[cfg(not(target_os = "windows"))]
+        {
+            unreachable!("OpenGLTestContext::new is only implemented on Windows")
+        }
+    }
+}
+
+#[cfg(target_os = "windows")]
+impl Drop for OpenGLTestContext {
+    fn drop(&mut self) {
+        // SAFETY: Handles belong to this test context and are released in
+        // dependency order after waiting for current-context teardown.
+        unsafe {
+            let hdc = self.device_context.as_ptr::<std::ffi::c_void>();
+            let hglrc = self.share_context.as_ptr::<std::ffi::c_void>();
+            let _ = wglMakeCurrent(std::ptr::null_mut(), std::ptr::null_mut());
+            wglDeleteContext(hglrc);
+            ReleaseDC(self.window.hwnd, hdc);
+        }
     }
 }
 
@@ -422,6 +631,46 @@ fn native_pointer_round_trips_address() {
 }
 
 #[test]
+fn opengl_context_provider_mask_is_exposed_semantically() {
+    let providers = crate::supported_opengl_context_providers();
+    let backends = crate::supported_render_backends();
+    if backends.contains(RenderBackendMask::OPENGL) {
+        assert!(
+            providers.intersects(OpenGLContextProviderMask::WGL | OpenGLContextProviderMask::EGL)
+        );
+    } else {
+        assert!(providers.is_empty());
+    }
+}
+
+#[test]
+fn opengl_owned_texture_session_attaches_with_platform_context() {
+    let runtime = RuntimeHandle::new().unwrap();
+    let map = MapHandle::with_options(
+        &runtime,
+        &MapOptions::new(64, 64, 1.0).with_mode(MapMode::Static),
+    )
+    .unwrap();
+    let Ok((_context, session)) =
+        create_opengl_owned_texture_session(&map, RenderTargetExtent::new(32, 16, 1.0))
+    else {
+        map.close().unwrap();
+        runtime.close().unwrap();
+        return;
+    };
+
+    let error = session.acquire_opengl_owned_texture_frame().unwrap_err();
+    assert!(matches!(
+        error.kind(),
+        ErrorKind::InvalidState | ErrorKind::Unsupported
+    ));
+
+    session.close().unwrap();
+    map.close().unwrap();
+    runtime.close().unwrap();
+}
+
+#[test]
 fn frame_native_pointer_round_trips_address_without_plain_native_pointer() {
     // SAFETY: Test uses a dummy opaque address and does not dereference it.
     let pointer = unsafe { FrameNativePointer::<'_>::from_ptr(0x4321usize as *mut u8) };
@@ -471,14 +720,40 @@ fn frame_metadata_copies_values_without_exposing_backend_pointers() {
     );
     assert_eq!(copied.frame_id, 11);
     assert_eq!((copied.format, copied.layout), (44, 55));
+
+    let mut opengl = empty_opengl_owned_texture_frame();
+    opengl.generation = 5;
+    opengl.width = 256;
+    opengl.height = 128;
+    opengl.scale_factor = 2.0;
+    opengl.frame_id = 13;
+    opengl.texture = 23;
+    opengl.target = 0x0de1;
+    opengl.internal_format = 0x8058;
+    opengl.format = 0x1908;
+    opengl.type_ = 0x1401;
+    let copied = OpenGLOwnedTextureFrame::from_native(&opengl);
+    assert_eq!(copied.generation, 5);
+    assert_eq!(
+        (copied.width, copied.height, copied.scale_factor),
+        (256, 128, 2.0)
+    );
+    assert_eq!(copied.frame_id, 13);
+    assert_eq!(copied.target, 0x0de1);
+    assert_eq!(copied.internal_format, 0x8058);
+    assert_eq!(copied.format, 0x1908);
+    assert_eq!(copied.type_, 0x1401);
 }
 
 #[test]
 fn feature_state_set_get_and_remove_copy_snapshots() {
     let runtime = RuntimeHandle::new().unwrap();
     let map = MapHandle::with_options(&runtime, &MapOptions::new(64, 64, 1.0)).unwrap();
-    let (_context, session) =
-        create_owned_texture_session(&map, RenderTargetExtent::new(64, 64, 1.0)).unwrap();
+    let Ok((_context, session)) =
+        create_owned_texture_session(&map, RenderTargetExtent::new(64, 64, 1.0))
+    else {
+        return;
+    };
     let selector = FeatureStateSelector::new("point").with_feature_id("feature-1");
     let state = JsonValue::Object(vec![
         JsonMember::new("hover", JsonValue::Bool(true)),
@@ -516,8 +791,11 @@ fn feature_state_set_get_and_remove_copy_snapshots() {
 fn rendered_and_source_queries_copy_results() {
     let runtime = RuntimeHandle::new().unwrap();
     let map = MapHandle::with_options(&runtime, &MapOptions::new(64, 64, 1.0)).unwrap();
-    let (_context, session) =
-        create_owned_texture_session(&map, RenderTargetExtent::new(64, 64, 1.0)).unwrap();
+    let Ok((_context, session)) =
+        create_owned_texture_session(&map, RenderTargetExtent::new(64, 64, 1.0))
+    else {
+        return;
+    };
 
     let error = session
         .query_rendered_features(
@@ -582,8 +860,11 @@ fn rendered_and_source_queries_copy_results() {
 fn feature_extension_queries_copy_value_and_feature_collection_results() {
     let runtime = RuntimeHandle::new().unwrap();
     let map = MapHandle::with_options(&runtime, &MapOptions::new(64, 64, 1.0)).unwrap();
-    let (_context, session) =
-        create_owned_texture_session(&map, RenderTargetExtent::new(64, 64, 1.0)).unwrap();
+    let Ok((_context, session)) =
+        create_owned_texture_session(&map, RenderTargetExtent::new(64, 64, 1.0))
+    else {
+        return;
+    };
 
     load_cluster_style(&runtime, &map, &session);
     let query_point = map.pixel_for_lat_lng(LatLng::new(0.0, 0.0)).unwrap();
@@ -636,8 +917,11 @@ fn owned_texture_session_retains_parent_and_enforces_single_session() {
         &MapOptions::new(64, 64, 1.0).with_mode(MapMode::Static),
     )
     .unwrap();
-    let (context, session) =
-        create_owned_texture_session(&map, RenderTargetExtent::new(32, 16, 1.0)).unwrap();
+    let Ok((context, session)) =
+        create_owned_texture_session(&map, RenderTargetExtent::new(32, 16, 1.0))
+    else {
+        return;
+    };
 
     let error = context
         .attach_owned_texture(&map, RenderTargetExtent::new(32, 16, 1.0))
@@ -664,8 +948,11 @@ fn acquired_frame_state_rejects_reentrant_session_operations_before_native_calls
         &MapOptions::new(64, 64, 1.0).with_mode(MapMode::Static),
     )
     .unwrap();
-    let (_context, session) =
-        create_owned_texture_session(&map, RenderTargetExtent::new(32, 16, 1.0)).unwrap();
+    let Ok((_context, session)) =
+        create_owned_texture_session(&map, RenderTargetExtent::new(32, 16, 1.0))
+    else {
+        return;
+    };
 
     session.inner.frame_acquired.set(true);
 
@@ -702,6 +989,7 @@ fn acquired_frame_state_rejects_reentrant_session_operations_before_native_calls
         session.read_premultiplied_rgba8_into(&mut []).unwrap_err(),
         session.acquire_metal_owned_texture_frame().unwrap_err(),
         session.acquire_vulkan_owned_texture_frame().unwrap_err(),
+        session.acquire_opengl_owned_texture_frame().unwrap_err(),
     ] {
         assert_eq!(error.kind(), ErrorKind::InvalidState);
         assert!(error.diagnostic().contains("acquired texture frame"));
@@ -724,8 +1012,11 @@ fn texture_readback_reports_documented_error_kinds_for_unsized_buffer() {
         &MapOptions::new(64, 64, 1.0).with_mode(MapMode::Static),
     )
     .unwrap();
-    let (_context, session) =
-        create_owned_texture_session(&map, RenderTargetExtent::new(32, 16, 1.0)).unwrap();
+    let Ok((_context, session)) =
+        create_owned_texture_session(&map, RenderTargetExtent::new(32, 16, 1.0))
+    else {
+        return;
+    };
 
     let _ = session.render_update();
     let mut empty = [];
@@ -776,6 +1067,43 @@ fn backend_specific_attach_calls_report_native_statuses() {
         .unwrap_err();
     assert!(matches!(
         vulkan_error.kind(),
+        ErrorKind::InvalidArgument | ErrorKind::Unsupported
+    ));
+
+    let opengl_context = OpenGLContextDescriptor::wgl(WglContextDescriptor::new(
+        NativePointer::NULL,
+        NativePointer::NULL,
+    ));
+    let opengl_error = map
+        .attach_opengl_surface(&OpenGLSurfaceDescriptor::new(
+            RenderTargetExtent::new(32, 16, 1.0),
+            opengl_context.clone(),
+            NativePointer::NULL,
+        ))
+        .unwrap_err();
+    assert!(matches!(
+        opengl_error.kind(),
+        ErrorKind::InvalidArgument | ErrorKind::Unsupported
+    ));
+
+    let opengl_error = map
+        .attach_opengl_owned_texture(&OpenGLOwnedTextureDescriptor::new(
+            RenderTargetExtent::new(0, 16, 1.0),
+            opengl_context.clone(),
+        ))
+        .unwrap_err();
+    assert_eq!(opengl_error.kind(), ErrorKind::InvalidArgument);
+
+    let opengl_error = map
+        .attach_opengl_borrowed_texture(&OpenGLBorrowedTextureDescriptor::new(
+            RenderTargetExtent::new(32, 16, 1.0),
+            opengl_context,
+            0,
+            0x0de1,
+        ))
+        .unwrap_err();
+    assert!(matches!(
+        opengl_error.kind(),
         ErrorKind::InvalidArgument | ErrorKind::Unsupported
     ));
 

@@ -53,20 +53,23 @@ pub use maplibre_core::{
     AmbientCacheOperation, ConstrainMode, Error, ErrorKind, LogEvent, LogSeverity, LogSeverityMask,
     MapDebugOptions, MapMode, MapOptions, MapTileOptions, MapViewportOptions, NetworkStatus,
     NorthOrientation, OfflineOperationKind, OfflineOperationResultKind, OfflineRegionDownloadState,
-    RenderBackendMask, RenderMode, ResourceErrorReason, ResourceKind, ResourceLoadingMethod,
-    ResourcePriority, ResourceResponseStatus, ResourceStoragePolicy, ResourceUsage, Result,
-    RuntimeEventType, TileLodMode, TileOperation, ViewportMode,
+    OpenGLContextProviderMask, RenderBackendMask, RenderMode, ResourceErrorReason, ResourceKind,
+    ResourceLoadingMethod, ResourcePriority, ResourceResponseStatus, ResourceStoragePolicy,
+    ResourceUsage, Result, RuntimeEventType, TileLodMode, TileOperation, ViewportMode,
 };
 pub use projection::MapProjectionHandle;
 pub use render::{
-    DetachedRenderSessionHandle, FeatureExtensionResult, FeatureStateSelector, FrameNativePointer,
+    DetachedRenderSessionHandle, EglContextDescriptor, FeatureExtensionResult,
+    FeatureStateSelector, FrameNativePointer, FrameOpenGLTextureName,
     MetalBorrowedTextureDescriptor, MetalContextDescriptor, MetalOwnedTextureDescriptor,
     MetalOwnedTextureFrame, MetalOwnedTextureFrameHandle, MetalSurfaceDescriptor, NativePointer,
+    OpenGLBorrowedTextureDescriptor, OpenGLContextDescriptor, OpenGLOwnedTextureDescriptor,
+    OpenGLOwnedTextureFrame, OpenGLOwnedTextureFrameHandle, OpenGLSurfaceDescriptor,
     PremultipliedRgba8Image, QueriedFeature, RenderSessionHandle, RenderTargetExtent,
     RenderedFeatureQueryOptions, RenderedQueryGeometry, SourceFeatureQueryOptions,
     TextureImageInfo, VulkanBorrowedTextureDescriptor, VulkanContextDescriptor,
     VulkanOwnedTextureDescriptor, VulkanOwnedTextureFrame, VulkanOwnedTextureFrameHandle,
-    VulkanSurfaceDescriptor,
+    VulkanSurfaceDescriptor, WglContextDescriptor,
 };
 pub use resource::{
     ByteRange, ResourceProviderDecision, ResourceRequest, ResourceRequestHandle, ResourceResponse,
@@ -151,6 +154,14 @@ pub fn supported_render_backends() -> RenderBackendMask {
     // value mask. Unknown future bits are preserved by from_bits_retain.
     let mask = unsafe { sys::mln_supported_render_backend_mask() };
     RenderBackendMask::from_bits_retain(mask)
+}
+
+/// Returns the OpenGL context providers compiled into the linked native library.
+pub fn supported_opengl_context_providers() -> OpenGLContextProviderMask {
+    // SAFETY: mln_opengl_supported_context_provider_mask takes no arguments and
+    // returns a value mask. Unknown future bits are preserved by from_bits_retain.
+    let mask = unsafe { sys::mln_opengl_supported_context_provider_mask() };
+    OpenGLContextProviderMask::from_bits_retain(mask)
 }
 
 /// Converts a geographic coordinate to Spherical Mercator projected meters.

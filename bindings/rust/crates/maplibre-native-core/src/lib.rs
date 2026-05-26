@@ -37,10 +37,10 @@ pub use enums::{
     AmbientCacheOperation, ConstrainMode, LocationIndicatorImageKind, LogEvent, LogSeverity,
     LogSeverityMask, MapDebugOptions, MapMode, NetworkStatus, NorthOrientation,
     OfflineOperationKind, OfflineOperationResultKind, OfflineRegionDownloadState,
-    RasterDemEncoding, RenderBackendMask, RenderMode, ResourceErrorReason, ResourceKind,
-    ResourceLoadingMethod, ResourcePriority, ResourceResponseStatus, ResourceStoragePolicy,
-    ResourceUsage, RuntimeEventType, SourceType, TileLodMode, TileOperation, TileScheme,
-    VectorTileEncoding, ViewportMode,
+    OpenGLContextProviderMask, RasterDemEncoding, RenderBackendMask, RenderMode,
+    ResourceErrorReason, ResourceKind, ResourceLoadingMethod, ResourcePriority,
+    ResourceResponseStatus, ResourceStoragePolicy, ResourceUsage, RuntimeEventType, SourceType,
+    TileLodMode, TileOperation, TileScheme, VectorTileEncoding, ViewportMode,
 };
 pub use error::{Error, ErrorKind, Result, check};
 pub use events::{

@@ -663,6 +663,7 @@ dependencies = [
  "maplibre-native-core",
  "maplibre-native-sys",
  "static_assertions",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
