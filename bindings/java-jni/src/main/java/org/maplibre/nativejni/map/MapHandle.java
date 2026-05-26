@@ -783,8 +783,8 @@ public final class MapHandle implements AutoCloseable {
   public void setLocationIndicatorLocation(String layerId, LatLng coordinate, double altitude) {
     NativeLibrary.ensureLoaded();
     Objects.requireNonNull(coordinate, "coordinate");
-    try (var layer = JavaCppValues.stringView(Objects.requireNonNull(layerId, "layerId"))) {
-      var nativeCoordinate = new MaplibreNativeC.mln_lat_lng();
+    try (var layer = JavaCppValues.stringView(Objects.requireNonNull(layerId, "layerId"));
+        var nativeCoordinate = new MaplibreNativeC.mln_lat_lng()) {
       nativeCoordinate.latitude(coordinate.latitude());
       nativeCoordinate.longitude(coordinate.longitude());
       Status.check(
@@ -793,7 +793,6 @@ public final class MapHandle implements AutoCloseable {
               layer.view(),
               nativeCoordinate,
               altitude));
-      nativeCoordinate.close();
     }
   }
 
