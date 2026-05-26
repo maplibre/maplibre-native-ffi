@@ -15,14 +15,26 @@ run = [
   "cp -a target/doc/. docs/public/reference/rust/",
 ]
 
-[tasks."api:java"]
+[tasks."api:java-ffm"]
 dir = "{{env.MLN_FFI_REPO_ROOT}}"
 run = [
-  "rm -rf docs/public/reference/java",
+  "rm -rf docs/public/reference/java-ffm",
   "mkdir -p docs/public/reference",
   "./gradlew :bindings:java-ffm:compileJava :bindings:java-ffm:javadoc -q",
-  "cp -a bindings/java-ffm/build/docs/javadoc/. docs/public/reference/java/",
+  "cp -a bindings/java-ffm/build/docs/javadoc/. docs/public/reference/java-ffm/",
 ]
+
+[tasks."api:java-jni"]
+dir = "{{env.MLN_FFI_REPO_ROOT}}"
+run = [
+  "rm -rf docs/public/reference/java-jni",
+  "mkdir -p docs/public/reference",
+  "./gradlew :bindings:java-jni:compileJava :bindings:java-jni:javadoc -q",
+  "cp -a bindings/java-jni/build/docs/javadoc/. docs/public/reference/java-jni/",
+]
+
+[tasks."api:java"]
+depends = ["api:java-ffm", "api:java-jni"]
 
 [tasks."api:zig"]
 dir = "{{env.MLN_FFI_REPO_ROOT}}/bindings/zig"
