@@ -1,0 +1,3 @@
+[tasks.build]
+depends = ["//:ensure-native-library"]
+run = "../../gradlew :bindings:java-jni:build"

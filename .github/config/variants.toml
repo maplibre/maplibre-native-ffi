@@ -32,6 +32,10 @@ requires = { platform = ["linux", "macos", "windows"], backend = ["metal", "open
 task = "//bindings/java-ffm:build"
 requires = { platform = ["linux", "macos", "windows"], backend = ["metal", "opengl", "vulkan"] }
 
+[bindings.java-jni]
+task = "//bindings/java-jni:build"
+requires = { platform = ["linux", "macos"] }
+
 [bindings.rust]
 task = "//bindings/rust:ci"
 requires = { platform = ["linux", "macos", "windows"], backend = ["metal", "opengl", "vulkan"] }
