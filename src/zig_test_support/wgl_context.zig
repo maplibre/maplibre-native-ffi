@@ -97,6 +97,7 @@ const wgl = if (builtin.os.tag == .windows) struct {
     extern "user32" fn ReleaseDC(hWnd: HWND, hDC: HDC) callconv(.winapi) INT;
     extern "gdi32" fn ChoosePixelFormat(hdc: HDC, ppfd: *const PIXELFORMATDESCRIPTOR) callconv(.winapi) INT;
     extern "gdi32" fn SetPixelFormat(hdc: HDC, format: INT, ppfd: *const PIXELFORMATDESCRIPTOR) callconv(.winapi) BOOL;
+    extern "opengl32" fn glGetString(name: UINT) callconv(.winapi) ?[*:0]const u8;
     extern "opengl32" fn wglCreateContext(hdc: HDC) callconv(.winapi) ?HGLRC;
     extern "opengl32" fn wglDeleteContext(hglrc: HGLRC) callconv(.winapi) BOOL;
     extern "opengl32" fn wglGetProcAddress(name: LPCSTR) callconv(.winapi) ?*anyopaque;
@@ -151,6 +152,25 @@ const Procs = if (builtin.os.tag == .windows) struct {
         return procs;
     }
 } else struct {};
+
+fn openglVersionAtLeast(version: []const u8, minimum_major: u32, minimum_minor: u32) bool {
+    var offset: usize = 0;
+    while (offset < version.len and !std.ascii.isDigit(version[offset])) : (offset += 1) {}
+    if (offset == version.len) return false;
+
+    var major_end = offset;
+    while (major_end < version.len and std.ascii.isDigit(version[major_end])) : (major_end += 1) {}
+    if (major_end == offset or major_end == version.len or version[major_end] != '.') return false;
+
+    const minor_start = major_end + 1;
+    var minor_end = minor_start;
+    while (minor_end < version.len and std.ascii.isDigit(version[minor_end])) : (minor_end += 1) {}
+    if (minor_end == minor_start) return false;
+
+    const major = std.fmt.parseUnsigned(u32, version[offset..major_end], 10) catch return false;
+    const minor = std.fmt.parseUnsigned(u32, version[minor_start..minor_end], 10) catch return false;
+    return major > minimum_major or (major == minimum_major and minor >= minimum_minor);
+}
 
 pub const Context = if (builtin.os.tag == .windows) struct {
     window: wgl.HWND,
@@ -233,6 +253,12 @@ pub const Context = if (builtin.os.tag == .windows) struct {
 
     pub fn makeCurrent(self: *const Context) !void {
         if (wgl.wglMakeCurrent(self.device_context, self.share_context) == 0) return error.SkipZigTest;
+    }
+
+    pub fn supportsMapLibreRendering(self: *const Context) bool {
+        self.makeCurrent() catch return false;
+        const version = wgl.glGetString(gl.VERSION) orelse return false;
+        return openglVersionAtLeast(std.mem.span(version), 3, 0);
     }
 
     pub fn deviceContextPointer(self: *const Context) *anyopaque {

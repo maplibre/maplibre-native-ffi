@@ -13,6 +13,12 @@ const egl = if (build_options.supports_opengl and builtin.os.tag == .linux) @cIm
     @cInclude("EGL/egl.h");
 }) else struct {};
 
+const egl_platform_surfaceless_mesa = 0x31dd;
+const EglGetPlatformDisplayExt = if (build_options.supports_opengl and builtin.os.tag == .linux)
+    *const fn (egl.EGLenum, ?*anyopaque, ?*const egl.EGLint) callconv(.c) egl.EGLDisplay
+else
+    void;
+
 const sdl = if (build_options.supports_opengl and builtin.os.tag == .windows) @cImport({
     @cInclude("SDL3/SDL.h");
 }) else struct {};
@@ -225,13 +231,9 @@ const OpenGLAttachContext = if (build_options.supports_opengl and builtin.os.tag
     share_context: egl.EGLContext,
 
     fn init() !@This() {
-        const display = egl.eglGetDisplay(egl.EGL_DEFAULT_DISPLAY);
-        if (display == egl.EGL_NO_DISPLAY) return error.EglUnavailable;
+        const display = try initDisplay();
         errdefer _ = egl.eglTerminate(display);
 
-        var major: egl.EGLint = 0;
-        var minor: egl.EGLint = 0;
-        if (egl.eglInitialize(display, &major, &minor) == egl.EGL_FALSE) return error.EglUnavailable;
         if (egl.eglBindAPI(egl.EGL_OPENGL_ES_API) == egl.EGL_FALSE) return error.EglUnavailable;
 
         const config_attributes = [_]egl.EGLint{
@@ -284,6 +286,26 @@ const OpenGLAttachContext = if (build_options.supports_opengl and builtin.os.tag
         _ = egl.eglDestroySurface(self.display, self.surface);
         _ = egl.eglDestroyContext(self.display, self.share_context);
         _ = egl.eglTerminate(self.display);
+    }
+
+    fn initDisplay() !egl.EGLDisplay {
+        if (initializeDisplay(egl.eglGetDisplay(egl.EGL_DEFAULT_DISPLAY))) |display| {
+            return display;
+        } else |_| {}
+
+        const get_platform_display: EglGetPlatformDisplayExt = @ptrCast(
+            egl.eglGetProcAddress("eglGetPlatformDisplayEXT") orelse return error.EglUnavailable,
+        );
+        return initializeDisplay(get_platform_display(egl_platform_surfaceless_mesa, null, null));
+    }
+
+    fn initializeDisplay(display: egl.EGLDisplay) !egl.EGLDisplay {
+        if (display == egl.EGL_NO_DISPLAY) return error.EglUnavailable;
+
+        var major: egl.EGLint = 0;
+        var minor: egl.EGLint = 0;
+        if (egl.eglInitialize(display, &major, &minor) == egl.EGL_FALSE) return error.EglUnavailable;
+        return display;
     }
 
     fn descriptor(self: *const @This()) maplibre.OpenGLContextDescriptor {

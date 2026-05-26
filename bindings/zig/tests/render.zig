@@ -17,6 +17,12 @@ const egl = if (build_options.supports_opengl and builtin.os.tag == .linux) @cIm
     @cInclude("EGL/egl.h");
 }) else struct {};
 
+const egl_platform_surfaceless_mesa = 0x31dd;
+const EglGetPlatformDisplayExt = if (build_options.supports_opengl and builtin.os.tag == .linux)
+    *const fn (egl.EGLenum, ?*anyopaque, ?*const egl.EGLint) callconv(.c) egl.EGLDisplay
+else
+    void;
+
 const gl = if (build_options.supports_opengl and (builtin.os.tag == .windows or builtin.os.tag == .linux)) @import("gl") else struct {};
 const wgl_test = if (build_options.supports_opengl and builtin.os.tag == .windows) @import("wgl_test_context") else struct {};
 
@@ -422,13 +428,9 @@ const EglAttachContext = if (build_options.supports_opengl and builtin.os.tag ==
     }
 
     pub fn initWithSize(width: u32, height: u32) !EglAttachContext {
-        const display = egl.eglGetDisplay(egl.EGL_DEFAULT_DISPLAY);
-        if (display == egl.EGL_NO_DISPLAY) return error.SkipZigTest;
+        const display = try initDisplay();
         errdefer _ = egl.eglTerminate(display);
 
-        var major: egl.EGLint = 0;
-        var minor: egl.EGLint = 0;
-        if (egl.eglInitialize(display, &major, &minor) == egl.EGL_FALSE) return error.SkipZigTest;
         if (egl.eglBindAPI(egl.EGL_OPENGL_ES_API) == egl.EGL_FALSE) return error.SkipZigTest;
 
         const config_attributes = [_]egl.EGLint{
@@ -482,6 +484,26 @@ const EglAttachContext = if (build_options.supports_opengl and builtin.os.tag ==
         _ = egl.eglDestroySurface(self.display, self.egl_surface);
         _ = egl.eglDestroyContext(self.display, self.share_context);
         _ = egl.eglTerminate(self.display);
+    }
+
+    fn initDisplay() !egl.EGLDisplay {
+        if (initializeDisplay(egl.eglGetDisplay(egl.EGL_DEFAULT_DISPLAY))) |display| {
+            return display;
+        } else |_| {}
+
+        const get_platform_display: EglGetPlatformDisplayExt = @ptrCast(
+            egl.eglGetProcAddress("eglGetPlatformDisplayEXT") orelse return error.SkipZigTest,
+        );
+        return initializeDisplay(get_platform_display(egl_platform_surfaceless_mesa, null, null));
+    }
+
+    fn initializeDisplay(display: egl.EGLDisplay) !egl.EGLDisplay {
+        if (display == egl.EGL_NO_DISPLAY) return error.SkipZigTest;
+
+        var major: egl.EGLint = 0;
+        var minor: egl.EGLint = 0;
+        if (egl.eglInitialize(display, &major, &minor) == egl.EGL_FALSE) return error.SkipZigTest;
+        return display;
     }
 
     pub fn makeCurrent(self: *const EglAttachContext) !void {
