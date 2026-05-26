@@ -21,6 +21,10 @@ const wgl = if (builtin.os.tag == .windows) struct {
     const WPARAM = usize;
     const LPARAM = isize;
     const LRESULT = isize;
+    const GLenum = c_uint;
+    const GLint = c_int;
+    const GLsizei = c_int;
+    const GLuint = c_uint;
 
     const HDC = *opaque {};
     const HGLRC = *opaque {};
@@ -78,6 +82,16 @@ const wgl = if (builtin.os.tag == .windows) struct {
     const PFD_TYPE_RGBA = 0;
     const PFD_MAIN_PLANE = 0;
     const WS_OVERLAPPEDWINDOW = 0x00cf0000;
+    const GL_NO_ERROR = 0;
+    const GL_TEXTURE_2D = 0x0de1;
+    const GL_RGBA = 0x1908;
+    const GL_UNSIGNED_BYTE = 0x1401;
+    const GL_TEXTURE_MAG_FILTER = 0x2800;
+    const GL_TEXTURE_MIN_FILTER = 0x2801;
+    const GL_TEXTURE_WRAP_S = 0x2802;
+    const GL_TEXTURE_WRAP_T = 0x2803;
+    const GL_LINEAR = 0x2601;
+    const GL_CLAMP = 0x2900;
 
     extern "kernel32" fn GetModuleHandleA(lpModuleName: ?LPCSTR) callconv(.winapi) ?HINSTANCE;
     extern "user32" fn RegisterClassA(lpWndClass: *const WNDCLASSA) callconv(.winapi) u16;
@@ -105,6 +119,23 @@ const wgl = if (builtin.os.tag == .windows) struct {
     extern "opengl32" fn wglDeleteContext(hglrc: HGLRC) callconv(.winapi) BOOL;
     extern "opengl32" fn wglGetProcAddress(name: LPCSTR) callconv(.winapi) ?*anyopaque;
     extern "opengl32" fn wglMakeCurrent(hdc: ?HDC, hglrc: ?HGLRC) callconv(.winapi) BOOL;
+    extern "opengl32" fn glBindTexture(target: GLenum, texture: GLuint) callconv(.winapi) void;
+    extern "opengl32" fn glDeleteTextures(n: GLsizei, textures: *const GLuint) callconv(.winapi) void;
+    extern "opengl32" fn glGenTextures(n: GLsizei, textures: *GLuint) callconv(.winapi) void;
+    extern "opengl32" fn glGetError() callconv(.winapi) GLenum;
+    extern "opengl32" fn glGetTexImage(target: GLenum, level: GLint, format: GLenum, @"type": GLenum, pixels: *anyopaque) callconv(.winapi) void;
+    extern "opengl32" fn glTexImage2D(
+        target: GLenum,
+        level: GLint,
+        internalformat: GLint,
+        width: GLsizei,
+        height: GLsizei,
+        border: GLint,
+        format: GLenum,
+        @"type": GLenum,
+        pixels: ?*const anyopaque,
+    ) callconv(.winapi) void;
+    extern "opengl32" fn glTexParameteri(target: GLenum, pname: GLenum, param: GLint) callconv(.winapi) void;
 
     fn windowProc(hWnd: HWND, msg: UINT, wParam: WPARAM, lParam: LPARAM) callconv(.winapi) LRESULT {
         return DefWindowProcA(hWnd, msg, wParam, lParam);
@@ -338,6 +369,45 @@ const WglTestContext = if (builtin.os.tag == .windows) struct {
             },
         };
     }
+
+    pub fn createRgbaTexture(self: *const WglTestContext, width: u32, height: u32) !wgl.GLuint {
+        if (wgl.wglMakeCurrent(self.device_context, self.share_context) == 0) return error.SkipZigTest;
+
+        var texture: wgl.GLuint = 0;
+        wgl.glGenTextures(1, &texture);
+        if (texture == 0) return error.SkipZigTest;
+        errdefer wgl.glDeleteTextures(1, &texture);
+
+        wgl.glBindTexture(wgl.GL_TEXTURE_2D, texture);
+        wgl.glTexParameteri(wgl.GL_TEXTURE_2D, wgl.GL_TEXTURE_MIN_FILTER, wgl.GL_LINEAR);
+        wgl.glTexParameteri(wgl.GL_TEXTURE_2D, wgl.GL_TEXTURE_MAG_FILTER, wgl.GL_LINEAR);
+        wgl.glTexParameteri(wgl.GL_TEXTURE_2D, wgl.GL_TEXTURE_WRAP_S, wgl.GL_CLAMP);
+        wgl.glTexParameteri(wgl.GL_TEXTURE_2D, wgl.GL_TEXTURE_WRAP_T, wgl.GL_CLAMP);
+        wgl.glTexImage2D(
+            wgl.GL_TEXTURE_2D,
+            0,
+            wgl.GL_RGBA,
+            @intCast(width),
+            @intCast(height),
+            0,
+            wgl.GL_RGBA,
+            wgl.GL_UNSIGNED_BYTE,
+            null,
+        );
+        try testing.expectEqual(@as(wgl.GLenum, wgl.GL_NO_ERROR), wgl.glGetError());
+        return texture;
+    }
+
+    pub fn destroyTexture(_: *const WglTestContext, texture: wgl.GLuint) void {
+        wgl.glDeleteTextures(1, &texture);
+    }
+
+    pub fn readRgbaTexture(self: *const WglTestContext, texture: wgl.GLuint, pixels: []u8) !void {
+        if (wgl.wglMakeCurrent(self.device_context, self.share_context) == 0) return error.SkipZigTest;
+        wgl.glBindTexture(wgl.GL_TEXTURE_2D, texture);
+        wgl.glGetTexImage(wgl.GL_TEXTURE_2D, 0, wgl.GL_RGBA, wgl.GL_UNSIGNED_BYTE, pixels.ptr);
+        try testing.expectEqual(@as(wgl.GLenum, wgl.GL_NO_ERROR), wgl.glGetError());
+    }
 } else struct {};
 
 test "OpenGL default descriptors initialize ABI sizes" {
@@ -480,4 +550,77 @@ test "OpenGL WGL owned texture renders through raw C ABI" {
     try testing.expect(frame.texture != 0);
     try testing.expectEqual(c.MLN_STATUS_INVALID_STATE, c.mln_texture_read_premultiplied_rgba8(handle, pixels.ptr, pixels.len, &image_info));
     try testing.expectEqual(c.MLN_STATUS_OK, c.mln_opengl_owned_texture_release_frame(handle, &frame));
+}
+
+test "OpenGL WGL borrowed texture renders through raw C ABI" {
+    if (!build_options.supports_opengl or builtin.os.tag != .windows) return error.SkipZigTest;
+
+    var wgl_context = try WglTestContext.init();
+    defer wgl_context.deinit();
+
+    const texture = try wgl_context.createRgbaTexture(256, 256);
+    defer wgl_context.destroyTexture(texture);
+
+    const runtime = try support.createRuntime();
+    defer support.destroyRuntime(runtime);
+    const map = try support.createMap(runtime);
+    defer support.destroyMap(map);
+
+    var descriptor = c.mln_opengl_borrowed_texture_descriptor_default();
+    descriptor.extent.width = 256;
+    descriptor.extent.height = 256;
+    descriptor.extent.scale_factor = 1.0;
+    descriptor.context = wgl_context.descriptor();
+    descriptor.texture = texture;
+    descriptor.target = wgl.GL_TEXTURE_2D;
+
+    var session: ?*c.mln_render_session = null;
+    try testing.expectEqual(c.MLN_STATUS_OK, c.mln_opengl_borrowed_texture_attach(map, &descriptor, &session));
+    const handle = session orelse return error.SessionAttachFailed;
+    defer testing.expectEqual(c.MLN_STATUS_OK, c.mln_render_session_destroy(handle)) catch @panic("render session destroy failed");
+
+    var image_info = c.mln_texture_image_info_default();
+    try testing.expectEqual(c.MLN_STATUS_UNSUPPORTED, c.mln_texture_read_premultiplied_rgba8(handle, null, 0, &image_info));
+
+    var frame = c.mln_opengl_owned_texture_frame{
+        .size = @sizeOf(c.mln_opengl_owned_texture_frame),
+        .generation = 0,
+        .width = 0,
+        .height = 0,
+        .scale_factor = 0.0,
+        .frame_id = 0,
+        .texture = 0,
+        .target = 0,
+        .internal_format = 0,
+        .format = 0,
+        .type = 0,
+    };
+    try testing.expectEqual(c.MLN_STATUS_INVALID_STATE, c.mln_opengl_owned_texture_acquire_frame(handle, &frame));
+
+    try testing.expectEqual(c.MLN_STATUS_OK, c.mln_map_set_style_json(map, raw_render_style_json));
+    try testing.expectEqual(c.MLN_STATUS_OK, c.mln_map_request_repaint(map));
+    try waitForRenderedFrame(runtime, map, handle);
+
+    const pixels = try testing.allocator.alloc(u8, 256 * 256 * 4);
+    defer testing.allocator.free(pixels);
+    @memset(pixels, 0);
+    try wgl_context.readRgbaTexture(texture, pixels);
+    try testing.expect(hasNonZeroByte(pixels));
+
+    image_info = c.mln_texture_image_info_default();
+    try testing.expectEqual(c.MLN_STATUS_UNSUPPORTED, c.mln_texture_read_premultiplied_rgba8(handle, null, 0, &image_info));
+    frame = .{
+        .size = @sizeOf(c.mln_opengl_owned_texture_frame),
+        .generation = 0,
+        .width = 0,
+        .height = 0,
+        .scale_factor = 0.0,
+        .frame_id = 0,
+        .texture = 0,
+        .target = 0,
+        .internal_format = 0,
+        .format = 0,
+        .type = 0,
+    };
+    try testing.expectEqual(c.MLN_STATUS_UNSUPPORTED, c.mln_opengl_owned_texture_acquire_frame(handle, &frame));
 }
