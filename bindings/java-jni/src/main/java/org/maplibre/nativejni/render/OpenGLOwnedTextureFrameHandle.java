@@ -44,11 +44,11 @@ public final class OpenGLOwnedTextureFrameHandle implements AutoCloseable {
     if (closed) {
       return;
     }
+    session.releaseOpenGLFrame(nativeFrame, null);
     closed = true;
     try {
-      session.releaseOpenGLFrame(nativeFrame, null);
-    } finally {
       scope.close();
+    } finally {
       nativeFrame.close();
     }
   }

@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
 import java.util.EnumSet;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.BeforeAll;
@@ -15,7 +16,9 @@ import org.maplibre.nativejni.Maplibre;
 import org.maplibre.nativejni.error.InvalidArgumentException;
 import org.maplibre.nativejni.error.InvalidStateException;
 import org.maplibre.nativejni.error.MaplibreException;
+import org.maplibre.nativejni.error.MaplibreStatus;
 import org.maplibre.nativejni.error.UnsupportedFeatureException;
+import org.maplibre.nativejni.error.WrongThreadException;
 import org.maplibre.nativejni.log.LogSeverity;
 import org.maplibre.nativejni.map.MapHandle;
 import org.maplibre.nativejni.map.MapOptions;
@@ -200,6 +203,38 @@ class RenderSessionHandleTest {
   }
 
   @Test
+  void openglOwnedTextureFrameCloseFailureLeavesHandleRetryable() throws Exception {
+    Maplibre.setLogCallback(record -> true);
+    Maplibre.setAsyncLogSeverities(EnumSet.noneOf(LogSeverity.class));
+
+    var runtime = RuntimeHandle.create();
+    var map = MapHandle.create(runtime, new MapOptions().size(64, 64));
+    try (var target = assumeOpenGLOwnedTextureTarget(map)) {
+      var activeSession = target.session();
+      map.setStyleJson(STYLE_JSON);
+      waitForMapEvent(runtime, map, RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE);
+      activeSession.renderUpdate();
+
+      var frameHandle = activeSession.acquireOpenGLOwnedTextureFrame();
+      var frame = frameHandle.frame();
+      try {
+        assertWrongThread(runOnOtherThread(frameHandle::close));
+        assertFalse(frameHandle.isClosed());
+        assertTrue(frame.texture() != 0);
+        assertThrows(InvalidStateException.class, activeSession::renderUpdate);
+      } finally {
+        frameHandle.close();
+      }
+      assertTrue(frameHandle.isClosed());
+      assertThrows(IllegalStateException.class, frame::texture);
+      activeSession.renderUpdate();
+    } finally {
+      map.close();
+      runtime.close();
+    }
+  }
+
+  @Test
   void openglBorrowedTextureSessionRendersThroughPublicBinding() throws Exception {
     Maplibre.setLogCallback(record -> true);
     Maplibre.setAsyncLogSeverities(EnumSet.noneOf(LogSeverity.class));
@@ -369,6 +404,29 @@ class RenderSessionHandleTest {
     return false;
   }
 
+  private static void assertWrongThread(Throwable thrown) {
+    assertTrue(thrown instanceof WrongThreadException, () -> String.valueOf(thrown));
+    var error = (WrongThreadException) thrown;
+    assertEquals(MaplibreStatus.WRONG_THREAD, error.status());
+    assertFalse(error.diagnostic().isBlank());
+  }
+
+  private static Throwable runOnOtherThread(ThrowingRunnable action) throws InterruptedException {
+    var thrown = new AtomicReference<Throwable>();
+    var thread =
+        new Thread(
+            () -> {
+              try {
+                action.run();
+              } catch (Throwable error) {
+                thrown.set(error);
+              }
+            });
+    thread.start();
+    thread.join();
+    return thrown.get();
+  }
+
   private static void waitForMapEvent(RuntimeHandle runtime, MapHandle map, RuntimeEventType type)
       throws InterruptedException {
     for (var attempt = 0; attempt < 1000; attempt++) {
@@ -386,5 +444,10 @@ class RenderSessionHandleTest {
       Thread.sleep(1);
     }
     fail("Timed out waiting for " + type);
+  }
+
+  @FunctionalInterface
+  private interface ThrowingRunnable {
+    void run() throws Exception;
   }
 }

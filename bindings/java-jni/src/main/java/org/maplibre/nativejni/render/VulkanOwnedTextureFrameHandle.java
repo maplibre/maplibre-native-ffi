@@ -44,11 +44,11 @@ public final class VulkanOwnedTextureFrameHandle implements AutoCloseable {
     if (closed) {
       return;
     }
+    session.releaseVulkanFrame(nativeFrame, null);
     closed = true;
     try {
-      session.releaseVulkanFrame(nativeFrame, null);
-    } finally {
       scope.close();
+    } finally {
       nativeFrame.close();
     }
   }
