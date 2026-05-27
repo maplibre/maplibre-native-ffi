@@ -65,7 +65,7 @@ that's not already a mise task, use `mise exec -- pixi run ...`.
 
 - Campsite rules apply: leave anything you touch tidier than when you found it.
 - The environment is mostly defined by `mise` and `pixi`.
-- The bindings are meant to be low level and broadly analagous to each other and
+- The bindings are meant to be low level and broadly analogous to each other and
   to the C API, exposing MapLibre concepts directly, while following language
   conventions for memory and thread safety. Prioritize safety, similarity, and
   idioms, in that order.
