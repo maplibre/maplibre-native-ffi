@@ -108,8 +108,12 @@ runs:
       shell: bash
       run: |
         sudo apt-get update
-        sudo apt-get install --no-install-recommends --yes mesa-utils
-        mise exec -- pixi run --locked eglinfo || true
+        sudo apt-get install --no-install-recommends --yes libegl-mesa0 libgl1-mesa-dri mesa-utils
+        mise exec -- pixi run --locked bash -euo pipefail -c '
+          env | sort | grep -E "^(EGL|LIBGL|MESA|LD_LIBRARY_PATH|__EGL|CONDA|PIXI)" || true
+          command -v eglinfo
+          EGL_LOG_LEVEL=debug LIBGL_DEBUG=verbose LD_DEBUG=libs eglinfo || true
+        '
 
     - name: Diagnose Vulkan setup
       if: ${{ contains(env.MISE_ENV, 'vulkan') }}
