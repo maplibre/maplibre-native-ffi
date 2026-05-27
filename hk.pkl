@@ -6,7 +6,10 @@ amends "package://github.com/jdx/hk/releases/download/v1.45.0/hk@1.45.0#/Config.
 import "package://github.com/jdx/hk/releases/download/v1.45.0/hk@1.45.0#/Builtins.pkl"
 
 local lintSteps = new Mapping<String, Step> {
-  ["dprint"] = Builtins.dprint
+  ["dprint"] = (Builtins.dprint) {
+    // the default batch=false hits the cmd length limit on windows
+    batch = true
+  }
   ["actionlint"] {
     glob = List(".github/workflows/*.yml", ".github/workflows/*.yaml")
     check = "actionlint {{files}}"

@@ -8,6 +8,7 @@ use raw_window_handle::{HasDisplayHandle, HasWindowHandle};
 use winit::window::Window;
 
 pub struct VulkanContext {
+    entry: ash::Entry,
     instance: ash::Instance,
     surface_loader: ash::khr::surface::Instance,
     surface: vk::SurfaceKHR,
@@ -102,6 +103,7 @@ impl VulkanContext {
         let graphics_queue = unsafe { device.get_device_queue(graphics_queue_family_index, 0) };
 
         Ok(Self {
+            entry,
             instance,
             surface_loader,
             surface,
@@ -159,6 +161,24 @@ impl VulkanContext {
     pub fn graphics_queue_pointer(&self) -> NativePointer {
         // SAFETY: The Vulkan queue is live for the render session lifetime.
         unsafe { NativePointer::from_address(self.graphics_queue.as_raw() as usize) }
+    }
+
+    pub fn get_instance_proc_addr_pointer(&self) -> NativePointer {
+        // SAFETY: The function pointer remains valid while the ash entry is live.
+        unsafe {
+            NativePointer::from_address(
+                self.entry.static_fn().get_instance_proc_addr as *const () as usize,
+            )
+        }
+    }
+
+    pub fn get_device_proc_addr_pointer(&self) -> NativePointer {
+        // SAFETY: The function pointer remains valid while the ash instance is live.
+        unsafe {
+            NativePointer::from_address(
+                self.instance.fp_v1_0().get_device_proc_addr as *const () as usize,
+            )
+        }
     }
 
     pub fn surface_pointer(&self) -> NativePointer {

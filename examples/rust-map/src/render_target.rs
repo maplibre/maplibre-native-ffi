@@ -155,6 +155,10 @@ impl RenderTarget {
                 vulkan.device_pointer(),
                 vulkan.graphics_queue_pointer(),
                 vulkan.graphics_queue_family_index(),
+            )
+            .with_proc_addresses(
+                vulkan.get_instance_proc_addr_pointer(),
+                vulkan.get_device_proc_addr_pointer(),
             ),
         );
         let session = map.attach_vulkan_owned_texture(&descriptor)?;
@@ -191,6 +195,10 @@ impl RenderTarget {
                 vulkan.device_pointer(),
                 vulkan.graphics_queue_pointer(),
                 vulkan.graphics_queue_family_index(),
+            )
+            .with_proc_addresses(
+                vulkan.get_instance_proc_addr_pointer(),
+                vulkan.get_device_proc_addr_pointer(),
             ),
             vulkan.surface_pointer(),
         );

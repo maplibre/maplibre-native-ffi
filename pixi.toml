@@ -49,6 +49,7 @@ LIBCLANG_PATH = "%CONDA_PREFIX%\\Library\\bin"
 MLN_FFI_DEPENDENCY_INCLUDE_DIR = "%CONDA_PREFIX%\\Library\\include"
 MLN_FFI_DEPENDENCY_LIBRARY_DIR = "%CONDA_PREFIX%\\Library\\lib"
 RUSTFLAGS = "-L native=%CONDA_PREFIX%\\Library\\lib"
+VK_ADD_DRIVER_FILES = "%CONDA_PREFIX%\\Library\\share\\vulkan\\icd.d\\lvp_icd.x86_64.json"
 
 [feature.format.dependencies]
 # Formatting stays on a single clang-format version across platforms.
@@ -61,14 +62,14 @@ cxx-compiler = ">=1.11,<2"
 clang-tools = ">=19,<20"
 libclang = ">=19,<20"
 glslang = ">=16,<17"
-cmake = ">=4,<5"
+cmake = ">=4.3,<5"
 ninja = ">=1.13,<2"
 pkg-config = ">=0.29,<1"
 vulkan-tools = ">=1.4.341,<2"
 
 # Native libraries linked by project code, examples, and vendored MapLibre Native.
 icu = ">=78,<79"
-libcurl = ">=8,<9"
+libcurl = ">=8,<8.20"
 libjpeg-turbo = ">=3.1,<4"
 libpng = ">=1.6,<2"
 libuv = ">=1,<2"
@@ -78,17 +79,22 @@ libvulkan-loader = ">=1.4,<2"
 zlib = ">=1.3,<2"
 
 [target.linux-64.dependencies]
-# Provides Mesa's lavapipe Vulkan ICD for Linux machines without a hardware GPU.
 mesalib = ">=26.0.3,<27"
 sysroot_linux-64 = ">=2.28,<2.29"
+libegl-devel = ">=1.7.0,<2"
+libopengl-devel = ">=1.7.0,<2"
+libgles-devel = ">=1.7.0,<2"
 
 [target.linux-aarch64.dependencies]
-# Provides Mesa's lavapipe Vulkan ICD for Linux machines without a hardware GPU.
 mesalib = ">=26.0.3,<27"
 sysroot_linux-aarch64 = ">=2.28,<2.29"
+libegl-devel = ">=1.7.0,<2"
+libopengl-devel = ">=1.7.0,<2"
+libgles-devel = ">=1.7.0,<2"
 
 [target.osx-arm64.dependencies]
 moltenvk = ">=1.4.1,<2"
 
 [target.win-64.dependencies]
 dlfcn-win32 = ">=1.4,<2"
+mesalib = ">=26.0.3,<27"

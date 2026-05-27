@@ -15,6 +15,7 @@
 #include "maplibre_native_c/texture.h"
 #include "render/render_session_common.hpp"
 #include "render/texture_session.hpp"
+#include "render/vulkan/vulkan_dispatch.hpp"
 #include "render/vulkan/vulkan_texture_backend.hpp"
 
 namespace {
@@ -130,6 +131,59 @@ auto validate_metal_borrowed_descriptor(
   return MLN_STATUS_OK;
 }
 
+auto validate_opengl_owned_descriptor(
+  const mln_opengl_owned_texture_descriptor* descriptor
+) -> mln_status {
+  if (descriptor == nullptr) {
+    mln::core::set_thread_error("texture descriptor must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (descriptor->size < sizeof(mln_opengl_owned_texture_descriptor)) {
+    mln::core::set_thread_error(
+      "mln_opengl_owned_texture_descriptor.size is too small"
+    );
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  const auto extent_status = mln::core::validate_render_target_extent(
+    descriptor->extent, "texture dimensions and scale_factor must be positive"
+  );
+  if (extent_status != MLN_STATUS_OK) {
+    return extent_status;
+  }
+  return mln::core::validate_opengl_context(descriptor->context, false);
+}
+
+auto validate_opengl_borrowed_descriptor(
+  const mln_opengl_borrowed_texture_descriptor* descriptor
+) -> mln_status {
+  if (descriptor == nullptr) {
+    mln::core::set_thread_error("texture descriptor must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (descriptor->size < sizeof(mln_opengl_borrowed_texture_descriptor)) {
+    mln::core::set_thread_error(
+      "mln_opengl_borrowed_texture_descriptor.size is too small"
+    );
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  const auto extent_status = mln::core::validate_render_target_extent(
+    descriptor->extent, "texture dimensions and scale_factor must be positive"
+  );
+  if (extent_status != MLN_STATUS_OK) {
+    return extent_status;
+  }
+  const auto context_status =
+    mln::core::validate_opengl_context(descriptor->context, false);
+  if (context_status != MLN_STATUS_OK) {
+    return context_status;
+  }
+  if (descriptor->texture == 0 || descriptor->target == 0) {
+    mln::core::set_thread_error("OpenGL texture and target must be specified");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  return MLN_STATUS_OK;
+}
+
 auto validate_vulkan_handles(
   const mln_vulkan_owned_texture_descriptor& descriptor
 ) -> mln_status {
@@ -137,9 +191,20 @@ auto validate_vulkan_handles(
   auto* const physical_device =
     static_cast<VkPhysicalDevice>(descriptor.context.physical_device);
 
+  auto dispatcher = mln::core::vulkan_dispatch_loader(descriptor.context);
+  mln::core::vulkan_init_instance_dispatch(dispatcher, descriptor.context);
+  if (
+    dispatcher.vkEnumeratePhysicalDevices == nullptr ||
+    dispatcher.vkGetPhysicalDeviceQueueFamilyProperties == nullptr
+  ) {
+    mln::core::set_thread_error("Vulkan dispatch functions must resolve");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+
   auto physical_device_count = uint32_t{};
-  auto result =
-    ::vkEnumeratePhysicalDevices(instance, &physical_device_count, nullptr);
+  auto result = dispatcher.vkEnumeratePhysicalDevices(
+    instance, &physical_device_count, nullptr
+  );
   if (result != VK_SUCCESS || physical_device_count == 0) {
     mln::core::set_thread_error(
       "Vulkan instance must expose at least one physical device"
@@ -148,7 +213,7 @@ auto validate_vulkan_handles(
   }
 
   auto physical_devices = std::vector<VkPhysicalDevice>(physical_device_count);
-  result = ::vkEnumeratePhysicalDevices(
+  result = dispatcher.vkEnumeratePhysicalDevices(
     instance, &physical_device_count, physical_devices.data()
   );
   if (result != VK_SUCCESS) {
@@ -171,7 +236,7 @@ auto validate_vulkan_handles(
   }
 
   auto queue_family_count = uint32_t{};
-  ::vkGetPhysicalDeviceQueueFamilyProperties(
+  dispatcher.vkGetPhysicalDeviceQueueFamilyProperties(
     physical_device, &queue_family_count, nullptr
   );
   if (descriptor.context.graphics_queue_family_index >= queue_family_count) {
@@ -183,7 +248,7 @@ auto validate_vulkan_handles(
 
   auto queue_families =
     std::vector<VkQueueFamilyProperties>(queue_family_count);
-  ::vkGetPhysicalDeviceQueueFamilyProperties(
+  dispatcher.vkGetPhysicalDeviceQueueFamilyProperties(
     physical_device, &queue_family_count, queue_families.data()
   );
   const auto& queue_family =
@@ -274,6 +339,8 @@ auto vulkan_owned_texture_descriptor_default() noexcept
       .device = nullptr,
       .graphics_queue = nullptr,
       .graphics_queue_family_index = 0,
+      .get_instance_proc_addr = nullptr,
+      .get_device_proc_addr = nullptr,
     },
   };
 }
@@ -297,6 +364,8 @@ auto vulkan_borrowed_texture_descriptor_default() noexcept
         .device = nullptr,
         .graphics_queue = nullptr,
         .graphics_queue_family_index = 0,
+        .get_instance_proc_addr = nullptr,
+        .get_device_proc_addr = nullptr,
       },
     .image = nullptr,
     .image_view = nullptr,
@@ -580,6 +649,67 @@ auto metal_borrowed_texture_attach(
   return MLN_STATUS_UNSUPPORTED;
 }
 
+auto opengl_owned_texture_attach(
+  mln_map* map, const mln_opengl_owned_texture_descriptor* descriptor,
+  mln_render_session** out_session
+) -> mln_status {
+  const auto map_status = validate_map(map);
+  if (map_status != MLN_STATUS_OK) {
+    return map_status;
+  }
+  const auto descriptor_status = validate_opengl_owned_descriptor(descriptor);
+  if (descriptor_status != MLN_STATUS_OK) {
+    return descriptor_status;
+  }
+  const auto output_status = validate_attach_output(
+    out_session, "out_session must not be null",
+    "out_session must point to a null handle"
+  );
+  if (output_status != MLN_STATUS_OK) {
+    return output_status;
+  }
+  const auto physical_status = validate_physical_size(
+    descriptor->extent.width, descriptor->extent.height,
+    descriptor->extent.scale_factor, "scaled texture dimensions are too large"
+  );
+  if (physical_status != MLN_STATUS_OK) {
+    return physical_status;
+  }
+  set_thread_error("OpenGL texture sessions are not supported by this build");
+  return MLN_STATUS_UNSUPPORTED;
+}
+
+auto opengl_borrowed_texture_attach(
+  mln_map* map, const mln_opengl_borrowed_texture_descriptor* descriptor,
+  mln_render_session** out_session
+) -> mln_status {
+  const auto map_status = validate_map(map);
+  if (map_status != MLN_STATUS_OK) {
+    return map_status;
+  }
+  const auto descriptor_status =
+    validate_opengl_borrowed_descriptor(descriptor);
+  if (descriptor_status != MLN_STATUS_OK) {
+    return descriptor_status;
+  }
+  const auto output_status = validate_attach_output(
+    out_session, "out_session must not be null",
+    "out_session must point to a null handle"
+  );
+  if (output_status != MLN_STATUS_OK) {
+    return output_status;
+  }
+  const auto physical_status = validate_physical_size(
+    descriptor->extent.width, descriptor->extent.height,
+    descriptor->extent.scale_factor, "scaled texture dimensions are too large"
+  );
+  if (physical_status != MLN_STATUS_OK) {
+    return physical_status;
+  }
+  set_thread_error("OpenGL texture sessions are not supported by this build");
+  return MLN_STATUS_UNSUPPORTED;
+}
+
 auto metal_owned_texture_acquire_frame(
   mln_render_session* texture, mln_metal_owned_texture_frame* out_frame
 ) -> mln_status {
@@ -610,6 +740,41 @@ auto metal_owned_texture_release_frame(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
   set_thread_error("Metal texture sessions are not supported by this build");
+  return MLN_STATUS_UNSUPPORTED;
+}
+
+auto opengl_owned_texture_acquire_frame(
+  mln_render_session* texture, mln_opengl_owned_texture_frame* out_frame
+) -> mln_status {
+  const auto status = validate_texture(texture);
+  if (status != MLN_STATUS_OK) {
+    return status;
+  }
+  if (
+    out_frame == nullptr ||
+    out_frame->size < sizeof(mln_opengl_owned_texture_frame)
+  ) {
+    set_thread_error("out_frame must not be null and must have a valid size");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  set_thread_error("OpenGL texture sessions are not supported by this build");
+  return MLN_STATUS_UNSUPPORTED;
+}
+
+auto opengl_owned_texture_release_frame(
+  mln_render_session* texture, const mln_opengl_owned_texture_frame* frame
+) -> mln_status {
+  const auto status = validate_texture(texture);
+  if (status != MLN_STATUS_OK) {
+    return status;
+  }
+  if (
+    frame == nullptr || frame->size < sizeof(mln_opengl_owned_texture_frame)
+  ) {
+    set_thread_error("frame must not be null and must have a valid size");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  set_thread_error("OpenGL texture sessions are not supported by this build");
   return MLN_STATUS_UNSUPPORTED;
 }
 

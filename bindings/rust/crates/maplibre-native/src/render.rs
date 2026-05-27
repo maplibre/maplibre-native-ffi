@@ -153,6 +153,46 @@ impl fmt::Debug for FrameNativePointer<'_> {
     }
 }
 
+/// Borrowed OpenGL texture object name tied to an active texture frame.
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+pub struct FrameOpenGLTextureName<'frame> {
+    name: u32,
+    _frame: PhantomData<&'frame ()>,
+    _thread_affine: PhantomData<Rc<()>>,
+}
+
+impl<'frame> FrameOpenGLTextureName<'frame> {
+    fn new(name: u32) -> Self {
+        Self {
+            name,
+            _frame: PhantomData,
+            _thread_affine: PhantomData,
+        }
+    }
+
+    /// Returns whether this OpenGL texture object name is zero.
+    pub fn is_zero(self) -> bool {
+        self.name == 0
+    }
+
+    /// Returns the OpenGL texture object name.
+    ///
+    /// # Safety
+    ///
+    /// The returned integer no longer carries this value's frame lifetime. Use
+    /// it only while the borrowed frame remains open and satisfy OpenGL
+    /// synchronization and context-share-group requirements.
+    pub unsafe fn value(self) -> u32 {
+        self.name
+    }
+}
+
+impl fmt::Debug for FrameOpenGLTextureName<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "FrameOpenGLTextureName({})", self.name)
+    }
+}
+
 mod query;
 pub use query::{
     FeatureExtensionResult, FeatureStateSelector, QueriedFeature, RenderedFeatureQueryOptions,
@@ -222,6 +262,8 @@ pub struct VulkanContextDescriptor {
     pub device: NativePointer,
     pub graphics_queue: NativePointer,
     pub graphics_queue_family_index: u32,
+    pub get_instance_proc_addr: NativePointer,
+    pub get_device_proc_addr: NativePointer,
 }
 
 impl VulkanContextDescriptor {
@@ -239,7 +281,19 @@ impl VulkanContextDescriptor {
             device,
             graphics_queue,
             graphics_queue_family_index,
+            get_instance_proc_addr: NativePointer::NULL,
+            get_device_proc_addr: NativePointer::NULL,
         }
+    }
+
+    pub fn with_proc_addresses(
+        mut self,
+        get_instance_proc_addr: NativePointer,
+        get_device_proc_addr: NativePointer,
+    ) -> Self {
+        self.get_instance_proc_addr = get_instance_proc_addr;
+        self.get_device_proc_addr = get_device_proc_addr;
+        self
     }
 
     pub(crate) fn to_core(&self) -> maplibre_core::render::VulkanContextDescriptorFields {
@@ -249,6 +303,8 @@ impl VulkanContextDescriptor {
             device: self.device.as_void_ptr(),
             graphics_queue: self.graphics_queue.as_void_ptr(),
             graphics_queue_family_index: self.graphics_queue_family_index,
+            get_instance_proc_addr: self.get_instance_proc_addr.as_void_ptr(),
+            get_device_proc_addr: self.get_device_proc_addr.as_void_ptr(),
         }
     }
 }
@@ -262,6 +318,119 @@ impl Default for VulkanContextDescriptor {
             NativePointer::NULL,
             0,
         )
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
+pub struct WglContextDescriptor {
+    pub device_context: NativePointer,
+    pub share_context: NativePointer,
+    pub get_proc_address: NativePointer,
+}
+
+impl WglContextDescriptor {
+    pub fn new(device_context: NativePointer, share_context: NativePointer) -> Self {
+        Self {
+            device_context,
+            share_context,
+            get_proc_address: NativePointer::NULL,
+        }
+    }
+
+    pub fn with_proc_address(mut self, get_proc_address: NativePointer) -> Self {
+        self.get_proc_address = get_proc_address;
+        self
+    }
+
+    pub(crate) fn to_core(&self) -> maplibre_core::render::WglContextDescriptorFields {
+        maplibre_core::render::WglContextDescriptorFields {
+            device_context: self.device_context.as_void_ptr(),
+            share_context: self.share_context.as_void_ptr(),
+            get_proc_address: self.get_proc_address.as_void_ptr(),
+        }
+    }
+}
+
+impl Default for WglContextDescriptor {
+    fn default() -> Self {
+        Self::new(NativePointer::NULL, NativePointer::NULL)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
+pub struct EglContextDescriptor {
+    pub display: NativePointer,
+    pub config: NativePointer,
+    pub share_context: NativePointer,
+    pub get_proc_address: NativePointer,
+}
+
+impl EglContextDescriptor {
+    pub fn new(
+        display: NativePointer,
+        config: NativePointer,
+        share_context: NativePointer,
+    ) -> Self {
+        Self {
+            display,
+            config,
+            share_context,
+            get_proc_address: NativePointer::NULL,
+        }
+    }
+
+    pub fn with_proc_address(mut self, get_proc_address: NativePointer) -> Self {
+        self.get_proc_address = get_proc_address;
+        self
+    }
+
+    pub(crate) fn to_core(&self) -> maplibre_core::render::EglContextDescriptorFields {
+        maplibre_core::render::EglContextDescriptorFields {
+            display: self.display.as_void_ptr(),
+            config: self.config.as_void_ptr(),
+            share_context: self.share_context.as_void_ptr(),
+            get_proc_address: self.get_proc_address.as_void_ptr(),
+        }
+    }
+}
+
+impl Default for EglContextDescriptor {
+    fn default() -> Self {
+        Self::new(
+            NativePointer::NULL,
+            NativePointer::NULL,
+            NativePointer::NULL,
+        )
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
+pub enum OpenGLContextDescriptor {
+    Wgl(WglContextDescriptor),
+    Egl(EglContextDescriptor),
+}
+
+impl OpenGLContextDescriptor {
+    pub fn wgl(descriptor: WglContextDescriptor) -> Self {
+        Self::Wgl(descriptor)
+    }
+
+    pub fn egl(descriptor: EglContextDescriptor) -> Self {
+        Self::Egl(descriptor)
+    }
+
+    pub(crate) fn to_core(&self) -> maplibre_core::render::OpenGLContextDescriptorFields {
+        match self {
+            Self::Wgl(descriptor) => {
+                maplibre_core::render::OpenGLContextDescriptorFields::Wgl(descriptor.to_core())
+            }
+            Self::Egl(descriptor) => {
+                maplibre_core::render::OpenGLContextDescriptorFields::Egl(descriptor.to_core())
+            }
+        }
     }
 }
 
@@ -321,6 +490,38 @@ impl VulkanSurfaceDescriptor {
     pub(crate) fn to_native(&self) -> sys::mln_vulkan_surface_descriptor {
         maplibre_core::render::vulkan_surface_descriptor_to_native(
             maplibre_core::render::VulkanSurfaceDescriptorFields {
+                extent: self.extent.to_core(),
+                context: self.context.to_core(),
+                surface: self.surface.as_void_ptr(),
+            },
+        )
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
+pub struct OpenGLSurfaceDescriptor {
+    pub extent: RenderTargetExtent,
+    pub context: OpenGLContextDescriptor,
+    pub surface: NativePointer,
+}
+
+impl OpenGLSurfaceDescriptor {
+    pub fn new(
+        extent: RenderTargetExtent,
+        context: OpenGLContextDescriptor,
+        surface: NativePointer,
+    ) -> Self {
+        Self {
+            extent,
+            context,
+            surface,
+        }
+    }
+
+    pub(crate) fn to_native(&self) -> sys::mln_opengl_surface_descriptor {
+        maplibre_core::render::opengl_surface_descriptor_to_native(
+            maplibre_core::render::OpenGLSurfaceDescriptorFields {
                 extent: self.extent.to_core(),
                 context: self.context.to_core(),
                 surface: self.surface.as_void_ptr(),
@@ -439,6 +640,64 @@ impl VulkanBorrowedTextureDescriptor {
                 format: self.format,
                 initial_layout: self.initial_layout,
                 final_layout: self.final_layout,
+            },
+        )
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
+pub struct OpenGLOwnedTextureDescriptor {
+    pub extent: RenderTargetExtent,
+    pub context: OpenGLContextDescriptor,
+}
+
+impl OpenGLOwnedTextureDescriptor {
+    pub fn new(extent: RenderTargetExtent, context: OpenGLContextDescriptor) -> Self {
+        Self { extent, context }
+    }
+
+    pub(crate) fn to_native(&self) -> sys::mln_opengl_owned_texture_descriptor {
+        maplibre_core::render::opengl_owned_texture_descriptor_to_native(
+            maplibre_core::render::OpenGLOwnedTextureDescriptorFields {
+                extent: self.extent.to_core(),
+                context: self.context.to_core(),
+            },
+        )
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
+pub struct OpenGLBorrowedTextureDescriptor {
+    pub extent: RenderTargetExtent,
+    pub context: OpenGLContextDescriptor,
+    pub texture: u32,
+    pub target: u32,
+}
+
+impl OpenGLBorrowedTextureDescriptor {
+    pub fn new(
+        extent: RenderTargetExtent,
+        context: OpenGLContextDescriptor,
+        texture: u32,
+        target: u32,
+    ) -> Self {
+        Self {
+            extent,
+            context,
+            texture,
+            target,
+        }
+    }
+
+    pub(crate) fn to_native(&self) -> sys::mln_opengl_borrowed_texture_descriptor {
+        maplibre_core::render::opengl_borrowed_texture_descriptor_to_native(
+            maplibre_core::render::OpenGLBorrowedTextureDescriptorFields {
+                extent: self.extent.to_core(),
+                context: self.context.to_core(),
+                texture: self.texture,
+                target: self.target,
             },
         )
     }
@@ -598,6 +857,40 @@ impl VulkanOwnedTextureFrame {
             frame_id: raw.frame_id,
             format: raw.format,
             layout: raw.layout,
+        }
+    }
+}
+
+/// Copied metadata for an acquired OpenGL session-owned texture frame.
+///
+/// The texture object name is exposed by [`OpenGLOwnedTextureFrameHandle`] so
+/// its lifetime stays tied to the open frame handle.
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[non_exhaustive]
+pub struct OpenGLOwnedTextureFrame {
+    pub generation: u64,
+    pub width: u32,
+    pub height: u32,
+    pub scale_factor: f64,
+    pub frame_id: u64,
+    pub target: u32,
+    pub internal_format: u32,
+    pub format: u32,
+    pub type_: u32,
+}
+
+impl OpenGLOwnedTextureFrame {
+    fn from_native(raw: &sys::mln_opengl_owned_texture_frame) -> Self {
+        Self {
+            generation: raw.generation,
+            width: raw.width,
+            height: raw.height,
+            scale_factor: raw.scale_factor,
+            frame_id: raw.frame_id,
+            target: raw.target,
+            internal_format: raw.internal_format,
+            format: raw.format,
+            type_: raw.type_,
         }
     }
 }
@@ -830,6 +1123,89 @@ impl Drop for VulkanOwnedTextureFrameHandle {
     }
 }
 
+/// RAII guard for an acquired OpenGL session-owned texture frame.
+///
+/// Releasing the guard ends the borrow of the backend OpenGL texture object.
+pub struct OpenGLOwnedTextureFrameHandle {
+    session: Rc<RenderSessionState>,
+    raw: sys::mln_opengl_owned_texture_frame,
+    frame: OpenGLOwnedTextureFrame,
+    closed: Cell<bool>,
+    _thread_affine: PhantomData<Rc<()>>,
+}
+
+impl fmt::Debug for OpenGLOwnedTextureFrameHandle {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("OpenGLOwnedTextureFrameHandle")
+            .field("closed", &self.is_closed())
+            .field("frame", &self.frame)
+            .finish()
+    }
+}
+
+impl OpenGLOwnedTextureFrameHandle {
+    /// Returns copied metadata for this acquired frame.
+    pub fn frame(&self) -> Result<&OpenGLOwnedTextureFrame> {
+        if self.closed.get() {
+            Err(closed_handle_error("OpenGLOwnedTextureFrameHandle"))
+        } else {
+            Ok(&self.frame)
+        }
+    }
+
+    pub fn is_closed(&self) -> bool {
+        self.closed.get()
+    }
+
+    /// Returns the borrowed OpenGL texture object name for backend interop.
+    pub fn texture(&self) -> Result<FrameOpenGLTextureName<'_>> {
+        if self.closed.get() {
+            Err(closed_handle_error("OpenGLOwnedTextureFrameHandle"))
+        } else {
+            Ok(FrameOpenGLTextureName::new(self.raw.texture))
+        }
+    }
+
+    /// Explicitly releases this frame.
+    #[allow(clippy::result_large_err)]
+    pub fn close(self) -> std::result::Result<(), HandleOperationError<Self>> {
+        if self.closed.get() {
+            return Ok(());
+        }
+        let session = match self.session.as_ptr() {
+            Ok(session) => session,
+            Err(error) => return Err(HandleOperationError::new(error, self)),
+        };
+        // SAFETY: session is live, and raw is the active frame returned by a
+        // successful acquire for this session until release succeeds.
+        if let Err(error) = maplibre_core::check(unsafe {
+            sys::mln_opengl_owned_texture_release_frame(session, &self.raw)
+        }) {
+            return Err(HandleOperationError::new(error, self));
+        }
+        self.closed.set(true);
+        self.session.frame_acquired.set(false);
+        Ok(())
+    }
+}
+
+impl Drop for OpenGLOwnedTextureFrameHandle {
+    fn drop(&mut self) {
+        if self.closed.get() {
+            return;
+        }
+        if let Ok(session) = self.session.as_ptr() {
+            // SAFETY: Best-effort release of the active frame. Drop cannot
+            // report errors and never panics.
+            let status = unsafe { sys::mln_opengl_owned_texture_release_frame(session, &self.raw) };
+            if status == sys::MLN_STATUS_OK {
+                self.closed.set(true);
+                self.session.frame_acquired.set(false);
+            }
+        }
+    }
+}
+
 impl RenderSessionHandle {
     pub(crate) fn attach<F>(map: &MapHandle, attach: F) -> Result<Self>
     where
@@ -1015,6 +1391,25 @@ impl RenderSessionHandle {
             _thread_affine: PhantomData,
         })
     }
+
+    /// Acquires a borrowed OpenGL frame from a session-owned texture target.
+    pub fn acquire_opengl_owned_texture_frame(&self) -> Result<OpenGLOwnedTextureFrameHandle> {
+        self.inner.ensure_no_frame_acquired()?;
+        let session = self.inner.as_ptr()?;
+        let mut raw = empty_opengl_owned_texture_frame();
+        // SAFETY: session is live and raw points to initialized writable frame storage.
+        maplibre_core::check(unsafe {
+            sys::mln_opengl_owned_texture_acquire_frame(session, &mut raw)
+        })?;
+        self.inner.frame_acquired.set(true);
+        Ok(OpenGLOwnedTextureFrameHandle {
+            session: Rc::clone(&self.inner),
+            frame: OpenGLOwnedTextureFrame::from_native(&raw),
+            raw,
+            closed: Cell::new(false),
+            _thread_affine: PhantomData,
+        })
+    }
 }
 
 fn empty_metal_owned_texture_frame() -> sys::mln_metal_owned_texture_frame {
@@ -1044,6 +1439,22 @@ fn empty_vulkan_owned_texture_frame() -> sys::mln_vulkan_owned_texture_frame {
         device: std::ptr::null_mut(),
         format: 0,
         layout: 0,
+    }
+}
+
+fn empty_opengl_owned_texture_frame() -> sys::mln_opengl_owned_texture_frame {
+    sys::mln_opengl_owned_texture_frame {
+        size: mem::size_of::<sys::mln_opengl_owned_texture_frame>() as u32,
+        generation: 0,
+        width: 0,
+        height: 0,
+        scale_factor: 0.0,
+        frame_id: 0,
+        texture: 0,
+        target: 0,
+        internal_format: 0,
+        format: 0,
+        type_: 0,
     }
 }
 

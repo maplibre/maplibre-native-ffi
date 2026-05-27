@@ -1,5 +1,6 @@
 const std = @import("std");
 const maplibre_build = @import("maplibre_native");
+const zigglgen = @import("zigglgen");
 
 const BuildOptions = struct {
     target: std.Build.ResolvedTarget,
@@ -19,6 +20,22 @@ fn addCTests(b: *std.Build, options: BuildOptions) *std.Build.Step.Compile {
         }),
     });
     maplibre_build.addRenderBackendOptions(b, c_tests.root_module, options.render_backend);
+    if (options.target.result.os.tag == .windows or options.target.result.os.tag == .linux) {
+        const gl_bindings = zigglgen.generateBindingsModule(b, if (options.target.result.os.tag == .linux)
+            .{ .api = .gles, .version = .@"3.0" }
+        else
+            .{ .api = .gl, .version = .@"3.0" });
+        c_tests.root_module.addImport("gl", gl_bindings);
+        if (options.target.result.os.tag == .windows) {
+            const wgl_test_context = b.createModule(.{
+                .root_source_file = b.path("../../../zig_test_support/wgl_context.zig"),
+                .target = options.target,
+                .optimize = options.optimize,
+            });
+            wgl_test_context.addImport("gl", gl_bindings);
+            c_tests.root_module.addImport("wgl_test_context", wgl_test_context);
+        }
+    }
     maplibre_build.linkMaplibreNativeC(b, c_tests.root_module, .{
         .target = options.target,
         .cmake_artifact_dir = options.cmake_artifact_dir,

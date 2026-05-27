@@ -1,4 +1,5 @@
 const std = @import("std");
+const zigglgen = @import("zigglgen");
 
 const BuildOptions = struct {
     target: std.Build.ResolvedTarget,
@@ -11,6 +12,7 @@ const BuildOptions = struct {
 
 pub const RenderBackend = enum {
     metal,
+    opengl,
     vulkan,
 };
 
@@ -41,8 +43,8 @@ pub fn renderBackend(b: *std.Build) RenderBackend {
     return b.option(
         RenderBackend,
         "render-backend",
-        "Render backend built into the CMake artifact: metal or vulkan",
-    ) orelse @panic("missing required -Drender-backend=metal|vulkan");
+        "Render backend built into the CMake artifact: metal, opengl, or vulkan",
+    ) orelse @panic("missing required -Drender-backend=metal|opengl|vulkan");
 }
 
 pub fn cmakeArtifactDir(b: *std.Build) std.Build.LazyPath {
@@ -102,6 +104,7 @@ pub fn vulkanLibraryName(target: std.Build.ResolvedTarget) []const u8 {
 pub fn isSupportedTarget(target: std.Build.ResolvedTarget, backend: RenderBackend) bool {
     return switch (backend) {
         .metal => target.result.os.tag == .macos,
+        .opengl => target.result.os.tag == .linux or target.result.os.tag == .windows,
         .vulkan => target.result.os.tag == .macos or target.result.os.tag == .linux or
             target.result.os.tag == .windows,
     };
@@ -119,6 +122,7 @@ pub fn checkSupportedTarget(target: std.Build.ResolvedTarget, backend: RenderBac
 pub fn addRenderBackendOptions(b: *std.Build, module: *std.Build.Module, backend: RenderBackend) void {
     const build_options = b.addOptions();
     build_options.addOption(bool, "supports_metal", backend == .metal);
+    build_options.addOption(bool, "supports_opengl", backend == .opengl);
     build_options.addOption(bool, "supports_vulkan", backend == .vulkan);
     module.addOptions("build_options", build_options);
 }
@@ -131,6 +135,14 @@ pub fn linkRenderBackend(b: *std.Build, module: *std.Build.Module, options: Rend
         .metal => {
             module.linkFramework("Metal", .{});
             module.linkFramework("QuartzCore", .{});
+        },
+        .opengl => switch (options.target.result.os.tag) {
+            .linux => {
+                module.linkSystemLibrary("EGL", .{});
+                module.linkSystemLibrary("GLESv2", .{});
+            },
+            .windows => module.linkSystemLibrary("opengl32", .{}),
+            else => unreachable,
         },
         .vulkan => {
             if (options.dependency_library_dir) |dependency_library_dir| {
@@ -264,6 +276,22 @@ fn addBindingTests(b: *std.Build, options: BuildOptions, maplibre_native: *std.B
     const tests = addTestCompile(b, options, b.path("tests/main.zig"));
     tests.root_module.addImport("maplibre_native", maplibre_native);
     addRenderBackendOptions(b, tests.root_module, options.render_backend);
+    if (options.render_backend == .opengl) {
+        const gl_bindings = zigglgen.generateBindingsModule(b, if (options.target.result.os.tag == .linux)
+            .{ .api = .gles, .version = .@"3.0" }
+        else
+            .{ .api = .gl, .version = .@"3.0" });
+        tests.root_module.addImport("gl", gl_bindings);
+        if (options.target.result.os.tag == .windows) {
+            const wgl_test_context = b.createModule(.{
+                .root_source_file = b.path("../../src/zig_test_support/wgl_context.zig"),
+                .target = options.target,
+                .optimize = options.optimize,
+            });
+            wgl_test_context.addImport("gl", gl_bindings);
+            tests.root_module.addImport("wgl_test_context", wgl_test_context);
+        }
+    }
     if (options.render_backend == .metal) {
         tests.root_module.addCSourceFile(.{ .file = b.path("tests/metal_support_macos.m") });
         tests.root_module.linkFramework("AppKit", .{});

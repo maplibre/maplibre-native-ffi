@@ -6,5 +6,6 @@ comptime {
     _ = @import("query_abi.zig");
     _ = @import("owned_texture_abi.zig");
     _ = @import("metal_backend_abi.zig");
+    _ = @import("opengl_backend_abi.zig");
     _ = @import("vulkan_backend_abi.zig");
 }

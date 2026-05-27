@@ -9,6 +9,14 @@ runs:
       shell: pwsh
       run: git config --global core.longpaths true
 
+    - name: Cache MapLibre Native source
+      uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+      with:
+        path: |
+          third_party/maplibre-native
+          .git/modules/third_party/maplibre-native
+        key: mln-src-v2-${{ hashFiles('.gitmodules', 'cmake/mln_version.cmake') }}
+
     - name: Install sccache
       uses: mozilla-actions/sccache-action@9e7fa8a12102821edf02ca5dbea1acd0f89a2696 # v0.0.10
 
@@ -20,6 +28,20 @@ runs:
           echo "CMAKE_C_COMPILER_LAUNCHER=sccache"
           echo "CMAKE_CXX_COMPILER_LAUNCHER=sccache"
         } >> "$GITHUB_ENV"
+
+    - name: Use software OpenGL on Linux
+      if: ${{ runner.os == 'Linux' }}
+      shell: bash
+      run: |
+        {
+          echo "EGL_PLATFORM=surfaceless"
+          echo "LIBGL_ALWAYS_SOFTWARE=true"
+        } >> "$GITHUB_ENV"
+
+    - name: Use software OpenGL on Windows
+      if: ${{ runner.os == 'Windows' }}
+      shell: pwsh
+      run: '"GALLIUM_DRIVER=llvmpipe" >> $env:GITHUB_ENV'
 
     - name: Cache Cargo packages
       uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
@@ -67,6 +89,55 @@ runs:
         cache: true
         cache_key_prefix: mise-v2
         install: true
+
+    - name: Register Windows CI software graphics drivers
+      if: ${{ runner.os == 'Windows' }}
+      shell: pwsh
+      run: |
+        $pixiLibrary = Join-Path $env:GITHUB_WORKSPACE ".pixi\envs\default\Library"
+
+        # Register Pixi's Mesa WGL driver so system opengl32.dll can load llvmpipe.
+        $mesaWglDriver = Join-Path $pixiLibrary "bin\libgallium_wgl.dll"
+        if (-not (Test-Path $mesaWglDriver)) {
+          throw "Missing Mesa WGL driver: $mesaWglDriver"
+        }
+
+        $mesaWglSystemDriver = Join-Path $env:WINDIR "System32\mesadrv.dll"
+        Copy-Item $mesaWglDriver $mesaWglSystemDriver -Force
+
+        $openglDriverKey = "HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\OpenGLDrivers\MSOGL"
+        New-Item -Path $openglDriverKey -Force | Out-Null
+        New-ItemProperty -Path $openglDriverKey -Name DLL -PropertyType String -Value "mesadrv.dll" -Force | Out-Null
+        New-ItemProperty -Path $openglDriverKey -Name DriverVersion -PropertyType DWord -Value 1 -Force | Out-Null
+        New-ItemProperty -Path $openglDriverKey -Name Flags -PropertyType DWord -Value 1 -Force | Out-Null
+        New-ItemProperty -Path $openglDriverKey -Name Version -PropertyType DWord -Value 2 -Force | Out-Null
+
+        # Register Pixi's lavapipe ICD so the Vulkan loader finds software Vulkan.
+        $driverManifest = Join-Path $pixiLibrary "share\vulkan\icd.d\lvp_icd.x86_64.json"
+        if (-not (Test-Path $driverManifest)) {
+          throw "Missing lavapipe Vulkan ICD manifest: $driverManifest"
+        }
+
+        $driverKey = "HKLM:\SOFTWARE\Khronos\Vulkan\Drivers"
+        New-Item -Path $driverKey -Force | Out-Null
+        New-ItemProperty -Path $driverKey -Name $driverManifest -PropertyType DWord -Value 0 -Force | Out-Null
+
+    - name: Diagnose EGL setup
+      if: ${{ runner.os == 'Linux' }}
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install --no-install-recommends --yes libegl-mesa0 libgl1-mesa-dri mesa-utils
+        mise exec -- pixi run --locked bash -euo pipefail -c '
+          env | sort | grep -E "^(EGL|LIBGL|MESA|LD_LIBRARY_PATH|__EGL|CONDA|PIXI)" || true
+          command -v eglinfo
+          EGL_LOG_LEVEL=debug LIBGL_DEBUG=verbose LD_DEBUG=libs eglinfo || true
+        '
+
+    - name: Diagnose Vulkan setup
+      if: ${{ contains(env.MISE_ENV, 'vulkan') }}
+      shell: bash
+      run: mise run ci:vulkan-info
 
     # The mise action may restore Rust metadata without all rustup-managed
     # component files. Repair the toolchain only when rustup cannot add the

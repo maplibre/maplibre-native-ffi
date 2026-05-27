@@ -475,7 +475,13 @@ fn vulkanContextDescriptor(context: *const Context) maplibre.VulkanContextDescri
         .device = .{ .ptr = @ptrCast(context.device.?) },
         .graphics_queue = .{ .ptr = @ptrCast(context.queue.?) },
         .graphics_queue_family_index = context.queue_family_index,
+        .get_instance_proc_addr = nativeFunctionPointer(c.vkGetInstanceProcAddr),
+        .get_device_proc_addr = nativeFunctionPointer(c.vkGetDeviceProcAddr),
     };
+}
+
+fn nativeFunctionPointer(comptime function: anytype) maplibre.NativePointer {
+    return .{ .ptr = @ptrFromInt(@intFromPtr(&function)) };
 }
 
 fn findMemoryType(

@@ -32,28 +32,62 @@ jobs:
       - uses: ./.github/actions/setup-ci-deps
       - run: mise run //docs:build
 
-  prepare-matrices:
-    name: prepare matrices
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    outputs:
-      native: ${{ steps.matrix.outputs.native }}
+  variants:
+    name: variant / ${{ matrix.mise_env }}
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 120
+    env:
+      MISE_ENV: ${{ matrix.mise_env }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - mise_env: linux-arm64-egl
+            runner: ubuntu-24.04-arm
+          - mise_env: linux-arm64-vulkan
+            runner: ubuntu-24.04-arm
+          - mise_env: linux-x64-egl
+            runner: ubuntu-latest
+          - mise_env: linux-x64-vulkan
+            runner: ubuntu-latest
+          - mise_env: macos-arm64-metal
+            runner: macos-latest
+          - mise_env: macos-arm64-vulkan
+            runner: macos-latest
+          - mise_env: windows-x64-vulkan
+            runner: windows-latest
+          - mise_env: windows-x64-wgl
+            runner: windows-latest
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - uses: ./.github/actions/setup-ci-deps
-      - id: matrix
-        run: echo "native=$(mise run -q ci:matrix native)" >> "$GITHUB_OUTPUT"
 
-  variants:
-    name: variant / ${{ matrix.variant }}
-    needs: prepare-matrices
-    strategy:
-      fail-fast: false
-      matrix: ${{ fromJson(needs.prepare-matrices.outputs.native) }}
-    uses: ./.github/workflows/ci-variant.yml
-    with:
-      variant: ${{ matrix.variant }}
-      runner: ${{ matrix.runner }}
+      - run: mise run configure
+      - run: mise run test
+
+      - name: Build Java FFM binding
+        run: mise run //bindings/java-ffm:build
+      - name: Build Java JNI binding
+        if: ${{ !startsWith(matrix.mise_env, 'windows-') }}
+        run: mise run //bindings/java-jni:build
+      - name: Test Rust binding
+        run: mise run //bindings/rust:ci
+      - name: Test Zig binding
+        run: mise run //bindings/zig:ci
+
+      - name: Build LWJGL example
+        if: ${{ contains(matrix.mise_env, 'vulkan') }}
+        run: mise run //examples/lwjgl-map:build
+      - name: Test Rust example
+        if: ${{ contains(matrix.mise_env, 'vulkan') }}
+        run: mise run //examples/rust-map:ci
+      - name: Build Swift example
+        if: ${{ matrix.mise_env == 'macos-arm64-metal' }}
+        run: mise run //examples/swift-map:build
+      - name: Build Zig example
+        run: mise run //examples/zig-map:build
+      - name: Run Zig readback example
+        run: mise run //examples/zig-readback:run
 
   required:
     name: ci-required
@@ -63,7 +97,6 @@ jobs:
     needs:
       - hygiene
       - docs
-      - prepare-matrices
       - variants
     steps:
       - name: Fail if required jobs failed

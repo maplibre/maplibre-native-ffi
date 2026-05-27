@@ -27,6 +27,7 @@
 #include "render/vulkan/vulkan_texture_backend.hpp"
 
 #include "maplibre_native_c/texture.h"
+#include "render/vulkan/vulkan_dispatch.hpp"
 
 namespace {
 
@@ -318,11 +319,11 @@ VulkanTextureBackend::~VulkanTextureBackend() {
 }
 
 void VulkanTextureBackend::initSharedDevice() {
-  dispatcher = vk::DispatchLoaderDynamic(::vkGetInstanceProcAddr);
+  dispatcher = vulkan_dispatch_loader(descriptor_.context);
 
   initFrameCapture();
   initInstance();
-  dispatcher.init(instance.get());
+  vulkan_init_instance_dispatch(dispatcher, descriptor_.context);
   initDebug();
   initSurface();
   initDevice();
@@ -502,8 +503,7 @@ void VulkanTextureBackend::initDevice() {
       nullptr, dispatcher
     )
   );
-  dispatcher.init(device.get());
-  dispatcher.vkDeviceWaitIdle = ::vkDeviceWaitIdle;
+  vulkan_init_device_dispatch(dispatcher, device.get(), descriptor_.context);
   graphicsQueueIndex =
     static_cast<int32_t>(descriptor_.context.graphics_queue_family_index);
   presentQueueIndex = -1;

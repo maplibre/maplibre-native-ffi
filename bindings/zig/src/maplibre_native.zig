@@ -80,15 +80,22 @@ pub const LogCallback = logging.LogCallback;
 
 pub const NativePointer = render.NativePointer;
 pub const RenderBackendSupport = render.RenderBackendSupport;
+pub const OpenGLContextProviderSupport = render.OpenGLContextProviderSupport;
 pub const RenderTargetExtent = render.RenderTargetExtent;
 pub const MetalContextDescriptor = render.MetalContextDescriptor;
 pub const VulkanContextDescriptor = render.VulkanContextDescriptor;
+pub const WglContextDescriptor = render.WglContextDescriptor;
+pub const EglContextDescriptor = render.EglContextDescriptor;
+pub const OpenGLContextDescriptor = render.OpenGLContextDescriptor;
 pub const MetalOwnedTextureDescriptor = render.MetalOwnedTextureDescriptor;
 pub const MetalBorrowedTextureDescriptor = render.MetalBorrowedTextureDescriptor;
 pub const VulkanOwnedTextureDescriptor = render.VulkanOwnedTextureDescriptor;
 pub const VulkanBorrowedTextureDescriptor = render.VulkanBorrowedTextureDescriptor;
+pub const OpenGLOwnedTextureDescriptor = render.OpenGLOwnedTextureDescriptor;
+pub const OpenGLBorrowedTextureDescriptor = render.OpenGLBorrowedTextureDescriptor;
 pub const MetalSurfaceDescriptor = render.MetalSurfaceDescriptor;
 pub const VulkanSurfaceDescriptor = render.VulkanSurfaceDescriptor;
+pub const OpenGLSurfaceDescriptor = render.OpenGLSurfaceDescriptor;
 pub const TextureImageInfo = render.TextureImageInfo;
 pub const FeatureStateSelector = render.FeatureStateSelector;
 pub const ScreenBox = render.ScreenBox;
@@ -102,10 +109,12 @@ pub const OwnedFeatureCollection = render.OwnedFeatureCollection;
 pub const FeatureExtensionResult = render.FeatureExtensionResult;
 pub const MetalOwnedTextureFrameInfo = render.MetalOwnedTextureFrameInfo;
 pub const VulkanOwnedTextureFrameInfo = render.VulkanOwnedTextureFrameInfo;
+pub const OpenGLOwnedTextureFrameInfo = render.OpenGLOwnedTextureFrameInfo;
 pub const OwnedImage = render.OwnedImage;
 pub const RenderSessionHandle = render.RenderSessionHandle;
 pub const MetalOwnedTextureFrameHandle = render.MetalOwnedTextureFrameHandle;
 pub const VulkanOwnedTextureFrameHandle = render.VulkanOwnedTextureFrameHandle;
+pub const OpenGLOwnedTextureFrameHandle = render.OpenGLOwnedTextureFrameHandle;
 
 pub const MapHandle = map.MapHandle;
 pub const MapOptions = map.MapOptions;
@@ -168,12 +177,16 @@ pub const setLogCallback = logging.setLogCallback;
 pub const clearLogCallback = logging.clearLogCallback;
 pub const setAsyncLogSeverityMask = logging.setAsyncLogSeverityMask;
 pub const supportedRenderBackends = render.supportedRenderBackends;
+pub const supportedOpenGLContextProviders = render.supportedOpenGLContextProviders;
 pub const attachMetalOwnedTexture = render.attachMetalOwnedTexture;
 pub const attachMetalBorrowedTexture = render.attachMetalBorrowedTexture;
 pub const attachVulkanOwnedTexture = render.attachVulkanOwnedTexture;
 pub const attachVulkanBorrowedTexture = render.attachVulkanBorrowedTexture;
+pub const attachOpenGLOwnedTexture = render.attachOpenGLOwnedTexture;
+pub const attachOpenGLBorrowedTexture = render.attachOpenGLBorrowedTexture;
 pub const attachMetalSurface = render.attachMetalSurface;
 pub const attachVulkanSurface = render.attachVulkanSurface;
+pub const attachOpenGLSurface = render.attachOpenGLSurface;
 
 /// Returns the C ABI contract version reported by the linked native library.
 pub fn cAbiVersion() u32 {
