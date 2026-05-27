@@ -14,6 +14,11 @@ auto mln_vulkan_surface_descriptor_default(void) noexcept
   return mln::core::vulkan_surface_descriptor_default();
 }
 
+auto mln_opengl_surface_descriptor_default(void) noexcept
+  -> mln_opengl_surface_descriptor {
+  return mln::core::opengl_surface_descriptor_default();
+}
+
 auto mln_metal_surface_attach(
   mln_map* map, const mln_metal_surface_descriptor* descriptor,
   mln_render_session** out_session
@@ -29,5 +34,14 @@ auto mln_vulkan_surface_attach(
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::vulkan_surface_attach(map, descriptor, out_session);
+  });
+}
+
+auto mln_opengl_surface_attach(
+  mln_map* map, const mln_opengl_surface_descriptor* descriptor,
+  mln_render_session** out_session
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::opengl_surface_attach(map, descriptor, out_session);
   });
 }

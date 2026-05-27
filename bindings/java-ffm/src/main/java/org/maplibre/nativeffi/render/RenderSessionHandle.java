@@ -11,6 +11,7 @@ import org.maplibre.nativeffi.geo.Feature;
 import org.maplibre.nativeffi.internal.access.InternalAccess;
 import org.maplibre.nativeffi.internal.c.MapLibreNativeC;
 import org.maplibre.nativeffi.internal.c.mln_metal_owned_texture_frame;
+import org.maplibre.nativeffi.internal.c.mln_opengl_owned_texture_frame;
 import org.maplibre.nativeffi.internal.c.mln_vulkan_owned_texture_frame;
 import org.maplibre.nativeffi.internal.lifecycle.HandleState;
 import org.maplibre.nativeffi.internal.loader.NativeAccess;
@@ -103,6 +104,38 @@ public final class RenderSessionHandle implements AutoCloseable {
     }
   }
 
+  public static RenderSessionHandle attachOpenGLOwnedTexture(
+      MapHandle map, OpenGLOwnedTextureDescriptor descriptor) {
+    NativeAccess.ensureLoaded();
+    Objects.requireNonNull(map, "map");
+    Objects.requireNonNull(descriptor, "descriptor");
+    try (var arena = Arena.ofConfined()) {
+      var outSession = MemoryUtil.allocatePointer(arena);
+      Status.check(
+          MapLibreNativeC.mln_opengl_owned_texture_attach(
+              map.nativeHandle(InternalAccess.INSTANCE),
+              RenderStructs.openglOwnedTextureDescriptor(descriptor, arena),
+              outSession));
+      return new RenderSessionHandle(map, outSession.get(ValueLayout.ADDRESS, 0));
+    }
+  }
+
+  public static RenderSessionHandle attachOpenGLBorrowedTexture(
+      MapHandle map, OpenGLBorrowedTextureDescriptor descriptor) {
+    NativeAccess.ensureLoaded();
+    Objects.requireNonNull(map, "map");
+    Objects.requireNonNull(descriptor, "descriptor");
+    try (var arena = Arena.ofConfined()) {
+      var outSession = MemoryUtil.allocatePointer(arena);
+      Status.check(
+          MapLibreNativeC.mln_opengl_borrowed_texture_attach(
+              map.nativeHandle(InternalAccess.INSTANCE),
+              RenderStructs.openglBorrowedTextureDescriptor(descriptor, arena),
+              outSession));
+      return new RenderSessionHandle(map, outSession.get(ValueLayout.ADDRESS, 0));
+    }
+  }
+
   public static RenderSessionHandle attachMetalSurface(
       MapHandle map, MetalSurfaceDescriptor descriptor) {
     NativeAccess.ensureLoaded();
@@ -135,8 +168,34 @@ public final class RenderSessionHandle implements AutoCloseable {
     }
   }
 
+  public static RenderSessionHandle attachOpenGLSurface(
+      MapHandle map, OpenGLSurfaceDescriptor descriptor) {
+    NativeAccess.ensureLoaded();
+    Objects.requireNonNull(map, "map");
+    Objects.requireNonNull(descriptor, "descriptor");
+    try (var arena = Arena.ofConfined()) {
+      var outSession = MemoryUtil.allocatePointer(arena);
+      Status.check(
+          MapLibreNativeC.mln_opengl_surface_attach(
+              map.nativeHandle(InternalAccess.INSTANCE),
+              RenderStructs.openglSurfaceDescriptor(descriptor, arena),
+              outSession));
+      return new RenderSessionHandle(map, outSession.get(ValueLayout.ADDRESS, 0));
+    }
+  }
+
   public void resize(int width, int height, double scaleFactor) {
     NativeAccess.ensureLoaded();
+    if (width < 0 || height < 0) {
+      throw new InvalidArgumentException(
+          MapLibreNativeC.MLN_STATUS_INVALID_ARGUMENT(),
+          "render target width and height must be non-negative");
+    }
+    if (!Double.isFinite(scaleFactor) || scaleFactor <= 0.0) {
+      throw new InvalidArgumentException(
+          MapLibreNativeC.MLN_STATUS_INVALID_ARGUMENT(),
+          "render target scale factor must be positive and finite");
+    }
     Status.check(
         MapLibreNativeC.mln_render_session_resize(state.requireLive(), width, height, scaleFactor));
   }
@@ -351,6 +410,32 @@ public final class RenderSessionHandle implements AutoCloseable {
     }
   }
 
+  /**
+   * Acquires an explicit OpenGL session-owned texture frame handle.
+   *
+   * <p>This advanced API is intended for integrations that sample the returned texture object and
+   * need to release it after that work completes. The returned handle must be closed on the render
+   * session owner thread after GPU work using {@link OpenGLOwnedTextureFrame#texture()} has
+   * completed. While the handle is open, the native session rejects resize, render, detach,
+   * destroy, and second-acquire operations.
+   */
+  public OpenGLOwnedTextureFrameHandle acquireOpenGLOwnedTextureFrame() {
+    NativeAccess.ensureLoaded();
+    var arena = Arena.ofConfined();
+    var frameSegment = RenderStructs.openglOwnedTextureFrame(arena);
+    try {
+      Status.check(
+          MapLibreNativeC.mln_opengl_owned_texture_acquire_frame(
+              state.requireLive(), frameSegment));
+      var scope = new FrameScope();
+      return new OpenGLOwnedTextureFrameHandle(
+          this, arena, frameSegment, scope, openglOwnedTextureFrame(frameSegment, scope));
+    } catch (Throwable throwable) {
+      arena.close();
+      throw throwable;
+    }
+  }
+
   private List<QueriedFeature> queryRenderedFeaturesInternal(
       RenderedQueryGeometry geometry, RenderedFeatureQueryOptions options, boolean hasOptions) {
     NativeAccess.ensureLoaded();
@@ -438,6 +523,22 @@ public final class RenderSessionHandle implements AutoCloseable {
         mln_vulkan_owned_texture_frame.layout(segment));
   }
 
+  private static OpenGLOwnedTextureFrame openglOwnedTextureFrame(
+      MemorySegment segment, FrameScope scope) {
+    return new OpenGLOwnedTextureFrame(
+        scope,
+        mln_opengl_owned_texture_frame.generation(segment),
+        mln_opengl_owned_texture_frame.width(segment),
+        mln_opengl_owned_texture_frame.height(segment),
+        mln_opengl_owned_texture_frame.scale_factor(segment),
+        mln_opengl_owned_texture_frame.frame_id(segment),
+        mln_opengl_owned_texture_frame.texture(segment),
+        mln_opengl_owned_texture_frame.target(segment),
+        mln_opengl_owned_texture_frame.internal_format(segment),
+        mln_opengl_owned_texture_frame.format(segment),
+        mln_opengl_owned_texture_frame.type(segment));
+  }
+
   private static NativePointer pointer(MemorySegment segment, FrameScope scope) {
     return MemoryUtil.isNull(segment)
         ? NativePointer.NULL
@@ -461,6 +562,20 @@ public final class RenderSessionHandle implements AutoCloseable {
     try {
       Status.check(
           MapLibreNativeC.mln_vulkan_owned_texture_release_frame(
+              state.requireLive(), frameSegment));
+    } catch (Throwable releaseFailure) {
+      if (callbackFailure != null) {
+        callbackFailure.addSuppressed(releaseFailure);
+      } else {
+        throw releaseFailure;
+      }
+    }
+  }
+
+  void releaseOpenGLFrame(MemorySegment frameSegment, Throwable callbackFailure) {
+    try {
+      Status.check(
+          MapLibreNativeC.mln_opengl_owned_texture_release_frame(
               state.requireLive(), frameSegment));
     } catch (Throwable releaseFailure) {
       if (callbackFailure != null) {

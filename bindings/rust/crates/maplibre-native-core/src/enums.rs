@@ -8,6 +8,17 @@ bitflags::bitflags! {
     pub struct RenderBackendMask: u32 {
         const METAL = sys::MLN_RENDER_BACKEND_FLAG_METAL;
         const VULKAN = sys::MLN_RENDER_BACKEND_FLAG_VULKAN;
+        const OPENGL = sys::MLN_RENDER_BACKEND_FLAG_OPENGL;
+        const _ = !0;
+    }
+}
+
+bitflags::bitflags! {
+    /// OpenGL context providers compiled into the linked native library.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    pub struct OpenGLContextProviderMask: u32 {
+        const WGL = sys::MLN_OPENGL_CONTEXT_PROVIDER_FLAG_WGL;
+        const EGL = sys::MLN_OPENGL_CONTEXT_PROVIDER_FLAG_EGL;
         const _ = !0;
     }
 }
@@ -908,7 +919,24 @@ mod tests {
             RenderBackendMask::VULKAN.bits(),
             sys::MLN_RENDER_BACKEND_FLAG_VULKAN
         );
+        assert_eq!(
+            RenderBackendMask::OPENGL.bits(),
+            sys::MLN_RENDER_BACKEND_FLAG_OPENGL
+        );
         assert_eq!(RenderBackendMask::from_bits_retain(1 << 31).bits(), 1 << 31);
+
+        assert_eq!(
+            OpenGLContextProviderMask::WGL.bits(),
+            sys::MLN_OPENGL_CONTEXT_PROVIDER_FLAG_WGL
+        );
+        assert_eq!(
+            OpenGLContextProviderMask::EGL.bits(),
+            sys::MLN_OPENGL_CONTEXT_PROVIDER_FLAG_EGL
+        );
+        assert_eq!(
+            OpenGLContextProviderMask::from_bits_retain(1 << 31).bits(),
+            1 << 31
+        );
 
         assert_eq!(
             LogSeverityMask::INFO.bits(),

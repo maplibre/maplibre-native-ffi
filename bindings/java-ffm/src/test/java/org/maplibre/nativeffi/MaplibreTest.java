@@ -1,6 +1,7 @@
 package org.maplibre.nativeffi;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -10,6 +11,8 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.maplibre.nativeffi.geo.LatLng;
 import org.maplibre.nativeffi.log.LogSeverity;
+import org.maplibre.nativeffi.render.OpenGLContextProvider;
+import org.maplibre.nativeffi.render.RenderBackend;
 import org.maplibre.nativeffi.runtime.NetworkStatus;
 import org.maplibre.nativeffi.test.NativeTestSupport;
 
@@ -28,7 +31,15 @@ final class MaplibreTest {
   @Test
   void exposesCVersionAndSupportedBackends() {
     assertEquals(0, Maplibre.cVersion());
-    assertNotNull(Maplibre.supportedRenderBackends());
+    var backends = Maplibre.supportedRenderBackends();
+    assertNotNull(backends);
+    var providers = Maplibre.supportedOpenGLContextProviders();
+    assertNotNull(providers);
+    if (backends.contains(RenderBackend.OPENGL)) {
+      assertFalse(providers.isEmpty());
+    } else {
+      assertEquals(EnumSet.noneOf(OpenGLContextProvider.class), providers);
+    }
   }
 
   @Test

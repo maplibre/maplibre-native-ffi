@@ -3,6 +3,10 @@
     .version = "0.16.0",
     .dependencies = .{
         .maplibre_native = .{ .path = "../../../../bindings/zig" },
+        .zigglgen = .{
+            .url = "git+https://github.com/castholm/zigglgen.git#7e55ad15655fc4d602ed3bcbe7fb487592063156",
+            .hash = "zigglgen-0.5.0-ziggltzDLwA0Gk0Pj6QMij1j6Z_jkvGEtGKBM6-YlI_s",
+        },
     },
     .paths = .{""},
     .fingerprint = 0x46e55102fec0a354,

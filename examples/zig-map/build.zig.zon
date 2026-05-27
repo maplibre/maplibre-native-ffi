@@ -7,6 +7,10 @@
             .hash = "zig_objc-0.0.0-Ir_Sp9gsAQCPAJc0oF5xoWePHWP6Y6tCphDeyNUThJoi",
         },
         .maplibre_native = .{ .path = "../../bindings/zig" },
+        .zigglgen = .{
+            .url = "git+https://github.com/castholm/zigglgen.git#7e55ad15655fc4d602ed3bcbe7fb487592063156",
+            .hash = "zigglgen-0.5.0-ziggltzDLwA0Gk0Pj6QMij1j6Z_jkvGEtGKBM6-YlI_s",
+        },
     },
     .paths = .{""},
     .fingerprint = 0x2e1fc989e1e5656a,

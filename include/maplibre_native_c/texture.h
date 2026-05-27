@@ -131,6 +131,59 @@ typedef struct mln_vulkan_owned_texture_frame {
   uint32_t layout;
 } mln_vulkan_owned_texture_frame;
 
+/** OpenGL texture session attachment options for a session-owned target. */
+typedef struct mln_opengl_owned_texture_descriptor {
+  uint32_t size;
+  /** Logical texture extent. */
+  mln_render_target_extent extent;
+  /**
+   * Borrowed OpenGL context provider data. The session creates and owns a
+   * context that shares texture objects with the host context.
+   */
+  mln_opengl_context_descriptor context;
+} mln_opengl_owned_texture_descriptor;
+
+/** OpenGL caller-owned texture session attachment options. */
+typedef struct mln_opengl_borrowed_texture_descriptor {
+  uint32_t size;
+  /** Logical texture extent. */
+  mln_render_target_extent extent;
+  /**
+   * Borrowed OpenGL context provider data. The texture must belong to this
+   * context or a context in the same share group.
+   */
+  mln_opengl_context_descriptor context;
+  /** Borrowed OpenGL texture object name. Required. */
+  uint32_t texture;
+  /** OpenGL texture target. GL_TEXTURE_2D is the expected target. */
+  uint32_t target;
+} mln_opengl_borrowed_texture_descriptor;
+
+/** OpenGL frame acquired from a session-owned texture target. */
+typedef struct mln_opengl_owned_texture_frame {
+  uint32_t size;
+  /** Session generation that produced this frame. */
+  uint64_t generation;
+  /** Physical OpenGL texture width in device pixels. */
+  uint32_t width;
+  /** Physical OpenGL texture height in device pixels. */
+  uint32_t height;
+  /** UI-to-device pixel scale used for this frame. */
+  double scale_factor;
+  /** Opaque frame identity used to reject stale releases. */
+  uint64_t frame_id;
+  /** Borrowed OpenGL texture object name. Valid until frame release. */
+  uint32_t texture;
+  /** OpenGL texture target. GL_TEXTURE_2D is the expected target. */
+  uint32_t target;
+  /** OpenGL internal format, such as GL_RGBA8. */
+  uint32_t internal_format;
+  /** OpenGL pixel format, such as GL_RGBA. */
+  uint32_t format;
+  /** OpenGL pixel type, such as GL_UNSIGNED_BYTE. */
+  uint32_t type;
+} mln_opengl_owned_texture_frame;
+
 /** CPU image readback metadata for a texture session frame. */
 typedef struct mln_texture_image_info {
   uint32_t size;
@@ -146,7 +199,6 @@ typedef struct mln_texture_image_info {
 
 /**
  * Returns Metal owned-texture descriptor defaults for this C API version.
-
  */
 MLN_API mln_metal_owned_texture_descriptor
 mln_metal_owned_texture_descriptor_default(void) MLN_NOEXCEPT;
@@ -168,6 +220,18 @@ mln_vulkan_owned_texture_descriptor_default(void) MLN_NOEXCEPT;
  */
 MLN_API mln_vulkan_borrowed_texture_descriptor
 mln_vulkan_borrowed_texture_descriptor_default(void) MLN_NOEXCEPT;
+
+/**
+ * Returns OpenGL owned-texture descriptor defaults for this C API version.
+ */
+MLN_API mln_opengl_owned_texture_descriptor
+mln_opengl_owned_texture_descriptor_default(void) MLN_NOEXCEPT;
+
+/**
+ * Returns OpenGL borrowed-texture descriptor defaults for this C API version.
+ */
+MLN_API mln_opengl_borrowed_texture_descriptor
+mln_opengl_borrowed_texture_descriptor_default(void) MLN_NOEXCEPT;
 
 /**
  * Returns texture image info defaults for this C API version.
@@ -286,6 +350,59 @@ MLN_API mln_status mln_vulkan_borrowed_texture_attach(
 ) MLN_NOEXCEPT;
 
 /**
+ * Attaches an OpenGL texture render target owned by the session to a map.
+ *
+ * The map may have at most one live render session. The session and every
+ * texture-session call are owner-thread affine to the map owner thread.
+ * The session creates an OpenGL texture in a context that shares objects with
+ * descriptor->context. Host sampling may use the acquired texture from a
+ * context in the same share group after acquire succeeds and before release.
+ * On success, *out_session receives a handle the caller destroys with
+ * mln_render_session_destroy().
+ *
+ * Returns:
+ * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, descriptor is
+ *   null or invalid, out_session is null, or *out_session is not null.
+ * - MLN_STATUS_INVALID_STATE when the map already has a render session.
+ * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
+ *   thread.
+ * - MLN_STATUS_UNSUPPORTED when OpenGL texture sessions are not supported by
+ *   this build.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ */
+MLN_API mln_status mln_opengl_owned_texture_attach(
+  mln_map* map, const mln_opengl_owned_texture_descriptor* descriptor,
+  mln_render_session** out_session
+) MLN_NOEXCEPT;
+
+/**
+ * Attaches an OpenGL caller-owned texture render target to a map.
+ *
+ * The map may have at most one live render session. The session and every
+ * texture-session call are owner-thread affine to the map owner thread.
+ * The session renders into descriptor->texture. The caller owns the texture,
+ * keeps it valid until detach or destroy, and synchronizes any use outside
+ * this session. On success, *out_session receives a handle the caller destroys
+ * with mln_render_session_destroy().
+ *
+ * Returns:
+ * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_INVALID_ARGUMENT when map is null or not live, descriptor is
+ *   null or invalid, out_session is null, or *out_session is not null.
+ * - MLN_STATUS_INVALID_STATE when the map already has a render session.
+ * - MLN_STATUS_WRONG_THREAD when called from a thread other than the map owner
+ *   thread.
+ * - MLN_STATUS_UNSUPPORTED when OpenGL borrowed texture sessions are not
+ *   supported by this build.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ */
+MLN_API mln_status mln_opengl_borrowed_texture_attach(
+  mln_map* map, const mln_opengl_borrowed_texture_descriptor* descriptor,
+  mln_render_session** out_session
+) MLN_NOEXCEPT;
+
+/**
  * Reads the most recently rendered session-owned texture frame into
  * caller-owned storage.
  *
@@ -396,6 +513,50 @@ MLN_API mln_status mln_vulkan_owned_texture_acquire_frame(
  */
 MLN_API mln_status mln_vulkan_owned_texture_release_frame(
   mln_render_session* session, const mln_vulkan_owned_texture_frame* frame
+) MLN_NOEXCEPT;
+
+/**
+ * Acquires the most recently rendered OpenGL texture frame.
+ *
+ * Use this function with sessions created by mln_opengl_owned_texture_attach().
+ *
+ * The returned texture object is borrowed and remains valid only until
+ * mln_opengl_owned_texture_release_frame() is called for the same frame.
+ * While acquired, resize, render update, detach, destroy, and a second acquire
+ * return MLN_STATUS_INVALID_STATE.
+ *
+ * Returns:
+ * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_INVALID_ARGUMENT when session is null or not live, out_frame is
+ *   null, or out_frame->size is too small.
+ * - MLN_STATUS_INVALID_STATE when the session is detached, no rendered frame is
+ *   available, or a texture frame is already acquired.
+ * - MLN_STATUS_WRONG_THREAD when called from a thread other than the session
+ *   owner thread.
+ * - MLN_STATUS_UNSUPPORTED when session cannot expose an OpenGL texture frame.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ */
+MLN_API mln_status mln_opengl_owned_texture_acquire_frame(
+  mln_render_session* session, mln_opengl_owned_texture_frame* out_frame
+) MLN_NOEXCEPT;
+
+/**
+ * Releases an OpenGL texture frame acquired from a session-owned texture
+ * target.
+ *
+ * Returns:
+ * - MLN_STATUS_OK on success.
+ * - MLN_STATUS_INVALID_ARGUMENT when session is null or not live, frame is
+ *   null, frame->size is too small, or frame identity does not match the
+ *   acquired frame.
+ * - MLN_STATUS_INVALID_STATE when no texture frame is currently acquired.
+ * - MLN_STATUS_WRONG_THREAD when called from a thread other than the session
+ *   owner thread.
+ * - MLN_STATUS_UNSUPPORTED when session cannot release an OpenGL texture frame.
+ * - MLN_STATUS_NATIVE_ERROR when an internal exception is converted to status.
+ */
+MLN_API mln_status mln_opengl_owned_texture_release_frame(
+  mln_render_session* session, const mln_opengl_owned_texture_frame* frame
 ) MLN_NOEXCEPT;
 
 #ifdef __cplusplus

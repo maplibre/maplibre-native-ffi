@@ -151,11 +151,12 @@ final class MapState implements AutoCloseable {
 
   private static VulkanContextDescriptor vulkanContextDescriptor(VulkanContext vulkan) {
     return new VulkanContextDescriptor(
-        vulkan.instancePointer(),
-        vulkan.physicalDevicePointer(),
-        vulkan.devicePointer(),
-        vulkan.graphicsQueuePointer(),
-        vulkan.graphicsQueueFamilyIndex());
+            vulkan.instancePointer(),
+            vulkan.physicalDevicePointer(),
+            vulkan.devicePointer(),
+            vulkan.graphicsQueuePointer(),
+            vulkan.graphicsQueueFamilyIndex())
+        .procAddresses(vulkan.getInstanceProcAddrPointer(), vulkan.getDeviceProcAddrPointer());
   }
 
   private interface RenderTarget extends AutoCloseable {

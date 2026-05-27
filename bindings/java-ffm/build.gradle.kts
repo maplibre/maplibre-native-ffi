@@ -43,8 +43,15 @@ dependencies {
   testImplementation(platform("org.lwjgl:lwjgl-bom:$lwjglVersion"))
   testImplementation("org.junit.jupiter:junit-jupiter")
   testImplementation("org.lwjgl:lwjgl")
+  testImplementation("org.lwjgl:lwjgl-egl")
+  testImplementation("org.lwjgl:lwjgl-glfw")
+  testImplementation("org.lwjgl:lwjgl-opengl")
+  testImplementation("org.lwjgl:lwjgl-opengles")
   testImplementation("org.lwjgl:lwjgl-vulkan")
   testRuntimeOnly("org.lwjgl:lwjgl::$lwjglNative")
+  testRuntimeOnly("org.lwjgl:lwjgl-glfw::$lwjglNative")
+  testRuntimeOnly("org.lwjgl:lwjgl-opengl::$lwjglNative")
+  testRuntimeOnly("org.lwjgl:lwjgl-opengles::$lwjglNative")
   testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 

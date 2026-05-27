@@ -2,6 +2,7 @@ package org.maplibre.nativeffi.map;
 
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
+import org.maplibre.nativeffi.error.InvalidArgumentException;
 import org.maplibre.nativeffi.geo.CanonicalTileId;
 import org.maplibre.nativeffi.internal.c.MapLibreNativeC;
 import org.maplibre.nativeffi.internal.c.mln_canonical_tile_id;
@@ -39,6 +40,12 @@ final class CustomGeometrySourceState implements AutoCloseable {
   }
 
   private void writeFields() {
+    if ((options.hasTileSize() && options.tileSize() < 0)
+        || (options.hasBuffer() && options.buffer() < 0)) {
+      throw new InvalidArgumentException(
+          MapLibreNativeC.MLN_STATUS_INVALID_ARGUMENT(),
+          "custom geometry source unsigned options must be non-negative");
+    }
     var fields = 0;
     if (options.hasMinZoom()) {
       fields |= MapLibreNativeC.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_MIN_ZOOM();

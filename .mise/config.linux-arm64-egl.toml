@@ -1,0 +1,7 @@
+[env]
+MLN_FFI_VARIANT = "linux-arm64-egl"
+MLN_FFI_TARGET_TRIPLE = "linux-arm64"
+MLN_FFI_RENDER_BACKEND = "opengl"
+MLN_FFI_OPENGL_CONTEXT_PROVIDER = "egl"
+MLN_FFI_BUILD_DIR = "{{config_root}}/build/linux-arm64-egl"
+MLN_FFI_ZIG_TARGET = "aarch64-linux-gnu"

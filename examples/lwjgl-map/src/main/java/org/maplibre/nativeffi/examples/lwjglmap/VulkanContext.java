@@ -49,6 +49,7 @@ import java.util.Locale;
 import java.util.Set;
 import org.lwjgl.PointerBuffer;
 import org.lwjgl.system.MemoryStack;
+import org.lwjgl.vulkan.VK;
 import org.lwjgl.vulkan.VkApplicationInfo;
 import org.lwjgl.vulkan.VkDevice;
 import org.lwjgl.vulkan.VkDeviceCreateInfo;
@@ -130,6 +131,18 @@ final class VulkanContext implements AutoCloseable {
 
   NativePointer graphicsQueuePointer() {
     return NativePointer.ofAddress(graphicsQueue.address());
+  }
+
+  NativePointer getInstanceProcAddrPointer() {
+    ensureVulkanFunctionProvider();
+    return NativePointer.ofAddress(
+        VK.getFunctionProvider().getFunctionAddress("vkGetInstanceProcAddr"));
+  }
+
+  NativePointer getDeviceProcAddrPointer() {
+    ensureVulkanFunctionProvider();
+    return NativePointer.ofAddress(
+        VK.getFunctionProvider().getFunctionAddress("vkGetDeviceProcAddr"));
   }
 
   int graphicsQueueFamilyIndex() {
@@ -304,6 +317,12 @@ final class VulkanContext implements AutoCloseable {
       names.add(prop.extensionNameString());
     }
     return names;
+  }
+
+  private static void ensureVulkanFunctionProvider() {
+    if (VK.getFunctionProvider() == null) {
+      VK.create();
+    }
   }
 
   private static Set<String> deviceExtensions(MemoryStack stack, VkPhysicalDevice device) {

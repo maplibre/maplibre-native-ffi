@@ -24,6 +24,7 @@ use crate::handle::{ThreadAffineNativeHandle, closed_handle_error, out_handle};
 use crate::options::{MapOptionsNativeExt, MapTileOptionsNativeExt, MapViewportOptionsNativeExt};
 use crate::render::{
     MetalBorrowedTextureDescriptor, MetalOwnedTextureDescriptor, MetalSurfaceDescriptor,
+    OpenGLBorrowedTextureDescriptor, OpenGLOwnedTextureDescriptor, OpenGLSurfaceDescriptor,
     RenderSessionHandle, VulkanBorrowedTextureDescriptor, VulkanOwnedTextureDescriptor,
     VulkanSurfaceDescriptor,
 };
@@ -750,6 +751,23 @@ impl MapHandle {
         })
     }
 
+    /// Attaches an OpenGL native surface render target to this map.
+    ///
+    /// OpenGL context provider and surface handles are borrowed. They must
+    /// remain valid and externally synchronized until the session is detached
+    /// or closed.
+    pub fn attach_opengl_surface(
+        &self,
+        descriptor: &OpenGLSurfaceDescriptor,
+    ) -> Result<RenderSessionHandle> {
+        let raw = descriptor.to_native();
+        RenderSessionHandle::attach(self, |map, out| {
+            // SAFETY: map is live, raw is a materialized descriptor valid for
+            // this call, and out is a null-initialized out-pointer.
+            unsafe { sys::mln_opengl_surface_attach(map, &raw, out) }
+        })
+    }
+
     /// Attaches a Metal session-owned texture render target to this map.
     ///
     /// The device pointer must name a valid Metal device that remains usable on
@@ -812,6 +830,40 @@ impl MapHandle {
             // SAFETY: map is live, raw is a materialized descriptor valid for
             // this call, and out is a null-initialized out-pointer.
             unsafe { sys::mln_vulkan_borrowed_texture_attach(map, &raw, out) }
+        })
+    }
+
+    /// Attaches an OpenGL session-owned texture render target to this map.
+    ///
+    /// The context provider handles are borrowed. They must remain valid until
+    /// the session is detached or closed. Host sampling must use a context in
+    /// the same share group while the acquired frame remains open.
+    pub fn attach_opengl_owned_texture(
+        &self,
+        descriptor: &OpenGLOwnedTextureDescriptor,
+    ) -> Result<RenderSessionHandle> {
+        let raw = descriptor.to_native();
+        RenderSessionHandle::attach(self, |map, out| {
+            // SAFETY: map is live, raw is a materialized descriptor valid for
+            // this call, and out is a null-initialized out-pointer.
+            unsafe { sys::mln_opengl_owned_texture_attach(map, &raw, out) }
+        })
+    }
+
+    /// Attaches an OpenGL caller-owned texture render target to this map.
+    ///
+    /// The context provider handles and texture object are borrowed. The caller
+    /// owns the texture, keeps it valid until detach or close, and synchronizes
+    /// use outside this session.
+    pub fn attach_opengl_borrowed_texture(
+        &self,
+        descriptor: &OpenGLBorrowedTextureDescriptor,
+    ) -> Result<RenderSessionHandle> {
+        let raw = descriptor.to_native();
+        RenderSessionHandle::attach(self, |map, out| {
+            // SAFETY: map is live, raw is a materialized descriptor valid for
+            // this call, and out is a null-initialized out-pointer.
+            unsafe { sys::mln_opengl_borrowed_texture_attach(map, &raw, out) }
         })
     }
 }
