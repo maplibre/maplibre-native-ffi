@@ -109,7 +109,7 @@ runs:
       run: |
         sudo apt-get update
         sudo apt-get install --no-install-recommends --yes mesa-utils
-        eglinfo || true
+        mise exec -- pixi run --locked eglinfo || true
 
     - name: Diagnose Vulkan setup
       if: ${{ contains(env.MISE_ENV, 'vulkan') }}
