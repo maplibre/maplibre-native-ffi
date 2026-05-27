@@ -163,23 +163,3 @@ run = [
 [tasks."ci:vulkan-info"]
 description = "Print the active Vulkan loader and driver summary."
 run = "vulkaninfo --summary"
-
-[tasks."ci:prepare-native-artifact"]
-run = [
-  "rm -rf ci-artifact",
-  "mkdir -p \"ci-artifact/build/$MLN_FFI_VARIANT\" ci-artifact/third_party/maplibre-native/vendor/Vulkan-Headers",
-  '''
-  found_native_lib=false
-  native_library_dir="$MLN_FFI_BUILD_DIR"
-  for native_lib in "$native_library_dir"/libmaplibre-native-c.* "$native_library_dir"/maplibre-native-c.*; do
-    [[ -e "$native_lib" ]] || continue
-    found_native_lib=true
-    cp "$native_lib" "ci-artifact/build/$MLN_FFI_VARIANT"
-  done
-  if [[ "$found_native_lib" != true ]]; then
-    echo "missing $native_library_dir/[lib]maplibre-native-c.*; native artifact was not built" >&2
-    exit 1
-  fi
-  ''',
-  "cp -R third_party/maplibre-native/vendor/Vulkan-Headers/include ci-artifact/third_party/maplibre-native/vendor/Vulkan-Headers/include",
-]

@@ -9,6 +9,14 @@ runs:
       shell: pwsh
       run: git config --global core.longpaths true
 
+    - name: Cache MapLibre Native source
+      uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+      with:
+        path: |
+          third_party/maplibre-native
+          .git/modules/third_party/maplibre-native
+        key: mln-src-v2-${{ hashFiles('.gitmodules', 'cmake/mln_version.cmake') }}
+
     - name: Install sccache
       uses: mozilla-actions/sccache-action@9e7fa8a12102821edf02ca5dbea1acd0f89a2696 # v0.0.10
 
@@ -78,7 +86,7 @@ runs:
         install: true
 
     - name: Register Windows Vulkan CI lavapipe ICD
-      if: ${{ runner.os == 'Windows' && contains(env.MISE_ENV, 'vulkan') }}
+      if: ${{ runner.os == 'Windows' }}
       shell: pwsh
       run: |
         $driverManifest = Join-Path $env:GITHUB_WORKSPACE ".pixi\envs\default\Library\share\vulkan\icd.d\lvp_icd.x86_64.json"
