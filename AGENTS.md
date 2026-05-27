@@ -1,6 +1,8 @@
 # AGENTS.md
 
-This project is a C API for MapLibre Native, built for low-level language bindings and host integrations that need a C boundary instead of direct C++ interop or the popular MapLibre Android/iOS SDKs.
+This project is a C API for MapLibre Native, built for low-level language
+bindings and host integrations that need a C boundary instead of direct C++
+interop or the popular MapLibre Android/iOS SDKs.
 
 ## Project map
 
@@ -46,9 +48,11 @@ Available mise envs: `linux-x64-vulkan`, `linux-x64-egl`, `linux-arm64-vulkan`,
 `windows-x64-vulkan`, `windows-x64-wgl`. The host-matching variant is selected
 automatically via `.miserc.toml`.
 
-Formatters and linters run automatically on pre-commit; you usually don't need to run them manually.
+Formatters and linters run automatically on pre-commit; you usually don't need
+to run them manually.
 
-The environment is managed by mise and pixi, so if you need to run a command that's not already a mise task, use `mise exec -- pixi run ...`.
+The environment is managed by mise and pixi, so if you need to run a command
+that's not already a mise task, use `mise exec -- pixi run ...`.
 
 ## Project Invariants
 
@@ -56,8 +60,12 @@ The environment is managed by mise and pixi, so if you need to run a command tha
 
 - Campsite rules apply: leave anything you touch tidier than when you found it.
 - The environment is mostly defined by `mise` and `pixi`.
-- The bindings are meant to be low level and broadly analagous to each other and to the C API, exposing MapLibre concepts directly, while following language conventions for memory and thread safety. Prioritize safety, similarity, and idioms, in that order.
-- We're currently in a prerelease state, so breaking API changes are allowed and encouraged over leaving backwards compatibility shims.
+- The bindings are meant to be low level and broadly analagous to each other and
+  to the C API, exposing MapLibre concepts directly, while following language
+  conventions for memory and thread safety. Prioritize safety, similarity, and
+  idioms, in that order.
+- We're currently in a prerelease state, so breaking API changes are allowed and
+  encouraged over leaving backwards compatibility shims.
 
 ### Prose
 
@@ -72,18 +80,25 @@ safety rules, and hard boundaries.
 
 ### Testing
 
-- The Zig bindings tests are also the primary integration test suite for the C/C++ layer.
-- For tests that _must_ reach below the bindings, there are dedicated tests in src/c_api/tests.
-- Other bindings (Rust, Java, Swift, etc) avoid writing redundant tests to test the C/C++ layer logic; their tests focus on validating their bindings.
-- Avoid trivial tests, tests that verify constants, tests that assert a negative (unless valuable), tests that simply test third party code; we want to keep our test suite robust and high-value.
+- The Zig bindings tests are also the primary integration test suite for the
+  C/C++ layer.
+- For tests that _must_ reach below the bindings, there are dedicated tests in
+  src/c_api/tests.
+- Other bindings (Rust, Java, Swift, etc) avoid writing redundant tests to test
+  the C/C++ layer logic; their tests focus on validating their bindings.
+- Avoid trivial tests, tests that verify constants, tests that assert a negative
+  (unless valuable), tests that simply test third party code; we want to keep
+  our test suite robust and high-value.
 - Example apps don't need tests.
-- Every test skip should be strictly justified. We do not skip rendering tests because the CI environment doesn't support them; we fix the environment.
+- Every test skip should be strictly justified. We do not skip rendering tests
+  because the CI environment doesn't support them; we fix the environment.
 
 ## Project Docs
 
 Read these docs before changing related code:
 
-- [Overview](docs/src/content/docs/development/overview.md) for project layout, workflow, and tooling.
+- [Overview](docs/src/content/docs/development/overview.md) for project layout,
+  workflow, and tooling.
 - [Concepts](docs/src/content/docs/concepts.md) for project scope, ownership,
   threading, events, rendering targets, and host integration boundaries.
 - [C API Conventions](docs/src/content/docs/development/c-conventions.md) before
