@@ -1,7 +1,4 @@
 [env]
-# TODO(linux): Run `mise -E linux-arm64-egl run test` on a Linux arm64 machine
-# or runner and confirm Pixi's Mesa/EGL stack exercises the backend with
-# software rendering.
 MLN_FFI_VARIANT = "linux-arm64-egl"
 MLN_FFI_TARGET_TRIPLE = "linux-arm64"
 MLN_FFI_RENDER_BACKEND = "opengl"
