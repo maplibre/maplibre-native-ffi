@@ -81,3 +81,35 @@ Read these docs for related tooling:
   `hk.pkl`.
 - [dprint configuration](https://dprint.dev/config/) when changing
   `dprint.jsonc`.
+
+## Cursor Cloud specific instructions
+
+The auto-detected build variant is `linux-x64-vulkan`. Pixi supplies Mesa's
+lavapipe software Vulkan ICD, so no GPU or display server is needed for builds
+or tests.
+
+Set these environment variables before running any mise task that touches the
+renderer (build, test, examples):
+
+```bash
+export EGL_PLATFORM=surfaceless
+export LIBGL_ALWAYS_SOFTWARE=true
+```
+
+Key commands (all run from the repository root):
+
+| Action                                  | Command                                |
+| --------------------------------------- | -------------------------------------- |
+| Install/refresh all tools and deps      | `mise install`                         |
+| Configure CMake                         | `mise run configure`                   |
+| Build the native library                | `mise run build`                       |
+| Build + run C API & Zig binding tests   | `mise run test`                        |
+| Run linters/formatters                  | `mise run fix`                         |
+| Headless smoke test (no display needed) | `mise run //examples/zig-readback:run` |
+
+`mise run test` already depends on `build`, which depends on `configure`, so a
+single `mise run test` from a clean state handles the full pipeline.
+
+The `zig-readback` example produces a PPM file at
+`examples/zig-readback/zig-out/zig-readback.ppm` and is the recommended
+hello-world verification for headless environments.
