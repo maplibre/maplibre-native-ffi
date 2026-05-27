@@ -103,6 +103,14 @@ runs:
         New-Item -Path $driverKey -Force | Out-Null
         New-ItemProperty -Path $driverKey -Name $driverManifest -PropertyType DWord -Value 0 -Force | Out-Null
 
+    - name: Diagnose EGL setup
+      if: ${{ runner.os == 'Linux' }}
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install --no-install-recommends --yes mesa-utils
+        eglinfo
+
     - name: Diagnose Vulkan setup
       if: ${{ contains(env.MISE_ENV, 'vulkan') }}
       shell: bash
