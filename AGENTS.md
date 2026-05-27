@@ -14,36 +14,27 @@ Feature changes need tests through the C ABI when practical.
 
 Campsite rules apply: leave anything you touch tidier than when you found it.
 
-## Documentation
+```bash
+# Install/refresh all tools, submodules, and dependencies
+mise install
 
-When working on documentation, gather necessary context first, then determine
-who the audience is and whether the documentation is a Tutorial, Guide,
-Reference, or Explanation, according to the
-[Diátaxis Framework](https://raw.githubusercontent.com/evildmp/diataxis-documentation-framework/refs/heads/main/start-here.rst).
-State your audience and category determination to the user, then load and follow
-the appropriate framework before making changes:
+# Build the native library (also runs configure)
+mise run build
 
-- [Reference](https://raw.githubusercontent.com/evildmp/diataxis-documentation-framework/refs/heads/main/reference.rst)
-  usually covers comments attached to source code (e.g., Doxygen).
-- [Guides](https://raw.githubusercontent.com/evildmp/diataxis-documentation-framework/refs/heads/main/how-to-guides.rst)
-  usually covers user-facing documentation.
-- [Explanation](https://raw.githubusercontent.com/evildmp/diataxis-documentation-framework/refs/heads/main/explanation.rst)
-  usually covers contributor-facing or user-facing documentation.
-- [Tutorials](https://raw.githubusercontent.com/evildmp/diataxis-documentation-framework/refs/heads/main/tutorials.rst)
+# Build and run C API + Zig binding tests (depends on build)
+mise run test
 
-Use positive wording for guidance. Use negative wording for real prohibitions,
-safety rules, and hard boundaries.
+# Headless smoke test — no display needed
+mise run //examples/zig-readback:run
 
-- Prefer: "Examples stay small and focused."
-- Avoid: "Examples should not grow into full applications."
-- Prefer: "Higher-level adapters may add execution models above this layer."
-- Avoid: "This layer should not try to manage execution models for every
-  possible host."
+# Build and test for a different variant (override auto-detected env)
+mise -E linux-x64-egl run test
+```
 
-Before finalizing documentation changes, apply the prose review strategy from
-[Writing Clearly and Concisely](https://raw.githubusercontent.com/obra/the-elements-of-style/refs/heads/main/skills/writing-clearly-and-concisely/SKILL.md#Limited%20Context%20Strategy):
-use active voice, positive statements, concrete language, parallel structure,
-and no needless words.
+Available mise envs: `linux-x64-vulkan`, `linux-x64-egl`, `linux-arm64-vulkan`,
+`linux-arm64-egl`, `macos-arm64-metal`, `macos-arm64-vulkan`,
+`windows-x64-vulkan`, `windows-x64-wgl`. The host-matching variant is selected
+automatically via `.miserc.toml`.
 
 ## Project Docs
 
@@ -82,34 +73,15 @@ Read these docs for related tooling:
 - [dprint configuration](https://dprint.dev/config/) when changing
   `dprint.jsonc`.
 
-## Cursor Cloud specific instructions
+## Project Invariants
 
-The auto-detected build variant is `linux-x64-vulkan`. Pixi supplies Mesa's
-lavapipe software Vulkan ICD, so no GPU or display server is needed for builds
-or tests.
+### Prose
 
-Set these environment variables before running any mise task that touches the
-renderer (build, test, examples):
+Use positive wording for guidance. Use negative wording for real prohibitions,
+safety rules, and hard boundaries.
 
-```bash
-export EGL_PLATFORM=surfaceless
-export LIBGL_ALWAYS_SOFTWARE=true
-```
-
-Key commands (all run from the repository root):
-
-| Action                                  | Command                                |
-| --------------------------------------- | -------------------------------------- |
-| Install/refresh all tools and deps      | `mise install`                         |
-| Configure CMake                         | `mise run configure`                   |
-| Build the native library                | `mise run build`                       |
-| Build + run C API & Zig binding tests   | `mise run test`                        |
-| Run linters/formatters                  | `mise run fix`                         |
-| Headless smoke test (no display needed) | `mise run //examples/zig-readback:run` |
-
-`mise run test` already depends on `build`, which depends on `configure`, so a
-single `mise run test` from a clean state handles the full pipeline.
-
-The `zig-readback` example produces a PPM file at
-`examples/zig-readback/zig-out/zig-readback.ppm` and is the recommended
-hello-world verification for headless environments.
+- Prefer: "Examples stay small and focused."
+- Avoid: "Examples should not grow into full applications."
+- Prefer: "Higher-level adapters may add execution models above this layer."
+- Avoid: "This layer should not try to manage execution models for every
+  possible host."
