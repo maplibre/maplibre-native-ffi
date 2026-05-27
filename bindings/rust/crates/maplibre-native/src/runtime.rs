@@ -903,8 +903,15 @@ mod tests {
 
     #[test]
     fn runtime_ambient_cache_operations_use_real_c_abi() {
-        let runtime =
-            RuntimeHandle::with_options(&RuntimeOptions::new().with_maximum_cache_size(0)).unwrap();
+        let base = TempDir::new("maplibre-rust-ambient-cache");
+        let cache = base.path().join("ambient.db");
+
+        let runtime = RuntimeHandle::with_options(
+            &RuntimeOptions::new()
+                .with_cache_path(cache.to_string_lossy())
+                .with_maximum_cache_size(0),
+        )
+        .unwrap();
 
         for operation in [
             AmbientCacheOperation::PackDatabase,
@@ -1028,10 +1035,9 @@ mod tests {
 
     #[test]
     fn offline_region_merge_database_uses_real_c_abi() {
-        let base = unique_temp_dir("maplibre-rust-offline-merge");
-        let main_cache = base.join("main.db");
-        let side_cache = base.join("side.db");
-        std::fs::create_dir_all(&base).unwrap();
+        let base = TempDir::new("maplibre-rust-offline-merge");
+        let main_cache = base.path().join("main.db");
+        let side_cache = base.path().join("side.db");
 
         let definition = test_offline_region_definition("custom://merge-style.json");
         {
@@ -1060,8 +1066,6 @@ mod tests {
         assert_eq!(merged[0].definition, definition);
         assert_eq!(merged[0].metadata, b"merge");
         main_runtime.close().unwrap();
-
-        std::fs::remove_dir_all(base).unwrap();
     }
 
     fn test_offline_region_definition(style_url: &str) -> OfflineRegionDefinition {
@@ -1078,12 +1082,31 @@ mod tests {
         }
     }
 
-    fn unique_temp_dir(prefix: &str) -> std::path::PathBuf {
-        let nanos = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_nanos();
-        std::env::temp_dir().join(format!("{prefix}-{}-{nanos}", std::process::id()))
+    struct TempDir {
+        path: std::path::PathBuf,
+    }
+
+    impl TempDir {
+        fn new(prefix: &str) -> Self {
+            let nanos = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos();
+            let path =
+                std::env::temp_dir().join(format!("{prefix}-{}-{nanos}", std::process::id()));
+            std::fs::create_dir_all(&path).unwrap();
+            Self { path }
+        }
+
+        fn path(&self) -> &std::path::Path {
+            &self.path
+        }
+    }
+
+    impl Drop for TempDir {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.path);
+        }
     }
 
     #[test]

@@ -10,10 +10,10 @@ lockfile_platforms = ["linux-x64", "linux-arm64", "macos-arm64", "windows-x64"]
 pin = true
 experimental = true
 python.uv_venv_auto = "create|source"
-windows_default_file_shell_args = '"C:/Program Files/Git/bin/bash.exe"'
-windows_default_inline_shell_args = 'pixi run --locked -x "C:/Program Files/Git/bin/bash.exe" -lc'
+windows_default_file_shell_args = 'pixi run --locked -x "C:/Program Files/Git/bin/bash.exe" -e -lc "source \"$MLN_FFI_REPO_ROOT/.mise/bin/windows-msvc-path.sh\"; exec \"C:/Program Files/Git/bin/bash.exe\" \"$@\"" _'
+windows_default_inline_shell_args = 'pixi run --locked -x "C:/Program Files/Git/bin/bash.exe" -e -lc "source \"$MLN_FFI_REPO_ROOT/.mise/bin/windows-msvc-path.sh\"; eval \"$1\"" _'
 unix_default_file_shell_args = "bash"
-unix_default_inline_shell_args = "pixi run --locked -x bash -lc"
+unix_default_inline_shell_args = "pixi run --locked -x bash -e -lc"
 # On Windows, the Microsoft Store Python alias in WindowsApps can appear before
 # mise-managed Python. Keep mise tool paths first so file tasks run pinned tools.
 activate_aggressive = true
@@ -78,6 +78,10 @@ postinstall = [
   "git submodule update --init --recursive --depth 1 third_party/maplibre-native",
   "hk install --mise --quiet",
   "pixi install --locked --quiet",
+  # conda-forge ships libclang-13.dll, but clang-sys on Windows searches for libclang.dll.
+  # https://github.com/KyleMayes/clang-sys/issues/213
+  # https://github.com/conda-forge/llvmdev-feedstock/issues/376
+  "{% if os() == \"windows\" %}cp \"$CONDA_PREFIX/Library/bin/libclang-13.dll\" \"$CONDA_PREFIX/Library/bin/libclang.dll\"{% endif %}",
   "uv sync --locked --quiet",
   "cd docs && pnpm install --frozen-lockfile --loglevel warn",
 ]
@@ -144,32 +148,18 @@ run = "pnpm dlx actions-up"
 description = "Called by dprint.jsonc"
 hide = true
 run = 'java -jar {{ tools["aqua:facebook/ktfmt"].path }}/ktfmt'
+# ktfmt on windows doesn't work in git bash for some reason
+shell = '{% if os() == "windows" %}cmd /c{% else %}sh -c -o errexit{% endif %}'
 
 [tasks."ci:lint"]
 run = [
   "hk fix --all",
   "git update-index -q --refresh",
-  # New mise versions often change the lockfile.
+  # Lockfile drift is common across different mise builds
   "git diff --exit-code -- . ':(exclude)mise.lock'",
   "git diff --cached --exit-code -- . ':(exclude)mise.lock'",
 ]
 
-[tasks."ci:prepare-native-artifact"]
-run = [
-  "rm -rf ci-artifact",
-  "mkdir -p \"ci-artifact/build/$MLN_FFI_VARIANT\" ci-artifact/third_party/maplibre-native/vendor/Vulkan-Headers",
-  '''
-  found_native_lib=false
-  native_library_dir="$MLN_FFI_BUILD_DIR"
-  for native_lib in "$native_library_dir"/libmaplibre-native-c.* "$native_library_dir"/maplibre-native-c.*; do
-    [[ -e "$native_lib" ]] || continue
-    found_native_lib=true
-    cp "$native_lib" "ci-artifact/build/$MLN_FFI_VARIANT"
-  done
-  if [[ "$found_native_lib" != true ]]; then
-    echo "missing $native_library_dir/[lib]maplibre-native-c.*; native artifact was not built" >&2
-    exit 1
-  fi
-  ''',
-  "cp -R third_party/maplibre-native/vendor/Vulkan-Headers/include ci-artifact/third_party/maplibre-native/vendor/Vulkan-Headers/include",
-]
+[tasks."ci:vulkan-info"]
+description = "Print the active Vulkan loader and driver summary."
+run = "vulkaninfo --summary"

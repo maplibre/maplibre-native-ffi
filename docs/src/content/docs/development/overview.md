@@ -76,23 +76,6 @@ mise run //examples/zig-map:run
 mise run //docs:build
 ```
 
-## CI Variant Matrix
-
-GitHub Actions builds native artifacts and examples for the variants described
-by the mise profiles, such as `.mise/config.linux-x64-vulkan.toml` and
-`.mise/config.macos-arm64-metal.toml`. The CI matrix generator reads each
-profile's platform, architecture, and render backend metadata.
-
-Use `.github/config/variants.toml` to configure CI matrix policy: runner
-selection, example tasks, compatibility requirements, and explicit exclusions.
-
-Preview the generated matrices locally:
-
-```bash
-mise run ci:matrix native --pretty
-mise run ci:matrix examples --pretty
-```
-
 ## How Tools Fit Together
 
 This repository spans native code, language bindings, examples, tests, and
@@ -115,6 +98,11 @@ libraries, C/C++ tooling, and build tools that participate in CMake
 configuration or native package discovery. CMake, Ninja, pkg-config, shader
 tools, and clang tooling live in Pixi for that reason. Pixi runs
 [CMake](https://cmake.org/), and CMake builds the native C/C++ library.
+
+Mise profiles select dependency environments and backend variants. Inner build
+files such as CMake, Cargo, Gradle, and Zig build scripts consume the resulting
+environment values and paths; keep Pixi and mise policy at the repository task
+layer.
 
 Language package managers own dependencies inside their ecosystems. For example,
 `uv` owns Python package dependencies, `pnpm` owns Node package dependencies,

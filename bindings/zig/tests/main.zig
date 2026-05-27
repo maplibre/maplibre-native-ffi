@@ -59,7 +59,9 @@ test "package root hides raw C declarations" {
     try testing.expect(!support.typeNameContains(maplibre.ResourceRequestHandle, "mln_"));
     try testing.expect(!support.typeNameContains(maplibre.RenderTargetExtent, "mln_"));
     try testing.expect(!support.typeNameContains(maplibre.RenderBackendSupport, "mln_"));
+    try testing.expect(!support.typeNameContains(maplibre.OpenGLContextProviderSupport, "mln_"));
     try testing.expect(!support.typeNameContains(maplibre.MetalOwnedTextureDescriptor, "mln_"));
+    try testing.expect(!support.typeNameContains(maplibre.OpenGLOwnedTextureDescriptor, "mln_"));
     try testing.expect(!support.typeNameContains(maplibre.VulkanOwnedTextureDescriptor, "mln_"));
     try testing.expect(!support.typeNameContains(maplibre.FeatureStateSelector, "mln_"));
     try testing.expect(!support.typeNameContains(maplibre.RenderedQueryGeometry, "mln_"));
@@ -67,7 +69,9 @@ test "package root hides raw C declarations" {
     try testing.expect(!support.typeNameContains(maplibre.FeatureExtensionResult, "mln_"));
     try testing.expect(!support.typeNameContains(maplibre.RenderSessionHandle, "mln_"));
     try testing.expect(!support.typeNameContains(maplibre.MetalOwnedTextureFrameHandle, "mln_"));
+    try testing.expect(!support.typeNameContains(maplibre.OpenGLOwnedTextureFrameHandle, "mln_"));
     try testing.expect(!support.typeNameContains(maplibre.MetalOwnedTextureFrameInfo, "mln_"));
+    try testing.expect(!support.typeNameContains(maplibre.OpenGLOwnedTextureFrameInfo, "mln_"));
     try testing.expect(!support.typeNameContains(maplibre.RuntimeHandle, "anyopaque"));
     try testing.expect(!support.typeNameContains(maplibre.MapHandle, "anyopaque"));
     try testing.expect(!support.typeNameContains(maplibre.MapProjectionHandle, "anyopaque"));

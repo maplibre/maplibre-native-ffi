@@ -3,6 +3,7 @@
 
 # include/maplibre_native_c/base.h
 --include-constant MLN_RENDER_BACKEND_FLAG_METAL
+--include-constant MLN_RENDER_BACKEND_FLAG_OPENGL
 --include-constant MLN_RENDER_BACKEND_FLAG_VULKAN
 --include-constant MLN_STATUS_INVALID_ARGUMENT
 --include-constant MLN_STATUS_INVALID_STATE
@@ -305,9 +306,18 @@
 --include-function mln_render_session_set_feature_state
 
 # include/maplibre_native_c/render_target.h
+--include-constant MLN_OPENGL_CONTEXT_PLATFORM_EGL
+--include-constant MLN_OPENGL_CONTEXT_PLATFORM_UNSPECIFIED
+--include-constant MLN_OPENGL_CONTEXT_PLATFORM_WGL
+--include-constant MLN_OPENGL_CONTEXT_PROVIDER_FLAG_EGL
+--include-constant MLN_OPENGL_CONTEXT_PROVIDER_FLAG_WGL
+--include-function mln_opengl_supported_context_provider_mask
+--include-struct mln_egl_context_descriptor
 --include-struct mln_metal_context_descriptor
+--include-struct mln_opengl_context_descriptor
 --include-struct mln_render_target_extent
 --include-struct mln_vulkan_context_descriptor
+--include-struct mln_wgl_context_descriptor
 
 # include/maplibre_native_c/runtime.h
 --include-constant MLN_AMBIENT_CACHE_OPERATION_CLEAR
@@ -557,9 +567,12 @@
 # include/maplibre_native_c/surface.h
 --include-function mln_metal_surface_attach
 --include-function mln_metal_surface_descriptor_default
+--include-function mln_opengl_surface_attach
+--include-function mln_opengl_surface_descriptor_default
 --include-function mln_vulkan_surface_attach
 --include-function mln_vulkan_surface_descriptor_default
 --include-struct mln_metal_surface_descriptor
+--include-struct mln_opengl_surface_descriptor
 --include-struct mln_vulkan_surface_descriptor
 
 # include/maplibre_native_c/texture.h
@@ -569,6 +582,12 @@
 --include-function mln_metal_owned_texture_attach
 --include-function mln_metal_owned_texture_descriptor_default
 --include-function mln_metal_owned_texture_release_frame
+--include-function mln_opengl_borrowed_texture_attach
+--include-function mln_opengl_borrowed_texture_descriptor_default
+--include-function mln_opengl_owned_texture_acquire_frame
+--include-function mln_opengl_owned_texture_attach
+--include-function mln_opengl_owned_texture_descriptor_default
+--include-function mln_opengl_owned_texture_release_frame
 --include-function mln_texture_image_info_default
 --include-function mln_texture_read_premultiplied_rgba8
 --include-function mln_vulkan_borrowed_texture_attach
@@ -580,6 +599,9 @@
 --include-struct mln_metal_borrowed_texture_descriptor
 --include-struct mln_metal_owned_texture_descriptor
 --include-struct mln_metal_owned_texture_frame
+--include-struct mln_opengl_borrowed_texture_descriptor
+--include-struct mln_opengl_owned_texture_descriptor
+--include-struct mln_opengl_owned_texture_frame
 --include-struct mln_texture_image_info
 --include-struct mln_vulkan_borrowed_texture_descriptor
 --include-struct mln_vulkan_owned_texture_descriptor

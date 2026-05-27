@@ -43,6 +43,8 @@ auto vulkan_surface_descriptor_default() noexcept
         .device = nullptr,
         .graphics_queue = nullptr,
         .graphics_queue_family_index = 0,
+        .get_instance_proc_addr = nullptr,
+        .get_device_proc_addr = nullptr,
       },
     .surface = nullptr,
   };

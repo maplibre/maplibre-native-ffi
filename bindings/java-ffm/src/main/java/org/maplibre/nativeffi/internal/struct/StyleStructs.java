@@ -10,6 +10,7 @@ import java.lang.foreign.ValueLayout;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import org.maplibre.nativeffi.error.InvalidArgumentException;
 import org.maplibre.nativeffi.geo.CanonicalTileId;
 import org.maplibre.nativeffi.internal.c.MapLibreNativeC;
 import org.maplibre.nativeffi.internal.c.mln_canonical_tile_id;
@@ -80,6 +81,10 @@ public final class StyleStructs {
       mln_style_tile_source_options.bounds(segment, latLngBounds(options.bounds(), arena));
     }
     if (options.hasTileSize()) {
+      if (options.tileSize() < 0) {
+        throw new InvalidArgumentException(
+            MapLibreNativeC.MLN_STATUS_INVALID_ARGUMENT(), "tile size must be non-negative");
+      }
       fields |= MapLibreNativeC.MLN_STYLE_TILE_SOURCE_OPTION_TILE_SIZE();
       mln_style_tile_source_options.tile_size(segment, options.tileSize());
     }

@@ -9,12 +9,16 @@ const values = @import("values.zig");
 
 const NativeRenderSession = opaque {};
 const MetalOwnedTextureFrameStorage = struct { raw: c.mln_metal_owned_texture_frame };
+const OpenGLOwnedTextureFrameStorage = struct { raw: c.mln_opengl_owned_texture_frame };
 const VulkanOwnedTextureFrameStorage = struct { raw: c.mln_vulkan_owned_texture_frame };
 
 const RenderSessionFrameState = struct {
     metal_frame: ?MetalOwnedTextureFrameStorage = null,
     metal_frame_active: bool = false,
     metal_frame_generation: u64 = 0,
+    opengl_frame: ?OpenGLOwnedTextureFrameStorage = null,
+    opengl_frame_active: bool = false,
+    opengl_frame_generation: u64 = 0,
     vulkan_frame: ?VulkanOwnedTextureFrameStorage = null,
     vulkan_frame_active: bool = false,
     vulkan_frame_generation: u64 = 0,
@@ -26,6 +30,7 @@ pub const NativePointer = struct {
 
 pub const RenderBackendSupport = struct {
     metal: bool,
+    opengl: bool,
     vulkan: bool,
 };
 
@@ -33,7 +38,21 @@ pub fn supportedRenderBackends() RenderBackendSupport {
     const mask = c.mln_supported_render_backend_mask();
     return .{
         .metal = (mask & c.MLN_RENDER_BACKEND_FLAG_METAL) != 0,
+        .opengl = (mask & c.MLN_RENDER_BACKEND_FLAG_OPENGL) != 0,
         .vulkan = (mask & c.MLN_RENDER_BACKEND_FLAG_VULKAN) != 0,
+    };
+}
+
+pub const OpenGLContextProviderSupport = struct {
+    wgl: bool,
+    egl: bool,
+};
+
+pub fn supportedOpenGLContextProviders() OpenGLContextProviderSupport {
+    const mask = c.mln_opengl_supported_context_provider_mask();
+    return .{
+        .wgl = (mask & c.MLN_OPENGL_CONTEXT_PROVIDER_FLAG_WGL) != 0,
+        .egl = (mask & c.MLN_OPENGL_CONTEXT_PROVIDER_FLAG_EGL) != 0,
     };
 }
 
@@ -53,6 +72,26 @@ pub const VulkanContextDescriptor = struct {
     device: NativePointer,
     graphics_queue: NativePointer,
     graphics_queue_family_index: u32,
+    get_instance_proc_addr: ?NativePointer = null,
+    get_device_proc_addr: ?NativePointer = null,
+};
+
+pub const WglContextDescriptor = struct {
+    device_context: NativePointer,
+    share_context: NativePointer,
+    get_proc_address: ?NativePointer = null,
+};
+
+pub const EglContextDescriptor = struct {
+    display: NativePointer,
+    config: NativePointer,
+    share_context: NativePointer,
+    get_proc_address: ?NativePointer = null,
+};
+
+pub const OpenGLContextDescriptor = union(enum) {
+    wgl: WglContextDescriptor,
+    egl: EglContextDescriptor,
 };
 
 pub const MetalOwnedTextureDescriptor = struct {
@@ -80,6 +119,18 @@ pub const VulkanBorrowedTextureDescriptor = struct {
     final_layout: u32,
 };
 
+pub const OpenGLOwnedTextureDescriptor = struct {
+    extent: RenderTargetExtent = .{},
+    context: OpenGLContextDescriptor,
+};
+
+pub const OpenGLBorrowedTextureDescriptor = struct {
+    extent: RenderTargetExtent = .{},
+    context: OpenGLContextDescriptor,
+    texture: u32,
+    target: u32,
+};
+
 pub const MetalSurfaceDescriptor = struct {
     extent: RenderTargetExtent = .{},
     context: MetalContextDescriptor = .{},
@@ -89,6 +140,12 @@ pub const MetalSurfaceDescriptor = struct {
 pub const VulkanSurfaceDescriptor = struct {
     extent: RenderTargetExtent = .{},
     context: VulkanContextDescriptor,
+    surface: NativePointer,
+};
+
+pub const OpenGLSurfaceDescriptor = struct {
+    extent: RenderTargetExtent = .{},
+    context: OpenGLContextDescriptor,
     surface: NativePointer,
 };
 
@@ -219,6 +276,18 @@ pub const VulkanOwnedTextureFrameInfo = struct {
     device: NativePointer,
     format: u32,
     layout: u32,
+};
+
+pub const OpenGLOwnedTextureFrameInfo = struct {
+    generation: u64,
+    width: u32,
+    height: u32,
+    scale_factor: f64,
+    texture: u32,
+    target: u32,
+    internal_format: u32,
+    format: u32,
+    type: u32,
 };
 
 pub const OwnedImage = struct {
@@ -463,10 +532,39 @@ pub const RenderSessionHandle = struct {
         };
     }
 
+    pub fn acquireOpenGLOwnedTextureFrame(self: *RenderSessionHandle) status.Error!OpenGLOwnedTextureFrameHandle {
+        try ensureNoActiveOwnedFrame(self);
+        var frame = c.mln_opengl_owned_texture_frame{
+            .size = @sizeOf(c.mln_opengl_owned_texture_frame),
+            .generation = 0,
+            .width = 0,
+            .height = 0,
+            .scale_factor = 0,
+            .frame_id = 0,
+            .texture = 0,
+            .target = 0,
+            .internal_format = 0,
+            .format = 0,
+            .type = 0,
+        };
+        const session_native = try native(self);
+        const session_frame_state = try frameState(self);
+        try status.checkStatus(c.mln_opengl_owned_texture_acquire_frame(session_native, &frame), self.diagnostic_store);
+        session_frame_state.opengl_frame_generation +%= 1;
+        session_frame_state.opengl_frame = .{ .raw = frame };
+        session_frame_state.opengl_frame_active = true;
+        return .{
+            .session_native = @ptrCast(session_native),
+            .diagnostic_store = self.diagnostic_store,
+            .frame_state = session_frame_state,
+            .generation = session_frame_state.opengl_frame_generation,
+        };
+    }
+
     pub fn close(self: *RenderSessionHandle) status.Error!void {
         const session: *c.mln_render_session = @ptrCast(self.native orelse return);
         const session_frame_state = try frameState(self);
-        if (session_frame_state.metal_frame_active or session_frame_state.vulkan_frame_active) return error.ActiveBorrow;
+        if (session_frame_state.metal_frame_active or session_frame_state.opengl_frame_active or session_frame_state.vulkan_frame_active) return error.ActiveBorrow;
         try status.checkStatus(c.mln_render_session_destroy(session), self.diagnostic_store);
         self.native = null;
         self.frame_state = null;
@@ -554,6 +652,47 @@ pub const VulkanOwnedTextureFrameHandle = struct {
     }
 };
 
+pub const OpenGLOwnedTextureFrameHandle = struct {
+    session_native: ?*NativeRenderSession,
+    diagnostic_store: ?*diagnostics.DiagnosticStore,
+    frame_state: ?*RenderSessionFrameState,
+    generation: u64,
+
+    /// Returns native OpenGL object names for this acquired frame.
+    ///
+    /// Safety: returned texture names stay valid only until this frame handle is
+    /// released. Callers must follow the C API context-sharing and
+    /// synchronization rules while using them.
+    pub fn info(self: *const OpenGLOwnedTextureFrameHandle) status.BindingError!OpenGLOwnedTextureFrameInfo {
+        const frame = try openglFrame(self);
+        return .{
+            .generation = frame.generation,
+            .width = frame.width,
+            .height = frame.height,
+            .scale_factor = frame.scale_factor,
+            .texture = frame.texture,
+            .target = frame.target,
+            .internal_format = frame.internal_format,
+            .format = frame.format,
+            .type = frame.type,
+        };
+    }
+
+    pub fn release(self: *OpenGLOwnedTextureFrameHandle) status.Error!void {
+        const session_frame_state = self.frame_state orelse return;
+        const session_native = self.session_native orelse return;
+        if (!session_frame_state.opengl_frame_active or self.generation != session_frame_state.opengl_frame_generation) return;
+        var frame = (session_frame_state.opengl_frame orelse return).raw;
+        try status.checkStatus(
+            c.mln_opengl_owned_texture_release_frame(@ptrCast(session_native), &frame),
+            self.diagnostic_store,
+        );
+        session_frame_state.opengl_frame_active = false;
+        session_frame_state.opengl_frame = null;
+        self.* = .{ .session_native = null, .diagnostic_store = self.diagnostic_store, .frame_state = null, .generation = 0 };
+    }
+};
+
 pub fn attachMetalOwnedTexture(map: *map_module.MapHandle, descriptor: MetalOwnedTextureDescriptor) status.Error!RenderSessionHandle {
     var raw = c.mln_metal_owned_texture_descriptor_default();
     raw.extent = renderTargetExtentToNative(descriptor.extent);
@@ -587,6 +726,22 @@ pub fn attachVulkanBorrowedTexture(map: *map_module.MapHandle, descriptor: Vulka
     return try attach(map, c.mln_vulkan_borrowed_texture_attach, &raw);
 }
 
+pub fn attachOpenGLOwnedTexture(map: *map_module.MapHandle, descriptor: OpenGLOwnedTextureDescriptor) status.Error!RenderSessionHandle {
+    var raw = c.mln_opengl_owned_texture_descriptor_default();
+    raw.extent = renderTargetExtentToNative(descriptor.extent);
+    raw.context = openglContextToNative(descriptor.context);
+    return try attach(map, c.mln_opengl_owned_texture_attach, &raw);
+}
+
+pub fn attachOpenGLBorrowedTexture(map: *map_module.MapHandle, descriptor: OpenGLBorrowedTextureDescriptor) status.Error!RenderSessionHandle {
+    var raw = c.mln_opengl_borrowed_texture_descriptor_default();
+    raw.extent = renderTargetExtentToNative(descriptor.extent);
+    raw.context = openglContextToNative(descriptor.context);
+    raw.texture = descriptor.texture;
+    raw.target = descriptor.target;
+    return try attach(map, c.mln_opengl_borrowed_texture_attach, &raw);
+}
+
 pub fn attachMetalSurface(map: *map_module.MapHandle, descriptor: MetalSurfaceDescriptor) status.Error!RenderSessionHandle {
     var raw = c.mln_metal_surface_descriptor_default();
     raw.extent = renderTargetExtentToNative(descriptor.extent);
@@ -601,6 +756,14 @@ pub fn attachVulkanSurface(map: *map_module.MapHandle, descriptor: VulkanSurface
     raw.context = vulkanContextToNative(descriptor.context);
     raw.surface = descriptor.surface.ptr;
     return try attach(map, c.mln_vulkan_surface_attach, &raw);
+}
+
+pub fn attachOpenGLSurface(map: *map_module.MapHandle, descriptor: OpenGLSurfaceDescriptor) status.Error!RenderSessionHandle {
+    var raw = c.mln_opengl_surface_descriptor_default();
+    raw.extent = renderTargetExtentToNative(descriptor.extent);
+    raw.context = openglContextToNative(descriptor.context);
+    raw.surface = descriptor.surface.ptr;
+    return try attach(map, c.mln_opengl_surface_attach, &raw);
 }
 
 fn attach(
@@ -639,7 +802,7 @@ fn frameState(handle: *RenderSessionHandle) status.BindingError!*RenderSessionFr
 fn ensureNoActiveOwnedFrame(handle: *RenderSessionHandle) status.BindingError!void {
     _ = handle.native orelse return error.ClosedHandle;
     const session_frame_state = try frameState(handle);
-    if (session_frame_state.metal_frame_active or session_frame_state.vulkan_frame_active) return error.ActiveBorrow;
+    if (session_frame_state.metal_frame_active or session_frame_state.opengl_frame_active or session_frame_state.vulkan_frame_active) return error.ActiveBorrow;
 }
 
 fn metalFrame(handle: *const MetalOwnedTextureFrameHandle) status.BindingError!c.mln_metal_owned_texture_frame {
@@ -652,6 +815,12 @@ fn vulkanFrame(handle: *const VulkanOwnedTextureFrameHandle) status.BindingError
     const session_frame_state = handle.frame_state orelse return error.ClosedHandle;
     if (!session_frame_state.vulkan_frame_active or handle.generation != session_frame_state.vulkan_frame_generation) return error.ClosedHandle;
     return (session_frame_state.vulkan_frame orelse return error.ClosedHandle).raw;
+}
+
+fn openglFrame(handle: *const OpenGLOwnedTextureFrameHandle) status.BindingError!c.mln_opengl_owned_texture_frame {
+    const session_frame_state = handle.frame_state orelse return error.ClosedHandle;
+    if (!session_frame_state.opengl_frame_active or handle.generation != session_frame_state.opengl_frame_generation) return error.ClosedHandle;
+    return (session_frame_state.opengl_frame orelse return error.ClosedHandle).raw;
 }
 
 fn renderTargetExtentToNative(extent: RenderTargetExtent) c.mln_render_target_extent {
@@ -906,7 +1075,39 @@ fn vulkanContextToNative(context: VulkanContextDescriptor) c.mln_vulkan_context_
         .device = context.device.ptr,
         .graphics_queue = context.graphics_queue.ptr,
         .graphics_queue_family_index = context.graphics_queue_family_index,
+        .get_instance_proc_addr = if (context.get_instance_proc_addr) |pointer| pointer.ptr else null,
+        .get_device_proc_addr = if (context.get_device_proc_addr) |pointer| pointer.ptr else null,
     };
+}
+
+fn openglContextToNative(context: OpenGLContextDescriptor) c.mln_opengl_context_descriptor {
+    var raw = c.mln_opengl_context_descriptor{
+        .size = @sizeOf(c.mln_opengl_context_descriptor),
+        .platform = 0,
+        .data = undefined,
+    };
+    switch (context) {
+        .wgl => |wgl| {
+            raw.platform = c.MLN_OPENGL_CONTEXT_PLATFORM_WGL;
+            raw.data.wgl = .{
+                .size = @sizeOf(c.mln_wgl_context_descriptor),
+                .device_context = wgl.device_context.ptr,
+                .share_context = wgl.share_context.ptr,
+                .get_proc_address = if (wgl.get_proc_address) |pointer| pointer.ptr else null,
+            };
+        },
+        .egl => |egl| {
+            raw.platform = c.MLN_OPENGL_CONTEXT_PLATFORM_EGL;
+            raw.data.egl = .{
+                .size = @sizeOf(c.mln_egl_context_descriptor),
+                .display = egl.display.ptr,
+                .config = egl.config.ptr,
+                .share_context = egl.share_context.ptr,
+                .get_proc_address = if (egl.get_proc_address) |pointer| pointer.ptr else null,
+            };
+        },
+    }
+    return raw;
 }
 
 test "feature identifier copy rejects unknown native tags" {

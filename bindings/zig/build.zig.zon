@@ -1,7 +1,12 @@
 .{
     .name = .maplibre_native,
     .version = "0.16.0",
-    .dependencies = .{},
+    .dependencies = .{
+        .zigglgen = .{
+            .url = "git+https://github.com/castholm/zigglgen.git#7e55ad15655fc4d602ed3bcbe7fb487592063156",
+            .hash = "zigglgen-0.5.0-ziggltzDLwA0Gk0Pj6QMij1j6Z_jkvGEtGKBM6-YlI_s",
+        },
+    },
     .paths = .{""},
     .fingerprint = 0xf39f1b6c19db75ea,
 }

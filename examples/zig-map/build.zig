@@ -1,5 +1,6 @@
 const std = @import("std");
 const maplibre_build = @import("maplibre_native");
+const zigglgen = @import("zigglgen");
 
 const BuildOptions = struct {
     target: std.Build.ResolvedTarget,
@@ -37,25 +38,33 @@ fn addSdlTranslateCWorkarounds(module: *std.Build.Module, target: std.Build.Reso
 }
 
 fn addZigMapExample(b: *std.Build, options: BuildOptions) *std.Build.Step.Compile {
+    const root_module = b.createModule(.{
+        .root_source_file = b.path("main.zig"),
+        .target = options.target,
+        .optimize = options.optimize,
+    });
     const example = b.addExecutable(.{
         .name = "zig-map",
-        .root_module = b.createModule(.{
-            .root_source_file = b.path("main.zig"),
-            .target = options.target,
-            .optimize = options.optimize,
-        }),
+        .root_module = root_module,
     });
 
-    maplibre_build.addRenderBackendOptions(b, example.root_module, options.render_backend);
-    maplibre_build.addIncludePaths(example.root_module, options.include_dirs);
-    addSdlTranslateCWorkarounds(example.root_module, options.target);
-    example.root_module.addImport("maplibre_native", maplibreNativeModule(b, options));
-    if (options.dependency_library_dir) |dependency_library_dir| {
-        example.root_module.addLibraryPath(dependency_library_dir);
-        example.root_module.addRPath(dependency_library_dir);
+    maplibre_build.addRenderBackendOptions(b, root_module, options.render_backend);
+    maplibre_build.addIncludePaths(root_module, options.include_dirs);
+    addSdlTranslateCWorkarounds(root_module, options.target);
+    root_module.addImport("maplibre_native", maplibreNativeModule(b, options));
+    if (options.render_backend == .opengl) {
+        const gl_bindings = zigglgen.generateBindingsModule(b, if (options.target.result.os.tag == .linux)
+            .{ .api = .gles, .version = .@"3.0" }
+        else
+            .{ .api = .gl, .version = .@"3.0" });
+        root_module.addImport("gl", gl_bindings);
     }
-    example.root_module.linkSystemLibrary("SDL3", .{});
-    maplibre_build.linkRenderBackend(b, example.root_module, .{
+    if (options.dependency_library_dir) |dependency_library_dir| {
+        root_module.addLibraryPath(dependency_library_dir);
+        root_module.addRPath(dependency_library_dir);
+    }
+    root_module.linkSystemLibrary("SDL3", .{});
+    maplibre_build.linkRenderBackend(b, root_module, .{
         .target = options.target,
         .render_backend = options.render_backend,
         .dependency_library_dir = options.dependency_library_dir,
@@ -66,8 +75,8 @@ fn addZigMapExample(b: *std.Build, options: BuildOptions) *std.Build.Step.Compil
             .target = options.target,
             .optimize = options.optimize,
         });
-        example.root_module.addImport("objc", zig_objc.module("objc"));
-        example.root_module.linkFramework("Foundation", .{});
+        root_module.addImport("objc", zig_objc.module("objc"));
+        root_module.linkFramework("Foundation", .{});
     }
 
     b.installArtifact(example);

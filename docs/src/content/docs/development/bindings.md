@@ -10,7 +10,9 @@ core model while adapting ownership, memory, error, and threading to the target
 language's conventions.
 
 See the language-specific binding conventions in this section for implementation
-choices in each target language.
+choices in each target language. For binding maturity across languages, see the
+[project status](/maplibre-native-ffi/#language-bindings) table on the overview
+page.
 
 ## Naming
 

@@ -1,4 +1,5 @@
 const std = @import("std");
+const builtin = @import("builtin");
 const build_options = @import("build_options");
 const objc = if (build_options.supports_metal) @import("objc") else struct {};
 
@@ -21,11 +22,25 @@ pub fn main(init_args: std.process.Init) !void {
     try maplibre.setLogCallback(.{ .handler = diagnostics.logRecord }, null);
     defer maplibre.clearLogCallback(null) catch {};
 
+    if (build_options.supports_opengl and builtin.os.tag == .linux) {
+        _ = c.SDL_SetHint(c.SDL_HINT_VIDEO_FORCE_EGL, "1");
+    }
+
     if (!c.SDL_Init(c.SDL_INIT_VIDEO)) {
         std.debug.print("SDL_Init failed: {s}\n", .{std.mem.span(c.SDL_GetError())});
         return types.AppError.SdlInitFailed;
     }
     defer c.SDL_Quit();
+
+    if (build_options.supports_opengl and builtin.os.tag == .linux) {
+        if (!c.SDL_GL_SetAttribute(c.SDL_GL_CONTEXT_PROFILE_MASK, c.SDL_GL_CONTEXT_PROFILE_ES) or
+            !c.SDL_GL_SetAttribute(c.SDL_GL_CONTEXT_MAJOR_VERSION, 3) or
+            !c.SDL_GL_SetAttribute(c.SDL_GL_CONTEXT_MINOR_VERSION, 0))
+        {
+            std.debug.print("SDL_GL_SetAttribute failed: {s}\n", .{std.mem.span(c.SDL_GetError())});
+            return types.AppError.BackendSetupFailed;
+        }
+    }
 
     const window_flags = Backend.window_flags |
         c.SDL_WINDOW_RESIZABLE |
@@ -129,16 +144,31 @@ pub fn main(init_args: std.process.Init) !void {
 
 fn logAndValidateNativeRenderBackend() !void {
     const support = maplibre.supportedRenderBackends();
-    std.debug.print("native render backends: {s}\n", .{renderBackendSupportLabel(support)});
+    var support_label_buffer: [32]u8 = undefined;
+    std.debug.print("native render backends: {s}\n", .{renderBackendSupportLabel(&support_label_buffer, support)});
     if (build_options.supports_metal and !support.metal) return error.NativeRenderBackendMismatch;
+    if (build_options.supports_opengl and !support.opengl) return error.NativeRenderBackendMismatch;
     if (build_options.supports_vulkan and !support.vulkan) return error.NativeRenderBackendMismatch;
 }
 
-fn renderBackendSupportLabel(support: maplibre.RenderBackendSupport) []const u8 {
-    if (support.metal and support.vulkan) return "metal,vulkan";
-    if (support.metal) return "metal";
-    if (support.vulkan) return "vulkan";
-    return "none";
+fn renderBackendSupportLabel(buffer: []u8, support: maplibre.RenderBackendSupport) []const u8 {
+    var len: usize = 0;
+    var has_backend = false;
+    if (support.metal) appendBackendLabel(buffer, &len, &has_backend, "metal");
+    if (support.opengl) appendBackendLabel(buffer, &len, &has_backend, "opengl");
+    if (support.vulkan) appendBackendLabel(buffer, &len, &has_backend, "vulkan");
+    if (!has_backend) return "none";
+    return buffer[0..len];
+}
+
+fn appendBackendLabel(buffer: []u8, len: *usize, has_backend: *bool, label: []const u8) void {
+    if (has_backend.*) {
+        buffer[len.*] = ',';
+        len.* += 1;
+    }
+    @memcpy(buffer[len.*..][0..label.len], label);
+    len.* += label.len;
+    has_backend.* = true;
 }
 
 fn parseRenderTargetMode(init_args: std.process.Init) !?types.RenderTargetMode {
@@ -184,9 +214,9 @@ fn printUsage() void {
         \\Usage: zig build run -- --render-target=<mode>
         \\
         \\Modes:
-        \\  owned-texture     MapLibre-owned Metal/Vulkan texture APIs
-        \\  borrowed-texture  caller-owned Metal/Vulkan texture APIs
-        \\  native-surface  Metal/Vulkan native surface presentation APIs
+        \\  owned-texture     session-owned texture render target
+        \\  borrowed-texture  caller-owned texture render target
+        \\  native-surface    native surface render target
         \\
     , .{});
 }

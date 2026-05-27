@@ -5,6 +5,7 @@
 
 #include "c_api/boundary.hpp"
 #include "maplibre_native_c.h"
+#include "render/render_session_common.hpp"
 #include "render/texture_session.hpp"
 
 auto mln_metal_owned_texture_descriptor_default(void) noexcept
@@ -27,12 +28,26 @@ auto mln_vulkan_borrowed_texture_descriptor_default(void) noexcept
   return mln::core::vulkan_borrowed_texture_descriptor_default();
 }
 
+auto mln_opengl_owned_texture_descriptor_default(void) noexcept
+  -> mln_opengl_owned_texture_descriptor {
+  return mln::core::opengl_owned_texture_descriptor_default();
+}
+
+auto mln_opengl_borrowed_texture_descriptor_default(void) noexcept
+  -> mln_opengl_borrowed_texture_descriptor {
+  return mln::core::opengl_borrowed_texture_descriptor_default();
+}
+
 auto mln_texture_image_info_default(void) noexcept -> mln_texture_image_info {
   return mln::core::texture_image_info_default();
 }
 
 auto mln_supported_render_backend_mask(void) noexcept -> uint32_t {
   return mln::core::supported_render_backend_mask();
+}
+
+auto mln_opengl_supported_context_provider_mask(void) noexcept -> uint32_t {
+  return mln::core::opengl_supported_context_provider_mask();
 }
 
 auto mln_metal_owned_texture_attach(
@@ -70,6 +85,26 @@ auto mln_vulkan_borrowed_texture_attach(
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::vulkan_borrowed_texture_attach(
+      map, descriptor, out_session
+    );
+  });
+}
+
+auto mln_opengl_owned_texture_attach(
+  mln_map* map, const mln_opengl_owned_texture_descriptor* descriptor,
+  mln_render_session** out_session
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::opengl_owned_texture_attach(map, descriptor, out_session);
+  });
+}
+
+auto mln_opengl_borrowed_texture_attach(
+  mln_map* map, const mln_opengl_borrowed_texture_descriptor* descriptor,
+  mln_render_session** out_session
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::opengl_borrowed_texture_attach(
       map, descriptor, out_session
     );
   });
@@ -115,5 +150,21 @@ auto mln_vulkan_owned_texture_release_frame(
 ) noexcept -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {
     return mln::core::vulkan_owned_texture_release_frame(session, frame);
+  });
+}
+
+auto mln_opengl_owned_texture_acquire_frame(
+  mln_render_session* session, mln_opengl_owned_texture_frame* out_frame
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::opengl_owned_texture_acquire_frame(session, out_frame);
+  });
+}
+
+auto mln_opengl_owned_texture_release_frame(
+  mln_render_session* session, const mln_opengl_owned_texture_frame* frame
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::opengl_owned_texture_release_frame(session, frame);
   });
 }
