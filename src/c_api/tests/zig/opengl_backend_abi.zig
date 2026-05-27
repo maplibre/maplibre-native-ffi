@@ -13,6 +13,9 @@ const c = support.c;
 const wgl_test = if (builtin.os.tag == .windows) @import("wgl_test_context") else struct {};
 
 const gl_texture_2d = if (builtin.os.tag == .windows) gl.TEXTURE_2D else 0x0de1;
+const gl_rgba8 = if (builtin.os.tag == .windows) gl.RGBA8 else 0x8058;
+const gl_rgba = if (builtin.os.tag == .windows) gl.RGBA else 0x1908;
+const gl_unsigned_byte = if (builtin.os.tag == .windows) gl.UNSIGNED_BYTE else 0x1401;
 
 const fake_handle: *anyopaque = @ptrFromInt(1);
 
@@ -286,6 +289,55 @@ test "OpenGL borrowed texture rejects unsafe raw descriptors" {
     try testing.expectEqual(@as(?*c.mln_render_session, null), texture);
 }
 
+test "OpenGL EGL owned texture renders through raw C ABI" {
+    if (!build_options.supports_opengl or builtin.os.tag != .linux) return error.SkipZigTest;
+
+    var egl_context = try support.OwnedTextureAttachContext.init();
+    defer egl_context.deinit();
+
+    const runtime = try support.createRuntime();
+    defer support.destroyRuntime(runtime);
+    const map = try support.createMap(runtime);
+    defer support.destroyMap(map);
+
+    var descriptor = c.mln_opengl_owned_texture_descriptor_default();
+    descriptor.extent.width = 256;
+    descriptor.extent.height = 256;
+    descriptor.extent.scale_factor = 1.0;
+    descriptor.context = egl_context.descriptor();
+
+    var session: ?*c.mln_render_session = null;
+    try testing.expectEqual(c.MLN_STATUS_OK, c.mln_opengl_owned_texture_attach(map, &descriptor, &session));
+    const handle = session orelse return error.SessionAttachFailed;
+    defer testing.expectEqual(c.MLN_STATUS_OK, c.mln_render_session_destroy(handle)) catch @panic("render session destroy failed");
+
+    try testing.expectEqual(c.MLN_STATUS_OK, c.mln_map_set_style_json(map, raw_render_style_json));
+    try testing.expectEqual(c.MLN_STATUS_OK, c.mln_map_request_repaint(map));
+    try waitForRenderedFrame(runtime, map, handle);
+
+    var image_info = c.mln_texture_image_info_default();
+    try testing.expectEqual(c.MLN_STATUS_INVALID_ARGUMENT, c.mln_texture_read_premultiplied_rgba8(handle, null, 0, &image_info));
+    try testing.expectEqual(@as(u32, 256), image_info.width);
+    try testing.expectEqual(@as(u32, 256), image_info.height);
+    try testing.expectEqual(@as(u32, 256 * 4), image_info.stride);
+
+    const pixels = try testing.allocator.alloc(u8, image_info.byte_length);
+    defer testing.allocator.free(pixels);
+    try testing.expectEqual(c.MLN_STATUS_OK, c.mln_texture_read_premultiplied_rgba8(handle, pixels.ptr, pixels.len, &image_info));
+    try testing.expect(hasNonZeroByte(pixels));
+
+    var frame = emptyOpenGLOwnedTextureFrame();
+    try testing.expectEqual(c.MLN_STATUS_OK, c.mln_opengl_owned_texture_acquire_frame(handle, &frame));
+    try testing.expectEqual(@as(u32, 256), frame.width);
+    try testing.expectEqual(@as(u32, 256), frame.height);
+    try testing.expectEqual(@as(u32, gl_texture_2d), frame.target);
+    try testing.expectEqual(@as(u32, gl_rgba8), frame.internal_format);
+    try testing.expectEqual(@as(u32, gl_rgba), frame.format);
+    try testing.expectEqual(@as(u32, gl_unsigned_byte), frame.type);
+    try testing.expect(frame.texture != 0);
+    try testing.expectEqual(c.MLN_STATUS_OK, c.mln_opengl_owned_texture_release_frame(handle, &frame));
+}
+
 test "OpenGL WGL owned texture renders through raw C ABI" {
     if (!build_options.supports_opengl or builtin.os.tag != .windows) return error.SkipZigTest;
 
@@ -359,9 +411,9 @@ test "OpenGL WGL owned texture renders through raw C ABI" {
     try testing.expectEqual(@as(u32, 256), frame.width);
     try testing.expectEqual(@as(u32, 256), frame.height);
     try testing.expectEqual(@as(u32, gl_texture_2d), frame.target);
-    try testing.expectEqual(@as(u32, gl.RGBA8), frame.internal_format);
-    try testing.expectEqual(@as(u32, gl.RGBA), frame.format);
-    try testing.expectEqual(@as(u32, gl.UNSIGNED_BYTE), frame.type);
+    try testing.expectEqual(@as(u32, gl_rgba8), frame.internal_format);
+    try testing.expectEqual(@as(u32, gl_rgba), frame.format);
+    try testing.expectEqual(@as(u32, gl_unsigned_byte), frame.type);
     try testing.expect(frame.texture != 0);
     try testing.expectEqual(c.MLN_STATUS_INVALID_STATE, c.mln_texture_read_premultiplied_rgba8(handle, pixels.ptr, pixels.len, &image_info));
     try testing.expectEqual(c.MLN_STATUS_OK, c.mln_opengl_owned_texture_release_frame(handle, &frame));

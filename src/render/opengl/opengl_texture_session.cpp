@@ -32,6 +32,9 @@
 #include "diagnostics/diagnostics.hpp"
 #include "map/map.hpp"
 #include "maplibre_native_c/base.h"
+#if defined(__linux__)
+#include "render/opengl/egl_common.hpp"
+#endif
 #include "render/opengl/wgl_common.hpp"
 #include "render/render_session_common.hpp"
 #include "render/texture_session.hpp"
@@ -465,7 +468,12 @@ class OpenGLTextureBackend final : public mbgl::gl::RendererBackend,
         return reinterpret_cast<mbgl::gl::ProcAddress>(proc);
       }
     }
-    return reinterpret_cast<mbgl::gl::ProcAddress>(eglGetProcAddress(name));
+    if (auto* proc = eglGetProcAddress(name); proc != nullptr) {
+      return reinterpret_cast<mbgl::gl::ProcAddress>(proc);
+    }
+    return reinterpret_cast<mbgl::gl::ProcAddress>(
+      mln::core::opengl::get_egl_client_library_proc_address(name, active_api_)
+    );
 #else
     (void)name;
     return nullptr;

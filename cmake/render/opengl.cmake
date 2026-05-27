@@ -15,7 +15,7 @@ function(mln_configure_opengl_backend target)
       APPEND MLN_FFI_VENDOR_OPENGL_SOURCES
       ${MLN_SOURCE_DIR}/platform/linux/src/gl_functions.cpp
       ${MLN_SOURCE_DIR}/platform/linux/src/headless_backend_egl.cpp)
-    target_link_libraries(${target} PRIVATE OpenGL::EGL)
+    target_link_libraries(${target} PRIVATE OpenGL::EGL ${CMAKE_DL_LIBS})
   elseif(MLN_FFI_OPENGL_CONTEXT_PROVIDER STREQUAL "wgl")
     find_package(OpenGL REQUIRED)
     list(APPEND MLN_FFI_VENDOR_OPENGL_SOURCES
