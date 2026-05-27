@@ -15,12 +15,6 @@ const egl = if (build_options.supports_opengl and builtin.os.tag == .linux) @cIm
     @cInclude("EGL/egl.h");
 }) else struct {};
 
-const egl_platform_surfaceless_mesa = 0x31dd;
-const EglGetPlatformDisplayExt = if (build_options.supports_opengl and builtin.os.tag == .linux)
-    *const fn (egl.EGLenum, ?*anyopaque, ?*const egl.EGLint) callconv(.c) egl.EGLDisplay
-else
-    void;
-
 const wgl_test = if (build_options.supports_opengl and builtin.os.tag == .windows) @import("wgl_test_context") else struct {};
 
 extern "c" fn MTLCreateSystemDefaultDevice() ?*anyopaque;
@@ -186,10 +180,7 @@ const OpenGLAttachContext = if (build_options.supports_opengl and builtin.os.tag
     }
 
     fn initDisplay() !egl.EGLDisplay {
-        const get_platform_display: EglGetPlatformDisplayExt = @ptrCast(
-            egl.eglGetProcAddress("eglGetPlatformDisplayEXT") orelse return error.EglUnavailable,
-        );
-        return initializeDisplay(get_platform_display(egl_platform_surfaceless_mesa, null, null));
+        return initializeDisplay(egl.eglGetDisplay(egl.EGL_DEFAULT_DISPLAY));
     }
 
     fn initializeDisplay(display: egl.EGLDisplay) !egl.EGLDisplay {
