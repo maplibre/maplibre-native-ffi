@@ -1,0 +1,30 @@
+{
+  "name": "maplibre-native-ffi",
+  "image": "ghcr.io/maplibre/maplibre-native-ffi/devcontainer:main",
+  "remoteUser": "dev",
+  "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
+  "containerEnv": {
+    "EGL_PLATFORM": "surfaceless",
+    "LIBGL_ALWAYS_SOFTWARE": "true"
+  },
+  "postCreateCommand": "mise trust -y && mise install",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "dprint.dprint",
+        "hverlin.mise-vscode",
+        "okerew.shader-with-metal",
+        "ziglang.vscode-zig",
+        "llvm-vs-code-extensions.vscode-clangd",
+        "bierner.markdown-mermaid",
+        "astro-build.astro-vscode",
+        "unifiedjs.vscode-mdx",
+        "tombi-toml.tombi",
+        "vscjava.vscode-gradle",
+        "redhat.java",
+        "ms-python.python",
+        "charliermarsh.ruff"
+      ]
+    }
+  }
+}

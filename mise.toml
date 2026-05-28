@@ -19,7 +19,7 @@ unix_default_inline_shell_args = "pixi run --locked -x bash -e -lc"
 activate_aggressive = true
 
 [monorepo]
-config_roots = ["bindings/*", "examples/*", "docs"]
+config_roots = [".devcontainer", "bindings/*", "examples/*", "docs"]
 
 [tools]
 # General tooling
