@@ -23,10 +23,20 @@ runs:
     - name: Wire sccache into CMake
       shell: bash
       run: |
+        # Use the resolved sccache binary (required on Windows for .exe paths).
+        launcher="${SCCACHE_PATH:-sccache}"
         {
           echo "SCCACHE_GHA_ENABLED=true"
-          echo "CMAKE_C_COMPILER_LAUNCHER=sccache"
-          echo "CMAKE_CXX_COMPILER_LAUNCHER=sccache"
+          # Isolate GHA cache namespaces per matrix leg. All variants previously
+          # shared one bucket, which thrashed the cache API when eight jobs wrote
+          # concurrently and prevented new backends (EGL/WGL) from warming up.
+          if [ -n "${MISE_ENV:-}" ]; then
+            echo "SCCACHE_GHA_VERSION=${MISE_ENV}"
+          fi
+          # Normalize absolute checkout paths in cache keys across worktrees.
+          echo "SCCACHE_BASEDIRS=${GITHUB_WORKSPACE}"
+          echo "CMAKE_C_COMPILER_LAUNCHER=${launcher}"
+          echo "CMAKE_CXX_COMPILER_LAUNCHER=${launcher}"
         } >> "$GITHUB_ENV"
 
     - name: Use software OpenGL on Linux

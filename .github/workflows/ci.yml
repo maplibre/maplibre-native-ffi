@@ -65,6 +65,35 @@ jobs:
       - run: mise run configure
       - run: mise run test
 
+      - name: Check sccache stats
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          sccache_bin="${SCCACHE_PATH:-sccache}"
+          "$sccache_bin" --show-stats
+          json="$("$sccache_bin" --show-stats --stats-format json)"
+          python3 -c '
+          import json, os, sys
+          stats = json.loads(sys.argv[1])["stats"]
+          compile_requests = stats.get("compile_requests", 0)
+          cache_writes = stats.get("cache_writes", 0)
+          write_errors = stats.get("cache_write_errors", 0)
+          hits = sum(stats.get("cache_hits", {}).get("counts", {}).values())
+          if compile_requests == 0:
+              sys.exit(0)
+          hit_rate = hits / compile_requests
+          print(
+              f"sccache summary: {hits}/{compile_requests} hits ({hit_rate:.1%}), "
+              f"{cache_writes} writes, {write_errors} write errors"
+          )
+          # Persistent write failures mean the remote cache never warms.
+          if write_errors > 0 and cache_writes == 0:
+              raise SystemExit(
+                  "sccache could not write to the GHA cache backend on this runner"
+              )
+          ' "$json"
+
       - name: Build Java FFM binding
         run: mise run //bindings/java-ffm:build
       - name: Build Java JNI binding
