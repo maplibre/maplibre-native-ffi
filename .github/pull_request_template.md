@@ -10,8 +10,11 @@
 
 <!-- Remove this section if disclosure does not apply; see AI_POLICY.md. -->
 
-- **Tool:** <!-- product and mode, e.g. Cursor cloud agent, Copilot inline -->
+- **Tool:** <!-- e.g. Codex, OpenCode, Claude Code, Cursor -->
 - **Models:**
 - **Scope:** <!-- what the AI did vs what you verified and own -->
 - **Context:**
-  <!-- how AI was used; links to plans, skills, or session exports if any — see AI_POLICY.md -->
+  <!-- How AI shaped this PR: workflow (planning, loops, review), repo setup
+  (AGENTS.md, rules, skills), artifact links (plan/spec gist), optional session
+  export. Not a transcript or full system prompt. "Ad-hoc; no artifacts kept" is
+  fine. -->
