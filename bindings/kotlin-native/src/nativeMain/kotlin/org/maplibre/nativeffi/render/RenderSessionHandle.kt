@@ -25,6 +25,12 @@ import org.maplibre.nativeffi.internal.c.mln_metal_owned_texture_attach
 import org.maplibre.nativeffi.internal.c.mln_metal_owned_texture_frame
 import org.maplibre.nativeffi.internal.c.mln_metal_owned_texture_release_frame
 import org.maplibre.nativeffi.internal.c.mln_metal_surface_attach
+import org.maplibre.nativeffi.internal.c.mln_opengl_borrowed_texture_attach
+import org.maplibre.nativeffi.internal.c.mln_opengl_owned_texture_acquire_frame
+import org.maplibre.nativeffi.internal.c.mln_opengl_owned_texture_attach
+import org.maplibre.nativeffi.internal.c.mln_opengl_owned_texture_frame
+import org.maplibre.nativeffi.internal.c.mln_opengl_owned_texture_release_frame
+import org.maplibre.nativeffi.internal.c.mln_opengl_surface_attach
 import org.maplibre.nativeffi.internal.c.mln_render_session_clear_data
 import org.maplibre.nativeffi.internal.c.mln_render_session_destroy
 import org.maplibre.nativeffi.internal.c.mln_render_session_detach
@@ -278,6 +284,24 @@ private constructor(private val map: MapHandle, handle: CPointer<mln_render_sess
     }
   }
 
+  public fun acquireOpenGLOwnedTextureFrame(): OpenGLOwnedTextureFrameHandle {
+    val frame = nativeHeap.alloc<mln_opengl_owned_texture_frame>()
+    frame.size = sizeOf<mln_opengl_owned_texture_frame>().toUInt()
+    try {
+      Status.check(mln_opengl_owned_texture_acquire_frame(state.requireLive(), frame.ptr))
+      val scope = FrameScope()
+      return OpenGLOwnedTextureFrameHandle(
+        this,
+        frame.ptr,
+        scope,
+        openglOwnedTextureFrame(frame, scope),
+      )
+    } catch (error: Throwable) {
+      nativeHeap.free(frame.rawPtr)
+      throw error
+    }
+  }
+
   override fun close() {
     state.closeOnce(::mln_render_session_destroy)
   }
@@ -296,6 +320,10 @@ private constructor(private val map: MapHandle, handle: CPointer<mln_render_sess
 
   internal fun releaseVulkanFrame(frame: CPointer<mln_vulkan_owned_texture_frame>) {
     Status.check(mln_vulkan_owned_texture_release_frame(state.requireLive(), frame))
+  }
+
+  internal fun releaseOpenGLFrame(frame: CPointer<mln_opengl_owned_texture_frame>) {
+    Status.check(mln_opengl_owned_texture_release_frame(state.requireLive(), frame))
   }
 
   private fun metalOwnedTextureFrame(
@@ -330,6 +358,24 @@ private constructor(private val map: MapHandle, handle: CPointer<mln_render_sess
       scopedPointer(value.device, scope),
       value.format.toInt(),
       value.layout.toInt(),
+    )
+
+  private fun openglOwnedTextureFrame(
+    value: mln_opengl_owned_texture_frame,
+    scope: FrameScope,
+  ): OpenGLOwnedTextureFrame =
+    OpenGLOwnedTextureFrame(
+      scope,
+      uint64BitsToLong(value.generation),
+      checkedInt(value.width, "OpenGL frame width"),
+      checkedInt(value.height, "OpenGL frame height"),
+      value.scale_factor,
+      uint64BitsToLong(value.frame_id),
+      checkedInt(value.texture, "OpenGL texture"),
+      checkedInt(value.target, "OpenGL texture target"),
+      checkedInt(value.internal_format, "OpenGL internal format"),
+      checkedInt(value.format, "OpenGL format"),
+      checkedInt(value.type, "OpenGL type"),
     )
 
   private fun checkedInt(value: UInt, name: String): Int {
@@ -410,6 +456,38 @@ private constructor(private val map: MapHandle, handle: CPointer<mln_render_sess
       RenderSessionHandle(map, requireNotNull(outSession.value))
     }
 
+    public fun attachOpenGLOwnedTexture(
+      map: MapHandle,
+      descriptor: OpenGLOwnedTextureDescriptor,
+    ): RenderSessionHandle = memScoped {
+      val outSession = alloc<CPointerVarOf<CPointer<mln_render_session>>>()
+      outSession.value = null
+      Status.check(
+        mln_opengl_owned_texture_attach(
+          map.nativeHandle(),
+          RenderStructs.openglOwnedTextureDescriptor(descriptor, this),
+          outSession.ptr,
+        )
+      )
+      RenderSessionHandle(map, requireNotNull(outSession.value))
+    }
+
+    public fun attachOpenGLBorrowedTexture(
+      map: MapHandle,
+      descriptor: OpenGLBorrowedTextureDescriptor,
+    ): RenderSessionHandle = memScoped {
+      val outSession = alloc<CPointerVarOf<CPointer<mln_render_session>>>()
+      outSession.value = null
+      Status.check(
+        mln_opengl_borrowed_texture_attach(
+          map.nativeHandle(),
+          RenderStructs.openglBorrowedTextureDescriptor(descriptor, this),
+          outSession.ptr,
+        )
+      )
+      RenderSessionHandle(map, requireNotNull(outSession.value))
+    }
+
     public fun attachMetalSurface(
       map: MapHandle,
       descriptor: MetalSurfaceDescriptor,
@@ -436,6 +514,22 @@ private constructor(private val map: MapHandle, handle: CPointer<mln_render_sess
         mln_vulkan_surface_attach(
           map.nativeHandle(),
           RenderStructs.vulkanSurfaceDescriptor(descriptor, this),
+          outSession.ptr,
+        )
+      )
+      RenderSessionHandle(map, requireNotNull(outSession.value))
+    }
+
+    public fun attachOpenGLSurface(
+      map: MapHandle,
+      descriptor: OpenGLSurfaceDescriptor,
+    ): RenderSessionHandle = memScoped {
+      val outSession = alloc<CPointerVarOf<CPointer<mln_render_session>>>()
+      outSession.value = null
+      Status.check(
+        mln_opengl_surface_attach(
+          map.nativeHandle(),
+          RenderStructs.openglSurfaceDescriptor(descriptor, this),
           outSession.ptr,
         )
       )

@@ -14,6 +14,7 @@ import org.maplibre.nativeffi.internal.c.mln_lat_lng_for_projected_meters
 import org.maplibre.nativeffi.internal.c.mln_log_set_async_severity_mask
 import org.maplibre.nativeffi.internal.c.mln_network_status_get
 import org.maplibre.nativeffi.internal.c.mln_network_status_set
+import org.maplibre.nativeffi.internal.c.mln_opengl_supported_context_provider_mask
 import org.maplibre.nativeffi.internal.c.mln_projected_meters
 import org.maplibre.nativeffi.internal.c.mln_projected_meters_for_lat_lng
 import org.maplibre.nativeffi.internal.c.mln_supported_render_backend_mask
@@ -22,6 +23,7 @@ import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.internal.struct.CoreStructs
 import org.maplibre.nativeffi.log.LogCallback
 import org.maplibre.nativeffi.log.LogSeverity
+import org.maplibre.nativeffi.render.OpenGLContextProvider
 import org.maplibre.nativeffi.render.RenderBackend
 import org.maplibre.nativeffi.runtime.NetworkStatus
 
@@ -40,6 +42,10 @@ public class Maplibre private constructor() {
     /** Returns the render backends compiled into the loaded native library. */
     public fun supportedRenderBackends(): Set<RenderBackend> =
       RenderBackend.fromMask(mln_supported_render_backend_mask())
+
+    /** Returns the OpenGL context providers compiled into the loaded native library. */
+    public fun supportedOpenGLContextProviders(): Set<OpenGLContextProvider> =
+      OpenGLContextProvider.fromMask(mln_opengl_supported_context_provider_mask())
 
     /** Reads Maplibre Native's process-global network status. */
     public fun networkStatus(): NetworkStatus = memScoped {

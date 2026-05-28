@@ -6,11 +6,16 @@ import kotlin.test.assertFalse
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.pointed
+import org.maplibre.nativeffi.render.EglContextDescriptor
 import org.maplibre.nativeffi.render.MetalBorrowedTextureDescriptor
 import org.maplibre.nativeffi.render.MetalContextDescriptor
 import org.maplibre.nativeffi.render.MetalOwnedTextureDescriptor
 import org.maplibre.nativeffi.render.MetalSurfaceDescriptor
 import org.maplibre.nativeffi.render.NativePointer
+import org.maplibre.nativeffi.render.OpenGLBorrowedTextureDescriptor
+import org.maplibre.nativeffi.render.OpenGLContextProvider
+import org.maplibre.nativeffi.render.OpenGLOwnedTextureDescriptor
+import org.maplibre.nativeffi.render.OpenGLSurfaceDescriptor
 import org.maplibre.nativeffi.render.RenderBackend
 import org.maplibre.nativeffi.render.RenderTargetExtent
 import org.maplibre.nativeffi.render.VulkanBorrowedTextureDescriptor
@@ -21,7 +26,14 @@ import org.maplibre.nativeffi.render.VulkanSurfaceDescriptor
 class RenderStructsTest {
   @Test
   fun renderBackendMasksRoundTrip() {
-    assertEquals(setOf(RenderBackend.METAL, RenderBackend.VULKAN), RenderBackend.fromMask(3U))
+    assertEquals(
+      setOf(RenderBackend.METAL, RenderBackend.VULKAN, RenderBackend.OPENGL),
+      RenderBackend.fromMask(7U),
+    )
+    assertEquals(
+      setOf(OpenGLContextProvider.WGL, OpenGLContextProvider.EGL),
+      OpenGLContextProvider.fromMask(3U),
+    )
     assertEquals(emptySet(), RenderBackend.fromMask(0U))
   }
 
@@ -74,6 +86,8 @@ class RenderStructsTest {
           NativePointer.ofAddress(0x30L),
           NativePointer.ofAddress(0x40L),
           7,
+          NativePointer.ofAddress(0x41L),
+          NativePointer.ofAddress(0x42L),
         )
       val borrowed =
         RenderStructs.vulkanBorrowedTextureDescriptor(
@@ -91,6 +105,8 @@ class RenderStructsTest {
           .pointed
       assertFalse(borrowed.context.instance == null)
       assertEquals(7U, borrowed.context.graphics_queue_family_index)
+      assertFalse(borrowed.context.get_instance_proc_addr == null)
+      assertFalse(borrowed.context.get_device_proc_addr == null)
       assertEquals(44U, borrowed.format)
       assertEquals(2U, borrowed.final_layout)
 
@@ -100,6 +116,57 @@ class RenderStructsTest {
             this,
           )
           .pointed
+      assertFalse(surface.surface == null)
+    }
+  }
+
+  @Test
+  fun openglDescriptorsMaterializeWglAndEglContexts() {
+    memScoped {
+      val extent = RenderTargetExtent(320, 240, 1.5)
+      val wglContext =
+        org.maplibre.nativeffi.render.WglContextDescriptor(
+          NativePointer.ofAddress(0x10L),
+          NativePointer.ofAddress(0x20L),
+          NativePointer.ofAddress(0x30L),
+        )
+      val owned =
+        RenderStructs.openglOwnedTextureDescriptor(
+            OpenGLOwnedTextureDescriptor(extent, wglContext),
+            this,
+          )
+          .pointed
+      assertEquals(320U, owned.extent.width)
+      assertFalse(owned.context.data.wgl.device_context == null)
+      assertFalse(owned.context.data.wgl.share_context == null)
+      assertFalse(owned.context.data.wgl.get_proc_address == null)
+
+      val borrowed =
+        RenderStructs.openglBorrowedTextureDescriptor(
+            OpenGLBorrowedTextureDescriptor(extent, wglContext, texture = 17, target = 3553),
+            this,
+          )
+          .pointed
+      assertEquals(17U, borrowed.texture)
+      assertEquals(3553U, borrowed.target)
+
+      val eglContext =
+        EglContextDescriptor(
+          NativePointer.ofAddress(0x40L),
+          NativePointer.ofAddress(0x50L),
+          NativePointer.ofAddress(0x60L),
+          NativePointer.ofAddress(0x70L),
+        )
+      val surface =
+        RenderStructs.openglSurfaceDescriptor(
+            OpenGLSurfaceDescriptor(extent, eglContext, NativePointer.ofAddress(0x80L)),
+            this,
+          )
+          .pointed
+      assertFalse(surface.context.data.egl.display == null)
+      assertFalse(surface.context.data.egl.config == null)
+      assertFalse(surface.context.data.egl.share_context == null)
+      assertFalse(surface.context.data.egl.get_proc_address == null)
       assertFalse(surface.surface == null)
     }
   }

@@ -7,6 +7,8 @@ public class VulkanContextDescriptor(
   public var device: NativePointer = NativePointer.NULL,
   public var graphicsQueue: NativePointer = NativePointer.NULL,
   graphicsQueueFamilyIndex: Int = 0,
+  public var getInstanceProcAddr: NativePointer = NativePointer.NULL,
+  public var getDeviceProcAddr: NativePointer = NativePointer.NULL,
 ) {
   public var graphicsQueueFamilyIndex: Int = graphicsQueueFamilyIndex
     set(value) {
@@ -35,4 +37,19 @@ public class VulkanContextDescriptor(
   public fun graphicsQueueFamilyIndex(index: Int): VulkanContextDescriptor = apply {
     this.graphicsQueueFamilyIndex = index
   }
+
+  public fun getInstanceProcAddr(getInstanceProcAddr: NativePointer): VulkanContextDescriptor =
+    apply {
+      this.getInstanceProcAddr = getInstanceProcAddr
+    }
+
+  public fun getDeviceProcAddr(getDeviceProcAddr: NativePointer): VulkanContextDescriptor = apply {
+    this.getDeviceProcAddr = getDeviceProcAddr
+  }
+
+  public fun procAddresses(
+    getInstanceProcAddr: NativePointer,
+    getDeviceProcAddr: NativePointer,
+  ): VulkanContextDescriptor =
+    getInstanceProcAddr(getInstanceProcAddr).getDeviceProcAddr(getDeviceProcAddr)
 }

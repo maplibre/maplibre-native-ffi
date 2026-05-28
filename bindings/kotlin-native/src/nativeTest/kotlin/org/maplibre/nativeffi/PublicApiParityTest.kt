@@ -6,6 +6,7 @@ import org.maplibre.nativeffi.log.LogEvent
 import org.maplibre.nativeffi.log.LogSeverity
 import org.maplibre.nativeffi.map.MapMode
 import org.maplibre.nativeffi.offline.OfflineRegionDownloadState
+import org.maplibre.nativeffi.render.OpenGLContextProvider
 import org.maplibre.nativeffi.render.RenderBackend
 import org.maplibre.nativeffi.render.RenderMode
 import org.maplibre.nativeffi.resource.ResourceKind
@@ -17,6 +18,10 @@ class PublicApiParityTest {
     assertEquals(LogEvent.SETUP, LogEvent.fromNative(LogEvent.SETUP.nativeValue))
     assertEquals(LogSeverity.ERROR, LogSeverity.fromNative(LogSeverity.ERROR.nativeValue))
     assertEquals(setOf(RenderBackend.METAL), RenderBackend.fromMask(RenderBackend.METAL.nativeMask))
+    assertEquals(
+      setOf(OpenGLContextProvider.EGL),
+      OpenGLContextProvider.fromMask(OpenGLContextProvider.EGL.nativeMask),
+    )
     assertEquals(MapMode.STATIC, MapMode.fromNative(MapMode.STATIC.nativeValue))
     assertEquals(
       OfflineRegionDownloadState.ACTIVE,
