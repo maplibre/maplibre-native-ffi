@@ -10,6 +10,15 @@ on:
       - .github/workflows/devcontainer-image.yml
       - mise.lock
       - mise.toml
+  pull_request:
+    branches: [main]
+    paths:
+      - .devcontainer/**
+      - .mise/**
+      - .miserc.toml
+      - .github/workflows/devcontainer-image.yml
+      - mise.lock
+      - mise.toml
   workflow_dispatch:
 
 permissions:
@@ -17,8 +26,8 @@ permissions:
   packages: write
 
 concurrency:
-  group: devcontainer-image
-  cancel-in-progress: false
+  group: devcontainer-image-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   IMAGE: ghcr.io/maplibre/maplibre-native-ffi/devcontainer
@@ -42,12 +51,18 @@ jobs:
       - name: Install image tooling
         run: sudo apt-get update && sudo apt-get install --no-install-recommends --yes skopeo
       - name: Log in to GHCR
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         run: echo "${{ github.token }}" | docker login ghcr.io --username "${{ github.actor }}" --password-stdin
       - name: Build and push image
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         run: mise run //.devcontainer:build --tag "$IMAGE:main-${{ matrix.arch }}" --push
+      - name: Build image
+        if: github.ref != 'refs/heads/main' || github.event_name == 'pull_request'
+        run: mise run //.devcontainer:build --tag "maplibre-native-ffi-devcontainer:ci-${{ matrix.arch }}"
 
   manifest:
     name: manifest
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     needs: build
     timeout-minutes: 10
