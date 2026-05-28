@@ -44,7 +44,9 @@ mise install
 ```
 
 The setup hooks install project dependencies and initialize the MapLibre Native
-submodule at `third_party/maplibre-native`.
+submodule at `third_party/maplibre-native` (only vendor submodules required for
+this repo’s `mbgl-core` build; see
+`.mise/tasks/sync-maplibre-native-submodules`).
 
 Run the Zig map example as a smoke test:
 
