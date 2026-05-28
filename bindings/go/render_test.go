@@ -24,6 +24,10 @@ func TestRenderSessionNilHandleAndInvalidSurfaceDescriptor(t *testing.T) {
 	if err := nilVulkanFrame.Close(); !errors.Is(err, ErrInvalidArgument) {
 		t.Fatalf("nil VulkanOwnedTextureFrame Close() error = %v, want ErrInvalidArgument", err)
 	}
+	var nilOpenGLFrame *OpenGLOwnedTextureFrame
+	if err := nilOpenGLFrame.Close(); !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("nil OpenGLOwnedTextureFrame Close() error = %v, want ErrInvalidArgument", err)
+	}
 
 	runtime, err := NewRuntime()
 	if err != nil {
@@ -72,5 +76,23 @@ func TestRenderSessionNilHandleAndInvalidSurfaceDescriptor(t *testing.T) {
 	})
 	if !errors.Is(err, ErrInvalidArgument) && !errors.Is(err, ErrUnsupported) {
 		t.Fatalf("AttachVulkanBorrowedTexture(invalid descriptor) error = %v, want ErrInvalidArgument or ErrUnsupported", err)
+	}
+	_, err = m.AttachOpenGLSurface(OpenGLSurfaceDescriptor{
+		Extent: RenderTargetExtent{Width: 64, Height: 64, ScaleFactor: 1},
+	})
+	if !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("AttachOpenGLSurface(invalid descriptor) error = %v, want ErrInvalidArgument", err)
+	}
+	_, err = m.AttachOpenGLOwnedTexture(OpenGLOwnedTextureDescriptor{
+		Extent: RenderTargetExtent{Width: 64, Height: 64, ScaleFactor: 1},
+	})
+	if !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("AttachOpenGLOwnedTexture(invalid descriptor) error = %v, want ErrInvalidArgument", err)
+	}
+	_, err = m.AttachOpenGLBorrowedTexture(OpenGLBorrowedTextureDescriptor{
+		Extent: RenderTargetExtent{Width: 64, Height: 64, ScaleFactor: 1},
+	})
+	if !errors.Is(err, ErrInvalidArgument) {
+		t.Fatalf("AttachOpenGLBorrowedTexture(invalid descriptor) error = %v, want ErrInvalidArgument", err)
 	}
 }

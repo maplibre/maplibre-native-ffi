@@ -17,3 +17,9 @@ func CVersion() uint32 {
 func SupportedRenderBackends() RenderBackendMask {
 	return RenderBackendMask(C.mln_supported_render_backend_mask())
 }
+
+// SupportedOpenGLContextProviders returns the OpenGL context providers compiled
+// into the linked native library.
+func SupportedOpenGLContextProviders() OpenGLContextProviderMask {
+	return OpenGLContextProviderMask(C.mln_opengl_supported_context_provider_mask())
+}
