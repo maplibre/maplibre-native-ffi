@@ -3,14 +3,13 @@
 set -euo pipefail
 
 repo_root="${MLN_FFI_REPO_ROOT:-$(git rev-parse --show-toplevel)}"
-backend="${MLN_FFI_RENDER_BACKEND:-vulkan}"
 mln_path="third_party/maplibre-native"
 
 cd "$repo_root"
 
 # Paths relative to the maplibre-native submodule (not the FFI repo root).
 # Nested test/mason/glfw trees inside these repos are not fetched (submodule.recurse=false).
-core_vendor_paths=(
+vendor_paths=(
   vendor/earcut.hpp # polygon triangulation
   vendor/polylabel # polygon label placement
   vendor/protozero # MVT / glyph PBF
@@ -37,23 +36,10 @@ core_vendor_paths=(
   vendor/maplibre-native-base/deps/pixelmatch-cpp # configure-time base dep
   vendor/freetype # text shaping (MLN_TEXT_SHAPING_HARFBUZZ)
   vendor/harfbuzz
-)
-
-vulkan_vendor_paths=(
   vendor/Vulkan-Headers # Vulkan headers + Zig bindgen include path
   vendor/VulkanMemoryAllocator
   vendor/glslang # SPIR-V toolchain (MLN_WITH_VULKAN)
 )
-
-vendor_paths=("${core_vendor_paths[@]}")
-case "$backend" in
-  vulkan) vendor_paths+=("${vulkan_vendor_paths[@]}") ;;
-  metal | opengl) ;;
-  *)
-    echo "sync-submodules: unknown MLN_FFI_RENDER_BACKEND=$backend" >&2
-    exit 1
-    ;;
-esac
 
 # Skipped by design (full MapLibre tree only): googletest, benchmark, cpp-httplib, args,
 # zip-archive, webgpu-cpp, wgpu-native, docs/doxygen, platform/windows/vendor/vcpkg, and
