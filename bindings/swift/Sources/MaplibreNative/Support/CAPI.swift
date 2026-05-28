@@ -12,6 +12,10 @@ enum CAPI {
     mln_supported_render_backend_mask()
   }
 
+  static func supportedOpenGLContextProviderMask() -> UInt32 {
+    mln_opengl_supported_context_provider_mask()
+  }
+
   static func networkStatus() throws -> UInt32 {
     let output = try NativeMemory.withTemporary(UInt32(0)) { rawStatus in
       try checkStatus(mln_network_status_get(rawStatus))
@@ -531,6 +535,10 @@ enum CAPI {
     mln_vulkan_surface_descriptor_default()
   }
 
+  static func openGLSurfaceDescriptorDefault() -> mln_opengl_surface_descriptor {
+    mln_opengl_surface_descriptor_default()
+  }
+
   static func metalOwnedTextureDescriptorDefault() -> mln_metal_owned_texture_descriptor {
     mln_metal_owned_texture_descriptor_default()
   }
@@ -545,6 +553,14 @@ enum CAPI {
 
   static func vulkanBorrowedTextureDescriptorDefault() -> mln_vulkan_borrowed_texture_descriptor {
     mln_vulkan_borrowed_texture_descriptor_default()
+  }
+
+  static func openGLOwnedTextureDescriptorDefault() -> mln_opengl_owned_texture_descriptor {
+    mln_opengl_owned_texture_descriptor_default()
+  }
+
+  static func openGLBorrowedTextureDescriptorDefault() -> mln_opengl_borrowed_texture_descriptor {
+    mln_opengl_borrowed_texture_descriptor_default()
   }
 
   static func textureImageInfoDefault() -> mln_texture_image_info {
@@ -573,6 +589,19 @@ enum CAPI {
     }
     guard let session = output.value else {
       throw NativeStatusFailure(rawStatus: 0, diagnostic: "mln_vulkan_surface_attach returned a null session")
+    }
+    return session
+  }
+
+  static func openGLSurfaceAttach(
+    map: OpaquePointer,
+    descriptor: UnsafePointer<mln_opengl_surface_descriptor>
+  ) throws -> OpaquePointer {
+    let output = try NativeMemory.withTemporary(Optional<OpaquePointer>.none) { session in
+      try checkStatus(mln_opengl_surface_attach(map, descriptor, session))
+    }
+    guard let session = output.value else {
+      throw NativeStatusFailure(rawStatus: 0, diagnostic: "mln_opengl_surface_attach returned a null session")
     }
     return session
   }
@@ -639,6 +668,32 @@ enum CAPI {
     return session
   }
 
+  static func openGLOwnedTextureAttach(
+    map: OpaquePointer,
+    descriptor: UnsafePointer<mln_opengl_owned_texture_descriptor>
+  ) throws -> OpaquePointer {
+    let output = try NativeMemory.withTemporary(Optional<OpaquePointer>.none) { session in
+      try checkStatus(mln_opengl_owned_texture_attach(map, descriptor, session))
+    }
+    guard let session = output.value else {
+      throw NativeStatusFailure(rawStatus: 0, diagnostic: "mln_opengl_owned_texture_attach returned a null session")
+    }
+    return session
+  }
+
+  static func openGLBorrowedTextureAttach(
+    map: OpaquePointer,
+    descriptor: UnsafePointer<mln_opengl_borrowed_texture_descriptor>
+  ) throws -> OpaquePointer {
+    let output = try NativeMemory.withTemporary(Optional<OpaquePointer>.none) { session in
+      try checkStatus(mln_opengl_borrowed_texture_attach(map, descriptor, session))
+    }
+    guard let session = output.value else {
+      throw NativeStatusFailure(rawStatus: 0, diagnostic: "mln_opengl_borrowed_texture_attach returned a null session")
+    }
+    return session
+  }
+
   static func metalOwnedTextureAcquireFrame(_ session: OpaquePointer) throws -> mln_metal_owned_texture_frame {
     var frame = mln_metal_owned_texture_frame()
     frame.size = UInt32(MemoryLayout<mln_metal_owned_texture_frame>.size)
@@ -665,6 +720,20 @@ enum CAPI {
     frame: UnsafePointer<mln_vulkan_owned_texture_frame>
   ) throws {
     try checkStatus(mln_vulkan_owned_texture_release_frame(session, frame))
+  }
+
+  static func openGLOwnedTextureAcquireFrame(_ session: OpaquePointer) throws -> mln_opengl_owned_texture_frame {
+    var frame = mln_opengl_owned_texture_frame()
+    frame.size = UInt32(MemoryLayout<mln_opengl_owned_texture_frame>.size)
+    try checkStatus(mln_opengl_owned_texture_acquire_frame(session, &frame))
+    return frame
+  }
+
+  static func openGLOwnedTextureReleaseFrame(
+    _ session: OpaquePointer,
+    frame: UnsafePointer<mln_opengl_owned_texture_frame>
+  ) throws {
+    try checkStatus(mln_opengl_owned_texture_release_frame(session, frame))
   }
 
   static func renderSessionQueryRenderedFeatures(

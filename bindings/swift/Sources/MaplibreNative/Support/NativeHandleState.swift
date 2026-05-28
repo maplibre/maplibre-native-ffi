@@ -36,17 +36,21 @@ final class NativeHandleState: @unchecked Sendable {
 
   func closeOnce(_ destroy: (OpaquePointer) throws -> Void) throws {
     let livePointer = lock.withLock {
-      guard let pointer else { return nil as OpaquePointer? }
-      return pointer
+      let livePointer = pointer
+      pointer = nil
+      return livePointer
     }
     guard let livePointer else { return }
 
-    try destroy(livePointer)
-
-    lock.withLock {
-      if pointer == livePointer {
-        pointer = nil
+    do {
+      try destroy(livePointer)
+    } catch {
+      lock.withLock {
+        if pointer == nil {
+          pointer = livePointer
+        }
       }
+      throw error
     }
   }
 }

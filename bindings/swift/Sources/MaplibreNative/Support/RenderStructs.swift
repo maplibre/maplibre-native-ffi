@@ -42,19 +42,25 @@ struct NativeVulkanContextDescriptor: Equatable, Sendable {
   let deviceAddress: UInt
   let graphicsQueueAddress: UInt
   let graphicsQueueFamilyIndex: UInt32
+  let getInstanceProcAddrAddress: UInt
+  let getDeviceProcAddrAddress: UInt
 
   init(
     instanceAddress: UInt,
     physicalDeviceAddress: UInt,
     deviceAddress: UInt,
     graphicsQueueAddress: UInt,
-    graphicsQueueFamilyIndex: UInt32
+    graphicsQueueFamilyIndex: UInt32,
+    getInstanceProcAddrAddress: UInt = 0,
+    getDeviceProcAddrAddress: UInt = 0
   ) {
     self.instanceAddress = instanceAddress
     self.physicalDeviceAddress = physicalDeviceAddress
     self.deviceAddress = deviceAddress
     self.graphicsQueueAddress = graphicsQueueAddress
     self.graphicsQueueFamilyIndex = graphicsQueueFamilyIndex
+    self.getInstanceProcAddrAddress = getInstanceProcAddrAddress
+    self.getDeviceProcAddrAddress = getDeviceProcAddrAddress
   }
 
   var native: mln_vulkan_context_descriptor {
@@ -64,8 +70,78 @@ struct NativeVulkanContextDescriptor: Equatable, Sendable {
       physical_device: UnsafeMutableRawPointer(bitPattern: physicalDeviceAddress),
       device: UnsafeMutableRawPointer(bitPattern: deviceAddress),
       graphics_queue: UnsafeMutableRawPointer(bitPattern: graphicsQueueAddress),
-      graphics_queue_family_index: graphicsQueueFamilyIndex
+      graphics_queue_family_index: graphicsQueueFamilyIndex,
+      get_instance_proc_addr: UnsafeMutableRawPointer(bitPattern: getInstanceProcAddrAddress),
+      get_device_proc_addr: UnsafeMutableRawPointer(bitPattern: getDeviceProcAddrAddress)
     )
+  }
+}
+
+struct NativeWglContextDescriptor: Equatable, Sendable {
+  let deviceContextAddress: UInt
+  let shareContextAddress: UInt
+  let getProcAddressAddress: UInt
+
+  init(deviceContextAddress: UInt, shareContextAddress: UInt, getProcAddressAddress: UInt = 0) {
+    self.deviceContextAddress = deviceContextAddress
+    self.shareContextAddress = shareContextAddress
+    self.getProcAddressAddress = getProcAddressAddress
+  }
+
+  var native: mln_wgl_context_descriptor {
+    mln_wgl_context_descriptor(
+      size: UInt32(MemoryLayout<mln_wgl_context_descriptor>.size),
+      device_context: UnsafeMutableRawPointer(bitPattern: deviceContextAddress),
+      share_context: UnsafeMutableRawPointer(bitPattern: shareContextAddress),
+      get_proc_address: UnsafeMutableRawPointer(bitPattern: getProcAddressAddress)
+    )
+  }
+}
+
+struct NativeEglContextDescriptor: Equatable, Sendable {
+  let displayAddress: UInt
+  let configAddress: UInt
+  let shareContextAddress: UInt
+  let getProcAddressAddress: UInt
+
+  init(displayAddress: UInt, configAddress: UInt, shareContextAddress: UInt, getProcAddressAddress: UInt = 0) {
+    self.displayAddress = displayAddress
+    self.configAddress = configAddress
+    self.shareContextAddress = shareContextAddress
+    self.getProcAddressAddress = getProcAddressAddress
+  }
+
+  var native: mln_egl_context_descriptor {
+    mln_egl_context_descriptor(
+      size: UInt32(MemoryLayout<mln_egl_context_descriptor>.size),
+      display: UnsafeMutableRawPointer(bitPattern: displayAddress),
+      config: UnsafeMutableRawPointer(bitPattern: configAddress),
+      share_context: UnsafeMutableRawPointer(bitPattern: shareContextAddress),
+      get_proc_address: UnsafeMutableRawPointer(bitPattern: getProcAddressAddress)
+    )
+  }
+}
+
+struct NativeOpenGLContextDescriptor: Equatable, Sendable {
+  enum Platform: Equatable, Sendable {
+    case wgl(NativeWglContextDescriptor)
+    case egl(NativeEglContextDescriptor)
+  }
+
+  let platform: Platform
+
+  var native: mln_opengl_context_descriptor {
+    var descriptor = mln_opengl_context_descriptor()
+    descriptor.size = UInt32(MemoryLayout<mln_opengl_context_descriptor>.size)
+    switch platform {
+    case let .wgl(context):
+      descriptor.platform = MLN_OPENGL_CONTEXT_PLATFORM_WGL
+      descriptor.data.wgl = context.native
+    case let .egl(context):
+      descriptor.platform = MLN_OPENGL_CONTEXT_PLATFORM_EGL
+      descriptor.data.egl = context.native
+    }
+    return descriptor
   }
 }
 
@@ -106,6 +182,28 @@ struct NativeVulkanSurfaceDescriptorInput: Equatable, Sendable {
     _ body: (UnsafePointer<mln_vulkan_surface_descriptor>) throws -> Result
   ) throws -> Result {
     var descriptor = CAPI.vulkanSurfaceDescriptorDefault()
+    descriptor.extent = extent.native
+    descriptor.context = context.native
+    descriptor.surface = UnsafeMutableRawPointer(bitPattern: surfaceAddress)
+    return try withUnsafePointer(to: &descriptor, body)
+  }
+}
+
+struct NativeOpenGLSurfaceDescriptorInput: Equatable, Sendable {
+  let extent: NativeRenderTargetExtent
+  let context: NativeOpenGLContextDescriptor
+  let surfaceAddress: UInt
+
+  init(extent: NativeRenderTargetExtent, context: NativeOpenGLContextDescriptor, surfaceAddress: UInt) {
+    self.extent = extent
+    self.context = context
+    self.surfaceAddress = surfaceAddress
+  }
+
+  func withNativeDescriptor<Result>(
+    _ body: (UnsafePointer<mln_opengl_surface_descriptor>) throws -> Result
+  ) throws -> Result {
+    var descriptor = CAPI.openGLSurfaceDescriptorDefault()
     descriptor.extent = extent.native
     descriptor.context = context.native
     descriptor.surface = UnsafeMutableRawPointer(bitPattern: surfaceAddress)
@@ -226,6 +324,50 @@ struct NativeVulkanBorrowedTextureDescriptorInput: Equatable, Sendable {
   }
 }
 
+struct NativeOpenGLOwnedTextureDescriptorInput: Equatable, Sendable {
+  let extent: NativeRenderTargetExtent
+  let context: NativeOpenGLContextDescriptor
+
+  init(extent: NativeRenderTargetExtent, context: NativeOpenGLContextDescriptor) {
+    self.extent = extent
+    self.context = context
+  }
+
+  func withNativeDescriptor<Result>(
+    _ body: (UnsafePointer<mln_opengl_owned_texture_descriptor>) throws -> Result
+  ) throws -> Result {
+    var descriptor = CAPI.openGLOwnedTextureDescriptorDefault()
+    descriptor.extent = extent.native
+    descriptor.context = context.native
+    return try withUnsafePointer(to: &descriptor, body)
+  }
+}
+
+struct NativeOpenGLBorrowedTextureDescriptorInput: Equatable, Sendable {
+  let extent: NativeRenderTargetExtent
+  let context: NativeOpenGLContextDescriptor
+  let texture: UInt32
+  let target: UInt32
+
+  init(extent: NativeRenderTargetExtent, context: NativeOpenGLContextDescriptor, texture: UInt32, target: UInt32) {
+    self.extent = extent
+    self.context = context
+    self.texture = texture
+    self.target = target
+  }
+
+  func withNativeDescriptor<Result>(
+    _ body: (UnsafePointer<mln_opengl_borrowed_texture_descriptor>) throws -> Result
+  ) throws -> Result {
+    var descriptor = CAPI.openGLBorrowedTextureDescriptorDefault()
+    descriptor.extent = extent.native
+    descriptor.context = context.native
+    descriptor.texture = texture
+    descriptor.target = target
+    return try withUnsafePointer(to: &descriptor, body)
+  }
+}
+
 struct NativeMetalOwnedTextureFrame {
   var raw: mln_metal_owned_texture_frame
 
@@ -238,6 +380,14 @@ struct NativeVulkanOwnedTextureFrame {
   var raw: mln_vulkan_owned_texture_frame
 
   init(_ raw: mln_vulkan_owned_texture_frame) {
+    self.raw = raw
+  }
+}
+
+struct NativeOpenGLOwnedTextureFrame {
+  var raw: mln_opengl_owned_texture_frame
+
+  init(_ raw: mln_opengl_owned_texture_frame) {
     self.raw = raw
   }
 }

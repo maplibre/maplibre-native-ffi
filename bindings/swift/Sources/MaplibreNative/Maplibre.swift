@@ -8,6 +8,10 @@ public enum Maplibre {
     RenderBackend(rawValue: CAPI.supportedRenderBackendMask())
   }
 
+  public static func supportedOpenGLContextProviders() -> OpenGLContextProvider {
+    OpenGLContextProvider(rawValue: CAPI.supportedOpenGLContextProviderMask())
+  }
+
   public static func networkStatus() throws -> NetworkStatus {
     try mapNativeFailure {
       NetworkStatus.fromNative(try CAPI.networkStatus())

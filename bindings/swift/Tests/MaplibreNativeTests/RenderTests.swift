@@ -50,7 +50,9 @@ private final class RenderLeakBox: @unchecked Sendable {
     physicalDevice: NativePointer(bitPattern: 0x40),
     device: NativePointer(bitPattern: 0x50),
     graphicsQueue: NativePointer(bitPattern: 0x60),
-    graphicsQueueFamilyIndex: 7
+    graphicsQueueFamilyIndex: 7,
+    getInstanceProcAddr: NativePointer(bitPattern: 0x90),
+    getDeviceProcAddr: NativePointer(bitPattern: 0xA0)
   )
   let vulkanTexture = VulkanBorrowedTextureDescriptor(
     extent: extent,
@@ -67,11 +69,53 @@ private final class RenderLeakBox: @unchecked Sendable {
     #expect(UInt(bitPattern: descriptor.pointee.context.device) == 0x50)
     #expect(UInt(bitPattern: descriptor.pointee.context.graphics_queue) == 0x60)
     #expect(descriptor.pointee.context.graphics_queue_family_index == 7)
+    #expect(UInt(bitPattern: descriptor.pointee.context.get_instance_proc_addr) == 0x90)
+    #expect(UInt(bitPattern: descriptor.pointee.context.get_device_proc_addr) == 0xA0)
     #expect(UInt(bitPattern: descriptor.pointee.image) == 0x70)
     #expect(UInt(bitPattern: descriptor.pointee.image_view) == 0x80)
     #expect(descriptor.pointee.format == 44)
     #expect(descriptor.pointee.initial_layout == 1)
     #expect(descriptor.pointee.final_layout == 2)
+  }
+
+  let wgl = OpenGLContextDescriptor.wgl(
+    WglContextDescriptor(
+      deviceContext: NativePointer(bitPattern: 0x110),
+      shareContext: NativePointer(bitPattern: 0x120),
+      getProcAddress: NativePointer(bitPattern: 0x130)
+    )
+  )
+  let openGLSurface = OpenGLSurfaceDescriptor(
+    extent: extent,
+    context: wgl,
+    surface: NativePointer(bitPattern: 0x140)
+  )
+  try openGLSurface.nativeInput.withNativeDescriptor { descriptor in
+    #expect(descriptor.pointee.extent.width == 640)
+    #expect(descriptor.pointee.context.platform == MLN_OPENGL_CONTEXT_PLATFORM_WGL)
+    #expect(UInt(bitPattern: descriptor.pointee.context.data.wgl.device_context) == 0x110)
+    #expect(UInt(bitPattern: descriptor.pointee.context.data.wgl.share_context) == 0x120)
+    #expect(UInt(bitPattern: descriptor.pointee.context.data.wgl.get_proc_address) == 0x130)
+    #expect(UInt(bitPattern: descriptor.pointee.surface) == 0x140)
+  }
+
+  let egl = OpenGLContextDescriptor.egl(
+    EglContextDescriptor(
+      display: NativePointer(bitPattern: 0x210),
+      config: NativePointer(bitPattern: 0x220),
+      shareContext: NativePointer(bitPattern: 0x230),
+      getProcAddress: NativePointer(bitPattern: 0x240)
+    )
+  )
+  let openGLTexture = OpenGLBorrowedTextureDescriptor(extent: extent, context: egl, texture: 33, target: 0x0DE1)
+  try openGLTexture.nativeInput.withNativeDescriptor { descriptor in
+    #expect(descriptor.pointee.context.platform == MLN_OPENGL_CONTEXT_PLATFORM_EGL)
+    #expect(UInt(bitPattern: descriptor.pointee.context.data.egl.display) == 0x210)
+    #expect(UInt(bitPattern: descriptor.pointee.context.data.egl.config) == 0x220)
+    #expect(UInt(bitPattern: descriptor.pointee.context.data.egl.share_context) == 0x230)
+    #expect(UInt(bitPattern: descriptor.pointee.context.data.egl.get_proc_address) == 0x240)
+    #expect(descriptor.pointee.texture == 33)
+    #expect(descriptor.pointee.target == 0x0DE1)
   }
 }
 
@@ -153,6 +197,72 @@ private final class RenderLeakBox: @unchecked Sendable {
     #expect(error.kind == .invalidState)
     #expect(error.rawStatus == nil)
   }
+}
+
+@Test func openGLOwnedTextureFrameInvalidatesAfterClose() throws {
+  let releases = RenderCounter()
+  var raw = mln_opengl_owned_texture_frame()
+  raw.size = UInt32(MemoryLayout<mln_opengl_owned_texture_frame>.size)
+  raw.texture = 77
+  raw.target = 0x0DE1
+  let frame = OpenGLOwnedTextureFrameHandle(frame: NativeOpenGLOwnedTextureFrame(raw)) { _ in
+    releases.increment()
+  }
+
+  var capturedView: OpenGLOwnedTextureFrameView?
+  try frame.withBackendPointers { view in
+    capturedView = view
+    let texture = try view.texture
+    let target = try view.target
+    #expect(texture == 77)
+    #expect(target == 0x0DE1)
+  }
+  do {
+    _ = try capturedView?.texture
+    Issue.record("frame view access after scope should throw")
+  } catch let error as MaplibreError {
+    #expect(error.kind == .invalidState)
+    #expect(error.rawStatus == nil)
+  }
+
+  try frame.close()
+  try frame.close()
+
+  #expect(frame.isClosed)
+  #expect(releases.value() == 1)
+  do {
+    try frame.withBackendPointers { _ in }
+    Issue.record("closed frame access should throw")
+  } catch let error as MaplibreError {
+    #expect(error.kind == .invalidState)
+    #expect(error.rawStatus == nil)
+  }
+}
+
+@Test func ownedTextureFrameAllowsRetryAfterFailedRelease() throws {
+  struct ReleaseFailure: Error {}
+
+  let releases = RenderCounter()
+  var raw = mln_opengl_owned_texture_frame()
+  raw.size = UInt32(MemoryLayout<mln_opengl_owned_texture_frame>.size)
+  raw.texture = 77
+  raw.target = 0x0DE1
+  let frame = OpenGLOwnedTextureFrameHandle(frame: NativeOpenGLOwnedTextureFrame(raw)) { _ in
+    releases.increment()
+    if releases.value() == 1 {
+      throw ReleaseFailure()
+    }
+  }
+
+  do {
+    try frame.close()
+    Issue.record("failed release should throw")
+  } catch is ReleaseFailure {}
+
+  #expect(!frame.isClosed)
+  try frame.close()
+  #expect(frame.isClosed)
+  #expect(releases.value() == 2)
 }
 
 @Test func textureFrameDeinitReportsLeakWithoutRelease() throws {

@@ -99,6 +99,20 @@ private final class LockedBox<Value>: @unchecked Sendable {
   #expect(closes.read { $0 } == 1)
 }
 
+@Test func nativeHandleStateConcurrentCloseDestroysOnce() throws {
+  let closes = LockedBox(0)
+  let state = try NativeHandleState(typeName: "test_handle", pointer: OpaquePointer(bitPattern: 0x5))
+
+  DispatchQueue.concurrentPerform(iterations: 16) { _ in
+    try? state.closeOnce { _ in
+      closes.update { $0 += 1 }
+    }
+  }
+
+  #expect(state.isClosed)
+  #expect(closes.read { $0 } == 1)
+}
+
 @Test func nativeHandleStateAllowsRetryAfterFailedClose() throws {
   struct CloseFailure: Error {}
 

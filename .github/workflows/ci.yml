@@ -72,6 +72,9 @@ jobs:
         run: mise run //bindings/java-jni:build
       - name: Test Rust binding
         run: mise run //bindings/rust:ci
+      - name: Test Swift binding
+        if: ${{ startsWith(matrix.mise_env, 'macos-') }}
+        run: mise run //bindings/swift:test
       - name: Test Zig binding
         run: mise run //bindings/zig:ci
 
