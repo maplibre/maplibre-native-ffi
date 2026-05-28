@@ -68,7 +68,6 @@ jobs:
       - name: Build Java FFM binding
         run: mise run //bindings/java-ffm:build
       - name: Build Java JNI binding
-        if: ${{ !startsWith(matrix.mise_env, 'windows-') }}
         run: mise run //bindings/java-jni:build
       - name: Test Rust binding
         run: mise run //bindings/rust:ci
