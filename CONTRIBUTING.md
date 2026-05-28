@@ -29,7 +29,7 @@ Open a pull request when the change is ready for review and include:
 - the validation you ran;
 - platform limitations or native MapLibre behavior you checked;
 
-If you use AI assistance, review
-[MapLibre's AI Policy](https://github.com/maplibre/maplibre/blob/main/AI_POLICY.md),
-verify generated content before requesting review, and disclose AI usage in the
-pull request.
+If you use AI assistance, follow
+[MapLibre's AI Policy](https://github.com/maplibre/maplibre/blob/main/AI_POLICY.md)
+and the concise [AI contributing guide](./AI_CONTRIBUTING.md) in this
+repository.
