@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 #MISE description="Build the local devcontainer image for the host architecture."
+#USAGE flag "--tag <tag>" help="Final image tag" default="maplibre-native-ffi-devcontainer:local"
+#USAGE flag "--push" help="Push the final image instead of loading it into Docker"
 set -euo pipefail
 
 host_arch="$(uname -m)"
@@ -47,10 +49,15 @@ skopeo copy \
   "docker-archive:mise-oci.tar:maplibre-native-ffi-devcontainer-tools:local"
 docker load --input mise-oci.tar
 
+output_arg="--load"
+if [[ "${usage_push:-false}" == "true" ]]; then
+  output_arg="--push"
+fi
+
 docker buildx build \
   --platform "$platform" \
   --file Dockerfile \
   --build-context "tools=docker-image://maplibre-native-ffi-devcontainer-tools:local" \
-  --tag maplibre-native-ffi-devcontainer:local \
-  --load \
+  --tag "${usage_tag:?}" \
+  "$output_arg" \
   ..

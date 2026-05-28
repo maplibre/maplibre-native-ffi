@@ -1,6 +1,6 @@
 {
   "name": "maplibre-native-ffi",
-  "image": "maplibre-native-ffi-devcontainer:local",
+  "image": "ghcr.io/maplibre/maplibre-native-ffi/devcontainer:main",
   "remoteUser": "dev",
   "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
   "containerEnv": {
