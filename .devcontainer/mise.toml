@@ -1,0 +1,8 @@
+[oci]
+from = "debian:bookworm-slim"
+tag = "maplibre-native-ffi-devcontainer:local"
+user = "root"
+workdir = "/workspaces/maplibre-native-ffi"
+
+[oci.labels]
+"org.opencontainers.image.source" = "https://github.com/maplibre/maplibre-native-ffi"

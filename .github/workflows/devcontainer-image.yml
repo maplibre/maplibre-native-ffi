@@ -1,0 +1,97 @@
+name: Dev Container Image
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .devcontainer/**
+      - .mise/**
+      - .miserc.toml
+      - .github/workflows/devcontainer-image.yml
+      - mise.lock
+      - mise.toml
+  pull_request:
+    branches: [main]
+    paths:
+      - .devcontainer/**
+      - .mise/**
+      - .miserc.toml
+      - .github/workflows/devcontainer-image.yml
+      - mise.lock
+      - mise.toml
+  workflow_dispatch:
+
+concurrency:
+  group: devcontainer-image-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  IMAGE: ghcr.io/maplibre/maplibre-native-ffi/devcontainer
+
+jobs:
+  build:
+    name: build / ${{ matrix.arch }}
+    if: github.event_name == 'pull_request' || github.ref != 'refs/heads/main'
+    permissions:
+      contents: read
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: ./.github/actions/setup-ci-deps
+      - name: Install image tooling
+        run: sudo apt-get update && sudo apt-get install --no-install-recommends --yes skopeo
+      - name: Build image
+        run: mise run //.devcontainer:build --tag "maplibre-native-ffi-devcontainer:ci-${{ matrix.arch }}"
+
+  release:
+    name: release / ${{ matrix.arch }}
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    permissions:
+      contents: read
+      packages: write
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-latest
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: ./.github/actions/setup-ci-deps
+      - name: Install image tooling
+        run: sudo apt-get update && sudo apt-get install --no-install-recommends --yes skopeo
+      - name: Log in to GHCR
+        run: echo "${{ github.token }}" | docker login ghcr.io --username "${{ github.actor }}" --password-stdin
+      - name: Build and push image
+        run: mise run //.devcontainer:build --tag "$IMAGE:main-${{ matrix.arch }}" --push
+
+  manifest:
+    name: manifest
+    permissions:
+      packages: write
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    needs: release
+    timeout-minutes: 10
+    steps:
+      - name: Log in to GHCR
+        run: echo "${{ github.token }}" | docker login ghcr.io --username "${{ github.actor }}" --password-stdin
+      - name: Publish multi-arch tag
+        run: |
+          docker buildx imagetools create \
+            --tag "$IMAGE:main" \
+            "$IMAGE:main-amd64" \
+            "$IMAGE:main-arm64"
