@@ -8,7 +8,7 @@ let nativeBuildDir = Context.environment["MLN_FFI_BUILD_DIR"] ?? {
 
 let package = Package(
   name: "maplibre-native-swift",
-  platforms: [.macOS(.v14)],
+  platforms: [.macOS("14.3")],
   products: [
     .library(name: "MaplibreNative", targets: ["MaplibreNative"]),
   ],

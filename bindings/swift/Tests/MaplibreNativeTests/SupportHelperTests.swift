@@ -139,14 +139,14 @@ private final class LockedBox<Value>: @unchecked Sendable {
 
 @Test func nativeHandleStateReportsLeaksWithoutDestroying() throws {
   let leaks = LockedBox([NativeHandleLeak]())
-  NativeHandleLeakReporter.setHandler { leak in
+
+  try NativeHandleLeakTestSupport.withHandler({ leak in
     leaks.update { $0.append(leak) }
-  }
-  defer { NativeHandleLeakReporter.resetHandler() }
+  }) {
+    do {
+      _ = try NativeHandleState(typeName: "leaky_handle", pointer: OpaquePointer(bitPattern: 0x3))
+    }
 
-  do {
-    _ = try NativeHandleState(typeName: "leaky_handle", pointer: OpaquePointer(bitPattern: 0x3))
+    #expect(leaks.read { $0 } == [NativeHandleLeak(typeName: "leaky_handle", address: 0x3)])
   }
-
-  #expect(leaks.read { $0 } == [NativeHandleLeak(typeName: "leaky_handle", address: 0x3)])
 }

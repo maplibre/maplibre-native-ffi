@@ -268,21 +268,21 @@ private final class RenderLeakBox: @unchecked Sendable {
 @Test func textureFrameDeinitReportsLeakWithoutRelease() throws {
   let releases = RenderCounter()
   let leaks = RenderLeakBox()
-  NativeHandleLeakReporter.setHandler { leak in
+
+  NativeHandleLeakTestSupport.withHandler({ leak in
     leaks.append(leak)
-  }
-  defer { NativeHandleLeakReporter.resetHandler() }
-
-  do {
-    var raw = mln_metal_owned_texture_frame()
-    raw.size = UInt32(MemoryLayout<mln_metal_owned_texture_frame>.size)
-    raw.texture = UnsafeMutableRawPointer(bitPattern: 0x1234)
-    raw.device = UnsafeMutableRawPointer(bitPattern: 0x5678)
-    _ = MetalOwnedTextureFrameHandle(frame: NativeMetalOwnedTextureFrame(raw)) { _ in
-      releases.increment()
+  }) {
+    do {
+      var raw = mln_metal_owned_texture_frame()
+      raw.size = UInt32(MemoryLayout<mln_metal_owned_texture_frame>.size)
+      raw.texture = UnsafeMutableRawPointer(bitPattern: 0x1234)
+      raw.device = UnsafeMutableRawPointer(bitPattern: 0x5678)
+      _ = MetalOwnedTextureFrameHandle(frame: NativeMetalOwnedTextureFrame(raw)) { _ in
+        releases.increment()
+      }
     }
-  }
 
-  #expect(releases.value() == 0)
-  #expect(leaks.value() == [NativeHandleLeak(typeName: "MetalOwnedTextureFrameHandle", address: 0x1234)])
+    #expect(releases.value() == 0)
+    #expect(leaks.value() == [NativeHandleLeak(typeName: "MetalOwnedTextureFrameHandle", address: 0x1234)])
+  }
 }
