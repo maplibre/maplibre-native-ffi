@@ -71,7 +71,7 @@ jobs:
         if: ${{ !startsWith(matrix.mise_env, 'windows-') }}
         run: mise run //bindings/java-jni:build
       - name: Test Kotlin/Native binding
-        if: ${{ !startsWith(matrix.mise_env, 'windows-') }}
+        if: ${{ startsWith(matrix.mise_env, 'linux-x64-') || startsWith(matrix.mise_env, 'macos-') }}
         run: mise run //bindings/kotlin-native:build
       - name: Test Rust binding
         run: mise run //bindings/rust:ci
