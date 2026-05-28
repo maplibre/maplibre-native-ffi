@@ -14,7 +14,4 @@
 - **Models:**
 - **Scope:** <!-- what the AI did vs what you verified and own -->
 - **Context:**
-  <!-- How AI shaped this PR: workflow (planning, loops, review), repo setup
-  (AGENTS.md, rules, skills), artifact links (plan/spec gist), optional session
-  export. Not a transcript or full system prompt. "Ad-hoc; no artifacts kept" is
-  fine. -->
+  <!-- how AI was used; links to plans, skills, or session exports if any — see AI_POLICY.md -->
