@@ -17,6 +17,9 @@ let package = Package(
       dependencies: [
         .product(name: "MaplibreNative", package: "maplibre-native-swift"),
       ],
+      swiftSettings: [
+        .enableExperimentalFeature("IsolatedDeinit"),
+      ],
       linkerSettings: [
         .linkedFramework("AppKit"),
         .linkedFramework("Metal"),
