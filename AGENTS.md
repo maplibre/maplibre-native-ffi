@@ -138,6 +138,11 @@ Read these docs whenever relevant:
 - `dprint`:
   - <https://dprint.dev/config/>
   - <https://dprint.dev/plugins/>
+- `vp` / Vite+:
+  - <https://viteplus.dev/guide/>
+  - <https://viteplus.dev/guide/monorepo>
+  - <https://viteplus.dev/guide/lint>
+  - <https://viteplus.dev/guide/run>
 - `pixi`:
   - <https://pixi.prefix.dev/latest/reference/pixi_manifest/>
   - <https://pixi.prefix.dev/latest/reference/pixi_configuration/>

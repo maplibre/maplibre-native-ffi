@@ -83,7 +83,9 @@ postinstall = [
   # https://github.com/conda-forge/llvmdev-feedstock/issues/376
   "{% if os() == \"windows\" %}cp \"$CONDA_PREFIX/Library/bin/libclang-13.dll\" \"$CONDA_PREFIX/Library/bin/libclang.dll\"{% endif %}",
   "uv sync --locked --quiet",
-  "cd docs && pnpm install --frozen-lockfile --loglevel warn",
+  "pnpm install --frozen-lockfile --loglevel warn",
+  # Astro type stubs for vp typeCheck on docs sources (.astro/ is gitignored).
+  "pnpm --filter docs exec astro sync",
 ]
 
 [tasks.configure]

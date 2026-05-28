@@ -2,7 +2,7 @@ PROJECT_NAME = "MapLibre Native C API"
 PROJECT_BRIEF = "Public C ABI for the MapLibre Native wrapper."
 QUIET = YES
 
-OUTPUT_DIRECTORY = api/c/gen
+OUTPUT_DIRECTORY = doxygen/gen
 INPUT = ../include
 FILE_PATTERNS = *.h
 RECURSIVE = YES
