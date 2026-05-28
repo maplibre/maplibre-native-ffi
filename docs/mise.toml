@@ -1,9 +1,9 @@
 [tasks."api:c"]
 run = [
-  "rm -rf api/c/gen public/reference/c",
-  "mkdir -p api/c/gen public/reference",
-  "doxygen api/c/Doxyfile",
-  "cp -a api/c/gen/html/. public/reference/c/",
+  "rm -rf doxygen/gen public/reference/c",
+  "mkdir -p doxygen/gen public/reference",
+  "doxygen doxygen/Doxyfile",
+  "cp -a doxygen/gen/html/. public/reference/c/",
 ]
 
 [tasks."api:rust"]
