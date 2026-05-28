@@ -6,7 +6,11 @@ settings:
 
 importers:
 
-  .: {}
+  .:
+    devDependencies:
+      vite-plus:
+        specifier: ^0.1.20
+        version: 0.1.22(@types/node@24.12.4)(esbuild@0.27.7)(vite@7.3.3(@types/node@24.12.4)(lightningcss@1.32.0)(yaml@2.9.0))(yaml@2.9.0)
 
   docs:
     dependencies:
@@ -41,9 +45,6 @@ importers:
       remark-gfm:
         specifier: ^4.0.1
         version: 4.0.1
-      vite-plus:
-        specifier: ^0.1.20
-        version: 0.1.22(@types/node@24.12.4)(esbuild@0.27.7)(vite@7.3.3(@types/node@24.12.4)(lightningcss@1.32.0)(yaml@2.9.0))(yaml@2.9.0)
 
 packages:
 
