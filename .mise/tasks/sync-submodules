@@ -50,7 +50,7 @@ case "$backend" in
   vulkan) vendor_paths+=("${vulkan_vendor_paths[@]}") ;;
   metal | opengl) ;;
   *)
-    echo "sync-maplibre-native-submodules: unknown MLN_FFI_RENDER_BACKEND=$backend" >&2
+    echo "sync-submodules: unknown MLN_FFI_RENDER_BACKEND=$backend" >&2
     exit 1
     ;;
 esac

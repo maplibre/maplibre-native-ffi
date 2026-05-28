@@ -74,7 +74,7 @@ MLN_FFI_TEST_TIMEOUT = "{{env.MLN_FFI_TEST_TIMEOUT | default(value=\"30s\")}}"
 
 [hooks]
 postinstall = [
-  { task = "sync-maplibre-native-submodules" },
+  { task = "sync-submodules" },
   "hk install --mise --quiet",
   "pixi install --locked --quiet",
   # conda-forge ships libclang-13.dll, but clang-sys on Windows searches for libclang.dll.

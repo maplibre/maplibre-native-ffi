@@ -9,7 +9,7 @@ function(mln_add_maplibre_native)
   if(NOT EXISTS "${MLN_SOURCE_DIR}/CMakeLists.txt")
     message(
       FATAL_ERROR
-        "MapLibre Native submodule is missing. Run `mise install` or `mise run sync-maplibre-native-submodules`.")
+        "MapLibre Native submodule is missing. Run `mise install` or `mise run sync-submodules`.")
   endif()
 
   add_subdirectory("${MLN_SOURCE_DIR}" "${PROJECT_BINARY_DIR}/maplibre-native")
