@@ -53,6 +53,24 @@ When disclosure applies under MapLibre's policy, fill in the **AI assistance**
 section of the pull request template. Disclosure is not penalized. If only
 single-line autocomplete was involved, remove that section from the template.
 
+MapLibre asks for models and prompts used. For this project, treat **Context**
+as a short account of how AI shaped the work—not a transcript or full system
+prompt. Say what is useful for reviewers to understand your process:
+
+- **Workflow:** How AI was involved across the PR (for example: spec/planning,
+  implementation loop, review passes, or inline completion only).
+- **Setup:** Repo-local or tool config that steered the agent (`AGENTS.md`,
+  rules, skills, custom instructions). Name or link files that live in the repo;
+  gist or paste only when there is no repo home for them.
+- **Artifacts:** Plans, specs, or checklists the agent worked from—link a gist
+  or doc when one exists and mattered.
+- **Exports:** If your tool provides a session link, run URL, or export, you may
+  link it. Optional; not required for every PR.
+
+You do not need to dump chat logs, every user message, or a complete system
+prompt. If nothing beyond the tool name and scope is worth sharing, say so (for
+example: "ad-hoc session; no plan or export kept").
+
 ## Credits
 
 Practices in this document were informed by the AI policies of

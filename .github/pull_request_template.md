@@ -10,10 +10,8 @@
 
 <!-- Remove this section if disclosure does not apply; see AI_POLICY.md. -->
 
-- **Tools:**
+- **Tool:** <!-- product and mode, e.g. Cursor cloud agent, Copilot inline -->
 - **Models:**
-- **Harness:**
-  <!-- optional: cloud agent, local agent, chat, inline completion -->
 - **Scope:** <!-- what the AI did vs what you verified and own -->
-- **Prompts:**
-  <!-- gist link, brief inline note, or "mostly inline completion" -->
+- **Context:**
+  <!-- how AI was used; links to plans, skills, or session exports if any — see AI_POLICY.md -->
