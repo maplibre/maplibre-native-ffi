@@ -61,10 +61,9 @@ that's not already a mise task, use `mise exec -- pixi run ...`.
 
 ## Pull requests
 
-Follow [AI_POLICY.md](./AI_POLICY.md). When you open a pull request, write
-**Summary** and **Test plan** in at most one or two sentences of prose each. I
-will expand those sections—and **AI assistance**, when disclosure applies—if
-more detail is needed.
+When you open a pull request, write **Summary** and **Test plan** in at most one
+or two sentences of prose each. I will expand the PR description if more detail
+is needed. More context: [AI_POLICY.md](./AI_POLICY.md).
 
 ## Project Invariants
 
