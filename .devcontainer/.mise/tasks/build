@@ -25,7 +25,6 @@ if [[ "$(uname -s)" == "Linux" ]]; then
 else
   docker run --rm \
     --platform "$platform" \
-    --network host \
     --volume "$PWD/..:/src" \
     --workdir /src \
     --env MISE_EXPERIMENTAL=1 \
