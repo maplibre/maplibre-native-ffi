@@ -19,3 +19,5 @@ yarn-error.log*
 pnpm-debug.log*
 .gradle
 .kotlin
+.devcontainer/mise-oci/
+.devcontainer/mise-oci.tar
