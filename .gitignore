@@ -1,7 +1,7 @@
 build/
 target/
 bindings/*/bin/
-docs/api/c/gen/
+docs/doxygen/gen/
 docs/public/reference/
 .zig-cache/
 .ruff_cache/

@@ -14,10 +14,5 @@ export default defineConfig({
       "third_party/**",
       "docs/public/reference/**",
     ],
-    overrides: [
-      {
-        files: ["docs/**"],
-      },
-    ],
   },
 });
