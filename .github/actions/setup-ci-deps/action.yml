@@ -25,10 +25,6 @@ runs:
       run: |
         {
           echo "SCCACHE_GHA_ENABLED=true"
-          if [ -n "${MISE_ENV:-}" ]; then
-            echo "SCCACHE_GHA_VERSION=${MISE_ENV}"
-          fi
-          echo "SCCACHE_BASEDIRS=${GITHUB_WORKSPACE}"
           echo "CMAKE_C_COMPILER_LAUNCHER=sccache"
           echo "CMAKE_CXX_COMPILER_LAUNCHER=sccache"
         } >> "$GITHUB_ENV"
@@ -93,6 +89,14 @@ runs:
         cache: true
         cache_key_prefix: mise-v2
         install: true
+
+    - name: Scope sccache to mise env
+      shell: bash
+      run: |
+        {
+          echo "SCCACHE_GHA_VERSION=${MISE_ENV}"
+          echo "SCCACHE_BASEDIRS=${GITHUB_WORKSPACE}"
+        } >> "$GITHUB_ENV"
 
     - name: Register Windows CI software graphics drivers
       if: ${{ runner.os == 'Windows' }}
