@@ -17,7 +17,6 @@ kotlin {
       hostOs.contains("mac") -> macosX64()
       hostOs.contains("linux") && (hostArch == "aarch64" || hostArch == "arm64") -> linuxArm64()
       hostOs.contains("linux") -> linuxX64()
-      hostOs.contains("mingw") || hostOs.contains("windows") -> mingwX64()
       else -> throw GradleException("Unsupported Kotlin/Native host target: $hostOs/$hostArch")
     }
 
@@ -25,7 +24,7 @@ kotlin {
     if (nativeBuildDir != null) {
       binaries.all {
         linkerOpts("-L$nativeBuildDir", "-lmaplibre-native-c")
-        if (hostOs.contains("mac")) {
+        if (hostOs.contains("mac") || hostOs.contains("linux")) {
           linkerOpts("-Wl,-rpath,$nativeBuildDir")
         }
       }

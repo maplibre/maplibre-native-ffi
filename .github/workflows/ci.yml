@@ -70,6 +70,9 @@ jobs:
       - name: Build Java JNI binding
         if: ${{ !startsWith(matrix.mise_env, 'windows-') }}
         run: mise run //bindings/java-jni:build
+      - name: Test Kotlin/Native binding
+        if: ${{ !startsWith(matrix.mise_env, 'windows-') }}
+        run: mise run //bindings/kotlin-native:build
       - name: Test Rust binding
         run: mise run //bindings/rust:ci
       - name: Test Zig binding
