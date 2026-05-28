@@ -10,7 +10,7 @@
 
 <!-- Remove this section if disclosure does not apply; see AI_POLICY.md. -->
 
-- **Tool:** <!-- e.g. Codex, OpenCode, Claude Code, Cursor -->
+- **Tools:** <!-- e.g. Codex, OpenCode, Claude Code, Cursor -->
 - **Models:**
 - **Scope:** <!-- what the AI did vs what you verified and own -->
 - **Context:**
