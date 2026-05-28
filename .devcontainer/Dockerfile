@@ -21,7 +21,10 @@ RUN useradd --create-home --uid 1000 --shell /bin/bash dev \
   && echo "dev ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/dev \
   && chmod 0440 /etc/sudoers.d/dev
 
+# Mise OCI images use MISE_DATA_DIR=/mise (default mount_point). The tools layer is
+# built as root; grant the runtime user write access so postCreate `mise install` can
+# add or update tools before the published :main image catches up.
 RUN mkdir -p /mise/migrations \
-  && chown dev:dev /mise/migrations
+  && chown -R dev:dev /mise
 
 USER dev
