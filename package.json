@@ -1,0 +1,5 @@
+{
+  "name": "maplibre-native-ffi",
+  "private": true,
+  "packageManager": "pnpm@10.33.2"
+}

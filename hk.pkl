@@ -20,8 +20,8 @@ local lintSteps = new Mapping<String, Step> {
   }
   ["vp-check"] {
     glob = List("docs/**/*.ts", "docs/**/*.tsx", "docs/**/*.js", "docs/**/*.jsx", "docs/**/*.mjs", "docs/**/*.cjs")
-    check = "pnpm --dir docs exec vp check --no-fmt"
-    fix = "pnpm --dir docs exec vp check --no-fmt --fix"
+    check = "pnpm --filter docs exec vp check --no-fmt"
+    fix = "pnpm --filter docs exec vp check --no-fmt --fix"
   }
   ["ruff"] {
     glob = List("**/*.py")
