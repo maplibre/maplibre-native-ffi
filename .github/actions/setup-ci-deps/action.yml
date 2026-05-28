@@ -84,10 +84,9 @@ runs:
     - name: Wire sccache into CMake
       shell: bash
       run: |
-        target_triple="$(mise exec -- printenv MLN_FFI_TARGET_TRIPLE)"
         {
           echo "SCCACHE_GHA_ENABLED=true"
-          echo "SCCACHE_GHA_VERSION=${target_triple}"
+          echo "SCCACHE_GHA_VERSION=${MLN_FFI_TARGET_TRIPLE}"
           echo "SCCACHE_BASEDIRS=${GITHUB_WORKSPACE}"
           echo "CMAKE_C_COMPILER_LAUNCHER=sccache"
           echo "CMAKE_CXX_COMPILER_LAUNCHER=sccache"
