@@ -4,6 +4,10 @@ import { defineConfig } from "vite-plus";
 // Per-package vite/astro configs stay in each workspace for dev/build/test.
 export default defineConfig({
   lint: {
+    options: {
+      typeAware: true,
+      typeCheck: true,
+    },
     ignorePatterns: [
       "**/node_modules/**",
       "**/dist/**",
