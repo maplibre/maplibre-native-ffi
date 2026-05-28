@@ -38,6 +38,13 @@ public static unsafe class Maplibre
         return (Render.RenderBackend)NativeMethods.MlnSupportedRenderBackendMask();
     }
 
+    /// <summary>Returns the OpenGL context providers compiled into the native library.</summary>
+    public static Render.OpenGLContextProvider SupportedOpenGLContextProviders()
+    {
+        NativeLibraryLoader.EnsureLoaded();
+        return (Render.OpenGLContextProvider)NativeMethods.mln_opengl_supported_context_provider_mask();
+    }
+
     /// <summary>Reads MapLibre Native's process-global network status.</summary>
     public static global::Maplibre.Native.NetworkStatus NetworkStatus()
     {

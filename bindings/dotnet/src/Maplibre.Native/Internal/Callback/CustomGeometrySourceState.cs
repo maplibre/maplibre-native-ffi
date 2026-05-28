@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using Maplibre.Native.Error;
 using Maplibre.Native.Geo;
 using Maplibre.Native.Internal.C;
 using Maplibre.Native.Style;
@@ -54,6 +55,14 @@ internal sealed unsafe class CustomGeometrySourceState : IDisposable
             }
             if (options.Buffer is { } buffer)
             {
+                if (buffer < 0)
+                {
+                    throw new InvalidArgumentException(
+                        MaplibreStatus.InvalidArgument,
+                        null,
+                        "Custom geometry source buffer must be non-negative.");
+                }
+
                 descriptor.fields |= (uint)mln_custom_geometry_source_option_field.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_BUFFER;
                 descriptor.buffer = (uint)buffer;
             }

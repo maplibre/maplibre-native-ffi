@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using Maplibre.Native.Error;
 using Maplibre.Native.Geo;
 using Maplibre.Native.Internal.C;
 using Maplibre.Native.Internal.Handle;
@@ -43,6 +44,15 @@ public sealed unsafe class RenderSessionHandle : IDisposable
         return new RenderSessionHandle(map, session);
     }
 
+    public static RenderSessionHandle AttachOpenGLSurface(MapHandle map, OpenGLSurfaceDescriptor descriptor)
+    {
+        ArgumentNullException.ThrowIfNull(map);
+        var native = RenderStructs.ToNative(descriptor);
+        mln_render_session* session = null;
+        NativeStatus.Check(NativeMethods.mln_opengl_surface_attach(map.Pointer, &native, &session));
+        return new RenderSessionHandle(map, session);
+    }
+
     public static RenderSessionHandle AttachMetalOwnedTexture(MapHandle map, MetalOwnedTextureDescriptor descriptor)
     {
         ArgumentNullException.ThrowIfNull(map);
@@ -79,12 +89,38 @@ public sealed unsafe class RenderSessionHandle : IDisposable
         return new RenderSessionHandle(map, session);
     }
 
+    public static RenderSessionHandle AttachOpenGLOwnedTexture(MapHandle map, OpenGLOwnedTextureDescriptor descriptor)
+    {
+        ArgumentNullException.ThrowIfNull(map);
+        var native = RenderStructs.ToNative(descriptor);
+        mln_render_session* session = null;
+        NativeStatus.Check(NativeMethods.mln_opengl_owned_texture_attach(map.Pointer, &native, &session));
+        return new RenderSessionHandle(map, session);
+    }
+
+    public static RenderSessionHandle AttachOpenGLBorrowedTexture(MapHandle map, OpenGLBorrowedTextureDescriptor descriptor)
+    {
+        ArgumentNullException.ThrowIfNull(map);
+        var native = RenderStructs.ToNative(descriptor);
+        mln_render_session* session = null;
+        NativeStatus.Check(NativeMethods.mln_opengl_borrowed_texture_attach(map.Pointer, &native, &session));
+        return new RenderSessionHandle(map, session);
+    }
+
     internal mln_render_session* Pointer => state.Pointer;
 
     public bool IsClosed => state.IsClosed;
 
     public void Resize(uint width, uint height, double scaleFactor)
     {
+        if (!double.IsFinite(scaleFactor) || scaleFactor <= 0)
+        {
+            throw new InvalidArgumentException(
+                MaplibreStatus.InvalidArgument,
+                null,
+                "Render target scale factor must be positive and finite.");
+        }
+
         NativeStatus.Check(NativeMethods.mln_render_session_resize(Pointer, width, height, scaleFactor));
     }
 
@@ -238,11 +274,32 @@ public sealed unsafe class RenderSessionHandle : IDisposable
         }
     }
 
+    public OpenGLOwnedTextureFrameHandle AcquireOpenGLOwnedTextureFrame()
+    {
+        var pointer = (mln_opengl_owned_texture_frame*)NativeMemory.AllocZeroed((nuint)sizeof(mln_opengl_owned_texture_frame));
+        pointer->size = (uint)sizeof(mln_opengl_owned_texture_frame);
+        try
+        {
+            NativeStatus.Check(NativeMethods.mln_opengl_owned_texture_acquire_frame(Pointer, pointer));
+            var scope = new FrameScope(nameof(OpenGLOwnedTextureFrame));
+            var frame = RenderStructs.FromNative(*pointer, scope);
+            return new OpenGLOwnedTextureFrameHandle(this, pointer, scope, frame);
+        }
+        catch
+        {
+            NativeMemory.Free(pointer);
+            throw;
+        }
+    }
+
     internal mln_status ReleaseMetalFrame(mln_metal_owned_texture_frame* frame) =>
         NativeMethods.mln_metal_owned_texture_release_frame(Pointer, frame);
 
     internal mln_status ReleaseVulkanFrame(mln_vulkan_owned_texture_frame* frame) =>
         NativeMethods.mln_vulkan_owned_texture_release_frame(Pointer, frame);
+
+    internal mln_status ReleaseOpenGLFrame(mln_opengl_owned_texture_frame* frame) =>
+        NativeMethods.mln_opengl_owned_texture_release_frame(Pointer, frame);
 
     private IReadOnlyList<QueriedFeature> QueryRenderedFeaturesCore(RenderedQueryGeometry geometry, RenderedFeatureQueryOptions? options)
     {
@@ -390,6 +447,25 @@ public sealed unsafe class VulkanOwnedTextureFrameHandle : IDisposable
     public bool IsClosed => state.IsClosed;
 
     public VulkanOwnedTextureFrame Frame { get; }
+
+    public void Close() => state.Close();
+
+    public void Dispose() => state.TryClose();
+}
+
+public sealed unsafe class OpenGLOwnedTextureFrameHandle : IDisposable
+{
+    private readonly TextureFrameState<mln_opengl_owned_texture_frame> state;
+
+    internal OpenGLOwnedTextureFrameHandle(RenderSessionHandle session, mln_opengl_owned_texture_frame* pointer, FrameScope scope, OpenGLOwnedTextureFrame frame)
+    {
+        state = new TextureFrameState<mln_opengl_owned_texture_frame>(session, pointer, scope, static (session, frame) => session.ReleaseOpenGLFrame(frame), nameof(OpenGLOwnedTextureFrameHandle));
+        Frame = frame;
+    }
+
+    public bool IsClosed => state.IsClosed;
+
+    public OpenGLOwnedTextureFrame Frame { get; }
 
     public void Close() => state.Close();
 

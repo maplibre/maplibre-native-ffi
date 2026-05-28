@@ -1,4 +1,5 @@
 using Maplibre.Native.Error;
+using Maplibre.Native.Render;
 using Xunit;
 
 namespace Maplibre.Native.Tests;
@@ -11,6 +12,16 @@ public sealed class MaplibreTests
         NativeLibraryTestSupport.SkipUnlessNativeLibraryIsAvailable();
 
         Assert.Equal(0u, Maplibre.CVersion());
+    }
+
+    [Fact]
+    public void SupportedOpenGLContextProvidersComeFromNativeLibrary()
+    {
+        NativeLibraryTestSupport.SkipUnlessNativeLibraryIsAvailable();
+
+        var providers = Maplibre.SupportedOpenGLContextProviders();
+
+        Assert.Equal(providers, providers & (OpenGLContextProvider.Wgl | OpenGLContextProvider.Egl));
     }
 
     [Fact]

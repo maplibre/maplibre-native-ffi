@@ -1,3 +1,4 @@
+using Maplibre.Native.Error;
 using Maplibre.Native.Geo;
 using Maplibre.Native.Internal.Callback;
 using Maplibre.Native.Map;
@@ -36,6 +37,16 @@ public sealed class CustomGeometrySourceTests
     {
         var error = Assert.Throws<ArgumentException>(() => new CustomGeometrySourceState(new CustomGeometrySourceOptions()));
         Assert.Equal("options", error.ParamName);
+    }
+
+    [Fact]
+    public void CustomGeometrySourceRejectsNegativeBuffer()
+    {
+        using var state = new CustomGeometrySourceState(new CustomGeometrySourceOptions { FetchTile = _ => { }, Buffer = -1 });
+
+        var error = Assert.Throws<InvalidArgumentException>(() => state.Descriptor);
+
+        Assert.Equal(MaplibreStatus.InvalidArgument, error.Status);
     }
 
     [Fact]
