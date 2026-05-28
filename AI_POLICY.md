@@ -52,6 +52,11 @@ maintainer approval.
 When disclosure applies under MapLibre's policy, fill in the **AI assistance**
 section of the pull request template. Disclosure is not penalized.
 
+When a plan, spec, or checklist guided the work, commit those artifacts on your
+branch as you go. Removing them before merge is fine; reviewers can still follow
+the process in the commit history. Point to the relevant commits or paths in
+**Context** when that history matters for review.
+
 ## Credits
 
 Practices in this document were informed by the AI policies of
