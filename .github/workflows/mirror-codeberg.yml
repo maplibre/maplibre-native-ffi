@@ -23,7 +23,13 @@ jobs:
           CODEBERG_USERNAME: ${{ secrets.CODEBERG_USERNAME }}
           CODEBERG_TOKEN: ${{ secrets.CODEBERG_TOKEN }}
         run: |
-          git remote add mirror "https://${CODEBERG_USERNAME}:${CODEBERG_TOKEN}@codeberg.org/maplibre/maplibre-native-ffi.git"
+          {
+            printf 'machine codeberg.org\nlogin %s\npassword %s\n' \
+              "$CODEBERG_USERNAME" "$CODEBERG_TOKEN"
+          } > ~/.netrc
+          chmod 600 ~/.netrc
+
+          git remote add mirror https://codeberg.org/maplibre/maplibre-native-ffi.git
           git fetch origin --tags
           git push mirror main
           git push mirror --tags
