@@ -195,7 +195,7 @@ From `.github/actions/setup-ci-deps` and pixi Linux activation:
 ```json
 "containerEnv": {
   "EGL_PLATFORM": "surfaceless",
-  "LIBGL_ALWAYS_SOFTWARE": "1"
+  "LIBGL_ALWAYS_SOFTWARE": "true"
 }
 ```
 
