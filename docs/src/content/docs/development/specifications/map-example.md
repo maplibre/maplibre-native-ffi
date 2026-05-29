@@ -32,12 +32,12 @@ packaging/installer UX.
 
 ## Implementations
 
-| Example              | Language / toolkit       | Platforms             | Backends              |
-| -------------------- | ------------------------ | --------------------- | --------------------- |
-| `examples/zig-map`   | Zig, SDL3                | Linux, macOS, Windows | Vulkan, Metal, OpenGL |
-| `examples/rust-map`  | Rust, winit              | Linux, macOS, Windows | Vulkan                |
-| `examples/lwjgl-map` | Java (FFM), GLFW + LWJGL | Linux, macOS, Windows | Vulkan                |
-| `examples/swift-map` | Swift, AppKit + SwiftUI  | macOS                 | Metal                 |
+| Example              | Binding  | Toolkit         | Platforms             | Backends              |
+| -------------------- | -------- | --------------- | --------------------- | --------------------- |
+| `examples/zig-map`   | Zig      | SDL3            | Linux, macOS, Windows | Vulkan, Metal, OpenGL |
+| `examples/rust-map`  | Rust     | winit           | Linux, macOS, Windows | Vulkan                |
+| `examples/lwjgl-map` | Java FFM | GLFW, LWJGL     | Linux, macOS, Windows | Vulkan                |
+| `examples/swift-map` | Swift    | AppKit, SwiftUI | macOS                 | Metal                 |
 
 ---
 
