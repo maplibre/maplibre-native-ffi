@@ -25,19 +25,19 @@ an internal namespace, and wrap it through small internal support packages for
 status conversion, diagnostics, descriptor materialization, memory helpers,
 callback state, and native-library loading.
 
-Kotlin/Native owns the initial implementation. Keep its public shape alignable
-with future Java FFM and JNI actual implementations, while keeping common
-declarations free of `kotlinx.cinterop` and platform pointer types. Use any
-shared `commonMain` declarations only for names, copied value models,
-exceptions, and expect declarations; adapters above this layer own coroutine,
-scheduler, rendering, and application policy.
+Kotlin/Native is the reference binding implementation for now. Prefer idiomatic
+Kotlin public APIs over matching the existing Java FFM or JNI surface. Build
+`nativeMain` without leaking cinterop or platform pointer types into public API.
+When a shared `commonMain` layer appears, put copied value models, exceptions,
+and platform-neutral API there; keep cinterop and platform bridge code in
+platform source sets. Adapters above this layer own coroutine, scheduler,
+rendering, and application policy.
 
 ## Public Surface
 
 Long-lived native objects use the shared `Handle` suffix. Public operations stay
-close to the Java FFM and JNI names where that preserves the C model, because
-these targets may become Kotlin Multiplatform actual implementations. Prefer
-Kotlin spelling for properties, builders, and nullability when it does not
+close to the C model and shared binding names unless idiomatic Kotlin spelling
+is clearer. Prefer Kotlin property and nullability conventions when they do not
 change the low-level contract.
 
 C option structs become Kotlin descriptor classes or data classes. Mutable
@@ -58,34 +58,20 @@ Public APIs use it only where the C API accepts opaque backend handles. Internal
 Kotlin/Native code converts between `NativePointer`, `COpaquePointer?`, and
 `NativePtr` at the cinterop boundary; `NativePtr` stays out of public APIs.
 
-## Maintaining Java and common API alignment
-
-When a Kotlin/Native type may become a `commonMain` actual implementation, keep
-its public names, value shapes, and numeric types close to the Java binding. Use
-signed `Int` and `Long` public values where Java uses them, then validate at the
-C boundary before converting to unsigned native fields. Reject negative sizes,
-counts, enum sentinels, and unsigned numeric inputs with clear exceptions
-instead of wrapping them.
+Use signed `Int` and `Long` public values at the binding boundary, then validate
+before converting to unsigned native fields. Reject negative sizes, counts, enum
+sentinels, and unsigned numeric inputs with clear exceptions instead of wrapping
+them.
 
 Use `Long` for native `uint64_t` values only in two cases:
 
-- numeric values that fit in Java's non-negative `long` range, such as
+- numeric values that fit in Kotlin's non-negative `Long` range, such as
   `JsonValue.UInt` and `FeatureIdentifier.UInt`; reject larger native snapshots
   and negative public inputs;
-- opaque identifiers, backend values, or ranges that Java carries as raw bits,
-  such as offline operation IDs, render frame generation IDs, frame IDs, Metal
-  pixel formats, byte ranges, and native pointer addresses; document those
-  fields as bit-pattern values on the public API.
-
-Prefer the Java value shape when it is practical: `Maplibre` exposes process
-APIs through a class with companion methods, copied value trees use Java-aligned
-names, `TileId` and `CanonicalTileId` stay flattened, `SourceInfo` preserves the
-native type string, and `OfflineRegionStatus` carries both the mapped and raw
-download state. Kotlin descriptors use nullable `var` properties for optional
-field-mask structs; presence is `property != null`, and callers clear fields by
-assigning `null`. Keep any remaining platform-only types at the edge of
-rendering or callback ownership, and describe their lifetime in KDoc or this
-guide.
+- opaque identifiers, backend values, or ranges carried as raw bits, such as
+  offline operation IDs, render frame generation IDs, frame IDs, Metal pixel
+  formats, byte ranges, and native pointer addresses; document those fields as
+  bit-pattern values on the public API.
 
 ## Handles, Status, and Threading
 
@@ -96,13 +82,13 @@ closed; later `close()` calls no-op. If native destruction reports a status,
 `close()` reports that status through the public error mechanism and leaves the
 handle live when a retry is valid.
 
-Public fallible operations throw Kotlin `MaplibreException` subclasses aligned
-with the Java FFM and JNI error model. Each exception maps one C status category
-to a stable Kotlin type and carries the copied native diagnostic. Optional
-`Result<T>` helpers may wrap the throwing API. Read the thread-local diagnostic
-immediately after a non-OK C status on the same thread. Validate Kotlin-owned
-state before the C call: closed wrappers, active scoped borrows, one-shot
-resource completion, invalid string shapes, and callback lifetime.
+Public fallible operations throw Kotlin `MaplibreException` subclasses that map
+one C status category to a stable Kotlin type and carry the copied native
+diagnostic. Optional `Result<T>` helpers may wrap the throwing API. Read the
+thread-local diagnostic immediately after a non-OK C status on the same thread.
+Validate Kotlin-owned state before the C call: closed wrappers, active scoped
+borrows, one-shot resource completion, invalid string shapes, and callback
+lifetime.
 
 Owner-thread-affine calls run on the calling native thread. The binding does not
 dispatch internally. Native `MLN_STATUS_WRONG_THREAD` becomes the Kotlin
