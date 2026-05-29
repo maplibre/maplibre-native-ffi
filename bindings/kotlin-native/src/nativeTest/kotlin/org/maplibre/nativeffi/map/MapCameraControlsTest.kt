@@ -33,31 +33,29 @@ class MapCameraControlsTest {
           },
         )
       try {
-        map.setDebugOptions(setOf(DebugOption.TILE_BORDERS, DebugOption.COLLISION))
-        assertEquals(setOf(DebugOption.TILE_BORDERS, DebugOption.COLLISION), map.debugOptions())
+        map.debugOptions = setOf(DebugOption.TILE_BORDERS, DebugOption.COLLISION)
+        assertEquals(setOf(DebugOption.TILE_BORDERS, DebugOption.COLLISION), map.debugOptions)
 
-        map.setRenderingStatsViewEnabled(true)
-        assertTrue(map.isRenderingStatsViewEnabled())
-        map.setRenderingStatsViewEnabled(false)
-        assertFalse(map.isRenderingStatsViewEnabled())
+        map.isRenderingStatsViewEnabled = true
+        assertTrue(map.isRenderingStatsViewEnabled)
+        map.isRenderingStatsViewEnabled = false
+        assertFalse(map.isRenderingStatsViewEnabled)
 
-        map.setViewportOptions(
+        map.viewportOptions =
           ViewportOptions().apply {
             viewportMode = ViewportMode.DEFAULT
             frustumOffset = EdgeInsets.ZERO
           }
-        )
-        val viewport = map.viewportOptions()
+        val viewport = map.viewportOptions
         assertNotNull(viewport.viewportMode)
         assertNotNull(viewport.frustumOffset)
 
-        map.setTileOptions(
+        map.tileOptions =
           TileOptions().apply {
             prefetchZoomDelta = 1
             lodMode = TileLodMode.DEFAULT
           }
-        )
-        val tileOptions = map.tileOptions()
+        val tileOptions = map.tileOptions
         assertNotNull(tileOptions.prefetchZoomDelta)
         assertNotNull(tileOptions.lodMode)
 
@@ -85,7 +83,7 @@ class MapCameraControlsTest {
         )
         map.pitchBy(0.0)
         map.pitchByAnimated(0.0, animation)
-        val camera = map.camera()
+        val camera = map.camera
         assertNotNull(camera.center)
         assertNotNull(camera.zoom)
         map.cancelTransitions()
@@ -102,19 +100,18 @@ class MapCameraControlsTest {
         map.cameraForGeometry(Geometry.point(LatLng(0.0, 0.0)), fitOptions)
         map.latLngBoundsForCamera(cameraOptions)
         map.latLngBoundsForCameraUnwrapped(cameraOptions)
-        map.setBounds(BoundOptions().apply { this.bounds = bounds })
-        assertNotNull(map.bounds().bounds)
-        map.setFreeCameraOptions(
+        map.bounds = BoundOptions().apply { this.bounds = bounds }
+        assertNotNull(map.bounds.bounds)
+        map.freeCameraOptions =
           FreeCameraOptions().apply {
             position = Vec3(0.0, 0.0, 0.0)
             orientation = Quaternion(0.0, 0.0, 0.0, 1.0)
           }
-        )
-        val freeCamera = map.freeCameraOptions()
+        val freeCamera = map.freeCameraOptions
         assertNotNull(freeCamera.position)
         assertNotNull(freeCamera.orientation)
-        map.setProjectionMode(ProjectionModeOptions().apply { axonometric = false })
-        assertNotNull(map.projectionMode().axonometric)
+        map.projectionMode = ProjectionModeOptions().apply { axonometric = false }
+        assertNotNull(map.projectionMode.axonometric)
         val point = map.pixelForLatLng(LatLng(0.0, 0.0))
         map.latLngForPixel(point)
         assertEquals(2, map.pixelsForLatLngs(listOf(LatLng(0.0, 0.0), LatLng(1.0, 1.0))).size)

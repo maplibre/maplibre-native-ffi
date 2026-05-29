@@ -13,14 +13,14 @@ import org.maplibre.nativeffi.offline.OfflineRegionDownloadState
 class RuntimeOfflineTest {
   @Test
   fun processGlobalNetworkStatusRoundTrips() {
-    val original = Maplibre.networkStatus()
+    val original = Maplibre.networkStatus
     try {
-      Maplibre.setNetworkStatus(NetworkStatus.OFFLINE)
-      assertEquals(NetworkStatus.OFFLINE, Maplibre.networkStatus())
-      Maplibre.setNetworkStatus(NetworkStatus.ONLINE)
-      assertEquals(NetworkStatus.ONLINE, Maplibre.networkStatus())
+      Maplibre.networkStatus = NetworkStatus.OFFLINE
+      assertEquals(NetworkStatus.OFFLINE, Maplibre.networkStatus)
+      Maplibre.networkStatus = NetworkStatus.ONLINE
+      assertEquals(NetworkStatus.ONLINE, Maplibre.networkStatus)
     } finally {
-      Maplibre.setNetworkStatus(original)
+      Maplibre.networkStatus = original
     }
   }
 
@@ -41,12 +41,12 @@ class RuntimeOfflineTest {
     val runtime = RuntimeHandle.create()
     try {
       val operation = runtime.startAmbientCacheOperation(AmbientCacheOperation.INVALIDATE)
-      assertFalse(operation.isClosed())
+      assertFalse(operation.isClosed)
       assertEquals(OfflineOperationKind.AMBIENT_CACHE, operation.kind)
       assertEquals(OfflineOperationResultKind.NONE, operation.resultKind)
 
       operation.close()
-      assertTrue(operation.isClosed())
+      assertTrue(operation.isClosed)
       assertFailsWith<InvalidStateException> { operation.close() }
     } finally {
       runtime.close()

@@ -41,11 +41,12 @@ public class MapProjectionHandle private constructor(handle: CPointer<mln_map_pr
   AutoCloseable {
   private val state = HandleState("MapProjectionHandle", handle)
 
-  public fun camera(): CameraOptions = memScoped {
-    val outCamera = mln_camera_options_default().getPointer(this)
-    Status.check(mln_map_projection_get_camera(state.requireLive(), outCamera))
-    MapStructs.cameraOptions(outCamera.pointed)
-  }
+  public val camera: CameraOptions
+    get() = memScoped {
+      val outCamera = mln_camera_options_default().getPointer(this)
+      Status.check(mln_map_projection_get_camera(state.requireLive(), outCamera))
+      MapStructs.cameraOptions(outCamera.pointed)
+    }
 
   public fun setCamera(camera: CameraOptions) {
     memScoped {
@@ -108,7 +109,8 @@ public class MapProjectionHandle private constructor(handle: CPointer<mln_map_pr
     state.closeOnce(::mln_map_projection_destroy)
   }
 
-  public fun isClosed(): Boolean = state.isReleased()
+  public val isClosed: Boolean
+    get() = state.isReleased()
 
   internal fun nativeHandle(): CPointer<mln_map_projection> = state.requireLive()
 

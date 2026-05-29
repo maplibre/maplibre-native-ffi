@@ -13,14 +13,14 @@ class MaplibreTest {
     Maplibre.cVersion()
     Maplibre.supportedRenderBackends()
 
-    val original = Maplibre.networkStatus()
+    val original = Maplibre.networkStatus
     try {
-      Maplibre.setNetworkStatus(NetworkStatus.OFFLINE)
-      assertEquals(NetworkStatus.OFFLINE, Maplibre.networkStatus())
-      Maplibre.setNetworkStatus(NetworkStatus.ONLINE)
-      assertEquals(NetworkStatus.ONLINE, Maplibre.networkStatus())
+      Maplibre.networkStatus = NetworkStatus.OFFLINE
+      assertEquals(NetworkStatus.OFFLINE, Maplibre.networkStatus)
+      Maplibre.networkStatus = NetworkStatus.ONLINE
+      assertEquals(NetworkStatus.ONLINE, Maplibre.networkStatus)
     } finally {
-      Maplibre.setNetworkStatus(original)
+      Maplibre.networkStatus = original
     }
 
     val meters = Maplibre.projectedMetersForLatLng(LatLng(0.0, 0.0))

@@ -23,11 +23,11 @@ class MapHandleTest {
           },
         )
 
-      assertFalse(map.isClosed())
+      assertFalse(map.isClosed)
       assertEquals(runtime, map.runtime())
       map.close()
 
-      assertTrue(map.isClosed())
+      assertTrue(map.isClosed)
       map.close()
       runtime.runOnce()
       assertFailsWith<InvalidStateException> { map.setStyleJson("{}") }

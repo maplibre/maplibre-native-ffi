@@ -78,9 +78,10 @@ Use `Long` for native `uint64_t` values only in two cases:
 Each handle stores the native pointer, release state, parent references needed
 for native validity, Kotlin callback state, and optional leak context.
 Successful `close()` releases the native object once and marks the wrapper
-closed; later `close()` calls no-op. If native destruction reports a status,
-`close()` reports that status through the public error mechanism and leaves the
-handle live when a retry is valid.
+closed; later `close()` calls no-op. Public releasable types implement
+`AutoCloseable` so callers may use stdlib `use { }` or explicit `try`/`finally`.
+If native destruction reports a status, `close()` reports that status through
+the public error mechanism and leaves the handle live when a retry is valid.
 
 Public fallible operations throw Kotlin `MaplibreException` subclasses that map
 one C status category to a stable Kotlin type and carry the copied native

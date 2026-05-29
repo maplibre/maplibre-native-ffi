@@ -1004,72 +1004,77 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     Status.check(mln_map_request_still_image(state.requireLive()))
   }
 
-  public fun setDebugOptions(options: Set<DebugOption>) {
-    val mask = options.fold(0) { acc, option -> acc or option.nativeMask }
-    Status.check(mln_map_set_debug_options(state.requireLive(), mask.toUInt()))
-  }
-
-  public fun debugOptions(): Set<DebugOption> = memScoped {
-    val outOptions = alloc<UIntVar>()
-    Status.check(mln_map_get_debug_options(state.requireLive(), outOptions.ptr))
-    DebugOption.entries.filterTo(mutableSetOf()) {
-      (outOptions.value.toInt() and it.nativeMask) != 0
+  public var debugOptions: Set<DebugOption>
+    get() = memScoped {
+      val outOptions = alloc<UIntVar>()
+      Status.check(mln_map_get_debug_options(state.requireLive(), outOptions.ptr))
+      DebugOption.entries.filterTo(mutableSetOf()) {
+        (outOptions.value.toInt() and it.nativeMask) != 0
+      }
     }
-  }
+    set(options) {
+      val mask = options.fold(0) { acc, option -> acc or option.nativeMask }
+      Status.check(mln_map_set_debug_options(state.requireLive(), mask.toUInt()))
+    }
 
-  public fun setRenderingStatsViewEnabled(enabled: Boolean) {
-    Status.check(mln_map_set_rendering_stats_view_enabled(state.requireLive(), enabled))
-  }
+  public var isRenderingStatsViewEnabled: Boolean
+    get() = memScoped {
+      val outEnabled = alloc<BooleanVar>()
+      Status.check(mln_map_get_rendering_stats_view_enabled(state.requireLive(), outEnabled.ptr))
+      outEnabled.value
+    }
+    set(enabled) {
+      Status.check(mln_map_set_rendering_stats_view_enabled(state.requireLive(), enabled))
+    }
 
-  public fun isRenderingStatsViewEnabled(): Boolean = memScoped {
-    val outEnabled = alloc<BooleanVar>()
-    Status.check(mln_map_get_rendering_stats_view_enabled(state.requireLive(), outEnabled.ptr))
-    outEnabled.value
-  }
-
-  public fun isFullyLoaded(): Boolean = memScoped {
-    val outLoaded = alloc<BooleanVar>()
-    Status.check(mln_map_is_fully_loaded(state.requireLive(), outLoaded.ptr))
-    outLoaded.value
-  }
+  public val isFullyLoaded: Boolean
+    get() = memScoped {
+      val outLoaded = alloc<BooleanVar>()
+      Status.check(mln_map_is_fully_loaded(state.requireLive(), outLoaded.ptr))
+      outLoaded.value
+    }
 
   public fun dumpDebugLogs() {
     Status.check(mln_map_dump_debug_logs(state.requireLive()))
   }
 
-  public fun viewportOptions(): ViewportOptions = memScoped {
-    val outOptions = mln_map_viewport_options_default().getPointer(this)
-    Status.check(mln_map_get_viewport_options(state.requireLive(), outOptions))
-    MapStructs.viewportOptions(outOptions.pointed)
-  }
-
-  public fun setViewportOptions(options: ViewportOptions) {
-    memScoped {
-      Status.check(
-        mln_map_set_viewport_options(state.requireLive(), MapStructs.viewportOptions(options, this))
-      )
+  public var viewportOptions: ViewportOptions
+    get() = memScoped {
+      val outOptions = mln_map_viewport_options_default().getPointer(this)
+      Status.check(mln_map_get_viewport_options(state.requireLive(), outOptions))
+      MapStructs.viewportOptions(outOptions.pointed)
     }
-  }
-
-  public fun tileOptions(): TileOptions = memScoped {
-    val outOptions = mln_map_tile_options_default().getPointer(this)
-    Status.check(mln_map_get_tile_options(state.requireLive(), outOptions))
-    MapStructs.tileOptions(outOptions.pointed)
-  }
-
-  public fun setTileOptions(options: TileOptions) {
-    memScoped {
-      Status.check(
-        mln_map_set_tile_options(state.requireLive(), MapStructs.tileOptions(options, this))
-      )
+    set(options) {
+      memScoped {
+        Status.check(
+          mln_map_set_viewport_options(
+            state.requireLive(),
+            MapStructs.viewportOptions(options, this),
+          )
+        )
+      }
     }
-  }
 
-  public fun camera(): CameraOptions = memScoped {
-    val outCamera = mln_camera_options_default().getPointer(this)
-    Status.check(mln_map_get_camera(state.requireLive(), outCamera))
-    MapStructs.cameraOptions(outCamera.pointed)
-  }
+  public var tileOptions: TileOptions
+    get() = memScoped {
+      val outOptions = mln_map_tile_options_default().getPointer(this)
+      Status.check(mln_map_get_tile_options(state.requireLive(), outOptions))
+      MapStructs.tileOptions(outOptions.pointed)
+    }
+    set(options) {
+      memScoped {
+        Status.check(
+          mln_map_set_tile_options(state.requireLive(), MapStructs.tileOptions(options, this))
+        )
+      }
+    }
+
+  public val camera: CameraOptions
+    get() = memScoped {
+      val outCamera = mln_camera_options_default().getPointer(this)
+      Status.check(mln_map_get_camera(state.requireLive(), outCamera))
+      MapStructs.cameraOptions(outCamera.pointed)
+    }
 
   public fun jumpTo(camera: CameraOptions) {
     memScoped {
@@ -1269,51 +1274,53 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     CoreStructs.latLngBounds(outBounds)
   }
 
-  public fun bounds(): BoundOptions = memScoped {
-    val outOptions = mln_bound_options_default().getPointer(this)
-    Status.check(mln_map_get_bounds(state.requireLive(), outOptions))
-    MapStructs.boundOptions(outOptions.pointed)
-  }
-
-  public fun setBounds(options: BoundOptions) {
-    memScoped {
-      Status.check(mln_map_set_bounds(state.requireLive(), MapStructs.boundOptions(options, this)))
+  public var bounds: BoundOptions
+    get() = memScoped {
+      val outOptions = mln_bound_options_default().getPointer(this)
+      Status.check(mln_map_get_bounds(state.requireLive(), outOptions))
+      MapStructs.boundOptions(outOptions.pointed)
     }
-  }
-
-  public fun freeCameraOptions(): FreeCameraOptions = memScoped {
-    val outOptions = mln_free_camera_options_default().getPointer(this)
-    Status.check(mln_map_get_free_camera_options(state.requireLive(), outOptions))
-    MapStructs.freeCameraOptions(outOptions.pointed)
-  }
-
-  public fun setFreeCameraOptions(options: FreeCameraOptions) {
-    memScoped {
-      Status.check(
-        mln_map_set_free_camera_options(
-          state.requireLive(),
-          MapStructs.freeCameraOptions(options, this),
+    set(options) {
+      memScoped {
+        Status.check(
+          mln_map_set_bounds(state.requireLive(), MapStructs.boundOptions(options, this))
         )
-      )
+      }
     }
-  }
 
-  public fun projectionMode(): ProjectionModeOptions = memScoped {
-    val outMode = mln_projection_mode_default().getPointer(this)
-    Status.check(mln_map_get_projection_mode(state.requireLive(), outMode))
-    MapStructs.projectionModeOptions(outMode.pointed)
-  }
-
-  public fun setProjectionMode(mode: ProjectionModeOptions) {
-    memScoped {
-      Status.check(
-        mln_map_set_projection_mode(
-          state.requireLive(),
-          MapStructs.projectionModeOptions(mode, this),
+  public var freeCameraOptions: FreeCameraOptions
+    get() = memScoped {
+      val outOptions = mln_free_camera_options_default().getPointer(this)
+      Status.check(mln_map_get_free_camera_options(state.requireLive(), outOptions))
+      MapStructs.freeCameraOptions(outOptions.pointed)
+    }
+    set(options) {
+      memScoped {
+        Status.check(
+          mln_map_set_free_camera_options(
+            state.requireLive(),
+            MapStructs.freeCameraOptions(options, this),
+          )
         )
-      )
+      }
     }
-  }
+
+  public var projectionMode: ProjectionModeOptions
+    get() = memScoped {
+      val outMode = mln_projection_mode_default().getPointer(this)
+      Status.check(mln_map_get_projection_mode(state.requireLive(), outMode))
+      MapStructs.projectionModeOptions(outMode.pointed)
+    }
+    set(mode) {
+      memScoped {
+        Status.check(
+          mln_map_set_projection_mode(
+            state.requireLive(),
+            MapStructs.projectionModeOptions(mode, this),
+          )
+        )
+      }
+    }
 
   public fun pixelForLatLng(coordinate: LatLng): ScreenPoint = memScoped {
     val outPoint = alloc<mln_screen_point>()
@@ -1404,7 +1411,8 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     }
   }
 
-  public fun isClosed(): Boolean = state.isReleased()
+  public val isClosed: Boolean
+    get() = state.isReleased()
 
   public fun runtime(): RuntimeHandle = runtime
 

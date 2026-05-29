@@ -13,7 +13,7 @@ internal constructor(
   private val deviceValue: NativePointer,
   private val pixelFormatValue: Long,
 ) {
-  /** Session generation preserved as a native uint64 bit pattern in a Java-compatible [Long]. */
+  /** Session generation preserved as a native `uint64_t` bit pattern in [Long]. */
   public fun generation(): Long = checked { generationValue }
 
   public fun width(): Int = checked { widthValue }
@@ -22,7 +22,7 @@ internal constructor(
 
   public fun scaleFactor(): Double = checked { scaleFactorValue }
 
-  /** Opaque frame identity preserved as a native uint64 bit pattern in a Java-compatible [Long]. */
+  /** Opaque frame identity preserved as a native `uint64_t` bit pattern in [Long]. */
   public fun frameId(): Long = checked { frameIdValue }
 
   public fun texture(): NativePointer = checked { textureValue }

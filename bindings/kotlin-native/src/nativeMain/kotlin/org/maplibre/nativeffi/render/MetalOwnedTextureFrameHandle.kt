@@ -29,7 +29,8 @@ internal constructor(
     return frameValue
   }
 
-  public fun isClosed(): Boolean = closed
+  public val isClosed: Boolean
+    get() = closed
 
   override fun close() {
     if (closed) return

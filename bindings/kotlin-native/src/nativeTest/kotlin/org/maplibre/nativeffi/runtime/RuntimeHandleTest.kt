@@ -15,12 +15,12 @@ class RuntimeHandleTest {
   fun closeReleasesRuntimeOnceAndInvalidatesWrapper() {
     val runtime = RuntimeHandle.create()
 
-    assertFalse(runtime.isClosed())
+    assertFalse(runtime.isClosed)
     runtime.runOnce()
     runtime.pollEvent()
     runtime.close()
 
-    assertTrue(runtime.isClosed())
+    assertTrue(runtime.isClosed)
     runtime.close()
     assertFailsWith<InvalidStateException> { runtime.runOnce() }
   }

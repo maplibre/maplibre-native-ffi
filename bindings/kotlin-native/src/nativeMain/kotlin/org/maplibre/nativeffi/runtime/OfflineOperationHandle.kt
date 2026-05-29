@@ -17,7 +17,7 @@ internal constructor(
   public val kind: OfflineOperationKind,
   public val resultKind: OfflineOperationResultKind,
 ) : AutoCloseable {
-  /** Native uint64 operation id preserved as a Java-compatible [Long] bit pattern. */
+  /** Native `uint64_t` operation id preserved as a [Long] bit pattern. */
   public val id: Long = uint64BitsToLong(nativeId)
   private val leakReport = LeakReport(id, kind, resultKind)
   @Suppress("unused") private val cleaner: Cleaner = createCleaner(leakReport) { it.report() }
@@ -27,7 +27,8 @@ internal constructor(
     require(nativeId != 0UL) { "offline operation id must not be zero" }
   }
 
-  public fun isClosed(): Boolean = closed
+  public val isClosed: Boolean
+    get() = closed
 
   internal fun requireLive(expectedRuntime: RuntimeHandle): ULong {
     if (closed) {

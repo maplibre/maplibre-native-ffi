@@ -29,14 +29,14 @@ class MapProjectionHandleTest {
         )
       val projection = MapProjectionHandle.create(map)
 
-      assertFalse(projection.isClosed())
+      assertFalse(projection.isClosed)
       projection.setCamera(
         CameraOptions().apply {
           center = LatLng(0.0, 0.0)
           zoom = 2.0
         }
       )
-      val camera = projection.camera()
+      val camera = projection.camera
       kotlin.test.assertNotNull(camera.center)
       kotlin.test.assertNotNull(camera.zoom)
       projection.setVisibleCoordinates(listOf(LatLng(0.0, 0.0), LatLng(1.0, 1.0)), EdgeInsets.ZERO)
@@ -51,7 +51,7 @@ class MapProjectionHandleTest {
       map.close()
       projection.close()
 
-      assertTrue(projection.isClosed())
+      assertTrue(projection.isClosed)
       projection.close()
       assertFailsWith<InvalidStateException> { projection.nativeHandle() }
     } finally {

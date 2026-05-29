@@ -46,7 +46,7 @@ public sealed interface RuntimeEventPayload {
     RuntimeEventPayload
 
   public data class OfflineOperationCompleted(
-    /** Native uint64 operation id preserved as a Java-compatible [Long] bit pattern. */
+    /** Native `uint64_t` operation id preserved as a [Long] bit pattern. */
     public val operationId: Long,
     public val operationKind: OfflineOperationKind,
     public val rawOperationKind: Int,

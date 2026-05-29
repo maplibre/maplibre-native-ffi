@@ -61,7 +61,7 @@ class ValueStructsTest {
   }
 
   @Test
-  fun jsonSnapshotRejectsUnsignedValuesThatDoNotFitJavaLong() {
+  fun jsonSnapshotRejectsUnsignedValuesAboveLongMaxValue() {
     memScoped {
       val native = alloc<mln_json_value>()
       native.type = MLN_JSON_VALUE_TYPE_UINT
@@ -72,7 +72,7 @@ class ValueStructsTest {
   }
 
   @Test
-  fun featureSnapshotRejectsUnsignedIdentifiersThatDoNotFitJavaLong() {
+  fun featureSnapshotRejectsUnsignedIdentifiersAboveLongMaxValue() {
     memScoped {
       val geometry = alloc<mln_geometry>()
       geometry.type = MLN_GEOMETRY_TYPE_EMPTY

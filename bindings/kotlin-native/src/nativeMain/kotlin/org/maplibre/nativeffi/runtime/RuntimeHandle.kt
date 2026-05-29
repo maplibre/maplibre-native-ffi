@@ -460,7 +460,8 @@ public class RuntimeHandle private constructor(handle: CPointer<mln_runtime>) : 
     }
   }
 
-  public fun isClosed(): Boolean = state.isReleased()
+  public val isClosed: Boolean
+    get() = state.isReleased()
 
   internal fun nativeHandle(): CPointer<mln_runtime> = state.requireLive()
 

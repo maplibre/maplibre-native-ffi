@@ -24,6 +24,6 @@ public class ResourceRequest(
   public val priorData: ByteArray
     get() = priorDataBytes.copyOf()
 
-  /** HTTP byte range. Values preserve native uint64 bit patterns in Java-compatible [Long]s. */
+  /** HTTP byte range. Values preserve native `uint64_t` bit patterns in [Long]. */
   public data class ByteRange(public val start: Long, public val end: Long)
 }

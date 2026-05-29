@@ -4,13 +4,17 @@ package org.maplibre.nativeffi.geo
 public sealed interface FeatureIdentifier {
   public data object Null : FeatureIdentifier
 
-  /** Unsigned feature identifier stored as a non-negative [Long] for Java/common API alignment. */
+  /** Unsigned feature identifier (`uint64_t` in the C ABI) stored as a non-negative [Long]. */
   public data class UInt(public val value: Long) : FeatureIdentifier {
     init {
       require(value >= 0) { "unsigned feature identifier must be non-negative" }
     }
   }
 
+  /**
+   * Signed feature identifier (`int64_t` in the C ABI). Name mirrors the C discriminant, not Kotlin
+   * [kotlin.Int].
+   */
   public data class Int(public val value: Long) : FeatureIdentifier
 
   public data class DoubleValue(public val value: Double) : FeatureIdentifier

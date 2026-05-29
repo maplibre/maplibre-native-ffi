@@ -45,7 +45,7 @@ class DescriptorValidationTest {
   }
 
   @Test
-  fun enumInputsKeepJavaAlignedUnknownSentinelsUntilNativeValidation() {
+  fun enumInputsKeepUnknownSentinelsUntilNativeValidation() {
     MapOptions().mapMode = MapMode.UNKNOWN
     TileOptions().lodMode = TileLodMode.UNKNOWN
     ViewportOptions().northOrientation = NorthOrientation.UNKNOWN

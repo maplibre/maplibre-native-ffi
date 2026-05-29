@@ -306,7 +306,8 @@ private constructor(private val map: MapHandle, handle: CPointer<mln_render_sess
     state.closeOnce(::mln_render_session_destroy)
   }
 
-  public fun isClosed(): Boolean = state.isReleased()
+  public val isClosed: Boolean
+    get() = state.isReleased()
 
   public fun map(): MapHandle = map
 
