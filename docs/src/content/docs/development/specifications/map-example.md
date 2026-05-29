@@ -12,6 +12,9 @@ language bindings and render-target integrations through a focused map demo.
 
 ### What every example provides
 
+- All map, runtime, and render access from application code through the
+  project’s language binding for that language (not direct C API calls from the
+  example).
 - One top-level map window with resize support.
 - Continuous map mode: runtime pumping, event draining, and repaint driven by
   map render events and user input.
@@ -25,8 +28,8 @@ language bindings and render-target integrations through a focused map demo.
 
 ### What an example is not
 
-A `*-map` program is a focused map demo. It MUST NOT include automated tests or
-packaging/installer UX.
+A `*-map` program is a focused map demo. It MUST NOT call the C API directly
+from application code or include automated tests or packaging/installer UX.
 
 ---
 
@@ -35,12 +38,15 @@ packaging/installer UX.
 The table lists current `*-map` trees for comparison. Conformance is defined by
 the sections above, not by matching these paths.
 
-| Example              | Binding  | Toolkit         | Platforms             | Backends              |
-| -------------------- | -------- | --------------- | --------------------- | --------------------- |
-| `examples/zig-map`   | Zig      | SDL3            | Linux, macOS, Windows | Vulkan, Metal, OpenGL |
-| `examples/rust-map`  | Rust     | winit           | Linux, macOS, Windows | Vulkan                |
-| `examples/lwjgl-map` | Java FFM | GLFW, LWJGL     | Linux, macOS, Windows | Vulkan                |
-| `examples/swift-map` | Swift    | AppKit, SwiftUI | macOS                 | Metal                 |
+| Example              | Binding             | Toolkit         | Platforms             | Backends              |
+| -------------------- | ------------------- | --------------- | --------------------- | --------------------- |
+| `examples/zig-map`   | Zig                 | SDL3            | Linux, macOS, Windows | Vulkan, Metal, OpenGL |
+| `examples/rust-map`  | Rust                | winit           | Linux, macOS, Windows | Vulkan                |
+| `examples/lwjgl-map` | Java FFM            | GLFW, LWJGL     | Linux, macOS, Windows | Vulkan                |
+| `examples/swift-map` | Swift (C API today) | AppKit, SwiftUI | macOS                 | Metal                 |
+
+`swift-map` still uses the C API from application code; a Swift binding is
+expected. It does not meet the binding requirement until that work lands.
 
 ---
 
