@@ -14,8 +14,8 @@ what it must not try to be.
 - One top-level map window with resize support.
 - Continuous map mode: runtime pumping, event draining, and repaint driven by
   map render events and user input.
-- Shared initial map content (style URL and camera).
-- Shared camera interaction model (pointer, scroll, keyboard).
+- Initial style URL and camera per [Shared defaults](#shared-defaults).
+- Camera controls per [Input](#input).
 - Modular support for three render-target modes (see
   [Render-target modes](#render-target-modes)), structured so additional
   graphics backends and modes can be added without rewriting unrelated modules.
