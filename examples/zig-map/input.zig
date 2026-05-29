@@ -120,7 +120,7 @@ pub fn logControls() void {
 }
 
 fn handleMouseWheel(wheel: c.SDL_MouseWheelEvent, map: *maplibre.MapHandle) !Result {
-    const delta: f64 = -wheel.y;
+    const delta: f64 = wheel.y;
     if (delta == 0) return .{ .handled = true };
 
     const anchor = point(wheel.mouse_x, wheel.mouse_y);
@@ -146,22 +146,22 @@ fn handleKeyDown(
 
     switch (key.scancode) {
         scancode(c.SDL_SCANCODE_LEFT), scancode(c.SDL_SCANCODE_A) => {
-            try expectCameraStatus(map.moveBy(-pan_step, 0), "keyboard pan failed");
+            try expectCameraStatus(map.moveByAnimated(pan_step, 0, animation), "keyboard pan failed");
         },
         scancode(c.SDL_SCANCODE_RIGHT), scancode(c.SDL_SCANCODE_D) => {
-            try expectCameraStatus(map.moveBy(pan_step, 0), "keyboard pan failed");
+            try expectCameraStatus(map.moveByAnimated(-pan_step, 0, animation), "keyboard pan failed");
         },
         scancode(c.SDL_SCANCODE_UP), scancode(c.SDL_SCANCODE_W) => {
-            try expectCameraStatus(map.moveBy(0, -pan_step), "keyboard pan failed");
+            try expectCameraStatus(map.moveByAnimated(0, pan_step, animation), "keyboard pan failed");
         },
         scancode(c.SDL_SCANCODE_DOWN), scancode(c.SDL_SCANCODE_S) => {
-            try expectCameraStatus(map.moveBy(0, pan_step), "keyboard pan failed");
+            try expectCameraStatus(map.moveByAnimated(0, -pan_step, animation), "keyboard pan failed");
         },
         scancode(c.SDL_SCANCODE_EQUALS), scancode(c.SDL_SCANCODE_KP_PLUS) => {
-            try expectCameraStatus(map.scaleBy(zoom_step, center), "keyboard zoom failed");
+            try expectCameraStatus(map.scaleByAnimated(zoom_step, center, animation), "keyboard zoom failed");
         },
         scancode(c.SDL_SCANCODE_MINUS), scancode(c.SDL_SCANCODE_KP_MINUS) => {
-            try expectCameraStatus(map.scaleBy(1.0 / zoom_step, center), "keyboard zoom failed");
+            try expectCameraStatus(map.scaleByAnimated(1.0 / zoom_step, center, animation), "keyboard zoom failed");
         },
         scancode(c.SDL_SCANCODE_Q) => try adjustBearingAnimated(map, -bearing_step, animation),
         scancode(c.SDL_SCANCODE_E) => try adjustBearingAnimated(map, bearing_step, animation),
