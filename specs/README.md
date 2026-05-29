@@ -7,14 +7,20 @@ sidebar; in the repository they are the `specs/` tree.
 
 ## Referencing a spec section in code
 
-Cite a section in a trailing comment:
+Cite the spec file and heading fragment (slug), not a bare label:
 
 ```text
-// map-ex: frame-loop
+// map-example.md#frame-loop
 ```
 
-Section slugs match the heading text (kebab-case). See
-[map example spec](examples/map-example.md).
+Use the spec basename (`map-example.md`, and later e.g. `bindings.md`) plus `#`
+and the section slug. Slugs are kebab-case from the heading text—the same
+fragment as in `[Frame loop](map-example.md#frame-loop)` links inside the spec.
+Resolve the file from `specs/` (or `specs/examples/` for map-example) when
+opening it; published URLs can come later.
+
+For a subsection, use one fragment (`#owned-texture`) or `#render-target-modes`
+on the parent section—whichever you are implementing.
 
 ## Spec language
 

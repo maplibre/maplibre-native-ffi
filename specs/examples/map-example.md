@@ -51,9 +51,8 @@ examples):
 | `examples/lwjgl-map` | Java (FFM), GLFW + LWJGL | Vulkan; `owned-texture` and `native-surface` today.                                                      |
 | `examples/swift-map` | Swift, AppKit + SwiftUI  | Apple platforms; `native-surface` (Metal) only today.                                                    |
 
-New `*-map` examples MUST follow this spec and add a
-`// map-ex: implementations` pointer in the app entry module listing the example
-name.
+New `*-map` examples MUST follow this spec and cite this file from the app entry
+module (for example `// map-example.md#implementations`).
 
 ---
 
@@ -247,7 +246,7 @@ On window close or fatal error, close resources in order:
 
 Implementations MAY use abrupt process exit only when documented
 platform/backend bugs make orderly native teardown unsafe; that behavior MUST be
-localized and commented (`map-ex: lifecycle / shutdown`).
+localized and commented (for example `// map-example.md#shutdown`).
 
 ### Handle ownership
 
