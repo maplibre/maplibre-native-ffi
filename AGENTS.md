@@ -91,17 +91,15 @@ safety rules, and hard boundaries.
 
 ### Specifications
 
-Normative specs live in
-[docs/src/content/docs/development/specifications/](docs/src/content/docs/development/specifications/).
-RFC 2119 usage and code citations are in the
-[specifications index](docs/src/content/docs/development/specifications/index.md).
+For specs in
+[docs/src/content/docs/development/specifications/](docs/src/content/docs/development/specifications/):
 
-- **Standalone and testable:** write for implementers who may not read the repo;
+- Standalone and testable: write for implementers who may not read the repo;
   each requirement should be checkable without pointing at an example or today’s
   tree.
-- **Add, don’t restate or hedge:** link to C API and binding docs instead of
-  copying them; avoid “or equivalent”, unnamed MAYs, and vague outcomes.
-- **Scope by constraint:** family-wide sections state behavior; platform- or
+- Add, don’t restate or hedge: link to C API and binding docs instead of copying
+  them; avoid “or equivalent”, unnamed MAYs, and vague outcomes.
+- Scope by constraint: family-wide sections state behavior; platform- or
   API-specific rules belong in clearly labeled subsections.
 
 ### Testing
