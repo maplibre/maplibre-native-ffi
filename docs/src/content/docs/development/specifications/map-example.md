@@ -32,7 +32,7 @@ packaging/installer UX.
 
 ---
 
-## Examples in this repository
+## Implementations
 
 | Example              | Binding  | Toolkit         | Platforms             | Backends              |
 | -------------------- | -------- | --------------- | --------------------- | --------------------- |
