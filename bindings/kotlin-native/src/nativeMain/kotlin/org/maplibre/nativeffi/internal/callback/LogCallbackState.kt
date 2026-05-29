@@ -8,6 +8,7 @@ import kotlinx.cinterop.COpaquePointer
 import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.staticCFunction
+import org.maplibre.nativeffi.internal.c.mln_log_clear_callback
 import org.maplibre.nativeffi.internal.c.mln_log_set_callback
 import org.maplibre.nativeffi.internal.memory.MemoryUtil
 import org.maplibre.nativeffi.internal.status.Status
@@ -48,27 +49,49 @@ internal class LogCallbackState private constructor(private val callback: LogCal
   }
 
   internal companion object {
+    private val updateLock = AtomicInt(0)
     private val installed = AtomicInt(0)
     private val current = AtomicReference<LogCallbackState?>(null)
 
     fun set(callback: LogCallback) {
       val replacement = LogCallbackState(callback)
+      var previous: LogCallbackState? = null
       try {
-        if (installed.compareAndSet(0, 1)) {
-          Status.check(mln_log_set_callback(staticCFunction(::logCallback), null))
+        withUpdateLock {
+          if (installed.load() == 0) {
+            Status.check(mln_log_set_callback(staticCFunction(::logCallback), null))
+            installed.store(1)
+          }
+          previous = current.exchange(replacement)
         }
       } catch (error: Throwable) {
-        installed.store(0)
         replacement.close()
         throw error
       }
-      val previous = current.exchange(replacement)
       previous?.close()
     }
 
     fun clear() {
-      val previous = current.exchange(null)
+      var previous: LogCallbackState? = null
+      withUpdateLock {
+        if (installed.load() != 0) {
+          Status.check(mln_log_clear_callback())
+          installed.store(0)
+        }
+        previous = current.exchange(null)
+      }
       previous?.close()
+    }
+
+    private inline fun <T> withUpdateLock(block: () -> T): T {
+      while (!updateLock.compareAndSet(0, 1)) {
+        // Spin briefly; log callback registration is process-global and infrequent.
+      }
+      try {
+        return block()
+      } finally {
+        updateLock.store(0)
+      }
     }
 
     fun currentForTesting(): LogCallbackState? = current.load()

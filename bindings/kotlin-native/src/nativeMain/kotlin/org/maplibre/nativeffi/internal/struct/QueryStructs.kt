@@ -123,9 +123,10 @@ internal object QueryStructs {
     val native = scope.alloc<mln_rendered_feature_query_options>()
     mln_rendered_feature_query_options_default().place(native.ptr)
     value.layerIds?.let { layerIds ->
+      val layerIdSnapshot = layerIds.toList()
       native.fields = native.fields or MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS
-      native.layer_ids = stringViewArray(layerIds, scope)
-      native.layer_id_count = layerIds.size.toULong()
+      native.layer_ids = stringViewArray(layerIdSnapshot, scope)
+      native.layer_id_count = layerIdSnapshot.size.toULong()
     }
     value.filter?.let { filter -> native.filter = ValueStructs.jsonValue(filter, scope) }
     return native.ptr
@@ -139,9 +140,10 @@ internal object QueryStructs {
     val native = scope.alloc<mln_source_feature_query_options>()
     mln_source_feature_query_options_default().place(native.ptr)
     value.sourceLayerIds?.let { sourceLayerIds ->
+      val sourceLayerIdSnapshot = sourceLayerIds.toList()
       native.fields = native.fields or MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS
-      native.source_layer_ids = stringViewArray(sourceLayerIds, scope)
-      native.source_layer_id_count = sourceLayerIds.size.toULong()
+      native.source_layer_ids = stringViewArray(sourceLayerIdSnapshot, scope)
+      native.source_layer_id_count = sourceLayerIdSnapshot.size.toULong()
     }
     value.filter?.let { filter -> native.filter = ValueStructs.jsonValue(filter, scope) }
     return native.ptr

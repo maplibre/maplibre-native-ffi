@@ -598,13 +598,14 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
   }
 
   public fun addImageSourceUrl(sourceId: String, coordinates: List<LatLng>, url: String) {
+    val coordinateSnapshot = coordinates.toList()
     memScoped {
       Status.check(
         mln_map_add_image_source_url(
           state.requireLive(),
           CoreStructs.stringView(sourceId, this),
-          CoreStructs.latLngArray(coordinates, this),
-          coordinates.size.toULong(),
+          CoreStructs.latLngArray(coordinateSnapshot, this),
+          coordinateSnapshot.size.toULong(),
           CoreStructs.stringView(url, this),
         )
       )
@@ -616,13 +617,14 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     coordinates: List<LatLng>,
     image: PremultipliedRgba8Image,
   ) {
+    val coordinateSnapshot = coordinates.toList()
     memScoped {
       Status.check(
         mln_map_add_image_source_image(
           state.requireLive(),
           CoreStructs.stringView(sourceId, this),
-          CoreStructs.latLngArray(coordinates, this),
-          coordinates.size.toULong(),
+          CoreStructs.latLngArray(coordinateSnapshot, this),
+          coordinateSnapshot.size.toULong(),
           StyleStructs.premultipliedRgba8Image(image, this),
         )
       )
@@ -654,13 +656,14 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
   }
 
   public fun setImageSourceCoordinates(sourceId: String, coordinates: List<LatLng>) {
+    val coordinateSnapshot = coordinates.toList()
     memScoped {
       Status.check(
         mln_map_set_image_source_coordinates(
           state.requireLive(),
           CoreStructs.stringView(sourceId, this),
-          CoreStructs.latLngArray(coordinates, this),
-          coordinates.size.toULong(),
+          CoreStructs.latLngArray(coordinateSnapshot, this),
+          coordinateSnapshot.size.toULong(),
         )
       )
     }
@@ -1224,12 +1227,13 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     coordinates: List<LatLng>,
     fitOptions: CameraFitOptions? = null,
   ): CameraOptions = memScoped {
+    val coordinateSnapshot = coordinates.toList()
     val outCamera = mln_camera_options_default().getPointer(this)
     Status.check(
       mln_map_camera_for_lat_lngs(
         state.requireLive(),
-        CoreStructs.latLngArray(coordinates, this),
-        coordinates.size.toULong(),
+        CoreStructs.latLngArray(coordinateSnapshot, this),
+        coordinateSnapshot.size.toULong(),
         fitOptions?.let { MapStructs.cameraFitOptions(it, this) },
         outCamera,
       )
@@ -1346,31 +1350,33 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
   }
 
   public fun pixelsForLatLngs(coordinates: List<LatLng>): List<ScreenPoint> = memScoped {
-    if (coordinates.isEmpty()) return@memScoped emptyList()
-    val outPoints = allocArray<mln_screen_point>(coordinates.size)
+    val coordinateSnapshot = coordinates.toList()
+    if (coordinateSnapshot.isEmpty()) return@memScoped emptyList()
+    val outPoints = allocArray<mln_screen_point>(coordinateSnapshot.size)
     Status.check(
       mln_map_pixels_for_lat_lngs(
         state.requireLive(),
-        CoreStructs.latLngArray(coordinates, this),
-        coordinates.size.toULong(),
+        CoreStructs.latLngArray(coordinateSnapshot, this),
+        coordinateSnapshot.size.toULong(),
         outPoints,
       )
     )
-    CoreStructs.screenPointArray(outPoints, coordinates.size)
+    CoreStructs.screenPointArray(outPoints, coordinateSnapshot.size)
   }
 
   public fun latLngsForPixels(points: List<ScreenPoint>): List<LatLng> = memScoped {
-    if (points.isEmpty()) return@memScoped emptyList()
-    val outCoordinates = allocArray<mln_lat_lng>(points.size)
+    val pointSnapshot = points.toList()
+    if (pointSnapshot.isEmpty()) return@memScoped emptyList()
+    val outCoordinates = allocArray<mln_lat_lng>(pointSnapshot.size)
     Status.check(
       mln_map_lat_lngs_for_pixels(
         state.requireLive(),
-        CoreStructs.screenPointArray(points, this),
-        points.size.toULong(),
+        CoreStructs.screenPointArray(pointSnapshot, this),
+        pointSnapshot.size.toULong(),
         outCoordinates,
       )
     )
-    CoreStructs.latLngArray(outCoordinates, points.size)
+    CoreStructs.latLngArray(outCoordinates, pointSnapshot.size)
   }
 
   public fun attachMetalOwnedTexture(descriptor: MetalOwnedTextureDescriptor): RenderSessionHandle =
