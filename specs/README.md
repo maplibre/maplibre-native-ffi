@@ -1,15 +1,8 @@
 # Specifications
 
-Normative specifications for parallel implementations in this repository
-(language bindings, example applications, and related conformance targets). They
-live in `specs/` as plain Markdown so contributors, reviewers, and tooling can
-diff them like code.
-
-User-facing tutorials and contributor workflow stay in `docs/`. Conceptual
-overviews stay in
-[`docs/src/content/docs/concepts.md`](../docs/src/content/docs/concepts.md).
-Specs state **what** each family of implementations must do; concepts explain
-**why** the underlying C API is shaped that way.
+`specs/` holds normative specs for implementation families in this repo (for
+example `*-map` example apps and language bindings). Each spec defines what
+every implementation in that family must do so parallel codebases stay aligned.
 
 ## Referencing a spec section in code
 
