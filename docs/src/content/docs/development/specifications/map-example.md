@@ -13,8 +13,7 @@ language bindings and render-target integrations through a focused map demo.
 ### What every example provides
 
 - All map, runtime, and render access from application code through the
-  project’s language binding for that language (not direct C API calls from the
-  example).
+  project’s language binding for that language.
 - One top-level map window with resize support.
 - Continuous map mode: runtime pumping, event draining, and repaint driven by
   map render events and user input.
@@ -28,8 +27,8 @@ language bindings and render-target integrations through a focused map demo.
 
 ### What an example is not
 
-A `*-map` program is a focused map demo. It MUST NOT call the C API directly
-from application code or include automated tests or packaging/installer UX.
+A `*-map` program is a focused map demo. It MUST NOT include automated tests or
+packaging/installer UX.
 
 ---
 
