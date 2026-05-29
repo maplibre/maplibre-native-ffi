@@ -45,7 +45,7 @@ class MapCameraControlsTest {
         assertTrue(tileOptions.hasLodMode())
 
         val cameraOptions = CameraOptions().center(0.0, 0.0).zoom(1.0)
-        val animation = AnimationOptions().durationMillis(0.0)
+        val animation = AnimationOptions().durationMs(0.0)
         map.jumpTo(cameraOptions)
         map.easeTo(cameraOptions, animation)
         map.flyTo(cameraOptions, animation)

@@ -5,8 +5,10 @@ public class ResourceResponse private constructor(public val status: ResourceRes
   public var errorReason: ResourceErrorReason = ResourceErrorReason.NONE
     private set
 
-  public var bytes: ByteArray = ByteArray(0)
-    private set
+  private var responseBytes: ByteArray = ByteArray(0)
+
+  public val bytes: ByteArray
+    get() = responseBytes.copyOf()
 
   public var errorMessage: String? = null
     private set
@@ -27,12 +29,11 @@ public class ResourceResponse private constructor(public val status: ResourceRes
     private set
 
   public fun errorReason(errorReason: ResourceErrorReason): ResourceResponse = apply {
-    require(errorReason != ResourceErrorReason.UNKNOWN) { "errorReason must be a known value" }
     this.errorReason = errorReason
   }
 
   public fun bytes(bytes: ByteArray?): ResourceResponse = apply {
-    this.bytes = bytes?.copyOf() ?: ByteArray(0)
+    responseBytes = bytes?.copyOf() ?: ByteArray(0)
   }
 
   public fun errorMessage(errorMessage: String): ResourceResponse = apply {

@@ -6,21 +6,24 @@ public class OfflineRegionInfo(
   public val definition: OfflineRegionDefinition,
   metadata: ByteArray,
 ) {
-  public val metadata: ByteArray = metadata.copyOf()
+  private val metadataBytes: ByteArray = metadata.copyOf()
+
+  public val metadata: ByteArray
+    get() = metadataBytes.copyOf()
 
   override fun equals(other: Any?): Boolean =
     other is OfflineRegionInfo &&
       id == other.id &&
       definition == other.definition &&
-      metadata.contentEquals(other.metadata)
+      metadataBytes.contentEquals(other.metadataBytes)
 
   override fun hashCode(): Int {
     var result = id.hashCode()
     result = 31 * result + definition.hashCode()
-    result = 31 * result + metadata.contentHashCode()
+    result = 31 * result + metadataBytes.contentHashCode()
     return result
   }
 
   override fun toString(): String =
-    "OfflineRegionInfo(id=$id, definition=$definition, metadata=${metadata.size} bytes)"
+    "OfflineRegionInfo(id=$id, definition=$definition, metadata=${metadataBytes.size} bytes)"
 }

@@ -19,7 +19,10 @@ public class ResourceRequest(
   public val priorEtag: String?,
   priorData: ByteArray,
 ) {
-  public val priorData: ByteArray = priorData.copyOf()
+  private val priorDataBytes: ByteArray = priorData.copyOf()
+
+  public val priorData: ByteArray
+    get() = priorDataBytes.copyOf()
 
   /** HTTP byte range. Values preserve native uint64 bit patterns in Java-compatible [Long]s. */
   public data class ByteRange(public val start: Long, public val end: Long)

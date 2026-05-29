@@ -2,19 +2,34 @@ package org.maplibre.nativeffi.render
 
 /** Mutable Vulkan backend context descriptor. */
 public class VulkanContextDescriptor(
-  public var instance: NativePointer = NativePointer.NULL,
-  public var physicalDevice: NativePointer = NativePointer.NULL,
-  public var device: NativePointer = NativePointer.NULL,
-  public var graphicsQueue: NativePointer = NativePointer.NULL,
+  instance: NativePointer = NativePointer.NULL,
+  physicalDevice: NativePointer = NativePointer.NULL,
+  device: NativePointer = NativePointer.NULL,
+  graphicsQueue: NativePointer = NativePointer.NULL,
   graphicsQueueFamilyIndex: Int = 0,
-  public var getInstanceProcAddr: NativePointer = NativePointer.NULL,
-  public var getDeviceProcAddr: NativePointer = NativePointer.NULL,
+  getInstanceProcAddr: NativePointer = NativePointer.NULL,
+  getDeviceProcAddr: NativePointer = NativePointer.NULL,
 ) {
+  public var instance: NativePointer = instance
+    private set
+
+  public var physicalDevice: NativePointer = physicalDevice
+    private set
+
+  public var device: NativePointer = device
+    private set
+
+  public var graphicsQueue: NativePointer = graphicsQueue
+    private set
+
+  public var getInstanceProcAddr: NativePointer = getInstanceProcAddr
+    private set
+
+  public var getDeviceProcAddr: NativePointer = getDeviceProcAddr
+    private set
+
   public var graphicsQueueFamilyIndex: Int = graphicsQueueFamilyIndex
-    set(value) {
-      require(value >= 0) { "graphicsQueueFamilyIndex must be non-negative" }
-      field = value
-    }
+    private set
 
   init {
     require(graphicsQueueFamilyIndex >= 0) { "graphicsQueueFamilyIndex must be non-negative" }
@@ -35,6 +50,7 @@ public class VulkanContextDescriptor(
   }
 
   public fun graphicsQueueFamilyIndex(index: Int): VulkanContextDescriptor = apply {
+    require(index >= 0) { "graphicsQueueFamilyIndex must be non-negative" }
     this.graphicsQueueFamilyIndex = index
   }
 

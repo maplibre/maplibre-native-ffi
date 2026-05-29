@@ -76,7 +76,7 @@ internal object MapStructs {
   fun animationOptions(value: AnimationOptions, scope: MemScope): CPointer<mln_animation_options> {
     val native = scope.alloc<mln_animation_options>()
     mln_animation_options_default().place(native.ptr)
-    value.durationMillis?.let {
+    value.durationMs?.let {
       native.fields = native.fields or MLN_ANIMATION_OPTION_DURATION
       native.duration_ms = it
     }

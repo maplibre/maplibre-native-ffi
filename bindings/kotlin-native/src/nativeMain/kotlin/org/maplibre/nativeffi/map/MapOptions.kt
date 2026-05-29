@@ -26,10 +26,7 @@ public class MapOptions {
 
   public fun clearScaleFactor(): MapOptions = apply { scaleFactor = null }
 
-  public fun mapMode(mapMode: MapMode): MapOptions = apply {
-    require(mapMode != MapMode.UNKNOWN) { "mapMode must be a known value" }
-    this.mapMode = mapMode
-  }
+  public fun mapMode(mapMode: MapMode): MapOptions = apply { this.mapMode = mapMode }
 
   public fun clearMapMode(): MapOptions = apply { mapMode = null }
 }

@@ -7,7 +7,10 @@ public class PremultipliedRgba8Image(
   public val stride: Int,
   pixels: ByteArray,
 ) {
-  public val pixels: ByteArray = pixels.copyOf()
+  private val pixelBytes: ByteArray = pixels.copyOf()
+
+  public val pixels: ByteArray
+    get() = pixelBytes.copyOf()
 
   init {
     require(width > 0 && height > 0) { "width and height must be positive" }
@@ -25,16 +28,16 @@ public class PremultipliedRgba8Image(
       width == other.width &&
       height == other.height &&
       stride == other.stride &&
-      pixels.contentEquals(other.pixels)
+      pixelBytes.contentEquals(other.pixelBytes)
 
   override fun hashCode(): Int {
     var result = width.hashCode()
     result = 31 * result + height.hashCode()
     result = 31 * result + stride.hashCode()
-    result = 31 * result + pixels.contentHashCode()
+    result = 31 * result + pixelBytes.contentHashCode()
     return result
   }
 
   override fun toString(): String =
-    "PremultipliedRgba8Image(width=$width, height=$height, stride=$stride, pixels=${pixels.size} bytes)"
+    "PremultipliedRgba8Image(width=$width, height=$height, stride=$stride, pixels=${pixelBytes.size} bytes)"
 }

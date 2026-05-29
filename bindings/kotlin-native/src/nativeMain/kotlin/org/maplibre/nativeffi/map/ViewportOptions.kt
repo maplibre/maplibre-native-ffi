@@ -19,9 +19,6 @@ public class ViewportOptions {
   public fun hasNorthOrientation(): Boolean = northOrientation != null
 
   public fun northOrientation(northOrientation: NorthOrientation): ViewportOptions = apply {
-    require(northOrientation != NorthOrientation.UNKNOWN) {
-      "northOrientation must be a known value"
-    }
     this.northOrientation = northOrientation
   }
 
@@ -30,7 +27,6 @@ public class ViewportOptions {
   public fun hasConstrainMode(): Boolean = constrainMode != null
 
   public fun constrainMode(constrainMode: ConstrainMode): ViewportOptions = apply {
-    require(constrainMode != ConstrainMode.UNKNOWN) { "constrainMode must be a known value" }
     this.constrainMode = constrainMode
   }
 
@@ -39,7 +35,6 @@ public class ViewportOptions {
   public fun hasViewportMode(): Boolean = viewportMode != null
 
   public fun viewportMode(viewportMode: ViewportMode): ViewportOptions = apply {
-    require(viewportMode != ViewportMode.UNKNOWN) { "viewportMode must be a known value" }
     this.viewportMode = viewportMode
   }
 

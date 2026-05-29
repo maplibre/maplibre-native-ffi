@@ -28,33 +28,25 @@ class DescriptorValidationTest {
     assertFailsWith<IllegalArgumentException> { FeatureIdentifier.unsigned(-1L) }
     assertFailsWith<IllegalArgumentException> { FeatureIdentifier.UInt(-1L) }
     assertFailsWith<IllegalArgumentException> { RenderTargetExtent(-1, 1) }
-    assertFailsWith<IllegalArgumentException> { RenderTargetExtent().width = -1 }
+    assertFailsWith<IllegalArgumentException> { RenderTargetExtent().size(-1, 1) }
     assertFailsWith<IllegalArgumentException> {
       VulkanContextDescriptor(graphicsQueueFamilyIndex = -1)
     }
     assertFailsWith<IllegalArgumentException> {
-      VulkanContextDescriptor().graphicsQueueFamilyIndex = -1
+      VulkanContextDescriptor().graphicsQueueFamilyIndex(-1)
     }
     assertFailsWith<IllegalArgumentException> { VulkanBorrowedTextureDescriptor(format = -1) }
-    assertFailsWith<IllegalArgumentException> { VulkanBorrowedTextureDescriptor().format = -1 }
+    assertFailsWith<IllegalArgumentException> { VulkanBorrowedTextureDescriptor().format(-1) }
   }
 
   @Test
-  fun enumInputsRejectUnknownSentinels() {
-    assertFailsWith<IllegalArgumentException> { MapOptions().mapMode(MapMode.UNKNOWN) }
-    assertFailsWith<IllegalArgumentException> { TileOptions().lodMode(TileLodMode.UNKNOWN) }
-    assertFailsWith<IllegalArgumentException> {
-      ViewportOptions().northOrientation(NorthOrientation.UNKNOWN)
-    }
-    assertFailsWith<IllegalArgumentException> {
-      ViewportOptions().constrainMode(ConstrainMode.UNKNOWN)
-    }
-    assertFailsWith<IllegalArgumentException> {
-      ViewportOptions().viewportMode(ViewportMode.UNKNOWN)
-    }
-    assertFailsWith<IllegalArgumentException> {
-      ResourceResponse.error(ResourceErrorReason.UNKNOWN, "bad")
-    }
+  fun enumInputsKeepJavaAlignedUnknownSentinelsUntilNativeValidation() {
+    MapOptions().mapMode(MapMode.UNKNOWN)
+    TileOptions().lodMode(TileLodMode.UNKNOWN)
+    ViewportOptions().northOrientation(NorthOrientation.UNKNOWN)
+    ViewportOptions().constrainMode(ConstrainMode.UNKNOWN)
+    ViewportOptions().viewportMode(ViewportMode.UNKNOWN)
+    ResourceResponse.error(ResourceErrorReason.UNKNOWN, "bad")
   }
 
   @Test

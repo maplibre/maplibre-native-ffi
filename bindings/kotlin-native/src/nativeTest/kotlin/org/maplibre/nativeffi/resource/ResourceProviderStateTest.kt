@@ -1,16 +1,21 @@
 package org.maplibre.nativeffi.resource
 
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlinx.cinterop.ByteVar
 import kotlinx.cinterop.ExperimentalForeignApi
+import kotlinx.cinterop.UByteVar
 import kotlinx.cinterop.alloc
+import kotlinx.cinterop.allocArray
 import kotlinx.cinterop.cstr
+import kotlinx.cinterop.get
 import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.pointed
 import kotlinx.cinterop.ptr
 import kotlinx.cinterop.reinterpret
+import kotlinx.cinterop.set
 import org.maplibre.nativeffi.error.InvalidStateException
 import org.maplibre.nativeffi.internal.c.mln_resource_request
 import org.maplibre.nativeffi.internal.callback.ResourceProviderState
@@ -35,8 +40,22 @@ class ResourceProviderStateTest {
         request.kind = ResourceKind.TILE.nativeValue.toUInt()
         request.loading_method = ResourceLoadingMethod.NETWORK_ONLY.nativeValue.toUInt()
         request.priority = ResourcePriority.LOW.nativeValue.toUInt()
-        request.usage = ResourceUsage.ONLINE.nativeValue.toUInt()
+        request.usage = ResourceUsage.OFFLINE.nativeValue.toUInt()
         request.storage_policy = ResourceStoragePolicy.VOLATILE.nativeValue.toUInt()
+        request.has_range = true
+        request.range_start = 7UL
+        request.range_end = 11UL
+        request.has_prior_modified = true
+        request.prior_modified_unix_ms = 123L
+        request.has_prior_expires = true
+        request.prior_expires_unix_ms = 456L
+        request.prior_etag = "etag".cstr.getPointer(this)
+        val priorData = allocArray<UByteVar>(3)
+        priorData[0] = 1U
+        priorData[1] = 2U
+        priorData[2] = 3U
+        request.prior_data = priorData
+        request.prior_data_size = 3UL
         val fakeHandle =
           alloc<ByteVar>().ptr.reinterpret<cnames.structs.mln_resource_request_handle>()
         assertEquals(
@@ -45,10 +64,24 @@ class ResourceProviderStateTest {
         )
       }
       assertEquals(ResourceKind.TILE, copied?.kind)
+      assertEquals(ResourceKind.TILE.nativeValue, copied?.rawKind)
       assertEquals(ResourceLoadingMethod.NETWORK_ONLY, copied?.loadingMethod)
+      assertEquals(ResourceLoadingMethod.NETWORK_ONLY.nativeValue, copied?.rawLoadingMethod)
       assertEquals(ResourcePriority.LOW, copied?.priority)
+      assertEquals(ResourcePriority.LOW.nativeValue, copied?.rawPriority)
+      assertEquals(ResourceUsage.OFFLINE, copied?.usage)
+      assertEquals(ResourceUsage.OFFLINE.nativeValue, copied?.rawUsage)
       assertEquals(ResourceStoragePolicy.VOLATILE, copied?.storagePolicy)
+      assertEquals(ResourceStoragePolicy.VOLATILE.nativeValue, copied?.rawStoragePolicy)
       assertEquals("https://example.com/tile.pbf", copied?.url)
+      assertEquals(ResourceRequest.ByteRange(7, 11), copied?.range)
+      assertEquals(123L, copied?.priorModifiedUnixMs)
+      assertEquals(456L, copied?.priorExpiresUnixMs)
+      assertEquals("etag", copied?.priorEtag)
+      val firstPriorData = copied?.priorData ?: ByteArray(0)
+      assertContentEquals(byteArrayOf(1, 2, 3), firstPriorData)
+      firstPriorData[0] = 9
+      assertContentEquals(byteArrayOf(1, 2, 3), copied?.priorData)
     } finally {
       state.close()
     }
@@ -71,6 +104,10 @@ class ResourceProviderStateTest {
       assertEquals(true, native.has_modified)
       assertEquals(true, native.has_expires)
       assertEquals(true, native.has_retry_after)
+
+      val bytes = response.bytes
+      bytes[0] = 9
+      assertContentEquals(byteArrayOf(1, 2, 3), response.bytes)
     }
   }
 

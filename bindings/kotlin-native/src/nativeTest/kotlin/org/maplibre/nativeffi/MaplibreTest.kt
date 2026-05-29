@@ -31,12 +31,11 @@ class MaplibreTest {
   }
 
   @Test
-  fun animationDurationMsAliasesMatchKotlinDurationMillisNames() {
+  fun animationOptionsUseJavaAlignedDurationMsShape() {
     val options = AnimationOptions().durationMs(12.0)
     assertTrue(options.hasDurationMs())
-    assertTrue(options.hasDurationMillis())
-    assertEquals(12.0, options.durationMillis)
+    assertEquals(12.0, options.durationMs)
     options.clearDurationMs()
-    assertEquals(null, options.durationMillis)
+    assertEquals(null, options.durationMs)
   }
 }

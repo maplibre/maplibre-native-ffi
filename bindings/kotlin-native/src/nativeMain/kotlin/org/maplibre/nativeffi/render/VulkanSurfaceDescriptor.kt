@@ -2,10 +2,19 @@ package org.maplibre.nativeffi.render
 
 /** Mutable descriptor for Vulkan native surface render targets. */
 public class VulkanSurfaceDescriptor(
-  public var extent: RenderTargetExtent = RenderTargetExtent(),
-  public var context: VulkanContextDescriptor = VulkanContextDescriptor(),
-  public var surface: NativePointer = NativePointer.NULL,
+  extent: RenderTargetExtent = RenderTargetExtent(),
+  context: VulkanContextDescriptor = VulkanContextDescriptor(),
+  surface: NativePointer = NativePointer.NULL,
 ) {
+  public var extent: RenderTargetExtent = extent
+    private set
+
+  public var context: VulkanContextDescriptor = context
+    private set
+
+  public var surface: NativePointer = surface
+    private set
+
   public fun extent(extent: RenderTargetExtent): VulkanSurfaceDescriptor = apply {
     this.extent = extent
   }

@@ -3,6 +3,8 @@ package org.maplibre.nativeffi.runtime
 import cnames.structs.mln_offline_region_list
 import cnames.structs.mln_offline_region_snapshot
 import cnames.structs.mln_runtime
+import kotlin.experimental.ExperimentalNativeApi
+import kotlin.native.ref.WeakReference
 import kotlinx.cinterop.BooleanVar
 import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.CPointerVarOf
@@ -60,10 +62,10 @@ import org.maplibre.nativeffi.resource.ResourceProviderCallback
 import org.maplibre.nativeffi.resource.ResourceTransformCallback
 
 /** Owned native runtime handle. Close it on the owner thread. */
-@OptIn(ExperimentalForeignApi::class)
+@OptIn(ExperimentalForeignApi::class, ExperimentalNativeApi::class)
 public class RuntimeHandle private constructor(handle: CPointer<mln_runtime>) : AutoCloseable {
   private val state = HandleState("RuntimeHandle", handle)
-  private val liveMaps = mutableMapOf<Long, MapHandle>()
+  private val liveMaps = mutableMapOf<Long, WeakReference<MapHandle>>()
   private var resourceTransformState: ResourceTransformState? = null
   private var resourceProviderState: ResourceProviderState? = null
 
@@ -206,9 +208,6 @@ public class RuntimeHandle private constructor(handle: CPointer<mln_runtime>) : 
     id: Long,
     downloadState: OfflineRegionDownloadState,
   ): OfflineOperationHandle<Unit> = memScoped {
-    require(downloadState != OfflineRegionDownloadState.UNKNOWN) {
-      "downloadState must be a known value"
-    }
     val outOperationId = alloc<ULongVar>()
     Status.check(
       mln_runtime_offline_region_set_download_state_start(
@@ -479,7 +478,8 @@ public class RuntimeHandle private constructor(handle: CPointer<mln_runtime>) : 
     sourceAddress: Long?,
   ): MapHandle? {
     val mapSource =
-      if (sourceType == RuntimeEventSourceType.MAP && sourceAddress != null) liveMaps[sourceAddress]
+      if (sourceType == RuntimeEventSourceType.MAP && sourceAddress != null)
+        liveMaps[sourceAddress]?.value
       else null
     if (eventType == RuntimeEventType.MAP_STYLE_LOADED) {
       mapSource?.releaseDetachedCustomGeometrySources()
@@ -488,12 +488,12 @@ public class RuntimeHandle private constructor(handle: CPointer<mln_runtime>) : 
   }
 
   internal fun registerMap(map: MapHandle) {
-    liveMaps[map.nativeAddress()] = map
+    liveMaps[map.nativeAddress()] = WeakReference(map)
   }
 
   internal fun unregisterMap(map: MapHandle) {
     val address = map.nativeAddress()
-    if (liveMaps[address] === map) {
+    if (liveMaps[address]?.value === map) {
       liveMaps.remove(address)
     }
   }

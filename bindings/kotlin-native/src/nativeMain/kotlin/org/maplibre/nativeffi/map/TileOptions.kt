@@ -62,10 +62,7 @@ public class TileOptions {
 
   public fun hasLodMode(): Boolean = lodMode != null
 
-  public fun lodMode(lodMode: TileLodMode): TileOptions = apply {
-    require(lodMode != TileLodMode.UNKNOWN) { "lodMode must be a known value" }
-    this.lodMode = lodMode
-  }
+  public fun lodMode(lodMode: TileLodMode): TileOptions = apply { this.lodMode = lodMode }
 
   public fun clearLodMode(): TileOptions = apply { lodMode = null }
 }

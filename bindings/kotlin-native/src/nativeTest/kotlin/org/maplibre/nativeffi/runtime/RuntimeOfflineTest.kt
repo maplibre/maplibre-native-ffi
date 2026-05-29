@@ -6,6 +6,7 @@ import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import org.maplibre.nativeffi.Maplibre
+import org.maplibre.nativeffi.error.InvalidArgumentException
 import org.maplibre.nativeffi.error.InvalidStateException
 import org.maplibre.nativeffi.offline.OfflineRegionDownloadState
 
@@ -24,10 +25,10 @@ class RuntimeOfflineTest {
   }
 
   @Test
-  fun offlineDownloadStateRejectsUnknownSentinel() {
+  fun offlineDownloadStateUnknownSentinelUsesNativeValidation() {
     val runtime = RuntimeHandle.create()
     try {
-      assertFailsWith<IllegalArgumentException> {
+      assertFailsWith<InvalidArgumentException> {
         runtime.startSetOfflineRegionDownloadState(1, OfflineRegionDownloadState.UNKNOWN)
       }
     } finally {
