@@ -3,6 +3,7 @@ package org.maplibre.nativeffi.render;
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 import java.util.Objects;
+import org.maplibre.nativeffi.error.InvalidStateException;
 
 /**
  * Explicit handle for an OpenGL session-owned texture frame.
@@ -48,7 +49,21 @@ public final class OpenGLOwnedTextureFrameHandle implements AutoCloseable {
     if (closed) {
       return;
     }
-    session.releaseOpenGLFrame(frameSegment, null);
+    try {
+      session.releaseOpenGLFrame(frameSegment, null);
+    } catch (InvalidStateException error) {
+      if (session.isClosed()) {
+        closeLocal();
+      }
+      throw error;
+    }
+    closeLocal();
+  }
+
+  private void closeLocal() {
+    if (closed) {
+      return;
+    }
     closed = true;
     leakRegistration.report().markClosed();
     leakRegistration.cleanable().clean();

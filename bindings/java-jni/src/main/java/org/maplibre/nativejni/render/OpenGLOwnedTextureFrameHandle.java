@@ -1,6 +1,7 @@
 package org.maplibre.nativejni.render;
 
 import java.util.Objects;
+import org.maplibre.nativejni.error.InvalidStateException;
 import org.maplibre.nativejni.internal.javacpp.MaplibreNativeC;
 
 /**
@@ -46,7 +47,21 @@ public final class OpenGLOwnedTextureFrameHandle implements AutoCloseable {
     if (closed) {
       return;
     }
-    session.releaseOpenGLFrame(nativeFrame, null);
+    try {
+      session.releaseOpenGLFrame(nativeFrame, null);
+    } catch (InvalidStateException error) {
+      if (session.isClosed()) {
+        closeLocal();
+      }
+      throw error;
+    }
+    closeLocal();
+  }
+
+  private void closeLocal() {
+    if (closed) {
+      return;
+    }
     closed = true;
     leakRegistration.report().markClosed();
     leakRegistration.cleanable().clean();

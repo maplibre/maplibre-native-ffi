@@ -57,12 +57,13 @@ public class MapProjectionHandle private constructor(handle: CPointer<mln_map_pr
   }
 
   public fun setVisibleCoordinates(coordinates: List<LatLng>, padding: EdgeInsets) {
+    val coordinateSnapshot = coordinates.toList()
     memScoped {
       Status.check(
         mln_map_projection_set_visible_coordinates(
           state.requireLive(),
-          CoreStructs.latLngArray(coordinates, this),
-          coordinates.size.toULong(),
+          CoreStructs.latLngArray(coordinateSnapshot, this),
+          coordinateSnapshot.size.toULong(),
           CoreStructs.edgeInsets(padding),
         )
       )

@@ -17,6 +17,7 @@ import kotlinx.cinterop.rawValue
 import kotlinx.cinterop.sizeOf
 import kotlinx.cinterop.toLong
 import kotlinx.cinterop.value
+import org.maplibre.nativeffi.error.InvalidStateException
 import org.maplibre.nativeffi.internal.c.MLN_RUNTIME_OPTION_MAXIMUM_CACHE_SIZE
 import org.maplibre.nativeffi.internal.c.mln_offline_region_status
 import org.maplibre.nativeffi.internal.c.mln_runtime_clear_resource_transform
@@ -382,8 +383,16 @@ public class RuntimeHandle private constructor(handle: CPointer<mln_runtime>) : 
   ): OfflineOperationHandle<T> = OfflineOperationHandle(this, operationId, kind, resultKind)
 
   public fun discardOfflineOperation(operation: OfflineOperationHandle<*>) {
+    if (operation.isClosed) return
     val id = operation.requireLive(this)
-    Status.check(mln_runtime_offline_operation_discard(state.requireLive(), id))
+    val runtime =
+      try {
+        state.requireLive()
+      } catch (error: InvalidStateException) {
+        operation.markConsumed()
+        throw error
+      }
+    Status.check(mln_runtime_offline_operation_discard(runtime, id))
     operation.markConsumed()
   }
 

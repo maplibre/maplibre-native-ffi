@@ -6,12 +6,8 @@ public sealed interface JsonValue {
 
   public data class Bool(public val value: Boolean) : JsonValue
 
-  /** Unsigned JSON integer (`uint64_t` in the C ABI) stored as a non-negative [Long]. */
-  public data class UInt(public val value: Long) : JsonValue {
-    init {
-      require(value >= 0) { "unsigned JSON value must be non-negative" }
-    }
-  }
+  /** Unsigned JSON integer (`uint64_t` in the C ABI) stored as a [Long] bit pattern. */
+  public data class UInt(public val value: Long) : JsonValue
 
   /**
    * Signed JSON integer (`int64_t` in the C ABI). Name mirrors the C discriminant, not Kotlin

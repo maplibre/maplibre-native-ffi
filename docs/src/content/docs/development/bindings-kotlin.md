@@ -60,18 +60,14 @@ Kotlin/Native code converts between `NativePointer`, `COpaquePointer?`, and
 
 Use signed `Int` and `Long` public values at the binding boundary, then validate
 before converting to unsigned native fields. Reject negative sizes, counts, enum
-sentinels, and unsigned numeric inputs with clear exceptions instead of wrapping
-them.
+sentinels, and unsigned numeric inputs that do not explicitly preserve native
+bit patterns with clear exceptions instead of wrapping them.
 
-Use `Long` for native `uint64_t` values only in two cases:
-
-- numeric values that fit in Kotlin's non-negative `Long` range, such as
-  `JsonValue.UInt` and `FeatureIdentifier.UInt`; reject larger native snapshots
-  and negative public inputs;
-- opaque identifiers, backend values, or ranges carried as raw bits, such as
-  offline operation IDs, render frame generation IDs, frame IDs, Metal pixel
-  formats, byte ranges, and native pointer addresses; document those fields as
-  bit-pattern values on the public API.
+Use `Long` for native `uint64_t` values that need Java-analogous API shape.
+Preserve the bit pattern for values that may use the full native range, such as
+`JsonValue.UInt`, `FeatureIdentifier.UInt`, offline operation IDs, render frame
+generation IDs, frame IDs, Metal pixel formats, byte ranges, and native pointer
+addresses. Document those fields as bit-pattern values on the public API.
 
 ## Handles, Status, and Threading
 

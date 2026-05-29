@@ -82,4 +82,22 @@ class RuntimeHandleTest {
       runtime.close()
     }
   }
+
+  @Test
+  fun closingOfflineOperationAfterRuntimeCloseConsumesHandle() {
+    val runtime = RuntimeHandle.create()
+    val operation =
+      OfflineOperationHandle<Unit>(
+        runtime,
+        1UL,
+        OfflineOperationKind.AMBIENT_CACHE,
+        OfflineOperationResultKind.NONE,
+      )
+
+    runtime.close()
+
+    assertFailsWith<InvalidStateException> { operation.close() }
+    assertTrue(operation.isClosed)
+    operation.close()
+  }
 }

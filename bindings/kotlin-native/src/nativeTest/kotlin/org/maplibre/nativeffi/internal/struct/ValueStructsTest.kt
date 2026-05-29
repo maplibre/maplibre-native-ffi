@@ -2,7 +2,6 @@ package org.maplibre.nativeffi.internal.struct
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.alloc
 import kotlinx.cinterop.get
@@ -61,27 +60,52 @@ class ValueStructsTest {
   }
 
   @Test
-  fun jsonSnapshotRejectsUnsignedValuesAboveLongMaxValue() {
+  fun jsonMaterializerPreservesUnsignedBitPatterns() {
     memScoped {
-      val native = alloc<mln_json_value>()
-      native.type = MLN_JSON_VALUE_TYPE_UINT
-      native.data.uint_value = Long.MAX_VALUE.toULong() + 1UL
+      val native = ValueStructs.jsonValue(JsonValue.UInt(-1L), this).pointed
 
-      assertFailsWith<IllegalArgumentException> { ValueStructs.jsonSnapshot(native.ptr) }
+      assertEquals(MLN_JSON_VALUE_TYPE_UINT, native.type)
+      assertEquals(ULong.MAX_VALUE, native.data.uint_value)
     }
   }
 
   @Test
-  fun featureSnapshotRejectsUnsignedIdentifiersAboveLongMaxValue() {
+  fun jsonSnapshotPreservesUnsignedBitPatterns() {
+    memScoped {
+      val native = alloc<mln_json_value>()
+      native.type = MLN_JSON_VALUE_TYPE_UINT
+      native.data.uint_value = ULong.MAX_VALUE
+
+      assertEquals(JsonValue.UInt(-1L), ValueStructs.jsonSnapshot(native.ptr))
+    }
+  }
+
+  @Test
+  fun featureMaterializerPreservesUnsignedIdentifierBitPatterns() {
+    val feature = Feature(Geometry.Empty, emptyList(), FeatureIdentifier.UInt(-1L))
+
+    memScoped {
+      val native = ValueStructs.feature(feature, this).pointed
+
+      assertEquals(MLN_FEATURE_IDENTIFIER_TYPE_UINT, native.identifier_type)
+      assertEquals(ULong.MAX_VALUE, native.identifier.uint_value)
+    }
+  }
+
+  @Test
+  fun featureSnapshotPreservesUnsignedIdentifierBitPatterns() {
     memScoped {
       val geometry = alloc<mln_geometry>()
       geometry.type = MLN_GEOMETRY_TYPE_EMPTY
       val feature = alloc<mln_feature>()
       feature.geometry = geometry.ptr
       feature.identifier_type = MLN_FEATURE_IDENTIFIER_TYPE_UINT
-      feature.identifier.uint_value = Long.MAX_VALUE.toULong() + 1UL
+      feature.identifier.uint_value = ULong.MAX_VALUE
 
-      assertFailsWith<IllegalArgumentException> { ValueStructs.featureSnapshot(feature.ptr) }
+      assertEquals(
+        FeatureIdentifier.UInt(-1L),
+        ValueStructs.featureSnapshot(feature.ptr).identifier,
+      )
     }
   }
 

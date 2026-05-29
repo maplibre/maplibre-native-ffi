@@ -312,8 +312,7 @@ internal object ValueStructs {
     when (native.type) {
       MLN_JSON_VALUE_TYPE_NULL -> JsonValue.Null
       MLN_JSON_VALUE_TYPE_BOOL -> JsonValue.Bool(native.data.bool_value)
-      MLN_JSON_VALUE_TYPE_UINT ->
-        JsonValue.UInt(checkedLong(native.data.uint_value, "JSON unsigned value"))
+      MLN_JSON_VALUE_TYPE_UINT -> JsonValue.UInt(native.data.uint_value.toLong())
       MLN_JSON_VALUE_TYPE_INT -> JsonValue.Int(native.data.int_value)
       MLN_JSON_VALUE_TYPE_DOUBLE -> JsonValue.DoubleValue(native.data.double_value)
       MLN_JSON_VALUE_TYPE_STRING ->
@@ -389,18 +388,11 @@ internal object ValueStructs {
     return value.toInt()
   }
 
-  private fun checkedLong(value: ULong, name: String): Long {
-    require(value <= Long.MAX_VALUE.toULong()) { "$name exceeds Long.MAX_VALUE" }
-    return value.toLong()
-  }
-
   private fun readFeatureIdentifier(native: mln_feature): FeatureIdentifier =
     when (native.identifier_type) {
       MLN_FEATURE_IDENTIFIER_TYPE_NULL -> FeatureIdentifier.Null
       MLN_FEATURE_IDENTIFIER_TYPE_UINT ->
-        FeatureIdentifier.UInt(
-          checkedLong(native.identifier.uint_value, "unsigned feature identifier")
-        )
+        FeatureIdentifier.UInt(native.identifier.uint_value.toLong())
       MLN_FEATURE_IDENTIFIER_TYPE_INT -> FeatureIdentifier.Int(native.identifier.int_value)
       MLN_FEATURE_IDENTIFIER_TYPE_DOUBLE ->
         FeatureIdentifier.DoubleValue(native.identifier.double_value)
