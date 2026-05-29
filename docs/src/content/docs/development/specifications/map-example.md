@@ -38,9 +38,6 @@ to example behavior and is not specified here.
 
 ## Implementations
 
-Reference implementations in this repository (not exhaustive of future
-examples):
-
 | Example              | Language / toolkit       | Notes                                                                                                    |
 | -------------------- | ------------------------ | -------------------------------------------------------------------------------------------------------- |
 | `examples/zig-map`   | Zig, SDL3                | Reference architecture; all three render-target modes on supported backends (Vulkan, Metal, OpenGL/EGL). |
