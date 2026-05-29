@@ -225,30 +225,41 @@ On window close or fatal error, close resources in order:
 
 ## Frame loop
 
-Each frame iteration MUST follow this logical sequence:
+Each iteration has two phases: **pump** (always) and **render** (only when
+`render_pending` is true).
+
+### Pump (every iteration)
 
 ```mermaid
 sequenceDiagram
   participant EL as Event loop
   participant RT as Runtime
-  participant MP as Map
-  participant RS as Render session
-  participant GFX as Backend / compositor
+  participant BE as Backend
 
   EL->>EL: Poll window + input events
-  Note over EL: Resize may reattach target
+  Note over EL: Resize may reattach target; input may set render_pending
   EL->>RT: run_once()
-  EL->>RT: poll events → render_pending
-  EL->>GFX: finishFrame() / swapchain upkeep
-  alt render_pending
-    EL->>RS: render_update()
-    alt texture mode
-      RS->>GFX: acquire frame / draw compositor / present
-    else native surface
-      RS->>GFX: present via surface session
-    end
+  EL->>RT: drain events → may set render_pending
+  EL->>BE: finishFrame()
+```
+
+### Render (`render_pending`)
+
+```mermaid
+sequenceDiagram
+  participant EL as Event loop
+  participant RS as Render session
+  participant CP as Compositor
+  participant BE as Backend
+
+  EL->>RS: render_update()
+  alt texture mode
+    RS-->>EL: map texture / frame
+    EL->>CP: draw into swapchain
+    CP->>BE: present
+  else native-surface
+    RS->>BE: present via surface session
   end
-  Note over EL: Idle sleep when no work
 ```
 
 Requirements:
