@@ -106,10 +106,6 @@ The mode is a required positional argument (for example
 On `--help` or invalid arguments, print usage listing the three mode names and
 exit before creating a window.
 
-Implementations MAY omit support for modes their graphics stack does not provide
-(see [Conditional requirements](#conditional-requirements)); omitted modes MUST
-be rejected at startup with a clear error if requested on the command line.
-
 ### Other flags
 
 The only permitted flag is `--help`. Implementations MUST NOT add other CLI
@@ -175,8 +171,7 @@ Each backend variant implements, at minimum:
 - `init` / `deinit`
 - `resize(viewport)`
 - `attachRenderTarget(map, viewport) → session`
-- `finishFrame()` (window presentation upkeep; see
-  [Conditional requirements](#conditional-requirements))
+- `finishFrame()` (window presentation upkeep each pump iteration)
 - `drawTexture(session, viewport)` for texture modes
 - `needsRenderTargetReattachOnResize() → bool` (see [Resize](#resize))
 
@@ -231,7 +226,9 @@ Each iteration has two phases: pump (always) and render (only when
 ### Pump (every iteration)
 
 While polling, handle resize (reattach the render target when required) and
-input (may set `render_pending`).
+input (may set `render_pending`). Toolkits that use callbacks or timers instead
+of a single poll API MUST run one pump iteration per display refresh tick (for
+example an `NSTimer` on `swift-map`).
 
 ```mermaid
 sequenceDiagram
@@ -244,6 +241,9 @@ sequenceDiagram
   EL->>RT: drain events → may set render_pending
   EL->>BE: finishFrame()
 ```
+
+`finishFrame()` runs every pump iteration: swapchain or surface upkeep, resize
+handling, and present hooks as required by the host graphics API.
 
 ### Render (`render_pending`)
 
@@ -342,9 +342,8 @@ resizes backend-owned textures/surfaces, and re-attaches.
 ## Render-target modes
 
 Three modes MUST be modeled in every example’s architecture (CLI parsing,
-backend discriminant, and attach paths). Implementations MUST implement every
-mode required by [Conditional requirements](#conditional-requirements) for their
-graphics API.
+backend discriminant, and attach paths). Each example MUST implement all three
+modes for its graphics API.
 
 ### Mode comparison
 
@@ -357,7 +356,7 @@ graphics API.
 ### Startup status lines
 
 Startup MUST print the active mode’s CLI value and exactly one line from this
-table (character-for-character, including the prefix):
+table:
 
 | CLI value          | Printed line                                                                                       |
 | ------------------ | -------------------------------------------------------------------------------------------------- |
@@ -369,27 +368,25 @@ table (character-for-character, including the prefix):
 
 - Attach with the C API owned-texture descriptor for the active graphics API.
 - Pass the host graphics context handles required by that descriptor (see
-  [Conditional requirements](#conditional-requirements)).
+  [Graphics API](#graphics-api)).
 - On `render_update`, acquire the frame/image from the session, draw via
   compositor, release/close the frame per the C API frame lifetime rules.
-- Resize the compositor and session per the C API and conditional requirements
-  for the active graphics API.
 
 ### `borrowed-texture`
 
 - Host creates an exportable texture sized to the viewport (see
-  [Conditional requirements](#conditional-requirements)).
+  [Graphics API](#graphics-api)).
 - Attach with the borrowed-texture descriptor referencing host-owned handles.
 - On `render_update`, sample that texture through the same compositor path as
   `owned-texture`.
-- `needsRenderTargetReattachOnResize` MUST return `true`: on resize, destroy the
-  render session, recreate host textures, and attach a new session for the new
-  extent.
+- On resize, recreate the host texture and re-attach the session (see
+  [Resize](#resize); `needsRenderTargetReattachOnResize` is `true` for this
+  mode).
 
 ### `native-surface`
 
 - Attach with the C API surface descriptor for window presentation (see
-  [Conditional requirements](#conditional-requirements)).
+  [Graphics API](#graphics-api)).
 - `render_update` presents through the surface session directly.
 - `drawTexture` MUST NOT be called for this mode.
 - On resize, call session `resize` and rebuild host presentation; reattach when
@@ -402,9 +399,14 @@ table (character-for-character, including the prefix):
 - Subscribe to window size, framebuffer size, and display-scale / content-scale
   events (as available on the platform).
 - Recompute viewport; skip rendering if extent is empty.
-- If `needsRenderTargetReattachOnResize()` → full session reattach path.
-- Else → resize backend swapchain/context, resize compositor, call session
-  `resize` with new extent.
+- `needsRenderTargetReattachOnResize()` is a backend method. It returns `true`
+  for `borrowed-texture` because the host-owned exportable texture is fixed to
+  the viewport size: resize destroys the session, recreates the texture, and
+  attaches again. It returns `false` for `owned-texture` and `native-surface`,
+  where resize updates the swapchain or surface and calls session `resize` (and
+  resizes the compositor for texture modes).
+- When it returns `true`, use the full reattach path; otherwise resize backend,
+  compositor (texture modes), and session in place.
 - Set `render_pending` after any resize.
 
 ---
@@ -414,7 +416,7 @@ table (character-for-character, including the prefix):
 ### Control scheme
 
 Implementations MUST provide the following interactions and MUST print this help
-text once at startup (wording MAY vary only for platform-specific key names):
+text once at startup:
 
 ```text
 Controls:
@@ -434,7 +436,7 @@ Controls:
 | ----------------------------- | ----------------------------------------------------------------------------------------------------------- |
 | Left drag                     | `move_by` with pointer delta in logical coordinates.                                                        |
 | Right drag, or Ctrl+left drag | Adjust bearing by `0.5 × Δx` degrees; adjust pitch by `0.5 × Δy` degrees (same sign convention everywhere). |
-| Scroll                        | Zoom about cursor: `scale_by(2^(Δ * 0.25), anchor)`; negate axis as needed for toolkit scroll direction.    |
+| Scroll                        | Zoom about cursor: `scale_by(2^(Δ * 0.25), anchor)` with `Δ = −wheel_y` (scroll up zooms in).               |
 | Arrow keys / WASD             | Pan `120` logical units per key press.                                                                      |
 | `+` / `-`                     | Zoom `1.25` / `1/1.25` about viewport center.                                                               |
 | `Q` / `E`                     | Bearing ±`10`° with keyboard animation.                                                                     |
@@ -465,75 +467,34 @@ Input handlers return whether the camera changed so the frame loop can set
 
 ---
 
-## Conditional requirements
+## Graphics API
 
-### When Vulkan presents the window
+Attach descriptors and shared context handles per graphics API. All three
+render-target modes MUST be implemented on each API the example supports.
 
-Applies when: the example uses Vulkan for the window surface and swapchain.
+### Vulkan
 
-- MUST implement render-target modes `owned-texture` and `native-surface`.
-- SHOULD implement `borrowed-texture` when the swapchain supports exportable
-  textures.
-- MUST use one shared Vulkan context (`VkInstance`, `VkDevice`, queue, and
+- One shared Vulkan context (`VkInstance`, `VkDevice`, queue, and
   `VkSurfaceKHR`) for compositor and render session.
-- `owned-texture`: attach with the Vulkan owned-texture descriptor; pass those
-  shared handles.
-- `borrowed-texture`: host allocates an exportable `VkImage` (and view) sized to
-  the viewport; attach with the borrowed-texture descriptor.
-- `native-surface`: attach with the Vulkan surface / swapchain presentation
-  descriptor for the window’s `VkSurfaceKHR`.
-- `finishFrame()` MUST maintain the swapchain (recreate or resize on window
-  resize, acquire/present each frame as required by the host).
-- On viewport resize for texture modes, resize both the compositor and the
-  render session when the C API requires both.
-- The compositor MUST follow
-  [Compositor shaders](#compositor-shaders-texture-modes).
+- `owned-texture`: Vulkan owned-texture descriptor with those shared handles.
+- `borrowed-texture`: exportable `VkImage` and view sized to the viewport;
+  borrowed-texture descriptor.
+- `native-surface`: surface / swapchain presentation descriptor for the window
+  `VkSurfaceKHR`.
 
-### When presentation goes through a Metal layer or surface
+### Metal
 
-Applies when: the example uses Metal for window presentation.
+- `native-surface`: Metal surface descriptor for the window `CAMetalLayer`.
+- `owned-texture`: Metal owned-texture descriptor; shared device and layer
+  handles required by the C API.
+- `borrowed-texture`: exportable Metal texture sized to the viewport;
+  borrowed-texture descriptor.
 
-- MUST implement `native-surface`.
-- MAY implement `owned-texture` and `borrowed-texture`.
-- `native-surface`: attach with the Metal surface descriptor for the window’s
-  `CAMetalLayer`.
-- `owned-texture`: attach with the Metal owned-texture descriptor; pass the
-  shared Metal device and layer handles required by the C API.
-- `borrowed-texture`: host allocates an exportable Metal texture sized to the
-  viewport; attach with the borrowed-texture descriptor.
+### OpenGL / EGL
 
-### When the host uses OpenGL or EGL
-
-Applies when: the example uses OpenGL or EGL for window presentation.
-
-- SHOULD implement all three render-target modes when the GL/EGL stack exposes
-  owned-texture, borrowed-texture, and surface attach paths.
-- `native-surface`: attach with the OpenGL or EGL surface descriptor for the
-  window’s platform GL surface.
-- `owned-texture`: attach with the OpenGL owned-texture descriptor; pass the
-  shared GL context handles required by the C API.
-- `borrowed-texture`: host allocates an exportable GL texture sized to the
-  viewport; attach with the borrowed-texture descriptor.
-- The compositor MUST follow
-  [Compositor shaders](#compositor-shaders-texture-modes).
-
-### When map work runs on a single UI thread
-
-Applies when: the platform or host integration requires runtime, map, and render
-session use on one UI owner thread.
-
-- All map and render calls MUST run on that thread.
-- Window and layer setup MUST follow the C API owner-thread contract for that
-  integration.
-
-### When the window toolkit has no single cross-platform event pump
-
-Applies when: the host UI framework does not deliver input, resize, and idle
-ticks through one portable poll loop.
-
-- The example MUST still run the [frame loop](#frame-loop) logic each tick
-  (runtime pump, event drain, conditional render).
-- The example SHOULD drive ticks at roughly display refresh (for example ~60 Hz
-  timer or display link).
-- [Input](#input) behavior and constants are unchanged; only the event source
-  differs.
+- `native-surface`: OpenGL or EGL surface descriptor for the window’s platform
+  GL surface.
+- `owned-texture`: OpenGL owned-texture descriptor; shared GL context handles
+  required by the C API.
+- `borrowed-texture`: exportable GL texture sized to the viewport;
+  borrowed-texture descriptor.
