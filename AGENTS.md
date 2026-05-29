@@ -96,8 +96,8 @@ For [specification writing](docs/src/content/docs/development/specifications/):
 - Standalone and testable: write for implementers who may not read the repo;
   each requirement should be checkable without pointing at an example or today’s
   tree.
-- Add, don’t restate or hedge: link to C API and binding docs instead of copying
-  them; avoid “or equivalent”, unnamed MAYs, and vague outcomes.
+- Add, don’t restate or hedge: link to other docs instead of copying them; avoid
+  “or equivalent”, unnamed MAYs, and vague outcomes.
 - Scope by constraint: family-wide sections state behavior; platform- or
   API-specific rules belong in clearly labeled subsections.
 
