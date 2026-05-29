@@ -85,12 +85,6 @@ final class RenderSessionHandleTest {
         assertEquals(info.byteLength(), buffer.toByteArray().length);
       }
 
-      var image = activeSession.readPremultipliedRgba8();
-      assertEquals(info.width(), image.width());
-      assertEquals(info.height(), image.height());
-      assertEquals(info.stride(), image.stride());
-      assertEquals(info.byteLength(), image.pixels().length);
-
       activeSession.reduceMemoryUse();
       activeSession.clearData();
       activeSession.dumpDebugLogs();
@@ -209,7 +203,10 @@ final class RenderSessionHandleTest {
       assertThrows(
           UnsupportedFeatureException.class, activeSession::acquireOpenGLOwnedTextureFrame);
       assertThrows(UnsupportedFeatureException.class, activeSession::textureImageInfo);
-      assertThrows(UnsupportedFeatureException.class, activeSession::readPremultipliedRgba8);
+      try (var buffer = NativeBuffer.allocate(4)) {
+        assertThrows(
+            UnsupportedFeatureException.class, () -> activeSession.readPremultipliedRgba8(buffer));
+      }
       assertThrows(UnsupportedFeatureException.class, () -> activeSession.resize(128, 128, 1.0));
       assertTrue(hasNonZeroByte(target.readOpenGLBorrowedTextureRgba()));
     } finally {
@@ -234,7 +231,10 @@ final class RenderSessionHandleTest {
       assertThrows(
           UnsupportedFeatureException.class, activeSession::acquireOpenGLOwnedTextureFrame);
       assertThrows(UnsupportedFeatureException.class, activeSession::textureImageInfo);
-      assertThrows(UnsupportedFeatureException.class, activeSession::readPremultipliedRgba8);
+      try (var buffer = NativeBuffer.allocate(4)) {
+        assertThrows(
+            UnsupportedFeatureException.class, () -> activeSession.readPremultipliedRgba8(buffer));
+      }
       assertTrue(hasNonZeroByte(target.readOpenGLSurfaceRgba(128, 128)));
     } finally {
       map.close();

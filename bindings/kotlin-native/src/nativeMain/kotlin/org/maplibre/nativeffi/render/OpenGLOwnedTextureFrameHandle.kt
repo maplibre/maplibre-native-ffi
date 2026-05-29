@@ -34,8 +34,8 @@ internal constructor(
 
   override fun close() {
     if (closed) return
-    session.releaseOpenGLFrame(framePointer)
     closed = true
+    session.releaseOpenGLFrame(framePointer)
     leakReport.markClosed()
     try {
       scope.close()

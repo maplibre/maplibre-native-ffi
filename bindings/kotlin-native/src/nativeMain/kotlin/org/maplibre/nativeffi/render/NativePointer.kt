@@ -17,11 +17,12 @@ private constructor(private val addressValue: Long, private val scope: FrameScop
       return addressValue == 0L
     }
 
-  override fun equals(other: Any?): Boolean = other is NativePointer && address == other.address
+  override fun equals(other: Any?): Boolean =
+    other is NativePointer && addressValue == other.addressValue
 
-  override fun hashCode(): Int = address.hashCode()
+  override fun hashCode(): Int = addressValue.hashCode()
 
-  override fun toString(): String = "NativePointer[address=0x${address.toString(16)}]"
+  override fun toString(): String = "NativePointer[address=0x${addressValue.toString(16)}]"
 
   private fun ensureActive() {
     scope?.ensureActive()

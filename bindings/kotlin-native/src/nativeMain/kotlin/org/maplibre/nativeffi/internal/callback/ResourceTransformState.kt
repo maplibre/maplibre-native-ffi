@@ -1,6 +1,7 @@
 package org.maplibre.nativeffi.internal.callback
 
 import kotlin.concurrent.atomics.AtomicInt
+import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlinx.cinterop.ByteVar
 import kotlinx.cinterop.COpaquePointer
@@ -31,8 +32,7 @@ internal class ResourceTransformState(private val callback: ResourceTransformCal
   AutoCloseable {
   private val selfRef = StableRef.create(this)
   private val descriptor = nativeHeap.alloc<mln_resource_transform>()
-  private val responseUrlLock = AtomicInt(0)
-  private val responseUrls = mutableMapOf<String, CPointer<ByteVar>>()
+  private val responseUrls = AtomicReference<List<ResponseUrl>>(emptyList())
   private val closed = AtomicInt(0)
 
   init {
@@ -85,40 +85,39 @@ internal class ResourceTransformState(private val callback: ResourceTransformCal
     nativeHeap.free(descriptor.rawPtr)
   }
 
-  private fun retainResponseUrl(threadKey: String, pointer: CPointer<ByteVar>): Boolean =
-    withResponseUrlLock {
-      if (closed.load() != 0) {
-        false
-      } else {
-        responseUrls.remove(threadKey)?.let { nativeHeap.free(it.rawValue) }
-        responseUrls[threadKey] = pointer
-        true
+  private fun retainResponseUrl(threadKey: String, pointer: CPointer<ByteVar>): Boolean {
+    while (true) {
+      if (closed.load() != 0) return false
+      val current = responseUrls.load()
+      val previous = current.firstOrNull { it.threadKey == threadKey }
+      val updated =
+        current.filterNot { it.threadKey == threadKey } + ResponseUrl(threadKey, pointer)
+      if (responseUrls.compareAndSet(current, updated)) {
+        previous?.let { nativeHeap.free(it.pointer.rawValue) }
+        if (closed.load() == 0) return true
+        clearResponseUrl(threadKey)
+        return false
       }
     }
+  }
 
   private fun clearResponseUrl(threadKey: String) {
-    withResponseUrlLock { responseUrls.remove(threadKey) }?.let { nativeHeap.free(it.rawValue) }
+    while (true) {
+      val current = responseUrls.load()
+      val previous = current.firstOrNull { it.threadKey == threadKey } ?: return
+      val updated = current.filterNot { it.threadKey == threadKey }
+      if (responseUrls.compareAndSet(current, updated)) {
+        nativeHeap.free(previous.pointer.rawValue)
+        return
+      }
+    }
   }
 
   private fun clearAllResponseUrls() {
-    val urls = withResponseUrlLock {
-      val copy = responseUrls.toList()
-      responseUrls.clear()
-      copy
-    }
-    urls.forEach { nativeHeap.free(it.second.rawValue) }
+    responseUrls.exchange(emptyList()).forEach { nativeHeap.free(it.pointer.rawValue) }
   }
 
-  private inline fun <T> withResponseUrlLock(block: () -> T): T {
-    while (!responseUrlLock.compareAndSet(0, 1)) {
-      // Callback results can arrive from worker threads; protect native URL storage bookkeeping.
-    }
-    try {
-      return block()
-    } finally {
-      responseUrlLock.store(0)
-    }
-  }
+  private data class ResponseUrl(val threadKey: String, val pointer: CPointer<ByteVar>)
 
   private fun allocateCString(value: String): CPointer<ByteVar> {
     MemoryUtil.requireValidCString(value)

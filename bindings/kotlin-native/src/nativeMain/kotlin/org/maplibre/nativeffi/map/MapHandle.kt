@@ -425,13 +425,14 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     tiles: List<String>,
     options: TileSourceOptions? = null,
   ) {
+    val tileSnapshot = tiles.toList()
     memScoped {
       Status.check(
         mln_map_add_vector_source_tiles(
           state.requireLive(),
           CoreStructs.stringView(sourceId, this),
-          StyleStructs.stringViewArray(tiles, this),
-          tiles.size.toULong(),
+          StyleStructs.stringViewArray(tileSnapshot, this),
+          tileSnapshot.size.toULong(),
           StyleStructs.tileSourceOptions(options, this),
         )
       )
@@ -456,13 +457,14 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     tiles: List<String>,
     options: TileSourceOptions? = null,
   ) {
+    val tileSnapshot = tiles.toList()
     memScoped {
       Status.check(
         mln_map_add_raster_source_tiles(
           state.requireLive(),
           CoreStructs.stringView(sourceId, this),
-          StyleStructs.stringViewArray(tiles, this),
-          tiles.size.toULong(),
+          StyleStructs.stringViewArray(tileSnapshot, this),
+          tileSnapshot.size.toULong(),
           StyleStructs.tileSourceOptions(options, this),
         )
       )
@@ -491,13 +493,14 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     tiles: List<String>,
     options: TileSourceOptions? = null,
   ) {
+    val tileSnapshot = tiles.toList()
     memScoped {
       Status.check(
         mln_map_add_raster_dem_source_tiles(
           state.requireLive(),
           CoreStructs.stringView(sourceId, this),
-          StyleStructs.stringViewArray(tiles, this),
-          tiles.size.toULong(),
+          StyleStructs.stringViewArray(tileSnapshot, this),
+          tileSnapshot.size.toULong(),
           StyleStructs.tileSourceOptions(options, this),
         )
       )

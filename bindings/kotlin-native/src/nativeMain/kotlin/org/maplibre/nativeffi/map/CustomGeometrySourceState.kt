@@ -32,10 +32,8 @@ internal class CustomGeometrySourceState(private val options: CustomGeometrySour
   AutoCloseable {
   private val selfRef = StableRef.create(this)
   private val descriptor = nativeHeap.alloc<mln_custom_geometry_source_options>()
-  private val callbackLock = AtomicInt(0)
-  private var activeCallbacks = 0
-  private var closeRequested = false
-  private var closed = false
+  private val state = AtomicInt(0)
+  private val nativeClosed = AtomicInt(0)
 
   init {
     mln_custom_geometry_source_options_default().place(descriptor.ptr)
@@ -102,52 +100,57 @@ internal class CustomGeometrySourceState(private val options: CustomGeometrySour
   }
 
   override fun close() {
-    val shouldClose = withCallbackLock {
-      if (closed || closeRequested) {
-        false
-      } else {
-        closeRequested = true
-        val canClose = activeCallbacks == 0
-        if (canClose) closed = true
-        canClose
+    while (true) {
+      val current = state.load()
+      if (current and CLOSED_FLAG != 0) return
+      val activeCallbacks = current and ACTIVE_MASK
+      val next = if (activeCallbacks == 0) CLOSED_FLAG else current or CLOSING_FLAG
+      if (state.compareAndSet(current, next)) {
+        if (next and CLOSED_FLAG != 0) closeNative()
+        return
       }
     }
-    if (shouldClose) closeNative()
   }
 
-  private fun enterCallback(): Boolean = withCallbackLock {
-    if (closed || closeRequested) {
-      false
-    } else {
-      activeCallbacks++
-      true
+  private fun enterCallback(): Boolean {
+    while (true) {
+      val current = state.load()
+      if (current and (CLOSING_FLAG or CLOSED_FLAG) != 0) return false
+      val activeCallbacks = current and ACTIVE_MASK
+      check(activeCallbacks < ACTIVE_MASK) { "too many active custom geometry callbacks" }
+      if (state.compareAndSet(current, current + 1)) return true
     }
   }
 
   private fun exitCallback() {
-    val shouldClose = withCallbackLock {
-      activeCallbacks--
-      val canClose = closeRequested && activeCallbacks == 0 && !closed
-      if (canClose) closed = true
-      canClose
+    while (true) {
+      val current = state.load()
+      val activeCallbacks = current and ACTIVE_MASK
+      check(activeCallbacks > 0) { "custom geometry callback count underflow" }
+      val next =
+        if (activeCallbacks == 1 && current and CLOSING_FLAG != 0) {
+          CLOSED_FLAG
+        } else {
+          current - 1
+        }
+      if (state.compareAndSet(current, next)) {
+        if (next and CLOSED_FLAG != 0) closeNative()
+        return
+      }
     }
-    if (shouldClose) closeNative()
   }
 
   private fun closeNative() {
-    selfRef.dispose()
-    nativeHeap.free(descriptor.rawPtr)
+    if (nativeClosed.compareAndSet(0, 1)) {
+      selfRef.dispose()
+      nativeHeap.free(descriptor.rawPtr)
+    }
   }
 
-  private inline fun <T> withCallbackLock(block: () -> T): T {
-    while (!callbackLock.compareAndSet(0, 1)) {
-      // Custom geometry callbacks can arrive concurrently on worker threads.
-    }
-    try {
-      return block()
-    } finally {
-      callbackLock.store(0)
-    }
+  private companion object {
+    private const val CLOSED_FLAG = Int.MIN_VALUE
+    private const val CLOSING_FLAG = 1 shl 30
+    private const val ACTIVE_MASK = CLOSING_FLAG - 1
   }
 }
 

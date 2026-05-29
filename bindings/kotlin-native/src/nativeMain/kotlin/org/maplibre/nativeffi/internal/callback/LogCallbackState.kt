@@ -1,13 +1,13 @@
 package org.maplibre.nativeffi.internal.callback
 
 import kotlin.concurrent.atomics.AtomicInt
+import kotlin.concurrent.atomics.AtomicReference
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlinx.cinterop.ByteVar
 import kotlinx.cinterop.COpaquePointer
 import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.staticCFunction
-import org.maplibre.nativeffi.internal.c.mln_log_clear_callback
 import org.maplibre.nativeffi.internal.c.mln_log_set_callback
 import org.maplibre.nativeffi.internal.memory.MemoryUtil
 import org.maplibre.nativeffi.internal.status.Status
@@ -48,50 +48,33 @@ internal class LogCallbackState private constructor(private val callback: LogCal
   }
 
   internal companion object {
-    private val lock = AtomicInt(0)
-    private var current: LogCallbackState? = null
+    private val installed = AtomicInt(0)
+    private val current = AtomicReference<LogCallbackState?>(null)
 
     fun set(callback: LogCallback) {
       val replacement = LogCallbackState(callback)
-      var previous: LogCallbackState? = null
       try {
-        withLock {
+        if (installed.compareAndSet(0, 1)) {
           Status.check(mln_log_set_callback(staticCFunction(::logCallback), null))
-          previous = current
-          current = replacement
         }
       } catch (error: Throwable) {
+        installed.store(0)
         replacement.close()
         throw error
       }
+      val previous = current.exchange(replacement)
       previous?.close()
     }
 
     fun clear() {
-      var previous: LogCallbackState? = null
-      withLock {
-        Status.check(mln_log_clear_callback())
-        previous = current
-        current = null
-      }
+      val previous = current.exchange(null)
       previous?.close()
     }
 
-    fun currentForTesting(): LogCallbackState? = withLock { current }
+    fun currentForTesting(): LogCallbackState? = current.load()
 
     fun invokeCurrent(severity: UInt, event: UInt, code: Long, message: CPointer<ByteVar>?): UInt =
-      withLock { current }?.invoke(severity, event, code, message) ?: 0U
-
-    private inline fun <T> withLock(block: () -> T): T {
-      while (!lock.compareAndSet(0, 1)) {
-        // Process-global logging callback replacement is rare; spin briefly.
-      }
-      try {
-        return block()
-      } finally {
-        lock.store(0)
-      }
-    }
+      current.load()?.invoke(severity, event, code, message) ?: 0U
   }
 }
 

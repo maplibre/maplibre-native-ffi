@@ -222,30 +222,18 @@ private constructor(private val map: MapHandle, handle: CPointer<mln_render_sess
   }
 
   public fun readPremultipliedRgba8(buffer: NativeBuffer): TextureImageInfo = memScoped {
-    val capacity = buffer.byteLength()
     val outInfo = mln_texture_image_info_default().getPointer(this)
-    Status.check(
-      mln_texture_read_premultiplied_rgba8(
-        state.requireLive(),
-        buffer.pointer()?.reinterpret<UByteVar>(),
-        capacity.toULong(),
-        outInfo,
-      )
-    )
-    RenderStructs.textureImageInfo(outInfo.pointed)
-  }
-
-  public fun readPremultipliedRgba8(): PremultipliedRgba8Image {
-    val info = textureImageInfo()
-    NativeBuffer.allocate(info.byteLength).use { buffer ->
-      val readInfo = readPremultipliedRgba8(buffer)
-      return PremultipliedRgba8Image(
-        readInfo.width,
-        readInfo.height,
-        readInfo.stride,
-        buffer.toByteArray(),
+    buffer.borrow { pointer, capacity ->
+      Status.check(
+        mln_texture_read_premultiplied_rgba8(
+          state.requireLive(),
+          pointer?.reinterpret<UByteVar>(),
+          capacity.toULong(),
+          outInfo,
+        )
       )
     }
+    RenderStructs.textureImageInfo(outInfo.pointed)
   }
 
   public fun acquireMetalOwnedTextureFrame(): MetalOwnedTextureFrameHandle {

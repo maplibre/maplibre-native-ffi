@@ -6,7 +6,16 @@ public sealed interface GeoJson {
 
   public data class FeatureValue(public val feature: Feature) : GeoJson
 
-  public data class FeatureCollection(public val features: List<Feature>) : GeoJson
+  public class FeatureCollection(features: List<Feature>) : GeoJson {
+    public val features: List<Feature> = features.toList()
+
+    override fun equals(other: Any?): Boolean =
+      other is FeatureCollection && features == other.features
+
+    override fun hashCode(): Int = features.hashCode()
+
+    override fun toString(): String = "FeatureCollection(features=$features)"
+  }
 
   public companion object {
     public fun geometry(geometry: Geometry): GeometryValue = GeometryValue(geometry)

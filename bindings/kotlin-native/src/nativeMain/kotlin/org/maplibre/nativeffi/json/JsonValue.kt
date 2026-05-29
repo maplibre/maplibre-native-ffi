@@ -23,12 +23,28 @@ public sealed interface JsonValue {
 
   public data class StringValue(public val value: String) : JsonValue
 
-  public data class Array(public val values: List<JsonValue>) : JsonValue {
+  public class Array(values: List<JsonValue>) : JsonValue {
+    public val values: List<JsonValue> = values.toList()
+
     public constructor(vararg values: JsonValue) : this(values.toList())
+
+    override fun equals(other: Any?): Boolean = other is Array && values == other.values
+
+    override fun hashCode(): kotlin.Int = values.hashCode()
+
+    override fun toString(): String = "Array(values=$values)"
   }
 
-  public data class ObjectValue(public val members: List<Member>) : JsonValue {
+  public class ObjectValue(members: List<Member>) : JsonValue {
+    public val members: List<Member> = members.toList()
+
     public constructor(vararg members: Member) : this(members.toList())
+
+    override fun equals(other: Any?): Boolean = other is ObjectValue && members == other.members
+
+    override fun hashCode(): kotlin.Int = members.hashCode()
+
+    override fun toString(): String = "ObjectValue(members=$members)"
   }
 
   /** Ordered JSON object member. Duplicate keys are preserved. */

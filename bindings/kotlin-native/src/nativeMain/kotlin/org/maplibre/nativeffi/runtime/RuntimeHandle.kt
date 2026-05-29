@@ -135,6 +135,7 @@ public class RuntimeHandle private constructor(handle: CPointer<mln_runtime>) : 
   public fun startMergeOfflineRegionsDatabase(
     path: String
   ): OfflineOperationHandle<List<OfflineRegionInfo>> = memScoped {
+    MemoryUtil.requireValidCString(path)
     val outOperationId = alloc<ULongVar>()
     Status.check(
       mln_runtime_offline_regions_merge_database_start(

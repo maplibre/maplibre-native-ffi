@@ -9,7 +9,15 @@ public sealed interface RenderedQueryGeometry {
 
   public data class Box(public val box: ScreenBox) : RenderedQueryGeometry
 
-  public data class LineString(public val points: List<ScreenPoint>) : RenderedQueryGeometry
+  public class LineString(points: List<ScreenPoint>) : RenderedQueryGeometry {
+    public val points: List<ScreenPoint> = points.toList()
+
+    override fun equals(other: Any?): Boolean = other is LineString && points == other.points
+
+    override fun hashCode(): Int = points.hashCode()
+
+    override fun toString(): String = "LineString(points=$points)"
+  }
 
   public companion object {
     public fun point(point: ScreenPoint): Point = Point(point)

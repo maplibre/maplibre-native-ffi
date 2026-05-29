@@ -55,13 +55,14 @@ internal object ResourceStructs {
   }
 
   fun resourceResponse(value: ResourceResponse, scope: MemScope): CPointer<mln_resource_response> {
+    val bytes = value.bytes
     val native = scope.alloc<mln_resource_response>()
     native.size = kotlinx.cinterop.sizeOf<mln_resource_response>().toUInt()
     native.status = value.status.nativeValue.toUInt()
     native.error_reason = value.errorReason.nativeValue.toUInt()
-    if (value.bytes.isNotEmpty()) {
-      native.bytes = value.bytes.toUByteArray().toCValues().getPointer(scope)
-      native.byte_count = value.bytes.size.toULong()
+    if (bytes.isNotEmpty()) {
+      native.bytes = bytes.toUByteArray().toCValues().getPointer(scope)
+      native.byte_count = bytes.size.toULong()
     }
     value.errorMessage?.let { native.error_message = MemoryUtil.cString(scope, it) }
     native.must_revalidate = value.mustRevalidate

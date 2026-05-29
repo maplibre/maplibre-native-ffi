@@ -34,8 +34,8 @@ internal constructor(
 
   override fun close() {
     if (closed) return
-    session.releaseVulkanFrame(framePointer)
     closed = true
+    session.releaseVulkanFrame(framePointer)
     leakReport.markClosed()
     try {
       scope.close()
