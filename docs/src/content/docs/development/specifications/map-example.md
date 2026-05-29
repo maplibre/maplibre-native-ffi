@@ -38,12 +38,12 @@ to example behavior and is not specified here.
 
 ## Implementations
 
-| Example              | Language / toolkit       | Notes                                                                                                    |
-| -------------------- | ------------------------ | -------------------------------------------------------------------------------------------------------- |
-| `examples/zig-map`   | Zig, SDL3                | Reference architecture; all three render-target modes on supported backends (Vulkan, Metal, OpenGL/EGL). |
-| `examples/rust-map`  | Rust, winit              | Vulkan; `owned-texture` and `native-surface` today.                                                      |
-| `examples/lwjgl-map` | Java (FFM), GLFW + LWJGL | Vulkan; `owned-texture` and `native-surface` today.                                                      |
-| `examples/swift-map` | Swift, AppKit + SwiftUI  | Apple platforms; `native-surface` (Metal) only today.                                                    |
+| Example              | Language / toolkit       | Platforms             | Backends              |
+| -------------------- | ------------------------ | --------------------- | --------------------- |
+| `examples/zig-map`   | Zig, SDL3                | Linux, macOS, Windows | Vulkan, Metal, OpenGL |
+| `examples/rust-map`  | Rust, winit              | Linux, macOS, Windows | Vulkan                |
+| `examples/lwjgl-map` | Java (FFM), GLFW + LWJGL | Linux, macOS, Windows | Vulkan                |
+| `examples/swift-map` | Swift, AppKit + SwiftUI  | macOS                 | Metal                 |
 
 New `*-map` examples MUST follow this spec and cite this file from the app entry
 module (for example `// map-example.md#implementations`).
