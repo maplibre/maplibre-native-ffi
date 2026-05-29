@@ -4,12 +4,12 @@ Specification for interactive desktop **`*-map` example programs**: small apps
 that exercise language bindings and render-target integrations through a shared
 windowed map demo.
 
-## Scope {#map-ex-scope}
+## Scope
 
 The following describes what each **`*-map` example application** must provide
 and what it must not try to be.
 
-### What every example provides {#map-ex-scope-in}
+### What every example provides
 
 - One top-level map window with resize support.
 - Continuous map mode: runtime pumping, event draining, and repaint driven by
@@ -17,13 +17,13 @@ and what it must not try to be.
 - Shared initial map content (style URL and camera).
 - Shared camera interaction model (pointer, scroll, keyboard).
 - Modular support for three **render-target modes** (see
-  [Render-target modes](#map-ex-render-target-modes)), structured so additional
+  [Render-target modes](#render-target-modes)), structured so additional
   graphics backends and modes can be added without rewriting unrelated modules.
 - Graceful process exit when the user closes the window.
 - Startup logging that identifies the selected render-target mode and, when
   practical, which native render backends the loaded library exposes.
 
-### What an example is not {#map-ex-scope-out}
+### What an example is not
 
 A `*-map` program is a demo, not a product SDK. It MUST NOT include:
 
@@ -39,7 +39,7 @@ to example behavior and is not specified here.
 
 ---
 
-## Implementations {#map-ex-implementations}
+## Implementations
 
 Reference implementations in this repository (not exhaustive of future
 examples):
@@ -57,17 +57,17 @@ name.
 
 ---
 
-## Shared defaults {#map-ex-shared-defaults}
+## Shared defaults
 
 These values MUST match across all `*-map` examples so behavior and visuals are
 comparable when switching languages.
 
-### Style {#map-ex-shared-defaults-style}
+### Style
 
 - **Style URL:** `https://tiles.openfreemap.org/styles/bright`
 - Load the style during map initialization, before the first render.
 
-### Initial camera {#map-ex-shared-defaults-camera}
+### Initial camera
 
 | Field   | Value                                                     |
 | ------- | --------------------------------------------------------- |
@@ -78,22 +78,22 @@ comparable when switching languages.
 
 Apply with an immediate camera jump (no arrival animation on startup).
 
-### Window {#map-ex-shared-defaults-window}
+### Window
 
 - **Initial logical size:** `960` × `640` pixels.
 - Window MUST be resizable.
 - High-DPI / Retina: derive map `RenderTargetExtent` from the window’s drawable
-  size and content scale (see [Viewport](#map-ex-viewport)).
+  size and content scale (see [Viewport](#viewport)).
 
-### Runtime resources {#map-ex-shared-defaults-runtime}
+### Runtime resources
 
 - **Runtime cache path:** `:memory:` (in-memory cache only).
 
-### Map mode {#map-ex-shared-defaults-map-mode}
+### Map mode
 
 - **Map mode:** continuous (`MLN_MAP_MODE_CONTINUOUS` / binding equivalent).
 
-### Compositor shaders (texture modes) {#map-ex-shared-defaults-shaders}
+### Compositor shaders (texture modes)
 
 For `owned-texture` and `borrowed-texture`, the host-owned compositor that
 samples the map texture into the window swapchain MUST use equivalent fullscreen
@@ -108,9 +108,9 @@ texture copy without color grading or UI overlay.
 
 ---
 
-## Command-line interface {#map-ex-cli}
+## Command-line interface
 
-### Render-target selection {#map-ex-cli-render-target}
+### Render-target selection
 
 The process MUST accept a render-target mode name:
 
@@ -133,20 +133,19 @@ names and exit without creating a window.
 **Default mode:** `owned-texture`.
 
 Implementations MAY omit support for modes their graphics stack does not provide
-(see [Conditional requirements](#map-ex-conditional-requirements)); omitted
-modes MUST be rejected at startup with a clear error if requested on the command
-line.
+(see [Conditional requirements](#conditional-requirements)); omitted modes MUST
+be rejected at startup with a clear error if requested on the command line.
 
-### Other flags {#map-ex-cli-other}
+### Other flags
 
 - No other behavioral flags are required. Implementations MUST NOT add divergent
   style URLs, camera presets, or window sizes via CLI.
 
 ---
 
-## Architecture {#map-ex-architecture}
+## Architecture
 
-### Overview {#map-ex-architecture-overview}
+### Overview
 
 Every `*-map` example splits host responsibilities into the same logical
 modules. Names differ by language; boundaries MUST NOT be collapsed into a
@@ -181,7 +180,7 @@ flowchart TB
   RS --> SC
 ```
 
-### Logical modules {#map-ex-architecture-modules}
+### Logical modules
 
 | Module                    | Responsibility                                                                                                         |
 | ------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
@@ -197,7 +196,7 @@ flowchart TB
 Implementations SHOULD mirror this layout in the source tree (separate files or
 packages per module).
 
-### Backend and mode matrix {#map-ex-architecture-matrix}
+### Backend and mode matrix
 
 The **backend** module MUST be structured as a discriminated implementation per
 render-target mode (union, sealed hierarchy, or equivalent), not as unrelated
@@ -211,21 +210,20 @@ Each backend variant implements, at minimum:
 - `attachRenderTarget(map, viewport) → session`
 - `finishFrame()` (swapchain maintenance where applicable)
 - `drawTexture(session, viewport)` for texture modes
-- `needsRenderTargetReattachOnResize() → bool` (see [Resize](#map-ex-resize))
+- `needsRenderTargetReattachOnResize() → bool` (see [Resize](#resize))
 
 ---
 
-## Lifecycle {#map-ex-lifecycle}
+## Lifecycle
 
-### Startup {#map-ex-lifecycle-startup}
+### Startup
 
 Order MUST be:
 
 1. Parse CLI; exit on help or invalid mode.
 2. Validate that the loaded native library supports the graphics backend(s) this
    binary targets; fail fast with a readable message if not.
-3. Create the window (initial size
-   [Shared defaults](#map-ex-shared-defaults-window)).
+3. Create the window (initial size [Window](#window)).
 4. Initialize the graphics **backend** for the selected mode.
 5. Create **runtime** (`:memory:` cache).
 6. Create **map** with extent from the initial **viewport** and continuous mode.
@@ -236,7 +234,7 @@ Order MUST be:
 On failure after partial setup, release already-created handles in reverse order
 (session → map → runtime → graphics).
 
-### Shutdown {#map-ex-lifecycle-shutdown}
+### Shutdown
 
 On window close or fatal error, close resources in order:
 
@@ -251,7 +249,7 @@ Implementations MAY use abrupt process exit only when documented
 platform/backend bugs make orderly native teardown unsafe; that behavior MUST be
 localized and commented (`map-ex: lifecycle / shutdown`).
 
-### Handle ownership {#map-ex-lifecycle-ownership}
+### Handle ownership
 
 - One **runtime** per process (owner thread drives `run_once` / pump).
 - One **map** per runtime for the demo.
@@ -261,7 +259,7 @@ localized and commented (`map-ex: lifecycle / shutdown`).
 
 ---
 
-## Frame loop {#map-ex-frame-loop}
+## Frame loop
 
 Each frame iteration MUST follow this logical sequence:
 
@@ -309,7 +307,7 @@ pass to copy the map texture into the window swapchain before present.
 
 ---
 
-## Viewport {#map-ex-viewport}
+## Viewport
 
 The **viewport** value MUST contain:
 
@@ -333,26 +331,26 @@ Pass `logical_*` and `scale_factor` to map creation, session attach, and session
 
 ---
 
-## Map state {#map-ex-map-state}
+## Map state
 
 The **map state** module owns the binding handles and map-specific setup.
 
-### Creation {#map-ex-map-state-create}
+### Creation
 
 - Create runtime with `:memory:` cache.
 - Create map with current viewport extent and continuous mode.
-- Load [shared style URL](#map-ex-shared-defaults-style).
-- Apply [shared initial camera](#map-ex-shared-defaults-camera).
+- Load [style URL](#style).
+- Apply [initial camera](#initial-camera).
 - Delegate render-session attachment to the **backend** for the CLI-selected
   mode.
 
-### Event drain {#map-ex-map-state-events}
+### Event drain
 
 - Drain all pending runtime events each frame.
 - When `map_render_update_available` references this map’s id/source, return
   `render_update_available = true` to the frame loop.
 
-### Resize API {#map-ex-map-state-resize}
+### Resize API
 
 Expose `resize(viewport)` that forwards to the render-target session (and
 compositor when applicable). When the backend reports
@@ -362,13 +360,13 @@ resizes backend-owned textures/surfaces, and re-attaches.
 
 ---
 
-## Render-target modes {#map-ex-render-target-modes}
+## Render-target modes
 
 Three modes MUST be modeled in every example’s architecture. Implementations
 implement as many as practical for their platform; unimplemented modes remain in
 the CLI and backend matrix as stubs or rejected at startup.
 
-### Mode comparison {#map-ex-render-target-modes-compare}
+### Mode comparison
 
 | CLI value          | C API concept                                                | Compositor | Typical use in spec                                         |
 | ------------------ | ------------------------------------------------------------ | ---------- | ----------------------------------------------------------- |
@@ -376,7 +374,7 @@ the CLI and backend matrix as stubs or rejected at startup.
 | `borrowed-texture` | Caller-owned texture/image borrowed by session               | Required   | Host allocates exportable texture; session renders into it. |
 | `native-surface`   | Window surface (Vulkan surface, Metal layer, EGL surface, …) | None       | Map renders directly to the swapchain/surface.              |
 
-### `owned-texture` {#map-ex-render-targets-owned-texture}
+### `owned-texture`
 
 - Attach with the binding’s “owned texture” descriptor for the active graphics
   API.
@@ -387,7 +385,7 @@ the CLI and backend matrix as stubs or rejected at startup.
 - **Compositor** resizes with the viewport independently of session resize where
   the API requires both.
 
-### `borrowed-texture` {#map-ex-render-targets-borrowed-texture}
+### `borrowed-texture`
 
 - Host creates an API-appropriate exportable texture (or image + view) sized to
   the viewport.
@@ -398,7 +396,7 @@ the CLI and backend matrix as stubs or rejected at startup.
   the render session, recreate host textures, and re-attach (do not only call
   session `resize`).
 
-### `native-surface` {#map-ex-render-targets-native-surface}
+### `native-surface`
 
 - Attach with the binding’s surface descriptor (Vulkan swapchain surface, Metal
   `CAMetalLayer`, platform GL surface, etc.).
@@ -410,7 +408,7 @@ the CLI and backend matrix as stubs or rejected at startup.
 
 ---
 
-## Resize {#map-ex-resize}
+## Resize
 
 - Subscribe to window size, framebuffer size, and display-scale / content-scale
   events (as available on the platform).
@@ -422,9 +420,9 @@ the CLI and backend matrix as stubs or rejected at startup.
 
 ---
 
-## Input {#map-ex-input}
+## Input
 
-### Control scheme {#map-ex-input-controls}
+### Control scheme
 
 Implementations MUST provide the following interactions and MUST print this help
 text once at startup (wording MAY vary only for platform-specific key names):
@@ -441,7 +439,7 @@ Controls:
   0: reset pitch and bearing
 ```
 
-### Behavioral constants {#map-ex-input-constants}
+### Behavioral constants
 
 | Interaction                   | Behavior                                                                                                         |
 | ----------------------------- | ---------------------------------------------------------------------------------------------------------------- |
@@ -466,7 +464,7 @@ Input handlers return whether the camera changed so the frame loop can set
 
 ---
 
-## Diagnostics {#map-ex-diagnostics}
+## Diagnostics
 
 - **SHOULD** register a native log callback during startup and clear it on
   shutdown where the binding supports it.
@@ -480,15 +478,15 @@ Input handlers return whether the camera changed so the frame loop can set
 
 ---
 
-## Conditional requirements {#map-ex-conditional-requirements}
+## Conditional requirements
 
 Rules in this section refine the base spec. They apply only when the stated
 property holds. Implementations that do not match a given condition ignore its
 bullets. Reference implementations are listed in
-[Implementations](#map-ex-implementations); they are examples, not names for the
+[Implementations](#implementations); they are examples, not names for the
 conditions themselves.
 
-### When Vulkan presents the window {#map-ex-when-vulkan}
+### When Vulkan presents the window
 
 **Applies when:** the example uses Vulkan for the window surface and swapchain
 (for example `rust-map`, `lwjgl-map`, Vulkan builds of `zig-map`).
@@ -499,9 +497,9 @@ conditions themselves.
 - **MUST** use one shared Vulkan context (instance, device, queue, surface) for
   compositor and render session.
 - The compositor **MUST** use the SPIR-V shader pair described in
-  [Shared defaults](#map-ex-shared-defaults-shaders).
+  [Compositor shaders](#compositor-shaders-texture-modes).
 
-### When presentation goes through a Metal layer or surface {#map-ex-when-metal-surface}
+### When presentation goes through a Metal layer or surface
 
 **Applies when:** the example attaches a `native-surface` session to a
 `CAMetalLayer` or equivalent Metal presentation handle (for example `swift-map`,
@@ -512,7 +510,7 @@ Metal builds of `zig-map`).
   borrowed texture targets.
 - Mobile and non-macOS Metal ports are out of scope until added explicitly.
 
-### When the host uses OpenGL or EGL {#map-ex-when-opengl}
+### When the host uses OpenGL or EGL
 
 **Applies when:** the example uses OpenGL or EGL for window presentation (for
 example OpenGL builds of `zig-map`).
@@ -520,9 +518,9 @@ example OpenGL builds of `zig-map`).
 - **SHOULD** implement all three render-target modes where the binding and
   GL/EGL stack allow owned and borrowed texture paths.
 - The compositor **MUST** still be a fullscreen textured quad equivalent to
-  [Shared defaults](#map-ex-shared-defaults-shaders).
+  [Compositor shaders](#compositor-shaders-texture-modes).
 
-### When the binding confines map work to a single UI thread {#map-ex-when-single-ui-thread}
+### When the binding confines map work to a single UI thread
 
 **Applies when:** the binding or platform requires runtime, map, and render
 session use on one UI owner thread (for example AppKit with main-thread
@@ -532,14 +530,14 @@ isolation).
 - Window and layer setup **MUST** stay consistent with the binding’s thread
   rules documented for that integration.
 
-### When the window toolkit has no single cross-platform event pump {#map-ex-when-no-unified-event-pump}
+### When the window toolkit has no single cross-platform event pump
 
 **Applies when:** the host UI framework does not deliver input, resize, and idle
 ticks through one portable poll loop (unlike SDL or winit).
 
-- The example **MUST** still run the [frame loop](#map-ex-frame-loop) logic each
-  tick (runtime pump, event drain, conditional render).
+- The example **MUST** still run the [frame loop](#frame-loop) logic each tick
+  (runtime pump, event drain, conditional render).
 - The example **SHOULD** drive ticks at roughly display refresh (for example ~60
   Hz timer or display link).
-- [Input](#map-ex-input) behavior and constants are unchanged; only the event
-  source differs.
+- [Input](#input) behavior and constants are unchanged; only the event source
+  differs.
