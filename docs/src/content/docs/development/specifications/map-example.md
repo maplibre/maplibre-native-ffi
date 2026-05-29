@@ -25,8 +25,8 @@ language bindings and render-target integrations through a focused map demo.
 
 ### What an example is not
 
-A `*-map` program is a demo, not a product SDK. It MUST NOT include automated
-tests or packaging/installer UX.
+A `*-map` program is a focused map demo. It MUST NOT include automated tests or
+packaging/installer UX.
 
 ---
 
@@ -57,7 +57,7 @@ tests or packaging/installer UX.
 | Bearing | `12.0` degrees                                            |
 | Pitch   | `30.0` degrees                                            |
 
-Apply with an immediate camera jump (no arrival animation on startup).
+Apply with an immediate `jump_to` on startup.
 
 ### Window
 
@@ -85,7 +85,7 @@ pass shaders:
   (`sample.frag` family).
 
 SPIR-V, MSL, or GLSL source MAY differ by backend; output MUST be a straight
-texture copy without color grading or UI overlay.
+texture copy.
 
 ---
 
@@ -109,7 +109,7 @@ usual argv style):
 - Flag combined: `--render-target=<mode>`.
 
 If parsing fails or the user requests help, print usage listing the three mode
-names and exit without creating a window.
+names and exit before creating a window.
 
 Default mode: `owned-texture`.
 
@@ -119,8 +119,8 @@ be rejected at startup with a clear error if requested on the command line.
 
 ### Other flags
 
-- No other behavioral flags are required. Implementations MUST NOT add divergent
-  style URLs, camera presets, or window sizes via CLI.
+- CLI exposes only render-target selection beyond defaults. Implementations MUST
+  NOT add flags that change style URL, camera preset, or window size.
 
 ---
 
@@ -179,10 +179,10 @@ packages per module).
 
 ### Backend and mode matrix
 
-The backend module MUST be structured as a discriminated implementation per
-render-target mode (union, sealed hierarchy, or equivalent), not as unrelated
-copies. Adding a mode or backend MUST require a localized change (new enum
-variant + module), matching the `zig-map` `render/` layout.
+The backend module MUST be a discriminated implementation per render-target mode
+(union, sealed hierarchy, or equivalent). Adding a mode or backend MUST require
+a localized change (new enum variant + module), matching the `zig-map` `render/`
+layout.
 
 Each backend variant implements, at minimum:
 
@@ -235,8 +235,8 @@ localized and commented (for example `// map-example.md#shutdown`).
 - One runtime per process (owner thread drives `run_once` / pump).
 - One map per runtime for the demo.
 - One live render session per map at a time.
-- Map configuration (style, camera) goes through the map handle, not the
-  session, except for render-target extent and present.
+- Map configuration (style, camera) uses the map handle; render-target extent
+  and present use the render session.
 
 ---
 
@@ -278,10 +278,10 @@ Requirements:
 - MUST set `render_pending` when input changes the camera.
 - MUST call `render_update` only while `render_pending` is true; clear the flag
   after a successful update that does not need an immediate retry.
-- SHOULD treat `invalid_state` from `render_update` as “nothing to draw yet”
-  without fatal exit.
-- SHOULD idle-sleep briefly when an iteration did no work (event poll, render,
-  or runtime progress) to avoid spinning CPU.
+- SHOULD treat `invalid_state` from `render_update` as “nothing to draw yet” and
+  continue.
+- SHOULD idle-sleep briefly when an iteration makes no progress (event poll,
+  render, or runtime work).
 
 Texture modes: after a successful `render_update`, MUST run the compositor pass
 to copy the map texture into the window swapchain before present.
@@ -373,18 +373,17 @@ the CLI and backend matrix as stubs or rejected at startup.
 - On `render_update`, sample that texture through the same compositor path as
   `owned-texture`.
 - `needsRenderTargetReattachOnResize` MUST return `true`: on resize, destroy the
-  render session, recreate host textures, and re-attach (do not only call
-  session `resize`).
+  render session, recreate host textures, and attach a new session for the new
+  extent.
 
 ### `native-surface`
 
 - Attach with the binding’s surface descriptor (Vulkan swapchain surface, Metal
   `CAMetalLayer`, platform GL surface, etc.).
-- `render_update` presents to the window; no compositor module.
+- `render_update` presents through the surface session directly.
 - `drawTexture` MUST NOT be called for this mode.
-- Resize: session `resize` plus backend swapchain rebuild as required; reattach
-  is not required solely because of mode (unless the toolkit recreates the
-  surface handle).
+- Resize: session `resize` plus backend swapchain rebuild as required. Reattach
+  when the toolkit recreates the surface handle.
 
 ---
 
@@ -434,7 +433,7 @@ Controls:
 | `0`                           | Animate bearing and pitch to `0` (duration ~`220` ms).                                                           |
 
 Keyboard animated moves SHOULD use ~`160` ms duration. Pointer drags use
-immediate `move_by` / `jump_to` / `pitch_by` without animation.
+immediate `move_by` / `jump_to` / `pitch_by`.
 
 On pointer down that starts a drag, cancel in-flight camera transitions before
 applying deltas.
