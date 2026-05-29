@@ -225,7 +225,7 @@ On window close or fatal error, close resources in order:
 
 ## Frame loop
 
-Each iteration has two phases: **pump** (always) and **render** (only when
+Each iteration has two phases: pump (always) and render (only when
 `render_pending` is true).
 
 ### Pump (every iteration)
