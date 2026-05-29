@@ -1,8 +1,7 @@
 # Map example specification
 
-Specification for interactive desktop `*-map` example programs: small apps that
-exercise language bindings and render-target integrations through a shared
-windowed map demo.
+Specification for interactive `*-map` example programs: small apps that exercise
+language bindings and render-target integrations through a focused map demo.
 
 ## Scope
 
@@ -24,14 +23,8 @@ what it must not try to be.
 
 ### What an example is not
 
-A `*-map` program is a demo, not a product SDK. It MUST NOT include:
-
-- Automated tests (unit, integration, or snapshot suites shipped with the app).
-- Packaging or installer UX, persistence, search, geolocation, or attribution
-  UI.
-- Offline map workflows, custom style editors, or multi-map layouts.
-- Mobile-first lifecycle, backgrounding, or power management beyond what the
-  desktop window toolkit needs for a resizable window.
+A `*-map` program is a demo, not a product SDK. It MUST NOT include automated
+tests or packaging/installer UX.
 
 Repository tooling (`mise`, Gradle, Cargo manifests, and similar) is unrelated
 to example behavior and is not specified here.
@@ -505,7 +498,6 @@ Metal builds of `zig-map`).
 - MUST implement `native-surface`.
 - MAY implement texture modes when the binding exposes Metal owned or borrowed
   texture targets.
-- Mobile and non-macOS Metal ports are out of scope until added explicitly.
 
 ### When the host uses OpenGL or EGL
 
