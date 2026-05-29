@@ -18,14 +18,27 @@ class MapProjectionHandleTest {
   fun projectionOwnsStandaloneSnapshotAndClosesIndependently() {
     val runtime = RuntimeHandle.create()
     try {
-      val map = MapHandle.create(runtime, MapOptions().size(64, 64).scaleFactor(1.0))
+      val map =
+        MapHandle.create(
+          runtime,
+          MapOptions().apply {
+            width = 64
+            height = 64
+            scaleFactor = 1.0
+          },
+        )
       val projection = MapProjectionHandle.create(map)
 
       assertFalse(projection.isClosed())
-      projection.setCamera(CameraOptions().center(0.0, 0.0).zoom(2.0))
+      projection.setCamera(
+        CameraOptions().apply {
+          center = LatLng(0.0, 0.0)
+          zoom = 2.0
+        }
+      )
       val camera = projection.camera()
-      kotlin.test.assertTrue(camera.hasCenter())
-      kotlin.test.assertTrue(camera.hasZoom())
+      kotlin.test.assertNotNull(camera.center)
+      kotlin.test.assertNotNull(camera.zoom)
       projection.setVisibleCoordinates(listOf(LatLng(0.0, 0.0), LatLng(1.0, 1.0)), EdgeInsets.ZERO)
       projection.setVisibleGeometry(
         Geometry.lineString(listOf(LatLng(0.0, 0.0), LatLng(1.0, 1.0))),

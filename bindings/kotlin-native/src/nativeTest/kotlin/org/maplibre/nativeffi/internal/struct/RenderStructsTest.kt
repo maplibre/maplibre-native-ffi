@@ -96,10 +96,12 @@ class RenderStructsTest {
                 context,
                 NativePointer.ofAddress(0x50L),
               )
-              .imageView(NativePointer.ofAddress(0x60L))
-              .format(44)
-              .initialLayout(1)
-              .finalLayout(2),
+              .apply {
+                imageView = NativePointer.ofAddress(0x60L)
+                format = 44
+                initialLayout = 1
+                finalLayout = 2
+              },
             this,
           )
           .pointed

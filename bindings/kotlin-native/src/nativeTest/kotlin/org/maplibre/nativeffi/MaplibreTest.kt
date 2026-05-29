@@ -2,7 +2,6 @@ package org.maplibre.nativeffi
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 import org.maplibre.nativeffi.camera.AnimationOptions
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.runtime.NetworkStatus
@@ -31,11 +30,10 @@ class MaplibreTest {
   }
 
   @Test
-  fun animationOptionsUseJavaAlignedDurationMsShape() {
-    val options = AnimationOptions().durationMs(12.0)
-    assertTrue(options.hasDurationMs())
+  fun animationOptionsUseNullableDurationMsShape() {
+    val options = AnimationOptions().apply { durationMs = 12.0 }
     assertEquals(12.0, options.durationMs)
-    options.clearDurationMs()
+    options.durationMs = null
     assertEquals(null, options.durationMs)
   }
 }

@@ -6,16 +6,6 @@ public class OpenGLOwnedTextureDescriptor(
   context: OpenGLContextDescriptor = WglContextDescriptor(),
 ) {
   public var extent: RenderTargetExtent = extent
-    private set
 
   public var context: OpenGLContextDescriptor = context
-    private set
-
-  public fun extent(extent: RenderTargetExtent): OpenGLOwnedTextureDescriptor = apply {
-    this.extent = extent
-  }
-
-  public fun context(context: OpenGLContextDescriptor): OpenGLOwnedTextureDescriptor = apply {
-    this.context = context
-  }
 }

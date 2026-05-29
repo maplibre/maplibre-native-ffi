@@ -91,12 +91,13 @@ class ResourceProviderStateTest {
   fun resourceResponseMaterializerCopiesOptionalFields() {
     memScoped {
       val response =
-        ResourceResponse.ok(byteArrayOf(1, 2, 3))
-          .etag("abc")
-          .modifiedUnixMs(10L)
-          .expiresUnixMs(20L)
-          .retryAfterUnixMs(30L)
-          .mustRevalidate(true)
+        ResourceResponse.ok(byteArrayOf(1, 2, 3)).apply {
+          etag = "abc"
+          modifiedUnixMs = 10L
+          expiresUnixMs = 20L
+          retryAfterUnixMs = 30L
+          mustRevalidate = true
+        }
       val native = ResourceStructs.resourceResponse(response, this).pointed
       assertEquals(ResourceResponseStatus.OK.nativeValue.toUInt(), native.status)
       assertEquals(3UL, native.byte_count)

@@ -41,10 +41,11 @@ Kotlin spelling for properties, builders, and nullability when it does not
 change the low-level contract.
 
 C option structs become Kotlin descriptor classes or data classes. Mutable
-field-mask descriptors use explicit setters, clearers, and presence checks.
-Immutable copied values use `data class` types where value equality is useful.
-Internal materializers write C `size` fields, masks, string views, arrays, and
-nested descriptors; callers set semantic fields only.
+field-mask descriptors use nullable public properties; optional validation lives
+in property setters where needed. Immutable copied values use `data class` types
+where value equality is useful. Internal materializers write C `size` fields,
+masks, string views, arrays, and nested descriptors; callers set semantic fields
+only.
 
 Closed C enum domains map to Kotlin enums with explicit raw conversions. Output
 domains that may grow preserve unknown raw values with a stable wrapper or
@@ -80,10 +81,11 @@ Prefer the Java value shape when it is practical: `Maplibre` exposes process
 APIs through a class with companion methods, copied value trees use Java-aligned
 names, `TileId` and `CanonicalTileId` stay flattened, `SourceInfo` preserves the
 native type string, and `OfflineRegionStatus` carries both the mapped and raw
-download state. Kotlin descriptors may still use nullable properties and fluent
-setters where they express the same low-level optional-field contract. Keep any
-remaining platform-only types at the edge of rendering or callback ownership,
-and describe their lifetime in KDoc or this guide.
+download state. Kotlin descriptors use nullable `var` properties for optional
+field-mask structs; presence is `property != null`, and callers clear fields by
+assigning `null`. Keep any remaining platform-only types at the edge of
+rendering or callback ownership, and describe their lifetime in KDoc or this
+guide.
 
 ## Handles, Status, and Threading
 

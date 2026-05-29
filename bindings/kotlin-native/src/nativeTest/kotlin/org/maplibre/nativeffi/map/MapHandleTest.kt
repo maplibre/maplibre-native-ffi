@@ -13,7 +13,15 @@ class MapHandleTest {
   fun closeReleasesMapOnceKeepsRuntimeLiveAndInvalidatesWrapper() {
     val runtime = RuntimeHandle.create()
     try {
-      val map = MapHandle.create(runtime, MapOptions().size(64, 64).scaleFactor(1.0))
+      val map =
+        MapHandle.create(
+          runtime,
+          MapOptions().apply {
+            width = 64
+            height = 64
+            scaleFactor = 1.0
+          },
+        )
 
       assertFalse(map.isClosed())
       assertEquals(runtime, map.runtime())

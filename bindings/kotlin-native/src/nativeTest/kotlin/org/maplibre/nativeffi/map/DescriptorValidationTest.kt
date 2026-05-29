@@ -19,33 +19,38 @@ import org.maplibre.nativeffi.runtime.RuntimeOptions
 class DescriptorValidationTest {
   @Test
   fun signedConvenienceSettersRejectNegativeValues() {
-    assertFailsWith<IllegalArgumentException> { MapOptions().size(-1, 1) }
-    assertFailsWith<IllegalArgumentException> { TileOptions().prefetchZoomDelta(-1) }
-    assertFailsWith<IllegalArgumentException> { RuntimeOptions().maximumCacheSize(-1) }
+    assertFailsWith<IllegalArgumentException> {
+      MapOptions().apply {
+        width = -1
+        height = 1
+      }
+    }
+    assertFailsWith<IllegalArgumentException> { TileOptions().prefetchZoomDelta = -1 }
+    assertFailsWith<IllegalArgumentException> { RuntimeOptions().maximumCacheSize = -1L }
     assertFailsWith<IllegalArgumentException> { NativeBuffer.allocate(-1) }
     assertFailsWith<IllegalArgumentException> { JsonValue.unsigned(-1L) }
     assertFailsWith<IllegalArgumentException> { JsonValue.UInt(-1L) }
     assertFailsWith<IllegalArgumentException> { FeatureIdentifier.unsigned(-1L) }
     assertFailsWith<IllegalArgumentException> { FeatureIdentifier.UInt(-1L) }
     assertFailsWith<IllegalArgumentException> { RenderTargetExtent(-1, 1) }
-    assertFailsWith<IllegalArgumentException> { RenderTargetExtent().size(-1, 1) }
+    assertFailsWith<IllegalArgumentException> { RenderTargetExtent().width = -1 }
     assertFailsWith<IllegalArgumentException> {
       VulkanContextDescriptor(graphicsQueueFamilyIndex = -1)
     }
     assertFailsWith<IllegalArgumentException> {
-      VulkanContextDescriptor().graphicsQueueFamilyIndex(-1)
+      VulkanContextDescriptor().graphicsQueueFamilyIndex = -1
     }
     assertFailsWith<IllegalArgumentException> { VulkanBorrowedTextureDescriptor(format = -1) }
-    assertFailsWith<IllegalArgumentException> { VulkanBorrowedTextureDescriptor().format(-1) }
+    assertFailsWith<IllegalArgumentException> { VulkanBorrowedTextureDescriptor().format = -1 }
   }
 
   @Test
   fun enumInputsKeepJavaAlignedUnknownSentinelsUntilNativeValidation() {
-    MapOptions().mapMode(MapMode.UNKNOWN)
-    TileOptions().lodMode(TileLodMode.UNKNOWN)
-    ViewportOptions().northOrientation(NorthOrientation.UNKNOWN)
-    ViewportOptions().constrainMode(ConstrainMode.UNKNOWN)
-    ViewportOptions().viewportMode(ViewportMode.UNKNOWN)
+    MapOptions().mapMode = MapMode.UNKNOWN
+    TileOptions().lodMode = TileLodMode.UNKNOWN
+    ViewportOptions().northOrientation = NorthOrientation.UNKNOWN
+    ViewportOptions().constrainMode = ConstrainMode.UNKNOWN
+    ViewportOptions().viewportMode = ViewportMode.UNKNOWN
     ResourceResponse.error(ResourceErrorReason.UNKNOWN, "bad")
   }
 

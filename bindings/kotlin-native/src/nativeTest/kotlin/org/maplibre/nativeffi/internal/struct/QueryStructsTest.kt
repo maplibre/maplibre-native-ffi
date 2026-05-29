@@ -57,9 +57,10 @@ class QueryStructsTest {
     memScoped {
       val rendered =
         QueryStructs.renderedFeatureQueryOptions(
-            RenderedFeatureQueryOptions()
-              .layerIds(listOf("roads", "labels"))
-              .filter(JsonValue.array(listOf(JsonValue.of("has"), JsonValue.of("name")))),
+            RenderedFeatureQueryOptions().apply {
+              layerIds = listOf("roads", "labels")
+              filter = JsonValue.array(listOf(JsonValue.of("has"), JsonValue.of("name")))
+            },
             this,
           )!!
           .pointed
@@ -69,7 +70,7 @@ class QueryStructsTest {
 
       val source =
         QueryStructs.sourceFeatureQueryOptions(
-            SourceFeatureQueryOptions().sourceLayerIds(listOf("water")),
+            SourceFeatureQueryOptions().apply { sourceLayerIds = listOf("water") },
             this,
           )!!
           .pointed
@@ -80,10 +81,14 @@ class QueryStructsTest {
 
   @Test
   fun featureStateSelectorKeepsStateKeyDependentOnFeatureId() {
-    assertFailsWith<IllegalStateException> { FeatureStateSelector("source").stateKey("hover") }
+    assertFailsWith<IllegalStateException> { FeatureStateSelector("source").stateKey = "hover" }
 
     val selector =
-      FeatureStateSelector("source").sourceLayerId("layer").featureId("feature-1").stateKey("hover")
+      FeatureStateSelector("source").apply {
+        sourceLayerId = "layer"
+        featureId = "feature-1"
+        stateKey = "hover"
+      }
     memScoped {
       val native = QueryStructs.featureStateSelector(selector, this).pointed
       assertTrue((native.fields and MLN_FEATURE_STATE_SELECTOR_SOURCE_LAYER_ID) != 0U)
@@ -91,8 +96,8 @@ class QueryStructsTest {
       assertTrue((native.fields and MLN_FEATURE_STATE_SELECTOR_STATE_KEY) != 0U)
     }
 
-    selector.clearFeatureId()
-    assertFalse(selector.hasFeatureId())
-    assertFalse(selector.hasStateKey())
+    selector.featureId = null
+    assertFalse(selector.featureId != null)
+    assertFalse(selector.stateKey != null)
   }
 }

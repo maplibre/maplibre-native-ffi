@@ -3,6 +3,7 @@ package org.maplibre.nativeffi.map
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import org.maplibre.nativeffi.camera.AnimationOptions
 import org.maplibre.nativeffi.camera.BoundOptions
@@ -22,7 +23,15 @@ class MapCameraControlsTest {
   fun mapCameraAndViewportControlsRoundTripThroughNativeCalls() {
     val runtime = RuntimeHandle.create()
     try {
-      val map = MapHandle.create(runtime, MapOptions().size(128, 128).scaleFactor(1.0))
+      val map =
+        MapHandle.create(
+          runtime,
+          MapOptions().apply {
+            width = 128
+            height = 128
+            scaleFactor = 1.0
+          },
+        )
       try {
         map.setDebugOptions(setOf(DebugOption.TILE_BORDERS, DebugOption.COLLISION))
         assertEquals(setOf(DebugOption.TILE_BORDERS, DebugOption.COLLISION), map.debugOptions())
@@ -33,19 +42,31 @@ class MapCameraControlsTest {
         assertFalse(map.isRenderingStatsViewEnabled())
 
         map.setViewportOptions(
-          ViewportOptions().viewportMode(ViewportMode.DEFAULT).frustumOffset(EdgeInsets.ZERO)
+          ViewportOptions().apply {
+            viewportMode = ViewportMode.DEFAULT
+            frustumOffset = EdgeInsets.ZERO
+          }
         )
         val viewport = map.viewportOptions()
-        assertTrue(viewport.hasViewportMode())
-        assertTrue(viewport.hasFrustumOffset())
+        assertNotNull(viewport.viewportMode)
+        assertNotNull(viewport.frustumOffset)
 
-        map.setTileOptions(TileOptions().prefetchZoomDelta(1).lodMode(TileLodMode.DEFAULT))
+        map.setTileOptions(
+          TileOptions().apply {
+            prefetchZoomDelta = 1
+            lodMode = TileLodMode.DEFAULT
+          }
+        )
         val tileOptions = map.tileOptions()
-        assertTrue(tileOptions.hasPrefetchZoomDelta())
-        assertTrue(tileOptions.hasLodMode())
+        assertNotNull(tileOptions.prefetchZoomDelta)
+        assertNotNull(tileOptions.lodMode)
 
-        val cameraOptions = CameraOptions().center(0.0, 0.0).zoom(1.0)
-        val animation = AnimationOptions().durationMs(0.0)
+        val cameraOptions =
+          CameraOptions().apply {
+            center = LatLng(0.0, 0.0)
+            zoom = 1.0
+          }
+        val animation = AnimationOptions().apply { durationMs = 0.0 }
         map.jumpTo(cameraOptions)
         map.easeTo(cameraOptions, animation)
         map.flyTo(cameraOptions, animation)
@@ -65,10 +86,15 @@ class MapCameraControlsTest {
         map.pitchBy(0.0)
         map.pitchByAnimated(0.0, animation)
         val camera = map.camera()
-        assertTrue(camera.hasCenter())
-        assertTrue(camera.hasZoom())
+        assertNotNull(camera.center)
+        assertNotNull(camera.zoom)
         map.cancelTransitions()
-        val fitOptions = CameraFitOptions().padding(EdgeInsets.ZERO).bearing(0.0).pitch(0.0)
+        val fitOptions =
+          CameraFitOptions().apply {
+            padding = EdgeInsets.ZERO
+            bearing = 0.0
+            pitch = 0.0
+          }
         val bounds = LatLngBounds(LatLng(-10.0, -10.0), LatLng(10.0, 10.0))
         map.cameraForLatLngBounds(bounds)
         map.cameraForLatLngBounds(bounds, fitOptions)
@@ -76,18 +102,19 @@ class MapCameraControlsTest {
         map.cameraForGeometry(Geometry.point(LatLng(0.0, 0.0)), fitOptions)
         map.latLngBoundsForCamera(cameraOptions)
         map.latLngBoundsForCameraUnwrapped(cameraOptions)
-        map.setBounds(BoundOptions().bounds(bounds))
-        assertTrue(map.bounds().hasBounds())
+        map.setBounds(BoundOptions().apply { this.bounds = bounds })
+        assertNotNull(map.bounds().bounds)
         map.setFreeCameraOptions(
-          FreeCameraOptions()
-            .position(Vec3(0.0, 0.0, 0.0))
-            .orientation(Quaternion(0.0, 0.0, 0.0, 1.0))
+          FreeCameraOptions().apply {
+            position = Vec3(0.0, 0.0, 0.0)
+            orientation = Quaternion(0.0, 0.0, 0.0, 1.0)
+          }
         )
         val freeCamera = map.freeCameraOptions()
-        assertTrue(freeCamera.hasPosition())
-        assertTrue(freeCamera.hasOrientation())
-        map.setProjectionMode(ProjectionModeOptions().axonometric(false))
-        assertTrue(map.projectionMode().hasAxonometric())
+        assertNotNull(freeCamera.position)
+        assertNotNull(freeCamera.orientation)
+        map.setProjectionMode(ProjectionModeOptions().apply { axonometric = false })
+        assertNotNull(map.projectionMode().axonometric)
         val point = map.pixelForLatLng(LatLng(0.0, 0.0))
         map.latLngForPixel(point)
         assertEquals(2, map.pixelsForLatLngs(listOf(LatLng(0.0, 0.0), LatLng(1.0, 1.0))).size)

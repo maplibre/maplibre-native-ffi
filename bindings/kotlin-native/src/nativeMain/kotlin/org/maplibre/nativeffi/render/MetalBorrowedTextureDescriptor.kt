@@ -6,16 +6,6 @@ public class MetalBorrowedTextureDescriptor(
   texture: NativePointer = NativePointer.NULL,
 ) {
   public var extent: RenderTargetExtent = extent
-    private set
 
   public var texture: NativePointer = texture
-    private set
-
-  public fun extent(extent: RenderTargetExtent): MetalBorrowedTextureDescriptor = apply {
-    this.extent = extent
-  }
-
-  public fun texture(texture: NativePointer): MetalBorrowedTextureDescriptor = apply {
-    this.texture = texture
-  }
 }

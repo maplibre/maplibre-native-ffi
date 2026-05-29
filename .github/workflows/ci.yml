@@ -69,13 +69,10 @@ jobs:
         run: mise run //bindings/java-ffm:build
       - name: Build Java JNI binding
         run: mise run //bindings/java-jni:build
-      # Kotlin/Native is skipped on linux-arm64 because Linux/AArch64 is not yet
-      # a supported Kotlin/Native host: https://youtrack.jetbrains.com/issue/KT-36871
-      # Windows is skipped while this project builds the C library with MSVC but
-      # Kotlin/Native exposes a MinGW Windows target; see related MSVC-linking
-      # discussion: https://youtrack.jetbrains.com/issue/SKIKO-446
+      # linux-arm64: no Kotlin/Native host — https://youtrack.jetbrains.com/issue/KT-36871
+      # windows: no MSVC target — https://youtrack.jetbrains.com/issue/SKIKO-446
       - name: Test Kotlin/Native binding
-        if: ${{ startsWith(matrix.mise_env, 'linux-x64-') || startsWith(matrix.mise_env, 'macos-') }}
+        if: ${{ !startsWith(matrix.mise_env, 'windows-') && !startsWith(matrix.mise_env, 'linux-arm64-') }}
         run: mise run //bindings/kotlin-native:build
       - name: Test Rust binding
         run: mise run //bindings/rust:ci

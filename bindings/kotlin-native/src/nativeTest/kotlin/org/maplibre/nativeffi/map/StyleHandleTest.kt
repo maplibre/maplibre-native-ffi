@@ -39,7 +39,14 @@ class StyleHandleTest {
   @Test
   fun customGeometrySourceApisKeepCallbackStateMapScoped() {
     val runtime = RuntimeHandle.create()
-    val map = MapHandle.create(runtime, MapOptions().size(128, 128))
+    val map =
+      MapHandle.create(
+        runtime,
+        MapOptions().apply {
+          width = 128
+          height = 128
+        },
+      )
     try {
       map.setStyleJson("{\"version\":8,\"sources\":{},\"layers\":[]}")
       map.addCustomGeometrySource(
@@ -49,12 +56,14 @@ class StyleHandleTest {
               override fun fetchTile(tileId: CanonicalTileId) = Unit
             }
           )
-          .minZoom(0.0)
-          .maxZoom(4.0)
-          .tileSize(256)
-          .buffer(8)
-          .clip(true)
-          .wrap(false),
+          .apply {
+            minZoom = 0.0
+            maxZoom = 4.0
+            tileSize = 256
+            buffer = 8
+            clip = true
+            wrap = false
+          },
       )
       assertEquals(1, map.customGeometrySourceCountForTesting())
       assertEquals(SourceType.CUSTOM_VECTOR, map.styleSourceType("custom"))
@@ -79,7 +88,14 @@ class StyleHandleTest {
   @Test
   fun mapStyleLoadedEventDropsCallbacksAfterNativeSourceDetaches() {
     val runtime = RuntimeHandle.create()
-    val map = MapHandle.create(runtime, MapOptions().size(128, 128))
+    val map =
+      MapHandle.create(
+        runtime,
+        MapOptions().apply {
+          width = 128
+          height = 128
+        },
+      )
     try {
       map.setStyleJson("{\"version\":8,\"sources\":{},\"layers\":[]}")
       map.addCustomGeometrySource(
@@ -122,7 +138,14 @@ class StyleHandleTest {
   @Test
   fun releaseDetachedCustomGeometrySourcesDropsCallbacksAfterNativeSourceDetaches() {
     val runtime = RuntimeHandle.create()
-    val map = MapHandle.create(runtime, MapOptions().size(128, 128))
+    val map =
+      MapHandle.create(
+        runtime,
+        MapOptions().apply {
+          width = 128
+          height = 128
+        },
+      )
     try {
       map.setStyleJson("{\"version\":8,\"sources\":{},\"layers\":[]}")
       map.addCustomGeometrySource(
@@ -158,7 +181,14 @@ class StyleHandleTest {
   @Test
   fun styleSourceAndLayerJsonApisCallNativeAndCopyDescriptors() {
     val runtime = RuntimeHandle.create()
-    val map = MapHandle.create(runtime, MapOptions().size(128, 128))
+    val map =
+      MapHandle.create(
+        runtime,
+        MapOptions().apply {
+          width = 128
+          height = 128
+        },
+      )
     try {
       map.setStyleJson("{\"version\":8,\"sources\":{},\"layers\":[]}")
       map.addStyleSourceJson(
@@ -218,11 +248,25 @@ class StyleHandleTest {
   @Test
   fun styleImageApisCopyPixelsAndMetadata() {
     val runtime = RuntimeHandle.create()
-    val map = MapHandle.create(runtime, MapOptions().size(128, 128))
+    val map =
+      MapHandle.create(
+        runtime,
+        MapOptions().apply {
+          width = 128
+          height = 128
+        },
+      )
     try {
       map.setStyleJson("{\"version\":8,\"sources\":{},\"layers\":[]}")
       val image = PremultipliedRgba8Image(1, 1, 4, byteArrayOf(1, 2, 3, 4))
-      map.setStyleImage("dot", image, StyleImageOptions().pixelRatio(2.0f).sdf(true))
+      map.setStyleImage(
+        "dot",
+        image,
+        StyleImageOptions().apply {
+          pixelRatio = 2.0f
+          sdf = true
+        },
+      )
       assertTrue(map.styleImageExists("dot"))
       assertEquals(2.0f, map.styleImageInfo("dot")?.pixelRatio)
       assertEquals(image, map.copyStyleImagePremultipliedRgba8("dot")?.image)
@@ -244,7 +288,14 @@ class StyleHandleTest {
   @Test
   fun imageSourceApisCopyCoordinatesAndPixels() {
     val runtime = RuntimeHandle.create()
-    val map = MapHandle.create(runtime, MapOptions().size(128, 128))
+    val map =
+      MapHandle.create(
+        runtime,
+        MapOptions().apply {
+          width = 128
+          height = 128
+        },
+      )
     val coordinates = listOf(LatLng(1.0, 1.0), LatLng(1.0, 2.0), LatLng(0.0, 2.0), LatLng(0.0, 1.0))
     try {
       map.setStyleJson("{\"version\":8,\"sources\":{},\"layers\":[]}")
@@ -268,32 +319,46 @@ class StyleHandleTest {
   @Test
   fun tileSourceApisMaterializeOptionsAndTileUrlLists() {
     val runtime = RuntimeHandle.create()
-    val map = MapHandle.create(runtime, MapOptions().size(128, 128))
+    val map =
+      MapHandle.create(
+        runtime,
+        MapOptions().apply {
+          width = 128
+          height = 128
+        },
+      )
     try {
       map.setStyleJson("{\"version\":8,\"sources\":{},\"layers\":[]}")
       map.addVectorSourceTiles(
         "vector",
         listOf("https://example.com/vector/{z}/{x}/{y}.pbf"),
-        TileSourceOptions()
-          .minZoom(0.0)
-          .maxZoom(14.0)
-          .attribution("vector attribution")
-          .scheme(TileScheme.XYZ)
-          .tileSize(512)
-          .vectorEncoding(VectorTileEncoding.MVT),
+        TileSourceOptions().apply {
+          minZoom = 0.0
+          maxZoom = 14.0
+          attribution = "vector attribution"
+          scheme = TileScheme.XYZ
+          tileSize = 512
+          vectorEncoding = VectorTileEncoding.MVT
+        },
       )
       assertEquals(SourceType.VECTOR, map.styleSourceType("vector"))
       assertEquals("vector attribution", map.styleSourceInfo("vector")?.attribution)
       map.addRasterSourceTiles(
         "raster",
         listOf("https://example.com/raster/{z}/{x}/{y}.png"),
-        TileSourceOptions().tileSize(256).scheme(TileScheme.TMS),
+        TileSourceOptions().apply {
+          tileSize = 256
+          scheme = TileScheme.TMS
+        },
       )
       assertEquals(SourceType.RASTER, map.styleSourceType("raster"))
       map.addRasterDemSourceTiles(
         "dem",
         listOf("https://example.com/dem/{z}/{x}/{y}.png"),
-        TileSourceOptions().tileSize(512).rasterDemEncoding(RasterDemEncoding.TERRARIUM),
+        TileSourceOptions().apply {
+          tileSize = 512
+          rasterDemEncoding = RasterDemEncoding.TERRARIUM
+        },
       )
       assertEquals(SourceType.RASTER_DEM, map.styleSourceType("dem"))
       map.addHillshadeLayer("hillshade", "dem")
@@ -309,7 +374,14 @@ class StyleHandleTest {
   @Test
   fun geoJsonSourceApisMaterializeGeoJsonDescriptors() {
     val runtime = RuntimeHandle.create()
-    val map = MapHandle.create(runtime, MapOptions().size(128, 128))
+    val map =
+      MapHandle.create(
+        runtime,
+        MapOptions().apply {
+          width = 128
+          height = 128
+        },
+      )
     try {
       map.setStyleJson("{\"version\":8,\"sources\":{},\"layers\":[]}")
       map.addGeoJsonSourceData(

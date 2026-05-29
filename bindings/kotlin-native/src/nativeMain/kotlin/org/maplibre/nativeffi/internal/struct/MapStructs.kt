@@ -198,11 +198,11 @@ internal object MapStructs {
   fun boundOptions(value: mln_bound_options): BoundOptions {
     val options = BoundOptions()
     if ((value.fields and MLN_BOUND_OPTION_BOUNDS) != 0U)
-      options.bounds(CoreStructs.latLngBounds(value.bounds))
-    if ((value.fields and MLN_BOUND_OPTION_MIN_ZOOM) != 0U) options.minZoom(value.min_zoom)
-    if ((value.fields and MLN_BOUND_OPTION_MAX_ZOOM) != 0U) options.maxZoom(value.max_zoom)
-    if ((value.fields and MLN_BOUND_OPTION_MIN_PITCH) != 0U) options.minPitch(value.min_pitch)
-    if ((value.fields and MLN_BOUND_OPTION_MAX_PITCH) != 0U) options.maxPitch(value.max_pitch)
+      options.bounds = CoreStructs.latLngBounds(value.bounds)
+    if ((value.fields and MLN_BOUND_OPTION_MIN_ZOOM) != 0U) options.minZoom = value.min_zoom
+    if ((value.fields and MLN_BOUND_OPTION_MAX_ZOOM) != 0U) options.maxZoom = value.max_zoom
+    if ((value.fields and MLN_BOUND_OPTION_MIN_PITCH) != 0U) options.minPitch = value.min_pitch
+    if ((value.fields and MLN_BOUND_OPTION_MAX_PITCH) != 0U) options.maxPitch = value.max_pitch
     return options
   }
 
@@ -231,19 +231,17 @@ internal object MapStructs {
   fun freeCameraOptions(value: mln_free_camera_options): FreeCameraOptions {
     val options = FreeCameraOptions()
     if ((value.fields and MLN_FREE_CAMERA_OPTION_POSITION) != 0U) {
-      options.position(
+      options.position =
         org.maplibre.nativeffi.geo.Vec3(value.position.x, value.position.y, value.position.z)
-      )
     }
     if ((value.fields and MLN_FREE_CAMERA_OPTION_ORIENTATION) != 0U) {
-      options.orientation(
+      options.orientation =
         org.maplibre.nativeffi.geo.Quaternion(
           value.orientation.x,
           value.orientation.y,
           value.orientation.z,
           value.orientation.w,
         )
-      )
     }
     return options
   }
@@ -276,16 +274,16 @@ internal object MapStructs {
   fun viewportOptions(value: mln_map_viewport_options): ViewportOptions {
     val options = ViewportOptions()
     if ((value.fields and MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION) != 0U) {
-      options.northOrientation(NorthOrientation.fromNative(value.north_orientation))
+      options.northOrientation = NorthOrientation.fromNative(value.north_orientation)
     }
     if ((value.fields and MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE) != 0U) {
-      options.constrainMode(ConstrainMode.fromNative(value.constrain_mode))
+      options.constrainMode = ConstrainMode.fromNative(value.constrain_mode)
     }
     if ((value.fields and MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE) != 0U) {
-      options.viewportMode(ViewportMode.fromNative(value.viewport_mode))
+      options.viewportMode = ViewportMode.fromNative(value.viewport_mode)
     }
     if ((value.fields and MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET) != 0U) {
-      options.frustumOffset(CoreStructs.edgeInsets(value.frustum_offset))
+      options.frustumOffset = CoreStructs.edgeInsets(value.frustum_offset)
     }
     return options
   }
@@ -323,22 +321,22 @@ internal object MapStructs {
   fun tileOptions(value: mln_map_tile_options): TileOptions {
     val options = TileOptions()
     if ((value.fields and MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA) != 0U) {
-      options.prefetchZoomDelta(value.prefetch_zoom_delta.toInt())
+      options.prefetchZoomDelta = value.prefetch_zoom_delta.toInt()
     }
     if ((value.fields and MLN_MAP_TILE_OPTION_LOD_MIN_RADIUS) != 0U) {
-      options.lodMinRadius(value.lod_min_radius)
+      options.lodMinRadius = value.lod_min_radius
     }
     if ((value.fields and MLN_MAP_TILE_OPTION_LOD_SCALE) != 0U) {
-      options.lodScale(value.lod_scale)
+      options.lodScale = value.lod_scale
     }
     if ((value.fields and MLN_MAP_TILE_OPTION_LOD_PITCH_THRESHOLD) != 0U) {
-      options.lodPitchThreshold(value.lod_pitch_threshold)
+      options.lodPitchThreshold = value.lod_pitch_threshold
     }
     if ((value.fields and MLN_MAP_TILE_OPTION_LOD_ZOOM_SHIFT) != 0U) {
-      options.lodZoomShift(value.lod_zoom_shift)
+      options.lodZoomShift = value.lod_zoom_shift
     }
     if ((value.fields and MLN_MAP_TILE_OPTION_LOD_MODE) != 0U) {
-      options.lodMode(TileLodMode.fromNative(value.lod_mode))
+      options.lodMode = TileLodMode.fromNative(value.lod_mode)
     }
     return options
   }
@@ -367,13 +365,13 @@ internal object MapStructs {
   fun projectionModeOptions(value: mln_projection_mode): ProjectionModeOptions {
     val options = ProjectionModeOptions()
     if ((value.fields and MLN_PROJECTION_MODE_AXONOMETRIC) != 0U) {
-      options.axonometric(value.axonometric)
+      options.axonometric = value.axonometric
     }
     if ((value.fields and MLN_PROJECTION_MODE_X_SKEW) != 0U) {
-      options.xSkew(value.x_skew)
+      options.xSkew = value.x_skew
     }
     if ((value.fields and MLN_PROJECTION_MODE_Y_SKEW) != 0U) {
-      options.ySkew(value.y_skew)
+      options.ySkew = value.y_skew
     }
     return options
   }
@@ -381,31 +379,31 @@ internal object MapStructs {
   fun cameraOptions(value: mln_camera_options): CameraOptions {
     val camera = CameraOptions()
     if ((value.fields and MLN_CAMERA_OPTION_CENTER) != 0U) {
-      camera.center(value.latitude, value.longitude)
+      camera.center = org.maplibre.nativeffi.geo.LatLng(value.latitude, value.longitude)
     }
     if ((value.fields and MLN_CAMERA_OPTION_CENTER_ALTITUDE) != 0U) {
-      camera.centerAltitude(value.center_altitude)
+      camera.centerAltitude = value.center_altitude
     }
     if ((value.fields and MLN_CAMERA_OPTION_PADDING) != 0U) {
-      camera.padding(CoreStructs.edgeInsets(value.padding))
+      camera.padding = CoreStructs.edgeInsets(value.padding)
     }
     if ((value.fields and MLN_CAMERA_OPTION_ANCHOR) != 0U) {
-      camera.anchor(CoreStructs.screenPoint(value.anchor))
+      camera.anchor = CoreStructs.screenPoint(value.anchor)
     }
     if ((value.fields and MLN_CAMERA_OPTION_ZOOM) != 0U) {
-      camera.zoom(value.zoom)
+      camera.zoom = value.zoom
     }
     if ((value.fields and MLN_CAMERA_OPTION_BEARING) != 0U) {
-      camera.bearing(value.bearing)
+      camera.bearing = value.bearing
     }
     if ((value.fields and MLN_CAMERA_OPTION_PITCH) != 0U) {
-      camera.pitch(value.pitch)
+      camera.pitch = value.pitch
     }
     if ((value.fields and MLN_CAMERA_OPTION_ROLL) != 0U) {
-      camera.roll(value.roll)
+      camera.roll = value.roll
     }
     if ((value.fields and MLN_CAMERA_OPTION_FOV) != 0U) {
-      camera.fieldOfView(value.field_of_view)
+      camera.fieldOfView = value.field_of_view
     }
     return camera
   }
