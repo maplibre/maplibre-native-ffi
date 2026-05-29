@@ -16,8 +16,6 @@ interop or the popular MapLibre Android/iOS SDKs.
 - `third_party/` — Vendored dependencies, primarily the MapLibre Native git
   submodule.
 - `docs/` — Astro/Starlight documentation site and generated API reference.
-- `docs/src/content/docs/development/specifications/` — Specs for parallel
-  implementations (examples, bindings).
 
 ## Workflow
 
