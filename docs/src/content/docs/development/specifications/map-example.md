@@ -30,7 +30,10 @@ packaging/installer UX.
 
 ---
 
-## Implementations
+## Examples in this repository
+
+The table lists current `*-map` trees for comparison. Conformance is defined by
+the sections above, not by matching these paths.
 
 | Example              | Binding  | Toolkit         | Platforms             | Backends              |
 | -------------------- | -------- | --------------- | --------------------- | --------------------- |
@@ -81,10 +84,8 @@ quad:
 - Fragment shader: `texture(map_texture, uv)` (straight copy, standard UV
   orientation).
 
-Reference GLSL sources: `examples/zig-map/render/vulkan/shaders/fullscreen.vert`
-and `sample.frag` (same filenames under
-`examples/rust-map/src/vulkan_texture_compositor/shaders/`). SPIR-V, MSL, or
-other GL dialects MAY differ; output MUST match that pass.
+SPIR-V, MSL, or GLSL source MAY differ by backend; the GPU output MUST match
+that pass.
 
 ---
 
@@ -180,8 +181,9 @@ packages per module).
 
 The backend module MUST be a discriminated implementation per render-target mode
 (union, sealed hierarchy, or equivalent). Adding a mode or backend MUST require
-a localized change (new enum variant + module), matching the `zig-map` `render/`
-layout.
+a localized change (new enum variant and dedicated module). Keep each graphics
+API and each render-target mode in its own variant or submodule rather than
+branching ad hoc through shared draw code.
 
 Each backend variant implements, at minimum:
 
@@ -346,11 +348,21 @@ the CLI and backend matrix as stubs or rejected at startup.
 
 ### Mode comparison
 
-| CLI value          | C API concept                                                | Compositor | Typical use in spec                                         |
+| CLI value          | C API concept                                                | Compositor | Role                                                        |
 | ------------------ | ------------------------------------------------------------ | ---------- | ----------------------------------------------------------- |
 | `owned-texture`    | Session-owned backend texture (e.g. Vulkan owned texture)    | Required   | Default; map allocates texture, host samples it.            |
 | `borrowed-texture` | Caller-owned texture/image borrowed by session               | Required   | Host allocates exportable texture; session renders into it. |
 | `native-surface`   | Window surface (Vulkan surface, Metal layer, EGL surface, …) | None       | Map renders directly to the swapchain/surface.              |
+
+Startup MUST print the active mode’s CLI value and a one-line status. Use the
+`render target status:` prefix and wording that describes presentation for that
+mode, for example:
+
+| CLI value          | Status line (substance; toolkit names MAY vary)                            |
+| ------------------ | -------------------------------------------------------------------------- |
+| `owned-texture`    | samples MapLibre-owned texture frames into the host swapchain              |
+| `borrowed-texture` | renders into a host-owned texture, then samples it into the host swapchain |
+| `native-surface`   | renders directly to the host window surface                                |
 
 ### `owned-texture`
 
@@ -418,17 +430,17 @@ Controls:
 
 ### Behavioral constants
 
-| Interaction                   | Behavior                                                                                                         |
-| ----------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| Left drag                     | `move_by` with pointer delta in logical coordinates.                                                             |
-| Right drag, or Ctrl+left drag | Adjust bearing by `0.5 × Δx` degrees; adjust pitch by `0.5 × Δy` degrees (same sign convention across examples). |
-| Scroll                        | Zoom about cursor: `scale_by(2^(Δ * 0.25), anchor)`; negate axis as needed for toolkit scroll direction.         |
-| Arrow keys / WASD             | Pan `120` logical units per key press.                                                                           |
-| `+` / `-`                     | Zoom `1.25` / `1/1.25` about viewport center.                                                                    |
-| `Q` / `E`                     | Bearing ±`10`° with keyboard animation.                                                                          |
-| PageUp / `]`                  | Pitch +`5`° (clamped to `[0, 60]`) with animation.                                                               |
-| PageDown / `[`                | Pitch −`5`° with animation.                                                                                      |
-| `0`                           | Animate bearing and pitch to `0` (duration ~`220` ms).                                                           |
+| Interaction                   | Behavior                                                                                                    |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| Left drag                     | `move_by` with pointer delta in logical coordinates.                                                        |
+| Right drag, or Ctrl+left drag | Adjust bearing by `0.5 × Δx` degrees; adjust pitch by `0.5 × Δy` degrees (same sign convention everywhere). |
+| Scroll                        | Zoom about cursor: `scale_by(2^(Δ * 0.25), anchor)`; negate axis as needed for toolkit scroll direction.    |
+| Arrow keys / WASD             | Pan `120` logical units per key press.                                                                      |
+| `+` / `-`                     | Zoom `1.25` / `1/1.25` about viewport center.                                                               |
+| `Q` / `E`                     | Bearing ±`10`° with keyboard animation.                                                                     |
+| PageUp / `]`                  | Pitch +`5`° (clamped to `[0, 60]`) with animation.                                                          |
+| PageDown / `[`                | Pitch −`5`° with animation.                                                                                 |
+| `0`                           | Animate bearing and pitch to `0` (duration ~`220` ms).                                                      |
 
 Keyboard animated moves SHOULD use ~`160` ms duration. Pointer drags use
 immediate `move_by` / `jump_to` / `pitch_by`.
@@ -447,9 +459,8 @@ Input handlers return whether the camera changed so the frame loop can set
   where the binding supports it.
 - On setup or camera failure, print a short message including the binding error
   or diagnostic (implementation-defined detail level).
-- On startup, print which render-target mode is active and a one-line
-  description of what it demonstrates (see existing `rust-map` / `lwjgl-map`
-  status lines).
+- On startup, print which render-target mode is active and the status line for
+  that mode (see [Render-target modes](#render-target-modes)).
 - MUST print supported native render backends (`metal`, `vulkan`, `opengl`) from
   `mln_supported_render_backend_mask()`.
 
@@ -459,22 +470,20 @@ Input handlers return whether the camera changed so the frame loop can set
 
 ### When Vulkan presents the window
 
-Applies when: the example uses Vulkan for the window surface and swapchain (for
-example `rust-map`, `lwjgl-map`, Vulkan builds of `zig-map`).
+Applies when: the example uses Vulkan for the window surface and swapchain.
 
 - MUST implement render-target modes `owned-texture` and `native-surface`.
 - SHOULD implement `borrowed-texture` when the binding and swapchain support
   exportable textures.
 - MUST use one shared Vulkan context (instance, device, queue, surface) for
   compositor and render session.
-- The compositor MUST use the SPIR-V shader pair described in
+- The compositor MUST follow
   [Compositor shaders](#compositor-shaders-texture-modes).
 
 ### When presentation goes through a Metal layer or surface
 
 Applies when: the example attaches a `native-surface` session to a
-`CAMetalLayer` or equivalent Metal presentation handle (for example `swift-map`,
-Metal builds of `zig-map`).
+`CAMetalLayer` or equivalent Metal presentation handle.
 
 - MUST implement `native-surface`.
 - MAY implement texture modes when the binding exposes Metal owned or borrowed
@@ -482,18 +491,17 @@ Metal builds of `zig-map`).
 
 ### When the host uses OpenGL or EGL
 
-Applies when: the example uses OpenGL or EGL for window presentation (for
-example OpenGL builds of `zig-map`).
+Applies when: the example uses OpenGL or EGL for window presentation.
 
 - SHOULD implement all three render-target modes where the binding and GL/EGL
   stack allow owned and borrowed texture paths.
-- The compositor MUST still be a fullscreen textured quad equivalent to
+- The compositor MUST follow
   [Compositor shaders](#compositor-shaders-texture-modes).
 
 ### When the binding confines map work to a single UI thread
 
 Applies when: the binding or platform requires runtime, map, and render session
-use on one UI owner thread (for example AppKit with main-thread isolation).
+use on one UI owner thread.
 
 - All map and render calls MUST run on that thread.
 - Window and layer setup MUST stay consistent with the binding’s thread rules
@@ -502,7 +510,7 @@ use on one UI owner thread (for example AppKit with main-thread isolation).
 ### When the window toolkit has no single cross-platform event pump
 
 Applies when: the host UI framework does not deliver input, resize, and idle
-ticks through one portable poll loop (unlike SDL or winit).
+ticks through one portable poll loop.
 
 - The example MUST still run the [frame loop](#frame-loop) logic each tick
   (runtime pump, event drain, conditional render).
