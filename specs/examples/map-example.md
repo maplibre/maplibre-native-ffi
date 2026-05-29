@@ -16,9 +16,8 @@ what it must not try to be.
   map render events and user input.
 - Initial style URL and camera per [Shared defaults](#shared-defaults).
 - Camera controls per [Input](#input).
-- Modular support for three render-target modes (see
-  [Render-target modes](#render-target-modes)), structured so additional
-  graphics backends and modes can be added without rewriting unrelated modules.
+- Support for the three render-target modes (see
+  [Render-target modes](#render-target-modes)).
 - Graceful process exit when the user closes the window.
 - Startup logging that identifies the selected render-target mode and, when
   practical, which native render backends the loaded library exposes.
