@@ -100,9 +100,8 @@ The process MUST accept a render-target mode name:
 | Caller-owned borrowed texture | `borrowed-texture` |
 | Native window surface         | `native-surface`   |
 
-Pass the mode with `--render-target` (for example
-`--render-target=owned-texture`). The flag is required; there is no default
-mode.
+The mode is a required positional argument (for example
+`zig-map owned-texture`). There is no default mode.
 
 On `--help` or invalid arguments, print usage listing the three mode names and
 exit before creating a window.
@@ -113,7 +112,8 @@ be rejected at startup with a clear error if requested on the command line.
 
 ### Other flags
 
-Implementations MUST NOT add other CLI flags.
+The only permitted flag is `--help`. Implementations MUST NOT add other CLI
+flags.
 
 ---
 
