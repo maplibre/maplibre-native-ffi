@@ -7,8 +7,6 @@ repositories { mavenCentral() }
 val nativeBuildDir = providers.environmentVariable("MLN_FFI_BUILD_DIR").orNull
 
 kotlin {
-  compilerOptions { freeCompilerArgs.add("-Xexpect-actual-classes") }
-
   val hostOs = System.getProperty("os.name").lowercase()
   val hostArch = System.getProperty("os.arch").lowercase()
   val hostTarget =
@@ -36,9 +34,6 @@ kotlin {
           defFile(project.file("src/nativeInterop/cinterop/maplibreNativeC.def"))
           includeDirs.headerFilterOnly(rootProject.file("include"))
           compilerOpts("-I${rootProject.file("include").absolutePath}")
-          compilerOpts(
-            "-I${rootProject.file("third_party/maplibre-native/vendor/Vulkan-Headers/include").absolutePath}"
-          )
         }
       }
     }
