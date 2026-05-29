@@ -270,8 +270,7 @@ sequenceDiagram
 
 Requirements:
 
-- MUST call runtime `run_once` (or binding equivalent) once per loop iteration
-  while the app is running.
+- MUST call runtime `run_once` once per loop iteration while the app is running.
 - MUST drain runtime events each iteration and set `render_pending` when a
   `map_render_update_available` event targets this map (and MAY also react to
   `map_render_frame_finished` / `needs_repaint` when the binding exposes it).
@@ -453,7 +452,7 @@ Input handlers return whether the camera changed so the frame loop can set
   description of what it demonstrates (see existing `rust-map` / `lwjgl-map`
   status lines).
 - MUST print supported native render backends (`metal`, `vulkan`, `opengl`) from
-  `mln_supported_render_backend_mask()` or the binding equivalent.
+  `mln_supported_render_backend_mask()`.
 
 ---
 
