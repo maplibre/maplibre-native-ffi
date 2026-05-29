@@ -34,18 +34,12 @@ packaging/installer UX.
 
 ## Examples in this repository
 
-The table lists current `*-map` trees for comparison. Conformance is defined by
-the sections above, not by matching these paths.
-
-| Example              | Binding             | Toolkit         | Platforms             | Backends              |
-| -------------------- | ------------------- | --------------- | --------------------- | --------------------- |
-| `examples/zig-map`   | Zig                 | SDL3            | Linux, macOS, Windows | Vulkan, Metal, OpenGL |
-| `examples/rust-map`  | Rust                | winit           | Linux, macOS, Windows | Vulkan                |
-| `examples/lwjgl-map` | Java FFM            | GLFW, LWJGL     | Linux, macOS, Windows | Vulkan                |
-| `examples/swift-map` | Swift (C API today) | AppKit, SwiftUI | macOS                 | Metal                 |
-
-`swift-map` still uses the C API from application code; a Swift binding is
-expected. It does not meet the binding requirement until that work lands.
+| Example              | Binding  | Toolkit         | Platforms             | Backends              |
+| -------------------- | -------- | --------------- | --------------------- | --------------------- |
+| `examples/zig-map`   | Zig      | SDL3            | Linux, macOS, Windows | Vulkan, Metal, OpenGL |
+| `examples/rust-map`  | Rust     | winit           | Linux, macOS, Windows | Vulkan                |
+| `examples/lwjgl-map` | Java FFM | GLFW, LWJGL     | Linux, macOS, Windows | Vulkan                |
+| `examples/swift-map` | Swift    | AppKit, SwiftUI | macOS                 | Metal                 |
 
 ---
 
