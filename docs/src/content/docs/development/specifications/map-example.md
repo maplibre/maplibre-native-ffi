@@ -434,17 +434,17 @@ Controls:
 
 ### Behavioral constants
 
-| Interaction                   | Behavior                                                                                                    |
-| ----------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| Left drag                     | `move_by` with pointer delta in logical coordinates.                                                        |
-| Right drag, or Ctrl+left drag | Adjust bearing by `0.5 × Δx` degrees; adjust pitch by `0.5 × Δy` degrees (same sign convention everywhere). |
-| Scroll                        | Zoom about cursor: `scale_by(2^(Δ * 0.25), anchor)` with `Δ = −wheel_y` (scroll up zooms in).               |
-| Arrow keys / WASD             | Pan `120` logical units per key press.                                                                      |
-| `+` / `-`                     | Zoom `1.25` / `1/1.25` about viewport center.                                                               |
-| `Q` / `E`                     | Bearing ±`10`° with keyboard animation.                                                                     |
-| PageUp / `]`                  | Pitch +`5`° (clamped to `[0, 60]`) with animation.                                                          |
-| PageDown / `[`                | Pitch −`5`° with animation.                                                                                 |
-| `0`                           | Animate bearing and pitch to `0` (duration ~`220` ms).                                                      |
+| Interaction                   | Behavior                                                                                                                                                                               |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Left drag                     | `move_by` with pointer delta in logical coordinates.                                                                                                                                   |
+| Right drag, or Ctrl+left drag | Adjust bearing by `0.5 × Δx` degrees; adjust pitch by `0.5 × Δy` degrees (same sign convention everywhere).                                                                            |
+| Scroll                        | Zoom about cursor: `scale_by(2^(Δ * 0.25), anchor)`. Δ from the toolkit wheel event; scrolling up zooms in (use OS-adjusted deltas as reported—do not undo platform scroll inversion). |
+| Arrow keys / WASD             | Pan `120` logical units per key press.                                                                                                                                                 |
+| `+` / `-`                     | Zoom `1.25` / `1/1.25` about viewport center.                                                                                                                                          |
+| `Q` / `E`                     | Bearing ±`10`° with keyboard animation.                                                                                                                                                |
+| PageUp / `]`                  | Pitch +`5`° (clamped to `[0, 60]`) with animation.                                                                                                                                     |
+| PageDown / `[`                | Pitch −`5`° with animation.                                                                                                                                                            |
+| `0`                           | Animate bearing and pitch to `0` (duration ~`220` ms).                                                                                                                                 |
 
 Keyboard animated moves SHOULD use ~`160` ms duration. Pointer drags use
 immediate `move_by` / `jump_to` / `pitch_by`.
@@ -471,8 +471,9 @@ Input handlers return whether the camera changed so the frame loop can set
 
 ## Graphics API
 
-Attach descriptors and shared context handles per graphics API. All three
-render-target modes MUST be implemented on each API the example supports.
+Each example MUST expose every API below that its toolkit and platform can
+support, and MUST implement all three render-target modes on each exposed API.
+Attach descriptors and shared context handles:
 
 ### Vulkan
 

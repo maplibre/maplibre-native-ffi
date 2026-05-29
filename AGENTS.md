@@ -107,8 +107,8 @@ Normative specs live under
   log lines). Avoid vague verbs (“react”, “retry”), “or equivalent”, “as
   practical”, “implementation-defined”, and optional wording that hides a real
   MUST.
-- Pin required user-visible strings verbatim in a table; skip redundant meta (“
-  character-for-character”).
+- Pin required user-visible strings verbatim in a table; skip redundant
+  qualifiers about how strictly to match them.
 - Put API- or platform-specific detail in scoped subsections (for example
   Graphics API), not in family-wide overview tables.
 - Require capabilities once at the right level (all render-target modes on each
