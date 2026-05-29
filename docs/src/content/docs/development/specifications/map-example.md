@@ -45,9 +45,6 @@ to example behavior and is not specified here.
 | `examples/lwjgl-map` | Java (FFM), GLFW + LWJGL | Linux, macOS, Windows | Vulkan                |
 | `examples/swift-map` | Swift, AppKit + SwiftUI  | macOS                 | Metal                 |
 
-New `*-map` examples MUST follow this spec and cite this file from the app entry
-module (for example `// map-example.md#implementations`).
-
 ---
 
 ## Shared defaults
