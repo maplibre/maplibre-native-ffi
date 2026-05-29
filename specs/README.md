@@ -52,8 +52,3 @@ condition on the underlying property, not on a target language or runtime name.
   required for that rule.
 - Split out a separate file only when a conditional block grows too large to
   scan.
-
-## Change control
-
-Specs have no version field. `main` is always current; propose changes through
-pull request like any other source file.
