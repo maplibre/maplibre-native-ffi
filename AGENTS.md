@@ -91,8 +91,7 @@ safety rules, and hard boundaries.
 
 ### Specifications
 
-For specs in
-[docs/src/content/docs/development/specifications/](docs/src/content/docs/development/specifications/):
+For [specification writing](docs/src/content/docs/development/specifications/):
 
 - Standalone and testable: write for implementers who may not read the repo;
   each requirement should be checkable without pointing at an example or today’s
