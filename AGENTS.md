@@ -93,9 +93,8 @@ safety rules, and hard boundaries.
 
 For [specification writing](docs/src/content/docs/development/specifications/):
 
-- Standalone and testable: write for implementers who may not read the repo;
-  each requirement should be checkable without pointing at an example or today’s
-  tree.
+- Standalone and testable: each requirement should be checkable on its own,
+  without pointing at an example or the current tree.
 - Add, don’t restate or hedge: link to other docs instead of copying them; avoid
   “or equivalent”, unnamed MAYs, and vague outcomes.
 - Scope by constraint: family-wide sections state behavior; platform- or
