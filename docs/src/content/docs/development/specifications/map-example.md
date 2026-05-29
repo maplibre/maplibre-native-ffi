@@ -448,7 +448,7 @@ Controls:
 | `Q` / `E`                     | Bearing ±`10`° with keyboard animation.                                                                                                                                                |
 | `]`                           | Pitch +`5`° (clamped to `[0, 60]`) with animation.                                                                                                                                     |
 | `[`                           | Pitch −`5`° with animation.                                                                                                                                                            |
-| `0`                           | Animate bearing and pitch to `0` (duration ~`220` ms).                                                                                                                                 |
+| `0`                           | Animate bearing and pitch to `0` with keyboard animation.                                                                                                                              |
 
 Keyboard animated moves SHOULD use ~`160` ms duration. Pointer drags use
 immediate `move_by` / `jump_to` / `pitch_by`.
