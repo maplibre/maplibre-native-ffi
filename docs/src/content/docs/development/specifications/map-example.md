@@ -10,9 +10,6 @@ language bindings and render-target integrations through a focused map demo.
 
 ## Scope
 
-The following describes what each `*-map` example application must provide and
-what it must not try to be.
-
 ### What every example provides
 
 - One top-level map window with resize support.
@@ -31,9 +28,6 @@ what it must not try to be.
 A `*-map` program is a demo, not a product SDK. It MUST NOT include automated
 tests or packaging/installer UX.
 
-Repository tooling (`mise`, Gradle, Cargo manifests, and similar) is unrelated
-to example behavior and is not specified here.
-
 ---
 
 ## Implementations
@@ -48,9 +42,6 @@ to example behavior and is not specified here.
 ---
 
 ## Shared defaults
-
-These values MUST match across all `*-map` examples so behavior and visuals are
-comparable when switching languages.
 
 ### Style
 
@@ -313,8 +304,8 @@ Derivation rules:
   every resize / backing-scale change.
 - Compute logical dimensions from physical size and scale when the toolkit only
   exposes physical pixels (use `ceil(physical / scale)`, minimum `1`).
-- Log viewport changes at informational level with the same field labels
-  (`logical=… physical=… scale=…`) so cross-language logs align.
+- Log viewport changes at informational level with field labels
+  `logical=… physical=… scale=…`.
 
 Pass `logical_*` and `scale_factor` to map creation, session attach, and session
 `resize`.
@@ -468,12 +459,6 @@ Input handlers return whether the camera changed so the frame loop can set
 ---
 
 ## Conditional requirements
-
-Rules in this section refine the base spec. They apply only when the stated
-property holds. Implementations that do not match a given condition ignore its
-bullets. Reference implementations are listed in
-[Implementations](#implementations); they are examples, not names for the
-conditions themselves.
 
 ### When Vulkan presents the window
 
