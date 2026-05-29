@@ -274,7 +274,7 @@ Requirements:
 - MUST call runtime `run_once` once per loop iteration while the app is running.
 - MUST drain runtime events each iteration and set `render_pending` when a
   `map_render_update_available` event targets this map (and MAY also react to
-  `map_render_frame_finished` / `needs_repaint` when the binding exposes it).
+  `map_render_frame_finished` when the event reports `needs_repaint`).
 - MUST set `render_pending` when input changes the camera.
 - MUST call `render_update` only while `render_pending` is true; clear the flag
   after a successful update that does not need an immediate retry.
@@ -314,7 +314,8 @@ Pass `logical_*` and `scale_factor` to map creation, session attach, and session
 
 ## Map state
 
-The map state module owns the binding handles and map-specific setup.
+The map state module owns the runtime, map, and render session handles plus
+map-specific setup.
 
 ### Creation
 
@@ -366,12 +367,11 @@ mode, for example:
 
 ### `owned-texture`
 
-- Attach with the binding’s “owned texture” descriptor for the active graphics
-  API.
+- Attach with the C API owned-texture descriptor for the active graphics API.
 - Pass the host’s shared Vulkan/Metal/GL context handles as required by the C
   API.
 - On `render_update`, acquire the frame/image from the session, draw via
-  compositor, release/close the frame per binding rules.
+  compositor, release/close the frame per the C API frame lifetime rules.
 - Compositor resizes with the viewport independently of session resize where the
   API requires both.
 
@@ -388,7 +388,7 @@ mode, for example:
 
 ### `native-surface`
 
-- Attach with the binding’s surface descriptor (Vulkan swapchain surface, Metal
+- Attach with the C API surface descriptor (Vulkan swapchain surface, Metal
   `CAMetalLayer`, platform GL surface, etc.).
 - `render_update` presents through the surface session directly.
 - `drawTexture` MUST NOT be called for this mode.
@@ -455,10 +455,9 @@ Input handlers return whether the camera changed so the frame loop can set
 
 ## Diagnostics
 
-- SHOULD register a native log callback during startup and clear it on shutdown
-  where the binding supports it.
-- On setup or camera failure, print a short message including the binding error
-  or diagnostic (implementation-defined detail level).
+- SHOULD register a native log callback during startup and clear it on shutdown.
+- On setup or camera failure, print a short message including the native status
+  and diagnostic (implementation-defined detail level).
 - On startup, print which render-target mode is active and the status line for
   that mode (see [Render-target modes](#render-target-modes)).
 - MUST print supported native render backends (`metal`, `vulkan`, `opengl`) from
@@ -473,8 +472,8 @@ Input handlers return whether the camera changed so the frame loop can set
 Applies when: the example uses Vulkan for the window surface and swapchain.
 
 - MUST implement render-target modes `owned-texture` and `native-surface`.
-- SHOULD implement `borrowed-texture` when the binding and swapchain support
-  exportable textures.
+- SHOULD implement `borrowed-texture` when the swapchain supports exportable
+  textures.
 - MUST use one shared Vulkan context (instance, device, queue, surface) for
   compositor and render session.
 - The compositor MUST follow
@@ -486,26 +485,25 @@ Applies when: the example attaches a `native-surface` session to a
 `CAMetalLayer` or equivalent Metal presentation handle.
 
 - MUST implement `native-surface`.
-- MAY implement texture modes when the binding exposes Metal owned or borrowed
-  texture targets.
+- MAY implement `owned-texture` and `borrowed-texture`.
 
 ### When the host uses OpenGL or EGL
 
 Applies when: the example uses OpenGL or EGL for window presentation.
 
-- SHOULD implement all three render-target modes where the binding and GL/EGL
-  stack allow owned and borrowed texture paths.
+- SHOULD implement all three render-target modes where the GL/EGL stack supports
+  owned and borrowed texture paths.
 - The compositor MUST follow
   [Compositor shaders](#compositor-shaders-texture-modes).
 
-### When the binding confines map work to a single UI thread
+### When map work runs on a single UI thread
 
-Applies when: the binding or platform requires runtime, map, and render session
-use on one UI owner thread.
+Applies when: the platform or host integration requires runtime, map, and render
+session use on one UI owner thread.
 
 - All map and render calls MUST run on that thread.
-- Window and layer setup MUST stay consistent with the binding’s thread rules
-  documented for that integration.
+- Window and layer setup MUST follow the C API owner-thread contract for that
+  integration.
 
 ### When the window toolkit has no single cross-platform event pump
 
