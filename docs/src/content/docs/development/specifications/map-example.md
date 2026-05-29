@@ -125,7 +125,6 @@ modules. Names differ by language; boundaries MUST NOT be collapsed into a
 single monolithic type.
 
 ```mermaid
-%%{init: {'theme': 'neutral'}}%%
 flowchart TB
   subgraph shell["App shell"]
     direction LR
