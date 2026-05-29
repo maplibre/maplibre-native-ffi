@@ -66,26 +66,25 @@ Apply with an immediate `jump_to` on startup.
 - High-DPI / Retina: derive map `RenderTargetExtent` from the window’s drawable
   size and content scale (see [Viewport](#viewport)).
 
-### Runtime resources
+### Map and runtime
 
-- Runtime cache path: `:memory:` (in-memory cache only).
-
-### Map mode
-
-- Map mode: continuous (`MLN_MAP_MODE_CONTINUOUS` / binding equivalent).
+- Runtime cache path: `:memory:` (in-memory).
+- Map mode: continuous (`MLN_MAP_MODE_CONTINUOUS`).
 
 ### Compositor shaders (texture modes)
 
 For `owned-texture` and `borrowed-texture`, the host-owned compositor that
-samples the map texture into the window swapchain MUST use equivalent fullscreen
-pass shaders:
+samples the map texture into the window swapchain MUST use a fullscreen textured
+quad:
 
-- Vertex: fullscreen triangle/quad pass-through (`fullscreen.vert` family).
-- Fragment: `texture(map_texture, uv)` with standard UV orientation
-  (`sample.frag` family).
+- Vertex shader: fullscreen triangle with pass-through UVs.
+- Fragment shader: `texture(map_texture, uv)` (straight copy, standard UV
+  orientation).
 
-SPIR-V, MSL, or GLSL source MAY differ by backend; output MUST be a straight
-texture copy.
+Reference GLSL sources: `examples/zig-map/render/vulkan/shaders/fullscreen.vert`
+and `sample.frag` (same filenames under
+`examples/rust-map/src/vulkan_texture_compositor/shaders/`). SPIR-V, MSL, or
+other GL dialects MAY differ; output MUST match that pass.
 
 ---
 
