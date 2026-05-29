@@ -3,6 +3,9 @@ package org.maplibre.nativeffi.resource
 import cnames.structs.mln_resource_request_handle
 import kotlin.concurrent.atomics.AtomicInt
 import kotlin.concurrent.atomics.ExperimentalAtomicApi
+import kotlin.experimental.ExperimentalNativeApi
+import kotlin.native.ref.Cleaner
+import kotlin.native.ref.createCleaner
 import kotlinx.cinterop.BooleanVar
 import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.ExperimentalForeignApi
@@ -19,7 +22,7 @@ import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.internal.struct.ResourceStructs
 
 /** Owned handle for a resource provider request that Kotlin chose to handle. */
-@OptIn(ExperimentalForeignApi::class, ExperimentalAtomicApi::class)
+@OptIn(ExperimentalForeignApi::class, ExperimentalAtomicApi::class, ExperimentalNativeApi::class)
 public class ResourceRequestHandle
 internal constructor(
   private val handle: CPointer<mln_resource_request_handle>,
@@ -27,11 +30,11 @@ internal constructor(
     ::mln_resource_request_release,
 ) : AutoCloseable {
   private val lock = AtomicInt(0)
+  private val nativeReference = NativeReference(handle, releaser)
+  @Suppress("unused") private val cleaner: Cleaner = createCleaner(nativeReference) { it.run() }
   private var decisionFinalized = false
   private var closed = false
   private var completed = false
-  private var releaseAccountedFor = false
-  private var providerOwned = false
 
   public fun complete(response: ResourceResponse) {
     withLock {
@@ -83,7 +86,7 @@ internal constructor(
   private fun finishProviderDecisionLocked(decision: ResourceProviderDecision): UInt {
     return if (completed || decision == ResourceProviderDecision.HANDLE) {
       decisionFinalized = true
-      providerOwned = true
+      nativeReference.markProviderOwned()
       if (closed) releaseNative()
       ResourceProviderDecision.HANDLE.nativeValue.toUInt()
     } else {
@@ -94,15 +97,12 @@ internal constructor(
 
   private fun markNativeWillRelease() {
     decisionFinalized = true
-    releaseAccountedFor = true
+    nativeReference.markNativeWillRelease()
     closed = true
   }
 
   private fun releaseNative() {
-    if (providerOwned && !releaseAccountedFor) {
-      releaseAccountedFor = true
-      releaser(handle)
-    }
+    nativeReference.releaseIfOwned()
     closed = true
   }
 
@@ -118,6 +118,41 @@ internal constructor(
       return block()
     } finally {
       lock.store(0)
+    }
+  }
+
+  private class NativeReference(
+    private val handle: CPointer<mln_resource_request_handle>,
+    private val releaser: (CPointer<mln_resource_request_handle>) -> Unit,
+  ) {
+    private val lock = AtomicInt(0)
+    private var providerOwned = false
+    private var releaseAccountedFor = false
+
+    fun markProviderOwned() = withLock { providerOwned = true }
+
+    fun markNativeWillRelease() = withLock { releaseAccountedFor = true }
+
+    fun releaseIfOwned() = withLock {
+      if (providerOwned && !releaseAccountedFor) {
+        releaseAccountedFor = true
+        releaser(handle)
+      }
+    }
+
+    fun run() {
+      releaseIfOwned()
+    }
+
+    private inline fun <T> withLock(block: () -> T): T {
+      while (!lock.compareAndSet(0, 1)) {
+        // Resource request cleanup may race with explicit close from another thread.
+      }
+      try {
+        return block()
+      } finally {
+        lock.store(0)
+      }
     }
   }
 }

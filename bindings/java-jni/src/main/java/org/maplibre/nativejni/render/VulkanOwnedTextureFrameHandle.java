@@ -17,6 +17,7 @@ public final class VulkanOwnedTextureFrameHandle implements AutoCloseable {
   private final MaplibreNativeC.mln_vulkan_owned_texture_frame nativeFrame;
   private final FrameScope scope;
   private final VulkanOwnedTextureFrame frame;
+  private final FrameHandleLeakReport.Registration leakRegistration;
   private boolean closed;
 
   VulkanOwnedTextureFrameHandle(
@@ -28,6 +29,7 @@ public final class VulkanOwnedTextureFrameHandle implements AutoCloseable {
     this.nativeFrame = Objects.requireNonNull(nativeFrame, "nativeFrame");
     this.scope = Objects.requireNonNull(scope, "scope");
     this.frame = Objects.requireNonNull(frame, "frame");
+    this.leakRegistration = FrameHandleLeakReport.register(this, "VulkanOwnedTextureFrameHandle");
   }
 
   public VulkanOwnedTextureFrame frame() {
@@ -46,6 +48,8 @@ public final class VulkanOwnedTextureFrameHandle implements AutoCloseable {
     }
     session.releaseVulkanFrame(nativeFrame, null);
     closed = true;
+    leakRegistration.report().markClosed();
+    leakRegistration.cleanable().clean();
     try {
       scope.close();
     } finally {

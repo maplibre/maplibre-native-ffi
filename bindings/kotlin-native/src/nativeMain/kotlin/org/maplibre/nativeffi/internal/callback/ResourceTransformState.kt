@@ -79,16 +79,7 @@ internal class ResourceTransformState(private val callback: ResourceTransformCal
   }
 
   private fun retainResponseUrl(pointer: CPointer<ByteVar>) {
-    withResponseUrlLock {
-      responseUrls += pointer
-      // The C API copies a replacement URL during the current transform invocation and bindings
-      // usually retain per-thread storage until a later callback. Kotlin/Native has no portable
-      // thread identity API across all native targets, so keep a bounded retirement window instead
-      // of retaining every transformed URL until runtime teardown.
-      while (responseUrls.size > MAX_RETAINED_RESPONSE_URLS) {
-        nativeHeap.free(responseUrls.removeAt(0).rawValue)
-      }
-    }
+    withResponseUrlLock { responseUrls += pointer }
   }
 
   private fun clearResponseUrls() {
@@ -109,10 +100,6 @@ internal class ResourceTransformState(private val callback: ResourceTransformCal
     } finally {
       responseUrlLock.store(0)
     }
-  }
-
-  private companion object {
-    const val MAX_RETAINED_RESPONSE_URLS = 64
   }
 
   private fun allocateCString(value: String): CPointer<ByteVar> {

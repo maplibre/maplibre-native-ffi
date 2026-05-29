@@ -1,5 +1,10 @@
 package org.maplibre.nativeffi.render
 
+import kotlin.concurrent.atomics.AtomicInt
+import kotlin.concurrent.atomics.ExperimentalAtomicApi
+import kotlin.experimental.ExperimentalNativeApi
+import kotlin.native.ref.Cleaner
+import kotlin.native.ref.createCleaner
 import kotlinx.cinterop.ByteVar
 import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.ExperimentalForeignApi
@@ -9,10 +14,12 @@ import kotlinx.cinterop.rawValue
 import kotlinx.cinterop.readBytes
 
 /** Explicit off-heap byte buffer for reusable native readback and upload storage. */
-@OptIn(ExperimentalForeignApi::class)
+@OptIn(ExperimentalForeignApi::class, ExperimentalAtomicApi::class, ExperimentalNativeApi::class)
 public class NativeBuffer
 private constructor(private val pointer: CPointer<ByteVar>?, private val length: Long) :
   AutoCloseable {
+  private val nativeReference = NativeReference(pointer)
+  @Suppress("unused") private val cleaner: Cleaner = createCleaner(nativeReference) { it.release() }
   private var closed = false
 
   public fun byteLength(): Long {
@@ -43,7 +50,7 @@ private constructor(private val pointer: CPointer<ByteVar>?, private val length:
   override fun close() {
     if (closed) return
     closed = true
-    pointer?.let { nativeHeap.free(it.rawValue) }
+    nativeReference.release()
   }
 
   public companion object {
@@ -53,6 +60,16 @@ private constructor(private val pointer: CPointer<ByteVar>?, private val length:
       val pointer =
         if (byteLength == 0L) null else nativeHeap.allocArray<ByteVar>(byteLength.toInt())
       return NativeBuffer(pointer, byteLength)
+    }
+  }
+
+  private class NativeReference(private val pointer: CPointer<ByteVar>?) {
+    private val released = AtomicInt(0)
+
+    fun release() {
+      if (released.compareAndSet(0, 1)) {
+        pointer?.let { nativeHeap.free(it.rawValue) }
+      }
     }
   }
 }

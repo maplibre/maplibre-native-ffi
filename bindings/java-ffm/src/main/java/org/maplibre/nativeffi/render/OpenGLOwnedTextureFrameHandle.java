@@ -17,6 +17,7 @@ public final class OpenGLOwnedTextureFrameHandle implements AutoCloseable {
   private final MemorySegment frameSegment;
   private final FrameScope scope;
   private final OpenGLOwnedTextureFrame frame;
+  private final FrameHandleLeakReport.Registration leakRegistration;
   private boolean closed;
 
   OpenGLOwnedTextureFrameHandle(
@@ -30,6 +31,7 @@ public final class OpenGLOwnedTextureFrameHandle implements AutoCloseable {
     this.frameSegment = Objects.requireNonNull(frameSegment, "frameSegment");
     this.scope = Objects.requireNonNull(scope, "scope");
     this.frame = Objects.requireNonNull(frame, "frame");
+    this.leakRegistration = FrameHandleLeakReport.register(this, "OpenGLOwnedTextureFrameHandle");
   }
 
   public OpenGLOwnedTextureFrame frame() {
@@ -48,6 +50,8 @@ public final class OpenGLOwnedTextureFrameHandle implements AutoCloseable {
     }
     session.releaseOpenGLFrame(frameSegment, null);
     closed = true;
+    leakRegistration.report().markClosed();
+    leakRegistration.cleanable().clean();
     try {
       scope.close();
     } finally {

@@ -1,5 +1,10 @@
 package org.maplibre.nativeffi.render
 
+import kotlin.concurrent.atomics.AtomicInt
+import kotlin.concurrent.atomics.ExperimentalAtomicApi
+import kotlin.experimental.ExperimentalNativeApi
+import kotlin.native.ref.Cleaner
+import kotlin.native.ref.createCleaner
 import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.nativeHeap
@@ -7,7 +12,7 @@ import kotlinx.cinterop.rawValue
 import org.maplibre.nativeffi.internal.c.mln_metal_owned_texture_frame
 
 /** Explicit handle for a Metal session-owned texture frame. */
-@OptIn(ExperimentalForeignApi::class)
+@OptIn(ExperimentalForeignApi::class, ExperimentalAtomicApi::class, ExperimentalNativeApi::class)
 public class MetalOwnedTextureFrameHandle
 internal constructor(
   private val session: RenderSessionHandle,
@@ -15,6 +20,8 @@ internal constructor(
   private val scope: FrameScope,
   private val frameValue: MetalOwnedTextureFrame,
 ) : AutoCloseable {
+  private val leakReport = LeakReport("MetalOwnedTextureFrameHandle")
+  @Suppress("unused") private val cleaner: Cleaner = createCleaner(leakReport) { it.report() }
   private var closed = false
 
   public fun frame(): MetalOwnedTextureFrame {
@@ -28,6 +35,7 @@ internal constructor(
     if (closed) return
     session.releaseMetalFrame(framePointer)
     closed = true
+    leakReport.markClosed()
     try {
       scope.close()
     } finally {
@@ -37,5 +45,21 @@ internal constructor(
 
   private fun ensureOpen() {
     check(!closed) { "Metal owned texture frame handle is closed" }
+  }
+
+  private class LeakReport(private val typeName: String) {
+    private val closed = AtomicInt(0)
+
+    fun markClosed() {
+      closed.store(1)
+    }
+
+    fun report() {
+      if (closed.load() == 0) {
+        println(
+          "Leaked $typeName; close frame handles explicitly on the render session owner thread."
+        )
+      }
+    }
   }
 }

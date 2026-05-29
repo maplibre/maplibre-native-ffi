@@ -19,6 +19,7 @@ public final class VulkanOwnedTextureFrameHandle implements AutoCloseable {
   private final MemorySegment frameSegment;
   private final FrameScope scope;
   private final VulkanOwnedTextureFrame frame;
+  private final FrameHandleLeakReport.Registration leakRegistration;
   private boolean closed;
 
   VulkanOwnedTextureFrameHandle(
@@ -32,6 +33,7 @@ public final class VulkanOwnedTextureFrameHandle implements AutoCloseable {
     this.frameSegment = Objects.requireNonNull(frameSegment, "frameSegment");
     this.scope = Objects.requireNonNull(scope, "scope");
     this.frame = Objects.requireNonNull(frame, "frame");
+    this.leakRegistration = FrameHandleLeakReport.register(this, "VulkanOwnedTextureFrameHandle");
   }
 
   public VulkanOwnedTextureFrame frame() {
@@ -50,6 +52,8 @@ public final class VulkanOwnedTextureFrameHandle implements AutoCloseable {
     }
     session.releaseVulkanFrame(frameSegment, null);
     closed = true;
+    leakRegistration.report().markClosed();
+    leakRegistration.cleanable().clean();
     try {
       scope.close();
     } finally {
