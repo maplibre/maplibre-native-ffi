@@ -1,4 +1,9 @@
-# Map example specification
+---
+title: Map example
+description: Specification for interactive *-map example programs.
+sidebar:
+  order: 5
+---
 
 Specification for interactive `*-map` example programs: small apps that exercise
 language bindings and render-target integrations through a focused map demo.

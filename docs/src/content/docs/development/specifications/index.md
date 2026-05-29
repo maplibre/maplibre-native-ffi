@@ -1,9 +1,15 @@
-# Specifications
+---
+title: Specifications
+description: Normative specs for parallel implementations (examples, bindings).
+sidebar:
+  order: 4
+---
 
 These documents define what every implementation in a family must do so parallel
 codebases stay aligned—starting with `*-map` example apps and, later, language
-bindings. On the documentation site they appear under Specifications in the
-sidebar; in the repository they are the `specs/` tree.
+bindings.
+
+- [Map example](/maplibre-native-ffi/development/specifications/map-example/)
 
 ## Referencing a spec section in code
 
@@ -15,9 +21,9 @@ Cite the spec file and heading fragment (slug), not a bare label:
 
 Use the spec basename (`map-example.md`, and later e.g. `bindings.md`) plus `#`
 and the section slug. Slugs are kebab-case from the heading text—the same
-fragment as in `[Frame loop](map-example.md#frame-loop)` links inside the spec.
-Resolve the file from `specs/` (or `specs/examples/` for map-example) when
-opening it; published URLs can come later.
+fragment as in `[Frame loop](map-example#frame-loop)` links inside the spec.
+Source files live in
+`docs/src/content/docs/development/specifications/` on this site.
 
 For a subsection, use one fragment (`#owned-texture`) or `#render-target-modes`
 on the parent section—whichever you are implementing.
