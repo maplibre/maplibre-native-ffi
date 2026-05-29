@@ -1,7 +1,6 @@
 package org.maplibre.nativejni.render;
 
 import java.util.Objects;
-import org.maplibre.nativejni.error.InvalidStateException;
 import org.maplibre.nativejni.internal.javacpp.MaplibreNativeC;
 
 /**
@@ -49,13 +48,9 @@ public final class OpenGLOwnedTextureFrameHandle implements AutoCloseable {
     }
     try {
       session.releaseOpenGLFrame(nativeFrame, null);
-    } catch (InvalidStateException error) {
-      if (session.isClosed()) {
-        closeLocal();
-      }
-      throw error;
+    } finally {
+      closeLocal();
     }
-    closeLocal();
   }
 
   private void closeLocal() {

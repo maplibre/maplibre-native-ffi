@@ -3,7 +3,6 @@ package org.maplibre.nativeffi.render;
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 import java.util.Objects;
-import org.maplibre.nativeffi.error.InvalidStateException;
 
 /**
  * Explicit handle for a Metal session-owned texture frame.
@@ -53,13 +52,9 @@ public final class MetalOwnedTextureFrameHandle implements AutoCloseable {
     }
     try {
       session.releaseMetalFrame(frameSegment, null);
-    } catch (InvalidStateException error) {
-      if (session.isClosed()) {
-        closeLocal();
-      }
-      throw error;
+    } finally {
+      closeLocal();
     }
-    closeLocal();
   }
 
   private void closeLocal() {
