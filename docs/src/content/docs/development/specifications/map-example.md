@@ -128,24 +128,17 @@ single monolithic type.
 flowchart TB
   subgraph shell["App shell"]
     direction LR
-    EL[Event loop]
-    VP[Viewport]
-    IN[Input]
-    DG[Diagnostics]
+    EL[Event loop] ~~~ VP[Viewport] ~~~ IN[Input] ~~~ DG[Diagnostics]
   end
   subgraph mapstate["Map state"]
     direction LR
-    RT[Runtime]
-    MP[Map]
-    RS[Render-target session]
+    RT[Runtime] ~~~ MP[Map] ~~~ RS[Render-target session]
   end
   subgraph gfx["Graphics host"]
     direction LR
-    BE[Backend context]
-    CP[Compositor]
-    SC[Presentation]
+    BE[Backend context] ~~~ CP[Compositor] ~~~ SC[Presentation]
   end
-  CLI -->|"owned-texture / borrowed-texture / native-surface"| shell
+  CLI --> shell
   shell --> mapstate
   mapstate --> gfx
   RS -->|texture modes| CP
