@@ -429,7 +429,7 @@ Controls:
   arrows or WASD: pan
   + / -: zoom at center
   Q / E: rotate
-  PageUp / ] or PageDown / [: pitch
+  ] / [: pitch
   0: reset pitch and bearing
 ```
 
@@ -443,8 +443,8 @@ Controls:
 | Arrow keys / WASD             | Pan `120` logical units per key press.                                                                                                                                                 |
 | `+` / `-`                     | Zoom `1.25` / `1/1.25` about viewport center.                                                                                                                                          |
 | `Q` / `E`                     | Bearing ±`10`° with keyboard animation.                                                                                                                                                |
-| PageUp / `]`                  | Pitch +`5`° (clamped to `[0, 60]`) with animation.                                                                                                                                     |
-| PageDown / `[`                | Pitch −`5`° with animation.                                                                                                                                                            |
+| `]`                           | Pitch +`5`° (clamped to `[0, 60]`) with animation.                                                                                                                                     |
+| `[`                           | Pitch −`5`° with animation.                                                                                                                                                            |
 | `0`                           | Animate bearing and pitch to `0` (duration ~`220` ms).                                                                                                                                 |
 
 Keyboard animated moves SHOULD use ~`160` ms duration. Pointer drags use
