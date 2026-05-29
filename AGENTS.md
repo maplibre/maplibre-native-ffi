@@ -91,38 +91,18 @@ safety rules, and hard boundaries.
 
 ### Specifications
 
-Normative specs live under
-[docs/src/content/docs/development/specifications/](docs/src/content/docs/development/specifications/)
-(published on the docs site). When writing or editing them:
+Normative specs live in
+[docs/src/content/docs/development/specifications/](docs/src/content/docs/development/specifications/).
+RFC 2119 usage and code citations are in the
+[specifications index](docs/src/content/docs/development/specifications/index.md).
 
-- A spec stands alone: state requirements directly; do not point at example
-  paths, “current” repo behavior, or gap commentary in normative text.
-- Use RFC 2119 keywords in requirement bullets only; do not bold them in spec
-  body prose (see the
-  [specifications index](docs/src/content/docs/development/specifications/index.md)).
-- Prefer positive, testable requirements. Reserve negatives for real
-  prohibitions. Do not restate the C API, owner-thread rules, or other contracts
-  already defined elsewhere unless the spec adds a concrete rule.
-- Name concrete symbols and outcomes (`render_pending`, `invalid_state`, exact
-  log lines). Avoid vague verbs (“react”, “retry”), “or equivalent”, “as
-  practical”, “implementation-defined”, and optional wording that hides a real
-  MUST.
-- Pin required user-visible strings verbatim in a table; skip redundant
-  qualifiers about how strictly to match them.
-- Put API- or platform-specific detail in scoped subsections (for example
-  Graphics API), not in family-wide overview tables.
-- Require capabilities once at the right level (all render-target modes on each
-  shipped graphics API; every API the toolkit and platform can support). An
-  implementations inventory table may list the repo today; it is not the
-  requirement.
-- Prefer behavioral rules when toolkits differ (scroll zoom direction). One
-  example’s formula is not a cross-platform constant unless every host uses the
-  same event shape.
-- Diagrams clarify structure or order; normative detail stays in bullets. Split
-  busy sequence charts; keep Mermaid nodes aligned with logical modules; put
-  side effects in prose, not long `Note` blocks.
-- Escape hatches need a named constraint and belong in code comments, not vague
-  spec-level MAYs, unless the family truly standardizes the exception.
+- **Standalone and testable:** write for implementers who may not read the repo;
+  each requirement should be checkable without pointing at an example or today’s
+  tree.
+- **Add, don’t restate or hedge:** link to C API and binding docs instead of
+  copying them; avoid “or equivalent”, unnamed MAYs, and vague outcomes.
+- **Scope by constraint:** family-wide sections state behavior; platform- or
+  API-specific rules belong in clearly labeled subsections.
 
 ### Testing
 
