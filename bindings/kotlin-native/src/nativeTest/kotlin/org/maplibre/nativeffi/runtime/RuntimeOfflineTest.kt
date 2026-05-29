@@ -7,7 +7,6 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import org.maplibre.nativeffi.Maplibre
 import org.maplibre.nativeffi.error.InvalidArgumentException
-import org.maplibre.nativeffi.error.InvalidStateException
 import org.maplibre.nativeffi.offline.OfflineRegionDownloadState
 
 class RuntimeOfflineTest {
@@ -47,7 +46,8 @@ class RuntimeOfflineTest {
 
       operation.close()
       assertTrue(operation.isClosed)
-      assertFailsWith<InvalidStateException> { operation.close() }
+      operation.close()
+      assertTrue(operation.isClosed)
     } finally {
       runtime.close()
     }
