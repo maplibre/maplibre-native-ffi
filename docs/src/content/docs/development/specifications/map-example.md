@@ -267,9 +267,11 @@ sequenceDiagram
 Requirements:
 
 - MUST call runtime `run_once` once per loop iteration while the app is running.
-- MUST drain runtime events each iteration and set `render_pending` when a
-  `map_render_update_available` event targets this map (and MAY also react to
-  `map_render_frame_finished` when the event reports `needs_repaint`).
+- MUST drain runtime events each iteration and set `render_pending` when:
+  - `map_render_update_available` targets this map (new map content to draw), or
+  - `map_render_frame_finished` targets this map and `needs_repaint` is true
+    (continuous mode needs another frame, for example ongoing camera
+    transitions).
 - MUST set `render_pending` when input changes the camera.
 - MUST call `render_update` only while `render_pending` is true; clear the flag
   after a successful update that does not need an immediate retry.
@@ -323,8 +325,9 @@ map-specific setup.
 ### Event drain
 
 - Drain all pending runtime events each frame.
-- When `map_render_update_available` references this map’s id/source, return
-  `render_update_available = true` to the frame loop.
+- Set `render_pending` for the frame loop when either:
+  - `map_render_update_available` targets this map, or
+  - `map_render_frame_finished` targets this map and `needs_repaint` is true.
 
 ### Resize API
 
