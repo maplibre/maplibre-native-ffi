@@ -3,9 +3,6 @@ title: Java FFM Binding Conventions
 description: Language-specific implementation conventions for Java FFM bindings.
 ---
 
-> Normative specs in [`specs/`](../../../../../specs/) supersede this page where
-> they apply. This document is interim guidance.
-
 Resources:
 
 - Tracking issue:

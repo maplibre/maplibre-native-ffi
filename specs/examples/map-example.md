@@ -1,14 +1,15 @@
 # Map example specification
 
-Normative specification for interactive desktop map example applications
-(`*-map`). Each implementation is a small, focused program that exercises the
-project's language bindings and render-target integrations through a shared
-windowed map demo. It is not a product-ready map SDK, application shell, or
-automated test harness.
+Specification for interactive desktop **`*-map` example programs**: small apps
+that exercise language bindings and render-target integrations through a shared
+windowed map demo.
 
 ## Scope {#map-ex-scope}
 
-### In scope {#map-ex-scope-in}
+The following describes what each **`*-map` example application** must provide
+and what it must not try to be.
+
+### What every example provides {#map-ex-scope-in}
 
 - One top-level map window with resize support.
 - Continuous map mode: runtime pumping, event draining, and repaint driven by
@@ -16,21 +17,25 @@ automated test harness.
 - Shared initial map content (style URL and camera).
 - Shared camera interaction model (pointer, scroll, keyboard).
 - Modular support for three **render-target modes** (see
-  [Render-target modes](#map-ex-render-target-modes)), implemented so additional
+  [Render-target modes](#map-ex-render-target-modes)), structured so additional
   graphics backends and modes can be added without rewriting unrelated modules.
 - Graceful process exit when the user closes the window.
 - Startup logging that identifies the selected render-target mode and, when
   practical, which native render backends the loaded library exposes.
 
-### Out of scope {#map-ex-scope-out}
+### What an example is not {#map-ex-scope-out}
 
-- Automated tests inside example apps (no unit, integration, or snapshot tests).
-- Packaging, installer UX, persistence, search, geolocation, or attribution UI.
-- Offline maps, custom style editors, or multi-map layouts.
-- CI/task-runner configuration (`mise`, Gradle, Cargo, etc.) — repository
-  workflow, not example architecture.
+A `*-map` program is a demo, not a product SDK. It MUST NOT include:
+
+- Automated tests (unit, integration, or snapshot suites shipped with the app).
+- Packaging or installer UX, persistence, search, geolocation, or attribution
+  UI.
+- Offline map workflows, custom style editors, or multi-map layouts.
 - Mobile-first lifecycle, backgrounding, or power management beyond what the
-  desktop window toolkit requires.
+  desktop window toolkit needs for a resizable window.
+
+Repository tooling (`mise`, Gradle, Cargo manifests, and similar) is unrelated
+to example behavior and is not specified here.
 
 ---
 

@@ -5,9 +5,6 @@ sidebar:
   order: 3
 ---
 
-> Normative specs in [`specs/`](../../../../../specs/) supersede this page where
-> they apply. This document is interim guidance.
-
 Language bindings sit directly above the public C API. They preserve the C API's
 core model while adapting ownership, memory, error, and threading to the target
 language's conventions.

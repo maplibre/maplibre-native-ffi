@@ -1,8 +1,8 @@
 # Specifications
 
-`specs/` holds normative specs for implementation families in this repo (for
-example `*-map` example apps and language bindings). Each spec defines what
-every implementation in that family must do so parallel codebases stay aligned.
+`specs/` holds specs for implementation families in this repo (for example
+`*-map` example apps and language bindings). Each spec defines what every
+implementation in that family must do so parallel codebases stay aligned.
 
 ## Referencing a spec section in code
 
