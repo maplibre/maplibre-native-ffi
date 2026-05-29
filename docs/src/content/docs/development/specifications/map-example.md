@@ -140,7 +140,7 @@ flowchart TB
   subgraph gfx["Graphics host"]
     BE[Backend context]
     CP[Compositor]
-    SC[Swapchain / surface]
+    SC[Presentation]
   end
   shell --> mapstate
   mapstate --> gfx
@@ -165,9 +165,9 @@ packages per module).
 ### Backend and mode matrix
 
 The backend module MUST be a discriminated implementation per render-target mode
-(union, sealed hierarchy, or equivalent). Adding a mode or backend MUST require
-a localized change (new enum variant and dedicated module). Keep each graphics
-API and each render-target mode in its own variant or submodule rather than
+(union, sealed hierarchy, or sum type). Adding a mode or backend MUST require a
+localized change (new enum variant and dedicated module). Keep each graphics API
+and each render-target mode in its own variant or submodule rather than
 branching ad hoc through shared draw code.
 
 Each backend variant implements, at minimum:
@@ -175,7 +175,8 @@ Each backend variant implements, at minimum:
 - `init` / `deinit`
 - `resize(viewport)`
 - `attachRenderTarget(map, viewport) → session`
-- `finishFrame()` (swapchain maintenance where applicable)
+- `finishFrame()` (window presentation upkeep; see
+  [Conditional requirements](#conditional-requirements))
 - `drawTexture(session, viewport)` for texture modes
 - `needsRenderTargetReattachOnResize() → bool` (see [Resize](#resize))
 
@@ -318,8 +319,8 @@ map-specific setup.
 
 ### Resize API
 
-Expose `resize(viewport)` that forwards to the render-target session (and
-compositor when applicable). When the backend reports
+Expose `resize(viewport)` that forwards to the render-target session. For
+texture modes, also resize the compositor. When the backend reports
 `needsRenderTargetReattachOnResize`, expose
 `resizeWithReattachedTarget(viewport, backend)` that destroys the session,
 resizes backend-owned textures/surfaces, and re-attaches.
@@ -328,43 +329,45 @@ resizes backend-owned textures/surfaces, and re-attaches.
 
 ## Render-target modes
 
-Three modes MUST be modeled in every example’s architecture. Implementations
-implement as many as practical for their platform; unimplemented modes remain in
-the CLI and backend matrix as stubs or rejected at startup.
+Three modes MUST be modeled in every example’s architecture (CLI parsing,
+backend discriminant, and attach paths). Implementations MUST implement every
+mode required by [Conditional requirements](#conditional-requirements) for their
+graphics API.
 
 ### Mode comparison
 
-| CLI value          | C API concept                                                | Compositor | Role                                                        |
-| ------------------ | ------------------------------------------------------------ | ---------- | ----------------------------------------------------------- |
-| `owned-texture`    | Session-owned backend texture (e.g. Vulkan owned texture)    | Required   | Map allocates texture, host samples it.                     |
-| `borrowed-texture` | Caller-owned texture/image borrowed by session               | Required   | Host allocates exportable texture; session renders into it. |
-| `native-surface`   | Window surface (Vulkan surface, Metal layer, EGL surface, …) | None       | Map renders directly to the swapchain/surface.              |
+| CLI value          | C API concept                            | Compositor | Role                                                        |
+| ------------------ | ---------------------------------------- | ---------- | ----------------------------------------------------------- |
+| `owned-texture`    | Session-owned backend texture            | Required   | Map allocates texture, host samples it.                     |
+| `borrowed-texture` | Caller-owned texture borrowed by session | Required   | Host allocates exportable texture; session renders into it. |
+| `native-surface`   | Window presentation surface              | None       | Map renders directly to the window presentation target.     |
 
-Startup MUST print the active mode’s CLI value and a one-line status. Use the
-`render target status:` prefix and wording that describes presentation for that
-mode, for example:
+### Startup status lines
 
-| CLI value          | Status line (substance; toolkit names MAY vary)                            |
-| ------------------ | -------------------------------------------------------------------------- |
-| `owned-texture`    | samples MapLibre-owned texture frames into the host swapchain              |
-| `borrowed-texture` | renders into a host-owned texture, then samples it into the host swapchain |
-| `native-surface`   | renders directly to the host window surface                                |
+Startup MUST print the active mode’s CLI value and exactly one line from this
+table (character-for-character, including the prefix):
+
+| CLI value          | Printed line                                                                                       |
+| ------------------ | -------------------------------------------------------------------------------------------------- |
+| `owned-texture`    | `render target status: samples MapLibre-owned texture frames into the host swapchain`              |
+| `borrowed-texture` | `render target status: renders into a host-owned texture, then samples it into the host swapchain` |
+| `native-surface`   | `render target status: renders directly to the host window surface`                                |
 
 ### `owned-texture`
 
 - Attach with the C API owned-texture descriptor for the active graphics API.
-- Pass the host’s shared Vulkan/Metal/GL context handles as required by the C
-  API.
+- Pass the host graphics context handles required by that descriptor (see
+  [Conditional requirements](#conditional-requirements)).
 - On `render_update`, acquire the frame/image from the session, draw via
   compositor, release/close the frame per the C API frame lifetime rules.
-- Compositor resizes with the viewport independently of session resize where the
-  API requires both.
+- Resize the compositor and session per the C API and conditional requirements
+  for the active graphics API.
 
 ### `borrowed-texture`
 
-- Host creates an API-appropriate exportable texture (or image + view) sized to
-  the viewport.
-- Attach with the “borrowed texture” descriptor referencing host-owned handles.
+- Host creates an exportable texture sized to the viewport (see
+  [Conditional requirements](#conditional-requirements)).
+- Attach with the borrowed-texture descriptor referencing host-owned handles.
 - On `render_update`, sample that texture through the same compositor path as
   `owned-texture`.
 - `needsRenderTargetReattachOnResize` MUST return `true`: on resize, destroy the
@@ -373,12 +376,12 @@ mode, for example:
 
 ### `native-surface`
 
-- Attach with the C API surface descriptor (Vulkan swapchain surface, Metal
-  `CAMetalLayer`, platform GL surface, etc.).
+- Attach with the C API surface descriptor for window presentation (see
+  [Conditional requirements](#conditional-requirements)).
 - `render_update` presents through the surface session directly.
 - `drawTexture` MUST NOT be called for this mode.
-- Resize: session `resize` plus backend swapchain rebuild as required. Reattach
-  when the toolkit recreates the surface handle.
+- On resize, call session `resize` and rebuild host presentation; reattach when
+  the window toolkit supplies a new surface handle.
 
 ---
 
@@ -442,7 +445,7 @@ Input handlers return whether the camera changed so the frame loop can set
 
 - SHOULD register a native log callback during startup and clear it on shutdown.
 - On setup or camera failure, print a short message including the native status
-  and diagnostic (implementation-defined detail level).
+  and diagnostic strings returned by the C API.
 - On startup, print which render-target mode is active and the status line for
   that mode (see [Render-target modes](#render-target-modes)).
 - MUST print supported native render backends (`metal`, `vulkan`, `opengl`) from
@@ -459,25 +462,46 @@ Applies when: the example uses Vulkan for the window surface and swapchain.
 - MUST implement render-target modes `owned-texture` and `native-surface`.
 - SHOULD implement `borrowed-texture` when the swapchain supports exportable
   textures.
-- MUST use one shared Vulkan context (instance, device, queue, surface) for
-  compositor and render session.
+- MUST use one shared Vulkan context (`VkInstance`, `VkDevice`, queue, and
+  `VkSurfaceKHR`) for compositor and render session.
+- `owned-texture`: attach with the Vulkan owned-texture descriptor; pass those
+  shared handles.
+- `borrowed-texture`: host allocates an exportable `VkImage` (and view) sized to
+  the viewport; attach with the borrowed-texture descriptor.
+- `native-surface`: attach with the Vulkan surface / swapchain presentation
+  descriptor for the window’s `VkSurfaceKHR`.
+- `finishFrame()` MUST maintain the swapchain (recreate or resize on window
+  resize, acquire/present each frame as required by the host).
+- On viewport resize for texture modes, resize both the compositor and the
+  render session when the C API requires both.
 - The compositor MUST follow
   [Compositor shaders](#compositor-shaders-texture-modes).
 
 ### When presentation goes through a Metal layer or surface
 
-Applies when: the example attaches a `native-surface` session to a
-`CAMetalLayer` or equivalent Metal presentation handle.
+Applies when: the example uses Metal for window presentation.
 
 - MUST implement `native-surface`.
 - MAY implement `owned-texture` and `borrowed-texture`.
+- `native-surface`: attach with the Metal surface descriptor for the window’s
+  `CAMetalLayer`.
+- `owned-texture`: attach with the Metal owned-texture descriptor; pass the
+  shared Metal device and layer handles required by the C API.
+- `borrowed-texture`: host allocates an exportable Metal texture sized to the
+  viewport; attach with the borrowed-texture descriptor.
 
 ### When the host uses OpenGL or EGL
 
 Applies when: the example uses OpenGL or EGL for window presentation.
 
-- SHOULD implement all three render-target modes where the GL/EGL stack supports
-  owned and borrowed texture paths.
+- SHOULD implement all three render-target modes when the GL/EGL stack exposes
+  owned-texture, borrowed-texture, and surface attach paths.
+- `native-surface`: attach with the OpenGL or EGL surface descriptor for the
+  window’s platform GL surface.
+- `owned-texture`: attach with the OpenGL owned-texture descriptor; pass the
+  shared GL context handles required by the C API.
+- `borrowed-texture`: host allocates an exportable GL texture sized to the
+  viewport; attach with the borrowed-texture descriptor.
 - The compositor MUST follow
   [Compositor shaders](#compositor-shaders-texture-modes).
 
