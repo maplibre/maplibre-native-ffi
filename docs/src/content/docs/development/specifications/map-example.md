@@ -127,16 +127,20 @@ single monolithic type.
 ```mermaid
 flowchart TB
   subgraph shell["App shell"]
-    direction LR
-    EL[Event loop] ~~~ VP[Viewport] ~~~ IN[Input] ~~~ DG[Diagnostics]
+    EL[Event loop]
+    VP[Viewport]
+    IN[Input]
+    DG[Diagnostics]
   end
   subgraph mapstate["Map state"]
-    direction LR
-    RT[Runtime] ~~~ MP[Map] ~~~ RS[Render-target session]
+    RT[Runtime]
+    MP[Map]
+    RS[Render-target session]
   end
   subgraph gfx["Graphics host"]
-    direction LR
-    BE[Backend context] ~~~ CP[Compositor] ~~~ SC[Presentation]
+    BE[Backend context]
+    CP[Compositor]
+    SC[Presentation]
   end
   CLI --> shell
   shell --> mapstate
