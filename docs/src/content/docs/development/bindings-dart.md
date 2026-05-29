@@ -3,6 +3,9 @@ title: Dart Binding Conventions
 description: Language-specific implementation conventions for Dart bindings.
 ---
 
+> Normative specs in [`specs/`](../../../../../specs/) supersede this page where
+> they apply. This document is interim guidance.
+
 Resources:
 
 - Tracking issue:

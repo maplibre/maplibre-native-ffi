@@ -16,6 +16,7 @@ interop or the popular MapLibre Android/iOS SDKs.
 - `third_party/` — Vendored dependencies, primarily the MapLibre Native git
   submodule.
 - `docs/` — Astro/Starlight documentation site and generated API reference.
+- `specs/` — Normative specs for parallel implementations (examples, bindings).
 
 ## Workflow
 
@@ -108,6 +109,7 @@ safety rules, and hard boundaries.
 
 Read these docs before changing related code:
 
+- [`specs/`](specs/) for normative example and binding requirements.
 - [Overview](docs/src/content/docs/development/overview.md) for project layout,
   workflow, and tooling.
 - [Concepts](docs/src/content/docs/concepts.md) for project scope, ownership,

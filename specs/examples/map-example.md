@@ -6,10 +6,6 @@ project's language bindings and render-target integrations through a shared
 windowed map demo. It is not a product-ready map SDK, application shell, or
 automated test harness.
 
-**How to cite:** `// map-ex: <slug>` — see [`specs/README.md`](../README.md).
-
----
-
 ## Scope {#map-ex-scope}
 
 ### In scope {#map-ex-scope-in}
@@ -542,24 +538,3 @@ ticks through one portable poll loop (unlike SDL or winit).
   Hz timer or display link).
 - [Input](#map-ex-input) behavior and constants are unchanged; only the event
   source differs.
-
----
-
-## Conformance {#map-ex-conformance}
-
-An example **conforms** to this spec when:
-
-1. Its source cites `map-ex:` section IDs for each logical module and
-   render-target variant implemented.
-2. [Shared defaults](#map-ex-shared-defaults), [CLI](#map-ex-cli),
-   [frame loop](#map-ex-frame-loop), [input](#map-ex-input), and
-   [lifecycle](#map-ex-lifecycle) match unless a
-   [conditional requirement](#map-ex-conditional-requirements) documents a
-   deliberate omission.
-3. The **backend / mode matrix** structure allows adding modes without rewriting
-   unrelated modules.
-4. No example-local automated tests are added for conformance checking.
-
-Reviewers verify conformance by inspection and by running the example manually;
-missing render-target modes are acceptable when no applicable conditional rule
-requires them, or startup errors document an unsupported mode.

@@ -21,8 +21,10 @@ diagnostics, borrowed data, threading, and event draining. They preserve the C
 API's concepts. Higher-level adapters may provide full SDKs, async models, view
 lifecycle integrations, convenience workflows, or new abstractions.
 
-Read the [Binding Conventions](/maplibre-native-ffi/development/bindings/)
-before implementing or reviewing a binding.
+Normative requirements for parallel implementations live in
+[`specs/`](../../../../../specs/) in the repository. The
+[Binding Conventions](/maplibre-native-ffi/development/bindings/) pages are
+interim guidance until superseded by those specs.
 
 ## Getting Set Up
 

@@ -5,6 +5,9 @@ sidebar:
   order: 2
 ---
 
+> Normative specs in [`specs/`](../../../../../specs/) supersede this page where
+> they apply. This document is interim guidance.
+
 ## API Layout
 
 `include/` is the public C API boundary. Keep implementation-only helpers out of

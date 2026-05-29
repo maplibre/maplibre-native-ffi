@@ -3,6 +3,9 @@ title: Java JNI Binding Conventions
 description: Language-specific implementation conventions for Java JNI bindings.
 ---
 
+> Normative specs in [`specs/`](../../../../../specs/) supersede this page where
+> they apply. This document is interim guidance.
+
 Resources:
 
 - Tracking issue:

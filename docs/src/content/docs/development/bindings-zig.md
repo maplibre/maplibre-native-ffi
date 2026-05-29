@@ -3,6 +3,9 @@ title: Zig Binding Conventions
 description: Language-specific implementation conventions for Zig bindings.
 ---
 
+> Normative specs in [`specs/`](../../../../../specs/) supersede this page where
+> they apply. This document is interim guidance.
+
 Resources: [Zig C interop](https://ziglang.org/documentation/master/#C) and
 [Zig allocators](https://ziglang.org/documentation/master/#Choosing-an-Allocator).
 
