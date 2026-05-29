@@ -125,6 +125,14 @@ Every `*-map` example splits host responsibilities into the same logical
 modules. Names differ by language; boundaries MUST NOT be collapsed into a
 single monolithic type.
 
+The figure below is a **module map** (who owns what), not a per-frame call
+graph. Host code sits in three layers: the app shell runs the loop and window;
+map state holds binding handles; the graphics host owns API context and
+presentation. Each frame, the event loop polls input, drives the runtime, and
+when a render is pending asks the render-target session to update; texture modes
+then copy the map texture through the compositor into the swapchain, while
+native-surface mode presents through the backend without a compositor pass.
+
 ```mermaid
 flowchart TB
   subgraph shell["App shell"]
@@ -132,26 +140,18 @@ flowchart TB
     VP[Viewport]
     IN[Input]
   end
-  subgraph maplibre["Binding / C API"]
+  subgraph mapstate["Map state"]
     RT[Runtime]
     MP[Map]
-    RS[Render session]
+    RS[Render-target session]
   end
   subgraph gfx["Graphics host"]
     BE[Backend context]
-    CP[Compositor - texture modes only]
+    CP[Compositor]
     SC[Swapchain / surface]
   end
-  EL --> VP
-  EL --> IN
-  IN --> MP
-  EL --> RT
-  RT --> MP
-  MP --> RS
-  RS --> BE
-  BE --> CP
-  CP --> SC
-  RS --> SC
+  shell --> mapstate
+  mapstate --> gfx
 ```
 
 ### Logical modules
