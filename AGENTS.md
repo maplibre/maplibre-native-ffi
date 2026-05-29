@@ -75,6 +75,8 @@ needed. More context: [AI_POLICY.md](./AI_POLICY.md).
   to the C API, exposing MapLibre concepts directly, while following language
   conventions for memory and thread safety. Prioritize safety, similarity, and
   idioms, in that order.
+- Bindings do not reimplement native validation; they validate binding-owned API
+  shape, state, lifetimes, and memory safety.
 - We're currently in a prerelease state, so breaking API changes are allowed and
   encouraged over leaving backwards compatibility shims.
 
