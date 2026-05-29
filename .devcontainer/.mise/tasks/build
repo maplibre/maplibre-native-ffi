@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+#MISE description="Build the local devcontainer image for the host architecture."
+#USAGE flag "--tag <tag>" help="Final image tag" default="maplibre-native-ffi-devcontainer:local"
+#USAGE flag "--push" help="Push the final image instead of loading it into Docker"
+set -euo pipefail
+
+host_arch="$(uname -m)"
+case "$host_arch" in
+  arm64 | aarch64)
+    platform="linux/arm64"
+    mise_env="linux-arm64-vulkan"
+    ;;
+  x86_64 | amd64)
+    platform="linux/amd64"
+    mise_env="linux-x64-vulkan"
+    ;;
+  *) echo "unsupported host architecture: $host_arch" >&2; exit 1 ;;
+esac
+
+rm -rf mise-oci
+
+if [[ "$(uname -s)" == "Linux" ]]; then
+  MISE_JOBS=1 MISE_ENV="$mise_env" mise --no-hooks install --quiet
+  MISE_JOBS=1 MISE_ENV="$mise_env" mise --no-hooks oci build --output mise-oci
+else
+  docker run --rm \
+    --platform "$platform" \
+    --volume "$PWD/..:/src" \
+    --workdir /src \
+    --env MISE_EXPERIMENTAL=1 \
+    --env MISE_JOBS=1 \
+    --env MISE_ENV="$mise_env" \
+    debian:bookworm-slim \
+    bash -euo pipefail -c '
+      apt-get update
+      apt-get install --no-install-recommends --yes ca-certificates curl git libicu72
+      curl https://mise.run | sh
+      /root/.local/bin/mise trust -y
+      cd .devcontainer
+      /root/.local/bin/mise --no-hooks install --quiet
+      /root/.local/bin/mise --no-hooks oci build --output mise-oci
+    '
+fi
+
+rm -f mise-oci.tar
+skopeo copy \
+  "oci:mise-oci" \
+  "docker-archive:mise-oci.tar:maplibre-native-ffi-devcontainer-tools:local"
+docker load --input mise-oci.tar
+
+output_arg="--load"
+if [[ "${usage_push:-false}" == "true" ]]; then
+  output_arg="--push"
+fi
+
+docker buildx build \
+  --platform "$platform" \
+  --file Dockerfile \
+  --build-context "tools=docker-image://maplibre-native-ffi-devcontainer-tools:local" \
+  --tag "${usage_tag:?}" \
+  "$output_arg" \
+  ..

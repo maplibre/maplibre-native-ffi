@@ -68,7 +68,6 @@ jobs:
       - name: Build Java FFM binding
         run: mise run //bindings/java-ffm:build
       - name: Build Java JNI binding
-        if: ${{ !startsWith(matrix.mise_env, 'windows-') }}
         run: mise run //bindings/java-jni:build
       # Kotlin/Native is skipped on linux-arm64 because Linux/AArch64 is not yet
       # a supported Kotlin/Native host: https://youtrack.jetbrains.com/issue/KT-36871

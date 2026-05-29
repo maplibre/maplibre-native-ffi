@@ -1,35 +1,84 @@
 # AGENTS.md
 
+This project is a C API for MapLibre Native, built for low-level language
+bindings and host integrations that need a C boundary instead of direct C++
+interop or the popular MapLibre Android/iOS SDKs.
+
+## Project map
+
+- `include/` — Public C API headers (the stable ABI surface).
+- `src/` — C++ implementation behind the C headers, plus render backend adapters
+  (Vulkan, Metal, OpenGL) and the Zig test support shim.
+- `bindings/` — Language bindings (Zig, Rust, Java FFM, Java JNI) that wrap the
+  C API in idiomatic target-language interfaces.
+- `examples/` — Small demo apps per language/backend (`zig-map`, `rust-map`,
+  `zig-readback`, `lwjgl-map`, `swift-map`).
+- `third_party/` — Vendored dependencies, primarily the MapLibre Native git
+  submodule.
+- `docs/` — Astro/Starlight documentation site and generated API reference.
+
 ## Workflow
 
-Use `mise run test` to build and test. Use `mise run fix` to run formatters and
-linters. Read the
-[development overview](docs/src/content/docs/development/overview.md) for
-contributor setup, workflow commands, examples, and platform/render backend
-variants. Run examples only when useful, with a brief timeout because most are
-GUI apps, not one-shot tests. The `zig-readback` example works headless and is a
-good smoke test; GUI examples need SDL3 and a display.
+```bash
+# Install/refresh all tools, submodules, and dependencies
+mise install
 
-Feature changes need tests through the C ABI when practical.
+# Build the native library (also runs configure)
+mise run build
 
-Campsite rules apply: leave anything you touch tidier than when you found it.
+# Build and run C API + Zig binding tests (also runs build)
+mise run test
 
-## Documentation
+# Build and run Rust binding tests (also runs build)
+mise run //bindings/rust:ci
 
-When working on documentation, gather necessary context first, then determine
-who the audience is and whether the documentation is a Tutorial, Guide,
-Reference, or Explanation, according to the
-[Diátaxis Framework](https://raw.githubusercontent.com/evildmp/diataxis-documentation-framework/refs/heads/main/start-here.rst).
-State your audience and category determination to the user, then load and follow
-the appropriate framework before making changes:
+# Headless smoke test — no display needed
+mise run //examples/zig-readback:run
 
-- [Reference](https://raw.githubusercontent.com/evildmp/diataxis-documentation-framework/refs/heads/main/reference.rst)
-  usually covers comments attached to source code (e.g., Doxygen).
-- [Guides](https://raw.githubusercontent.com/evildmp/diataxis-documentation-framework/refs/heads/main/how-to-guides.rst)
-  usually covers user-facing documentation.
-- [Explanation](https://raw.githubusercontent.com/evildmp/diataxis-documentation-framework/refs/heads/main/explanation.rst)
-  usually covers contributor-facing or user-facing documentation.
-- [Tutorials](https://raw.githubusercontent.com/evildmp/diataxis-documentation-framework/refs/heads/main/tutorials.rst)
+# GUI map app — use a brief timeout or run in background
+mise run //examples/zig-map:run
+
+# Build and test for a different variant (override auto-detected env)
+mise -E linux-x64-egl run test
+
+# Run formatters and linters on _all_ files (will stage affected files)
+mise run fix
+
+# Run formatters and linters on targeted files (will stage affected files)
+hk fix [FILES...]
+```
+
+Available mise envs: `linux-x64-vulkan`, `linux-x64-egl`, `linux-arm64-vulkan`,
+`linux-arm64-egl`, `macos-arm64-metal`, `macos-arm64-vulkan`,
+`windows-x64-vulkan`, `windows-x64-wgl`. The host-matching variant is selected
+automatically via `.miserc.toml`.
+
+Formatters and linters run automatically on pre-commit; you usually don't need
+to run them manually.
+
+The environment is managed by mise and pixi, so if you need to run a command
+that's not already a mise task, use `mise exec -- pixi run ...`.
+
+## Pull requests
+
+When you open a pull request, write **Summary** and **Test plan** in at most one
+sentence of prose each. I will expand the PR description if more detail is
+needed. More context: [AI_POLICY.md](./AI_POLICY.md).
+
+## Project Invariants
+
+### General
+
+- Campsite rules apply: leave anything you touch tidier than when you found it.
+- The environment is mostly defined by `mise` and `pixi`.
+- The bindings are meant to be low level and broadly analogous to each other and
+  to the C API, exposing MapLibre concepts directly, while following language
+  conventions for memory and thread safety. Prioritize safety, similarity, and
+  idioms, in that order.
+- We're currently in a prerelease state, so breaking API changes are allowed and
+  encouraged over leaving backwards compatibility shims.
+
+### Prose
 
 Use positive wording for guidance. Use negative wording for real prohibitions,
 safety rules, and hard boundaries.
@@ -40,15 +89,27 @@ safety rules, and hard boundaries.
 - Avoid: "This layer should not try to manage execution models for every
   possible host."
 
-Before finalizing documentation changes, apply the prose review strategy from
-[Writing Clearly and Concisely](https://raw.githubusercontent.com/obra/the-elements-of-style/refs/heads/main/skills/writing-clearly-and-concisely/SKILL.md#Limited%20Context%20Strategy):
-use active voice, positive statements, concrete language, parallel structure,
-and no needless words.
+### Testing
+
+- The Zig bindings tests are also the primary integration test suite for the
+  C/C++ layer.
+- For tests that _must_ reach below the bindings, there are dedicated tests in
+  src/c_api/tests.
+- Other bindings (Rust, Java, Swift, etc) avoid writing redundant tests to test
+  the C/C++ layer logic; their tests focus on validating their bindings.
+- Avoid trivial tests, tests that verify constants, tests that assert a negative
+  (unless valuable), tests that simply test third party code; we want to keep
+  our test suite robust and high-value.
+- Example apps don't need tests.
+- Every test skip should be strictly justified. We do not skip rendering tests
+  because the CI environment doesn't support them; we fix the environment.
 
 ## Project Docs
 
 Read these docs before changing related code:
 
+- [Overview](docs/src/content/docs/development/overview.md) for project layout,
+  workflow, and tooling.
 - [Concepts](docs/src/content/docs/concepts.md) for project scope, ownership,
   threading, events, rendering targets, and host integration boundaries.
 - [C API Conventions](docs/src/content/docs/development/c-conventions.md) before
@@ -61,23 +122,33 @@ Read these docs before changing related code:
 
 ## External Docs
 
-Read these docs for related tooling:
+Read these docs whenever relevant:
 
-- [mise settings](https://mise.jdx.dev/configuration/settings.html) when
-  changing `[settings]` entries in `mise.toml`.
-- [mise task configuration](https://mise.jdx.dev/tasks/task-configuration.html)
-  when changing mise task metadata.
-- [mise file tasks](https://mise.jdx.dev/tasks/file-tasks.html) when changing
-  `.mise/tasks/**` task files.
-- [mise task arguments](https://mise.jdx.dev/tasks/task-arguments.html) when
-  changing `usage` specs or task CLI arguments.
-- [mise task templates](https://mise.jdx.dev/tasks/templates.html) when changing
-  task template expressions.
-- [mise environments](https://mise.jdx.dev/environments/) when changing `[env]`,
-  environment files, environment scripts, or mise profiles.
-- [mise Python](https://mise.jdx.dev/lang/python.html) when changing Python, uv,
-  or virtual environment integration.
-- [hk configuration](https://hk.jdx.dev/configuration.html) when changing
-  `hk.pkl`.
-- [dprint configuration](https://dprint.dev/config/) when changing
-  `dprint.jsonc`.
+- `mise`:
+  - <https://mise.jdx.dev/configuration.html>
+  - <https://mise.jdx.dev/configuration/settings.html>
+  - <https://mise.jdx.dev/configuration/environments.html>
+  - <https://mise.jdx.dev/dev-tools/>
+  - <https://mise.jdx.dev/environments/>
+  - <https://mise.jdx.dev/tasks/>
+  - <https://mise.jdx.dev/tasks/toml-tasks.html>
+  - <https://mise.jdx.dev/tasks/file-tasks.html>
+  - <https://mise.jdx.dev/tasks/task-arguments.html>
+  - <https://mise.jdx.dev/tasks/task-configuration.html>
+  - ... and many more pages. Browse the site if needed.
+- `hk`:
+  - <https://hk.jdx.dev/configuration.html>
+  - <https://hk.jdx.dev/builtins.html>
+  - <https://hk.jdx.dev/reference/examples/>
+  - <https://hk.jdx.dev/pkl_introduction.html>
+- `dprint`:
+  - <https://dprint.dev/config/>
+  - <https://dprint.dev/plugins/>
+- `vp` / Vite+:
+  - <https://viteplus.dev/guide/>
+  - <https://viteplus.dev/guide/monorepo>
+  - <https://viteplus.dev/guide/lint>
+  - <https://viteplus.dev/guide/run>
+- `pixi`:
+  - <https://pixi.prefix.dev/latest/reference/pixi_manifest/>
+  - <https://pixi.prefix.dev/latest/reference/pixi_configuration/>
