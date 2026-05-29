@@ -154,7 +154,7 @@ flowchart TB
 | Viewport              | Map logical size, physical drawable size, and `scale_factor` for `RenderTargetExtent`.                                 |
 | Map state             | Owns runtime, map, and render session; loads style and initial camera; attaches render target for the selected mode.   |
 | Render-target session | Thin wrapper over `RenderSessionHandle`: resize, `render_update`, close; dispatches by texture vs surface.             |
-| Backend               | Host-owned graphics resources for the active API: context/device, presentation surface, and swapchain (or equivalent). |
+| Backend               | Host-owned device context and window presentation for the active graphics API.                                         |
 | Compositor            | Host pass that draws a map-owned or borrowed texture into the swapchain (`owned-texture` and `borrowed-texture` only). |
 | Input                 | Pointer and keyboard → map camera APIs; prints control help once at startup.                                           |
 | Diagnostics           | Optional log callback and consistent error messages on failed setup or camera commands.                                |
