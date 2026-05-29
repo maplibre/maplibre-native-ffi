@@ -213,10 +213,6 @@ On window close or fatal error, close resources in order:
 4. Runtime
 5. Graphics context and window.
 
-Implementations MAY use abrupt process exit only when documented
-platform/backend bugs make orderly native teardown unsafe; that behavior MUST be
-localized and commented (for example `// map-example.md#shutdown`).
-
 ### Handle ownership
 
 - One runtime per process (owner thread drives `run_once` / pump).
