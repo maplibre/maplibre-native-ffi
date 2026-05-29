@@ -23,6 +23,7 @@ import org.maplibre.nativeffi.internal.memory.MemoryUtil
 import org.maplibre.nativeffi.resource.ResourceKind
 import org.maplibre.nativeffi.resource.ResourceTransformCallback
 import org.maplibre.nativeffi.resource.ResourceTransformRequest
+import platform.posix.pthread_self
 
 /** Owns runtime-scoped resource transform callback state. */
 @OptIn(ExperimentalForeignApi::class, ExperimentalAtomicApi::class)
@@ -31,7 +32,7 @@ internal class ResourceTransformState(private val callback: ResourceTransformCal
   private val selfRef = StableRef.create(this)
   private val descriptor = nativeHeap.alloc<mln_resource_transform>()
   private val responseUrlLock = AtomicInt(0)
-  private val responseUrls = mutableListOf<CPointer<ByteVar>>()
+  private val responseUrls = mutableMapOf<String, CPointer<ByteVar>>()
   private val closed = AtomicInt(0)
 
   init {
@@ -48,7 +49,9 @@ internal class ResourceTransformState(private val callback: ResourceTransformCal
     outResponse: CPointer<mln_resource_transform_response>?,
   ): Int {
     if (closed.load() != 0 || outResponse == null) return MaplibreStatus.INVALID_ARGUMENT.nativeCode
+    val threadKey = currentThreadKey()
     return try {
+      clearResponseUrl(threadKey)
       outResponse.pointed.size = kotlinx.cinterop.sizeOf<mln_resource_transform_response>().toUInt()
       outResponse.pointed.url = null
       val request =
@@ -60,8 +63,12 @@ internal class ResourceTransformState(private val callback: ResourceTransformCal
       val replacement = callback.transform(request)
       if (!replacement.isNullOrEmpty()) {
         val responseUrl = allocateCString(replacement)
-        retainResponseUrl(responseUrl)
-        outResponse.pointed.url = responseUrl
+        if (retainResponseUrl(threadKey, responseUrl)) {
+          outResponse.pointed.url = responseUrl
+        } else {
+          nativeHeap.free(responseUrl.rawValue)
+          return MaplibreStatus.INVALID_ARGUMENT.nativeCode
+        }
       }
       MaplibreStatus.OK.nativeCode
     } catch (_: IllegalArgumentException) {
@@ -73,22 +80,33 @@ internal class ResourceTransformState(private val callback: ResourceTransformCal
 
   override fun close() {
     if (!closed.compareAndSet(0, 1)) return
-    clearResponseUrls()
+    clearAllResponseUrls()
     selfRef.dispose()
     nativeHeap.free(descriptor.rawPtr)
   }
 
-  private fun retainResponseUrl(pointer: CPointer<ByteVar>) {
-    withResponseUrlLock { responseUrls += pointer }
+  private fun retainResponseUrl(threadKey: String, pointer: CPointer<ByteVar>): Boolean =
+    withResponseUrlLock {
+      if (closed.load() != 0) {
+        false
+      } else {
+        responseUrls.remove(threadKey)?.let { nativeHeap.free(it.rawValue) }
+        responseUrls[threadKey] = pointer
+        true
+      }
+    }
+
+  private fun clearResponseUrl(threadKey: String) {
+    withResponseUrlLock { responseUrls.remove(threadKey) }?.let { nativeHeap.free(it.rawValue) }
   }
 
-  private fun clearResponseUrls() {
+  private fun clearAllResponseUrls() {
     val urls = withResponseUrlLock {
       val copy = responseUrls.toList()
       responseUrls.clear()
       copy
     }
-    urls.forEach { nativeHeap.free(it.rawValue) }
+    urls.forEach { nativeHeap.free(it.second.rawValue) }
   }
 
   private inline fun <T> withResponseUrlLock(block: () -> T): T {
@@ -110,6 +128,8 @@ internal class ResourceTransformState(private val callback: ResourceTransformCal
     pointer[bytes.size] = 0
     return pointer
   }
+
+  private fun currentThreadKey(): String = pthread_self().toString()
 }
 
 @OptIn(ExperimentalForeignApi::class)

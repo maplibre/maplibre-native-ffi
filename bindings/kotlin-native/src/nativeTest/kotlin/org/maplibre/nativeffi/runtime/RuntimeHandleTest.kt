@@ -62,4 +62,24 @@ class RuntimeHandleTest {
       runtime.close()
     }
   }
+
+  @Test
+  fun consumedOfflineOperationCloseIsNoOp() {
+    val runtime = RuntimeHandle.create()
+    val operation =
+      OfflineOperationHandle<Unit>(
+        runtime,
+        1UL,
+        OfflineOperationKind.AMBIENT_CACHE,
+        OfflineOperationResultKind.NONE,
+      )
+    try {
+      operation.markConsumed()
+      operation.close()
+      operation.close()
+      assertTrue(operation.isClosed)
+    } finally {
+      runtime.close()
+    }
+  }
 }

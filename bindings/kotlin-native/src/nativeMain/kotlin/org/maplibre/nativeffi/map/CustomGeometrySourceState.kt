@@ -1,5 +1,7 @@
 package org.maplibre.nativeffi.map
 
+import kotlin.concurrent.atomics.AtomicInt
+import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlinx.cinterop.COpaquePointer
 import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.CValue
@@ -25,12 +27,15 @@ import org.maplibre.nativeffi.internal.struct.StyleStructs
 import org.maplibre.nativeffi.style.CustomGeometrySourceOptions
 
 /** Owns map/style-scoped custom geometry source callback state. */
-@OptIn(ExperimentalForeignApi::class)
+@OptIn(ExperimentalForeignApi::class, ExperimentalAtomicApi::class)
 internal class CustomGeometrySourceState(private val options: CustomGeometrySourceOptions) :
   AutoCloseable {
   private val selfRef = StableRef.create(this)
-  private var closed = false
   private val descriptor = nativeHeap.alloc<mln_custom_geometry_source_options>()
+  private val callbackLock = AtomicInt(0)
+  private var activeCallbacks = 0
+  private var closeRequested = false
+  private var closed = false
 
   init {
     mln_custom_geometry_source_options_default().place(descriptor.ptr)
@@ -43,20 +48,24 @@ internal class CustomGeometrySourceState(private val options: CustomGeometrySour
   fun descriptor(): CPointer<mln_custom_geometry_source_options> = descriptor.ptr
 
   internal fun fetch(tileId: CValue<mln_canonical_tile_id>) {
-    if (closed) return
+    if (!enterCallback()) return
     try {
       options.callback.fetchTile(tileId.useContents { StyleStructs.canonicalTileId(this) })
     } catch (_: Throwable) {
       // Native callbacks must not unwind through the C ABI.
+    } finally {
+      exitCallback()
     }
   }
 
   internal fun cancel(tileId: CValue<mln_canonical_tile_id>) {
-    if (closed) return
+    if (!enterCallback()) return
     try {
       options.callback.cancelTile(tileId.useContents { StyleStructs.canonicalTileId(this) })
     } catch (_: Throwable) {
       // Native callbacks must not unwind through the C ABI.
+    } finally {
+      exitCallback()
     }
   }
 
@@ -93,10 +102,52 @@ internal class CustomGeometrySourceState(private val options: CustomGeometrySour
   }
 
   override fun close() {
-    if (closed) return
-    closed = true
+    val shouldClose = withCallbackLock {
+      if (closed || closeRequested) {
+        false
+      } else {
+        closeRequested = true
+        val canClose = activeCallbacks == 0
+        if (canClose) closed = true
+        canClose
+      }
+    }
+    if (shouldClose) closeNative()
+  }
+
+  private fun enterCallback(): Boolean = withCallbackLock {
+    if (closed || closeRequested) {
+      false
+    } else {
+      activeCallbacks++
+      true
+    }
+  }
+
+  private fun exitCallback() {
+    val shouldClose = withCallbackLock {
+      activeCallbacks--
+      val canClose = closeRequested && activeCallbacks == 0 && !closed
+      if (canClose) closed = true
+      canClose
+    }
+    if (shouldClose) closeNative()
+  }
+
+  private fun closeNative() {
     selfRef.dispose()
     nativeHeap.free(descriptor.rawPtr)
+  }
+
+  private inline fun <T> withCallbackLock(block: () -> T): T {
+    while (!callbackLock.compareAndSet(0, 1)) {
+      // Custom geometry callbacks can arrive concurrently on worker threads.
+    }
+    try {
+      return block()
+    } finally {
+      callbackLock.store(0)
+    }
   }
 }
 

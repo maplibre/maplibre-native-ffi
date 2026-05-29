@@ -67,6 +67,7 @@ internal constructor(
   }
 
   override fun close() {
+    if (closed) return
     runtime.discardOfflineOperation(this)
   }
 

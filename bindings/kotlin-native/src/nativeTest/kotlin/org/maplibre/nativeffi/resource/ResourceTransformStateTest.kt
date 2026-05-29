@@ -2,7 +2,6 @@ package org.maplibre.nativeffi.resource
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNotEquals
 import kotlin.test.assertNull
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.alloc
@@ -17,7 +16,7 @@ import org.maplibre.nativeffi.internal.callback.ResourceTransformState
 @OptIn(ExperimentalForeignApi::class)
 class ResourceTransformStateTest {
   @Test
-  fun transformCallbackCopiesRequestAndKeepsReplacementUrlsIndependent() {
+  fun transformCallbackCopiesRequestAndReturnsReplacementUrls() {
     var copiedRequest: ResourceTransformRequest? = null
     var index = 0
     val replacements =
@@ -43,9 +42,7 @@ class ResourceTransformStateTest {
         val secondStatus =
           state.invoke(1U, "https://example.com/style-2.json".cstr.getPointer(this), secondOut.ptr)
         assertEquals(MaplibreStatus.OK.nativeCode, secondStatus)
-        assertEquals("https://cdn.example.com/style.json", firstOut.url?.toKString())
         assertEquals("https://cdn.example.com/style-2.json", secondOut.url?.toKString())
-        assertNotEquals(firstOut.url, secondOut.url)
       }
     } finally {
       state.close()

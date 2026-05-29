@@ -372,11 +372,11 @@ private constructor(private val map: MapHandle, handle: CPointer<mln_render_sess
       checkedInt(value.height, "OpenGL frame height"),
       value.scale_factor,
       uint64BitsToLong(value.frame_id),
-      checkedInt(value.texture, "OpenGL texture"),
-      checkedInt(value.target, "OpenGL texture target"),
-      checkedInt(value.internal_format, "OpenGL internal format"),
-      checkedInt(value.format, "OpenGL format"),
-      checkedInt(value.type, "OpenGL type"),
+      value.texture.toInt(),
+      value.target.toInt(),
+      value.internal_format.toInt(),
+      value.format.toInt(),
+      value.type.toInt(),
     )
 
   private fun checkedInt(value: UInt, name: String): Int {

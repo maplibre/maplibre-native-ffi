@@ -54,4 +54,25 @@ class FrameScopeTest {
     assertFailsWith<IllegalStateException> { frame.format() }
     assertFailsWith<IllegalStateException> { frame.imageView() }
   }
+
+  @Test
+  fun openglFramePreservesHighBitTextureValues() {
+    val scope = FrameScope()
+    val frame =
+      OpenGLOwnedTextureFrame(
+        scope,
+        1L,
+        2,
+        3,
+        2.0,
+        4L,
+        UInt.MAX_VALUE.toInt(),
+        0x0de1,
+        0x8058,
+        0x1908,
+        0x1401,
+      )
+
+    assertEquals(UInt.MAX_VALUE.toInt(), frame.texture())
+  }
 }

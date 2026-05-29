@@ -1,6 +1,8 @@
 package org.maplibre.nativeffi.internal.callback
 
 import cnames.structs.mln_resource_request_handle
+import kotlin.concurrent.atomics.AtomicInt
+import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlinx.cinterop.COpaquePointer
 import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.ExperimentalForeignApi
@@ -17,12 +19,12 @@ import org.maplibre.nativeffi.resource.ResourceProviderCallback
 import org.maplibre.nativeffi.resource.ResourceRequestHandle
 
 /** Owns runtime-scoped resource provider callback state. */
-@OptIn(ExperimentalForeignApi::class)
+@OptIn(ExperimentalForeignApi::class, ExperimentalAtomicApi::class)
 internal class ResourceProviderState(private val callback: ResourceProviderCallback) :
   AutoCloseable {
   private val selfRef = StableRef.create(this)
   private val descriptor = nativeHeap.alloc<mln_resource_provider>()
-  private var closed = false
+  private val closed = AtomicInt(0)
 
   init {
     descriptor.size = kotlinx.cinterop.sizeOf<mln_resource_provider>().toUInt()
@@ -36,7 +38,7 @@ internal class ResourceProviderState(private val callback: ResourceProviderCallb
     request: CPointer<org.maplibre.nativeffi.internal.c.mln_resource_request>?,
     handle: CPointer<mln_resource_request_handle>?,
   ): UInt {
-    if (closed || request == null || handle == null) return UInt.MAX_VALUE
+    if (closed.load() != 0 || request == null || handle == null) return UInt.MAX_VALUE
     val requestHandle = ResourceRequestHandle(handle)
     return try {
       val decision =
@@ -48,8 +50,7 @@ internal class ResourceProviderState(private val callback: ResourceProviderCallb
   }
 
   override fun close() {
-    if (closed) return
-    closed = true
+    if (!closed.compareAndSet(0, 1)) return
     selfRef.dispose()
     nativeHeap.free(descriptor.rawPtr)
   }
