@@ -9,6 +9,7 @@ import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.nativeHeap
 import kotlinx.cinterop.rawValue
+import org.maplibre.nativeffi.error.InvalidStateException
 import org.maplibre.nativeffi.internal.c.mln_opengl_owned_texture_frame
 
 /** Explicit handle for an OpenGL session-owned texture frame. */
@@ -34,7 +35,17 @@ internal constructor(
 
   override fun close() {
     if (closed) return
-    session.releaseOpenGLFrame(framePointer)
+    try {
+      session.releaseOpenGLFrame(framePointer)
+    } catch (error: InvalidStateException) {
+      if (session.isClosed) closeLocal()
+      throw error
+    }
+    closeLocal()
+  }
+
+  private fun closeLocal() {
+    if (closed) return
     closed = true
     leakReport.markClosed()
     try {
