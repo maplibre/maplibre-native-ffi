@@ -38,11 +38,20 @@ Requirement bullets use [RFC 2119](https://www.rfc-editor.org/info/rfc2119)
 keywords (**MUST**, **SHOULD**, **MAY**). Explanatory prose outside bullet lists
 is informative unless it repeats a keyword.
 
-## Profiles
+## Conditional requirements
 
-When a host platform or language class needs different obligations, the spec
-states them in an inline **Profile** subsection. Extract a separate profile
-document only if that subsection grows unwieldy.
+Some rules apply only when an implementation has a specific capability or
+constraint (graphics API, memory model, thread ownership, and so on). State the
+condition on the underlying property, not on a target language or runtime name.
+
+- Write conditions **inline** on the rule or in a short subsection opened with
+  **Applies when:** …
+- Keep each condition **independent**. One rule might apply when the host uses a
+  tracing GC; another when the public API is confined to a single owner thread.
+  Combine conditions on a single rule only when both properties are genuinely
+  required for that rule.
+- Split out a separate file only when a conditional block grows too large to
+  scan.
 
 ## Change control
 

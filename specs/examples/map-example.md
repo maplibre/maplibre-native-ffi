@@ -131,9 +131,10 @@ names and exit without creating a window.
 
 **Default mode:** `owned-texture`.
 
-Implementations MAY omit support for modes their platform stack does not provide
-(see [Platform profiles](#map-ex-platform-profiles)); omitted modes MUST be
-rejected at startup with a clear error if requested on the command line.
+Implementations MAY omit support for modes their graphics stack does not provide
+(see [Conditional requirements](#map-ex-conditional-requirements)); omitted
+modes MUST be rejected at startup with a clear error if requested on the command
+line.
 
 ### Other flags {#map-ex-cli-other}
 
@@ -478,59 +479,69 @@ Input handlers return whether the camera changed so the frame loop can set
 
 ---
 
-## Platform profiles {#map-ex-platform-profiles}
+## Conditional requirements {#map-ex-conditional-requirements}
 
-Profiles refine which modes and backends an example must ship. They are not
-separate specs; unmentioned platforms follow the same architecture with modes
-implemented as far as practical.
+Rules in this section refine the base spec. They apply only when the stated
+property holds. Implementations that do not match a given condition ignore its
+bullets. Reference implementations are listed in
+[Implementations](#map-ex-implementations); they are examples, not names for the
+conditions themselves.
 
-### Desktop Vulkan (Windows, Linux) {#map-ex-profile-vulkan-desktop}
+### When Vulkan presents the window {#map-ex-when-vulkan}
 
-Examples: `rust-map`, `lwjgl-map`, `zig-map` (Vulkan variant).
+**Applies when:** the example uses Vulkan for the window surface and swapchain
+(for example `rust-map`, `lwjgl-map`, Vulkan builds of `zig-map`).
 
-- **MUST** implement: `owned-texture`, `native-surface`.
-- **SHOULD** implement: `borrowed-texture` when the binding and swapchain
-  support exportable textures.
-- **Backend:** shared Vulkan context (instance, device, queue, surface);
-  compositor uses the same SPIR-V shader pair as
+- **MUST** implement render-target modes `owned-texture` and `native-surface`.
+- **SHOULD** implement `borrowed-texture` when the binding and swapchain support
+  exportable textures.
+- **MUST** use one shared Vulkan context (instance, device, queue, surface) for
+  compositor and render session.
+- The compositor **MUST** use the SPIR-V shader pair described in
   [Shared defaults](#map-ex-shared-defaults-shaders).
 
-### Desktop Metal (macOS) {#map-ex-profile-metal-desktop}
+### When presentation goes through a Metal layer or surface {#map-ex-when-metal-surface}
 
-Examples: `swift-map`, `zig-map` (Metal variant).
+**Applies when:** the example attaches a `native-surface` session to a
+`CAMetalLayer` or equivalent Metal presentation handle (for example `swift-map`,
+Metal builds of `zig-map`).
 
-- **MUST** implement: `native-surface` (Metal layer / surface attach).
-- **MAY** implement texture modes when the binding exposes Metal owned/borrowed
-  texture targets.
-- **Out of scope for now:** iOS, tvOS, Android; Linux Metal ports.
+- **MUST** implement `native-surface`.
+- **MAY** implement texture modes when the binding exposes Metal owned or
+  borrowed texture targets.
+- Mobile and non-macOS Metal ports are out of scope until added explicitly.
 
-### Desktop OpenGL / EGL (Linux, Windows) {#map-ex-profile-opengl-desktop}
+### When the host uses OpenGL or EGL {#map-ex-when-opengl}
 
-Example: `zig-map` (OpenGL variant).
+**Applies when:** the example uses OpenGL or EGL for window presentation (for
+example OpenGL builds of `zig-map`).
 
-- **SHOULD** implement all three modes where EGL/GL and the binding allow
-  borrowed and owned texture paths.
-- Same compositor behavior (fullscreen textured quad).
+- **SHOULD** implement all three render-target modes where the binding and
+  GL/EGL stack allow owned and borrowed texture paths.
+- The compositor **MUST** still be a fullscreen textured quad equivalent to
+  [Shared defaults](#map-ex-shared-defaults-shaders).
 
-### Java / JVM hosts {#map-ex-profile-jvm}
+### When the binding confines map work to a single UI thread {#map-ex-when-single-ui-thread}
 
-Examples: `lwjgl-map` (FFM binding).
+**Applies when:** the binding or platform requires runtime, map, and render
+session use on one UI owner thread (for example AppKit with main-thread
+isolation).
 
-- Same obligations as the underlying graphics profile (Vulkan desktop above).
-- Windowing/input via GLFW (or equivalent) with logical coordinates matching
-  [Viewport](#map-ex-viewport).
+- All map and render calls **MUST** run on that thread.
+- Window and layer setup **MUST** stay consistent with the binding’s thread
+  rules documented for that integration.
 
-### Swift / Apple hosts {#map-ex-profile-swift-apple}
+### When the window toolkit has no single cross-platform event pump {#map-ex-when-no-unified-event-pump}
 
-Example: `swift-map`.
+**Applies when:** the host UI framework does not deliver input, resize, and idle
+ticks through one portable poll loop (unlike SDL or winit).
 
-- AppKit window with `CAMetalLayer`; main-thread / `@MainActor` ownership
-  aligned with the binding’s thread rules.
-- Timer- or display-link-driven frame loop (~60 Hz) when the toolkit does not
-  deliver a single cross-platform event pump.
-- Input uses AppKit event types; control help and constants remain as in
-  [Input](#map-ex-input).
-- **MUST** implement `native-surface` on macOS; texture modes optional.
+- The example **MUST** still run the [frame loop](#map-ex-frame-loop) logic each
+  tick (runtime pump, event drain, conditional render).
+- The example **SHOULD** drive ticks at roughly display refresh (for example ~60
+  Hz timer or display link).
+- [Input](#map-ex-input) behavior and constants are unchanged; only the event
+  source differs.
 
 ---
 
@@ -543,12 +554,12 @@ An example **conforms** to this spec when:
 2. [Shared defaults](#map-ex-shared-defaults), [CLI](#map-ex-cli),
    [frame loop](#map-ex-frame-loop), [input](#map-ex-input), and
    [lifecycle](#map-ex-lifecycle) match unless a
-   [platform profile](#map-ex-platform-profiles) documents a deliberate
-   omission.
+   [conditional requirement](#map-ex-conditional-requirements) documents a
+   deliberate omission.
 3. The **backend / mode matrix** structure allows adding modes without rewriting
    unrelated modules.
 4. No example-local automated tests are added for conformance checking.
 
 Reviewers verify conformance by inspection and by running the example manually;
-missing render-target modes on a platform are acceptable if the profile or
-startup errors document the gap.
+missing render-target modes are acceptable when no applicable conditional rule
+requires them, or startup errors document an unsupported mode.
