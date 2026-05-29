@@ -19,8 +19,10 @@ language bindings and render-target integrations through a focused map demo.
   map render events and user input.
 - Initial style URL and camera per [Shared defaults](#shared-defaults).
 - Camera controls per [Input](#input).
-- Support for the three render-target modes (see
-  [Render-target modes](#render-target-modes)).
+- Support for the three render-target modes on every graphics API the example
+  ships (see [Render-target modes](#render-target-modes)).
+- Every graphics API the window toolkit and target platform can support (Vulkan,
+  Metal, OpenGL/EGL as applicable).
 - Graceful process exit when the user closes the window.
 - Startup logging that identifies the selected render-target mode and which
   native render backends the loaded library supports.
@@ -343,7 +345,7 @@ resizes backend-owned textures/surfaces, and re-attaches.
 
 Three modes MUST be modeled in every example’s architecture (CLI parsing,
 backend discriminant, and attach paths). Each example MUST implement all three
-modes for its graphics API.
+modes on every graphics API the example binary exposes.
 
 ### Mode comparison
 
