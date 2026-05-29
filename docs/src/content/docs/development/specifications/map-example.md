@@ -78,10 +78,11 @@ Apply with an immediate `jump_to` on startup.
 ### Compositor shaders (texture modes)
 
 For `owned-texture` and `borrowed-texture`, the host-owned compositor that
-samples the map texture into the window swapchain MUST use a fullscreen textured
-quad:
+samples the map texture into the window swapchain MUST use a fullscreen triangle
+covering the viewport:
 
-- Vertex shader: fullscreen triangle with pass-through UVs.
+- Vertex shader: three corners with pass-through UVs spanning the visible
+  `[0, 1] × [0, 1]` texture range (large-triangle technique).
 - Fragment shader: `texture(map_texture, uv)` (straight copy, standard UV
   orientation).
 
@@ -428,7 +429,7 @@ Controls:
   arrows or WASD: pan
   + / -: zoom at center
   Q / E: rotate
-  PageUp / PageDown or [ / ]: pitch
+  PageUp / ] or PageDown / [: pitch
   0: reset pitch and bearing
 ```
 
