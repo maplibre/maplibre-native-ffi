@@ -125,24 +125,32 @@ modules. Names differ by language; boundaries MUST NOT be collapsed into a
 single monolithic type.
 
 ```mermaid
+%%{init: {'theme': 'neutral'}}%%
 flowchart TB
   subgraph shell["App shell"]
+    direction LR
     EL[Event loop]
     VP[Viewport]
     IN[Input]
+    DG[Diagnostics]
   end
   subgraph mapstate["Map state"]
+    direction LR
     RT[Runtime]
     MP[Map]
     RS[Render-target session]
   end
   subgraph gfx["Graphics host"]
+    direction LR
     BE[Backend context]
     CP[Compositor]
     SC[Presentation]
   end
+  CLI -->|"owned-texture / borrowed-texture / native-surface"| shell
   shell --> mapstate
   mapstate --> gfx
+  RS -->|texture modes| CP
+  RS -->|native-surface| SC
 ```
 
 ### Logical modules
@@ -447,7 +455,7 @@ Controls:
 | `+` / `-`                     | Zoom `1.25` / `1/1.25` about viewport center.                                                                                                                                          |
 | `Q` / `E`                     | Bearing ±`10`° with keyboard animation.                                                                                                                                                |
 | `]`                           | Pitch +`5`° (clamped to `[0, 60]`) with animation.                                                                                                                                     |
-| `[`                           | Pitch −`5`° with animation.                                                                                                                                                            |
+| `[`                           | Pitch −`5`° (clamped to `[0, 60]`) with animation.                                                                                                                                     |
 | `0`                           | Animate bearing and pitch to `0` with keyboard animation.                                                                                                                              |
 
 Keyboard animated moves SHOULD use ~`160` ms duration. Pointer drags use
