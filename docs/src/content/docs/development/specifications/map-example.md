@@ -230,6 +230,9 @@ Each iteration has two phases: pump (always) and render (only when
 
 ### Pump (every iteration)
 
+While polling, handle resize (reattach the render target when required) and
+input (may set `render_pending`).
+
 ```mermaid
 sequenceDiagram
   participant EL as Event loop
@@ -237,7 +240,6 @@ sequenceDiagram
   participant BE as Backend
 
   EL->>EL: Poll window + input events
-  Note over EL: Resize may reattach target; input may set render_pending
   EL->>RT: run_once()
   EL->>RT: drain events → may set render_pending
   EL->>BE: finishFrame()
