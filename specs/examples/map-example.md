@@ -19,8 +19,8 @@ what it must not try to be.
 - Support for the three render-target modes (see
   [Render-target modes](#render-target-modes)).
 - Graceful process exit when the user closes the window.
-- Startup logging that identifies the selected render-target mode and, when
-  practical, which native render backends the loaded library exposes.
+- Startup logging that identifies the selected render-target mode and which
+  native render backends the loaded library supports.
 
 ### What an example is not
 
@@ -470,8 +470,8 @@ Input handlers return whether the camera changed so the frame loop can set
 - On startup, print which render-target mode is active and a one-line
   description of what it demonstrates (see existing `rust-map` / `lwjgl-map`
   status lines).
-- SHOULD print supported native render backends (`metal`, `vulkan`, `opengl`)
-  when the binding exposes them.
+- MUST print supported native render backends (`metal`, `vulkan`, `opengl`) from
+  `mln_supported_render_backend_mask()` or the binding equivalent.
 
 ---
 
