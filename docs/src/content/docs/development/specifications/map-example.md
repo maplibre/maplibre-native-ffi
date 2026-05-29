@@ -100,17 +100,12 @@ The process MUST accept a render-target mode name:
 | Caller-owned borrowed texture | `borrowed-texture` |
 | Native window surface         | `native-surface`   |
 
-Accepted forms (implementations MUST support all that apply to their language’s
-usual argv style):
+Pass the mode with `--render-target` (for example
+`--render-target=owned-texture`). The flag is required; there is no default
+mode.
 
-- Positional: `owned-texture` (bare mode name as a non-flag argument).
-- Flag pair: `--render-target <mode>`.
-- Flag combined: `--render-target=<mode>`.
-
-If parsing fails or the user requests help, print usage listing the three mode
-names and exit before creating a window.
-
-Default mode: `owned-texture`.
+On `--help` or invalid arguments, print usage listing the three mode names and
+exit before creating a window.
 
 Implementations MAY omit support for modes their graphics stack does not provide
 (see [Conditional requirements](#conditional-requirements)); omitted modes MUST
@@ -118,8 +113,7 @@ be rejected at startup with a clear error if requested on the command line.
 
 ### Other flags
 
-- CLI exposes only render-target selection beyond defaults. Implementations MUST
-  NOT add flags that change style URL, camera preset, or window size.
+Implementations MUST NOT add other CLI flags.
 
 ---
 
@@ -350,7 +344,7 @@ the CLI and backend matrix as stubs or rejected at startup.
 
 | CLI value          | C API concept                                                | Compositor | Role                                                        |
 | ------------------ | ------------------------------------------------------------ | ---------- | ----------------------------------------------------------- |
-| `owned-texture`    | Session-owned backend texture (e.g. Vulkan owned texture)    | Required   | Default; map allocates texture, host samples it.            |
+| `owned-texture`    | Session-owned backend texture (e.g. Vulkan owned texture)    | Required   | Map allocates texture, host samples it.                     |
 | `borrowed-texture` | Caller-owned texture/image borrowed by session               | Required   | Host allocates exportable texture; session renders into it. |
 | `native-surface`   | Window surface (Vulkan surface, Metal layer, EGL surface, …) | None       | Map renders directly to the swapchain/surface.              |
 
