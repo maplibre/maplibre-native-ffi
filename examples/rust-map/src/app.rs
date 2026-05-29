@@ -333,9 +333,9 @@ fn immediate_exit(code: i32) -> ! {
         fn _exit(status: std::ffi::c_int) -> !;
     }
 
-    // SAFETY: `_exit` terminates the process without running Rust or native
-    // destructors. Used when shutdown or fatal errors would otherwise hit a known
-    // macOS Vulkan issue: native teardown can abort after the window closes while
-    // cleaning up thread-local state. The OS reclaims resources on process exit.
+    // SAFETY: `_exit` terminates the process without running native teardown.
+    // The example uses it on close because the current macOS Vulkan stack can
+    // abort while MapLibre native tears down thread-local state after the window
+    // has closed. The operating system reclaims the example's resources.
     unsafe { _exit(code) }
 }
