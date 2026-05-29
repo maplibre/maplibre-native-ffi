@@ -195,7 +195,10 @@ Order MUST be:
 6. Create map with extent from the initial viewport and continuous mode.
 7. Load style and apply initial camera.
 8. Attach render session for the selected mode.
-9. Print render-target mode (and control help).
+9. Print:
+   - render-target mode and status line
+   - control help
+   - supported native render backends from `mln_supported_render_backend_mask()`
 
 On failure after partial setup, release already-created handles in reverse order
 (session → map → runtime → graphics).
@@ -463,10 +466,7 @@ Input handlers return whether the camera changed so the frame loop can set
 - SHOULD register a native log callback during startup and clear it on shutdown.
 - On setup or camera failure, print a short message including the native status
   and diagnostic strings returned by the C API.
-- On startup, print which render-target mode is active and the status line for
-  that mode (see [Render-target modes](#render-target-modes)).
-- MUST print supported native render backends (`metal`, `vulkan`, `opengl`) from
-  `mln_supported_render_backend_mask()`.
+- On startup, print the three items listed in [Startup](#startup) step 9.
 
 ---
 
