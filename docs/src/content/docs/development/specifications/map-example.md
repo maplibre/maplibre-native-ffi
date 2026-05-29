@@ -273,10 +273,10 @@ Requirements:
     (continuous mode needs another frame, for example ongoing camera
     transitions).
 - MUST set `render_pending` when input changes the camera.
-- MUST call `render_update` only while `render_pending` is true; clear the flag
-  after a successful update that does not need an immediate retry.
-- SHOULD treat `invalid_state` from `render_update` as “nothing to draw yet” and
-  continue.
+- MUST call `render_update` only while `render_pending` is true.
+- MUST clear `render_pending` after `render_update` returns success.
+- On `invalid_state` from `render_update`, leave `render_pending` set and
+  continue the pump loop (no frame was drawn yet).
 - SHOULD idle-sleep briefly when an iteration makes no progress (event poll,
   render, or runtime work).
 
