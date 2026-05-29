@@ -1,13 +1,13 @@
 # Map example specification
 
-Specification for interactive desktop **`*-map` example programs**: small apps
-that exercise language bindings and render-target integrations through a shared
+Specification for interactive desktop `*-map` example programs: small apps that
+exercise language bindings and render-target integrations through a shared
 windowed map demo.
 
 ## Scope
 
-The following describes what each **`*-map` example application** must provide
-and what it must not try to be.
+The following describes what each `*-map` example application must provide and
+what it must not try to be.
 
 ### What every example provides
 
@@ -16,7 +16,7 @@ and what it must not try to be.
   map render events and user input.
 - Shared initial map content (style URL and camera).
 - Shared camera interaction model (pointer, scroll, keyboard).
-- Modular support for three **render-target modes** (see
+- Modular support for three render-target modes (see
   [Render-target modes](#render-target-modes)), structured so additional
   graphics backends and modes can be added without rewriting unrelated modules.
 - Graceful process exit when the user closes the window.
@@ -64,7 +64,7 @@ comparable when switching languages.
 
 ### Style
 
-- **Style URL:** `https://tiles.openfreemap.org/styles/bright`
+- Style URL: `https://tiles.openfreemap.org/styles/bright`
 - Load the style during map initialization, before the first render.
 
 ### Initial camera
@@ -80,18 +80,18 @@ Apply with an immediate camera jump (no arrival animation on startup).
 
 ### Window
 
-- **Initial logical size:** `960` × `640` pixels.
+- Initial logical size: `960` × `640` pixels.
 - Window MUST be resizable.
 - High-DPI / Retina: derive map `RenderTargetExtent` from the window’s drawable
   size and content scale (see [Viewport](#viewport)).
 
 ### Runtime resources
 
-- **Runtime cache path:** `:memory:` (in-memory cache only).
+- Runtime cache path: `:memory:` (in-memory cache only).
 
 ### Map mode
 
-- **Map mode:** continuous (`MLN_MAP_MODE_CONTINUOUS` / binding equivalent).
+- Map mode: continuous (`MLN_MAP_MODE_CONTINUOUS` / binding equivalent).
 
 ### Compositor shaders (texture modes)
 
@@ -130,7 +130,7 @@ usual argv style):
 If parsing fails or the user requests help, print usage listing the three mode
 names and exit without creating a window.
 
-**Default mode:** `owned-texture`.
+Default mode: `owned-texture`.
 
 Implementations MAY omit support for modes their graphics stack does not provide
 (see [Conditional requirements](#conditional-requirements)); omitted modes MUST
@@ -182,23 +182,23 @@ flowchart TB
 
 ### Logical modules
 
-| Module                    | Responsibility                                                                                                         |
-| ------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| **App shell**             | Process entry, argument parsing, window creation, main event loop, idle pacing, shutdown ordering.                     |
-| **Viewport**              | Map logical size, physical drawable size, and `scale_factor` for `RenderTargetExtent`.                                 |
-| **Map state**             | Owns runtime, map, and render session; loads style and initial camera; attaches render target for the selected mode.   |
-| **Render-target session** | Thin wrapper over `RenderSessionHandle`: resize, `render_update`, close; dispatches by texture vs surface.             |
-| **Backend**               | Graphics API context tied to the window (instance, device, queue, surface/swapchain, or Metal layer / GL context).     |
-| **Compositor**            | Host pass that draws a map-owned or borrowed texture into the swapchain (`owned-texture` and `borrowed-texture` only). |
-| **Input**                 | Pointer and keyboard → map camera APIs; prints control help once at startup.                                           |
-| **Diagnostics**           | Optional log callback and consistent error messages on failed setup or camera commands.                                |
+| Module                | Responsibility                                                                                                         |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| App shell             | Process entry, argument parsing, window creation, main event loop, idle pacing, shutdown ordering.                     |
+| Viewport              | Map logical size, physical drawable size, and `scale_factor` for `RenderTargetExtent`.                                 |
+| Map state             | Owns runtime, map, and render session; loads style and initial camera; attaches render target for the selected mode.   |
+| Render-target session | Thin wrapper over `RenderSessionHandle`: resize, `render_update`, close; dispatches by texture vs surface.             |
+| Backend               | Graphics API context tied to the window (instance, device, queue, surface/swapchain, or Metal layer / GL context).     |
+| Compositor            | Host pass that draws a map-owned or borrowed texture into the swapchain (`owned-texture` and `borrowed-texture` only). |
+| Input                 | Pointer and keyboard → map camera APIs; prints control help once at startup.                                           |
+| Diagnostics           | Optional log callback and consistent error messages on failed setup or camera commands.                                |
 
 Implementations SHOULD mirror this layout in the source tree (separate files or
 packages per module).
 
 ### Backend and mode matrix
 
-The **backend** module MUST be structured as a discriminated implementation per
+The backend module MUST be structured as a discriminated implementation per
 render-target mode (union, sealed hierarchy, or equivalent), not as unrelated
 copies. Adding a mode or backend MUST require a localized change (new enum
 variant + module), matching the `zig-map` `render/` layout.
@@ -224,11 +224,11 @@ Order MUST be:
 2. Validate that the loaded native library supports the graphics backend(s) this
    binary targets; fail fast with a readable message if not.
 3. Create the window (initial size [Window](#window)).
-4. Initialize the graphics **backend** for the selected mode.
-5. Create **runtime** (`:memory:` cache).
-6. Create **map** with extent from the initial **viewport** and continuous mode.
-7. Load **style** and apply **initial camera**.
-8. **Attach** render session for the selected mode.
+4. Initialize the graphics backend for the selected mode.
+5. Create runtime (`:memory:` cache).
+6. Create map with extent from the initial viewport and continuous mode.
+7. Load style and apply initial camera.
+8. Attach render session for the selected mode.
 9. Print render-target mode (and control help).
 
 On failure after partial setup, release already-created handles in reverse order
@@ -239,10 +239,10 @@ On failure after partial setup, release already-created handles in reverse order
 On window close or fatal error, close resources in order:
 
 1. Finish or wait on in-flight GPU work if the backend requires it.
-2. **Render session** (compositor first when it owns GPU objects separate from
-   the session).
-3. **Map**
-4. **Runtime**
+2. Render session (compositor first when it owns GPU objects separate from the
+   session).
+3. Map
+4. Runtime
 5. Graphics context and window.
 
 Implementations MAY use abrupt process exit only when documented
@@ -251,10 +251,10 @@ localized and commented (`map-ex: lifecycle / shutdown`).
 
 ### Handle ownership
 
-- One **runtime** per process (owner thread drives `run_once` / pump).
-- One **map** per runtime for the demo.
-- One live **render session** per map at a time.
-- Map configuration (style, camera) goes through the **map** handle, not the
+- One runtime per process (owner thread drives `run_once` / pump).
+- One map per runtime for the demo.
+- One live render session per map at a time.
+- Map configuration (style, camera) goes through the map handle, not the
   session, except for render-target extent and present.
 
 ---
@@ -289,27 +289,27 @@ sequenceDiagram
 
 Requirements:
 
-- **MUST** call runtime `run_once` (or binding equivalent) once per loop
-  iteration while the app is running.
-- **MUST** drain runtime events each iteration and set `render_pending` when a
+- MUST call runtime `run_once` (or binding equivalent) once per loop iteration
+  while the app is running.
+- MUST drain runtime events each iteration and set `render_pending` when a
   `map_render_update_available` event targets this map (and MAY also react to
   `map_render_frame_finished` / `needs_repaint` when the binding exposes it).
-- **MUST** set `render_pending` when input changes the camera.
-- **MUST** call `render_update` only while `render_pending` is true; clear the
-  flag after a successful update that does not need an immediate retry.
-- **SHOULD** treat `invalid_state` from `render_update` as “nothing to draw yet”
+- MUST set `render_pending` when input changes the camera.
+- MUST call `render_update` only while `render_pending` is true; clear the flag
+  after a successful update that does not need an immediate retry.
+- SHOULD treat `invalid_state` from `render_update` as “nothing to draw yet”
   without fatal exit.
-- **SHOULD** idle-sleep briefly when an iteration did no work (event poll,
-  render, or runtime progress) to avoid spinning CPU.
+- SHOULD idle-sleep briefly when an iteration did no work (event poll, render,
+  or runtime progress) to avoid spinning CPU.
 
-Texture modes: after a successful `render_update`, **MUST** run the compositor
-pass to copy the map texture into the window swapchain before present.
+Texture modes: after a successful `render_update`, MUST run the compositor pass
+to copy the map texture into the window swapchain before present.
 
 ---
 
 ## Viewport
 
-The **viewport** value MUST contain:
+The viewport value MUST contain:
 
 | Field                               | Meaning                                                                   |
 | ----------------------------------- | ------------------------------------------------------------------------- |
@@ -333,7 +333,7 @@ Pass `logical_*` and `scale_factor` to map creation, session attach, and session
 
 ## Map state
 
-The **map state** module owns the binding handles and map-specific setup.
+The map state module owns the binding handles and map-specific setup.
 
 ### Creation
 
@@ -341,8 +341,7 @@ The **map state** module owns the binding handles and map-specific setup.
 - Create map with current viewport extent and continuous mode.
 - Load [style URL](#style).
 - Apply [initial camera](#initial-camera).
-- Delegate render-session attachment to the **backend** for the CLI-selected
-  mode.
+- Delegate render-session attachment to the backend for the CLI-selected mode.
 
 ### Event drain
 
@@ -381,9 +380,9 @@ the CLI and backend matrix as stubs or rejected at startup.
 - Pass the host’s shared Vulkan/Metal/GL context handles as required by the C
   API.
 - On `render_update`, acquire the frame/image from the session, draw via
-  **compositor**, release/close the frame per binding rules.
-- **Compositor** resizes with the viewport independently of session resize where
-  the API requires both.
+  compositor, release/close the frame per binding rules.
+- Compositor resizes with the viewport independently of session resize where the
+  API requires both.
 
 ### `borrowed-texture`
 
@@ -392,8 +391,8 @@ the CLI and backend matrix as stubs or rejected at startup.
 - Attach with the “borrowed texture” descriptor referencing host-owned handles.
 - On `render_update`, sample that texture through the same compositor path as
   `owned-texture`.
-- **`needsRenderTargetReattachOnResize` MUST return `true`:** on resize, destroy
-  the render session, recreate host textures, and re-attach (do not only call
+- `needsRenderTargetReattachOnResize` MUST return `true`: on resize, destroy the
+  render session, recreate host textures, and re-attach (do not only call
   session `resize`).
 
 ### `native-surface`
@@ -412,7 +411,7 @@ the CLI and backend matrix as stubs or rejected at startup.
 
 - Subscribe to window size, framebuffer size, and display-scale / content-scale
   events (as available on the platform).
-- Recompute **viewport**; skip rendering if extent is empty.
+- Recompute viewport; skip rendering if extent is empty.
 - If `needsRenderTargetReattachOnResize()` → full session reattach path.
 - Else → resize backend swapchain/context, resize compositor, call session
   `resize` with new extent.
@@ -466,15 +465,15 @@ Input handlers return whether the camera changed so the frame loop can set
 
 ## Diagnostics
 
-- **SHOULD** register a native log callback during startup and clear it on
-  shutdown where the binding supports it.
+- SHOULD register a native log callback during startup and clear it on shutdown
+  where the binding supports it.
 - On setup or camera failure, print a short message including the binding error
   or diagnostic (implementation-defined detail level).
 - On startup, print which render-target mode is active and a one-line
   description of what it demonstrates (see existing `rust-map` / `lwjgl-map`
   status lines).
-- **SHOULD** print supported native render backends (`metal`, `vulkan`,
-  `opengl`) when the binding exposes them.
+- SHOULD print supported native render backends (`metal`, `vulkan`, `opengl`)
+  when the binding exposes them.
 
 ---
 
@@ -488,56 +487,55 @@ conditions themselves.
 
 ### When Vulkan presents the window
 
-**Applies when:** the example uses Vulkan for the window surface and swapchain
-(for example `rust-map`, `lwjgl-map`, Vulkan builds of `zig-map`).
+Applies when: the example uses Vulkan for the window surface and swapchain (for
+example `rust-map`, `lwjgl-map`, Vulkan builds of `zig-map`).
 
-- **MUST** implement render-target modes `owned-texture` and `native-surface`.
-- **SHOULD** implement `borrowed-texture` when the binding and swapchain support
+- MUST implement render-target modes `owned-texture` and `native-surface`.
+- SHOULD implement `borrowed-texture` when the binding and swapchain support
   exportable textures.
-- **MUST** use one shared Vulkan context (instance, device, queue, surface) for
+- MUST use one shared Vulkan context (instance, device, queue, surface) for
   compositor and render session.
-- The compositor **MUST** use the SPIR-V shader pair described in
+- The compositor MUST use the SPIR-V shader pair described in
   [Compositor shaders](#compositor-shaders-texture-modes).
 
 ### When presentation goes through a Metal layer or surface
 
-**Applies when:** the example attaches a `native-surface` session to a
+Applies when: the example attaches a `native-surface` session to a
 `CAMetalLayer` or equivalent Metal presentation handle (for example `swift-map`,
 Metal builds of `zig-map`).
 
-- **MUST** implement `native-surface`.
-- **MAY** implement texture modes when the binding exposes Metal owned or
-  borrowed texture targets.
+- MUST implement `native-surface`.
+- MAY implement texture modes when the binding exposes Metal owned or borrowed
+  texture targets.
 - Mobile and non-macOS Metal ports are out of scope until added explicitly.
 
 ### When the host uses OpenGL or EGL
 
-**Applies when:** the example uses OpenGL or EGL for window presentation (for
+Applies when: the example uses OpenGL or EGL for window presentation (for
 example OpenGL builds of `zig-map`).
 
-- **SHOULD** implement all three render-target modes where the binding and
-  GL/EGL stack allow owned and borrowed texture paths.
-- The compositor **MUST** still be a fullscreen textured quad equivalent to
+- SHOULD implement all three render-target modes where the binding and GL/EGL
+  stack allow owned and borrowed texture paths.
+- The compositor MUST still be a fullscreen textured quad equivalent to
   [Compositor shaders](#compositor-shaders-texture-modes).
 
 ### When the binding confines map work to a single UI thread
 
-**Applies when:** the binding or platform requires runtime, map, and render
-session use on one UI owner thread (for example AppKit with main-thread
-isolation).
+Applies when: the binding or platform requires runtime, map, and render session
+use on one UI owner thread (for example AppKit with main-thread isolation).
 
-- All map and render calls **MUST** run on that thread.
-- Window and layer setup **MUST** stay consistent with the binding’s thread
-  rules documented for that integration.
+- All map and render calls MUST run on that thread.
+- Window and layer setup MUST stay consistent with the binding’s thread rules
+  documented for that integration.
 
 ### When the window toolkit has no single cross-platform event pump
 
-**Applies when:** the host UI framework does not deliver input, resize, and idle
+Applies when: the host UI framework does not deliver input, resize, and idle
 ticks through one portable poll loop (unlike SDL or winit).
 
-- The example **MUST** still run the [frame loop](#frame-loop) logic each tick
+- The example MUST still run the [frame loop](#frame-loop) logic each tick
   (runtime pump, event drain, conditional render).
-- The example **SHOULD** drive ticks at roughly display refresh (for example ~60
-  Hz timer or display link).
+- The example SHOULD drive ticks at roughly display refresh (for example ~60 Hz
+  timer or display link).
 - [Input](#input) behavior and constants are unchanged; only the event source
   differs.
