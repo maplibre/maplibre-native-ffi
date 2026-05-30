@@ -54,10 +54,6 @@ pub const VulkanBackend = union(enum) {
         };
     }
 
-    pub fn viewportMode(_: *const VulkanBackend) maplibre.ViewportMode {
-        return .default;
-    }
-
     pub fn finishFrame(self: *VulkanBackend) !void {
         switch (self.*) {
             .owned_texture => |*backend| try backend.finishFrame(),

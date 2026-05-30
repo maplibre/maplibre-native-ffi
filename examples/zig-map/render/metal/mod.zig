@@ -69,13 +69,6 @@ pub const MetalBackend = union(enum) {
         };
     }
 
-    pub fn viewportMode(self: *const MetalBackend) maplibre.ViewportMode {
-        return switch (self.*) {
-            .owned_texture, .borrowed_texture => .flipped_y,
-            .native_surface => .default,
-        };
-    }
-
     pub fn finishFrame(_: *MetalBackend) !void {}
 
     pub fn attachRenderTarget(
