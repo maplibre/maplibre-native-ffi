@@ -41,7 +41,6 @@ public final class ResourceTransformState implements AutoCloseable {
       mln_resource_transform_response.size(
           outResponse, (int) mln_resource_transform_response.sizeof());
       mln_resource_transform_response.url(outResponse, MemorySegment.NULL);
-      mln_resource_transform_response.context(outResponse, MemorySegment.NULL);
       var replacement =
           callback.transform(
               new ResourceTransformRequest(

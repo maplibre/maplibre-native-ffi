@@ -310,7 +310,6 @@ pub unsafe fn initialize_resource_transform_response(
     unsafe {
         (*out_response).size = std::mem::size_of::<sys::mln_resource_transform_response>() as u32;
         (*out_response).url = ptr::null();
-        (*out_response).context = ptr::null_mut();
     }
     sys::MLN_STATUS_OK
 }

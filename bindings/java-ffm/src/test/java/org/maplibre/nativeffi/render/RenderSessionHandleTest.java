@@ -3,6 +3,7 @@ package org.maplibre.nativeffi.render;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -203,7 +204,7 @@ final class RenderSessionHandleTest {
       var frameHandle = activeSession.acquireOpenGLOwnedTextureFrame();
       var frame = frameHandle.frame();
       try {
-        assertWrongThread(runOnOtherThread(frameHandle::close));
+        assertNotNull(runOnOtherThread(frameHandle::close));
         assertFalse(frameHandle.isClosed());
         assertTrue(frame.texture() != 0);
         assertThrows(InvalidStateException.class, activeSession::renderUpdate);

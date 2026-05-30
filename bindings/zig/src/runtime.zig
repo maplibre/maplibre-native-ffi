@@ -1310,11 +1310,8 @@ fn resourceTransformTrampoline(
 ) callconv(.c) c.mln_status {
     const transform: *ResourceTransform = @ptrCast(@alignCast(user_data orelse return c.MLN_STATUS_INVALID_ARGUMENT));
     const native_response = out_response orelse return c.MLN_STATUS_INVALID_ARGUMENT;
-    native_response.* = .{
-        .size = @sizeOf(c.mln_resource_transform_response),
-        .url = null,
-        .context = null,
-    };
+    native_response.*.size = @sizeOf(c.mln_resource_transform_response);
+    native_response.*.url = null;
     const copied_url = std.heap.smp_allocator.dupe(u8, if (url == null) "" else std.mem.span(url)) catch return c.MLN_STATUS_NATIVE_ERROR;
     defer std.heap.smp_allocator.free(copied_url);
     const response = transform.handler(transform.context, .{

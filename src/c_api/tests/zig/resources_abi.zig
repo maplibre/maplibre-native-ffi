@@ -6,6 +6,20 @@ const support = @import("support.zig");
 const c = support.c;
 
 const offline_style_url = "http://example.com/offline-style.json";
+const transform_style_json =
+    \\{
+    \\  "version": 8,
+    \\  "name": "zig-transform-style-abi-test",
+    \\  "sources": {},
+    \\  "layers": []
+    \\}
+;
+
+const HttpServerState = struct {
+    server: *std.Io.net.Server,
+    served: bool = false,
+    err: ?anyerror = null,
+};
 
 fn sleepOneMillisecond() !void {
     try testing.io.sleep(.fromMilliseconds(1), .awake);
@@ -26,7 +40,7 @@ fn emptyEvent() c.mln_runtime_event {
     };
 }
 
-fn waitForMapLoadingFailureContaining(runtime: *c.mln_runtime, map: *c.mln_map, needle: []const u8) !bool {
+fn waitForMapEvent(runtime: *c.mln_runtime, map: *c.mln_map, event_type: u32) !bool {
     for (0..1000) |_| {
         try testing.expectEqual(c.MLN_STATUS_OK, c.mln_runtime_run_once(runtime));
         while (true) {
@@ -34,9 +48,7 @@ fn waitForMapLoadingFailureContaining(runtime: *c.mln_runtime, map: *c.mln_map, 
             var has_event = false;
             try testing.expectEqual(c.MLN_STATUS_OK, c.mln_runtime_poll_event(runtime, &event, &has_event));
             if (!has_event) break;
-            if (event.type != c.MLN_RUNTIME_EVENT_MAP_LOADING_FAILED or event.source_type != c.MLN_RUNTIME_EVENT_SOURCE_MAP or event.source != @as(?*anyopaque, @ptrCast(map))) continue;
-            const message = if (event.message == null) "" else event.message[0..event.message_size];
-            if (std.mem.indexOf(u8, message, needle) != null) return true;
+            if (event.type == event_type and event.source_type == c.MLN_RUNTIME_EVENT_SOURCE_MAP and event.source == @as(?*anyopaque, @ptrCast(map))) return true;
         }
         try sleepOneMillisecond();
     }
@@ -121,7 +133,6 @@ fn resourceProviderStub(_: ?*anyopaque, _: [*c]const c.mln_resource_request, _: 
 fn resourceTransformStub(_: ?*anyopaque, _: u32, _: [*c]const u8, out_response: [*c]c.mln_resource_transform_response) callconv(.c) c.mln_status {
     if (out_response == null) return c.MLN_STATUS_INVALID_ARGUMENT;
     out_response.*.url = null;
-    out_response.*.context = null;
     return c.MLN_STATUS_OK;
 }
 
@@ -144,6 +155,34 @@ fn resourceTransformWithTemporaryReplacement(
     const status = c.mln_resource_transform_response_set_url(out_response, scratch[0..state.replacement_url.len].ptr, state.replacement_url.len);
     @memset(scratch[0..state.replacement_url.len], 'x');
     return status;
+}
+
+fn serveOneHttpStyleInner(state: *HttpServerState) !void {
+    var stream = try state.server.accept(testing.io);
+    defer stream.close(testing.io);
+
+    var request_buffer: [1024]u8 = undefined;
+    var reader = stream.reader(testing.io, &request_buffer);
+    _ = try reader.interface.discardDelimiterInclusive('\n');
+
+    var header_buffer: [256]u8 = undefined;
+    const header = try std.fmt.bufPrint(
+        &header_buffer,
+        "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nCache-Control: no-store\r\nContent-Length: {d}\r\nConnection: close\r\n\r\n",
+        .{transform_style_json.len},
+    );
+    var response_buffer: [1024]u8 = undefined;
+    var writer = stream.writer(testing.io, &response_buffer);
+    try writer.interface.writeAll(header);
+    try writer.interface.writeAll(transform_style_json);
+    try writer.interface.flush();
+    state.served = true;
+}
+
+fn serveOneHttpStyle(state: *HttpServerState) void {
+    serveOneHttpStyleInner(state) catch |err| {
+        state.err = err;
+    };
 }
 
 test "custom provider request handles reject raw null handles" {
@@ -302,10 +341,22 @@ test "resource transform helper copies temporary replacement URL through native 
     try testing.expectEqual(c.MLN_STATUS_OK, c.mln_network_status_set(c.MLN_NETWORK_STATUS_ONLINE));
     defer testing.expectEqual(c.MLN_STATUS_OK, c.mln_network_status_set(c.MLN_NETWORK_STATUS_ONLINE)) catch @panic("network status restore failed");
 
+    var address = try std.Io.net.IpAddress.parse("127.0.0.1", 0);
+    var server = try address.listen(testing.io, .{ .reuse_address = true });
+    var server_state = HttpServerState{ .server = &server };
+    const server_thread = try std.Thread.spawn(.{}, serveOneHttpStyle, .{&server_state});
+    var server_thread_joined = false;
+    defer {
+        server.deinit(testing.io);
+        if (!server_thread_joined) server_thread.join();
+    }
+    const replacement_url = try std.fmt.allocPrint(testing.allocator, "http://127.0.0.1:{d}/style.json", .{server.socket.address.getPort()});
+    defer testing.allocator.free(replacement_url);
+
     const runtime = try support.createRuntime();
     defer support.destroyRuntime(runtime);
 
-    var state = TransformCopyState{ .replacement_url = "rewritten-temp-copy://style.json" };
+    var state = TransformCopyState{ .replacement_url = replacement_url };
     var transform = c.mln_resource_transform{
         .size = @sizeOf(c.mln_resource_transform),
         .callback = resourceTransformWithTemporaryReplacement,
@@ -317,7 +368,11 @@ test "resource transform helper copies temporary replacement URL through native 
     defer support.destroyMap(map);
 
     try testing.expectEqual(c.MLN_STATUS_OK, c.mln_map_set_style_url(map, "http://original.invalid/style.json"));
-    try testing.expect(try waitForMapLoadingFailureContaining(runtime, map, "rewritten-temp-copy"));
+    try testing.expect(try waitForMapEvent(runtime, map, c.MLN_RUNTIME_EVENT_MAP_STYLE_LOADED));
+    server_thread.join();
+    server_thread_joined = true;
+    try testing.expect(server_state.served);
+    try testing.expectEqual(@as(?anyerror, null), server_state.err);
     try testing.expect(state.transform_calls.load(.seq_cst) > 0);
 }
 
