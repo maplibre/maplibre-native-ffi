@@ -7,13 +7,11 @@ struct VertexOut {
 };
 
 vertex VertexOut vertex_main(uint vertex_id [[vertex_id]]) {
-  float2 positions[6] = {
-    float2(-1.0, -1.0), float2( 1.0, -1.0), float2(-1.0,  1.0),
-    float2( 1.0, -1.0), float2( 1.0,  1.0), float2(-1.0,  1.0),
+  float2 positions[3] = {
+    float2(-1.0, 1.0), float2(3.0, 1.0), float2(-1.0, -3.0),
   };
-  float2 uvs[6] = {
-    float2(0.0, 1.0), float2(1.0, 1.0), float2(0.0, 0.0),
-    float2(1.0, 1.0), float2(1.0, 0.0), float2(0.0, 0.0),
+  float2 uvs[3] = {
+    float2(0.0, 0.0), float2(2.0, 0.0), float2(0.0, 2.0),
   };
   VertexOut out;
   out.position = float4(positions[vertex_id], 0.0, 1.0);

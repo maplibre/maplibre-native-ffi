@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using Maplibre.Native.Error;
 using Maplibre.Native.Internal.C;
 using Maplibre.Native.Internal.Memory;
 using Maplibre.Native.Resource;
@@ -9,7 +10,6 @@ internal sealed unsafe class ResourceTransformState : IDisposable
 {
     private readonly ResourceTransformCallback callback;
     private readonly GCHandle handle;
-    private readonly ThreadLocal<NativeUtf8String?> responseUrls = new(trackAllValues: true);
 
     internal ResourceTransformState(ResourceTransformCallback callback)
     {
@@ -24,17 +24,13 @@ internal sealed unsafe class ResourceTransformState : IDisposable
         user_data = (void*)GCHandle.ToIntPtr(handle),
     };
 
-    internal string? TransformForTest(ResourceKind kind, string url)
+    internal mln_status TransformForTest(ResourceKind kind, string? url, out string? replacementUrl)
     {
         using var nativeUrl = NativeUtf8String.FromNullableString(url, nameof(url));
-        mln_resource_transform_response response = default;
+        mln_resource_transform_response response = new() { size = (uint)sizeof(mln_resource_transform_response) };
         var status = Invoke(this, (uint)kind, nativeUrl.Pointer, &response);
-        if (status != mln_status.MLN_STATUS_OK)
-        {
-            return null;
-        }
-
-        return response.url is null ? null : Marshal.PtrToStringUTF8((nint)response.url);
+        replacementUrl = response.url is null ? null : Marshal.PtrToStringUTF8((nint)response.url);
+        return status;
     }
 
     [UnmanagedCallersOnly(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
@@ -63,19 +59,33 @@ internal sealed unsafe class ResourceTransformState : IDisposable
             var requestUrl = url is null ? string.Empty : Marshal.PtrToStringUTF8((nint)url) ?? string.Empty;
             var replacement = state.callback(new ResourceTransformRequest((ResourceKind)kind, requestUrl));
 
-            var previous = state.responseUrls.Value;
-            var responseUrl = NativeUtf8String.FromNullableString(replacement, nameof(replacement));
-            state.responseUrls.Value = responseUrl;
-            previous?.Dispose();
-
-            *outResponse = new mln_resource_transform_response
+            outResponse->size = (uint)sizeof(mln_resource_transform_response);
+            outResponse->url = null;
+            if (string.IsNullOrEmpty(replacement))
             {
-                size = (uint)sizeof(mln_resource_transform_response),
-                url = responseUrl.Pointer,
-            };
-            return mln_status.MLN_STATUS_OK;
+                return mln_status.MLN_STATUS_OK;
+            }
+
+            using var responseUrl = NativeUtf8String.FromNullableString(replacement, nameof(replacement));
+            return NativeMethods.mln_resource_transform_response_set_url(outResponse, responseUrl.Pointer, responseUrl.ByteLength);
         }
-        catch
+        catch (InvalidArgumentException)
+        {
+            return mln_status.MLN_STATUS_INVALID_ARGUMENT;
+        }
+        catch (ArgumentException)
+        {
+            return mln_status.MLN_STATUS_INVALID_ARGUMENT;
+        }
+        catch (OverflowException)
+        {
+            return mln_status.MLN_STATUS_INVALID_ARGUMENT;
+        }
+        catch (OutOfMemoryException)
+        {
+            return mln_status.MLN_STATUS_NATIVE_ERROR;
+        }
+        catch (Exception)
         {
             return mln_status.MLN_STATUS_NATIVE_ERROR;
         }
@@ -83,12 +93,6 @@ internal sealed unsafe class ResourceTransformState : IDisposable
 
     public void Dispose()
     {
-        foreach (var responseUrl in responseUrls.Values)
-        {
-            responseUrl?.Dispose();
-        }
-
-        responseUrls.Dispose();
         if (handle.IsAllocated)
         {
             handle.Free();

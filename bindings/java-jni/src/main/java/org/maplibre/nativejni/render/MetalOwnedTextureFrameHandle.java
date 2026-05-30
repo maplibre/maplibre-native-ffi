@@ -17,6 +17,7 @@ public final class MetalOwnedTextureFrameHandle implements AutoCloseable {
   private final MaplibreNativeC.mln_metal_owned_texture_frame nativeFrame;
   private final FrameScope scope;
   private final MetalOwnedTextureFrame frame;
+  private final FrameHandleLeakReport.Registration leakRegistration;
   private boolean closed;
 
   MetalOwnedTextureFrameHandle(
@@ -28,6 +29,7 @@ public final class MetalOwnedTextureFrameHandle implements AutoCloseable {
     this.nativeFrame = Objects.requireNonNull(nativeFrame, "nativeFrame");
     this.scope = Objects.requireNonNull(scope, "scope");
     this.frame = Objects.requireNonNull(frame, "frame");
+    this.leakRegistration = FrameHandleLeakReport.register(this, "MetalOwnedTextureFrameHandle");
   }
 
   public MetalOwnedTextureFrame frame() {
@@ -44,8 +46,26 @@ public final class MetalOwnedTextureFrameHandle implements AutoCloseable {
     if (closed) {
       return;
     }
-    session.releaseMetalFrame(nativeFrame, null);
+    try {
+      session.releaseMetalFrame(nativeFrame, null);
+    } catch (Throwable releaseFailure) {
+      if (session.isClosed()) {
+        closeLocal();
+        return;
+      }
+      // Keep local frame state live when native release fails so callers can retry.
+      throw releaseFailure;
+    }
+    closeLocal();
+  }
+
+  private void closeLocal() {
+    if (closed) {
+      return;
+    }
     closed = true;
+    leakRegistration.report().markClosed();
+    leakRegistration.cleanable().clean();
     try {
       scope.close();
     } finally {

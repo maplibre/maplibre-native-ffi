@@ -380,7 +380,27 @@ typedef struct mln_resource_transform_response {
   /** Replacement URL. Null or empty keeps the original URL. Copied on return.
    */
   const char* url;
+  /** C API-managed callback context. Callback implementations leave unchanged.
+   */
+  void* context;
 } mln_resource_transform_response;
+
+/**
+ * Copies a replacement URL into C API-managed storage for the current callback.
+ *
+ * Use this helper inside mln_resource_transform_callback implementations to set
+ * out_response->url from temporary host-language storage. The copied URL stays
+ * valid until the current resource transform invocation finishes. Empty input
+ * clears the replacement URL.
+ *
+ * Returns MLN_STATUS_INVALID_ARGUMENT when response is null, response->size is
+ * too small, url is null with a non-zero size, or url contains embedded NUL.
+ * Returns MLN_STATUS_INVALID_STATE when called outside a resource transform
+ * callback.
+ */
+MLN_API mln_status mln_resource_transform_response_set_url(
+  mln_resource_transform_response* response, const char* url, size_t url_size
+) MLN_NOEXCEPT;
 
 /**
  * Rewrites a network resource URL.
@@ -392,14 +412,12 @@ typedef struct mln_resource_transform_response {
  *
  * - MapLibre may invoke the callback on a worker or network thread instead of
  *   the runtime owner thread.
- * - The callback must be thread-safe, return quickly, and must not call this C
- *   API.
+ * - The callback must be thread-safe, return quickly, and must not call C API
+ *   functions other than mln_resource_transform_response_set_url().
  * - url and out_response are borrowed for the callback duration.
- * - When a replacement URL is set, out_response->url must point to
- *   null-terminated storage that remains valid after the callback returns until
- *   the C API copies it during the current transform invocation. Bindings
- *   usually keep per-thread response storage alive until the next callback,
- *   transform replacement, transform clear, or runtime teardown.
+ * - Use mln_resource_transform_response_set_url() to set a replacement URL from
+ *   temporary host-language storage. The helper copies the URL into C
+ *   API-managed storage for the current transform invocation.
  * - A non-OK return status is treated as no rewrite and does not fail the
  *   resource request.
  * - The callback and user_data must remain valid until the transform is

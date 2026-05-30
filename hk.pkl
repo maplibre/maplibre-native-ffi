@@ -18,10 +18,24 @@ local lintSteps = new Mapping<String, Step> {
     glob = List("**/*.json", "**/*.jsonc")
     check = "jvl check {{files}}"
   }
+  // Mirrors Builtins.`vp-check` (available in hk 1.46+). dprint owns formatting.
   ["vp-check"] {
-    glob = List("docs/**/*.ts", "docs/**/*.tsx", "docs/**/*.js", "docs/**/*.jsx", "docs/**/*.mjs", "docs/**/*.cjs")
-    check = "pnpm --dir docs exec vp check --no-fmt"
-    fix = "pnpm --dir docs exec vp check --no-fmt --fix"
+    glob = List(
+      "**/*.js",
+      "**/*.mjs",
+      "**/*.cjs",
+      "**/*.ts",
+      "**/*.mts",
+      "**/*.cts",
+      "**/*.jsx",
+      "**/*.tsx",
+      "**/*.vue",
+      "**/*.svelte",
+      "**/*.astro",
+    )
+    exclude = List("third_party/**")
+    check = "pnpm exec vp check --no-fmt {{files}}"
+    fix = "pnpm exec vp check --no-fmt --fix {{files}}"
   }
   ["ruff"] {
     glob = List("**/*.py")

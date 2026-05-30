@@ -350,15 +350,6 @@ public final class RenderSessionHandle implements AutoCloseable {
     }
   }
 
-  public PremultipliedRgba8Image readPremultipliedRgba8() {
-    var info = textureImageInfo();
-    try (var buffer = NativeBuffer.allocate(info.byteLength())) {
-      var readInfo = readPremultipliedRgba8(buffer);
-      return new PremultipliedRgba8Image(
-          readInfo.width(), readInfo.height(), readInfo.stride(), buffer.toByteArray());
-    }
-  }
-
   /**
    * Acquires an explicit Metal session-owned texture frame handle.
    *

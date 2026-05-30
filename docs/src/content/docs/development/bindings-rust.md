@@ -158,9 +158,8 @@ return immediately; the binding must not retain or release the native handle.
 the C request handle exactly once—on `complete`, explicit release, or `Drop`.
 
 Resource transform callbacks copy the request URL before invoking user code.
-Replacement URL storage stays alive until native consumes it. Per-thread
-response scratch storage closes on the next callback for that thread and during
-runtime teardown.
+Replacement URLs pass through the C API response helper so native copies
+temporary Rust storage before the callback returns.
 
 Custom geometry source callbacks are map/style scoped. They catch user failures,
 track active upcalls, and delay state release until in-flight callbacks finish.

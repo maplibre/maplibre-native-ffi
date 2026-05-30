@@ -118,8 +118,8 @@ adapters, outside the core binding design.
 
 Resource transforms stay synchronous. Implement them with native-owned rewrite
 rules or a callback shape that can return quickly without touching thread-affine
-handles. Copy borrowed request fields before Dart code can retain them, and keep
-replacement URL storage alive until native consumes it.
+handles. Copy borrowed request fields before Dart code can retain them, and pass
+replacement URLs through the C API response helper before returning.
 
 Resource provider callbacks copy request data before posting to Dart. Matching
 requests own a `ResourceRequestHandle` that enforces one-shot completion and

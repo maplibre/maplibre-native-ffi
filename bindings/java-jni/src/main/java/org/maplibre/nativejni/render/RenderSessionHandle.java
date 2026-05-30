@@ -1,6 +1,5 @@
 package org.maplibre.nativejni.render;
 
-import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import org.bytedeco.javacpp.PointerPointer;
@@ -331,18 +330,6 @@ public final class RenderSessionHandle implements AutoCloseable {
               capacity,
               outInfo));
       return RenderStructs.textureImageInfo(outInfo);
-    }
-  }
-
-  public PremultipliedRgba8Image readPremultipliedRgba8() {
-    var info = textureImageInfo();
-    try (var buffer = NativeBuffer.allocate(info.byteLength())) {
-      var readInfo = readPremultipliedRgba8(buffer);
-      return new PremultipliedRgba8Image(
-          readInfo.width(),
-          readInfo.height(),
-          readInfo.stride(),
-          Arrays.copyOf(buffer.toByteArray(), Math.toIntExact(readInfo.byteLength())));
     }
   }
 

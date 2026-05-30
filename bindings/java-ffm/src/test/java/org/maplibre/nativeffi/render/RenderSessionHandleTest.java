@@ -3,6 +3,7 @@ package org.maplibre.nativeffi.render;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -84,12 +85,6 @@ final class RenderSessionHandleTest {
         assertEquals(info, activeSession.readPremultipliedRgba8(buffer));
         assertEquals(info.byteLength(), buffer.toByteArray().length);
       }
-
-      var image = activeSession.readPremultipliedRgba8();
-      assertEquals(info.width(), image.width());
-      assertEquals(info.height(), image.height());
-      assertEquals(info.stride(), image.stride());
-      assertEquals(info.byteLength(), image.pixels().length);
 
       activeSession.reduceMemoryUse();
       activeSession.clearData();
@@ -194,6 +189,38 @@ final class RenderSessionHandleTest {
   }
 
   @Test
+  void openglOwnedTextureFrameCloseFailureLeavesHandleRetryable() throws Exception {
+    Maplibre.setLogCallback(record -> true);
+    Maplibre.setAsyncLogSeverities(EnumSet.noneOf(LogSeverity.class));
+
+    var runtime = RuntimeHandle.create();
+    var map = MapHandle.create(runtime, new MapOptions().size(64, 64));
+    try (var target = assumeOpenGLOwnedTextureTarget(map)) {
+      var activeSession = target.session();
+      map.setStyleJson(STYLE_JSON);
+      waitForMapEvent(runtime, map, RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE);
+      activeSession.renderUpdate();
+
+      var frameHandle = activeSession.acquireOpenGLOwnedTextureFrame();
+      var frame = frameHandle.frame();
+      try {
+        assertNotNull(runOnOtherThread(frameHandle::close));
+        assertFalse(frameHandle.isClosed());
+        assertTrue(frame.texture() != 0);
+        assertThrows(InvalidStateException.class, activeSession::renderUpdate);
+      } finally {
+        frameHandle.close();
+      }
+      assertTrue(frameHandle.isClosed());
+      assertThrows(IllegalStateException.class, frame::texture);
+      activeSession.renderUpdate();
+    } finally {
+      map.close();
+      runtime.close();
+    }
+  }
+
+  @Test
   void openglBorrowedTextureSessionRendersThroughPublicBinding() throws Exception {
     Maplibre.setLogCallback(record -> true);
     Maplibre.setAsyncLogSeverities(EnumSet.noneOf(LogSeverity.class));
@@ -209,7 +236,10 @@ final class RenderSessionHandleTest {
       assertThrows(
           UnsupportedFeatureException.class, activeSession::acquireOpenGLOwnedTextureFrame);
       assertThrows(UnsupportedFeatureException.class, activeSession::textureImageInfo);
-      assertThrows(UnsupportedFeatureException.class, activeSession::readPremultipliedRgba8);
+      try (var buffer = NativeBuffer.allocate(4)) {
+        assertThrows(
+            UnsupportedFeatureException.class, () -> activeSession.readPremultipliedRgba8(buffer));
+      }
       assertThrows(UnsupportedFeatureException.class, () -> activeSession.resize(128, 128, 1.0));
       assertTrue(hasNonZeroByte(target.readOpenGLBorrowedTextureRgba()));
     } finally {
@@ -234,7 +264,10 @@ final class RenderSessionHandleTest {
       assertThrows(
           UnsupportedFeatureException.class, activeSession::acquireOpenGLOwnedTextureFrame);
       assertThrows(UnsupportedFeatureException.class, activeSession::textureImageInfo);
-      assertThrows(UnsupportedFeatureException.class, activeSession::readPremultipliedRgba8);
+      try (var buffer = NativeBuffer.allocate(4)) {
+        assertThrows(
+            UnsupportedFeatureException.class, () -> activeSession.readPremultipliedRgba8(buffer));
+      }
       assertTrue(hasNonZeroByte(target.readOpenGLSurfaceRgba(128, 128)));
     } finally {
       map.close();

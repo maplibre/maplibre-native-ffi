@@ -521,7 +521,7 @@ const OpenGLOwnedTextureBackend = struct {
             .extent = render_target.extent(viewport),
             .context = self.compositor.context.descriptor(),
         }) catch |err| {
-            diagnostics.logError("OpenGL texture attach failed", err);
+            diagnostics.logError("OpenGL texture attach failed", err, null);
             return types.AppError.TextureAttachFailed;
         };
         return .{ .texture = texture };
@@ -535,11 +535,11 @@ const OpenGLOwnedTextureBackend = struct {
         var frame = texture.acquireOpenGLOwnedTextureFrame() catch |err| switch (err) {
             error.InvalidState => return false,
             else => {
-                diagnostics.logError("OpenGL texture acquire failed", err);
+                diagnostics.logError("OpenGL texture acquire failed", err, null);
                 return types.AppError.BackendDrawFailed;
             },
         };
-        defer frame.release() catch |err| diagnostics.logError("OpenGL texture release failed", err);
+        defer frame.release() catch |err| diagnostics.logError("OpenGL texture release failed", err, null);
 
         const info = try frame.info();
         return try self.compositor.drawTexture(info.texture);
@@ -621,7 +621,7 @@ const OpenGLBorrowedTextureBackend = struct {
             .texture = self.borrowed_texture.texture,
             .target = gl_texture_target,
         }) catch |err| {
-            diagnostics.logError("OpenGL borrowed texture attach failed", err);
+            diagnostics.logError("OpenGL borrowed texture attach failed", err, null);
             return types.AppError.TextureAttachFailed;
         };
         return .{ .texture = texture };
@@ -672,7 +672,7 @@ const OpenGLSurfaceBackend = struct {
             .context = self.context.descriptor(),
             .surface = self.context.surface(),
         }) catch |err| {
-            diagnostics.logError("OpenGL surface attach failed", err);
+            diagnostics.logError("OpenGL surface attach failed", err, null);
             return types.AppError.SurfaceAttachFailed;
         };
         return .{ .surface = surface };

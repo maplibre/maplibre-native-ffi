@@ -1046,6 +1046,44 @@ auto set_resource_transform(
   return MLN_STATUS_OK;
 }
 
+auto resource_transform_response_set_url(
+  mln_resource_transform_response* response, const char* url, size_t url_size
+) -> mln_status {
+  if (response == nullptr) {
+    set_thread_error("resource transform response must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (response->size < sizeof(mln_resource_transform_response)) {
+    set_thread_error("mln_resource_transform_response.size is too small");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (url == nullptr && url_size != 0) {
+    set_thread_error("resource transform response URL must not be null");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  if (url_size != 0 && std::memchr(url, '\0', url_size) != nullptr) {
+    set_thread_error("resource transform response URL contains embedded NUL");
+    return MLN_STATUS_INVALID_ARGUMENT;
+  }
+  auto* const replacement_url = static_cast<std::string*>(response->context);
+  if (replacement_url == nullptr) {
+    set_thread_error(
+      "resource transform response URL can only be set during a transform "
+      "callback"
+    );
+    return MLN_STATUS_INVALID_STATE;
+  }
+  if (url_size == 0) {
+    replacement_url->clear();
+    response->url = nullptr;
+    return MLN_STATUS_OK;
+  }
+
+  replacement_url->assign(url, url_size);
+  response->url = replacement_url->c_str();
+  return MLN_STATUS_OK;
+}
+
 auto clear_resource_transform(mln_runtime* runtime) -> mln_status {
   const auto status = validate_runtime(runtime);
   if (status != MLN_STATUS_OK) {
@@ -2491,7 +2529,9 @@ auto invoke_resource_transform(
   }
 
   auto response = mln_resource_transform_response{
-    .size = sizeof(mln_resource_transform_response), .url = nullptr
+    .size = sizeof(mln_resource_transform_response),
+    .url = nullptr,
+    .context = &out_replacement_url,
   };
   try {
     const auto status =

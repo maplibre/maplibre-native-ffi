@@ -19,7 +19,7 @@ unix_default_inline_shell_args = "pixi run --locked -x bash -e -lc"
 activate_aggressive = true
 
 [monorepo]
-config_roots = ["bindings/*", "examples/*", "docs"]
+config_roots = [".devcontainer", "bindings/*", "examples/*", "docs"]
 
 [tools]
 # General tooling
@@ -74,8 +74,7 @@ MLN_FFI_TEST_TIMEOUT = "{{env.MLN_FFI_TEST_TIMEOUT | default(value=\"30s\")}}"
 
 [hooks]
 postinstall = [
-  "git submodule sync --recursive third_party/maplibre-native",
-  "git submodule update --init --recursive --depth 1 third_party/maplibre-native",
+  { task = "sync-submodules" },
   "hk install --mise --quiet",
   "pixi install --locked --quiet",
   # conda-forge ships libclang-13.dll, but clang-sys on Windows searches for libclang.dll.
@@ -83,7 +82,9 @@ postinstall = [
   # https://github.com/conda-forge/llvmdev-feedstock/issues/376
   "{% if os() == \"windows\" %}cp \"$CONDA_PREFIX/Library/bin/libclang-13.dll\" \"$CONDA_PREFIX/Library/bin/libclang.dll\"{% endif %}",
   "uv sync --locked --quiet",
-  "cd docs && pnpm install --frozen-lockfile --loglevel warn",
+  "pnpm install --frozen-lockfile --loglevel warn",
+  # Astro type stubs for vp typeCheck on docs sources (.astro/ is gitignored).
+  "pnpm --filter docs exec astro sync",
 ]
 
 [tasks.configure]

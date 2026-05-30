@@ -130,10 +130,10 @@ Resource providers copy request data before user code can retain it. A handled
 `ResourceRequestHandle` owns the provider request reference, supports completion
 during the callback or later from an allowed thread, enforces one-shot
 completion, and releases exactly once. Pass-through requests return immediately
-and do not retain the native request handle. Resource transform callbacks keep
-replacement URL storage alive until native consumes it. Custom geometry
-callbacks track active upcalls and delay state release until in-flight callbacks
-finish.
+and do not retain the native request handle. Resource transform callbacks pass
+replacement URLs through the C API response helper before returning. Custom
+geometry callbacks track active upcalls and delay state release until in-flight
+callbacks finish.
 
 ## Render Targets
 

@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+#MISE description="Init only MapLibre Native submodules required for maplibre-native-ffi builds"
+set -euo pipefail
+
+repo_root="${MLN_FFI_REPO_ROOT:-$(git rev-parse --show-toplevel)}"
+mln_path="third_party/maplibre-native"
+
+cd "$repo_root"
+
+# Paths relative to the maplibre-native submodule (not the FFI repo root).
+# Nested test/mason/glfw trees inside these repos are not fetched (submodule.recurse=false).
+vendor_paths=(
+  vendor/earcut.hpp # polygon triangulation
+  vendor/polylabel # polygon label placement
+  vendor/protozero # MVT / glyph PBF
+  vendor/vector-tile # MVT decode headers
+  vendor/wagyu # geometry clipping
+  vendor/unique_resource # OpenGL headless RAII
+  vendor/boost # header-only utilities
+  vendor/rapidjson # style JSON (not thirdparty/gtest)
+  vendor/eternal # interned strings
+  vendor/expected-lite # expected<> types
+  vendor/filesystem # ghc::filesystem shim
+  vendor/unordered_dense # hash maps
+  vendor/supercluster # clustering
+  vendor/kdbush.hpp # spatial index
+  vendor/PMTiles # PMTiles headers (MLN_WITH_PMTILES)
+  vendor/maplibre-tile-spec # mlt-cpp (MLT JSON/FASTPFOR/TESTS off in FFI)
+  vendor/maplibre-native-base/deps/cheap-ruler-cpp
+  vendor/maplibre-native-base/deps/geojson-vt-cpp
+  vendor/maplibre-native-base/deps/geojson.hpp
+  vendor/maplibre-native-base/deps/geometry.hpp
+  vendor/maplibre-native-base/deps/shelf-pack-cpp
+  vendor/maplibre-native-base/deps/variant
+  vendor/maplibre-native-base/deps/jni.hpp # configure-time base dep
+  vendor/maplibre-native-base/deps/pixelmatch-cpp # configure-time base dep
+  vendor/freetype # text shaping (MLN_TEXT_SHAPING_HARFBUZZ)
+  vendor/harfbuzz
+  vendor/Vulkan-Headers # Vulkan headers + Zig bindgen include path
+  vendor/VulkanMemoryAllocator
+  vendor/glslang # SPIR-V toolchain (MLN_WITH_VULKAN)
+)
+
+# Skipped by design (full MapLibre tree only): googletest, benchmark, cpp-httplib, args,
+# zip-archive, webgpu-cpp, wgpu-native, docs/doxygen, platform/windows/vendor/vcpkg, and
+# nested .mason / test fixture / glfw submodules under the paths above.
+
+git -c submodule.recurse=false submodule sync "$mln_path"
+git -c submodule.recurse=false submodule update --init --depth 1 "$mln_path"
+
+git -C "$mln_path" -c submodule.recurse=false submodule sync "${vendor_paths[@]}"
+git -C "$mln_path" -c submodule.recurse=false submodule update --init --depth 1 "${vendor_paths[@]}"

@@ -128,7 +128,9 @@ retain them, invoke Java through JavaCPP's callback machinery, and convert
 thrown Java exceptions or errors to the C callback's documented result. Java
 exceptions never unwind through C frames.
 
-Resource provider callbacks copy requests into Java `ResourceRequest` values.
+Resource transform callbacks copy request URLs before invoking Java and pass
+replacement URLs through the C API response helper before returning. Resource
+provider callbacks copy requests into Java `ResourceRequest` values.
 `ResourceRequestHandle` owns the native request reference while Java handles it,
 enforces one-shot completion, and releases the reference exactly once.
 Completion may occur during the callback or later from another thread when the C

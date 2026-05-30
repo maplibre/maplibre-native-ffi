@@ -251,7 +251,7 @@ const VulkanOwnedTextureBackend = struct {
             .extent = render_target.extent(viewport),
             .context = vulkanContextDescriptor(&self.compositor.context),
         }) catch |err| {
-            diagnostics.logError("Vulkan texture attach failed", err);
+            diagnostics.logError("Vulkan texture attach failed", err, null);
             return types.AppError.TextureAttachFailed;
         };
         return .{ .texture = texture };
@@ -265,16 +265,16 @@ const VulkanOwnedTextureBackend = struct {
         var frame = texture.acquireVulkanOwnedTextureFrame() catch |err| switch (err) {
             error.InvalidState => return false,
             else => {
-                diagnostics.logError("Vulkan texture acquire failed", err);
+                diagnostics.logError("Vulkan texture acquire failed", err, null);
                 return types.AppError.BackendDrawFailed;
             },
         };
-        errdefer frame.release() catch |err| diagnostics.logError("Vulkan texture release failed", err);
+        errdefer frame.release() catch |err| diagnostics.logError("Vulkan texture release failed", err, null);
 
         const info = try frame.info();
         const image_view: c.VkImageView = @ptrCast(info.image_view.ptr);
         if (!try self.compositor.presentImageView(image_view)) {
-            frame.release() catch |err| diagnostics.logError("Vulkan texture release failed", err);
+            frame.release() catch |err| diagnostics.logError("Vulkan texture release failed", err, null);
             return false;
         }
 
@@ -283,7 +283,7 @@ const VulkanOwnedTextureBackend = struct {
     }
 
     fn releasePendingFrame(self: *VulkanOwnedTextureBackend) void {
-        if (self.pending_frame) |*frame| frame.release() catch |err| diagnostics.logError("Vulkan texture release failed", err);
+        if (self.pending_frame) |*frame| frame.release() catch |err| diagnostics.logError("Vulkan texture release failed", err, null);
         self.pending_frame = null;
     }
 };
@@ -419,7 +419,7 @@ const VulkanBorrowedTextureBackend = struct {
             .initial_layout = c.VK_IMAGE_LAYOUT_UNDEFINED,
             .final_layout = c.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
         }) catch |err| {
-            diagnostics.logError("Vulkan borrowed texture attach failed", err);
+            diagnostics.logError("Vulkan borrowed texture attach failed", err, null);
             return types.AppError.TextureAttachFailed;
         };
         return .{ .texture = texture };
@@ -461,7 +461,7 @@ const VulkanSurfaceBackend = struct {
             .context = vulkanContextDescriptor(&self.context),
             .surface = .{ .ptr = @ptrCast(self.context.surface.?) },
         }) catch |err| {
-            diagnostics.logError("Vulkan surface attach failed", err);
+            diagnostics.logError("Vulkan surface attach failed", err, null);
             return types.AppError.SurfaceAttachFailed;
         };
         return .{ .surface = surface };

@@ -1,0 +1,4 @@
+package org.maplibre.nativeffi.render
+
+/** OpenGL platform context provider data for OpenGL render targets. */
+public sealed interface OpenGLContextDescriptor

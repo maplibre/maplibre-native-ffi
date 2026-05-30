@@ -7,15 +7,19 @@ namespace Maplibre.Native.Internal.Memory;
 internal sealed unsafe class NativeUtf8String : IDisposable
 {
     private nint pointer;
+    private readonly nuint byteLength;
 
-    private NativeUtf8String(nint pointer)
+    private NativeUtf8String(nint pointer, nuint byteLength)
     {
         this.pointer = pointer;
+        this.byteLength = byteLength;
     }
 
-    internal static NativeUtf8String Null { get; } = new(0);
+    internal static NativeUtf8String Null { get; } = new(0, 0);
 
     internal sbyte* Pointer => (sbyte*)pointer;
+
+    internal nuint ByteLength => byteLength;
 
     internal static NativeUtf8String FromNullableString(string? value, string parameterName)
     {
@@ -38,7 +42,7 @@ internal sealed unsafe class NativeUtf8String : IDisposable
         {
             Encoding.UTF8.GetBytes(value, new Span<byte>(allocation, byteCount));
             allocation[byteCount] = 0;
-            return new NativeUtf8String((nint)allocation);
+            return new NativeUtf8String((nint)allocation, (nuint)byteCount);
         }
         catch
         {

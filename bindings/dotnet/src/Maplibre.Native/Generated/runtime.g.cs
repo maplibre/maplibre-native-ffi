@@ -440,6 +440,8 @@ namespace Maplibre.Native.Internal.C
 
         [NativeTypeName("const char *")]
         public sbyte* url;
+
+        public void* context;
     }
 
     internal unsafe partial struct mln_resource_transform
@@ -570,6 +572,9 @@ namespace Maplibre.Native.Internal.C
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern mln_status mln_network_status_set([NativeTypeName("uint32_t")] uint status);
+
+        [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
+        public static extern mln_status mln_resource_transform_response_set_url(mln_resource_transform_response* response, [NativeTypeName("const char *")] sbyte* url, [NativeTypeName("size_t")] nuint url_size);
 
         [DllImport("maplibre-native-c", CallingConvention = CallingConvention.Cdecl, ExactSpelling = true)]
         public static extern mln_runtime_options mln_runtime_options_default();

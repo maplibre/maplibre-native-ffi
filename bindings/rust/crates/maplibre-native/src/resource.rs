@@ -1,13 +1,10 @@
 use std::cell::Cell;
-use std::collections::HashMap;
-use std::ffi::CString;
 use std::fmt;
 use std::marker::PhantomData;
 use std::os::raw::{c_char, c_void};
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::ptr;
-use std::sync::{Arc, Mutex};
-use std::thread::ThreadId;
+use std::sync::Arc;
 
 use maplibre_native_core as maplibre_core;
 use maplibre_native_sys as sys;
@@ -175,7 +172,6 @@ type ResourceTransformCallback =
 
 pub(crate) struct ResourceTransformState {
     callback: Box<ResourceTransformCallback>,
-    replacement_urls: Mutex<HashMap<ThreadId, CString>>,
 }
 
 impl fmt::Debug for ResourceTransformState {
@@ -192,7 +188,6 @@ impl ResourceTransformState {
     {
         Box::new(Self {
             callback: Box::new(callback),
-            replacement_urls: Mutex::new(HashMap::new()),
         })
     }
 
@@ -233,33 +228,20 @@ impl ResourceTransformState {
 
         match replacement {
             Some(replacement) if !replacement.is_empty() => {
-                let replacement = match CString::new(replacement) {
-                    Ok(replacement) => replacement,
-                    Err(_) => return sys::MLN_STATUS_INVALID_ARGUMENT,
-                };
-                let replacement_ptr = replacement.as_ptr();
-                let mut replacements = match self.replacement_urls.lock() {
-                    Ok(replacements) => replacements,
-                    Err(_) => return sys::MLN_STATUS_NATIVE_ERROR,
-                };
-                replacements.insert(std::thread::current().id(), replacement);
-                // SAFETY: out_response was checked non-null above. The stored
-                // CString is retained in replacement_urls until the next
-                // callback on this thread or until state teardown, so it
-                // remains live after this trampoline returns while C copies it.
+                // SAFETY: out_response was checked by
+                // initialize_resource_transform_response. The helper copies the
+                // temporary Rust string into C API-managed callback scratch
+                // storage that remains live while native copies it after this
+                // trampoline returns.
                 unsafe {
-                    (*out_response).url = replacement_ptr;
-                }
-                sys::MLN_STATUS_OK
-            }
-            _ => {
-                if let Ok(mut replacements) = self.replacement_urls.lock() {
-                    replacements.remove(&std::thread::current().id());
-                    sys::MLN_STATUS_OK
-                } else {
-                    sys::MLN_STATUS_NATIVE_ERROR
+                    sys::mln_resource_transform_response_set_url(
+                        out_response,
+                        replacement.as_ptr().cast(),
+                        replacement.len(),
+                    )
                 }
             }
+            _ => sys::MLN_STATUS_OK,
         }
     }
 }
@@ -281,7 +263,7 @@ unsafe extern "C" fn resource_transform_trampoline(
 
 #[cfg(test)]
 mod tests {
-    use std::ffi::CStr;
+    use std::ffi::CString;
     use std::sync::Mutex as StdMutex;
     use std::sync::atomic::{AtomicBool, AtomicI32, AtomicUsize, Ordering};
 
@@ -371,6 +353,7 @@ mod tests {
         sys::mln_resource_transform_response {
             size: std::mem::size_of::<sys::mln_resource_transform_response>() as u32,
             url: ptr::null(),
+            context: ptr::null_mut(),
         }
     }
 
@@ -538,12 +521,12 @@ mod tests {
     }
 
     #[test]
-    fn transform_callback_copies_request_and_keeps_replacement_url_alive() {
+    fn transform_callback_copies_request_when_keeping_original_url() {
         let state = ResourceTransformState::new(|request| {
             assert_eq!(request.kind, ResourceKind::Style);
             assert_eq!(request.raw_kind, sys::MLN_RESOURCE_KIND_STYLE);
             assert_eq!(request.url, "https://example.test/style.json");
-            Some(format!("{}?token=1", request.url))
+            None
         });
         let descriptor = state.descriptor();
         let callback = descriptor.callback.unwrap();
@@ -560,9 +543,7 @@ mod tests {
         };
 
         assert_eq!(status, sys::MLN_STATUS_OK);
-        assert!(!response.url.is_null());
-        let replacement = unsafe { CStr::from_ptr(response.url) }.to_str().unwrap();
-        assert_eq!(replacement, "https://example.test/style.json?token=1");
+        assert!(response.url.is_null());
     }
 
     #[test]
@@ -650,9 +631,9 @@ mod tests {
         let state = Arc::new(ResourceTransformState {
             callback: Box::new(move |request| {
                 callback_calls.fetch_add(1, Ordering::SeqCst);
-                Some(format!("{}?thread=1", request.url))
+                let _ = request;
+                None
             }),
-            replacement_urls: Mutex::new(HashMap::new()),
         });
 
         let handles = (0..2)
@@ -672,9 +653,7 @@ mod tests {
                         )
                     };
                     assert_eq!(status, sys::MLN_STATUS_OK);
-                    assert!(!response.url.is_null());
-                    let replacement = unsafe { CStr::from_ptr(response.url) }.to_str().unwrap();
-                    assert_eq!(replacement, "https://example.test/tile?thread=1");
+                    assert!(response.url.is_null());
                 })
             })
             .collect::<Vec<_>>();

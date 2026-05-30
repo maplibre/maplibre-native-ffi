@@ -17,6 +17,7 @@ public final class OpenGLOwnedTextureFrameHandle implements AutoCloseable {
   private final MaplibreNativeC.mln_opengl_owned_texture_frame nativeFrame;
   private final FrameScope scope;
   private final OpenGLOwnedTextureFrame frame;
+  private final FrameHandleLeakReport.Registration leakRegistration;
   private boolean closed;
 
   OpenGLOwnedTextureFrameHandle(
@@ -28,6 +29,7 @@ public final class OpenGLOwnedTextureFrameHandle implements AutoCloseable {
     this.nativeFrame = Objects.requireNonNull(nativeFrame, "nativeFrame");
     this.scope = Objects.requireNonNull(scope, "scope");
     this.frame = Objects.requireNonNull(frame, "frame");
+    this.leakRegistration = FrameHandleLeakReport.register(this, "OpenGLOwnedTextureFrameHandle");
   }
 
   public OpenGLOwnedTextureFrame frame() {
@@ -44,8 +46,26 @@ public final class OpenGLOwnedTextureFrameHandle implements AutoCloseable {
     if (closed) {
       return;
     }
-    session.releaseOpenGLFrame(nativeFrame, null);
+    try {
+      session.releaseOpenGLFrame(nativeFrame, null);
+    } catch (Throwable releaseFailure) {
+      if (session.isClosed()) {
+        closeLocal();
+        return;
+      }
+      // Keep local frame state live when native release fails so callers can retry.
+      throw releaseFailure;
+    }
+    closeLocal();
+  }
+
+  private void closeLocal() {
+    if (closed) {
+      return;
+    }
     closed = true;
+    leakRegistration.report().markClosed();
+    leakRegistration.cleanable().clean();
     try {
       scope.close();
     } finally {

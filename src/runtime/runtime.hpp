@@ -95,6 +95,9 @@ auto set_resource_provider(
 auto set_resource_transform(
   mln_runtime* runtime, const mln_resource_transform* transform
 ) -> mln_status;
+auto resource_transform_response_set_url(
+  mln_resource_transform_response* response, const char* url, size_t url_size
+) -> mln_status;
 auto clear_resource_transform(mln_runtime* runtime) -> mln_status;
 auto invoke_resource_transform(
   void* platform_context, uint32_t kind, const char* url,

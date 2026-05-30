@@ -289,12 +289,10 @@ pub const ResourceTransformRequest = struct {
 };
 
 pub const ResourceTransformResponse = struct {
-    /// Replacement URL borrowed by native code during the current callback invocation.
+    /// Replacement URL copied by the binding before the native callback returns.
     ///
-    /// Safety: when set, the pointed-to null-terminated storage must remain valid
-    /// after the handler returns until native code copies it before completing the
-    /// current transform invocation. String literals and context-owned storage are
-    /// suitable; stack or temporary formatted buffers are not.
+    /// The pointed-to storage only needs to remain valid for the handler call;
+    /// string literals and context-owned storage are suitable.
     replacement_url: ?[:0]const u8 = null,
 };
 
@@ -1311,17 +1309,21 @@ fn resourceTransformTrampoline(
     out_response: [*c]c.mln_resource_transform_response,
 ) callconv(.c) c.mln_status {
     const transform: *ResourceTransform = @ptrCast(@alignCast(user_data orelse return c.MLN_STATUS_INVALID_ARGUMENT));
+    const native_response = out_response orelse return c.MLN_STATUS_INVALID_ARGUMENT;
+    native_response.*.size = @sizeOf(c.mln_resource_transform_response);
+    native_response.*.url = null;
     const copied_url = std.heap.smp_allocator.dupe(u8, if (url == null) "" else std.mem.span(url)) catch return c.MLN_STATUS_NATIVE_ERROR;
     defer std.heap.smp_allocator.free(copied_url);
     const response = transform.handler(transform.context, .{
         .kind = ResourceKind.fromRaw(kind),
         .url = copied_url,
     });
-    if (out_response) |native_response| {
-        native_response.* = .{
-            .size = @sizeOf(c.mln_resource_transform_response),
-            .url = if (response.replacement_url) |replacement_url| replacement_url.ptr else null,
-        };
+    if (response.replacement_url) |replacement_url| {
+        return c.mln_resource_transform_response_set_url(
+            native_response,
+            replacement_url.ptr,
+            replacement_url.len,
+        );
     }
     return c.MLN_STATUS_OK;
 }
