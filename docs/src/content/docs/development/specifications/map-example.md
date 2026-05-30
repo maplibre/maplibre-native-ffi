@@ -192,8 +192,10 @@ Each backend variant implements, at minimum:
 Order MUST be:
 
 1. Parse CLI and validate selected render mode.
-2. Validate that the loaded native library supports the graphics backend(s) this
-   binary targets; fail fast with a readable message if not.
+2. Read and log the loaded library's supported native render backends from
+   `mln_supported_render_backend_mask()`, then validate that the loaded native
+   library supports the graphics backend(s) this binary targets; fail fast with
+   a readable message if not.
 3. Create the window (initial size [Window](#window)).
 4. Initialize the graphics backend for the selected mode.
 5. Create runtime (`:memory:` cache).
@@ -203,7 +205,6 @@ Order MUST be:
 9. Print startup information:
    - active render-target mode CLI value
    - active render-target status line
-   - supported native render backends from `mln_supported_render_backend_mask()`
    - control help
 
 On failure after partial setup, release already-created handles in reverse order

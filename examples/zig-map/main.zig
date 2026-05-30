@@ -16,7 +16,7 @@ const Backend = render.Backend;
 
 pub fn main(init_args: std.process.Init) !void {
     const target_mode = (try parseRenderTargetMode(init_args)) orelse return;
-    const native_render_backend_support = try validateNativeRenderBackend();
+    try validateNativeRenderBackend();
 
     try maplibre.setLogCallback(.{ .handler = diagnostics.logRecord }, null);
     defer maplibre.clearLogCallback(null) catch {};
@@ -73,7 +73,7 @@ pub fn main(init_args: std.process.Init) !void {
         std.debug.print("failed to finish final frame: {s}\n", .{@errorName(err)});
     };
 
-    printStartupStatus(target_mode, native_render_backend_support);
+    printStartupStatus(target_mode);
     input.logControls();
 
     var running = true;
@@ -144,24 +144,20 @@ pub fn main(init_args: std.process.Init) !void {
     }
 }
 
-fn validateNativeRenderBackend() !maplibre.RenderBackendSupport {
+fn validateNativeRenderBackend() !void {
     const support = maplibre.supportedRenderBackends();
+    var support_label_buffer: [32]u8 = undefined;
+    std.debug.print("native render backends: {s}\n", .{
+        renderBackendSupportLabel(&support_label_buffer, support),
+    });
     if (build_options.supports_metal and !support.metal) return error.NativeRenderBackendMismatch;
     if (build_options.supports_opengl and !support.opengl) return error.NativeRenderBackendMismatch;
     if (build_options.supports_vulkan and !support.vulkan) return error.NativeRenderBackendMismatch;
-    return support;
 }
 
-fn printStartupStatus(
-    target_mode: types.RenderTargetMode,
-    native_render_backend_support: maplibre.RenderBackendSupport,
-) void {
-    var support_label_buffer: [32]u8 = undefined;
+fn printStartupStatus(target_mode: types.RenderTargetMode) void {
     std.debug.print("render target: {s}\n", .{target_mode.label()});
     std.debug.print("render target status: {s}\n", .{target_mode.statusLine()});
-    std.debug.print("native render backends: {s}\n", .{
-        renderBackendSupportLabel(&support_label_buffer, native_render_backend_support),
-    });
 }
 
 fn renderBackendSupportLabel(buffer: []u8, support: maplibre.RenderBackendSupport) []const u8 {
