@@ -125,7 +125,7 @@ pub fn main(init_args: std.process.Init) !void {
         try backend.finishFrame();
 
         if (render_pending) {
-            if (try map.target.renderUpdate()) {
+            if (try map.target.renderUpdate(map.diagnostic_store)) {
                 render_pending = false;
                 did_work = true;
                 switch (map.target) {

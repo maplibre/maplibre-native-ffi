@@ -63,7 +63,7 @@ pub const MapState = struct {
     }
 
     pub fn resize(self: *MapState, viewport: types.Viewport) !void {
-        self.target.resize(viewport) catch |err| {
+        self.target.resize(viewport, self.diagnostic_store) catch |err| {
             diagnostics.logError("render target resize failed", err, self.diagnostic_store);
             return err;
         };

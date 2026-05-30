@@ -22,6 +22,13 @@
 - Setup and camera failure logs printed only Zig error names. Map state now owns
   a stable diagnostic store and setup/camera paths include native status details
   when the C API reports them.
+- Render-session resize/render-update diagnostics were dropped at the
+  render-target wrapper. The wrapper now accepts the map state's diagnostic
+  store for native failure reporting.
+- The specification did not define the invalid-argument exit code and mixed
+  early backend validation with later startup reporting. It now specifies exit
+  `1` for invalid arguments and separates validation from startup information
+  printing.
 
 ## Deferred/needs follow-up
 

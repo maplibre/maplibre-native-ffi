@@ -106,8 +106,9 @@ The process MUST accept a render-target mode name:
 The mode is a required positional argument (for example
 `zig-map owned-texture`). There is no default mode.
 
-On `--help` or invalid arguments, print usage listing the three mode names and
-exit before creating a window.
+On `--help`, print usage listing the three mode names and exit `0` before
+creating a window. On invalid arguments, print usage listing the three mode
+names and exit `1` before creating a window.
 
 ### Other flags
 
@@ -190,7 +191,7 @@ Each backend variant implements, at minimum:
 
 Order MUST be:
 
-1. Parse CLI; exit on help or invalid mode.
+1. Parse CLI; exit `0` on help, or print usage and exit `1` on invalid mode.
 2. Validate that the loaded native library supports the graphics backend(s) this
    binary targets; fail fast with a readable message if not.
 3. Create the window (initial size [Window](#window)).
@@ -199,10 +200,11 @@ Order MUST be:
 6. Create map with extent from the initial viewport and continuous mode.
 7. Load style and apply initial camera.
 8. Attach render session for the selected mode.
-9. Print:
-   - render-target mode and status line
-   - control help
+9. Print startup information:
+   - active render-target mode CLI value
+   - active render-target status line
    - supported native render backends from `mln_supported_render_backend_mask()`
+   - control help
 
 On failure after partial setup, release already-created handles in reverse order
 (session → map → runtime → graphics).
