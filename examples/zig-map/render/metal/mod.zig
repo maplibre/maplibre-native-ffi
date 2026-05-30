@@ -195,7 +195,7 @@ const MetalTextureCompositor = struct {
         encoder.msgSend(void, "drawPrimitives:vertexStart:vertexCount:", .{
             @as(u64, MTLPrimitiveTypeTriangle),
             @as(c_ulong, 0),
-            @as(c_ulong, 6),
+            @as(c_ulong, 3),
         });
         encoder.msgSend(void, "endEncoding", .{});
         command_buffer.msgSend(void, "presentDrawable:", .{drawable});
@@ -229,7 +229,7 @@ const MetalOwnedTextureBackend = struct {
             .extent = render_target.extent(viewport),
             .context = .{ .device = .{ .ptr = self.compositor.view.device.value.? } },
         }) catch |err| {
-            diagnostics.logError("Metal texture attach failed", err);
+            diagnostics.logError("Metal texture attach failed", err, null);
             return types.AppError.TextureAttachFailed;
         };
         return .{ .texture = texture };
@@ -243,11 +243,11 @@ const MetalOwnedTextureBackend = struct {
         var frame = texture.acquireMetalOwnedTextureFrame() catch |err| switch (err) {
             error.InvalidState => return false,
             else => {
-                diagnostics.logError("Metal texture acquire failed", err);
+                diagnostics.logError("Metal texture acquire failed", err, null);
                 return types.AppError.BackendDrawFailed;
             },
         };
-        defer frame.release() catch |err| diagnostics.logError("Metal texture release failed", err);
+        defer frame.release() catch |err| diagnostics.logError("Metal texture release failed", err, null);
 
         const info = try frame.info();
         return try self.compositor.drawMetalTexture(info.texture.ptr);
@@ -288,7 +288,7 @@ const MetalBorrowedTextureBackend = struct {
             .extent = render_target.extent(viewport),
             .texture = .{ .ptr = self.borrowed_texture.value.? },
         }) catch |err| {
-            diagnostics.logError("Metal borrowed texture attach failed", err);
+            diagnostics.logError("Metal borrowed texture attach failed", err, null);
             return types.AppError.TextureAttachFailed;
         };
         return .{ .texture = texture };
@@ -327,7 +327,7 @@ const MetalSurfaceBackend = struct {
             .context = .{ .device = .{ .ptr = self.view.device.value.? } },
             .layer = .{ .ptr = self.view.layer.value.? },
         }) catch |err| {
-            diagnostics.logError("Metal surface attach failed", err);
+            diagnostics.logError("Metal surface attach failed", err, null);
             return types.AppError.SurfaceAttachFailed;
         };
         return .{ .surface = surface };

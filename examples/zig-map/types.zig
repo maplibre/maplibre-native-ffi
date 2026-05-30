@@ -46,4 +46,12 @@ pub const RenderTargetMode = enum {
             .native_surface => "native-surface",
         };
     }
+
+    pub fn statusLine(self: RenderTargetMode) []const u8 {
+        return switch (self) {
+            .owned_texture => "samples MapLibre-owned texture frames into the host swapchain",
+            .borrowed_texture => "renders into a host-owned texture, then samples it into the host swapchain",
+            .native_surface => "renders directly to the host window surface",
+        };
+    }
 };

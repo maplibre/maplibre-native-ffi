@@ -20,11 +20,11 @@ pub const Session = union(enum) {
         switch (self.*) {
             .none => return types.AppError.TextureResizeFailed,
             .texture => |*texture| texture.resize(extent(viewport)) catch |err| {
-                diagnostics.logError("texture resize failed", err);
+                diagnostics.logError("texture resize failed", err, null);
                 return types.AppError.TextureResizeFailed;
             },
             .surface => |*surface| surface.resize(extent(viewport)) catch |err| {
-                diagnostics.logError("surface resize failed", err);
+                diagnostics.logError("surface resize failed", err, null);
                 return types.AppError.SurfaceResizeFailed;
             },
         }
@@ -37,7 +37,7 @@ pub const Session = union(enum) {
                 texture.renderUpdate() catch |err| switch (err) {
                     error.InvalidState => return false,
                     else => {
-                        diagnostics.logError("texture render failed", err);
+                        diagnostics.logError("texture render failed", err, null);
                         return types.AppError.TextureRenderFailed;
                     },
                 };
@@ -47,7 +47,7 @@ pub const Session = union(enum) {
                 surface.renderUpdate() catch |err| switch (err) {
                     error.InvalidState => return false,
                     else => {
-                        diagnostics.logError("surface render failed", err);
+                        diagnostics.logError("surface render failed", err, null);
                         return types.AppError.SurfaceRenderFailed;
                     },
                 };
