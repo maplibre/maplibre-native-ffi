@@ -23,6 +23,9 @@ interop or the popular MapLibre Android/iOS SDKs.
 # Install/refresh all tools, submodules, and dependencies
 mise install
 
+# List available tasks across the workspace
+mise tasks --all
+
 # Build the native library (also runs configure)
 mise run build
 

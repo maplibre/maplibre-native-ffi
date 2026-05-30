@@ -93,18 +93,14 @@ pub fn drainEvents(
     while (try runtime.pollEventOwned(allocator)) |event_value| {
         var event = event_value;
         defer event.deinit();
-        if (event.source_type == .map and event.source_id != null and std.meta.eql(event.source_id.?, map_id) and
-            event.event_type == .map_render_update_available)
-        {
-            render_update_available = true;
-        }
-        if (event.source_type == .map and event.source_id != null and std.meta.eql(event.source_id.?, map_id) and
-            event.event_type == .map_render_frame_finished)
-        {
-            switch (event.payload) {
+        if (event.source_type != .map or event.source_id == null or !std.meta.eql(event.source_id.?, map_id)) continue;
+        switch (event.event_type) {
+            .map_render_update_available => render_update_available = true,
+            .map_render_frame_finished => switch (event.payload) {
                 .render_frame => |frame| render_update_available = render_update_available or frame.needs_repaint,
                 else => {},
-            }
+            },
+            else => {},
         }
     }
     return render_update_available;
