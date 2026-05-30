@@ -259,6 +259,10 @@ const PlatformOpenGLBackend = union(enum) {
         };
     }
 
+    pub fn viewportMode(_: *const PlatformOpenGLBackend) maplibre.ViewportMode {
+        return .default;
+    }
+
     pub fn finishFrame(self: *PlatformOpenGLBackend) !void {
         switch (self.*) {
             .owned_texture => |*backend| try backend.finishFrame(),

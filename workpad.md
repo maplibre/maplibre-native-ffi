@@ -16,6 +16,9 @@
 - The Metal compositor used two triangles and flipped UVs. The specification
   requires a fullscreen triangle and a straight texture copy with standard UV
   orientation.
+- Metal texture modes rendered vertically mirrored after the compositor stopped
+  flipping UVs. The example now keeps the compositor as a straight copy and
+  requests MapLibre's flipped-Y viewport transform for Metal texture targets.
 - The shader compilation task failed for non-Vulkan variants before the OpenGL
   build could run. The task now performs work only for Vulkan without exiting
   the shell early.

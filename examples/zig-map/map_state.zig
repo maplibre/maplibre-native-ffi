@@ -39,6 +39,7 @@ pub const MapState = struct {
 
         try loadStyle(allocator, &map, diagnostic_store);
         try setCamera(&map, diagnostic_store);
+        try setViewportMode(&map, backend, diagnostic_store);
 
         var target = backend.attachRenderTarget(&map, viewport) catch |err| {
             diagnostics.logError("render target attach failed", err, diagnostic_store);
@@ -133,5 +134,16 @@ fn setCamera(
     }) catch |err| {
         diagnostics.logError("camera jump failed", err, diagnostic_store);
         return types.AppError.CameraJumpFailed;
+    };
+}
+
+fn setViewportMode(
+    map: *maplibre.MapHandle,
+    backend: anytype,
+    diagnostic_store: *const maplibre.DiagnosticStore,
+) !void {
+    map.setViewportOptions(.{ .viewport_mode = backend.viewportMode() }) catch |err| {
+        diagnostics.logError("map viewport mode failed", err, diagnostic_store);
+        return types.AppError.MapSetupFailed;
     };
 }
