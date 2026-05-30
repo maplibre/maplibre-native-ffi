@@ -205,11 +205,7 @@ fn parseRenderTargetMode(init_args: std.process.Init) !?types.RenderTargetMode {
         printUsage();
         std.process.exit(1);
     };
-    while (args.next()) |arg| {
-        if (std.mem.eql(u8, arg, "--help")) {
-            printUsage();
-            return null;
-        }
+    while (args.next()) |_| {
         printUsage();
         std.process.exit(1);
     }
