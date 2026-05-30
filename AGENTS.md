@@ -100,8 +100,10 @@ safety rules, and hard boundaries.
   C/C++ layer.
 - For tests that _must_ reach below the bindings, there are dedicated tests in
   src/c_api/tests.
-- Other bindings (Rust, Java, Swift, etc) avoid writing redundant tests to test
-  the C/C++ layer logic; their tests focus on validating their bindings.
+- Other bindings (Rust, Java, Swift, etc) should include useful integration
+  tests that validate binding behavior through the native C/C++ layer.
+  Incidental native coverage from those integration tests is acceptable; chasing
+  duplicate full C/C++ coverage in every binding is unnecessary.
 - Avoid trivial tests, tests that verify constants, tests that assert a negative
   (unless valuable), tests that simply test third party code; we want to keep
   our test suite robust and high-value.
