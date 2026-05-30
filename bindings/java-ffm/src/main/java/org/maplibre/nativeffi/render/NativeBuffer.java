@@ -3,10 +3,14 @@ package org.maplibre.nativeffi.render;
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
+import java.lang.ref.Cleaner;
 
 /** Explicit off-heap byte buffer for reusable native readback and upload storage. */
 public final class NativeBuffer implements AutoCloseable {
-  private final Arena arena;
+  private static final Cleaner CLEANER = Cleaner.create();
+
+  private final NativeReference nativeReference;
+  private final Cleaner.Cleanable cleanable;
   private final MemorySegment segment;
   private final long byteLength;
 
@@ -16,7 +20,9 @@ public final class NativeBuffer implements AutoCloseable {
     if (byteLength < 0) {
       throw new IllegalArgumentException("byteLength must be non-negative");
     }
-    this.arena = Arena.ofShared();
+    var arena = Arena.ofShared();
+    this.nativeReference = new NativeReference(arena);
+    this.cleanable = CLEANER.register(this, nativeReference);
     this.byteLength = byteLength;
     this.segment = byteLength == 0 ? MemorySegment.NULL : arena.allocate(byteLength);
   }
@@ -63,6 +69,28 @@ public final class NativeBuffer implements AutoCloseable {
       return;
     }
     closed = true;
-    arena.close();
+    nativeReference.close();
+    cleanable.clean();
+  }
+
+  private static final class NativeReference implements Runnable {
+    private final Arena arena;
+    private boolean closed;
+
+    NativeReference(Arena arena) {
+      this.arena = arena;
+    }
+
+    synchronized void close() {
+      if (!closed) {
+        closed = true;
+        arena.close();
+      }
+    }
+
+    @Override
+    public void run() {
+      close();
+    }
   }
 }

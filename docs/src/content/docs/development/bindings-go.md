@@ -129,11 +129,12 @@ threads; callback implementations must be safe for that use and return quickly.
 Callbacks that need map or runtime methods hand work back to the owner thread
 before calling thread-affine APIs.
 
-Resource transforms copy request URLs before invoking Go and keep replacement
-URL storage alive until native consumes it. Resource providers copy request
-fields before user code can retain them. A handled resource request owns the C
-request reference, enforces one-shot completion, supports completion from any
-thread allowed by the C API, and releases the reference exactly once.
+Resource transforms copy request URLs before invoking Go and pass replacement
+URLs through the C API response helper before the callback returns. Resource
+providers copy request fields before user code can retain them. A handled
+resource request owns the C request reference, enforces one-shot completion,
+supports completion from any thread allowed by the C API, and releases the
+reference exactly once.
 
 ## Render Targets
 

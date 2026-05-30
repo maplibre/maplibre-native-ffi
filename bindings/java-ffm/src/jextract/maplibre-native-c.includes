@@ -425,6 +425,7 @@
 --include-function mln_resource_request_cancelled
 --include-function mln_resource_request_complete
 --include-function mln_resource_request_release
+--include-function mln_resource_transform_response_set_url
 --include-function mln_runtime_clear_resource_transform
 --include-function mln_runtime_create
 --include-function mln_runtime_destroy

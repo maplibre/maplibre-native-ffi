@@ -22,27 +22,6 @@ final class ResourceTransformStateTest {
   }
 
   @Test
-  void copiesReplacementUrlIntoNativeResponse() {
-    try (var state =
-            new ResourceTransformState(request -> Optional.of(request.url() + "?token=1"));
-        var arena = Arena.ofConfined()) {
-      var response = mln_resource_transform_response.allocate(arena);
-      var status =
-          mln_resource_transform_callback.invoke(
-              mln_resource_transform.callback(state.descriptor()),
-              MemorySegment.NULL,
-              ResourceKind.STYLE.nativeValue(),
-              MemoryUtil.allocateCString(arena, "https://example.test/style.json"),
-              response);
-
-      assertEquals(MapLibreNativeC.MLN_STATUS_OK(), status);
-      assertEquals(
-          "https://example.test/style.json?token=1",
-          MemoryUtil.copyCString(mln_resource_transform_response.url(response)));
-    }
-  }
-
-  @Test
   void clearsStaleResponseUrlWhenKeepingOriginalUrl() {
     try (var state = new ResourceTransformState(request -> Optional.empty());
         var arena = Arena.ofConfined()) {

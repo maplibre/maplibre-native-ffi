@@ -25,26 +25,27 @@ an internal namespace, and wrap it through small internal support packages for
 status conversion, diagnostics, descriptor materialization, memory helpers,
 callback state, and native-library loading.
 
-Kotlin/Native owns the initial implementation. Keep its public shape alignable
-with future Java FFM and JNI actual implementations, while keeping common
-declarations free of `kotlinx.cinterop` and platform pointer types. Use any
-shared `commonMain` declarations only for names, copied value models,
-exceptions, and expect declarations; adapters above this layer own coroutine,
-scheduler, rendering, and application policy.
+Kotlin/Native is the reference binding implementation for now. Prefer idiomatic
+Kotlin public APIs over matching the existing Java FFM or JNI surface. Build
+`nativeMain` without leaking cinterop or platform pointer types into public API.
+When a shared `commonMain` layer appears, put copied value models, exceptions,
+and platform-neutral API there; keep cinterop and platform bridge code in
+platform source sets. Adapters above this layer own coroutine, scheduler,
+rendering, and application policy.
 
 ## Public Surface
 
 Long-lived native objects use the shared `Handle` suffix. Public operations stay
-close to the Java FFM and JNI names where that preserves the C model, because
-these targets may become Kotlin Multiplatform actual implementations. Prefer
-Kotlin spelling for properties, builders, and nullability when it does not
+close to the C model and shared binding names unless idiomatic Kotlin spelling
+is clearer. Prefer Kotlin property and nullability conventions when they do not
 change the low-level contract.
 
 C option structs become Kotlin descriptor classes or data classes. Mutable
-field-mask descriptors use explicit setters, clearers, and presence checks.
-Immutable copied values use `data class` types where value equality is useful.
-Internal materializers write C `size` fields, masks, string views, arrays, and
-nested descriptors; callers set semantic fields only.
+field-mask descriptors use nullable public properties; optional validation lives
+in property setters where needed. Immutable copied values use `data class` types
+where value equality is useful. Internal materializers write C `size` fields,
+masks, string views, arrays, and nested descriptors; callers set semantic fields
+only.
 
 Closed C enum domains map to Kotlin enums with explicit raw conversions. Output
 domains that may grow preserve unknown raw values with a stable wrapper or
@@ -57,22 +58,34 @@ Public APIs use it only where the C API accepts opaque backend handles. Internal
 Kotlin/Native code converts between `NativePointer`, `COpaquePointer?`, and
 `NativePtr` at the cinterop boundary; `NativePtr` stays out of public APIs.
 
+Use signed `Int` and `Long` public values at the binding boundary, then validate
+before converting to unsigned native fields. Reject negative sizes, counts, enum
+sentinels, and unsigned numeric inputs that do not explicitly preserve native
+bit patterns with clear exceptions instead of wrapping them.
+
+Use `Long` for native `uint64_t` values that need Java-analogous API shape.
+Preserve the bit pattern for values that may use the full native range, such as
+`JsonValue.UInt`, `FeatureIdentifier.UInt`, offline operation IDs, render frame
+generation IDs, frame IDs, Metal pixel formats, byte ranges, and native pointer
+addresses. Document those fields as bit-pattern values on the public API.
+
 ## Handles, Status, and Threading
 
 Each handle stores the native pointer, release state, parent references needed
 for native validity, Kotlin callback state, and optional leak context.
 Successful `close()` releases the native object once and marks the wrapper
-closed; later `close()` calls no-op. If native destruction reports a status,
-`close()` reports that status through the public error mechanism and leaves the
-handle live when a retry is valid.
+closed; later `close()` calls no-op. Public releasable types implement
+`AutoCloseable` so callers may use stdlib `use { }` or explicit `try`/`finally`.
+If native destruction reports a status, `close()` reports that status through
+the public error mechanism and leaves the handle live when a retry is valid.
 
-Public fallible operations throw Kotlin `MaplibreException` subclasses aligned
-with the Java FFM and JNI error model. Each exception maps one C status category
-to a stable Kotlin type and carries the copied native diagnostic. Optional
-`Result<T>` helpers may wrap the throwing API. Read the thread-local diagnostic
-immediately after a non-OK C status on the same thread. Validate Kotlin-owned
-state before the C call: closed wrappers, active scoped borrows, one-shot
-resource completion, invalid string shapes, and callback lifetime.
+Public fallible operations throw Kotlin `MaplibreException` subclasses that map
+one C status category to a stable Kotlin type and carry the copied native
+diagnostic. Optional `Result<T>` helpers may wrap the throwing API. Read the
+thread-local diagnostic immediately after a non-OK C status on the same thread.
+Validate Kotlin-owned state before the C call: closed wrappers, active scoped
+borrows, one-shot resource completion, invalid string shapes, and callback
+lifetime.
 
 Owner-thread-affine calls run on the calling native thread. The binding does not
 dispatch internally. Native `MLN_STATUS_WRONG_THREAD` becomes the Kotlin
@@ -128,8 +141,10 @@ before calling thread-affine APIs.
 
 Catch Kotlin exceptions inside every callback trampoline and convert them to the
 C callback's documented failure behavior. Exceptions never cross native frames.
-Resource provider callbacks copy request fields before user code can retain
-them. A handled request owns the native request reference only while Kotlin is
+Resource transform callbacks copy request URLs before invoking Kotlin and pass
+replacement URLs through the C API response helper before returning. Resource
+provider callbacks copy request fields before user code can retain them. A
+handled request owns the native request reference only while Kotlin is
 responsible for it, enforces one-shot completion, and releases that reference
 exactly once.
 

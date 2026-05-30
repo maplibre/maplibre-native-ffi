@@ -16,28 +16,35 @@ pub const Session = union(enum) {
         self.* = .none;
     }
 
-    pub fn resize(self: *Session, viewport: types.Viewport) !void {
+    pub fn resize(
+        self: *Session,
+        viewport: types.Viewport,
+        diagnostic_store: ?*const maplibre.DiagnosticStore,
+    ) !void {
         switch (self.*) {
             .none => return types.AppError.TextureResizeFailed,
             .texture => |*texture| texture.resize(extent(viewport)) catch |err| {
-                diagnostics.logError("texture resize failed", err);
+                diagnostics.logError("texture resize failed", err, diagnostic_store);
                 return types.AppError.TextureResizeFailed;
             },
             .surface => |*surface| surface.resize(extent(viewport)) catch |err| {
-                diagnostics.logError("surface resize failed", err);
+                diagnostics.logError("surface resize failed", err, diagnostic_store);
                 return types.AppError.SurfaceResizeFailed;
             },
         }
     }
 
-    pub fn renderUpdate(self: *Session) !bool {
+    pub fn renderUpdate(
+        self: *Session,
+        diagnostic_store: ?*const maplibre.DiagnosticStore,
+    ) !bool {
         switch (self.*) {
             .none => return false,
             .texture => |*texture| {
                 texture.renderUpdate() catch |err| switch (err) {
                     error.InvalidState => return false,
                     else => {
-                        diagnostics.logError("texture render failed", err);
+                        diagnostics.logError("texture render failed", err, diagnostic_store);
                         return types.AppError.TextureRenderFailed;
                     },
                 };
@@ -47,7 +54,7 @@ pub const Session = union(enum) {
                 surface.renderUpdate() catch |err| switch (err) {
                     error.InvalidState => return false,
                     else => {
-                        diagnostics.logError("surface render failed", err);
+                        diagnostics.logError("surface render failed", err, diagnostic_store);
                         return types.AppError.SurfaceRenderFailed;
                     },
                 };

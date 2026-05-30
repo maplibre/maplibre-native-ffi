@@ -48,7 +48,7 @@
       { "command": "zig fmt --stdin --zon", "exts": ["zon"] },
       { "command": "rustfmt --edition 2024", "exts": ["rs"] },
       {
-        "command": "pnpm --dir docs exec mdxlint --rc-path .mdxlintrc.json --file-path {{file_path}}",
+        "command": "pnpm --filter docs exec mdxlint --rc-path .mdxlintrc.json --file-path {{file_path}}",
         "exts": ["mdx"],
       },
     ],

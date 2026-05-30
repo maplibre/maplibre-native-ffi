@@ -21,7 +21,6 @@
   "devDependencies": {
     "mdxlint": "1.0.0",
     "remark-frontmatter": "^5.0.0",
-    "remark-gfm": "^4.0.1",
-    "vite-plus": "^0.1.20"
+    "remark-gfm": "^4.0.1"
   }
 }

@@ -111,9 +111,9 @@ state in a retained box and pass it through C `user_data` with `Unmanaged`:
 registration retains with `passRetained`, trampolines recover with
 `fromOpaque(...).takeUnretainedValue()`, and teardown releases exactly once with
 `takeRetainedValue()` or an equivalent owner object. The box owns the closure,
-response scratch storage, active-upcall counters, and native registration tokens
-for the C owner scope. Mutable box state uses locks, atomics, or another
-explicit synchronization primitive when callbacks may arrive concurrently.
+active-upcall counters, and native registration tokens for the C owner scope.
+Mutable box state uses locks, atomics, or another explicit synchronization
+primitive when callbacks may arrive concurrently.
 
 Trampolines copy or scope callback arguments before invoking Swift. They catch
 Swift errors and convert failures to the documented C behavior; Swift errors do

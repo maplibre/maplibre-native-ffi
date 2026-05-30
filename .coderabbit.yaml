@@ -1,0 +1,9 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+# Config reference: https://docs.coderabbit.ai/reference/configuration
+
+reviews:
+  high_level_summary_in_walkthrough: true
+  collapse_walkthrough: false
+
+chat:
+  allow_non_org_members: true

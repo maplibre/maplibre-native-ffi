@@ -16,8 +16,7 @@ const Backend = render.Backend;
 
 pub fn main(init_args: std.process.Init) !void {
     const target_mode = (try parseRenderTargetMode(init_args)) orelse return;
-    std.debug.print("render target: {s}\n", .{target_mode.label()});
-    try logAndValidateNativeRenderBackend();
+    try validateNativeRenderBackend();
 
     try maplibre.setLogCallback(.{ .handler = diagnostics.logRecord }, null);
     defer maplibre.clearLogCallback(null) catch {};
@@ -60,7 +59,6 @@ pub fn main(init_args: std.process.Init) !void {
     const window_handle = window.?;
     var current_viewport = viewport.get(window_handle);
     viewport.log("initial viewport", current_viewport);
-    input.logControls();
 
     var gpa = std.heap.DebugAllocator(.{}){};
     defer _ = gpa.deinit();
@@ -74,6 +72,9 @@ pub fn main(init_args: std.process.Init) !void {
     defer backend.finishFrame() catch |err| {
         std.debug.print("failed to finish final frame: {s}\n", .{@errorName(err)});
     };
+
+    printStartupStatus(target_mode);
+    input.logControls();
 
     var running = true;
     var has_presented_frame = false;
@@ -108,6 +109,7 @@ pub fn main(init_args: std.process.Init) !void {
                     const input_result = try input_controller.handleEvent(
                         &event,
                         &map.map,
+                        map.diagnostic_store,
                         current_viewport,
                     );
                     render_pending = render_pending or input_result.camera_changed;
@@ -116,14 +118,14 @@ pub fn main(init_args: std.process.Init) !void {
         }
 
         try map.runtime.runOnce();
-        const render_update_available = try map_state.drainEvents(&map.runtime, &map.map);
+        const render_update_available = try map_state.drainEvents(allocator, &map.runtime, &map.map);
         render_pending = render_pending or render_update_available;
         did_work = did_work or render_update_available;
 
         try backend.finishFrame();
 
         if (render_pending) {
-            if (try map.target.renderUpdate()) {
+            if (try map.target.renderUpdate(map.diagnostic_store)) {
                 render_pending = false;
                 did_work = true;
                 switch (map.target) {
@@ -142,13 +144,20 @@ pub fn main(init_args: std.process.Init) !void {
     }
 }
 
-fn logAndValidateNativeRenderBackend() !void {
+fn validateNativeRenderBackend() !void {
     const support = maplibre.supportedRenderBackends();
     var support_label_buffer: [32]u8 = undefined;
-    std.debug.print("native render backends: {s}\n", .{renderBackendSupportLabel(&support_label_buffer, support)});
+    std.debug.print("native render backends: {s}\n", .{
+        renderBackendSupportLabel(&support_label_buffer, support),
+    });
     if (build_options.supports_metal and !support.metal) return error.NativeRenderBackendMismatch;
     if (build_options.supports_opengl and !support.opengl) return error.NativeRenderBackendMismatch;
     if (build_options.supports_vulkan and !support.vulkan) return error.NativeRenderBackendMismatch;
+}
+
+fn printStartupStatus(target_mode: types.RenderTargetMode) void {
+    std.debug.print("render target: {s}\n", .{target_mode.label()});
+    std.debug.print("render target status: {s}\n", .{target_mode.statusLine()});
 }
 
 fn renderBackendSupportLabel(buffer: []u8, support: maplibre.RenderBackendSupport) []const u8 {
@@ -176,42 +185,32 @@ fn parseRenderTargetMode(init_args: std.process.Init) !?types.RenderTargetMode {
     defer args.deinit();
     _ = args.skip();
 
-    var mode = types.RenderTargetMode.owned_texture;
-    while (args.next()) |arg| {
-        if (std.mem.eql(u8, arg, "--help") or std.mem.eql(u8, arg, "-h")) {
-            printUsage();
-            return null;
-        }
-        if (std.mem.eql(u8, arg, "--render-target")) {
-            const value = args.next() orelse {
-                printUsage();
-                return types.AppError.InvalidArguments;
-            };
-            mode = types.RenderTargetMode.parse(value) orelse {
-                printUsage();
-                return types.AppError.InvalidArguments;
-            };
-            continue;
-        }
-        if (std.mem.startsWith(u8, arg, "--render-target=")) {
-            const value = arg["--render-target=".len..];
-            mode = types.RenderTargetMode.parse(value) orelse {
-                printUsage();
-                return types.AppError.InvalidArguments;
-            };
-            continue;
-        }
-        mode = types.RenderTargetMode.parse(arg) orelse {
-            printUsage();
-            return types.AppError.InvalidArguments;
-        };
+    const mode_arg = args.next() orelse {
+        printUsage();
+        std.process.exit(1);
+    };
+    if (std.mem.eql(u8, mode_arg, "--help")) {
+        printUsage();
+        return null;
+    }
+    if (std.mem.startsWith(u8, mode_arg, "-")) {
+        printUsage();
+        std.process.exit(1);
+    }
+    const mode = types.RenderTargetMode.parse(mode_arg) orelse {
+        printUsage();
+        std.process.exit(1);
+    };
+    while (args.next()) |_| {
+        printUsage();
+        std.process.exit(1);
     }
     return mode;
 }
 
 fn printUsage() void {
     std.debug.print(
-        \\Usage: zig build run -- --render-target=<mode>
+        \\Usage: zig-map <mode>
         \\
         \\Modes:
         \\  owned-texture     session-owned texture render target

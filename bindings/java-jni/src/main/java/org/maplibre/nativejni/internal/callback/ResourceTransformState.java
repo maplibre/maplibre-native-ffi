@@ -1,7 +1,7 @@
 package org.maplibre.nativejni.internal.callback;
 
+import java.nio.charset.StandardCharsets;
 import java.util.Objects;
-import java.util.concurrent.ConcurrentHashMap;
 import org.bytedeco.javacpp.BytePointer;
 import org.bytedeco.javacpp.Pointer;
 import org.maplibre.nativejni.internal.javacpp.JavaCppSupport;
@@ -13,7 +13,6 @@ import org.maplibre.nativejni.resource.ResourceTransformRequest;
 /** Owns runtime-scoped resource transform callback state. */
 public final class ResourceTransformState implements AutoCloseable {
   private final ResourceTransformCallback callback;
-  private final ConcurrentHashMap<Thread, BytePointer> responseStorages = new ConcurrentHashMap<>();
   private final MaplibreNativeC.mln_resource_transform_callback nativeCallback;
   private final MaplibreNativeC.mln_resource_transform transform;
   private boolean closed;
@@ -29,17 +28,13 @@ public final class ResourceTransformState implements AutoCloseable {
               BytePointer url,
               MaplibreNativeC.mln_resource_transform_response response) {
             try {
-              closeCurrentResponseStorage();
               var transformed =
                   ResourceTransformState.this.callback.transform(
                       new ResourceTransformRequest(
                           ResourceKind.fromNative(kind), kind, JavaCppSupport.cString(url)));
-              if (transformed.isPresent()) {
-                var storage = JavaCppSupport.utf8(transformed.get());
-                responseStorages.put(Thread.currentThread(), storage);
-                response.url(storage);
-              } else {
-                response.url(null);
+              response.url(null);
+              if (transformed.isPresent() && !transformed.get().isEmpty()) {
+                return setResponseUrl(response, transformed.get());
               }
               return MaplibreNativeC.MLN_STATUS_OK;
             } catch (Throwable exception) {
@@ -62,21 +57,18 @@ public final class ResourceTransformState implements AutoCloseable {
   public synchronized void close() {
     if (!closed) {
       closed = true;
-      responseStorages.forEach(
-          (thread, storage) -> {
-            if (responseStorages.remove(thread, storage)) {
-              storage.close();
-            }
-          });
       transform.close();
       nativeCallback.close();
     }
   }
 
-  private void closeCurrentResponseStorage() {
-    var storage = responseStorages.remove(Thread.currentThread());
-    if (storage != null) {
-      storage.close();
+  private static int setResponseUrl(
+      MaplibreNativeC.mln_resource_transform_response response, String value) {
+    var bytes = value.getBytes(StandardCharsets.UTF_8);
+    try (var storage = new BytePointer(bytes.length)) {
+      storage.put(bytes);
+      return MaplibreNativeC.mln_resource_transform_response_set_url(
+          response, storage, bytes.length);
     }
   }
 }

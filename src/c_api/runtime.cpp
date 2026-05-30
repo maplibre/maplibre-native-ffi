@@ -64,6 +64,16 @@ auto mln_runtime_set_resource_transform(
   });
 }
 
+auto mln_resource_transform_response_set_url(
+  mln_resource_transform_response* response, const char* url, size_t url_size
+) noexcept -> mln_status {
+  return mln::c_api::status_boundary([&]() -> mln_status {
+    return mln::core::resource_transform_response_set_url(
+      response, url, url_size
+    );
+  });
+}
+
 auto mln_runtime_clear_resource_transform(mln_runtime* runtime) noexcept
   -> mln_status {
   return mln::c_api::status_boundary([&]() -> mln_status {

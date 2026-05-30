@@ -1,0 +1,36 @@
+name: Mirror to Codeberg
+
+on:
+  push:
+    branches: [main]
+    tags: ["**"]
+
+permissions:
+  contents: read
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    environment: codeberg
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Push mirror
+        env:
+          CODEBERG_USERNAME: ${{ secrets.CODEBERG_USERNAME }}
+          CODEBERG_TOKEN: ${{ secrets.CODEBERG_TOKEN }}
+        run: |
+          {
+            printf 'machine codeberg.org\nlogin %s\npassword %s\n' \
+              "$CODEBERG_USERNAME" "$CODEBERG_TOKEN"
+          } > ~/.netrc
+          chmod 600 ~/.netrc
+
+          git remote add mirror https://codeberg.org/maplibre/maplibre-native-ffi.git
+          git fetch origin --tags
+          git push mirror main
+          git push mirror --tags

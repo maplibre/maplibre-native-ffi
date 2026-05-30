@@ -68,8 +68,12 @@ jobs:
       - name: Build Java FFM binding
         run: mise run //bindings/java-ffm:build
       - name: Build Java JNI binding
-        if: ${{ !startsWith(matrix.mise_env, 'windows-') }}
         run: mise run //bindings/java-jni:build
+      # linux-arm64: no Kotlin/Native host — https://youtrack.jetbrains.com/issue/KT-36871
+      # windows: no MSVC target — https://youtrack.jetbrains.com/issue/SKIKO-446
+      - name: Test Kotlin/Native binding
+        if: ${{ !startsWith(matrix.mise_env, 'windows-') && !startsWith(matrix.mise_env, 'linux-arm64-') }}
+        run: mise run //bindings/kotlin-native:build
       - name: Test Rust binding
         run: mise run //bindings/rust:ci
       - name: Test Swift binding
