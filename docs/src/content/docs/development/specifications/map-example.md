@@ -191,7 +191,7 @@ Each backend variant implements, at minimum:
 
 Order MUST be:
 
-1. Parse CLI; exit `0` on help, or print usage and exit `1` on invalid mode.
+1. Parse CLI and validate selected render mode.
 2. Validate that the loaded native library supports the graphics backend(s) this
    binary targets; fail fast with a readable message if not.
 3. Create the window (initial size [Window](#window)).
