@@ -188,6 +188,38 @@ final class RenderSessionHandleTest {
   }
 
   @Test
+  void openglOwnedTextureFrameCloseFailureLeavesHandleRetryable() throws Exception {
+    Maplibre.setLogCallback(record -> true);
+    Maplibre.setAsyncLogSeverities(EnumSet.noneOf(LogSeverity.class));
+
+    var runtime = RuntimeHandle.create();
+    var map = MapHandle.create(runtime, new MapOptions().size(64, 64));
+    try (var target = assumeOpenGLOwnedTextureTarget(map)) {
+      var activeSession = target.session();
+      map.setStyleJson(STYLE_JSON);
+      waitForMapEvent(runtime, map, RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE);
+      activeSession.renderUpdate();
+
+      var frameHandle = activeSession.acquireOpenGLOwnedTextureFrame();
+      var frame = frameHandle.frame();
+      try {
+        assertWrongThread(runOnOtherThread(frameHandle::close));
+        assertFalse(frameHandle.isClosed());
+        assertTrue(frame.texture() != 0);
+        assertThrows(InvalidStateException.class, activeSession::renderUpdate);
+      } finally {
+        frameHandle.close();
+      }
+      assertTrue(frameHandle.isClosed());
+      assertThrows(IllegalStateException.class, frame::texture);
+      activeSession.renderUpdate();
+    } finally {
+      map.close();
+      runtime.close();
+    }
+  }
+
+  @Test
   void openglBorrowedTextureSessionRendersThroughPublicBinding() throws Exception {
     Maplibre.setLogCallback(record -> true);
     Maplibre.setAsyncLogSeverities(EnumSet.noneOf(LogSeverity.class));

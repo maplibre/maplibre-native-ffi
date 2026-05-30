@@ -50,9 +50,15 @@ public final class OpenGLOwnedTextureFrameHandle implements AutoCloseable {
     }
     try {
       session.releaseOpenGLFrame(frameSegment, null);
-    } finally {
-      closeLocal();
+    } catch (Throwable releaseFailure) {
+      if (session.isClosed()) {
+        closeLocal();
+        return;
+      }
+      // Keep local frame state live when native release fails so callers can retry.
+      throw releaseFailure;
     }
+    closeLocal();
   }
 
   private void closeLocal() {

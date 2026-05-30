@@ -52,9 +52,15 @@ public final class MetalOwnedTextureFrameHandle implements AutoCloseable {
     }
     try {
       session.releaseMetalFrame(frameSegment, null);
-    } finally {
-      closeLocal();
+    } catch (Throwable releaseFailure) {
+      if (session.isClosed()) {
+        closeLocal();
+        return;
+      }
+      // Keep local frame state live when native release fails so callers can retry.
+      throw releaseFailure;
     }
+    closeLocal();
   }
 
   private void closeLocal() {

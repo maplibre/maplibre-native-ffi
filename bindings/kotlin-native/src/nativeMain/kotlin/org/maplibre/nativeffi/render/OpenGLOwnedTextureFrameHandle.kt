@@ -36,9 +36,15 @@ internal constructor(
     if (closed) return
     try {
       session.releaseOpenGLFrame(framePointer)
-    } finally {
-      closeLocal()
+    } catch (releaseFailure: Throwable) {
+      if (session.isClosed) {
+        closeLocal()
+        return
+      }
+      // Keep local frame state live when native release fails so callers can retry.
+      throw releaseFailure
     }
+    closeLocal()
   }
 
   private fun closeLocal() {
