@@ -3,13 +3,17 @@ run = "scripts/generate-clangsharp.sh"
 
 [tasks.build]
 run = "dotnet build Maplibre.Native.slnx"
+# Visual Studio exports Platform=x64 on Windows; the .NET solution uses Any CPU.
+env.Platform = "Any CPU"
 
 [tasks.test]
 depends = ["//:ensure-native-library"]
 run = "dotnet test Maplibre.Native.slnx"
+env.Platform = "Any CPU"
 
 [tasks.format]
 run = "dotnet format Maplibre.Native.slnx --verify-no-changes --verbosity minimal"
+env.Platform = "Any CPU"
 
 [tasks.ci]
 depends = [":format", ":test"]
