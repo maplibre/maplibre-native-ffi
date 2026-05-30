@@ -35,31 +35,6 @@
 #include "geojson/geojson.hpp"
 #include "maplibre_native_c.h"
 
-namespace {
-thread_local std::string* current_resource_transform_replacement_url = nullptr;
-
-class ScopedResourceTransformReplacementUrl final {
- public:
-  explicit ScopedResourceTransformReplacementUrl(std::string& replacement_url)
-      : previous_(current_resource_transform_replacement_url) {
-    current_resource_transform_replacement_url = &replacement_url;
-  }
-
-  ~ScopedResourceTransformReplacementUrl() {
-    current_resource_transform_replacement_url = previous_;
-  }
-
-  ScopedResourceTransformReplacementUrl(
-    const ScopedResourceTransformReplacementUrl&
-  ) = delete;
-  auto operator=(const ScopedResourceTransformReplacementUrl&)
-    -> ScopedResourceTransformReplacementUrl& = delete;
-
- private:
-  std::string* previous_;
-};
-}  // namespace
-
 struct OfflineRegionData {
   mln_offline_region_id id = 0;
   uint32_t definition_type = 0;
@@ -1090,7 +1065,8 @@ auto resource_transform_response_set_url(
     set_thread_error("resource transform response URL contains embedded NUL");
     return MLN_STATUS_INVALID_ARGUMENT;
   }
-  if (current_resource_transform_replacement_url == nullptr) {
+  auto* const replacement_url = static_cast<std::string*>(response->context);
+  if (replacement_url == nullptr) {
     set_thread_error(
       "resource transform response URL can only be set during a transform "
       "callback"
@@ -1098,13 +1074,13 @@ auto resource_transform_response_set_url(
     return MLN_STATUS_INVALID_STATE;
   }
   if (url_size == 0) {
-    current_resource_transform_replacement_url->clear();
+    replacement_url->clear();
     response->url = nullptr;
     return MLN_STATUS_OK;
   }
 
-  current_resource_transform_replacement_url->assign(url, url_size);
-  response->url = current_resource_transform_replacement_url->c_str();
+  replacement_url->assign(url, url_size);
+  response->url = replacement_url->c_str();
   return MLN_STATUS_OK;
 }
 
@@ -2553,10 +2529,10 @@ auto invoke_resource_transform(
   }
 
   auto response = mln_resource_transform_response{
-    .size = sizeof(mln_resource_transform_response), .url = nullptr
+    .size = sizeof(mln_resource_transform_response),
+    .url = nullptr,
+    .context = &out_replacement_url,
   };
-  const auto replacement_url_scope =
-    ScopedResourceTransformReplacementUrl{out_replacement_url};
   try {
     const auto status =
       callback(runtime->resource_transform_user_data, kind, url, &response);

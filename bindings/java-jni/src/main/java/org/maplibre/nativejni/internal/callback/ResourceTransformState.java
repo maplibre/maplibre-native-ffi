@@ -33,12 +33,14 @@ public final class ResourceTransformState implements AutoCloseable {
                       new ResourceTransformRequest(
                           ResourceKind.fromNative(kind), kind, JavaCppSupport.cString(url)));
               response.url(null);
+              response.context(null);
               if (transformed.isPresent() && !transformed.get().isEmpty()) {
                 return setResponseUrl(response, transformed.get());
               }
               return MaplibreNativeC.MLN_STATUS_OK;
             } catch (Throwable exception) {
               response.url(null);
+              response.context(null);
               return MaplibreNativeC.MLN_STATUS_NATIVE_ERROR;
             }
           }

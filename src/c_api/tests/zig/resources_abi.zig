@@ -121,6 +121,7 @@ fn resourceProviderStub(_: ?*anyopaque, _: [*c]const c.mln_resource_request, _: 
 fn resourceTransformStub(_: ?*anyopaque, _: u32, _: [*c]const u8, out_response: [*c]c.mln_resource_transform_response) callconv(.c) c.mln_status {
     if (out_response == null) return c.MLN_STATUS_INVALID_ARGUMENT;
     out_response.*.url = null;
+    out_response.*.context = null;
     return c.MLN_STATUS_OK;
 }
 
@@ -290,7 +291,7 @@ test "offline take result before polling removes queued completion event" {
 }
 
 test "resource transform response helper is callback scoped" {
-    var response = c.mln_resource_transform_response{ .size = @sizeOf(c.mln_resource_transform_response), .url = null };
+    var response = c.mln_resource_transform_response{ .size = @sizeOf(c.mln_resource_transform_response), .url = null, .context = null };
     const url = "https://example.test/style.json";
 
     try testing.expectEqual(c.MLN_STATUS_INVALID_STATE, c.mln_resource_transform_response_set_url(&response, url, url.len));

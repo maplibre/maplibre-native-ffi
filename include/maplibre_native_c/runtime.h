@@ -380,6 +380,9 @@ typedef struct mln_resource_transform_response {
   /** Replacement URL. Null or empty keeps the original URL. Copied on return.
    */
   const char* url;
+  /** C API-managed callback context. Callback implementations leave unchanged.
+   */
+  void* context;
 } mln_resource_transform_response;
 
 /**

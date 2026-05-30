@@ -353,6 +353,7 @@ mod tests {
         sys::mln_resource_transform_response {
             size: std::mem::size_of::<sys::mln_resource_transform_response>() as u32,
             url: ptr::null(),
+            context: ptr::null_mut(),
         }
     }
 

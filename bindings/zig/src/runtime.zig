@@ -1313,6 +1313,7 @@ fn resourceTransformTrampoline(
     native_response.* = .{
         .size = @sizeOf(c.mln_resource_transform_response),
         .url = null,
+        .context = null,
     };
     const copied_url = std.heap.smp_allocator.dupe(u8, if (url == null) "" else std.mem.span(url)) catch return c.MLN_STATUS_NATIVE_ERROR;
     defer std.heap.smp_allocator.free(copied_url);

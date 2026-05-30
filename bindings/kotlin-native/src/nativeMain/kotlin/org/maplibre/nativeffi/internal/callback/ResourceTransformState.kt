@@ -47,6 +47,7 @@ internal class ResourceTransformState(private val callback: ResourceTransformCal
     return try {
       outResponse.pointed.size = kotlinx.cinterop.sizeOf<mln_resource_transform_response>().toUInt()
       outResponse.pointed.url = null
+      outResponse.pointed.context = null
       val request =
         ResourceTransformRequest(
           ResourceKind.fromNative(rawKind),
