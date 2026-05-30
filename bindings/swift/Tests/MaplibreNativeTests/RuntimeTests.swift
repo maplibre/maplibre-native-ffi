@@ -68,17 +68,28 @@ private final class ResourceCancellationResult: @unchecked Sendable {
   }
 }
 
-@Test func resourceTransformCallbackCopiesRequestAndStoresReplacement() {
+@Test func resourceTransformCallbackCopiesRequestWithoutReplacement() {
   let state = NativeResourceTransformState { request in
     #expect(request.kind == 3)
     #expect(request.url == "https://example.test/tile")
-    return "https://example.invalid/tile"
+    return nil
   }
 
   let result = state.invokeForTesting(kind: 3, url: "https://example.test/tile")
 
   #expect(result.status == 0)
-  #expect(result.replacement == "https://example.invalid/tile")
+  #expect(result.replacement == nil)
+}
+
+@Test func resourceTransformCallbackUsesNativeResponseStorageForReplacement() {
+  let state = NativeResourceTransformState { _ in
+    "https://example.invalid/tile"
+  }
+
+  let result = state.invokeForTesting(kind: 3, url: "https://example.test/tile")
+
+  #expect(result.status == MLN_STATUS_INVALID_STATE.rawValue)
+  #expect(result.replacement == nil)
 }
 
 @Test func resourceRequestHandleRejectsSecondCompletionBeforeCallingNative() throws {

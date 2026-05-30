@@ -244,20 +244,9 @@ struct NativeResourceTransformRequest: Equatable, Sendable {
 
 private final class NativeResourceTransformBox: @unchecked Sendable {
   private let callback: @Sendable (NativeResourceTransformRequest) -> String?
-  private let lock = NSLock()
-  private var responseStorage: [UnsafeMutablePointer<CChar>] = []
 
   init(_ callback: @escaping @Sendable (NativeResourceTransformRequest) -> String?) {
     self.callback = callback
-  }
-
-  deinit {
-    lock.withLock {
-      for pointer in responseStorage {
-        free(pointer)
-      }
-      responseStorage.removeAll()
-    }
   }
 
   func invoke(
@@ -266,8 +255,8 @@ private final class NativeResourceTransformBox: @unchecked Sendable {
     outResponse: UnsafeMutablePointer<mln_resource_transform_response>?
   ) -> mln_status {
     guard let outResponse else { return MLN_STATUS_INVALID_ARGUMENT }
-    outResponse.pointee = mln_resource_transform_response()
     outResponse.pointee.size = UInt32(MemoryLayout<mln_resource_transform_response>.size)
+    outResponse.pointee.url = nil
     let request = NativeResourceTransformRequest(kind: kind, url: NativeString.copyCString(url))
     guard let replacement = callback(request), !replacement.isEmpty else {
       return MLN_STATUS_OK
@@ -275,14 +264,13 @@ private final class NativeResourceTransformBox: @unchecked Sendable {
     if replacement.utf8.contains(0) {
       return MLN_STATUS_INVALID_ARGUMENT
     }
-    guard let storage = strdup(replacement) else {
-      return MLN_STATUS_NATIVE_ERROR
+    return replacement.withCString { replacementURL in
+      mln_resource_transform_response_set_url(
+        outResponse,
+        replacementURL,
+        replacement.utf8.count
+      )
     }
-    lock.withLock {
-      responseStorage.append(storage)
-    }
-    outResponse.pointee.url = UnsafePointer(storage)
-    return MLN_STATUS_OK
   }
 }
 
