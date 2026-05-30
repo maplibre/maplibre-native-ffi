@@ -18,11 +18,14 @@ run = "cargo clippy -p rust-map --all-targets -- -D warnings"
 [tasks.run]
 depends = ["//:ensure-native-library", ":compile-shaders"]
 dir = "{{env.MLN_FFI_REPO_ROOT}}"
-usage = 'arg "[render-target]" default="owned-texture"'
-run = 'cargo run -p rust-map -- --render-target="{{ usage.render_target }}"'
+usage = 'arg "render-target"'
+run = 'cargo run -p rust-map -- "{{ usage.render_target }}"'
 
 [tasks."run:owned-texture"]
 run = [{ task = "run", args = ["owned-texture"] }]
+
+[tasks."run:borrowed-texture"]
+run = [{ task = "run", args = ["borrowed-texture"] }]
 
 [tasks."run:native-surface"]
 run = [{ task = "run", args = ["native-surface"] }]

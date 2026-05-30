@@ -33,7 +33,7 @@ impl Controller {
         println!("  arrows or WASD: pan");
         println!("  + / -: zoom at center");
         println!("  Q / E: rotate");
-        println!("  PageUp / PageDown or [ / ]: pitch");
+        println!("  ] / [: pitch");
         println!("  0: reset pitch and bearing");
     }
 
@@ -162,12 +162,8 @@ impl Controller {
             }
             KeyCode::KeyQ => adjust_bearing(map, -KEYBOARD_BEARING, &animation)?,
             KeyCode::KeyE => adjust_bearing(map, KEYBOARD_BEARING, &animation)?,
-            KeyCode::PageUp | KeyCode::BracketRight => {
-                adjust_pitch(map, KEYBOARD_PITCH, &animation)?
-            }
-            KeyCode::PageDown | KeyCode::BracketLeft => {
-                adjust_pitch(map, -KEYBOARD_PITCH, &animation)?
-            }
+            KeyCode::BracketRight => adjust_pitch(map, KEYBOARD_PITCH, &animation)?,
+            KeyCode::BracketLeft => adjust_pitch(map, -KEYBOARD_PITCH, &animation)?,
             KeyCode::Digit0 | KeyCode::Numpad0 => map.ease_to(
                 &CameraOptions::new().with_bearing(0.0).with_pitch(0.0),
                 Some(&reset_animation),

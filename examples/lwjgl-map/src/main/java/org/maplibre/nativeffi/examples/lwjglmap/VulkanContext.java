@@ -61,8 +61,9 @@ import org.lwjgl.vulkan.VkPhysicalDevice;
 import org.lwjgl.vulkan.VkQueue;
 import org.lwjgl.vulkan.VkQueueFamilyProperties;
 import org.maplibre.nativeffi.render.NativePointer;
+import org.maplibre.nativeffi.render.RenderBackend;
 
-final class VulkanContext implements AutoCloseable {
+final class VulkanContext implements GraphicsContext {
   private final long window;
   private VkInstance instance;
   private long surface;
@@ -113,8 +114,14 @@ final class VulkanContext implements AutoCloseable {
     }
   }
 
-  long window() {
+  @Override
+  public long window() {
     return window;
+  }
+
+  @Override
+  public RenderBackend backend() {
+    return RenderBackend.VULKAN;
   }
 
   NativePointer instancePointer() {

@@ -1,6 +1,5 @@
 import org.gradle.api.tasks.JavaExec
 import org.gradle.api.tasks.compile.JavaCompile
-import org.gradle.api.tasks.testing.Test
 
 plugins { application }
 
@@ -46,15 +45,9 @@ dependencies {
   runtimeOnly("org.lwjgl:lwjgl::$lwjglNative")
   runtimeOnly("org.lwjgl:lwjgl-glfw::$lwjglNative")
   runtimeOnly("org.lwjgl:lwjgl-shaderc::$lwjglNative")
-
-  testImplementation(platform("org.junit:junit-bom:6.0.3"))
-  testImplementation("org.junit.jupiter:junit-jupiter")
-  testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
 tasks.withType<JavaCompile>().configureEach { options.release = 25 }
-
-tasks.withType<Test>().configureEach { useJUnitPlatform() }
 
 val nativeLibraryPathProperty = "org.maplibre.nativeffi.library.path"
 val nativeBuildDir = providers.environmentVariable("MLN_FFI_BUILD_DIR")

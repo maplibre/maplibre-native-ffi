@@ -263,7 +263,10 @@ final class VulkanTextureCompositor implements AutoCloseable {
       throw new IllegalStateException(
           "MapLibre owned texture frame is not shader-readable: layout=" + frame.layout());
     }
+    drawImageView(frame.imageView().address());
+  }
 
+  void drawImageView(long imageView) {
     try (var stack = MemoryStack.stackPush()) {
       check(vkWaitForFences(context.device(), inFlight, true, Long.MAX_VALUE), "vkWaitForFences");
       var imageIndex = stack.mallocInt(1);
@@ -279,7 +282,7 @@ final class VulkanTextureCompositor implements AutoCloseable {
       }
       check(vkResetFences(context.device(), inFlight), "vkResetFences");
 
-      updateDescriptor(frame.imageView().address());
+      updateDescriptor(imageView);
       record(imageIndex.get(0));
       submit(stack);
       check(vkWaitForFences(context.device(), inFlight, true, Long.MAX_VALUE), "vkWaitForFences");

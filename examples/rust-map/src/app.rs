@@ -7,10 +7,10 @@ use winit::event::WindowEvent;
 use winit::event_loop::EventLoopWindowTarget;
 use winit::window::Window;
 
+use crate::graphics::GraphicsContext;
 use crate::input::Controller;
 use crate::render_target::{Mode, RenderTarget};
 use crate::viewport::Viewport;
-use crate::vulkan::VulkanContext;
 
 const STYLE_URL: &str = "https://tiles.openfreemap.org/styles/bright";
 
@@ -18,7 +18,7 @@ pub struct App {
     target: Option<RenderTarget>,
     map: Option<maplibre_native::MapHandle>,
     runtime: Option<RuntimeHandle>,
-    vulkan: VulkanContext,
+    graphics: GraphicsContext,
     window: Window,
     viewport: Viewport,
     input: Controller,
@@ -29,8 +29,12 @@ pub struct App {
 }
 
 impl App {
-    pub fn new(window: Window, mode: Mode) -> Result<Self, Box<dyn Error>> {
-        let vulkan = VulkanContext::new(&window)?;
+    pub fn new(
+        window: Window,
+        mode: Mode,
+        backends: maplibre_native::RenderBackendMask,
+    ) -> Result<Self, Box<dyn Error>> {
+        let graphics = GraphicsContext::new(&window, backends)?;
         let viewport = Viewport::from_window(&window);
         if viewport.is_empty() {
             return Err("window has no drawable extent".into());
@@ -65,8 +69,16 @@ impl App {
                 ));
             }
         };
+        if let Err(error) = configure_map(&map) {
+            return Err(startup_error(
+                format!("map initialization failed: {error}"),
+                None,
+                Some(map),
+                Some(runtime),
+            ));
+        }
         viewport.log("initial viewport");
-        let target = match RenderTarget::attach(mode, &map, &vulkan, viewport) {
+        let target = match RenderTarget::attach(mode, &map, &graphics, viewport) {
             Ok(target) => target,
             Err(error) => {
                 return Err(startup_error(
@@ -77,20 +89,12 @@ impl App {
                 ));
             }
         };
-        if let Err(error) = configure_map(&map) {
-            return Err(startup_error(
-                format!("map initialization failed: {error}"),
-                Some(target),
-                Some(map),
-                Some(runtime),
-            ));
-        }
 
         Ok(Self {
             target: Some(target),
             map: Some(map),
             runtime: Some(runtime),
-            vulkan,
+            graphics,
             window,
             viewport,
             input: Controller::default(),
@@ -102,8 +106,7 @@ impl App {
     }
 
     pub fn print_status(&self) {
-        println!("MapLibre Rust Vulkan map example running. Close the window to exit.");
-        println!("rust-map render target: {}", self.mode.cli_name());
+        println!("render target: {}", self.mode.cli_name());
         println!("render target status: {}", self.mode.status());
         Controller::print_controls();
     }
@@ -167,10 +170,28 @@ impl App {
             self.render_pending = false;
             return Ok(());
         }
-        self.target
-            .as_mut()
+        self.graphics.resize(next)?;
+        if self
+            .target
+            .as_ref()
             .expect("render target is open")
-            .resize(next)?;
+            .needs_reattach_on_resize()
+        {
+            let old_target = self.target.take().expect("render target is open");
+            old_target.close()?;
+            let new_target = RenderTarget::attach(
+                self.mode,
+                self.map.as_ref().expect("map is open"),
+                &self.graphics,
+                next,
+            )?;
+            self.target = Some(new_target);
+        } else {
+            self.target
+                .as_mut()
+                .expect("render target is open")
+                .resize(next)?;
+        }
         self.map.as_ref().expect("map is open").request_repaint()?;
         self.render_pending = true;
         Ok(())
@@ -193,7 +214,12 @@ impl App {
                 {
                     self.render_pending = true;
                 }
-                RuntimeEventType::MapRenderFrameFinished => {
+                RuntimeEventType::MapRenderFrameFinished
+                    if event.source
+                        == RuntimeEventSource::Map(
+                            self.map.as_ref().expect("map is open").id(),
+                        ) =>
+                {
                     if let RuntimeEventPayload::RenderFrame(frame) = event.payload {
                         self.render_pending |= frame.needs_repaint;
                     }
@@ -215,13 +241,17 @@ impl App {
         if self.closed || self.viewport.is_empty() {
             return Ok(());
         }
-        self.pump_runtime()?;
         if self.render_pending {
-            self.target
+            match self
+                .target
                 .as_mut()
                 .expect("render target is open")
-                .render_update()?;
-            self.render_pending = false;
+                .render_update()
+            {
+                Ok(()) => self.render_pending = false,
+                Err(error) if error.kind() == maplibre_native::ErrorKind::InvalidState => {}
+                Err(error) => return Err(error.into()),
+            }
         }
         Ok(())
     }
@@ -246,11 +276,12 @@ impl App {
         self.render_pending = false;
         self.viewport_dirty = false;
 
-        let mut first_error = self
-            .vulkan
-            .wait_idle()
-            .err()
-            .map(|error| format!("Vulkan device wait idle failed: {error:?}"));
+        let mut first_error = self.graphics.wait_idle().err().map(|error| {
+            format!(
+                "{} device wait idle failed: {error}",
+                self.graphics.backend_name()
+            )
+        });
 
         if let Some(target) = self.target.take()
             && let Err(error) = target.close()

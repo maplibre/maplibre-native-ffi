@@ -2,6 +2,7 @@ package org.maplibre.nativeffi.examples.lwjglmap;
 
 enum RenderTargetMode {
   OWNED_TEXTURE("owned-texture"),
+  BORROWED_TEXTURE("borrowed-texture"),
   NATIVE_SURFACE("native-surface");
 
   private final String cliName;
@@ -16,8 +17,10 @@ enum RenderTargetMode {
 
   String status() {
     return switch (this) {
-      case OWNED_TEXTURE -> "samples MapLibre-owned Vulkan frames into the GLFW swapchain";
-      case NATIVE_SURFACE -> "renders directly to the GLFW Vulkan surface";
+      case OWNED_TEXTURE -> "samples MapLibre-owned texture frames into the host swapchain";
+      case BORROWED_TEXTURE ->
+          "renders into a host-owned texture, then samples it into the host swapchain";
+      case NATIVE_SURFACE -> "renders directly to the host window surface";
     };
   }
 

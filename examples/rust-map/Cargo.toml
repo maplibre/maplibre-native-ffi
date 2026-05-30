@@ -12,3 +12,10 @@ ash-window = "0.13.0"
 maplibre-native = { path = "../../bindings/rust/crates/maplibre-native" }
 raw-window-handle = "0.6.2"
 winit = { version = "0.29.15", features = ["rwh_06"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.5.2"
+objc2-app-kit = { version = "0.2.2", features = ["NSResponder", "NSView", "objc2-quartz-core"] }
+objc2-foundation = { version = "0.2.2", features = ["NSError", "NSGeometry", "NSObject", "NSString"] }
+objc2-metal = { version = "0.2.2", features = ["MTLCommandBuffer", "MTLCommandEncoder", "MTLCommandQueue", "MTLDevice", "MTLDrawable", "MTLLibrary", "MTLPixelFormat", "MTLRenderCommandEncoder", "MTLRenderPass", "MTLRenderPipeline", "MTLResource", "MTLTexture"] }
+objc2-quartz-core = { version = "0.2.2", features = ["CALayer", "CAMetalLayer", "objc2-metal"] }

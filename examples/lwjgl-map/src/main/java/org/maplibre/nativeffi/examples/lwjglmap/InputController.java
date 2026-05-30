@@ -9,8 +9,6 @@ import static org.lwjgl.glfw.GLFW.GLFW_KEY_EQUAL;
 import static org.lwjgl.glfw.GLFW.GLFW_KEY_LEFT;
 import static org.lwjgl.glfw.GLFW.GLFW_KEY_LEFT_BRACKET;
 import static org.lwjgl.glfw.GLFW.GLFW_KEY_MINUS;
-import static org.lwjgl.glfw.GLFW.GLFW_KEY_PAGE_DOWN;
-import static org.lwjgl.glfw.GLFW.GLFW_KEY_PAGE_UP;
 import static org.lwjgl.glfw.GLFW.GLFW_KEY_Q;
 import static org.lwjgl.glfw.GLFW.GLFW_KEY_RIGHT;
 import static org.lwjgl.glfw.GLFW.GLFW_KEY_RIGHT_BRACKET;
@@ -45,6 +43,7 @@ final class InputController implements AutoCloseable {
 
   private final long window;
   private final MapHandle map;
+  private final Runnable renderRequested;
   private boolean leftDown;
   private boolean rightDown;
   private boolean ctrlDown;
@@ -53,9 +52,10 @@ final class InputController implements AutoCloseable {
   private double cursorX;
   private double cursorY;
 
-  InputController(long window, MapHandle map) {
+  InputController(long window, MapHandle map, Runnable renderRequested) {
     this.window = window;
     this.map = map;
+    this.renderRequested = renderRequested;
     installCallbacks();
   }
 
@@ -67,7 +67,7 @@ final class InputController implements AutoCloseable {
     System.out.println("  arrows or WASD: pan");
     System.out.println("  + / -: zoom at center");
     System.out.println("  Q / E: rotate");
-    System.out.println("  PageUp / PageDown or [ / ]: pitch");
+    System.out.println("  ] / [: pitch");
     System.out.println("  0: reset pitch and bearing");
   }
 
@@ -89,8 +89,10 @@ final class InputController implements AutoCloseable {
     if (rightDown || (leftDown && ctrlDown)) {
       setBearing(currentBearing() + dx * DRAG_ROTATE_FACTOR, false);
       setPitch(currentPitch() - dy * DRAG_PITCH_FACTOR, false);
+      renderRequested.run();
     } else if (leftDown) {
       map.moveBy(dx, dy);
+      renderRequested.run();
     }
   }
 
@@ -111,6 +113,7 @@ final class InputController implements AutoCloseable {
     // scrolling behave like the host platform expects.
     var scale = Math.pow(2.0, yOffset * 0.25);
     map.scaleBy(scale, new ScreenPoint(cursorX, cursorY));
+    renderRequested.run();
   }
 
   private void onKey(int key, int action, int mods) {
@@ -118,6 +121,7 @@ final class InputController implements AutoCloseable {
     if (action != GLFW_PRESS && action != GLFW_REPEAT) {
       return;
     }
+    var changed = true;
     switch (key) {
       case GLFW_KEY_LEFT, GLFW_KEY_A -> map.moveByAnimated(KEYBOARD_PAN, 0.0, KEYBOARD_ANIMATION);
       case GLFW_KEY_RIGHT, GLFW_KEY_D -> map.moveByAnimated(-KEYBOARD_PAN, 0.0, KEYBOARD_ANIMATION);
@@ -127,12 +131,13 @@ final class InputController implements AutoCloseable {
       case GLFW_KEY_MINUS -> map.scaleByAnimated(1.0 / KEYBOARD_ZOOM, KEYBOARD_ANIMATION);
       case GLFW_KEY_Q -> setBearing(currentBearing() - KEYBOARD_BEARING, true);
       case GLFW_KEY_E -> setBearing(currentBearing() + KEYBOARD_BEARING, true);
-      case GLFW_KEY_PAGE_UP, GLFW_KEY_RIGHT_BRACKET ->
-          setPitch(currentPitch() + KEYBOARD_PITCH, true);
-      case GLFW_KEY_PAGE_DOWN, GLFW_KEY_LEFT_BRACKET ->
-          setPitch(currentPitch() - KEYBOARD_PITCH, true);
+      case GLFW_KEY_RIGHT_BRACKET -> setPitch(currentPitch() + KEYBOARD_PITCH, true);
+      case GLFW_KEY_LEFT_BRACKET -> setPitch(currentPitch() - KEYBOARD_PITCH, true);
       case GLFW_KEY_0 -> map.easeTo(new CameraOptions().bearing(0.0).pitch(0.0), RESET_ANIMATION);
-      default -> {}
+      default -> changed = false;
+    }
+    if (changed) {
+      renderRequested.run();
     }
   }
 

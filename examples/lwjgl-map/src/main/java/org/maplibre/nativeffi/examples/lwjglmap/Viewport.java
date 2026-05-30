@@ -33,4 +33,10 @@ record Viewport(
       return new Viewport(logicalWidth, logicalHeight, scale, physicalWidth, physicalHeight);
     }
   }
+
+  void log(String label) {
+    System.out.printf(
+        "%s: logical=%dx%d physical=%dx%d scale=%.2f%n",
+        label, width, height, framebufferWidth, framebufferHeight, scaleFactor);
+  }
 }

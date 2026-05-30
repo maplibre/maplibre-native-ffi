@@ -1489,6 +1489,11 @@ dependencies = [
  "ash",
  "ash-window",
  "maplibre-native",
+ "objc2 0.5.2",
+ "objc2-app-kit 0.2.2",
+ "objc2-foundation 0.2.2",
+ "objc2-metal",
+ "objc2-quartz-core",
  "raw-window-handle",
  "winit 0.29.15",
 ]
