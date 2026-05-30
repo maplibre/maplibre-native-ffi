@@ -15,9 +15,9 @@ struct Viewport: Equatable {
 
 @MainActor
 final class MapState {
-  private(set) var runtime: RuntimeHandle
-  private(set) var map: MapHandle
-  private(set) var renderSession: RenderSessionHandle
+  private nonisolated(unsafe) let runtime: RuntimeHandle
+  nonisolated(unsafe) let map: MapHandle
+  private nonisolated(unsafe) let renderSession: RenderSessionHandle
 
   init(viewport: Viewport, layer: CAMetalLayer) throws {
     let runtime = try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
@@ -57,7 +57,7 @@ final class MapState {
     }
   }
 
-  isolated deinit {
+  deinit {
     try? renderSession.close()
     try? map.close()
     try? runtime.close()
