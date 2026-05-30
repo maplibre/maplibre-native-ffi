@@ -128,10 +128,9 @@ When replacing a callback, install the new native descriptor before closing the
 old Java state. If native installation fails, close the replacement state and
 keep the previous state active.
 
-Resource transform callbacks copy the request URL before invoking Java. Response
-storage that C borrows after the callback stays alive until native consumes it.
-Per-thread response scratch storage closes on the next callback for that thread
-and during runtime teardown.
+Resource transform callbacks copy the request URL before invoking Java. The
+binding passes replacement URLs through the C API response helper so native
+copies temporary Java storage before the callback returns.
 
 Resource provider callbacks copy the request into `ResourceRequest` before user
 code runs. `ResourceRequestHandle` owns the provider's native request reference

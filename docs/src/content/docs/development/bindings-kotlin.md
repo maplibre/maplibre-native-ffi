@@ -141,8 +141,10 @@ before calling thread-affine APIs.
 
 Catch Kotlin exceptions inside every callback trampoline and convert them to the
 C callback's documented failure behavior. Exceptions never cross native frames.
-Resource provider callbacks copy request fields before user code can retain
-them. A handled request owns the native request reference only while Kotlin is
+Resource transform callbacks copy request URLs before invoking Kotlin and pass
+replacement URLs through the C API response helper before returning. Resource
+provider callbacks copy request fields before user code can retain them. A
+handled request owns the native request reference only while Kotlin is
 responsible for it, enforces one-shot completion, and releases that reference
 exactly once.
 

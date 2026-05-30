@@ -26,6 +26,23 @@ fn emptyEvent() c.mln_runtime_event {
     };
 }
 
+fn waitForMapLoadingFailureContaining(runtime: *c.mln_runtime, map: *c.mln_map, needle: []const u8) !bool {
+    for (0..1000) |_| {
+        try testing.expectEqual(c.MLN_STATUS_OK, c.mln_runtime_run_once(runtime));
+        while (true) {
+            var event = emptyEvent();
+            var has_event = false;
+            try testing.expectEqual(c.MLN_STATUS_OK, c.mln_runtime_poll_event(runtime, &event, &has_event));
+            if (!has_event) break;
+            if (event.type != c.MLN_RUNTIME_EVENT_MAP_LOADING_FAILED or event.source_type != c.MLN_RUNTIME_EVENT_SOURCE_MAP or event.source != @as(?*anyopaque, @ptrCast(map))) continue;
+            const message = if (event.message == null) "" else event.message[0..event.message_size];
+            if (std.mem.indexOf(u8, message, needle) != null) return true;
+        }
+        try sleepOneMillisecond();
+    }
+    return false;
+}
+
 fn waitForOfflineOperation(runtime: *c.mln_runtime, operation_id: c.mln_offline_operation_id) !c.mln_runtime_event_offline_operation_completed {
     for (0..5000) |_| {
         try testing.expectEqual(c.MLN_STATUS_OK, c.mln_runtime_run_once(runtime));
@@ -105,6 +122,27 @@ fn resourceTransformStub(_: ?*anyopaque, _: u32, _: [*c]const u8, out_response: 
     if (out_response == null) return c.MLN_STATUS_INVALID_ARGUMENT;
     out_response.*.url = null;
     return c.MLN_STATUS_OK;
+}
+
+const TransformCopyState = struct {
+    replacement_url: []const u8,
+    transform_calls: std.atomic.Value(usize) = std.atomic.Value(usize).init(0),
+};
+
+fn resourceTransformWithTemporaryReplacement(
+    user_data: ?*anyopaque,
+    _: u32,
+    _: [*c]const u8,
+    out_response: [*c]c.mln_resource_transform_response,
+) callconv(.c) c.mln_status {
+    const state: *TransformCopyState = @ptrCast(@alignCast(user_data.?));
+    _ = state.transform_calls.fetchAdd(1, .seq_cst);
+    var scratch: [128]u8 = undefined;
+    if (state.replacement_url.len > scratch.len) return c.MLN_STATUS_INVALID_ARGUMENT;
+    @memcpy(scratch[0..state.replacement_url.len], state.replacement_url);
+    const status = c.mln_resource_transform_response_set_url(out_response, scratch[0..state.replacement_url.len].ptr, state.replacement_url.len);
+    @memset(scratch[0..state.replacement_url.len], 'x');
+    return status;
 }
 
 test "custom provider request handles reject raw null handles" {
@@ -249,6 +287,37 @@ test "offline take result before polling removes queued completion event" {
         const payload: *const c.mln_runtime_event_offline_operation_completed = @ptrCast(@alignCast(event.payload orelse return error.MissingPayload));
         try testing.expect(payload.operation_id != create_id);
     }
+}
+
+test "resource transform response helper is callback scoped" {
+    var response = c.mln_resource_transform_response{ .size = @sizeOf(c.mln_resource_transform_response), .url = null };
+    const url = "https://example.test/style.json";
+
+    try testing.expectEqual(c.MLN_STATUS_INVALID_STATE, c.mln_resource_transform_response_set_url(&response, url, url.len));
+    try testing.expect(response.url == null);
+}
+
+test "resource transform helper copies temporary replacement URL through native load" {
+    try testing.expectEqual(c.MLN_STATUS_OK, c.mln_network_status_set(c.MLN_NETWORK_STATUS_ONLINE));
+    defer testing.expectEqual(c.MLN_STATUS_OK, c.mln_network_status_set(c.MLN_NETWORK_STATUS_ONLINE)) catch @panic("network status restore failed");
+
+    const runtime = try support.createRuntime();
+    defer support.destroyRuntime(runtime);
+
+    var state = TransformCopyState{ .replacement_url = "rewritten-temp-copy://style.json" };
+    var transform = c.mln_resource_transform{
+        .size = @sizeOf(c.mln_resource_transform),
+        .callback = resourceTransformWithTemporaryReplacement,
+        .user_data = &state,
+    };
+    try testing.expectEqual(c.MLN_STATUS_OK, c.mln_runtime_set_resource_transform(runtime, &transform));
+
+    const map = try support.createMap(runtime);
+    defer support.destroyMap(map);
+
+    try testing.expectEqual(c.MLN_STATUS_OK, c.mln_map_set_style_url(map, "http://original.invalid/style.json"));
+    try testing.expect(try waitForMapLoadingFailureContaining(runtime, map, "rewritten-temp-copy"));
+    try testing.expect(state.transform_calls.load(.seq_cst) > 0);
 }
 
 test "resource transform rejects raw invalid descriptors" {

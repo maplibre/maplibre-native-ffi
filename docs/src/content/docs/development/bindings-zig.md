@@ -125,11 +125,11 @@ When replacing a callback, install the new native descriptor before releasing
 the old Zig state. If native installation fails, release the replacement state
 and keep the previous callback active.
 
-Resource transforms copy request URLs and keep replacement URL storage alive
-until native consumes it. Resource providers copy request fields before user
-code can retain them. Handled requests enforce one-shot completion or release.
-Custom geometry callbacks track active upcalls and delay state release until
-they finish.
+Resource transforms copy request URLs and pass replacement URLs through the C
+API response helper before the callback returns. Resource providers copy request
+fields before user code can retain them. Handled requests enforce one-shot
+completion or release. Custom geometry callbacks track active upcalls and delay
+state release until they finish.
 
 ## Render Targets
 

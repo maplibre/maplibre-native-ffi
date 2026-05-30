@@ -8,7 +8,6 @@ import kotlinx.cinterop.alloc
 import kotlinx.cinterop.cstr
 import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.ptr
-import kotlinx.cinterop.toKString
 import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.internal.c.mln_resource_transform_response
 import org.maplibre.nativeffi.internal.callback.ResourceTransformState
@@ -16,33 +15,24 @@ import org.maplibre.nativeffi.internal.callback.ResourceTransformState
 @OptIn(ExperimentalForeignApi::class)
 class ResourceTransformStateTest {
   @Test
-  fun transformCallbackCopiesRequestAndReturnsReplacementUrls() {
+  fun transformCallbackCopiesRequestWhenKeepingOriginalUrl() {
     var copiedRequest: ResourceTransformRequest? = null
-    var index = 0
-    val replacements =
-      listOf("https://cdn.example.com/style.json", "https://cdn.example.com/style-2.json")
     val state =
       ResourceTransformState(
         ResourceTransformCallback { request ->
           copiedRequest = request
-          replacements[index++]
+          null
         }
       )
     try {
       memScoped {
-        val firstOut = alloc<mln_resource_transform_response>()
-        val firstStatus =
-          state.invoke(1U, "https://example.com/style.json".cstr.getPointer(this), firstOut.ptr)
-        assertEquals(MaplibreStatus.OK.nativeCode, firstStatus)
+        val out = alloc<mln_resource_transform_response>()
+        val status =
+          state.invoke(1U, "https://example.com/style.json".cstr.getPointer(this), out.ptr)
+        assertEquals(MaplibreStatus.OK.nativeCode, status)
         assertEquals(ResourceKind.STYLE, copiedRequest?.kind)
         assertEquals("https://example.com/style.json", copiedRequest?.url)
-        assertEquals("https://cdn.example.com/style.json", firstOut.url?.toKString())
-
-        val secondOut = alloc<mln_resource_transform_response>()
-        val secondStatus =
-          state.invoke(1U, "https://example.com/style-2.json".cstr.getPointer(this), secondOut.ptr)
-        assertEquals(MaplibreStatus.OK.nativeCode, secondStatus)
-        assertEquals("https://cdn.example.com/style-2.json", secondOut.url?.toKString())
+        assertNull(out.url)
       }
     } finally {
       state.close()

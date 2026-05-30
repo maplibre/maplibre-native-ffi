@@ -2,8 +2,9 @@ package org.maplibre.nativeffi.internal.callback;
 
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
+import java.lang.foreign.ValueLayout;
+import java.nio.charset.StandardCharsets;
 import java.util.Objects;
-import java.util.concurrent.ConcurrentHashMap;
 import org.maplibre.nativeffi.internal.c.MapLibreNativeC;
 import org.maplibre.nativeffi.internal.c.mln_resource_transform;
 import org.maplibre.nativeffi.internal.c.mln_resource_transform_callback;
@@ -19,7 +20,6 @@ public final class ResourceTransformState implements AutoCloseable {
   private final ResourceTransformCallback callback;
   private final MemorySegment stub;
   private final MemorySegment descriptor;
-  private final ConcurrentHashMap<Thread, Arena> responseArenas = new ConcurrentHashMap<>();
 
   public ResourceTransformState(ResourceTransformCallback callback) {
     this.arena = Arena.ofShared();
@@ -38,7 +38,6 @@ public final class ResourceTransformState implements AutoCloseable {
   private int invoke(
       MemorySegment userData, int rawKind, MemorySegment url, MemorySegment outResponse) {
     try {
-      closePreviousResponseArena();
       mln_resource_transform_response.size(
           outResponse, (int) mln_resource_transform_response.sizeof());
       mln_resource_transform_response.url(outResponse, MemorySegment.NULL);
@@ -48,10 +47,7 @@ public final class ResourceTransformState implements AutoCloseable {
                   ResourceKind.fromNative(rawKind), rawKind, MemoryUtil.copyCString(url)));
       Objects.requireNonNull(replacement, "replacement");
       if (replacement.isPresent() && !replacement.get().isEmpty()) {
-        var responseArena = Arena.ofShared();
-        responseArenas.put(Thread.currentThread(), responseArena);
-        mln_resource_transform_response.url(
-            outResponse, MemoryUtil.allocateCString(responseArena, replacement.get()));
+        return setResponseUrl(outResponse, replacement.get());
       }
       return MapLibreNativeC.MLN_STATUS_OK();
     } catch (IllegalArgumentException error) {
@@ -63,23 +59,14 @@ public final class ResourceTransformState implements AutoCloseable {
 
   @Override
   public void close() {
-    responseArenas.values().forEach(ResourceTransformState::closeQuietly);
-    responseArenas.clear();
     arena.close();
   }
 
-  private void closePreviousResponseArena() {
-    closeQuietly(responseArenas.remove(Thread.currentThread()));
-  }
-
-  private static void closeQuietly(Arena arena) {
-    if (arena == null) {
-      return;
-    }
-    try {
-      arena.close();
-    } catch (IllegalStateException ignored) {
-      // Closing callback scratch memory is best-effort during runtime teardown.
+  private static int setResponseUrl(MemorySegment outResponse, String value) {
+    var bytes = value.getBytes(StandardCharsets.UTF_8);
+    try (var responseArena = Arena.ofConfined()) {
+      return MapLibreNativeC.mln_resource_transform_response_set_url(
+          outResponse, responseArena.allocateFrom(ValueLayout.JAVA_BYTE, bytes), bytes.length);
     }
   }
 }
