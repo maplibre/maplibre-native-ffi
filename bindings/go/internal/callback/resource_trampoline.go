@@ -6,6 +6,7 @@ package callback
 */
 import "C"
 import (
+	stdruntime "runtime"
 	"runtime/cgo"
 	"unsafe"
 )
@@ -18,7 +19,7 @@ func goMaplibreResourceTransform(userData unsafe.Pointer, kind C.uint32_t, url *
 		}
 	}()
 
-	if outResponse == nil || url == nil {
+	if userData == nil || outResponse == nil || url == nil {
 		return C.mln_status(C.MLN_STATUS_INVALID_ARGUMENT)
 	}
 	outResponse.size = C.uint32_t(unsafe.Sizeof(C.mln_resource_transform_response{}))
@@ -29,14 +30,22 @@ func goMaplibreResourceTransform(userData unsafe.Pointer, kind C.uint32_t, url *
 	if !ok || state == nil {
 		return C.mln_status(C.MLN_STATUS_INVALID_ARGUMENT)
 	}
-	pointer, invokeStatus := state.invoke(uint32(kind), C.GoString(url))
+	replacement, replace, invokeStatus := state.invoke(uint32(kind), C.GoString(url))
 	if invokeStatus != int32(C.MLN_STATUS_OK) {
 		return C.mln_status(invokeStatus)
 	}
-	if pointer != nil {
-		outResponse.url = (*C.char)(pointer)
+	if !replace || replacement == "" {
+		return C.mln_status(C.MLN_STATUS_OK)
 	}
-	return C.mln_status(int32(C.MLN_STATUS_OK))
+
+	bytes := []byte(replacement)
+	status = C.mln_resource_transform_response_set_url(
+		outResponse,
+		(*C.char)(unsafe.Pointer(&bytes[0])),
+		C.size_t(len(bytes)),
+	)
+	stdruntime.KeepAlive(bytes)
+	return status
 }
 
 //export goMaplibreResourceProvider

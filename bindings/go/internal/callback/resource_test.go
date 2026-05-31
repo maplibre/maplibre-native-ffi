@@ -8,6 +8,7 @@ import (
 const (
 	testStatusOK              int32  = 0
 	testStatusInvalidArgument int32  = -1
+	testStatusInvalidState    int32  = -2
 	testStatusNativeError     int32  = -5
 	testResourceKindStyle     uint32 = 1
 	testResourceKindTile      uint32 = 3
@@ -32,14 +33,14 @@ func TestResourceTransformStateCopiesReplacementURL(t *testing.T) {
 	}
 }
 
-func TestResourceTransformTrampolineCopiesReplacementToThreadStorage(t *testing.T) {
+func TestResourceTransformTrampolineRequiresNativeResponseContext(t *testing.T) {
 	state := newResourceTransformState(func(uint32, string) (string, bool) {
 		return "https://example.com/replacement", true
 	})
 	defer state.Release()
 
 	replacement, replaced, status := invokeResourceTransformTrampolineReplacementForTest(state, testResourceKindStyle, "https://example.com/style.json")
-	if status != testStatusOK || !replaced || replacement != "https://example.com/replacement" {
+	if status != testStatusInvalidState || replaced || replacement != "" {
 		t.Fatalf("invoke = %q, %v, %v", replacement, replaced, status)
 	}
 }
