@@ -428,9 +428,6 @@ public final class RenderSessionHandle {
   }
 }
 
-// Maintenance note: Metal and Vulkan frame wrappers intentionally stay explicit in
-// this branch. A focused follow-up can extract their shared lifetime machinery while
-// keeping backend-specific pointer names clear.
 public final class MetalOwnedTextureFrameView {
   private let texturePointer: NativePointer
   private let devicePointer: NativePointer
