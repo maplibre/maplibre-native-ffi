@@ -40,6 +40,19 @@ private final class ResourceCancellationResult: @unchecked Sendable {
   }
 }
 
+private final class ResourceHandleStateCapture: @unchecked Sendable {
+  private let lock = NSLock()
+  private var state: NativeResourceRequestHandleState?
+
+  func store(_ state: NativeResourceRequestHandleState) {
+    lock.withLock { self.state = state }
+  }
+
+  func load() -> NativeResourceRequestHandleState? {
+    lock.withLock { state }
+  }
+}
+
 @Test func runtimeCreateRunPollAndClose() throws {
   let runtime = try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
   try runtime.runOnce()
@@ -109,7 +122,7 @@ private final class ResourceCancellationResult: @unchecked Sendable {
     #expect(failure.diagnostic.contains("already completed"))
   }
 
-  state.markProviderReturnedHandle()
+  _ = state.finishProviderDecision(MLN_RESOURCE_PROVIDER_DECISION_HANDLE.rawValue)
 
   #expect(counters.snapshot().complete == 1)
   #expect(counters.snapshot().release == 1)
@@ -132,7 +145,7 @@ private final class ResourceCancellationResult: @unchecked Sendable {
     release: { _ in counters.released() }
   )
   let state = try NativeResourceRequestHandleState(pointer: OpaquePointer(bitPattern: 0x6), functions: functions)
-  state.markProviderReturnedHandle()
+  _ = state.finishProviderDecision(MLN_RESOURCE_PROVIDER_DECISION_HANDLE.rawValue)
 
   let cancellationResult = ResourceCancellationResult()
   DispatchQueue.global().async {
@@ -217,6 +230,64 @@ private final class ResourceCancellationResult: @unchecked Sendable {
   }
 
   #expect(decision == 1)
+  #expect(counters.snapshot().complete == 1)
+  #expect(counters.snapshot().release == 1)
+}
+
+@Test func resourceProviderPassThroughClosesEscapedHandleState() throws {
+  let counters = ResourceCounters()
+  let functions = NativeResourceRequestHandleFunctions(
+    complete: { _, _ in counters.completed() },
+    cancelled: { _ in false },
+    release: { _ in counters.released() }
+  )
+  let escapedState = ResourceHandleStateCapture()
+  let state = NativeResourceProviderState(handleFunctions: functions) { _, nativeHandle in
+    escapedState.store(nativeHandle)
+    return MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH.rawValue
+  }
+
+  let decision = try NativeString.withCString("https://example.test/tile") { url in
+    var request = mln_resource_request()
+    request.size = UInt32(MemoryLayout<mln_resource_request>.size)
+    request.url = url
+    return state.invokeForTesting(request: request, handle: OpaquePointer(bitPattern: 0x7))
+  }
+
+  #expect(decision == MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH.rawValue)
+  do {
+    try escapedState.load()?.complete(NativeResourceResponseInput(status: ResourceResponseStatus.ok.rawValue, errorReason: ResourceErrorReason.none.rawValue))
+    Issue.record("pass-through handle should be closed")
+  } catch let failure as NativeStatusFailure {
+    #expect(failure.diagnostic.contains("closed"))
+  }
+  #expect(counters.snapshot().complete == 0)
+  #expect(counters.snapshot().release == 0)
+}
+
+@Test func resourceProviderInlineCompletionForcesHandleDecision() throws {
+  let counters = ResourceCounters()
+  let functions = NativeResourceRequestHandleFunctions(
+    complete: { _, response in
+      counters.completed()
+      #expect(response.status == ResourceResponseStatus.ok.rawValue)
+    },
+    cancelled: { _ in false },
+    release: { _ in counters.released() }
+  )
+  let state = NativeResourceProviderState(handleFunctions: functions) { _, nativeHandle in
+    try? nativeHandle.complete(NativeResourceResponseInput(status: ResourceResponseStatus.ok.rawValue, errorReason: ResourceErrorReason.none.rawValue))
+    return MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH.rawValue
+  }
+
+  let decision = try NativeString.withCString("https://example.test/tile") { url in
+    var request = mln_resource_request()
+    request.size = UInt32(MemoryLayout<mln_resource_request>.size)
+    request.url = url
+    return state.invokeForTesting(request: request, handle: OpaquePointer(bitPattern: 0x8))
+  }
+
+  #expect(decision == MLN_RESOURCE_PROVIDER_DECISION_HANDLE.rawValue)
   #expect(counters.snapshot().complete == 1)
   #expect(counters.snapshot().release == 1)
 }

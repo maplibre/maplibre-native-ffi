@@ -130,10 +130,17 @@ struct NativeResourceRequestHandleFunctions: Sendable {
 }
 
 final class NativeResourceRequestHandleState: @unchecked Sendable {
+  private enum ProviderOwnership {
+    case pending
+    case nativeWillRelease
+    case providerOwned
+  }
+
   private let functions: NativeResourceRequestHandleFunctions
   private let condition = NSCondition()
   private var pointer: OpaquePointer?
-  private var providerReturnedHandle = false
+  private var providerOwnership = ProviderOwnership.pending
+  private var finalizedProviderDecision: UInt32?
   private var completed = false
   private var releaseRequested = false
   private var inFlightOperations = 0
@@ -153,14 +160,35 @@ final class NativeResourceRequestHandleState: @unchecked Sendable {
     release()
   }
 
-  func markProviderReturnedHandle() {
-    let handle = condition.withLock {
-      providerReturnedHandle = true
-      return takeReleasableHandleLocked()
+  func finishProviderDecision(_ decision: UInt32) -> UInt32 {
+    let result = condition.withLock {
+      while inFlightOperations > 0 {
+        condition.wait()
+      }
+      if let finalizedProviderDecision {
+        return (
+          decision: finalizedProviderDecision,
+          handle: takeReleasableHandleLocked()
+        )
+      }
+      if completed || decision == MLN_RESOURCE_PROVIDER_DECISION_HANDLE.rawValue {
+        providerOwnership = .providerOwned
+        finalizedProviderDecision = MLN_RESOURCE_PROVIDER_DECISION_HANDLE.rawValue
+      } else {
+        providerOwnership = .nativeWillRelease
+        finalizedProviderDecision = decision
+        pointer = nil
+        releaseRequested = true
+      }
+      return (
+        decision: finalizedProviderDecision ?? decision,
+        handle: takeReleasableHandleLocked()
+      )
     }
-    if let handle {
+    if let handle = result.handle {
       functions.release(handle)
     }
+    return result.decision
   }
 
   func complete(_ response: NativeResourceResponseInput) throws {
@@ -168,6 +196,9 @@ final class NativeResourceRequestHandleState: @unchecked Sendable {
     do {
       try functions.complete(handle, response)
     } catch {
+      condition.withLock {
+        completed = false
+      }
       finishNativeOperation()
       throw error
     }
@@ -183,7 +214,7 @@ final class NativeResourceRequestHandleState: @unchecked Sendable {
   func release() {
     let handle = condition.withLock {
       releaseRequested = true
-      while providerReturnedHandle, inFlightOperations > 0 {
+      while providerOwnership == .providerOwned, inFlightOperations > 0 {
         condition.wait()
       }
       return takeReleasableHandleLocked()
@@ -230,7 +261,7 @@ final class NativeResourceRequestHandleState: @unchecked Sendable {
   }
 
   private func takeReleasableHandleLocked() -> OpaquePointer? {
-    guard providerReturnedHandle, inFlightOperations == 0, completed || releaseRequested else { return nil }
+    guard providerOwnership == .providerOwned, inFlightOperations == 0, completed || releaseRequested else { return nil }
     let handle = pointer
     pointer = nil
     return handle
@@ -338,10 +369,7 @@ private final class NativeResourceProviderBox: @unchecked Sendable {
       return UInt32.max
     }
     let decision = callback(copiedRequest, state)
-    if decision == MLN_RESOURCE_PROVIDER_DECISION_HANDLE.rawValue {
-      state.markProviderReturnedHandle()
-    }
-    return decision
+    return state.finishProviderDecision(decision)
   }
 }
 
