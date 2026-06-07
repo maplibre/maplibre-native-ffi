@@ -14,8 +14,8 @@ Resources:
 ## Architecture
 
 The C# binding exposes a low-level .NET API over the public C API. It targets
-`net10.0` for source-generated interop, NativeAOT-compatible call paths,
-trimming-friendly metadata, and modern memory helpers.
+`net10.0` for ClangSharp-generated P/Invoke declarations, NativeAOT-conscious
+unmanaged signatures, trimming-friendly metadata, and modern memory helpers.
 
 Keep ClangSharp-generated declarations internal: constants, layouts, opaque
 pointer types, and raw functions. Internal support code owns status conversion,
@@ -23,11 +23,12 @@ diagnostics, descriptor materializers, UTF-8 helpers, callback state, native
 memory guards, and handle state. The public layer is handwritten C# handles,
 values, descriptors, callbacks, and exceptions.
 
-Prefer source-generated `LibraryImport` stubs for raw calls that the generator
-can express cleanly. Handwritten P/Invokes cover generator gaps and use the same
-internal shape. Keep the public API parallel to Java FFM and JNI where
-practical: same concepts, same handle suffixes, same copied-value model, and
-.NET-specific names and resource patterns.
+Generated raw functions use ClangSharp's `DllImport` output. Keep the raw
+interop layer mechanically generated from the C headers; use handwritten imports
+only when the generated declaration cannot express a native contract correctly.
+Keep the public API parallel to Java FFM and JNI where practical: same concepts,
+same handle suffixes, same copied-value model, and .NET-specific names and
+resource patterns.
 
 ## Public Types
 
@@ -79,8 +80,10 @@ above this layer.
 Successful `Close()` releases the native object once, releases managed callback
 state, stores a closed marker, and makes later close calls no-ops. If native
 destruction fails, the handle remains live for retry. Public methods validate
-closed wrappers, active texture frames, callback-scoped borrows, and one-shot
-request completion before crossing into C.
+closed wrappers, callback-scoped borrows, and one-shot request completion before
+crossing into C. Native render-session state, including whether a texture frame
+is currently acquired, stays validated by the C API and surfaces through native
+status mapping.
 
 ## Status, Diagnostics, and Strings
 
@@ -145,9 +148,10 @@ synchronized for the C API's required lifetime.
 Texture readback supports caller-owned `Span<byte>` or arrays for reusable
 storage and may offer a copied image convenience method. Session-owned texture
 frames use explicit disposable frame handles. A frame handle acquires the native
-frame, exposes copied metadata and scoped `NativePointer` values, rejects access
-after close, and closes before resize, another render update, detach, or session
-destruction.
+frame, exposes copied metadata and scoped `NativePointer` values, and rejects
+access after close. The C API enforces render-session operations that are
+invalid while a frame is acquired; the binding maps those statuses without
+duplicating native validation.
 
 ## Testing
 

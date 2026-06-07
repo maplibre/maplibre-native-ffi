@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="src/Maplibre.Native/Maplibre.Native.csproj" />
+  <Project Path="tests/Maplibre.Native.Tests/Maplibre.Native.Tests.csproj" />
+</Solution>

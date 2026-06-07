@@ -349,7 +349,7 @@ public final class RuntimeHandle implements AutoCloseable {
     return regionStatus;
   }
 
-  public void discardOfflineOperation(OfflineOperationHandle<?> operation) {
+  void discardOfflineOperation(OfflineOperationHandle<?> operation) {
     NativeLibrary.ensureLoaded();
     Objects.requireNonNull(operation, "operation");
     if (operation.isClosed()) {

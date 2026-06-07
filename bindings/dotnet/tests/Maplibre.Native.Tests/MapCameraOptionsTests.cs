@@ -1,0 +1,271 @@
+using Maplibre.Native.Camera;
+using Maplibre.Native.Geo;
+using Maplibre.Native.Map;
+using Maplibre.Native.Runtime;
+using Xunit;
+
+namespace Maplibre.Native.Tests;
+
+public sealed class MapCameraOptionsTests
+{
+    private const int CoordinatePrecision = 10;
+
+    private static void AssertClose(LatLng expected, LatLng actual)
+    {
+        Assert.Equal(expected.Latitude, actual.Latitude, CoordinatePrecision);
+        Assert.Equal(expected.Longitude, actual.Longitude, CoordinatePrecision);
+    }
+
+    [Fact]
+    public void ViewportAndTileOptionsRoundTripThroughNativeMap()
+    {
+        NativeLibraryTestSupport.SkipUnlessNativeLibraryIsAvailable();
+        using var runtime = RuntimeHandle.Create();
+        using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
+
+        map.SetViewportOptions(
+            new ViewportOptions
+            {
+                NorthOrientation = NorthOrientation.Right,
+                ConstrainMode = ConstrainMode.WidthAndHeight,
+                ViewportMode = ViewportMode.FlippedY,
+                FrustumOffset = new EdgeInsets(1, 2, 3, 4),
+            }
+        );
+        map.SetTileOptions(
+            new TileOptions
+            {
+                PrefetchZoomDelta = 3,
+                LodMinimumRadius = 1.5,
+                LodScale = 2.5,
+                LodPitchThreshold = 45,
+                LodZoomShift = 1.25,
+                LodMode = TileLodMode.Distance,
+            }
+        );
+
+        var viewport = map.GetViewportOptions();
+        Assert.Equal(NorthOrientation.Right, viewport.NorthOrientation);
+        Assert.Equal(ConstrainMode.WidthAndHeight, viewport.ConstrainMode);
+        Assert.Equal(ViewportMode.FlippedY, viewport.ViewportMode);
+        Assert.Equal(new EdgeInsets(1, 2, 3, 4), viewport.FrustumOffset);
+
+        var tile = map.GetTileOptions();
+        Assert.Equal(3u, tile.PrefetchZoomDelta);
+        Assert.Equal(1.5, tile.LodMinimumRadius);
+        Assert.Equal(2.5, tile.LodScale);
+        Assert.Equal(45, tile.LodPitchThreshold);
+        Assert.Equal(1.25, tile.LodZoomShift);
+        Assert.Equal(TileLodMode.Distance, tile.LodMode);
+    }
+
+    [Fact]
+    public void CameraFitHelpersCopyDescriptorsThroughNativeMap()
+    {
+        NativeLibraryTestSupport.SkipUnlessNativeLibraryIsAvailable();
+        using var runtime = RuntimeHandle.Create();
+        using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
+        var bounds = new LatLngBounds(new LatLng(-10, -20), new LatLng(10, 20));
+        var fit = new CameraFitOptions
+        {
+            Padding = new EdgeInsets(1, 2, 3, 4),
+            Bearing = 5,
+            Pitch = 10,
+        };
+
+        var boundsCamera = map.CameraForLatLngBounds(bounds, fit);
+        var coordinatesCamera = map.CameraForLatLngs([bounds.Southwest, bounds.Northeast], fit);
+        var geometryCamera = map.CameraForGeometry(
+            new Geometry.LineString([bounds.Southwest, bounds.Northeast]),
+            fit
+        );
+
+        Assert.NotNull(boundsCamera.Center);
+        Assert.NotNull(boundsCamera.Zoom);
+        Assert.NotNull(coordinatesCamera.Center);
+        Assert.NotNull(coordinatesCamera.Zoom);
+        Assert.NotNull(geometryCamera.Center);
+        Assert.NotNull(geometryCamera.Zoom);
+    }
+
+    [Fact]
+    public void BoundsAndProjectionOptionsRoundTripThroughNativeMap()
+    {
+        NativeLibraryTestSupport.SkipUnlessNativeLibraryIsAvailable();
+        using var runtime = RuntimeHandle.Create();
+        using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
+
+        var bounds = new LatLngBounds(new LatLng(-10, -20), new LatLng(10, 20));
+        map.SetBounds(
+            new BoundOptions
+            {
+                Bounds = bounds,
+                MinimumZoom = 1,
+                MaximumZoom = 12,
+                MinimumPitch = 0,
+                MaximumPitch = 60,
+            }
+        );
+        map.SetProjectionMode(
+            new ProjectionModeOptions
+            {
+                Axonometric = true,
+                XSkew = 0.1,
+                YSkew = 0.2,
+            }
+        );
+
+        var copiedBounds = map.GetBounds();
+        Assert.Equal(bounds, copiedBounds.Bounds);
+        Assert.NotNull(copiedBounds.MinimumZoom);
+        Assert.Equal(1, copiedBounds.MinimumZoom.Value, 12);
+        Assert.NotNull(copiedBounds.MaximumZoom);
+        Assert.Equal(12, copiedBounds.MaximumZoom.Value, 12);
+        Assert.NotNull(copiedBounds.MinimumPitch);
+        Assert.Equal(0, copiedBounds.MinimumPitch.Value, 12);
+        Assert.NotNull(copiedBounds.MaximumPitch);
+        Assert.Equal(60, copiedBounds.MaximumPitch.Value, 12);
+
+        var projectionMode = map.GetProjectionMode();
+        Assert.True(projectionMode.Axonometric);
+        Assert.NotNull(projectionMode.XSkew);
+        Assert.Equal(0.1, projectionMode.XSkew.Value, 12);
+        Assert.NotNull(projectionMode.YSkew);
+        Assert.Equal(0.2, projectionMode.YSkew.Value, 12);
+
+        var visibleBounds = map.LatLngBoundsForCamera(
+            new CameraOptions { Center = new LatLng(0, 0), Zoom = 1 }
+        );
+        var unwrappedBounds = map.LatLngBoundsForCameraUnwrapped(
+            new CameraOptions { Center = new LatLng(0, 0), Zoom = 1 }
+        );
+        Assert.True(visibleBounds.Southwest.Latitude <= visibleBounds.Northeast.Latitude);
+        Assert.True(unwrappedBounds.Southwest.Latitude <= unwrappedBounds.Northeast.Latitude);
+    }
+
+    [Fact]
+    public void CoordinateProjectionRoundTripsThroughNativeMap()
+    {
+        NativeLibraryTestSupport.SkipUnlessNativeLibraryIsAvailable();
+        using var runtime = RuntimeHandle.Create();
+        using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
+        var coordinate = new LatLng(12.5, 34.25);
+
+        var point = map.PixelForLatLng(coordinate);
+        AssertClose(coordinate, map.LatLngForPixel(point));
+
+        var points = map.PixelsForLatLngs([coordinate, new LatLng(0, 0)]);
+        Assert.Equal(2, points.Length);
+        var coordinates = map.LatLngsForPixels(points);
+        Assert.Equal(2, coordinates.Length);
+        AssertClose(coordinate, coordinates[0]);
+        AssertClose(new LatLng(0, 0), coordinates[1]);
+
+        Assert.Empty(map.PixelsForLatLngs([]));
+        Assert.Empty(map.LatLngsForPixels([]));
+    }
+
+    [Fact]
+    public void ProjectionSnapshotSupportsCameraAndCoordinateConversions()
+    {
+        NativeLibraryTestSupport.SkipUnlessNativeLibraryIsAvailable();
+        using var runtime = RuntimeHandle.Create();
+        using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
+        using var projection = map.CreateProjection();
+        var coordinate = new LatLng(12.5, 34.25);
+
+        projection.SetCamera(new CameraOptions { Center = new LatLng(0, 0), Zoom = 1 });
+        projection.SetVisibleCoordinates(
+            [new LatLng(-10, -20), new LatLng(10, 20)],
+            new EdgeInsets(1, 2, 3, 4)
+        );
+        projection.SetVisibleGeometry(
+            new Geometry.LineString([new LatLng(-10, -20), new LatLng(10, 20)]),
+            new EdgeInsets(1, 2, 3, 4)
+        );
+
+        var camera = projection.GetCamera();
+        Assert.NotNull(camera.Center);
+        var point = projection.PixelForLatLng(coordinate);
+        AssertClose(coordinate, projection.LatLngForPixel(point));
+
+        projection.Close();
+        Assert.True(projection.IsClosed);
+    }
+
+    [Fact]
+    public void FreeCameraOptionsCanBeCopiedThroughNativeMap()
+    {
+        NativeLibraryTestSupport.SkipUnlessNativeLibraryIsAvailable();
+        using var runtime = RuntimeHandle.Create();
+        using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
+
+        var freeCamera = map.GetFreeCameraOptions();
+        map.SetFreeCameraOptions(freeCamera);
+    }
+
+    [Fact]
+    public void CameraTransitionCommandsAcceptOptionalAnimationDescriptors()
+    {
+        NativeLibraryTestSupport.SkipUnlessNativeLibraryIsAvailable();
+        using var runtime = RuntimeHandle.Create();
+        using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
+        var camera = new CameraOptions { Center = new LatLng(0, 0), Zoom = 1 };
+        var animation = new AnimationOptions
+        {
+            Duration = 0,
+            MinimumZoom = 0,
+            Easing = new UnitBezier(0, 0, 1, 1),
+        };
+
+        map.EaseTo(camera);
+        map.EaseTo(camera, animation);
+        map.FlyTo(camera);
+        map.FlyTo(camera, animation);
+        map.MoveBy(0, 0);
+        map.MoveByAnimated(0, 0);
+        map.MoveByAnimated(0, 0, animation);
+        map.ScaleBy(1);
+        map.ScaleBy(1, new ScreenPoint(256, 256));
+        map.ScaleByAnimated(1);
+        map.ScaleByAnimated(1, new ScreenPoint(256, 256));
+        map.ScaleByAnimated(1, animation);
+        map.ScaleByAnimated(1, new ScreenPoint(256, 256), animation);
+        map.RotateBy(new ScreenPoint(0, 0), new ScreenPoint(1, 1));
+        map.RotateByAnimated(new ScreenPoint(0, 0), new ScreenPoint(1, 1));
+        map.RotateByAnimated(new ScreenPoint(0, 0), new ScreenPoint(1, 1), animation);
+        map.PitchBy(0);
+        map.PitchByAnimated(0);
+        map.PitchByAnimated(0, animation);
+        map.CancelTransitions();
+    }
+
+    [Fact]
+    public void JumpToAppliesCameraFieldsThroughNativeMap()
+    {
+        NativeLibraryTestSupport.SkipUnlessNativeLibraryIsAvailable();
+        using var runtime = RuntimeHandle.Create();
+        using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
+
+        map.JumpTo(
+            new CameraOptions
+            {
+                Center = new LatLng(12.5, 34.25),
+                Zoom = 5.5,
+                Bearing = 45,
+                Pitch = 30,
+            }
+        );
+
+        var camera = map.GetCamera();
+        Assert.NotNull(camera.Center);
+        Assert.Equal(12.5, camera.Center.Value.Latitude, 12);
+        Assert.Equal(34.25, camera.Center.Value.Longitude, 12);
+        Assert.NotNull(camera.Zoom);
+        Assert.Equal(5.5, camera.Zoom.Value, 12);
+        Assert.NotNull(camera.Bearing);
+        Assert.Equal(45, camera.Bearing.Value, 12);
+        Assert.NotNull(camera.Pitch);
+        Assert.Equal(30, camera.Pitch.Value, 12);
+    }
+}

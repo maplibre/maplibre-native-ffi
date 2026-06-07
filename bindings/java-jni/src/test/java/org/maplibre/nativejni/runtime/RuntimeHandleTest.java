@@ -61,9 +61,9 @@ class RuntimeHandleTest {
       assertTrue(operation.kind() == OfflineOperationKind.AMBIENT_CACHE);
       assertTrue(operation.resultKind() == OfflineOperationResultKind.NONE);
 
-      runtime.discardOfflineOperation(operation);
+      operation.close();
       assertTrue(operation.isClosed());
-      runtime.discardOfflineOperation(operation);
+      operation.close();
     }
   }
 
@@ -73,9 +73,9 @@ class RuntimeHandleTest {
     var operation = runtime.startAmbientCacheOperation(AmbientCacheOperation.CLEAR);
     runtime.close();
 
-    assertThrows(InvalidStateException.class, () -> runtime.discardOfflineOperation(operation));
+    assertThrows(InvalidStateException.class, operation::close);
     assertTrue(operation.isClosed());
-    runtime.discardOfflineOperation(operation);
+    operation.close();
   }
 
   @Test
@@ -97,7 +97,7 @@ class RuntimeHandleTest {
       try {
         runtime.takeCreateOfflineRegionResult(operation);
       } catch (InvalidStateException expectedIfStillRunning) {
-        runtime.discardOfflineOperation(operation);
+        operation.close();
       }
 
       var geometryOperation =
@@ -112,7 +112,7 @@ class RuntimeHandleTest {
               new byte[] {1, 2, 3});
       assertTrue(geometryOperation.kind() == OfflineOperationKind.REGION_CREATE);
       assertTrue(geometryOperation.resultKind() == OfflineOperationResultKind.REGION);
-      runtime.discardOfflineOperation(geometryOperation);
+      geometryOperation.close();
     }
   }
 
@@ -122,32 +122,31 @@ class RuntimeHandleTest {
       var get = runtime.startOfflineRegion(123);
       assertTrue(get.kind() == OfflineOperationKind.REGION_GET);
       assertTrue(get.resultKind() == OfflineOperationResultKind.OPTIONAL_REGION);
-      runtime.discardOfflineOperation(get);
+      get.close();
 
       var list = runtime.startOfflineRegions();
       assertTrue(list.kind() == OfflineOperationKind.REGIONS_LIST);
       assertTrue(list.resultKind() == OfflineOperationResultKind.REGION_LIST);
-      runtime.discardOfflineOperation(list);
+      list.close();
 
       var update = runtime.startUpdateOfflineRegionMetadata(123, new byte[] {4, 5, 6});
       assertTrue(update.kind() == OfflineOperationKind.REGION_UPDATE_METADATA);
       assertTrue(update.resultKind() == OfflineOperationResultKind.REGION);
       assertThrows(
           InvalidStateException.class, () -> runtime.takeUpdateOfflineRegionMetadataResult(update));
-      runtime.discardOfflineOperation(update);
+      update.close();
 
       var status = runtime.startOfflineRegionStatus(123);
       assertTrue(status.kind() == OfflineOperationKind.REGION_GET_STATUS);
       assertTrue(status.resultKind() == OfflineOperationResultKind.REGION_STATUS);
       assertThrows(
           InvalidStateException.class, () -> runtime.takeOfflineRegionStatusResult(status));
-      runtime.discardOfflineOperation(status);
+      status.close();
 
-      runtime.discardOfflineOperation(runtime.startSetOfflineRegionObserved(123, false));
-      runtime.discardOfflineOperation(
-          runtime.startSetOfflineRegionDownloadState(123, OfflineRegionDownloadState.INACTIVE));
-      runtime.discardOfflineOperation(runtime.startInvalidateOfflineRegion(123));
-      runtime.discardOfflineOperation(runtime.startDeleteOfflineRegion(123));
+      runtime.startSetOfflineRegionObserved(123, false).close();
+      runtime.startSetOfflineRegionDownloadState(123, OfflineRegionDownloadState.INACTIVE).close();
+      runtime.startInvalidateOfflineRegion(123).close();
+      runtime.startDeleteOfflineRegion(123).close();
     }
   }
 

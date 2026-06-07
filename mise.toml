@@ -10,8 +10,8 @@ lockfile_platforms = ["linux-x64", "linux-arm64", "macos-arm64", "windows-x64"]
 pin = true
 experimental = true
 python.uv_venv_auto = "create|source"
-windows_default_file_shell_args = 'pixi run --locked -x "C:/Program Files/Git/bin/bash.exe" -e -lc "source \"$MLN_FFI_REPO_ROOT/.mise/bin/windows-msvc-path.sh\"; exec \"C:/Program Files/Git/bin/bash.exe\" \"$@\"" _'
-windows_default_inline_shell_args = 'pixi run --locked -x "C:/Program Files/Git/bin/bash.exe" -e -lc "source \"$MLN_FFI_REPO_ROOT/.mise/bin/windows-msvc-path.sh\"; eval \"$1\"" _'
+windows_default_file_shell_args = 'pixi run --locked -x "C:/Program Files/Git/bin/bash.exe" -e -lc "source ""$MLN_FFI_REPO_ROOT/.mise/bin/windows-msvc-path.sh""; exec ""C:/Program Files/Git/bin/bash.exe"" ""$@""" _'
+windows_default_inline_shell_args = 'pixi run --locked -x "C:/Program Files/Git/bin/bash.exe" -e -lc "source ""$MLN_FFI_REPO_ROOT/.mise/bin/windows-msvc-path.sh""; eval ""$1""" _'
 unix_default_file_shell_args = "bash"
 unix_default_inline_shell_args = "pixi run --locked -x bash -e -lc"
 # On Windows, the Microsoft Store Python alias in WindowsApps can appear before
@@ -83,6 +83,7 @@ postinstall = [
   "{% if os() == \"windows\" %}cp \"$CONDA_PREFIX/Library/bin/libclang-13.dll\" \"$CONDA_PREFIX/Library/bin/libclang.dll\"{% endif %}",
   "uv sync --locked --quiet",
   "pnpm install --frozen-lockfile --loglevel warn",
+  "cd bindings/dotnet && dotnet tool restore --verbosity quiet",
   # Astro type stubs for vp typeCheck on docs sources (.astro/ is gitignored).
   "pnpm --filter docs exec astro sync",
 ]
@@ -154,6 +155,8 @@ shell = '{% if os() == "windows" %}cmd /c{% else %}sh -c -o errexit{% endif %}'
 
 [tasks."ci:lint"]
 run = [
+  # Warm process-plugin cache before hk runs parallel dprint batches.
+  "dprint output-resolved-config > /dev/null",
   "hk fix --all",
   "git update-index -q --refresh",
   # Lockfile drift is common across different mise builds

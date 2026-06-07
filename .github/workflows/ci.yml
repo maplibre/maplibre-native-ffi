@@ -69,6 +69,8 @@ jobs:
         run: mise run //bindings/java-ffm:build
       - name: Build Java JNI binding
         run: mise run //bindings/java-jni:build
+      - name: Test .NET binding
+        run: mise run //bindings/dotnet:test
       # linux-arm64: no Kotlin/Native host — https://youtrack.jetbrains.com/issue/KT-36871
       # windows: no MSVC target — https://youtrack.jetbrains.com/issue/SKIKO-446
       - name: Test Kotlin/Native binding
@@ -76,6 +78,9 @@ jobs:
         run: mise run //bindings/kotlin-native:build
       - name: Test Rust binding
         run: mise run //bindings/rust:ci
+      - name: Test Swift binding
+        if: ${{ startsWith(matrix.mise_env, 'macos-') }}
+        run: mise run //bindings/swift:test
       - name: Test Zig binding
         run: mise run //bindings/zig:ci
 

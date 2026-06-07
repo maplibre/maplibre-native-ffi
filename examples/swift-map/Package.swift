@@ -2,25 +2,22 @@
 
 import PackageDescription
 
-let nativeBuildDir = Context.environment["MLN_FFI_BUILD_DIR"] ?? {
-  fatalError("MLN_FFI_BUILD_DIR is required")
-}()
-
 let package = Package(
   name: "swift-map",
-  platforms: [.macOS(.v14)],
+  platforms: [.macOS("14.3")],
   products: [
     .executable(name: "swift-map", targets: ["SwiftMap"]),
   ],
+  dependencies: [
+    .package(name: "maplibre-native-swift", path: "../../bindings/swift"),
+  ],
   targets: [
-    .systemLibrary(
-      name: "CMapLibreNativeC"
-    ),
     .executableTarget(
       name: "SwiftMap",
-      dependencies: ["CMapLibreNativeC"],
+      dependencies: [
+        .product(name: "MaplibreNative", package: "maplibre-native-swift"),
+      ],
       linkerSettings: [
-        .unsafeFlags(["-L\(nativeBuildDir)", "-lmaplibre-native-c", "-Xlinker", "-rpath", "-Xlinker", nativeBuildDir]),
         .linkedFramework("AppKit"),
         .linkedFramework("Metal"),
         .linkedFramework("QuartzCore"),

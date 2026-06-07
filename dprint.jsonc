@@ -6,7 +6,7 @@
   "lineWidth": 80,
   "indentWidth": 2,
   "useTabs": false,
-  "newLineKind": "auto",
+  "newLineKind": "lf",
   "excludes": [
     "third_party/**",
     "**/*-lock.yaml",
@@ -17,6 +17,7 @@
     "Cargo.lock",
     "gradlew",
     "gradlew.bat",
+    "**/*.g.cs",
   ],
   "json": { "preferSingleLine": true },
   "markdown": { "textWrap": "always" },
@@ -43,6 +44,12 @@
       {
         "command": "google-java-format - --assume-filename {{file_path}}",
         "exts": ["java"],
+      },
+      {
+        "command": "dotnet csharpier format --write-stdout --stdin-path {{file_path}} --log-level None",
+        "cwd": "bindings/dotnet",
+        "exts": ["cs"],
+        "cacheKeyFiles": ["dotnet-tools.json"],
       },
       { "command": "zig fmt --stdin", "exts": ["zig"] },
       { "command": "zig fmt --stdin --zon", "exts": ["zon"] },
