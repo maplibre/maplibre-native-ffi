@@ -1,6 +1,5 @@
 using Maplibre.Native.Runtime;
 using Xunit;
-using InvalidArgumentException = Maplibre.Native.Error.InvalidArgumentException;
 
 namespace Maplibre.Native.Tests;
 
@@ -26,7 +25,7 @@ public sealed class RuntimeOfflineOperationTests
     }
 
     [Fact]
-    public void OperationCloseAfterRuntimeCloseThrowsAndMarksOperationClosed()
+    public void OperationCloseAfterRuntimeCloseMarksOperationClosed()
     {
         NativeLibraryTestSupport.SkipUnlessNativeLibraryIsAvailable();
         var runtime = RuntimeHandle.Create();
@@ -34,7 +33,7 @@ public sealed class RuntimeOfflineOperationTests
 
         runtime.Close();
 
-        Assert.Throws<InvalidArgumentException>(operation.Close);
+        operation.Close();
         Assert.True(operation.IsClosed);
         operation.Close();
     }

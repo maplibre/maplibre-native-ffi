@@ -452,7 +452,7 @@ public sealed unsafe class RuntimeHandle : IDisposable
         {
             // The runtime already owns cleanup for its pending operations.
             operation.MarkConsumed();
-            throw;
+            return;
         }
 
         NativeStatus.Check(
