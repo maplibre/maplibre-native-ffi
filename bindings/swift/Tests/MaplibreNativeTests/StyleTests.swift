@@ -237,6 +237,40 @@ import Testing
   #expect(map.retainsCustomGeometrySourceCallbacks(sourceId: "custom"))
 }
 
+@Test func staleStyleLoadedEventReleasesOnlyCallbacksForMissingSources() throws {
+  let runtime = try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
+  defer { try? runtime.close() }
+  let map = try MapHandle(runtime: runtime, options: MapOptions(width: 1, height: 1))
+  defer { try? map.close() }
+
+  try map.setStyleJSON("""
+    {"version":8,"sources":{},"layers":[]}
+    """)
+  map.storeCustomGeometrySourceCallbacks(NativeCustomGeometrySourceCallbacks(fetchTile: { _ in }), sourceId: "missing")
+
+  try map.setStyleURL("https://tiles.openfreemap.org/styles/bright")
+  map.releaseCallbacksForLoadedStyleURLIfNeeded()
+
+  #expect(!map.retainsCustomGeometrySourceCallbacks(sourceId: "missing"))
+}
+
+@Test func staleStyleLoadedEventReleasesCallbacksForSourceTypeCollisions() throws {
+  let runtime = try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
+  defer { try? runtime.close() }
+  let map = try MapHandle(runtime: runtime, options: MapOptions(width: 1, height: 1))
+  defer { try? map.close() }
+
+  try map.setStyleJSON("""
+    {"version":8,"sources":{"custom":{"type":"geojson","data":{"type":"FeatureCollection","features":[]}}},"layers":[]}
+    """)
+  map.storeCustomGeometrySourceCallbacks(NativeCustomGeometrySourceCallbacks(fetchTile: { _ in }), sourceId: "custom")
+
+  try map.setStyleURL("https://tiles.openfreemap.org/styles/bright")
+  map.releaseCallbacksForLoadedStyleURLIfNeeded()
+
+  #expect(!map.retainsCustomGeometrySourceCallbacks(sourceId: "custom"))
+}
+
 @Test func closedMapRejectsStyleCallsThroughSwiftHandleState() throws {
   let runtime = try RuntimeHandle()
   defer { try? runtime.close() }

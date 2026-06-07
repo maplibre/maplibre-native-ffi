@@ -507,9 +507,11 @@ struct NativeQueriedFeature: Equatable, Sendable {
     sourceLayerId = (raw.fields & MLN_QUERIED_FEATURE_SOURCE_LAYER_ID.rawValue) != 0
       ? try NativeString.copyUTF8(data: raw.source_layer_id.data, size: raw.source_layer_id.size)
       : nil
-    state = (raw.fields & MLN_QUERIED_FEATURE_STATE.rawValue) != 0 && raw.state != nil
-      ? try NativeJSONValue(copying: raw.state.pointee)
-      : nil
+    if (raw.fields & MLN_QUERIED_FEATURE_STATE.rawValue) != 0, let statePtr = raw.state {
+      state = try NativeJSONValue(copying: statePtr.pointee)
+    } else {
+      state = nil
+    }
   }
 }
 

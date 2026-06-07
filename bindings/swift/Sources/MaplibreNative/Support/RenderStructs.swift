@@ -150,12 +150,6 @@ struct NativeMetalSurfaceDescriptorInput: Equatable, Sendable {
   let context: NativeMetalContextDescriptor
   let layerAddress: UInt
 
-  init(extent: NativeRenderTargetExtent, context: NativeMetalContextDescriptor, layerAddress: UInt) {
-    self.extent = extent
-    self.context = context
-    self.layerAddress = layerAddress
-  }
-
   func withNativeDescriptor<Result>(
     _ body: (UnsafePointer<mln_metal_surface_descriptor>) throws -> Result
   ) throws -> Result {
@@ -172,12 +166,6 @@ struct NativeVulkanSurfaceDescriptorInput: Equatable, Sendable {
   let context: NativeVulkanContextDescriptor
   let surfaceAddress: UInt
 
-  init(extent: NativeRenderTargetExtent, context: NativeVulkanContextDescriptor, surfaceAddress: UInt) {
-    self.extent = extent
-    self.context = context
-    self.surfaceAddress = surfaceAddress
-  }
-
   func withNativeDescriptor<Result>(
     _ body: (UnsafePointer<mln_vulkan_surface_descriptor>) throws -> Result
   ) throws -> Result {
@@ -193,12 +181,6 @@ struct NativeOpenGLSurfaceDescriptorInput: Equatable, Sendable {
   let extent: NativeRenderTargetExtent
   let context: NativeOpenGLContextDescriptor
   let surfaceAddress: UInt
-
-  init(extent: NativeRenderTargetExtent, context: NativeOpenGLContextDescriptor, surfaceAddress: UInt) {
-    self.extent = extent
-    self.context = context
-    self.surfaceAddress = surfaceAddress
-  }
 
   func withNativeDescriptor<Result>(
     _ body: (UnsafePointer<mln_opengl_surface_descriptor>) throws -> Result
@@ -229,11 +211,6 @@ struct NativeMetalOwnedTextureDescriptorInput: Equatable, Sendable {
   let extent: NativeRenderTargetExtent
   let context: NativeMetalContextDescriptor
 
-  init(extent: NativeRenderTargetExtent, context: NativeMetalContextDescriptor) {
-    self.extent = extent
-    self.context = context
-  }
-
   func withNativeDescriptor<Result>(
     _ body: (UnsafePointer<mln_metal_owned_texture_descriptor>) throws -> Result
   ) throws -> Result {
@@ -248,11 +225,6 @@ struct NativeMetalBorrowedTextureDescriptorInput: Equatable, Sendable {
   let extent: NativeRenderTargetExtent
   let textureAddress: UInt
 
-  init(extent: NativeRenderTargetExtent, textureAddress: UInt) {
-    self.extent = extent
-    self.textureAddress = textureAddress
-  }
-
   func withNativeDescriptor<Result>(
     _ body: (UnsafePointer<mln_metal_borrowed_texture_descriptor>) throws -> Result
   ) throws -> Result {
@@ -266,11 +238,6 @@ struct NativeMetalBorrowedTextureDescriptorInput: Equatable, Sendable {
 struct NativeVulkanOwnedTextureDescriptorInput: Equatable, Sendable {
   let extent: NativeRenderTargetExtent
   let context: NativeVulkanContextDescriptor
-
-  init(extent: NativeRenderTargetExtent, context: NativeVulkanContextDescriptor) {
-    self.extent = extent
-    self.context = context
-  }
 
   func withNativeDescriptor<Result>(
     _ body: (UnsafePointer<mln_vulkan_owned_texture_descriptor>) throws -> Result
@@ -291,24 +258,6 @@ struct NativeVulkanBorrowedTextureDescriptorInput: Equatable, Sendable {
   let initialLayout: UInt32
   let finalLayout: UInt32
 
-  init(
-    extent: NativeRenderTargetExtent,
-    context: NativeVulkanContextDescriptor,
-    imageAddress: UInt,
-    imageViewAddress: UInt,
-    format: UInt32,
-    initialLayout: UInt32,
-    finalLayout: UInt32
-  ) {
-    self.extent = extent
-    self.context = context
-    self.imageAddress = imageAddress
-    self.imageViewAddress = imageViewAddress
-    self.format = format
-    self.initialLayout = initialLayout
-    self.finalLayout = finalLayout
-  }
-
   func withNativeDescriptor<Result>(
     _ body: (UnsafePointer<mln_vulkan_borrowed_texture_descriptor>) throws -> Result
   ) throws -> Result {
@@ -328,11 +277,6 @@ struct NativeOpenGLOwnedTextureDescriptorInput: Equatable, Sendable {
   let extent: NativeRenderTargetExtent
   let context: NativeOpenGLContextDescriptor
 
-  init(extent: NativeRenderTargetExtent, context: NativeOpenGLContextDescriptor) {
-    self.extent = extent
-    self.context = context
-  }
-
   func withNativeDescriptor<Result>(
     _ body: (UnsafePointer<mln_opengl_owned_texture_descriptor>) throws -> Result
   ) throws -> Result {
@@ -348,13 +292,6 @@ struct NativeOpenGLBorrowedTextureDescriptorInput: Equatable, Sendable {
   let context: NativeOpenGLContextDescriptor
   let texture: UInt32
   let target: UInt32
-
-  init(extent: NativeRenderTargetExtent, context: NativeOpenGLContextDescriptor, texture: UInt32, target: UInt32) {
-    self.extent = extent
-    self.context = context
-    self.texture = texture
-    self.target = target
-  }
 
   func withNativeDescriptor<Result>(
     _ body: (UnsafePointer<mln_opengl_borrowed_texture_descriptor>) throws -> Result

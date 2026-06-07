@@ -21,40 +21,44 @@ final class MapState {
 
   init(viewport: Viewport, layer: CAMetalLayer) throws {
     let runtime = try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
-    var map: MapHandle?
-    var renderSession: RenderSessionHandle?
-    do {
-      let createdMap = try MapHandle(
-        runtime: runtime,
-        options: MapOptions(
-          width: viewport.logicalWidth,
-          height: viewport.logicalHeight,
-          scaleFactor: viewport.scaleFactor,
-          mode: .continuous
-        )
-      )
-      map = createdMap
-      try createdMap.setStyleURL("https://tiles.openfreemap.org/styles/bright")
-      try createdMap.jump(to: CameraOptions(
-        center: LatLng(latitude: 37.7749, longitude: -122.4194),
-        zoom: 13.0,
-        bearing: 12.0,
-        pitch: 30.0
-      ))
-      let createdRenderSession = try createdMap.attachMetalSurface(MetalSurfaceDescriptor(
-        extent: viewport.extent,
-        layer: NativePointer(bitPattern: UInt(bitPattern: Unmanaged.passUnretained(layer).toOpaque()))
-      ))
-      renderSession = createdRenderSession
-      self.runtime = runtime
-      self.map = createdMap
-      self.renderSession = createdRenderSession
-    } catch {
-      try? renderSession?.close()
-      try? map?.close()
-      try? runtime.close()
-      throw error
+    var createdMap: MapHandle?
+    var createdRenderSession: RenderSessionHandle?
+    var didInitialize = false
+    defer {
+      if !didInitialize {
+        try? createdRenderSession?.close()
+        try? createdMap?.close()
+        try? runtime.close()
+      }
     }
+
+    let map = try MapHandle(
+      runtime: runtime,
+      options: MapOptions(
+        width: viewport.logicalWidth,
+        height: viewport.logicalHeight,
+        scaleFactor: viewport.scaleFactor,
+        mode: .continuous
+      )
+    )
+    createdMap = map
+    try map.setStyleURL("https://tiles.openfreemap.org/styles/bright")
+    try map.jump(to: CameraOptions(
+      center: LatLng(latitude: 37.7749, longitude: -122.4194),
+      zoom: 13.0,
+      bearing: 12.0,
+      pitch: 30.0
+    ))
+    let renderSession = try map.attachMetalSurface(MetalSurfaceDescriptor(
+      extent: viewport.extent,
+      layer: NativePointer(bitPattern: UInt(bitPattern: Unmanaged.passUnretained(layer).toOpaque()))
+    ))
+    createdRenderSession = renderSession
+
+    self.runtime = runtime
+    self.map = map
+    self.renderSession = renderSession
+    didInitialize = true
   }
 
   func resize(_ viewport: Viewport) throws {

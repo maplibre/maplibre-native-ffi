@@ -96,12 +96,14 @@ public final class MapHandle {
   func releaseCallbacksForLoadedStyleURLIfNeeded() {
     guard styleURLReplacementPending else { return }
 
-    for sourceId in customGeometrySourceCallbacks.keys {
-      guard (try? styleSourceExists(sourceId)) == false else { return }
+    for sourceId in Array(customGeometrySourceCallbacks.keys) {
+      guard (try? styleSourceType(sourceId)) != .customVector else { continue }
+      customGeometrySourceCallbacks.removeValue(forKey: sourceId)
     }
 
-    styleURLReplacementPending = false
-    customGeometrySourceCallbacks.removeAll()
+    if customGeometrySourceCallbacks.isEmpty {
+      styleURLReplacementPending = false
+    }
   }
 
   func storeCustomGeometrySourceCallbacks(_ callbacks: NativeCustomGeometrySourceCallbacks, sourceId: String) {

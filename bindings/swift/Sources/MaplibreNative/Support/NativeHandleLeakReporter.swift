@@ -12,12 +12,13 @@ struct NativeHandleLeak: Equatable, Sendable {
 
 enum NativeHandleLeakReporter {
   private static let lock = NSLock()
-  private nonisolated(unsafe) static var handler: @Sendable (NativeHandleLeak) -> Void = { leak in
+  private static let defaultHandler: @Sendable (NativeHandleLeak) -> Void = { leak in
     fputs(
       "Leaked \(leak.typeName) native handle 0x\(String(leak.address, radix: 16)); close handles explicitly on their owner thread.\n",
       stderr
     )
   }
+  private nonisolated(unsafe) static var handler = defaultHandler
 
   static func report(_ leak: NativeHandleLeak) {
     let current = lock.withLock { handler }
@@ -31,11 +32,6 @@ enum NativeHandleLeakReporter {
   }
 
   static func resetHandler() {
-    setHandler { leak in
-      fputs(
-        "Leaked \(leak.typeName) native handle 0x\(String(leak.address, radix: 16)); close handles explicitly on their owner thread.\n",
-        stderr
-      )
-    }
+    setHandler(defaultHandler)
   }
 }
