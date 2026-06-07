@@ -10,8 +10,8 @@ lockfile_platforms = ["linux-x64", "linux-arm64", "macos-arm64", "windows-x64"]
 pin = true
 experimental = true
 python.uv_venv_auto = "create|source"
-windows_default_file_shell_args = 'pixi run --locked -x "C:/Program Files/Git/bin/bash.exe" -e -lc "source \"$MLN_FFI_REPO_ROOT/.mise/bin/windows-msvc-path.sh\"; exec \"C:/Program Files/Git/bin/bash.exe\" \"$@\"" _'
-windows_default_inline_shell_args = 'pixi run --locked -x "C:/Program Files/Git/bin/bash.exe" -e -lc "source \"$MLN_FFI_REPO_ROOT/.mise/bin/windows-msvc-path.sh\"; eval \"$1\"" _'
+windows_default_file_shell_args = 'pixi run --locked -x "C:/Program Files/Git/bin/bash.exe" -e -lc "source ""$MLN_FFI_REPO_ROOT/.mise/bin/windows-msvc-path.sh""; exec ""C:/Program Files/Git/bin/bash.exe"" ""$@""" _'
+windows_default_inline_shell_args = 'pixi run --locked -x "C:/Program Files/Git/bin/bash.exe" -e -lc "source ""$MLN_FFI_REPO_ROOT/.mise/bin/windows-msvc-path.sh""; eval ""$1""" _'
 unix_default_file_shell_args = "bash"
 unix_default_inline_shell_args = "pixi run --locked -x bash -e -lc"
 # On Windows, the Microsoft Store Python alias in WindowsApps can appear before
