@@ -2,6 +2,7 @@ using System.Runtime.InteropServices;
 using Maplibre.Native.Error;
 using Maplibre.Native.Geo;
 using Maplibre.Native.Internal.C;
+using Maplibre.Native.Internal.Loader;
 using Maplibre.Native.Style;
 
 namespace Maplibre.Native.Internal.Callback;
@@ -34,6 +35,8 @@ internal sealed unsafe class CustomGeometrySourceState : IDisposable
     {
         get
         {
+            ValidateDescriptorOptions();
+            NativeLibraryLoader.EnsureLoaded();
             var descriptor = NativeMethods.mln_custom_geometry_source_options_default();
             descriptor.fetch_tile = &FetchTile;
             descriptor.cancel_tile = &CancelTile;
@@ -64,15 +67,6 @@ internal sealed unsafe class CustomGeometrySourceState : IDisposable
             }
             if (options.Buffer is { } buffer)
             {
-                if (buffer < 0)
-                {
-                    throw new InvalidArgumentException(
-                        MaplibreStatus.InvalidArgument,
-                        null,
-                        "Custom geometry source buffer must be non-negative."
-                    );
-                }
-
                 descriptor.fields |= (uint)
                     mln_custom_geometry_source_option_field.MLN_CUSTOM_GEOMETRY_SOURCE_OPTION_BUFFER;
                 descriptor.buffer = (uint)buffer;
@@ -90,6 +84,18 @@ internal sealed unsafe class CustomGeometrySourceState : IDisposable
                 descriptor.wrap = wrap ? (byte)1 : (byte)0;
             }
             return descriptor;
+        }
+    }
+
+    private void ValidateDescriptorOptions()
+    {
+        if (options.Buffer < 0)
+        {
+            throw new InvalidArgumentException(
+                MaplibreStatus.InvalidArgument,
+                null,
+                "Custom geometry source buffer must be non-negative."
+            );
         }
     }
 
