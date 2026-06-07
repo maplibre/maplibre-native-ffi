@@ -1,3 +1,4 @@
+internal import CMaplibreNativeC
 import Foundation
 
 public enum AmbientCacheOperation: UInt32, Sendable, Hashable {
@@ -84,7 +85,7 @@ extension RuntimeHandle {
 
   public func discardOfflineOperation(_ operationId: UInt64) throws {
     try mapNativeFailure {
-      try CAPI.runtimeOfflineOperationDiscard(try requireLivePointer(), operationId: operationId)
+      try checkStatus(mln_runtime_offline_operation_discard(try requireLivePointer(), operationId))
     }
   }
 

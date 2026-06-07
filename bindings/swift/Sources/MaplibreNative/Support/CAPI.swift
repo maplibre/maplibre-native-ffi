@@ -105,28 +105,16 @@ enum CAPI {
     return bounds
   }
 
-  static func mapSetBounds(_ map: OpaquePointer, bounds: UnsafePointer<mln_bound_options>) throws {
-    try checkStatus(mln_map_set_bounds(map, bounds))
-  }
-
   static func mapGetFreeCameraOptions(_ map: OpaquePointer) throws -> mln_free_camera_options {
     var options = mln_free_camera_options_default()
     try checkStatus(mln_map_get_free_camera_options(map, &options))
     return options
   }
 
-  static func mapSetFreeCameraOptions(_ map: OpaquePointer, options: UnsafePointer<mln_free_camera_options>) throws {
-    try checkStatus(mln_map_set_free_camera_options(map, options))
-  }
-
   static func mapGetProjectionMode(_ map: OpaquePointer) throws -> mln_projection_mode {
     var mode = mln_projection_mode_default()
     try checkStatus(mln_map_get_projection_mode(map, &mode))
     return mode
-  }
-
-  static func mapSetProjectionMode(_ map: OpaquePointer, mode: UnsafePointer<mln_projection_mode>) throws {
-    try checkStatus(mln_map_set_projection_mode(map, mode))
   }
 
   static func mapPixelForLatLng(_ map: OpaquePointer, coordinate: NativeLatLng) throws -> NativeScreenPoint {
@@ -143,20 +131,12 @@ enum CAPI {
     return NativeLatLng(output.value)
   }
 
-  static func mapPixelsForLatLngs(_ map: OpaquePointer, coordinates: UnsafePointer<mln_lat_lng>?, count: Int, outPoints: UnsafeMutablePointer<mln_screen_point>?) throws {
-    try checkStatus(mln_map_pixels_for_lat_lngs(map, coordinates, count, outPoints))
-  }
-
-  static func mapLatLngsForPixels(_ map: OpaquePointer, points: UnsafePointer<mln_screen_point>?, count: Int, outCoordinates: UnsafeMutablePointer<mln_lat_lng>?) throws {
-    try checkStatus(mln_map_lat_lngs_for_pixels(map, points, count, outCoordinates))
-  }
-
   static func mapPixelsForLatLngs(_ map: OpaquePointer, coordinates: [NativeLatLng]) throws -> [NativeScreenPoint] {
     let rawCoordinates = coordinates.map(\.native)
     var rawPoints = [mln_screen_point](repeating: mln_screen_point(), count: rawCoordinates.count)
     try rawCoordinates.withUnsafeBufferPointer { coordinates in
       try rawPoints.withUnsafeMutableBufferPointer { points in
-        try mapPixelsForLatLngs(map, coordinates: coordinates.baseAddress, count: coordinates.count, outPoints: points.baseAddress)
+        try checkStatus(mln_map_pixels_for_lat_lngs(map, coordinates.baseAddress, coordinates.count, points.baseAddress))
       }
     }
     return rawPoints.map(NativeScreenPoint.init)
@@ -167,7 +147,7 @@ enum CAPI {
     var rawCoordinates = [mln_lat_lng](repeating: mln_lat_lng(), count: rawPoints.count)
     try rawPoints.withUnsafeBufferPointer { points in
       try rawCoordinates.withUnsafeMutableBufferPointer { coordinates in
-        try mapLatLngsForPixels(map, points: points.baseAddress, count: points.count, outCoordinates: coordinates.baseAddress)
+        try checkStatus(mln_map_lat_lngs_for_pixels(map, points.baseAddress, points.count, coordinates.baseAddress))
       }
     }
     return rawCoordinates.map(NativeLatLng.init)
@@ -183,38 +163,10 @@ enum CAPI {
     return projection
   }
 
-  static func destroyMapProjection(_ projection: OpaquePointer) throws {
-    try checkStatus(mln_map_projection_destroy(projection))
-  }
-
   static func mapProjectionGetCamera(_ projection: OpaquePointer) throws -> mln_camera_options {
     var camera = mln_camera_options_default()
     try checkStatus(mln_map_projection_get_camera(projection, &camera))
     return camera
-  }
-
-  static func mapProjectionSetCamera(
-    _ projection: OpaquePointer,
-    _ camera: UnsafePointer<mln_camera_options>
-  ) throws {
-    try checkStatus(mln_map_projection_set_camera(projection, camera))
-  }
-
-  static func mapProjectionSetVisibleCoordinates(
-    _ projection: OpaquePointer,
-    coordinates: UnsafePointer<mln_lat_lng>,
-    count: Int,
-    padding: mln_edge_insets
-  ) throws {
-    try checkStatus(mln_map_projection_set_visible_coordinates(projection, coordinates, count, padding))
-  }
-
-  static func mapProjectionSetVisibleGeometry(
-    _ projection: OpaquePointer,
-    geometry: UnsafePointer<mln_geometry>,
-    padding: mln_edge_insets
-  ) throws {
-    try checkStatus(mln_map_projection_set_visible_geometry(projection, geometry, padding))
   }
 
   static func mapProjectionPixelForLatLng(
@@ -441,20 +393,12 @@ enum CAPI {
     return try NativeQueriedFeature(copying: feature)
   }
 
-  static func featureQueryResultDestroy(_ result: OpaquePointer) {
-    mln_feature_query_result_destroy(result)
-  }
-
   static func jsonSnapshotCopyValue(_ snapshot: OpaquePointer) throws -> NativeJSONValue? {
     let output = try NativeMemory.withTemporary(Optional<UnsafePointer<mln_json_value>>.none) { value in
       try checkStatus(mln_json_snapshot_get(snapshot, value))
     }
     guard let value = output.value else { return nil }
     return try NativeJSONValue(copying: value.pointee)
-  }
-
-  static func jsonSnapshotDestroy(_ snapshot: OpaquePointer) {
-    mln_json_snapshot_destroy(snapshot)
   }
 
   static func styleIdListCopy(_ list: OpaquePointer) throws -> [String] {
@@ -467,14 +411,6 @@ enum CAPI {
       }
       return try NativeString.copyUTF8(data: output.value.data, size: output.value.size)
     }
-  }
-
-  static func styleIdListDestroy(_ list: OpaquePointer) {
-    mln_style_id_list_destroy(list)
-  }
-
-  static func mapAddStyleSourceJSON(_ map: OpaquePointer, sourceId: mln_string_view, sourceJSON: UnsafePointer<mln_json_value>) throws {
-    try checkStatus(mln_map_add_style_source_json(map, sourceId, sourceJSON))
   }
 
   static func mapRemoveStyleSource(_ map: OpaquePointer, sourceId: mln_string_view) throws -> Bool {
@@ -518,6 +454,9 @@ enum CAPI {
       }.value
     }
     guard found else { return (nil, size) }
+    guard size <= capacity else {
+      throw NativeStatusFailure(rawStatus: MLN_STATUS_NATIVE_ERROR.rawValue, diagnostic: "native style source attribution size exceeded caller buffer")
+    }
     return (String(decoding: bytes.prefix(size), as: UTF8.self), size)
   }
 
@@ -526,68 +465,8 @@ enum CAPI {
       try checkStatus(mln_map_list_style_source_ids(map, list))
     }.value
     guard let list else { throw NativeStatusFailure(rawStatus: 0, diagnostic: "source ID list was null") }
-    defer { styleIdListDestroy(list) }
+    defer { mln_style_id_list_destroy(list) }
     return try styleIdListCopy(list)
-  }
-
-  static func mapAddGeoJSONSourceURL(_ map: OpaquePointer, sourceId: mln_string_view, url: mln_string_view) throws {
-    try checkStatus(mln_map_add_geojson_source_url(map, sourceId, url))
-  }
-
-  static func mapAddGeoJSONSourceData(_ map: OpaquePointer, sourceId: mln_string_view, data: UnsafePointer<mln_geojson>) throws {
-    try checkStatus(mln_map_add_geojson_source_data(map, sourceId, data))
-  }
-
-  static func mapSetGeoJSONSourceURL(_ map: OpaquePointer, sourceId: mln_string_view, url: mln_string_view) throws {
-    try checkStatus(mln_map_set_geojson_source_url(map, sourceId, url))
-  }
-
-  static func mapSetGeoJSONSourceData(_ map: OpaquePointer, sourceId: mln_string_view, data: UnsafePointer<mln_geojson>) throws {
-    try checkStatus(mln_map_set_geojson_source_data(map, sourceId, data))
-  }
-
-  static func mapAddVectorSourceURL(_ map: OpaquePointer, sourceId: mln_string_view, url: mln_string_view, options: UnsafePointer<mln_style_tile_source_options>?) throws {
-    try checkStatus(mln_map_add_vector_source_url(map, sourceId, url, options))
-  }
-
-  static func mapAddVectorSourceTiles(_ map: OpaquePointer, sourceId: mln_string_view, tiles: UnsafePointer<mln_string_view>?, count: Int, options: UnsafePointer<mln_style_tile_source_options>?) throws {
-    try checkStatus(mln_map_add_vector_source_tiles(map, sourceId, tiles, count, options))
-  }
-
-  static func mapAddRasterSourceURL(_ map: OpaquePointer, sourceId: mln_string_view, url: mln_string_view, options: UnsafePointer<mln_style_tile_source_options>?) throws {
-    try checkStatus(mln_map_add_raster_source_url(map, sourceId, url, options))
-  }
-
-  static func mapAddRasterSourceTiles(_ map: OpaquePointer, sourceId: mln_string_view, tiles: UnsafePointer<mln_string_view>?, count: Int, options: UnsafePointer<mln_style_tile_source_options>?) throws {
-    try checkStatus(mln_map_add_raster_source_tiles(map, sourceId, tiles, count, options))
-  }
-
-  static func mapAddRasterDEMSourceURL(_ map: OpaquePointer, sourceId: mln_string_view, url: mln_string_view, options: UnsafePointer<mln_style_tile_source_options>?) throws {
-    try checkStatus(mln_map_add_raster_dem_source_url(map, sourceId, url, options))
-  }
-
-  static func mapAddRasterDEMSourceTiles(_ map: OpaquePointer, sourceId: mln_string_view, tiles: UnsafePointer<mln_string_view>?, count: Int, options: UnsafePointer<mln_style_tile_source_options>?) throws {
-    try checkStatus(mln_map_add_raster_dem_source_tiles(map, sourceId, tiles, count, options))
-  }
-
-  static func mapAddCustomGeometrySource(_ map: OpaquePointer, sourceId: mln_string_view, options: UnsafePointer<mln_custom_geometry_source_options>) throws {
-    try checkStatus(mln_map_add_custom_geometry_source(map, sourceId, options))
-  }
-
-  static func mapSetCustomGeometrySourceTileData(_ map: OpaquePointer, sourceId: mln_string_view, tileId: NativeCanonicalTileID, data: UnsafePointer<mln_geojson>) throws {
-    try checkStatus(mln_map_set_custom_geometry_source_tile_data(map, sourceId, tileId.native, data))
-  }
-
-  static func mapInvalidateCustomGeometrySourceTile(_ map: OpaquePointer, sourceId: mln_string_view, tileId: NativeCanonicalTileID) throws {
-    try checkStatus(mln_map_invalidate_custom_geometry_source_tile(map, sourceId, tileId.native))
-  }
-
-  static func mapInvalidateCustomGeometrySourceRegion(_ map: OpaquePointer, sourceId: mln_string_view, bounds: NativeLatLngBounds) throws {
-    try checkStatus(mln_map_invalidate_custom_geometry_source_region(map, sourceId, bounds.native))
-  }
-
-  static func mapSetStyleImage(_ map: OpaquePointer, imageId: mln_string_view, image: UnsafePointer<mln_premultiplied_rgba8_image>, options: UnsafePointer<mln_style_image_options>) throws {
-    try checkStatus(mln_map_set_style_image(map, imageId, image, options))
   }
 
   static func mapRemoveStyleImage(_ map: OpaquePointer, imageId: mln_string_view) throws -> Bool {
@@ -621,47 +500,31 @@ enum CAPI {
         }
       }.value
     }
-    return found ? (Array(bytes.prefix(size)), size) : (nil, size)
-  }
-
-  static func mapAddImageSourceURL(_ map: OpaquePointer, sourceId: mln_string_view, coordinates: UnsafePointer<mln_lat_lng>?, count: Int, url: mln_string_view) throws {
-    try checkStatus(mln_map_add_image_source_url(map, sourceId, coordinates, count, url))
+    guard found else { return (nil, size) }
+    guard size <= capacity else {
+      throw NativeStatusFailure(rawStatus: MLN_STATUS_NATIVE_ERROR.rawValue, diagnostic: "native style image byte size exceeded caller buffer")
+    }
+    return (Array(bytes.prefix(size)), size)
   }
 
   static func mapAddImageSourceURL(_ map: OpaquePointer, sourceId: mln_string_view, coordinates: [NativeLatLng], url: mln_string_view) throws {
     let rawCoordinates = coordinates.map(\.native)
     try rawCoordinates.withUnsafeBufferPointer { coordinates in
-      try mapAddImageSourceURL(map, sourceId: sourceId, coordinates: coordinates.baseAddress, count: coordinates.count, url: url)
+      try checkStatus(mln_map_add_image_source_url(map, sourceId, coordinates.baseAddress, coordinates.count, url))
     }
-  }
-
-  static func mapAddImageSourceImage(_ map: OpaquePointer, sourceId: mln_string_view, coordinates: UnsafePointer<mln_lat_lng>?, count: Int, image: UnsafePointer<mln_premultiplied_rgba8_image>) throws {
-    try checkStatus(mln_map_add_image_source_image(map, sourceId, coordinates, count, image))
   }
 
   static func mapAddImageSourceImage(_ map: OpaquePointer, sourceId: mln_string_view, coordinates: [NativeLatLng], image: UnsafePointer<mln_premultiplied_rgba8_image>) throws {
     let rawCoordinates = coordinates.map(\.native)
     try rawCoordinates.withUnsafeBufferPointer { coordinates in
-      try mapAddImageSourceImage(map, sourceId: sourceId, coordinates: coordinates.baseAddress, count: coordinates.count, image: image)
+      try checkStatus(mln_map_add_image_source_image(map, sourceId, coordinates.baseAddress, coordinates.count, image))
     }
-  }
-
-  static func mapSetImageSourceURL(_ map: OpaquePointer, sourceId: mln_string_view, url: mln_string_view) throws {
-    try checkStatus(mln_map_set_image_source_url(map, sourceId, url))
-  }
-
-  static func mapSetImageSourceImage(_ map: OpaquePointer, sourceId: mln_string_view, image: UnsafePointer<mln_premultiplied_rgba8_image>) throws {
-    try checkStatus(mln_map_set_image_source_image(map, sourceId, image))
-  }
-
-  static func mapSetImageSourceCoordinates(_ map: OpaquePointer, sourceId: mln_string_view, coordinates: UnsafePointer<mln_lat_lng>?, count: Int) throws {
-    try checkStatus(mln_map_set_image_source_coordinates(map, sourceId, coordinates, count))
   }
 
   static func mapSetImageSourceCoordinates(_ map: OpaquePointer, sourceId: mln_string_view, coordinates: [NativeLatLng]) throws {
     let rawCoordinates = coordinates.map(\.native)
     try rawCoordinates.withUnsafeBufferPointer { coordinates in
-      try mapSetImageSourceCoordinates(map, sourceId: sourceId, coordinates: coordinates.baseAddress, count: coordinates.count)
+      try checkStatus(mln_map_set_image_source_coordinates(map, sourceId, coordinates.baseAddress, coordinates.count))
     }
   }
 
@@ -677,38 +540,6 @@ enum CAPI {
       }.value
     }
     return found ? coordinates.prefix(count).map(NativeLatLng.init) : nil
-  }
-
-  static func mapAddHillshadeLayer(_ map: OpaquePointer, layerId: mln_string_view, sourceId: mln_string_view, beforeLayerId: mln_string_view) throws {
-    try checkStatus(mln_map_add_hillshade_layer(map, layerId, sourceId, beforeLayerId))
-  }
-
-  static func mapAddColorReliefLayer(_ map: OpaquePointer, layerId: mln_string_view, sourceId: mln_string_view, beforeLayerId: mln_string_view) throws {
-    try checkStatus(mln_map_add_color_relief_layer(map, layerId, sourceId, beforeLayerId))
-  }
-
-  static func mapAddLocationIndicatorLayer(_ map: OpaquePointer, layerId: mln_string_view, beforeLayerId: mln_string_view) throws {
-    try checkStatus(mln_map_add_location_indicator_layer(map, layerId, beforeLayerId))
-  }
-
-  static func mapSetLocationIndicatorLocation(_ map: OpaquePointer, layerId: mln_string_view, coordinate: NativeLatLng, altitude: Double) throws {
-    try checkStatus(mln_map_set_location_indicator_location(map, layerId, coordinate.native, altitude))
-  }
-
-  static func mapSetLocationIndicatorBearing(_ map: OpaquePointer, layerId: mln_string_view, bearing: Double) throws {
-    try checkStatus(mln_map_set_location_indicator_bearing(map, layerId, bearing))
-  }
-
-  static func mapSetLocationIndicatorAccuracyRadius(_ map: OpaquePointer, layerId: mln_string_view, radius: Double) throws {
-    try checkStatus(mln_map_set_location_indicator_accuracy_radius(map, layerId, radius))
-  }
-
-  static func mapSetLocationIndicatorImageName(_ map: OpaquePointer, layerId: mln_string_view, imageKind: UInt32, imageId: mln_string_view) throws {
-    try checkStatus(mln_map_set_location_indicator_image_name(map, layerId, imageKind, imageId))
-  }
-
-  static func mapAddStyleLayerJSON(_ map: OpaquePointer, layerJSON: UnsafePointer<mln_json_value>, beforeLayerId: mln_string_view) throws {
-    try checkStatus(mln_map_add_style_layer_json(map, layerJSON, beforeLayerId))
   }
 
   static func mapRemoveStyleLayer(_ map: OpaquePointer, layerId: mln_string_view) throws -> Bool {
@@ -736,12 +567,8 @@ enum CAPI {
       try checkStatus(mln_map_list_style_layer_ids(map, list))
     }.value
     guard let list else { throw NativeStatusFailure(rawStatus: 0, diagnostic: "layer ID list was null") }
-    defer { styleIdListDestroy(list) }
+    defer { mln_style_id_list_destroy(list) }
     return try styleIdListCopy(list)
-  }
-
-  static func mapMoveStyleLayer(_ map: OpaquePointer, layerId: mln_string_view, beforeLayerId: mln_string_view) throws {
-    try checkStatus(mln_map_move_style_layer(map, layerId, beforeLayerId))
   }
 
   static func mapGetStyleLayerJSON(_ map: OpaquePointer, layerId: mln_string_view) throws -> NativeJSONValue? {
@@ -752,16 +579,8 @@ enum CAPI {
       }
     }.value
     guard let snapshot = output else { return nil }
-    defer { jsonSnapshotDestroy(snapshot) }
+    defer { mln_json_snapshot_destroy(snapshot) }
     return try jsonSnapshotCopyValue(snapshot)
-  }
-
-  static func mapSetStyleLightJSON(_ map: OpaquePointer, lightJSON: UnsafePointer<mln_json_value>) throws {
-    try checkStatus(mln_map_set_style_light_json(map, lightJSON))
-  }
-
-  static func mapSetStyleLightProperty(_ map: OpaquePointer, propertyName: mln_string_view, value: UnsafePointer<mln_json_value>) throws {
-    try checkStatus(mln_map_set_style_light_property(map, propertyName, value))
   }
 
   static func mapGetStyleLightProperty(_ map: OpaquePointer, propertyName: mln_string_view) throws -> NativeJSONValue? {
@@ -769,12 +588,8 @@ enum CAPI {
       try checkStatus(mln_map_get_style_light_property(map, propertyName, snapshot))
     }.value
     guard let snapshot else { return nil }
-    defer { jsonSnapshotDestroy(snapshot) }
+    defer { mln_json_snapshot_destroy(snapshot) }
     return try jsonSnapshotCopyValue(snapshot)
-  }
-
-  static func mapSetLayerProperty(_ map: OpaquePointer, layerId: mln_string_view, propertyName: mln_string_view, value: UnsafePointer<mln_json_value>) throws {
-    try checkStatus(mln_map_set_layer_property(map, layerId, propertyName, value))
   }
 
   static func mapGetLayerProperty(_ map: OpaquePointer, layerId: mln_string_view, propertyName: mln_string_view) throws -> NativeJSONValue? {
@@ -782,12 +597,8 @@ enum CAPI {
       try checkStatus(mln_map_get_layer_property(map, layerId, propertyName, snapshot))
     }.value
     guard let snapshot else { return nil }
-    defer { jsonSnapshotDestroy(snapshot) }
+    defer { mln_json_snapshot_destroy(snapshot) }
     return try jsonSnapshotCopyValue(snapshot)
-  }
-
-  static func mapSetLayerFilter(_ map: OpaquePointer, layerId: mln_string_view, filter: UnsafePointer<mln_json_value>?) throws {
-    try checkStatus(mln_map_set_layer_filter(map, layerId, filter))
   }
 
   static func mapGetLayerFilter(_ map: OpaquePointer, layerId: mln_string_view) throws -> NativeJSONValue? {
@@ -795,7 +606,7 @@ enum CAPI {
       try checkStatus(mln_map_get_layer_filter(map, layerId, snapshot))
     }.value
     guard let snapshot else { return nil }
-    defer { jsonSnapshotDestroy(snapshot) }
+    defer { mln_json_snapshot_destroy(snapshot) }
     return try jsonSnapshotCopyValue(snapshot)
   }
 
@@ -823,18 +634,10 @@ enum CAPI {
     return try NativeFeatureExtensionResult(copying: info)
   }
 
-  static func featureExtensionResultDestroy(_ result: OpaquePointer) {
-    mln_feature_extension_result_destroy(result)
-  }
-
   static func runtimeRunAmbientCacheOperationStart(_ runtime: OpaquePointer, operation: UInt32) throws -> UInt64 {
     try NativeMemory.withTemporary(UInt64(0)) { operationId in
       try checkStatus(mln_runtime_run_ambient_cache_operation_start(runtime, operation, operationId))
     }.value
-  }
-
-  static func runtimeOfflineOperationDiscard(_ runtime: OpaquePointer, operationId: UInt64) throws {
-    try checkStatus(mln_runtime_offline_operation_discard(runtime, operationId))
   }
 
   static func runtimeOfflineRegionCreateStart(_ runtime: OpaquePointer, definition: UnsafePointer<mln_offline_region_definition>, metadata: Data) throws -> UInt64 {
@@ -978,20 +781,12 @@ enum CAPI {
     }
   }
 
-  static func renderSessionSetFeatureState(_ session: OpaquePointer, selector: UnsafePointer<mln_feature_state_selector>, state: UnsafePointer<mln_json_value>) throws {
-    try checkStatus(mln_render_session_set_feature_state(session, selector, state))
-  }
-
   static func renderSessionGetFeatureState(_ session: OpaquePointer, selector: UnsafePointer<mln_feature_state_selector>) throws -> NativeJSONValue? {
     let snapshot = try NativeMemory.withTemporary(Optional<OpaquePointer>.none) { snapshot in
       try checkStatus(mln_render_session_get_feature_state(session, selector, snapshot))
     }.value
     guard let snapshot else { return nil }
-    defer { jsonSnapshotDestroy(snapshot) }
+    defer { mln_json_snapshot_destroy(snapshot) }
     return try jsonSnapshotCopyValue(snapshot)
-  }
-
-  static func renderSessionRemoveFeatureState(_ session: OpaquePointer, selector: UnsafePointer<mln_feature_state_selector>) throws {
-    try checkStatus(mln_render_session_remove_feature_state(session, selector))
   }
 }

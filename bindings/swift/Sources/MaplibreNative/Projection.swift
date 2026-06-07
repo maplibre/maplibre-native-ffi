@@ -1,4 +1,6 @@
 
+internal import CMaplibreNativeC
+
 public struct ProjectedMeters: Equatable, Sendable {
   public let northing: Double
   public let easting: Double
@@ -25,7 +27,7 @@ public final class MapProjectionHandle {
 
   public func close() throws {
     try handle.closeOnce { pointer in
-      try CAPI.destroyMapProjection(pointer)
+      try checkStatus(mln_map_projection_destroy(pointer))
     }
   }
 
@@ -38,7 +40,7 @@ public final class MapProjectionHandle {
   public func setCamera(_ camera: CameraOptions) throws {
     try mapNativeFailure {
       try camera.nativeInput.withNativeOptions { nativeCamera in
-        try CAPI.mapProjectionSetCamera(try handle.requireLive(), nativeCamera)
+        try checkStatus(mln_map_projection_set_camera(try handle.requireLive(), nativeCamera))
       }
     }
   }
@@ -53,12 +55,7 @@ public final class MapProjectionHandle {
         guard let baseAddress = buffer.baseAddress else {
           throw MaplibreError.invalidArgument("visible coordinates cannot be empty")
         }
-        try CAPI.mapProjectionSetVisibleCoordinates(
-          try handle.requireLive(),
-          coordinates: baseAddress,
-          count: buffer.count,
-          padding: padding.nativeInput.native
-        )
+        try checkStatus(mln_map_projection_set_visible_coordinates(try handle.requireLive(), baseAddress, buffer.count, padding.nativeInput.native))
       }
     }
   }
@@ -66,11 +63,7 @@ public final class MapProjectionHandle {
   public func setVisibleGeometry(_ geometry: Geometry, padding: EdgeInsets = EdgeInsets(top: 0, left: 0, bottom: 0, right: 0)) throws {
     try mapNativeFailure {
       let arena = NativeInputArena()
-      try CAPI.mapProjectionSetVisibleGeometry(
-        try handle.requireLive(),
-        geometry: arena.allocateGeometry(geometry.nativeGeometry),
-        padding: padding.nativeInput.native
-      )
+      try checkStatus(mln_map_projection_set_visible_geometry(try handle.requireLive(), arena.allocateGeometry(geometry.nativeGeometry), padding.nativeInput.native))
     }
   }
 

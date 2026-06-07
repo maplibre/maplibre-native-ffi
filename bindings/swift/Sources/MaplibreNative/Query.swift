@@ -1,4 +1,6 @@
 
+internal import CMaplibreNativeC
+
 public enum RenderedQueryGeometry: Equatable, Sendable {
   case point(ScreenPoint)
   case box(min: ScreenPoint, max: ScreenPoint)
@@ -150,7 +152,7 @@ extension RenderSessionHandle {
             geometry: nativeGeometry,
             options: nativeOptions
           )
-          defer { CAPI.featureQueryResultDestroy(result) }
+          defer { mln_feature_query_result_destroy(result) }
           return try NativeFeatureQueryResultReader(handle: result).copyFeatures().map(QueriedFeature.init(native:))
         }
       }
@@ -170,7 +172,7 @@ extension RenderSessionHandle {
           sourceId: sourceId,
           options: nativeOptions
         )
-        defer { CAPI.featureQueryResultDestroy(result) }
+        defer { mln_feature_query_result_destroy(result) }
         return try NativeFeatureQueryResultReader(handle: result).copyFeatures().map(QueriedFeature.init(native:))
       }
     }
@@ -193,7 +195,7 @@ extension RenderSessionHandle {
         extensionField: arena.view(extensionField),
         arguments: arguments.map { arena.allocate($0.nativeValue) }
       )
-      defer { CAPI.featureExtensionResultDestroy(result) }
+      defer { mln_feature_extension_result_destroy(result) }
       return try FeatureExtensionResult(native: CAPI.featureExtensionResultCopy(result))
     }
   }
@@ -202,7 +204,7 @@ extension RenderSessionHandle {
     try mapNativeFailure {
       let arena = NativeInputArena()
       try selector.nativeSelector.withNativeSelector { selector in
-        try CAPI.renderSessionSetFeatureState(try requireLivePointer(), selector: selector, state: arena.allocate(state.nativeValue))
+        try checkStatus(mln_render_session_set_feature_state(try requireLivePointer(), selector, arena.allocate(state.nativeValue)))
       }
     }
   }
@@ -218,7 +220,7 @@ extension RenderSessionHandle {
   public func removeFeatureState(selector: FeatureStateSelector) throws {
     try mapNativeFailure {
       try selector.nativeSelector.withNativeSelector { selector in
-        try CAPI.renderSessionRemoveFeatureState(try requireLivePointer(), selector: selector)
+        try checkStatus(mln_render_session_remove_feature_state(try requireLivePointer(), selector))
       }
     }
   }

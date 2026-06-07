@@ -349,7 +349,7 @@ extension MapHandle {
   }
 
   public func setBounds(_ bounds: BoundOptions) throws {
-    try mapNativeFailure { try bounds.nativeInput.withNativeOptions { try CAPI.mapSetBounds(try requireLivePointer(), bounds: $0) } }
+    try mapNativeFailure { try bounds.nativeInput.withNativeOptions { try checkStatus(mln_map_set_bounds(try requireLivePointer(), $0)) } }
   }
 
   public func freeCameraOptions() throws -> FreeCameraOptions {
@@ -357,7 +357,7 @@ extension MapHandle {
   }
 
   public func setFreeCameraOptions(_ options: FreeCameraOptions) throws {
-    try mapNativeFailure { try options.nativeInput.withNativeOptions { try CAPI.mapSetFreeCameraOptions(try requireLivePointer(), options: $0) } }
+    try mapNativeFailure { try options.nativeInput.withNativeOptions { try checkStatus(mln_map_set_free_camera_options(try requireLivePointer(), $0)) } }
   }
 
   public func projectionMode() throws -> ProjectionMode {
@@ -365,7 +365,7 @@ extension MapHandle {
   }
 
   public func setProjectionMode(_ mode: ProjectionMode) throws {
-    try mapNativeFailure { try mode.nativeInput.withNativeMode { try CAPI.mapSetProjectionMode(try requireLivePointer(), mode: $0) } }
+    try mapNativeFailure { try mode.nativeInput.withNativeMode { try checkStatus(mln_map_set_projection_mode(try requireLivePointer(), $0)) } }
   }
 
   public func pixel(for coordinate: LatLng) throws -> ScreenPoint {
