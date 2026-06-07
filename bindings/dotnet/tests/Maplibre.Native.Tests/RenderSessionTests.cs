@@ -168,10 +168,11 @@ public sealed unsafe class RenderSessionTests
     Assert.Equal(5u, vulkanBorrowed.final_layout);
 
     var openglOwned = RenderStructs.ToNative(new OpenGLOwnedTextureDescriptor());
+    var openglOwnedDefault = NativeMethods.mln_opengl_owned_texture_descriptor_default();
     Assert.Equal(256u, openglOwned.extent.width);
     Assert.Equal(256u, openglOwned.extent.height);
     Assert.Equal(1, openglOwned.extent.scale_factor);
-    Assert.Equal(mln_opengl_context_platform.MLN_OPENGL_CONTEXT_PLATFORM_WGL, openglOwned.context.platform);
+    Assert.Equal(openglOwnedDefault.context.platform, openglOwned.context.platform);
   }
 
   [Fact]

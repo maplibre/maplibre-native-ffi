@@ -300,7 +300,7 @@ internal static unsafe class QueryStructs
     mln_geometry_type.MLN_GEOMETRY_TYPE_MULTI_LINE_STRING => new Geometry.MultiLineString(ReadMultiLine(geometry.data.multi_line_string)),
     mln_geometry_type.MLN_GEOMETRY_TYPE_MULTI_POLYGON => new Geometry.MultiPolygon(ReadMultiPolygon(geometry.data.multi_polygon)),
     mln_geometry_type.MLN_GEOMETRY_TYPE_GEOMETRY_COLLECTION => new Geometry.Collection(ReadGeometryCollection(geometry.data.geometry_collection)),
-    _ => Geometry.Empty.Instance,
+    _ => throw new InvalidOperationException($"ReadGeometry received unknown mln_geometry_type value {geometry.type}."),
   };
 
   private static FeatureIdentifier ReadIdentifier(mln_feature value) => (mln_feature_identifier_type)value.identifier_type switch
@@ -309,7 +309,7 @@ internal static unsafe class QueryStructs
     mln_feature_identifier_type.MLN_FEATURE_IDENTIFIER_TYPE_INT => new FeatureIdentifier.Int(value.identifier.int_value),
     mln_feature_identifier_type.MLN_FEATURE_IDENTIFIER_TYPE_DOUBLE => new FeatureIdentifier.Double(value.identifier.double_value),
     mln_feature_identifier_type.MLN_FEATURE_IDENTIFIER_TYPE_STRING => new FeatureIdentifier.String(RuntimeStructs.CopyUtf8(value.identifier.string_value.data, value.identifier.string_value.size)),
-    _ => FeatureIdentifier.Null.Instance,
+    _ => throw new InvalidOperationException($"ReadIdentifier received unknown mln_feature_identifier_type value {value.identifier_type}."),
   };
 
   private static IReadOnlyList<LatLng> ReadCoordinateSpan(mln_coordinate_span span)

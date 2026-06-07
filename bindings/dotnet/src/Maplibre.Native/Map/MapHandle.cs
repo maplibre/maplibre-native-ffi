@@ -586,6 +586,12 @@ public sealed unsafe class MapHandle : IDisposable
           return null;
         }
 
+        if (attributionSize > (nuint)buffer.Length)
+        {
+          throw new InvalidOperationException(
+              $"Native style source attribution size {attributionSize} exceeds buffer length {buffer.Length}.");
+        }
+
         fixed (byte* bufferPointer = buffer)
         {
           attribution = RuntimeStructs.CopyUtf8((sbyte*)bufferPointer, attributionSize);
@@ -814,6 +820,12 @@ public sealed unsafe class MapHandle : IDisposable
     if (!found)
     {
       return null;
+    }
+
+    if (byteLength > (nuint)bytes.Length)
+    {
+      throw new InvalidOperationException(
+          $"Native style image byte length {byteLength} exceeds buffer length {bytes.Length}.");
     }
 
     if (byteLength != (nuint)bytes.Length)

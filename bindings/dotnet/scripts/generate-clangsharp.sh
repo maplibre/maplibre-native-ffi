@@ -56,6 +56,11 @@ headers=(
 
 mkdir -p "$output_dir"
 
+(
+  cd "$binding_dir"
+  dotnet tool restore
+)
+
 for header in "${headers[@]}"; do
   args=(
     tool run ClangSharpPInvokeGenerator --

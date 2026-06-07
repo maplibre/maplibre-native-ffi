@@ -107,4 +107,26 @@ public sealed unsafe class QueryStructTests
     var id = Assert.IsType<FeatureIdentifier.String>(queried.Feature.Identifier);
     Assert.Equal("feature-1", id.Value);
   }
+
+  [Fact]
+  public void UnknownNativeFeatureDiscriminantsThrow()
+  {
+    var geometryError = Assert.Throws<InvalidOperationException>(() =>
+        QueryStructs.ReadGeometry(new mln_geometry
+        {
+          size = (uint)sizeof(mln_geometry),
+          type = 999,
+        }));
+    Assert.Contains("mln_geometry_type", geometryError.Message, StringComparison.Ordinal);
+    Assert.Contains("999", geometryError.Message, StringComparison.Ordinal);
+
+    var identifierError = Assert.Throws<InvalidOperationException>(() =>
+        QueryStructs.ReadFeature(new mln_feature
+        {
+          size = (uint)sizeof(mln_feature),
+          identifier_type = 999,
+        }));
+    Assert.Contains("mln_feature_identifier_type", identifierError.Message, StringComparison.Ordinal);
+    Assert.Contains("999", identifierError.Message, StringComparison.Ordinal);
+  }
 }

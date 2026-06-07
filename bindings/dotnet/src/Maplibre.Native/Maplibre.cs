@@ -61,7 +61,7 @@ public static unsafe class Maplibre
     if (!status.IsKnown)
     {
       throw new InvalidArgumentException(
-          MaplibreStatus.Unknown,
+          MaplibreStatus.InvalidArgument,
           null,
           $"Unknown network status value {status.RawValue} cannot be set.");
     }

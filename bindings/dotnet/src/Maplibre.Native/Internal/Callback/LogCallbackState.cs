@@ -9,15 +9,28 @@ namespace Maplibre.Native.Internal.Callback;
 internal sealed unsafe class LogCallbackState : IDisposable
 {
   private static readonly Lock Gate = new();
+  private static readonly Lock RegistryGate = new();
+  private static readonly Dictionary<nint, LogCallbackState> Registry = [];
   private static LogCallbackState? current;
+  private static nint nextToken;
 
+  private readonly nint token;
   private readonly LogCallback callback;
-  private nint handle;
+  private bool retired;
 
   private LogCallbackState(LogCallback callback)
   {
     this.callback = callback;
-    handle = GCHandle.ToIntPtr(GCHandle.Alloc(this));
+    lock (RegistryGate)
+    {
+      token = ++nextToken;
+      if (token == 0)
+      {
+        token = ++nextToken;
+      }
+
+      Registry.Add(token, this);
+    }
   }
 
   internal static void Set(LogCallback callback)
@@ -29,14 +42,14 @@ internal sealed unsafe class LogCallbackState : IDisposable
     {
       try
       {
-        NativeStatus.Check(NativeMethods.mln_log_set_callback(&OnLog, (void*)replacement.handle));
+        NativeStatus.Check(NativeMethods.mln_log_set_callback(&OnLog, replacement.UserData));
         var old = current;
         current = replacement;
-        old?.Dispose();
+        old?.Retire();
       }
       catch
       {
-        replacement.Dispose();
+        replacement.Retire();
         throw;
       }
     }
@@ -50,23 +63,37 @@ internal sealed unsafe class LogCallbackState : IDisposable
       NativeStatus.Check(NativeMethods.mln_log_clear_callback());
       var old = current;
       current = null;
-      old?.Dispose();
+      old?.Retire();
     }
   }
+
+  private void* UserData => (void*)token;
 
   [UnmanagedCallersOnly(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
   private static uint OnLog(void* userData, uint severity, uint @event, long code, sbyte* message)
   {
     try
     {
-      var state = (LogCallbackState?)GCHandle.FromIntPtr((nint)userData).Target;
+      var state = Enter((nint)userData);
       if (state is null)
       {
         return 0;
       }
 
+      return state.Invoke(severity, @event, code, message);
+    }
+    catch
+    {
+      return 0;
+    }
+  }
+
+  private uint Invoke(uint severity, uint @event, long code, sbyte* message)
+  {
+    try
+    {
       var text = message is null ? string.Empty : Marshal.PtrToStringUTF8((nint)message) ?? string.Empty;
-      return state.callback(new LogRecord(
+      return callback(new LogRecord(
           (LogSeverity)severity,
           severity,
           (LogEvent)@event,
@@ -80,12 +107,35 @@ internal sealed unsafe class LogCallbackState : IDisposable
     }
   }
 
+  private static LogCallbackState? Enter(nint token)
+  {
+    lock (RegistryGate)
+    {
+      if (!Registry.TryGetValue(token, out var state) || state.retired)
+      {
+        return null;
+      }
+
+      return state;
+    }
+  }
+
   public void Dispose()
   {
-    var current = System.Threading.Interlocked.Exchange(ref handle, 0);
-    if (current != 0)
+    Retire();
+  }
+
+  private void Retire()
+  {
+    lock (RegistryGate)
     {
-      GCHandle.FromIntPtr(current).Free();
+      if (retired)
+      {
+        return;
+      }
+
+      retired = true;
+      Registry.Remove(token);
     }
   }
 }

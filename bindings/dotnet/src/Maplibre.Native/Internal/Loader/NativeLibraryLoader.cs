@@ -12,41 +12,36 @@ internal static class NativeLibraryLoader
 
   private static readonly object Gate = new();
   private static bool installed;
-  private static nint explicitHandle;
+  private static nint resolvedHandle;
+  private static bool explicitlyLoaded;
 
   internal static void Load(string libraryPath)
   {
     ArgumentException.ThrowIfNullOrWhiteSpace(libraryPath);
-    EnsureLoaded();
     lock (Gate)
     {
-      if (explicitHandle != 0)
+      if (resolvedHandle != 0)
       {
-        return;
+        if (explicitlyLoaded)
+        {
+          return;
+        }
+
+        throw new InvalidOperationException(
+            "The MapLibre Native library has already been resolved through the standard lookup order; call LoadNativeLibrary(path) before any native entry point.");
       }
 
-      explicitHandle = NativeLibrary.Load(libraryPath);
+      resolvedHandle = NativeLibrary.Load(libraryPath);
+      explicitlyLoaded = true;
+      EnsureLoadedLocked();
     }
   }
 
   internal static void EnsureLoaded()
   {
-    if (installed)
-    {
-      return;
-    }
-
     lock (Gate)
     {
-      if (installed)
-      {
-        return;
-      }
-
-      NativeLibrary.SetDllImportResolver(
-          typeof(NativeMethods).Assembly,
-          ResolveLibrary);
-      installed = true;
+      EnsureLoadedLocked();
     }
   }
 
@@ -60,20 +55,37 @@ internal static class NativeLibraryLoader
       return 0;
     }
 
-    if (explicitHandle != 0)
+    lock (Gate)
     {
-      return explicitHandle;
-    }
-
-    foreach (var path in CandidatePaths())
-    {
-      if (File.Exists(path) && NativeLibrary.TryLoad(path, out var handle))
+      if (resolvedHandle != 0)
       {
-        return handle;
+        return resolvedHandle;
       }
+
+      foreach (var path in CandidatePaths())
+      {
+        if (File.Exists(path) && NativeLibrary.TryLoad(path, out var handle))
+        {
+          resolvedHandle = handle;
+          return resolvedHandle;
+        }
+      }
+
+      return 0;
+    }
+  }
+
+  private static void EnsureLoadedLocked()
+  {
+    if (installed)
+    {
+      return;
     }
 
-    return 0;
+    NativeLibrary.SetDllImportResolver(
+        typeof(NativeMethods).Assembly,
+        ResolveLibrary);
+    installed = true;
   }
 
   private static IEnumerable<string> CandidatePaths()

@@ -391,7 +391,25 @@ internal sealed unsafe class TextureFrameState<T>
       return;
     }
 
-    var status = release(session, pointer);
+    if (session.IsClosed)
+    {
+      ReportParentClosed();
+      MarkClosed();
+      return;
+    }
+
+    mln_status status;
+    try
+    {
+      status = release(session, pointer);
+    }
+    catch (MaplibreException) when (session.IsClosed)
+    {
+      ReportParentClosed();
+      MarkClosed();
+      return;
+    }
+
     if (status != mln_status.MLN_STATUS_OK)
     {
       NativeLeakReporter.Report(new NativeLeakReport(
@@ -404,6 +422,16 @@ internal sealed unsafe class TextureFrameState<T>
     }
 
     MarkClosed();
+  }
+
+  private void ReportParentClosed()
+  {
+    NativeLeakReporter.Report(new NativeLeakReport(
+        NativeLeakReportKind.DisposeFailed,
+        typeName,
+        (nint)pointer,
+        null,
+        $"Dispose could not release {typeName} frame 0x{(nint)pointer:x}; the parent RenderSessionHandle is already closed."));
   }
 
   private void MarkClosed()

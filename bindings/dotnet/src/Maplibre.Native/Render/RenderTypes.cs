@@ -50,13 +50,13 @@ public sealed class EglContextDescriptor : OpenGLContextDescriptor
 
 public sealed class MetalSurfaceDescriptor { public RenderTargetExtent Extent { get; set; } public NativePointer Layer { get; set; } public MetalContextDescriptor? Context { get; set; } }
 public sealed class VulkanSurfaceDescriptor { public RenderTargetExtent Extent { get; set; } public NativePointer Surface { get; set; } public VulkanContextDescriptor? Context { get; set; } }
-public sealed class OpenGLSurfaceDescriptor { public RenderTargetExtent Extent { get; set; } public NativePointer Surface { get; set; } public OpenGLContextDescriptor Context { get; set; } = new WglContextDescriptor(); }
+public sealed class OpenGLSurfaceDescriptor { public RenderTargetExtent Extent { get; set; } public NativePointer Surface { get; set; } public OpenGLContextDescriptor? Context { get; set; } }
 public sealed class MetalOwnedTextureDescriptor { public RenderTargetExtent Extent { get; set; } public MetalContextDescriptor? Context { get; set; } }
 public sealed class MetalBorrowedTextureDescriptor { public RenderTargetExtent Extent { get; set; } public NativePointer Texture { get; set; } }
 public sealed class VulkanOwnedTextureDescriptor { public RenderTargetExtent Extent { get; set; } public VulkanContextDescriptor? Context { get; set; } }
 public sealed class VulkanBorrowedTextureDescriptor { public RenderTargetExtent Extent { get; set; } public NativePointer Image { get; set; } public NativePointer ImageView { get; set; } public VulkanContextDescriptor? Context { get; set; } public uint Format { get; set; } public uint InitialLayout { get; set; } public uint FinalLayout { get; set; } }
-public sealed class OpenGLOwnedTextureDescriptor { public RenderTargetExtent Extent { get; set; } public OpenGLContextDescriptor Context { get; set; } = new WglContextDescriptor(); }
-public sealed class OpenGLBorrowedTextureDescriptor { public RenderTargetExtent Extent { get; set; } public OpenGLContextDescriptor Context { get; set; } = new WglContextDescriptor(); public uint Texture { get; set; } public uint Target { get; set; } }
+public sealed class OpenGLOwnedTextureDescriptor { public RenderTargetExtent Extent { get; set; } public OpenGLContextDescriptor? Context { get; set; } }
+public sealed class OpenGLBorrowedTextureDescriptor { public RenderTargetExtent Extent { get; set; } public OpenGLContextDescriptor? Context { get; set; } public uint Texture { get; set; } public uint Target { get; set; } }
 
 public sealed class MetalOwnedTextureFrame
 {

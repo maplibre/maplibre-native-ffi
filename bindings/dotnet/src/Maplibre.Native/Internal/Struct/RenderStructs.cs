@@ -119,7 +119,10 @@ internal static unsafe class RenderStructs
     NativeLibraryLoader.EnsureLoaded();
     var native = NativeMethods.mln_opengl_surface_descriptor_default();
     native.extent = ToNative(descriptor.Extent);
-    native.context = ToNative(descriptor.Context);
+    if (descriptor.Context is not null)
+    {
+      native.context = ToNative(descriptor.Context);
+    }
     native.surface = (void*)descriptor.Surface.Address;
     return native;
   }
@@ -178,7 +181,10 @@ internal static unsafe class RenderStructs
     NativeLibraryLoader.EnsureLoaded();
     var native = NativeMethods.mln_opengl_owned_texture_descriptor_default();
     native.extent = ToNative(descriptor.Extent);
-    native.context = ToNative(descriptor.Context);
+    if (descriptor.Context is not null)
+    {
+      native.context = ToNative(descriptor.Context);
+    }
     return native;
   }
 
@@ -188,7 +194,10 @@ internal static unsafe class RenderStructs
     NativeLibraryLoader.EnsureLoaded();
     var native = NativeMethods.mln_opengl_borrowed_texture_descriptor_default();
     native.extent = ToNative(descriptor.Extent);
-    native.context = ToNative(descriptor.Context);
+    if (descriptor.Context is not null)
+    {
+      native.context = ToNative(descriptor.Context);
+    }
     native.texture = descriptor.Texture;
     native.target = descriptor.Target;
     return native;

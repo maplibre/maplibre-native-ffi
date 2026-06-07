@@ -23,7 +23,6 @@ public sealed class RuntimeOptions
 
 internal sealed unsafe class NativeRuntimeOptions : IDisposable
 {
-  private const uint MaximumCacheSizeFlag = 1u << 0;
   private readonly NativeUtf8String assetPath;
   private readonly NativeUtf8String cachePath;
 
@@ -36,7 +35,7 @@ internal sealed unsafe class NativeRuntimeOptions : IDisposable
     Value.cache_path = cachePath.Pointer;
     if (options.MaximumCacheSize is { } maximumCacheSize)
     {
-      Value.flags |= MaximumCacheSizeFlag;
+      Value.flags |= (uint)mln_runtime_option_flag.MLN_RUNTIME_OPTION_MAXIMUM_CACHE_SIZE;
       Value.maximum_cache_size = maximumCacheSize;
     }
   }

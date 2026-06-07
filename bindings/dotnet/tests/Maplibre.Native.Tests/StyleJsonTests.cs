@@ -38,6 +38,26 @@ public sealed unsafe class StyleJsonTests
   }
 
   [Fact]
+  public void JsonReaderRejectsNonZeroCountsWithNullBackingPointers()
+  {
+    var arrayValue = new mln_json_value
+    {
+      type = (uint)mln_json_value_type.MLN_JSON_VALUE_TYPE_ARRAY,
+      data = { array_value = new mln_json_array { value_count = 1, values = null } },
+    };
+    var arrayError = Assert.Throws<InvalidOperationException>(() => ReadJsonValueForTest(arrayValue));
+    Assert.Contains("mln_json_array", arrayError.Message, StringComparison.Ordinal);
+
+    var objectValue = new mln_json_value
+    {
+      type = (uint)mln_json_value_type.MLN_JSON_VALUE_TYPE_OBJECT,
+      data = { object_value = new mln_json_object { member_count = 1, members = null } },
+    };
+    var objectError = Assert.Throws<InvalidOperationException>(() => ReadJsonValueForTest(objectValue));
+    Assert.Contains("mln_json_object", objectError.Message, StringComparison.Ordinal);
+  }
+
+  [Fact]
   public void UrlAndTileSourceApisAdaptThroughNativeMap()
   {
     NativeLibraryTestSupport.SkipUnlessNativeLibraryIsAvailable();
@@ -131,4 +151,9 @@ public sealed unsafe class StyleJsonTests
             new JsonMember("features", new JsonValue.Array([])),
         ])),
     ]);
+
+  private static void ReadJsonValueForTest(mln_json_value value)
+  {
+    ValueStructs.ReadJsonValue(&value);
+  }
 }

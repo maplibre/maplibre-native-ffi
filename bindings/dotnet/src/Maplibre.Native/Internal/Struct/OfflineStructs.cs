@@ -134,13 +134,16 @@ internal static unsafe class OfflineStructs
   internal static OfflineRegionInfo ReadInfo(mln_offline_region_info info) =>
       new(info.id, ReadDefinition(info.definition), CopyBytes(info.metadata, info.metadata_size));
 
-  internal static OfflineRegionDefinition ReadDefinition(mln_offline_region_definition definition) =>
-      (mln_offline_region_definition_type)definition.type switch
-      {
-        mln_offline_region_definition_type.MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID => ReadTilePyramid(definition.data.tile_pyramid),
-        mln_offline_region_definition_type.MLN_OFFLINE_REGION_DEFINITION_GEOMETRY => ReadGeometryRegion(definition.data.geometry),
-        _ => new OfflineRegionDefinition.TilePyramid(string.Empty, new LatLngBounds(default, default), 0, 0, 0, false),
-      };
+  internal static OfflineRegionDefinition ReadDefinition(mln_offline_region_definition definition)
+  {
+    return (mln_offline_region_definition_type)definition.type switch
+    {
+      mln_offline_region_definition_type.MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID => ReadTilePyramid(definition.data.tile_pyramid),
+      mln_offline_region_definition_type.MLN_OFFLINE_REGION_DEFINITION_GEOMETRY => ReadGeometryRegion(definition.data.geometry),
+      _ => throw new InvalidOperationException(
+          $"ReadDefinition received unknown mln_offline_region_definition_type value {definition.type}."),
+    };
+  }
 
   internal static OfflineRegionStatus ReadStatus(mln_offline_region_status value) =>
       new(

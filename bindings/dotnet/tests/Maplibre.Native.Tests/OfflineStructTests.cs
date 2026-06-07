@@ -78,6 +78,20 @@ public sealed unsafe class OfflineStructTests
   }
 
   [Fact]
+  public void UnknownOfflineRegionDefinitionTypeThrows()
+  {
+    var error = Assert.Throws<InvalidOperationException>(() =>
+        OfflineStructs.ReadDefinition(new mln_offline_region_definition
+        {
+          size = (uint)sizeof(mln_offline_region_definition),
+          type = 999,
+        }));
+
+    Assert.Contains("mln_offline_region_definition_type", error.Message, StringComparison.Ordinal);
+    Assert.Contains("999", error.Message, StringComparison.Ordinal);
+  }
+
+  [Fact]
   public void OfflineRegionStatusCopiesNativeFields()
   {
     var status = OfflineStructs.ReadStatus(new mln_offline_region_status

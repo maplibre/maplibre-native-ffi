@@ -379,7 +379,7 @@ public final class RuntimeHandle implements AutoCloseable {
     }
   }
 
-  public void discardOfflineOperation(OfflineOperationHandle<?> operation) {
+  void discardOfflineOperation(OfflineOperationHandle<?> operation) {
     NativeAccess.ensureLoaded();
     Objects.requireNonNull(operation, "operation");
     if (operation.isClosed()) {

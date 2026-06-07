@@ -36,7 +36,7 @@ final class StandardUtf8Test {
     try (var runtime = RuntimeHandle.create()) {
       var operation = runtime.startMergeOfflineRegionsDatabase(database.toString());
       assertEquals(OfflineOperationKind.REGIONS_MERGE_DATABASE, operation.kind());
-      runtime.discardOfflineOperation(operation);
+      operation.close();
     } finally {
       Files.deleteIfExists(database);
     }

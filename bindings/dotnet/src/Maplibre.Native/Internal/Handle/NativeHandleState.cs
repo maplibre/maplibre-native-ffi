@@ -10,6 +10,7 @@ internal unsafe delegate mln_status StatusDestroy<T>(T* handle)
 internal sealed unsafe class NativeHandleState<T>
     where T : unmanaged
 {
+  private readonly object gate = new();
   private readonly StatusDestroy<T> destroy;
   private readonly string typeName;
   private nint address;
@@ -64,39 +65,46 @@ internal sealed unsafe class NativeHandleState<T>
 
   internal void Close()
   {
-    var handle = (T*)address;
-    if (handle is null)
+    lock (gate)
     {
-      return;
-    }
+      var handle = (T*)address;
+      if (handle is null)
+      {
+        return;
+      }
 
-    NativeStatus.Check(destroy(handle));
-    address = 0;
-    GC.SuppressFinalize(this);
+      NativeStatus.Check(destroy(handle));
+      address = 0;
+      GC.SuppressFinalize(this);
+    }
   }
 
   internal bool TryClose()
   {
-    var handle = (T*)address;
-    if (handle is null)
+    lock (gate)
     {
+      var handle = (T*)address;
+      if (handle is null)
+      {
+        return true;
+      }
+
+      var current = address;
+      var status = destroy(handle);
+      if (status != mln_status.MLN_STATUS_OK)
+      {
+        NativeLeakReporter.Report(new NativeLeakReport(
+            NativeLeakReportKind.DisposeFailed,
+            typeName,
+            current,
+            status,
+            $"Dispose could not close {typeName} native handle 0x{current:x}; native destroy returned {status}. Call Close() on the owner thread to observe the error and retry."));
+        return false;
+      }
+
+      address = 0;
+      GC.SuppressFinalize(this);
       return true;
     }
-
-    var status = destroy(handle);
-    if (status != mln_status.MLN_STATUS_OK)
-    {
-      NativeLeakReporter.Report(new NativeLeakReport(
-          NativeLeakReportKind.DisposeFailed,
-          typeName,
-          address,
-          status,
-          $"Dispose could not close {typeName} native handle 0x{address:x}; native destroy returned {status}. Call Close() on the owner thread to observe the error and retry."));
-      return false;
-    }
-
-    address = 0;
-    GC.SuppressFinalize(this);
-    return true;
   }
 }

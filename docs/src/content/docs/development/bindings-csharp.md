@@ -24,11 +24,11 @@ memory guards, and handle state. The public layer is handwritten C# handles,
 values, descriptors, callbacks, and exceptions.
 
 Generated raw functions use ClangSharp's `DllImport` output. Keep the raw
-interop layer mechanically generated from the C headers; avoid handwritten
-duplicate imports unless the generated declaration cannot express a native
-contract correctly. Keep the public API parallel to Java FFM and JNI where
-practical: same concepts, same handle suffixes, same copied-value model, and
-.NET-specific names and resource patterns.
+interop layer mechanically generated from the C headers; use handwritten imports
+only when the generated declaration cannot express a native contract correctly.
+Keep the public API parallel to Java FFM and JNI where practical: same concepts,
+same handle suffixes, same copied-value model, and .NET-specific names and
+resource patterns.
 
 ## Public Types
 

@@ -276,6 +276,11 @@ public sealed unsafe class RuntimeHandle : IDisposable
   internal void DiscardOfflineOperation(OfflineOperationHandle operation)
   {
     ArgumentNullException.ThrowIfNull(operation);
+    if (operation.IsClosed)
+    {
+      return;
+    }
+
     var operationId = operation.RequireLive(this);
     NativeStatus.Check(NativeMethods.mln_runtime_offline_operation_discard(Pointer, operationId));
     operation.MarkConsumed();

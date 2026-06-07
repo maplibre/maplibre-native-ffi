@@ -19,13 +19,12 @@ public sealed unsafe class NativeBuffer : IDisposable
 
   public void Dispose()
   {
-    var allocation = (void*)address;
+    var allocation = (void*)System.Threading.Interlocked.Exchange(ref address, 0);
     if (allocation is null)
     {
       return;
     }
 
-    address = 0;
     NativeMemory.Free(allocation);
   }
 

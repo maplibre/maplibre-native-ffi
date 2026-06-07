@@ -52,7 +52,13 @@ internal static unsafe class ValueStructs
 
   private static JsonValue.Array ReadArray(mln_json_array array)
   {
-    var values = new JsonValue[checked((int)array.value_count)];
+    var count = checked((int)array.value_count);
+    if (count > 0 && array.values is null)
+    {
+      throw new InvalidOperationException("mln_json_array.value_count is non-zero but values is null.");
+    }
+
+    var values = new JsonValue[count];
     for (var index = 0; index < values.Length; index++)
     {
       values[index] = ReadJsonValue(&array.values[index]);
@@ -63,7 +69,13 @@ internal static unsafe class ValueStructs
 
   private static JsonValue.Object ReadObject(mln_json_object obj)
   {
-    var members = new JsonMember[checked((int)obj.member_count)];
+    var count = checked((int)obj.member_count);
+    if (count > 0 && obj.members is null)
+    {
+      throw new InvalidOperationException("mln_json_object.member_count is non-zero but members is null.");
+    }
+
+    var members = new JsonMember[count];
     for (var index = 0; index < members.Length; index++)
     {
       var member = obj.members[index];

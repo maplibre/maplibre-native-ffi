@@ -100,19 +100,31 @@ internal sealed unsafe class NativeStyleImage : IDisposable
     ArgumentNullException.ThrowIfNull(image);
     var bytes = image.Bytes ?? [];
     var pixels = bytes.Length == 0 ? 0 : (nint)NativeMemory.Alloc((nuint)bytes.Length);
-    if (pixels != 0)
+    try
     {
-      Marshal.Copy(bytes, 0, pixels, bytes.Length);
-    }
+      if (pixels != 0)
+      {
+        Marshal.Copy(bytes, 0, pixels, bytes.Length);
+      }
 
-    var info = image.Info;
-    var native = NativeMethods.mln_premultiplied_rgba8_image_default();
-    native.width = info.Width;
-    native.height = info.Height;
-    native.stride = info.Stride;
-    native.byte_length = (nuint)bytes.Length;
-    native.pixels = (byte*)pixels;
-    return new NativeStyleImage(native, pixels);
+      var info = image.Info;
+      var native = NativeMethods.mln_premultiplied_rgba8_image_default();
+      native.width = info.Width;
+      native.height = info.Height;
+      native.stride = info.Stride;
+      native.byte_length = (nuint)bytes.Length;
+      native.pixels = (byte*)pixels;
+      var result = new NativeStyleImage(native, pixels);
+      pixels = 0;
+      return result;
+    }
+    finally
+    {
+      if (pixels != 0)
+      {
+        NativeMemory.Free((void*)pixels);
+      }
+    }
   }
 
   public void Dispose()

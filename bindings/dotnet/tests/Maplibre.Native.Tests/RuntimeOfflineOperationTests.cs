@@ -1,4 +1,3 @@
-using Maplibre.Native.Error;
 using Maplibre.Native.Runtime;
 using Xunit;
 
@@ -20,9 +19,8 @@ public sealed class RuntimeOfflineOperationTests
     Assert.False(operation.IsClosed);
 
     operation.Close();
+    operation.Close();
 
     Assert.True(operation.IsClosed);
-    var error = Assert.Throws<InvalidStateException>(operation.Close);
-    Assert.Equal(MaplibreStatus.InvalidState, error.Status);
   }
 }

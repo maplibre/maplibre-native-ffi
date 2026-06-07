@@ -101,10 +101,7 @@ public sealed class OfflineOperationHandle : IDisposable
   }
 
   /// <summary>Discards the native offline operation result on the runtime owner thread.</summary>
-  public void Close()
-  {
-    runtime.DiscardOfflineOperation(this);
-  }
+  public void Close() => runtime.DiscardOfflineOperation(this);
 
   /// <inheritdoc />
   public void Dispose()

@@ -44,7 +44,7 @@ public sealed class MaplibreTests
 
     var error = Assert.Throws<InvalidArgumentException>(() => Maplibre.SetNetworkStatus(status));
 
-    Assert.Equal(MaplibreStatus.Unknown, error.Status);
+    Assert.Equal(MaplibreStatus.InvalidArgument, error.Status);
     Assert.Null(error.RawStatus);
     Assert.Contains("999999", error.Diagnostic, StringComparison.Ordinal);
   }
