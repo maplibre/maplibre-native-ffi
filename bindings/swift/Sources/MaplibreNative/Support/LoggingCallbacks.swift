@@ -22,10 +22,6 @@ private final class LogCallbackBox: @unchecked Sendable {
     self.callback = callback
   }
 
-  deinit {
-    LoggingCallbackState.reportBoxDeinitForTesting()
-  }
-
   func invoke(_ record: NativeLogRecord) -> Bool {
     callback(record)
   }
@@ -52,48 +48,31 @@ private func logCallbackTrampoline(
 enum LoggingCallbackState {
   private static let lock = NSLock()
   private nonisolated(unsafe) static var retainedBox: Unmanaged<LogCallbackBox>?
-  private nonisolated(unsafe) static var boxDeinitHandlerForTesting: (@Sendable () -> Void)?
+  private nonisolated(unsafe) static var retainedBoxes: [Unmanaged<LogCallbackBox>] = []
 
   static func set(_ callback: @escaping @Sendable (NativeLogRecord) -> Bool) throws {
     let replacement = Unmanaged.passRetained(LogCallbackBox(callback))
-    let previous: Unmanaged<LogCallbackBox>?
     do {
-      previous = try lock.withLock {
+      try lock.withLock {
         try checkStatus(mln_log_set_callback(logCallbackTrampoline, replacement.toOpaque()))
-        let previous = retainedBox
         retainedBox = replacement
-        return previous
+        retainedBoxes.append(replacement)
       }
     } catch {
       replacement.release()
       throw error
     }
-    previous?.release()
   }
 
   static func clear() throws {
-    let previous = try lock.withLock {
+    try lock.withLock {
       try checkStatus(mln_log_clear_callback())
-      let previous = retainedBox
       retainedBox = nil
-      return previous
     }
-    previous?.release()
   }
 
   static func invokeForTesting(_ record: NativeLogRecord) -> Bool? {
     let box = lock.withLock { retainedBox?.takeUnretainedValue() }
     return box?.invoke(record)
-  }
-
-  static func setBoxDeinitHandlerForTesting(_ handler: (@Sendable () -> Void)?) {
-    lock.withLock {
-      boxDeinitHandlerForTesting = handler
-    }
-  }
-
-  fileprivate static func reportBoxDeinitForTesting() {
-    let handler = lock.withLock { boxDeinitHandlerForTesting }
-    handler?()
   }
 }

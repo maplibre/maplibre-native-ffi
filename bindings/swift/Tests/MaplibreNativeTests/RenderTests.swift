@@ -130,16 +130,25 @@ private final class RenderLeakBox: @unchecked Sendable {
   }
 
   var capturedView: MetalOwnedTextureFrameView?
+  var escapedTexture: FrameNativePointer?
   try frame.withBackendPointers { view in
     capturedView = view
     let texture = try view.texture
     let device = try view.device
-    #expect(texture == NativePointer(bitPattern: 0x1234))
-    #expect(device == NativePointer(bitPattern: 0x5678))
+    escapedTexture = texture
+    #expect(try texture.addressBitPattern == 0x1234)
+    #expect(try device.addressBitPattern == 0x5678)
   }
   do {
     _ = try capturedView?.texture
     Issue.record("frame view access after scope should throw")
+  } catch let error as MaplibreError {
+    #expect(error.kind == .invalidState)
+    #expect(error.rawStatus == nil)
+  }
+  do {
+    _ = try escapedTexture?.addressBitPattern
+    Issue.record("escaped frame pointer access after scope should throw")
   } catch let error as MaplibreError {
     #expect(error.kind == .invalidState)
     #expect(error.rawStatus == nil)
@@ -170,16 +179,25 @@ private final class RenderLeakBox: @unchecked Sendable {
   }
 
   var capturedView: VulkanOwnedTextureFrameView?
+  var escapedImage: FrameNativePointer?
   try frame.withBackendPointers { view in
     capturedView = view
     let image = try view.image
     let imageView = try view.imageView
-    #expect(image == NativePointer(bitPattern: 0x1234))
-    #expect(imageView == NativePointer(bitPattern: 0x5678))
+    escapedImage = image
+    #expect(try image.addressBitPattern == 0x1234)
+    #expect(try imageView.addressBitPattern == 0x5678)
   }
   do {
     _ = try capturedView?.image
     Issue.record("frame view access after scope should throw")
+  } catch let error as MaplibreError {
+    #expect(error.kind == .invalidState)
+    #expect(error.rawStatus == nil)
+  }
+  do {
+    _ = try escapedImage?.addressBitPattern
+    Issue.record("escaped frame pointer access after scope should throw")
   } catch let error as MaplibreError {
     #expect(error.kind == .invalidState)
     #expect(error.rawStatus == nil)
@@ -210,16 +228,25 @@ private final class RenderLeakBox: @unchecked Sendable {
   }
 
   var capturedView: OpenGLOwnedTextureFrameView?
+  var escapedTexture: FrameOpenGLTextureName?
   try frame.withBackendPointers { view in
     capturedView = view
     let texture = try view.texture
     let target = try view.target
-    #expect(texture == 77)
+    escapedTexture = texture
+    #expect(try texture.value == 77)
     #expect(target == 0x0DE1)
   }
   do {
     _ = try capturedView?.texture
     Issue.record("frame view access after scope should throw")
+  } catch let error as MaplibreError {
+    #expect(error.kind == .invalidState)
+    #expect(error.rawStatus == nil)
+  }
+  do {
+    _ = try escapedTexture?.value
+    Issue.record("escaped OpenGL texture access after scope should throw")
   } catch let error as MaplibreError {
     #expect(error.kind == .invalidState)
     #expect(error.rawStatus == nil)

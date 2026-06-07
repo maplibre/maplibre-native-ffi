@@ -18,31 +18,11 @@ private final class LogRecords: @unchecked Sendable {
   }
 }
 
-private final class LogReleaseCounter: @unchecked Sendable {
-  private let lock = NSLock()
-  private var count = 0
-
-  func increment() {
-    lock.withLock {
-      count += 1
-    }
-  }
-
-  func value() -> Int {
-    lock.withLock { count }
-  }
-}
-
 @Test func logCallbackInstallReplaceAndClear() throws {
   let first = LogRecords()
   let second = LogRecords()
-  let releases = LogReleaseCounter()
-  LoggingCallbackState.setBoxDeinitHandlerForTesting {
-    releases.increment()
-  }
   defer {
     try? Maplibre.clearLogCallback()
-    LoggingCallbackState.setBoxDeinitHandlerForTesting(nil)
   }
 
   try Maplibre.setLogCallback { record in
@@ -65,8 +45,6 @@ private final class LogReleaseCounter: @unchecked Sendable {
     ) == false
   )
 
-  #expect(releases.value() == 1)
-
   try Maplibre.clearLogCallback()
   #expect(
     LoggingCallbackState.invokeForTesting(
@@ -76,7 +54,6 @@ private final class LogReleaseCounter: @unchecked Sendable {
 
   #expect(first.snapshot() == [LogRecord(severity: .info, event: .general, code: 7, message: "first")])
   #expect(second.snapshot() == [LogRecord(severity: .warning, event: .parseStyle, code: 8, message: "second")])
-  #expect(releases.value() == 2)
 }
 
 @Test func asyncLogSeverityMaskRejectsUnknownBitsBeforeCallingC() throws {

@@ -430,123 +430,74 @@ public final class RenderSessionHandle {
 }
 
 public final class MetalOwnedTextureFrameView {
-  private let texturePointer: NativePointer
-  private let devicePointer: NativePointer
-  private let isFrameLive: () -> Bool
-  private var active = true
+  private let texturePointer: FrameNativePointer
+  private let devicePointer: FrameNativePointer
 
-  fileprivate init(texture: NativePointer, device: NativePointer, isFrameLive: @escaping () -> Bool) {
+  fileprivate init(texture: FrameNativePointer, device: FrameNativePointer) {
     texturePointer = texture
     devicePointer = device
-    self.isFrameLive = isFrameLive
   }
 
-  fileprivate func invalidate() {
-    active = false
-  }
-
-  public var texture: NativePointer {
+  public var texture: FrameNativePointer {
     get throws {
-      guard active else {
-        throw MaplibreError(kind: .invalidState, rawStatus: nil, diagnostic: "Metal texture frame scope has ended")
-      }
-      guard isFrameLive() else {
-        throw MaplibreError(kind: .invalidState, rawStatus: nil, diagnostic: "Metal texture frame is closed")
-      }
+      _ = try texturePointer.addressBitPattern
       return texturePointer
     }
   }
 
-  public var device: NativePointer {
+  public var device: FrameNativePointer {
     get throws {
-      guard active else {
-        throw MaplibreError(kind: .invalidState, rawStatus: nil, diagnostic: "Metal texture frame scope has ended")
-      }
-      guard isFrameLive() else {
-        throw MaplibreError(kind: .invalidState, rawStatus: nil, diagnostic: "Metal texture frame is closed")
-      }
+      _ = try devicePointer.addressBitPattern
       return devicePointer
     }
   }
 }
 
 public final class VulkanOwnedTextureFrameView {
-  private let imagePointer: NativePointer
-  private let imageViewPointer: NativePointer
-  private let isFrameLive: () -> Bool
-  private var active = true
+  private let imagePointer: FrameNativePointer
+  private let imageViewPointer: FrameNativePointer
 
-  fileprivate init(image: NativePointer, imageView: NativePointer, isFrameLive: @escaping () -> Bool) {
+  fileprivate init(image: FrameNativePointer, imageView: FrameNativePointer) {
     imagePointer = image
     imageViewPointer = imageView
-    self.isFrameLive = isFrameLive
   }
 
-  fileprivate func invalidate() {
-    active = false
-  }
-
-  public var image: NativePointer {
+  public var image: FrameNativePointer {
     get throws {
-      guard active else {
-        throw MaplibreError(kind: .invalidState, rawStatus: nil, diagnostic: "Vulkan texture frame scope has ended")
-      }
-      guard isFrameLive() else {
-        throw MaplibreError(kind: .invalidState, rawStatus: nil, diagnostic: "Vulkan texture frame is closed")
-      }
+      _ = try imagePointer.addressBitPattern
       return imagePointer
     }
   }
 
-  public var imageView: NativePointer {
+  public var imageView: FrameNativePointer {
     get throws {
-      guard active else {
-        throw MaplibreError(kind: .invalidState, rawStatus: nil, diagnostic: "Vulkan texture frame scope has ended")
-      }
-      guard isFrameLive() else {
-        throw MaplibreError(kind: .invalidState, rawStatus: nil, diagnostic: "Vulkan texture frame is closed")
-      }
+      _ = try imageViewPointer.addressBitPattern
       return imageViewPointer
     }
   }
 }
 
 public final class OpenGLOwnedTextureFrameView {
-  private let textureName: UInt32
+  private let textureName: FrameOpenGLTextureName
   private let textureTarget: UInt32
-  private let isFrameLive: () -> Bool
-  private var active = true
+  private let scope: NativeFrameScope
 
-  fileprivate init(texture: UInt32, target: UInt32, isFrameLive: @escaping () -> Bool) {
+  fileprivate init(texture: FrameOpenGLTextureName, target: UInt32, scope: NativeFrameScope) {
     textureName = texture
     textureTarget = target
-    self.isFrameLive = isFrameLive
+    self.scope = scope
   }
 
-  fileprivate func invalidate() {
-    active = false
-  }
-
-  public var texture: UInt32 {
+  public var texture: FrameOpenGLTextureName {
     get throws {
-      guard active else {
-        throw MaplibreError(kind: .invalidState, rawStatus: nil, diagnostic: "OpenGL texture frame scope has ended")
-      }
-      guard isFrameLive() else {
-        throw MaplibreError(kind: .invalidState, rawStatus: nil, diagnostic: "OpenGL texture frame is closed")
-      }
+      _ = try textureName.value
       return textureName
     }
   }
 
   public var target: UInt32 {
     get throws {
-      guard active else {
-        throw MaplibreError(kind: .invalidState, rawStatus: nil, diagnostic: "OpenGL texture frame scope has ended")
-      }
-      guard isFrameLive() else {
-        throw MaplibreError(kind: .invalidState, rawStatus: nil, diagnostic: "OpenGL texture frame is closed")
-      }
+      try scope.requireActive("OpenGL texture")
       return textureTarget
     }
   }
@@ -589,12 +540,12 @@ public final class MetalOwnedTextureFrameHandle {
     guard let frame else {
       throw MaplibreError(kind: .invalidState, rawStatus: nil, diagnostic: "Metal texture frame is closed")
     }
+    let scope = NativeFrameScope(isFrameLive: { [weak self] in self?.frame != nil })
     let view = MetalOwnedTextureFrameView(
-      texture: NativePointer(bitPattern: UInt(bitPattern: frame.raw.texture)),
-      device: NativePointer(bitPattern: UInt(bitPattern: frame.raw.device)),
-      isFrameLive: { [weak self] in self?.frame != nil }
+      texture: FrameNativePointer(bitPattern: UInt(bitPattern: frame.raw.texture), scope: scope, diagnosticName: "Metal texture"),
+      device: FrameNativePointer(bitPattern: UInt(bitPattern: frame.raw.device), scope: scope, diagnosticName: "Metal device")
     )
-    defer { view.invalidate() }
+    defer { scope.close() }
     try body(view)
   }
 
@@ -644,12 +595,12 @@ public final class VulkanOwnedTextureFrameHandle {
     guard let frame else {
       throw MaplibreError(kind: .invalidState, rawStatus: nil, diagnostic: "Vulkan texture frame is closed")
     }
+    let scope = NativeFrameScope(isFrameLive: { [weak self] in self?.frame != nil })
     let view = VulkanOwnedTextureFrameView(
-      image: NativePointer(bitPattern: UInt(bitPattern: frame.raw.image)),
-      imageView: NativePointer(bitPattern: UInt(bitPattern: frame.raw.image_view)),
-      isFrameLive: { [weak self] in self?.frame != nil }
+      image: FrameNativePointer(bitPattern: UInt(bitPattern: frame.raw.image), scope: scope, diagnosticName: "Vulkan image"),
+      imageView: FrameNativePointer(bitPattern: UInt(bitPattern: frame.raw.image_view), scope: scope, diagnosticName: "Vulkan image view")
     )
-    defer { view.invalidate() }
+    defer { scope.close() }
     try body(view)
   }
 
@@ -699,12 +650,13 @@ public final class OpenGLOwnedTextureFrameHandle {
     guard let frame else {
       throw MaplibreError(kind: .invalidState, rawStatus: nil, diagnostic: "OpenGL texture frame is closed")
     }
+    let scope = NativeFrameScope(isFrameLive: { [weak self] in self?.frame != nil })
     let view = OpenGLOwnedTextureFrameView(
-      texture: frame.raw.texture,
+      texture: FrameOpenGLTextureName(frame.raw.texture, scope: scope),
       target: frame.raw.target,
-      isFrameLive: { [weak self] in self?.frame != nil }
+      scope: scope
     )
-    defer { view.invalidate() }
+    defer { scope.close() }
     try body(view)
   }
 
