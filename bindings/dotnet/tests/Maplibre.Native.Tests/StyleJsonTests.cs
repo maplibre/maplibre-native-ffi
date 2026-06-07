@@ -75,6 +75,16 @@ public sealed unsafe class StyleJsonTests
     }
 
     [Fact]
+    public void JsonReaderRejectsUnknownNativeValueTypes()
+    {
+        var value = new mln_json_value { type = uint.MaxValue };
+
+        var error = Assert.Throws<InvalidOperationException>(() => ReadJsonValueForTest(value));
+
+        Assert.Contains("Unknown native JSON value type", error.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void UrlAndTileSourceApisAdaptThroughNativeMap()
     {
         NativeLibraryTestSupport.SkipUnlessNativeLibraryIsAvailable();

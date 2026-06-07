@@ -57,7 +57,9 @@ internal static unsafe class ValueStructs
             ),
             mln_json_value_type.MLN_JSON_VALUE_TYPE_ARRAY => ReadArray(value->data.array_value),
             mln_json_value_type.MLN_JSON_VALUE_TYPE_OBJECT => ReadObject(value->data.object_value),
-            _ => JsonValue.Null.Instance,
+            _ => throw new InvalidOperationException(
+                $"Unknown native JSON value type {value->type}."
+            ),
         };
     }
 

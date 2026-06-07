@@ -443,14 +443,20 @@ public sealed unsafe class RuntimeHandle : IDisposable
         }
 
         var operationId = operation.RequireLive(this);
-        if (IsClosed)
+        mln_runtime* runtime;
+        try
         {
+            runtime = Pointer;
+        }
+        catch (Error.InvalidArgumentException) when (IsClosed)
+        {
+            // The runtime already owns cleanup for its pending operations.
             operation.MarkConsumed();
-            _ = Pointer;
+            throw;
         }
 
         NativeStatus.Check(
-            NativeMethods.mln_runtime_offline_operation_discard(Pointer, operationId)
+            NativeMethods.mln_runtime_offline_operation_discard(runtime, operationId)
         );
         operation.MarkConsumed();
     }

@@ -26,7 +26,7 @@ public sealed class RuntimeOfflineOperationTests
     }
 
     [Fact]
-    public void OperationCloseAfterRuntimeCloseMarksOperationClosed()
+    public void OperationCloseAfterRuntimeCloseThrowsAndMarksOperationClosed()
     {
         NativeLibraryTestSupport.SkipUnlessNativeLibraryIsAvailable();
         var runtime = RuntimeHandle.Create();
@@ -36,5 +36,6 @@ public sealed class RuntimeOfflineOperationTests
 
         Assert.Throws<InvalidArgumentException>(operation.Close);
         Assert.True(operation.IsClosed);
+        operation.Close();
     }
 }

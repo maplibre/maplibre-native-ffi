@@ -330,17 +330,29 @@ public sealed unsafe class RenderSessionHandle : IDisposable
         var pointer = (mln_metal_owned_texture_frame*)
             NativeMemory.AllocZeroed((nuint)sizeof(mln_metal_owned_texture_frame));
         pointer->size = (uint)sizeof(mln_metal_owned_texture_frame);
+        var acquired = false;
+        FrameScope? scope = null;
         try
         {
             NativeStatus.Check(
                 NativeMethods.mln_metal_owned_texture_acquire_frame(Pointer, pointer)
             );
-            var scope = new FrameScope(nameof(MetalOwnedTextureFrame));
+            acquired = true;
+            scope = new FrameScope(nameof(MetalOwnedTextureFrame));
             var frame = RenderStructs.FromNative(*pointer, scope);
             return new MetalOwnedTextureFrameHandle(this, pointer, scope, frame);
         }
         catch
         {
+            if (acquired)
+            {
+                ReleaseAcquiredFrameAfterConstructionFailure(
+                    pointer,
+                    static (session, frame) => session.ReleaseMetalFrame(frame),
+                    nameof(MetalOwnedTextureFrameHandle)
+                );
+            }
+            scope?.Dispose();
             NativeMemory.Free(pointer);
             throw;
         }
@@ -351,17 +363,29 @@ public sealed unsafe class RenderSessionHandle : IDisposable
         var pointer = (mln_vulkan_owned_texture_frame*)
             NativeMemory.AllocZeroed((nuint)sizeof(mln_vulkan_owned_texture_frame));
         pointer->size = (uint)sizeof(mln_vulkan_owned_texture_frame);
+        var acquired = false;
+        FrameScope? scope = null;
         try
         {
             NativeStatus.Check(
                 NativeMethods.mln_vulkan_owned_texture_acquire_frame(Pointer, pointer)
             );
-            var scope = new FrameScope(nameof(VulkanOwnedTextureFrame));
+            acquired = true;
+            scope = new FrameScope(nameof(VulkanOwnedTextureFrame));
             var frame = RenderStructs.FromNative(*pointer, scope);
             return new VulkanOwnedTextureFrameHandle(this, pointer, scope, frame);
         }
         catch
         {
+            if (acquired)
+            {
+                ReleaseAcquiredFrameAfterConstructionFailure(
+                    pointer,
+                    static (session, frame) => session.ReleaseVulkanFrame(frame),
+                    nameof(VulkanOwnedTextureFrameHandle)
+                );
+            }
+            scope?.Dispose();
             NativeMemory.Free(pointer);
             throw;
         }
@@ -372,17 +396,29 @@ public sealed unsafe class RenderSessionHandle : IDisposable
         var pointer = (mln_opengl_owned_texture_frame*)
             NativeMemory.AllocZeroed((nuint)sizeof(mln_opengl_owned_texture_frame));
         pointer->size = (uint)sizeof(mln_opengl_owned_texture_frame);
+        var acquired = false;
+        FrameScope? scope = null;
         try
         {
             NativeStatus.Check(
                 NativeMethods.mln_opengl_owned_texture_acquire_frame(Pointer, pointer)
             );
-            var scope = new FrameScope(nameof(OpenGLOwnedTextureFrame));
+            acquired = true;
+            scope = new FrameScope(nameof(OpenGLOwnedTextureFrame));
             var frame = RenderStructs.FromNative(*pointer, scope);
             return new OpenGLOwnedTextureFrameHandle(this, pointer, scope, frame);
         }
         catch
         {
+            if (acquired)
+            {
+                ReleaseAcquiredFrameAfterConstructionFailure(
+                    pointer,
+                    static (session, frame) => session.ReleaseOpenGLFrame(frame),
+                    nameof(OpenGLOwnedTextureFrameHandle)
+                );
+            }
+            scope?.Dispose();
             NativeMemory.Free(pointer);
             throw;
         }
@@ -396,6 +432,45 @@ public sealed unsafe class RenderSessionHandle : IDisposable
 
     internal mln_status ReleaseOpenGLFrame(mln_opengl_owned_texture_frame* frame) =>
         NativeMethods.mln_opengl_owned_texture_release_frame(Pointer, frame);
+
+    private void ReleaseAcquiredFrameAfterConstructionFailure<T>(
+        T* pointer,
+        FrameRelease<T> release,
+        string typeName
+    )
+        where T : unmanaged
+    {
+        try
+        {
+            var status = release(this, pointer);
+            if (status == mln_status.MLN_STATUS_OK)
+            {
+                return;
+            }
+
+            NativeLeakReporter.Report(
+                new NativeLeakReport(
+                    NativeLeakReportKind.DisposeFailed,
+                    typeName,
+                    (nint)pointer,
+                    status,
+                    $"Construction failed after acquiring {typeName} frame 0x{(nint)pointer:x}; cleanup returned {status}."
+                )
+            );
+        }
+        catch (Exception error)
+        {
+            NativeLeakReporter.Report(
+                new NativeLeakReport(
+                    NativeLeakReportKind.DisposeFailed,
+                    typeName,
+                    (nint)pointer,
+                    null,
+                    $"Construction failed after acquiring {typeName} frame 0x{(nint)pointer:x}; cleanup threw {error.GetType().Name}: {error.Message}"
+                )
+            );
+        }
+    }
 
     private IReadOnlyList<QueriedFeature> QueryRenderedFeaturesCore(
         RenderedQueryGeometry geometry,
