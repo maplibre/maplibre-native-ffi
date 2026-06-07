@@ -11,9 +11,9 @@ namespace Maplibre.Native;
 /// </remarks>
 public readonly record struct NativePointer(nint Address)
 {
-  /// <summary>A null native pointer.</summary>
-  public static NativePointer Null { get; } = new(0);
+    /// <summary>A null native pointer.</summary>
+    public static NativePointer Null { get; } = new(0);
 
-  /// <summary>Whether the address is zero.</summary>
-  public bool IsNull => Address == 0;
+    /// <summary>Whether the address is zero.</summary>
+    public bool IsNull => Address == 0;
 }

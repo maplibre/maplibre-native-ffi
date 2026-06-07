@@ -1,40 +1,40 @@
 using Maplibre.Native.Runtime;
-using InvalidArgumentException = Maplibre.Native.Error.InvalidArgumentException;
 using Xunit;
+using InvalidArgumentException = Maplibre.Native.Error.InvalidArgumentException;
 
 namespace Maplibre.Native.Tests;
 
 public sealed class RuntimeOfflineOperationTests
 {
-  [Fact]
-  public void AmbientCacheOperationCanBeStartedAndDiscarded()
-  {
-    NativeLibraryTestSupport.SkipUnlessNativeLibraryIsAvailable();
-    using var runtime = RuntimeHandle.Create();
+    [Fact]
+    public void AmbientCacheOperationCanBeStartedAndDiscarded()
+    {
+        NativeLibraryTestSupport.SkipUnlessNativeLibraryIsAvailable();
+        using var runtime = RuntimeHandle.Create();
 
-    using var operation = runtime.StartAmbientCacheOperation(AmbientCacheOperation.Invalidate);
+        using var operation = runtime.StartAmbientCacheOperation(AmbientCacheOperation.Invalidate);
 
-    Assert.NotEqual(0u, operation.Id);
-    Assert.Equal(OfflineOperationKind.AmbientCache, operation.Kind);
-    Assert.Equal(OfflineOperationResultKind.None, operation.ResultKind);
-    Assert.False(operation.IsClosed);
+        Assert.NotEqual(0u, operation.Id);
+        Assert.Equal(OfflineOperationKind.AmbientCache, operation.Kind);
+        Assert.Equal(OfflineOperationResultKind.None, operation.ResultKind);
+        Assert.False(operation.IsClosed);
 
-    operation.Close();
-    operation.Close();
+        operation.Close();
+        operation.Close();
 
-    Assert.True(operation.IsClosed);
-  }
+        Assert.True(operation.IsClosed);
+    }
 
-  [Fact]
-  public void OperationCloseAfterRuntimeCloseMarksOperationClosed()
-  {
-    NativeLibraryTestSupport.SkipUnlessNativeLibraryIsAvailable();
-    var runtime = RuntimeHandle.Create();
-    using var operation = runtime.StartAmbientCacheOperation(AmbientCacheOperation.Invalidate);
+    [Fact]
+    public void OperationCloseAfterRuntimeCloseMarksOperationClosed()
+    {
+        NativeLibraryTestSupport.SkipUnlessNativeLibraryIsAvailable();
+        var runtime = RuntimeHandle.Create();
+        using var operation = runtime.StartAmbientCacheOperation(AmbientCacheOperation.Invalidate);
 
-    runtime.Close();
+        runtime.Close();
 
-    Assert.Throws<InvalidArgumentException>(operation.Close);
-    Assert.True(operation.IsClosed);
-  }
+        Assert.Throws<InvalidArgumentException>(operation.Close);
+        Assert.True(operation.IsClosed);
+    }
 }

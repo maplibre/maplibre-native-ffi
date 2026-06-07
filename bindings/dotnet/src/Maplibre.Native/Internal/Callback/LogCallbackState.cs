@@ -8,134 +8,136 @@ namespace Maplibre.Native.Internal.Callback;
 
 internal sealed unsafe class LogCallbackState : IDisposable
 {
-  private static readonly Lock Gate = new();
-  private static readonly Lock RegistryGate = new();
-  private static readonly Dictionary<nint, LogCallbackState> Registry = [];
-  private static LogCallbackState? current;
-  private static nint nextToken;
+    private static readonly Lock Gate = new();
+    private static readonly Lock RegistryGate = new();
+    private static readonly Dictionary<nint, LogCallbackState> Registry = [];
+    private static LogCallbackState? current;
+    private static nint nextToken;
 
-  private readonly nint token;
-  private readonly LogCallback callback;
-  private bool retired;
+    private readonly nint token;
+    private readonly LogCallback callback;
+    private bool retired;
 
-  private LogCallbackState(LogCallback callback)
-  {
-    this.callback = callback;
-    lock (RegistryGate)
+    private LogCallbackState(LogCallback callback)
     {
-      token = ++nextToken;
-      if (token == 0)
-      {
-        token = ++nextToken;
-      }
+        this.callback = callback;
+        lock (RegistryGate)
+        {
+            token = ++nextToken;
+            if (token == 0)
+            {
+                token = ++nextToken;
+            }
 
-      Registry.Add(token, this);
+            Registry.Add(token, this);
+        }
     }
-  }
 
-  internal static void Set(LogCallback callback)
-  {
-    ArgumentNullException.ThrowIfNull(callback);
-    NativeLibraryLoader.EnsureLoaded();
-    var replacement = new LogCallbackState(callback);
-    lock (Gate)
+    internal static void Set(LogCallback callback)
     {
-      try
-      {
-        NativeStatus.Check(NativeMethods.mln_log_set_callback(&OnLog, replacement.UserData));
-        var old = current;
-        current = replacement;
-        old?.Retire();
-      }
-      catch
-      {
-        replacement.Retire();
-        throw;
-      }
+        ArgumentNullException.ThrowIfNull(callback);
+        NativeLibraryLoader.EnsureLoaded();
+        var replacement = new LogCallbackState(callback);
+        lock (Gate)
+        {
+            try
+            {
+                NativeStatus.Check(
+                    NativeMethods.mln_log_set_callback(&OnLog, replacement.UserData)
+                );
+                var old = current;
+                current = replacement;
+                old?.Retire();
+            }
+            catch
+            {
+                replacement.Retire();
+                throw;
+            }
+        }
     }
-  }
 
-  internal static void Clear()
-  {
-    NativeLibraryLoader.EnsureLoaded();
-    lock (Gate)
+    internal static void Clear()
     {
-      NativeStatus.Check(NativeMethods.mln_log_clear_callback());
-      var old = current;
-      current = null;
-      old?.Retire();
+        NativeLibraryLoader.EnsureLoaded();
+        lock (Gate)
+        {
+            NativeStatus.Check(NativeMethods.mln_log_clear_callback());
+            var old = current;
+            current = null;
+            old?.Retire();
+        }
     }
-  }
 
-  private void* UserData => (void*)token;
+    private void* UserData => (void*)token;
 
-  [UnmanagedCallersOnly(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
-  private static uint OnLog(void* userData, uint severity, uint @event, long code, sbyte* message)
-  {
-    try
+    [UnmanagedCallersOnly(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    private static uint OnLog(void* userData, uint severity, uint @event, long code, sbyte* message)
     {
-      var state = Enter((nint)userData);
-      if (state is null)
-      {
-        return 0;
-      }
+        try
+        {
+            var state = Enter((nint)userData);
+            if (state is null)
+            {
+                return 0;
+            }
 
-      return state.Invoke(severity, @event, code, message);
+            return state.Invoke(severity, @event, code, message);
+        }
+        catch
+        {
+            return 0;
+        }
     }
-    catch
+
+    private uint Invoke(uint severity, uint @event, long code, sbyte* message)
     {
-      return 0;
+        try
+        {
+            var text = message is null
+                ? string.Empty
+                : Marshal.PtrToStringUTF8((nint)message) ?? string.Empty;
+            return callback(
+                new LogRecord((LogSeverity)severity, severity, (LogEvent)@event, @event, code, text)
+            )
+                ? 1u
+                : 0u;
+        }
+        catch
+        {
+            return 0;
+        }
     }
-  }
 
-  private uint Invoke(uint severity, uint @event, long code, sbyte* message)
-  {
-    try
+    private static LogCallbackState? Enter(nint token)
     {
-      var text = message is null ? string.Empty : Marshal.PtrToStringUTF8((nint)message) ?? string.Empty;
-      return callback(new LogRecord(
-          (LogSeverity)severity,
-          severity,
-          (LogEvent)@event,
-          @event,
-          code,
-          text)) ? 1u : 0u;
+        lock (RegistryGate)
+        {
+            if (!Registry.TryGetValue(token, out var state) || state.retired)
+            {
+                return null;
+            }
+
+            return state;
+        }
     }
-    catch
+
+    public void Dispose()
     {
-      return 0;
+        Retire();
     }
-  }
 
-  private static LogCallbackState? Enter(nint token)
-  {
-    lock (RegistryGate)
+    private void Retire()
     {
-      if (!Registry.TryGetValue(token, out var state) || state.retired)
-      {
-        return null;
-      }
+        lock (RegistryGate)
+        {
+            if (retired)
+            {
+                return;
+            }
 
-      return state;
+            retired = true;
+            Registry.Remove(token);
+        }
     }
-  }
-
-  public void Dispose()
-  {
-    Retire();
-  }
-
-  private void Retire()
-  {
-    lock (RegistryGate)
-    {
-      if (retired)
-      {
-        return;
-      }
-
-      retired = true;
-      Registry.Remove(token);
-    }
-  }
 }

@@ -11,10 +11,11 @@ namespace Maplibre.Native.Internal.C;
         | AttributeTargets.Parameter
         | AttributeTargets.ReturnValue,
     AllowMultiple = false,
-    Inherited = true)]
+    Inherited = true
+)]
 [Conditional("DEBUG")]
 internal sealed class NativeTypeNameAttribute(string name) : Attribute
 {
-  /// <summary>The native type spelling.</summary>
-  public string Name { get; } = name;
+    /// <summary>The native type spelling.</summary>
+    public string Name { get; } = name;
 }

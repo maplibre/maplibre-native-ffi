@@ -5,36 +5,36 @@ namespace Maplibre.Native.Render;
 /// <summary>Owned off-heap byte buffer for reusable native I/O.</summary>
 public sealed unsafe class NativeBuffer : IDisposable
 {
-  private nint address;
+    private nint address;
 
-  public NativeBuffer(nuint byteLength)
-  {
-    ByteLength = byteLength;
-    address = (nint)NativeMemory.Alloc(byteLength == 0 ? 1 : byteLength);
-  }
-
-  public nuint ByteLength { get; }
-  public NativePointer Pointer => new(AddressOrThrow());
-  public Span<byte> Span => new((void*)AddressOrThrow(), checked((int)ByteLength));
-
-  public void Dispose()
-  {
-    var allocation = (void*)System.Threading.Interlocked.Exchange(ref address, 0);
-    if (allocation is null)
+    public NativeBuffer(nuint byteLength)
     {
-      return;
+        ByteLength = byteLength;
+        address = (nint)NativeMemory.Alloc(byteLength == 0 ? 1 : byteLength);
     }
 
-    NativeMemory.Free(allocation);
-  }
+    public nuint ByteLength { get; }
+    public NativePointer Pointer => new(AddressOrThrow());
+    public Span<byte> Span => new((void*)AddressOrThrow(), checked((int)ByteLength));
 
-  private nint AddressOrThrow()
-  {
-    if (address == 0)
+    public void Dispose()
     {
-      throw new ObjectDisposedException(nameof(NativeBuffer));
+        var allocation = (void*)System.Threading.Interlocked.Exchange(ref address, 0);
+        if (allocation is null)
+        {
+            return;
+        }
+
+        NativeMemory.Free(allocation);
     }
 
-    return address;
-  }
+    private nint AddressOrThrow()
+    {
+        if (address == 0)
+        {
+            throw new ObjectDisposedException(nameof(NativeBuffer));
+        }
+
+        return address;
+    }
 }

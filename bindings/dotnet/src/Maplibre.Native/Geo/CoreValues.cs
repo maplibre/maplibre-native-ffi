@@ -22,7 +22,13 @@ public readonly record struct Vec3(double X, double Y, double Z);
 public readonly record struct Quaternion(double X, double Y, double Z, double W);
 
 /// <summary>Overscaled tile identity.</summary>
-public readonly record struct TileId(uint OverscaledZ, int Wrap, uint CanonicalZ, uint CanonicalX, uint CanonicalY);
+public readonly record struct TileId(
+    uint OverscaledZ,
+    int Wrap,
+    uint CanonicalZ,
+    uint CanonicalX,
+    uint CanonicalY
+);
 
 /// <summary>Canonical tile identity.</summary>
 public readonly record struct CanonicalTileId(uint Z, uint X, uint Y);

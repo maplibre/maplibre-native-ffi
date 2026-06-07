@@ -4,12 +4,12 @@ namespace Maplibre.Native.Tests;
 
 public sealed class PublicApiSurfaceTests
 {
-  [Fact]
-  public void ExpectedPublicTypesExist()
-  {
-    var assembly = typeof(Maplibre).Assembly;
-    var expected = new[]
+    [Fact]
+    public void ExpectedPublicTypesExist()
     {
+        var assembly = typeof(Maplibre).Assembly;
+        var expected = new[]
+        {
             "Maplibre.Native.Maplibre",
             "Maplibre.Native.NativePointer",
             "Maplibre.Native.Error.MaplibreException",
@@ -49,9 +49,9 @@ public sealed class PublicApiSurfaceTests
             "Maplibre.Native.Style.StyleImage",
         };
 
-    foreach (var typeName in expected)
-    {
-      Assert.NotNull(assembly.GetType(typeName));
+        foreach (var typeName in expected)
+        {
+            Assert.NotNull(assembly.GetType(typeName));
+        }
     }
-  }
 }
