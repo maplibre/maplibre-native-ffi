@@ -9,19 +9,19 @@ namespace Maplibre.Native.Internal.Callback;
 internal sealed unsafe class ResourceTransformState : IDisposable
 {
     private readonly ResourceTransformCallback callback;
-    private readonly GCHandle handle;
+    private nint handle;
 
     internal ResourceTransformState(ResourceTransformCallback callback)
     {
         this.callback = callback ?? throw new ArgumentNullException(nameof(callback));
-        handle = GCHandle.Alloc(this);
+        handle = GCHandle.ToIntPtr(GCHandle.Alloc(this));
     }
 
     internal mln_resource_transform Descriptor => new()
     {
         size = (uint)sizeof(mln_resource_transform),
         callback = &OnTransform,
-        user_data = (void*)GCHandle.ToIntPtr(handle),
+        user_data = (void*)handle,
     };
 
     internal mln_status TransformForTest(ResourceKind kind, string? url, out string? replacementUrl)
@@ -93,9 +93,10 @@ internal sealed unsafe class ResourceTransformState : IDisposable
 
     public void Dispose()
     {
-        if (handle.IsAllocated)
+        var current = System.Threading.Interlocked.Exchange(ref handle, 0);
+        if (current != 0)
         {
-            handle.Free();
+            GCHandle.FromIntPtr(current).Free();
         }
     }
 }

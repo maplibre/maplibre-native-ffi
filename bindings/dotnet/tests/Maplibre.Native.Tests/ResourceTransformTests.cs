@@ -50,6 +50,15 @@ public sealed class ResourceTransformTests
     }
 
     [Fact]
+    public void ResourceTransformStateDisposeIsIdempotent()
+    {
+        var state = new ResourceTransformState(_ => null);
+
+        state.Dispose();
+        state.Dispose();
+    }
+
+    [Fact]
     public unsafe void ResourceTransformResponseHelperRequiresNativeCallbackContext()
     {
         NativeLibraryTestSupport.SkipUnlessNativeLibraryIsAvailable();

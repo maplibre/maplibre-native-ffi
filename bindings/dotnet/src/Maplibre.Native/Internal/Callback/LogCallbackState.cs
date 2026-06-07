@@ -11,13 +11,13 @@ internal sealed unsafe class LogCallbackState : IDisposable
     private static readonly Lock Gate = new();
     private static LogCallbackState? current;
 
-    private readonly GCHandle handle;
     private readonly LogCallback callback;
+    private nint handle;
 
     private LogCallbackState(LogCallback callback)
     {
         this.callback = callback;
-        handle = GCHandle.Alloc(this);
+        handle = GCHandle.ToIntPtr(GCHandle.Alloc(this));
     }
 
     internal static void Set(LogCallback callback)
@@ -29,7 +29,7 @@ internal sealed unsafe class LogCallbackState : IDisposable
         {
             try
             {
-                NativeStatus.Check(NativeMethods.mln_log_set_callback(&OnLog, (void*)GCHandle.ToIntPtr(replacement.handle)));
+                NativeStatus.Check(NativeMethods.mln_log_set_callback(&OnLog, (void*)replacement.handle));
                 var old = current;
                 current = replacement;
                 old?.Dispose();
@@ -82,9 +82,10 @@ internal sealed unsafe class LogCallbackState : IDisposable
 
     public void Dispose()
     {
-        if (handle.IsAllocated)
+        var current = System.Threading.Interlocked.Exchange(ref handle, 0);
+        if (current != 0)
         {
-            handle.Free();
+            GCHandle.FromIntPtr(current).Free();
         }
     }
 }

@@ -110,6 +110,15 @@ public sealed unsafe class ResourceProviderTests
     }
 
     [Fact]
+    public void ResourceProviderStateDisposeIsIdempotent()
+    {
+        var state = new ResourceProviderState((_, _) => ResourceProviderDecision.PassThrough);
+
+        state.Dispose();
+        state.Dispose();
+    }
+
+    [Fact]
     public void CanInstallAndReplaceResourceProvider()
     {
         NativeLibraryTestSupport.SkipUnlessNativeLibraryIsAvailable();

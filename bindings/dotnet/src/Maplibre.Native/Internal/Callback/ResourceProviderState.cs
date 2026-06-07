@@ -8,19 +8,19 @@ namespace Maplibre.Native.Internal.Callback;
 internal sealed unsafe class ResourceProviderState : IDisposable
 {
     private readonly ResourceProviderCallback callback;
-    private readonly GCHandle handle;
+    private nint handle;
 
     internal ResourceProviderState(ResourceProviderCallback callback)
     {
         this.callback = callback ?? throw new ArgumentNullException(nameof(callback));
-        handle = GCHandle.Alloc(this);
+        handle = GCHandle.ToIntPtr(GCHandle.Alloc(this));
     }
 
     internal mln_resource_provider Descriptor => new()
     {
         size = (uint)sizeof(mln_resource_provider),
         callback = &OnRequest,
-        user_data = (void*)GCHandle.ToIntPtr(handle),
+        user_data = (void*)handle,
     };
 
     internal uint HandleForTest(mln_resource_request* request)
@@ -64,9 +64,10 @@ internal sealed unsafe class ResourceProviderState : IDisposable
 
     public void Dispose()
     {
-        if (handle.IsAllocated)
+        var current = System.Threading.Interlocked.Exchange(ref handle, 0);
+        if (current != 0)
         {
-            handle.Free();
+            GCHandle.FromIntPtr(current).Free();
         }
     }
 }
