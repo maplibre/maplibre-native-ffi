@@ -448,7 +448,7 @@ public sealed unsafe class RuntimeHandle : IDisposable
         {
             runtime = Pointer;
         }
-        catch (Error.InvalidArgumentException) when (IsClosed)
+        catch (Error.InvalidStateException) when (IsClosed)
         {
             // The runtime already owns cleanup for its pending operations.
             operation.MarkConsumed();

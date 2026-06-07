@@ -87,9 +87,9 @@ public sealed class RuntimeMapLifecycleTests
         map.Close();
         runtime.Close();
 
-        var error = Assert.Throws<InvalidArgumentException>(map.RequestRepaint);
+        var error = Assert.Throws<InvalidStateException>(map.RequestRepaint);
 
-        Assert.Equal(MaplibreStatus.InvalidArgument, error.Status);
+        Assert.Equal(MaplibreStatus.InvalidState, error.Status);
         Assert.Null(error.RawStatus);
         Assert.Contains("closed", error.Diagnostic, StringComparison.OrdinalIgnoreCase);
     }

@@ -57,8 +57,8 @@ internal sealed unsafe class NativeHandleState<T>
             var handle = (T*)address;
             if (handle is null)
             {
-                throw new InvalidArgumentException(
-                    MaplibreStatus.InvalidArgument,
+                throw new InvalidStateException(
+                    MaplibreStatus.InvalidState,
                     null,
                     $"{typeName} is closed."
                 );
