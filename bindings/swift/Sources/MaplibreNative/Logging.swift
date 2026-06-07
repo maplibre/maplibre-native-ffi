@@ -1,4 +1,6 @@
 
+internal import CMaplibreNativeC
+
 public enum LogSeverity: Sendable, Hashable {
   case info
   case warning
@@ -121,7 +123,7 @@ extension Maplibre {
       )
     }
     try mapNativeFailure {
-      try CAPI.setAsyncLogSeverityMask(mask.rawValue)
+      try checkStatus(mln_log_set_async_severity_mask(mask.rawValue))
     }
   }
 

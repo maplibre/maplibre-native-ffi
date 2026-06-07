@@ -1,27 +1,32 @@
 
+internal import CMaplibreNativeC
+
 public enum Maplibre {
   public static func cVersion() -> UInt32 {
-    CAPI.cVersion()
+    mln_c_version()
   }
 
   public static func supportedRenderBackends() -> RenderBackend {
-    RenderBackend(rawValue: CAPI.supportedRenderBackendMask())
+    RenderBackend(rawValue: mln_supported_render_backend_mask())
   }
 
   public static func supportedOpenGLContextProviders() -> OpenGLContextProvider {
-    OpenGLContextProvider(rawValue: CAPI.supportedOpenGLContextProviderMask())
+    OpenGLContextProvider(rawValue: mln_opengl_supported_context_provider_mask())
   }
 
   public static func networkStatus() throws -> NetworkStatus {
     try mapNativeFailure {
-      NetworkStatus.fromNative(try CAPI.networkStatus())
+      let rawStatus = try NativeMemory.withTemporary(UInt32(0)) { rawStatus in
+        try checkStatus(mln_network_status_get(rawStatus))
+      }
+      return NetworkStatus.fromNative(rawStatus.value)
     }
   }
 
   public static func setNetworkStatus(_ status: NetworkStatus) throws {
     let rawStatus = try status.nativeValue
     try mapNativeFailure {
-      try CAPI.setNetworkStatus(rawStatus)
+      try checkStatus(mln_network_status_set(rawStatus))
     }
   }
 }

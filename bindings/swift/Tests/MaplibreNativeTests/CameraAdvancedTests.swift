@@ -41,7 +41,7 @@ import Testing
 }
 
 @Test func nativeCameraOptionsPreserveAbsentFieldMasks() throws {
-  var raw = CAPI.cameraOptionsDefault()
+  var raw = mln_camera_options_default()
   raw.fields = MLN_CAMERA_OPTION_ZOOM.rawValue
   raw.latitude = 12
   raw.longitude = 34

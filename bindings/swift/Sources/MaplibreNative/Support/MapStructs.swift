@@ -98,7 +98,7 @@ struct NativeMapOptionsInput: Equatable, Sendable {
   func withNativeOptions<Result>(
     _ body: (UnsafePointer<mln_map_options>) throws -> Result
   ) throws -> Result {
-    var options = CAPI.mapOptionsDefault()
+    var options = mln_map_options_default()
     options.width = width
     options.height = height
     options.scale_factor = scaleFactor
@@ -155,7 +155,7 @@ struct NativeCameraOptionsInput: Equatable, Sendable {
   func withNativeOptions<Result>(
     _ body: (UnsafePointer<mln_camera_options>) throws -> Result
   ) throws -> Result {
-    var camera = CAPI.cameraOptionsDefault()
+    var camera = mln_camera_options_default()
     if let center {
       camera.fields |= MLN_CAMERA_OPTION_CENTER.rawValue
       camera.latitude = center.latitude
@@ -239,7 +239,7 @@ struct NativeAnimationOptionsInput: Equatable, Sendable {
     if durationMilliseconds == nil, velocity == nil, minimumZoom == nil, easing == nil {
       return try body(nil)
     }
-    var animation = CAPI.animationOptionsDefault()
+    var animation = mln_animation_options_default()
     if let durationMilliseconds {
       animation.fields |= MLN_ANIMATION_OPTION_DURATION.rawValue
       animation.duration_ms = durationMilliseconds
@@ -273,7 +273,7 @@ struct NativeCameraFitOptionsInput: Equatable, Sendable {
 
   func withOptionalNativeOptions<Result>(_ body: (UnsafePointer<mln_camera_fit_options>?) throws -> Result) throws -> Result {
     if padding == nil, bearing == nil, pitch == nil { return try body(nil) }
-    var options = CAPI.cameraFitOptionsDefault()
+    var options = mln_camera_fit_options_default()
     if let padding {
       options.fields |= MLN_CAMERA_FIT_OPTION_PADDING.rawValue
       options.padding = padding.native
@@ -314,7 +314,7 @@ struct NativeBoundOptionsInput: Equatable, Sendable {
   }
 
   func withNativeOptions<Result>(_ body: (UnsafePointer<mln_bound_options>) throws -> Result) throws -> Result {
-    var options = CAPI.boundOptionsDefault()
+    var options = mln_bound_options_default()
     if let bounds {
       options.fields |= MLN_BOUND_OPTION_BOUNDS.rawValue
       options.bounds = bounds.native
@@ -367,7 +367,7 @@ struct NativeFreeCameraOptionsInput: Equatable, Sendable {
     orientation = (raw.fields & MLN_FREE_CAMERA_OPTION_ORIENTATION.rawValue) != 0 ? NativeQuaternion(raw.orientation) : nil
   }
   func withNativeOptions<Result>(_ body: (UnsafePointer<mln_free_camera_options>) throws -> Result) throws -> Result {
-    var options = CAPI.freeCameraOptionsDefault()
+    var options = mln_free_camera_options_default()
     if let position { options.fields |= MLN_FREE_CAMERA_OPTION_POSITION.rawValue; options.position = position.native }
     if let orientation { options.fields |= MLN_FREE_CAMERA_OPTION_ORIENTATION.rawValue; options.orientation = orientation.native }
     return try withUnsafePointer(to: &options, body)
@@ -385,7 +385,7 @@ struct NativeProjectionModeInput: Equatable, Sendable {
     ySkew = (raw.fields & MLN_PROJECTION_MODE_Y_SKEW.rawValue) != 0 ? raw.y_skew : nil
   }
   func withNativeMode<Result>(_ body: (UnsafePointer<mln_projection_mode>) throws -> Result) throws -> Result {
-    var mode = CAPI.projectionModeDefault()
+    var mode = mln_projection_mode_default()
     if let axonometric { mode.fields |= MLN_PROJECTION_MODE_AXONOMETRIC.rawValue; mode.axonometric = axonometric }
     if let xSkew { mode.fields |= MLN_PROJECTION_MODE_X_SKEW.rawValue; mode.x_skew = xSkew }
     if let ySkew { mode.fields |= MLN_PROJECTION_MODE_Y_SKEW.rawValue; mode.y_skew = ySkew }
@@ -408,7 +408,7 @@ struct NativeMapViewportOptionsInput: Equatable, Sendable {
     frustumOffset = (raw.fields & MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET.rawValue) != 0 ? NativeEdgeInsets(raw.frustum_offset) : nil
   }
   func withNativeOptions<Result>(_ body: (UnsafePointer<mln_map_viewport_options>) throws -> Result) throws -> Result {
-    var options = CAPI.mapViewportOptionsDefault()
+    var options = mln_map_viewport_options_default()
     if let northOrientation { options.fields |= MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION.rawValue; options.north_orientation = northOrientation }
     if let constrainMode { options.fields |= MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE.rawValue; options.constrain_mode = constrainMode }
     if let viewportMode { options.fields |= MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE.rawValue; options.viewport_mode = viewportMode }
@@ -436,7 +436,7 @@ struct NativeMapTileOptionsInput: Equatable, Sendable {
     lodMode = (raw.fields & MLN_MAP_TILE_OPTION_LOD_MODE.rawValue) != 0 ? raw.lod_mode : nil
   }
   func withNativeOptions<Result>(_ body: (UnsafePointer<mln_map_tile_options>) throws -> Result) throws -> Result {
-    var options = CAPI.mapTileOptionsDefault()
+    var options = mln_map_tile_options_default()
     if let prefetchZoomDelta { options.fields |= MLN_MAP_TILE_OPTION_PREFETCH_ZOOM_DELTA.rawValue; options.prefetch_zoom_delta = prefetchZoomDelta }
     if let lodMinRadius { options.fields |= MLN_MAP_TILE_OPTION_LOD_MIN_RADIUS.rawValue; options.lod_min_radius = lodMinRadius }
     if let lodScale { options.fields |= MLN_MAP_TILE_OPTION_LOD_SCALE.rawValue; options.lod_scale = lodScale }

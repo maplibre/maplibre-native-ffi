@@ -1,4 +1,6 @@
 
+internal import CMaplibreNativeC
+
 public struct CameraFitOptions: Equatable, Sendable {
   public var padding: EdgeInsets?
   public var bearing: Double?
@@ -233,7 +235,7 @@ public struct MapTileOptions: Equatable, Sendable {
 
 extension MapHandle {
   public func setDebugOptions(_ options: MapDebugOptions) throws {
-    try mapNativeFailure { try CAPI.mapSetDebugOptions(try requireLivePointer(), options: options.rawValue) }
+    try mapNativeFailure { try checkStatus(mln_map_set_debug_options(try requireLivePointer(), options.rawValue)) }
   }
 
   public func debugOptions() throws -> MapDebugOptions {
@@ -241,7 +243,7 @@ extension MapHandle {
   }
 
   public func setRenderingStatsViewEnabled(_ enabled: Bool) throws {
-    try mapNativeFailure { try CAPI.mapSetRenderingStatsViewEnabled(try requireLivePointer(), enabled: enabled) }
+    try mapNativeFailure { try checkStatus(mln_map_set_rendering_stats_view_enabled(try requireLivePointer(), enabled)) }
   }
 
   public func renderingStatsViewEnabled() throws -> Bool {
@@ -253,7 +255,7 @@ extension MapHandle {
   }
 
   public func dumpDebugLogs() throws {
-    try mapNativeFailure { try CAPI.mapDumpDebugLogs(try requireLivePointer()) }
+    try mapNativeFailure { try checkStatus(mln_map_dump_debug_logs(try requireLivePointer())) }
   }
 
   public func viewportOptions() throws -> MapViewportOptions {
@@ -261,7 +263,7 @@ extension MapHandle {
   }
 
   public func setViewportOptions(_ options: MapViewportOptions) throws {
-    try mapNativeFailure { try options.nativeInput.withNativeOptions { try CAPI.mapSetViewportOptions(try requireLivePointer(), options: $0) } }
+    try mapNativeFailure { try options.nativeInput.withNativeOptions { try checkStatus(mln_map_set_viewport_options(try requireLivePointer(), $0)) } }
   }
 
   public func tileOptions() throws -> MapTileOptions {
@@ -269,39 +271,39 @@ extension MapHandle {
   }
 
   public func setTileOptions(_ options: MapTileOptions) throws {
-    try mapNativeFailure { try options.nativeInput.withNativeOptions { try CAPI.mapSetTileOptions(try requireLivePointer(), options: $0) } }
+    try mapNativeFailure { try options.nativeInput.withNativeOptions { try checkStatus(mln_map_set_tile_options(try requireLivePointer(), $0)) } }
   }
 
   public func fly(to camera: CameraOptions, animation: AnimationOptions? = nil) throws {
     try mapNativeFailure {
       try camera.nativeInput.withNativeOptions { nativeCamera in
         try (animation?.nativeInput ?? NativeAnimationOptionsInput()).withOptionalNativeOptions { nativeAnimation in
-          try CAPI.mapFlyTo(try requireLivePointer(), nativeCamera, nativeAnimation)
+          try checkStatus(mln_map_fly_to(try requireLivePointer(), nativeCamera, nativeAnimation))
         }
       }
     }
   }
 
   public func rotateBy(first: ScreenPoint, second: ScreenPoint) throws {
-    try mapNativeFailure { try CAPI.mapRotateBy(try requireLivePointer(), first: first.nativeInput, second: second.nativeInput) }
+    try mapNativeFailure { try checkStatus(mln_map_rotate_by(try requireLivePointer(), first.nativeInput.native, second.nativeInput.native)) }
   }
 
   public func rotateBy(first: ScreenPoint, second: ScreenPoint, animation: AnimationOptions) throws {
     try mapNativeFailure {
       try animation.nativeInput.withOptionalNativeOptions { animation in
-        try CAPI.mapRotateByAnimated(try requireLivePointer(), first: first.nativeInput, second: second.nativeInput, animation: animation)
+        try checkStatus(mln_map_rotate_by_animated(try requireLivePointer(), first.nativeInput.native, second.nativeInput.native, animation))
       }
     }
   }
 
   public func pitchBy(_ pitch: Double) throws {
-    try mapNativeFailure { try CAPI.mapPitchBy(try requireLivePointer(), pitch: pitch) }
+    try mapNativeFailure { try checkStatus(mln_map_pitch_by(try requireLivePointer(), pitch)) }
   }
 
   public func pitchBy(_ pitch: Double, animation: AnimationOptions) throws {
     try mapNativeFailure {
       try animation.nativeInput.withOptionalNativeOptions { animation in
-        try CAPI.mapPitchByAnimated(try requireLivePointer(), pitch: pitch, animation: animation)
+        try checkStatus(mln_map_pitch_by_animated(try requireLivePointer(), pitch, animation))
       }
     }
   }

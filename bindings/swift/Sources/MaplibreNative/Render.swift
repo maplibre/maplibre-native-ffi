@@ -1,3 +1,4 @@
+internal import CMaplibreNativeC
 import Foundation
 
 public struct RenderTargetExtent: Equatable, Sendable {
@@ -347,43 +348,43 @@ public final class RenderSessionHandle {
 
   public func close() throws {
     try handle.closeOnce { pointer in
-      try CAPI.renderSessionDestroy(pointer)
+      try checkStatus(mln_render_session_destroy(pointer))
     }
   }
 
   public func resize(width: UInt32, height: UInt32, scaleFactor: Double) throws {
     try mapNativeFailure {
-      try CAPI.renderSessionResize(try handle.requireLive(), width: width, height: height, scaleFactor: scaleFactor)
+      try checkStatus(mln_render_session_resize(try handle.requireLive(), width, height, scaleFactor))
     }
   }
 
   public func renderUpdate() throws {
     try mapNativeFailure {
-      try CAPI.renderSessionRenderUpdate(try handle.requireLive())
+      try checkStatus(mln_render_session_render_update(try handle.requireLive()))
     }
   }
 
   public func detach() throws {
     try mapNativeFailure {
-      try CAPI.renderSessionDetach(try handle.requireLive())
+      try checkStatus(mln_render_session_detach(try handle.requireLive()))
     }
   }
 
   public func reduceMemoryUse() throws {
     try mapNativeFailure {
-      try CAPI.renderSessionReduceMemoryUse(try handle.requireLive())
+      try checkStatus(mln_render_session_reduce_memory_use(try handle.requireLive()))
     }
   }
 
   public func clearData() throws {
     try mapNativeFailure {
-      try CAPI.renderSessionClearData(try handle.requireLive())
+      try checkStatus(mln_render_session_clear_data(try handle.requireLive()))
     }
   }
 
   public func dumpDebugLogs() throws {
     try mapNativeFailure {
-      try CAPI.renderSessionDumpDebugLogs(try handle.requireLive())
+      try checkStatus(mln_render_session_dump_debug_logs(try handle.requireLive()))
     }
   }
 
@@ -558,7 +559,7 @@ public final class MetalOwnedTextureFrameHandle {
   init(session: RenderSessionHandle, frame: NativeMetalOwnedTextureFrame) {
     self.releaseFrame = { frame in
       try withUnsafePointer(to: &frame.raw) { rawFrame in
-        try CAPI.metalOwnedTextureReleaseFrame(try session.requireLivePointer(), frame: rawFrame)
+        try checkStatus(mln_metal_owned_texture_release_frame(try session.requireLivePointer(), rawFrame))
       }
     }
     self.frame = frame
@@ -613,7 +614,7 @@ public final class VulkanOwnedTextureFrameHandle {
   init(session: RenderSessionHandle, frame: NativeVulkanOwnedTextureFrame) {
     self.releaseFrame = { frame in
       try withUnsafePointer(to: &frame.raw) { rawFrame in
-        try CAPI.vulkanOwnedTextureReleaseFrame(try session.requireLivePointer(), frame: rawFrame)
+        try checkStatus(mln_vulkan_owned_texture_release_frame(try session.requireLivePointer(), rawFrame))
       }
     }
     self.frame = frame
@@ -668,7 +669,7 @@ public final class OpenGLOwnedTextureFrameHandle {
   init(session: RenderSessionHandle, frame: NativeOpenGLOwnedTextureFrame) {
     self.releaseFrame = { frame in
       try withUnsafePointer(to: &frame.raw) { rawFrame in
-        try CAPI.openGLOwnedTextureReleaseFrame(try session.requireLivePointer(), frame: rawFrame)
+        try checkStatus(mln_opengl_owned_texture_release_frame(try session.requireLivePointer(), rawFrame))
       }
     }
     self.frame = frame

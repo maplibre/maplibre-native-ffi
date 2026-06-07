@@ -159,7 +159,7 @@ struct NativeMetalSurfaceDescriptorInput: Equatable, Sendable {
   func withNativeDescriptor<Result>(
     _ body: (UnsafePointer<mln_metal_surface_descriptor>) throws -> Result
   ) throws -> Result {
-    var descriptor = CAPI.metalSurfaceDescriptorDefault()
+    var descriptor = mln_metal_surface_descriptor_default()
     descriptor.extent = extent.native
     descriptor.context = context.native
     descriptor.layer = UnsafeMutableRawPointer(bitPattern: layerAddress)
@@ -181,7 +181,7 @@ struct NativeVulkanSurfaceDescriptorInput: Equatable, Sendable {
   func withNativeDescriptor<Result>(
     _ body: (UnsafePointer<mln_vulkan_surface_descriptor>) throws -> Result
   ) throws -> Result {
-    var descriptor = CAPI.vulkanSurfaceDescriptorDefault()
+    var descriptor = mln_vulkan_surface_descriptor_default()
     descriptor.extent = extent.native
     descriptor.context = context.native
     descriptor.surface = UnsafeMutableRawPointer(bitPattern: surfaceAddress)
@@ -203,7 +203,7 @@ struct NativeOpenGLSurfaceDescriptorInput: Equatable, Sendable {
   func withNativeDescriptor<Result>(
     _ body: (UnsafePointer<mln_opengl_surface_descriptor>) throws -> Result
   ) throws -> Result {
-    var descriptor = CAPI.openGLSurfaceDescriptorDefault()
+    var descriptor = mln_opengl_surface_descriptor_default()
     descriptor.extent = extent.native
     descriptor.context = context.native
     descriptor.surface = UnsafeMutableRawPointer(bitPattern: surfaceAddress)
@@ -237,7 +237,7 @@ struct NativeMetalOwnedTextureDescriptorInput: Equatable, Sendable {
   func withNativeDescriptor<Result>(
     _ body: (UnsafePointer<mln_metal_owned_texture_descriptor>) throws -> Result
   ) throws -> Result {
-    var descriptor = CAPI.metalOwnedTextureDescriptorDefault()
+    var descriptor = mln_metal_owned_texture_descriptor_default()
     descriptor.extent = extent.native
     descriptor.context = context.native
     return try withUnsafePointer(to: &descriptor, body)
@@ -256,7 +256,7 @@ struct NativeMetalBorrowedTextureDescriptorInput: Equatable, Sendable {
   func withNativeDescriptor<Result>(
     _ body: (UnsafePointer<mln_metal_borrowed_texture_descriptor>) throws -> Result
   ) throws -> Result {
-    var descriptor = CAPI.metalBorrowedTextureDescriptorDefault()
+    var descriptor = mln_metal_borrowed_texture_descriptor_default()
     descriptor.extent = extent.native
     descriptor.texture = UnsafeMutableRawPointer(bitPattern: textureAddress)
     return try withUnsafePointer(to: &descriptor, body)
@@ -275,7 +275,7 @@ struct NativeVulkanOwnedTextureDescriptorInput: Equatable, Sendable {
   func withNativeDescriptor<Result>(
     _ body: (UnsafePointer<mln_vulkan_owned_texture_descriptor>) throws -> Result
   ) throws -> Result {
-    var descriptor = CAPI.vulkanOwnedTextureDescriptorDefault()
+    var descriptor = mln_vulkan_owned_texture_descriptor_default()
     descriptor.extent = extent.native
     descriptor.context = context.native
     return try withUnsafePointer(to: &descriptor, body)
@@ -312,7 +312,7 @@ struct NativeVulkanBorrowedTextureDescriptorInput: Equatable, Sendable {
   func withNativeDescriptor<Result>(
     _ body: (UnsafePointer<mln_vulkan_borrowed_texture_descriptor>) throws -> Result
   ) throws -> Result {
-    var descriptor = CAPI.vulkanBorrowedTextureDescriptorDefault()
+    var descriptor = mln_vulkan_borrowed_texture_descriptor_default()
     descriptor.extent = extent.native
     descriptor.context = context.native
     descriptor.image = UnsafeMutableRawPointer(bitPattern: imageAddress)
@@ -336,7 +336,7 @@ struct NativeOpenGLOwnedTextureDescriptorInput: Equatable, Sendable {
   func withNativeDescriptor<Result>(
     _ body: (UnsafePointer<mln_opengl_owned_texture_descriptor>) throws -> Result
   ) throws -> Result {
-    var descriptor = CAPI.openGLOwnedTextureDescriptorDefault()
+    var descriptor = mln_opengl_owned_texture_descriptor_default()
     descriptor.extent = extent.native
     descriptor.context = context.native
     return try withUnsafePointer(to: &descriptor, body)
@@ -359,7 +359,7 @@ struct NativeOpenGLBorrowedTextureDescriptorInput: Equatable, Sendable {
   func withNativeDescriptor<Result>(
     _ body: (UnsafePointer<mln_opengl_borrowed_texture_descriptor>) throws -> Result
   ) throws -> Result {
-    var descriptor = CAPI.openGLBorrowedTextureDescriptorDefault()
+    var descriptor = mln_opengl_borrowed_texture_descriptor_default()
     descriptor.extent = extent.native
     descriptor.context = context.native
     descriptor.texture = texture

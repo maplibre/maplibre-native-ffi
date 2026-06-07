@@ -1,3 +1,4 @@
+internal import CMaplibreNativeC
 import Foundation
 
 public struct RuntimeOptions: Equatable, Sendable {
@@ -344,7 +345,7 @@ public final class RuntimeHandle {
 
   public func close() throws {
     try handle.closeOnce { pointer in
-      try CAPI.destroyRuntime(pointer)
+      try checkStatus(mln_runtime_destroy(pointer))
     }
     resourceTransform = nil
     resourceProvider = nil
@@ -356,7 +357,7 @@ public final class RuntimeHandle {
 
   public func runOnce() throws {
     try mapNativeFailure {
-      try CAPI.runtimeRunOnce(try handle.requireLive())
+      try checkStatus(mln_runtime_run_once(try handle.requireLive()))
     }
   }
 
@@ -379,7 +380,7 @@ public final class RuntimeHandle {
     }
     try mapNativeFailure {
       try replacement.withDescriptor { descriptor in
-        try CAPI.setResourceTransform(try handle.requireLive(), descriptor)
+        try checkStatus(mln_runtime_set_resource_transform(try handle.requireLive(), descriptor))
       }
     }
     resourceTransform = replacement
@@ -387,7 +388,7 @@ public final class RuntimeHandle {
 
   public func clearResourceTransform() throws {
     try mapNativeFailure {
-      try CAPI.clearResourceTransform(try handle.requireLive())
+      try checkStatus(mln_runtime_clear_resource_transform(try handle.requireLive()))
     }
     resourceTransform = nil
   }
@@ -407,7 +408,7 @@ public final class RuntimeHandle {
     }
     try mapNativeFailure {
       try replacement.withDescriptor { descriptor in
-        try CAPI.setResourceProvider(try handle.requireLive(), descriptor)
+        try checkStatus(mln_runtime_set_resource_provider(try handle.requireLive(), descriptor))
       }
     }
     resourceProvider = replacement

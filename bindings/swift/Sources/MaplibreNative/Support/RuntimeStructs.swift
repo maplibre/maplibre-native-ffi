@@ -16,7 +16,7 @@ struct NativeRuntimeOptionsInput: Sendable, Equatable {
   ) throws -> Result {
     try NativeString.withOptionalCString(assetPath) { assetPath in
       try NativeString.withOptionalCString(cachePath) { cachePath in
-        var options = CAPI.runtimeOptionsDefault()
+        var options = mln_runtime_options_default()
         options.asset_path = assetPath
         options.cache_path = cachePath
         if let maximumCacheSize {

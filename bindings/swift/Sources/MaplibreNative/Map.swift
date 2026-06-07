@@ -1,3 +1,4 @@
+internal import CMaplibreNativeC
 import Foundation
 
 private final class WeakMapHandle {
@@ -103,7 +104,7 @@ public final class MapHandle {
 
   public func close() throws {
     try handle.closeOnce { pointer in
-      try CAPI.destroyMap(pointer)
+      try checkStatus(mln_map_destroy(pointer))
     }
     Self.unregister(nativeAddress)
     customGeometrySourceCallbacks.removeAll()
@@ -111,14 +112,18 @@ public final class MapHandle {
 
   public func setStyleURL(_ url: String) throws {
     try mapNativeFailure {
-      try CAPI.mapSetStyleURL(try handle.requireLive(), url)
+      try NativeString.withCString(url) { url in
+        try checkStatus(mln_map_set_style_url(try handle.requireLive(), url))
+      }
       retainCallbacksUntilPendingStyleURLLoads()
     }
   }
 
   public func setStyleJSON(_ json: String) throws {
     try mapNativeFailure {
-      try CAPI.mapSetStyleJSON(try handle.requireLive(), json)
+      try NativeString.withCString(json) { json in
+        try checkStatus(mln_map_set_style_json(try handle.requireLive(), json))
+      }
       styleURLReplacementPending = false
       customGeometrySourceCallbacks.removeAll()
     }
@@ -126,13 +131,13 @@ public final class MapHandle {
 
   public func requestRepaint() throws {
     try mapNativeFailure {
-      try CAPI.mapRequestRepaint(try handle.requireLive())
+      try checkStatus(mln_map_request_repaint(try handle.requireLive()))
     }
   }
 
   public func requestStillImage() throws {
     try mapNativeFailure {
-      try CAPI.mapRequestStillImage(try handle.requireLive())
+      try checkStatus(mln_map_request_still_image(try handle.requireLive()))
     }
   }
 
@@ -145,7 +150,7 @@ public final class MapHandle {
   public func jump(to camera: CameraOptions) throws {
     try mapNativeFailure {
       try camera.nativeInput.withNativeOptions { nativeCamera in
-        try CAPI.mapJumpTo(try handle.requireLive(), nativeCamera)
+        try checkStatus(mln_map_jump_to(try handle.requireLive(), nativeCamera))
       }
     }
   }
@@ -154,7 +159,7 @@ public final class MapHandle {
     try mapNativeFailure {
       try camera.nativeInput.withNativeOptions { nativeCamera in
         try (animation?.nativeInput ?? NativeAnimationOptionsInput()).withOptionalNativeOptions { nativeAnimation in
-          try CAPI.mapEaseTo(try handle.requireLive(), nativeCamera, nativeAnimation)
+          try checkStatus(mln_map_ease_to(try handle.requireLive(), nativeCamera, nativeAnimation))
         }
       }
     }
@@ -162,19 +167,14 @@ public final class MapHandle {
 
   public func moveBy(deltaX: Double, deltaY: Double) throws {
     try mapNativeFailure {
-      try CAPI.mapMoveBy(try handle.requireLive(), deltaX: deltaX, deltaY: deltaY)
+      try checkStatus(mln_map_move_by(try handle.requireLive(), deltaX, deltaY))
     }
   }
 
   public func moveBy(deltaX: Double, deltaY: Double, animation: AnimationOptions) throws {
     try mapNativeFailure {
       try animation.nativeInput.withOptionalNativeOptions { nativeAnimation in
-        try CAPI.mapMoveByAnimated(
-          try handle.requireLive(),
-          deltaX: deltaX,
-          deltaY: deltaY,
-          animation: nativeAnimation
-        )
+        try checkStatus(mln_map_move_by_animated(try handle.requireLive(), deltaX, deltaY, nativeAnimation))
       }
     }
   }
@@ -183,10 +183,10 @@ public final class MapHandle {
     try mapNativeFailure {
       if var nativeAnchor = anchor?.nativeInput.native {
         try withUnsafePointer(to: &nativeAnchor) { anchor in
-          try CAPI.mapScaleBy(try handle.requireLive(), scale: scale, anchor: anchor)
+          try checkStatus(mln_map_scale_by(try handle.requireLive(), scale, anchor))
         }
       } else {
-        try CAPI.mapScaleBy(try handle.requireLive(), scale: scale, anchor: nil)
+        try checkStatus(mln_map_scale_by(try handle.requireLive(), scale, nil))
       }
     }
   }
@@ -196,20 +196,10 @@ public final class MapHandle {
       try animation.nativeInput.withOptionalNativeOptions { nativeAnimation in
         if var nativeAnchor = anchor?.nativeInput.native {
           try withUnsafePointer(to: &nativeAnchor) { anchor in
-            try CAPI.mapScaleByAnimated(
-              try handle.requireLive(),
-              scale: scale,
-              anchor: anchor,
-              animation: nativeAnimation
-            )
+            try checkStatus(mln_map_scale_by_animated(try handle.requireLive(), scale, anchor, nativeAnimation))
           }
         } else {
-          try CAPI.mapScaleByAnimated(
-            try handle.requireLive(),
-            scale: scale,
-            anchor: nil,
-            animation: nativeAnimation
-          )
+          try checkStatus(mln_map_scale_by_animated(try handle.requireLive(), scale, nil, nativeAnimation))
         }
       }
     }
@@ -217,7 +207,7 @@ public final class MapHandle {
 
   public func cancelTransitions() throws {
     try mapNativeFailure {
-      try CAPI.mapCancelTransitions(try handle.requireLive())
+      try checkStatus(mln_map_cancel_transitions(try handle.requireLive()))
     }
   }
 }

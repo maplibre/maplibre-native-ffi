@@ -2,48 +2,6 @@ internal import CMaplibreNativeC
 import Foundation
 
 enum CAPI {
-  static func cVersion() -> UInt32 {
-    mln_c_version()
-  }
-
-  static func supportedRenderBackendMask() -> UInt32 {
-    mln_supported_render_backend_mask()
-  }
-
-  static func supportedOpenGLContextProviderMask() -> UInt32 {
-    mln_opengl_supported_context_provider_mask()
-  }
-
-  static func networkStatus() throws -> UInt32 {
-    let output = try NativeMemory.withTemporary(UInt32(0)) { rawStatus in
-      try checkStatus(mln_network_status_get(rawStatus))
-    }
-    return output.value
-  }
-
-  static func setNetworkStatus(_ rawStatus: UInt32) throws {
-    try checkStatus(mln_network_status_set(rawStatus))
-  }
-
-  static func setLogCallback(
-    _ callback: mln_log_callback?,
-    userData: UnsafeMutableRawPointer?
-  ) throws {
-    try checkStatus(mln_log_set_callback(callback, userData))
-  }
-
-  static func clearLogCallback() throws {
-    try checkStatus(mln_log_clear_callback())
-  }
-
-  static func setAsyncLogSeverityMask(_ mask: UInt32) throws {
-    try checkStatus(mln_log_set_async_severity_mask(mask))
-  }
-
-  static func runtimeOptionsDefault() -> mln_runtime_options {
-    mln_runtime_options_default()
-  }
-
   static func createRuntime(_ options: UnsafePointer<mln_runtime_options>) throws -> OpaquePointer {
     let output = try NativeMemory.withTemporary(Optional<OpaquePointer>.none) { runtime in
       try checkStatus(mln_runtime_create(options, runtime))
@@ -54,14 +12,6 @@ enum CAPI {
     return runtime
   }
 
-  static func destroyRuntime(_ runtime: OpaquePointer) throws {
-    try checkStatus(mln_runtime_destroy(runtime))
-  }
-
-  static func runtimeRunOnce(_ runtime: OpaquePointer) throws {
-    try checkStatus(mln_runtime_run_once(runtime))
-  }
-
   static func runtimePollEvent(_ runtime: OpaquePointer) throws -> mln_runtime_event? {
     var event = mln_runtime_event()
     event.size = UInt32(MemoryLayout<mln_runtime_event>.size)
@@ -69,46 +19,6 @@ enum CAPI {
       try checkStatus(mln_runtime_poll_event(runtime, &event, hasEvent))
     }
     return output.value ? event : nil
-  }
-
-  static func setResourceTransform(
-    _ runtime: OpaquePointer,
-    _ transform: UnsafePointer<mln_resource_transform>
-  ) throws {
-    try checkStatus(mln_runtime_set_resource_transform(runtime, transform))
-  }
-
-  static func clearResourceTransform(_ runtime: OpaquePointer) throws {
-    try checkStatus(mln_runtime_clear_resource_transform(runtime))
-  }
-
-  static func setResourceProvider(
-    _ runtime: OpaquePointer,
-    _ provider: UnsafePointer<mln_resource_provider>
-  ) throws {
-    try checkStatus(mln_runtime_set_resource_provider(runtime, provider))
-  }
-
-  static func completeResourceRequest(
-    _ handle: OpaquePointer,
-    _ response: UnsafePointer<mln_resource_response>
-  ) throws {
-    try checkStatus(mln_resource_request_complete(handle, response))
-  }
-
-  static func resourceRequestCancelled(_ handle: OpaquePointer) throws -> Bool {
-    let output = try NativeMemory.withTemporary(false) { cancelled in
-      try checkStatus(mln_resource_request_cancelled(handle, cancelled))
-    }
-    return output.value
-  }
-
-  static func releaseResourceRequest(_ handle: OpaquePointer?) {
-    mln_resource_request_release(handle)
-  }
-
-  static func mapOptionsDefault() -> mln_map_options {
-    mln_map_options_default()
   }
 
   static func createMap(
@@ -124,74 +34,10 @@ enum CAPI {
     return map
   }
 
-  static func destroyMap(_ map: OpaquePointer) throws {
-    try checkStatus(mln_map_destroy(map))
-  }
-
-  static func mapSetStyleURL(_ map: OpaquePointer, _ url: String) throws {
-    try NativeString.withCString(url) { url in
-      try checkStatus(mln_map_set_style_url(map, url))
-    }
-  }
-
-  static func mapSetStyleJSON(_ map: OpaquePointer, _ json: String) throws {
-    try NativeString.withCString(json) { json in
-      try checkStatus(mln_map_set_style_json(map, json))
-    }
-  }
-
-  static func mapRequestRepaint(_ map: OpaquePointer) throws {
-    try checkStatus(mln_map_request_repaint(map))
-  }
-
-  static func mapRequestStillImage(_ map: OpaquePointer) throws {
-    try checkStatus(mln_map_request_still_image(map))
-  }
-
-  static func cameraOptionsDefault() -> mln_camera_options {
-    mln_camera_options_default()
-  }
-
-  static func animationOptionsDefault() -> mln_animation_options {
-    mln_animation_options_default()
-  }
-
-  static func cameraFitOptionsDefault() -> mln_camera_fit_options {
-    mln_camera_fit_options_default()
-  }
-
-  static func boundOptionsDefault() -> mln_bound_options {
-    mln_bound_options_default()
-  }
-
-  static func freeCameraOptionsDefault() -> mln_free_camera_options {
-    mln_free_camera_options_default()
-  }
-
-  static func projectionModeDefault() -> mln_projection_mode {
-    mln_projection_mode_default()
-  }
-
-  static func mapViewportOptionsDefault() -> mln_map_viewport_options {
-    mln_map_viewport_options_default()
-  }
-
-  static func mapTileOptionsDefault() -> mln_map_tile_options {
-    mln_map_tile_options_default()
-  }
-
-  static func mapSetDebugOptions(_ map: OpaquePointer, options: UInt32) throws {
-    try checkStatus(mln_map_set_debug_options(map, options))
-  }
-
   static func mapGetDebugOptions(_ map: OpaquePointer) throws -> UInt32 {
     try NativeMemory.withTemporary(UInt32(0)) { options in
       try checkStatus(mln_map_get_debug_options(map, options))
     }.value
-  }
-
-  static func mapSetRenderingStatsViewEnabled(_ map: OpaquePointer, enabled: Bool) throws {
-    try checkStatus(mln_map_set_rendering_stats_view_enabled(map, enabled))
   }
 
   static func mapGetRenderingStatsViewEnabled(_ map: OpaquePointer) throws -> Bool {
@@ -206,125 +52,38 @@ enum CAPI {
     }.value
   }
 
-  static func mapDumpDebugLogs(_ map: OpaquePointer) throws {
-    try checkStatus(mln_map_dump_debug_logs(map))
-  }
-
   static func mapGetViewportOptions(_ map: OpaquePointer) throws -> mln_map_viewport_options {
-    var options = mapViewportOptionsDefault()
+    var options = mln_map_viewport_options_default()
     try checkStatus(mln_map_get_viewport_options(map, &options))
     return options
   }
 
-  static func mapSetViewportOptions(_ map: OpaquePointer, options: UnsafePointer<mln_map_viewport_options>) throws {
-    try checkStatus(mln_map_set_viewport_options(map, options))
-  }
-
   static func mapGetTileOptions(_ map: OpaquePointer) throws -> mln_map_tile_options {
-    var options = mapTileOptionsDefault()
+    var options = mln_map_tile_options_default()
     try checkStatus(mln_map_get_tile_options(map, &options))
     return options
   }
 
-  static func mapSetTileOptions(_ map: OpaquePointer, options: UnsafePointer<mln_map_tile_options>) throws {
-    try checkStatus(mln_map_set_tile_options(map, options))
-  }
-
   static func mapGetCamera(_ map: OpaquePointer) throws -> mln_camera_options {
-    var camera = cameraOptionsDefault()
+    var camera = mln_camera_options_default()
     try checkStatus(mln_map_get_camera(map, &camera))
     return camera
   }
 
-  static func mapJumpTo(_ map: OpaquePointer, _ camera: UnsafePointer<mln_camera_options>) throws {
-    try checkStatus(mln_map_jump_to(map, camera))
-  }
-
-  static func mapEaseTo(
-    _ map: OpaquePointer,
-    _ camera: UnsafePointer<mln_camera_options>,
-    _ animation: UnsafePointer<mln_animation_options>?
-  ) throws {
-    try checkStatus(mln_map_ease_to(map, camera, animation))
-  }
-
-  static func mapFlyTo(
-    _ map: OpaquePointer,
-    _ camera: UnsafePointer<mln_camera_options>,
-    _ animation: UnsafePointer<mln_animation_options>?
-  ) throws {
-    try checkStatus(mln_map_fly_to(map, camera, animation))
-  }
-
-  static func mapMoveBy(_ map: OpaquePointer, deltaX: Double, deltaY: Double) throws {
-    try checkStatus(mln_map_move_by(map, deltaX, deltaY))
-  }
-
-  static func mapMoveByAnimated(
-    _ map: OpaquePointer,
-    deltaX: Double,
-    deltaY: Double,
-    animation: UnsafePointer<mln_animation_options>?
-  ) throws {
-    try checkStatus(mln_map_move_by_animated(map, deltaX, deltaY, animation))
-  }
-
-  static func mapScaleBy(
-    _ map: OpaquePointer,
-    scale: Double,
-    anchor: UnsafePointer<mln_screen_point>?
-  ) throws {
-    try checkStatus(mln_map_scale_by(map, scale, anchor))
-  }
-
-  static func mapScaleByAnimated(
-    _ map: OpaquePointer,
-    scale: Double,
-    anchor: UnsafePointer<mln_screen_point>?,
-    animation: UnsafePointer<mln_animation_options>?
-  ) throws {
-    try checkStatus(mln_map_scale_by_animated(map, scale, anchor, animation))
-  }
-
-  static func mapRotateBy(_ map: OpaquePointer, first: NativeScreenPoint, second: NativeScreenPoint) throws {
-    try checkStatus(mln_map_rotate_by(map, first.native, second.native))
-  }
-
-  static func mapRotateByAnimated(
-    _ map: OpaquePointer,
-    first: NativeScreenPoint,
-    second: NativeScreenPoint,
-    animation: UnsafePointer<mln_animation_options>?
-  ) throws {
-    try checkStatus(mln_map_rotate_by_animated(map, first.native, second.native, animation))
-  }
-
-  static func mapPitchBy(_ map: OpaquePointer, pitch: Double) throws {
-    try checkStatus(mln_map_pitch_by(map, pitch))
-  }
-
-  static func mapPitchByAnimated(_ map: OpaquePointer, pitch: Double, animation: UnsafePointer<mln_animation_options>?) throws {
-    try checkStatus(mln_map_pitch_by_animated(map, pitch, animation))
-  }
-
-  static func mapCancelTransitions(_ map: OpaquePointer) throws {
-    try checkStatus(mln_map_cancel_transitions(map))
-  }
-
   static func mapCameraForLatLngBounds(_ map: OpaquePointer, bounds: NativeLatLngBounds, fitOptions: UnsafePointer<mln_camera_fit_options>?) throws -> mln_camera_options {
-    var camera = cameraOptionsDefault()
+    var camera = mln_camera_options_default()
     try checkStatus(mln_map_camera_for_lat_lng_bounds(map, bounds.native, fitOptions, &camera))
     return camera
   }
 
   static func mapCameraForLatLngs(_ map: OpaquePointer, coordinates: UnsafePointer<mln_lat_lng>?, count: Int, fitOptions: UnsafePointer<mln_camera_fit_options>?) throws -> mln_camera_options {
-    var camera = cameraOptionsDefault()
+    var camera = mln_camera_options_default()
     try checkStatus(mln_map_camera_for_lat_lngs(map, coordinates, count, fitOptions, &camera))
     return camera
   }
 
   static func mapCameraForGeometry(_ map: OpaquePointer, geometry: UnsafePointer<mln_geometry>, fitOptions: UnsafePointer<mln_camera_fit_options>?) throws -> mln_camera_options {
-    var camera = cameraOptionsDefault()
+    var camera = mln_camera_options_default()
     try checkStatus(mln_map_camera_for_geometry(map, geometry, fitOptions, &camera))
     return camera
   }
@@ -341,7 +100,7 @@ enum CAPI {
   }
 
   static func mapGetBounds(_ map: OpaquePointer) throws -> mln_bound_options {
-    var bounds = boundOptionsDefault()
+    var bounds = mln_bound_options_default()
     try checkStatus(mln_map_get_bounds(map, &bounds))
     return bounds
   }
@@ -351,7 +110,7 @@ enum CAPI {
   }
 
   static func mapGetFreeCameraOptions(_ map: OpaquePointer) throws -> mln_free_camera_options {
-    var options = freeCameraOptionsDefault()
+    var options = mln_free_camera_options_default()
     try checkStatus(mln_map_get_free_camera_options(map, &options))
     return options
   }
@@ -361,7 +120,7 @@ enum CAPI {
   }
 
   static func mapGetProjectionMode(_ map: OpaquePointer) throws -> mln_projection_mode {
-    var mode = projectionModeDefault()
+    var mode = mln_projection_mode_default()
     try checkStatus(mln_map_get_projection_mode(map, &mode))
     return mode
   }
@@ -429,7 +188,7 @@ enum CAPI {
   }
 
   static func mapProjectionGetCamera(_ projection: OpaquePointer) throws -> mln_camera_options {
-    var camera = cameraOptionsDefault()
+    var camera = mln_camera_options_default()
     try checkStatus(mln_map_projection_get_camera(projection, &camera))
     return camera
   }
@@ -492,79 +251,6 @@ enum CAPI {
     return NativeLatLng(output.value)
   }
 
-  static func renderSessionResize(
-    _ session: OpaquePointer,
-    width: UInt32,
-    height: UInt32,
-    scaleFactor: Double
-  ) throws {
-    try checkStatus(mln_render_session_resize(session, width, height, scaleFactor))
-  }
-
-  static func renderSessionRenderUpdate(_ session: OpaquePointer) throws {
-    try checkStatus(mln_render_session_render_update(session))
-  }
-
-  static func renderSessionDetach(_ session: OpaquePointer) throws {
-    try checkStatus(mln_render_session_detach(session))
-  }
-
-  static func renderSessionDestroy(_ session: OpaquePointer) throws {
-    try checkStatus(mln_render_session_destroy(session))
-  }
-
-  static func renderSessionReduceMemoryUse(_ session: OpaquePointer) throws {
-    try checkStatus(mln_render_session_reduce_memory_use(session))
-  }
-
-  static func renderSessionClearData(_ session: OpaquePointer) throws {
-    try checkStatus(mln_render_session_clear_data(session))
-  }
-
-  static func renderSessionDumpDebugLogs(_ session: OpaquePointer) throws {
-    try checkStatus(mln_render_session_dump_debug_logs(session))
-  }
-
-  static func metalSurfaceDescriptorDefault() -> mln_metal_surface_descriptor {
-    mln_metal_surface_descriptor_default()
-  }
-
-  static func vulkanSurfaceDescriptorDefault() -> mln_vulkan_surface_descriptor {
-    mln_vulkan_surface_descriptor_default()
-  }
-
-  static func openGLSurfaceDescriptorDefault() -> mln_opengl_surface_descriptor {
-    mln_opengl_surface_descriptor_default()
-  }
-
-  static func metalOwnedTextureDescriptorDefault() -> mln_metal_owned_texture_descriptor {
-    mln_metal_owned_texture_descriptor_default()
-  }
-
-  static func metalBorrowedTextureDescriptorDefault() -> mln_metal_borrowed_texture_descriptor {
-    mln_metal_borrowed_texture_descriptor_default()
-  }
-
-  static func vulkanOwnedTextureDescriptorDefault() -> mln_vulkan_owned_texture_descriptor {
-    mln_vulkan_owned_texture_descriptor_default()
-  }
-
-  static func vulkanBorrowedTextureDescriptorDefault() -> mln_vulkan_borrowed_texture_descriptor {
-    mln_vulkan_borrowed_texture_descriptor_default()
-  }
-
-  static func openGLOwnedTextureDescriptorDefault() -> mln_opengl_owned_texture_descriptor {
-    mln_opengl_owned_texture_descriptor_default()
-  }
-
-  static func openGLBorrowedTextureDescriptorDefault() -> mln_opengl_borrowed_texture_descriptor {
-    mln_opengl_borrowed_texture_descriptor_default()
-  }
-
-  static func textureImageInfoDefault() -> mln_texture_image_info {
-    mln_texture_image_info_default()
-  }
-
   static func metalSurfaceAttach(
     map: OpaquePointer,
     descriptor: UnsafePointer<mln_metal_surface_descriptor>
@@ -609,7 +295,7 @@ enum CAPI {
     data: UnsafeMutablePointer<UInt8>?,
     capacity: Int
   ) throws -> mln_texture_image_info {
-    var info = textureImageInfoDefault()
+    var info = mln_texture_image_info_default()
     try checkStatus(mln_texture_read_premultiplied_rgba8(session, data, capacity, &info))
     return info
   }
@@ -699,13 +385,6 @@ enum CAPI {
     return frame
   }
 
-  static func metalOwnedTextureReleaseFrame(
-    _ session: OpaquePointer,
-    frame: UnsafePointer<mln_metal_owned_texture_frame>
-  ) throws {
-    try checkStatus(mln_metal_owned_texture_release_frame(session, frame))
-  }
-
   static func vulkanOwnedTextureAcquireFrame(_ session: OpaquePointer) throws -> mln_vulkan_owned_texture_frame {
     var frame = mln_vulkan_owned_texture_frame()
     frame.size = UInt32(MemoryLayout<mln_vulkan_owned_texture_frame>.size)
@@ -713,25 +392,11 @@ enum CAPI {
     return frame
   }
 
-  static func vulkanOwnedTextureReleaseFrame(
-    _ session: OpaquePointer,
-    frame: UnsafePointer<mln_vulkan_owned_texture_frame>
-  ) throws {
-    try checkStatus(mln_vulkan_owned_texture_release_frame(session, frame))
-  }
-
   static func openGLOwnedTextureAcquireFrame(_ session: OpaquePointer) throws -> mln_opengl_owned_texture_frame {
     var frame = mln_opengl_owned_texture_frame()
     frame.size = UInt32(MemoryLayout<mln_opengl_owned_texture_frame>.size)
     try checkStatus(mln_opengl_owned_texture_acquire_frame(session, &frame))
     return frame
-  }
-
-  static func openGLOwnedTextureReleaseFrame(
-    _ session: OpaquePointer,
-    frame: UnsafePointer<mln_opengl_owned_texture_frame>
-  ) throws {
-    try checkStatus(mln_opengl_owned_texture_release_frame(session, frame))
   }
 
   static func renderSessionQueryRenderedFeatures(

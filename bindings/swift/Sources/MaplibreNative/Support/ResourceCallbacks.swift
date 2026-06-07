@@ -117,14 +117,16 @@ struct NativeResourceRequestHandleFunctions: Sendable {
   static let native = Self(
     complete: { handle, response in
       try response.withNativeResponse { nativeResponse in
-        try CAPI.completeResourceRequest(handle, nativeResponse)
+        try checkStatus(mln_resource_request_complete(handle, nativeResponse))
       }
     },
     cancelled: { handle in
-      try CAPI.resourceRequestCancelled(handle)
+      try NativeMemory.withTemporary(false) { cancelled in
+        try checkStatus(mln_resource_request_cancelled(handle, cancelled))
+      }.value
     },
     release: { handle in
-      CAPI.releaseResourceRequest(handle)
+      mln_resource_request_release(handle)
     }
   )
 }
