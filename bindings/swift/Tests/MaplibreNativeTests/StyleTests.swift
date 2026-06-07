@@ -188,6 +188,7 @@ import Testing
   let entered = DispatchSemaphore(value: 0)
   let allowReturn = DispatchSemaphore(value: 0)
   let invocationFinished = DispatchSemaphore(value: 0)
+  let releaseStarted = DispatchSemaphore(value: 0)
   let releaseFinished = DispatchSemaphore(value: 0)
 
   let holder = CallbackHolder(NativeCustomGeometrySourceCallbacks(fetchTile: { _ in
@@ -200,21 +201,23 @@ import Testing
     }
   }
 
-  DispatchQueue.global().async {
+  Thread {
     invocation.call()
     invocationFinished.signal()
-  }
-  #expect(entered.wait(timeout: .now() + 1) == .success)
+  }.start()
+  #expect(entered.wait(timeout: .now() + .seconds(5)) == .success)
 
-  DispatchQueue.global().async {
+  Thread {
+    releaseStarted.signal()
     holder.clear()
     releaseFinished.signal()
-  }
-  #expect(releaseFinished.wait(timeout: .now() + 0.05) == .timedOut)
+  }.start()
+  #expect(releaseStarted.wait(timeout: .now() + .seconds(5)) == .success)
+  #expect(releaseFinished.wait(timeout: .now() + .milliseconds(100)) == .timedOut)
 
   allowReturn.signal()
-  #expect(invocationFinished.wait(timeout: .now() + 1) == .success)
-  #expect(releaseFinished.wait(timeout: .now() + 1) == .success)
+  #expect(invocationFinished.wait(timeout: .now() + .seconds(5)) == .success)
+  #expect(releaseFinished.wait(timeout: .now() + .seconds(5)) == .success)
 }
 
 @Test func staleStyleLoadedEventDoesNotReleaseCallbacksWhileOldSourceExists() throws {

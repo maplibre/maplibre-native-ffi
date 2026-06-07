@@ -176,7 +176,7 @@ private final class LockedBox<Value>: @unchecked Sendable {
   let allowCloseToFail = DispatchSemaphore(value: 0)
   let closeFinished = DispatchSemaphore(value: 0)
 
-  DispatchQueue.global().async {
+  Thread {
     do {
       try state.closeOnce { _ in
         closeStarted.signal()
@@ -189,9 +189,9 @@ private final class LockedBox<Value>: @unchecked Sendable {
       Issue.record("unexpected error: \(error)")
     }
     closeFinished.signal()
-  }
+  }.start()
 
-  _ = closeStarted.wait(timeout: .now() + .seconds(5))
+  #expect(closeStarted.wait(timeout: .now() + .seconds(5)) == .success)
   #expect(!state.isClosed)
   do {
     _ = try state.requireLive()

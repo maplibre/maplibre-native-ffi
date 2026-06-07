@@ -153,6 +153,7 @@ private final class ResourceHandleStateCapture: @unchecked Sendable {
   let cancellationStarted = DispatchSemaphore(value: 0)
   let allowCancellationReturn = DispatchSemaphore(value: 0)
   let cancellationFinished = DispatchSemaphore(value: 0)
+  let releaseStarted = DispatchSemaphore(value: 0)
   let releaseFinished = DispatchSemaphore(value: 0)
   let functions = NativeResourceRequestHandleFunctions(
     complete: { _, _ in counters.completed() },
@@ -168,23 +169,25 @@ private final class ResourceHandleStateCapture: @unchecked Sendable {
   _ = state.finishProviderDecision(MLN_RESOURCE_PROVIDER_DECISION_HANDLE.rawValue)
 
   let cancellationResult = ResourceCancellationResult()
-  DispatchQueue.global().async {
+  Thread {
     cancellationResult.store(Result { try state.isCancelled() })
     cancellationFinished.signal()
-  }
+  }.start()
 
-  #expect(cancellationStarted.wait(timeout: .now() + .seconds(2)) == .success)
-  DispatchQueue.global().async {
+  #expect(cancellationStarted.wait(timeout: .now() + .seconds(5)) == .success)
+  Thread {
+    releaseStarted.signal()
     state.release()
     releaseFinished.signal()
-  }
+  }.start()
 
+  #expect(releaseStarted.wait(timeout: .now() + .seconds(5)) == .success)
   #expect(releaseFinished.wait(timeout: .now() + .milliseconds(100)) == .timedOut)
   #expect(counters.snapshot().release == 0)
 
   allowCancellationReturn.signal()
-  #expect(cancellationFinished.wait(timeout: .now() + .seconds(2)) == .success)
-  #expect(releaseFinished.wait(timeout: .now() + .seconds(2)) == .success)
+  #expect(cancellationFinished.wait(timeout: .now() + .seconds(5)) == .success)
+  #expect(releaseFinished.wait(timeout: .now() + .seconds(5)) == .success)
 
   switch cancellationResult.load() {
   case .success(let isCancelled):
