@@ -1,3 +1,21 @@
+include_guard(GLOBAL)
+
+function(mln_configure_apple_toolchain_defaults)
+  if(DEFINED CMAKE_SYSTEM_NAME)
+    if(NOT CMAKE_SYSTEM_NAME MATCHES "^(Darwin|iOS|tvOS|watchOS|visionOS)$")
+      return()
+    endif()
+  elseif(NOT CMAKE_HOST_APPLE)
+    return()
+  endif()
+
+  if(NOT CMAKE_OSX_DEPLOYMENT_TARGET
+     AND NOT DEFINED ENV{MACOSX_DEPLOYMENT_TARGET})
+    set(CMAKE_OSX_DEPLOYMENT_TARGET "14.3"
+        CACHE STRING "Minimum macOS deployment target" FORCE)
+  endif()
+endfunction()
+
 function(mln_configure_apple_platform target)
   set(MLN_FFI_VENDOR_APPLE_SOURCES
       ${MLN_SOURCE_DIR}/platform/qt/src/mbgl/bidi.cpp

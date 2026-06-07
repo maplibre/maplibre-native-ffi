@@ -1,5 +1,5 @@
 import AppKit
-import CMapLibreNativeC
+import MaplibreNative
 
 private let keyboardAnimationDurationMS = 160.0
 private let resetAnimationDurationMS = 220.0
@@ -16,17 +16,17 @@ final class InputController {
   private var dragMode = DragMode.none
   private var lastLocation = CGPoint.zero
 
-  func mouseDown(_ event: NSEvent, map: OpaquePointer?) throws -> Bool {
+  func mouseDown(_ event: NSEvent, map: MapHandle) throws -> Bool {
     lastLocation = event.locationInWindow
     dragMode = event.modifierFlags.contains(.control) ? .rotate : .pan
-    try checkCAPI(mln_map_cancel_transitions(map), "cancel camera transitions failed")
+    try map.cancelTransitions()
     return true
   }
 
-  func rightMouseDown(_ event: NSEvent, map: OpaquePointer?) throws -> Bool {
+  func rightMouseDown(_ event: NSEvent, map: MapHandle) throws -> Bool {
     lastLocation = event.locationInWindow
     dragMode = .rotate
-    try checkCAPI(mln_map_cancel_transitions(map), "cancel camera transitions failed")
+    try map.cancelTransitions()
     return true
   }
 
@@ -36,7 +36,7 @@ final class InputController {
     return true
   }
 
-  func mouseDragged(_ event: NSEvent, map: OpaquePointer?) throws -> Bool {
+  func mouseDragged(_ event: NSEvent, map: MapHandle) throws -> Bool {
     let location = event.locationInWindow
     let dx = Double(location.x - lastLocation.x)
     let dy = Double(lastLocation.y - location.y)
@@ -47,7 +47,7 @@ final class InputController {
       return false
     case .pan:
       if dx == 0 && dy == 0 { return true }
-      try checkCAPI(mln_map_move_by(map, dx, dy), "camera pan failed")
+      try map.moveBy(deltaX: dx, deltaY: dy)
     case .rotate:
       if dx == 0 && dy == 0 { return true }
       try adjustBearing(map, dx * 0.5)
@@ -56,116 +56,79 @@ final class InputController {
     return true
   }
 
-  func scrollWheel(_ event: NSEvent, map: OpaquePointer?, in view: NSView) throws -> Bool {
+  func scrollWheel(_ event: NSEvent, map: MapHandle, in view: NSView) throws -> Bool {
     let rawDelta = -Double(event.scrollingDeltaY)
     let delta = event.hasPreciseScrollingDeltas ? rawDelta / preciseScrollDeltaPerWheelStep : rawDelta
     if delta == 0 { return true }
 
     let location = view.convert(event.locationInWindow, from: nil)
-    var anchor = mln_screen_point(x: Double(location.x), y: Double(view.bounds.height - location.y))
+    let anchor = ScreenPoint(x: Double(location.x), y: Double(view.bounds.height - location.y))
     let scale = pow(2.0, delta * 0.25)
-    try checkCAPI(mln_map_scale_by(map, scale, &anchor), "camera zoom failed")
+    try map.scaleBy(scale, anchor: anchor)
     return true
   }
 
-  func keyDown(_ event: NSEvent, map: OpaquePointer?, viewport: Viewport) throws -> Bool {
+  func keyDown(_ event: NSEvent, map: MapHandle, viewport: Viewport) throws -> Bool {
     let panStep = 120.0
     let zoomStep = 1.25
     let bearingStep = 10.0
     let pitchStep = 5.0
-    var animation = cameraAnimation(durationMS: keyboardAnimationDurationMS)
-    var center = mln_screen_point(
+    let animation = AnimationOptions(durationMilliseconds: keyboardAnimationDurationMS)
+    let center = ScreenPoint(
       x: Double(viewport.logicalWidth) / 2.0,
       y: Double(viewport.logicalHeight) / 2.0
     )
 
     switch event.keyCode {
     case 123, 0:
-      try checkCAPI(mln_map_move_by_animated(map, panStep, 0, &animation), "keyboard pan failed")
+      try map.moveBy(deltaX: panStep, deltaY: 0, animation: animation)
     case 124, 2:
-      try checkCAPI(mln_map_move_by_animated(map, -panStep, 0, &animation), "keyboard pan failed")
+      try map.moveBy(deltaX: -panStep, deltaY: 0, animation: animation)
     case 126, 13:
-      try checkCAPI(mln_map_move_by_animated(map, 0, panStep, &animation), "keyboard pan failed")
+      try map.moveBy(deltaX: 0, deltaY: panStep, animation: animation)
     case 125, 1:
-      try checkCAPI(mln_map_move_by_animated(map, 0, -panStep, &animation), "keyboard pan failed")
+      try map.moveBy(deltaX: 0, deltaY: -panStep, animation: animation)
     case 24, 69:
-      try checkCAPI(mln_map_scale_by_animated(map, zoomStep, &center, &animation), "keyboard zoom failed")
+      try map.scaleBy(zoomStep, anchor: center, animation: animation)
     case 27, 78:
-      try checkCAPI(mln_map_scale_by_animated(map, 1.0 / zoomStep, &center, &animation), "keyboard zoom failed")
+      try map.scaleBy(1.0 / zoomStep, anchor: center, animation: animation)
     case 12:
-      try adjustBearingAnimated(map, -bearingStep, animation: &animation)
+      try adjustBearingAnimated(map, -bearingStep, animation: animation)
     case 14:
-      try adjustBearingAnimated(map, bearingStep, animation: &animation)
+      try adjustBearingAnimated(map, bearingStep, animation: animation)
     case 116, 30:
-      try adjustPitchAnimated(map, pitchStep, animation: &animation)
+      try adjustPitchAnimated(map, pitchStep, animation: animation)
     case 121, 33:
-      try adjustPitchAnimated(map, -pitchStep, animation: &animation)
+      try adjustPitchAnimated(map, -pitchStep, animation: animation)
     case 29:
-      var resetAnimation = cameraAnimation(durationMS: resetAnimationDurationMS)
-      try resetPitchAndBearingAnimated(map, animation: &resetAnimation)
+      try resetPitchAndBearingAnimated(map, animation: AnimationOptions(durationMilliseconds: resetAnimationDurationMS))
     default:
       return false
     }
     return true
   }
 
-  private func adjustBearing(_ map: OpaquePointer?, _ delta: Double) throws {
-    var camera = try currentCamera(map)
-    camera.fields = MLN_CAMERA_OPTION_BEARING.rawValue
-    camera.bearing += delta
-    try checkCAPI(mln_map_jump_to(map, &camera), "keyboard rotate failed")
+  private func adjustBearing(_ map: MapHandle, _ delta: Double) throws {
+    let current = try map.camera()
+    try map.jump(to: CameraOptions(bearing: (current.bearing ?? 0) + delta))
   }
 
-  private func adjustBearingAnimated(
-    _ map: OpaquePointer?,
-    _ delta: Double,
-    animation: UnsafePointer<mln_animation_options>
-  ) throws {
-    var camera = try currentCamera(map)
-    camera.fields = MLN_CAMERA_OPTION_BEARING.rawValue
-    camera.bearing += delta
-    try checkCAPI(mln_map_ease_to(map, &camera, animation), "keyboard rotate failed")
+  private func adjustBearingAnimated(_ map: MapHandle, _ delta: Double, animation: AnimationOptions) throws {
+    let current = try map.camera()
+    try map.ease(to: CameraOptions(bearing: (current.bearing ?? 0) + delta), animation: animation)
   }
 
-  private func adjustPitch(_ map: OpaquePointer?, _ delta: Double) throws {
-    var camera = try currentCamera(map)
-    camera.fields = MLN_CAMERA_OPTION_PITCH.rawValue
-    camera.pitch = min(max(camera.pitch + delta, 0.0), 60.0)
-    try checkCAPI(mln_map_jump_to(map, &camera), "keyboard pitch failed")
+  private func adjustPitch(_ map: MapHandle, _ delta: Double) throws {
+    let current = try map.camera()
+    try map.jump(to: CameraOptions(pitch: min(max((current.pitch ?? 0) + delta, 0.0), 60.0)))
   }
 
-  private func adjustPitchAnimated(
-    _ map: OpaquePointer?,
-    _ delta: Double,
-    animation: UnsafePointer<mln_animation_options>
-  ) throws {
-    var camera = try currentCamera(map)
-    camera.fields = MLN_CAMERA_OPTION_PITCH.rawValue
-    camera.pitch = min(max(camera.pitch + delta, 0.0), 60.0)
-    try checkCAPI(mln_map_ease_to(map, &camera, animation), "keyboard pitch failed")
+  private func adjustPitchAnimated(_ map: MapHandle, _ delta: Double, animation: AnimationOptions) throws {
+    let current = try map.camera()
+    try map.ease(to: CameraOptions(pitch: min(max((current.pitch ?? 0) + delta, 0.0), 60.0)), animation: animation)
   }
 
-  private func resetPitchAndBearingAnimated(
-    _ map: OpaquePointer?,
-    animation: UnsafePointer<mln_animation_options>
-  ) throws {
-    var camera = mln_camera_options_default()
-    camera.fields = MLN_CAMERA_OPTION_BEARING.rawValue | MLN_CAMERA_OPTION_PITCH.rawValue
-    camera.bearing = 0
-    camera.pitch = 0
-    try checkCAPI(mln_map_ease_to(map, &camera, animation), "camera reset failed")
-  }
-
-  private func currentCamera(_ map: OpaquePointer?) throws -> mln_camera_options {
-    var camera = mln_camera_options_default()
-    try checkCAPI(mln_map_get_camera(map, &camera), "camera snapshot failed")
-    return camera
-  }
-
-  private func cameraAnimation(durationMS: Double) -> mln_animation_options {
-    var animation = mln_animation_options_default()
-    animation.fields = MLN_ANIMATION_OPTION_DURATION.rawValue
-    animation.duration_ms = durationMS
-    return animation
+  private func resetPitchAndBearingAnimated(_ map: MapHandle, animation: AnimationOptions) throws {
+    try map.ease(to: CameraOptions(bearing: 0, pitch: 0), animation: animation)
   }
 }

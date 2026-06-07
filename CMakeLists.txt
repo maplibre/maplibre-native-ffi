@@ -1,5 +1,8 @@
 cmake_minimum_required(VERSION 4.0)
 
+include("${CMAKE_CURRENT_LIST_DIR}/cmake/platform/apple.cmake")
+mln_configure_apple_toolchain_defaults()
+
 set(CMAKE_TRY_COMPILE_TARGET_TYPE STATIC_LIBRARY)
 
 project(maplibre_native_c VERSION 0.1.0 LANGUAGES C CXX)
