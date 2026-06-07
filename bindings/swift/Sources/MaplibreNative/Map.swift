@@ -46,7 +46,7 @@ public final class MapHandle {
   private let handle: NativeHandleBox
   private let nativeAddress: UInt
   private var styleURLReplacementPending = false
-  var customGeometrySourceCallbacks: [String: NativeCustomGeometrySourceCallbacks] = [:]
+  private var customGeometrySourceCallbacks: [String: NativeCustomGeometrySourceCallbacks] = [:]
 
   public init(runtime: RuntimeHandle, options: MapOptions) throws {
     let pointer = try mapNativeFailure {
@@ -95,9 +95,28 @@ public final class MapHandle {
 
   func releaseCallbacksForLoadedStyleURLIfNeeded() {
     guard styleURLReplacementPending else { return }
+
     for sourceId in customGeometrySourceCallbacks.keys {
       guard (try? styleSourceExists(sourceId)) == false else { return }
     }
+
+    styleURLReplacementPending = false
+    customGeometrySourceCallbacks.removeAll()
+  }
+
+  func storeCustomGeometrySourceCallbacks(_ callbacks: NativeCustomGeometrySourceCallbacks, sourceId: String) {
+    customGeometrySourceCallbacks[sourceId] = callbacks
+  }
+
+  func removeCustomGeometrySourceCallbacks(sourceId: String) {
+    _ = customGeometrySourceCallbacks.removeValue(forKey: sourceId)
+  }
+
+  func retainsCustomGeometrySourceCallbacks(sourceId: String) -> Bool {
+    customGeometrySourceCallbacks[sourceId] != nil
+  }
+
+  private func resetCallbackRetentionState() {
     styleURLReplacementPending = false
     customGeometrySourceCallbacks.removeAll()
   }
@@ -107,7 +126,7 @@ public final class MapHandle {
       try checkStatus(mln_map_destroy(pointer))
     }
     Self.unregister(nativeAddress)
-    customGeometrySourceCallbacks.removeAll()
+    resetCallbackRetentionState()
   }
 
   public func setStyleURL(_ url: String) throws {
@@ -124,8 +143,7 @@ public final class MapHandle {
       try NativeString.withCString(json) { json in
         try checkStatus(mln_map_set_style_json(try handle.requireLive(), json))
       }
-      styleURLReplacementPending = false
-      customGeometrySourceCallbacks.removeAll()
+      resetCallbackRetentionState()
     }
   }
 

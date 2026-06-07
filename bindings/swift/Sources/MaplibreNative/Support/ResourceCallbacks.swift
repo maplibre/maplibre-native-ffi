@@ -20,6 +20,9 @@ struct NativeResourceRequest: Equatable, Sendable {
   let priorData: [UInt8]
 
   init(_ raw: mln_resource_request) throws {
+    guard raw.url != nil else {
+      throw NativeStatusFailure(rawStatus: MLN_STATUS_INVALID_ARGUMENT.rawValue, diagnostic: "resource request url is null")
+    }
     url = NativeString.copyCString(raw.url)
     kind = raw.kind
     loadingMethod = raw.loading_method
@@ -364,14 +367,21 @@ private final class NativeResourceProviderBox: @unchecked Sendable {
     request: UnsafePointer<mln_resource_request>?,
     handle: OpaquePointer?
   ) -> UInt32 {
-    guard let request,
-      let state = try? NativeResourceRequestHandleState(pointer: handle, functions: handleFunctions),
-      let copiedRequest = try? NativeResourceRequest(request.pointee)
-    else {
+    guard let request else {
       return UInt32.max
     }
-    let decision = callback(copiedRequest, state)
-    return state.finishProviderDecision(decision)
+
+    var state: NativeResourceRequestHandleState?
+    do {
+      let createdState = try NativeResourceRequestHandleState(pointer: handle, functions: handleFunctions)
+      state = createdState
+      let copiedRequest = try NativeResourceRequest(request.pointee)
+      let decision = callback(copiedRequest, createdState)
+      return createdState.finishProviderDecision(decision)
+    } catch {
+      _ = state?.finishProviderDecision(UInt32.max)
+      return UInt32.max
+    }
   }
 }
 

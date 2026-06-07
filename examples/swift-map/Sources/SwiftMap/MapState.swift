@@ -57,14 +57,30 @@ final class MapState {
     }
   }
 
-  deinit {
-    try? renderSession.close()
-    try? map.close()
-    try? runtime.close()
-  }
-
   func resize(_ viewport: Viewport) throws {
     try renderSession.resize(width: viewport.logicalWidth, height: viewport.logicalHeight, scaleFactor: viewport.scaleFactor)
+  }
+
+  func close() throws {
+    var firstError: Error?
+    do {
+      try renderSession.close()
+    } catch {
+      firstError = firstError ?? error
+    }
+    do {
+      try map.close()
+    } catch {
+      firstError = firstError ?? error
+    }
+    do {
+      try runtime.close()
+    } catch {
+      firstError = firstError ?? error
+    }
+    if let firstError {
+      throw firstError
+    }
   }
 
   func runOnce() {

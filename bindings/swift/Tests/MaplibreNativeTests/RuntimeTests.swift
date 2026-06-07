@@ -94,7 +94,7 @@ private final class ResourceHandleStateCapture: @unchecked Sendable {
   #expect(result.replacement == nil)
 }
 
-@Test func resourceTransformCallbackUsesNativeResponseStorageForReplacement() {
+@Test func resourceTransformInvokeForTestingCannotExerciseReplacementPath() {
   let state = NativeResourceTransformState { _ in
     "https://example.invalid/tile"
   }
@@ -103,6 +103,26 @@ private final class ResourceHandleStateCapture: @unchecked Sendable {
 
   #expect(result.status == MLN_STATUS_INVALID_STATE.rawValue)
   #expect(result.replacement == nil)
+}
+
+@Test func resourceProviderParseFailureFinalizesHandleState() throws {
+  let counters = ResourceCounters()
+  let functions = NativeResourceRequestHandleFunctions(
+    complete: { _, _ in counters.completed() },
+    cancelled: { _ in false },
+    release: { _ in counters.released() }
+  )
+  let state = NativeResourceProviderState(handleFunctions: functions) { _, _ in
+    Issue.record("malformed request should not reach provider callback")
+    return MLN_RESOURCE_PROVIDER_DECISION_HANDLE.rawValue
+  }
+
+  var request = mln_resource_request()
+  request.size = UInt32(MemoryLayout<mln_resource_request>.size)
+  let decision = state.invokeForTesting(request: request, handle: OpaquePointer(bitPattern: 0x9))
+
+  #expect(decision == UInt32.max)
+  #expect(counters.snapshot().release == 0)
 }
 
 @Test func resourceRequestHandleRejectsSecondCompletionBeforeCallingNative() throws {

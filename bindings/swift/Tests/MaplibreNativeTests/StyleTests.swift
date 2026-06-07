@@ -214,7 +214,7 @@ import Testing
   try map.setStyleURL("https://tiles.openfreemap.org/styles/bright")
   map.releaseCallbacksForLoadedStyleURLIfNeeded()
 
-  #expect(map.customGeometrySourceCallbacks["custom"] != nil)
+  #expect(map.retainsCustomGeometrySourceCallbacks(sourceId: "custom"))
 }
 
 @Test func closedMapRejectsStyleCallsThroughSwiftHandleState() throws {

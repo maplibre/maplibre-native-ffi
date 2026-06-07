@@ -137,6 +137,48 @@ private final class LockedBox<Value>: @unchecked Sendable {
   #expect(closes.read { $0 } == 2)
 }
 
+@Test func nativeHandleStateRejectsUseWhileCloseIsInFlightAndRetriesAfterFailure() throws {
+  struct CloseFailure: Error {}
+
+  let state = try NativeHandleState(typeName: "test_handle", pointer: OpaquePointer(bitPattern: 0x6))
+  let closeStarted = DispatchSemaphore(value: 0)
+  let allowCloseToFail = DispatchSemaphore(value: 0)
+  let closeFinished = DispatchSemaphore(value: 0)
+
+  DispatchQueue.global().async {
+    do {
+      try state.closeOnce { _ in
+        closeStarted.signal()
+        _ = allowCloseToFail.wait(timeout: .now() + .seconds(5))
+        throw CloseFailure()
+      }
+      Issue.record("failed close should throw")
+    } catch is CloseFailure {
+    } catch {
+      Issue.record("unexpected error: \(error)")
+    }
+    closeFinished.signal()
+  }
+
+  _ = closeStarted.wait(timeout: .now() + .seconds(5))
+  #expect(!state.isClosed)
+  do {
+    _ = try state.requireLive()
+    Issue.record("closing handle should throw")
+  } catch let failure as NativeStatusFailure {
+    #expect(failure.diagnostic == "test_handle is closing")
+  } catch {
+    Issue.record("unexpected error: \(error)")
+  }
+
+  allowCloseToFail.signal()
+  _ = closeFinished.wait(timeout: .now() + .seconds(5))
+  #expect(!state.isClosed)
+
+  try state.closeOnce { _ in }
+  #expect(state.isClosed)
+}
+
 @Test func nativeHandleStateReportsLeaksWithoutDestroying() throws {
   let leaks = LockedBox([NativeHandleLeak]())
 

@@ -231,7 +231,7 @@ extension MapHandle {
     try mapNativeFailure {
       let arena = NativeInputArena()
       let removed = try NativeStyle.removeSource(try requireLivePointer(), sourceId: arena.view(sourceId))
-      if removed { customGeometrySourceCallbacks.removeValue(forKey: sourceId) }
+      if removed { removeCustomGeometrySourceCallbacks(sourceId: sourceId) }
       return removed
     }
   }
@@ -374,7 +374,7 @@ extension MapHandle {
       try options.nativeOptions(callbacks: callbacks).withNativeOptions { nativeOptions in
         try checkStatus(mln_map_add_custom_geometry_source(try requireLivePointer(), arena.view(sourceId), nativeOptions))
       }
-      customGeometrySourceCallbacks[sourceId] = callbacks
+      storeCustomGeometrySourceCallbacks(callbacks, sourceId: sourceId)
     }
   }
 

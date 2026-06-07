@@ -56,24 +56,24 @@ enum LoggingCallbackState {
 
   static func set(_ callback: @escaping @Sendable (NativeLogRecord) -> Bool) throws {
     let replacement = Unmanaged.passRetained(LogCallbackBox(callback))
+    let previous: Unmanaged<LogCallbackBox>?
     do {
-      try checkStatus(mln_log_set_callback(logCallbackTrampoline, replacement.toOpaque()))
+      previous = try lock.withLock {
+        try checkStatus(mln_log_set_callback(logCallbackTrampoline, replacement.toOpaque()))
+        let previous = retainedBox
+        retainedBox = replacement
+        return previous
+      }
     } catch {
       replacement.release()
       throw error
-    }
-
-    let previous = lock.withLock {
-      let previous = retainedBox
-      retainedBox = replacement
-      return previous
     }
     previous?.release()
   }
 
   static func clear() throws {
-    try checkStatus(mln_log_clear_callback())
-    let previous = lock.withLock {
+    let previous = try lock.withLock {
+      try checkStatus(mln_log_clear_callback())
       let previous = retainedBox
       retainedBox = nil
       return previous

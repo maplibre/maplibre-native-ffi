@@ -54,6 +54,11 @@ final class MetalMapView: NSView {
   @objc private func shutdown() {
     timer?.invalidate()
     timer = nil
+    do {
+      try mapState?.close()
+    } catch {
+      print(error)
+    }
     mapState = nil
     NotificationCenter.default.removeObserver(self)
   }

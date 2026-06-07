@@ -30,6 +30,13 @@ class NativeHandleBox {
     do {
       try state.closeOnce(destroy)
     } catch let failure as NativeStatusFailure {
+      if failure.rawStatus == 0 {
+        throw MaplibreError(
+          kind: .invalidState,
+          rawStatus: nil,
+          diagnostic: failure.diagnostic
+        )
+      }
       throw MaplibreError.fromNativeFailure(failure)
     }
   }
