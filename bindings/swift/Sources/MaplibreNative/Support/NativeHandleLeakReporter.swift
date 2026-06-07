@@ -1,4 +1,5 @@
 import Foundation
+import Darwin
 
 struct NativeHandleLeak: Equatable, Sendable {
   let typeName: String
@@ -13,10 +14,10 @@ struct NativeHandleLeak: Equatable, Sendable {
 enum NativeHandleLeakReporter {
   private static let lock = NSLock()
   private static let defaultHandler: @Sendable (NativeHandleLeak) -> Void = { leak in
-    fputs(
-      "Leaked \(leak.typeName) native handle 0x\(String(leak.address, radix: 16)); close handles explicitly on their owner thread.\n",
-      stderr
-    )
+    let message = "Leaked \(leak.typeName) native handle 0x\(String(leak.address, radix: 16)); close handles explicitly on their owner thread.\n"
+    message.withCString { message in
+      _ = Darwin.write(STDERR_FILENO, message, strlen(message))
+    }
   }
   private nonisolated(unsafe) static var handler = defaultHandler
 

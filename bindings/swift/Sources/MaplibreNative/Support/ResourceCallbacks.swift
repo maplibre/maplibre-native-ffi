@@ -201,9 +201,6 @@ final class NativeResourceRequestHandleState: @unchecked Sendable {
     do {
       try functions.complete(handle, response)
     } catch {
-      condition.withLock {
-        completed = false
-      }
       finishNativeOperation()
       throw error
     }

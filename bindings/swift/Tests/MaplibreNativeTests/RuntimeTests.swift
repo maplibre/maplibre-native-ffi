@@ -148,6 +148,37 @@ private final class ResourceHandleStateCapture: @unchecked Sendable {
   #expect(counters.snapshot().release == 1)
 }
 
+@Test func resourceRequestHandleKeepsFailedCompletionTerminal() throws {
+  let counters = ResourceCounters()
+  let functions = NativeResourceRequestHandleFunctions(
+    complete: { _, _ in
+      counters.completed()
+      throw NativeStatusFailure(rawStatus: MLN_STATUS_INVALID_STATE.rawValue, diagnostic: "resource request can no longer accept a response")
+    },
+    cancelled: { _ in false },
+    release: { _ in counters.released() }
+  )
+  let state = try NativeResourceRequestHandleState(pointer: OpaquePointer(bitPattern: 0x5), functions: functions)
+
+  do {
+    try state.complete(NativeResourceResponseInput(status: ResourceResponseStatus.ok.rawValue, errorReason: ResourceErrorReason.none.rawValue))
+    Issue.record("failed native completion should throw")
+  } catch let failure as NativeStatusFailure {
+    #expect(failure.diagnostic.contains("no longer accept"))
+  }
+  do {
+    try state.complete(NativeResourceResponseInput(status: ResourceResponseStatus.ok.rawValue, errorReason: ResourceErrorReason.none.rawValue))
+    Issue.record("second completion should throw before calling native")
+  } catch let failure as NativeStatusFailure {
+    #expect(failure.diagnostic.contains("already completed"))
+  }
+
+  _ = state.finishProviderDecision(MLN_RESOURCE_PROVIDER_DECISION_HANDLE.rawValue)
+
+  #expect(counters.snapshot().complete == 1)
+  #expect(counters.snapshot().release == 1)
+}
+
 @Test func resourceRequestReleaseWaitsForCancellationCheck() throws {
   let counters = ResourceCounters()
   let cancellationStarted = DispatchSemaphore(value: 0)
