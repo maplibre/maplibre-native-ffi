@@ -420,6 +420,10 @@ provenance = "github-attestations"
 version = "1.95.0"
 backend = "core:rust"
 
+[tools.rust.options]
+components = "clippy,rustfmt"
+profile = "minimal"
+
 [[tools.swift]]
 version = "6.3.1"
 backend = "core:swift"
