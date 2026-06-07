@@ -154,6 +154,8 @@ shell = '{% if os() == "windows" %}cmd /c{% else %}sh -c -o errexit{% endif %}'
 
 [tasks."ci:lint"]
 run = [
+  # Warm process-plugin cache before hk runs parallel dprint batches.
+  "dprint output-resolved-config > /dev/null",
   "hk fix --all",
   "git update-index -q --refresh",
   # Lockfile drift is common across different mise builds
