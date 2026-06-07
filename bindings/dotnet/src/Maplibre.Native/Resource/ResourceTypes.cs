@@ -30,33 +30,33 @@ public sealed record ResourceTransformRequest(ResourceKind Kind, string Url);
 /// <summary>Mutable descriptor used to complete a resource provider request.</summary>
 public sealed class ResourceResponse
 {
-    private byte[] bytes = [];
+  private byte[] bytes = [];
 
-    public ResourceResponse(ResourceResponseStatus status = ResourceResponseStatus.Ok)
-    {
-        Status = status;
-    }
+  public ResourceResponse(ResourceResponseStatus status = ResourceResponseStatus.Ok)
+  {
+    Status = status;
+  }
 
-    public static ResourceResponse Ok(ReadOnlySpan<byte> bytes) => new(ResourceResponseStatus.Ok) { Bytes = bytes.ToArray() };
-    public static ResourceResponse NoContent() => new(ResourceResponseStatus.NoContent);
-    public static ResourceResponse NotModified() => new(ResourceResponseStatus.NotModified);
-    public static ResourceResponse Error(ResourceErrorReason reason, string? message) => new(ResourceResponseStatus.Error) { ErrorReason = reason, ErrorMessage = message };
+  public static ResourceResponse Ok(ReadOnlySpan<byte> bytes) => new(ResourceResponseStatus.Ok) { Bytes = bytes.ToArray() };
+  public static ResourceResponse NoContent() => new(ResourceResponseStatus.NoContent);
+  public static ResourceResponse NotModified() => new(ResourceResponseStatus.NotModified);
+  public static ResourceResponse Error(ResourceErrorReason reason, string? message) => new(ResourceResponseStatus.Error) { ErrorReason = reason, ErrorMessage = message };
 
-    public ResourceResponseStatus Status { get; set; }
-    public ResourceErrorReason ErrorReason { get; set; } = ResourceErrorReason.None;
+  public ResourceResponseStatus Status { get; set; }
+  public ResourceErrorReason ErrorReason { get; set; } = ResourceErrorReason.None;
 
-    public byte[] Bytes
-    {
-        get => (byte[])bytes.Clone();
-        set => bytes = value is null ? [] : (byte[])value.Clone();
-    }
+  public byte[] Bytes
+  {
+    get => (byte[])bytes.Clone();
+    set => bytes = value is null ? [] : (byte[])value.Clone();
+  }
 
-    public string? ErrorMessage { get; set; }
-    public bool MustRevalidate { get; set; }
-    public DateTimeOffset? Modified { get; set; }
-    public DateTimeOffset? Expires { get; set; }
-    public string? Etag { get; set; }
-    public DateTimeOffset? RetryAfter { get; set; }
+  public string? ErrorMessage { get; set; }
+  public bool MustRevalidate { get; set; }
+  public DateTimeOffset? Modified { get; set; }
+  public DateTimeOffset? Expires { get; set; }
+  public string? Etag { get; set; }
+  public DateTimeOffset? RetryAfter { get; set; }
 }
 
 public delegate ResourceProviderDecision ResourceProviderCallback(ResourceRequest request, ResourceRequestHandle handle);

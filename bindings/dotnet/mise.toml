@@ -9,8 +9,5 @@ run = 'dotnet build Maplibre.Native.slnx -p:Platform="Any CPU"'
 depends = ["//:ensure-native-library"]
 run = 'dotnet test Maplibre.Native.slnx -p:Platform="Any CPU"'
 
-[tasks.format]
-run = 'Platform="Any CPU" dotnet format Maplibre.Native.slnx --verify-no-changes --verbosity minimal'
-
 [tasks.ci]
-depends = [":format", ":test"]
+depends = [":test"]

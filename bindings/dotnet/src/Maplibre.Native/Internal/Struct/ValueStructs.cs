@@ -10,256 +10,256 @@ namespace Maplibre.Native.Internal.Struct;
 
 internal static unsafe class ValueStructs
 {
-    internal static JsonValue? ReadJsonSnapshot(mln_json_snapshot* snapshot)
+  internal static JsonValue? ReadJsonSnapshot(mln_json_snapshot* snapshot)
+  {
+    if (snapshot is null)
     {
-        if (snapshot is null)
-        {
-            return null;
-        }
-
-        try
-        {
-            mln_json_value* value = null;
-            NativeStatus.Check(NativeMethods.mln_json_snapshot_get(snapshot, &value));
-            return value is null ? null : ReadJsonValue(value);
-        }
-        finally
-        {
-            NativeMethods.mln_json_snapshot_destroy(snapshot);
-        }
+      return null;
     }
 
-    internal static JsonValue ReadJsonValue(mln_json_value* value)
+    try
     {
-        if (value is null)
-        {
-            return JsonValue.Null.Instance;
-        }
+      mln_json_value* value = null;
+      NativeStatus.Check(NativeMethods.mln_json_snapshot_get(snapshot, &value));
+      return value is null ? null : ReadJsonValue(value);
+    }
+    finally
+    {
+      NativeMethods.mln_json_snapshot_destroy(snapshot);
+    }
+  }
 
-        return (mln_json_value_type)value->type switch
-        {
-            mln_json_value_type.MLN_JSON_VALUE_TYPE_NULL => JsonValue.Null.Instance,
-            mln_json_value_type.MLN_JSON_VALUE_TYPE_BOOL => new JsonValue.Bool(value->data.bool_value != 0),
-            mln_json_value_type.MLN_JSON_VALUE_TYPE_UINT => new JsonValue.UInt(value->data.uint_value),
-            mln_json_value_type.MLN_JSON_VALUE_TYPE_INT => new JsonValue.Int(value->data.int_value),
-            mln_json_value_type.MLN_JSON_VALUE_TYPE_DOUBLE => new JsonValue.Double(value->data.double_value),
-            mln_json_value_type.MLN_JSON_VALUE_TYPE_STRING => new JsonValue.String(RuntimeStructs.CopyUtf8(value->data.string_value.data, value->data.string_value.size)),
-            mln_json_value_type.MLN_JSON_VALUE_TYPE_ARRAY => ReadArray(value->data.array_value),
-            mln_json_value_type.MLN_JSON_VALUE_TYPE_OBJECT => ReadObject(value->data.object_value),
-            _ => JsonValue.Null.Instance,
-        };
+  internal static JsonValue ReadJsonValue(mln_json_value* value)
+  {
+    if (value is null)
+    {
+      return JsonValue.Null.Instance;
     }
 
-    private static JsonValue.Array ReadArray(mln_json_array array)
+    return (mln_json_value_type)value->type switch
     {
-        var values = new JsonValue[checked((int)array.value_count)];
-        for (var index = 0; index < values.Length; index++)
-        {
-            values[index] = ReadJsonValue(&array.values[index]);
-        }
+      mln_json_value_type.MLN_JSON_VALUE_TYPE_NULL => JsonValue.Null.Instance,
+      mln_json_value_type.MLN_JSON_VALUE_TYPE_BOOL => new JsonValue.Bool(value->data.bool_value != 0),
+      mln_json_value_type.MLN_JSON_VALUE_TYPE_UINT => new JsonValue.UInt(value->data.uint_value),
+      mln_json_value_type.MLN_JSON_VALUE_TYPE_INT => new JsonValue.Int(value->data.int_value),
+      mln_json_value_type.MLN_JSON_VALUE_TYPE_DOUBLE => new JsonValue.Double(value->data.double_value),
+      mln_json_value_type.MLN_JSON_VALUE_TYPE_STRING => new JsonValue.String(RuntimeStructs.CopyUtf8(value->data.string_value.data, value->data.string_value.size)),
+      mln_json_value_type.MLN_JSON_VALUE_TYPE_ARRAY => ReadArray(value->data.array_value),
+      mln_json_value_type.MLN_JSON_VALUE_TYPE_OBJECT => ReadObject(value->data.object_value),
+      _ => JsonValue.Null.Instance,
+    };
+  }
 
-        return new JsonValue.Array(values);
+  private static JsonValue.Array ReadArray(mln_json_array array)
+  {
+    var values = new JsonValue[checked((int)array.value_count)];
+    for (var index = 0; index < values.Length; index++)
+    {
+      values[index] = ReadJsonValue(&array.values[index]);
     }
 
-    private static JsonValue.Object ReadObject(mln_json_object obj)
-    {
-        var members = new JsonMember[checked((int)obj.member_count)];
-        for (var index = 0; index < members.Length; index++)
-        {
-            var member = obj.members[index];
-            members[index] = new JsonMember(
-                RuntimeStructs.CopyUtf8(member.key.data, member.key.size),
-                ReadJsonValue(member.value));
-        }
+    return new JsonValue.Array(values);
+  }
 
-        return new JsonValue.Object(members);
+  private static JsonValue.Object ReadObject(mln_json_object obj)
+  {
+    var members = new JsonMember[checked((int)obj.member_count)];
+    for (var index = 0; index < members.Length; index++)
+    {
+      var member = obj.members[index];
+      members[index] = new JsonMember(
+          RuntimeStructs.CopyUtf8(member.key.data, member.key.size),
+          ReadJsonValue(member.value));
     }
+
+    return new JsonValue.Object(members);
+  }
 }
 
 internal sealed unsafe class NativeStringView : IDisposable
 {
-    private readonly nint allocation;
+  private readonly nint allocation;
 
-    private NativeStringView(mln_string_view value, nint allocation)
+  private NativeStringView(mln_string_view value, nint allocation)
+  {
+    Value = value;
+    this.allocation = allocation;
+  }
+
+  internal mln_string_view Value { get; }
+
+  internal static NativeStringView From(string value, string parameterName)
+  {
+    ArgumentNullException.ThrowIfNull(value, parameterName);
+    var bytes = Encoding.UTF8.GetBytes(value);
+    var allocation = bytes.Length == 0 ? 0 : (nint)NativeMemory.Alloc((nuint)bytes.Length);
+    if (allocation != 0)
     {
-        Value = value;
-        this.allocation = allocation;
+      Marshal.Copy(bytes, 0, allocation, bytes.Length);
     }
 
-    internal mln_string_view Value { get; }
+    return new NativeStringView(
+        new mln_string_view { data = (sbyte*)allocation, size = (nuint)bytes.Length },
+        allocation);
+  }
 
-    internal static NativeStringView From(string value, string parameterName)
+  public void Dispose()
+  {
+    if (allocation != 0)
     {
-        ArgumentNullException.ThrowIfNull(value, parameterName);
-        var bytes = Encoding.UTF8.GetBytes(value);
-        var allocation = bytes.Length == 0 ? 0 : (nint)NativeMemory.Alloc((nuint)bytes.Length);
-        if (allocation != 0)
-        {
-            Marshal.Copy(bytes, 0, allocation, bytes.Length);
-        }
-
-        return new NativeStringView(
-            new mln_string_view { data = (sbyte*)allocation, size = (nuint)bytes.Length },
-            allocation);
+      NativeMemory.Free((void*)allocation);
     }
-
-    public void Dispose()
-    {
-        if (allocation != 0)
-        {
-            NativeMemory.Free((void*)allocation);
-        }
-    }
+  }
 }
 
 internal sealed unsafe class NativeJsonValue : IDisposable
 {
-    private readonly List<nint> allocations = [];
+  private readonly List<nint> allocations = [];
 
-    private NativeJsonValue(mln_json_value* pointer)
+  private NativeJsonValue(mln_json_value* pointer)
+  {
+    Pointer = pointer;
+  }
+
+  internal mln_json_value* Pointer { get; }
+
+  internal static NativeJsonValue From(JsonValue value)
+  {
+    ArgumentNullException.ThrowIfNull(value);
+    var root = (mln_json_value*)NativeMemory.Alloc((nuint)sizeof(mln_json_value));
+    var native = new NativeJsonValue(root);
+    try
     {
-        Pointer = pointer;
+      native.Write(Pointer: root, value, depth: 0);
+      return native;
+    }
+    catch
+    {
+      native.Dispose();
+      throw;
+    }
+  }
+
+  private void Write(mln_json_value* Pointer, JsonValue value, int depth)
+  {
+    if (depth > JsonValue.MaxDepth)
+    {
+      throw new InvalidArgumentException(
+          MaplibreStatus.InvalidArgument,
+          null,
+          $"JsonValue exceeds maximum depth {JsonValue.MaxDepth}.");
     }
 
-    internal mln_json_value* Pointer { get; }
-
-    internal static NativeJsonValue From(JsonValue value)
+    *Pointer = new mln_json_value { size = (uint)sizeof(mln_json_value) };
+    switch (value)
     {
-        ArgumentNullException.ThrowIfNull(value);
-        var root = (mln_json_value*)NativeMemory.Alloc((nuint)sizeof(mln_json_value));
-        var native = new NativeJsonValue(root);
-        try
+      case JsonValue.Null:
+        Pointer->type = (uint)mln_json_value_type.MLN_JSON_VALUE_TYPE_NULL;
+        break;
+      case JsonValue.Bool boolean:
+        Pointer->type = (uint)mln_json_value_type.MLN_JSON_VALUE_TYPE_BOOL;
+        Pointer->data.bool_value = boolean.Value ? (byte)1 : (byte)0;
+        break;
+      case JsonValue.UInt unsigned:
+        Pointer->type = (uint)mln_json_value_type.MLN_JSON_VALUE_TYPE_UINT;
+        Pointer->data.uint_value = unsigned.Value;
+        break;
+      case JsonValue.Int integer:
+        Pointer->type = (uint)mln_json_value_type.MLN_JSON_VALUE_TYPE_INT;
+        Pointer->data.int_value = integer.Value;
+        break;
+      case JsonValue.Double number:
+        if (double.IsNaN(number.Value) || double.IsInfinity(number.Value))
         {
-            native.Write(Pointer: root, value, depth: 0);
-            return native;
+          throw new InvalidArgumentException(MaplibreStatus.InvalidArgument, null, "JsonValue.Double must be finite.");
         }
-        catch
-        {
-            native.Dispose();
-            throw;
-        }
+
+        Pointer->type = (uint)mln_json_value_type.MLN_JSON_VALUE_TYPE_DOUBLE;
+        Pointer->data.double_value = number.Value;
+        break;
+      case JsonValue.String text:
+        Pointer->type = (uint)mln_json_value_type.MLN_JSON_VALUE_TYPE_STRING;
+        Pointer->data.string_value = AllocateStringView(text.Value);
+        break;
+      case JsonValue.Array array:
+        Pointer->type = (uint)mln_json_value_type.MLN_JSON_VALUE_TYPE_ARRAY;
+        Pointer->data.array_value = AllocateArray(array.Values, depth + 1);
+        break;
+      case JsonValue.Object obj:
+        Pointer->type = (uint)mln_json_value_type.MLN_JSON_VALUE_TYPE_OBJECT;
+        Pointer->data.object_value = AllocateObject(obj.Members, depth + 1);
+        break;
+      default:
+        throw new InvalidArgumentException(MaplibreStatus.InvalidArgument, null, $"Unsupported JsonValue type {value.GetType().Name}.");
+    }
+  }
+
+  private mln_json_array AllocateArray(IReadOnlyList<JsonValue> values, int depth)
+  {
+    if (values.Count == 0)
+    {
+      return default;
     }
 
-    private void Write(mln_json_value* Pointer, JsonValue value, int depth)
+    var pointer = Allocate<mln_json_value>(values.Count);
+    for (var index = 0; index < values.Count; index++)
     {
-        if (depth > JsonValue.MaxDepth)
-        {
-            throw new InvalidArgumentException(
-                MaplibreStatus.InvalidArgument,
-                null,
-                $"JsonValue exceeds maximum depth {JsonValue.MaxDepth}.");
-        }
-
-        *Pointer = new mln_json_value { size = (uint)sizeof(mln_json_value) };
-        switch (value)
-        {
-            case JsonValue.Null:
-                Pointer->type = (uint)mln_json_value_type.MLN_JSON_VALUE_TYPE_NULL;
-                break;
-            case JsonValue.Bool boolean:
-                Pointer->type = (uint)mln_json_value_type.MLN_JSON_VALUE_TYPE_BOOL;
-                Pointer->data.bool_value = boolean.Value ? (byte)1 : (byte)0;
-                break;
-            case JsonValue.UInt unsigned:
-                Pointer->type = (uint)mln_json_value_type.MLN_JSON_VALUE_TYPE_UINT;
-                Pointer->data.uint_value = unsigned.Value;
-                break;
-            case JsonValue.Int integer:
-                Pointer->type = (uint)mln_json_value_type.MLN_JSON_VALUE_TYPE_INT;
-                Pointer->data.int_value = integer.Value;
-                break;
-            case JsonValue.Double number:
-                if (double.IsNaN(number.Value) || double.IsInfinity(number.Value))
-                {
-                    throw new InvalidArgumentException(MaplibreStatus.InvalidArgument, null, "JsonValue.Double must be finite.");
-                }
-
-                Pointer->type = (uint)mln_json_value_type.MLN_JSON_VALUE_TYPE_DOUBLE;
-                Pointer->data.double_value = number.Value;
-                break;
-            case JsonValue.String text:
-                Pointer->type = (uint)mln_json_value_type.MLN_JSON_VALUE_TYPE_STRING;
-                Pointer->data.string_value = AllocateStringView(text.Value);
-                break;
-            case JsonValue.Array array:
-                Pointer->type = (uint)mln_json_value_type.MLN_JSON_VALUE_TYPE_ARRAY;
-                Pointer->data.array_value = AllocateArray(array.Values, depth + 1);
-                break;
-            case JsonValue.Object obj:
-                Pointer->type = (uint)mln_json_value_type.MLN_JSON_VALUE_TYPE_OBJECT;
-                Pointer->data.object_value = AllocateObject(obj.Members, depth + 1);
-                break;
-            default:
-                throw new InvalidArgumentException(MaplibreStatus.InvalidArgument, null, $"Unsupported JsonValue type {value.GetType().Name}.");
-        }
+      Write(&pointer[index], values[index], depth);
     }
 
-    private mln_json_array AllocateArray(IReadOnlyList<JsonValue> values, int depth)
+    return new mln_json_array { values = pointer, value_count = (nuint)values.Count };
+  }
+
+  private mln_json_object AllocateObject(IReadOnlyList<JsonMember> members, int depth)
+  {
+    if (members.Count == 0)
     {
-        if (values.Count == 0)
-        {
-            return default;
-        }
-
-        var pointer = Allocate<mln_json_value>(values.Count);
-        for (var index = 0; index < values.Count; index++)
-        {
-            Write(&pointer[index], values[index], depth);
-        }
-
-        return new mln_json_array { values = pointer, value_count = (nuint)values.Count };
+      return default;
     }
 
-    private mln_json_object AllocateObject(IReadOnlyList<JsonMember> members, int depth)
+    var memberPointer = Allocate<mln_json_member>(members.Count);
+    var valuePointer = Allocate<mln_json_value>(members.Count);
+    for (var index = 0; index < members.Count; index++)
     {
-        if (members.Count == 0)
-        {
-            return default;
-        }
-
-        var memberPointer = Allocate<mln_json_member>(members.Count);
-        var valuePointer = Allocate<mln_json_value>(members.Count);
-        for (var index = 0; index < members.Count; index++)
-        {
-            memberPointer[index].key = AllocateStringView(members[index].Key);
-            memberPointer[index].value = &valuePointer[index];
-            Write(&valuePointer[index], members[index].Value, depth);
-        }
-
-        return new mln_json_object { members = memberPointer, member_count = (nuint)members.Count };
+      memberPointer[index].key = AllocateStringView(members[index].Key);
+      memberPointer[index].value = &valuePointer[index];
+      Write(&valuePointer[index], members[index].Value, depth);
     }
 
-    private mln_string_view AllocateStringView(string value)
-    {
-        var bytes = Encoding.UTF8.GetBytes(value);
-        if (bytes.Length == 0)
-        {
-            return default;
-        }
+    return new mln_json_object { members = memberPointer, member_count = (nuint)members.Count };
+  }
 
-        var allocation = NativeMemory.Alloc((nuint)bytes.Length);
-        allocations.Add((nint)allocation);
-        Marshal.Copy(bytes, 0, (nint)allocation, bytes.Length);
-        return new mln_string_view { data = (sbyte*)allocation, size = (nuint)bytes.Length };
+  private mln_string_view AllocateStringView(string value)
+  {
+    var bytes = Encoding.UTF8.GetBytes(value);
+    if (bytes.Length == 0)
+    {
+      return default;
     }
 
-    private T* Allocate<T>(int count) where T : unmanaged
+    var allocation = NativeMemory.Alloc((nuint)bytes.Length);
+    allocations.Add((nint)allocation);
+    Marshal.Copy(bytes, 0, (nint)allocation, bytes.Length);
+    return new mln_string_view { data = (sbyte*)allocation, size = (nuint)bytes.Length };
+  }
+
+  private T* Allocate<T>(int count) where T : unmanaged
+  {
+    var pointer = NativeAllocation.AllocZeroedArray<T>(count);
+    allocations.Add((nint)pointer);
+    return pointer;
+  }
+
+  public void Dispose()
+  {
+    foreach (var allocation in allocations)
     {
-        var pointer = NativeAllocation.AllocZeroedArray<T>(count);
-        allocations.Add((nint)pointer);
-        return pointer;
+      NativeMemory.Free((void*)allocation);
     }
 
-    public void Dispose()
+    if (Pointer is not null)
     {
-        foreach (var allocation in allocations)
-        {
-            NativeMemory.Free((void*)allocation);
-        }
-
-        if (Pointer is not null)
-        {
-            NativeMemory.Free(Pointer);
-        }
+      NativeMemory.Free(Pointer);
     }
+  }
 }

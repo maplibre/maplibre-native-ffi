@@ -6,7 +6,7 @@
   "lineWidth": 80,
   "indentWidth": 2,
   "useTabs": false,
-  "newLineKind": "auto",
+  "newLineKind": "lf",
   "excludes": [
     "third_party/**",
     "**/*-lock.yaml",
@@ -55,6 +55,7 @@
   },
   "plugins": [
     "https://plugins.dprint.dev/exec-0.6.2.json@df98f54ffd3092b8a841aedd6d098a2651f16d0a796a40535774f1a8b4b9d463",
+    "https://plugins.dprint.dev/roslyn-0.20.1.json@19d542734f015097dbed728ca7ae6a96af3a97d7dddd81a0f94b5c4f69217fa4",
     "https://plugins.dprint.dev/ruff-0.7.0.wasm",
     "https://plugins.dprint.dev/oxc-0.20.0.wasm",
     "https://plugins.dprint.dev/json-0.21.3.wasm",

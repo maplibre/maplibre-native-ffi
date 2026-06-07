@@ -10,93 +10,93 @@ internal unsafe delegate mln_status StatusDestroy<T>(T* handle)
 internal sealed unsafe class NativeHandleState<T>
     where T : unmanaged
 {
-    private readonly StatusDestroy<T> destroy;
-    private readonly string typeName;
-    private nint address;
+  private readonly StatusDestroy<T> destroy;
+  private readonly string typeName;
+  private nint address;
 
-    internal NativeHandleState(T* handle, StatusDestroy<T> destroy, string typeName)
+  internal NativeHandleState(T* handle, StatusDestroy<T> destroy, string typeName)
+  {
+    if (handle is null)
     {
-        if (handle is null)
-        {
-            throw new InvalidArgumentException(
-                MaplibreStatus.InvalidArgument,
-                null,
-                $"{typeName} pointer is null.");
-        }
-
-        this.destroy = destroy;
-        this.typeName = typeName;
-        address = (nint)handle;
+      throw new InvalidArgumentException(
+          MaplibreStatus.InvalidArgument,
+          null,
+          $"{typeName} pointer is null.");
     }
 
-    ~NativeHandleState()
+    this.destroy = destroy;
+    this.typeName = typeName;
+    address = (nint)handle;
+  }
+
+  ~NativeHandleState()
+  {
+    var current = address;
+    if (current != 0)
     {
-        var current = address;
-        if (current != 0)
-        {
-            NativeLeakReporter.Report(new NativeLeakReport(
-                NativeLeakReportKind.LeakedHandle,
-                typeName,
-                current,
-                null,
-                $"Leaked {typeName} native handle 0x{current:x}; call Close() on the owner thread before releasing the wrapper."));
-        }
+      NativeLeakReporter.Report(new NativeLeakReport(
+          NativeLeakReportKind.LeakedHandle,
+          typeName,
+          current,
+          null,
+          $"Leaked {typeName} native handle 0x{current:x}; call Close() on the owner thread before releasing the wrapper."));
+    }
+  }
+
+  internal bool IsClosed => address == 0;
+
+  internal T* Pointer
+  {
+    get
+    {
+      var handle = (T*)address;
+      if (handle is null)
+      {
+        throw new InvalidArgumentException(
+            MaplibreStatus.InvalidArgument,
+            null,
+            $"{typeName} is closed.");
+      }
+
+      return handle;
+    }
+  }
+
+  internal void Close()
+  {
+    var handle = (T*)address;
+    if (handle is null)
+    {
+      return;
     }
 
-    internal bool IsClosed => address == 0;
+    NativeStatus.Check(destroy(handle));
+    address = 0;
+    GC.SuppressFinalize(this);
+  }
 
-    internal T* Pointer
+  internal bool TryClose()
+  {
+    var handle = (T*)address;
+    if (handle is null)
     {
-        get
-        {
-            var handle = (T*)address;
-            if (handle is null)
-            {
-                throw new InvalidArgumentException(
-                    MaplibreStatus.InvalidArgument,
-                    null,
-                    $"{typeName} is closed.");
-            }
-
-            return handle;
-        }
+      return true;
     }
 
-    internal void Close()
+    var status = destroy(handle);
+    if (status != mln_status.MLN_STATUS_OK)
     {
-        var handle = (T*)address;
-        if (handle is null)
-        {
-            return;
-        }
-
-        NativeStatus.Check(destroy(handle));
-        address = 0;
-        GC.SuppressFinalize(this);
+      NativeLeakReporter.Report(new NativeLeakReport(
+          NativeLeakReportKind.DisposeFailed,
+          typeName,
+          address,
+          status,
+          $"Dispose could not close {typeName} native handle 0x{address:x}; native destroy returned {status}. Call Close() on the owner thread to observe the error and retry."));
+      return false;
     }
 
-    internal bool TryClose()
-    {
-        var handle = (T*)address;
-        if (handle is null)
-        {
-            return true;
-        }
-
-        var status = destroy(handle);
-        if (status != mln_status.MLN_STATUS_OK)
-        {
-            NativeLeakReporter.Report(new NativeLeakReport(
-                NativeLeakReportKind.DisposeFailed,
-                typeName,
-                address,
-                status,
-                $"Dispose could not close {typeName} native handle 0x{address:x}; native destroy returned {status}. Call Close() on the owner thread to observe the error and retry."));
-            return false;
-        }
-
-        address = 0;
-        GC.SuppressFinalize(this);
-        return true;
-    }
+    address = 0;
+    GC.SuppressFinalize(this);
+    return true;
+  }
 }
