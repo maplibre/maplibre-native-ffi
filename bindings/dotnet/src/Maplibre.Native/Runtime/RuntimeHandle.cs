@@ -282,6 +282,12 @@ public sealed unsafe class RuntimeHandle : IDisposable
     }
 
     var operationId = operation.RequireLive(this);
+    if (IsClosed)
+    {
+      operation.MarkConsumed();
+      _ = Pointer;
+    }
+
     NativeStatus.Check(NativeMethods.mln_runtime_offline_operation_discard(Pointer, operationId));
     operation.MarkConsumed();
   }

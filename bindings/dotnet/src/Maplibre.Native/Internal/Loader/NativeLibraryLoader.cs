@@ -71,6 +71,12 @@ internal static class NativeLibraryLoader
         }
       }
 
+      if (NativeLibrary.TryLoad(libraryName, assembly, searchPath, out var standardHandle))
+      {
+        resolvedHandle = standardHandle;
+        return resolvedHandle;
+      }
+
       return 0;
     }
   }
@@ -86,6 +92,7 @@ internal static class NativeLibraryLoader
         typeof(NativeMethods).Assembly,
         ResolveLibrary);
     installed = true;
+    ResolveLibrary(NativeMethods.LibraryName, typeof(NativeMethods).Assembly, null);
   }
 
   private static IEnumerable<string> CandidatePaths()

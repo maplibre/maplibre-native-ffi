@@ -109,6 +109,18 @@ public sealed unsafe class QueryStructTests
   }
 
   [Fact]
+  public void NativeFeatureNullIdentifierMaterializesNullIdentifier()
+  {
+    var feature = QueryStructs.ReadFeature(new mln_feature
+    {
+      size = (uint)sizeof(mln_feature),
+      identifier_type = (uint)mln_feature_identifier_type.MLN_FEATURE_IDENTIFIER_TYPE_NULL,
+    });
+
+    Assert.Same(FeatureIdentifier.Null.Instance, feature.Identifier);
+  }
+
+  [Fact]
   public void UnknownNativeFeatureDiscriminantsThrow()
   {
     var geometryError = Assert.Throws<InvalidOperationException>(() =>

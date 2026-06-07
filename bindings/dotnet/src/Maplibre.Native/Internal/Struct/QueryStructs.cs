@@ -305,6 +305,7 @@ internal static unsafe class QueryStructs
 
   private static FeatureIdentifier ReadIdentifier(mln_feature value) => (mln_feature_identifier_type)value.identifier_type switch
   {
+    mln_feature_identifier_type.MLN_FEATURE_IDENTIFIER_TYPE_NULL => FeatureIdentifier.Null.Instance,
     mln_feature_identifier_type.MLN_FEATURE_IDENTIFIER_TYPE_UINT => new FeatureIdentifier.UInt(value.identifier.uint_value),
     mln_feature_identifier_type.MLN_FEATURE_IDENTIFIER_TYPE_INT => new FeatureIdentifier.Int(value.identifier.int_value),
     mln_feature_identifier_type.MLN_FEATURE_IDENTIFIER_TYPE_DOUBLE => new FeatureIdentifier.Double(value.identifier.double_value),

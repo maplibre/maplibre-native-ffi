@@ -98,6 +98,18 @@ public sealed unsafe class ResourceRequestHandle : IDisposable
   public void Dispose()
   {
     Close();
+    GC.SuppressFinalize(this);
+  }
+
+  ~ResourceRequestHandle()
+  {
+    lock (gate)
+    {
+      if (providerDecisionFinalized)
+      {
+        ReleaseIfOwnedLocked();
+      }
+    }
   }
 
   internal uint FinishProviderDecision(ResourceProviderDecision decision)
