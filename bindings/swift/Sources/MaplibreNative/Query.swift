@@ -147,7 +147,7 @@ extension RenderSessionHandle {
     try mapNativeFailure {
       try geometry.nativeGeometry.withNativeGeometry { nativeGeometry in
         try options.nativeOptions.withNativeOptions { nativeOptions in
-          let result = try CAPI.renderSessionQueryRenderedFeatures(
+          let result = try NativeQuery.renderedFeatures(
             session: try requireLivePointer(),
             geometry: nativeGeometry,
             options: nativeOptions
@@ -167,7 +167,7 @@ extension RenderSessionHandle {
       let arena = NativeInputArena()
       let sourceId = arena.view(sourceId)
       return try options.nativeOptions.withNativeOptions { nativeOptions in
-        let result = try CAPI.renderSessionQuerySourceFeatures(
+        let result = try NativeQuery.sourceFeatures(
           session: try requireLivePointer(),
           sourceId: sourceId,
           options: nativeOptions
@@ -187,7 +187,7 @@ extension RenderSessionHandle {
   ) throws -> FeatureExtensionResult {
     try mapNativeFailure {
       let arena = NativeInputArena()
-      let result = try CAPI.renderSessionQueryFeatureExtensions(
+      let result = try NativeQuery.featureExtensions(
         session: try requireLivePointer(),
         sourceId: arena.view(sourceId),
         feature: arena.allocateFeature(feature.nativeFeature),
@@ -196,7 +196,7 @@ extension RenderSessionHandle {
         arguments: arguments.map { arena.allocate($0.nativeValue) }
       )
       defer { mln_feature_extension_result_destroy(result) }
-      return try FeatureExtensionResult(native: CAPI.featureExtensionResultCopy(result))
+      return try FeatureExtensionResult(native: NativeQuery.featureExtensionResultCopy(result))
     }
   }
 
@@ -212,7 +212,7 @@ extension RenderSessionHandle {
   public func featureState(selector: FeatureStateSelector) throws -> JSONValue? {
     try mapNativeFailure {
       try selector.nativeSelector.withNativeSelector { selector in
-        try CAPI.renderSessionGetFeatureState(try requireLivePointer(), selector: selector).map(JSONValue.init(native:))
+        try NativeQuery.featureState(try requireLivePointer(), selector: selector).map(JSONValue.init(native:))
       }
     }
   }

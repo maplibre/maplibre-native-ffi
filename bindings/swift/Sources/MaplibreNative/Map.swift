@@ -51,7 +51,7 @@ public final class MapHandle {
   public init(runtime: RuntimeHandle, options: MapOptions) throws {
     let pointer = try mapNativeFailure {
       try options.nativeInput.withNativeOptions { nativeOptions in
-        try CAPI.createMap(runtime: try runtime.requireLivePointer(), options: nativeOptions)
+        try NativeMap.create(runtime: try runtime.requireLivePointer(), options: nativeOptions)
       }
     }
     self.runtime = runtime
@@ -143,7 +143,7 @@ public final class MapHandle {
 
   public func camera() throws -> CameraOptions {
     try mapNativeFailure {
-      CameraOptions(native: NativeCameraOptionsInput(try CAPI.mapGetCamera(try handle.requireLive())))
+      CameraOptions(native: NativeCameraOptionsInput(try NativeMap.camera(try handle.requireLive())))
     }
   }
 

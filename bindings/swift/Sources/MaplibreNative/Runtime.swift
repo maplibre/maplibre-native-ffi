@@ -333,7 +333,7 @@ public final class RuntimeHandle {
   public init(options: RuntimeOptions = RuntimeOptions()) throws {
     let pointer = try mapNativeFailure {
       try options.nativeInput.withNativeOptions { nativeOptions in
-        try CAPI.createRuntime(nativeOptions)
+        try NativeRuntime.create(nativeOptions)
       }
     }
     handle = try NativeHandleBox(typeName: "RuntimeHandle", pointer: pointer)
@@ -363,7 +363,7 @@ public final class RuntimeHandle {
 
   public func pollEvent() throws -> RuntimeEvent? {
     try mapNativeFailure {
-      guard let event = try CAPI.runtimePollEvent(try handle.requireLive()) else {
+      guard let event = try NativeRuntime.pollEvent(try handle.requireLive()) else {
         return nil
       }
       let runtimeEvent = RuntimeEvent(native: try NativeRuntimeEvent(event))

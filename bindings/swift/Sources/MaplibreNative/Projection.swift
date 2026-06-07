@@ -16,7 +16,7 @@ public final class MapProjectionHandle {
 
   public init(map: MapHandle) throws {
     let pointer = try mapNativeFailure {
-      try CAPI.createMapProjection(try map.requireLivePointer())
+      try NativeProjection.create(try map.requireLivePointer())
     }
     handle = try NativeHandleBox(typeName: "MapProjectionHandle", pointer: pointer)
   }
@@ -33,7 +33,7 @@ public final class MapProjectionHandle {
 
   public func camera() throws -> CameraOptions {
     try mapNativeFailure {
-      CameraOptions(native: NativeCameraOptionsInput(try CAPI.mapProjectionGetCamera(try handle.requireLive())))
+      CameraOptions(native: NativeCameraOptionsInput(try NativeProjection.camera(try handle.requireLive())))
     }
   }
 
@@ -69,7 +69,7 @@ public final class MapProjectionHandle {
 
   public func pixel(for coordinate: LatLng) throws -> ScreenPoint {
     try mapNativeFailure {
-      ScreenPoint(native: NativeScreenPoint(try CAPI.mapProjectionPixelForLatLng(
+      ScreenPoint(native: NativeScreenPoint(try NativeProjection.pixelForLatLng(
         try handle.requireLive(),
         coordinate: coordinate.nativeInput.native
       )))
@@ -78,7 +78,7 @@ public final class MapProjectionHandle {
 
   public func latLng(for point: ScreenPoint) throws -> LatLng {
     try mapNativeFailure {
-      LatLng(native: NativeLatLng(try CAPI.mapProjectionLatLngForPixel(
+      LatLng(native: NativeLatLng(try NativeProjection.latLngForPixel(
         try handle.requireLive(),
         point: point.nativeInput.native
       )))
@@ -89,14 +89,14 @@ public final class MapProjectionHandle {
 extension Maplibre {
   public static func projectedMeters(for coordinate: LatLng) throws -> ProjectedMeters {
     try mapNativeFailure {
-      let meters = try CAPI.projectedMetersForLatLng(coordinate.nativeInput)
+      let meters = try NativeProjection.projectedMetersForLatLng(coordinate.nativeInput)
       return ProjectedMeters(northing: meters.northing, easting: meters.easting)
     }
   }
 
   public static func latLng(forProjectedMeters meters: ProjectedMeters) throws -> LatLng {
     try mapNativeFailure {
-      LatLng(native: try CAPI.latLngForProjectedMeters(
+      LatLng(native: try NativeProjection.latLngForProjectedMeters(
         NativeProjectedMeters(northing: meters.northing, easting: meters.easting)
       ))
     }

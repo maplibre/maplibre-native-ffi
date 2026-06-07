@@ -79,7 +79,7 @@ public struct OfflineRegionInfo: Equatable, Sendable {
 extension RuntimeHandle {
   public func runAmbientCacheOperationStart(_ operation: AmbientCacheOperation) throws -> UInt64 {
     try mapNativeFailure {
-      try CAPI.runtimeRunAmbientCacheOperationStart(try requireLivePointer(), operation: operation.rawValue)
+      try NativeOffline.runAmbientCacheOperationStart(try requireLivePointer(), operation: operation.rawValue)
     }
   }
 
@@ -92,68 +92,68 @@ extension RuntimeHandle {
   public func offlineRegionCreateStart(definition: OfflineRegionDefinition, metadata: Data = Data()) throws -> UInt64 {
     try mapNativeFailure {
       try definition.nativeDefinition.withNativeDefinition { definition in
-        try CAPI.runtimeOfflineRegionCreateStart(try requireLivePointer(), definition: definition, metadata: metadata)
+        try NativeOffline.regionCreateStart(try requireLivePointer(), definition: definition, metadata: metadata)
       }
     }
   }
 
   public func offlineRegionGetStart(regionId: Int64) throws -> UInt64 {
-    try mapNativeFailure { try CAPI.runtimeOfflineRegionGetStart(try requireLivePointer(), regionId: regionId) }
+    try mapNativeFailure { try NativeOffline.regionGetStart(try requireLivePointer(), regionId: regionId) }
   }
 
   public func offlineRegionsListStart() throws -> UInt64 {
-    try mapNativeFailure { try CAPI.runtimeOfflineRegionsListStart(try requireLivePointer()) }
+    try mapNativeFailure { try NativeOffline.regionsListStart(try requireLivePointer()) }
   }
 
   public func offlineRegionsMergeDatabaseStart(sideDatabasePath: String) throws -> UInt64 {
-    try mapNativeFailure { try CAPI.runtimeOfflineRegionsMergeDatabaseStart(try requireLivePointer(), sideDatabasePath: sideDatabasePath) }
+    try mapNativeFailure { try NativeOffline.regionsMergeDatabaseStart(try requireLivePointer(), sideDatabasePath: sideDatabasePath) }
   }
 
   public func offlineRegionUpdateMetadataStart(regionId: Int64, metadata: Data) throws -> UInt64 {
-    try mapNativeFailure { try CAPI.runtimeOfflineRegionUpdateMetadataStart(try requireLivePointer(), regionId: regionId, metadata: metadata) }
+    try mapNativeFailure { try NativeOffline.regionUpdateMetadataStart(try requireLivePointer(), regionId: regionId, metadata: metadata) }
   }
 
   public func offlineRegionGetStatusStart(regionId: Int64) throws -> UInt64 {
-    try mapNativeFailure { try CAPI.runtimeOfflineRegionGetStatusStart(try requireLivePointer(), regionId: regionId) }
+    try mapNativeFailure { try NativeOffline.regionGetStatusStart(try requireLivePointer(), regionId: regionId) }
   }
 
   public func offlineRegionSetObservedStart(regionId: Int64, observed: Bool) throws -> UInt64 {
-    try mapNativeFailure { try CAPI.runtimeOfflineRegionSetObservedStart(try requireLivePointer(), regionId: regionId, observed: observed) }
+    try mapNativeFailure { try NativeOffline.regionSetObservedStart(try requireLivePointer(), regionId: regionId, observed: observed) }
   }
 
   public func offlineRegionSetDownloadStateStart(regionId: Int64, state: OfflineRegionDownloadState) throws -> UInt64 {
-    try mapNativeFailure { try CAPI.runtimeOfflineRegionSetDownloadStateStart(try requireLivePointer(), regionId: regionId, state: state.rawValue) }
+    try mapNativeFailure { try NativeOffline.regionSetDownloadStateStart(try requireLivePointer(), regionId: regionId, state: state.rawValue) }
   }
 
   public func offlineRegionInvalidateStart(regionId: Int64) throws -> UInt64 {
-    try mapNativeFailure { try CAPI.runtimeOfflineRegionInvalidateStart(try requireLivePointer(), regionId: regionId) }
+    try mapNativeFailure { try NativeOffline.regionInvalidateStart(try requireLivePointer(), regionId: regionId) }
   }
 
   public func offlineRegionDeleteStart(regionId: Int64) throws -> UInt64 {
-    try mapNativeFailure { try CAPI.runtimeOfflineRegionDeleteStart(try requireLivePointer(), regionId: regionId) }
+    try mapNativeFailure { try NativeOffline.regionDeleteStart(try requireLivePointer(), regionId: regionId) }
   }
 
   public func offlineRegionCreateTakeResult(operationId: UInt64) throws -> OfflineRegionInfo {
-    try mapNativeFailure { try OfflineRegionInfo(native: CAPI.runtimeOfflineRegionCreateTakeResult(try requireLivePointer(), operationId: operationId)) }
+    try mapNativeFailure { try OfflineRegionInfo(native: NativeOffline.regionCreateTakeResult(try requireLivePointer(), operationId: operationId)) }
   }
 
   public func offlineRegionGetTakeResult(operationId: UInt64) throws -> OfflineRegionInfo? {
-    try mapNativeFailure { try CAPI.runtimeOfflineRegionGetTakeResult(try requireLivePointer(), operationId: operationId).map(OfflineRegionInfo.init(native:)) }
+    try mapNativeFailure { try NativeOffline.regionGetTakeResult(try requireLivePointer(), operationId: operationId).map(OfflineRegionInfo.init(native:)) }
   }
 
   public func offlineRegionsListTakeResult(operationId: UInt64) throws -> [OfflineRegionInfo] {
-    try mapNativeFailure { try CAPI.runtimeOfflineRegionsListTakeResult(try requireLivePointer(), operationId: operationId).map(OfflineRegionInfo.init(native:)) }
+    try mapNativeFailure { try NativeOffline.regionsListTakeResult(try requireLivePointer(), operationId: operationId).map(OfflineRegionInfo.init(native:)) }
   }
 
   public func offlineRegionsMergeDatabaseTakeResult(operationId: UInt64) throws -> [OfflineRegionInfo] {
-    try mapNativeFailure { try CAPI.runtimeOfflineRegionsMergeDatabaseTakeResult(try requireLivePointer(), operationId: operationId).map(OfflineRegionInfo.init(native:)) }
+    try mapNativeFailure { try NativeOffline.regionsMergeDatabaseTakeResult(try requireLivePointer(), operationId: operationId).map(OfflineRegionInfo.init(native:)) }
   }
 
   public func offlineRegionUpdateMetadataTakeResult(operationId: UInt64) throws -> OfflineRegionInfo {
-    try mapNativeFailure { try OfflineRegionInfo(native: CAPI.runtimeOfflineRegionUpdateMetadataTakeResult(try requireLivePointer(), operationId: operationId)) }
+    try mapNativeFailure { try OfflineRegionInfo(native: NativeOffline.regionUpdateMetadataTakeResult(try requireLivePointer(), operationId: operationId)) }
   }
 
   public func offlineRegionGetStatusTakeResult(operationId: UInt64) throws -> OfflineRegionStatus {
-    try mapNativeFailure { try OfflineRegionStatus(native: CAPI.runtimeOfflineRegionGetStatusTakeResult(try requireLivePointer(), operationId: operationId)) }
+    try mapNativeFailure { try OfflineRegionStatus(native: NativeOffline.regionGetStatusTakeResult(try requireLivePointer(), operationId: operationId)) }
   }
 }

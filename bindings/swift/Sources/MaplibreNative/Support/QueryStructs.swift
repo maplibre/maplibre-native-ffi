@@ -127,9 +127,9 @@ struct NativeFeatureQueryResultReader {
   }
 
   func copyFeatures() throws -> [NativeQueriedFeature] {
-    let count = try CAPI.featureQueryResultCount(handle)
+    let count = try NativeQuery.featureQueryResultCount(handle)
     return try (0..<count).map { index in
-      try CAPI.featureQueryResultGet(handle, index: index)
+      try NativeQuery.featureQueryResultGet(handle, index: index)
     }
   }
 }
