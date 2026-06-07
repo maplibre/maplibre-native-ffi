@@ -250,14 +250,11 @@ public sealed unsafe class RenderSessionTests
     using var map = MapHandle.Create(runtime, new MapOptions { Width = 64, Height = 64 });
     var context = new WglContextDescriptor { DeviceContext = new NativePointer(1), ShareContext = new NativePointer(1) };
 
-    Assert.Throws<UnsupportedFeatureException>(() => RenderSessionHandle.AttachOpenGLOwnedTexture(
-        map,
+    Assert.Throws<UnsupportedFeatureException>(() => map.AttachOpenGLOwnedTexture(
         new OpenGLOwnedTextureDescriptor { Extent = new RenderTargetExtent(32, 16, 1), Context = context }));
-    Assert.Throws<UnsupportedFeatureException>(() => RenderSessionHandle.AttachOpenGLBorrowedTexture(
-        map,
+    Assert.Throws<UnsupportedFeatureException>(() => map.AttachOpenGLBorrowedTexture(
         new OpenGLBorrowedTextureDescriptor { Extent = new RenderTargetExtent(32, 16, 1), Context = context, Texture = 1, Target = 0x0de1 }));
-    Assert.Throws<UnsupportedFeatureException>(() => RenderSessionHandle.AttachOpenGLSurface(
-        map,
+    Assert.Throws<UnsupportedFeatureException>(() => map.AttachOpenGLSurface(
         new OpenGLSurfaceDescriptor { Extent = new RenderTargetExtent(32, 16, 1), Context = context, Surface = new NativePointer(1) }));
   }
 

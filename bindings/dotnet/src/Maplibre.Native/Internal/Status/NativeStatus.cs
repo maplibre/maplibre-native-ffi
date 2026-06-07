@@ -55,7 +55,7 @@ internal static unsafe class NativeStatus
   {
     try
     {
-      var message = NativeMethods.MlnThreadLastErrorMessage();
+      var message = NativeMethods.mln_thread_last_error_message();
       return message is null
           ? string.Empty
           : Marshal.PtrToStringUTF8((nint)message) ?? string.Empty;

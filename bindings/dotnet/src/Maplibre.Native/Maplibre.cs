@@ -28,14 +28,14 @@ public static unsafe class Maplibre
   public static uint CVersion()
   {
     NativeLibraryLoader.EnsureLoaded();
-    return NativeMethods.MlnCVersion();
+    return NativeMethods.mln_c_version();
   }
 
   /// <summary>Returns the render backends compiled into the native library.</summary>
   public static Render.RenderBackend SupportedRenderBackends()
   {
     NativeLibraryLoader.EnsureLoaded();
-    return (Render.RenderBackend)NativeMethods.MlnSupportedRenderBackendMask();
+    return (Render.RenderBackend)NativeMethods.mln_supported_render_backend_mask();
   }
 
   /// <summary>Returns the OpenGL context providers compiled into the native library.</summary>
@@ -49,7 +49,8 @@ public static unsafe class Maplibre
   public static global::Maplibre.Native.NetworkStatus NetworkStatus()
   {
     NativeLibraryLoader.EnsureLoaded();
-    NativeStatus.Check(NativeMethods.MlnNetworkStatusGet(out var status));
+    uint status = 0;
+    NativeStatus.Check(NativeMethods.mln_network_status_get(&status));
     return global::Maplibre.Native.NetworkStatus.FromRaw(status);
   }
 
@@ -66,7 +67,7 @@ public static unsafe class Maplibre
     }
 
     NativeLibraryLoader.EnsureLoaded();
-    NativeStatus.Check(NativeMethods.MlnNetworkStatusSet(status.RawValue));
+    NativeStatus.Check(NativeMethods.mln_network_status_set(status.RawValue));
   }
 
   /// <summary>Installs or replaces the process-global native log callback.</summary>

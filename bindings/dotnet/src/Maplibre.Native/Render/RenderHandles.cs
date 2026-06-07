@@ -26,7 +26,7 @@ public sealed unsafe class RenderSessionHandle : IDisposable
         nameof(RenderSessionHandle));
   }
 
-  public static RenderSessionHandle AttachMetalSurface(MapHandle map, MetalSurfaceDescriptor descriptor)
+  internal static RenderSessionHandle AttachMetalSurface(MapHandle map, MetalSurfaceDescriptor descriptor)
   {
     ArgumentNullException.ThrowIfNull(map);
     var native = RenderStructs.ToNative(descriptor);
@@ -35,7 +35,7 @@ public sealed unsafe class RenderSessionHandle : IDisposable
     return new RenderSessionHandle(map, session);
   }
 
-  public static RenderSessionHandle AttachVulkanSurface(MapHandle map, VulkanSurfaceDescriptor descriptor)
+  internal static RenderSessionHandle AttachVulkanSurface(MapHandle map, VulkanSurfaceDescriptor descriptor)
   {
     ArgumentNullException.ThrowIfNull(map);
     var native = RenderStructs.ToNative(descriptor);
@@ -44,7 +44,7 @@ public sealed unsafe class RenderSessionHandle : IDisposable
     return new RenderSessionHandle(map, session);
   }
 
-  public static RenderSessionHandle AttachOpenGLSurface(MapHandle map, OpenGLSurfaceDescriptor descriptor)
+  internal static RenderSessionHandle AttachOpenGLSurface(MapHandle map, OpenGLSurfaceDescriptor descriptor)
   {
     ArgumentNullException.ThrowIfNull(map);
     var native = RenderStructs.ToNative(descriptor);
@@ -53,7 +53,7 @@ public sealed unsafe class RenderSessionHandle : IDisposable
     return new RenderSessionHandle(map, session);
   }
 
-  public static RenderSessionHandle AttachMetalOwnedTexture(MapHandle map, MetalOwnedTextureDescriptor descriptor)
+  internal static RenderSessionHandle AttachMetalOwnedTexture(MapHandle map, MetalOwnedTextureDescriptor descriptor)
   {
     ArgumentNullException.ThrowIfNull(map);
     var native = RenderStructs.ToNative(descriptor);
@@ -62,7 +62,7 @@ public sealed unsafe class RenderSessionHandle : IDisposable
     return new RenderSessionHandle(map, session);
   }
 
-  public static RenderSessionHandle AttachMetalBorrowedTexture(MapHandle map, MetalBorrowedTextureDescriptor descriptor)
+  internal static RenderSessionHandle AttachMetalBorrowedTexture(MapHandle map, MetalBorrowedTextureDescriptor descriptor)
   {
     ArgumentNullException.ThrowIfNull(map);
     var native = RenderStructs.ToNative(descriptor);
@@ -71,7 +71,7 @@ public sealed unsafe class RenderSessionHandle : IDisposable
     return new RenderSessionHandle(map, session);
   }
 
-  public static RenderSessionHandle AttachVulkanOwnedTexture(MapHandle map, VulkanOwnedTextureDescriptor descriptor)
+  internal static RenderSessionHandle AttachVulkanOwnedTexture(MapHandle map, VulkanOwnedTextureDescriptor descriptor)
   {
     ArgumentNullException.ThrowIfNull(map);
     var native = RenderStructs.ToNative(descriptor);
@@ -80,7 +80,7 @@ public sealed unsafe class RenderSessionHandle : IDisposable
     return new RenderSessionHandle(map, session);
   }
 
-  public static RenderSessionHandle AttachVulkanBorrowedTexture(MapHandle map, VulkanBorrowedTextureDescriptor descriptor)
+  internal static RenderSessionHandle AttachVulkanBorrowedTexture(MapHandle map, VulkanBorrowedTextureDescriptor descriptor)
   {
     ArgumentNullException.ThrowIfNull(map);
     var native = RenderStructs.ToNative(descriptor);
@@ -89,7 +89,7 @@ public sealed unsafe class RenderSessionHandle : IDisposable
     return new RenderSessionHandle(map, session);
   }
 
-  public static RenderSessionHandle AttachOpenGLOwnedTexture(MapHandle map, OpenGLOwnedTextureDescriptor descriptor)
+  internal static RenderSessionHandle AttachOpenGLOwnedTexture(MapHandle map, OpenGLOwnedTextureDescriptor descriptor)
   {
     ArgumentNullException.ThrowIfNull(map);
     var native = RenderStructs.ToNative(descriptor);
@@ -98,7 +98,7 @@ public sealed unsafe class RenderSessionHandle : IDisposable
     return new RenderSessionHandle(map, session);
   }
 
-  public static RenderSessionHandle AttachOpenGLBorrowedTexture(MapHandle map, OpenGLBorrowedTextureDescriptor descriptor)
+  internal static RenderSessionHandle AttachOpenGLBorrowedTexture(MapHandle map, OpenGLBorrowedTextureDescriptor descriptor)
   {
     ArgumentNullException.ThrowIfNull(map);
     var native = RenderStructs.ToNative(descriptor);

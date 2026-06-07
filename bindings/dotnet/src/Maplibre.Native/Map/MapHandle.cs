@@ -1082,6 +1082,42 @@ public sealed unsafe class MapHandle : IDisposable
     return value is JsonValue.Null ? null : value;
   }
 
+  /// <summary>Attaches this map to a Metal surface render target.</summary>
+  public RenderSessionHandle AttachMetalSurface(MetalSurfaceDescriptor descriptor) =>
+      RenderSessionHandle.AttachMetalSurface(this, descriptor);
+
+  /// <summary>Attaches this map to a Vulkan surface render target.</summary>
+  public RenderSessionHandle AttachVulkanSurface(VulkanSurfaceDescriptor descriptor) =>
+      RenderSessionHandle.AttachVulkanSurface(this, descriptor);
+
+  /// <summary>Attaches this map to an OpenGL surface render target.</summary>
+  public RenderSessionHandle AttachOpenGLSurface(OpenGLSurfaceDescriptor descriptor) =>
+      RenderSessionHandle.AttachOpenGLSurface(this, descriptor);
+
+  /// <summary>Attaches this map to a session-owned Metal texture render target.</summary>
+  public RenderSessionHandle AttachMetalOwnedTexture(MetalOwnedTextureDescriptor descriptor) =>
+      RenderSessionHandle.AttachMetalOwnedTexture(this, descriptor);
+
+  /// <summary>Attaches this map to a caller-owned Metal texture render target.</summary>
+  public RenderSessionHandle AttachMetalBorrowedTexture(MetalBorrowedTextureDescriptor descriptor) =>
+      RenderSessionHandle.AttachMetalBorrowedTexture(this, descriptor);
+
+  /// <summary>Attaches this map to a session-owned Vulkan texture render target.</summary>
+  public RenderSessionHandle AttachVulkanOwnedTexture(VulkanOwnedTextureDescriptor descriptor) =>
+      RenderSessionHandle.AttachVulkanOwnedTexture(this, descriptor);
+
+  /// <summary>Attaches this map to a caller-owned Vulkan texture render target.</summary>
+  public RenderSessionHandle AttachVulkanBorrowedTexture(VulkanBorrowedTextureDescriptor descriptor) =>
+      RenderSessionHandle.AttachVulkanBorrowedTexture(this, descriptor);
+
+  /// <summary>Attaches this map to a session-owned OpenGL texture render target.</summary>
+  public RenderSessionHandle AttachOpenGLOwnedTexture(OpenGLOwnedTextureDescriptor descriptor) =>
+      RenderSessionHandle.AttachOpenGLOwnedTexture(this, descriptor);
+
+  /// <summary>Attaches this map to a caller-owned OpenGL texture render target.</summary>
+  public RenderSessionHandle AttachOpenGLBorrowedTexture(OpenGLBorrowedTextureDescriptor descriptor) =>
+      RenderSessionHandle.AttachOpenGLBorrowedTexture(this, descriptor);
+
   /// <summary>Destroys the map on its owner thread.</summary>
   public void Close()
   {
