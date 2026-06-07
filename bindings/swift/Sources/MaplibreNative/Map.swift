@@ -60,6 +60,13 @@ public final class MapHandle {
     Self.register(self)
   }
 
+  deinit {
+    Self.unregister(nativeAddress)
+    if !handle.isClosed {
+      abandonNativeOwnedCustomGeometrySourceCallbacks()
+    }
+  }
+
   public var isClosed: Bool {
     handle.isClosed
   }
@@ -121,6 +128,12 @@ public final class MapHandle {
   private func resetCallbackRetentionState() {
     styleURLReplacementPending = false
     customGeometrySourceCallbacks.removeAll()
+  }
+
+  private func abandonNativeOwnedCustomGeometrySourceCallbacks() {
+    for callbacks in customGeometrySourceCallbacks.values {
+      callbacks.abandonRetainedBox()
+    }
   }
 
   public func close() throws {

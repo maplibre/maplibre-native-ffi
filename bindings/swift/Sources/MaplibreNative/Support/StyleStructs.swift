@@ -227,7 +227,7 @@ private final class NativeCustomGeometrySourceCallbackBox: @unchecked Sendable {
 final class NativeCustomGeometrySourceCallbacks: @unchecked Sendable {
   typealias TileCallback = @Sendable (NativeCanonicalTileID) -> Void
 
-  private let retainedBox: Unmanaged<NativeCustomGeometrySourceCallbackBox>
+  private var retainedBox: Unmanaged<NativeCustomGeometrySourceCallbackBox>?
 
   init(fetchTile: @escaping TileCallback, cancelTile: TileCallback? = nil) {
     retainedBox = Unmanaged.passRetained(
@@ -236,12 +236,23 @@ final class NativeCustomGeometrySourceCallbacks: @unchecked Sendable {
   }
 
   deinit {
+    guard let retainedBox else { return }
     retainedBox.takeUnretainedValue().retireAndWait()
     retainedBox.release()
   }
 
   var unmanagedPointer: UnsafeMutableRawPointer {
-    retainedBox.toOpaque()
+    retainedBox!.toOpaque()
+  }
+
+  func abandonRetainedBox() {
+    retainedBox = nil
+  }
+
+  static func releaseAbandonedRetainedBoxForTesting(_ pointer: UnsafeMutableRawPointer) {
+    let retainedBox = Unmanaged<NativeCustomGeometrySourceCallbackBox>.fromOpaque(pointer)
+    retainedBox.takeUnretainedValue().retireAndWait()
+    retainedBox.release()
   }
 }
 

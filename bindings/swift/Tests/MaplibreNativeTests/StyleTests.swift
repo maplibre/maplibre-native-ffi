@@ -220,6 +220,43 @@ import Testing
   #expect(releaseFinished.wait(timeout: .now() + .seconds(5)) == .success)
 }
 
+@Test func customGeometryCallbacksCanAbandonRetainedBoxForNativeLeakPath() throws {
+  final class Counter: @unchecked Sendable {
+    private let lock = NSLock()
+    private var count = 0
+
+    func increment() {
+      lock.withLock {
+        count += 1
+      }
+    }
+
+    func value() -> Int {
+      lock.withLock { count }
+    }
+  }
+
+  let counter = Counter()
+  var fetchTile: mln_custom_geometry_source_tile_callback?
+  var userData: UnsafeMutableRawPointer?
+
+  do {
+    let callbacks = NativeCustomGeometrySourceCallbacks(fetchTile: { _ in counter.increment() })
+    try NativeCustomGeometrySourceOptions(callbacks: callbacks).withNativeOptions { native in
+      fetchTile = native.pointee.fetch_tile
+      userData = native.pointee.user_data
+    }
+    callbacks.abandonRetainedBox()
+  }
+
+  let abandonedUserData = try #require(userData)
+  let abandonedFetchTile = try #require(fetchTile)
+  defer { NativeCustomGeometrySourceCallbacks.releaseAbandonedRetainedBoxForTesting(abandonedUserData) }
+  abandonedFetchTile(abandonedUserData, mln_canonical_tile_id(z: 1, x: 2, y: 3))
+
+  #expect(counter.value() == 1)
+}
+
 @Test func staleStyleLoadedEventDoesNotReleaseCallbacksWhileOldSourceExists() throws {
   let runtime = try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
   defer { try? runtime.close() }
