@@ -73,6 +73,23 @@ import Testing
   }
 }
 
+@Test func imageSourceCoordinatesRejectInvalidCountBeforeCallingC() throws {
+  let map = OpaquePointer(bitPattern: 0x1)!
+  let sourceId = mln_string_view()
+  let coordinate = NativeLatLng(latitude: 1, longitude: 2)
+
+  do {
+    try NativeStyle.addImageSourceURL(map, sourceId: sourceId, coordinates: [coordinate], url: mln_string_view())
+    Issue.record("invalid coordinate count should throw")
+  } catch let failure as NativeStatusFailure {
+    #expect(!failure.isNativeStatus)
+    #expect(failure.rawStatus == MLN_STATUS_INVALID_ARGUMENT.rawValue)
+    #expect(failure.diagnostic == "image source coordinates must contain exactly 4 coordinates")
+  } catch {
+    Issue.record("unexpected error: \(error)")
+  }
+}
+
 @Test func geoJSONFeatureMaterializesNativeDescriptorTree() throws {
   let geoJSON = GeoJSON.feature(Feature(
     geometry: .polygon([[LatLng(latitude: 1, longitude: 2), LatLng(latitude: 3, longitude: 4)]]),

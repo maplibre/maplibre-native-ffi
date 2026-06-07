@@ -7,7 +7,7 @@ enum NativeHandleFactory {
   ) throws -> OpaquePointer {
     let output = try NativeMemory.withTemporary(Optional<OpaquePointer>.none, body)
     guard let handle = output.value else {
-      throw NativeStatusFailure(rawStatus: 0, diagnostic: nullDiagnostic)
+      throw NativeStatusFailure.swiftNativeError(nullDiagnostic)
     }
     return handle
   }

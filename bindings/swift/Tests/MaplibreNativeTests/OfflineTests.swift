@@ -67,6 +67,40 @@ import Testing
   #expect(copied.metadata == Data(metadata))
 }
 
+@Test func offlineRegionCopyRejectsMissingGeometryAndMetadataPointers() throws {
+  var definition = mln_offline_region_definition()
+  definition.type = MLN_OFFLINE_REGION_DEFINITION_GEOMETRY.rawValue
+  definition.data.geometry = mln_offline_geometry_region_definition()
+  definition.data.geometry.geometry = nil
+
+  do {
+    _ = try NativeOfflineRegionDefinition(copying: definition)
+    Issue.record("missing geometry should throw")
+  } catch let failure as NativeStatusFailure {
+    #expect(!failure.isNativeStatus)
+    #expect(failure.rawStatus == MLN_STATUS_NATIVE_ERROR.rawValue)
+    #expect(failure.diagnostic == "offline geometry region definition geometry is null")
+  } catch {
+    Issue.record("unexpected error: \(error)")
+  }
+
+  var info = mln_offline_region_info()
+  info.definition.type = MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID.rawValue
+  info.metadata = nil
+  info.metadata_size = 1
+
+  do {
+    _ = try NativeOfflineRegionInfo(copying: info)
+    Issue.record("missing metadata should throw")
+  } catch let failure as NativeStatusFailure {
+    #expect(!failure.isNativeStatus)
+    #expect(failure.rawStatus == MLN_STATUS_NATIVE_ERROR.rawValue)
+    #expect(failure.diagnostic == "offline region metadata is null")
+  } catch {
+    Issue.record("unexpected error: \(error)")
+  }
+}
+
 @Test func closedRuntimeRejectsOfflineCallsThroughSwiftHandleState() throws {
   let runtime = try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
   try runtime.close()

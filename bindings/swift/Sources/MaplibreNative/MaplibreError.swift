@@ -31,7 +31,10 @@ public struct MaplibreError: Error, Sendable, Equatable, CustomStringConvertible
   }
 
   static func fromNativeFailure(_ failure: NativeStatusFailure) -> Self {
-    Self(
+    if !failure.isNativeStatus {
+      return Self(kind: Self.kind(forRawStatus: failure.rawStatus), rawStatus: nil, diagnostic: failure.diagnostic)
+    }
+    return Self(
       kind: Self.kind(forRawStatus: failure.rawStatus),
       rawStatus: failure.rawStatus,
       diagnostic: failure.diagnostic

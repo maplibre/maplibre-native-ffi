@@ -67,16 +67,19 @@ enum NativeOfflineRegionDefinition: Equatable, Sendable {
       )
     case MLN_OFFLINE_REGION_DEFINITION_GEOMETRY.rawValue:
       let value = raw.data.geometry
+      guard let geometry = value.geometry else {
+        throw NativeStatusFailure.swiftNativeError("offline geometry region definition geometry is null")
+      }
       self = .geometry(
         styleURL: NativeString.copyCString(value.style_url),
-        geometry: try NativeGeometry(copying: value.geometry.pointee),
+        geometry: try NativeGeometry(copying: geometry.pointee),
         minZoom: value.min_zoom,
         maxZoom: value.max_zoom,
         pixelRatio: value.pixel_ratio,
         includeIdeographs: value.include_ideographs
       )
     default:
-      throw NativeStatusFailure(rawStatus: 0, diagnostic: "unknown offline region definition type \(raw.type)")
+      throw NativeStatusFailure.swiftNativeError("unknown offline region definition type \(raw.type)")
     }
   }
 }
@@ -92,7 +95,10 @@ struct NativeOfflineRegionInfo: Equatable, Sendable {
     if raw.metadata_size == 0 {
       metadata = Data()
     } else {
-      metadata = Data(bytes: raw.metadata!, count: raw.metadata_size)
+      guard let metadataBytes = raw.metadata else {
+        throw NativeStatusFailure.swiftNativeError("offline region metadata is null")
+      }
+      metadata = Data(bytes: metadataBytes, count: raw.metadata_size)
     }
   }
 }

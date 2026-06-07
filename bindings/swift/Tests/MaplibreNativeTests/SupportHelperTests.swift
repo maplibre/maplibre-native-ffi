@@ -71,6 +71,37 @@ private final class LockedBox<Value>: @unchecked Sendable {
   #expect(copied == TinyDescriptor(size: 8, value: 99))
 }
 
+@Test func nativeHandleFactoryReportsSwiftNullHandleFailure() throws {
+  do {
+    _ = try NativeHandleFactory.create(nullDiagnostic: "factory returned null") { _ in }
+    Issue.record("null handle should throw")
+  } catch let failure as NativeStatusFailure {
+    #expect(!failure.isNativeStatus)
+    #expect(failure.rawStatus == MLN_STATUS_NATIVE_ERROR.rawValue)
+    #expect(failure.diagnostic == "factory returned null")
+  } catch {
+    Issue.record("unexpected error: \(error)")
+  }
+}
+
+@Test func nativeStringCopyUTF8RejectsInvalidBytes() throws {
+  var invalid = [UInt8](arrayLiteral: 0xff)
+
+  do {
+    _ = try invalid.withUnsafeMutableBufferPointer { buffer in
+      try NativeString.copyUTF8(
+        data: UnsafeRawPointer(buffer.baseAddress!).assumingMemoryBound(to: CChar.self),
+        size: buffer.count
+      )
+    }
+    Issue.record("invalid UTF-8 should throw")
+  } catch let error as NativeStringError {
+    #expect(error.message.contains("invalid bytes"))
+  } catch {
+    Issue.record("unexpected error: \(error)")
+  }
+}
+
 @Test func nativeResultGuardReleasesExactlyOnce() throws {
   let releases = LockedBox(0)
   let pointer = OpaquePointer(bitPattern: 0x1)

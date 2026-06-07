@@ -18,6 +18,19 @@ import Testing
     }
 }
 
+@Test func renderedQueryLineStringRejectsEmptyInputBeforeCallingC() throws {
+  do {
+    try RenderedQueryGeometry.lineString([]).nativeGeometry.withNativeGeometry { _ in }
+    Issue.record("empty line string should throw")
+  } catch let failure as NativeStatusFailure {
+    #expect(!failure.isNativeStatus)
+    #expect(failure.rawStatus == MLN_STATUS_INVALID_ARGUMENT.rawValue)
+    #expect(failure.diagnostic == "rendered query line string geometry must contain at least one point")
+  } catch {
+    Issue.record("unexpected error: \(error)")
+  }
+}
+
 @Test func queryOptionsMaterializeLayerIdsAndFilters() throws {
   let options = RenderedFeatureQueryOptions(
     layerIds: ["roads", "labels"],

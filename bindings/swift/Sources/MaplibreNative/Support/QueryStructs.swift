@@ -16,6 +16,9 @@ enum NativeRenderedQueryGeometry: Equatable, Sendable {
       var geometry = mln_rendered_query_geometry_box(mln_screen_box(min: min.native, max: max.native))
       return try withUnsafePointer(to: &geometry, body)
     case .lineString(let points):
+      guard !points.isEmpty else {
+        throw NativeStatusFailure.swiftInvalidArgument("rendered query line string geometry must contain at least one point")
+      }
       let nativePoints = points.map(\.native)
       return try nativePoints.withUnsafeBufferPointer { buffer in
         var geometry = mln_rendered_query_geometry_line_string(buffer.baseAddress, buffer.count)

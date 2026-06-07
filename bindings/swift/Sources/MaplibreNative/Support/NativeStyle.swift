@@ -45,14 +45,20 @@ enum NativeStyle {
     guard size <= capacity else {
       throw NativeStatusFailure(rawStatus: MLN_STATUS_NATIVE_ERROR.rawValue, diagnostic: "native style source attribution size exceeded caller buffer")
     }
-    return (String(decoding: bytes.prefix(size), as: UTF8.self), size)
+    let attribution = try bytes.withUnsafeBufferPointer { buffer in
+      try NativeString.copyUTF8(
+        data: buffer.baseAddress.map { UnsafeRawPointer($0).assumingMemoryBound(to: CChar.self) },
+        size: size
+      )
+    }
+    return (attribution, size)
   }
 
   static func sourceIds(_ map: OpaquePointer) throws -> [String] {
     let list = try NativeMemory.withTemporary(Optional<OpaquePointer>.none) { list in
       try checkStatus(mln_map_list_style_source_ids(map, list))
     }.value
-    guard let list else { throw NativeStatusFailure(rawStatus: 0, diagnostic: "source ID list was null") }
+    guard let list else { throw NativeStatusFailure.swiftNativeError("source ID list was null") }
     defer { mln_style_id_list_destroy(list) }
     return try copyStyleIdList(list)
   }
@@ -96,6 +102,7 @@ enum NativeStyle {
   }
 
   static func addImageSourceURL(_ map: OpaquePointer, sourceId: mln_string_view, coordinates: [NativeLatLng], url: mln_string_view) throws {
+    try validateImageSourceCoordinates(coordinates)
     let rawCoordinates = coordinates.map(\.native)
     try rawCoordinates.withUnsafeBufferPointer { coordinates in
       try checkStatus(mln_map_add_image_source_url(map, sourceId, coordinates.baseAddress, coordinates.count, url))
@@ -103,6 +110,7 @@ enum NativeStyle {
   }
 
   static func addImageSourceImage(_ map: OpaquePointer, sourceId: mln_string_view, coordinates: [NativeLatLng], image: UnsafePointer<mln_premultiplied_rgba8_image>) throws {
+    try validateImageSourceCoordinates(coordinates)
     let rawCoordinates = coordinates.map(\.native)
     try rawCoordinates.withUnsafeBufferPointer { coordinates in
       try checkStatus(mln_map_add_image_source_image(map, sourceId, coordinates.baseAddress, coordinates.count, image))
@@ -110,6 +118,7 @@ enum NativeStyle {
   }
 
   static func setImageSourceCoordinates(_ map: OpaquePointer, sourceId: mln_string_view, coordinates: [NativeLatLng]) throws {
+    try validateImageSourceCoordinates(coordinates)
     let rawCoordinates = coordinates.map(\.native)
     try rawCoordinates.withUnsafeBufferPointer { coordinates in
       try checkStatus(mln_map_set_image_source_coordinates(map, sourceId, coordinates.baseAddress, coordinates.count))
@@ -132,6 +141,12 @@ enum NativeStyle {
       throw NativeStatusFailure(rawStatus: MLN_STATUS_NATIVE_ERROR.rawValue, diagnostic: "native image source coordinate count did not match Swift image source invariant")
     }
     return coordinates.map(NativeLatLng.init)
+  }
+
+  private static func validateImageSourceCoordinates(_ coordinates: [NativeLatLng]) throws {
+    guard coordinates.count == 4 else {
+      throw NativeStatusFailure.swiftInvalidArgument("image source coordinates must contain exactly 4 coordinates")
+    }
   }
 
   static func removeLayer(_ map: OpaquePointer, layerId: mln_string_view) throws -> Bool {
@@ -158,7 +173,7 @@ enum NativeStyle {
     let list = try NativeMemory.withTemporary(Optional<OpaquePointer>.none) { list in
       try checkStatus(mln_map_list_style_layer_ids(map, list))
     }.value
-    guard let list else { throw NativeStatusFailure(rawStatus: 0, diagnostic: "layer ID list was null") }
+    guard let list else { throw NativeStatusFailure.swiftNativeError("layer ID list was null") }
     defer { mln_style_id_list_destroy(list) }
     return try copyStyleIdList(list)
   }

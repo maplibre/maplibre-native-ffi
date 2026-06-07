@@ -27,19 +27,28 @@ enum NativeJSONValue: Equatable, Sendable {
       self = .string(try NativeString.copyUTF8(data: raw.data.string_value.data, size: raw.data.string_value.size))
     case MLN_JSON_VALUE_TYPE_ARRAY.rawValue:
       let array = raw.data.array_value
-      let values = (0..<array.value_count).map { index in
-        array.values![index]
-      }
+      let values = try Self.copyJSONValues(array.values, count: array.value_count)
       self = .array(try values.map { try NativeJSONValue(copying: $0) })
     case MLN_JSON_VALUE_TYPE_OBJECT.rawValue:
       let object = raw.data.object_value
-      let members = try (0..<object.member_count).map { index in
-        try NativeJSONMember(copying: object.members![index])
-      }
+      let rawMembers = try Self.copyJSONMembers(object.members, count: object.member_count)
+      let members = try rawMembers.map { try NativeJSONMember(copying: $0) }
       self = .object(members)
     default:
-      throw NativeStatusFailure(rawStatus: 0, diagnostic: "unknown JSON value type \(raw.type)")
+      throw NativeStatusFailure.swiftNativeError("unknown JSON value type \(raw.type)")
     }
+  }
+
+  private static func copyJSONValues(_ values: UnsafePointer<mln_json_value>?, count: Int) throws -> [mln_json_value] {
+    guard count > 0 else { return [] }
+    guard let values else { throw NativeStatusFailure.swiftNativeError("JSON array values pointer is null") }
+    return (0..<count).map { values[$0] }
+  }
+
+  private static func copyJSONMembers(_ members: UnsafePointer<mln_json_member>?, count: Int) throws -> [mln_json_member] {
+    guard count > 0 else { return [] }
+    guard let members else { throw NativeStatusFailure.swiftNativeError("JSON object members pointer is null") }
+    return (0..<count).map { members[$0] }
   }
 }
 
@@ -54,7 +63,10 @@ struct NativeJSONMember: Equatable, Sendable {
 
   init(copying raw: mln_json_member) throws {
     key = try NativeString.copyUTF8(data: raw.key.data, size: raw.key.size)
-    value = try NativeJSONValue(copying: raw.value.pointee)
+    guard let rawValue = raw.value else {
+      throw NativeStatusFailure.swiftNativeError("JSON member value pointer is null")
+    }
+    value = try NativeJSONValue(copying: rawValue.pointee)
   }
 }
 
@@ -352,39 +364,65 @@ enum NativeGeometry: Equatable, Sendable {
     case MLN_GEOMETRY_TYPE_POINT.rawValue:
       self = .point(NativeLatLng(raw.data.point))
     case MLN_GEOMETRY_TYPE_LINE_STRING.rawValue:
-      self = .lineString(Self.copyCoordinateSpan(raw.data.line_string))
+      self = .lineString(try Self.copyCoordinateSpan(raw.data.line_string))
     case MLN_GEOMETRY_TYPE_POLYGON.rawValue:
-      self = .polygon(Self.copyPolygon(raw.data.polygon))
+      self = .polygon(try Self.copyPolygon(raw.data.polygon))
     case MLN_GEOMETRY_TYPE_MULTI_POINT.rawValue:
-      self = .multiPoint(Self.copyCoordinateSpan(raw.data.multi_point))
+      self = .multiPoint(try Self.copyCoordinateSpan(raw.data.multi_point))
     case MLN_GEOMETRY_TYPE_MULTI_LINE_STRING.rawValue:
       let multiLine = raw.data.multi_line_string
-      self = .multiLineString((0..<multiLine.line_count).map { lineIndex in
-        Self.copyCoordinateSpan(multiLine.lines![lineIndex])
+      let lines = try Self.copyCoordinateSpans(multiLine.lines, count: multiLine.line_count, diagnostic: "multi-line geometry lines pointer is null")
+      self = .multiLineString(try lines.map { line in
+        try Self.copyCoordinateSpan(line)
       })
     case MLN_GEOMETRY_TYPE_MULTI_POLYGON.rawValue:
       let multiPolygon = raw.data.multi_polygon
-      self = .multiPolygon((0..<multiPolygon.polygon_count).map { polygonIndex in
-        Self.copyPolygon(multiPolygon.polygons![polygonIndex])
+      let polygons = try Self.copyPolygons(multiPolygon.polygons, count: multiPolygon.polygon_count, diagnostic: "multi-polygon geometry polygons pointer is null")
+      self = .multiPolygon(try polygons.map { polygon in
+        try Self.copyPolygon(polygon)
       })
     case MLN_GEOMETRY_TYPE_GEOMETRY_COLLECTION.rawValue:
       let collection = raw.data.geometry_collection
-      self = .geometryCollection(try (0..<collection.geometry_count).map { geometryIndex in
-        try NativeGeometry(copying: collection.geometries![geometryIndex])
+      let geometries = try Self.copyGeometries(collection.geometries, count: collection.geometry_count, diagnostic: "geometry collection geometries pointer is null")
+      self = .geometryCollection(try geometries.map { geometry in
+        try NativeGeometry(copying: geometry)
       })
     default:
-      throw NativeStatusFailure(rawStatus: 0, diagnostic: "unsupported geometry type \(raw.type)")
+      throw NativeStatusFailure.swiftNativeError("unsupported geometry type \(raw.type)")
     }
   }
 
-  private static func copyCoordinateSpan(_ span: mln_coordinate_span) -> [NativeLatLng] {
-    (0..<span.coordinate_count).map { NativeLatLng(span.coordinates![$0]) }
+  private static func copyCoordinateSpan(_ span: mln_coordinate_span) throws -> [NativeLatLng] {
+    guard span.coordinate_count > 0 else { return [] }
+    guard let coordinates = span.coordinates else {
+      throw NativeStatusFailure.swiftNativeError("coordinate span coordinates pointer is null")
+    }
+    return (0..<span.coordinate_count).map { NativeLatLng(coordinates[$0]) }
   }
 
-  private static func copyPolygon(_ polygon: mln_polygon_geometry) -> [[NativeLatLng]] {
-    (0..<polygon.ring_count).map { ringIndex in
-      copyCoordinateSpan(polygon.rings![ringIndex])
+  private static func copyPolygon(_ polygon: mln_polygon_geometry) throws -> [[NativeLatLng]] {
+    let rings = try copyCoordinateSpans(polygon.rings, count: polygon.ring_count, diagnostic: "polygon geometry rings pointer is null")
+    return try rings.map { ring in
+      try copyCoordinateSpan(ring)
     }
+  }
+
+  private static func copyCoordinateSpans(_ spans: UnsafePointer<mln_coordinate_span>?, count: Int, diagnostic: String) throws -> [mln_coordinate_span] {
+    guard count > 0 else { return [] }
+    guard let spans else { throw NativeStatusFailure.swiftNativeError(diagnostic) }
+    return (0..<count).map { spans[$0] }
+  }
+
+  private static func copyPolygons(_ polygons: UnsafePointer<mln_polygon_geometry>?, count: Int, diagnostic: String) throws -> [mln_polygon_geometry] {
+    guard count > 0 else { return [] }
+    guard let polygons else { throw NativeStatusFailure.swiftNativeError(diagnostic) }
+    return (0..<count).map { polygons[$0] }
+  }
+
+  private static func copyGeometries(_ geometries: UnsafePointer<mln_geometry>?, count: Int, diagnostic: String) throws -> [mln_geometry] {
+    guard count > 0 else { return [] }
+    guard let geometries else { throw NativeStatusFailure.swiftNativeError(diagnostic) }
+    return (0..<count).map { geometries[$0] }
   }
 }
 
@@ -412,9 +450,12 @@ struct NativeFeature: Equatable, Sendable {
   }
 
   init(copying raw: mln_feature) throws {
-    geometry = try NativeGeometry(copying: raw.geometry.pointee)
-    properties = try (0..<raw.property_count).map { index in
-      try NativeJSONMember(copying: raw.properties![index])
+    guard let rawGeometry = raw.geometry else {
+      throw NativeStatusFailure.swiftNativeError("feature geometry pointer is null")
+    }
+    geometry = try NativeGeometry(copying: rawGeometry.pointee)
+    properties = try Self.copyProperties(raw.properties, count: raw.property_count).map { property in
+      try NativeJSONMember(copying: property)
     }
     switch raw.identifier_type {
     case MLN_FEATURE_IDENTIFIER_TYPE_NULL.rawValue:
@@ -428,8 +469,14 @@ struct NativeFeature: Equatable, Sendable {
     case MLN_FEATURE_IDENTIFIER_TYPE_STRING.rawValue:
       identifier = .string(try NativeString.copyUTF8(data: raw.identifier.string_value.data, size: raw.identifier.string_value.size))
     default:
-      throw NativeStatusFailure(rawStatus: 0, diagnostic: "unknown feature identifier type \(raw.identifier_type)")
+      throw NativeStatusFailure.swiftNativeError("unknown feature identifier type \(raw.identifier_type)")
     }
+  }
+
+  private static func copyProperties(_ properties: UnsafePointer<mln_json_member>?, count: Int) throws -> [mln_json_member] {
+    guard count > 0 else { return [] }
+    guard let properties else { throw NativeStatusFailure.swiftNativeError("feature properties pointer is null") }
+    return (0..<count).map { properties[$0] }
   }
 }
 
@@ -473,15 +520,24 @@ enum NativeFeatureExtensionResult: Equatable, Sendable {
   init(copying raw: mln_feature_extension_result_info) throws {
     switch raw.type {
     case MLN_FEATURE_EXTENSION_RESULT_TYPE_VALUE.rawValue:
-      self = .value(try NativeJSONValue(copying: raw.data.value.pointee))
+      guard let value = raw.data.value else {
+        throw NativeStatusFailure.swiftNativeError("feature extension result value pointer is null")
+      }
+      self = .value(try NativeJSONValue(copying: value.pointee))
     case MLN_FEATURE_EXTENSION_RESULT_TYPE_FEATURE_COLLECTION.rawValue:
       let collection = raw.data.feature_collection
-      let features = try (0..<collection.feature_count).map { index in
-        try NativeFeature(copying: collection.features![index])
+      let features = try Self.copyFeatures(collection.features, count: collection.feature_count).map { feature in
+        try NativeFeature(copying: feature)
       }
       self = .featureCollection(features)
     default:
-      throw NativeStatusFailure(rawStatus: 0, diagnostic: "unknown feature extension result type \(raw.type)")
+      throw NativeStatusFailure.swiftNativeError("unknown feature extension result type \(raw.type)")
     }
+  }
+
+  private static func copyFeatures(_ features: UnsafePointer<mln_feature>?, count: Int) throws -> [mln_feature] {
+    guard count > 0 else { return [] }
+    guard let features else { throw NativeStatusFailure.swiftNativeError("feature extension result feature collection pointer is null") }
+    return (0..<count).map { features[$0] }
   }
 }

@@ -1,4 +1,5 @@
 internal import CMaplibreNativeC
+import Foundation
 
 struct NativeStringError: Error, Equatable, Sendable {
   let message: String
@@ -22,7 +23,10 @@ enum NativeString {
       start: UnsafeRawPointer(data).assumingMemoryBound(to: UInt8.self),
       count: size
     )
-    return String(decoding: bytes, as: UTF8.self)
+    guard let text = String(bytes: bytes, encoding: .utf8) else {
+      throw NativeStringError("UTF-8 string view contains invalid bytes")
+    }
+    return text
   }
 
   static func copyCString(_ data: UnsafePointer<CChar>?) -> String {
