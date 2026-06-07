@@ -14,17 +14,9 @@ struct CallbackState {
     callback: Box<LogCallback>,
 }
 
-struct GlobalLogCallbackState {
-    current: Option<Arc<CallbackState>>,
-    retained: Vec<Arc<CallbackState>>,
-}
+static LOG_CALLBACK_STATE: Mutex<Option<Arc<CallbackState>>> = Mutex::new(None);
 
-static LOG_CALLBACK_STATE: Mutex<GlobalLogCallbackState> = Mutex::new(GlobalLogCallbackState {
-    current: None,
-    retained: Vec::new(),
-});
-
-fn lock_log_callback_state() -> MutexGuard<'static, GlobalLogCallbackState> {
+fn lock_log_callback_state() -> MutexGuard<'static, Option<Arc<CallbackState>>> {
     LOG_CALLBACK_STATE
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner())
@@ -44,16 +36,18 @@ where
         callback: Box::new(callback),
     });
     let user_data = Arc::as_ptr(&replacement).cast_mut().cast::<c_void>();
-    // SAFETY: log_callback_trampoline has the C callback ABI. user_data points
-    // at replacement, which is retained for the process lifetime below so native
-    // and in-flight callbacks never observe a dangling pointer.
-    maplibre_core::check(unsafe {
-        sys::mln_log_set_callback(Some(log_callback_trampoline), user_data)
-    })?;
+    let previous = {
+        let mut current = lock_log_callback_state();
+        // SAFETY: log_callback_trampoline has the C callback ABI. user_data
+        // points at replacement, which is retained in current until the native
+        // callback is replaced or cleared.
+        maplibre_core::check(unsafe {
+            sys::mln_log_set_callback(Some(log_callback_trampoline), user_data)
+        })?;
 
-    let mut state = lock_log_callback_state();
-    state.current = Some(replacement.clone());
-    state.retained.push(replacement);
+        current.replace(replacement)
+    };
+    drop(previous);
     Ok(())
 }
 
@@ -61,9 +55,12 @@ where
 pub fn clear_log_callback() -> Result<()> {
     // SAFETY: mln_log_clear_callback takes no arguments and clears native's
     // process-global callback slot.
-    maplibre_core::check(unsafe { sys::mln_log_clear_callback() })?;
-
-    lock_log_callback_state().current = None;
+    let previous = {
+        let mut current = lock_log_callback_state();
+        maplibre_core::check(unsafe { sys::mln_log_clear_callback() })?;
+        current.take()
+    };
+    drop(previous);
     Ok(())
 }
 
@@ -91,8 +88,8 @@ unsafe extern "C" fn log_callback_trampoline(
     }
 
     // SAFETY: set_log_callback installs Arc::as_ptr(&CallbackState) as
-    // user_data and retains every installed Arc for the process lifetime, so the
-    // pointer remains valid for native dispatch and in-flight callbacks.
+    // user_data and retains the current Arc until native replacement or clear
+    // succeeds, so the pointer remains valid for native dispatch.
     let state = unsafe { &*user_data.cast::<CallbackState>() };
     invoke_callback(state, severity, event, code, message)
 }
@@ -182,7 +179,7 @@ mod tests {
         let message = CString::new("hello").unwrap();
         let current = {
             let state = lock_log_callback_state();
-            state.current.as_ref().unwrap().clone()
+            state.as_ref().unwrap().clone()
         };
         let user_data = Arc::as_ptr(&current).cast_mut().cast::<c_void>();
         assert_eq!(
@@ -200,7 +197,7 @@ mod tests {
         assert_eq!(calls.load(Ordering::SeqCst), baseline_calls + 1);
 
         clear_log_callback().unwrap();
-        assert!(lock_log_callback_state().current.is_none());
+        assert!(lock_log_callback_state().is_none());
         assert_eq!(
             unsafe {
                 log_callback_trampoline(
@@ -223,7 +220,7 @@ mod tests {
         let invalid = b"\xff\0";
         let current = {
             let state = lock_log_callback_state();
-            state.current.as_ref().unwrap().clone()
+            state.as_ref().unwrap().clone()
         };
 
         assert_eq!(
@@ -248,7 +245,7 @@ mod tests {
         let message = CString::new("boom").unwrap();
         let current = {
             let state = lock_log_callback_state();
-            state.current.as_ref().unwrap().clone()
+            state.as_ref().unwrap().clone()
         };
 
         assert_eq!(
