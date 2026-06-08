@@ -11,7 +11,7 @@ const Pipeline = @import("pipeline.zig").Pipeline;
 const Swapchain = @import("swapchain.zig").Swapchain;
 const util = @import("util.zig");
 
-pub const VulkanBackend = union(enum) {
+pub const VulkanRenderTarget = union(enum) {
     pub const window_flags = c.SDL_WINDOW_VULKAN;
 
     owned_texture: VulkanOwnedTextureBackend,
@@ -23,15 +23,16 @@ pub const VulkanBackend = union(enum) {
         window: *c.SDL_Window,
         viewport: types.Viewport,
         mode: types.RenderTargetMode,
-    ) !VulkanBackend {
+        map: *maplibre.MapHandle,
+    ) !VulkanRenderTarget {
         return switch (mode) {
-            .owned_texture => .{ .owned_texture = try VulkanOwnedTextureBackend.init(allocator, window, viewport) },
-            .borrowed_texture => .{ .borrowed_texture = try VulkanBorrowedTextureBackend.init(allocator, window, viewport) },
-            .native_surface => .{ .native_surface = try VulkanSurfaceBackend.init(allocator, window) },
+            .owned_texture => .{ .owned_texture = try VulkanOwnedTextureBackend.init(allocator, window, viewport, map) },
+            .borrowed_texture => .{ .borrowed_texture = try VulkanBorrowedTextureBackend.init(allocator, window, viewport, map) },
+            .native_surface => .{ .native_surface = try VulkanSurfaceBackend.init(allocator, window, viewport, map) },
         };
     }
 
-    pub fn deinit(self: *VulkanBackend) void {
+    pub fn deinit(self: *VulkanRenderTarget) void {
         switch (self.*) {
             .owned_texture => |*backend| backend.deinit(),
             .borrowed_texture => |*backend| backend.deinit(),
@@ -39,7 +40,7 @@ pub const VulkanBackend = union(enum) {
         }
     }
 
-    pub fn resize(self: *VulkanBackend, viewport: types.Viewport) !void {
+    pub fn resize(self: *VulkanRenderTarget, viewport: types.Viewport) !void {
         switch (self.*) {
             .owned_texture => |*backend| try backend.resize(viewport),
             .borrowed_texture => |*backend| try backend.resize(viewport),
@@ -47,14 +48,14 @@ pub const VulkanBackend = union(enum) {
         }
     }
 
-    pub fn needsRenderTargetReattachOnResize(self: *const VulkanBackend) bool {
+    pub fn needsReattachOnResize(self: *const VulkanRenderTarget) bool {
         return switch (self.*) {
             .owned_texture, .native_surface => false,
             .borrowed_texture => true,
         };
     }
 
-    pub fn finishFrame(self: *VulkanBackend) !void {
+    pub fn finishFrame(self: *VulkanRenderTarget) !void {
         switch (self.*) {
             .owned_texture => |*backend| try backend.finishFrame(),
             .borrowed_texture => |*backend| try backend.finishFrame(),
@@ -62,27 +63,15 @@ pub const VulkanBackend = union(enum) {
         }
     }
 
-    pub fn attachRenderTarget(
-        self: *VulkanBackend,
-        map: *maplibre.MapHandle,
-        viewport: types.Viewport,
-    ) !render_target.Session {
-        return switch (self.*) {
-            .owned_texture => |*backend| backend.attachRenderTarget(map, viewport),
-            .borrowed_texture => |*backend| backend.attachRenderTarget(map, viewport),
-            .native_surface => |*backend| backend.attachRenderTarget(map, viewport),
-        };
-    }
-
-    pub fn drawTexture(
-        self: *VulkanBackend,
-        texture: *maplibre.RenderSessionHandle,
+    pub fn renderUpdate(
+        self: *VulkanRenderTarget,
+        diagnostic_store: ?*const maplibre.DiagnosticStore,
         viewport: types.Viewport,
     ) !bool {
         return switch (self.*) {
-            .owned_texture => |*backend| backend.drawTexture(texture, viewport),
-            .borrowed_texture => |*backend| backend.drawTexture(texture, viewport),
-            .native_surface => unreachable,
+            .owned_texture => |*backend| backend.renderUpdate(diagnostic_store, viewport),
+            .borrowed_texture => |*backend| backend.renderUpdate(diagnostic_store, viewport),
+            .native_surface => |*backend| backend.renderUpdate(diagnostic_store),
         };
     }
 };
@@ -211,22 +200,29 @@ const VulkanTextureCompositor = struct {
 
 const VulkanOwnedTextureBackend = struct {
     compositor: VulkanTextureCompositor,
+    session: render_target.Session,
     pending_frame: ?maplibre.VulkanOwnedTextureFrameHandle,
 
     fn init(
         allocator: std.mem.Allocator,
         window: *c.SDL_Window,
         viewport: types.Viewport,
+        map: *maplibre.MapHandle,
     ) !VulkanOwnedTextureBackend {
-        return .{
+        var self = VulkanOwnedTextureBackend{
             .compositor = try VulkanTextureCompositor.init(allocator, window, viewport, false),
+            .session = .none,
             .pending_frame = null,
         };
+        errdefer self.deinit();
+        self.session = try self.attachRenderTarget(map, viewport);
+        return self;
     }
 
     fn deinit(self: *VulkanOwnedTextureBackend) void {
         self.compositor.waitIdle();
         self.releasePendingFrame();
+        self.session.deinit();
         self.compositor.deinit();
     }
 
@@ -234,6 +230,7 @@ const VulkanOwnedTextureBackend = struct {
         self.compositor.waitIdle();
         self.releasePendingFrame();
         try self.compositor.resize(viewport);
+        try self.session.resize(viewport, null);
     }
 
     fn finishFrame(self: *VulkanOwnedTextureBackend) !void {
@@ -257,11 +254,17 @@ const VulkanOwnedTextureBackend = struct {
         return .{ .texture = texture };
     }
 
-    fn drawTexture(
+    fn renderUpdate(
         self: *VulkanOwnedTextureBackend,
-        texture: *maplibre.RenderSessionHandle,
-        _: types.Viewport,
+        diagnostic_store: ?*const maplibre.DiagnosticStore,
+        viewport: types.Viewport,
     ) !bool {
+        _ = viewport;
+        if (!try self.session.renderUpdate(diagnostic_store)) return false;
+        const texture = switch (self.session) {
+            .texture => |*texture| texture,
+            else => return false,
+        };
         var frame = texture.acquireVulkanOwnedTextureFrame() catch |err| switch (err) {
             error.InvalidState => return false,
             else => {
@@ -371,34 +374,36 @@ const BorrowedImage = struct {
 
 const VulkanBorrowedTextureBackend = struct {
     compositor: VulkanTextureCompositor,
+    session: render_target.Session,
     borrowed_image: BorrowedImage,
 
     fn init(
         allocator: std.mem.Allocator,
         window: *c.SDL_Window,
         viewport: types.Viewport,
+        map: *maplibre.MapHandle,
     ) !VulkanBorrowedTextureBackend {
         var compositor = try VulkanTextureCompositor.init(allocator, window, viewport, false);
         errdefer compositor.deinit();
-        return .{
+        var self = VulkanBorrowedTextureBackend{
             .borrowed_image = try BorrowedImage.init(&compositor.context, viewport),
+            .session = .none,
             .compositor = compositor,
         };
+        errdefer self.deinit();
+        self.session = try self.attachRenderTarget(map, viewport);
+        return self;
     }
 
     fn deinit(self: *VulkanBorrowedTextureBackend) void {
         self.compositor.waitIdle();
+        self.session.deinit();
         self.borrowed_image.deinit(self.compositor.context.device);
         self.compositor.deinit();
     }
 
-    fn resize(self: *VulkanBorrowedTextureBackend, viewport: types.Viewport) !void {
-        self.compositor.waitIdle();
-        var borrowed_image = try BorrowedImage.init(&self.compositor.context, viewport);
-        errdefer borrowed_image.deinit(self.compositor.context.device);
-        try self.compositor.resize(viewport);
-        self.borrowed_image.deinit(self.compositor.context.device);
-        self.borrowed_image = borrowed_image;
+    fn resize(_: *VulkanBorrowedTextureBackend, _: types.Viewport) !void {
+        return types.AppError.TextureResizeFailed;
     }
 
     fn finishFrame(self: *VulkanBorrowedTextureBackend) !void {
@@ -425,31 +430,54 @@ const VulkanBorrowedTextureBackend = struct {
         return .{ .texture = texture };
     }
 
-    fn drawTexture(
+    fn renderUpdate(
         self: *VulkanBorrowedTextureBackend,
-        texture: *maplibre.RenderSessionHandle,
-        _: types.Viewport,
+        diagnostic_store: ?*const maplibre.DiagnosticStore,
+        viewport: types.Viewport,
     ) !bool {
-        _ = texture;
+        _ = viewport;
+        if (!try self.session.renderUpdate(diagnostic_store)) return false;
         return try self.compositor.presentImageView(self.borrowed_image.view);
     }
 };
 
 const VulkanSurfaceBackend = struct {
     context: Context,
+    session: render_target.Session,
 
-    fn init(allocator: std.mem.Allocator, window: *c.SDL_Window) !VulkanSurfaceBackend {
-        return .{ .context = try Context.init(allocator, window, false) };
+    fn init(
+        allocator: std.mem.Allocator,
+        window: *c.SDL_Window,
+        viewport: types.Viewport,
+        map: *maplibre.MapHandle,
+    ) !VulkanSurfaceBackend {
+        var self = VulkanSurfaceBackend{
+            .context = try Context.init(allocator, window, false),
+            .session = .none,
+        };
+        errdefer self.deinit();
+        self.session = try self.attachRenderTarget(map, viewport);
+        return self;
     }
 
     fn deinit(self: *VulkanSurfaceBackend) void {
         self.context.waitIdle();
+        self.session.deinit();
         self.context.deinit();
     }
 
-    fn resize(_: *VulkanSurfaceBackend, _: types.Viewport) !void {}
+    fn resize(self: *VulkanSurfaceBackend, viewport: types.Viewport) !void {
+        try self.session.resize(viewport, null);
+    }
 
     fn finishFrame(_: *VulkanSurfaceBackend) !void {}
+
+    fn renderUpdate(
+        self: *VulkanSurfaceBackend,
+        diagnostic_store: ?*const maplibre.DiagnosticStore,
+    ) !bool {
+        return try self.session.renderUpdate(diagnostic_store);
+    }
 
     fn attachRenderTarget(
         self: *VulkanSurfaceBackend,

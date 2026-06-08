@@ -152,8 +152,8 @@ final class MapState implements AutoCloseable {
                         viewport.width(), viewport.height(), viewport.scaleFactor()))
                 .context(vulkanContextDescriptor(vulkan))
                 .surface(vulkan.surfacePointer());
-        yield new SurfaceRenderTarget(
-            RenderSessionHandle.attachVulkanSurface(map, descriptor), false);
+        yield new VulkanSurfaceRenderTarget(
+            RenderSessionHandle.attachVulkanSurface(map, descriptor));
       }
       case OWNED_TEXTURE -> attachOwnedTextureRenderTarget(vulkan, map, viewport);
       case BORROWED_TEXTURE -> attachBorrowedTextureRenderTarget(vulkan, map, viewport);
@@ -171,8 +171,7 @@ final class MapState implements AutoCloseable {
                         viewport.width(), viewport.height(), viewport.scaleFactor()))
                 .context(metalContextDescriptor(metal))
                 .layer(metal.layerPointer());
-        yield new SurfaceRenderTarget(
-            RenderSessionHandle.attachMetalSurface(map, descriptor), true);
+        yield new MetalSurfaceRenderTarget(RenderSessionHandle.attachMetalSurface(map, descriptor));
       }
       case OWNED_TEXTURE -> attachMetalOwnedTextureRenderTarget(metal, map, viewport);
       case BORROWED_TEXTURE -> attachMetalBorrowedTextureRenderTarget(metal, map, viewport);
@@ -191,7 +190,7 @@ final class MapState implements AutoCloseable {
     try {
       session = RenderSessionHandle.attachVulkanOwnedTexture(map, descriptor);
       compositor = new VulkanTextureCompositor(vulkan, viewport);
-      return new OwnedTextureRenderTarget(session, compositor);
+      return new VulkanOwnedTextureRenderTarget(session, compositor);
     } catch (RuntimeException error) {
       if (compositor != null) {
         try {
@@ -231,7 +230,7 @@ final class MapState implements AutoCloseable {
               .finalLayout(VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
       session = RenderSessionHandle.attachVulkanBorrowedTexture(map, descriptor);
       compositor = new VulkanTextureCompositor(vulkan, viewport);
-      return new BorrowedTextureRenderTarget(vulkan, map, session, compositor, image);
+      return new VulkanBorrowedTextureRenderTarget(vulkan, map, session, compositor, image);
     } catch (RuntimeException error) {
       if (compositor != null) {
         try {
@@ -367,18 +366,11 @@ final class MapState implements AutoCloseable {
     void close();
   }
 
-  private static final class SurfaceRenderTarget implements RenderTarget {
+  private static final class VulkanSurfaceRenderTarget implements RenderTarget {
     private final RenderSessionHandle session;
-    private final boolean metal;
 
-    SurfaceRenderTarget(RenderSessionHandle session, boolean metal) {
+    VulkanSurfaceRenderTarget(RenderSessionHandle session) {
       this.session = session;
-      this.metal = metal;
-    }
-
-    @Override
-    public boolean needsMetalAutoreleasePool() {
-      return metal;
     }
 
     @Override
@@ -397,11 +389,40 @@ final class MapState implements AutoCloseable {
     }
   }
 
-  private static final class OwnedTextureRenderTarget implements RenderTarget {
+  private static final class MetalSurfaceRenderTarget implements RenderTarget {
+    private final RenderSessionHandle session;
+
+    MetalSurfaceRenderTarget(RenderSessionHandle session) {
+      this.session = session;
+    }
+
+    @Override
+    public boolean needsMetalAutoreleasePool() {
+      return true;
+    }
+
+    @Override
+    public void resize(Viewport viewport) {
+      session.resize(viewport.width(), viewport.height(), viewport.scaleFactor());
+    }
+
+    @Override
+    public void renderUpdate() {
+      session.renderUpdate();
+    }
+
+    @Override
+    public void close() {
+      session.close();
+    }
+  }
+
+  private static final class VulkanOwnedTextureRenderTarget implements RenderTarget {
     private final RenderSessionHandle session;
     private final VulkanTextureCompositor compositor;
 
-    OwnedTextureRenderTarget(RenderSessionHandle session, VulkanTextureCompositor compositor) {
+    VulkanOwnedTextureRenderTarget(
+        RenderSessionHandle session, VulkanTextureCompositor compositor) {
       this.session = session;
       this.compositor = compositor;
     }
@@ -467,14 +488,14 @@ final class MapState implements AutoCloseable {
     }
   }
 
-  private static final class BorrowedTextureRenderTarget implements RenderTarget {
+  private static final class VulkanBorrowedTextureRenderTarget implements RenderTarget {
     private final VulkanContext vulkan;
     private final MapHandle map;
     private RenderSessionHandle session;
     private VulkanTextureCompositor compositor;
     private VulkanBorrowedImage image;
 
-    BorrowedTextureRenderTarget(
+    VulkanBorrowedTextureRenderTarget(
         VulkanContext vulkan,
         MapHandle map,
         RenderSessionHandle session,
@@ -496,7 +517,7 @@ final class MapState implements AutoCloseable {
     public void reattach(Viewport viewport) {
       close();
       var replacement = attachBorrowedTextureRenderTarget(vulkan, map, viewport);
-      if (replacement instanceof BorrowedTextureRenderTarget borrowed) {
+      if (replacement instanceof VulkanBorrowedTextureRenderTarget borrowed) {
         session = borrowed.session;
         compositor = borrowed.compositor;
         image = borrowed.image;

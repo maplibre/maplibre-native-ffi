@@ -2,7 +2,7 @@ const std = @import("std");
 const maplibre = @import("maplibre_native");
 
 const diagnostics = @import("diagnostics.zig");
-const render_target = @import("render_target.zig");
+const render = @import("render/mod.zig");
 const types = @import("types.zig");
 
 pub const MapState = struct {
@@ -10,9 +10,14 @@ pub const MapState = struct {
     diagnostic_store: *maplibre.DiagnosticStore,
     runtime: maplibre.RuntimeHandle,
     map: maplibre.MapHandle,
-    target: render_target.Session,
+    target: ?render.RenderTarget,
 
-    pub fn init(allocator: std.mem.Allocator, viewport: types.Viewport, backend: anytype) !MapState {
+    pub fn init(
+        allocator: std.mem.Allocator,
+        window: anytype,
+        viewport: types.Viewport,
+        mode: types.RenderTargetMode,
+    ) !MapState {
         const diagnostic_store = try allocator.create(maplibre.DiagnosticStore);
         diagnostic_store.* = maplibre.DiagnosticStore.init(allocator);
         errdefer {
@@ -40,7 +45,7 @@ pub const MapState = struct {
         try loadStyle(allocator, &map, diagnostic_store);
         try setCamera(&map, diagnostic_store);
 
-        var target = backend.attachRenderTarget(&map, viewport) catch |err| {
+        var target = render.RenderTarget.init(allocator, window, viewport, mode, &map) catch |err| {
             diagnostics.logError("render target attach failed", err, diagnostic_store);
             return err;
         };
@@ -55,28 +60,55 @@ pub const MapState = struct {
     }
 
     pub fn deinit(self: *MapState) void {
-        self.target.deinit();
+        if (self.target) |*target| target.deinit();
+        self.target = null;
         self.map.close() catch {};
         self.runtime.close() catch {};
         self.diagnostic_store.deinit();
         self.allocator.destroy(self.diagnostic_store);
     }
 
+    pub fn finishFrame(self: *MapState) !void {
+        if (self.target) |*target| try target.finishFrame();
+    }
+
+    pub fn needsReattachOnResize(self: *const MapState) bool {
+        return if (self.target) |*target| target.needsReattachOnResize() else false;
+    }
+
+    pub fn renderUpdate(self: *MapState, viewport: types.Viewport) !bool {
+        return if (self.target) |*target|
+            try target.renderUpdate(self.diagnostic_store, viewport)
+        else
+            false;
+    }
+
     pub fn resize(self: *MapState, viewport: types.Viewport) !void {
-        self.target.resize(viewport, self.diagnostic_store) catch |err| {
-            diagnostics.logError("render target resize failed", err, self.diagnostic_store);
-            return err;
-        };
+        if (self.target) |*target| {
+            target.resize(viewport) catch |err| {
+                diagnostics.logError("render target resize failed", err, self.diagnostic_store);
+                return err;
+            };
+        } else {
+            return types.AppError.TextureResizeFailed;
+        }
     }
 
     pub fn resizeWithReattachedTarget(
         self: *MapState,
+        window: anytype,
         viewport: types.Viewport,
-        backend: anytype,
+        mode: types.RenderTargetMode,
     ) !void {
-        self.target.deinit();
-        try backend.resize(viewport);
-        self.target = backend.attachRenderTarget(&self.map, viewport) catch |err| {
+        if (self.target) |*target| target.deinit();
+        self.target = null;
+        self.target = render.RenderTarget.init(
+            self.allocator,
+            window,
+            viewport,
+            mode,
+            &self.map,
+        ) catch |err| {
             diagnostics.logError("render target reattach failed", err, self.diagnostic_store);
             return err;
         };

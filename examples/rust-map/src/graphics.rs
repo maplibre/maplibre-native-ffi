@@ -4,6 +4,7 @@ use winit::window::Window;
 
 #[cfg(target_os = "macos")]
 use crate::metal::MetalContext;
+use crate::viewport::Viewport;
 use crate::vulkan::VulkanContext;
 
 pub enum GraphicsContext {
@@ -46,13 +47,20 @@ impl GraphicsContext {
         }
     }
 
-    pub fn resize(&self, viewport: crate::viewport::Viewport) -> Result<(), Box<dyn Error>> {
+    #[cfg(target_os = "macos")]
+    pub fn resize(&self, viewport: Viewport) -> Result<(), Box<dyn Error>> {
         match self {
-            #[cfg(target_os = "macos")]
             Self::Metal(context) => {
                 context.resize(viewport);
                 Ok(())
             }
+            Self::Vulkan(_) => Ok(()),
+        }
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    pub fn resize(&self, _viewport: Viewport) -> Result<(), Box<dyn Error>> {
+        match self {
             Self::Vulkan(_) => Ok(()),
         }
     }

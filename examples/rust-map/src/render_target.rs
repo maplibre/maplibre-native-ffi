@@ -49,31 +49,31 @@ impl Mode {
 }
 
 pub enum RenderTarget {
-    VulkanOwnedTexture {
+    OwnedVulkanTexture {
         session: RenderSessionHandle,
         compositor: Box<VulkanTextureCompositor>,
     },
-    VulkanBorrowedTexture {
+    BorrowedVulkanTexture {
         session: RenderSessionHandle,
         compositor: Box<VulkanTextureCompositor>,
         image: Box<BorrowedImage>,
     },
-    VulkanNativeSurface {
+    VulkanSurface {
         session: RenderSessionHandle,
     },
     #[cfg(target_os = "macos")]
-    MetalOwnedTexture {
+    OwnedMetalTexture {
         session: RenderSessionHandle,
         compositor: Box<MetalTextureCompositor>,
     },
     #[cfg(target_os = "macos")]
-    MetalBorrowedTexture {
+    BorrowedMetalTexture {
         session: RenderSessionHandle,
         compositor: Box<MetalTextureCompositor>,
         texture: Box<MetalBorrowedTexture>,
     },
     #[cfg(target_os = "macos")]
-    MetalNativeSurface {
+    MetalSurface {
         session: RenderSessionHandle,
     },
 }
@@ -104,16 +104,16 @@ impl RenderTarget {
 
     pub fn needs_reattach_on_resize(&self) -> bool {
         match self {
-            Self::VulkanBorrowedTexture { .. } => true,
+            Self::BorrowedVulkanTexture { .. } => true,
             #[cfg(target_os = "macos")]
-            Self::MetalBorrowedTexture { .. } => true,
+            Self::BorrowedMetalTexture { .. } => true,
             _ => false,
         }
     }
 
     pub fn resize(&mut self, viewport: Viewport) -> maplibre_native::Result<()> {
         match self {
-            Self::VulkanOwnedTexture {
+            Self::OwnedVulkanTexture {
                 session,
                 compositor,
             } => {
@@ -128,26 +128,26 @@ impl RenderTarget {
                     viewport.scale_factor,
                 )
             }
-            Self::VulkanBorrowedTexture { .. } => Err(compositor_error(
+            Self::BorrowedVulkanTexture { .. } => Err(compositor_error(
                 "borrowed texture resize requires render target reattachment",
             )),
             #[cfg(target_os = "macos")]
-            Self::MetalBorrowedTexture { .. } => Err(compositor_error(
+            Self::BorrowedMetalTexture { .. } => Err(compositor_error(
                 "borrowed texture resize requires render target reattachment",
             )),
-            Self::VulkanNativeSurface { session } => session.resize(
+            Self::VulkanSurface { session } => session.resize(
                 viewport.logical_width,
                 viewport.logical_height,
                 viewport.scale_factor,
             ),
             #[cfg(target_os = "macos")]
-            Self::MetalNativeSurface { session } => session.resize(
+            Self::MetalSurface { session } => session.resize(
                 viewport.logical_width,
                 viewport.logical_height,
                 viewport.scale_factor,
             ),
             #[cfg(target_os = "macos")]
-            Self::MetalOwnedTexture { session, .. } => session.resize(
+            Self::OwnedMetalTexture { session, .. } => session.resize(
                 viewport.logical_width,
                 viewport.logical_height,
                 viewport.scale_factor,
@@ -157,7 +157,7 @@ impl RenderTarget {
 
     pub fn render_update(&mut self) -> maplibre_native::Result<()> {
         match self {
-            Self::VulkanOwnedTexture {
+            Self::OwnedVulkanTexture {
                 session,
                 compositor,
             } => {
@@ -176,7 +176,7 @@ impl RenderTarget {
                     )),
                 }
             }
-            Self::VulkanBorrowedTexture {
+            Self::BorrowedVulkanTexture {
                 session,
                 compositor,
                 image,
@@ -186,9 +186,9 @@ impl RenderTarget {
                     compositor_error(format!("Vulkan texture compositor draw failed: {error:?}"))
                 })
             }
-            Self::VulkanNativeSurface { session } => session.render_update(),
+            Self::VulkanSurface { session } => session.render_update(),
             #[cfg(target_os = "macos")]
-            Self::MetalOwnedTexture {
+            Self::OwnedMetalTexture {
                 session,
                 compositor,
             } => {
@@ -208,7 +208,7 @@ impl RenderTarget {
                 }
             }
             #[cfg(target_os = "macos")]
-            Self::MetalBorrowedTexture {
+            Self::BorrowedMetalTexture {
                 session,
                 compositor,
                 texture,
@@ -217,13 +217,13 @@ impl RenderTarget {
                 compositor.draw_texture(texture.texture())
             }
             #[cfg(target_os = "macos")]
-            Self::MetalNativeSurface { session } => session.render_update(),
+            Self::MetalSurface { session } => session.render_update(),
         }
     }
 
     pub fn close(self) -> Result<(), Box<dyn StdError>> {
         match self {
-            Self::VulkanOwnedTexture {
+            Self::OwnedVulkanTexture {
                 session,
                 mut compositor,
             } => {
@@ -242,7 +242,7 @@ impl RenderTarget {
                     None => Ok(()),
                 }
             }
-            Self::VulkanBorrowedTexture {
+            Self::BorrowedVulkanTexture {
                 session,
                 mut compositor,
                 image,
@@ -263,11 +263,11 @@ impl RenderTarget {
                     None => Ok(()),
                 }
             }
-            Self::VulkanNativeSurface { session } => session
+            Self::VulkanSurface { session } => session
                 .close()
                 .map_err(|error| Box::new(error) as Box<dyn StdError>),
             #[cfg(target_os = "macos")]
-            Self::MetalOwnedTexture {
+            Self::OwnedMetalTexture {
                 session,
                 compositor,
             } => {
@@ -277,7 +277,7 @@ impl RenderTarget {
                     .map_err(|error| Box::new(error) as Box<dyn StdError>)
             }
             #[cfg(target_os = "macos")]
-            Self::MetalBorrowedTexture {
+            Self::BorrowedMetalTexture {
                 session,
                 compositor,
                 texture,
@@ -290,7 +290,7 @@ impl RenderTarget {
                 result
             }
             #[cfg(target_os = "macos")]
-            Self::MetalNativeSurface { session } => session
+            Self::MetalSurface { session } => session
                 .close()
                 .map_err(|error| Box::new(error) as Box<dyn StdError>),
         }
@@ -330,7 +330,7 @@ impl RenderTarget {
                 return Err(compositor_error(message));
             }
         };
-        Ok(Self::VulkanOwnedTexture {
+        Ok(Self::OwnedVulkanTexture {
             session,
             compositor: Box::new(compositor),
         })
@@ -378,7 +378,7 @@ impl RenderTarget {
                 return Err(compositor_error(message));
             }
         };
-        Ok(Self::VulkanBorrowedTexture {
+        Ok(Self::BorrowedVulkanTexture {
             session,
             compositor: Box::new(compositor),
             image: Box::new(image),
@@ -409,7 +409,7 @@ impl RenderTarget {
             ),
             vulkan.surface_pointer(),
         );
-        Ok(Self::VulkanNativeSurface {
+        Ok(Self::VulkanSurface {
             session: map.attach_vulkan_surface(&descriptor)?,
         })
     }
@@ -439,7 +439,7 @@ impl RenderTarget {
                 return Err(compositor_error(message));
             }
         };
-        Ok(Self::MetalOwnedTexture {
+        Ok(Self::OwnedMetalTexture {
             session,
             compositor: Box::new(compositor),
         })
@@ -471,7 +471,7 @@ impl RenderTarget {
                 return Err(compositor_error(message));
             }
         };
-        Ok(Self::MetalBorrowedTexture {
+        Ok(Self::BorrowedMetalTexture {
             session,
             compositor: Box::new(compositor),
             texture: Box::new(texture),
@@ -493,7 +493,7 @@ impl RenderTarget {
             metal.context_descriptor(),
             metal.layer_pointer(),
         );
-        Ok(Self::MetalNativeSurface {
+        Ok(Self::MetalSurface {
             session: map.attach_metal_surface(&descriptor)?,
         })
     }

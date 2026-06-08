@@ -12,7 +12,7 @@ const render = @import("render/mod.zig");
 const types = @import("types.zig");
 const viewport = @import("viewport.zig");
 
-const Backend = render.Backend;
+const RenderTarget = render.RenderTarget;
 
 pub fn main(init_args: std.process.Init) !void {
     const target_mode = (try parseRenderTargetMode(init_args)) orelse return;
@@ -41,7 +41,7 @@ pub fn main(init_args: std.process.Init) !void {
         }
     }
 
-    const window_flags = Backend.window_flags |
+    const window_flags = RenderTarget.window_flags |
         c.SDL_WINDOW_RESIZABLE |
         c.SDL_WINDOW_HIGH_PIXEL_DENSITY;
     const window = c.SDL_CreateWindow(
@@ -64,12 +64,9 @@ pub fn main(init_args: std.process.Init) !void {
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
-    var backend = try Backend.init(allocator, window_handle, current_viewport, target_mode);
-    defer backend.deinit();
-
-    var map = try map_state.MapState.init(allocator, current_viewport, &backend);
+    var map = try map_state.MapState.init(allocator, window_handle, current_viewport, target_mode);
     defer map.deinit();
-    defer backend.finishFrame() catch |err| {
+    defer map.finishFrame() catch |err| {
         std.debug.print("failed to finish final frame: {s}\n", .{@errorName(err)});
     };
 
@@ -97,10 +94,9 @@ pub fn main(init_args: std.process.Init) !void {
                 => {
                     current_viewport = viewport.get(window_handle);
                     viewport.log("resized viewport", current_viewport);
-                    if (backend.needsRenderTargetReattachOnResize()) {
-                        try map.resizeWithReattachedTarget(current_viewport, &backend);
+                    if (map.needsReattachOnResize()) {
+                        try map.resizeWithReattachedTarget(window_handle, current_viewport, target_mode);
                     } else {
-                        try backend.resize(current_viewport);
                         try map.resize(current_viewport);
                     }
                     render_pending = true;
@@ -122,21 +118,13 @@ pub fn main(init_args: std.process.Init) !void {
         render_pending = render_pending or render_update_available;
         did_work = did_work or render_update_available;
 
-        try backend.finishFrame();
+        try map.finishFrame();
 
         if (render_pending) {
-            if (try map.target.renderUpdate(map.diagnostic_store)) {
+            if (try map.renderUpdate(current_viewport)) {
                 render_pending = false;
                 did_work = true;
-                switch (map.target) {
-                    .none => {},
-                    .texture => |*texture| {
-                        if (try backend.drawTexture(texture, current_viewport)) {
-                            has_presented_frame = true;
-                        }
-                    },
-                    .surface => has_presented_frame = true,
-                }
+                has_presented_frame = true;
             }
         }
 
