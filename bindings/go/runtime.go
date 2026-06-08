@@ -220,17 +220,29 @@ const (
 	RuntimeEventPayloadOfflineOperationCompleted   RuntimeEventPayloadType = RuntimeEventPayloadType(C.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_OPERATION_COMPLETED)
 )
 
+// MapID identifies a map within one RuntimeHandle.
+type MapID uint64
+
+// RuntimeEventSource identifies the runtime object that emitted an event without
+// exposing native handle addresses.
+type RuntimeEventSource struct {
+	Type  RuntimeEventSourceType
+	MapID MapID
+}
+
 // RuntimeEvent is a copied runtime event. Unknown payloads preserve raw
-// metadata and leave Payload nil.
+// metadata and bytes.
 type RuntimeEvent struct {
 	Type        RuntimeEventType
 	SourceType  RuntimeEventSourceType
-	Source      uintptr
+	Source      RuntimeEventSource
 	Code        int32
 	PayloadType RuntimeEventPayloadType
 	PayloadSize uintptr
 	Message     string
 	Payload     any
+
+	rawSource uintptr
 }
 
 // RenderMode identifies a render observer mode.
@@ -333,6 +345,12 @@ type RuntimeEventOfflineOperationCompletedPayload struct {
 	Found         bool
 }
 
+// RuntimeEventUnknownPayload contains copied bytes for a payload type unknown to
+// this Go binding version.
+type RuntimeEventUnknownPayload struct {
+	Bytes []byte
+}
+
 // RuntimeHandle owns scheduler state and event storage for one owner thread.
 type RuntimeHandle struct {
 	state *handle.State[nativeRuntime]
@@ -343,6 +361,7 @@ type RuntimeHandle struct {
 	resourceProvider    *callback.ResourceProviderState
 	mapsMu              sync.Mutex
 	maps                map[uintptr]*MapHandle
+	nextMapID           MapID
 }
 
 // String returns a diagnostic name for the status.
@@ -481,21 +500,36 @@ func (runtime *RuntimeHandle) PollEvent() (*RuntimeEvent, error) {
 	if !bool(hasEvent) {
 		return nil, nil
 	}
-	event := runtimeEventFromC(rawEvent)
+	event := runtime.runtimeEventFromC(rawEvent)
 	runtime.handleEventSideEffects(event)
 	return event, nil
 }
 
 func runtimeEventFromC(event C.mln_runtime_event) *RuntimeEvent {
+	return runtimeEventFromCWithSource(event, RuntimeEventSource{Type: RuntimeEventSourceType(event.source_type)})
+}
+
+func (runtime *RuntimeHandle) runtimeEventFromC(event C.mln_runtime_event) *RuntimeEvent {
+	source := RuntimeEventSource{Type: RuntimeEventSourceType(event.source_type)}
+	if source.Type == RuntimeEventSourceMap {
+		if m := runtime.mapForEventSource(uintptr(event.source)); m != nil {
+			source.MapID = m.id
+		}
+	}
+	return runtimeEventFromCWithSource(event, source)
+}
+
+func runtimeEventFromCWithSource(event C.mln_runtime_event, source RuntimeEventSource) *RuntimeEvent {
 	return &RuntimeEvent{
 		Type:        RuntimeEventType(event._type),
 		SourceType:  RuntimeEventSourceType(event.source_type),
-		Source:      uintptr(event.source),
+		Source:      source,
 		Code:        int32(event.code),
 		PayloadType: RuntimeEventPayloadType(event.payload_type),
 		PayloadSize: uintptr(event.payload_size),
 		Message:     goCharBytes(event.message, event.message_size),
 		Payload:     runtimeEventPayloadFromC(event),
+		rawSource:   uintptr(event.source),
 	}
 }
 
@@ -503,7 +537,7 @@ func (runtime *RuntimeHandle) handleEventSideEffects(event *RuntimeEvent) {
 	if event == nil || event.Type != RuntimeEventMapStyleLoaded || event.SourceType != RuntimeEventSourceMap {
 		return
 	}
-	m := runtime.mapForEventSource(event.Source)
+	m := runtime.mapForEventSource(event.rawSource)
 	if m != nil {
 		m.releaseDetachedCustomGeometrySources()
 	}
@@ -516,6 +550,10 @@ func (runtime *RuntimeHandle) registerMap(m *MapHandle) {
 	runtime.mapsMu.Lock()
 	if runtime.maps == nil {
 		runtime.maps = make(map[uintptr]*MapHandle)
+	}
+	if m.id == 0 {
+		runtime.nextMapID++
+		m.id = runtime.nextMapID
 	}
 	runtime.maps[m.nativeAddress] = m
 	runtime.mapsMu.Unlock()
@@ -591,7 +629,10 @@ func runtimeEventPayloadFromC(event C.mln_runtime_event) any {
 			Found:         bool(payload.found),
 		}
 	default:
-		return nil
+		if event.payload_size == 0 {
+			return RuntimeEventUnknownPayload{}
+		}
+		return RuntimeEventUnknownPayload{Bytes: C.GoBytes(event.payload, C.int(event.payload_size))}
 	}
 }
 

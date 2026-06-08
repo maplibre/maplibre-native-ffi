@@ -216,11 +216,9 @@ type openglOwnedTextureFrameState struct {
 	closed  bool
 }
 
-// MetalOwnedTextureFrame is an acquired session-owned Metal texture frame.
-// Backend handles are borrowed and remain valid only until Close. Close the
-// frame on the render session owner thread before resizing, rendering, reading
-// back, detaching, closing the session, or acquiring another frame.
-type MetalOwnedTextureFrame struct {
+// MetalOwnedTextureFrameInfo contains borrowed Metal objects for an acquired
+// session-owned texture frame.
+type MetalOwnedTextureFrameInfo struct {
 	Generation  uint64
 	Width       uint32
 	Height      uint32
@@ -228,15 +226,20 @@ type MetalOwnedTextureFrame struct {
 	Texture     NativePointer
 	Device      NativePointer
 	PixelFormat uint64
+}
 
+// MetalOwnedTextureFrame is an acquired session-owned Metal texture frame.
+// Backend handles are borrowed and remain valid only during WithInfo. Close the
+// frame on the render session owner thread before resizing, rendering, reading
+// back, detaching, closing the session, or acquiring another frame.
+type MetalOwnedTextureFrame struct {
+	info  MetalOwnedTextureFrameInfo
 	state *metalOwnedTextureFrameState
 }
 
-// VulkanOwnedTextureFrame is an acquired session-owned Vulkan texture frame.
-// Backend handles are borrowed and remain valid only until Close. Close the
-// frame on the render session owner thread before resizing, rendering, reading
-// back, detaching, closing the session, or acquiring another frame.
-type VulkanOwnedTextureFrame struct {
+// VulkanOwnedTextureFrameInfo contains borrowed Vulkan objects for an acquired
+// session-owned texture frame.
+type VulkanOwnedTextureFrameInfo struct {
 	Generation  uint64
 	Width       uint32
 	Height      uint32
@@ -246,15 +249,20 @@ type VulkanOwnedTextureFrame struct {
 	Device      NativePointer
 	Format      uint32
 	Layout      uint32
+}
 
+// VulkanOwnedTextureFrame is an acquired session-owned Vulkan texture frame.
+// Backend handles are borrowed and remain valid only during WithInfo. Close the
+// frame on the render session owner thread before resizing, rendering, reading
+// back, detaching, closing the session, or acquiring another frame.
+type VulkanOwnedTextureFrame struct {
+	info  VulkanOwnedTextureFrameInfo
 	state *vulkanOwnedTextureFrameState
 }
 
-// OpenGLOwnedTextureFrame is an acquired session-owned OpenGL texture frame.
-// Backend handles are borrowed and remain valid only until Close. Close the
-// frame on the render session owner thread before resizing, rendering, reading
-// back, detaching, closing the session, or acquiring another frame.
-type OpenGLOwnedTextureFrame struct {
+// OpenGLOwnedTextureFrameInfo contains borrowed OpenGL object names for an
+// acquired session-owned texture frame.
+type OpenGLOwnedTextureFrameInfo struct {
 	Generation     uint64
 	Width          uint32
 	Height         uint32
@@ -264,7 +272,14 @@ type OpenGLOwnedTextureFrame struct {
 	InternalFormat uint32
 	Format         uint32
 	Type           uint32
+}
 
+// OpenGLOwnedTextureFrame is an acquired session-owned OpenGL texture frame.
+// Backend handles are borrowed and remain valid only during WithInfo. Close the
+// frame on the render session owner thread before resizing, rendering, reading
+// back, detaching, closing the session, or acquiring another frame.
+type OpenGLOwnedTextureFrame struct {
+	info  OpenGLOwnedTextureFrameInfo
 	state *openglOwnedTextureFrameState
 }
 
@@ -808,14 +823,16 @@ func (session *RenderSessionHandle) AcquireMetalTextureFrame() (*MetalOwnedTextu
 	}
 	session.frame = true
 	return &MetalOwnedTextureFrame{
-		Generation:  uint64(rawFrame.generation),
-		Width:       uint32(rawFrame.width),
-		Height:      uint32(rawFrame.height),
-		ScaleFactor: float64(rawFrame.scale_factor),
-		Texture:     NativePointer(uintptr(rawFrame.texture)),
-		Device:      NativePointer(uintptr(rawFrame.device)),
-		PixelFormat: uint64(rawFrame.pixel_format),
-		state:       &metalOwnedTextureFrameState{session: session, raw: rawFrame},
+		info: MetalOwnedTextureFrameInfo{
+			Generation:  uint64(rawFrame.generation),
+			Width:       uint32(rawFrame.width),
+			Height:      uint32(rawFrame.height),
+			ScaleFactor: float64(rawFrame.scale_factor),
+			Texture:     NativePointer(uintptr(rawFrame.texture)),
+			Device:      NativePointer(uintptr(rawFrame.device)),
+			PixelFormat: uint64(rawFrame.pixel_format),
+		},
+		state: &metalOwnedTextureFrameState{session: session, raw: rawFrame},
 	}, nil
 }
 
@@ -842,16 +859,18 @@ func (session *RenderSessionHandle) AcquireVulkanTextureFrame() (*VulkanOwnedTex
 	}
 	session.frame = true
 	return &VulkanOwnedTextureFrame{
-		Generation:  uint64(rawFrame.generation),
-		Width:       uint32(rawFrame.width),
-		Height:      uint32(rawFrame.height),
-		ScaleFactor: float64(rawFrame.scale_factor),
-		Image:       NativePointer(uintptr(rawFrame.image)),
-		ImageView:   NativePointer(uintptr(rawFrame.image_view)),
-		Device:      NativePointer(uintptr(rawFrame.device)),
-		Format:      uint32(rawFrame.format),
-		Layout:      uint32(rawFrame.layout),
-		state:       &vulkanOwnedTextureFrameState{session: session, raw: rawFrame},
+		info: VulkanOwnedTextureFrameInfo{
+			Generation:  uint64(rawFrame.generation),
+			Width:       uint32(rawFrame.width),
+			Height:      uint32(rawFrame.height),
+			ScaleFactor: float64(rawFrame.scale_factor),
+			Image:       NativePointer(uintptr(rawFrame.image)),
+			ImageView:   NativePointer(uintptr(rawFrame.image_view)),
+			Device:      NativePointer(uintptr(rawFrame.device)),
+			Format:      uint32(rawFrame.format),
+			Layout:      uint32(rawFrame.layout),
+		},
+		state: &vulkanOwnedTextureFrameState{session: session, raw: rawFrame},
 	}, nil
 }
 
@@ -878,17 +897,70 @@ func (session *RenderSessionHandle) AcquireOpenGLTextureFrame() (*OpenGLOwnedTex
 	}
 	session.frame = true
 	return &OpenGLOwnedTextureFrame{
-		Generation:     uint64(rawFrame.generation),
-		Width:          uint32(rawFrame.width),
-		Height:         uint32(rawFrame.height),
-		ScaleFactor:    float64(rawFrame.scale_factor),
-		Texture:        uint32(rawFrame.texture),
-		Target:         uint32(rawFrame.target),
-		InternalFormat: uint32(rawFrame.internal_format),
-		Format:         uint32(rawFrame.format),
-		Type:           uint32(rawFrame._type),
-		state:          &openglOwnedTextureFrameState{session: session, raw: rawFrame},
+		info: OpenGLOwnedTextureFrameInfo{
+			Generation:     uint64(rawFrame.generation),
+			Width:          uint32(rawFrame.width),
+			Height:         uint32(rawFrame.height),
+			ScaleFactor:    float64(rawFrame.scale_factor),
+			Texture:        uint32(rawFrame.texture),
+			Target:         uint32(rawFrame.target),
+			InternalFormat: uint32(rawFrame.internal_format),
+			Format:         uint32(rawFrame.format),
+			Type:           uint32(rawFrame._type),
+		},
+		state: &openglOwnedTextureFrameState{session: session, raw: rawFrame},
 	}, nil
+}
+
+// WithInfo exposes borrowed Metal frame objects while the frame remains live.
+// The info value and backend handles must not be used after fn returns.
+func (frame *MetalOwnedTextureFrame) WithInfo(fn func(MetalOwnedTextureFrameInfo) error) error {
+	if frame == nil || frame.state == nil {
+		return newBindingError(ErrInvalidArgument, "MetalOwnedTextureFrame is nil")
+	}
+	if fn == nil {
+		return newBindingError(ErrInvalidArgument, "MetalOwnedTextureFrame WithInfo callback is nil")
+	}
+	frame.state.mu.Lock()
+	defer frame.state.mu.Unlock()
+	if frame.state.closed {
+		return newBindingError(ErrInvalidState, "MetalOwnedTextureFrame is closed")
+	}
+	return fn(frame.info)
+}
+
+// WithInfo exposes borrowed Vulkan frame objects while the frame remains live.
+// The info value and backend handles must not be used after fn returns.
+func (frame *VulkanOwnedTextureFrame) WithInfo(fn func(VulkanOwnedTextureFrameInfo) error) error {
+	if frame == nil || frame.state == nil {
+		return newBindingError(ErrInvalidArgument, "VulkanOwnedTextureFrame is nil")
+	}
+	if fn == nil {
+		return newBindingError(ErrInvalidArgument, "VulkanOwnedTextureFrame WithInfo callback is nil")
+	}
+	frame.state.mu.Lock()
+	defer frame.state.mu.Unlock()
+	if frame.state.closed {
+		return newBindingError(ErrInvalidState, "VulkanOwnedTextureFrame is closed")
+	}
+	return fn(frame.info)
+}
+
+// WithInfo exposes borrowed OpenGL frame objects while the frame remains live.
+// The info value and backend object names must not be used after fn returns.
+func (frame *OpenGLOwnedTextureFrame) WithInfo(fn func(OpenGLOwnedTextureFrameInfo) error) error {
+	if frame == nil || frame.state == nil {
+		return newBindingError(ErrInvalidArgument, "OpenGLOwnedTextureFrame is nil")
+	}
+	if fn == nil {
+		return newBindingError(ErrInvalidArgument, "OpenGLOwnedTextureFrame WithInfo callback is nil")
+	}
+	frame.state.mu.Lock()
+	defer frame.state.mu.Unlock()
+	if frame.state.closed {
+		return newBindingError(ErrInvalidState, "OpenGLOwnedTextureFrame is closed")
+	}
+	return fn(frame.info)
 }
 
 // Close releases this acquired Metal texture frame on the session owner thread.

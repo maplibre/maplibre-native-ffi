@@ -407,9 +407,13 @@ func cFeatureExtensionResult(result *C.mln_feature_extension_result) (FeatureExt
 			out.Features[i] = feature
 		}
 	default:
-		return FeatureExtensionResult{}, newBindingError(ErrNative, "unknown feature extension result type")
+		return out, nil
 	}
 	return out, nil
+}
+
+func featureExtensionResultForTest(resultType uint32) FeatureExtensionResult {
+	return FeatureExtensionResult{Type: FeatureExtensionResultType(resultType)}
 }
 
 // SetFeatureState sets per-feature state on a render source. The state value is

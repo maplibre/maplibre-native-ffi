@@ -2,6 +2,7 @@ package maplibre
 
 import (
 	"errors"
+	stdruntime "runtime"
 	"testing"
 )
 
@@ -155,5 +156,39 @@ func TestMapStyleStringsRejectEmbeddedNUL(t *testing.T) {
 	}
 	if err := m.SetStyleJSON("{\x00}"); !errors.Is(err, ErrInvalidArgument) {
 		t.Fatalf("SetStyleJSON embedded NUL error = %v, want ErrInvalidArgument", err)
+	}
+}
+
+func TestMapWrongThreadReturnsWrongThread(t *testing.T) {
+	stdruntime.LockOSThread()
+	defer stdruntime.UnlockOSThread()
+
+	runtime, err := NewRuntime()
+	if err != nil {
+		t.Fatalf("NewRuntime(): %v", err)
+	}
+	m, err := runtime.NewMap()
+	if err != nil {
+		_ = runtime.Close()
+		t.Fatalf("NewMap(): %v", err)
+	}
+	defer func() {
+		if err := m.Close(); err != nil {
+			t.Errorf("Map Close(): %v", err)
+		}
+		if err := runtime.Close(); err != nil {
+			t.Errorf("Runtime Close(): %v", err)
+		}
+	}()
+
+	errCh := make(chan error, 1)
+	go func() {
+		errCh <- m.RequestRepaint()
+	}()
+	if err := <-errCh; !errors.Is(err, ErrWrongThread) {
+		t.Fatalf("RequestRepaint() from another thread error = %v, want ErrWrongThread", err)
+	}
+	if err := m.RequestRepaint(); err != nil {
+		t.Fatalf("RequestRepaint() on owner thread after wrong-thread call: %v", err)
 	}
 }

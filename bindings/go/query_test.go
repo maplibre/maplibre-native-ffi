@@ -42,3 +42,13 @@ func TestQueryDescriptorsAndHandleErrors(t *testing.T) {
 		t.Fatalf("QueryFeatureExtensions(nil session) error = %v, want ErrInvalidArgument", err)
 	}
 }
+
+func TestFeatureExtensionUnknownResultTypePreserved(t *testing.T) {
+	result := featureExtensionResultForTest(0x7fff_0002)
+	if result.Type != FeatureExtensionResultType(0x7fff_0002) {
+		t.Fatalf("result type = %d, want unknown raw type", result.Type)
+	}
+	if result.Value != nil || result.Features != nil {
+		t.Fatalf("unknown result data = (%v, %v), want empty", result.Value, result.Features)
+	}
+}

@@ -65,3 +65,45 @@ func TestRuntimeEventKnownMapPayloads(t *testing.T) {
 		}
 	})
 }
+
+func TestRuntimeEventUnknownPayloadPreservesBytes(t *testing.T) {
+	event := runtimeEventUnknownPayloadForTest(0x7fff_0001, []byte{1, 2, 3})
+	payload, ok := event.Payload.(RuntimeEventUnknownPayload)
+	if !ok {
+		t.Fatalf("Payload type = %T, want RuntimeEventUnknownPayload", event.Payload)
+	}
+	if event.PayloadType != RuntimeEventPayloadType(0x7fff_0001) || event.PayloadSize != 3 {
+		t.Fatalf("event payload metadata = (%d, %d)", event.PayloadType, event.PayloadSize)
+	}
+	if len(payload.Bytes) != 3 || payload.Bytes[0] != 1 || payload.Bytes[1] != 2 || payload.Bytes[2] != 3 {
+		t.Fatalf("unknown payload bytes = %v", payload.Bytes)
+	}
+}
+
+func TestRuntimeEventMapSourceUsesRuntimeLocalID(t *testing.T) {
+	runtime, err := NewRuntime()
+	if err != nil {
+		t.Fatalf("NewRuntime(): %v", err)
+	}
+	m, err := runtime.NewMap()
+	if err != nil {
+		_ = runtime.Close()
+		t.Fatalf("NewMap(): %v", err)
+	}
+	defer func() {
+		if err := m.Close(); err != nil {
+			t.Errorf("Map Close(): %v", err)
+		}
+		if err := runtime.Close(); err != nil {
+			t.Errorf("Runtime Close(): %v", err)
+		}
+	}()
+
+	event := runtimeEventMapSourceForTest(runtime, m)
+	if event.Source.Type != RuntimeEventSourceMap {
+		t.Fatalf("source type = %v, want map", event.Source.Type)
+	}
+	if event.Source.MapID == 0 || event.Source.MapID != m.id {
+		t.Fatalf("source map ID = %d, want %d", event.Source.MapID, m.id)
+	}
+}

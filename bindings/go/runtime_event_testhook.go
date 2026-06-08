@@ -18,6 +18,24 @@ func runtimeEventWithPayloadForTest(payloadType uint32, payload unsafe.Pointer, 
 	return runtimeEventFromC(raw)
 }
 
+func runtimeEventUnknownPayloadForTest(payloadType uint32, payload []byte) *RuntimeEvent {
+	var payloadPtr unsafe.Pointer
+	if len(payload) > 0 {
+		payloadPtr = unsafe.Pointer(&payload[0])
+	}
+	return runtimeEventWithPayloadForTest(payloadType, payloadPtr, uintptr(len(payload)))
+}
+
+func runtimeEventMapSourceForTest(runtime *RuntimeHandle, m *MapHandle) *RuntimeEvent {
+	ptr, _ := m.state.Ptr()
+	raw := C.mln_runtime_event{
+		size:        C.uint32_t(unsafe.Sizeof(C.mln_runtime_event{})),
+		source_type: C.uint32_t(C.MLN_RUNTIME_EVENT_SOURCE_MAP),
+		source:      unsafe.Pointer(ptr),
+	}
+	return runtime.runtimeEventFromC(raw)
+}
+
 func runtimeEventRenderFrameForTest(mode uint32, needsRepaint bool, placementChanged bool, stats RenderingStats) *RuntimeEvent {
 	raw := C.mln_runtime_event_render_frame{
 		size:              C.uint32_t(unsafe.Sizeof(C.mln_runtime_event_render_frame{})),

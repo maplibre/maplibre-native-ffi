@@ -18,6 +18,10 @@ func goMaplibreCustomGeometryFetchTile(userData unsafe.Pointer, tileID C.mln_can
 	if !ok || state == nil {
 		return
 	}
+	if !state.beginInvoke() {
+		return
+	}
+	defer state.endInvoke()
 	state.invokeFetch(canonicalTileIDFromC(tileID))
 }
 
@@ -30,5 +34,9 @@ func goMaplibreCustomGeometryCancelTile(userData unsafe.Pointer, tileID C.mln_ca
 	if !ok || state == nil {
 		return
 	}
+	if !state.beginInvoke() {
+		return
+	}
+	defer state.endInvoke()
 	state.invokeCancel(canonicalTileIDFromC(tileID))
 }

@@ -127,3 +127,38 @@ func TestOpenGLFrameNilClose(t *testing.T) {
 		t.Fatalf("nil OpenGLOwnedTextureFrame Close() error = %v, want ErrInvalidArgument", err)
 	}
 }
+
+func TestTextureFrameWithInfoRejectsClosedFrames(t *testing.T) {
+	metal := &MetalOwnedTextureFrame{
+		info:  MetalOwnedTextureFrameInfo{Generation: 7, Texture: NativePointer(0xabc)},
+		state: &metalOwnedTextureFrameState{},
+	}
+	if err := metal.WithInfo(func(info MetalOwnedTextureFrameInfo) error {
+		if info.Generation != 7 || info.Texture != NativePointer(0xabc) {
+			t.Fatalf("Metal info = %+v", info)
+		}
+		return nil
+	}); err != nil {
+		t.Fatalf("Metal WithInfo(): %v", err)
+	}
+	metal.state.closed = true
+	if err := metal.WithInfo(func(MetalOwnedTextureFrameInfo) error { return nil }); !errors.Is(err, ErrInvalidState) {
+		t.Fatalf("closed Metal WithInfo() error = %v, want ErrInvalidState", err)
+	}
+
+	vulkan := &VulkanOwnedTextureFrame{
+		info:  VulkanOwnedTextureFrameInfo{Generation: 8, Image: NativePointer(0xdef)},
+		state: &vulkanOwnedTextureFrameState{closed: true},
+	}
+	if err := vulkan.WithInfo(func(VulkanOwnedTextureFrameInfo) error { return nil }); !errors.Is(err, ErrInvalidState) {
+		t.Fatalf("closed Vulkan WithInfo() error = %v, want ErrInvalidState", err)
+	}
+
+	opengl := &OpenGLOwnedTextureFrame{
+		info:  OpenGLOwnedTextureFrameInfo{Generation: 9, Texture: 11},
+		state: &openglOwnedTextureFrameState{closed: true},
+	}
+	if err := opengl.WithInfo(func(OpenGLOwnedTextureFrameInfo) error { return nil }); !errors.Is(err, ErrInvalidState) {
+		t.Fatalf("closed OpenGL WithInfo() error = %v, want ErrInvalidState", err)
+	}
+}

@@ -135,8 +135,8 @@ type ResourceTransformRequest struct {
 // ResourceTransformCallback rewrites network resource URLs. Native code may
 // invoke it on worker or network threads. The request data is copied for Go; do
 // not call MapLibre map/runtime APIs from the callback. Return replace=false or
-// an empty URL to keep the original URL. Panics or invalid replacement URLs are
-// treated as no rewrite.
+// an empty URL to keep the original URL. Panics become native callback errors,
+// and replacement URLs containing embedded NUL are rejected.
 type ResourceTransformCallback func(ResourceTransformRequest) (replacementURL string, replace bool)
 
 // ResourceProviderCallback intercepts network resource requests. Native code may

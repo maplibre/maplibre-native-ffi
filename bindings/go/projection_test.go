@@ -2,6 +2,7 @@ package maplibre
 
 import (
 	"errors"
+	stdruntime "runtime"
 	"testing"
 )
 
@@ -107,5 +108,49 @@ func TestMapProjectionSnapshotOutlivesMap(t *testing.T) {
 	}
 	if _, err := projection.PixelForLatLng(coordinate); !errors.Is(err, ErrInvalidArgument) {
 		t.Fatalf("PixelForLatLng() after close error = %v, want ErrInvalidArgument", err)
+	}
+}
+
+func TestMapProjectionWrongThreadReturnsWrongThread(t *testing.T) {
+	stdruntime.LockOSThread()
+	defer stdruntime.UnlockOSThread()
+
+	runtime, err := NewRuntime()
+	if err != nil {
+		t.Fatalf("NewRuntime(): %v", err)
+	}
+	m, err := runtime.NewMapWithOptions(NewMapOptions(512, 512, 1))
+	if err != nil {
+		_ = runtime.Close()
+		t.Fatalf("NewMapWithOptions(): %v", err)
+	}
+	projection, err := m.NewProjection()
+	if err != nil {
+		_ = m.Close()
+		_ = runtime.Close()
+		t.Fatalf("NewProjection(): %v", err)
+	}
+	defer func() {
+		if err := projection.Close(); err != nil {
+			t.Errorf("Projection Close(): %v", err)
+		}
+		if err := m.Close(); err != nil {
+			t.Errorf("Map Close(): %v", err)
+		}
+		if err := runtime.Close(); err != nil {
+			t.Errorf("Runtime Close(): %v", err)
+		}
+	}()
+
+	errCh := make(chan error, 1)
+	go func() {
+		_, err := projection.Camera()
+		errCh <- err
+	}()
+	if err := <-errCh; !errors.Is(err, ErrWrongThread) {
+		t.Fatalf("Projection Camera() from another thread error = %v, want ErrWrongThread", err)
+	}
+	if _, err := projection.Camera(); err != nil {
+		t.Fatalf("Projection Camera() on owner thread after wrong-thread call: %v", err)
 	}
 }

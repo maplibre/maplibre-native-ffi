@@ -62,6 +62,7 @@ type MapHandle struct {
 	state         *handle.State[nativeMap]
 	runtime       *RuntimeHandle
 	nativeAddress uintptr
+	id            MapID
 
 	customGeometryMu      sync.Mutex
 	customGeometrySources map[string]*callback.CustomGeometrySourceState

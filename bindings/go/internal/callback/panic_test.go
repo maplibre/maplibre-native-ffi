@@ -36,3 +36,32 @@ func TestLogCallbackTrampolineReturnsConsumed(t *testing.T) {
 		t.Fatalf("consumed = %d, want 1", consumed)
 	}
 }
+
+func TestCustomGeometryReleaseWaitsForActiveCallback(t *testing.T) {
+	entered := make(chan struct{})
+	unblock := make(chan struct{})
+	released := make(chan struct{})
+
+	state := newCustomGeometrySourceStateForTest(func(CanonicalTileID) {
+		close(entered)
+		<-unblock
+	})
+
+	go invokeCustomGeometryFetchStateForTest(state)
+	<-entered
+
+	go func() {
+		state.Release()
+		close(released)
+	}()
+
+	select {
+	case <-released:
+		t.Fatal("Release returned while callback was active")
+	default:
+	}
+
+	close(unblock)
+	<-released
+	state.Release()
+}

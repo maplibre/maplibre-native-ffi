@@ -46,6 +46,17 @@ type CustomGeometrySourceState struct {
 	cancelTile CustomGeometryTileCallback
 	handle     cgo.Handle
 	once       sync.Once
+	mu         sync.Mutex
+	cond       *sync.Cond
+	active     uint64
+	released   bool
+}
+
+func newCustomGeometrySourceState(options CustomGeometrySourceOptions) *CustomGeometrySourceState {
+	state := &CustomGeometrySourceState{fetchTile: options.FetchTile, cancelTile: options.CancelTile}
+	state.cond = sync.NewCond(&state.mu)
+	state.handle = cgo.NewHandle(state)
+	return state
 }
 
 // AddCustomGeometrySource installs a custom geometry source callback descriptor.
@@ -53,8 +64,7 @@ func AddCustomGeometrySource(m unsafe.Pointer, sourceID string, options CustomGe
 	if options.FetchTile == nil {
 		return nil, int32(C.MLN_STATUS_INVALID_ARGUMENT)
 	}
-	state := &CustomGeometrySourceState{fetchTile: options.FetchTile, cancelTile: options.CancelTile}
-	state.handle = cgo.NewHandle(state)
+	state := newCustomGeometrySourceState(options)
 
 	sourceData := C.CBytes([]byte(sourceID))
 	defer C.free(sourceData)
@@ -89,8 +99,36 @@ func (state *CustomGeometrySourceState) Release() {
 		return
 	}
 	state.once.Do(func() {
+		state.mu.Lock()
+		state.released = true
+		for state.active > 0 {
+			state.cond.Wait()
+		}
+		state.mu.Unlock()
 		state.handle.Delete()
 	})
+}
+
+func (state *CustomGeometrySourceState) beginInvoke() bool {
+	if state == nil {
+		return false
+	}
+	state.mu.Lock()
+	defer state.mu.Unlock()
+	if state.released {
+		return false
+	}
+	state.active++
+	return true
+}
+
+func (state *CustomGeometrySourceState) endInvoke() {
+	state.mu.Lock()
+	state.active--
+	if state.active == 0 {
+		state.cond.Broadcast()
+	}
+	state.mu.Unlock()
 }
 
 func (state *CustomGeometrySourceState) invokeFetch(tileID CanonicalTileID) {
@@ -110,9 +148,19 @@ func canonicalTileIDFromC(tileID C.mln_canonical_tile_id) CanonicalTileID {
 }
 
 func invokeCustomGeometryFetchForTest(callback CustomGeometryTileCallback) {
-	state := &CustomGeometrySourceState{fetchTile: callback}
-	state.handle = cgo.NewHandle(state)
+	state := newCustomGeometrySourceState(CustomGeometrySourceOptions{FetchTile: callback})
 	defer state.Release()
+	goMaplibreCustomGeometryFetchTile(
+		C.mln_go_handle_to_pointer(C.uintptr_t(state.handle)),
+		C.mln_canonical_tile_id{z: 1, x: 2, y: 3},
+	)
+}
+
+func newCustomGeometrySourceStateForTest(callback CustomGeometryTileCallback) *CustomGeometrySourceState {
+	return newCustomGeometrySourceState(CustomGeometrySourceOptions{FetchTile: callback})
+}
+
+func invokeCustomGeometryFetchStateForTest(state *CustomGeometrySourceState) {
 	goMaplibreCustomGeometryFetchTile(
 		C.mln_go_handle_to_pointer(C.uintptr_t(state.handle)),
 		C.mln_canonical_tile_id{z: 1, x: 2, y: 3},
