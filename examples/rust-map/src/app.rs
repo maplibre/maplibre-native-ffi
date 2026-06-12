@@ -4,8 +4,7 @@ use maplibre_native::{
 };
 use std::error::Error;
 use winit::event::WindowEvent;
-use winit::event_loop::EventLoopWindowTarget;
-use winit::window::Window;
+use winit::window::{Window, WindowId};
 
 use crate::graphics::GraphicsContext;
 use crate::input::Controller;
@@ -110,16 +109,16 @@ impl App {
         Controller::print_controls();
     }
 
-    pub fn handle_window_event(&mut self, event: WindowEvent, target: &EventLoopWindowTarget<()>) {
+    pub fn window_id(&self) -> WindowId {
+        self.window.id()
+    }
+
+    pub fn handle_window_event(&mut self, event: WindowEvent) {
         if self.closed {
-            if matches!(event, WindowEvent::CloseRequested) {
-                target.exit();
-            }
             return;
         }
 
         match event {
-            WindowEvent::CloseRequested => self.request_exit(target),
             WindowEvent::Resized(_) | WindowEvent::ScaleFactorChanged { .. } => self.queue_resize(),
             WindowEvent::RedrawRequested => self.render_or_exit(),
             event => match self.input.handle(
@@ -260,11 +259,6 @@ impl App {
             eprintln!("shutdown failed: {error}");
             self.abort_process(1);
         }
-    }
-
-    fn request_exit(&mut self, target: &EventLoopWindowTarget<()>) {
-        self.close_or_abort();
-        target.exit();
     }
 
     fn close_resources(&mut self) -> Result<(), Box<dyn Error>> {

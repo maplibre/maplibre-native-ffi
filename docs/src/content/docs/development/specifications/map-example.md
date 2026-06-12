@@ -154,10 +154,10 @@ flowchart TB
 
 | Module           | Responsibility                                                                                                          |
 | ---------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| App shell        | Process entry, argument parsing, window creation, main event loop, idle pacing, shutdown ordering.                      |
+| App shell        | Process entry, argument parsing, toolkit lifecycle, main event loop, idle pacing, shutdown ordering.                    |
 | Viewport         | Map logical size, physical drawable size, and `scale_factor` for `RenderTargetExtent`.                                  |
 | Map state        | Owns runtime, map, and active render target; loads style and initial camera.                                            |
-| Graphics context | Owns host graphics API context and window presentation resources for the active graphics API.                           |
+| Graphics context | Creates/configures the top-level window and owns host graphics API context and presentation resources.                  |
 | Render target    | Owns the render session and mode-specific resources such as compositors, borrowed textures/images, and acquired frames. |
 | Compositor       | Host pass that draws a map-owned or borrowed texture into the swapchain.                                                |
 | Input            | Pointer and keyboard → map camera APIs; prints control help once at startup.                                            |
@@ -191,13 +191,13 @@ Order MUST be:
    `mln_supported_render_backend_mask()`, then validate that the loaded native
    library supports the graphics backend(s) this binary targets; fail fast with
    a readable message if not.
-3. Create the window (initial size [Window](#window)).
-4. Initialize the graphics backend for the selected mode.
-5. Create runtime (`:memory:` cache).
-6. Create map with extent from the initial viewport and continuous mode.
-7. Load style and apply initial camera.
-8. Attach render target for the selected mode.
-9. Print startup information:
+3. Create the top-level window and initialize the graphics backend for the
+   selected graphics API.
+4. Create runtime (`:memory:` cache).
+5. Create map with extent from the initial viewport and continuous mode.
+6. Load style and apply initial camera.
+7. Attach render target for the selected mode.
+8. Print startup information:
    - active render-target mode CLI value
    - active render-target status line
    - control help

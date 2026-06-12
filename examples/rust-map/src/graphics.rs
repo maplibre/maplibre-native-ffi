@@ -1,8 +1,8 @@
 use std::error::Error;
 
-use winit::event_loop::EventLoop;
+use winit::event_loop::ActiveEventLoop;
 use winit::window::Window;
-use winit::window::WindowBuilder;
+use winit::window::WindowAttributes;
 
 #[cfg(target_os = "macos")]
 use crate::metal::MetalContext;
@@ -21,23 +21,23 @@ pub enum GraphicsContext {
 
 impl GraphicsContext {
     pub fn create_window(
-        event_loop: &EventLoop<()>,
-        window_builder: WindowBuilder,
+        event_loop: &ActiveEventLoop,
+        window_attributes: WindowAttributes,
         backends: maplibre_native::RenderBackendMask,
     ) -> Result<(Window, Self), Box<dyn Error>> {
         #[cfg(target_os = "macos")]
         if backends.contains(maplibre_native::RenderBackendMask::METAL) {
-            let window = window_builder.clone().build(event_loop)?;
+            let window = event_loop.create_window(window_attributes.clone())?;
             let context = MetalContext::new(&window)?;
             return Ok((window, Self::Metal(context)));
         }
         #[cfg(any(target_os = "linux", target_os = "windows"))]
         if backends.contains(maplibre_native::RenderBackendMask::OPENGL) {
-            let (window, context) = OpenGLContext::new(event_loop, window_builder.clone())?;
+            let (window, context) = OpenGLContext::new(event_loop, window_attributes.clone())?;
             return Ok((window, Self::OpenGL(Box::new(context))));
         }
         if backends.contains(maplibre_native::RenderBackendMask::VULKAN) {
-            let window = window_builder.build(event_loop)?;
+            let window = event_loop.create_window(window_attributes)?;
             let context = VulkanContext::new(&window)?;
             return Ok((window, Self::Vulkan(Box::new(context))));
         }

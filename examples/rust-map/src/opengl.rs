@@ -18,11 +18,11 @@ use maplibre_native::WglContextDescriptor;
 use maplibre_native::{
     EglContextDescriptor, NativePointer, OpenGLContextDescriptor, OpenGLOwnedTextureFrameHandle,
 };
-use raw_window_handle05::HasRawWindowHandle;
+use raw_window_handle::HasWindowHandle;
 #[cfg(target_os = "windows")]
-use raw_window_handle05::RawWindowHandle;
-use winit::event_loop::EventLoop;
-use winit::window::{Window, WindowBuilder};
+use raw_window_handle::RawWindowHandle;
+use winit::event_loop::ActiveEventLoop;
+use winit::window::{Window, WindowAttributes};
 
 use crate::viewport::Viewport;
 
@@ -58,8 +58,8 @@ pub struct OpenGLBorrowedTexture {
 
 impl OpenGLContext {
     pub fn new(
-        event_loop: &EventLoop<()>,
-        window_builder: WindowBuilder,
+        event_loop: &ActiveEventLoop,
+        window_attributes: WindowAttributes,
     ) -> Result<(Window, Self), Box<dyn Error>> {
         let template = ConfigTemplateBuilder::new()
             .with_alpha_size(8)
@@ -70,14 +70,14 @@ impl OpenGLContext {
 
         let (window, config) = DisplayBuilder::new()
             .with_preference(opengl_api_preference())
-            .with_window_builder(Some(window_builder))
+            .with_window_attributes(Some(window_attributes))
             .build(event_loop, template, |configs| {
                 configs
                     .max_by_key(GlConfig::num_samples)
                     .expect("glutin returned no OpenGL configs")
             })?;
         let window = window.ok_or("glutin did not create a window")?;
-        let raw_window_handle = window.raw_window_handle();
+        let raw_window_handle = window.window_handle()?.as_raw();
         let context_api = if cfg!(target_os = "linux") {
             ContextApi::Gles(Some(Version::new(3, 0)))
         } else {
@@ -561,8 +561,8 @@ fn nonzero_dimension(value: u32) -> NonZeroU32 {
 
 #[cfg(target_os = "windows")]
 fn hwnd_from_window(window: &Window) -> Result<HWND, Box<dyn Error>> {
-    let RawWindowHandle::Win32(handle) = window.raw_window_handle() else {
+    let RawWindowHandle::Win32(handle) = window.window_handle()?.as_raw() else {
         return Err("winit did not return a Win32 window handle".into());
     };
-    Ok(handle.hwnd as HWND)
+    Ok(handle.hwnd.get() as HWND)
 }

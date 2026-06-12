@@ -10,12 +10,11 @@ repository.workspace = true
 ash = "0.38.0"
 ash-window = "0.13.0"
 glow = "0.16.0"
-glutin = "0.31.3"
-glutin-winit = "0.4.2"
+glutin = "0.32.3"
+glutin-winit = "0.5.0"
 maplibre-native = { path = "../../bindings/rust/crates/maplibre-native" }
 raw-window-handle = "0.6.2"
-raw-window-handle05 = { package = "raw-window-handle", version = "0.5.2" }
-winit = { version = "0.29.15", features = ["rwh_05", "rwh_06"] }
+winit = { version = "0.30.13", features = ["rwh_06"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = "0.5.2"

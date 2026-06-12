@@ -8,22 +8,14 @@ mod metal;
 #[cfg(any(target_os = "linux", target_os = "windows"))]
 mod opengl;
 mod render_target;
+mod shell;
 mod viewport;
 mod vulkan;
 mod vulkan_texture_compositor;
 
 use std::error::Error;
-use std::time::{Duration, Instant};
 
-use app::App;
-use graphics::GraphicsContext;
 use render_target::Mode;
-use winit::event::Event;
-use winit::event_loop::{ControlFlow, EventLoop};
-use winit::window::WindowBuilder;
-
-const INITIAL_WIDTH: u32 = 960;
-const INITIAL_HEIGHT: u32 = 640;
 
 fn main() -> Result<(), Box<dyn Error>> {
     let Some(mode) = parse_args(std::env::args().skip(1))? else {
@@ -49,29 +41,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
     let _clear_log_callback = ClearLogCallback;
 
-    let event_loop = EventLoop::new()?;
-    let window_builder = WindowBuilder::new()
-        .with_title("MapLibre Rust Map")
-        .with_inner_size(winit::dpi::LogicalSize::new(INITIAL_WIDTH, INITIAL_HEIGHT))
-        .with_resizable(true);
-    let (window, graphics) = GraphicsContext::create_window(&event_loop, window_builder, backends)?;
-    let mut app = App::new(window, graphics, mode)?;
-
-    app.print_status();
-    event_loop.run(move |event, target| {
-        target.set_control_flow(ControlFlow::WaitUntil(
-            Instant::now() + Duration::from_millis(4),
-        ));
-
-        match event {
-            Event::WindowEvent { event, .. } => app.handle_window_event(event, target),
-            Event::AboutToWait => app.step(),
-            Event::LoopExiting => app.close_or_abort(),
-            _ => {}
-        }
-    })?;
-
-    Ok(())
+    shell::run(mode, backends)
 }
 
 fn parse_args(args: impl IntoIterator<Item = String>) -> Result<Option<Mode>, Box<dyn Error>> {
