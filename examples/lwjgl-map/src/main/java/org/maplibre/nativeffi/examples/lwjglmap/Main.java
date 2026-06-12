@@ -1,19 +1,10 @@
 package org.maplibre.nativeffi.examples.lwjglmap;
 
-import static org.lwjgl.glfw.GLFW.glfwPollEvents;
-import static org.lwjgl.glfw.GLFW.glfwSetFramebufferSizeCallback;
-import static org.lwjgl.glfw.GLFW.glfwSetWindowContentScaleCallback;
-import static org.lwjgl.glfw.GLFW.glfwSetWindowSizeCallback;
-import static org.lwjgl.glfw.GLFW.glfwWindowShouldClose;
-
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.maplibre.nativeffi.Maplibre;
 import org.maplibre.nativeffi.render.RenderBackend;
 
 public final class Main {
-  private static final int INITIAL_WIDTH = 960;
-  private static final int INITIAL_HEIGHT = 640;
-
   private Main() {}
 
   public static void main(String[] args) throws Exception {
@@ -50,36 +41,13 @@ public final class Main {
     }
 
     try (var clearLogCallback =
-            (AutoCloseable)
-                () -> {
-                  if (logCallbackInstalled.getAndSet(false)) {
-                    Maplibre.clearLogCallback();
-                  }
-                };
-        var graphics =
-            GraphicsContext.create("MapLibre LWJGL Map", INITIAL_WIDTH, INITIAL_HEIGHT, backends)) {
-      var viewport = new ViewportHolder(Viewport.read(graphics.window()));
-      viewport.value.log("initial viewport");
-      try (var mapState = MapState.create(graphics, viewport.value, mode);
-          var input =
-              new InputController(graphics.window(), mapState.map(), mapState::requestRender)) {
-        System.out.println("render target: " + mode.cliName());
-        System.out.println("render target status: " + mode.status());
-        InputController.printControls();
-        installResizeCallbacks(graphics.window(), viewport);
-        while (!glfwWindowShouldClose(graphics.window())) {
-          glfwPollEvents();
-          if (viewport.consumeChanged()) {
-            viewport.value.log("resized viewport");
-            graphics.resize(viewport.value);
-            mapState.resize(viewport.value);
-          }
-          var rendered = mapState.step();
-          if (!rendered) {
-            Thread.sleep(4);
-          }
-        }
-      }
+        (AutoCloseable)
+            () -> {
+              if (logCallbackInstalled.getAndSet(false)) {
+                Maplibre.clearLogCallback();
+              }
+            }) {
+      Shell.run(mode, backends);
     }
   }
 
@@ -115,38 +83,9 @@ public final class Main {
   }
 
   private static boolean supportsUsableBackend(java.util.Set<RenderBackend> backends) {
-    // TODO: Add OpenGL/EGL and Windows WGL host backends once they can be tested on suitable
-    // Linux/Windows machines.
-    return (GraphicsContext.isMac() && backends.contains(RenderBackend.METAL))
-        || backends.contains(RenderBackend.VULKAN);
-  }
-
-  private static void installResizeCallbacks(long window, ViewportHolder viewport) {
-    glfwSetWindowSizeCallback(window, (ignored, width, height) -> viewport.update(window));
-    glfwSetFramebufferSizeCallback(window, (ignored, width, height) -> viewport.update(window));
-    glfwSetWindowContentScaleCallback(window, (ignored, xScale, yScale) -> viewport.update(window));
-  }
-
-  private static final class ViewportHolder {
-    private Viewport value;
-    private boolean changed;
-
-    ViewportHolder(Viewport value) {
-      this.value = value;
+    if (GraphicsContext.isMac()) {
+      return backends.contains(RenderBackend.METAL) || backends.contains(RenderBackend.VULKAN);
     }
-
-    void update(long window) {
-      var next = Viewport.read(window);
-      if (!next.equals(value)) {
-        value = next;
-        changed = true;
-      }
-    }
-
-    boolean consumeChanged() {
-      var result = changed;
-      changed = false;
-      return result;
-    }
+    return backends.contains(RenderBackend.OPENGL) || backends.contains(RenderBackend.VULKAN);
   }
 }

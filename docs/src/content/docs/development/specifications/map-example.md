@@ -40,7 +40,7 @@ packaging/installer UX.
 | -------------------- | -------- | --------------- | --------------------- | --------------------- |
 | `examples/zig-map`   | Zig      | SDL3            | Linux, macOS, Windows | Vulkan, Metal, OpenGL |
 | `examples/rust-map`  | Rust     | winit           | Linux, macOS, Windows | Vulkan, Metal, OpenGL |
-| `examples/lwjgl-map` | Java FFM | GLFW, LWJGL     | Linux, macOS, Windows | Vulkan, Metal         |
+| `examples/lwjgl-map` | Java FFM | GLFW, LWJGL     | Linux, macOS, Windows | Vulkan, Metal, OpenGL |
 | `examples/swift-map` | Swift    | AppKit, SwiftUI | macOS                 | Metal                 |
 
 ---

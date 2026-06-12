@@ -8,6 +8,9 @@ interface GraphicsContext extends AutoCloseable {
     if (isMac() && backends.contains(RenderBackend.METAL)) {
       return MetalContext.create(title, width, height);
     }
+    if (!isMac() && backends.contains(RenderBackend.OPENGL)) {
+      return OpenGLContext.create(title, width, height);
+    }
     if (backends.contains(RenderBackend.VULKAN)) {
       return VulkanContext.create(title, width, height);
     }

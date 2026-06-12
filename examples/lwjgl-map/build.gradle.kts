@@ -39,11 +39,16 @@ dependencies {
   implementation(project(":bindings:java-ffm"))
   implementation(platform("org.lwjgl:lwjgl-bom:$lwjglVersion"))
   implementation("org.lwjgl:lwjgl")
+  implementation("org.lwjgl:lwjgl-egl")
   implementation("org.lwjgl:lwjgl-glfw")
+  implementation("org.lwjgl:lwjgl-opengl")
+  implementation("org.lwjgl:lwjgl-opengles")
   implementation("org.lwjgl:lwjgl-vulkan")
   implementation("org.lwjgl:lwjgl-shaderc")
   runtimeOnly("org.lwjgl:lwjgl::$lwjglNative")
   runtimeOnly("org.lwjgl:lwjgl-glfw::$lwjglNative")
+  runtimeOnly("org.lwjgl:lwjgl-opengl::$lwjglNative")
+  runtimeOnly("org.lwjgl:lwjgl-opengles::$lwjglNative")
   runtimeOnly("org.lwjgl:lwjgl-shaderc::$lwjglNative")
 }
 

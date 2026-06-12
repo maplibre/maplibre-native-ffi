@@ -138,6 +138,9 @@ final class MapState implements AutoCloseable {
     if (graphics instanceof VulkanContext vulkan) {
       return attachVulkanRenderTarget(vulkan, map, viewport, mode);
     }
+    if (graphics instanceof OpenGLContext opengl) {
+      return OpenGLRenderTarget.attach(opengl, map, viewport, mode);
+    }
     throw new IllegalStateException("Unsupported graphics context: " + graphics.backend());
   }
 
@@ -343,27 +346,6 @@ final class MapState implements AutoCloseable {
 
   private static MetalContextDescriptor metalContextDescriptor(MetalContext metal) {
     return new MetalContextDescriptor(metal.devicePointer());
-  }
-
-  private interface RenderTarget extends AutoCloseable {
-    default boolean needsReattachOnResize() {
-      return false;
-    }
-
-    default boolean needsMetalAutoreleasePool() {
-      return false;
-    }
-
-    default void reattach(Viewport viewport) {
-      throw new IllegalStateException("render target does not support reattachment");
-    }
-
-    void resize(Viewport viewport);
-
-    void renderUpdate();
-
-    @Override
-    void close();
   }
 
   private static final class VulkanSurfaceRenderTarget implements RenderTarget {
