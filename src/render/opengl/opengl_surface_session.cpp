@@ -168,7 +168,7 @@ class OpenGLSurfaceBackend final : public mbgl::gl::RendererBackend,
 
   void updateAssumedState() override {
     assumeFramebufferBinding(0);
-    assumeViewport(0, 0, size);
+    setViewport(0, 0, size);
     assumeScissorTest(0, 0, 0, 0);
   }
 

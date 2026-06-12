@@ -1,6 +1,5 @@
 package org.maplibre.nativeffi.examples.lwjglmap;
 
-import java.util.concurrent.atomic.AtomicBoolean;
 import org.maplibre.nativeffi.Maplibre;
 import org.maplibre.nativeffi.render.RenderBackend;
 
@@ -19,15 +18,6 @@ public final class Main {
           "The loaded MapLibre native library does not support a backend usable by lwjgl-map on"
               + " this platform");
     }
-    var logCallbackInstalled = new AtomicBoolean(true);
-    Runtime.getRuntime()
-        .addShutdownHook(
-            new Thread(
-                () -> {
-                  if (logCallbackInstalled.getAndSet(false)) {
-                    Maplibre.clearLogCallback();
-                  }
-                }));
     Maplibre.setLogCallback(
         record -> {
           System.err.printf(
@@ -40,14 +30,10 @@ public final class Main {
       System.out.println("MapLibre native library: " + propertyPath);
     }
 
-    try (var clearLogCallback =
-        (AutoCloseable)
-            () -> {
-              if (logCallbackInstalled.getAndSet(false)) {
-                Maplibre.clearLogCallback();
-              }
-            }) {
+    try {
       Shell.run(mode, backends);
+    } finally {
+      Maplibre.clearLogCallback();
     }
   }
 

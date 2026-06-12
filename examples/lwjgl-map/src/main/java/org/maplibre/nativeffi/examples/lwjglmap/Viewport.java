@@ -35,20 +35,26 @@ record Viewport(
               || rawPhysicalWidth <= 0
               || rawPhysicalHeight <= 0;
 
-      var logicalWidth = Math.max(1, rawLogicalWidth);
-      var logicalHeight = Math.max(1, rawLogicalHeight);
       var physicalWidth = Math.max(1, rawPhysicalWidth);
       var physicalHeight = Math.max(1, rawPhysicalHeight);
-      var scale =
-          Math.max((double) physicalWidth / logicalWidth, (double) physicalHeight / logicalHeight);
+      double scale = Math.max(xScale.get(0), yScale.get(0));
       if (!(scale > 0.0) || !Double.isFinite(scale)) {
-        scale = Math.max(xScale.get(0), yScale.get(0));
+        scale =
+            Math.max(
+                (double) physicalWidth / Math.max(1, rawLogicalWidth),
+                (double) physicalHeight / Math.max(1, rawLogicalHeight));
       }
       if (!(scale > 0.0) || !Double.isFinite(scale)) {
         scale = 1.0;
       }
+      var logicalWidth = scaledLogicalSize(physicalWidth, scale);
+      var logicalHeight = scaledLogicalSize(physicalHeight, scale);
       return new Viewport(logicalWidth, logicalHeight, scale, physicalWidth, physicalHeight, empty);
     }
+  }
+
+  private static int scaledLogicalSize(int physicalSize, double scaleFactor) {
+    return Math.max(1, (int) Math.ceil(physicalSize / scaleFactor));
   }
 
   void log(String label) {
