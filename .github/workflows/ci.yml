@@ -55,9 +55,9 @@ jobs:
           - mise_env: macos-arm64-vulkan
             runner: macos-latest
           - mise_env: windows-x64-vulkan
-            runner: windows-latest
+            runner: windows-2022
           - mise_env: windows-x64-wgl
-            runner: windows-latest
+            runner: windows-2022
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - uses: ./.github/actions/setup-ci-deps
