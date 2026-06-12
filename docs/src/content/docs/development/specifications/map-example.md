@@ -39,7 +39,7 @@ packaging/installer UX.
 | Example              | Binding  | Toolkit         | Platforms             | Backends              |
 | -------------------- | -------- | --------------- | --------------------- | --------------------- |
 | `examples/zig-map`   | Zig      | SDL3            | Linux, macOS, Windows | Vulkan, Metal, OpenGL |
-| `examples/rust-map`  | Rust     | winit           | Linux, macOS, Windows | Vulkan, Metal         |
+| `examples/rust-map`  | Rust     | winit           | Linux, macOS, Windows | Vulkan, Metal, OpenGL |
 | `examples/lwjgl-map` | Java FFM | GLFW, LWJGL     | Linux, macOS, Windows | Vulkan, Metal         |
 | `examples/swift-map` | Swift    | AppKit, SwiftUI | macOS                 | Metal                 |
 
@@ -495,9 +495,9 @@ Attach descriptors and shared context handles:
 - `borrowed-texture`: exportable Metal texture sized to the viewport;
   borrowed-texture descriptor.
 
-### OpenGL / EGL
+### OpenGL / EGL / WGL
 
-- `native-surface`: OpenGL or EGL surface descriptor for the window’s platform
+- `native-surface`: OpenGL/EGL/WGL surface descriptor for the window’s platform
   GL surface.
 - `owned-texture`: OpenGL owned-texture descriptor; shared GL context handles
   required by the C API.

@@ -31,10 +31,9 @@ pub struct App {
 impl App {
     pub fn new(
         window: Window,
+        graphics: GraphicsContext,
         mode: Mode,
-        backends: maplibre_native::RenderBackendMask,
     ) -> Result<Self, Box<dyn Error>> {
-        let graphics = GraphicsContext::new(&window, backends)?;
         let viewport = Viewport::from_window(&window);
         if viewport.is_empty() {
             return Err("window has no drawable extent".into());
@@ -178,7 +177,7 @@ impl App {
             .needs_reattach_on_resize()
         {
             let old_target = self.target.take().expect("render target is open");
-            old_target.close()?;
+            old_target.close(Some(&self.graphics))?;
             let new_target = RenderTarget::attach(
                 self.mode,
                 self.map.as_ref().expect("map is open"),
@@ -246,7 +245,7 @@ impl App {
                 .target
                 .as_mut()
                 .expect("render target is open")
-                .render_update()
+                .render_update(&self.graphics)
             {
                 Ok(()) => self.render_pending = false,
                 Err(error) if error.kind() == maplibre_native::ErrorKind::InvalidState => {}
@@ -284,7 +283,7 @@ impl App {
         });
 
         if let Some(target) = self.target.take()
-            && let Err(error) = target.close()
+            && let Err(error) = target.close(Some(&self.graphics))
         {
             append_error(&mut first_error, error.to_string());
         }
@@ -331,7 +330,7 @@ fn startup_error(
     runtime: Option<RuntimeHandle>,
 ) -> Box<dyn Error> {
     if let Some(target) = target {
-        append_cleanup_result(&mut message, "render target", target.close());
+        append_cleanup_result(&mut message, "render target", target.close(None));
     }
     if let Some(map) = map {
         append_cleanup_result(&mut message, "map", map.close());

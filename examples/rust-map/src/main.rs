@@ -5,6 +5,8 @@ mod graphics;
 mod input;
 #[cfg(target_os = "macos")]
 mod metal;
+#[cfg(any(target_os = "linux", target_os = "windows"))]
+mod opengl;
 mod render_target;
 mod viewport;
 mod vulkan;
@@ -14,8 +16,8 @@ use std::error::Error;
 use std::time::{Duration, Instant};
 
 use app::App;
+use graphics::GraphicsContext;
 use render_target::Mode;
-use winit::dpi::LogicalSize;
 use winit::event::Event;
 use winit::event_loop::{ControlFlow, EventLoop};
 use winit::window::WindowBuilder;
@@ -48,12 +50,12 @@ fn main() -> Result<(), Box<dyn Error>> {
     let _clear_log_callback = ClearLogCallback;
 
     let event_loop = EventLoop::new()?;
-    let window = WindowBuilder::new()
+    let window_builder = WindowBuilder::new()
         .with_title("MapLibre Rust Map")
-        .with_inner_size(LogicalSize::new(INITIAL_WIDTH, INITIAL_HEIGHT))
-        .with_resizable(true)
-        .build(&event_loop)?;
-    let mut app = App::new(window, mode, backends)?;
+        .with_inner_size(winit::dpi::LogicalSize::new(INITIAL_WIDTH, INITIAL_HEIGHT))
+        .with_resizable(true);
+    let (window, graphics) = GraphicsContext::create_window(&event_loop, window_builder, backends)?;
+    let mut app = App::new(window, graphics, mode)?;
 
     app.print_status();
     event_loop.run(move |event, target| {
@@ -122,10 +124,13 @@ fn render_backend_label(backends: maplibre_native::RenderBackendMask) -> String 
 
 fn supports_usable_backend(backends: maplibre_native::RenderBackendMask) -> bool {
     #[cfg(target_os = "macos")]
-    if backends.contains(maplibre_native::RenderBackendMask::METAL) {
-        return true;
+    {
+        return backends.intersects(
+            maplibre_native::RenderBackendMask::METAL | maplibre_native::RenderBackendMask::VULKAN,
+        );
     }
-    // TODO: Add OpenGL/EGL and Windows WGL host backends once they can be tested
-    // on suitable Linux/Windows machines.
-    backends.contains(maplibre_native::RenderBackendMask::VULKAN)
+    #[cfg(not(target_os = "macos"))]
+    backends.intersects(
+        maplibre_native::RenderBackendMask::VULKAN | maplibre_native::RenderBackendMask::OPENGL,
+    )
 }

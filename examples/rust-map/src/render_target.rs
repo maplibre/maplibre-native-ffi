@@ -5,6 +5,9 @@ use maplibre_native::{
 };
 use std::error::Error as StdError;
 
+#[cfg(any(target_os = "linux", target_os = "windows"))]
+mod opengl_target;
+
 use crate::graphics::GraphicsContext;
 #[cfg(target_os = "macos")]
 use crate::metal::{MetalBorrowedTexture, MetalContext, MetalTextureCompositor};
@@ -61,6 +64,8 @@ pub enum RenderTarget {
     VulkanSurface {
         session: RenderSessionHandle,
     },
+    #[cfg(any(target_os = "linux", target_os = "windows"))]
+    OpenGL(opengl_target::RenderTarget),
     #[cfg(target_os = "macos")]
     OwnedMetalTexture {
         session: RenderSessionHandle,
@@ -99,12 +104,29 @@ impl RenderTarget {
                 }
                 Mode::NativeSurface => Self::attach_vulkan_surface(map, vulkan, viewport),
             },
+            #[cfg(any(target_os = "linux", target_os = "windows"))]
+            GraphicsContext::OpenGL(opengl) => match mode {
+                Mode::OwnedTexture => {
+                    opengl_target::RenderTarget::attach_owned_texture(map, opengl, viewport)
+                        .map(Self::OpenGL)
+                }
+                Mode::BorrowedTexture => {
+                    opengl_target::RenderTarget::attach_borrowed_texture(map, opengl, viewport)
+                        .map(Self::OpenGL)
+                }
+                Mode::NativeSurface => {
+                    opengl_target::RenderTarget::attach_surface(map, opengl, viewport)
+                        .map(Self::OpenGL)
+                }
+            },
         }
     }
 
     pub fn needs_reattach_on_resize(&self) -> bool {
         match self {
             Self::BorrowedVulkanTexture { .. } => true,
+            #[cfg(any(target_os = "linux", target_os = "windows"))]
+            Self::OpenGL(target) => target.needs_reattach_on_resize(),
             #[cfg(target_os = "macos")]
             Self::BorrowedMetalTexture { .. } => true,
             _ => false,
@@ -140,6 +162,8 @@ impl RenderTarget {
                 viewport.logical_height,
                 viewport.scale_factor,
             ),
+            #[cfg(any(target_os = "linux", target_os = "windows"))]
+            Self::OpenGL(target) => target.resize(viewport),
             #[cfg(target_os = "macos")]
             Self::MetalSurface { session } => session.resize(
                 viewport.logical_width,
@@ -155,7 +179,7 @@ impl RenderTarget {
         }
     }
 
-    pub fn render_update(&mut self) -> maplibre_native::Result<()> {
+    pub fn render_update(&mut self, graphics: &GraphicsContext) -> maplibre_native::Result<()> {
         match self {
             Self::OwnedVulkanTexture {
                 session,
@@ -187,6 +211,15 @@ impl RenderTarget {
                 })
             }
             Self::VulkanSurface { session } => session.render_update(),
+            #[cfg(any(target_os = "linux", target_os = "windows"))]
+            Self::OpenGL(target) => {
+                let GraphicsContext::OpenGL(context) = graphics else {
+                    return Err(compositor_error(
+                        "OpenGL render target requires OpenGL context",
+                    ));
+                };
+                target.render_update(context)
+            }
             #[cfg(target_os = "macos")]
             Self::OwnedMetalTexture {
                 session,
@@ -221,7 +254,7 @@ impl RenderTarget {
         }
     }
 
-    pub fn close(self) -> Result<(), Box<dyn StdError>> {
+    pub fn close(self, graphics: Option<&GraphicsContext>) -> Result<(), Box<dyn StdError>> {
         match self {
             Self::OwnedVulkanTexture {
                 session,
@@ -266,6 +299,14 @@ impl RenderTarget {
             Self::VulkanSurface { session } => session
                 .close()
                 .map_err(|error| Box::new(error) as Box<dyn StdError>),
+            #[cfg(any(target_os = "linux", target_os = "windows"))]
+            Self::OpenGL(target) => {
+                let opengl = match graphics {
+                    Some(GraphicsContext::OpenGL(context)) => Some(context.as_ref()),
+                    _ => None,
+                };
+                target.close(opengl)
+            }
             #[cfg(target_os = "macos")]
             Self::OwnedMetalTexture {
                 session,
