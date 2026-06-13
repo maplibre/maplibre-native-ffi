@@ -19,7 +19,6 @@ public sealed class MapCameraOptionsTests
     [Fact]
     public void ViewportAndTileOptionsRoundTripThroughNativeMap()
     {
-        NativeLibraryTestSupport.SkipUnlessNativeLibraryIsAvailable();
         using var runtime = RuntimeHandle.Create();
         using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
 
@@ -62,7 +61,6 @@ public sealed class MapCameraOptionsTests
     [Fact]
     public void CameraFitHelpersCopyDescriptorsThroughNativeMap()
     {
-        NativeLibraryTestSupport.SkipUnlessNativeLibraryIsAvailable();
         using var runtime = RuntimeHandle.Create();
         using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
         var bounds = new LatLngBounds(new LatLng(-10, -20), new LatLng(10, 20));
@@ -91,7 +89,6 @@ public sealed class MapCameraOptionsTests
     [Fact]
     public void BoundsAndProjectionOptionsRoundTripThroughNativeMap()
     {
-        NativeLibraryTestSupport.SkipUnlessNativeLibraryIsAvailable();
         using var runtime = RuntimeHandle.Create();
         using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
 
@@ -146,7 +143,6 @@ public sealed class MapCameraOptionsTests
     [Fact]
     public void CoordinateProjectionRoundTripsThroughNativeMap()
     {
-        NativeLibraryTestSupport.SkipUnlessNativeLibraryIsAvailable();
         using var runtime = RuntimeHandle.Create();
         using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
         var coordinate = new LatLng(12.5, 34.25);
@@ -168,7 +164,6 @@ public sealed class MapCameraOptionsTests
     [Fact]
     public void ProjectionSnapshotSupportsCameraAndCoordinateConversions()
     {
-        NativeLibraryTestSupport.SkipUnlessNativeLibraryIsAvailable();
         using var runtime = RuntimeHandle.Create();
         using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
         using var projection = map.CreateProjection();
@@ -196,7 +191,6 @@ public sealed class MapCameraOptionsTests
     [Fact]
     public void FreeCameraOptionsCanBeCopiedThroughNativeMap()
     {
-        NativeLibraryTestSupport.SkipUnlessNativeLibraryIsAvailable();
         using var runtime = RuntimeHandle.Create();
         using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
 
@@ -207,7 +201,6 @@ public sealed class MapCameraOptionsTests
     [Fact]
     public void CameraTransitionCommandsAcceptOptionalAnimationDescriptors()
     {
-        NativeLibraryTestSupport.SkipUnlessNativeLibraryIsAvailable();
         using var runtime = RuntimeHandle.Create();
         using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
         var camera = new CameraOptions { Center = new LatLng(0, 0), Zoom = 1 };
@@ -243,7 +236,6 @@ public sealed class MapCameraOptionsTests
     [Fact]
     public void JumpToAppliesCameraFieldsThroughNativeMap()
     {
-        NativeLibraryTestSupport.SkipUnlessNativeLibraryIsAvailable();
         using var runtime = RuntimeHandle.Create();
         using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
 

@@ -87,7 +87,6 @@ public sealed unsafe class StyleJsonTests
     [Fact]
     public void UrlAndTileSourceApisAdaptThroughNativeMap()
     {
-        NativeLibraryTestSupport.SkipUnlessNativeLibraryIsAvailable();
         using var runtime = RuntimeHandle.Create();
         using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
         map.SetStyleJson("{\"version\":8,\"sources\":{},\"layers\":[]}");
@@ -127,7 +126,6 @@ public sealed unsafe class StyleJsonTests
     [Fact]
     public void LayerJsonPropertiesAndFiltersAdaptThroughNativeMap()
     {
-        NativeLibraryTestSupport.SkipUnlessNativeLibraryIsAvailable();
         using var runtime = RuntimeHandle.Create();
         using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
         map.SetStyleJson("{\"version\":8,\"sources\":{},\"layers\":[]}");
@@ -161,7 +159,6 @@ public sealed unsafe class StyleJsonTests
     [Fact]
     public void StyleSourceAndLayerJsonAdaptThroughNativeMap()
     {
-        NativeLibraryTestSupport.SkipUnlessNativeLibraryIsAvailable();
         using var runtime = RuntimeHandle.Create();
         using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
         map.SetStyleJson("{\"version\":8,\"sources\":{},\"layers\":[]}");

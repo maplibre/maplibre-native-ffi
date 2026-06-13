@@ -78,7 +78,6 @@ public sealed class ResourceTransformTests
     [Fact]
     public unsafe void ResourceTransformResponseHelperRequiresNativeCallbackContext()
     {
-        NativeLibraryTestSupport.SkipUnlessNativeLibraryIsAvailable();
         var response = new mln_resource_transform_response
         {
             size = (uint)sizeof(mln_resource_transform_response),
@@ -103,7 +102,6 @@ public sealed class ResourceTransformTests
     [Fact]
     public void CanInstallReplaceAndClearResourceTransform()
     {
-        NativeLibraryTestSupport.SkipUnlessNativeLibraryIsAvailable();
         using var runtime = RuntimeHandle.Create();
 
         runtime.SetResourceTransform(request => request.Url + "?first");

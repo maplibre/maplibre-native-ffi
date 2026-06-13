@@ -70,7 +70,6 @@ public sealed unsafe class RuntimeEventTests
     [Fact]
     public void EmptyRuntimePollReturnsNull()
     {
-        NativeLibraryTestSupport.SkipUnlessNativeLibraryIsAvailable();
         using var runtime = RuntimeHandle.Create();
 
         Assert.Null(runtime.PollEvent());

@@ -10,7 +10,6 @@ public sealed class RuntimeMapLifecycleTests
     [Fact]
     public void DefaultMapOptionsPreserveNativeCreationDefaults()
     {
-        NativeLibraryTestSupport.SkipUnlessNativeLibraryIsAvailable();
         using var runtime = RuntimeHandle.Create();
         using var map = MapHandle.Create(runtime);
 
@@ -20,7 +19,6 @@ public sealed class RuntimeMapLifecycleTests
     [Fact]
     public void RuntimeAndMapCloseDeterministically()
     {
-        NativeLibraryTestSupport.SkipUnlessNativeLibraryIsAvailable();
         using var runtime = RuntimeHandle.Create();
         using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
 
@@ -37,7 +35,6 @@ public sealed class RuntimeMapLifecycleTests
     [Fact]
     public void MapDebugSettingsRoundTripThroughNativeMap()
     {
-        NativeLibraryTestSupport.SkipUnlessNativeLibraryIsAvailable();
         using var runtime = RuntimeHandle.Create();
         using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
 
@@ -54,7 +51,6 @@ public sealed class RuntimeMapLifecycleTests
     [Fact]
     public void OwnerThreadViolationMapsToWrongThreadException()
     {
-        NativeLibraryTestSupport.SkipUnlessNativeLibraryIsAvailable();
         using var runtime = RuntimeHandle.Create();
         using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
         Exception? thrown = null;
@@ -81,7 +77,6 @@ public sealed class RuntimeMapLifecycleTests
     [Fact]
     public void MethodsRejectClosedMapBeforeNativeCall()
     {
-        NativeLibraryTestSupport.SkipUnlessNativeLibraryIsAvailable();
         using var runtime = RuntimeHandle.Create();
         var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
         map.Close();

@@ -9,7 +9,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.maplibre.nativejni.camera.AnimationOptions;
 import org.maplibre.nativejni.camera.BoundOptions;
@@ -41,23 +40,15 @@ import org.maplibre.nativejni.style.StyleImageOptions;
 import org.maplibre.nativejni.style.TileScheme;
 import org.maplibre.nativejni.style.TileSourceOptions;
 import org.maplibre.nativejni.style.VectorTileEncoding;
-import org.maplibre.nativejni.test.NativeTestSupport;
 
 class MapHandleTest {
-  @BeforeAll
-  static void loadNativeLibrary() {
-    NativeTestSupport.loadNativeLibraryOrSkip();
-  }
-
   @Test
   void createMapKeepsRuntimeAndClosesOnce() {
     try (var runtime = RuntimeHandle.create()) {
       var map = MapHandle.create(runtime, new MapOptions().size(64, 64));
-
       assertFalse(map.isClosed());
       assertSame(runtime, map.runtime());
       assertTrue(map.nativeAddress() != 0);
-
       map.close();
       assertTrue(map.isClosed());
       map.close();
@@ -70,7 +61,6 @@ class MapHandleTest {
     assertThrows(
         InvalidArgumentException.class,
         () -> RuntimeHandle.create(new RuntimeOptions().assetPath("asset\0path")));
-
     try (var runtime = RuntimeHandle.create()) {
       var error =
           assertThrows(
@@ -115,13 +105,11 @@ class MapHandleTest {
             EnumSet.of(DebugOption.TILE_BORDERS, DebugOption.COLLISION), map.debugOptions());
         map.setDebugOptions(EnumSet.noneOf(DebugOption.class));
         assertEquals(EnumSet.noneOf(DebugOption.class), map.debugOptions());
-
         assertFalse(map.isRenderingStatsViewEnabled());
         map.setRenderingStatsViewEnabled(true);
         assertTrue(map.isRenderingStatsViewEnabled());
         map.setRenderingStatsViewEnabled(false);
         assertFalse(map.isRenderingStatsViewEnabled());
-
         assertFalse(map.isFullyLoaded());
         map.dumpDebugLogs();
       }
@@ -138,7 +126,6 @@ class MapHandleTest {
                 .constrainMode(ConstrainMode.HEIGHT_ONLY)
                 .viewportMode(ViewportMode.FLIPPED_Y)
                 .frustumOffset(new EdgeInsets(1, 2, 3, 4)));
-
         var viewport = map.viewportOptions();
         assertTrue(viewport.hasNorthOrientation());
         assertEquals(NorthOrientation.RIGHT, viewport.northOrientation());
@@ -151,7 +138,6 @@ class MapHandleTest {
         assertEquals(2, viewport.frustumOffset().left(), 1.0e-9);
         assertEquals(3, viewport.frustumOffset().bottom(), 1.0e-9);
         assertEquals(4, viewport.frustumOffset().right(), 1.0e-9);
-
         map.setTileOptions(
             new TileOptions()
                 .prefetchZoomDelta(2)
@@ -160,7 +146,6 @@ class MapHandleTest {
                 .lodPitchThreshold(35.0)
                 .lodZoomShift(0.75)
                 .lodMode(TileLodMode.DISTANCE));
-
         var tile = map.tileOptions();
         assertTrue(tile.hasPrefetchZoomDelta());
         assertEquals(2, tile.prefetchZoomDelta());
@@ -189,7 +174,6 @@ class MapHandleTest {
         assertEquals(20, camera.center().longitude(), 0.000001);
         assertTrue(camera.hasZoom());
         assertEquals(3, camera.zoom(), 0.000001);
-
         var point = map.pixelForLatLng(camera.center());
         assertTrue(Double.isFinite(point.x()));
         assertTrue(Double.isFinite(point.y()));
@@ -200,7 +184,6 @@ class MapHandleTest {
         assertEquals(2, points.size());
         var coordinates = map.latLngsForPixels(points);
         assertEquals(2, coordinates.size());
-
         var animation = new AnimationOptions().durationMs(0);
         map.easeTo(new CameraOptions().zoom(4), animation);
         map.flyTo(new CameraOptions().zoom(3), animation);
@@ -216,7 +199,6 @@ class MapHandleTest {
             new FreeCameraOptions()
                 .position(new Vec3(0.1, 0.2, 0.3))
                 .orientation(new Quaternion(0, 0, 0, 1)));
-
         var camera = map.freeCameraOptions();
         assertTrue(camera.hasPosition());
         assertTrue(Double.isFinite(camera.position().x()));
@@ -232,7 +214,6 @@ class MapHandleTest {
     try (var runtime = RuntimeHandle.create()) {
       try (var map = MapHandle.create(runtime, new MapOptions().size(64, 64))) {
         map.setProjectionMode(new ProjectionModeOptions().axonometric(true).xSkew(0.25).ySkew(0.5));
-
         var mode = map.projectionMode();
         assertTrue(mode.hasAxonometric());
         assertTrue(mode.axonometric());
@@ -251,7 +232,6 @@ class MapHandleTest {
         var bounds = new LatLngBounds(new LatLng(-10, -20), new LatLng(10, 20));
         map.setBounds(
             new BoundOptions().bounds(bounds).minZoom(1).maxZoom(10).minPitch(0).maxPitch(60));
-
         var result = map.bounds();
         assertTrue(result.hasBounds());
         assertEquals(-10, result.bounds().southwest().latitude(), 1.0e-9);
@@ -272,26 +252,21 @@ class MapHandleTest {
       try (var map = MapHandle.create(runtime, new MapOptions().size(256, 256))) {
         var bounds = new LatLngBounds(new LatLng(-1, -1), new LatLng(1, 1));
         var fit = new CameraFitOptions().padding(new EdgeInsets(4, 4, 4, 4)).bearing(0).pitch(0);
-
         var boundsCamera = map.cameraForLatLngBounds(bounds, fit);
         assertTrue(boundsCamera.hasCenter());
         assertTrue(boundsCamera.hasZoom());
-
         var coordinatesCamera =
             map.cameraForLatLngs(List.of(bounds.southwest(), bounds.northeast()));
         assertTrue(coordinatesCamera.hasCenter());
         assertTrue(coordinatesCamera.hasZoom());
-
         var geometryCamera =
             map.cameraForGeometry(
                 Geometry.lineString(List.of(bounds.southwest(), bounds.northeast())), fit);
         assertTrue(geometryCamera.hasCenter());
         assertTrue(geometryCamera.hasZoom());
-
         var visibleBounds = map.latLngBoundsForCamera(new CameraOptions().center(0, 0).zoom(1));
         assertTrue(Double.isFinite(visibleBounds.southwest().latitude()));
         assertTrue(Double.isFinite(visibleBounds.northeast().longitude()));
-
         var unwrappedBounds =
             map.latLngBoundsForCameraUnwrapped(new CameraOptions().center(0, 0).zoom(1));
         assertTrue(Double.isFinite(unwrappedBounds.southwest().latitude()));
@@ -383,7 +358,6 @@ class MapHandleTest {
                                 new JsonValue.Member("features", JsonValue.array(List.of()))))))));
         assertEquals(SourceType.GEOJSON, map.styleSourceType("json-geojson-source").orElseThrow());
         assertTrue(map.removeStyleSource("json-geojson-source"));
-
         var customFetchCount = new AtomicInteger();
         map.addCustomGeometrySource(
             "custom-source",
@@ -413,7 +387,6 @@ class MapHandleTest {
             "custom-source", new LatLngBounds(new LatLng(-1.0, -2.0), new LatLng(1.0, 2.0)));
         assertTrue(map.removeStyleSource("custom-source"));
         assertEquals(0, map.customGeometrySourceCountForTesting());
-
         map.addVectorSourceUrl(
             "vector-source",
             "https://example.com/vector.json",

@@ -7,27 +7,17 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.maplibre.nativejni.error.InvalidStateException;
-import org.maplibre.nativejni.test.NativeTestSupport;
 
 class HandleStateTest {
-  @BeforeAll
-  static void loadNativeLibrary() {
-    NativeTestSupport.loadNativeLibraryOrSkip();
-  }
-
   @Test
   void reportsLeaksAndSuppressesReleasedHandles() {
     var state = new HandleState("TestHandle", 0x1234);
-
     var leaked = captureStderr(state::reportLeakForTesting);
     assertTrue(leaked.contains("Leaked TestHandle native handle 0x1234"));
-
     state.closeOnce(address -> 0);
     assertThrows(InvalidStateException.class, state::requireLiveAddress);
-
     var released = captureStderr(state::reportLeakForTesting);
     assertTrue(released.isEmpty());
   }
@@ -40,7 +30,6 @@ class HandleStateTest {
   @Test
   void leavesHandleLiveWhenNativeDestroyFails() {
     var state = new HandleState("TestHandle", 0x5678);
-
     assertThrows(InvalidStateException.class, () -> state.closeOnce(address -> -2));
     assertDoesNotThrow(state::requireLiveAddress);
   }

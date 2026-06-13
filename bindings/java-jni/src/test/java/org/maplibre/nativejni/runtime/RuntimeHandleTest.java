@@ -5,7 +5,6 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Optional;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.maplibre.nativejni.error.InvalidArgumentException;
 import org.maplibre.nativejni.error.InvalidStateException;
@@ -15,23 +14,15 @@ import org.maplibre.nativejni.geo.LatLngBounds;
 import org.maplibre.nativejni.offline.OfflineRegionDefinition;
 import org.maplibre.nativejni.offline.OfflineRegionDownloadState;
 import org.maplibre.nativejni.resource.ResourceProviderDecision;
-import org.maplibre.nativejni.test.NativeTestSupport;
 
 class RuntimeHandleTest {
-  @BeforeAll
-  static void loadNativeLibrary() {
-    NativeTestSupport.loadNativeLibraryOrSkip();
-  }
-
   @Test
   void createRunOnceAndCloseRuntime() {
     var runtime = RuntimeHandle.create();
-
     assertFalse(runtime.isClosed());
     runtime.runOnce();
     runtime.close();
     assertTrue(runtime.isClosed());
-
     runtime.close();
     assertTrue(runtime.isClosed());
     assertThrows(InvalidStateException.class, runtime::runOnce);
@@ -42,7 +33,6 @@ class RuntimeHandleTest {
     try (var runtime = RuntimeHandle.create(new RuntimeOptions().maximumCacheSize(42))) {
       runtime.runOnce();
     }
-
     assertThrows(
         InvalidArgumentException.class,
         () -> RuntimeHandle.create(new RuntimeOptions().assetPath("asset\0path")));
@@ -55,12 +45,10 @@ class RuntimeHandleTest {
   void startsAndDiscardsAmbientCacheOperation() {
     try (var runtime = RuntimeHandle.create()) {
       var operation = runtime.startAmbientCacheOperation(AmbientCacheOperation.CLEAR);
-
       assertFalse(operation.isClosed());
       assertTrue(operation.id() != 0);
       assertTrue(operation.kind() == OfflineOperationKind.AMBIENT_CACHE);
       assertTrue(operation.resultKind() == OfflineOperationResultKind.NONE);
-
       operation.close();
       assertTrue(operation.isClosed());
       operation.close();
@@ -72,7 +60,6 @@ class RuntimeHandleTest {
     var runtime = RuntimeHandle.create();
     var operation = runtime.startAmbientCacheOperation(AmbientCacheOperation.CLEAR);
     runtime.close();
-
     assertThrows(InvalidStateException.class, operation::close);
     assertTrue(operation.isClosed());
     operation.close();
@@ -91,7 +78,6 @@ class RuntimeHandleTest {
                   1.0f,
                   true),
               new byte[] {1, 2, 3});
-
       assertTrue(operation.kind() == OfflineOperationKind.REGION_CREATE);
       assertTrue(operation.resultKind() == OfflineOperationResultKind.REGION);
       try {
@@ -99,7 +85,6 @@ class RuntimeHandleTest {
       } catch (InvalidStateException expectedIfStillRunning) {
         operation.close();
       }
-
       var geometryOperation =
           runtime.startCreateOfflineRegion(
               new OfflineRegionDefinition.GeometryRegion(
@@ -123,26 +108,22 @@ class RuntimeHandleTest {
       assertTrue(get.kind() == OfflineOperationKind.REGION_GET);
       assertTrue(get.resultKind() == OfflineOperationResultKind.OPTIONAL_REGION);
       get.close();
-
       var list = runtime.startOfflineRegions();
       assertTrue(list.kind() == OfflineOperationKind.REGIONS_LIST);
       assertTrue(list.resultKind() == OfflineOperationResultKind.REGION_LIST);
       list.close();
-
       var update = runtime.startUpdateOfflineRegionMetadata(123, new byte[] {4, 5, 6});
       assertTrue(update.kind() == OfflineOperationKind.REGION_UPDATE_METADATA);
       assertTrue(update.resultKind() == OfflineOperationResultKind.REGION);
       assertThrows(
           InvalidStateException.class, () -> runtime.takeUpdateOfflineRegionMetadataResult(update));
       update.close();
-
       var status = runtime.startOfflineRegionStatus(123);
       assertTrue(status.kind() == OfflineOperationKind.REGION_GET_STATUS);
       assertTrue(status.resultKind() == OfflineOperationResultKind.REGION_STATUS);
       assertThrows(
           InvalidStateException.class, () -> runtime.takeOfflineRegionStatusResult(status));
       status.close();
-
       runtime.startSetOfflineRegionObserved(123, false).close();
       runtime.startSetOfflineRegionDownloadState(123, OfflineRegionDownloadState.INACTIVE).close();
       runtime.startInvalidateOfflineRegion(123).close();

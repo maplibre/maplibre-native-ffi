@@ -127,7 +127,6 @@ public sealed unsafe class ResourceProviderTests
     [Fact]
     public void CanInstallAndReplaceResourceProvider()
     {
-        NativeLibraryTestSupport.SkipUnlessNativeLibraryIsAvailable();
         using var runtime = RuntimeHandle.Create();
 
         runtime.SetResourceProvider((_, _) => ResourceProviderDecision.PassThrough);

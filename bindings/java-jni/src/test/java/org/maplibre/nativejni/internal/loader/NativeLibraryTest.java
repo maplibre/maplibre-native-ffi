@@ -9,17 +9,11 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.maplibre.nativejni.Maplibre;
 import org.maplibre.nativejni.test.NativeTestSupport;
 
 final class NativeLibraryTest {
-  @BeforeAll
-  static void loadNativeLibrary() {
-    NativeTestSupport.loadNativeLibraryOrSkip();
-  }
-
   @Test
   void exposesDocumentedLookupInputs() {
     assertFalse(NativeLibrary.LIBRARY_PATH_PROPERTY.isBlank());
@@ -135,7 +129,6 @@ final class NativeLibraryTest {
     if (exactPath != null) {
       command.add(exactPath);
     }
-
     var processBuilder = new ProcessBuilder(command).redirectErrorStream(true);
     if (envName != null) {
       processBuilder.environment().put(envName, envValue);

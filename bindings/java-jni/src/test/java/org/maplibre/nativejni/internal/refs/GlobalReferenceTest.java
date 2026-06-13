@@ -4,18 +4,11 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 
 import java.lang.ref.WeakReference;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.maplibre.nativejni.Maplibre;
 import org.maplibre.nativejni.log.LogCallback;
-import org.maplibre.nativejni.test.NativeTestSupport;
 
 final class GlobalReferenceTest {
-  @BeforeAll
-  static void loadNativeLibrary() {
-    NativeTestSupport.loadNativeLibraryOrSkip();
-  }
-
   @AfterEach
   void clearLogCallback() {
     Maplibre.clearLogCallback();
@@ -25,7 +18,6 @@ final class GlobalReferenceTest {
   void logCallbackGlobalReferencesReleaseAfterReplaceAndClear() {
     var first = installCallback();
     var second = installCallback();
-
     assertReleased(first);
     Maplibre.clearLogCallback();
     assertReleased(second);

@@ -11,7 +11,6 @@ public sealed class NativeStatusTests
     [Fact]
     public void NativeInvalidStatusMapsToExceptionWithCopiedDiagnostic()
     {
-        NativeLibraryTestSupport.SkipUnlessNativeLibraryIsAvailable();
         NativeLibraryLoader.EnsureLoaded();
 
         var error = Assert.Throws<InvalidArgumentException>(() =>

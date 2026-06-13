@@ -9,16 +9,12 @@ public sealed class MaplibreTests
     [Fact]
     public void CVersionComesFromNativeLibrary()
     {
-        NativeLibraryTestSupport.SkipUnlessNativeLibraryIsAvailable();
-
         Assert.Equal(0u, Maplibre.CVersion());
     }
 
     [Fact]
     public void SupportedOpenGLContextProvidersComeFromNativeLibrary()
     {
-        NativeLibraryTestSupport.SkipUnlessNativeLibraryIsAvailable();
-
         var providers = Maplibre.SupportedOpenGLContextProviders();
 
         Assert.Equal(
@@ -30,7 +26,6 @@ public sealed class MaplibreTests
     [Fact]
     public void ProjectionHelpersRoundTripThroughNativeLibrary()
     {
-        NativeLibraryTestSupport.SkipUnlessNativeLibraryIsAvailable();
         var coordinate = new Geo.LatLng(45.0, -122.0);
 
         var meters = Maplibre.ProjectedMetersForLatLng(coordinate);

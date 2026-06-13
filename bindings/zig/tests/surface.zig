@@ -27,7 +27,7 @@ test "Metal surface renders to window-attached layer through public binding" {
     const pool = try metal_support.AutoreleasePool.init();
     defer pool.deinit();
 
-    var window_layer = metal_support.createWindowLayer(64, 64) catch return error.SkipZigTest;
+    var window_layer = try metal_support.createWindowLayer(64, 64);
     defer window_layer.deinit();
 
     var runtime = try maplibre.RuntimeHandle.init(null);
@@ -52,7 +52,7 @@ test "Metal surface render acquires one drawable per frame through public bindin
     const pool = try metal_support.AutoreleasePool.init();
     defer pool.deinit();
 
-    var window_layer = metal_support.createCountingWindowLayer(64, 64) catch return error.SkipZigTest;
+    var window_layer = try metal_support.createCountingWindowLayer(64, 64);
     defer window_layer.deinit();
 
     var runtime = try maplibre.RuntimeHandle.init(null);

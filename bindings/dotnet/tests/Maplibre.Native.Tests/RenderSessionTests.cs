@@ -14,7 +14,6 @@ public sealed unsafe class RenderSessionTests
     [Fact]
     public void SurfaceDescriptorsMaterializeOpaquePointersAndExtent()
     {
-        NativeLibraryTestSupport.SkipUnlessNativeLibraryIsAvailable();
         var metal = RenderStructs.ToNative(
             new MetalSurfaceDescriptor
             {
@@ -85,7 +84,6 @@ public sealed unsafe class RenderSessionTests
     [Fact]
     public void TextureDescriptorsMaterializeOpaquePointersAndExtent()
     {
-        NativeLibraryTestSupport.SkipUnlessNativeLibraryIsAvailable();
         var metalOwned = RenderStructs.ToNative(
             new MetalOwnedTextureDescriptor
             {
@@ -184,7 +182,6 @@ public sealed unsafe class RenderSessionTests
     [Fact]
     public void RenderDescriptorsPreserveNativeDefaultsWhenExtentOmitted()
     {
-        NativeLibraryTestSupport.SkipUnlessNativeLibraryIsAvailable();
         var metal = RenderStructs.ToNative(
             new MetalSurfaceDescriptor { Layer = new NativePointer(1) }
         );
@@ -320,10 +317,9 @@ public sealed unsafe class RenderSessionTests
     [Fact]
     public void OpenGLAttachMethodsReportUnsupportedWhenBackendUnavailable()
     {
-        NativeLibraryTestSupport.SkipUnlessNativeLibraryIsAvailable();
         if ((Maplibre.SupportedRenderBackends() & RenderBackend.OpenGL) != 0)
         {
-            Assert.Skip("OpenGL native build exercises positive attach paths.");
+            Assert.Skip("OpenGL native build exercises positive attach paths");
         }
 
         using var runtime = RuntimeHandle.Create();
