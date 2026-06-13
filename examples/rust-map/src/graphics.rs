@@ -78,8 +78,6 @@ impl GraphicsContext {
                 Ok(())
             }
             Self::Vulkan(_) => Ok(()),
-            #[cfg(any(target_os = "linux", target_os = "windows"))]
-            Self::OpenGL(context) => context.resize(viewport),
         }
     }
 

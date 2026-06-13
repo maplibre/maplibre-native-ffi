@@ -525,18 +525,24 @@ final class MapState implements AutoCloseable {
 
     @Override
     public void close() {
+      var closingCompositor = compositor;
+      var closingSession = session;
+      var closingImage = image;
+      compositor = null;
+      session = null;
+      image = null;
       try {
-        if (compositor != null) {
-          compositor.close();
+        if (closingCompositor != null) {
+          closingCompositor.close();
         }
       } finally {
         try {
-          if (session != null) {
-            session.close();
+          if (closingSession != null) {
+            closingSession.close();
           }
         } finally {
-          if (image != null) {
-            image.close();
+          if (closingImage != null) {
+            closingImage.close();
           }
         }
       }
@@ -603,18 +609,24 @@ final class MapState implements AutoCloseable {
 
     @Override
     public void close() {
+      var closingCompositor = compositor;
+      var closingSession = session;
+      var closingTexture = texture;
+      compositor = null;
+      session = null;
+      texture = null;
       try {
-        if (compositor != null) {
-          compositor.close();
+        if (closingCompositor != null) {
+          closingCompositor.close();
         }
       } finally {
         try {
-          if (session != null) {
-            session.close();
+          if (closingSession != null) {
+            closingSession.close();
           }
         } finally {
-          if (texture != null) {
-            texture.close();
+          if (closingTexture != null) {
+            closingTexture.close();
           }
         }
       }

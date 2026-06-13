@@ -16,7 +16,13 @@ final class MetalTextureCompositor implements AutoCloseable {
   MetalTextureCompositor(MetalContext context) {
     this.context = context;
     this.commandQueue = context.createCommandQueue();
-    this.pipeline = context.createRenderPipeline();
+    try {
+      this.pipeline = context.createRenderPipeline();
+    } catch (RuntimeException error) {
+      MacObjectiveC.release(commandQueue);
+      commandQueue = NULL;
+      throw error;
+    }
   }
 
   void draw(MetalOwnedTextureFrameHandle frameHandle) {

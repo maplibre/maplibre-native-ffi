@@ -251,11 +251,6 @@ final class MetalTextureCompositor {
     encoder.endEncoding()
     commandBuffer.present(drawable)
     commandBuffer.commit()
-    commandBuffer.waitUntilCompleted()
-
-    if let error = commandBuffer.error {
-      throw metalError("Metal texture compositor draw failed: \(error)")
-    }
   }
 
   private static func makePipeline(

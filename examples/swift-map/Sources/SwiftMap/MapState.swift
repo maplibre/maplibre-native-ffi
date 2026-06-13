@@ -26,7 +26,7 @@ struct Viewport: Equatable {
 final class MapState {
   private nonisolated(unsafe) let runtime: RuntimeHandle
   nonisolated(unsafe) let map: MapHandle
-  private var renderTarget: MetalRenderTarget
+  private var renderTarget: MetalRenderTarget?
   private let mode: RenderTargetMode
   private var isClosed = false
 
@@ -79,9 +79,11 @@ final class MapState {
 
   func resize(_ viewport: Viewport, graphics: MetalGraphicsContext) throws {
     guard !viewport.isEmpty else { return }
+    guard let renderTarget else { return }
     if renderTarget.needsReattachOnResize {
       try renderTarget.close()
-      renderTarget = try MetalRenderTarget.attach(
+      self.renderTarget = nil
+      self.renderTarget = try MetalRenderTarget.attach(
         mode: mode,
         map: map,
         graphics: graphics,
@@ -98,7 +100,8 @@ final class MapState {
     isClosed = true
     var firstError: Error?
     do {
-      try renderTarget.close()
+      try renderTarget?.close()
+      renderTarget = nil
     } catch {
       firstError = firstError ?? error
     }
@@ -144,6 +147,7 @@ final class MapState {
   }
 
   func render() throws -> Bool {
+    guard let renderTarget else { return false }
     do {
       try renderTarget.renderUpdate()
       return true

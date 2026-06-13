@@ -196,18 +196,24 @@ final class OpenGLRenderTarget {
 
     @Override
     public void close() {
+      var closingCompositor = compositor;
+      var closingSession = session;
+      var closingTexture = texture;
+      compositor = null;
+      session = null;
+      texture = null;
       try {
-        if (compositor != null) {
-          compositor.close();
+        if (closingCompositor != null) {
+          closingCompositor.close();
         }
       } finally {
         try {
-          if (session != null) {
-            session.close();
+          if (closingSession != null) {
+            closingSession.close();
           }
         } finally {
-          if (texture != null) {
-            texture.close();
+          if (closingTexture != null) {
+            closingTexture.close();
           }
         }
       }

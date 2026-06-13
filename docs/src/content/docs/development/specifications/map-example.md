@@ -136,7 +136,7 @@ flowchart TB
   subgraph mapstate["Map state"]
     RT[Runtime]
     MP[Map]
-    RS[Render-target session]
+    RS[Render target]
   end
   subgraph gfx["Graphics host"]
     BE[Backend context]
@@ -467,7 +467,7 @@ Input handlers return whether the camera changed so the frame loop can set
 - SHOULD register a native log callback during startup and clear it on shutdown.
 - On setup or camera failure, print a short message including the native status
   and diagnostic strings returned by the C API.
-- On startup, print the three items listed in [Startup](#startup) step 9.
+- On startup, print the three items listed in [Startup](#startup) step 8.
 
 ---
 
