@@ -10,4 +10,14 @@ swift build --scratch-path ".build/$MLN_FFI_VARIANT"
 
 [tasks.run]
 depends = ["build"]
-run = 'swift run --scratch-path ".build/$MLN_FFI_VARIANT"'
+usage = 'arg "render-target"'
+run = '".build/$MLN_FFI_VARIANT/debug/swift-map" "{{ usage.render_target }}"'
+
+[tasks."run:owned-texture"]
+run = [{ task = "run", args = ["owned-texture"] }]
+
+[tasks."run:borrowed-texture"]
+run = [{ task = "run", args = ["borrowed-texture"] }]
+
+[tasks."run:native-surface"]
+run = [{ task = "run", args = ["native-surface"] }]

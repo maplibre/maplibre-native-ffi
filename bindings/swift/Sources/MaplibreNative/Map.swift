@@ -71,6 +71,13 @@ public final class MapHandle {
     handle.isClosed
   }
 
+  public func isSource(of event: RuntimeEvent) -> Bool {
+    guard case .map(let source) = event.source else {
+      return false
+    }
+    return source.addressBitPattern == nativeAddress
+  }
+
   func requireLivePointer() throws -> OpaquePointer {
     try handle.requireLive()
   }

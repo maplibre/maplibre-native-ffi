@@ -6,21 +6,30 @@ import QuartzCore
 final class MetalMapView: NSView {
   private let metalLayer = CAMetalLayer()
   private let input = InputController()
+  private let mode: RenderTargetMode
+  private var graphics: MetalGraphicsContext?
   private var mapState: MapState?
   private var timer: Timer?
   private var currentViewport: Viewport?
   private var renderPending = true
   private var consecutiveRenderFailures = 0
+  private var didLogStartupStatus = false
   private var setupError: Error?
   private var errorLabel: NSTextField?
 
   override var acceptsFirstResponder: Bool { true }
 
-  init() {
+  init(mode: RenderTargetMode) {
+    self.mode = mode
     super.init(frame: .zero)
 
     wantsLayer = true
     layer = metalLayer
+    do {
+      graphics = try MetalGraphicsContext(layer: metalLayer)
+    } catch {
+      setupError = error
+    }
     postsFrameChangedNotifications = true
     NotificationCenter.default.addObserver(
       self,
@@ -125,27 +134,28 @@ final class MetalMapView: NSView {
 
   private func updateViewport() {
     guard setupError == nil else { return }
-    guard bounds.width > 0, bounds.height > 0 else { return }
-    let scale = window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 1.0
-    let logicalWidth = max(UInt32(ceil(bounds.width)), 1)
-    let logicalHeight = max(UInt32(ceil(bounds.height)), 1)
-    let physicalWidth = max(UInt32(ceil(bounds.width * scale)), 1)
-    let physicalHeight = max(UInt32(ceil(bounds.height * scale)), 1)
-    let viewport = Viewport(
-      logicalWidth: logicalWidth,
-      logicalHeight: logicalHeight,
-      physicalWidth: physicalWidth,
-      physicalHeight: physicalHeight,
-      scaleFactor: scale
-    )
-    metalLayer.contentsScale = scale
+    guard let graphics else { return }
+    let viewport = readViewport()
 
     guard viewport != currentViewport else { return }
+    let label = currentViewport == nil ? "initial viewport" : "resized viewport"
+    viewport.log(label)
+    if viewport.isEmpty {
+      currentViewport = viewport
+      renderPending = false
+      return
+    }
+
     do {
+      graphics.resize(viewport)
       if mapState == nil {
-        mapState = try MapState(viewport: viewport, layer: metalLayer)
+        mapState = try MapState(mode: mode, viewport: viewport, graphics: graphics)
+        if !didLogStartupStatus {
+          logStartupStatus(mode: mode)
+          didLogStartupStatus = true
+        }
       } else {
-        try mapState?.resize(viewport)
+        try mapState?.resize(viewport, graphics: graphics)
       }
       currentViewport = viewport
       renderPending = true
@@ -158,8 +168,10 @@ final class MetalMapView: NSView {
   private func tick() {
     guard let mapState else { return }
     do {
-      mapState.runOnce()
+      try mapState.runOnce()
       renderPending = try mapState.drainEvents() || renderPending
+      try mapState.finishFrame()
+      guard let viewport = currentViewport, !viewport.isEmpty else { return }
       guard renderPending else { return }
       if try mapState.render() {
         renderPending = false
@@ -172,8 +184,31 @@ final class MetalMapView: NSView {
         timer?.invalidate()
         timer = nil
         showError(error)
+        shutdown()
+        NSApp.terminate(nil)
       }
     }
+  }
+
+  private func readViewport() -> Viewport {
+    let rawScale = window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 1.0
+    let scale = rawScale.isFinite && rawScale > 0 ? rawScale : 1.0
+    let rawLogicalWidth = bounds.width
+    let rawLogicalHeight = bounds.height
+    let rawPhysicalWidth = rawLogicalWidth * scale
+    let rawPhysicalHeight = rawLogicalHeight * scale
+    let empty = rawLogicalWidth <= 0 ||
+      rawLogicalHeight <= 0 ||
+      rawPhysicalWidth <= 0 ||
+      rawPhysicalHeight <= 0
+    return Viewport(
+      logicalWidth: empty ? 0 : max(UInt32(ceil(rawLogicalWidth)), 1),
+      logicalHeight: empty ? 0 : max(UInt32(ceil(rawLogicalHeight)), 1),
+      physicalWidth: empty ? 0 : max(UInt32(ceil(rawPhysicalWidth)), 1),
+      physicalHeight: empty ? 0 : max(UInt32(ceil(rawPhysicalHeight)), 1),
+      scaleFactor: scale,
+      isEmpty: empty
+    )
   }
 
   private func showError(_ error: Error) {

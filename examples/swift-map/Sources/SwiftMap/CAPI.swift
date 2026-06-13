@@ -29,9 +29,15 @@ func logControls() {
       arrows or WASD: pan
       + / -: zoom at center
       Q / E: rotate
-      PageUp / PageDown or [ / ]: pitch
+      ] / [: pitch
       0: reset pitch and bearing
 
     """
   )
+}
+
+func logStartupStatus(mode: RenderTargetMode) {
+  print("render target: \(mode.rawValue)")
+  print("render target status: \(mode.statusLine)")
+  logControls()
 }
