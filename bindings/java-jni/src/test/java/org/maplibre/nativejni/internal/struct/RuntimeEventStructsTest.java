@@ -7,7 +7,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.Optional;
 import org.bytedeco.javacpp.BytePointer;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.maplibre.nativejni.internal.javacpp.MaplibreNativeC;
 import org.maplibre.nativejni.map.TileOperation;
@@ -19,14 +18,8 @@ import org.maplibre.nativejni.runtime.OfflineOperationResultKind;
 import org.maplibre.nativejni.runtime.RuntimeEventPayload;
 import org.maplibre.nativejni.runtime.RuntimeEventSourceType;
 import org.maplibre.nativejni.runtime.RuntimeEventType;
-import org.maplibre.nativejni.test.NativeTestSupport;
 
 final class RuntimeEventStructsTest {
-  @BeforeAll
-  static void loadNativeLibrary() {
-    NativeTestSupport.loadNativeLibraryOrSkip();
-  }
-
   @Test
   void renderFramePayloadCopiesStatsAndFlags() {
     var longs = longs();
@@ -41,12 +34,10 @@ final class RuntimeEventStructsTest {
     longs[RuntimeStructs.LONG_FRAME_COUNT] = 3;
     longs[RuntimeStructs.LONG_DRAW_CALL_COUNT] = 4;
     longs[RuntimeStructs.LONG_TOTAL_DRAW_CALL_COUNT] = 5;
-
     var payload =
         assertInstanceOf(
             RuntimeEventPayload.RenderFrame.class,
             RuntimeStructs.runtimeEventPayload(longs, ints, booleans, doubles, strings()));
-
     assertSame(RenderMode.FULL, payload.mode());
     assertTrue(payload.needsRepaint());
     assertEquals(1.5, payload.stats().encodingTime(), 0.0);
@@ -67,7 +58,6 @@ final class RuntimeEventStructsTest {
                 doubles(),
                 strings));
     assertEquals("missing-image", imagePayload.imageId());
-
     var longs = longs();
     var ints = ints(RuntimeStructs.PAYLOAD_TILE_ACTION);
     strings[RuntimeStructs.STRING_PAYLOAD] = "source";
@@ -77,7 +67,6 @@ final class RuntimeEventStructsTest {
     longs[RuntimeStructs.LONG_TILE_CANONICAL_Z] = 5;
     longs[RuntimeStructs.LONG_TILE_CANONICAL_X] = 4;
     longs[RuntimeStructs.LONG_TILE_CANONICAL_Y] = 3;
-
     var tilePayload =
         assertInstanceOf(
             RuntimeEventPayload.TileAction.class,
@@ -103,7 +92,6 @@ final class RuntimeEventStructsTest {
     statusLongs[RuntimeStructs.LONG_REQUIRED_RESOURCE_COUNT] = 6;
     statusBooleans[RuntimeStructs.BOOLEAN_REQUIRED_RESOURCE_COUNT_IS_PRECISE] = true;
     statusBooleans[RuntimeStructs.BOOLEAN_COMPLETE] = true;
-
     var statusPayload =
         assertInstanceOf(
             RuntimeEventPayload.OfflineRegionStatusChanged.class,
@@ -112,7 +100,6 @@ final class RuntimeEventStructsTest {
     assertEquals(9, statusPayload.regionId());
     assertSame(OfflineRegionDownloadState.ACTIVE, statusPayload.status().downloadState());
     assertTrue(statusPayload.status().complete());
-
     var errorLongs = longs();
     var errorInts = ints(RuntimeStructs.PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR);
     errorLongs[RuntimeStructs.LONG_REGION_ID] = 10;
@@ -124,7 +111,6 @@ final class RuntimeEventStructsTest {
             RuntimeStructs.runtimeEventPayload(
                 errorLongs, errorInts, booleans(), doubles(), strings()));
     assertSame(ResourceErrorReason.NOT_FOUND, errorPayload.reason());
-
     var limitLongs = longs();
     limitLongs[RuntimeStructs.LONG_REGION_ID] = 11;
     limitLongs[RuntimeStructs.LONG_LIMIT] = 12;
@@ -138,7 +124,6 @@ final class RuntimeEventStructsTest {
                 doubles(),
                 strings()));
     assertEquals(12, limitPayload.limit());
-
     var completedLongs = longs();
     var completedInts = ints(RuntimeStructs.PAYLOAD_OFFLINE_OPERATION_COMPLETED);
     var completedBooleans = booleans();
@@ -167,11 +152,9 @@ final class RuntimeEventStructsTest {
       event.payload_type(RuntimeStructs.PAYLOAD_RENDER_MAP);
       event.payload(payload);
       event.payload_size(0);
-
       var longs = longs();
       var ints = new int[RuntimeStructs.INT_COUNT];
       RuntimeStructs.copyEvent(event, longs, ints, booleans(), doubles(), strings());
-
       assertEquals(0, ints[RuntimeStructs.INT_PAYLOAD_AVAILABLE]);
       var unknown =
           assertInstanceOf(
@@ -199,11 +182,9 @@ final class RuntimeEventStructsTest {
       event.payload_size(payload.sizeof());
       event.message(messageBytes);
       event.message_size(message.length);
-
       var strings = strings();
       RuntimeStructs.copyEvent(
           event, longs(), new int[RuntimeStructs.INT_COUNT], booleans(), doubles(), strings);
-
       assertEquals("i\0d", strings[RuntimeStructs.STRING_PAYLOAD]);
       assertEquals("m\0g", strings[RuntimeStructs.STRING_MESSAGE]);
     }
@@ -219,11 +200,9 @@ final class RuntimeEventStructsTest {
     ints[RuntimeStructs.INT_CODE] = 7;
     longs[RuntimeStructs.LONG_PAYLOAD_SIZE] = 123;
     strings[RuntimeStructs.STRING_MESSAGE] = "boom";
-
     var event =
         RuntimeStructs.runtimeEvent(
             longs, ints, booleans(), doubles(), strings, Optional.empty(), Optional.empty());
-
     assertSame(RuntimeEventType.MAP_LOADING_FAILED, event.type());
     assertSame(RuntimeEventSourceType.RUNTIME, event.sourceType());
     assertEquals(7, event.code());

@@ -11,8 +11,6 @@ public sealed class LoggingTests
     [Fact]
     public void CanInstallAndClearLogCallback()
     {
-        NativeLibraryTestSupport.SkipUnlessNativeLibraryIsAvailable();
-
         Maplibre.SetLogCallback(_ => true);
         Maplibre.ClearLogCallback();
     }
@@ -20,8 +18,6 @@ public sealed class LoggingTests
     [Fact]
     public void InvalidAsyncSeverityMaskMapsNativeStatus()
     {
-        NativeLibraryTestSupport.SkipUnlessNativeLibraryIsAvailable();
-
         var error = Assert.Throws<InvalidArgumentException>(() =>
             Maplibre.SetAsyncLogSeverities((LogSeverityMask)(1u << 31))
         );

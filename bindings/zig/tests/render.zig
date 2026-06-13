@@ -299,7 +299,7 @@ const TestOwnedTextureContext = if (build_options.supports_vulkan) VulkanAttachC
     device: *anyopaque,
 
     pub fn init() !@This() {
-        return .{ .device = MTLCreateSystemDefaultDevice() orelse return error.SkipZigTest };
+        return .{ .device = MTLCreateSystemDefaultDevice() orelse return error.MetalDeviceUnavailable };
     }
 
     pub fn deinit(_: *@This()) void {}
@@ -1438,7 +1438,7 @@ test "OpenGL surface renders through public bindings" {
 
 test "Metal owned texture frame handle scopes native pointers" {
     if (!build_options.supports_metal) return error.SkipZigTest;
-    const device = MTLCreateSystemDefaultDevice() orelse return error.SkipZigTest;
+    const device = MTLCreateSystemDefaultDevice() orelse return error.MetalDeviceUnavailable;
 
     var runtime = try maplibre.RuntimeHandle.init(null);
     defer runtime.close() catch @panic("runtime close failed");
@@ -1494,7 +1494,7 @@ test "Metal owned texture frame handle scopes native pointers" {
 
 test "Metal owned texture frame release follows moved session wrapper" {
     if (!build_options.supports_metal) return error.SkipZigTest;
-    const device = MTLCreateSystemDefaultDevice() orelse return error.SkipZigTest;
+    const device = MTLCreateSystemDefaultDevice() orelse return error.MetalDeviceUnavailable;
 
     const pool = try metal_support.AutoreleasePool.init();
     defer pool.deinit();
@@ -1534,7 +1534,7 @@ test "render session rejects wrong-thread calls through public bindings" {
 
 test "Metal borrowed texture renders through public bindings" {
     if (!build_options.supports_metal) return error.SkipZigTest;
-    const device = MTLCreateSystemDefaultDevice() orelse return error.SkipZigTest;
+    const device = MTLCreateSystemDefaultDevice() orelse return error.MetalDeviceUnavailable;
 
     const pool = try metal_support.AutoreleasePool.init();
     defer pool.deinit();

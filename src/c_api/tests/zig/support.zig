@@ -211,7 +211,7 @@ const MetalAttachContext = struct {
     device: *anyopaque,
 
     pub fn init() !MetalAttachContext {
-        return .{ .device = MTLCreateSystemDefaultDevice() orelse return error.SkipZigTest };
+        return .{ .device = MTLCreateSystemDefaultDevice() orelse return error.MetalDeviceUnavailable };
     }
 
     pub fn deinit(_: *MetalAttachContext) void {}

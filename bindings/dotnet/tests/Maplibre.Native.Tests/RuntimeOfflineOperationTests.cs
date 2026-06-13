@@ -8,7 +8,6 @@ public sealed class RuntimeOfflineOperationTests
     [Fact]
     public void AmbientCacheOperationCanBeStartedAndDiscarded()
     {
-        NativeLibraryTestSupport.SkipUnlessNativeLibraryIsAvailable();
         using var runtime = RuntimeHandle.Create();
 
         using var operation = runtime.StartAmbientCacheOperation(AmbientCacheOperation.Invalidate);
@@ -27,7 +26,6 @@ public sealed class RuntimeOfflineOperationTests
     [Fact]
     public void OperationCloseAfterRuntimeCloseMarksOperationClosed()
     {
-        NativeLibraryTestSupport.SkipUnlessNativeLibraryIsAvailable();
         var runtime = RuntimeHandle.Create();
         using var operation = runtime.StartAmbientCacheOperation(AmbientCacheOperation.Invalidate);
 

@@ -96,7 +96,6 @@ public sealed class CustomGeometrySourceTests
     [Fact]
     public void CustomGeometrySourceApisAdaptThroughNativeMap()
     {
-        NativeLibraryTestSupport.SkipUnlessNativeLibraryIsAvailable();
         using var runtime = RuntimeHandle.Create();
         using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
         map.SetStyleJson("{\"version\":8,\"sources\":{},\"layers\":[]}");
@@ -131,7 +130,6 @@ public sealed class CustomGeometrySourceTests
     [Fact]
     public void DetachedCustomGeometryCleanupKeepsActiveCustomVectorSources()
     {
-        NativeLibraryTestSupport.SkipUnlessNativeLibraryIsAvailable();
         using var runtime = RuntimeHandle.Create();
         using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
         map.SetStyleJson("{\"version\":8,\"sources\":{},\"layers\":[]}");
@@ -149,7 +147,6 @@ public sealed class CustomGeometrySourceTests
     [Fact]
     public void StaleStyleLoadedEventKeepsStillAttachedCustomGeometrySource()
     {
-        NativeLibraryTestSupport.SkipUnlessNativeLibraryIsAvailable();
         using var runtime = RuntimeHandle.Create();
         using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
         map.SetStyleJson("{\"version\":8,\"sources\":{},\"layers\":[]}");
@@ -175,7 +172,6 @@ public sealed class CustomGeometrySourceTests
     [Fact]
     public void InlineStyleReplacementReleasesCustomGeometryCallbacks()
     {
-        NativeLibraryTestSupport.SkipUnlessNativeLibraryIsAvailable();
         using var runtime = RuntimeHandle.Create();
         using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
         map.SetStyleJson("{\"version\":8,\"sources\":{},\"layers\":[]}");

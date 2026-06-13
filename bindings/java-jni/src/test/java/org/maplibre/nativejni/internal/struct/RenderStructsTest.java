@@ -19,7 +19,6 @@ import org.maplibre.nativejni.render.VulkanContextDescriptor;
 import org.maplibre.nativejni.render.VulkanOwnedTextureDescriptor;
 import org.maplibre.nativejni.render.VulkanSurfaceDescriptor;
 import org.maplibre.nativejni.render.WglContextDescriptor;
-import org.maplibre.nativejni.test.NativeTestSupport;
 
 final class RenderStructsTest {
   @Test
@@ -43,13 +42,11 @@ final class RenderStructsTest {
                 NativePointer.ofAddress(0x201),
                 NativePointer.ofAddress(0x202))
             .getProcAddress(NativePointer.ofAddress(0x203));
-
     var metalOwnedTexture =
         RenderStructs.metalOwnedTextureDescriptor(
             new MetalOwnedTextureDescriptor().extent(extent).context(metalContext));
     assertExtent(extent, metalOwnedTexture.extent());
     assertEquals(0x1234, metalOwnedTexture.context().device());
-
     var metalBorrowedTexture =
         RenderStructs.metalBorrowedTextureDescriptor(
             new MetalBorrowedTextureDescriptor()
@@ -57,7 +54,6 @@ final class RenderStructsTest {
                 .texture(NativePointer.ofAddress(0x50)));
     assertExtent(extent, metalBorrowedTexture.extent());
     assertEquals(0x50, metalBorrowedTexture.texture());
-
     var metalSurface =
         RenderStructs.metalSurfaceDescriptor(
             new MetalSurfaceDescriptor()
@@ -67,13 +63,11 @@ final class RenderStructsTest {
     assertExtent(extent, metalSurface.extent());
     assertEquals(0x1234, metalSurface.context().device());
     assertEquals(0x60, metalSurface.layer());
-
     var vulkanOwnedTexture =
         RenderStructs.vulkanOwnedTextureDescriptor(
             new VulkanOwnedTextureDescriptor().extent(extent).context(vulkanContext));
     assertExtent(extent, vulkanOwnedTexture.extent());
     assertVulkanContext(vulkanContext, vulkanOwnedTexture.context());
-
     var vulkanBorrowedTexture =
         RenderStructs.vulkanBorrowedTextureDescriptor(
             new VulkanBorrowedTextureDescriptor()
@@ -91,7 +85,6 @@ final class RenderStructsTest {
     assertEquals(44, vulkanBorrowedTexture.format());
     assertEquals(1, vulkanBorrowedTexture.initialLayout());
     assertEquals(2, vulkanBorrowedTexture.finalLayout());
-
     var vulkanSurface =
         RenderStructs.vulkanSurfaceDescriptor(
             new VulkanSurfaceDescriptor()
@@ -101,13 +94,11 @@ final class RenderStructsTest {
     assertExtent(extent, vulkanSurface.extent());
     assertVulkanContext(vulkanContext, vulkanSurface.context());
     assertEquals(0x90, vulkanSurface.surface());
-
     var openglOwnedTexture =
         RenderStructs.openglOwnedTextureDescriptor(
             new OpenGLOwnedTextureDescriptor().extent(extent).context(wglContext));
     assertExtent(extent, openglOwnedTexture.extent());
     assertWglContext(wglContext, openglOwnedTexture.context());
-
     var openglBorrowedTexture =
         RenderStructs.openglBorrowedTextureDescriptor(
             new OpenGLBorrowedTextureDescriptor()
@@ -119,7 +110,6 @@ final class RenderStructsTest {
     assertEglContext(eglContext, openglBorrowedTexture.context());
     assertEquals(12, openglBorrowedTexture.texture());
     assertEquals(0x0de1, openglBorrowedTexture.target());
-
     var openglSurface =
         RenderStructs.openglSurfaceDescriptor(
             new OpenGLSurfaceDescriptor()
@@ -133,7 +123,6 @@ final class RenderStructsTest {
 
   @Test
   void nativeOpenGLDescriptorsMaterializeUnionFields() {
-    NativeTestSupport.loadNativeLibraryOrSkip();
     var extent = new RenderTargetExtent(640, 480, 2.0);
     var wglContext =
         new WglContextDescriptor(NativePointer.ofAddress(0x100), NativePointer.ofAddress(0x101))
@@ -144,14 +133,12 @@ final class RenderStructsTest {
                 NativePointer.ofAddress(0x201),
                 NativePointer.ofAddress(0x202))
             .getProcAddress(NativePointer.ofAddress(0x203));
-
     var openglOwnedTexture =
         RenderStructs.nativeOpenGLOwnedTextureDescriptor(
             new OpenGLOwnedTextureDescriptor().extent(extent).context(wglContext));
     assertEquals((int) openglOwnedTexture.sizeof(), openglOwnedTexture.size());
     assertNativeExtent(extent, openglOwnedTexture.extent());
     assertNativeWglContext(wglContext, openglOwnedTexture.context());
-
     var openglBorrowedTexture =
         RenderStructs.nativeOpenGLBorrowedTextureDescriptor(
             new OpenGLBorrowedTextureDescriptor()
@@ -164,7 +151,6 @@ final class RenderStructsTest {
     assertNativeEglContext(eglContext, openglBorrowedTexture.context());
     assertEquals(12, openglBorrowedTexture.texture());
     assertEquals(0x0de1, openglBorrowedTexture.target());
-
     var openglSurface =
         RenderStructs.nativeOpenGLSurfaceDescriptor(
             new OpenGLSurfaceDescriptor()

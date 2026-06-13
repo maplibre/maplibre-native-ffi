@@ -17,14 +17,12 @@ import org.maplibre.nativejni.internal.status.Status;
 import org.maplibre.nativejni.log.LogSeverity;
 import org.maplibre.nativejni.render.OpenGLContextProvider;
 import org.maplibre.nativejni.runtime.NetworkStatus;
-import org.maplibre.nativejni.test.NativeTestSupport;
 
 class MaplibreTest {
   private static NetworkStatus originalNetworkStatus;
 
   @BeforeAll
-  static void loadNativeLibrary() {
-    NativeTestSupport.loadNativeLibraryOrSkip();
+  static void captureOriginalNetworkStatus() {
     originalNetworkStatus = Maplibre.networkStatus();
   }
 

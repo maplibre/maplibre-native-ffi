@@ -11,7 +11,6 @@ public sealed class StyleLayerTests
     [Fact]
     public void DemAndLocationLayerHelpersAdaptThroughNativeMap()
     {
-        NativeLibraryTestSupport.SkipUnlessNativeLibraryIsAvailable();
         using var runtime = RuntimeHandle.Create();
         using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
         map.SetStyleJson("{\"version\":8,\"sources\":{},\"layers\":[]}");

@@ -10,7 +10,6 @@ import java.util.EnumSet;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assumptions;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.maplibre.nativejni.Maplibre;
 import org.maplibre.nativejni.error.InvalidArgumentException;
@@ -24,7 +23,6 @@ import org.maplibre.nativejni.map.MapHandle;
 import org.maplibre.nativejni.map.MapOptions;
 import org.maplibre.nativejni.runtime.RuntimeEventType;
 import org.maplibre.nativejni.runtime.RuntimeHandle;
-import org.maplibre.nativejni.test.NativeTestSupport;
 import org.maplibre.nativejni.test.RenderTargetTestSupport;
 
 class RenderSessionHandleTest {
@@ -38,11 +36,6 @@ class RenderSessionHandleTest {
         ]
       }
       """;
-
-  @BeforeAll
-  static void loadNativeLibrary() {
-    NativeTestSupport.loadNativeLibraryOrSkip();
-  }
 
   @AfterEach
   void restoreProcessState() {
@@ -173,7 +166,6 @@ class RenderSessionHandleTest {
   void openglOwnedTextureFrameHandleStaysActiveUntilClosed() throws Exception {
     Maplibre.setLogCallback(record -> true);
     Maplibre.setAsyncLogSeverities(EnumSet.noneOf(LogSeverity.class));
-
     var runtime = RuntimeHandle.create();
     var map = MapHandle.create(runtime, new MapOptions().size(64, 64));
     try (var target = assumeOpenGLOwnedTextureTarget(map)) {
@@ -181,7 +173,6 @@ class RenderSessionHandleTest {
       map.setStyleJson(STYLE_JSON);
       waitForMapEvent(runtime, map, RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE);
       activeSession.renderUpdate();
-
       OpenGLOwnedTextureFrame frame;
       try (var frameHandle = activeSession.acquireOpenGLOwnedTextureFrame()) {
         frame = frameHandle.frame();
@@ -206,7 +197,6 @@ class RenderSessionHandleTest {
   void openglOwnedTextureFrameCloseFailureLeavesHandleRetryable() throws Exception {
     Maplibre.setLogCallback(record -> true);
     Maplibre.setAsyncLogSeverities(EnumSet.noneOf(LogSeverity.class));
-
     var runtime = RuntimeHandle.create();
     var map = MapHandle.create(runtime, new MapOptions().size(64, 64));
     try (var target = assumeOpenGLOwnedTextureTarget(map)) {
@@ -214,7 +204,6 @@ class RenderSessionHandleTest {
       map.setStyleJson(STYLE_JSON);
       waitForMapEvent(runtime, map, RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE);
       activeSession.renderUpdate();
-
       var frameHandle = activeSession.acquireOpenGLOwnedTextureFrame();
       var frame = frameHandle.frame();
       try {
@@ -238,7 +227,6 @@ class RenderSessionHandleTest {
   void openglBorrowedTextureSessionRendersThroughPublicBinding() throws Exception {
     Maplibre.setLogCallback(record -> true);
     Maplibre.setAsyncLogSeverities(EnumSet.noneOf(LogSeverity.class));
-
     var runtime = RuntimeHandle.create();
     var map = MapHandle.create(runtime, new MapOptions().size(128, 128));
     try (var target = assumeOpenGLBorrowedTextureTarget(map)) {
@@ -246,7 +234,6 @@ class RenderSessionHandleTest {
       map.setStyleJson(STYLE_JSON);
       waitForMapEvent(runtime, map, RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE);
       activeSession.renderUpdate();
-
       assertThrows(
           UnsupportedFeatureException.class, activeSession::acquireOpenGLOwnedTextureFrame);
       assertThrows(UnsupportedFeatureException.class, activeSession::textureImageInfo);
@@ -266,7 +253,6 @@ class RenderSessionHandleTest {
   void openglSurfaceSessionRendersThroughPublicBinding() throws Exception {
     Maplibre.setLogCallback(record -> true);
     Maplibre.setAsyncLogSeverities(EnumSet.noneOf(LogSeverity.class));
-
     var runtime = RuntimeHandle.create();
     var map = MapHandle.create(runtime, new MapOptions().size(128, 128));
     try (var target = assumeOpenGLSurfaceTarget(map)) {
@@ -274,7 +260,6 @@ class RenderSessionHandleTest {
       map.setStyleJson(STYLE_JSON);
       waitForMapEvent(runtime, map, RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE);
       activeSession.renderUpdate();
-
       assertThrows(
           UnsupportedFeatureException.class, activeSession::acquireOpenGLOwnedTextureFrame);
       assertThrows(UnsupportedFeatureException.class, activeSession::textureImageInfo);
@@ -301,11 +286,9 @@ class RenderSessionHandleTest {
     var wglContext =
         new WglContextDescriptor(NativePointer.ofAddress(0x50), NativePointer.ofAddress(0x60))
             .getProcAddress(NativePointer.ofAddress(0x70));
-
     var owned = new OpenGLOwnedTextureDescriptor().extent(extent).context(eglContext);
     assertEquals(extent, owned.extent());
     assertEquals(eglContext, owned.context());
-
     var borrowed =
         new OpenGLBorrowedTextureDescriptor()
             .extent(extent)
@@ -316,7 +299,6 @@ class RenderSessionHandleTest {
     assertEquals(wglContext, borrowed.context());
     assertEquals(12, borrowed.texture());
     assertEquals(0x0de1, borrowed.target());
-
     var surface =
         new OpenGLSurfaceDescriptor()
             .extent(extent)
@@ -332,7 +314,6 @@ class RenderSessionHandleTest {
     var scope = new FrameScope();
     var frame =
         new OpenGLOwnedTextureFrame(scope, 1, 2, 3, 1.0, 4, 5, 0x0de1, 0x8058, 0x1908, 0x1401);
-
     assertEquals(5, frame.texture());
     scope.close();
     assertThrows(IllegalStateException.class, frame::texture);
