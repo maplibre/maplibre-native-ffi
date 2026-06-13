@@ -14,7 +14,9 @@ public final class NativeTestSupport {
       throw new IllegalStateException(
           "Set "
               + NativeLibrary.LIBRARY_PATH_PROPERTY
-              + " to an exact JNI bridge path for Java JNI tests.");
+              + " (system property) or "
+              + NativeLibrary.LIBRARY_PATH_ENV
+              + " (env var) to an exact JNI bridge path for Java JNI tests.");
     }
     var path = Path.of(libraryPath);
     if (!Files.isRegularFile(path)) {

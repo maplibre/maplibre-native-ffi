@@ -22,7 +22,7 @@ class MaplibreTest {
   private static NetworkStatus originalNetworkStatus;
 
   @BeforeAll
-  static void loadNativeLibrary() {
+  static void captureOriginalNetworkStatus() {
     originalNetworkStatus = Maplibre.networkStatus();
   }
 

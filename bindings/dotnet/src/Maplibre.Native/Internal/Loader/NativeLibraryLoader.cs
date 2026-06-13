@@ -116,7 +116,7 @@ internal static class NativeLibraryLoader
         }
     }
 
-    private static string PlatformLibraryFileName()
+    internal static string PlatformLibraryFileName()
     {
         if (OperatingSystem.IsWindows())
         {

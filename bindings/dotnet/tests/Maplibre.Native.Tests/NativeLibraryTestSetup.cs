@@ -1,4 +1,5 @@
 using System.Runtime.CompilerServices;
+using Maplibre.Native.Internal.Loader;
 
 namespace Maplibre.Native.Tests;
 
@@ -15,27 +16,12 @@ internal static class NativeLibraryTestSetup
             );
         }
 
-        var libraryPath = Path.Combine(buildDir, PlatformLibraryFileName());
+        var libraryPath = Path.Combine(buildDir, NativeLibraryLoader.PlatformLibraryFileName());
         if (!File.Exists(libraryPath))
         {
             throw new FileNotFoundException("Native library is not built.", libraryPath);
         }
 
         global::Maplibre.Native.Maplibre.LoadNativeLibrary(libraryPath);
-    }
-
-    private static string PlatformLibraryFileName()
-    {
-        if (OperatingSystem.IsWindows())
-        {
-            return "maplibre-native-c.dll";
-        }
-
-        if (OperatingSystem.IsMacOS())
-        {
-            return "libmaplibre-native-c.dylib";
-        }
-
-        return "libmaplibre-native-c.so";
     }
 }
