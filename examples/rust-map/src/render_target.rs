@@ -180,6 +180,9 @@ impl RenderTarget {
     }
 
     pub fn render_update(&mut self, graphics: &GraphicsContext) -> maplibre_native::Result<()> {
+        #[cfg(target_os = "macos")]
+        let _ = graphics;
+
         match self {
             Self::OwnedVulkanTexture {
                 session,
@@ -255,6 +258,9 @@ impl RenderTarget {
     }
 
     pub fn close(self, graphics: Option<&GraphicsContext>) -> Result<(), Box<dyn StdError>> {
+        #[cfg(target_os = "macos")]
+        let _ = graphics;
+
         match self {
             Self::OwnedVulkanTexture {
                 session,

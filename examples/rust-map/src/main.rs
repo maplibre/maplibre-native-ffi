@@ -95,9 +95,9 @@ fn render_backend_label(backends: maplibre_native::RenderBackendMask) -> String 
 fn supports_usable_backend(backends: maplibre_native::RenderBackendMask) -> bool {
     #[cfg(target_os = "macos")]
     {
-        return backends.intersects(
+        backends.intersects(
             maplibre_native::RenderBackendMask::METAL | maplibre_native::RenderBackendMask::VULKAN,
-        );
+        )
     }
     #[cfg(not(target_os = "macos"))]
     backends.intersects(
