@@ -154,15 +154,15 @@ impl OpenGLTextureCompositor {
         context.make_current()?;
         let gl = context.gl();
         let program = create_texture_program(&gl)?;
+        let mut program_guard = GlCleanupGuard::new(gl.clone(), program, delete_program);
         let vertex_array = match unsafe { gl.create_vertex_array() } {
             Ok(vertex_array) => vertex_array,
             Err(error) => {
-                unsafe {
-                    gl.delete_program(program);
-                }
                 return Err(error.into());
             }
         };
+        let mut vertex_array_guard =
+            GlCleanupGuard::new(gl.clone(), vertex_array, delete_vertex_array);
         unsafe {
             gl.use_program(Some(program));
             if let Some(sampler) = gl.get_uniform_location(program, "map_texture") {
@@ -171,12 +171,10 @@ impl OpenGLTextureCompositor {
             gl.use_program(None);
         }
         if let Err(error) = check_gl_error(&gl, "initialize OpenGL texture compositor") {
-            unsafe {
-                gl.delete_vertex_array(vertex_array);
-                gl.delete_program(program);
-            }
             return Err(error);
         }
+        let program = program_guard.take();
+        let vertex_array = vertex_array_guard.take();
         Ok(Self {
             gl: gl.clone(),
             program,
@@ -275,6 +273,7 @@ impl OpenGLBorrowedTexture {
         context.make_current()?;
         let gl = context.gl();
         let texture = unsafe { gl.create_texture()? };
+        let mut texture_guard = GlCleanupGuard::new(gl.clone(), texture, delete_texture);
         unsafe {
             gl.bind_texture(TEXTURE_TARGET, Some(texture));
             gl.tex_parameter_i32(
@@ -301,6 +300,7 @@ impl OpenGLBorrowedTexture {
             gl.bind_texture(TEXTURE_TARGET, None);
         }
         check_gl_error(&gl, "create OpenGL borrowed texture")?;
+        let texture = texture_guard.take();
         Ok(Self {
             gl: gl.clone(),
             texture,
@@ -443,6 +443,58 @@ fn check_gl_error(gl: &glow::Context, operation: &str) -> Result<(), Box<dyn Err
 
 fn compositor_error(message: impl Into<String>) -> maplibre_native::Error {
     maplibre_native::Error::new(maplibre_native::ErrorKind::NativeError, None, message)
+}
+
+struct GlCleanupGuard<T> {
+    gl: Rc<glow::Context>,
+    object: Option<T>,
+    cleanup: fn(&glow::Context, T),
+}
+
+impl<T> GlCleanupGuard<T> {
+    fn new(gl: Rc<glow::Context>, object: T, cleanup: fn(&glow::Context, T)) -> Self {
+        Self {
+            gl,
+            object: Some(object),
+            cleanup,
+        }
+    }
+
+    fn take(&mut self) -> T {
+        self.object.take().expect("GL cleanup guard is live")
+    }
+}
+
+impl<T> Drop for GlCleanupGuard<T> {
+    fn drop(&mut self) {
+        if let Some(object) = self.object.take() {
+            (self.cleanup)(&self.gl, object);
+        }
+    }
+}
+
+fn delete_program(gl: &glow::Context, program: glow::Program) {
+    // SAFETY: Constructor guards run before ownership escapes and while the
+    // OpenGL context made current for construction is still current.
+    unsafe {
+        gl.delete_program(program);
+    }
+}
+
+fn delete_vertex_array(gl: &glow::Context, vertex_array: glow::VertexArray) {
+    // SAFETY: Constructor guards run before ownership escapes and while the
+    // OpenGL context made current for construction is still current.
+    unsafe {
+        gl.delete_vertex_array(vertex_array);
+    }
+}
+
+fn delete_texture(gl: &glow::Context, texture: glow::Texture) {
+    // SAFETY: Constructor guards run before ownership escapes and while the
+    // OpenGL context made current for construction is still current.
+    unsafe {
+        gl.delete_texture(texture);
+    }
 }
 
 fn nonzero_dimension(value: u32) -> NonZeroU32 {
