@@ -4,44 +4,28 @@ use std::num::NonZeroU32;
 use std::rc::Rc;
 
 use glow::HasContext;
-use glutin::config::{AsRawConfig, Config, ConfigSurfaceTypes, RawConfig};
 use glutin::config::{ConfigTemplateBuilder, GlConfig};
-use glutin::context::{
-    AsRawContext, ContextApi, ContextAttributesBuilder, PossiblyCurrentContext, RawContext, Version,
-};
-use glutin::display::{AsRawDisplay, GetGlDisplay, GlDisplay, RawDisplay};
+use glutin::context::{ContextAttributesBuilder, PossiblyCurrentContext};
+use glutin::display::{GetGlDisplay, GlDisplay};
 use glutin::prelude::*;
-use glutin::surface::{AsRawSurface, RawSurface, Surface, SurfaceAttributesBuilder, WindowSurface};
-use glutin_winit::{ApiPreference, DisplayBuilder};
-#[cfg(target_os = "windows")]
-use maplibre_native::WglContextDescriptor;
-use maplibre_native::{
-    EglContextDescriptor, NativePointer, OpenGLContextDescriptor, OpenGLOwnedTextureFrameHandle,
-};
+use glutin::surface::{Surface, SurfaceAttributesBuilder, WindowSurface};
+use glutin_winit::DisplayBuilder;
+use maplibre_native::{NativePointer, OpenGLContextDescriptor, OpenGLOwnedTextureFrameHandle};
 use raw_window_handle::HasWindowHandle;
-#[cfg(target_os = "windows")]
-use raw_window_handle::RawWindowHandle;
 use winit::event_loop::ActiveEventLoop;
 use winit::window::{Window, WindowAttributes};
 
 use crate::viewport::Viewport;
 
-#[cfg(target_os = "windows")]
-use windows_sys::Win32::Foundation::HWND;
-#[cfg(target_os = "windows")]
-use windows_sys::Win32::Graphics::Gdi::{GetDC, HDC, ReleaseDC};
+mod platform;
 
 const TEXTURE_TARGET: u32 = glow::TEXTURE_2D;
 
 pub struct OpenGLContext {
-    config: Config,
+    platform: platform::OpenGLPlatformContext,
     context: PossiblyCurrentContext,
     surface: Surface<WindowSurface>,
     gl: Rc<glow::Context>,
-    #[cfg(target_os = "windows")]
-    hwnd: HWND,
-    #[cfg(target_os = "windows")]
-    hdc: HDC,
 }
 
 pub struct OpenGLTextureCompositor {
@@ -61,15 +45,15 @@ impl OpenGLContext {
         event_loop: &ActiveEventLoop,
         window_attributes: WindowAttributes,
     ) -> Result<(Window, Self), Box<dyn Error>> {
-        let template = ConfigTemplateBuilder::new()
-            .with_alpha_size(8)
-            .with_depth_size(24)
-            .with_stencil_size(8);
-        #[cfg(target_os = "linux")]
-        let template = template.with_surface_type(ConfigSurfaceTypes::WINDOW);
+        let template = platform::configure_template(
+            ConfigTemplateBuilder::new()
+                .with_alpha_size(8)
+                .with_depth_size(24)
+                .with_stencil_size(8),
+        );
 
         let (window, config) = DisplayBuilder::new()
-            .with_preference(opengl_api_preference())
+            .with_preference(platform::opengl_api_preference())
             .with_window_attributes(Some(window_attributes))
             .build(event_loop, template, |configs| {
                 configs
@@ -78,13 +62,8 @@ impl OpenGLContext {
             })?;
         let window = window.ok_or("glutin did not create a window")?;
         let raw_window_handle = window.window_handle()?.as_raw();
-        let context_api = if cfg!(target_os = "linux") {
-            ContextApi::Gles(Some(Version::new(3, 0)))
-        } else {
-            ContextApi::OpenGl(Some(Version::new(3, 0)))
-        };
         let context_attributes = ContextAttributesBuilder::new()
-            .with_context_api(context_api)
+            .with_context_api(platform::context_api())
             .build(Some(raw_window_handle));
         let display = config.display();
         // SAFETY: raw_window_handle comes from a live window and the config was
@@ -107,83 +86,24 @@ impl OpenGLContext {
             })
         });
 
-        #[cfg(target_os = "windows")]
-        let hwnd = hwnd_from_window(&window)?;
-        #[cfg(target_os = "windows")]
-        let hdc = unsafe { GetDC(hwnd) };
-        #[cfg(target_os = "windows")]
-        if hdc.is_null() {
-            return Err("GetDC returned null".into());
-        }
+        let platform = platform::OpenGLPlatformContext::new(&window, config)?;
 
         let context = Self {
-            config,
+            platform,
             context,
             surface,
             gl,
-            #[cfg(target_os = "windows")]
-            hwnd,
-            #[cfg(target_os = "windows")]
-            hdc,
         };
         println!("OpenGL context: {}", context.context_api_name());
         Ok((window, context))
     }
 
     pub fn descriptor(&self) -> Result<OpenGLContextDescriptor, Box<dyn Error>> {
-        #[cfg(target_os = "windows")]
-        {
-            let RawContext::Wgl(raw_context) = self.context.raw_context() else {
-                return Err("glutin did not create a WGL context".into());
-            };
-            return Ok(OpenGLContextDescriptor::wgl(WglContextDescriptor::new(
-                unsafe { NativePointer::from_ptr(self.hdc) },
-                unsafe { NativePointer::from_ptr(raw_context.cast_mut()) },
-            )));
-        }
-
-        #[cfg(target_os = "linux")]
-        {
-            let RawDisplay::Egl(raw_display) = self.config.display().raw_display() else {
-                return Err("glutin did not create an EGL display".into());
-            };
-            let RawConfig::Egl(raw_config) = self.config.raw_config() else {
-                return Err("glutin did not choose an EGL config".into());
-            };
-            let RawContext::Egl(raw_context) = self.context.raw_context() else {
-                return Err("glutin did not create an EGL context".into());
-            };
-            Ok(OpenGLContextDescriptor::egl(EglContextDescriptor::new(
-                unsafe { NativePointer::from_ptr(raw_display.cast_mut()) },
-                unsafe { NativePointer::from_ptr(raw_config.cast_mut()) },
-                unsafe { NativePointer::from_ptr(raw_context.cast_mut()) },
-            )))
-        }
-
-        #[cfg(not(any(target_os = "windows", target_os = "linux")))]
-        {
-            Err("OpenGL context descriptors are only available on Linux EGL and Windows WGL".into())
-        }
+        self.platform.descriptor(&self.context)
     }
 
     pub fn surface_pointer(&self) -> Result<NativePointer, Box<dyn Error>> {
-        #[cfg(target_os = "windows")]
-        {
-            return Ok(unsafe { NativePointer::from_ptr(self.hdc) });
-        }
-
-        #[cfg(target_os = "linux")]
-        {
-            let RawSurface::Egl(raw_surface) = self.surface.raw_surface() else {
-                return Err("glutin did not create an EGL surface".into());
-            };
-            Ok(unsafe { NativePointer::from_ptr(raw_surface.cast_mut()) })
-        }
-
-        #[cfg(not(any(target_os = "windows", target_os = "linux")))]
-        {
-            Err("OpenGL surfaces are only available on Linux EGL and Windows WGL".into())
-        }
+        self.platform.surface_pointer(&self.surface)
     }
 
     pub fn gl(&self) -> Rc<glow::Context> {
@@ -219,32 +139,13 @@ impl OpenGLContext {
     }
 
     fn context_api_name(&self) -> &'static str {
-        #[cfg(target_os = "linux")]
-        {
-            "EGL/GLES"
-        }
-        #[cfg(target_os = "windows")]
-        {
-            "WGL/OpenGL"
-        }
-        #[cfg(not(any(target_os = "linux", target_os = "windows")))]
-        {
-            "OpenGL"
-        }
+        self.platform.context_api_name()
     }
 }
 
 impl Drop for OpenGLContext {
     fn drop(&mut self) {
         self.wait_idle();
-        #[cfg(target_os = "windows")]
-        if !self.hdc.is_null() {
-            // SAFETY: hdc was acquired from this live window with GetDC.
-            unsafe {
-                ReleaseDC(self.hwnd, self.hdc);
-            }
-            self.hdc = std::ptr::null_mut();
-        }
     }
 }
 
@@ -424,17 +325,6 @@ impl OpenGLBorrowedTexture {
     }
 }
 
-fn opengl_api_preference() -> ApiPreference {
-    #[cfg(target_os = "linux")]
-    {
-        ApiPreference::PreferEgl
-    }
-    #[cfg(not(target_os = "linux"))]
-    {
-        ApiPreference::FallbackEgl
-    }
-}
-
 fn create_texture_program(gl: &glow::Context) -> Result<glow::Program, Box<dyn Error>> {
     let vertex = compile_shader(gl, glow::VERTEX_SHADER, vertex_shader_source(), "vertex")?;
     let fragment = match compile_shader(
@@ -500,7 +390,7 @@ fn compile_shader(
 }
 
 fn vertex_shader_source() -> &'static str {
-    if cfg!(target_os = "linux") {
+    if platform::uses_gles() {
         "#version 300 es\n\
          out vec2 out_uv;\n\
          const vec2 positions[3] = vec2[3](vec2(-1.0, -1.0), vec2(3.0, -1.0), vec2(-1.0, 3.0));\n\
@@ -522,7 +412,7 @@ fn vertex_shader_source() -> &'static str {
 }
 
 fn fragment_shader_source() -> &'static str {
-    if cfg!(target_os = "linux") {
+    if platform::uses_gles() {
         "#version 300 es\n\
          precision mediump float;\n\
          uniform sampler2D map_texture;\n\
@@ -557,12 +447,4 @@ fn compositor_error(message: impl Into<String>) -> maplibre_native::Error {
 
 fn nonzero_dimension(value: u32) -> NonZeroU32 {
     NonZeroU32::new(value.max(1)).expect("dimension is clamped to at least one")
-}
-
-#[cfg(target_os = "windows")]
-fn hwnd_from_window(window: &Window) -> Result<HWND, Box<dyn Error>> {
-    let RawWindowHandle::Win32(handle) = window.window_handle()?.as_raw() else {
-        return Err("winit did not return a Win32 window handle".into());
-    };
-    Ok(handle.hwnd.get() as HWND)
 }
