@@ -14,13 +14,14 @@ append_unique() {
 }
 
 normalize_windows_msvc_path() {
-  [[ -n "${VCTOOLSINSTALLDIR:-}" ]] || return 0
+  local vc_tools_install_dir="${VCTOOLSINSTALLDIR:-${VCToolsInstallDir:-}}"
+  [[ -n "$vc_tools_install_dir" ]] || return 0
   command -v cygpath >/dev/null 2>&1 || return 0
 
   local host_arch="${VSCMD_ARG_HOST_ARCH:-x64}"
   local target_arch="${VSCMD_ARG_TGT_ARCH:-x64}"
   local msvc_bin
-  msvc_bin="$(cygpath -u "${VCTOOLSINSTALLDIR%\\}\\bin\\Host${host_arch^}\\${target_arch}")"
+  msvc_bin="$(cygpath -u "${vc_tools_install_dir%\\}\\bin\\Host${host_arch^}\\${target_arch}")"
   [[ -x "$msvc_bin/link.exe" ]] || return 0
 
   local dependency_bin="" dependency_path="" rest_path="" path_entry

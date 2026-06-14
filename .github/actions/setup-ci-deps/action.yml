@@ -106,6 +106,50 @@ runs:
         $workspaceDrive = Split-Path -Qualifier $env:GITHUB_WORKSPACE
         New-Item -ItemType Directory -Force -Path (Join-Path $workspaceDrive "tmp") | Out-Null
 
+        $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+        $vsInstall = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+        if (-not $vsInstall) {
+          throw "Visual Studio C++ tools were not found"
+        }
+
+        $vsDevCmd = Join-Path $vsInstall "Common7\Tools\VsDevCmd.bat"
+        $msvcEnv = cmd /s /c "`"$vsDevCmd`" -arch=x64 -host_arch=x64 >nul && set"
+        $msvcEnv | ForEach-Object {
+          if ($_ -match "^(.*?)=(.*)$") {
+            $name = $matches[1]
+            $value = $matches[2]
+            if ($name -in @(
+                "DevEnvDir",
+                "ExtensionSdkDir",
+                "INCLUDE",
+                "LIB",
+                "LIBPATH",
+                "Path",
+                "UCRTVersion",
+                "UniversalCRTSdkDir",
+                "VCIDEInstallDir",
+                "VCINSTALLDIR",
+                "VCToolsInstallDir",
+                "VCToolsRedistDir",
+                "VCToolsVersion",
+                "VisualStudioVersion",
+                "VSINSTALLDIR",
+                "VSCMD_ARG_HOST_ARCH",
+                "VSCMD_ARG_TGT_ARCH",
+                "VSCMD_VER",
+                "WindowsLibPath",
+                "WindowsSdkBinPath",
+                "WindowsSdkDir",
+                "WindowsSDKLibVersion",
+                "WindowsSdkVerBinPath",
+                "WindowsSDKVersion"
+              )) {
+              "$name=$value" >> $env:GITHUB_ENV
+              Set-Item -Path "env:$name" -Value $value
+            }
+          }
+        }
+
         $paths = @(
           if ($env:SCCACHE_PATH) { Split-Path -Parent $env:SCCACHE_PATH }
           if ($env:Path) { $env:Path -split ';' }
