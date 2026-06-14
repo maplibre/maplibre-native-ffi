@@ -305,85 +305,85 @@ References:
 
 ## Phase 6: Render Targets and Compositors
 
-- [ ] Implement the shared render-target factory.
+- [x] Implement the shared render-target factory.
   - Grounding: `map-example.md#render-target-modes`.
   - Dispatch by active graphics backend and selected render-target mode.
 
-- [ ] Implement `owned-texture` attach for Metal.
+- [x] Implement `owned-texture` attach for Metal.
   - Grounding: `map-example.md#owned-texture`, `map-example.md#metal`.
   - Use `MetalOwnedTextureDescriptor` with the shared device/context.
 
-- [ ] Implement `owned-texture` attach for Vulkan.
+- [x] Implement `owned-texture` attach for Vulkan.
   - Grounding: `map-example.md#owned-texture`, `map-example.md#vulkan`.
   - Use `VulkanOwnedTextureDescriptor` with shared Vulkan handles.
 
-- [ ] Implement `owned-texture` attach for OpenGL.
+- [x] Implement `owned-texture` attach for OpenGL.
   - Grounding: `map-example.md#owned-texture`,
     `map-example.md#opengl--egl--wgl`.
   - Use `OpenGLOwnedTextureDescriptor` with EGL or WGL context descriptor.
 
-- [ ] Implement `owned-texture` frame acquisition and release.
+- [x] Implement `owned-texture` frame acquisition and release.
   - Grounding: `map-example.md#owned-texture`.
   - Acquire the backend frame after successful render update.
   - Draw it through the compositor.
   - Release/close the frame before the next render-session operation.
 
-- [ ] Implement `borrowed-texture` host texture creation for Metal.
+- [x] Implement `borrowed-texture` host texture creation for Metal.
   - Grounding: `map-example.md#borrowed-texture`, `map-example.md#metal`.
   - Create an exportable `MTLTexture` sized to the physical viewport.
 
-- [ ] Implement `borrowed-texture` host image creation for Vulkan.
+- [x] Implement `borrowed-texture` host image creation for Vulkan.
   - Grounding: `map-example.md#borrowed-texture`, `map-example.md#vulkan`.
   - Create exportable `VkImage` and `VkImageView` sized to the physical
     viewport.
 
-- [ ] Implement `borrowed-texture` host texture creation for OpenGL.
+- [x] Implement `borrowed-texture` host texture creation for OpenGL.
   - Grounding: `map-example.md#borrowed-texture`,
     `map-example.md#opengl--egl--wgl`.
   - Create a GL texture sized to the physical viewport.
 
-- [ ] Implement `borrowed-texture` attach for each backend.
+- [x] Implement `borrowed-texture` attach for each backend.
   - Grounding: `map-example.md#borrowed-texture`.
   - Use the matching C# borrowed-texture descriptor.
   - Return `NeedsReattachOnResize = true`.
 
-- [ ] Implement `native-surface` attach for Metal.
+- [x] Implement `native-surface` attach for Metal.
   - Grounding: `map-example.md#native-surface`, `map-example.md#metal`.
   - Use `MetalSurfaceDescriptor` with the `CAMetalLayer`.
 
-- [ ] Implement `native-surface` attach for Vulkan.
+- [x] Implement `native-surface` attach for Vulkan.
   - Grounding: `map-example.md#native-surface`, `map-example.md#vulkan`.
   - Use `VulkanSurfaceDescriptor` with `VkSurfaceKHR`.
 
-- [ ] Implement `native-surface` attach for OpenGL.
+- [x] Implement `native-surface` attach for OpenGL.
   - Grounding: `map-example.md#native-surface`,
     `map-example.md#opengl--egl--wgl`.
   - Use `OpenGLSurfaceDescriptor` with EGL surface or WGL device context.
 
-- [ ] Add a native-surface render path that bypasses compositor draw.
+- [x] Add a native-surface render path that bypasses compositor draw.
   - Grounding: `map-example.md#native-surface`.
 
-- [ ] Implement the fullscreen triangle compositor for OpenGL.
+- [x] Implement the fullscreen triangle compositor for OpenGL.
   - Grounding: `map-example.md#compositor-shaders-texture-modes`.
   - Use pass-through UVs and straight texture copy.
 
-- [ ] Implement the fullscreen triangle compositor for Vulkan.
+- [x] Implement the fullscreen triangle compositor for Vulkan.
   - Grounding: `map-example.md#compositor-shaders-texture-modes`.
   - Use pass-through UVs and straight texture copy.
 
-- [ ] Implement the fullscreen triangle compositor for Metal.
+- [x] Implement the fullscreen triangle compositor for Metal.
   - Grounding: `map-example.md#compositor-shaders-texture-modes`.
   - Compile MSL source, create command queue, create render pipeline, draw into
     the next `CAMetalDrawable`.
 
-- [ ] Implement render-target resize behavior for each mode.
+- [x] Implement render-target resize behavior for each mode.
   - Grounding: `map-example.md#resize`.
   - `borrowed-texture`: destroy and recreate mode resources, then reattach.
   - `owned-texture`: resize session and compositor resources in place.
   - `native-surface`: resize session and presentation resources in place unless
     the platform provides a new surface handle.
 
-- [ ] Implement render-target shutdown for each mode.
+- [x] Implement render-target shutdown for each mode.
   - Grounding: `map-example.md#shutdown`.
   - Release compositor resources and borrowed textures/images before or with the
     render session according to backend lifetime rules.

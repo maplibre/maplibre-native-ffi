@@ -43,6 +43,20 @@ internal sealed unsafe partial class VulkanContext : IGraphicsContext
 
     public bool CanRenderFrame => window.CanRenderFrame();
 
+    public Vk Api => vk;
+
+    public Instance Instance => instance;
+
+    public SurfaceKHR Surface => surface;
+
+    public PhysicalDevice PhysicalDevice => physicalDevice;
+
+    public Device Device => device;
+
+    public Queue GraphicsQueue => graphicsQueue;
+
+    public uint GraphicsQueueFamilyIndex => graphicsQueueFamilyIndex;
+
     public static VulkanContext Create(string title, int width, int height)
     {
         var vk = Vk.GetApi();
@@ -399,7 +413,7 @@ internal sealed unsafe partial class VulkanContext : IGraphicsContext
         return extensions;
     }
 
-    private static void Check(Result result, string operation)
+    public static void Check(Result result, string operation)
     {
         if (result != Result.Success)
         {

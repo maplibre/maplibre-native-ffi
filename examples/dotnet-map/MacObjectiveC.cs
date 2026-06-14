@@ -108,9 +108,25 @@ internal static partial class MacObjectiveC
         objc_msgSend_void_IntPtr(receiver, Selector(selectorName), argument);
     }
 
+    public static void SendVoid(nint receiver, string selectorName, nint first, ulong second)
+    {
+        objc_msgSend_void_IntPtr_ulong(receiver, Selector(selectorName), first, second);
+    }
+
     public static void SendVoid(nint receiver, string selectorName, ulong argument)
     {
         objc_msgSend_void_ulong(receiver, Selector(selectorName), argument);
+    }
+
+    public static void SendVoid(
+        nint receiver,
+        string selectorName,
+        ulong first,
+        ulong second,
+        ulong third
+    )
+    {
+        objc_msgSend_void_ulong_ulong_ulong(receiver, Selector(selectorName), first, second, third);
     }
 
     public static void SendVoid(nint receiver, string selectorName, long argument)
@@ -266,10 +282,27 @@ internal static partial class MacObjectiveC
     );
 
     [LibraryImport("/usr/lib/libobjc.A.dylib", EntryPoint = "objc_msgSend")]
+    private static partial void objc_msgSend_void_IntPtr_ulong(
+        nint receiver,
+        nint selector,
+        nint first,
+        ulong second
+    );
+
+    [LibraryImport("/usr/lib/libobjc.A.dylib", EntryPoint = "objc_msgSend")]
     private static partial void objc_msgSend_void_ulong(
         nint receiver,
         nint selector,
         ulong argument
+    );
+
+    [LibraryImport("/usr/lib/libobjc.A.dylib", EntryPoint = "objc_msgSend")]
+    private static partial void objc_msgSend_void_ulong_ulong_ulong(
+        nint receiver,
+        nint selector,
+        ulong first,
+        ulong second,
+        ulong third
     );
 
     [LibraryImport("/usr/lib/libobjc.A.dylib", EntryPoint = "objc_msgSend")]

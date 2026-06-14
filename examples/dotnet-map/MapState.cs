@@ -1,8 +1,15 @@
+using Maplibre.Native.Map;
+
 namespace Maplibre.Native.Examples.DotnetMap;
 
 internal sealed class MapState : IDisposable
 {
     private MapState() { }
+
+    private MapHandle? MapOrNull { get; set; }
+
+    public MapHandle Map =>
+        MapOrNull ?? throw new InvalidOperationException("Map state has not created a map yet.");
 
     public bool RenderPending { get; private set; }
 
