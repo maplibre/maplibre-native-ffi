@@ -2,7 +2,7 @@ package org.maplibre.nativejni.render;
 
 import java.util.Objects;
 
-/** Mutable EGL context descriptor for OpenGL render targets on Linux. */
+/** Mutable EGL context descriptor for OpenGL render targets. */
 public final class EglContextDescriptor implements OpenGLContextDescriptor {
   private NativePointer display = NativePointer.NULL;
   private NativePointer config = NativePointer.NULL;

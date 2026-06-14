@@ -37,9 +37,12 @@ on that platform.
 | -------- | ----------------- | ----------------- | ----------------- | ----------------- |
 | Linux    | 🟢 EGL            | 🟢                | -                 | ❌ [#37][issue-37] |
 | Android  | ❌ [#24][issue-24] | ❌ [#24][issue-24] | -                 | ❌ [#37][issue-37] |
-| macOS    | -                 | 🟢                | 🟢                | ❌ [#37][issue-37] |
+| macOS    | 🟢 ANGLE/EGL      | 🟢                | 🟢                | ❌ [#37][issue-37] |
 | iOS      | -                 | -                 | ❌ [#25][issue-25] | ❌ [#37][issue-37] |
 | Windows  | 🟢 WGL            | 🟢                | -                 | ❌ [#37][issue-37] |
+
+The `macos-arm64-angle` mise variant is the macOS EGL backend. It uses ANGLE
+with Metal to exercise the OpenGL ES renderer on macOS.
 
 ### Language bindings
 

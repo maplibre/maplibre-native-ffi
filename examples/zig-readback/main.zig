@@ -177,7 +177,7 @@ const OpenGLAttachContext = if (build_options.supports_opengl and builtin.os.tag
     fn init() !OpenGLAttachContext {
         // WGL contexts need a Win32 device context with a selected pixel
         // format. SDL gives us a hidden helper window for that without showing
-        // UI, but this is not truly surfaceless like the Linux EGL pbuffer path.
+        // UI, but this is not truly surfaceless like the EGL pbuffer path.
         if (!sdl.SDL_Init(sdl.SDL_INIT_VIDEO)) return error.WglUnavailable;
         errdefer sdl.SDL_Quit();
 

@@ -53,9 +53,11 @@ Broad phases are grouped so each phase can land as a separate commit.
 
 ## Phase 4: Documentation
 
-- [ ] Update public docs and header wording that currently says EGL is
+- [x] Update public docs and header wording that currently says EGL is
       Linux-only.
-- [ ] Add `macos-arm64-angle` to docs as the macOS development EGL backend.
+- [x] Add `macos-arm64-angle` to docs as the macOS EGL backend.
+- [x] Add `macos-arm64-angle` to the CI variant matrix with native, Zig binding,
+      and Zig readback coverage.
 
 ## Phase 5: Verification
 
