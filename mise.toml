@@ -99,6 +99,19 @@ run = [
     -DMLN_FFI_RENDER_BACKEND="$MLN_FFI_RENDER_BACKEND"
   )
 
+  if [[ -n "${MLN_FFI_OPENGL_CONTEXT_PROVIDER:-}" ]]; then
+    cmake_args+=(
+      -DMLN_FFI_OPENGL_CONTEXT_PROVIDER="$MLN_FFI_OPENGL_CONTEXT_PROVIDER"
+    )
+  fi
+
+  if [[ -n "${MLN_FFI_ANGLE_ROOT:-}" ]]; then
+    mise run deps:angle
+    cmake_args+=(
+      -DMLN_FFI_ANGLE_ROOT="$MLN_FFI_ANGLE_ROOT"
+    )
+  fi
+
   cmake "${cmake_args[@]}"
   ''',
   '''
@@ -161,8 +174,9 @@ sha256="$(printf '%s\n' "$angle_meta" | sed -n '3p')"
 angle_root="${MLN_FFI_REPO_ROOT}/third_party/angle/${version}/${artifact}"
 archive="${MLN_FFI_REPO_ROOT}/third_party/angle/${version}/${artifact}.tar.gz"
 marker="${angle_root}/.complete"
+marker_value="${sha256} install-name-rpath-v1"
 
-if [[ -f "$marker" ]] && [[ "$(cat "$marker")" == "$sha256" ]]; then
+if [[ -f "$marker" ]] && [[ "$(cat "$marker")" == "$marker_value" ]]; then
   exit 0
 fi
 
@@ -184,7 +198,15 @@ rm -rf "$angle_root"
 mkdir -p "$angle_root"
 tar -xzf "$tmp_dir/angle.tar.gz" -C "$angle_root" --strip-components=1
 cp "$tmp_dir/angle.tar.gz" "$archive"
-printf '%s' "$sha256" > "$marker"
+
+if [[ "$(uname -s)" == "Darwin" ]]; then
+  install_name_tool -id @rpath/libEGL.dylib "$angle_root/libEGL.dylib"
+  install_name_tool -id @rpath/libGLESv2.dylib "$angle_root/libGLESv2.dylib"
+  codesign --force --sign - "$angle_root/libEGL.dylib" >/dev/null
+  codesign --force --sign - "$angle_root/libGLESv2.dylib" >/dev/null
+fi
+
+printf '%s' "$marker_value" > "$marker"
 '''
 
 [tasks.test]

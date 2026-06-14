@@ -16,24 +16,24 @@ Broad phases are grouped so each phase can land as a separate commit.
 
 ## Phase 2: Build Variant and CMake Wiring
 
-- [ ] Add `.mise/config.macos-arm64-angle.toml` with
+- [x] Add `.mise/config.macos-arm64-angle.toml` with
       `MLN_FFI_VARIANT=macos-arm64-angle`, `MLN_FFI_TARGET_TRIPLE=macos-arm64`,
       `MLN_FFI_RENDER_BACKEND=opengl`, `MLN_FFI_OPENGL_CONTEXT_PROVIDER=egl`,
       `MLN_FFI_ANGLE_ROOT={{config_root}}/third_party/angle/chromium-7151_rev1/macos-arm64`,
       and a dedicated build dir.
-- [ ] Update `mise.toml` `configure` so OpenGL builds pass
+- [x] Update `mise.toml` `configure` so OpenGL builds pass
       `-DMLN_FFI_OPENGL_CONTEXT_PROVIDER="$MLN_FFI_OPENGL_CONTEXT_PROVIDER"` and
       ANGLE builds pass `-DMLN_FFI_ANGLE_ROOT="$MLN_FFI_ANGLE_ROOT"`.
-- [ ] Update `cmake/mln_options.cmake` to allow
+- [x] Update `cmake/mln_options.cmake` to allow
       `MLN_FFI_OPENGL_CONTEXT_PROVIDER=egl` on macOS only when
       `MLN_FFI_ANGLE_ROOT` is set.
-- [ ] Add `cmake/angle.cmake` defining imported targets `ANGLE::EGL` and
+- [x] Add `cmake/angle.cmake` defining imported targets `ANGLE::EGL` and
       `ANGLE::GLESv2` from `MLN_FFI_ANGLE_ROOT`, including header dirs and dylib
       locations.
-- [ ] Update `cmake/render/opengl.cmake`: for macOS EGL, use ANGLE targets, add
+- [x] Update `cmake/render/opengl.cmake`: for macOS EGL, use ANGLE targets, add
       ANGLE include dirs, link `ANGLE::EGL` and `ANGLE::GLESv2`, and define
       `MLN_FFI_OPENGL_PROVIDER_EGL=1` plus `MLN_FFI_OPENGL_PROVIDER_ANGLE=1`.
-- [ ] Ensure build-tree runtime loading works by adding the ANGLE library
+- [x] Ensure build-tree runtime loading works by adding the ANGLE library
       directory to build RPATH or copying `libEGL.dylib` and `libGLESv2.dylib`
       next to `libmaplibre-native-c.dylib`.
 

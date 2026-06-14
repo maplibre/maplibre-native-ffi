@@ -10,12 +10,30 @@ function(mln_configure_opengl_backend target)
     PRIVATE ${MLN_SOURCE_DIR}/vendor/unique_resource)
 
   if(MLN_FFI_OPENGL_CONTEXT_PROVIDER STREQUAL "egl")
-    find_package(OpenGL REQUIRED EGL)
-    list(
-      APPEND MLN_FFI_VENDOR_OPENGL_SOURCES
-      ${MLN_SOURCE_DIR}/platform/linux/src/gl_functions.cpp
-      ${MLN_SOURCE_DIR}/platform/linux/src/headless_backend_egl.cpp)
-    target_link_libraries(${target} PRIVATE OpenGL::EGL ${CMAKE_DL_LIBS})
+    target_compile_definitions(${target} PRIVATE MLN_FFI_OPENGL_PROVIDER_EGL=1)
+    list(APPEND MLN_FFI_VENDOR_OPENGL_SOURCES
+         ${MLN_SOURCE_DIR}/platform/linux/src/headless_backend_egl.cpp)
+    if(APPLE)
+      include(angle)
+      mln_import_angle()
+      target_compile_definitions(
+        ${target}
+        PRIVATE MLN_FFI_OPENGL_PROVIDER_ANGLE=1)
+      target_link_libraries(${target} PRIVATE ANGLE::EGL ANGLE::GLESv2)
+      target_include_directories(
+        ${target}
+        SYSTEM
+        PRIVATE "${MLN_FFI_ANGLE_INCLUDE_DIR}")
+      set_property(
+        TARGET ${target}
+        APPEND
+        PROPERTY BUILD_RPATH "${MLN_FFI_ANGLE_LIBRARY_DIR}")
+    else()
+      find_package(OpenGL REQUIRED EGL)
+      target_link_libraries(${target} PRIVATE OpenGL::EGL ${CMAKE_DL_LIBS})
+    endif()
+    list(APPEND MLN_FFI_VENDOR_OPENGL_SOURCES
+         ${MLN_SOURCE_DIR}/platform/linux/src/gl_functions.cpp)
   elseif(MLN_FFI_OPENGL_CONTEXT_PROVIDER STREQUAL "wgl")
     find_package(OpenGL REQUIRED)
     list(APPEND MLN_FFI_VENDOR_OPENGL_SOURCES
