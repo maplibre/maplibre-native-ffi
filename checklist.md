@@ -4,12 +4,12 @@ Broad phases are grouped so each phase can land as a separate commit.
 
 ## Phase 1: Dependency Pinning and Fetching
 
-- [ ] Add `third_party/angle/manifest.json` with pinned Kivy ANGLE artifacts:
+- [x] Add `third_party/angle/manifest.json` with pinned Kivy ANGLE artifacts:
       `chromium-7151_rev1`, macOS arm64 URL, macOS universal URL, and SHA-256
       values.
-- [ ] Add `third_party/angle/.gitignore` so extracted ANGLE archives and
+- [x] Add `third_party/angle/.gitignore` so extracted ANGLE archives and
       libraries stay out of git while the manifest remains tracked.
-- [ ] Add a mise task `deps:angle` in `mise.toml` that downloads the platform
+- [x] Add a mise task `deps:angle` in `mise.toml` that downloads the platform
       artifact, verifies SHA-256, extracts to
       `third_party/angle/chromium-7151_rev1/macos-arm64`, and exits successfully
       when the verified extraction already exists.
