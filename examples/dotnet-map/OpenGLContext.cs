@@ -29,6 +29,8 @@ internal sealed unsafe class OpenGLContext : IGraphicsContext
 
     public bool ShouldClose => window.ShouldClose;
 
+    public bool CanRenderFrame => window.CanRenderFrame();
+
     public static OpenGLContext Create(string title, int width, int height)
     {
         if (OperatingSystem.IsLinux())

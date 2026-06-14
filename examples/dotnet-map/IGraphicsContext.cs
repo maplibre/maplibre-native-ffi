@@ -10,6 +10,8 @@ internal interface IGraphicsContext : IDisposable
 
     bool ShouldClose { get; }
 
+    bool CanRenderFrame { get; }
+
     Viewport ReadViewport();
 
     void Resize(Viewport viewport);

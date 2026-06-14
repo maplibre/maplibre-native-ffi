@@ -30,11 +30,13 @@ internal readonly record struct Viewport(
             scale = 1;
         }
 
+        var physicalWidthValue = CheckedDimension(physicalWidth);
+        var physicalHeightValue = CheckedDimension(physicalHeight);
         return new Viewport(
-            CheckedDimension(logicalWidth),
-            CheckedDimension(logicalHeight),
-            CheckedDimension(physicalWidth),
-            CheckedDimension(physicalHeight),
+            LogicalDimension(logicalWidth, physicalWidthValue, scale),
+            LogicalDimension(logicalHeight, physicalHeightValue, scale),
+            physicalWidthValue,
+            physicalHeightValue,
             scale
         );
     }
@@ -49,5 +51,20 @@ internal readonly record struct Viewport(
     private static uint CheckedDimension(int value)
     {
         return value <= 0 ? 0 : checked((uint)value);
+    }
+
+    private static uint LogicalDimension(int logicalValue, uint physicalValue, double scale)
+    {
+        if (logicalValue > 0)
+        {
+            return checked((uint)logicalValue);
+        }
+
+        if (physicalValue == 0)
+        {
+            return 0;
+        }
+
+        return Math.Max(1, checked((uint)Math.Ceiling(physicalValue / scale)));
     }
 }

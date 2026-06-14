@@ -27,6 +27,8 @@ internal sealed unsafe class MetalContext : IGraphicsContext
 
     public bool ShouldClose => window.ShouldClose;
 
+    public bool CanRenderFrame => window.CanRenderFrame();
+
     public static MetalContext Create(string title, int width, int height)
     {
         if (!OperatingSystem.IsMacOS())

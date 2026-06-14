@@ -41,6 +41,8 @@ internal sealed unsafe partial class VulkanContext : IGraphicsContext
 
     public bool ShouldClose => window.ShouldClose;
 
+    public bool CanRenderFrame => window.CanRenderFrame();
+
     public static VulkanContext Create(string title, int width, int height)
     {
         var vk = Vk.GetApi();

@@ -234,28 +234,28 @@ References:
 
 ## Phase 4: Viewport
 
-- [ ] Implement `Viewport` with logical size, physical size, and scale factor.
+- [x] Implement `Viewport` with logical size, physical size, and scale factor.
   - Grounding: `map-example.md#viewport`.
 
-- [ ] Read the initial viewport after window creation.
+- [x] Read the initial viewport after window creation.
   - Grounding: `map-example.md#window`, `map-example.md#viewport`.
   - Use GLFW window size, framebuffer size, and content scale.
 
-- [ ] Compute logical dimensions from physical size and scale when needed.
+- [x] Compute logical dimensions from physical size and scale when needed.
   - Grounding: `map-example.md#viewport`.
   - Use `ceil(physical / scale)` with minimum `1`.
 
-- [ ] Log initial viewport values.
+- [x] Log initial viewport values.
   - Grounding: `map-example.md#viewport`.
   - Format includes `logical=... physical=... scale=...`.
 
-- [ ] Register GLFW window size, framebuffer size, and content-scale callbacks.
+- [x] Register GLFW window size, framebuffer size, and content-scale callbacks.
   - Grounding: `map-example.md#resize`.
 
-- [ ] Recompute and log viewport changes from resize callbacks.
+- [x] Recompute and log viewport changes from resize callbacks.
   - Grounding: `map-example.md#viewport`, `map-example.md#resize`.
 
-- [ ] Add a viewport-empty guard to the frame loop.
+- [x] Add a viewport-empty guard to the frame loop.
   - Grounding: `map-example.md#resize`.
   - Skip render updates while the viewport extent is empty.
 

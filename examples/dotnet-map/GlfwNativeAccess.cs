@@ -33,4 +33,10 @@ internal static unsafe partial class GlfwNativeAccess
 
     [LibraryImport(GlfwLibrary, EntryPoint = "glfwGetCocoaView")]
     public static partial nint GetCocoaView(WindowHandle* window);
+
+    [LibraryImport(GlfwLibrary, EntryPoint = "glfwSetWindowContentScaleCallback")]
+    public static partial nint SetWindowContentScaleCallback(
+        WindowHandle* window,
+        delegate* unmanaged[Cdecl]<WindowHandle*, float, float, void> callback
+    );
 }

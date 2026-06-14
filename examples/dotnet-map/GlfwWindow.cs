@@ -4,12 +4,19 @@ namespace Maplibre.Native.Examples.DotnetMap;
 
 internal sealed unsafe class GlfwWindow : IDisposable
 {
+    private static readonly Dictionary<nint, GlfwWindow> Windows = new();
+    private readonly GlfwCallbacks.WindowSizeCallback windowSizeCallback;
+    private readonly GlfwCallbacks.FramebufferSizeCallback framebufferSizeCallback;
+    private float contentScaleX = 1;
+    private float contentScaleY = 1;
     private bool closed;
 
     private GlfwWindow(Glfw glfw, WindowHandle* handle)
     {
         Glfw = glfw;
         Handle = handle;
+        windowSizeCallback = OnWindowSize;
+        framebufferSizeCallback = OnFramebufferSize;
     }
 
     public Glfw Glfw { get; }
@@ -19,6 +26,10 @@ internal sealed unsafe class GlfwWindow : IDisposable
     public nint NativeHandle => (nint)Handle;
 
     public bool ShouldClose => Glfw.WindowShouldClose(Handle);
+
+    public Viewport CurrentViewport { get; private set; }
+
+    public event Action<Viewport>? ViewportChanged;
 
     public static GlfwWindow Create(
         string title,
@@ -45,7 +56,10 @@ internal sealed unsafe class GlfwWindow : IDisposable
                 throw new InvalidOperationException("GLFW window creation failed.");
             }
 
-            return new GlfwWindow(glfw, handle);
+            var window = new GlfwWindow(glfw, handle);
+            window.RegisterViewportCallbacks();
+            window.RecomputeViewport("initial viewport", forceLog: true);
+            return window;
         }
         catch
         {
@@ -54,25 +68,16 @@ internal sealed unsafe class GlfwWindow : IDisposable
         }
     }
 
-    public Viewport ReadViewport()
-    {
-        Glfw.GetWindowSize(Handle, out var logicalWidth, out var logicalHeight);
-        Glfw.GetFramebufferSize(Handle, out var physicalWidth, out var physicalHeight);
-        var scaleX = logicalWidth > 0 ? (float)physicalWidth / logicalWidth : 1;
-        var scaleY = logicalHeight > 0 ? (float)physicalHeight / logicalHeight : 1;
-        return Viewport.FromWindowMetrics(
-            logicalWidth,
-            logicalHeight,
-            physicalWidth,
-            physicalHeight,
-            scaleX,
-            scaleY
-        );
-    }
+    public Viewport ReadViewport() => CurrentViewport;
 
     public void PollEvents()
     {
         Glfw.PollEvents();
+    }
+
+    public bool CanRenderFrame()
+    {
+        return !CurrentViewport.IsEmpty;
     }
 
     public void Dispose()
@@ -85,9 +90,89 @@ internal sealed unsafe class GlfwWindow : IDisposable
         closed = true;
         if (Handle is not null)
         {
+            Windows.Remove((nint)Handle);
+            Glfw.SetWindowSizeCallback(Handle, null);
+            Glfw.SetFramebufferSizeCallback(Handle, null);
+            GlfwNativeAccess.SetWindowContentScaleCallback(Handle, null);
             Glfw.DestroyWindow(Handle);
             Handle = null;
         }
         Glfw.Terminate();
+    }
+
+    private static void OnWindowSize(WindowHandle* handle, int width, int height)
+    {
+        _ = width;
+        _ = height;
+        DispatchViewportChange(handle);
+    }
+
+    private static void OnFramebufferSize(WindowHandle* handle, int width, int height)
+    {
+        _ = width;
+        _ = height;
+        DispatchViewportChange(handle);
+    }
+
+    [System.Runtime.InteropServices.UnmanagedCallersOnly(
+        CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)]
+    )]
+    private static void OnContentScale(WindowHandle* handle, float scaleX, float scaleY)
+    {
+        if (!Windows.TryGetValue((nint)handle, out var window))
+        {
+            return;
+        }
+
+        window.contentScaleX = scaleX;
+        window.contentScaleY = scaleY;
+        window.RecomputeViewport("viewport changed", forceLog: false);
+    }
+
+    private static void DispatchViewportChange(WindowHandle* handle)
+    {
+        if (Windows.TryGetValue((nint)handle, out var window))
+        {
+            window.RecomputeViewport("viewport changed", forceLog: false);
+        }
+    }
+
+    private void RegisterViewportCallbacks()
+    {
+        Windows[(nint)Handle] = this;
+        Glfw.SetWindowSizeCallback(Handle, windowSizeCallback);
+        Glfw.SetFramebufferSizeCallback(Handle, framebufferSizeCallback);
+        GlfwNativeAccess.SetWindowContentScaleCallback(Handle, &OnContentScale);
+    }
+
+    private void RecomputeViewport(string label, bool forceLog)
+    {
+        Glfw.GetWindowSize(Handle, out var logicalWidth, out var logicalHeight);
+        Glfw.GetFramebufferSize(Handle, out var physicalWidth, out var physicalHeight);
+        var scaleX =
+            contentScaleX > 0 ? contentScaleX
+            : logicalWidth > 0 ? (float)physicalWidth / logicalWidth
+            : 1;
+        var scaleY =
+            contentScaleY > 0 ? contentScaleY
+            : logicalHeight > 0 ? (float)physicalHeight / logicalHeight
+            : 1;
+        var viewport = Viewport.FromWindowMetrics(
+            logicalWidth,
+            logicalHeight,
+            physicalWidth,
+            physicalHeight,
+            scaleX,
+            scaleY
+        );
+
+        if (!forceLog && viewport == CurrentViewport)
+        {
+            return;
+        }
+
+        CurrentViewport = viewport;
+        CurrentViewport.Log(label);
+        ViewportChanged?.Invoke(CurrentViewport);
     }
 }
