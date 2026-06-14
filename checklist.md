@@ -61,7 +61,7 @@ Broad phases are grouped so each phase can land as a separate commit.
 
 ## Phase 5: Verification
 
-- [ ] Verify `mise -E macos-arm64-angle run deps:angle`.
-- [ ] Verify `mise -E macos-arm64-angle run build`.
-- [ ] Verify `mise -E macos-arm64-angle run test`.
-- [ ] Verify a headless readback smoke test on macOS through ANGLE.
+- [x] Verify `mise -E macos-arm64-angle run deps:angle`.
+- [x] Verify `mise -E macos-arm64-angle run build`.
+- [x] Verify `mise -E macos-arm64-angle run test`.
+- [x] Verify a headless readback smoke test on macOS through ANGLE.
