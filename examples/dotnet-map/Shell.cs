@@ -15,8 +15,6 @@ internal static class Shell
             InitialHeight,
             backends
         );
-        Console.WriteLine($"render target: {mode.CliName}");
-        Console.WriteLine($"render target status: {mode.Status}");
         var viewport = graphics.ReadViewport();
         using var mapState = MapState.Create(graphics, viewport, mode);
         using var input = new InputController(
@@ -24,6 +22,8 @@ internal static class Shell
             mapState.Map,
             mapState.RequestRender
         );
+        Console.WriteLine($"render target: {mode.CliName}");
+        Console.WriteLine($"render target status: {mode.Status}");
         InputController.PrintControls();
 
         while (!graphics.ShouldClose)
@@ -33,7 +33,10 @@ internal static class Shell
             if (currentViewport != viewport)
             {
                 viewport = currentViewport;
-                mapState.Resize(viewport);
+                if (!viewport.IsEmpty)
+                {
+                    mapState.Resize(viewport);
+                }
             }
 
             var madeProgress = mapState.Step(graphics.CanRenderFrame);

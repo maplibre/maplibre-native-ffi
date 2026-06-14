@@ -87,46 +87,71 @@ internal sealed class OwnedTextureRenderTarget : IRenderTarget
     {
         return graphics switch
         {
-            MetalContext metal => new OwnedTextureRenderTarget(
-                graphics,
-                new MetalTextureCompositor(metal),
-                RenderSessionHandle.AttachMetalOwnedTexture(
-                    map,
-                    new MetalOwnedTextureDescriptor
-                    {
-                        Extent = viewport.RenderTargetExtent,
-                        Context = metal.Descriptor(),
-                    }
-                )
+            MetalContext metal => AttachWithCleanup(
+                metal,
+                () =>
+                    RenderSessionHandle.AttachMetalOwnedTexture(
+                        map,
+                        new MetalOwnedTextureDescriptor
+                        {
+                            Extent = viewport.RenderTargetExtent,
+                            Context = metal.Descriptor(),
+                        }
+                    ),
+                () => new MetalTextureCompositor(metal)
             ),
-            VulkanContext vulkan => new OwnedTextureRenderTarget(
-                graphics,
-                new VulkanTextureCompositor(vulkan, viewport),
-                RenderSessionHandle.AttachVulkanOwnedTexture(
-                    map,
-                    new VulkanOwnedTextureDescriptor
-                    {
-                        Extent = viewport.RenderTargetExtent,
-                        Context = vulkan.Descriptor(),
-                    }
-                )
+            VulkanContext vulkan => AttachWithCleanup(
+                vulkan,
+                () =>
+                    RenderSessionHandle.AttachVulkanOwnedTexture(
+                        map,
+                        new VulkanOwnedTextureDescriptor
+                        {
+                            Extent = viewport.RenderTargetExtent,
+                            Context = vulkan.Descriptor(),
+                        }
+                    ),
+                () => new VulkanTextureCompositor(vulkan, viewport)
             ),
-            OpenGLContext openGl => new OwnedTextureRenderTarget(
-                graphics,
-                new OpenGLTextureCompositor(openGl, viewport),
-                RenderSessionHandle.AttachOpenGLOwnedTexture(
-                    map,
-                    new OpenGLOwnedTextureDescriptor
-                    {
-                        Extent = viewport.RenderTargetExtent,
-                        Context = openGl.Descriptor(),
-                    }
-                )
+            OpenGLContext openGl => AttachWithCleanup(
+                openGl,
+                () =>
+                    RenderSessionHandle.AttachOpenGLOwnedTexture(
+                        map,
+                        new OpenGLOwnedTextureDescriptor
+                        {
+                            Extent = viewport.RenderTargetExtent,
+                            Context = openGl.Descriptor(),
+                        }
+                    ),
+                () => new OpenGLTextureCompositor(openGl, viewport)
             ),
             _ => throw new InvalidOperationException(
                 $"Owned textures are not implemented for {graphics.Backend}."
             ),
         };
+    }
+
+    private static OwnedTextureRenderTarget AttachWithCleanup(
+        IGraphicsContext graphics,
+        Func<RenderSessionHandle> attachSession,
+        Func<ITextureCompositor> createCompositor
+    )
+    {
+        RenderSessionHandle? session = null;
+        ITextureCompositor? compositor = null;
+        try
+        {
+            session = attachSession();
+            compositor = createCompositor();
+            return new OwnedTextureRenderTarget(graphics, compositor, session);
+        }
+        catch
+        {
+            DisposeAfterFailure(compositor);
+            DisposeAfterFailure(session);
+            throw;
+        }
     }
 
     public void Render()
@@ -171,6 +196,23 @@ internal sealed class OwnedTextureRenderTarget : IRenderTarget
     {
         compositor.Dispose();
         session.Dispose();
+    }
+
+    private static void DisposeAfterFailure(IDisposable? disposable)
+    {
+        if (disposable is null)
+        {
+            return;
+        }
+
+        try
+        {
+            disposable.Dispose();
+        }
+        catch
+        {
+            // Preserve the setup failure that triggered cleanup.
+        }
     }
 }
 

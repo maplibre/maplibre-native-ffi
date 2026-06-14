@@ -7,12 +7,10 @@ internal readonly record struct Viewport(
     uint LogicalHeight,
     uint PhysicalWidth,
     uint PhysicalHeight,
-    double ScaleFactor
+    double ScaleFactor,
+    bool IsEmpty
 )
 {
-    public bool IsEmpty =>
-        LogicalWidth == 0 || LogicalHeight == 0 || PhysicalWidth == 0 || PhysicalHeight == 0;
-
     public RenderTargetExtent RenderTargetExtent => new(LogicalWidth, LogicalHeight, ScaleFactor);
 
     public static Viewport FromWindowMetrics(
@@ -32,19 +30,22 @@ internal readonly record struct Viewport(
 
         var physicalWidthValue = CheckedDimension(physicalWidth);
         var physicalHeightValue = CheckedDimension(physicalHeight);
+        var isEmpty =
+            logicalWidth <= 0 || logicalHeight <= 0 || physicalWidth <= 0 || physicalHeight <= 0;
         return new Viewport(
-            LogicalDimension(logicalWidth, physicalWidthValue, scale),
-            LogicalDimension(logicalHeight, physicalHeightValue, scale),
+            LogicalDimension(physicalWidthValue, scale),
+            LogicalDimension(physicalHeightValue, scale),
             physicalWidthValue,
             physicalHeightValue,
-            scale
+            scale,
+            isEmpty
         );
     }
 
     public void Log(string label)
     {
         Console.WriteLine(
-            $"{label}: logical={LogicalWidth}x{LogicalHeight} physical={PhysicalWidth}x{PhysicalHeight} scale={ScaleFactor:0.###}"
+            $"{label}: logical={LogicalWidth}x{LogicalHeight} physical={PhysicalWidth}x{PhysicalHeight} scale={ScaleFactor:0.###}{(IsEmpty ? " empty=true" : "")}"
         );
     }
 
@@ -53,13 +54,8 @@ internal readonly record struct Viewport(
         return value <= 0 ? 0 : checked((uint)value);
     }
 
-    private static uint LogicalDimension(int logicalValue, uint physicalValue, double scale)
+    private static uint LogicalDimension(uint physicalValue, double scale)
     {
-        if (logicalValue > 0)
-        {
-            return checked((uint)logicalValue);
-        }
-
         if (physicalValue == 0)
         {
             return 0;

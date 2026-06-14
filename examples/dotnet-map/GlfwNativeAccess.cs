@@ -39,4 +39,10 @@ internal static unsafe partial class GlfwNativeAccess
         WindowHandle* window,
         delegate* unmanaged[Cdecl]<WindowHandle*, float, float, void> callback
     );
+
+    [LibraryImport(GlfwLibrary, EntryPoint = "glfwInitHint")]
+    public static partial void InitHint(int hint, int value);
+
+    [LibraryImport(GlfwLibrary, EntryPoint = "glfwGetPlatform")]
+    public static partial int GetPlatform();
 }

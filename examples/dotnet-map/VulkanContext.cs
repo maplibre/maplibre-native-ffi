@@ -13,6 +13,8 @@ internal sealed unsafe partial class VulkanContext : IGraphicsContext
     private const string KhrPortabilityEnumerationExtension = "VK_KHR_portability_enumeration";
     private const string KhrPortabilitySubsetExtension = "VK_KHR_portability_subset";
     private const string ExtDebugUtilsExtension = "VK_EXT_debug_utils";
+    private const int GlfwPlatform = 0x00050003;
+    private const int GlfwPlatformWayland = 0x00060003;
 
     private readonly GlfwWindow window;
     private readonly Vk vk;
@@ -61,40 +63,93 @@ internal sealed unsafe partial class VulkanContext : IGraphicsContext
 
     public static VulkanContext Create(string title, int width, int height)
     {
+        SelectWaylandOnLinux();
         var vk = new Vk(Vk.CreateDefaultContext(NativeLibraryResolver.VulkanLibraryCandidates()));
-        var window = GlfwWindow.Create(
-            title,
-            width,
-            height,
-            glfw =>
-            {
-                if (!glfw.VulkanSupported())
-                {
-                    throw new InvalidOperationException("GLFW reports Vulkan is not supported.");
-                }
+        GlfwWindow? window = null;
+        VulkanContext? context = null;
 
-                glfw.WindowHint(WindowHintClientApi.ClientApi, ClientApi.NoApi);
-            }
-        );
-
-        var context = new VulkanContext(window, vk);
         try
         {
+            window = GlfwWindow.Create(
+                title,
+                width,
+                height,
+                glfw =>
+                {
+                    if (!glfw.VulkanSupported())
+                    {
+                        throw new InvalidOperationException(
+                            "GLFW reports Vulkan is not supported."
+                        );
+                    }
+
+                    ValidateWaylandOnLinux();
+                    glfw.WindowHint(WindowHintClientApi.ClientApi, ClientApi.NoApi);
+                }
+            );
+            context = new VulkanContext(window, vk);
             context.CreateInstance();
             context.CreateSurface();
             context.PickPhysicalDeviceAndQueue();
             context.CreateDevice();
             Console.WriteLine(
-                $"GLFW {window.Glfw.GetVersionString()}, Vulkan queue family {context.graphicsQueueFamilyIndex}"
+                $"GLFW {window.Glfw.GetVersionString()}, Vulkan queue family {context.graphicsQueueFamilyIndex}{context.PlatformStatus()}"
             );
             return context;
         }
         catch
         {
-            context.Dispose();
+            if (context is not null)
+            {
+                context.Dispose();
+            }
+            else
+            {
+                window?.Dispose();
+                vk.Dispose();
+            }
+
             throw;
         }
     }
+
+    private static void SelectWaylandOnLinux()
+    {
+        if (OperatingSystem.IsLinux() && HasWaylandDisplay())
+        {
+            GlfwNativeAccess.InitHint(GlfwPlatform, GlfwPlatformWayland);
+        }
+    }
+
+    private static void ValidateWaylandOnLinux()
+    {
+        if (!OperatingSystem.IsLinux())
+        {
+            return;
+        }
+
+        if (!HasWaylandDisplay())
+        {
+            Console.Error.WriteLine(
+                "WAYLAND_DISPLAY is not set; Linux runtime support for this example targets Wayland."
+            );
+            return;
+        }
+
+        var platform = GlfwNativeAccess.GetPlatform();
+        if (platform != GlfwPlatformWayland)
+        {
+            throw new InvalidOperationException(
+                $"GLFW did not select Wayland; selected platform={platform}."
+            );
+        }
+    }
+
+    private static bool HasWaylandDisplay() =>
+        !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("WAYLAND_DISPLAY"));
+
+    private string PlatformStatus() =>
+        OperatingSystem.IsLinux() ? $", platform {GlfwNativeAccess.GetPlatform()}" : "";
 
     public VulkanContextDescriptor Descriptor() =>
         new()
