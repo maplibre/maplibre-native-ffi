@@ -21,6 +21,7 @@ inline auto vulkan_get_instance_proc_addr(
 ) noexcept -> PFN_vkGetInstanceProcAddr {
   if (context.get_instance_proc_addr != nullptr) {
     // The C ABI carries Vulkan loader callbacks as opaque pointers.
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
     return reinterpret_cast<PFN_vkGetInstanceProcAddr>(
       context.get_instance_proc_addr
     );
@@ -33,6 +34,7 @@ inline auto vulkan_get_device_proc_addr(
 ) noexcept -> PFN_vkGetDeviceProcAddr {
   if (context.get_device_proc_addr != nullptr) {
     // The C ABI carries Vulkan loader callbacks as opaque pointers.
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
     return reinterpret_cast<PFN_vkGetDeviceProcAddr>(
       context.get_device_proc_addr
     );
