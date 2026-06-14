@@ -289,9 +289,21 @@ internal sealed class BorrowedTextureRenderTarget : IRenderTarget
 
     public void Dispose()
     {
-        compositor.Dispose();
-        session.Dispose();
-        texture.Dispose();
+        try
+        {
+            compositor.Dispose();
+        }
+        finally
+        {
+            try
+            {
+                session.Dispose();
+            }
+            finally
+            {
+                texture.Dispose();
+            }
+        }
     }
 
     private static BorrowedTextureRenderTarget AttachVulkan(
@@ -300,11 +312,14 @@ internal sealed class BorrowedTextureRenderTarget : IRenderTarget
         Viewport viewport
     )
     {
-        var texture = new VulkanBorrowedImage(vulkan, viewport);
-        var compositor = new VulkanTextureCompositor(vulkan, viewport);
+        VulkanBorrowedImage? texture = null;
+        VulkanTextureCompositor? compositor = null;
+        RenderSessionHandle? session = null;
         try
         {
-            var session = RenderSessionHandle.AttachVulkanBorrowedTexture(
+            texture = new VulkanBorrowedImage(vulkan, viewport);
+            compositor = new VulkanTextureCompositor(vulkan, viewport);
+            session = RenderSessionHandle.AttachVulkanBorrowedTexture(
                 map,
                 new VulkanBorrowedTextureDescriptor
                 {
@@ -321,8 +336,9 @@ internal sealed class BorrowedTextureRenderTarget : IRenderTarget
         }
         catch
         {
-            compositor.Dispose();
-            texture.Dispose();
+            DisposeAfterFailure(compositor);
+            DisposeAfterFailure(session);
+            DisposeAfterFailure(texture);
             throw;
         }
     }
@@ -333,11 +349,14 @@ internal sealed class BorrowedTextureRenderTarget : IRenderTarget
         Viewport viewport
     )
     {
-        var texture = new MetalBorrowedTexture(metal, viewport);
-        var compositor = new MetalTextureCompositor(metal);
+        MetalBorrowedTexture? texture = null;
+        MetalTextureCompositor? compositor = null;
+        RenderSessionHandle? session = null;
         try
         {
-            var session = RenderSessionHandle.AttachMetalBorrowedTexture(
+            texture = new MetalBorrowedTexture(metal, viewport);
+            compositor = new MetalTextureCompositor(metal);
+            session = RenderSessionHandle.AttachMetalBorrowedTexture(
                 map,
                 new MetalBorrowedTextureDescriptor
                 {
@@ -349,8 +368,9 @@ internal sealed class BorrowedTextureRenderTarget : IRenderTarget
         }
         catch
         {
-            compositor.Dispose();
-            texture.Dispose();
+            DisposeAfterFailure(compositor);
+            DisposeAfterFailure(session);
+            DisposeAfterFailure(texture);
             throw;
         }
     }
@@ -361,11 +381,14 @@ internal sealed class BorrowedTextureRenderTarget : IRenderTarget
         Viewport viewport
     )
     {
-        var texture = new OpenGLBorrowedTexture(openGl, viewport);
-        var compositor = new OpenGLTextureCompositor(openGl, viewport);
+        OpenGLBorrowedTexture? texture = null;
+        OpenGLTextureCompositor? compositor = null;
+        RenderSessionHandle? session = null;
         try
         {
-            var session = RenderSessionHandle.AttachOpenGLBorrowedTexture(
+            texture = new OpenGLBorrowedTexture(openGl, viewport);
+            compositor = new OpenGLTextureCompositor(openGl, viewport);
+            session = RenderSessionHandle.AttachOpenGLBorrowedTexture(
                 map,
                 new OpenGLBorrowedTextureDescriptor
                 {
@@ -379,9 +402,27 @@ internal sealed class BorrowedTextureRenderTarget : IRenderTarget
         }
         catch
         {
-            compositor.Dispose();
-            texture.Dispose();
+            DisposeAfterFailure(compositor);
+            DisposeAfterFailure(session);
+            DisposeAfterFailure(texture);
             throw;
+        }
+    }
+
+    private static void DisposeAfterFailure(IDisposable? disposable)
+    {
+        if (disposable is null)
+        {
+            return;
+        }
+
+        try
+        {
+            disposable.Dispose();
+        }
+        catch
+        {
+            // Preserve the setup failure that triggered cleanup.
         }
     }
 }
