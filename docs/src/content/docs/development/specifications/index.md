@@ -6,9 +6,9 @@ sidebar:
 ---
 
 These documents define what every implementation in a family must do so parallel
-codebases stay aligned—starting with `*-map` example apps and, later, language
-bindings.
+codebases stay aligned.
 
+- [Language binding](/maplibre-native-ffi/development/specifications/binding/)
 - [Map example](/maplibre-native-ffi/development/specifications/map-example/)
 
 ## Referencing a spec section in code
@@ -19,11 +19,10 @@ Cite the spec file and heading fragment (slug), not a bare label:
 // map-example.md#frame-loop
 ```
 
-Use the spec basename (`map-example.md`, and later e.g. `bindings.md`) plus `#`
-and the section slug. Slugs are kebab-case from the heading text—the same
-fragment as in `[Frame loop](map-example#frame-loop)` links inside the spec.
-Source files live in `docs/src/content/docs/development/specifications/` on this
-site.
+Use the spec basename (`binding.md` or `map-example.md`) plus `#` and the
+section slug. Slugs are kebab-case from the heading text—the same fragment as in
+`[Frame loop](map-example#frame-loop)` links inside the spec. Source files live
+in `docs/src/content/docs/development/specifications/` on this site.
 
 For a subsection, use one fragment (`#owned-texture`) or `#render-target-modes`
 on the parent section—whichever you are implementing.
