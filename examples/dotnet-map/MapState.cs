@@ -100,7 +100,15 @@ internal sealed class MapState : IDisposable
 
         try
         {
-            renderTarget.Render();
+            if (graphics is MetalContext)
+            {
+                using var pool = MacObjectiveC.AutoreleasePool();
+                renderTarget.Render();
+            }
+            else
+            {
+                renderTarget.Render();
+            }
             RenderPending = false;
         }
         catch (InvalidStateException)
