@@ -65,9 +65,15 @@ EOF
   local msvc_env
   msvc_env="$(tr -d '\r' <<< "$msvc_env_raw")"
 
-  local name value
+  local name value msvc_path_windows=""
   while IFS='=' read -r name value; do
     [[ "$name" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || continue
+    case "$name" in
+      Path | PATH)
+        msvc_path_windows="$value"
+        continue
+        ;;
+    esac
     export "$name=$value"
   done <<< "$msvc_env"
 
@@ -76,13 +82,13 @@ EOF
     return 1
   fi
 
-  if [[ -z "${Path:-}" ]]; then
+  if [[ -z "$msvc_path_windows" ]]; then
     echo "VsDevCmd.bat did not provide Path" >&2
     return 1
   fi
 
   local msvc_path
-  msvc_path="$(cygpath -u -p "$Path")"
+  msvc_path="$(cygpath -u -p "$msvc_path_windows")"
   export PATH="$msvc_path${original_path:+:$original_path}"
 }
 
