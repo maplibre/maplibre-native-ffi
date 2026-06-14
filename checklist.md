@@ -38,16 +38,16 @@ Broad phases are grouped so each phase can land as a separate commit.
 
 ## Phase 3: Shared EGL Provider Implementation
 
-- [ ] Replace Linux-specific EGL guards in `src/render/opengl/*` with
+- [x] Replace Linux-specific EGL guards in `src/render/opengl/*` with
       `MLN_FFI_OPENGL_PROVIDER_EGL`.
-- [ ] Refactor duplicated EGL context code from texture and surface sessions
+- [x] Refactor duplicated EGL context code from texture and surface sessions
       into `src/render/opengl/egl_context.hpp/.cpp`.
-- [ ] Implement ANGLE display creation by calling `eglGetPlatformDisplayEXT`
+- [x] Implement ANGLE display creation by calling `eglGetPlatformDisplayEXT`
       with `EGL_PLATFORM_ANGLE_ANGLE`, `EGL_PLATFORM_ANGLE_TYPE_ANGLE`,
       `EGL_PLATFORM_ANGLE_TYPE_METAL_ANGLE`,
       `EGL_PLATFORM_ANGLE_DEVICE_TYPE_ANGLE`, and
       `EGL_PLATFORM_ANGLE_DEVICE_TYPE_HARDWARE_ANGLE`.
-- [ ] Add a small internal ANGLE/EGL bootstrap path for tests and examples that
+- [x] Add a small internal ANGLE/EGL bootstrap path for tests and examples that
       creates `EGLDisplay`, chooses an ES3 pbuffer-capable `EGLConfig`, creates
       a share `EGLContext`, and fills the existing `mln_egl_context_descriptor`.
 

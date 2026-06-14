@@ -20,8 +20,8 @@ fn addCTests(b: *std.Build, options: BuildOptions) *std.Build.Step.Compile {
         }),
     });
     maplibre_build.addRenderBackendOptions(b, c_tests.root_module, options.render_backend);
-    if (options.target.result.os.tag == .windows or options.target.result.os.tag == .linux) {
-        const gl_bindings = zigglgen.generateBindingsModule(b, if (options.target.result.os.tag == .linux)
+    if (options.target.result.os.tag == .windows or options.target.result.os.tag == .linux or options.target.result.os.tag == .macos) {
+        const gl_bindings = zigglgen.generateBindingsModule(b, if (options.target.result.os.tag == .linux or options.target.result.os.tag == .macos)
             .{ .api = .gles, .version = .@"3.0" }
         else
             .{ .api = .gl, .version = .@"3.0" });

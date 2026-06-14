@@ -104,7 +104,8 @@ pub fn vulkanLibraryName(target: std.Build.ResolvedTarget) []const u8 {
 pub fn isSupportedTarget(target: std.Build.ResolvedTarget, backend: RenderBackend) bool {
     return switch (backend) {
         .metal => target.result.os.tag == .macos,
-        .opengl => target.result.os.tag == .linux or target.result.os.tag == .windows,
+        .opengl => target.result.os.tag == .linux or target.result.os.tag == .macos or
+            target.result.os.tag == .windows,
         .vulkan => target.result.os.tag == .macos or target.result.os.tag == .linux or
             target.result.os.tag == .windows,
     };
@@ -138,6 +139,14 @@ pub fn linkRenderBackend(b: *std.Build, module: *std.Build.Module, options: Rend
         },
         .opengl => switch (options.target.result.os.tag) {
             .linux => {
+                module.linkSystemLibrary("EGL", .{});
+                module.linkSystemLibrary("GLESv2", .{});
+            },
+            .macos => {
+                const angle_library_dir = options.dependency_library_dir orelse
+                    @panic("macOS OpenGL builds require -Ddependency-library-dir=<angle-root>");
+                module.addLibraryPath(angle_library_dir);
+                module.addRPath(angle_library_dir);
                 module.linkSystemLibrary("EGL", .{});
                 module.linkSystemLibrary("GLESv2", .{});
             },
@@ -277,7 +286,7 @@ fn addBindingTests(b: *std.Build, options: BuildOptions, maplibre_native: *std.B
     tests.root_module.addImport("maplibre_native", maplibre_native);
     addRenderBackendOptions(b, tests.root_module, options.render_backend);
     if (options.render_backend == .opengl) {
-        const gl_bindings = zigglgen.generateBindingsModule(b, if (options.target.result.os.tag == .linux)
+        const gl_bindings = zigglgen.generateBindingsModule(b, if (options.target.result.os.tag == .linux or options.target.result.os.tag == .macos)
             .{ .api = .gles, .version = .@"3.0" }
         else
             .{ .api = .gl, .version = .@"3.0" });

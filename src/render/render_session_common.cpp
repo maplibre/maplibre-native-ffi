@@ -50,9 +50,9 @@ struct OwnedQueriedFeatureDescriptor {
 };
 
 auto opengl_supported_context_provider_mask() noexcept -> uint32_t {
-#if defined(MLN_RENDER_BACKEND_OPENGL) && defined(_WIN32)
+#if defined(MLN_RENDER_BACKEND_OPENGL) && defined(MLN_FFI_OPENGL_PROVIDER_WGL)
   return MLN_OPENGL_CONTEXT_PROVIDER_FLAG_WGL;
-#elif defined(MLN_RENDER_BACKEND_OPENGL) && defined(__linux__)
+#elif defined(MLN_RENDER_BACKEND_OPENGL) && defined(MLN_FFI_OPENGL_PROVIDER_EGL)
   return MLN_OPENGL_CONTEXT_PROVIDER_FLAG_EGL;
 #else
   return 0;
@@ -66,7 +66,7 @@ auto opengl_context_descriptor_default() noexcept
     .platform = MLN_OPENGL_CONTEXT_PLATFORM_UNSPECIFIED,
     .data = {},
   };
-#if defined(_WIN32)
+#if defined(MLN_FFI_OPENGL_PROVIDER_WGL)
   result.platform = MLN_OPENGL_CONTEXT_PLATFORM_WGL;
   result.data.wgl = mln_wgl_context_descriptor{
     .size = sizeof(mln_wgl_context_descriptor),
@@ -74,7 +74,7 @@ auto opengl_context_descriptor_default() noexcept
     .share_context = nullptr,
     .get_proc_address = nullptr,
   };
-#elif defined(__linux__)
+#elif defined(MLN_FFI_OPENGL_PROVIDER_EGL)
   result.platform = MLN_OPENGL_CONTEXT_PLATFORM_EGL;
   result.data.egl = mln_egl_context_descriptor{
     .size = sizeof(mln_egl_context_descriptor),

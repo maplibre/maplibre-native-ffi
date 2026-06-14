@@ -1,14 +1,17 @@
 #pragma once
 
-#if defined(__linux__)
+#if defined(MLN_FFI_OPENGL_PROVIDER_EGL)
 #include <array>
 #include <cstddef>
 
 #include <EGL/egl.h>
+#if defined(__linux__)
 #include <dlfcn.h>
+#endif
 
 namespace mln::core::opengl {
 
+#if defined(__linux__)
 template <std::size_t N>
 inline auto open_egl_client_libraries(
   const std::array<const char*, N>& libraries
@@ -73,6 +76,14 @@ inline auto get_egl_client_library_proc_address(const char* name, EGLenum api)
   }
   return find_egl_client_symbol_in_handles(name, gl_client_library_handles());
 }
+#else
+inline auto get_egl_client_library_proc_address(const char* name, EGLenum api)
+  -> void* {
+  (void)name;
+  (void)api;
+  return nullptr;
+}
+#endif
 
 }  // namespace mln::core::opengl
 #endif

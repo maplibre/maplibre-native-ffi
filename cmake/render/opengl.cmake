@@ -22,6 +22,9 @@ function(mln_configure_opengl_backend target)
       target_link_libraries(${target} PRIVATE ANGLE::EGL ANGLE::GLESv2)
       target_include_directories(
         ${target}
+        PRIVATE "${PROJECT_SOURCE_DIR}/third_party/angle_compat/include")
+      target_include_directories(
+        ${target}
         SYSTEM
         PRIVATE "${MLN_FFI_ANGLE_INCLUDE_DIR}")
       set_property(
@@ -36,6 +39,7 @@ function(mln_configure_opengl_backend target)
          ${MLN_SOURCE_DIR}/platform/linux/src/gl_functions.cpp)
   elseif(MLN_FFI_OPENGL_CONTEXT_PROVIDER STREQUAL "wgl")
     find_package(OpenGL REQUIRED)
+    target_compile_definitions(${target} PRIVATE MLN_FFI_OPENGL_PROVIDER_WGL=1)
     list(APPEND MLN_FFI_VENDOR_OPENGL_SOURCES
          ${MLN_SOURCE_DIR}/platform/windows/src/headless_backend_wgl.cpp)
     target_compile_definitions(${target} PRIVATE KHRONOS_STATIC)
@@ -59,6 +63,13 @@ function(mln_configure_opengl_backend target)
   set(MLN_FFI_OPENGL_SOURCES
       ${PROJECT_SOURCE_DIR}/src/render/opengl/opengl_texture_session.cpp
       ${PROJECT_SOURCE_DIR}/src/render/opengl/opengl_surface_session.cpp)
+  if(MLN_FFI_OPENGL_CONTEXT_PROVIDER STREQUAL "egl")
+    list(APPEND MLN_FFI_OPENGL_SOURCES
+         ${PROJECT_SOURCE_DIR}/src/render/opengl/egl_context.cpp)
+  endif()
+  set_source_files_properties(
+    ${MLN_FFI_OPENGL_SOURCES}
+    PROPERTIES SKIP_LINTING TRUE)
 
   mln_target_vendor_sources(${target} ${MLN_FFI_VENDOR_OPENGL_SOURCES})
   mln_target_project_sources(${target} ${MLN_FFI_OPENGL_SOURCES})

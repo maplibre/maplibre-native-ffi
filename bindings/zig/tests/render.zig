@@ -13,12 +13,17 @@ const vk = if (build_options.supports_vulkan) @cImport({
     @cInclude("vulkan/vulkan.h");
 }) else struct {};
 
-const egl = if (build_options.supports_opengl and builtin.os.tag == .linux) @cImport({
+const supports_wgl = build_options.supports_opengl and builtin.os.tag == .windows;
+const supports_egl = build_options.supports_opengl and (builtin.os.tag == .linux or builtin.os.tag == .macos);
+
+const egl = if (supports_egl) @cImport({
+    @cDefine("EGL_EGLEXT_PROTOTYPES", "1");
     @cInclude("EGL/egl.h");
+    @cInclude("EGL/eglext.h");
 }) else struct {};
 
-const gl = if (build_options.supports_opengl and (builtin.os.tag == .windows or builtin.os.tag == .linux)) @import("gl") else struct {};
-const wgl_test = if (build_options.supports_opengl and builtin.os.tag == .windows) @import("wgl_test_context") else struct {};
+const gl = if (supports_wgl or supports_egl) @import("gl") else struct {};
+const wgl_test = if (supports_wgl) @import("wgl_test_context") else struct {};
 
 const cluster_style_json =
     \\{
@@ -58,19 +63,9 @@ test "supported OpenGL context providers are exposed semantically" {
     if (!build_options.supports_opengl) {
         try testing.expect(!providers.wgl);
         try testing.expect(!providers.egl);
-    } else switch (builtin.os.tag) {
-        .windows => {
-            try testing.expect(providers.wgl);
-            try testing.expect(!providers.egl);
-        },
-        .linux => {
-            try testing.expect(!providers.wgl);
-            try testing.expect(providers.egl);
-        },
-        else => {
-            try testing.expect(!providers.wgl);
-            try testing.expect(!providers.egl);
-        },
+    } else {
+        try testing.expectEqual(supports_wgl, providers.wgl);
+        try testing.expectEqual(supports_egl, providers.egl);
     }
 }
 
@@ -251,7 +246,7 @@ const TestOwnedTextureDescriptor = struct {
     extent: maplibre.RenderTargetExtent = .{},
 };
 
-const gl_texture_2d = if (build_options.supports_opengl and builtin.os.tag == .windows) gl.TEXTURE_2D else 0x0DE1;
+const gl_texture_2d = if (supports_wgl) gl.TEXTURE_2D else 0x0DE1;
 
 fn fakeNativePointer() maplibre.NativePointer {
     return .{ .ptr = @ptrFromInt(1) };
@@ -259,27 +254,24 @@ fn fakeNativePointer() maplibre.NativePointer {
 
 fn fakeOpenGLContext() maplibre.OpenGLContextDescriptor {
     const fake_pointer = fakeNativePointer();
-    return switch (builtin.os.tag) {
-        .windows => .{
+    if (supports_wgl) {
+        return .{
             .wgl = .{
                 .device_context = fake_pointer,
                 .share_context = fake_pointer,
             },
-        },
-        .linux => .{
+        };
+    }
+    if (supports_egl) {
+        return .{
             .egl = .{
                 .display = fake_pointer,
                 .config = fake_pointer,
                 .share_context = fake_pointer,
             },
-        },
-        else => .{
-            .wgl = .{
-                .device_context = fake_pointer,
-                .share_context = fake_pointer,
-            },
-        },
-    };
+        };
+    }
+    return .{ .wgl = .{ .device_context = fake_pointer, .share_context = fake_pointer } };
 }
 
 fn fakeVulkanContext() maplibre.VulkanContextDescriptor {
@@ -295,7 +287,7 @@ fn fakeVulkanContext() maplibre.VulkanContextDescriptor {
 
 const supports_test_owned_texture = build_options.supports_metal or build_options.supports_vulkan or build_options.supports_opengl;
 
-const TestOwnedTextureContext = if (build_options.supports_vulkan) VulkanAttachContext else if (build_options.supports_opengl and builtin.os.tag == .windows) WglAttachContext else if (build_options.supports_opengl and builtin.os.tag == .linux) EglAttachContext else if (build_options.supports_metal) struct {
+const TestOwnedTextureContext = if (build_options.supports_vulkan) VulkanAttachContext else if (supports_wgl) WglAttachContext else if (supports_egl) EglAttachContext else if (build_options.supports_metal) struct {
     device: *anyopaque,
 
     pub fn init() !@This() {
@@ -309,7 +301,7 @@ const TestOwnedTextureContext = if (build_options.supports_vulkan) VulkanAttachC
     }
 } else struct {};
 
-const WglAttachContext = if (build_options.supports_opengl and builtin.os.tag == .windows) struct {
+const WglAttachContext = if (supports_wgl) struct {
     context: wgl_test.Context,
 
     pub fn init() !WglAttachContext {
@@ -341,7 +333,7 @@ const WglAttachContext = if (build_options.supports_opengl and builtin.os.tag ==
     }
 } else struct {};
 
-const WglBorrowedTexture = if (build_options.supports_opengl and builtin.os.tag == .windows) struct {
+const WglBorrowedTexture = if (supports_wgl) struct {
     context: WglAttachContext,
     texture: gl.uint,
     width: u32,
@@ -377,7 +369,7 @@ const WglBorrowedTexture = if (build_options.supports_opengl and builtin.os.tag 
 } else struct {};
 
 fn GlProc(comptime name: []const u8) type {
-    if (!build_options.supports_opengl or builtin.os.tag != .linux) return void;
+    if (!supports_egl) return void;
     return @TypeOf(@field(@as(gl.ProcTable, undefined), name));
 }
 
@@ -385,7 +377,7 @@ fn glProcName(comptime command: []const u8) [:0]const u8 {
     return "gl" ++ command;
 }
 
-const EglProcs = if (build_options.supports_opengl and builtin.os.tag == .linux) struct {
+const EglProcs = if (supports_egl) struct {
     BindTexture: GlProc("BindTexture"),
     BindFramebuffer: GlProc("BindFramebuffer"),
     CheckFramebufferStatus: GlProc("CheckFramebufferStatus"),
@@ -421,7 +413,7 @@ const EglProcs = if (build_options.supports_opengl and builtin.os.tag == .linux)
     }
 } else struct {};
 
-const EglAttachContext = if (build_options.supports_opengl and builtin.os.tag == .linux) struct {
+const EglAttachContext = if (supports_egl) struct {
     display: egl.EGLDisplay,
     config: egl.EGLConfig,
     egl_surface: egl.EGLSurface,
@@ -492,6 +484,14 @@ const EglAttachContext = if (build_options.supports_opengl and builtin.os.tag ==
     }
 
     fn initDisplay() !egl.EGLDisplay {
+        if (builtin.os.tag == .macos) {
+            const display_attributes = [_]egl.EGLint{
+                egl.EGL_PLATFORM_ANGLE_TYPE_ANGLE,        egl.EGL_PLATFORM_ANGLE_TYPE_METAL_ANGLE,
+                egl.EGL_PLATFORM_ANGLE_DEVICE_TYPE_ANGLE, egl.EGL_PLATFORM_ANGLE_DEVICE_TYPE_HARDWARE_ANGLE,
+                egl.EGL_NONE,
+            };
+            return initializeDisplay(egl.eglGetPlatformDisplayEXT(egl.EGL_PLATFORM_ANGLE_ANGLE, null, &display_attributes));
+        }
         return initializeDisplay(egl.eglGetDisplay(egl.EGL_DEFAULT_DISPLAY));
     }
 
@@ -573,7 +573,7 @@ const EglAttachContext = if (build_options.supports_opengl and builtin.os.tag ==
     }
 } else struct {};
 
-const OpenGLBorrowedTexture = if (build_options.supports_opengl and builtin.os.tag == .windows) WglBorrowedTexture else if (build_options.supports_opengl and builtin.os.tag == .linux) struct {
+const OpenGLBorrowedTexture = if (supports_wgl) WglBorrowedTexture else if (supports_egl) struct {
     context: EglAttachContext,
     texture: gl.uint,
     width: u32,
