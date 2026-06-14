@@ -8,9 +8,13 @@ internal interface IGraphicsContext : IDisposable
 
     nint WindowHandle { get; }
 
+    bool ShouldClose { get; }
+
     Viewport ReadViewport();
 
     void Resize(Viewport viewport);
+
+    void PollEvents();
 
     void FinishFrame();
 }

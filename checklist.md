@@ -180,25 +180,25 @@ References:
 
 ## Phase 3: Graphics Contexts
 
-- [ ] Implement GLFW lifecycle shared by all backends.
+- [x] Implement GLFW lifecycle shared by all backends.
   - Grounding: `map-example.md#startup`, `map-example.md#shutdown`.
   - Initialize GLFW, create a resizable `960 x 640` window, expose event
     polling, and terminate GLFW during graphics shutdown.
 
-- [ ] Implement OpenGL/EGL context creation on Linux.
+- [x] Implement OpenGL/EGL context creation on Linux.
   - Grounding: `map-example.md#opengl--egl--wgl`.
   - Create a GLFW OpenGL ES/EGL context.
   - Expose EGL display/config/context and EGL surface for C# render descriptors.
   - Initialize Silk.NET OpenGLES bindings for compositor calls.
 
-- [ ] Implement OpenGL/WGL context creation on Windows.
+- [x] Implement OpenGL/WGL context creation on Windows.
   - Grounding: `map-example.md#opengl--egl--wgl`.
   - Create a GLFW OpenGL context.
   - Expose WGL device/context handles and window surface for C# render
     descriptors.
   - Initialize Silk.NET OpenGL bindings for compositor calls.
 
-- [ ] Implement Vulkan instance, surface, device, and queue creation.
+- [x] Implement Vulkan instance, surface, device, and queue creation.
   - Grounding: `map-example.md#vulkan`.
   - Use Silk.NET Vulkan and GLFW Vulkan helpers.
   - Enable required GLFW instance extensions.
@@ -206,13 +206,13 @@ References:
   - Expose instance, physical device, device, queue, queue family,
     `vkGetInstanceProcAddr`, `vkGetDeviceProcAddr`, and `VkSurfaceKHR`.
 
-- [ ] Implement the macOS Objective-C runtime helper.
+- [x] Implement the macOS Objective-C runtime helper.
   - Grounding: `map-example.md#metal`.
   - Provide minimal helpers for class lookup, selector lookup, `objc_msgSend`
     variants, retain/release, autorelease pool, CoreFoundation strings,
     framework loading, and `MTLCreateSystemDefaultDevice`.
 
-- [ ] Implement Metal context creation on macOS.
+- [x] Implement Metal context creation on macOS.
   - Grounding: `map-example.md#metal`.
   - Create a GLFW no-API window.
   - Get the Cocoa view from GLFW native access.
@@ -221,13 +221,13 @@ References:
   - Set layer device, pixel format, opacity, and drawable size.
   - Expose raw device and layer pointers for C# render descriptors.
 
-- [ ] Implement graphics-context resize hooks for each backend.
+- [x] Implement graphics-context resize hooks for each backend.
   - Grounding: `map-example.md#resize`.
   - OpenGL: ensure context is current and update any surface state.
   - Vulkan: update swapchain/presentation resources as required.
   - Metal: update `CAMetalLayer.drawableSize`.
 
-- [ ] Implement graphics-context shutdown for each backend.
+- [x] Implement graphics-context shutdown for each backend.
   - Grounding: `map-example.md#shutdown`.
   - Wait for in-flight GPU work where required.
   - Release backend resources before destroying the window.
