@@ -19,6 +19,7 @@ load_windows_msvc_environment() {
   fi
   command -v cmd.exe >/dev/null 2>&1 || return 0
 
+  local original_path="$PATH"
   local vswhere='C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe'
   local vswhere_unix="$vswhere"
   if command -v cygpath >/dev/null 2>&1; then
@@ -77,11 +78,11 @@ EOF
   fi
 
   if [[ -n "${Path:-}" ]]; then
+    local msvc_path="$Path"
     if command -v cygpath >/dev/null 2>&1; then
-      export PATH="$(cygpath -u -p "$Path")"
-    else
-      export PATH="$Path"
+      msvc_path="$(cygpath -u -p "$Path")"
     fi
+    export PATH="$msvc_path${original_path:+:$original_path}"
   fi
 }
 
