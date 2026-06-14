@@ -10,7 +10,7 @@
 #include <mbgl/gl/renderer_backend.hpp>
 #include <mbgl/util/size.hpp>
 
-#if defined(_WIN32)
+#ifdef _WIN32
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN 1
 #endif
@@ -21,7 +21,7 @@
 
 #include "diagnostics/diagnostics.hpp"
 #include "map/map.hpp"
-#if defined(__linux__)
+#ifdef __linux__
 #include "render/opengl/egl_common.hpp"
 #endif
 #include "render/opengl/wgl_common.hpp"
@@ -173,7 +173,7 @@ class OpenGLSurfaceBackend final : public mbgl::gl::RendererBackend,
   }
 
   void swap_surface() {
-#if defined(_WIN32)
+#ifdef _WIN32
     if (SwapBuffers(static_cast<HDC>(descriptor_.surface)) == 0) {
       throw std::runtime_error("Swapping OpenGL WGL surface buffers failed");
     }
@@ -194,7 +194,7 @@ class OpenGLSurfaceBackend final : public mbgl::gl::RendererBackend,
  private:
   auto getExtensionFunctionPointer(const char* name)
     -> mbgl::gl::ProcAddress override {
-#if defined(_WIN32)
+#ifdef _WIN32
     using GetProcAddressFunction = PROC(WINAPI*)(LPCSTR);
     auto* loader = reinterpret_cast<GetProcAddressFunction>(
       descriptor_.context.data.wgl.get_proc_address
@@ -236,7 +236,7 @@ class OpenGLSurfaceBackend final : public mbgl::gl::RendererBackend,
   }
 
   void activate() override {
-#if defined(_WIN32)
+#ifdef _WIN32
     previous_device_context_ = wglGetCurrentDC();
     previous_render_context_ = wglGetCurrentContext();
     try {
@@ -300,7 +300,7 @@ class OpenGLSurfaceBackend final : public mbgl::gl::RendererBackend,
   }
 
   void deactivate() override {
-#if defined(_WIN32)
+#ifdef _WIN32
     wglMakeCurrent(
       static_cast<HDC>(previous_device_context_),
       static_cast<HGLRC>(previous_render_context_)
@@ -314,7 +314,7 @@ class OpenGLSurfaceBackend final : public mbgl::gl::RendererBackend,
 #endif
   }
 
-#if defined(_WIN32)
+#ifdef _WIN32
   void create_wgl_context() {
     auto* const device_context =
       static_cast<HDC>(descriptor_.context.data.wgl.device_context);
@@ -438,7 +438,7 @@ class OpenGLSurfaceBackend final : public mbgl::gl::RendererBackend,
   mln_opengl_surface_descriptor descriptor_{};
   void* render_context_ = nullptr;
 
-#if defined(_WIN32)
+#ifdef _WIN32
   void* previous_device_context_ = nullptr;
   void* previous_render_context_ = nullptr;
 #elif defined(__linux__)

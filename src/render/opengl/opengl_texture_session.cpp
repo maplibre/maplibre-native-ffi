@@ -20,7 +20,7 @@
 #include <mbgl/util/image.hpp>
 #include <mbgl/util/size.hpp>
 
-#if defined(_WIN32)
+#ifdef _WIN32
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN 1
 #endif
@@ -32,7 +32,7 @@
 #include "diagnostics/diagnostics.hpp"
 #include "map/map.hpp"
 #include "maplibre_native_c/base.h"
-#if defined(__linux__)
+#ifdef __linux__
 #include "render/opengl/egl_common.hpp"
 #endif
 #include "render/opengl/wgl_common.hpp"
@@ -439,7 +439,7 @@ class OpenGLTextureBackend final : public mbgl::gl::RendererBackend,
  private:
   auto getExtensionFunctionPointer(const char* name)
     -> mbgl::gl::ProcAddress override {
-#if defined(_WIN32)
+#ifdef _WIN32
     using GetProcAddressFunction = PROC(WINAPI*)(LPCSTR);
     auto* loader = reinterpret_cast<GetProcAddressFunction>(
       context_.data.wgl.get_proc_address
@@ -481,7 +481,7 @@ class OpenGLTextureBackend final : public mbgl::gl::RendererBackend,
   }
 
   void activate() override {
-#if defined(_WIN32)
+#ifdef _WIN32
     previous_device_context_ = wglGetCurrentDC();
     previous_render_context_ = wglGetCurrentContext();
     try {
@@ -544,7 +544,7 @@ class OpenGLTextureBackend final : public mbgl::gl::RendererBackend,
   }
 
   void deactivate() override {
-#if defined(_WIN32)
+#ifdef _WIN32
     wglMakeCurrent(
       static_cast<HDC>(previous_device_context_),
       static_cast<HGLRC>(previous_render_context_)
@@ -558,7 +558,7 @@ class OpenGLTextureBackend final : public mbgl::gl::RendererBackend,
 #endif
   }
 
-#if defined(_WIN32)
+#ifdef _WIN32
   void create_wgl_context() {
     auto* const device_context =
       static_cast<HDC>(context_.data.wgl.device_context);
@@ -693,7 +693,7 @@ class OpenGLTextureBackend final : public mbgl::gl::RendererBackend,
   void* render_context_ = nullptr;
   mbgl::Size resource_size_{};
 
-#if defined(_WIN32)
+#ifdef _WIN32
   void* previous_device_context_ = nullptr;
   void* previous_render_context_ = nullptr;
 #elif defined(__linux__)

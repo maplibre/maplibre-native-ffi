@@ -1,6 +1,6 @@
 #pragma once
 
-#if defined(__linux__)
+#ifdef __linux__
 #include <array>
 #include <cstddef>
 

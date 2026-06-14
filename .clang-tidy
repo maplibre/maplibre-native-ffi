@@ -14,6 +14,7 @@ Checks:
   - -bugprone-easily-swappable-parameters
   - -cppcoreguidelines-avoid-magic-numbers
   - -cppcoreguidelines-pro-type-union-access
+  - -readability-use-concise-preprocessor-directives
   - -readability-magic-numbers
 CheckOptions:
   - key: misc-include-cleaner.IgnoreHeaders

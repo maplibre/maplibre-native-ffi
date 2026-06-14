@@ -66,7 +66,7 @@ auto opengl_context_descriptor_default() noexcept
     .platform = MLN_OPENGL_CONTEXT_PLATFORM_UNSPECIFIED,
     .data = {},
   };
-#if defined(_WIN32)
+#ifdef _WIN32
   result.platform = MLN_OPENGL_CONTEXT_PLATFORM_WGL;
   result.data.wgl = mln_wgl_context_descriptor{
     .size = sizeof(mln_wgl_context_descriptor),

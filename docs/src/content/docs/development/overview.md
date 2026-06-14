@@ -82,27 +82,32 @@ This repository spans native code, language bindings, examples, tests, and
 documentation. Each tool owns the layer where it has the clearest dependency
 model.
 
-Project-managed dependency state keeps builds reproducible. Pixi supplies native
-build dependencies instead of Homebrew, apt, or other machine-global package
-managers. Platform SDKs such as Xcode, Visual Studio, and the Android SDK remain
-pragmatic external exceptions.
+Project-managed dependency state keeps builds reproducible. Mise supplies
+repository tools and owns the environment variables consumed by tasks, build
+systems, bindings, and examples. Platform SDKs such as Xcode, Visual Studio,
+Linux compiler packages, and the Android SDK remain host toolchain inputs.
 
-[`mise`](https://mise.jdx.dev/) is the contributor entrypoint. It pins top-level
-tools, installs Git hooks, and runs repository tasks. Use `mise run ...` for
+[`mise`](https://mise.jdx.dev/) is the contributor entrypoint. It pins
+repository tools, installs Git hooks, selects backend variants, exports the
+native dependency paths, and runs repository tasks. Use `mise run ...` for
 common workflows: build, test, check, fix, and examples. Mise also provides
 ecosystem entrypoints such as Pixi, Zig, Python, uv, Node, and pnpm.
 
-[`pixi`](https://pixi.sh/) owns the C and C++ native build environment. It
-supplies native packages from [`conda-forge`](https://conda-forge.org/):
-libraries, C/C++ tooling, and build tools that participate in CMake
-configuration or native package discovery. CMake, Ninja, pkg-config, shader
-tools, and clang tooling live in Pixi for that reason. Pixi runs
-[CMake](https://cmake.org/), and CMake builds the native C/C++ library.
+[`pixi`](https://pixi.sh/) is the current desktop native library provider. It
+installs the native dependency prefix from
+[`conda-forge`](https://conda-forge.org/), including libraries such as ICU,
+libcurl, libpng, libuv, WebP, SDL, Vulkan loader libraries, and Zlib. Mise owns
+the provider-neutral environment variables that point CMake, Cargo, Gradle, Zig,
+and other tools at that prefix.
 
-Mise profiles select dependency environments and backend variants. Inner build
-files such as CMake, Cargo, Gradle, and Zig build scripts consume the resulting
-environment values and paths; keep Pixi and mise policy at the repository task
-layer.
+CMake, Ninja, pkg-config, shader tools, Doxygen, clang-format, and clang-tidy
+are pinned by mise. Host platform toolchains provide C and C++ compilers. CMake
+builds the native C/C++ library.
+
+Inner build files such as CMake, Cargo, Gradle, and Zig build scripts consume
+the mise-provided environment contract. They should use `MLN_FFI_*`,
+`LIBCLANG_PATH`, `BINDGEN_EXTRA_CLANG_ARGS`, `CMAKE_PREFIX_PATH`, and
+`PKG_CONFIG_PATH` instead of provider-specific activation variables.
 
 Language package managers own dependencies inside their ecosystems. For example,
 `uv` owns Python package dependencies, `pnpm` owns Node package dependencies,

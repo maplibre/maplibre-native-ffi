@@ -32,6 +32,17 @@ jobs:
       - uses: ./.github/actions/setup-ci-deps
       - run: mise run //docs:build
 
+  native-lint:
+    name: native lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      MISE_ENV: linux-x64-vulkan
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: ./.github/actions/setup-ci-deps
+      - run: mise run lint:native
+
   variants:
     name: variant / ${{ matrix.mise_env }}
     runs-on: ${{ matrix.runner }}
@@ -105,6 +116,7 @@ jobs:
     needs:
       - hygiene
       - docs
+      - native-lint
       - variants
     steps:
       - name: Fail if required jobs failed
