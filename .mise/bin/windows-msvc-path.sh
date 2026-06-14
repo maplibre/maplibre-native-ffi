@@ -17,14 +17,14 @@ load_windows_msvc_environment() {
   if [[ -n "${VCTOOLSINSTALLDIR:-${VCToolsInstallDir:-}}" ]]; then
     return 0
   fi
-  command -v cmd.exe >/dev/null 2>&1 || return 0
+  command -v cmd.exe >/dev/null
+  command -v cygpath >/dev/null
 
   local original_path="$PATH"
+  original_path="$(cygpath -u -p "$original_path")"
   local vswhere='C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe'
-  local vswhere_unix="$vswhere"
-  if command -v cygpath >/dev/null 2>&1; then
-    vswhere_unix="$(cygpath -u "$vswhere")"
-  fi
+  local vswhere_unix
+  vswhere_unix="$(cygpath -u "$vswhere")"
   if [[ ! -x "$vswhere_unix" ]]; then
     echo "vswhere.exe was not found at $vswhere" >&2
     return 1
@@ -46,14 +46,13 @@ load_windows_msvc_environment() {
   vs_dev_loader="$(mktemp "${TMPDIR:-/tmp}/mln-vsdev.XXXXXX.bat")"
   cat > "$vs_dev_loader" <<EOF
 @echo off
+set "PATH=%SystemRoot%\\System32;%SystemRoot%;%SystemRoot%\\System32\\Wbem;%SystemRoot%\\System32\\WindowsPowerShell\\v1.0"
 call "$vs_dev_cmd" -arch=x64 -host_arch=x64 >nul
 set
 EOF
 
-  local vs_dev_loader_windows="$vs_dev_loader"
-  if command -v cygpath >/dev/null 2>&1; then
-    vs_dev_loader_windows="$(cygpath -w "$vs_dev_loader")"
-  fi
+  local vs_dev_loader_windows
+  vs_dev_loader_windows="$(cygpath -w "$vs_dev_loader")"
 
   local msvc_env_raw
   if ! msvc_env_raw="$(cmd.exe //d //s //c "$vs_dev_loader_windows")"; then
@@ -77,25 +76,32 @@ EOF
     return 1
   fi
 
-  if [[ -n "${Path:-}" ]]; then
-    local msvc_path="$Path"
-    if command -v cygpath >/dev/null 2>&1; then
-      msvc_path="$(cygpath -u -p "$Path")"
-    fi
-    export PATH="$msvc_path${original_path:+:$original_path}"
+  if [[ -z "${Path:-}" ]]; then
+    echo "VsDevCmd.bat did not provide Path" >&2
+    return 1
   fi
+
+  local msvc_path
+  msvc_path="$(cygpath -u -p "$Path")"
+  export PATH="$msvc_path${original_path:+:$original_path}"
 }
 
 normalize_windows_msvc_path() {
   local vc_tools_install_dir="${VCTOOLSINSTALLDIR:-${VCToolsInstallDir:-}}"
-  [[ -n "$vc_tools_install_dir" ]] || return 0
-  command -v cygpath >/dev/null 2>&1 || return 0
+  [[ -n "$vc_tools_install_dir" ]] || {
+    echo "VCToolsInstallDir is required after Visual Studio environment setup" >&2
+    return 1
+  }
+  command -v cygpath >/dev/null
 
   local host_arch="${VSCMD_ARG_HOST_ARCH:-x64}"
   local target_arch="${VSCMD_ARG_TGT_ARCH:-x64}"
   local msvc_bin
   msvc_bin="$(cygpath -u "${vc_tools_install_dir%\\}\\bin\\Host${host_arch^}\\${target_arch}")"
-  [[ -x "$msvc_bin/link.exe" ]] || return 0
+  if [[ ! -x "$msvc_bin/link.exe" ]]; then
+    echo "MSVC link.exe was not found at $msvc_bin/link.exe" >&2
+    return 1
+  fi
 
   local dependency_bin="" dependency_path="" rest_path="" path_entry
   if [[ -n "${MLN_FFI_DEPS_PREFIX:-}" ]]; then
