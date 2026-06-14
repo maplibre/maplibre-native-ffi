@@ -2,10 +2,12 @@ use std::error::Error as StdError;
 
 use maplibre_native::{
     Error, MapHandle, OpenGLBorrowedTextureDescriptor, OpenGLOwnedTextureDescriptor,
-    OpenGLSurfaceDescriptor, RenderSessionHandle, RenderTargetExtent,
+    OpenGLSurfaceDescriptor, RenderSessionHandle,
 };
 
+use crate::graphics::GraphicsContext;
 use crate::opengl::{OpenGLBorrowedTexture, OpenGLContext, OpenGLTextureCompositor};
+use crate::render_target::{Mode, extent};
 use crate::viewport::Viewport;
 
 pub enum RenderTarget {
@@ -24,6 +26,20 @@ pub enum RenderTarget {
 }
 
 impl RenderTarget {
+    pub fn attach(
+        mode: Mode,
+        map: &MapHandle,
+        graphics: &GraphicsContext,
+        viewport: Viewport,
+    ) -> maplibre_native::Result<Self> {
+        let opengl = graphics.opengl();
+        match mode {
+            Mode::OwnedTexture => Self::attach_owned_texture(map, opengl, viewport),
+            Mode::BorrowedTexture => Self::attach_borrowed_texture(map, opengl, viewport),
+            Mode::NativeSurface => Self::attach_surface(map, opengl, viewport),
+        }
+    }
+
     pub fn attach_owned_texture(
         map: &MapHandle,
         opengl: &OpenGLContext,
@@ -137,7 +153,8 @@ impl RenderTarget {
         }
     }
 
-    pub fn render_update(&mut self, opengl: &OpenGLContext) -> maplibre_native::Result<()> {
+    pub fn render_update(&mut self, graphics: &GraphicsContext) -> maplibre_native::Result<()> {
+        let opengl = graphics.opengl();
         match self {
             Self::OwnedTexture {
                 session,
@@ -170,7 +187,8 @@ impl RenderTarget {
         }
     }
 
-    pub fn close(self, opengl: Option<&OpenGLContext>) -> Result<(), Box<dyn StdError>> {
+    pub fn close(self, graphics: &GraphicsContext) -> Result<(), Box<dyn StdError>> {
+        let opengl = Some(graphics.opengl());
         match self {
             Self::OwnedTexture {
                 session,
@@ -198,14 +216,6 @@ impl RenderTarget {
                 .map_err(|error| Box::new(error) as Box<dyn StdError>),
         }
     }
-}
-
-fn extent(viewport: Viewport) -> RenderTargetExtent {
-    RenderTargetExtent::new(
-        viewport.logical_width,
-        viewport.logical_height,
-        viewport.scale_factor,
-    )
 }
 
 fn compositor_error(message: impl Into<String>) -> Error {

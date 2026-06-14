@@ -88,7 +88,6 @@ jobs:
         if: ${{ contains(matrix.mise_env, 'vulkan') }}
         run: mise run //examples/lwjgl-map:build
       - name: Test Rust example
-        if: ${{ contains(matrix.mise_env, 'vulkan') }}
         run: mise run //examples/rust-map:ci
       - name: Build Swift example
         if: ${{ matrix.mise_env == 'macos-arm64-metal' }}

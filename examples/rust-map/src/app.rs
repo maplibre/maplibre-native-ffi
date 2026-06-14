@@ -46,7 +46,6 @@ impl App {
                         format!("runtime creation failed: {error}"),
                         None,
                         None,
-                        None,
                     ));
                 }
             };
@@ -62,7 +61,6 @@ impl App {
                 return Err(startup_error(
                     format!("map creation failed: {error}"),
                     None,
-                    None,
                     Some(runtime),
                 ));
             }
@@ -70,7 +68,6 @@ impl App {
         if let Err(error) = configure_map(&map) {
             return Err(startup_error(
                 format!("map initialization failed: {error}"),
-                None,
                 Some(map),
                 Some(runtime),
             ));
@@ -81,7 +78,6 @@ impl App {
             Err(error) => {
                 return Err(startup_error(
                     format!("render target attachment failed: {error}"),
-                    None,
                     Some(map),
                     Some(runtime),
                 ));
@@ -176,7 +172,7 @@ impl App {
             .needs_reattach_on_resize()
         {
             let old_target = self.target.take().expect("render target is open");
-            old_target.close(Some(&self.graphics))?;
+            old_target.close(&self.graphics)?;
             let new_target = RenderTarget::attach(
                 self.mode,
                 self.map.as_ref().expect("map is open"),
@@ -277,7 +273,7 @@ impl App {
         });
 
         if let Some(target) = self.target.take()
-            && let Err(error) = target.close(Some(&self.graphics))
+            && let Err(error) = target.close(&self.graphics)
         {
             append_error(&mut first_error, error.to_string());
         }
@@ -319,13 +315,9 @@ fn configure_map(map: &maplibre_native::MapHandle) -> maplibre_native::Result<()
 
 fn startup_error(
     mut message: String,
-    target: Option<RenderTarget>,
     map: Option<maplibre_native::MapHandle>,
     runtime: Option<RuntimeHandle>,
 ) -> Box<dyn Error> {
-    if let Some(target) = target {
-        append_cleanup_result(&mut message, "render target", target.close(None));
-    }
     if let Some(map) = map {
         append_cleanup_result(&mut message, "map", map.close());
     }

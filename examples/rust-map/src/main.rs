@@ -1,16 +1,34 @@
 #![deny(unsafe_op_in_unsafe_fn)]
 
+#[cfg(not(any(feature = "metal", feature = "opengl", feature = "vulkan")))]
+compile_error!("rust-map requires exactly one backend feature: metal, opengl, or vulkan");
+#[cfg(any(
+    all(feature = "metal", feature = "opengl"),
+    all(feature = "metal", feature = "vulkan"),
+    all(feature = "opengl", feature = "vulkan")
+))]
+compile_error!("rust-map backend features are mutually exclusive");
+#[cfg(all(feature = "metal", not(target_os = "macos")))]
+compile_error!("rust-map metal backend is only supported on macOS");
+#[cfg(all(
+    feature = "opengl",
+    not(any(target_os = "linux", target_os = "windows"))
+))]
+compile_error!("rust-map opengl backend is only supported on Linux and Windows");
+
 mod app;
 mod graphics;
 mod input;
-#[cfg(target_os = "macos")]
+#[cfg(feature = "metal")]
 mod metal;
-#[cfg(any(target_os = "linux", target_os = "windows"))]
+#[cfg(feature = "opengl")]
 mod opengl;
 mod render_target;
 mod shell;
 mod viewport;
+#[cfg(feature = "vulkan")]
 mod vulkan;
+#[cfg(feature = "vulkan")]
 mod vulkan_texture_compositor;
 
 use std::error::Error;
@@ -93,14 +111,5 @@ fn render_backend_label(backends: maplibre_native::RenderBackendMask) -> String 
 }
 
 fn supports_usable_backend(backends: maplibre_native::RenderBackendMask) -> bool {
-    #[cfg(target_os = "macos")]
-    {
-        backends.intersects(
-            maplibre_native::RenderBackendMask::METAL | maplibre_native::RenderBackendMask::VULKAN,
-        )
-    }
-    #[cfg(not(target_os = "macos"))]
-    backends.intersects(
-        maplibre_native::RenderBackendMask::VULKAN | maplibre_native::RenderBackendMask::OPENGL,
-    )
+    backends.contains(graphics::required_backend())
 }

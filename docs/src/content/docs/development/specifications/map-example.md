@@ -20,9 +20,10 @@ language bindings and render-target integrations through a focused map demo.
 - Initial style URL and camera per [Shared defaults](#shared-defaults).
 - Camera controls per [Input](#input).
 - Support for the three render-target modes on every graphics API the example
-  ships (see [Render-target modes](#render-target-modes)).
-- Every graphics API the window toolkit and target platform can support (Vulkan,
-  Metal, OpenGL/EGL as applicable).
+  ships, either in one binary or across configured native render-backend
+  variants (see [Render-target modes](#render-target-modes)).
+- Every graphics API the window toolkit and target platform can support across
+  configured variants (Vulkan, Metal, OpenGL/EGL as applicable).
 - Graceful process exit when the user closes the window.
 - Startup logging that identifies the selected render-target mode and which
   native render backends the loaded library supports.
@@ -42,6 +43,11 @@ packaging/installer UX.
 | `examples/rust-map`  | Rust     | winit           | Linux, macOS, Windows | Vulkan, Metal, OpenGL |
 | `examples/lwjgl-map` | Java FFM | GLFW, LWJGL     | Linux, macOS, Windows | Vulkan, Metal, OpenGL |
 | `examples/swift-map` | Swift    | AppKit, SwiftUI | macOS                 | Metal                 |
+
+For examples built by native render-backend variant, “Backends” is the union of
+supported configured variants. A binary that selects one native render backend
+exposes that graphics API for that binary; the example as a whole exposes the
+union across configured variants.
 
 ---
 
@@ -173,6 +179,11 @@ active render-target mode. Graphics context code owns API-level resources
 (Vulkan, Metal, OpenGL/EGL/WGL as applicable). Render target code owns the
 attached `RenderSessionHandle`, mode-specific resources, resize behavior,
 `render_update`, and close behavior.
+
+When a build variant selects a single native render backend, the example SHOULD
+compile only the matching graphics API implementation and its platform glue.
+Backend selection can happen at build time; render-target mode selection remains
+a runtime CLI choice.
 
 Adding a graphics API or render-target mode MUST require localized changes. Keep
 each graphics API and render-target mode in its own variant, class, or submodule

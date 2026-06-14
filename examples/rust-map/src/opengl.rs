@@ -170,9 +170,7 @@ impl OpenGLTextureCompositor {
             }
             gl.use_program(None);
         }
-        if let Err(error) = check_gl_error(&gl, "initialize OpenGL texture compositor") {
-            return Err(error);
-        }
+        check_gl_error(&gl, "initialize OpenGL texture compositor")?;
         let program = program_guard.take();
         let vertex_array = vertex_array_guard.take();
         Ok(Self {
