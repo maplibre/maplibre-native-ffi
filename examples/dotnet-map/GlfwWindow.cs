@@ -7,8 +7,8 @@ internal sealed unsafe class GlfwWindow : IDisposable
     private static readonly Dictionary<nint, GlfwWindow> Windows = new();
     private readonly GlfwCallbacks.WindowSizeCallback windowSizeCallback;
     private readonly GlfwCallbacks.FramebufferSizeCallback framebufferSizeCallback;
-    private float contentScaleX = 1;
-    private float contentScaleY = 1;
+    private float contentScaleX;
+    private float contentScaleY;
     private bool closed;
 
     private GlfwWindow(Glfw glfw, WindowHandle* handle)

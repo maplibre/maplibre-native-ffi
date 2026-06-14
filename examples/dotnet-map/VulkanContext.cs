@@ -61,7 +61,7 @@ internal sealed unsafe partial class VulkanContext : IGraphicsContext
 
     public static VulkanContext Create(string title, int width, int height)
     {
-        var vk = Vk.GetApi();
+        var vk = new Vk(Vk.CreateDefaultContext(NativeLibraryResolver.VulkanLibraryCandidates()));
         var window = GlfwWindow.Create(
             title,
             width,

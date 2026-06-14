@@ -21,13 +21,28 @@ internal static class NativeLibraryResolver
         );
     }
 
+    public static string[] VulkanLibraryCandidates() => LibraryCandidates("vulkan").ToArray();
+
     private static nint ResolveNativeLibrary(
         string libraryName,
         Assembly assembly,
         DllImportSearchPath? searchPath
     )
     {
-        string[] candidates = libraryName switch
+        foreach (var candidate in LibraryCandidates(libraryName))
+        {
+            if (NativeLibrary.TryLoad(candidate, assembly, searchPath, out var handle))
+            {
+                return handle;
+            }
+        }
+
+        return 0;
+    }
+
+    private static IEnumerable<string> LibraryCandidates(string libraryName)
+    {
+        string[] names = libraryName switch
         {
             "glfw" when OperatingSystem.IsWindows() => ["glfw3"],
             "glfw" when OperatingSystem.IsMacOS() => ["libglfw.3.dylib", "glfw"],
@@ -44,14 +59,58 @@ internal static class NativeLibraryResolver
             _ => [],
         };
 
-        foreach (var candidate in candidates)
+        foreach (var name in names)
         {
-            if (NativeLibrary.TryLoad(candidate, assembly, searchPath, out var handle))
+            foreach (var directory in CandidateLibraryDirectories())
             {
-                return handle;
+                var path = Path.Combine(directory, name);
+                if (File.Exists(path))
+                {
+                    yield return path;
+                }
+            }
+
+            yield return name;
+        }
+    }
+
+    private static IEnumerable<string> CandidateLibraryDirectories()
+    {
+        var environmentPrefixes = new[]
+        {
+            Environment.GetEnvironmentVariable("CONDA_PREFIX"),
+            Environment.GetEnvironmentVariable("PIXI_PROJECT_ROOT") is { Length: > 0 } pixiRoot
+                ? Path.Combine(pixiRoot, ".pixi", "envs", "default")
+                : null,
+        };
+
+        foreach (var prefix in environmentPrefixes)
+        {
+            if (!string.IsNullOrWhiteSpace(prefix))
+            {
+                var lib = Path.Combine(prefix, "lib");
+                if (Directory.Exists(lib))
+                {
+                    yield return lib;
+                }
             }
         }
 
-        return 0;
+        foreach (var start in new[] { Directory.GetCurrentDirectory(), AppContext.BaseDirectory })
+        {
+            for (
+                var directory = new DirectoryInfo(start);
+                directory is not null;
+                directory = directory.Parent
+            )
+            {
+                var pixiLib = Path.Combine(directory.FullName, ".pixi", "envs", "default", "lib");
+                if (Directory.Exists(pixiLib))
+                {
+                    yield return pixiLib;
+                    break;
+                }
+            }
+        }
     }
 }

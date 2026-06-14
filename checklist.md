@@ -538,36 +538,36 @@ References:
   - Grounding: existing C# mise tasks force Any CPU because Visual Studio may
     export `Platform=x64` on Windows.
 
-- [ ] Verify `mise run //bindings/dotnet:test`.
+- [x] Verify `mise run //bindings/dotnet:test`.
   - Grounding: binding tests should keep passing after solution and package
     configuration changes.
 
-- [ ] Verify `mise run //examples/dotnet-map:build`.
+- [x] Verify `mise run //examples/dotnet-map:build`.
   - Grounding: example build must integrate with native library setup.
 
-- [ ] Smoke-test `owned-texture` on the host backend.
+- [x] Smoke-test `owned-texture` on the host backend.
   - Grounding: `map-example.md#owned-texture`.
   - Command: `mise run //examples/dotnet-map:run:owned-texture`.
 
-- [ ] Smoke-test `borrowed-texture` on the host backend.
+- [x] Smoke-test `borrowed-texture` on the host backend.
   - Grounding: `map-example.md#borrowed-texture`.
   - Command: `mise run //examples/dotnet-map:run:borrowed-texture`.
 
-- [ ] Smoke-test `native-surface` on the host backend.
+- [x] Smoke-test `native-surface` on the host backend.
   - Grounding: `map-example.md#native-surface`.
   - Command: `mise run //examples/dotnet-map:run:native-surface`.
 
-- [ ] Smoke-test at least one non-default backend variant where available.
+- [x] Smoke-test at least one non-default backend variant where available.
   - Grounding: `map-example.md#graphics-api`.
   - macOS example:
     `mise -E macos-arm64-vulkan run //examples/dotnet-map:run:owned-texture`.
   - Linux example: run the alternate Vulkan/OpenGL variant configured for the
     host.
 
-- [ ] Run targeted formatting on touched files.
+- [x] Run targeted formatting on touched files.
   - Grounding: repository formatting is orchestrated by `hk` and `dprint`.
   - Command: `hk fix [FILES...]`.
 
-- [ ] Run the full repository formatter/linter before final handoff.
+- [x] Run the full repository formatter/linter before final handoff.
   - Grounding: `mise run fix` is the repository-wide cleanup entrypoint.
   - Command: `mise run fix`.
