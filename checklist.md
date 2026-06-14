@@ -44,7 +44,7 @@ References:
 
 ## Phase 1: .NET Project Configuration
 
-- [ ] Add root `Directory.Packages.props` with NuGet Central Package Management
+- [x] Add root `Directory.Packages.props` with NuGet Central Package Management
       enabled.
   - Grounding: package manager config belongs at the repo root for this branch.
   - Include
@@ -53,25 +53,25 @@ References:
     project.
   - Add central versions for Silk.NET packages used by the example.
 
-- [ ] Add a repo-root .NET tool manifest for CSharpier.
+- [x] Add a repo-root .NET tool manifest for CSharpier.
   - Grounding: C# formatting applies to both `bindings/dotnet` and
     `examples/dotnet-map`.
   - Use a root `dotnet-tools.json` unless the branch also updates tooling to use
     the SDK default `.config/dotnet-tools.json` path.
   - Include only project-wide .NET tools such as `csharpier`.
 
-- [ ] Remove CSharpier from `bindings/dotnet/dotnet-tools.json`.
+- [x] Remove CSharpier from `bindings/dotnet/dotnet-tools.json`.
   - Grounding: `bindings/dotnet/dotnet-tools.json` should remain scoped to
     binding-specific generation tools.
   - Keep `clangsharppinvokegenerator` there.
 
-- [ ] Update root `mise.toml` postinstall to restore repo-root .NET tools.
+- [x] Update root `mise.toml` postinstall to restore repo-root .NET tools.
   - Grounding: root setup should install the project-wide C# formatter.
   - Add a root
     `dotnet tool restore --tool-manifest dotnet-tools.json --verbosity quiet`
     step before or alongside the binding generator tool restore.
 
-- [ ] Keep the binding-specific ClangSharp tool restore in root `mise.toml`.
+- [x] Keep the binding-specific ClangSharp tool restore in root `mise.toml`.
   - Grounding: `bindings/dotnet/scripts/generate-clangsharp.sh` runs
     `dotnet tool restore` in `bindings/dotnet` before generation.
   - Preserve the existing binding-scoped restore behavior for
@@ -80,22 +80,22 @@ References:
     `dotnet tool restore --tool-manifest bindings/dotnet/dotnet-tools.json --verbosity quiet`
     command from the repo root.
 
-- [ ] Update `dprint.jsonc` to run CSharpier from the repository root.
+- [x] Update `dprint.jsonc` to run CSharpier from the repository root.
   - Grounding: C# formatting should apply uniformly to binding and example C#
     files.
   - Change the C# formatter `cwd` from `bindings/dotnet` to the root context.
   - Update CSharpier `cacheKeyFiles` to the repo-root tool manifest.
 
-- [ ] Remove package `Version` attributes from existing C# test project
+- [x] Remove package `Version` attributes from existing C# test project
       references.
   - Grounding: NuGet Central Package Management uses versionless
     `PackageReference` entries in projects and central `PackageVersion` entries
     in `Directory.Packages.props`.
 
-- [ ] Create the `examples/dotnet-map` directory.
+- [x] Create the `examples/dotnet-map` directory.
   - Grounding: examples live under `examples/` and keep their own mise tasks.
 
-- [ ] Add `examples/dotnet-map/Maplibre.Native.Examples.DotnetMap.csproj`.
+- [x] Add `examples/dotnet-map/Maplibre.Native.Examples.DotnetMap.csproj`.
   - Grounding: `map-example.md#what-an-example-is-not`.
   - Configure it as an executable, `net10.0`, nullable enabled, unsafe allowed,
     and non-packable.
@@ -104,30 +104,33 @@ References:
   - Add versionless package references for the Silk.NET packages used by the
     example.
 
-- [ ] Add a repo-root `Maplibre.Native.slnx`.
+- [x] Add an example-local `.gitignore` for .NET build output.
+  - Grounding: generated `bin/` and `obj/` directories should stay out of git.
+
+- [x] Add a repo-root `Maplibre.Native.slnx`.
   - Grounding: `map-example.md#architecture`.
   - Include:
     - `bindings/dotnet/src/Maplibre.Native/Maplibre.Native.csproj`
     - `bindings/dotnet/tests/Maplibre.Native.Tests/Maplibre.Native.Tests.csproj`
     - `examples/dotnet-map/Maplibre.Native.Examples.DotnetMap.csproj`
 
-- [ ] Update `bindings/dotnet/mise.toml` to build from the repo-root solution.
+- [x] Update `bindings/dotnet/mise.toml` to build from the repo-root solution.
   - Grounding: the root solution is the branch's .NET build entrypoint.
   - Build command should run from `{{env.MLN_FFI_REPO_ROOT}}`.
   - Preserve `-p:Platform="Any CPU"`.
 
-- [ ] Update `bindings/dotnet/mise.toml` to test with root-relative project
+- [x] Update `bindings/dotnet/mise.toml` to test with root-relative project
       paths.
   - Grounding: binding test task should keep working after moving solution
     ownership to the repository root.
   - Test command should run from `{{env.MLN_FFI_REPO_ROOT}}`.
   - Preserve `-p:Platform="Any CPU"`.
 
-- [ ] Remove `bindings/dotnet/Maplibre.Native.slnx` after root solution tasks
+- [x] Remove `bindings/dotnet/Maplibre.Native.slnx` after root solution tasks
       work.
   - Grounding: avoid two competing authoritative .NET solutions in the branch.
 
-- [ ] Add `examples/dotnet-map/mise.toml`.
+- [x] Add `examples/dotnet-map/mise.toml`.
   - Grounding: `map-example.md#command-line-interface`.
   - Provide `build`, `run`, `run:owned-texture`, `run:borrowed-texture`, and
     `run:native-surface`.
@@ -518,20 +521,20 @@ References:
 
 ## Phase 10: Verification
 
-- [ ] Verify repo-root .NET tool restore succeeds.
+- [x] Verify repo-root .NET tool restore succeeds.
   - Grounding: CSharpier is now a project-wide formatter tool.
   - Command: `dotnet tool restore --tool-manifest dotnet-tools.json`.
 
-- [ ] Verify binding-local .NET generator tool restore succeeds.
+- [x] Verify binding-local .NET generator tool restore succeeds.
   - Grounding: ClangSharp remains scoped to `bindings/dotnet`.
   - Command:
     `dotnet tool restore --tool-manifest bindings/dotnet/dotnet-tools.json`.
 
-- [ ] Verify `dotnet restore Maplibre.Native.slnx` from the repository root.
+- [x] Verify `dotnet restore Maplibre.Native.slnx` from the repository root.
   - Grounding: root solution and central package versions are the normal .NET
     entrypoint.
 
-- [ ] Verify `dotnet build Maplibre.Native.slnx -p:Platform="Any CPU"`.
+- [x] Verify `dotnet build Maplibre.Native.slnx -p:Platform="Any CPU"`.
   - Grounding: existing C# mise tasks force Any CPU because Visual Studio may
     export `Platform=x64` on Windows.
 

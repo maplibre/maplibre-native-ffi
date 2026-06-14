@@ -47,7 +47,6 @@
       },
       {
         "command": "dotnet csharpier format --write-stdout --stdin-path {{file_path}} --log-level None",
-        "cwd": "bindings/dotnet",
         "exts": ["cs"],
         "cacheKeyFiles": ["dotnet-tools.json"],
       },

@@ -1,0 +1,19 @@
+[tasks.build]
+depends = ["//:ensure-native-library"]
+dir = "{{env.MLN_FFI_REPO_ROOT}}"
+run = 'dotnet build examples/dotnet-map/Maplibre.Native.Examples.DotnetMap.csproj -p:Platform="Any CPU"'
+
+[tasks.run]
+depends = ["//:ensure-native-library"]
+dir = "{{env.MLN_FFI_REPO_ROOT}}"
+usage = 'arg "render-target"'
+run = 'dotnet run --project examples/dotnet-map/Maplibre.Native.Examples.DotnetMap.csproj -p:Platform="Any CPU" -- "{{ usage.render_target }}"'
+
+[tasks."run:owned-texture"]
+run = [{ task = "run", args = ["owned-texture"] }]
+
+[tasks."run:borrowed-texture"]
+run = [{ task = "run", args = ["borrowed-texture"] }]
+
+[tasks."run:native-surface"]
+run = [{ task = "run", args = ["native-surface"] }]
