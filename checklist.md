@@ -261,7 +261,7 @@ References:
 
 ## Phase 5: CLI, Startup, and Diagnostics
 
-- [ ] Implement exact CLI parsing in `Program.cs`.
+- [x] Implement exact CLI parsing in `Program.cs`.
   - Grounding: `map-example.md#command-line-interface`.
   - Accept exactly one positional mode argument.
   - Support only `--help`.
@@ -269,36 +269,36 @@ References:
   - Print usage and exit `1` for invalid arguments.
   - Do all of this before creating a window.
 
-- [ ] Load the native library through the existing C# loader.
+- [x] Load the native library through the existing C# loader.
   - Grounding: `map-example.md#startup`.
   - Project grounding:
     `bindings/dotnet/src/Maplibre.Native/Internal/Loader/NativeLibraryLoader.cs`
     already resolves `MAPLIBRE_NATIVE_FFI_LIBRARY_PATH` and `MLN_FFI_BUILD_DIR`.
   - Call `Maplibre.LoadNativeLibrary()` before querying backend support.
 
-- [ ] Query and print the loaded library's supported render backend mask.
+- [x] Query and print the loaded library's supported render backend mask.
   - Grounding: `map-example.md#startup`.
   - Use `Maplibre.SupportedRenderBackends()`.
 
-- [ ] Validate that the loaded native library supports a usable backend.
+- [x] Validate that the loaded native library supports a usable backend.
   - Grounding: `map-example.md#startup`.
   - Fail fast with a readable message before creating graphics resources.
 
-- [ ] Implement backend preference order in `IGraphicsContext.Create`.
+- [x] Implement backend preference order in `IGraphicsContext.Create`.
   - Grounding: `map-example.md#implementations`, `map-example.md#graphics-api`.
   - macOS: prefer Metal, then Vulkan.
   - Linux/Windows: prefer OpenGL, then Vulkan.
 
-- [ ] Register a native log callback during startup.
+- [x] Register a native log callback during startup.
   - Grounding: `map-example.md#diagnostics`.
   - Print concise MapLibre log records to stderr.
 
-- [ ] Clear the native log callback during shutdown.
+- [x] Clear the native log callback during shutdown.
   - Grounding: `map-example.md#diagnostics`.
   - Use `finally` so fatal setup/runtime failures still clear process-global
     logging state.
 
-- [ ] Print the required active render-target startup lines.
+- [x] Print the required active render-target startup lines.
   - Grounding: `map-example.md#startup-status-lines`.
   - Print `render target: <mode>`.
   - Print exactly one required `render target status: ...` line.

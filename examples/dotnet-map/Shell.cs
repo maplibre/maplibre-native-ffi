@@ -9,8 +9,14 @@ internal static class Shell
 
     public static void Run(RenderTargetMode mode, RenderBackend backends)
     {
-        _ = mode;
-        _ = backends;
-        throw new NotImplementedException("dotnet-map shell is not implemented yet.");
+        using var graphics = GraphicsContext.Create(
+            "dotnet-map",
+            InitialWidth,
+            InitialHeight,
+            backends
+        );
+        Console.WriteLine($"render target: {mode.CliName}");
+        Console.WriteLine($"render target status: {mode.Status}");
+        InputController.PrintControls();
     }
 }
