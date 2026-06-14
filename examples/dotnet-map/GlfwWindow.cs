@@ -75,6 +75,11 @@ internal sealed unsafe class GlfwWindow : IDisposable
         Glfw.PollEvents();
     }
 
+    public void WaitEventsTimeout(double timeoutSeconds)
+    {
+        Glfw.WaitEventsTimeout(timeoutSeconds);
+    }
+
     public bool CanRenderFrame()
     {
         return !CurrentViewport.IsEmpty;

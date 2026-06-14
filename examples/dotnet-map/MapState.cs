@@ -86,9 +86,14 @@ internal sealed class MapState : IDisposable
 
     public bool Step()
     {
+        return Step(canRender: true);
+    }
+
+    public bool Step(bool canRender)
+    {
         runtime.RunOnce();
         DrainEvents();
-        if (!RenderPending)
+        if (!canRender || !RenderPending)
         {
             return false;
         }

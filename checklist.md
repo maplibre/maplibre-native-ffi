@@ -469,49 +469,49 @@ References:
 
 ## Phase 9: Frame Loop and Shutdown
 
-- [ ] Implement the main GLFW pump loop in `Shell`.
+- [x] Implement the main GLFW pump loop in `Shell`.
   - Grounding: `map-example.md#frame-loop`.
   - Continue until window close is requested.
 
-- [ ] Poll window and input events every loop iteration.
+- [x] Poll window and input events every loop iteration.
   - Grounding: `map-example.md#pump-every-iteration`.
 
-- [ ] Run one runtime pump per loop iteration.
+- [x] Run one runtime pump per loop iteration.
   - Grounding: `map-example.md#frame-loop`.
   - Call the C# runtime handle's `RunOnce` equivalent.
 
-- [ ] Drain runtime events every loop iteration.
+- [x] Drain runtime events every loop iteration.
   - Grounding: `map-example.md#frame-loop`.
 
-- [ ] Run graphics-context frame maintenance every loop iteration.
+- [x] Run graphics-context frame maintenance every loop iteration.
   - Grounding: `map-example.md#pump-every-iteration`.
   - This is where swapchain or surface upkeep belongs.
 
-- [ ] Call render update only while render is pending.
+- [x] Call render update only while render is pending.
   - Grounding: `map-example.md#render-render_pending`.
 
-- [ ] Handle invalid-state render-update failures by leaving render pending.
+- [x] Handle invalid-state render-update failures by leaving render pending.
   - Grounding: `map-example.md#frame-loop`.
 
-- [ ] Clear render pending after successful render update.
+- [x] Clear render pending after successful render update.
   - Grounding: `map-example.md#frame-loop`.
 
-- [ ] Draw through the compositor after successful texture-mode render updates.
+- [x] Draw through the compositor after successful texture-mode render updates.
   - Grounding: `map-example.md#render-render_pending`,
     `map-example.md#render-target-modes`.
 
-- [ ] Present or finish backend frame work after rendering.
+- [x] Present or finish backend frame work after rendering.
   - Grounding: `map-example.md#frame-loop`.
 
-- [ ] Idle briefly when a loop iteration makes no progress.
+- [x] Idle briefly when a loop iteration makes no progress.
   - Grounding: `map-example.md#frame-loop`.
   - Use `glfwWaitEventsTimeout` or an equivalent short wait.
 
-- [ ] Implement graceful process exit on window close.
+- [x] Implement graceful process exit on window close.
   - Grounding: `map-example.md#what-every-example-provides`,
     `map-example.md#shutdown`.
 
-- [ ] Release resources in required shutdown order.
+- [x] Release resources in required shutdown order.
   - Grounding: `map-example.md#shutdown`.
   - Finish/wait GPU work.
   - Close render target.
