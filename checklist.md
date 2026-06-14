@@ -34,19 +34,17 @@ Broad phases are grouped so each phase can land as a separate commit.
       ANGLE include dirs, link `ANGLE::EGL` and `ANGLE::GLESv2`, and define
       `MLN_FFI_OPENGL_PROVIDER_EGL=1` plus `MLN_FFI_OPENGL_PROVIDER_ANGLE=1`.
 - [x] Ensure build-tree runtime loading works by adding the ANGLE library
-      directory to build RPATH or copying `libEGL.dylib` and `libGLESv2.dylib`
-      next to `libmaplibre-native-c.dylib`.
+      directory to build RPATH.
 
 ## Phase 3: Shared EGL Provider Implementation
 
 - [ ] Replace Linux-specific EGL guards in `src/render/opengl/*` with
       `MLN_FFI_OPENGL_PROVIDER_EGL`.
 - [ ] Refactor duplicated EGL context code from texture and surface sessions
-      into a shared project helper, such as
-      `src/render/opengl/egl_context.hpp/.cpp`.
-- [ ] Implement ANGLE display creation using `eglGetPlatformDisplay` or
-      `eglGetPlatformDisplayEXT` with `EGL_PLATFORM_ANGLE_ANGLE`,
-      `EGL_PLATFORM_ANGLE_TYPE_ANGLE`, `EGL_PLATFORM_ANGLE_TYPE_METAL_ANGLE`,
+      into `src/render/opengl/egl_context.hpp/.cpp`.
+- [ ] Implement ANGLE display creation by calling `eglGetPlatformDisplayEXT`
+      with `EGL_PLATFORM_ANGLE_ANGLE`, `EGL_PLATFORM_ANGLE_TYPE_ANGLE`,
+      `EGL_PLATFORM_ANGLE_TYPE_METAL_ANGLE`,
       `EGL_PLATFORM_ANGLE_DEVICE_TYPE_ANGLE`, and
       `EGL_PLATFORM_ANGLE_DEVICE_TYPE_HARDWARE_ANGLE`.
 - [ ] Add a small internal ANGLE/EGL bootstrap path for tests and examples that
@@ -57,8 +55,7 @@ Broad phases are grouped so each phase can land as a separate commit.
 
 - [ ] Update public docs and header wording that currently says EGL is
       Linux-only.
-- [ ] Add `macos-arm64-angle` to docs as experimental development support once
-      smoke tests pass.
+- [ ] Add `macos-arm64-angle` to docs as the macOS development EGL backend.
 
 ## Phase 5: Verification
 
