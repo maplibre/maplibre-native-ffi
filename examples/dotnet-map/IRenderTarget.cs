@@ -23,28 +23,40 @@ internal static class RenderTargetFactory
         ArgumentNullException.ThrowIfNull(graphics);
         ArgumentNullException.ThrowIfNull(mapState);
 
+        return Attach(graphics, mapState.Map, mode);
+    }
+
+    public static IRenderTarget Attach(
+        IGraphicsContext graphics,
+        MapHandle map,
+        RenderTargetMode mode
+    )
+    {
+        ArgumentNullException.ThrowIfNull(graphics);
+        ArgumentNullException.ThrowIfNull(map);
+
         return mode.Kind switch
         {
-            RenderTargetModeKind.OwnedTexture => AttachOwnedTexture(graphics, mapState),
-            RenderTargetModeKind.BorrowedTexture => AttachBorrowedTexture(graphics, mapState),
-            RenderTargetModeKind.NativeSurface => AttachNativeSurface(graphics, mapState),
+            RenderTargetModeKind.OwnedTexture => AttachOwnedTexture(graphics, map),
+            RenderTargetModeKind.BorrowedTexture => AttachBorrowedTexture(graphics, map),
+            RenderTargetModeKind.NativeSurface => AttachNativeSurface(graphics, map),
             _ => throw new ArgumentOutOfRangeException(nameof(mode)),
         };
     }
 
-    private static IRenderTarget AttachOwnedTexture(IGraphicsContext graphics, MapState mapState)
+    private static IRenderTarget AttachOwnedTexture(IGraphicsContext graphics, MapHandle map)
     {
-        return OwnedTextureRenderTarget.Attach(graphics, mapState.Map, graphics.ReadViewport());
+        return OwnedTextureRenderTarget.Attach(graphics, map, graphics.ReadViewport());
     }
 
-    private static IRenderTarget AttachBorrowedTexture(IGraphicsContext graphics, MapState mapState)
+    private static IRenderTarget AttachBorrowedTexture(IGraphicsContext graphics, MapHandle map)
     {
-        return BorrowedTextureRenderTarget.Attach(graphics, mapState.Map, graphics.ReadViewport());
+        return BorrowedTextureRenderTarget.Attach(graphics, map, graphics.ReadViewport());
     }
 
-    private static IRenderTarget AttachNativeSurface(IGraphicsContext graphics, MapState mapState)
+    private static IRenderTarget AttachNativeSurface(IGraphicsContext graphics, MapHandle map)
     {
-        return NativeSurfaceRenderTarget.Attach(graphics, mapState.Map, graphics.ReadViewport());
+        return NativeSurfaceRenderTarget.Attach(graphics, map, graphics.ReadViewport());
     }
 }
 

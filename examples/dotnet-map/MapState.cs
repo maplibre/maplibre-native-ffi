@@ -1,15 +1,38 @@
+using Maplibre.Native.Camera;
+using Maplibre.Native.Error;
+using Maplibre.Native.Geo;
 using Maplibre.Native.Map;
+using Maplibre.Native.Runtime;
 
 namespace Maplibre.Native.Examples.DotnetMap;
 
 internal sealed class MapState : IDisposable
 {
-    private MapState() { }
+    private const string StyleUrl = "https://tiles.openfreemap.org/styles/bright";
 
-    private MapHandle? MapOrNull { get; set; }
+    private readonly RuntimeHandle runtime;
+    private readonly IGraphicsContext graphics;
+    private readonly RenderTargetMode renderTargetMode;
+    private IRenderTarget renderTarget;
+    private bool closed;
 
-    public MapHandle Map =>
-        MapOrNull ?? throw new InvalidOperationException("Map state has not created a map yet.");
+    private MapState(
+        RuntimeHandle runtime,
+        MapHandle map,
+        IGraphicsContext graphics,
+        RenderTargetMode renderTargetMode,
+        IRenderTarget renderTarget
+    )
+    {
+        this.runtime = runtime;
+        Map = map;
+        this.graphics = graphics;
+        this.renderTargetMode = renderTargetMode;
+        this.renderTarget = renderTarget;
+        RenderPending = true;
+    }
+
+    public MapHandle Map { get; }
 
     public bool RenderPending { get; private set; }
 
@@ -20,9 +43,40 @@ internal sealed class MapState : IDisposable
     )
     {
         ArgumentNullException.ThrowIfNull(graphics);
-        _ = viewport;
-        _ = renderTargetMode;
-        throw new NotImplementedException("Map state creation is not implemented yet.");
+        var runtime = RuntimeHandle.Create(new RuntimeOptions { CachePath = ":memory:" });
+        var map = MapHandle.Create(
+            runtime,
+            new MapOptions
+            {
+                Width = viewport.LogicalWidth,
+                Height = viewport.LogicalHeight,
+                ScaleFactor = viewport.ScaleFactor,
+                MapMode = MapMode.Continuous,
+            }
+        );
+        IRenderTarget? renderTarget = null;
+        try
+        {
+            map.SetStyleUrl(StyleUrl);
+            map.JumpTo(
+                new CameraOptions
+                {
+                    Center = new LatLng(37.7749, -122.4194),
+                    Zoom = 13.0,
+                    Bearing = 12.0,
+                    Pitch = 30.0,
+                }
+            );
+            renderTarget = RenderTargetFactory.Attach(graphics, map, renderTargetMode);
+            return new MapState(runtime, map, graphics, renderTargetMode, renderTarget);
+        }
+        catch
+        {
+            renderTarget?.Dispose();
+            map.Dispose();
+            runtime.Dispose();
+            throw;
+        }
     }
 
     public void RequestRender()
@@ -32,14 +86,87 @@ internal sealed class MapState : IDisposable
 
     public bool Step()
     {
-        throw new NotImplementedException("Map frame stepping is not implemented yet.");
+        runtime.RunOnce();
+        DrainEvents();
+        if (!RenderPending)
+        {
+            return false;
+        }
+
+        try
+        {
+            renderTarget.Render();
+            RenderPending = false;
+        }
+        catch (InvalidStateException)
+        {
+            RenderPending = true;
+        }
+
+        return true;
+    }
+
+    public void DrainEvents()
+    {
+        while (runtime.PollEvent() is { } runtimeEvent)
+        {
+            if (!ReferenceEquals(runtimeEvent.MapSource, Map))
+            {
+                continue;
+            }
+
+            if (runtimeEvent.Type == RuntimeEventType.MapRenderUpdateAvailable)
+            {
+                RenderPending = true;
+            }
+            else if (
+                runtimeEvent.Type == RuntimeEventType.MapRenderFrameFinished
+                && runtimeEvent.Payload is RuntimeEventPayload.RenderFrame { NeedsRepaint: true }
+            )
+            {
+                RenderPending = true;
+            }
+        }
     }
 
     public void Resize(Viewport viewport)
     {
-        _ = viewport;
-        throw new NotImplementedException("Map resize is not implemented yet.");
+        graphics.Resize(viewport);
+        if (renderTarget.NeedsReattachOnResize)
+        {
+            renderTarget.Dispose();
+            renderTarget = RenderTargetFactory.Attach(graphics, Map, renderTargetMode);
+        }
+        else
+        {
+            renderTarget.Resize(viewport);
+        }
+
+        RenderPending = true;
     }
 
-    public void Dispose() { }
+    public void Dispose()
+    {
+        if (closed)
+        {
+            return;
+        }
+
+        closed = true;
+        try
+        {
+            renderTarget.Dispose();
+        }
+        finally
+        {
+            try
+            {
+                Map.Dispose();
+            }
+            finally
+            {
+                runtime.Dispose();
+            }
+        }
+    }
 }

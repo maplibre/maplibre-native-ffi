@@ -390,36 +390,36 @@ References:
 
 ## Phase 7: Map State
 
-- [ ] Create `RuntimeHandle` with cache path `:memory:`.
+- [x] Create `RuntimeHandle` with cache path `:memory:`.
   - Grounding: `map-example.md#map-and-runtime`, `map-example.md#map-state`.
 
-- [ ] Create `MapHandle` with the current viewport and continuous mode.
+- [x] Create `MapHandle` with the current viewport and continuous mode.
   - Grounding: `map-example.md#map-and-runtime`.
 
-- [ ] Load the required style URL during map initialization.
+- [x] Load the required style URL during map initialization.
   - Grounding: `map-example.md#style`.
   - URL: `https://tiles.openfreemap.org/styles/bright`.
 
-- [ ] Apply the required initial camera with an immediate jump.
+- [x] Apply the required initial camera with an immediate jump.
   - Grounding: `map-example.md#initial-camera`.
   - Center: latitude `37.7749`, longitude `-122.4194`.
   - Zoom `13.0`, bearing `12.0`, pitch `30.0`.
 
-- [ ] Attach the initial render target after style and camera setup.
+- [x] Attach the initial render target after style and camera setup.
   - Grounding: `map-example.md#startup`, `map-example.md#map-state`.
 
-- [ ] Implement runtime event draining in `MapState`.
+- [x] Implement runtime event draining in `MapState`.
   - Grounding: `map-example.md#map-state`.
   - Set render pending for `map_render_update_available` targeting this map.
   - Set render pending for `map_render_frame_finished` targeting this map when
     `needs_repaint` is true.
 
-- [ ] Implement `MapState.Resize`.
+- [x] Implement `MapState.Resize`.
   - Grounding: `map-example.md#resize`, `map-example.md#map-state`.
   - Reattach when the active render target needs reattach on resize.
   - Otherwise resize graphics and render-session resources in place.
 
-- [ ] Implement deterministic `MapState` shutdown.
+- [x] Implement deterministic `MapState` shutdown.
   - Grounding: `map-example.md#shutdown`.
   - Close render target, then map, then runtime.
 
