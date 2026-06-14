@@ -425,46 +425,46 @@ References:
 
 ## Phase 8: Input
 
-- [ ] Print the required control help once at startup.
+- [x] Print the required control help once at startup.
   - Grounding: `map-example.md#control-scheme`.
 
-- [ ] Implement left-drag pan.
+- [x] Implement left-drag pan.
   - Grounding: `map-example.md#behavioral-constants`.
   - Call `move_by` with pointer delta in logical coordinates.
 
-- [ ] Implement right-drag and Ctrl-left-drag rotate/pitch.
+- [x] Implement right-drag and Ctrl-left-drag rotate/pitch.
   - Grounding: `map-example.md#behavioral-constants`.
   - Bearing changes by `0.5 * deltaX` degrees.
   - Pitch changes by `0.5 * deltaY` degrees.
 
-- [ ] Cancel in-flight camera transitions when a drag starts.
+- [x] Cancel in-flight camera transitions when a drag starts.
   - Grounding: `map-example.md#input`.
 
-- [ ] Implement scroll zoom at cursor.
+- [x] Implement scroll zoom at cursor.
   - Grounding: `map-example.md#behavioral-constants`.
   - Use `scale_by(2^(delta * 0.25), anchor)`.
 
-- [ ] Implement arrow-key and WASD pan.
+- [x] Implement arrow-key and WASD pan.
   - Grounding: `map-example.md#behavioral-constants`.
   - Pan `120` logical units per key press.
 
-- [ ] Implement `+` and `-` center zoom.
+- [x] Implement `+` and `-` center zoom.
   - Grounding: `map-example.md#behavioral-constants`.
   - Use factors `1.25` and `1 / 1.25`.
 
-- [ ] Implement `Q` and `E` bearing controls.
+- [x] Implement `Q` and `E` bearing controls.
   - Grounding: `map-example.md#behavioral-constants`.
   - Rotate by `10` degrees with keyboard animation.
 
-- [ ] Implement `]` and `[` pitch controls.
+- [x] Implement `]` and `[` pitch controls.
   - Grounding: `map-example.md#behavioral-constants`.
   - Adjust by `5` degrees and clamp to `[0, 60]`.
 
-- [ ] Implement `0` pitch/bearing reset.
+- [x] Implement `0` pitch/bearing reset.
   - Grounding: `map-example.md#behavioral-constants`.
   - Animate pitch and bearing to `0`.
 
-- [ ] Mark render pending after every input-driven camera change.
+- [x] Mark render pending after every input-driven camera change.
   - Grounding: `map-example.md#frame-loop`, `map-example.md#input`.
 
 ## Phase 9: Frame Loop and Shutdown

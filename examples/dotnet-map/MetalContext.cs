@@ -30,6 +30,8 @@ internal sealed unsafe class MetalContext : IGraphicsContext
 
     public nint WindowHandle => window.NativeHandle;
 
+    public GlfwWindow Window => window;
+
     public bool ShouldClose => window.ShouldClose;
 
     public bool CanRenderFrame => window.CanRenderFrame();

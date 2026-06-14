@@ -8,6 +8,8 @@ internal interface IGraphicsContext : IDisposable
 
     nint WindowHandle { get; }
 
+    GlfwWindow Window { get; }
+
     bool ShouldClose { get; }
 
     bool CanRenderFrame { get; }
