@@ -140,7 +140,7 @@ References:
 
 ## Phase 2: Source Skeleton and Contracts
 
-- [ ] Create the C# module files matching the spec's logical modules.
+- [x] Create the C# module files matching the spec's logical modules.
   - Grounding: `map-example.md#logical-modules`.
   - Initial files:
     - `Program.cs`
@@ -157,22 +157,22 @@ References:
     - backend compositor files
     - `MacObjectiveC.cs`
 
-- [ ] Define `RenderTargetMode` with the three required CLI values.
+- [x] Define `RenderTargetMode` with the three required CLI values.
   - Grounding: `map-example.md#render-target-selection`.
   - Values: `owned-texture`, `borrowed-texture`, `native-surface`.
   - Store the exact required startup status line for each mode.
 
-- [ ] Define the `IGraphicsContext` contract for backend-level resources.
+- [x] Define the `IGraphicsContext` contract for backend-level resources.
   - Grounding: `map-example.md#graphics-api-and-mode-matrix`.
   - Include backend identity, window handle/accessors, resize hook, per-frame
     maintenance hook, and shutdown.
 
-- [ ] Define the `IRenderTarget` contract for render-session and mode resources.
+- [x] Define the `IRenderTarget` contract for render-session and mode resources.
   - Grounding: `map-example.md#render-target-modes`.
   - Include render update/draw behavior, resize behavior,
     `NeedsReattachOnResize`, and shutdown.
 
-- [ ] Implement separate factories for graphics API selection and render-target
+- [x] Implement separate factories for graphics API selection and render-target
       mode selection.
   - Grounding: `map-example.md#graphics-api-and-mode-matrix`.
   - `IGraphicsContext.Create` selects Metal/Vulkan/OpenGL.
