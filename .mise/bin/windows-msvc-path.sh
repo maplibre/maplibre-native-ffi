@@ -89,7 +89,7 @@ EOF
 
   local msvc_path
   msvc_path="$(cygpath -u -p "$msvc_path_windows")"
-  export PATH="$msvc_path${original_path:+:$original_path}"
+  export PATH="$original_path${msvc_path:+:$msvc_path}"
 }
 
 normalize_windows_msvc_path() {
