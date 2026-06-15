@@ -1,0 +1,8 @@
+[env]
+MLN_FFI_VARIANT = "macos-arm64-egl"
+MLN_FFI_TARGET_TRIPLE = "macos-arm64"
+MLN_FFI_RENDER_BACKEND = "opengl"
+MLN_FFI_OPENGL_CONTEXT_PROVIDER = "egl"
+MLN_FFI_EGL_ROOT = "{{config_root}}/third_party/angle/chromium-7151_rev1/macos-arm64"
+MLN_FFI_BUILD_DIR = "{{config_root}}/build/macos-arm64-egl"
+MLN_FFI_ZIG_TARGET = "aarch64-macos"

@@ -1,6 +1,6 @@
 #pragma once
 
-#if defined(_WIN32)
+#if defined(MLN_FFI_OPENGL_PROVIDER_WGL)
 #include <cstdint>
 #include <limits>
 #include <stdexcept>

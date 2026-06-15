@@ -6,7 +6,7 @@ const BuildOptions = struct {
     optimize: std.builtin.OptimizeMode,
     cmake_artifact_dir: std.Build.LazyPath,
     include_dirs: []const std.Build.LazyPath,
-    dependency_library_dir: ?std.Build.LazyPath,
+    dependency_library_dirs: []const std.Build.LazyPath,
     render_backend: maplibre_build.RenderBackend,
 };
 
@@ -17,7 +17,7 @@ fn maplibreNativeModule(b: *std.Build, options: BuildOptions) *std.Build.Module 
         .cmake_artifact_dir = options.cmake_artifact_dir,
         .include_dirs = options.include_dirs,
         .render_backend = options.render_backend,
-        .dependency_library_dir = options.dependency_library_dir,
+        .dependency_library_dirs = options.dependency_library_dirs,
     });
 }
 
@@ -43,7 +43,7 @@ fn addReadbackExample(b: *std.Build, options: BuildOptions) *std.Build.Step.Comp
     maplibre_build.addIncludePaths(example.root_module, options.include_dirs);
     if (options.render_backend == .opengl and options.target.result.os.tag == .windows) {
         addSdlTranslateCWorkarounds(example.root_module, options.target);
-        if (options.dependency_library_dir) |dependency_library_dir| {
+        for (options.dependency_library_dirs) |dependency_library_dir| {
             example.root_module.addLibraryPath(dependency_library_dir);
             example.root_module.addRPath(dependency_library_dir);
         }
@@ -53,7 +53,7 @@ fn addReadbackExample(b: *std.Build, options: BuildOptions) *std.Build.Step.Comp
     maplibre_build.linkRenderBackend(b, example.root_module, .{
         .target = options.target,
         .render_backend = options.render_backend,
-        .dependency_library_dir = options.dependency_library_dir,
+        .dependency_library_dirs = options.dependency_library_dirs,
     });
     b.installArtifact(example);
     return example;
@@ -67,7 +67,7 @@ pub fn build(b: *std.Build) void {
         .optimize = b.standardOptimizeOption(.{}),
         .cmake_artifact_dir = maplibre_build.cmakeArtifactDir(b),
         .include_dirs = maplibre_build.includeDirs(b),
-        .dependency_library_dir = maplibre_build.dependencyLibraryDir(b),
+        .dependency_library_dirs = maplibre_build.dependencyLibraryDirs(b),
         .render_backend = render_backend,
     };
 

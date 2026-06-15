@@ -4,18 +4,20 @@
 
 const build_options = @import("build_options");
 const builtin = @import("builtin");
-const gl = if (builtin.os.tag == .windows) @import("gl") else struct {};
+const supports_wgl = build_options.supports_opengl and builtin.os.tag == .windows;
+const supports_egl = build_options.supports_opengl and (builtin.os.tag == .linux or builtin.os.tag == .macos);
+const gl = if (supports_wgl) @import("gl") else struct {};
 const std = @import("std");
 const testing = @import("std").testing;
 const support = @import("support.zig");
 const common = @import("render_session_abi.zig");
 const c = support.c;
-const wgl_test = if (builtin.os.tag == .windows) @import("wgl_test_context") else struct {};
+const wgl_test = if (supports_wgl) @import("wgl_test_context") else struct {};
 
-const gl_texture_2d = if (builtin.os.tag == .windows) gl.TEXTURE_2D else 0x0de1;
-const gl_rgba8 = if (builtin.os.tag == .windows) gl.RGBA8 else 0x8058;
-const gl_rgba = if (builtin.os.tag == .windows) gl.RGBA else 0x1908;
-const gl_unsigned_byte = if (builtin.os.tag == .windows) gl.UNSIGNED_BYTE else 0x1401;
+const gl_texture_2d = if (supports_wgl) gl.TEXTURE_2D else 0x0de1;
+const gl_rgba8 = if (supports_wgl) gl.RGBA8 else 0x8058;
+const gl_rgba = if (supports_wgl) gl.RGBA else 0x1908;
+const gl_unsigned_byte = if (supports_wgl) gl.UNSIGNED_BYTE else 0x1401;
 
 const fake_handle: *anyopaque = @ptrFromInt(1);
 
@@ -101,7 +103,7 @@ fn emptyOpenGLOwnedTextureFrame() c.mln_opengl_owned_texture_frame {
 }
 
 fn configureContext(context: *c.mln_opengl_context_descriptor) void {
-    if (builtin.os.tag == .windows) {
+    if (supports_wgl) {
         context.platform = c.MLN_OPENGL_CONTEXT_PLATFORM_WGL;
         context.data.wgl.size = @sizeOf(c.mln_wgl_context_descriptor);
         context.data.wgl.device_context = fake_handle;
@@ -116,7 +118,7 @@ fn configureContext(context: *c.mln_opengl_context_descriptor) void {
 }
 
 fn shrinkContext(context: *c.mln_opengl_context_descriptor) void {
-    if (builtin.os.tag == .windows) {
+    if (supports_wgl) {
         context.data.wgl.size = @sizeOf(c.mln_wgl_context_descriptor) - 1;
     } else {
         context.data.egl.size = @sizeOf(c.mln_egl_context_descriptor) - 1;
@@ -124,7 +126,7 @@ fn shrinkContext(context: *c.mln_opengl_context_descriptor) void {
 }
 
 fn clearRequiredContextHandle(context: *c.mln_opengl_context_descriptor) void {
-    if (builtin.os.tag == .windows) {
+    if (supports_wgl) {
         context.data.wgl.share_context = null;
     } else {
         context.data.egl.share_context = null;
@@ -178,10 +180,10 @@ const OpenGLSurface = struct {
 
 const opengl_backend_abi = @This();
 
-const WglContext = if (builtin.os.tag == .windows) wgl_test.Context else opaque {};
+const WglContext = if (supports_wgl) wgl_test.Context else opaque {};
 
 fn wglContextDescriptor(context: *const WglContext) c.mln_opengl_context_descriptor {
-    if (builtin.os.tag != .windows) unreachable;
+    if (!supports_wgl) unreachable;
     return .{
         .size = @sizeOf(c.mln_opengl_context_descriptor),
         .platform = c.MLN_OPENGL_CONTEXT_PLATFORM_WGL,
@@ -217,7 +219,7 @@ test "OpenGL provider mask matches OpenGL build platform" {
     const mask = c.mln_opengl_supported_context_provider_mask();
     if (!build_options.supports_opengl) {
         try testing.expectEqual(@as(u32, 0), mask);
-    } else if (builtin.os.tag == .windows) {
+    } else if (supports_wgl) {
         try testing.expect((mask & c.MLN_OPENGL_CONTEXT_PROVIDER_FLAG_WGL) != 0);
     } else {
         try testing.expect((mask & c.MLN_OPENGL_CONTEXT_PROVIDER_FLAG_EGL) != 0);
@@ -290,7 +292,7 @@ test "OpenGL borrowed texture rejects unsafe raw descriptors" {
 }
 
 test "OpenGL EGL owned texture renders through raw C ABI" {
-    if (!build_options.supports_opengl or builtin.os.tag != .linux) return error.SkipZigTest;
+    if (!supports_egl) return error.SkipZigTest;
 
     var egl_context = try support.OwnedTextureAttachContext.init();
     defer egl_context.deinit();
@@ -339,7 +341,7 @@ test "OpenGL EGL owned texture renders through raw C ABI" {
 }
 
 test "OpenGL WGL owned texture renders through raw C ABI" {
-    if (!build_options.supports_opengl or builtin.os.tag != .windows) return error.SkipZigTest;
+    if (!supports_wgl) return error.SkipZigTest;
 
     var wgl_context = try wgl_test.Context.init();
     defer wgl_context.deinit();
@@ -420,7 +422,7 @@ test "OpenGL WGL owned texture renders through raw C ABI" {
 }
 
 test "OpenGL WGL borrowed texture renders through raw C ABI" {
-    if (!build_options.supports_opengl or builtin.os.tag != .windows) return error.SkipZigTest;
+    if (!supports_wgl) return error.SkipZigTest;
 
     var wgl_context = try wgl_test.Context.init();
     defer wgl_context.deinit();
@@ -470,7 +472,7 @@ test "OpenGL WGL borrowed texture renders through raw C ABI" {
 }
 
 test "OpenGL WGL surface renders through raw C ABI" {
-    if (!build_options.supports_opengl or builtin.os.tag != .windows) return error.SkipZigTest;
+    if (!supports_wgl) return error.SkipZigTest;
 
     var wgl_context = try wgl_test.Context.initWithSize(256, 256);
     defer wgl_context.deinit();

@@ -53,13 +53,13 @@ function(mln_add_c_api_library target)
       $<$<AND:$<COMPILE_LANGUAGE:CXX>,$<CXX_COMPILER_ID:MSVC>>:/GR->
       $<$<COMPILE_LANGUAGE:OBJC,OBJCXX>:-fobjc-arc>)
 
-  if(UNIX AND DEFINED ENV{CONDA_PREFIX})
-    # Build-tree binaries find Pixi-provided shared libraries through embedded
-    # runtime search paths.
+  if(UNIX AND DEFINED ENV{MLN_FFI_DEPENDENCY_LIBRARY_DIR})
+    # Build-tree binaries find provider-supplied shared libraries through
+    # embedded runtime search paths.
     set_property(
       TARGET ${target}
       APPEND
-      PROPERTY BUILD_RPATH "$ENV{CONDA_PREFIX}/lib")
+      PROPERTY BUILD_RPATH "$ENV{MLN_FFI_DEPENDENCY_LIBRARY_DIR}")
   endif()
 
   set_target_properties(

@@ -9,6 +9,7 @@ const render_target = @import("../../render_target.zig");
 const types = @import("../../types.zig");
 
 pub const OpenGLRenderTarget = PlatformOpenGLRenderTarget;
+const uses_egl = builtin.os.tag == .linux or builtin.os.tag == .macos;
 
 fn GlProc(comptime name: []const u8) type {
     return @TypeOf(@field(@as(gl.ProcTable, undefined), name));
@@ -148,8 +149,8 @@ fn loadOpenGLCompositorProcs() !OpenGLCompositorProcs {
 }
 
 fn createTextureProgram(procs: OpenGLCompositorProcs) !gl.uint {
-    const vertex_source = if (builtin.os.tag == .linux) gles_texture_vertex_shader else desktop_texture_vertex_shader;
-    const fragment_source = if (builtin.os.tag == .linux) gles_texture_fragment_shader else desktop_texture_fragment_shader;
+    const vertex_source = if (uses_egl) gles_texture_vertex_shader else desktop_texture_vertex_shader;
+    const fragment_source = if (uses_egl) gles_texture_fragment_shader else desktop_texture_fragment_shader;
 
     const vertex = try compileShader(procs, gl.VERTEX_SHADER, vertex_source, "texture vertex shader");
     defer procs.DeleteShader(vertex);
@@ -374,7 +375,7 @@ fn platformContext(window: *c.SDL_Window) !OpenGLContext.Platform {
             ) orelse return types.AppError.BackendSetupFailed;
             return .{ .wgl = .{ .device_context = device_context } };
         },
-        .linux => {
+        .linux, .macos => {
             const display = c.SDL_EGL_GetCurrentDisplay() orelse {
                 logSdlError("SDL_EGL_GetCurrentDisplay failed");
                 return types.AppError.BackendSetupFailed;

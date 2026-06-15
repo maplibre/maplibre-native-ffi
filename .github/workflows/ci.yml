@@ -54,6 +54,8 @@ jobs:
             runner: macos-latest
           - mise_env: macos-arm64-vulkan
             runner: macos-latest
+          - mise_env: macos-arm64-egl
+            runner: macos-latest
           - mise_env: windows-x64-vulkan
             runner: windows-2022
           - mise_env: windows-x64-wgl
@@ -66,20 +68,24 @@ jobs:
       - run: mise run test
 
       - name: Build Java FFM binding
+        if: ${{ matrix.mise_env != 'macos-arm64-egl' }}
         run: mise run //bindings/java-ffm:build
       - name: Build Java JNI binding
+        if: ${{ matrix.mise_env != 'macos-arm64-egl' }}
         run: mise run //bindings/java-jni:build
       - name: Test .NET binding
+        if: ${{ matrix.mise_env != 'macos-arm64-egl' }}
         run: mise run //bindings/dotnet:test
       # linux-arm64: no Kotlin/Native host — https://youtrack.jetbrains.com/issue/KT-36871
       # windows: no MSVC target — https://youtrack.jetbrains.com/issue/SKIKO-446
       - name: Test Kotlin/Native binding
-        if: ${{ !startsWith(matrix.mise_env, 'windows-') && !startsWith(matrix.mise_env, 'linux-arm64-') }}
+        if: ${{ matrix.mise_env != 'macos-arm64-egl' && !startsWith(matrix.mise_env, 'windows-') && !startsWith(matrix.mise_env, 'linux-arm64-') }}
         run: mise run //bindings/kotlin-native:build
       - name: Test Rust binding
+        if: ${{ matrix.mise_env != 'macos-arm64-egl' }}
         run: mise run //bindings/rust:ci
       - name: Test Swift binding
-        if: ${{ startsWith(matrix.mise_env, 'macos-') }}
+        if: ${{ matrix.mise_env != 'macos-arm64-egl' && startsWith(matrix.mise_env, 'macos-') }}
         run: mise run //bindings/swift:test
       - name: Test Zig binding
         run: mise run //bindings/zig:ci
@@ -88,11 +94,13 @@ jobs:
         if: ${{ contains(matrix.mise_env, 'vulkan') }}
         run: mise run //examples/lwjgl-map:build
       - name: Test Rust example
+        if: ${{ matrix.mise_env != 'macos-arm64-egl' }}
         run: mise run //examples/rust-map:ci
       - name: Build Swift example
         if: ${{ matrix.mise_env == 'macos-arm64-metal' }}
         run: mise run //examples/swift-map:build
       - name: Build Zig example
+        if: ${{ matrix.mise_env != 'macos-arm64-egl' }}
         run: mise run //examples/zig-map:build
       - name: Run Zig readback example
         run: mise run //examples/zig-readback:run

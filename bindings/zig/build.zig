@@ -6,7 +6,7 @@ const BuildOptions = struct {
     optimize: std.builtin.OptimizeMode,
     cmake_artifact_dir: std.Build.LazyPath,
     include_dirs: []const std.Build.LazyPath,
-    dependency_library_dir: ?std.Build.LazyPath,
+    dependency_library_dirs: []const std.Build.LazyPath,
     render_backend: RenderBackend,
 };
 
@@ -21,7 +21,7 @@ pub const LinkOptions = struct {
     cmake_artifact_dir: std.Build.LazyPath,
     render_backend: RenderBackend,
     include_dirs: []const std.Build.LazyPath,
-    dependency_library_dir: ?std.Build.LazyPath = null,
+    dependency_library_dirs: []const std.Build.LazyPath = &.{},
 };
 
 pub const DependencyOptions = struct {
@@ -30,13 +30,13 @@ pub const DependencyOptions = struct {
     cmake_artifact_dir: std.Build.LazyPath,
     include_dirs: []const std.Build.LazyPath,
     render_backend: RenderBackend,
-    dependency_library_dir: ?std.Build.LazyPath = null,
+    dependency_library_dirs: []const std.Build.LazyPath = &.{},
 };
 
 pub const RenderBackendLinkOptions = struct {
     target: std.Build.ResolvedTarget,
     render_backend: RenderBackend,
-    dependency_library_dir: ?std.Build.LazyPath = null,
+    dependency_library_dirs: []const std.Build.LazyPath = &.{},
 };
 
 pub fn renderBackend(b: *std.Build) RenderBackend {
@@ -69,12 +69,19 @@ pub fn addIncludePaths(module: *std.Build.Module, include_dirs: []const std.Buil
     }
 }
 
-pub fn dependencyLibraryDir(b: *std.Build) ?std.Build.LazyPath {
+pub fn dependencyLibraryDirs(b: *std.Build) []const std.Build.LazyPath {
     return b.option(
-        std.Build.LazyPath,
+        []const std.Build.LazyPath,
         "dependency-library-dir",
-        "Directory containing backend dependency libraries such as Vulkan",
-    );
+        "Dependency library directory. Repeat for backend runtime libraries.",
+    ) orelse &.{};
+}
+
+fn addDependencyLibraryPaths(module: *std.Build.Module, dependency_library_dirs: []const std.Build.LazyPath) void {
+    for (dependency_library_dirs) |dependency_library_dir| {
+        module.addLibraryPath(dependency_library_dir);
+        module.addRPath(dependency_library_dir);
+    }
 }
 
 pub fn addPlatformSystemPaths(b: *std.Build, module: *std.Build.Module, target: std.Build.ResolvedTarget) void {
@@ -104,7 +111,8 @@ pub fn vulkanLibraryName(target: std.Build.ResolvedTarget) []const u8 {
 pub fn isSupportedTarget(target: std.Build.ResolvedTarget, backend: RenderBackend) bool {
     return switch (backend) {
         .metal => target.result.os.tag == .macos,
-        .opengl => target.result.os.tag == .linux or target.result.os.tag == .windows,
+        .opengl => target.result.os.tag == .linux or target.result.os.tag == .macos or
+            target.result.os.tag == .windows,
         .vulkan => target.result.os.tag == .macos or target.result.os.tag == .linux or
             target.result.os.tag == .windows,
     };
@@ -141,14 +149,19 @@ pub fn linkRenderBackend(b: *std.Build, module: *std.Build.Module, options: Rend
                 module.linkSystemLibrary("EGL", .{});
                 module.linkSystemLibrary("GLESv2", .{});
             },
+            .macos => {
+                if (options.dependency_library_dirs.len == 0) {
+                    @panic("macOS OpenGL builds require -Ddependency-library-dir=<path> containing EGL and GLESv2");
+                }
+                addDependencyLibraryPaths(module, options.dependency_library_dirs);
+                module.linkSystemLibrary("EGL", .{});
+                module.linkSystemLibrary("GLESv2", .{});
+            },
             .windows => module.linkSystemLibrary("opengl32", .{}),
             else => unreachable,
         },
         .vulkan => {
-            if (options.dependency_library_dir) |dependency_library_dir| {
-                module.addLibraryPath(dependency_library_dir);
-                module.addRPath(dependency_library_dir);
-            }
+            addDependencyLibraryPaths(module, options.dependency_library_dirs);
             module.linkSystemLibrary(vulkanLibraryName(options.target), .{});
         },
     }
@@ -160,7 +173,7 @@ fn dependencyArgs(options: DependencyOptions) struct {
     @"cmake-artifact-dir": std.Build.LazyPath,
     @"include-dir": []const std.Build.LazyPath,
     @"render-backend": RenderBackend,
-    @"dependency-library-dir": ?std.Build.LazyPath,
+    @"dependency-library-dir": []const std.Build.LazyPath,
 } {
     return .{
         .target = options.target,
@@ -168,7 +181,7 @@ fn dependencyArgs(options: DependencyOptions) struct {
         .@"cmake-artifact-dir" = options.cmake_artifact_dir,
         .@"include-dir" = options.include_dirs,
         .@"render-backend" = options.render_backend,
-        .@"dependency-library-dir" = options.dependency_library_dir,
+        .@"dependency-library-dir" = options.dependency_library_dirs,
     };
 }
 
@@ -186,7 +199,7 @@ fn repoLinkOptions(options: BuildOptions) LinkOptions {
         .cmake_artifact_dir = options.cmake_artifact_dir,
         .render_backend = options.render_backend,
         .include_dirs = options.include_dirs,
-        .dependency_library_dir = options.dependency_library_dir,
+        .dependency_library_dirs = options.dependency_library_dirs,
     };
 }
 
@@ -216,7 +229,7 @@ pub fn linkMaplibreNativeC(b: *std.Build, module_: *std.Build.Module, options: L
     linkRenderBackend(b, module_, .{
         .target = options.target,
         .render_backend = options.render_backend,
-        .dependency_library_dir = options.dependency_library_dir,
+        .dependency_library_dirs = options.dependency_library_dirs,
     });
 }
 
@@ -277,7 +290,7 @@ fn addBindingTests(b: *std.Build, options: BuildOptions, maplibre_native: *std.B
     tests.root_module.addImport("maplibre_native", maplibre_native);
     addRenderBackendOptions(b, tests.root_module, options.render_backend);
     if (options.render_backend == .opengl) {
-        const gl_bindings = zigglgen.generateBindingsModule(b, if (options.target.result.os.tag == .linux)
+        const gl_bindings = zigglgen.generateBindingsModule(b, if (options.target.result.os.tag == .linux or options.target.result.os.tag == .macos)
             .{ .api = .gles, .version = .@"3.0" }
         else
             .{ .api = .gl, .version = .@"3.0" });
@@ -331,7 +344,7 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
         .cmake_artifact_dir = cmake_artifact_dir,
         .include_dirs = include_dirs,
-        .dependency_library_dir = dependencyLibraryDir(b),
+        .dependency_library_dirs = dependencyLibraryDirs(b),
         .render_backend = backend,
     };
     checkSupportedTarget(options.target, options.render_backend);

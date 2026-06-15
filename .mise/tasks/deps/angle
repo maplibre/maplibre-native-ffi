@@ -1,0 +1,66 @@
+#!/usr/bin/env bash
+#MISE description="Download and verify the pinned ANGLE binary artifact for the active variant."
+set -euo pipefail
+
+manifest="$MLN_FFI_REPO_ROOT/third_party/angle/manifest.json"
+
+if [[ "$MLN_FFI_TARGET_TRIPLE" != "macos-arm64" ]]; then
+  echo "ANGLE artifact is only configured for macos-arm64" >&2
+  exit 1
+fi
+
+artifact="macos-arm64"
+
+angle_meta="$(
+  node -e '
+    const fs = require("fs");
+    const manifest = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+    const artifact = manifest.artifacts[process.argv[2]];
+    if (!artifact) {
+      throw new Error(`Missing ANGLE artifact ${process.argv[2]} in manifest`);
+    }
+    console.log(manifest.version);
+    console.log(artifact.url);
+    console.log(artifact.sha256);
+  ' "$manifest" "$artifact"
+)"
+
+version="$(printf '%s\n' "$angle_meta" | sed -n '1p')"
+url="$(printf '%s\n' "$angle_meta" | sed -n '2p')"
+sha256="$(printf '%s\n' "$angle_meta" | sed -n '3p')"
+angle_root="${MLN_FFI_REPO_ROOT}/third_party/angle/${version}/${artifact}"
+archive="${MLN_FFI_REPO_ROOT}/third_party/angle/${version}/${artifact}.tar.gz"
+marker="${angle_root}/.complete"
+marker_value="${sha256} install-name-rpath-v1"
+
+if [[ -f "$marker" ]] && [[ "$(cat "$marker")" == "$marker_value" ]]; then
+  exit 0
+fi
+
+tmp_dir="$(mktemp -d)"
+trap 'rm -rf "$tmp_dir"' EXIT
+
+mkdir -p "$(dirname "$archive")"
+curl --fail --location --silent --show-error --output "$tmp_dir/angle.tar.gz" "$url"
+
+actual_sha256="$(shasum -a 256 "$tmp_dir/angle.tar.gz" | awk '{print $1}')"
+if [[ "$actual_sha256" != "$sha256" ]]; then
+  echo "ANGLE archive SHA-256 mismatch for $artifact" >&2
+  echo "expected: $sha256" >&2
+  echo "actual:   $actual_sha256" >&2
+  exit 1
+fi
+
+rm -rf "$angle_root"
+mkdir -p "$angle_root"
+tar -xzf "$tmp_dir/angle.tar.gz" -C "$angle_root" --strip-components=1
+cp "$tmp_dir/angle.tar.gz" "$archive"
+
+if [[ "$(uname -s)" == "Darwin" ]]; then
+  install_name_tool -id @rpath/libEGL.dylib "$angle_root/libEGL.dylib"
+  install_name_tool -id @rpath/libGLESv2.dylib "$angle_root/libGLESv2.dylib"
+  codesign --force --sign - "$angle_root/libEGL.dylib" >/dev/null
+  codesign --force --sign - "$angle_root/libGLESv2.dylib" >/dev/null
+fi
+
+printf '%s' "$marker_value" > "$marker"

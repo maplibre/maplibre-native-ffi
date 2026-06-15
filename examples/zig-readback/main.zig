@@ -9,8 +9,12 @@ const vk = if (build_options.supports_vulkan) @cImport({
     @cInclude("vulkan/vulkan.h");
 }) else struct {};
 
-const egl = if (build_options.supports_opengl and builtin.os.tag == .linux) @cImport({
+const supports_egl = build_options.supports_opengl and (builtin.os.tag == .linux or builtin.os.tag == .macos);
+
+const egl = if (supports_egl) @cImport({
+    @cDefine("EGL_EGLEXT_PROTOTYPES", "1");
     @cInclude("EGL/egl.h");
+    @cInclude("EGL/eglext.h");
 }) else struct {};
 
 const sdl = if (build_options.supports_opengl and builtin.os.tag == .windows) @cImport({
@@ -173,7 +177,7 @@ const OpenGLAttachContext = if (build_options.supports_opengl and builtin.os.tag
     fn init() !OpenGLAttachContext {
         // WGL contexts need a Win32 device context with a selected pixel
         // format. SDL gives us a hidden helper window for that without showing
-        // UI, but this is not truly surfaceless like the Linux EGL pbuffer path.
+        // UI, but this is not truly surfaceless like the EGL pbuffer path.
         if (!sdl.SDL_Init(sdl.SDL_INIT_VIDEO)) return error.WglUnavailable;
         errdefer sdl.SDL_Quit();
 
@@ -218,7 +222,7 @@ const OpenGLAttachContext = if (build_options.supports_opengl and builtin.os.tag
             .get_proc_address = .{ .ptr = @ptrCast(@constCast(&sdl.SDL_GL_GetProcAddress)) },
         } };
     }
-} else if (build_options.supports_opengl and builtin.os.tag == .linux) struct {
+} else if (supports_egl) struct {
     display: egl.EGLDisplay,
     config: egl.EGLConfig,
     surface: egl.EGLSurface,
@@ -283,6 +287,14 @@ const OpenGLAttachContext = if (build_options.supports_opengl and builtin.os.tag
     }
 
     fn initDisplay() !egl.EGLDisplay {
+        if (builtin.os.tag == .macos) {
+            const display_attributes = [_]egl.EGLint{
+                egl.EGL_PLATFORM_ANGLE_TYPE_ANGLE,        egl.EGL_PLATFORM_ANGLE_TYPE_METAL_ANGLE,
+                egl.EGL_PLATFORM_ANGLE_DEVICE_TYPE_ANGLE, egl.EGL_PLATFORM_ANGLE_DEVICE_TYPE_HARDWARE_ANGLE,
+                egl.EGL_NONE,
+            };
+            return initializeDisplay(egl.eglGetPlatformDisplayEXT(egl.EGL_PLATFORM_ANGLE_ANGLE, null, &display_attributes));
+        }
         return initializeDisplay(egl.eglGetDisplay(egl.EGL_DEFAULT_DISPLAY));
     }
 

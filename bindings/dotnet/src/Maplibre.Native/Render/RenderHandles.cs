@@ -27,7 +27,7 @@ public sealed unsafe class RenderSessionHandle : IDisposable
         );
     }
 
-    internal static RenderSessionHandle AttachMetalSurface(
+    public static RenderSessionHandle AttachMetalSurface(
         MapHandle map,
         MetalSurfaceDescriptor descriptor
     )
@@ -39,7 +39,7 @@ public sealed unsafe class RenderSessionHandle : IDisposable
         return new RenderSessionHandle(map, session);
     }
 
-    internal static RenderSessionHandle AttachVulkanSurface(
+    public static RenderSessionHandle AttachVulkanSurface(
         MapHandle map,
         VulkanSurfaceDescriptor descriptor
     )
@@ -51,7 +51,7 @@ public sealed unsafe class RenderSessionHandle : IDisposable
         return new RenderSessionHandle(map, session);
     }
 
-    internal static RenderSessionHandle AttachOpenGLSurface(
+    public static RenderSessionHandle AttachOpenGLSurface(
         MapHandle map,
         OpenGLSurfaceDescriptor descriptor
     )
@@ -63,7 +63,7 @@ public sealed unsafe class RenderSessionHandle : IDisposable
         return new RenderSessionHandle(map, session);
     }
 
-    internal static RenderSessionHandle AttachMetalOwnedTexture(
+    public static RenderSessionHandle AttachMetalOwnedTexture(
         MapHandle map,
         MetalOwnedTextureDescriptor descriptor
     )
@@ -77,7 +77,7 @@ public sealed unsafe class RenderSessionHandle : IDisposable
         return new RenderSessionHandle(map, session);
     }
 
-    internal static RenderSessionHandle AttachMetalBorrowedTexture(
+    public static RenderSessionHandle AttachMetalBorrowedTexture(
         MapHandle map,
         MetalBorrowedTextureDescriptor descriptor
     )
@@ -91,7 +91,7 @@ public sealed unsafe class RenderSessionHandle : IDisposable
         return new RenderSessionHandle(map, session);
     }
 
-    internal static RenderSessionHandle AttachVulkanOwnedTexture(
+    public static RenderSessionHandle AttachVulkanOwnedTexture(
         MapHandle map,
         VulkanOwnedTextureDescriptor descriptor
     )
@@ -105,7 +105,7 @@ public sealed unsafe class RenderSessionHandle : IDisposable
         return new RenderSessionHandle(map, session);
     }
 
-    internal static RenderSessionHandle AttachVulkanBorrowedTexture(
+    public static RenderSessionHandle AttachVulkanBorrowedTexture(
         MapHandle map,
         VulkanBorrowedTextureDescriptor descriptor
     )
@@ -119,7 +119,7 @@ public sealed unsafe class RenderSessionHandle : IDisposable
         return new RenderSessionHandle(map, session);
     }
 
-    internal static RenderSessionHandle AttachOpenGLOwnedTexture(
+    public static RenderSessionHandle AttachOpenGLOwnedTexture(
         MapHandle map,
         OpenGLOwnedTextureDescriptor descriptor
     )
@@ -133,7 +133,7 @@ public sealed unsafe class RenderSessionHandle : IDisposable
         return new RenderSessionHandle(map, session);
     }
 
-    internal static RenderSessionHandle AttachOpenGLBorrowedTexture(
+    public static RenderSessionHandle AttachOpenGLBorrowedTexture(
         MapHandle map,
         OpenGLBorrowedTextureDescriptor descriptor
     )

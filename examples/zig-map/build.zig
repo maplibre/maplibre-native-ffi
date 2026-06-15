@@ -7,7 +7,7 @@ const BuildOptions = struct {
     optimize: std.builtin.OptimizeMode,
     cmake_artifact_dir: std.Build.LazyPath,
     include_dirs: []const std.Build.LazyPath,
-    dependency_library_dir: ?std.Build.LazyPath,
+    dependency_library_dirs: []const std.Build.LazyPath,
     render_backend: maplibre_build.RenderBackend,
 };
 
@@ -22,7 +22,7 @@ fn maplibreNativeModule(b: *std.Build, options: BuildOptions) *std.Build.Module 
         .cmake_artifact_dir = options.cmake_artifact_dir,
         .include_dirs = options.include_dirs,
         .render_backend = options.render_backend,
-        .dependency_library_dir = options.dependency_library_dir,
+        .dependency_library_dirs = options.dependency_library_dirs,
     });
 }
 
@@ -53,13 +53,13 @@ fn addZigMapExample(b: *std.Build, options: BuildOptions) *std.Build.Step.Compil
     addSdlTranslateCWorkarounds(root_module, options.target);
     root_module.addImport("maplibre_native", maplibreNativeModule(b, options));
     if (options.render_backend == .opengl) {
-        const gl_bindings = zigglgen.generateBindingsModule(b, if (options.target.result.os.tag == .linux)
+        const gl_bindings = zigglgen.generateBindingsModule(b, if (options.target.result.os.tag == .linux or options.target.result.os.tag == .macos)
             .{ .api = .gles, .version = .@"3.0" }
         else
             .{ .api = .gl, .version = .@"3.0" });
         root_module.addImport("gl", gl_bindings);
     }
-    if (options.dependency_library_dir) |dependency_library_dir| {
+    for (options.dependency_library_dirs) |dependency_library_dir| {
         root_module.addLibraryPath(dependency_library_dir);
         root_module.addRPath(dependency_library_dir);
     }
@@ -67,7 +67,7 @@ fn addZigMapExample(b: *std.Build, options: BuildOptions) *std.Build.Step.Compil
     maplibre_build.linkRenderBackend(b, root_module, .{
         .target = options.target,
         .render_backend = options.render_backend,
-        .dependency_library_dir = options.dependency_library_dir,
+        .dependency_library_dirs = options.dependency_library_dirs,
     });
 
     if (options.render_backend == .metal) {
@@ -91,7 +91,7 @@ pub fn build(b: *std.Build) void {
         .optimize = b.standardOptimizeOption(.{}),
         .cmake_artifact_dir = maplibre_build.cmakeArtifactDir(b),
         .include_dirs = maplibre_build.includeDirs(b),
-        .dependency_library_dir = maplibre_build.dependencyLibraryDir(b),
+        .dependency_library_dirs = maplibre_build.dependencyLibraryDirs(b),
         .render_backend = render_backend,
     };
 

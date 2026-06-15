@@ -7,7 +7,7 @@ const BuildOptions = struct {
     optimize: std.builtin.OptimizeMode,
     cmake_artifact_dir: std.Build.LazyPath,
     include_dirs: []const std.Build.LazyPath,
-    dependency_library_dir: ?std.Build.LazyPath,
+    dependency_library_dirs: []const std.Build.LazyPath,
     render_backend: maplibre_build.RenderBackend,
 };
 
@@ -20,8 +20,8 @@ fn addCTests(b: *std.Build, options: BuildOptions) *std.Build.Step.Compile {
         }),
     });
     maplibre_build.addRenderBackendOptions(b, c_tests.root_module, options.render_backend);
-    if (options.target.result.os.tag == .windows or options.target.result.os.tag == .linux) {
-        const gl_bindings = zigglgen.generateBindingsModule(b, if (options.target.result.os.tag == .linux)
+    if (options.target.result.os.tag == .windows or options.target.result.os.tag == .linux or options.target.result.os.tag == .macos) {
+        const gl_bindings = zigglgen.generateBindingsModule(b, if (options.target.result.os.tag == .linux or options.target.result.os.tag == .macos)
             .{ .api = .gles, .version = .@"3.0" }
         else
             .{ .api = .gl, .version = .@"3.0" });
@@ -41,7 +41,7 @@ fn addCTests(b: *std.Build, options: BuildOptions) *std.Build.Step.Compile {
         .cmake_artifact_dir = options.cmake_artifact_dir,
         .render_backend = options.render_backend,
         .include_dirs = options.include_dirs,
-        .dependency_library_dir = options.dependency_library_dir,
+        .dependency_library_dirs = options.dependency_library_dirs,
     });
     return c_tests;
 }
@@ -55,7 +55,7 @@ pub fn build(b: *std.Build) void {
         .optimize = b.standardOptimizeOption(.{}),
         .cmake_artifact_dir = cmake_artifact_dir,
         .include_dirs = maplibre_build.includeDirs(b),
-        .dependency_library_dir = maplibre_build.dependencyLibraryDir(b),
+        .dependency_library_dirs = maplibre_build.dependencyLibraryDirs(b),
         .render_backend = render_backend,
     };
 

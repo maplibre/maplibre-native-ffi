@@ -14,7 +14,7 @@
 #include <stdint.h>
 
 #ifdef _WIN32
-#if defined(MLN_BUILDING_C)
+#ifdef MLN_BUILDING_C
 #define MLN_API __declspec(dllexport)
 #else
 #define MLN_API __declspec(dllimport)

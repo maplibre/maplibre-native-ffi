@@ -1,6 +1,6 @@
 package org.maplibre.nativeffi.render
 
-/** Mutable EGL context descriptor for OpenGL render targets on Linux. */
+/** Mutable EGL context descriptor for OpenGL render targets. */
 public class EglContextDescriptor() : OpenGLContextDescriptor {
   public var display: NativePointer = NativePointer.NULL
 

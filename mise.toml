@@ -10,10 +10,10 @@ lockfile_platforms = ["linux-x64", "linux-arm64", "macos-arm64", "windows-x64"]
 pin = true
 experimental = true
 python.uv_venv_auto = "create|source"
-windows_default_file_shell_args = 'pixi run --locked -x "C:/Program Files/Git/bin/bash.exe" -e -lc "source ""$MLN_FFI_REPO_ROOT/.mise/bin/windows-msvc-path.sh""; exec ""C:/Program Files/Git/bin/bash.exe"" ""$@""" _'
-windows_default_inline_shell_args = 'pixi run --locked -x "C:/Program Files/Git/bin/bash.exe" -e -lc "source ""$MLN_FFI_REPO_ROOT/.mise/bin/windows-msvc-path.sh""; eval ""$1""" _'
+windows_default_file_shell_args = '"C:/Program Files/Git/bin/bash.exe" -e -c "source ""$MLN_FFI_REPO_ROOT/.mise/bin/windows-msvc-path.sh""; exec ""C:/Program Files/Git/bin/bash.exe"" ""$@""" _'
+windows_default_inline_shell_args = '"C:/Program Files/Git/bin/bash.exe" -e -c "source ""$MLN_FFI_REPO_ROOT/.mise/bin/windows-msvc-path.sh""; eval ""$1""" _'
 unix_default_file_shell_args = "bash"
-unix_default_inline_shell_args = "pixi run --locked -x bash -e -lc"
+unix_default_inline_shell_args = "bash -e -lc"
 # On Windows, the Microsoft Store Python alias in WindowsApps can appear before
 # mise-managed Python. Keep mise tool paths first so file tasks run pinned tools.
 activate_aggressive = true
@@ -33,6 +33,14 @@ config_roots = [".devcontainer", "bindings/*", "examples/*", "docs"]
 
 # C/C++ ecosystem
 "github:prefix-dev/pixi" = "0.68.1"
+"aqua:Kitware/CMake" = "4.3.3"
+"aqua:ninja-build/ninja" = "1.13.2"
+"conda:clang-format" = "22.1.7"
+"conda:clang-tools" = "22.1.7"
+"conda:doxygen" = "1.13.2"
+"conda:glslang" = "16.3.0"
+"conda:pkg-config" = "0.29.2"
+"conda:vulkan-tools" = "1.4.341.0"
 "github:cmakefmt/cmakefmt" = "1.3.0"
 "aqua:XcodesOrg/xcodes" = { version = "1.6.2", os = ["macos"] }
 
@@ -71,6 +79,7 @@ MLN_FFI_INCLUDE_DIR = "{{config_root}}/include"
 MLN_FFI_VULKAN_INCLUDE_DIR = "{{config_root}}/third_party/maplibre-native/vendor/Vulkan-Headers/include"
 MLN_FFI_ZIG_TARGET = { required = true }
 MLN_FFI_TEST_TIMEOUT = "{{env.MLN_FFI_TEST_TIMEOUT | default(value=\"30s\")}}"
+_.source = { path = ".mise/env/pixi-provider.sh", tools = true }
 
 [hooks]
 postinstall = [
@@ -80,15 +89,17 @@ postinstall = [
   # conda-forge ships libclang-13.dll, but clang-sys on Windows searches for libclang.dll.
   # https://github.com/KyleMayes/clang-sys/issues/213
   # https://github.com/conda-forge/llvmdev-feedstock/issues/376
-  "{% if os() == \"windows\" %}cp \"$CONDA_PREFIX/Library/bin/libclang-13.dll\" \"$CONDA_PREFIX/Library/bin/libclang.dll\"{% endif %}",
+  "{% if os() == \"windows\" %}cp \"$MLN_FFI_DEPS_PREFIX/bin/libclang-13.dll\" \"$MLN_FFI_DEPS_PREFIX/bin/libclang.dll\"{% endif %}",
   "uv sync --locked --quiet",
   "pnpm install --frozen-lockfile --loglevel warn",
-  "cd bindings/dotnet && dotnet tool restore --verbosity quiet",
+  "dotnet tool restore --tool-manifest dotnet-tools.json --verbosity quiet",
+  "dotnet tool restore --tool-manifest bindings/dotnet/dotnet-tools.json --verbosity quiet",
   # Astro type stubs for vp typeCheck on docs sources (.astro/ is gitignored).
   "pnpm --filter docs exec astro sync",
 ]
 
 [tasks.configure]
+depends = ["//:deps"]
 run = [
   '''
   cmake_args=(
@@ -97,6 +108,8 @@ run = [
     -G Ninja
     -DCMAKE_BUILD_TYPE="$MLN_FFI_CMAKE_BUILD_TYPE"
     -DMLN_FFI_RENDER_BACKEND="$MLN_FFI_RENDER_BACKEND"
+    -DMLN_FFI_OPENGL_CONTEXT_PROVIDER="$MLN_FFI_OPENGL_CONTEXT_PROVIDER"
+    -DMLN_FFI_EGL_ROOT="$MLN_FFI_EGL_ROOT"
   )
 
   cmake "${cmake_args[@]}"
@@ -104,8 +117,11 @@ run = [
   '''
   if [[ -f "$MLN_FFI_BUILD_DIR/compile_commands.json" ]]; then
     mkdir -p build/clangd
-    ln -sfn "$MLN_FFI_BUILD_DIR/compile_commands.json" \
-      build/clangd/compile_commands.json
+    compile_commands_link="build/clangd/compile_commands.json"
+    compile_commands_tmp="${compile_commands_link}.tmp"
+    rm -f "$compile_commands_tmp"
+    ln -s "$MLN_FFI_BUILD_DIR/compile_commands.json" "$compile_commands_tmp"
+    mv -f "$compile_commands_tmp" "$compile_commands_link"
   fi
   ''',
 ]
@@ -123,16 +139,24 @@ cmake "${build_args[@]}"'''
 [tasks.clean]
 run = "rm -rf \"$MLN_FFI_BUILD_DIR\""
 
+[tasks.deps]
+description = "Install variant-specific managed dependencies."
+run = '''
+if [[ "$MLN_FFI_TARGET_TRIPLE" == "macos-arm64" ]]; then
+  mise run deps:angle
+fi
+'''
+
 [tasks.test]
 depends = ["//:build"]
 run = '''
 (
   cd src/c_api/tests/zig
-  zig build -Dtarget="$MLN_FFI_ZIG_TARGET" --test-timeout "$MLN_FFI_TEST_TIMEOUT" test --summary all --verbose -Dcmake-artifact-dir="$MLN_FFI_BUILD_DIR" -Dinclude-dir="$MLN_FFI_INCLUDE_DIR" -Dinclude-dir="$MLN_FFI_DEPENDENCY_INCLUDE_DIR" -Dinclude-dir="$MLN_FFI_VULKAN_INCLUDE_DIR" -Ddependency-library-dir="$MLN_FFI_DEPENDENCY_LIBRARY_DIR" -Drender-backend="$MLN_FFI_RENDER_BACKEND"
+  zig build test {{ env.MLN_FFI_ZIG_BUILD_ARGS }} --test-timeout "$MLN_FFI_TEST_TIMEOUT" --summary all --verbose
 )
 (
   cd bindings/zig
-  zig build -Dtarget="$MLN_FFI_ZIG_TARGET" --test-timeout "$MLN_FFI_TEST_TIMEOUT" test --summary all --verbose -Dcmake-artifact-dir="$MLN_FFI_BUILD_DIR" -Dinclude-dir="$MLN_FFI_INCLUDE_DIR" -Dinclude-dir="$MLN_FFI_DEPENDENCY_INCLUDE_DIR" -Dinclude-dir="$MLN_FFI_VULKAN_INCLUDE_DIR" -Ddependency-library-dir="$MLN_FFI_DEPENDENCY_LIBRARY_DIR" -Drender-backend="$MLN_FFI_RENDER_BACKEND"
+  zig build test {{ env.MLN_FFI_ZIG_BUILD_ARGS }} --test-timeout "$MLN_FFI_TEST_TIMEOUT" --summary all --verbose
 )
 '''
 
