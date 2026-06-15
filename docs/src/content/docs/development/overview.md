@@ -57,12 +57,6 @@ available. Set `MISE_ENV=<variant>` before `mise run ...`, or pass
 `mise -E <variant> run ...`, to build, test, or run examples for another
 platform and render backend.
 
-Supported development variants are `linux-x64-vulkan`, `linux-x64-egl`,
-`linux-arm64-vulkan`, `linux-arm64-egl`, `macos-arm64-metal`,
-`macos-arm64-vulkan`, `macos-arm64-egl`, `windows-x64-vulkan`, and
-`windows-x64-wgl`. The `macos-arm64-egl` variant uses ANGLE as the managed macOS
-EGL and OpenGL ES implementation.
-
 ## Common Commands
 
 ```bash

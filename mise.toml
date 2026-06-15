@@ -97,19 +97,12 @@ run = [
     -G Ninja
     -DCMAKE_BUILD_TYPE="$MLN_FFI_CMAKE_BUILD_TYPE"
     -DMLN_FFI_RENDER_BACKEND="$MLN_FFI_RENDER_BACKEND"
+    -DMLN_FFI_OPENGL_CONTEXT_PROVIDER="$MLN_FFI_OPENGL_CONTEXT_PROVIDER"
+    -DMLN_FFI_ANGLE_ROOT="$MLN_FFI_ANGLE_ROOT"
   )
-
-  if [[ -n "${MLN_FFI_OPENGL_CONTEXT_PROVIDER:-}" ]]; then
-    cmake_args+=(
-      -DMLN_FFI_OPENGL_CONTEXT_PROVIDER="$MLN_FFI_OPENGL_CONTEXT_PROVIDER"
-    )
-  fi
 
   if [[ -n "${MLN_FFI_ANGLE_ROOT:-}" ]]; then
     mise run deps:angle
-    cmake_args+=(
-      -DMLN_FFI_ANGLE_ROOT="$MLN_FFI_ANGLE_ROOT"
-    )
   fi
 
   cmake "${cmake_args[@]}"
