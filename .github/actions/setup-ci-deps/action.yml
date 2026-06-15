@@ -47,6 +47,11 @@ runs:
         $mesaUrl = "https://github.com/pal1000/mesa-dist-win/releases/download/$mesaVersion/mesa3d-$mesaVersion-release-msvc.7z"
 
         Invoke-WebRequest -Uri $mesaUrl -OutFile $mesaArchive
+        $expectedHash = "A438C26C2752726916E455F9AD121F8A7E3CFECF8626251ABF8E5B3E129D8497"
+        $actualHash = (Get-FileHash $mesaArchive -Algorithm SHA256).Hash
+        if ($actualHash -ne $expectedHash) {
+          throw "Mesa archive hash mismatch: expected $expectedHash, got $actualHash"
+        }
         7z x $mesaArchive "-o$mesaRoot" -y | Out-Null
 
         $mesaWglDriver = Get-ChildItem $mesaRoot -Recurse -Filter "libgallium_wgl.dll" |

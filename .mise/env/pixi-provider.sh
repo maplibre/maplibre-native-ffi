@@ -48,9 +48,18 @@ case "$(uname -s)" in
     if [[ -n "$toolchain_triple" ]]; then
       sysroot="$MLN_FFI_DEPS_PREFIX/$toolchain_triple/sysroot"
       export MLN_FFI_SYSTEM_ROOT="$sysroot"
-      gcc_include="$MLN_FFI_DEPS_PREFIX/lib/gcc/$toolchain_triple/14.3.0/include"
-      gcc_include_fixed="$MLN_FFI_DEPS_PREFIX/lib/gcc/$toolchain_triple/14.3.0/include-fixed"
-      export BINDGEN_EXTRA_CLANG_ARGS="--sysroot=$sysroot -isystem$gcc_include -isystem$gcc_include_fixed"
+      bindgen_args="--sysroot=$sysroot"
+      gcc_root="$MLN_FFI_DEPS_PREFIX/lib/gcc/$toolchain_triple"
+      if [[ -d "$gcc_root" ]]; then
+        gcc_version="$(find "$gcc_root" -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort -V | tail -n 1)"
+        if [[ -n "$gcc_version" ]]; then
+          gcc_include="$gcc_root/$gcc_version/include"
+          gcc_include_fixed="$gcc_root/$gcc_version/include-fixed"
+          [[ -d "$gcc_include" ]] && bindgen_args="$bindgen_args -isystem$gcc_include"
+          [[ -d "$gcc_include_fixed" ]] && bindgen_args="$bindgen_args -isystem$gcc_include_fixed"
+        fi
+      fi
+      export BINDGEN_EXTRA_CLANG_ARGS="$bindgen_args"
     fi
     export RUSTFLAGS="-C link-arg=-Wl,-rpath,$MLN_FFI_DEPENDENCY_LIBRARY_DIR -C link-arg=-Wl,-rpath-link,$MLN_FFI_DEPENDENCY_LIBRARY_DIR -C link-arg=-Wl,-rpath,$MLN_FFI_BUILD_DIR"
     ;;
