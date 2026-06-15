@@ -154,14 +154,8 @@ internal sealed unsafe class GlfwWindow : IDisposable
     {
         Glfw.GetWindowSize(Handle, out var logicalWidth, out var logicalHeight);
         Glfw.GetFramebufferSize(Handle, out var physicalWidth, out var physicalHeight);
-        var scaleX =
-            contentScaleX > 0 ? contentScaleX
-            : logicalWidth > 0 ? (float)physicalWidth / logicalWidth
-            : 1;
-        var scaleY =
-            contentScaleY > 0 ? contentScaleY
-            : logicalHeight > 0 ? (float)physicalHeight / logicalHeight
-            : 1;
+        var scaleX = ViewportScale(logicalWidth, physicalWidth, contentScaleX);
+        var scaleY = ViewportScale(logicalHeight, physicalHeight, contentScaleY);
         var viewport = Viewport.FromWindowMetrics(
             logicalWidth,
             logicalHeight,
@@ -179,5 +173,15 @@ internal sealed unsafe class GlfwWindow : IDisposable
         CurrentViewport = viewport;
         CurrentViewport.Log(label);
         ViewportChanged?.Invoke(CurrentViewport);
+    }
+
+    private static float ViewportScale(int logicalSize, int physicalSize, float fallbackScale)
+    {
+        if (logicalSize > 0 && physicalSize > 0)
+        {
+            return (float)physicalSize / logicalSize;
+        }
+
+        return float.IsFinite(fallbackScale) && fallbackScale > 0 ? fallbackScale : 1;
     }
 }

@@ -62,6 +62,7 @@ internal sealed unsafe partial class VulkanTextureCompositor : ITextureComposito
         DestroySwapchainDependents();
         var oldSwapchain = swapchain;
         var oldFormat = swapchainFormat;
+        swapchain = default;
         try
         {
             CreateSwapchain(viewport, oldSwapchain);
