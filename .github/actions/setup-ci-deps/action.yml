@@ -103,6 +103,10 @@ runs:
       if: ${{ runner.os == 'Windows' }}
       shell: pwsh
       run: |
+        $workspaceDrive = Split-Path -Qualifier $env:GITHUB_WORKSPACE
+        # Git Bash maps /tmp to the checkout drive; create it before mise hooks run.
+        New-Item -ItemType Directory -Force -Path (Join-Path $workspaceDrive "tmp") | Out-Null
+
         $paths = @(
           if ($env:SCCACHE_PATH) { Split-Path -Parent $env:SCCACHE_PATH }
           if ($env:Path) { $env:Path -split ';' }
