@@ -97,6 +97,8 @@ case "$(uname -s)" in
           [[ -d "$gcc_include_fixed" ]] && bindgen_args="$bindgen_args -isystem$gcc_include_fixed"
         fi
       fi
+      host_builtin_include="$(cc -print-file-name=include)"
+      bindgen_args="$bindgen_args -isystem$host_builtin_include"
       export BINDGEN_EXTRA_CLANG_ARGS="$bindgen_args"
     fi
     export RUSTFLAGS="-C link-arg=-Wl,-rpath,$MLN_FFI_DEPENDENCY_LIBRARY_DIR -C link-arg=-Wl,-rpath-link,$MLN_FFI_DEPENDENCY_LIBRARY_DIR -C link-arg=-Wl,-rpath,$MLN_FFI_BUILD_DIR"
