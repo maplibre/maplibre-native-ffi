@@ -126,6 +126,9 @@ internal sealed unsafe class InputController : IDisposable
 
         if (action == InputAction.Press)
         {
+            window.Glfw.GetCursorPos(handle, out cursorX, out cursorY);
+            lastX = cursorX;
+            lastY = cursorY;
             map.CancelTransitions();
         }
     }

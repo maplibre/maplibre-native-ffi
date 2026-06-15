@@ -450,14 +450,6 @@ internal sealed unsafe class OpenGLContext : IGraphicsContext
             }
 
             window.Glfw.MakeContextCurrent(null);
-            if (OperatingSystem.IsWindows() && deviceContext != 0)
-            {
-                WindowsNative.ReleaseDeviceContextOrThrow(
-                    GlfwNativeAccess.GetWin32Window(window.Handle),
-                    deviceContext
-                );
-                deviceContext = 0;
-            }
         }
 
         (glesGl as IDisposable)?.Dispose();
@@ -491,16 +483,15 @@ internal sealed unsafe class OpenGLContext : IGraphicsContext
             window.Glfw.MakeContextCurrent(window.Handle);
             var gl = Gles.GetApi(window.Glfw.GetProcAddress);
             context = new OpenGLContext(window, true, null, gl);
-            _ = context.EglConfig();
-            if (
-                GlfwNativeAccess.GetEglDisplay() == 0
-                || GlfwNativeAccess.GetEglContext(window.Handle) == 0
-                || GlfwNativeAccess.GetEglSurface(window.Handle) == 0
-            )
+            var display = GlfwNativeAccess.GetEglDisplay();
+            var eglContext = GlfwNativeAccess.GetEglContext(window.Handle);
+            var surface = GlfwNativeAccess.GetEglSurface(window.Handle);
+            if (display == 0 || eglContext == 0 || surface == 0)
             {
                 throw new InvalidOperationException("GLFW did not expose EGL handles.");
             }
 
+            _ = EglNative.GetSurfaceConfig(display, surface);
             Console.WriteLine($"GLFW {window.Glfw.GetVersionString()}, OpenGL EGL/GLES");
             return context;
         }
@@ -541,10 +532,15 @@ internal sealed unsafe class OpenGLContext : IGraphicsContext
             var gl = DesktopGL.GetApi(window.Glfw.GetProcAddress);
             var hwnd = GlfwNativeAccess.GetWin32Window(window.Handle);
             var hglrc = GlfwNativeAccess.GetWglContext(window.Handle);
-            var hdc = WindowsNative.GetDeviceContext(hwnd);
-            if (hwnd == 0 || hglrc == 0 || hdc == 0)
+            if (hwnd == 0 || hglrc == 0)
             {
                 throw new InvalidOperationException("GLFW did not expose WGL handles.");
+            }
+
+            var hdc = WindowsNative.GetDeviceContext(hwnd);
+            if (hdc == 0)
+            {
+                throw new InvalidOperationException("Failed to acquire a WGL device context.");
             }
 
             context = new OpenGLContext(window, false, gl, null) { deviceContext = hdc };
@@ -570,11 +566,9 @@ internal sealed unsafe class OpenGLContext : IGraphicsContext
 
     private nint EglConfig()
     {
-        if (!GlfwNativeAccess.GetEglConfig(window.Handle, out var config) || config == 0)
-        {
-            throw new InvalidOperationException("GLFW did not expose an EGL config.");
-        }
-
-        return config;
+        return EglNative.GetSurfaceConfig(
+            GlfwNativeAccess.GetEglDisplay(),
+            GlfwNativeAccess.GetEglSurface(window.Handle)
+        );
     }
 }

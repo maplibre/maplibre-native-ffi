@@ -21,10 +21,6 @@ internal static unsafe partial class GlfwNativeAccess
     [LibraryImport(GlfwLibrary, EntryPoint = "glfwGetEGLSurface")]
     public static partial nint GetEglSurface(WindowHandle* window);
 
-    [LibraryImport(GlfwLibrary, EntryPoint = "glfwGetEGLConfig")]
-    [return: MarshalAs(UnmanagedType.Bool)]
-    public static partial bool GetEglConfig(WindowHandle* window, out nint config);
-
     [LibraryImport(GlfwLibrary, EntryPoint = "glfwGetWGLContext")]
     public static partial nint GetWglContext(WindowHandle* window);
 

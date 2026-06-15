@@ -194,8 +194,14 @@ internal sealed class OwnedTextureRenderTarget : IRenderTarget
 
     public void Dispose()
     {
-        compositor.Dispose();
-        session.Dispose();
+        try
+        {
+            compositor.Dispose();
+        }
+        finally
+        {
+            session.Dispose();
+        }
     }
 
     private static void DisposeAfterFailure(IDisposable? disposable)
@@ -429,12 +435,10 @@ internal sealed class BorrowedTextureRenderTarget : IRenderTarget
 
 internal sealed class NativeSurfaceRenderTarget : IRenderTarget
 {
-    private readonly IGraphicsContext graphics;
     private readonly RenderSessionHandle session;
 
-    private NativeSurfaceRenderTarget(IGraphicsContext graphics, RenderSessionHandle session)
+    private NativeSurfaceRenderTarget(RenderSessionHandle session)
     {
-        this.graphics = graphics;
         this.session = session;
     }
 
@@ -449,7 +453,6 @@ internal sealed class NativeSurfaceRenderTarget : IRenderTarget
         return graphics switch
         {
             MetalContext metal => new NativeSurfaceRenderTarget(
-                graphics,
                 RenderSessionHandle.AttachMetalSurface(
                     map,
                     new MetalSurfaceDescriptor
@@ -461,7 +464,6 @@ internal sealed class NativeSurfaceRenderTarget : IRenderTarget
                 )
             ),
             VulkanContext vulkan => new NativeSurfaceRenderTarget(
-                graphics,
                 RenderSessionHandle.AttachVulkanSurface(
                     map,
                     new VulkanSurfaceDescriptor
@@ -473,7 +475,6 @@ internal sealed class NativeSurfaceRenderTarget : IRenderTarget
                 )
             ),
             OpenGLContext openGl => new NativeSurfaceRenderTarget(
-                graphics,
                 RenderSessionHandle.AttachOpenGLSurface(
                     map,
                     new OpenGLSurfaceDescriptor
@@ -493,7 +494,6 @@ internal sealed class NativeSurfaceRenderTarget : IRenderTarget
     public void Render()
     {
         session.RenderUpdate();
-        graphics.FinishFrame();
     }
 
     public void Resize(Viewport viewport)

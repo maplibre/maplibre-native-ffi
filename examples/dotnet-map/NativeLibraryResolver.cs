@@ -5,20 +5,24 @@ namespace Maplibre.Native.Examples.DotnetMap;
 
 internal static class NativeLibraryResolver
 {
+    private static readonly object RegistrationLock = new();
     private static bool registered;
 
     public static void Register()
     {
-        if (registered)
+        lock (RegistrationLock)
         {
-            return;
-        }
+            if (registered)
+            {
+                return;
+            }
 
-        registered = true;
-        NativeLibrary.SetDllImportResolver(
-            typeof(NativeLibraryResolver).Assembly,
-            ResolveNativeLibrary
-        );
+            NativeLibrary.SetDllImportResolver(
+                typeof(NativeLibraryResolver).Assembly,
+                ResolveNativeLibrary
+            );
+            registered = true;
+        }
     }
 
     public static string[] VulkanLibraryCandidates() => LibraryCandidates("vulkan").ToArray();
@@ -56,6 +60,7 @@ internal static class NativeLibraryResolver
                 "vulkan",
             ],
             "vulkan" => ["libvulkan.so.1", "vulkan"],
+            "EGL" when OperatingSystem.IsLinux() => ["libEGL.so.1", "libEGL.so", "EGL"],
             _ => [],
         };
 

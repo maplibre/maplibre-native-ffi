@@ -219,9 +219,20 @@ internal sealed unsafe class MetalContext : IGraphicsContext
             MacObjectiveC.Release(fragment);
             MacObjectiveC.Release(vertex);
             MacObjectiveC.Release(library);
-            MacObjectiveC.CFRelease(fragmentName);
-            MacObjectiveC.CFRelease(vertexName);
-            MacObjectiveC.CFRelease(source);
+            if (fragmentName != 0)
+            {
+                MacObjectiveC.CFRelease(fragmentName);
+            }
+
+            if (vertexName != 0)
+            {
+                MacObjectiveC.CFRelease(vertexName);
+            }
+
+            if (source != 0)
+            {
+                MacObjectiveC.CFRelease(source);
+            }
         }
     }
 

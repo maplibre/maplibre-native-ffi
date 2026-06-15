@@ -61,10 +61,26 @@ internal sealed unsafe partial class VulkanTextureCompositor : ITextureComposito
         context.WaitIdle();
         DestroySwapchainDependents();
         var oldSwapchain = swapchain;
-        CreateSwapchain(viewport, oldSwapchain);
-        if (oldSwapchain.Handle != 0)
+        var oldFormat = swapchainFormat;
+        try
         {
-            vkDestroySwapchainKHR(context.Device.Handle, oldSwapchain.Handle, 0);
+            CreateSwapchain(viewport, oldSwapchain);
+        }
+        finally
+        {
+            if (oldSwapchain.Handle != 0)
+            {
+                vkDestroySwapchainKHR(context.Device.Handle, oldSwapchain.Handle, 0);
+            }
+        }
+
+        if (renderPass.Handle == 0 || swapchainFormat != oldFormat)
+        {
+            DestroyPipeline();
+            DestroyPipelineLayout();
+            DestroyRenderPass();
+            CreateRenderPass();
+            CreatePipeline();
         }
 
         CreateFramebuffers();
@@ -130,6 +146,7 @@ internal sealed unsafe partial class VulkanTextureCompositor : ITextureComposito
             "vkWaitForFences"
         );
         Present(imageIndex);
+        VulkanContext.Check(vk.QueueWaitIdle(context.GraphicsQueue), "vkQueueWaitIdle");
     }
 
     public void Dispose()
@@ -173,14 +190,12 @@ internal sealed unsafe partial class VulkanTextureCompositor : ITextureComposito
 
         if (pipeline.Handle != 0)
         {
-            vk.DestroyPipeline(context.Device, pipeline, null);
-            pipeline = default;
+            DestroyPipeline();
         }
 
         if (pipelineLayout.Handle != 0)
         {
-            vk.DestroyPipelineLayout(context.Device, pipelineLayout, null);
-            pipelineLayout = default;
+            DestroyPipelineLayout();
         }
 
         if (descriptorPool.Handle != 0)
@@ -204,8 +219,7 @@ internal sealed unsafe partial class VulkanTextureCompositor : ITextureComposito
 
         if (renderPass.Handle != 0)
         {
-            vk.DestroyRenderPass(context.Device, renderPass, null);
-            renderPass = default;
+            DestroyRenderPass();
         }
     }
 
@@ -747,7 +761,11 @@ internal sealed unsafe partial class VulkanTextureCompositor : ITextureComposito
             PImageIndices = &imageIndex,
         };
         var result = vkQueuePresentKHR(context.GraphicsQueue.Handle, &presentInfo);
-        if (result != Result.Success && result != Result.ErrorOutOfDateKhr)
+        if (
+            result != Result.Success
+            && result != Result.SuboptimalKhr
+            && result != Result.ErrorOutOfDateKhr
+        )
         {
             VulkanContext.Check(result, "vkQueuePresentKHR");
         }
@@ -816,6 +834,33 @@ internal sealed unsafe partial class VulkanTextureCompositor : ITextureComposito
         }
 
         imageViews = [];
+    }
+
+    private void DestroyPipeline()
+    {
+        if (pipeline.Handle != 0)
+        {
+            vk.DestroyPipeline(context.Device, pipeline, null);
+            pipeline = default;
+        }
+    }
+
+    private void DestroyPipelineLayout()
+    {
+        if (pipelineLayout.Handle != 0)
+        {
+            vk.DestroyPipelineLayout(context.Device, pipelineLayout, null);
+            pipelineLayout = default;
+        }
+    }
+
+    private void DestroyRenderPass()
+    {
+        if (renderPass.Handle != 0)
+        {
+            vk.DestroyRenderPass(context.Device, renderPass, null);
+            renderPass = default;
+        }
     }
 
     private static Extent2D ChooseExtent(SurfaceCapabilitiesKHR capabilities, Viewport viewport)

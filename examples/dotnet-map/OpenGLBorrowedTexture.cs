@@ -19,21 +19,31 @@ internal sealed class OpenGLBorrowedTexture : IDisposable
         this.context = context;
         context.MakeCurrentForRendering();
         texture = context.GenTexture();
-        context.BindTexture(Texture2D, texture);
-        context.TexParameter(Texture2D, TextureMinFilter, Linear);
-        context.TexParameter(Texture2D, TextureMagFilter, Linear);
-        context.TexImage2D(
-            Texture2D,
-            0,
-            Rgba8,
-            viewport.PhysicalWidth,
-            viewport.PhysicalHeight,
-            0,
-            Rgba,
-            UnsignedByte
-        );
-        context.BindTexture(Texture2D, 0);
-        CheckError("create OpenGL borrowed texture");
+        try
+        {
+            context.BindTexture(Texture2D, texture);
+            context.TexParameter(Texture2D, TextureMinFilter, Linear);
+            context.TexParameter(Texture2D, TextureMagFilter, Linear);
+            context.TexImage2D(
+                Texture2D,
+                0,
+                Rgba8,
+                viewport.PhysicalWidth,
+                viewport.PhysicalHeight,
+                0,
+                Rgba,
+                UnsignedByte
+            );
+            context.BindTexture(Texture2D, 0);
+            CheckError("create OpenGL borrowed texture");
+        }
+        catch
+        {
+            context.BindTexture(Texture2D, 0);
+            context.DeleteTexture(texture);
+            texture = 0;
+            throw;
+        }
     }
 
     public uint Texture => texture;
