@@ -103,9 +103,6 @@ runs:
       if: ${{ runner.os == 'Windows' }}
       shell: pwsh
       run: |
-        $workspaceDrive = Split-Path -Qualifier $env:GITHUB_WORKSPACE
-        New-Item -ItemType Directory -Force -Path (Join-Path $workspaceDrive "tmp") | Out-Null
-
         $paths = @(
           if ($env:SCCACHE_PATH) { Split-Path -Parent $env:SCCACHE_PATH }
           if ($env:Path) { $env:Path -split ';' }
@@ -120,6 +117,12 @@ runs:
         ) | Where-Object { $_ -and (Test-Path $_) }
 
         "Path=$($paths -join ';')" >> $env:GITHUB_ENV
+
+        $gradleOptions = "-Djava.io.tmpdir=$env:RUNNER_TEMP"
+        if ($env:GRADLE_OPTS) {
+          $gradleOptions = "$gradleOptions $env:GRADLE_OPTS"
+        }
+        "GRADLE_OPTS=$gradleOptions" >> $env:GITHUB_ENV
 
     - name: Install mise toolchain
       uses: jdx/mise-action@1648a7812b9aeae629881980618f079932869151 # v4.0.1
