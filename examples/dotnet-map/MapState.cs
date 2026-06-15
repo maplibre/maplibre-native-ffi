@@ -13,7 +13,7 @@ internal sealed class MapState : IDisposable
     private readonly RuntimeHandle runtime;
     private readonly IGraphicsContext graphics;
     private readonly RenderTargetMode renderTargetMode;
-    private IRenderTarget renderTarget;
+    private IRenderTarget? renderTarget;
     private bool closed;
 
     private MapState(
@@ -103,11 +103,11 @@ internal sealed class MapState : IDisposable
             if (graphics is MetalContext)
             {
                 using var pool = MacObjectiveC.AutoreleasePool();
-                renderTarget.Render();
+                CurrentRenderTarget().Render();
             }
             else
             {
-                renderTarget.Render();
+                CurrentRenderTarget().Render();
             }
             RenderPending = false;
         }
@@ -145,14 +145,16 @@ internal sealed class MapState : IDisposable
     public void Resize(Viewport viewport)
     {
         graphics.Resize(viewport);
-        if (renderTarget.NeedsReattachOnResize)
+        var currentRenderTarget = CurrentRenderTarget();
+        if (currentRenderTarget.NeedsReattachOnResize)
         {
-            renderTarget.Dispose();
+            renderTarget = null;
+            currentRenderTarget.Dispose();
             renderTarget = RenderTargetFactory.Attach(graphics, Map, renderTargetMode);
         }
         else
         {
-            renderTarget.Resize(viewport);
+            currentRenderTarget.Resize(viewport);
         }
 
         RenderPending = true;
@@ -168,7 +170,7 @@ internal sealed class MapState : IDisposable
         closed = true;
         try
         {
-            renderTarget.Dispose();
+            renderTarget?.Dispose();
         }
         finally
         {
@@ -181,5 +183,11 @@ internal sealed class MapState : IDisposable
                 runtime.Dispose();
             }
         }
+    }
+
+    private IRenderTarget CurrentRenderTarget()
+    {
+        return renderTarget
+            ?? throw new InvalidOperationException("The render target is not attached.");
     }
 }
