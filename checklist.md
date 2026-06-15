@@ -16,8 +16,8 @@ Broad phases are grouped so each phase can land as a separate commit.
 
 ## Phase 2: Build Variant and CMake Wiring
 
-- [x] Add `.mise/config.macos-arm64-angle.toml` with
-      `MLN_FFI_VARIANT=macos-arm64-angle`, `MLN_FFI_TARGET_TRIPLE=macos-arm64`,
+- [x] Add `.mise/config.macos-arm64-egl.toml` with
+      `MLN_FFI_VARIANT=macos-arm64-egl`, `MLN_FFI_TARGET_TRIPLE=macos-arm64`,
       `MLN_FFI_RENDER_BACKEND=opengl`, `MLN_FFI_OPENGL_CONTEXT_PROVIDER=egl`,
       `MLN_FFI_ANGLE_ROOT={{config_root}}/third_party/angle/chromium-7151_rev1/macos-arm64`,
       and a dedicated build dir.
@@ -32,7 +32,7 @@ Broad phases are grouped so each phase can land as a separate commit.
       locations.
 - [x] Update `cmake/render/opengl.cmake`: for macOS EGL, use ANGLE targets, add
       ANGLE include dirs, link `ANGLE::EGL` and `ANGLE::GLESv2`, and define
-      `MLN_FFI_OPENGL_PROVIDER_EGL=1` plus `MLN_FFI_OPENGL_PROVIDER_ANGLE=1`.
+      `MLN_FFI_OPENGL_PROVIDER_EGL=1`.
 - [x] Ensure build-tree runtime loading works by adding the ANGLE library
       directory to build RPATH.
 
@@ -55,13 +55,13 @@ Broad phases are grouped so each phase can land as a separate commit.
 
 - [x] Update public docs and header wording that currently says EGL is
       Linux-only.
-- [x] Add `macos-arm64-angle` to docs as the macOS EGL backend.
-- [x] Add `macos-arm64-angle` to the CI variant matrix with native, Zig binding,
+- [x] Add `macos-arm64-egl` to docs as the macOS EGL backend.
+- [x] Add `macos-arm64-egl` to the CI variant matrix with native, Zig binding,
       and Zig readback coverage.
 
 ## Phase 5: Verification
 
-- [x] Verify `mise -E macos-arm64-angle run deps:angle`.
-- [x] Verify `mise -E macos-arm64-angle run build`.
-- [x] Verify `mise -E macos-arm64-angle run test`.
+- [x] Verify `mise -E macos-arm64-egl run deps:angle`.
+- [x] Verify `mise -E macos-arm64-egl run build`.
+- [x] Verify `mise -E macos-arm64-egl run test`.
 - [x] Verify a headless readback smoke test on macOS through ANGLE.

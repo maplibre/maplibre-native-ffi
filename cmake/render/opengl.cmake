@@ -16,9 +16,6 @@ function(mln_configure_opengl_backend target)
     if(APPLE)
       include(angle)
       mln_import_angle()
-      target_compile_definitions(
-        ${target}
-        PRIVATE MLN_FFI_OPENGL_PROVIDER_ANGLE=1)
       target_link_libraries(${target} PRIVATE ANGLE::EGL ANGLE::GLESv2)
       target_include_directories(
         ${target}
