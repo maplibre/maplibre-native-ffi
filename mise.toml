@@ -132,7 +132,7 @@ run = "rm -rf \"$MLN_FFI_BUILD_DIR\""
 [tasks.deps]
 description = "Install variant-specific managed dependencies."
 run = '''
-if [[ "$MLN_FFI_TARGET_TRIPLE" == macos-* ]]; then
+if [[ "$MLN_FFI_TARGET_TRIPLE" == "macos-arm64" ]]; then
   mise run deps:angle
 fi
 '''
@@ -140,25 +140,15 @@ fi
 [tasks.test]
 depends = ["//:build"]
 run = '''
-include_args=(
-  -Dinclude-dir="$MLN_FFI_INCLUDE_DIR"
-  -Dinclude-dir="$MLN_FFI_DEPENDENCY_INCLUDE_DIR"
-  -Dinclude-dir="$MLN_FFI_VULKAN_INCLUDE_DIR"
-)
-dependency_library_dir="$MLN_FFI_DEPENDENCY_LIBRARY_DIR"
-
-if [[ "${MLN_FFI_OPENGL_CONTEXT_PROVIDER:-}" == "egl" && "$MLN_FFI_TARGET_TRIPLE" == macos-* ]]; then
-  include_args+=(-Dinclude-dir="$MLN_FFI_ANGLE_ROOT/include")
-  dependency_library_dir="$MLN_FFI_ANGLE_ROOT"
-fi
+source "$MLN_FFI_REPO_ROOT/.mise/bin/zig-build-args.sh"
 
 (
   cd src/c_api/tests/zig
-  zig build -Dtarget="$MLN_FFI_ZIG_TARGET" --test-timeout "$MLN_FFI_TEST_TIMEOUT" test --summary all --verbose -Dcmake-artifact-dir="$MLN_FFI_BUILD_DIR" "${include_args[@]}" -Ddependency-library-dir="$dependency_library_dir" -Drender-backend="$MLN_FFI_RENDER_BACKEND"
+  zig build test "${MLN_FFI_ZIG_BUILD_ARGS[@]}" --test-timeout "$MLN_FFI_TEST_TIMEOUT" --summary all --verbose
 )
 (
   cd bindings/zig
-  zig build -Dtarget="$MLN_FFI_ZIG_TARGET" --test-timeout "$MLN_FFI_TEST_TIMEOUT" test --summary all --verbose -Dcmake-artifact-dir="$MLN_FFI_BUILD_DIR" "${include_args[@]}" -Ddependency-library-dir="$dependency_library_dir" -Drender-backend="$MLN_FFI_RENDER_BACKEND"
+  zig build test "${MLN_FFI_ZIG_BUILD_ARGS[@]}" --test-timeout "$MLN_FFI_TEST_TIMEOUT" --summary all --verbose
 )
 '''
 

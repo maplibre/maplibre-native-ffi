@@ -47,7 +47,7 @@ function(mln_configure_options)
     endif()
     if(MLN_FFI_OPENGL_CONTEXT_PROVIDER STREQUAL "egl"
        AND NOT CMAKE_SYSTEM_NAME STREQUAL "Linux")
-      if(NOT (APPLE AND MLN_FFI_ANGLE_ROOT))
+      if(NOT (CMAKE_SYSTEM_NAME STREQUAL "Darwin" AND MLN_FFI_ANGLE_ROOT))
         message(FATAL_ERROR "OpenGL EGL builds require Linux or macOS ANGLE")
       endif()
     endif()

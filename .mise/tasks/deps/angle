@@ -4,18 +4,12 @@ set -euo pipefail
 
 manifest="$MLN_FFI_REPO_ROOT/third_party/angle/manifest.json"
 
-case "${MLN_FFI_ANGLE_ARTIFACT:-${MLN_FFI_TARGET_TRIPLE}}" in
-  macos-arm64)
-    artifact="macos-arm64"
-    ;;
-  macos-universal)
-    artifact="macos-universal"
-    ;;
-  *)
-    echo "ANGLE artifact is only configured for macos-arm64 or macos-universal" >&2
-    exit 1
-    ;;
-esac
+if [[ "$MLN_FFI_TARGET_TRIPLE" != "macos-arm64" ]]; then
+  echo "ANGLE artifact is only configured for macos-arm64" >&2
+  exit 1
+fi
+
+artifact="macos-arm64"
 
 angle_meta="$(
   node -e '
@@ -23,7 +17,7 @@ angle_meta="$(
     const manifest = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
     const artifact = manifest.artifacts[process.argv[2]];
     if (!artifact) {
-      throw new Error(`Unknown ANGLE artifact ${process.argv[2]}`);
+      throw new Error(`Missing ANGLE artifact ${process.argv[2]} in manifest`);
     }
     console.log(manifest.version);
     console.log(artifact.url);

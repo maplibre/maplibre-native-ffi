@@ -13,7 +13,7 @@ function(mln_configure_opengl_backend target)
     target_compile_definitions(${target} PRIVATE MLN_FFI_OPENGL_PROVIDER_EGL=1)
     list(APPEND MLN_FFI_VENDOR_OPENGL_SOURCES
          ${MLN_SOURCE_DIR}/platform/linux/src/headless_backend_egl.cpp)
-    if(APPLE)
+    if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
       include(angle)
       mln_import_angle()
       target_link_libraries(${target} PRIVATE ANGLE::EGL ANGLE::GLESv2)
