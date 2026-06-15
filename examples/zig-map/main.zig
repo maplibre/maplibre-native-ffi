@@ -13,6 +13,7 @@ const types = @import("types.zig");
 const viewport = @import("viewport.zig");
 
 const RenderTarget = render.RenderTarget;
+const uses_egl = build_options.supports_opengl and (builtin.os.tag == .linux or builtin.os.tag == .macos);
 
 pub fn main(init_args: std.process.Init) !void {
     const target_mode = (try parseRenderTargetMode(init_args)) orelse return;
@@ -21,7 +22,7 @@ pub fn main(init_args: std.process.Init) !void {
     try maplibre.setLogCallback(.{ .handler = diagnostics.logRecord }, null);
     defer maplibre.clearLogCallback(null) catch {};
 
-    if (build_options.supports_opengl and builtin.os.tag == .linux) {
+    if (uses_egl) {
         _ = c.SDL_SetHint(c.SDL_HINT_VIDEO_FORCE_EGL, "1");
     }
 
@@ -31,7 +32,7 @@ pub fn main(init_args: std.process.Init) !void {
     }
     defer c.SDL_Quit();
 
-    if (build_options.supports_opengl and builtin.os.tag == .linux) {
+    if (uses_egl) {
         if (!c.SDL_GL_SetAttribute(c.SDL_GL_CONTEXT_PROFILE_MASK, c.SDL_GL_CONTEXT_PROFILE_ES) or
             !c.SDL_GL_SetAttribute(c.SDL_GL_CONTEXT_MAJOR_VERSION, 3) or
             !c.SDL_GL_SetAttribute(c.SDL_GL_CONTEXT_MINOR_VERSION, 0))
@@ -57,6 +58,7 @@ pub fn main(init_args: std.process.Init) !void {
     defer c.SDL_DestroyWindow(window);
 
     const window_handle = window.?;
+    _ = c.SDL_RaiseWindow(window_handle);
     var current_viewport = viewport.get(window_handle);
     viewport.log("initial viewport", current_viewport);
 

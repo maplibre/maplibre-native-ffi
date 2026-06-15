@@ -12,13 +12,25 @@ fi
 [tasks.build]
 depends = ["//:ensure-native-library", ":compile-shaders"]
 run = '''
-zig build -Dtarget="$MLN_FFI_ZIG_TARGET" -Dcmake-artifact-dir="$MLN_FFI_BUILD_DIR" -Dinclude-dir="$MLN_FFI_INCLUDE_DIR" -Dinclude-dir="$MLN_FFI_DEPENDENCY_INCLUDE_DIR" -Dinclude-dir="$MLN_FFI_VULKAN_INCLUDE_DIR" -Ddependency-library-dir="$MLN_FFI_DEPENDENCY_LIBRARY_DIR" -Drender-backend="$MLN_FFI_RENDER_BACKEND"
+dependency_include_dir="$MLN_FFI_DEPENDENCY_INCLUDE_DIR"
+dependency_library_dir="$MLN_FFI_DEPENDENCY_LIBRARY_DIR"
+if [[ -n "${MLN_FFI_ANGLE_ROOT:-}" ]]; then
+  dependency_include_dir="$MLN_FFI_ANGLE_ROOT/include"
+  dependency_library_dir="$MLN_FFI_ANGLE_ROOT"
+fi
+zig build -Dtarget="$MLN_FFI_ZIG_TARGET" -Dcmake-artifact-dir="$MLN_FFI_BUILD_DIR" -Dinclude-dir="$MLN_FFI_INCLUDE_DIR" -Dinclude-dir="$dependency_include_dir" -Dinclude-dir="$MLN_FFI_VULKAN_INCLUDE_DIR" -Ddependency-library-dir="$dependency_library_dir" -Drender-backend="$MLN_FFI_RENDER_BACKEND"
 '''
 
 [tasks.run]
 depends = ["//:ensure-native-library", ":compile-shaders"]
 run = '''
-zig build run -Dtarget="$MLN_FFI_ZIG_TARGET" -Dcmake-artifact-dir="$MLN_FFI_BUILD_DIR" -Dinclude-dir="$MLN_FFI_INCLUDE_DIR" -Dinclude-dir="$MLN_FFI_DEPENDENCY_INCLUDE_DIR" -Dinclude-dir="$MLN_FFI_VULKAN_INCLUDE_DIR" -Ddependency-library-dir="$MLN_FFI_DEPENDENCY_LIBRARY_DIR" -Drender-backend="$MLN_FFI_RENDER_BACKEND" -- owned-texture
+dependency_include_dir="$MLN_FFI_DEPENDENCY_INCLUDE_DIR"
+dependency_library_dir="$MLN_FFI_DEPENDENCY_LIBRARY_DIR"
+if [[ -n "${MLN_FFI_ANGLE_ROOT:-}" ]]; then
+  dependency_include_dir="$MLN_FFI_ANGLE_ROOT/include"
+  dependency_library_dir="$MLN_FFI_ANGLE_ROOT"
+fi
+zig build run -Dtarget="$MLN_FFI_ZIG_TARGET" -Dcmake-artifact-dir="$MLN_FFI_BUILD_DIR" -Dinclude-dir="$MLN_FFI_INCLUDE_DIR" -Dinclude-dir="$dependency_include_dir" -Dinclude-dir="$MLN_FFI_VULKAN_INCLUDE_DIR" -Ddependency-library-dir="$dependency_library_dir" -Drender-backend="$MLN_FFI_RENDER_BACKEND" -- owned-texture
 '''
 
 [tasks."run:owned-texture"]
@@ -27,11 +39,23 @@ run = [{ task = "run", args = [] }]
 [tasks."run:borrowed-texture"]
 depends = ["//:ensure-native-library", ":compile-shaders"]
 run = '''
-zig build run -Dtarget="$MLN_FFI_ZIG_TARGET" -Dcmake-artifact-dir="$MLN_FFI_BUILD_DIR" -Dinclude-dir="$MLN_FFI_INCLUDE_DIR" -Dinclude-dir="$MLN_FFI_DEPENDENCY_INCLUDE_DIR" -Dinclude-dir="$MLN_FFI_VULKAN_INCLUDE_DIR" -Ddependency-library-dir="$MLN_FFI_DEPENDENCY_LIBRARY_DIR" -Drender-backend="$MLN_FFI_RENDER_BACKEND" -- borrowed-texture
+dependency_include_dir="$MLN_FFI_DEPENDENCY_INCLUDE_DIR"
+dependency_library_dir="$MLN_FFI_DEPENDENCY_LIBRARY_DIR"
+if [[ -n "${MLN_FFI_ANGLE_ROOT:-}" ]]; then
+  dependency_include_dir="$MLN_FFI_ANGLE_ROOT/include"
+  dependency_library_dir="$MLN_FFI_ANGLE_ROOT"
+fi
+zig build run -Dtarget="$MLN_FFI_ZIG_TARGET" -Dcmake-artifact-dir="$MLN_FFI_BUILD_DIR" -Dinclude-dir="$MLN_FFI_INCLUDE_DIR" -Dinclude-dir="$dependency_include_dir" -Dinclude-dir="$MLN_FFI_VULKAN_INCLUDE_DIR" -Ddependency-library-dir="$dependency_library_dir" -Drender-backend="$MLN_FFI_RENDER_BACKEND" -- borrowed-texture
 '''
 
 [tasks."run:native-surface"]
 depends = ["//:ensure-native-library", ":compile-shaders"]
 run = '''
-zig build run -Dtarget="$MLN_FFI_ZIG_TARGET" -Dcmake-artifact-dir="$MLN_FFI_BUILD_DIR" -Dinclude-dir="$MLN_FFI_INCLUDE_DIR" -Dinclude-dir="$MLN_FFI_DEPENDENCY_INCLUDE_DIR" -Dinclude-dir="$MLN_FFI_VULKAN_INCLUDE_DIR" -Ddependency-library-dir="$MLN_FFI_DEPENDENCY_LIBRARY_DIR" -Drender-backend="$MLN_FFI_RENDER_BACKEND" -- native-surface
+dependency_include_dir="$MLN_FFI_DEPENDENCY_INCLUDE_DIR"
+dependency_library_dir="$MLN_FFI_DEPENDENCY_LIBRARY_DIR"
+if [[ -n "${MLN_FFI_ANGLE_ROOT:-}" ]]; then
+  dependency_include_dir="$MLN_FFI_ANGLE_ROOT/include"
+  dependency_library_dir="$MLN_FFI_ANGLE_ROOT"
+fi
+zig build run -Dtarget="$MLN_FFI_ZIG_TARGET" -Dcmake-artifact-dir="$MLN_FFI_BUILD_DIR" -Dinclude-dir="$MLN_FFI_INCLUDE_DIR" -Dinclude-dir="$dependency_include_dir" -Dinclude-dir="$MLN_FFI_VULKAN_INCLUDE_DIR" -Ddependency-library-dir="$dependency_library_dir" -Drender-backend="$MLN_FFI_RENDER_BACKEND" -- native-surface
 '''

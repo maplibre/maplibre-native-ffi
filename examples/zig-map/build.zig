@@ -53,7 +53,7 @@ fn addZigMapExample(b: *std.Build, options: BuildOptions) *std.Build.Step.Compil
     addSdlTranslateCWorkarounds(root_module, options.target);
     root_module.addImport("maplibre_native", maplibreNativeModule(b, options));
     if (options.render_backend == .opengl) {
-        const gl_bindings = zigglgen.generateBindingsModule(b, if (options.target.result.os.tag == .linux)
+        const gl_bindings = zigglgen.generateBindingsModule(b, if (options.target.result.os.tag == .linux or options.target.result.os.tag == .macos)
             .{ .api = .gles, .version = .@"3.0" }
         else
             .{ .api = .gl, .version = .@"3.0" });
