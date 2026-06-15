@@ -82,12 +82,23 @@ Requirements:
 
 ## Naming
 
-Bindings follow
-[Binding Conventions](/maplibre-native-ffi/development/bindings/#naming).
-
 This specification uses generic concept names. Bindings apply target-language
 naming and packaging conventions while preserving the concept and ownership
 semantics.
+
+Use `MapLibre` when referring to the project or upstream library in prose.
+Inside code identifiers, treat `maplibre` as one word and apply the target
+language's normal casing rules:
+
+```text
+MaplibreMap
+maplibre_map
+maplibreMap
+MAPLIBRE_MAP
+```
+
+Do not split the brand into separate identifier words such as `MapLibreMap` or
+`map_libre_map`.
 
 Long-lived C-owned opaque handle concepts include:
 

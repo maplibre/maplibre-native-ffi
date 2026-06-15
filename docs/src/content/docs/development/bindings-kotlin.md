@@ -16,7 +16,7 @@ Resources:
 The first Kotlin binding target is Kotlin/Native. It exposes a safe low-level
 API over the public C API and keeps generated cinterop declarations private.
 This page describes the Kotlin/Native concrete choices that refine the shared
-[binding conventions](/maplibre-native-ffi/development/bindings/).
+[binding specification](/maplibre-native-ffi/development/specifications/binding/).
 
 Build `nativeMain` with Kotlin/Native `cinterop` against the public umbrella
 header. Treat successful cinterop generation and compilation as the

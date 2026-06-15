@@ -10,7 +10,7 @@ crate's handle, lifetime, callback, or finalizer model.
 
 ## References
 
-- [Binding conventions](../../docs/src/content/docs/development/bindings.md)
+- [Binding specification](../../docs/src/content/docs/development/specifications/binding.md)
 - [Rust binding conventions](../../docs/src/content/docs/development/bindings-rust.md)
 - [C API conventions](../../docs/src/content/docs/development/c-conventions.md)
 - [Concepts](../../docs/src/content/docs/concepts.md)

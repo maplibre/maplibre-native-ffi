@@ -138,8 +138,8 @@ Read these docs before changing related code:
 - [C API Conventions](docs/src/content/docs/development/c-conventions.md) before
   changing public C headers, C ABI behavior, callbacks, diagnostics, or render
   target contracts.
-- [Binding Conventions](docs/src/content/docs/development/bindings.md) and the
-  relevant language-specific binding note in
+- [Binding Specification](docs/src/content/docs/development/specifications/binding.md)
+  and the relevant language-specific binding note in
   `docs/src/content/docs/development/bindings-*.md` before changing a language
   binding or its generated reference docs.
 
