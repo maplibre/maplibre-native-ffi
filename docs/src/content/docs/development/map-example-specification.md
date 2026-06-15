@@ -1,8 +1,8 @@
 ---
-title: Map example
+title: Map example specification
 description: Specification for interactive *-map example programs.
 sidebar:
-  order: 6
+  order: 4
 ---
 
 Specification for interactive `*-map` example programs: small apps that exercise

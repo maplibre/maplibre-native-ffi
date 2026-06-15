@@ -1,8 +1,8 @@
 ---
-title: Language binding
+title: Binding specification
 description: Specification for low-level language bindings over the C API.
 sidebar:
-  order: 5
+  order: 3
 ---
 
 Specification for language binding subprojects that expose MapLibre Native

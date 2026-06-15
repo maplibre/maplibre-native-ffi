@@ -22,7 +22,7 @@ API's concepts. Higher-level adapters may provide full SDKs, async models, view
 lifecycle integrations, convenience workflows, or new abstractions.
 
 Read the
-[Binding specification](/maplibre-native-ffi/development/specifications/binding/)
+[Binding specification](/maplibre-native-ffi/development/binding-specification/)
 before implementing or reviewing a binding.
 
 ## Getting Set Up

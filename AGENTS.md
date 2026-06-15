@@ -100,7 +100,7 @@ safety rules, and hard boundaries.
 
 ### Specifications
 
-For [specification writing](docs/src/content/docs/development/specifications/):
+For specification writing:
 
 - Standalone and testable: each requirement should be checkable on its own,
   without pointing at an example or the current tree.
@@ -129,8 +129,10 @@ For [specification writing](docs/src/content/docs/development/specifications/):
 
 Read these docs before changing related code:
 
-- [Specifications](docs/src/content/docs/development/specifications/) for
-  example and binding requirements.
+- [Binding Specification](docs/src/content/docs/development/binding-specification.md)
+  for binding requirements and language binding changes.
+- [Map Example Specification](docs/src/content/docs/development/map-example-specification.md)
+  for example requirements.
 - [Overview](docs/src/content/docs/development/overview.md) for project layout,
   workflow, and tooling.
 - [Concepts](docs/src/content/docs/concepts.md) for project scope, ownership,
@@ -138,10 +140,6 @@ Read these docs before changing related code:
 - [C API Conventions](docs/src/content/docs/development/c-conventions.md) before
   changing public C headers, C ABI behavior, callbacks, diagnostics, or render
   target contracts.
-- [Binding Specification](docs/src/content/docs/development/specifications/binding.md)
-  and the relevant language-specific binding note in
-  `docs/src/content/docs/development/bindings-*.md` before changing a language
-  binding or its generated reference docs.
 
 ## External Docs
 
