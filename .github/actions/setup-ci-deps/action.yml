@@ -122,7 +122,8 @@ runs:
 
         "Path=$($paths -join ';')" >> $env:GITHUB_ENV
 
-        $gradleOptions = "-Djava.io.tmpdir=$env:RUNNER_TEMP"
+        $gradleTemp = $env:RUNNER_TEMP -replace '\\', '/'
+        $gradleOptions = "-Djava.io.tmpdir=$gradleTemp"
         if ($env:GRADLE_OPTS) {
           $gradleOptions = "$gradleOptions $env:GRADLE_OPTS"
         }
