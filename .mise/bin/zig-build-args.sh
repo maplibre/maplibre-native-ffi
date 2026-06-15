@@ -1,15 +1,13 @@
-MLN_FFI_ZIG_INCLUDE_ARGS=(
-  -Dinclude-dir="$MLN_FFI_INCLUDE_DIR"
-  -Dinclude-dir="$MLN_FFI_DEPENDENCY_INCLUDE_DIR"
-  -Dinclude-dir="$MLN_FFI_VULKAN_INCLUDE_DIR"
-)
+source "$MLN_FFI_REPO_ROOT/.mise/bin/native-build-env.sh"
 
-MLN_FFI_ZIG_DEPENDENCY_LIBRARY_DIR="$MLN_FFI_DEPENDENCY_LIBRARY_DIR"
+MLN_FFI_ZIG_INCLUDE_ARGS=()
+for include_dir in "${MLN_FFI_NATIVE_INCLUDE_DIRS[@]}"; do
+  MLN_FFI_ZIG_INCLUDE_ARGS+=(-Dinclude-dir="$include_dir")
+done
 
-if [[ "$MLN_FFI_OPENGL_CONTEXT_PROVIDER" == "egl" && "$MLN_FFI_TARGET_TRIPLE" == "macos-arm64" ]]; then
-  MLN_FFI_ZIG_INCLUDE_ARGS+=(-Dinclude-dir="$MLN_FFI_ANGLE_ROOT/include")
-  MLN_FFI_ZIG_DEPENDENCY_LIBRARY_DIR="$MLN_FFI_ANGLE_ROOT"
-fi
+for library_dir in "${MLN_FFI_NATIVE_LIBRARY_DIRS[@]}"; do
+  MLN_FFI_ZIG_DEPENDENCY_LIBRARY_DIR="$library_dir"
+done
 
 MLN_FFI_ZIG_BUILD_ARGS=(
   -Dtarget="$MLN_FFI_ZIG_TARGET"
