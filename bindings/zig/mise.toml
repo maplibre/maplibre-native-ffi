@@ -1,16 +1,10 @@
 [tasks.build]
 depends = ["//:ensure-native-library"]
-run = '''
-source "$MLN_FFI_REPO_ROOT/.mise/bin/zig-build-args.sh"
-zig build "${MLN_FFI_ZIG_BUILD_ARGS[@]}"
-'''
+run = "zig build {{ env.MLN_FFI_ZIG_BUILD_ARGS }}"
 
 [tasks.test]
 depends = ["//:ensure-native-library"]
-run = '''
-source "$MLN_FFI_REPO_ROOT/.mise/bin/zig-build-args.sh"
-zig build test "${MLN_FFI_ZIG_BUILD_ARGS[@]}" --summary all --verbose
-'''
+run = "zig build test {{ env.MLN_FFI_ZIG_BUILD_ARGS }} --summary all --verbose"
 
 [tasks.ci]
 depends = [":test"]

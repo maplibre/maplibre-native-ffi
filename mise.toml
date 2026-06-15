@@ -68,8 +68,14 @@ MLN_FFI_RENDER_BACKEND = { required = true }
 MLN_FFI_BUILD_DIR = { required = true }
 MLN_FFI_CMAKE_BUILD_TYPE = "{{env.MLN_FFI_CMAKE_BUILD_TYPE | default(value=\"RelWithDebInfo\")}}"
 MLN_FFI_INCLUDE_DIR = "{{config_root}}/include"
+MLN_FFI_DEPENDENCY_ROOT = { required = true }
+MLN_FFI_DEPENDENCY_INCLUDE_DIR = { required = true }
+MLN_FFI_DEPENDENCY_LIBRARY_DIR = { required = true }
 MLN_FFI_VULKAN_INCLUDE_DIR = "{{config_root}}/third_party/maplibre-native/vendor/Vulkan-Headers/include"
+MLN_FFI_NATIVE_INCLUDE_DIRS = { required = true }
+MLN_FFI_NATIVE_LIBRARY_DIRS = { required = true }
 MLN_FFI_ZIG_TARGET = { required = true }
+MLN_FFI_ZIG_BUILD_ARGS = { required = true }
 MLN_FFI_TEST_TIMEOUT = "{{env.MLN_FFI_TEST_TIMEOUT | default(value=\"30s\")}}"
 
 [hooks]
@@ -99,7 +105,7 @@ run = [
     -DCMAKE_BUILD_TYPE="$MLN_FFI_CMAKE_BUILD_TYPE"
     -DMLN_FFI_RENDER_BACKEND="$MLN_FFI_RENDER_BACKEND"
     -DMLN_FFI_OPENGL_CONTEXT_PROVIDER="$MLN_FFI_OPENGL_CONTEXT_PROVIDER"
-    -DMLN_FFI_ANGLE_ROOT="$MLN_FFI_ANGLE_ROOT"
+    -DMLN_FFI_EGL_ROOT="$MLN_FFI_EGL_ROOT"
   )
 
   cmake "${cmake_args[@]}"
@@ -140,15 +146,13 @@ fi
 [tasks.test]
 depends = ["//:build"]
 run = '''
-source "$MLN_FFI_REPO_ROOT/.mise/bin/zig-build-args.sh"
-
 (
   cd src/c_api/tests/zig
-  zig build test "${MLN_FFI_ZIG_BUILD_ARGS[@]}" --test-timeout "$MLN_FFI_TEST_TIMEOUT" --summary all --verbose
+  zig build test {{ env.MLN_FFI_ZIG_BUILD_ARGS }} --test-timeout "$MLN_FFI_TEST_TIMEOUT" --summary all --verbose
 )
 (
   cd bindings/zig
-  zig build test "${MLN_FFI_ZIG_BUILD_ARGS[@]}" --test-timeout "$MLN_FFI_TEST_TIMEOUT" --summary all --verbose
+  zig build test {{ env.MLN_FFI_ZIG_BUILD_ARGS }} --test-timeout "$MLN_FFI_TEST_TIMEOUT" --summary all --verbose
 )
 '''
 

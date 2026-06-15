@@ -11,31 +11,19 @@ fi
 
 [tasks.build]
 depends = ["//:ensure-native-library", ":compile-shaders"]
-run = '''
-source "$MLN_FFI_REPO_ROOT/.mise/bin/zig-build-args.sh"
-zig build "${MLN_FFI_ZIG_BUILD_ARGS[@]}"
-'''
+run = "zig build {{ env.MLN_FFI_ZIG_BUILD_ARGS }}"
 
 [tasks.run]
 depends = ["//:ensure-native-library", ":compile-shaders"]
-run = '''
-source "$MLN_FFI_REPO_ROOT/.mise/bin/zig-build-args.sh"
-zig build run "${MLN_FFI_ZIG_BUILD_ARGS[@]}" -- owned-texture
-'''
+run = "zig build run {{ env.MLN_FFI_ZIG_BUILD_ARGS }} -- owned-texture"
 
 [tasks."run:owned-texture"]
 run = [{ task = "run", args = [] }]
 
 [tasks."run:borrowed-texture"]
 depends = ["//:ensure-native-library", ":compile-shaders"]
-run = '''
-source "$MLN_FFI_REPO_ROOT/.mise/bin/zig-build-args.sh"
-zig build run "${MLN_FFI_ZIG_BUILD_ARGS[@]}" -- borrowed-texture
-'''
+run = "zig build run {{ env.MLN_FFI_ZIG_BUILD_ARGS }} -- borrowed-texture"
 
 [tasks."run:native-surface"]
 depends = ["//:ensure-native-library", ":compile-shaders"]
-run = '''
-source "$MLN_FFI_REPO_ROOT/.mise/bin/zig-build-args.sh"
-zig build run "${MLN_FFI_ZIG_BUILD_ARGS[@]}" -- native-surface
-'''
+run = "zig build run {{ env.MLN_FFI_ZIG_BUILD_ARGS }} -- native-surface"

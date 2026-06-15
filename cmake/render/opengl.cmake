@@ -13,21 +13,23 @@ function(mln_configure_opengl_backend target)
     target_compile_definitions(${target} PRIVATE MLN_FFI_OPENGL_PROVIDER_EGL=1)
     list(APPEND MLN_FFI_VENDOR_OPENGL_SOURCES
          ${MLN_SOURCE_DIR}/platform/linux/src/headless_backend_egl.cpp)
-    if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
-      include(angle)
-      mln_import_angle()
-      target_link_libraries(${target} PRIVATE ANGLE::EGL ANGLE::GLESv2)
+    if(MLN_FFI_EGL_ROOT)
+      include(egl)
+      mln_import_egl()
+      target_link_libraries(${target} PRIVATE MLN_FFI::EGL MLN_FFI::GLESv2)
       target_include_directories(
         ${target}
-        PRIVATE "${PROJECT_SOURCE_DIR}/third_party/angle_compat/include")
+        PRIVATE "${PROJECT_SOURCE_DIR}/third_party/egl_compat/include")
       target_include_directories(
         ${target}
         SYSTEM
-        PRIVATE "${MLN_FFI_ANGLE_INCLUDE_DIR}")
+        PRIVATE "${MLN_FFI_EGL_INCLUDE_DIR}")
       set_property(
         TARGET ${target}
         APPEND
-        PROPERTY BUILD_RPATH "${MLN_FFI_ANGLE_LIBRARY_DIR}")
+        PROPERTY BUILD_RPATH "${MLN_FFI_EGL_LIBRARY_DIR}")
+    elseif(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+      message(FATAL_ERROR "macOS EGL builds require MLN_FFI_EGL_ROOT")
     else()
       find_package(OpenGL REQUIRED EGL)
       target_link_libraries(${target} PRIVATE OpenGL::EGL ${CMAKE_DL_LIBS})
