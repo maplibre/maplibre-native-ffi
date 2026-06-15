@@ -1,6 +1,5 @@
 # https://pixi.prefix.dev/
-# Pixi owns the current desktop native dependency prefix. Mise owns repository
-# task execution, tools, and the environment variables that point at this prefix.
+# Pixi installs the desktop native libraries used by local builds.
 
 [workspace]
 channels = ["conda-forge"]

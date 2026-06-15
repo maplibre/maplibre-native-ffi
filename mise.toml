@@ -151,22 +151,6 @@ run = "hk check --all"
 [tasks.fix]
 run = "hk fix --all"
 
-[tasks."lint:native"]
-run = '''
-lint_build_dir="$MLN_FFI_BUILD_DIR-lint"
-cmake_args=(
-  -S .
-  -B "$lint_build_dir"
-  -G Ninja
-  -DCMAKE_BUILD_TYPE="$MLN_FFI_CMAKE_BUILD_TYPE"
-  -DMLN_FFI_RENDER_BACKEND="$MLN_FFI_RENDER_BACKEND"
-  -DMLN_FFI_ENABLE_CLANG_TIDY=ON
-)
-
-cmake "${cmake_args[@]}"
-cmake --build "$lint_build_dir" --parallel
-'''
-
 [tasks.actions-up]
 description = "Update and pin GitHub Actions steps."
 run = "pnpm dlx actions-up"

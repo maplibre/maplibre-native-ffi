@@ -55,8 +55,7 @@ function(mln_add_c_api_library target)
 
   if(UNIX AND DEFINED ENV{MLN_FFI_DEPENDENCY_LIBRARY_DIR})
     # Build-tree binaries find provider-supplied shared libraries through
-    # embedded
-    # runtime search paths.
+    # embedded runtime search paths.
     set_property(
       TARGET ${target}
       APPEND

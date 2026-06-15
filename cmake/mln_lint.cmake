@@ -16,13 +16,6 @@ function(mln_configure_source_linting target)
       COMMAND_ERROR_IS_FATAL ANY)
     list(APPEND MLN_FFI_CLANG_TIDY_COMMAND
          --extra-arg=-resource-dir=${MLN_FFI_CLANG_RESOURCE_DIR})
-  elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-    execute_process(
-      COMMAND ${CMAKE_CXX_COMPILER} -print-file-name=include
-      OUTPUT_VARIABLE MLN_FFI_GCC_INCLUDE_DIR OUTPUT_STRIP_TRAILING_WHITESPACE
-      COMMAND_ERROR_IS_FATAL ANY)
-    list(APPEND MLN_FFI_CLANG_TIDY_COMMAND --extra-arg-before=-isystem
-         --extra-arg-before=${MLN_FFI_GCC_INCLUDE_DIR})
   endif()
 
   set_target_properties(
