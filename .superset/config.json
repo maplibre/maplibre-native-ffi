@@ -1,1 +1,1 @@
-{ "setup": ["mise trust . && mise install"], "teardown": [], "run": [] }
+{ "setup": ["bash ./.superset/setup.sh"], "teardown": [], "run": [] }

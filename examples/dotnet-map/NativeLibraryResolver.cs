@@ -5,6 +5,7 @@ namespace Maplibre.Native.Examples.DotnetMap;
 
 internal static class NativeLibraryResolver
 {
+    private const string DependencyPrefixEnvironment = "MLN_FFI_DEPS_PREFIX";
     private static readonly object RegistrationLock = new();
     private static bool registered;
 
@@ -48,10 +49,10 @@ internal static class NativeLibraryResolver
     {
         string[] names = libraryName switch
         {
-            "glfw" when OperatingSystem.IsWindows() => ["glfw3"],
+            "glfw" when OperatingSystem.IsWindows() => ["glfw3.dll", "glfw3"],
             "glfw" when OperatingSystem.IsMacOS() => ["libglfw.3.dylib", "glfw"],
             "glfw" => ["libglfw.so.3", "glfw"],
-            "vulkan" when OperatingSystem.IsWindows() => ["vulkan-1"],
+            "vulkan" when OperatingSystem.IsWindows() => ["vulkan-1.dll", "vulkan-1"],
             "vulkan" when OperatingSystem.IsMacOS() =>
             [
                 "libvulkan.1.dylib",
@@ -83,6 +84,7 @@ internal static class NativeLibraryResolver
     {
         var environmentPrefixes = new[]
         {
+            Environment.GetEnvironmentVariable(DependencyPrefixEnvironment),
             Environment.GetEnvironmentVariable("CONDA_PREFIX"),
             Environment.GetEnvironmentVariable("PIXI_PROJECT_ROOT") is { Length: > 0 } pixiRoot
                 ? Path.Combine(pixiRoot, ".pixi", "envs", "default")
@@ -93,10 +95,9 @@ internal static class NativeLibraryResolver
         {
             if (!string.IsNullOrWhiteSpace(prefix))
             {
-                var lib = Path.Combine(prefix, "lib");
-                if (Directory.Exists(lib))
+                foreach (var directory in PrefixLibraryDirectories(prefix))
                 {
-                    yield return lib;
+                    yield return directory;
                 }
             }
         }
@@ -116,6 +117,27 @@ internal static class NativeLibraryResolver
                     break;
                 }
             }
+        }
+    }
+
+    private static IEnumerable<string> PrefixLibraryDirectories(string prefix)
+    {
+        var lib = Path.Combine(prefix, "lib");
+        if (Directory.Exists(lib))
+        {
+            yield return lib;
+        }
+
+        var bin = Path.Combine(prefix, "bin");
+        if (Directory.Exists(bin))
+        {
+            yield return bin;
+        }
+
+        var windowsLibraryBin = Path.Combine(prefix, "Library", "bin");
+        if (Directory.Exists(windowsLibraryBin))
+        {
+            yield return windowsLibraryBin;
         }
     }
 }

@@ -59,8 +59,9 @@ automatically via `.miserc.toml`.
 Formatters and linters run automatically on pre-commit; you usually don't need
 to run them manually.
 
-The environment is managed by mise and pixi, so if you need to run a command
-that's not already a mise task, use `mise exec -- pixi run ...`.
+The environment is managed by mise. If you need to run a command that's not
+already a mise task, use `mise exec -- ...` so repository tools and dependency
+paths are available.
 
 ## Pull requests
 
@@ -74,7 +75,8 @@ the PR description if more detail is needed. More context:
 ### General
 
 - Campsite rules apply: leave anything you touch tidier than when you found it.
-- The environment is mostly defined by `mise` and `pixi`.
+- The environment is defined by `mise`; pixi is the current desktop native
+  library provider behind mise-managed paths.
 - The bindings are meant to be low level and broadly analogous to each other and
   to the C API, exposing MapLibre concepts directly, while following language
   conventions for memory and thread safety. Prioritize safety, similarity, and
