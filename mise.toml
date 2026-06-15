@@ -89,6 +89,7 @@ postinstall = [
 ]
 
 [tasks.configure]
+depends = ["//:deps"]
 run = [
   '''
   cmake_args=(
@@ -101,17 +102,16 @@ run = [
     -DMLN_FFI_ANGLE_ROOT="$MLN_FFI_ANGLE_ROOT"
   )
 
-  if [[ -n "${MLN_FFI_ANGLE_ROOT:-}" ]]; then
-    mise run deps:angle
-  fi
-
   cmake "${cmake_args[@]}"
   ''',
   '''
   if [[ -f "$MLN_FFI_BUILD_DIR/compile_commands.json" ]]; then
     mkdir -p build/clangd
-    ln -sfn "$MLN_FFI_BUILD_DIR/compile_commands.json" \
-      build/clangd/compile_commands.json
+    compile_commands_link="build/clangd/compile_commands.json"
+    compile_commands_tmp="${compile_commands_link}.tmp"
+    rm -f "$compile_commands_tmp"
+    ln -s "$MLN_FFI_BUILD_DIR/compile_commands.json" "$compile_commands_tmp"
+    mv -f "$compile_commands_tmp" "$compile_commands_link"
   fi
   ''',
 ]
@@ -129,96 +129,36 @@ cmake "${build_args[@]}"'''
 [tasks.clean]
 run = "rm -rf \"$MLN_FFI_BUILD_DIR\""
 
-[tasks."deps:angle"]
-description = "Download and verify the pinned ANGLE binary artifact for the active variant."
+[tasks.deps]
+description = "Install variant-specific managed dependencies."
 run = '''
-manifest="$MLN_FFI_REPO_ROOT/third_party/angle/manifest.json"
-
-case "${MLN_FFI_ANGLE_ARTIFACT:-${MLN_FFI_TARGET_TRIPLE}}" in
-  macos-arm64)
-    artifact="macos-arm64"
-    ;;
-  macos-universal)
-    artifact="macos-universal"
-    ;;
-  *)
-    echo "ANGLE artifact is only configured for macos-arm64 or macos-universal" >&2
-    exit 1
-    ;;
-esac
-
-angle_meta="$(
-  node -e '
-    const fs = require("fs");
-    const manifest = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
-    const artifact = manifest.artifacts[process.argv[2]];
-    if (!artifact) {
-      throw new Error(`Unknown ANGLE artifact ${process.argv[2]}`);
-    }
-    console.log(manifest.version);
-    console.log(artifact.url);
-    console.log(artifact.sha256);
-  ' "$manifest" "$artifact"
-)"
-
-version="$(printf '%s\n' "$angle_meta" | sed -n '1p')"
-url="$(printf '%s\n' "$angle_meta" | sed -n '2p')"
-sha256="$(printf '%s\n' "$angle_meta" | sed -n '3p')"
-angle_root="${MLN_FFI_REPO_ROOT}/third_party/angle/${version}/${artifact}"
-archive="${MLN_FFI_REPO_ROOT}/third_party/angle/${version}/${artifact}.tar.gz"
-marker="${angle_root}/.complete"
-marker_value="${sha256} install-name-rpath-v1"
-
-if [[ -f "$marker" ]] && [[ "$(cat "$marker")" == "$marker_value" ]]; then
-  exit 0
+if [[ "$MLN_FFI_TARGET_TRIPLE" == macos-* ]]; then
+  mise run deps:angle
 fi
-
-tmp_dir="$(mktemp -d)"
-trap 'rm -rf "$tmp_dir"' EXIT
-
-mkdir -p "$(dirname "$archive")"
-curl --fail --location --silent --show-error --output "$tmp_dir/angle.tar.gz" "$url"
-
-actual_sha256="$(shasum -a 256 "$tmp_dir/angle.tar.gz" | awk '{print $1}')"
-if [[ "$actual_sha256" != "$sha256" ]]; then
-  echo "ANGLE archive SHA-256 mismatch for $artifact" >&2
-  echo "expected: $sha256" >&2
-  echo "actual:   $actual_sha256" >&2
-  exit 1
-fi
-
-rm -rf "$angle_root"
-mkdir -p "$angle_root"
-tar -xzf "$tmp_dir/angle.tar.gz" -C "$angle_root" --strip-components=1
-cp "$tmp_dir/angle.tar.gz" "$archive"
-
-if [[ "$(uname -s)" == "Darwin" ]]; then
-  install_name_tool -id @rpath/libEGL.dylib "$angle_root/libEGL.dylib"
-  install_name_tool -id @rpath/libGLESv2.dylib "$angle_root/libGLESv2.dylib"
-  codesign --force --sign - "$angle_root/libEGL.dylib" >/dev/null
-  codesign --force --sign - "$angle_root/libGLESv2.dylib" >/dev/null
-fi
-
-printf '%s' "$marker_value" > "$marker"
 '''
 
 [tasks.test]
 depends = ["//:build"]
 run = '''
-dependency_include_dir="$MLN_FFI_DEPENDENCY_INCLUDE_DIR"
+include_args=(
+  -Dinclude-dir="$MLN_FFI_INCLUDE_DIR"
+  -Dinclude-dir="$MLN_FFI_DEPENDENCY_INCLUDE_DIR"
+  -Dinclude-dir="$MLN_FFI_VULKAN_INCLUDE_DIR"
+)
 dependency_library_dir="$MLN_FFI_DEPENDENCY_LIBRARY_DIR"
-if [[ -n "${MLN_FFI_ANGLE_ROOT:-}" ]]; then
-  dependency_include_dir="$MLN_FFI_ANGLE_ROOT/include"
+
+if [[ "${MLN_FFI_OPENGL_CONTEXT_PROVIDER:-}" == "egl" && "$MLN_FFI_TARGET_TRIPLE" == macos-* ]]; then
+  include_args+=(-Dinclude-dir="$MLN_FFI_ANGLE_ROOT/include")
   dependency_library_dir="$MLN_FFI_ANGLE_ROOT"
 fi
 
 (
   cd src/c_api/tests/zig
-  zig build -Dtarget="$MLN_FFI_ZIG_TARGET" --test-timeout "$MLN_FFI_TEST_TIMEOUT" test --summary all --verbose -Dcmake-artifact-dir="$MLN_FFI_BUILD_DIR" -Dinclude-dir="$MLN_FFI_INCLUDE_DIR" -Dinclude-dir="$dependency_include_dir" -Dinclude-dir="$MLN_FFI_VULKAN_INCLUDE_DIR" -Ddependency-library-dir="$dependency_library_dir" -Drender-backend="$MLN_FFI_RENDER_BACKEND"
+  zig build -Dtarget="$MLN_FFI_ZIG_TARGET" --test-timeout "$MLN_FFI_TEST_TIMEOUT" test --summary all --verbose -Dcmake-artifact-dir="$MLN_FFI_BUILD_DIR" "${include_args[@]}" -Ddependency-library-dir="$dependency_library_dir" -Drender-backend="$MLN_FFI_RENDER_BACKEND"
 )
 (
   cd bindings/zig
-  zig build -Dtarget="$MLN_FFI_ZIG_TARGET" --test-timeout "$MLN_FFI_TEST_TIMEOUT" test --summary all --verbose -Dcmake-artifact-dir="$MLN_FFI_BUILD_DIR" -Dinclude-dir="$MLN_FFI_INCLUDE_DIR" -Dinclude-dir="$dependency_include_dir" -Dinclude-dir="$MLN_FFI_VULKAN_INCLUDE_DIR" -Ddependency-library-dir="$dependency_library_dir" -Drender-backend="$MLN_FFI_RENDER_BACKEND"
+  zig build -Dtarget="$MLN_FFI_ZIG_TARGET" --test-timeout "$MLN_FFI_TEST_TIMEOUT" test --summary all --verbose -Dcmake-artifact-dir="$MLN_FFI_BUILD_DIR" "${include_args[@]}" -Ddependency-library-dir="$dependency_library_dir" -Drender-backend="$MLN_FFI_RENDER_BACKEND"
 )
 '''
 
