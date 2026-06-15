@@ -52,14 +52,14 @@ internal sealed unsafe class OpenGLContext : IGraphicsContext
         );
     }
 
-    public OpenGLContextDescriptor Descriptor()
+    public OpenGLContextDescriptor Descriptor(bool requirePbufferConfig)
     {
         if (gles)
         {
             return new EglContextDescriptor
             {
                 Display = new NativePointer(GlfwNativeAccess.GetEglDisplay()),
-                Config = new NativePointer(EglConfig()),
+                Config = new NativePointer(EglConfig(requirePbufferConfig)),
                 ShareContext = new NativePointer(GlfwNativeAccess.GetEglContext(window.Handle)),
                 GetProcAddress = NativeCallbacks.GlfwGetProcAddress,
             };
@@ -564,11 +564,12 @@ internal sealed unsafe class OpenGLContext : IGraphicsContext
         window.Glfw.MakeContextCurrent(window.Handle);
     }
 
-    private nint EglConfig()
+    private nint EglConfig(bool requirePbufferConfig)
     {
-        return EglNative.GetSurfaceConfig(
-            GlfwNativeAccess.GetEglDisplay(),
-            GlfwNativeAccess.GetEglSurface(window.Handle)
-        );
+        var display = GlfwNativeAccess.GetEglDisplay();
+        var surface = GlfwNativeAccess.GetEglSurface(window.Handle);
+        return requirePbufferConfig
+            ? EglNative.GetTextureConfig(display, surface)
+            : EglNative.GetSurfaceConfig(display, surface);
     }
 }

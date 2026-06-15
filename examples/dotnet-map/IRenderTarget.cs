@@ -7,7 +7,7 @@ internal interface IRenderTarget : IDisposable
 {
     bool NeedsReattachOnResize { get; }
 
-    void Render();
+    bool Render();
 
     void Resize(Viewport viewport);
 }
@@ -121,7 +121,7 @@ internal sealed class OwnedTextureRenderTarget : IRenderTarget
                         new OpenGLOwnedTextureDescriptor
                         {
                             Extent = viewport.RenderTargetExtent,
-                            Context = openGl.Descriptor(),
+                            Context = openGl.Descriptor(requirePbufferConfig: true),
                         }
                     ),
                 () => new OpenGLTextureCompositor(openGl, viewport)
@@ -154,27 +154,28 @@ internal sealed class OwnedTextureRenderTarget : IRenderTarget
         }
     }
 
-    public void Render()
+    public bool Render()
     {
         session.RenderUpdate();
+        var presented = false;
         switch (graphics)
         {
             case MetalContext:
                 using (var frame = session.AcquireMetalOwnedTextureFrame())
                 {
-                    compositor.Draw(frame.Frame);
+                    presented = compositor.Draw(frame.Frame);
                 }
                 break;
             case VulkanContext:
                 using (var frame = session.AcquireVulkanOwnedTextureFrame())
                 {
-                    compositor.Draw(frame.Frame);
+                    presented = compositor.Draw(frame.Frame);
                 }
                 break;
             case OpenGLContext:
                 using (var frame = session.AcquireOpenGLOwnedTextureFrame())
                 {
-                    compositor.Draw(frame.Frame);
+                    presented = compositor.Draw(frame.Frame);
                 }
                 break;
             default:
@@ -183,7 +184,12 @@ internal sealed class OwnedTextureRenderTarget : IRenderTarget
                 );
         }
 
-        graphics.FinishFrame();
+        if (presented)
+        {
+            graphics.FinishFrame();
+        }
+
+        return presented;
     }
 
     public void Resize(Viewport viewport)
@@ -261,9 +267,10 @@ internal sealed class BorrowedTextureRenderTarget : IRenderTarget
         };
     }
 
-    public void Render()
+    public bool Render()
     {
         session.RenderUpdate();
+        var presented = true;
         switch (texture)
         {
             case MetalBorrowedTexture metalTexture
@@ -272,7 +279,7 @@ internal sealed class BorrowedTextureRenderTarget : IRenderTarget
                 break;
             case VulkanBorrowedImage vulkanImage
                 when compositor is VulkanTextureCompositor vulkanCompositor:
-                vulkanCompositor.DrawImageView(vulkanImage.View);
+                presented = vulkanCompositor.DrawImageView(vulkanImage.View);
                 break;
             case OpenGLBorrowedTexture openGlTexture
                 when compositor is OpenGLTextureCompositor openGlCompositor:
@@ -282,7 +289,12 @@ internal sealed class BorrowedTextureRenderTarget : IRenderTarget
                 throw new InvalidOperationException("Unsupported borrowed texture compositor.");
         }
 
-        graphics.FinishFrame();
+        if (presented)
+        {
+            graphics.FinishFrame();
+        }
+
+        return presented;
     }
 
     public void Resize(Viewport viewport)
@@ -399,7 +411,7 @@ internal sealed class BorrowedTextureRenderTarget : IRenderTarget
                 new OpenGLBorrowedTextureDescriptor
                 {
                     Extent = viewport.RenderTargetExtent,
-                    Context = openGl.Descriptor(),
+                    Context = openGl.Descriptor(requirePbufferConfig: true),
                     Texture = texture.Texture,
                     Target = texture.Target,
                 }
@@ -481,7 +493,7 @@ internal sealed class NativeSurfaceRenderTarget : IRenderTarget
                     {
                         Extent = viewport.RenderTargetExtent,
                         Surface = openGl.SurfacePointer(),
-                        Context = openGl.Descriptor(),
+                        Context = openGl.Descriptor(requirePbufferConfig: false),
                     }
                 )
             ),
@@ -491,9 +503,10 @@ internal sealed class NativeSurfaceRenderTarget : IRenderTarget
         };
     }
 
-    public void Render()
+    public bool Render()
     {
         session.RenderUpdate();
+        return true;
     }
 
     public void Resize(Viewport viewport)

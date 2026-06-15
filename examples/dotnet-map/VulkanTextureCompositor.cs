@@ -35,10 +35,12 @@ internal sealed unsafe partial class VulkanTextureCompositor : ITextureComposito
     private VulkanSemaphore imageAvailable;
     private VulkanSemaphore renderFinished;
     private Fence inFlight;
+    private Viewport viewport;
 
     public VulkanTextureCompositor(VulkanContext context, Viewport viewport)
     {
         this.context = context;
+        this.viewport = viewport;
         vk = context.Api;
         try
         {
@@ -58,6 +60,7 @@ internal sealed unsafe partial class VulkanTextureCompositor : ITextureComposito
 
     public void Resize(Viewport viewport)
     {
+        this.viewport = viewport;
         context.WaitIdle();
         DestroySwapchainDependents();
         var oldSwapchain = swapchain;
@@ -87,7 +90,7 @@ internal sealed unsafe partial class VulkanTextureCompositor : ITextureComposito
         CreateFramebuffers();
     }
 
-    public void Draw(VulkanOwnedTextureFrame frame)
+    public bool Draw(VulkanOwnedTextureFrame frame)
     {
         if (frame.Width == 0 || frame.Height == 0)
         {
@@ -108,10 +111,10 @@ internal sealed unsafe partial class VulkanTextureCompositor : ITextureComposito
             throw new InvalidOperationException("MapLibre returned a null Vulkan image view.");
         }
 
-        DrawImageView(new ImageView((ulong)frame.ImageView.Address));
+        return DrawImageView(new ImageView((ulong)frame.ImageView.Address));
     }
 
-    public void DrawImageView(ImageView imageView)
+    public bool DrawImageView(ImageView imageView)
     {
         var fence = inFlight;
         VulkanContext.Check(
@@ -129,7 +132,8 @@ internal sealed unsafe partial class VulkanTextureCompositor : ITextureComposito
         );
         if (acquire == Result.ErrorOutOfDateKhr)
         {
-            return;
+            RecreateSwapchain();
+            return false;
         }
 
         if (acquire != Result.Success && acquire != Result.SuboptimalKhr)
@@ -146,8 +150,15 @@ internal sealed unsafe partial class VulkanTextureCompositor : ITextureComposito
             vk.WaitForFences(context.Device, 1, &fence, true, ulong.MaxValue),
             "vkWaitForFences"
         );
-        Present(imageIndex);
+        var present = Present(imageIndex);
         VulkanContext.Check(vk.QueueWaitIdle(context.GraphicsQueue), "vkQueueWaitIdle");
+        if (present == Result.ErrorOutOfDateKhr)
+        {
+            RecreateSwapchain();
+            return false;
+        }
+
+        return true;
     }
 
     public void Dispose()
@@ -260,22 +271,7 @@ internal sealed unsafe partial class VulkanTextureCompositor : ITextureComposito
             ),
             "vkGetPhysicalDeviceSurfaceFormatsKHR"
         );
-        var chosen = formats[0];
-        for (var i = 0; i < formatCount; i++)
-        {
-            var candidate = formats[i];
-            if (
-                (
-                    candidate.Format == Format.B8G8R8A8Unorm
-                    || candidate.Format == Format.R8G8B8A8Unorm
-                )
-                && candidate.ColorSpace == ColorSpaceKHR.PaceSrgbNonlinearKhr
-            )
-            {
-                chosen = candidate;
-                break;
-            }
-        }
+        var chosen = ChooseSurfaceFormat(formats, formatCount);
 
         swapchainFormat = chosen.Format;
         extent = ChooseExtent(capabilities, viewport);
@@ -748,7 +744,12 @@ internal sealed unsafe partial class VulkanTextureCompositor : ITextureComposito
         );
     }
 
-    private void Present(uint imageIndex)
+    private void RecreateSwapchain()
+    {
+        Resize(viewport);
+    }
+
+    private Result Present(uint imageIndex)
     {
         var waitSemaphore = renderFinished;
         var swapchainHandle = swapchain;
@@ -770,6 +771,31 @@ internal sealed unsafe partial class VulkanTextureCompositor : ITextureComposito
         {
             VulkanContext.Check(result, "vkQueuePresentKHR");
         }
+
+        return result;
+    }
+
+    private static SurfaceFormatKHR ChooseSurfaceFormat(SurfaceFormatKHR* formats, uint formatCount)
+    {
+        for (var i = 0; i < formatCount; i++)
+        {
+            var candidate = formats[i];
+            if (
+                (
+                    candidate.Format == Format.B8G8R8A8Unorm
+                    || candidate.Format == Format.R8G8B8A8Unorm
+                )
+                && candidate.ColorSpace == ColorSpaceKHR.PaceSrgbNonlinearKhr
+            )
+            {
+                return candidate;
+            }
+        }
+
+        var first = formats[0];
+        return first.Format == Format.Undefined
+            ? new SurfaceFormatKHR { Format = Format.B8G8R8A8Unorm, ColorSpace = first.ColorSpace }
+            : first;
     }
 
     private ImageView CreateImageView(Image image, Format format)

@@ -33,7 +33,7 @@ internal sealed class MetalTextureCompositor : ITextureCompositor
         _ = viewport;
     }
 
-    public void Draw(MetalOwnedTextureFrame frame)
+    public bool Draw(MetalOwnedTextureFrame frame)
     {
         if (frame.Width == 0 || frame.Height == 0 || frame.Texture.IsNull)
         {
@@ -43,6 +43,7 @@ internal sealed class MetalTextureCompositor : ITextureCompositor
         }
 
         DrawTexture(frame.Texture.Address);
+        return true;
     }
 
     public void DrawTexture(nint texture)

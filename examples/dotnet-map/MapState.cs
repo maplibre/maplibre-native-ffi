@@ -103,11 +103,17 @@ internal sealed class MapState : IDisposable
             if (graphics is MetalContext)
             {
                 using var pool = MacObjectiveC.AutoreleasePool();
-                CurrentRenderTarget().Render();
+                if (!CurrentRenderTarget().Render())
+                {
+                    return true;
+                }
             }
             else
             {
-                CurrentRenderTarget().Render();
+                if (!CurrentRenderTarget().Render())
+                {
+                    return true;
+                }
             }
             RenderPending = false;
         }
