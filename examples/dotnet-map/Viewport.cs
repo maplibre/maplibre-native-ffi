@@ -22,19 +22,23 @@ internal readonly record struct Viewport(
         float scaleY
     )
     {
-        var scale = Math.Max(scaleX, scaleY);
-        if (!double.IsFinite(scale) || scale <= 0)
-        {
-            scale = 1;
-        }
-
+        var logicalWidthValue = CheckedDimension(logicalWidth);
+        var logicalHeightValue = CheckedDimension(logicalHeight);
         var physicalWidthValue = CheckedDimension(physicalWidth);
         var physicalHeightValue = CheckedDimension(physicalHeight);
+        var scale = CalculateScaleFactor(
+            logicalWidthValue,
+            logicalHeightValue,
+            physicalWidthValue,
+            physicalHeightValue,
+            scaleX,
+            scaleY
+        );
         var isEmpty =
             logicalWidth <= 0 || logicalHeight <= 0 || physicalWidth <= 0 || physicalHeight <= 0;
         return new Viewport(
-            LogicalDimension(physicalWidthValue, scale),
-            LogicalDimension(physicalHeightValue, scale),
+            logicalWidthValue,
+            logicalHeightValue,
             physicalWidthValue,
             physicalHeightValue,
             scale,
@@ -54,13 +58,32 @@ internal readonly record struct Viewport(
         return value <= 0 ? 0 : checked((uint)value);
     }
 
-    private static uint LogicalDimension(uint physicalValue, double scale)
+    private static double CalculateScaleFactor(
+        uint logicalWidth,
+        uint logicalHeight,
+        uint physicalWidth,
+        uint physicalHeight,
+        float scaleX,
+        float scaleY
+    )
     {
-        if (physicalValue == 0)
+        if (logicalWidth > 0 && logicalHeight > 0 && physicalWidth > 0 && physicalHeight > 0)
         {
-            return 0;
+            var lowerBound = Math.Max(
+                (physicalWidth - 1.0) / logicalWidth,
+                (physicalHeight - 1.0) / logicalHeight
+            );
+            var upperBound = Math.Min(
+                physicalWidth / (double)logicalWidth,
+                physicalHeight / (double)logicalHeight
+            );
+            if (upperBound > lowerBound)
+            {
+                return upperBound;
+            }
         }
 
-        return Math.Max(1, checked((uint)Math.Ceiling(physicalValue / scale)));
+        var scale = Math.Max(scaleX, scaleY);
+        return double.IsFinite(scale) && scale > 0 ? scale : 1;
     }
 }
