@@ -1,7 +1,5 @@
 #pragma once
 
-#include <bit>
-
 #ifndef VULKAN_HPP_DISPATCH_LOADER_DYNAMIC
 // NOLINTNEXTLINE(cppcoreguidelines-macro-usage)
 #define VULKAN_HPP_DISPATCH_LOADER_DYNAMIC 1
@@ -22,7 +20,9 @@ inline auto vulkan_get_instance_proc_addr(
   const mln_vulkan_context_descriptor& context
 ) noexcept -> PFN_vkGetInstanceProcAddr {
   if (context.get_instance_proc_addr != nullptr) {
-    return std::bit_cast<PFN_vkGetInstanceProcAddr>(
+    // The C ABI carries Vulkan loader callbacks as opaque pointers.
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
+    return reinterpret_cast<PFN_vkGetInstanceProcAddr>(
       context.get_instance_proc_addr
     );
   }
@@ -33,7 +33,11 @@ inline auto vulkan_get_device_proc_addr(
   const mln_vulkan_context_descriptor& context
 ) noexcept -> PFN_vkGetDeviceProcAddr {
   if (context.get_device_proc_addr != nullptr) {
-    return std::bit_cast<PFN_vkGetDeviceProcAddr>(context.get_device_proc_addr);
+    // The C ABI carries Vulkan loader callbacks as opaque pointers.
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
+    return reinterpret_cast<PFN_vkGetDeviceProcAddr>(
+      context.get_device_proc_addr
+    );
   }
   return nullptr;
 }
