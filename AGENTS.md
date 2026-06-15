@@ -111,14 +111,13 @@ For [specification writing](docs/src/content/docs/development/specifications/):
 
 ### Testing
 
-- The Zig bindings tests are also the primary integration test suite for the
-  C/C++ layer.
-- For tests that _must_ reach below the bindings, there are dedicated tests in
-  src/c_api/tests.
-- Other bindings (Rust, Java, Swift, etc) should include useful integration
-  tests that validate binding behavior through the native C/C++ layer.
-  Incidental native coverage from those integration tests is acceptable; chasing
-  duplicate full C/C++ coverage in every binding is unnecessary.
+- The bindings tests include broad integration coverage for the C/C++ layer on
+  targets where they run.
+- For tests that _must_ reach below the bindings, there are dedicated Zig tests
+  in src/c_api/tests.
+- Each binding's test suite should stand on its own for the C API domains and
+  targets it supports, using public binding APIs to validate both native
+  workflows and binding-owned safety behavior.
 - Avoid trivial tests, tests that verify constants, tests that assert a negative
   (unless valuable), tests that simply test third party code; we want to keep
   our test suite robust and high-value.

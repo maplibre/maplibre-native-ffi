@@ -2,41 +2,28 @@
 title: Language binding
 description: Specification for low-level language bindings over the C API.
 sidebar:
-  order: 6
+  order: 5
 ---
 
 Specification for language binding subprojects that expose MapLibre Native
 through the public C API.
 
-This specification defines the common low-level binding contract. Existing
-bindings are not grandfathered; new work moves bindings toward this document
-rather than preserving divergent local patterns.
-
 ## Scope
 
-### What every binding provides
+Every binding gives host code a safe, low-level way to use MapLibre Native
+through `maplibre_native_c.h`.
 
-- One safe low-level public API over `maplibre_native_c.h`.
-- Direct exposure of MapLibre concepts: runtime, map, camera, style, resources,
-  events, diagnostics, render sessions, render targets, query results, and
-  offline operations.
-- Explicit deterministic release for every public wrapper that owns a native
-  handle.
-- Native status and diagnostic translation through the target language's normal
-  error mechanism.
-- Copied language values for native events, snapshots, lists, strings, JSON,
-  GeoJSON, query results, offline region data, and other C-owned borrowed
-  output.
-- Explicit lifetime control for callbacks, resource requests, and scoped render
-  frame borrows.
-- Tests for every binding-owned ownership, threading, copying, callback, and
-  error-mapping invariant listed in [Test cases](#test-cases).
+A binding exposes MapLibre concepts directly, keeps native ownership and
+borrowed data safe in the target language, reports native failures through the
+target language's error model, and tests the supported C API domains through the
+public binding.
 
-### What this layer is not
+The required binding layer is a low-level FFI API. It MUST NOT add
+application-framework policy, UI/view lifecycle integration, general async APIs,
+or scheduler models above the C API concepts.
 
-The binding is a low-level FFI layer. It MUST NOT add application-framework
-policy, UI/view lifecycle integration, or scheduler/async execution models above
-the C API concepts.
+A subproject that needs host-thread confinement uses the owner-thread helper
+design in Threading. No other execution model belongs in the binding layer.
 
 ---
 
@@ -51,40 +38,38 @@ Cross-binding alignment means bindings expose the same C API concepts, ownership
 rules, operation boundaries, and error semantics. It does not require identical
 syntax, names, or package structure.
 
-Bindings expose one correct low-level way to perform each C API operation. A
-binding adds another public path only when that path enforces a target-language
-safety rule that the primary path cannot express.
-
 Bindings are minimal and complete:
 
 - Minimal: public APIs map to C API concepts and binding-owned safety policy.
-  They do not add redundant workflows, shortcuts, or higher-level composites.
+  They expose one correct low-level public API for each C API operation and do
+  not add redundant workflows, shortcuts, higher-level composites, or alternate
+  ownership, threading, callback, allocation, or error contracts.
 - Complete: a binding that claims support for a C API domain exposes that
-  domain's public operations, descriptor shapes, event payloads, status
-  behavior, and ownership rules.
+  domain's public operations, input shapes, event payloads, status behavior, and
+  ownership rules through public wrapper types. Unsupported domains stay absent
+  from the safe public API.
 
 ## Architecture
 
 Every binding splits implementation into three layers:
 
-| Layer                  | Responsibility                                                                                      |
-| ---------------------- | --------------------------------------------------------------------------------------------------- |
-| Raw C layer            | Generated or handwritten declarations for the public C headers, raw structs, constants, and calls.  |
-| Internal support layer | Status conversion, diagnostics, handle state, memory guards, callback state, native loading, shims. |
-| Public binding layer   | Handles, descriptors, values, events, callbacks, errors, and render-target APIs for users.          |
+| Layer                  | Responsibility                                                                                       |
+| ---------------------- | ---------------------------------------------------------------------------------------------------- |
+| Raw C layer            | Generated or tool-imported declarations for the public C headers, raw structs, constants, and calls. |
+| Internal support layer | Status conversion, diagnostics, handle state, memory guards, callback state, native loading, shims.  |
+| Public binding layer   | Handles, input types, values, events, callbacks, errors, and render-target APIs for users.           |
 
 Requirements:
 
 - Raw C declarations MUST stay outside the safe public API. If the target
   language cannot hide raw declarations, they MUST live under a generated
   interop namespace and be excluded from the supported safe API surface.
-- Host FFI carrier types such as raw memory segments, arenas, method/function
-  handles, generated layout wrappers, foreign references, unsafe pointers, and
-  raw entrypoints MUST stay outside the safe public API. Public APIs expose
-  backend addresses only through `NativePointer`.
+- Host FFI carrier types and raw entrypoints MUST stay outside the safe public
+  API. Public APIs expose backend addresses only through `NativePointer`.
 - Public examples and tests MUST use the public binding layer, not raw C calls,
   except bindability and layout tests.
-- Generated code MUST be mechanically reproducible from public headers,
+- Raw C declarations MUST be generated or tool-imported from public headers.
+  Generated files MUST be mechanically reproducible from public headers,
   metadata, or generator inputs checked into the repository.
 - Handwritten support code MUST follow repeatable patterns that can be audited
   across domains.
@@ -95,14 +80,16 @@ Requirements:
 
 ---
 
-## Public Surface
-
-### Naming
+## Naming
 
 Bindings follow
 [Binding Conventions](/maplibre-native-ffi/development/bindings/#naming).
 
-Long-lived C-owned opaque handles use the `Handle` suffix:
+This specification uses generic concept names. Bindings apply target-language
+naming and packaging conventions while preserving the concept and ownership
+semantics.
+
+Long-lived C-owned opaque handle concepts include:
 
 - `RuntimeHandle`
 - `MapHandle`
@@ -112,104 +99,65 @@ Long-lived C-owned opaque handles use the `Handle` suffix:
 - `ResourceRequestHandle`
 
 `Handle` means the public value owns or controls an explicitly releasable native
-resource with identity across operations. This includes pointer-backed handles,
-ID-backed handles, registry-backed request tokens, and operation handles.
-
-### Domain coverage
-
-A binding that supports a domain MUST expose the domain through public wrapper
-types, not raw ABI structs.
-
-| Domain             | Required public concepts                                                                                        |
-| ------------------ | --------------------------------------------------------------------------------------------------------------- |
-| Library globals    | C ABI version check, supported render-backend mask, network status, logging.                                    |
-| Diagnostics/errors | Stable status categories, raw unknown status preservation, copied diagnostic message.                           |
-| Runtime            | Runtime options, create/close, `run_once`, event polling, resource transforms, resource providers, offline ops. |
-| Map                | Map options, create/close, style URL/JSON, debug options, render events, camera, projection, query operations.  |
-| Style              | Style sources, layers, images, feature state, source/layer ID lists, style JSON values.                         |
-| Values             | Camera values, geometry, GeoJSON, JSON, screen coordinates, bounds, edge insets, tile IDs, offline values.      |
-| Rendering          | Render sessions, extent, backend descriptors, texture frames, readback, backend support queries.                |
-
-Domain support is explicit. A binding supports a domain only when it documents
-the domain and exposes the domain's public concepts through the binding layer.
-Unsupported domains stay absent from the safe public API.
-
-### One public shape per concept
-
-Each concept uses one public representation:
-
-- one public status/error family;
-- one public JSON value model;
-- one public GeoJSON value model;
-- one public native-pointer value;
-- one public runtime event model;
-- one public render session model;
-- one public descriptor style per concept.
-
-Package re-exports and type aliases name the same underlying public
-representation. They MUST NOT create another ownership, threading, callback,
-allocation, or error contract.
+resource with identity across operations. The representation can vary by
+binding; the ownership contract does not.
 
 ---
 
 ## Handle Lifetime
 
+Public handles are for values that own or control native state across calls,
+such as runtimes, maps, render sessions, offline operations, resource requests,
+and acquired texture frames. Input values, events, diagnostics, query results,
+snapshots, and native-filled structs become copied language values. Native
+snapshot, result, and list handles remain internal implementation details.
+
 ### Owned handles
 
-Every public wrapper for a long-lived C-owned handle or handle-like native token
-MUST store:
+Every public wrapper that owns or controls native state across calls MUST store:
 
 - private native identity;
 - live/releasing/closed state;
 - the native destroy function or bridge release path;
 - parent references or lifetime evidence required for native validity;
 - callback state owned by that handle's native scope;
-- optional leak-reporting context.
+- leak-reporting context when the binding has non-deterministic cleanup hooks.
 
 Native identity MUST NOT be public. The implementation can represent it with a
-native pointer, bridge handle, or registry token, but every public operation
-uses the same ownership rules.
+native pointer, bridge-owned handle, or private table ID, but every public
+operation uses the same ownership rules.
 
-Release requirements:
+Public release follows this operation:
 
-- Public release MUST be deterministic and explicit, with a name that follows
-  the target language's resource-release convention.
-- Release MUST call the matching C destroy function exactly once after a
-  successful native release.
-- Release MUST no-op after a successful release.
-- If native release returns a non-OK status, the wrapper MUST remain live so the
-  caller can retry and inspect diagnostics.
-- If the public release operation consumes or moves the wrapper, a failed native
-  release MUST return the live owner state for retry.
-- Public methods MUST reject use after successful release before crossing into
-  C.
-- Public methods MUST reject use while a release is in progress before crossing
-  into C. Concurrent release attempts MUST synchronize so at most one native
-  release is in progress, successful release wins exactly once, and failed
-  release restores the live state.
-- Parent references, callback state, request registries, and other owner-scoped
-  support state MUST remain live until native owner release succeeds.
-- Non-deterministic cleanup hooks MUST report leaks for thread-affine handles.
-  They MUST NOT destroy runtime, map, projection, or render-session handles from
-  cleanup hooks.
-- Infallible language destructors that attempt best-effort release MUST preserve
-  the explicit release contract and MUST NOT mask native errors from the
-  explicit release path.
+1. If the wrapper is already closed, return success without calling native code.
+2. If another release is in progress, wait for it or return the binding's
+   in-progress error before calling native code.
+3. Mark the wrapper as releasing so public methods fail before calling native
+   code.
+4. Keep owner-scoped support state live, including parent references, callback
+   state, and request registries.
+5. Invoke the matching native release path.
+6. If native release succeeds, mark the wrapper closed and make later release
+   calls no-op.
+7. If native release fails, restore the live state and return the native error
+   with diagnostics. Consuming or move-based release APIs return the live owner
+   state so callers can retry.
+
+Deterministic cleanup hooks follow the same release operation when they can
+report release failure through the target language's normal error path.
+Non-deterministic cleanup hooks report leaks for thread-affine handles. They
+MUST NOT destroy runtime, map, projection, or render-session handles from
+cleanup hooks. Infallible language destructors that attempt best-effort release
+MUST preserve the explicit release contract and MUST NOT mask native errors from
+the explicit release path.
 
 ### Parent validity
 
 Bindings MUST preserve native parent validity while child wrappers are live:
 
-| Child                       | Parent validity requirement                                                                        |
-| --------------------------- | -------------------------------------------------------------------------------------------------- |
-| `MapHandle`                 | Runtime remains live while the map is live.                                                        |
-| `RenderSessionHandle`       | Map remains live while the render session is live.                                                 |
-| Style-scoped callback state | Owning map/style remains live until native callback unregistration and in-flight callbacks finish. |
-| Resource provider request   | Native request remains retained until completion, cancellation handling, or explicit release.      |
-| Session-owned texture frame | Render session remains live and the frame remains acquired until the frame handle releases.        |
-
-Child wrappers MUST retain the parent owner state. Releasing a parent while
-children are live MUST fail without consuming or destroying the parent.
+Child wrappers retain the parent owner state whenever native validity depends on
+the parent. Releasing a parent while children are live MUST fail without
+consuming or destroying the parent.
 
 `MapProjectionHandle` is the exception: after creation it owns a standalone
 projection snapshot. It MUST remain valid after the source map closes and MUST
@@ -222,8 +170,7 @@ owners. Reference-copy languages MUST make all references share one owner state.
 Value-copy languages MUST make owned handles non-copyable or move-only. Public
 code MUST NOT be able to fabricate live handles, ID-backed operation tokens, or
 request tokens from raw integers, raw addresses, public fields, or ordinary
-constructors. Any unsafe constructor for backend interop MUST produce a borrowed
-value, not an owned handle.
+constructors.
 
 ---
 
@@ -232,84 +179,72 @@ value, not an owned handle.
 Every status-returning C call maps to the target language's normal error
 mechanism.
 
-Requirements:
+Status handling follows this operation:
 
-- `MLN_STATUS_INVALID_ARGUMENT`, `MLN_STATUS_INVALID_STATE`,
-  `MLN_STATUS_WRONG_THREAD`, `MLN_STATUS_UNSUPPORTED`, and
-  `MLN_STATUS_NATIVE_ERROR` MUST map to stable public categories.
-- Unknown future status values MUST map to a stable unknown-status category and
-  preserve the raw native value.
-- The binding MUST copy `mln_thread_last_error_message()` immediately after a
-  non-OK status on the same thread, before any other diagnostic-writing C call.
-- Public errors MUST expose the copied diagnostic string when the target
-  language supports payloads.
-- Binding-owned validation failures MUST use the same public error family. They
-  MUST provide a fresh binding diagnostic and MUST NOT read stale native
-  thread-local diagnostics.
-- When public errors cannot carry payloads, the binding MUST expose a
-  deterministic diagnostic store for the failing call and document how child
-  handles inherit that store.
-- If public errors expose raw native status, binding-owned validation failures
-  MUST be distinguishable from native non-OK statuses.
-- Native `MLN_STATUS_WRONG_THREAD` MUST surface as the binding's wrong-thread
-  error. The binding MUST NOT silently dispatch the call to another thread.
+1. Run binding-owned validation before calling C when the binding can detect the
+   failure itself.
+2. Report binding-owned validation through the same public error family as
+   native failures, with a fresh binding diagnostic and no stale thread-local C
+   diagnostic.
+3. When a C call returns non-OK, copy `mln_thread_last_error_message()` on the
+   same thread before any later diagnostic-writing C call.
+4. Convert each known non-OK status to the corresponding documented public error
+   kind. The error kind is stable API and is separate from the diagnostic
+   string.
+5. Convert unknown future status values to the documented unknown-status error
+   kind and carry the raw native value.
+6. Expose the copied diagnostic through the public error. When the target
+   language's error mechanism cannot carry payloads, as with Zig error tags,
+   expose a diagnostic store for the failing call and document how child handles
+   inherit it.
 
-Binding-owned validation covers:
-
-- closed wrappers;
-- active scoped borrows;
-- one-shot resource request completion;
-- invalid language string shape for C inputs;
-- unsupported callback shapes;
-- ABI version mismatch;
-- host-owned buffer size mismatches that the binding can detect before C.
-
-Native validation remains authoritative for MapLibre state, enum domains, native
-handle validity, numeric ranges, and owner-thread identity.
+Bindings validate binding-owned state before calling C. They do not duplicate
+MapLibre or native validation that the C API already performs.
 
 ---
 
 ## Type Mapping
 
-### Descriptors and structs
+Bindings translate C data shapes into public language values without exposing
+ABI bookkeeping.
 
-C option structs become language-owned descriptors.
+### Input Structs and Values
 
-Requirements:
+C option structs map to language-owned public types, such as classes, records,
+or structs.
 
-- Public callers MUST set semantic fields, not ABI `size` fields, masks, or raw
-  nested C storage.
-- Materializers MUST initialize every C struct to the C API defaults before
-  setting public fields. When the C API provides a default constructor,
-  materializers MUST call it.
-- Field-mask descriptors MUST provide explicit present/absent behavior for each
-  optional field.
-- Descriptor storage passed to C MUST live for the complete C borrow window,
-  including recursive descriptor trees and interior pointers.
-- Structs that C fills and returns by value MUST become copied language values.
+Public callers set semantic fields. ABI `size` fields, masks, and raw nested C
+storage stay inside C struct materializers.
+
+C struct materialization follows this operation:
+
+1. Call the C default initializer for each defaultable C struct before setting
+   public fields.
+2. Set semantic fields from the public value.
+3. Encode optional fields with explicit present/absent state so present zero
+   values remain distinguishable from absent values.
+4. Keep native input storage alive for the full C borrow window, including
+   nested input trees and interior pointers.
+
+Structs that C fills and returns by value become copied language values.
 
 ### Enums and masks
 
-Requirements:
+Public enum values convert to C through a complete named-case mapping. Public
+values represent valid C enum inputs.
 
-- Closed C enum domains MUST map through explicit raw conversions.
-- Public code MUST NOT rely on language enum ordinal values matching C ABI
-  values.
-- Future-extensible output domains MUST preserve unknown raw values.
-- Bit masks MUST use an idiomatic set, flags enum, option set, packed wrapper,
-  or purpose-built mask type.
-- C field masks MUST remain internal to descriptor materializers.
+When C returns an enum value that the binding does not know yet, the binding
+preserves the raw value instead of collapsing it to a known case.
+
+Public bit masks use a named public type that supports combining, testing, and
+empty values. C field masks stay internal to C struct materializers.
 
 ### Strings
 
-Requirements:
-
-- Public string inputs use UTF-8 at the C boundary.
-- Null-terminated `const char*` inputs MUST reject embedded `NUL`.
-- Explicit-length `mln_string_view` inputs MUST pass UTF-8 bytes and byte
-  length. They allow embedded `NUL` exactly when the C contract allows it.
-- Borrowed C strings and string views MUST be copied before their native borrow
-  window ends.
+Public string inputs use UTF-8 at the C boundary. Null-terminated `const char*`
+inputs reject embedded `NUL`. `mln_string_view` inputs pass UTF-8 bytes and byte
+length, and allow embedded `NUL` when the C contract allows it. Borrowed C
+strings and string views are copied before their native borrow window ends.
 
 ### JSON and GeoJSON
 
@@ -323,301 +258,311 @@ reformatting unless the public API is explicitly a structured-value API.
 
 `NativePointer` represents a borrowed opaque backend-native address.
 
-Requirements:
+`NativePointer` transfers no ownership and grants no general memory access.
+Public APIs accept it only where the C API accepts host-owned opaque backend
+handles. Conversion from raw addresses or raw pointers is internal or exposed as
+an unsafe or borrowed backend-interop constructor that states the backend
+lifetime and synchronization requirements.
 
-- `NativePointer` MUST transfer no ownership.
-- `NativePointer` MUST grant no general memory access.
-- Public APIs MUST accept `NativePointer` only where the C API accepts
-  host-owned opaque backend handles.
-- Conversion from raw addresses or raw pointers MUST be internal or exposed only
-  as an unsafe or borrowed backend-interop constructor. Public constructors MUST
-  state the backend lifetime and synchronization requirements.
-- Public fields or constructors MUST NOT make a `NativePointer` look like an
-  owned handle or grant safe access to arbitrary memory.
-- Backend pointers returned from acquired texture frames MUST perform
-  active-frame checks before exposing the pointer.
+Backend pointers returned from acquired texture frames perform active-frame
+checks before exposing the pointer.
 
 ---
 
 ## Data Ownership
 
+Bindings keep C borrow windows explicit and expose stable language-owned values.
+
 ### Temporary native storage
 
 Bindings materialize most native input at the call boundary.
 
-Requirements:
+Native input materialization follows this operation:
 
-- Temporary C structs, strings, arrays, out parameters, and recursive pointer
-  graphs MUST live until the C call returns or the full documented native borrow
-  window ends.
-- Temporary pointers MUST NOT be stored in public objects unless the object owns
-  the native storage and releases it deterministically.
-- Materializers MUST release temporary native allocations on every failure path.
-- Out parameters and response structs passed into callbacks MUST be initialized
-  to the C API's neutral value before user code runs.
+1. Allocate or borrow temporary native input storage.
+2. Initialize out parameters and callback response structs to the C API's
+   neutral value before user code runs.
+3. Keep temporary storage alive until the C call returns or the full documented
+   native borrow window ends.
+4. Release temporary native allocations on every failure path.
 
-### Copied output
+Public objects store temporary pointers only when the object owns that native
+storage and releases it deterministically.
+
+### Output values
+
+Bindings expose C outputs as language-owned values unless the result owns or
+controls native state across calls.
 
 Native snapshot, result, and list handles are internal implementation details.
+Plain value outputs with no interior borrowed pointers are copied by value.
 
-Requirements:
+Outputs backed by native storage follow this operation:
 
-- Public snapshot/list/result APIs MUST return copied language-owned data.
-- Internal readers MUST release native snapshot/list/result handles exactly once
-  after copying, including failure paths.
-- Runtime event polling MUST return copied language values independent of the
-  next native poll.
-- Unknown event and payload domains MUST preserve raw values and copied payload
-  bytes when the C API exposes those bytes.
-- Map-originated events MUST identify a live source map when identity can be
-  proven. If lookup misses, they MUST carry no public map handle or only copied
-  source metadata; they MUST NOT expose a dangling borrowed native handle.
+1. Acquire the native snapshot, result, list, or event.
+2. Copy public data into language-owned values before the native borrow window
+   ends.
+3. Preserve unknown event and payload domains as raw values with copied payload
+   bytes when the C API exposes those bytes.
+4. Release native snapshot, result, and list handles exactly once after copying,
+   including failure paths.
+
+Runtime event polling returns values independent of the next native poll.
+Map-originated events identify a live source map when identity can be proven. If
+lookup misses, they carry no public map handle or only copied source metadata.
 
 ## Callbacks And Requests
 
+Callbacks and request handles preserve C lifetimes while protecting
+host-language state.
+
 ### Callback lifetime
 
-Callback state MUST be stored strongly for the native scope that can invoke it:
+Callback state is retained by the native scope that can invoke it and remains
+live until replacement, clearing, owner release, native unregistration, and
+in-flight invocations can no longer reach it.
 
-| Callback kind         | Native scope                                                                                           |
-| --------------------- | ------------------------------------------------------------------------------------------------------ |
-| Logging               | Process-global until replaced or cleared and in-flight invocations finish.                             |
-| Resource transform    | Runtime until replaced, cleared, runtime close makes it unreachable, and in-flight invocations finish. |
-| Resource provider     | Runtime until replaced, cleared, runtime close, and in-flight requests or invocations end.             |
-| Custom geometry/style | Map/style/source scope until native unregistration and in-flight invocations finish.                   |
+Callback invocation follows this operation:
 
-Requirements:
+1. Copy callback arguments into language-owned values before user code receives
+   them. Lexical views are allowed only when the public type prevents retention
+   beyond the invocation.
+2. Catch host exceptions, panics, or errors and convert them to the C callback's
+   documented behavior.
+3. Synchronize callback state that native can invoke concurrently.
+4. Return promptly. Callback code hands owner-thread work back to the owner
+   thread before calling runtime or map APIs.
 
-- Callback adapters MUST pass copied language-owned callback arguments to user
-  code. A lexical view is allowed only when the public type prevents retention
-  beyond the callback invocation.
-- Callback adapters MUST catch host exceptions, panics, or errors and convert
-  them to the C callback's documented behavior.
-- Host failures MUST NOT unwind through native frames.
-- Callback state that can be invoked concurrently MUST use explicit
-  synchronization.
-- Callback code MUST return quickly and hand owner-thread work back to the owner
-  thread before calling runtime or map APIs.
-- Replacing a callback MUST install the new native descriptor before releasing
-  old callback state. If installation fails, the old callback state MUST remain
-  active and the replacement state MUST be released.
-- Unregistering callback state by clearing, replacing, or closing MUST prevent
-  new upcalls, wait for in-flight upcalls, and release callback roots only after
-  native can no longer invoke them.
-- If a leaked native owner can still reach callback user data, non-deterministic
-  cleanup MUST report the leak and keep callback memory reachable from native
-  alive.
-- Style-scoped callback retention and release MUST be driven by current native
-  source ownership, not by stale event timing or source ID reuse alone.
+Callback replacement installs the new native registration before releasing old
+callback state. If installation fails, the old callback remains active and the
+replacement state is released. Clearing, replacing, or closing prevents new
+upcalls, waits for in-flight upcalls, and releases callback roots after native
+can no longer invoke them.
+
+If a leaked native owner can still reach callback user data, non-deterministic
+cleanup reports the leak and keeps callback memory reachable from native alive.
+Style-scoped callback retention follows current native source ownership, not
+stale event timing or source ID reuse alone.
 
 ### Resource transforms
 
 Resource transform callbacks are synchronous.
 
-Requirements:
+Resource transform invocation follows this operation:
 
-- Request URL and metadata exposed to user code MUST be copied language-owned
-  values.
-- Replacement URLs MUST be copied into the native response shape before the
-  callback returns.
-- Returning no rewrite MUST map to the C API's pass-through behavior.
-- Host failure, validation failure, or no rewrite MUST leave the native response
-  shape in the neutral pass-through state.
+1. Copy request URL and metadata into language-owned values before user code
+   receives them.
+2. Initialize the native response shape to pass-through.
+3. If user code returns a replacement URL, copy it into the native response
+   shape before the callback returns.
+4. If user code returns no rewrite or fails validation, keep pass-through
+   behavior.
+5. If user code throws or panics, convert the failure to the C callback's
+   documented behavior.
 
 ### Resource providers
 
 Resource providers decide whether a request passes through to the native
 provider or is handled by the binding.
 
-Requirements:
+Resource provider invocation follows this operation:
 
-- Non-matching requests MUST return pass-through without retaining the native
-  request handle.
-- Matching handled requests MUST copy request fields before user code can retain
-  them.
-- A handled request MUST own the native request reference until completion,
-  cancellation handling, or release.
-- Inline completion during the provider callback finalizes the request as
-  handled ownership, regardless of the callback's later return path.
-- Completion MUST be one-shot.
-- Completion that reaches the C API MUST be terminal, including non-OK native
-  completion results.
-- Release MUST be exactly once.
-- Release MUST wait for in-flight completion or cancellation checks before
-  releasing the native request reference.
-- Late use after release MUST report a binding error before crossing into C.
-- When the C API allows deferred or cross-thread completion, the binding MUST
-  preserve that capability without changing one-shot or release behavior.
-- Cancellation checks MUST preserve the request handle's one-shot and release
-  state.
-- Registry-backed request handles MUST include stale-handle or ABA protection so
-  copied old handles cannot complete, cancel, or release a later request that
-  reused the same slot or integer identity.
+1. For pass-through requests, return pass-through without retaining the native
+   request handle.
+2. For handled requests, copy request fields before user code can retain them.
+3. Retain the native request reference until completion, cancellation handling,
+   or release.
+4. Treat inline completion during the provider callback as handled ownership,
+   even if the callback return path would otherwise pass through.
+5. Allow deferred or cross-thread completion when the C API allows it, without
+   changing one-shot or release behavior.
+
+Handled request completion is terminal. A request can complete once; a
+completion that reaches C consumes the completion path even when native returns
+non-OK. Release runs once, waits for in-flight completion or cancellation
+checks, and makes later completion or cancellation checks fail before crossing
+into C. Stale public request handles cannot affect later native requests.
 
 ---
 
 ## Threading
 
-The C API owner-thread model is visible at the binding layer.
+The C API owner-thread model is visible at the binding layer. Ordinary public
+methods call C synchronously on the calling native thread and surface the C
+owner-thread status when called from the wrong thread.
 
-Requirements:
+### Owner-thread helpers
 
-- Runtime creation records the owner thread; map, projection, and render session
-  operations follow the C API owner-thread rules.
-- Ordinary public methods MUST call C synchronously on the calling native
-  thread.
-- The binding MUST NOT dispatch ordinary calls to another host scheduler,
-  executor, event loop, worker queue, or UI thread.
-- Scheduler or owner-thread execution adapters MUST NOT change ordinary binding
-  call semantics.
-- Runtime event draining MUST happen only when host code calls the binding's
-  event polling/draining API.
-- Signals or language events that mirror runtime events MUST be emitted only
-  while the owner thread is explicitly draining the C runtime event queue.
+Provide an owner-thread execution helper when the host language can move a
+logical task across native threads or cannot otherwise give safe callers a
+stable native owner thread for a runtime/map lifecycle. Bindings with stable
+native caller identity expose ordinary methods and wrong-thread errors without
+this helper.
 
-Languages with static or runtime concurrency markers MUST represent owner-thread
-handles as not freely transferable across threads unless the binding proves a
-stronger invariant. Copied immutable values can be transferable when their
-contents are independent of native owner-thread state. Unchecked or unsafe
+The helper follows this design:
+
+1. It owns or binds one native owner thread before creating thread-affine
+   handles.
+2. It runs submitted operations by calling the ordinary low-level binding
+   methods on that owner thread.
+3. It serializes submitted operations with event polling and close on that owner
+   thread.
+4. It returns the ordinary binding result or error shape, including copied
+   native diagnostics.
+5. Closing rejects new submissions, releases thread-affine handles on the owner
+   thread, and leaves later submissions in the binding's closed-state error
+   shape.
+
+### Event polling
+
+The public event API is explicit: host code pumps native runtime work, then
+polls one queued runtime event. Polling returns one copied event or empty.
+
+Event polling follows this operation:
+
+1. Initialize the native event struct and `has_event` out parameter before
+   calling C.
+2. Call the C poll function on the runtime owner thread.
+3. If no event is available, return the language's empty result.
+4. Copy the event type, source type, status code, message bytes, payload bytes,
+   and typed payload fields before another poll can invalidate native event
+   storage.
+5. Decode known typed payloads only after validating their native size. Preserve
+   unknown event and payload domains with their raw values and copied payload
+   bytes.
+6. Resolve event source identity through binding-owned runtime state. A
+   map-originated event may reference an existing public map wrapper or copied
+   map identity only when the binding can prove that identity. It never creates
+   a public handle from the native source pointer.
+7. Apply binding-owned state updates triggered by the event before returning the
+   copied event.
+
+### Transferability
+
+When the language can declare or enforce cross-thread transferability, ordinary
+owner-thread handles MUST be non-transferable. A transferable owner-thread
+helper handle is allowed only when every operation is submitted back to the
+bound native owner thread. Copied immutable values can be transferable when
+their contents are independent of native owner-thread state. Unchecked or unsafe
 concurrency conformance MUST name the synchronization invariant that makes it
-sound and MUST be covered by binding tests.
+sound.
 
 ---
 
 ## Rendering
 
+Rendering bindings expose render sessions, frame lifetimes, and readback without
+taking ownership of caller-owned backend resources.
+
 ### Render sessions
 
-Requirements:
+Render-session attach APIs cover the C API session families:
 
-- `RenderSessionHandle` MUST be a distinct public handle for one attached render
-  target on one map.
-- Attach APIs MUST return `RenderSessionHandle`.
-- Public render-target descriptors MUST expose backend-native handles as
-  `NativePointer`.
-- Borrowed backend handles MUST remain caller-owned and caller-synchronized.
-  Passing them MUST NOT transfer ownership to the binding.
-- The binding MUST surface `MLN_STATUS_UNSUPPORTED` when a requested native
-  backend or render-target mode is unavailable.
-- The binding MUST expose supported render-backend queries.
+- Surface sessions render and present through a host surface.
+- Session-owned texture sessions render into a texture or image created by the
+  session.
+- Caller-owned texture sessions render into a host-owned texture or image.
+
+Attach follows this operation:
+
+1. Materialize the backend-specific public descriptor into the matching C
+   descriptor.
+2. Pass backend-native host resources as `NativePointer` values.
+3. Call the matching C attach function on the map owner thread.
+4. Return a distinct `RenderSessionHandle` for the map's one live render
+   session.
+5. Surface unsupported backend, unsupported render-target mode,
+   existing-session, wrong-thread, and native errors through the binding's
+   status mapping.
+
+For host-owned backend resources, the binding does not release or synchronize
+those resources. The caller keeps them valid for the C API's documented borrow
+window.
+
+The public handle exposes:
+
+- `resize` for session kinds that support resize;
+- `render_update` for the latest available map render update;
+- `detach`, which keeps the public handle live after backend resources detach;
+- `close` or `destroy`, using the owned-handle release operation.
 
 ### Texture frames
 
 Session-owned texture frames are scoped borrows.
 
-Requirements:
+Frame acquisition follows this operation:
 
-- Acquiring a frame MUST produce an explicit frame handle.
-- Frame metadata exposed publicly MUST be copied from the native frame.
-- Backend handles exposed from the frame MUST be valid only while the frame is
-  active.
-- Access after frame release MUST fail before returning a backend handle.
-- Frame release MUST no-op after successful release.
-- Failed native frame release MUST leave the frame live for retry.
-- The binding MUST reject nested frame acquisition and every exposed session
-  operation whose C contract forbids execution while a frame is active,
-  including render update, resize, readback, query, detach, release, or session
-  destruction.
-- If wrapper construction fails after native frame acquisition, the binding MUST
-  release the acquired native frame.
-- Copyable or registry-backed frame handles MUST include stale-handle protection
-  so old frame copies cannot expose backend handles after release or after a
-  later frame reuses the same storage.
+1. Acquire the native frame and create an explicit frame handle.
+2. Copy public metadata from the native frame.
+3. Expose backend handles only through active-frame checked accessors.
+4. While the frame is active, reject nested frame acquisition and every exposed
+   session operation whose C contract forbids execution during an active frame.
+5. Release follows the owned-handle release operation. Failed native frame
+   release leaves the frame live for retry.
+6. If wrapper construction fails after native frame acquisition, release the
+   acquired native frame.
+
+Copyable frame handles include stale-handle protection so old frame copies
+cannot expose backend handles after release or after a later frame reuses the
+same storage.
 
 ### Readback
 
-Requirements:
+CPU texture readback accepts caller-owned mutable storage.
 
-- CPU texture readback MUST use caller-owned reusable storage when the target
-  language can express mutable external storage safely. Languages without a safe
-  caller-owned buffer shape return an explicitly allocated language-owned buffer
-  and document the allocation path.
-- Readback MUST return copied `TextureImageInfo` metadata.
-- Buffer-capacity failures MUST preserve the caller's buffer ownership and map
-  to the binding's error mechanism.
-- Public buffer reads MUST return copied or read-only views unless the binding
-  proves exclusive mutable access. Reusable native buffers MUST reject use after
-  release before crossing into C.
-
----
-
-## Host Constraints
-
-Host-language constraints refine the common contract; they do not create
-alternate binding designs.
-
-| Constraint                         | Binding requirement                                                                                                 |
-| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| Package calls C headers directly   | Raw declarations stay below the safe public API; public wrappers own safety policy.                                 |
-| Package uses a native bridge       | The bridge exposes the same low-level binding contract and keeps raw C details internal to the bridge.              |
-| Cleanup can run arbitrarily        | Cleanup hooks report leaks for thread-affine handles; explicit release performs native destruction.                 |
-| Scope cleanup or destructors exist | Explicit release remains observable for fallible native release; scope-bound cleanup does not hide fallible errors. |
-| Public references are copyable     | Copied references share one owner state.                                                                            |
-| Public values are copyable         | Owned handles are non-copyable or move-only.                                                                        |
-| Logical execution moves threads    | Ordinary calls run on the current native thread; scheduler confinement belongs outside the core binding.            |
-| Introspection metadata is public   | Metadata accurately records transfer, nullability, closure, array length, and errors.                               |
-
-Owner-thread execution helpers belong above the core binding. If a binding
-subproject ships one, it is documented as an adapter API and keeps the core
-binding's owner-thread model visible.
-
----
-
-## Documentation
-
-Each binding subproject MUST document:
-
-- supported platforms and native render backends;
-- how the native library is found or linked;
-- how to run that binding's tests;
-- which C API domains are implemented;
-- any owner-thread execution adapter shipped in the binding subproject;
-- unsafe APIs and caller obligations;
-- non-deterministic cleanup or leak-reporting behavior;
-- callback threading behavior.
-
-Language-specific convention docs remain the place for implementation details
-such as generator tools, package manager choices, module names, and idiomatic
-spelling.
+Readback returns copied `TextureImageInfo` metadata. Buffer-capacity failures
+preserve the caller's buffer ownership and map to the binding's error mechanism.
+Public buffer reads return copied or read-only views unless the binding proves
+exclusive mutable access.
 
 ---
 
 ## Test Cases
 
-Binding tests prove both the language adaptation layer and the native behavior
-that users reach through that binding. This matters on targets where the Zig
-test suite does not run. Tests use the public binding API to cover high-value
-native workflows plus every binding-owned ownership, copying, callback,
-threading, and error-mapping invariant.
+Each binding test suite includes the tests below. Conditional tests become
+required when the binding has the named host-language mechanic, configured
+render backend, or C API platform support.
 
-The matrix below is comprehensive for a binding's supported domains. Tests
-marked "Applies when" are required when the binding exposes that capability or
-matches that host constraint.
+Public behavior tests use public binding APIs and real C calls when behavior
+crosses the binding/C boundary. Tests focus on high-value native workflows and
+binding-owned safety invariants, not trivial constant assertions or exhaustive
+invalid-input matrices for validation owned by C.
 
 ### Test execution strictness
 
-Missing native libraries, native dependencies, configured render backends,
-platform setup, or CI capabilities are test failures, not skips. Skips are
-limited to tests that are inapplicable because the binding does not expose the
-domain, the C API does not support the capability on the target, an "Applies
-when" host constraint is absent, or the target is outside the binding's
-documented supported platforms.
+Missing dependencies, configured render backends, platform setup, or CI
+capabilities are test failures, not skips. Skips are limited to tests that are
+inapplicable because the configured backend or platform support is absent, or
+the target is outside the binding's documented supported platforms.
 
 Skips MUST be declared explicitly in the test file or through a shared
-capability check. Individual tests MUST NOT convert setup, loading, rendering,
-or native-call failures to skips.
+capability check. Each skip states the inapplicable backend, platform, or
+host-language condition. Individual tests MUST NOT convert setup, loading,
+rendering, or native-call failures to skips.
 
-### Build and bindability
+### Test seams
 
-| ID      | Test                                                                                                                                                                                                         |
-| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| BND-001 | The raw C layer compiles or generates from `maplibre_native_c.h` without public API edits.                                                                                                                   |
-| BND-002 | Public binding tests load or link the real native library used by the subproject.                                                                                                                            |
-| BND-003 | ABI-version mismatch returns the binding's ABI-version error before storing a public native handle.                                                                                                          |
-| BND-004 | Public API surface tests prevent raw C structs, raw C handles, raw FFI carrier types, and generated declarations leaking through public types, methods, fields, properties, delegates, or generic arguments. |
-| BND-005 | Applies when generated layouts exist: representative generated struct layouts match the C ABI.                                                                                                               |
-| BND-006 | Applies when introspection metadata exists: metadata generation and a small consumer compile test pass.                                                                                                      |
-| BND-007 | Missing native libraries, missing native dependencies, load failures, ABI mismatch, and unavailable configured render backends fail the test run rather than skip tests.                                     |
+Tests SHOULD use public binding APIs for public behavior. Internal test seams
+are allowed for behavior that cannot be produced reliably through the public
+native library:
+
+- ABI mismatch before public handle creation;
+- unknown future status, enum, event, or payload values;
+- native destroy, request release, frame release, and callback-install failure;
+- allocation or copy failure after a native snapshot/list/result handle is
+  acquired;
+- in-flight or concurrent callback and release races that require deterministic
+  scheduling.
+
+Internal seams MUST assert the same public error, lifetime, and cleanup behavior
+that a real native failure would expose.
+
+### Binding surface and loading
+
+| ID      | Test                                                                                                                                                                      |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| BND-001 | ABI-version mismatch returns the binding's ABI-version error before storing a public native handle, using an internal loader or version seam.                             |
+| BND-002 | Public API surface tests prevent raw C structs, raw C handles, raw FFI carrier types, and generated declarations leaking through the language's supported public surface. |
 
 ### Status and diagnostics
 
@@ -633,55 +578,50 @@ or native-call failures to skips.
 
 ### Handle lifetime
 
-| ID      | Test                                                                                                                                                                                        |
-| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| BND-040 | Runtime creation followed by explicit release destroys the native handle exactly once; a second release no-ops.                                                                             |
-| BND-041 | A failed native destroy leaves the handle live; a later successful release destroys the native handle.                                                                                      |
-| BND-042 | A child handle retains parent owner state, and parent release fails while child handles are live.                                                                                           |
-| BND-043 | Runtime release fails while maps are live; after maps release, runtime release succeeds.                                                                                                    |
-| BND-044 | `MapProjectionHandle` remains usable after the source map closes and then releases successfully.                                                                                            |
-| BND-045 | Applies when non-deterministic cleanup hooks exist: leaked thread-affine handles report leaks rather than destroy.                                                                          |
-| BND-046 | Applies when handles can be copied by the host language: copied references share owner state, and owned value handles are non-copyable or move-only.                                        |
-| BND-047 | Applies when release can run concurrently: concurrent releases call native release at most once and public calls fail while release is in progress.                                         |
-| BND-048 | Public APIs cannot fabricate live owned handles, ID-backed operation handles, or request tokens from raw integers, raw addresses, public fields, or ordinary constructors.                  |
-| BND-049 | Applies when infallible cleanup calls best-effort release: best-effort failure is reported through the binding's documented leak or failure channel and explicit release remains retryable. |
+| ID      | Test                                                                                                                                                           |
+| ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| BND-040 | Runtime creation followed by explicit release destroys the native handle exactly once; every public alias observes release state, and a second release no-ops. |
+| BND-041 | A failed native destroy leaves the handle live; a later successful release destroys the native handle.                                                         |
+| BND-042 | A child handle retains parent owner state, and parent release fails while child handles are live.                                                              |
+| BND-043 | `MapProjectionHandle` remains usable after the source map closes and then releases successfully.                                                               |
+| BND-047 | Public API surface tests reject construction of live owned handles or operation tokens from user-supplied native identity.                                     |
 
-### Descriptors, values, and copied data
+### Input Structs, Values, and Copied Data
 
 | ID      | Test                                                                                                                             |
 | ------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| BND-060 | Descriptor materialization initializes C defaults, `size` fields, field masks, and nested descriptors.                           |
-| BND-061 | Optional field-mask descriptors distinguish absent values from present zero values.                                              |
-| BND-062 | Closed enum inputs convert through explicit raw mapping.                                                                         |
-| BND-063 | Unknown output enum values preserve the raw native value, using an internal conversion hook when no real C call can produce one. |
-| BND-064 | Borrowed native strings and string views are copied before their native borrow window ends.                                      |
-| BND-065 | JSON values round-trip supported scalar, array, object, null, integer, floating, boolean, and string data.                       |
-| BND-066 | GeoJSON values copy nested geometry, feature, feature collection, properties, and identifiers.                                   |
-| BND-067 | Native snapshot/list/result handles are released on success and on copy failure.                                                 |
-| BND-068 | Structured JSON preserves object member order, repeated member names, and signed or unsigned integer width.                      |
+| BND-060 | Representative input-struct tests per family initialize C defaults, `size` fields, field masks, and nested inputs.               |
+| BND-061 | Optional field-mask inputs distinguish absent values from present zero values.                                                   |
+| BND-062 | Unknown output enum values preserve the raw native value, using an internal conversion hook when no real C call can produce one. |
+| BND-063 | Borrowed native strings and string views are copied before their native borrow window ends.                                      |
+| BND-064 | JSON values round-trip scalar and nested container values without type loss.                                                     |
+| BND-065 | GeoJSON values copy nested geometries, features, properties, and identifiers.                                                    |
+| BND-066 | Native snapshot/list/result handles are released on success and on copy failure, using fault injection for copy failure.         |
+| BND-067 | Structured JSON preserves object member order, repeated member names, and signed or unsigned integer width.                      |
 
 ### Runtime and events
 
-| ID      | Test                                                                                                                                                        |
-| ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| BND-080 | `run_once` drives native event processing through the public runtime API and event polling reports an empty queue after events drain.                       |
-| BND-081 | Map style loading emits the expected copied map event and identifies the correct public map identity.                                                       |
-| BND-082 | Event message and payload data remain valid after the next event poll.                                                                                      |
-| BND-083 | Unknown event or payload domains preserve raw values and copied bytes when the C API exposes those bytes.                                                   |
-| BND-084 | Offline operation completion returns copied result data and leaves failed take-result handles retryable.                                                    |
-| BND-085 | Offline region observation emits copied status/error events through the public runtime event model.                                                         |
-| BND-086 | Applies when event source identity uses a registry: a map-originated event with no live public map exposes no public map handle or borrowed native pointer. |
+| ID      | Test                                                                                                                         |
+| ------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| BND-080 | `run_once` drives native event processing through the public runtime API, and repeated event polling reaches an empty queue. |
+| BND-081 | Map style loading returns the expected copied map event through polling and identifies the correct public map identity.      |
+| BND-082 | Event message and payload data remain valid after the next event poll.                                                       |
+| BND-083 | Unknown event or payload domains preserve raw values and copied bytes when the C API exposes those bytes.                    |
+| BND-084 | Offline operation completion returns copied result data and leaves failed take-result handles retryable.                     |
+| BND-085 | Offline region observation returns copied status/error events through the public runtime event model.                        |
+| BND-086 | A map-originated event with no provable live public map exposes no public map handle or borrowed native pointer.             |
+| BND-087 | Known typed event payloads validate native payload size before reading payload fields.                                       |
 
 ### Map, camera, projection, style, and query
 
 | ID      | Test                                                                                                                                |
 | ------- | ----------------------------------------------------------------------------------------------------------------------------------- |
 | BND-100 | Map creation applies public map options, extent, and mode, then releases through the runtime parent relationship.                   |
-| BND-101 | Style URL and style JSON loading succeed through public map APIs and emit copied style-loaded events.                               |
+| BND-101 | Style URL and style JSON loading succeed through public map APIs and return copied style-loaded events through polling.             |
 | BND-102 | Camera set/get, animated camera commands, and transition cancellation produce the expected native camera state and statuses.        |
 | BND-103 | Projection helpers round-trip screen, lat/lng, and projected-meter values through copied public values within documented tolerance. |
 | BND-104 | Representative invalid map and projection inputs propagate native invalid-argument diagnostics through the public error shape.      |
-| BND-105 | Style source, layer, image, and feature-state workflows add, update, query/list, and remove public descriptors and copied IDs.      |
+| BND-105 | Style source, layer, image, and feature-state workflows add, update, query/list, and remove public input values and copied IDs.     |
 | BND-106 | Query workflows return copied feature geometry, properties, feature state, source/layer identifiers, and unknown IDs.               |
 
 ### Logging and callbacks
@@ -689,78 +629,78 @@ or native-call failures to skips.
 | ID      | Test                                                                                                                                                        |
 | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | BND-120 | Log callback install invokes the registered callback, clear prevents later invocation, and replacement invokes only the replacement callback.               |
-| BND-121 | Callback exceptions, panics, or thrown errors are caught and converted to documented C behavior.                                                            |
+| BND-121 | Callback host failures are caught and converted to documented C behavior.                                                                                   |
 | BND-122 | Each exposed callback family preserves the previous callback and releases replacement state when replacement fails.                                         |
-| BND-123 | Applies when callbacks can arrive concurrently: callback state remains synchronized under concurrency.                                                      |
-| BND-124 | Applies when callbacks use bridge roots, global references, or delegates: clear, replacement, and owner release release the root and prevent later upcalls. |
-| BND-125 | Custom geometry or style-scoped callback teardown handles style reload, source removal, source ID reuse, map close, and in-flight upcalls without late use. |
+| BND-123 | Callback state remains synchronized for callback families whose C contract allows concurrent invocation.                                                    |
+| BND-124 | Custom geometry or style-scoped callback teardown handles style reload, source removal, source ID reuse, map close, and in-flight upcalls without late use. |
 
 ### Resources
 
-| ID      | Test                                                                                                                                                     |
-| ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| BND-140 | Resource transform can rewrite a URL and can be cleared after registration.                                                                              |
-| BND-141 | Resource transform request data is copied into language-owned values before user code receives it.                                                       |
-| BND-142 | Resource provider pass-through delegates to native loading without retaining a request handle.                                                           |
-| BND-143 | Resource provider handled request can complete inline and load a style.                                                                                  |
-| BND-144 | Resource provider handled request can complete later and load a style.                                                                                   |
-| BND-145 | Applies when the C API allows it: handled request can complete from another thread.                                                                      |
-| BND-146 | Completing a handled request twice reports the binding's already-completed error before crossing into C.                                                 |
-| BND-147 | Releasing a handled request makes later completion and cancellation checks fail as closed.                                                               |
-| BND-148 | Request cancellation is observable before a late completion, and late completion maps native status.                                                     |
-| BND-149 | Resource error responses become copied runtime loading-failure or offline-error events.                                                                  |
-| BND-150 | Inline completion during the provider callback finalizes handled ownership even when the callback's later return path would otherwise pass through.      |
-| BND-151 | Applies when request handles use registries or integer identities: stale copied handles cannot complete, cancel, or release a later reused request slot. |
-| BND-152 | Completion that reaches C is terminal even when native completion returns a non-OK status.                                                               |
-| BND-153 | Releasing a request waits for in-flight completion or cancellation checks before native release.                                                         |
+| ID      | Test                                                                                                                                                |
+| ------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| BND-140 | Resource transform can rewrite a URL and can be cleared after registration.                                                                         |
+| BND-141 | Resource transform request data is copied into language-owned values before user code receives it.                                                  |
+| BND-142 | Resource provider pass-through delegates to native loading without retaining a request handle.                                                      |
+| BND-143 | Resource provider handled request can complete inline and load a style.                                                                             |
+| BND-144 | Resource provider handled request can complete later and load a style.                                                                              |
+| BND-145 | Handled request can complete from another thread.                                                                                                   |
+| BND-146 | Completing a handled request twice reports the binding's already-completed error before crossing into C.                                            |
+| BND-147 | Releasing a handled request makes later completion and cancellation checks fail as closed.                                                          |
+| BND-148 | Request cancellation is observable before a late completion, and late completion maps native status.                                                |
+| BND-149 | Resource error responses become copied runtime loading-failure or offline-error events.                                                             |
+| BND-150 | Inline completion during the provider callback finalizes handled ownership even when the callback's later return path would otherwise pass through. |
+| BND-151 | Stale request handles cannot complete, cancel, or release later native requests.                                                                    |
+| BND-152 | Completion that reaches C is terminal even when native completion returns a non-OK status.                                                          |
+| BND-153 | Releasing a request waits for in-flight completion or cancellation checks before native release.                                                    |
 
 ### Rendering
 
-| ID      | Test                                                                                                                                                         |
-| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| BND-160 | Supported render-backend queries agree with the loaded native library and gate unsupported render workflows.                                                 |
-| BND-161 | Render-target descriptors materialize extents and `NativePointer` backend handles without taking ownership.                                                  |
-| BND-162 | Attaching a render target returns one `RenderSessionHandle` and keeps the map parent valid.                                                                  |
-| BND-163 | Attaching a second render session to the same map reports invalid state.                                                                                     |
-| BND-164 | Unsupported backend or render-target mode reports unsupported status with diagnostics.                                                                       |
-| BND-165 | `render_update` maps invalid state without closing the session.                                                                                              |
-| BND-166 | Resize updates extent through the public render session API.                                                                                                 |
-| BND-167 | CPU readback copies metadata; undersized buffers fail without losing ownership, and sufficiently sized reusable buffers receive image bytes.                 |
-| BND-168 | Owned texture frame acquire returns an explicit frame handle with copied metadata and active-checked backend handles.                                        |
-| BND-169 | Owned texture frame access after release fails before exposing backend handles.                                                                              |
-| BND-170 | Failed frame release leaves the frame live and a later successful release closes it.                                                                         |
-| BND-171 | Nested frame acquisition and every exposed session operation forbidden during an active frame fail while a frame is active.                                  |
-| BND-172 | Borrowed texture descriptors do not release or mutate caller-owned backend handles during session close.                                                     |
-| BND-173 | Wrapper construction failure after native frame acquisition releases the native frame.                                                                       |
-| BND-174 | Applies when frame handles are copyable or registry-backed: stale frame copies cannot expose backend handles after release or reuse.                         |
-| BND-175 | Applies when reusable native buffers are exposed: reads are copied or read-only, exclusive mutable access is enforced, and use after release fails before C. |
+| ID      | Test                                                                                                                                                      |
+| ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| BND-160 | Supported render-backend queries gate configured workflows and unsupported backend/mode errors.                                                           |
+| BND-161 | Render-target descriptors materialize extents and `NativePointer` backend handles without taking ownership.                                               |
+| BND-162 | Surface, session-owned texture, and caller-owned texture attach paths call the matching C session family and report the same public session handle shape. |
+| BND-163 | Attaching a second render session to the same map reports invalid state.                                                                                  |
+| BND-164 | `render_update` maps invalid state without closing the session.                                                                                           |
+| BND-165 | Resize updates extent through the public render session API.                                                                                              |
+| BND-166 | CPU readback copies metadata; undersized buffers fail without losing ownership, and sufficiently sized reusable buffers receive image bytes.              |
+| BND-167 | Owned texture frame acquire returns an explicit frame handle with copied metadata and active-checked backend handles.                                     |
+| BND-168 | Owned texture frame access after release fails before exposing backend handles.                                                                           |
+| BND-169 | Failed frame release leaves the frame live and a later successful release closes it.                                                                      |
+| BND-170 | Nested frame acquisition and every exposed session operation forbidden during an active frame fail while a frame is active.                               |
+| BND-171 | Caller-owned texture descriptors do not release or mutate caller-owned backend handles during session close.                                              |
+| BND-172 | Wrapper construction failure after native frame acquisition releases the native frame.                                                                    |
+| BND-173 | Stale frame handles cannot expose backend handles after release or reuse.                                                                                 |
 
-### Threading
+### Conditional tests
 
-| ID      | Test                                                                                                                                         |
-| ------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| BND-190 | Owner-thread-affine call from a different native thread reports the binding's wrong-thread error.                                            |
-| BND-191 | The wrong-thread error includes the copied native diagnostic.                                                                                |
-| BND-192 | Ordinary public calls do not internally dispatch to another thread or scheduler.                                                             |
-| BND-193 | Applies when an owner-thread execution adapter ships in the subproject: adapter confines create, pump, event drain, and close to one thread. |
-| BND-194 | Applies when concurrency markers exist: owner-thread handles are not freely transferable across threads.                                     |
-| BND-195 | Applies when unchecked or unsafe concurrency conformance exists: tests cover the documented synchronization invariant.                       |
+The following tests apply only when a binding has the named host-language
+mechanic or helper.
 
-### Test quality
+#### Host cleanup hooks
 
-Requirements:
+When the host language can run cleanup outside explicit release, include:
 
-- Tests MUST exercise public binding APIs except raw-layer bindability,
-  generated-layout, capability-gate, and internal lifetime-guard tests.
-- Tests MUST use real C calls for public behavior that crosses the binding/C
-  boundary.
-- Tests use internal fake destroy callbacks only for failure paths that are hard
-  to force through the public native library, such as destroy retry.
-- Tests MUST cover every supported public domain with high-value native
-  workflows and every binding-owned safety invariant. They MUST avoid trivial
-  constant assertions and mechanically exhaustive invalid-input matrices unless
-  the binding owns conversion, validation, lifetime, or error behavior for that
-  case.
-- Test skips MUST state the inapplicable domain, C API capability, host-language
-  constraint, or unsupported target platform and link to the tracking issue or
-  task when the inapplicability is temporary.
+| ID      | Test                                                                                                                             |
+| ------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| BND-044 | Non-deterministic cleanup hooks report leaked thread-affine handles rather than destroying them.                                 |
+| BND-048 | Best-effort cleanup failure is reported through the binding's documented leak or failure channel and explicit release can retry. |
+
+#### Cross-thread public handle use
+
+When safe public code can call owner-thread-affine APIs from the wrong native
+thread or race release on the same owner-thread handle, include:
+
+| ID      | Test                                                                                                     |
+| ------- | -------------------------------------------------------------------------------------------------------- |
+| BND-046 | Concurrent releases call native release at most once and public calls fail while release is in progress. |
+| BND-190 | Owner-thread-affine calls from a different native thread report the binding's wrong-thread error.        |
+| BND-191 | Runtime wrong-thread errors include the copied native diagnostic.                                        |
+
+#### Owner-thread execution adapters
+
+When the subproject ships an owner-thread execution adapter, include:
+
+| ID      | Test                                                                       |
+| ------- | -------------------------------------------------------------------------- |
+| BND-192 | The adapter confines create, pump, event polling, and close to one thread. |
