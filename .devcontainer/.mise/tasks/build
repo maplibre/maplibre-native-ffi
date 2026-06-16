@@ -19,6 +19,13 @@ esac
 
 rm -rf mise-oci
 
+github_env_args=()
+for github_env_var in GITHUB_TOKEN GH_TOKEN; do
+  if [[ -n "${!github_env_var:-}" ]]; then
+    github_env_args+=(--env "$github_env_var")
+  fi
+done
+
 if [[ "$(uname -s)" == "Linux" ]]; then
   MISE_JOBS=1 MISE_ENV="$mise_env" mise --no-hooks install --quiet
   MISE_JOBS=1 MISE_ENV="$mise_env" mise --no-hooks oci build --output mise-oci
@@ -30,13 +37,16 @@ else
     --env MISE_EXPERIMENTAL=1 \
     --env MISE_JOBS=1 \
     --env MISE_ENV="$mise_env" \
+    "${github_env_args[@]}" \
     debian:bookworm-slim \
     bash -euo pipefail -c '
       apt-get update
-      apt-get install --no-install-recommends --yes ca-certificates curl git libicu72
+      apt-get install --no-install-recommends --yes build-essential ca-certificates curl git libicu72
       curl https://mise.run | sh
       /root/.local/bin/mise trust -y
       cd .devcontainer
+      /root/.local/bin/mise --no-hooks install python node --quiet
+      eval "$(/root/.local/bin/mise activate bash)"
       /root/.local/bin/mise --no-hooks install --quiet
       /root/.local/bin/mise --no-hooks oci build --output mise-oci
     '
