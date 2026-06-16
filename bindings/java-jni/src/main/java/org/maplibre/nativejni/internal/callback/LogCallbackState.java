@@ -15,46 +15,61 @@ import org.maplibre.nativejni.log.LogSeverity;
 
 /** Owns process-global logging callback state. */
 public final class LogCallbackState {
+  private static final Object LOCK = new Object();
   private static CallbackRegistration currentCallback;
-  private static CallbackRegistration failedInstallForTesting;
+  private static CallbackRegistration failedInstallRegistration;
   private static final AtomicReference<RuntimeException> INSTALL_FAILURE = new AtomicReference<>();
 
   private LogCallbackState() {}
 
-  public static synchronized void set(LogCallback callback) {
+  public static void set(LogCallback callback) {
     NativeLibrary.ensureLoaded();
-    if (currentCallback != null && currentCallback.isCurrentThreadInCallback()) {
-      throw Status.callbackReentry("Log callback");
-    }
     var nativeCallback = new CallbackRegistration(callback);
+    CallbackRegistration previousCallback;
     try {
-      throwInstallFailureForTesting();
-      Status.check(MaplibreNativeC.mln_log_set_callback(nativeCallback.nativeCallback(), null));
+      synchronized (LOCK) {
+        if (currentCallback != null && currentCallback.isCurrentThreadInCallback()) {
+          throw Status.callbackReentry("Log callback");
+        }
+        throwInstallFailureForTesting();
+        Status.check(MaplibreNativeC.mln_log_set_callback(nativeCallback.nativeCallback(), null));
+        previousCallback = currentCallback;
+        currentCallback = nativeCallback;
+      }
     } catch (RuntimeException | Error error) {
       closeQuietly(nativeCallback);
-      failedInstallForTesting = nativeCallback;
+      synchronized (LOCK) {
+        failedInstallRegistration = nativeCallback;
+      }
       throw error;
     }
-    closeQuietly(currentCallback);
-    currentCallback = nativeCallback;
+    closeQuietly(previousCallback);
   }
 
-  public static synchronized void clear() {
+  public static void clear() {
     NativeLibrary.ensureLoaded();
-    if (currentCallback != null && currentCallback.isCurrentThreadInCallback()) {
-      throw Status.callbackReentry("Log callback");
+    CallbackRegistration previousCallback;
+    synchronized (LOCK) {
+      if (currentCallback != null && currentCallback.isCurrentThreadInCallback()) {
+        throw Status.callbackReentry("Log callback");
+      }
+      Status.check(MaplibreNativeC.mln_log_clear_callback());
+      previousCallback = currentCallback;
+      currentCallback = null;
     }
-    Status.check(MaplibreNativeC.mln_log_clear_callback());
-    closeQuietly(currentCallback);
-    currentCallback = null;
+    closeQuietly(previousCallback);
   }
 
-  static synchronized CallbackRegistration currentCallbackForTesting() {
-    return currentCallback;
+  static CallbackRegistration currentCallbackForTesting() {
+    synchronized (LOCK) {
+      return currentCallback;
+    }
   }
 
-  static synchronized CallbackRegistration failedInstallForTesting() {
-    return failedInstallForTesting;
+  static CallbackRegistration failedInstallForTesting() {
+    synchronized (LOCK) {
+      return failedInstallRegistration;
+    }
   }
 
   static void failNextInstallForTesting(RuntimeException failure) {

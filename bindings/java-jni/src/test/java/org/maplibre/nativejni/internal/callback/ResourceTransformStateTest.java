@@ -64,6 +64,38 @@ class ResourceTransformStateTest {
   }
 
   @Test
+  void bnd123CloseFromCurrentCallbackFailsWithoutDeadlock() {
+    var attempted = new AtomicBoolean();
+    var state = new AtomicReference<ResourceTransformState>();
+    state.set(
+        new ResourceTransformState(
+            request -> {
+              attempted.set(true);
+              state.get().close();
+              return java.util.Optional.empty();
+            }));
+
+    try (var url = new BytePointer("https://example.com/style.json");
+        var response = new MaplibreNativeC.mln_resource_transform_response()) {
+      response.size(response.sizeof());
+      response.url(null);
+
+      var status =
+          state
+              .get()
+              .transform()
+              .callback()
+              .call(null, ResourceKind.STYLE.nativeValue(), url, response);
+
+      assertEquals(MaplibreNativeC.MLN_STATUS_NATIVE_ERROR, status);
+      assertTrue(attempted.get());
+      assertFalse(state.get().isClosed());
+    } finally {
+      state.get().close();
+    }
+  }
+
+  @Test
   void bnd121InvalidRewriteUrlFallsBackToPassThrough() {
     try (var state = new ResourceTransformState(request -> java.util.Optional.of("bad\0url"));
         var url = new BytePointer("https://example.com/style.json");

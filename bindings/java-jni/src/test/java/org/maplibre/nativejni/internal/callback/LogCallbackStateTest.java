@@ -140,6 +140,66 @@ class LogCallbackStateTest {
   }
 
   @Test
+  void bnd123ReplacementAllowsInflightCallbackToInstallReplacement() throws Exception {
+    var entered = new CountDownLatch(1);
+    var replacementStarted = new CountDownLatch(1);
+    var callbackInstalledReplacement = new AtomicBoolean();
+    var replacementInstalled = new AtomicBoolean();
+    var callbackFailure = new AtomicReference<Throwable>();
+    var originalReference = new AtomicReference<LogCallbackState.CallbackRegistration>();
+
+    Maplibre.setLogCallback(
+        record -> {
+          entered.countDown();
+          try {
+            assertTrue(await(replacementStarted));
+            assertTrue(awaitReplacement(originalReference.get()));
+            Maplibre.setLogCallback(next -> false);
+            callbackInstalledReplacement.set(true);
+          } catch (Throwable failure) {
+            callbackFailure.set(failure);
+          }
+          return true;
+        });
+    var original = LogCallbackState.currentCallbackForTesting();
+    originalReference.set(original);
+
+    try (var message = new BytePointer("hello")) {
+      var callbackThread =
+          new Thread(
+              () ->
+                  original
+                      .nativeCallback()
+                      .call(
+                          null,
+                          MaplibreNativeC.MLN_LOG_SEVERITY_INFO,
+                          MaplibreNativeC.MLN_LOG_EVENT_GENERAL,
+                          7,
+                          message));
+      callbackThread.start();
+      assertTrue(await(entered));
+
+      var replacementThread =
+          new Thread(
+              () -> {
+                replacementStarted.countDown();
+                Maplibre.setLogCallback(record -> true);
+                replacementInstalled.set(true);
+              });
+      replacementThread.start();
+
+      callbackThread.join(5000);
+      replacementThread.join(5000);
+
+      assertFalse(callbackThread.isAlive());
+      assertFalse(replacementThread.isAlive());
+      assertNull(callbackFailure.get());
+      assertTrue(callbackInstalledReplacement.get());
+      assertTrue(replacementInstalled.get());
+    }
+  }
+
+  @Test
   void bnd123CloseFromCurrentCallbackFailsWithoutDeadlock() {
     var attempted = new AtomicBoolean();
     var registration = new AtomicReference<LogCallbackState.CallbackRegistration>();
@@ -201,5 +261,21 @@ class LogCallbackStateTest {
       Thread.currentThread().interrupt();
       return false;
     }
+  }
+
+  private static boolean awaitReplacement(LogCallbackState.CallbackRegistration original) {
+    var deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+    while (System.nanoTime() < deadline) {
+      if (LogCallbackState.currentCallbackForTesting() != original) {
+        return true;
+      }
+      try {
+        Thread.sleep(10);
+      } catch (InterruptedException exception) {
+        Thread.currentThread().interrupt();
+        return false;
+      }
+    }
+    return false;
   }
 }
