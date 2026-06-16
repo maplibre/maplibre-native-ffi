@@ -4,8 +4,6 @@ LABEL org.opencontainers.image.source="https://github.com/maplibre/maplibre-nati
 
 SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
 
-USER root
-
 RUN apt-get update \
   && apt-get install --no-install-recommends --yes \
     bash \
