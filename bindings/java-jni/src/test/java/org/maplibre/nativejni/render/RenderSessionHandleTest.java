@@ -44,6 +44,8 @@ import org.maplibre.nativejni.runtime.RuntimeHandle;
 import org.maplibre.nativejni.test.RenderTargetTestSupport;
 
 class RenderSessionHandleTest {
+  private static final double RENDERED_QUERY_COORDINATE_TOLERANCE = 1.0e-6;
+
   private static final String STYLE_JSON =
       """
       {
@@ -490,8 +492,10 @@ class RenderSessionHandleTest {
       assertTrue(rendered.sourceLayerId().isEmpty());
       assertEquals(FeatureIdentifier.of("feature-1"), rendered.feature().identifier());
       var renderedPoint = assertInstanceOf(Geometry.Point.class, rendered.feature().geometry());
-      assertEquals(37.7749, renderedPoint.coordinate().latitude(), 1.0e-9);
-      assertEquals(-122.4194, renderedPoint.coordinate().longitude(), 1.0e-9);
+      assertEquals(
+          37.7749, renderedPoint.coordinate().latitude(), RENDERED_QUERY_COORDINATE_TOLERANCE);
+      assertEquals(
+          -122.4194, renderedPoint.coordinate().longitude(), RENDERED_QUERY_COORDINATE_TOLERANCE);
       assertEquals(JsonValue.of("capital"), member(rendered.feature(), "kind"));
       assertEquals(
           JsonValue.of(true),
