@@ -7,7 +7,13 @@ run = 'dotnet build examples/dotnet-map/Maplibre.Native.Examples.DotnetMap.cspro
 depends = ["//:ensure-native-library"]
 dir = "{{env.MLN_FFI_REPO_ROOT}}"
 usage = 'arg "render-target"'
-run = 'dotnet run --project examples/dotnet-map/Maplibre.Native.Examples.DotnetMap.csproj -p:Platform="Any CPU" -- "{{ usage.render_target }}"'
+run = '''
+if [[ -f "$MLN_FFI_CONAN_RUN_ENV" ]]; then
+  # shellcheck disable=SC1090
+  . "$MLN_FFI_CONAN_RUN_ENV"
+fi
+dotnet run --project examples/dotnet-map/Maplibre.Native.Examples.DotnetMap.csproj -p:Platform="Any CPU" -- "{{ usage.render_target }}"
+'''
 
 [tasks."run:owned-texture"]
 run = [{ task = "run", args = ["owned-texture"] }]

@@ -32,7 +32,7 @@ config_roots = [".devcontainer", "bindings/*", "examples/*", "docs"]
 "aqua:koalaman/shellcheck" = "0.11.0" # Shell script linter (used by actionlint)
 
 # C/C++ ecosystem
-"github:prefix-dev/pixi" = "0.68.1"
+"pipx:conan" = "2.29.1"
 "aqua:Kitware/CMake" = "4.3.3"
 "aqua:ninja-build/ninja" = "1.13.2"
 "conda:clang-format" = "22.1.7"
@@ -68,33 +68,41 @@ config_roots = [".devcontainer", "bindings/*", "examples/*", "docs"]
 "core:dotnet" = "10.0.203"
 
 [env]
+_.path = [
+  "{% if env.MISE_DATA_DIR is defined and env.MISE_DATA_DIR != \"\" %}{{ env.MISE_DATA_DIR }}{% else %}{{ env.HOME }}/.local/share/mise{% endif %}/installs/conda-clang-tools/22.1.7/bin",
+  "{% if env.MISE_DATA_DIR is defined and env.MISE_DATA_DIR != \"\" %}{{ env.MISE_DATA_DIR }}{% else %}{{ env.HOME }}/.local/share/mise{% endif %}/installs/conda-clang-tools/22.1.7/Library/bin",
+]
 UV_PYTHON = { value = "{{ tools.python.path }}", tools = true }
+LIBCLANG_PATH = "{{config_root}}/build/libclang"
+MLN_FFI_LIBCLANG_SOURCE = "{% if env.MISE_DATA_DIR is defined and env.MISE_DATA_DIR != \"\" %}{{ env.MISE_DATA_DIR }}{% else %}{{ env.HOME }}/.local/share/mise{% endif %}/installs/conda-clang-tools/22.1.7/{% if os() == \"macos\" %}lib/libclang.13.dylib{% elif os() == \"linux\" %}lib/libclang.so.13{% else %}Library/bin/libclang.dll{% endif %}"
+DYLD_LIBRARY_PATH = "{% if env.MISE_DATA_DIR is defined and env.MISE_DATA_DIR != \"\" %}{{ env.MISE_DATA_DIR }}{% else %}{{ env.HOME }}/.local/share/mise{% endif %}/installs/conda-clang-tools/22.1.7/lib:{{ env.DYLD_LIBRARY_PATH | default(value=\"\") }}"
+LD_LIBRARY_PATH = "{% if env.MISE_DATA_DIR is defined and env.MISE_DATA_DIR != \"\" %}{{ env.MISE_DATA_DIR }}{% else %}{{ env.HOME }}/.local/share/mise{% endif %}/installs/conda-clang-tools/22.1.7/lib:{{ env.LD_LIBRARY_PATH | default(value=\"\") }}"
 MLN_FFI_REPO_ROOT = "{{config_root}}"
 MLN_FFI_VARIANT = { required = true }
 MLN_FFI_TARGET_TRIPLE = { required = true }
 MLN_FFI_RENDER_BACKEND = { required = true }
 MLN_FFI_BUILD_DIR = { required = true }
 MLN_FFI_CMAKE_BUILD_TYPE = "{{env.MLN_FFI_CMAKE_BUILD_TYPE | default(value=\"RelWithDebInfo\")}}"
+MLN_FFI_CONAN_BUILD_TYPE = "{{env.MLN_FFI_CONAN_BUILD_TYPE | default(value=\"Release\")}}"
+MLN_FFI_CONAN_OS = { required = true }
+MLN_FFI_CONAN_ARCH = { required = true }
+MLN_FFI_CONAN_DIR = { required = true }
+MLN_FFI_CONAN_GENERATORS_DIR = { required = true }
+MLN_FFI_CONAN_TOOLCHAIN_FILE = { required = true }
+MLN_FFI_CONAN_RUN_ENV = { required = true }
 MLN_FFI_INCLUDE_DIR = "{{config_root}}/include"
 MLN_FFI_VULKAN_INCLUDE_DIR = "{{config_root}}/third_party/maplibre-native/vendor/Vulkan-Headers/include"
-MLN_FFI_DEPENDENCY_INCLUDE_DIR = "{{config_root}}/.pixi/envs/default/include"
-MLN_FFI_DEPENDENCY_LIBRARY_DIR = "{{config_root}}/.pixi/envs/default/lib"
 MLN_FFI_ZIG_TARGET = { required = true }
 MLN_FFI_ZIG_BUILD_ARGS = { required = true }
 MLN_FFI_TEST_TIMEOUT = "{{env.MLN_FFI_TEST_TIMEOUT | default(value=\"30s\")}}"
-CMAKE_PREFIX_PATH = "{{config_root}}/.pixi/envs/default"
-PKG_CONFIG_PATH = "{{config_root}}/.pixi/envs/default/lib/pkgconfig"
-LIBCLANG_PATH = "{{config_root}}/.pixi/envs/default/lib"
+CMAKE_PREFIX_PATH = { required = true }
+PKG_CONFIG_PATH = { required = true }
 
 [hooks]
 postinstall = [
   { task = "sync-submodules" },
   "hk install --mise --quiet",
-  "pixi install --locked --quiet",
-  # conda-forge ships libclang-13.dll, but clang-sys on Windows searches for libclang.dll.
-  # https://github.com/KyleMayes/clang-sys/issues/213
-  # https://github.com/conda-forge/llvmdev-feedstock/issues/376
-  '{% if os() == "windows" %}libclang_bin="$(dirname "$MLN_FFI_DEPENDENCY_LIBRARY_DIR")/bin"; cp "$libclang_bin/libclang-13.dll" "$libclang_bin/libclang.dll"{% endif %}',
+  "mise run deps",
   "uv sync --locked --quiet",
   "pnpm install --frozen-lockfile --loglevel warn",
   "dotnet tool restore --tool-manifest dotnet-tools.json --verbosity quiet",
@@ -112,10 +120,19 @@ run = [
     -B "$MLN_FFI_BUILD_DIR"
     -G Ninja
     -DCMAKE_BUILD_TYPE="$MLN_FFI_CMAKE_BUILD_TYPE"
+    -DCMAKE_MAP_IMPORTED_CONFIG_RELWITHDEBINFO=Release
+    -DCMAKE_PREFIX_PATH="$MLN_FFI_CONAN_GENERATORS_DIR"
     -DMLN_FFI_RENDER_BACKEND="$MLN_FFI_RENDER_BACKEND"
     -DMLN_FFI_OPENGL_CONTEXT_PROVIDER="$MLN_FFI_OPENGL_CONTEXT_PROVIDER"
-    -DMLN_FFI_EGL_ROOT="$MLN_FFI_EGL_ROOT"
   )
+
+  if [[ -n "${MLN_FFI_EGL_ROOT:-}" ]]; then
+    cmake_args+=(-DMLN_FFI_EGL_ROOT="$MLN_FFI_EGL_ROOT")
+  fi
+
+  if [[ -f "$MLN_FFI_CONAN_TOOLCHAIN_FILE" ]]; then
+    cmake_args+=(-DCMAKE_TOOLCHAIN_FILE="$MLN_FFI_CONAN_TOOLCHAIN_FILE")
+  fi
 
   cmake "${cmake_args[@]}"
   ''',
@@ -147,14 +164,60 @@ run = "rm -rf \"$MLN_FFI_BUILD_DIR\""
 [tasks.deps]
 description = "Install variant-specific managed dependencies."
 run = '''
-if [[ "$MLN_FFI_TARGET_TRIPLE" == "macos-arm64" ]]; then
+mise run deps:conan
+
+if [[ "$MLN_FFI_TARGET_TRIPLE" == "macos-arm64" && "${MLN_FFI_OPENGL_CONTEXT_PROVIDER:-}" == "egl" ]]; then
   mise run deps:angle
 fi
+'''
+
+[tasks."deps:conan"]
+description = "Install ConanCenter native dependencies for the active variant."
+run = '''
+conan_bin="$(mise which conan 2>/dev/null || command -v conan)"
+
+if ! "$conan_bin" profile path default >/dev/null 2>&1; then
+  "$conan_bin" profile detect --force
+fi
+
+rm -rf "$MLN_FFI_CONAN_GENERATORS_DIR"
+"$conan_bin" install "$MLN_FFI_REPO_ROOT" \
+  --output-folder "$MLN_FFI_CONAN_DIR" \
+  --build=missing \
+  -s:h os="$MLN_FFI_CONAN_OS" \
+  -s:h arch="$MLN_FFI_CONAN_ARCH" \
+  -s:h build_type="$MLN_FFI_CONAN_BUILD_TYPE" \
+  -s:h compiler.cppstd=17 \
+  -s:b build_type="$MLN_FFI_CONAN_BUILD_TYPE" \
+  -s:b compiler.cppstd=17 \
+  -o "&:render_backend=$MLN_FFI_RENDER_BACKEND" \
+  -o "&:opengl_context_provider=${MLN_FFI_OPENGL_CONTEXT_PROVIDER:-none}"
+'''
+
+[tasks."deps:libclang"]
+hide = true
+run = '''
+mkdir -p "$LIBCLANG_PATH"
+# clang-sys searches for unversioned libclang names, while conda packages may
+# only ship versioned files. Keep the workaround local to bindgen users.
+# https://github.com/KyleMayes/clang-sys/issues/213
+# https://github.com/conda-forge/llvmdev-feedstock/issues/376
+case "$(uname -s 2>/dev/null || printf Windows)" in
+  Darwin) ln -sf "$MLN_FFI_LIBCLANG_SOURCE" "$LIBCLANG_PATH/libclang.dylib" ;;
+  Linux) ln -sf "$MLN_FFI_LIBCLANG_SOURCE" "$LIBCLANG_PATH/libclang.so" ;;
+  MINGW* | MSYS* | CYGWIN* | Windows*) cp -f "$MLN_FFI_LIBCLANG_SOURCE" "$LIBCLANG_PATH/libclang.dll" ;;
+  *) echo "unsupported libclang host" >&2; exit 1 ;;
+esac
 '''
 
 [tasks.test]
 depends = ["//:build"]
 run = '''
+if [[ -f "$MLN_FFI_CONAN_RUN_ENV" ]]; then
+  # shellcheck disable=SC1090
+  . "$MLN_FFI_CONAN_RUN_ENV"
+fi
+
 (
   cd src/c_api/tests/zig
   zig build test {{ env.MLN_FFI_ZIG_BUILD_ARGS }} --test-timeout "$MLN_FFI_TEST_TIMEOUT" --summary all --verbose

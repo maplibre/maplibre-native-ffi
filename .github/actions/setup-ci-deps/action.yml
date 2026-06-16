@@ -26,12 +26,14 @@ runs:
       run: |
         sudo apt-get update
         sudo apt-get install --no-install-recommends --yes \
+          libegl1-mesa-dev \
           libegl-mesa0 \
           libgl1-mesa-dri \
           libvulkan1 \
           mesa-utils \
           mesa-utils-extra \
-          mesa-vulkan-drivers
+          mesa-vulkan-drivers \
+          xkb-data
         {
           echo "EGL_PLATFORM=surfaceless"
           echo "LIBGL_ALWAYS_SOFTWARE=true"

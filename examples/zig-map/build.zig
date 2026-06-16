@@ -59,11 +59,7 @@ fn addZigMapExample(b: *std.Build, options: BuildOptions) *std.Build.Step.Compil
             .{ .api = .gl, .version = .@"3.0" });
         root_module.addImport("gl", gl_bindings);
     }
-    for (options.dependency_library_dirs) |dependency_library_dir| {
-        root_module.addLibraryPath(dependency_library_dir);
-        root_module.addRPath(dependency_library_dir);
-    }
-    root_module.linkSystemLibrary("SDL3", .{});
+    root_module.linkSystemLibrary("sdl-sdl3", .{ .use_pkg_config = .force });
     maplibre_build.linkRenderBackend(b, root_module, .{
         .target = options.target,
         .render_backend = options.render_backend,

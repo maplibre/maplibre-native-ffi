@@ -101,13 +101,6 @@ pub fn addPlatformSystemPaths(b: *std.Build, module: *std.Build.Module, target: 
     }
 }
 
-pub fn vulkanLibraryName(target: std.Build.ResolvedTarget) []const u8 {
-    return switch (target.result.os.tag) {
-        .windows => "vulkan-1",
-        else => "vulkan",
-    };
-}
-
 pub fn isSupportedTarget(target: std.Build.ResolvedTarget, backend: RenderBackend) bool {
     return switch (backend) {
         .metal => target.result.os.tag == .macos,
@@ -146,8 +139,8 @@ pub fn linkRenderBackend(b: *std.Build, module: *std.Build.Module, options: Rend
         },
         .opengl => switch (options.target.result.os.tag) {
             .linux => {
-                module.linkSystemLibrary("EGL", .{});
-                module.linkSystemLibrary("GLESv2", .{});
+                module.linkSystemLibrary("EGL", .{ .use_pkg_config = .yes });
+                module.linkSystemLibrary("GLESv2", .{ .use_pkg_config = .yes });
             },
             .macos => {
                 if (options.dependency_library_dirs.len == 0) {
@@ -161,8 +154,7 @@ pub fn linkRenderBackend(b: *std.Build, module: *std.Build.Module, options: Rend
             else => unreachable,
         },
         .vulkan => {
-            addDependencyLibraryPaths(module, options.dependency_library_dirs);
-            module.linkSystemLibrary(vulkanLibraryName(options.target), .{});
+            module.linkSystemLibrary("vulkan", .{ .use_pkg_config = .force });
         },
     }
 }

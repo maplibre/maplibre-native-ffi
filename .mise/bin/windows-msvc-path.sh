@@ -109,24 +109,15 @@ normalize_windows_msvc_path() {
     return 1
   fi
 
-  local dependency_bin="" dependency_path="" rest_path="" path_entry
-  if [[ -n "${MLN_FFI_DEPENDENCY_LIBRARY_DIR:-}" ]]; then
-    dependency_bin="$(cygpath -u "$(dirname "$MLN_FFI_DEPENDENCY_LIBRARY_DIR")/bin")"
-    dependency_bin="${dependency_bin%/}"
-  fi
-
+  local rest_path="" path_entry
   IFS=":" read -ra path_entries <<< "$PATH"
   for path_entry in "${path_entries[@]}"; do
     path_entry="${path_entry%/}"
     [[ "$path_entry" != "$msvc_bin" ]] || continue
-    if [[ -n "$dependency_bin" && "$path_entry" == "$dependency_bin" ]]; then
-      append_unique dependency_path "$path_entry"
-    else
-      append_unique rest_path "$path_entry"
-    fi
+    append_unique rest_path "$path_entry"
   done
 
-  export PATH="${dependency_path:+$dependency_path:}$msvc_bin${rest_path:+:$rest_path}"
+  export PATH="$msvc_bin${rest_path:+:$rest_path}"
 }
 
 load_windows_msvc_environment

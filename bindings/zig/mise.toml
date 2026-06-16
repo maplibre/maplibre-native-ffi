@@ -4,7 +4,13 @@ run = "zig build {{ env.MLN_FFI_ZIG_BUILD_ARGS }}"
 
 [tasks.test]
 depends = ["//:ensure-native-library"]
-run = "zig build test {{ env.MLN_FFI_ZIG_BUILD_ARGS }} --summary all --verbose"
+run = '''
+if [[ -f "$MLN_FFI_CONAN_RUN_ENV" ]]; then
+  # shellcheck disable=SC1090
+  . "$MLN_FFI_CONAN_RUN_ENV"
+fi
+zig build test {{ env.MLN_FFI_ZIG_BUILD_ARGS }} --summary all --verbose
+'''
 
 [tasks.ci]
 depends = [":test"]

@@ -4,6 +4,8 @@ LABEL org.opencontainers.image.source="https://github.com/maplibre/maplibre-nati
 
 SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
 
+USER root
+
 RUN apt-get update \
   && apt-get install --no-install-recommends --yes \
     bash \
@@ -11,13 +13,14 @@ RUN apt-get update \
     ca-certificates \
     curl \
     git \
+    libegl1-mesa-dev \
     libegl-mesa0 \
     libgl1-mesa-dri \
-    libicu72 \
     libvulkan1 \
     mesa-utils \
     mesa-vulkan-drivers \
     sudo \
+    xkb-data \
   && rm -rf /var/lib/apt/lists/*
 
 RUN useradd --create-home --uid 1000 --shell /bin/bash dev \

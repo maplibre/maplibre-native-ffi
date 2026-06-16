@@ -75,8 +75,8 @@ the PR description if more detail is needed. More context:
 ### General
 
 - Campsite rules apply: leave anything you touch tidier than when you found it.
-- The environment is defined by `mise`; pixi is the current desktop native
-  library provider behind mise-managed paths.
+- The environment is defined by `mise`; ConanCenter is the current desktop
+  native library provider behind mise-managed paths.
 - The bindings are meant to be low level and broadly analogous to each other and
   to the C API, exposing MapLibre concepts directly, while following language
   conventions for memory and thread safety. Prioritize safety, similarity, and
@@ -172,6 +172,3 @@ Read these docs whenever relevant:
   - <https://viteplus.dev/guide/monorepo>
   - <https://viteplus.dev/guide/lint>
   - <https://viteplus.dev/guide/run>
-- `pixi`:
-  - <https://pixi.prefix.dev/latest/reference/pixi_manifest/>
-  - <https://pixi.prefix.dev/latest/reference/pixi_configuration/>

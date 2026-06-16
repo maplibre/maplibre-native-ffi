@@ -43,11 +43,7 @@ fn addReadbackExample(b: *std.Build, options: BuildOptions) *std.Build.Step.Comp
     maplibre_build.addIncludePaths(example.root_module, options.include_dirs);
     if (options.render_backend == .opengl and options.target.result.os.tag == .windows) {
         addSdlTranslateCWorkarounds(example.root_module, options.target);
-        for (options.dependency_library_dirs) |dependency_library_dir| {
-            example.root_module.addLibraryPath(dependency_library_dir);
-            example.root_module.addRPath(dependency_library_dir);
-        }
-        example.root_module.linkSystemLibrary("SDL3", .{});
+        example.root_module.linkSystemLibrary("sdl-sdl3", .{ .use_pkg_config = .force });
     }
     example.root_module.addImport("maplibre_native", maplibreNativeModule(b, options));
     maplibre_build.linkRenderBackend(b, example.root_module, .{

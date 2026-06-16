@@ -1,14 +1,32 @@
 [tasks.build]
-depends = ["//:ensure-native-library"]
+depends = ["//:ensure-native-library", "//:deps:libclang"]
 dir = "{{env.MLN_FFI_REPO_ROOT}}"
-run = "cargo build -p maplibre-native-sys -p maplibre-native-core -p maplibre-native"
+run = '''
+if [[ -f "$MLN_FFI_CONAN_RUN_ENV" ]]; then
+  # shellcheck disable=SC1090
+  . "$MLN_FFI_CONAN_RUN_ENV"
+fi
+cargo build -p maplibre-native-sys -p maplibre-native-core -p maplibre-native
+'''
 
 [tasks.test]
-depends = ["//:ensure-native-library"]
+depends = ["//:ensure-native-library", "//:deps:libclang"]
 dir = "{{env.MLN_FFI_REPO_ROOT}}"
-run = "cargo test -p maplibre-native-sys -p maplibre-native-core -p maplibre-native -- --test-threads=1"
+run = '''
+if [[ -f "$MLN_FFI_CONAN_RUN_ENV" ]]; then
+  # shellcheck disable=SC1090
+  . "$MLN_FFI_CONAN_RUN_ENV"
+fi
+cargo test -p maplibre-native-sys -p maplibre-native-core -p maplibre-native -- --test-threads=1
+'''
 
 [tasks.ci]
 depends = [":test"]
 dir = "{{env.MLN_FFI_REPO_ROOT}}"
-run = "cargo clippy -p maplibre-native-sys -p maplibre-native-core -p maplibre-native --all-targets -- -D warnings"
+run = '''
+if [[ -f "$MLN_FFI_CONAN_RUN_ENV" ]]; then
+  # shellcheck disable=SC1090
+  . "$MLN_FFI_CONAN_RUN_ENV"
+fi
+cargo clippy -p maplibre-native-sys -p maplibre-native-core -p maplibre-native --all-targets -- -D warnings
+'''

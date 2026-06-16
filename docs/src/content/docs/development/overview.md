@@ -89,18 +89,18 @@ model.
 
 Project-managed dependency state keeps builds reproducible. Mise supplies
 repository tools, owns task execution, and exports the environment consumed by
-build systems, bindings, and examples. Pixi currently supplies desktop native
-libraries from [`conda-forge`](https://conda-forge.org/). Platform SDKs such as
-Xcode, Visual Studio, Linux compiler packages, and the Android SDK remain host
-toolchain inputs.
+build systems, bindings, and examples. Conan installs desktop native libraries
+from [`ConanCenter`](https://conan.io/center/) into variant-specific build
+prefixes. Platform SDKs such as Xcode, Visual Studio, Linux compiler packages,
+and the Android SDK remain host toolchain inputs.
 
 [`mise`](https://mise.jdx.dev/) is the contributor entrypoint. It pins top-level
 tools, installs Git hooks, selects backend variants, and runs repository tasks.
 Use `mise run ...` for common workflows: build, test, check, fix, and examples.
-Mise also provides ecosystem entrypoints such as Pixi, Zig, Python, uv, Node,
+Mise also provides ecosystem entrypoints such as Conan, Zig, Python, uv, Node,
 and pnpm.
 
-[`pixi`](https://pixi.sh/) installs the desktop native libraries used by local
+[`Conan`](https://conan.io/) resolves the desktop native libraries used by local
 builds. CMake, Ninja, pkg-config, shader tools, Doxygen, clang-format, and
 clang-tidy are pinned by mise. Host platform toolchains provide C and C++
 compilers, and CMake builds the native C/C++ library.

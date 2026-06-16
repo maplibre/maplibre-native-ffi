@@ -5,6 +5,10 @@ run = "zig build {{ env.MLN_FFI_ZIG_BUILD_ARGS }}"
 [tasks.run]
 depends = ["//:ensure-native-library"]
 run = '''
+if [[ -f "$MLN_FFI_CONAN_RUN_ENV" ]]; then
+  # shellcheck disable=SC1090
+  . "$MLN_FFI_CONAN_RUN_ENV"
+fi
 mkdir -p zig-out
 zig build run {{ env.MLN_FFI_ZIG_BUILD_ARGS }} -- zig-out/zig-readback.ppm
 '''

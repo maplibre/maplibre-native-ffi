@@ -924,42 +924,6 @@ checksum = "sha256:709779781c37d0f4020b5e3fa8ade4070340c37b980f3826b84d61c35ccb6
 url = "https://github.com/nicklockwood/SwiftFormat/releases/download/0.61.1/SwiftFormat.amd64.msi"
 url_api = "https://api.github.com/repos/nicklockwood/SwiftFormat/releases/assets/406642521"
 
-[[tools."github:prefix-dev/pixi"]]
-version = "0.68.1"
-backend = "github:prefix-dev/pixi"
-
-[tools."github:prefix-dev/pixi"."platforms.linux-arm64"]
-checksum = "sha256:b2b21272578600086e92f4e1d0e42cb7409c8e541688b9ea61aed7dd6a07a5ad"
-url = "https://github.com/prefix-dev/pixi/releases/download/v0.68.1/pixi-aarch64-unknown-linux-musl.tar.gz"
-url_api = "https://api.github.com/repos/prefix-dev/pixi/releases/assets/418286905"
-
-[tools."github:prefix-dev/pixi"."platforms.linux-arm64".provenance.slsa]
-url = "https://github.com/prefix-dev/pixi/releases/download/v0.68.1/attestations-aarch64-unknown-linux-musl.intoto.jsonl"
-
-[tools."github:prefix-dev/pixi"."platforms.linux-x64"]
-checksum = "sha256:f61a9546898cc1caad1956d1b5bba0408de5a24854b648631c0b49555520ed42"
-url = "https://github.com/prefix-dev/pixi/releases/download/v0.68.1/pixi-x86_64-unknown-linux-musl.tar.gz"
-url_api = "https://api.github.com/repos/prefix-dev/pixi/releases/assets/418286974"
-
-[tools."github:prefix-dev/pixi"."platforms.linux-x64".provenance.slsa]
-url = "https://github.com/prefix-dev/pixi/releases/download/v0.68.1/attestations-x86_64-unknown-linux-musl.intoto.jsonl"
-
-[tools."github:prefix-dev/pixi"."platforms.macos-arm64"]
-checksum = "sha256:31a15146f404230858a7a921b1eb76db894e1ec8b99e37efe6aeac2984af92a2"
-url = "https://github.com/prefix-dev/pixi/releases/download/v0.68.1/pixi-aarch64-apple-darwin.tar.gz"
-url_api = "https://api.github.com/repos/prefix-dev/pixi/releases/assets/418286876"
-
-[tools."github:prefix-dev/pixi"."platforms.macos-arm64".provenance.slsa]
-url = "https://github.com/prefix-dev/pixi/releases/download/v0.68.1/attestations-aarch64-apple-darwin.intoto.jsonl"
-
-[tools."github:prefix-dev/pixi"."platforms.windows-x64"]
-checksum = "sha256:71de85bd7cbf645f43a7381f1396e35a6764d508668785a46dd88d67323745b3"
-url = "https://github.com/prefix-dev/pixi/releases/download/v0.68.1/pixi-x86_64-pc-windows-msvc.zip"
-url_api = "https://api.github.com/repos/prefix-dev/pixi/releases/assets/418286950"
-
-[tools."github:prefix-dev/pixi"."platforms.windows-x64".provenance.slsa]
-url = "https://github.com/prefix-dev/pixi/releases/download/v0.68.1/attestations-x86_64-pc-windows-msvc.intoto.jsonl"
-
 [[tools."github:sargunv/jvl"]]
 version = "2026.05.03"
 backend = "github:sargunv/jvl"
@@ -1043,6 +1007,10 @@ url = "https://nodejs.org/dist/v24.11.0/node-v24.11.0-darwin-arm64.tar.gz"
 [tools.node."platforms.windows-x64"]
 checksum = "sha256:1054540bce22b54ec7e50ebc078ec5d090700a77657607a58f6a64df21f49fdd"
 url = "https://nodejs.org/dist/v24.11.0/node-v24.11.0-win-x64.zip"
+
+[[tools."pipx:conan"]]
+version = "2.29.1"
+backend = "pipx:conan"
 
 [[tools.python]]
 version = "3.14.4"
