@@ -937,16 +937,14 @@ pub const OfflineOperationHandle = enum(u128) {
         unlockOfflineOperationRegistry();
 
         const runtime_lease = lease(&runtime_handle) catch |err| {
-            self.consume();
             return err;
         };
         defer runtime_lease.release();
-        const discard_result = status.checkStatus(
+        try status.checkStatus(
             c.mln_runtime_offline_operation_discard(runtime_lease.native, operation_id),
             runtime_lease.diagnostic_store,
         );
         self.consume();
-        try discard_result;
     }
 };
 
@@ -2343,6 +2341,17 @@ test "offline operation take-result failures preserve handle state" {
     const operation = try runtime.operationHandle(9_999_999, .region_get_status, .region_status);
     try std.testing.expectError(error.InvalidArgument, runtime.takeOfflineRegionStatus(operation));
     try std.testing.expectEqual(@as(OfflineOperationId, 9_999_999), try operation.operationId());
+
+    operation.consume();
+}
+
+test "offline operation discard failures preserve handle state" {
+    var runtime = try RuntimeHandle.create(std.testing.allocator, .{}, null);
+    defer runtime.close() catch @panic("runtime close failed");
+
+    const operation = try runtime.operationHandle(9_999_997, .region_get_status, .region_status);
+    try std.testing.expectError(error.InvalidArgument, operation.discard());
+    try std.testing.expectEqual(@as(OfflineOperationId, 9_999_997), try operation.operationId());
 
     operation.consume();
 }
