@@ -77,15 +77,15 @@ public final class ResourceRequestHandle implements AutoCloseable {
     }
     requireLive();
     MaplibreException completionFailure = null;
-    try (var arena = Arena.ofConfined()) {
-      var nativeStatus =
-          completer.complete(
-              handle, ResourceStructs.resourceResponse(Objects.requireNonNull(response), arena));
-      try {
+    try {
+      try (var arena = Arena.ofConfined()) {
+        var nativeStatus =
+            completer.complete(
+                handle, ResourceStructs.resourceResponse(Objects.requireNonNull(response), arena));
         Status.check(nativeStatus);
-      } catch (MaplibreException error) {
-        completionFailure = error;
       }
+    } catch (MaplibreException error) {
+      completionFailure = error;
     }
     completed = true;
     closed = true;

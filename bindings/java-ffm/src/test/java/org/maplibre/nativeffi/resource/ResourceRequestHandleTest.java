@@ -26,7 +26,7 @@ final class ResourceRequestHandleTest {
             MemorySegment.ofAddress(0x1234), ignored -> releases.incrementAndGet());
 
     assertEquals(
-        ResourceProviderDecision.HANDLE.nativeValue(),
+        NativeValues.nativeValue(ResourceProviderDecision.HANDLE),
         handle.finishProviderDecision(ResourceProviderDecision.HANDLE));
     assertEquals(0, releases.get());
 
@@ -47,7 +47,7 @@ final class ResourceRequestHandleTest {
               return MapLibreNativeC.MLN_STATUS_INVALID_STATE();
             });
     assertEquals(
-        ResourceProviderDecision.HANDLE.nativeValue(),
+        NativeValues.nativeValue(ResourceProviderDecision.HANDLE),
         handle.finishProviderDecision(ResourceProviderDecision.HANDLE));
 
     assertThrows(InvalidStateException.class, () -> handle.complete(ResourceResponse.noContent()));
@@ -61,7 +61,7 @@ final class ResourceRequestHandleTest {
   }
 
   @Test
-  void unknownResourceErrorReasonIsRejectedBeforeNativeCompletion() {
+  void completionPreCallFailureIsTerminalAfterProviderDecision() {
     var completions = new AtomicInteger();
     var releases = new AtomicInteger();
     var handle =
@@ -73,7 +73,7 @@ final class ResourceRequestHandleTest {
               return MapLibreNativeC.MLN_STATUS_OK();
             });
     assertEquals(
-        ResourceProviderDecision.HANDLE.nativeValue(),
+        NativeValues.nativeValue(ResourceProviderDecision.HANDLE),
         handle.finishProviderDecision(ResourceProviderDecision.HANDLE));
 
     var unknownReason = NativeValues.resourceErrorReason(999_996);
@@ -84,7 +84,9 @@ final class ResourceRequestHandleTest {
         () -> handle.complete(ResourceResponse.error(unknownReason, "unknown")));
 
     assertEquals(0, completions.get());
-    assertEquals(0, releases.get());
+    assertEquals(1, releases.get());
+    assertThrows(InvalidStateException.class, () -> handle.complete(ResourceResponse.noContent()));
+    assertEquals(0, completions.get());
     handle.close();
     assertEquals(1, releases.get());
   }
@@ -104,7 +106,7 @@ final class ResourceRequestHandleTest {
             });
 
     assertEquals(
-        ResourceProviderDecision.PASS_THROUGH.nativeValue(),
+        NativeValues.nativeValue(ResourceProviderDecision.PASS_THROUGH),
         handle.finishProviderDecision(ResourceProviderDecision.PASS_THROUGH));
 
     assertThrows(InvalidStateException.class, () -> handle.complete(ResourceResponse.noContent()));
@@ -130,7 +132,7 @@ final class ResourceRequestHandleTest {
               return false;
             });
     assertEquals(
-        ResourceProviderDecision.HANDLE.nativeValue(),
+        NativeValues.nativeValue(ResourceProviderDecision.HANDLE),
         handle.finishProviderDecision(ResourceProviderDecision.HANDLE));
 
     var executor = Executors.newFixedThreadPool(2);

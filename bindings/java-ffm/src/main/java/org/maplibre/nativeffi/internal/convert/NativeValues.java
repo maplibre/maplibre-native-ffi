@@ -167,9 +167,9 @@ public final class NativeValues {
 
   public static int nativeValue(LocationIndicatorImageKind kind) {
     return switch (kind) {
-      case TOP -> 0;
-      case BEARING -> 1;
-      case SHADOW -> 2;
+      case TOP -> MapLibreNativeC.MLN_LOCATION_INDICATOR_IMAGE_KIND_TOP();
+      case BEARING -> MapLibreNativeC.MLN_LOCATION_INDICATOR_IMAGE_KIND_BEARING();
+      case SHADOW -> MapLibreNativeC.MLN_LOCATION_INDICATOR_IMAGE_KIND_SHADOW();
     };
   }
 
@@ -227,8 +227,8 @@ public final class NativeValues {
 
   public static int nativeValue(RasterDemEncoding encoding) {
     return switch (encoding) {
-      case MAPBOX -> 0;
-      case TERRARIUM -> 1;
+      case MAPBOX -> MapLibreNativeC.MLN_STYLE_RASTER_DEM_ENCODING_MAPBOX();
+      case TERRARIUM -> MapLibreNativeC.MLN_STYLE_RASTER_DEM_ENCODING_TERRARIUM();
     };
   }
 
@@ -288,15 +288,15 @@ public final class NativeValues {
 
   public static int nativeValue(TileScheme scheme) {
     return switch (scheme) {
-      case XYZ -> 0;
-      case TMS -> 1;
+      case XYZ -> MapLibreNativeC.MLN_STYLE_TILE_SCHEME_XYZ();
+      case TMS -> MapLibreNativeC.MLN_STYLE_TILE_SCHEME_TMS();
     };
   }
 
   public static int nativeValue(VectorTileEncoding encoding) {
     return switch (encoding) {
-      case MVT -> 0;
-      case MLT -> 1;
+      case MVT -> MapLibreNativeC.MLN_STYLE_VECTOR_TILE_ENCODING_MVT();
+      case MLT -> MapLibreNativeC.MLN_STYLE_VECTOR_TILE_ENCODING_MLT();
     };
   }
 
