@@ -5,6 +5,7 @@ import org.bytedeco.javacpp.BytePointer;
 import org.bytedeco.javacpp.Pointer;
 import org.maplibre.nativejni.internal.javacpp.JavaCppSupport;
 import org.maplibre.nativejni.internal.javacpp.MaplibreNativeC;
+import org.maplibre.nativejni.internal.status.Status;
 import org.maplibre.nativejni.resource.ResourceResponse;
 
 /** Internal materializers for resource request, response, and transform values. */
@@ -33,6 +34,8 @@ public final class ResourceStructs {
 
   public static ResourceResponseValue resourceResponse(ResourceResponse response) {
     Objects.requireNonNull(response, "response");
+    response.errorMessage().ifPresent(value -> Status.checkNoEmbeddedNul(value, "error message"));
+    response.etag().ifPresent(value -> Status.checkNoEmbeddedNul(value, "ETag"));
     return new ResourceResponseValue(
         response.status().nativeValue(),
         response.errorReason().nativeValue(),

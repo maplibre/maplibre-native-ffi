@@ -24,24 +24,20 @@ public sealed interface RuntimeEventPayload
   record None() implements RuntimeEventPayload {}
 
   record RenderFrame(
-      RenderMode mode,
-      int rawMode,
-      boolean needsRepaint,
-      boolean placementChanged,
-      RenderingStats stats)
+      RenderMode mode, boolean needsRepaint, boolean placementChanged, RenderingStats stats)
       implements RuntimeEventPayload {}
 
-  record RenderMap(RenderMode mode, int rawMode) implements RuntimeEventPayload {}
+  record RenderMap(RenderMode mode) implements RuntimeEventPayload {}
 
   record StyleImageMissing(String imageId) implements RuntimeEventPayload {}
 
-  record TileAction(TileOperation operation, int rawOperation, TileId tileId, String sourceId)
+  record TileAction(TileOperation operation, TileId tileId, String sourceId)
       implements RuntimeEventPayload {}
 
   record OfflineRegionStatusChanged(long regionId, OfflineRegionStatus status)
       implements RuntimeEventPayload {}
 
-  record OfflineRegionResponseError(long regionId, ResourceErrorReason reason, int rawReason)
+  record OfflineRegionResponseError(long regionId, ResourceErrorReason reason)
       implements RuntimeEventPayload {}
 
   record OfflineRegionTileCountLimit(long regionId, long limit) implements RuntimeEventPayload {}
@@ -49,12 +45,20 @@ public sealed interface RuntimeEventPayload
   record OfflineOperationCompleted(
       long operationId,
       OfflineOperationKind operationKind,
-      int rawOperationKind,
       OfflineOperationResultKind resultKind,
-      int rawResultKind,
       int resultStatus,
       boolean found)
       implements RuntimeEventPayload {}
 
-  record Unknown(int rawPayloadType, long payloadSize) implements RuntimeEventPayload {}
+  record Unknown(int rawPayloadType, long payloadSize, byte[] payloadBytes)
+      implements RuntimeEventPayload {
+    public Unknown {
+      payloadBytes = payloadBytes == null ? new byte[0] : payloadBytes.clone();
+    }
+
+    @Override
+    public byte[] payloadBytes() {
+      return payloadBytes.clone();
+    }
+  }
 }

@@ -29,14 +29,22 @@ public class MaplibreException extends RuntimeException {
 
   public static MaplibreException forStatus(
       MaplibreStatus status, int nativeStatusCode, String diagnostic) {
-    return switch (status) {
-      case INVALID_ARGUMENT -> new InvalidArgumentException(nativeStatusCode, diagnostic);
-      case INVALID_STATE -> new InvalidStateException(nativeStatusCode, diagnostic);
-      case WRONG_THREAD -> new WrongThreadException(nativeStatusCode, diagnostic);
-      case UNSUPPORTED -> new UnsupportedFeatureException(nativeStatusCode, diagnostic);
-      case NATIVE_ERROR -> new NativeErrorException(nativeStatusCode, diagnostic);
-      case OK, UNKNOWN -> new MaplibreException(status, nativeStatusCode, diagnostic);
-    };
+    if (MaplibreStatus.INVALID_ARGUMENT.equals(status)) {
+      return new InvalidArgumentException(nativeStatusCode, diagnostic);
+    }
+    if (MaplibreStatus.INVALID_STATE.equals(status)) {
+      return new InvalidStateException(nativeStatusCode, diagnostic);
+    }
+    if (MaplibreStatus.WRONG_THREAD.equals(status)) {
+      return new WrongThreadException(nativeStatusCode, diagnostic);
+    }
+    if (MaplibreStatus.UNSUPPORTED.equals(status)) {
+      return new UnsupportedFeatureException(nativeStatusCode, diagnostic);
+    }
+    if (MaplibreStatus.NATIVE_ERROR.equals(status)) {
+      return new NativeErrorException(nativeStatusCode, diagnostic);
+    }
+    return new MaplibreException(status, nativeStatusCode, diagnostic);
   }
 
   private static String message(MaplibreStatus status, int nativeStatusCode, String diagnostic) {

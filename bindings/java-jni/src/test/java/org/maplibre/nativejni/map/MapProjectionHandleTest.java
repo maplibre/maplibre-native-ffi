@@ -14,7 +14,7 @@ import org.maplibre.nativejni.runtime.RuntimeHandle;
 
 class MapProjectionHandleTest {
   @Test
-  void projectionConvertsPixelsAndCoordinates() {
+  void bnd103ProjectionConvertsPixelsAndCoordinates() {
     try (var runtime = RuntimeHandle.create()) {
       try (var map = MapHandle.create(runtime, new MapOptions().size(64, 64))) {
         try (var projection = map.createProjection()) {
@@ -29,7 +29,7 @@ class MapProjectionHandleTest {
   }
 
   @Test
-  void projectionCameraCanBeReadSetAndFitToCoordinates() {
+  void bnd102AndBnd103ProjectionCameraCanBeReadSetAndFitToCoordinates() {
     try (var runtime = RuntimeHandle.create()) {
       try (var map = MapHandle.create(runtime, new MapOptions().size(256, 256))) {
         try (var projection = map.createProjection()) {
@@ -54,13 +54,17 @@ class MapProjectionHandleTest {
   }
 
   @Test
-  void projectionOwnsStandaloneNativeSnapshot() {
+  void bnd043ProjectionOwnsStandaloneNativeSnapshot() {
     try (var runtime = RuntimeHandle.create()) {
       var map = MapHandle.create(runtime, new MapOptions().size(64, 64));
       var projection = map.createProjection();
       assertFalse(projection.isClosed());
       map.close();
       assertTrue(map.isClosed());
+      var point = projection.pixelForLatLng(new LatLng(0, 0));
+      var roundTrip = projection.latLngForPixel(point);
+      assertEquals(0, roundTrip.latitude(), 1.0e-9);
+      assertEquals(0, roundTrip.longitude(), 1.0e-9);
       projection.close();
       assertTrue(projection.isClosed());
       projection.close();

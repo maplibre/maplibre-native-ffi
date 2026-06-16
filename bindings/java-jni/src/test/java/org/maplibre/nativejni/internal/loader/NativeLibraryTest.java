@@ -2,6 +2,7 @@ package org.maplibre.nativejni.internal.loader;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
@@ -11,11 +12,15 @@ import java.nio.file.Path;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.maplibre.nativejni.Maplibre;
+import org.maplibre.nativejni.error.AbiVersionMismatchException;
 import org.maplibre.nativejni.test.NativeTestSupport;
 
+// Support invariant for BND-001: Java JNI exposes several documented library lookup mechanisms.
+// The exact property/env/path matrix is Java-specific, but each route must fail before any
+// incompatible public native handle can be stored.
 final class NativeLibraryTest {
   @Test
-  void exposesDocumentedLookupInputs() {
+  void supportJavaJniExposesDocumentedLookupInputs() {
     assertFalse(NativeLibrary.LIBRARY_PATH_PROPERTY.isBlank());
     assertFalse(NativeLibrary.LIBRARY_PATH_ENV.isBlank());
     assertEquals("jniMaplibreNativeC", NativeLibrary.LIBRARY_NAME);
@@ -25,28 +30,38 @@ final class NativeLibraryTest {
   }
 
   @Test
-  void loadedLibraryServesCAbiCalls() {
+  void supportJavaJniLoadedLibraryServesCAbiCalls() {
     assertTrue(Maplibre.cVersion() >= 0);
     NativeLibrary.ensureLoaded();
   }
 
   @Test
-  void subprocessLoadsThroughSystemProperty() throws Exception {
+  void bnd001AbiVersionMismatchUsesStablePublicErrorCategory() {
+    var error =
+        assertThrows(AbiVersionMismatchException.class, () -> NativeLibrary.checkCAbiVersion(7, 0));
+
+    assertEquals(7, error.actualVersion());
+    assertEquals(0, error.expectedVersion());
+    assertTrue(error.diagnostic().contains("Unsupported Maplibre C ABI version 7"));
+  }
+
+  @Test
+  void supportJavaJniLoadsThroughSystemProperty() throws Exception {
     assertLoaderSmoke(List.of("-D" + NativeLibrary.LIBRARY_PATH_PROPERTY + "=" + libraryPath()));
   }
 
   @Test
-  void subprocessLoadsExactPath() throws Exception {
+  void supportJavaJniLoadsExactPath() throws Exception {
     assertLoaderSmoke(List.of(), libraryPath());
   }
 
   @Test
-  void subprocessRejectsBadExactPath() throws Exception {
+  void supportJavaJniRejectsBadExactPath() throws Exception {
     assertLoaderSmokeFails(List.of(), Path.of(libraryPath()).resolveSibling("missing-jni-bridge"));
   }
 
   @Test
-  void subprocessRejectsMissingConfiguredPropertyPath() throws Exception {
+  void supportJavaJniRejectsMissingConfiguredPropertyPath() throws Exception {
     assertLoaderSmokeFails(
         List.of(
             "-D"
@@ -56,12 +71,12 @@ final class NativeLibraryTest {
   }
 
   @Test
-  void subprocessLoadsThroughEnvironmentPath() throws Exception {
+  void supportJavaJniLoadsThroughEnvironmentPath() throws Exception {
     assertLoaderSmoke(List.of(), NativeLibrary.LIBRARY_PATH_ENV, libraryPath());
   }
 
   @Test
-  void subprocessLoadsThroughJavaLibraryPath() throws Exception {
+  void supportJavaJniLoadsThroughJavaLibraryPath() throws Exception {
     assertLoaderSmoke(List.of("-Djava.library.path=" + Path.of(libraryPath()).getParent()));
   }
 

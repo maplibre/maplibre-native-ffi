@@ -15,6 +15,10 @@ public final class ResourceTransformState implements AutoCloseable {
   private final ResourceTransformCallback callback;
   private final MaplibreNativeC.mln_resource_transform_callback nativeCallback;
   private final MaplibreNativeC.mln_resource_transform transform;
+  private final Object callbackLock = new Object();
+
+  private int activeCallbacks;
+  private boolean closeRequested;
   private boolean closed;
 
   public ResourceTransformState(ResourceTransformCallback callback) {
@@ -27,19 +31,28 @@ public final class ResourceTransformState implements AutoCloseable {
               int kind,
               BytePointer url,
               MaplibreNativeC.mln_resource_transform_response response) {
+            if (!ResourceTransformState.this.enterCallback()) {
+              response.url(null);
+              return MaplibreNativeC.MLN_STATUS_OK;
+            }
             try {
               var transformed =
                   ResourceTransformState.this.callback.transform(
                       new ResourceTransformRequest(
-                          ResourceKind.fromNative(kind), kind, JavaCppSupport.cString(url)));
+                          ResourceKind.fromNative(kind), JavaCppSupport.cString(url)));
               response.url(null);
               if (transformed.isPresent() && !transformed.get().isEmpty()) {
+                if (transformed.get().indexOf('\0') >= 0) {
+                  return MaplibreNativeC.MLN_STATUS_OK;
+                }
                 return setResponseUrl(response, transformed.get());
               }
               return MaplibreNativeC.MLN_STATUS_OK;
             } catch (Throwable exception) {
               response.url(null);
               return MaplibreNativeC.MLN_STATUS_NATIVE_ERROR;
+            } finally {
+              ResourceTransformState.this.exitCallback();
             }
           }
         };
@@ -53,12 +66,55 @@ public final class ResourceTransformState implements AutoCloseable {
     return transform;
   }
 
+  public boolean isClosed() {
+    synchronized (callbackLock) {
+      return closed;
+    }
+  }
+
+  private boolean enterCallback() {
+    synchronized (callbackLock) {
+      if (closeRequested || closed) {
+        return false;
+      }
+      activeCallbacks++;
+      return true;
+    }
+  }
+
+  private void exitCallback() {
+    synchronized (callbackLock) {
+      activeCallbacks--;
+      if (activeCallbacks == 0) {
+        callbackLock.notifyAll();
+      }
+    }
+  }
+
   @Override
-  public synchronized void close() {
-    if (!closed) {
+  public void close() {
+    var interrupted = false;
+    synchronized (callbackLock) {
+      if (closed) {
+        return;
+      }
+      closeRequested = true;
+      while (activeCallbacks > 0) {
+        try {
+          callbackLock.wait();
+        } catch (InterruptedException exception) {
+          interrupted = true;
+        }
+      }
       closed = true;
+    }
+    try {
       transform.close();
       nativeCallback.close();
+    } finally {
+      if (interrupted) {
+        Thread.currentThread().interrupt();
+      }
     }
   }
 

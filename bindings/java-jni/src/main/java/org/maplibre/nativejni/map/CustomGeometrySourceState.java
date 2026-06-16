@@ -45,6 +45,12 @@ final class CustomGeometrySourceState implements AutoCloseable {
     return descriptor;
   }
 
+  boolean isClosedForTesting() {
+    synchronized (callbackLock) {
+      return closed;
+    }
+  }
+
   private void writeFields() {
     var fields = 0;
     if (options.hasMinZoom()) {
@@ -106,7 +112,7 @@ final class CustomGeometrySourceState implements AutoCloseable {
 
   private boolean enterCallback() {
     synchronized (callbackLock) {
-      if (closed) {
+      if (closeRequested || closed) {
         return false;
       }
       activeCallbacks++;
@@ -115,16 +121,11 @@ final class CustomGeometrySourceState implements AutoCloseable {
   }
 
   private void exitCallback() {
-    var shouldClose = false;
     synchronized (callbackLock) {
       activeCallbacks--;
-      shouldClose = closeRequested && activeCallbacks == 0 && !closed;
-      if (shouldClose) {
-        closed = true;
+      if (activeCallbacks == 0) {
+        callbackLock.notifyAll();
       }
-    }
-    if (shouldClose) {
-      closeNative();
     }
   }
 
@@ -135,19 +136,27 @@ final class CustomGeometrySourceState implements AutoCloseable {
 
   @Override
   public void close() {
-    var shouldClose = false;
+    var interrupted = false;
     synchronized (callbackLock) {
-      if (closed || closeRequested) {
+      if (closed) {
         return;
       }
       closeRequested = true;
-      shouldClose = activeCallbacks == 0;
-      if (shouldClose) {
-        closed = true;
+      while (activeCallbacks > 0) {
+        try {
+          callbackLock.wait();
+        } catch (InterruptedException exception) {
+          interrupted = true;
+        }
       }
+      closed = true;
     }
-    if (shouldClose) {
+    try {
       closeNative();
+    } finally {
+      if (interrupted) {
+        Thread.currentThread().interrupt();
+      }
     }
   }
 

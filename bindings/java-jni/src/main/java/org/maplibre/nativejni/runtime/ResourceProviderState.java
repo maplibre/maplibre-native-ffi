@@ -22,6 +22,10 @@ final class ResourceProviderState implements AutoCloseable {
   private final ResourceProviderCallback callback;
   private final MaplibreNativeC.mln_resource_provider_callback nativeCallback;
   private final MaplibreNativeC.mln_resource_provider provider;
+  private final Object callbackLock = new Object();
+
+  private int activeCallbacks;
+  private boolean closeRequested;
   private boolean closed;
 
   ResourceProviderState(ResourceProviderCallback callback) {
@@ -33,6 +37,9 @@ final class ResourceProviderState implements AutoCloseable {
               Pointer userData,
               MaplibreNativeC.mln_resource_request request,
               MaplibreNativeC.mln_resource_request_handle handle) {
+            if (!ResourceProviderState.this.enterCallback()) {
+              return ResourceProviderDecision.PASS_THROUGH.nativeValue();
+            }
             ResourceRequestHandle requestHandle = null;
             try {
               requestHandle = new ResourceRequestHandle(InternalAccess.INSTANCE, handle.address());
@@ -46,6 +53,8 @@ final class ResourceProviderState implements AutoCloseable {
               return requestHandle == null
                   ? -1
                   : requestHandle.finishProviderException(InternalAccess.INSTANCE);
+            } finally {
+              ResourceProviderState.this.exitCallback();
             }
           }
         };
@@ -59,12 +68,55 @@ final class ResourceProviderState implements AutoCloseable {
     return provider;
   }
 
+  boolean isClosed() {
+    synchronized (callbackLock) {
+      return closed;
+    }
+  }
+
+  private boolean enterCallback() {
+    synchronized (callbackLock) {
+      if (closeRequested || closed) {
+        return false;
+      }
+      activeCallbacks++;
+      return true;
+    }
+  }
+
+  private void exitCallback() {
+    synchronized (callbackLock) {
+      activeCallbacks--;
+      if (activeCallbacks == 0) {
+        callbackLock.notifyAll();
+      }
+    }
+  }
+
   @Override
-  public synchronized void close() {
-    if (!closed) {
+  public void close() {
+    var interrupted = false;
+    synchronized (callbackLock) {
+      if (closed) {
+        return;
+      }
+      closeRequested = true;
+      while (activeCallbacks > 0) {
+        try {
+          callbackLock.wait();
+        } catch (InterruptedException exception) {
+          interrupted = true;
+        }
+      }
       closed = true;
+    }
+    try {
       provider.close();
       nativeCallback.close();
+    } finally {
+      if (interrupted) {
+        Thread.currentThread().interrupt();
+      }
     }
   }
 
@@ -72,15 +124,10 @@ final class ResourceProviderState implements AutoCloseable {
     return new ResourceRequest(
         JavaCppSupport.cString(request.url()),
         ResourceKind.fromNative(request.kind()),
-        request.kind(),
         ResourceLoadingMethod.fromNative(request.loading_method()),
-        request.loading_method(),
         ResourcePriority.fromNative(request.priority()),
-        request.priority(),
         ResourceUsage.fromNative(request.usage()),
-        request.usage(),
         ResourceStoragePolicy.fromNative(request.storage_policy()),
-        request.storage_policy(),
         request.has_range()
             ? Optional.of(new ByteRange(request.range_start(), request.range_end()))
             : Optional.empty(),

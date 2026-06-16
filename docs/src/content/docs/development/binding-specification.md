@@ -245,7 +245,8 @@ Public enum values convert to C through a complete named-case mapping. Public
 values represent valid C enum inputs.
 
 When C returns an enum value that the binding does not know yet, the binding
-preserves the raw value instead of collapsing it to a known case.
+preserves the raw value instead of collapsing it to a known case. Public input
+paths reject values outside the C input contract before crossing into C.
 
 Public bit masks use a named public type that supports combining, testing, and
 empty values. C field masks stay internal to C struct materializers.
@@ -264,6 +265,11 @@ object member order, repeated member names, signed and unsigned integer width,
 floating-point values, booleans, nulls, strings, arrays, and nested objects. Raw
 JSON or GeoJSON text inputs MUST pass through as text without reparsing or
 reformatting unless the public API is explicitly a structured-value API.
+
+Languages without a native unsigned 64-bit integer type MAY expose unsigned JSON
+and GeoJSON integer values through a fixed-width language carrier that preserves
+the raw 64-bit value. The binding documentation MUST state how callers compare
+and format that carrier as unsigned.
 
 ### Native pointers
 
@@ -558,6 +564,8 @@ are allowed for behavior that cannot be produced reliably through the public
 native library:
 
 - ABI mismatch before public handle creation;
+- native status conversion for status categories whose C producers are
+  nondeterministic, backend-dependent, or native-exception-only;
 - unknown future status, enum, event, or payload values;
 - native destroy, request release, frame release, and callback-install failure;
 - allocation or copy failure after a native snapshot/list/result handle is
@@ -577,15 +585,15 @@ that a real native failure would expose.
 
 ### Status and diagnostics
 
-| ID      | Test                                                                                                                                                                             |
-| ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| BND-020 | Each native status category maps to the expected public error category through one real failing C call.                                                                          |
-| BND-021 | Unknown native status maps to the unknown-status category and preserves the raw status value, using an internal conversion hook when no real C call can produce a future status. |
-| BND-022 | A native diagnostic is copied immediately and remains available after a later C call changes thread-local state.                                                                 |
-| BND-023 | Binding-owned closed-handle validation returns the documented public error before crossing into C.                                                                               |
-| BND-024 | Invalid string input containing embedded `NUL` is rejected for null-terminated C inputs.                                                                                         |
-| BND-025 | Binding-owned validation produces a fresh binding diagnostic and does not expose stale native thread-local diagnostics.                                                          |
-| BND-026 | A public failing call that performs binding cleanup or support work still reports the original native diagnostic, not a later diagnostic.                                        |
+| ID      | Test                                                                                                                                      |
+| ------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| BND-020 | Each native status category maps to the expected public error category.                                                                   |
+| BND-021 | Unknown native status preserves the raw status value, using an internal conversion hook when no real C call can produce a future status.  |
+| BND-022 | A native diagnostic is copied immediately and remains available after a later C call changes thread-local state.                          |
+| BND-023 | Binding-owned closed-handle validation returns the documented public error before crossing into C.                                        |
+| BND-024 | Invalid string input containing embedded `NUL` is rejected for null-terminated C inputs.                                                  |
+| BND-025 | Binding-owned validation produces a fresh binding diagnostic and does not expose stale native thread-local diagnostics.                   |
+| BND-026 | A public failing call that performs binding cleanup or support work still reports the original native diagnostic, not a later diagnostic. |
 
 ### Handle lifetime
 
@@ -609,6 +617,7 @@ that a real native failure would expose.
 | BND-065 | GeoJSON values copy nested geometries, features, properties, and identifiers.                                                    |
 | BND-066 | Native snapshot/list/result handles are released on success and on copy failure, using fault injection for copy failure.         |
 | BND-067 | Structured JSON preserves object member order, repeated member names, and signed or unsigned integer width.                      |
+| BND-068 | Unknown enum values preserve their raw value and are rejected before crossing into C when used in public input APIs.             |
 
 ### Runtime and events
 

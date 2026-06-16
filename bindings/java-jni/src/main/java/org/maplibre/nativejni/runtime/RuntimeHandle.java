@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicReference;
 import org.bytedeco.javacpp.BoolPointer;
 import org.maplibre.nativejni.error.InvalidStateException;
 import org.maplibre.nativejni.internal.access.InternalAccess;
@@ -27,11 +28,18 @@ import org.maplibre.nativejni.resource.ResourceTransformCallback;
 
 /** Owned native runtime handle. Close it on the owner thread. */
 public final class RuntimeHandle implements AutoCloseable {
+  private static final AtomicReference<RuntimeException> RESOURCE_TRANSFORM_INSTALL_FAILURE =
+      new AtomicReference<>();
+  private static final AtomicReference<RuntimeException> RESOURCE_PROVIDER_INSTALL_FAILURE =
+      new AtomicReference<>();
+
   private final HandleState state;
   private final ConcurrentHashMap<Long, WeakReference<MapHandle>> liveMaps =
       new ConcurrentHashMap<>();
   private ResourceProviderState resourceProvider;
   private ResourceTransformState resourceTransform;
+  private ResourceProviderState failedResourceProviderForTesting;
+  private ResourceTransformState failedResourceTransformForTesting;
 
   private RuntimeHandle(long handle) {
     this.state = new HandleState("RuntimeHandle", handle);
@@ -66,6 +74,15 @@ public final class RuntimeHandle implements AutoCloseable {
     }
   }
 
+  private static void validateOfflineRegionDefinition(OfflineRegionDefinition definition) {
+    switch (definition) {
+      case OfflineRegionDefinition.TilePyramid tilePyramid ->
+          Status.checkNoEmbeddedNul(tilePyramid.styleUrl(), "offline region style URL");
+      case OfflineRegionDefinition.GeometryRegion geometryRegion ->
+          Status.checkNoEmbeddedNul(geometryRegion.styleUrl(), "offline region style URL");
+    }
+  }
+
   public void runOnce() {
     NativeLibrary.ensureLoaded();
     Status.check(
@@ -93,6 +110,7 @@ public final class RuntimeHandle implements AutoCloseable {
       OfflineRegionDefinition definition, byte[] metadata) {
     NativeLibrary.ensureLoaded();
     Objects.requireNonNull(definition, "definition");
+    validateOfflineRegionDefinition(definition);
     var outOperationId = new long[1];
     try (var nativeDefinition = new OfflineStructs.DefinitionScope(definition)) {
       Status.check(
@@ -326,27 +344,24 @@ public final class RuntimeHandle implements AutoCloseable {
     var operationId =
         operation.requireLive(
             this, OfflineOperationKind.REGION_GET_STATUS, OfflineOperationResultKind.REGION_STATUS);
-    var status = new MaplibreNativeC.mln_offline_region_status();
-    status.size(status.sizeof());
-    Status.check(
-        MaplibreNativeC.mln_runtime_offline_region_get_status_take_result(
-            JavaCppSupport.runtime(state.requireLiveAddress()), operationId, status));
-    operation.markConsumed();
-    var rawDownloadState = status.download_state();
-    var regionStatus =
-        new OfflineRegionStatus(
-            OfflineRegionDownloadState.fromNative(rawDownloadState),
-            rawDownloadState,
-            status.completed_resource_count(),
-            status.completed_resource_size(),
-            status.completed_tile_count(),
-            status.required_tile_count(),
-            status.completed_tile_size(),
-            status.required_resource_count(),
-            status.required_resource_count_is_precise(),
-            status.complete());
-    status.close();
-    return regionStatus;
+    try (var status = new MaplibreNativeC.mln_offline_region_status()) {
+      status.size(status.sizeof());
+      Status.check(
+          MaplibreNativeC.mln_runtime_offline_region_get_status_take_result(
+              JavaCppSupport.runtime(state.requireLiveAddress()), operationId, status));
+      operation.markConsumed();
+      var rawDownloadState = status.download_state();
+      return new OfflineRegionStatus(
+          OfflineRegionDownloadState.fromNative(rawDownloadState),
+          status.completed_resource_count(),
+          status.completed_resource_size(),
+          status.completed_tile_count(),
+          status.required_tile_count(),
+          status.completed_tile_size(),
+          status.required_resource_count(),
+          status.required_resource_count_is_precise(),
+          status.complete());
+    }
   }
 
   void discardOfflineOperation(OfflineOperationHandle<?> operation) {
@@ -373,11 +388,13 @@ public final class RuntimeHandle implements AutoCloseable {
     NativeLibrary.ensureLoaded();
     var replacement = new ResourceTransformState(Objects.requireNonNull(callback, "callback"));
     try {
+      throwResourceTransformInstallFailureForTesting();
       Status.check(
           MaplibreNativeC.mln_runtime_set_resource_transform(
               JavaCppSupport.runtime(state.requireLiveAddress()), replacement.transform()));
     } catch (RuntimeException | Error error) {
       closeQuietly(replacement);
+      failedResourceTransformForTesting = replacement;
       throw error;
     }
     closeQuietly(resourceTransform);
@@ -397,15 +414,59 @@ public final class RuntimeHandle implements AutoCloseable {
     NativeLibrary.ensureLoaded();
     var replacement = new ResourceProviderState(Objects.requireNonNull(callback, "callback"));
     try {
+      throwResourceProviderInstallFailureForTesting();
       Status.check(
           MaplibreNativeC.mln_runtime_set_resource_provider(
               JavaCppSupport.runtime(state.requireLiveAddress()), replacement.provider()));
     } catch (RuntimeException | Error error) {
       closeQuietly(replacement);
+      failedResourceProviderForTesting = replacement;
       throw error;
     }
     closeQuietly(resourceProvider);
     resourceProvider = replacement;
+  }
+
+  static void failNextResourceTransformInstallForTesting(RuntimeException failure) {
+    if (!RESOURCE_TRANSFORM_INSTALL_FAILURE.compareAndSet(null, Objects.requireNonNull(failure))) {
+      throw new IllegalStateException("resource transform install failure is already armed");
+    }
+  }
+
+  static void failNextResourceProviderInstallForTesting(RuntimeException failure) {
+    if (!RESOURCE_PROVIDER_INSTALL_FAILURE.compareAndSet(null, Objects.requireNonNull(failure))) {
+      throw new IllegalStateException("resource provider install failure is already armed");
+    }
+  }
+
+  ResourceTransformState resourceTransformForTesting() {
+    return resourceTransform;
+  }
+
+  ResourceTransformState failedResourceTransformForTesting() {
+    return failedResourceTransformForTesting;
+  }
+
+  ResourceProviderState resourceProviderForTesting() {
+    return resourceProvider;
+  }
+
+  ResourceProviderState failedResourceProviderForTesting() {
+    return failedResourceProviderForTesting;
+  }
+
+  private static void throwResourceTransformInstallFailureForTesting() {
+    var failure = RESOURCE_TRANSFORM_INSTALL_FAILURE.getAndSet(null);
+    if (failure != null) {
+      throw failure;
+    }
+  }
+
+  private static void throwResourceProviderInstallFailureForTesting() {
+    var failure = RESOURCE_PROVIDER_INSTALL_FAILURE.getAndSet(null);
+    if (failure != null) {
+      throw failure;
+    }
   }
 
   public Optional<RuntimeEvent> pollEvent() {
@@ -415,6 +476,7 @@ public final class RuntimeHandle implements AutoCloseable {
     var booleans = new boolean[RuntimeStructs.BOOLEAN_COUNT];
     var doubles = new double[RuntimeStructs.DOUBLE_COUNT];
     var strings = new String[RuntimeStructs.STRING_COUNT];
+    var bytes = new byte[RuntimeStructs.BYTES_COUNT][];
     try (var nativeEvent = new MaplibreNativeC.mln_runtime_event()) {
       nativeEvent.size(nativeEvent.sizeof());
       var hasEvent = new boolean[1];
@@ -423,7 +485,7 @@ public final class RuntimeHandle implements AutoCloseable {
               JavaCppSupport.runtime(state.requireLiveAddress()), nativeEvent, hasEvent));
       booleans[RuntimeStructs.BOOLEAN_HAS_EVENT] = hasEvent[0];
       if (hasEvent[0]) {
-        RuntimeStructs.copyEvent(nativeEvent, longs, ints, booleans, doubles, strings);
+        RuntimeStructs.copyEvent(nativeEvent, longs, ints, booleans, doubles, strings, bytes);
       }
     }
     if (!booleans[RuntimeStructs.BOOLEAN_HAS_EVENT]) {
@@ -440,7 +502,7 @@ public final class RuntimeHandle implements AutoCloseable {
             : Optional.<MapHandle>empty();
     var event =
         RuntimeStructs.runtimeEvent(
-            longs, ints, booleans, doubles, strings, runtimeSource, mapSource);
+            longs, ints, booleans, doubles, strings, bytes, runtimeSource, mapSource);
     if (event.type() == RuntimeEventType.MAP_STYLE_LOADED) {
       event
           .mapSource()
@@ -465,8 +527,13 @@ public final class RuntimeHandle implements AutoCloseable {
   }
 
   public long nativeAddress(InternalAccess access) {
-    Objects.requireNonNull(access, "access");
+    Objects.requireNonNull(access, "access").checkCaller();
     return nativeAddress();
+  }
+
+  public HandleState.ChildRetention retainChild(InternalAccess access, String childTypeName) {
+    Objects.requireNonNull(access, "access").checkCaller();
+    return state.retainChild(childTypeName);
   }
 
   long nativeAddress() {
@@ -474,13 +541,13 @@ public final class RuntimeHandle implements AutoCloseable {
   }
 
   public void registerMap(InternalAccess access, MapHandle map) {
-    Objects.requireNonNull(access, "access");
+    Objects.requireNonNull(access, "access").checkCaller();
     Objects.requireNonNull(map, "map");
     liveMaps.put(map.nativeAddress(InternalAccess.INSTANCE), new WeakReference<>(map));
   }
 
   public void unregisterMap(InternalAccess access, MapHandle map) {
-    Objects.requireNonNull(access, "access");
+    Objects.requireNonNull(access, "access").checkCaller();
     Objects.requireNonNull(map, "map");
     liveMaps.entrySet().removeIf(entry -> entry.getValue().get() == map);
   }
