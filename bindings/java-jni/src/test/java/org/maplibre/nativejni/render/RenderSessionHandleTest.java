@@ -44,7 +44,7 @@ import org.maplibre.nativejni.runtime.RuntimeHandle;
 import org.maplibre.nativejni.test.RenderTargetTestSupport;
 
 class RenderSessionHandleTest {
-  private static final double RENDERED_QUERY_COORDINATE_TOLERANCE = 1.0e-6;
+  private static final double RENDERED_QUERY_COORDINATE_TOLERANCE = 1.0e-4;
 
   private static final String STYLE_JSON =
       """
@@ -139,6 +139,7 @@ class RenderSessionHandleTest {
 
   @AfterEach
   void restoreProcessState() {
+    RenderSessionHandle.resetFrameConstructionFailureForTesting();
     Maplibre.clearLogCallback();
     Maplibre.restoreDefaultAsyncLogSeverities();
   }

@@ -9,6 +9,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 import org.bytedeco.javacpp.BoolPointer;
 import org.maplibre.nativejni.error.InvalidStateException;
+import org.maplibre.nativejni.error.MaplibreStatus;
 import org.maplibre.nativejni.internal.access.InternalAccess;
 import org.maplibre.nativejni.internal.callback.ResourceTransformState;
 import org.maplibre.nativejni.internal.javacpp.JavaCppSupport;
@@ -378,10 +379,17 @@ public final class RuntimeHandle implements AutoCloseable {
       operation.markConsumed();
       throw error;
     }
-    Status.check(
+    var status =
         MaplibreNativeC.mln_runtime_offline_operation_discard(
-            JavaCppSupport.runtime(runtimeAddress), operationId));
-    operation.markConsumed();
+            JavaCppSupport.runtime(runtimeAddress), operationId);
+    if (status == MaplibreStatus.WRONG_THREAD.nativeCode()) {
+      Status.check(status);
+    }
+    try {
+      Status.check(status);
+    } finally {
+      operation.markConsumed();
+    }
   }
 
   public void setResourceTransform(ResourceTransformCallback callback) {
@@ -437,6 +445,11 @@ public final class RuntimeHandle implements AutoCloseable {
     if (!RESOURCE_PROVIDER_INSTALL_FAILURE.compareAndSet(null, Objects.requireNonNull(failure))) {
       throw new IllegalStateException("resource provider install failure is already armed");
     }
+  }
+
+  static void resetInstallFailuresForTesting() {
+    RESOURCE_TRANSFORM_INSTALL_FAILURE.set(null);
+    RESOURCE_PROVIDER_INSTALL_FAILURE.set(null);
   }
 
   ResourceTransformState resourceTransformForTesting() {

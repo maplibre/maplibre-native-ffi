@@ -266,10 +266,11 @@ floating-point values, booleans, nulls, strings, arrays, and nested objects. Raw
 JSON or GeoJSON text inputs MUST pass through as text without reparsing or
 reformatting unless the public API is explicitly a structured-value API.
 
-Languages without a native unsigned 64-bit integer type MAY expose unsigned JSON
-and GeoJSON integer values through a fixed-width language carrier that preserves
-the raw 64-bit value. The binding documentation MUST state how callers compare
-and format that carrier as unsigned.
+Bindings MUST preserve the full unsigned 64-bit domain for unsigned JSON and
+GeoJSON integer values. Languages without a native unsigned 64-bit integer type
+MUST expose those values through a documented representation that preserves the
+raw value. The binding documentation MUST state how callers compare and format
+representations that are not naturally unsigned.
 
 ### Native pointers
 

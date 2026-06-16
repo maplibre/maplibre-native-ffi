@@ -24,6 +24,7 @@ import org.maplibre.nativejni.log.LogRecord;
 class LogCallbackStateTest {
   @AfterEach
   void clearLogCallback() {
+    LogCallbackState.resetInstallFailureForTesting();
     Maplibre.clearLogCallback();
   }
 

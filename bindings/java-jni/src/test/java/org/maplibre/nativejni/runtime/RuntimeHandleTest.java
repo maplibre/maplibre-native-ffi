@@ -19,6 +19,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.maplibre.nativejni.Maplibre;
 import org.maplibre.nativejni.error.InvalidArgumentException;
@@ -40,6 +41,11 @@ import org.maplibre.nativejni.resource.ResourceResponse;
 
 class RuntimeHandleTest {
   private static final String STYLE_JSON = "{\"version\":8,\"sources\":{},\"layers\":[]}";
+
+  @AfterEach
+  void resetTestInjections() {
+    RuntimeHandle.resetInstallFailuresForTesting();
+  }
 
   @Test
   void bnd023AndBnd040AndBnd080CreateRunOnceAndCloseRuntime() {

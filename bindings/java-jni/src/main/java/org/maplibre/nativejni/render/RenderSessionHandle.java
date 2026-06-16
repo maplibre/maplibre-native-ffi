@@ -479,6 +479,10 @@ public final class RenderSessionHandle implements AutoCloseable {
     }
   }
 
+  static void resetFrameConstructionFailureForTesting() {
+    FRAME_CONSTRUCTION_FAILURE.set(null);
+  }
+
   private static void throwFrameConstructionFailureForTesting() {
     var failure = FRAME_CONSTRUCTION_FAILURE.getAndSet(null);
     if (failure != null) {

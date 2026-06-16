@@ -78,6 +78,10 @@ public final class LogCallbackState {
     }
   }
 
+  static void resetInstallFailureForTesting() {
+    INSTALL_FAILURE.set(null);
+  }
+
   private static void throwInstallFailureForTesting() {
     var failure = INSTALL_FAILURE.getAndSet(null);
     if (failure != null) {
