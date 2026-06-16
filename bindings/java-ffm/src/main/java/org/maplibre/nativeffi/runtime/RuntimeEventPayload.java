@@ -1,5 +1,6 @@
 package org.maplibre.nativeffi.runtime;
 
+import java.util.Arrays;
 import org.maplibre.nativeffi.geo.TileId;
 import org.maplibre.nativeffi.map.RenderingStats;
 import org.maplibre.nativeffi.map.TileOperation;
@@ -56,5 +57,49 @@ public sealed interface RuntimeEventPayload
       boolean found)
       implements RuntimeEventPayload {}
 
-  record Unknown(int rawPayloadType, long payloadSize) implements RuntimeEventPayload {}
+  /**
+   * Native event payload that this binding could not decode.
+   *
+   * @param payloadSize byte count reported by native
+   * @param rawPayload copied payload bytes, which can be shorter than {@code payloadSize} when
+   *     native supplied a null payload pointer
+   */
+  record Unknown(int rawPayloadType, long payloadSize, byte[] rawPayload)
+      implements RuntimeEventPayload {
+    public Unknown {
+      rawPayload = rawPayload == null ? new byte[0] : rawPayload.clone();
+    }
+
+    @Override
+    public byte[] rawPayload() {
+      return rawPayload.clone();
+    }
+
+    @Override
+    public boolean equals(Object other) {
+      return other instanceof Unknown that
+          && rawPayloadType == that.rawPayloadType
+          && payloadSize == that.payloadSize
+          && Arrays.equals(rawPayload, that.rawPayload);
+    }
+
+    @Override
+    public int hashCode() {
+      var result = Integer.hashCode(rawPayloadType);
+      result = 31 * result + Long.hashCode(payloadSize);
+      result = 31 * result + Arrays.hashCode(rawPayload);
+      return result;
+    }
+
+    @Override
+    public String toString() {
+      return "Unknown[rawPayloadType="
+          + rawPayloadType
+          + ", payloadSize="
+          + payloadSize
+          + ", rawPayload="
+          + rawPayload.length
+          + " bytes]";
+    }
+  }
 }

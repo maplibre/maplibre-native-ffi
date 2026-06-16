@@ -77,9 +77,14 @@ MLN_FFI_BUILD_DIR = { required = true }
 MLN_FFI_CMAKE_BUILD_TYPE = "{{env.MLN_FFI_CMAKE_BUILD_TYPE | default(value=\"RelWithDebInfo\")}}"
 MLN_FFI_INCLUDE_DIR = "{{config_root}}/include"
 MLN_FFI_VULKAN_INCLUDE_DIR = "{{config_root}}/third_party/maplibre-native/vendor/Vulkan-Headers/include"
+MLN_FFI_DEPENDENCY_INCLUDE_DIR = "{{config_root}}/.pixi/envs/default/include"
+MLN_FFI_DEPENDENCY_LIBRARY_DIR = "{{config_root}}/.pixi/envs/default/lib"
 MLN_FFI_ZIG_TARGET = { required = true }
+MLN_FFI_ZIG_BUILD_ARGS = { required = true }
 MLN_FFI_TEST_TIMEOUT = "{{env.MLN_FFI_TEST_TIMEOUT | default(value=\"30s\")}}"
-_.source = { path = ".mise/env/pixi-provider.sh", tools = true }
+CMAKE_PREFIX_PATH = "{{config_root}}/.pixi/envs/default"
+PKG_CONFIG_PATH = "{{config_root}}/.pixi/envs/default/lib/pkgconfig"
+LIBCLANG_PATH = "{{config_root}}/.pixi/envs/default/lib"
 
 [hooks]
 postinstall = [
@@ -89,7 +94,7 @@ postinstall = [
   # conda-forge ships libclang-13.dll, but clang-sys on Windows searches for libclang.dll.
   # https://github.com/KyleMayes/clang-sys/issues/213
   # https://github.com/conda-forge/llvmdev-feedstock/issues/376
-  "{% if os() == \"windows\" %}cp \"$MLN_FFI_DEPS_PREFIX/bin/libclang-13.dll\" \"$MLN_FFI_DEPS_PREFIX/bin/libclang.dll\"{% endif %}",
+  '{% if os() == "windows" %}libclang_bin="$(dirname "$MLN_FFI_DEPENDENCY_LIBRARY_DIR")/bin"; cp "$libclang_bin/libclang-13.dll" "$libclang_bin/libclang.dll"{% endif %}',
   "uv sync --locked --quiet",
   "pnpm install --frozen-lockfile --loglevel warn",
   "dotnet tool restore --tool-manifest dotnet-tools.json --verbosity quiet",

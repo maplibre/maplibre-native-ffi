@@ -81,7 +81,11 @@ final class ValueStructsTest {
 
   @Test
   void featureDepthCountsFeatureGeometryBoundary() {
-    var feature = new Feature(nestedCollection(Geometry.MAX_COLLECTION_DEPTH), List.of());
+    var feature =
+        new Feature(
+            nestedCollection(Geometry.MAX_COLLECTION_DEPTH),
+            List.of(),
+            FeatureIdentifier.nullValue());
 
     try (var arena = Arena.ofConfined()) {
       assertThrows(IllegalArgumentException.class, () -> ValueStructs.feature(feature, arena));
@@ -90,7 +94,11 @@ final class ValueStructsTest {
 
   @Test
   void geoJsonFeatureCollectionDepthCountsFeatureBoundary() {
-    var feature = new Feature(nestedCollection(Geometry.MAX_COLLECTION_DEPTH - 1), List.of());
+    var feature =
+        new Feature(
+            nestedCollection(Geometry.MAX_COLLECTION_DEPTH - 1),
+            List.of(),
+            FeatureIdentifier.nullValue());
     var geoJson = GeoJson.featureCollection(List.of(feature));
 
     try (var arena = Arena.ofConfined()) {
@@ -103,7 +111,8 @@ final class ValueStructsTest {
     var feature =
         new Feature(
             Geometry.empty(),
-            List.of(new JsonValue.Member("deep", nestedArray(JsonValue.MAX_DESCRIPTOR_DEPTH - 1))));
+            List.of(new JsonValue.Member("deep", nestedArray(JsonValue.MAX_DESCRIPTOR_DEPTH - 1))),
+            FeatureIdentifier.nullValue());
     var geoJson = GeoJson.featureCollection(List.of(feature));
 
     try (var arena = Arena.ofConfined()) {

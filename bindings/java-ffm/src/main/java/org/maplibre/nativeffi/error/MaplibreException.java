@@ -27,7 +27,7 @@ public class MaplibreException extends RuntimeException {
     return diagnostic;
   }
 
-  public static MaplibreException forStatus(
+  static MaplibreException forStatus(
       MaplibreStatus status, int nativeStatusCode, String diagnostic) {
     return switch (status) {
       case INVALID_ARGUMENT -> new InvalidArgumentException(nativeStatusCode, diagnostic);

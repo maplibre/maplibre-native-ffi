@@ -71,6 +71,12 @@ public sealed interface JsonValue
 
   record Bool(boolean value) implements JsonValue {}
 
+  /**
+   * Unsigned 64-bit JSON integer stored in a Java {@code long} using the native bit pattern.
+   *
+   * <p>Use {@link Long#compareUnsigned(long, long)} and {@link Long#toUnsignedString(long)} when
+   * interpreting this value as unsigned.
+   */
   record UInt(long value) implements JsonValue {}
 
   record Int(long value) implements JsonValue {}

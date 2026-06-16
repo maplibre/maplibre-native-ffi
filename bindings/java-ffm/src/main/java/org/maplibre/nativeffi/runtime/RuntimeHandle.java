@@ -4,13 +4,11 @@ import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
 import java.lang.ref.WeakReference;
-import java.nio.file.Path;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import org.maplibre.nativeffi.error.InvalidStateException;
-import org.maplibre.nativeffi.error.MaplibreException;
 import org.maplibre.nativeffi.error.MaplibreStatus;
 import org.maplibre.nativeffi.internal.access.InternalAccess;
 import org.maplibre.nativeffi.internal.c.MapLibreNativeC;
@@ -24,19 +22,17 @@ import org.maplibre.nativeffi.internal.c.mln_runtime_event_render_map;
 import org.maplibre.nativeffi.internal.c.mln_runtime_event_style_image_missing;
 import org.maplibre.nativeffi.internal.c.mln_runtime_event_tile_action;
 import org.maplibre.nativeffi.internal.callback.ResourceTransformState;
+import org.maplibre.nativeffi.internal.convert.NativeValues;
 import org.maplibre.nativeffi.internal.lifecycle.HandleState;
 import org.maplibre.nativeffi.internal.loader.NativeAccess;
 import org.maplibre.nativeffi.internal.memory.MemoryUtil;
 import org.maplibre.nativeffi.internal.status.Status;
 import org.maplibre.nativeffi.internal.struct.RuntimeStructs;
 import org.maplibre.nativeffi.map.MapHandle;
-import org.maplibre.nativeffi.map.TileOperation;
 import org.maplibre.nativeffi.offline.OfflineRegionDefinition;
 import org.maplibre.nativeffi.offline.OfflineRegionDownloadState;
 import org.maplibre.nativeffi.offline.OfflineRegionInfo;
 import org.maplibre.nativeffi.offline.OfflineRegionStatus;
-import org.maplibre.nativeffi.render.RenderMode;
-import org.maplibre.nativeffi.resource.ResourceErrorReason;
 import org.maplibre.nativeffi.resource.ResourceProviderCallback;
 import org.maplibre.nativeffi.resource.ResourceTransformCallback;
 
@@ -50,10 +46,6 @@ public final class RuntimeHandle implements AutoCloseable {
 
   private RuntimeHandle(MemorySegment handle) {
     this.state = new HandleState("RuntimeHandle", handle);
-  }
-
-  public static RuntimeHandle create() {
-    return create(new RuntimeOptions());
   }
 
   public static RuntimeHandle create(RuntimeOptions options) {
@@ -86,7 +78,7 @@ public final class RuntimeHandle implements AutoCloseable {
       Status.check(
           MapLibreNativeC.mln_runtime_run_ambient_cache_operation_start(
               runtime,
-              Objects.requireNonNull(operation, "operation").nativeValue(),
+              NativeValues.nativeValue(Objects.requireNonNull(operation, "operation")),
               outOperationId));
       return offlineOperation(
           outOperationId.get(ValueLayout.JAVA_LONG, 0),
@@ -142,11 +134,6 @@ public final class RuntimeHandle implements AutoCloseable {
           OfflineOperationKind.REGIONS_LIST,
           OfflineOperationResultKind.REGION_LIST);
     }
-  }
-
-  public OfflineOperationHandle<List<OfflineRegionInfo>> startMergeOfflineRegionsDatabase(
-      Path path) {
-    return startMergeOfflineRegionsDatabase(Objects.requireNonNull(path, "path").toString());
   }
 
   public OfflineOperationHandle<List<OfflineRegionInfo>> startMergeOfflineRegionsDatabase(
@@ -220,7 +207,8 @@ public final class RuntimeHandle implements AutoCloseable {
   public OfflineOperationHandle<Void> startSetOfflineRegionDownloadState(
       long id, OfflineRegionDownloadState downloadState) {
     NativeAccess.ensureLoaded();
-    var stateValue = Objects.requireNonNull(downloadState, "downloadState").nativeValue();
+    var stateValue =
+        NativeValues.nativeValue(Objects.requireNonNull(downloadState, "downloadState"));
     var runtime = state.requireLive();
     try (var arena = Arena.ofConfined()) {
       var outOperationId = arena.allocate(ValueLayout.JAVA_LONG);
@@ -402,6 +390,9 @@ public final class RuntimeHandle implements AutoCloseable {
     var replacement = new ResourceTransformState(Objects.requireNonNull(callback, "callback"));
     ResourceTransformState previous;
     try {
+      if (resourceTransformState != null && resourceTransformState.isCurrentThreadInCallback()) {
+        throw Status.callbackReentry("Resource transform");
+      }
       Status.check(
           MapLibreNativeC.mln_runtime_set_resource_transform(
               state.requireLive(), replacement.descriptor()));
@@ -416,6 +407,9 @@ public final class RuntimeHandle implements AutoCloseable {
 
   public void clearResourceTransform() {
     NativeAccess.ensureLoaded();
+    if (resourceTransformState != null && resourceTransformState.isCurrentThreadInCallback()) {
+      throw Status.callbackReentry("Resource transform");
+    }
     Status.check(MapLibreNativeC.mln_runtime_clear_resource_transform(state.requireLive()));
     var previous = resourceTransformState;
     resourceTransformState = null;
@@ -427,6 +421,9 @@ public final class RuntimeHandle implements AutoCloseable {
     var replacement = new ResourceProviderState(Objects.requireNonNull(callback, "callback"));
     ResourceProviderState previous;
     try {
+      if (resourceProviderState != null && resourceProviderState.isCurrentThreadInCallback()) {
+        throw Status.callbackReentry("Resource provider");
+      }
       Status.check(
           MapLibreNativeC.mln_runtime_set_resource_provider(
               state.requireLive(), replacement.descriptor()));
@@ -464,7 +461,7 @@ public final class RuntimeHandle implements AutoCloseable {
   }
 
   public MemorySegment nativeHandle(InternalAccess access) {
-    Objects.requireNonNull(access, "access");
+    Objects.requireNonNull(access, "access").checkCaller();
     return nativeHandle();
   }
 
@@ -472,17 +469,30 @@ public final class RuntimeHandle implements AutoCloseable {
     return state.requireLive();
   }
 
+  public long nativeAddress(InternalAccess access) {
+    Objects.requireNonNull(access, "access").checkCaller();
+    return nativeAddress();
+  }
+
   long nativeAddress() {
     return state.address();
   }
 
   public void registerMap(InternalAccess access, MapHandle map) {
-    Objects.requireNonNull(access, "access");
+    Objects.requireNonNull(access, "access").checkCaller();
+    registerMap(map);
+  }
+
+  void registerMap(MapHandle map) {
     liveMaps.put(map.nativeAddress(InternalAccess.INSTANCE), new WeakReference<>(map));
   }
 
   public void unregisterMap(InternalAccess access, MapHandle map) {
-    Objects.requireNonNull(access, "access");
+    Objects.requireNonNull(access, "access").checkCaller();
+    unregisterMap(map);
+  }
+
+  void unregisterMap(MapHandle map) {
     liveMaps.computeIfPresent(
         map.nativeAddress(InternalAccess.INSTANCE),
         (address, reference) -> reference.get() == map ? null : reference);
@@ -505,17 +515,17 @@ public final class RuntimeHandle implements AutoCloseable {
     var rawType = mln_runtime_event.type(event);
     var rawSourceType = mln_runtime_event.source_type(event);
     var source = mln_runtime_event.source(event);
-    var sourceType = RuntimeEventSourceType.fromNative(rawSourceType);
+    var sourceType = NativeValues.runtimeEventSourceType(rawSourceType);
     var runtimeSource =
-        sourceType == RuntimeEventSourceType.RUNTIME
+        RuntimeEventSourceType.RUNTIME.equals(sourceType)
             ? Optional.of(this)
             : Optional.<RuntimeHandle>empty();
     var mapSource =
-        sourceType == RuntimeEventSourceType.MAP
+        RuntimeEventSourceType.MAP.equals(sourceType)
             ? Optional.ofNullable(mapFor(source))
             : Optional.<MapHandle>empty();
     var rawPayloadType = mln_runtime_event.payload_type(event);
-    var eventType = RuntimeEventType.fromNative(rawType);
+    var eventType = NativeValues.runtimeEventType(rawType);
     var copied =
         new RuntimeEvent(
             eventType,
@@ -532,7 +542,7 @@ public final class RuntimeHandle implements AutoCloseable {
                 mln_runtime_event.payload_size(event)),
             MemoryUtil.copyStringView(
                 mln_runtime_event.message(event), mln_runtime_event.message_size(event)));
-    if (eventType == RuntimeEventType.MAP_STYLE_LOADED) {
+    if (RuntimeEventType.MAP_STYLE_LOADED.equals(eventType)) {
       mapSource.ifPresent(map -> map.releaseDetachedCustomGeometrySources(InternalAccess.INSTANCE));
     }
     return copied;
@@ -544,57 +554,63 @@ public final class RuntimeHandle implements AutoCloseable {
       return RuntimeEventPayload.NONE;
     }
     if (MemoryUtil.isNull(payload) || payloadSize == 0) {
-      return new RuntimeEventPayload.Unknown(rawPayloadType, payloadSize);
+      return unknownPayload(rawPayloadType, payload, payloadSize);
     }
 
     if (rawPayloadType == MapLibreNativeC.MLN_RUNTIME_EVENT_PAYLOAD_RENDER_FRAME()) {
       return payloadSize >= mln_runtime_event_render_frame.sizeof()
           ? readRenderFrame(payload)
-          : new RuntimeEventPayload.Unknown(rawPayloadType, payloadSize);
+          : unknownPayload(rawPayloadType, payload, payloadSize);
     }
     if (rawPayloadType == MapLibreNativeC.MLN_RUNTIME_EVENT_PAYLOAD_RENDER_MAP()) {
       return payloadSize >= mln_runtime_event_render_map.sizeof()
           ? readRenderMap(payload)
-          : new RuntimeEventPayload.Unknown(rawPayloadType, payloadSize);
+          : unknownPayload(rawPayloadType, payload, payloadSize);
     }
     if (rawPayloadType == MapLibreNativeC.MLN_RUNTIME_EVENT_PAYLOAD_STYLE_IMAGE_MISSING()) {
       return payloadSize >= mln_runtime_event_style_image_missing.sizeof()
           ? readStyleImageMissing(payload)
-          : new RuntimeEventPayload.Unknown(rawPayloadType, payloadSize);
+          : unknownPayload(rawPayloadType, payload, payloadSize);
     }
     if (rawPayloadType == MapLibreNativeC.MLN_RUNTIME_EVENT_PAYLOAD_TILE_ACTION()) {
       return payloadSize >= mln_runtime_event_tile_action.sizeof()
           ? readTileAction(payload)
-          : new RuntimeEventPayload.Unknown(rawPayloadType, payloadSize);
+          : unknownPayload(rawPayloadType, payload, payloadSize);
     }
     if (rawPayloadType == MapLibreNativeC.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_STATUS()) {
       return payloadSize >= mln_runtime_event_offline_region_status.sizeof()
           ? readOfflineRegionStatus(payload)
-          : new RuntimeEventPayload.Unknown(rawPayloadType, payloadSize);
+          : unknownPayload(rawPayloadType, payload, payloadSize);
     }
     if (rawPayloadType
         == MapLibreNativeC.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_RESPONSE_ERROR()) {
       return payloadSize >= mln_runtime_event_offline_region_response_error.sizeof()
           ? readOfflineRegionResponseError(payload)
-          : new RuntimeEventPayload.Unknown(rawPayloadType, payloadSize);
+          : unknownPayload(rawPayloadType, payload, payloadSize);
     }
     if (rawPayloadType
         == MapLibreNativeC.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_REGION_TILE_COUNT_LIMIT()) {
       return payloadSize >= mln_runtime_event_offline_region_tile_count_limit.sizeof()
           ? readOfflineRegionTileCountLimit(payload)
-          : new RuntimeEventPayload.Unknown(rawPayloadType, payloadSize);
+          : unknownPayload(rawPayloadType, payload, payloadSize);
     }
     if (rawPayloadType == MapLibreNativeC.MLN_RUNTIME_EVENT_PAYLOAD_OFFLINE_OPERATION_COMPLETED()) {
       return readOfflineOperationCompletedPayload(rawPayloadType, payload, payloadSize);
     }
-    return new RuntimeEventPayload.Unknown(rawPayloadType, payloadSize);
+    return unknownPayload(rawPayloadType, payload, payloadSize);
+  }
+
+  static RuntimeEventPayload.Unknown unknownPayload(
+      int rawPayloadType, MemorySegment payload, long payloadSize) {
+    return new RuntimeEventPayload.Unknown(
+        rawPayloadType, payloadSize, MemoryUtil.copyBytes(payload, payloadSize));
   }
 
   private RuntimeEventPayload.RenderFrame readRenderFrame(MemorySegment payload) {
     var frame = payload.reinterpret(mln_runtime_event_render_frame.sizeof());
     var rawMode = mln_runtime_event_render_frame.mode(frame);
     return new RuntimeEventPayload.RenderFrame(
-        RenderMode.fromNative(rawMode),
+        NativeValues.renderMode(rawMode),
         rawMode,
         mln_runtime_event_render_frame.needs_repaint(frame),
         mln_runtime_event_render_frame.placement_changed(frame),
@@ -604,7 +620,7 @@ public final class RuntimeHandle implements AutoCloseable {
   private RuntimeEventPayload.RenderMap readRenderMap(MemorySegment payload) {
     var renderMap = payload.reinterpret(mln_runtime_event_render_map.sizeof());
     var rawMode = mln_runtime_event_render_map.mode(renderMap);
-    return new RuntimeEventPayload.RenderMap(RenderMode.fromNative(rawMode), rawMode);
+    return new RuntimeEventPayload.RenderMap(NativeValues.renderMode(rawMode), rawMode);
   }
 
   private RuntimeEventPayload.StyleImageMissing readStyleImageMissing(MemorySegment payload) {
@@ -619,7 +635,7 @@ public final class RuntimeHandle implements AutoCloseable {
     var action = payload.reinterpret(mln_runtime_event_tile_action.sizeof());
     var rawOperation = mln_runtime_event_tile_action.operation(action);
     return new RuntimeEventPayload.TileAction(
-        TileOperation.fromNative(rawOperation),
+        NativeValues.tileOperation(rawOperation),
         rawOperation,
         RuntimeStructs.tileId(mln_runtime_event_tile_action.tile_id(action)),
         MemoryUtil.copyStringView(
@@ -641,7 +657,7 @@ public final class RuntimeHandle implements AutoCloseable {
     var rawReason = mln_runtime_event_offline_region_response_error.reason(error);
     return new RuntimeEventPayload.OfflineRegionResponseError(
         mln_runtime_event_offline_region_response_error.region_id(error),
-        ResourceErrorReason.fromNative(rawReason),
+        NativeValues.resourceErrorReason(rawReason),
         rawReason);
   }
 
@@ -657,7 +673,7 @@ public final class RuntimeHandle implements AutoCloseable {
       int rawPayloadType, MemorySegment payload, long payloadSize) {
     var requiredSize = mln_runtime_event_offline_operation_completed.sizeof();
     if (MemoryUtil.isNull(payload) || payloadSize < requiredSize) {
-      return new RuntimeEventPayload.Unknown(rawPayloadType, payloadSize);
+      return unknownPayload(rawPayloadType, payload, payloadSize);
     }
     return readOfflineOperationCompleted(payload);
   }
@@ -667,7 +683,7 @@ public final class RuntimeHandle implements AutoCloseable {
     var payloadSize = mln_runtime_event.payload_size(event);
     var requiredSize = mln_runtime_event_offline_operation_completed.sizeof();
     if (MemoryUtil.isNull(payload) || payloadSize < requiredSize) {
-      throw MaplibreException.forStatus(
+      throw NativeValues.exceptionForStatus(
           MaplibreStatus.INVALID_ARGUMENT,
           MapLibreNativeC.MLN_STATUS_INVALID_ARGUMENT(),
           "offline operation completion payload is invalid");
@@ -682,9 +698,9 @@ public final class RuntimeHandle implements AutoCloseable {
     var rawResultKind = mln_runtime_event_offline_operation_completed.result_kind(completed);
     return new RuntimeEventPayload.OfflineOperationCompleted(
         mln_runtime_event_offline_operation_completed.operation_id(completed),
-        OfflineOperationKind.fromNative(rawOperationKind),
+        NativeValues.offlineOperationKind(rawOperationKind),
         rawOperationKind,
-        OfflineOperationResultKind.fromNative(rawResultKind),
+        NativeValues.offlineOperationResultKind(rawResultKind),
         rawResultKind,
         mln_runtime_event_offline_operation_completed.result_status(completed),
         mln_runtime_event_offline_operation_completed.found(completed));

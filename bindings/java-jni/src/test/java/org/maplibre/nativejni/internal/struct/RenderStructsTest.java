@@ -20,9 +20,11 @@ import org.maplibre.nativejni.render.VulkanOwnedTextureDescriptor;
 import org.maplibre.nativejni.render.VulkanSurfaceDescriptor;
 import org.maplibre.nativejni.render.WglContextDescriptor;
 
+// Support invariant for BND-161 and BND-162: render descriptor structs are the
+// JNI materialization seam for backend handles and attach descriptors.
 final class RenderStructsTest {
   @Test
-  void renderTargetDescriptorsMaterializeNestedFields() {
+  void bnd161AndBnd162RenderTargetDescriptorsMaterializeNestedFields() {
     var extent = new RenderTargetExtent(640, 480, 2.0);
     var metalContext = new MetalContextDescriptor(NativePointer.ofAddress(0x1234));
     var vulkanContext =
@@ -122,7 +124,7 @@ final class RenderStructsTest {
   }
 
   @Test
-  void nativeOpenGLDescriptorsMaterializeUnionFields() {
+  void bnd161AndBnd162NativeOpenGLDescriptorsMaterializeUnionFields() {
     var extent = new RenderTargetExtent(640, 480, 2.0);
     var wglContext =
         new WglContextDescriptor(NativePointer.ofAddress(0x100), NativePointer.ofAddress(0x101))

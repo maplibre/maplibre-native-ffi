@@ -1,30 +1,43 @@
 package org.maplibre.nativeffi.map;
 
 /** North orientation used by map viewport options. */
-public enum NorthOrientation {
-  UP(0),
-  RIGHT(1),
-  DOWN(2),
-  LEFT(3),
-  UNKNOWN(-1);
+public final class NorthOrientation {
+  public static final NorthOrientation UP = new NorthOrientation(0);
+  public static final NorthOrientation RIGHT = new NorthOrientation(1);
+  public static final NorthOrientation DOWN = new NorthOrientation(2);
+  public static final NorthOrientation LEFT = new NorthOrientation(3);
 
-  private final int nativeValue;
+  private final int rawValue;
+  private final String name;
 
-  NorthOrientation(int nativeValue) {
-    this.nativeValue = nativeValue;
+  public NorthOrientation(int rawValue) {
+    this.rawValue = rawValue;
+    this.name =
+        switch (rawValue) {
+          case 0 -> "UP";
+          case 1 -> "RIGHT";
+          case 2 -> "DOWN";
+          case 3 -> "LEFT";
+          default -> "UNKNOWN(" + Integer.toUnsignedLong(rawValue) + ")";
+        };
   }
 
-  public int nativeValue() {
-    return nativeValue;
+  public int rawValue() {
+    return rawValue;
   }
 
-  public static NorthOrientation fromNative(int nativeValue) {
-    return switch (nativeValue) {
-      case 0 -> UP;
-      case 1 -> RIGHT;
-      case 2 -> DOWN;
-      case 3 -> LEFT;
-      default -> UNKNOWN;
-    };
+  @Override
+  public boolean equals(Object other) {
+    return other instanceof NorthOrientation that && rawValue == that.rawValue;
+  }
+
+  @Override
+  public int hashCode() {
+    return Integer.hashCode(rawValue);
+  }
+
+  @Override
+  public String toString() {
+    return name;
   }
 }

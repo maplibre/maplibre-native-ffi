@@ -5,7 +5,7 @@ namespace Maplibre.Native.Examples.DotnetMap;
 
 internal static class NativeLibraryResolver
 {
-    private const string DependencyPrefixEnvironment = "MLN_FFI_DEPS_PREFIX";
+    private const string DependencyLibraryDirEnvironment = "MLN_FFI_DEPENDENCY_LIBRARY_DIR";
     private static readonly object RegistrationLock = new();
     private static bool registered;
 
@@ -82,9 +82,16 @@ internal static class NativeLibraryResolver
 
     private static IEnumerable<string> CandidateLibraryDirectories()
     {
+        var dependencyLibraryDir = Environment.GetEnvironmentVariable(
+            DependencyLibraryDirEnvironment
+        );
+        if (!string.IsNullOrWhiteSpace(dependencyLibraryDir))
+        {
+            yield return dependencyLibraryDir;
+        }
+
         var environmentPrefixes = new[]
         {
-            Environment.GetEnvironmentVariable(DependencyPrefixEnvironment),
             Environment.GetEnvironmentVariable("CONDA_PREFIX"),
             Environment.GetEnvironmentVariable("PIXI_PROJECT_ROOT") is { Length: > 0 } pixiRoot
                 ? Path.Combine(pixiRoot, ".pixi", "envs", "default")

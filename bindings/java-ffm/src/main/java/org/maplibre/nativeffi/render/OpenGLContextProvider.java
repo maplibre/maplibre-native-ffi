@@ -13,11 +13,11 @@ public enum OpenGLContextProvider {
     this.nativeMask = nativeMask;
   }
 
-  public int nativeMask() {
+  int nativeMask() {
     return nativeMask;
   }
 
-  public static EnumSet<OpenGLContextProvider> fromMask(int mask) {
+  static EnumSet<OpenGLContextProvider> fromMask(int mask) {
     var providers = EnumSet.noneOf(OpenGLContextProvider.class);
     for (var provider : values()) {
       if ((mask & provider.nativeMask) != 0) {

@@ -4,6 +4,7 @@ import java.lang.ref.Cleaner;
 import java.util.Objects;
 import org.maplibre.nativeffi.error.InvalidStateException;
 import org.maplibre.nativeffi.error.MaplibreStatus;
+import org.maplibre.nativeffi.internal.convert.NativeValues;
 
 /** Owner-thread offline database operation that must be taken or discarded. */
 public final class OfflineOperationHandle<T> implements AutoCloseable {
@@ -52,11 +53,12 @@ public final class OfflineOperationHandle<T> implements AutoCloseable {
   synchronized long requireLive(RuntimeHandle expectedRuntime) {
     if (closed) {
       throw new InvalidStateException(
-          MaplibreStatus.INVALID_STATE.nativeCode(), "OfflineOperationHandle is already closed");
+          NativeValues.nativeCode(MaplibreStatus.INVALID_STATE),
+          "OfflineOperationHandle is already closed");
     }
     if (runtime != Objects.requireNonNull(expectedRuntime, "expectedRuntime")) {
       throw new InvalidStateException(
-          MaplibreStatus.INVALID_STATE.nativeCode(),
+          NativeValues.nativeCode(MaplibreStatus.INVALID_STATE),
           "OfflineOperationHandle belongs to a different RuntimeHandle");
     }
     return id;
@@ -69,7 +71,7 @@ public final class OfflineOperationHandle<T> implements AutoCloseable {
     requireLive(expectedRuntime);
     if (kind != expectedKind || resultKind != expectedResultKind) {
       throw new InvalidStateException(
-          MaplibreStatus.INVALID_STATE.nativeCode(),
+          NativeValues.nativeCode(MaplibreStatus.INVALID_STATE),
           "OfflineOperationHandle has kind "
               + kind
               + " and result kind "

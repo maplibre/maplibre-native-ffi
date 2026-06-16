@@ -1,5 +1,6 @@
 package org.maplibre.nativejni.internal.struct;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -19,9 +20,12 @@ import org.maplibre.nativejni.runtime.RuntimeEventPayload;
 import org.maplibre.nativejni.runtime.RuntimeEventSourceType;
 import org.maplibre.nativejni.runtime.RuntimeEventType;
 
+// Support invariant for BND-082, BND-083, BND-085, BND-086, and BND-087: event
+// struct seams let Java JNI cover borrowed payload lifetimes and unknown payloads
+// deterministically.
 final class RuntimeEventStructsTest {
   @Test
-  void renderFramePayloadCopiesStatsAndFlags() {
+  void bnd082RenderFramePayloadCopiesStatsAndFlags() {
     var longs = longs();
     var ints = ints(RuntimeStructs.PAYLOAD_RENDER_FRAME);
     var booleans = booleans();
@@ -45,7 +49,7 @@ final class RuntimeEventStructsTest {
   }
 
   @Test
-  void stringAndTilePayloadsCopyBorrowedStrings() {
+  void bnd082AndBnd083StringAndTilePayloadsCopyBorrowedStrings() {
     var strings = strings();
     strings[RuntimeStructs.STRING_PAYLOAD] = "missing-image";
     var imagePayload =
@@ -77,7 +81,7 @@ final class RuntimeEventStructsTest {
   }
 
   @Test
-  void offlinePayloadsCopyStatusErrorLimitAndCompletion() {
+  void bnd085OfflinePayloadsCopyStatusErrorLimitAndCompletion() {
     var statusLongs = longs();
     var statusInts = ints(RuntimeStructs.PAYLOAD_OFFLINE_REGION_STATUS);
     var statusBooleans = booleans();
@@ -146,27 +150,31 @@ final class RuntimeEventStructsTest {
   }
 
   @Test
-  void copyEventTreatsUndersizedPayloadAsUnknown() {
+  void bnd083AndBnd087CopyEventTreatsUndersizedPayloadAsUnknown() {
     try (var event = new MaplibreNativeC.mln_runtime_event();
         var payload = new BytePointer(1)) {
+      payload.put(0, (byte) 42);
       event.payload_type(RuntimeStructs.PAYLOAD_RENDER_MAP);
       event.payload(payload);
-      event.payload_size(0);
+      event.payload_size(1);
       var longs = longs();
       var ints = new int[RuntimeStructs.INT_COUNT];
-      RuntimeStructs.copyEvent(event, longs, ints, booleans(), doubles(), strings());
+      var bytes = bytes();
+      RuntimeStructs.copyEvent(event, longs, ints, booleans(), doubles(), strings(), bytes);
       assertEquals(0, ints[RuntimeStructs.INT_PAYLOAD_AVAILABLE]);
       var unknown =
           assertInstanceOf(
               RuntimeEventPayload.Unknown.class,
-              RuntimeStructs.runtimeEventPayload(longs, ints, booleans(), doubles(), strings()));
+              RuntimeStructs.runtimeEventPayload(
+                  longs, ints, booleans(), doubles(), strings(), bytes));
       assertEquals(RuntimeStructs.PAYLOAD_RENDER_MAP, unknown.rawPayloadType());
-      assertEquals(0, unknown.payloadSize());
+      assertEquals(1, unknown.payloadSize());
+      assertArrayEquals(new byte[] {42}, unknown.payloadBytes());
     }
   }
 
   @Test
-  void copyEventUsesExplicitStringSizes() {
+  void bnd063AndBnd082CopyEventUsesExplicitStringSizes() {
     var imageId = new byte[] {'i', 0, 'd'};
     var message = new byte[] {'m', 0, 'g'};
     try (var event = new MaplibreNativeC.mln_runtime_event();
@@ -191,7 +199,7 @@ final class RuntimeEventStructsTest {
   }
 
   @Test
-  void eventCopiesHeaderSourcesMessageAndUnknownPayload() {
+  void bnd082AndBnd083EventCopiesHeaderSourcesMessageAndUnknownPayload() {
     var longs = longs();
     var ints = ints(99);
     var strings = strings();
@@ -210,6 +218,21 @@ final class RuntimeEventStructsTest {
     var unknown = assertInstanceOf(RuntimeEventPayload.Unknown.class, event.payload());
     assertEquals(99, unknown.rawPayloadType());
     assertEquals(123, unknown.payloadSize());
+  }
+
+  @Test
+  void bnd086MapOriginEventWithoutLiveMapExposesNoMapHandle() {
+    var longs = longs();
+    var ints = ints(RuntimeStructs.PAYLOAD_NONE);
+    ints[RuntimeStructs.INT_SOURCE_TYPE] = 1;
+    longs[RuntimeStructs.LONG_SOURCE_ADDRESS] = 0x1234;
+
+    var event =
+        RuntimeStructs.runtimeEvent(
+            longs, ints, booleans(), doubles(), strings(), Optional.empty(), Optional.empty());
+
+    assertSame(RuntimeEventSourceType.MAP, event.sourceType());
+    assertTrue(event.mapSource().isEmpty());
   }
 
   private static long[] longs() {
@@ -233,5 +256,9 @@ final class RuntimeEventStructsTest {
 
   private static String[] strings() {
     return new String[RuntimeStructs.STRING_COUNT];
+  }
+
+  private static byte[][] bytes() {
+    return new byte[RuntimeStructs.BYTES_COUNT][];
   }
 }

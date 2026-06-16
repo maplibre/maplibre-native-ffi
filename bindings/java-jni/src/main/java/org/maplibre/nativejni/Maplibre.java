@@ -1,7 +1,6 @@
 package org.maplibre.nativejni;
 
 import java.nio.file.Path;
-import java.util.EnumSet;
 import java.util.Objects;
 import java.util.Set;
 import org.maplibre.nativejni.geo.LatLng;
@@ -12,8 +11,8 @@ import org.maplibre.nativejni.internal.loader.NativeLibrary;
 import org.maplibre.nativejni.internal.status.Status;
 import org.maplibre.nativejni.log.LogCallback;
 import org.maplibre.nativejni.log.LogSeverity;
-import org.maplibre.nativejni.render.OpenGLContextProvider;
-import org.maplibre.nativejni.render.RenderBackend;
+import org.maplibre.nativejni.render.OpenGLContextProviderSupport;
+import org.maplibre.nativejni.render.RenderBackendSupport;
 import org.maplibre.nativejni.runtime.NetworkStatus;
 
 /** Process-global entry points for the Java JNI binding. */
@@ -37,15 +36,15 @@ public final class Maplibre {
   }
 
   /** Returns the render backends compiled into the loaded native library. */
-  public static EnumSet<RenderBackend> supportedRenderBackends() {
+  public static RenderBackendSupport supportedRenderBackends() {
     NativeLibrary.ensureLoaded();
-    return RenderBackend.fromMask(MaplibreNativeC.mln_supported_render_backend_mask());
+    return RenderBackendSupport.fromMask(MaplibreNativeC.mln_supported_render_backend_mask());
   }
 
   /** Returns the OpenGL context providers compiled into the loaded native library. */
-  public static EnumSet<OpenGLContextProvider> supportedOpenGLContextProviders() {
+  public static OpenGLContextProviderSupport supportedOpenGLContextProviders() {
     NativeLibrary.ensureLoaded();
-    return OpenGLContextProvider.fromMask(
+    return OpenGLContextProviderSupport.fromMask(
         MaplibreNativeC.mln_opengl_supported_context_provider_mask());
   }
 

@@ -33,6 +33,10 @@ Install the platform toolchain:
   compatible Xcode. Run the pinned
   [`xcodes`](https://github.com/XcodesOrg/xcodes) tool with `xcodes select` to
   switch to the repository version.
+- On Fedora, install the `C Development Tools and Libraries` package group with
+  `sudo dnf group install c-development`.
+- On Debian or Ubuntu, install the C and C++ compiler packages with
+  `sudo apt install build-essential`.
 - On Windows, install a recent version of Visual Studio Community (or Build
   Tools) 2022 with the `Desktop development with C++` workload and
   `Git for Windows`. We rely on Git Bash to run project scripts.

@@ -8,7 +8,8 @@ public sealed interface FeatureIdentifier
         FeatureIdentifier.UInt,
         FeatureIdentifier.Int,
         FeatureIdentifier.DoubleValue,
-        FeatureIdentifier.StringValue {
+        FeatureIdentifier.StringValue,
+        FeatureIdentifier.Unknown {
   static Null nullValue() {
     return Null.INSTANCE;
   }
@@ -27,6 +28,10 @@ public sealed interface FeatureIdentifier
 
   static StringValue of(String value) {
     return new StringValue(value);
+  }
+
+  static Unknown unknown(int rawType) {
+    return new Unknown(rawType);
   }
 
   /** Singleton null identifier. */
@@ -51,6 +56,12 @@ public sealed interface FeatureIdentifier
     }
   }
 
+  /**
+   * Unsigned 64-bit feature identifier stored in a Java {@code long} using the native bit pattern.
+   *
+   * <p>Use {@link Long#compareUnsigned(long, long)} and {@link Long#toUnsignedString(long)} when
+   * interpreting this value as unsigned.
+   */
   record UInt(long value) implements FeatureIdentifier {}
 
   record Int(long value) implements FeatureIdentifier {}
@@ -62,4 +73,7 @@ public sealed interface FeatureIdentifier
       Objects.requireNonNull(value, "value");
     }
   }
+
+  /** Feature identifier with an unknown native type tag returned by a newer C API. */
+  record Unknown(int rawType) implements FeatureIdentifier {}
 }

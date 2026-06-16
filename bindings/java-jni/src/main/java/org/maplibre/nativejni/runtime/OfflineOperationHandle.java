@@ -4,6 +4,8 @@ import java.lang.ref.Cleaner;
 import java.util.Objects;
 import org.maplibre.nativejni.error.InvalidStateException;
 import org.maplibre.nativejni.error.MaplibreStatus;
+import org.maplibre.nativejni.internal.access.InternalAccess;
+import org.maplibre.nativejni.internal.lifecycle.HandleState;
 
 /** Owner-thread offline database operation that must be taken or discarded. */
 public final class OfflineOperationHandle<T> implements AutoCloseable {
@@ -13,6 +15,7 @@ public final class OfflineOperationHandle<T> implements AutoCloseable {
   private final long id;
   private final OfflineOperationKind kind;
   private final OfflineOperationResultKind resultKind;
+  private final HandleState.ChildRetention runtimeRetention;
   private final LeakReport leakReport;
   private final Cleaner.Cleanable cleanable;
   private boolean closed;
@@ -29,8 +32,15 @@ public final class OfflineOperationHandle<T> implements AutoCloseable {
     this.id = id;
     this.kind = Objects.requireNonNull(kind, "kind");
     this.resultKind = Objects.requireNonNull(resultKind, "resultKind");
-    this.leakReport = new LeakReport(id, kind, resultKind);
-    this.cleanable = CLEANER.register(this, leakReport);
+    var retention = runtime.retainChild(InternalAccess.INSTANCE, "OfflineOperationHandle");
+    try {
+      this.runtimeRetention = retention;
+      this.leakReport = new LeakReport(id, kind, resultKind, retention);
+      this.cleanable = CLEANER.register(this, leakReport);
+    } catch (RuntimeException | Error error) {
+      retention.close();
+      throw error;
+    }
   }
 
   public synchronized long id() {
@@ -84,8 +94,13 @@ public final class OfflineOperationHandle<T> implements AutoCloseable {
 
   synchronized void markConsumed() {
     closed = true;
+    runtimeRetention.close();
     leakReport.markClosed();
     cleanable.clean();
+  }
+
+  void reportLeakForTesting() {
+    leakReport.run();
   }
 
   @Override
@@ -97,12 +112,18 @@ public final class OfflineOperationHandle<T> implements AutoCloseable {
     private final long id;
     private final OfflineOperationKind kind;
     private final OfflineOperationResultKind resultKind;
+    private final HandleState.ChildRetention runtimeRetention;
     private volatile boolean closed;
 
-    private LeakReport(long id, OfflineOperationKind kind, OfflineOperationResultKind resultKind) {
+    private LeakReport(
+        long id,
+        OfflineOperationKind kind,
+        OfflineOperationResultKind resultKind,
+        HandleState.ChildRetention runtimeRetention) {
       this.id = id;
       this.kind = kind;
       this.resultKind = resultKind;
+      this.runtimeRetention = runtimeRetention;
     }
 
     private void markClosed() {
@@ -111,11 +132,15 @@ public final class OfflineOperationHandle<T> implements AutoCloseable {
 
     @Override
     public void run() {
-      if (!closed) {
-        System.err.printf(
-            "Leaked OfflineOperationHandle id=%d kind=%s resultKind=%s; take or discard operations"
-                + " explicitly on the runtime owner thread.%n",
-            id, kind, resultKind);
+      try {
+        if (!closed) {
+          System.err.printf(
+              "Leaked OfflineOperationHandle id=%d kind=%s resultKind=%s; take or discard"
+                  + " operations explicitly on the runtime owner thread.%n",
+              id, kind, resultKind);
+        }
+      } finally {
+        runtimeRetention.close();
       }
     }
   }

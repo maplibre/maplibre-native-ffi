@@ -17,11 +17,11 @@ public enum MaplibreStatus {
   }
 
   /** Returns the C ABI status value for known statuses. */
-  public int nativeCode() {
+  int nativeCode() {
     return nativeCode;
   }
 
-  public static MaplibreStatus fromNative(int nativeCode) {
+  static MaplibreStatus fromNative(int nativeCode) {
     return switch (nativeCode) {
       case 0 -> OK;
       case -1 -> INVALID_ARGUMENT;

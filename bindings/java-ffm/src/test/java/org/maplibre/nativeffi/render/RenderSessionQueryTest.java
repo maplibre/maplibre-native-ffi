@@ -7,8 +7,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
-import java.util.EnumSet;
 import java.util.List;
+import java.util.Set;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -21,7 +21,6 @@ import org.maplibre.nativeffi.geo.LatLng;
 import org.maplibre.nativeffi.geo.ScreenBox;
 import org.maplibre.nativeffi.geo.ScreenPoint;
 import org.maplibre.nativeffi.json.JsonValue;
-import org.maplibre.nativeffi.log.LogSeverity;
 import org.maplibre.nativeffi.map.MapHandle;
 import org.maplibre.nativeffi.map.MapOptions;
 import org.maplibre.nativeffi.query.FeatureExtensionResult;
@@ -32,6 +31,7 @@ import org.maplibre.nativeffi.query.RenderedQueryGeometry;
 import org.maplibre.nativeffi.query.SourceFeatureQueryOptions;
 import org.maplibre.nativeffi.runtime.RuntimeEventType;
 import org.maplibre.nativeffi.runtime.RuntimeHandle;
+import org.maplibre.nativeffi.runtime.RuntimeOptions;
 import org.maplibre.nativeffi.test.NativeTestSupport;
 import org.maplibre.nativeffi.test.RenderTargetTestSupport;
 
@@ -104,9 +104,9 @@ final class RenderSessionQueryTest {
   @Test
   void featureStateSetGetRemoveCopiesSnapshots() throws Exception {
     Maplibre.setLogCallback(record -> true);
-    Maplibre.setAsyncLogSeverities(EnumSet.noneOf(LogSeverity.class));
+    Maplibre.setAsyncLogSeverities(Set.of());
 
-    var runtime = RuntimeHandle.create();
+    var runtime = RuntimeHandle.create(new RuntimeOptions());
     var map = MapHandle.create(runtime, new MapOptions().size(64, 64));
     try (var target = assumeOwnedTextureTarget(map)) {
       var session = target.session();
@@ -145,16 +145,17 @@ final class RenderSessionQueryTest {
   @Test
   void renderedAndSourceQueriesCopyResults() throws Exception {
     Maplibre.setLogCallback(record -> true);
-    Maplibre.setAsyncLogSeverities(EnumSet.noneOf(LogSeverity.class));
+    Maplibre.setAsyncLogSeverities(Set.of());
 
-    var runtime = RuntimeHandle.create();
+    var runtime = RuntimeHandle.create(new RuntimeOptions());
     var map = MapHandle.create(runtime, new MapOptions().size(64, 64));
     try (var target = assumeOwnedTextureTarget(map)) {
       var session = target.session();
       assertThrows(
           InvalidStateException.class,
           () ->
-              session.queryRenderedFeatures(RenderedQueryGeometry.point(new ScreenPoint(32, 32))));
+              session.queryRenderedFeatures(
+                  RenderedQueryGeometry.point(new ScreenPoint(32, 32)), null));
 
       loadStyleAndRender(runtime, map, session);
       var queryPoint = map.pixelForLatLng(new LatLng(37.7749, -122.4194));
@@ -199,9 +200,9 @@ final class RenderSessionQueryTest {
   @Test
   void featureExtensionQueriesCopyValueAndFeatureCollectionResults() throws Exception {
     Maplibre.setLogCallback(record -> true);
-    Maplibre.setAsyncLogSeverities(EnumSet.noneOf(LogSeverity.class));
+    Maplibre.setAsyncLogSeverities(Set.of());
 
-    var runtime = RuntimeHandle.create();
+    var runtime = RuntimeHandle.create(new RuntimeOptions());
     var map = MapHandle.create(runtime, new MapOptions().size(64, 64));
     try (var target = assumeOwnedTextureTarget(map)) {
       var session = target.session();
@@ -225,14 +226,14 @@ final class RenderSessionQueryTest {
           assertInstanceOf(
               FeatureExtensionResult.FeatureCollection.class,
               session.queryFeatureExtension(
-                  "cluster-source", cluster.feature(), "supercluster", "children"));
+                  "cluster-source", cluster.feature(), "supercluster", "children", null));
       assertTrue(children.features().size() > 0);
 
       var expansionZoom =
           assertInstanceOf(
               FeatureExtensionResult.Value.class,
               session.queryFeatureExtension(
-                  "cluster-source", cluster.feature(), "supercluster", "expansion-zoom"));
+                  "cluster-source", cluster.feature(), "supercluster", "expansion-zoom", null));
       assertInstanceOf(JsonValue.UInt.class, expansionZoom.value());
 
       var leavesArguments =
@@ -264,7 +265,7 @@ final class RenderSessionQueryTest {
   private static void loadStyleAndRender(
       RuntimeHandle runtime, MapHandle map, RenderSessionHandle session)
       throws InterruptedException {
-    map.jumpTo(new CameraOptions().center(37.7749, -122.4194).zoom(10.0));
+    map.jumpTo(new CameraOptions().center(new LatLng(37.7749, -122.4194)).zoom(10.0));
     map.setStyleJson(QUERY_STYLE_JSON);
     for (var index = 0; index < 5; index++) {
       renderIfAvailable(runtime, map, session);
@@ -274,7 +275,7 @@ final class RenderSessionQueryTest {
   private static void loadClusterStyleAndRender(
       RuntimeHandle runtime, MapHandle map, RenderSessionHandle session)
       throws InterruptedException {
-    map.jumpTo(new CameraOptions().center(0.0, 0.0).zoom(0.0));
+    map.jumpTo(new CameraOptions().center(new LatLng(0.0, 0.0)).zoom(0.0));
     map.setStyleJson(CLUSTER_STYLE_JSON);
     for (var index = 0; index < 5; index++) {
       renderIfAvailable(runtime, map, session);
@@ -349,7 +350,7 @@ final class RenderSessionQueryTest {
         return;
       }
       var value = event.get();
-      if (value.type() == RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE
+      if (RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE.equals(value.type())
           && value.mapSource().filter(source -> source == map).isPresent()) {
         try {
           session.renderUpdate();

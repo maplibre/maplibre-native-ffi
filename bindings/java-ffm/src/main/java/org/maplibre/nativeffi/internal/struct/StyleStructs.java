@@ -20,10 +20,10 @@ import org.maplibre.nativeffi.internal.c.mln_style_image_info;
 import org.maplibre.nativeffi.internal.c.mln_style_image_options;
 import org.maplibre.nativeffi.internal.c.mln_style_source_info;
 import org.maplibre.nativeffi.internal.c.mln_style_tile_source_options;
+import org.maplibre.nativeffi.internal.convert.NativeValues;
 import org.maplibre.nativeffi.internal.status.Status;
 import org.maplibre.nativeffi.render.PremultipliedRgba8Image;
 import org.maplibre.nativeffi.style.SourceInfo;
-import org.maplibre.nativeffi.style.SourceType;
 import org.maplibre.nativeffi.style.StyleImageInfo;
 import org.maplibre.nativeffi.style.StyleImageOptions;
 import org.maplibre.nativeffi.style.TileSourceOptions;
@@ -74,7 +74,7 @@ public final class StyleStructs {
     }
     if (options.hasScheme()) {
       fields |= MapLibreNativeC.MLN_STYLE_TILE_SOURCE_OPTION_SCHEME();
-      mln_style_tile_source_options.scheme(segment, options.scheme().nativeValue());
+      mln_style_tile_source_options.scheme(segment, NativeValues.nativeValue(options.scheme()));
     }
     if (options.hasBounds()) {
       fields |= MapLibreNativeC.MLN_STYLE_TILE_SOURCE_OPTION_BOUNDS();
@@ -91,12 +91,12 @@ public final class StyleStructs {
     if (options.hasVectorEncoding()) {
       fields |= MapLibreNativeC.MLN_STYLE_TILE_SOURCE_OPTION_VECTOR_ENCODING();
       mln_style_tile_source_options.vector_encoding(
-          segment, options.vectorEncoding().nativeValue());
+          segment, NativeValues.nativeValue(options.vectorEncoding()));
     }
     if (options.hasRasterDemEncoding()) {
       fields |= MapLibreNativeC.MLN_STYLE_TILE_SOURCE_OPTION_RASTER_ENCODING();
       mln_style_tile_source_options.raster_encoding(
-          segment, options.rasterDemEncoding().nativeValue());
+          segment, NativeValues.nativeValue(options.rasterDemEncoding()));
     }
     mln_style_tile_source_options.fields(segment, fields);
     return segment;
@@ -105,7 +105,7 @@ public final class StyleStructs {
   public static SourceInfo sourceInfo(MemorySegment segment, Optional<String> attribution) {
     var nativeType = mln_style_source_info.type(segment);
     return new SourceInfo(
-        SourceType.fromNative(nativeType),
+        NativeValues.sourceType(nativeType),
         nativeType,
         mln_style_source_info.is_volatile(segment),
         attribution);

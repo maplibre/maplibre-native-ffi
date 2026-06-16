@@ -1,6 +1,9 @@
 package org.maplibre.nativejni.internal.struct;
 
 import java.util.ArrayList;
+import java.util.Objects;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import org.bytedeco.javacpp.BytePointer;
 import org.bytedeco.javacpp.Pointer;
 import org.bytedeco.javacpp.PointerPointer;
@@ -17,6 +20,9 @@ import org.maplibre.nativejni.json.JsonValue;
 
 /** JavaCPP-backed materializers and readers for style JNI calls. */
 public final class StyleStructs {
+  private static final AtomicReference<RuntimeException> STYLE_ID_LIST_COPY_FAILURE =
+      new AtomicReference<>();
+  private static final AtomicInteger STYLE_ID_LIST_DESTROY_COUNT = new AtomicInteger();
 
   private StyleStructs() {}
 
@@ -24,17 +30,43 @@ public final class StyleStructs {
     try (var count = new SizeTPointer(1)) {
       var status = MaplibreNativeC.mln_style_id_list_count(list, count);
       org.maplibre.nativejni.internal.status.Status.check(status);
+      throwStyleIdListCopyFailureForTesting();
       var ids = new String[Math.toIntExact(count.get())];
       for (var i = 0; i < ids.length; i++) {
         var view = new MaplibreNativeC.mln_string_view();
-        status = MaplibreNativeC.mln_style_id_list_get(list, i, view);
-        org.maplibre.nativejni.internal.status.Status.check(status);
-        ids[i] = JavaCppValues.string(view);
-        view.close();
+        try {
+          status = MaplibreNativeC.mln_style_id_list_get(list, i, view);
+          org.maplibre.nativejni.internal.status.Status.check(status);
+          ids[i] = JavaCppValues.string(view);
+        } finally {
+          view.close();
+        }
       }
       return ids;
     } finally {
       MaplibreNativeC.mln_style_id_list_destroy(list);
+      STYLE_ID_LIST_DESTROY_COUNT.incrementAndGet();
+    }
+  }
+
+  static void failNextStyleIdListCopyForTesting(RuntimeException failure) {
+    if (!STYLE_ID_LIST_COPY_FAILURE.compareAndSet(null, Objects.requireNonNull(failure))) {
+      throw new IllegalStateException("style ID list copy failure is already armed");
+    }
+  }
+
+  static int styleIdListDestroyCountForTesting() {
+    return STYLE_ID_LIST_DESTROY_COUNT.get();
+  }
+
+  static void resetStyleIdListDestroyCountForTesting() {
+    STYLE_ID_LIST_DESTROY_COUNT.set(0);
+  }
+
+  private static void throwStyleIdListCopyFailureForTesting() {
+    var failure = STYLE_ID_LIST_COPY_FAILURE.getAndSet(null);
+    if (failure != null) {
+      throw failure;
     }
   }
 
@@ -46,8 +78,7 @@ public final class StyleStructs {
       return null;
     }
     var snapshot = new MaplibreNativeC.mln_json_snapshot(JavaCppSupport.pointer(snapshotAddress));
-    try {
-      var outValue = JavaCppSupport.outPointer(MaplibreNativeC.mln_json_value.class);
+    try (var outValue = JavaCppSupport.outPointer(MaplibreNativeC.mln_json_value.class)) {
       var status = MaplibreNativeC.mln_json_snapshot_get(snapshot, outValue);
       org.maplibre.nativejni.internal.status.Status.check(status);
       var valueAddress = JavaCppSupport.outAddress(outValue, MaplibreNativeC.mln_json_value.class);
@@ -143,7 +174,12 @@ public final class StyleStructs {
     private final MaplibreNativeC.mln_geojson value;
 
     public GeoJsonScope(GeoJson value) {
-      this.value = geoJson(value);
+      try {
+        this.value = geoJson(value);
+      } catch (RuntimeException | Error error) {
+        close();
+        throw error;
+      }
     }
 
     public MaplibreNativeC.mln_geojson value() {
@@ -283,6 +319,9 @@ public final class StyleStructs {
           out.identifier_type(MaplibreNativeC.MLN_FEATURE_IDENTIFIER_TYPE_STRING);
           out.identifier_string_value(string(node.value()));
         }
+        case FeatureIdentifier.Unknown node ->
+            throw new IllegalArgumentException(
+                "Unknown feature identifier type cannot be used as input: " + node.rawType());
       }
     }
 
