@@ -103,11 +103,22 @@ public final class ResourceTransformState implements AutoCloseable {
   @Override
   public void close() {
     var interrupted = false;
+    var closeNative = false;
     synchronized (callbackLock) {
       if (callbackDepth.get() > 0) {
         throw Status.callbackReentry("Resource transform");
       }
+      while (closeRequested && !closed) {
+        try {
+          callbackLock.wait();
+        } catch (InterruptedException exception) {
+          interrupted = true;
+        }
+      }
       if (closed) {
+        if (interrupted) {
+          Thread.currentThread().interrupt();
+        }
         return;
       }
       closeRequested = true;
@@ -118,12 +129,20 @@ public final class ResourceTransformState implements AutoCloseable {
           interrupted = true;
         }
       }
-      closed = true;
+      closeNative = true;
     }
     try {
-      transform.close();
-      nativeCallback.close();
+      if (closeNative) {
+        transform.close();
+        nativeCallback.close();
+      }
     } finally {
+      if (closeNative) {
+        synchronized (callbackLock) {
+          closed = true;
+          callbackLock.notifyAll();
+        }
+      }
       if (interrupted) {
         Thread.currentThread().interrupt();
       }

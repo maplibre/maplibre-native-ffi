@@ -105,11 +105,22 @@ final class ResourceProviderState implements AutoCloseable {
   @Override
   public void close() {
     var interrupted = false;
+    var closeNative = false;
     synchronized (callbackLock) {
       if (callbackDepth.get() > 0) {
         throw Status.callbackReentry("Resource provider");
       }
+      while (closeRequested && !closed) {
+        try {
+          callbackLock.wait();
+        } catch (InterruptedException exception) {
+          interrupted = true;
+        }
+      }
       if (closed) {
+        if (interrupted) {
+          Thread.currentThread().interrupt();
+        }
         return;
       }
       closeRequested = true;
@@ -120,12 +131,20 @@ final class ResourceProviderState implements AutoCloseable {
           interrupted = true;
         }
       }
-      closed = true;
+      closeNative = true;
     }
     try {
-      provider.close();
-      nativeCallback.close();
+      if (closeNative) {
+        provider.close();
+        nativeCallback.close();
+      }
     } finally {
+      if (closeNative) {
+        synchronized (callbackLock) {
+          closed = true;
+          callbackLock.notifyAll();
+        }
+      }
       if (interrupted) {
         Thread.currentThread().interrupt();
       }

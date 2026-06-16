@@ -185,11 +185,22 @@ public final class LogCallbackState {
     @Override
     public void close() {
       var interrupted = false;
+      var closeNative = false;
       synchronized (lock) {
         if (isCurrentThreadInCallback()) {
           throw Status.callbackReentry("Log callback");
         }
+        while (closing && !closed) {
+          try {
+            lock.wait();
+          } catch (InterruptedException exception) {
+            interrupted = true;
+          }
+        }
         if (closed) {
+          if (interrupted) {
+            Thread.currentThread().interrupt();
+          }
           return;
         }
         closing = true;
@@ -200,11 +211,19 @@ public final class LogCallbackState {
             interrupted = true;
           }
         }
-        closed = true;
+        closeNative = true;
       }
       try {
-        nativeCallback.close();
+        if (closeNative) {
+          nativeCallback.close();
+        }
       } finally {
+        if (closeNative) {
+          synchronized (lock) {
+            closed = true;
+            lock.notifyAll();
+          }
+        }
         if (interrupted) {
           Thread.currentThread().interrupt();
         }
