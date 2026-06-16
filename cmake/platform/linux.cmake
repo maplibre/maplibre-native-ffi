@@ -1,11 +1,10 @@
 function(mln_configure_linux_platform target)
   find_package(CURL REQUIRED)
   find_package(JPEG REQUIRED)
+  find_package(libuv REQUIRED)
   find_package(PNG REQUIRED)
-  find_package(PkgConfig REQUIRED)
   find_package(Threads REQUIRED)
-  pkg_search_module(WEBP libwebp REQUIRED)
-  pkg_search_module(LIBUV libuv REQUIRED)
+  find_package(WebP REQUIRED)
   include(${MLN_SOURCE_DIR}/vendor/icu.cmake)
 
   set(MLN_FFI_VENDOR_LINUX_SOURCES
@@ -33,18 +32,16 @@ function(mln_configure_linux_platform target)
   target_include_directories(
     ${target}
     SYSTEM
-    PRIVATE
-      ${CURL_INCLUDE_DIRS} ${JPEG_INCLUDE_DIRS} ${LIBUV_INCLUDE_DIRS}
-      ${WEBP_INCLUDE_DIRS})
+    PRIVATE ${CURL_INCLUDE_DIRS} ${JPEG_INCLUDE_DIRS})
 
   target_link_libraries(
     ${target}
     PRIVATE
       ${CURL_LIBRARIES}
       ${JPEG_LIBRARIES}
-      ${LIBUV_LIBRARIES}
-      ${WEBP_LIBRARIES}
+      $<IF:$<TARGET_EXISTS:libuv::uv_a>,libuv::uv_a,libuv::uv>
       mbgl-vendor-icu
       PNG::PNG
-      Threads::Threads)
+      Threads::Threads
+      WebP::webp)
 endfunction()
