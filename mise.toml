@@ -81,7 +81,6 @@ _.path = [
 UV_PYTHON = { value = "{{ tools.python.path }}", tools = true }
 LIBCLANG_PATH = "{{config_root}}/build/libclang"
 MLN_FFI_LIBCLANG_SOURCE = "{% if env.MISE_DATA_DIR is defined and env.MISE_DATA_DIR != \"\" %}{{ env.MISE_DATA_DIR }}{% elif os() == \"windows\" %}{{ env.LOCALAPPDATA }}/mise{% else %}{{ env.HOME }}/.local/share/mise{% endif %}/installs/conda-clang-tools/22.1.7/{% if os() == \"macos\" %}lib/libclang.13.dylib{% elif os() == \"linux\" %}lib/libclang.so.13{% else %}Library/bin/libclang.dll{% endif %}"
-DYLD_LIBRARY_PATH = "{% if env.MISE_DATA_DIR is defined and env.MISE_DATA_DIR != \"\" %}{{ env.MISE_DATA_DIR }}{% elif os() == \"windows\" %}{{ env.LOCALAPPDATA }}/mise{% else %}{{ env.HOME }}/.local/share/mise{% endif %}/installs/conda-clang-tools/22.1.7/lib:{{ env.DYLD_LIBRARY_PATH | default(value=\"\") }}"
 LD_LIBRARY_PATH = "{% if env.MISE_DATA_DIR is defined and env.MISE_DATA_DIR != \"\" %}{{ env.MISE_DATA_DIR }}{% elif os() == \"windows\" %}{{ env.LOCALAPPDATA }}/mise{% else %}{{ env.HOME }}/.local/share/mise{% endif %}/installs/conda-clang-tools/22.1.7/lib:{{ env.LD_LIBRARY_PATH | default(value=\"\") }}"
 MLN_FFI_REPO_ROOT = "{{config_root}}"
 MLN_FFI_VARIANT = { required = true }
