@@ -134,8 +134,15 @@ class PublicApiSurfaceTest {
   }
 
   private static String className(Path path) {
-    var relative = classesRoot().relativize(path).toString();
-    return relative.substring(0, relative.length() - ".class".length()).replace('/', '.');
+    var relative = classesRoot().relativize(path);
+    var classFile = relative.getFileName().toString();
+    var simpleName = classFile.substring(0, classFile.length() - ".class".length());
+    var packageName =
+        Stream.iterate(0, index -> index + 1)
+            .limit(relative.getNameCount() - 1L)
+            .map(index -> relative.getName(index).toString())
+            .collect(Collectors.joining("."));
+    return packageName.isEmpty() ? simpleName : packageName + "." + simpleName;
   }
 
   private static Stream<Class<?>> loadClass(String className) {
