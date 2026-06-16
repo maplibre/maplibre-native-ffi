@@ -196,6 +196,7 @@ rm -rf "$MLN_FFI_CONAN_GENERATORS_DIR"
   -s:h compiler.cppstd=17 \
   -s:b build_type="$MLN_FFI_CONAN_BUILD_TYPE" \
   -s:b compiler.cppstd=17 \
+  -c tools.cmake.cmaketoolchain:generator=Ninja \
   -o "&:render_backend=$MLN_FFI_RENDER_BACKEND" \
   -o "&:opengl_context_provider=${MLN_FFI_OPENGL_CONTEXT_PROVIDER:-none}"
 '''
