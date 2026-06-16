@@ -483,7 +483,12 @@ public final class QueryStructs {
     private final MaplibreNativeC.mln_feature feature;
 
     public FeatureScope(Feature value) {
-      feature = feature(value);
+      try {
+        this.feature = feature(value);
+      } catch (RuntimeException | Error error) {
+        close();
+        throw error;
+      }
     }
 
     public MaplibreNativeC.mln_feature feature() {

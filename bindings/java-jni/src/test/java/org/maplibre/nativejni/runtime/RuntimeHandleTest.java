@@ -437,7 +437,7 @@ class RuntimeHandleTest {
   void bnd140AndBnd141ResourceTransformRewritesStyleUrlThroughPublicLoad() throws Exception {
     var originalNetworkStatus = Maplibre.networkStatus();
     Maplibre.setNetworkStatus(NetworkStatus.ONLINE);
-    try (var server = new ServerSocket(0, 1, InetAddress.getLoopbackAddress())) {
+    try (var server = new ServerSocket(0, 1, InetAddress.getByName("127.0.0.1"))) {
       var served = new AtomicInteger();
       var serverFailure = new AtomicReference<Throwable>();
       var serverThread =

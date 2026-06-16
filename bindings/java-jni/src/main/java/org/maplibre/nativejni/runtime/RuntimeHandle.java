@@ -261,9 +261,11 @@ public final class RuntimeHandle implements AutoCloseable {
     Status.check(
         MaplibreNativeC.mln_runtime_offline_region_create_take_result(
             JavaCppSupport.runtime(state.requireLiveAddress()), operationId, outSnapshot));
-    var region = OfflineStructs.offlineRegionSnapshot(outSnapshot);
-    operation.markConsumed();
-    return region;
+    try {
+      return OfflineStructs.offlineRegionSnapshot(outSnapshot);
+    } finally {
+      operation.markConsumed();
+    }
   }
 
   public Optional<OfflineRegionInfo> takeOfflineRegionResult(
@@ -279,12 +281,13 @@ public final class RuntimeHandle implements AutoCloseable {
       Status.check(
           MaplibreNativeC.mln_runtime_offline_region_get_take_result(
               JavaCppSupport.runtime(state.requireLiveAddress()), operationId, outSnapshot, found));
-      var region =
-          found.get()
-              ? Optional.of(OfflineStructs.offlineRegionSnapshot(outSnapshot))
-              : Optional.<OfflineRegionInfo>empty();
-      operation.markConsumed();
-      return region;
+      try {
+        return found.get()
+            ? Optional.of(OfflineStructs.offlineRegionSnapshot(outSnapshot))
+            : Optional.<OfflineRegionInfo>empty();
+      } finally {
+        operation.markConsumed();
+      }
     }
   }
 
@@ -299,9 +302,11 @@ public final class RuntimeHandle implements AutoCloseable {
     Status.check(
         MaplibreNativeC.mln_runtime_offline_regions_list_take_result(
             JavaCppSupport.runtime(state.requireLiveAddress()), operationId, outList));
-    var regions = OfflineStructs.offlineRegionList(outList);
-    operation.markConsumed();
-    return regions;
+    try {
+      return OfflineStructs.offlineRegionList(outList);
+    } finally {
+      operation.markConsumed();
+    }
   }
 
   public List<OfflineRegionInfo> takeMergeOfflineRegionsDatabaseResult(
@@ -317,9 +322,11 @@ public final class RuntimeHandle implements AutoCloseable {
     Status.check(
         MaplibreNativeC.mln_runtime_offline_regions_merge_database_take_result(
             JavaCppSupport.runtime(state.requireLiveAddress()), operationId, outList));
-    var regions = OfflineStructs.offlineRegionList(outList);
-    operation.markConsumed();
-    return regions;
+    try {
+      return OfflineStructs.offlineRegionList(outList);
+    } finally {
+      operation.markConsumed();
+    }
   }
 
   public OfflineRegionInfo takeUpdateOfflineRegionMetadataResult(
@@ -333,9 +340,11 @@ public final class RuntimeHandle implements AutoCloseable {
     Status.check(
         MaplibreNativeC.mln_runtime_offline_region_update_metadata_take_result(
             JavaCppSupport.runtime(state.requireLiveAddress()), operationId, outSnapshot));
-    var region = OfflineStructs.offlineRegionSnapshot(outSnapshot);
-    operation.markConsumed();
-    return region;
+    try {
+      return OfflineStructs.offlineRegionSnapshot(outSnapshot);
+    } finally {
+      operation.markConsumed();
+    }
   }
 
   public OfflineRegionStatus takeOfflineRegionStatusResult(
@@ -350,18 +359,21 @@ public final class RuntimeHandle implements AutoCloseable {
       Status.check(
           MaplibreNativeC.mln_runtime_offline_region_get_status_take_result(
               JavaCppSupport.runtime(state.requireLiveAddress()), operationId, status));
-      operation.markConsumed();
-      var rawDownloadState = status.download_state();
-      return new OfflineRegionStatus(
-          OfflineRegionDownloadState.fromNative(rawDownloadState),
-          status.completed_resource_count(),
-          status.completed_resource_size(),
-          status.completed_tile_count(),
-          status.required_tile_count(),
-          status.completed_tile_size(),
-          status.required_resource_count(),
-          status.required_resource_count_is_precise(),
-          status.complete());
+      try {
+        var rawDownloadState = status.download_state();
+        return new OfflineRegionStatus(
+            OfflineRegionDownloadState.fromNative(rawDownloadState),
+            status.completed_resource_count(),
+            status.completed_resource_size(),
+            status.completed_tile_count(),
+            status.required_tile_count(),
+            status.completed_tile_size(),
+            status.required_resource_count(),
+            status.required_resource_count_is_precise(),
+            status.complete());
+      } finally {
+        operation.markConsumed();
+      }
     }
   }
 
