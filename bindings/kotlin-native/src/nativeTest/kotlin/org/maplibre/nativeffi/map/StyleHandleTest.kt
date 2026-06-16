@@ -2,6 +2,7 @@ package org.maplibre.nativeffi.map
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import kotlinx.cinterop.BooleanVar
@@ -10,8 +11,10 @@ import kotlinx.cinterop.alloc
 import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.ptr
 import kotlinx.cinterop.value
+import org.maplibre.nativeffi.error.InvalidArgumentException
 import org.maplibre.nativeffi.geo.CanonicalTileId
 import org.maplibre.nativeffi.geo.Feature
+import org.maplibre.nativeffi.geo.FeatureIdentifier
 import org.maplibre.nativeffi.geo.GeoJson
 import org.maplibre.nativeffi.geo.Geometry
 import org.maplibre.nativeffi.geo.LatLng
@@ -36,9 +39,20 @@ import org.maplibre.nativeffi.style.VectorTileEncoding
 
 @OptIn(ExperimentalForeignApi::class)
 class StyleHandleTest {
+  // BND-062: unknown output discriminators keep raw native values.
+
+  @Test
+  fun sourceTypePreservesUnknownRawNativeValues() {
+    val value = SourceType(999)
+
+    assertEquals(999, value.nativeValue)
+  }
+
+  // BND-124: style-scoped callback state follows native source lifetime and reload events.
+
   @Test
   fun customGeometrySourceApisKeepCallbackStateMapScoped() {
-    val runtime = RuntimeHandle.create()
+    val runtime = RuntimeHandle.create(org.maplibre.nativeffi.runtime.RuntimeOptions())
     val map =
       MapHandle.create(
         runtime,
@@ -70,13 +84,67 @@ class StyleHandleTest {
       map.setCustomGeometrySourceTileData(
         "custom",
         CanonicalTileId(0, 0, 0),
-        GeoJson.featureCollection(emptyList()),
+        GeoJson.FeatureCollection(emptyList()),
       )
       map.invalidateCustomGeometrySourceTile("custom", CanonicalTileId(0, 0, 0))
       map.invalidateCustomGeometrySourceRegion(
         "custom",
         LatLngBounds(LatLng(0.0, 0.0), LatLng(1.0, 1.0)),
       )
+      assertTrue(map.removeStyleSource("custom"))
+      assertEquals(0, map.customGeometrySourceCountForTesting())
+      map.addCustomGeometrySource(
+        "custom",
+        CustomGeometrySourceOptions(
+          object : CustomGeometrySourceCallback {
+            override fun fetchTile(tileId: CanonicalTileId) = Unit
+          }
+        ),
+      )
+      assertEquals(1, map.customGeometrySourceCountForTesting())
+      assertEquals(SourceType.CUSTOM_VECTOR, map.styleSourceType("custom"))
+    } finally {
+      map.close()
+      assertEquals(0, map.customGeometrySourceCountForTesting())
+      runtime.close()
+    }
+  }
+
+  @Test
+  fun failedCustomGeometrySourceReplacementKeepsExistingCallbackState() {
+    val runtime = RuntimeHandle.create(org.maplibre.nativeffi.runtime.RuntimeOptions())
+    val map =
+      MapHandle.create(
+        runtime,
+        MapOptions().apply {
+          width = 128
+          height = 128
+        },
+      )
+    try {
+      map.setStyleJson("{\"version\":8,\"sources\":{},\"layers\":[]}")
+      map.addCustomGeometrySource(
+        "custom",
+        CustomGeometrySourceOptions(
+          object : CustomGeometrySourceCallback {
+            override fun fetchTile(tileId: CanonicalTileId) = Unit
+          }
+        ),
+      )
+
+      assertFailsWith<InvalidArgumentException> {
+        map.addCustomGeometrySource(
+          "custom",
+          CustomGeometrySourceOptions(
+            object : CustomGeometrySourceCallback {
+              override fun fetchTile(tileId: CanonicalTileId) = Unit
+            }
+          ),
+        )
+      }
+
+      assertEquals(1, map.customGeometrySourceCountForTesting())
+      assertEquals(SourceType.CUSTOM_VECTOR, map.styleSourceType("custom"))
       assertTrue(map.removeStyleSource("custom"))
       assertEquals(0, map.customGeometrySourceCountForTesting())
     } finally {
@@ -87,7 +155,7 @@ class StyleHandleTest {
 
   @Test
   fun mapStyleLoadedEventDropsCallbacksAfterNativeSourceDetaches() {
-    val runtime = RuntimeHandle.create()
+    val runtime = RuntimeHandle.create(org.maplibre.nativeffi.runtime.RuntimeOptions())
     val map =
       MapHandle.create(
         runtime,
@@ -137,7 +205,7 @@ class StyleHandleTest {
 
   @Test
   fun releaseDetachedCustomGeometrySourcesDropsCallbacksAfterNativeSourceDetaches() {
-    val runtime = RuntimeHandle.create()
+    val runtime = RuntimeHandle.create(org.maplibre.nativeffi.runtime.RuntimeOptions())
     val map =
       MapHandle.create(
         runtime,
@@ -179,8 +247,62 @@ class StyleHandleTest {
   }
 
   @Test
+  fun styleReloadAndStaleEventsDoNotDropReusedCustomGeometrySourceIds() {
+    val runtime = RuntimeHandle.create(org.maplibre.nativeffi.runtime.RuntimeOptions())
+    val map =
+      MapHandle.create(
+        runtime,
+        MapOptions().apply {
+          width = 128
+          height = 128
+        },
+      )
+    try {
+      map.setStyleJson("{\"version\":8,\"sources\":{},\"layers\":[]}")
+      map.addCustomGeometrySource(
+        "custom",
+        CustomGeometrySourceOptions(
+          object : CustomGeometrySourceCallback {
+            override fun fetchTile(tileId: CanonicalTileId) = Unit
+          }
+        ),
+      )
+      assertEquals(1, map.customGeometrySourceCountForTesting())
+
+      map.setStyleJson("{\"version\":8,\"sources\":{},\"layers\":[]}")
+      assertEquals(0, map.customGeometrySourceCountForTesting())
+
+      map.addCustomGeometrySource(
+        "custom",
+        CustomGeometrySourceOptions(
+          object : CustomGeometrySourceCallback {
+            override fun fetchTile(tileId: CanonicalTileId) = Unit
+          }
+        ),
+      )
+      assertEquals(1, map.customGeometrySourceCountForTesting())
+
+      val mapSource =
+        runtime.applyEventSideEffectsForTesting(
+          RuntimeEventType.MAP_STYLE_LOADED,
+          RuntimeEventSourceType.MAP,
+          map.nativeAddress(),
+        )
+
+      assertEquals(map, mapSource)
+      assertEquals(1, map.customGeometrySourceCountForTesting())
+    } finally {
+      map.close()
+      assertEquals(0, map.customGeometrySourceCountForTesting())
+      runtime.close()
+    }
+  }
+
+  // BND-101, BND-105, BND-069: style loading and workflows use copied public values.
+
+  @Test
   fun styleSourceAndLayerJsonApisCallNativeAndCopyDescriptors() {
-    val runtime = RuntimeHandle.create()
+    val runtime = RuntimeHandle.create(org.maplibre.nativeffi.runtime.RuntimeOptions())
     val map =
       MapHandle.create(
         runtime,
@@ -193,15 +315,15 @@ class StyleHandleTest {
       map.setStyleJson("{\"version\":8,\"sources\":{},\"layers\":[]}")
       map.addStyleSourceJson(
         "parks",
-        JsonValue.`object`(
+        JsonValue.ObjectValue(
           listOf(
-            JsonValue.Member("type", JsonValue.of("geojson")),
+            JsonValue.Member("type", JsonValue.StringValue("geojson")),
             JsonValue.Member(
               "data",
-              JsonValue.`object`(
+              JsonValue.ObjectValue(
                 listOf(
-                  JsonValue.Member("type", JsonValue.of("FeatureCollection")),
-                  JsonValue.Member("features", JsonValue.array(emptyList())),
+                  JsonValue.Member("type", JsonValue.StringValue("FeatureCollection")),
+                  JsonValue.Member("features", JsonValue.Array(emptyList())),
                 )
               ),
             ),
@@ -211,27 +333,31 @@ class StyleHandleTest {
       assertTrue(map.styleSourceExists("parks"))
       assertEquals(SourceType.GEOJSON, map.styleSourceType("parks"))
       assertEquals(SourceType.GEOJSON, map.styleSourceInfo("parks")?.type)
-      assertTrue(map.styleSourceIds().contains("parks"))
+      val copiedSourceIds = map.styleSourceIds()
+      assertTrue(copiedSourceIds.contains("parks"))
 
       map.addStyleLayerJson(
-        JsonValue.`object`(
+        JsonValue.ObjectValue(
           listOf(
-            JsonValue.Member("id", JsonValue.of("park-circles")),
-            JsonValue.Member("type", JsonValue.of("circle")),
-            JsonValue.Member("source", JsonValue.of("parks")),
+            JsonValue.Member("id", JsonValue.StringValue("park-circles")),
+            JsonValue.Member("type", JsonValue.StringValue("circle")),
+            JsonValue.Member("source", JsonValue.StringValue("parks")),
           )
-        )
+        ),
+        "",
       )
       assertTrue(map.styleLayerExists("park-circles"))
       assertEquals("circle", map.styleLayerType("park-circles"))
-      assertTrue(map.styleLayerIds().contains("park-circles"))
-      assertTrue(map.styleLayerJson("park-circles") is JsonValue.ObjectValue)
-      map.moveStyleLayer("park-circles")
-      map.setLayerProperty("park-circles", "circle-radius", JsonValue.of(5.0))
+      val copiedLayerIds = map.styleLayerIds()
+      assertTrue(copiedLayerIds.contains("park-circles"))
+      val copiedLayerJson = map.styleLayerJson("park-circles")
+      assertTrue(copiedLayerJson is JsonValue.ObjectValue)
+      map.moveStyleLayer("park-circles", "")
+      map.setLayerProperty("park-circles", "circle-radius", JsonValue.DoubleValue(5.0))
       assertTrue(map.layerProperty("park-circles", "circle-radius") != null)
       map.setLayerFilter(
         "park-circles",
-        JsonValue.array(listOf(JsonValue.of("has"), JsonValue.of("kind"))),
+        JsonValue.Array(listOf(JsonValue.StringValue("has"), JsonValue.StringValue("kind"))),
       )
       assertTrue(map.layerFilter("park-circles") != null)
       map.clearLayerFilter("park-circles")
@@ -239,6 +365,12 @@ class StyleHandleTest {
       assertFalse(map.styleLayerExists("park-circles"))
       assertTrue(map.removeStyleSource("parks"))
       assertFalse(map.styleSourceExists("parks"))
+      assertTrue(copiedSourceIds.contains("parks"))
+      assertTrue(copiedLayerIds.contains("park-circles"))
+      assertEquals(
+        JsonValue.StringValue("park-circles"),
+        copiedLayerJson.members.firstOrNull { it.key == "id" }?.value,
+      )
     } finally {
       map.close()
       runtime.close()
@@ -247,7 +379,7 @@ class StyleHandleTest {
 
   @Test
   fun styleImageApisCopyPixelsAndMetadata() {
-    val runtime = RuntimeHandle.create()
+    val runtime = RuntimeHandle.create(org.maplibre.nativeffi.runtime.RuntimeOptions())
     val map =
       MapHandle.create(
         runtime,
@@ -271,7 +403,7 @@ class StyleHandleTest {
       assertEquals(2.0f, map.styleImageInfo("dot")?.pixelRatio)
       assertEquals(image, map.copyStyleImagePremultipliedRgba8("dot")?.image)
       assertEquals(image, map.copyStyleImagePremultipliedRgba8("dot")?.image)
-      map.addLocationIndicatorLayer("location")
+      map.addLocationIndicatorLayer("location", "")
       assertEquals("location-indicator", map.styleLayerType("location"))
       map.setLocationIndicatorLocation("location", LatLng(0.0, 0.0), 0.0)
       map.setLocationIndicatorBearing("location", 45.0)
@@ -287,7 +419,7 @@ class StyleHandleTest {
 
   @Test
   fun imageSourceApisCopyCoordinatesAndPixels() {
-    val runtime = RuntimeHandle.create()
+    val runtime = RuntimeHandle.create(org.maplibre.nativeffi.runtime.RuntimeOptions())
     val map =
       MapHandle.create(
         runtime,
@@ -318,7 +450,7 @@ class StyleHandleTest {
 
   @Test
   fun tileSourceApisMaterializeOptionsAndTileUrlLists() {
-    val runtime = RuntimeHandle.create()
+    val runtime = RuntimeHandle.create(org.maplibre.nativeffi.runtime.RuntimeOptions())
     val map =
       MapHandle.create(
         runtime,
@@ -361,9 +493,9 @@ class StyleHandleTest {
         },
       )
       assertEquals(SourceType.RASTER_DEM, map.styleSourceType("dem"))
-      map.addHillshadeLayer("hillshade", "dem")
+      map.addHillshadeLayer("hillshade", "dem", "")
       assertEquals("hillshade", map.styleLayerType("hillshade"))
-      map.addColorReliefLayer("relief", "dem")
+      map.addColorReliefLayer("relief", "dem", "")
       assertEquals("color-relief", map.styleLayerType("relief"))
     } finally {
       map.close()
@@ -373,7 +505,7 @@ class StyleHandleTest {
 
   @Test
   fun geoJsonSourceApisMaterializeGeoJsonDescriptors() {
-    val runtime = RuntimeHandle.create()
+    val runtime = RuntimeHandle.create(org.maplibre.nativeffi.runtime.RuntimeOptions())
     val map =
       MapHandle.create(
         runtime,
@@ -386,17 +518,18 @@ class StyleHandleTest {
       map.setStyleJson("{\"version\":8,\"sources\":{},\"layers\":[]}")
       map.addGeoJsonSourceData(
         "points",
-        GeoJson.featureCollection(
+        GeoJson.FeatureCollection(
           listOf(
             Feature(
-              Geometry.point(LatLng(0.0, 0.0)),
-              listOf(JsonValue.Member("kind", JsonValue.of("point"))),
+              Geometry.Point(LatLng(0.0, 0.0)),
+              listOf(JsonValue.Member("kind", JsonValue.StringValue("point"))),
+              FeatureIdentifier.Null,
             )
           )
         ),
       )
       assertEquals(SourceType.GEOJSON, map.styleSourceType("points"))
-      map.setGeoJsonSourceData("points", GeoJson.geometry(Geometry.point(LatLng(1.0, 1.0))))
+      map.setGeoJsonSourceData("points", GeoJson.GeometryValue(Geometry.Point(LatLng(1.0, 1.0))))
       assertTrue(map.removeStyleSource("points"))
     } finally {
       map.close()

@@ -1,7 +1,7 @@
 package org.maplibre.nativeffi.render
 
 /** Mutable logical render target extent. */
-public class RenderTargetExtent(width: Int = 256, height: Int = 256, scaleFactor: Double = 1.0) {
+public class RenderTargetExtent(width: Int, height: Int, scaleFactor: Double) {
   public var width: Int = width
     set(value) {
       require(value >= 0) { "width must be non-negative" }

@@ -5,10 +5,10 @@ public enum class OpenGLContextProvider(public val nativeMask: Int) {
   WGL(1),
   EGL(1 shl 1);
 
-  public companion object {
+  internal companion object {
     internal fun fromMask(mask: UInt): Set<OpenGLContextProvider> = fromMask(mask.toInt())
 
-    public fun fromMask(mask: Int): Set<OpenGLContextProvider> =
+    internal fun fromMask(mask: Int): Set<OpenGLContextProvider> =
       entries.filterTo(mutableSetOf()) { (mask and it.nativeMask) != 0 }
   }
 }

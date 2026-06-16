@@ -2,9 +2,9 @@ package org.maplibre.nativeffi.render
 
 /** Mutable descriptor for Metal native surface render targets. */
 public class MetalSurfaceDescriptor(
-  extent: RenderTargetExtent = RenderTargetExtent(),
-  context: MetalContextDescriptor = MetalContextDescriptor(),
-  layer: NativePointer = NativePointer.NULL,
+  extent: RenderTargetExtent,
+  context: MetalContextDescriptor,
+  layer: NativePointer,
 ) {
   public var extent: RenderTargetExtent = extent
 

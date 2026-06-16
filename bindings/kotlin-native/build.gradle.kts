@@ -23,6 +23,9 @@ kotlin {
         if (hostOs.contains("mac") || hostOs.contains("linux")) {
           linkerOpts("-Wl,-rpath,$nativeBuildDir")
         }
+        if (hostOs.contains("mac")) {
+          linkerOpts("-framework", "Foundation", "-framework", "Metal", "-framework", "QuartzCore")
+        }
       }
     }
 

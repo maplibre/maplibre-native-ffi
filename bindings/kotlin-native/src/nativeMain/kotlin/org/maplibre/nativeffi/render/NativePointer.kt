@@ -17,12 +17,22 @@ private constructor(private val addressValue: Long, private val scope: FrameScop
       return addressValue == 0L
     }
 
-  override fun equals(other: Any?): Boolean =
-    other is NativePointer && addressValue == other.addressValue
+  override fun equals(other: Any?): Boolean {
+    ensureActive()
+    if (other !is NativePointer) return false
+    other.ensureActive()
+    return addressValue == other.addressValue
+  }
 
-  override fun hashCode(): Int = addressValue.hashCode()
+  override fun hashCode(): Int {
+    ensureActive()
+    return addressValue.hashCode()
+  }
 
-  override fun toString(): String = "NativePointer[address=0x${addressValue.toString(16)}]"
+  override fun toString(): String {
+    ensureActive()
+    return "NativePointer[address=0x${addressValue.toString(16)}]"
+  }
 
   private fun ensureActive() {
     scope?.ensureActive()
@@ -32,7 +42,13 @@ private constructor(private val addressValue: Long, private val scope: FrameScop
     /** Null native pointer value. */
     public val NULL: NativePointer = NativePointer(0L, null)
 
-    /** Creates an opaque borrowed pointer value from an address bit pattern. */
+    /**
+     * Creates an opaque borrowed backend interop pointer from an address bit pattern.
+     *
+     * The caller retains ownership of the pointed-to backend resource and keeps it valid and
+     * synchronized for the full C API borrow window documented by the descriptor that receives this
+     * value. This value grants no general memory access.
+     */
     public fun ofAddress(address: Long): NativePointer =
       if (address == 0L) NULL else NativePointer(address, null)
 

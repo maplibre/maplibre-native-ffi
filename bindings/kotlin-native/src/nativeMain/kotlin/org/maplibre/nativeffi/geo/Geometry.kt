@@ -71,25 +71,21 @@ public sealed interface Geometry {
     override fun toString(): String = "Collection(geometries=$geometries)"
   }
 
+  public class Unknown internal constructor(public val rawType: Int, public val rawSize: Int) :
+    Geometry {
+    override fun equals(other: Any?): Boolean =
+      other is Unknown && rawType == other.rawType && rawSize == other.rawSize
+
+    override fun hashCode(): Int {
+      var result = rawType
+      result = 31 * result + rawSize
+      return result
+    }
+
+    override fun toString(): String = "Unknown(rawType=$rawType, rawSize=$rawSize)"
+  }
+
   public companion object {
     public const val MAX_COLLECTION_DEPTH: Int = 64
-
-    public fun empty(): Empty = Empty
-
-    public fun point(coordinate: LatLng): Point = Point(coordinate)
-
-    public fun lineString(coordinates: List<LatLng>): LineString = LineString(coordinates.toList())
-
-    public fun polygon(rings: List<List<LatLng>>): Polygon = Polygon(rings.map { it.toList() })
-
-    public fun multiPoint(coordinates: List<LatLng>): MultiPoint = MultiPoint(coordinates.toList())
-
-    public fun multiLineString(lines: List<List<LatLng>>): MultiLineString =
-      MultiLineString(lines.map { it.toList() })
-
-    public fun multiPolygon(polygons: List<List<List<LatLng>>>): MultiPolygon =
-      MultiPolygon(polygons.map { polygon -> polygon.map { it.toList() } })
-
-    public fun collection(geometries: List<Geometry>): Collection = Collection(geometries.toList())
   }
 }

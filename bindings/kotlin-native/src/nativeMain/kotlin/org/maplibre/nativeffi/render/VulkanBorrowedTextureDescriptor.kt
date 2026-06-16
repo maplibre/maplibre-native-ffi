@@ -2,12 +2,12 @@ package org.maplibre.nativeffi.render
 
 /** Mutable descriptor for Vulkan caller-owned texture render targets. */
 public class VulkanBorrowedTextureDescriptor(
-  extent: RenderTargetExtent = RenderTargetExtent(),
-  context: VulkanContextDescriptor = VulkanContextDescriptor(),
-  image: NativePointer = NativePointer.NULL,
-  imageView: NativePointer = NativePointer.NULL,
-  format: Int = 0,
-  initialLayout: Int = 0,
+  extent: RenderTargetExtent,
+  context: VulkanContextDescriptor,
+  image: NativePointer,
+  imageView: NativePointer,
+  format: Int,
+  initialLayout: Int,
 ) {
   public var extent: RenderTargetExtent = extent
 

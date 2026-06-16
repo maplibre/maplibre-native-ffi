@@ -2,23 +2,18 @@ package org.maplibre.nativeffi.map
 
 import cnames.structs.mln_map_projection
 import kotlinx.cinterop.CPointer
-import kotlinx.cinterop.CPointerVarOf
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.alloc
 import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.pointed
 import kotlinx.cinterop.ptr
-import kotlinx.cinterop.value
 import org.maplibre.nativeffi.camera.CameraOptions
 import org.maplibre.nativeffi.camera.EdgeInsets
 import org.maplibre.nativeffi.geo.Geometry
 import org.maplibre.nativeffi.geo.LatLng
-import org.maplibre.nativeffi.geo.ProjectedMeters
 import org.maplibre.nativeffi.geo.ScreenPoint
 import org.maplibre.nativeffi.internal.c.mln_camera_options_default
 import org.maplibre.nativeffi.internal.c.mln_lat_lng
-import org.maplibre.nativeffi.internal.c.mln_lat_lng_for_projected_meters
-import org.maplibre.nativeffi.internal.c.mln_map_projection_create
 import org.maplibre.nativeffi.internal.c.mln_map_projection_destroy
 import org.maplibre.nativeffi.internal.c.mln_map_projection_get_camera
 import org.maplibre.nativeffi.internal.c.mln_map_projection_lat_lng_for_pixel
@@ -26,8 +21,6 @@ import org.maplibre.nativeffi.internal.c.mln_map_projection_pixel_for_lat_lng
 import org.maplibre.nativeffi.internal.c.mln_map_projection_set_camera
 import org.maplibre.nativeffi.internal.c.mln_map_projection_set_visible_coordinates
 import org.maplibre.nativeffi.internal.c.mln_map_projection_set_visible_geometry
-import org.maplibre.nativeffi.internal.c.mln_projected_meters
-import org.maplibre.nativeffi.internal.c.mln_projected_meters_for_lat_lng
 import org.maplibre.nativeffi.internal.c.mln_screen_point
 import org.maplibre.nativeffi.internal.lifecycle.HandleState
 import org.maplibre.nativeffi.internal.status.Status
@@ -37,7 +30,7 @@ import org.maplibre.nativeffi.internal.struct.ValueStructs
 
 /** Owned standalone projection snapshot created from a map. */
 @OptIn(ExperimentalForeignApi::class)
-public class MapProjectionHandle private constructor(handle: CPointer<mln_map_projection>) :
+public class MapProjectionHandle internal constructor(handle: CPointer<mln_map_projection>) :
   AutoCloseable {
   private val state = HandleState("MapProjectionHandle", handle)
 
@@ -116,29 +109,4 @@ public class MapProjectionHandle private constructor(handle: CPointer<mln_map_pr
   internal fun nativeHandle(): CPointer<mln_map_projection> = state.requireLive()
 
   internal fun nativeAddress(): Long = state.address()
-
-  public companion object {
-    public fun projectedMetersForLatLng(coordinate: LatLng): ProjectedMeters = memScoped {
-      val outMeters = alloc<mln_projected_meters>()
-      Status.check(mln_projected_meters_for_lat_lng(CoreStructs.latLng(coordinate), outMeters.ptr))
-      CoreStructs.projectedMeters(outMeters)
-    }
-
-    public fun latLngForProjectedMeters(meters: ProjectedMeters): LatLng = memScoped {
-      val outCoordinate = alloc<mln_lat_lng>()
-      Status.check(
-        mln_lat_lng_for_projected_meters(CoreStructs.projectedMeters(meters), outCoordinate.ptr)
-      )
-      CoreStructs.latLng(outCoordinate)
-    }
-
-    public fun create(map: MapHandle): MapProjectionHandle = memScoped {
-      val outProjection = alloc<CPointerVarOf<CPointer<mln_map_projection>>>()
-      outProjection.value = null
-      Status.check(mln_map_projection_create(map.nativeHandle(), outProjection.ptr))
-      MapProjectionHandle(
-        requireNotNull(outProjection.value) { "mln_map_projection_create returned null" }
-      )
-    }
-  }
 }

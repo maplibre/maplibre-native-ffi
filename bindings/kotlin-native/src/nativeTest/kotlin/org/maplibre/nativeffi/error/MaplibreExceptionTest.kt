@@ -13,7 +13,7 @@ class MaplibreExceptionTest {
     assertEquals(MaplibreStatus.WRONG_THREAD, MaplibreStatus.fromNative(-3))
     assertEquals(MaplibreStatus.UNSUPPORTED, MaplibreStatus.fromNative(-4))
     assertEquals(MaplibreStatus.NATIVE_ERROR, MaplibreStatus.fromNative(-5))
-    assertEquals(MaplibreStatus.UNKNOWN, MaplibreStatus.fromNative(-127))
+    assertEquals(MaplibreStatus(-127), MaplibreStatus.fromNative(-127))
   }
 
   @Test

@@ -19,9 +19,11 @@ import org.maplibre.nativeffi.geo.Vec3
 import org.maplibre.nativeffi.runtime.RuntimeHandle
 
 class MapCameraControlsTest {
+  // BND-102, BND-103: camera commands, transitions, viewport state, and projection helpers.
+
   @Test
   fun mapCameraAndViewportControlsRoundTripThroughNativeCalls() {
-    val runtime = RuntimeHandle.create()
+    val runtime = RuntimeHandle.create(org.maplibre.nativeffi.runtime.RuntimeOptions())
     try {
       val map =
         MapHandle.create(
@@ -70,8 +72,8 @@ class MapCameraControlsTest {
         map.flyTo(cameraOptions, animation)
         map.moveBy(0.0, 0.0)
         map.moveByAnimated(0.0, 0.0, animation)
-        map.scaleBy(1.0)
-        map.scaleByAnimated(1.0, animation)
+        map.scaleBy(1.0, null)
+        map.scaleByAnimated(1.0, null, animation)
         map.rotateBy(
           org.maplibre.nativeffi.geo.ScreenPoint(0.0, 0.0),
           org.maplibre.nativeffi.geo.ScreenPoint(0.0, 0.0),
@@ -84,9 +86,19 @@ class MapCameraControlsTest {
         map.pitchBy(0.0)
         map.pitchByAnimated(0.0, animation)
         val camera = map.camera
-        assertNotNull(camera.center)
-        assertNotNull(camera.zoom)
+        assertEquals(LatLng(0.0, 0.0), camera.center)
+        assertEquals(1.0, assertNotNull(camera.zoom), 0.000001)
         map.cancelTransitions()
+        map.jumpTo(
+          CameraOptions().apply {
+            center = LatLng(1.0, 1.0)
+            zoom = 2.0
+          }
+        )
+        val cameraAfterCancel = map.camera
+        assertEquals(1.0, assertNotNull(cameraAfterCancel.center).latitude, 0.000001)
+        assertEquals(1.0, assertNotNull(cameraAfterCancel.center).longitude, 0.000001)
+        assertEquals(2.0, assertNotNull(cameraAfterCancel.zoom), 0.000001)
         val fitOptions =
           CameraFitOptions().apply {
             padding = EdgeInsets.ZERO
@@ -94,10 +106,10 @@ class MapCameraControlsTest {
             pitch = 0.0
           }
         val bounds = LatLngBounds(LatLng(-10.0, -10.0), LatLng(10.0, 10.0))
-        map.cameraForLatLngBounds(bounds)
+        map.cameraForLatLngBounds(bounds, null)
         map.cameraForLatLngBounds(bounds, fitOptions)
         map.cameraForLatLngs(listOf(LatLng(-1.0, -1.0), LatLng(1.0, 1.0)), fitOptions)
-        map.cameraForGeometry(Geometry.point(LatLng(0.0, 0.0)), fitOptions)
+        map.cameraForGeometry(Geometry.Point(LatLng(0.0, 0.0)), fitOptions)
         map.latLngBoundsForCamera(cameraOptions)
         map.latLngBoundsForCameraUnwrapped(cameraOptions)
         map.bounds = BoundOptions().apply { this.bounds = bounds }
@@ -111,11 +123,20 @@ class MapCameraControlsTest {
         assertNotNull(freeCamera.position)
         assertNotNull(freeCamera.orientation)
         map.projectionMode = ProjectionModeOptions().apply { axonometric = false }
-        assertNotNull(map.projectionMode.axonometric)
+        assertEquals(false, map.projectionMode.axonometric)
         val point = map.pixelForLatLng(LatLng(0.0, 0.0))
-        map.latLngForPixel(point)
-        assertEquals(2, map.pixelsForLatLngs(listOf(LatLng(0.0, 0.0), LatLng(1.0, 1.0))).size)
-        assertEquals(2, map.latLngsForPixels(listOf(point, point)).size)
+        val coordinate = map.latLngForPixel(point)
+        assertEquals(0.0, coordinate.latitude, 0.000001)
+        assertEquals(0.0, coordinate.longitude, 0.000001)
+        val projectedCoordinates = listOf(LatLng(0.0, 0.0), LatLng(1.0, 1.0))
+        val points = map.pixelsForLatLngs(projectedCoordinates)
+        assertEquals(point, points[0])
+        val coordinates = map.latLngsForPixels(points)
+        assertEquals(2, coordinates.size)
+        assertEquals(projectedCoordinates[0].latitude, coordinates[0].latitude, 0.000001)
+        assertEquals(projectedCoordinates[0].longitude, coordinates[0].longitude, 0.000001)
+        assertEquals(projectedCoordinates[1].latitude, coordinates[1].latitude, 0.000001)
+        assertEquals(projectedCoordinates[1].longitude, coordinates[1].longitude, 0.000001)
         map.createProjection().close()
         map.dumpDebugLogs()
       } finally {

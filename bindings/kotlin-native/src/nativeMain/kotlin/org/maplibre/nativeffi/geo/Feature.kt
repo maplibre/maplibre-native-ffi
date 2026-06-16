@@ -6,7 +6,7 @@ import org.maplibre.nativeffi.json.JsonValue
 public class Feature(
   public val geometry: Geometry,
   properties: List<JsonValue.Member>,
-  public val identifier: FeatureIdentifier = FeatureIdentifier.Null,
+  public val identifier: FeatureIdentifier,
 ) {
   public val properties: List<JsonValue.Member> = properties.toList()
 

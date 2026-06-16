@@ -2,10 +2,13 @@ package org.maplibre.nativeffi.internal.struct
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlinx.cinterop.ExperimentalForeignApi
+import kotlinx.cinterop.alloc
 import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.pointed
+import org.maplibre.nativeffi.internal.c.mln_texture_image_info
 import org.maplibre.nativeffi.render.EglContextDescriptor
 import org.maplibre.nativeffi.render.MetalBorrowedTextureDescriptor
 import org.maplibre.nativeffi.render.MetalContextDescriptor
@@ -18,6 +21,7 @@ import org.maplibre.nativeffi.render.OpenGLOwnedTextureDescriptor
 import org.maplibre.nativeffi.render.OpenGLSurfaceDescriptor
 import org.maplibre.nativeffi.render.RenderBackend
 import org.maplibre.nativeffi.render.RenderTargetExtent
+import org.maplibre.nativeffi.render.TextureImageInfo
 import org.maplibre.nativeffi.render.VulkanBorrowedTextureDescriptor
 import org.maplibre.nativeffi.render.VulkanContextDescriptor
 import org.maplibre.nativeffi.render.VulkanSurfaceDescriptor
@@ -35,6 +39,22 @@ class RenderStructsTest {
       OpenGLContextProvider.fromMask(3U),
     )
     assertEquals(emptySet(), RenderBackend.fromMask(0U))
+  }
+
+  @Test
+  fun textureImageInfoCopiesMetadataAndRejectsOversizedLengths() {
+    memScoped {
+      val info = alloc<mln_texture_image_info>()
+      info.width = 2U
+      info.height = 3U
+      info.stride = 8U
+      info.byte_length = 24UL
+
+      assertEquals(TextureImageInfo(2, 3, 8, 24), RenderStructs.textureImageInfo(info))
+
+      info.byte_length = Long.MAX_VALUE.toULong() + 1UL
+      assertFailsWith<IllegalArgumentException> { RenderStructs.textureImageInfo(info) }
+    }
   }
 
   @Test
@@ -66,7 +86,7 @@ class RenderStructsTest {
         RenderStructs.metalSurfaceDescriptor(
             MetalSurfaceDescriptor(
               extent,
-              MetalContextDescriptor(),
+              MetalContextDescriptor(NativePointer.NULL),
               NativePointer.ofAddress(0x30L),
             ),
             this,
@@ -92,16 +112,14 @@ class RenderStructsTest {
       val borrowed =
         RenderStructs.vulkanBorrowedTextureDescriptor(
             VulkanBorrowedTextureDescriptor(
-                RenderTargetExtent(),
+                RenderTargetExtent(256, 256, 1.0),
                 context,
                 NativePointer.ofAddress(0x50L),
+                NativePointer.ofAddress(0x60L),
+                44,
+                1,
               )
-              .apply {
-                imageView = NativePointer.ofAddress(0x60L)
-                format = 44
-                initialLayout = 1
-                finalLayout = 2
-              },
+              .apply { finalLayout = 2 },
             this,
           )
           .pointed
@@ -114,7 +132,11 @@ class RenderStructsTest {
 
       val surface =
         RenderStructs.vulkanSurfaceDescriptor(
-            VulkanSurfaceDescriptor(RenderTargetExtent(), context, NativePointer.ofAddress(0x70L)),
+            VulkanSurfaceDescriptor(
+              RenderTargetExtent(256, 256, 1.0),
+              context,
+              NativePointer.ofAddress(0x70L),
+            ),
             this,
           )
           .pointed

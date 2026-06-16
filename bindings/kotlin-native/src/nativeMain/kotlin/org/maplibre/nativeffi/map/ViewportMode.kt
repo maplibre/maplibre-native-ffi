@@ -1,15 +1,19 @@
 package org.maplibre.nativeffi.map
 
-/** Viewport orientation mode used by map viewport options. */
-public enum class ViewportMode(public val nativeValue: Int) {
-  DEFAULT(0),
-  FLIPPED_Y(1),
-  UNKNOWN(-1);
+import kotlin.jvm.JvmInline
 
+/** Viewport orientation mode used by map viewport options. */
+@JvmInline
+public value class ViewportMode(public val nativeValue: Int) {
   public companion object {
+    public val DEFAULT: ViewportMode = ViewportMode(0)
+    public val FLIPPED_Y: ViewportMode = ViewportMode(1)
+
     internal fun fromNative(nativeValue: UInt): ViewportMode = fromNative(nativeValue.toInt())
 
-    public fun fromNative(nativeValue: Int): ViewportMode =
-      entries.firstOrNull { it.nativeValue == nativeValue } ?: UNKNOWN
+    internal fun fromNative(nativeValue: Int): ViewportMode = ViewportMode(nativeValue)
   }
+
+  internal val isKnown: Boolean
+    get() = this == DEFAULT || this == FLIPPED_Y
 }

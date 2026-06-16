@@ -4,7 +4,11 @@ package org.maplibre.nativeffi.geo
 public sealed interface FeatureIdentifier {
   public data object Null : FeatureIdentifier
 
-  /** Unsigned feature identifier (`uint64_t` in the C ABI) stored as a [Long] bit pattern. */
+  /**
+   * Unsigned feature identifier (`uint64_t` in the C ABI) stored as a [Long] bit pattern.
+   *
+   * Compare and format as unsigned by converting [value] with [Long.toULong].
+   */
   public data class UInt(public val value: Long) : FeatureIdentifier
 
   /**
@@ -17,15 +21,11 @@ public sealed interface FeatureIdentifier {
 
   public data class StringValue(public val value: String) : FeatureIdentifier
 
-  public companion object {
-    public fun nullValue(): Null = Null
+  public class Unknown internal constructor(public val rawType: kotlin.Int) : FeatureIdentifier {
+    override fun equals(other: Any?): Boolean = other is Unknown && rawType == other.rawType
 
-    public fun unsigned(value: Long): UInt = UInt(value)
+    override fun hashCode(): kotlin.Int = rawType
 
-    public fun of(value: Long): Int = Int(value)
-
-    public fun of(value: Double): DoubleValue = DoubleValue(value)
-
-    public fun of(value: String): StringValue = StringValue(value)
+    override fun toString(): String = "Unknown(rawType=$rawType)"
   }
 }

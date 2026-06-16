@@ -1,19 +1,21 @@
 package org.maplibre.nativeffi.runtime
 
-/** Offline operation result kind reported by completion events. */
-public enum class OfflineOperationResultKind(public val nativeValue: Int) {
-  NONE(0),
-  REGION(1),
-  OPTIONAL_REGION(2),
-  REGION_LIST(3),
-  REGION_STATUS(4),
-  UNKNOWN(-1);
+import kotlin.jvm.JvmInline
 
+/** Offline operation result kind reported by completion events. */
+@JvmInline
+public value class OfflineOperationResultKind(public val nativeValue: Int) {
   public companion object {
+    public val NONE: OfflineOperationResultKind = OfflineOperationResultKind(0)
+    public val REGION: OfflineOperationResultKind = OfflineOperationResultKind(1)
+    public val OPTIONAL_REGION: OfflineOperationResultKind = OfflineOperationResultKind(2)
+    public val REGION_LIST: OfflineOperationResultKind = OfflineOperationResultKind(3)
+    public val REGION_STATUS: OfflineOperationResultKind = OfflineOperationResultKind(4)
+
     internal fun fromNative(nativeValue: UInt): OfflineOperationResultKind =
       fromNative(nativeValue.toInt())
 
-    public fun fromNative(nativeValue: Int): OfflineOperationResultKind =
-      entries.firstOrNull { it.nativeValue == nativeValue } ?: UNKNOWN
+    internal fun fromNative(nativeValue: Int): OfflineOperationResultKind =
+      OfflineOperationResultKind(nativeValue)
   }
 }

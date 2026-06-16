@@ -43,4 +43,37 @@ class CustomGeometrySourceStateTest {
 
     assertEquals(listOf(CanonicalTileId(1, 2, 3), CanonicalTileId(1, 2, 3)), received)
   }
+
+  @Test
+  fun closeDuringInFlightCallbackCompletesAfterCallbackAndSuppressesLaterUpcalls() {
+    val received = mutableListOf<CanonicalTileId>()
+    lateinit var state: CustomGeometrySourceState
+    state =
+      CustomGeometrySourceState(
+        CustomGeometrySourceOptions(
+          object : CustomGeometrySourceCallback {
+            override fun fetchTile(tileId: CanonicalTileId) {
+              received += tileId
+              state.close()
+            }
+
+            override fun cancelTile(tileId: CanonicalTileId) {
+              received += tileId
+            }
+          }
+        )
+      )
+    val tile =
+      cValue<mln_canonical_tile_id> {
+        z = 4U
+        x = 5U
+        y = 6U
+      }
+
+    state.fetch(tile)
+    state.cancel(tile)
+    state.close()
+
+    assertEquals(listOf(CanonicalTileId(4, 5, 6)), received)
+  }
 }
