@@ -577,12 +577,11 @@ native library:
 Internal seams MUST assert the same public error, lifetime, and cleanup behavior
 that a real native failure would expose.
 
-### Binding surface and loading
+### Loading
 
-| ID      | Test                                                                                                                                                                      |
-| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| BND-001 | ABI-version mismatch returns the binding's ABI-version error before storing a public native handle, using an internal loader or version seam.                             |
-| BND-002 | Public API surface tests prevent raw C structs, raw C handles, raw FFI carrier types, and generated declarations leaking through the language's supported public surface. |
+| ID      | Test                                                                                                                                          |
+| ------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| BND-001 | ABI-version mismatch returns the binding's ABI-version error before storing a public native handle, using an internal loader or version seam. |
 
 ### Status and diagnostics
 
@@ -604,7 +603,6 @@ that a real native failure would expose.
 | BND-041 | A failed native destroy leaves the handle live; a later successful release destroys the native handle.                                                         |
 | BND-042 | A child handle retains parent owner state, and parent release fails while child handles are live.                                                              |
 | BND-043 | `MapProjectionHandle` remains usable after the source map closes and then releases successfully.                                                               |
-| BND-047 | Public API surface tests reject construction of live owned handles or operation tokens from user-supplied native identity.                                     |
 
 ### Input Structs, Values, and Copied Data
 

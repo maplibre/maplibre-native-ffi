@@ -29,7 +29,7 @@ class HandleStateTest {
   }
 
   @Test
-  void bnd047RejectsNullNativeHandles() {
+  void bnd040RejectsNullNativeHandles() {
     assertThrows(IllegalArgumentException.class, () -> new HandleState("TestHandle", 0));
   }
 
