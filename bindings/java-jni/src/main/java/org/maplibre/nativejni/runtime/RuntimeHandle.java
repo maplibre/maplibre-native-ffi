@@ -385,11 +385,8 @@ public final class RuntimeHandle implements AutoCloseable {
     if (status == MaplibreStatus.WRONG_THREAD.nativeCode()) {
       Status.check(status);
     }
-    try {
-      Status.check(status);
-    } finally {
-      operation.markConsumed();
-    }
+    Status.check(status);
+    operation.markConsumed();
   }
 
   public void setResourceTransform(ResourceTransformCallback callback) {

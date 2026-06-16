@@ -146,11 +146,22 @@ final class CustomGeometrySourceState implements AutoCloseable {
   @Override
   public void close() {
     var interrupted = false;
+    var closeNative = false;
     synchronized (callbackLock) {
       if (callbackDepth.get() > 0) {
         throw Status.callbackReentry("Custom geometry source");
       }
+      while (closeRequested && !closed) {
+        try {
+          callbackLock.wait();
+        } catch (InterruptedException exception) {
+          interrupted = true;
+        }
+      }
       if (closed) {
+        if (interrupted) {
+          Thread.currentThread().interrupt();
+        }
         return;
       }
       closeRequested = true;
@@ -161,11 +172,19 @@ final class CustomGeometrySourceState implements AutoCloseable {
           interrupted = true;
         }
       }
-      closed = true;
+      closeNative = true;
     }
     try {
-      closeNative();
+      if (closeNative) {
+        closeNative();
+      }
     } finally {
+      if (closeNative) {
+        synchronized (callbackLock) {
+          closed = true;
+          callbackLock.notifyAll();
+        }
+      }
       if (interrupted) {
         Thread.currentThread().interrupt();
       }

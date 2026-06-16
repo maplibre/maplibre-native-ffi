@@ -174,7 +174,12 @@ public final class StyleStructs {
     private final MaplibreNativeC.mln_geojson value;
 
     public GeoJsonScope(GeoJson value) {
-      this.value = geoJson(value);
+      try {
+        this.value = geoJson(value);
+      } catch (RuntimeException | Error error) {
+        close();
+        throw error;
+      }
     }
 
     public MaplibreNativeC.mln_geojson value() {
