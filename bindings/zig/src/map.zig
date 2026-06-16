@@ -24,6 +24,12 @@ const MapState = struct {
     diagnostic_store: ?*diagnostics.DiagnosticStore,
     custom_geometry_sources: *std.ArrayList(*CustomGeometrySourceState),
     active_render_sessions: std.atomic.Value(usize),
+    closing: bool,
+};
+
+pub const RenderSessionRegistration = struct {
+    native: *c.mln_map,
+    diagnostic_store: ?*diagnostics.DiagnosticStore,
 };
 
 const MapRegistrySlot = struct {
@@ -124,6 +130,7 @@ pub const MapHandle = enum(u128) {
             .diagnostic_store = diagnostic_store,
             .custom_geometry_sources = custom_geometry_sources,
             .active_render_sessions = std.atomic.Value(usize).init(0),
+            .closing = false,
         };
         errdefer std.heap.smp_allocator.destroy(map_state);
 
@@ -1339,17 +1346,21 @@ pub const MapHandle = enum(u128) {
     }
 
     pub fn close(self: *MapHandle) status.Error!void {
-        const map_state = mapState(self.*) orelse return;
-        if (map_state.active_render_sessions.load(.seq_cst) != 0) {
-            try status.setBindingDiagnostic(map_state.diagnostic_store, "map has live render sessions");
-            return error.InvalidState;
-        }
-        const map: *c.mln_map = @ptrCast(map_state.native orelse return);
-        try status.checkStatus(c.mln_map_destroy(map), map_state.diagnostic_store);
-        runtime_module.unregisterMap(map_state.runtime_registry, map);
-        freeCustomGeometrySourceStates(map_state);
-        map_state.native = null;
-        _ = unregisterMapState(self.*);
+        const map_close = beginMapClose(self.*) catch |err| {
+            if (err == error.InvalidState) {
+                if (diagnosticStore(self)) |store| {
+                    try status.setBindingDiagnostic(store, "map has live render sessions");
+                }
+            }
+            return err;
+        } orelse return;
+        status.checkStatus(c.mln_map_destroy(map_close.native), map_close.diagnostic_store) catch |err| {
+            cancelMapClose(map_close.state);
+            return err;
+        };
+        runtime_module.unregisterMap(map_close.runtime_registry, map_close.native);
+        freeCustomGeometrySourceStates(map_close.state);
+        const map_state = finishMapClose(self.*) orelse map_close.state;
         std.heap.smp_allocator.destroy(map_state);
     }
 };
@@ -1630,6 +1641,59 @@ fn unregisterMapState(handle: MapHandle) ?*MapState {
     return map_state;
 }
 
+const MapClose = struct {
+    state: *MapState,
+    native: *c.mln_map,
+    diagnostic_store: ?*diagnostics.DiagnosticStore,
+    runtime_registry: *runtime_module.RuntimeRegistry,
+};
+
+fn beginMapClose(handle: MapHandle) status.BindingError!?MapClose {
+    lockMapRegistry();
+    defer unlockMapRegistry();
+
+    const index = mapHandleIndex(handle) orelse return null;
+    if (index > map_registry.items.len) return null;
+    const slot_index = index - 1;
+    const slot = &map_registry.items[slot_index];
+    if (slot.generation != mapHandleGeneration(handle)) return null;
+    const map_state = slot.state orelse return null;
+    if (map_state.closing) return error.ActiveBorrow;
+    if (map_state.active_render_sessions.load(.seq_cst) != 0) return error.InvalidState;
+    const map: *c.mln_map = @ptrCast(map_state.native orelse return null);
+    map_state.closing = true;
+    return .{
+        .state = map_state,
+        .native = map,
+        .diagnostic_store = map_state.diagnostic_store,
+        .runtime_registry = map_state.runtime_registry,
+    };
+}
+
+fn cancelMapClose(map_state: *MapState) void {
+    lockMapRegistry();
+    defer unlockMapRegistry();
+
+    map_state.closing = false;
+}
+
+fn finishMapClose(handle: MapHandle) ?*MapState {
+    lockMapRegistry();
+    defer unlockMapRegistry();
+
+    const index = mapHandleIndex(handle) orelse return null;
+    if (index > map_registry.items.len) return null;
+    const slot_index = index - 1;
+    const slot = &map_registry.items[slot_index];
+    if (slot.generation != mapHandleGeneration(handle)) return null;
+    const map_state = slot.state orelse return null;
+    slot.state = null;
+    slot.generation = runtime_module.nextHandleGeneration();
+    map_state.native = null;
+    map_free_list.appendAssumeCapacity(slot_index);
+    return map_state;
+}
+
 fn lockMapRegistry() void {
     while (map_registry_lock.cmpxchgWeak(false, true, .seq_cst, .seq_cst) != null) {
         std.Thread.yield() catch {};
@@ -1642,6 +1706,7 @@ fn unlockMapRegistry() void {
 
 pub fn native(handle: *MapHandle) status.BindingError!*c.mln_map {
     const map_state = mapState(handle.*) orelse return error.ClosedHandle;
+    if (map_state.closing) return error.ActiveBorrow;
     return @ptrCast(map_state.native orelse return error.ClosedHandle);
 }
 
@@ -1650,9 +1715,18 @@ pub fn diagnosticStore(handle: *MapHandle) ?*diagnostics.DiagnosticStore {
     return map_state.diagnostic_store;
 }
 
-pub fn registerRenderSession(handle: *MapHandle) status.BindingError!void {
-    const map_state = try mapStateForHandle(handle);
+pub fn registerRenderSession(handle: *MapHandle) status.BindingError!RenderSessionRegistration {
+    lockMapRegistry();
+    defer unlockMapRegistry();
+
+    const map_state = mapStateLocked(handle.*) orelse return error.ClosedHandle;
+    if (map_state.closing) return error.ActiveBorrow;
+    const map: *c.mln_map = @ptrCast(map_state.native orelse return error.ClosedHandle);
     _ = map_state.active_render_sessions.fetchAdd(1, .seq_cst);
+    return .{
+        .native = map,
+        .diagnostic_store = map_state.diagnostic_store,
+    };
 }
 
 pub fn unregisterRenderSession(handle: MapHandle) void {

@@ -910,16 +910,16 @@ fn attach(
     descriptor: anytype,
 ) status.Error!RenderSessionHandle {
     var session: ?*c.mln_render_session = null;
+    const registration = try map_module.registerRenderSession(map);
+    errdefer map_module.unregisterRenderSession(map.*);
     try status.checkStatus(
-        attachFn(try map_module.native(map), descriptor, &session),
-        map_module.diagnosticStore(map),
+        attachFn(registration.native, descriptor, &session),
+        registration.diagnostic_store,
     );
     errdefer {
         if (session) |handle| _ = c.mln_render_session_destroy(handle);
     }
-    try map_module.registerRenderSession(map);
-    errdefer map_module.unregisterRenderSession(map.*);
-    return try newRenderSession(session.?, map.*, map_module.diagnosticStore(map));
+    return try newRenderSession(session.?, map.*, registration.diagnostic_store);
 }
 
 fn newRenderSession(
