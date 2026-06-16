@@ -110,10 +110,10 @@ final class MapState implements AutoCloseable {
         return;
       }
       var value = event.get();
-      if (value.type() == RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE
+      if (RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE.equals(value.type())
           && value.mapSource().filter(source -> source == map).isPresent()) {
         renderPending = true;
-      } else if (value.type() == RuntimeEventType.MAP_RENDER_FRAME_FINISHED
+      } else if (RuntimeEventType.MAP_RENDER_FRAME_FINISHED.equals(value.type())
           && value.mapSource().filter(source -> source == map).isPresent()
           && value.payload() instanceof RuntimeEventPayload.RenderFrame frame
           && frame.needsRepaint()) {

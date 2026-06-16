@@ -1,5 +1,6 @@
 package org.maplibre.nativejni.internal.status;
 
+import org.maplibre.nativejni.error.InvalidArgumentException;
 import org.maplibre.nativejni.error.InvalidStateException;
 import org.maplibre.nativejni.error.MaplibreException;
 import org.maplibre.nativejni.error.MaplibreStatus;
@@ -21,6 +22,30 @@ public final class Status {
   public static InvalidStateException released(String typeName) {
     return new InvalidStateException(
         MaplibreStatus.INVALID_STATE.nativeCode(), typeName + " is already closed");
+  }
+
+  public static void checkNoEmbeddedNul(String value, String description) {
+    if (value.indexOf('\0') >= 0) {
+      throw new InvalidArgumentException(
+          MaplibreStatus.INVALID_ARGUMENT.nativeCode(), description + " contains embedded NUL");
+    }
+  }
+
+  public static InvalidStateException releasing(String typeName) {
+    return new InvalidStateException(
+        MaplibreStatus.INVALID_STATE.nativeCode(), typeName + " is closing");
+  }
+
+  public static InvalidStateException callbackReentry(String typeName) {
+    return new InvalidStateException(
+        MaplibreStatus.INVALID_STATE.nativeCode(),
+        typeName + " cannot be closed from its callback");
+  }
+
+  public static InvalidStateException liveChildren(String typeName, int childCount) {
+    return new InvalidStateException(
+        MaplibreStatus.INVALID_STATE.nativeCode(),
+        typeName + " has " + childCount + " live child handle(s)");
   }
 
   public static String captureDiagnostic() {

@@ -8,6 +8,8 @@ import org.junit.jupiter.api.Test;
 import org.maplibre.nativejni.Maplibre;
 import org.maplibre.nativejni.log.LogCallback;
 
+// Support invariant for BND-120 and BND-122: Java global references are the JNI
+// ownership mechanism behind callback replacement and clear.
 final class GlobalReferenceTest {
   @AfterEach
   void clearLogCallback() {
@@ -15,7 +17,7 @@ final class GlobalReferenceTest {
   }
 
   @Test
-  void logCallbackGlobalReferencesReleaseAfterReplaceAndClear() {
+  void bnd120AndBnd122LogCallbackGlobalReferencesReleaseAfterReplaceAndClear() {
     var first = installCallback();
     var second = installCallback();
     assertReleased(first);

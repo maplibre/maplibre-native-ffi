@@ -15,16 +15,18 @@ import org.maplibre.nativejni.runtime.OfflineOperationKind;
 import org.maplibre.nativejni.runtime.RuntimeHandle;
 import org.maplibre.nativejni.runtime.RuntimeOptions;
 
+// Support invariant for BND-024, BND-025, and BND-063: Java JNI uses standard
+// UTF-8 conversion for language strings and rejects embedded NUL for C strings.
 final class StandardUtf8Test {
   @Test
-  void standardUtf8StringsReachNativeRuntimeOptions() {
+  void bnd063StandardUtf8StringsReachNativeRuntimeOptions() {
     try (var runtime = RuntimeHandle.create(new RuntimeOptions().assetPath("assets/é"))) {
       runtime.runOnce();
     }
   }
 
   @Test
-  void standardUtf8PathStringsReachOfflineMergeOperation() throws IOException {
+  void bnd063StandardUtf8PathStringsReachOfflineMergeOperation() throws IOException {
     var database = Files.createTempFile("offline-\uD83D\uDDFC", ".db");
     try (var runtime = RuntimeHandle.create()) {
       var operation = runtime.startMergeOfflineRegionsDatabase(database.toString());
@@ -36,7 +38,7 @@ final class StandardUtf8Test {
   }
 
   @Test
-  void embeddedNulStringsAreRejectedBeforeNativeUse() {
+  void bnd024EmbeddedNulStringsAreRejectedBeforeNativeUse() {
     assertThrows(
         InvalidArgumentException.class,
         () -> RuntimeHandle.create(new RuntimeOptions().assetPath("asset\0path")));
@@ -48,7 +50,7 @@ final class StandardUtf8Test {
   }
 
   @Test
-  void jniStringValidationDiagnosticDoesNotReusePreviousCFailure() {
+  void bnd025JniStringValidationDiagnosticDoesNotReusePreviousCFailure() {
     var nativeException =
         assertThrows(
             InvalidArgumentException.class,

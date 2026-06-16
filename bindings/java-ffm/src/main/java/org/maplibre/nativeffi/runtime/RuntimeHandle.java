@@ -517,11 +517,11 @@ public final class RuntimeHandle implements AutoCloseable {
     var source = mln_runtime_event.source(event);
     var sourceType = NativeValues.runtimeEventSourceType(rawSourceType);
     var runtimeSource =
-        sourceType == RuntimeEventSourceType.RUNTIME
+        RuntimeEventSourceType.RUNTIME.equals(sourceType)
             ? Optional.of(this)
             : Optional.<RuntimeHandle>empty();
     var mapSource =
-        sourceType == RuntimeEventSourceType.MAP
+        RuntimeEventSourceType.MAP.equals(sourceType)
             ? Optional.ofNullable(mapFor(source))
             : Optional.<MapHandle>empty();
     var rawPayloadType = mln_runtime_event.payload_type(event);
@@ -542,7 +542,7 @@ public final class RuntimeHandle implements AutoCloseable {
                 mln_runtime_event.payload_size(event)),
             MemoryUtil.copyStringView(
                 mln_runtime_event.message(event), mln_runtime_event.message_size(event)));
-    if (eventType == RuntimeEventType.MAP_STYLE_LOADED) {
+    if (RuntimeEventType.MAP_STYLE_LOADED.equals(eventType)) {
       mapSource.ifPresent(map -> map.releaseDetachedCustomGeometrySources(InternalAccess.INSTANCE));
     }
     return copied;

@@ -2,7 +2,10 @@ package org.maplibre.nativejni.internal.struct;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import org.bytedeco.javacpp.Pointer;
 import org.bytedeco.javacpp.PointerPointer;
 import org.bytedeco.javacpp.SizeTPointer;
@@ -25,6 +28,16 @@ import org.maplibre.nativejni.query.SourceFeatureQueryOptions;
 
 /** JavaCPP-backed materializers and readers for query-related JNI calls. */
 public final class QueryStructs {
+  private static final AtomicReference<RuntimeException> JSON_SNAPSHOT_COPY_FAILURE =
+      new AtomicReference<>();
+  private static final AtomicInteger JSON_SNAPSHOT_DESTROY_COUNT = new AtomicInteger();
+  private static final AtomicReference<RuntimeException> FEATURE_QUERY_RESULT_COPY_FAILURE =
+      new AtomicReference<>();
+  private static final AtomicInteger FEATURE_QUERY_RESULT_DESTROY_COUNT = new AtomicInteger();
+  private static final AtomicReference<RuntimeException> FEATURE_EXTENSION_RESULT_COPY_FAILURE =
+      new AtomicReference<>();
+  private static final AtomicInteger FEATURE_EXTENSION_RESULT_DESTROY_COUNT = new AtomicInteger();
+
   private QueryStructs() {}
 
   public static SelectorScope featureStateSelector(FeatureStateSelector value) {
@@ -36,10 +49,10 @@ public final class QueryStructs {
       return null;
     }
     var snapshot = new MaplibreNativeC.mln_json_snapshot(JavaCppSupport.pointer(snapshotAddress));
-    try {
-      var outValue = JavaCppSupport.outPointer(MaplibreNativeC.mln_json_value.class);
+    try (var outValue = JavaCppSupport.outPointer(MaplibreNativeC.mln_json_value.class)) {
       var status = MaplibreNativeC.mln_json_snapshot_get(snapshot, outValue);
       org.maplibre.nativejni.internal.status.Status.check(status);
+      throwJsonSnapshotCopyFailureForTesting();
       var valueAddress = JavaCppSupport.outAddress(outValue, MaplibreNativeC.mln_json_value.class);
       return valueAddress == 0
           ? null
@@ -47,6 +60,7 @@ public final class QueryStructs {
               new MaplibreNativeC.mln_json_value(JavaCppSupport.pointer(valueAddress)));
     } finally {
       MaplibreNativeC.mln_json_snapshot_destroy(snapshot);
+      JSON_SNAPSHOT_DESTROY_COUNT.incrementAndGet();
     }
   }
 
@@ -59,21 +73,23 @@ public final class QueryStructs {
     try (var count = new SizeTPointer(1)) {
       var status = MaplibreNativeC.mln_feature_query_result_count(result, count);
       org.maplibre.nativejni.internal.status.Status.check(status);
+      throwFeatureQueryResultCopyFailureForTesting();
       var features = new QueriedFeature[Math.toIntExact(count.get())];
       for (var i = 0; i < features.length; i++) {
         var feature = new MaplibreNativeC.mln_queried_feature();
-        feature.size(feature.sizeof());
-        status = MaplibreNativeC.mln_feature_query_result_get(result, i, feature);
-        if (status != MaplibreNativeC.MLN_STATUS_OK) {
-          feature.close();
+        try {
+          feature.size(feature.sizeof());
+          status = MaplibreNativeC.mln_feature_query_result_get(result, i, feature);
           org.maplibre.nativejni.internal.status.Status.check(status);
+          features[i] = queriedFeature(feature);
+        } finally {
+          feature.close();
         }
-        features[i] = queriedFeature(feature);
-        feature.close();
       }
       return List.of(features);
     } finally {
       MaplibreNativeC.mln_feature_query_result_destroy(result);
+      FEATURE_QUERY_RESULT_DESTROY_COUNT.incrementAndGet();
     }
   }
 
@@ -84,15 +100,80 @@ public final class QueryStructs {
     var result =
         new MaplibreNativeC.mln_feature_extension_result(JavaCppSupport.pointer(resultAddress));
     try {
-      var info = new MaplibreNativeC.mln_feature_extension_result_info();
-      info.size(info.sizeof());
-      var status = MaplibreNativeC.mln_feature_extension_result_get(result, info);
-      org.maplibre.nativejni.internal.status.Status.check(status);
-      var javaResult = extensionResult(info);
-      info.close();
-      return javaResult;
+      try (var info = new MaplibreNativeC.mln_feature_extension_result_info()) {
+        info.size(info.sizeof());
+        var status = MaplibreNativeC.mln_feature_extension_result_get(result, info);
+        org.maplibre.nativejni.internal.status.Status.check(status);
+        throwFeatureExtensionResultCopyFailureForTesting();
+        return extensionResult(info);
+      }
     } finally {
       MaplibreNativeC.mln_feature_extension_result_destroy(result);
+      FEATURE_EXTENSION_RESULT_DESTROY_COUNT.incrementAndGet();
+    }
+  }
+
+  public static void failNextJsonSnapshotCopyForTesting(RuntimeException failure) {
+    if (!JSON_SNAPSHOT_COPY_FAILURE.compareAndSet(null, Objects.requireNonNull(failure))) {
+      throw new IllegalStateException("JSON snapshot copy failure is already armed");
+    }
+  }
+
+  public static int jsonSnapshotDestroyCountForTesting() {
+    return JSON_SNAPSHOT_DESTROY_COUNT.get();
+  }
+
+  public static void resetJsonSnapshotDestroyCountForTesting() {
+    JSON_SNAPSHOT_DESTROY_COUNT.set(0);
+  }
+
+  public static void failNextFeatureQueryResultCopyForTesting(RuntimeException failure) {
+    if (!FEATURE_QUERY_RESULT_COPY_FAILURE.compareAndSet(null, Objects.requireNonNull(failure))) {
+      throw new IllegalStateException("feature query result copy failure is already armed");
+    }
+  }
+
+  public static int featureQueryResultDestroyCountForTesting() {
+    return FEATURE_QUERY_RESULT_DESTROY_COUNT.get();
+  }
+
+  public static void resetFeatureQueryResultDestroyCountForTesting() {
+    FEATURE_QUERY_RESULT_DESTROY_COUNT.set(0);
+  }
+
+  public static void failNextFeatureExtensionResultCopyForTesting(RuntimeException failure) {
+    if (!FEATURE_EXTENSION_RESULT_COPY_FAILURE.compareAndSet(
+        null, Objects.requireNonNull(failure))) {
+      throw new IllegalStateException("feature extension result copy failure is already armed");
+    }
+  }
+
+  public static int featureExtensionResultDestroyCountForTesting() {
+    return FEATURE_EXTENSION_RESULT_DESTROY_COUNT.get();
+  }
+
+  public static void resetFeatureExtensionResultDestroyCountForTesting() {
+    FEATURE_EXTENSION_RESULT_DESTROY_COUNT.set(0);
+  }
+
+  private static void throwJsonSnapshotCopyFailureForTesting() {
+    var failure = JSON_SNAPSHOT_COPY_FAILURE.getAndSet(null);
+    if (failure != null) {
+      throw failure;
+    }
+  }
+
+  private static void throwFeatureQueryResultCopyFailureForTesting() {
+    var failure = FEATURE_QUERY_RESULT_COPY_FAILURE.getAndSet(null);
+    if (failure != null) {
+      throw failure;
+    }
+  }
+
+  private static void throwFeatureExtensionResultCopyFailureForTesting() {
+    var failure = FEATURE_EXTENSION_RESULT_COPY_FAILURE.getAndSet(null);
+    if (failure != null) {
+      throw failure;
     }
   }
 
@@ -131,7 +212,7 @@ public final class QueryStructs {
           new JsonValue.Member(
               JavaCppValues.string(property.key()), JavaCppValues.jsonValue(property.value())));
     }
-    return new Feature(geometry(feature.geometry()), properties, identifier(feature));
+    return new Feature(geometry(feature.geometry()), properties, featureIdentifier(feature));
   }
 
   private static List<Feature> features(MaplibreNativeC.mln_feature_collection collection) {
@@ -143,7 +224,7 @@ public final class QueryStructs {
     return features;
   }
 
-  private static FeatureIdentifier identifier(MaplibreNativeC.mln_feature feature) {
+  static FeatureIdentifier featureIdentifier(MaplibreNativeC.mln_feature feature) {
     return switch (feature.identifier_type()) {
       case MaplibreNativeC.MLN_FEATURE_IDENTIFIER_TYPE_NULL -> FeatureIdentifier.nullValue();
       case MaplibreNativeC.MLN_FEATURE_IDENTIFIER_TYPE_UINT ->
@@ -154,7 +235,7 @@ public final class QueryStructs {
           FeatureIdentifier.of(feature.identifier_double_value());
       case MaplibreNativeC.MLN_FEATURE_IDENTIFIER_TYPE_STRING ->
           FeatureIdentifier.of(JavaCppValues.string(feature.identifier_string_value()));
-      default -> FeatureIdentifier.nullValue();
+      default -> FeatureIdentifier.unknown(feature.identifier_type());
     };
   }
 
@@ -402,7 +483,12 @@ public final class QueryStructs {
     private final MaplibreNativeC.mln_feature feature;
 
     public FeatureScope(Feature value) {
-      feature = feature(value);
+      try {
+        this.feature = feature(value);
+      } catch (RuntimeException | Error error) {
+        close();
+        throw error;
+      }
     }
 
     public MaplibreNativeC.mln_feature feature() {
@@ -454,6 +540,9 @@ public final class QueryStructs {
           out.identifier_type(MaplibreNativeC.MLN_FEATURE_IDENTIFIER_TYPE_STRING);
           out.identifier_string_value(string(node.value()));
         }
+        case FeatureIdentifier.Unknown node ->
+            throw new IllegalArgumentException(
+                "Unknown feature identifier type cannot be used as input: " + node.rawType());
       }
     }
 

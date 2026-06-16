@@ -1,5 +1,6 @@
 package org.maplibre.nativejni.runtime;
 
+import java.util.Arrays;
 import org.maplibre.nativejni.geo.TileId;
 import org.maplibre.nativejni.map.RenderingStats;
 import org.maplibre.nativejni.map.TileOperation;
@@ -24,24 +25,20 @@ public sealed interface RuntimeEventPayload
   record None() implements RuntimeEventPayload {}
 
   record RenderFrame(
-      RenderMode mode,
-      int rawMode,
-      boolean needsRepaint,
-      boolean placementChanged,
-      RenderingStats stats)
+      RenderMode mode, boolean needsRepaint, boolean placementChanged, RenderingStats stats)
       implements RuntimeEventPayload {}
 
-  record RenderMap(RenderMode mode, int rawMode) implements RuntimeEventPayload {}
+  record RenderMap(RenderMode mode) implements RuntimeEventPayload {}
 
   record StyleImageMissing(String imageId) implements RuntimeEventPayload {}
 
-  record TileAction(TileOperation operation, int rawOperation, TileId tileId, String sourceId)
+  record TileAction(TileOperation operation, TileId tileId, String sourceId)
       implements RuntimeEventPayload {}
 
   record OfflineRegionStatusChanged(long regionId, OfflineRegionStatus status)
       implements RuntimeEventPayload {}
 
-  record OfflineRegionResponseError(long regionId, ResourceErrorReason reason, int rawReason)
+  record OfflineRegionResponseError(long regionId, ResourceErrorReason reason)
       implements RuntimeEventPayload {}
 
   record OfflineRegionTileCountLimit(long regionId, long limit) implements RuntimeEventPayload {}
@@ -49,12 +46,36 @@ public sealed interface RuntimeEventPayload
   record OfflineOperationCompleted(
       long operationId,
       OfflineOperationKind operationKind,
-      int rawOperationKind,
       OfflineOperationResultKind resultKind,
-      int rawResultKind,
       int resultStatus,
       boolean found)
       implements RuntimeEventPayload {}
 
-  record Unknown(int rawPayloadType, long payloadSize) implements RuntimeEventPayload {}
+  record Unknown(int rawPayloadType, long payloadSize, byte[] payloadBytes)
+      implements RuntimeEventPayload {
+    public Unknown {
+      payloadBytes = payloadBytes == null ? new byte[0] : payloadBytes.clone();
+    }
+
+    @Override
+    public byte[] payloadBytes() {
+      return payloadBytes.clone();
+    }
+
+    @Override
+    public boolean equals(Object other) {
+      return other instanceof Unknown unknown
+          && rawPayloadType == unknown.rawPayloadType
+          && payloadSize == unknown.payloadSize
+          && Arrays.equals(payloadBytes, unknown.payloadBytes);
+    }
+
+    @Override
+    public int hashCode() {
+      var result = Integer.hashCode(rawPayloadType);
+      result = 31 * result + Long.hashCode(payloadSize);
+      result = 31 * result + Arrays.hashCode(payloadBytes);
+      return result;
+    }
+  }
 }

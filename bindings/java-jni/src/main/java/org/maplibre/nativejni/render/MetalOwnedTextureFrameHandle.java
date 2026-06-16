@@ -2,6 +2,7 @@ package org.maplibre.nativejni.render;
 
 import java.util.Objects;
 import org.maplibre.nativejni.internal.javacpp.MaplibreNativeC;
+import org.maplibre.nativejni.internal.lifecycle.HandleState;
 
 /**
  * Explicit handle for a Metal session-owned texture frame.
@@ -17,6 +18,7 @@ public final class MetalOwnedTextureFrameHandle implements AutoCloseable {
   private final MaplibreNativeC.mln_metal_owned_texture_frame nativeFrame;
   private final FrameScope scope;
   private final MetalOwnedTextureFrame frame;
+  private final HandleState.ChildRetention sessionRetention;
   private final FrameHandleLeakReport.Registration leakRegistration;
   private boolean closed;
 
@@ -26,10 +28,18 @@ public final class MetalOwnedTextureFrameHandle implements AutoCloseable {
       FrameScope scope,
       MetalOwnedTextureFrame frame) {
     this.session = Objects.requireNonNull(session, "session");
-    this.nativeFrame = Objects.requireNonNull(nativeFrame, "nativeFrame");
-    this.scope = Objects.requireNonNull(scope, "scope");
-    this.frame = Objects.requireNonNull(frame, "frame");
-    this.leakRegistration = FrameHandleLeakReport.register(this, "MetalOwnedTextureFrameHandle");
+    var retention = session.retainChild("MetalOwnedTextureFrameHandle");
+    try {
+      this.nativeFrame = Objects.requireNonNull(nativeFrame, "nativeFrame");
+      this.scope = Objects.requireNonNull(scope, "scope");
+      this.frame = Objects.requireNonNull(frame, "frame");
+      this.sessionRetention = retention;
+      this.leakRegistration =
+          FrameHandleLeakReport.register(this, "MetalOwnedTextureFrameHandle", retention);
+    } catch (RuntimeException | Error error) {
+      retention.close();
+      throw error;
+    }
   }
 
   public MetalOwnedTextureFrame frame() {
@@ -64,6 +74,7 @@ public final class MetalOwnedTextureFrameHandle implements AutoCloseable {
       return;
     }
     closed = true;
+    sessionRetention.close();
     leakRegistration.report().markClosed();
     leakRegistration.cleanable().clean();
     try {

@@ -110,8 +110,8 @@ normalize_windows_msvc_path() {
   fi
 
   local dependency_bin="" dependency_path="" rest_path="" path_entry
-  if [[ -n "${MLN_FFI_DEPS_PREFIX:-}" ]]; then
-    dependency_bin="$(cygpath -u "$MLN_FFI_DEPS_PREFIX/bin")"
+  if [[ -n "${MLN_FFI_DEPENDENCY_LIBRARY_DIR:-}" ]]; then
+    dependency_bin="$(cygpath -u "$(dirname "$MLN_FFI_DEPENDENCY_LIBRARY_DIR")/bin")"
     dependency_bin="${dependency_bin%/}"
   fi
 

@@ -7,8 +7,8 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
-import java.util.EnumSet;
 import java.util.List;
+import java.util.Set;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -21,7 +21,6 @@ import org.maplibre.nativeffi.geo.LatLng;
 import org.maplibre.nativeffi.geo.ScreenBox;
 import org.maplibre.nativeffi.geo.ScreenPoint;
 import org.maplibre.nativeffi.json.JsonValue;
-import org.maplibre.nativeffi.log.LogSeverity;
 import org.maplibre.nativeffi.map.MapHandle;
 import org.maplibre.nativeffi.map.MapOptions;
 import org.maplibre.nativeffi.query.FeatureExtensionResult;
@@ -105,7 +104,7 @@ final class RenderSessionQueryTest {
   @Test
   void featureStateSetGetRemoveCopiesSnapshots() throws Exception {
     Maplibre.setLogCallback(record -> true);
-    Maplibre.setAsyncLogSeverities(EnumSet.noneOf(LogSeverity.class));
+    Maplibre.setAsyncLogSeverities(Set.of());
 
     var runtime = RuntimeHandle.create(new RuntimeOptions());
     var map = MapHandle.create(runtime, new MapOptions().size(64, 64));
@@ -146,7 +145,7 @@ final class RenderSessionQueryTest {
   @Test
   void renderedAndSourceQueriesCopyResults() throws Exception {
     Maplibre.setLogCallback(record -> true);
-    Maplibre.setAsyncLogSeverities(EnumSet.noneOf(LogSeverity.class));
+    Maplibre.setAsyncLogSeverities(Set.of());
 
     var runtime = RuntimeHandle.create(new RuntimeOptions());
     var map = MapHandle.create(runtime, new MapOptions().size(64, 64));
@@ -201,7 +200,7 @@ final class RenderSessionQueryTest {
   @Test
   void featureExtensionQueriesCopyValueAndFeatureCollectionResults() throws Exception {
     Maplibre.setLogCallback(record -> true);
-    Maplibre.setAsyncLogSeverities(EnumSet.noneOf(LogSeverity.class));
+    Maplibre.setAsyncLogSeverities(Set.of());
 
     var runtime = RuntimeHandle.create(new RuntimeOptions());
     var map = MapHandle.create(runtime, new MapOptions().size(64, 64));
@@ -351,7 +350,7 @@ final class RenderSessionQueryTest {
         return;
       }
       var value = event.get();
-      if (value.type() == RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE
+      if (RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE.equals(value.type())
           && value.mapSource().filter(source -> source == map).isPresent()) {
         try {
           session.renderUpdate();

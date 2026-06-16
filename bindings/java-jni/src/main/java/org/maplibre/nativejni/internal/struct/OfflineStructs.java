@@ -25,13 +25,12 @@ public final class OfflineStructs {
     var snapshot =
         new MaplibreNativeC.mln_offline_region_snapshot(JavaCppSupport.pointer(snapshotAddress));
     try {
-      var info = new MaplibreNativeC.mln_offline_region_info();
-      info.size(info.sizeof());
-      var status = MaplibreNativeC.mln_offline_region_snapshot_get(snapshot, info);
-      org.maplibre.nativejni.internal.status.Status.check(status);
-      var region = regionInfo(info);
-      info.close();
-      return region;
+      try (var info = new MaplibreNativeC.mln_offline_region_info()) {
+        info.size(info.sizeof());
+        var status = MaplibreNativeC.mln_offline_region_snapshot_get(snapshot, info);
+        org.maplibre.nativejni.internal.status.Status.check(status);
+        return regionInfo(info);
+      }
     } finally {
       MaplibreNativeC.mln_offline_region_snapshot_destroy(snapshot);
     }
@@ -48,14 +47,14 @@ public final class OfflineStructs {
       var regions = new ArrayList<OfflineRegionInfo>(Math.toIntExact(count.get()));
       for (var i = 0; i < Math.toIntExact(count.get()); i++) {
         var info = new MaplibreNativeC.mln_offline_region_info();
-        info.size(info.sizeof());
-        status = MaplibreNativeC.mln_offline_region_list_get(list, i, info);
-        if (status != MaplibreNativeC.MLN_STATUS_OK) {
-          info.close();
+        try {
+          info.size(info.sizeof());
+          status = MaplibreNativeC.mln_offline_region_list_get(list, i, info);
           org.maplibre.nativejni.internal.status.Status.check(status);
+          regions.add(regionInfo(info));
+        } finally {
+          info.close();
         }
-        regions.add(regionInfo(info));
-        info.close();
       }
       return List.copyOf(regions);
     } finally {

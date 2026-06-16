@@ -10,7 +10,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
-import java.util.EnumSet;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assumptions;
@@ -23,7 +23,6 @@ import org.maplibre.nativeffi.error.MaplibreException;
 import org.maplibre.nativeffi.error.MaplibreStatus;
 import org.maplibre.nativeffi.error.UnsupportedFeatureException;
 import org.maplibre.nativeffi.error.WrongThreadException;
-import org.maplibre.nativeffi.log.LogSeverity;
 import org.maplibre.nativeffi.map.MapHandle;
 import org.maplibre.nativeffi.map.MapOptions;
 import org.maplibre.nativeffi.runtime.RuntimeEventType;
@@ -58,7 +57,7 @@ final class RenderSessionHandleTest {
   @Test
   void ownedTextureSessionRendersReadsBackAndDetaches() throws Exception {
     Maplibre.setLogCallback(record -> true);
-    Maplibre.setAsyncLogSeverities(EnumSet.noneOf(LogSeverity.class));
+    Maplibre.setAsyncLogSeverities(Set.of());
 
     var runtime = RuntimeHandle.create(new RuntimeOptions());
     var map = MapHandle.create(runtime, new MapOptions().size(64, 64));
@@ -103,7 +102,7 @@ final class RenderSessionHandleTest {
   @Test
   void metalOwnedTextureFrameHandleStaysActiveUntilClosed() throws Exception {
     Maplibre.setLogCallback(record -> true);
-    Maplibre.setAsyncLogSeverities(EnumSet.noneOf(LogSeverity.class));
+    Maplibre.setAsyncLogSeverities(Set.of());
 
     var runtime = RuntimeHandle.create(new RuntimeOptions());
     var map = MapHandle.create(runtime, new MapOptions().size(64, 64));
@@ -131,7 +130,7 @@ final class RenderSessionHandleTest {
   @Test
   void vulkanOwnedTextureFrameHandleStaysActiveUntilClosed() throws Exception {
     Maplibre.setLogCallback(record -> true);
-    Maplibre.setAsyncLogSeverities(EnumSet.noneOf(LogSeverity.class));
+    Maplibre.setAsyncLogSeverities(Set.of());
 
     var runtime = RuntimeHandle.create(new RuntimeOptions());
     var map = MapHandle.create(runtime, new MapOptions().size(64, 64));
@@ -159,7 +158,7 @@ final class RenderSessionHandleTest {
   @Test
   void openglOwnedTextureFrameHandleStaysActiveUntilClosed() throws Exception {
     Maplibre.setLogCallback(record -> true);
-    Maplibre.setAsyncLogSeverities(EnumSet.noneOf(LogSeverity.class));
+    Maplibre.setAsyncLogSeverities(Set.of());
 
     var runtime = RuntimeHandle.create(new RuntimeOptions());
     var map = MapHandle.create(runtime, new MapOptions().size(64, 64));
@@ -192,7 +191,7 @@ final class RenderSessionHandleTest {
   @Test
   void openglOwnedTextureFrameCloseFailureLeavesHandleRetryable() throws Exception {
     Maplibre.setLogCallback(record -> true);
-    Maplibre.setAsyncLogSeverities(EnumSet.noneOf(LogSeverity.class));
+    Maplibre.setAsyncLogSeverities(Set.of());
 
     var runtime = RuntimeHandle.create(new RuntimeOptions());
     var map = MapHandle.create(runtime, new MapOptions().size(64, 64));
@@ -224,7 +223,7 @@ final class RenderSessionHandleTest {
   @Test
   void openglBorrowedTextureSessionRendersThroughPublicBinding() throws Exception {
     Maplibre.setLogCallback(record -> true);
-    Maplibre.setAsyncLogSeverities(EnumSet.noneOf(LogSeverity.class));
+    Maplibre.setAsyncLogSeverities(Set.of());
 
     var runtime = RuntimeHandle.create(new RuntimeOptions());
     var map = MapHandle.create(runtime, new MapOptions().size(128, 128));
@@ -252,7 +251,7 @@ final class RenderSessionHandleTest {
   @Test
   void openglSurfaceSessionRendersThroughPublicBinding() throws Exception {
     Maplibre.setLogCallback(record -> true);
-    Maplibre.setAsyncLogSeverities(EnumSet.noneOf(LogSeverity.class));
+    Maplibre.setAsyncLogSeverities(Set.of());
 
     var runtime = RuntimeHandle.create(new RuntimeOptions());
     var map = MapHandle.create(runtime, new MapOptions().size(128, 128));

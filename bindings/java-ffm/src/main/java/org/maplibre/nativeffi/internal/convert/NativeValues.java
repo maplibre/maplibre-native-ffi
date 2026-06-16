@@ -124,10 +124,7 @@ public final class NativeValues {
   }
 
   public static int nativeMask(LogSeverity severity) {
-    if (severity == LogSeverity.UNKNOWN) {
-      throw new IllegalArgumentException("UNKNOWN log severity cannot be used as an input");
-    }
-    return 1 << nativeValue(severity);
+    return severity.nativeMask();
   }
 
   public static int nativeMask(DebugOption option) {
@@ -177,35 +174,11 @@ public final class NativeValues {
   }
 
   public static int nativeValue(LogEvent event) {
-    return switch (event) {
-      case GENERAL -> 0;
-      case SETUP -> 1;
-      case SHADER -> 2;
-      case PARSE_STYLE -> 3;
-      case PARSE_TILE -> 4;
-      case RENDER -> 5;
-      case STYLE -> 6;
-      case DATABASE -> 7;
-      case HTTP_REQUEST -> 8;
-      case SPRITE -> 9;
-      case IMAGE -> 10;
-      case OPENGL -> 11;
-      case JNI -> 12;
-      case ANDROID -> 13;
-      case CRASH -> 14;
-      case GLYPH -> 15;
-      case TIMING -> 16;
-      case UNKNOWN -> -1;
-    };
+    return event.nativeValue();
   }
 
   public static int nativeValue(LogSeverity severity) {
-    return switch (severity) {
-      case INFO -> 1;
-      case WARNING -> 2;
-      case ERROR -> 3;
-      case UNKNOWN -> -1;
-    };
+    return severity.nativeValue();
   }
 
   public static int nativeValue(MapMode mode) {
@@ -234,32 +207,11 @@ public final class NativeValues {
   }
 
   public static int nativeValue(OfflineOperationKind kind) {
-    return switch (kind) {
-      case AMBIENT_CACHE -> MapLibreNativeC.MLN_OFFLINE_OPERATION_AMBIENT_CACHE();
-      case REGION_CREATE -> MapLibreNativeC.MLN_OFFLINE_OPERATION_REGION_CREATE();
-      case REGION_GET -> MapLibreNativeC.MLN_OFFLINE_OPERATION_REGION_GET();
-      case REGIONS_LIST -> MapLibreNativeC.MLN_OFFLINE_OPERATION_REGIONS_LIST();
-      case REGIONS_MERGE_DATABASE -> MapLibreNativeC.MLN_OFFLINE_OPERATION_REGIONS_MERGE_DATABASE();
-      case REGION_UPDATE_METADATA -> MapLibreNativeC.MLN_OFFLINE_OPERATION_REGION_UPDATE_METADATA();
-      case REGION_GET_STATUS -> MapLibreNativeC.MLN_OFFLINE_OPERATION_REGION_GET_STATUS();
-      case REGION_SET_OBSERVED -> MapLibreNativeC.MLN_OFFLINE_OPERATION_REGION_SET_OBSERVED();
-      case REGION_SET_DOWNLOAD_STATE ->
-          MapLibreNativeC.MLN_OFFLINE_OPERATION_REGION_SET_DOWNLOAD_STATE();
-      case REGION_INVALIDATE -> MapLibreNativeC.MLN_OFFLINE_OPERATION_REGION_INVALIDATE();
-      case REGION_DELETE -> MapLibreNativeC.MLN_OFFLINE_OPERATION_REGION_DELETE();
-      case UNKNOWN -> -1;
-    };
+    return kind.nativeValue();
   }
 
   public static int nativeValue(OfflineOperationResultKind kind) {
-    return switch (kind) {
-      case NONE -> MapLibreNativeC.MLN_OFFLINE_OPERATION_RESULT_NONE();
-      case REGION -> MapLibreNativeC.MLN_OFFLINE_OPERATION_RESULT_REGION();
-      case OPTIONAL_REGION -> MapLibreNativeC.MLN_OFFLINE_OPERATION_RESULT_OPTIONAL_REGION();
-      case REGION_LIST -> MapLibreNativeC.MLN_OFFLINE_OPERATION_RESULT_REGION_LIST();
-      case REGION_STATUS -> MapLibreNativeC.MLN_OFFLINE_OPERATION_RESULT_REGION_STATUS();
-      case UNKNOWN -> -1;
-    };
+    return kind.nativeValue();
   }
 
   public static int nativeValue(OfflineRegionDownloadState state) {
@@ -304,16 +256,7 @@ public final class NativeValues {
   }
 
   public static int nativeValue(ResourceKind kind) {
-    return switch (kind) {
-      case UNKNOWN -> MapLibreNativeC.MLN_RESOURCE_KIND_UNKNOWN();
-      case STYLE -> MapLibreNativeC.MLN_RESOURCE_KIND_STYLE();
-      case SOURCE -> MapLibreNativeC.MLN_RESOURCE_KIND_SOURCE();
-      case TILE -> MapLibreNativeC.MLN_RESOURCE_KIND_TILE();
-      case GLYPHS -> MapLibreNativeC.MLN_RESOURCE_KIND_GLYPHS();
-      case SPRITE_IMAGE -> MapLibreNativeC.MLN_RESOURCE_KIND_SPRITE_IMAGE();
-      case SPRITE_JSON -> MapLibreNativeC.MLN_RESOURCE_KIND_SPRITE_JSON();
-      case IMAGE -> MapLibreNativeC.MLN_RESOURCE_KIND_IMAGE();
-    };
+    return kind.nativeValue();
   }
 
   public static int nativeValue(ResourceProviderDecision decision) {
@@ -373,25 +316,11 @@ public final class NativeValues {
   }
 
   public static RenderMode renderMode(int nativeValue) {
-    return switch (nativeValue) {
-      case 0 -> RenderMode.PARTIAL;
-      case 1 -> RenderMode.FULL;
-      default -> RenderMode.UNKNOWN;
-    };
+    return RenderMode.fromNative(nativeValue);
   }
 
   public static ResourceKind resourceKind(int nativeValue) {
-    return switch (nativeValue) {
-      case 0 -> ResourceKind.UNKNOWN;
-      case 1 -> ResourceKind.STYLE;
-      case 2 -> ResourceKind.SOURCE;
-      case 3 -> ResourceKind.TILE;
-      case 4 -> ResourceKind.GLYPHS;
-      case 5 -> ResourceKind.SPRITE_IMAGE;
-      case 6 -> ResourceKind.SPRITE_JSON;
-      case 7 -> ResourceKind.IMAGE;
-      default -> ResourceKind.UNKNOWN;
-    };
+    return ResourceKind.fromNative(nativeValue);
   }
 
   public static ResourceErrorReason resourceErrorReason(int nativeValue) {
@@ -399,81 +328,31 @@ public final class NativeValues {
   }
 
   public static ResourceLoadingMethod resourceLoadingMethod(int nativeValue) {
-    return switch (nativeValue) {
-      case 0 -> ResourceLoadingMethod.ALL;
-      case 1 -> ResourceLoadingMethod.CACHE_ONLY;
-      case 2 -> ResourceLoadingMethod.NETWORK_ONLY;
-      default -> ResourceLoadingMethod.UNKNOWN;
-    };
+    return ResourceLoadingMethod.fromNative(nativeValue);
   }
 
   public static ResourcePriority resourcePriority(int nativeValue) {
-    return switch (nativeValue) {
-      case 0 -> ResourcePriority.REGULAR;
-      case 1 -> ResourcePriority.LOW;
-      default -> ResourcePriority.UNKNOWN;
-    };
+    return ResourcePriority.fromNative(nativeValue);
   }
 
   public static ResourceStoragePolicy resourceStoragePolicy(int nativeValue) {
-    return switch (nativeValue) {
-      case 0 -> ResourceStoragePolicy.PERMANENT;
-      case 1 -> ResourceStoragePolicy.VOLATILE;
-      default -> ResourceStoragePolicy.UNKNOWN;
-    };
+    return ResourceStoragePolicy.fromNative(nativeValue);
   }
 
   public static ResourceUsage resourceUsage(int nativeValue) {
-    return switch (nativeValue) {
-      case 0 -> ResourceUsage.ONLINE;
-      case 1 -> ResourceUsage.OFFLINE;
-      default -> ResourceUsage.UNKNOWN;
-    };
+    return ResourceUsage.fromNative(nativeValue);
   }
 
   public static RuntimeEventSourceType runtimeEventSourceType(int nativeValue) {
-    return switch (nativeValue) {
-      case 0 -> RuntimeEventSourceType.RUNTIME;
-      case 1 -> RuntimeEventSourceType.MAP;
-      default -> RuntimeEventSourceType.UNKNOWN;
-    };
+    return RuntimeEventSourceType.fromNative(nativeValue);
   }
 
   public static RuntimeEventType runtimeEventType(int nativeValue) {
-    for (var type : RuntimeEventType.values()) {
-      if (nativeValue(type) == nativeValue) {
-        return type;
-      }
-    }
-    return RuntimeEventType.UNKNOWN;
+    return RuntimeEventType.fromNative(nativeValue);
   }
 
   public static int nativeValue(RuntimeEventType type) {
-    return switch (type) {
-      case MAP_CAMERA_WILL_CHANGE -> 1;
-      case MAP_CAMERA_IS_CHANGING -> 2;
-      case MAP_CAMERA_DID_CHANGE -> 3;
-      case MAP_STYLE_LOADED -> 4;
-      case MAP_LOADING_STARTED -> 5;
-      case MAP_LOADING_FINISHED -> 6;
-      case MAP_LOADING_FAILED -> 7;
-      case MAP_IDLE -> 8;
-      case MAP_RENDER_UPDATE_AVAILABLE -> 9;
-      case MAP_RENDER_ERROR -> 10;
-      case MAP_STILL_IMAGE_FINISHED -> 11;
-      case MAP_STILL_IMAGE_FAILED -> 12;
-      case MAP_RENDER_FRAME_STARTED -> 13;
-      case MAP_RENDER_FRAME_FINISHED -> 14;
-      case MAP_RENDER_MAP_STARTED -> 15;
-      case MAP_RENDER_MAP_FINISHED -> 16;
-      case MAP_STYLE_IMAGE_MISSING -> 17;
-      case MAP_TILE_ACTION -> 18;
-      case OFFLINE_REGION_STATUS_CHANGED -> 19;
-      case OFFLINE_REGION_RESPONSE_ERROR -> 20;
-      case OFFLINE_REGION_TILE_COUNT_LIMIT_EXCEEDED -> 21;
-      case OFFLINE_OPERATION_COMPLETED -> 22;
-      case UNKNOWN -> -1;
-    };
+    return type.rawValue();
   }
 
   public static SourceType sourceType(int nativeValue) {
@@ -481,27 +360,11 @@ public final class NativeValues {
   }
 
   public static TileOperation tileOperation(int nativeValue) {
-    for (var operation : TileOperation.values()) {
-      if (nativeValue(operation) == nativeValue) {
-        return operation;
-      }
-    }
-    return TileOperation.UNKNOWN;
+    return TileOperation.fromNative(nativeValue);
   }
 
   public static int nativeValue(TileOperation operation) {
-    return switch (operation) {
-      case REQUESTED_FROM_CACHE -> 0;
-      case REQUESTED_FROM_NETWORK -> 1;
-      case LOAD_FROM_NETWORK -> 2;
-      case LOAD_FROM_CACHE -> 3;
-      case START_PARSE -> 4;
-      case END_PARSE -> 5;
-      case ERROR -> 6;
-      case CANCELLED -> 7;
-      case NULL_OPERATION -> 8;
-      case UNKNOWN -> -1;
-    };
+    return operation.rawValue();
   }
 
   public static NorthOrientation northOrientation(int nativeValue) {
@@ -521,38 +384,18 @@ public final class NativeValues {
   }
 
   public static LogEvent logEvent(int nativeValue) {
-    for (var event : LogEvent.values()) {
-      if (nativeValue(event) == nativeValue) {
-        return event;
-      }
-    }
-    return LogEvent.UNKNOWN;
+    return LogEvent.fromNative(nativeValue);
   }
 
   public static LogSeverity logSeverity(int nativeValue) {
-    return switch (nativeValue) {
-      case 1 -> LogSeverity.INFO;
-      case 2 -> LogSeverity.WARNING;
-      case 3 -> LogSeverity.ERROR;
-      default -> LogSeverity.UNKNOWN;
-    };
+    return LogSeverity.fromNative(nativeValue);
   }
 
   public static OfflineOperationKind offlineOperationKind(int nativeValue) {
-    for (var kind : OfflineOperationKind.values()) {
-      if (nativeValue(kind) == nativeValue) {
-        return kind;
-      }
-    }
-    return OfflineOperationKind.UNKNOWN;
+    return OfflineOperationKind.fromNative(nativeValue);
   }
 
   public static OfflineOperationResultKind offlineOperationResultKind(int nativeValue) {
-    for (var kind : OfflineOperationResultKind.values()) {
-      if (nativeValue(kind) == nativeValue) {
-        return kind;
-      }
-    }
-    return OfflineOperationResultKind.UNKNOWN;
+    return OfflineOperationResultKind.fromNative(nativeValue);
   }
 }

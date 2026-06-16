@@ -2,13 +2,11 @@ package org.maplibre.nativejni.map;
 
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.Set;
 import org.bytedeco.javacpp.BoolPointer;
 import org.bytedeco.javacpp.BytePointer;
 import org.bytedeco.javacpp.SizeTPointer;
@@ -75,11 +73,19 @@ public final class MapHandle implements AutoCloseable {
 
   private final RuntimeHandle runtime;
   private final HandleState state;
+  private final HandleState.ChildRetention runtimeRetention;
   private final Map<String, CustomGeometrySourceState> customGeometrySources = new HashMap<>();
 
   private MapHandle(RuntimeHandle runtime, long handle) {
     this.runtime = Objects.requireNonNull(runtime, "runtime");
-    this.state = new HandleState("MapHandle", handle, runtime);
+    var retention = runtime.retainChild(InternalAccess.INSTANCE, "MapHandle");
+    try {
+      this.state = new HandleState("MapHandle", handle, runtime);
+      this.runtimeRetention = retention;
+    } catch (RuntimeException | Error error) {
+      retention.close();
+      throw error;
+    }
     runtime.registerMap(InternalAccess.INSTANCE, this);
   }
 
@@ -116,7 +122,9 @@ public final class MapHandle implements AutoCloseable {
 
   public void setStyleUrl(String url) {
     NativeLibrary.ensureLoaded();
-    var nativeUrl = JavaCppSupport.utf8(Objects.requireNonNull(url, "url"));
+    var urlValue = Objects.requireNonNull(url, "url");
+    Status.checkNoEmbeddedNul(urlValue, "style URL");
+    var nativeUrl = JavaCppSupport.utf8(urlValue);
     try {
       Status.check(
           MaplibreNativeC.mln_map_set_style_url(
@@ -128,7 +136,9 @@ public final class MapHandle implements AutoCloseable {
 
   public void setStyleJson(String json) {
     NativeLibrary.ensureLoaded();
-    var nativeJson = JavaCppSupport.utf8(Objects.requireNonNull(json, "json"));
+    var jsonValue = Objects.requireNonNull(json, "json");
+    Status.checkNoEmbeddedNul(jsonValue, "style JSON");
+    var nativeJson = JavaCppSupport.utf8(jsonValue);
     try {
       Status.check(
           MaplibreNativeC.mln_map_set_style_json(
@@ -234,10 +244,7 @@ public final class MapHandle implements AutoCloseable {
       }
       return Optional.of(
           new SourceInfo(
-              SourceType.fromNative(outInfo.type()),
-              outInfo.type(),
-              outInfo.is_volatile(),
-              attribution));
+              SourceType.fromNative(outInfo.type()), outInfo.is_volatile(), attribution));
     }
   }
 
@@ -1058,11 +1065,11 @@ public final class MapHandle implements AutoCloseable {
             JavaCppSupport.map(state.requireLiveAddress())));
   }
 
-  public void setDebugOptions(Set<DebugOption> options) {
+  public void setDebugOptions(DebugOptions options) {
     NativeLibrary.ensureLoaded();
     Objects.requireNonNull(options, "options");
     var mask = 0;
-    for (var option : options) {
+    for (var option : options.asSet()) {
       mask |= Objects.requireNonNull(option, "option").nativeMask();
     }
     Status.check(
@@ -1070,19 +1077,13 @@ public final class MapHandle implements AutoCloseable {
             JavaCppSupport.map(state.requireLiveAddress()), mask));
   }
 
-  public EnumSet<DebugOption> debugOptions() {
+  public DebugOptions debugOptions() {
     NativeLibrary.ensureLoaded();
     var outOptions = new int[1];
     Status.check(
         MaplibreNativeC.mln_map_get_debug_options(
             JavaCppSupport.map(state.requireLiveAddress()), outOptions));
-    var options = EnumSet.noneOf(DebugOption.class);
-    for (var option : DebugOption.values()) {
-      if ((outOptions[0] & option.nativeMask()) != 0) {
-        options.add(option);
-      }
-    }
-    return options;
+    return DebugOptions.fromMask(outOptions[0]);
   }
 
   public void setRenderingStatsViewEnabled(boolean enabled) {
@@ -2147,6 +2148,7 @@ public final class MapHandle implements AutoCloseable {
         () -> {
           clearCustomGeometrySources();
           runtime.unregisterMap(InternalAccess.INSTANCE, this);
+          runtimeRetention.close();
         });
   }
 
@@ -2159,8 +2161,13 @@ public final class MapHandle implements AutoCloseable {
   }
 
   public long nativeAddress(InternalAccess access) {
-    Objects.requireNonNull(access, "access");
+    Objects.requireNonNull(access, "access").checkCaller();
     return nativeAddress();
+  }
+
+  public HandleState.ChildRetention retainChild(InternalAccess access, String childTypeName) {
+    Objects.requireNonNull(access, "access").checkCaller();
+    return state.retainChild(childTypeName);
   }
 
   long nativeAddress() {
@@ -2168,7 +2175,7 @@ public final class MapHandle implements AutoCloseable {
   }
 
   public void releaseDetachedCustomGeometrySources(InternalAccess access) {
-    Objects.requireNonNull(access, "access");
+    Objects.requireNonNull(access, "access").checkCaller();
     releaseDetachedCustomGeometrySources();
   }
 
@@ -2186,6 +2193,10 @@ public final class MapHandle implements AutoCloseable {
 
   int customGeometrySourceCountForTesting() {
     return customGeometrySources.size();
+  }
+
+  CustomGeometrySourceState customGeometrySourceForTesting(String sourceId) {
+    return customGeometrySources.get(sourceId);
   }
 
   private void closeCustomGeometrySource(String sourceId) {

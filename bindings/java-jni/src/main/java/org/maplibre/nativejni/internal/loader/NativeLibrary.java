@@ -4,7 +4,7 @@ import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Objects;
-import org.maplibre.nativejni.error.NativeErrorException;
+import org.maplibre.nativejni.error.AbiVersionMismatchException;
 import org.maplibre.nativejni.internal.javacpp.MaplibreNativeC;
 
 /** Loads the JavaCPP JNI bridge library exactly once per class loader. */
@@ -87,11 +87,12 @@ public final class NativeLibrary {
       missing.addSuppressed(error);
       throw missing;
     }
-    if (version != EXPECTED_C_ABI_VERSION) {
-      throw new NativeErrorException(
-          0,
-          "Unsupported Maplibre C ABI version %d; expected %d"
-              .formatted(version, EXPECTED_C_ABI_VERSION));
+    checkCAbiVersion(version, EXPECTED_C_ABI_VERSION);
+  }
+
+  static void checkCAbiVersion(int version, int expectedVersion) {
+    if (version != expectedVersion) {
+      throw new AbiVersionMismatchException(version, expectedVersion);
     }
   }
 
