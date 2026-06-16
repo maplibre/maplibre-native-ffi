@@ -1346,6 +1346,7 @@ test "resource provider observes cancellation before late completion" {
     try map.close();
     try waitForRequestCancellation(&runtime, handle);
     try testing.expectError(error.InvalidState, handle.complete(.{ .bytes = support.style_json }));
+    try testing.expectError(error.InvalidState, handle.complete(.{ .bytes = support.style_json }));
     const diagnostic = diagnostics.get().?;
     try testing.expectEqual(@as(?i32, -2), diagnostic.raw_status);
     try testing.expect(diagnostic.message.len > 0);

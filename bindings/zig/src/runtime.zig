@@ -513,8 +513,8 @@ pub const ResourceRequestHandle = enum(u128) {
         if (request_state.completed) return error.AlreadyCompleted;
         const native_handle = request_state.native orelse return error.ClosedHandle;
         var native_response = try resourceResponseToNative(response, request_state.diagnostic_store);
-        request_state.completed = true;
         try status.checkStatus(c.mln_resource_request_complete(native_handle, &native_response), request_state.diagnostic_store);
+        request_state.completed = true;
     }
 
     pub fn cancelled(self: ResourceRequestHandle) status.Error!bool {
