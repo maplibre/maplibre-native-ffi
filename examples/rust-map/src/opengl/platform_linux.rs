@@ -30,7 +30,7 @@ impl OpenGLPlatformContext {
         let RawContext::Egl(raw_context) = context.raw_context() else {
             return Err("glutin did not create an EGL context".into());
         };
-        Ok(OpenGLContextDescriptor::egl(EglContextDescriptor::new(
+        Ok(OpenGLContextDescriptor::Egl(EglContextDescriptor::new(
             unsafe { NativePointer::from_ptr(raw_display.cast_mut()) },
             unsafe { NativePointer::from_ptr(raw_config.cast_mut()) },
             unsafe { NativePointer::from_ptr(raw_context.cast_mut()) },

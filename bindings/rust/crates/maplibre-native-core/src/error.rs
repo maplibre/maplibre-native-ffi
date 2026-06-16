@@ -21,16 +21,12 @@ pub enum ErrorKind {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Error {
     kind: ErrorKind,
-    raw_status: Option<sys::mln_status>,
+    raw_status: Option<i32>,
     diagnostic: String,
 }
 
 impl Error {
-    pub fn new(
-        kind: ErrorKind,
-        raw_status: Option<sys::mln_status>,
-        diagnostic: impl Into<String>,
-    ) -> Self {
+    pub fn new(kind: ErrorKind, raw_status: Option<i32>, diagnostic: impl Into<String>) -> Self {
         Self {
             kind,
             raw_status,
@@ -38,14 +34,11 @@ impl Error {
         }
     }
 
-    pub fn from_status(status: sys::mln_status) -> Self {
+    pub fn from_status(status: i32) -> Self {
         Self::from_status_and_diagnostic(status, capture_thread_diagnostic())
     }
 
-    pub fn from_status_and_diagnostic(
-        status: sys::mln_status,
-        diagnostic: impl Into<String>,
-    ) -> Self {
+    pub fn from_status_and_diagnostic(status: i32, diagnostic: impl Into<String>) -> Self {
         Self::new(kind_for_status(status), Some(status), diagnostic)
     }
 
@@ -65,7 +58,7 @@ impl Error {
         self.kind
     }
 
-    pub fn raw_status(&self) -> Option<sys::mln_status> {
+    pub fn raw_status(&self) -> Option<i32> {
         self.raw_status
     }
 
@@ -85,7 +78,7 @@ impl fmt::Display for Error {
 
 impl std::error::Error for Error {}
 
-pub fn check(status: sys::mln_status) -> Result<()> {
+pub fn check(status: i32) -> Result<()> {
     if status == sys::MLN_STATUS_OK {
         Ok(())
     } else {
@@ -100,7 +93,7 @@ pub fn capture_thread_diagnostic() -> String {
     unsafe { copy_c_string_lossy(sys::mln_thread_last_error_message()) }
 }
 
-pub fn kind_for_status(status: sys::mln_status) -> ErrorKind {
+pub fn kind_for_status(status: i32) -> ErrorKind {
     match status {
         sys::MLN_STATUS_INVALID_ARGUMENT => ErrorKind::InvalidArgument,
         sys::MLN_STATUS_INVALID_STATE => ErrorKind::InvalidState,
@@ -128,6 +121,7 @@ mod tests {
     use super::*;
 
     #[test]
+    // Spec coverage: BND-021.
     fn maps_unknown_status_without_losing_raw_status() {
         let error = Error::from_status_and_diagnostic(-123_456, "future status");
 

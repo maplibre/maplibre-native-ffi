@@ -189,14 +189,15 @@ mod tests {
     assert_not_impl_any!(MapProjectionHandle: Send, Sync);
 
     #[test]
+    // Spec coverage: BND-043 and BND-103.
     fn projection_create_round_trip_close_and_stays_live_after_map_close() {
-        let runtime = RuntimeHandle::new().unwrap();
-        let map = runtime
-            .create_map_with_options(&MapOptions::new(512, 512, 1.0))
-            .unwrap();
+        let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+        let map = MapHandle::with_options(&runtime, &MapOptions::new(512, 512, 1.0)).unwrap();
         let center = LatLng::new(37.7749, -122.4194);
-        map.jump_to(&CameraOptions::new().with_center(center).with_zoom(5.0))
-            .unwrap();
+        let mut camera_options = CameraOptions::default();
+        camera_options.center = Some(center);
+        camera_options.zoom = Some(5.0);
+        map.jump_to(&camera_options).unwrap();
 
         let projection = map.create_projection().unwrap();
         map.close().unwrap();
@@ -211,9 +212,11 @@ mod tests {
     }
 
     #[test]
+    // Rust regression: dropping a projection without explicit close must not
+    // attempt unsafe cleanup from an uncontrolled destructor path.
     fn projection_drops_without_explicit_close() {
-        let runtime = RuntimeHandle::new().unwrap();
-        let map = runtime.create_map().unwrap();
+        let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+        let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
 
         {
             let _projection = map.create_projection().unwrap();
@@ -224,18 +227,16 @@ mod tests {
     }
 
     #[test]
+    // Spec coverage: BND-103.
     fn projection_camera_and_visible_region_helpers_call_c_api() {
-        let runtime = RuntimeHandle::new().unwrap();
-        let map = runtime.create_map().unwrap();
+        let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+        let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
         let projection = map.create_projection().unwrap();
 
-        projection
-            .set_camera(
-                &CameraOptions::new()
-                    .with_center(LatLng::new(0.0, 0.0))
-                    .with_zoom(2.0),
-            )
-            .unwrap();
+        let mut camera_options = CameraOptions::default();
+        camera_options.center = Some(LatLng::new(0.0, 0.0));
+        camera_options.zoom = Some(2.0);
+        projection.set_camera(&camera_options).unwrap();
         let camera = projection.camera().unwrap();
         assert_eq!(camera.center, Some(LatLng::new(0.0, 0.0)));
         assert_eq!(camera.zoom, Some(2.0));

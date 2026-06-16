@@ -286,16 +286,6 @@ impl VulkanContextDescriptor {
         }
     }
 
-    pub fn with_proc_addresses(
-        mut self,
-        get_instance_proc_addr: NativePointer,
-        get_device_proc_addr: NativePointer,
-    ) -> Self {
-        self.get_instance_proc_addr = get_instance_proc_addr;
-        self.get_device_proc_addr = get_device_proc_addr;
-        self
-    }
-
     pub(crate) fn to_core(&self) -> maplibre_core::render::VulkanContextDescriptorFields {
         maplibre_core::render::VulkanContextDescriptorFields {
             instance: self.instance.as_void_ptr(),
@@ -338,11 +328,6 @@ impl WglContextDescriptor {
         }
     }
 
-    pub fn with_proc_address(mut self, get_proc_address: NativePointer) -> Self {
-        self.get_proc_address = get_proc_address;
-        self
-    }
-
     pub(crate) fn to_core(&self) -> maplibre_core::render::WglContextDescriptorFields {
         maplibre_core::render::WglContextDescriptorFields {
             device_context: self.device_context.as_void_ptr(),
@@ -381,11 +366,6 @@ impl EglContextDescriptor {
         }
     }
 
-    pub fn with_proc_address(mut self, get_proc_address: NativePointer) -> Self {
-        self.get_proc_address = get_proc_address;
-        self
-    }
-
     pub(crate) fn to_core(&self) -> maplibre_core::render::EglContextDescriptorFields {
         maplibre_core::render::EglContextDescriptorFields {
             display: self.display.as_void_ptr(),
@@ -414,14 +394,6 @@ pub enum OpenGLContextDescriptor {
 }
 
 impl OpenGLContextDescriptor {
-    pub fn wgl(descriptor: WglContextDescriptor) -> Self {
-        Self::Wgl(descriptor)
-    }
-
-    pub fn egl(descriptor: EglContextDescriptor) -> Self {
-        Self::Egl(descriptor)
-    }
-
     pub(crate) fn to_core(&self) -> maplibre_core::render::OpenGLContextDescriptorFields {
         match self {
             Self::Wgl(descriptor) => {
@@ -762,7 +734,7 @@ pub struct RenderSessionHandle {
 impl fmt::Debug for RenderSessionHandle {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("RenderSessionHandle")
-            .field("closed", &self.is_closed())
+            .field("closed", &self.inner.handle.is_closed())
             .field("detached", &self.inner.detached.get())
             .finish()
     }
@@ -776,7 +748,7 @@ pub struct DetachedRenderSessionHandle {
 impl fmt::Debug for DetachedRenderSessionHandle {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("DetachedRenderSessionHandle")
-            .field("closed", &self.is_closed())
+            .field("closed", &self.inner.handle.is_closed())
             .finish()
     }
 }
@@ -788,10 +760,6 @@ impl DetachedRenderSessionHandle {
             return Err(HandleOperationError::new(error, self));
         }
         Ok(())
-    }
-
-    pub fn is_closed(&self) -> bool {
-        self.inner.handle.is_closed()
     }
 }
 
@@ -909,7 +877,7 @@ pub struct MetalOwnedTextureFrameHandle {
 impl fmt::Debug for MetalOwnedTextureFrameHandle {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("MetalOwnedTextureFrameHandle")
-            .field("closed", &self.is_closed())
+            .field("closed", &self.closed.get())
             .field("frame", &self.frame)
             .finish()
     }
@@ -924,11 +892,6 @@ impl MetalOwnedTextureFrameHandle {
             Ok(&self.frame)
         }
     }
-
-    pub fn is_closed(&self) -> bool {
-        self.closed.get()
-    }
-
     /// Returns the borrowed Metal texture pointer for backend interop.
     ///
     /// # Safety
@@ -964,6 +927,17 @@ impl MetalOwnedTextureFrameHandle {
     /// Explicitly releases this frame.
     #[allow(clippy::result_large_err)]
     pub fn close(self) -> std::result::Result<(), HandleOperationError<Self>> {
+        self.close_with_release(sys::mln_metal_owned_texture_release_frame)
+    }
+
+    #[allow(clippy::result_large_err)]
+    fn close_with_release(
+        self,
+        release: unsafe extern "C" fn(
+            *mut sys::mln_render_session,
+            *const sys::mln_metal_owned_texture_frame,
+        ) -> sys::mln_status,
+    ) -> std::result::Result<(), HandleOperationError<Self>> {
         if self.closed.get() {
             return Ok(());
         }
@@ -973,9 +947,7 @@ impl MetalOwnedTextureFrameHandle {
         };
         // SAFETY: session is live, and raw is the active frame returned by a
         // successful acquire for this session until release succeeds.
-        if let Err(error) = maplibre_core::check(unsafe {
-            sys::mln_metal_owned_texture_release_frame(session, &self.raw)
-        }) {
+        if let Err(error) = maplibre_core::check(unsafe { release(session, &self.raw) }) {
             return Err(HandleOperationError::new(error, self));
         }
         self.closed.set(true);
@@ -1016,7 +988,7 @@ pub struct VulkanOwnedTextureFrameHandle {
 impl fmt::Debug for VulkanOwnedTextureFrameHandle {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("VulkanOwnedTextureFrameHandle")
-            .field("closed", &self.is_closed())
+            .field("closed", &self.closed.get())
             .field("frame", &self.frame)
             .finish()
     }
@@ -1031,11 +1003,6 @@ impl VulkanOwnedTextureFrameHandle {
             Ok(&self.frame)
         }
     }
-
-    pub fn is_closed(&self) -> bool {
-        self.closed.get()
-    }
-
     /// Returns the borrowed Vulkan image pointer for backend interop.
     ///
     /// # Safety
@@ -1137,7 +1104,7 @@ pub struct OpenGLOwnedTextureFrameHandle {
 impl fmt::Debug for OpenGLOwnedTextureFrameHandle {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("OpenGLOwnedTextureFrameHandle")
-            .field("closed", &self.is_closed())
+            .field("closed", &self.closed.get())
             .field("frame", &self.frame)
             .finish()
     }
@@ -1152,11 +1119,6 @@ impl OpenGLOwnedTextureFrameHandle {
             Ok(&self.frame)
         }
     }
-
-    pub fn is_closed(&self) -> bool {
-        self.closed.get()
-    }
-
     /// Returns the borrowed OpenGL texture object name for backend interop.
     pub fn texture(&self) -> Result<FrameOpenGLTextureName<'_>> {
         if self.closed.get() {
@@ -1234,11 +1196,6 @@ impl RenderSessionHandle {
         }
         Ok(())
     }
-
-    pub fn is_closed(&self) -> bool {
-        self.inner.handle.is_closed()
-    }
-
     /// Resizes this attached render session.
     pub fn resize(&self, width: u32, height: u32, scale_factor: f64) -> Result<()> {
         self.inner.ensure_no_frame_acquired()?;
@@ -1344,14 +1301,6 @@ impl RenderSessionHandle {
             sys::mln_texture_read_premultiplied_rgba8(session, data_ptr, data.len(), &mut info)
         })?;
         Ok(maplibre_core::values::texture_image_info_from_native(&info))
-    }
-
-    /// Reads the most recently rendered texture frame into owned bytes.
-    pub fn read_premultiplied_rgba8(&self) -> Result<PremultipliedRgba8Image> {
-        let info = self.texture_image_info()?;
-        let mut data = vec![0; info.byte_length];
-        let info = self.read_premultiplied_rgba8_into(&mut data)?;
-        Ok(PremultipliedRgba8Image::new(info, data))
     }
 
     /// Acquires a borrowed Metal frame from a session-owned texture target.

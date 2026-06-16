@@ -1,5 +1,5 @@
 use maplibre_native::{
-    CameraOptions, LatLng, MapMode, MapOptions, RuntimeEventPayload, RuntimeEventSource,
+    CameraOptions, LatLng, MapHandle, MapMode, MapOptions, RuntimeEventPayload, RuntimeEventSource,
     RuntimeEventType, RuntimeHandle, RuntimeOptions,
 };
 use std::error::Error;
@@ -38,24 +38,25 @@ impl App {
             return Err("window has no drawable extent".into());
         }
 
-        let runtime =
-            match RuntimeHandle::with_options(&RuntimeOptions::new().with_cache_path(":memory:")) {
-                Ok(runtime) => runtime,
-                Err(error) => {
-                    return Err(startup_error(
-                        format!("runtime creation failed: {error}"),
-                        None,
-                        None,
-                    ));
-                }
-            };
-        let map_options = MapOptions::new(
+        let mut runtime_options = RuntimeOptions::default();
+        runtime_options.cache_path = Some(":memory:".into());
+        let runtime = match RuntimeHandle::with_options(&runtime_options) {
+            Ok(runtime) => runtime,
+            Err(error) => {
+                return Err(startup_error(
+                    format!("runtime creation failed: {error}"),
+                    None,
+                    None,
+                ));
+            }
+        };
+        let mut map_options = MapOptions::new(
             viewport.logical_width,
             viewport.logical_height,
             viewport.scale_factor,
-        )
-        .with_mode(MapMode::Continuous);
-        let map = match runtime.create_map_with_options(&map_options) {
+        );
+        map_options.mode = MapMode::Continuous;
+        let map = match MapHandle::with_options(&runtime, &map_options) {
             Ok(map) => map,
             Err(error) => {
                 return Err(startup_error(
@@ -303,13 +304,12 @@ impl App {
 
 fn configure_map(map: &maplibre_native::MapHandle) -> maplibre_native::Result<()> {
     map.set_style_url(STYLE_URL)?;
-    map.jump_to(
-        &CameraOptions::new()
-            .with_center(LatLng::new(37.7749, -122.4194))
-            .with_zoom(13.0)
-            .with_bearing(12.0)
-            .with_pitch(30.0),
-    )?;
+    let mut camera = CameraOptions::default();
+    camera.center = Some(LatLng::new(37.7749, -122.4194));
+    camera.zoom = Some(13.0);
+    camera.bearing = Some(12.0);
+    camera.pitch = Some(30.0);
+    map.jump_to(&camera)?;
     map.request_repaint()
 }
 

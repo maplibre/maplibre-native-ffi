@@ -1,6 +1,5 @@
 package org.maplibre.nativejni.internal.strings;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -11,7 +10,6 @@ import org.junit.jupiter.api.Test;
 import org.maplibre.nativejni.error.InvalidArgumentException;
 import org.maplibre.nativejni.internal.javacpp.MaplibreNativeC;
 import org.maplibre.nativejni.internal.status.Status;
-import org.maplibre.nativejni.runtime.OfflineOperationKind;
 import org.maplibre.nativejni.runtime.RuntimeHandle;
 import org.maplibre.nativejni.runtime.RuntimeOptions;
 
@@ -30,7 +28,6 @@ final class StandardUtf8Test {
     var database = Files.createTempFile("offline-\uD83D\uDDFC", ".db");
     try (var runtime = RuntimeHandle.create()) {
       var operation = runtime.startMergeOfflineRegionsDatabase(database.toString());
-      assertEquals(OfflineOperationKind.REGIONS_MERGE_DATABASE, operation.kind());
       operation.close();
     } finally {
       Files.deleteIfExists(database);

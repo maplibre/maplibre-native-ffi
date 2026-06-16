@@ -9,7 +9,7 @@ use std::sync::Arc;
 use maplibre_native_core as maplibre_core;
 use maplibre_native_sys as sys;
 
-use crate::{HandleOperationError, Result};
+use crate::Result;
 
 pub use maplibre_core::resource::{
     ByteRange, ResourceProviderDecision, ResourceRequest, ResourceResponse,
@@ -54,20 +54,17 @@ impl ResourceRequestHandle {
         unsafe { ResourceRequestHandleState::new(handle, fns) }.map(Self::from_state)
     }
 
-    /// Completes the request. Successful completion releases this handle once
-    /// the provider callback has returned `Handle` to native code.
+    /// Completes the request. A completion attempt that reaches native code
+    /// closes this handle, even when native reports a non-OK status. Binding
+    /// validation failures that happen before native code is called leave the
+    /// handle live so completion can be retried with a valid response.
     ///
     /// When a provider callback completes inline and then returns
     /// [`ResourceProviderDecision::PassThrough`], the wrapper still returns the
     /// native `Handle` decision. Native code must not also pass the completed
     /// request through to its own networking path.
-    pub fn complete(
-        self,
-        response: ResourceResponse,
-    ) -> std::result::Result<(), HandleOperationError<Self>> {
-        self.state
-            .complete(&response)
-            .map_err(|error| HandleOperationError::new(error, self))
+    pub fn complete(&self, response: ResourceResponse) -> Result<()> {
+        self.state.complete(&response)
     }
 
     /// Reports whether native code has cancelled the request.
@@ -277,6 +274,7 @@ mod tests {
 
     static FAKE_HANDLE_TEST_LOCK: StdMutex<()> = StdMutex::new(());
     static COMPLETE_COUNT: AtomicUsize = AtomicUsize::new(0);
+    static CANCELLED_COUNT: AtomicUsize = AtomicUsize::new(0);
     static RELEASE_COUNT: AtomicUsize = AtomicUsize::new(0);
     static CANCELLED_VALUE: AtomicBool = AtomicBool::new(false);
     static COMPLETE_STATUS: AtomicI32 = AtomicI32::new(sys::MLN_STATUS_OK);
@@ -293,6 +291,7 @@ mod tests {
         _handle: *const sys::mln_resource_request_handle,
         out_cancelled: *mut bool,
     ) -> sys::mln_status {
+        CANCELLED_COUNT.fetch_add(1, Ordering::SeqCst);
         if out_cancelled.is_null() {
             return sys::MLN_STATUS_INVALID_ARGUMENT;
         }
@@ -313,6 +312,7 @@ mod tests {
 
     fn reset_fake_handle_state() {
         COMPLETE_COUNT.store(0, Ordering::SeqCst);
+        CANCELLED_COUNT.store(0, Ordering::SeqCst);
         RELEASE_COUNT.store(0, Ordering::SeqCst);
         CANCELLED_VALUE.store(false, Ordering::SeqCst);
         COMPLETE_STATUS.store(sys::MLN_STATUS_OK, Ordering::SeqCst);
@@ -358,12 +358,15 @@ mod tests {
     }
 
     #[test]
+    // Rust regression: Rust request handles are transferable for deferred
+    // completion, but shared references are not safe to use concurrently.
     fn resource_request_handle_is_send_but_not_sync() {
         assert_impl_all!(ResourceRequestHandle: Send);
         assert_not_impl_any!(ResourceRequestHandle: Sync);
     }
 
     #[test]
+    // Spec coverage: BND-142.
     fn provider_callback_copies_request_and_pass_through_does_not_release() {
         let _guard = FAKE_HANDLE_TEST_LOCK.lock().unwrap();
         reset_fake_handle_state();
@@ -399,6 +402,39 @@ mod tests {
     }
 
     #[test]
+    // Spec coverage: BND-151.
+    fn retained_pass_through_request_handle_is_stale_after_callback() {
+        let _guard = FAKE_HANDLE_TEST_LOCK.lock().unwrap();
+        reset_fake_handle_state();
+        let (sender, receiver) = std::sync::mpsc::channel();
+        let state = ResourceProviderState {
+            callback: Box::new(move |_, handle| {
+                sender.send(handle).unwrap();
+                ResourceProviderDecision::PassThrough
+            }),
+            handle_fns: fake_fns(),
+        };
+        let raw_request = request();
+
+        let decision = state.invoke(
+            &raw_request,
+            0x1234usize as *mut sys::mln_resource_request_handle,
+        );
+        let handle = receiver.recv().unwrap();
+
+        assert_eq!(decision, sys::MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH);
+        let error = handle.is_cancelled().unwrap_err();
+        assert_eq!(error.kind(), ErrorKind::InvalidArgument);
+        let error = handle.complete(ResourceResponse::no_content()).unwrap_err();
+        assert_eq!(error.kind(), ErrorKind::InvalidArgument);
+        handle.close();
+        assert_eq!(COMPLETE_COUNT.load(Ordering::SeqCst), 0);
+        assert_eq!(CANCELLED_COUNT.load(Ordering::SeqCst), 0);
+        assert_eq!(RELEASE_COUNT.load(Ordering::SeqCst), 0);
+    }
+
+    #[test]
+    // Spec coverage: BND-143 and BND-150.
     fn inline_completion_returns_handle_and_releases_once() {
         let _guard = FAKE_HANDLE_TEST_LOCK.lock().unwrap();
         reset_fake_handle_state();
@@ -422,6 +458,7 @@ mod tests {
     }
 
     #[test]
+    // Spec coverage: BND-144 and BND-145.
     fn deferred_completion_from_another_thread_releases_once() {
         let _guard = FAKE_HANDLE_TEST_LOCK.lock().unwrap();
         let handle = fake_handle();
@@ -444,24 +481,59 @@ mod tests {
     }
 
     #[test]
-    fn failed_completion_returns_handle_for_retry() {
+    // Spec coverage: BND-152.
+    fn failed_completion_is_terminal_after_reaching_c() {
         let _guard = FAKE_HANDLE_TEST_LOCK.lock().unwrap();
         let handle = fake_handle();
+        assert_eq!(
+            handle
+                .state
+                .finish_provider_decision(ResourceProviderDecision::Handle),
+            sys::MLN_RESOURCE_PROVIDER_DECISION_HANDLE
+        );
         COMPLETE_STATUS.store(sys::MLN_STATUS_INVALID_STATE, Ordering::SeqCst);
 
         let error = handle
             .complete(ResourceResponse::ok(Vec::new()))
             .unwrap_err();
+
         assert_eq!(error.kind(), ErrorKind::InvalidState);
         assert_eq!(COMPLETE_COUNT.load(Ordering::SeqCst), 1);
-
-        COMPLETE_STATUS.store(sys::MLN_STATUS_OK, Ordering::SeqCst);
-        let handle = error.into_handle();
-        handle.complete(ResourceResponse::no_content()).unwrap();
-        assert_eq!(COMPLETE_COUNT.load(Ordering::SeqCst), 2);
+        assert_eq!(RELEASE_COUNT.load(Ordering::SeqCst), 1);
+        let error = handle.complete(ResourceResponse::no_content()).unwrap_err();
+        assert_eq!(error.kind(), ErrorKind::InvalidState);
+        assert_eq!(COMPLETE_COUNT.load(Ordering::SeqCst), 1);
     }
 
     #[test]
+    // Spec coverage: BND-146.
+    fn validation_failure_before_completion_keeps_handle_retryable() {
+        let _guard = FAKE_HANDLE_TEST_LOCK.lock().unwrap();
+        let handle = fake_handle();
+        assert_eq!(
+            handle
+                .state
+                .finish_provider_decision(ResourceProviderDecision::Handle),
+            sys::MLN_RESOURCE_PROVIDER_DECISION_HANDLE
+        );
+
+        let error = handle
+            .complete(ResourceResponse::error(
+                crate::ResourceErrorReason::Other,
+                "bad\0message",
+            ))
+            .unwrap_err();
+
+        assert_eq!(error.kind(), ErrorKind::InvalidArgument);
+        assert_eq!(COMPLETE_COUNT.load(Ordering::SeqCst), 0);
+        assert_eq!(RELEASE_COUNT.load(Ordering::SeqCst), 0);
+        handle.complete(ResourceResponse::no_content()).unwrap();
+        assert_eq!(COMPLETE_COUNT.load(Ordering::SeqCst), 1);
+        assert_eq!(RELEASE_COUNT.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    // Spec coverage: BND-147 and BND-153.
     fn drop_releases_uncompleted_handled_request_once() {
         let _guard = FAKE_HANDLE_TEST_LOCK.lock().unwrap();
         let handle = fake_handle();
@@ -477,6 +549,7 @@ mod tests {
     }
 
     #[test]
+    // Spec coverage: BND-153.
     fn close_before_handle_decision_releases_after_decision() {
         let _guard = FAKE_HANDLE_TEST_LOCK.lock().unwrap();
         let handle = fake_handle();
@@ -492,6 +565,7 @@ mod tests {
     }
 
     #[test]
+    // Spec coverage: BND-147.
     fn cancelled_queries_use_native_function_until_closed() {
         let _guard = FAKE_HANDLE_TEST_LOCK.lock().unwrap();
         let handle = fake_handle();
@@ -502,6 +576,32 @@ mod tests {
     }
 
     #[test]
+    // Spec coverage: BND-023 and BND-148.
+    fn late_completion_after_observed_cancellation_maps_native_status_and_closes() {
+        let _guard = FAKE_HANDLE_TEST_LOCK.lock().unwrap();
+        let handle = fake_handle();
+        assert_eq!(
+            handle
+                .state
+                .finish_provider_decision(ResourceProviderDecision::Handle),
+            sys::MLN_RESOURCE_PROVIDER_DECISION_HANDLE
+        );
+        CANCELLED_VALUE.store(true, Ordering::SeqCst);
+
+        assert!(handle.is_cancelled().unwrap());
+        COMPLETE_STATUS.store(sys::MLN_STATUS_INVALID_STATE, Ordering::SeqCst);
+        let error = handle.complete(ResourceResponse::no_content()).unwrap_err();
+
+        assert_eq!(error.kind(), ErrorKind::InvalidState);
+        assert_eq!(COMPLETE_COUNT.load(Ordering::SeqCst), 1);
+        assert_eq!(RELEASE_COUNT.load(Ordering::SeqCst), 1);
+        let error = handle.complete(ResourceResponse::no_content()).unwrap_err();
+        assert_eq!(error.kind(), ErrorKind::InvalidState);
+        assert_eq!(COMPLETE_COUNT.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    // Spec coverage: BND-121.
     fn provider_panics_produce_unknown_decision_without_unwinding() {
         let _guard = FAKE_HANDLE_TEST_LOCK.lock().unwrap();
         reset_fake_handle_state();
@@ -521,6 +621,7 @@ mod tests {
     }
 
     #[test]
+    // Spec coverage: BND-141.
     fn transform_callback_copies_request_when_keeping_original_url() {
         let state = ResourceTransformState::new(|request| {
             assert_eq!(request.kind, ResourceKind::Style);
@@ -547,6 +648,7 @@ mod tests {
     }
 
     #[test]
+    // Spec coverage: BND-140.
     fn transform_callback_clears_stale_response_when_keeping_original_url() {
         let state = ResourceTransformState::new(|_| None);
         let descriptor = state.descriptor();
@@ -570,6 +672,7 @@ mod tests {
     }
 
     #[test]
+    // Spec coverage: BND-121.
     fn transform_callback_contains_panics() {
         let state = ResourceTransformState::new(|_| panic!("boom"));
         let descriptor = state.descriptor();
@@ -591,6 +694,7 @@ mod tests {
     }
 
     #[test]
+    // Spec coverage: BND-024.
     fn transform_callback_rejects_embedded_nul_replacements() {
         let state = ResourceTransformState::new(|_| Some("https://example.test/\0bad".to_owned()));
         let descriptor = state.descriptor();
@@ -612,6 +716,8 @@ mod tests {
     }
 
     #[test]
+    // Rust regression: proves callback captures are released by the Rust
+    // transform-state implementation after native unregistration.
     fn transform_state_drops_callback_capture() {
         let token = Arc::new(());
         let callback_token = Arc::clone(&token);
@@ -625,6 +731,7 @@ mod tests {
     }
 
     #[test]
+    // Spec coverage: BND-123.
     fn callback_can_run_from_multiple_threads() {
         let calls = Arc::new(AtomicUsize::new(0));
         let callback_calls = Arc::clone(&calls);

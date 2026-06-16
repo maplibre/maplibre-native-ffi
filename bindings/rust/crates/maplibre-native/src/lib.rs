@@ -21,6 +21,8 @@ mod projection;
 mod render;
 mod resource;
 mod runtime;
+#[cfg(test)]
+mod surface_tests;
 mod values;
 
 use crate::values::NativeValue;
@@ -41,10 +43,7 @@ pub use events::{
 pub use geojson::{Feature, FeatureIdentifier, GeoJson};
 pub use geometry::Geometry;
 pub use json::{JsonMember, JsonValue};
-pub use logging::{
-    LogRecord, clear_log_callback, restore_default_async_log_severity_mask,
-    set_async_log_severity_mask, set_log_callback,
-};
+pub use logging::{LogRecord, clear_log_callback, set_async_log_severity_mask, set_log_callback};
 pub use map::{
     LocationIndicatorImageKind, MapHandle, RasterDemEncoding, SourceInfo, SourceType, StyleImage,
     StyleImageInfo, StyleImageOptions, TileScheme, TileSourceOptions, VectorTileEncoding,
@@ -108,7 +107,7 @@ impl<T> HandleOperationError<T> {
     }
 
     /// Returns the raw C status for native operation errors, when available.
-    pub fn raw_status(&self) -> Option<sys::mln_status> {
+    pub fn raw_status(&self) -> Option<i32> {
         self.error.raw_status()
     }
 
@@ -225,6 +224,7 @@ mod tests {
     assert_not_impl_any!(RenderSessionHandle: Send, Sync);
 
     #[test]
+    // Spec coverage: BND-103.
     fn projected_meter_helpers_round_trip() {
         let coordinate = LatLng::new(45.0, -122.0);
         let meters = projected_meters_for_lat_lng(coordinate).unwrap();
@@ -235,6 +235,7 @@ mod tests {
     }
 
     #[test]
+    // Spec coverage: BND-020.
     fn invalid_network_status_reports_public_error() {
         let error = set_network_status_raw(999_999).unwrap_err();
 
@@ -244,6 +245,7 @@ mod tests {
     }
 
     #[test]
+    // Spec coverage: BND-025 and BND-068.
     fn unknown_network_status_is_rejected_before_calling_c() {
         let error = set_network_status(NetworkStatus::Unknown(999_999)).unwrap_err();
 
