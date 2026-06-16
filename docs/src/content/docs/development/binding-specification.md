@@ -346,8 +346,8 @@ Callback invocation follows this operation:
    them. Lexical views are allowed only when the public type prevents retention
    beyond the invocation.
 2. Host-language failures must not unwind or otherwise escape across the C
-   callback boundary. Convert recoverable failures represented by the public
-   callback signature to the C callback's documented behavior.
+   callback boundary. If the public callback returns a recoverable host failure,
+   convert the failure to the C callback's documented behavior.
 3. Synchronize callback state that native can invoke concurrently.
 4. Return promptly. Callback code hands owner-thread work back to the owner
    thread before calling runtime or map APIs.

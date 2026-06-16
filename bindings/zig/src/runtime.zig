@@ -914,7 +914,10 @@ pub const OfflineOperationHandle = enum(u128) {
         var runtime_handle = operation_state.runtime;
         unlockOfflineOperationRegistry();
 
-        const runtime = try native(&runtime_handle);
+        const runtime = native(&runtime_handle) catch |err| {
+            self.consume();
+            return err;
+        };
         try status.checkStatus(
             c.mln_runtime_offline_operation_discard(runtime, operation_id),
             diagnosticStore(&runtime_handle),
@@ -1481,6 +1484,7 @@ fn registerRuntimeState(runtime_state: *RuntimeState) std.mem.Allocator.Error!Ru
     }
 
     const generation = nextHandleGeneration();
+    try runtime_handle_free_list.ensureTotalCapacity(std.heap.smp_allocator, runtime_handle_registry.items.len + 1);
     try runtime_handle_registry.append(std.heap.smp_allocator, .{ .state = runtime_state, .generation = generation });
     return runtimeHandle(runtime_handle_registry.items.len, generation);
 }
@@ -1525,7 +1529,7 @@ fn unregisterRuntimeState(handle: RuntimeHandle) ?*RuntimeState {
     const runtime_state = slot.state orelse return null;
     slot.state = null;
     slot.generation = nextHandleGeneration();
-    runtime_handle_free_list.append(std.heap.smp_allocator, slot_index) catch {};
+    runtime_handle_free_list.appendAssumeCapacity(slot_index);
     return runtime_state;
 }
 
@@ -1551,6 +1555,7 @@ fn registerResourceRequestState(request_state: *ResourceRequestState) std.mem.Al
     }
 
     const generation = nextHandleGeneration();
+    try resource_request_free_list.ensureTotalCapacity(std.heap.smp_allocator, resource_request_registry.items.len + 1);
     try resource_request_registry.append(std.heap.smp_allocator, .{ .state = request_state, .generation = generation });
     return resourceRequestHandle(resource_request_registry.items.len, generation);
 }
@@ -1586,7 +1591,7 @@ fn unregisterResourceRequestState(handle: ResourceRequestHandle) ?*ResourceReque
     const request_state = slot.state orelse return null;
     slot.state = null;
     slot.generation = nextHandleGeneration();
-    resource_request_free_list.append(std.heap.smp_allocator, slot_index) catch {};
+    resource_request_free_list.appendAssumeCapacity(slot_index);
     return request_state;
 }
 
@@ -1612,6 +1617,7 @@ fn registerOfflineOperationState(operation_state: *OfflineOperationState) std.me
     }
 
     const generation = nextHandleGeneration();
+    try offline_operation_free_list.ensureTotalCapacity(std.heap.smp_allocator, offline_operation_registry.items.len + 1);
     try offline_operation_registry.append(std.heap.smp_allocator, .{ .state = operation_state, .generation = generation });
     return offlineOperationHandle(offline_operation_registry.items.len, generation);
 }
@@ -1650,7 +1656,7 @@ fn unregisterOfflineOperationState(handle: OfflineOperationHandle) ?*OfflineOper
     const operation_state = slot.state orelse return null;
     slot.state = null;
     slot.generation = nextHandleGeneration();
-    offline_operation_free_list.append(std.heap.smp_allocator, slot_index) catch {};
+    offline_operation_free_list.appendAssumeCapacity(slot_index);
     return operation_state;
 }
 

@@ -1581,6 +1581,7 @@ fn registerMapState(map_state: *MapState) std.mem.Allocator.Error!MapHandle {
     }
 
     const generation = runtime_module.nextHandleGeneration();
+    try map_free_list.ensureTotalCapacity(std.heap.smp_allocator, map_registry.items.len + 1);
     try map_registry.append(std.heap.smp_allocator, .{ .state = map_state, .generation = generation });
     return mapHandle(map_registry.items.len, generation);
 }
@@ -1625,7 +1626,7 @@ fn unregisterMapState(handle: MapHandle) ?*MapState {
     const map_state = slot.state orelse return null;
     slot.state = null;
     slot.generation = runtime_module.nextHandleGeneration();
-    map_free_list.append(std.heap.smp_allocator, slot_index) catch {};
+    map_free_list.appendAssumeCapacity(slot_index);
     return map_state;
 }
 

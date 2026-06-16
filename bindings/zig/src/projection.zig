@@ -139,6 +139,7 @@ fn registerProjectionState(projection_state: *ProjectionState) std.mem.Allocator
     }
 
     const generation = runtime_module.nextHandleGeneration();
+    try projection_free_list.ensureTotalCapacity(std.heap.smp_allocator, projection_registry.items.len + 1);
     try projection_registry.append(std.heap.smp_allocator, .{ .state = projection_state, .generation = generation });
     return projectionHandle(projection_registry.items.len, generation);
 }
@@ -180,7 +181,7 @@ fn unregisterProjectionState(handle: MapProjectionHandle) ?*ProjectionState {
     const projection_state = slot.state orelse return null;
     slot.state = null;
     slot.generation = runtime_module.nextHandleGeneration();
-    projection_free_list.append(std.heap.smp_allocator, slot_index) catch {};
+    projection_free_list.appendAssumeCapacity(slot_index);
     return projection_state;
 }
 

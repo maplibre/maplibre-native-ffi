@@ -875,6 +875,7 @@ fn registerRenderSessionState(session_state: *RenderSessionState) std.mem.Alloca
     }
 
     const generation = runtime_module.nextHandleGeneration();
+    try render_session_free_list.ensureTotalCapacity(std.heap.smp_allocator, render_session_registry.items.len + 1);
     try render_session_registry.append(std.heap.smp_allocator, .{ .state = session_state, .generation = generation });
     return renderSessionHandle(render_session_registry.items.len, generation);
 }
@@ -916,7 +917,7 @@ fn unregisterRenderSessionState(handle: RenderSessionHandle) ?*RenderSessionStat
     const session_state = slot.state orelse return null;
     slot.state = null;
     slot.generation = runtime_module.nextHandleGeneration();
-    render_session_free_list.append(std.heap.smp_allocator, slot_index) catch {};
+    render_session_free_list.appendAssumeCapacity(slot_index);
     return session_state;
 }
 
@@ -976,6 +977,7 @@ fn registerOwnedTextureFrameState(comptime T: type, frame_state_handle: *OwnedTe
     }
 
     const generation = runtime_module.nextHandleGeneration();
+    try owned_texture_frame_free_list.ensureTotalCapacity(std.heap.smp_allocator, owned_texture_frame_registry.items.len + 1);
     try owned_texture_frame_registry.append(std.heap.smp_allocator, .{ .state = frame_state_handle, .generation = generation });
     return ownedTextureFrameHandle(T, owned_texture_frame_registry.items.len, generation);
 }
@@ -1021,7 +1023,7 @@ fn unregisterOwnedTextureFrameState(handle: anytype) ?*OwnedTextureFrameState {
     const frame_state_handle = slot.state orelse return null;
     slot.state = null;
     slot.generation = runtime_module.nextHandleGeneration();
-    owned_texture_frame_free_list.append(std.heap.smp_allocator, slot_index) catch {};
+    owned_texture_frame_free_list.appendAssumeCapacity(slot_index);
     return frame_state_handle;
 }
 
