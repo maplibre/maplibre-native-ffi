@@ -6,7 +6,7 @@ const maplibre = @import("maplibre_native");
 const center = maplibre.LatLng{ .latitude = 37.7749, .longitude = -122.4194 };
 
 test "camera jump updates snapshot fields through public binding" {
-    var runtime = try maplibre.RuntimeHandle.init(null);
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
     var map = try maplibre.MapHandle.create(&runtime, .{});
     defer map.close() catch @panic("map close failed");
@@ -19,7 +19,7 @@ test "camera jump updates snapshot fields through public binding" {
 }
 
 test "camera commands accept valid public descriptors" {
-    var runtime = try maplibre.RuntimeHandle.init(null);
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
     var map = try maplibre.MapHandle.create(&runtime, .{});
     defer map.close() catch @panic("map close failed");
@@ -47,7 +47,7 @@ test "camera commands accept valid public descriptors" {
 }
 
 test "camera fitting computes camera and visible bounds" {
-    var runtime = try maplibre.RuntimeHandle.init(null);
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
     var map = try maplibre.MapHandle.create(&runtime, .{});
     defer map.close() catch @panic("map close failed");
@@ -83,7 +83,7 @@ test "camera fitting computes camera and visible bounds" {
 }
 
 test "camera constraints and free camera options round-trip public values" {
-    var runtime = try maplibre.RuntimeHandle.init(null);
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
     var map = try maplibre.MapHandle.create(&runtime, .{});
     defer map.close() catch @panic("map close failed");
@@ -111,7 +111,7 @@ test "camera constraints and free camera options round-trip public values" {
 }
 
 test "camera public descriptors report invalid native arguments" {
-    var runtime = try maplibre.RuntimeHandle.init(null);
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
     var map = try maplibre.MapHandle.create(&runtime, .{});
     defer map.close() catch @panic("map close failed");

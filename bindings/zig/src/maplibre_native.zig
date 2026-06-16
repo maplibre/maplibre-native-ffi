@@ -1,3 +1,4 @@
+const builtin = @import("builtin");
 const c = @import("c.zig").raw;
 const diagnostics = @import("diagnostics.zig");
 const logging = @import("logging.zig");
@@ -48,7 +49,6 @@ pub const ResourceResponse = runtime.ResourceResponse;
 pub const ResourceProviderHandler = runtime.ResourceProviderHandler;
 pub const ResourceProvider = runtime.ResourceProvider;
 pub const ResourceRequestHandle = runtime.ResourceRequestHandle;
-pub const RuntimeEvent = runtime.RuntimeEvent;
 pub const OwnedRuntimeEvent = runtime.OwnedRuntimeEvent;
 pub const RuntimeEventPayload = runtime.RuntimeEventPayload;
 pub const RuntimeEventType = runtime.RuntimeEventType;
@@ -110,7 +110,6 @@ pub const FeatureExtensionResult = render.FeatureExtensionResult;
 pub const MetalOwnedTextureFrameInfo = render.MetalOwnedTextureFrameInfo;
 pub const VulkanOwnedTextureFrameInfo = render.VulkanOwnedTextureFrameInfo;
 pub const OpenGLOwnedTextureFrameInfo = render.OpenGLOwnedTextureFrameInfo;
-pub const OwnedImage = render.OwnedImage;
 pub const RenderSessionHandle = render.RenderSessionHandle;
 pub const MetalOwnedTextureFrameHandle = render.MetalOwnedTextureFrameHandle;
 pub const VulkanOwnedTextureFrameHandle = render.VulkanOwnedTextureFrameHandle;
@@ -201,4 +200,26 @@ pub fn validateAbiVersion(diagnostic_store: ?*DiagnosticStore) Error!void {
 
 comptime {
     _ = c.MLN_STATUS_OK;
+    if (builtin.is_test) {
+        @export(&testFailNextOwnedTextureFrameWrapperAllocation, .{ .name = "mln_zig_test_fail_next_owned_texture_frame_wrapper_allocation" });
+        @export(&testUseCountingFeatureQueryResultDestroy, .{ .name = "mln_zig_test_use_counting_feature_query_result_destroy" });
+        @export(&testRestoreFeatureQueryResultDestroy, .{ .name = "mln_zig_test_restore_feature_query_result_destroy" });
+        @export(&testFeatureQueryResultDestroyCount, .{ .name = "mln_zig_test_feature_query_result_destroy_count" });
+    }
+}
+
+fn testFailNextOwnedTextureFrameWrapperAllocation() callconv(.c) void {
+    render.failNextOwnedTextureFrameWrapperAllocationForTesting();
+}
+
+fn testUseCountingFeatureQueryResultDestroy() callconv(.c) void {
+    render.useCountingFeatureQueryResultDestroyForTesting();
+}
+
+fn testRestoreFeatureQueryResultDestroy() callconv(.c) void {
+    render.restoreFeatureQueryResultDestroyForTesting();
+}
+
+fn testFeatureQueryResultDestroyCount() callconv(.c) usize {
+    return render.featureQueryResultDestroyCountForTesting();
 }
