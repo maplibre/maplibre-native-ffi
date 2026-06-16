@@ -20,6 +20,7 @@ import org.maplibre.nativeffi.error.MaplibreStatus;
 import org.maplibre.nativeffi.geo.Geometry;
 import org.maplibre.nativeffi.geo.LatLng;
 import org.maplibre.nativeffi.geo.LatLngBounds;
+import org.maplibre.nativeffi.internal.convert.NativeValues;
 import org.maplibre.nativeffi.offline.OfflineRegionDefinition;
 import org.maplibre.nativeffi.offline.OfflineRegionDownloadState;
 import org.maplibre.nativeffi.offline.OfflineRegionInfo;
@@ -64,12 +65,14 @@ final class RuntimeOfflineTest {
           runtime,
           runtime.startSetOfflineRegionDownloadState(
               created.id(), OfflineRegionDownloadState.INACTIVE));
+      var unknownDownloadState = NativeValues.offlineRegionDownloadState(999_997);
+      assertEquals(999_997, unknownDownloadState.rawValue());
+      assertFalse(OfflineRegionDownloadState.INACTIVE.equals(unknownDownloadState));
+      assertFalse(OfflineRegionDownloadState.ACTIVE.equals(unknownDownloadState));
       var unknownStateError =
           assertThrows(
               InvalidArgumentException.class,
-              () ->
-                  runtime.startSetOfflineRegionDownloadState(
-                      created.id(), OfflineRegionDownloadState.UNKNOWN));
+              () -> runtime.startSetOfflineRegionDownloadState(created.id(), unknownDownloadState));
       assertEquals(MaplibreStatus.INVALID_ARGUMENT, unknownStateError.status());
       completeVoidOperation(runtime, runtime.startInvalidateOfflineRegion(created.id()));
 
@@ -163,10 +166,10 @@ final class RuntimeOfflineTest {
           continue;
         }
         assertEquals(operation.kind(), completed.operationKind());
-        assertEquals(operation.kind().nativeValue(), completed.rawOperationKind());
+        assertEquals(NativeValues.nativeValue(operation.kind()), completed.rawOperationKind());
         assertEquals(operation.resultKind(), completed.resultKind());
-        assertEquals(operation.resultKind().nativeValue(), completed.rawResultKind());
-        assertEquals(MaplibreStatus.OK.nativeCode(), completed.resultStatus());
+        assertEquals(NativeValues.nativeValue(operation.resultKind()), completed.rawResultKind());
+        assertEquals(NativeValues.nativeCode(MaplibreStatus.OK), completed.resultStatus());
         return completed;
       }
       try {
@@ -206,7 +209,7 @@ final class RuntimeOfflineTest {
 
   private static List<OfflineRegionInfo> mergeOfflineRegionsDatabase(
       RuntimeHandle runtime, Path path) {
-    var operation = runtime.startMergeOfflineRegionsDatabase(path);
+    var operation = runtime.startMergeOfflineRegionsDatabase(path.toString());
     waitForOperation(runtime, operation);
     return runtime.takeMergeOfflineRegionsDatabaseResult(operation);
   }

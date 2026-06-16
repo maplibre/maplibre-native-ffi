@@ -12,7 +12,7 @@ public enum RenderMode {
     this.nativeValue = nativeValue;
   }
 
-  public static RenderMode fromNative(int nativeValue) {
+  static RenderMode fromNative(int nativeValue) {
     return switch (nativeValue) {
       case 0 -> PARTIAL;
       case 1 -> FULL;

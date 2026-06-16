@@ -16,7 +16,7 @@ public enum DebugOption {
     this.nativeMask = nativeMask;
   }
 
-  public int nativeMask() {
+  int nativeMask() {
     return nativeMask;
   }
 }

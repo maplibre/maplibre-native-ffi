@@ -1,27 +1,39 @@
 package org.maplibre.nativeffi.runtime;
 
-import org.maplibre.nativeffi.error.NativeErrorException;
-
 /** Process-global network reachability state used by Maplibre Native. */
-public enum NetworkStatus {
-  ONLINE(1),
-  OFFLINE(2);
+public final class NetworkStatus {
+  public static final NetworkStatus ONLINE = new NetworkStatus(1);
+  public static final NetworkStatus OFFLINE = new NetworkStatus(2);
 
-  private final int nativeValue;
+  private final int rawValue;
+  private final String name;
 
-  NetworkStatus(int nativeValue) {
-    this.nativeValue = nativeValue;
+  public NetworkStatus(int rawValue) {
+    this.rawValue = rawValue;
+    this.name =
+        switch (rawValue) {
+          case 1 -> "ONLINE";
+          case 2 -> "OFFLINE";
+          default -> "UNKNOWN(" + Integer.toUnsignedLong(rawValue) + ")";
+        };
   }
 
-  public int nativeValue() {
-    return nativeValue;
+  public int rawValue() {
+    return rawValue;
   }
 
-  public static NetworkStatus fromNative(int nativeValue) {
-    return switch (nativeValue) {
-      case 1 -> ONLINE;
-      case 2 -> OFFLINE;
-      default -> throw new NativeErrorException(0, "Unknown native network status: " + nativeValue);
-    };
+  @Override
+  public boolean equals(Object other) {
+    return other instanceof NetworkStatus that && rawValue == that.rawValue;
+  }
+
+  @Override
+  public int hashCode() {
+    return Integer.hashCode(rawValue);
+  }
+
+  @Override
+  public String toString() {
+    return name;
   }
 }

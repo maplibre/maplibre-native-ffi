@@ -12,8 +12,4 @@ public record Feature(
     properties = List.copyOf(properties);
     identifier = identifier == null ? FeatureIdentifier.nullValue() : identifier;
   }
-
-  public Feature(Geometry geometry, List<JsonValue.Member> properties) {
-    this(geometry, properties, FeatureIdentifier.nullValue());
-  }
 }

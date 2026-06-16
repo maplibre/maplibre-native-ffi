@@ -12,11 +12,11 @@ public enum ResourceStoragePolicy {
     this.nativeValue = nativeValue;
   }
 
-  public int nativeValue() {
+  int nativeValue() {
     return nativeValue;
   }
 
-  public static ResourceStoragePolicy fromNative(int nativeValue) {
+  static ResourceStoragePolicy fromNative(int nativeValue) {
     return switch (nativeValue) {
       case 0 -> PERMANENT;
       case 1 -> VOLATILE;

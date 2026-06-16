@@ -19,7 +19,7 @@ public enum TileOperation {
     this.nativeValue = nativeValue;
   }
 
-  public static TileOperation fromNative(int nativeValue) {
+  static TileOperation fromNative(int nativeValue) {
     for (var operation : values()) {
       if (operation.nativeValue == nativeValue) {
         return operation;

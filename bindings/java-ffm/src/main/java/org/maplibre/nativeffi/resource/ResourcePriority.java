@@ -12,11 +12,11 @@ public enum ResourcePriority {
     this.nativeValue = nativeValue;
   }
 
-  public int nativeValue() {
+  int nativeValue() {
     return nativeValue;
   }
 
-  public static ResourcePriority fromNative(int nativeValue) {
+  static ResourcePriority fromNative(int nativeValue) {
     return switch (nativeValue) {
       case 0 -> REGULAR;
       case 1 -> LOW;

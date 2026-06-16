@@ -27,11 +27,11 @@ public enum LogEvent {
     this.nativeValue = nativeValue;
   }
 
-  public int nativeValue() {
+  int nativeValue() {
     return nativeValue;
   }
 
-  public static LogEvent fromNative(int nativeValue) {
+  static LogEvent fromNative(int nativeValue) {
     for (var event : values()) {
       if (event.nativeValue == nativeValue) {
         return event;

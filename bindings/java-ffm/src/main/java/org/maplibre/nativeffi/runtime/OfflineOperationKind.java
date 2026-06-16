@@ -23,11 +23,11 @@ public enum OfflineOperationKind {
     this.nativeValue = nativeValue;
   }
 
-  public int nativeValue() {
+  int nativeValue() {
     return nativeValue;
   }
 
-  public static OfflineOperationKind fromNative(int nativeValue) {
+  static OfflineOperationKind fromNative(int nativeValue) {
     for (var kind : values()) {
       if (kind.nativeValue == nativeValue) {
         return kind;

@@ -13,11 +13,11 @@ public enum ResourceLoadingMethod {
     this.nativeValue = nativeValue;
   }
 
-  public int nativeValue() {
+  int nativeValue() {
     return nativeValue;
   }
 
-  public static ResourceLoadingMethod fromNative(int nativeValue) {
+  static ResourceLoadingMethod fromNative(int nativeValue) {
     return switch (nativeValue) {
       case 0 -> ALL;
       case 1 -> CACHE_ONLY;

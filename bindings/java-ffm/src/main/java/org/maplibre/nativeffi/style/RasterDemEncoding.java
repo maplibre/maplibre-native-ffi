@@ -11,7 +11,7 @@ public enum RasterDemEncoding {
     this.nativeValue = nativeValue;
   }
 
-  public int nativeValue() {
+  int nativeValue() {
     return nativeValue;
   }
 }

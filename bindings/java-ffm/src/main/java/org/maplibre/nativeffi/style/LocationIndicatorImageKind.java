@@ -12,7 +12,7 @@ public enum LocationIndicatorImageKind {
     this.nativeValue = nativeValue;
   }
 
-  public int nativeValue() {
+  int nativeValue() {
     return nativeValue;
   }
 }

@@ -13,18 +13,18 @@ public enum LogSeverity {
     this.nativeValue = nativeValue;
   }
 
-  public int nativeValue() {
+  int nativeValue() {
     return nativeValue;
   }
 
-  public int nativeMask() {
+  int nativeMask() {
     if (this == UNKNOWN) {
       throw new IllegalArgumentException("UNKNOWN log severity cannot be used as an input");
     }
     return 1 << nativeValue;
   }
 
-  public static LogSeverity fromNative(int nativeValue) {
+  static LogSeverity fromNative(int nativeValue) {
     return switch (nativeValue) {
       case 1 -> INFO;
       case 2 -> WARNING;

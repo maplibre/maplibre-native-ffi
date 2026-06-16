@@ -17,11 +17,11 @@ public enum OfflineOperationResultKind {
     this.nativeValue = nativeValue;
   }
 
-  public int nativeValue() {
+  int nativeValue() {
     return nativeValue;
   }
 
-  public static OfflineOperationResultKind fromNative(int nativeValue) {
+  static OfflineOperationResultKind fromNative(int nativeValue) {
     for (var kind : values()) {
       if (kind.nativeValue == nativeValue) {
         return kind;

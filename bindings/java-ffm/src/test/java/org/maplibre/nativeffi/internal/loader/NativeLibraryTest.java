@@ -7,6 +7,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.nio.file.Files;
 import org.junit.jupiter.api.Test;
+import org.maplibre.nativeffi.error.MaplibreStatus;
+import org.maplibre.nativeffi.error.NativeErrorException;
 import org.maplibre.nativeffi.internal.c.MapLibreNativeC;
 import org.maplibre.nativeffi.test.NativeTestSupport;
 
@@ -47,6 +49,15 @@ final class NativeLibraryTest {
     } finally {
       restoreProperty(originalProperty);
     }
+  }
+
+  @Test
+  void abiVersionMismatchUsesStableBindingError() {
+    var error = assertThrows(NativeErrorException.class, () -> NativeAccess.checkAbiVersion(1));
+
+    assertEquals(MaplibreStatus.NATIVE_ERROR, error.status());
+    assertTrue(error.diagnostic().contains("Unsupported Maplibre C ABI version 1"));
+    assertTrue(error.diagnostic().contains("expected 0"));
   }
 
   private static void restoreProperty(String originalProperty) {

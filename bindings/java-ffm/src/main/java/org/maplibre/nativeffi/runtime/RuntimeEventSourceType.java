@@ -12,7 +12,7 @@ public enum RuntimeEventSourceType {
     this.nativeValue = nativeValue;
   }
 
-  public static RuntimeEventSourceType fromNative(int nativeValue) {
+  static RuntimeEventSourceType fromNative(int nativeValue) {
     return switch (nativeValue) {
       case 0 -> RUNTIME;
       case 1 -> MAP;

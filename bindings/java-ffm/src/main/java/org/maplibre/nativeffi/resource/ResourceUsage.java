@@ -12,11 +12,11 @@ public enum ResourceUsage {
     this.nativeValue = nativeValue;
   }
 
-  public int nativeValue() {
+  int nativeValue() {
     return nativeValue;
   }
 
-  public static ResourceUsage fromNative(int nativeValue) {
+  static ResourceUsage fromNative(int nativeValue) {
     return switch (nativeValue) {
       case 0 -> ONLINE;
       case 1 -> OFFLINE;

@@ -32,7 +32,7 @@ public enum RuntimeEventType {
     this.nativeValue = nativeValue;
   }
 
-  public static RuntimeEventType fromNative(int nativeValue) {
+  static RuntimeEventType fromNative(int nativeValue) {
     for (var type : values()) {
       if (type.nativeValue == nativeValue) {
         return type;

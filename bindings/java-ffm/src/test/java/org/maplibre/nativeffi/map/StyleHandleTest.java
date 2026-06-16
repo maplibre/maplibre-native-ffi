@@ -13,18 +13,21 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.maplibre.nativeffi.geo.CanonicalTileId;
 import org.maplibre.nativeffi.geo.Feature;
+import org.maplibre.nativeffi.geo.FeatureIdentifier;
 import org.maplibre.nativeffi.geo.GeoJson;
 import org.maplibre.nativeffi.geo.Geometry;
 import org.maplibre.nativeffi.geo.LatLng;
 import org.maplibre.nativeffi.geo.LatLngBounds;
 import org.maplibre.nativeffi.internal.c.mln_custom_geometry_source_options;
 import org.maplibre.nativeffi.internal.c.mln_custom_geometry_source_tile_callback;
+import org.maplibre.nativeffi.internal.convert.NativeValues;
 import org.maplibre.nativeffi.internal.struct.StyleStructs;
 import org.maplibre.nativeffi.json.JsonValue;
 import org.maplibre.nativeffi.render.PremultipliedRgba8Image;
@@ -33,6 +36,7 @@ import org.maplibre.nativeffi.resource.ResourceProviderDecision;
 import org.maplibre.nativeffi.resource.ResourceResponse;
 import org.maplibre.nativeffi.runtime.RuntimeEventType;
 import org.maplibre.nativeffi.runtime.RuntimeHandle;
+import org.maplibre.nativeffi.runtime.RuntimeOptions;
 import org.maplibre.nativeffi.style.CustomGeometrySourceOptions;
 import org.maplibre.nativeffi.style.LocationIndicatorImageKind;
 import org.maplibre.nativeffi.style.RasterDemEncoding;
@@ -52,8 +56,16 @@ final class StyleHandleTest {
   }
 
   @Test
+  void unknownStyleSourceTypePreservesRawValue() {
+    var sourceType = NativeValues.sourceType(999_999);
+
+    assertEquals(999_999, sourceType.rawValue());
+    assertFalse(SourceType.UNKNOWN.equals(sourceType));
+  }
+
+  @Test
   void styleSourceAndLayerApisCopyIdsAndSnapshots() {
-    var runtime = RuntimeHandle.create();
+    var runtime = RuntimeHandle.create(new RuntimeOptions());
     var map = MapHandle.create(runtime, new MapOptions().size(128, 128));
     try {
       map.setStyleJson(EMPTY_STYLE);
@@ -63,7 +75,8 @@ final class StyleHandleTest {
               List.of(
                   new Feature(
                       Geometry.point(new LatLng(0, 0)),
-                      List.of(new JsonValue.Member("kind", JsonValue.of("park")))))));
+                      List.of(new JsonValue.Member("kind", JsonValue.of("park"))),
+                      FeatureIdentifier.nullValue()))));
 
       assertTrue(map.styleSourceExists("parks"));
       assertEquals(Optional.of(SourceType.GEOJSON), map.styleSourceType("parks"));
@@ -76,7 +89,7 @@ final class StyleHandleTest {
                   new JsonValue.Member("id", JsonValue.of("park-circles")),
                   new JsonValue.Member("type", JsonValue.of("circle")),
                   new JsonValue.Member("source", JsonValue.of("parks"))));
-      map.addStyleLayerJson(layerJson);
+      map.addStyleLayerJson(layerJson, "");
       assertTrue(map.styleLayerExists("park-circles"));
       assertEquals(Optional.of("circle"), map.styleLayerType("park-circles"));
       assertTrue(map.styleLayerIds().contains("park-circles"));
@@ -101,7 +114,7 @@ final class StyleHandleTest {
 
   @Test
   void tileSourceOptionsAndStyleImagesRoundTripThroughNativeMetadata() {
-    var runtime = RuntimeHandle.create();
+    var runtime = RuntimeHandle.create(new RuntimeOptions());
     var map = MapHandle.create(runtime, new MapOptions().size(128, 128));
     try {
       map.setStyleJson(EMPTY_STYLE);
@@ -152,7 +165,7 @@ final class StyleHandleTest {
 
       var padded =
           new PremultipliedRgba8Image(1, 2, 8, new byte[] {1, 2, 3, 4, 0, 0, 0, 0, 9, 10, 11, 12});
-      map.setStyleImage("padded", padded);
+      map.setStyleImage("padded", padded, null);
       assertArrayEquals(
           new byte[] {1, 2, 3, 4, 9, 10, 11, 12},
           map.copyStyleImagePremultipliedRgba8("padded").orElseThrow().image().pixels());
@@ -196,21 +209,30 @@ final class StyleHandleTest {
     thread.start();
 
     assertTrue(entered.await(5, TimeUnit.SECONDS));
-    state.close();
-    mln_custom_geometry_source_options.cancel_tile(state.descriptor());
-    release.countDown();
-    thread.join(5000);
+    var executor = Executors.newSingleThreadExecutor();
+    try {
+      var close = executor.submit(state::close);
+      TimeUnit.MILLISECONDS.sleep(100);
+      assertFalse(close.isDone());
+      mln_custom_geometry_source_options.cancel_tile(state.descriptor());
+      release.countDown();
+      thread.join(5000);
+      close.get(5, TimeUnit.SECONDS);
 
-    assertFalse(thread.isAlive());
-    assertEquals(new CanonicalTileId(1, 1, 1), seenTile.get());
-    assertThrows(
-        IllegalStateException.class,
-        () -> mln_custom_geometry_source_options.fetch_tile(state.descriptor()));
+      assertFalse(thread.isAlive());
+      assertEquals(new CanonicalTileId(1, 1, 1), seenTile.get());
+      assertThrows(
+          IllegalStateException.class,
+          () -> mln_custom_geometry_source_options.fetch_tile(state.descriptor()));
+    } finally {
+      release.countDown();
+      executor.shutdownNow();
+    }
   }
 
   @Test
   void imageSourcesAndLocationIndicatorHelpersUsePublicValues() throws Exception {
-    var runtime = RuntimeHandle.create();
+    var runtime = RuntimeHandle.create(new RuntimeOptions());
     var map = MapHandle.create(runtime, new MapOptions().size(128, 128));
     try {
       map.setStyleJson(EMPTY_STYLE);
@@ -251,13 +273,13 @@ final class StyleHandleTest {
       waitForMapEvent(runtime, map, RuntimeEventType.MAP_STYLE_LOADED);
       assertEquals(0, map.customGeometrySourceCountForTesting());
 
-      map.addLocationIndicatorLayer("location");
+      map.addLocationIndicatorLayer("location", "");
       assertTrue(map.styleLayerExists("location"));
       assertEquals(Optional.of("location-indicator"), map.styleLayerType("location"));
       map.setLocationIndicatorLocation("location", new LatLng(37.7749, -122.4194), 15.0);
       map.setLocationIndicatorBearing("location", 45.0);
       map.setLocationIndicatorAccuracyRadius("location", 12.0);
-      map.setStyleImage("location-top", image);
+      map.setStyleImage("location-top", image, null);
       map.setLocationIndicatorImageName("location", LocationIndicatorImageKind.TOP, "location-top");
     } finally {
       map.close();
@@ -267,7 +289,7 @@ final class StyleHandleTest {
 
   @Test
   void customGeometryCallbackStateReleasesAfterUrlStyleReplacement() throws Exception {
-    var runtime = RuntimeHandle.create();
+    var runtime = RuntimeHandle.create(new RuntimeOptions());
     try {
       runtime.setResourceProvider(
           (request, handle) -> {

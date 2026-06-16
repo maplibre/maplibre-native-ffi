@@ -14,11 +14,11 @@ public enum RenderBackend {
     this.nativeMask = nativeMask;
   }
 
-  public int nativeMask() {
+  int nativeMask() {
     return nativeMask;
   }
 
-  public static EnumSet<RenderBackend> fromMask(int mask) {
+  static EnumSet<RenderBackend> fromMask(int mask) {
     var backends = EnumSet.noneOf(RenderBackend.class);
     for (var backend : values()) {
       if ((mask & backend.nativeMask) != 0) {

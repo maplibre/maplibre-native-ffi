@@ -5,6 +5,7 @@ import java.lang.foreign.MemorySegment;
 import org.maplibre.nativeffi.internal.access.InternalAccess;
 import org.maplibre.nativeffi.internal.c.mln_resource_provider;
 import org.maplibre.nativeffi.internal.c.mln_resource_provider_callback;
+import org.maplibre.nativeffi.internal.callback.CallbackLifecycle;
 import org.maplibre.nativeffi.internal.struct.ResourceStructs;
 import org.maplibre.nativeffi.resource.ResourceProviderCallback;
 import org.maplibre.nativeffi.resource.ResourceRequestHandle;
@@ -14,6 +15,7 @@ final class ResourceProviderState implements AutoCloseable {
   static final int UNKNOWN_DECISION = -1;
 
   private final Arena arena;
+  private final CallbackLifecycle lifecycle = new CallbackLifecycle();
   private final ResourceProviderCallback callback;
   private final MemorySegment stub;
   private final MemorySegment descriptor;
@@ -32,9 +34,17 @@ final class ResourceProviderState implements AutoCloseable {
     return descriptor;
   }
 
+  boolean isCurrentThreadInCallback() {
+    return lifecycle.isCurrentThreadInCallback();
+  }
+
   private int invoke(MemorySegment userData, MemorySegment request, MemorySegment handle) {
+    var lease = lifecycle.enter();
+    if (lease.isEmpty()) {
+      return UNKNOWN_DECISION;
+    }
     ResourceRequestHandle requestHandle = null;
-    try {
+    try (var ignored = lease.get()) {
       requestHandle = new ResourceRequestHandle(InternalAccess.INSTANCE, handle);
       var decision = callback.handle(ResourceStructs.resourceRequest(request), requestHandle);
       return requestHandle.finishProviderDecision(InternalAccess.INSTANCE, decision);
@@ -48,6 +58,6 @@ final class ResourceProviderState implements AutoCloseable {
 
   @Override
   public void close() {
-    arena.close();
+    lifecycle.close("Resource provider", arena::close);
   }
 }

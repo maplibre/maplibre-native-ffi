@@ -8,6 +8,7 @@ import org.maplibre.nativeffi.internal.c.MapLibreNativeC;
 import org.maplibre.nativeffi.internal.c.mln_canonical_tile_id;
 import org.maplibre.nativeffi.internal.c.mln_custom_geometry_source_options;
 import org.maplibre.nativeffi.internal.c.mln_custom_geometry_source_tile_callback;
+import org.maplibre.nativeffi.internal.callback.CallbackLifecycle;
 import org.maplibre.nativeffi.style.CustomGeometrySourceOptions;
 
 /** Owns map/style-scoped custom geometry source callback state. */
@@ -17,11 +18,7 @@ final class CustomGeometrySourceState implements AutoCloseable {
   private final MemorySegment fetchStub;
   private final MemorySegment cancelStub;
   private final MemorySegment descriptor;
-  private final Object callbackLock = new Object();
-
-  private int activeCallbacks;
-  private boolean closeRequested;
-  private boolean closed;
+  private final CallbackLifecycle lifecycle = new CallbackLifecycle();
 
   CustomGeometrySourceState(CustomGeometrySourceOptions options) {
     this.arena = Arena.ofShared();
@@ -79,52 +76,26 @@ final class CustomGeometrySourceState implements AutoCloseable {
   }
 
   private void fetchTile(MemorySegment userData, MemorySegment tileId) {
-    if (!enterCallback()) {
+    var lease = lifecycle.enter();
+    if (lease.isEmpty()) {
       return;
     }
-    try {
+    try (var ignored = lease.get()) {
       options.callback().fetchTile(canonicalTileId(tileId));
     } catch (Throwable ignored) {
       // Native callbacks must not unwind through the C ABI.
-    } finally {
-      exitCallback();
     }
   }
 
   private void cancelTile(MemorySegment userData, MemorySegment tileId) {
-    if (!enterCallback()) {
+    var lease = lifecycle.enter();
+    if (lease.isEmpty()) {
       return;
     }
-    try {
+    try (var ignored = lease.get()) {
       options.callback().cancelTile(canonicalTileId(tileId));
     } catch (Throwable ignored) {
       // Native callbacks must not unwind through the C ABI.
-    } finally {
-      exitCallback();
-    }
-  }
-
-  private boolean enterCallback() {
-    synchronized (callbackLock) {
-      if (closed) {
-        return false;
-      }
-      activeCallbacks++;
-      return true;
-    }
-  }
-
-  private void exitCallback() {
-    var shouldClose = false;
-    synchronized (callbackLock) {
-      activeCallbacks--;
-      shouldClose = closeRequested && activeCallbacks == 0 && !closed;
-      if (shouldClose) {
-        closed = true;
-      }
-    }
-    if (shouldClose) {
-      arena.close();
     }
   }
 
@@ -137,19 +108,6 @@ final class CustomGeometrySourceState implements AutoCloseable {
 
   @Override
   public void close() {
-    var shouldClose = false;
-    synchronized (callbackLock) {
-      if (closed || closeRequested) {
-        return;
-      }
-      closeRequested = true;
-      shouldClose = activeCallbacks == 0;
-      if (shouldClose) {
-        closed = true;
-      }
-    }
-    if (shouldClose) {
-      arena.close();
-    }
+    lifecycle.close("Custom geometry source", arena::close);
   }
 }

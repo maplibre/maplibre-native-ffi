@@ -8,6 +8,7 @@ import java.lang.foreign.Arena;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.maplibre.nativeffi.error.InvalidArgumentException;
+import org.maplibre.nativeffi.error.MaplibreException;
 import org.maplibre.nativeffi.error.MaplibreStatus;
 import org.maplibre.nativeffi.internal.c.MapLibreNativeC;
 import org.maplibre.nativeffi.internal.memory.MemoryUtil;
@@ -29,6 +30,14 @@ final class StatusAndMemoryTest {
             () -> Status.check(MapLibreNativeC.mln_network_status_set(999_999)));
     assertEquals(MaplibreStatus.INVALID_ARGUMENT, error.status());
     assertTrue(error.diagnostic().contains("network status"));
+  }
+
+  @Test
+  void unknownStatusPreservesRawNativeValue() {
+    var error = assertThrows(MaplibreException.class, () -> Status.check(123_456));
+
+    assertEquals(MaplibreStatus.UNKNOWN, error.status());
+    assertEquals(123_456, error.nativeStatusCode());
   }
 
   @Test

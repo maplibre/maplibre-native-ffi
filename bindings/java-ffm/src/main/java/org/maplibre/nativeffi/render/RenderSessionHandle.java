@@ -13,6 +13,7 @@ import org.maplibre.nativeffi.internal.c.MapLibreNativeC;
 import org.maplibre.nativeffi.internal.c.mln_metal_owned_texture_frame;
 import org.maplibre.nativeffi.internal.c.mln_opengl_owned_texture_frame;
 import org.maplibre.nativeffi.internal.c.mln_vulkan_owned_texture_frame;
+import org.maplibre.nativeffi.internal.convert.NativeValues;
 import org.maplibre.nativeffi.internal.lifecycle.HandleState;
 import org.maplibre.nativeffi.internal.loader.NativeAccess;
 import org.maplibre.nativeffi.internal.memory.MemoryUtil;
@@ -261,28 +262,14 @@ public final class RenderSessionHandle implements AutoCloseable {
     }
   }
 
-  public List<QueriedFeature> queryRenderedFeatures(RenderedQueryGeometry geometry) {
-    return queryRenderedFeaturesInternal(geometry, null, false);
-  }
-
   public List<QueriedFeature> queryRenderedFeatures(
       RenderedQueryGeometry geometry, RenderedFeatureQueryOptions options) {
-    return queryRenderedFeaturesInternal(
-        geometry, Objects.requireNonNull(options, "options"), true);
-  }
-
-  public List<QueriedFeature> querySourceFeatures(String sourceId) {
-    return querySourceFeaturesInternal(sourceId, null, false);
+    return queryRenderedFeaturesInternal(geometry, options, options != null);
   }
 
   public List<QueriedFeature> querySourceFeatures(
       String sourceId, SourceFeatureQueryOptions options) {
-    return querySourceFeaturesInternal(sourceId, Objects.requireNonNull(options, "options"), true);
-  }
-
-  public FeatureExtensionResult queryFeatureExtension(
-      String sourceId, Feature feature, String extension, String extensionField) {
-    return queryFeatureExtension(sourceId, feature, extension, extensionField, null);
+    return querySourceFeaturesInternal(sourceId, options, options != null);
   }
 
   public FeatureExtensionResult queryFeatureExtension(
@@ -317,8 +304,9 @@ public final class RenderSessionHandle implements AutoCloseable {
           MapLibreNativeC.mln_texture_read_premultiplied_rgba8(
               state.requireLive(), MemorySegment.NULL, 0, outInfo);
       var info = RenderStructs.textureImageInfo(outInfo);
-      if (status == MaplibreStatus.OK.nativeCode()
-          || (status == MaplibreStatus.INVALID_ARGUMENT.nativeCode() && info.byteLength() > 0)) {
+      if (status == NativeValues.nativeCode(MaplibreStatus.OK)
+          || (status == NativeValues.nativeCode(MaplibreStatus.INVALID_ARGUMENT)
+              && info.byteLength() > 0)) {
         return info;
       }
       Status.check(status);
@@ -363,13 +351,18 @@ public final class RenderSessionHandle implements AutoCloseable {
     NativeAccess.ensureLoaded();
     var arena = Arena.ofConfined();
     var frameSegment = RenderStructs.metalOwnedTextureFrame(arena);
+    var acquired = false;
     try {
       Status.check(
           MapLibreNativeC.mln_metal_owned_texture_acquire_frame(state.requireLive(), frameSegment));
+      acquired = true;
       var scope = new FrameScope();
       return new MetalOwnedTextureFrameHandle(
           this, arena, frameSegment, scope, metalOwnedTextureFrame(frameSegment, scope));
     } catch (Throwable throwable) {
+      if (acquired) {
+        releaseAcquiredFrame(throwable, () -> releaseMetalFrame(frameSegment, null));
+      }
       arena.close();
       throw throwable;
     }
@@ -388,14 +381,19 @@ public final class RenderSessionHandle implements AutoCloseable {
     NativeAccess.ensureLoaded();
     var arena = Arena.ofConfined();
     var frameSegment = RenderStructs.vulkanOwnedTextureFrame(arena);
+    var acquired = false;
     try {
       Status.check(
           MapLibreNativeC.mln_vulkan_owned_texture_acquire_frame(
               state.requireLive(), frameSegment));
+      acquired = true;
       var scope = new FrameScope();
       return new VulkanOwnedTextureFrameHandle(
           this, arena, frameSegment, scope, vulkanOwnedTextureFrame(frameSegment, scope));
     } catch (Throwable throwable) {
+      if (acquired) {
+        releaseAcquiredFrame(throwable, () -> releaseVulkanFrame(frameSegment, null));
+      }
       arena.close();
       throw throwable;
     }
@@ -414,14 +412,19 @@ public final class RenderSessionHandle implements AutoCloseable {
     NativeAccess.ensureLoaded();
     var arena = Arena.ofConfined();
     var frameSegment = RenderStructs.openglOwnedTextureFrame(arena);
+    var acquired = false;
     try {
       Status.check(
           MapLibreNativeC.mln_opengl_owned_texture_acquire_frame(
               state.requireLive(), frameSegment));
+      acquired = true;
       var scope = new FrameScope();
       return new OpenGLOwnedTextureFrameHandle(
           this, arena, frameSegment, scope, openglOwnedTextureFrame(frameSegment, scope));
     } catch (Throwable throwable) {
+      if (acquired) {
+        releaseAcquiredFrame(throwable, () -> releaseOpenGLFrame(frameSegment, null));
+      }
       arena.close();
       throw throwable;
     }
@@ -574,6 +577,14 @@ public final class RenderSessionHandle implements AutoCloseable {
       } else {
         throw releaseFailure;
       }
+    }
+  }
+
+  private static void releaseAcquiredFrame(Throwable originalFailure, Runnable release) {
+    try {
+      release.run();
+    } catch (Throwable releaseFailure) {
+      originalFailure.addSuppressed(releaseFailure);
     }
   }
 }

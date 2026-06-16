@@ -9,14 +9,15 @@ import org.maplibre.nativeffi.internal.c.MapLibreNativeC;
 import org.maplibre.nativeffi.internal.c.mln_resource_transform;
 import org.maplibre.nativeffi.internal.c.mln_resource_transform_callback;
 import org.maplibre.nativeffi.internal.c.mln_resource_transform_response;
+import org.maplibre.nativeffi.internal.convert.NativeValues;
 import org.maplibre.nativeffi.internal.memory.MemoryUtil;
-import org.maplibre.nativeffi.resource.ResourceKind;
 import org.maplibre.nativeffi.resource.ResourceTransformCallback;
 import org.maplibre.nativeffi.resource.ResourceTransformRequest;
 
 /** Owns runtime-scoped resource transform callback state. */
 public final class ResourceTransformState implements AutoCloseable {
   private final Arena arena;
+  private final CallbackLifecycle lifecycle = new CallbackLifecycle();
   private final ResourceTransformCallback callback;
   private final MemorySegment stub;
   private final MemorySegment descriptor;
@@ -35,16 +36,24 @@ public final class ResourceTransformState implements AutoCloseable {
     return descriptor;
   }
 
+  public boolean isCurrentThreadInCallback() {
+    return lifecycle.isCurrentThreadInCallback();
+  }
+
   private int invoke(
       MemorySegment userData, int rawKind, MemorySegment url, MemorySegment outResponse) {
-    try {
+    var lease = lifecycle.enter();
+    if (lease.isEmpty()) {
+      return MapLibreNativeC.MLN_STATUS_NATIVE_ERROR();
+    }
+    try (var ignored = lease.get()) {
       mln_resource_transform_response.size(
           outResponse, (int) mln_resource_transform_response.sizeof());
       mln_resource_transform_response.url(outResponse, MemorySegment.NULL);
       var replacement =
           callback.transform(
               new ResourceTransformRequest(
-                  ResourceKind.fromNative(rawKind), rawKind, MemoryUtil.copyCString(url)));
+                  NativeValues.resourceKind(rawKind), rawKind, MemoryUtil.copyCString(url)));
       Objects.requireNonNull(replacement, "replacement");
       if (replacement.isPresent() && !replacement.get().isEmpty()) {
         return setResponseUrl(outResponse, replacement.get());
@@ -59,7 +68,7 @@ public final class ResourceTransformState implements AutoCloseable {
 
   @Override
   public void close() {
-    arena.close();
+    lifecycle.close("Resource transform", arena::close);
   }
 
   private static int setResponseUrl(MemorySegment outResponse, String value) {

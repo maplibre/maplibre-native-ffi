@@ -2,6 +2,7 @@ package org.maplibre.nativeffi;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -9,7 +10,9 @@ import java.util.EnumSet;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.maplibre.nativeffi.error.InvalidArgumentException;
 import org.maplibre.nativeffi.geo.LatLng;
+import org.maplibre.nativeffi.internal.convert.NativeValues;
 import org.maplibre.nativeffi.log.LogSeverity;
 import org.maplibre.nativeffi.render.OpenGLContextProvider;
 import org.maplibre.nativeffi.render.RenderBackend;
@@ -53,6 +56,17 @@ final class MaplibreTest {
     } finally {
       Maplibre.setNetworkStatus(original);
     }
+  }
+
+  @Test
+  void unknownNetworkStatusPreservesRawValueAndIsRejectedAsInput() {
+    var unknown = NativeValues.networkStatus(999_999);
+
+    assertEquals(999_999, unknown.rawValue());
+    assertNotEquals(NetworkStatus.ONLINE, unknown);
+    assertNotEquals(NetworkStatus.OFFLINE, unknown);
+    assertEquals(unknown, NativeValues.networkStatus(999_999));
+    assertThrows(InvalidArgumentException.class, () -> Maplibre.setNetworkStatus(unknown));
   }
 
   @Test

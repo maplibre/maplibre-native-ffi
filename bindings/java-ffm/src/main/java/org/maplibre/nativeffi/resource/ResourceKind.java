@@ -17,11 +17,11 @@ public enum ResourceKind {
     this.nativeValue = nativeValue;
   }
 
-  public int nativeValue() {
+  int nativeValue() {
     return nativeValue;
   }
 
-  public static ResourceKind fromNative(int nativeValue) {
+  static ResourceKind fromNative(int nativeValue) {
     for (var kind : values()) {
       if (kind.nativeValue == nativeValue) {
         return kind;
