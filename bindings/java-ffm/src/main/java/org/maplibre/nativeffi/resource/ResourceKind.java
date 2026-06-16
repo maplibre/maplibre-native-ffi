@@ -20,6 +20,9 @@ public final class ResourceKind {
   }
 
   public int nativeValue() {
+    if (name == null) {
+      throw new IllegalArgumentException("Unknown resource kind cannot be used as an input");
+    }
     return nativeValue;
   }
 

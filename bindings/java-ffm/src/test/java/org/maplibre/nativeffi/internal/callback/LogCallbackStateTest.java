@@ -1,9 +1,9 @@
 package org.maplibre.nativeffi.internal.callback;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.lang.foreign.Arena;
@@ -11,6 +11,7 @@ import java.lang.foreign.MemorySegment;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -55,8 +56,7 @@ final class LogCallbackStateTest {
       assertTrue(entered.await(5, TimeUnit.SECONDS));
 
       var clear = executor.submit(Maplibre::clearLogCallback);
-      TimeUnit.MILLISECONDS.sleep(100);
-      assertFalse(clear.isDone());
+      assertThrows(TimeoutException.class, () -> clear.get(100, TimeUnit.MILLISECONDS));
 
       release.countDown();
       assertEquals(1, invoke.get(5, TimeUnit.SECONDS));

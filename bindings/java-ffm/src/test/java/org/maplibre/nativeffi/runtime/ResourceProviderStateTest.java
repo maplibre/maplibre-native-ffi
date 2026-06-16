@@ -2,7 +2,7 @@ package org.maplibre.nativeffi.runtime;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.lang.foreign.Arena;
@@ -11,6 +11,7 @@ import java.lang.foreign.ValueLayout;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -124,8 +125,7 @@ final class ResourceProviderStateTest {
       assertTrue(entered.await(5, TimeUnit.SECONDS));
 
       var close = executor.submit(state::close);
-      TimeUnit.MILLISECONDS.sleep(100);
-      assertFalse(close.isDone());
+      assertThrows(TimeoutException.class, () -> close.get(100, TimeUnit.MILLISECONDS));
 
       release.countDown();
       assertEquals(

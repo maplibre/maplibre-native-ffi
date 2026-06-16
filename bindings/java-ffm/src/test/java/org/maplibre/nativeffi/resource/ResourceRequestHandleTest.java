@@ -9,6 +9,7 @@ import java.lang.foreign.MemorySegment;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 import org.maplibre.nativeffi.error.InvalidArgumentException;
@@ -138,8 +139,7 @@ final class ResourceRequestHandleTest {
       assertTrue(entered.await(5, TimeUnit.SECONDS));
 
       var close = executor.submit(handle::close);
-      TimeUnit.MILLISECONDS.sleep(100);
-      assertFalse(close.isDone());
+      assertThrows(TimeoutException.class, () -> close.get(100, TimeUnit.MILLISECONDS));
       assertEquals(0, releases.get());
 
       release.countDown();

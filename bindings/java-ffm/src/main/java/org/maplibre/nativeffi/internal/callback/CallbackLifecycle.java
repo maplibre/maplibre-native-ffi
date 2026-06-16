@@ -136,6 +136,7 @@ public final class CallbackLifecycle {
 
   private static boolean isAcquiredSession(IllegalStateException error) {
     var message = error.getMessage();
-    return message != null && message.contains("Session is acquired");
+    return message != null
+        && (message.contains("Session is acquired") || message.contains("Scope is acquired"));
   }
 }

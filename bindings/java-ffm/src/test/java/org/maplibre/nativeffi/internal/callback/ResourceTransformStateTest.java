@@ -1,7 +1,7 @@
 package org.maplibre.nativeffi.internal.callback;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.lang.foreign.Arena;
@@ -10,6 +10,7 @@ import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.maplibre.nativeffi.internal.c.MapLibreNativeC;
@@ -112,8 +113,7 @@ final class ResourceTransformStateTest {
       assertTrue(entered.await(5, TimeUnit.SECONDS));
 
       var close = executor.submit(state::close);
-      TimeUnit.MILLISECONDS.sleep(100);
-      assertFalse(close.isDone());
+      assertThrows(TimeoutException.class, () -> close.get(100, TimeUnit.MILLISECONDS));
 
       release.countDown();
       assertEquals(MapLibreNativeC.MLN_STATUS_OK(), invoke.get(5, TimeUnit.SECONDS));
