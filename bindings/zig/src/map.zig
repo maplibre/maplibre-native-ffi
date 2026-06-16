@@ -99,34 +99,36 @@ pub const MapHandle = enum(u128) {
         native_options.scale_factor = options.scale_factor;
         native_options.map_mode = options.mode.toRaw();
 
+        const runtime_lease = try runtime_module.lease(runtime);
+        defer runtime_lease.release();
+
         var map: ?*c.mln_map = null;
-        const diagnostic_store = runtime_module.diagnosticStore(runtime);
+        const diagnostic_store = runtime_lease.diagnostic_store;
         try status.checkStatus(
-            c.mln_map_create(try runtime_module.native(runtime), &native_options, &map),
+            c.mln_map_create(runtime_lease.native, &native_options, &map),
             diagnostic_store,
         );
         errdefer {
             if (map) |handle| _ = c.mln_map_destroy(handle);
         }
 
-        const runtime_registry = try runtime_module.registry(runtime);
         const custom_geometry_sources = try std.heap.smp_allocator.create(std.ArrayList(*CustomGeometrySourceState));
         custom_geometry_sources.* = .empty;
         errdefer std.heap.smp_allocator.destroy(custom_geometry_sources);
 
-        const map_id = try runtime_module.registerMap(
-            runtime_registry,
+        const map_registration = try runtime_module.registerMap(
+            runtime,
             map.?,
             releaseDetachedCustomGeometrySourceStatesForStyleLoaded,
             custom_geometry_sources,
         );
-        errdefer runtime_module.unregisterMap(runtime_registry, map.?);
+        errdefer runtime_module.unregisterMap(map_registration.registry, map.?);
 
         const map_state = try std.heap.smp_allocator.create(MapState);
         map_state.* = .{
             .native = @ptrCast(map.?),
-            .runtime_registry = runtime_registry,
-            .id_value = map_id,
+            .runtime_registry = map_registration.registry,
+            .id_value = map_registration.id,
             .diagnostic_store = diagnostic_store,
             .custom_geometry_sources = custom_geometry_sources,
             .active_render_sessions = std.atomic.Value(usize).init(0),
