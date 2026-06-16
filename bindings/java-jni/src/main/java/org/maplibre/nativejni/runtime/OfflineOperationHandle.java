@@ -35,7 +35,7 @@ public final class OfflineOperationHandle<T> implements AutoCloseable {
     var retention = runtime.retainChild(InternalAccess.INSTANCE, "OfflineOperationHandle");
     try {
       this.runtimeRetention = retention;
-      this.leakReport = new LeakReport(id, kind, resultKind);
+      this.leakReport = new LeakReport(id, kind, resultKind, retention);
       this.cleanable = CLEANER.register(this, leakReport);
     } catch (RuntimeException | Error error) {
       retention.close();
@@ -112,12 +112,18 @@ public final class OfflineOperationHandle<T> implements AutoCloseable {
     private final long id;
     private final OfflineOperationKind kind;
     private final OfflineOperationResultKind resultKind;
+    private final HandleState.ChildRetention runtimeRetention;
     private volatile boolean closed;
 
-    private LeakReport(long id, OfflineOperationKind kind, OfflineOperationResultKind resultKind) {
+    private LeakReport(
+        long id,
+        OfflineOperationKind kind,
+        OfflineOperationResultKind resultKind,
+        HandleState.ChildRetention runtimeRetention) {
       this.id = id;
       this.kind = kind;
       this.resultKind = resultKind;
+      this.runtimeRetention = runtimeRetention;
     }
 
     private void markClosed() {
@@ -126,11 +132,15 @@ public final class OfflineOperationHandle<T> implements AutoCloseable {
 
     @Override
     public void run() {
-      if (!closed) {
-        System.err.printf(
-            "Leaked OfflineOperationHandle id=%d kind=%s resultKind=%s; take or discard operations"
-                + " explicitly on the runtime owner thread.%n",
-            id, kind, resultKind);
+      try {
+        if (!closed) {
+          System.err.printf(
+              "Leaked OfflineOperationHandle id=%d kind=%s resultKind=%s; take or discard"
+                  + " operations explicitly on the runtime owner thread.%n",
+              id, kind, resultKind);
+        }
+      } finally {
+        runtimeRetention.close();
       }
     }
   }

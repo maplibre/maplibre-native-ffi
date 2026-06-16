@@ -34,7 +34,8 @@ public final class MetalOwnedTextureFrameHandle implements AutoCloseable {
       this.scope = Objects.requireNonNull(scope, "scope");
       this.frame = Objects.requireNonNull(frame, "frame");
       this.sessionRetention = retention;
-      this.leakRegistration = FrameHandleLeakReport.register(this, "MetalOwnedTextureFrameHandle");
+      this.leakRegistration =
+          FrameHandleLeakReport.register(this, "MetalOwnedTextureFrameHandle", retention);
     } catch (RuntimeException | Error error) {
       retention.close();
       throw error;
