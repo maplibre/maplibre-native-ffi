@@ -79,6 +79,8 @@ public final class HandleState {
       if (releasing) {
         throw Status.releasing(typeName);
       }
+      // Child handles borrow parent native state. Requiring explicit child close
+      // keeps destruction order deterministic instead of cascading behind callers.
       if (liveChildren > 0) {
         throw Status.liveChildren(typeName, liveChildren);
       }

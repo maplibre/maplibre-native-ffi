@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import org.bytedeco.javacpp.BytePointer;
 import org.junit.jupiter.api.Test;
 import org.maplibre.nativejni.internal.javacpp.JavaCppSupport;
@@ -76,6 +77,33 @@ final class ResourceProviderStateTest {
       closeThread.join();
 
       assertTrue(closed.get());
+    }
+  }
+
+  @Test
+  void bnd123CloseFromCurrentCallbackFailsWithoutDeadlock() {
+    var attempted = new AtomicBoolean();
+    var state = new AtomicReference<ResourceProviderState>();
+    state.set(
+        new ResourceProviderState(
+            (request, handle) -> {
+              attempted.set(true);
+              state.get().close();
+              return ResourceProviderDecision.PASS_THROUGH;
+            }));
+
+    try (var url = new BytePointer("https://example.com/style.json");
+        var request = new MaplibreNativeC.mln_resource_request();
+        var handle = JavaCppSupport.resourceRequestHandle(0x1234)) {
+      request.size(request.sizeof());
+      request.url(url);
+      request.kind(ResourceKind.STYLE.nativeValue());
+
+      assertEquals(-1, state.get().provider().callback().call(null, request, handle));
+      assertTrue(attempted.get());
+      assertFalse(state.get().isClosed());
+    } finally {
+      state.get().close();
     }
   }
 

@@ -9,6 +9,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.maplibre.nativejni.geo.CanonicalTileId;
@@ -55,6 +56,29 @@ class CustomGeometrySourceStateTest {
       closeThread.join();
 
       assertTrue(closed.get());
+    }
+  }
+
+  @Test
+  void bnd123CloseFromCurrentCallbackFailsWithoutDeadlock() {
+    var attempted = new AtomicBoolean();
+    var state = new AtomicReference<CustomGeometrySourceState>();
+    state.set(
+        new CustomGeometrySourceState(
+            new CustomGeometrySourceOptions(
+                tileId -> {
+                  attempted.set(true);
+                  state.get().close();
+                })));
+
+    try (var tileId = new MaplibreNativeC.mln_canonical_tile_id()) {
+      tileId.z(1).x(2).y(3);
+      state.get().descriptor().fetch_tile().call(null, tileId);
+
+      assertTrue(attempted.get());
+      assertFalse(state.get().isClosedForTesting());
+    } finally {
+      state.get().close();
     }
   }
 

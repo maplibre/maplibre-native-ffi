@@ -36,6 +36,12 @@ public final class Status {
         MaplibreStatus.INVALID_STATE.nativeCode(), typeName + " is closing");
   }
 
+  public static InvalidStateException callbackReentry(String typeName) {
+    return new InvalidStateException(
+        MaplibreStatus.INVALID_STATE.nativeCode(),
+        typeName + " cannot be closed from its callback");
+  }
+
   public static InvalidStateException liveChildren(String typeName, int childCount) {
     return new InvalidStateException(
         MaplibreStatus.INVALID_STATE.nativeCode(),

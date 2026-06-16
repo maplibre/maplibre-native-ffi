@@ -9,6 +9,7 @@ public enum InternalAccess {
 
   private static final StackWalker STACK_WALKER =
       StackWalker.getInstance(StackWalker.Option.RETAIN_CLASS_REFERENCE);
+  private static final Module LIBRARY_MODULE = InternalAccess.class.getModule();
   private static final String LIBRARY_LOCATION = codeSourceLocation(InternalAccess.class);
 
   public void checkCaller() {
@@ -33,7 +34,13 @@ public enum InternalAccess {
   }
 
   private static boolean isBindingImplementation(Class<?> type) {
-    return type.getName().startsWith("org.maplibre.nativejni.")
+    if (!type.getName().startsWith("org.maplibre.nativejni.")) {
+      return false;
+    }
+    if (LIBRARY_MODULE.isNamed()) {
+      return type.getModule() == LIBRARY_MODULE;
+    }
+    return type.getModule() == LIBRARY_MODULE
         && Objects.equals(codeSourceLocation(type), LIBRARY_LOCATION);
   }
 

@@ -6,6 +6,7 @@ import org.bytedeco.javacpp.Pointer;
 import org.maplibre.nativejni.internal.access.InternalAccess;
 import org.maplibre.nativejni.internal.javacpp.JavaCppSupport;
 import org.maplibre.nativejni.internal.javacpp.MaplibreNativeC;
+import org.maplibre.nativejni.internal.status.Status;
 import org.maplibre.nativejni.resource.ResourceKind;
 import org.maplibre.nativejni.resource.ResourceLoadingMethod;
 import org.maplibre.nativejni.resource.ResourcePriority;
@@ -23,6 +24,7 @@ final class ResourceProviderState implements AutoCloseable {
   private final MaplibreNativeC.mln_resource_provider_callback nativeCallback;
   private final MaplibreNativeC.mln_resource_provider provider;
   private final Object callbackLock = new Object();
+  private final ThreadLocal<Integer> callbackDepth = ThreadLocal.withInitial(() -> 0);
 
   private int activeCallbacks;
   private boolean closeRequested;
@@ -80,12 +82,19 @@ final class ResourceProviderState implements AutoCloseable {
         return false;
       }
       activeCallbacks++;
+      callbackDepth.set(callbackDepth.get() + 1);
       return true;
     }
   }
 
   private void exitCallback() {
     synchronized (callbackLock) {
+      var depth = callbackDepth.get() - 1;
+      if (depth == 0) {
+        callbackDepth.remove();
+      } else {
+        callbackDepth.set(depth);
+      }
       activeCallbacks--;
       if (activeCallbacks == 0) {
         callbackLock.notifyAll();
@@ -97,6 +106,9 @@ final class ResourceProviderState implements AutoCloseable {
   public void close() {
     var interrupted = false;
     synchronized (callbackLock) {
+      if (callbackDepth.get() > 0) {
+        throw Status.callbackReentry("Resource provider");
+      }
       if (closed) {
         return;
       }

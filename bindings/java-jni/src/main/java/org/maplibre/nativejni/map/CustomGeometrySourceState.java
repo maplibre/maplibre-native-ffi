@@ -4,6 +4,7 @@ import org.bytedeco.javacpp.Pointer;
 import org.maplibre.nativejni.geo.CanonicalTileId;
 import org.maplibre.nativejni.internal.javacpp.JavaCppSupport;
 import org.maplibre.nativejni.internal.javacpp.MaplibreNativeC;
+import org.maplibre.nativejni.internal.status.Status;
 import org.maplibre.nativejni.style.CustomGeometrySourceOptions;
 
 /** Owns map/style-scoped custom geometry source callback state. */
@@ -13,6 +14,7 @@ final class CustomGeometrySourceState implements AutoCloseable {
   private final MaplibreNativeC.mln_custom_geometry_source_tile_callback cancelTile;
   private final MaplibreNativeC.mln_custom_geometry_source_options descriptor;
   private final Object callbackLock = new Object();
+  private final ThreadLocal<Integer> callbackDepth = ThreadLocal.withInitial(() -> 0);
 
   private int activeCallbacks;
   private boolean closeRequested;
@@ -116,12 +118,19 @@ final class CustomGeometrySourceState implements AutoCloseable {
         return false;
       }
       activeCallbacks++;
+      callbackDepth.set(callbackDepth.get() + 1);
       return true;
     }
   }
 
   private void exitCallback() {
     synchronized (callbackLock) {
+      var depth = callbackDepth.get() - 1;
+      if (depth == 0) {
+        callbackDepth.remove();
+      } else {
+        callbackDepth.set(depth);
+      }
       activeCallbacks--;
       if (activeCallbacks == 0) {
         callbackLock.notifyAll();
@@ -138,6 +147,9 @@ final class CustomGeometrySourceState implements AutoCloseable {
   public void close() {
     var interrupted = false;
     synchronized (callbackLock) {
+      if (callbackDepth.get() > 0) {
+        throw Status.callbackReentry("Custom geometry source");
+      }
       if (closed) {
         return;
       }

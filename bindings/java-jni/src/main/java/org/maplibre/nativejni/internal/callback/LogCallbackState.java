@@ -23,6 +23,9 @@ public final class LogCallbackState {
 
   public static synchronized void set(LogCallback callback) {
     NativeLibrary.ensureLoaded();
+    if (currentCallback != null && currentCallback.isCurrentThreadInCallback()) {
+      throw Status.callbackReentry("Log callback");
+    }
     var nativeCallback = new CallbackRegistration(callback);
     try {
       throwInstallFailureForTesting();
@@ -38,6 +41,9 @@ public final class LogCallbackState {
 
   public static synchronized void clear() {
     NativeLibrary.ensureLoaded();
+    if (currentCallback != null && currentCallback.isCurrentThreadInCallback()) {
+      throw Status.callbackReentry("Log callback");
+    }
     Status.check(MaplibreNativeC.mln_log_clear_callback());
     closeQuietly(currentCallback);
     currentCallback = null;
@@ -79,6 +85,7 @@ public final class LogCallbackState {
     private final LogCallback callback;
     private final MaplibreNativeC.mln_log_callback nativeCallback;
     private final Object lock = new Object();
+    private final ThreadLocal<Integer> callbackDepth = ThreadLocal.withInitial(() -> 0);
 
     private int activeCallbacks;
     private boolean closing;
@@ -104,6 +111,10 @@ public final class LogCallbackState {
       synchronized (lock) {
         return closed;
       }
+    }
+
+    boolean isCurrentThreadInCallback() {
+      return callbackDepth.get() > 0;
     }
 
     private int call(int severity, int event, long code, BytePointer message) {
@@ -132,12 +143,19 @@ public final class LogCallbackState {
           return false;
         }
         activeCallbacks++;
+        callbackDepth.set(callbackDepth.get() + 1);
         return true;
       }
     }
 
     private void exitCallback() {
       synchronized (lock) {
+        var depth = callbackDepth.get() - 1;
+        if (depth == 0) {
+          callbackDepth.remove();
+        } else {
+          callbackDepth.set(depth);
+        }
         activeCallbacks--;
         if (activeCallbacks == 0) {
           lock.notifyAll();
@@ -149,6 +167,9 @@ public final class LogCallbackState {
     public void close() {
       var interrupted = false;
       synchronized (lock) {
+        if (isCurrentThreadInCallback()) {
+          throw Status.callbackReentry("Log callback");
+        }
         if (closed) {
           return;
         }

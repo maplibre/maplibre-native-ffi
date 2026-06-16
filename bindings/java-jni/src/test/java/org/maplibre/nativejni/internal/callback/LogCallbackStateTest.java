@@ -140,6 +140,38 @@ class LogCallbackStateTest {
   }
 
   @Test
+  void bnd123CloseFromCurrentCallbackFailsWithoutDeadlock() {
+    var attempted = new AtomicBoolean();
+    var registration = new AtomicReference<LogCallbackState.CallbackRegistration>();
+    registration.set(
+        new LogCallbackState.CallbackRegistration(
+            record -> {
+              attempted.set(true);
+              registration.get().close();
+              return true;
+            }));
+
+    try (var message = new BytePointer("hello")) {
+      assertEquals(
+          0,
+          registration
+              .get()
+              .nativeCallback()
+              .call(
+                  null,
+                  MaplibreNativeC.MLN_LOG_SEVERITY_INFO,
+                  MaplibreNativeC.MLN_LOG_EVENT_GENERAL,
+                  7,
+                  message));
+
+      assertTrue(attempted.get());
+      assertFalse(registration.get().isClosed());
+    } finally {
+      registration.get().close();
+    }
+  }
+
+  @Test
   void bnd121CallbackExceptionsReturnUnconsumed() {
     var registration =
         new LogCallbackState.CallbackRegistration(

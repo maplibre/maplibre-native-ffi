@@ -80,6 +80,9 @@ public final class ResourceRequestHandle implements AutoCloseable {
       } catch (MaplibreException error) {
         completionFailure = error;
       }
+      // The C API treats a completion attempt that reaches native as terminal:
+      // cancelled/already-completed requests and actor delivery failures reject
+      // the response but leave the provider responsible for releasing its handle.
       completed = true;
       closed = true;
       if (decisionFinalized) {
