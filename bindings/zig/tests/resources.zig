@@ -239,6 +239,7 @@ test "network status APIs wrap process-global MapLibre status" {
     var diagnostics = maplibre.DiagnosticStore.init(testing.allocator);
     defer diagnostics.deinit();
     try testing.expectError(error.InvalidArgument, maplibre.setNetworkStatus(.{ .unknown = 999 }, &diagnostics));
+    try testing.expectEqual(@as(?i32, null), diagnostics.get().?.raw_status);
     try testing.expect(diagnostics.get().?.message.len > 0);
 }
 
@@ -1148,6 +1149,10 @@ test "resource provider can complete style request later" {
     try state.expectObservedRequest();
     try testing.expect(!try handle.cancelled());
 
+    try testing.expectError(error.InvalidArgument, handle.complete(.{
+        .status = .@"error",
+        .error_reason = .{ .unknown = 999 },
+    }));
     try handle.complete(.{ .bytes = support.style_json });
     try testing.expectError(error.AlreadyCompleted, handle.complete(.{ .bytes = support.style_json }));
     try waitForStyleLoaded(&runtime);

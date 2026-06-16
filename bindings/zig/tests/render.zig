@@ -1228,7 +1228,7 @@ test "render session feature state set get and remove" {
     const selector = maplibre.FeatureStateSelector{ .source_id = "point", .feature_id = "feature-1" };
     const state_members = [_]maplibre.JsonMember{
         .{ .key = "hover", .value = .{ .bool = true } },
-        .{ .key = "radius", .value = .{ .uint = 20 } },
+        .{ .key = "radius", .value = .{ .uint = std.math.maxInt(u64) } },
     };
     try testing.expectError(error.InvalidState, session.setFeatureState(testing.allocator, selector, .{ .object = state_members[0..] }));
 
@@ -1251,7 +1251,7 @@ test "render session feature state set get and remove" {
             try testing.expectEqual(true, member.value.bool);
             saw_hover = true;
         } else if (std.mem.eql(u8, member.key, "radius")) {
-            try testing.expectEqual(@as(u64, 20), member.value.uint);
+            try testing.expectEqual(@as(u64, std.math.maxInt(u64)), member.value.uint);
             saw_radius = true;
         }
     }
@@ -1270,7 +1270,7 @@ test "render session feature state set get and remove" {
     };
     try testing.expectEqual(@as(usize, 1), after_members.len);
     try testing.expectEqualStrings("radius", after_members[0].key);
-    try testing.expectEqual(@as(u64, 20), after_members[0].value.uint);
+    try testing.expectEqual(@as(u64, std.math.maxInt(u64)), after_members[0].value.uint);
 
     try testing.expectError(error.InvalidArgument, session.removeFeatureState(testing.allocator, .{ .source_id = "point", .state_key = "hover" }));
 }

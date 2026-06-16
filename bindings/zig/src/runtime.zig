@@ -115,6 +115,16 @@ pub const NetworkStatus = union(enum) {
             .unknown => |raw| raw,
         };
     }
+
+    fn toInputRaw(self: NetworkStatus, diagnostic_store: ?*diagnostics.DiagnosticStore) status.Error!u32 {
+        return switch (self) {
+            .online, .offline => self.toRaw(),
+            .unknown => {
+                try status.setBindingDiagnostic(diagnostic_store, "network status cannot be an unknown enum value");
+                return error.InvalidArgument;
+            },
+        };
+    }
 };
 
 pub const AmbientCacheOperation = enum {
@@ -484,7 +494,7 @@ pub const ResourceRequestHandle = enum(u128) {
         const request_state = resourceRequestState(self) orelse return error.ClosedHandle;
         if (request_state.completed) return error.AlreadyCompleted;
         const native_handle = request_state.native orelse return error.ClosedHandle;
-        var native_response = resourceResponseToNative(response);
+        var native_response = try resourceResponseToNative(response, request_state.diagnostic_store);
         request_state.completed = true;
         try status.checkStatus(c.mln_resource_request_complete(native_handle, &native_response), request_state.diagnostic_store);
     }
@@ -660,6 +670,16 @@ pub const OfflineRegionDownloadState = union(enum) {
             .unknown => |raw| raw,
         };
     }
+
+    fn toInputRaw(self: OfflineRegionDownloadState, diagnostic_store: ?*diagnostics.DiagnosticStore) status.Error!u32 {
+        return switch (self) {
+            .inactive, .active => self.toRaw(),
+            .unknown => {
+                try status.setBindingDiagnostic(diagnostic_store, "offline region download state cannot be an unknown enum value");
+                return error.InvalidArgument;
+            },
+        };
+    }
 };
 
 pub const OfflineRegionStatus = struct {
@@ -709,6 +729,16 @@ pub const ResourceErrorReason = union(enum) {
             .rate_limit => c.MLN_RESOURCE_ERROR_REASON_RATE_LIMIT,
             .other => c.MLN_RESOURCE_ERROR_REASON_OTHER,
             .unknown => |raw| raw,
+        };
+    }
+
+    fn toInputRaw(self: ResourceErrorReason, diagnostic_store: ?*diagnostics.DiagnosticStore) status.Error!u32 {
+        return switch (self) {
+            .none, .not_found, .server, .connection, .rate_limit, .other => self.toRaw(),
+            .unknown => {
+                try status.setBindingDiagnostic(diagnostic_store, "resource error reason cannot be an unknown enum value");
+                return error.InvalidArgument;
+            },
         };
     }
 };
@@ -1095,7 +1125,7 @@ pub const RuntimeHandle = enum(u128) {
         const runtime = try native(self);
         var operation_id: c.mln_offline_operation_id = 0;
         try status.checkStatus(
-            c.mln_runtime_offline_region_set_download_state_start(runtime, region_id, download_state.toRaw(), &operation_id),
+            c.mln_runtime_offline_region_set_download_state_start(runtime, region_id, try download_state.toInputRaw(diagnosticStore(self)), &operation_id),
             diagnosticStore(self),
         );
         return self.operationHandle(operation_id, .region_set_download_state, .none);
@@ -1274,7 +1304,7 @@ pub fn getNetworkStatus(diagnostic_store: ?*diagnostics.DiagnosticStore) status.
 }
 
 pub fn setNetworkStatus(network_status: NetworkStatus, diagnostic_store: ?*diagnostics.DiagnosticStore) status.Error!void {
-    try status.checkStatus(c.mln_network_status_set(network_status.toRaw()), diagnostic_store);
+    try status.checkStatus(c.mln_network_status_set(try network_status.toInputRaw(diagnostic_store)), diagnostic_store);
 }
 
 fn createNative(
@@ -1692,11 +1722,14 @@ fn resourceRequestDeinit(allocator: std.mem.Allocator, request: ResourceRequest)
     allocator.free(request.prior_data);
 }
 
-fn resourceResponseToNative(response: ResourceResponse) c.mln_resource_response {
+fn resourceResponseToNative(
+    response: ResourceResponse,
+    diagnostic_store: ?*diagnostics.DiagnosticStore,
+) status.Error!c.mln_resource_response {
     return .{
         .size = @sizeOf(c.mln_resource_response),
         .status = response.status.toRaw(),
-        .error_reason = response.error_reason.toRaw(),
+        .error_reason = try response.error_reason.toInputRaw(diagnostic_store),
         .bytes = if (response.bytes.len == 0) null else response.bytes.ptr,
         .byte_count = response.bytes.len,
         .error_message = if (response.error_message) |message| message.ptr else null,
