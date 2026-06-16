@@ -1047,6 +1047,7 @@ pub const RuntimeHandle = enum(u128) {
         operation_kind: OfflineOperationKind,
         result_kind: OfflineOperationResultKind,
     ) status.Error!OfflineOperationHandle {
+        // `runtime` must come from an active RuntimeLease that spans this call.
         return OfflineOperationHandle.init(self, operation_id, operation_kind, result_kind) catch |err| {
             if (operation_id != 0) _ = c.mln_runtime_offline_operation_discard(runtime, operation_id);
             return err;

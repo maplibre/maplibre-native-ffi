@@ -140,9 +140,7 @@ pub const MapHandle = enum(u128) {
     }
 
     pub fn id(self: *MapHandle) status.BindingError!values.MapId {
-        const map_state = try mapStateForHandle(self);
-        _ = map_state.native orelse return error.ClosedHandle;
-        return map_state.id_value;
+        return mapIdForHandle(self);
     }
 
     pub fn setStyleJson(
@@ -1580,6 +1578,14 @@ fn waitForCustomGeometryUpcalls(source_state: *CustomGeometrySourceState) void {
 
 fn mapStateForHandle(handle: *MapHandle) status.BindingError!*MapState {
     return mapState(handle.*) orelse error.ClosedHandle;
+}
+
+fn mapIdForHandle(handle: *MapHandle) status.BindingError!values.MapId {
+    lockMapRegistry();
+    defer unlockMapRegistry();
+
+    const map_state = mapStateLocked(handle.*) orelse return error.ClosedHandle;
+    return map_state.id_value;
 }
 
 fn registerMapState(map_state: *MapState) std.mem.Allocator.Error!MapHandle {
