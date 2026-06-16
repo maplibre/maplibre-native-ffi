@@ -7,7 +7,9 @@ internal static class NativeLibraryResolver
 {
     private static readonly string[] NativeLibraryPathEnvironmentVariables =
     [
-        OperatingSystem.IsWindows() ? "PATH" : OperatingSystem.IsMacOS() ? "DYLD_LIBRARY_PATH" : "LD_LIBRARY_PATH",
+        OperatingSystem.IsWindows() ? "PATH"
+        : OperatingSystem.IsMacOS() ? "DYLD_LIBRARY_PATH"
+        : "LD_LIBRARY_PATH",
     ];
     private static readonly object RegistrationLock = new();
     private static bool registered;

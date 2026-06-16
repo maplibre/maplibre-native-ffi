@@ -96,5 +96,7 @@ class MapLibreNativeCDependencies(ConanFile):
         run_env.generate()
 
         toolchain = CMakeToolchain(self)
-        toolchain.cache_variables["CMAKE_MAP_IMPORTED_CONFIG_RELWITHDEBINFO"] = "Release"
+        toolchain.cache_variables["CMAKE_MAP_IMPORTED_CONFIG_RELWITHDEBINFO"] = (
+            "Release"
+        )
         toolchain.generate()

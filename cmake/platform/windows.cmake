@@ -34,10 +34,8 @@ function(mln_configure_windows_platform target)
     SYSTEM
     PRIVATE
       ${PROJECT_SOURCE_DIR}/src/platform/windows/include
-      ${MLN_SOURCE_DIR}/platform/windows/include
-      ${CURL_INCLUDE_DIRS}
-      ${JPEG_INCLUDE_DIRS}
-      ${WEBP_INCLUDE_DIRS})
+      ${MLN_SOURCE_DIR}/platform/windows/include ${CURL_INCLUDE_DIRS}
+      ${JPEG_INCLUDE_DIRS} ${WEBP_INCLUDE_DIRS})
 
   target_compile_definitions(
     ${target}
@@ -46,11 +44,8 @@ function(mln_configure_windows_platform target)
   target_link_libraries(
     ${target}
     PRIVATE
-      ${CURL_LIBRARIES}
-      ${JPEG_LIBRARIES}
-      WebP::webp
-      $<IF:$<TARGET_EXISTS:libuv::uv_a>,libuv::uv_a,libuv::uv>
-      mbgl-vendor-icu
+      ${CURL_LIBRARIES} ${JPEG_LIBRARIES} WebP::webp
+      $<IF:$<TARGET_EXISTS:libuv::uv_a>,libuv::uv_a,libuv::uv> mbgl-vendor-icu
       PNG::PNG)
 
   target_compile_definitions(mbgl-vendor-icu PRIVATE U_STATIC_IMPLEMENTATION)

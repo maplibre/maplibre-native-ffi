@@ -29,12 +29,9 @@
         "command": "mise run _clang_format -- \"{{file_path}}\"",
         "exts": ["c", "cc", "cpp", "cxx", "h", "hh", "hpp", "hxx", "m", "mm"],
       },
+      { "command": "mise run _cmakefmt", "exts": ["cmake"] },
       {
-        "command": "cmakefmt --line-width {{line_width}} --tab-size {{indent_width}} -",
-        "exts": ["cmake"],
-      },
-      {
-        "command": "cmakefmt --line-width {{line_width}} --tab-size {{indent_width}} -",
+        "command": "mise run _cmakefmt",
         "fileNames": ["cmakelists.txt", "cmakelists.txt.in"],
       },
       {

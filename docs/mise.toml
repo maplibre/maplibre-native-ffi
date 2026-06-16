@@ -7,6 +7,7 @@ run = [
 ]
 
 [tasks."api:rust"]
+depends = ["//:deps:libclang"]
 dir = "{{env.MLN_FFI_REPO_ROOT}}"
 run = [
   "rm -rf docs/public/reference/rust",

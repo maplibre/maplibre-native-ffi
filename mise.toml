@@ -46,7 +46,7 @@ config_roots = [".devcontainer", "bindings/*", "examples/*", "docs"]
 "conda:doxygen" = { version = "1.13.2", os = ["linux", "macos", "windows/x64"] }
 "conda:glslang" = { version = "16.3.0", os = ["linux", "macos", "windows/x64"] }
 "conda:pkg-config" = { version = "0.29.2", os = ["linux", "macos", "windows/x64"] }
-"github:cmakefmt/cmakefmt" = "1.3.0"
+"github:cmakefmt/cmakefmt" = { version = "1.3.0", os = ["linux", "macos", "windows/x64"] }
 "aqua:XcodesOrg/xcodes" = { version = "1.6.2", os = ["macos"] }
 
 # Node.js ecosystem
@@ -73,6 +73,7 @@ config_roots = [".devcontainer", "bindings/*", "examples/*", "docs"]
 "core:dotnet" = "10.0.203"
 
 [env]
+HK_LIBGIT2 = "0"
 _.path = [
   "{% if env.MISE_DATA_DIR is defined and env.MISE_DATA_DIR != \"\" %}{{ env.MISE_DATA_DIR }}{% elif os() == \"windows\" %}{{ env.LOCALAPPDATA }}/mise{% else %}{{ env.HOME }}/.local/share/mise{% endif %}/installs/conda-clang-tools/22.1.7/bin",
   "{% if env.MISE_DATA_DIR is defined and env.MISE_DATA_DIR != \"\" %}{{ env.MISE_DATA_DIR }}{% elif os() == \"windows\" %}{{ env.LOCALAPPDATA }}/mise{% else %}{{ env.HOME }}/.local/share/mise{% endif %}/installs/conda-clang-tools/22.1.7/Library/bin",
@@ -250,6 +251,18 @@ if [[ "$MLN_FFI_TARGET_TRIPLE" == "windows-arm64" ]]; then
   cat
 else
   clang-format --assume-filename="$usage_file"
+fi
+'''
+
+[tasks._cmakefmt]
+description = "Called by dprint.jsonc"
+hide = true
+run = "cmakefmt --line-width 80 --tab-size 2 -"
+run_windows = '''
+if [[ "$MLN_FFI_TARGET_TRIPLE" == "windows-arm64" ]]; then
+  cat
+else
+  cmakefmt --line-width 80 --tab-size 2 -
 fi
 '''
 

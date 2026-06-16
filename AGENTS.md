@@ -54,8 +54,8 @@ hk fix [FILES...]
 Available mise envs: `linux-x64-vulkan`, `linux-x64-egl`, `linux-arm64-vulkan`,
 `linux-arm64-egl`, `macos-arm64-metal`, `macos-arm64-vulkan`, `macos-arm64-egl`,
 `windows-x64-vulkan`, `windows-x64-wgl`, `windows-arm64-vulkan`,
-`windows-arm64-wgl`. The host-matching variant is selected
-automatically via `.miserc.toml`.
+`windows-arm64-wgl`. The host-matching variant is selected automatically via
+`.miserc.toml`.
 
 Formatters and linters run automatically on pre-commit; you usually don't need
 to run them manually.

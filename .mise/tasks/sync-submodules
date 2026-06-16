@@ -45,8 +45,6 @@ vendor_paths=(
 # zip-archive, webgpu-cpp, wgpu-native, docs/doxygen, platform/windows/vendor/vcpkg, and
 # nested .mason / test fixture / glfw submodules under the paths above.
 
-git -c submodule.recurse=false submodule sync "$mln_path"
 git -c submodule.recurse=false submodule update --init --depth 1 "$mln_path"
 
-git -C "$mln_path" -c submodule.recurse=false submodule sync "${vendor_paths[@]}"
 git -C "$mln_path" -c submodule.recurse=false submodule update --init --depth 1 "${vendor_paths[@]}"
