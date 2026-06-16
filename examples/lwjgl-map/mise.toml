@@ -5,40 +5,28 @@ run = "../../gradlew :examples:lwjgl-map:build"
 [tasks.run]
 depends = ["//:ensure-native-library"]
 usage = 'arg "render-target"'
+env._.source = "{{env.MLN_FFI_CONAN_RUN_ENV}}"
 run = '''
-if [[ -f "$MLN_FFI_CONAN_RUN_ENV" ]]; then
-  # shellcheck disable=SC1090
-  . "$MLN_FFI_CONAN_RUN_ENV"
-fi
 ../../gradlew :examples:lwjgl-map:run --args="{{ usage.render_target }}"
 '''
 
 [tasks."run:owned-texture"]
 depends = ["//:ensure-native-library"]
+env._.source = "{{env.MLN_FFI_CONAN_RUN_ENV}}"
 run = '''
-if [[ -f "$MLN_FFI_CONAN_RUN_ENV" ]]; then
-  # shellcheck disable=SC1090
-  . "$MLN_FFI_CONAN_RUN_ENV"
-fi
 ../../gradlew :examples:lwjgl-map:run --args='owned-texture'
 '''
 
 [tasks."run:borrowed-texture"]
 depends = ["//:ensure-native-library"]
+env._.source = "{{env.MLN_FFI_CONAN_RUN_ENV}}"
 run = '''
-if [[ -f "$MLN_FFI_CONAN_RUN_ENV" ]]; then
-  # shellcheck disable=SC1090
-  . "$MLN_FFI_CONAN_RUN_ENV"
-fi
 ../../gradlew :examples:lwjgl-map:run --args='borrowed-texture'
 '''
 
 [tasks."run:native-surface"]
 depends = ["//:ensure-native-library"]
+env._.source = "{{env.MLN_FFI_CONAN_RUN_ENV}}"
 run = '''
-if [[ -f "$MLN_FFI_CONAN_RUN_ENV" ]]; then
-  # shellcheck disable=SC1090
-  . "$MLN_FFI_CONAN_RUN_ENV"
-fi
 ../../gradlew :examples:lwjgl-map:run --args='native-surface'
 '''

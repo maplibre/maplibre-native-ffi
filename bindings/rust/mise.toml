@@ -2,21 +2,14 @@
 depends = ["//:ensure-native-library", "//:deps:libclang"]
 dir = "{{env.MLN_FFI_REPO_ROOT}}"
 run = '''
-if [[ -f "$MLN_FFI_CONAN_RUN_ENV" ]]; then
-  # shellcheck disable=SC1090
-  . "$MLN_FFI_CONAN_RUN_ENV"
-fi
 cargo build -p maplibre-native-sys -p maplibre-native-core -p maplibre-native
 '''
 
 [tasks.test]
 depends = ["//:ensure-native-library", "//:deps:libclang"]
 dir = "{{env.MLN_FFI_REPO_ROOT}}"
+env._.source = "{{env.MLN_FFI_CONAN_RUN_ENV}}"
 run = '''
-if [[ -f "$MLN_FFI_CONAN_RUN_ENV" ]]; then
-  # shellcheck disable=SC1090
-  . "$MLN_FFI_CONAN_RUN_ENV"
-fi
 cargo test -p maplibre-native-sys -p maplibre-native-core -p maplibre-native -- --test-threads=1
 '''
 
@@ -24,9 +17,5 @@ cargo test -p maplibre-native-sys -p maplibre-native-core -p maplibre-native -- 
 depends = [":test"]
 dir = "{{env.MLN_FFI_REPO_ROOT}}"
 run = '''
-if [[ -f "$MLN_FFI_CONAN_RUN_ENV" ]]; then
-  # shellcheck disable=SC1090
-  . "$MLN_FFI_CONAN_RUN_ENV"
-fi
 cargo clippy -p maplibre-native-sys -p maplibre-native-core -p maplibre-native --all-targets -- -D warnings
 '''

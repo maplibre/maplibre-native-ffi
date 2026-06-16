@@ -218,12 +218,8 @@ esac
 
 [tasks.test]
 depends = ["//:build"]
+env._.source = "{{env.MLN_FFI_CONAN_RUN_ENV}}"
 run = '''
-if [[ -f "$MLN_FFI_CONAN_RUN_ENV" ]]; then
-  # shellcheck disable=SC1090
-  . "$MLN_FFI_CONAN_RUN_ENV"
-fi
-
 (
   cd src/c_api/tests/zig
   zig build test {{ env.MLN_FFI_ZIG_BUILD_ARGS }} --test-timeout "$MLN_FFI_TEST_TIMEOUT" --summary all --verbose

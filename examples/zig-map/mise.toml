@@ -15,11 +15,8 @@ run = "zig build {{ env.MLN_FFI_ZIG_BUILD_ARGS }}"
 
 [tasks.run]
 depends = ["//:ensure-native-library", ":compile-shaders"]
+env._.source = "{{env.MLN_FFI_CONAN_RUN_ENV}}"
 run = '''
-if [[ -f "$MLN_FFI_CONAN_RUN_ENV" ]]; then
-  # shellcheck disable=SC1090
-  . "$MLN_FFI_CONAN_RUN_ENV"
-fi
 zig build run {{ env.MLN_FFI_ZIG_BUILD_ARGS }} -- owned-texture
 '''
 
@@ -28,20 +25,14 @@ run = [{ task = "run", args = [] }]
 
 [tasks."run:borrowed-texture"]
 depends = ["//:ensure-native-library", ":compile-shaders"]
+env._.source = "{{env.MLN_FFI_CONAN_RUN_ENV}}"
 run = '''
-if [[ -f "$MLN_FFI_CONAN_RUN_ENV" ]]; then
-  # shellcheck disable=SC1090
-  . "$MLN_FFI_CONAN_RUN_ENV"
-fi
 zig build run {{ env.MLN_FFI_ZIG_BUILD_ARGS }} -- borrowed-texture
 '''
 
 [tasks."run:native-surface"]
 depends = ["//:ensure-native-library", ":compile-shaders"]
+env._.source = "{{env.MLN_FFI_CONAN_RUN_ENV}}"
 run = '''
-if [[ -f "$MLN_FFI_CONAN_RUN_ENV" ]]; then
-  # shellcheck disable=SC1090
-  . "$MLN_FFI_CONAN_RUN_ENV"
-fi
 zig build run {{ env.MLN_FFI_ZIG_BUILD_ARGS }} -- native-surface
 '''
