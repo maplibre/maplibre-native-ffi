@@ -30,14 +30,28 @@ load_windows_msvc_environment() {
     return 1
   fi
 
+  local msvc_target_arch="${MLN_FFI_MSVC_TARGET_ARCH:-}"
+  if [[ -z "$msvc_target_arch" ]]; then
+    case "${MLN_FFI_TARGET_TRIPLE:-windows-x64}" in
+      windows-arm64) msvc_target_arch="arm64" ;;
+      *) msvc_target_arch="x64" ;;
+    esac
+  fi
+
+  local msvc_host_arch="${MLN_FFI_MSVC_HOST_ARCH:-$msvc_target_arch}"
+  local vc_tools_component="Microsoft.VisualStudio.Component.VC.Tools.x86.x64"
+  if [[ "$msvc_target_arch" == "arm64" ]]; then
+    vc_tools_component="Microsoft.VisualStudio.Component.VC.Tools.ARM64"
+  fi
+
   local vs_install
   vs_install="$(
-    "$vswhere_unix" -latest -version '[17.0,18.0)' -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath \
+    "$vswhere_unix" -latest -version '[17.0,18.0)' -products '*' -requires "$vc_tools_component" -property installationPath \
       | tr -d '\r' \
       | sed -n '1p'
   )"
   if [[ -z "$vs_install" ]]; then
-    echo "Visual Studio 2022 C++ tools were not found" >&2
+    echo "Visual Studio 2022 C++ tools were not found for $msvc_target_arch" >&2
     return 1
   fi
 
@@ -47,7 +61,7 @@ load_windows_msvc_environment() {
   cat > "$vs_dev_loader" <<EOF
 @echo off
 set "PATH=%SystemRoot%\\System32;%SystemRoot%;%SystemRoot%\\System32\\Wbem;%SystemRoot%\\System32\\WindowsPowerShell\\v1.0"
-call "$vs_dev_cmd" -arch=x64 -host_arch=x64 >nul
+call "$vs_dev_cmd" -arch=$msvc_target_arch -host_arch=$msvc_host_arch >nul
 set
 EOF
 
