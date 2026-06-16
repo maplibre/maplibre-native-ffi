@@ -918,11 +918,12 @@ pub const OfflineOperationHandle = enum(u128) {
             self.consume();
             return err;
         };
-        try status.checkStatus(
+        const discard_result = status.checkStatus(
             c.mln_runtime_offline_operation_discard(runtime, operation_id),
             diagnosticStore(&runtime_handle),
         );
         self.consume();
+        try discard_result;
     }
 };
 
