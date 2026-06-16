@@ -1,14 +1,26 @@
 const std = @import("std");
 
 const c = @import("c.zig").raw;
+const diagnostics = @import("diagnostics.zig");
 const status = @import("status.zig");
 const values = @import("values.zig");
 
 pub const TempStorage = struct {
     arena: std.heap.ArenaAllocator,
+    diagnostic_store: ?*diagnostics.DiagnosticStore = null,
 
     pub fn init(allocator: std.mem.Allocator) TempStorage {
         return .{ .arena = std.heap.ArenaAllocator.init(allocator) };
+    }
+
+    pub fn initWithDiagnostics(
+        allocator: std.mem.Allocator,
+        diagnostic_store: ?*diagnostics.DiagnosticStore,
+    ) TempStorage {
+        return .{
+            .arena = std.heap.ArenaAllocator.init(allocator),
+            .diagnostic_store = diagnostic_store,
+        };
     }
 
     pub fn deinit(self: *TempStorage) void {
@@ -198,7 +210,10 @@ pub const TempStorage = struct {
     }
 
     fn nulTerminatedString(self: *TempStorage, value: []const u8) status.Error![:0]u8 {
-        if (std.mem.indexOfScalar(u8, value, 0) != null) return error.InvalidString;
+        if (std.mem.indexOfScalar(u8, value, 0) != null) {
+            try status.setBindingDiagnostic(self.diagnostic_store, "offline region style_url contains embedded NUL");
+            return error.InvalidString;
+        }
         return self.arena.allocator().dupeZ(u8, value);
     }
 

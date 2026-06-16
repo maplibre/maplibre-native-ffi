@@ -21,6 +21,7 @@ comptime {
 
 test "package root hides raw C declarations" {
     try testing.expect(!@hasDecl(maplibre, "c"));
+    try testing.expect(!@hasDecl(maplibre, "TestHooks"));
     try testing.expect(!@hasDecl(maplibre, "mln_runtime"));
     try testing.expect(!@hasDecl(maplibre, "mln_runtime_create"));
     try testing.expect(!@hasDecl(maplibre.OwnedJsonValue, "copyFromNative"));
@@ -75,7 +76,14 @@ test "package root hides raw C declarations" {
     try testing.expect(!support.typeNameContains(maplibre.RuntimeHandle, "anyopaque"));
     try testing.expect(!support.typeNameContains(maplibre.MapHandle, "anyopaque"));
     try testing.expect(!support.typeNameContains(maplibre.MapProjectionHandle, "anyopaque"));
+    try testing.expect(!support.typeNameContains(maplibre.NativePointer, "anyopaque"));
     try testing.expect(!support.typeNameContains(maplibre.RenderSessionHandle, "anyopaque"));
+}
+
+test "native pointer uses explicit borrowed constructor" {
+    const ptr: *anyopaque = @ptrFromInt(1);
+    const native = maplibre.NativePointer.fromPtr(ptr);
+    try testing.expectEqual(ptr, native.toPtr());
 }
 
 test "package links the native C library" {
@@ -88,4 +96,43 @@ test "package validates the supported C ABI version" {
 
     try maplibre.validateAbiVersion(&diagnostics);
     try testing.expect(diagnostics.get() == null);
+}
+
+test "fabricated operation and request tokens are closed" {
+    var runtime: maplibre.RuntimeHandle = @enumFromInt(0);
+    try testing.expectError(error.ClosedHandle, runtime.runOnce());
+    try runtime.close();
+
+    var map: maplibre.MapHandle = @enumFromInt(0);
+    try testing.expectError(error.ClosedHandle, map.id());
+    try map.close();
+
+    var projection: maplibre.MapProjectionHandle = @enumFromInt(0);
+    try testing.expectError(error.ClosedHandle, projection.getCamera());
+    try projection.close();
+
+    var session: maplibre.RenderSessionHandle = @enumFromInt(0);
+    try testing.expectError(error.ClosedHandle, session.renderUpdate());
+    try session.close();
+
+    var metal_frame: maplibre.MetalOwnedTextureFrameHandle = @enumFromInt(0);
+    try testing.expectError(error.ClosedHandle, metal_frame.info());
+    try metal_frame.release();
+
+    var opengl_frame: maplibre.OpenGLOwnedTextureFrameHandle = @enumFromInt(0);
+    try testing.expectError(error.ClosedHandle, opengl_frame.info());
+    try opengl_frame.release();
+
+    var vulkan_frame: maplibre.VulkanOwnedTextureFrameHandle = @enumFromInt(0);
+    try testing.expectError(error.ClosedHandle, vulkan_frame.info());
+    try vulkan_frame.release();
+
+    const operation: maplibre.OfflineOperationHandle = @enumFromInt(0);
+    try testing.expectError(error.ClosedHandle, operation.operationId());
+    try operation.discard();
+
+    const request: maplibre.ResourceRequestHandle = @enumFromInt(0);
+    try testing.expectError(error.ClosedHandle, request.cancelled());
+    try testing.expectError(error.ClosedHandle, request.complete(.{}));
+    request.release();
 }
