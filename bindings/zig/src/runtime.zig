@@ -20,6 +20,7 @@ const MapRegistration = struct {
 pub const RuntimeRegistry = struct {
     maps: std.ArrayList(MapRegistration),
     next_map_id: u64,
+    live_offline_operations: usize,
 };
 
 const ResourceProviderState = struct {
@@ -846,6 +847,9 @@ pub const OfflineOperationHandle = enum(u128) {
         result_kind: OfflineOperationResultKind,
     ) status.Error!OfflineOperationHandle {
         if (operation_id == 0) return error.InvalidArgument;
+        try registerRuntimeOfflineOperation(runtime.*);
+        errdefer unregisterRuntimeOfflineOperation(runtime.*);
+
         const operation_state = try std.heap.smp_allocator.create(OfflineOperationState);
         operation_state.* = .{
             .runtime = runtime.*,
@@ -901,6 +905,7 @@ pub const OfflineOperationHandle = enum(u128) {
 
     fn consume(self: OfflineOperationHandle) void {
         const operation_state = unregisterOfflineOperationState(self) orelse return;
+        unregisterRuntimeOfflineOperation(operation_state.runtime);
         std.heap.smp_allocator.destroy(operation_state);
     }
 
@@ -1008,7 +1013,13 @@ pub const RuntimeHandle = enum(u128) {
         operation_kind: OfflineOperationKind,
         result_kind: OfflineOperationResultKind,
     ) status.Error!OfflineOperationHandle {
-        return OfflineOperationHandle.init(self, operation_id, operation_kind, result_kind);
+        return OfflineOperationHandle.init(self, operation_id, operation_kind, result_kind) catch |err| {
+            const runtime = native(self) catch null;
+            if (runtime) |handle| {
+                if (operation_id != 0) _ = c.mln_runtime_offline_operation_discard(handle, operation_id);
+            }
+            return err;
+        };
     }
 
     pub fn startAmbientCacheOperation(self: *RuntimeHandle, operation: AmbientCacheOperation) status.Error!OfflineOperationHandle {
@@ -1281,6 +1292,10 @@ pub const RuntimeHandle = enum(u128) {
             try status.setBindingDiagnostic(runtime_state.diagnostic_store, "runtime has live maps");
             return error.InvalidState;
         }
+        if (runtime_registry.live_offline_operations != 0) {
+            try status.setBindingDiagnostic(runtime_state.diagnostic_store, "runtime has live offline operations");
+            return error.InvalidState;
+        }
 
         const runtime: *c.mln_runtime = @ptrCast(runtime_state.native orelse return);
         try status.checkStatus(c.mln_runtime_destroy(runtime), diagnosticStore(self));
@@ -1322,7 +1337,7 @@ fn createNative(
     }
 
     const runtime_registry = try std.heap.smp_allocator.create(RuntimeRegistry);
-    runtime_registry.* = .{ .maps = .empty, .next_map_id = 1 };
+    runtime_registry.* = .{ .maps = .empty, .next_map_id = 1, .live_offline_operations = 0 };
     errdefer std.heap.smp_allocator.destroy(runtime_registry);
 
     const runtime_state = try std.heap.smp_allocator.create(RuntimeState);
@@ -1516,6 +1531,24 @@ fn runtimeStateLocked(handle: RuntimeHandle) ?*RuntimeState {
     const slot = runtime_handle_registry.items[index - 1];
     if (slot.generation != runtimeHandleGeneration(handle)) return null;
     return slot.state;
+}
+
+fn registerRuntimeOfflineOperation(handle: RuntimeHandle) status.BindingError!void {
+    lockRuntimeRegistry();
+    defer unlockRuntimeRegistry();
+
+    const runtime_state = runtimeStateLocked(handle) orelse return error.ClosedHandle;
+    const runtime_registry = runtime_state.registry orelse return error.ClosedHandle;
+    runtime_registry.live_offline_operations += 1;
+}
+
+fn unregisterRuntimeOfflineOperation(handle: RuntimeHandle) void {
+    lockRuntimeRegistry();
+    defer unlockRuntimeRegistry();
+
+    const runtime_state = runtimeStateLocked(handle) orelse return;
+    const runtime_registry = runtime_state.registry orelse return;
+    if (runtime_registry.live_offline_operations > 0) runtime_registry.live_offline_operations -= 1;
 }
 
 fn unregisterRuntimeState(handle: RuntimeHandle) ?*RuntimeState {
@@ -2191,6 +2224,23 @@ test "offline operation take-result failures preserve handle state" {
     try std.testing.expectEqual(@as(OfflineOperationId, 9_999_999), try operation.operationId());
 
     operation.consume();
+}
+
+test "runtime close rejects live offline operations" {
+    var diagnostic_store = diagnostics.DiagnosticStore.init(std.testing.allocator);
+    defer diagnostic_store.deinit();
+
+    var runtime = try RuntimeHandle.create(std.testing.allocator, .{}, &diagnostic_store);
+    var runtime_open = true;
+    defer if (runtime_open) runtime.close() catch @panic("runtime close failed");
+
+    const operation = try runtime.operationHandle(9_999_998, .region_get_status, .region_status);
+    try std.testing.expectError(error.InvalidState, runtime.close());
+    try std.testing.expectEqualStrings("runtime has live offline operations", diagnostic_store.get().?.message);
+
+    operation.consume();
+    try runtime.close();
+    runtime_open = false;
 }
 
 test "offline region snapshot destroy runs when copied output allocation fails" {
