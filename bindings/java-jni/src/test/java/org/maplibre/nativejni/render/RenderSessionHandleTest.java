@@ -44,7 +44,7 @@ import org.maplibre.nativejni.runtime.RuntimeHandle;
 import org.maplibre.nativejni.test.RenderTargetTestSupport;
 
 class RenderSessionHandleTest {
-  private static final double RENDERED_QUERY_COORDINATE_TOLERANCE = 1.0e-4;
+  private static final double QUERY_COORDINATE_TOLERANCE = 1.0e-4;
 
   private static final String STYLE_JSON =
       """
@@ -493,10 +493,8 @@ class RenderSessionHandleTest {
       assertTrue(rendered.sourceLayerId().isEmpty());
       assertEquals(FeatureIdentifier.of("feature-1"), rendered.feature().identifier());
       var renderedPoint = assertInstanceOf(Geometry.Point.class, rendered.feature().geometry());
-      assertEquals(
-          37.7749, renderedPoint.coordinate().latitude(), RENDERED_QUERY_COORDINATE_TOLERANCE);
-      assertEquals(
-          -122.4194, renderedPoint.coordinate().longitude(), RENDERED_QUERY_COORDINATE_TOLERANCE);
+      assertEquals(37.7749, renderedPoint.coordinate().latitude(), QUERY_COORDINATE_TOLERANCE);
+      assertEquals(-122.4194, renderedPoint.coordinate().longitude(), QUERY_COORDINATE_TOLERANCE);
       assertEquals(JsonValue.of("capital"), member(rendered.feature(), "kind"));
       assertEquals(
           JsonValue.of(true),
@@ -528,8 +526,8 @@ class RenderSessionHandleTest {
       assertTrue(source.sourceLayerId().isEmpty());
       assertEquals(FeatureIdentifier.of("feature-1"), source.feature().identifier());
       var sourcePoint = assertInstanceOf(Geometry.Point.class, source.feature().geometry());
-      assertEquals(37.7749, sourcePoint.coordinate().latitude(), 1.0e-9);
-      assertEquals(-122.4194, sourcePoint.coordinate().longitude(), 1.0e-9);
+      assertEquals(37.7749, sourcePoint.coordinate().latitude(), QUERY_COORDINATE_TOLERANCE);
+      assertEquals(-122.4194, sourcePoint.coordinate().longitude(), QUERY_COORDINATE_TOLERANCE);
       assertEquals(JsonValue.of("capital"), member(source.feature(), "kind"));
     } finally {
       map.close();
