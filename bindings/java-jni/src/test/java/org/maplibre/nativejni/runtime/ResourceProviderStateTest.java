@@ -38,6 +38,8 @@ final class ResourceProviderStateTest {
     var entered = new CountDownLatch(1);
     var release = new CountDownLatch(1);
     var closed = new AtomicBoolean();
+    var callbackResult = new AtomicReference<Integer>();
+    var callbackFailure = new AtomicReference<Throwable>();
     var state =
         new ResourceProviderState(
             (request, handle) -> {
@@ -55,10 +57,13 @@ final class ResourceProviderStateTest {
 
       var callbackThread =
           new Thread(
-              () ->
-                  assertEquals(
-                      ResourceProviderDecision.PASS_THROUGH.nativeValue(),
-                      state.provider().callback().call(null, request, handle)));
+              () -> {
+                try {
+                  callbackResult.set(state.provider().callback().call(null, request, handle));
+                } catch (Throwable failure) {
+                  callbackFailure.set(failure);
+                }
+              });
       callbackThread.start();
       assertTrue(await(entered));
 
@@ -73,9 +78,15 @@ final class ResourceProviderStateTest {
       Thread.sleep(25);
       assertFalse(closed.get());
       release.countDown();
-      callbackThread.join();
-      closeThread.join();
+      callbackThread.join(5_000);
+      closeThread.join(5_000);
 
+      assertFalse(callbackThread.isAlive());
+      assertFalse(closeThread.isAlive());
+      if (callbackFailure.get() != null) {
+        throw new AssertionError("callback thread failed", callbackFailure.get());
+      }
+      assertEquals(ResourceProviderDecision.PASS_THROUGH.nativeValue(), callbackResult.get());
       assertTrue(closed.get());
     }
   }

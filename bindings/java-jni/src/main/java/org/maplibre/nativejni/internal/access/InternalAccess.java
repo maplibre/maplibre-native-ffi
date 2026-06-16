@@ -17,9 +17,6 @@ public enum InternalAccess {
   }
 
   public void checkCaller(int implementationFrameCount) {
-    if (this != INSTANCE) {
-      throw new SecurityException("Invalid internal access token");
-    }
     var caller =
         STACK_WALKER.walk(
             frames ->

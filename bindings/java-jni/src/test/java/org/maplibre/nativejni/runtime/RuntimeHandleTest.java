@@ -590,7 +590,11 @@ class RuntimeHandleTest {
               }
             });
     thread.start();
-    thread.join();
+    thread.join(5_000);
+    if (thread.isAlive()) {
+      thread.interrupt();
+      return new AssertionError("Timed out waiting for cross-thread action to finish");
+    }
     return thrown.get();
   }
 
