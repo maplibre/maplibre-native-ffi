@@ -29,10 +29,11 @@ import platform.posix.usleep
 
 @OptIn(ExperimentalAtomicApi::class, ExperimentalForeignApi::class)
 class LogCallbackStateTest {
-  // BND-120, BND-121, BND-122, BND-123: log callback install, replacement, failures, and races.
+  // BND-120, BND-121, BND-122, BND-123: log callback install, replacement,
+  // host-language failure containment, and races.
 
   @Test
-  fun processGlobalLogCallbackCopiesRecordsContainsExceptionsAndClearsState() {
+  fun processGlobalLogCallbackCopiesRecordsContainsHostFailuresAndClearsState() {
     val records = mutableListOf<LogRecord>()
     val replacementRecords = mutableListOf<LogRecord>()
     var initialState: LogCallbackState? = null

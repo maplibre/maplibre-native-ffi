@@ -67,6 +67,7 @@ class ResourceTransformStateTest {
       assertNull(nullOut.url)
       nullState.close()
 
+      // BND-121: host-language failures do not escape the C callback boundary.
       val throwingState =
         ResourceTransformState(
           ResourceTransformCallback { throw IllegalStateException("contained") }

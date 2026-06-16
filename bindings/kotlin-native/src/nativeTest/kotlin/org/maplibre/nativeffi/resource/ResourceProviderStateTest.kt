@@ -331,10 +331,11 @@ class ResourceProviderStateTest {
     }
   }
 
-  // BND-121, BND-123: callback failures and close-during-callback synchronization.
+  // BND-121, BND-123: host-language failure containment and close-during-callback
+  // synchronization.
 
   @Test
-  fun exceptionDecisionTellsNativeNotToPassThrough() {
+  fun hostLanguageFailureTellsNativeNotToPassThrough() {
     val state =
       ResourceProviderState(
         ResourceProviderCallback { _, _ -> throw IllegalStateException("contained") }
