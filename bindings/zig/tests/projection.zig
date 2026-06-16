@@ -16,7 +16,7 @@ fn expectLatLngApprox(expected: maplibre.LatLng, actual: maplibre.LatLng) !void 
 }
 
 test "map projection mode updates snapshot fields through public binding" {
-    var runtime = try maplibre.RuntimeHandle.init(null);
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
     var map = try maplibre.MapHandle.create(&runtime, .{});
     defer map.close() catch @panic("map close failed");
@@ -30,7 +30,7 @@ test "map projection mode updates snapshot fields through public binding" {
 }
 
 test "map converts between lat lngs and screen points" {
-    var runtime = try maplibre.RuntimeHandle.init(null);
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
     var map = try maplibre.MapHandle.create(&runtime, .{});
     defer map.close() catch @panic("map close failed");
@@ -61,7 +61,7 @@ test "map converts between lat lngs and screen points" {
 }
 
 test "standalone projection converts and updates camera" {
-    var runtime = try maplibre.RuntimeHandle.init(null);
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
     var map = try maplibre.MapHandle.create(&runtime, .{});
     defer map.close() catch @panic("map close failed");
@@ -109,7 +109,7 @@ test "projected meters convert to and from lat lng" {
 }
 
 test "projection public descriptors report invalid native arguments" {
-    var runtime = try maplibre.RuntimeHandle.init(null);
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
     var map = try maplibre.MapHandle.create(&runtime, .{});
     defer map.close() catch @panic("map close failed");

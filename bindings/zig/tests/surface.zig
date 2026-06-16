@@ -9,8 +9,10 @@ const support = @import("support.zig");
 fn waitForEvent(runtime: *maplibre.RuntimeHandle, event_type: maplibre.RuntimeEventType) !bool {
     for (0..1000) |_| {
         try runtime.runOnce();
-        while (try runtime.pollEvent()) |event| {
-            if (std.meta.eql(event.event_type, event_type)) return true;
+        while (try runtime.pollEvent(testing.allocator)) |event| {
+            var owned_event = event;
+            defer owned_event.deinit();
+            if (std.meta.eql(owned_event.event_type, event_type)) return true;
         }
         try std.Thread.yield();
     }
@@ -18,7 +20,7 @@ fn waitForEvent(runtime: *maplibre.RuntimeHandle, event_type: maplibre.RuntimeEv
 }
 
 fn nativePointer(ptr: *anyopaque) maplibre.NativePointer {
-    return .{ .ptr = ptr };
+    return maplibre.NativePointer.fromPtr(ptr);
 }
 
 test "Metal surface renders to window-attached layer through public binding" {
@@ -30,7 +32,7 @@ test "Metal surface renders to window-attached layer through public binding" {
     var window_layer = try metal_support.createWindowLayer(64, 64);
     defer window_layer.deinit();
 
-    var runtime = try maplibre.RuntimeHandle.init(null);
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
     var map = try maplibre.MapHandle.create(&runtime, .{});
     defer map.close() catch @panic("map close failed");
@@ -55,7 +57,7 @@ test "Metal surface render acquires one drawable per frame through public bindin
     var window_layer = try metal_support.createCountingWindowLayer(64, 64);
     defer window_layer.deinit();
 
-    var runtime = try maplibre.RuntimeHandle.init(null);
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
     var map = try maplibre.MapHandle.create(&runtime, .{});
     defer map.close() catch @panic("map close failed");
@@ -75,7 +77,7 @@ test "Metal surface render acquires one drawable per frame through public bindin
 
 test "surface public descriptors report invalid native arguments" {
     if (!build_options.supports_metal and !build_options.supports_vulkan) return error.SkipZigTest;
-    var runtime = try maplibre.RuntimeHandle.init(null);
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
     var map = try maplibre.MapHandle.create(&runtime, .{});
     defer map.close() catch @panic("map close failed");
@@ -109,7 +111,7 @@ test "surface public descriptors report invalid native arguments" {
 
 test "unsupported public surface backends report unsupported" {
     if (!build_options.supports_metal and !build_options.supports_vulkan) return error.SkipZigTest;
-    var runtime = try maplibre.RuntimeHandle.init(null);
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
     var map = try maplibre.MapHandle.create(&runtime, .{});
     defer map.close() catch @panic("map close failed");

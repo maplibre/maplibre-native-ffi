@@ -275,7 +275,7 @@ const VulkanOwnedTextureBackend = struct {
         errdefer frame.release() catch |err| diagnostics.logError("Vulkan texture release failed", err, null);
 
         const info = try frame.info();
-        const image_view: c.VkImageView = @ptrCast(info.image_view.ptr);
+        const image_view: c.VkImageView = @ptrCast(info.image_view.toPtr());
         if (!try self.compositor.presentImageView(image_view)) {
             frame.release() catch |err| diagnostics.logError("Vulkan texture release failed", err, null);
             return false;
@@ -418,8 +418,8 @@ const VulkanBorrowedTextureBackend = struct {
         const texture = maplibre.attachVulkanBorrowedTexture(map, .{
             .extent = render_target.extent(viewport),
             .context = vulkanContextDescriptor(&self.compositor.context),
-            .image = .{ .ptr = @ptrCast(self.borrowed_image.image.?) },
-            .image_view = .{ .ptr = @ptrCast(self.borrowed_image.view.?) },
+            .image = maplibre.NativePointer.fromPtr(@ptrCast(self.borrowed_image.image.?)),
+            .image_view = maplibre.NativePointer.fromPtr(@ptrCast(self.borrowed_image.view.?)),
             .format = c.VK_FORMAT_R8G8B8A8_UNORM,
             .initial_layout = c.VK_IMAGE_LAYOUT_UNDEFINED,
             .final_layout = c.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
@@ -487,7 +487,7 @@ const VulkanSurfaceBackend = struct {
         const surface = maplibre.attachVulkanSurface(map, .{
             .extent = render_target.extent(viewport),
             .context = vulkanContextDescriptor(&self.context),
-            .surface = .{ .ptr = @ptrCast(self.context.surface.?) },
+            .surface = maplibre.NativePointer.fromPtr(@ptrCast(self.context.surface.?)),
         }) catch |err| {
             diagnostics.logError("Vulkan surface attach failed", err, null);
             return types.AppError.SurfaceAttachFailed;
@@ -498,10 +498,10 @@ const VulkanSurfaceBackend = struct {
 
 fn vulkanContextDescriptor(context: *const Context) maplibre.VulkanContextDescriptor {
     return .{
-        .instance = .{ .ptr = @ptrCast(context.instance.?) },
-        .physical_device = .{ .ptr = @ptrCast(context.physical_device.?) },
-        .device = .{ .ptr = @ptrCast(context.device.?) },
-        .graphics_queue = .{ .ptr = @ptrCast(context.queue.?) },
+        .instance = maplibre.NativePointer.fromPtr(@ptrCast(context.instance.?)),
+        .physical_device = maplibre.NativePointer.fromPtr(@ptrCast(context.physical_device.?)),
+        .device = maplibre.NativePointer.fromPtr(@ptrCast(context.device.?)),
+        .graphics_queue = maplibre.NativePointer.fromPtr(@ptrCast(context.queue.?)),
         .graphics_queue_family_index = context.queue_family_index,
         .get_instance_proc_addr = nativeFunctionPointer(c.vkGetInstanceProcAddr),
         .get_device_proc_addr = nativeFunctionPointer(c.vkGetDeviceProcAddr),
@@ -509,7 +509,7 @@ fn vulkanContextDescriptor(context: *const Context) maplibre.VulkanContextDescri
 }
 
 fn nativeFunctionPointer(comptime function: anytype) maplibre.NativePointer {
-    return .{ .ptr = @ptrFromInt(@intFromPtr(&function)) };
+    return maplibre.NativePointer.fromPtr(@ptrFromInt(@intFromPtr(&function)));
 }
 
 fn findMemoryType(

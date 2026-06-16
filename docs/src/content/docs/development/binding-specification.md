@@ -345,8 +345,9 @@ Callback invocation follows this operation:
 1. Copy callback arguments into language-owned values before user code receives
    them. Lexical views are allowed only when the public type prevents retention
    beyond the invocation.
-2. Catch host exceptions, panics, or errors and convert them to the C callback's
-   documented behavior.
+2. Host-language failures must not unwind or otherwise escape across the C
+   callback boundary. If the public callback returns a recoverable host failure,
+   convert the failure to the C callback's documented behavior.
 3. Synchronize callback state that native can invoke concurrently.
 4. Return promptly. Callback code hands owner-thread work back to the owner
    thread before calling runtime or map APIs.
@@ -375,8 +376,9 @@ Resource transform invocation follows this operation:
    shape before the callback returns.
 4. If user code returns no rewrite or fails validation, keep pass-through
    behavior.
-5. If user code throws or panics, convert the failure to the C callback's
-   documented behavior.
+5. Host-language failures must not unwind or otherwise escape across the C
+   callback boundary. If the public handler returns a recoverable host failure,
+   convert the failure to the C callback's documented behavior.
 
 ### Resource providers
 
@@ -648,7 +650,7 @@ that a real native failure would expose.
 | ID      | Test                                                                                                                                                        |
 | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | BND-120 | Log callback install invokes the registered callback, clear prevents later invocation, and replacement invokes only the replacement callback.               |
-| BND-121 | Callback host failures are caught and converted to documented C behavior.                                                                                   |
+| BND-121 | Host-language failures do not unwind or escape across the C callback boundary, and recoverable callback failures are converted to documented C behavior.    |
 | BND-122 | Each exposed callback family preserves the previous callback and releases replacement state when replacement fails.                                         |
 | BND-123 | Callback state remains synchronized for callback families whose C contract allows concurrent invocation.                                                    |
 | BND-124 | Custom geometry or style-scoped callback teardown handles style reload, source removal, source ID reuse, map close, and in-flight upcalls without late use. |

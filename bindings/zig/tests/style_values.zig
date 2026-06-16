@@ -7,8 +7,10 @@ const support = @import("support.zig");
 fn waitForEvent(runtime: *maplibre.RuntimeHandle, event_type: maplibre.RuntimeEventType) !bool {
     for (0..1000) |_| {
         try runtime.runOnce();
-        while (try runtime.pollEvent()) |event| {
-            if (std.meta.eql(event.event_type, event_type)) return true;
+        while (try runtime.pollEvent(testing.allocator)) |event| {
+            var owned_event = event;
+            defer owned_event.deinit();
+            if (std.meta.eql(owned_event.event_type, event_type)) return true;
         }
         try std.Thread.yield();
     }
@@ -48,7 +50,7 @@ fn expectObjectString(value: maplibre.OwnedJsonValue, key: []const u8, expected:
 }
 
 test "style ID lists are copied into owned Zig output" {
-    var runtime = try maplibre.RuntimeHandle.init(null);
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
     var map = try createLoadedMap(&runtime);
     defer map.close() catch @panic("map close failed");
@@ -64,7 +66,7 @@ test "style ID lists are copied into owned Zig output" {
 }
 
 test "style layer JSON helpers manage lifecycle and order" {
-    var runtime = try maplibre.RuntimeHandle.init(null);
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
     var map = try createLoadedMap(&runtime);
     defer map.close() catch @panic("map close failed");
@@ -101,7 +103,7 @@ test "style layer JSON helpers manage lifecycle and order" {
 }
 
 test "layer properties accept semantic JSON values and return owned snapshots" {
-    var runtime = try maplibre.RuntimeHandle.init(null);
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
     var map = try createLoadedMap(&runtime);
     defer map.close() catch @panic("map close failed");
@@ -114,7 +116,7 @@ test "layer properties accept semantic JSON values and return owned snapshots" {
 }
 
 test "layer filters accept nested semantic JSON arrays and return owned snapshots" {
-    var runtime = try maplibre.RuntimeHandle.init(null);
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
     var map = try createLoadedMap(&runtime);
     defer map.close() catch @panic("map close failed");
@@ -138,7 +140,7 @@ test "layer filters accept nested semantic JSON arrays and return owned snapshot
 }
 
 test "style light accepts full JSON and property updates" {
-    var runtime = try maplibre.RuntimeHandle.init(null);
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
     var map = try createLoadedMap(&runtime);
     defer map.close() catch @panic("map close failed");
@@ -165,7 +167,7 @@ test "style light accepts full JSON and property updates" {
 }
 
 test "runtime style images copy premultiplied RGBA8 pixels" {
-    var runtime = try maplibre.RuntimeHandle.init(null);
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
     var map = try createLoadedMap(&runtime);
     defer map.close() catch @panic("map close failed");
@@ -213,7 +215,7 @@ test "runtime style images copy premultiplied RGBA8 pixels" {
 }
 
 test "location indicator helpers set focused properties" {
-    var runtime = try maplibre.RuntimeHandle.init(null);
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
     var map = try createLoadedMap(&runtime);
     defer map.close() catch @panic("map close failed");
@@ -257,7 +259,7 @@ test "location indicator helpers set focused properties" {
 }
 
 test "style JSON descriptors reject invalid values" {
-    var runtime = try maplibre.RuntimeHandle.init(null);
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
     var map = try createLoadedMap(&runtime);
     defer map.close() catch @panic("map close failed");

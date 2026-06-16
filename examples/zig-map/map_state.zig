@@ -122,7 +122,7 @@ pub fn drainEvents(
 ) !bool {
     const map_id = try map.id();
     var render_update_available = false;
-    while (try runtime.pollEventOwned(allocator)) |event_value| {
+    while (try runtime.pollEvent(allocator)) |event_value| {
         var event = event_value;
         defer event.deinit();
         if (event.source_type != .map or event.source_id == null or !std.meta.eql(event.source_id.?, map_id)) continue;
