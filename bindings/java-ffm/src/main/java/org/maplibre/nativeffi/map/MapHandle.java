@@ -1484,7 +1484,7 @@ public final class MapHandle implements AutoCloseable {
         }
         var found = outFound.get(ValueLayout.JAVA_BOOLEAN, 0);
         var sourceType = NativeValues.sourceType(outType.get(ValueLayout.JAVA_INT, 0));
-        if (!found || sourceType != SourceType.CUSTOM_VECTOR) {
+        if (!found || !sourceType.equals(SourceType.CUSTOM_VECTOR)) {
           closeQuietly(entry.getValue());
           iterator.remove();
         }

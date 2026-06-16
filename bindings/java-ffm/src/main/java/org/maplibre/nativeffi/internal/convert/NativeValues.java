@@ -149,16 +149,16 @@ public final class NativeValues {
   }
 
   public static int nativeValue(ConstrainMode mode) {
-    if (mode == ConstrainMode.NONE) {
+    if (mode.equals(ConstrainMode.NONE)) {
       return MapLibreNativeC.MLN_CONSTRAIN_MODE_NONE();
     }
-    if (mode == ConstrainMode.HEIGHT_ONLY) {
+    if (mode.equals(ConstrainMode.HEIGHT_ONLY)) {
       return MapLibreNativeC.MLN_CONSTRAIN_MODE_HEIGHT_ONLY();
     }
-    if (mode == ConstrainMode.WIDTH_AND_HEIGHT) {
+    if (mode.equals(ConstrainMode.WIDTH_AND_HEIGHT)) {
       return MapLibreNativeC.MLN_CONSTRAIN_MODE_WIDTH_AND_HEIGHT();
     }
-    if (mode == ConstrainMode.SCREEN) {
+    if (mode.equals(ConstrainMode.SCREEN)) {
       return MapLibreNativeC.MLN_CONSTRAIN_MODE_SCREEN();
     }
     throw new InvalidArgumentException(
@@ -190,16 +190,16 @@ public final class NativeValues {
   }
 
   public static int nativeValue(NorthOrientation orientation) {
-    if (orientation == NorthOrientation.UP) {
+    if (orientation.equals(NorthOrientation.UP)) {
       return MapLibreNativeC.MLN_NORTH_ORIENTATION_UP();
     }
-    if (orientation == NorthOrientation.RIGHT) {
+    if (orientation.equals(NorthOrientation.RIGHT)) {
       return MapLibreNativeC.MLN_NORTH_ORIENTATION_RIGHT();
     }
-    if (orientation == NorthOrientation.DOWN) {
+    if (orientation.equals(NorthOrientation.DOWN)) {
       return MapLibreNativeC.MLN_NORTH_ORIENTATION_DOWN();
     }
-    if (orientation == NorthOrientation.LEFT) {
+    if (orientation.equals(NorthOrientation.LEFT)) {
       return MapLibreNativeC.MLN_NORTH_ORIENTATION_LEFT();
     }
     throw new InvalidArgumentException(
@@ -233,22 +233,22 @@ public final class NativeValues {
   }
 
   public static int nativeValue(ResourceErrorReason reason) {
-    if (reason == ResourceErrorReason.NONE) {
+    if (reason.equals(ResourceErrorReason.NONE)) {
       return MapLibreNativeC.MLN_RESOURCE_ERROR_REASON_NONE();
     }
-    if (reason == ResourceErrorReason.NOT_FOUND) {
+    if (reason.equals(ResourceErrorReason.NOT_FOUND)) {
       return MapLibreNativeC.MLN_RESOURCE_ERROR_REASON_NOT_FOUND();
     }
-    if (reason == ResourceErrorReason.SERVER) {
+    if (reason.equals(ResourceErrorReason.SERVER)) {
       return MapLibreNativeC.MLN_RESOURCE_ERROR_REASON_SERVER();
     }
-    if (reason == ResourceErrorReason.CONNECTION) {
+    if (reason.equals(ResourceErrorReason.CONNECTION)) {
       return MapLibreNativeC.MLN_RESOURCE_ERROR_REASON_CONNECTION();
     }
-    if (reason == ResourceErrorReason.RATE_LIMIT) {
+    if (reason.equals(ResourceErrorReason.RATE_LIMIT)) {
       return MapLibreNativeC.MLN_RESOURCE_ERROR_REASON_RATE_LIMIT();
     }
-    if (reason == ResourceErrorReason.OTHER) {
+    if (reason.equals(ResourceErrorReason.OTHER)) {
       return MapLibreNativeC.MLN_RESOURCE_ERROR_REASON_OTHER();
     }
     throw new InvalidArgumentException(
@@ -276,10 +276,10 @@ public final class NativeValues {
   }
 
   public static int nativeValue(TileLodMode mode) {
-    if (mode == TileLodMode.DEFAULT) {
+    if (mode.equals(TileLodMode.DEFAULT)) {
       return MapLibreNativeC.MLN_TILE_LOD_MODE_DEFAULT();
     }
-    if (mode == TileLodMode.DISTANCE) {
+    if (mode.equals(TileLodMode.DISTANCE)) {
       return MapLibreNativeC.MLN_TILE_LOD_MODE_DISTANCE();
     }
     throw new InvalidArgumentException(
@@ -301,10 +301,10 @@ public final class NativeValues {
   }
 
   public static int nativeValue(ViewportMode mode) {
-    if (mode == ViewportMode.DEFAULT) {
+    if (mode.equals(ViewportMode.DEFAULT)) {
       return MapLibreNativeC.MLN_VIEWPORT_MODE_DEFAULT();
     }
-    if (mode == ViewportMode.FLIPPED_Y) {
+    if (mode.equals(ViewportMode.FLIPPED_Y)) {
       return MapLibreNativeC.MLN_VIEWPORT_MODE_FLIPPED_Y();
     }
     throw new InvalidArgumentException(

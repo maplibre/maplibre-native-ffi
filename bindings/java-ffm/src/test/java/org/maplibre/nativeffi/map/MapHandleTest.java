@@ -158,11 +158,13 @@ final class MapHandleTest {
       assertEquals(ConstrainMode.HEIGHT_ONLY, viewport.constrainMode());
       assertEquals(ViewportMode.DEFAULT, viewport.viewportMode());
       assertEquals(EdgeInsets.ZERO, viewport.frustumOffset());
+      map.setViewportOptions(viewport);
 
       map.setTileOptions(new TileOptions().prefetchZoomDelta(2).lodMode(TileLodMode.DEFAULT));
       var tile = map.tileOptions();
       assertEquals(2, tile.prefetchZoomDelta());
       assertEquals(TileLodMode.DEFAULT, tile.lodMode());
+      map.setTileOptions(tile);
 
       map.setBounds(new BoundOptions().minZoom(0).maxZoom(22).minPitch(0).maxPitch(60));
       var bounds = map.bounds();
