@@ -39,15 +39,17 @@ final class ResourceProviderState implements AutoCloseable {
   }
 
   private int invoke(MemorySegment userData, MemorySegment request, MemorySegment handle) {
-    var lease = lifecycle.enter();
-    if (lease.isEmpty()) {
-      return UNKNOWN_DECISION;
-    }
     ResourceRequestHandle requestHandle = null;
-    try (var ignored = lease.get()) {
+    try {
       requestHandle = new ResourceRequestHandle(InternalAccess.INSTANCE, handle);
-      var decision = callback.handle(ResourceStructs.resourceRequest(request), requestHandle);
-      return requestHandle.finishProviderDecision(InternalAccess.INSTANCE, decision);
+      var lease = lifecycle.enter();
+      if (lease.isEmpty()) {
+        return requestHandle.finishProviderException(InternalAccess.INSTANCE);
+      }
+      try (var ignored = lease.get()) {
+        var decision = callback.handle(ResourceStructs.resourceRequest(request), requestHandle);
+        return requestHandle.finishProviderDecision(InternalAccess.INSTANCE, decision);
+      }
     } catch (Throwable ignored) {
       if (requestHandle != null) {
         return requestHandle.finishProviderException(InternalAccess.INSTANCE);

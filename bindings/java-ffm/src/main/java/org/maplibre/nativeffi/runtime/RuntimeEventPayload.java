@@ -57,6 +57,13 @@ public sealed interface RuntimeEventPayload
       boolean found)
       implements RuntimeEventPayload {}
 
+  /**
+   * Native event payload that this binding could not decode.
+   *
+   * @param payloadSize byte count reported by native
+   * @param rawPayload copied payload bytes, which can be shorter than {@code payloadSize} when
+   *     native supplied a null payload pointer
+   */
   record Unknown(int rawPayloadType, long payloadSize, byte[] rawPayload)
       implements RuntimeEventPayload {
     public Unknown {
