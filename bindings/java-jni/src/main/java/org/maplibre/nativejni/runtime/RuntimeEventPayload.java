@@ -1,5 +1,6 @@
 package org.maplibre.nativejni.runtime;
 
+import java.util.Arrays;
 import org.maplibre.nativejni.geo.TileId;
 import org.maplibre.nativejni.map.RenderingStats;
 import org.maplibre.nativejni.map.TileOperation;
@@ -59,6 +60,22 @@ public sealed interface RuntimeEventPayload
     @Override
     public byte[] payloadBytes() {
       return payloadBytes.clone();
+    }
+
+    @Override
+    public boolean equals(Object other) {
+      return other instanceof Unknown unknown
+          && rawPayloadType == unknown.rawPayloadType
+          && payloadSize == unknown.payloadSize
+          && Arrays.equals(payloadBytes, unknown.payloadBytes);
+    }
+
+    @Override
+    public int hashCode() {
+      var result = Integer.hashCode(rawPayloadType);
+      result = 31 * result + Long.hashCode(payloadSize);
+      result = 31 * result + Arrays.hashCode(payloadBytes);
+      return result;
     }
   }
 }

@@ -1,5 +1,6 @@
 package org.maplibre.nativejni.runtime;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -478,6 +479,21 @@ class RuntimeHandleTest {
       runtime.runOnce();
       assertTrue(runtime.pollEvent().isEmpty());
     }
+  }
+
+  @Test
+  void bnd083UnknownPayloadBytesAreCopiedValueData() {
+    var originalBytes = new byte[] {1, 2, 3};
+    var payload = new RuntimeEventPayload.Unknown(1234, originalBytes.length, originalBytes);
+    originalBytes[0] = 9;
+
+    var sameValue = new RuntimeEventPayload.Unknown(1234, 3, new byte[] {1, 2, 3});
+    assertEquals(sameValue, payload);
+    assertEquals(sameValue.hashCode(), payload.hashCode());
+
+    var returnedBytes = payload.payloadBytes();
+    returnedBytes[0] = 9;
+    assertArrayEquals(new byte[] {1, 2, 3}, payload.payloadBytes());
   }
 
   @Test
