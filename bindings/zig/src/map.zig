@@ -1625,22 +1625,6 @@ fn mapStateLocked(handle: MapHandle) ?*MapState {
     return slot.state;
 }
 
-fn unregisterMapState(handle: MapHandle) ?*MapState {
-    lockMapRegistry();
-    defer unlockMapRegistry();
-
-    const index = mapHandleIndex(handle) orelse return null;
-    if (index > map_registry.items.len) return null;
-    const slot_index = index - 1;
-    const slot = &map_registry.items[slot_index];
-    if (slot.generation != mapHandleGeneration(handle)) return null;
-    const map_state = slot.state orelse return null;
-    slot.state = null;
-    slot.generation = runtime_module.nextHandleGeneration();
-    map_free_list.appendAssumeCapacity(slot_index);
-    return map_state;
-}
-
 const MapClose = struct {
     state: *MapState,
     native: *c.mln_map,

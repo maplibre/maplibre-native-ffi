@@ -185,7 +185,7 @@ pub const TempStorage = struct {
                 raw.type = c.MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID;
                 raw.data = .{ .tile_pyramid = .{
                     .size = @sizeOf(c.mln_offline_tile_pyramid_region_definition),
-                    .style_url = (try self.nulTerminatedString(definition.style_url)).ptr,
+                    .style_url = (try self.nulTerminatedString(definition.style_url, "offline region style_url contains embedded NUL")).ptr,
                     .bounds = values.latLngBoundsToNative(definition.bounds),
                     .min_zoom = definition.min_zoom,
                     .max_zoom = definition.max_zoom,
@@ -197,7 +197,7 @@ pub const TempStorage = struct {
                 raw.type = c.MLN_OFFLINE_REGION_DEFINITION_GEOMETRY;
                 raw.data = .{ .geometry = .{
                     .size = @sizeOf(c.mln_offline_geometry_region_definition),
-                    .style_url = (try self.nulTerminatedString(definition.style_url)).ptr,
+                    .style_url = (try self.nulTerminatedString(definition.style_url, "offline region style_url contains embedded NUL")).ptr,
                     .geometry = try self.geometry(definition.geometry),
                     .min_zoom = definition.min_zoom,
                     .max_zoom = definition.max_zoom,
@@ -209,9 +209,9 @@ pub const TempStorage = struct {
         return raw;
     }
 
-    fn nulTerminatedString(self: *TempStorage, value: []const u8) status.Error![:0]u8 {
+    fn nulTerminatedString(self: *TempStorage, value: []const u8, diagnostic_message: []const u8) status.Error![:0]u8 {
         if (std.mem.indexOfScalar(u8, value, 0) != null) {
-            try status.setBindingDiagnostic(self.diagnostic_store, "offline region style_url contains embedded NUL");
+            try status.setBindingDiagnostic(self.diagnostic_store, diagnostic_message);
             return error.InvalidString;
         }
         return self.arena.allocator().dupeZ(u8, value);
