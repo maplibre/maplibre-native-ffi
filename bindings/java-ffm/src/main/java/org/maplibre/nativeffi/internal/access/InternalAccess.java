@@ -3,7 +3,7 @@ package org.maplibre.nativeffi.internal.access;
 import java.security.CodeSource;
 import java.util.Objects;
 
-/** Token for cross-package calls inside this module. */
+/** API-hygiene token for cross-package calls inside this module. */
 public enum InternalAccess {
   INSTANCE;
 
@@ -38,6 +38,7 @@ public enum InternalAccess {
       return type.getModule() == LIBRARY_MODULE;
     }
     return type.getModule() == LIBRARY_MODULE
+        && LIBRARY_LOCATION != null
         && Objects.equals(codeSourceLocation(type), LIBRARY_LOCATION);
   }
 

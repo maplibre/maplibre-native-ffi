@@ -87,15 +87,15 @@ public final class NativeValues {
   }
 
   public static int nativeValue(NetworkStatus status) {
-    return switch (status.rawValue()) {
-      case 1 -> MapLibreNativeC.MLN_NETWORK_STATUS_ONLINE();
-      case 2 -> MapLibreNativeC.MLN_NETWORK_STATUS_OFFLINE();
-      default ->
-          throw new InvalidArgumentException(
-              0,
-              "Unknown network status value cannot be set: "
-                  + Integer.toUnsignedLong(status.rawValue()));
-    };
+    if (status.equals(NetworkStatus.ONLINE)) {
+      return MapLibreNativeC.MLN_NETWORK_STATUS_ONLINE();
+    }
+    if (status.equals(NetworkStatus.OFFLINE)) {
+      return MapLibreNativeC.MLN_NETWORK_STATUS_OFFLINE();
+    }
+    throw new InvalidArgumentException(
+        0,
+        "Unknown network status value cannot be set: " + Integer.toUnsignedLong(status.rawValue()));
   }
 
   public static EnumSet<RenderBackend> renderBackendsFromMask(int mask) {
@@ -215,10 +215,10 @@ public final class NativeValues {
   }
 
   public static int nativeValue(OfflineRegionDownloadState state) {
-    if (state == OfflineRegionDownloadState.INACTIVE) {
+    if (state.equals(OfflineRegionDownloadState.INACTIVE)) {
       return MapLibreNativeC.MLN_OFFLINE_REGION_DOWNLOAD_INACTIVE();
     }
-    if (state == OfflineRegionDownloadState.ACTIVE) {
+    if (state.equals(OfflineRegionDownloadState.ACTIVE)) {
       return MapLibreNativeC.MLN_OFFLINE_REGION_DOWNLOAD_ACTIVE();
     }
     throw new InvalidArgumentException(

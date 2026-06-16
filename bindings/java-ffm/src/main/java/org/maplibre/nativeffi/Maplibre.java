@@ -70,7 +70,7 @@ public final class Maplibre {
     NativeAccess.ensureLoaded();
     Status.check(
         MapLibreNativeC.mln_network_status_set(
-            NativeValues.nativeValue(Objects.requireNonNull(status))));
+            NativeValues.nativeValue(Objects.requireNonNull(status, "status"))));
   }
 
   /**

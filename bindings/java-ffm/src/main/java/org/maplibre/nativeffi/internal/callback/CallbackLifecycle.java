@@ -8,6 +8,7 @@ import org.maplibre.nativeffi.internal.status.Status;
 /** Tracks callback upcalls so native stubs are released only after active calls return. */
 public final class CallbackLifecycle {
   private static final int MAX_DEFERRED_CLOSE_ATTEMPTS = 1_000;
+  private static final System.Logger LOGGER = System.getLogger(CallbackLifecycle.class.getName());
 
   private final ThreadLocal<Integer> currentThreadCalls = ThreadLocal.withInitial(() -> 0);
 
@@ -109,7 +110,14 @@ public final class CallbackLifecycle {
         action.run();
         return;
       } catch (IllegalStateException error) {
-        if (!isAcquiredSession(error) || attempt >= MAX_DEFERRED_CLOSE_ATTEMPTS) {
+        if (!isAcquiredSession(error)) {
+          throw error;
+        }
+        if (attempt >= MAX_DEFERRED_CLOSE_ATTEMPTS) {
+          LOGGER.log(
+              System.Logger.Level.WARNING,
+              "Timed out waiting for FFM callback arena release",
+              error);
           throw error;
         }
         sleepBeforeRetry();

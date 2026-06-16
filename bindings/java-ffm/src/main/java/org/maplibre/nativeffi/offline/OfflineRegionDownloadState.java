@@ -1,21 +1,26 @@
 package org.maplibre.nativeffi.offline;
 
+import org.maplibre.nativeffi.internal.c.MapLibreNativeC;
+
 /** Download state for an offline region status snapshot. */
 public final class OfflineRegionDownloadState {
-  public static final OfflineRegionDownloadState INACTIVE = new OfflineRegionDownloadState(0);
-  public static final OfflineRegionDownloadState ACTIVE = new OfflineRegionDownloadState(1);
+  public static final OfflineRegionDownloadState INACTIVE =
+      new OfflineRegionDownloadState(MapLibreNativeC.MLN_OFFLINE_REGION_DOWNLOAD_INACTIVE());
+  public static final OfflineRegionDownloadState ACTIVE =
+      new OfflineRegionDownloadState(MapLibreNativeC.MLN_OFFLINE_REGION_DOWNLOAD_ACTIVE());
 
   private final int rawValue;
   private final String name;
 
   public OfflineRegionDownloadState(int rawValue) {
     this.rawValue = rawValue;
-    this.name =
-        switch (rawValue) {
-          case 0 -> "INACTIVE";
-          case 1 -> "ACTIVE";
-          default -> "UNKNOWN(" + rawValue + ")";
-        };
+    if (rawValue == MapLibreNativeC.MLN_OFFLINE_REGION_DOWNLOAD_INACTIVE()) {
+      name = "INACTIVE";
+    } else if (rawValue == MapLibreNativeC.MLN_OFFLINE_REGION_DOWNLOAD_ACTIVE()) {
+      name = "ACTIVE";
+    } else {
+      name = "UNKNOWN(" + rawValue + ")";
+    }
   }
 
   public int rawValue() {

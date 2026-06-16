@@ -1,21 +1,26 @@
 package org.maplibre.nativeffi.runtime;
 
+import org.maplibre.nativeffi.internal.c.MapLibreNativeC;
+
 /** Process-global network reachability state used by Maplibre Native. */
 public final class NetworkStatus {
-  public static final NetworkStatus ONLINE = new NetworkStatus(1);
-  public static final NetworkStatus OFFLINE = new NetworkStatus(2);
+  public static final NetworkStatus ONLINE =
+      new NetworkStatus(MapLibreNativeC.MLN_NETWORK_STATUS_ONLINE());
+  public static final NetworkStatus OFFLINE =
+      new NetworkStatus(MapLibreNativeC.MLN_NETWORK_STATUS_OFFLINE());
 
   private final int rawValue;
   private final String name;
 
   public NetworkStatus(int rawValue) {
     this.rawValue = rawValue;
-    this.name =
-        switch (rawValue) {
-          case 1 -> "ONLINE";
-          case 2 -> "OFFLINE";
-          default -> "UNKNOWN(" + Integer.toUnsignedLong(rawValue) + ")";
-        };
+    if (rawValue == MapLibreNativeC.MLN_NETWORK_STATUS_ONLINE()) {
+      name = "ONLINE";
+    } else if (rawValue == MapLibreNativeC.MLN_NETWORK_STATUS_OFFLINE()) {
+      name = "OFFLINE";
+    } else {
+      name = "UNKNOWN(" + Integer.toUnsignedLong(rawValue) + ")";
+    }
   }
 
   public int rawValue() {
