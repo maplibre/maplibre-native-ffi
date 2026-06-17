@@ -37,7 +37,7 @@ else
     --env MISE_EXPERIMENTAL=1 \
     --env MISE_JOBS=1 \
     --env MISE_ENV="$mise_env" \
-    "${github_env_args[@]}" \
+    ${github_env_args+"${github_env_args[@]}"} \
     debian:bookworm-slim \
     bash -euo pipefail -c '
       apt-get update

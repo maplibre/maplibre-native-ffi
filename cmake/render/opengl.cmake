@@ -54,7 +54,7 @@ function(mln_configure_opengl_backend target)
       PROPERTIES
         COMPILE_OPTIONS
         "/FI${PROJECT_SOURCE_DIR}/third_party/khronos/include/GLES3/gl3.h;/FI${PROJECT_SOURCE_DIR}/third_party/khronos/include/GL/wglext.h")
-    target_link_libraries(${target} PRIVATE OpenGL::GL Gdi32 User32)
+    target_link_libraries(${target} PRIVATE OpenGL::GL opengl32 Gdi32 User32)
   else()
     message(
       FATAL_ERROR
