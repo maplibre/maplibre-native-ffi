@@ -2,9 +2,9 @@ package org.maplibre.nativeffi.render
 
 /** Mutable descriptor for OpenGL native surface render targets. */
 public class OpenGLSurfaceDescriptor(
-  extent: RenderTargetExtent = RenderTargetExtent(),
-  context: OpenGLContextDescriptor = WglContextDescriptor(),
-  surface: NativePointer = NativePointer.NULL,
+  extent: RenderTargetExtent,
+  context: OpenGLContextDescriptor,
+  surface: NativePointer,
 ) {
   public var extent: RenderTargetExtent = extent
 

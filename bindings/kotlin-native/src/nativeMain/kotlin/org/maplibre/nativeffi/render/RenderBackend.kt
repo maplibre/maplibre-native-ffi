@@ -6,10 +6,10 @@ public enum class RenderBackend(public val nativeMask: Int) {
   VULKAN(1 shl 1),
   OPENGL(1 shl 2);
 
-  public companion object {
+  internal companion object {
     internal fun fromMask(mask: UInt): Set<RenderBackend> = fromMask(mask.toInt())
 
-    public fun fromMask(mask: Int): Set<RenderBackend> =
+    internal fun fromMask(mask: Int): Set<RenderBackend> =
       entries.filterTo(mutableSetOf()) { (mask and it.nativeMask) != 0 }
   }
 }

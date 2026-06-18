@@ -121,6 +121,9 @@ internal object RuntimeStructs {
     RuntimeEventPayload.Unknown(
       event.payload_type.toInt(),
       checkedLong(event.payload_size, "payload size"),
+      event.payload
+        ?.reinterpret<kotlinx.cinterop.ByteVar>()
+        ?.readBytes(checkedInt(event.payload_size, "payload size")) ?: ByteArray(0),
     )
 
   private fun renderFrame(
@@ -129,7 +132,6 @@ internal object RuntimeStructs {
     val value = payload.pointed
     return RuntimeEventPayload.RenderFrame(
       RenderMode.fromNative(value.mode),
-      value.mode.toInt(),
       value.needs_repaint,
       value.placement_changed,
       RenderingStats(
@@ -146,7 +148,7 @@ internal object RuntimeStructs {
     payload: CPointer<mln_runtime_event_render_map>
   ): RuntimeEventPayload.RenderMap {
     val value = payload.pointed
-    return RuntimeEventPayload.RenderMap(RenderMode.fromNative(value.mode), value.mode.toInt())
+    return RuntimeEventPayload.RenderMap(RenderMode.fromNative(value.mode))
   }
 
   private fun styleImageMissing(
@@ -172,7 +174,6 @@ internal object RuntimeStructs {
       )
     return RuntimeEventPayload.TileAction(
       TileOperation.fromNative(value.operation),
-      value.operation.toInt(),
       tileId,
       MemoryUtil.copyStringView(value.source_id, value.source_id_size),
     )
@@ -195,7 +196,6 @@ internal object RuntimeStructs {
     return RuntimeEventPayload.OfflineRegionResponseError(
       value.region_id,
       ResourceErrorReason.fromNative(value.reason),
-      value.reason.toInt(),
     )
   }
 
@@ -216,9 +216,7 @@ internal object RuntimeStructs {
     return RuntimeEventPayload.OfflineOperationCompleted(
       uint64BitsToLong(value.operation_id),
       OfflineOperationKind.fromNative(value.operation_kind),
-      value.operation_kind.toInt(),
       OfflineOperationResultKind.fromNative(value.result_kind),
-      value.result_kind.toInt(),
       value.result_status,
       value.found,
     )
@@ -276,40 +274,58 @@ internal object RuntimeStructs {
         native.data.geometry.pixel_ratio = value.pixelRatio
         native.data.geometry.include_ideographs = value.includeIdeographs
       }
+      is OfflineRegionDefinition.Unknown ->
+        throw IllegalArgumentException("unknown offline region definitions cannot be used as input")
     }
     return native.ptr
   }
 
   fun offlineRegionSnapshot(
-    snapshot: CPointer<cnames.structs.mln_offline_region_snapshot>
+    snapshot: CPointer<cnames.structs.mln_offline_region_snapshot>,
+    getter:
+      (
+        CPointer<cnames.structs.mln_offline_region_snapshot>, CPointer<mln_offline_region_info>,
+      ) -> Int =
+      ::mln_offline_region_snapshot_get,
+    destroyer: (CPointer<cnames.structs.mln_offline_region_snapshot>) -> Unit =
+      ::mln_offline_region_snapshot_destroy,
   ): OfflineRegionInfo =
     try {
       memScoped {
         val info = alloc<mln_offline_region_info>()
         info.size = sizeOf<mln_offline_region_info>().toUInt()
-        Status.check(mln_offline_region_snapshot_get(snapshot, info.ptr))
+        Status.check(getter(snapshot, info.ptr))
         offlineRegionInfo(info)
       }
     } finally {
-      mln_offline_region_snapshot_destroy(snapshot)
+      destroyer(snapshot)
     }
 
   fun offlineRegionList(
-    list: CPointer<cnames.structs.mln_offline_region_list>
+    list: CPointer<cnames.structs.mln_offline_region_list>,
+    counter: (CPointer<cnames.structs.mln_offline_region_list>, CPointer<ULongVar>) -> Int =
+      ::mln_offline_region_list_count,
+    getter:
+      (
+        CPointer<cnames.structs.mln_offline_region_list>, ULong, CPointer<mln_offline_region_info>,
+      ) -> Int =
+      ::mln_offline_region_list_get,
+    destroyer: (CPointer<cnames.structs.mln_offline_region_list>) -> Unit =
+      ::mln_offline_region_list_destroy,
   ): List<OfflineRegionInfo> =
     try {
       memScoped {
         val outCount = alloc<ULongVar>()
-        Status.check(mln_offline_region_list_count(list, outCount.ptr))
+        Status.check(counter(list, outCount.ptr))
         List(checkedInt(outCount.value, "offline region count")) { index ->
           val info = alloc<mln_offline_region_info>()
           info.size = sizeOf<mln_offline_region_info>().toUInt()
-          Status.check(mln_offline_region_list_get(list, index.toULong(), info.ptr))
+          Status.check(getter(list, index.toULong(), info.ptr))
           offlineRegionInfo(info)
         }
       }
     } finally {
-      mln_offline_region_list_destroy(list)
+      destroyer(list)
     }
 
   fun offlineRegionInfo(value: mln_offline_region_info): OfflineRegionInfo =
@@ -346,13 +362,16 @@ internal object RuntimeStructs {
           definition.include_ideographs,
         )
       }
-      else -> error("Unknown offline region definition type ${value.type}")
+      else ->
+        OfflineRegionDefinition.Unknown(
+          value.type.toInt(),
+          checkedInt(value.size.toULong(), "offline region definition size"),
+        )
     }
 
   fun offlineRegionStatus(value: mln_offline_region_status): OfflineRegionStatus =
     OfflineRegionStatus(
       OfflineRegionDownloadState.fromNative(value.download_state),
-      value.download_state.toInt(),
       checkedLong(value.completed_resource_count, "completed resource count"),
       checkedLong(value.completed_resource_size, "completed resource size"),
       checkedLong(value.completed_tile_count, "completed tile count"),

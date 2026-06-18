@@ -4,11 +4,13 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 class GeometryTest {
+  // BND-069: public geometry values snapshot caller-owned nested collections.
+
   @Test
-  fun geometryFactoriesCopyNestedCollections() {
+  fun geometryValuesSnapshotNestedCollections() {
     val ring = mutableListOf(LatLng(0.0, 0.0), LatLng(1.0, 1.0))
     val rings = mutableListOf(ring)
-    val polygon = Geometry.polygon(rings)
+    val polygon = Geometry.Polygon(rings)
 
     ring.add(LatLng(2.0, 2.0))
     rings.add(mutableListOf(LatLng(3.0, 3.0)))

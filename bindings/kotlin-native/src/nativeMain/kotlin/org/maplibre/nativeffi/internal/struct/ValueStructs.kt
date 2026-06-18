@@ -101,17 +101,23 @@ internal object ValueStructs {
     return readJson(value.pointed)
   }
 
-  fun jsonSnapshotHandle(snapshot: CPointer<mln_json_snapshot>?): JsonValue? {
+  fun jsonSnapshotHandle(
+    snapshot: CPointer<mln_json_snapshot>?,
+    getter:
+      (CPointer<mln_json_snapshot>, CPointer<CPointerVarOf<CPointer<mln_json_value>>>) -> Int =
+      ::mln_json_snapshot_get,
+    destroyer: (CPointer<mln_json_snapshot>) -> Unit = ::mln_json_snapshot_destroy,
+  ): JsonValue? {
     if (snapshot == null) return null
     return try {
       memScoped {
         val outValue = alloc<CPointerVarOf<CPointer<mln_json_value>>>()
         outValue.value = null
-        Status.check(mln_json_snapshot_get(snapshot, outValue.ptr))
+        Status.check(getter(snapshot, outValue.ptr))
         outValue.value?.let(::jsonSnapshot)
       }
     } finally {
-      mln_json_snapshot_destroy(snapshot)
+      destroyer(snapshot)
     }
   }
 
@@ -165,6 +171,8 @@ internal object ValueStructs {
         native.identifier_type = MLN_FEATURE_IDENTIFIER_TYPE_STRING
         CoreStructs.setStringView(native.identifier.string_value, identifier.value, scope)
       }
+      is FeatureIdentifier.Unknown ->
+        throw IllegalArgumentException("unknown feature identifiers cannot be used as input")
     }
   }
 
@@ -221,6 +229,8 @@ internal object ValueStructs {
         native.data.object_value.members = members
         native.data.object_value.member_count = value.members.size.toULong()
       }
+      is JsonValue.Unknown ->
+        throw IllegalArgumentException("unknown JSON values cannot be used as input")
     }
   }
 
@@ -278,6 +288,8 @@ internal object ValueStructs {
         native.data.geometry_collection.geometries = geometries
         native.data.geometry_collection.geometry_count = value.geometries.size.toULong()
       }
+      is Geometry.Unknown ->
+        throw IllegalArgumentException("unknown geometries cannot be used as input")
     }
   }
 
@@ -331,7 +343,8 @@ internal object ValueStructs {
             JsonValue.Member(CoreStructs.stringView(member.key), jsonSnapshot(member.value))
           }
         )
-      else -> error("Unknown JSON value type ${native.type}")
+      else ->
+        JsonValue.Unknown(native.type.toInt(), checkedInt(native.size.toULong(), "JSON value size"))
     }
 
   private fun readGeometry(native: mln_geometry): Geometry =
@@ -367,7 +380,8 @@ internal object ValueStructs {
             readGeometry(native.data.geometry_collection.geometries!![index])
           }
         )
-      else -> error("Unknown geometry type ${native.type}")
+      else ->
+        Geometry.Unknown(native.type.toInt(), checkedInt(native.size.toULong(), "geometry size"))
     }
 
   private fun readFeature(native: mln_feature): Feature {
@@ -398,7 +412,7 @@ internal object ValueStructs {
         FeatureIdentifier.DoubleValue(native.identifier.double_value)
       MLN_FEATURE_IDENTIFIER_TYPE_STRING ->
         FeatureIdentifier.StringValue(CoreStructs.stringView(native.identifier.string_value))
-      else -> FeatureIdentifier.Null
+      else -> FeatureIdentifier.Unknown(native.identifier_type.toInt())
     }
 
   private fun readCoordinateSpan(native: mln_coordinate_span): List<LatLng> =

@@ -18,6 +18,7 @@ import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.internal.c.mln_resource_request_cancelled
 import org.maplibre.nativeffi.internal.c.mln_resource_request_complete
 import org.maplibre.nativeffi.internal.c.mln_resource_request_release
+import org.maplibre.nativeffi.internal.c.mln_resource_response
 import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.internal.struct.ResourceStructs
 
@@ -26,6 +27,14 @@ import org.maplibre.nativeffi.internal.struct.ResourceStructs
 public class ResourceRequestHandle
 internal constructor(
   private val handle: CPointer<mln_resource_request_handle>,
+  private val completer:
+    (CPointer<mln_resource_request_handle>, CPointer<mln_resource_response>) -> Int =
+    ::mln_resource_request_complete,
+  private val cancellationChecker:
+    (CPointer<mln_resource_request_handle>, CPointer<BooleanVar>) -> Int =
+    { requestHandle, outCancelled ->
+      mln_resource_request_cancelled(requestHandle, outCancelled)
+    },
   private val releaser: (CPointer<mln_resource_request_handle>) -> Unit =
     ::mln_resource_request_release,
 ) : AutoCloseable {
@@ -48,16 +57,25 @@ internal constructor(
       completion.store(COMPLETION_OPEN)
       throw error
     }
+    var reachedNative = false
     try {
-      memScoped {
-        Status.check(
-          mln_resource_request_complete(handle, ResourceStructs.resourceResponse(response, this))
-        )
+      val nativeStatus = memScoped {
+        val nativeResponse = ResourceStructs.resourceResponse(response, this)
+        reachedNative = true
+        completer(handle, nativeResponse)
       }
+      val nativeFailure =
+        if (nativeStatus == MaplibreStatus.OK.nativeCode) null else Status.exception(nativeStatus)
       completion.store(COMPLETION_DONE)
       markClosed()
+      nativeFailure?.let { throw it }
     } catch (error: Throwable) {
-      completion.store(COMPLETION_OPEN)
+      if (reachedNative) {
+        completion.store(COMPLETION_DONE)
+        markClosed()
+      } else {
+        completion.store(COMPLETION_OPEN)
+      }
       throw error
     } finally {
       releaseBorrow()
@@ -67,7 +85,8 @@ internal constructor(
   public fun isCancelled(): Boolean = withLiveHandle {
     memScoped {
       val outCancelled = alloc<BooleanVar>()
-      Status.check(mln_resource_request_cancelled(handle, outCancelled.ptr))
+      outCancelled.value = false
+      Status.check(cancellationChecker(handle, outCancelled.ptr))
       outCancelled.value
     }
   }

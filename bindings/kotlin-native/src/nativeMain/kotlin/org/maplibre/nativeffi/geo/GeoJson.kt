@@ -16,13 +16,4 @@ public sealed interface GeoJson {
 
     override fun toString(): String = "FeatureCollection(features=$features)"
   }
-
-  public companion object {
-    public fun geometry(geometry: Geometry): GeometryValue = GeometryValue(geometry)
-
-    public fun feature(feature: Feature): FeatureValue = FeatureValue(feature)
-
-    public fun featureCollection(features: List<Feature>): FeatureCollection =
-      FeatureCollection(features.toList())
-  }
 }

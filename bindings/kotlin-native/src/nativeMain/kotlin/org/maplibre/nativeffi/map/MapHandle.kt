@@ -2,12 +2,14 @@ package org.maplibre.nativeffi.map
 
 import cnames.structs.mln_json_snapshot
 import cnames.structs.mln_map
+import cnames.structs.mln_map_projection
 import cnames.structs.mln_style_id_list
 import kotlinx.cinterop.BooleanVar
 import kotlinx.cinterop.ByteVar
 import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.CPointerVarOf
 import kotlinx.cinterop.ExperimentalForeignApi
+import kotlinx.cinterop.MemScope
 import kotlinx.cinterop.UByteVar
 import kotlinx.cinterop.UIntVar
 import kotlinx.cinterop.ULongVar
@@ -100,6 +102,7 @@ import org.maplibre.nativeffi.internal.c.mln_map_pitch_by
 import org.maplibre.nativeffi.internal.c.mln_map_pitch_by_animated
 import org.maplibre.nativeffi.internal.c.mln_map_pixel_for_lat_lng
 import org.maplibre.nativeffi.internal.c.mln_map_pixels_for_lat_lngs
+import org.maplibre.nativeffi.internal.c.mln_map_projection_create
 import org.maplibre.nativeffi.internal.c.mln_map_remove_style_image
 import org.maplibre.nativeffi.internal.c.mln_map_remove_style_layer
 import org.maplibre.nativeffi.internal.c.mln_map_remove_style_source
@@ -407,7 +410,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     }
   }
 
-  public fun addVectorSourceUrl(sourceId: String, url: String, options: TileSourceOptions? = null) {
+  public fun addVectorSourceUrl(sourceId: String, url: String, options: TileSourceOptions?) {
     memScoped {
       Status.check(
         mln_map_add_vector_source_url(
@@ -423,7 +426,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
   public fun addVectorSourceTiles(
     sourceId: String,
     tiles: List<String>,
-    options: TileSourceOptions? = null,
+    options: TileSourceOptions?,
   ) {
     val tileSnapshot = tiles.toList()
     memScoped {
@@ -439,7 +442,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     }
   }
 
-  public fun addRasterSourceUrl(sourceId: String, url: String, options: TileSourceOptions? = null) {
+  public fun addRasterSourceUrl(sourceId: String, url: String, options: TileSourceOptions?) {
     memScoped {
       Status.check(
         mln_map_add_raster_source_url(
@@ -455,7 +458,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
   public fun addRasterSourceTiles(
     sourceId: String,
     tiles: List<String>,
-    options: TileSourceOptions? = null,
+    options: TileSourceOptions?,
   ) {
     val tileSnapshot = tiles.toList()
     memScoped {
@@ -471,11 +474,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     }
   }
 
-  public fun addRasterDemSourceUrl(
-    sourceId: String,
-    url: String,
-    options: TileSourceOptions? = null,
-  ) {
+  public fun addRasterDemSourceUrl(sourceId: String, url: String, options: TileSourceOptions?) {
     memScoped {
       Status.check(
         mln_map_add_raster_dem_source_url(
@@ -491,7 +490,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
   public fun addRasterDemSourceTiles(
     sourceId: String,
     tiles: List<String>,
-    options: TileSourceOptions? = null,
+    options: TileSourceOptions?,
   ) {
     val tileSnapshot = tiles.toList()
     memScoped {
@@ -505,10 +504,6 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
         )
       )
     }
-  }
-
-  public fun setStyleImage(imageId: String, image: PremultipliedRgba8Image) {
-    setStyleImage(imageId, image, StyleImageOptions())
   }
 
   public fun setStyleImage(
@@ -717,10 +712,6 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     }
   }
 
-  public fun addStyleLayerJson(layerJson: JsonValue) {
-    addStyleLayerJson(layerJson, "")
-  }
-
   public fun addStyleLayerJson(layerJson: JsonValue, beforeLayerId: String) {
     memScoped {
       Status.check(
@@ -731,10 +722,6 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
         )
       )
     }
-  }
-
-  public fun addHillshadeLayer(layerId: String, sourceId: String) {
-    addHillshadeLayer(layerId, sourceId, "")
   }
 
   public fun addHillshadeLayer(layerId: String, sourceId: String, beforeLayerId: String) {
@@ -750,10 +737,6 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     }
   }
 
-  public fun addColorReliefLayer(layerId: String, sourceId: String) {
-    addColorReliefLayer(layerId, sourceId, "")
-  }
-
   public fun addColorReliefLayer(layerId: String, sourceId: String, beforeLayerId: String) {
     memScoped {
       Status.check(
@@ -765,10 +748,6 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
         )
       )
     }
-  }
-
-  public fun addLocationIndicatorLayer(layerId: String) {
-    addLocationIndicatorLayer(layerId, "")
   }
 
   public fun addLocationIndicatorLayer(layerId: String, beforeLayerId: String) {
@@ -882,7 +861,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     StyleStructs.styleIdList(requireNotNull(outList.value))
   }
 
-  public fun moveStyleLayer(layerId: String, beforeLayerId: String = "") {
+  public fun moveStyleLayer(layerId: String, beforeLayerId: String) {
     memScoped {
       Status.check(
         mln_map_move_style_layer(
@@ -1088,7 +1067,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     }
   }
 
-  public fun easeTo(camera: CameraOptions, animation: AnimationOptions? = null) {
+  public fun easeTo(camera: CameraOptions, animation: AnimationOptions?) {
     memScoped {
       Status.check(
         mln_map_ease_to(
@@ -1100,7 +1079,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     }
   }
 
-  public fun flyTo(camera: CameraOptions, animation: AnimationOptions? = null) {
+  public fun flyTo(camera: CameraOptions, animation: AnimationOptions?) {
     memScoped {
       Status.check(
         mln_map_fly_to(
@@ -1116,7 +1095,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     Status.check(mln_map_move_by(state.requireLive(), deltaX, deltaY))
   }
 
-  public fun moveByAnimated(deltaX: Double, deltaY: Double, animation: AnimationOptions? = null) {
+  public fun moveByAnimated(deltaX: Double, deltaY: Double, animation: AnimationOptions?) {
     memScoped {
       Status.check(
         mln_map_move_by_animated(
@@ -1129,22 +1108,10 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     }
   }
 
-  public fun scaleBy(scale: Double, anchor: ScreenPoint? = null) {
+  public fun scaleBy(scale: Double, anchor: ScreenPoint?) {
     Status.check(
       mln_map_scale_by(state.requireLive(), scale, anchor?.let { CoreStructs.screenPoint(it) })
     )
-  }
-
-  public fun scaleByAnimated(scale: Double) {
-    scaleByAnimated(scale, null, null)
-  }
-
-  public fun scaleByAnimated(scale: Double, anchor: ScreenPoint?) {
-    scaleByAnimated(scale, anchor, null)
-  }
-
-  public fun scaleByAnimated(scale: Double, animation: AnimationOptions?) {
-    scaleByAnimated(scale, null, animation)
   }
 
   public fun scaleByAnimated(scale: Double, anchor: ScreenPoint?, animation: AnimationOptions?) {
@@ -1173,7 +1140,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
   public fun rotateByAnimated(
     first: ScreenPoint,
     second: ScreenPoint,
-    animation: AnimationOptions? = null,
+    animation: AnimationOptions?,
   ) {
     memScoped {
       Status.check(
@@ -1191,7 +1158,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     Status.check(mln_map_pitch_by(state.requireLive(), pitch))
   }
 
-  public fun pitchByAnimated(pitch: Double, animation: AnimationOptions? = null) {
+  public fun pitchByAnimated(pitch: Double, animation: AnimationOptions?) {
     memScoped {
       Status.check(
         mln_map_pitch_by_animated(
@@ -1209,7 +1176,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
 
   public fun cameraForLatLngBounds(
     bounds: LatLngBounds,
-    fitOptions: CameraFitOptions? = null,
+    fitOptions: CameraFitOptions?,
   ): CameraOptions = memScoped {
     val outCamera = mln_camera_options_default().getPointer(this)
     Status.check(
@@ -1225,7 +1192,7 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
 
   public fun cameraForLatLngs(
     coordinates: List<LatLng>,
-    fitOptions: CameraFitOptions? = null,
+    fitOptions: CameraFitOptions?,
   ): CameraOptions = memScoped {
     val coordinateSnapshot = coordinates.toList()
     val outCamera = mln_camera_options_default().getPointer(this)
@@ -1241,21 +1208,19 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     MapStructs.cameraOptions(outCamera.pointed)
   }
 
-  public fun cameraForGeometry(
-    geometry: Geometry,
-    fitOptions: CameraFitOptions? = null,
-  ): CameraOptions = memScoped {
-    val outCamera = mln_camera_options_default().getPointer(this)
-    Status.check(
-      mln_map_camera_for_geometry(
-        state.requireLive(),
-        ValueStructs.geometry(geometry, this),
-        fitOptions?.let { MapStructs.cameraFitOptions(it, this) },
-        outCamera,
+  public fun cameraForGeometry(geometry: Geometry, fitOptions: CameraFitOptions?): CameraOptions =
+    memScoped {
+      val outCamera = mln_camera_options_default().getPointer(this)
+      Status.check(
+        mln_map_camera_for_geometry(
+          state.requireLive(),
+          ValueStructs.geometry(geometry, this),
+          fitOptions?.let { MapStructs.cameraFitOptions(it, this) },
+          outCamera,
+        )
       )
-    )
-    MapStructs.cameraOptions(outCamera.pointed)
-  }
+      MapStructs.cameraOptions(outCamera.pointed)
+    }
 
   public fun latLngBoundsForCamera(camera: CameraOptions): LatLngBounds = memScoped {
     val outBounds = alloc<mln_lat_lng_bounds>()
@@ -1411,7 +1376,14 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
   public fun attachOpenGLSurface(descriptor: OpenGLSurfaceDescriptor): RenderSessionHandle =
     RenderSessionHandle.attachOpenGLSurface(this, descriptor)
 
-  public fun createProjection(): MapProjectionHandle = MapProjectionHandle.create(this)
+  public fun createProjection(): MapProjectionHandle = memScoped {
+    val outProjection = alloc<CPointerVarOf<CPointer<mln_map_projection>>>()
+    outProjection.value = null
+    Status.check(mln_map_projection_create(state.requireLive(), outProjection.ptr))
+    MapProjectionHandle(
+      requireNotNull(outProjection.value) { "mln_map_projection_create returned null" }
+    )
+  }
 
   override fun close() {
     state.closeOnce(::mln_map_destroy) {
@@ -1436,19 +1408,35 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
 
   public companion object {
     public fun create(runtime: RuntimeHandle, options: MapOptions): MapHandle = memScoped {
-      val nativeOptions = alloc<mln_map_options>()
-      mln_map_options_default().place(nativeOptions.ptr)
-      options.width?.let { nativeOptions.width = it.toUInt() }
-      options.height?.let { nativeOptions.height = it.toUInt() }
-      options.scaleFactor?.let { nativeOptions.scale_factor = it }
-      options.mapMode?.let { nativeOptions.map_mode = it.nativeValue.toUInt() }
-
       val outMap = alloc<CPointerVarOf<CPointer<mln_map>>>()
       outMap.value = null
-      Status.check(mln_map_create(runtime.nativeHandle(), nativeOptions.ptr, outMap.ptr))
+      Status.check(mln_map_create(runtime.nativeHandle(), mapOptions(options, this), outMap.ptr))
       val map = MapHandle(runtime, requireNotNull(outMap.value) { "mln_map_create returned null" })
       runtime.registerMap(map)
       map
+    }
+
+    internal fun mapOptionsForTesting(options: MapOptions, inspect: (mln_map_options) -> Unit) {
+      memScoped { inspect(mapOptions(options, this).pointed) }
+    }
+
+    private fun mapOptions(options: MapOptions, scope: MemScope): CPointer<mln_map_options> {
+      val nativeOptions = scope.alloc<mln_map_options>()
+      mln_map_options_default().place(nativeOptions.ptr)
+      options.width?.let {
+        require(it >= 0) { "width must be non-negative" }
+        nativeOptions.width = it.toUInt()
+      }
+      options.height?.let {
+        require(it >= 0) { "height must be non-negative" }
+        nativeOptions.height = it.toUInt()
+      }
+      options.scaleFactor?.let { nativeOptions.scale_factor = it }
+      options.mapMode?.let {
+        require(it.isKnown) { "Unknown map mode cannot be used as input: ${it.nativeValue}" }
+        nativeOptions.map_mode = it.nativeValue.toUInt()
+      }
+      return nativeOptions.ptr
     }
   }
 }

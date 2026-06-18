@@ -2,10 +2,10 @@ package org.maplibre.nativeffi.render
 
 /** Mutable descriptor for OpenGL caller-owned texture render targets. */
 public class OpenGLBorrowedTextureDescriptor(
-  extent: RenderTargetExtent = RenderTargetExtent(),
-  context: OpenGLContextDescriptor = WglContextDescriptor(),
-  texture: Int = 0,
-  target: Int = 0,
+  extent: RenderTargetExtent,
+  context: OpenGLContextDescriptor,
+  texture: Int,
+  target: Int,
 ) {
   public var extent: RenderTargetExtent = extent
 

@@ -29,9 +29,7 @@ internal class LogCallbackState private constructor(private val callback: LogCal
       val record =
         LogRecord(
           LogSeverity.fromNative(severity),
-          severity.toInt(),
           LogEvent.fromNative(event),
-          event.toInt(),
           code,
           MemoryUtil.copyCString(message),
         )
@@ -48,18 +46,31 @@ internal class LogCallbackState private constructor(private val callback: LogCal
     closed.store(1)
   }
 
+  internal fun isClosedForTesting(): Boolean = closed.load() != 0
+
   internal companion object {
     private val updateLock = AtomicInt(0)
     private val installed = AtomicInt(0)
     private val current = AtomicReference<LogCallbackState?>(null)
 
     fun set(callback: LogCallback) {
-      val replacement = LogCallbackState(callback)
+      set(LogCallbackState(callback)) { mln_log_set_callback(staticCFunction(::logCallback), null) }
+    }
+
+    fun setForTesting(
+      callback: LogCallback,
+      install: () -> Int,
+      captureReplacement: (LogCallbackState) -> Unit,
+    ) {
+      set(LogCallbackState(callback).also(captureReplacement), install)
+    }
+
+    private fun set(replacement: LogCallbackState, install: () -> Int) {
       var previous: LogCallbackState? = null
       try {
         withUpdateLock {
           if (installed.load() == 0) {
-            Status.check(mln_log_set_callback(staticCFunction(::logCallback), null))
+            Status.check(install())
             installed.store(1)
           }
           previous = current.exchange(replacement)
