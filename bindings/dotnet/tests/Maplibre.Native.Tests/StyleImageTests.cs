@@ -9,10 +9,11 @@ namespace Maplibre.Native.Tests;
 
 public sealed class StyleImageTests
 {
+    [BindingSpecTest("BND-105")]
     [Fact]
     public void ImageSourceApisAdaptCoordinatesAndImagesThroughNativeMap()
     {
-        using var runtime = RuntimeHandle.Create();
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
         using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
         map.SetStyleJson("{\"version\":8,\"sources\":{},\"layers\":[]}");
         var coordinates = new[]
@@ -43,10 +44,11 @@ public sealed class StyleImageTests
         Assert.Equal(coordinates, map.GetImageSourceCoordinates("image-inline"));
     }
 
+    [BindingSpecTest("BND-105")]
     [Fact]
     public void StyleImageRoundTripsMetadataAndPixelsThroughNativeMap()
     {
-        using var runtime = RuntimeHandle.Create();
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
         using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
         map.SetStyleJson("{\"version\":8,\"sources\":{},\"layers\":[]}");
         var image = new PremultipliedRgba8Image([255, 0, 0, 255], new TextureImageInfo(1, 1, 4, 4));

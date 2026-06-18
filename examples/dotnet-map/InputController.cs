@@ -179,10 +179,10 @@ internal sealed unsafe class InputController : IDisposable
                 break;
             case Keys.Equal:
             case Keys.KeypadEqual:
-                map.ScaleByAnimated(KeyboardZoom, KeyboardAnimation);
+                map.ScaleByAnimated(KeyboardZoom, null, KeyboardAnimation);
                 break;
             case Keys.Minus:
-                map.ScaleByAnimated(1.0 / KeyboardZoom, KeyboardAnimation);
+                map.ScaleByAnimated(1.0 / KeyboardZoom, null, KeyboardAnimation);
                 break;
             case Keys.Q:
                 SetBearing(CurrentBearing() - KeyboardBearing, animated: true);

@@ -23,7 +23,8 @@ public sealed class OfflineOperationHandle : IDisposable
             throw new InvalidArgumentException(
                 MaplibreStatus.InvalidArgument,
                 null,
-                "Offline operation id must not be zero."
+                "Offline operation id must not be zero.",
+                null
             );
         }
 
@@ -62,7 +63,8 @@ public sealed class OfflineOperationHandle : IDisposable
                 throw new InvalidStateException(
                     MaplibreStatus.InvalidState,
                     null,
-                    "OfflineOperationHandle is already closed."
+                    "OfflineOperationHandle is already closed.",
+                    null
                 );
             }
 
@@ -71,7 +73,8 @@ public sealed class OfflineOperationHandle : IDisposable
                 throw new InvalidStateException(
                     MaplibreStatus.InvalidState,
                     null,
-                    "OfflineOperationHandle belongs to a different RuntimeHandle."
+                    "OfflineOperationHandle belongs to a different RuntimeHandle.",
+                    null
                 );
             }
 
@@ -93,7 +96,8 @@ public sealed class OfflineOperationHandle : IDisposable
                 throw new InvalidStateException(
                     MaplibreStatus.InvalidState,
                     null,
-                    $"OfflineOperationHandle has kind {Kind} and result kind {ResultKind}, expected {expectedKind} and {expectedResultKind}."
+                    $"OfflineOperationHandle has kind {Kind} and result kind {ResultKind}, expected {expectedKind} and {expectedResultKind}.",
+                    null
                 );
             }
 

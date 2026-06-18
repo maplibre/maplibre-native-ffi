@@ -137,5 +137,5 @@ public abstract record RuntimeEventPayload
         bool Found
     ) : RuntimeEventPayload;
 
-    public sealed record Unknown(uint RawPayloadType, nuint PayloadSize) : RuntimeEventPayload;
+    public sealed record Unknown(uint RawPayloadType, byte[] PayloadBytes) : RuntimeEventPayload;
 }

@@ -13,9 +13,24 @@ using Maplibre.Native.Style;
 
 namespace Maplibre.Native.Map;
 
+internal unsafe delegate mln_status MapAddCustomGeometrySource(
+    mln_map* map,
+    mln_string_view sourceId,
+    mln_custom_geometry_source_options* options
+);
+
 /// <summary>Owner-thread map handle bound to a runtime.</summary>
 public sealed unsafe class MapHandle : IDisposable
 {
+    private static readonly MapAddCustomGeometrySource DefaultAddCustomGeometrySource = static (
+        map,
+        sourceId,
+        options
+    ) => NativeMethods.mln_map_add_custom_geometry_source(map, sourceId, options);
+
+    [ThreadStatic]
+    private static MapAddCustomGeometrySource? addCustomGeometrySourceForTest;
+
     private readonly RuntimeHandle runtime;
     private readonly nint nativeAddress;
     private readonly NativeHandleState<mln_map> state;
@@ -33,10 +48,10 @@ public sealed unsafe class MapHandle : IDisposable
     }
 
     /// <summary>Creates a map from a runtime on the runtime owner thread.</summary>
-    public static MapHandle Create(RuntimeHandle runtime, MapOptions? options = null)
+    public static MapHandle Create(RuntimeHandle runtime, MapOptions options)
     {
         ArgumentNullException.ThrowIfNull(runtime);
-        options ??= new MapOptions();
+        ArgumentNullException.ThrowIfNull(options);
         var nativeOptions = options.ToNative();
         mln_map* map = null;
 
@@ -159,12 +174,6 @@ public sealed unsafe class MapHandle : IDisposable
         NativeStatus.Check(NativeMethods.mln_map_jump_to(Pointer, &nativeCamera));
     }
 
-    /// <summary>Eases to the camera descriptor.</summary>
-    public void EaseTo(CameraOptions camera)
-    {
-        EaseTo(camera, animation: null);
-    }
-
     /// <summary>Eases to the camera descriptor with animation options.</summary>
     public void EaseTo(CameraOptions camera, AnimationOptions? animation)
     {
@@ -177,12 +186,6 @@ public sealed unsafe class MapHandle : IDisposable
                 animation is null ? null : &nativeAnimation
             )
         );
-    }
-
-    /// <summary>Flies to the camera descriptor.</summary>
-    public void FlyTo(CameraOptions camera)
-    {
-        FlyTo(camera, animation: null);
     }
 
     /// <summary>Flies to the camera descriptor with animation options.</summary>
@@ -205,12 +208,6 @@ public sealed unsafe class MapHandle : IDisposable
         NativeStatus.Check(NativeMethods.mln_map_move_by(Pointer, deltaX, deltaY));
     }
 
-    /// <summary>Moves the map by a screen delta with default animation.</summary>
-    public void MoveByAnimated(double deltaX, double deltaY)
-    {
-        MoveByAnimated(deltaX, deltaY, animation: null);
-    }
-
     /// <summary>Moves the map by a screen delta with animation options.</summary>
     public void MoveByAnimated(double deltaX, double deltaY, AnimationOptions? animation)
     {
@@ -225,12 +222,6 @@ public sealed unsafe class MapHandle : IDisposable
         );
     }
 
-    /// <summary>Scales the map around its default anchor.</summary>
-    public void ScaleBy(double scale)
-    {
-        ScaleBy(scale, anchor: null);
-    }
-
     /// <summary>Scales the map around a screen anchor.</summary>
     public void ScaleBy(double scale, ScreenPoint? anchor)
     {
@@ -238,24 +229,6 @@ public sealed unsafe class MapHandle : IDisposable
         NativeStatus.Check(
             NativeMethods.mln_map_scale_by(Pointer, scale, anchor.HasValue ? &nativeAnchor : null)
         );
-    }
-
-    /// <summary>Scales the map around its default anchor with default animation.</summary>
-    public void ScaleByAnimated(double scale)
-    {
-        ScaleByAnimated(scale, anchor: null, animation: null);
-    }
-
-    /// <summary>Scales the map around a screen anchor with default animation.</summary>
-    public void ScaleByAnimated(double scale, ScreenPoint anchor)
-    {
-        ScaleByAnimated(scale, anchor, animation: null);
-    }
-
-    /// <summary>Scales the map around its default anchor with animation options.</summary>
-    public void ScaleByAnimated(double scale, AnimationOptions animation)
-    {
-        ScaleByAnimated(scale, anchor: null, animation);
     }
 
     /// <summary>Scales the map around a screen anchor with animation options.</summary>
@@ -281,12 +254,6 @@ public sealed unsafe class MapHandle : IDisposable
         NativeStatus.Check(NativeMethods.mln_map_rotate_by(Pointer, nativeFirst, nativeSecond));
     }
 
-    /// <summary>Rotates around two screen points with default animation.</summary>
-    public void RotateByAnimated(ScreenPoint first, ScreenPoint second)
-    {
-        RotateByAnimated(first, second, animation: null);
-    }
-
     /// <summary>Rotates around two screen points with animation options.</summary>
     public void RotateByAnimated(ScreenPoint first, ScreenPoint second, AnimationOptions? animation)
     {
@@ -309,12 +276,6 @@ public sealed unsafe class MapHandle : IDisposable
         NativeStatus.Check(NativeMethods.mln_map_pitch_by(Pointer, pitch));
     }
 
-    /// <summary>Pitches the map by a delta in degrees with default animation.</summary>
-    public void PitchByAnimated(double pitch)
-    {
-        PitchByAnimated(pitch, animation: null);
-    }
-
     /// <summary>Pitches the map by a delta in degrees with animation options.</summary>
     public void PitchByAnimated(double pitch, AnimationOptions? animation)
     {
@@ -334,12 +295,6 @@ public sealed unsafe class MapHandle : IDisposable
         NativeStatus.Check(NativeMethods.mln_map_cancel_transitions(Pointer));
     }
 
-    /// <summary>Calculates a camera that fits geographic bounds.</summary>
-    public CameraOptions CameraForLatLngBounds(LatLngBounds bounds)
-    {
-        return CameraForLatLngBounds(bounds, fitOptions: null);
-    }
-
     /// <summary>Calculates a camera that fits geographic bounds and fit options.</summary>
     public CameraOptions CameraForLatLngBounds(LatLngBounds bounds, CameraFitOptions? fitOptions)
     {
@@ -355,12 +310,6 @@ public sealed unsafe class MapHandle : IDisposable
             )
         );
         return MapStructs.CameraOptionsFromNative(camera);
-    }
-
-    /// <summary>Calculates a camera that fits geographic coordinates.</summary>
-    public CameraOptions CameraForLatLngs(IReadOnlyList<LatLng> coordinates)
-    {
-        return CameraForLatLngs(coordinates, fitOptions: null);
     }
 
     /// <summary>Calculates a camera that fits geographic coordinates and fit options.</summary>
@@ -394,7 +343,7 @@ public sealed unsafe class MapHandle : IDisposable
     }
 
     /// <summary>Calculates a camera that fits geographic geometry and fit options.</summary>
-    public CameraOptions CameraForGeometry(Geometry geometry, CameraFitOptions? fitOptions = null)
+    public CameraOptions CameraForGeometry(Geometry geometry, CameraFitOptions? fitOptions)
     {
         using var nativeGeometry = NativeGeometry.From(geometry);
         var nativeFitOptions = fitOptions is null ? default : MapStructs.ToNative(fitOptions);
@@ -801,11 +750,7 @@ public sealed unsafe class MapHandle : IDisposable
         {
             var descriptor = sourceState.Descriptor;
             NativeStatus.Check(
-                NativeMethods.mln_map_add_custom_geometry_source(
-                    Pointer,
-                    nativeSourceId.Value,
-                    &descriptor
-                )
+                AddCustomGeometrySourceNative(Pointer, nativeSourceId.Value, &descriptor)
             );
             if (customGeometrySources.Remove(sourceId, out var previous))
             {
@@ -867,7 +812,7 @@ public sealed unsafe class MapHandle : IDisposable
     }
 
     /// <summary>Adds a vector source that loads TileJSON from a URL.</summary>
-    public void AddVectorSourceUrl(string sourceId, string url, TileSourceOptions? options = null)
+    public void AddVectorSourceUrl(string sourceId, string url, TileSourceOptions? options)
     {
         using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
         using var nativeUrl = NativeStringView.From(url, nameof(url));
@@ -887,7 +832,7 @@ public sealed unsafe class MapHandle : IDisposable
     public void AddVectorSourceTiles(
         string sourceId,
         IReadOnlyList<string> tiles,
-        TileSourceOptions? options = null
+        TileSourceOptions? options
     )
     {
         using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
@@ -906,7 +851,7 @@ public sealed unsafe class MapHandle : IDisposable
     }
 
     /// <summary>Adds a raster source that loads TileJSON from a URL.</summary>
-    public void AddRasterSourceUrl(string sourceId, string url, TileSourceOptions? options = null)
+    public void AddRasterSourceUrl(string sourceId, string url, TileSourceOptions? options)
     {
         using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
         using var nativeUrl = NativeStringView.From(url, nameof(url));
@@ -926,7 +871,7 @@ public sealed unsafe class MapHandle : IDisposable
     public void AddRasterSourceTiles(
         string sourceId,
         IReadOnlyList<string> tiles,
-        TileSourceOptions? options = null
+        TileSourceOptions? options
     )
     {
         using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
@@ -945,11 +890,7 @@ public sealed unsafe class MapHandle : IDisposable
     }
 
     /// <summary>Adds a raster DEM source that loads TileJSON from a URL.</summary>
-    public void AddRasterDemSourceUrl(
-        string sourceId,
-        string url,
-        TileSourceOptions? options = null
-    )
+    public void AddRasterDemSourceUrl(string sourceId, string url, TileSourceOptions? options)
     {
         using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
         using var nativeUrl = NativeStringView.From(url, nameof(url));
@@ -969,7 +910,7 @@ public sealed unsafe class MapHandle : IDisposable
     public void AddRasterDemSourceTiles(
         string sourceId,
         IReadOnlyList<string> tiles,
-        TileSourceOptions? options = null
+        TileSourceOptions? options
     )
     {
         using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
@@ -988,17 +929,10 @@ public sealed unsafe class MapHandle : IDisposable
     }
 
     /// <summary>Sets or replaces a style image.</summary>
-    public void SetStyleImage(string imageId, StyleImage image)
-    {
-        ArgumentNullException.ThrowIfNull(image);
-        SetStyleImage(imageId, image.Image, image.Options);
-    }
-
-    /// <summary>Sets or replaces a style image.</summary>
     public void SetStyleImage(
         string imageId,
         PremultipliedRgba8Image image,
-        StyleImageOptions? options = null
+        StyleImageOptions? options
     )
     {
         using var nativeImageId = NativeStringView.From(imageId, nameof(imageId));
@@ -1225,7 +1159,7 @@ public sealed unsafe class MapHandle : IDisposable
     }
 
     /// <summary>Adds a hillshade layer for a raster DEM source.</summary>
-    public void AddHillshadeLayer(string layerId, string sourceId, string beforeLayerId = "")
+    public void AddHillshadeLayer(string layerId, string sourceId, string beforeLayerId)
     {
         using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));
         using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
@@ -1241,7 +1175,7 @@ public sealed unsafe class MapHandle : IDisposable
     }
 
     /// <summary>Adds a color-relief layer for a raster DEM source.</summary>
-    public void AddColorReliefLayer(string layerId, string sourceId, string beforeLayerId = "")
+    public void AddColorReliefLayer(string layerId, string sourceId, string beforeLayerId)
     {
         using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));
         using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
@@ -1257,7 +1191,7 @@ public sealed unsafe class MapHandle : IDisposable
     }
 
     /// <summary>Adds a source-free location indicator layer.</summary>
-    public void AddLocationIndicatorLayer(string layerId, string beforeLayerId = "")
+    public void AddLocationIndicatorLayer(string layerId, string beforeLayerId)
     {
         using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));
         using var nativeBeforeLayerId = NativeStringView.From(beforeLayerId, nameof(beforeLayerId));
@@ -1330,7 +1264,7 @@ public sealed unsafe class MapHandle : IDisposable
     }
 
     /// <summary>Adds a style layer from a JSON-like value.</summary>
-    public void AddStyleLayerJson(JsonValue layerJson, string beforeLayerId = "")
+    public void AddStyleLayerJson(JsonValue layerJson, string beforeLayerId)
     {
         using var nativeJson = NativeJsonValue.From(layerJson);
         using var nativeBeforeLayerId = NativeStringView.From(beforeLayerId, nameof(beforeLayerId));
@@ -1391,7 +1325,7 @@ public sealed unsafe class MapHandle : IDisposable
     }
 
     /// <summary>Moves a style layer before another layer, or to the top when beforeLayerId is empty.</summary>
-    public void MoveStyleLayer(string layerId, string beforeLayerId = "")
+    public void MoveStyleLayer(string layerId, string beforeLayerId)
     {
         using var nativeLayerId = NativeStringView.From(layerId, nameof(layerId));
         using var nativeBeforeLayerId = NativeStringView.From(beforeLayerId, nameof(beforeLayerId));
@@ -1516,45 +1450,6 @@ public sealed unsafe class MapHandle : IDisposable
         return value is JsonValue.Null ? null : value;
     }
 
-    /// <summary>Attaches this map to a Metal surface render target.</summary>
-    public RenderSessionHandle AttachMetalSurface(MetalSurfaceDescriptor descriptor) =>
-        RenderSessionHandle.AttachMetalSurface(this, descriptor);
-
-    /// <summary>Attaches this map to a Vulkan surface render target.</summary>
-    public RenderSessionHandle AttachVulkanSurface(VulkanSurfaceDescriptor descriptor) =>
-        RenderSessionHandle.AttachVulkanSurface(this, descriptor);
-
-    /// <summary>Attaches this map to an OpenGL surface render target.</summary>
-    public RenderSessionHandle AttachOpenGLSurface(OpenGLSurfaceDescriptor descriptor) =>
-        RenderSessionHandle.AttachOpenGLSurface(this, descriptor);
-
-    /// <summary>Attaches this map to a session-owned Metal texture render target.</summary>
-    public RenderSessionHandle AttachMetalOwnedTexture(MetalOwnedTextureDescriptor descriptor) =>
-        RenderSessionHandle.AttachMetalOwnedTexture(this, descriptor);
-
-    /// <summary>Attaches this map to a caller-owned Metal texture render target.</summary>
-    public RenderSessionHandle AttachMetalBorrowedTexture(
-        MetalBorrowedTextureDescriptor descriptor
-    ) => RenderSessionHandle.AttachMetalBorrowedTexture(this, descriptor);
-
-    /// <summary>Attaches this map to a session-owned Vulkan texture render target.</summary>
-    public RenderSessionHandle AttachVulkanOwnedTexture(VulkanOwnedTextureDescriptor descriptor) =>
-        RenderSessionHandle.AttachVulkanOwnedTexture(this, descriptor);
-
-    /// <summary>Attaches this map to a caller-owned Vulkan texture render target.</summary>
-    public RenderSessionHandle AttachVulkanBorrowedTexture(
-        VulkanBorrowedTextureDescriptor descriptor
-    ) => RenderSessionHandle.AttachVulkanBorrowedTexture(this, descriptor);
-
-    /// <summary>Attaches this map to a session-owned OpenGL texture render target.</summary>
-    public RenderSessionHandle AttachOpenGLOwnedTexture(OpenGLOwnedTextureDescriptor descriptor) =>
-        RenderSessionHandle.AttachOpenGLOwnedTexture(this, descriptor);
-
-    /// <summary>Attaches this map to a caller-owned OpenGL texture render target.</summary>
-    public RenderSessionHandle AttachOpenGLBorrowedTexture(
-        OpenGLBorrowedTextureDescriptor descriptor
-    ) => RenderSessionHandle.AttachOpenGLBorrowedTexture(this, descriptor);
-
     /// <summary>Destroys the map on its owner thread.</summary>
     public void Close()
     {
@@ -1564,6 +1459,30 @@ public sealed unsafe class MapHandle : IDisposable
     }
 
     internal int CustomGeometrySourceCountForTest => customGeometrySources.Count;
+
+    internal CustomGeometrySourceState? CustomGeometrySourceForTest(string sourceId) =>
+        customGeometrySources.GetValueOrDefault(sourceId);
+
+    internal static IDisposable UseCustomGeometrySourceInstallForTest(
+        MapAddCustomGeometrySource addCustomGeometrySource
+    )
+    {
+        var previous = addCustomGeometrySourceForTest;
+        addCustomGeometrySourceForTest = addCustomGeometrySource;
+        return new RestoreCustomGeometrySourceInstall(previous);
+    }
+
+    private static MapAddCustomGeometrySource AddCustomGeometrySourceNative =>
+        addCustomGeometrySourceForTest ?? DefaultAddCustomGeometrySource;
+
+    private sealed class RestoreCustomGeometrySourceInstall(MapAddCustomGeometrySource? previous)
+        : IDisposable
+    {
+        public void Dispose()
+        {
+            addCustomGeometrySourceForTest = previous;
+        }
+    }
 
     internal void ReleaseDetachedCustomGeometrySources()
     {

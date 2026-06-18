@@ -14,6 +14,7 @@ internal sealed unsafe class NativeHandleState<T>
     private readonly StatusDestroy<T> destroy;
     private readonly string typeName;
     private nint address;
+    private bool releaseInProgress;
 
     internal NativeHandleState(T* handle, StatusDestroy<T> destroy, string typeName)
     {
@@ -22,7 +23,8 @@ internal sealed unsafe class NativeHandleState<T>
             throw new InvalidArgumentException(
                 MaplibreStatus.InvalidArgument,
                 null,
-                $"{typeName} pointer is null."
+                $"{typeName} pointer is null.",
+                null
             );
         }
 
@@ -48,71 +50,159 @@ internal sealed unsafe class NativeHandleState<T>
         }
     }
 
-    internal bool IsClosed => address == 0;
+    internal bool IsClosed
+    {
+        get
+        {
+            lock (gate)
+            {
+                return address == 0;
+            }
+        }
+    }
 
     internal T* Pointer
     {
         get
         {
-            var handle = (T*)address;
-            if (handle is null)
+            lock (gate)
             {
-                throw new InvalidStateException(
-                    MaplibreStatus.InvalidState,
-                    null,
-                    $"{typeName} is closed."
-                );
-            }
+                if (releaseInProgress)
+                {
+                    throw new InvalidStateException(
+                        MaplibreStatus.InvalidState,
+                        null,
+                        $"{typeName} is closing.",
+                        null
+                    );
+                }
 
-            return handle;
+                var handle = (T*)address;
+                if (handle is null)
+                {
+                    throw new InvalidStateException(
+                        MaplibreStatus.InvalidState,
+                        null,
+                        $"{typeName} is closed.",
+                        null
+                    );
+                }
+
+                return handle;
+            }
         }
     }
 
     internal void Close()
     {
+        T* handle;
         lock (gate)
         {
-            var handle = (T*)address;
+            handle = BeginReleaseLocked();
             if (handle is null)
             {
                 return;
             }
-
-            NativeStatus.Check(destroy(handle));
-            address = 0;
-            GC.SuppressFinalize(this);
         }
+
+        mln_status status;
+        try
+        {
+            status = destroy(handle);
+        }
+        catch
+        {
+            EndFailedRelease();
+            throw;
+        }
+
+        if (status != mln_status.MLN_STATUS_OK)
+        {
+            EndFailedRelease();
+            NativeStatus.Check(status);
+        }
+
+        EndSuccessfulRelease();
     }
 
     internal bool TryClose()
     {
+        T* handle;
+        nint current;
         lock (gate)
         {
-            var handle = (T*)address;
+            handle = BeginReleaseLocked();
             if (handle is null)
             {
                 return true;
             }
 
-            var current = address;
-            var status = destroy(handle);
-            if (status != mln_status.MLN_STATUS_OK)
-            {
-                NativeLeakReporter.Report(
-                    new NativeLeakReport(
-                        NativeLeakReportKind.DisposeFailed,
-                        typeName,
-                        current,
-                        status,
-                        $"Dispose could not close {typeName} native handle 0x{current:x}; native destroy returned {status}. Call Close() on the owner thread to observe the error and retry."
-                    )
-                );
-                return false;
-            }
+            current = address;
+        }
 
+        mln_status status;
+        try
+        {
+            status = destroy(handle);
+        }
+        catch
+        {
+            EndFailedRelease();
+            throw;
+        }
+
+        if (status != mln_status.MLN_STATUS_OK)
+        {
+            EndFailedRelease();
+            NativeLeakReporter.Report(
+                new NativeLeakReport(
+                    NativeLeakReportKind.DisposeFailed,
+                    typeName,
+                    current,
+                    status,
+                    $"Dispose could not close {typeName} native handle 0x{current:x}; native destroy returned {status}. Call Close() on the owner thread to observe the error and retry."
+                )
+            );
+            return false;
+        }
+
+        EndSuccessfulRelease();
+        return true;
+    }
+
+    private T* BeginReleaseLocked()
+    {
+        while (releaseInProgress)
+        {
+            Monitor.Wait(gate);
+        }
+
+        var handle = (T*)address;
+        if (handle is not null)
+        {
+            releaseInProgress = true;
+        }
+
+        return handle;
+    }
+
+    private void EndFailedRelease()
+    {
+        lock (gate)
+        {
+            releaseInProgress = false;
+            Monitor.PulseAll(gate);
+        }
+    }
+
+    private void EndSuccessfulRelease()
+    {
+        lock (gate)
+        {
             address = 0;
+            releaseInProgress = false;
             GC.SuppressFinalize(this);
-            return true;
+            Monitor.PulseAll(gate);
         }
     }
 }

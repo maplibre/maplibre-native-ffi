@@ -42,7 +42,8 @@ internal sealed unsafe class NativeGeometry : IDisposable
             throw new Error.InvalidArgumentException(
                 Error.MaplibreStatus.InvalidArgument,
                 null,
-                $"Geometry exceeds maximum collection depth {Geometry.MaxCollectionDepth}."
+                $"Geometry exceeds maximum collection depth {Geometry.MaxCollectionDepth}.",
+                null
             );
         }
 

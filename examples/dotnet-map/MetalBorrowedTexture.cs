@@ -13,7 +13,7 @@ internal sealed class MetalBorrowedTexture : IDisposable
         texture = context.CreateBorrowedTexture(viewport);
     }
 
-    public NativePointer Pointer => new(texture);
+    public NativePointer Pointer => NativePointer.FromBorrowedAddress(texture);
 
     public nint Texture => texture;
 

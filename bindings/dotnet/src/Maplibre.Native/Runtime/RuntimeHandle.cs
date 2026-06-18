@@ -10,9 +10,50 @@ using Maplibre.Native.Resource;
 
 namespace Maplibre.Native.Runtime;
 
+internal unsafe delegate mln_status RuntimeSetResourceProvider(
+    mln_runtime* runtime,
+    mln_resource_provider* provider
+);
+
+internal unsafe delegate mln_status RuntimeSetResourceTransform(
+    mln_runtime* runtime,
+    mln_resource_transform* transform
+);
+
+internal unsafe delegate mln_status RuntimeTakeOfflineRegionStatusResult(
+    mln_runtime* runtime,
+    ulong operationId,
+    mln_offline_region_status* outStatus
+);
+
 /// <summary>Owner-thread runtime handle for MapLibre Native work and event polling.</summary>
 public sealed unsafe class RuntimeHandle : IDisposable
 {
+    private static readonly RuntimeSetResourceProvider DefaultSetResourceProvider = static (
+        runtime,
+        provider
+    ) => NativeMethods.mln_runtime_set_resource_provider(runtime, provider);
+    private static readonly RuntimeSetResourceTransform DefaultSetResourceTransform = static (
+        runtime,
+        transform
+    ) => NativeMethods.mln_runtime_set_resource_transform(runtime, transform);
+    private static readonly RuntimeTakeOfflineRegionStatusResult DefaultTakeOfflineRegionStatus =
+        static (runtime, operationId, outStatus) =>
+            NativeMethods.mln_runtime_offline_region_get_status_take_result(
+                runtime,
+                operationId,
+                outStatus
+            );
+
+    [ThreadStatic]
+    private static RuntimeSetResourceProvider? setResourceProviderForTest;
+
+    [ThreadStatic]
+    private static RuntimeSetResourceTransform? setResourceTransformForTest;
+
+    [ThreadStatic]
+    private static RuntimeTakeOfflineRegionStatusResult? takeOfflineRegionStatusForTest;
+
     private readonly Lock callbackGate = new();
     private readonly Lock mapGate = new();
     private readonly Dictionary<nint, WeakReference<Map.MapHandle>> liveMaps = [];
@@ -30,10 +71,10 @@ public sealed unsafe class RuntimeHandle : IDisposable
     }
 
     /// <summary>Creates a runtime on the current thread.</summary>
-    public static RuntimeHandle Create(RuntimeOptions? options = null)
+    public static RuntimeHandle Create(RuntimeOptions options)
     {
+        ArgumentNullException.ThrowIfNull(options);
         NativeLibraryLoader.EnsureLoaded();
-        options ??= new RuntimeOptions();
         using var nativeOptions = options.ToNative();
         var value = nativeOptions.Value;
         mln_runtime* runtime = null;
@@ -56,9 +97,7 @@ public sealed unsafe class RuntimeHandle : IDisposable
             try
             {
                 var descriptor = replacement.Descriptor;
-                NativeStatus.Check(
-                    NativeMethods.mln_runtime_set_resource_provider(Pointer, &descriptor)
-                );
+                NativeStatus.Check(SetResourceProviderNative(Pointer, &descriptor));
                 var previous = resourceProviderState;
                 resourceProviderState = replacement;
                 previous?.Dispose();
@@ -80,9 +119,7 @@ public sealed unsafe class RuntimeHandle : IDisposable
             try
             {
                 var descriptor = replacement.Descriptor;
-                NativeStatus.Check(
-                    NativeMethods.mln_runtime_set_resource_transform(Pointer, &descriptor)
-                );
+                NativeStatus.Check(SetResourceTransformNative(Pointer, &descriptor));
                 var previous = resourceTransformState;
                 resourceTransformState = replacement;
                 previous?.Dispose();
@@ -92,6 +129,62 @@ public sealed unsafe class RuntimeHandle : IDisposable
                 replacement.Dispose();
                 throw;
             }
+        }
+    }
+
+    internal ResourceProviderState? ResourceProviderStateForTest => resourceProviderState;
+
+    internal ResourceTransformState? ResourceTransformStateForTest => resourceTransformState;
+
+    internal static IDisposable UseResourceCallbackInstallMethodsForTest(
+        RuntimeSetResourceProvider setProvider,
+        RuntimeSetResourceTransform setTransform
+    )
+    {
+        var previousProvider = setResourceProviderForTest;
+        var previousTransform = setResourceTransformForTest;
+        setResourceProviderForTest = setProvider;
+        setResourceTransformForTest = setTransform;
+        return new RestoreResourceCallbackInstallMethods(previousProvider, previousTransform);
+    }
+
+    private static RuntimeSetResourceProvider SetResourceProviderNative =>
+        setResourceProviderForTest ?? DefaultSetResourceProvider;
+
+    private static RuntimeSetResourceTransform SetResourceTransformNative =>
+        setResourceTransformForTest ?? DefaultSetResourceTransform;
+
+    internal static IDisposable UseOfflineTakeResultMethodsForTest(
+        RuntimeTakeOfflineRegionStatusResult takeOfflineRegionStatus
+    )
+    {
+        var previous = takeOfflineRegionStatusForTest;
+        takeOfflineRegionStatusForTest = takeOfflineRegionStatus;
+        return new RestoreOfflineTakeResultMethods(previous);
+    }
+
+    private static RuntimeTakeOfflineRegionStatusResult TakeOfflineRegionStatusNative =>
+        takeOfflineRegionStatusForTest ?? DefaultTakeOfflineRegionStatus;
+
+    private sealed class RestoreOfflineTakeResultMethods(
+        RuntimeTakeOfflineRegionStatusResult? previous
+    ) : IDisposable
+    {
+        public void Dispose()
+        {
+            takeOfflineRegionStatusForTest = previous;
+        }
+    }
+
+    private sealed class RestoreResourceCallbackInstallMethods(
+        RuntimeSetResourceProvider? previousProvider,
+        RuntimeSetResourceTransform? previousTransform
+    ) : IDisposable
+    {
+        public void Dispose()
+        {
+            setResourceProviderForTest = previousProvider;
+            setResourceTransformForTest = previousTransform;
         }
     }
 
@@ -423,13 +516,7 @@ public sealed unsafe class RuntimeHandle : IDisposable
         {
             size = (uint)sizeof(mln_offline_region_status),
         };
-        NativeStatus.Check(
-            NativeMethods.mln_runtime_offline_region_get_status_take_result(
-                Pointer,
-                operationId,
-                &status
-            )
-        );
+        NativeStatus.Check(TakeOfflineRegionStatusNative(Pointer, operationId, &status));
         operation.MarkConsumed();
         return OfflineStructs.ReadStatus(status);
     }

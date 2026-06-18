@@ -5,10 +5,25 @@ using Maplibre.Native.Internal.Struct;
 
 namespace Maplibre.Native.Resource;
 
+internal unsafe delegate mln_status ResourceRequestComplete(
+    mln_resource_request_handle* handle,
+    mln_resource_response* response
+);
+
+internal unsafe delegate mln_status ResourceRequestCancelled(
+    mln_resource_request_handle* handle,
+    bool* cancelled
+);
+
+internal unsafe delegate void ResourceRequestRelease(mln_resource_request_handle* handle);
+
 /// <summary>Resource provider request handle.</summary>
 public sealed unsafe class ResourceRequestHandle : IDisposable
 {
     private readonly object gate = new();
+    private readonly ResourceRequestComplete complete;
+    private readonly ResourceRequestCancelled cancelled;
+    private readonly ResourceRequestRelease release;
     private mln_resource_request_handle* handle;
     private bool providerDecisionFinalized;
     private bool releaseAccountedFor;
@@ -16,12 +31,30 @@ public sealed unsafe class ResourceRequestHandle : IDisposable
     private bool completed;
 
     internal ResourceRequestHandle(mln_resource_request_handle* handle)
+        : this(
+            handle,
+            static (request, response) =>
+                NativeMethods.mln_resource_request_complete(request, response),
+            static (request, cancelled) =>
+                NativeMethods.mln_resource_request_cancelled(request, cancelled),
+            static request => NativeMethods.mln_resource_request_release(request)
+        ) { }
+
+    internal ResourceRequestHandle(
+        mln_resource_request_handle* handle,
+        ResourceRequestComplete complete,
+        ResourceRequestCancelled cancelled,
+        ResourceRequestRelease release
+    )
     {
         if (handle is null)
         {
             throw new ArgumentNullException(nameof(handle));
         }
 
+        this.complete = complete;
+        this.cancelled = cancelled;
+        this.release = release;
         this.handle = handle;
     }
 
@@ -48,20 +81,23 @@ public sealed unsafe class ResourceRequestHandle : IDisposable
                 throw new InvalidStateException(
                     MaplibreStatus.InvalidState,
                     null,
-                    "ResourceRequestHandle is already completed."
+                    "ResourceRequestHandle is already completed.",
+                    null
                 );
             }
 
             ThrowIfClosed();
             using var nativeResponse = NativeResourceResponse.From(response);
             var value = nativeResponse.Value;
-            NativeStatus.Check(NativeMethods.mln_resource_request_complete(handle, &value));
+            var status = complete(handle, &value);
             completed = true;
             closed = true;
             if (providerDecisionFinalized)
             {
                 ReleaseIfOwnedLocked();
             }
+            GC.SuppressFinalize(this);
+            NativeStatus.Check(status);
         }
     }
 
@@ -72,7 +108,7 @@ public sealed unsafe class ResourceRequestHandle : IDisposable
         {
             ThrowIfClosed();
             bool cancelled = false;
-            NativeStatus.Check(NativeMethods.mln_resource_request_cancelled(handle, &cancelled));
+            NativeStatus.Check(this.cancelled(handle, &cancelled));
             return cancelled;
         }
     }
@@ -92,6 +128,7 @@ public sealed unsafe class ResourceRequestHandle : IDisposable
             {
                 ReleaseIfOwnedLocked();
             }
+            GC.SuppressFinalize(this);
         }
     }
 
@@ -167,7 +204,7 @@ public sealed unsafe class ResourceRequestHandle : IDisposable
         handle = null;
         if (current is not null)
         {
-            NativeMethods.mln_resource_request_release(current);
+            release(current);
         }
         closed = true;
     }
@@ -187,7 +224,8 @@ public sealed unsafe class ResourceRequestHandle : IDisposable
             throw new InvalidStateException(
                 MaplibreStatus.InvalidState,
                 null,
-                "ResourceRequestHandle is already completed or released."
+                "ResourceRequestHandle is already completed or released.",
+                null
             );
         }
     }

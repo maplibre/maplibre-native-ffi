@@ -85,20 +85,10 @@ public sealed class ResourceResponse
 {
     private byte[] bytes = [];
 
-    public ResourceResponse(ResourceResponseStatus status = ResourceResponseStatus.Ok)
+    public ResourceResponse(ResourceResponseStatus status)
     {
         Status = status;
     }
-
-    public static ResourceResponse Ok(ReadOnlySpan<byte> bytes) =>
-        new(ResourceResponseStatus.Ok) { Bytes = bytes.ToArray() };
-
-    public static ResourceResponse NoContent() => new(ResourceResponseStatus.NoContent);
-
-    public static ResourceResponse NotModified() => new(ResourceResponseStatus.NotModified);
-
-    public static ResourceResponse Error(ResourceErrorReason reason, string? message) =>
-        new(ResourceResponseStatus.Error) { ErrorReason = reason, ErrorMessage = message };
 
     public ResourceResponseStatus Status { get; set; }
     public ResourceErrorReason ErrorReason { get; set; } = ResourceErrorReason.None;

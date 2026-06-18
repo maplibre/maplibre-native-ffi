@@ -1,5 +1,6 @@
 using Maplibre.Native.Error;
 using Maplibre.Native.Geo;
+using Maplibre.Native.Internal.C;
 using Maplibre.Native.Internal.Callback;
 using Maplibre.Native.Map;
 using Maplibre.Native.Runtime;
@@ -10,6 +11,7 @@ namespace Maplibre.Native.Tests;
 
 public sealed class CustomGeometrySourceTests
 {
+    [BindingSpecTest("BND-121", "BND-124")]
     [Fact]
     public void CustomGeometryCallbacksCopyTileIdsAndSwallowExceptions()
     {
@@ -39,6 +41,7 @@ public sealed class CustomGeometrySourceTests
         throwing.FetchForTest(tile);
     }
 
+    [BindingSpecTest("BND-025")]
     [Fact]
     public void CustomGeometrySourceRequiresFetchTileCallback()
     {
@@ -48,6 +51,7 @@ public sealed class CustomGeometrySourceTests
         Assert.Equal("options", error.ParamName);
     }
 
+    [BindingSpecTest("BND-025")]
     [Fact]
     public void CustomGeometrySourceRejectsNegativeBuffer()
     {
@@ -60,6 +64,7 @@ public sealed class CustomGeometrySourceTests
         Assert.Equal(MaplibreStatus.InvalidArgument, error.Status);
     }
 
+    [BindingSpecTest("BND-124")]
     [Fact]
     public async Task CustomGeometryDisposeKeepsHandleAliveUntilActiveCallbackExits()
     {
@@ -93,10 +98,57 @@ public sealed class CustomGeometrySourceTests
         Assert.False(state.IsHandleAllocatedForTest);
     }
 
+    [BindingSpecTest("BND-122")]
+    [Fact]
+    public unsafe void CustomGeometrySourceInstallFailurePreservesPreviousCallbacksAndReleasesReplacement()
+    {
+        var failInstall = false;
+        CustomGeometrySourceState? failedReplacement = null;
+        using var install = MapHandle.UseCustomGeometrySourceInstallForTest(
+            (_, _, options) =>
+            {
+                if (!failInstall)
+                {
+                    return mln_status.MLN_STATUS_OK;
+                }
+
+                failedReplacement = (CustomGeometrySourceState?)
+                    System
+                        .Runtime.InteropServices.GCHandle.FromIntPtr((nint)options->user_data)
+                        .Target;
+                return mln_status.MLN_STATUS_INVALID_STATE;
+            }
+        );
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
+        using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
+        map.AddCustomGeometrySource(
+            "custom",
+            new CustomGeometrySourceOptions { FetchTile = _ => { } }
+        );
+        var previous = Assert.IsType<CustomGeometrySourceState>(
+            map.CustomGeometrySourceForTest("custom")
+        );
+
+        failInstall = true;
+        Assert.Throws<InvalidStateException>(() =>
+            map.AddCustomGeometrySource(
+                "custom",
+                new CustomGeometrySourceOptions { FetchTile = _ => { } }
+            )
+        );
+
+        Assert.Equal(1, map.CustomGeometrySourceCountForTest);
+        Assert.Same(previous, map.CustomGeometrySourceForTest("custom"));
+        Assert.True(previous.IsHandleAllocatedForTest);
+        Assert.NotNull(failedReplacement);
+        Assert.False(failedReplacement.IsHandleAllocatedForTest);
+    }
+
+    [BindingSpecTest("BND-105", "BND-124")]
     [Fact]
     public void CustomGeometrySourceApisAdaptThroughNativeMap()
     {
-        using var runtime = RuntimeHandle.Create();
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
         using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
         map.SetStyleJson("{\"version\":8,\"sources\":{},\"layers\":[]}");
         var tile = new CanonicalTileId(0, 0, 0);
@@ -127,10 +179,11 @@ public sealed class CustomGeometrySourceTests
         Assert.True(map.RemoveStyleSource("custom"));
     }
 
+    [BindingSpecTest("BND-124")]
     [Fact]
     public void DetachedCustomGeometryCleanupKeepsActiveCustomVectorSources()
     {
-        using var runtime = RuntimeHandle.Create();
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
         using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
         map.SetStyleJson("{\"version\":8,\"sources\":{},\"layers\":[]}");
         map.AddCustomGeometrySource(
@@ -144,10 +197,11 @@ public sealed class CustomGeometrySourceTests
         Assert.Equal(SourceType.CustomVector, map.StyleSourceType("custom"));
     }
 
+    [BindingSpecTest("BND-124")]
     [Fact]
     public void StaleStyleLoadedEventKeepsStillAttachedCustomGeometrySource()
     {
-        using var runtime = RuntimeHandle.Create();
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
         using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
         map.SetStyleJson("{\"version\":8,\"sources\":{},\"layers\":[]}");
         map.AddCustomGeometrySource(
@@ -169,10 +223,11 @@ public sealed class CustomGeometrySourceTests
         Assert.Equal(SourceType.CustomVector, map.StyleSourceType("custom"));
     }
 
+    [BindingSpecTest("BND-124")]
     [Fact]
     public void InlineStyleReplacementReleasesCustomGeometryCallbacks()
     {
-        using var runtime = RuntimeHandle.Create();
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
         using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
         map.SetStyleJson("{\"version\":8,\"sources\":{},\"layers\":[]}");
         map.AddCustomGeometrySource(

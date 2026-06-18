@@ -1,17 +1,21 @@
 using System.Reflection;
 using System.Runtime.InteropServices;
+using Maplibre.Native.Error;
 using Maplibre.Native.Internal.C;
 
 namespace Maplibre.Native.Internal.Loader;
 
 internal static class NativeLibraryLoader
 {
+    internal const uint ExpectedAbiVersion = 0;
+
     private const string LibraryPathSwitch = "Maplibre.Native.LibraryPath";
     private const string LibraryPathEnvironment = "MAPLIBRE_NATIVE_FFI_LIBRARY_PATH";
     private const string BuildDirEnvironment = "MLN_FFI_BUILD_DIR";
 
     private static readonly object Gate = new();
     private static bool installed;
+    private static bool abiValidated;
     private static nint resolvedHandle;
     private static bool explicitlyLoaded;
 
@@ -32,7 +36,19 @@ internal static class NativeLibraryLoader
                 );
             }
 
-            resolvedHandle = NativeLibrary.Load(libraryPath);
+            try
+            {
+                resolvedHandle = NativeLibrary.Load(libraryPath);
+            }
+            catch (Exception error) when (error is DllNotFoundException or BadImageFormatException)
+            {
+                throw new UnsupportedFeatureException(
+                    MaplibreStatus.Unsupported,
+                    null,
+                    $"MapLibre Native C library could not be loaded from '{libraryPath}'.",
+                    error
+                );
+            }
             explicitlyLoaded = true;
             EnsureLoadedLocked();
         }
@@ -85,14 +101,64 @@ internal static class NativeLibraryLoader
 
     private static void EnsureLoadedLocked()
     {
-        if (installed)
+        if (!installed)
+        {
+            NativeLibrary.SetDllImportResolver(typeof(NativeMethods).Assembly, ResolveLibrary);
+            installed = true;
+        }
+
+        ResolveLibrary(NativeMethods.LibraryName, typeof(NativeMethods).Assembly, null);
+        ValidateLoadedAbiLocked();
+    }
+
+    private static void ValidateLoadedAbiLocked()
+    {
+        if (abiValidated)
         {
             return;
         }
 
-        NativeLibrary.SetDllImportResolver(typeof(NativeMethods).Assembly, ResolveLibrary);
-        installed = true;
-        ResolveLibrary(NativeMethods.LibraryName, typeof(NativeMethods).Assembly, null);
+        uint actualVersion;
+        try
+        {
+            actualVersion = NativeMethods.mln_c_version();
+        }
+        catch (DllNotFoundException error)
+        {
+            throw new UnsupportedFeatureException(
+                MaplibreStatus.Unsupported,
+                null,
+                "MapLibre Native C library could not be loaded.",
+                error
+            );
+        }
+        catch (EntryPointNotFoundException error)
+        {
+            throw new MaplibreException(
+                MaplibreStatus.AbiMismatch,
+                null,
+                "MapLibre Native C library does not export the required mln_c_version entry point.",
+                error
+            );
+        }
+
+        ValidateAbiVersion(actualVersion);
+        abiValidated = true;
+    }
+
+    internal static void ValidateAbiVersion(uint actualVersion)
+    {
+        if (actualVersion == ExpectedAbiVersion)
+        {
+            return;
+        }
+
+        throw new MaplibreException(
+            MaplibreStatus.AbiMismatch,
+            null,
+            $"MapLibre Native C ABI version {actualVersion} is incompatible with this binding; expected {ExpectedAbiVersion}.",
+            null
+        );
     }
 
     private static IEnumerable<string> CandidatePaths()
