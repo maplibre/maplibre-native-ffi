@@ -68,6 +68,10 @@ class MapCameraControlsTest {
           }
         val animation = AnimationOptions().apply { durationMs = 0.0 }
         map.jumpTo(cameraOptions)
+        val camera = map.camera
+        assertEquals(0.0, assertNotNull(camera.center).latitude, 0.000001)
+        assertEquals(0.0, assertNotNull(camera.center).longitude, 0.000001)
+        assertEquals(1.0, assertNotNull(camera.zoom), 0.000001)
         map.easeTo(cameraOptions, animation)
         map.flyTo(cameraOptions, animation)
         map.moveBy(0.0, 0.0)
@@ -85,9 +89,6 @@ class MapCameraControlsTest {
         )
         map.pitchBy(0.0)
         map.pitchByAnimated(0.0, animation)
-        val camera = map.camera
-        assertEquals(LatLng(0.0, 0.0), camera.center)
-        assertEquals(1.0, assertNotNull(camera.zoom), 0.000001)
         map.cancelTransitions()
         map.jumpTo(
           CameraOptions().apply {
@@ -124,11 +125,18 @@ class MapCameraControlsTest {
         assertNotNull(freeCamera.orientation)
         map.projectionMode = ProjectionModeOptions().apply { axonometric = false }
         assertEquals(false, map.projectionMode.axonometric)
-        val point = map.pixelForLatLng(LatLng(0.0, 0.0))
+        val projectionCenter = LatLng(37.7749, -122.4194)
+        map.jumpTo(
+          CameraOptions().apply {
+            center = projectionCenter
+            zoom = 10.0
+          }
+        )
+        val point = map.pixelForLatLng(projectionCenter)
         val coordinate = map.latLngForPixel(point)
-        assertEquals(0.0, coordinate.latitude, 0.000001)
-        assertEquals(0.0, coordinate.longitude, 0.000001)
-        val projectedCoordinates = listOf(LatLng(0.0, 0.0), LatLng(1.0, 1.0))
+        assertEquals(projectionCenter.latitude, coordinate.latitude, 0.000001)
+        assertEquals(projectionCenter.longitude, coordinate.longitude, 0.000001)
+        val projectedCoordinates = listOf(projectionCenter, LatLng(0.0, 0.0))
         val points = map.pixelsForLatLngs(projectedCoordinates)
         assertEquals(2, points.size)
         assertTrue(points.all { it.x.isFinite() && it.y.isFinite() })
