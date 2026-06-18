@@ -17,6 +17,7 @@ import kotlinx.cinterop.rawValue
 import kotlinx.cinterop.sizeOf
 import kotlinx.cinterop.toLong
 import kotlinx.cinterop.value
+import org.maplibre.nativeffi.Maplibre
 import org.maplibre.nativeffi.error.InvalidStateException
 import org.maplibre.nativeffi.internal.c.MLN_RUNTIME_OPTION_MAXIMUM_CACHE_SIZE
 import org.maplibre.nativeffi.internal.c.mln_offline_region_status
@@ -64,7 +65,11 @@ import org.maplibre.nativeffi.resource.ResourceTransformCallback
 
 /** Owned native runtime handle. Close it on the owner thread. */
 @OptIn(ExperimentalForeignApi::class, ExperimentalNativeApi::class)
-public class RuntimeHandle private constructor(handle: CPointer<mln_runtime>) : AutoCloseable {
+public class RuntimeHandle
+internal constructor(
+  handle: CPointer<mln_runtime>,
+  private val destroyer: (CPointer<mln_runtime>) -> Int = ::mln_runtime_destroy,
+) : AutoCloseable {
   private val state = HandleState("RuntimeHandle", handle)
   private val liveMaps = mutableMapOf<Long, WeakReference<MapHandle>>()
   private var resourceTransformState: ResourceTransformState? = null
@@ -210,6 +215,9 @@ public class RuntimeHandle private constructor(handle: CPointer<mln_runtime>) : 
     id: Long,
     downloadState: OfflineRegionDownloadState,
   ): OfflineOperationHandle<Unit> = memScoped {
+    require(downloadState.isKnown) {
+      "Unknown offline region download state cannot be used as input: ${downloadState.nativeValue}"
+    }
     val outOperationId = alloc<ULongVar>()
     Status.check(
       mln_runtime_offline_region_set_download_state_start(
@@ -359,6 +367,7 @@ public class RuntimeHandle private constructor(handle: CPointer<mln_runtime>) : 
     operation: OfflineOperationHandle<OfflineRegionStatus>
   ): OfflineRegionStatus = memScoped {
     val outStatus = alloc<mln_offline_region_status>()
+    outStatus.size = sizeOf<mln_offline_region_status>().toUInt()
     val operationId =
       operation.requireLive(
         this@RuntimeHandle,
@@ -382,7 +391,7 @@ public class RuntimeHandle private constructor(handle: CPointer<mln_runtime>) : 
     resultKind: OfflineOperationResultKind,
   ): OfflineOperationHandle<T> = OfflineOperationHandle(this, operationId, kind, resultKind)
 
-  public fun discardOfflineOperation(operation: OfflineOperationHandle<*>) {
+  internal fun discardOfflineOperation(operation: OfflineOperationHandle<*>) {
     if (operation.isClosed) return
     val id = operation.requireLive(this)
     val runtime =
@@ -397,10 +406,26 @@ public class RuntimeHandle private constructor(handle: CPointer<mln_runtime>) : 
   }
 
   public fun setResourceProvider(callback: ResourceProviderCallback) {
+    setResourceProvider(callback) { replacement ->
+      mln_runtime_set_resource_provider(state.requireLive(), replacement.descriptor())
+    }
+  }
+
+  internal fun setResourceProviderForTesting(
+    callback: ResourceProviderCallback,
+    install: (ResourceProviderState) -> Int,
+  ) {
+    setResourceProvider(callback, install)
+  }
+
+  private fun setResourceProvider(
+    callback: ResourceProviderCallback,
+    install: (ResourceProviderState) -> Int,
+  ) {
     val replacement = ResourceProviderState(callback)
     val previous: ResourceProviderState?
     try {
-      Status.check(mln_runtime_set_resource_provider(state.requireLive(), replacement.descriptor()))
+      Status.check(install(replacement))
       previous = resourceProviderState
       resourceProviderState = replacement
     } catch (error: Throwable) {
@@ -411,12 +436,26 @@ public class RuntimeHandle private constructor(handle: CPointer<mln_runtime>) : 
   }
 
   public fun setResourceTransform(callback: ResourceTransformCallback) {
+    setResourceTransform(callback) { replacement ->
+      mln_runtime_set_resource_transform(state.requireLive(), replacement.descriptor())
+    }
+  }
+
+  internal fun setResourceTransformForTesting(
+    callback: ResourceTransformCallback,
+    install: (ResourceTransformState) -> Int,
+  ) {
+    setResourceTransform(callback, install)
+  }
+
+  private fun setResourceTransform(
+    callback: ResourceTransformCallback,
+    install: (ResourceTransformState) -> Int,
+  ) {
     val replacement = ResourceTransformState(callback)
     val previous: ResourceTransformState?
     try {
-      Status.check(
-        mln_runtime_set_resource_transform(state.requireLive(), replacement.descriptor())
-      )
+      Status.check(install(replacement))
       previous = resourceTransformState
       resourceTransformState = replacement
     } catch (error: Throwable) {
@@ -443,26 +482,11 @@ public class RuntimeHandle private constructor(handle: CPointer<mln_runtime>) : 
       return@memScoped null
     }
 
-    val eventType = RuntimeEventType.fromNative(event.type)
-    val sourceType = RuntimeEventSourceType.fromNative(event.source_type)
-    val sourceAddress = event.source?.rawValue?.toLong()
-    val mapSource = applyEventSideEffects(eventType, sourceType, sourceAddress)
-    RuntimeEvent(
-      eventType,
-      event.type.toInt(),
-      sourceType,
-      event.source_type.toInt(),
-      if (sourceType == RuntimeEventSourceType.RUNTIME) this@RuntimeHandle else null,
-      mapSource,
-      event.code,
-      event.payload_type.toInt(),
-      RuntimeStructs.payload(event),
-      RuntimeStructs.message(event),
-    )
+    runtimeEvent(event)
   }
 
   override fun close() {
-    state.closeOnce(::mln_runtime_destroy) {
+    state.closeOnce(destroyer) {
       resourceProviderState?.close()
       resourceTransformState?.close()
       resourceProviderState = null
@@ -477,11 +501,33 @@ public class RuntimeHandle private constructor(handle: CPointer<mln_runtime>) : 
 
   internal fun nativeAddress(): Long = state.address()
 
+  internal fun resourceProviderStateForTesting(): ResourceProviderState? = resourceProviderState
+
+  internal fun resourceTransformStateForTesting(): ResourceTransformState? = resourceTransformState
+
+  internal fun copyEventForTesting(event: mln_runtime_event): RuntimeEvent = runtimeEvent(event)
+
   internal fun applyEventSideEffectsForTesting(
     eventType: RuntimeEventType,
     sourceType: RuntimeEventSourceType,
     sourceAddress: Long?,
   ): MapHandle? = applyEventSideEffects(eventType, sourceType, sourceAddress)
+
+  private fun runtimeEvent(event: mln_runtime_event): RuntimeEvent {
+    val eventType = RuntimeEventType.fromNative(event.type)
+    val sourceType = RuntimeEventSourceType.fromNative(event.source_type)
+    val sourceAddress = event.source?.rawValue?.toLong()
+    val mapSource = applyEventSideEffects(eventType, sourceType, sourceAddress)
+    return RuntimeEvent(
+      eventType,
+      sourceType,
+      if (sourceType == RuntimeEventSourceType.RUNTIME) this else null,
+      mapSource,
+      event.code,
+      RuntimeStructs.payload(event),
+      RuntimeStructs.message(event),
+    )
+  }
 
   private fun applyEventSideEffects(
     eventType: RuntimeEventType,
@@ -510,9 +556,23 @@ public class RuntimeHandle private constructor(handle: CPointer<mln_runtime>) : 
   }
 
   public companion object {
-    public fun create(): RuntimeHandle = create(RuntimeOptions())
+    public fun create(options: RuntimeOptions): RuntimeHandle =
+      create(options, Maplibre.cVersion(), ::mln_runtime_create)
 
-    public fun create(options: RuntimeOptions): RuntimeHandle = memScoped {
+    internal fun createForTesting(
+      options: RuntimeOptions = RuntimeOptions(),
+      actualAbiVersion: Long = Maplibre.EXPECTED_C_ABI_VERSION,
+      creator:
+        (CPointer<mln_runtime_options>, CPointer<CPointerVarOf<CPointer<mln_runtime>>>) -> Int,
+    ): RuntimeHandle = create(options, actualAbiVersion, creator)
+
+    private fun create(
+      options: RuntimeOptions,
+      actualAbiVersion: Long,
+      creator:
+        (CPointer<mln_runtime_options>, CPointer<CPointerVarOf<CPointer<mln_runtime>>>) -> Int,
+    ): RuntimeHandle = memScoped {
+      Maplibre.checkCompatibleCAbi(actualAbiVersion)
       val nativeOptions = alloc<mln_runtime_options>()
       mln_runtime_options_default().place(nativeOptions.ptr)
       options.assetPath?.let { nativeOptions.asset_path = MemoryUtil.cString(this, it) }
@@ -525,7 +585,7 @@ public class RuntimeHandle private constructor(handle: CPointer<mln_runtime>) : 
 
       val outRuntime = alloc<CPointerVarOf<CPointer<mln_runtime>>>()
       outRuntime.value = null
-      Status.check(mln_runtime_create(nativeOptions.ptr, outRuntime.ptr))
+      Status.check(creator(nativeOptions.ptr, outRuntime.ptr))
       RuntimeHandle(requireNotNull(outRuntime.value) { "mln_runtime_create returned null" })
     }
   }

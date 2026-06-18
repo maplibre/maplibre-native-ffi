@@ -1,17 +1,19 @@
 package org.maplibre.nativeffi.runtime
 
-import org.maplibre.nativeffi.error.NativeErrorException
+import kotlin.jvm.JvmInline
 
 /** Process-global network reachability state used by Maplibre Native. */
-public enum class NetworkStatus(public val nativeValue: Int) {
-  ONLINE(1),
-  OFFLINE(2);
-
+@JvmInline
+public value class NetworkStatus(public val nativeValue: Int) {
   public companion object {
+    public val ONLINE: NetworkStatus = NetworkStatus(1)
+    public val OFFLINE: NetworkStatus = NetworkStatus(2)
+
     internal fun fromNative(nativeValue: UInt): NetworkStatus = fromNative(nativeValue.toInt())
 
-    public fun fromNative(nativeValue: Int): NetworkStatus =
-      entries.firstOrNull { it.nativeValue == nativeValue }
-        ?: throw NativeErrorException(0, "Unknown native network status: $nativeValue")
+    internal fun fromNative(nativeValue: Int): NetworkStatus = NetworkStatus(nativeValue)
   }
+
+  internal val isKnown: Boolean
+    get() = this == ONLINE || this == OFFLINE
 }

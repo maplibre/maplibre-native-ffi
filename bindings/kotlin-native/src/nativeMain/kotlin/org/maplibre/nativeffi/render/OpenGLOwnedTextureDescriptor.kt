@@ -2,8 +2,8 @@ package org.maplibre.nativeffi.render
 
 /** Mutable descriptor for OpenGL session-owned texture render targets. */
 public class OpenGLOwnedTextureDescriptor(
-  extent: RenderTargetExtent = RenderTargetExtent(),
-  context: OpenGLContextDescriptor = WglContextDescriptor(),
+  extent: RenderTargetExtent,
+  context: OpenGLContextDescriptor,
 ) {
   public var extent: RenderTargetExtent = extent
 

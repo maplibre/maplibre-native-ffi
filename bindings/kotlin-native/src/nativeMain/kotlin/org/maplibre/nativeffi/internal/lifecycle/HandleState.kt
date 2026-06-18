@@ -24,11 +24,17 @@ internal class HandleState<T : CPointed>(
     requireNotNull(handle) { "$typeName native handle is null" }.rawValue.toLong()
   private val leakReport = LeakReport(typeName, address)
   @Suppress("unused") private val cleaner: Cleaner = createCleaner(leakReport) { it.report() }
+  private val releaseState = AtomicInt(STATE_LIVE)
   private var handle: CPointer<T>? = handle
 
-  fun requireLive(): CPointer<T> = handle ?: throw Status.released(typeName)
+  fun requireLive(): CPointer<T> =
+    when (releaseState.load()) {
+      STATE_LIVE -> handle ?: throw Status.released(typeName)
+      STATE_RELEASING -> throw Status.invalidState("$typeName is currently releasing")
+      else -> throw Status.released(typeName)
+    }
 
-  fun isReleased(): Boolean = handle == null
+  fun isReleased(): Boolean = releaseState.load() == STATE_CLOSED
 
   fun address(): Long = address
 
@@ -37,14 +43,36 @@ internal class HandleState<T : CPointed>(
   }
 
   fun closeOnce(destroy: (CPointer<T>) -> Int, afterSuccess: () -> Unit) {
-    val live = handle ?: return
-    Status.check(destroy(live))
+    if (!releaseState.compareAndSet(STATE_LIVE, STATE_RELEASING)) {
+      when (releaseState.load()) {
+        STATE_CLOSED -> return
+        STATE_RELEASING -> throw Status.invalidState("$typeName is currently releasing")
+        else -> throw Status.released(typeName)
+      }
+    }
+    val live =
+      handle
+        ?: run {
+          releaseState.store(STATE_CLOSED)
+          return
+        }
+    try {
+      Status.check(destroy(live))
+    } catch (error: Throwable) {
+      releaseState.store(STATE_LIVE)
+      throw error
+    }
     handle = null
     leakReport.markReleased()
+    releaseState.store(STATE_CLOSED)
     afterSuccess()
   }
 
-  private class LeakReport(private val typeName: String, private val address: Long) {
+  internal class LeakReport(
+    private val typeName: String,
+    private val address: Long,
+    private val writeLine: (String) -> Unit = { message -> println(message) },
+  ) {
     private val released = AtomicInt(0)
 
     fun markReleased() {
@@ -53,11 +81,17 @@ internal class HandleState<T : CPointed>(
 
     fun report() {
       if (released.load() == 0) {
-        println(
+        writeLine(
           "Leaked $typeName native handle 0x${address.toString(16)}; " +
             "close handles explicitly on their owner thread."
         )
       }
     }
+  }
+
+  private companion object {
+    private const val STATE_LIVE = 0
+    private const val STATE_RELEASING = 1
+    private const val STATE_CLOSED = 2
   }
 }

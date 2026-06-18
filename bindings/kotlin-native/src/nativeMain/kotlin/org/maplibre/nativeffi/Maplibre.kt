@@ -1,11 +1,13 @@
 package org.maplibre.nativeffi
 
+import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.UIntVar
 import kotlinx.cinterop.alloc
 import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.ptr
 import kotlinx.cinterop.value
+import org.maplibre.nativeffi.error.AbiVersionMismatchException
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.ProjectedMeters
 import org.maplibre.nativeffi.internal.c.MLN_LOG_SEVERITY_MASK_DEFAULT
@@ -31,13 +33,25 @@ import org.maplibre.nativeffi.runtime.NetworkStatus
 /** Process-global entry points for the Kotlin/Native binding. */
 @OptIn(ExperimentalForeignApi::class)
 public object Maplibre {
+  /** C ABI contract version expected by this Kotlin/Native binding. */
+  public const val EXPECTED_C_ABI_VERSION: Long = 0L
+
   /** Native libraries are linked by the host binary for Kotlin/Native. */
   public fun loadNativeLibrary() {
     // Direct cinterop calls bind against the native library at link/load time.
+    checkCompatibleCAbi()
   }
 
   /** Returns the native C ABI contract version. */
   public fun cVersion(): Long = mln_c_version().toLong()
+
+  internal fun checkCompatibleCAbi(actualVersion: Long = cVersion()) {
+    if (actualVersion == EXPECTED_C_ABI_VERSION) {
+      return
+    }
+
+    throw AbiVersionMismatchException(actualVersion, EXPECTED_C_ABI_VERSION)
+  }
 
   /** Returns the render backends compiled into the loaded native library. */
   public fun supportedRenderBackends(): Set<RenderBackend> =
@@ -47,16 +61,26 @@ public object Maplibre {
   public fun supportedOpenGLContextProviders(): Set<OpenGLContextProvider> =
     OpenGLContextProvider.fromMask(mln_opengl_supported_context_provider_mask())
 
-  /** Reads or sets Maplibre Native's process-global network status. */
-  public var networkStatus: NetworkStatus
-    get() = memScoped {
-      val outStatus = alloc<UIntVar>()
-      Status.check(mln_network_status_get(outStatus.ptr))
-      NetworkStatus.fromNative(outStatus.value)
+  /** Reads Maplibre Native's process-global network status. */
+  public val networkStatus: NetworkStatus
+    get() = networkStatus(::mln_network_status_get)
+
+  /** Sets Maplibre Native's process-global network status. */
+  public fun setNetworkStatus(status: NetworkStatus) {
+    require(status.isKnown) {
+      "Unknown network status cannot be used as input: ${status.nativeValue}"
     }
-    set(status) {
-      Status.check(mln_network_status_set(status.nativeValue.toUInt()))
-    }
+    Status.check(mln_network_status_set(status.nativeValue.toUInt()))
+  }
+
+  internal fun networkStatusForTesting(getter: (CPointer<UIntVar>) -> Int): NetworkStatus =
+    networkStatus(getter)
+
+  private fun networkStatus(getter: (CPointer<UIntVar>) -> Int): NetworkStatus = memScoped {
+    val outStatus = alloc<UIntVar>()
+    Status.check(getter(outStatus.ptr))
+    NetworkStatus.fromNative(outStatus.value)
+  }
 
   /** Installs or replaces the process-global native log callback. */
   public fun setLogCallback(callback: LogCallback) {

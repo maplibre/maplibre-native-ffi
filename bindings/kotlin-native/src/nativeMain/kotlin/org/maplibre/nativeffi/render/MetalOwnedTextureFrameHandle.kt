@@ -48,7 +48,11 @@ internal constructor(
     try {
       scope.close()
     } finally {
-      nativeHeap.free(framePointer.rawValue)
+      try {
+        nativeHeap.free(framePointer.rawValue)
+      } finally {
+        session.finishFrameBorrow()
+      }
     }
   }
 

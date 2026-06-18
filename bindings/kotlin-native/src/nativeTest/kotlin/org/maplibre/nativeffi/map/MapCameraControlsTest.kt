@@ -19,9 +19,11 @@ import org.maplibre.nativeffi.geo.Vec3
 import org.maplibre.nativeffi.runtime.RuntimeHandle
 
 class MapCameraControlsTest {
+  // BND-102, BND-103: camera commands, transitions, viewport state, and projection helpers.
+
   @Test
   fun mapCameraAndViewportControlsRoundTripThroughNativeCalls() {
-    val runtime = RuntimeHandle.create()
+    val runtime = RuntimeHandle.create(org.maplibre.nativeffi.runtime.RuntimeOptions())
     try {
       val map =
         MapHandle.create(
@@ -66,12 +68,16 @@ class MapCameraControlsTest {
           }
         val animation = AnimationOptions().apply { durationMs = 0.0 }
         map.jumpTo(cameraOptions)
+        val camera = map.camera
+        assertEquals(0.0, assertNotNull(camera.center).latitude, 0.000001)
+        assertEquals(0.0, assertNotNull(camera.center).longitude, 0.000001)
+        assertEquals(1.0, assertNotNull(camera.zoom), 0.000001)
         map.easeTo(cameraOptions, animation)
         map.flyTo(cameraOptions, animation)
         map.moveBy(0.0, 0.0)
         map.moveByAnimated(0.0, 0.0, animation)
-        map.scaleBy(1.0)
-        map.scaleByAnimated(1.0, animation)
+        map.scaleBy(1.0, null)
+        map.scaleByAnimated(1.0, null, animation)
         map.rotateBy(
           org.maplibre.nativeffi.geo.ScreenPoint(0.0, 0.0),
           org.maplibre.nativeffi.geo.ScreenPoint(0.0, 0.0),
@@ -83,10 +89,17 @@ class MapCameraControlsTest {
         )
         map.pitchBy(0.0)
         map.pitchByAnimated(0.0, animation)
-        val camera = map.camera
-        assertNotNull(camera.center)
-        assertNotNull(camera.zoom)
         map.cancelTransitions()
+        map.jumpTo(
+          CameraOptions().apply {
+            center = LatLng(1.0, 1.0)
+            zoom = 2.0
+          }
+        )
+        val cameraAfterCancel = map.camera
+        assertEquals(1.0, assertNotNull(cameraAfterCancel.center).latitude, 0.000001)
+        assertEquals(1.0, assertNotNull(cameraAfterCancel.center).longitude, 0.000001)
+        assertEquals(2.0, assertNotNull(cameraAfterCancel.zoom), 0.000001)
         val fitOptions =
           CameraFitOptions().apply {
             padding = EdgeInsets.ZERO
@@ -94,10 +107,10 @@ class MapCameraControlsTest {
             pitch = 0.0
           }
         val bounds = LatLngBounds(LatLng(-10.0, -10.0), LatLng(10.0, 10.0))
-        map.cameraForLatLngBounds(bounds)
+        map.cameraForLatLngBounds(bounds, null)
         map.cameraForLatLngBounds(bounds, fitOptions)
         map.cameraForLatLngs(listOf(LatLng(-1.0, -1.0), LatLng(1.0, 1.0)), fitOptions)
-        map.cameraForGeometry(Geometry.point(LatLng(0.0, 0.0)), fitOptions)
+        map.cameraForGeometry(Geometry.Point(LatLng(0.0, 0.0)), fitOptions)
         map.latLngBoundsForCamera(cameraOptions)
         map.latLngBoundsForCameraUnwrapped(cameraOptions)
         map.bounds = BoundOptions().apply { this.bounds = bounds }
@@ -111,11 +124,28 @@ class MapCameraControlsTest {
         assertNotNull(freeCamera.position)
         assertNotNull(freeCamera.orientation)
         map.projectionMode = ProjectionModeOptions().apply { axonometric = false }
-        assertNotNull(map.projectionMode.axonometric)
-        val point = map.pixelForLatLng(LatLng(0.0, 0.0))
-        map.latLngForPixel(point)
-        assertEquals(2, map.pixelsForLatLngs(listOf(LatLng(0.0, 0.0), LatLng(1.0, 1.0))).size)
-        assertEquals(2, map.latLngsForPixels(listOf(point, point)).size)
+        assertEquals(false, map.projectionMode.axonometric)
+        val projectionCenter = LatLng(37.7749, -122.4194)
+        map.jumpTo(
+          CameraOptions().apply {
+            center = projectionCenter
+            zoom = 10.0
+          }
+        )
+        val point = map.pixelForLatLng(projectionCenter)
+        val coordinate = map.latLngForPixel(point)
+        assertEquals(projectionCenter.latitude, coordinate.latitude, 0.000001)
+        assertEquals(projectionCenter.longitude, coordinate.longitude, 0.000001)
+        val projectedCoordinates = listOf(projectionCenter, LatLng(0.0, 0.0))
+        val points = map.pixelsForLatLngs(projectedCoordinates)
+        assertEquals(2, points.size)
+        assertTrue(points.all { it.x.isFinite() && it.y.isFinite() })
+        val coordinates = map.latLngsForPixels(points)
+        assertEquals(2, coordinates.size)
+        assertEquals(projectedCoordinates[0].latitude, coordinates[0].latitude, 0.000001)
+        assertEquals(projectedCoordinates[0].longitude, coordinates[0].longitude, 0.000001)
+        assertTrue(coordinates[1].latitude.isFinite())
+        assertTrue(coordinates[1].longitude.isFinite())
         map.createProjection().close()
         map.dumpDebugLogs()
       } finally {

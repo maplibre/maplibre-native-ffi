@@ -608,17 +608,18 @@ that a real native failure would expose.
 
 ### Input Structs, Values, and Copied Data
 
-| ID      | Test                                                                                                                             |
-| ------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| BND-060 | Representative input-struct tests per family initialize C defaults, `size` fields, field masks, and nested inputs.               |
-| BND-061 | Optional field-mask inputs distinguish absent values from present zero values.                                                   |
-| BND-062 | Unknown output enum values preserve the raw native value, using an internal conversion hook when no real C call can produce one. |
-| BND-063 | Borrowed native strings and string views are copied before their native borrow window ends.                                      |
-| BND-064 | JSON values round-trip scalar and nested container values without type loss.                                                     |
-| BND-065 | GeoJSON values copy nested geometries, features, properties, and identifiers.                                                    |
-| BND-066 | Native snapshot/list/result handles are released on success and on copy failure, using fault injection for copy failure.         |
-| BND-067 | Structured JSON preserves object member order, repeated member names, and signed or unsigned integer width.                      |
-| BND-068 | Unknown enum values preserve their raw value and are rejected before crossing into C when used in public input APIs.             |
+| ID      | Test                                                                                                                                                                                               |
+| ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| BND-060 | Each public API family that accepts input structs has at least one test that initializes C defaults, `size` fields, field masks, and nested inputs.                                                |
+| BND-061 | Optional field-mask inputs distinguish absent values from present zero values.                                                                                                                     |
+| BND-062 | Unknown output enum values preserve the raw native value, using an internal conversion hook when no real C call can produce one.                                                                   |
+| BND-063 | Borrowed native strings and string views are copied before their native borrow window ends.                                                                                                        |
+| BND-064 | JSON values round-trip scalar and nested container values without type loss.                                                                                                                       |
+| BND-065 | GeoJSON values copy nested geometries, features, properties, and identifiers.                                                                                                                      |
+| BND-066 | Native snapshot/list/result handles are released on success and on copy failure, using fault injection for copy failure.                                                                           |
+| BND-067 | Structured JSON preserves object member order, repeated member names, and signed or unsigned integer width.                                                                                        |
+| BND-068 | Unknown enum values preserve their raw value and are rejected before crossing into C when used in public input APIs.                                                                               |
+| BND-069 | Public values and descriptors that accept caller-owned mutable storage remain unchanged after later caller mutation, and accessors do not expose mutable storage that can mutate the stored value. |
 
 ### Runtime and events
 

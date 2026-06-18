@@ -1,30 +1,31 @@
 package org.maplibre.nativeffi.log
 
-/** Category for a Maplibre Native log record. */
-public enum class LogEvent(public val nativeValue: Int) {
-  GENERAL(0),
-  SETUP(1),
-  SHADER(2),
-  PARSE_STYLE(3),
-  PARSE_TILE(4),
-  RENDER(5),
-  STYLE(6),
-  DATABASE(7),
-  HTTP_REQUEST(8),
-  SPRITE(9),
-  IMAGE(10),
-  OPENGL(11),
-  JNI(12),
-  ANDROID(13),
-  CRASH(14),
-  GLYPH(15),
-  TIMING(16),
-  UNKNOWN(-1);
+import kotlin.jvm.JvmInline
 
+/** Category for a Maplibre Native log record. */
+@JvmInline
+public value class LogEvent(public val nativeValue: Int) {
   public companion object {
+    public val GENERAL: LogEvent = LogEvent(0)
+    public val SETUP: LogEvent = LogEvent(1)
+    public val SHADER: LogEvent = LogEvent(2)
+    public val PARSE_STYLE: LogEvent = LogEvent(3)
+    public val PARSE_TILE: LogEvent = LogEvent(4)
+    public val RENDER: LogEvent = LogEvent(5)
+    public val STYLE: LogEvent = LogEvent(6)
+    public val DATABASE: LogEvent = LogEvent(7)
+    public val HTTP_REQUEST: LogEvent = LogEvent(8)
+    public val SPRITE: LogEvent = LogEvent(9)
+    public val IMAGE: LogEvent = LogEvent(10)
+    public val OPENGL: LogEvent = LogEvent(11)
+    public val JNI: LogEvent = LogEvent(12)
+    public val ANDROID: LogEvent = LogEvent(13)
+    public val CRASH: LogEvent = LogEvent(14)
+    public val GLYPH: LogEvent = LogEvent(15)
+    public val TIMING: LogEvent = LogEvent(16)
+
     internal fun fromNative(nativeValue: UInt): LogEvent = fromNative(nativeValue.toInt())
 
-    public fun fromNative(nativeValue: Int): LogEvent =
-      entries.firstOrNull { it.nativeValue == nativeValue } ?: UNKNOWN
+    internal fun fromNative(nativeValue: Int): LogEvent = LogEvent(nativeValue)
   }
 }

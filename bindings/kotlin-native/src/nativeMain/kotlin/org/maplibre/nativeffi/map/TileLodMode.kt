@@ -1,15 +1,19 @@
 package org.maplibre.nativeffi.map
 
-/** Tile level-of-detail algorithm used by map tile options. */
-public enum class TileLodMode(public val nativeValue: Int) {
-  DEFAULT(0),
-  DISTANCE(1),
-  UNKNOWN(-1);
+import kotlin.jvm.JvmInline
 
+/** Tile level-of-detail algorithm used by map tile options. */
+@JvmInline
+public value class TileLodMode(public val nativeValue: Int) {
   public companion object {
+    public val DEFAULT: TileLodMode = TileLodMode(0)
+    public val DISTANCE: TileLodMode = TileLodMode(1)
+
     internal fun fromNative(nativeValue: UInt): TileLodMode = fromNative(nativeValue.toInt())
 
-    public fun fromNative(nativeValue: Int): TileLodMode =
-      entries.firstOrNull { it.nativeValue == nativeValue } ?: UNKNOWN
+    internal fun fromNative(nativeValue: Int): TileLodMode = TileLodMode(nativeValue)
   }
+
+  internal val isKnown: Boolean
+    get() = this == DEFAULT || this == DISTANCE
 }

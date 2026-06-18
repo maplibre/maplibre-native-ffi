@@ -24,7 +24,8 @@ internal class ResourceProviderState(private val callback: ResourceProviderCallb
   AutoCloseable {
   private val selfRef = StableRef.create(this)
   private val descriptor = nativeHeap.alloc<mln_resource_provider>()
-  private val closed = AtomicInt(0)
+  private val state = AtomicInt(0)
+  private val nativeClosed = AtomicInt(0)
 
   init {
     descriptor.size = kotlinx.cinterop.sizeOf<mln_resource_provider>().toUInt()
@@ -38,21 +39,77 @@ internal class ResourceProviderState(private val callback: ResourceProviderCallb
     request: CPointer<org.maplibre.nativeffi.internal.c.mln_resource_request>?,
     handle: CPointer<mln_resource_request_handle>?,
   ): UInt {
-    if (closed.load() != 0 || request == null || handle == null) return UInt.MAX_VALUE
-    val requestHandle = ResourceRequestHandle(handle)
+    if (request == null || handle == null || !enterCallback()) return UInt.MAX_VALUE
     return try {
-      val decision =
-        callback.handle(ResourceStructs.resourceRequest(request.pointed), requestHandle)
-      requestHandle.finishProviderDecision(decision)
+      val requestHandle = ResourceRequestHandle(handle)
+      try {
+        val decision =
+          callback.handle(ResourceStructs.resourceRequest(request.pointed), requestHandle)
+        requestHandle.finishProviderDecision(decision)
+      } catch (_: Throwable) {
+        requestHandle.finishProviderException()
+      }
     } catch (_: Throwable) {
-      requestHandle.finishProviderException()
+      UInt.MAX_VALUE
+    } finally {
+      exitCallback()
     }
   }
 
   override fun close() {
-    if (!closed.compareAndSet(0, 1)) return
-    selfRef.dispose()
-    nativeHeap.free(descriptor.rawPtr)
+    while (true) {
+      val current = state.load()
+      if (current and CLOSED_FLAG != 0) return
+      val activeCallbacks = current and ACTIVE_MASK
+      val next = if (activeCallbacks == 0) CLOSED_FLAG else current or CLOSING_FLAG
+      if (state.compareAndSet(current, next)) {
+        if (next and CLOSED_FLAG != 0) closeNative()
+        return
+      }
+    }
+  }
+
+  internal fun isClosedForTesting(): Boolean = state.load() and CLOSED_FLAG != 0
+
+  private fun enterCallback(): Boolean {
+    while (true) {
+      val current = state.load()
+      if (current and (CLOSING_FLAG or CLOSED_FLAG) != 0) return false
+      val activeCallbacks = current and ACTIVE_MASK
+      check(activeCallbacks < ACTIVE_MASK) { "too many active resource provider callbacks" }
+      if (state.compareAndSet(current, current + 1)) return true
+    }
+  }
+
+  private fun exitCallback() {
+    while (true) {
+      val current = state.load()
+      val activeCallbacks = current and ACTIVE_MASK
+      check(activeCallbacks > 0) { "resource provider callback count underflow" }
+      val next =
+        if (activeCallbacks == 1 && current and CLOSING_FLAG != 0) {
+          CLOSED_FLAG
+        } else {
+          current - 1
+        }
+      if (state.compareAndSet(current, next)) {
+        if (next and CLOSED_FLAG != 0) closeNative()
+        return
+      }
+    }
+  }
+
+  private fun closeNative() {
+    if (nativeClosed.compareAndSet(0, 1)) {
+      selfRef.dispose()
+      nativeHeap.free(descriptor.rawPtr)
+    }
+  }
+
+  private companion object {
+    private const val CLOSED_FLAG = Int.MIN_VALUE
+    private const val CLOSING_FLAG = 1 shl 30
+    private const val ACTIVE_MASK = CLOSING_FLAG - 1
   }
 }
 

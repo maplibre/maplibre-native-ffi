@@ -31,15 +31,10 @@ internal object ResourceStructs {
     return ResourceRequest(
       MemoryUtil.copyCString(value.url),
       ResourceKind.fromNative(rawKind),
-      rawKind.toInt(),
       ResourceLoadingMethod.fromNative(rawLoadingMethod),
-      rawLoadingMethod.toInt(),
       ResourcePriority.fromNative(rawPriority),
-      rawPriority.toInt(),
       ResourceUsage.fromNative(rawUsage),
-      rawUsage.toInt(),
       ResourceStoragePolicy.fromNative(rawStoragePolicy),
-      rawStoragePolicy.toInt(),
       if (value.has_range)
         ResourceRequest.ByteRange(
           uint64BitsToLong(value.range_start),
@@ -59,6 +54,9 @@ internal object ResourceStructs {
     val native = scope.alloc<mln_resource_response>()
     native.size = kotlinx.cinterop.sizeOf<mln_resource_response>().toUInt()
     native.status = value.status.nativeValue.toUInt()
+    require(value.errorReason.isKnown) {
+      "Unknown resource error reason cannot be used as input: ${value.errorReason.nativeValue}"
+    }
     native.error_reason = value.errorReason.nativeValue.toUInt()
     if (bytes.isNotEmpty()) {
       native.bytes = bytes.toUByteArray().toCValues().getPointer(scope)
