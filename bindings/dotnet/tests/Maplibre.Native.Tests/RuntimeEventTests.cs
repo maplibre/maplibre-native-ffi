@@ -74,6 +74,20 @@ public sealed unsafe class RuntimeEventTests
         );
     }
 
+    [BindingSpecTest("BND-069", "BND-083")]
+    [Fact]
+    public void UnknownRuntimePayloadSnapshotsBytesAndReturnsCopies()
+    {
+        var source = new byte[] { 1, 2, 3 };
+        var payload = new RuntimeEventPayload.Unknown(999, source);
+        source[0] = 9;
+
+        var first = payload.PayloadBytes;
+        Assert.Equal([1, 2, 3], first);
+        first[0] = 8;
+        Assert.Equal([1, 2, 3], payload.PayloadBytes);
+    }
+
     [BindingSpecTest("BND-086")]
     [Fact]
     public void UnmatchedMapSourceDoesNotExposePublicMapOrNativeIdentity()

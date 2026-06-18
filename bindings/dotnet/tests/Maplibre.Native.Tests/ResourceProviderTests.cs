@@ -81,6 +81,33 @@ public sealed unsafe class ResourceProviderTests
         Assert.Equal([1, 2, 3], copiedRequest.PriorData);
     }
 
+    [BindingSpecTest("BND-069", "BND-141")]
+    [Fact]
+    public void ResourceRequestSnapshotsPriorDataAndReturnsCopies()
+    {
+        var source = new byte[] { 1, 2, 3 };
+        var request = new ResourceRequest(
+            ResourceKind.Tile,
+            "https://example.test/tile",
+            ResourceLoadingMethod.All,
+            ResourcePriority.Regular,
+            ResourceUsage.Online,
+            ResourceStoragePolicy.Permanent,
+            null,
+            null,
+            null,
+            null,
+            (ulong)source.Length,
+            source
+        );
+        source[0] = 9;
+
+        var first = request.PriorData;
+        Assert.Equal([1, 2, 3], first);
+        first![0] = 8;
+        Assert.Equal([1, 2, 3], request.PriorData);
+    }
+
     [BindingSpecTest("BND-142", "BND-147", "BND-151")]
     [Fact]
     public void PassThroughFinalizationClosesRequestHandleBeforeNativeRelease()

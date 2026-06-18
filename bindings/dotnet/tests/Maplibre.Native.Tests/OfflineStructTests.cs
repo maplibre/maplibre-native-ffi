@@ -108,6 +108,31 @@ public sealed unsafe class OfflineStructTests
         Assert.Equal(new LatLng(3, 4), definition.Bounds.Northeast);
     }
 
+    [BindingSpecTest("BND-069")]
+    [Fact]
+    public void OfflineRegionInfoSnapshotsMetadataAndReturnsCopies()
+    {
+        var source = new byte[] { 1, 2, 3 };
+        var info = new OfflineRegionInfo(
+            42,
+            new OfflineRegionDefinition.TilePyramid(
+                "maplibre://snapshot",
+                new LatLngBounds(new LatLng(1, 2), new LatLng(3, 4)),
+                5,
+                6,
+                2,
+                true
+            ),
+            source
+        );
+        source[0] = 9;
+
+        var first = info.Metadata;
+        Assert.Equal([1, 2, 3], first);
+        first[0] = 8;
+        Assert.Equal([1, 2, 3], info.Metadata);
+    }
+
     // Support invariant for copied offline output: malformed native definition
     // discriminants fail deterministically instead of fabricating public values.
     [Fact]

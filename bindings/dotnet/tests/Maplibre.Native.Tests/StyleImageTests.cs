@@ -9,6 +9,20 @@ namespace Maplibre.Native.Tests;
 
 public sealed class StyleImageTests
 {
+    [BindingSpecTest("BND-069")]
+    [Fact]
+    public void PremultipliedRgba8ImageSnapshotsPixelsAndReturnsCopies()
+    {
+        var source = new byte[] { 1, 2, 3, 4 };
+        var image = new PremultipliedRgba8Image(source, new TextureImageInfo(1, 1, 4, 4));
+        source[0] = 9;
+
+        var first = image.Bytes;
+        Assert.Equal([1, 2, 3, 4], first);
+        first[0] = 8;
+        Assert.Equal([1, 2, 3, 4], image.Bytes);
+    }
+
     [BindingSpecTest("BND-105")]
     [Fact]
     public void ImageSourceApisAdaptCoordinatesAndImagesThroughNativeMap()

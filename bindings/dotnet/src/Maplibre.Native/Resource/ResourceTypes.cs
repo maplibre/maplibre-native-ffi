@@ -63,20 +63,52 @@ public enum ResourceProviderDecision : uint
 
 public readonly record struct ByteRange(ulong Start, ulong End);
 
-public sealed record ResourceRequest(
-    ResourceKind Kind,
-    string Url,
-    ResourceLoadingMethod LoadingMethod,
-    ResourcePriority Priority,
-    ResourceUsage Usage,
-    ResourceStoragePolicy StoragePolicy,
-    ByteRange? Range,
-    DateTimeOffset? PriorModified,
-    DateTimeOffset? PriorExpires,
-    string? PriorEtag,
-    ulong? PriorDataSize,
-    byte[]? PriorData
-);
+public sealed record ResourceRequest
+{
+    private readonly byte[]? priorData;
+
+    public ResourceRequest(
+        ResourceKind Kind,
+        string Url,
+        ResourceLoadingMethod LoadingMethod,
+        ResourcePriority Priority,
+        ResourceUsage Usage,
+        ResourceStoragePolicy StoragePolicy,
+        ByteRange? Range,
+        DateTimeOffset? PriorModified,
+        DateTimeOffset? PriorExpires,
+        string? PriorEtag,
+        ulong? PriorDataSize,
+        byte[]? PriorData
+    )
+    {
+        this.Kind = Kind;
+        this.Url = Url;
+        this.LoadingMethod = LoadingMethod;
+        this.Priority = Priority;
+        this.Usage = Usage;
+        this.StoragePolicy = StoragePolicy;
+        this.Range = Range;
+        this.PriorModified = PriorModified;
+        this.PriorExpires = PriorExpires;
+        this.PriorEtag = PriorEtag;
+        this.PriorDataSize = PriorDataSize;
+        priorData = PriorData is null ? null : (byte[])PriorData.Clone();
+    }
+
+    public ResourceKind Kind { get; }
+    public string Url { get; }
+    public ResourceLoadingMethod LoadingMethod { get; }
+    public ResourcePriority Priority { get; }
+    public ResourceUsage Usage { get; }
+    public ResourceStoragePolicy StoragePolicy { get; }
+    public ByteRange? Range { get; }
+    public DateTimeOffset? PriorModified { get; }
+    public DateTimeOffset? PriorExpires { get; }
+    public string? PriorEtag { get; }
+    public ulong? PriorDataSize { get; }
+    public byte[]? PriorData => priorData is null ? null : (byte[])priorData.Clone();
+}
 
 public sealed record ResourceTransformRequest(ResourceKind Kind, string Url);
 
