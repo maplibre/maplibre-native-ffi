@@ -117,17 +117,19 @@ fn test_style_image(data: Vec<u8>) -> PremultipliedRgba8Image {
 }
 
 #[test]
-// Spec coverage: BND-105.
+// Spec coverage: BND-069 and BND-105.
 fn style_image_copy_uses_rust_owned_buffer() {
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
     let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
     map.set_style_json(VALID_STYLE_JSON).unwrap();
 
-    let image = test_style_image(vec![
+    let original_pixels = vec![
         255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255, 255, 255, 255, 255,
-    ]);
+    ];
+    let mut image = test_style_image(original_pixels.clone());
 
     map.set_style_image("plain", &image, None).unwrap();
+    image.data.fill(0);
     assert!(map.style_image_exists("plain").unwrap());
     let info = map
         .style_image_info("plain")
@@ -135,14 +137,23 @@ fn style_image_copy_uses_rust_owned_buffer() {
         .expect("added image should have copied metadata");
     assert_eq!(info.width, image.info.width);
     assert_eq!(info.height, image.info.height);
-    let copied = map
+    let mut copied = map
         .copy_style_image_premultiplied_rgba8("plain")
         .unwrap()
         .expect("added Rust image should copy back through C");
 
     assert_eq!(copied.image.info.width, image.info.width);
     assert_eq!(copied.image.info.height, image.info.height);
-    assert_eq!(copied.image.data, image.data);
+    assert_eq!(copied.image.data, original_pixels);
+    copied.image.data.fill(1);
+    assert_eq!(
+        map.copy_style_image_premultiplied_rgba8("plain")
+            .unwrap()
+            .expect("style image copy should not expose native storage")
+            .image
+            .data,
+        original_pixels
+    );
     assert!(map.remove_style_image("plain").unwrap());
     assert!(!map.style_image_exists("plain").unwrap());
     assert!(!map.remove_style_image("plain").unwrap());
