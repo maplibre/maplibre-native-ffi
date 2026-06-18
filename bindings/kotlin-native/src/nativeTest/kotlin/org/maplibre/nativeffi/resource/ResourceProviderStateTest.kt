@@ -25,6 +25,7 @@ import kotlinx.cinterop.ptr
 import kotlinx.cinterop.reinterpret
 import kotlinx.cinterop.set
 import kotlinx.cinterop.staticCFunction
+import kotlinx.cinterop.value
 import org.maplibre.nativeffi.error.InvalidArgumentException
 import org.maplibre.nativeffi.error.InvalidStateException
 import org.maplibre.nativeffi.error.MaplibreStatus
@@ -529,6 +530,7 @@ class ResourceProviderStateTest {
           cancellationChecker = { _, outCancelled ->
             handle.close()
             assertEquals(0, releases)
+            outCancelled.pointed.value = false
             MaplibreStatus.OK.nativeCode
           },
           releaser = { releases++ },

@@ -40,13 +40,17 @@ internal class ResourceProviderState(private val callback: ResourceProviderCallb
     handle: CPointer<mln_resource_request_handle>?,
   ): UInt {
     if (request == null || handle == null || !enterCallback()) return UInt.MAX_VALUE
-    val requestHandle = ResourceRequestHandle(handle)
     return try {
-      val decision =
-        callback.handle(ResourceStructs.resourceRequest(request.pointed), requestHandle)
-      requestHandle.finishProviderDecision(decision)
+      val requestHandle = ResourceRequestHandle(handle)
+      try {
+        val decision =
+          callback.handle(ResourceStructs.resourceRequest(request.pointed), requestHandle)
+        requestHandle.finishProviderDecision(decision)
+      } catch (_: Throwable) {
+        requestHandle.finishProviderException()
+      }
     } catch (_: Throwable) {
-      requestHandle.finishProviderException()
+      UInt.MAX_VALUE
     } finally {
       exitCallback()
     }

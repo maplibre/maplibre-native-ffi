@@ -238,11 +238,13 @@ private constructor(private val map: MapHandle, handle: CPointer<mln_render_sess
   }
 
   public fun acquireMetalOwnedTextureFrame(): MetalOwnedTextureFrameHandle {
-    activeFrame.beginAcquire()
     val frame = nativeHeap.alloc<mln_metal_owned_texture_frame>()
-    frame.size = sizeOf<mln_metal_owned_texture_frame>().toUInt()
     var acquired = false
+    var borrowStarted = false
     try {
+      activeFrame.beginAcquire()
+      borrowStarted = true
+      frame.size = sizeOf<mln_metal_owned_texture_frame>().toUInt()
       Status.check(mln_metal_owned_texture_acquire_frame(state.requireLive(), frame.ptr))
       acquired = true
       val scope = FrameScope()
@@ -257,7 +259,7 @@ private constructor(private val map: MapHandle, handle: CPointer<mln_render_sess
         acquired,
         releaseNative = { releaseMetalFrame(frame.ptr) },
         closeLocal = {
-          activeFrame.endBorrow()
+          if (borrowStarted) activeFrame.endBorrow()
           nativeHeap.free(frame.rawPtr)
         },
         failure = error,
@@ -266,11 +268,13 @@ private constructor(private val map: MapHandle, handle: CPointer<mln_render_sess
   }
 
   public fun acquireVulkanOwnedTextureFrame(): VulkanOwnedTextureFrameHandle {
-    activeFrame.beginAcquire()
     val frame = nativeHeap.alloc<mln_vulkan_owned_texture_frame>()
-    frame.size = sizeOf<mln_vulkan_owned_texture_frame>().toUInt()
     var acquired = false
+    var borrowStarted = false
     try {
+      activeFrame.beginAcquire()
+      borrowStarted = true
+      frame.size = sizeOf<mln_vulkan_owned_texture_frame>().toUInt()
       Status.check(mln_vulkan_owned_texture_acquire_frame(state.requireLive(), frame.ptr))
       acquired = true
       val scope = FrameScope()
@@ -285,7 +289,7 @@ private constructor(private val map: MapHandle, handle: CPointer<mln_render_sess
         acquired,
         releaseNative = { releaseVulkanFrame(frame.ptr) },
         closeLocal = {
-          activeFrame.endBorrow()
+          if (borrowStarted) activeFrame.endBorrow()
           nativeHeap.free(frame.rawPtr)
         },
         failure = error,
@@ -294,11 +298,13 @@ private constructor(private val map: MapHandle, handle: CPointer<mln_render_sess
   }
 
   public fun acquireOpenGLOwnedTextureFrame(): OpenGLOwnedTextureFrameHandle {
-    activeFrame.beginAcquire()
     val frame = nativeHeap.alloc<mln_opengl_owned_texture_frame>()
-    frame.size = sizeOf<mln_opengl_owned_texture_frame>().toUInt()
     var acquired = false
+    var borrowStarted = false
     try {
+      activeFrame.beginAcquire()
+      borrowStarted = true
+      frame.size = sizeOf<mln_opengl_owned_texture_frame>().toUInt()
       Status.check(mln_opengl_owned_texture_acquire_frame(state.requireLive(), frame.ptr))
       acquired = true
       val scope = FrameScope()
@@ -313,7 +319,7 @@ private constructor(private val map: MapHandle, handle: CPointer<mln_render_sess
         acquired,
         releaseNative = { releaseOpenGLFrame(frame.ptr) },
         closeLocal = {
-          activeFrame.endBorrow()
+          if (borrowStarted) activeFrame.endBorrow()
           nativeHeap.free(frame.rawPtr)
         },
         failure = error,

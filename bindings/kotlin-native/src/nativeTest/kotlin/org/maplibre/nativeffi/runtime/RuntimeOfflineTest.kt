@@ -20,6 +20,8 @@ import org.maplibre.nativeffi.offline.OfflineRegionStatus
 import platform.posix.usleep
 
 class RuntimeOfflineTest {
+  private val deferredEvents = ArrayDeque<RuntimeEvent>()
+
   @Test
   fun processGlobalNetworkStatusRoundTrips() {
     val original = Maplibre.networkStatus
@@ -128,9 +130,16 @@ class RuntimeOfflineTest {
     repeat(10_000) {
       runtime.runOnce()
       while (true) {
-        val event = runtime.pollEvent() ?: break
-        val completed = event.payload as? RuntimeEventPayload.OfflineOperationCompleted ?: continue
-        if (completed.operationId != operation.id) continue
+        val event = pollEvent(runtime) ?: break
+        val completed = event.payload as? RuntimeEventPayload.OfflineOperationCompleted
+        if (completed == null) {
+          deferredEvents.addLast(event)
+          continue
+        }
+        if (completed.operationId != operation.id) {
+          deferredEvents.addLast(event)
+          continue
+        }
         assertEquals(operation.kind, completed.operationKind)
         assertEquals(operation.kind.nativeValue, completed.operationKind.nativeValue)
         assertEquals(operation.resultKind, completed.resultKind)
@@ -182,7 +191,7 @@ class RuntimeOfflineTest {
     repeat(10_000) {
       runtime.runOnce()
       while (true) {
-        val event = runtime.pollEvent() ?: break
+        val event = pollEvent(runtime) ?: break
         when (val payload = event.payload) {
           is RuntimeEventPayload.OfflineRegionStatusChanged ->
             if (payload.regionId == regionId) return event
@@ -197,6 +206,9 @@ class RuntimeOfflineTest {
     }
     error("offline region observation event did not arrive for region $regionId")
   }
+
+  private fun pollEvent(runtime: RuntimeHandle): RuntimeEvent? =
+    if (deferredEvents.isNotEmpty()) deferredEvents.removeFirst() else runtime.pollEvent()
 
   private fun assertObservedOfflineRegionStatusPayload(
     regionId: Long,

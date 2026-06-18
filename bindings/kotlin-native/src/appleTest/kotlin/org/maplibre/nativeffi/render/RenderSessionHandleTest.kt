@@ -73,218 +73,224 @@ class RenderSessionHandleTest {
       MTLCreateSystemDefaultDevice() ?: error("MTLCreateSystemDefaultDevice returned nil")
     Maplibre.setLogCallback(LogCallback { true })
     Maplibre.setAsyncLogSeverities(emptySet())
-
-    val runtime = RuntimeHandle.create(org.maplibre.nativeffi.runtime.RuntimeOptions())
-    val map =
-      MapHandle.create(
-        runtime,
-        MapOptions().apply {
-          width = 64
-          height = 64
-        },
-      )
     try {
-      val session =
-        map.attachMetalOwnedTexture(
-          MetalOwnedTextureDescriptor(
-            extent = RenderTargetExtent(32, 16, 1.0),
-            context = MetalContextDescriptor(NativePointer.ofAddress(device.address())),
-          )
+      val runtime = RuntimeHandle.create(org.maplibre.nativeffi.runtime.RuntimeOptions())
+      val map =
+        MapHandle.create(
+          runtime,
+          MapOptions().apply {
+            width = 64
+            height = 64
+          },
         )
       try {
-        assertSame(map, session.map())
-        assertFailsWith<InvalidStateException> { session.textureImageInfo() }
-        assertFailsWith<InvalidStateException> {
-          session.setFeatureState(featureStateSelector(), featureState())
-        }
-        assertFailsWith<InvalidStateException> { map.close() }
-        assertFailsWith<InvalidStateException> {
-          map
-            .attachMetalOwnedTexture(
-              MetalOwnedTextureDescriptor(
-                extent = RenderTargetExtent(16, 8, 1.0),
-                context = MetalContextDescriptor(NativePointer.ofAddress(device.address())),
+        val session =
+          map.attachMetalOwnedTexture(
+            MetalOwnedTextureDescriptor(
+              extent = RenderTargetExtent(32, 16, 1.0),
+              context = MetalContextDescriptor(NativePointer.ofAddress(device.address())),
+            )
+          )
+        try {
+          assertSame(map, session.map())
+          assertFailsWith<InvalidStateException> { session.textureImageInfo() }
+          assertFailsWith<InvalidStateException> {
+            session.setFeatureState(featureStateSelector(), featureState())
+          }
+          assertFailsWith<InvalidStateException> { map.close() }
+          assertFailsWith<InvalidStateException> {
+            map
+              .attachMetalOwnedTexture(
+                MetalOwnedTextureDescriptor(
+                  extent = RenderTargetExtent(16, 8, 1.0),
+                  context = MetalContextDescriptor(NativePointer.ofAddress(device.address())),
+                )
+              )
+              .close()
+          }
+
+          map.setStyleJson(QUERY_STYLE_JSON)
+          assertTrue(waitForMapEvent(runtime, map, RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE))
+          session.renderUpdate()
+
+          val sessionCallError = AtomicReference<Throwable?>(null)
+          spawnSessionRenderOnNativeThread(session, sessionCallError)
+          val sessionCallWrongThread = sessionCallError.load()
+          if (sessionCallWrongThread !is WrongThreadException)
+            throw sessionCallWrongThread
+              ?: AssertionError("wrong-thread render session call succeeded")
+          val sessionCallDiagnostic = sessionCallWrongThread.diagnostic
+          assertEquals(MaplibreStatus.WRONG_THREAD, sessionCallWrongThread.status)
+          assertTrue(sessionCallDiagnostic.isNotBlank())
+
+          session.renderUpdate()
+
+          assertEquals(sessionCallDiagnostic, sessionCallWrongThread.diagnostic)
+
+          val sessionCloseError = AtomicReference<Throwable?>(null)
+          spawnSessionCloseOnNativeThread(session, sessionCloseError)
+          val sessionCloseWrongThread = sessionCloseError.load()
+          if (sessionCloseWrongThread !is WrongThreadException)
+            throw sessionCloseWrongThread
+              ?: AssertionError("wrong-thread render session close succeeded")
+          assertEquals(MaplibreStatus.WRONG_THREAD, sessionCloseWrongThread.status)
+          assertFalse(session.isClosed)
+
+          val info = session.textureImageInfo()
+          assertEquals(32, info.width)
+          assertEquals(16, info.height)
+          assertEquals(32 * 4, info.stride)
+          assertEquals(info.stride.toLong() * info.height.toLong(), info.byteLength)
+
+          NativeBuffer.allocate(4).use { small ->
+            assertFailsWith<InvalidArgumentException> { session.readPremultipliedRgba8(small) }
+          }
+          NativeBuffer.allocate(info.byteLength).use { buffer ->
+            assertEquals(info, session.readPremultipliedRgba8(buffer))
+            assertEquals(info.byteLength.toInt(), buffer.toByteArray().size)
+          }
+
+          val queryPoint = map.pixelForLatLng(LatLng(37.7749, -122.4194))
+          val queryGeometry =
+            RenderedQueryGeometry.Box(
+              ScreenBox(
+                ScreenPoint(queryPoint.x - 20.0, queryPoint.y - 20.0),
+                ScreenPoint(queryPoint.x + 20.0, queryPoint.y + 20.0),
               )
             )
-            .close()
-        }
-
-        map.setStyleJson(QUERY_STYLE_JSON)
-        assertTrue(waitForMapEvent(runtime, map, RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE))
-        session.renderUpdate()
-
-        val sessionCallError = AtomicReference<Throwable?>(null)
-        spawnSessionRenderOnNativeThread(session, sessionCallError)
-        val sessionCallWrongThread = sessionCallError.load()
-        if (sessionCallWrongThread !is WrongThreadException)
-          throw sessionCallWrongThread
-            ?: AssertionError("wrong-thread render session call succeeded")
-        val sessionCallDiagnostic = sessionCallWrongThread.diagnostic
-        assertEquals(MaplibreStatus.WRONG_THREAD, sessionCallWrongThread.status)
-        assertTrue(sessionCallDiagnostic.isNotBlank())
-
-        session.renderUpdate()
-
-        assertEquals(sessionCallDiagnostic, sessionCallWrongThread.diagnostic)
-
-        val sessionCloseError = AtomicReference<Throwable?>(null)
-        spawnSessionCloseOnNativeThread(session, sessionCloseError)
-        val sessionCloseWrongThread = sessionCloseError.load()
-        if (sessionCloseWrongThread !is WrongThreadException)
-          throw sessionCloseWrongThread
-            ?: AssertionError("wrong-thread render session close succeeded")
-        assertEquals(MaplibreStatus.WRONG_THREAD, sessionCloseWrongThread.status)
-        assertFalse(session.isClosed)
-
-        val info = session.textureImageInfo()
-        assertEquals(32, info.width)
-        assertEquals(16, info.height)
-        assertEquals(32 * 4, info.stride)
-        assertEquals(info.stride.toLong() * info.height.toLong(), info.byteLength)
-
-        NativeBuffer.allocate(4).use { small ->
-          assertFailsWith<InvalidArgumentException> { session.readPremultipliedRgba8(small) }
-        }
-        NativeBuffer.allocate(info.byteLength).use { buffer ->
-          assertEquals(info, session.readPremultipliedRgba8(buffer))
-          assertEquals(info.byteLength.toInt(), buffer.toByteArray().size)
-        }
-
-        val queryPoint = map.pixelForLatLng(LatLng(37.7749, -122.4194))
-        val queryGeometry =
-          RenderedQueryGeometry.Box(
-            ScreenBox(
-              ScreenPoint(queryPoint.x - 20.0, queryPoint.y - 20.0),
-              ScreenPoint(queryPoint.x + 20.0, queryPoint.y + 20.0),
+          val filter =
+            JsonValue.Array(
+              listOf(
+                JsonValue.StringValue("=="),
+                JsonValue.Array(
+                  listOf(JsonValue.StringValue("get"), JsonValue.StringValue("kind"))
+                ),
+                JsonValue.StringValue("capital"),
+              )
             )
+          val rendered =
+            waitForQueriedFeature(runtime, map, session) {
+              session.queryRenderedFeatures(
+                queryGeometry,
+                RenderedFeatureQueryOptions().apply {
+                  layerIds = listOf("point-circle")
+                  this.filter = filter
+                },
+              )
+            }
+          assertEquals("point", rendered.sourceId)
+          assertEquals(JsonValue.StringValue("capital"), member(rendered, "kind"))
+
+          val source =
+            waitForQueriedFeature(runtime, map, session) {
+              session.querySourceFeatures(
+                "point",
+                SourceFeatureQueryOptions().apply { this.filter = filter },
+              )
+            }
+          assertEquals("point", source.sourceId)
+          assertEquals(JsonValue.StringValue("capital"), member(source, "kind"))
+
+          assertFailsWith<InvalidArgumentException> {
+            session.setFeatureState(featureStateSelector(), JsonValue.Array(emptyList()))
+          }
+          session.setFeatureState(featureStateSelector(), featureState())
+          val copiedState = session.getFeatureState(featureStateSelector())
+          assertEquals(JsonValue.Bool(true), member(copiedState, "hover"))
+          assertEquals(JsonValue.UInt(20), member(copiedState, "radius"))
+
+          renderIfAvailable(runtime, map, session)
+          val renderedWithState =
+            waitForQueriedFeature(runtime, map, session) {
+              session.queryRenderedFeatures(
+                queryGeometry,
+                RenderedFeatureQueryOptions().apply {
+                  layerIds = listOf("point-circle")
+                  this.filter = filter
+                },
+              )
+            }
+          assertEquals(JsonValue.Bool(true), member(renderedWithState.state, "hover"))
+          assertEquals(JsonValue.UInt(20), member(renderedWithState.state, "radius"))
+
+          session.removeFeatureState(
+            FeatureStateSelector("point").apply {
+              featureId = "feature-1"
+              stateKey = "hover"
+            }
           )
-        val filter =
-          JsonValue.Array(
-            listOf(
-              JsonValue.StringValue("=="),
-              JsonValue.Array(listOf(JsonValue.StringValue("get"), JsonValue.StringValue("kind"))),
-              JsonValue.StringValue("capital"),
-            )
-          )
-        val rendered =
-          waitForQueriedFeature(runtime, map, session) {
-            session.queryRenderedFeatures(
-              queryGeometry,
-              RenderedFeatureQueryOptions().apply {
-                layerIds = listOf("point-circle")
-                this.filter = filter
-              },
-            )
+          renderIfAvailable(runtime, map, session)
+          val afterRemove = session.getFeatureState(featureStateSelector())
+          assertEquals(null, member(afterRemove, "hover"))
+          assertEquals(JsonValue.UInt(20), member(afterRemove, "radius"))
+
+          val frameHandle = session.acquireMetalOwnedTextureFrame()
+          val frame = frameHandle.frame()
+          try {
+            assertEquals(32, frame.width())
+            assertEquals(16, frame.height())
+            assertNotEquals(0L, frame.texture().address)
+            assertFalse(frameHandle.isClosed)
+            assertFailsWith<InvalidStateException> { session.renderUpdate() }
+            assertFailsWith<InvalidStateException> { session.resize(16, 8, 2.0) }
+            assertFailsWith<InvalidStateException> { session.detach() }
+            assertFailsWith<InvalidStateException> { session.reduceMemoryUse() }
+            assertFailsWith<InvalidStateException> { session.clearData() }
+            assertFailsWith<InvalidStateException> { session.dumpDebugLogs() }
+            assertFailsWith<InvalidStateException> {
+              session.setFeatureState(featureStateSelector(), JsonValue.Bool(true))
+            }
+            assertFailsWith<InvalidStateException> {
+              session.getFeatureState(featureStateSelector())
+            }
+            assertFailsWith<InvalidStateException> {
+              session.removeFeatureState(featureStateSelector())
+            }
+            assertFailsWith<InvalidStateException> {
+              session.queryRenderedFeatures(queryGeometry, null)
+            }
+            assertFailsWith<InvalidStateException> { session.querySourceFeatures("point", null) }
+            assertFailsWith<InvalidStateException> {
+              session.queryFeatureExtension(
+                "point",
+                rendered.feature,
+                "supercluster",
+                "children",
+                null,
+              )
+            }
+            assertFailsWith<InvalidStateException> { session.textureImageInfo() }
+            NativeBuffer.allocate(1).use { buffer ->
+              assertFailsWith<InvalidStateException> { session.readPremultipliedRgba8(buffer) }
+            }
+            assertFailsWith<InvalidStateException> { session.acquireMetalOwnedTextureFrame() }
+            assertFailsWith<InvalidStateException> { session.close() }
+
+            val closeError = AtomicReference<Throwable?>(null)
+            closeFrameOnNativeThread(frameHandle, closeError)
+            assertTrue(closeError.load() is WrongThreadException)
+            assertFalse(frameHandle.isClosed)
+            assertNotEquals(0L, frame.texture().address)
+            assertFailsWith<InvalidStateException> { session.renderUpdate() }
+          } finally {
+            frameHandle.close()
           }
-        assertEquals("point", rendered.sourceId)
-        assertEquals(JsonValue.StringValue("capital"), member(rendered, "kind"))
+          assertTrue(frameHandle.isClosed)
+          assertFailsWith<IllegalStateException> { frame.width() }
 
-        val source =
-          waitForQueriedFeature(runtime, map, session) {
-            session.querySourceFeatures(
-              "point",
-              SourceFeatureQueryOptions().apply { this.filter = filter },
-            )
-          }
-        assertEquals("point", source.sourceId)
-        assertEquals(JsonValue.StringValue("capital"), member(source, "kind"))
-
-        assertFailsWith<InvalidArgumentException> {
-          session.setFeatureState(featureStateSelector(), JsonValue.Array(emptyList()))
-        }
-        session.setFeatureState(featureStateSelector(), featureState())
-        val copiedState = session.getFeatureState(featureStateSelector())
-        assertEquals(JsonValue.Bool(true), member(copiedState, "hover"))
-        assertEquals(JsonValue.UInt(20), member(copiedState, "radius"))
-
-        renderIfAvailable(runtime, map, session)
-        val renderedWithState =
-          waitForQueriedFeature(runtime, map, session) {
-            session.queryRenderedFeatures(
-              queryGeometry,
-              RenderedFeatureQueryOptions().apply {
-                layerIds = listOf("point-circle")
-                this.filter = filter
-              },
-            )
-          }
-        assertEquals(JsonValue.Bool(true), member(renderedWithState.state, "hover"))
-        assertEquals(JsonValue.UInt(20), member(renderedWithState.state, "radius"))
-
-        session.removeFeatureState(
-          FeatureStateSelector("point").apply {
-            featureId = "feature-1"
-            stateKey = "hover"
-          }
-        )
-        renderIfAvailable(runtime, map, session)
-        val afterRemove = session.getFeatureState(featureStateSelector())
-        assertEquals(null, member(afterRemove, "hover"))
-        assertEquals(JsonValue.UInt(20), member(afterRemove, "radius"))
-
-        val frameHandle = session.acquireMetalOwnedTextureFrame()
-        val frame = frameHandle.frame()
-        try {
-          assertEquals(32, frame.width())
-          assertEquals(16, frame.height())
-          assertNotEquals(0L, frame.texture().address)
-          assertFalse(frameHandle.isClosed)
+          session.resize(16, 8, 2.0)
+          session.renderUpdate()
+          session.detach()
           assertFailsWith<InvalidStateException> { session.renderUpdate() }
-          assertFailsWith<InvalidStateException> { session.resize(16, 8, 2.0) }
-          assertFailsWith<InvalidStateException> { session.detach() }
-          assertFailsWith<InvalidStateException> { session.reduceMemoryUse() }
-          assertFailsWith<InvalidStateException> { session.clearData() }
-          assertFailsWith<InvalidStateException> { session.dumpDebugLogs() }
-          assertFailsWith<InvalidStateException> {
-            session.setFeatureState(featureStateSelector(), JsonValue.Bool(true))
-          }
-          assertFailsWith<InvalidStateException> { session.getFeatureState(featureStateSelector()) }
-          assertFailsWith<InvalidStateException> {
-            session.removeFeatureState(featureStateSelector())
-          }
-          assertFailsWith<InvalidStateException> {
-            session.queryRenderedFeatures(queryGeometry, null)
-          }
-          assertFailsWith<InvalidStateException> { session.querySourceFeatures("point", null) }
-          assertFailsWith<InvalidStateException> {
-            session.queryFeatureExtension(
-              "point",
-              rendered.feature,
-              "supercluster",
-              "children",
-              null,
-            )
-          }
-          assertFailsWith<InvalidStateException> { session.textureImageInfo() }
-          NativeBuffer.allocate(1).use { buffer ->
-            assertFailsWith<InvalidStateException> { session.readPremultipliedRgba8(buffer) }
-          }
-          assertFailsWith<InvalidStateException> { session.acquireMetalOwnedTextureFrame() }
-          assertFailsWith<InvalidStateException> { session.close() }
-
-          val closeError = AtomicReference<Throwable?>(null)
-          closeFrameOnNativeThread(frameHandle, closeError)
-          assertTrue(closeError.load() is WrongThreadException)
-          assertFalse(frameHandle.isClosed)
-          assertNotEquals(0L, frame.texture().address)
-          assertFailsWith<InvalidStateException> { session.renderUpdate() }
+          assertFalse(session.isClosed)
         } finally {
-          frameHandle.close()
+          session.close()
         }
-        assertTrue(frameHandle.isClosed)
-        assertFailsWith<IllegalStateException> { frame.width() }
-
-        session.resize(16, 8, 2.0)
-        session.renderUpdate()
-        session.detach()
-        assertFailsWith<InvalidStateException> { session.renderUpdate() }
-        assertFalse(session.isClosed)
       } finally {
-        session.close()
+        map.close()
+        runtime.close()
       }
     } finally {
-      map.close()
-      runtime.close()
       Maplibre.clearLogCallback()
       Maplibre.restoreDefaultAsyncLogSeverities()
     }
@@ -300,78 +306,80 @@ class RenderSessionHandleTest {
       MTLCreateSystemDefaultDevice() ?: error("MTLCreateSystemDefaultDevice returned nil")
     Maplibre.setLogCallback(LogCallback { true })
     Maplibre.setAsyncLogSeverities(emptySet())
-
-    val runtime = RuntimeHandle.create(org.maplibre.nativeffi.runtime.RuntimeOptions())
     try {
-      val borrowedTexture = createMetalTexture(device, 32, 16)
-      val borrowedMap =
-        MapHandle.create(
-          runtime,
-          MapOptions().apply {
-            width = 64
-            height = 64
-          },
-        )
+      val runtime = RuntimeHandle.create(org.maplibre.nativeffi.runtime.RuntimeOptions())
       try {
-        val borrowedTextureAddress = borrowedTexture.address()
-        val borrowedDescriptor =
-          MetalBorrowedTextureDescriptor(
-            extent = RenderTargetExtent(32, 16, 1.0),
-            texture = NativePointer.ofAddress(borrowedTextureAddress),
+        val borrowedTexture = createMetalTexture(device, 32, 16)
+        val borrowedMap =
+          MapHandle.create(
+            runtime,
+            MapOptions().apply {
+              width = 64
+              height = 64
+            },
           )
-        val session = borrowedMap.attachMetalBorrowedTexture(borrowedDescriptor)
         try {
-          assertSame(borrowedMap, session.map())
-          borrowedMap.setStyleJson(QUERY_STYLE_JSON)
-          assertTrue(
-            waitForMapEvent(runtime, borrowedMap, RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE)
-          )
-          session.renderUpdate()
-          assertFailsWith<UnsupportedFeatureException> { session.acquireMetalOwnedTextureFrame() }
-          assertFailsWith<UnsupportedFeatureException> { session.textureImageInfo() }
-        } finally {
-          session.close()
-        }
-        assertEquals(borrowedTextureAddress, borrowedDescriptor.texture.address)
-      } finally {
-        borrowedMap.close()
-      }
-
-      val layer = createMetalLayer(device, 32, 16)
-      val surfaceMap =
-        MapHandle.create(
-          runtime,
-          MapOptions().apply {
-            width = 64
-            height = 64
-          },
-        )
-      try {
-        val session =
-          surfaceMap.attachMetalSurface(
-            MetalSurfaceDescriptor(
+          val borrowedTextureAddress = borrowedTexture.address()
+          val borrowedDescriptor =
+            MetalBorrowedTextureDescriptor(
               extent = RenderTargetExtent(32, 16, 1.0),
-              context = MetalContextDescriptor(NativePointer.ofAddress(device.address())),
-              layer = NativePointer.ofAddress(layer.address()),
+              texture = NativePointer.ofAddress(borrowedTextureAddress),
             )
+          val session = borrowedMap.attachMetalBorrowedTexture(borrowedDescriptor)
+          try {
+            assertSame(borrowedMap, session.map())
+            borrowedMap.setStyleJson(QUERY_STYLE_JSON)
+            assertTrue(
+              waitForMapEvent(runtime, borrowedMap, RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE)
+            )
+            session.renderUpdate()
+            assertFailsWith<UnsupportedFeatureException> { session.acquireMetalOwnedTextureFrame() }
+            assertFailsWith<UnsupportedFeatureException> { session.textureImageInfo() }
+          } finally {
+            session.close()
+          }
+          assertEquals(borrowedTextureAddress, borrowedDescriptor.texture.address)
+        } finally {
+          borrowedMap.close()
+        }
+
+        val layer = createMetalLayer(device, 32, 16)
+        val surfaceMap =
+          MapHandle.create(
+            runtime,
+            MapOptions().apply {
+              width = 64
+              height = 64
+            },
           )
         try {
-          assertSame(surfaceMap, session.map())
-          surfaceMap.setStyleJson(QUERY_STYLE_JSON)
-          assertTrue(
-            waitForMapEvent(runtime, surfaceMap, RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE)
-          )
-          session.renderUpdate()
-          assertFailsWith<UnsupportedFeatureException> { session.acquireMetalOwnedTextureFrame() }
-          assertFailsWith<UnsupportedFeatureException> { session.textureImageInfo() }
+          val session =
+            surfaceMap.attachMetalSurface(
+              MetalSurfaceDescriptor(
+                extent = RenderTargetExtent(32, 16, 1.0),
+                context = MetalContextDescriptor(NativePointer.ofAddress(device.address())),
+                layer = NativePointer.ofAddress(layer.address()),
+              )
+            )
+          try {
+            assertSame(surfaceMap, session.map())
+            surfaceMap.setStyleJson(QUERY_STYLE_JSON)
+            assertTrue(
+              waitForMapEvent(runtime, surfaceMap, RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE)
+            )
+            session.renderUpdate()
+            assertFailsWith<UnsupportedFeatureException> { session.acquireMetalOwnedTextureFrame() }
+            assertFailsWith<UnsupportedFeatureException> { session.textureImageInfo() }
+          } finally {
+            session.close()
+          }
         } finally {
-          session.close()
+          surfaceMap.close()
         }
       } finally {
-        surfaceMap.close()
+        runtime.close()
       }
     } finally {
-      runtime.close()
       Maplibre.clearLogCallback()
       Maplibre.restoreDefaultAsyncLogSeverities()
     }

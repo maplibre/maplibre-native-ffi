@@ -1423,8 +1423,14 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
     private fun mapOptions(options: MapOptions, scope: MemScope): CPointer<mln_map_options> {
       val nativeOptions = scope.alloc<mln_map_options>()
       mln_map_options_default().place(nativeOptions.ptr)
-      options.width?.let { nativeOptions.width = it.toUInt() }
-      options.height?.let { nativeOptions.height = it.toUInt() }
+      options.width?.let {
+        require(it >= 0) { "width must be non-negative" }
+        nativeOptions.width = it.toUInt()
+      }
+      options.height?.let {
+        require(it >= 0) { "height must be non-negative" }
+        nativeOptions.height = it.toUInt()
+      }
       options.scaleFactor?.let { nativeOptions.scale_factor = it }
       options.mapMode?.let {
         require(it.isKnown) { "Unknown map mode cannot be used as input: ${it.nativeValue}" }

@@ -610,7 +610,7 @@ that a real native failure would expose.
 
 | ID      | Test                                                                                                                                                                                               |
 | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| BND-060 | Representative input-struct tests per family initialize C defaults, `size` fields, field masks, and nested inputs.                                                                                 |
+| BND-060 | Each public API family that accepts input structs has at least one test that initializes C defaults, `size` fields, field masks, and nested inputs.                                                |
 | BND-061 | Optional field-mask inputs distinguish absent values from present zero values.                                                                                                                     |
 | BND-062 | Unknown output enum values preserve the raw native value, using an internal conversion hook when no real C call can produce one.                                                                   |
 | BND-063 | Borrowed native strings and string views are copied before their native borrow window ends.                                                                                                        |
