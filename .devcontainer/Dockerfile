@@ -18,10 +18,13 @@ RUN apt-get update \
     mesa-utils \
     mesa-vulkan-drivers \
     sudo \
+    tar \
+    unzip \
     xkb-data \
+    zip \
   && rm -rf /var/lib/apt/lists/*
 
-RUN useradd --create-home --uid 1000 --shell /bin/bash dev \
+RUN id -u dev >/dev/null 2>&1 || useradd --create-home --uid 1000 --shell /bin/bash dev \
   && echo "dev ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/dev \
   && chmod 0440 /etc/sudoers.d/dev
 

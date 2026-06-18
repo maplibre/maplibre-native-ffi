@@ -1,0 +1,19 @@
+{
+  "name": "maplibre-native-ffi-zig-map",
+  "version-string": "0.1.0",
+  "builtin-baseline": "a4676fa5be1d5e94250745b4614d5d2a9034290b",
+  "dependencies": [
+    {
+      "name": "sdl3",
+      "default-features": false,
+      "features": ["wayland", "vulkan"],
+      "platform": "linux"
+    },
+    {
+      "name": "sdl3",
+      "default-features": false,
+      "features": ["vulkan"],
+      "platform": "!linux"
+    }
+  ]
+}

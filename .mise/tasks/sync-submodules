@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#MISE description="Init only MapLibre Native submodules required for maplibre-native-ffi builds"
+#MISE description="Init third-party submodules required for maplibre-native-ffi builds"
 set -euo pipefail
 
 repo_root="${MLN_FFI_REPO_ROOT:-$(git rev-parse --show-toplevel)}"
@@ -46,5 +46,6 @@ vendor_paths=(
 # nested .mason / test fixture / glfw submodules under the paths above.
 
 git -c submodule.recurse=false submodule update --init --depth 1 "$mln_path"
+git -c submodule.recurse=false submodule update --init --depth 1 third_party/vcpkg
 
 git -C "$mln_path" -c submodule.recurse=false submodule update --init --depth 1 "${vendor_paths[@]}"

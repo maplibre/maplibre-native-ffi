@@ -1,3 +1,27 @@
+[env]
+MLN_FFI_ZIG_MAP_VCPKG_INSTALLED_DIR = "{{env.MLN_FFI_VCPKG_INSTALLED_DIR}}/examples/zig-map"
+PKG_CONFIG_PATH = "{{env.MLN_FFI_ZIG_MAP_VCPKG_INSTALLED_DIR}}/{{env.MLN_FFI_VCPKG_TARGET_TRIPLET}}/lib/pkgconfig{% if env.PKG_CONFIG_PATH is defined and env.PKG_CONFIG_PATH != \"\" %}:{{env.PKG_CONFIG_PATH}}{% endif %}"
+
+[tasks.deps]
+hide = true
+depends = ["//:deps:vcpkg:bootstrap"]
+run = '''
+mkdir -p "$VCPKG_DOWNLOADS" "$VCPKG_DEFAULT_BINARY_CACHE" "$MLN_FFI_ZIG_MAP_VCPKG_INSTALLED_DIR"
+case "$(uname -s 2>/dev/null || printf Windows)" in
+  MINGW* | MSYS* | CYGWIN* | Windows*) vcpkg_bin="$MLN_FFI_VCPKG_ROOT/vcpkg.exe" ;;
+  *) vcpkg_bin="$MLN_FFI_VCPKG_ROOT/vcpkg" ;;
+esac
+
+"$vcpkg_bin" install \
+  --vcpkg-root "$MLN_FFI_VCPKG_ROOT" \
+  --x-manifest-root="$MISE_TASK_DIR" \
+  --triplet "$MLN_FFI_VCPKG_TARGET_TRIPLET" \
+  --host-triplet "$MLN_FFI_VCPKG_HOST_TRIPLET" \
+  --overlay-triplets="$MLN_FFI_VCPKG_OVERLAY_TRIPLETS" \
+  --x-install-root="$MLN_FFI_ZIG_MAP_VCPKG_INSTALLED_DIR" \
+  --clean-after-build
+'''
+
 [tasks.compile-shaders]
 hide = true
 run = '''
@@ -10,29 +34,20 @@ fi
 '''
 
 [tasks.build]
-depends = ["//:ensure-native-library", ":compile-shaders"]
+depends = ["//:ensure-native-library", ":deps", ":compile-shaders"]
 run = "zig build {{ env.MLN_FFI_ZIG_BUILD_ARGS }}"
 
 [tasks.run]
-depends = ["//:ensure-native-library", ":compile-shaders"]
-env._.source = "{{env.MLN_FFI_CONAN_RUN_ENV}}"
-run = '''
-zig build run {{ env.MLN_FFI_ZIG_BUILD_ARGS }} -- owned-texture
-'''
+depends = ["//:ensure-native-library", ":deps", ":compile-shaders"]
+run = "zig build run {{ env.MLN_FFI_ZIG_BUILD_ARGS }} -- owned-texture"
 
 [tasks."run:owned-texture"]
 run = [{ task = "run", args = [] }]
 
 [tasks."run:borrowed-texture"]
-depends = ["//:ensure-native-library", ":compile-shaders"]
-env._.source = "{{env.MLN_FFI_CONAN_RUN_ENV}}"
-run = '''
-zig build run {{ env.MLN_FFI_ZIG_BUILD_ARGS }} -- borrowed-texture
-'''
+depends = ["//:ensure-native-library", ":deps", ":compile-shaders"]
+run = "zig build run {{ env.MLN_FFI_ZIG_BUILD_ARGS }} -- borrowed-texture"
 
 [tasks."run:native-surface"]
-depends = ["//:ensure-native-library", ":compile-shaders"]
-env._.source = "{{env.MLN_FFI_CONAN_RUN_ENV}}"
-run = '''
-zig build run {{ env.MLN_FFI_ZIG_BUILD_ARGS }} -- native-surface
-'''
+depends = ["//:ensure-native-library", ":deps", ":compile-shaders"]
+run = "zig build run {{ env.MLN_FFI_ZIG_BUILD_ARGS }} -- native-surface"

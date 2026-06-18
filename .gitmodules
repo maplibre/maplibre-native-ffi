@@ -3,3 +3,8 @@
 	url = https://github.com/maplibre/maplibre-native.git
 	shallow = true
 	ignore = dirty
+[submodule "third_party/vcpkg"]
+	path = third_party/vcpkg
+	url = https://github.com/microsoft/vcpkg.git
+	shallow = true
+	ignore = dirty

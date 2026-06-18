@@ -38,7 +38,6 @@ config_roots = [".devcontainer", "bindings/*", "examples/*", "docs"]
 "aqua:koalaman/shellcheck" = "0.11.0" # Shell script linter (used by actionlint)
 
 # C/C++ ecosystem
-"pipx:conan" = "2.29.1"
 "aqua:Kitware/CMake" = "4.3.3"
 "aqua:ninja-build/ninja" = "1.13.2"
 "conda:clang-format" = { version = "22.1.7", os = ["linux", "macos", "windows/x64"] }
@@ -88,20 +87,21 @@ MLN_FFI_TARGET_TRIPLE = { required = true }
 MLN_FFI_RENDER_BACKEND = { required = true }
 MLN_FFI_BUILD_DIR = { required = true }
 MLN_FFI_CMAKE_BUILD_TYPE = "{{env.MLN_FFI_CMAKE_BUILD_TYPE | default(value=\"RelWithDebInfo\")}}"
-MLN_FFI_CONAN_BUILD_TYPE = "{{env.MLN_FFI_CONAN_BUILD_TYPE | default(value=\"Release\")}}"
-MLN_FFI_CONAN_OS = { required = true }
-MLN_FFI_CONAN_ARCH = { required = true }
-MLN_FFI_CONAN_DIR = { required = true }
-MLN_FFI_CONAN_GENERATORS_DIR = { required = true }
-MLN_FFI_CONAN_TOOLCHAIN_FILE = { required = true }
-MLN_FFI_CONAN_RUN_ENV = { required = true }
+MLN_FFI_VCPKG_ROOT = "{{config_root}}/third_party/vcpkg"
+MLN_FFI_VCPKG_OVERLAY_TRIPLETS = "{{config_root}}/cmake/vcpkg/triplets"
+MLN_FFI_VCPKG_TARGET_TRIPLET = { required = true }
+MLN_FFI_VCPKG_HOST_TRIPLET = "{% if os() == \"macos\" and arch() == \"arm64\" %}arm64-osx{% elif os() == \"linux\" and arch() == \"arm64\" %}arm64-linux{% elif os() == \"linux\" %}x64-linux{% elif os() == \"windows\" and arch() == \"arm64\" %}arm64-windows{% elif os() == \"windows\" %}x64-windows{% else %}{{ os() }}-{{ arch() }}{% endif %}"
+MLN_FFI_VCPKG_INSTALLED_DIR = { required = true }
 MLN_FFI_INCLUDE_DIR = "{{config_root}}/include"
 MLN_FFI_VULKAN_INCLUDE_DIR = "{{config_root}}/third_party/maplibre-native/vendor/Vulkan-Headers/include"
 MLN_FFI_ZIG_TARGET = { required = true }
 MLN_FFI_ZIG_BUILD_ARGS = { required = true }
 MLN_FFI_TEST_TIMEOUT = "{{env.MLN_FFI_TEST_TIMEOUT | default(value=\"30s\")}}"
-CMAKE_PREFIX_PATH = { required = true }
-PKG_CONFIG_PATH = { required = true }
+PKG_CONFIG_PATH = "{{ env.PKG_CONFIG_PATH | default(value=\"\") }}"
+VCPKG_ROOT = "{{env.MLN_FFI_VCPKG_ROOT}}"
+VCPKG_DOWNLOADS = "{{config_root}}/build/vcpkg/downloads"
+VCPKG_DEFAULT_BINARY_CACHE = "{{config_root}}/build/vcpkg/bincache"
+VCPKG_DISABLE_METRICS = "1"
 
 [hooks]
 postinstall = [
@@ -120,23 +120,35 @@ postinstall = [
 depends = ["//:deps"]
 run = [
   '''
+  vcpkg_toolchain="$MLN_FFI_VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake"
+  cmake_cache="$MLN_FFI_BUILD_DIR/CMakeCache.txt"
+  if [[ -f "$cmake_cache" ]] && ! grep -Eq 'scripts[/\\]buildsystems[/\\]vcpkg\.cmake' "$cmake_cache"; then
+    echo "Removing stale CMake build directory with a non-vcpkg toolchain: $MLN_FFI_BUILD_DIR"
+    rm -rf "$MLN_FFI_BUILD_DIR"
+  fi
+
   cmake_args=(
     -S .
     -B "$MLN_FFI_BUILD_DIR"
     -G Ninja
     -DCMAKE_BUILD_TYPE="$MLN_FFI_CMAKE_BUILD_TYPE"
     -DCMAKE_MAP_IMPORTED_CONFIG_RELWITHDEBINFO=Release
-    -DCMAKE_PREFIX_PATH="$MLN_FFI_CONAN_GENERATORS_DIR"
+    -DCMAKE_TOOLCHAIN_FILE="$vcpkg_toolchain"
+    -DVCPKG_MANIFEST_DIR="$MLN_FFI_REPO_ROOT"
+    -DVCPKG_TARGET_TRIPLET="$MLN_FFI_VCPKG_TARGET_TRIPLET"
+    -DVCPKG_HOST_TRIPLET="$MLN_FFI_VCPKG_HOST_TRIPLET"
+    -DVCPKG_INSTALLED_DIR="$MLN_FFI_VCPKG_INSTALLED_DIR"
+    -DVCPKG_OVERLAY_TRIPLETS="$MLN_FFI_VCPKG_OVERLAY_TRIPLETS"
     -DMLN_FFI_RENDER_BACKEND="$MLN_FFI_RENDER_BACKEND"
     -DMLN_FFI_OPENGL_CONTEXT_PROVIDER="$MLN_FFI_OPENGL_CONTEXT_PROVIDER"
   )
 
-  if [[ -n "${MLN_FFI_EGL_ROOT:-}" ]]; then
-    cmake_args+=(-DMLN_FFI_EGL_ROOT="$MLN_FFI_EGL_ROOT")
+  if [[ -n "${MLN_FFI_MACOSX_DEPLOYMENT_TARGET:-}" ]]; then
+    cmake_args+=(-DCMAKE_OSX_DEPLOYMENT_TARGET="$MLN_FFI_MACOSX_DEPLOYMENT_TARGET")
   fi
 
-  if [[ -f "$MLN_FFI_CONAN_TOOLCHAIN_FILE" ]]; then
-    cmake_args+=(-DCMAKE_TOOLCHAIN_FILE="$MLN_FFI_CONAN_TOOLCHAIN_FILE")
+  if [[ -n "${MLN_FFI_EGL_ROOT:-}" ]]; then
+    cmake_args+=(-DMLN_FFI_EGL_ROOT="$MLN_FFI_EGL_ROOT")
   fi
 
   cmake "${cmake_args[@]}"
@@ -158,8 +170,13 @@ depends = ["//:configure"]
 run = '''
 build_args=(
   --build "$MLN_FFI_BUILD_DIR"
-  --parallel
 )
+
+if [[ -n "${MLN_FFI_BUILD_PARALLEL:-}" ]]; then
+  build_args+=(--parallel "$MLN_FFI_BUILD_PARALLEL")
+else
+  build_args+=(--parallel)
+fi
 
 cmake "${build_args[@]}"'''
 
@@ -168,36 +185,56 @@ run = "rm -rf \"$MLN_FFI_BUILD_DIR\""
 
 [tasks.deps]
 description = "Install variant-specific managed dependencies."
+depends = ["//:deps:vcpkg"]
 run = '''
-mise run deps:conan
-
 if [[ "$MLN_FFI_TARGET_TRIPLE" == "macos-arm64" && "${MLN_FFI_OPENGL_CONTEXT_PROVIDER:-}" == "egl" ]]; then
   mise run deps:angle
 fi
 '''
 
-[tasks."deps:conan"]
-description = "Install ConanCenter native dependencies for the active variant."
+[tasks."deps:vcpkg:bootstrap"]
+description = "Bootstrap the pinned vcpkg submodule."
+hide = true
+depends = ["//:sync-submodules"]
 run = '''
-conan_bin="$(mise which conan 2>/dev/null || command -v conan)"
+mkdir -p "$VCPKG_DOWNLOADS" "$VCPKG_DEFAULT_BINARY_CACHE"
 
-if ! "$conan_bin" profile path default >/dev/null 2>&1; then
-  "$conan_bin" profile detect --force
-fi
+case "$(uname -s 2>/dev/null || printf Windows)" in
+  MINGW* | MSYS* | CYGWIN* | Windows*)
+    vcpkg_bin="$MLN_FFI_VCPKG_ROOT/vcpkg.exe"
+    if [[ ! -x "$vcpkg_bin" ]] || ! "$vcpkg_bin" version >/dev/null 2>&1; then
+      rm -f "$vcpkg_bin"
+      (cd "$MLN_FFI_VCPKG_ROOT" && cmd.exe //c bootstrap-vcpkg.bat -disableMetrics)
+    fi
+    ;;
+  *)
+    vcpkg_bin="$MLN_FFI_VCPKG_ROOT/vcpkg"
+    if [[ ! -x "$vcpkg_bin" ]] || ! "$vcpkg_bin" version >/dev/null 2>&1; then
+      rm -f "$vcpkg_bin"
+      (cd "$MLN_FFI_VCPKG_ROOT" && ./bootstrap-vcpkg.sh -disableMetrics)
+    fi
+    ;;
+esac
+'''
 
-rm -rf "$MLN_FFI_CONAN_GENERATORS_DIR"
-"$conan_bin" install "$MLN_FFI_REPO_ROOT" \
-  --output-folder "$MLN_FFI_CONAN_DIR" \
-  --build=missing \
-  -s:h os="$MLN_FFI_CONAN_OS" \
-  -s:h arch="$MLN_FFI_CONAN_ARCH" \
-  -s:h build_type="$MLN_FFI_CONAN_BUILD_TYPE" \
-  -s:h compiler.cppstd=17 \
-  -s:b build_type="$MLN_FFI_CONAN_BUILD_TYPE" \
-  -s:b compiler.cppstd=17 \
-  -c tools.cmake.cmaketoolchain:generator=Ninja \
-  -o "&:render_backend=$MLN_FFI_RENDER_BACKEND" \
-  -o "&:opengl_context_provider=${MLN_FFI_OPENGL_CONTEXT_PROVIDER:-none}"
+[tasks."deps:vcpkg"]
+description = "Install vcpkg native dependencies for the active variant."
+depends = [":deps:vcpkg:bootstrap"]
+run = '''
+mkdir -p "$VCPKG_DOWNLOADS" "$VCPKG_DEFAULT_BINARY_CACHE" "$MLN_FFI_VCPKG_INSTALLED_DIR"
+case "$(uname -s 2>/dev/null || printf Windows)" in
+  MINGW* | MSYS* | CYGWIN* | Windows*) vcpkg_bin="$MLN_FFI_VCPKG_ROOT/vcpkg.exe" ;;
+  *) vcpkg_bin="$MLN_FFI_VCPKG_ROOT/vcpkg" ;;
+esac
+
+"$vcpkg_bin" install \
+  --vcpkg-root "$MLN_FFI_VCPKG_ROOT" \
+  --x-manifest-root="$MLN_FFI_REPO_ROOT" \
+  --triplet "$MLN_FFI_VCPKG_TARGET_TRIPLET" \
+  --host-triplet "$MLN_FFI_VCPKG_HOST_TRIPLET" \
+  --overlay-triplets="$MLN_FFI_VCPKG_OVERLAY_TRIPLETS" \
+  --x-install-root="$MLN_FFI_VCPKG_INSTALLED_DIR" \
+  --clean-after-build
 '''
 
 [tasks."deps:libclang"]
@@ -218,7 +255,6 @@ esac
 
 [tasks.test]
 depends = ["//:build"]
-env._.source = "{{env.MLN_FFI_CONAN_RUN_ENV}}"
 run = '''
 (
   cd src/c_api/tests/zig

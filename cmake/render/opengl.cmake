@@ -31,10 +31,10 @@ function(mln_configure_opengl_backend target)
     elseif(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
       message(FATAL_ERROR "macOS EGL builds require MLN_FFI_EGL_ROOT")
     else()
-      find_package(libglvnd REQUIRED)
+      find_package(OpenGL REQUIRED COMPONENTS EGL GLES2)
       target_link_libraries(
         ${target}
-        PRIVATE libglvnd::egl libglvnd::gles2 ${CMAKE_DL_LIBS})
+        PRIVATE OpenGL::EGL OpenGL::GLES2 ${CMAKE_DL_LIBS})
     endif()
     list(APPEND MLN_FFI_VENDOR_OPENGL_SOURCES
          ${MLN_SOURCE_DIR}/platform/linux/src/gl_functions.cpp)

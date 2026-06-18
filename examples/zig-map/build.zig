@@ -59,7 +59,29 @@ fn addZigMapExample(b: *std.Build, options: BuildOptions) *std.Build.Step.Compil
             .{ .api = .gl, .version = .@"3.0" });
         root_module.addImport("gl", gl_bindings);
     }
-    root_module.linkSystemLibrary("sdl-sdl3", .{ .use_pkg_config = .force });
+    root_module.linkSystemLibrary("sdl3", .{ .use_pkg_config = .force });
+    if (options.target.result.os.tag == .macos) {
+        inline for (.{
+            "AudioToolbox",
+            "AVFoundation",
+            "Carbon",
+            "Cocoa",
+            "CoreAudio",
+            "CoreFoundation",
+            "CoreGraphics",
+            "CoreHaptics",
+            "CoreMedia",
+            "CoreVideo",
+            "ForceFeedback",
+            "Foundation",
+            "GameController",
+            "IOKit",
+            "Metal",
+            "QuartzCore",
+            "UniformTypeIdentifiers",
+        }) |framework| root_module.linkFramework(framework, .{});
+        root_module.linkSystemLibrary("objc", .{});
+    }
     maplibre_build.linkRenderBackend(b, root_module, .{
         .target = options.target,
         .render_backend = options.render_backend,

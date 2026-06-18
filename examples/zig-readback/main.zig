@@ -10,15 +10,12 @@ const vk = if (build_options.supports_vulkan) @cImport({
 }) else struct {};
 
 const supports_egl = build_options.supports_opengl and (builtin.os.tag == .linux or builtin.os.tag == .macos);
+const wgl_test = if (build_options.supports_opengl and builtin.os.tag == .windows) @import("wgl_test_context") else struct {};
 
 const egl = if (supports_egl) @cImport({
     @cDefine("EGL_EGLEXT_PROTOTYPES", "1");
     @cInclude("EGL/egl.h");
     @cInclude("EGL/eglext.h");
-}) else struct {};
-
-const sdl = if (build_options.supports_opengl and builtin.os.tag == .windows) @cImport({
-    @cInclude("SDL3/SDL.h");
 }) else struct {};
 
 const width = 512;
@@ -170,56 +167,21 @@ const OwnedTextureTarget = struct {
 };
 
 const OpenGLAttachContext = if (build_options.supports_opengl and builtin.os.tag == .windows) struct {
-    window: *sdl.SDL_Window,
-    context: sdl.SDL_GLContext,
-    device_context: *anyopaque,
+    context: wgl_test.Context,
 
     fn init() !OpenGLAttachContext {
-        // WGL contexts need a Win32 device context with a selected pixel
-        // format. SDL gives us a hidden helper window for that without showing
-        // UI, but this is not truly surfaceless like the EGL pbuffer path.
-        if (!sdl.SDL_Init(sdl.SDL_INIT_VIDEO)) return error.WglUnavailable;
-        errdefer sdl.SDL_Quit();
-
-        const window = sdl.SDL_CreateWindow(
-            "MapLibre Zig Readback WGL",
-            8,
-            8,
-            sdl.SDL_WINDOW_OPENGL | sdl.SDL_WINDOW_HIDDEN,
-        ) orelse return error.WglUnavailable;
-        errdefer sdl.SDL_DestroyWindow(window);
-
-        const context = sdl.SDL_GL_CreateContext(window) orelse return error.WglUnavailable;
-        errdefer _ = sdl.SDL_GL_DestroyContext(context);
-        if (!sdl.SDL_GL_MakeCurrent(window, context)) return error.WglUnavailable;
-
-        const properties = sdl.SDL_GetWindowProperties(window);
-        if (properties == 0) return error.WglUnavailable;
-        const device_context = sdl.SDL_GetPointerProperty(
-            properties,
-            sdl.SDL_PROP_WINDOW_WIN32_HDC_POINTER,
-            null,
-        ) orelse return error.WglUnavailable;
-
-        return .{
-            .window = window,
-            .context = context,
-            .device_context = device_context,
-        };
+        return .{ .context = try wgl_test.Context.initWithClassName("MapLibreNativeZigReadbackWgl", 8, 8) };
     }
 
     fn deinit(self: *OpenGLAttachContext) void {
-        _ = sdl.SDL_GL_MakeCurrent(self.window, null);
-        _ = sdl.SDL_GL_DestroyContext(self.context);
-        sdl.SDL_DestroyWindow(self.window);
-        sdl.SDL_Quit();
+        self.context.deinit();
     }
 
     fn descriptor(self: *const OpenGLAttachContext) maplibre.OpenGLContextDescriptor {
         return .{ .wgl = .{
-            .device_context = .{ .ptr = @ptrCast(self.device_context) },
-            .share_context = .{ .ptr = @ptrCast(self.context) },
-            .get_proc_address = .{ .ptr = @ptrCast(@constCast(&sdl.SDL_GL_GetProcAddress)) },
+            .device_context = .{ .ptr = self.context.deviceContextPointer() },
+            .share_context = .{ .ptr = self.context.shareContextPointer() },
+            .get_proc_address = .{ .ptr = wgl_test.Context.getProcAddressPointer() },
         } };
     }
 } else if (supports_egl) struct {

@@ -4,7 +4,6 @@ run = "zig build {{ env.MLN_FFI_ZIG_BUILD_ARGS }}"
 
 [tasks.test]
 depends = ["//:ensure-native-library"]
-env._.source = "{{env.MLN_FFI_CONAN_RUN_ENV}}"
 run = '''
 zig build test {{ env.MLN_FFI_ZIG_BUILD_ARGS }} --summary all --verbose
 '''

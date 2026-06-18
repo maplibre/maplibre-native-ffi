@@ -7,6 +7,25 @@ function(mln_configure_linux_platform target)
   find_package(WebP REQUIRED)
   include(${MLN_SOURCE_DIR}/vendor/icu.cmake)
 
+  foreach(
+    imported_target
+    CURL::libcurl
+    JPEG::JPEG
+    PNG::PNG
+    WebP::webp
+    libuv::uv
+    libuv::uv_a)
+    if(TARGET ${imported_target})
+      get_target_property(aliased_target ${imported_target} ALIASED_TARGET)
+      if(aliased_target)
+        set(imported_target ${aliased_target})
+      endif()
+      set_target_properties(
+        ${imported_target}
+        PROPERTIES MAP_IMPORTED_CONFIG_RELWITHDEBINFO RELEASE)
+    endif()
+  endforeach()
+
   set(MLN_FFI_VENDOR_LINUX_SOURCES
       ${MLN_SOURCE_DIR}/platform/default/src/mbgl/i18n/collator.cpp
       ${MLN_SOURCE_DIR}/platform/default/src/mbgl/i18n/number_format.cpp
@@ -37,8 +56,8 @@ function(mln_configure_linux_platform target)
   target_link_libraries(
     ${target}
     PRIVATE
-      ${CURL_LIBRARIES}
-      ${JPEG_LIBRARIES}
+      CURL::libcurl
+      JPEG::JPEG
       $<IF:$<TARGET_EXISTS:libuv::uv_a>,libuv::uv_a,libuv::uv>
       mbgl-vendor-icu
       PNG::PNG

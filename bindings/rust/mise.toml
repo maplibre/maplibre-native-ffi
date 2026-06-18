@@ -8,7 +8,6 @@ cargo build -p maplibre-native-sys -p maplibre-native-core -p maplibre-native
 [tasks.test]
 depends = ["//:ensure-native-library", "//:deps:libclang"]
 dir = "{{env.MLN_FFI_REPO_ROOT}}"
-env._.source = "{{env.MLN_FFI_CONAN_RUN_ENV}}"
 run = '''
 cargo test -p maplibre-native-sys -p maplibre-native-core -p maplibre-native -- --test-threads=1
 '''

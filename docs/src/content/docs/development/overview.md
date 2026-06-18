@@ -33,8 +33,8 @@ Install the platform toolchain:
   compatible Xcode. Run the pinned
   [`xcodes`](https://github.com/XcodesOrg/xcodes) tool with `xcodes select` to
   switch to the repository version.
-- On Fedora, install the `C Development Tools and Libraries` package group with
-  `sudo dnf group install c-development`.
+- On Fedora, install the C development package groups with
+  `sudo dnf group install --with-optional c-development development-tools`.
 - On Debian or Ubuntu, install the C and C++ compiler packages with
   `sudo apt install build-essential`.
 - On Windows, install a recent version of Visual Studio Community (or Build
@@ -49,7 +49,10 @@ mise install
 ```
 
 The setup hooks install project dependencies and initialize the MapLibre Native
-submodule at `third_party/maplibre-native`.
+submodule at `third_party/maplibre-native` and the vcpkg submodule at
+`third_party/vcpkg`. On Linux, install the graphics SDK packages for the backend
+you use. EGL builds use the host EGL/OpenGL ES SDK; Vulkan builds use the host
+Vulkan loader SDK.
 
 Run the Zig map example as a smoke test:
 
@@ -89,21 +92,21 @@ model.
 
 Project-managed dependency state keeps builds reproducible. Mise supplies
 repository tools, owns task execution, and exports the environment consumed by
-build systems, bindings, and examples. Conan installs desktop native libraries
-from [`ConanCenter`](https://conan.io/center/) into variant-specific build
-prefixes. Platform SDKs such as Xcode, Visual Studio, Linux compiler packages,
-and the Android SDK remain host toolchain inputs.
+build systems, bindings, and examples. vcpkg installs native libraries into
+variant-specific build prefixes. Platform SDKs such as Xcode, Visual Studio,
+Linux compiler and graphics SDK packages, and the Android SDK remain host
+toolchain inputs.
 
 [`mise`](https://mise.jdx.dev/) is the contributor entrypoint. It pins top-level
 tools, installs Git hooks, selects backend variants, and runs repository tasks.
 Use `mise run ...` for common workflows: build, test, check, fix, and examples.
-Mise also provides ecosystem entrypoints such as Conan, Zig, Python, uv, Node,
+Mise also provides ecosystem entrypoints such as vcpkg, Zig, Python, uv, Node,
 and pnpm.
 
-[`Conan`](https://conan.io/) resolves the desktop native libraries used by local
-builds. CMake, Ninja, pkg-config, shader tools, Doxygen, clang-format, and
-clang-tidy are pinned by mise. Host platform toolchains provide C and C++
-compilers, and CMake builds the native C/C++ library.
+[`vcpkg`](https://vcpkg.io/) resolves native libraries used by local builds.
+CMake, Ninja, pkg-config, shader tools, Doxygen, clang-format, and clang-tidy
+are pinned by mise. Host platform toolchains provide C and C++ compilers, and
+CMake builds the native C/C++ library.
 
 Language package managers own dependencies inside their ecosystems. For example,
 `uv` owns Python package dependencies, `pnpm` owns Node package dependencies,

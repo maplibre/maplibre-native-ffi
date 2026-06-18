@@ -7,7 +7,6 @@ run = 'dotnet build examples/dotnet-map/Maplibre.Native.Examples.DotnetMap.cspro
 depends = ["//:ensure-native-library"]
 dir = "{{env.MLN_FFI_REPO_ROOT}}"
 usage = 'arg "render-target"'
-env._.source = "{{env.MLN_FFI_CONAN_RUN_ENV}}"
 run = '''
 dotnet run --project examples/dotnet-map/Maplibre.Native.Examples.DotnetMap.csproj -p:Platform="Any CPU" -- "{{ usage.render_target }}"
 '''

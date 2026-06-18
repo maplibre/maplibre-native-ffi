@@ -4,21 +4,43 @@ function(mln_import_egl)
       FATAL_ERROR "MLN_FFI_EGL_ROOT must be set for explicit EGL/GLES imports")
   endif()
 
+  set(MLN_FFI_EGL_INCLUDE_ROOTS "${MLN_FFI_EGL_ROOT}")
+  if(VCPKG_INSTALLED_DIR AND VCPKG_TARGET_TRIPLET)
+    list(APPEND MLN_FFI_EGL_INCLUDE_ROOTS
+         "${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}")
+  endif()
+
   find_path(
     MLN_FFI_EGL_INCLUDE_DIR
     NAMES EGL/egl.h GLES2/gl2.h
-    HINTS "${MLN_FFI_EGL_ROOT}" PATH_SUFFIXES include
-    REQUIRED NO_DEFAULT_PATH)
+    HINTS ${MLN_FFI_EGL_INCLUDE_ROOTS} PATH_SUFFIXES include
+    REQUIRED NO_DEFAULT_PATH NO_CMAKE_FIND_ROOT_PATH)
   find_library(
     MLN_FFI_EGL_LIBRARY
-    NAMES EGL
-    HINTS "${MLN_FFI_EGL_ROOT}" PATH_SUFFIXES . lib
-    REQUIRED NO_DEFAULT_PATH)
+    NAMES EGL libEGL.so.1
+    HINTS
+      "${MLN_FFI_EGL_ROOT}"
+      PATH_SUFFIXES
+      .
+      lib
+      lib64
+      "lib/${CMAKE_LIBRARY_ARCHITECTURE}"
+      lib/aarch64-linux-gnu
+      lib/x86_64-linux-gnu
+    REQUIRED NO_DEFAULT_PATH NO_CMAKE_FIND_ROOT_PATH)
   find_library(
     MLN_FFI_GLESV2_LIBRARY
-    NAMES GLESv2
-    HINTS "${MLN_FFI_EGL_ROOT}" PATH_SUFFIXES . lib
-    REQUIRED NO_DEFAULT_PATH)
+    NAMES GLESv2 libGLESv2.so.2
+    HINTS
+      "${MLN_FFI_EGL_ROOT}"
+      PATH_SUFFIXES
+      .
+      lib
+      lib64
+      "lib/${CMAKE_LIBRARY_ARCHITECTURE}"
+      lib/aarch64-linux-gnu
+      lib/x86_64-linux-gnu
+    REQUIRED NO_DEFAULT_PATH NO_CMAKE_FIND_ROOT_PATH)
   get_filename_component(
     MLN_FFI_EGL_LIBRARY_DIR "${MLN_FFI_EGL_LIBRARY}"
     DIRECTORY)

@@ -35,7 +35,6 @@ cargo clippy -p rust-map --no-default-features --features "$feature" --all-targe
 depends = ["//:ensure-native-library", "//:deps:libclang", ":compile-shaders"]
 dir = "{{env.MLN_FFI_REPO_ROOT}}"
 usage = 'arg "render-target"'
-env._.source = "{{env.MLN_FFI_CONAN_RUN_ENV}}"
 run = '''
 case "${MLN_FFI_RENDER_BACKEND:-}" in
   metal | opengl | vulkan) feature="$MLN_FFI_RENDER_BACKEND" ;;

@@ -79,9 +79,29 @@ pub fn dependencyLibraryDirs(b: *std.Build) []const std.Build.LazyPath {
 
 fn addDependencyLibraryPaths(module: *std.Build.Module, dependency_library_dirs: []const std.Build.LazyPath) void {
     for (dependency_library_dirs) |dependency_library_dir| {
+        const dependency_library_path = dependency_library_dir.getPath(module.owner);
+        std.Io.Dir.cwd().access(module.owner.graph.io, dependency_library_path, .{}) catch continue;
         module.addLibraryPath(dependency_library_dir);
         module.addRPath(dependency_library_dir);
     }
+}
+
+fn addSharedLibraryFile(
+    b: *std.Build,
+    module: *std.Build.Module,
+    dependency_library_dirs: []const std.Build.LazyPath,
+    candidate_names: []const []const u8,
+) bool {
+    for (dependency_library_dirs) |dependency_library_dir| {
+        const dependency_library_path = dependency_library_dir.getPath(b);
+        for (candidate_names) |candidate_name| {
+            const library_path = b.pathJoin(&.{ dependency_library_path, candidate_name });
+            std.Io.Dir.cwd().access(b.graph.io, library_path, .{}) catch continue;
+            module.addObjectFile(.{ .cwd_relative = library_path });
+            return true;
+        }
+    }
+    return false;
 }
 
 pub fn addPlatformSystemPaths(b: *std.Build, module: *std.Build.Module, target: std.Build.ResolvedTarget) void {
@@ -139,8 +159,18 @@ pub fn linkRenderBackend(b: *std.Build, module: *std.Build.Module, options: Rend
         },
         .opengl => switch (options.target.result.os.tag) {
             .linux => {
-                module.linkSystemLibrary("EGL", .{ .use_pkg_config = .yes });
-                module.linkSystemLibrary("GLESv2", .{ .use_pkg_config = .yes });
+                if (options.dependency_library_dirs.len > 0) {
+                    addDependencyLibraryPaths(module, options.dependency_library_dirs);
+                    if (!addSharedLibraryFile(b, module, options.dependency_library_dirs, &.{ "libEGL.so", "libEGL.so.1" })) {
+                        module.linkSystemLibrary("EGL", .{ .use_pkg_config = .no });
+                    }
+                    if (!addSharedLibraryFile(b, module, options.dependency_library_dirs, &.{ "libGLESv2.so", "libGLESv2.so.2" })) {
+                        module.linkSystemLibrary("GLESv2", .{ .use_pkg_config = .no });
+                    }
+                } else {
+                    module.linkSystemLibrary("EGL", .{ .use_pkg_config = .yes });
+                    module.linkSystemLibrary("GLESv2", .{ .use_pkg_config = .yes });
+                }
             },
             .macos => {
                 if (options.dependency_library_dirs.len == 0) {
