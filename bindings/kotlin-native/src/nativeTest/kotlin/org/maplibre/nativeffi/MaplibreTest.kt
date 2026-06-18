@@ -3,6 +3,7 @@ package org.maplibre.nativeffi
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertIs
 import kotlin.test.assertTrue
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.set
@@ -10,6 +11,7 @@ import kotlinx.cinterop.toKString
 import org.maplibre.nativeffi.camera.AnimationOptions
 import org.maplibre.nativeffi.error.AbiVersionMismatchException
 import org.maplibre.nativeffi.error.MaplibreStatus
+import org.maplibre.nativeffi.error.NativeErrorException
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.render.RenderBackend
 import org.maplibre.nativeffi.runtime.NetworkStatus
@@ -89,6 +91,7 @@ class MaplibreTest {
       }
 
     assertEquals(MaplibreStatus.NATIVE_ERROR, error.status)
+    assertIs<NativeErrorException>(error)
     assertEquals(MaplibreStatus.NATIVE_ERROR.nativeCode, error.nativeStatusCode)
     assertEquals(Maplibre.EXPECTED_C_ABI_VERSION + 1L, error.actualVersion)
     assertEquals(Maplibre.EXPECTED_C_ABI_VERSION, error.expectedVersion)

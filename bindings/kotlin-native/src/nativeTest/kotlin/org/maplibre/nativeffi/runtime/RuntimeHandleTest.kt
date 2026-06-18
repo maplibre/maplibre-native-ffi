@@ -9,6 +9,7 @@ import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
+import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertSame
@@ -33,6 +34,7 @@ import org.maplibre.nativeffi.error.AbiVersionMismatchException
 import org.maplibre.nativeffi.error.InvalidStateException
 import org.maplibre.nativeffi.error.MaplibreException
 import org.maplibre.nativeffi.error.MaplibreStatus
+import org.maplibre.nativeffi.error.NativeErrorException
 import org.maplibre.nativeffi.error.WrongThreadException
 import org.maplibre.nativeffi.internal.c.mln_runtime_event
 import org.maplibre.nativeffi.internal.callback.ResourceProviderState
@@ -107,6 +109,7 @@ class RuntimeHandleTest {
       }
 
     assertEquals(MaplibreStatus.NATIVE_ERROR, error.status)
+    assertIs<NativeErrorException>(error)
     assertEquals(Maplibre.EXPECTED_C_ABI_VERSION + 1L, error.actualVersion)
     assertEquals(Maplibre.EXPECTED_C_ABI_VERSION, error.expectedVersion)
     assertEquals(0, creates)

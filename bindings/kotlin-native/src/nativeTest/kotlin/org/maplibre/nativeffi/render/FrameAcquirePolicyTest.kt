@@ -82,6 +82,25 @@ class FrameAcquirePolicyTest {
   }
 
   @Test
+  fun localCleanupFailureDoesNotReplaceOriginalFailure() {
+    val failure = IllegalArgumentException("frame copy failed")
+    var released = 0
+
+    val thrown =
+      assertFailsWith<IllegalArgumentException> {
+        FrameAcquirePolicy.cleanupAfterWrapperFailure(
+          acquired = true,
+          releaseNative = { released += 1 },
+          closeLocal = { throw IllegalStateException("cleanup failed") },
+          failure = failure,
+        )
+      }
+
+    assertSame(failure, thrown)
+    assertEquals(1, released)
+  }
+
+  @Test
   fun cleanupNativeFailureDoesNotReplaceOriginalNativeDiagnostic() {
     memScoped {
       val failure =

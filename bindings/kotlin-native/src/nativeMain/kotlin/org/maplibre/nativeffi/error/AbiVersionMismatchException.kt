@@ -5,8 +5,7 @@ public class AbiVersionMismatchException(
   public val actualVersion: Long,
   public val expectedVersion: Long,
 ) :
-  MaplibreException(
-    MaplibreStatus.NATIVE_ERROR,
+  NativeErrorException(
     MaplibreStatus.NATIVE_ERROR.nativeCode,
     "Unsupported Maplibre C ABI version $actualVersion; expected $expectedVersion",
   )

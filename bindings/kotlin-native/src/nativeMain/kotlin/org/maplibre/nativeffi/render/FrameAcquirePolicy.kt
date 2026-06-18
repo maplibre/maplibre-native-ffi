@@ -12,7 +12,7 @@ internal object FrameAcquirePolicy {
         runCatching { releaseNative() }
       }
     } finally {
-      closeLocal()
+      runCatching { closeLocal() }
     }
     throw failure
   }
