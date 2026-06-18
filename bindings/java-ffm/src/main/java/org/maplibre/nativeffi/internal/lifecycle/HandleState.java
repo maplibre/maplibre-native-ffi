@@ -19,6 +19,8 @@ public final class HandleState {
   private final Object[] parents;
 
   private boolean released;
+  private boolean releasing;
+  private int liveChildren;
 
   public HandleState(String typeName, MemorySegment handle, Object... parents) {
     this.typeName = Objects.requireNonNull(typeName, "typeName");
@@ -35,6 +37,9 @@ public final class HandleState {
     if (released) {
       throw Status.released(typeName);
     }
+    if (releasing) {
+      throw Status.releasing(typeName);
+    }
     return handle;
   }
 
@@ -44,6 +49,17 @@ public final class HandleState {
 
   public long address() {
     return handle.address();
+  }
+
+  public synchronized ChildRetention retainChild(String childTypeName) {
+    if (released) {
+      throw Status.released(typeName);
+    }
+    if (releasing) {
+      throw Status.releasing(typeName);
+    }
+    liveChildren++;
+    return new ChildRetention(this, childTypeName);
   }
 
   public void closeOnce(NativeDestroy destroy) {
@@ -58,18 +74,69 @@ public final class HandleState {
       if (released) {
         return;
       }
-      Status.check(destroy.destroy(handle));
-      released = true;
-      leakReport.markReleased();
-      cleanable.clean();
+      if (releasing) {
+        throw Status.releasing(typeName);
+      }
+      if (liveChildren > 0) {
+        throw Status.liveChildren(typeName, liveChildren);
+      }
+      releasing = true;
     }
 
+    var destroySucceeded = false;
+    try {
+      Status.check(destroy.destroy(handle));
+      destroySucceeded = true;
+    } finally {
+      if (!destroySucceeded) {
+        synchronized (this) {
+          releasing = false;
+        }
+      }
+    }
+
+    synchronized (this) {
+      released = true;
+      releasing = false;
+      leakReport.markReleased();
+    }
+    cleanable.clean();
+
     afterSuccess.run();
+  }
+
+  private synchronized void releaseChild() {
+    if (liveChildren > 0) {
+      liveChildren--;
+    }
   }
 
   @FunctionalInterface
   public interface NativeDestroy {
     int destroy(MemorySegment handle);
+  }
+
+  public static final class ChildRetention implements AutoCloseable {
+    private final HandleState parent;
+
+    @SuppressWarnings("unused")
+    private final String childTypeName;
+
+    private boolean released;
+
+    private ChildRetention(HandleState parent, String childTypeName) {
+      this.parent = parent;
+      this.childTypeName = Objects.requireNonNull(childTypeName, "childTypeName");
+    }
+
+    @Override
+    public synchronized void close() {
+      if (released) {
+        return;
+      }
+      released = true;
+      parent.releaseChild();
+    }
   }
 
   private static final class LeakReport implements Runnable {
