@@ -2,6 +2,7 @@ package org.maplibre.nativejni.render;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicReference;
 import org.bytedeco.javacpp.PointerPointer;
 import org.maplibre.nativejni.error.MaplibreStatus;
 import org.maplibre.nativejni.geo.Feature;
@@ -27,10 +28,20 @@ import org.maplibre.nativejni.query.SourceFeatureQueryOptions;
 public final class RenderSessionHandle implements AutoCloseable {
   private final MapHandle map;
   private final HandleState state;
+  private final HandleState.ChildRetention mapRetention;
+  private static final AtomicReference<RuntimeException> FRAME_CONSTRUCTION_FAILURE =
+      new AtomicReference<>();
 
   private RenderSessionHandle(MapHandle map, long handle) {
     this.map = Objects.requireNonNull(map, "map");
-    this.state = new HandleState("RenderSessionHandle", handle, map);
+    var retention = map.retainChild(InternalAccess.INSTANCE, "RenderSessionHandle");
+    try {
+      this.state = new HandleState("RenderSessionHandle", handle, map);
+      this.mapRetention = retention;
+    } catch (RuntimeException | Error error) {
+      retention.close();
+      throw error;
+    }
   }
 
   public static RenderSessionHandle attachMetalOwnedTexture(
@@ -350,20 +361,27 @@ public final class RenderSessionHandle implements AutoCloseable {
         MaplibreNativeC.mln_metal_owned_texture_acquire_frame(
             JavaCppSupport.renderSession(state.requireLiveAddress()), nativeFrame));
     var scope = new FrameScope();
-    return new MetalOwnedTextureFrameHandle(
-        this,
-        nativeFrame,
-        scope,
-        new MetalOwnedTextureFrame(
-            scope,
-            nativeFrame.generation(),
-            nativeFrame.width(),
-            nativeFrame.height(),
-            nativeFrame.scale_factor(),
-            nativeFrame.frame_id(),
-            NativePointer.scoped(address(nativeFrame.texture()), scope),
-            NativePointer.scoped(address(nativeFrame.device()), scope),
-            nativeFrame.pixel_format()));
+    try {
+      throwFrameConstructionFailureForTesting();
+      return new MetalOwnedTextureFrameHandle(
+          this,
+          nativeFrame,
+          scope,
+          new MetalOwnedTextureFrame(
+              scope,
+              nativeFrame.generation(),
+              nativeFrame.width(),
+              nativeFrame.height(),
+              nativeFrame.scale_factor(),
+              nativeFrame.frame_id(),
+              NativePointer.scoped(address(nativeFrame.texture()), scope),
+              NativePointer.scoped(address(nativeFrame.device()), scope),
+              nativeFrame.pixel_format()));
+    } catch (RuntimeException | Error error) {
+      releaseMetalFrame(nativeFrame, error);
+      closeFrameLocals(scope, nativeFrame, error);
+      throw error;
+    }
   }
 
   /**
@@ -383,22 +401,29 @@ public final class RenderSessionHandle implements AutoCloseable {
         MaplibreNativeC.mln_vulkan_owned_texture_acquire_frame(
             JavaCppSupport.renderSession(state.requireLiveAddress()), nativeFrame));
     var scope = new FrameScope();
-    return new VulkanOwnedTextureFrameHandle(
-        this,
-        nativeFrame,
-        scope,
-        new VulkanOwnedTextureFrame(
-            scope,
-            nativeFrame.generation(),
-            nativeFrame.width(),
-            nativeFrame.height(),
-            nativeFrame.scale_factor(),
-            nativeFrame.frame_id(),
-            NativePointer.scoped(address(nativeFrame.image()), scope),
-            NativePointer.scoped(address(nativeFrame.image_view()), scope),
-            NativePointer.scoped(address(nativeFrame.device()), scope),
-            nativeFrame.format(),
-            nativeFrame.layout()));
+    try {
+      throwFrameConstructionFailureForTesting();
+      return new VulkanOwnedTextureFrameHandle(
+          this,
+          nativeFrame,
+          scope,
+          new VulkanOwnedTextureFrame(
+              scope,
+              nativeFrame.generation(),
+              nativeFrame.width(),
+              nativeFrame.height(),
+              nativeFrame.scale_factor(),
+              nativeFrame.frame_id(),
+              NativePointer.scoped(address(nativeFrame.image()), scope),
+              NativePointer.scoped(address(nativeFrame.image_view()), scope),
+              NativePointer.scoped(address(nativeFrame.device()), scope),
+              nativeFrame.format(),
+              nativeFrame.layout()));
+    } catch (RuntimeException | Error error) {
+      releaseVulkanFrame(nativeFrame, error);
+      closeFrameLocals(scope, nativeFrame, error);
+      throw error;
+    }
   }
 
   /**
@@ -418,22 +443,29 @@ public final class RenderSessionHandle implements AutoCloseable {
         MaplibreNativeC.mln_opengl_owned_texture_acquire_frame(
             JavaCppSupport.renderSession(state.requireLiveAddress()), nativeFrame));
     var scope = new FrameScope();
-    return new OpenGLOwnedTextureFrameHandle(
-        this,
-        nativeFrame,
-        scope,
-        new OpenGLOwnedTextureFrame(
-            scope,
-            nativeFrame.generation(),
-            nativeFrame.width(),
-            nativeFrame.height(),
-            nativeFrame.scale_factor(),
-            nativeFrame.frame_id(),
-            nativeFrame.texture(),
-            nativeFrame.target(),
-            nativeFrame.internal_format(),
-            nativeFrame.format(),
-            nativeFrame.type()));
+    try {
+      throwFrameConstructionFailureForTesting();
+      return new OpenGLOwnedTextureFrameHandle(
+          this,
+          nativeFrame,
+          scope,
+          new OpenGLOwnedTextureFrame(
+              scope,
+              nativeFrame.generation(),
+              nativeFrame.width(),
+              nativeFrame.height(),
+              nativeFrame.scale_factor(),
+              nativeFrame.frame_id(),
+              nativeFrame.texture(),
+              nativeFrame.target(),
+              nativeFrame.internal_format(),
+              nativeFrame.format(),
+              nativeFrame.type()));
+    } catch (RuntimeException | Error error) {
+      releaseOpenGLFrame(nativeFrame, error);
+      closeFrameLocals(scope, nativeFrame, error);
+      throw error;
+    }
   }
 
   private static long sessionAddress(
@@ -441,8 +473,39 @@ public final class RenderSessionHandle implements AutoCloseable {
     return JavaCppSupport.outAddress(outSession, MaplibreNativeC.mln_render_session.class);
   }
 
+  static void failNextFrameConstructionForTesting(RuntimeException failure) {
+    if (!FRAME_CONSTRUCTION_FAILURE.compareAndSet(null, Objects.requireNonNull(failure))) {
+      throw new IllegalStateException("frame construction failure is already armed");
+    }
+  }
+
+  static void resetFrameConstructionFailureForTesting() {
+    FRAME_CONSTRUCTION_FAILURE.set(null);
+  }
+
+  private static void throwFrameConstructionFailureForTesting() {
+    var failure = FRAME_CONSTRUCTION_FAILURE.getAndSet(null);
+    if (failure != null) {
+      throw failure;
+    }
+  }
+
   private static long address(org.bytedeco.javacpp.Pointer pointer) {
     return pointer == null || pointer.isNull() ? 0 : pointer.address();
+  }
+
+  private static void closeFrameLocals(
+      FrameScope scope, org.bytedeco.javacpp.Pointer nativeFrame, Throwable failure) {
+    try {
+      scope.close();
+    } catch (Throwable closeFailure) {
+      failure.addSuppressed(closeFailure);
+    }
+    try {
+      nativeFrame.close();
+    } catch (Throwable closeFailure) {
+      failure.addSuppressed(closeFailure);
+    }
   }
 
   private List<QueriedFeature> queryRenderedFeaturesInternal(
@@ -482,7 +545,8 @@ public final class RenderSessionHandle implements AutoCloseable {
     NativeLibrary.ensureLoaded();
     state.closeOnce(
         address ->
-            MaplibreNativeC.mln_render_session_destroy(JavaCppSupport.renderSession(address)));
+            MaplibreNativeC.mln_render_session_destroy(JavaCppSupport.renderSession(address)),
+        mapRetention::close);
   }
 
   public boolean isClosed() {
@@ -495,6 +559,10 @@ public final class RenderSessionHandle implements AutoCloseable {
 
   long nativeAddress() {
     return state.requireLiveAddress();
+  }
+
+  HandleState.ChildRetention retainChild(String childTypeName) {
+    return state.retainChild(childTypeName);
   }
 
   void releaseMetalFrame(

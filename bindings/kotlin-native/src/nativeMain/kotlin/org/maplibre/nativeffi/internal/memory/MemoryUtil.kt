@@ -8,13 +8,16 @@ import kotlinx.cinterop.cstr
 import kotlinx.cinterop.readBytes
 import kotlinx.cinterop.toCValues
 import kotlinx.cinterop.toKString
+import org.maplibre.nativeffi.internal.status.Status
 
 /** Memory helpers for Kotlin/Native C ABI calls. */
 @OptIn(ExperimentalForeignApi::class)
 internal object MemoryUtil {
   /** Rejects strings that C would truncate when passed as null-terminated text. */
   fun requireValidCString(value: String) {
-    require('\u0000' !in value) { "C string inputs cannot contain embedded NUL characters" }
+    if ('\u0000' in value) {
+      throw Status.invalidArgument("C string inputs cannot contain embedded NUL characters")
+    }
   }
 
   /** Allocates a null-terminated UTF-8 string for one C call. */

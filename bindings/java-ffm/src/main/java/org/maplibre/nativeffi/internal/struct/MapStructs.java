@@ -15,6 +15,7 @@ import org.maplibre.nativeffi.camera.CameraFitOptions;
 import org.maplibre.nativeffi.camera.CameraOptions;
 import org.maplibre.nativeffi.camera.FreeCameraOptions;
 import org.maplibre.nativeffi.error.InvalidArgumentException;
+import org.maplibre.nativeffi.geo.LatLng;
 import org.maplibre.nativeffi.internal.c.MapLibreNativeC;
 import org.maplibre.nativeffi.internal.c.mln_animation_options;
 import org.maplibre.nativeffi.internal.c.mln_bound_options;
@@ -25,13 +26,10 @@ import org.maplibre.nativeffi.internal.c.mln_map_options;
 import org.maplibre.nativeffi.internal.c.mln_map_tile_options;
 import org.maplibre.nativeffi.internal.c.mln_map_viewport_options;
 import org.maplibre.nativeffi.internal.c.mln_projection_mode;
-import org.maplibre.nativeffi.map.ConstrainMode;
+import org.maplibre.nativeffi.internal.convert.NativeValues;
 import org.maplibre.nativeffi.map.MapOptions;
-import org.maplibre.nativeffi.map.NorthOrientation;
 import org.maplibre.nativeffi.map.ProjectionModeOptions;
-import org.maplibre.nativeffi.map.TileLodMode;
 import org.maplibre.nativeffi.map.TileOptions;
-import org.maplibre.nativeffi.map.ViewportMode;
 import org.maplibre.nativeffi.map.ViewportOptions;
 
 /** Internal materializers and readers for map descriptors. */
@@ -55,7 +53,7 @@ public final class MapStructs {
       mln_map_options.scale_factor(segment, options.scaleFactor());
     }
     if (options.mapMode() != null) {
-      mln_map_options.map_mode(segment, options.mapMode().nativeValue());
+      mln_map_options.map_mode(segment, NativeValues.nativeValue(options.mapMode()));
     }
     return segment;
   }
@@ -108,7 +106,8 @@ public final class MapStructs {
     var fields = mln_camera_options.fields(segment);
     var options = new CameraOptions();
     if ((fields & MapLibreNativeC.MLN_CAMERA_OPTION_CENTER()) != 0) {
-      options.center(mln_camera_options.latitude(segment), mln_camera_options.longitude(segment));
+      options.center(
+          new LatLng(mln_camera_options.latitude(segment), mln_camera_options.longitude(segment)));
     }
     if ((fields & MapLibreNativeC.MLN_CAMERA_OPTION_CENTER_ALTITUDE()) != 0) {
       options.centerAltitude(mln_camera_options.center_altitude(segment));
@@ -232,15 +231,18 @@ public final class MapStructs {
     var fields = 0;
     if (options.hasNorthOrientation()) {
       fields |= MapLibreNativeC.MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION();
-      mln_map_viewport_options.north_orientation(segment, options.northOrientation().nativeValue());
+      mln_map_viewport_options.north_orientation(
+          segment, NativeValues.nativeValue(options.northOrientation()));
     }
     if (options.hasConstrainMode()) {
       fields |= MapLibreNativeC.MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE();
-      mln_map_viewport_options.constrain_mode(segment, options.constrainMode().nativeValue());
+      mln_map_viewport_options.constrain_mode(
+          segment, NativeValues.nativeValue(options.constrainMode()));
     }
     if (options.hasViewportMode()) {
       fields |= MapLibreNativeC.MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE();
-      mln_map_viewport_options.viewport_mode(segment, options.viewportMode().nativeValue());
+      mln_map_viewport_options.viewport_mode(
+          segment, NativeValues.nativeValue(options.viewportMode()));
     }
     if (options.hasFrustumOffset()) {
       fields |= MapLibreNativeC.MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET();
@@ -255,15 +257,15 @@ public final class MapStructs {
     var options = new ViewportOptions();
     if ((fields & MapLibreNativeC.MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION()) != 0) {
       options.northOrientation(
-          NorthOrientation.fromNative(mln_map_viewport_options.north_orientation(segment)));
+          NativeValues.northOrientation(mln_map_viewport_options.north_orientation(segment)));
     }
     if ((fields & MapLibreNativeC.MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE()) != 0) {
       options.constrainMode(
-          ConstrainMode.fromNative(mln_map_viewport_options.constrain_mode(segment)));
+          NativeValues.constrainMode(mln_map_viewport_options.constrain_mode(segment)));
     }
     if ((fields & MapLibreNativeC.MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE()) != 0) {
       options.viewportMode(
-          ViewportMode.fromNative(mln_map_viewport_options.viewport_mode(segment)));
+          NativeValues.viewportMode(mln_map_viewport_options.viewport_mode(segment)));
     }
     if ((fields & MapLibreNativeC.MLN_MAP_VIEWPORT_OPTION_FRUSTUM_OFFSET()) != 0) {
       options.frustumOffset(edgeInsets(mln_map_viewport_options.frustum_offset(segment)));
@@ -296,7 +298,7 @@ public final class MapStructs {
     }
     if (options.hasLodMode()) {
       fields |= MapLibreNativeC.MLN_MAP_TILE_OPTION_LOD_MODE();
-      mln_map_tile_options.lod_mode(segment, options.lodMode().nativeValue());
+      mln_map_tile_options.lod_mode(segment, NativeValues.nativeValue(options.lodMode()));
     }
     mln_map_tile_options.fields(segment, fields);
     return segment;
@@ -321,7 +323,7 @@ public final class MapStructs {
       options.lodZoomShift(mln_map_tile_options.lod_zoom_shift(segment));
     }
     if ((fields & MapLibreNativeC.MLN_MAP_TILE_OPTION_LOD_MODE()) != 0) {
-      options.lodMode(TileLodMode.fromNative(mln_map_tile_options.lod_mode(segment)));
+      options.lodMode(NativeValues.tileLodMode(mln_map_tile_options.lod_mode(segment)));
     }
     return options;
   }

@@ -170,25 +170,33 @@ internal object StyleStructs {
   }
 
   fun styleIdList(list: CPointer<mln_style_id_list>): List<String> =
+    styleIdList(
+      list,
+      counter = ::mln_style_id_list_count,
+      getter = ::mln_style_id_list_get,
+      destroyer = ::mln_style_id_list_destroy,
+    )
+
+  fun styleIdList(
+    list: CPointer<mln_style_id_list>,
+    counter: (CPointer<mln_style_id_list>, CPointer<ULongVar>) -> Int,
+    getter: (CPointer<mln_style_id_list>, ULong, CPointer<mln_string_view>) -> Int,
+    destroyer: (CPointer<mln_style_id_list>) -> Unit,
+  ): List<String> =
     try {
       memScoped {
         val outCount = alloc<ULongVar>()
-        Status.check(mln_style_id_list_count(list, outCount.ptr))
+        Status.check(counter(list, outCount.ptr))
         List(checkedInt(outCount.value, "style id count")) { index ->
           val outId = alloc<mln_string_view>()
-          Status.check(mln_style_id_list_get(list, index.toULong(), outId.ptr))
+          Status.check(getter(list, index.toULong(), outId.ptr))
           CoreStructs.stringView(outId)
         }
       }
     } finally {
-      mln_style_id_list_destroy(list)
+      destroyer(list)
     }
 
   fun sourceInfo(value: mln_style_source_info, attribution: String?): SourceInfo =
-    SourceInfo(
-      SourceType.fromNative(value.type),
-      value.type.toInt(),
-      value.is_volatile,
-      attribution,
-    )
+    SourceInfo(SourceType.fromNative(value.type), value.is_volatile, attribution)
 }

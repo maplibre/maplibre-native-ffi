@@ -339,14 +339,14 @@ const OpenGLContext = struct {
     fn descriptor(self: *const OpenGLContext) maplibre.OpenGLContextDescriptor {
         return switch (self.platform) {
             .wgl => |wgl| .{ .wgl = .{
-                .device_context = .{ .ptr = @ptrCast(wgl.device_context) },
-                .share_context = .{ .ptr = @ptrCast(self.context) },
+                .device_context = maplibre.NativePointer.fromPtr(@ptrCast(wgl.device_context)),
+                .share_context = maplibre.NativePointer.fromPtr(@ptrCast(self.context)),
                 .get_proc_address = null,
             } },
             .egl => |egl| .{ .egl = .{
-                .display = .{ .ptr = @ptrCast(egl.display) },
-                .config = .{ .ptr = @ptrCast(egl.config) },
-                .share_context = .{ .ptr = @ptrCast(self.context) },
+                .display = maplibre.NativePointer.fromPtr(@ptrCast(egl.display)),
+                .config = maplibre.NativePointer.fromPtr(@ptrCast(egl.config)),
+                .share_context = maplibre.NativePointer.fromPtr(@ptrCast(self.context)),
                 .get_proc_address = null,
             } },
         };
@@ -354,8 +354,8 @@ const OpenGLContext = struct {
 
     fn surface(self: *const OpenGLContext) maplibre.NativePointer {
         return switch (self.platform) {
-            .wgl => |wgl| .{ .ptr = @ptrCast(wgl.device_context) },
-            .egl => |egl| .{ .ptr = @ptrCast(egl.surface) },
+            .wgl => |wgl| maplibre.NativePointer.fromPtr(@ptrCast(wgl.device_context)),
+            .egl => |egl| maplibre.NativePointer.fromPtr(@ptrCast(egl.surface)),
         };
     }
 };

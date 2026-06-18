@@ -4,7 +4,7 @@ const testing = std.testing;
 const maplibre = @import("maplibre_native");
 
 test "map debug options round trip and diagnostics toggles" {
-    var runtime = try maplibre.RuntimeHandle.init(null);
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
     var map = try maplibre.MapHandle.create(&runtime, .{});
     defer map.close() catch @panic("map close failed");
@@ -31,7 +31,7 @@ test "map debug options round trip and diagnostics toggles" {
 }
 
 test "map viewport options update selected fields through public descriptors" {
-    var runtime = try maplibre.RuntimeHandle.init(null);
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
     var map = try maplibre.MapHandle.create(&runtime, .{});
     defer map.close() catch @panic("map close failed");
@@ -59,7 +59,7 @@ test "map viewport options update selected fields through public descriptors" {
 }
 
 test "map tile options update selected fields through public descriptors" {
-    var runtime = try maplibre.RuntimeHandle.init(null);
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
     var map = try maplibre.MapHandle.create(&runtime, .{});
     defer map.close() catch @panic("map close failed");
@@ -88,7 +88,7 @@ test "map tile options update selected fields through public descriptors" {
 }
 
 test "map tuning public descriptors report invalid native arguments" {
-    var runtime = try maplibre.RuntimeHandle.init(null);
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
     var map = try maplibre.MapHandle.create(&runtime, .{});
     defer map.close() catch @panic("map close failed");

@@ -22,7 +22,9 @@ import org.maplibre.nativeffi.geo.Geometry;
 import org.maplibre.nativeffi.geo.LatLng;
 import org.maplibre.nativeffi.geo.LatLngBounds;
 import org.maplibre.nativeffi.geo.ScreenPoint;
+import org.maplibre.nativeffi.internal.convert.NativeValues;
 import org.maplibre.nativeffi.runtime.RuntimeHandle;
+import org.maplibre.nativeffi.runtime.RuntimeOptions;
 import org.maplibre.nativeffi.test.NativeTestSupport;
 
 final class MapHandleTest {
@@ -32,8 +34,25 @@ final class MapHandleTest {
   }
 
   @Test
+  void unknownMapOptionEnumsPreserveRawValues() {
+    var northOrientation = NativeValues.northOrientation(999_991);
+    var constrainMode = NativeValues.constrainMode(999_992);
+    var viewportMode = NativeValues.viewportMode(999_993);
+    var tileLodMode = NativeValues.tileLodMode(999_994);
+
+    assertEquals(999_991, northOrientation.rawValue());
+    assertEquals(999_992, constrainMode.rawValue());
+    assertEquals(999_993, viewportMode.rawValue());
+    assertEquals(999_994, tileLodMode.rawValue());
+    assertThrows(InvalidArgumentException.class, () -> NativeValues.nativeValue(northOrientation));
+    assertThrows(InvalidArgumentException.class, () -> NativeValues.nativeValue(constrainMode));
+    assertThrows(InvalidArgumentException.class, () -> NativeValues.nativeValue(viewportMode));
+    assertThrows(InvalidArgumentException.class, () -> NativeValues.nativeValue(tileLodMode));
+  }
+
+  @Test
   void createsAndClosesMapBeforeRuntime() {
-    var runtime = RuntimeHandle.create();
+    var runtime = RuntimeHandle.create(new RuntimeOptions());
     var map = MapHandle.create(runtime, new MapOptions().size(128, 128));
     try {
       map.requestRepaint();
@@ -46,7 +65,7 @@ final class MapHandleTest {
 
   @Test
   void mapOptionSemanticValidationComesFromNative() {
-    var runtime = RuntimeHandle.create();
+    var runtime = RuntimeHandle.create(new RuntimeOptions());
     try {
       var error =
           assertThrows(
@@ -61,7 +80,7 @@ final class MapHandleTest {
 
   @Test
   void runtimeCloseFailsWhileMapIsLive() {
-    var runtime = RuntimeHandle.create();
+    var runtime = RuntimeHandle.create(new RuntimeOptions());
     var map = MapHandle.create(runtime, new MapOptions().size(128, 128));
     try {
       var error = assertThrows(InvalidStateException.class, runtime::close);
@@ -74,13 +93,13 @@ final class MapHandleTest {
 
   @Test
   void releasedMapRejectsLaterMethodsBeforeNativeDispatch() {
-    var runtime = RuntimeHandle.create();
+    var runtime = RuntimeHandle.create(new RuntimeOptions());
     try {
       var map = MapHandle.create(runtime, new MapOptions().size(128, 128));
       map.close();
       var error = assertThrows(InvalidStateException.class, () -> map.setStyleJson("{}"));
       assertTrue(error.diagnostic().contains("MapHandle"));
-      assertThrows(InvalidStateException.class, () -> map.cameraForLatLngs(List.of()));
+      assertThrows(InvalidStateException.class, () -> map.cameraForLatLngs(List.of(), null));
       assertThrows(InvalidStateException.class, () -> map.pixelsForLatLngs(List.of()));
       assertThrows(InvalidStateException.class, () -> map.latLngsForPixels(List.of()));
     } finally {
@@ -90,7 +109,7 @@ final class MapHandleTest {
 
   @Test
   void publicStyleStringInputsRejectEmbeddedNul() {
-    var runtime = RuntimeHandle.create();
+    var runtime = RuntimeHandle.create(new RuntimeOptions());
     var map = MapHandle.create(runtime, new MapOptions().size(128, 128));
     try {
       assertThrows(IllegalArgumentException.class, () -> map.setStyleUrl("custom://a\0b"));
@@ -103,7 +122,7 @@ final class MapHandleTest {
 
   @Test
   void debugAndStateHelpersRoundTrip() {
-    var runtime = RuntimeHandle.create();
+    var runtime = RuntimeHandle.create(new RuntimeOptions());
     var map = MapHandle.create(runtime, new MapOptions().size(128, 128));
     try {
       map.setDebugOptions(EnumSet.of(DebugOption.TILE_BORDERS, DebugOption.TIMESTAMPS));
@@ -125,7 +144,7 @@ final class MapHandleTest {
 
   @Test
   void viewportTileBoundsAndProjectionModeOptionsRoundTrip() {
-    var runtime = RuntimeHandle.create();
+    var runtime = RuntimeHandle.create(new RuntimeOptions());
     var map = MapHandle.create(runtime, new MapOptions().size(128, 128));
     try {
       map.setViewportOptions(
@@ -139,11 +158,13 @@ final class MapHandleTest {
       assertEquals(ConstrainMode.HEIGHT_ONLY, viewport.constrainMode());
       assertEquals(ViewportMode.DEFAULT, viewport.viewportMode());
       assertEquals(EdgeInsets.ZERO, viewport.frustumOffset());
+      map.setViewportOptions(viewport);
 
       map.setTileOptions(new TileOptions().prefetchZoomDelta(2).lodMode(TileLodMode.DEFAULT));
       var tile = map.tileOptions();
       assertEquals(2, tile.prefetchZoomDelta());
       assertEquals(TileLodMode.DEFAULT, tile.lodMode());
+      map.setTileOptions(tile);
 
       map.setBounds(new BoundOptions().minZoom(0).maxZoom(22).minPitch(0).maxPitch(60));
       var bounds = map.bounds();
@@ -163,10 +184,10 @@ final class MapHandleTest {
 
   @Test
   void cameraCommandsAndCoordinateConversionsUseRealMap() {
-    var runtime = RuntimeHandle.create();
+    var runtime = RuntimeHandle.create(new RuntimeOptions());
     var map = MapHandle.create(runtime, new MapOptions().size(256, 256));
     try {
-      map.jumpTo(new CameraOptions().center(37.7749, -122.4194).zoom(4).pitch(20));
+      map.jumpTo(new CameraOptions().center(new LatLng(37.7749, -122.4194)).zoom(4).pitch(20));
       var camera = map.camera();
       assertEquals(37.7749, camera.center().latitude(), 1e-6);
       assertEquals(-122.4194, camera.center().longitude(), 1e-6);
@@ -209,12 +230,12 @@ final class MapHandleTest {
 
   @Test
   void emptyCameraFitCoordinateInputsUseNativeValidation() {
-    var runtime = RuntimeHandle.create();
+    var runtime = RuntimeHandle.create(new RuntimeOptions());
     var map = MapHandle.create(runtime, new MapOptions().size(128, 128));
     var projection = map.createProjection();
     try {
       var mapError =
-          assertThrows(InvalidArgumentException.class, () -> map.cameraForLatLngs(List.of()));
+          assertThrows(InvalidArgumentException.class, () -> map.cameraForLatLngs(List.of(), null));
       assertEquals(MaplibreStatus.INVALID_ARGUMENT, mapError.status());
       assertFalse(mapError.diagnostic().isBlank());
 
@@ -233,11 +254,11 @@ final class MapHandleTest {
 
   @Test
   void projectionHelpersCloseIndependently() {
-    var runtime = RuntimeHandle.create();
+    var runtime = RuntimeHandle.create(new RuntimeOptions());
     var map = MapHandle.create(runtime, new MapOptions().size(128, 128));
     try {
       var projection = map.createProjection();
-      projection.setCamera(new CameraOptions().center(0, 0).zoom(2));
+      projection.setCamera(new CameraOptions().center(new LatLng(0, 0)).zoom(2));
       var camera = projection.camera();
       assertEquals(0.0, camera.center().latitude(), 1e-6);
       assertEquals(0.0, camera.center().longitude(), 1e-6);
@@ -262,12 +283,31 @@ final class MapHandleTest {
   }
 
   @Test
+  void projectionSnapshotRemainsUsableAfterSourceMapCloses() {
+    var runtime = RuntimeHandle.create(new RuntimeOptions());
+    var map = MapHandle.create(runtime, new MapOptions().size(128, 128));
+    var projection = map.createProjection();
+    try {
+      projection.setCamera(new CameraOptions().center(new LatLng(0, 0)).zoom(2));
+      map.close();
+
+      var point = projection.pixelForLatLng(new LatLng(0, 0));
+      var coordinate = projection.latLngForPixel(point);
+      assertEquals(0.0, coordinate.latitude(), 1e-6);
+      assertEquals(0.0, coordinate.longitude(), 1e-6);
+    } finally {
+      projection.close();
+      runtime.close();
+    }
+  }
+
+  @Test
   void wrongThreadMapCallMapsToWrongThreadException() throws Exception {
-    var runtime = RuntimeHandle.create();
+    var runtime = RuntimeHandle.create(new RuntimeOptions());
     var map = MapHandle.create(runtime, new MapOptions().size(128, 128));
     try {
       assertWrongThread(runOnOtherThread(map::requestRepaint));
-      assertWrongThread(runOnOtherThread(() -> map.cameraForLatLngs(List.of())));
+      assertWrongThread(runOnOtherThread(() -> map.cameraForLatLngs(List.of(), null)));
       assertWrongThread(runOnOtherThread(() -> map.pixelsForLatLngs(List.of())));
       assertWrongThread(runOnOtherThread(() -> map.latLngsForPixels(List.of())));
     } finally {
@@ -278,7 +318,7 @@ final class MapHandleTest {
 
   @Test
   void wrongThreadProjectionCallMapsToWrongThreadException() throws Exception {
-    var runtime = RuntimeHandle.create();
+    var runtime = RuntimeHandle.create(new RuntimeOptions());
     var map = MapHandle.create(runtime, new MapOptions().size(128, 128));
     var projection = map.createProjection();
     try {
@@ -294,7 +334,7 @@ final class MapHandleTest {
 
   @Test
   void wrongThreadCloseLeavesMapAndProjectionLive() throws Exception {
-    var runtime = RuntimeHandle.create();
+    var runtime = RuntimeHandle.create(new RuntimeOptions());
     var map = MapHandle.create(runtime, new MapOptions().size(128, 128));
     var projection = map.createProjection();
     try {

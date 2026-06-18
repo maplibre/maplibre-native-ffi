@@ -2,10 +2,16 @@ package org.maplibre.nativeffi.runtime;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
 import java.lang.foreign.ValueLayout;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -102,6 +108,36 @@ final class ResourceProviderStateTest {
     }
   }
 
+  @Test
+  void closeWaitsForActiveProviderUpcalls() throws Exception {
+    var entered = new CountDownLatch(1);
+    var release = new CountDownLatch(1);
+    var state =
+        new ResourceProviderState(
+            (request, handle) -> {
+              entered.countDown();
+              await(release);
+              return ResourceProviderDecision.PASS_THROUGH;
+            });
+    var executor = Executors.newFixedThreadPool(2);
+    try (var arena = Arena.ofShared()) {
+      var invoke = executor.submit(() -> invoke(state, request(arena)));
+      assertTrue(entered.await(5, TimeUnit.SECONDS));
+
+      var close = executor.submit(state::close);
+      assertThrows(TimeoutException.class, () -> close.get(100, TimeUnit.MILLISECONDS));
+
+      release.countDown();
+      assertEquals(
+          MapLibreNativeC.MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH(),
+          invoke.get(5, TimeUnit.SECONDS));
+      close.get(5, TimeUnit.SECONDS);
+    } finally {
+      release.countDown();
+      executor.shutdownNow();
+    }
+  }
+
   private static int invoke(ResourceProviderState state, MemorySegment request) {
     return mln_resource_provider_callback.invoke(
         mln_resource_provider.callback(state.descriptor()),
@@ -137,5 +173,16 @@ final class ResourceProviderStateTest {
     mln_resource_request.prior_data(request, priorData);
     mln_resource_request.prior_data_size(request, 3);
     return request;
+  }
+
+  private static void await(CountDownLatch latch) {
+    try {
+      if (!latch.await(5, TimeUnit.SECONDS)) {
+        throw new AssertionError("timed out waiting for latch");
+      }
+    } catch (InterruptedException error) {
+      Thread.currentThread().interrupt();
+      throw new AssertionError(error);
+    }
   }
 }

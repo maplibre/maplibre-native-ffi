@@ -1,38 +1,74 @@
 package org.maplibre.nativeffi.runtime;
 
-import org.maplibre.nativeffi.internal.c.MapLibreNativeC;
-
 /** Offline database operation kind reported by completion events. */
-public enum OfflineOperationKind {
-  AMBIENT_CACHE(MapLibreNativeC.MLN_OFFLINE_OPERATION_AMBIENT_CACHE()),
-  REGION_CREATE(MapLibreNativeC.MLN_OFFLINE_OPERATION_REGION_CREATE()),
-  REGION_GET(MapLibreNativeC.MLN_OFFLINE_OPERATION_REGION_GET()),
-  REGIONS_LIST(MapLibreNativeC.MLN_OFFLINE_OPERATION_REGIONS_LIST()),
-  REGIONS_MERGE_DATABASE(MapLibreNativeC.MLN_OFFLINE_OPERATION_REGIONS_MERGE_DATABASE()),
-  REGION_UPDATE_METADATA(MapLibreNativeC.MLN_OFFLINE_OPERATION_REGION_UPDATE_METADATA()),
-  REGION_GET_STATUS(MapLibreNativeC.MLN_OFFLINE_OPERATION_REGION_GET_STATUS()),
-  REGION_SET_OBSERVED(MapLibreNativeC.MLN_OFFLINE_OPERATION_REGION_SET_OBSERVED()),
-  REGION_SET_DOWNLOAD_STATE(MapLibreNativeC.MLN_OFFLINE_OPERATION_REGION_SET_DOWNLOAD_STATE()),
-  REGION_INVALIDATE(MapLibreNativeC.MLN_OFFLINE_OPERATION_REGION_INVALIDATE()),
-  REGION_DELETE(MapLibreNativeC.MLN_OFFLINE_OPERATION_REGION_DELETE()),
-  UNKNOWN(-1);
+public final class OfflineOperationKind {
+  public static final OfflineOperationKind AMBIENT_CACHE =
+      new OfflineOperationKind(1, "AMBIENT_CACHE");
+  public static final OfflineOperationKind REGION_CREATE =
+      new OfflineOperationKind(2, "REGION_CREATE");
+  public static final OfflineOperationKind REGION_GET = new OfflineOperationKind(3, "REGION_GET");
+  public static final OfflineOperationKind REGIONS_LIST =
+      new OfflineOperationKind(4, "REGIONS_LIST");
+  public static final OfflineOperationKind REGIONS_MERGE_DATABASE =
+      new OfflineOperationKind(5, "REGIONS_MERGE_DATABASE");
+  public static final OfflineOperationKind REGION_UPDATE_METADATA =
+      new OfflineOperationKind(6, "REGION_UPDATE_METADATA");
+  public static final OfflineOperationKind REGION_GET_STATUS =
+      new OfflineOperationKind(7, "REGION_GET_STATUS");
+  public static final OfflineOperationKind REGION_SET_OBSERVED =
+      new OfflineOperationKind(8, "REGION_SET_OBSERVED");
+  public static final OfflineOperationKind REGION_SET_DOWNLOAD_STATE =
+      new OfflineOperationKind(9, "REGION_SET_DOWNLOAD_STATE");
+  public static final OfflineOperationKind REGION_INVALIDATE =
+      new OfflineOperationKind(10, "REGION_INVALIDATE");
+  public static final OfflineOperationKind REGION_DELETE =
+      new OfflineOperationKind(11, "REGION_DELETE");
 
   private final int nativeValue;
+  private final String name;
 
-  OfflineOperationKind(int nativeValue) {
+  private OfflineOperationKind(int nativeValue, String name) {
     this.nativeValue = nativeValue;
+    this.name = name;
   }
 
   public int nativeValue() {
     return nativeValue;
   }
 
+  public int rawValue() {
+    return nativeValue;
+  }
+
   public static OfflineOperationKind fromNative(int nativeValue) {
-    for (var kind : values()) {
-      if (kind.nativeValue == nativeValue) {
-        return kind;
-      }
-    }
-    return UNKNOWN;
+    return switch (nativeValue) {
+      case 1 -> AMBIENT_CACHE;
+      case 2 -> REGION_CREATE;
+      case 3 -> REGION_GET;
+      case 4 -> REGIONS_LIST;
+      case 5 -> REGIONS_MERGE_DATABASE;
+      case 6 -> REGION_UPDATE_METADATA;
+      case 7 -> REGION_GET_STATUS;
+      case 8 -> REGION_SET_OBSERVED;
+      case 9 -> REGION_SET_DOWNLOAD_STATE;
+      case 10 -> REGION_INVALIDATE;
+      case 11 -> REGION_DELETE;
+      default -> new OfflineOperationKind(nativeValue, null);
+    };
+  }
+
+  @Override
+  public boolean equals(Object other) {
+    return other instanceof OfflineOperationKind value && nativeValue == value.nativeValue;
+  }
+
+  @Override
+  public int hashCode() {
+    return Integer.hashCode(nativeValue);
+  }
+
+  @Override
+  public String toString() {
+    return name != null ? name : "OfflineOperationKind(" + nativeValue + ")";
   }
 }

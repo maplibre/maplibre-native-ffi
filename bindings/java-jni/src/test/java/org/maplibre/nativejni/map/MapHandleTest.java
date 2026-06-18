@@ -27,6 +27,8 @@ import org.maplibre.nativejni.geo.LatLngBounds;
 import org.maplibre.nativejni.geo.Quaternion;
 import org.maplibre.nativejni.geo.ScreenPoint;
 import org.maplibre.nativejni.geo.Vec3;
+import org.maplibre.nativejni.internal.javacpp.MaplibreNativeC;
+import org.maplibre.nativejni.internal.status.Status;
 import org.maplibre.nativejni.json.JsonValue;
 import org.maplibre.nativejni.render.PremultipliedRgba8Image;
 import org.maplibre.nativejni.runtime.RuntimeHandle;
@@ -43,7 +45,7 @@ import org.maplibre.nativejni.style.VectorTileEncoding;
 
 class MapHandleTest {
   @Test
-  void createMapKeepsRuntimeAndClosesOnce() {
+  void bnd040AndBnd100CreateMapKeepsRuntimeAndClosesOnce() {
     try (var runtime = RuntimeHandle.create()) {
       var map = MapHandle.create(runtime, new MapOptions().size(64, 64));
       assertFalse(map.isClosed());
@@ -57,7 +59,7 @@ class MapHandleTest {
   }
 
   @Test
-  void invalidDimensionsReportSpecificJniDiagnostic() {
+  void bnd025AndBnd104InvalidDimensionsReportSpecificJniDiagnostic() {
     assertThrows(
         InvalidArgumentException.class,
         () -> RuntimeHandle.create(new RuntimeOptions().assetPath("asset\0path")));
@@ -71,7 +73,27 @@ class MapHandleTest {
   }
 
   @Test
-  void sourceOptionsRejectNegativeIntegralOptionsBeforeCast() {
+  void bnd024AndBnd025NullTerminatedStyleInputsRejectEmbeddedNulBeforeNativeCall() {
+    assertThrows(
+        InvalidArgumentException.class,
+        () -> Status.check(MaplibreNativeC.mln_network_status_set(999_999)));
+
+    try (var runtime = RuntimeHandle.create()) {
+      try (var map = MapHandle.create(runtime, new MapOptions().size(64, 64))) {
+        var urlError =
+            assertThrows(InvalidArgumentException.class, () -> map.setStyleUrl("style\0url"));
+        assertTrue(urlError.diagnostic().contains("style URL"));
+        assertFalse(urlError.diagnostic().contains("network status"));
+
+        var jsonError =
+            assertThrows(InvalidArgumentException.class, () -> map.setStyleJson("{\0}"));
+        assertTrue(jsonError.diagnostic().contains("style JSON"));
+      }
+    }
+  }
+
+  @Test
+  void bnd104SourceOptionsRejectNegativeIntegralOptionsBeforeCast() {
     try (var runtime = RuntimeHandle.create()) {
       try (var map = MapHandle.create(runtime, new MapOptions().size(64, 64))) {
         assertThrows(
@@ -97,14 +119,49 @@ class MapHandleTest {
   }
 
   @Test
-  void debugAndLoadingStateCrossNativeBoundary() {
+  void bnd124CustomGeometrySourceTeardownTracksNativeStyleOwnership() {
     try (var runtime = RuntimeHandle.create()) {
       try (var map = MapHandle.create(runtime, new MapOptions().size(64, 64))) {
-        map.setDebugOptions(EnumSet.of(DebugOption.TILE_BORDERS, DebugOption.COLLISION));
+        map.addCustomGeometrySource(
+            "removed-source", new CustomGeometrySourceOptions(tileId -> {}));
+        var removedSource = map.customGeometrySourceForTesting("removed-source");
+        assertEquals(1, map.customGeometrySourceCountForTesting());
+        assertFalse(removedSource.isClosedForTesting());
+        assertTrue(map.removeStyleSource("removed-source"));
+        assertTrue(removedSource.isClosedForTesting());
+        assertEquals(0, map.customGeometrySourceCountForTesting());
+
+        map.addCustomGeometrySource("reload-source", new CustomGeometrySourceOptions(tileId -> {}));
+        var reloadedSource = map.customGeometrySourceForTesting("reload-source");
+        map.setStyleJson("{\"version\":8,\"sources\":{},\"layers\":[]}");
+        assertTrue(reloadedSource.isClosedForTesting());
+        assertEquals(0, map.customGeometrySourceCountForTesting());
+
+        map.addCustomGeometrySource("reused-source", new CustomGeometrySourceOptions(tileId -> {}));
+        var reusedSource = map.customGeometrySourceForTesting("reused-source");
+        map.releaseDetachedCustomGeometrySources();
+        assertSame(reusedSource, map.customGeometrySourceForTesting("reused-source"));
+        assertFalse(reusedSource.isClosedForTesting());
+        assertEquals(1, map.customGeometrySourceCountForTesting());
+
+        map.close();
+        assertTrue(reusedSource.isClosedForTesting());
+        assertEquals(0, map.customGeometrySourceCountForTesting());
+      }
+    }
+  }
+
+  @Test
+  void bnd060DebugAndLoadingStateCrossNativeBoundary() {
+    try (var runtime = RuntimeHandle.create()) {
+      try (var map = MapHandle.create(runtime, new MapOptions().size(64, 64))) {
+        map.setDebugOptions(
+            new DebugOptions(EnumSet.of(DebugOption.TILE_BORDERS, DebugOption.COLLISION)));
         assertEquals(
-            EnumSet.of(DebugOption.TILE_BORDERS, DebugOption.COLLISION), map.debugOptions());
-        map.setDebugOptions(EnumSet.noneOf(DebugOption.class));
-        assertEquals(EnumSet.noneOf(DebugOption.class), map.debugOptions());
+            new DebugOptions(EnumSet.of(DebugOption.TILE_BORDERS, DebugOption.COLLISION)),
+            map.debugOptions());
+        map.setDebugOptions(new DebugOptions(EnumSet.noneOf(DebugOption.class)));
+        assertEquals(new DebugOptions(EnumSet.noneOf(DebugOption.class)), map.debugOptions());
         assertFalse(map.isRenderingStatsViewEnabled());
         map.setRenderingStatsViewEnabled(true);
         assertTrue(map.isRenderingStatsViewEnabled());
@@ -117,7 +174,7 @@ class MapHandleTest {
   }
 
   @Test
-  void viewportAndTileOptionsCrossNativeBoundary() {
+  void bnd060AndBnd061ViewportAndTileOptionsCrossNativeBoundary() {
     try (var runtime = RuntimeHandle.create()) {
       try (var map = MapHandle.create(runtime, new MapOptions().size(64, 64))) {
         map.setViewportOptions(
@@ -129,10 +186,13 @@ class MapHandleTest {
         var viewport = map.viewportOptions();
         assertTrue(viewport.hasNorthOrientation());
         assertEquals(NorthOrientation.RIGHT, viewport.northOrientation());
+        assertEquals(NorthOrientation.RIGHT.nativeValue(), viewport.northOrientation().rawValue());
         assertTrue(viewport.hasConstrainMode());
         assertEquals(ConstrainMode.HEIGHT_ONLY, viewport.constrainMode());
+        assertEquals(ConstrainMode.HEIGHT_ONLY.nativeValue(), viewport.constrainMode().rawValue());
         assertTrue(viewport.hasViewportMode());
         assertEquals(ViewportMode.FLIPPED_Y, viewport.viewportMode());
+        assertEquals(ViewportMode.FLIPPED_Y.nativeValue(), viewport.viewportMode().rawValue());
         assertTrue(viewport.hasFrustumOffset());
         assertEquals(1, viewport.frustumOffset().top(), 1.0e-9);
         assertEquals(2, viewport.frustumOffset().left(), 1.0e-9);
@@ -159,12 +219,34 @@ class MapHandleTest {
         assertEquals(0.75, tile.lodZoomShift(), 1.0e-9);
         assertTrue(tile.hasLodMode());
         assertEquals(TileLodMode.DISTANCE, tile.lodMode());
+        assertEquals(TileLodMode.DISTANCE.nativeValue(), tile.lodMode().rawValue());
+
+        assertEquals(101, NorthOrientation.fromNative(101).rawValue());
+        assertEquals(102, ConstrainMode.fromNative(102).rawValue());
+        assertEquals(103, ViewportMode.fromNative(103).rawValue());
+        assertEquals(104, TileLodMode.fromNative(104).rawValue());
       }
     }
   }
 
   @Test
-  void cameraStateCommandsCrossNativeBoundary() {
+  void bnd068UnknownViewportAndTileEnumsAreRejectedAsInputs() {
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> new ViewportOptions().northOrientation(NorthOrientation.fromNative(101)));
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> new ViewportOptions().constrainMode(ConstrainMode.fromNative(102)));
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> new ViewportOptions().viewportMode(ViewportMode.fromNative(103)));
+    assertThrows(
+        IllegalArgumentException.class,
+        () -> new TileOptions().lodMode(TileLodMode.fromNative(104)));
+  }
+
+  @Test
+  void bnd102CameraStateCommandsCrossNativeBoundary() {
     try (var runtime = RuntimeHandle.create()) {
       try (var map = MapHandle.create(runtime, new MapOptions().size(64, 64))) {
         map.jumpTo(new CameraOptions().center(10, 20).zoom(3).bearing(4).pitch(5));
@@ -192,7 +274,7 @@ class MapHandleTest {
   }
 
   @Test
-  void freeCameraCrossNativeBoundary() {
+  void bnd102FreeCameraCrossNativeBoundary() {
     try (var runtime = RuntimeHandle.create()) {
       try (var map = MapHandle.create(runtime, new MapOptions().size(64, 64))) {
         map.setFreeCameraOptions(
@@ -210,7 +292,7 @@ class MapHandleTest {
   }
 
   @Test
-  void projectionModeCrossNativeBoundary() {
+  void bnd103ProjectionModeCrossNativeBoundary() {
     try (var runtime = RuntimeHandle.create()) {
       try (var map = MapHandle.create(runtime, new MapOptions().size(64, 64))) {
         map.setProjectionMode(new ProjectionModeOptions().axonometric(true).xSkew(0.25).ySkew(0.5));
@@ -226,7 +308,7 @@ class MapHandleTest {
   }
 
   @Test
-  void cameraBoundsCrossNativeBoundary() {
+  void bnd102CameraBoundsCrossNativeBoundary() {
     try (var runtime = RuntimeHandle.create()) {
       try (var map = MapHandle.create(runtime, new MapOptions().size(64, 64))) {
         var bounds = new LatLngBounds(new LatLng(-10, -20), new LatLng(10, 20));
@@ -247,7 +329,7 @@ class MapHandleTest {
   }
 
   @Test
-  void cameraFitQueriesCrossNativeBoundary() {
+  void bnd102CameraFitQueriesCrossNativeBoundary() {
     try (var runtime = RuntimeHandle.create()) {
       try (var map = MapHandle.create(runtime, new MapOptions().size(256, 256))) {
         var bounds = new LatLngBounds(new LatLng(-1, -1), new LatLng(1, 1));
@@ -276,7 +358,7 @@ class MapHandleTest {
   }
 
   @Test
-  void primitiveCameraCommandsCrossNativeBoundary() {
+  void bnd102PrimitiveCameraCommandsCrossNativeBoundary() {
     try (var runtime = RuntimeHandle.create()) {
       try (var map = MapHandle.create(runtime, new MapOptions().size(64, 64))) {
         map.moveBy(1, 2);
@@ -301,7 +383,7 @@ class MapHandleTest {
   }
 
   @Test
-  void basicStyleAndRenderRequestsCrossNativeBoundary() {
+  void bnd105BasicStyleAndRenderRequestsCrossNativeBoundary() {
     try (var runtime = RuntimeHandle.create()) {
       try (var map = MapHandle.create(runtime, new MapOptions().size(64, 64))) {
         map.setStyleJson("{\"version\":8,\"sources\":{},\"layers\":[]}");
@@ -328,8 +410,9 @@ class MapHandleTest {
         assertFalse(map.styleSourceExists("geojson-source"));
         map.addGeoJsonSourceUrl("geojson-source", "https://example.com/data.geojson");
         assertTrue(map.styleSourceExists("geojson-source"));
-        assertEquals(SourceType.GEOJSON, map.styleSourceType("geojson-source").orElseThrow());
+        assertSourceType(map, "geojson-source", SourceType.GEOJSON);
         assertTrue(map.styleSourceType("missing-source").isEmpty());
+        assertEquals(999, SourceType.fromNative(999).rawValue());
         map.setGeoJsonSourceUrl("geojson-source", "https://example.com/updated.geojson");
         assertTrue(map.removeStyleSource("geojson-source"));
         assertFalse(map.removeStyleSource("geojson-source"));
@@ -340,7 +423,7 @@ class MapHandleTest {
                     new Feature(
                         Geometry.point(new LatLng(0.25, 0.5)),
                         List.of(new JsonValue.Member("name", JsonValue.of("one")))))));
-        assertEquals(SourceType.GEOJSON, map.styleSourceType("geojson-data-source").orElseThrow());
+        assertSourceType(map, "geojson-data-source", SourceType.GEOJSON);
         map.setGeoJsonSourceData(
             "geojson-data-source",
             GeoJson.geometry(Geometry.lineString(List.of(new LatLng(0, 0), new LatLng(1, 1)))));
@@ -356,7 +439,7 @@ class MapHandleTest {
                             List.of(
                                 new JsonValue.Member("type", JsonValue.of("FeatureCollection")),
                                 new JsonValue.Member("features", JsonValue.array(List.of()))))))));
-        assertEquals(SourceType.GEOJSON, map.styleSourceType("json-geojson-source").orElseThrow());
+        assertSourceType(map, "json-geojson-source", SourceType.GEOJSON);
         assertTrue(map.removeStyleSource("json-geojson-source"));
         var customFetchCount = new AtomicInteger();
         map.addCustomGeometrySource(
@@ -369,7 +452,7 @@ class MapHandleTest {
                 .clip(true)
                 .wrap(false));
         assertEquals(1, map.customGeometrySourceCountForTesting());
-        assertEquals(SourceType.CUSTOM_VECTOR, map.styleSourceType("custom-source").orElseThrow());
+        assertSourceType(map, "custom-source", SourceType.CUSTOM_VECTOR);
         var customTile = new CanonicalTileId(0, 0, 0);
         map.setCustomGeometrySourceTileData(
             "custom-source", customTile, GeoJson.featureCollection(List.of()));
@@ -395,11 +478,11 @@ class MapHandleTest {
                 .maxZoom(12.0)
                 .vectorEncoding(VectorTileEncoding.MVT));
         assertTrue(map.styleSourceIds().contains("vector-source"));
-        assertEquals(SourceType.VECTOR, map.styleSourceType("vector-source").orElseThrow());
+        assertSourceType(map, "vector-source", SourceType.VECTOR);
         assertTrue(map.removeStyleSource("vector-source"));
         map.addVectorSourceTiles(
             "vector-tiles-source", List.of("https://example.com/vector/{z}/{x}/{y}.pbf"));
-        assertEquals(SourceType.VECTOR, map.styleSourceType("vector-tiles-source").orElseThrow());
+        assertSourceType(map, "vector-tiles-source", SourceType.VECTOR);
         assertTrue(map.removeStyleSource("vector-tiles-source"));
         map.addRasterSourceUrl(
             "raster-source",
@@ -409,28 +492,27 @@ class MapHandleTest {
                 .scheme(TileScheme.XYZ)
                 .tileSize(256)
                 .bounds(new LatLngBounds(new LatLng(-1.0, -2.0), new LatLng(1.0, 2.0))));
-        assertEquals(SourceType.RASTER, map.styleSourceType("raster-source").orElseThrow());
+        assertSourceType(map, "raster-source", SourceType.RASTER);
         SourceInfo rasterInfo = map.styleSourceInfo("raster-source").orElseThrow();
         assertEquals(SourceType.RASTER, rasterInfo.type());
-        assertEquals(SourceType.RASTER.nativeValue(), rasterInfo.nativeType());
+        assertEquals(SourceType.RASTER.nativeValue(), rasterInfo.type().rawValue());
         assertFalse(rasterInfo.volatileSource());
         assertTrue(rasterInfo.attribution().isEmpty());
         assertTrue(map.styleSourceInfo("missing-source").isEmpty());
         assertTrue(map.removeStyleSource("raster-source"));
         map.addRasterSourceTiles(
             "raster-tiles-source", List.of("https://example.com/raster/{z}/{x}/{y}.png"));
-        assertEquals(SourceType.RASTER, map.styleSourceType("raster-tiles-source").orElseThrow());
+        assertSourceType(map, "raster-tiles-source", SourceType.RASTER);
         assertTrue(map.removeStyleSource("raster-tiles-source"));
         map.addRasterDemSourceUrl(
             "raster-dem-source",
             "https://example.com/raster-dem.json",
             new TileSourceOptions().rasterDemEncoding(RasterDemEncoding.MAPBOX));
-        assertEquals(SourceType.RASTER_DEM, map.styleSourceType("raster-dem-source").orElseThrow());
+        assertSourceType(map, "raster-dem-source", SourceType.RASTER_DEM);
         assertTrue(map.removeStyleSource("raster-dem-source"));
         map.addRasterDemSourceTiles(
             "raster-dem-tiles-source", List.of("https://example.com/dem/{z}/{x}/{y}.png"));
-        assertEquals(
-            SourceType.RASTER_DEM, map.styleSourceType("raster-dem-tiles-source").orElseThrow());
+        assertSourceType(map, "raster-dem-tiles-source", SourceType.RASTER_DEM);
         assertTrue(map.removeStyleSource("raster-dem-tiles-source"));
         List<LatLng> imageCoordinates =
             List.of(
@@ -439,7 +521,7 @@ class MapHandleTest {
                 new LatLng(0.0, 3.0),
                 new LatLng(0.0, 2.0));
         map.addImageSourceUrl("image-source", imageCoordinates, "https://example.com/image.png");
-        assertEquals(SourceType.IMAGE, map.styleSourceType("image-source").orElseThrow());
+        assertSourceType(map, "image-source", SourceType.IMAGE);
         assertEquals(imageCoordinates, map.imageSourceCoordinates("image-source").orElseThrow());
         map.setImageSourceUrl("image-source", "https://example.com/updated-image.png");
         List<LatLng> updatedImageCoordinates =
@@ -454,7 +536,7 @@ class MapHandleTest {
         assertTrue(map.imageSourceCoordinates("missing-image-source").isEmpty());
         assertTrue(map.removeStyleSource("image-source"));
         map.addImageSourceImage("inline-image-source", imageCoordinates, styleImage);
-        assertEquals(SourceType.IMAGE, map.styleSourceType("inline-image-source").orElseThrow());
+        assertSourceType(map, "inline-image-source", SourceType.IMAGE);
         map.setImageSourceImage(
             "inline-image-source", new PremultipliedRgba8Image(1, 1, 4, new byte[] {5, 6, 7, 8}));
         assertTrue(map.removeStyleSource("inline-image-source"));
@@ -525,5 +607,9 @@ class MapHandleTest {
         assertThrows(InvalidStateException.class, map::requestStillImage);
       }
     }
+  }
+
+  private static void assertSourceType(MapHandle map, String sourceId, SourceType expected) {
+    assertEquals(expected, map.styleSourceType(sourceId).orElseThrow());
   }
 }

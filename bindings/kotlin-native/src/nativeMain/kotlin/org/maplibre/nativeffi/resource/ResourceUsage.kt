@@ -1,15 +1,16 @@
 package org.maplibre.nativeffi.resource
 
-/** Resource usage copied from a native resource request. */
-public enum class ResourceUsage(public val nativeValue: Int) {
-  ONLINE(0),
-  OFFLINE(1),
-  UNKNOWN(-1);
+import kotlin.jvm.JvmInline
 
+/** Resource usage copied from a native resource request. */
+@JvmInline
+public value class ResourceUsage(public val nativeValue: Int) {
   public companion object {
+    public val ONLINE: ResourceUsage = ResourceUsage(0)
+    public val OFFLINE: ResourceUsage = ResourceUsage(1)
+
     internal fun fromNative(nativeValue: UInt): ResourceUsage = fromNative(nativeValue.toInt())
 
-    public fun fromNative(nativeValue: Int): ResourceUsage =
-      entries.firstOrNull { it.nativeValue == nativeValue } ?: UNKNOWN
+    internal fun fromNative(nativeValue: Int): ResourceUsage = ResourceUsage(nativeValue)
   }
 }

@@ -1,18 +1,23 @@
 package org.maplibre.nativeffi.resource;
 
 /** Resource request priority copied from a native resource request. */
-public enum ResourcePriority {
-  REGULAR(0),
-  LOW(1),
-  UNKNOWN(-1);
+public final class ResourcePriority {
+  public static final ResourcePriority REGULAR = new ResourcePriority(0, "REGULAR");
+  public static final ResourcePriority LOW = new ResourcePriority(1, "LOW");
 
   private final int nativeValue;
+  private final String name;
 
-  ResourcePriority(int nativeValue) {
+  private ResourcePriority(int nativeValue, String name) {
     this.nativeValue = nativeValue;
+    this.name = name;
   }
 
   public int nativeValue() {
+    return nativeValue;
+  }
+
+  public int rawValue() {
     return nativeValue;
   }
 
@@ -20,7 +25,22 @@ public enum ResourcePriority {
     return switch (nativeValue) {
       case 0 -> REGULAR;
       case 1 -> LOW;
-      default -> UNKNOWN;
+      default -> new ResourcePriority(nativeValue, null);
     };
+  }
+
+  @Override
+  public boolean equals(Object other) {
+    return other instanceof ResourcePriority value && nativeValue == value.nativeValue;
+  }
+
+  @Override
+  public int hashCode() {
+    return Integer.hashCode(nativeValue);
+  }
+
+  @Override
+  public String toString() {
+    return name != null ? name : "ResourcePriority(" + nativeValue + ")";
   }
 }

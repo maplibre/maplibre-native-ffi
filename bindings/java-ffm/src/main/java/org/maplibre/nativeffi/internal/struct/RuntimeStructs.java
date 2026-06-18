@@ -14,11 +14,11 @@ import org.maplibre.nativeffi.internal.c.mln_offline_tile_pyramid_region_definit
 import org.maplibre.nativeffi.internal.c.mln_rendering_stats;
 import org.maplibre.nativeffi.internal.c.mln_runtime_options;
 import org.maplibre.nativeffi.internal.c.mln_tile_id;
+import org.maplibre.nativeffi.internal.convert.NativeValues;
 import org.maplibre.nativeffi.internal.memory.MemoryUtil;
 import org.maplibre.nativeffi.internal.status.Status;
 import org.maplibre.nativeffi.map.RenderingStats;
 import org.maplibre.nativeffi.offline.OfflineRegionDefinition;
-import org.maplibre.nativeffi.offline.OfflineRegionDownloadState;
 import org.maplibre.nativeffi.offline.OfflineRegionInfo;
 import org.maplibre.nativeffi.offline.OfflineRegionStatus;
 import org.maplibre.nativeffi.runtime.RuntimeOptions;
@@ -74,7 +74,7 @@ public final class RuntimeStructs {
   public static OfflineRegionStatus offlineRegionStatus(MemorySegment segment) {
     var rawDownloadState = mln_offline_region_status.download_state(segment);
     return new OfflineRegionStatus(
-        OfflineRegionDownloadState.fromNative(rawDownloadState),
+        NativeValues.offlineRegionDownloadState(rawDownloadState),
         rawDownloadState,
         mln_offline_region_status.completed_resource_count(segment),
         mln_offline_region_status.completed_resource_size(segment),

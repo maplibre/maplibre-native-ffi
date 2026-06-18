@@ -18,12 +18,4 @@ public sealed interface RenderedQueryGeometry {
 
     override fun toString(): String = "LineString(points=$points)"
   }
-
-  public companion object {
-    public fun point(point: ScreenPoint): Point = Point(point)
-
-    public fun box(box: ScreenBox): Box = Box(box)
-
-    public fun lineString(points: List<ScreenPoint>): LineString = LineString(points.toList())
-  }
 }

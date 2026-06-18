@@ -6,14 +6,10 @@ import java.lang.foreign.ValueLayout;
 import java.util.Optional;
 import org.maplibre.nativeffi.internal.c.mln_resource_request;
 import org.maplibre.nativeffi.internal.c.mln_resource_response;
+import org.maplibre.nativeffi.internal.convert.NativeValues;
 import org.maplibre.nativeffi.internal.memory.MemoryUtil;
-import org.maplibre.nativeffi.resource.ResourceKind;
-import org.maplibre.nativeffi.resource.ResourceLoadingMethod;
-import org.maplibre.nativeffi.resource.ResourcePriority;
 import org.maplibre.nativeffi.resource.ResourceRequest;
 import org.maplibre.nativeffi.resource.ResourceResponse;
-import org.maplibre.nativeffi.resource.ResourceStoragePolicy;
-import org.maplibre.nativeffi.resource.ResourceUsage;
 
 /** Internal materializers and readers for resource callback structs. */
 public final class ResourceStructs {
@@ -27,15 +23,15 @@ public final class ResourceStructs {
     var rawStoragePolicy = mln_resource_request.storage_policy(segment);
     return new ResourceRequest(
         MemoryUtil.copyCString(mln_resource_request.url(segment)),
-        ResourceKind.fromNative(rawKind),
+        NativeValues.resourceKind(rawKind),
         rawKind,
-        ResourceLoadingMethod.fromNative(rawLoadingMethod),
+        NativeValues.resourceLoadingMethod(rawLoadingMethod),
         rawLoadingMethod,
-        ResourcePriority.fromNative(rawPriority),
+        NativeValues.resourcePriority(rawPriority),
         rawPriority,
-        ResourceUsage.fromNative(rawUsage),
+        NativeValues.resourceUsage(rawUsage),
         rawUsage,
-        ResourceStoragePolicy.fromNative(rawStoragePolicy),
+        NativeValues.resourceStoragePolicy(rawStoragePolicy),
         rawStoragePolicy,
         resourceRange(segment),
         optionalLong(
@@ -53,8 +49,8 @@ public final class ResourceStructs {
   public static MemorySegment resourceResponse(ResourceResponse response, Arena arena) {
     var segment = mln_resource_response.allocate(arena);
     mln_resource_response.size(segment, (int) mln_resource_response.sizeof());
-    mln_resource_response.status(segment, response.status().nativeValue());
-    mln_resource_response.error_reason(segment, response.errorReason().nativeValue());
+    mln_resource_response.status(segment, NativeValues.nativeValue(response.status()));
+    mln_resource_response.error_reason(segment, NativeValues.nativeValue(response.errorReason()));
     var bytes = response.bytes();
     if (bytes.length > 0) {
       var nativeBytes = arena.allocate(bytes.length);

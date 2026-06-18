@@ -7,7 +7,7 @@ import org.maplibre.nativejni.runtime.RuntimeHandle;
 
 final class StyleHandleTest {
   @Test
-  void styleJsonAndSourceQueriesCrossNativeBoundary() {
+  void bnd101AndBnd105StyleJsonAndSourceQueriesCrossNativeBoundary() {
     try (var runtime = RuntimeHandle.create()) {
       try (var map = MapHandle.create(runtime, new MapOptions().size(64, 64))) {
         map.setStyleJson("{\"version\":8,\"sources\":{},\"layers\":[]}");

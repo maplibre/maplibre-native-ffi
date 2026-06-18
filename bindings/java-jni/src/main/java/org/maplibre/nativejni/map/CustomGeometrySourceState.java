@@ -4,6 +4,7 @@ import org.bytedeco.javacpp.Pointer;
 import org.maplibre.nativejni.geo.CanonicalTileId;
 import org.maplibre.nativejni.internal.javacpp.JavaCppSupport;
 import org.maplibre.nativejni.internal.javacpp.MaplibreNativeC;
+import org.maplibre.nativejni.internal.status.Status;
 import org.maplibre.nativejni.style.CustomGeometrySourceOptions;
 
 /** Owns map/style-scoped custom geometry source callback state. */
@@ -13,6 +14,7 @@ final class CustomGeometrySourceState implements AutoCloseable {
   private final MaplibreNativeC.mln_custom_geometry_source_tile_callback cancelTile;
   private final MaplibreNativeC.mln_custom_geometry_source_options descriptor;
   private final Object callbackLock = new Object();
+  private final ThreadLocal<Integer> callbackDepth = ThreadLocal.withInitial(() -> 0);
 
   private int activeCallbacks;
   private boolean closeRequested;
@@ -43,6 +45,12 @@ final class CustomGeometrySourceState implements AutoCloseable {
 
   MaplibreNativeC.mln_custom_geometry_source_options descriptor() {
     return descriptor;
+  }
+
+  boolean isClosedForTesting() {
+    synchronized (callbackLock) {
+      return closed;
+    }
   }
 
   private void writeFields() {
@@ -106,25 +114,27 @@ final class CustomGeometrySourceState implements AutoCloseable {
 
   private boolean enterCallback() {
     synchronized (callbackLock) {
-      if (closed) {
+      if (closeRequested || closed) {
         return false;
       }
       activeCallbacks++;
+      callbackDepth.set(callbackDepth.get() + 1);
       return true;
     }
   }
 
   private void exitCallback() {
-    var shouldClose = false;
     synchronized (callbackLock) {
-      activeCallbacks--;
-      shouldClose = closeRequested && activeCallbacks == 0 && !closed;
-      if (shouldClose) {
-        closed = true;
+      var depth = callbackDepth.get() - 1;
+      if (depth == 0) {
+        callbackDepth.remove();
+      } else {
+        callbackDepth.set(depth);
       }
-    }
-    if (shouldClose) {
-      closeNative();
+      activeCallbacks--;
+      if (activeCallbacks == 0) {
+        callbackLock.notifyAll();
+      }
     }
   }
 
@@ -135,19 +145,49 @@ final class CustomGeometrySourceState implements AutoCloseable {
 
   @Override
   public void close() {
-    var shouldClose = false;
+    var interrupted = false;
+    var closeNative = false;
     synchronized (callbackLock) {
-      if (closed || closeRequested) {
+      if (callbackDepth.get() > 0) {
+        throw Status.callbackReentry("Custom geometry source");
+      }
+      while (closeRequested && !closed) {
+        try {
+          callbackLock.wait();
+        } catch (InterruptedException exception) {
+          interrupted = true;
+        }
+      }
+      if (closed) {
+        if (interrupted) {
+          Thread.currentThread().interrupt();
+        }
         return;
       }
       closeRequested = true;
-      shouldClose = activeCallbacks == 0;
-      if (shouldClose) {
-        closed = true;
+      while (activeCallbacks > 0) {
+        try {
+          callbackLock.wait();
+        } catch (InterruptedException exception) {
+          interrupted = true;
+        }
       }
+      closeNative = true;
     }
-    if (shouldClose) {
-      closeNative();
+    try {
+      if (closeNative) {
+        closeNative();
+      }
+    } finally {
+      if (closeNative) {
+        synchronized (callbackLock) {
+          closed = true;
+          callbackLock.notifyAll();
+        }
+      }
+      if (interrupted) {
+        Thread.currentThread().interrupt();
+      }
     }
   }
 

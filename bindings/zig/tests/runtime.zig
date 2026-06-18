@@ -12,7 +12,7 @@ fn runRuntimeOnThread(runtime: *maplibre.RuntimeHandle, out_error: *?anyerror) v
 }
 
 fn pollRuntimeOnThread(runtime: *maplibre.RuntimeHandle, out_error: *?anyerror) void {
-    _ = runtime.pollEvent() catch |err| {
+    _ = runtime.pollEvent(testing.allocator) catch |err| {
         out_error.* = err;
         return;
     };
@@ -28,7 +28,7 @@ fn closeRuntimeOnThread(runtime: *maplibre.RuntimeHandle, out_error: *?anyerror)
 }
 
 fn createRuntimeOnThread(out_error: *?anyerror) void {
-    var runtime = maplibre.RuntimeHandle.init(null) catch |err| {
+    var runtime = maplibre.RuntimeHandle.create(testing.allocator, .{}, null) catch |err| {
         out_error.* = err;
         return;
     };
@@ -44,10 +44,10 @@ fn sleepOneMillisecond() !void {
 }
 
 test "runtime rejects second runtime on same owner and permits distinct owner" {
-    var runtime = try maplibre.RuntimeHandle.init(null);
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
 
-    try testing.expectError(error.InvalidState, maplibre.RuntimeHandle.init(null));
+    try testing.expectError(error.InvalidState, maplibre.RuntimeHandle.create(testing.allocator, .{}, null));
 
     var thread_error: ?anyerror = error.InvalidState;
     const thread = try std.Thread.spawn(.{}, createRuntimeOnThread, .{&thread_error});
@@ -59,8 +59,9 @@ test "wrong-thread runtime failures propagate diagnostics" {
     var diagnostics = maplibre.DiagnosticStore.init(testing.allocator);
     defer diagnostics.deinit();
 
-    var runtime = try maplibre.RuntimeHandle.init(&diagnostics);
-    defer runtime.close() catch @panic("runtime close failed");
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, &diagnostics);
+    var runtime_open = true;
+    defer if (runtime_open) runtime.close() catch @panic("runtime close failed");
 
     var run_once_error: ?anyerror = null;
     const run_once_thread = try std.Thread.spawn(.{}, runRuntimeOnThread, .{ &runtime, &run_once_error });
@@ -81,20 +82,27 @@ test "wrong-thread runtime failures propagate diagnostics" {
     try testing.expect(diagnostics.get().?.message.len > 0);
 
     try runtime.runOnce();
+    try runtime.close();
+    runtime_open = false;
 }
 
 test "runtime option strings reject embedded NUL before C calls" {
     var diagnostics = maplibre.DiagnosticStore.init(testing.allocator);
     defer diagnostics.deinit();
+    try diagnostics.set(-5, "stale native diagnostic");
 
     try testing.expectError(
         error.InvalidString,
         maplibre.RuntimeHandle.create(testing.allocator, .{ .asset_path = "asset\x00path" }, &diagnostics),
     );
+
+    const diagnostic = diagnostics.get().?;
+    try testing.expectEqual(@as(?i32, null), diagnostic.raw_status);
+    try testing.expectEqualStrings("runtime asset_path contains embedded NUL", diagnostic.message);
 }
 
 test "owned runtime events copy message and resolve map identity" {
-    var runtime = try maplibre.RuntimeHandle.init(null);
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
 
     var map = try maplibre.MapHandle.create(&runtime, .{});
@@ -106,7 +114,7 @@ test "owned runtime events copy message and resolve map identity" {
     var found: ?maplibre.OwnedRuntimeEvent = null;
     for (0..1000) |_| {
         try runtime.runOnce();
-        while (try runtime.pollEventOwned(testing.allocator)) |event| {
+        while (try runtime.pollEvent(testing.allocator)) |event| {
             if (std.meta.eql(event.event_type, maplibre.RuntimeEventType.map_loading_failed)) {
                 found = event;
                 break;
@@ -127,7 +135,7 @@ test "owned runtime events copy message and resolve map identity" {
     const copied_message = try testing.allocator.dupe(u8, event.message);
     defer testing.allocator.free(copied_message);
 
-    if (try runtime.pollEventOwned(testing.allocator)) |later_event| {
+    if (try runtime.pollEvent(testing.allocator)) |later_event| {
         var discard = later_event;
         discard.deinit();
     }
@@ -135,18 +143,18 @@ test "owned runtime events copy message and resolve map identity" {
 }
 
 test "closing a map discards queued runtime events" {
-    var runtime = try maplibre.RuntimeHandle.init(null);
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
 
     var map = try maplibre.MapHandle.create(&runtime, .{});
     try testing.expectError(error.NativeError, map.setStyleJson(testing.allocator, "{"));
     try map.close();
 
-    try testing.expectEqual(@as(?maplibre.RuntimeEvent, null), try runtime.pollEvent());
+    try testing.expectEqual(@as(?maplibre.OwnedRuntimeEvent, null), try runtime.pollEvent(testing.allocator));
 }
 
 test "runtime event polling reports empty queues" {
-    var runtime = try maplibre.RuntimeHandle.init(null);
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
 
     var map = try maplibre.MapHandle.create(&runtime, .{});
@@ -155,10 +163,13 @@ test "runtime event polling reports empty queues" {
     for (0..100) |_| {
         try runtime.runOnce();
         var drained = false;
-        while (try runtime.pollEvent()) |_| drained = true;
+        while (try runtime.pollEvent(testing.allocator)) |event| {
+            var owned_event = event;
+            defer owned_event.deinit();
+            drained = true;
+        }
         if (!drained) break;
     }
 
-    try testing.expectEqual(@as(?maplibre.RuntimeEvent, null), try runtime.pollEvent());
-    try testing.expectEqual(@as(?maplibre.OwnedRuntimeEvent, null), try runtime.pollEventOwned(testing.allocator));
+    try testing.expectEqual(@as(?maplibre.OwnedRuntimeEvent, null), try runtime.pollEvent(testing.allocator));
 }

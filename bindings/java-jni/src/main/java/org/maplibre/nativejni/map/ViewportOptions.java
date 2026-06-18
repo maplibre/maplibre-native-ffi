@@ -19,7 +19,9 @@ public final class ViewportOptions {
   }
 
   public ViewportOptions northOrientation(NorthOrientation northOrientation) {
-    this.northOrientation = Objects.requireNonNull(northOrientation, "northOrientation");
+    var value = Objects.requireNonNull(northOrientation, "northOrientation");
+    value.nativeValue();
+    this.northOrientation = value;
     return this;
   }
 
@@ -37,7 +39,9 @@ public final class ViewportOptions {
   }
 
   public ViewportOptions constrainMode(ConstrainMode constrainMode) {
-    this.constrainMode = Objects.requireNonNull(constrainMode, "constrainMode");
+    var value = Objects.requireNonNull(constrainMode, "constrainMode");
+    value.nativeValue();
+    this.constrainMode = value;
     return this;
   }
 
@@ -55,7 +59,9 @@ public final class ViewportOptions {
   }
 
   public ViewportOptions viewportMode(ViewportMode viewportMode) {
-    this.viewportMode = Objects.requireNonNull(viewportMode, "viewportMode");
+    var value = Objects.requireNonNull(viewportMode, "viewportMode");
+    value.nativeValue();
+    this.viewportMode = value;
     return this;
   }
 

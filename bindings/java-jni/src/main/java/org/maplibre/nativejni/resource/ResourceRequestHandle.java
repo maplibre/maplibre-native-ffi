@@ -4,6 +4,7 @@ import java.lang.ref.Cleaner;
 import java.util.Objects;
 import java.util.function.Consumer;
 import org.maplibre.nativejni.error.InvalidStateException;
+import org.maplibre.nativejni.error.MaplibreException;
 import org.maplibre.nativejni.error.MaplibreStatus;
 import org.maplibre.nativejni.internal.access.InternalAccess;
 import org.maplibre.nativejni.internal.javacpp.JavaCppSupport;
@@ -22,6 +23,7 @@ public final class ResourceRequestHandle implements AutoCloseable {
   private static final Cleaner CLEANER = Cleaner.create();
 
   private final long handle;
+  private final LongCompleter completer;
   private final NativeReference nativeReference;
   private final Cleaner.Cleanable cleanable;
   private boolean decisionFinalized;
@@ -29,12 +31,15 @@ public final class ResourceRequestHandle implements AutoCloseable {
   private boolean completed;
 
   ResourceRequestHandle(long handle, Consumer<Long> releaser) {
-    this(handle, consumerReleaser(releaser));
+    this(handle, nativeCompleter(), consumerReleaser(releaser));
+  }
+
+  ResourceRequestHandle(long handle, LongCompleter completer, Consumer<Long> releaser) {
+    this(handle, completer, consumerReleaser(releaser));
   }
 
   public ResourceRequestHandle(InternalAccess access, long handle) {
-    this(handle);
-    Objects.requireNonNull(access, "access");
+    this(internalHandle(access, handle));
   }
 
   ResourceRequestHandle(long handle) {
@@ -47,10 +52,15 @@ public final class ResourceRequestHandle implements AutoCloseable {
   }
 
   private ResourceRequestHandle(long handle, LongReleaser releaser) {
+    this(handle, nativeCompleter(), releaser);
+  }
+
+  private ResourceRequestHandle(long handle, LongCompleter completer, LongReleaser releaser) {
     if (handle == 0) {
       throw new IllegalArgumentException("Resource request handle is null");
     }
     this.handle = handle;
+    this.completer = Objects.requireNonNull(completer, "completer");
     nativeReference = new NativeReference(handle, releaser);
     cleanable = CLEANER.register(this, nativeReference);
   }
@@ -63,14 +73,25 @@ public final class ResourceRequestHandle implements AutoCloseable {
     requireLive();
     try (var nativeResponse =
         ResourceStructs.nativeResourceResponse(Objects.requireNonNull(response))) {
-      Status.check(
-          MaplibreNativeC.mln_resource_request_complete(
-              JavaCppSupport.resourceRequestHandle(handle), nativeResponse.response()));
-    }
-    completed = true;
-    closed = true;
-    if (decisionFinalized) {
-      releaseNative();
+      var status = completer.complete(handle, nativeResponse.response());
+      MaplibreException completionFailure = null;
+      try {
+        Status.check(status);
+      } catch (MaplibreException error) {
+        completionFailure = error;
+      }
+      // The C API treats a completion attempt that reaches native as terminal:
+      // cancelled/already-completed requests and actor delivery failures reject
+      // the response but leave the provider responsible for releasing its handle.
+      completed = true;
+      closed = true;
+      if (decisionFinalized) {
+        releaseNative();
+        JavaCppSupport.takeThreadDiagnostic();
+      }
+      if (completionFailure != null) {
+        throw completionFailure;
+      }
     }
   }
 
@@ -96,7 +117,7 @@ public final class ResourceRequestHandle implements AutoCloseable {
 
   public synchronized int finishProviderDecision(
       InternalAccess access, ResourceProviderDecision decision) {
-    Objects.requireNonNull(access, "access");
+    Objects.requireNonNull(access, "access").checkCaller();
     return finishProviderDecision(decision);
   }
 
@@ -115,8 +136,13 @@ public final class ResourceRequestHandle implements AutoCloseable {
   }
 
   public synchronized int finishProviderException(InternalAccess access) {
-    Objects.requireNonNull(access, "access");
+    Objects.requireNonNull(access, "access").checkCaller();
     return finishProviderException();
+  }
+
+  private static long internalHandle(InternalAccess access, long handle) {
+    Objects.requireNonNull(access, "access").checkCaller(2);
+    return handle;
   }
 
   synchronized int finishProviderException() {
@@ -149,6 +175,17 @@ public final class ResourceRequestHandle implements AutoCloseable {
   private static LongReleaser consumerReleaser(Consumer<Long> releaser) {
     Objects.requireNonNull(releaser, "releaser");
     return releaser::accept;
+  }
+
+  @FunctionalInterface
+  interface LongCompleter {
+    int complete(long address, MaplibreNativeC.mln_resource_response response);
+  }
+
+  private static LongCompleter nativeCompleter() {
+    return (address, response) ->
+        MaplibreNativeC.mln_resource_request_complete(
+            JavaCppSupport.resourceRequestHandle(address), response);
   }
 
   @FunctionalInterface

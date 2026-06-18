@@ -57,6 +57,10 @@ public final class NativeAccess {
       throw missingSymbols(error);
     }
 
+    checkAbiVersion(version);
+  }
+
+  static void checkAbiVersion(int version) {
     if (version != EXPECTED_C_ABI_VERSION) {
       throw new NativeErrorException(
           0,

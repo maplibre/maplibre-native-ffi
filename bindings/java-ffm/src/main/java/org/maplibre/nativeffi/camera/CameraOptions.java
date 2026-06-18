@@ -29,10 +29,6 @@ public final class CameraOptions {
     return this;
   }
 
-  public CameraOptions center(double latitude, double longitude) {
-    return center(new LatLng(latitude, longitude));
-  }
-
   public CameraOptions clearCenter() {
     center = null;
     return this;

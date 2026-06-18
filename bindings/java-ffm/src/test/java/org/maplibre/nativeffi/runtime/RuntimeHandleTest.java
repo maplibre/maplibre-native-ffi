@@ -1,5 +1,6 @@
 package org.maplibre.nativeffi.runtime;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -10,6 +11,7 @@ import static org.junit.jupiter.api.Assertions.fail;
 
 import java.lang.foreign.Arena;
 import java.lang.foreign.MemorySegment;
+import java.lang.foreign.ValueLayout;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -64,7 +66,7 @@ final class RuntimeHandleTest {
 
   @Test
   void createsRunsPollsAndClosesRuntime() {
-    var runtime = RuntimeHandle.create();
+    var runtime = RuntimeHandle.create(new RuntimeOptions());
     runtime.runOnce();
     assertTrue(runtime.pollEvent().isEmpty());
     runtime.close();
@@ -74,7 +76,7 @@ final class RuntimeHandleTest {
 
   @Test
   void releasedRuntimeRejectsLaterMethodsBeforeNativeDispatch() {
-    var runtime = RuntimeHandle.create();
+    var runtime = RuntimeHandle.create(new RuntimeOptions());
     runtime.close();
     var error = assertThrows(InvalidStateException.class, runtime::runOnce);
     assertEquals(MaplibreStatus.INVALID_STATE, error.status());
@@ -116,8 +118,37 @@ final class RuntimeHandleTest {
   }
 
   @Test
+  void unknownEventPayloadCopiesRawBytes() {
+    try (var arena = Arena.ofConfined()) {
+      var raw = arena.allocateFrom(ValueLayout.JAVA_BYTE, (byte) 1, (byte) 2, (byte) 3);
+
+      var payload = RuntimeHandle.unknownPayload(999_999, raw, 3);
+
+      assertEquals(999_999, payload.rawPayloadType());
+      assertEquals(3, payload.payloadSize());
+      assertArrayEquals(new byte[] {1, 2, 3}, payload.rawPayload());
+
+      raw.set(ValueLayout.JAVA_BYTE, 0, (byte) 9);
+      assertArrayEquals(new byte[] {1, 2, 3}, payload.rawPayload());
+
+      var returned = payload.rawPayload();
+      returned[1] = 9;
+      assertArrayEquals(new byte[] {1, 2, 3}, payload.rawPayload());
+    }
+  }
+
+  @Test
+  void unknownEventPayloadPreservesDeclaredSizeForNullPayload() {
+    var payload = RuntimeHandle.unknownPayload(1234, MemorySegment.NULL, 7);
+
+    assertEquals(1234, payload.rawPayloadType());
+    assertEquals(7, payload.payloadSize());
+    assertArrayEquals(new byte[0], payload.rawPayload());
+  }
+
+  @Test
   void failedTakeResultLeavesOfflineOperationHandleLive() {
-    var runtime = RuntimeHandle.create();
+    var runtime = RuntimeHandle.create(new RuntimeOptions());
     try {
       var operation =
           new OfflineOperationHandle<OfflineRegionInfo>(
@@ -139,7 +170,7 @@ final class RuntimeHandleTest {
 
   @Test
   void failedNativeDiscardLeavesOfflineOperationHandleLive() {
-    var runtime = RuntimeHandle.create();
+    var runtime = RuntimeHandle.create(new RuntimeOptions());
     try {
       var operation =
           new OfflineOperationHandle<Void>(
@@ -158,7 +189,7 @@ final class RuntimeHandleTest {
 
   @Test
   void discardAfterRuntimeCloseMarksOfflineOperationHandleClosed() {
-    var runtime = RuntimeHandle.create();
+    var runtime = RuntimeHandle.create(new RuntimeOptions());
     var operation =
         new OfflineOperationHandle<Void>(
             runtime,
@@ -174,7 +205,7 @@ final class RuntimeHandleTest {
 
   @Test
   void setsResourceCallbacksBeforeMapsAreCreated() {
-    var runtime = RuntimeHandle.create();
+    var runtime = RuntimeHandle.create(new RuntimeOptions());
     try {
       runtime.setResourceTransform(request -> java.util.Optional.empty());
       runtime.clearResourceTransform();
@@ -186,7 +217,7 @@ final class RuntimeHandleTest {
 
   @Test
   void resourceTransformUpdatesAndClearsAfterMapCreation() {
-    var runtime = RuntimeHandle.create();
+    var runtime = RuntimeHandle.create(new RuntimeOptions());
     var map = MapHandle.create(runtime, new MapOptions().size(128, 128));
     try {
       runtime.setResourceTransform(request -> java.util.Optional.empty());
@@ -199,7 +230,7 @@ final class RuntimeHandleTest {
 
   @Test
   void resourceProviderRejectsInstallAfterMapCreation() {
-    var runtime = RuntimeHandle.create();
+    var runtime = RuntimeHandle.create(new RuntimeOptions());
     var map = MapHandle.create(runtime, new MapOptions().size(128, 128));
     try {
       assertThrows(
@@ -215,7 +246,7 @@ final class RuntimeHandleTest {
 
   @Test
   void resourceProviderCompletesStyleRequestAtCAbiBoundary() throws Exception {
-    var runtime = RuntimeHandle.create();
+    var runtime = RuntimeHandle.create(new RuntimeOptions());
     var providerCalls = new AtomicInteger();
     var callbackError = new AtomicReference<Throwable>();
     try {
@@ -255,7 +286,7 @@ final class RuntimeHandleTest {
 
   @Test
   void resourceProviderCanCompleteHandledRequestAfterCallbackReturns() throws Exception {
-    var runtime = RuntimeHandle.create();
+    var runtime = RuntimeHandle.create(new RuntimeOptions());
     var handledRequest = new AtomicReference<ResourceRequestHandle>();
     var callbackExited = new CountDownLatch(1);
     try {
@@ -293,7 +324,7 @@ final class RuntimeHandleTest {
 
   @Test
   void runtimeEventsCopyPayloadAndMessageBeforeNextPoll() throws Exception {
-    var runtime = RuntimeHandle.create();
+    var runtime = RuntimeHandle.create(new RuntimeOptions());
     var map = MapHandle.create(runtime, new MapOptions().size(64, 64));
     RenderTargetTestSupport target = null;
     try {
@@ -337,7 +368,7 @@ final class RuntimeHandleTest {
 
   @Test
   void wrongThreadRuntimeCallMapsToWrongThreadException() throws Exception {
-    var runtime = RuntimeHandle.create();
+    var runtime = RuntimeHandle.create(new RuntimeOptions());
     try {
       assertWrongThread(runOnOtherThread(runtime::runOnce));
     } finally {
@@ -347,7 +378,7 @@ final class RuntimeHandleTest {
 
   @Test
   void wrongThreadRuntimeCloseLeavesHandleLive() throws Exception {
-    var runtime = RuntimeHandle.create();
+    var runtime = RuntimeHandle.create(new RuntimeOptions());
     try {
       assertWrongThread(runOnOtherThread(runtime::close));
       assertFalse(runtime.isClosed());

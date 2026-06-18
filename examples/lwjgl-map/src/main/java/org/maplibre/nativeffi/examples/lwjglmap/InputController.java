@@ -127,8 +127,10 @@ final class InputController implements AutoCloseable {
       case GLFW_KEY_RIGHT, GLFW_KEY_D -> map.moveByAnimated(-KEYBOARD_PAN, 0.0, KEYBOARD_ANIMATION);
       case GLFW_KEY_UP, GLFW_KEY_W -> map.moveByAnimated(0.0, KEYBOARD_PAN, KEYBOARD_ANIMATION);
       case GLFW_KEY_DOWN, GLFW_KEY_S -> map.moveByAnimated(0.0, -KEYBOARD_PAN, KEYBOARD_ANIMATION);
-      case GLFW_KEY_EQUAL -> map.scaleByAnimated(KEYBOARD_ZOOM, KEYBOARD_ANIMATION);
-      case GLFW_KEY_MINUS -> map.scaleByAnimated(1.0 / KEYBOARD_ZOOM, KEYBOARD_ANIMATION);
+      case GLFW_KEY_EQUAL ->
+          map.scaleByAnimated(KEYBOARD_ZOOM, viewportCenter(), KEYBOARD_ANIMATION);
+      case GLFW_KEY_MINUS ->
+          map.scaleByAnimated(1.0 / KEYBOARD_ZOOM, viewportCenter(), KEYBOARD_ANIMATION);
       case GLFW_KEY_Q -> setBearing(currentBearing() - KEYBOARD_BEARING, true);
       case GLFW_KEY_E -> setBearing(currentBearing() + KEYBOARD_BEARING, true);
       case GLFW_KEY_RIGHT_BRACKET -> setPitch(currentPitch() + KEYBOARD_PITCH, true);
@@ -149,6 +151,11 @@ final class InputController implements AutoCloseable {
   private double currentPitch() {
     var camera = map.camera();
     return camera.hasPitch() ? camera.pitch() : 0.0;
+  }
+
+  private ScreenPoint viewportCenter() {
+    var viewport = Viewport.read(window);
+    return new ScreenPoint(viewport.width() / 2.0, viewport.height() / 2.0);
   }
 
   private void setBearing(double bearing, boolean animated) {

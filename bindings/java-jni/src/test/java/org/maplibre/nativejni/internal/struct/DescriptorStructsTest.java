@@ -24,9 +24,12 @@ import org.maplibre.nativejni.resource.ResourceErrorReason;
 import org.maplibre.nativejni.resource.ResourceResponse;
 import org.maplibre.nativejni.runtime.RuntimeOptions;
 
+// Support invariant for BND-060 through BND-063: descriptor conversion is the
+// Java JNI seam that initializes C defaults, masks, nested values, and borrowed
+// strings before public calls cross into C.
 final class DescriptorStructsTest {
   @Test
-  void coreCopiedValuesRoundTrip() {
+  void bnd060CoreCopiedValuesRoundTrip() {
     assertEquals(new LatLng(1, 2), CoreStructs.latLng(CoreStructs.latLng(new LatLng(1, 2))));
     assertEquals(
         new LatLngBounds(new LatLng(-1, -2), new LatLng(3, 4)),
@@ -46,7 +49,7 @@ final class DescriptorStructsTest {
   }
 
   @Test
-  void mapAndCameraDescriptorsMaterializeFields() {
+  void bnd060AndBnd061MapAndCameraDescriptorsMaterializeFields() {
     var map =
         MapStructs.mapOptions(
             new MapOptions().size(320, 240).scaleFactor(2).mapMode(MapMode.STATIC));
@@ -107,7 +110,7 @@ final class DescriptorStructsTest {
   }
 
   @Test
-  void queryRuntimeResourceAndStyleDescriptorsMaterializeFields() {
+  void bnd060AndBnd063QueryRuntimeResourceAndStyleDescriptorsMaterializeFields() {
     var runtime =
         RuntimeStructs.runtimeOptions(
             new RuntimeOptions().assetPath("assets").cachePath("cache").maximumCacheSize(42));
@@ -127,10 +130,10 @@ final class DescriptorStructsTest {
   }
 
   @Test
-  void enumConversionsPreserveKnownAndUnknownValues() {
+  void bnd062EnumConversionsPreserveKnownAndUnknownValues() {
     assertEquals(MapMode.TILE.nativeValue(), 2);
     assertEquals(ResourceErrorReason.NOT_FOUND, ResourceErrorReason.fromNative(1));
-    assertEquals(ResourceErrorReason.UNKNOWN, ResourceErrorReason.fromNative(999));
+    assertEquals(999, ResourceErrorReason.fromNative(999).rawValue());
     assertFalse(
         org.maplibre.nativejni.render.RenderBackend.fromMask(0)
             .contains(org.maplibre.nativejni.render.RenderBackend.METAL));

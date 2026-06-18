@@ -229,7 +229,7 @@ const MetalOwnedTextureBackend = struct {
     ) !render_target.Session {
         const texture = maplibre.attachMetalOwnedTexture(map, .{
             .extent = render_target.extent(viewport),
-            .context = .{ .device = .{ .ptr = self.compositor.view.device.value.? } },
+            .context = .{ .device = maplibre.NativePointer.fromPtr(self.compositor.view.device.value.?) },
         }) catch |err| {
             diagnostics.logError("Metal texture attach failed", err, null);
             return types.AppError.TextureAttachFailed;
@@ -258,7 +258,7 @@ const MetalOwnedTextureBackend = struct {
         defer frame.release() catch |err| diagnostics.logError("Metal texture release failed", err, null);
 
         const info = try frame.info();
-        return try self.compositor.drawMetalTexture(info.texture.ptr);
+        return try self.compositor.drawMetalTexture(info.texture.toPtr());
     }
 };
 
@@ -301,7 +301,7 @@ const MetalBorrowedTextureBackend = struct {
     ) !render_target.Session {
         const texture = maplibre.attachMetalBorrowedTexture(map, .{
             .extent = render_target.extent(viewport),
-            .texture = .{ .ptr = self.borrowed_texture.value.? },
+            .texture = maplibre.NativePointer.fromPtr(self.borrowed_texture.value.?),
         }) catch |err| {
             diagnostics.logError("Metal borrowed texture attach failed", err, null);
             return types.AppError.TextureAttachFailed;
@@ -362,8 +362,8 @@ const MetalSurfaceBackend = struct {
     ) !render_target.Session {
         const surface = maplibre.attachMetalSurface(map, .{
             .extent = render_target.extent(viewport),
-            .context = .{ .device = .{ .ptr = self.view.device.value.? } },
-            .layer = .{ .ptr = self.view.layer.value.? },
+            .context = .{ .device = maplibre.NativePointer.fromPtr(self.view.device.value.?) },
+            .layer = maplibre.NativePointer.fromPtr(self.view.layer.value.?),
         }) catch |err| {
             diagnostics.logError("Metal surface attach failed", err, null);
             return types.AppError.SurfaceAttachFailed;

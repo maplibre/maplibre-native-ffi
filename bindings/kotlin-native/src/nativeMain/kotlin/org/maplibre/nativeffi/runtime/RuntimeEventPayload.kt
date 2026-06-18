@@ -13,20 +13,17 @@ public sealed interface RuntimeEventPayload {
 
   public data class RenderFrame(
     public val mode: RenderMode,
-    public val rawMode: Int,
     public val needsRepaint: Boolean,
     public val placementChanged: Boolean,
     public val stats: RenderingStats,
   ) : RuntimeEventPayload
 
-  public data class RenderMap(public val mode: RenderMode, public val rawMode: Int) :
-    RuntimeEventPayload
+  public data class RenderMap(public val mode: RenderMode) : RuntimeEventPayload
 
   public data class StyleImageMissing(public val imageId: String) : RuntimeEventPayload
 
   public data class TileAction(
     public val operation: TileOperation,
-    public val rawOperation: Int,
     public val tileId: TileId,
     public val sourceId: String,
   ) : RuntimeEventPayload
@@ -39,7 +36,6 @@ public sealed interface RuntimeEventPayload {
   public data class OfflineRegionResponseError(
     public val regionId: Long,
     public val reason: ResourceErrorReason,
-    public val rawReason: Int,
   ) : RuntimeEventPayload
 
   public data class OfflineRegionTileCountLimit(public val regionId: Long, public val limit: Long) :
@@ -49,13 +45,35 @@ public sealed interface RuntimeEventPayload {
     /** Native `uint64_t` operation id preserved as a [Long] bit pattern. */
     public val operationId: Long,
     public val operationKind: OfflineOperationKind,
-    public val rawOperationKind: Int,
     public val resultKind: OfflineOperationResultKind,
-    public val rawResultKind: Int,
     public val resultStatus: Int,
     public val found: Boolean,
   ) : RuntimeEventPayload
 
-  public data class Unknown(public val rawPayloadType: Int, public val payloadSize: Long) :
-    RuntimeEventPayload
+  public class Unknown(
+    public val rawPayloadType: Int,
+    public val payloadSize: Long,
+    payloadBytes: ByteArray,
+  ) : RuntimeEventPayload {
+    private val copiedPayloadBytes: ByteArray = payloadBytes.copyOf()
+
+    public val payloadBytes: ByteArray
+      get() = copiedPayloadBytes.copyOf()
+
+    override fun equals(other: Any?): Boolean =
+      other is Unknown &&
+        rawPayloadType == other.rawPayloadType &&
+        payloadSize == other.payloadSize &&
+        copiedPayloadBytes.contentEquals(other.copiedPayloadBytes)
+
+    override fun hashCode(): Int {
+      var result = rawPayloadType
+      result = 31 * result + payloadSize.hashCode()
+      result = 31 * result + copiedPayloadBytes.contentHashCode()
+      return result
+    }
+
+    override fun toString(): String =
+      "Unknown(rawPayloadType=$rawPayloadType, payloadSize=$payloadSize, payloadBytes=${copiedPayloadBytes.contentToString()})"
+  }
 }

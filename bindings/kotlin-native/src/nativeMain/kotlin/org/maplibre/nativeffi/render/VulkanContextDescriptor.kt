@@ -2,13 +2,13 @@ package org.maplibre.nativeffi.render
 
 /** Mutable Vulkan backend context descriptor. */
 public class VulkanContextDescriptor(
-  instance: NativePointer = NativePointer.NULL,
-  physicalDevice: NativePointer = NativePointer.NULL,
-  device: NativePointer = NativePointer.NULL,
-  graphicsQueue: NativePointer = NativePointer.NULL,
-  graphicsQueueFamilyIndex: Int = 0,
-  getInstanceProcAddr: NativePointer = NativePointer.NULL,
-  getDeviceProcAddr: NativePointer = NativePointer.NULL,
+  instance: NativePointer,
+  physicalDevice: NativePointer,
+  device: NativePointer,
+  graphicsQueue: NativePointer,
+  graphicsQueueFamilyIndex: Int,
+  getInstanceProcAddr: NativePointer,
+  getDeviceProcAddr: NativePointer,
 ) {
   public var instance: NativePointer = instance
 

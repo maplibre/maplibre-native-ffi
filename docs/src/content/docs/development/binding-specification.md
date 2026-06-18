@@ -245,7 +245,8 @@ Public enum values convert to C through a complete named-case mapping. Public
 values represent valid C enum inputs.
 
 When C returns an enum value that the binding does not know yet, the binding
-preserves the raw value instead of collapsing it to a known case.
+preserves the raw value instead of collapsing it to a known case. Public input
+paths reject values outside the C input contract before crossing into C.
 
 Public bit masks use a named public type that supports combining, testing, and
 empty values. C field masks stay internal to C struct materializers.
@@ -264,6 +265,12 @@ object member order, repeated member names, signed and unsigned integer width,
 floating-point values, booleans, nulls, strings, arrays, and nested objects. Raw
 JSON or GeoJSON text inputs MUST pass through as text without reparsing or
 reformatting unless the public API is explicitly a structured-value API.
+
+Bindings MUST preserve the full unsigned 64-bit domain for unsigned JSON and
+GeoJSON integer values. Languages without a native unsigned 64-bit integer type
+MUST expose those values through a documented representation that preserves the
+raw value. The binding documentation MUST state how callers compare and format
+representations that are not naturally unsigned.
 
 ### Native pointers
 
@@ -338,8 +345,9 @@ Callback invocation follows this operation:
 1. Copy callback arguments into language-owned values before user code receives
    them. Lexical views are allowed only when the public type prevents retention
    beyond the invocation.
-2. Catch host exceptions, panics, or errors and convert them to the C callback's
-   documented behavior.
+2. Host-language failures must not unwind or otherwise escape across the C
+   callback boundary. If the public callback returns a recoverable host failure,
+   convert the failure to the C callback's documented behavior.
 3. Synchronize callback state that native can invoke concurrently.
 4. Return promptly. Callback code hands owner-thread work back to the owner
    thread before calling runtime or map APIs.
@@ -368,8 +376,9 @@ Resource transform invocation follows this operation:
    shape before the callback returns.
 4. If user code returns no rewrite or fails validation, keep pass-through
    behavior.
-5. If user code throws or panics, convert the failure to the C callback's
-   documented behavior.
+5. Host-language failures must not unwind or otherwise escape across the C
+   callback boundary. If the public handler returns a recoverable host failure,
+   convert the failure to the C callback's documented behavior.
 
 ### Resource providers
 
@@ -558,6 +567,8 @@ are allowed for behavior that cannot be produced reliably through the public
 native library:
 
 - ABI mismatch before public handle creation;
+- native status conversion for status categories whose C producers are
+  nondeterministic, backend-dependent, or native-exception-only;
 - unknown future status, enum, event, or payload values;
 - native destroy, request release, frame release, and callback-install failure;
 - allocation or copy failure after a native snapshot/list/result handle is
@@ -568,24 +579,23 @@ native library:
 Internal seams MUST assert the same public error, lifetime, and cleanup behavior
 that a real native failure would expose.
 
-### Binding surface and loading
+### Loading
 
-| ID      | Test                                                                                                                                                                      |
-| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| BND-001 | ABI-version mismatch returns the binding's ABI-version error before storing a public native handle, using an internal loader or version seam.                             |
-| BND-002 | Public API surface tests prevent raw C structs, raw C handles, raw FFI carrier types, and generated declarations leaking through the language's supported public surface. |
+| ID      | Test                                                                                                                                          |
+| ------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| BND-001 | ABI-version mismatch returns the binding's ABI-version error before storing a public native handle, using an internal loader or version seam. |
 
 ### Status and diagnostics
 
-| ID      | Test                                                                                                                                                                             |
-| ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| BND-020 | Each native status category maps to the expected public error category through one real failing C call.                                                                          |
-| BND-021 | Unknown native status maps to the unknown-status category and preserves the raw status value, using an internal conversion hook when no real C call can produce a future status. |
-| BND-022 | A native diagnostic is copied immediately and remains available after a later C call changes thread-local state.                                                                 |
-| BND-023 | Binding-owned closed-handle validation returns the documented public error before crossing into C.                                                                               |
-| BND-024 | Invalid string input containing embedded `NUL` is rejected for null-terminated C inputs.                                                                                         |
-| BND-025 | Binding-owned validation produces a fresh binding diagnostic and does not expose stale native thread-local diagnostics.                                                          |
-| BND-026 | A public failing call that performs binding cleanup or support work still reports the original native diagnostic, not a later diagnostic.                                        |
+| ID      | Test                                                                                                                                      |
+| ------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| BND-020 | Each native status category maps to the expected public error category.                                                                   |
+| BND-021 | Unknown native status preserves the raw status value, using an internal conversion hook when no real C call can produce a future status.  |
+| BND-022 | A native diagnostic is copied immediately and remains available after a later C call changes thread-local state.                          |
+| BND-023 | Binding-owned closed-handle validation returns the documented public error before crossing into C.                                        |
+| BND-024 | Invalid string input containing embedded `NUL` is rejected for null-terminated C inputs.                                                  |
+| BND-025 | Binding-owned validation produces a fresh binding diagnostic and does not expose stale native thread-local diagnostics.                   |
+| BND-026 | A public failing call that performs binding cleanup or support work still reports the original native diagnostic, not a later diagnostic. |
 
 ### Handle lifetime
 
@@ -595,20 +605,21 @@ that a real native failure would expose.
 | BND-041 | A failed native destroy leaves the handle live; a later successful release destroys the native handle.                                                         |
 | BND-042 | A child handle retains parent owner state, and parent release fails while child handles are live.                                                              |
 | BND-043 | `MapProjectionHandle` remains usable after the source map closes and then releases successfully.                                                               |
-| BND-047 | Public API surface tests reject construction of live owned handles or operation tokens from user-supplied native identity.                                     |
 
 ### Input Structs, Values, and Copied Data
 
-| ID      | Test                                                                                                                             |
-| ------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| BND-060 | Representative input-struct tests per family initialize C defaults, `size` fields, field masks, and nested inputs.               |
-| BND-061 | Optional field-mask inputs distinguish absent values from present zero values.                                                   |
-| BND-062 | Unknown output enum values preserve the raw native value, using an internal conversion hook when no real C call can produce one. |
-| BND-063 | Borrowed native strings and string views are copied before their native borrow window ends.                                      |
-| BND-064 | JSON values round-trip scalar and nested container values without type loss.                                                     |
-| BND-065 | GeoJSON values copy nested geometries, features, properties, and identifiers.                                                    |
-| BND-066 | Native snapshot/list/result handles are released on success and on copy failure, using fault injection for copy failure.         |
-| BND-067 | Structured JSON preserves object member order, repeated member names, and signed or unsigned integer width.                      |
+| ID      | Test                                                                                                                                                                                               |
+| ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| BND-060 | Each public API family that accepts input structs has at least one test that initializes C defaults, `size` fields, field masks, and nested inputs.                                                |
+| BND-061 | Optional field-mask inputs distinguish absent values from present zero values.                                                                                                                     |
+| BND-062 | Unknown output enum values preserve the raw native value, using an internal conversion hook when no real C call can produce one.                                                                   |
+| BND-063 | Borrowed native strings and string views are copied before their native borrow window ends.                                                                                                        |
+| BND-064 | JSON values round-trip scalar and nested container values without type loss.                                                                                                                       |
+| BND-065 | GeoJSON values copy nested geometries, features, properties, and identifiers.                                                                                                                      |
+| BND-066 | Native snapshot/list/result handles are released on success and on copy failure, using fault injection for copy failure.                                                                           |
+| BND-067 | Structured JSON preserves object member order, repeated member names, and signed or unsigned integer width.                                                                                        |
+| BND-068 | Unknown enum values preserve their raw value and are rejected before crossing into C when used in public input APIs.                                                                               |
+| BND-069 | Public values and descriptors that accept caller-owned mutable storage remain unchanged after later caller mutation, and accessors do not expose mutable storage that can mutate the stored value. |
 
 ### Runtime and events
 
@@ -640,7 +651,7 @@ that a real native failure would expose.
 | ID      | Test                                                                                                                                                        |
 | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | BND-120 | Log callback install invokes the registered callback, clear prevents later invocation, and replacement invokes only the replacement callback.               |
-| BND-121 | Callback host failures are caught and converted to documented C behavior.                                                                                   |
+| BND-121 | Host-language failures do not unwind or escape across the C callback boundary, and recoverable callback failures are converted to documented C behavior.    |
 | BND-122 | Each exposed callback family preserves the previous callback and releases replacement state when replacement fails.                                         |
 | BND-123 | Callback state remains synchronized for callback families whose C contract allows concurrent invocation.                                                    |
 | BND-124 | Custom geometry or style-scoped callback teardown handles style reload, source removal, source ID reuse, map close, and in-flight upcalls without late use. |

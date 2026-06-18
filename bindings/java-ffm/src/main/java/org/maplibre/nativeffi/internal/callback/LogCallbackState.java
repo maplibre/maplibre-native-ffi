@@ -5,13 +5,12 @@ import java.lang.foreign.MemorySegment;
 import java.util.Objects;
 import org.maplibre.nativeffi.internal.c.MapLibreNativeC;
 import org.maplibre.nativeffi.internal.c.mln_log_callback;
+import org.maplibre.nativeffi.internal.convert.NativeValues;
 import org.maplibre.nativeffi.internal.loader.NativeAccess;
 import org.maplibre.nativeffi.internal.memory.MemoryUtil;
 import org.maplibre.nativeffi.internal.status.Status;
 import org.maplibre.nativeffi.log.LogCallback;
-import org.maplibre.nativeffi.log.LogEvent;
 import org.maplibre.nativeffi.log.LogRecord;
-import org.maplibre.nativeffi.log.LogSeverity;
 
 /** Owns process-global logging callback state. */
 public final class LogCallbackState implements AutoCloseable {
@@ -19,6 +18,7 @@ public final class LogCallbackState implements AutoCloseable {
   private static LogCallbackState current;
 
   private final Arena arena;
+  private final CallbackLifecycle lifecycle = new CallbackLifecycle();
   private final LogCallback callback;
   private final MemorySegment stub;
 
@@ -34,6 +34,9 @@ public final class LogCallbackState implements AutoCloseable {
     LogCallbackState previous;
     try {
       synchronized (LOCK) {
+        if (current != null && current.isCurrentThreadInCallback()) {
+          throw Status.callbackReentry("Log callback");
+        }
         Status.check(MapLibreNativeC.mln_log_set_callback(replacement.stub, MemorySegment.NULL));
         previous = current;
         current = replacement;
@@ -49,6 +52,9 @@ public final class LogCallbackState implements AutoCloseable {
     NativeAccess.ensureLoaded();
     LogCallbackState previous;
     synchronized (LOCK) {
+      if (current != null && current.isCurrentThreadInCallback()) {
+        throw Status.callbackReentry("Log callback");
+      }
       Status.check(MapLibreNativeC.mln_log_clear_callback());
       previous = current;
       current = null;
@@ -66,14 +72,22 @@ public final class LogCallbackState implements AutoCloseable {
     return stub;
   }
 
+  boolean isCurrentThreadInCallback() {
+    return lifecycle.isCurrentThreadInCallback();
+  }
+
   private int invoke(
       MemorySegment userData, int severity, int event, long code, MemorySegment message) {
-    try {
+    var lease = lifecycle.enter();
+    if (lease.isEmpty()) {
+      return 0;
+    }
+    try (var ignored = lease.get()) {
       var record =
           new LogRecord(
-              LogSeverity.fromNative(severity),
+              NativeValues.logSeverity(severity),
               severity,
-              LogEvent.fromNative(event),
+              NativeValues.logEvent(event),
               event,
               code,
               MemoryUtil.copyCString(message));
@@ -85,7 +99,7 @@ public final class LogCallbackState implements AutoCloseable {
 
   @Override
   public void close() {
-    arena.close();
+    lifecycle.close("Log callback", arena::close);
   }
 
   private static void closeQuietly(LogCallbackState state) {

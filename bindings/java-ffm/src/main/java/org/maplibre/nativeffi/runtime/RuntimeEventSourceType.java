@@ -1,22 +1,42 @@
 package org.maplibre.nativeffi.runtime;
 
 /** Source kind for a copied runtime event. */
-public enum RuntimeEventSourceType {
-  RUNTIME(0),
-  MAP(1),
-  UNKNOWN(-1);
+public final class RuntimeEventSourceType {
+  public static final RuntimeEventSourceType RUNTIME = new RuntimeEventSourceType(0, "RUNTIME");
+  public static final RuntimeEventSourceType MAP = new RuntimeEventSourceType(1, "MAP");
 
   private final int nativeValue;
+  private final String name;
 
-  RuntimeEventSourceType(int nativeValue) {
+  private RuntimeEventSourceType(int nativeValue, String name) {
     this.nativeValue = nativeValue;
+    this.name = name;
+  }
+
+  public int rawValue() {
+    return nativeValue;
   }
 
   public static RuntimeEventSourceType fromNative(int nativeValue) {
     return switch (nativeValue) {
       case 0 -> RUNTIME;
       case 1 -> MAP;
-      default -> UNKNOWN;
+      default -> new RuntimeEventSourceType(nativeValue, null);
     };
+  }
+
+  @Override
+  public boolean equals(Object other) {
+    return other instanceof RuntimeEventSourceType value && nativeValue == value.nativeValue;
+  }
+
+  @Override
+  public int hashCode() {
+    return Integer.hashCode(nativeValue);
+  }
+
+  @Override
+  public String toString() {
+    return name != null ? name : "RuntimeEventSourceType(" + nativeValue + ")";
   }
 }

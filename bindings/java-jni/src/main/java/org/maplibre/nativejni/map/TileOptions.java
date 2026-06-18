@@ -110,7 +110,9 @@ public final class TileOptions {
   }
 
   public TileOptions lodMode(TileLodMode lodMode) {
-    this.lodMode = Objects.requireNonNull(lodMode, "lodMode");
+    var value = Objects.requireNonNull(lodMode, "lodMode");
+    value.nativeValue();
+    this.lodMode = value;
     return this;
   }
 

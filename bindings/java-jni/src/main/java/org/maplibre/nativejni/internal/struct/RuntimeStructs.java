@@ -77,6 +77,9 @@ public final class RuntimeStructs {
   public static final int STRING_PAYLOAD = 1;
   public static final int STRING_COUNT = 2;
 
+  public static final int BYTES_PAYLOAD = 0;
+  public static final int BYTES_COUNT = 1;
+
   public static final int PAYLOAD_NONE = 0;
   public static final int PAYLOAD_RENDER_FRAME = 1;
   public static final int PAYLOAD_RENDER_MAP = 2;
@@ -112,7 +115,8 @@ public final class RuntimeStructs {
       int[] ints,
       boolean[] booleans,
       double[] doubles,
-      String[] strings) {
+      String[] strings,
+      byte[][] bytes) {
     ints[INT_EVENT_TYPE] = event.type();
     ints[INT_SOURCE_TYPE] = event.source_type();
     longs[LONG_SOURCE_ADDRESS] = event.source() == null ? 0 : event.source().address();
@@ -124,6 +128,7 @@ public final class RuntimeStructs {
     if (ints[INT_PAYLOAD_AVAILABLE] == 0) {
       return;
     }
+    bytes[BYTES_PAYLOAD] = payloadBytes(event);
     switch (event.payload_type()) {
       case PAYLOAD_RENDER_FRAME -> {
         if (payloadSizeAtLeast(event, PayloadSizes.RENDER_FRAME, ints)) {
@@ -167,6 +172,25 @@ public final class RuntimeStructs {
       }
       default -> ints[INT_PAYLOAD_AVAILABLE] = 0;
     }
+  }
+
+  public static void copyEvent(
+      MaplibreNativeC.mln_runtime_event event,
+      long[] longs,
+      int[] ints,
+      boolean[] booleans,
+      double[] doubles,
+      String[] strings) {
+    copyEvent(event, longs, ints, booleans, doubles, strings, new byte[BYTES_COUNT][]);
+  }
+
+  private static byte[] payloadBytes(MaplibreNativeC.mln_runtime_event event) {
+    if (event.payload_size() == 0) {
+      return new byte[0];
+    }
+    var out = new byte[Math.toIntExact(event.payload_size())];
+    new BytePointer(event.payload()).get(out, 0, out.length);
+    return out;
   }
 
   private static boolean payloadSizeAtLeast(
@@ -257,6 +281,7 @@ public final class RuntimeStructs {
       boolean[] booleans,
       double[] doubles,
       String[] strings,
+      byte[][] bytes,
       Optional<RuntimeHandle> runtimeSource,
       Optional<MapHandle> mapSource) {
     Objects.requireNonNull(longs, "longs");
@@ -269,31 +294,44 @@ public final class RuntimeStructs {
     requireLength(booleans.length, BOOLEAN_COUNT, "booleans");
     requireLength(doubles.length, DOUBLE_COUNT, "doubles");
     requireLength(strings.length, STRING_COUNT, "strings");
+    requireLength(bytes.length, BYTES_COUNT, "bytes");
 
-    var rawType = ints[INT_EVENT_TYPE];
-    var rawSourceType = ints[INT_SOURCE_TYPE];
-    var rawPayloadType = ints[INT_PAYLOAD_TYPE];
     return new RuntimeEvent(
-        RuntimeEventType.fromNative(rawType),
-        rawType,
-        RuntimeEventSourceType.fromNative(rawSourceType),
-        rawSourceType,
+        RuntimeEventType.fromNative(ints[INT_EVENT_TYPE]),
+        RuntimeEventSourceType.fromNative(ints[INT_SOURCE_TYPE]),
         runtimeSource,
         mapSource,
         ints[INT_CODE],
-        rawPayloadType,
-        runtimeEventPayload(longs, ints, booleans, doubles, strings),
+        runtimeEventPayload(longs, ints, booleans, doubles, strings, bytes),
         nullToEmpty(strings[STRING_MESSAGE]));
   }
 
+  public static RuntimeEvent runtimeEvent(
+      long[] longs,
+      int[] ints,
+      boolean[] booleans,
+      double[] doubles,
+      String[] strings,
+      Optional<RuntimeHandle> runtimeSource,
+      Optional<MapHandle> mapSource) {
+    return runtimeEvent(
+        longs, ints, booleans, doubles, strings, new byte[BYTES_COUNT][], runtimeSource, mapSource);
+  }
+
   public static RuntimeEventPayload runtimeEventPayload(
-      long[] longs, int[] ints, boolean[] booleans, double[] doubles, String[] strings) {
+      long[] longs,
+      int[] ints,
+      boolean[] booleans,
+      double[] doubles,
+      String[] strings,
+      byte[][] bytes) {
     var rawPayloadType = ints[INT_PAYLOAD_TYPE];
     if (rawPayloadType == PAYLOAD_NONE) {
       return RuntimeEventPayload.NONE;
     }
     if (ints[INT_PAYLOAD_AVAILABLE] == 0) {
-      return new RuntimeEventPayload.Unknown(rawPayloadType, longs[LONG_PAYLOAD_SIZE]);
+      return new RuntimeEventPayload.Unknown(
+          rawPayloadType, longs[LONG_PAYLOAD_SIZE], bytes[BYTES_PAYLOAD]);
     }
 
     return switch (rawPayloadType) {
@@ -308,8 +346,15 @@ public final class RuntimeStructs {
           new RuntimeEventPayload.OfflineRegionTileCountLimit(
               longs[LONG_REGION_ID], longs[LONG_LIMIT]);
       case PAYLOAD_OFFLINE_OPERATION_COMPLETED -> offlineOperationCompleted(longs, ints, booleans);
-      default -> new RuntimeEventPayload.Unknown(rawPayloadType, longs[LONG_PAYLOAD_SIZE]);
+      default ->
+          new RuntimeEventPayload.Unknown(
+              rawPayloadType, longs[LONG_PAYLOAD_SIZE], bytes[BYTES_PAYLOAD]);
     };
+  }
+
+  public static RuntimeEventPayload runtimeEventPayload(
+      long[] longs, int[] ints, boolean[] booleans, double[] doubles, String[] strings) {
+    return runtimeEventPayload(longs, ints, booleans, doubles, strings, new byte[BYTES_COUNT][]);
   }
 
   private static RuntimeEventPayload.RenderFrame renderFrame(
@@ -317,7 +362,6 @@ public final class RuntimeStructs {
     var rawMode = ints[INT_RENDER_MODE];
     return new RuntimeEventPayload.RenderFrame(
         RenderMode.fromNative(rawMode),
-        rawMode,
         booleans[BOOLEAN_NEEDS_REPAINT],
         booleans[BOOLEAN_PLACEMENT_CHANGED],
         new RenderingStats(
@@ -329,8 +373,7 @@ public final class RuntimeStructs {
   }
 
   private static RuntimeEventPayload.RenderMap renderMap(int[] ints) {
-    var rawMode = ints[INT_RENDER_MODE];
-    return new RuntimeEventPayload.RenderMap(RenderMode.fromNative(rawMode), rawMode);
+    return new RuntimeEventPayload.RenderMap(RenderMode.fromNative(ints[INT_RENDER_MODE]));
   }
 
   private static RuntimeEventPayload.TileAction tileAction(
@@ -338,7 +381,6 @@ public final class RuntimeStructs {
     var rawOperation = ints[INT_TILE_OPERATION];
     return new RuntimeEventPayload.TileAction(
         TileOperation.fromNative(rawOperation),
-        rawOperation,
         new TileId(
             longs[LONG_TILE_OVERSCALED_Z],
             ints[INT_TILE_WRAP],
@@ -355,7 +397,6 @@ public final class RuntimeStructs {
         longs[LONG_REGION_ID],
         new OfflineRegionStatus(
             OfflineRegionDownloadState.fromNative(rawDownloadState),
-            rawDownloadState,
             longs[LONG_COMPLETED_RESOURCE_COUNT],
             longs[LONG_COMPLETED_RESOURCE_SIZE],
             longs[LONG_COMPLETED_TILE_COUNT],
@@ -370,7 +411,7 @@ public final class RuntimeStructs {
       long[] longs, int[] ints) {
     var rawReason = ints[INT_RESOURCE_ERROR_REASON];
     return new RuntimeEventPayload.OfflineRegionResponseError(
-        longs[LONG_REGION_ID], ResourceErrorReason.fromNative(rawReason), rawReason);
+        longs[LONG_REGION_ID], ResourceErrorReason.fromNative(rawReason));
   }
 
   private static RuntimeEventPayload.OfflineOperationCompleted offlineOperationCompleted(
@@ -380,9 +421,7 @@ public final class RuntimeStructs {
     return new RuntimeEventPayload.OfflineOperationCompleted(
         longs[LONG_OPERATION_ID],
         OfflineOperationKind.fromNative(rawOperationKind),
-        rawOperationKind,
         OfflineOperationResultKind.fromNative(rawResultKind),
-        rawResultKind,
         ints[INT_OFFLINE_RESULT_STATUS],
         booleans[BOOLEAN_FOUND]);
   }

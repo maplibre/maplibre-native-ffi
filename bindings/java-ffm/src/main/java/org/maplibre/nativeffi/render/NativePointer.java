@@ -2,7 +2,13 @@ package org.maplibre.nativeffi.render;
 
 import java.util.Objects;
 
-/** Opaque borrowed native address value used for backend interop handles. */
+/**
+ * Opaque borrowed native address value used for backend interop handles.
+ *
+ * <p>The pointer transfers no ownership and grants no general memory access. Callers that create a
+ * pointer from an address keep the backend object alive and externally synchronized for the full C
+ * API borrow window of the render descriptor or active frame that receives it.
+ */
 public final class NativePointer {
   public static final NativePointer NULL = new NativePointer(0, null);
 

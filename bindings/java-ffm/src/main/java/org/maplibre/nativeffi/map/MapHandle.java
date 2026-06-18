@@ -27,6 +27,7 @@ import org.maplibre.nativeffi.internal.c.mln_lat_lng;
 import org.maplibre.nativeffi.internal.c.mln_lat_lng_bounds;
 import org.maplibre.nativeffi.internal.c.mln_screen_point;
 import org.maplibre.nativeffi.internal.c.mln_style_source_info;
+import org.maplibre.nativeffi.internal.convert.NativeValues;
 import org.maplibre.nativeffi.internal.lifecycle.HandleState;
 import org.maplibre.nativeffi.internal.loader.NativeAccess;
 import org.maplibre.nativeffi.internal.memory.MemoryUtil;
@@ -159,7 +160,7 @@ public final class MapHandle implements AutoCloseable {
               outType,
               outFound));
       return outFound.get(ValueLayout.JAVA_BOOLEAN, 0)
-          ? Optional.of(SourceType.fromNative(outType.get(ValueLayout.JAVA_INT, 0)))
+          ? Optional.of(NativeValues.sourceType(outType.get(ValueLayout.JAVA_INT, 0)))
           : Optional.empty();
     }
   }
@@ -319,63 +320,34 @@ public final class MapHandle implements AutoCloseable {
     }
   }
 
-  public void addVectorSourceUrl(String sourceId, String url) {
-    addVectorSourceUrlInternal(sourceId, url, null, false);
-  }
-
   public void addVectorSourceUrl(String sourceId, String url, TileSourceOptions options) {
-    addVectorSourceUrlInternal(sourceId, url, Objects.requireNonNull(options, "options"), true);
-  }
-
-  public void addVectorSourceTiles(String sourceId, List<String> tiles) {
-    addVectorSourceTilesInternal(sourceId, tiles, null, false);
+    addVectorSourceUrlInternal(sourceId, url, options, options != null);
   }
 
   public void addVectorSourceTiles(String sourceId, List<String> tiles, TileSourceOptions options) {
-    addVectorSourceTilesInternal(sourceId, tiles, Objects.requireNonNull(options, "options"), true);
-  }
-
-  public void addRasterSourceUrl(String sourceId, String url) {
-    addRasterSourceUrlInternal(sourceId, url, null, false);
+    addVectorSourceTilesInternal(sourceId, tiles, options, options != null);
   }
 
   public void addRasterSourceUrl(String sourceId, String url, TileSourceOptions options) {
-    addRasterSourceUrlInternal(sourceId, url, Objects.requireNonNull(options, "options"), true);
-  }
-
-  public void addRasterSourceTiles(String sourceId, List<String> tiles) {
-    addRasterSourceTilesInternal(sourceId, tiles, null, false);
+    addRasterSourceUrlInternal(sourceId, url, options, options != null);
   }
 
   public void addRasterSourceTiles(String sourceId, List<String> tiles, TileSourceOptions options) {
-    addRasterSourceTilesInternal(sourceId, tiles, Objects.requireNonNull(options, "options"), true);
-  }
-
-  public void addRasterDemSourceUrl(String sourceId, String url) {
-    addRasterDemSourceUrlInternal(sourceId, url, null, false);
+    addRasterSourceTilesInternal(sourceId, tiles, options, options != null);
   }
 
   public void addRasterDemSourceUrl(String sourceId, String url, TileSourceOptions options) {
-    addRasterDemSourceUrlInternal(sourceId, url, Objects.requireNonNull(options, "options"), true);
-  }
-
-  public void addRasterDemSourceTiles(String sourceId, List<String> tiles) {
-    addRasterDemSourceTilesInternal(sourceId, tiles, null, false);
+    addRasterDemSourceUrlInternal(sourceId, url, options, options != null);
   }
 
   public void addRasterDemSourceTiles(
       String sourceId, List<String> tiles, TileSourceOptions options) {
-    addRasterDemSourceTilesInternal(
-        sourceId, tiles, Objects.requireNonNull(options, "options"), true);
-  }
-
-  public void setStyleImage(String imageId, PremultipliedRgba8Image image) {
-    setStyleImageInternal(imageId, image, null, false);
+    addRasterDemSourceTilesInternal(sourceId, tiles, options, options != null);
   }
 
   public void setStyleImage(
       String imageId, PremultipliedRgba8Image image, StyleImageOptions options) {
-    setStyleImageInternal(imageId, image, Objects.requireNonNull(options, "options"), true);
+    setStyleImageInternal(imageId, image, options, options != null);
   }
 
   public boolean removeStyleImage(String imageId) {
@@ -542,10 +514,6 @@ public final class MapHandle implements AutoCloseable {
     }
   }
 
-  public void addStyleLayerJson(JsonValue layerJson) {
-    addStyleLayerJson(layerJson, "");
-  }
-
   public void addStyleLayerJson(JsonValue layerJson, String beforeLayerId) {
     NativeAccess.ensureLoaded();
     Objects.requireNonNull(layerJson, "layerJson");
@@ -557,10 +525,6 @@ public final class MapHandle implements AutoCloseable {
               CoreStructs.stringView(
                   Objects.requireNonNull(beforeLayerId, "beforeLayerId"), arena)));
     }
-  }
-
-  public void addHillshadeLayer(String layerId, String sourceId) {
-    addHillshadeLayer(layerId, sourceId, "");
   }
 
   public void addHillshadeLayer(String layerId, String sourceId, String beforeLayerId) {
@@ -576,10 +540,6 @@ public final class MapHandle implements AutoCloseable {
     }
   }
 
-  public void addColorReliefLayer(String layerId, String sourceId) {
-    addColorReliefLayer(layerId, sourceId, "");
-  }
-
   public void addColorReliefLayer(String layerId, String sourceId, String beforeLayerId) {
     NativeAccess.ensureLoaded();
     try (var arena = Arena.ofConfined()) {
@@ -591,10 +551,6 @@ public final class MapHandle implements AutoCloseable {
               CoreStructs.stringView(
                   Objects.requireNonNull(beforeLayerId, "beforeLayerId"), arena)));
     }
-  }
-
-  public void addLocationIndicatorLayer(String layerId) {
-    addLocationIndicatorLayer(layerId, "");
   }
 
   public void addLocationIndicatorLayer(String layerId, String beforeLayerId) {
@@ -653,7 +609,7 @@ public final class MapHandle implements AutoCloseable {
           MapLibreNativeC.mln_map_set_location_indicator_image_name(
               state.requireLive(),
               CoreStructs.stringView(Objects.requireNonNull(layerId, "layerId"), arena),
-              imageKind.nativeValue(),
+              NativeValues.nativeValue(imageKind),
               CoreStructs.stringView(Objects.requireNonNull(imageId, "imageId"), arena)));
     }
   }
@@ -708,10 +664,6 @@ public final class MapHandle implements AutoCloseable {
       Status.check(MapLibreNativeC.mln_map_list_style_layer_ids(state.requireLive(), outList));
       return StyleStructs.styleIdList(outList.get(ValueLayout.ADDRESS, 0));
     }
-  }
-
-  public void moveStyleLayer(String layerId) {
-    moveStyleLayer(layerId, "");
   }
 
   public void moveStyleLayer(String layerId, String beforeLayerId) {
@@ -880,7 +832,7 @@ public final class MapHandle implements AutoCloseable {
     Objects.requireNonNull(options, "options");
     var mask = 0;
     for (var option : options) {
-      mask |= Objects.requireNonNull(option, "option").nativeMask();
+      mask |= NativeValues.nativeMask(Objects.requireNonNull(option, "option"));
     }
     Status.check(MapLibreNativeC.mln_map_set_debug_options(state.requireLive(), mask));
   }
@@ -893,7 +845,7 @@ public final class MapHandle implements AutoCloseable {
       var mask = outOptions.get(ValueLayout.JAVA_INT, 0);
       var options = EnumSet.noneOf(DebugOption.class);
       for (var option : DebugOption.values()) {
-        if ((mask & option.nativeMask()) != 0) {
+        if ((mask & NativeValues.nativeMask(option)) != 0) {
           options.add(option);
         }
       }
@@ -989,20 +941,12 @@ public final class MapHandle implements AutoCloseable {
     }
   }
 
-  public void easeTo(CameraOptions camera) {
-    easeToInternal(camera, null, false);
-  }
-
   public void easeTo(CameraOptions camera, AnimationOptions animation) {
-    easeToInternal(camera, Objects.requireNonNull(animation, "animation"), true);
-  }
-
-  public void flyTo(CameraOptions camera) {
-    flyToInternal(camera, null, false);
+    easeToInternal(camera, animation, animation != null);
   }
 
   public void flyTo(CameraOptions camera, AnimationOptions animation) {
-    flyToInternal(camera, Objects.requireNonNull(animation, "animation"), true);
+    flyToInternal(camera, animation, animation != null);
   }
 
   public void moveBy(double deltaX, double deltaY) {
@@ -1010,42 +954,16 @@ public final class MapHandle implements AutoCloseable {
     Status.check(MapLibreNativeC.mln_map_move_by(state.requireLive(), deltaX, deltaY));
   }
 
-  public void moveByAnimated(double deltaX, double deltaY) {
-    moveByAnimatedInternal(deltaX, deltaY, null, false);
-  }
-
   public void moveByAnimated(double deltaX, double deltaY, AnimationOptions animation) {
-    moveByAnimatedInternal(deltaX, deltaY, Objects.requireNonNull(animation, "animation"), true);
-  }
-
-  public void scaleBy(double scale) {
-    scaleByInternal(scale, null, false);
+    moveByAnimatedInternal(deltaX, deltaY, animation, animation != null);
   }
 
   public void scaleBy(double scale, ScreenPoint anchor) {
-    scaleByInternal(scale, Objects.requireNonNull(anchor, "anchor"), true);
-  }
-
-  public void scaleByAnimated(double scale) {
-    scaleByAnimatedInternal(scale, null, false, null, false);
-  }
-
-  public void scaleByAnimated(double scale, ScreenPoint anchor) {
-    scaleByAnimatedInternal(scale, Objects.requireNonNull(anchor, "anchor"), true, null, false);
-  }
-
-  public void scaleByAnimated(double scale, AnimationOptions animation) {
-    scaleByAnimatedInternal(
-        scale, null, false, Objects.requireNonNull(animation, "animation"), true);
+    scaleByInternal(scale, anchor, anchor != null);
   }
 
   public void scaleByAnimated(double scale, ScreenPoint anchor, AnimationOptions animation) {
-    scaleByAnimatedInternal(
-        scale,
-        Objects.requireNonNull(anchor, "anchor"),
-        true,
-        Objects.requireNonNull(animation, "animation"),
-        true);
+    scaleByAnimatedInternal(scale, anchor, anchor != null, animation, animation != null);
   }
 
   public void rotateBy(ScreenPoint first, ScreenPoint second) {
@@ -1061,12 +979,8 @@ public final class MapHandle implements AutoCloseable {
     }
   }
 
-  public void rotateByAnimated(ScreenPoint first, ScreenPoint second) {
-    rotateByAnimatedInternal(first, second, null, false);
-  }
-
   public void rotateByAnimated(ScreenPoint first, ScreenPoint second, AnimationOptions animation) {
-    rotateByAnimatedInternal(first, second, Objects.requireNonNull(animation, "animation"), true);
+    rotateByAnimatedInternal(first, second, animation, animation != null);
   }
 
   public void pitchBy(double pitch) {
@@ -1074,12 +988,8 @@ public final class MapHandle implements AutoCloseable {
     Status.check(MapLibreNativeC.mln_map_pitch_by(state.requireLive(), pitch));
   }
 
-  public void pitchByAnimated(double pitch) {
-    pitchByAnimatedInternal(pitch, null, false);
-  }
-
   public void pitchByAnimated(double pitch, AnimationOptions animation) {
-    pitchByAnimatedInternal(pitch, Objects.requireNonNull(animation, "animation"), true);
+    pitchByAnimatedInternal(pitch, animation, animation != null);
   }
 
   public void cancelTransitions() {
@@ -1087,31 +997,16 @@ public final class MapHandle implements AutoCloseable {
     Status.check(MapLibreNativeC.mln_map_cancel_transitions(state.requireLive()));
   }
 
-  public CameraOptions cameraForLatLngBounds(LatLngBounds bounds) {
-    return cameraForLatLngBoundsInternal(bounds, null, false);
-  }
-
   public CameraOptions cameraForLatLngBounds(LatLngBounds bounds, CameraFitOptions fitOptions) {
-    return cameraForLatLngBoundsInternal(
-        bounds, Objects.requireNonNull(fitOptions, "fitOptions"), true);
-  }
-
-  public CameraOptions cameraForLatLngs(List<LatLng> coordinates) {
-    return cameraForLatLngsInternal(coordinates, null, false);
+    return cameraForLatLngBoundsInternal(bounds, fitOptions, fitOptions != null);
   }
 
   public CameraOptions cameraForLatLngs(List<LatLng> coordinates, CameraFitOptions fitOptions) {
-    return cameraForLatLngsInternal(
-        coordinates, Objects.requireNonNull(fitOptions, "fitOptions"), true);
-  }
-
-  public CameraOptions cameraForGeometry(Geometry geometry) {
-    return cameraForGeometryInternal(geometry, null, false);
+    return cameraForLatLngsInternal(coordinates, fitOptions, fitOptions != null);
   }
 
   public CameraOptions cameraForGeometry(Geometry geometry, CameraFitOptions fitOptions) {
-    return cameraForGeometryInternal(
-        geometry, Objects.requireNonNull(fitOptions, "fitOptions"), true);
+    return cameraForGeometryInternal(geometry, fitOptions, fitOptions != null);
   }
 
   public LatLngBounds latLngBoundsForCamera(CameraOptions camera) {
@@ -1551,7 +1446,7 @@ public final class MapHandle implements AutoCloseable {
   }
 
   public MemorySegment nativeHandle(InternalAccess access) {
-    Objects.requireNonNull(access, "access");
+    Objects.requireNonNull(access, "access").checkCaller();
     return nativeHandle();
   }
 
@@ -1560,7 +1455,7 @@ public final class MapHandle implements AutoCloseable {
   }
 
   public long nativeAddress(InternalAccess access) {
-    Objects.requireNonNull(access, "access");
+    Objects.requireNonNull(access, "access").checkCaller();
     return nativeAddress();
   }
 
@@ -1569,7 +1464,7 @@ public final class MapHandle implements AutoCloseable {
   }
 
   public void releaseDetachedCustomGeometrySources(InternalAccess access) {
-    Objects.requireNonNull(access, "access");
+    Objects.requireNonNull(access, "access").checkCaller();
     releaseDetachedCustomGeometrySources();
   }
 
@@ -1588,8 +1483,8 @@ public final class MapHandle implements AutoCloseable {
           continue;
         }
         var found = outFound.get(ValueLayout.JAVA_BOOLEAN, 0);
-        var sourceType = SourceType.fromNative(outType.get(ValueLayout.JAVA_INT, 0));
-        if (!found || sourceType != SourceType.CUSTOM_VECTOR) {
+        var sourceType = NativeValues.sourceType(outType.get(ValueLayout.JAVA_INT, 0));
+        if (!found || !sourceType.equals(SourceType.CUSTOM_VECTOR)) {
           closeQuietly(entry.getValue());
           iterator.remove();
         }

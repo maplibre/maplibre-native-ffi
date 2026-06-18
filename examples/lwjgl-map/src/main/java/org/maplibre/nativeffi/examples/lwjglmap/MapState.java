@@ -2,6 +2,7 @@ package org.maplibre.nativeffi.examples.lwjglmap;
 
 import org.lwjgl.vulkan.VK10;
 import org.maplibre.nativeffi.camera.CameraOptions;
+import org.maplibre.nativeffi.geo.LatLng;
 import org.maplibre.nativeffi.map.MapHandle;
 import org.maplibre.nativeffi.map.MapMode;
 import org.maplibre.nativeffi.map.MapOptions;
@@ -47,7 +48,11 @@ final class MapState implements AutoCloseable {
     try {
       map.setStyleUrl(STYLE_URL);
       map.jumpTo(
-          new CameraOptions().center(37.7749, -122.4194).zoom(13.0).bearing(12.0).pitch(30.0));
+          new CameraOptions()
+              .center(new LatLng(37.7749, -122.4194))
+              .zoom(13.0)
+              .bearing(12.0)
+              .pitch(30.0));
       target = attachRenderTarget(graphics, map, viewport, mode);
       return new MapState(runtime, map, target);
     } catch (RuntimeException error) {
@@ -105,10 +110,10 @@ final class MapState implements AutoCloseable {
         return;
       }
       var value = event.get();
-      if (value.type() == RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE
+      if (RuntimeEventType.MAP_RENDER_UPDATE_AVAILABLE.equals(value.type())
           && value.mapSource().filter(source -> source == map).isPresent()) {
         renderPending = true;
-      } else if (value.type() == RuntimeEventType.MAP_RENDER_FRAME_FINISHED
+      } else if (RuntimeEventType.MAP_RENDER_FRAME_FINISHED.equals(value.type())
           && value.mapSource().filter(source -> source == map).isPresent()
           && value.payload() instanceof RuntimeEventPayload.RenderFrame frame
           && frame.needsRepaint()) {

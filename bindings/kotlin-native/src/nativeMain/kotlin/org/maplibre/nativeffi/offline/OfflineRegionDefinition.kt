@@ -22,4 +22,18 @@ public sealed interface OfflineRegionDefinition {
     public val pixelRatio: Float,
     public val includeIdeographs: Boolean,
   ) : OfflineRegionDefinition
+
+  public class Unknown internal constructor(public val rawType: Int, public val rawSize: Int) :
+    OfflineRegionDefinition {
+    override fun equals(other: Any?): Boolean =
+      other is Unknown && rawType == other.rawType && rawSize == other.rawSize
+
+    override fun hashCode(): Int {
+      var result = rawType
+      result = 31 * result + rawSize
+      return result
+    }
+
+    override fun toString(): String = "Unknown(rawType=$rawType, rawSize=$rawSize)"
+  }
 }
