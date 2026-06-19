@@ -11,3 +11,4 @@ crate-type = ["staticlib"]
 [dependencies]
 image = { version = "0.25.8", default-features = false, features = ["jpeg", "png", "webp"] }
 minreq = { version = "3.0.0", default-features = false, features = ["https-rustls"] }
+threadpool = "1.8.1"

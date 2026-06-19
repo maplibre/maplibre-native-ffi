@@ -1,6 +1,6 @@
 ---
 title: Android Rust Platform Spike
-description: Planned Android platform bring-up path using native Android sources, default MapLibre sources, and Rust platform components.
+description: Android platform bring-up path using native Android sources, default MapLibre sources, and Rust platform components.
 sidebar:
   order: 6
 ---
@@ -8,25 +8,23 @@ sidebar:
 ## Goal
 
 Bring up an Android native build of `maplibre_native_c` without waiting on a
-desktop-style native dependency provider. The spike treats Rust platform
+desktop-style native dependency provider. This spike treats Rust platform
 components as the primary path for dependency-heavy Android platform behavior,
 then leaves room to compare that path against a later vcpkg-based build.
 
-The first milestone is a linked Android `maplibre_native_c` library for one
-target, preferably `android-arm64-vulkan`. Rendering a map is a later milestone;
-the first build may use Rust replacements for features that would otherwise
-require curl, image codec libraries, or full ICU.
+The current target is a linked Android `maplibre_native_c` library for
+`android-arm64-vulkan`. Rendering a map is a later milestone.
 
 ## Build Shape
 
-- Add an Android mise environment for one ABI and render backend.
-- Configure CMake with the Android NDK toolchain file and API 24.
-- Add `cmake/platform/android.cmake` and select it from
-  `cmake/mln_platform.cmake` when `CMAKE_SYSTEM_NAME` is `Android`.
-- Keep the existing `MLN_WITH_CORE_ONLY` wrapper flow and attach platform
-  sources to `maplibre_native_c`.
-- Add a Rust static library target only after the C++ Android platform source
-  list configures and links.
+- An Android mise environment selects one ABI and render backend.
+- CMake configures with the Android NDK toolchain file and API 24.
+- `cmake/platform/android.cmake` is selected from `cmake/mln_platform.cmake`
+  when `CMAKE_SYSTEM_NAME` is `Android`.
+- The existing `MLN_WITH_CORE_ONLY` wrapper flow attaches platform sources to
+  `maplibre_native_c`.
+- A Rust static library links into `maplibre_native_c` through a CMake custom
+  command.
 
 Rust integrates through a narrow C ABI. C++ platform shims continue to own
 MapLibre types, exceptions, callbacks, and lifecycle. Rust functions receive
@@ -40,7 +38,7 @@ plain buffers and return plain structs or status codes.
 | Run loop                     | Drive MapLibre scheduled work on Android threads                                | `platform/android/src/run_loop.cpp`                             | None                                      |
 | Async task                   | Post work into the Android run loop                                             | `platform/android/src/async_task.cpp`                           | None                                      |
 | Timer                        | Schedule delayed and repeating tasks                                            | `platform/android/src/timer.cpp`                                | None                                      |
-| Threading                    | Worker threads and thread local state                                           | Default `thread.cpp` and `thread_local.cpp`                     | None                                      |
+| Threading                    | Worker threads and thread local state                                           | Project-local Android thread implementation                     | None                                      |
 | Monotonic time and wall time | Clock and timestamp support                                                     | Default `monotonic_timer.cpp` and `platform/time.cpp`           | None                                      |
 | Logging                      | Emit MapLibre logs                                                              | Default `logging_stderr.cpp` first                              | None                                      |
 | Filesystem                   | Read and write app-private paths                                                | Default filesystem and local file sources                       | None                                      |
@@ -49,15 +47,15 @@ plain buffers and return plain structs or status codes.
 | Resource loader routing      | Route asset, local, database, network, PMTiles, and MBTiles requests            | Default sources plus existing custom manager                    | None                                      |
 | C API resource provider      | Let bindings intercept network requests                                         | Existing `src/resources/resource_loader.cpp`                    | None                                      |
 | Compression                  | Inflate and deflate compressed resource payloads                                | Default compression with NDK `libz`                             | `flate2` or `miniz_oxide`, low priority   |
-| HTTP                         | Async request, cancellation, headers, ranges, cache metadata, and error mapping | Rust replacement                                                | `minreq` + `rustls`                       |
+| HTTP                         | Async request, cancellation, headers, ranges, cache metadata, and error mapping | Rust replacement                                                | `minreq` + Rustls                         |
 | PNG decode                   | Decode encoded bytes to premultiplied RGBA8                                     | Rust replacement                                                | `image`                                   |
 | JPEG decode                  | Decode encoded bytes to RGBA8                                                   | Rust replacement                                                | `image`                                   |
 | WebP decode                  | Decode encoded bytes to RGBA8                                                   | Rust replacement                                                | `image`                                   |
-| PNG write                    | Encode readback or snapshot pixels to PNG                                       | Stub unless a test or API path needs it                         | `png` or `image`                          |
+| PNG write                    | Encode readback or snapshot pixels to PNG                                       | Default `png_writer.cpp`                                        | None                                      |
 | Bidi and Unicode core        | Unicode text processing used by layout                                          | Default sources plus vendored `mbgl-vendor-icu` and `nunicode`  | None                                      |
 | Collation                    | Compare strings with case and diacritic options                                 | Default `collator.cpp`                                          | Later ICU4X collator                      |
 | Number formatting            | Implement style `number-format` expression                                      | `number_format.cpp` with `MBGL_USE_BUILTIN_ICU` degraded mode   | Later ICU4X decimal or number formatting  |
-| Local glyph rasterizer       | Generate local CJK glyph bitmaps                                                | Default stub                                                    | No first-pass Rust target                 |
+| Local glyph rasterizer       | Generate local CJK glyph bitmaps                                                | Default implementation                                          | No first-pass Rust target                 |
 | Layer manager and factories  | Register MapLibre style layer factories                                         | Existing wrapper source list                                    | None                                      |
 | Vulkan backend               | Render through Android Vulkan                                                   | Existing FFI Vulkan backend plus default Vulkan headless source | None                                      |
 | OpenGL ES backend            | Render through Android EGL/GLES                                                 | Follow-up after Vulkan unless required first                    | None                                      |
@@ -65,52 +63,53 @@ plain buffers and return plain structs or status codes.
 
 ## Rust Image Boundary
 
-Start with image decoding because it is isolated and testable. A minimal C ABI
-can look like this:
+Image decoding is isolated behind a C ABI:
 
 ```c
-typedef struct mln_rust_image {
+typedef struct mln_rust_decoded_image {
   uint32_t width;
   uint32_t height;
-  uint8_t* rgba;
-  size_t rgba_len;
-} mln_rust_image;
+  uint8_t* data;
+  size_t data_len;
+  char* error;
+} mln_rust_decoded_image;
 
-int32_t mln_rust_decode_image(
+mln_rust_decoded_image mln_rust_decode_image(
   const uint8_t* data,
-  size_t data_len,
-  mln_rust_image* out_image
+  size_t data_len
 );
 
-void mln_rust_image_free(mln_rust_image* image);
+void mln_rust_decoded_image_free(mln_rust_decoded_image image);
 ```
 
-The C++ Android image shim converts `mln_rust_image` into
-`mbgl::PremultipliedImage`. The shim owns validation of null pointers, dimension
-overflow, alpha premultiplication, and conversion errors into MapLibre
-exceptions or diagnostics.
+The C++ Android image shim converts the Rust response into
+`mbgl::PremultipliedImage`. Rust returns premultiplied RGBA8 bytes and owns
+decoder errors until C++ copies them into MapLibre exceptions.
+
+## Rust HTTP Boundary
+
+HTTP uses a Rust-owned background thread per request. C++ owns MapLibre
+`Resource`, `Response`, cancellation, and callback delivery; Rust owns
+URL/header copying, the blocking HTTP request, TLS, and response buffers. The C
+ABI passes plain request headers and returns status, body bytes, selected
+response headers, and an error string.
 
 ## Milestones
 
 1. Android CMake configure succeeds for one ABI/backend.
 2. `maplibre_native_c` links with Android platform source selection.
-3. A minimal native smoke path calls a basic exported C API function.
-4. Rust static library links into `maplibre_native_c`.
-5. Rust PNG/JPEG/WebP decoding replaces native image codec dependencies.
-6. HTTP is replaced by a Rust implementation behind the same MapLibre
+3. Rust static library links into `maplibre_native_c`.
+4. Rust PNG/JPEG/WebP decoding replaces native image codec dependencies.
+5. HTTP is replaced by a Rust implementation behind the same MapLibre
    `FileSource` behavior.
-7. ICU4X collation and number formatting are evaluated separately after image
-   and HTTP behavior are stable.
 
 ## Open Decisions
 
-- Whether the first backend is Vulkan only or also includes OpenGL ES.
-- Whether Rust image decoding should use the unified `image` crate or
-  lower-level per-format crates.
-- Whether Rust HTTP should use blocking `ureq` on a Rust-owned thread pool or
-  async `reqwest` with a runtime.
-- How Android TLS trust should work if Rust HTTP uses `rustls`; static web PKI
-  roots are portable, while Android's Network Security Config requires platform
+- Whether to add OpenGL ES alongside Vulkan.
+- How Android TLS trust should work with Rustls; static web PKI roots are
+  portable, while Android's Network Security Config requires platform
   integration.
 - How much locale data ICU4X should embed if it replaces degraded number
   formatting and default collation.
+- Whether the Rust HTTP implementation should move from one thread per request
+  to a shared worker pool after functional testing.

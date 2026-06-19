@@ -3,10 +3,11 @@ use std::os::raw::{c_char, c_void};
 use std::ptr;
 use std::slice;
 use std::sync::{
-    Arc,
+    Arc, OnceLock,
     atomic::{AtomicBool, Ordering},
 };
-use std::thread;
+
+const HTTP_WORKER_THREADS: usize = 16;
 
 #[repr(C)]
 pub struct MlnRustHttpHeader {
@@ -67,7 +68,7 @@ pub unsafe extern "C" fn mln_rust_http_request_start(
     let canceled = Arc::new(AtomicBool::new(false));
     let thread_canceled = Arc::clone(&canceled);
     let callback_user_data = user_data as usize;
-    thread::spawn(move || {
+    http_thread_pool().execute(move || {
         let response = send_http_request(request);
         let _ = thread_canceled.load(Ordering::Acquire);
         // SAFETY: The C++ caller keeps `user_data` valid until this callback
@@ -78,6 +79,13 @@ pub unsafe extern "C" fn mln_rust_http_request_start(
     });
 
     Box::into_raw(Box::new(HttpRequestHandle { canceled })) as *mut c_void
+}
+
+fn http_thread_pool() -> &'static threadpool::ThreadPool {
+    static HTTP_THREAD_POOL: OnceLock<threadpool::ThreadPool> = OnceLock::new();
+    // TODO(android): Replace this hardcoded worker count with MapLibre's
+    // MAX_CONCURRENT_REQUESTS_KEY file-source property.
+    HTTP_THREAD_POOL.get_or_init(|| threadpool::ThreadPool::new(HTTP_WORKER_THREADS))
 }
 
 #[unsafe(no_mangle)]
@@ -229,6 +237,9 @@ fn copy_http_request(
 }
 
 fn send_http_request(request: HttpRequest) -> MlnRustHttpResponse {
+    // TODO(android): Decide whether Rustls' bundled WebPKI roots are sufficient
+    // or whether Android builds must validate through the platform trust store
+    // and Network Security Config.
     let mut minreq = minreq::get(request.url);
     for (name, value) in request.headers {
         minreq = minreq.with_header(name, value);
