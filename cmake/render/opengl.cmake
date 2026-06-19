@@ -41,7 +41,7 @@ function(mln_configure_opengl_backend target)
           ${MLN_FFI_ANDROID_EGL_LIBRARY} ${MLN_FFI_ANDROID_GLESV3_LIBRARY}
           ${CMAKE_DL_LIBS})
     else()
-      find_package(OpenGL REQUIRED EGL)
+      find_package(OpenGL REQUIRED COMPONENTS EGL GLES3)
       target_link_libraries(${target} PRIVATE OpenGL::EGL ${CMAKE_DL_LIBS})
     endif()
     list(APPEND MLN_FFI_VENDOR_OPENGL_SOURCES
