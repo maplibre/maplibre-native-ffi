@@ -105,6 +105,7 @@ pub fn translateCModule(b: *std.Build, options: TranslateCModuleOptions) *std.Bu
         .optimize = options.optimize,
     });
     addTranslateCIncludePaths(translate_c, options.include_dirs);
+    addPlatformSystemHeaderPaths(b, translate_c, options.target);
     for (options.c_macros) |c_macro| {
         translate_c.defineCMacro(c_macro.name, c_macro.value);
     }
@@ -172,15 +173,23 @@ fn addDependencyLibraryPaths(module: *std.Build.Module, dependency_library_dirs:
     }
 }
 
-pub fn addPlatformSystemPaths(b: *std.Build, module: *std.Build.Module, target: std.Build.ResolvedTarget) void {
+fn addPlatformSystemHeaderPaths(b: *std.Build, destination: anytype, target: std.Build.ResolvedTarget) void {
     if (!target.result.os.tag.isDarwin() and target.result.os.tag != .linux) return;
     const system_root = b.graph.environ_map.get("MLN_FFI_SYSTEM_ROOT") orelse return;
     if (system_root.len == 0) return;
 
     if (target.result.os.tag.isDarwin()) {
-        module.addSystemFrameworkPath(.{ .cwd_relative = b.pathJoin(&.{ system_root, "System", "Library", "Frameworks" }) });
+        destination.addSystemFrameworkPath(.{ .cwd_relative = b.pathJoin(&.{ system_root, "System", "Library", "Frameworks" }) });
     }
-    module.addSystemIncludePath(.{ .cwd_relative = b.pathJoin(&.{ system_root, "usr", "include" }) });
+    destination.addSystemIncludePath(.{ .cwd_relative = b.pathJoin(&.{ system_root, "usr", "include" }) });
+}
+
+pub fn addPlatformSystemPaths(b: *std.Build, module: *std.Build.Module, target: std.Build.ResolvedTarget) void {
+    addPlatformSystemHeaderPaths(b, module, target);
+    if (!target.result.os.tag.isDarwin() and target.result.os.tag != .linux) return;
+    const system_root = b.graph.environ_map.get("MLN_FFI_SYSTEM_ROOT") orelse return;
+    if (system_root.len == 0) return;
+
     module.addLibraryPath(.{ .cwd_relative = b.pathJoin(&.{ system_root, "usr", "lib" }) });
     if (target.result.os.tag == .linux) {
         module.addLibraryPath(.{ .cwd_relative = b.pathJoin(&.{ system_root, "usr", "lib64" }) });
