@@ -6,7 +6,6 @@ namespace Maplibre.Native.Examples.DotnetMap;
 internal static class NativeLibraryResolver
 {
     private const string LibraryDirsSwitch = "Maplibre.Native.LibraryDirs";
-    private const string LibraryDirsEnvironment = "MLN_FFI_NATIVE_LIBRARY_DIRS";
     private static readonly object RegistrationLock = new();
     private static bool registered;
 
@@ -85,12 +84,6 @@ internal static class NativeLibraryResolver
     {
         var switchDirs = AppContext.GetData(LibraryDirsSwitch) as string;
         foreach (var directory in PathList(switchDirs))
-        {
-            yield return directory;
-        }
-
-        var environmentDirs = Environment.GetEnvironmentVariable(LibraryDirsEnvironment);
-        foreach (var directory in PathList(environmentDirs))
         {
             yield return directory;
         }

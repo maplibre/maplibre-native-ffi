@@ -112,8 +112,8 @@ native input each consumer can use:
 - `pkg-config` for consumers with first-class `pkg-config` support.
 - Gradle properties for JVM and Kotlin/Native builds.
 - MSBuild props for .NET development and test projects.
-- Shell environment, Swift linker flags, and Zig key/value config files for
-  tools without a direct `pkg-config` integration point.
+- Swift linker flags and Zig key/value config files for tools without a direct
+  `pkg-config` integration point.
 
 Consumer build systems should parse the JSON metadata only when no simpler
 generated format fits their native model.

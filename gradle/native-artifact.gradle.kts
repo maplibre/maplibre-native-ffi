@@ -1,10 +1,6 @@
 import java.util.Properties
 
 fun Project.maplibreNativeCPropertiesFile(): File {
-  providers.environmentVariable("MLN_FFI_NATIVE_GRADLE_PROPERTIES_FILE").orNull?.let {
-    return file(it)
-  }
-
   val buildDir =
     providers.environmentVariable("MLN_FFI_BUILD_DIR").orNull
       ?: throw GradleException(

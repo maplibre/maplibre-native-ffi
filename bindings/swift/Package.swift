@@ -4,12 +4,10 @@ import Foundation
 import PackageDescription
 
 func nativeLinkerFlags() -> [String] {
-  let flagsFile = Context.environment["MLN_FFI_NATIVE_SWIFT_LINKER_FLAGS_FILE"] ?? {
-    guard let nativeBuildDir = Context.environment["MLN_FFI_BUILD_DIR"] else {
-      fatalError("MLN_FFI_NATIVE_SWIFT_LINKER_FLAGS_FILE or MLN_FFI_BUILD_DIR is required")
-    }
-    return "\(nativeBuildDir)/maplibre-native-c.swift-linker-flags"
-  }()
+  guard let nativeBuildDir = Context.environment["MLN_FFI_BUILD_DIR"] else {
+    fatalError("MLN_FFI_BUILD_DIR is required")
+  }
+  let flagsFile = "\(nativeBuildDir)/maplibre-native-c.swift-linker-flags"
 
   do {
     return try String(contentsOfFile: flagsFile, encoding: .utf8)
