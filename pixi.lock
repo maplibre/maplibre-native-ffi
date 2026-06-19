@@ -71,7 +71,6 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/linux-64/libwebp-1.6.0-h9635ea4_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/libwebp-base-1.6.0-hd42ef1d_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/libxcb-1.17.0-h8a09558_0.conda
-      - conda: https://conda.anaconda.org/conda-forge/linux-64/libxcrypt1-4.4.36-hd590300_1.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/libxkbcommon-1.13.1-hca5e8e5_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/libxml2-16-2.15.3-hca6bf5a_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-64/libxml2-2.15.3-h49c6c72_0.conda
@@ -161,7 +160,6 @@ environments:
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/libwebp-1.6.0-h05a2d3e_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/libwebp-base-1.6.0-ha2e29f5_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/libxcb-1.17.0-h262b8f6_0.conda
-      - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/libxcrypt1-4.4.36-h31becfc_1.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/libxkbcommon-1.13.1-h3c6a4c8_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/libxml2-16-2.15.3-h79dcc73_0.conda
       - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/libxml2-2.15.3-h869d058_0.conda
@@ -988,14 +986,6 @@ packages:
   license_family: MIT
   size: 395888
   timestamp: 1727278577118
-- conda: https://conda.anaconda.org/conda-forge/linux-64/libxcrypt1-4.4.36-hd590300_1.conda
-  sha256: f73770a0a043b41ccb678ed6095b1a0a0fb5b9a3d3aca1d985705299182248be
-  md5: e8444913ffc6358a2f33fbb5c7c2e3af
-  depends:
-  - libgcc-ng >=12
-  license: LGPL-2.1-or-later
-  size: 88165
-  timestamp: 1702724463253
 - conda: https://conda.anaconda.org/conda-forge/linux-64/libxkbcommon-1.13.1-hca5e8e5_0.conda
   sha256: d2195b5fbcb0af1ff7b345efdf89290c279b8d1d74f325ae0ac98148c375863c
   md5: 2bca1fbb221d9c3c8e3a155784bbc2e9
@@ -1960,14 +1950,6 @@ packages:
   license_family: MIT
   size: 397493
   timestamp: 1727280745441
-- conda: https://conda.anaconda.org/conda-forge/linux-aarch64/libxcrypt1-4.4.36-h31becfc_1.conda
-  sha256: b5fd1c8bf73879ae3c2cc8df89f6f555938c20e7ea4f39be82b58674e6cb8e36
-  md5: eaac133e112b393c16c733d30362cf2e
-  depends:
-  - libgcc-ng >=12
-  license: LGPL-2.1-or-later
-  size: 102660
-  timestamp: 1702724439867
 - conda: https://conda.anaconda.org/conda-forge/linux-aarch64/libxkbcommon-1.13.1-h3c6a4c8_0.conda
   sha256: 37e4aa45b71c35095a01835bd42fa37c08218fec44eb2c6bf4b9e2826b0351d4
   md5: 22c1ce28d481e490f3635c1b6a2bb23f
