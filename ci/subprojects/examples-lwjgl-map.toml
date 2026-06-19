@@ -1,0 +1,6 @@
+[requires]
+backend = ["vulkan"]
+os = ["linux", "macos", "windows"]
+
+[ci]
+build = "//examples/lwjgl-map:build"

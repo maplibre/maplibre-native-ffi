@@ -2,3 +2,4 @@
 *.bat       text eol=crlf
 *.jar       binary
 third_party/** linguist-vendored
+.github/workflows/ci.yml linguist-generated=true
