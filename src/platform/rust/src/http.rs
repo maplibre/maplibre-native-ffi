@@ -39,15 +39,6 @@ struct HttpRequestHandle {
     canceled: Arc<AtomicBool>,
 }
 
-#[repr(C)]
-pub struct MlnRustDecodedImage {
-    pub width: u32,
-    pub height: u32,
-    pub data: *mut u8,
-    pub data_len: usize,
-    pub error: *mut c_char,
-}
-
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn mln_rust_http_request_start(
     url: *const c_char,
@@ -115,92 +106,6 @@ pub unsafe extern "C" fn mln_rust_http_request_free(handle: *mut c_void) {
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn mln_rust_http_response_free(response: MlnRustHttpResponse) {
     free_http_response(response);
-}
-
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_rust_decode_image(
-    data: *const u8,
-    data_len: usize,
-) -> MlnRustDecodedImage {
-    if data.is_null() {
-        return decode_error("image input pointer is null");
-    }
-
-    // SAFETY: The C++ caller passes a pointer/length pair valid for this call.
-    let encoded = unsafe { slice::from_raw_parts(data, data_len) };
-    match decode_image(encoded) {
-        Ok(decoded) => decoded,
-        Err(message) => decode_error(&message),
-    }
-}
-
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_rust_decoded_image_free(image: MlnRustDecodedImage) {
-    if !image.data.is_null() && image.data_len > 0 {
-        // SAFETY: `mln_rust_decode_image` returns `data` from a Vec with
-        // capacity equal to length, and ownership is transferred back here.
-        unsafe {
-            Vec::from_raw_parts(image.data, image.data_len, image.data_len);
-        }
-    }
-
-    if !image.error.is_null() {
-        // SAFETY: `decode_error` returns `error` from `CString::into_raw`.
-        unsafe {
-            drop(CString::from_raw(image.error));
-        }
-    }
-}
-
-fn decode_image(encoded: &[u8]) -> Result<MlnRustDecodedImage, String> {
-    let image = image::load_from_memory(encoded).map_err(|error| error.to_string())?;
-    let rgba = image.to_rgba8();
-    let (width, height) = rgba.dimensions();
-    let mut data = rgba.into_raw();
-
-    premultiply_rgba(&mut data);
-
-    let data_len = data.len();
-    let data_ptr = data.as_mut_ptr();
-    std::mem::forget(data);
-
-    Ok(MlnRustDecodedImage {
-        width,
-        height,
-        data: data_ptr,
-        data_len,
-        error: ptr::null_mut(),
-    })
-}
-
-fn premultiply_rgba(data: &mut [u8]) {
-    for pixel in data.chunks_exact_mut(4) {
-        let alpha = u16::from(pixel[3]);
-        pixel[0] = premultiply_channel(pixel[0], alpha);
-        pixel[1] = premultiply_channel(pixel[1], alpha);
-        pixel[2] = premultiply_channel(pixel[2], alpha);
-    }
-}
-
-fn premultiply_channel(channel: u8, alpha: u16) -> u8 {
-    ((u16::from(channel) * alpha + 127) / 255) as u8
-}
-
-fn decode_error(message: &str) -> MlnRustDecodedImage {
-    let error = match CString::new(message) {
-        Ok(error) => error.into_raw(),
-        Err(_) => CString::new("image decode failed")
-            .expect("static string has no interior nul")
-            .into_raw(),
-    };
-
-    MlnRustDecodedImage {
-        width: 0,
-        height: 0,
-        data: ptr::null_mut(),
-        data_len: 0,
-        error,
-    }
 }
 
 struct HttpRequest {

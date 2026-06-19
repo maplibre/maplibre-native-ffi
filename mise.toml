@@ -117,15 +117,9 @@ run = [
     -DMLN_FFI_EGL_ROOT="$MLN_FFI_EGL_ROOT"
   )
 
-  if [[ -n "${MLN_FFI_CMAKE_TOOLCHAIN_FILE:-}" ]]; then
-    cmake_args+=("-DCMAKE_TOOLCHAIN_FILE=$MLN_FFI_CMAKE_TOOLCHAIN_FILE")
-  fi
-  if [[ -n "${MLN_FFI_ANDROID_ABI:-}" ]]; then
-    cmake_args+=("-DANDROID_ABI=$MLN_FFI_ANDROID_ABI")
-  fi
-  if [[ -n "${MLN_FFI_ANDROID_PLATFORM:-}" ]]; then
-    cmake_args+=("-DANDROID_PLATFORM=$MLN_FFI_ANDROID_PLATFORM")
-  fi
+  while IFS= read -r cmake_arg; do
+    [[ -n "$cmake_arg" ]] && cmake_args+=("$cmake_arg")
+  done <<< "${MLN_FFI_CMAKE_ARGS:-}"
 
   cmake "${cmake_args[@]}"
   ''',

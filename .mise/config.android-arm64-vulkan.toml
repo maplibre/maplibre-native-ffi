@@ -5,9 +5,14 @@ MLN_FFI_RENDER_BACKEND = "vulkan"
 MLN_FFI_BUILD_DIR = "{{config_root}}/build/android-arm64-vulkan"
 MLN_FFI_ANDROID_ABI = "arm64-v8a"
 MLN_FFI_ANDROID_PLATFORM = "android-24"
-ANDROID_HOME = "{% if env.ANDROID_HOME is defined and env.ANDROID_HOME != \"\" %}{{env.ANDROID_HOME}}{% else %}{{env.HOME}}/Library/Android/sdk{% endif %}"
-ANDROID_NDK_ROOT = "{% if env.ANDROID_NDK_ROOT is defined and env.ANDROID_NDK_ROOT != \"\" %}{{env.ANDROID_NDK_ROOT}}{% elif env.ANDROID_NDK_HOME is defined and env.ANDROID_NDK_HOME != \"\" %}{{env.ANDROID_NDK_HOME}}{% else %}{{ exec(command='find \"$HOME/Library/Android/sdk/ndk\" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | sort | tail -n 1', cache_key='android-ndk-root', cache_duration='1h') | trim }}{% endif %}"
+ANDROID_HOME = "{{env.ANDROID_HOME}}"
+ANDROID_NDK_ROOT = "{{env.ANDROID_NDK_ROOT}}"
 MLN_FFI_CMAKE_TOOLCHAIN_FILE = "{{env.ANDROID_NDK_ROOT}}/build/cmake/android.toolchain.cmake"
+MLN_FFI_CMAKE_ARGS = """
+-DCMAKE_TOOLCHAIN_FILE={{env.MLN_FFI_CMAKE_TOOLCHAIN_FILE}}
+-DANDROID_ABI={{env.MLN_FFI_ANDROID_ABI}}
+-DANDROID_PLATFORM={{env.MLN_FFI_ANDROID_PLATFORM}}
+"""
 MLN_FFI_ZIG_TARGET = "aarch64-linux-android"
 MLN_FFI_ZIG_BUILD_ARGS = "-Dtarget=aarch64-linux-android -Dcmake-artifact-dir=\"{{env.MLN_FFI_BUILD_DIR}}\" -Drender-backend=vulkan -Dinclude-dir=\"{{env.MLN_FFI_INCLUDE_DIR}}\" -Dinclude-dir=\"{{env.MLN_FFI_VULKAN_INCLUDE_DIR}}\""
 CARGO_BUILD_TARGET = "aarch64-linux-android"

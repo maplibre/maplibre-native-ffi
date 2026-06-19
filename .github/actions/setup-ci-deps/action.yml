@@ -134,6 +134,14 @@ runs:
         }
         "GRADLE_OPTS=$gradleOptions" >> $env:GITHUB_ENV
 
+    - name: Install Android NDK
+      if: ${{ startsWith(env.MISE_ENV, 'android-') }}
+      shell: bash
+      run: |
+        : "${ANDROID_HOME:?ANDROID_HOME must be set by the runner image}"
+        "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "ndk;29.0.14033849"
+        echo "ANDROID_NDK_ROOT=$ANDROID_HOME/ndk/29.0.14033849" >> "$GITHUB_ENV"
+
     - name: Install mise toolchain
       uses: jdx/mise-action@1648a7812b9aeae629881980618f079932869151 # v4.0.1
       with:
@@ -183,3 +191,8 @@ runs:
           mise install --force rust
           ensure_rust_components
         fi
+
+    - name: Ensure Android Rust target
+      if: ${{ startsWith(env.MISE_ENV, 'android-') }}
+      shell: bash
+      run: mise exec -- rustup target add aarch64-linux-android

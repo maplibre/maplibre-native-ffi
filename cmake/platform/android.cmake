@@ -10,22 +10,13 @@ function(mln_configure_android_platform target)
       ${MLN_SOURCE_DIR}/platform/default/src/mbgl/i18n/number_format.cpp
       ${MLN_SOURCE_DIR}/platform/default/src/mbgl/text/bidi.cpp
       ${MLN_SOURCE_DIR}/platform/default/src/mbgl/text/local_glyph_rasterizer.cpp
-      ${MLN_SOURCE_DIR}/platform/default/src/mbgl/util/async_task.cpp
       ${MLN_SOURCE_DIR}/platform/default/src/mbgl/util/png_writer.cpp
-      ${MLN_SOURCE_DIR}/platform/default/src/mbgl/util/run_loop.cpp
-      ${MLN_SOURCE_DIR}/platform/default/src/mbgl/util/string_stdlib.cpp
-      ${MLN_SOURCE_DIR}/platform/default/src/mbgl/util/timer.cpp)
-
-  list(
-    REMOVE_ITEM MLN_FFI_VENDOR_ANDROID_SOURCES
-    ${MLN_SOURCE_DIR}/platform/default/src/mbgl/util/async_task.cpp
-    ${MLN_SOURCE_DIR}/platform/default/src/mbgl/util/run_loop.cpp
-    ${MLN_SOURCE_DIR}/platform/default/src/mbgl/util/timer.cpp)
+      ${MLN_SOURCE_DIR}/platform/default/src/mbgl/util/string_stdlib.cpp)
 
   set(MLN_FFI_ANDROID_SOURCES
-      ${PROJECT_SOURCE_DIR}/src/platform/android/http_file_source.cpp
-      ${PROJECT_SOURCE_DIR}/src/platform/android/image.cpp
-      ${PROJECT_SOURCE_DIR}/src/platform/android/thread.cpp)
+      ${PROJECT_SOURCE_DIR}/src/platform/android/thread.cpp
+      ${PROJECT_SOURCE_DIR}/src/platform/rust/http_file_source.cpp
+      ${PROJECT_SOURCE_DIR}/src/platform/rust/image.cpp)
 
   mln_target_vendor_sources(${target} ${MLN_FFI_VENDOR_ANDROID_SOURCES})
   mln_target_project_sources(${target} ${MLN_FFI_ANDROID_SOURCES})
