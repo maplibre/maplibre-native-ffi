@@ -29,7 +29,13 @@ function(mln_add_c_api_library target)
       ${PROJECT_SOURCE_DIR}/src/style/style_value.cpp
       ${PROJECT_SOURCE_DIR}/src/runtime/runtime.cpp)
 
-  add_library(${target} SHARED)
+  if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+    # iOS packaging decides the final linkage shape; keep the core as an
+    # archive until a framework/XCFramework packaging layer exists.
+    add_library(${target} STATIC)
+  else()
+    add_library(${target} SHARED)
+  endif()
   mln_target_project_sources(${target} ${MLN_FFI_C_API_SOURCES})
 
   target_include_directories(
@@ -53,7 +59,22 @@ function(mln_add_c_api_library target)
       $<$<AND:$<COMPILE_LANGUAGE:CXX>,$<CXX_COMPILER_ID:MSVC>>:/GR->
       $<$<COMPILE_LANGUAGE:OBJC,OBJCXX>:-fobjc-arc>)
 
-  if(UNIX AND DEFINED ENV{MLN_FFI_DEPENDENCY_LIBRARY_DIR})
+  set(MLN_FFI_HAS_PROVIDER_LIBRARY_DIR FALSE)
+  if(DEFINED ENV{MLN_FFI_DEPENDENCY_LIBRARY_DIR}
+     AND NOT "$ENV{MLN_FFI_DEPENDENCY_LIBRARY_DIR}" STREQUAL "")
+    set(MLN_FFI_HAS_PROVIDER_LIBRARY_DIR TRUE)
+  endif()
+
+  set(MLN_FFI_ENABLE_PROVIDER_RPATH FALSE)
+  if(UNIX)
+    if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
+      if(MLN_FFI_HAS_PROVIDER_LIBRARY_DIR)
+        set(MLN_FFI_ENABLE_PROVIDER_RPATH TRUE)
+      endif()
+    endif()
+  endif()
+
+  if(MLN_FFI_ENABLE_PROVIDER_RPATH)
     # Build-tree binaries find provider-supplied shared libraries through
     # embedded runtime search paths.
     set_property(

@@ -8,6 +8,10 @@ function(mln_add_maplibre_native)
 
   add_subdirectory("${MLN_SOURCE_DIR}" "${PROJECT_BINARY_DIR}/maplibre-native")
 
+  if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+    target_link_libraries(mbgl-core PRIVATE mbgl-vendor-filesystem)
+  endif()
+
   include("${MLN_SOURCE_DIR}/vendor/nunicode.cmake")
   include("${MLN_SOURCE_DIR}/vendor/sqlite.cmake")
 
