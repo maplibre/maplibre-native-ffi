@@ -31,7 +31,9 @@ void mln_test_autorelease_pool_pop(void* pool) {
   objc_autoreleasePoolPop(pool);
 }
 
-void* mln_test_create_metal_layer(void) { return [CAMetalLayer layer]; }
+void* mln_test_create_metal_layer(void) {
+  return [[CAMetalLayer layer] retain];
+}
 
 void* mln_test_create_metal_texture(
   void* device, uint32_t width, uint32_t height
@@ -156,7 +158,11 @@ static bool create_window_metal_layer(
 
   layer.frame = CGRectMake(0.0, 0.0, (CGFloat)width, (CGFloat)height);
   layer.drawableSize = CGSizeMake((CGFloat)width, (CGFloat)height);
-  layer.device = MTLCreateSystemDefaultDevice();
+  id<MTLDevice> device = MTLCreateSystemDefaultDevice();
+  if (device == nil) {
+    return false;
+  }
+  layer.device = device;
   [layer retain];
   out_layer->window = layer;
   out_layer->layer = layer;
