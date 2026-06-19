@@ -31,8 +31,6 @@ WORKFLOW_PATH = REPO_ROOT / ".github" / "workflows" / "ci.yml"
 
 CHECKOUT_ACTION = "actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10"
 TASK_PATTERN = re.compile(r"^(?:[A-Za-z0-9_-]+|//[A-Za-z0-9_./-]+:[A-Za-z0-9_-]+)$")
-TEMPORARY_VALIDATION_VARIANTS = {"linux-x64-vulkan"}
-TEMPORARY_VALIDATION_COMMANDS = ["mise run test"]
 
 NonEmptyString = Annotated[str, Field(min_length=1)]
 NonEmptyStringList = Annotated[list[NonEmptyString], Field(min_length=1)]
@@ -208,12 +206,26 @@ WorkflowDumper.add_representer(LiteralString, represent_literal_string)
 
 
 def render_workflow(variants: list[Variant], commands: dict[str, list[str]]) -> str:
-    variants = [
-        variant for variant in variants if variant.name in TEMPORARY_VALIDATION_VARIANTS
-    ]
-    commands = {variant.name: TEMPORARY_VALIDATION_COMMANDS for variant in variants}
-
-    jobs = {}
+    jobs = {
+        "hygiene": {
+            "name": "hygiene",
+            "runs-on": "ubuntu-latest",
+            "timeout-minutes": 30,
+            "steps": [
+                *setup_steps(),
+                {"run": "mise run ci:lint"},
+            ],
+        },
+        "docs": {
+            "name": "docs",
+            "runs-on": "ubuntu-latest",
+            "timeout-minutes": 60,
+            "steps": [
+                *setup_steps(),
+                {"run": "mise run //docs:build"},
+            ],
+        },
+    }
 
     for variant in variants:
         jobs[variant_job_id(variant)] = {
@@ -234,6 +246,8 @@ def render_workflow(variants: list[Variant], commands: dict[str, list[str]]) -> 
         "timeout-minutes": 5,
         "if": "${{ always() }}",
         "needs": [
+            "hygiene",
+            "docs",
             *(variant_job_id(variant) for variant in variants),
         ],
         "steps": [
