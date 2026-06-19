@@ -42,6 +42,7 @@ config_roots = [".devcontainer", "bindings/*", "examples/*", "docs"]
 "aqua:ninja-build/ninja" = "1.13.2"
 "conda:clang-format" = { version = "22.1.7", os = ["linux", "macos", "windows/x64"] }
 "conda:clang-tools" = { version = "22.1.7", os = ["linux", "macos", "windows/x64"] }
+"conda:libclang" = { version = "22.1.8", os = ["windows/x64"] }
 "conda:doxygen" = { version = "1.13.2", os = ["linux", "macos", "windows/x64"] }
 "conda:glslang" = { version = "16.3.0", os = ["linux", "macos", "windows/x64"] }
 "conda:pkg-config" = { version = "0.29.2", os = ["linux", "macos", "windows/x64"] }
@@ -80,6 +81,7 @@ _.path = [
 UV_PYTHON = { value = "{{ tools.python.path }}", tools = true }
 LIBCLANG_PATH = "{{config_root}}/build/libclang"
 MLN_FFI_CLANG_TOOLS_ROOT = "{% if env.MISE_DATA_DIR is defined and env.MISE_DATA_DIR != \"\" %}{{ env.MISE_DATA_DIR }}{% elif os() == \"windows\" %}{{ env.LOCALAPPDATA }}/mise{% else %}{{ env.HOME }}/.local/share/mise{% endif %}/installs/conda-clang-tools/22.1.7"
+MLN_FFI_LIBCLANG_ROOT = "{% if os() == \"windows\" %}{% if env.MISE_DATA_DIR is defined and env.MISE_DATA_DIR != \"\" %}{{ env.MISE_DATA_DIR }}{% else %}{{ env.LOCALAPPDATA }}/mise{% endif %}/installs/conda-libclang/22.1.8{% else %}{{env.MLN_FFI_CLANG_TOOLS_ROOT}}{% endif %}"
 LD_LIBRARY_PATH = "{% if env.MISE_DATA_DIR is defined and env.MISE_DATA_DIR != \"\" %}{{ env.MISE_DATA_DIR }}{% elif os() == \"windows\" %}{{ env.LOCALAPPDATA }}/mise{% else %}{{ env.HOME }}/.local/share/mise{% endif %}/installs/conda-clang-tools/22.1.7/lib:{{ env.LD_LIBRARY_PATH | default(value=\"\") }}"
 MLN_FFI_REPO_ROOT = "{{config_root}}"
 MLN_FFI_VARIANT = { required = true }
@@ -268,12 +270,12 @@ case "$(uname -s 2>/dev/null || printf Windows)" in
     ln -sf "$libclang_source" "$LIBCLANG_PATH/libclang.so"
     ;;
   MINGW* | MSYS* | CYGWIN* | Windows*)
-    libclang_source="$(find_libclang \
-      "$MLN_FFI_CLANG_TOOLS_ROOT/Library/bin/libclang*.dll" \
-      "$MLN_FFI_CLANG_TOOLS_ROOT/bin/libclang*.dll" \
-      "$MLN_FFI_CLANG_TOOLS_ROOT/Library/lib/libclang*.dll")"
-    [[ -n "$libclang_source" ]] || { echo "could not find libclang in $MLN_FFI_CLANG_TOOLS_ROOT" >&2; exit 1; }
-    cp -f "$libclang_source" "$LIBCLANG_PATH/libclang.dll"
+    libclang_root="$(cygpath -u "$MLN_FFI_LIBCLANG_ROOT")"
+    libclang_path="$(cygpath -u "$LIBCLANG_PATH")"
+    libclang_source="$(find_libclang "$libclang_root/Library/bin/libclang.dll")"
+    [[ -n "$libclang_source" ]] || { echo "could not find libclang in $libclang_root/Library/bin" >&2; exit 1; }
+    mkdir -p "$libclang_path"
+    cp -f "$libclang_source" "$libclang_path/libclang.dll"
     ;;
   *) echo "unsupported libclang host" >&2; exit 1 ;;
 esac

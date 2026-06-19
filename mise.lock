@@ -196,6 +196,10 @@ checksum = "sha256:2d2d460d55ca190c3e80c560de6d25559af38fb08e5c10d8c4efec5f88cbf
 url = "https://conda.anaconda.org/conda-forge/win-64/libclang13-22.1.7-default_ha2db4b5_1.conda"
 checksum = "sha256:084a7297f343bff863bb7af986aa04f194192523d0c37e5dc1df726d40bef055"
 
+[conda-packages.windows-x64."libclang13-22.1.8-default_ha2db4b5_1"]
+url = "https://conda.anaconda.org/conda-forge/win-64/libclang13-22.1.8-default_ha2db4b5_1.conda"
+checksum = "sha256:330fcbdd561dfa855c8b4b164c1a1a2a40735da45268b8fbe44bb5b1ca1ddc62"
+
 [conda-packages.windows-x64."libffi-3.5.2-h3d046cb_0"]
 url = "https://conda.anaconda.org/conda-forge/win-64/libffi-3.5.2-h3d046cb_0.conda"
 checksum = "sha256:59d01f2dfa8b77491b5888a5ab88ff4e1574c9359f7e229da254cdfe27ddc190"
@@ -699,6 +703,30 @@ conda_deps = [
     "vc-14.5-h1b7c187_39",
     "vc14_runtime-14.51.36231-h1b9f54f_39",
     "vcomp14-14.51.36231-h1b9f54f_39",
+]
+
+[[tools."conda:libclang"]]
+version = "22.1.8"
+backend = "conda:libclang"
+
+[tools."conda:libclang".options]
+channel = "conda-forge"
+
+[tools."conda:libclang"."platforms.windows-x64"]
+checksum = "sha256:020835284c0e12d3917ea854e71ba878f1ed556d9ad0a755c16a97f58ddcf1aa"
+url = "https://conda.anaconda.org/conda-forge/win-64/libclang-22.1.8-default_hac490eb_1.conda"
+conda_deps = [
+    "libzlib-1.3.2-hfd05255_2",
+    "libclang13-22.1.8-default_ha2db4b5_1",
+    "libxml2-2.15.3-hbc0d294_0",
+    "libxml2-16-2.15.3-h692994f_0",
+    "liblzma-5.8.3-hfd05255_0",
+    "ucrt-10.0.26100.0-h57928b3_0",
+    "vc-14.5-h1b7c187_39",
+    "vc14_runtime-14.51.36231-h1b9f54f_39",
+    "vcomp14-14.51.36231-h1b9f54f_39",
+    "zstd-1.5.7-h534d264_6",
+    "libiconv-1.18-hc1393d2_2",
 ]
 
 [[tools."conda:pkg-config"]]
