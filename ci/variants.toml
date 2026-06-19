@@ -45,18 +45,21 @@ runner = "ubuntu-latest"
 os = "android"
 arch = "arm64"
 backend = "opengl"
+supports_tests = false
 
 [variants.android-arm64-vulkan]
 runner = "ubuntu-latest"
 os = "android"
 arch = "arm64"
 backend = "vulkan"
+supports_tests = false
 
 [variants.ios-arm64-metal]
 runner = "macos-latest"
 os = "ios"
 arch = "arm64"
 backend = "metal"
+supports_tests = false
 
 [variants.ios-simulator-arm64-metal]
 runner = "macos-latest"
@@ -69,12 +72,14 @@ runner = "ubuntu-latest"
 os = "ohos"
 arch = "arm64"
 backend = "opengl"
+supports_tests = false
 
 [variants.ohos-arm64-vulkan]
 runner = "ubuntu-latest"
 os = "ohos"
 arch = "arm64"
 backend = "vulkan"
+supports_tests = false
 
 [variants.windows-x64-vulkan]
 runner = "windows-2022"

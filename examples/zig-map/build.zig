@@ -11,10 +11,6 @@ const BuildOptions = struct {
     render_backend: maplibre_build.RenderBackend,
 };
 
-fn failUnsupportedTarget() noreturn {
-    @panic("zig-map does not support this target platform");
-}
-
 fn maplibreNativeModule(b: *std.Build, options: BuildOptions) *std.Build.Module {
     return maplibre_build.maplibreNativeModule(b, .{
         .target = options.target,
@@ -96,9 +92,6 @@ pub fn build(b: *std.Build) void {
     };
 
     const run_step = b.step("run", "Run Zig map example");
-    if (!maplibre_build.isSupportedTarget(options.target, options.render_backend)) {
-        failUnsupportedTarget();
-    }
     const zig_map = addZigMapExample(b, options);
     const run_zig_map = b.addRunArtifact(zig_map);
     if (b.args) |args| run_zig_map.addArgs(args);

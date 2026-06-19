@@ -108,23 +108,14 @@ pub fn vulkanLibraryName(target: std.Build.ResolvedTarget) []const u8 {
     };
 }
 
-pub fn isSupportedTarget(target: std.Build.ResolvedTarget, backend: RenderBackend) bool {
-    return switch (backend) {
-        .metal => target.result.os.tag == .macos,
-        .opengl => target.result.os.tag == .linux or target.result.os.tag == .macos or
-            target.result.os.tag == .windows,
-        .vulkan => target.result.os.tag == .macos or target.result.os.tag == .linux or
-            target.result.os.tag == .windows,
-    };
+pub fn isIosSimulator(target: std.Build.ResolvedTarget) bool {
+    return target.result.os.tag == .ios and target.result.abi == .simulator;
 }
 
-pub fn checkSupportedTarget(target: std.Build.ResolvedTarget, backend: RenderBackend) void {
-    if (!isSupportedTarget(target, backend)) {
-        std.debug.panic(
-            "unsupported target/render-backend combination: {s}/{s}",
-            .{ @tagName(target.result.os.tag), @tagName(backend) },
-        );
-    }
+pub fn testOptimize(target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) std.builtin.OptimizeMode {
+    // Zig Debug iOS simulator tests hit Mach-O/debug-info linker limits in this dependency graph.
+    if (isIosSimulator(target) and optimize == .Debug) return .ReleaseSafe;
+    return optimize;
 }
 
 pub fn addRenderBackendOptions(b: *std.Build, module: *std.Build.Module, backend: RenderBackend) void {
@@ -136,7 +127,6 @@ pub fn addRenderBackendOptions(b: *std.Build, module: *std.Build.Module, backend
 }
 
 pub fn linkRenderBackend(b: *std.Build, module: *std.Build.Module, options: RenderBackendLinkOptions) void {
-    checkSupportedTarget(options.target, options.render_backend);
     addPlatformSystemPaths(b, module, options.target);
 
     switch (options.render_backend) {
@@ -221,6 +211,37 @@ pub fn linkMaplibreNativeC(b: *std.Build, module_: *std.Build.Module, options: L
     addMaplibreNativeIncludes(module_, .{ .include_dirs = options.include_dirs });
     if (options.target.result.os.tag == .windows) {
         module_.addObjectFile(options.cmake_artifact_dir.path(b, "maplibre-native-c.lib"));
+    } else if (isIosSimulator(options.target)) {
+        module_.addLibraryPath(options.cmake_artifact_dir);
+        module_.addRPath(options.cmake_artifact_dir);
+        module_.linkSystemLibrary("maplibre-native-c", .{});
+    } else if (options.target.result.os.tag == .ios) {
+        module_.addLibraryPath(options.cmake_artifact_dir);
+        module_.addLibraryPath(options.cmake_artifact_dir.path(b, "maplibre-native"));
+        module_.addLibraryPath(options.cmake_artifact_dir.path(b, "maplibre-native/vendor/maplibre-tile-spec/cpp"));
+        module_.linkSystemLibrary("maplibre-native-c", .{});
+        module_.linkSystemLibrary("mbgl-core", .{});
+        module_.linkSystemLibrary("mbgl-freetype", .{});
+        module_.linkSystemLibrary("mbgl-harfbuzz", .{});
+        module_.linkSystemLibrary("mbgl-vendor-csscolorparser", .{});
+        module_.linkSystemLibrary("mbgl-vendor-nunicode", .{});
+        module_.linkSystemLibrary("mbgl-vendor-parsedate", .{});
+        module_.linkSystemLibrary("mbgl-vendor-sqlite", .{});
+        module_.linkSystemLibrary("mlt-cpp", .{});
+        if (b.graph.environ_map.get("MLN_FFI_SYSTEM_ROOT")) |system_root| {
+            if (system_root.len != 0) {
+                module_.addObjectFile(.{ .cwd_relative = b.pathJoin(&.{ system_root, "usr", "lib", "libc++.tbd" }) });
+            }
+        }
+        module_.linkSystemLibrary("objc", .{});
+        module_.linkSystemLibrary("sqlite3", .{});
+        module_.linkSystemLibrary("z", .{});
+        module_.linkFramework("CoreFoundation", .{});
+        module_.linkFramework("CoreGraphics", .{});
+        module_.linkFramework("CoreText", .{});
+        module_.linkFramework("Foundation", .{});
+        module_.linkFramework("ImageIO", .{});
+        module_.linkFramework("MetalKit", .{});
     } else {
         module_.addLibraryPath(options.cmake_artifact_dir);
         module_.addRPath(options.cmake_artifact_dir);
@@ -280,7 +301,11 @@ fn addTestCompile(b: *std.Build, options: BuildOptions, root_source_file: std.Bu
             .target = options.target,
             .optimize = options.optimize,
         }),
+        .use_lld = if (isIosSimulator(options.target)) false else null,
     });
+    if (isIosSimulator(options.target)) {
+        tests.root_module.addCSourceFile(.{ .file = b.path("../../src/zig_test_support/ios_simulator_dyld_stub.m") });
+    }
     linkMaplibreNativeC(b, tests.root_module, repoLinkOptions(options));
     return tests;
 }
@@ -306,10 +331,35 @@ fn addBindingTests(b: *std.Build, options: BuildOptions, maplibre_native: *std.B
         }
     }
     if (options.render_backend == .metal) {
-        tests.root_module.addCSourceFile(.{ .file = b.path("tests/metal_support_macos.m") });
-        tests.root_module.linkFramework("AppKit", .{});
+        if (isIosSimulator(options.target)) {
+            tests.root_module.addCSourceFile(.{ .file = b.path("tests/metal_support_ios.m") });
+            tests.root_module.linkSystemLibrary("objc", .{});
+            tests.root_module.linkFramework("Foundation", .{});
+        }
+        if (options.target.result.os.tag == .macos) {
+            tests.root_module.addCSourceFile(.{ .file = b.path("tests/metal_support_macos.m") });
+            tests.root_module.linkFramework("AppKit", .{});
+        }
     }
     return tests;
+}
+
+pub fn addTestRunStep(
+    b: *std.Build,
+    tests: *std.Build.Step.Compile,
+    target: std.Build.ResolvedTarget,
+    simulator_runner: std.Build.LazyPath,
+) *std.Build.Step.Run {
+    if (isIosSimulator(target)) {
+        const run_tests = b.addSystemCommand(&.{
+            "bash",
+            simulator_runner.getPath(b),
+        });
+        run_tests.addArtifactArg(tests);
+        return run_tests;
+    }
+
+    return b.addRunArtifact(tests);
 }
 
 pub fn build(b: *std.Build) void {
@@ -341,13 +391,12 @@ pub fn build(b: *std.Build) void {
     const backend = renderBackend(b);
     const options = BuildOptions{
         .target = target,
-        .optimize = optimize,
+        .optimize = testOptimize(target, optimize),
         .cmake_artifact_dir = cmake_artifact_dir,
         .include_dirs = include_dirs,
         .dependency_library_dirs = dependencyLibraryDirs(b),
         .render_backend = backend,
     };
-    checkSupportedTarget(options.target, options.render_backend);
 
     const maplibre_native = addMaplibreNativeModule(b, options);
 
@@ -362,13 +411,13 @@ pub fn build(b: *std.Build) void {
 
     const binding_tests = addBindingTests(b, options, maplibre_native);
     b.default_step.dependOn(&binding_tests.step);
-    const run_binding_tests = b.addRunArtifact(binding_tests);
+    const run_binding_tests = addTestRunStep(b, binding_tests, options.target, b.path("../../scripts/run-ios-simulator-test.sh"));
     test_step.dependOn(&run_binding_tests.step);
 
     for (test_sources) |source| {
         const tests = addTestCompile(b, options, source);
         b.default_step.dependOn(&tests.step);
-        const run_tests = b.addRunArtifact(tests);
+        const run_tests = addTestRunStep(b, tests, options.target, b.path("../../scripts/run-ios-simulator-test.sh"));
         test_step.dependOn(&run_tests.step);
     }
 }
