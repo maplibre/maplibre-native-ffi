@@ -10,18 +10,12 @@ const test_hooks = @import("test_hooks.zig");
 
 extern "c" fn MTLCreateSystemDefaultDevice() ?*anyopaque;
 
-const vk = if (build_options.supports_vulkan) @cImport({
-    @cInclude("vulkan/vulkan.h");
-}) else struct {};
+const vk = if (build_options.supports_vulkan) @import("vulkan") else struct {};
 
 const supports_wgl = build_options.supports_opengl and builtin.os.tag == .windows;
 const supports_egl = build_options.supports_opengl and (builtin.os.tag == .linux or builtin.os.tag == .macos);
 
-const egl = if (supports_egl) @cImport({
-    @cDefine("EGL_EGLEXT_PROTOTYPES", "1");
-    @cInclude("EGL/egl.h");
-    @cInclude("EGL/eglext.h");
-}) else struct {};
+const egl = if (supports_egl) @import("egl") else struct {};
 
 const gl = if (supports_wgl or supports_egl) @import("gl") else struct {};
 const wgl_test = if (supports_wgl) @import("wgl_test_context") else struct {};

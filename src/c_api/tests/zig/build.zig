@@ -20,6 +20,12 @@ fn addCTests(b: *std.Build, options: BuildOptions) *std.Build.Step.Compile {
         }),
     });
     maplibre_build.addRenderBackendOptions(b, c_tests.root_module, options.render_backend);
+    maplibre_build.addRenderBackendTranslateC(b, c_tests.root_module, .{
+        .target = options.target,
+        .optimize = options.optimize,
+        .include_dirs = options.include_dirs,
+        .render_backend = options.render_backend,
+    });
     if (options.target.result.os.tag == .windows or options.target.result.os.tag == .linux or options.target.result.os.tag == .macos) {
         const gl_bindings = zigglgen.generateBindingsModule(b, if (options.target.result.os.tag == .linux or options.target.result.os.tag == .macos)
             .{ .api = .gles, .version = .@"3.0" }
@@ -38,6 +44,7 @@ fn addCTests(b: *std.Build, options: BuildOptions) *std.Build.Step.Compile {
     }
     maplibre_build.linkMaplibreNativeC(b, c_tests.root_module, .{
         .target = options.target,
+        .optimize = options.optimize,
         .cmake_artifact_dir = options.cmake_artifact_dir,
         .render_backend = options.render_backend,
         .include_dirs = options.include_dirs,

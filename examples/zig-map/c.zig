@@ -1,12 +1,6 @@
 const build_options = @import("build_options");
 
-pub const c = if (build_options.supports_metal) @cImport({
-    @cInclude("SDL3/SDL.h");
-    @cInclude("SDL3/SDL_metal.h");
-}) else if (build_options.supports_vulkan) @cImport({
-    @cInclude("SDL3/SDL.h");
-    @cInclude("SDL3/SDL_vulkan.h");
-    @cInclude("vulkan/vulkan.h");
-}) else if (build_options.supports_opengl) @cImport({
-    @cInclude("SDL3/SDL.h");
-}) else @compileError("zig-map currently supports Metal, OpenGL, and Vulkan variants");
+pub const c = if (build_options.supports_metal or build_options.supports_vulkan or build_options.supports_opengl)
+    @import("c")
+else
+    @compileError("zig-map currently supports Metal, OpenGL, and Vulkan variants");

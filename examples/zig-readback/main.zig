@@ -5,21 +5,13 @@ const maplibre = @import("maplibre_native");
 
 extern "c" fn MTLCreateSystemDefaultDevice() ?*anyopaque;
 
-const vk = if (build_options.supports_vulkan) @cImport({
-    @cInclude("vulkan/vulkan.h");
-}) else struct {};
+const vk = if (build_options.supports_vulkan) @import("vulkan") else struct {};
 
 const supports_egl = build_options.supports_opengl and (builtin.os.tag == .linux or builtin.os.tag == .macos);
 
-const egl = if (supports_egl) @cImport({
-    @cDefine("EGL_EGLEXT_PROTOTYPES", "1");
-    @cInclude("EGL/egl.h");
-    @cInclude("EGL/eglext.h");
-}) else struct {};
+const egl = if (supports_egl) @import("egl") else struct {};
 
-const sdl = if (build_options.supports_opengl and builtin.os.tag == .windows) @cImport({
-    @cInclude("SDL3/SDL.h");
-}) else struct {};
+const sdl = if (build_options.supports_opengl and builtin.os.tag == .windows) @import("sdl") else struct {};
 
 const width = 512;
 const height = 512;
