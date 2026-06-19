@@ -279,7 +279,7 @@ class VulkanSurfaceBackend final : public mbgl::vulkan::RendererBackend,
       }
       surface = vk::UniqueSurfaceKHR(
         borrowed_surface,
-        vk::ObjectDestroy<vk::Instance, vk::DispatchLoaderDynamic>(
+        mbgl::vulkan::ObjectDestroy<vk::Instance>(
           backend.getInstance().get(), nullptr, backend.getDispatcher()
         )
       );
@@ -359,9 +359,7 @@ class VulkanSurfaceBackend final : public mbgl::vulkan::RendererBackend,
     usingSharedContext = true;
     instance = vk::UniqueInstance(
       static_cast<VkInstance>(descriptor_.context.instance),
-      vk::ObjectDestroy<vk::NoParent, vk::DispatchLoaderDynamic>(
-        nullptr, dispatcher
-      )
+      mbgl::vulkan::ObjectDestroy<vk::detail::NoParent>(nullptr, dispatcher)
     );
   }
 
@@ -396,9 +394,7 @@ class VulkanSurfaceBackend final : public mbgl::vulkan::RendererBackend,
 
     device = vk::UniqueDevice(
       static_cast<VkDevice>(descriptor_.context.device),
-      vk::ObjectDestroy<vk::NoParent, vk::DispatchLoaderDynamic>(
-        nullptr, dispatcher
-      )
+      mbgl::vulkan::ObjectDestroy<vk::detail::NoParent>(nullptr, dispatcher)
     );
     mln::core::vulkan_init_device_dispatch(
       dispatcher, device.get(), descriptor_.context

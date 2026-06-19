@@ -161,7 +161,8 @@ def load_commands(variants: list[Variant]) -> dict[str, list[str]]:
             if not matches(variant, requires) or variant.name in excluded_variants:
                 continue
             for action_key, task in tasks.items():
-                if is_native and variant.os != "ios" and action_key == "build":
+                build_only_native = variant.os in {"android", "ios", "ohos"}
+                if is_native and not build_only_native and action_key == "build":
                     continue
                 if action_key == "test" and not variant.supports_tests:
                     continue
@@ -174,9 +175,16 @@ def variant_job_id(variant: Variant) -> str:
     return f"variant-{variant.name}"
 
 
-def setup_steps() -> list[dict[str, str]]:
+def checkout_step(*, persist_credentials: bool = False) -> dict[str, object]:
+    step: dict[str, object] = {"uses": CHECKOUT_ACTION}
+    if not persist_credentials:
+        step["with"] = {"persist-credentials": False}
+    return step
+
+
+def setup_steps(*, persist_credentials: bool = False) -> list[dict[str, object]]:
     return [
-        {"uses": CHECKOUT_ACTION},
+        checkout_step(persist_credentials=persist_credentials),
         {"uses": "./.github/actions/setup-ci-deps"},
     ]
 

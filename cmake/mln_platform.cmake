@@ -5,7 +5,6 @@ endif()
 
 function(mln_configure_platform_support target)
   set(MLN_FFI_VENDOR_PLATFORM_SOURCES
-      ${MLN_SOURCE_DIR}/platform/default/src/mbgl/util/logging_stderr.cpp
       ${MLN_SOURCE_DIR}/platform/default/src/mbgl/util/monotonic_timer.cpp
       ${MLN_SOURCE_DIR}/platform/default/src/mbgl/gfx/headless_backend.cpp
       ${MLN_SOURCE_DIR}/platform/default/src/mbgl/layermanager/layer_manager.cpp
@@ -41,6 +40,11 @@ function(mln_configure_platform_support target)
       ${MLN_SOURCE_DIR}/src/mbgl/layermanager/raster_layer_factory.cpp
       ${MLN_SOURCE_DIR}/src/mbgl/layermanager/symbol_layer_factory.cpp)
 
+  if(NOT CMAKE_SYSTEM_NAME STREQUAL "OHOS")
+    list(APPEND MLN_FFI_VENDOR_PLATFORM_SOURCES
+         ${MLN_SOURCE_DIR}/platform/default/src/mbgl/util/logging_stderr.cpp)
+  endif()
+
   if(NOT CMAKE_SYSTEM_NAME STREQUAL "Windows")
     list(APPEND MLN_FFI_VENDOR_PLATFORM_SOURCES
          ${MLN_SOURCE_DIR}/platform/default/src/mbgl/util/thread_local.cpp)
@@ -70,6 +74,12 @@ function(mln_configure_platform_support target)
   elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     include(platform/linux)
     mln_configure_linux_platform(${target})
+  elseif(CMAKE_SYSTEM_NAME STREQUAL "Android")
+    include(platform/android)
+    mln_configure_android_platform(${target})
+  elseif(CMAKE_SYSTEM_NAME STREQUAL "OHOS")
+    include(platform/ohos)
+    mln_configure_ohos_platform(${target})
   elseif(CMAKE_SYSTEM_NAME STREQUAL "Windows")
     include(platform/windows)
     mln_configure_windows_platform(${target})

@@ -39,6 +39,7 @@ if [[ -z "$clang_include" && -d /Library/Developer/CommandLineTools/usr/lib/clan
 fi
 
 headers=(
+  android
   base
   diagnostics
   logging

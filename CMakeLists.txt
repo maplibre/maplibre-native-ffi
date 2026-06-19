@@ -7,6 +7,13 @@ set(CMAKE_TRY_COMPILE_TARGET_TYPE STATIC_LIBRARY)
 
 project(maplibre_native_c VERSION 0.1.0 LANGUAGES C CXX)
 
+if(CMAKE_SYSTEM_NAME STREQUAL "OHOS")
+  # The OHOS SDK toolchain injects --gcc-toolchain, which clang reports as
+  # unused. Keep the warning non-fatal without weakening other platforms.
+  add_compile_options($<$<COMPILE_LANGUAGE:C>:-Wno-unused-command-line-argument>
+                      $<$<COMPILE_LANGUAGE:CXX>:-Wno-unused-command-line-argument>)
+endif()
+
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 

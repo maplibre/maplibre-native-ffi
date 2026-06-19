@@ -13,7 +13,9 @@ function(mln_configure_opengl_backend target)
     target_compile_definitions(${target} PRIVATE MLN_FFI_OPENGL_PROVIDER_EGL=1)
     list(APPEND MLN_FFI_VENDOR_OPENGL_SOURCES
          ${MLN_SOURCE_DIR}/platform/linux/src/headless_backend_egl.cpp)
-    if(MLN_FFI_EGL_ROOT)
+    if(CMAKE_SYSTEM_NAME STREQUAL "OHOS")
+      target_link_libraries(${target} PRIVATE EGL GLESv3)
+    elseif(MLN_FFI_EGL_ROOT)
       include(egl)
       mln_import_egl()
       target_link_libraries(${target} PRIVATE MLN_FFI::EGL MLN_FFI::GLESv2)
@@ -30,6 +32,14 @@ function(mln_configure_opengl_backend target)
         PROPERTY BUILD_RPATH "${MLN_FFI_EGL_LIBRARY_DIR}")
     elseif(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
       message(FATAL_ERROR "macOS EGL builds require MLN_FFI_EGL_ROOT")
+    elseif(CMAKE_SYSTEM_NAME STREQUAL "Android")
+      find_library(MLN_FFI_ANDROID_EGL_LIBRARY EGL REQUIRED)
+      find_library(MLN_FFI_ANDROID_GLESV3_LIBRARY GLESv3 REQUIRED)
+      target_link_libraries(
+        ${target}
+        PRIVATE
+          ${MLN_FFI_ANDROID_EGL_LIBRARY} ${MLN_FFI_ANDROID_GLESV3_LIBRARY}
+          ${CMAKE_DL_LIBS})
     else()
       find_package(OpenGL REQUIRED EGL)
       target_link_libraries(${target} PRIVATE OpenGL::EGL ${CMAKE_DL_LIBS})

@@ -14,6 +14,7 @@ import org.bytedeco.javacpp.tools.InfoMapper;
               "maplibre_native_c/base.h",
               "maplibre_native_c/diagnostics.h",
               "maplibre_native_c/logging.h",
+              "maplibre_native_c/android.h",
               "maplibre_native_c/runtime.h",
               "maplibre_native_c/camera.h",
               "maplibre_native_c/render_target.h",

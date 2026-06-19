@@ -19,6 +19,8 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
       - uses: ./.github/actions/setup-ci-deps
       - run: mise run ci:lint
   docs:
@@ -27,6 +29,8 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
       - uses: ./.github/actions/setup-ci-deps
       - run: mise run //docs:build
   variant-linux-arm64-egl:
@@ -37,6 +41,8 @@ jobs:
       MISE_ENV: linux-arm64-egl
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
       - uses: ./.github/actions/setup-ci-deps
       - run: mise run configure
       - run: mise run test
@@ -56,6 +62,8 @@ jobs:
       MISE_ENV: linux-arm64-vulkan
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
       - uses: ./.github/actions/setup-ci-deps
       - run: mise run configure
       - run: mise run test
@@ -76,6 +84,8 @@ jobs:
       MISE_ENV: linux-x64-egl
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
       - uses: ./.github/actions/setup-ci-deps
       - run: mise run configure
       - run: mise run test
@@ -96,6 +106,8 @@ jobs:
       MISE_ENV: linux-x64-vulkan
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
       - uses: ./.github/actions/setup-ci-deps
       - run: mise run configure
       - run: mise run test
@@ -117,6 +129,8 @@ jobs:
       MISE_ENV: macos-arm64-metal
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
       - uses: ./.github/actions/setup-ci-deps
       - run: mise run configure
       - run: mise run test
@@ -139,6 +153,8 @@ jobs:
       MISE_ENV: macos-arm64-vulkan
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
       - uses: ./.github/actions/setup-ci-deps
       - run: mise run configure
       - run: mise run test
@@ -161,11 +177,39 @@ jobs:
       MISE_ENV: macos-arm64-egl
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
       - uses: ./.github/actions/setup-ci-deps
       - run: mise run configure
       - run: mise run test
       - run: mise run //bindings/zig:ci
       - run: mise run //examples/zig-readback:run
+  variant-android-arm64-egl:
+    name: variant / android-arm64-egl
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      MISE_ENV: android-arm64-egl
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-ci-deps
+      - run: mise run configure
+      - run: mise run build
+  variant-android-arm64-vulkan:
+    name: variant / android-arm64-vulkan
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      MISE_ENV: android-arm64-vulkan
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-ci-deps
+      - run: mise run configure
+      - run: mise run build
   variant-ios-arm64-metal:
     name: variant / ios-arm64-metal
     runs-on: macos-latest
@@ -174,6 +218,8 @@ jobs:
       MISE_ENV: ios-arm64-metal
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
       - uses: ./.github/actions/setup-ci-deps
       - run: mise run configure
       - run: mise run build
@@ -185,11 +231,39 @@ jobs:
       MISE_ENV: ios-simulator-arm64-metal
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
       - uses: ./.github/actions/setup-ci-deps
       - run: mise run configure
       - run: mise run build
       - run: mise run test
       - run: mise run //bindings/zig:ci
+  variant-ohos-arm64-egl:
+    name: variant / ohos-arm64-egl
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      MISE_ENV: ohos-arm64-egl
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-ci-deps
+      - run: mise run configure
+      - run: mise run build
+  variant-ohos-arm64-vulkan:
+    name: variant / ohos-arm64-vulkan
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      MISE_ENV: ohos-arm64-vulkan
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-ci-deps
+      - run: mise run configure
+      - run: mise run build
   variant-windows-x64-vulkan:
     name: variant / windows-x64-vulkan
     runs-on: windows-2022
@@ -198,6 +272,8 @@ jobs:
       MISE_ENV: windows-x64-vulkan
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
       - uses: ./.github/actions/setup-ci-deps
       - run: mise run configure
       - run: mise run test
@@ -218,6 +294,8 @@ jobs:
       MISE_ENV: windows-x64-wgl
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
       - uses: ./.github/actions/setup-ci-deps
       - run: mise run configure
       - run: mise run test
@@ -244,8 +322,12 @@ jobs:
       - variant-macos-arm64-metal
       - variant-macos-arm64-vulkan
       - variant-macos-arm64-egl
+      - variant-android-arm64-egl
+      - variant-android-arm64-vulkan
       - variant-ios-arm64-metal
       - variant-ios-simulator-arm64-metal
+      - variant-ohos-arm64-egl
+      - variant-ohos-arm64-vulkan
       - variant-windows-x64-vulkan
       - variant-windows-x64-wgl
     steps:
