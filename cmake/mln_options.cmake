@@ -87,7 +87,8 @@ function(mln_configure_options)
       CACHE BOOL "Do not fail wrapper builds on MapLibre Native warnings" FORCE)
 
   set(MLN_FFI_ENABLE_CLANG_TIDY_DEFAULT OFF)
-  if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+  if(CMAKE_CXX_COMPILER_ID MATCHES "Clang"
+     AND NOT CMAKE_SYSTEM_NAME STREQUAL "Android")
     set(MLN_FFI_ENABLE_CLANG_TIDY_DEFAULT ON)
   endif()
   option(MLN_FFI_ENABLE_CLANG_TIDY "Run clang-tidy for wrapper sources"
