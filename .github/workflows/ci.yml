@@ -56,6 +56,8 @@ jobs:
             runner: macos-latest
           - mise_env: macos-arm64-egl
             runner: macos-latest
+          - mise_env: android-arm64-egl
+            runner: macos-latest
           - mise_env: android-arm64-vulkan
             runner: macos-latest
           - mise_env: windows-x64-vulkan

@@ -30,6 +30,14 @@ function(mln_configure_opengl_backend target)
         PROPERTY BUILD_RPATH "${MLN_FFI_EGL_LIBRARY_DIR}")
     elseif(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
       message(FATAL_ERROR "macOS EGL builds require MLN_FFI_EGL_ROOT")
+    elseif(CMAKE_SYSTEM_NAME STREQUAL "Android")
+      find_library(MLN_FFI_ANDROID_EGL_LIBRARY EGL REQUIRED)
+      find_library(MLN_FFI_ANDROID_GLESV3_LIBRARY GLESv3 REQUIRED)
+      target_link_libraries(
+        ${target}
+        PRIVATE
+          ${MLN_FFI_ANDROID_EGL_LIBRARY} ${MLN_FFI_ANDROID_GLESV3_LIBRARY}
+          ${CMAKE_DL_LIBS})
     else()
       find_package(OpenGL REQUIRED EGL)
       target_link_libraries(${target} PRIVATE OpenGL::EGL ${CMAKE_DL_LIBS})
