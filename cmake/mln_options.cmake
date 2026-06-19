@@ -20,6 +20,8 @@ function(mln_configure_options)
       set(MLN_FFI_RENDER_BACKEND "metal")
     elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
       set(MLN_FFI_RENDER_BACKEND "vulkan")
+    elseif(CMAKE_SYSTEM_NAME STREQUAL "Android")
+      set(MLN_FFI_RENDER_BACKEND "vulkan")
     endif()
   endif()
 
