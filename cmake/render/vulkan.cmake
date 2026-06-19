@@ -11,5 +11,9 @@ function(mln_configure_vulkan_backend target)
   mln_target_vendor_sources(${target} ${MLN_FFI_VENDOR_VULKAN_SOURCES})
   mln_target_project_sources(${target} ${MLN_FFI_VULKAN_SOURCES})
 
+  target_include_directories(
+    ${target}
+    BEFORE
+    PRIVATE ${MLN_SOURCE_DIR}/vendor/Vulkan-Headers/include)
   target_link_libraries(${target} PRIVATE ${Vulkan_LIBRARIES})
 endfunction()

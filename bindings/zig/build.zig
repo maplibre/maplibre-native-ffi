@@ -184,6 +184,7 @@ pub fn linkRenderBackend(b: *std.Build, module: *std.Build.Module, options: Rend
             else => unreachable,
         },
         .vulkan => {
+            addDependencyLibraryPaths(module, options.dependency_library_dirs);
             module.linkSystemLibrary("vulkan", .{ .use_pkg_config = .force });
         },
     }

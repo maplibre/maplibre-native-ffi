@@ -39,6 +39,22 @@ runs:
           echo "LIBGL_ALWAYS_SOFTWARE=true"
         } >> "$GITHUB_ENV"
 
+    - name: Use macOS Vulkan graphics driver
+      if: ${{ runner.os == 'macOS' && contains(env.MISE_ENV, 'vulkan') }}
+      shell: bash
+      run: |
+        brew install molten-vk
+        molten_prefix="$(brew --prefix molten-vk)"
+        icd_manifest="$(find -L "$molten_prefix" -name MoltenVK_icd.json -print -quit)"
+        if [[ -z "$icd_manifest" ]]; then
+          echo "Missing MoltenVK ICD manifest in $molten_prefix" >&2
+          exit 1
+        fi
+        {
+          echo "VK_ICD_FILENAMES=$icd_manifest"
+          echo "DYLD_FALLBACK_LIBRARY_PATH=$molten_prefix/lib:${DYLD_FALLBACK_LIBRARY_PATH:-}"
+        } >> "$GITHUB_ENV"
+
     - name: Use Windows software graphics drivers
       if: ${{ runner.os == 'Windows' && runner.arch != 'ARM64' }}
       shell: pwsh
