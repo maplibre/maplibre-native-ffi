@@ -4,7 +4,7 @@ set -euo pipefail
 
 manifest="$MLN_FFI_REPO_ROOT/third_party/angle/manifest.json"
 
-if [[ "$MLN_FFI_TARGET_TRIPLE" != "macos-arm64" ]]; then
+if [[ "${MISE_ENV%-*}" != "macos-arm64" ]]; then
   echo "ANGLE artifact is only configured for macos-arm64" >&2
   exit 1
 fi

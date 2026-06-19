@@ -70,8 +70,6 @@ config_roots = [".devcontainer", "bindings/*", "examples/*", "docs"]
 [env]
 UV_PYTHON = { value = "{{ tools.python.path }}", tools = true }
 MLN_FFI_REPO_ROOT = "{{config_root}}"
-MLN_FFI_VARIANT = { required = true }
-MLN_FFI_TARGET_TRIPLE = { required = true }
 MLN_FFI_RENDER_BACKEND = { required = true }
 MLN_FFI_BUILD_DIR = { required = true }
 MLN_FFI_CMAKE_BUILD_TYPE = "{{env.MLN_FFI_CMAKE_BUILD_TYPE | default(value=\"RelWithDebInfo\")}}"
@@ -79,7 +77,6 @@ MLN_FFI_INCLUDE_DIR = "{{config_root}}/include"
 MLN_FFI_VULKAN_INCLUDE_DIR = "{{config_root}}/third_party/maplibre-native/vendor/Vulkan-Headers/include"
 MLN_FFI_DEPENDENCY_INCLUDE_DIR = "{{config_root}}/.pixi/envs/default/include"
 MLN_FFI_DEPENDENCY_LIBRARY_DIR = "{{config_root}}/.pixi/envs/default/lib"
-MLN_FFI_ZIG_TARGET = { required = true }
 MLN_FFI_ZIG_BUILD_ARGS = { required = true }
 MLN_FFI_TEST_TIMEOUT = "{{env.MLN_FFI_TEST_TIMEOUT | default(value=\"30s\")}}"
 CMAKE_PREFIX_PATH = "{{config_root}}/.pixi/envs/default"
@@ -151,7 +148,7 @@ run = "rm -rf \"$MLN_FFI_BUILD_DIR\""
 [tasks.deps]
 description = "Install variant-specific managed dependencies."
 run = '''
-if [[ "$MLN_FFI_TARGET_TRIPLE" == "macos-arm64" ]]; then
+if [[ "${MISE_ENV%-*}" == "macos-arm64" ]]; then
   mise run deps:angle
 fi
 '''

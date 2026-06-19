@@ -1,9 +1,6 @@
 [env]
-MLN_FFI_VARIANT = "linux-x64-vulkan"
-MLN_FFI_TARGET_TRIPLE = "linux-x64"
 MLN_FFI_RENDER_BACKEND = "vulkan"
 MLN_FFI_BUILD_DIR = "{{config_root}}/build/linux-x64-vulkan"
-MLN_FFI_ZIG_TARGET = "x86_64-linux-gnu"
 MLN_FFI_ZIG_BUILD_ARGS = "-Dtarget=x86_64-linux-gnu -Dcmake-artifact-dir=\"{{env.MLN_FFI_BUILD_DIR}}\" -Drender-backend=vulkan -Dinclude-dir=\"{{env.MLN_FFI_INCLUDE_DIR}}\" -Dinclude-dir=\"{{env.MLN_FFI_DEPENDENCY_INCLUDE_DIR}}\" -Dinclude-dir=\"{{env.MLN_FFI_VULKAN_INCLUDE_DIR}}\" -Ddependency-library-dir=\"{{env.MLN_FFI_DEPENDENCY_LIBRARY_DIR}}\""
 BINDGEN_EXTRA_CLANG_ARGS = "{% if os() == \"linux\" %}-isystem{{ exec(command='cc -print-file-name=include', cache_key='host-cc-builtin-include', cache_duration='1d') | trim }}{% endif %}"
 CMAKE_LIBRARY_PATH = "{{env.MLN_FFI_DEPENDENCY_LIBRARY_DIR}}"

@@ -1,17 +1,12 @@
 [env]
-MLN_FFI_VARIANT = "android-arm64-egl"
-MLN_FFI_TARGET_TRIPLE = "android-arm64"
 MLN_FFI_RENDER_BACKEND = "opengl"
 MLN_FFI_BUILD_DIR = "{{config_root}}/build/android-arm64-egl"
-MLN_FFI_ANDROID_ABI = "arm64-v8a"
-MLN_FFI_ANDROID_PLATFORM = "android-24"
 ANDROID_HOME = { required = true }
 ANDROID_NDK_HOME = { required = true }
 MLN_FFI_CMAKE_ARGS = """
 -DCMAKE_TOOLCHAIN_FILE={{env.ANDROID_NDK_HOME}}/build/cmake/android.toolchain.cmake
--DANDROID_ABI={{env.MLN_FFI_ANDROID_ABI}}
--DANDROID_PLATFORM={{env.MLN_FFI_ANDROID_PLATFORM}}
+-DANDROID_ABI=arm64-v8a
+-DANDROID_PLATFORM=android-24
 """
-MLN_FFI_ZIG_TARGET = "aarch64-linux-android"
 MLN_FFI_ZIG_BUILD_ARGS = "-Dtarget=aarch64-linux-android -Dcmake-artifact-dir=\"{{env.MLN_FFI_BUILD_DIR}}\" -Drender-backend=opengl -Dinclude-dir=\"{{env.MLN_FFI_INCLUDE_DIR}}\""
 CARGO_BUILD_TARGET = "aarch64-linux-android"
