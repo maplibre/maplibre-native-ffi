@@ -119,8 +119,12 @@ if(
       if(NOT pkgconfig_contents MATCHES "(^|\n)Libs: [^\n]* -latomic([ \n]|$)")
         string(REGEX REPLACE "(^|\n)(Libs: [^\n]*)" "\\1\\2 -latomic"
                pkgconfig_contents "${pkgconfig_contents}")
-        file(WRITE "${pkgconfig_file}" "${pkgconfig_contents}")
       endif()
+      if(NOT pkgconfig_contents MATCHES "(^|\n)Libs: [^\n]* -lgcc([ \n]|$)")
+        string(REGEX REPLACE "(^|\n)(Libs: [^\n]*)" "\\1\\2 -lgcc"
+               pkgconfig_contents "${pkgconfig_contents}")
+      endif()
+      file(WRITE "${pkgconfig_file}" "${pkgconfig_contents}")
     endif()
   endforeach()
 endif()
