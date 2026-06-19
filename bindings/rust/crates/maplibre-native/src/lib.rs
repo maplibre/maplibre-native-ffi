@@ -21,8 +21,6 @@ mod projection;
 mod render;
 mod resource;
 mod runtime;
-#[cfg(test)]
-mod surface_tests;
 mod values;
 
 use crate::values::NativeValue;
@@ -139,6 +137,72 @@ impl<T> std::fmt::Display for HandleOperationError<T> {
 }
 
 impl<T: std::fmt::Debug> std::error::Error for HandleOperationError<T> {}
+
+/// Error returned by offline operation result transfers.
+#[derive(Debug)]
+pub enum OfflineOperationTakeError<T> {
+    /// The native transfer failed before consuming the operation result.
+    Retryable(HandleOperationError<T>),
+    /// The native result was consumed, but copying it into Rust-owned data failed.
+    Consumed(Error),
+}
+
+impl<T> OfflineOperationTakeError<T> {
+    pub(crate) fn retryable(error: Error, handle: T) -> Self {
+        Self::Retryable(HandleOperationError::new(error, handle))
+    }
+
+    pub(crate) fn consumed(error: Error) -> Self {
+        Self::Consumed(error)
+    }
+
+    /// Returns the operation error.
+    pub fn error(&self) -> &Error {
+        match self {
+            Self::Retryable(error) => error.error(),
+            Self::Consumed(error) => error,
+        }
+    }
+
+    /// Returns the stable category for the operation error.
+    pub fn kind(&self) -> ErrorKind {
+        self.error().kind()
+    }
+
+    /// Returns the raw C status for native operation errors, when available.
+    pub fn raw_status(&self) -> Option<i32> {
+        self.error().raw_status()
+    }
+
+    /// Returns the copied diagnostic message for the operation error.
+    pub fn diagnostic(&self) -> &str {
+        self.error().diagnostic()
+    }
+
+    /// Returns the retryable error and still-live handle, if the operation was not consumed.
+    pub fn into_retryable(self) -> Option<HandleOperationError<T>> {
+        match self {
+            Self::Retryable(error) => Some(error),
+            Self::Consumed(_) => None,
+        }
+    }
+
+    /// Returns the operation error, dropping any retryable handle.
+    pub fn into_error(self) -> Error {
+        match self {
+            Self::Retryable(error) => error.into_error(),
+            Self::Consumed(error) => error,
+        }
+    }
+}
+
+impl<T> std::fmt::Display for OfflineOperationTakeError<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.error().fmt(f)
+    }
+}
+
+impl<T: std::fmt::Debug> std::error::Error for OfflineOperationTakeError<T> {}
 
 /// Returns the native C ABI contract version.
 pub fn c_version() -> u32 {

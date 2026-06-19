@@ -15,7 +15,10 @@ use crate::events::{
 use crate::handle::{ThreadAffineNativeHandle, closed_handle_error, out_handle};
 use crate::map::MapState;
 use crate::resource::{ResourceProviderState, ResourceTransformState};
-use crate::{Error, ErrorKind, HandleOperationError, ResourceProviderDecision, Result};
+use crate::{
+    Error, ErrorKind, HandleOperationError, OfflineOperationTakeError, ResourceProviderDecision,
+    Result,
+};
 #[cfg(test)]
 use crate::{Geometry, LatLngBounds, MapHandle, MapOptions};
 
@@ -302,10 +305,10 @@ impl<T> Drop for OfflineOperationHandle<T> {
 impl OfflineOperationHandle<OfflineRegionInfo> {
     /// Takes a completed create/update operation result as copied region info.
     #[allow(clippy::result_large_err)]
-    pub fn take(self) -> std::result::Result<OfflineRegionInfo, HandleOperationError<Self>> {
+    pub fn take(self) -> std::result::Result<OfflineRegionInfo, OfflineOperationTakeError<Self>> {
         let runtime = match self.runtime_ptr() {
             Ok(runtime) => runtime,
-            Err(error) => return Err(HandleOperationError::new(error, self)),
+            Err(error) => return Err(OfflineOperationTakeError::retryable(error, self)),
         };
         let mut out = maplibre_core::ptr::OutPtr::<sys::mln_offline_region_snapshot>::new();
         let status = match self.operation_kind {
@@ -326,17 +329,17 @@ impl OfflineOperationHandle<OfflineRegionInfo> {
             _ => sys::MLN_STATUS_INVALID_STATE,
         };
         if let Err(error) = maplibre_core::check(status) {
-            return Err(HandleOperationError::new(error, self));
+            return Err(OfflineOperationTakeError::retryable(error, self));
         }
         self.mark_consumed();
         let snapshot = match out.into_non_null("mln_offline_region_snapshot") {
             Ok(snapshot) => snapshot,
-            Err(error) => return Err(HandleOperationError::new(error, self)),
+            Err(error) => return Err(OfflineOperationTakeError::consumed(error)),
         };
         // SAFETY: On success, the C API returns an owned snapshot handle;
         // core copies and releases it.
         unsafe { maplibre_core::runtime::copy_offline_region_snapshot(snapshot) }
-            .map_err(|error| HandleOperationError::new(error, self))
+            .map_err(OfflineOperationTakeError::consumed)
     }
 }
 
@@ -345,10 +348,10 @@ impl OfflineOperationHandle<Option<OfflineRegionInfo>> {
     #[allow(clippy::result_large_err)]
     pub fn take(
         self,
-    ) -> std::result::Result<Option<OfflineRegionInfo>, HandleOperationError<Self>> {
+    ) -> std::result::Result<Option<OfflineRegionInfo>, OfflineOperationTakeError<Self>> {
         let runtime = match self.runtime_ptr() {
             Ok(runtime) => runtime,
-            Err(error) => return Err(HandleOperationError::new(error, self)),
+            Err(error) => return Err(OfflineOperationTakeError::retryable(error, self)),
         };
         let mut out = maplibre_core::ptr::OutPtr::<sys::mln_offline_region_snapshot>::new();
         let mut found = false;
@@ -361,7 +364,7 @@ impl OfflineOperationHandle<Option<OfflineRegionInfo>> {
             )
         };
         if let Err(error) = maplibre_core::check(status) {
-            return Err(HandleOperationError::new(error, self));
+            return Err(OfflineOperationTakeError::retryable(error, self));
         }
         self.mark_consumed();
         if !found {
@@ -369,13 +372,13 @@ impl OfflineOperationHandle<Option<OfflineRegionInfo>> {
         }
         let snapshot = match out.into_non_null("mln_offline_region_snapshot") {
             Ok(snapshot) => snapshot,
-            Err(error) => return Err(HandleOperationError::new(error, self)),
+            Err(error) => return Err(OfflineOperationTakeError::consumed(error)),
         };
         // SAFETY: When found is true, the C API returns an owned snapshot
         // handle; core copies and releases it.
         Ok(Some(
             unsafe { maplibre_core::runtime::copy_offline_region_snapshot(snapshot) }
-                .map_err(|error| HandleOperationError::new(error, self))?,
+                .map_err(OfflineOperationTakeError::consumed)?,
         ))
     }
 }
@@ -383,10 +386,12 @@ impl OfflineOperationHandle<Option<OfflineRegionInfo>> {
 impl OfflineOperationHandle<Vec<OfflineRegionInfo>> {
     /// Takes a completed list/merge operation result as copied region info.
     #[allow(clippy::result_large_err)]
-    pub fn take(self) -> std::result::Result<Vec<OfflineRegionInfo>, HandleOperationError<Self>> {
+    pub fn take(
+        self,
+    ) -> std::result::Result<Vec<OfflineRegionInfo>, OfflineOperationTakeError<Self>> {
         let runtime = match self.runtime_ptr() {
             Ok(runtime) => runtime,
-            Err(error) => return Err(HandleOperationError::new(error, self)),
+            Err(error) => return Err(OfflineOperationTakeError::retryable(error, self)),
         };
         let mut out = maplibre_core::ptr::OutPtr::<sys::mln_offline_region_list>::new();
         let status = match self.operation_kind {
@@ -407,17 +412,17 @@ impl OfflineOperationHandle<Vec<OfflineRegionInfo>> {
             _ => sys::MLN_STATUS_INVALID_STATE,
         };
         if let Err(error) = maplibre_core::check(status) {
-            return Err(HandleOperationError::new(error, self));
+            return Err(OfflineOperationTakeError::retryable(error, self));
         }
         self.mark_consumed();
         let list = match out.into_non_null("mln_offline_region_list") {
             Ok(list) => list,
-            Err(error) => return Err(HandleOperationError::new(error, self)),
+            Err(error) => return Err(OfflineOperationTakeError::consumed(error)),
         };
         // SAFETY: On success, the C API returns an owned list handle; core
         // copies and releases it.
         unsafe { maplibre_core::runtime::copy_offline_region_list(list) }
-            .map_err(|error| HandleOperationError::new(error, self))
+            .map_err(OfflineOperationTakeError::consumed)
     }
 }
 
@@ -974,7 +979,7 @@ mod tests {
         let error = region_result.take().unwrap_err();
 
         assert_eq!(error.kind(), ErrorKind::InvalidState);
-        let region_result = error.into_handle();
+        let region_result = error.into_retryable().unwrap().into_handle();
         region_result.discard().unwrap();
         drop(ambient);
         runtime.close().unwrap();
