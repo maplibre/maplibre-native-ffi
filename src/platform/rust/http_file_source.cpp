@@ -240,17 +240,20 @@ class HTTPRequestState : public std::enable_shared_from_this<HTTPRequestState> {
 
     const auto code = rustResponse.status_code;
     if (code == 200 || code == 206) {
-      if (rustResponse.data == nullptr) {
+      if (rustResponse.data_len == 0) {
+        result.data = std::make_shared<std::string>();
+      } else if (rustResponse.data == nullptr) {
         result.error = std::make_unique<Response::Error>(
           Response::Error::Reason::Other, "HTTP response missing body data"
         );
         return result;
+      } else {
+        result.data = std::make_shared<std::string>(
+          // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
+          reinterpret_cast<const char*>(rustResponse.data),
+          rustResponse.data_len
+        );
       }
-
-      result.data = std::make_shared<std::string>(
-        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
-        reinterpret_cast<const char*>(rustResponse.data), rustResponse.data_len
-      );
     } else if (
       code == 204 || (code == 404 && resource.kind == Resource::Kind::Tile)
     ) {

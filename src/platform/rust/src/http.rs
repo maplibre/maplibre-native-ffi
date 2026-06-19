@@ -10,6 +10,7 @@ use std::sync::{
 
 const HTTP_WORKER_THREADS: usize = 16;
 const HTTP_REQUEST_TIMEOUT_SECONDS: u64 = 30;
+const HTTP_MAX_308_REDIRECTS: usize = 100;
 
 #[repr(C)]
 pub struct MlnRustHttpHeader {
@@ -147,35 +148,102 @@ fn copy_http_request(
 }
 
 fn send_http_request(request: HttpRequest) -> MlnRustHttpResponse {
-    if !crate::android::tls_verifier_initialized() {
-        return http_error(
-            HTTP_ERROR_OTHER,
-            "Android TLS verifier is not initialized; call mln_android_init before network requests",
-        );
-    }
+    let mut url = request.url;
 
-    let mut minreq = minreq::get(request.url).with_timeout(HTTP_REQUEST_TIMEOUT_SECONDS);
     let has_accept_encoding = request
         .headers
         .iter()
         .any(|(name, _)| name.eq_ignore_ascii_case("accept-encoding"));
-    for (name, value) in request.headers {
-        minreq = minreq.with_header(name, value);
-    }
-    if !has_accept_encoding {
-        minreq = minreq.with_header("Accept-Encoding", "identity");
-    }
 
-    match minreq.send() {
-        Ok(response) => http_response(response),
-        Err(error) => {
-            let reason = match error {
-                minreq::Error::AddressNotFound | minreq::Error::IoError(_) => HTTP_ERROR_CONNECTION,
-                _ => HTTP_ERROR_OTHER,
-            };
-            http_error(reason, &error.to_string())
+    for _ in 0..=HTTP_MAX_308_REDIRECTS {
+        if is_https_url(&url) && !crate::android::tls_verifier_initialized() {
+            return http_error(
+                HTTP_ERROR_OTHER,
+                "Android TLS verifier is not initialized; call mln_android_init before HTTPS requests",
+            );
+        }
+
+        let mut minreq = minreq::get(&url).with_timeout(HTTP_REQUEST_TIMEOUT_SECONDS);
+        for (name, value) in &request.headers {
+            minreq = minreq.with_header(name, value);
+        }
+        if !has_accept_encoding {
+            minreq = minreq.with_header("Accept-Encoding", "identity");
+        }
+
+        match minreq.send() {
+            Ok(response) if response.status_code == 308 => {
+                let Some(location) = response.header("location") else {
+                    return http_error(
+                        HTTP_ERROR_OTHER,
+                        "HTTP 308 redirect missing Location header",
+                    );
+                };
+                url = match redirect_url(&url, location) {
+                    Some(url) => url,
+                    None => {
+                        return http_error(HTTP_ERROR_OTHER, "unsupported HTTP 308 redirect URL");
+                    }
+                };
+            }
+            Ok(response) => return http_response(response),
+            Err(error) => {
+                let reason = match error {
+                    minreq::Error::AddressNotFound | minreq::Error::IoError(_) => {
+                        HTTP_ERROR_CONNECTION
+                    }
+                    _ => HTTP_ERROR_OTHER,
+                };
+                return http_error(reason, &error.to_string());
+            }
         }
     }
+
+    http_error(HTTP_ERROR_OTHER, "too many HTTP 308 redirects")
+}
+
+fn is_https_url(url: &str) -> bool {
+    url.get(..8)
+        .is_some_and(|scheme| scheme.eq_ignore_ascii_case("https://"))
+}
+
+fn redirect_url(current_url: &str, location: &str) -> Option<String> {
+    if location
+        .get(..7)
+        .is_some_and(|url| url.eq_ignore_ascii_case("http://"))
+        || location
+            .get(..8)
+            .is_some_and(|url| url.eq_ignore_ascii_case("https://"))
+    {
+        return Some(location.to_owned());
+    }
+
+    let scheme_end = current_url.find("://")?;
+    let scheme = &current_url[..scheme_end];
+    if location.starts_with("//") {
+        return Some(format!("{scheme}:{location}"));
+    }
+
+    let authority_start = scheme_end + 3;
+    let authority_len = current_url[authority_start..]
+        .find(['/', '?', '#'])
+        .unwrap_or(current_url.len() - authority_start);
+    let origin_end = authority_start + authority_len;
+    let origin = &current_url[..origin_end];
+    if location.starts_with('/') {
+        return Some(format!("{origin}{location}"));
+    }
+
+    let path_end = current_url.find(['?', '#']).unwrap_or(current_url.len());
+    let path = &current_url[..path_end];
+    let directory = path
+        .rfind('/')
+        .filter(|index| *index >= origin_end)
+        .map_or_else(
+            || format!("{origin}/"),
+            |index| current_url[..=index].to_owned(),
+        );
+    Some(format!("{directory}{location}"))
 }
 
 fn http_response(response: minreq::Response) -> MlnRustHttpResponse {
