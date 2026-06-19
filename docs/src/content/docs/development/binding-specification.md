@@ -691,7 +691,7 @@ that a real native failure would expose.
 | BND-169 | Failed frame release leaves the frame live and a later successful release closes it.                                                                      |
 | BND-170 | Nested frame acquisition and every exposed session operation forbidden during an active frame fail while a frame is active.                               |
 | BND-171 | Caller-owned texture descriptors do not release or mutate caller-owned backend handles during session close.                                              |
-| BND-172 | Wrapper construction failure after native frame acquisition releases the native frame.                                                                    |
+| BND-172 | Bindings with fallible owned-frame wrapper construction release the native frame when construction fails after native frame acquisition.                  |
 | BND-173 | Stale frame handles cannot expose backend handles after release or reuse.                                                                                 |
 
 ### Conditional tests

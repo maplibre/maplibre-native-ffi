@@ -1237,8 +1237,11 @@ fn opengl_borrowed_texture_session_renders_with_platform_context() {
 }
 
 #[test]
-// Spec coverage: BND-167 and BND-168.
+// Spec coverage: BND-167, BND-168, and BND-173.
 fn frame_native_pointer_round_trips_address_without_plain_native_pointer() {
+    // Rust ties backend frame handles to the borrowed frame lifetime; successful
+    // frame release consumes the owner, so stale released handles cannot expose
+    // backend pointers through safe public APIs.
     // SAFETY: Test uses a dummy opaque address and does not dereference it.
     let pointer = unsafe { FrameNativePointer::<'_>::from_ptr(0x4321usize as *mut u8) };
     // SAFETY: Test only verifies address reconstruction while the typed frame borrow is live.
