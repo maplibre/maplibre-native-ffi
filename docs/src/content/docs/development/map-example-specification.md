@@ -589,17 +589,24 @@ Mobile `*-map` examples add:
 
 ### Lifecycle
 
-Mobile examples keep map state alive across brief disappear and background
-transitions. They tear down only on view destruction or app termination.
+Mobile examples keep runtime and map state alive across brief disappear and
+background transitions. They tear down only on view destruction or app
+termination.
 
-| Transition                          | Behavior                                                                   |
-| ----------------------------------- | -------------------------------------------------------------------------- |
-| View will appear / app foreground   | Start the display-paced host loop. Refresh viewport. Set `render_pending`. |
-| View did disappear / app background | Stop the host loop. Keep runtime, map, and render-target handles alive.    |
-| View destroyed / app termination    | Run [Shared shutdown](#shutdown).                                          |
+Track view visibility and app foreground separately. Run the display-paced host
+loop only while the view is visible and the app is in the foreground.
 
-If `render_update` returns `invalid_state` after resume, follow the existing
-reattach path for the active render target.
+When the host toolkit destroys or invalidates the presentation surface, detach
+the render target. Keep runtime and map handles alive. Reattach when a fresh
+surface is available.
+
+| Transition                       | Behavior                                                                                                                                                       |
+| -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| View will appear                 | Mark the view visible. If the app is in the foreground, start the host loop, refresh viewport, attach or reattach the render target, and set `render_pending`. |
+| View did disappear               | Mark the view not visible. Stop the host loop. Detach the render target when the presentation surface is destroyed or invalidated.                             |
+| App foreground                   | Mark the app foreground. If the view is visible, start the host loop, refresh viewport, attach or reattach the render target, and set `render_pending`.        |
+| App background                   | Mark the app background. Stop the host loop. Detach the render target when the presentation surface is destroyed or invalidated.                               |
+| View destroyed / app termination | Run [Shared shutdown](#shutdown).                                                                                                                              |
 
 ### Entry and shell
 
@@ -630,8 +637,8 @@ Implementations MUST provide the following touch interactions:
 | Two-finger vertical drag (shove) | `pitch -= 0.1 × Δy` degrees (clamp to `[0, 60]`), where `Δy` is the change in average touch Y in logical coordinates since the last update.                                                             |
 | Double-tap                       | Zoom `1.25` about the tap location with animation (~`160` ms).                                                                                                                                          |
 
-On pointer down that starts a drag, cancel in-flight camera transitions before
-applying deltas.
+On any gesture begin, cancel in-flight camera transitions before applying
+deltas.
 
 Input handlers return whether the camera changed so the frame loop can set
 `render_pending`.
