@@ -14,6 +14,7 @@ fi
 
 device=${MLN_FFI_IOS_SIMULATOR_DEVICE:-}
 if [[ -z "$device" ]]; then
+  # iPhone simulators are present on the CI images and cover the app runtime surface used by these tests.
   device=$(xcrun simctl list devices available iOS |
     awk -F '[()]' '/ iPhone / && /Shutdown|Booted/ { print $2; exit }')
 fi

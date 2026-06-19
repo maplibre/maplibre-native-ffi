@@ -18,10 +18,10 @@ fn addCTests(b: *std.Build, options: BuildOptions) *std.Build.Step.Compile {
             .target = options.target,
             .optimize = options.optimize,
         }),
-        .use_lld = if (isIosSimulator(options.target)) false else null,
+        .use_lld = if (maplibre_build.isIosSimulator(options.target)) false else null,
     });
     maplibre_build.addRenderBackendOptions(b, c_tests.root_module, options.render_backend);
-    if (isIosSimulator(options.target)) {
+    if (maplibre_build.isIosSimulator(options.target)) {
         c_tests.root_module.addCSourceFile(.{ .file = b.path("../../../zig_test_support/ios_simulator_dyld_stub.m") });
     }
     if (options.target.result.os.tag == .windows or options.target.result.os.tag == .linux or options.target.result.os.tag == .macos) {
@@ -50,35 +50,13 @@ fn addCTests(b: *std.Build, options: BuildOptions) *std.Build.Step.Compile {
     return c_tests;
 }
 
-fn isIosSimulator(target: std.Build.ResolvedTarget) bool {
-    return target.result.os.tag == .ios and target.result.abi == .simulator;
-}
-
-fn testOptimize(target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) std.builtin.OptimizeMode {
-    if (isIosSimulator(target) and optimize == .Debug) return .ReleaseSafe;
-    return optimize;
-}
-
-fn addTestRunStep(b: *std.Build, tests: *std.Build.Step.Compile, target: std.Build.ResolvedTarget) *std.Build.Step.Run {
-    if (isIosSimulator(target)) {
-        const run_tests = b.addSystemCommand(&.{
-            "bash",
-            b.path("../../../../scripts/run-ios-simulator-test.sh").getPath(b),
-        });
-        run_tests.addArtifactArg(tests);
-        return run_tests;
-    }
-
-    return b.addRunArtifact(tests);
-}
-
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const render_backend = maplibre_build.renderBackend(b);
     const cmake_artifact_dir = maplibre_build.cmakeArtifactDir(b);
     const options = BuildOptions{
         .target = target,
-        .optimize = testOptimize(target, b.standardOptimizeOption(.{})),
+        .optimize = maplibre_build.testOptimize(target, b.standardOptimizeOption(.{})),
         .cmake_artifact_dir = cmake_artifact_dir,
         .include_dirs = maplibre_build.includeDirs(b),
         .dependency_library_dirs = maplibre_build.dependencyLibraryDirs(b),
@@ -87,7 +65,12 @@ pub fn build(b: *std.Build) void {
 
     const c_tests = addCTests(b, options);
 
-    const run_c_tests = addTestRunStep(b, c_tests, options.target);
+    const run_c_tests = maplibre_build.addTestRunStep(
+        b,
+        c_tests,
+        options.target,
+        b.path("../../../../scripts/run-ios-simulator-test.sh"),
+    );
     const test_step = b.step("test", "Run Zig C ABI tests");
     test_step.dependOn(&run_c_tests.step);
 }

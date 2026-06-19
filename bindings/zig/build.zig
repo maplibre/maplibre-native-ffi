@@ -108,11 +108,12 @@ pub fn vulkanLibraryName(target: std.Build.ResolvedTarget) []const u8 {
     };
 }
 
-fn isIosSimulator(target: std.Build.ResolvedTarget) bool {
+pub fn isIosSimulator(target: std.Build.ResolvedTarget) bool {
     return target.result.os.tag == .ios and target.result.abi == .simulator;
 }
 
-fn testOptimize(target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) std.builtin.OptimizeMode {
+pub fn testOptimize(target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) std.builtin.OptimizeMode {
+    // Zig Debug iOS simulator tests hit Mach-O/debug-info linker limits in this dependency graph.
     if (isIosSimulator(target) and optimize == .Debug) return .ReleaseSafe;
     return optimize;
 }
@@ -343,11 +344,16 @@ fn addBindingTests(b: *std.Build, options: BuildOptions, maplibre_native: *std.B
     return tests;
 }
 
-fn addTestRunStep(b: *std.Build, tests: *std.Build.Step.Compile, target: std.Build.ResolvedTarget) *std.Build.Step.Run {
+pub fn addTestRunStep(
+    b: *std.Build,
+    tests: *std.Build.Step.Compile,
+    target: std.Build.ResolvedTarget,
+    simulator_runner: std.Build.LazyPath,
+) *std.Build.Step.Run {
     if (isIosSimulator(target)) {
         const run_tests = b.addSystemCommand(&.{
             "bash",
-            b.path("../../scripts/run-ios-simulator-test.sh").getPath(b),
+            simulator_runner.getPath(b),
         });
         run_tests.addArtifactArg(tests);
         return run_tests;
@@ -405,13 +411,13 @@ pub fn build(b: *std.Build) void {
 
     const binding_tests = addBindingTests(b, options, maplibre_native);
     b.default_step.dependOn(&binding_tests.step);
-    const run_binding_tests = addTestRunStep(b, binding_tests, options.target);
+    const run_binding_tests = addTestRunStep(b, binding_tests, options.target, b.path("../../scripts/run-ios-simulator-test.sh"));
     test_step.dependOn(&run_binding_tests.step);
 
     for (test_sources) |source| {
         const tests = addTestCompile(b, options, source);
         b.default_step.dependOn(&tests.step);
-        const run_tests = addTestRunStep(b, tests, options.target);
+        const run_tests = addTestRunStep(b, tests, options.target, b.path("../../scripts/run-ios-simulator-test.sh"));
         test_step.dependOn(&run_tests.step);
     }
 }
