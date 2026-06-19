@@ -26,6 +26,9 @@ internal static class Shell
         Console.WriteLine($"render target status: {mode.Status}");
         InputController.PrintControls();
 
+        // TODO(map-example-spec): Drive the pump from a display-refresh callback instead of
+        // polling GLFW events and waiting with a timeout when idle. See Frame loop in the
+        // map example spec.
         while (!graphics.ShouldClose)
         {
             graphics.PollEvents();

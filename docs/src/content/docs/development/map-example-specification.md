@@ -44,6 +44,7 @@ profile**. Implement a mobile example by reading **Shared baseline** and
 | Window and process lifecycle   | [Desktop profile → Shell and window](#shell-and-window) |
 | Keyboard and mouse             | [Desktop profile → Input](#input)                       |
 | View lifecycle and layout      | [Mobile profile → Entry and shell](#entry-and-shell)    |
+| View lifecycle transitions     | [Mobile profile → Lifecycle](#lifecycle-1)              |
 | Touch gestures                 | [Mobile profile → Input](#input-1)                      |
 | Platform log sinks             | [Mobile profile → Logging](#logging)                    |
 
@@ -194,10 +195,9 @@ Order MUST be:
 5. Create map with extent from the initial viewport and continuous mode.
 6. Load style and apply initial camera.
 7. Attach render target for the selected mode.
-8. Print startup information:
+8. Emit startup information:
    - active render-target mode identifier
    - active render-target status line
-   - profile control help
 
 On failure after partial setup, release already-created handles in reverse order
 (render target → map → runtime → graphics).
@@ -338,9 +338,10 @@ replacement for the same graphics context, map, and mode.
 
 ### Render-target modes
 
-Three modes MUST be modeled in every example's architecture (render-target
-discriminant/class and attach paths). Profile sections define which modes each
-example implements ([Render-target coverage](#render-target-coverage)).
+Shared baseline defines three render-target modes (discriminant/class, attach
+paths, and present behavior). Each example implements only the modes required by
+its profile ([Render-target coverage](#render-target-coverage)). Example
+architecture MUST model each implemented mode.
 
 #### Mode comparison
 
@@ -426,7 +427,8 @@ Profile sections define which host events trigger resize
 - SHOULD register a native log callback during startup and clear it on shutdown.
 - On setup or camera failure, print a short message including the native status
   and diagnostic strings returned by the C API.
-- On startup, print the three items listed in [Startup](#startup) step 8.
+- On startup, emit the items listed in [Startup](#startup) step 8 through the
+  profile logging sink.
 
 ### Graphics API
 
@@ -513,6 +515,11 @@ flags.
   size and content scale (see [Viewport](#viewport)).
 - Shutdown triggers on window close.
 
+### Startup logging
+
+On startup, print the items listed in [Startup](#startup) step 8 to stdout, plus
+the control help text from [Input](#input) below.
+
 ### Input
 
 #### Control scheme
@@ -572,6 +579,20 @@ Mobile `*-map` examples add:
 - Touch camera controls.
 - View lifecycle integration (appear, disappear, foreground, background).
 
+### Lifecycle
+
+Mobile examples keep map state alive across brief disappear and background
+transitions. They tear down only on view destruction or app termination.
+
+| Transition                          | Behavior                                                                           |
+| ----------------------------------- | ---------------------------------------------------------------------------------- |
+| View will appear / app foreground   | Start the display-refresh pump. Refresh viewport. Set `render_pending`.            |
+| View did disappear / app background | Stop the display-refresh pump. Keep runtime, map, and render-target handles alive. |
+| View destroyed / app termination    | Run [Shared shutdown](#shutdown).                                                  |
+
+If `render_update` returns `invalid_state` after resume, follow the existing
+reattach path for the active render target.
+
 ### Entry and shell
 
 - The map view fills the available layout area or the screen.
@@ -585,17 +606,21 @@ Mobile `*-map` examples add:
 
 ### Input
 
+Use separate pan, pinch-scale, rotation, and shove recognizers. Pinch and
+rotation MAY recognize simultaneously. Shove MUST NOT recognize simultaneously
+with pinch or rotation.
+
 #### Control scheme
 
 Implementations MUST provide the following touch interactions:
 
-| Interaction              | Behavior                                                                                         |
-| ------------------------ | ------------------------------------------------------------------------------------------------ |
-| One-finger drag          | `move_by` with pointer delta in logical coordinates.                                             |
-| Two-finger rotate        | Adjust bearing by `0.5 × Δθ` degrees, where `Δθ` is the change in angle between the two touches. |
-| Two-finger vertical drag | Adjust pitch by `0.5 × Δy` degrees (same sign convention as desktop rotate drag).                |
-| Pinch                    | Zoom about the gesture centroid: `scale_by(2^(Δ * 0.25), anchor)`. Pinch apart zooms in.         |
-| Double-tap               | Zoom `1.25` about the tap location with keyboard animation (~`160` ms).                          |
+| Interaction                      | Behavior                                                                                                                                                                                                |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| One-finger drag                  | `move_by` with pointer delta in logical coordinates.                                                                                                                                                    |
+| Pinch                            | On begin, record `zoom₀`. On change, `jump_to` zoom `zoom₀ + log₂(S)` about the gesture centroid, where `S` is the scale recognizer's cumulative scale factor since the gesture began (`1.0` at begin). |
+| Two-finger rotate                | Adjust bearing by `−Δθ` degrees, where `Δθ` is the rotation recognizer's delta in degrees since the last update.                                                                                        |
+| Two-finger vertical drag (shove) | `pitch -= 0.1 × Δy` degrees (clamp to `[0, 60]`), where `Δy` is the change in average touch Y in logical coordinates since the last update.                                                             |
+| Double-tap                       | Zoom `1.25` about the tap location with animation (~`160` ms).                                                                                                                                          |
 
 On pointer down that starts a drag, cancel in-flight camera transitions before
 applying deltas.
@@ -610,6 +635,7 @@ Input handlers return whether the camera changed so the frame loop can set
 
 ### Logging
 
-- Emit startup and viewport diagnostics through the platform log sink (for
-  example `OSLog` on Apple platforms or `logcat` on Android).
-- Control help is not printed to stdout on mobile.
+- Emit [Startup](#startup) step 8 items and viewport diagnostics through the
+  platform log sink (for example `OSLog` on Apple platforms or `logcat` on
+  Android).
+- Control help is not required on mobile.

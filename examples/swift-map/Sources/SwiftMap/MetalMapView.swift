@@ -126,6 +126,8 @@ final class MetalMapView: NSView {
 
   private func startTimerIfNeeded() {
     guard timer == nil else { return }
+    // TODO(map-example-spec): Drive the pump from a display-refresh callback (for example
+    // CVDisplayLink) instead of a fixed NSTimer. See Frame loop in the map example spec.
     timer = Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0, repeats: true) { [weak self] _ in
       Task { @MainActor in self?.tick() }
     }
