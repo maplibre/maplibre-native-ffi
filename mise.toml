@@ -51,7 +51,7 @@ config_roots = [".devcontainer", "bindings/*", "examples/*", "docs"]
 # Java/Kotlin ecosystem
 "core:java" = "temurin-25.0.3+9.0.LTS"
 "aqua:facebook/ktfmt" = "0.62"
-"github:google/google-java-format" = "1.35.0"
+"aqua:google/google-java-format" = "1.35.0"
 
 # Python ecosystem
 "core:python" = "3.14.4"
@@ -59,7 +59,7 @@ config_roots = [".devcontainer", "bindings/*", "examples/*", "docs"]
 
 # Swift ecosystem
 "core:swift" = { version = "6.3.1", os = ["macos"] }
-"github:nicklockwood/SwiftFormat" = "0.61.1"
+swiftformat = { version = "0.61.1", backend = "github:nicklockwood/SwiftFormat", no_app = true, rename_exe = "swiftformat" }
 
 # Other ecosystems
 "core:rust" = { version = "1.95.0", profile = "minimal", components = "rustfmt,clippy" }

@@ -1,9 +1,7 @@
 import CMaplibreNativeC
 import Foundation
-import Testing
-
 @testable import MaplibreNative
-
+import Testing
 
 private final class LockedBox<Value>: @unchecked Sendable {
   private let lock = NSLock()
@@ -63,7 +61,10 @@ private final class LockedBox<Value>: @unchecked Sendable {
     var value: UInt32
   }
 
-  let descriptor = NativeDescriptorMaterializer(TinyDescriptor(size: 8, value: 99))
+  let descriptor = NativeDescriptorMaterializer(TinyDescriptor(
+    size: 8,
+    value: 99
+  ))
   let copied = try descriptor.withNativeDescriptor { pointer in
     pointer.pointee
   }
@@ -73,7 +74,8 @@ private final class LockedBox<Value>: @unchecked Sendable {
 
 @Test func nativeHandleFactoryReportsSwiftNullHandleFailure() throws {
   do {
-    _ = try NativeHandleFactory.create(nullDiagnostic: "factory returned null") { _ in }
+    _ = try NativeHandleFactory
+      .create(nullDiagnostic: "factory returned null") { _ in }
     Issue.record("null handle should throw")
   } catch let failure as NativeStatusFailure {
     #expect(!failure.isNativeStatus)
@@ -85,12 +87,13 @@ private final class LockedBox<Value>: @unchecked Sendable {
 }
 
 @Test func nativeStringCopyUTF8RejectsInvalidBytes() throws {
-  var invalid = [UInt8](arrayLiteral: 0xff)
+  var invalid = [UInt8](arrayLiteral: 0xFF)
 
   do {
     _ = try invalid.withUnsafeMutableBufferPointer { buffer in
       try NativeString.copyUTF8(
-        data: UnsafeRawPointer(buffer.baseAddress!).assumingMemoryBound(to: CChar.self),
+        data: UnsafeRawPointer(buffer.baseAddress!)
+          .assumingMemoryBound(to: CChar.self),
         size: buffer.count
       )
     }
@@ -105,7 +108,10 @@ private final class LockedBox<Value>: @unchecked Sendable {
 @Test func nativeResultGuardReleasesExactlyOnce() throws {
   let releases = LockedBox(0)
   let pointer = OpaquePointer(bitPattern: 0x1)
-  let guardHandle = try NativeResultGuard(typeName: "test_result", pointer: pointer) { _ in
+  let guardHandle = try NativeResultGuard(
+    typeName: "test_result",
+    pointer: pointer
+  ) { _ in
     releases.update { $0 += 1 }
   }
 
@@ -117,7 +123,10 @@ private final class LockedBox<Value>: @unchecked Sendable {
 
 @Test func nativeHandleStateCloseIsIdempotentAfterSuccess() throws {
   let closes = LockedBox(0)
-  let state = try NativeHandleState(typeName: "test_handle", pointer: OpaquePointer(bitPattern: 0x2))
+  let state = try NativeHandleState(
+    typeName: "test_handle",
+    pointer: OpaquePointer(bitPattern: 0x2)
+  )
 
   try state.closeOnce { _ in
     closes.update { $0 += 1 }
@@ -132,7 +141,10 @@ private final class LockedBox<Value>: @unchecked Sendable {
 
 @Test func nativeHandleStateConcurrentCloseDestroysOnce() throws {
   let closes = LockedBox(0)
-  let state = try NativeHandleState(typeName: "test_handle", pointer: OpaquePointer(bitPattern: 0x5))
+  let state = try NativeHandleState(
+    typeName: "test_handle",
+    pointer: OpaquePointer(bitPattern: 0x5)
+  )
 
   DispatchQueue.concurrentPerform(iterations: 16) { _ in
     try? state.closeOnce { _ in
@@ -148,7 +160,10 @@ private final class LockedBox<Value>: @unchecked Sendable {
   struct CloseFailure: Error {}
 
   let closes = LockedBox(0)
-  let state = try NativeHandleState(typeName: "test_handle", pointer: OpaquePointer(bitPattern: 0x4))
+  let state = try NativeHandleState(
+    typeName: "test_handle",
+    pointer: OpaquePointer(bitPattern: 0x4)
+  )
 
   do {
     try state.closeOnce { _ in
@@ -168,10 +183,14 @@ private final class LockedBox<Value>: @unchecked Sendable {
   #expect(closes.read { $0 } == 2)
 }
 
-@Test func nativeHandleStateRejectsUseWhileCloseIsInFlightAndRetriesAfterFailure() throws {
+@Test func nativeHandleStateRejectsUseWhileCloseIsInFlightAndRetriesAfterFailure(
+) throws {
   struct CloseFailure: Error {}
 
-  let state = try NativeHandleState(typeName: "test_handle", pointer: OpaquePointer(bitPattern: 0x6))
+  let state = try NativeHandleState(
+    typeName: "test_handle",
+    pointer: OpaquePointer(bitPattern: 0x6)
+  )
   let closeStarted = DispatchSemaphore(value: 0)
   let allowCloseToFail = DispatchSemaphore(value: 0)
   let closeFinished = DispatchSemaphore(value: 0)
@@ -217,9 +236,15 @@ private final class LockedBox<Value>: @unchecked Sendable {
     leaks.update { $0.append(leak) }
   }) {
     do {
-      _ = try NativeHandleState(typeName: "leaky_handle", pointer: OpaquePointer(bitPattern: 0x3))
+      _ = try NativeHandleState(
+        typeName: "leaky_handle",
+        pointer: OpaquePointer(bitPattern: 0x3)
+      )
     }
 
-    #expect(leaks.read { $0 } == [NativeHandleLeak(typeName: "leaky_handle", address: 0x3)])
+    #expect(leaks.read { $0 } == [NativeHandleLeak(
+      typeName: "leaky_handle",
+      address: 0x3
+    )])
   }
 }

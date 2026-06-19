@@ -3,7 +3,9 @@ import MaplibreNative
 func installCAPILogging() {
   do {
     try Maplibre.setLogCallback { record in
-      print("[MapLibre] severity=\(record.severity) event=\(record.event) code=\(record.code): \(record.message)")
+      print(
+        "[MapLibre] severity=\(record.severity) event=\(record.event) code=\(record.code): \(record.message)"
+      )
       return true
     }
   } catch {

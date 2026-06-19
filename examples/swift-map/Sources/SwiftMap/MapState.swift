@@ -10,7 +10,11 @@ struct Viewport: Equatable {
   var isEmpty: Bool
 
   var extent: RenderTargetExtent {
-    RenderTargetExtent(width: logicalWidth, height: logicalHeight, scaleFactor: scaleFactor)
+    RenderTargetExtent(
+      width: logicalWidth,
+      height: logicalHeight,
+      scaleFactor: scaleFactor
+    )
   }
 
   func log(_ label: String) {
@@ -30,9 +34,17 @@ final class MapState {
   private let mode: RenderTargetMode
   private var isClosed = false
 
-  init(mode: RenderTargetMode, viewport: Viewport, graphics: MetalGraphicsContext) throws {
-    precondition(!viewport.isEmpty, "cannot create MapState with an empty viewport")
-    let runtime = try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
+  init(
+    mode: RenderTargetMode,
+    viewport: Viewport,
+    graphics: MetalGraphicsContext
+  ) throws {
+    precondition(
+      !viewport.isEmpty,
+      "cannot create MapState with an empty viewport"
+    )
+    let runtime =
+      try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
     var createdMap: MapHandle?
     var createdRenderTarget: MetalRenderTarget?
     var didInitialize = false
@@ -132,7 +144,7 @@ final class MapState {
       case .mapRenderUpdateAvailable:
         renderPending = true
       case .mapRenderFrameFinished:
-        if case .renderFrame(let frame) = event.payload, frame.needsRepaint {
+        if case let .renderFrame(frame) = event.payload, frame.needsRepaint {
           renderPending = true
         }
       default:

@@ -7,7 +7,9 @@ let swiftMapConfiguration = AppConfiguration.loadOrExit()
 struct AppConfiguration {
   let mode: RenderTargetMode
 
-  static func loadOrExit(arguments: [String] = CommandLine.arguments) -> AppConfiguration {
+  static func loadOrExit(arguments: [String] = CommandLine
+    .arguments) -> AppConfiguration
+  {
     let args = Array(arguments.dropFirst())
     guard let mode = parseMode(args) else {
       exit(0)
@@ -29,8 +31,8 @@ struct AppConfiguration {
       return nil
     }
     guard args.count == 1,
-      !args[0].hasPrefix("-"),
-      let mode = RenderTargetMode(rawValue: args[0])
+          !args[0].hasPrefix("-"),
+          let mode = RenderTargetMode(rawValue: args[0])
     else {
       printUsage()
       exit(1)

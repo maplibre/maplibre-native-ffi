@@ -1,6 +1,5 @@
-import Testing
-
 @testable import MaplibreNative
+import Testing
 
 @Test func cVersionIsReadable() {
   #expect(Maplibre.cVersion() == 0)

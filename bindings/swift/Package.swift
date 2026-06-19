@@ -27,7 +27,7 @@ let package = Package(
           "-rpath",
           "-Xlinker",
           nativeBuildDir,
-        ])
+        ]),
       ]
     ),
     .testTarget(

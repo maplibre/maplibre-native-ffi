@@ -1,8 +1,7 @@
 import CMaplibreNativeC
 import Foundation
-import Testing
-
 @testable import MaplibreNative
+import Testing
 
 private final class RenderCounter: @unchecked Sendable {
   private let lock = NSLock()
@@ -65,12 +64,17 @@ private final class RenderLeakBox: @unchecked Sendable {
   )
   try vulkanTexture.nativeInput.withNativeDescriptor { descriptor in
     #expect(UInt(bitPattern: descriptor.pointee.context.instance) == 0x30)
-    #expect(UInt(bitPattern: descriptor.pointee.context.physical_device) == 0x40)
+    #expect(UInt(bitPattern: descriptor.pointee.context.physical_device) ==
+      0x40)
     #expect(UInt(bitPattern: descriptor.pointee.context.device) == 0x50)
     #expect(UInt(bitPattern: descriptor.pointee.context.graphics_queue) == 0x60)
     #expect(descriptor.pointee.context.graphics_queue_family_index == 7)
-    #expect(UInt(bitPattern: descriptor.pointee.context.get_instance_proc_addr) == 0x90)
-    #expect(UInt(bitPattern: descriptor.pointee.context.get_device_proc_addr) == 0xA0)
+    #expect(UInt(
+      bitPattern: descriptor.pointee.context.get_instance_proc_addr
+    ) ==
+      0x90)
+    #expect(UInt(bitPattern: descriptor.pointee.context.get_device_proc_addr) ==
+      0xA0)
     #expect(UInt(bitPattern: descriptor.pointee.image) == 0x70)
     #expect(UInt(bitPattern: descriptor.pointee.image_view) == 0x80)
     #expect(descriptor.pointee.format == 44)
@@ -92,10 +96,16 @@ private final class RenderLeakBox: @unchecked Sendable {
   )
   try openGLSurface.nativeInput.withNativeDescriptor { descriptor in
     #expect(descriptor.pointee.extent.width == 640)
-    #expect(descriptor.pointee.context.platform == MLN_OPENGL_CONTEXT_PLATFORM_WGL)
-    #expect(UInt(bitPattern: descriptor.pointee.context.data.wgl.device_context) == 0x110)
-    #expect(UInt(bitPattern: descriptor.pointee.context.data.wgl.share_context) == 0x120)
-    #expect(UInt(bitPattern: descriptor.pointee.context.data.wgl.get_proc_address) == 0x130)
+    #expect(descriptor.pointee.context
+      .platform == MLN_OPENGL_CONTEXT_PLATFORM_WGL)
+    #expect(UInt(bitPattern: descriptor.pointee.context.data.wgl
+        .device_context) == 0x110)
+    #expect(UInt(
+      bitPattern: descriptor.pointee.context.data.wgl.share_context
+    ) ==
+      0x120)
+    #expect(UInt(bitPattern: descriptor.pointee.context.data.wgl
+        .get_proc_address) == 0x130)
     #expect(UInt(bitPattern: descriptor.pointee.surface) == 0x140)
   }
 
@@ -107,13 +117,25 @@ private final class RenderLeakBox: @unchecked Sendable {
       getProcAddress: NativePointer(bitPattern: 0x240)
     )
   )
-  let openGLTexture = OpenGLBorrowedTextureDescriptor(extent: extent, context: egl, texture: 33, target: 0x0DE1)
+  let openGLTexture = OpenGLBorrowedTextureDescriptor(
+    extent: extent,
+    context: egl,
+    texture: 33,
+    target: 0x0DE1
+  )
   try openGLTexture.nativeInput.withNativeDescriptor { descriptor in
-    #expect(descriptor.pointee.context.platform == MLN_OPENGL_CONTEXT_PLATFORM_EGL)
-    #expect(UInt(bitPattern: descriptor.pointee.context.data.egl.display) == 0x210)
-    #expect(UInt(bitPattern: descriptor.pointee.context.data.egl.config) == 0x220)
-    #expect(UInt(bitPattern: descriptor.pointee.context.data.egl.share_context) == 0x230)
-    #expect(UInt(bitPattern: descriptor.pointee.context.data.egl.get_proc_address) == 0x240)
+    #expect(descriptor.pointee.context
+      .platform == MLN_OPENGL_CONTEXT_PLATFORM_EGL)
+    #expect(UInt(bitPattern: descriptor.pointee.context.data.egl.display) ==
+      0x210)
+    #expect(UInt(bitPattern: descriptor.pointee.context.data.egl.config) ==
+      0x220)
+    #expect(UInt(
+      bitPattern: descriptor.pointee.context.data.egl.share_context
+    ) ==
+      0x230)
+    #expect(UInt(bitPattern: descriptor.pointee.context.data.egl
+        .get_proc_address) == 0x240)
     #expect(descriptor.pointee.texture == 33)
     #expect(descriptor.pointee.target == 0x0DE1)
   }
@@ -125,9 +147,12 @@ private final class RenderLeakBox: @unchecked Sendable {
   raw.size = UInt32(MemoryLayout<mln_metal_owned_texture_frame>.size)
   raw.texture = UnsafeMutableRawPointer(bitPattern: 0x1234)
   raw.device = UnsafeMutableRawPointer(bitPattern: 0x5678)
-  let frame = MetalOwnedTextureFrameHandle(frame: NativeMetalOwnedTextureFrame(raw)) { _ in
-    releases.increment()
-  }
+  let frame =
+    MetalOwnedTextureFrameHandle(frame: NativeMetalOwnedTextureFrame(
+      raw
+    )) { _ in
+      releases.increment()
+    }
 
   var capturedView: MetalOwnedTextureFrameView?
   var escapedTexture: FrameNativePointer?
@@ -174,9 +199,12 @@ private final class RenderLeakBox: @unchecked Sendable {
   raw.size = UInt32(MemoryLayout<mln_vulkan_owned_texture_frame>.size)
   raw.image = UnsafeMutableRawPointer(bitPattern: 0x1234)
   raw.image_view = UnsafeMutableRawPointer(bitPattern: 0x5678)
-  let frame = VulkanOwnedTextureFrameHandle(frame: NativeVulkanOwnedTextureFrame(raw)) { _ in
-    releases.increment()
-  }
+  let frame =
+    VulkanOwnedTextureFrameHandle(frame: NativeVulkanOwnedTextureFrame(
+      raw
+    )) { _ in
+      releases.increment()
+    }
 
   var capturedView: VulkanOwnedTextureFrameView?
   var escapedImage: FrameNativePointer?
@@ -223,9 +251,12 @@ private final class RenderLeakBox: @unchecked Sendable {
   raw.size = UInt32(MemoryLayout<mln_opengl_owned_texture_frame>.size)
   raw.texture = 77
   raw.target = 0x0DE1
-  let frame = OpenGLOwnedTextureFrameHandle(frame: NativeOpenGLOwnedTextureFrame(raw)) { _ in
-    releases.increment()
-  }
+  let frame =
+    OpenGLOwnedTextureFrameHandle(frame: NativeOpenGLOwnedTextureFrame(
+      raw
+    )) { _ in
+      releases.increment()
+    }
 
   var capturedView: OpenGLOwnedTextureFrameView?
   var escapedTexture: FrameOpenGLTextureName?
@@ -274,12 +305,15 @@ private final class RenderLeakBox: @unchecked Sendable {
   raw.size = UInt32(MemoryLayout<mln_opengl_owned_texture_frame>.size)
   raw.texture = 77
   raw.target = 0x0DE1
-  let frame = OpenGLOwnedTextureFrameHandle(frame: NativeOpenGLOwnedTextureFrame(raw)) { _ in
-    releases.increment()
-    if releases.value() == 1 {
-      throw ReleaseFailure()
+  let frame =
+    OpenGLOwnedTextureFrameHandle(frame: NativeOpenGLOwnedTextureFrame(
+      raw
+    )) { _ in
+      releases.increment()
+      if releases.value() == 1 {
+        throw ReleaseFailure()
+      }
     }
-  }
 
   do {
     try frame.close()
@@ -292,7 +326,7 @@ private final class RenderLeakBox: @unchecked Sendable {
   #expect(releases.value() == 2)
 }
 
-@Test func textureFrameDeinitReportsLeakWithoutRelease() throws {
+@Test func textureFrameDeinitReportsLeakWithoutRelease() {
   let releases = RenderCounter()
   let leaks = RenderLeakBox()
 
@@ -304,12 +338,18 @@ private final class RenderLeakBox: @unchecked Sendable {
       raw.size = UInt32(MemoryLayout<mln_metal_owned_texture_frame>.size)
       raw.texture = UnsafeMutableRawPointer(bitPattern: 0x1234)
       raw.device = UnsafeMutableRawPointer(bitPattern: 0x5678)
-      _ = MetalOwnedTextureFrameHandle(frame: NativeMetalOwnedTextureFrame(raw)) { _ in
-        releases.increment()
-      }
+      _ =
+        MetalOwnedTextureFrameHandle(frame: NativeMetalOwnedTextureFrame(
+          raw
+        )) { _ in
+          releases.increment()
+        }
     }
 
     #expect(releases.value() == 0)
-    #expect(leaks.value() == [NativeHandleLeak(typeName: "MetalOwnedTextureFrameHandle", address: 0x1234)])
+    #expect(leaks.value() == [NativeHandleLeak(
+      typeName: "MetalOwnedTextureFrameHandle",
+      address: 0x1234
+    )])
   }
 }

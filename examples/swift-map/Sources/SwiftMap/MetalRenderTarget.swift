@@ -43,7 +43,10 @@ final class MetalGraphicsContext {
 
 @MainActor
 enum MetalRenderTarget {
-  case ownedTexture(session: RenderSessionHandle, compositor: MetalTextureCompositor)
+  case ownedTexture(
+    session: RenderSessionHandle,
+    compositor: MetalTextureCompositor
+  )
   case borrowedTexture(
     session: RenderSessionHandle,
     compositor: MetalTextureCompositor,
@@ -59,11 +62,23 @@ enum MetalRenderTarget {
   ) throws -> MetalRenderTarget {
     switch mode {
     case .ownedTexture:
-      return try attachOwnedTexture(map: map, graphics: graphics, viewport: viewport)
+      return try attachOwnedTexture(
+        map: map,
+        graphics: graphics,
+        viewport: viewport
+      )
     case .borrowedTexture:
-      return try attachBorrowedTexture(map: map, graphics: graphics, viewport: viewport)
+      return try attachBorrowedTexture(
+        map: map,
+        graphics: graphics,
+        viewport: viewport
+      )
     case .nativeSurface:
-      return try attachNativeSurface(map: map, graphics: graphics, viewport: viewport)
+      return try attachNativeSurface(
+        map: map,
+        graphics: graphics,
+        viewport: viewport
+      )
     }
   }
 
@@ -86,7 +101,9 @@ enum MetalRenderTarget {
         scaleFactor: viewport.scaleFactor
       )
     case .borrowedTexture:
-      throw metalError("borrowed texture resize requires render target reattachment")
+      throw metalError(
+        "borrowed texture resize requires render target reattachment"
+      )
     case let .nativeSurface(session):
       try session.resize(
         width: viewport.logicalWidth,
@@ -157,14 +174,22 @@ enum MetalRenderTarget {
     graphics: MetalGraphicsContext,
     viewport: Viewport
   ) throws -> MetalRenderTarget {
-    let texture = try MetalBorrowedTexture(graphics: graphics, viewport: viewport)
-    let session = try map.attachMetalBorrowedTexture(MetalBorrowedTextureDescriptor(
-      extent: viewport.extent,
-      texture: texture.pointer
-    ))
+    let texture = try MetalBorrowedTexture(
+      graphics: graphics,
+      viewport: viewport
+    )
+    let session = try map
+      .attachMetalBorrowedTexture(MetalBorrowedTextureDescriptor(
+        extent: viewport.extent,
+        texture: texture.pointer
+      ))
     do {
       let compositor = try MetalTextureCompositor(graphics: graphics)
-      return .borrowedTexture(session: session, compositor: compositor, texture: texture)
+      return .borrowedTexture(
+        session: session,
+        compositor: compositor,
+        texture: texture
+      )
     } catch {
       try? session.close()
       throw error
@@ -195,9 +220,9 @@ final class MetalTextureCompositor {
     guard let queue = graphics.device.makeCommandQueue() else {
       throw metalError("Metal command queue creation failed")
     }
-    self.layer = graphics.layer
+    layer = graphics.layer
     self.queue = queue
-    self.pipeline = try Self.makePipeline(
+    pipeline = try Self.makePipeline(
       device: graphics.device,
       pixelFormat: graphics.layer.pixelFormat
     )
@@ -257,7 +282,10 @@ final class MetalTextureCompositor {
     device: any MTLDevice,
     pixelFormat: MTLPixelFormat
   ) throws -> any MTLRenderPipelineState {
-    let library = try device.makeLibrary(source: metalCompositorShader, options: nil)
+    let library = try device.makeLibrary(
+      source: metalCompositorShader,
+      options: nil
+    )
     guard let vertex = library.makeFunction(name: "vertex_main") else {
       throw metalError("Metal vertex function lookup failed")
     }
@@ -285,7 +313,8 @@ final class MetalBorrowedTexture {
       mipmapped: false
     )
     descriptor.usage = [.shaderRead, .renderTarget]
-    guard let texture = graphics.device.makeTexture(descriptor: descriptor) else {
+    guard let texture = graphics.device.makeTexture(descriptor: descriptor)
+    else {
       throw metalError("Metal borrowed texture creation failed")
     }
     self.texture = texture
@@ -302,7 +331,9 @@ private func metalTexture(address: UInt) throws -> any MTLTexture {
   }
   let object = Unmanaged<AnyObject>.fromOpaque(pointer).takeUnretainedValue()
   guard let texture = object as? any MTLTexture else {
-    throw metalError("Metal texture frame pointer did not contain an MTLTexture")
+    throw metalError(
+      "Metal texture frame pointer did not contain an MTLTexture"
+    )
   }
   return texture
 }
