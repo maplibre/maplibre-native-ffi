@@ -2,9 +2,17 @@ import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
 
 plugins { kotlin("multiplatform") version "2.2.21" }
 
+apply(from = rootProject.file("gradle/native-artifact.gradle.kts"))
+
 repositories { mavenCentral() }
 
-val nativeBuildDir = providers.environmentVariable("MLN_FFI_BUILD_DIR").orNull
+@Suppress("UNCHECKED_CAST")
+val maplibreNativeCList = extra["maplibreNativeCList"] as (String) -> List<String>
+val nativeIncludeDirs = maplibreNativeCList("maplibreNativeC.includeDirs")
+val nativeLinkDirs = maplibreNativeCList("maplibreNativeC.linkDirs")
+val nativeRuntimeLibraryDirs = maplibreNativeCList("maplibreNativeC.runtimeLibraryDirs")
+val nativeLinkLibraries = maplibreNativeCList("maplibreNativeC.linkLibraries")
+val nativeFrameworks = maplibreNativeCList("maplibreNativeC.frameworks")
 val hostOs = System.getProperty("os.name").lowercase()
 val hostArch = System.getProperty("os.arch").lowercase()
 
@@ -17,15 +25,14 @@ kotlin {
   }
 
   targets.withType<KotlinNativeTarget>().configureEach {
-    if (nativeBuildDir != null) {
-      binaries.all {
-        linkerOpts("-L$nativeBuildDir", "-lmaplibre-native-c")
-        if (hostOs.contains("mac") || hostOs.contains("linux")) {
-          linkerOpts("-Wl,-rpath,$nativeBuildDir")
-        }
-        if (hostOs.contains("mac")) {
-          linkerOpts("-framework", "Foundation", "-framework", "Metal", "-framework", "QuartzCore")
-        }
+    binaries.all {
+      linkerOpts(nativeLinkDirs.map { "-L$it" })
+      linkerOpts(nativeLinkLibraries.map { "-l$it" })
+      if (hostOs.contains("mac") || hostOs.contains("linux")) {
+        linkerOpts(nativeRuntimeLibraryDirs.map { "-Wl,-rpath,$it" })
+      }
+      if (hostOs.contains("mac")) {
+        linkerOpts(nativeFrameworks.flatMap { listOf("-framework", it) })
       }
     }
 
@@ -33,8 +40,8 @@ kotlin {
       cinterops {
         val maplibreNativeC by creating {
           defFile(project.file("src/nativeInterop/cinterop/maplibreNativeC.def"))
-          includeDirs.headerFilterOnly(rootProject.file("include"))
-          compilerOpts("-I${rootProject.file("include").absolutePath}")
+          includeDirs.headerFilterOnly(*nativeIncludeDirs.map { file(it) }.toTypedArray())
+          compilerOpts(nativeIncludeDirs.map { "-I$it" })
         }
       }
     }

@@ -11,19 +11,19 @@ fi
 
 [tasks.build]
 depends = ["//:ensure-native-library", ":compile-shaders"]
-run = "zig build {{ env.MLN_FFI_ZIG_BUILD_ARGS }} -Dnative-metadata=\"$MLN_FFI_BUILD_DIR/maplibre-native-c.dev.json\""
+run = "zig build {{ env.MLN_FFI_ZIG_BUILD_ARGS }} -Dnative-config=\"$MLN_FFI_BUILD_DIR/maplibre-native-c.zig-config\""
 
 [tasks.run]
 depends = ["//:ensure-native-library", ":compile-shaders"]
-run = "zig build run {{ env.MLN_FFI_ZIG_BUILD_ARGS }} -Dnative-metadata=\"$MLN_FFI_BUILD_DIR/maplibre-native-c.dev.json\" -- owned-texture"
+run = "zig build run {{ env.MLN_FFI_ZIG_BUILD_ARGS }} -Dnative-config=\"$MLN_FFI_BUILD_DIR/maplibre-native-c.zig-config\" -- owned-texture"
 
 [tasks."run:owned-texture"]
 run = [{ task = "run", args = [] }]
 
 [tasks."run:borrowed-texture"]
 depends = ["//:ensure-native-library", ":compile-shaders"]
-run = "zig build run {{ env.MLN_FFI_ZIG_BUILD_ARGS }} -Dnative-metadata=\"$MLN_FFI_BUILD_DIR/maplibre-native-c.dev.json\" -- borrowed-texture"
+run = "zig build run {{ env.MLN_FFI_ZIG_BUILD_ARGS }} -Dnative-config=\"$MLN_FFI_BUILD_DIR/maplibre-native-c.zig-config\" -- borrowed-texture"
 
 [tasks."run:native-surface"]
 depends = ["//:ensure-native-library", ":compile-shaders"]
-run = "zig build run {{ env.MLN_FFI_ZIG_BUILD_ARGS }} -Dnative-metadata=\"$MLN_FFI_BUILD_DIR/maplibre-native-c.dev.json\" -- native-surface"
+run = "zig build run {{ env.MLN_FFI_ZIG_BUILD_ARGS }} -Dnative-config=\"$MLN_FFI_BUILD_DIR/maplibre-native-c.zig-config\" -- native-surface"

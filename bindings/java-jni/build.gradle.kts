@@ -5,9 +5,16 @@ import org.gradle.jvm.toolchain.JavaToolchainService
 
 plugins { `java-library` }
 
+apply(from = rootProject.file("gradle/native-artifact.gradle.kts"))
+
 repositories { mavenCentral() }
 
 val lwjglVersion = "3.4.1"
+@Suppress("UNCHECKED_CAST")
+val maplibreNativeCProperty = extra["maplibreNativeCProperty"] as (String) -> String
+@Suppress("UNCHECKED_CAST")
+val maplibreNativeCList = extra["maplibreNativeCList"] as (String) -> List<String>
+val maplibreNativeCPropertiesFile = extra["maplibreNativeCPropertiesFile"] as File
 
 fun lwjglNativeClassifier(): String {
   val os = System.getProperty("os.name").lowercase()
@@ -95,7 +102,7 @@ val generateJavaCppBindings =
     args(
       "-classpath",
       classpath.asPath,
-      "-Dplatform.includepath=${rootProject.layout.projectDirectory.dir("include").asFile.absolutePath}",
+      "-Dplatform.includepath=${maplibreNativeCList("maplibreNativeC.includeDirs").joinToString(File.pathSeparator)}",
       "-d",
       generatedJavaCppSources.get().asFile.absolutePath,
       "-nogenerate",
@@ -112,7 +119,7 @@ val generateJavaCppBindings =
 
 tasks.named<JavaCompile>("compileJava") { dependsOn(generateJavaCppBindings) }
 
-val nativeBuildDir = providers.environmentVariable("MLN_FFI_BUILD_DIR")
+val nativeLibraryPath = file(maplibreNativeCProperty("maplibreNativeC.libraryPath"))
 val javaCppPlatformName = javaCppPlatform()
 val jniBridgeLibrary =
   layout.buildDirectory.file(
@@ -129,12 +136,13 @@ val buildJavaCppNative =
     args(
       "-classpath",
       sourceSets.main.get().runtimeClasspath.asPath,
-      "-Dplatform.linkpath=${nativeBuildDir.get()}",
+      "-Dplatform.linkpath=${maplibreNativeCList("maplibreNativeC.linkDirs").joinToString(File.pathSeparator)}",
       "org.maplibre.nativejni.internal.javacpp.MaplibreNativeC",
     )
     inputs.files(sourceSets.main.get().output.classesDirs)
     inputs.dir(rootProject.layout.projectDirectory.dir("include"))
-    inputs.dir(nativeBuildDir)
+    inputs.file(nativeLibraryPath)
+    inputs.file(maplibreNativeCPropertiesFile)
     outputs.file(jniBridgeLibrary)
     mustRunAfter(tasks.named("compileTestJava"))
   }

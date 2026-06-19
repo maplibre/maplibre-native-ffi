@@ -105,14 +105,24 @@ The metadata should include:
 - System libraries and frameworks required by static final links.
 - C ABI version expected by generated or compiled bindings.
 
-Language-specific build scripts may transform this metadata into their native
-tooling format, but they should not duplicate the source of truth.
+The JSON metadata is an internal interchange format. Repository build scripts
+should transform it once, in `scripts/native-metadata.py`, into the simplest
+native input each consumer can use:
+
+- `pkg-config` for consumers with first-class `pkg-config` support.
+- Gradle properties for JVM and Kotlin/Native builds.
+- MSBuild props for .NET development and test projects.
+- Shell environment, Swift linker flags, and Zig key/value config files for
+  tools without a direct `pkg-config` integration point.
+
+Consumer build systems should parse the JSON metadata only when no simpler
+generated format fits their native model.
 
 ## Binding Consumption
 
-Zig should be the first consumer moved to the metadata contract. It already has
-the most complete native linker helper surface, and current iOS static linking
-exposes implementation libraries directly.
+Bindings and examples should consume generated native inputs instead of
+reconstructing library names, include paths, link paths, or runtime search paths
+from the build directory.
 
 After Zig consumes the metadata, Rust, Swift, and Kotlin/Native should move to
 `static-monolithic` for native final-binary workflows.
@@ -132,14 +142,15 @@ owned by the example.
    preserved and iOS device builds mapped to static.
 2. Generate the variant metadata file from CMake configure output.
 3. Replace glob-based native artifact checks with metadata validation.
-4. Move Zig C API tests, Zig binding tests, and Zig examples to the metadata
-   contract.
+4. Move Zig C API tests, Zig binding tests, and Zig examples to generated native
+   config.
 5. Make `static-monolithic` the default for native final-binary consumers.
 6. Move Rust, Swift, and Kotlin/Native native workflows to `static-monolithic`.
 7. Move runtime-loaded bindings to `shared-private` with strict `mln_*` export
    control.
 8. Remove duplicated per-language linker and loader metadata once each binding
-   consumes the generated contract.
+   consumes the generated contract through `pkg-config` or generated
+   tool-specific inputs.
 
 ## Non-Goals
 

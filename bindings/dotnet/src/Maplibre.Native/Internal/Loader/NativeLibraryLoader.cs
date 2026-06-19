@@ -11,7 +11,6 @@ internal static class NativeLibraryLoader
 
     private const string LibraryPathSwitch = "Maplibre.Native.LibraryPath";
     private const string LibraryPathEnvironment = "MAPLIBRE_NATIVE_FFI_LIBRARY_PATH";
-    private const string BuildDirEnvironment = "MLN_FFI_BUILD_DIR";
 
     private static readonly object Gate = new();
     private static bool installed;
@@ -226,26 +225,5 @@ internal static class NativeLibraryLoader
         {
             yield return environmentPath;
         }
-
-        var buildDir = Environment.GetEnvironmentVariable(BuildDirEnvironment);
-        if (!string.IsNullOrWhiteSpace(buildDir))
-        {
-            yield return Path.Combine(buildDir, PlatformLibraryFileName());
-        }
-    }
-
-    internal static string PlatformLibraryFileName()
-    {
-        if (OperatingSystem.IsWindows())
-        {
-            return "maplibre-native-c.dll";
-        }
-
-        if (OperatingSystem.IsMacOS())
-        {
-            return "libmaplibre-native-c.dylib";
-        }
-
-        return "libmaplibre-native-c.so";
     }
 }

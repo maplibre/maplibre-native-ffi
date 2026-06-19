@@ -1,10 +1,10 @@
 [tasks.build]
 depends = ["//:ensure-native-library"]
-run = "zig build {{ env.MLN_FFI_ZIG_BUILD_ARGS }} -Dnative-metadata=\"$MLN_FFI_BUILD_DIR/maplibre-native-c.dev.json\""
+run = "zig build {{ env.MLN_FFI_ZIG_BUILD_ARGS }} -Dnative-config=\"$MLN_FFI_BUILD_DIR/maplibre-native-c.zig-config\""
 
 [tasks.test]
 depends = ["//:ensure-native-library"]
-run = "zig build test {{ env.MLN_FFI_ZIG_BUILD_ARGS }} -Dnative-metadata=\"$MLN_FFI_BUILD_DIR/maplibre-native-c.dev.json\" --test-timeout \"$MLN_FFI_TEST_TIMEOUT\" --summary all --verbose"
+run = "zig build test {{ env.MLN_FFI_ZIG_BUILD_ARGS }} -Dnative-config=\"$MLN_FFI_BUILD_DIR/maplibre-native-c.zig-config\" --test-timeout \"$MLN_FFI_TEST_TIMEOUT\" --summary all --verbose"
 
 [tasks.ci]
 depends = [":test"]

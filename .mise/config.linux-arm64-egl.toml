@@ -6,4 +6,3 @@ BINDGEN_EXTRA_CLANG_ARGS = "{% if os() == \"linux\" %}-isystem{{ exec(command='c
 CMAKE_LIBRARY_PATH = "{{env.MLN_FFI_DEPENDENCY_LIBRARY_DIR}}"
 LIBRARY_PATH = "{{env.MLN_FFI_DEPENDENCY_LIBRARY_DIR}}"
 LD_LIBRARY_PATH = "{{env.MLN_FFI_DEPENDENCY_LIBRARY_DIR}}"
-RUSTFLAGS = "-C link-arg=-Wl,-rpath,{{env.MLN_FFI_DEPENDENCY_LIBRARY_DIR}} -C link-arg=-Wl,-rpath-link,{{env.MLN_FFI_DEPENDENCY_LIBRARY_DIR}} -C link-arg=-Wl,-rpath,{{env.MLN_FFI_BUILD_DIR}}"

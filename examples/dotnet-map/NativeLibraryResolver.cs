@@ -5,7 +5,8 @@ namespace Maplibre.Native.Examples.DotnetMap;
 
 internal static class NativeLibraryResolver
 {
-    private const string DependencyLibraryDirEnvironment = "MLN_FFI_DEPENDENCY_LIBRARY_DIR";
+    private const string LibraryDirsSwitch = "Maplibre.Native.LibraryDirs";
+    private const string LibraryDirsEnvironment = "MLN_FFI_NATIVE_LIBRARY_DIRS";
     private static readonly object RegistrationLock = new();
     private static bool registered;
 
@@ -82,69 +83,31 @@ internal static class NativeLibraryResolver
 
     private static IEnumerable<string> CandidateLibraryDirectories()
     {
-        var dependencyLibraryDir = Environment.GetEnvironmentVariable(
-            DependencyLibraryDirEnvironment
-        );
-        if (!string.IsNullOrWhiteSpace(dependencyLibraryDir))
+        var switchDirs = AppContext.GetData(LibraryDirsSwitch) as string;
+        foreach (var directory in PathList(switchDirs))
         {
-            yield return dependencyLibraryDir;
+            yield return directory;
         }
 
-        var environmentPrefixes = new[]
+        var environmentDirs = Environment.GetEnvironmentVariable(LibraryDirsEnvironment);
+        foreach (var directory in PathList(environmentDirs))
         {
-            Environment.GetEnvironmentVariable("CONDA_PREFIX"),
-            Environment.GetEnvironmentVariable("PIXI_PROJECT_ROOT") is { Length: > 0 } pixiRoot
-                ? Path.Combine(pixiRoot, ".pixi", "envs", "default")
-                : null,
-        };
-
-        foreach (var prefix in environmentPrefixes)
-        {
-            if (!string.IsNullOrWhiteSpace(prefix))
-            {
-                foreach (var directory in PrefixLibraryDirectories(prefix))
-                {
-                    yield return directory;
-                }
-            }
-        }
-
-        foreach (var start in new[] { Directory.GetCurrentDirectory(), AppContext.BaseDirectory })
-        {
-            for (
-                var directory = new DirectoryInfo(start);
-                directory is not null;
-                directory = directory.Parent
-            )
-            {
-                var pixiLib = Path.Combine(directory.FullName, ".pixi", "envs", "default", "lib");
-                if (Directory.Exists(pixiLib))
-                {
-                    yield return pixiLib;
-                    break;
-                }
-            }
+            yield return directory;
         }
     }
 
-    private static IEnumerable<string> PrefixLibraryDirectories(string prefix)
+    private static IEnumerable<string> PathList(string? value)
     {
-        var lib = Path.Combine(prefix, "lib");
-        if (Directory.Exists(lib))
+        if (string.IsNullOrWhiteSpace(value))
         {
-            yield return lib;
+            yield break;
         }
 
-        var bin = Path.Combine(prefix, "bin");
-        if (Directory.Exists(bin))
+        foreach (
+            var directory in value.Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries)
+        )
         {
-            yield return bin;
-        }
-
-        var windowsLibraryBin = Path.Combine(prefix, "Library", "bin");
-        if (Directory.Exists(windowsLibraryBin))
-        {
-            yield return windowsLibraryBin;
+            yield return directory;
         }
     }
 }

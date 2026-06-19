@@ -17,6 +17,7 @@ case "${MLN_FFI_RENDER_BACKEND:-}" in
   metal | opengl | vulkan) feature="$MLN_FFI_RENDER_BACKEND" ;;
   *) echo "unsupported rust-map render backend: ${MLN_FFI_RENDER_BACKEND:-unset}" >&2; exit 1 ;;
 esac
+. "$MLN_FFI_BUILD_DIR/maplibre-native-c.env"
 cargo build -p rust-map --no-default-features --features "$feature"
 '''
 
@@ -28,6 +29,7 @@ case "${MLN_FFI_RENDER_BACKEND:-}" in
   metal | opengl | vulkan) feature="$MLN_FFI_RENDER_BACKEND" ;;
   *) echo "unsupported rust-map render backend: ${MLN_FFI_RENDER_BACKEND:-unset}" >&2; exit 1 ;;
 esac
+. "$MLN_FFI_BUILD_DIR/maplibre-native-c.env"
 cargo clippy -p rust-map --no-default-features --features "$feature" --all-targets -- -D warnings
 '''
 
@@ -40,6 +42,7 @@ case "${MLN_FFI_RENDER_BACKEND:-}" in
   metal | opengl | vulkan) feature="$MLN_FFI_RENDER_BACKEND" ;;
   *) echo "unsupported rust-map render backend: ${MLN_FFI_RENDER_BACKEND:-unset}" >&2; exit 1 ;;
 esac
+. "$MLN_FFI_BUILD_DIR/maplibre-native-c.env"
 cargo run -p rust-map --no-default-features --features "$feature" -- "{{ usage.render_target }}"
 '''
 

@@ -6,9 +6,16 @@ plugins {
   id("de.infolektuell.jextract") version "1.4.0"
 }
 
+apply(from = rootProject.file("gradle/native-artifact.gradle.kts"))
+
 repositories { mavenCentral() }
 
 val lwjglVersion = "3.4.1"
+@Suppress("UNCHECKED_CAST")
+val maplibreNativeCProperty = extra["maplibreNativeCProperty"] as (String) -> String
+@Suppress("UNCHECKED_CAST")
+val maplibreNativeCList = extra["maplibreNativeCList"] as (String) -> List<String>
+val maplibreNativeCPropertiesFile = extra["maplibreNativeCPropertiesFile"] as File
 
 fun lwjglNativeClassifier(): String {
   val os = System.getProperty("os.name").lowercase()
@@ -29,7 +36,9 @@ val lwjglTestJvmArgs = listOf("--enable-native-access=ALL-UNNAMED")
 jextract.libraries {
   val maplibreNativeC by registering {
     header = rootProject.layout.projectDirectory.file("include/maplibre_native_c.h")
-    includes.add(rootProject.layout.projectDirectory.dir("include"))
+    maplibreNativeCList("maplibreNativeC.includeDirs").forEach { includeDir ->
+      includes.add(rootProject.layout.dir(providers.provider { file(includeDir) }))
+    }
     headerClassName = "MapLibreNativeC"
     targetPackage = "org.maplibre.nativeffi.internal.c"
     whitelist.argFile = layout.projectDirectory.file("src/jextract/maplibre-native-c.includes")
@@ -70,14 +79,12 @@ tasks.named<Javadoc>("javadoc") {
 }
 
 val nativeLibraryPathProperty = "org.maplibre.nativeffi.library.path"
-val nativeBuildDirForTests = providers.environmentVariable("MLN_FFI_BUILD_DIR")
-val nativeLibraryPathForTests = nativeBuildDirForTests.map {
-  "$it/${System.mapLibraryName("maplibre-native-c")}"
-}
+val nativeLibraryPathForTests = file(maplibreNativeCProperty("maplibreNativeC.libraryPath"))
 
 tasks.withType<Test>().configureEach {
   useJUnitPlatform()
   jvmArgs(lwjglTestJvmArgs)
-  systemProperty(nativeLibraryPathProperty, nativeLibraryPathForTests.get())
+  systemProperty(nativeLibraryPathProperty, nativeLibraryPathForTests.absolutePath)
   inputs.file(nativeLibraryPathForTests).withPropertyName("maplibreNativeCLibrary")
+  inputs.file(maplibreNativeCPropertiesFile).withPropertyName("maplibreNativeCProperties")
 }

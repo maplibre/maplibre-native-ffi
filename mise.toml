@@ -150,11 +150,11 @@ fi
 '''
 
 [tasks.test]
-depends = ["//:build"]
+depends = ["//:ensure-native-library"]
 run = '''
 (
   cd src/c_api/tests/zig
-  zig build test {{ env.MLN_FFI_ZIG_BUILD_ARGS }} -Dnative-metadata="$MLN_FFI_BUILD_DIR/maplibre-native-c.dev.json" --test-timeout "$MLN_FFI_TEST_TIMEOUT" --summary all --verbose
+  zig build test {{ env.MLN_FFI_ZIG_BUILD_ARGS }} -Dnative-config="$MLN_FFI_BUILD_DIR/maplibre-native-c.zig-config" --test-timeout "$MLN_FFI_TEST_TIMEOUT" --summary all --verbose
 )
 '''
 
