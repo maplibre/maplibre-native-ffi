@@ -52,6 +52,18 @@ os = "ios"
 arch = "arm64"
 backend = "metal"
 
+[variants.ohos-arm64-egl]
+runner = "ubuntu-latest"
+os = "ohos"
+arch = "arm64"
+backend = "opengl"
+
+[variants.ohos-arm64-vulkan]
+runner = "ubuntu-latest"
+os = "ohos"
+arch = "arm64"
+backend = "vulkan"
+
 [variants.windows-x64-vulkan]
 runner = "windows-2022"
 os = "windows"

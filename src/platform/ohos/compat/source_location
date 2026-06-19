@@ -1,0 +1,52 @@
+#pragma once
+
+#if defined(__has_include_next)
+#if __has_include_next(<source_location>)
+#include_next <source_location>
+#define MLN_FFI_OHOS_HAS_REAL_SOURCE_LOCATION 1
+#endif
+#endif
+
+#ifndef MLN_FFI_OHOS_HAS_REAL_SOURCE_LOCATION
+#include <cstdint>
+
+namespace std {
+
+struct source_location {
+  static constexpr source_location current(
+    const char* file = __builtin_FILE(),
+    const char* function = __builtin_FUNCTION(),
+    uint_least32_t line = __builtin_LINE(),
+    uint_least32_t column = __builtin_COLUMN()
+  ) noexcept {
+    return source_location(file, function, line, column);
+  }
+
+  constexpr source_location() noexcept = default;
+
+  constexpr uint_least32_t line() const noexcept { return line_; }
+  constexpr uint_least32_t column() const noexcept { return column_; }
+  constexpr const char* file_name() const noexcept { return file_; }
+  constexpr const char* function_name() const noexcept { return function_; }
+
+ private:
+  constexpr source_location(
+    const char* file,
+    const char* function,
+    uint_least32_t line,
+    uint_least32_t column
+  ) noexcept
+      : file_(file),
+        function_(function),
+        line_(line),
+        column_(column) {}
+
+  const char* file_ = "";
+  const char* function_ = "";
+  uint_least32_t line_ = 0;
+  uint_least32_t column_ = 0;
+};
+
+}  // namespace std
+
+#endif

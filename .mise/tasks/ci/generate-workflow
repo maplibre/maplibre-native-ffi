@@ -160,11 +160,13 @@ def load_commands(variants: list[Variant]) -> dict[str, list[str]]:
             if not matches(variant, requires) or variant.name in excluded_variants:
                 continue
             for action_key, task in tasks.items():
-                if is_native and variant.os != "ios" and action_key == "build":
+                build_only_native = variant.os in {"ios", "ohos"}
+                if is_native and not build_only_native and action_key == "build":
                     continue
-                # Temporary policy: iOS variants build only. When iOS tests are wired,
-                # remove this branch and let subproject manifests opt into test actions.
-                if variant.os == "ios" and action_key == "test":
+                # Temporary policy: mobile cross variants build only. When device
+                # or simulator test targets are wired, remove this branch and let
+                # subproject manifests opt into test actions.
+                if build_only_native and action_key == "test":
                     continue
                 commands[variant.name].append(f"mise run {task}")
 

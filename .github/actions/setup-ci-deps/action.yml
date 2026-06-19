@@ -94,6 +94,19 @@ runs:
           ~/.cargo/git/db/
         key: ${{ runner.os }}-${{ runner.arch }}-cargo-registry-v1-${{ hashFiles('**/Cargo.lock') }}
 
+    - name: Setup OpenHarmony SDK
+      id: setup-ohos-sdk
+      if: ${{ contains(env.MISE_ENV, 'ohos') }}
+      uses: openharmony-rs/setup-ohos-sdk@eb82b94ef522b07269679195c2512f22e922ef3b # v1.0.0
+      with:
+        version: "6.1"
+        components: native
+
+    - name: Export OpenHarmony SDK
+      if: ${{ contains(env.MISE_ENV, 'ohos') }}
+      shell: bash
+      run: echo "OHOS_SDK_NATIVE=${{ steps.setup-ohos-sdk.outputs.ohos_sdk_native }}" >> "$GITHUB_ENV"
+
     - name: Cache Gradle
       uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
       with:
@@ -153,7 +166,7 @@ runs:
         } >> "$GITHUB_ENV"
 
     - name: Diagnose EGL setup
-      if: ${{ runner.os == 'Linux' }}
+      if: ${{ runner.os == 'Linux' && !contains(env.MISE_ENV, 'ohos') }}
       shell: bash
       run: |
         mise exec -- bash -euo pipefail -c '
@@ -163,7 +176,7 @@ runs:
         '
 
     - name: Diagnose Vulkan setup
-      if: ${{ contains(env.MISE_ENV, 'vulkan') }}
+      if: ${{ contains(env.MISE_ENV, 'vulkan') && !contains(env.MISE_ENV, 'ohos') }}
       shell: bash
       run: mise run ci:vulkan-info
 
