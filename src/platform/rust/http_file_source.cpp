@@ -315,7 +315,6 @@ class HTTPRequest : public AsyncRequest {
       );
     }
 
-    header_storage.emplace_back("Accept-Encoding", "gzip, deflate");
     header_storage.emplace_back("User-Agent", "MapLibreNative/1.0");
 
     headers.reserve(header_storage.size());

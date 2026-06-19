@@ -61,10 +61,11 @@ pub unsafe extern "C" fn mln_rust_http_request_start(
     let thread_canceled = Arc::clone(&canceled);
     let callback_user_data = user_data as usize;
     http_thread_pool().execute(move || {
-        // Keep the cancellation flag alive until the callback runs. The C++
-        // request owner handles canceled completions for now.
-        let _ = thread_canceled;
-        let response = send_http_request(request);
+        let response = if thread_canceled.load(Ordering::Acquire) {
+            http_error(HTTP_ERROR_OTHER, "HTTP request canceled before start")
+        } else {
+            send_http_request(request)
+        };
         // SAFETY: The C++ caller keeps `user_data` valid until this callback
         // runs, even when the request is canceled.
         unsafe {
