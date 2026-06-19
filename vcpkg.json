@@ -24,6 +24,7 @@
     },
     { "name": "libpng", "platform": "linux | windows | android" },
     { "name": "libuv", "platform": "linux | windows | android" },
+    { "name": "vulkan-loader", "platform": "linux | osx | windows" },
     {
       "name": "libwebp",
       "default-features": false,
