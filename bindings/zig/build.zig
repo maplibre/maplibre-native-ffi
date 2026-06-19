@@ -7,6 +7,7 @@ const BuildOptions = struct {
     cmake_artifact_dir: std.Build.LazyPath,
     include_dirs: []const std.Build.LazyPath,
     dependency_library_dirs: []const std.Build.LazyPath,
+    dependency_object_files: []const std.Build.LazyPath,
     render_backend: RenderBackend,
 };
 
@@ -22,6 +23,7 @@ pub const LinkOptions = struct {
     render_backend: RenderBackend,
     include_dirs: []const std.Build.LazyPath,
     dependency_library_dirs: []const std.Build.LazyPath = &.{},
+    dependency_object_files: []const std.Build.LazyPath = &.{},
 };
 
 pub const DependencyOptions = struct {
@@ -31,12 +33,14 @@ pub const DependencyOptions = struct {
     include_dirs: []const std.Build.LazyPath,
     render_backend: RenderBackend,
     dependency_library_dirs: []const std.Build.LazyPath = &.{},
+    dependency_object_files: []const std.Build.LazyPath = &.{},
 };
 
 pub const RenderBackendLinkOptions = struct {
     target: std.Build.ResolvedTarget,
     render_backend: RenderBackend,
     dependency_library_dirs: []const std.Build.LazyPath = &.{},
+    dependency_object_files: []const std.Build.LazyPath = &.{},
 };
 
 pub fn renderBackend(b: *std.Build) RenderBackend {
@@ -77,6 +81,14 @@ pub fn dependencyLibraryDirs(b: *std.Build) []const std.Build.LazyPath {
     ) orelse &.{};
 }
 
+pub fn dependencyObjectFiles(b: *std.Build) []const std.Build.LazyPath {
+    return b.option(
+        []const std.Build.LazyPath,
+        "dependency-object-file",
+        "Dependency object or archive file. Repeat for backend runtime archives.",
+    ) orelse &.{};
+}
+
 fn addDependencyLibraryPaths(module: *std.Build.Module, dependency_library_dirs: []const std.Build.LazyPath) void {
     for (dependency_library_dirs) |dependency_library_dir| {
         const dependency_library_path = dependency_library_dir.getPath(module.owner);
@@ -102,6 +114,14 @@ fn addSharedLibraryFile(
         }
     }
     return false;
+}
+
+fn addDependencyObjectFiles(module: *std.Build.Module, dependency_object_files: []const std.Build.LazyPath) void {
+    for (dependency_object_files) |dependency_object_file| {
+        const dependency_object_path = dependency_object_file.getPath(module.owner);
+        std.Io.Dir.cwd().access(module.owner.graph.io, dependency_object_path, .{}) catch continue;
+        module.addObjectFile(dependency_object_file);
+    }
 }
 
 pub fn addPlatformSystemPaths(b: *std.Build, module: *std.Build.Module, target: std.Build.ResolvedTarget) void {
@@ -188,6 +208,7 @@ pub fn linkRenderBackend(b: *std.Build, module: *std.Build.Module, options: Rend
             module.linkSystemLibrary("vulkan", .{ .use_pkg_config = .force });
         },
     }
+    addDependencyObjectFiles(module, options.dependency_object_files);
 }
 
 fn dependencyArgs(options: DependencyOptions) struct {
@@ -197,6 +218,7 @@ fn dependencyArgs(options: DependencyOptions) struct {
     @"include-dir": []const std.Build.LazyPath,
     @"render-backend": RenderBackend,
     @"dependency-library-dir": []const std.Build.LazyPath,
+    @"dependency-object-file": []const std.Build.LazyPath,
 } {
     return .{
         .target = options.target,
@@ -205,6 +227,7 @@ fn dependencyArgs(options: DependencyOptions) struct {
         .@"include-dir" = options.include_dirs,
         .@"render-backend" = options.render_backend,
         .@"dependency-library-dir" = options.dependency_library_dirs,
+        .@"dependency-object-file" = options.dependency_object_files,
     };
 }
 
@@ -223,6 +246,7 @@ fn repoLinkOptions(options: BuildOptions) LinkOptions {
         .render_backend = options.render_backend,
         .include_dirs = options.include_dirs,
         .dependency_library_dirs = options.dependency_library_dirs,
+        .dependency_object_files = options.dependency_object_files,
     };
 }
 
@@ -253,6 +277,7 @@ pub fn linkMaplibreNativeC(b: *std.Build, module_: *std.Build.Module, options: L
         .target = options.target,
         .render_backend = options.render_backend,
         .dependency_library_dirs = options.dependency_library_dirs,
+        .dependency_object_files = options.dependency_object_files,
     });
 }
 
@@ -368,6 +393,7 @@ pub fn build(b: *std.Build) void {
         .cmake_artifact_dir = cmake_artifact_dir,
         .include_dirs = include_dirs,
         .dependency_library_dirs = dependencyLibraryDirs(b),
+        .dependency_object_files = dependencyObjectFiles(b),
         .render_backend = backend,
     };
     checkSupportedTarget(options.target, options.render_backend);

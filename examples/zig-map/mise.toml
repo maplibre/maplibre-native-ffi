@@ -1,6 +1,6 @@
 [env]
 MLN_FFI_ZIG_MAP_VCPKG_INSTALLED_DIR = "{{env.MLN_FFI_VCPKG_INSTALLED_DIR}}/examples/zig-map"
-PKG_CONFIG_PATH = "{{env.MLN_FFI_ZIG_MAP_VCPKG_INSTALLED_DIR}}/{{env.MLN_FFI_VCPKG_TARGET_TRIPLET}}/lib/pkgconfig{% if env.PKG_CONFIG_PATH is defined and env.PKG_CONFIG_PATH != \"\" %}:{{env.PKG_CONFIG_PATH}}{% endif %}"
+PKG_CONFIG_PATH = "{% if os() == \"windows\" %}{{ exec(command='cygpath -m \"$MLN_FFI_ZIG_MAP_VCPKG_INSTALLED_DIR/$MLN_FFI_VCPKG_TARGET_TRIPLET/lib/pkgconfig\"', cache_key='zig-map-windows-pkg-config-path', cache_duration='1d') | trim }}{% if env.PKG_CONFIG_PATH is defined and env.PKG_CONFIG_PATH != \"\" %};{{env.PKG_CONFIG_PATH}}{% endif %}{% else %}{{env.MLN_FFI_ZIG_MAP_VCPKG_INSTALLED_DIR}}/{{env.MLN_FFI_VCPKG_TARGET_TRIPLET}}/lib/pkgconfig{% if env.PKG_CONFIG_PATH is defined and env.PKG_CONFIG_PATH != \"\" %}:{{env.PKG_CONFIG_PATH}}{% endif %}{% endif %}"
 
 [tasks.deps]
 hide = true

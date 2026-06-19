@@ -11,4 +11,4 @@ MLN_FFI_VCPKG_INSTALLED_DIR = "{{config_root}}/build/vcpkg/installed/windows-x64
 MLN_FFI_ZIG_TARGET = "x86_64-windows-msvc"
 MLN_FFI_SYSTEM_ROOT = false
 MLN_FFI_ZIG_BUILD_ARGS = "-Dtarget=x86_64-windows-msvc -Dcmake-artifact-dir=\"{{env.MLN_FFI_BUILD_DIR}}\" -Drender-backend=vulkan -Dinclude-dir=\"{{env.MLN_FFI_INCLUDE_DIR}}\" -Dinclude-dir=\"{{env.MLN_FFI_VULKAN_INCLUDE_DIR}}\" -Ddependency-library-dir=\"{{env.MLN_FFI_VCPKG_INSTALLED_DIR}}/{{env.MLN_FFI_VCPKG_TARGET_TRIPLET}}/lib\""
-PKG_CONFIG_PATH = "{{env.MLN_FFI_VCPKG_INSTALLED_DIR}}/{{env.MLN_FFI_VCPKG_TARGET_TRIPLET}}/lib/pkgconfig"
+PKG_CONFIG_PATH = "{% if os() == \"windows\" %}{{ exec(command='cygpath -m \"$MLN_FFI_VCPKG_INSTALLED_DIR/$MLN_FFI_VCPKG_TARGET_TRIPLET/lib/pkgconfig\"', cache_key='windows-x64-vulkan-pkg-config-path', cache_duration='1d') | trim }}{% else %}{{env.MLN_FFI_VCPKG_INSTALLED_DIR}}/{{env.MLN_FFI_VCPKG_TARGET_TRIPLET}}/lib/pkgconfig{% endif %}"
