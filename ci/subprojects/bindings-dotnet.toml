@@ -1,0 +1,6 @@
+[requires]
+exclude = ["macos-arm64-egl"]
+os = ["linux", "macos", "windows"]
+
+[ci]
+test = "//bindings/dotnet:test"

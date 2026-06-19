@@ -14,6 +14,15 @@ local lintSteps = new Mapping<String, Step> {
     glob = List(".github/workflows/*.yml", ".github/workflows/*.yaml")
     check = "actionlint {{files}}"
   }
+  ["ci-workflow"] {
+    glob = List(
+      "ci/**/*.toml",
+      ".mise/tasks/ci/generate-workflow",
+      ".github/workflows/ci.yml",
+    )
+    check = "mise run ci:generate-workflow -- --check"
+    fix = "mise run ci:generate-workflow"
+  }
   ["jvl"] {
     glob = List("**/*.json", "**/*.jsonc")
     check = "jvl check {{files}}"
