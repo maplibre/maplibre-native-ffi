@@ -17,7 +17,9 @@ final class MetalMapView: NSView {
   private var setupError: Error?
   private var errorLabel: NSTextField?
 
-  override var acceptsFirstResponder: Bool { true }
+  override var acceptsFirstResponder: Bool {
+    true
+  }
 
   init(mode: RenderTargetMode) {
     self.mode = mode
@@ -42,7 +44,7 @@ final class MetalMapView: NSView {
     }
   }
 
-  required init?(coder: NSCoder) {
+  required init?(coder _: NSCoder) {
     return nil
   }
 
@@ -112,7 +114,9 @@ final class MetalMapView: NSView {
 
   override func keyDown(with event: NSEvent) {
     guard let viewport = currentViewport else { return }
-    handleInput { map in try input.keyDown(event, map: map, viewport: viewport) }
+    handleInput { map in
+      try input.keyDown(event, map: map, viewport: viewport)
+    }
   }
 
   private func handleInput(_ action: (MapHandle) throws -> Bool) {
@@ -127,9 +131,12 @@ final class MetalMapView: NSView {
   private func startTimerIfNeeded() {
     guard timer == nil else { return }
     // TODO(map-example-spec): Replace fixed NSTimer with a display-paced host loop. See Frame loop.
-    timer = Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0, repeats: true) { [weak self] _ in
-      Task { @MainActor in self?.tick() }
-    }
+    timer = Timer
+      .scheduledTimer(withTimeInterval: 1.0 / 60.0,
+                      repeats: true)
+      { [weak self] _ in
+        Task { @MainActor in self?.tick() }
+      }
     RunLoop.main.add(timer!, forMode: .common)
   }
 
@@ -150,7 +157,11 @@ final class MetalMapView: NSView {
     do {
       graphics.resize(viewport)
       if mapState == nil {
-        mapState = try MapState(mode: mode, viewport: viewport, graphics: graphics)
+        mapState = try MapState(
+          mode: mode,
+          viewport: viewport,
+          graphics: graphics
+        )
         if !didLogStartupStatus {
           logStartupStatus(mode: mode)
           didLogStartupStatus = true
@@ -192,7 +203,8 @@ final class MetalMapView: NSView {
   }
 
   private func readViewport() -> Viewport {
-    let rawScale = window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 1.0
+    let rawScale = window?.backingScaleFactor ?? NSScreen.main?
+      .backingScaleFactor ?? 1.0
     let scale = rawScale.isFinite && rawScale > 0 ? rawScale : 1.0
     let rawLogicalWidth = bounds.width
     let rawLogicalHeight = bounds.height
@@ -220,8 +232,14 @@ final class MetalMapView: NSView {
       label.alignment = .center
       addSubview(label)
       NSLayoutConstraint.activate([
-        label.leadingAnchor.constraint(greaterThanOrEqualTo: leadingAnchor, constant: 24),
-        label.trailingAnchor.constraint(lessThanOrEqualTo: trailingAnchor, constant: -24),
+        label.leadingAnchor.constraint(
+          greaterThanOrEqualTo: leadingAnchor,
+          constant: 24
+        ),
+        label.trailingAnchor.constraint(
+          lessThanOrEqualTo: trailingAnchor,
+          constant: -24
+        ),
         label.centerXAnchor.constraint(equalTo: centerXAnchor),
         label.centerYAnchor.constraint(equalTo: centerYAnchor),
       ])

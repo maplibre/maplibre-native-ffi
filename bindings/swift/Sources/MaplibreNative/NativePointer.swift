@@ -48,10 +48,18 @@ final class NativeFrameScope: @unchecked Sendable {
   func requireActive(_ diagnostic: String) throws {
     let isActive = lock.withLock { active }
     guard isActive else {
-      throw MaplibreError(kind: .invalidState, rawStatus: nil, diagnostic: "\(diagnostic) scope has ended")
+      throw MaplibreError(
+        kind: .invalidState,
+        rawStatus: nil,
+        diagnostic: "\(diagnostic) scope has ended"
+      )
     }
     guard isFrameLive() else {
-      throw MaplibreError(kind: .invalidState, rawStatus: nil, diagnostic: "\(diagnostic) frame is closed")
+      throw MaplibreError(
+        kind: .invalidState,
+        rawStatus: nil,
+        diagnostic: "\(diagnostic) frame is closed"
+      )
     }
   }
 }
@@ -85,7 +93,9 @@ public struct FrameNativePointer: Sendable, Hashable, CustomStringConvertible {
     "FrameNativePointer(address: 0x\(String(bitPattern, radix: 16)))"
   }
 
-  public static func == (lhs: FrameNativePointer, rhs: FrameNativePointer) -> Bool {
+  public static func == (lhs: FrameNativePointer,
+                         rhs: FrameNativePointer) -> Bool
+  {
     lhs.bitPattern == rhs.bitPattern
   }
 
@@ -94,7 +104,9 @@ public struct FrameNativePointer: Sendable, Hashable, CustomStringConvertible {
   }
 }
 
-public struct FrameOpenGLTextureName: Sendable, Hashable, CustomStringConvertible {
+public struct FrameOpenGLTextureName: Sendable, Hashable,
+  CustomStringConvertible
+{
   private let name: UInt32
   private let scope: NativeFrameScope
 
@@ -121,7 +133,10 @@ public struct FrameOpenGLTextureName: Sendable, Hashable, CustomStringConvertibl
     "FrameOpenGLTextureName(\(name))"
   }
 
-  public static func == (lhs: FrameOpenGLTextureName, rhs: FrameOpenGLTextureName) -> Bool {
+  public static func == (
+    lhs: FrameOpenGLTextureName,
+    rhs: FrameOpenGLTextureName
+  ) -> Bool {
     lhs.name == rhs.name
   }
 

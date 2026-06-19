@@ -1,6 +1,6 @@
 internal import CMaplibreNativeC
 
-enum NativeRenderedQueryGeometry: Equatable, Sendable {
+enum NativeRenderedQueryGeometry: Equatable {
   case point(NativeScreenPoint)
   case box(min: NativeScreenPoint, max: NativeScreenPoint)
   case lineString([NativeScreenPoint])
@@ -9,26 +9,35 @@ enum NativeRenderedQueryGeometry: Equatable, Sendable {
     _ body: (UnsafePointer<mln_rendered_query_geometry>) throws -> Result
   ) throws -> Result {
     switch self {
-    case .point(let point):
+    case let .point(point):
       var geometry = mln_rendered_query_geometry_point(point.native)
       return try withUnsafePointer(to: &geometry, body)
-    case .box(let min, let max):
-      var geometry = mln_rendered_query_geometry_box(mln_screen_box(min: min.native, max: max.native))
+    case let .box(min, max):
+      var geometry = mln_rendered_query_geometry_box(mln_screen_box(
+        min: min.native,
+        max: max.native
+      ))
       return try withUnsafePointer(to: &geometry, body)
-    case .lineString(let points):
+    case let .lineString(points):
       guard !points.isEmpty else {
-        throw NativeStatusFailure.swiftInvalidArgument("rendered query line string geometry must contain at least one point")
+        throw NativeStatusFailure
+          .swiftInvalidArgument(
+            "rendered query line string geometry must contain at least one point"
+          )
       }
       let nativePoints = points.map(\.native)
       return try nativePoints.withUnsafeBufferPointer { buffer in
-        var geometry = mln_rendered_query_geometry_line_string(buffer.baseAddress, buffer.count)
+        var geometry = mln_rendered_query_geometry_line_string(
+          buffer.baseAddress,
+          buffer.count
+        )
         return try withUnsafePointer(to: &geometry, body)
       }
     }
   }
 }
 
-struct NativeRenderedFeatureQueryOptions: Equatable, Sendable {
+struct NativeRenderedFeatureQueryOptions: Equatable {
   let layerIds: [String]
   let filter: NativeJSONValue?
 
@@ -38,7 +47,8 @@ struct NativeRenderedFeatureQueryOptions: Equatable, Sendable {
   }
 
   func withNativeOptions<Result>(
-    _ body: (UnsafePointer<mln_rendered_feature_query_options>?) throws -> Result
+    _ body: (UnsafePointer<mln_rendered_feature_query_options>?) throws
+      -> Result
   ) throws -> Result {
     if layerIds.isEmpty, filter == nil { return try body(nil) }
     let arena = NativeInputArena()
@@ -58,7 +68,7 @@ struct NativeRenderedFeatureQueryOptions: Equatable, Sendable {
   }
 }
 
-struct NativeSourceFeatureQueryOptions: Equatable, Sendable {
+struct NativeSourceFeatureQueryOptions: Equatable {
   let sourceLayerIds: [String]
   let filter: NativeJSONValue?
 
@@ -76,7 +86,8 @@ struct NativeSourceFeatureQueryOptions: Equatable, Sendable {
     return try layerViews.withUnsafeBufferPointer { layerViews in
       var options = mln_source_feature_query_options_default()
       if !self.sourceLayerIds.isEmpty {
-        options.fields |= MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS.rawValue
+        options.fields |= MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS
+          .rawValue
         options.source_layer_ids = layerViews.baseAddress
         options.source_layer_id_count = layerViews.count
       }
@@ -88,20 +99,29 @@ struct NativeSourceFeatureQueryOptions: Equatable, Sendable {
   }
 }
 
-struct NativeFeatureStateSelector: Equatable, Sendable {
+struct NativeFeatureStateSelector: Equatable {
   let sourceId: String
   let sourceLayerId: String?
   let featureId: String?
   let stateKey: String?
 
-  init(sourceId: String, sourceLayerId: String? = nil, featureId: String? = nil, stateKey: String? = nil) {
+  init(
+    sourceId: String,
+    sourceLayerId: String? = nil,
+    featureId: String? = nil,
+    stateKey: String? = nil
+  ) {
     self.sourceId = sourceId
     self.sourceLayerId = sourceLayerId
     self.featureId = featureId
     self.stateKey = stateKey
   }
 
-  func withNativeSelector<Result>(_ body: (UnsafePointer<mln_feature_state_selector>) throws -> Result) throws -> Result {
+  func withNativeSelector<Result>(_ body: (
+    UnsafePointer<mln_feature_state_selector>
+  ) throws
+    -> Result) throws -> Result
+  {
     let arena = NativeInputArena()
     var selector = mln_feature_state_selector()
     selector.size = UInt32(MemoryLayout<mln_feature_state_selector>.size)
@@ -125,13 +145,9 @@ struct NativeFeatureStateSelector: Equatable, Sendable {
 struct NativeFeatureQueryResultReader {
   let handle: OpaquePointer
 
-  init(handle: OpaquePointer) {
-    self.handle = handle
-  }
-
   func copyFeatures() throws -> [NativeQueriedFeature] {
     let count = try NativeQuery.featureQueryResultCount(handle)
-    return try (0..<count).map { index in
+    return try (0 ..< count).map { index in
       try NativeQuery.featureQueryResultGet(handle, index: index)
     }
   }

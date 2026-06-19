@@ -10,8 +10,12 @@ public enum Maplibre {
     RenderBackend(rawValue: mln_supported_render_backend_mask())
   }
 
-  public static func supportedOpenGLContextProviders() -> OpenGLContextProvider {
-    OpenGLContextProvider(rawValue: mln_opengl_supported_context_provider_mask())
+  public static func supportedOpenGLContextProviders()
+    -> OpenGLContextProvider
+  {
+    OpenGLContextProvider(
+      rawValue: mln_opengl_supported_context_provider_mask()
+    )
   }
 
   public static func networkStatus() throws -> NetworkStatus {

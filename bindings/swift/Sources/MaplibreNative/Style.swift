@@ -85,7 +85,12 @@ public struct StyleRGBA8Image: Equatable, Sendable {
   }
 
   var nativeImage: NativePremultipliedRGBA8Image {
-    NativePremultipliedRGBA8Image(width: width, height: height, stride: stride, pixels: pixels)
+    NativePremultipliedRGBA8Image(
+      width: width,
+      height: height,
+      stride: stride,
+      pixels: pixels
+    )
   }
 }
 
@@ -205,7 +210,9 @@ public struct CustomGeometrySourceOptions: Sendable {
     self.wrap = wrap
   }
 
-  func nativeOptions(callbacks: NativeCustomGeometrySourceCallbacks) -> NativeCustomGeometrySourceOptions {
+  func nativeOptions(callbacks: NativeCustomGeometrySourceCallbacks)
+    -> NativeCustomGeometrySourceOptions
+  {
     NativeCustomGeometrySourceOptions(
       callbacks: callbacks,
       minZoom: minZoom,
@@ -219,86 +226,125 @@ public struct CustomGeometrySourceOptions: Sendable {
   }
 }
 
-extension MapHandle {
-  public func addStyleSourceJSON(sourceId: String, sourceJSON: JSONValue) throws {
+public extension MapHandle {
+  func addStyleSourceJSON(sourceId: String, sourceJSON: JSONValue) throws {
     try mapNativeFailure {
       let arena = NativeInputArena()
-      try checkStatus(mln_map_add_style_source_json(try requireLivePointer(), arena.view(sourceId), arena.allocate(sourceJSON.nativeValue)))
+      try checkStatus(mln_map_add_style_source_json(
+        requireLivePointer(),
+        arena.view(sourceId),
+        arena.allocate(sourceJSON.nativeValue)
+      ))
     }
   }
 
-  @discardableResult public func removeStyleSource(_ sourceId: String) throws -> Bool {
+  @discardableResult func removeStyleSource(_ sourceId: String) throws -> Bool {
     try mapNativeFailure {
       let arena = NativeInputArena()
-      let removed = try NativeStyle.removeSource(try requireLivePointer(), sourceId: arena.view(sourceId))
+      let removed = try NativeStyle.removeSource(
+        requireLivePointer(),
+        sourceId: arena.view(sourceId)
+      )
       if removed { removeCustomGeometrySourceCallbacks(sourceId: sourceId) }
       return removed
     }
   }
 
-  public func styleSourceExists(_ sourceId: String) throws -> Bool {
+  func styleSourceExists(_ sourceId: String) throws -> Bool {
     try mapNativeFailure {
       let arena = NativeInputArena()
-      return try NativeStyle.sourceExists(try requireLivePointer(), sourceId: arena.view(sourceId))
+      return try NativeStyle.sourceExists(
+        requireLivePointer(),
+        sourceId: arena.view(sourceId)
+      )
     }
   }
 
-  public func styleSourceType(_ sourceId: String) throws -> StyleSourceType? {
+  func styleSourceType(_ sourceId: String) throws -> StyleSourceType? {
     try mapNativeFailure {
       let arena = NativeInputArena()
-      return try NativeStyle.sourceType(try requireLivePointer(), sourceId: arena.view(sourceId)).map { StyleSourceType(rawValue: $0) ?? .unknown }
+      return try NativeStyle.sourceType(
+        requireLivePointer(),
+        sourceId: arena.view(sourceId)
+      ).map { StyleSourceType(rawValue: $0) ?? .unknown }
     }
   }
 
-  public func styleSourceInfo(_ sourceId: String) throws -> StyleSourceInfo? {
+  func styleSourceInfo(_ sourceId: String) throws -> StyleSourceInfo? {
     try mapNativeFailure {
       let arena = NativeInputArena()
-      return try NativeStyle.sourceInfo(try requireLivePointer(), sourceId: arena.view(sourceId)).map(StyleSourceInfo.init(native:))
+      return try NativeStyle.sourceInfo(
+        requireLivePointer(),
+        sourceId: arena.view(sourceId)
+      ).map(StyleSourceInfo.init(native:))
     }
   }
 
-  public func styleSourceAttribution(_ sourceId: String) throws -> String? {
+  func styleSourceAttribution(_ sourceId: String) throws -> String? {
     try mapNativeFailure {
       let arena = NativeInputArena()
       let sourceIdView = arena.view(sourceId)
-      guard let info = try NativeStyle.sourceInfo(try requireLivePointer(), sourceId: sourceIdView) else { return nil }
+      guard let info = try NativeStyle.sourceInfo(
+        requireLivePointer(),
+        sourceId: sourceIdView
+      ) else { return nil }
       guard info.hasAttribution else { return nil }
-      return try NativeStyle.copySourceAttribution(try requireLivePointer(), sourceId: sourceIdView, capacity: info.attributionSize).0
+      return try NativeStyle.copySourceAttribution(
+        requireLivePointer(),
+        sourceId: sourceIdView,
+        capacity: info.attributionSize
+      ).0
     }
   }
 
-  public func styleSourceIds() throws -> [String] {
-    try mapNativeFailure { try NativeStyle.sourceIds(try requireLivePointer()) }
+  func styleSourceIds() throws -> [String] {
+    try mapNativeFailure { try NativeStyle.sourceIds(requireLivePointer()) }
   }
 
-  public func addGeoJSONSourceURL(sourceId: String, url: String) throws {
+  func addGeoJSONSourceURL(sourceId: String, url: String) throws {
     try mapNativeFailure {
       let arena = NativeInputArena()
-      try checkStatus(mln_map_add_geojson_source_url(try requireLivePointer(), arena.view(sourceId), arena.view(url)))
+      try checkStatus(mln_map_add_geojson_source_url(
+        requireLivePointer(),
+        arena.view(sourceId),
+        arena.view(url)
+      ))
     }
   }
 
-  public func addGeoJSONSourceData(sourceId: String, data: GeoJSON) throws {
+  func addGeoJSONSourceData(sourceId: String, data: GeoJSON) throws {
     try mapNativeFailure {
       let arena = NativeInputArena()
       try arena.withNativeGeoJSON(data.nativeGeoJSON) { data in
-        try checkStatus(mln_map_add_geojson_source_data(try requireLivePointer(), arena.view(sourceId), data))
+        try checkStatus(mln_map_add_geojson_source_data(
+          requireLivePointer(),
+          arena.view(sourceId),
+          data
+        ))
       }
     }
   }
 
-  public func setGeoJSONSourceURL(sourceId: String, url: String) throws {
+  func setGeoJSONSourceURL(sourceId: String, url: String) throws {
     try mapNativeFailure {
       let arena = NativeInputArena()
-      try checkStatus(mln_map_set_geojson_source_url(try requireLivePointer(), arena.view(sourceId), arena.view(url)))
+      try checkStatus(mln_map_set_geojson_source_url(
+        requireLivePointer(),
+        arena.view(sourceId),
+        arena.view(url)
+      ))
     }
   }
 
-  public func setGeoJSONSourceData(sourceId: String, data: GeoJSON) throws {
+  func setGeoJSONSourceData(sourceId: String, data: GeoJSON) throws {
     try mapNativeFailure {
       let arena = NativeInputArena()
       try arena.withNativeGeoJSON(data.nativeGeoJSON) { data in
-        try checkStatus(mln_map_set_geojson_source_data(try requireLivePointer(), arena.view(sourceId), data))
+        try checkStatus(mln_map_set_geojson_source_data(
+          requireLivePointer(),
+          arena.view(sourceId),
+          data
+        ))
       }
     }
   }
@@ -307,12 +353,22 @@ extension MapHandle {
     sourceId: String,
     url: String,
     options: StyleTileSourceOptions,
-    add: (OpaquePointer, mln_string_view, mln_string_view, UnsafePointer<mln_style_tile_source_options>?) -> mln_status
+    add: (
+      OpaquePointer,
+      mln_string_view,
+      mln_string_view,
+      UnsafePointer<mln_style_tile_source_options>?
+    ) -> mln_status
   ) throws {
     try mapNativeFailure {
       let arena = NativeInputArena()
       try options.nativeOptions.withNativeOptions { options in
-        try checkStatus(add(try requireLivePointer(), arena.view(sourceId), arena.view(url), options))
+        try checkStatus(add(
+          requireLivePointer(),
+          arena.view(sourceId),
+          arena.view(url),
+          options
+        ))
       }
     }
   }
@@ -321,316 +377,586 @@ extension MapHandle {
     sourceId: String,
     tiles: [String],
     options: StyleTileSourceOptions,
-    add: (OpaquePointer, mln_string_view, UnsafePointer<mln_string_view>?, Int, UnsafePointer<mln_style_tile_source_options>?) -> mln_status
+    add: (
+      OpaquePointer,
+      mln_string_view,
+      UnsafePointer<mln_string_view>?,
+      Int,
+      UnsafePointer<mln_style_tile_source_options>?
+    ) -> mln_status
   ) throws {
     try mapNativeFailure {
       let arena = NativeInputArena()
       let tileViews = tiles.map { arena.view($0) }
       try tileViews.withUnsafeBufferPointer { tiles in
         try options.nativeOptions.withNativeOptions { options in
-          try checkStatus(add(try requireLivePointer(), arena.view(sourceId), tiles.baseAddress, tiles.count, options))
+          try checkStatus(add(
+            requireLivePointer(),
+            arena.view(sourceId),
+            tiles.baseAddress,
+            tiles.count,
+            options
+          ))
         }
       }
     }
   }
 
-  public func addVectorSourceURL(sourceId: String, url: String, options: StyleTileSourceOptions = StyleTileSourceOptions()) throws {
-    try addTiledSourceURL(sourceId: sourceId, url: url, options: options, add: mln_map_add_vector_source_url)
+  func addVectorSourceURL(
+    sourceId: String,
+    url: String,
+    options: StyleTileSourceOptions = StyleTileSourceOptions()
+  ) throws {
+    try addTiledSourceURL(
+      sourceId: sourceId,
+      url: url,
+      options: options,
+      add: mln_map_add_vector_source_url
+    )
   }
 
-  public func addVectorSourceTiles(sourceId: String, tiles: [String], options: StyleTileSourceOptions = StyleTileSourceOptions()) throws {
-    try addTiledSourceTiles(sourceId: sourceId, tiles: tiles, options: options, add: mln_map_add_vector_source_tiles)
+  func addVectorSourceTiles(
+    sourceId: String,
+    tiles: [String],
+    options: StyleTileSourceOptions = StyleTileSourceOptions()
+  ) throws {
+    try addTiledSourceTiles(
+      sourceId: sourceId,
+      tiles: tiles,
+      options: options,
+      add: mln_map_add_vector_source_tiles
+    )
   }
 
-  public func addRasterSourceURL(sourceId: String, url: String, options: StyleTileSourceOptions = StyleTileSourceOptions()) throws {
-    try addTiledSourceURL(sourceId: sourceId, url: url, options: options, add: mln_map_add_raster_source_url)
+  func addRasterSourceURL(
+    sourceId: String,
+    url: String,
+    options: StyleTileSourceOptions = StyleTileSourceOptions()
+  ) throws {
+    try addTiledSourceURL(
+      sourceId: sourceId,
+      url: url,
+      options: options,
+      add: mln_map_add_raster_source_url
+    )
   }
 
-  public func addRasterSourceTiles(sourceId: String, tiles: [String], options: StyleTileSourceOptions = StyleTileSourceOptions()) throws {
-    try addTiledSourceTiles(sourceId: sourceId, tiles: tiles, options: options, add: mln_map_add_raster_source_tiles)
+  func addRasterSourceTiles(
+    sourceId: String,
+    tiles: [String],
+    options: StyleTileSourceOptions = StyleTileSourceOptions()
+  ) throws {
+    try addTiledSourceTiles(
+      sourceId: sourceId,
+      tiles: tiles,
+      options: options,
+      add: mln_map_add_raster_source_tiles
+    )
   }
 
-  public func addRasterDEMSourceURL(sourceId: String, url: String, options: StyleTileSourceOptions = StyleTileSourceOptions()) throws {
-    try addTiledSourceURL(sourceId: sourceId, url: url, options: options, add: mln_map_add_raster_dem_source_url)
+  func addRasterDEMSourceURL(
+    sourceId: String,
+    url: String,
+    options: StyleTileSourceOptions = StyleTileSourceOptions()
+  ) throws {
+    try addTiledSourceURL(
+      sourceId: sourceId,
+      url: url,
+      options: options,
+      add: mln_map_add_raster_dem_source_url
+    )
   }
 
-  public func addRasterDEMSourceTiles(sourceId: String, tiles: [String], options: StyleTileSourceOptions = StyleTileSourceOptions()) throws {
-    try addTiledSourceTiles(sourceId: sourceId, tiles: tiles, options: options, add: mln_map_add_raster_dem_source_tiles)
+  func addRasterDEMSourceTiles(
+    sourceId: String,
+    tiles: [String],
+    options: StyleTileSourceOptions = StyleTileSourceOptions()
+  ) throws {
+    try addTiledSourceTiles(
+      sourceId: sourceId,
+      tiles: tiles,
+      options: options,
+      add: mln_map_add_raster_dem_source_tiles
+    )
   }
 
-  public func addCustomGeometrySource(sourceId: String, options: CustomGeometrySourceOptions) throws {
-    let fetchTile: NativeCustomGeometrySourceCallbacks.TileCallback = { tileId in
-      options.fetchTile(CanonicalTileID(native: tileId))
-    }
+  func addCustomGeometrySource(
+    sourceId: String,
+    options: CustomGeometrySourceOptions
+  ) throws {
+    let fetchTile: NativeCustomGeometrySourceCallbacks
+      .TileCallback = { tileId in
+        options.fetchTile(CanonicalTileID(native: tileId))
+      }
     let cancelTile: NativeCustomGeometrySourceCallbacks.TileCallback?
     if let callback = options.cancelTile {
       cancelTile = { tileId in callback(CanonicalTileID(native: tileId)) }
     } else {
       cancelTile = nil
     }
-    let callbacks = NativeCustomGeometrySourceCallbacks(fetchTile: fetchTile, cancelTile: cancelTile)
+    let callbacks = NativeCustomGeometrySourceCallbacks(
+      fetchTile: fetchTile,
+      cancelTile: cancelTile
+    )
     try mapNativeFailure {
       let arena = NativeInputArena()
-      try options.nativeOptions(callbacks: callbacks).withNativeOptions { nativeOptions in
-        try checkStatus(mln_map_add_custom_geometry_source(try requireLivePointer(), arena.view(sourceId), nativeOptions))
-      }
+      try options.nativeOptions(callbacks: callbacks)
+        .withNativeOptions { nativeOptions in
+          try checkStatus(mln_map_add_custom_geometry_source(
+            requireLivePointer(),
+            arena.view(sourceId),
+            nativeOptions
+          ))
+        }
       storeCustomGeometrySourceCallbacks(callbacks, sourceId: sourceId)
     }
   }
 
-  public func setCustomGeometrySourceTileData(sourceId: String, tileId: CanonicalTileID, data: GeoJSON) throws {
+  func setCustomGeometrySourceTileData(
+    sourceId: String,
+    tileId: CanonicalTileID,
+    data: GeoJSON
+  ) throws {
     try mapNativeFailure {
       let arena = NativeInputArena()
       try arena.withNativeGeoJSON(data.nativeGeoJSON) { data in
-        try checkStatus(mln_map_set_custom_geometry_source_tile_data(try requireLivePointer(), arena.view(sourceId), tileId.nativeTileID.native, data))
+        try checkStatus(mln_map_set_custom_geometry_source_tile_data(
+          requireLivePointer(),
+          arena.view(sourceId),
+          tileId.nativeTileID.native,
+          data
+        ))
       }
     }
   }
 
-  public func invalidateCustomGeometrySourceTile(sourceId: String, tileId: CanonicalTileID) throws {
+  func invalidateCustomGeometrySourceTile(
+    sourceId: String,
+    tileId: CanonicalTileID
+  ) throws {
     try mapNativeFailure {
       let arena = NativeInputArena()
-      try checkStatus(mln_map_invalidate_custom_geometry_source_tile(try requireLivePointer(), arena.view(sourceId), tileId.nativeTileID.native))
+      try checkStatus(mln_map_invalidate_custom_geometry_source_tile(
+        requireLivePointer(),
+        arena.view(sourceId),
+        tileId.nativeTileID.native
+      ))
     }
   }
 
-  public func invalidateCustomGeometrySourceRegion(sourceId: String, bounds: LatLngBounds) throws {
+  func invalidateCustomGeometrySourceRegion(
+    sourceId: String,
+    bounds: LatLngBounds
+  ) throws {
     try mapNativeFailure {
       let arena = NativeInputArena()
-      try checkStatus(mln_map_invalidate_custom_geometry_source_region(try requireLivePointer(), arena.view(sourceId), bounds.nativeInput.native))
+      try checkStatus(mln_map_invalidate_custom_geometry_source_region(
+        requireLivePointer(),
+        arena.view(sourceId),
+        bounds.nativeInput.native
+      ))
     }
   }
 
-  public func setStyleImage(imageId: String, image: StyleRGBA8Image, options: StyleImageOptions = StyleImageOptions()) throws {
+  func setStyleImage(
+    imageId: String,
+    image: StyleRGBA8Image,
+    options: StyleImageOptions = StyleImageOptions()
+  ) throws {
     try mapNativeFailure {
       let arena = NativeInputArena()
       try image.nativeImage.withNativeImage { image in
         try options.nativeOptions.withNativeOptions { options in
-          try checkStatus(mln_map_set_style_image(try requireLivePointer(), arena.view(imageId), image, options))
+          try checkStatus(mln_map_set_style_image(
+            requireLivePointer(),
+            arena.view(imageId),
+            image,
+            options
+          ))
         }
       }
     }
   }
 
-  @discardableResult public func removeStyleImage(_ imageId: String) throws -> Bool {
+  @discardableResult func removeStyleImage(_ imageId: String) throws -> Bool {
     try mapNativeFailure {
       let arena = NativeInputArena()
-      return try NativeStyle.removeImage(try requireLivePointer(), imageId: arena.view(imageId))
+      return try NativeStyle.removeImage(
+        requireLivePointer(),
+        imageId: arena.view(imageId)
+      )
     }
   }
 
-  public func styleImageExists(_ imageId: String) throws -> Bool {
+  func styleImageExists(_ imageId: String) throws -> Bool {
     try mapNativeFailure {
       let arena = NativeInputArena()
-      return try NativeStyle.imageExists(try requireLivePointer(), imageId: arena.view(imageId))
+      return try NativeStyle.imageExists(
+        requireLivePointer(),
+        imageId: arena.view(imageId)
+      )
     }
   }
 
-  public func styleImageInfo(_ imageId: String) throws -> StyleImageInfo? {
+  func styleImageInfo(_ imageId: String) throws -> StyleImageInfo? {
     try mapNativeFailure {
       let arena = NativeInputArena()
-      return try NativeStyle.imageInfo(try requireLivePointer(), imageId: arena.view(imageId)).map(StyleImageInfo.init(native:))
+      return try NativeStyle.imageInfo(
+        requireLivePointer(),
+        imageId: arena.view(imageId)
+      ).map(StyleImageInfo.init(native:))
     }
   }
 
-  public func styleImage(_ imageId: String) throws -> StyleImage? {
+  func styleImage(_ imageId: String) throws -> StyleImage? {
     try mapNativeFailure {
       let arena = NativeInputArena()
       let imageIdView = arena.view(imageId)
-      guard let info = try NativeStyle.imageInfo(try requireLivePointer(), imageId: imageIdView) else { return nil }
-      guard let pixels = try NativeStyle.copyImagePremultipliedRGBA8(try requireLivePointer(), imageId: imageIdView, capacity: info.byteLength).0 else { return nil }
+      guard let info = try NativeStyle.imageInfo(
+        requireLivePointer(),
+        imageId: imageIdView
+      ) else { return nil }
+      guard let pixels = try NativeStyle.copyImagePremultipliedRGBA8(
+        requireLivePointer(),
+        imageId: imageIdView,
+        capacity: info.byteLength
+      ).0 else { return nil }
       return StyleImage(info: StyleImageInfo(native: info), pixels: pixels)
     }
   }
 
-  public func addImageSourceURL(sourceId: String, coordinates: [LatLng], url: String) throws {
+  func addImageSourceURL(
+    sourceId: String,
+    coordinates: [LatLng],
+    url: String
+  ) throws {
     try mapNativeFailure {
       let arena = NativeInputArena()
-      try NativeStyle.addImageSourceURL(try requireLivePointer(), sourceId: arena.view(sourceId), coordinates: coordinates.map(\.nativeInput), url: arena.view(url))
+      try NativeStyle.addImageSourceURL(
+        requireLivePointer(),
+        sourceId: arena.view(sourceId),
+        coordinates: coordinates.map(\.nativeInput),
+        url: arena.view(url)
+      )
     }
   }
 
-  public func addImageSourceImage(sourceId: String, coordinates: [LatLng], image: StyleRGBA8Image) throws {
+  func addImageSourceImage(
+    sourceId: String,
+    coordinates: [LatLng],
+    image: StyleRGBA8Image
+  ) throws {
     try mapNativeFailure {
       let arena = NativeInputArena()
       try image.nativeImage.withNativeImage { image in
-        try NativeStyle.addImageSourceImage(try requireLivePointer(), sourceId: arena.view(sourceId), coordinates: coordinates.map(\.nativeInput), image: image)
+        try NativeStyle.addImageSourceImage(
+          requireLivePointer(),
+          sourceId: arena.view(sourceId),
+          coordinates: coordinates.map(\.nativeInput),
+          image: image
+        )
       }
     }
   }
 
-  public func setImageSourceURL(sourceId: String, url: String) throws {
+  func setImageSourceURL(sourceId: String, url: String) throws {
     try mapNativeFailure {
       let arena = NativeInputArena()
-      try checkStatus(mln_map_set_image_source_url(try requireLivePointer(), arena.view(sourceId), arena.view(url)))
+      try checkStatus(mln_map_set_image_source_url(
+        requireLivePointer(),
+        arena.view(sourceId),
+        arena.view(url)
+      ))
     }
   }
 
-  public func setImageSourceImage(sourceId: String, image: StyleRGBA8Image) throws {
+  func setImageSourceImage(sourceId: String, image: StyleRGBA8Image) throws {
     try mapNativeFailure {
       let arena = NativeInputArena()
       try image.nativeImage.withNativeImage { image in
-        try checkStatus(mln_map_set_image_source_image(try requireLivePointer(), arena.view(sourceId), image))
+        try checkStatus(mln_map_set_image_source_image(
+          requireLivePointer(),
+          arena.view(sourceId),
+          image
+        ))
       }
     }
   }
 
-  public func setImageSourceCoordinates(sourceId: String, coordinates: [LatLng]) throws {
+  func setImageSourceCoordinates(
+    sourceId: String,
+    coordinates: [LatLng]
+  ) throws {
     try mapNativeFailure {
       let arena = NativeInputArena()
-      try NativeStyle.setImageSourceCoordinates(try requireLivePointer(), sourceId: arena.view(sourceId), coordinates: coordinates.map(\.nativeInput))
+      try NativeStyle.setImageSourceCoordinates(
+        requireLivePointer(),
+        sourceId: arena.view(sourceId),
+        coordinates: coordinates.map(\.nativeInput)
+      )
     }
   }
 
-  public func imageSourceCoordinates(sourceId: String) throws -> [LatLng]? {
+  func imageSourceCoordinates(sourceId: String) throws -> [LatLng]? {
     try mapNativeFailure {
       let arena = NativeInputArena()
-      return try NativeStyle.imageSourceCoordinates(try requireLivePointer(), sourceId: arena.view(sourceId))?.map(LatLng.init(native:))
+      return try NativeStyle.imageSourceCoordinates(
+        requireLivePointer(),
+        sourceId: arena.view(sourceId)
+      )?.map(LatLng.init(native:))
     }
   }
 
-  public func addHillshadeLayer(layerId: String, sourceId: String, beforeLayerId: String? = nil) throws {
+  func addHillshadeLayer(
+    layerId: String,
+    sourceId: String,
+    beforeLayerId: String? = nil
+  ) throws {
     try mapNativeFailure {
       let arena = NativeInputArena()
-      try checkStatus(mln_map_add_hillshade_layer(try requireLivePointer(), arena.view(layerId), arena.view(sourceId), arena.view(beforeLayerId ?? "")))
+      try checkStatus(mln_map_add_hillshade_layer(
+        requireLivePointer(),
+        arena.view(layerId),
+        arena.view(sourceId),
+        arena.view(beforeLayerId ?? "")
+      ))
     }
   }
 
-  public func addColorReliefLayer(layerId: String, sourceId: String, beforeLayerId: String? = nil) throws {
+  func addColorReliefLayer(
+    layerId: String,
+    sourceId: String,
+    beforeLayerId: String? = nil
+  ) throws {
     try mapNativeFailure {
       let arena = NativeInputArena()
-      try checkStatus(mln_map_add_color_relief_layer(try requireLivePointer(), arena.view(layerId), arena.view(sourceId), arena.view(beforeLayerId ?? "")))
+      try checkStatus(mln_map_add_color_relief_layer(
+        requireLivePointer(),
+        arena.view(layerId),
+        arena.view(sourceId),
+        arena.view(beforeLayerId ?? "")
+      ))
     }
   }
 
-  public func addLocationIndicatorLayer(layerId: String, beforeLayerId: String? = nil) throws {
+  func addLocationIndicatorLayer(
+    layerId: String,
+    beforeLayerId: String? = nil
+  ) throws {
     try mapNativeFailure {
       let arena = NativeInputArena()
-      try checkStatus(mln_map_add_location_indicator_layer(try requireLivePointer(), arena.view(layerId), arena.view(beforeLayerId ?? "")))
+      try checkStatus(mln_map_add_location_indicator_layer(
+        requireLivePointer(),
+        arena.view(layerId),
+        arena.view(beforeLayerId ?? "")
+      ))
     }
   }
 
-  public func setLocationIndicatorLocation(layerId: String, coordinate: LatLng, altitude: Double) throws {
+  func setLocationIndicatorLocation(
+    layerId: String,
+    coordinate: LatLng,
+    altitude: Double
+  ) throws {
     try mapNativeFailure {
       let arena = NativeInputArena()
-      try checkStatus(mln_map_set_location_indicator_location(try requireLivePointer(), arena.view(layerId), coordinate.nativeInput.native, altitude))
+      try checkStatus(mln_map_set_location_indicator_location(
+        requireLivePointer(),
+        arena.view(layerId),
+        coordinate.nativeInput.native,
+        altitude
+      ))
     }
   }
 
-  public func setLocationIndicatorBearing(layerId: String, bearing: Double) throws {
+  func setLocationIndicatorBearing(layerId: String, bearing: Double) throws {
     try mapNativeFailure {
       let arena = NativeInputArena()
-      try checkStatus(mln_map_set_location_indicator_bearing(try requireLivePointer(), arena.view(layerId), bearing))
+      try checkStatus(mln_map_set_location_indicator_bearing(
+        requireLivePointer(),
+        arena.view(layerId),
+        bearing
+      ))
     }
   }
 
-  public func setLocationIndicatorAccuracyRadius(layerId: String, radius: Double) throws {
+  func setLocationIndicatorAccuracyRadius(
+    layerId: String,
+    radius: Double
+  ) throws {
     try mapNativeFailure {
       let arena = NativeInputArena()
-      try checkStatus(mln_map_set_location_indicator_accuracy_radius(try requireLivePointer(), arena.view(layerId), radius))
+      try checkStatus(mln_map_set_location_indicator_accuracy_radius(
+        requireLivePointer(),
+        arena.view(layerId),
+        radius
+      ))
     }
   }
 
-  public func setLocationIndicatorImageName(layerId: String, kind: LocationIndicatorImageKind, imageId: String) throws {
+  func setLocationIndicatorImageName(
+    layerId: String,
+    kind: LocationIndicatorImageKind,
+    imageId: String
+  ) throws {
     try mapNativeFailure {
       let arena = NativeInputArena()
-      try checkStatus(mln_map_set_location_indicator_image_name(try requireLivePointer(), arena.view(layerId), kind.rawValue, arena.view(imageId)))
+      try checkStatus(mln_map_set_location_indicator_image_name(
+        requireLivePointer(),
+        arena.view(layerId),
+        kind.rawValue,
+        arena.view(imageId)
+      ))
     }
   }
 
-  public func addStyleLayerJSON(_ layerJSON: JSONValue, beforeLayerId: String? = nil) throws {
+  func addStyleLayerJSON(
+    _ layerJSON: JSONValue,
+    beforeLayerId: String? = nil
+  ) throws {
     try mapNativeFailure {
       let arena = NativeInputArena()
-      try checkStatus(mln_map_add_style_layer_json(try requireLivePointer(), arena.allocate(layerJSON.nativeValue), arena.view(beforeLayerId ?? "")))
+      try checkStatus(mln_map_add_style_layer_json(
+        requireLivePointer(),
+        arena.allocate(layerJSON.nativeValue),
+        arena.view(beforeLayerId ?? "")
+      ))
     }
   }
 
-  @discardableResult public func removeStyleLayer(_ layerId: String) throws -> Bool {
+  @discardableResult func removeStyleLayer(_ layerId: String) throws -> Bool {
     try mapNativeFailure {
       let arena = NativeInputArena()
-      return try NativeStyle.removeLayer(try requireLivePointer(), layerId: arena.view(layerId))
+      return try NativeStyle.removeLayer(
+        requireLivePointer(),
+        layerId: arena.view(layerId)
+      )
     }
   }
 
-  public func styleLayerExists(_ layerId: String) throws -> Bool {
+  func styleLayerExists(_ layerId: String) throws -> Bool {
     try mapNativeFailure {
       let arena = NativeInputArena()
-      return try NativeStyle.layerExists(try requireLivePointer(), layerId: arena.view(layerId))
+      return try NativeStyle.layerExists(
+        requireLivePointer(),
+        layerId: arena.view(layerId)
+      )
     }
   }
 
-  public func styleLayerType(_ layerId: String) throws -> String? {
+  func styleLayerType(_ layerId: String) throws -> String? {
     try mapNativeFailure {
       let arena = NativeInputArena()
-      return try NativeStyle.layerType(try requireLivePointer(), layerId: arena.view(layerId))
+      return try NativeStyle.layerType(
+        requireLivePointer(),
+        layerId: arena.view(layerId)
+      )
     }
   }
 
-  public func styleLayerIds() throws -> [String] {
-    try mapNativeFailure { try NativeStyle.layerIds(try requireLivePointer()) }
+  func styleLayerIds() throws -> [String] {
+    try mapNativeFailure { try NativeStyle.layerIds(requireLivePointer()) }
   }
 
-  public func moveStyleLayer(_ layerId: String, beforeLayerId: String? = nil) throws {
+  func moveStyleLayer(_ layerId: String, beforeLayerId: String? = nil) throws {
     try mapNativeFailure {
       let arena = NativeInputArena()
-      try checkStatus(mln_map_move_style_layer(try requireLivePointer(), arena.view(layerId), arena.view(beforeLayerId ?? "")))
+      try checkStatus(mln_map_move_style_layer(
+        requireLivePointer(),
+        arena.view(layerId),
+        arena.view(beforeLayerId ?? "")
+      ))
     }
   }
 
-  public func styleLayerJSON(_ layerId: String) throws -> JSONValue? {
+  func styleLayerJSON(_ layerId: String) throws -> JSONValue? {
     try mapNativeFailure {
       let arena = NativeInputArena()
-      return try NativeStyle.layerJSON(try requireLivePointer(), layerId: arena.view(layerId)).map(JSONValue.init(native:))
+      return try NativeStyle.layerJSON(
+        requireLivePointer(),
+        layerId: arena.view(layerId)
+      ).map(JSONValue.init(native:))
     }
   }
 
-  public func setStyleLightJSON(_ lightJSON: JSONValue) throws {
+  func setStyleLightJSON(_ lightJSON: JSONValue) throws {
     try mapNativeFailure {
       let arena = NativeInputArena()
-      try checkStatus(mln_map_set_style_light_json(try requireLivePointer(), arena.allocate(lightJSON.nativeValue)))
+      try checkStatus(mln_map_set_style_light_json(
+        requireLivePointer(),
+        arena.allocate(lightJSON.nativeValue)
+      ))
     }
   }
 
-  public func setStyleLightProperty(_ propertyName: String, value: JSONValue) throws {
+  func setStyleLightProperty(_ propertyName: String, value: JSONValue) throws {
     try mapNativeFailure {
       let arena = NativeInputArena()
-      try checkStatus(mln_map_set_style_light_property(try requireLivePointer(), arena.view(propertyName), arena.allocate(value.nativeValue)))
+      try checkStatus(mln_map_set_style_light_property(
+        requireLivePointer(),
+        arena.view(propertyName),
+        arena.allocate(value.nativeValue)
+      ))
     }
   }
 
-  public func styleLightProperty(_ propertyName: String) throws -> JSONValue? {
+  func styleLightProperty(_ propertyName: String) throws -> JSONValue? {
     try mapNativeFailure {
       let arena = NativeInputArena()
-      return try NativeStyle.lightProperty(try requireLivePointer(), propertyName: arena.view(propertyName)).map(JSONValue.init(native:))
+      return try NativeStyle.lightProperty(
+        requireLivePointer(),
+        propertyName: arena.view(propertyName)
+      ).map(JSONValue.init(native:))
     }
   }
 
-  public func setLayerProperty(layerId: String, propertyName: String, value: JSONValue) throws {
+  func setLayerProperty(
+    layerId: String,
+    propertyName: String,
+    value: JSONValue
+  ) throws {
     try mapNativeFailure {
       let arena = NativeInputArena()
-      try checkStatus(mln_map_set_layer_property(try requireLivePointer(), arena.view(layerId), arena.view(propertyName), arena.allocate(value.nativeValue)))
+      try checkStatus(mln_map_set_layer_property(
+        requireLivePointer(),
+        arena.view(layerId),
+        arena.view(propertyName),
+        arena.allocate(value.nativeValue)
+      ))
     }
   }
 
-  public func layerProperty(layerId: String, propertyName: String) throws -> JSONValue? {
+  func layerProperty(layerId: String,
+                     propertyName: String) throws -> JSONValue?
+  {
     try mapNativeFailure {
       let arena = NativeInputArena()
-      return try NativeStyle.layerProperty(try requireLivePointer(), layerId: arena.view(layerId), propertyName: arena.view(propertyName)).map(JSONValue.init(native:))
+      return try NativeStyle.layerProperty(
+        requireLivePointer(),
+        layerId: arena.view(layerId),
+        propertyName: arena.view(propertyName)
+      ).map(JSONValue.init(native:))
     }
   }
 
-  public func setLayerFilter(layerId: String, filter: JSONValue?) throws {
+  func setLayerFilter(layerId: String, filter: JSONValue?) throws {
     try mapNativeFailure {
       let arena = NativeInputArena()
-      try checkStatus(mln_map_set_layer_filter(try requireLivePointer(), arena.view(layerId), filter.map { arena.allocate($0.nativeValue) }))
+      try checkStatus(mln_map_set_layer_filter(
+        requireLivePointer(),
+        arena.view(layerId),
+        filter.map { arena.allocate($0.nativeValue) }
+      ))
     }
   }
 
-  public func layerFilter(_ layerId: String) throws -> JSONValue? {
+  func layerFilter(_ layerId: String) throws -> JSONValue? {
     try mapNativeFailure {
       let arena = NativeInputArena()
-      return try NativeStyle.layerFilter(try requireLivePointer(), layerId: arena.view(layerId)).map(JSONValue.init(native:))
+      return try NativeStyle.layerFilter(
+        requireLivePointer(),
+        layerId: arena.view(layerId)
+      ).map(JSONValue.init(native:))
     }
   }
-
 }

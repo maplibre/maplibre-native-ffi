@@ -13,13 +13,13 @@ public enum JSONValue: Equatable, Sendable {
   var nativeValue: NativeJSONValue {
     switch self {
     case .null: .null
-    case .bool(let value): .bool(value)
-    case .uint(let value): .uint(value)
-    case .int(let value): .int(value)
-    case .double(let value): .double(value)
-    case .string(let value): .string(value)
-    case .array(let values): .array(values.map(\.nativeValue))
-    case .object(let members): .object(members.map(\.nativeMember))
+    case let .bool(value): .bool(value)
+    case let .uint(value): .uint(value)
+    case let .int(value): .int(value)
+    case let .double(value): .double(value)
+    case let .string(value): .string(value)
+    case let .array(values): .array(values.map(\.nativeValue))
+    case let .object(members): .object(members.map(\.nativeMember))
     }
   }
 }
@@ -51,13 +51,18 @@ public enum Geometry: Equatable, Sendable {
   var nativeGeometry: NativeGeometry {
     switch self {
     case .empty: .empty
-    case .point(let point): .point(point.nativeInput)
-    case .lineString(let coordinates): .lineString(coordinates.map(\.nativeInput))
-    case .polygon(let rings): .polygon(rings.map { $0.map(\.nativeInput) })
-    case .multiPoint(let coordinates): .multiPoint(coordinates.map(\.nativeInput))
-    case .multiLineString(let lines): .multiLineString(lines.map { $0.map(\.nativeInput) })
-    case .multiPolygon(let polygons): .multiPolygon(polygons.map { $0.map { $0.map(\.nativeInput) } })
-    case .geometryCollection(let geometries): .geometryCollection(geometries.map(\.nativeGeometry))
+    case let .point(point): .point(point.nativeInput)
+    case let .lineString(coordinates): .lineString(coordinates
+        .map(\.nativeInput))
+    case let .polygon(rings): .polygon(rings.map { $0.map(\.nativeInput) })
+    case let .multiPoint(coordinates): .multiPoint(coordinates
+        .map(\.nativeInput))
+    case let .multiLineString(lines): .multiLineString(lines
+        .map { $0.map(\.nativeInput) })
+    case let .multiPolygon(polygons): .multiPolygon(polygons
+        .map { $0.map { $0.map(\.nativeInput) } })
+    case let .geometryCollection(geometries): .geometryCollection(geometries
+        .map(\.nativeGeometry))
     }
   }
 }
@@ -72,10 +77,10 @@ public enum FeatureIdentifier: Equatable, Sendable {
   var nativeIdentifier: NativeFeatureIdentifier {
     switch self {
     case .none: .none
-    case .uint(let value): .uint(value)
-    case .int(let value): .int(value)
-    case .double(let value): .double(value)
-    case .string(let value): .string(value)
+    case let .uint(value): .uint(value)
+    case let .int(value): .int(value)
+    case let .double(value): .double(value)
+    case let .string(value): .string(value)
     }
   }
 }
@@ -111,9 +116,10 @@ public enum GeoJSON: Equatable, Sendable {
 
   var nativeGeoJSON: NativeGeoJSON {
     switch self {
-    case .geometry(let geometry): .geometry(geometry.nativeGeometry)
-    case .feature(let feature): .feature(feature.nativeFeature)
-    case .featureCollection(let features): .featureCollection(features.map(\.nativeFeature))
+    case let .geometry(geometry): .geometry(geometry.nativeGeometry)
+    case let .feature(feature): .feature(feature.nativeFeature)
+    case let .featureCollection(features): .featureCollection(features
+        .map(\.nativeFeature))
     }
   }
 }

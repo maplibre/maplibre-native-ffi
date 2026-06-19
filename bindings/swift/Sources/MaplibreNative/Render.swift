@@ -13,7 +13,11 @@ public struct RenderTargetExtent: Equatable, Sendable {
   }
 
   var nativeInput: NativeRenderTargetExtent {
-    NativeRenderTargetExtent(width: width, height: height, scaleFactor: scaleFactor)
+    NativeRenderTargetExtent(
+      width: width,
+      height: height,
+      scaleFactor: scaleFactor
+    )
   }
 }
 
@@ -74,7 +78,11 @@ public struct WglContextDescriptor: Equatable, Sendable {
   public var shareContext: NativePointer
   public var getProcAddress: NativePointer
 
-  public init(deviceContext: NativePointer, shareContext: NativePointer, getProcAddress: NativePointer = .null) {
+  public init(
+    deviceContext: NativePointer,
+    shareContext: NativePointer,
+    getProcAddress: NativePointer = .null
+  ) {
     self.deviceContext = deviceContext
     self.shareContext = shareContext
     self.getProcAddress = getProcAddress
@@ -136,7 +144,11 @@ public struct MetalSurfaceDescriptor: Equatable, Sendable {
   public var context: MetalContextDescriptor
   public var layer: NativePointer
 
-  public init(extent: RenderTargetExtent, context: MetalContextDescriptor = MetalContextDescriptor(), layer: NativePointer) {
+  public init(
+    extent: RenderTargetExtent,
+    context: MetalContextDescriptor = MetalContextDescriptor(),
+    layer: NativePointer
+  ) {
     self.extent = extent
     self.context = context
     self.layer = layer
@@ -156,7 +168,11 @@ public struct VulkanSurfaceDescriptor: Equatable, Sendable {
   public var context: VulkanContextDescriptor
   public var surface: NativePointer
 
-  public init(extent: RenderTargetExtent, context: VulkanContextDescriptor, surface: NativePointer) {
+  public init(
+    extent: RenderTargetExtent,
+    context: VulkanContextDescriptor,
+    surface: NativePointer
+  ) {
     self.extent = extent
     self.context = context
     self.surface = surface
@@ -176,7 +192,11 @@ public struct OpenGLSurfaceDescriptor: Equatable, Sendable {
   public var context: OpenGLContextDescriptor
   public var surface: NativePointer
 
-  public init(extent: RenderTargetExtent, context: OpenGLContextDescriptor, surface: NativePointer) {
+  public init(
+    extent: RenderTargetExtent,
+    context: OpenGLContextDescriptor,
+    surface: NativePointer
+  ) {
     self.extent = extent
     self.context = context
     self.surface = surface
@@ -220,7 +240,10 @@ public struct MetalOwnedTextureDescriptor: Equatable, Sendable {
   }
 
   var nativeInput: NativeMetalOwnedTextureDescriptorInput {
-    NativeMetalOwnedTextureDescriptorInput(extent: extent.nativeInput, context: context.nativeInput)
+    NativeMetalOwnedTextureDescriptorInput(
+      extent: extent.nativeInput,
+      context: context.nativeInput
+    )
   }
 }
 
@@ -234,7 +257,10 @@ public struct MetalBorrowedTextureDescriptor: Equatable, Sendable {
   }
 
   var nativeInput: NativeMetalBorrowedTextureDescriptorInput {
-    NativeMetalBorrowedTextureDescriptorInput(extent: extent.nativeInput, textureAddress: texture.addressBitPattern)
+    NativeMetalBorrowedTextureDescriptorInput(
+      extent: extent.nativeInput,
+      textureAddress: texture.addressBitPattern
+    )
   }
 }
 
@@ -248,7 +274,10 @@ public struct VulkanOwnedTextureDescriptor: Equatable, Sendable {
   }
 
   var nativeInput: NativeVulkanOwnedTextureDescriptorInput {
-    NativeVulkanOwnedTextureDescriptorInput(extent: extent.nativeInput, context: context.nativeInput)
+    NativeVulkanOwnedTextureDescriptorInput(
+      extent: extent.nativeInput,
+      context: context.nativeInput
+    )
   }
 }
 
@@ -302,7 +331,10 @@ public struct OpenGLOwnedTextureDescriptor: Equatable, Sendable {
   }
 
   var nativeInput: NativeOpenGLOwnedTextureDescriptorInput {
-    NativeOpenGLOwnedTextureDescriptorInput(extent: extent.nativeInput, context: context.nativeInput)
+    NativeOpenGLOwnedTextureDescriptorInput(
+      extent: extent.nativeInput,
+      context: context.nativeInput
+    )
   }
 }
 
@@ -312,7 +344,12 @@ public struct OpenGLBorrowedTextureDescriptor: Equatable, Sendable {
   public var texture: UInt32
   public var target: UInt32
 
-  public init(extent: RenderTargetExtent, context: OpenGLContextDescriptor, texture: UInt32, target: UInt32) {
+  public init(
+    extent: RenderTargetExtent,
+    context: OpenGLContextDescriptor,
+    texture: UInt32,
+    target: UInt32
+  ) {
     self.extent = extent
     self.context = context
     self.texture = texture
@@ -335,7 +372,10 @@ public final class RenderSessionHandle {
 
   init(map: MapHandle, pointer: OpaquePointer) throws {
     self.map = map
-    handle = try NativeHandleBox(typeName: "RenderSessionHandle", pointer: pointer)
+    handle = try NativeHandleBox(
+      typeName: "RenderSessionHandle",
+      pointer: pointer
+    )
   }
 
   public var isClosed: Bool {
@@ -352,47 +392,59 @@ public final class RenderSessionHandle {
     }
   }
 
-  public func resize(width: UInt32, height: UInt32, scaleFactor: Double) throws {
+  public func resize(width: UInt32, height: UInt32,
+                     scaleFactor: Double) throws
+  {
     try mapNativeFailure {
-      try checkStatus(mln_render_session_resize(try handle.requireLive(), width, height, scaleFactor))
+      try checkStatus(mln_render_session_resize(
+        handle.requireLive(),
+        width,
+        height,
+        scaleFactor
+      ))
     }
   }
 
   public func renderUpdate() throws {
     try mapNativeFailure {
-      try checkStatus(mln_render_session_render_update(try handle.requireLive()))
+      try checkStatus(mln_render_session_render_update(handle
+          .requireLive()))
     }
   }
 
   public func detach() throws {
     try mapNativeFailure {
-      try checkStatus(mln_render_session_detach(try handle.requireLive()))
+      try checkStatus(mln_render_session_detach(handle.requireLive()))
     }
   }
 
   public func reduceMemoryUse() throws {
     try mapNativeFailure {
-      try checkStatus(mln_render_session_reduce_memory_use(try handle.requireLive()))
+      try checkStatus(mln_render_session_reduce_memory_use(handle
+          .requireLive()))
     }
   }
 
   public func clearData() throws {
     try mapNativeFailure {
-      try checkStatus(mln_render_session_clear_data(try handle.requireLive()))
+      try checkStatus(mln_render_session_clear_data(handle.requireLive()))
     }
   }
 
   public func dumpDebugLogs() throws {
     try mapNativeFailure {
-      try checkStatus(mln_render_session_dump_debug_logs(try handle.requireLive()))
+      try checkStatus(mln_render_session_dump_debug_logs(handle
+          .requireLive()))
     }
   }
 
-  public func readPremultipliedRGBA8(into data: inout [UInt8]) throws -> TextureImageInfo {
+  public func readPremultipliedRGBA8(into data: inout [UInt8]) throws
+    -> TextureImageInfo
+  {
     try mapNativeFailure {
       try data.withUnsafeMutableBufferPointer { buffer in
         let rawInfo = try NativeRender.textureReadPremultipliedRGBA8(
-          session: try handle.requireLive(),
+          session: handle.requireLive(),
           data: buffer.baseAddress,
           capacity: buffer.count
         )
@@ -401,29 +453,38 @@ public final class RenderSessionHandle {
     }
   }
 
-  public func acquireMetalOwnedTextureFrame() throws -> MetalOwnedTextureFrameHandle {
+  public func acquireMetalOwnedTextureFrame() throws
+    -> MetalOwnedTextureFrameHandle
+  {
     try mapNativeFailure {
-      MetalOwnedTextureFrameHandle(
+      try MetalOwnedTextureFrameHandle(
         session: self,
-        frame: NativeMetalOwnedTextureFrame(try NativeRender.metalOwnedTextureAcquireFrame(try handle.requireLive()))
+        frame: NativeMetalOwnedTextureFrame(NativeRender
+          .metalOwnedTextureAcquireFrame(handle.requireLive()))
       )
     }
   }
 
-  public func acquireVulkanOwnedTextureFrame() throws -> VulkanOwnedTextureFrameHandle {
+  public func acquireVulkanOwnedTextureFrame() throws
+    -> VulkanOwnedTextureFrameHandle
+  {
     try mapNativeFailure {
-      VulkanOwnedTextureFrameHandle(
+      try VulkanOwnedTextureFrameHandle(
         session: self,
-        frame: NativeVulkanOwnedTextureFrame(try NativeRender.vulkanOwnedTextureAcquireFrame(try handle.requireLive()))
+        frame: NativeVulkanOwnedTextureFrame(NativeRender
+          .vulkanOwnedTextureAcquireFrame(handle.requireLive()))
       )
     }
   }
 
-  public func acquireOpenGLOwnedTextureFrame() throws -> OpenGLOwnedTextureFrameHandle {
+  public func acquireOpenGLOwnedTextureFrame() throws
+    -> OpenGLOwnedTextureFrameHandle
+  {
     try mapNativeFailure {
-      OpenGLOwnedTextureFrameHandle(
+      try OpenGLOwnedTextureFrameHandle(
         session: self,
-        frame: NativeOpenGLOwnedTextureFrame(try NativeRender.openGLOwnedTextureAcquireFrame(try handle.requireLive()))
+        frame: NativeOpenGLOwnedTextureFrame(NativeRender
+          .openGLOwnedTextureAcquireFrame(handle.requireLive()))
       )
     }
   }
@@ -482,7 +543,11 @@ public final class OpenGLOwnedTextureFrameView {
   private let textureTarget: UInt32
   private let scope: NativeFrameScope
 
-  fileprivate init(texture: FrameOpenGLTextureName, target: UInt32, scope: NativeFrameScope) {
+  fileprivate init(
+    texture: FrameOpenGLTextureName,
+    target: UInt32,
+    scope: NativeFrameScope
+  ) {
     textureName = texture
     textureTarget = target
     self.scope = scope
@@ -508,9 +573,12 @@ public final class MetalOwnedTextureFrameHandle {
   private var frame: NativeMetalOwnedTextureFrame?
 
   init(session: RenderSessionHandle, frame: NativeMetalOwnedTextureFrame) {
-    self.releaseFrame = { frame in
+    releaseFrame = { frame in
       try withUnsafePointer(to: &frame.raw) { rawFrame in
-        try checkStatus(mln_metal_owned_texture_release_frame(try session.requireLivePointer(), rawFrame))
+        try checkStatus(mln_metal_owned_texture_release_frame(
+          session.requireLivePointer(),
+          rawFrame
+        ))
       }
     }
     self.frame = frame
@@ -527,7 +595,10 @@ public final class MetalOwnedTextureFrameHandle {
   deinit {
     if let frame {
       NativeHandleLeakReporter.report(
-        NativeHandleLeak(typeName: "MetalOwnedTextureFrameHandle", address: UInt(bitPattern: frame.raw.texture))
+        NativeHandleLeak(
+          typeName: "MetalOwnedTextureFrameHandle",
+          address: UInt(bitPattern: frame.raw.texture)
+        )
       )
     }
   }
@@ -536,14 +607,30 @@ public final class MetalOwnedTextureFrameHandle {
     frame == nil
   }
 
-  public func withBackendPointers(_ body: (MetalOwnedTextureFrameView) throws -> Void) throws {
+  public func withBackendPointers(_ body: (MetalOwnedTextureFrameView) throws
+    -> Void) throws
+  {
     guard let frame else {
-      throw MaplibreError(kind: .invalidState, rawStatus: nil, diagnostic: "Metal texture frame is closed")
+      throw MaplibreError(
+        kind: .invalidState,
+        rawStatus: nil,
+        diagnostic: "Metal texture frame is closed"
+      )
     }
-    let scope = NativeFrameScope(isFrameLive: { [weak self] in self?.frame != nil })
+    let scope = NativeFrameScope(isFrameLive: { [weak self] in
+      self?.frame != nil
+    })
     let view = MetalOwnedTextureFrameView(
-      texture: FrameNativePointer(bitPattern: UInt(bitPattern: frame.raw.texture), scope: scope, diagnosticName: "Metal texture"),
-      device: FrameNativePointer(bitPattern: UInt(bitPattern: frame.raw.device), scope: scope, diagnosticName: "Metal device")
+      texture: FrameNativePointer(
+        bitPattern: UInt(bitPattern: frame.raw.texture),
+        scope: scope,
+        diagnosticName: "Metal texture"
+      ),
+      device: FrameNativePointer(
+        bitPattern: UInt(bitPattern: frame.raw.device),
+        scope: scope,
+        diagnosticName: "Metal device"
+      )
     )
     defer { scope.close() }
     try body(view)
@@ -563,9 +650,12 @@ public final class VulkanOwnedTextureFrameHandle {
   private var frame: NativeVulkanOwnedTextureFrame?
 
   init(session: RenderSessionHandle, frame: NativeVulkanOwnedTextureFrame) {
-    self.releaseFrame = { frame in
+    releaseFrame = { frame in
       try withUnsafePointer(to: &frame.raw) { rawFrame in
-        try checkStatus(mln_vulkan_owned_texture_release_frame(try session.requireLivePointer(), rawFrame))
+        try checkStatus(mln_vulkan_owned_texture_release_frame(
+          session.requireLivePointer(),
+          rawFrame
+        ))
       }
     }
     self.frame = frame
@@ -582,7 +672,10 @@ public final class VulkanOwnedTextureFrameHandle {
   deinit {
     if let frame {
       NativeHandleLeakReporter.report(
-        NativeHandleLeak(typeName: "VulkanOwnedTextureFrameHandle", address: UInt(bitPattern: frame.raw.image))
+        NativeHandleLeak(
+          typeName: "VulkanOwnedTextureFrameHandle",
+          address: UInt(bitPattern: frame.raw.image)
+        )
       )
     }
   }
@@ -591,14 +684,30 @@ public final class VulkanOwnedTextureFrameHandle {
     frame == nil
   }
 
-  public func withBackendPointers(_ body: (VulkanOwnedTextureFrameView) throws -> Void) throws {
+  public func withBackendPointers(_ body: (VulkanOwnedTextureFrameView) throws
+    -> Void) throws
+  {
     guard let frame else {
-      throw MaplibreError(kind: .invalidState, rawStatus: nil, diagnostic: "Vulkan texture frame is closed")
+      throw MaplibreError(
+        kind: .invalidState,
+        rawStatus: nil,
+        diagnostic: "Vulkan texture frame is closed"
+      )
     }
-    let scope = NativeFrameScope(isFrameLive: { [weak self] in self?.frame != nil })
+    let scope = NativeFrameScope(isFrameLive: { [weak self] in
+      self?.frame != nil
+    })
     let view = VulkanOwnedTextureFrameView(
-      image: FrameNativePointer(bitPattern: UInt(bitPattern: frame.raw.image), scope: scope, diagnosticName: "Vulkan image"),
-      imageView: FrameNativePointer(bitPattern: UInt(bitPattern: frame.raw.image_view), scope: scope, diagnosticName: "Vulkan image view")
+      image: FrameNativePointer(
+        bitPattern: UInt(bitPattern: frame.raw.image),
+        scope: scope,
+        diagnosticName: "Vulkan image"
+      ),
+      imageView: FrameNativePointer(
+        bitPattern: UInt(bitPattern: frame.raw.image_view),
+        scope: scope,
+        diagnosticName: "Vulkan image view"
+      )
     )
     defer { scope.close() }
     try body(view)
@@ -618,9 +727,12 @@ public final class OpenGLOwnedTextureFrameHandle {
   private var frame: NativeOpenGLOwnedTextureFrame?
 
   init(session: RenderSessionHandle, frame: NativeOpenGLOwnedTextureFrame) {
-    self.releaseFrame = { frame in
+    releaseFrame = { frame in
       try withUnsafePointer(to: &frame.raw) { rawFrame in
-        try checkStatus(mln_opengl_owned_texture_release_frame(try session.requireLivePointer(), rawFrame))
+        try checkStatus(mln_opengl_owned_texture_release_frame(
+          session.requireLivePointer(),
+          rawFrame
+        ))
       }
     }
     self.frame = frame
@@ -637,7 +749,10 @@ public final class OpenGLOwnedTextureFrameHandle {
   deinit {
     if let frame {
       NativeHandleLeakReporter.report(
-        NativeHandleLeak(typeName: "OpenGLOwnedTextureFrameHandle", address: UInt(frame.raw.texture))
+        NativeHandleLeak(
+          typeName: "OpenGLOwnedTextureFrameHandle",
+          address: UInt(frame.raw.texture)
+        )
       )
     }
   }
@@ -646,11 +761,19 @@ public final class OpenGLOwnedTextureFrameHandle {
     frame == nil
   }
 
-  public func withBackendPointers(_ body: (OpenGLOwnedTextureFrameView) throws -> Void) throws {
+  public func withBackendPointers(_ body: (OpenGLOwnedTextureFrameView) throws
+    -> Void) throws
+  {
     guard let frame else {
-      throw MaplibreError(kind: .invalidState, rawStatus: nil, diagnostic: "OpenGL texture frame is closed")
+      throw MaplibreError(
+        kind: .invalidState,
+        rawStatus: nil,
+        diagnostic: "OpenGL texture frame is closed"
+      )
     }
-    let scope = NativeFrameScope(isFrameLive: { [weak self] in self?.frame != nil })
+    let scope = NativeFrameScope(isFrameLive: { [weak self] in
+      self?.frame != nil
+    })
     let view = OpenGLOwnedTextureFrameView(
       texture: FrameOpenGLTextureName(frame.raw.texture, scope: scope),
       target: frame.raw.target,
@@ -669,83 +792,138 @@ public final class OpenGLOwnedTextureFrameHandle {
   }
 }
 
-extension MapHandle {
-  public func attachMetalSurface(_ descriptor: MetalSurfaceDescriptor) throws -> RenderSessionHandle {
+public extension MapHandle {
+  func attachMetalSurface(_ descriptor: MetalSurfaceDescriptor) throws
+    -> RenderSessionHandle
+  {
     let pointer = try mapNativeFailure {
       try descriptor.nativeInput.withNativeDescriptor { nativeDescriptor in
-        try NativeRender.metalSurfaceAttach(map: try requireLivePointer(), descriptor: nativeDescriptor)
+        try NativeRender.metalSurfaceAttach(
+          map: requireLivePointer(),
+          descriptor: nativeDescriptor
+        )
       }
     }
     return try RenderSessionHandle(map: self, pointer: pointer)
   }
 
-  public func attachVulkanSurface(_ descriptor: VulkanSurfaceDescriptor) throws -> RenderSessionHandle {
+  func attachVulkanSurface(_ descriptor: VulkanSurfaceDescriptor) throws
+    -> RenderSessionHandle
+  {
     let pointer = try mapNativeFailure {
       try descriptor.nativeInput.withNativeDescriptor { nativeDescriptor in
-        try NativeRender.vulkanSurfaceAttach(map: try requireLivePointer(), descriptor: nativeDescriptor)
+        try NativeRender.vulkanSurfaceAttach(
+          map: requireLivePointer(),
+          descriptor: nativeDescriptor
+        )
       }
     }
     return try RenderSessionHandle(map: self, pointer: pointer)
   }
 
-  public func attachOpenGLSurface(_ descriptor: OpenGLSurfaceDescriptor) throws -> RenderSessionHandle {
+  func attachOpenGLSurface(_ descriptor: OpenGLSurfaceDescriptor) throws
+    -> RenderSessionHandle
+  {
     let pointer = try mapNativeFailure {
       try descriptor.nativeInput.withNativeDescriptor { nativeDescriptor in
-        try NativeRender.openGLSurfaceAttach(map: try requireLivePointer(), descriptor: nativeDescriptor)
+        try NativeRender.openGLSurfaceAttach(
+          map: requireLivePointer(),
+          descriptor: nativeDescriptor
+        )
       }
     }
     return try RenderSessionHandle(map: self, pointer: pointer)
   }
 
-  public func attachMetalOwnedTexture(_ descriptor: MetalOwnedTextureDescriptor) throws -> RenderSessionHandle {
+  func attachMetalOwnedTexture(_ descriptor: MetalOwnedTextureDescriptor) throws
+    -> RenderSessionHandle
+  {
     let pointer = try mapNativeFailure {
       try descriptor.nativeInput.withNativeDescriptor { nativeDescriptor in
-        try NativeRender.metalOwnedTextureAttach(map: try requireLivePointer(), descriptor: nativeDescriptor)
+        try NativeRender.metalOwnedTextureAttach(
+          map: requireLivePointer(),
+          descriptor: nativeDescriptor
+        )
       }
     }
     return try RenderSessionHandle(map: self, pointer: pointer)
   }
 
-  public func attachMetalBorrowedTexture(_ descriptor: MetalBorrowedTextureDescriptor) throws -> RenderSessionHandle {
+  func attachMetalBorrowedTexture(
+    _ descriptor: MetalBorrowedTextureDescriptor
+  ) throws
+    -> RenderSessionHandle
+  {
     let pointer = try mapNativeFailure {
       try descriptor.nativeInput.withNativeDescriptor { nativeDescriptor in
-        try NativeRender.metalBorrowedTextureAttach(map: try requireLivePointer(), descriptor: nativeDescriptor)
+        try NativeRender.metalBorrowedTextureAttach(
+          map: requireLivePointer(),
+          descriptor: nativeDescriptor
+        )
       }
     }
     return try RenderSessionHandle(map: self, pointer: pointer)
   }
 
-  public func attachVulkanOwnedTexture(_ descriptor: VulkanOwnedTextureDescriptor) throws -> RenderSessionHandle {
+  func attachVulkanOwnedTexture(
+    _ descriptor: VulkanOwnedTextureDescriptor
+  ) throws
+    -> RenderSessionHandle
+  {
     let pointer = try mapNativeFailure {
       try descriptor.nativeInput.withNativeDescriptor { nativeDescriptor in
-        try NativeRender.vulkanOwnedTextureAttach(map: try requireLivePointer(), descriptor: nativeDescriptor)
+        try NativeRender.vulkanOwnedTextureAttach(
+          map: requireLivePointer(),
+          descriptor: nativeDescriptor
+        )
       }
     }
     return try RenderSessionHandle(map: self, pointer: pointer)
   }
 
-  public func attachVulkanBorrowedTexture(_ descriptor: VulkanBorrowedTextureDescriptor) throws -> RenderSessionHandle {
+  func attachVulkanBorrowedTexture(
+    _ descriptor: VulkanBorrowedTextureDescriptor
+  ) throws
+    -> RenderSessionHandle
+  {
     let pointer = try mapNativeFailure {
       try descriptor.nativeInput.withNativeDescriptor { nativeDescriptor in
-        try NativeRender.vulkanBorrowedTextureAttach(map: try requireLivePointer(), descriptor: nativeDescriptor)
+        try NativeRender.vulkanBorrowedTextureAttach(
+          map: requireLivePointer(),
+          descriptor: nativeDescriptor
+        )
       }
     }
     return try RenderSessionHandle(map: self, pointer: pointer)
   }
 
-  public func attachOpenGLOwnedTexture(_ descriptor: OpenGLOwnedTextureDescriptor) throws -> RenderSessionHandle {
+  func attachOpenGLOwnedTexture(
+    _ descriptor: OpenGLOwnedTextureDescriptor
+  ) throws
+    -> RenderSessionHandle
+  {
     let pointer = try mapNativeFailure {
       try descriptor.nativeInput.withNativeDescriptor { nativeDescriptor in
-        try NativeRender.openGLOwnedTextureAttach(map: try requireLivePointer(), descriptor: nativeDescriptor)
+        try NativeRender.openGLOwnedTextureAttach(
+          map: requireLivePointer(),
+          descriptor: nativeDescriptor
+        )
       }
     }
     return try RenderSessionHandle(map: self, pointer: pointer)
   }
 
-  public func attachOpenGLBorrowedTexture(_ descriptor: OpenGLBorrowedTextureDescriptor) throws -> RenderSessionHandle {
+  func attachOpenGLBorrowedTexture(
+    _ descriptor: OpenGLBorrowedTextureDescriptor
+  ) throws
+    -> RenderSessionHandle
+  {
     let pointer = try mapNativeFailure {
       try descriptor.nativeInput.withNativeDescriptor { nativeDescriptor in
-        try NativeRender.openGLBorrowedTextureAttach(map: try requireLivePointer(), descriptor: nativeDescriptor)
+        try NativeRender.openGLBorrowedTextureAttach(
+          map: requireLivePointer(),
+          descriptor: nativeDescriptor
+        )
       }
     }
     return try RenderSessionHandle(map: self, pointer: pointer)

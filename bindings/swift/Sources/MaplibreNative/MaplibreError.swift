@@ -8,7 +8,9 @@ public enum MaplibreErrorKind: Sendable, Equatable {
   case unknownStatus
 }
 
-public struct MaplibreError: Error, Sendable, Equatable, CustomStringConvertible {
+public struct MaplibreError: Error, Sendable, Equatable,
+  CustomStringConvertible
+{
   public let kind: MaplibreErrorKind
   public let rawStatus: Int32?
   public let diagnostic: String
@@ -32,10 +34,14 @@ public struct MaplibreError: Error, Sendable, Equatable, CustomStringConvertible
 
   static func fromNativeFailure(_ failure: NativeStatusFailure) -> Self {
     if !failure.isNativeStatus {
-      return Self(kind: Self.kind(forRawStatus: failure.rawStatus), rawStatus: nil, diagnostic: failure.diagnostic)
+      return Self(
+        kind: kind(forRawStatus: failure.rawStatus),
+        rawStatus: nil,
+        diagnostic: failure.diagnostic
+      )
     }
     return Self(
-      kind: Self.kind(forRawStatus: failure.rawStatus),
+      kind: kind(forRawStatus: failure.rawStatus),
       rawStatus: failure.rawStatus,
       diagnostic: failure.diagnostic
     )

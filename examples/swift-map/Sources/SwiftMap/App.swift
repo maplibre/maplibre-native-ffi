@@ -14,22 +14,30 @@ struct SwiftMapApp: App {
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
-  static let willTerminateMapViews = Notification.Name("SwiftMapWillTerminateMapViews")
+  static let willTerminateMapViews = Notification
+    .Name("SwiftMapWillTerminateMapViews")
   private var window: NSWindow?
 
-  func applicationDidFinishLaunching(_ notification: Notification) {
+  func applicationDidFinishLaunching(_: Notification) {
     NSApp.setActivationPolicy(.regular)
     installCAPILogging()
     createWindow()
     NSApp.activate(ignoringOtherApps: true)
   }
 
-  func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+  func applicationShouldTerminateAfterLastWindowClosed(_: NSApplication)
+    -> Bool
+  {
     true
   }
 
-  func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-    NotificationCenter.default.post(name: Self.willTerminateMapViews, object: nil)
+  func applicationShouldTerminate(_: NSApplication) -> NSApplication
+    .TerminateReply
+  {
+    NotificationCenter.default.post(
+      name: Self.willTerminateMapViews,
+      object: nil
+    )
     clearCAPILogging()
     return .terminateNow
   }

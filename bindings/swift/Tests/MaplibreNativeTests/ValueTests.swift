@@ -1,7 +1,6 @@
 import CMaplibreNativeC
-import Testing
-
 @testable import MaplibreNative
+import Testing
 
 @Test func jsonValueMaterializesNestedObjectDescriptors() throws {
   let arena = NativeInputArena()
@@ -12,9 +11,10 @@ import Testing
 
   #expect(root.type == MLN_JSON_VALUE_TYPE_OBJECT.rawValue)
   #expect(root.data.object_value.member_count == 2)
-  let first = root.data.object_value.members![0]
+  let first = try #require(root.data.object_value.members?[0])
   #expect(first.key.size == 4)
-  #expect(try NativeString.copyUTF8(data: first.key.data, size: first.key.size) == "name")
+  #expect(try NativeString
+    .copyUTF8(data: first.key.data, size: first.key.size) == "name")
   #expect(first.value.pointee.type == MLN_JSON_VALUE_TYPE_STRING.rawValue)
 }
 
@@ -37,13 +37,20 @@ import Testing
 
 @Test func geometryMaterializesAndCopiesAllCVariants() throws {
   let geometry = Geometry.geometryCollection([
-    .multiPoint([LatLng(latitude: 1, longitude: 2), LatLng(latitude: 3, longitude: 4)]),
+    .multiPoint([
+      LatLng(latitude: 1, longitude: 2),
+      LatLng(latitude: 3, longitude: 4),
+    ]),
     .multiLineString([
       [LatLng(latitude: 5, longitude: 6), LatLng(latitude: 7, longitude: 8)],
       [LatLng(latitude: 9, longitude: 10)],
     ]),
     .multiPolygon([[
-      [LatLng(latitude: 11, longitude: 12), LatLng(latitude: 13, longitude: 14), LatLng(latitude: 11, longitude: 12)],
+      [
+        LatLng(latitude: 11, longitude: 12),
+        LatLng(latitude: 13, longitude: 14),
+        LatLng(latitude: 11, longitude: 12),
+      ],
     ]]),
   ])
 
@@ -52,9 +59,12 @@ import Testing
 
   #expect(raw.type == MLN_GEOMETRY_TYPE_GEOMETRY_COLLECTION.rawValue)
   #expect(raw.data.geometry_collection.geometry_count == 3)
-  #expect(raw.data.geometry_collection.geometries![0].type == MLN_GEOMETRY_TYPE_MULTI_POINT.rawValue)
-  #expect(raw.data.geometry_collection.geometries![1].type == MLN_GEOMETRY_TYPE_MULTI_LINE_STRING.rawValue)
-  #expect(raw.data.geometry_collection.geometries![2].type == MLN_GEOMETRY_TYPE_MULTI_POLYGON.rawValue)
+  #expect(raw.data.geometry_collection.geometries?[0]
+    .type == MLN_GEOMETRY_TYPE_MULTI_POINT.rawValue)
+  #expect(raw.data.geometry_collection.geometries?[1]
+    .type == MLN_GEOMETRY_TYPE_MULTI_LINE_STRING.rawValue)
+  #expect(raw.data.geometry_collection.geometries?[2]
+    .type == MLN_GEOMETRY_TYPE_MULTI_POLYGON.rawValue)
 
   let copiedNative = try NativeGeometry(copying: raw)
   #expect(Geometry(native: copiedNative) == geometry)
@@ -86,7 +96,10 @@ import Testing
 @Test func nativeGeometryCopyRejectsNullPointersForNonEmptyContainers() throws {
   var line = mln_geometry()
   line.type = MLN_GEOMETRY_TYPE_LINE_STRING.rawValue
-  line.data.line_string = mln_coordinate_span(coordinates: nil, coordinate_count: 1)
+  line.data.line_string = mln_coordinate_span(
+    coordinates: nil,
+    coordinate_count: 1
+  )
 
   try expectSwiftFailure("coordinate span coordinates pointer is null") {
     _ = try NativeGeometry(copying: line)
@@ -102,7 +115,10 @@ import Testing
 
   var collection = mln_geometry()
   collection.type = MLN_GEOMETRY_TYPE_GEOMETRY_COLLECTION.rawValue
-  collection.data.geometry_collection = mln_geometry_collection(geometries: nil, geometry_count: 1)
+  collection.data.geometry_collection = mln_geometry_collection(
+    geometries: nil,
+    geometry_count: 1
+  )
 
   try expectSwiftFailure("geometry collection geometries pointer is null") {
     _ = try NativeGeometry(copying: collection)
@@ -133,7 +149,8 @@ import Testing
   }
 }
 
-@Test func nativeFeatureExtensionResultCopyRejectsNullPointersForPayloads() throws {
+@Test func nativeFeatureExtensionResultCopyRejectsNullPointersForPayloads(
+) throws {
   var valueResult = mln_feature_extension_result_info()
   valueResult.type = MLN_FEATURE_EXTENSION_RESULT_TYPE_VALUE.rawValue
   valueResult.data.value = nil
@@ -143,15 +160,24 @@ import Testing
   }
 
   var collectionResult = mln_feature_extension_result_info()
-  collectionResult.type = MLN_FEATURE_EXTENSION_RESULT_TYPE_FEATURE_COLLECTION.rawValue
-  collectionResult.data.feature_collection = mln_feature_collection(features: nil, feature_count: 1)
+  collectionResult.type = MLN_FEATURE_EXTENSION_RESULT_TYPE_FEATURE_COLLECTION
+    .rawValue
+  collectionResult.data.feature_collection = mln_feature_collection(
+    features: nil,
+    feature_count: 1
+  )
 
-  try expectSwiftFailure("feature extension result feature collection pointer is null") {
+  try expectSwiftFailure(
+    "feature extension result feature collection pointer is null"
+  ) {
     _ = try NativeFeatureExtensionResult(copying: collectionResult)
   }
 }
 
-private func expectSwiftFailure(_ diagnostic: String, _ body: () throws -> Void) throws {
+private func expectSwiftFailure(
+  _ diagnostic: String,
+  _ body: () throws -> Void
+) throws {
   do {
     try body()
     Issue.record("expected Swift validation failure")
