@@ -316,10 +316,16 @@ PremultipliedImage decodeImage(const std::string& string) {
     );
   }
 
-  const auto sourceRowStride =
+  const auto tightRowStride =
     checkedByteCount(static_cast<std::size_t>(width), 4, "row stride");
+  if (rowStride < tightRowStride) {
+    throw std::runtime_error(
+      "OHOS image decoder returned row stride smaller than image width: " +
+      description
+    );
+  }
   const auto bytesRequired =
-    checkedByteCount(sourceRowStride, height, "pixel buffer size");
+    checkedByteCount(rowStride, height, "pixel buffer size");
   std::vector<uint8_t> pixels(bytesRequired);
   size_t bytesRead = pixels.size();
   checkImageResult(
@@ -338,15 +344,14 @@ PremultipliedImage decodeImage(const std::string& string) {
   if (alphaType == PIXELMAP_ALPHA_TYPE_UNPREMULTIPLIED) {
     UnassociatedImage image(imageSize);
     copyRows(
-      image.data.get(), pixels.data(), width, height, sourceRowStride,
-      pixelFormat
+      image.data.get(), pixels.data(), width, height, rowStride, pixelFormat
     );
     return util::premultiply(std::move(image));
   }
 
   PremultipliedImage image(imageSize);
   copyRows(
-    image.data.get(), pixels.data(), width, height, sourceRowStride, pixelFormat
+    image.data.get(), pixels.data(), width, height, rowStride, pixelFormat
   );
   return image;
 }
