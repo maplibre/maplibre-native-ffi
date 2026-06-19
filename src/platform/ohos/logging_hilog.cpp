@@ -27,14 +27,27 @@ LogLevel logLevelForSeverity(EventSeverity severity) {
   return LOG_INFO;
 }
 
+std::string escapeHilogFormatString(const std::string& value) {
+  std::string escaped;
+  escaped.reserve(value.size());
+  for (const char character : value) {
+    escaped += character;
+    if (character == '%') {
+      escaped += '%';
+    }
+  }
+  return escaped;
+}
+
 }  // namespace
 
 void Log::platformRecord(EventSeverity severity, const std::string& msg) {
   const auto message =
     std::string("[") + Enum<EventSeverity>::toString(severity) + "] " + msg;
+  const auto escapedMessage = escapeHilogFormatString(message);
   OH_LOG_PrintMsg(
     LOG_APP, logLevelForSeverity(severity), kMapLibreHilogDomain,
-    kMapLibreHilogTag, message.c_str()
+    kMapLibreHilogTag, escapedMessage.c_str()
   );
 }
 
