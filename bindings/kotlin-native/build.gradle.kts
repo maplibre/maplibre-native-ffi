@@ -1,4 +1,5 @@
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
+import org.maplibre.nativeffi.gradle.MaplibreNativeCArtifact
 
 plugins { kotlin("multiplatform") version "2.2.21" }
 
@@ -6,13 +7,7 @@ apply(from = rootProject.file("gradle/native-artifact.gradle.kts"))
 
 repositories { mavenCentral() }
 
-@Suppress("UNCHECKED_CAST")
-val maplibreNativeCList = extra["maplibreNativeCList"] as (String) -> List<String>
-val nativeIncludeDirs = maplibreNativeCList("maplibreNativeC.includeDirs")
-val nativeLinkDirs = maplibreNativeCList("maplibreNativeC.linkDirs")
-val nativeRuntimeLibraryDirs = maplibreNativeCList("maplibreNativeC.runtimeLibraryDirs")
-val nativeLinkLibraries = maplibreNativeCList("maplibreNativeC.linkLibraries")
-val nativeFrameworks = maplibreNativeCList("maplibreNativeC.frameworks")
+val maplibreNativeC = extensions.getByType<MaplibreNativeCArtifact>()
 val hostOs = System.getProperty("os.name").lowercase()
 val hostArch = System.getProperty("os.arch").lowercase()
 
@@ -26,22 +21,22 @@ kotlin {
 
   targets.withType<KotlinNativeTarget>().configureEach {
     binaries.all {
-      linkerOpts(nativeLinkDirs.map { "-L$it" })
-      linkerOpts(nativeLinkLibraries.map { "-l$it" })
+      linkerOpts(maplibreNativeC.linkDirs.map { "-L$it" })
+      linkerOpts(maplibreNativeC.linkLibraries.map { "-l$it" })
       if (hostOs.contains("mac") || hostOs.contains("linux")) {
-        linkerOpts(nativeRuntimeLibraryDirs.map { "-Wl,-rpath,$it" })
+        linkerOpts(maplibreNativeC.runtimeLibraryDirs.map { "-Wl,-rpath,$it" })
       }
       if (hostOs.contains("mac")) {
-        linkerOpts(nativeFrameworks.flatMap { listOf("-framework", it) })
+        linkerOpts(maplibreNativeC.frameworks.flatMap { listOf("-framework", it) })
       }
     }
 
     compilations.getByName("main") {
       cinterops {
-        val maplibreNativeC by creating {
+        create("maplibreNativeC") {
           defFile(project.file("src/nativeInterop/cinterop/maplibreNativeC.def"))
-          includeDirs.headerFilterOnly(*nativeIncludeDirs.map { file(it) }.toTypedArray())
-          compilerOpts(nativeIncludeDirs.map { "-I$it" })
+          includeDirs.headerFilterOnly(*maplibreNativeC.includeDirs.toTypedArray())
+          compilerOpts(maplibreNativeC.includeDirs.map { "-I$it" })
         }
       }
     }

@@ -1,4 +1,4 @@
-import java.util.Properties
+import org.maplibre.nativeffi.gradle.MaplibreNativeCArtifact
 
 fun Project.maplibreNativeCPropertiesFile(): File {
   val buildDir =
@@ -15,19 +15,4 @@ if (!maplibreNativeCPropertiesFile.isFile) {
   throw GradleException("Missing native artifact properties: $maplibreNativeCPropertiesFile")
 }
 
-val maplibreNativeCProperties =
-  Properties().apply { maplibreNativeCPropertiesFile.inputStream().use(::load) }
-
-extra["maplibreNativeCProperty"] = { name: String ->
-  maplibreNativeCProperties.getProperty(name).orEmpty()
-}
-
-extra["maplibreNativeCList"] = { name: String ->
-  maplibreNativeCProperties
-    .getProperty(name)
-    .orEmpty()
-    .split(File.pathSeparatorChar)
-    .filter(String::isNotBlank)
-}
-
-extra["maplibreNativeCPropertiesFile"] = maplibreNativeCPropertiesFile
+extensions.add("maplibreNativeC", MaplibreNativeCArtifact(maplibreNativeCPropertiesFile))
