@@ -22,15 +22,12 @@ fn maplibreNativeModule(b: *std.Build, options: BuildOptions) *std.Build.Module 
     });
 }
 
-fn addSdlTranslateCWorkarounds(module: *std.Build.Module, target: std.Build.ResolvedTarget) void {
-    if (target.result.os.tag != .windows or target.result.abi != .msvc) return;
-
-    // Zig 0.16 translate-c cannot parse MSVC's non-standard i64/ui64 integer
-    // literal suffixes when SDL3 headers expose them through @cImport. Keep the
-    // workaround local to zig-map: it is the only Zig target that imports SDL.
-    module.addCMacro("SIZE_MAX", "((size_t)-1)");
-    module.addCMacro("SDL_SINT64_C(c)", "c##LL");
-    module.addCMacro("SDL_UINT64_C(c)", "c##ULL");
+fn cBindingsHeader(b: *std.Build, backend: maplibre_build.RenderBackend) std.Build.LazyPath {
+    return switch (backend) {
+        .metal => b.path("c_metal.h"),
+        .opengl => b.path("c_opengl.h"),
+        .vulkan => b.path("c_vulkan.h"),
+    };
 }
 
 fn addZigMapExample(b: *std.Build, options: BuildOptions) *std.Build.Step.Compile {
@@ -46,7 +43,13 @@ fn addZigMapExample(b: *std.Build, options: BuildOptions) *std.Build.Step.Compil
 
     maplibre_build.addRenderBackendOptions(b, root_module, options.render_backend);
     maplibre_build.addIncludePaths(root_module, options.include_dirs);
-    addSdlTranslateCWorkarounds(root_module, options.target);
+    root_module.addImport("c", maplibre_build.translateCModule(b, .{
+        .root_source_file = cBindingsHeader(b, options.render_backend),
+        .target = options.target,
+        .optimize = options.optimize,
+        .include_dirs = options.include_dirs,
+        .c_macros = maplibre_build.sdlTranslateCMacros(options.target),
+    }));
     root_module.addImport("maplibre_native", maplibreNativeModule(b, options));
     if (options.render_backend == .opengl) {
         const gl_bindings = zigglgen.generateBindingsModule(b, if (options.target.result.os.tag == .linux or options.target.result.os.tag == .macos)

@@ -26,6 +26,7 @@ internal static class Shell
         Console.WriteLine($"render target status: {mode.Status}");
         InputController.PrintControls();
 
+        // TODO(map-example-spec): Replace poll-and-wait with a display-paced host loop. See Frame loop.
         while (!graphics.ShouldClose)
         {
             graphics.PollEvents();

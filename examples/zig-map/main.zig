@@ -79,6 +79,7 @@ pub fn main(init_args: std.process.Init) !void {
     var has_presented_frame = false;
     var render_pending = true;
     var input_controller = input.Controller{};
+    // TODO(map-example-spec): Replace poll-and-sleep with a display-paced host loop. See Frame loop.
     while (running) {
         const pool = if (build_options.supports_metal) objc.AutoreleasePool.init() else {};
         defer if (build_options.supports_metal) pool.deinit();

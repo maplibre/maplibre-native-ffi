@@ -126,6 +126,7 @@ final class MetalMapView: NSView {
 
   private func startTimerIfNeeded() {
     guard timer == nil else { return }
+    // TODO(map-example-spec): Replace fixed NSTimer with a display-paced host loop. See Frame loop.
     timer = Timer.scheduledTimer(withTimeInterval: 1.0 / 60.0, repeats: true) { [weak self] _ in
       Task { @MainActor in self?.tick() }
     }

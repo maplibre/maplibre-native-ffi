@@ -18,6 +18,7 @@ pub const RenderBackend = enum {
 
 pub const LinkOptions = struct {
     target: std.Build.ResolvedTarget,
+    optimize: std.builtin.OptimizeMode,
     cmake_artifact_dir: std.Build.LazyPath,
     render_backend: RenderBackend,
     include_dirs: []const std.Build.LazyPath,
@@ -69,6 +70,94 @@ pub fn addIncludePaths(module: *std.Build.Module, include_dirs: []const std.Buil
     }
 }
 
+fn addTranslateCIncludePaths(translate_c: *std.Build.Step.TranslateC, include_dirs: []const std.Build.LazyPath) void {
+    for (include_dirs) |include_dir| {
+        translate_c.addIncludePath(include_dir);
+    }
+}
+
+pub const CMacro = struct {
+    name: []const u8,
+    value: ?[]const u8 = null,
+};
+
+pub fn sdlTranslateCMacros(target: std.Build.ResolvedTarget) []const CMacro {
+    if (target.result.os.tag != .windows or target.result.abi != .msvc) return &.{};
+    return &.{
+        .{ .name = "SIZE_MAX", .value = "((size_t)-1)" },
+        .{ .name = "SDL_SINT64_C(c)", .value = "c##LL" },
+        .{ .name = "SDL_UINT64_C(c)", .value = "c##ULL" },
+    };
+}
+
+pub const TranslateCModuleOptions = struct {
+    root_source_file: std.Build.LazyPath,
+    target: std.Build.ResolvedTarget,
+    optimize: std.builtin.OptimizeMode,
+    include_dirs: []const std.Build.LazyPath,
+    c_macros: []const CMacro = &.{},
+};
+
+pub fn translateCModule(b: *std.Build, options: TranslateCModuleOptions) *std.Build.Module {
+    const translate_c = b.addTranslateC(.{
+        .root_source_file = options.root_source_file,
+        .target = options.target,
+        .optimize = options.optimize,
+    });
+    addTranslateCIncludePaths(translate_c, options.include_dirs);
+    addPlatformSystemHeaderPaths(b, translate_c, options.target);
+    for (options.c_macros) |c_macro| {
+        translate_c.defineCMacro(c_macro.name, c_macro.value);
+    }
+    return translate_c.createModule();
+}
+
+fn maplibreNativeCHeader(b: *std.Build) std.Build.LazyPath {
+    const header = b.addWriteFiles();
+    return header.add("maplibre_native_c_import.h", "#include <maplibre_native_c.h>\n");
+}
+
+fn vulkanBindingsHeader(b: *std.Build) std.Build.LazyPath {
+    const header = b.addWriteFiles();
+    return header.add("vulkan_bindings.h", "#include <vulkan/vulkan.h>\n");
+}
+
+fn eglBindingsHeader(b: *std.Build) std.Build.LazyPath {
+    const header = b.addWriteFiles();
+    return header.add("egl_bindings.h",
+        \\#define EGL_EGLEXT_PROTOTYPES 1
+        \\#include <EGL/egl.h>
+        \\#include <EGL/eglext.h>
+        \\
+    );
+}
+
+pub const RenderBackendTranslateCOptions = struct {
+    target: std.Build.ResolvedTarget,
+    optimize: std.builtin.OptimizeMode,
+    include_dirs: []const std.Build.LazyPath,
+    render_backend: RenderBackend,
+};
+
+pub fn addRenderBackendTranslateC(b: *std.Build, module: *std.Build.Module, options: RenderBackendTranslateCOptions) void {
+    if (options.render_backend == .vulkan) {
+        module.addImport("vulkan", translateCModule(b, .{
+            .root_source_file = vulkanBindingsHeader(b),
+            .target = options.target,
+            .optimize = options.optimize,
+            .include_dirs = options.include_dirs,
+        }));
+    }
+    if (options.render_backend == .opengl and (options.target.result.os.tag == .linux or options.target.result.os.tag == .macos)) {
+        module.addImport("egl", translateCModule(b, .{
+            .root_source_file = eglBindingsHeader(b),
+            .target = options.target,
+            .optimize = options.optimize,
+            .include_dirs = options.include_dirs,
+        }));
+    }
+}
+
 pub fn dependencyLibraryDirs(b: *std.Build) []const std.Build.LazyPath {
     return b.option(
         []const std.Build.LazyPath,
@@ -84,15 +173,23 @@ fn addDependencyLibraryPaths(module: *std.Build.Module, dependency_library_dirs:
     }
 }
 
-pub fn addPlatformSystemPaths(b: *std.Build, module: *std.Build.Module, target: std.Build.ResolvedTarget) void {
+fn addPlatformSystemHeaderPaths(b: *std.Build, destination: anytype, target: std.Build.ResolvedTarget) void {
     if (!target.result.os.tag.isDarwin() and target.result.os.tag != .linux) return;
     const system_root = b.graph.environ_map.get("MLN_FFI_SYSTEM_ROOT") orelse return;
     if (system_root.len == 0) return;
 
     if (target.result.os.tag.isDarwin()) {
-        module.addSystemFrameworkPath(.{ .cwd_relative = b.pathJoin(&.{ system_root, "System", "Library", "Frameworks" }) });
+        destination.addSystemFrameworkPath(.{ .cwd_relative = b.pathJoin(&.{ system_root, "System", "Library", "Frameworks" }) });
     }
-    module.addSystemIncludePath(.{ .cwd_relative = b.pathJoin(&.{ system_root, "usr", "include" }) });
+    destination.addSystemIncludePath(.{ .cwd_relative = b.pathJoin(&.{ system_root, "usr", "include" }) });
+}
+
+pub fn addPlatformSystemPaths(b: *std.Build, module: *std.Build.Module, target: std.Build.ResolvedTarget) void {
+    addPlatformSystemHeaderPaths(b, module, target);
+    if (!target.result.os.tag.isDarwin() and target.result.os.tag != .linux) return;
+    const system_root = b.graph.environ_map.get("MLN_FFI_SYSTEM_ROOT") orelse return;
+    if (system_root.len == 0) return;
+
     module.addLibraryPath(.{ .cwd_relative = b.pathJoin(&.{ system_root, "usr", "lib" }) });
     if (target.result.os.tag == .linux) {
         module.addLibraryPath(.{ .cwd_relative = b.pathJoin(&.{ system_root, "usr", "lib64" }) });
@@ -186,6 +283,7 @@ pub fn maplibreNativeModule(b: *std.Build, options: DependencyOptions) *std.Buil
 fn repoLinkOptions(options: BuildOptions) LinkOptions {
     return .{
         .target = options.target,
+        .optimize = options.optimize,
         .cmake_artifact_dir = options.cmake_artifact_dir,
         .render_backend = options.render_backend,
         .include_dirs = options.include_dirs,
@@ -195,12 +293,20 @@ fn repoLinkOptions(options: BuildOptions) LinkOptions {
 
 pub const IncludeOptions = struct {
     include_dirs: []const std.Build.LazyPath,
+    target: std.Build.ResolvedTarget,
+    optimize: std.builtin.OptimizeMode,
 };
 
-/// Configures include paths and libc for `@cImport` without linking maplibre-native-c.
-pub fn addMaplibreNativeIncludes(module_: *std.Build.Module, options: IncludeOptions) void {
+/// Configures the raw C declarations without linking maplibre-native-c.
+pub fn addMaplibreNativeIncludes(b: *std.Build, module_: *std.Build.Module, options: IncludeOptions) void {
     addIncludePaths(module_, options.include_dirs);
     module_.link_libc = true;
+    module_.addImport("maplibre_native_c", translateCModule(b, .{
+        .root_source_file = maplibreNativeCHeader(b),
+        .target = options.target,
+        .optimize = options.optimize,
+        .include_dirs = options.include_dirs,
+    }));
 }
 
 /// Links a Zig module to the MapLibre Native C library and its backend-specific dependencies.
@@ -208,7 +314,11 @@ pub fn addMaplibreNativeIncludes(module_: *std.Build.Module, options: IncludeOpt
 /// Callers provide all filesystem paths explicitly so the helper works both from this
 /// package and from external consumers with a different build root layout.
 pub fn linkMaplibreNativeC(b: *std.Build, module_: *std.Build.Module, options: LinkOptions) void {
-    addMaplibreNativeIncludes(module_, .{ .include_dirs = options.include_dirs });
+    addMaplibreNativeIncludes(b, module_, .{
+        .include_dirs = options.include_dirs,
+        .target = options.target,
+        .optimize = options.optimize,
+    });
     if (options.target.result.os.tag == .windows) {
         module_.addObjectFile(options.cmake_artifact_dir.path(b, "maplibre-native-c.lib"));
     } else if (isIosSimulator(options.target)) {
@@ -279,7 +389,11 @@ fn addMaplibreNativeDocs(
         .target = target,
         .optimize = optimize,
     });
-    addMaplibreNativeIncludes(docs_module, .{ .include_dirs = include_dirs });
+    addMaplibreNativeIncludes(b, docs_module, .{
+        .include_dirs = include_dirs,
+        .target = target,
+        .optimize = optimize,
+    });
 
     const doc_compile = b.addObject(.{
         .name = "maplibre_native_docs",
@@ -314,6 +428,12 @@ fn addBindingTests(b: *std.Build, options: BuildOptions, maplibre_native: *std.B
     const tests = addTestCompile(b, options, b.path("tests/main.zig"));
     tests.root_module.addImport("maplibre_native", maplibre_native);
     addRenderBackendOptions(b, tests.root_module, options.render_backend);
+    addRenderBackendTranslateC(b, tests.root_module, .{
+        .target = options.target,
+        .optimize = options.optimize,
+        .include_dirs = options.include_dirs,
+        .render_backend = options.render_backend,
+    });
     if (options.render_backend == .opengl) {
         const gl_bindings = zigglgen.generateBindingsModule(b, if (options.target.result.os.tag == .linux or options.target.result.os.tag == .macos)
             .{ .api = .gles, .version = .@"3.0" }

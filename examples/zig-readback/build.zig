@@ -21,12 +21,16 @@ fn maplibreNativeModule(b: *std.Build, options: BuildOptions) *std.Build.Module 
     });
 }
 
-fn addSdlTranslateCWorkarounds(module: *std.Build.Module, target: std.Build.ResolvedTarget) void {
-    if (target.result.os.tag != .windows or target.result.abi != .msvc) return;
-
-    module.addCMacro("SIZE_MAX", "((size_t)-1)");
-    module.addCMacro("SDL_SINT64_C(c)", "c##LL");
-    module.addCMacro("SDL_UINT64_C(c)", "c##ULL");
+fn addSdlTranslateC(b: *std.Build, module: *std.Build.Module, options: BuildOptions) void {
+    if (options.render_backend == .opengl and options.target.result.os.tag == .windows) {
+        module.addImport("sdl", maplibre_build.translateCModule(b, .{
+            .root_source_file = b.path("sdl_bindings.h"),
+            .target = options.target,
+            .optimize = options.optimize,
+            .include_dirs = options.include_dirs,
+            .c_macros = maplibre_build.sdlTranslateCMacros(options.target),
+        }));
+    }
 }
 
 fn addReadbackExample(b: *std.Build, options: BuildOptions) *std.Build.Step.Compile {
@@ -41,8 +45,14 @@ fn addReadbackExample(b: *std.Build, options: BuildOptions) *std.Build.Step.Comp
 
     maplibre_build.addRenderBackendOptions(b, example.root_module, options.render_backend);
     maplibre_build.addIncludePaths(example.root_module, options.include_dirs);
+    maplibre_build.addRenderBackendTranslateC(b, example.root_module, .{
+        .target = options.target,
+        .optimize = options.optimize,
+        .include_dirs = options.include_dirs,
+        .render_backend = options.render_backend,
+    });
+    addSdlTranslateC(b, example.root_module, options);
     if (options.render_backend == .opengl and options.target.result.os.tag == .windows) {
-        addSdlTranslateCWorkarounds(example.root_module, options.target);
         for (options.dependency_library_dirs) |dependency_library_dir| {
             example.root_module.addLibraryPath(dependency_library_dir);
             example.root_module.addRPath(dependency_library_dir);
