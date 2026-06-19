@@ -43,7 +43,8 @@ def load_artifact(metadata_path: Path) -> Artifact:
     library_path = metadata.get("library_path", "")
     import_library_path = metadata.get("import_library_path") or library_path
     require_existing_file(library_path, "native library")
-    require_existing_file(import_library_path, "Windows import library")
+    if import_library_path != library_path:
+        require_existing_file(import_library_path, "Windows import library")
     library_dirs = metadata.get("library_dirs", [])
     runtime_library_dirs = []
     if metadata.get("supports_linker_rpath", False):

@@ -32,7 +32,7 @@ let package = Package(
       name: "MaplibreNative",
       dependencies: ["CMaplibreNativeC"],
       linkerSettings: [
-        .unsafeFlags(nativeLinkerFlags())
+        .unsafeFlags(nativeLinkerFlags()),
       ]
     ),
     .testTarget(
