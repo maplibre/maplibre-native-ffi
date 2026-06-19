@@ -990,8 +990,14 @@ impl super::MapHandle {
             sys::mln_map_get_layer_filter(map, layer_id.raw(), out.as_mut_ptr())
         })?;
         // SAFETY: On success, the C API returns either null or an owned JSON
-        // snapshot handle for this call; core copies and releases it.
-        unsafe { maplibre_core::json::copy_json_snapshot(out.into_option()) }
+        // snapshot handle for this call; core copies and releases it. Some
+        // native backends represent a cleared filter as a JSON null snapshot.
+        Ok(
+            match unsafe { maplibre_core::json::copy_json_snapshot(out.into_option()) }? {
+                Some(JsonValue::Null) => None,
+                filter => filter,
+            },
+        )
     }
 
     /// Copies current style source IDs into owned Rust strings.

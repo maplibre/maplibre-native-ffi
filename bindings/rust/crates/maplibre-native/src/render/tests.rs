@@ -9,7 +9,7 @@ use std::marker::PhantomData;
 use std::ptr::NonNull;
 use std::rc::Rc;
 use std::sync::atomic::{AtomicI32, AtomicUsize, Ordering};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use ash::vk;
 use ash::vk::Handle;
@@ -1123,7 +1123,8 @@ fn pick_vulkan_physical_device(
 }
 
 fn wait_for_runtime_event(runtime: &RuntimeHandle, event_type: RuntimeEventType) -> bool {
-    for _ in 0..100 {
+    let deadline = Instant::now() + Duration::from_secs(5);
+    while Instant::now() < deadline {
         let _ = runtime.run_once();
         while let Ok(Some(event)) = runtime.poll_event() {
             if event.event_type == event_type {
@@ -1199,7 +1200,8 @@ fn wait_for_rendered_feature(
     options: &RenderedFeatureQueryOptions,
     description: &str,
 ) -> QueriedFeature {
-    for _ in 0..1000 {
+    let deadline = Instant::now() + Duration::from_secs(5);
+    while Instant::now() < deadline {
         let features = session
             .query_rendered_features(geometry, Some(options))
             .unwrap();
@@ -1219,7 +1221,8 @@ fn wait_for_source_feature(
     options: &SourceFeatureQueryOptions,
     description: &str,
 ) -> QueriedFeature {
-    for _ in 0..1000 {
+    let deadline = Instant::now() + Duration::from_secs(5);
+    while Instant::now() < deadline {
         let features = session
             .query_source_features(source_id, Some(options))
             .unwrap();
@@ -1770,7 +1773,8 @@ fn resize_updates_owned_texture_frame_extent() {
         )
         .unwrap();
     map.request_still_image().unwrap();
-    for _ in 0..200 {
+    let deadline = Instant::now() + Duration::from_secs(5);
+    while Instant::now() < deadline {
         let _ = runtime.run_once();
         while let Ok(Some(event)) = runtime.poll_event() {
             if event.event_type != RuntimeEventType::MapRenderUpdateAvailable {
@@ -1917,7 +1921,8 @@ fn texture_readback_copies_metadata_and_fills_reusable_buffers_when_supported() 
     load_query_style(&runtime, &map, &session);
     map.request_still_image().unwrap();
     let mut info = None;
-    for _ in 0..200 {
+    let deadline = Instant::now() + Duration::from_secs(5);
+    while Instant::now() < deadline {
         let _ = runtime.run_once();
         while let Ok(Some(event)) = runtime.poll_event() {
             if event.event_type == RuntimeEventType::MapRenderUpdateAvailable {

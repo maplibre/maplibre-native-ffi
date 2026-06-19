@@ -418,10 +418,11 @@ impl ResourceRequestHandleState {
         // SAFETY: handle is live while not closed/released, and native response
         // points to storage retained for this call. The C API copies contents.
         let status = unsafe { (self.fns.complete)(Self::handle_ptr(&inner), native.as_ptr()) };
+        let result = crate::check(status);
         if inner.decision_finalized && inner.provider_owned {
             self.release_if_owned_locked(&mut inner);
         }
-        crate::check(status)
+        result
     }
 
     pub fn is_cancelled(&self) -> Result<bool> {
@@ -556,7 +557,7 @@ mod tests {
     use std::ffi::CString;
     use std::sync::Mutex as StdMutex;
     use std::sync::atomic::{AtomicBool, AtomicI32, AtomicUsize, Ordering};
-    use std::time::Duration;
+    use std::time::{Duration, Instant};
 
     use super::*;
 
@@ -793,7 +794,12 @@ mod tests {
         let thread = std::thread::spawn(move || {
             thread_state.is_cancelled().unwrap();
         });
+        let started_deadline = Instant::now() + Duration::from_secs(5);
         while !CANCELLED_STARTED.load(Ordering::SeqCst) {
+            assert!(
+                Instant::now() < started_deadline,
+                "timed out waiting for cancellation check to start"
+            );
             std::thread::yield_now();
         }
 

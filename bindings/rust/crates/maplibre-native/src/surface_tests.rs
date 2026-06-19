@@ -134,7 +134,7 @@ fn public_declarations(source: &str) -> Vec<PublicDeclaration> {
                 current_impl = Some("FrameNativePointer");
             }
             if current_impl.is_some() {
-                impl_depth = brace_delta(line, 0);
+                impl_depth = syntax_depth_delta(line, 0, b'{', b'}');
                 started_allowed_impl = true;
             }
         }
@@ -144,19 +144,27 @@ fn public_declarations(source: &str) -> Vec<PublicDeclaration> {
             let start = index;
             let mut end = index;
             let mut text = String::new();
-            let mut depth = 0usize;
+            let mut brace_depth = 0usize;
+            let mut paren_depth = 0usize;
 
             while end < lines.len() {
                 let current = lines[end];
                 text.push_str(current);
                 text.push('\n');
-                depth = brace_delta(current, depth);
+                brace_depth = syntax_depth_delta(current, brace_depth, b'{', b'}');
+                paren_depth = syntax_depth_delta(current, paren_depth, b'(', b')');
 
                 let current_trimmed = current.trim_end();
-                if current_trimmed.ends_with(';') || (end > start && depth == 0) {
+                if paren_depth == 0
+                    && (code_has_byte(current, b'{') || current_trimmed.ends_with(';'))
+                {
                     break;
                 }
-                if end == start && current_trimmed.ends_with('{') {
+                if end > start
+                    && brace_depth == 0
+                    && paren_depth == 0
+                    && current_trimmed.ends_with('}')
+                {
                     break;
                 }
                 end += 1;
@@ -175,7 +183,7 @@ fn public_declarations(source: &str) -> Vec<PublicDeclaration> {
 
         if current_impl.is_some() && !started_allowed_impl {
             for current in &lines[index..next_index] {
-                impl_depth = brace_delta(current, impl_depth);
+                impl_depth = syntax_depth_delta(current, impl_depth, b'{', b'}');
             }
             if impl_depth == 0 {
                 current_impl = None;
@@ -194,10 +202,83 @@ fn starts_public_declaration(trimmed: &str) -> bool {
         || trimmed.starts_with("pub const ")
 }
 
-fn brace_delta(line: &str, depth: usize) -> usize {
-    let opens = line.bytes().filter(|byte| *byte == b'{').count();
-    let closes = line.bytes().filter(|byte| *byte == b'}').count();
+fn syntax_depth_delta(line: &str, depth: usize, open: u8, close: u8) -> usize {
+    let code = code_without_comments_or_strings(line);
+    let opens = code.bytes().filter(|byte| *byte == open).count();
+    let closes = code.bytes().filter(|byte| *byte == close).count();
     depth.saturating_add(opens).saturating_sub(closes)
+}
+
+fn code_has_byte(line: &str, byte: u8) -> bool {
+    code_without_comments_or_strings(line)
+        .bytes()
+        .any(|current| current == byte)
+}
+
+fn code_without_comments_or_strings(line: &str) -> String {
+    let mut result = String::with_capacity(line.len());
+    let mut chars = line.char_indices().peekable();
+    let mut in_string = false;
+    let mut escaped = false;
+
+    while let Some((index, ch)) = chars.next() {
+        if !in_string {
+            if ch == '/' && chars.peek().is_some_and(|(_, next)| *next == '/') {
+                break;
+            }
+            if ch == 'r' {
+                let rest = &line[index..];
+                if let Some(offset) = raw_string_end_offset(rest) {
+                    result.push(' ');
+                    while chars
+                        .peek()
+                        .is_some_and(|(next_index, _)| *next_index < index + offset)
+                    {
+                        chars.next();
+                    }
+                    continue;
+                }
+            }
+            if ch == '"' {
+                in_string = true;
+                result.push(' ');
+                continue;
+            }
+            result.push(ch);
+            continue;
+        }
+
+        if escaped {
+            escaped = false;
+        } else if ch == '\\' {
+            escaped = true;
+        } else if ch == '"' {
+            in_string = false;
+        }
+        result.push(' ');
+    }
+
+    result
+}
+
+fn raw_string_end_offset(value: &str) -> Option<usize> {
+    let bytes = value.as_bytes();
+    if bytes.first().copied() != Some(b'r') {
+        return None;
+    }
+
+    let mut hashes = 0;
+    while bytes.get(1 + hashes).copied() == Some(b'#') {
+        hashes += 1;
+    }
+    if bytes.get(1 + hashes).copied() != Some(b'"') {
+        return None;
+    }
+
+    let terminator = format!("\"{}", "#".repeat(hashes));
+    value[2 + hashes..]
+        .find(&terminator)
+        .map(|offset| 2 + hashes + offset + terminator.len())
 }
 
 fn private_handle_fields(source: &str, handle_type: &str, path: &Path, failures: &mut Vec<String>) {
@@ -233,18 +314,23 @@ fn no_public_identity_constructors(
     failures: &mut Vec<String>,
 ) {
     let allowed_lifecycle_constructors = ["RuntimeHandle", "MapHandle"];
-    let impl_needle = format!("impl {handle_type}");
     let mut rest = source;
 
-    while let Some(start) = rest.find(&impl_needle) {
-        rest = &rest[start + impl_needle.len()..];
+    while let Some(start) = rest.find("impl") {
+        rest = &rest[start + "impl".len()..];
         let Some(open) = rest.find('{') else {
+            break;
+        };
+        let header = &rest[..open];
+        let Some(close) = matching_brace_end(rest, open) else {
+            rest = &rest[open + 1..];
             continue;
         };
-        let Some(close) = rest[open + 1..].find("\n}") else {
+        if !header.contains(handle_type) {
+            rest = &rest[close + 1..];
             continue;
-        };
-        let body = &rest[open + 1..open + 1 + close];
+        }
+        let body = &rest[open + 1..close];
 
         for line in body.lines() {
             let trimmed = line.trim_start();
@@ -268,6 +354,26 @@ fn no_public_identity_constructors(
             }
         }
 
-        rest = &rest[open + 1 + close..];
+        rest = &rest[close + 1..];
     }
+}
+
+fn matching_brace_end(source: &str, open: usize) -> Option<usize> {
+    let mut depth = 0usize;
+    let mut offset = 0usize;
+    for line in source[open..].split_inclusive('\n') {
+        let code = code_without_comments_or_strings(line);
+        for (line_offset, byte) in code.bytes().enumerate() {
+            if byte == b'{' {
+                depth += 1;
+            } else if byte == b'}' {
+                depth = depth.saturating_sub(1);
+                if depth == 0 {
+                    return Some(open + offset + line_offset);
+                }
+            }
+        }
+        offset += line.len();
+    }
+    None
 }

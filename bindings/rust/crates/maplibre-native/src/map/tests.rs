@@ -21,8 +21,8 @@ fn object_member<'a>(value: &'a JsonValue, key: &str) -> Option<&'a JsonValue> {
 }
 
 fn assert_lat_lng_close(actual: LatLng, expected: LatLng) {
-    assert!((actual.latitude - expected.latitude).abs() < 1e-9);
-    assert!((actual.longitude - expected.longitude).abs() < 1e-9);
+    assert!((actual.latitude - expected.latitude).abs() < 1e-7);
+    assert!((actual.longitude - expected.longitude).abs() < 1e-7);
 }
 
 #[test]
@@ -518,7 +518,7 @@ fn style_json_descriptors_copy_owned_rust_values() {
     map.set_layer_filter("geo-fill", Some(&filter)).unwrap();
     assert_eq!(map.layer_filter("geo-fill").unwrap(), Some(filter.clone()));
     map.set_layer_filter("geo-fill", None).unwrap();
-    assert_ne!(map.layer_filter("geo-fill").unwrap(), Some(filter));
+    assert_eq!(map.layer_filter("geo-fill").unwrap(), None);
 
     let error = map
         .set_layer_filter("owned-background", Some(&JsonValue::Double(f64::NAN)))

@@ -832,7 +832,7 @@ mod tests {
     use std::net::TcpListener;
     use std::sync::Arc;
     use std::sync::atomic::{AtomicUsize, Ordering};
-    use std::time::{Duration, SystemTime, UNIX_EPOCH};
+    use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
     use super::*;
     use crate::{
@@ -890,7 +890,18 @@ mod tests {
         operation_kind: Op,
         result_kind: OpResult,
     ) -> Result<OfflineOperationCompletedEvent> {
+        let deadline = Instant::now() + Duration::from_secs(30);
         loop {
+            if Instant::now() >= deadline {
+                return Err(Error::new(
+                    ErrorKind::InvalidState,
+                    None,
+                    format!(
+                        "timed out waiting for offline operation {:?}/{:?} with id {}",
+                        operation_kind, result_kind, operation.operation_id
+                    ),
+                ));
+            }
             runtime.run_once()?;
             while let Some(event) = runtime.poll_event()? {
                 let RuntimeEventPayload::OfflineOperationCompleted(completed) = event.payload

@@ -252,8 +252,6 @@ pub struct RenderedFeatureQueryOptions {
     pub filter: Option<JsonValue>,
 }
 
-impl RenderedFeatureQueryOptions {}
-
 pub struct NativeRenderedFeatureQueryOptions<'a> {
     raw: sys::mln_rendered_feature_query_options,
     _layer_id_views: Vec<StringView<'a>>,
@@ -328,8 +326,6 @@ pub struct SourceFeatureQueryOptions {
     pub source_layer_ids: Option<Vec<String>>,
     pub filter: Option<JsonValue>,
 }
-
-impl SourceFeatureQueryOptions {}
 
 pub struct NativeSourceFeatureQueryOptions<'a> {
     raw: sys::mln_source_feature_query_options,
