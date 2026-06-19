@@ -44,19 +44,19 @@ public final class OfflineOperationHandle<T> implements AutoCloseable {
     }
   }
 
-  public synchronized long id() {
+  synchronized long id() {
     return id;
   }
 
-  public synchronized OfflineOperationKind kind() {
+  synchronized OfflineOperationKind kind() {
     return kind;
   }
 
-  public synchronized OfflineOperationResultKind resultKind() {
+  synchronized OfflineOperationResultKind resultKind() {
     return resultKind;
   }
 
-  public synchronized boolean isClosed() {
+  synchronized boolean isClosed() {
     return closed;
   }
 

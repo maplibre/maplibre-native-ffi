@@ -882,6 +882,7 @@ mod tests {
     use crate::ErrorKind;
 
     #[test]
+    // Spec coverage: BND-062.
     fn log_severity_maps_raw_values_and_preserves_unknowns() {
         assert_eq!(
             LogSeverity::from_raw(sys::MLN_LOG_SEVERITY_INFO),
@@ -1098,6 +1099,7 @@ mod tests {
     }
 
     #[test]
+    // Spec coverage: BND-068.
     fn offline_download_state_maps_raw_values_and_rejects_unknown_for_set() {
         assert_eq!(
             OfflineRegionDownloadState::from_raw(sys::MLN_OFFLINE_REGION_DOWNLOAD_ACTIVE),
@@ -1188,6 +1190,7 @@ mod tests {
     }
 
     #[test]
+    // Spec coverage: BND-068.
     fn network_status_preserves_unknown_raw_values() {
         assert_eq!(
             NetworkStatus::from_raw(999_999),

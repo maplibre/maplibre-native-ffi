@@ -312,6 +312,29 @@ mod tests {
     }
 
     #[test]
+    // Spec coverage: BND-066. This injects a post-acquire copy failure at
+    // Rust's shared native result-handle guard, which every snapshot/list/result
+    // copier uses, instead of repeating the same guard behavior per domain.
+    fn native_handle_drop_releases_owned_pointer_after_copy_error() {
+        let _lock = DESTROY_COUNT_LOCK.lock().unwrap();
+        DESTROY_COUNT.store(0, Ordering::SeqCst);
+        let mut value = 1u8;
+
+        let error = {
+            let handle =
+                unsafe { NativeHandle::from_raw(&mut value, count_destroy, "test_handle") }
+                    .unwrap();
+            assert_eq!(handle.as_ptr().cast_const(), ptr::addr_of!(value));
+            let result: crate::Result<()> = Err(crate::Error::invalid_argument("copy failed"));
+            result
+        }
+        .unwrap_err();
+
+        assert_eq!(error.kind(), crate::error::ErrorKind::InvalidArgument);
+        assert_eq!(DESTROY_COUNT.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
     fn native_handle_rejects_null() {
         let _lock = DESTROY_COUNT_LOCK.lock().unwrap();
         let error =

@@ -41,10 +41,7 @@ pub use events::{
 pub use geojson::{Feature, FeatureIdentifier, GeoJson};
 pub use geometry::Geometry;
 pub use json::{JsonMember, JsonValue};
-pub use logging::{
-    LogRecord, clear_log_callback, restore_default_async_log_severity_mask,
-    set_async_log_severity_mask, set_log_callback,
-};
+pub use logging::{LogRecord, clear_log_callback, set_async_log_severity_mask, set_log_callback};
 pub use map::{
     LocationIndicatorImageKind, MapHandle, RasterDemEncoding, SourceInfo, SourceType, StyleImage,
     StyleImageInfo, StyleImageOptions, TileScheme, TileSourceOptions, VectorTileEncoding,
@@ -108,7 +105,7 @@ impl<T> HandleOperationError<T> {
     }
 
     /// Returns the raw C status for native operation errors, when available.
-    pub fn raw_status(&self) -> Option<sys::mln_status> {
+    pub fn raw_status(&self) -> Option<i32> {
         self.error.raw_status()
     }
 
@@ -140,6 +137,72 @@ impl<T> std::fmt::Display for HandleOperationError<T> {
 }
 
 impl<T: std::fmt::Debug> std::error::Error for HandleOperationError<T> {}
+
+/// Error returned by offline operation result transfers.
+#[derive(Debug)]
+pub enum OfflineOperationTakeError<T> {
+    /// The native transfer failed before consuming the operation result.
+    Retryable(HandleOperationError<T>),
+    /// The native result was consumed, but copying it into Rust-owned data failed.
+    Consumed(Error),
+}
+
+impl<T> OfflineOperationTakeError<T> {
+    pub(crate) fn retryable(error: Error, handle: T) -> Self {
+        Self::Retryable(HandleOperationError::new(error, handle))
+    }
+
+    pub(crate) fn consumed(error: Error) -> Self {
+        Self::Consumed(error)
+    }
+
+    /// Returns the operation error.
+    pub fn error(&self) -> &Error {
+        match self {
+            Self::Retryable(error) => error.error(),
+            Self::Consumed(error) => error,
+        }
+    }
+
+    /// Returns the stable category for the operation error.
+    pub fn kind(&self) -> ErrorKind {
+        self.error().kind()
+    }
+
+    /// Returns the raw C status for native operation errors, when available.
+    pub fn raw_status(&self) -> Option<i32> {
+        self.error().raw_status()
+    }
+
+    /// Returns the copied diagnostic message for the operation error.
+    pub fn diagnostic(&self) -> &str {
+        self.error().diagnostic()
+    }
+
+    /// Returns the retryable error and still-live handle, if the operation was not consumed.
+    pub fn into_retryable(self) -> Option<HandleOperationError<T>> {
+        match self {
+            Self::Retryable(error) => Some(error),
+            Self::Consumed(_) => None,
+        }
+    }
+
+    /// Returns the operation error, dropping any retryable handle.
+    pub fn into_error(self) -> Error {
+        match self {
+            Self::Retryable(error) => error.into_error(),
+            Self::Consumed(error) => error,
+        }
+    }
+}
+
+impl<T> std::fmt::Display for OfflineOperationTakeError<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.error().fmt(f)
+    }
+}
+
+impl<T: std::fmt::Debug> std::error::Error for OfflineOperationTakeError<T> {}
 
 /// Returns the native C ABI contract version.
 pub fn c_version() -> u32 {
@@ -225,6 +288,7 @@ mod tests {
     assert_not_impl_any!(RenderSessionHandle: Send, Sync);
 
     #[test]
+    // Spec coverage: BND-103.
     fn projected_meter_helpers_round_trip() {
         let coordinate = LatLng::new(45.0, -122.0);
         let meters = projected_meters_for_lat_lng(coordinate).unwrap();
@@ -235,6 +299,7 @@ mod tests {
     }
 
     #[test]
+    // Spec coverage: BND-020.
     fn invalid_network_status_reports_public_error() {
         let error = set_network_status_raw(999_999).unwrap_err();
 
@@ -244,6 +309,7 @@ mod tests {
     }
 
     #[test]
+    // Spec coverage: BND-025 and BND-068.
     fn unknown_network_status_is_rejected_before_calling_c() {
         let error = set_network_status(NetworkStatus::Unknown(999_999)).unwrap_err();
 

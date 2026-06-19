@@ -17,41 +17,7 @@ pub struct RuntimeOptions {
     pub maximum_cache_size: Option<u64>,
 }
 
-impl RuntimeOptions {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn with_asset_path(mut self, asset_path: impl Into<String>) -> Self {
-        self.asset_path = Some(asset_path.into());
-        self
-    }
-
-    pub fn with_cache_path(mut self, cache_path: impl Into<String>) -> Self {
-        self.cache_path = Some(cache_path.into());
-        self
-    }
-
-    pub fn with_maximum_cache_size(mut self, maximum_cache_size: u64) -> Self {
-        self.maximum_cache_size = Some(maximum_cache_size);
-        self
-    }
-
-    pub fn clear_asset_path(mut self) -> Self {
-        self.asset_path = None;
-        self
-    }
-
-    pub fn clear_cache_path(mut self) -> Self {
-        self.cache_path = None;
-        self
-    }
-
-    pub fn clear_maximum_cache_size(mut self) -> Self {
-        self.maximum_cache_size = None;
-        self
-    }
-}
+impl RuntimeOptions {}
 
 /// Region descriptor used to create or inspect offline regions.
 #[derive(Debug, Clone, PartialEq)]
@@ -416,13 +382,13 @@ mod tests {
     use super::*;
 
     #[test]
+    // Spec coverage: BND-060 and BND-061.
     fn runtime_options_materializes_flags_strings_and_defaults() {
-        let native = runtime_options_to_native(
-            &RuntimeOptions::new()
-                .with_asset_path("assets")
-                .with_cache_path("cache.db")
-                .with_maximum_cache_size(42),
-        )
+        let native = runtime_options_to_native(&RuntimeOptions {
+            asset_path: Some("assets".into()),
+            cache_path: Some("cache.db".into()),
+            maximum_cache_size: Some(42),
+        })
         .unwrap();
 
         let raw = native.to_raw();
@@ -449,7 +415,7 @@ mod tests {
 
     #[test]
     fn runtime_options_leave_absent_fields_null_and_unflagged() {
-        let native = runtime_options_to_native(&RuntimeOptions::new()).unwrap();
+        let native = runtime_options_to_native(&RuntimeOptions::default()).unwrap();
         let raw = native.to_raw();
 
         assert_eq!(raw.flags & sys::MLN_RUNTIME_OPTION_MAXIMUM_CACHE_SIZE, 0);

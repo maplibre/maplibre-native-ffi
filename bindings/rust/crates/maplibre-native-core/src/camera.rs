@@ -24,55 +24,6 @@ pub struct CameraOptions {
 }
 
 impl CameraOptions {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn with_center(mut self, center: LatLng) -> Self {
-        self.center = Some(center);
-        self
-    }
-
-    pub fn with_zoom(mut self, zoom: f64) -> Self {
-        self.zoom = Some(zoom);
-        self
-    }
-
-    pub fn with_bearing(mut self, bearing: f64) -> Self {
-        self.bearing = Some(bearing);
-        self
-    }
-
-    pub fn with_pitch(mut self, pitch: f64) -> Self {
-        self.pitch = Some(pitch);
-        self
-    }
-
-    pub fn with_center_altitude(mut self, center_altitude: f64) -> Self {
-        self.center_altitude = Some(center_altitude);
-        self
-    }
-
-    pub fn with_padding(mut self, padding: EdgeInsets) -> Self {
-        self.padding = Some(padding);
-        self
-    }
-
-    pub fn with_anchor(mut self, anchor: ScreenPoint) -> Self {
-        self.anchor = Some(anchor);
-        self
-    }
-
-    pub fn with_roll(mut self, roll: f64) -> Self {
-        self.roll = Some(roll);
-        self
-    }
-
-    pub fn with_field_of_view(mut self, field_of_view: f64) -> Self {
-        self.field_of_view = Some(field_of_view);
-        self
-    }
-
     fn to_native(&self) -> sys::mln_camera_options {
         // SAFETY: Default constructor takes no arguments and initializes size
         // and default values for this C ABI version.
@@ -147,30 +98,6 @@ pub struct AnimationOptions {
 }
 
 impl AnimationOptions {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn with_duration_ms(mut self, duration_ms: f64) -> Self {
-        self.duration_ms = Some(duration_ms);
-        self
-    }
-
-    pub fn with_velocity(mut self, velocity: f64) -> Self {
-        self.velocity = Some(velocity);
-        self
-    }
-
-    pub fn with_min_zoom(mut self, min_zoom: f64) -> Self {
-        self.min_zoom = Some(min_zoom);
-        self
-    }
-
-    pub fn with_easing(mut self, easing: UnitBezier) -> Self {
-        self.easing = Some(easing);
-        self
-    }
-
     fn to_native(&self) -> sys::mln_animation_options {
         // SAFETY: Default constructor takes no arguments and initializes size.
         let mut raw = unsafe { sys::mln_animation_options_default() };
@@ -204,25 +131,6 @@ pub struct CameraFitOptions {
 }
 
 impl CameraFitOptions {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn with_padding(mut self, padding: EdgeInsets) -> Self {
-        self.padding = Some(padding);
-        self
-    }
-
-    pub fn with_bearing(mut self, bearing: f64) -> Self {
-        self.bearing = Some(bearing);
-        self
-    }
-
-    pub fn with_pitch(mut self, pitch: f64) -> Self {
-        self.pitch = Some(pitch);
-        self
-    }
-
     fn to_native(&self) -> sys::mln_camera_fit_options {
         // SAFETY: Default constructor takes no arguments and initializes size.
         let mut raw = unsafe { sys::mln_camera_fit_options_default() };
@@ -254,35 +162,6 @@ pub struct BoundOptions {
 }
 
 impl BoundOptions {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn with_bounds(mut self, bounds: LatLngBounds) -> Self {
-        self.bounds = Some(bounds);
-        self
-    }
-
-    pub fn with_min_zoom(mut self, min_zoom: f64) -> Self {
-        self.min_zoom = Some(min_zoom);
-        self
-    }
-
-    pub fn with_max_zoom(mut self, max_zoom: f64) -> Self {
-        self.max_zoom = Some(max_zoom);
-        self
-    }
-
-    pub fn with_min_pitch(mut self, min_pitch: f64) -> Self {
-        self.min_pitch = Some(min_pitch);
-        self
-    }
-
-    pub fn with_max_pitch(mut self, max_pitch: f64) -> Self {
-        self.max_pitch = Some(max_pitch);
-        self
-    }
-
     fn to_native(&self) -> sys::mln_bound_options {
         // SAFETY: Default constructor takes no arguments and initializes size.
         let mut raw = unsafe { sys::mln_bound_options_default() };
@@ -330,20 +209,6 @@ pub struct FreeCameraOptions {
 }
 
 impl FreeCameraOptions {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn with_position(mut self, position: Vec3) -> Self {
-        self.position = Some(position);
-        self
-    }
-
-    pub fn with_orientation(mut self, orientation: Quaternion) -> Self {
-        self.orientation = Some(orientation);
-        self
-    }
-
     fn to_native(&self) -> sys::mln_free_camera_options {
         // SAFETY: Default constructor takes no arguments and initializes size.
         let mut raw = unsafe { sys::mln_free_camera_options_default() };
@@ -378,25 +243,6 @@ pub struct ProjectionMode {
 }
 
 impl ProjectionMode {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn with_axonometric(mut self, axonometric: bool) -> Self {
-        self.axonometric = Some(axonometric);
-        self
-    }
-
-    pub fn with_x_skew(mut self, x_skew: f64) -> Self {
-        self.x_skew = Some(x_skew);
-        self
-    }
-
-    pub fn with_y_skew(mut self, y_skew: f64) -> Self {
-        self.y_skew = Some(y_skew);
-        self
-    }
-
     fn to_native(&self) -> sys::mln_projection_mode {
         // SAFETY: Default constructor takes no arguments and initializes size.
         let mut raw = unsafe { sys::mln_projection_mode_default() };
@@ -560,17 +406,19 @@ mod tests {
     use super::*;
 
     #[test]
+    // Spec coverage: BND-060 and BND-061.
     fn camera_options_materializes_masks_and_round_trips() {
-        let options = CameraOptions::new()
-            .with_center(LatLng::new(1.0, 2.0))
-            .with_zoom(3.0)
-            .with_bearing(4.0)
-            .with_pitch(5.0)
-            .with_center_altitude(6.0)
-            .with_padding(EdgeInsets::new(7.0, 8.0, 9.0, 10.0))
-            .with_anchor(ScreenPoint::new(11.0, 12.0))
-            .with_roll(13.0)
-            .with_field_of_view(14.0);
+        let options = CameraOptions {
+            center: Some(LatLng::new(1.0, 2.0)),
+            zoom: Some(3.0),
+            bearing: Some(4.0),
+            pitch: Some(5.0),
+            center_altitude: Some(6.0),
+            padding: Some(EdgeInsets::new(7.0, 8.0, 9.0, 10.0)),
+            anchor: Some(ScreenPoint::new(11.0, 12.0)),
+            roll: Some(13.0),
+            field_of_view: Some(14.0),
+        };
 
         let raw = camera_options_to_native(&options);
 
@@ -595,11 +443,12 @@ mod tests {
 
     #[test]
     fn animation_and_fit_options_materialize_masks() {
-        let animation = AnimationOptions::new()
-            .with_duration_ms(100.0)
-            .with_velocity(2.0)
-            .with_min_zoom(3.0)
-            .with_easing(UnitBezier::new(0.0, 0.1, 0.2, 1.0));
+        let animation = AnimationOptions {
+            duration_ms: Some(100.0),
+            velocity: Some(2.0),
+            min_zoom: Some(3.0),
+            easing: Some(UnitBezier::new(0.0, 0.1, 0.2, 1.0)),
+        };
         let raw_animation = animation_options_to_native(&animation);
         assert_eq!(
             raw_animation.size,
@@ -613,10 +462,11 @@ mod tests {
                 | sys::MLN_ANIMATION_OPTION_EASING
         );
 
-        let fit = CameraFitOptions::new()
-            .with_padding(EdgeInsets::new(1.0, 2.0, 3.0, 4.0))
-            .with_bearing(5.0)
-            .with_pitch(6.0);
+        let fit = CameraFitOptions {
+            padding: Some(EdgeInsets::new(1.0, 2.0, 3.0, 4.0)),
+            bearing: Some(5.0),
+            pitch: Some(6.0),
+        };
         let raw_fit = camera_fit_options_to_native(&fit);
         assert_eq!(
             raw_fit.size,
@@ -632,15 +482,16 @@ mod tests {
 
     #[test]
     fn bound_free_camera_and_projection_modes_round_trip() {
-        let bounds = BoundOptions::new()
-            .with_bounds(LatLngBounds::new(
+        let bounds = BoundOptions {
+            bounds: Some(LatLngBounds::new(
                 LatLng::new(1.0, 2.0),
                 LatLng::new(3.0, 4.0),
-            ))
-            .with_min_zoom(5.0)
-            .with_max_zoom(6.0)
-            .with_min_pitch(7.0)
-            .with_max_pitch(8.0);
+            )),
+            min_zoom: Some(5.0),
+            max_zoom: Some(6.0),
+            min_pitch: Some(7.0),
+            max_pitch: Some(8.0),
+        };
         let raw_bounds = bound_options_to_native(&bounds);
         assert_eq!(
             raw_bounds.size,
@@ -648,9 +499,10 @@ mod tests {
         );
         assert_eq!(bound_options_from_native(raw_bounds), bounds);
 
-        let free = FreeCameraOptions::new()
-            .with_position(Vec3::new(1.0, 2.0, 3.0))
-            .with_orientation(Quaternion::new(4.0, 5.0, 6.0, 7.0));
+        let free = FreeCameraOptions {
+            position: Some(Vec3::new(1.0, 2.0, 3.0)),
+            orientation: Some(Quaternion::new(4.0, 5.0, 6.0, 7.0)),
+        };
         let raw_free = free_camera_options_to_native(&free);
         assert_eq!(
             raw_free.size,
@@ -658,10 +510,11 @@ mod tests {
         );
         assert_eq!(free_camera_options_from_native(raw_free), free);
 
-        let projection = ProjectionMode::new()
-            .with_axonometric(true)
-            .with_x_skew(1.5)
-            .with_y_skew(2.5);
+        let projection = ProjectionMode {
+            axonometric: Some(true),
+            x_skew: Some(1.5),
+            y_skew: Some(2.5),
+        };
         let raw_projection = projection_mode_to_native(&projection);
         assert_eq!(
             raw_projection.size,

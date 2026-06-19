@@ -232,17 +232,16 @@ fn attach_surface(
 }
 
 fn context_descriptor(vulkan: &VulkanContext) -> VulkanContextDescriptor {
-    VulkanContextDescriptor::new(
+    let mut descriptor = VulkanContextDescriptor::new(
         vulkan.instance_pointer(),
         vulkan.physical_device_pointer(),
         vulkan.device_pointer(),
         vulkan.graphics_queue_pointer(),
         vulkan.graphics_queue_family_index(),
-    )
-    .with_proc_addresses(
-        vulkan.get_instance_proc_addr_pointer(),
-        vulkan.get_device_proc_addr_pointer(),
-    )
+    );
+    descriptor.get_instance_proc_addr = vulkan.get_instance_proc_addr_pointer();
+    descriptor.get_device_proc_addr = vulkan.get_device_proc_addr_pointer();
+    descriptor
 }
 
 fn append_error(message: &mut Option<String>, error: String) {

@@ -766,13 +766,11 @@ dependencies = [
  "ash",
  "bitflags 2.11.1",
  "glow",
- "glutin",
- "glutin-winit",
+ "glutin_egl_sys",
+ "libloading",
  "maplibre-native-core",
  "maplibre-native-sys",
  "static_assertions",
- "windows-sys 0.61.2",
- "winit",
 ]
 
 [[package]]
