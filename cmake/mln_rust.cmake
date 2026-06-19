@@ -12,6 +12,8 @@ function(mln_link_rust_platform target)
   set(rust_manifest "${PROJECT_SOURCE_DIR}/src/platform/rust/Cargo.toml")
   set(rust_library
       "${PROJECT_SOURCE_DIR}/target/${rust_target}/release/libmaplibre_native_platform.a")
+  file(GLOB_RECURSE rust_sources CONFIGURE_DEPENDS
+       "${PROJECT_SOURCE_DIR}/src/platform/rust/src/*.rs")
 
   string(TOUPPER "${rust_target}" rust_target_env)
   string(REPLACE "-" "_" rust_target_env "${rust_target_env}")
@@ -41,10 +43,8 @@ function(mln_link_rust_platform target)
       "${rust_target}"
       --release
     DEPENDS
-      "${rust_manifest}" "${PROJECT_SOURCE_DIR}/src/platform/rust/src/lib.rs"
-      "${PROJECT_SOURCE_DIR}/src/platform/rust/src/http.rs"
-      "${PROJECT_SOURCE_DIR}/src/platform/rust/src/image.rs"
-      "${PROJECT_SOURCE_DIR}/Cargo.toml" "${PROJECT_SOURCE_DIR}/Cargo.lock"
+      "${rust_manifest}" ${rust_sources} "${PROJECT_SOURCE_DIR}/Cargo.toml"
+      "${PROJECT_SOURCE_DIR}/Cargo.lock"
     WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
     VERBATIM)
 

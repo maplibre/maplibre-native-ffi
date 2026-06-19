@@ -2,6 +2,7 @@ use std::ffi::CString;
 use std::os::raw::{c_char, c_void};
 use std::ptr;
 use std::slice;
+use std::slice::from_raw_parts_mut;
 use std::sync::{
     Arc, OnceLock,
     atomic::{AtomicBool, Ordering},
@@ -60,8 +61,10 @@ pub unsafe extern "C" fn mln_rust_http_request_start(
     let thread_canceled = Arc::clone(&canceled);
     let callback_user_data = user_data as usize;
     http_thread_pool().execute(move || {
+        // Keep the cancellation flag alive until the callback runs. The C++
+        // request owner handles canceled completions for now.
+        let _ = thread_canceled;
         let response = send_http_request(request);
-        let _ = thread_canceled.load(Ordering::Acquire);
         // SAFETY: The C++ caller keeps `user_data` valid until this callback
         // runs, even when the request is canceled.
         unsafe {
@@ -142,9 +145,9 @@ fn copy_http_request(
 }
 
 fn send_http_request(request: HttpRequest) -> MlnRustHttpResponse {
-    // TODO(android): Decide whether Rustls' bundled WebPKI roots are sufficient
-    // or whether Android builds must validate through the platform trust store
-    // and Network Security Config.
+    // TODO(android): Integrate Android platform TLS trust policy. The current
+    // Rustls path uses bundled WebPKI roots and does not honor Android Network
+    // Security Config, user-installed CAs, or certificate pinning.
     let mut minreq = minreq::get(request.url);
     for (name, value) in request.headers {
         minreq = minreq.with_header(name, value);
@@ -189,14 +192,13 @@ fn http_response(response: minreq::Response) -> MlnRustHttpResponse {
         .and_then(c_string_ptr)
         .unwrap_or(ptr::null_mut());
 
-    let mut body = response.into_bytes();
+    let body = response.into_bytes();
     let data_len = body.len();
     let data = if body.is_empty() {
         ptr::null_mut()
     } else {
-        let data = body.as_mut_ptr();
-        std::mem::forget(body);
-        data
+        let body = body.into_boxed_slice();
+        Box::into_raw(body) as *mut u8
     };
 
     MlnRustHttpResponse {
@@ -236,14 +238,13 @@ fn http_error(reason: u8, message: &str) -> MlnRustHttpResponse {
 
 fn free_http_response(response: MlnRustHttpResponse) {
     if !response.data.is_null() && response.data_len > 0 {
-        // SAFETY: `http_response` returns `data` from a Vec with capacity equal
-        // to length, and ownership is transferred back here.
+        // SAFETY: `http_response` returns `data` from `Box<[u8]>`, and the
+        // caller returns ownership here with the original length.
         unsafe {
-            drop(Vec::from_raw_parts(
+            drop(Box::from_raw(from_raw_parts_mut(
                 response.data,
                 response.data_len,
-                response.data_len,
-            ));
+            )));
         }
     }
 
