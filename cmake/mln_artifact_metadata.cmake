@@ -32,10 +32,13 @@ function(mln_write_artifact_metadata target)
   set(rpaths "")
   set(link_libraries "")
   set(frameworks "")
+  set(supports_linker_rpath false)
 
   mln_append_env_path(include_dirs MLN_FFI_DEPENDENCY_INCLUDE_DIR)
   mln_append_env_path(include_dirs MLN_FFI_VULKAN_INCLUDE_DIR)
-  mln_append_env_path(library_dirs MLN_FFI_DEPENDENCY_LIBRARY_DIR)
+  if(NOT CMAKE_CROSSCOMPILING)
+    mln_append_env_path(library_dirs MLN_FFI_DEPENDENCY_LIBRARY_DIR)
+  endif()
 
   if(MLN_FFI_EGL_ROOT)
     list(APPEND include_dirs "${MLN_FFI_EGL_ROOT}/include")
@@ -44,6 +47,7 @@ function(mln_write_artifact_metadata target)
 
   if(UNIX AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
     set(rpaths ${library_dirs})
+    set(supports_linker_rpath true)
   endif()
 
   if(MLN_FFI_ARTIFACT_SHAPE STREQUAL "static-monolithic")
@@ -95,6 +99,7 @@ function(mln_write_artifact_metadata target)
   \"artifact_shape\": \"${artifact_shape}\",
   \"library_path\": \"$<TARGET_FILE:${target}>\",
   \"import_library_path\": \"$<TARGET_LINKER_FILE:${target}>\",
+  \"supports_linker_rpath\": ${supports_linker_rpath},
   \"include_dirs\": ${include_dirs_json},
   \"library_dirs\": ${library_dirs_json},
   \"rpaths\": ${rpaths_json},

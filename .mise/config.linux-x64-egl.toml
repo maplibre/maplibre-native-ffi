@@ -6,4 +6,4 @@ BINDGEN_EXTRA_CLANG_ARGS = "{% if os() == \"linux\" %}-isystem{{ exec(command='c
 PKG_CONFIG_PATH = "{{env.MLN_FFI_BUILD_DIR}}:{{config_root}}/.pixi/envs/default/lib/pkgconfig"
 CMAKE_LIBRARY_PATH = "{{env.MLN_FFI_DEPENDENCY_LIBRARY_DIR}}"
 LIBRARY_PATH = "{{env.MLN_FFI_DEPENDENCY_LIBRARY_DIR}}"
-LD_LIBRARY_PATH = "{{env.MLN_FFI_DEPENDENCY_LIBRARY_DIR}}"
+LD_LIBRARY_PATH = "{{env.MLN_FFI_BUILD_DIR}}:{{env.MLN_FFI_DEPENDENCY_LIBRARY_DIR}}"

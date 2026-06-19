@@ -35,26 +35,20 @@ const NativeArtifactConfig = struct {
 };
 
 const NativeArtifactConfigCache = struct {
-    build: *std.Build,
     path: ?std.Build.LazyPath = null,
     path_loaded: bool = false,
     config: ?NativeArtifactConfig = null,
     config_loaded: bool = false,
 };
 
-var native_artifact_config_caches: [16]NativeArtifactConfigCache = undefined;
-var native_artifact_config_cache_count: usize = 0;
+var native_artifact_config_caches = std.AutoArrayHashMapUnmanaged(*std.Build, NativeArtifactConfigCache){};
 
 fn nativeArtifactConfigCache(b: *std.Build) *NativeArtifactConfigCache {
-    for (native_artifact_config_caches[0..native_artifact_config_cache_count]) |*cache| {
-        if (cache.build == b) return cache;
+    const result = native_artifact_config_caches.getOrPut(b.allocator, b) catch @panic("out of memory");
+    if (!result.found_existing) {
+        result.value_ptr.* = .{};
     }
-    if (native_artifact_config_cache_count == native_artifact_config_caches.len) {
-        @panic("too many Zig build contexts using native artifact config");
-    }
-    native_artifact_config_caches[native_artifact_config_cache_count] = .{ .build = b };
-    native_artifact_config_cache_count += 1;
-    return &native_artifact_config_caches[native_artifact_config_cache_count - 1];
+    return result.value_ptr;
 }
 
 fn parseRenderBackend(value: []const u8) RenderBackend {
