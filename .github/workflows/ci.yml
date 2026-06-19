@@ -236,6 +236,32 @@ jobs:
       - uses: ./.github/actions/setup-ci-deps
       - run: mise run configure
       - run: mise run build
+  variant-ohos-arm64-egl:
+    name: variant / ohos-arm64-egl
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      MISE_ENV: ohos-arm64-egl
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-ci-deps
+      - run: mise run configure
+      - run: mise run build
+  variant-ohos-arm64-vulkan:
+    name: variant / ohos-arm64-vulkan
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      MISE_ENV: ohos-arm64-vulkan
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup-ci-deps
+      - run: mise run configure
+      - run: mise run build
   variant-windows-x64-vulkan:
     name: variant / windows-x64-vulkan
     runs-on: windows-2022
@@ -298,6 +324,8 @@ jobs:
       - variant-android-arm64-vulkan
       - variant-ios-arm64-metal
       - variant-ios-simulator-arm64-metal
+      - variant-ohos-arm64-egl
+      - variant-ohos-arm64-vulkan
       - variant-windows-x64-vulkan
       - variant-windows-x64-wgl
     steps:

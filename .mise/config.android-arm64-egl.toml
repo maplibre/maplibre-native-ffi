@@ -8,6 +8,7 @@ MLN_FFI_ANDROID_PLATFORM = "android-24"
 ANDROID_HOME = { required = true }
 ANDROID_NDK_HOME = { required = true }
 MLN_FFI_CMAKE_ARGS = """
+-DCMAKE_TOOLCHAIN_FILE={{env.ANDROID_NDK_HOME}}/build/cmake/android.toolchain.cmake
 -DANDROID_ABI={{env.MLN_FFI_ANDROID_ABI}}
 -DANDROID_PLATFORM={{env.MLN_FFI_ANDROID_PLATFORM}}
 """

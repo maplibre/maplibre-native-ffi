@@ -9,6 +9,8 @@
 #define VULKAN_HPP_NO_DEFAULT_DISPATCHER
 #endif
 
+#include <mbgl/vulkan/renderer_backend.hpp>
+
 #include <vulkan/vulkan.hpp>
 #include <vulkan/vulkan_core.h>
 
@@ -44,19 +46,19 @@ inline auto vulkan_get_device_proc_addr(
 
 inline auto vulkan_dispatch_loader(
   const mln_vulkan_context_descriptor& context
-) noexcept -> vk::DispatchLoaderDynamic {
+) noexcept -> mbgl::vulkan::DispatchLoaderDynamic {
   return {vulkan_get_instance_proc_addr(context)};
 }
 
 inline auto vulkan_init_instance_dispatch(
-  vk::DispatchLoaderDynamic& dispatcher,
+  mbgl::vulkan::DispatchLoaderDynamic& dispatcher,
   const mln_vulkan_context_descriptor& context
 ) noexcept -> void {
   dispatcher.init(vk::Instance(static_cast<VkInstance>(context.instance)));
 }
 
 inline auto vulkan_init_device_dispatch(
-  vk::DispatchLoaderDynamic& dispatcher, VkDevice device,
+  mbgl::vulkan::DispatchLoaderDynamic& dispatcher, VkDevice device,
   const mln_vulkan_context_descriptor& context
 ) noexcept -> void {
   if (const auto get_device_proc_addr = vulkan_get_device_proc_addr(context)) {

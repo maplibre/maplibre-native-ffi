@@ -94,6 +94,42 @@ runs:
           ~/.cargo/git/db/
         key: ${{ runner.os }}-${{ runner.arch }}-cargo-registry-v1-${{ hashFiles('**/Cargo.lock') }}
 
+    - name: Cache OpenHarmony SDK
+      if: ${{ contains(env.MISE_ENV, 'ohos') }}
+      uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+      with:
+        path: ~/setup-ohos-sdk
+        key: ohos-sdk-v1-v6.1-${{ runner.os }}-${{ runner.arch }}
+
+    - name: Setup OpenHarmony SDK
+      if: ${{ contains(env.MISE_ENV, 'ohos') }}
+      shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        sdk_root="$HOME/setup-ohos-sdk"
+        archive="ohos-sdk-windows_linux-public.tar.gz"
+
+        mkdir -p "$sdk_root"
+        cd "$sdk_root"
+        if [[ ! -f "$sdk_root/linux/native/build/cmake/ohos.toolchain.cmake" ]]; then
+          gh release download v6.1 \
+            --repo openharmony-rs/ohos-sdk \
+            --pattern "${archive}*"
+
+          cat "${archive}".a* > "$archive"
+          expected_sha="$(tr -d '[:space:]' < "${archive}.sha256")"
+          actual_sha="$(sha256sum "$archive" | awk '{print $1}')"
+          if [[ "$actual_sha" != "$expected_sha" ]]; then
+            echo "OHOS SDK archive hash mismatch: expected $expected_sha, got $actual_sha" >&2
+            exit 1
+          fi
+          tar -xf "$archive"
+          unzip -q linux/native-*.zip -d linux
+        fi
+
+        echo "OHOS_SDK_NATIVE=$sdk_root/linux/native" >> "$GITHUB_ENV"
+
     - name: Cache Gradle
       uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
       with:
@@ -153,7 +189,7 @@ runs:
         } >> "$GITHUB_ENV"
 
     - name: Diagnose EGL setup
-      if: ${{ runner.os == 'Linux' }}
+      if: ${{ runner.os == 'Linux' && !contains(env.MISE_ENV, 'ohos') }}
       shell: bash
       run: |
         mise exec -- bash -euo pipefail -c '
@@ -161,11 +197,6 @@ runs:
           command -v eglinfo
           EGL_LOG_LEVEL=debug LIBGL_DEBUG=verbose LD_DEBUG=libs eglinfo || true
         '
-
-    - name: Diagnose Vulkan setup
-      if: ${{ contains(env.MISE_ENV, 'vulkan') && !startsWith(env.MISE_ENV, 'android-') }}
-      shell: bash
-      run: mise run ci:vulkan-info
 
     # The mise action may restore Rust metadata without all rustup-managed
     # component files. Repair the toolchain only when rustup cannot add the

@@ -470,9 +470,7 @@ void VulkanTextureBackend::initInstance() {
   usingSharedContext = true;
   instance = vk::UniqueInstance(
     static_cast<VkInstance>(descriptor_.context.instance),
-    vk::ObjectDestroy<vk::NoParent, vk::DispatchLoaderDynamic>(
-      nullptr, dispatcher
-    )
+    mbgl::vulkan::ObjectDestroy<vk::detail::NoParent>(nullptr, dispatcher)
   );
 }
 
@@ -499,9 +497,7 @@ void VulkanTextureBackend::initDevice() {
   }
   device = vk::UniqueDevice(
     static_cast<VkDevice>(descriptor_.context.device),
-    vk::ObjectDestroy<vk::NoParent, vk::DispatchLoaderDynamic>(
-      nullptr, dispatcher
-    )
+    mbgl::vulkan::ObjectDestroy<vk::detail::NoParent>(nullptr, dispatcher)
   );
   vulkan_init_device_dispatch(dispatcher, device.get(), descriptor_.context);
   graphicsQueueIndex =
