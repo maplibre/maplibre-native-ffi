@@ -28,6 +28,7 @@ internal static class NativeLibraryLoader
             {
                 if (explicitlyLoaded)
                 {
+                    ValidateLoadedAbiLocked();
                     return;
                 }
 
@@ -36,9 +37,10 @@ internal static class NativeLibraryLoader
                 );
             }
 
+            nint handle;
             try
             {
-                resolvedHandle = NativeLibrary.Load(libraryPath);
+                handle = NativeLibrary.Load(libraryPath);
             }
             catch (Exception error) when (error is DllNotFoundException or BadImageFormatException)
             {
@@ -49,8 +51,19 @@ internal static class NativeLibraryLoader
                     error
                 );
             }
+            try
+            {
+                resolvedHandle = ValidateAndCacheResolvedHandle(handle);
+            }
+            catch
+            {
+                resolvedHandle = 0;
+                explicitlyLoaded = false;
+                abiValidated = false;
+                throw;
+            }
             explicitlyLoaded = true;
-            EnsureLoadedLocked();
+            EnsureResolverInstalledLocked();
         }
     }
 
@@ -84,15 +97,13 @@ internal static class NativeLibraryLoader
             {
                 if (File.Exists(path) && NativeLibrary.TryLoad(path, out var handle))
                 {
-                    resolvedHandle = handle;
-                    return resolvedHandle;
+                    return ValidateAndCacheResolvedHandle(handle);
                 }
             }
 
             if (NativeLibrary.TryLoad(libraryName, assembly, searchPath, out var standardHandle))
             {
-                resolvedHandle = standardHandle;
-                return resolvedHandle;
+                return ValidateAndCacheResolvedHandle(standardHandle);
             }
 
             return 0;
@@ -101,14 +112,55 @@ internal static class NativeLibraryLoader
 
     private static void EnsureLoadedLocked()
     {
-        if (!installed)
-        {
-            NativeLibrary.SetDllImportResolver(typeof(NativeMethods).Assembly, ResolveLibrary);
-            installed = true;
-        }
-
+        EnsureResolverInstalledLocked();
         ResolveLibrary(NativeMethods.LibraryName, typeof(NativeMethods).Assembly, null);
         ValidateLoadedAbiLocked();
+    }
+
+    private static void EnsureResolverInstalledLocked()
+    {
+        if (installed)
+        {
+            return;
+        }
+
+        NativeLibrary.SetDllImportResolver(typeof(NativeMethods).Assembly, ResolveLibrary);
+        installed = true;
+    }
+
+    private static unsafe uint ReadAbiVersion(nint handle)
+    {
+        try
+        {
+            var version = NativeLibrary.GetExport(handle, "mln_c_version");
+            return ((delegate* unmanaged[Cdecl]<uint>)version)();
+        }
+        catch (EntryPointNotFoundException error)
+        {
+            throw new MaplibreException(
+                MaplibreStatus.AbiMismatch,
+                null,
+                "MapLibre Native C library does not export the required mln_c_version entry point.",
+                error
+            );
+        }
+    }
+
+    private static nint ValidateAndCacheResolvedHandle(nint handle)
+    {
+        try
+        {
+            ValidateAbiVersion(ReadAbiVersion(handle));
+        }
+        catch
+        {
+            NativeLibrary.Free(handle);
+            throw;
+        }
+
+        resolvedHandle = handle;
+        abiValidated = true;
+        return resolvedHandle;
     }
 
     private static void ValidateLoadedAbiLocked()

@@ -380,6 +380,56 @@ public sealed unsafe class RenderSessionTests
     {
         var reports = new List<NativeLeakReport>();
         using var capture = NativeLeakReporter.CaptureForTest(reports.Add);
+        var resizeCalls = 0;
+        var renderUpdateCalls = 0;
+        var textureReadCalls = 0;
+        var destroyCalls = 0;
+        var metalAcquireCalls = 0;
+        var vulkanAcquireCalls = 0;
+        var openGLAcquireCalls = 0;
+        using var sessionMethods = RenderSessionHandle.UseSessionMethodsForTest(
+            (_, _, _, _) =>
+            {
+                resizeCalls++;
+                return mln_status.MLN_STATUS_OK;
+            },
+            _ =>
+            {
+                renderUpdateCalls++;
+                return mln_status.MLN_STATUS_OK;
+            },
+            (_, _, _, _) =>
+            {
+                textureReadCalls++;
+                return mln_status.MLN_STATUS_OK;
+            },
+            _ =>
+            {
+                destroyCalls++;
+                return mln_status.MLN_STATUS_OK;
+            }
+        );
+        using var metalMethods = RenderSessionHandle.UseMetalFrameMethodsForTest(
+            (_, _) =>
+            {
+                metalAcquireCalls++;
+                return mln_status.MLN_STATUS_OK;
+            },
+            (_, _) => mln_status.MLN_STATUS_OK,
+            (_, _) => throw new InvalidOperationException("unexpected frame read")
+        );
+        using var textureFrameMethods = RenderSessionHandle.UseTextureFrameAcquireMethodsForTest(
+            (_, _) =>
+            {
+                vulkanAcquireCalls++;
+                return mln_status.MLN_STATUS_OK;
+            },
+            (_, _) =>
+            {
+                openGLAcquireCalls++;
+                return mln_status.MLN_STATUS_OK;
+            }
+        );
         var session = RenderSessionHandle.CreateForTest((mln_render_session*)1234);
         var pointer = (mln_metal_owned_texture_frame*)
             NativeMemory.AllocZeroed((nuint)sizeof(mln_metal_owned_texture_frame));
@@ -407,6 +457,13 @@ public sealed unsafe class RenderSessionTests
             AssertActiveFrameError(session.Close);
             session.Dispose();
 
+            Assert.Equal(0, resizeCalls);
+            Assert.Equal(0, renderUpdateCalls);
+            Assert.Equal(0, textureReadCalls);
+            Assert.Equal(0, destroyCalls);
+            Assert.Equal(0, metalAcquireCalls);
+            Assert.Equal(0, vulkanAcquireCalls);
+            Assert.Equal(0, openGLAcquireCalls);
             var report = Assert.Single(reports);
             Assert.Equal(NativeLeakReportKind.DisposeFailed, report.Kind);
             Assert.Equal(nameof(RenderSessionHandle), report.TypeName);
@@ -464,6 +521,7 @@ public sealed unsafe class RenderSessionTests
         using var sessionMethods = RenderSessionHandle.UseSessionMethodsForTest(
             (_, _, _, _) => mln_status.MLN_STATUS_OK,
             _ => mln_status.MLN_STATUS_OK,
+            (_, _, _, _) => mln_status.MLN_STATUS_OK,
             session =>
             {
                 destroyed.Add((nint)session);
@@ -547,6 +605,7 @@ public sealed unsafe class RenderSessionTests
         using var sessionMethods = RenderSessionHandle.UseSessionMethodsForTest(
             (_, _, _, _) => mln_status.MLN_STATUS_OK,
             _ => mln_status.MLN_STATUS_OK,
+            (_, _, _, _) => mln_status.MLN_STATUS_OK,
             _ => mln_status.MLN_STATUS_OK
         );
         using var runtime = RuntimeHandle.Create(new RuntimeOptions());
@@ -590,6 +649,7 @@ public sealed unsafe class RenderSessionTests
                 return mln_status.MLN_STATUS_OK;
             },
             _ => mln_status.MLN_STATUS_INVALID_STATE,
+            (_, _, _, _) => mln_status.MLN_STATUS_OK,
             _ => mln_status.MLN_STATUS_OK
         );
         var session = RenderSessionHandle.CreateForTest((mln_render_session*)1234);

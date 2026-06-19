@@ -168,6 +168,23 @@ public sealed class RuntimeMapLifecycleTests
         Assert.Null(error.RawStatus);
     }
 
+    [BindingSpecTest("BND-192")]
+    [Fact]
+    public void OwnerThreadHelperRejectsNestedSubmissionsAfterOwnerThreadClose()
+    {
+        using var ownerThread = new OwnerThread();
+
+        ownerThread.Invoke(() =>
+        {
+            ownerThread.Close();
+
+            var error = Assert.Throws<InvalidStateException>(() => ownerThread.Invoke(() => { }));
+
+            Assert.Equal(MaplibreStatus.InvalidState, error.Status);
+            Assert.Null(error.RawStatus);
+        });
+    }
+
     [BindingSpecTest("BND-023")]
     [Fact]
     public void MethodsRejectClosedMapBeforeNativeCall()

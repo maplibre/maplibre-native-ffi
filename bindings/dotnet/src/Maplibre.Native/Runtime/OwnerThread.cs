@@ -52,6 +52,14 @@ public sealed class OwnerThread : IDisposable
     public T Invoke<T>(Func<T> operation)
     {
         ArgumentNullException.ThrowIfNull(operation);
+        lock (gate)
+        {
+            if (closing || closed)
+            {
+                ThrowClosed();
+            }
+        }
+
         if (Environment.CurrentManagedThreadId == ownerManagedThreadId)
         {
             return operation();
@@ -74,6 +82,7 @@ public sealed class OwnerThread : IDisposable
     /// <summary>Stops accepting new work and waits for queued work to finish.</summary>
     public void Close()
     {
+        var shouldCompleteAdding = false;
         lock (gate)
         {
             if (closed)
@@ -81,7 +90,15 @@ public sealed class OwnerThread : IDisposable
                 return;
             }
 
-            closing = true;
+            if (!closing)
+            {
+                closing = true;
+                shouldCompleteAdding = true;
+            }
+        }
+
+        if (shouldCompleteAdding)
+        {
             queue.CompleteAdding();
         }
 
@@ -94,6 +111,8 @@ public sealed class OwnerThread : IDisposable
     public void Dispose()
     {
         Close();
+        // Owner-thread disposal cannot join the running thread or dispose queue primitives
+        // that are still in use by the current work item.
         if (Environment.CurrentManagedThreadId != ownerManagedThreadId)
         {
             started.Dispose();

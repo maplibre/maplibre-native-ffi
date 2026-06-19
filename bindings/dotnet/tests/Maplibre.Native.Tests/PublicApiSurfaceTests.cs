@@ -421,14 +421,26 @@ public sealed class PublicApiSurfaceTests
             return false;
         }
 
-        if (
-            member.Name
-            is nameof(NativePointer.FromBorrowedAddress)
-                or nameof(NativePointer.Address)
-                or "get_Address"
-        )
+        if (member is PropertyInfo { Name: nameof(NativePointer.Address), CanWrite: false })
         {
             return exposedType == typeof(nint);
+        }
+
+        if (
+            member
+                is MethodInfo
+                {
+                    Name: nameof(NativePointer.FromBorrowedAddress),
+                    IsStatic: true,
+                    ReturnType: var returnType,
+                } method
+            && returnType == typeof(NativePointer)
+        )
+        {
+            var parameters = method.GetParameters();
+            return exposedType == typeof(nint)
+                && parameters.Length == 1
+                && parameters[0].ParameterType == typeof(nint);
         }
 
         return false;
