@@ -5,13 +5,13 @@ if [[ "${MLN_FFI_RENDER_BACKEND:-metal}" != "metal" ]]; then
   echo "swift-map currently supports Metal variants only" >&2
   exit 1
 fi
-swift build --scratch-path ".build/$MLN_FFI_VARIANT"
+swift build --scratch-path ".build/$MISE_ENV"
 '''
 
 [tasks.run]
 depends = ["build"]
 usage = 'arg "render-target"'
-run = '".build/$MLN_FFI_VARIANT/debug/swift-map" "{{ usage.render_target }}"'
+run = '".build/$MISE_ENV/debug/swift-map" "{{ usage.render_target }}"'
 
 [tasks."run:owned-texture"]
 run = [{ task = "run", args = ["owned-texture"] }]

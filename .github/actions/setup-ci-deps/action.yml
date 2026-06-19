@@ -180,9 +180,10 @@ runs:
     - name: Wire sccache into CMake
       shell: bash
       run: |
+        mise_env="${MISE_ENV:-$(mise exec -- printenv MISE_ENV)}"
         {
           echo "SCCACHE_GHA_ENABLED=true"
-          echo "SCCACHE_GHA_VERSION=${MLN_FFI_TARGET_TRIPLE}"
+          echo "SCCACHE_GHA_VERSION=${mise_env%-*}"
           echo "SCCACHE_BASEDIRS=${GITHUB_WORKSPACE}"
           echo "CMAKE_C_COMPILER_LAUNCHER=sccache"
           echo "CMAKE_CXX_COMPILER_LAUNCHER=sccache"

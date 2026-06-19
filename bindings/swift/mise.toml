@@ -1,10 +1,10 @@
 [tasks.build]
 depends = ["//:ensure-native-library"]
-run = 'swift build --scratch-path ".build/$MLN_FFI_VARIANT"'
+run = 'swift build --scratch-path ".build/$MISE_ENV"'
 
 [tasks.test]
 depends = ["//:ensure-native-library"]
-run = 'swift test --scratch-path ".build/$MLN_FFI_VARIANT"'
+run = 'swift test --scratch-path ".build/$MISE_ENV"'
 
 [tasks.ci]
 depends = ["test"]
