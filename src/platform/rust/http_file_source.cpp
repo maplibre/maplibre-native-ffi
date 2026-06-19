@@ -18,6 +18,7 @@
 #include <mbgl/util/client_options.hpp>
 #include <mbgl/util/http_header.hpp>
 #include <mbgl/util/string.hpp>
+#include <mbgl/util/url.hpp>
 
 extern "C" {
 
@@ -62,6 +63,39 @@ auto optionalCString(char* value) -> std::optional<std::string> {
   }
 
   return std::string{value};
+}
+
+auto hasSuffix(const std::string& value, const std::string& suffix) -> bool {
+  return value.ends_with(suffix);
+}
+
+auto isValidMapboxEndpoint(const std::string& url) -> bool {
+  const auto parsed = mbgl::util::URL{url};
+  const auto host = url.substr(parsed.domain.first, parsed.domain.second);
+  return host == "mapbox.com" || host == "mapbox.cn" ||
+         hasSuffix(host, ".mapbox.com") || hasSuffix(host, ".mapbox.cn");
+}
+
+auto offlineURL(const mbgl::Resource& resource) -> std::string {
+  auto url = resource.url;
+  if (
+    resource.usage != mbgl::Resource::Usage::Offline ||
+    !isValidMapboxEndpoint(url)
+  ) {
+    return url;
+  }
+
+  const auto fragment = url.find('#');
+  const auto query = url.find('?');
+  const auto separator = query == std::string::npos ||
+                             (fragment != std::string::npos && fragment < query)
+                           ? '?'
+                           : '&';
+  url.insert(
+    fragment == std::string::npos ? url.size() : fragment,
+    std::string{separator} + "offline=true"
+  );
+  return url;
 }
 
 class RustHttpResponse {
@@ -189,7 +223,7 @@ class HTTPRequestState : public std::enable_shared_from_this<HTTPRequestState> {
     }
 
     auto expires = optionalCString(rustResponse.expires);
-    if (expires) {
+    if (expires && !cacheControl) {
       result.expires = util::parseTimestamp(expires->c_str());
     }
 
@@ -277,11 +311,12 @@ class HTTPRequest : public AsyncRequest {
     state->startAsyncTask();
 
     auto headers = makeHeaders(resource);
+    auto url = offlineURL(resource);
     // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
     auto* stateForCallback = new std::shared_ptr<HTTPRequestState>{state};
     handle =
       std::make_unique<RustHttpRequestHandle>(mln_rust_http_request_start(
-        resource.url.c_str(), headers.data(), headers.size(), onComplete,
+        url.c_str(), headers.data(), headers.size(), onComplete,
         stateForCallback
       ));
   }

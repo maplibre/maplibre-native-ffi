@@ -32,10 +32,13 @@ pub unsafe extern "C" fn mln_rust_decode_image(
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn mln_rust_decoded_image_free(image: MlnRustDecodedImage) {
     if !image.data.is_null() && image.data_len > 0 {
-        // SAFETY: `mln_rust_decode_image` returns `data` from a Vec with
-        // capacity equal to length, and ownership is transferred back here.
+        // SAFETY: `mln_rust_decode_image` returns `data` from `Box<[u8]>`,
+        // and ownership is transferred back here with the original length.
         unsafe {
-            Vec::from_raw_parts(image.data, image.data_len, image.data_len);
+            drop(Box::from_raw(slice::from_raw_parts_mut(
+                image.data,
+                image.data_len,
+            )));
         }
     }
 
@@ -55,9 +58,9 @@ fn decode_image(encoded: &[u8]) -> Result<MlnRustDecodedImage, String> {
 
     premultiply_rgba(&mut data);
 
+    let data = data.into_boxed_slice();
     let data_len = data.len();
-    let data_ptr = data.as_mut_ptr();
-    std::mem::forget(data);
+    let data_ptr = Box::into_raw(data) as *mut u8;
 
     Ok(MlnRustDecodedImage {
         width,

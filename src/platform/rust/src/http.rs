@@ -9,6 +9,7 @@ use std::sync::{
 };
 
 const HTTP_WORKER_THREADS: usize = 16;
+const HTTP_REQUEST_TIMEOUT_SECONDS: u64 = 30;
 
 #[repr(C)]
 pub struct MlnRustHttpHeader {
@@ -153,9 +154,16 @@ fn send_http_request(request: HttpRequest) -> MlnRustHttpResponse {
         );
     }
 
-    let mut minreq = minreq::get(request.url);
+    let mut minreq = minreq::get(request.url).with_timeout(HTTP_REQUEST_TIMEOUT_SECONDS);
+    let has_accept_encoding = request
+        .headers
+        .iter()
+        .any(|(name, _)| name.eq_ignore_ascii_case("accept-encoding"));
     for (name, value) in request.headers {
         minreq = minreq.with_header(name, value);
+    }
+    if !has_accept_encoding {
+        minreq = minreq.with_header("Accept-Encoding", "identity");
     }
 
     match minreq.send() {
@@ -172,6 +180,15 @@ fn send_http_request(request: HttpRequest) -> MlnRustHttpResponse {
 
 fn http_response(response: minreq::Response) -> MlnRustHttpResponse {
     let status_code = response.status_code;
+    if let Some(encoding) = response.header("content-encoding")
+        && !encoding.eq_ignore_ascii_case("identity")
+    {
+        return http_error(
+            HTTP_ERROR_OTHER,
+            &format!("unsupported HTTP content encoding: {encoding}"),
+        );
+    }
+
     let etag = response
         .header("etag")
         .and_then(c_string_ptr)

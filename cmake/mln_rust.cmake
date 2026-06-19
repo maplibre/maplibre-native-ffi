@@ -19,19 +19,42 @@ function(mln_link_rust_platform target)
   string(REPLACE "-" "_" rust_target_env "${rust_target_env}")
   string(TOLOWER "${rust_target_env}" rust_target_env_lower)
 
+  set(rust_cc "${CMAKE_C_COMPILER}")
+  set(rust_cxx "${CMAKE_CXX_COMPILER}")
+  set(rust_linker "${CMAKE_CXX_COMPILER}")
+  if(CMAKE_SYSTEM_NAME STREQUAL "Android")
+    get_filename_component(rust_compiler_dir "${CMAKE_C_COMPILER}" DIRECTORY)
+    if(rust_target STREQUAL "aarch64-linux-android")
+      string(REGEX REPLACE "^android-" "" android_api_level
+             "${ANDROID_PLATFORM}")
+      set(android_tool_prefix "aarch64-linux-android${android_api_level}")
+      set(android_cc "${rust_compiler_dir}/${android_tool_prefix}-clang")
+      set(android_cxx "${rust_compiler_dir}/${android_tool_prefix}-clang++")
+      if(EXISTS "${android_cc}" AND EXISTS "${android_cxx}")
+        set(rust_cc "${android_cc}")
+        set(rust_cxx "${android_cxx}")
+        set(rust_linker "${android_cxx}")
+      else()
+        message(
+          FATAL_ERROR
+            "Android Rust build requires target-prefixed NDK compilers: ${android_cc} and ${android_cxx}")
+      endif()
+    endif()
+  endif()
+
   add_custom_command(
     OUTPUT "${rust_library}"
     COMMAND
       ${CMAKE_COMMAND}
       -E
       env
-      "CC_${rust_target_env}=${CMAKE_C_COMPILER}"
-      "CXX_${rust_target_env}=${CMAKE_CXX_COMPILER}"
+      "CC_${rust_target_env}=${rust_cc}"
+      "CXX_${rust_target_env}=${rust_cxx}"
       "AR_${rust_target_env}=${CMAKE_AR}"
-      "CC_${rust_target_env_lower}=${CMAKE_C_COMPILER}"
-      "CXX_${rust_target_env_lower}=${CMAKE_CXX_COMPILER}"
+      "CC_${rust_target_env_lower}=${rust_cc}"
+      "CXX_${rust_target_env_lower}=${rust_cxx}"
       "AR_${rust_target_env_lower}=${CMAKE_AR}"
-      "CARGO_TARGET_${rust_target_env}_LINKER=${CMAKE_CXX_COMPILER}"
+      "CARGO_TARGET_${rust_target_env}_LINKER=${rust_linker}"
       "CARGO_TARGET_${rust_target_env}_AR=${CMAKE_AR}"
       "${CARGO_EXECUTABLE}"
       build
