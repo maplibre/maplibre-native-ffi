@@ -341,7 +341,10 @@ PremultipliedImage decodeImage(const std::string& string) {
   }
 
   const Size imageSize{width, height};
-  if (alphaType == PIXELMAP_ALPHA_TYPE_UNPREMULTIPLIED) {
+  if (
+    alphaType == PIXELMAP_ALPHA_TYPE_UNPREMULTIPLIED ||
+    alphaType == PIXELMAP_ALPHA_TYPE_UNKNOWN
+  ) {
     UnassociatedImage image(imageSize);
     copyRows(
       image.data.get(), pixels.data(), width, height, rowStride, pixelFormat
