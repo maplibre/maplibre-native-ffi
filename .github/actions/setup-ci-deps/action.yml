@@ -10,7 +10,7 @@ runs:
       run: git config --global core.longpaths true
 
     - name: Cache MapLibre Native source
-      uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+      uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
       with:
         path: |
           third_party/maplibre-native
@@ -86,7 +86,7 @@ runs:
         "Path=$mesaBin;$env:Path" >> $env:GITHUB_ENV
 
     - name: Cache Cargo packages
-      uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+      uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
       with:
         path: |
           ~/.cargo/registry/index/
@@ -95,20 +95,29 @@ runs:
         key: ${{ runner.os }}-${{ runner.arch }}-cargo-registry-v1-${{ hashFiles('**/Cargo.lock') }}
 
     - name: Setup OpenHarmony SDK
-      id: setup-ohos-sdk
-      if: ${{ contains(env.MISE_ENV, 'ohos') }}
-      uses: openharmony-rs/setup-ohos-sdk@eb82b94ef522b07269679195c2512f22e922ef3b # v1.0.0
-      with:
-        version: "6.1"
-        components: native
-
-    - name: Export OpenHarmony SDK
       if: ${{ contains(env.MISE_ENV, 'ohos') }}
       shell: bash
-      run: echo "OHOS_SDK_NATIVE=${{ steps.setup-ohos-sdk.outputs.ohos_sdk_native }}" >> "$GITHUB_ENV"
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        sdk_root="$HOME/setup-ohos-sdk"
+        archive="ohos-sdk-windows_linux-public.tar.gz"
+
+        mkdir -p "$sdk_root"
+        cd "$sdk_root"
+        gh release download v6.1 \
+          --repo openharmony-rs/ohos-sdk \
+          --pattern "${archive}*"
+
+        cat "${archive}".a* > "$archive"
+        sha256sum --check "${archive}.sha256"
+        tar -xf "$archive"
+        unzip -q linux/native-*.zip -d linux
+
+        echo "OHOS_SDK_NATIVE=$sdk_root/linux/native" >> "$GITHUB_ENV"
 
     - name: Cache Gradle
-      uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+      uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
       with:
         path: |
           ~/.gradle/caches
