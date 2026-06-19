@@ -196,7 +196,7 @@ import Testing
     func withCallbacks<Result>(_ body: (
       NativeCustomGeometrySourceCallbacks
     ) throws
-      -> Result) rethrows -> Result
+      -> Result) throws -> Result
     {
       lock.lock()
       let callbacks = try #require(callbacks)
