@@ -768,6 +768,8 @@ dependencies = [
  "glow",
  "glutin",
  "glutin-winit",
+ "glutin_egl_sys",
+ "libloading",
  "maplibre-native-core",
  "maplibre-native-sys",
  "static_assertions",

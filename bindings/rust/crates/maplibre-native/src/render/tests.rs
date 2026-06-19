@@ -1,8 +1,10 @@
 use std::cell::{Cell, RefCell};
 use std::error::Error as StdError;
+#[cfg(target_os = "linux")]
+use std::ffi::c_void;
 use std::ffi::{CStr, CString};
 use std::marker::PhantomData;
-#[cfg(any(target_os = "linux", target_os = "windows"))]
+#[cfg(target_os = "windows")]
 use std::num::NonZeroU32;
 use std::ptr::NonNull;
 use std::rc::Rc;
@@ -12,31 +14,30 @@ use std::time::Duration;
 use ash::vk;
 use ash::vk::Handle;
 use glow::HasContext;
-#[cfg(target_os = "linux")]
-use glutin::config::{AsRawConfig, ConfigSurfaceTypes, RawConfig};
-#[cfg(any(target_os = "linux", target_os = "windows"))]
+#[cfg(target_os = "windows")]
 use glutin::config::{ConfigTemplateBuilder, GlConfig};
+#[cfg(target_os = "windows")]
 use glutin::context::PossiblyCurrentContext;
-#[cfg(any(target_os = "windows", target_os = "linux"))]
+#[cfg(target_os = "windows")]
 use glutin::context::{AsRawContext, RawContext};
-#[cfg(any(target_os = "linux", target_os = "windows"))]
+#[cfg(target_os = "windows")]
 use glutin::context::{ContextApi, ContextAttributesBuilder, Version};
-#[cfg(target_os = "linux")]
-use glutin::display::{AsRawDisplay, Display as GlutinDisplay, DisplayApiPreference, RawDisplay};
-#[cfg(any(target_os = "linux", target_os = "windows"))]
+#[cfg(target_os = "windows")]
 use glutin::display::{GetGlDisplay, GlDisplay};
+#[cfg(target_os = "windows")]
 use glutin::prelude::*;
-#[cfg(target_os = "linux")]
-use glutin::surface::PbufferSurface;
-use glutin::surface::Surface;
-#[cfg(any(target_os = "linux", target_os = "windows"))]
-use glutin::surface::SurfaceAttributesBuilder;
-#[cfg(not(target_os = "linux"))]
+#[cfg(target_os = "windows")]
 use glutin::surface::WindowSurface;
+#[cfg(target_os = "windows")]
+use glutin::surface::{Surface, SurfaceAttributesBuilder};
 #[cfg(target_os = "linux")]
-use glutin::surface::{AsRawSurface, RawSurface};
+use glutin_egl_sys::egl;
+#[cfg(target_os = "linux")]
+use glutin_egl_sys::egl::types::{EGLConfig, EGLContext, EGLDisplay, EGLSurface, EGLint};
 #[cfg(target_os = "windows")]
 use glutin_winit::{ApiPreference, DisplayBuilder};
+#[cfg(target_os = "linux")]
+use libloading::Library;
 use static_assertions::assert_not_impl_any;
 #[cfg(target_os = "windows")]
 use windows_sys::Win32::Foundation::HWND;
@@ -54,8 +55,6 @@ use winit::raw_window_handle::HasWindowHandle;
 use winit::raw_window_handle::RawWindowHandle;
 #[cfg(target_os = "windows")]
 use winit::raw_window_handle::Win32WindowHandle;
-#[cfg(target_os = "linux")]
-use winit::raw_window_handle::{RawDisplayHandle, XlibDisplayHandle};
 #[cfg(target_os = "windows")]
 use winit::window::{Window, WindowAttributes};
 
@@ -256,8 +255,12 @@ struct OpenGLTestContext {
     descriptor: OpenGLContextDescriptor,
     surface_handle: NativePointer,
     gl: glow::Context,
+    #[cfg(target_os = "linux")]
+    platform: EglTestContext,
+    #[cfg(target_os = "windows")]
     context: PossiblyCurrentContext,
-    surface: Surface<OpenGLTestSurface>,
+    #[cfg(target_os = "windows")]
+    surface: Surface<WindowSurface>,
     #[cfg(target_os = "windows")]
     _window: Window,
     #[cfg(target_os = "windows")]
@@ -269,9 +272,231 @@ struct OpenGLTestContext {
 }
 
 #[cfg(target_os = "linux")]
-type OpenGLTestSurface = PbufferSurface;
-#[cfg(not(target_os = "linux"))]
-type OpenGLTestSurface = WindowSurface;
+struct EglTestContext {
+    egl: egl::Egl,
+    _lib: Library,
+    display: EGLDisplay,
+    config: EGLConfig,
+    surface: EGLSurface,
+    context: EGLContext,
+}
+
+#[cfg(target_os = "linux")]
+impl EglTestContext {
+    fn new() -> std::result::Result<Self, Box<dyn StdError>> {
+        const EGL_PLATFORM_SURFACELESS_MESA: u32 = 0x31DD;
+
+        let lib = load_egl_library()?;
+        let egl = load_egl_bindings(&lib)?;
+        if !egl.GetPlatformDisplayEXT.is_loaded() {
+            return Err("eglGetPlatformDisplayEXT is unavailable".into());
+        }
+        let display = unsafe {
+            egl.GetPlatformDisplayEXT(
+                EGL_PLATFORM_SURFACELESS_MESA,
+                egl::DEFAULT_DISPLAY as *mut c_void,
+                [egl::NONE as EGLint].as_ptr(),
+            )
+        };
+        if display == egl::NO_DISPLAY {
+            return Err(
+                format!("eglGetPlatformDisplayEXT failed with 0x{:x}", unsafe {
+                    egl.GetError()
+                })
+                .into(),
+            );
+        }
+
+        let mut major = 0;
+        let mut minor = 0;
+        if unsafe { egl.Initialize(display, &mut major, &mut minor) } == egl::FALSE {
+            return Err(format!("eglInitialize failed with 0x{:x}", unsafe {
+                egl.GetError()
+            })
+            .into());
+        }
+
+        if unsafe { egl.BindAPI(egl::OPENGL_ES_API) } == egl::FALSE {
+            let error = unsafe { egl.GetError() };
+            unsafe {
+                egl.Terminate(display);
+            }
+            return Err(format!("eglBindAPI failed with 0x{error:x}").into());
+        }
+
+        let config_attributes = [
+            egl::SURFACE_TYPE as EGLint,
+            egl::PBUFFER_BIT as EGLint,
+            egl::RENDERABLE_TYPE as EGLint,
+            egl::OPENGL_ES3_BIT as EGLint,
+            egl::RED_SIZE as EGLint,
+            8,
+            egl::GREEN_SIZE as EGLint,
+            8,
+            egl::BLUE_SIZE as EGLint,
+            8,
+            egl::ALPHA_SIZE as EGLint,
+            8,
+            egl::DEPTH_SIZE as EGLint,
+            24,
+            egl::STENCIL_SIZE as EGLint,
+            8,
+            egl::NONE as EGLint,
+        ];
+        let mut config: EGLConfig = std::ptr::null_mut();
+        let mut config_count = 0;
+        if unsafe {
+            egl.ChooseConfig(
+                display,
+                config_attributes.as_ptr(),
+                &mut config,
+                1,
+                &mut config_count,
+            )
+        } == egl::FALSE
+            || config_count == 0
+            || config.is_null()
+        {
+            let error = unsafe { egl.GetError() };
+            unsafe {
+                egl.Terminate(display);
+            }
+            return Err(format!("eglChooseConfig failed with 0x{error:x}").into());
+        }
+
+        let context_attributes = [
+            egl::CONTEXT_CLIENT_VERSION as EGLint,
+            3,
+            egl::NONE as EGLint,
+        ];
+        let context = unsafe {
+            egl.CreateContext(
+                display,
+                config,
+                egl::NO_CONTEXT,
+                context_attributes.as_ptr(),
+            )
+        };
+        if context == egl::NO_CONTEXT {
+            let error = unsafe { egl.GetError() };
+            unsafe {
+                egl.Terminate(display);
+            }
+            return Err(format!("eglCreateContext failed with 0x{error:x}").into());
+        }
+
+        let surface_attributes = [
+            egl::WIDTH as EGLint,
+            8,
+            egl::HEIGHT as EGLint,
+            8,
+            egl::NONE as EGLint,
+        ];
+        let surface =
+            unsafe { egl.CreatePbufferSurface(display, config, surface_attributes.as_ptr()) };
+        if surface == egl::NO_SURFACE {
+            let error = unsafe { egl.GetError() };
+            unsafe {
+                egl.DestroyContext(display, context);
+                egl.Terminate(display);
+            }
+            return Err(format!("eglCreatePbufferSurface failed with 0x{error:x}").into());
+        }
+
+        if unsafe { egl.MakeCurrent(display, surface, surface, context) } == egl::FALSE {
+            let error = unsafe { egl.GetError() };
+            unsafe {
+                egl.DestroySurface(display, surface);
+                egl.DestroyContext(display, context);
+                egl.Terminate(display);
+            }
+            return Err(format!("eglMakeCurrent failed with 0x{error:x}").into());
+        }
+
+        Ok(Self {
+            egl,
+            _lib: lib,
+            display,
+            config,
+            surface,
+            context,
+        })
+    }
+
+    fn descriptor(&self) -> OpenGLContextDescriptor {
+        OpenGLContextDescriptor::Egl(EglContextDescriptor::new(
+            unsafe { NativePointer::from_ptr(self.display.cast_mut()) },
+            unsafe { NativePointer::from_ptr(self.config.cast_mut()) },
+            unsafe { NativePointer::from_ptr(self.context.cast_mut()) },
+        ))
+    }
+
+    fn surface(&self) -> NativePointer {
+        unsafe { NativePointer::from_ptr(self.surface.cast_mut()) }
+    }
+
+    fn make_current(&self) -> std::result::Result<(), Box<dyn StdError>> {
+        if unsafe {
+            self.egl
+                .MakeCurrent(self.display, self.surface, self.surface, self.context)
+        } == egl::FALSE
+        {
+            Err(format!("eglMakeCurrent failed with 0x{:x}", unsafe {
+                self.egl.GetError()
+            })
+            .into())
+        } else {
+            Ok(())
+        }
+    }
+
+    fn get_proc_address(&self, symbol: &CStr) -> *const c_void {
+        unsafe { self.egl.GetProcAddress(symbol.as_ptr().cast()).cast() }
+    }
+}
+
+#[cfg(target_os = "linux")]
+impl Drop for EglTestContext {
+    fn drop(&mut self) {
+        unsafe {
+            self.egl.MakeCurrent(
+                self.display,
+                egl::NO_SURFACE,
+                egl::NO_SURFACE,
+                egl::NO_CONTEXT,
+            );
+            self.egl.DestroySurface(self.display, self.surface);
+            self.egl.DestroyContext(self.display, self.context);
+            self.egl.Terminate(self.display);
+        }
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn load_egl_library() -> std::result::Result<Library, Box<dyn StdError>> {
+    unsafe { Library::new("libEGL.so.1") }
+        .or_else(|_| unsafe { Library::new("libEGL.so") })
+        .map_err(|error| format!("failed to load libEGL: {error}").into())
+}
+
+#[cfg(target_os = "linux")]
+fn load_egl_bindings(lib: &Library) -> std::result::Result<egl::Egl, Box<dyn StdError>> {
+    type EglGetProcAddress = unsafe extern "system" fn(*const c_void) -> *const c_void;
+
+    let get_proc_address: libloading::Symbol<'_, EglGetProcAddress> =
+        unsafe { lib.get(b"eglGetProcAddress\0")? };
+    let egl = unsafe {
+        egl::Egl::load_with(|symbol| {
+            let name = CString::new(symbol).expect("EGL symbol names do not contain NULs");
+            if let Ok(loaded) = lib.get::<*const c_void>(name.as_bytes_with_nul()) {
+                *loaded
+            } else {
+                get_proc_address(name.as_ptr().cast())
+            }
+        })
+    };
+    Ok(egl)
+}
 
 impl OpenGLTestContext {
     fn new() -> std::result::Result<Self, Box<dyn StdError>> {
@@ -280,45 +505,21 @@ impl OpenGLTestContext {
 
     #[cfg(target_os = "linux")]
     fn new_platform() -> std::result::Result<Self, Box<dyn StdError>> {
-        let display_handle = RawDisplayHandle::Xlib(XlibDisplayHandle::new(None, 0));
-        let display = unsafe { GlutinDisplay::new(display_handle, DisplayApiPreference::Egl)? };
-        let template = ConfigTemplateBuilder::new()
-            .with_alpha_size(8)
-            .with_depth_size(24)
-            .with_stencil_size(8)
-            .with_surface_type(ConfigSurfaceTypes::PBUFFER)
-            .with_pbuffer_sizes(NonZeroU32::new(8).unwrap(), NonZeroU32::new(8).unwrap())
-            .build();
-        let config = unsafe {
-            display
-                .find_configs(template)?
-                .max_by_key(|config| config.num_samples())
-                .ok_or("glutin returned no EGL pbuffer configs")?
-        };
-        let context_attributes = ContextAttributesBuilder::new()
-            .with_context_api(ContextApi::Gles(Some(Version::new(3, 0))))
-            .build(None);
-        let not_current = unsafe { display.create_context(&config, &context_attributes)? };
-        let surface_attributes = SurfaceAttributesBuilder::<PbufferSurface>::new()
-            .build(NonZeroU32::new(8).unwrap(), NonZeroU32::new(8).unwrap());
-        let surface = unsafe { display.create_pbuffer_surface(&config, &surface_attributes)? };
-        let context = not_current.make_current(&surface)?;
+        let platform = EglTestContext::new()?;
         let gl = unsafe {
             glow::Context::from_loader_function(|symbol| {
                 let symbol = CString::new(symbol).expect("GL symbol names do not contain NULs");
-                display.get_proc_address(&symbol).cast()
+                platform.get_proc_address(&symbol).cast()
             })
         };
-        let descriptor =
-            opengl_context_descriptor_from_glutin(&config, &context, NativePointer::NULL)?;
-        let surface_handle = opengl_surface_handle_from_glutin(&surface, NativePointer::NULL)?;
+        let descriptor = platform.descriptor();
+        let surface_handle = platform.surface();
 
         Ok(Self {
             descriptor,
             surface_handle,
             gl,
-            context,
-            surface,
+            platform,
         })
     }
 
@@ -404,8 +605,20 @@ impl OpenGLTestContext {
     }
 
     fn make_current(&self) -> std::result::Result<(), Box<dyn StdError>> {
-        self.context.make_current(&self.surface)?;
-        Ok(())
+        #[cfg(target_os = "linux")]
+        {
+            self.platform.make_current()?;
+            Ok(())
+        }
+        #[cfg(target_os = "windows")]
+        {
+            self.context.make_current(&self.surface)?;
+            Ok(())
+        }
+        #[cfg(not(any(target_os = "linux", target_os = "windows")))]
+        {
+            Ok(())
+        }
     }
 
     fn check_gl_error(&self, operation: &str) -> std::result::Result<(), Box<dyn StdError>> {
@@ -433,75 +646,29 @@ fn opengl_api_preference() -> ApiPreference {
     ApiPreference::FallbackEgl
 }
 
-#[cfg(any(target_os = "windows", target_os = "linux"))]
+#[cfg(target_os = "windows")]
 fn opengl_context_descriptor_from_glutin(
     _config: &glutin::config::Config,
     context: &PossiblyCurrentContext,
     device_context: NativePointer,
 ) -> std::result::Result<OpenGLContextDescriptor, Box<dyn StdError>> {
-    #[cfg(target_os = "windows")]
-    {
-        let RawContext::Wgl(raw_context) = context.raw_context() else {
-            return Err("glutin did not create a WGL context".into());
-        };
-        let share_context = unsafe { NativePointer::from_ptr(raw_context.cast_mut()) };
-        Ok(OpenGLContextDescriptor::Wgl(WglContextDescriptor::new(
-            device_context,
-            share_context,
-        )))
-    }
-
-    #[cfg(target_os = "linux")]
-    {
-        let _ = device_context;
-        let RawDisplay::Egl(raw_display) = _config.display().raw_display() else {
-            return Err("glutin did not create an EGL display".into());
-        };
-        let RawConfig::Egl(raw_config) = _config.raw_config() else {
-            return Err("glutin did not choose an EGL config".into());
-        };
-        let RawContext::Egl(raw_context) = context.raw_context() else {
-            return Err("glutin did not create an EGL context".into());
-        };
-        Ok(OpenGLContextDescriptor::Egl(EglContextDescriptor::new(
-            unsafe { NativePointer::from_ptr(raw_display.cast_mut()) },
-            unsafe { NativePointer::from_ptr(raw_config.cast_mut()) },
-            unsafe { NativePointer::from_ptr(raw_context.cast_mut()) },
-        )))
-    }
-
-    #[cfg(not(any(target_os = "windows", target_os = "linux")))]
-    {
-        let _ = (_config, context, device_context);
-        Err("OpenGL test context is only available on Windows WGL and Linux EGL".into())
-    }
+    let RawContext::Wgl(raw_context) = context.raw_context() else {
+        return Err("glutin did not create a WGL context".into());
+    };
+    let share_context = unsafe { NativePointer::from_ptr(raw_context.cast_mut()) };
+    Ok(OpenGLContextDescriptor::Wgl(WglContextDescriptor::new(
+        device_context,
+        share_context,
+    )))
 }
 
-#[cfg(any(target_os = "windows", target_os = "linux"))]
+#[cfg(target_os = "windows")]
 fn opengl_surface_handle_from_glutin(
-    surface: &Surface<OpenGLTestSurface>,
+    surface: &Surface<WindowSurface>,
     device_context: NativePointer,
 ) -> std::result::Result<NativePointer, Box<dyn StdError>> {
-    #[cfg(target_os = "windows")]
-    {
-        let _ = surface;
-        Ok(device_context)
-    }
-
-    #[cfg(target_os = "linux")]
-    {
-        let _ = device_context;
-        let RawSurface::Egl(raw_surface) = surface.raw_surface() else {
-            return Err("glutin did not create an EGL surface".into());
-        };
-        Ok(unsafe { NativePointer::from_ptr(raw_surface.cast_mut()) })
-    }
-
-    #[cfg(not(any(target_os = "windows", target_os = "linux")))]
-    {
-        let _ = (surface, device_context);
-        Err("OpenGL test surfaces are only available on Windows WGL and Linux EGL".into())
-    }
+    let _ = surface;
+    Ok(device_context)
 }
 
 #[cfg(target_os = "windows")]
@@ -582,16 +749,38 @@ impl OpenGLBorrowedTexture {
     fn read_rgba(&self) -> std::result::Result<Vec<u8>, Box<dyn StdError>> {
         self.context.make_current()?;
         let mut pixels = vec![0_u8; self.width as usize * self.height as usize * 4];
+        let texture = self.texture.ok_or("borrowed texture has been deleted")?;
         unsafe {
-            self.context.gl.bind_texture(glow::TEXTURE_2D, self.texture);
-            self.context.gl.get_tex_image(
+            let framebuffer = self.context.gl.create_framebuffer()?;
+            self.context
+                .gl
+                .bind_framebuffer(glow::FRAMEBUFFER, Some(framebuffer));
+            self.context.gl.framebuffer_texture_2d(
+                glow::FRAMEBUFFER,
+                glow::COLOR_ATTACHMENT0,
                 glow::TEXTURE_2D,
+                Some(texture),
                 0,
+            );
+            let status = self.context.gl.check_framebuffer_status(glow::FRAMEBUFFER);
+            if status != glow::FRAMEBUFFER_COMPLETE {
+                self.context.gl.bind_framebuffer(glow::FRAMEBUFFER, None);
+                self.context.gl.delete_framebuffer(framebuffer);
+                return Err(
+                    format!("borrowed texture framebuffer is incomplete: 0x{status:x}").into(),
+                );
+            }
+            self.context.gl.read_pixels(
+                0,
+                0,
+                self.width as i32,
+                self.height as i32,
                 glow::RGBA,
                 glow::UNSIGNED_BYTE,
                 glow::PixelPackData::Slice(Some(&mut pixels)),
             );
-            self.context.gl.bind_texture(glow::TEXTURE_2D, None);
+            self.context.gl.bind_framebuffer(glow::FRAMEBUFFER, None);
+            self.context.gl.delete_framebuffer(framebuffer);
         }
         self.context.check_gl_error("read borrowed texture")?;
         Ok(pixels)
