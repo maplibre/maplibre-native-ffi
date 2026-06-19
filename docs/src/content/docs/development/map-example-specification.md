@@ -50,17 +50,19 @@ profile**. Implement a mobile example by reading **Shared baseline** and
 
 ### Implementations
 
-| Example              | Profile | Binding  | Toolkit         | Platforms             | Backends              |
-| -------------------- | ------- | -------- | --------------- | --------------------- | --------------------- |
-| `examples/zig-map`   | Desktop | Zig      | SDL3            | Linux, macOS, Windows | Vulkan, Metal, OpenGL |
-| `examples/rust-map`  | Desktop | Rust     | winit           | Linux, macOS, Windows | Vulkan, Metal, OpenGL |
-| `examples/lwjgl-map` | Desktop | Java FFM | GLFW, LWJGL     | Linux, macOS, Windows | Vulkan, Metal, OpenGL |
-| `examples/swift-map` | Desktop | Swift    | AppKit, SwiftUI | macOS                 | Metal                 |
+| Example               | Profile | Binding  | Toolkit         | Platforms             | Backends              |
+| --------------------- | ------- | -------- | --------------- | --------------------- | --------------------- |
+| `examples/zig-map`    | Desktop | Zig      | SDL3            | Linux, macOS, Windows | Vulkan, Metal, OpenGL |
+| `examples/rust-map`   | Desktop | Rust     | winit           | Linux, macOS, Windows | Vulkan, Metal, OpenGL |
+| `examples/lwjgl-map`  | Desktop | Java FFM | GLFW, LWJGL     | Linux, macOS, Windows | Vulkan, Metal, OpenGL |
+| `examples/dotnet-map` | Desktop | C#       | GLFW            | Linux, macOS, Windows | Vulkan, Metal, OpenGL |
+| `examples/swift-map`  | Desktop | Swift    | AppKit, SwiftUI | macOS                 | Metal                 |
 
 For examples built by native render-backend variant, “Backends” is the union of
-supported configured variants. A binary that selects one native render backend
-exposes that graphics API for that binary; the example as a whole exposes the
-union across configured variants.
+supported configured variants. Each native library artifact includes one render
+backend. A single run uses one graphics API, selected at build time
+(build-variant examples) or at startup from the loaded library (multi-context
+examples).
 
 ---
 
@@ -169,10 +171,22 @@ active render-target mode. Graphics context code owns API-level resources
 attached `RenderSessionHandle`, mode-specific resources, resize behavior,
 `render_update`, and close behavior.
 
-When a build variant selects a single native render backend, the example SHOULD
-compile only the matching graphics API implementation and its platform glue.
-Backend selection happens at build time. Render-target mode selection follows
-the active profile ([Entry](#entry) or [Entry and shell](#entry-and-shell)).
+The loaded native library reports one render backend per library artifact
+through `mln_supported_render_backend_mask()`. Examples built across native
+render-backend variants expose the union of those backends in the
+[Implementations](#implementations) table.
+
+Graphics API selection follows one of these patterns:
+
+- **Build-variant examples** compile only the graphics API implementation that
+  matches the active native build variant (for example `zig-map`, `rust-map`,
+  `swift-map`).
+- **Multi-context examples** ship a graphics context per targeted API and select
+  the active API at startup from `supportedRenderBackends()` and platform policy
+  (for example `lwjgl-map`, `dotnet-map`).
+
+Each process run uses one graphics API. Render-target mode selection follows the
+active profile ([Entry](#entry) or [Entry and shell](#entry-and-shell)).
 
 Adding a graphics API or render-target mode MUST require localized changes. Keep
 each graphics API and render-target mode in its own variant, class, or submodule
@@ -187,8 +201,8 @@ Order MUST be:
 1. Parse profile entry configuration and validate the selected render mode.
 2. Read and log the loaded library's supported native render backends from
    `mln_supported_render_backend_mask()`, then validate that the loaded native
-   library supports the graphics backend(s) this binary targets; fail fast with
-   a readable message if not.
+   library supports the graphics API selected for this run; fail fast with a
+   readable message if not.
 3. Create the host presentation surface and initialize the graphics backend for
    the selected graphics API.
 4. Create runtime (`:memory:` cache).
