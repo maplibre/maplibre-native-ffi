@@ -16,6 +16,98 @@ pub const RenderBackend = enum {
     vulkan,
 };
 
+const ArtifactShape = enum {
+    shared_private,
+    static_monolithic,
+};
+
+const NativeMetadataJson = struct {
+    schema_version: u32,
+    render_backend: []const u8,
+    artifact_shape: []const u8,
+    core_library_path: []const u8,
+    windows_import_library_path: ?[]const u8 = null,
+    public_include_dirs: []const []const u8 = &.{},
+    binding_include_dirs: []const []const u8 = &.{},
+    dependency_library_dirs: []const []const u8 = &.{},
+    runtime_search_paths: []const []const u8 = &.{},
+    static_library_dirs: []const []const u8 = &.{},
+    static_libraries: []const []const u8 = &.{},
+    static_system_libraries: []const []const u8 = &.{},
+    static_frameworks: []const []const u8 = &.{},
+    c_abi_version: u32,
+};
+
+var cached_native_metadata_path: ?std.Build.LazyPath = null;
+var native_metadata_path_loaded = false;
+var cached_native_metadata: ?NativeMetadataJson = null;
+var native_metadata_loaded = false;
+
+fn parseRenderBackend(value: []const u8) RenderBackend {
+    return std.meta.stringToEnum(RenderBackend, value) orelse
+        std.debug.panic("unsupported render backend in native metadata: {s}", .{value});
+}
+
+fn parseArtifactShape(value: []const u8) ArtifactShape {
+    if (std.mem.eql(u8, value, "shared-private")) return .shared_private;
+    if (std.mem.eql(u8, value, "static-monolithic")) return .static_monolithic;
+    std.debug.panic("unsupported artifact shape in native metadata: {s}", .{value});
+}
+
+fn nativeMetadataPath(b: *std.Build) ?std.Build.LazyPath {
+    if (!native_metadata_path_loaded) {
+        cached_native_metadata_path = b.option(
+            std.Build.LazyPath,
+            "native-metadata",
+            "Generated native artifact metadata JSON from the CMake build directory",
+        );
+        native_metadata_path_loaded = true;
+    }
+    return cached_native_metadata_path;
+}
+
+fn nativeMetadata(b: *std.Build) ?NativeMetadataJson {
+    if (native_metadata_loaded) return cached_native_metadata;
+    const metadata_path = nativeMetadataPath(b) orelse return null;
+    const metadata_bytes = std.Io.Dir.cwd().readFileAlloc(
+        b.graph.io,
+        metadata_path.getPath(b),
+        b.allocator,
+        .limited(1024 * 1024),
+    ) catch |err| std.debug.panic("failed to read native metadata: {s}: {}", .{ metadata_path.getPath(b), err });
+    const parsed = std.json.parseFromSlice(
+        NativeMetadataJson,
+        b.allocator,
+        metadata_bytes,
+        .{ .ignore_unknown_fields = true },
+    ) catch |err| std.debug.panic("failed to parse native metadata: {s}: {}", .{ metadata_path.getPath(b), err });
+    if (parsed.value.schema_version != 1) {
+        std.debug.panic("unsupported native metadata schema version: {}", .{parsed.value.schema_version});
+    }
+    if (parsed.value.c_abi_version != 0) {
+        std.debug.panic("unsupported native C ABI version: {}", .{parsed.value.c_abi_version});
+    }
+    cached_native_metadata = parsed.value;
+    native_metadata_loaded = true;
+    return cached_native_metadata;
+}
+
+fn lazyPath(path: []const u8) std.Build.LazyPath {
+    return .{ .cwd_relative = path };
+}
+
+fn lazyPathsFromStrings(b: *std.Build, paths: []const []const u8) []const std.Build.LazyPath {
+    const lazy_paths = b.allocator.alloc(std.Build.LazyPath, paths.len) catch @panic("out of memory");
+    for (paths, lazy_paths) |path, *lazy_path_| {
+        lazy_path_.* = lazyPath(path);
+    }
+    return lazy_paths;
+}
+
+fn parentDir(path: []const u8) std.Build.LazyPath {
+    return lazyPath(std.fs.path.dirname(path) orelse ".");
+}
+
 pub const LinkOptions = struct {
     target: std.Build.ResolvedTarget,
     optimize: std.builtin.OptimizeMode,
@@ -41,27 +133,36 @@ pub const RenderBackendLinkOptions = struct {
 };
 
 pub fn renderBackend(b: *std.Build) RenderBackend {
-    return b.option(
+    const cli_backend = b.option(
         RenderBackend,
         "render-backend",
         "Render backend built into the CMake artifact: metal, opengl, or vulkan",
-    ) orelse @panic("missing required -Drender-backend=metal|opengl|vulkan");
+    );
+    if (nativeMetadata(b)) |metadata| return parseRenderBackend(metadata.render_backend);
+    return cli_backend orelse @panic("missing required -Drender-backend=metal|opengl|vulkan");
 }
 
 pub fn cmakeArtifactDir(b: *std.Build) std.Build.LazyPath {
-    return b.option(
+    const cli_artifact_dir = b.option(
         std.Build.LazyPath,
         "cmake-artifact-dir",
         "Directory containing the CMake-built maplibre-native-c library",
-    ) orelse @panic("missing required -Dcmake-artifact-dir=<path-to-cmake-artifacts>");
+    );
+    if (nativeMetadata(b)) |metadata| return parentDir(metadata.core_library_path);
+    return cli_artifact_dir orelse @panic("missing required -Dcmake-artifact-dir=<path-to-cmake-artifacts>");
 }
 
 pub fn includeDirs(b: *std.Build) []const std.Build.LazyPath {
-    return b.option(
+    const cli_include_dirs = b.option(
         []const std.Build.LazyPath,
         "include-dir",
         "Include directory. Repeat for project, dependency, and backend headers.",
-    ) orelse @panic("missing required -Dinclude-dir=<path>; repeat for additional include roots");
+    );
+    if (nativeMetadata(b)) |metadata| {
+        if (metadata.binding_include_dirs.len != 0) return lazyPathsFromStrings(b, metadata.binding_include_dirs);
+        return lazyPathsFromStrings(b, metadata.public_include_dirs);
+    }
+    return cli_include_dirs orelse @panic("missing required -Dinclude-dir=<path>; repeat for additional include roots");
 }
 
 pub fn addIncludePaths(module: *std.Build.Module, include_dirs: []const std.Build.LazyPath) void {
@@ -159,11 +260,13 @@ pub fn addRenderBackendTranslateC(b: *std.Build, module: *std.Build.Module, opti
 }
 
 pub fn dependencyLibraryDirs(b: *std.Build) []const std.Build.LazyPath {
-    return b.option(
+    const cli_dependency_library_dirs = b.option(
         []const std.Build.LazyPath,
         "dependency-library-dir",
         "Dependency library directory. Repeat for backend runtime libraries.",
-    ) orelse &.{};
+    );
+    if (nativeMetadata(b)) |metadata| return lazyPathsFromStrings(b, metadata.dependency_library_dirs);
+    return cli_dependency_library_dirs orelse &.{};
 }
 
 fn addDependencyLibraryPaths(module: *std.Build.Module, dependency_library_dirs: []const std.Build.LazyPath) void {
@@ -195,6 +298,24 @@ pub fn addPlatformSystemPaths(b: *std.Build, module: *std.Build.Module, target: 
         module.addLibraryPath(.{ .cwd_relative = b.pathJoin(&.{ system_root, "usr", "lib64" }) });
         module.addLibraryPath(.{ .cwd_relative = b.pathJoin(&.{ system_root, "lib" }) });
         module.addLibraryPath(.{ .cwd_relative = b.pathJoin(&.{ system_root, "lib64" }) });
+    }
+}
+
+fn linkSystemLibraries(module: *std.Build.Module, libraries: []const []const u8) void {
+    for (libraries) |library| {
+        module.linkSystemLibrary(library, .{});
+    }
+}
+
+fn linkFrameworks(module: *std.Build.Module, frameworks: []const []const u8) void {
+    for (frameworks) |framework| {
+        module.linkFramework(framework, .{});
+    }
+}
+
+fn addLibraryPaths(module: *std.Build.Module, library_dirs: []const std.Build.LazyPath) void {
+    for (library_dirs) |library_dir| {
+        module.addLibraryPath(library_dir);
     }
 }
 
@@ -319,6 +440,47 @@ pub fn linkMaplibreNativeC(b: *std.Build, module_: *std.Build.Module, options: L
         .target = options.target,
         .optimize = options.optimize,
     });
+    if (nativeMetadata(b)) |metadata| {
+        const dependency_library_dirs = lazyPathsFromStrings(b, metadata.dependency_library_dirs);
+        switch (parseArtifactShape(metadata.artifact_shape)) {
+            .shared_private => {
+                if (options.target.result.os.tag == .windows) {
+                    module_.addObjectFile(lazyPath(metadata.windows_import_library_path orelse metadata.core_library_path));
+                } else {
+                    module_.addLibraryPath(parentDir(metadata.core_library_path));
+                    module_.addRPath(parentDir(metadata.core_library_path));
+                    for (metadata.runtime_search_paths) |runtime_search_path| {
+                        module_.addRPath(lazyPath(runtime_search_path));
+                    }
+                    module_.linkSystemLibrary("maplibre-native-c", .{});
+                }
+            },
+            .static_monolithic => {
+                addLibraryPaths(module_, lazyPathsFromStrings(b, metadata.static_library_dirs));
+                if (metadata.static_libraries.len == 0) {
+                    module_.addLibraryPath(parentDir(metadata.core_library_path));
+                    module_.linkSystemLibrary("maplibre-native-c", .{});
+                } else {
+                    linkSystemLibraries(module_, metadata.static_libraries);
+                }
+                if (options.target.result.os.tag == .ios) {
+                    if (b.graph.environ_map.get("MLN_FFI_SYSTEM_ROOT")) |system_root| {
+                        if (system_root.len != 0) {
+                            module_.addObjectFile(.{ .cwd_relative = b.pathJoin(&.{ system_root, "usr", "lib", "libc++.tbd" }) });
+                        }
+                    }
+                }
+                linkSystemLibraries(module_, metadata.static_system_libraries);
+                linkFrameworks(module_, metadata.static_frameworks);
+            },
+        }
+        linkRenderBackend(b, module_, .{
+            .target = options.target,
+            .render_backend = parseRenderBackend(metadata.render_backend),
+            .dependency_library_dirs = dependency_library_dirs,
+        });
+        return;
+    }
     if (options.target.result.os.tag == .windows) {
         module_.addObjectFile(options.cmake_artifact_dir.path(b, "maplibre-native-c.lib"));
     } else if (isIosSimulator(options.target)) {

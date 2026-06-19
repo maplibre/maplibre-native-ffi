@@ -1,6 +1,31 @@
+include(mln_artifact_metadata)
 include(mln_lint)
 include(mln_platform)
 include(mln_render_backend)
+
+function(mln_configure_shared_exports target)
+  if(MLN_FFI_ARTIFACT_SHAPE STREQUAL "static-monolithic")
+    return()
+  endif()
+
+  set(export_dir "${CMAKE_CURRENT_BINARY_DIR}/exports")
+  file(MAKE_DIRECTORY "${export_dir}")
+
+  if(APPLE)
+    set(export_file "${export_dir}/maplibre-native-c.exports")
+    file(WRITE "${export_file}" "_mln_*\n")
+    target_link_options(
+      ${target}
+      PRIVATE "LINKER:-exported_symbols_list,${export_file}")
+  elseif(UNIX)
+    set(export_file "${export_dir}/maplibre-native-c.version")
+    file(WRITE "${export_file}"
+         "{\n  global:\n    mln_*;\n  local:\n    *;\n};\n")
+    target_link_options(
+      ${target}
+      PRIVATE "LINKER:--version-script,${export_file}")
+  endif()
+endfunction()
 
 function(mln_add_c_api_library target)
   find_package(ZLIB REQUIRED)
@@ -30,15 +55,7 @@ function(mln_add_c_api_library target)
       ${PROJECT_SOURCE_DIR}/src/style/style_value.cpp
       ${PROJECT_SOURCE_DIR}/src/runtime/runtime.cpp)
 
-  set(MLN_FFI_IS_IOS_SIMULATOR FALSE)
-  if(CMAKE_SYSTEM_NAME STREQUAL "iOS"
-     AND CMAKE_OSX_SYSROOT MATCHES "[iI][pP]hone[Ss]imulator")
-    set(MLN_FFI_IS_IOS_SIMULATOR TRUE)
-  endif()
-
-  if(CMAKE_SYSTEM_NAME STREQUAL "iOS" AND NOT MLN_FFI_IS_IOS_SIMULATOR)
-    # iOS device packaging decides the final linkage shape; keep the core as an
-    # archive until a framework/XCFramework packaging layer exists.
+  if(MLN_FFI_ARTIFACT_SHAPE STREQUAL "static-monolithic")
     add_library(${target} STATIC)
   else()
     add_library(${target} SHARED)
@@ -117,4 +134,6 @@ function(mln_add_c_api_library target)
   mln_configure_source_linting(${target})
   mln_configure_platform_support(${target})
   mln_configure_render_backend(${target})
+  mln_configure_shared_exports(${target})
+  mln_write_artifact_metadata(${target})
 endfunction()
