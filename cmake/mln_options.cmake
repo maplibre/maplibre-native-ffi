@@ -14,13 +14,6 @@ function(mln_configure_options)
       CACHE STRING "OpenGL context provider for this wrapper build")
   set_property(CACHE MLN_FFI_OPENGL_CONTEXT_PROVIDER PROPERTY STRINGS egl wgl)
   set(MLN_FFI_EGL_ROOT "" CACHE PATH "Path to a local EGL/GLES package")
-  set(MLN_FFI_ARTIFACT_SHAPE ""
-      CACHE
-        STRING
-        "Native C API artifact shape: shared-private or static-monolithic")
-  set_property(
-    CACHE MLN_FFI_ARTIFACT_SHAPE
-    PROPERTY STRINGS shared-private static-monolithic)
 
   if(NOT MLN_FFI_RENDER_BACKEND)
     if(APPLE)
@@ -46,16 +39,10 @@ function(mln_configure_options)
     set(MLN_FFI_IS_IOS_SIMULATOR TRUE)
   endif()
 
-  if(NOT MLN_FFI_ARTIFACT_SHAPE)
-    if(CMAKE_SYSTEM_NAME STREQUAL "iOS" AND NOT MLN_FFI_IS_IOS_SIMULATOR)
-      set(MLN_FFI_ARTIFACT_SHAPE "static-monolithic")
-    else()
-      set(MLN_FFI_ARTIFACT_SHAPE "shared-private")
-    endif()
-  endif()
-  string(TOLOWER "${MLN_FFI_ARTIFACT_SHAPE}" MLN_FFI_ARTIFACT_SHAPE)
-  if(NOT MLN_FFI_ARTIFACT_SHAPE MATCHES "^(shared-private|static-monolithic)$")
-    message(FATAL_ERROR "Unsupported artifact shape: ${MLN_FFI_ARTIFACT_SHAPE}")
+  if(CMAKE_SYSTEM_NAME STREQUAL "iOS" AND NOT MLN_FFI_IS_IOS_SIMULATOR)
+    set(MLN_FFI_ARTIFACT_SHAPE "static-monolithic")
+  else()
+    set(MLN_FFI_ARTIFACT_SHAPE "shared-private")
   endif()
 
   if(MLN_FFI_RENDER_BACKEND STREQUAL "metal" AND NOT APPLE)

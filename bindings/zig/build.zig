@@ -179,16 +179,10 @@ fn lazyPathsFromStrings(b: *std.Build, paths: []const []const u8) []const std.Bu
     return lazy_paths;
 }
 
-fn parentDir(path: []const u8) std.Build.LazyPath {
-    return lazyPath(std.fs.path.dirname(path) orelse ".");
-}
-
 pub const LinkOptions = struct {
     target: std.Build.ResolvedTarget,
     optimize: std.builtin.OptimizeMode,
-    render_backend: RenderBackend,
     include_dirs: []const std.Build.LazyPath,
-    dependency_library_dirs: []const std.Build.LazyPath = &.{},
 };
 
 pub const DependencyOptions = struct {
@@ -445,9 +439,7 @@ fn repoLinkOptions(options: BuildOptions) LinkOptions {
     return .{
         .target = options.target,
         .optimize = options.optimize,
-        .render_backend = options.render_backend,
         .include_dirs = options.include_dirs,
-        .dependency_library_dirs = options.dependency_library_dirs,
     };
 }
 
@@ -495,12 +487,7 @@ pub fn linkMaplibreNativeC(b: *std.Build, module_: *std.Build.Module, options: L
         },
         .static_monolithic => {
             addLibraryPaths(module_, link_dirs);
-            if (config.link_libraries.len == 0) {
-                module_.addLibraryPath(parentDir(config.library_path));
-                module_.linkSystemLibrary("maplibre-native-c", .{});
-            } else {
-                linkSystemLibraries(module_, config.link_libraries);
-            }
+            linkSystemLibraries(module_, config.link_libraries);
             if (options.target.result.os.tag == .ios) {
                 if (b.graph.environ_map.get("MLN_FFI_SYSTEM_ROOT")) |system_root| {
                     if (system_root.len != 0) {

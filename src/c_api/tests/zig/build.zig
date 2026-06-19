@@ -48,9 +48,7 @@ fn addCTests(b: *std.Build, options: BuildOptions) *std.Build.Step.Compile {
     maplibre_build.linkMaplibreNativeC(b, c_tests.root_module, .{
         .target = options.target,
         .optimize = options.optimize,
-        .render_backend = options.render_backend,
         .include_dirs = options.include_dirs,
-        .dependency_library_dirs = options.dependency_library_dirs,
     });
     return c_tests;
 }

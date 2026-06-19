@@ -2,7 +2,6 @@
 depends = ["//:ensure-native-library"]
 dir = "{{env.MLN_FFI_REPO_ROOT}}"
 run = '''
-export PKG_CONFIG_PATH="$MLN_FFI_BUILD_DIR${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
 cargo build -p maplibre-native-sys -p maplibre-native-core -p maplibre-native
 '''
 
@@ -10,7 +9,6 @@ cargo build -p maplibre-native-sys -p maplibre-native-core -p maplibre-native
 depends = ["//:ensure-native-library"]
 dir = "{{env.MLN_FFI_REPO_ROOT}}"
 run = '''
-export PKG_CONFIG_PATH="$MLN_FFI_BUILD_DIR${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
 cargo test -p maplibre-native-sys -p maplibre-native-core -p maplibre-native -- --test-threads=1
 '''
 
@@ -18,6 +16,5 @@ cargo test -p maplibre-native-sys -p maplibre-native-core -p maplibre-native -- 
 depends = [":test"]
 dir = "{{env.MLN_FFI_REPO_ROOT}}"
 run = '''
-export PKG_CONFIG_PATH="$MLN_FFI_BUILD_DIR${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
 cargo clippy -p maplibre-native-sys -p maplibre-native-core -p maplibre-native --all-targets -- -D warnings
 '''

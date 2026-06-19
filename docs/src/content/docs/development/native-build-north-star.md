@@ -138,7 +138,7 @@ owned by the example.
 
 ## Migration Plan
 
-1. Add a native build option for artifact shape, with current shared behavior
+1. Derive the artifact shape from platform policy, with current shared behavior
    preserved and iOS device builds mapped to static.
 2. Generate the variant metadata file from CMake configure output.
 3. Replace glob-based native artifact checks with metadata validation.

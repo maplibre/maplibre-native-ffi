@@ -1,6 +1,7 @@
 [env]
 MLN_FFI_RENDER_BACKEND = "opengl"
 MLN_FFI_BUILD_DIR = "{{config_root}}/build/android-arm64-egl"
+PKG_CONFIG_PATH = "{{env.MLN_FFI_BUILD_DIR}}:{{config_root}}/.pixi/envs/default/lib/pkgconfig"
 ANDROID_HOME = { required = true }
 ANDROID_NDK_HOME = { required = true }
 MLN_FFI_CMAKE_ARGS = """
