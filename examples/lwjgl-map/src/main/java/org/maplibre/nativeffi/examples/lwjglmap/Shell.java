@@ -29,8 +29,8 @@ final class Shell {
         System.out.println("render target status: " + mode.status());
         InputController.printControls();
         installResizeCallbacks(graphics.window(), viewport);
-        // TODO(map-example-spec): Replace poll-and-wait with a display-paced host loop
-        // (pace on display refresh; desktop may also wake on input). See Frame loop.
+        // TODO(map-example-spec): Replace poll-and-wait with a display-paced host loop. See Frame
+        // loop.
         while (!glfwWindowShouldClose(graphics.window())) {
           glfwPollEvents();
           if (viewport.consumeChanged()) {

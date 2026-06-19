@@ -16,39 +16,12 @@ The specification has three sections:
    and keyboard/mouse input.
 3. [Mobile profile](#mobile-profile) — embedded view hosts with touch input.
 
-Implement a desktop example by reading **Shared baseline** and **Desktop
-profile**. Implement a mobile example by reading **Shared baseline** and
-**Mobile profile**.
+Implement a desktop example by reading Shared baseline and Desktop profile.
+Implement a mobile example by reading Shared baseline and Mobile profile.
 
 ---
 
-## Profiles
-
-### Routing
-
-| Concern                        | Section                                                 |
-| ------------------------------ | ------------------------------------------------------- |
-| Style, camera, map/runtime     | [Shared defaults](#shared-defaults)                     |
-| Module layout                  | [Architecture](#architecture)                           |
-| Startup and shutdown ordering  | [Lifecycle](#lifecycle)                                 |
-| Host loop (pump and render)    | [Frame loop](#frame-loop)                               |
-| Extent and scale               | [Viewport](#viewport)                                   |
-| Runtime, map, render session   | [Map state](#map-state)                                 |
-| All render-target modes        | [Render-target modes](#render-target-modes)             |
-| Texture compositor pass        | [Compositor shaders](#compositor-shaders)               |
-| Resize and reattach mechanics  | [Resize mechanics](#resize-mechanics)                   |
-| What to log                    | [Diagnostics](#diagnostics)                             |
-| Attach descriptors per API     | [Graphics API](#graphics-api)                           |
-| Which modes each profile ships | [Render-target coverage](#render-target-coverage)       |
-| CLI and mode selection         | [Desktop profile → Entry](#entry)                       |
-| Window and process lifecycle   | [Desktop profile → Shell and window](#shell-and-window) |
-| Keyboard and mouse             | [Desktop profile → Input](#input)                       |
-| View lifecycle and layout      | [Mobile profile → Entry and shell](#entry-and-shell)    |
-| View lifecycle transitions     | [Mobile profile → Lifecycle](#lifecycle-1)              |
-| Touch gestures                 | [Mobile profile → Input](#input-1)                      |
-| Platform log sinks             | [Mobile profile → Logging](#logging)                    |
-
-### Implementations
+## Implementations
 
 | Example               | Profile | Binding  | Toolkit         | Platforms             | Backends              |
 | --------------------- | ------- | -------- | --------------- | --------------------- | --------------------- |
@@ -277,8 +250,6 @@ While the map is visible and the example is active:
 - MUST subscribe to the host toolkit's display refresh mechanism (for example
   swapchain frame callbacks, `CADisplayLink`, or `Choreographer`) to pace the
   loop.
-- Desktop examples MAY wake an additional iteration on input or resize before
-  the next display refresh.
 
 Display refresh paces the loop; it does not replace `run_once`. Each iteration
 MUST call `run_once` exactly once.
