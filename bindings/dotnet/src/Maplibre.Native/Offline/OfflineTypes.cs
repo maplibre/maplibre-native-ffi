@@ -31,11 +31,21 @@ public abstract record OfflineRegionDefinition
     ) : OfflineRegionDefinition;
 }
 
-public sealed record OfflineRegionInfo(
-    long Id,
-    OfflineRegionDefinition Definition,
-    byte[] Metadata
-);
+public sealed record OfflineRegionInfo
+{
+    private readonly byte[] metadata;
+
+    public OfflineRegionInfo(long Id, OfflineRegionDefinition Definition, byte[] Metadata)
+    {
+        this.Id = Id;
+        this.Definition = Definition;
+        metadata = Metadata is null ? [] : (byte[])Metadata.Clone();
+    }
+
+    public long Id { get; }
+    public OfflineRegionDefinition Definition { get; }
+    public byte[] Metadata => (byte[])metadata.Clone();
+}
 
 public sealed record OfflineRegionStatus(
     OfflineRegionDownloadState DownloadState,

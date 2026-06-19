@@ -1,4 +1,5 @@
 using Maplibre.Native.Error;
+using Maplibre.Native.Internal.Loader;
 using Maplibre.Native.Render;
 using Xunit;
 
@@ -6,12 +7,31 @@ namespace Maplibre.Native.Tests;
 
 public sealed class MaplibreTests
 {
+    [BindingSpecTest("BND-001")]
     [Fact]
     public void CVersionComesFromNativeLibrary()
     {
-        Assert.Equal(0u, Maplibre.CVersion());
+        Assert.Equal(NativeLibraryLoader.ExpectedAbiVersion, Maplibre.CVersion());
     }
 
+    [BindingSpecTest("BND-001")]
+    [Fact]
+    public void AbiVersionMismatchUsesStableBindingError()
+    {
+        var error = Assert.Throws<MaplibreException>(() =>
+            NativeLibraryLoader.ValidateAbiVersion(NativeLibraryLoader.ExpectedAbiVersion + 1)
+        );
+
+        Assert.Equal(MaplibreStatus.AbiMismatch, error.Status);
+        Assert.Null(error.RawStatus);
+        Assert.Contains(
+            NativeLibraryLoader.ExpectedAbiVersion.ToString(),
+            error.Diagnostic,
+            StringComparison.Ordinal
+        );
+    }
+
+    [BindingSpecTest("BND-160")]
     [Fact]
     public void SupportedOpenGLContextProvidersComeFromNativeLibrary()
     {
@@ -23,6 +43,7 @@ public sealed class MaplibreTests
         );
     }
 
+    [BindingSpecTest("BND-103")]
     [Fact]
     public void ProjectionHelpersRoundTripThroughNativeLibrary()
     {
@@ -35,6 +56,7 @@ public sealed class MaplibreTests
         Assert.True(Math.Abs(roundTripped.Longitude - coordinate.Longitude) < 1e-9);
     }
 
+    [BindingSpecTest("BND-068")]
     [Fact]
     public void UnknownNetworkStatusIsRejectedBeforeNativeCall()
     {

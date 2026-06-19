@@ -1,15 +1,24 @@
+using System.Runtime.InteropServices;
 using System.Text;
 using Maplibre.Native.Error;
 using Maplibre.Native.Internal.C;
 using Maplibre.Native.Internal.Callback;
+using Maplibre.Native.Map;
 using Maplibre.Native.Resource;
 using Maplibre.Native.Runtime;
 using Xunit;
 
 namespace Maplibre.Native.Tests;
 
+#pragma warning disable xUnit1031, xUnit1051
+
 public sealed unsafe class ResourceProviderTests
 {
+    private const string StyleUrl = "https://example.test/style.json";
+    private const string StyleJson = "{\"version\":8,\"sources\":{},\"layers\":[]}";
+
+    // Support invariant for resource provider callbacks: request data is copied
+    // into language-owned values before user code receives it.
     [Fact]
     public void ResourceProviderCopiesRequestAndReturnsDecision()
     {
@@ -72,6 +81,34 @@ public sealed unsafe class ResourceProviderTests
         Assert.Equal([1, 2, 3], copiedRequest.PriorData);
     }
 
+    [BindingSpecTest("BND-069", "BND-141")]
+    [Fact]
+    public void ResourceRequestSnapshotsPriorDataAndReturnsCopies()
+    {
+        var source = new byte[] { 1, 2, 3 };
+        var request = new ResourceRequest(
+            ResourceKind.Tile,
+            "https://example.test/tile",
+            ResourceLoadingMethod.All,
+            ResourcePriority.Regular,
+            ResourceUsage.Online,
+            ResourceStoragePolicy.Permanent,
+            null,
+            null,
+            null,
+            null,
+            (ulong)source.Length,
+            source
+        );
+        source[0] = 9;
+
+        var first = request.PriorData;
+        Assert.Equal([1, 2, 3], first);
+        first![0] = 8;
+        Assert.Equal([1, 2, 3], request.PriorData);
+    }
+
+    [BindingSpecTest("BND-142", "BND-147", "BND-151")]
     [Fact]
     public void PassThroughFinalizationClosesRequestHandleBeforeNativeRelease()
     {
@@ -82,7 +119,7 @@ public sealed unsafe class ResourceProviderTests
         Assert.Equal((uint)ResourceProviderDecision.PassThrough, decision);
         Assert.True(handle.IsClosed);
         var completeError = Assert.Throws<InvalidStateException>(() =>
-            handle.Complete(ResourceResponse.NoContent())
+            handle.Complete(new ResourceResponse(ResourceResponseStatus.NoContent))
         );
         Assert.Equal(MaplibreStatus.InvalidState, completeError.Status);
         var cancelledError = Assert.Throws<InvalidStateException>(() => handle.IsCancelled());
@@ -90,6 +127,7 @@ public sealed unsafe class ResourceProviderTests
         handle.Close();
     }
 
+    [BindingSpecTest("BND-121")]
     [Fact]
     public void UnknownProviderDecisionReturnsErrorDecisionPath()
     {
@@ -101,6 +139,137 @@ public sealed unsafe class ResourceProviderTests
         Assert.True(handle.IsClosed);
     }
 
+    [BindingSpecTest("BND-146", "BND-152")]
+    [Fact]
+    public void CompletionThatReachesNativeIsTerminalWhenNativeReturnsError()
+    {
+        var completeCalls = 0;
+        var releaseCalls = 0;
+        var handle = new ResourceRequestHandle(
+            (mln_resource_request_handle*)1234,
+            (_, _) =>
+            {
+                completeCalls++;
+                return mln_status.MLN_STATUS_INVALID_STATE;
+            },
+            (_, cancelled) =>
+            {
+                *cancelled = false;
+                return mln_status.MLN_STATUS_OK;
+            },
+            _ => releaseCalls++
+        );
+        Assert.Equal(
+            (uint)ResourceProviderDecision.Handle,
+            handle.FinishProviderDecision(ResourceProviderDecision.Handle)
+        );
+
+        var error = Assert.Throws<InvalidStateException>(() =>
+            handle.Complete(new ResourceResponse(ResourceResponseStatus.NoContent))
+        );
+
+        Assert.Equal(MaplibreStatus.InvalidState, error.Status);
+        Assert.True(handle.IsClosed);
+        Assert.Equal(1, completeCalls);
+        Assert.Equal(1, releaseCalls);
+        var secondError = Assert.Throws<InvalidStateException>(() =>
+            handle.Complete(new ResourceResponse(ResourceResponseStatus.NoContent))
+        );
+        Assert.Null(secondError.RawStatus);
+        Assert.Equal(1, completeCalls);
+        Assert.Equal(1, releaseCalls);
+    }
+
+    [BindingSpecTest("BND-145", "BND-153")]
+    [Fact]
+    public void CloseWaitsForInFlightCompletionBeforeNativeRelease()
+    {
+        using var completionStarted = new ManualResetEventSlim(false);
+        using var allowCompletion = new ManualResetEventSlim(false);
+        var completeCalls = 0;
+        var releaseCalls = 0;
+        var handle = new ResourceRequestHandle(
+            (mln_resource_request_handle*)1234,
+            (_, _) =>
+            {
+                completeCalls++;
+                completionStarted.Set();
+                Assert.True(allowCompletion.Wait(TimeSpan.FromSeconds(5)));
+                return mln_status.MLN_STATUS_OK;
+            },
+            (_, cancelled) =>
+            {
+                *cancelled = false;
+                return mln_status.MLN_STATUS_OK;
+            },
+            _ => releaseCalls++
+        );
+        Assert.Equal(
+            (uint)ResourceProviderDecision.Handle,
+            handle.FinishProviderDecision(ResourceProviderDecision.Handle)
+        );
+
+        var complete = Task.Run(() =>
+            handle.Complete(new ResourceResponse(ResourceResponseStatus.NoContent))
+        );
+        Assert.True(completionStarted.Wait(TimeSpan.FromSeconds(5)));
+
+        var close = Task.Run(handle.Close);
+        Assert.False(close.Wait(TimeSpan.FromMilliseconds(50)));
+        Assert.Equal(0, Volatile.Read(ref releaseCalls));
+
+        allowCompletion.Set();
+        complete.GetAwaiter().GetResult();
+        close.GetAwaiter().GetResult();
+
+        Assert.True(handle.IsClosed);
+        Assert.Equal(1, completeCalls);
+        Assert.Equal(1, releaseCalls);
+    }
+
+    [BindingSpecTest("BND-153")]
+    [Fact]
+    public void CloseWaitsForInFlightCancellationCheckBeforeNativeRelease()
+    {
+        using var cancellationStarted = new ManualResetEventSlim(false);
+        using var allowCancellation = new ManualResetEventSlim(false);
+        var cancelCalls = 0;
+        var releaseCalls = 0;
+        var handle = new ResourceRequestHandle(
+            (mln_resource_request_handle*)1234,
+            (_, _) => mln_status.MLN_STATUS_OK,
+            (_, cancelled) =>
+            {
+                cancelCalls++;
+                cancellationStarted.Set();
+                Assert.True(allowCancellation.Wait(TimeSpan.FromSeconds(5)));
+                *cancelled = false;
+                return mln_status.MLN_STATUS_OK;
+            },
+            _ => releaseCalls++
+        );
+        Assert.Equal(
+            (uint)ResourceProviderDecision.Handle,
+            handle.FinishProviderDecision(ResourceProviderDecision.Handle)
+        );
+
+        var isCancelled = Task.Run(handle.IsCancelled);
+        Assert.True(cancellationStarted.Wait(TimeSpan.FromSeconds(5)));
+
+        var close = Task.Run(handle.Close);
+        Assert.False(close.Wait(TimeSpan.FromMilliseconds(50)));
+        Assert.Equal(0, Volatile.Read(ref releaseCalls));
+
+        allowCancellation.Set();
+        Assert.False(isCancelled.GetAwaiter().GetResult());
+        close.GetAwaiter().GetResult();
+
+        Assert.True(handle.IsClosed);
+        Assert.Equal(1, cancelCalls);
+        Assert.Equal(1, releaseCalls);
+    }
+
+    [BindingSpecTest("BND-121")]
     [Fact]
     public void ResourceProviderExceptionReturnsUnknownDecision()
     {
@@ -115,6 +284,7 @@ public sealed unsafe class ResourceProviderTests
         }
     }
 
+    [BindingSpecTest("BND-123")]
     [Fact]
     public void ResourceProviderStateDisposeIsIdempotent()
     {
@@ -124,12 +294,212 @@ public sealed unsafe class ResourceProviderTests
         state.Dispose();
     }
 
+    [BindingSpecTest("BND-122")]
+    [Fact]
+    public void ResourceProviderInstallFailurePreservesPreviousCallbackAndReleasesReplacement()
+    {
+        var failInstall = false;
+        ResourceProviderState? failedReplacement = null;
+        using var install = RuntimeHandle.UseResourceCallbackInstallMethodsForTest(
+            (_, provider) =>
+            {
+                if (!failInstall)
+                {
+                    return mln_status.MLN_STATUS_OK;
+                }
+
+                failedReplacement = (ResourceProviderState?)
+                    GCHandle.FromIntPtr((nint)provider->user_data).Target;
+                return mln_status.MLN_STATUS_INVALID_STATE;
+            },
+            (_, _) => mln_status.MLN_STATUS_OK
+        );
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
+        runtime.SetResourceProvider((_, _) => ResourceProviderDecision.PassThrough);
+        var previous = Assert.IsType<ResourceProviderState>(runtime.ResourceProviderStateForTest);
+
+        failInstall = true;
+        Assert.Throws<InvalidStateException>(() =>
+            runtime.SetResourceProvider((_, _) => ResourceProviderDecision.Handle)
+        );
+
+        Assert.Same(previous, runtime.ResourceProviderStateForTest);
+        Assert.True(previous.IsHandleAllocatedForTest);
+        Assert.NotNull(failedReplacement);
+        Assert.False(failedReplacement.IsHandleAllocatedForTest);
+    }
+
+    [BindingSpecTest("BND-122")]
     [Fact]
     public void CanInstallAndReplaceResourceProvider()
     {
-        using var runtime = RuntimeHandle.Create();
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
 
         runtime.SetResourceProvider((_, _) => ResourceProviderDecision.PassThrough);
         runtime.SetResourceProvider((_, _) => ResourceProviderDecision.PassThrough);
     }
+
+    [BindingSpecTest("BND-101", "BND-143", "BND-150")]
+    [Fact]
+    public void InlineHandledResourceProviderCompletionLoadsStyleAndClosesRequest()
+    {
+        ResourceRequestHandle? handled = null;
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
+        runtime.SetResourceProvider(
+            (request, handle) =>
+            {
+                Assert.Equal(StyleUrl, request.Url);
+                handled = handle;
+                handle.Complete(StyleResponse());
+                return ResourceProviderDecision.Handle;
+            }
+        );
+        using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
+
+        map.SetStyleUrl(StyleUrl);
+        var runtimeEvent = RuntimeEventTestHelpers.WaitForMapEvent(
+            runtime,
+            map,
+            RuntimeEventType.MapStyleLoaded
+        );
+
+        Assert.Same(map, runtimeEvent.MapSource);
+        Assert.NotNull(handled);
+        Assert.True(handled.IsClosed);
+    }
+
+    [BindingSpecTest("BND-101", "BND-144")]
+    [Fact]
+    public void LaterHandledResourceProviderCompletionLoadsStyle()
+    {
+        using var providerCalled = new ManualResetEventSlim(false);
+        ResourceRequestHandle? handled = null;
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
+        runtime.SetResourceProvider(
+            (request, handle) =>
+            {
+                Assert.Equal(StyleUrl, request.Url);
+                handled = handle;
+                providerCalled.Set();
+                return ResourceProviderDecision.Handle;
+            }
+        );
+        using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
+
+        map.SetStyleUrl(StyleUrl);
+        DriveRuntimeUntil(runtime, providerCalled);
+        Assert.NotNull(handled);
+        handled.Complete(StyleResponse());
+
+        var runtimeEvent = RuntimeEventTestHelpers.WaitForMapEvent(
+            runtime,
+            map,
+            RuntimeEventType.MapStyleLoaded
+        );
+
+        Assert.Same(map, runtimeEvent.MapSource);
+        Assert.True(handled.IsClosed);
+    }
+
+    [BindingSpecTest("BND-148")]
+    [Fact]
+    public void CancelledResourceRequestReportsCancellationBeforeLateCompletionStatus()
+    {
+        using var providerCalled = new ManualResetEventSlim(false);
+        ResourceRequestHandle? handled = null;
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
+        runtime.SetResourceProvider(
+            (_, handle) =>
+            {
+                handled = handle;
+                providerCalled.Set();
+                return ResourceProviderDecision.Handle;
+            }
+        );
+        using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
+
+        map.SetStyleUrl(StyleUrl);
+        DriveRuntimeUntil(runtime, providerCalled);
+        Assert.NotNull(handled);
+
+        map.SetStyleJson(StyleJson);
+        DriveRuntimeUntilCancelled(runtime, handled);
+
+        var error = Assert.Throws<InvalidStateException>(() => handled.Complete(StyleResponse()));
+
+        Assert.Equal(MaplibreStatus.InvalidState, error.Status);
+        Assert.NotNull(error.RawStatus);
+        Assert.True(handled.IsClosed);
+    }
+
+    [BindingSpecTest("BND-149")]
+    [Fact]
+    public void ResourceProviderErrorResponseProducesCopiedLoadingFailureEvent()
+    {
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
+        runtime.SetResourceProvider(
+            (_, handle) =>
+            {
+                handle.Complete(
+                    new ResourceResponse(ResourceResponseStatus.Error)
+                    {
+                        ErrorReason = ResourceErrorReason.NotFound,
+                        ErrorMessage = "style missing",
+                    }
+                );
+                return ResourceProviderDecision.Handle;
+            }
+        );
+        using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
+
+        map.SetStyleUrl(StyleUrl);
+        var runtimeEvent = RuntimeEventTestHelpers.WaitForMapEvent(
+            runtime,
+            map,
+            RuntimeEventType.MapLoadingFailed
+        );
+
+        Assert.Same(map, runtimeEvent.MapSource);
+        Assert.Contains("style", runtimeEvent.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static ResourceResponse StyleResponse() =>
+        new(ResourceResponseStatus.Ok) { Bytes = Encoding.UTF8.GetBytes(StyleJson) };
+
+    private static void DriveRuntimeUntil(RuntimeHandle runtime, ManualResetEventSlim signal)
+    {
+        for (var attempt = 0; attempt < 1000; attempt++)
+        {
+            runtime.RunOnce();
+            if (signal.IsSet)
+            {
+                return;
+            }
+
+            Thread.Sleep(1);
+        }
+
+        Assert.True(signal.IsSet);
+    }
+
+    private static void DriveRuntimeUntilCancelled(
+        RuntimeHandle runtime,
+        ResourceRequestHandle handle
+    )
+    {
+        for (var attempt = 0; attempt < 1000; attempt++)
+        {
+            runtime.RunOnce();
+            if (handle.IsCancelled())
+            {
+                return;
+            }
+
+            Thread.Sleep(1);
+        }
+
+        Assert.True(handle.IsCancelled());
+    }
 }
+
+#pragma warning restore xUnit1031, xUnit1051

@@ -474,6 +474,11 @@ public final class RuntimeHandle implements AutoCloseable {
     return nativeAddress();
   }
 
+  public HandleState.ChildRetention retainChild(InternalAccess access, String childTypeName) {
+    Objects.requireNonNull(access, "access").checkCaller();
+    return state.retainChild(childTypeName);
+  }
+
   long nativeAddress() {
     return state.address();
   }

@@ -9,10 +9,25 @@ namespace Maplibre.Native.Tests;
 
 public sealed class StyleImageTests
 {
+    [BindingSpecTest("BND-069")]
+    [Fact]
+    public void PremultipliedRgba8ImageSnapshotsPixelsAndReturnsCopies()
+    {
+        var source = new byte[] { 1, 2, 3, 4 };
+        var image = new PremultipliedRgba8Image(source, new TextureImageInfo(1, 1, 4, 4));
+        source[0] = 9;
+
+        var first = image.Bytes;
+        Assert.Equal([1, 2, 3, 4], first);
+        first[0] = 8;
+        Assert.Equal([1, 2, 3, 4], image.Bytes);
+    }
+
+    [BindingSpecTest("BND-105")]
     [Fact]
     public void ImageSourceApisAdaptCoordinatesAndImagesThroughNativeMap()
     {
-        using var runtime = RuntimeHandle.Create();
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
         using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
         map.SetStyleJson("{\"version\":8,\"sources\":{},\"layers\":[]}");
         var coordinates = new[]
@@ -43,10 +58,11 @@ public sealed class StyleImageTests
         Assert.Equal(coordinates, map.GetImageSourceCoordinates("image-inline"));
     }
 
+    [BindingSpecTest("BND-105")]
     [Fact]
     public void StyleImageRoundTripsMetadataAndPixelsThroughNativeMap()
     {
-        using var runtime = RuntimeHandle.Create();
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
         using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
         map.SetStyleJson("{\"version\":8,\"sources\":{},\"layers\":[]}");
         var image = new PremultipliedRgba8Image([255, 0, 0, 255], new TextureImageInfo(1, 1, 4, 4));

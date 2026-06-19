@@ -8,17 +8,18 @@ namespace Maplibre.Native.Tests;
 
 public sealed class StyleLayerTests
 {
+    [BindingSpecTest("BND-105")]
     [Fact]
     public void DemAndLocationLayerHelpersAdaptThroughNativeMap()
     {
-        using var runtime = RuntimeHandle.Create();
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
         using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
         map.SetStyleJson("{\"version\":8,\"sources\":{},\"layers\":[]}");
-        map.AddRasterDemSourceTiles("dem", ["https://example.test/dem/{z}/{x}/{y}.png"]);
+        map.AddRasterDemSourceTiles("dem", ["https://example.test/dem/{z}/{x}/{y}.png"], null);
 
-        map.AddHillshadeLayer("hillshade", "dem");
-        map.AddColorReliefLayer("relief", "dem");
-        map.AddLocationIndicatorLayer("location");
+        map.AddHillshadeLayer("hillshade", "dem", "");
+        map.AddColorReliefLayer("relief", "dem", "");
+        map.AddLocationIndicatorLayer("location", "");
         map.SetLocationIndicatorLocation("location", new LatLng(12.5, 34.25), 100);
         map.SetLocationIndicatorBearing("location", 45);
         map.SetLocationIndicatorAccuracyRadius("location", 12);

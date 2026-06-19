@@ -11,6 +11,7 @@ namespace Maplibre.Native.Tests;
 
 public sealed unsafe class GeoJsonSourceTests
 {
+    [BindingSpecTest("BND-065")]
     [Fact]
     public void GeoJsonMaterializesFeatureCollectionWithProperties()
     {
@@ -36,10 +37,11 @@ public sealed unsafe class GeoJsonSourceTests
         );
     }
 
+    [BindingSpecTest("BND-065", "BND-105")]
     [Fact]
     public void GeoJsonSourceDataAdaptsThroughNativeMap()
     {
-        using var runtime = RuntimeHandle.Create();
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
         using var map = MapHandle.Create(runtime, new MapOptions { Width = 512, Height = 512 });
         map.SetStyleJson("{\"version\":8,\"sources\":{},\"layers\":[]}");
 

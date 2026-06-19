@@ -33,7 +33,8 @@ internal sealed unsafe class NativeUtf8String : IDisposable
             throw new InvalidArgumentException(
                 MaplibreStatus.InvalidArgument,
                 null,
-                $"{parameterName} contains an embedded NUL character."
+                $"{parameterName} contains an embedded NUL character.",
+                null
             );
         }
 

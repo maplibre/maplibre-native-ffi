@@ -58,23 +58,29 @@ internal sealed unsafe class OpenGLContext : IGraphicsContext
         {
             return new EglContextDescriptor
             {
-                Display = new NativePointer(GlfwNativeAccess.GetEglDisplay()),
-                Config = new NativePointer(EglConfig(requirePbufferConfig)),
-                ShareContext = new NativePointer(GlfwNativeAccess.GetEglContext(window.Handle)),
+                Display = NativePointer.FromBorrowedAddress(GlfwNativeAccess.GetEglDisplay()),
+                Config = NativePointer.FromBorrowedAddress(EglConfig(requirePbufferConfig)),
+                ShareContext = NativePointer.FromBorrowedAddress(
+                    GlfwNativeAccess.GetEglContext(window.Handle)
+                ),
                 GetProcAddress = NativeCallbacks.GlfwGetProcAddress,
             };
         }
 
         return new WglContextDescriptor
         {
-            DeviceContext = new NativePointer(deviceContext),
-            ShareContext = new NativePointer(GlfwNativeAccess.GetWglContext(window.Handle)),
+            DeviceContext = NativePointer.FromBorrowedAddress(deviceContext),
+            ShareContext = NativePointer.FromBorrowedAddress(
+                GlfwNativeAccess.GetWglContext(window.Handle)
+            ),
             GetProcAddress = NativeCallbacks.GlfwGetProcAddress,
         };
     }
 
     public NativePointer SurfacePointer() =>
-        new(gles ? GlfwNativeAccess.GetEglSurface(window.Handle) : deviceContext);
+        NativePointer.FromBorrowedAddress(
+            gles ? GlfwNativeAccess.GetEglSurface(window.Handle) : deviceContext
+        );
 
     public Viewport ReadViewport() => window.ReadViewport();
 

@@ -188,19 +188,25 @@ final class RuntimeHandleTest {
   }
 
   @Test
-  void discardAfterRuntimeCloseMarksOfflineOperationHandleClosed() {
+  void bnd042RuntimeCloseFailsWhileOfflineOperationIsLive() {
     var runtime = RuntimeHandle.create(new RuntimeOptions());
-    var operation =
-        new OfflineOperationHandle<Void>(
-            runtime,
-            9_999_999L,
-            OfflineOperationKind.AMBIENT_CACHE,
-            OfflineOperationResultKind.NONE);
-    runtime.close();
-
-    var error = assertThrows(InvalidStateException.class, operation::close);
-    assertEquals(MaplibreStatus.INVALID_STATE, error.status());
-    assertTrue(operation.isClosed());
+    try {
+      var operation = runtime.startAmbientCacheOperation(AmbientCacheOperation.CLEAR);
+      try {
+        var error = assertThrows(InvalidStateException.class, runtime::close);
+        assertTrue(error.diagnostic().contains("live child handle"));
+        assertTrue(error.diagnostic().contains("OfflineOperationHandle=1"));
+        assertFalse(runtime.isClosed());
+        operation.close();
+      } finally {
+        if (!operation.isClosed()) {
+          operation.markConsumed();
+        }
+      }
+    } finally {
+      runtime.close();
+    }
+    assertTrue(runtime.isClosed());
   }
 
   @Test

@@ -29,6 +29,19 @@ public final class Status {
         typeName + " cannot be closed from its callback");
   }
 
+  public static InvalidStateException releasing(String typeName) {
+    return new InvalidStateException(
+        NativeValues.nativeCode(MaplibreStatus.INVALID_STATE), typeName + " is closing");
+  }
+
+  public static InvalidStateException liveChildren(
+      String typeName, int childCount, String childSummary) {
+    var suffix = childSummary.isEmpty() ? "" : ": " + childSummary;
+    return new InvalidStateException(
+        NativeValues.nativeCode(MaplibreStatus.INVALID_STATE),
+        typeName + " has " + childCount + " live child handle(s)" + suffix);
+  }
+
   public static String captureDiagnostic() {
     return MemoryUtil.copyCString(MapLibreNativeC.mln_thread_last_error_message());
   }

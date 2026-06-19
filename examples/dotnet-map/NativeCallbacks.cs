@@ -10,7 +10,9 @@ internal static unsafe class NativeCallbacks
     private static readonly Glfw Glfw = Glfw.GetApi();
 
     public static NativePointer GlfwGetProcAddress =>
-        new((nint)(delegate* unmanaged[Cdecl]<byte*, nint>)&GlfwGetProcAddressCallback);
+        NativePointer.FromBorrowedAddress(
+            (nint)(delegate* unmanaged[Cdecl]<byte*, nint>)&GlfwGetProcAddressCallback
+        );
 
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static nint GlfwGetProcAddressCallback(byte* name)

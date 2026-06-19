@@ -91,11 +91,12 @@ internal sealed unsafe class MetalContext : IGraphicsContext
         }
     }
 
-    public MetalContextDescriptor Descriptor() => new() { Device = new NativePointer(device) };
+    public MetalContextDescriptor Descriptor() =>
+        new() { Device = NativePointer.FromBorrowedAddress(device) };
 
-    public NativePointer LayerPointer() => new(layer);
+    public NativePointer LayerPointer() => NativePointer.FromBorrowedAddress(layer);
 
-    public NativePointer DevicePointer() => new(device);
+    public NativePointer DevicePointer() => NativePointer.FromBorrowedAddress(device);
 
     public nint CreateBorrowedTexture(Viewport viewport)
     {

@@ -7,6 +7,7 @@ namespace Maplibre.Native.Tests;
 
 public sealed unsafe class NativeUtf8StringTests
 {
+    [BindingSpecTest("BND-024")]
     [Fact]
     public void RejectsEmbeddedNul()
     {
@@ -18,6 +19,8 @@ public sealed unsafe class NativeUtf8StringTests
         Assert.Contains("embedded NUL", error.Diagnostic, StringComparison.Ordinal);
     }
 
+    // Support invariant for null-terminated C string inputs: non-null strings are
+    // encoded as UTF-8 with exactly one terminator before crossing into C.
     [Fact]
     public void EncodesUtf8WithTerminatingNul()
     {
@@ -32,6 +35,8 @@ public sealed unsafe class NativeUtf8StringTests
         Assert.Equal(0, ((byte*)value.Pointer)[expected.Length]);
     }
 
+    // Support invariant for nullable C string inputs: null remains an absent
+    // pointer rather than an empty string.
     [Fact]
     public void NullStringProducesNullPointer()
     {

@@ -154,20 +154,21 @@ internal sealed unsafe partial class VulkanContext : IGraphicsContext
     public VulkanContextDescriptor Descriptor() =>
         new()
         {
-            Instance = new NativePointer(instance.Handle),
-            PhysicalDevice = new NativePointer(physicalDevice.Handle),
-            Device = new NativePointer(device.Handle),
-            Queue = new NativePointer(graphicsQueue.Handle),
+            Instance = NativePointer.FromBorrowedAddress(instance.Handle),
+            PhysicalDevice = NativePointer.FromBorrowedAddress(physicalDevice.Handle),
+            Device = NativePointer.FromBorrowedAddress(device.Handle),
+            Queue = NativePointer.FromBorrowedAddress(graphicsQueue.Handle),
             GraphicsQueueFamilyIndex = graphicsQueueFamilyIndex,
-            GetInstanceProcAddr = new NativePointer(
+            GetInstanceProcAddr = NativePointer.FromBorrowedAddress(
                 (nint)vk.GetInstanceProcAddr(instance, "vkGetInstanceProcAddr")
             ),
-            GetDeviceProcAddr = new NativePointer(
+            GetDeviceProcAddr = NativePointer.FromBorrowedAddress(
                 (nint)vk.GetDeviceProcAddr(device, "vkGetDeviceProcAddr")
             ),
         };
 
-    public NativePointer SurfacePointer() => new((nint)surface.Handle);
+    public NativePointer SurfacePointer() =>
+        NativePointer.FromBorrowedAddress((nint)surface.Handle);
 
     public Viewport ReadViewport() => window.ReadViewport();
 
