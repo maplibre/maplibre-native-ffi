@@ -23,11 +23,6 @@ impl MapOptions {
         }
     }
 
-    pub fn with_mode(mut self, mode: MapMode) -> Self {
-        self.mode = mode;
-        self
-    }
-
     fn to_native(&self) -> sys::mln_map_options {
         // SAFETY: Default constructor takes no arguments and initializes size
         // and default values for this C ABI version.
@@ -65,30 +60,6 @@ pub struct MapViewportOptions {
 }
 
 impl MapViewportOptions {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn with_north_orientation(mut self, north_orientation: NorthOrientation) -> Self {
-        self.north_orientation = Some(north_orientation);
-        self
-    }
-
-    pub fn with_constrain_mode(mut self, constrain_mode: ConstrainMode) -> Self {
-        self.constrain_mode = Some(constrain_mode);
-        self
-    }
-
-    pub fn with_viewport_mode(mut self, viewport_mode: ViewportMode) -> Self {
-        self.viewport_mode = Some(viewport_mode);
-        self
-    }
-
-    pub fn with_frustum_offset(mut self, frustum_offset: EdgeInsets) -> Self {
-        self.frustum_offset = Some(frustum_offset);
-        self
-    }
-
     fn to_native(&self) -> sys::mln_map_viewport_options {
         // SAFETY: Default constructor takes no arguments and initializes size.
         let mut raw = unsafe { sys::mln_map_viewport_options_default() };
@@ -150,40 +121,6 @@ pub struct MapTileOptions {
 }
 
 impl MapTileOptions {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn with_prefetch_zoom_delta(mut self, prefetch_zoom_delta: u32) -> Self {
-        self.prefetch_zoom_delta = Some(prefetch_zoom_delta);
-        self
-    }
-
-    pub fn with_lod_min_radius(mut self, lod_min_radius: f64) -> Self {
-        self.lod_min_radius = Some(lod_min_radius);
-        self
-    }
-
-    pub fn with_lod_scale(mut self, lod_scale: f64) -> Self {
-        self.lod_scale = Some(lod_scale);
-        self
-    }
-
-    pub fn with_lod_pitch_threshold(mut self, lod_pitch_threshold: f64) -> Self {
-        self.lod_pitch_threshold = Some(lod_pitch_threshold);
-        self
-    }
-
-    pub fn with_lod_zoom_shift(mut self, lod_zoom_shift: f64) -> Self {
-        self.lod_zoom_shift = Some(lod_zoom_shift);
-        self
-    }
-
-    pub fn with_lod_mode(mut self, lod_mode: TileLodMode) -> Self {
-        self.lod_mode = Some(lod_mode);
-        self
-    }
-
     fn to_native(&self) -> sys::mln_map_tile_options {
         // SAFETY: Default constructor takes no arguments and initializes size.
         let mut raw = unsafe { sys::mln_map_tile_options_default() };
@@ -315,7 +252,9 @@ mod tests {
 
     #[test]
     fn map_options_materializes_defaults_and_fields() {
-        let raw = map_options_to_native(&MapOptions::new(800, 600, 2.0).with_mode(MapMode::Static));
+        let mut options = MapOptions::new(800, 600, 2.0);
+        options.mode = MapMode::Static;
+        let raw = map_options_to_native(&options);
 
         assert_eq!(raw.size, std::mem::size_of::<sys::mln_map_options>() as u32);
         assert_eq!(raw.width, 800);
@@ -326,11 +265,12 @@ mod tests {
 
     #[test]
     fn viewport_options_materializes_masks_and_round_trips() {
-        let options = MapViewportOptions::new()
-            .with_north_orientation(NorthOrientation::Right)
-            .with_constrain_mode(ConstrainMode::HeightOnly)
-            .with_viewport_mode(ViewportMode::FlippedY)
-            .with_frustum_offset(EdgeInsets::new(1.0, 2.0, 3.0, 4.0));
+        let options = MapViewportOptions {
+            north_orientation: Some(NorthOrientation::Right),
+            constrain_mode: Some(ConstrainMode::HeightOnly),
+            viewport_mode: Some(ViewportMode::FlippedY),
+            frustum_offset: Some(EdgeInsets::new(1.0, 2.0, 3.0, 4.0)),
+        };
 
         let raw = map_viewport_options_to_native(&options);
 
@@ -346,13 +286,14 @@ mod tests {
 
     #[test]
     fn tile_options_materializes_masks_and_round_trips() {
-        let options = MapTileOptions::new()
-            .with_prefetch_zoom_delta(4)
-            .with_lod_min_radius(1.5)
-            .with_lod_scale(2.5)
-            .with_lod_pitch_threshold(3.5)
-            .with_lod_zoom_shift(4.5)
-            .with_lod_mode(TileLodMode::Distance);
+        let options = MapTileOptions {
+            prefetch_zoom_delta: Some(4),
+            lod_min_radius: Some(1.5),
+            lod_scale: Some(2.5),
+            lod_pitch_threshold: Some(3.5),
+            lod_zoom_shift: Some(4.5),
+            lod_mode: Some(TileLodMode::Distance),
+        };
 
         let raw = map_tile_options_to_native(&options);
 

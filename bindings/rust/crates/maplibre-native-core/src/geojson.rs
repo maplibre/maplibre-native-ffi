@@ -41,11 +41,6 @@ impl Feature {
         }
     }
 
-    pub fn with_identifier(mut self, identifier: FeatureIdentifier) -> Self {
-        self.identifier = identifier;
-        self
-    }
-
     fn try_to_native(&self, depth: usize) -> Result<NativeFeature> {
         NativeFeature::new(self, depth)
     }
@@ -435,15 +430,16 @@ mod tests {
     use crate::{JsonMember, JsonValue, LatLng};
 
     #[test]
+    // Spec coverage: BND-065.
     fn feature_and_geojson_materialize_and_copy_back() {
-        let feature = Feature::new(
-            Geometry::Point(LatLng::new(1.0, 2.0)),
-            vec![
+        let feature = Feature {
+            geometry: Geometry::Point(LatLng::new(1.0, 2.0)),
+            properties: vec![
                 JsonMember::new("name", JsonValue::String("park".to_owned())),
                 JsonMember::new("name", JsonValue::String("duplicate".to_owned())),
             ],
-        )
-        .with_identifier(FeatureIdentifier::UInt(u64::MAX));
+            identifier: FeatureIdentifier::UInt(u64::MAX),
+        };
         let geojson = GeoJson::FeatureCollection(vec![feature.clone()]);
 
         let native_feature = feature.try_to_native(0).unwrap();
@@ -514,14 +510,14 @@ mod tests {
 
         assert_eq!(
             copied,
-            Feature::new(
-                Geometry::Point(LatLng::new(1.0, 2.0)),
-                vec![JsonMember::new(
+            Feature {
+                geometry: Geometry::Point(LatLng::new(1.0, 2.0)),
+                properties: vec![JsonMember::new(
                     "name",
                     JsonValue::String("park".to_owned())
-                )]
-            )
-            .with_identifier(FeatureIdentifier::String("id-1".to_owned()))
+                )],
+                identifier: FeatureIdentifier::String("id-1".to_owned()),
+            }
         );
     }
 
@@ -549,8 +545,11 @@ mod tests {
 
     #[test]
     fn geojson_rejects_non_finite_feature_identifier_before_calling_c() {
-        let feature = Feature::new(Geometry::Empty, Vec::new())
-            .with_identifier(FeatureIdentifier::Double(f64::INFINITY));
+        let feature = Feature {
+            geometry: Geometry::Empty,
+            properties: Vec::new(),
+            identifier: FeatureIdentifier::Double(f64::INFINITY),
+        };
 
         let error = feature.try_to_native(0).err().unwrap();
 

@@ -20,19 +20,26 @@ fn object_member<'a>(value: &'a JsonValue, key: &str) -> Option<&'a JsonValue> {
         .map(|member| &member.value)
 }
 
+fn assert_lat_lng_close(actual: LatLng, expected: LatLng) {
+    assert!((actual.latitude - expected.latitude).abs() < 1e-7);
+    assert!((actual.longitude - expected.longitude).abs() < 1e-7);
+}
+
 #[test]
+// Spec coverage: BND-040 and BND-100.
 fn map_close_consumes_handle_and_drop_stays_idempotent() {
-    let runtime = RuntimeHandle::new().unwrap();
-    let map = MapHandle::new(&runtime).unwrap();
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
 
     map.close().unwrap();
     runtime.close().unwrap();
 }
 
 #[test]
+// Spec coverage: BND-042.
 fn map_retains_runtime_after_runtime_handle_is_dropped() {
-    let runtime = RuntimeHandle::new().unwrap();
-    let map = MapHandle::new(&runtime).unwrap();
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
 
     drop(runtime);
 
@@ -40,9 +47,10 @@ fn map_retains_runtime_after_runtime_handle_is_dropped() {
 }
 
 #[test]
+// Spec coverage: BND-024, BND-101, and BND-105.
 fn style_setters_accept_valid_input_and_reject_embedded_nul() {
-    let runtime = RuntimeHandle::new().unwrap();
-    let map = MapHandle::new(&runtime).unwrap();
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
 
     map.set_style_json(VALID_STYLE_JSON).unwrap();
     let _ = map.style_source_ids().unwrap();
@@ -65,11 +73,8 @@ fn style_setters_accept_valid_input_and_reject_embedded_nul() {
     assert!(error.diagnostic().contains("embedded NUL"));
 
     let error = map.set_style_json("{").unwrap_err();
-    assert!(matches!(
-        error.kind(),
-        ErrorKind::InvalidArgument | ErrorKind::NativeError
-    ));
-    assert!(error.raw_status().is_some());
+    assert_eq!(error.kind(), ErrorKind::NativeError);
+    assert_eq!(error.raw_status(), Some(sys::MLN_STATUS_NATIVE_ERROR));
     assert!(!error.diagnostic().trim().is_empty());
 
     map.close().unwrap();
@@ -77,9 +82,10 @@ fn style_setters_accept_valid_input_and_reject_embedded_nul() {
 }
 
 #[test]
+// Spec coverage: BND-105.
 fn style_source_exists_and_remove_call_real_c_api() {
-    let runtime = RuntimeHandle::new().unwrap();
-    let map = MapHandle::new(&runtime).unwrap();
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
     map.set_style_json(VALID_STYLE_JSON).unwrap();
 
     let source = JsonValue::Object(vec![
@@ -111,24 +117,46 @@ fn test_style_image(data: Vec<u8>) -> PremultipliedRgba8Image {
 }
 
 #[test]
+// Spec coverage: BND-069 and BND-105.
 fn style_image_copy_uses_rust_owned_buffer() {
-    let runtime = RuntimeHandle::new().unwrap();
-    let map = MapHandle::new(&runtime).unwrap();
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
     map.set_style_json(VALID_STYLE_JSON).unwrap();
 
-    let image = test_style_image(vec![
+    let original_pixels = vec![
         255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255, 255, 255, 255, 255,
-    ]);
+    ];
+    let mut image = test_style_image(original_pixels.clone());
 
     map.set_style_image("plain", &image, None).unwrap();
-    let copied = map
+    image.data.fill(0);
+    assert!(map.style_image_exists("plain").unwrap());
+    let info = map
+        .style_image_info("plain")
+        .unwrap()
+        .expect("added image should have copied metadata");
+    assert_eq!(info.width, image.info.width);
+    assert_eq!(info.height, image.info.height);
+    let mut copied = map
         .copy_style_image_premultiplied_rgba8("plain")
         .unwrap()
         .expect("added Rust image should copy back through C");
 
     assert_eq!(copied.image.info.width, image.info.width);
     assert_eq!(copied.image.info.height, image.info.height);
-    assert_eq!(copied.image.data, image.data);
+    assert_eq!(copied.image.data, original_pixels);
+    copied.image.data.fill(1);
+    assert_eq!(
+        map.copy_style_image_premultiplied_rgba8("plain")
+            .unwrap()
+            .expect("style image copy should not expose native storage")
+            .image
+            .data,
+        original_pixels
+    );
+    assert!(map.remove_style_image("plain").unwrap());
+    assert!(!map.style_image_exists("plain").unwrap());
+    assert!(!map.remove_style_image("plain").unwrap());
 }
 
 fn image_source_coordinates() -> [LatLng; 4] {
@@ -141,9 +169,10 @@ fn image_source_coordinates() -> [LatLng; 4] {
 }
 
 #[test]
+// Spec coverage: BND-105.
 fn image_source_helpers_accept_url_and_inline_images() {
-    let runtime = RuntimeHandle::new().unwrap();
-    let map = MapHandle::new(&runtime).unwrap();
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
     map.set_style_json(VALID_STYLE_JSON).unwrap();
 
     let coordinates = image_source_coordinates();
@@ -164,9 +193,10 @@ fn image_source_helpers_accept_url_and_inline_images() {
 }
 
 #[test]
+// Spec coverage: BND-105.
 fn tile_source_helpers_call_real_c_api() {
-    let runtime = RuntimeHandle::new().unwrap();
-    let map = MapHandle::new(&runtime).unwrap();
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
     map.set_style_json(VALID_STYLE_JSON).unwrap();
 
     map.add_vector_source_url("vector-url", "https://example.com/vector.json", None)
@@ -176,8 +206,8 @@ fn tile_source_helpers_call_real_c_api() {
         Some(SourceType::Vector)
     );
 
-    let dem_options =
-        TileSourceOptions::new().with_raster_dem_encoding(RasterDemEncoding::Terrarium);
+    let mut dem_options = TileSourceOptions::default();
+    dem_options.raster_dem_encoding = Some(RasterDemEncoding::Terrarium);
     map.add_raster_dem_source_tiles(
         "dem-tiles",
         &["https://example.com/dem/{z}/{x}/{y}.png"],
@@ -191,9 +221,10 @@ fn tile_source_helpers_call_real_c_api() {
 }
 
 #[test]
+// Spec coverage: BND-105.
 fn style_source_type_and_info_call_real_c_api() {
-    let runtime = RuntimeHandle::new().unwrap();
-    let map = MapHandle::new(&runtime).unwrap();
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
     map.set_style_json(VALID_STYLE_JSON).unwrap();
 
     let geojson_source = JsonValue::Object(vec![
@@ -250,24 +281,22 @@ fn style_source_type_and_info_call_real_c_api() {
 }
 
 #[test]
+// Spec coverage: BND-124.
 fn custom_geometry_source_apis_call_real_c_api_and_style_replacement_releases_state() {
-    let runtime = RuntimeHandle::new().unwrap();
-    let map = MapHandle::new(&runtime).unwrap();
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
     map.set_style_json(VALID_STYLE_JSON).unwrap();
 
-    map.add_custom_geometry_source(
-        "custom",
-        CustomGeometrySourceOptions::new(|_| {})
-            .with_cancel_tile(|_| {})
-            .with_min_zoom(0.0)
-            .with_max_zoom(2.0)
-            .with_tolerance(0.375)
-            .with_tile_size(512)
-            .with_buffer(64)
-            .with_clip(true)
-            .with_wrap(false),
-    )
-    .unwrap();
+    let mut custom_options = CustomGeometrySourceOptions::new(|_| {}).with_cancel_tile(|_| {});
+    custom_options.min_zoom = Some(0.0);
+    custom_options.max_zoom = Some(2.0);
+    custom_options.tolerance = Some(0.375);
+    custom_options.tile_size = Some(512);
+    custom_options.buffer = Some(64);
+    custom_options.clip = Some(true);
+    custom_options.wrap = Some(false);
+    map.add_custom_geometry_source("custom", custom_options)
+        .unwrap();
     assert_eq!(map.custom_geometry_source_count_for_testing(), 1);
 
     let tile_id = CanonicalTileId::new(0, 0, 0);
@@ -301,9 +330,10 @@ fn custom_geometry_source_apis_call_real_c_api_and_style_replacement_releases_st
 }
 
 #[test]
+// Spec coverage: BND-124.
 fn custom_geometry_source_state_is_released_on_map_close() {
-    let runtime = RuntimeHandle::new().unwrap();
-    let map = MapHandle::new(&runtime).unwrap();
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
     map.set_style_json(VALID_STYLE_JSON).unwrap();
     map.add_custom_geometry_source("custom", CustomGeometrySourceOptions::new(|_| {}))
         .unwrap();
@@ -314,9 +344,10 @@ fn custom_geometry_source_state_is_released_on_map_close() {
 }
 
 #[test]
+// Spec coverage: BND-124.
 fn custom_geometry_source_state_ignores_stale_style_loaded_events() {
-    let runtime = RuntimeHandle::new().unwrap();
-    let map = MapHandle::new(&runtime).unwrap();
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
     map.set_style_json(VALID_STYLE_JSON).unwrap();
     map.add_custom_geometry_source("custom", CustomGeometrySourceOptions::new(|_| {}))
         .unwrap();
@@ -333,9 +364,10 @@ fn custom_geometry_source_state_ignores_stale_style_loaded_events() {
 }
 
 #[test]
+// Spec coverage: BND-124.
 fn custom_geometry_source_state_releases_detached_sources_on_style_loaded_event() {
-    let runtime = RuntimeHandle::new().unwrap();
-    let map = MapHandle::new(&runtime).unwrap();
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
     map.set_style_json(VALID_STYLE_JSON).unwrap();
     map.add_custom_geometry_source("custom", CustomGeometrySourceOptions::new(|_| {}))
         .unwrap();
@@ -364,9 +396,10 @@ fn custom_geometry_source_state_releases_detached_sources_on_style_loaded_event(
 }
 
 #[test]
+// Spec coverage: BND-124.
 fn custom_geometry_source_adds_to_current_style_after_url_style_request() {
-    let runtime = RuntimeHandle::new().unwrap();
-    let map = MapHandle::new(&runtime).unwrap();
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
     map.set_style_json(VALID_STYLE_JSON).unwrap();
     map.set_style_url("unsupported://style.json").unwrap();
 
@@ -379,8 +412,9 @@ fn custom_geometry_source_adds_to_current_style_after_url_style_request() {
 }
 
 #[test]
+// Spec coverage: BND-124.
 fn custom_geometry_source_state_releases_after_url_style_replacement() {
-    let runtime = RuntimeHandle::new().unwrap();
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
     runtime
         .set_resource_provider(|request, handle| {
             if request.url == "custom://style.json" {
@@ -392,7 +426,7 @@ fn custom_geometry_source_state_releases_after_url_style_replacement() {
             ResourceProviderDecision::PassThrough
         })
         .unwrap();
-    let map = MapHandle::new(&runtime).unwrap();
+    let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
     map.set_style_json(VALID_STYLE_JSON).unwrap();
     map.add_custom_geometry_source("custom", CustomGeometrySourceOptions::new(|_| {}))
         .unwrap();
@@ -428,10 +462,11 @@ fn wait_for_map_event(runtime: &RuntimeHandle, map: &MapHandle, event_type: Runt
 }
 
 #[test]
+// Spec coverage: BND-063, BND-064, and BND-105.
 fn style_json_descriptors_copy_owned_rust_values() {
-    let runtime = RuntimeHandle::new().unwrap();
-    let map = MapHandle::new(&runtime).unwrap();
-    map.set_style_json(VALID_STYLE_JSON).unwrap();
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
+    map.set_style_json(STYLE_WITH_IDS_JSON).unwrap();
 
     let layer = JsonValue::Object(vec![
         JsonMember::new("id", JsonValue::String("owned-background".to_owned())),
@@ -460,6 +495,31 @@ fn style_json_descriptors_copy_owned_rust_values() {
         Some(&JsonValue::Double(0.5))
     );
 
+    map.set_layer_property(
+        "owned-background",
+        "background-opacity",
+        &JsonValue::Double(0.75),
+    )
+    .unwrap();
+    assert_eq!(
+        map.layer_property("owned-background", "background-opacity")
+            .unwrap(),
+        Some(JsonValue::Double(0.75))
+    );
+
+    let filter = JsonValue::Array(vec![
+        JsonValue::String("==".to_owned()),
+        JsonValue::Array(vec![
+            JsonValue::String("get".to_owned()),
+            JsonValue::String("kind".to_owned()),
+        ]),
+        JsonValue::String("park".to_owned()),
+    ]);
+    map.set_layer_filter("geo-fill", Some(&filter)).unwrap();
+    assert_eq!(map.layer_filter("geo-fill").unwrap(), Some(filter.clone()));
+    map.set_layer_filter("geo-fill", None).unwrap();
+    assert_eq!(map.layer_filter("geo-fill").unwrap(), None);
+
     let error = map
         .set_layer_filter("owned-background", Some(&JsonValue::Double(f64::NAN)))
         .unwrap_err();
@@ -471,20 +531,49 @@ fn style_json_descriptors_copy_owned_rust_values() {
 }
 
 #[test]
+// Spec coverage: BND-102 and BND-103.
 fn camera_jump_and_coordinate_conversions_round_trip() {
-    let runtime = RuntimeHandle::new().unwrap();
-    let map = RuntimeHandle::create_map_with_options(
-        &runtime,
-        &MapOptions::new(512, 512, 1.0).with_mode(MapMode::Continuous),
-    )
-    .unwrap();
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let mut options = MapOptions::new(512, 512, 1.0);
+    options.mode = MapMode::Continuous;
+    let map = MapHandle::with_options(&runtime, &options).unwrap();
     let center = LatLng::new(45.0, -122.0);
+    let eased_center = LatLng::new(46.0, -123.0);
+    let flown_center = LatLng::new(47.0, -124.0);
 
-    map.jump_to(&CameraOptions::new().with_center(center).with_zoom(4.0))
-        .unwrap();
+    let mut jump_camera = CameraOptions::default();
+    jump_camera.center = Some(center);
+    jump_camera.zoom = Some(4.0);
+    map.jump_to(&jump_camera).unwrap();
     let camera = map.camera().unwrap();
     assert_eq!(camera.center, Some(center));
     assert_eq!(camera.zoom, Some(4.0));
+
+    let mut immediate = AnimationOptions::default();
+    immediate.duration_ms = Some(0.0);
+    let mut ease_camera = CameraOptions::default();
+    ease_camera.center = Some(eased_center);
+    ease_camera.zoom = Some(5.0);
+    map.ease_to(&ease_camera, Some(&immediate)).unwrap();
+    let camera = map.camera().unwrap();
+    assert_lat_lng_close(camera.center.unwrap(), eased_center);
+    assert_eq!(camera.zoom, Some(5.0));
+
+    let mut fly_camera = CameraOptions::default();
+    fly_camera.center = Some(flown_center);
+    fly_camera.zoom = Some(6.0);
+    map.fly_to(&fly_camera, Some(&immediate)).unwrap();
+    let camera = map.camera().unwrap();
+    assert_lat_lng_close(camera.center.unwrap(), flown_center);
+    assert_eq!(camera.zoom, Some(6.0));
+
+    let mut cancel_camera = CameraOptions::default();
+    cancel_camera.center = Some(center);
+    let mut cancel_animation = AnimationOptions::default();
+    cancel_animation.duration_ms = Some(1000.0);
+    map.ease_to(&cancel_camera, Some(&cancel_animation))
+        .unwrap();
+    map.cancel_transitions().unwrap();
 
     let point = map.pixel_for_lat_lng(center).unwrap();
     let round_tripped = map.lat_lng_for_pixel(point).unwrap();
@@ -502,10 +591,12 @@ fn camera_jump_and_coordinate_conversions_round_trip() {
 }
 
 #[test]
+// Spec coverage: BND-104.
 fn empty_coordinate_slice_is_rejected_before_calling_c() {
-    let runtime = RuntimeHandle::new().unwrap();
-    let map = MapHandle::new(&runtime).unwrap();
-    let fit = CameraFitOptions::new().with_padding(EdgeInsets::new(1.0, 1.0, 1.0, 1.0));
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
+    let mut fit = CameraFitOptions::default();
+    fit.padding = Some(EdgeInsets::new(1.0, 1.0, 1.0, 1.0));
 
     let error = map.camera_for_lat_lngs(&[], Some(&fit)).unwrap_err();
 
@@ -518,14 +609,15 @@ fn empty_coordinate_slice_is_rejected_before_calling_c() {
 }
 
 #[test]
+// Spec coverage: BND-102.
 fn projection_mode_round_trips_through_real_c_api() {
-    let runtime = RuntimeHandle::new().unwrap();
-    let map = MapHandle::new(&runtime).unwrap();
+    let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
+    let map = MapHandle::with_options(&runtime, &MapOptions::default()).unwrap();
 
-    let projection_mode = ProjectionMode::new()
-        .with_axonometric(false)
-        .with_x_skew(0.0)
-        .with_y_skew(0.0);
+    let mut projection_mode = ProjectionMode::default();
+    projection_mode.axonometric = Some(false);
+    projection_mode.x_skew = Some(0.0);
+    projection_mode.y_skew = Some(0.0);
     map.set_projection_mode(&projection_mode).unwrap();
     let copied_projection_mode = map.projection_mode().unwrap();
 

@@ -623,28 +623,28 @@ that a real native failure would expose.
 
 ### Runtime and events
 
-| ID      | Test                                                                                                                         |
-| ------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| BND-080 | `run_once` drives native event processing through the public runtime API, and repeated event polling reaches an empty queue. |
-| BND-081 | Map style loading returns the expected copied map event through polling and identifies the correct public map identity.      |
-| BND-082 | Event message and payload data remain valid after the next event poll.                                                       |
-| BND-083 | Unknown event or payload domains preserve raw values and copied bytes when the C API exposes those bytes.                    |
-| BND-084 | Offline operation completion returns copied result data and leaves failed take-result handles retryable.                     |
-| BND-085 | Offline region observation returns copied status/error events through the public runtime event model.                        |
-| BND-086 | A map-originated event with no provable live public map exposes no public map handle or borrowed native pointer.             |
-| BND-087 | Known typed event payloads validate native payload size before reading payload fields.                                       |
+| ID      | Test                                                                                                                                                                |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| BND-080 | `run_once` drives native event processing through the public runtime API, and repeated event polling reaches an empty queue.                                        |
+| BND-081 | Map style loading returns the expected copied map event through polling and identifies the correct public map identity.                                             |
+| BND-082 | Event message and payload data remain valid after the next event poll.                                                                                              |
+| BND-083 | Unknown event or payload domains preserve raw values and copied bytes when the C API exposes those bytes.                                                           |
+| BND-084 | Offline operation completion returns copied result data. Native take-result status failures before result ownership transfers leave the operation handle retryable. |
+| BND-085 | Offline region observation returns copied status/error events through the public runtime event model.                                                               |
+| BND-086 | A map-originated event with no provable live public map exposes no public map handle or borrowed native pointer.                                                    |
+| BND-087 | Known typed event payloads validate native payload size before reading payload fields.                                                                              |
 
 ### Map, camera, projection, style, and query
 
-| ID      | Test                                                                                                                                |
-| ------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| BND-100 | Map creation applies public map options, extent, and mode, then releases through the runtime parent relationship.                   |
-| BND-101 | Style URL and style JSON loading succeed through public map APIs and return copied style-loaded events through polling.             |
-| BND-102 | Camera set/get, animated camera commands, and transition cancellation produce the expected native camera state and statuses.        |
-| BND-103 | Projection helpers round-trip screen, lat/lng, and projected-meter values through copied public values within documented tolerance. |
-| BND-104 | Representative invalid map and projection inputs propagate native invalid-argument diagnostics through the public error shape.      |
-| BND-105 | Style source, layer, image, and feature-state workflows add, update, query/list, and remove public input values and copied IDs.     |
-| BND-106 | Query workflows return copied feature geometry, properties, feature state, source/layer identifiers, and unknown IDs.               |
+| ID      | Test                                                                                                                                   |
+| ------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| BND-100 | Map creation applies public map options, extent, and mode, then releases through the runtime parent relationship.                      |
+| BND-101 | Style URL and style JSON loading succeed through public map APIs and return copied style-loaded events through polling.                |
+| BND-102 | Camera set/get, animated camera commands, and transition cancellation produce the expected native camera state and statuses.           |
+| BND-103 | Projection helpers round-trip screen, lat/lng, and projected-meter values through copied public values within documented tolerance.    |
+| BND-104 | Representative invalid map and projection inputs propagate native invalid-argument diagnostics through the public error shape.         |
+| BND-105 | Style source, layer, image, and feature-state workflows add, update, query/list, and remove public input values and copied IDs.        |
+| BND-106 | Query workflows return copied feature geometry, properties, feature identifiers, feature state, and optional source/layer identifiers. |
 
 ### Logging and callbacks
 
@@ -691,7 +691,7 @@ that a real native failure would expose.
 | BND-169 | Failed frame release leaves the frame live and a later successful release closes it.                                                                      |
 | BND-170 | Nested frame acquisition and every exposed session operation forbidden during an active frame fail while a frame is active.                               |
 | BND-171 | Caller-owned texture descriptors do not release or mutate caller-owned backend handles during session close.                                              |
-| BND-172 | Wrapper construction failure after native frame acquisition releases the native frame.                                                                    |
+| BND-172 | Bindings with fallible owned-frame wrapper construction release the native frame when construction fails after native frame acquisition.                  |
 | BND-173 | Stale frame handles cannot expose backend handles after release or reuse.                                                                                 |
 
 ### Conditional tests

@@ -54,11 +54,6 @@ impl super::RenderSessionHandle {
         )
     }
 
-    /// Copies per-feature state from a render source in this session.
-    pub fn feature_state(&self, selector: &FeatureStateSelector) -> Result<JsonValue> {
-        self.get_feature_state(selector)
-    }
-
     /// Removes per-feature state selected for this session.
     pub fn remove_feature_state(&self, selector: &FeatureStateSelector) -> Result<()> {
         self.inner.ensure_no_frame_acquired()?;

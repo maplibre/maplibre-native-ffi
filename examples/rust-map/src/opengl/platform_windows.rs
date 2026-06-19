@@ -32,7 +32,7 @@ impl OpenGLPlatformContext {
         let RawContext::Wgl(raw_context) = context.raw_context() else {
             return Err("glutin did not create a WGL context".into());
         };
-        Ok(OpenGLContextDescriptor::wgl(WglContextDescriptor::new(
+        Ok(OpenGLContextDescriptor::Wgl(WglContextDescriptor::new(
             unsafe { NativePointer::from_ptr(self.hdc) },
             unsafe { NativePointer::from_ptr(raw_context.cast_mut()) },
         )))
