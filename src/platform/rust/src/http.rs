@@ -208,6 +208,10 @@ fn is_https_url(url: &str) -> bool {
 }
 
 fn redirect_url(current_url: &str, location: &str) -> Option<String> {
+    if location.is_empty() {
+        return Some(current_url.to_owned());
+    }
+
     if location
         .get(..7)
         .is_some_and(|url| url.eq_ignore_ascii_case("http://"))
@@ -234,6 +238,16 @@ fn redirect_url(current_url: &str, location: &str) -> Option<String> {
         return Some(format!("{origin}{location}"));
     }
 
+    if location.starts_with('?') {
+        let path_end = current_url.find(['?', '#']).unwrap_or(current_url.len());
+        return Some(format!("{}{location}", &current_url[..path_end]));
+    }
+
+    if location.starts_with('#') {
+        let fragment_start = current_url.find('#').unwrap_or(current_url.len());
+        return Some(format!("{}{location}", &current_url[..fragment_start]));
+    }
+
     let path_end = current_url.find(['?', '#']).unwrap_or(current_url.len());
     let path = &current_url[..path_end];
     let directory = path
@@ -248,7 +262,8 @@ fn redirect_url(current_url: &str, location: &str) -> Option<String> {
 
 fn http_response(response: minreq::Response) -> MlnRustHttpResponse {
     let status_code = response.status_code;
-    if let Some(encoding) = response.header("content-encoding")
+    if (status_code == 200 || status_code == 206)
+        && let Some(encoding) = response.header("content-encoding")
         && !encoding.eq_ignore_ascii_case("identity")
     {
         return http_error(

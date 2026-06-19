@@ -65,6 +65,20 @@ fn init_tls_verifier(jni_env: *mut c_void, context: *mut c_void) -> Result<(), S
     let mut env = unsafe { jni::JNIEnv::from_raw(jni_env as *mut jni::sys::JNIEnv) }
         .map_err(|error| error.to_string())?;
     let context = unsafe { jni::objects::JObject::from_raw(context as jni::sys::jobject) };
+    let application_context = env
+        .call_method(
+            &context,
+            "getApplicationContext",
+            "()Landroid/content/Context;",
+            &[],
+        )
+        .and_then(|value| value.l())
+        .map_err(|error| error.to_string())?;
+    let context = if application_context.is_null() {
+        context
+    } else {
+        application_context
+    };
 
     rustls_platform_verifier::android::init_with_env(&mut env, context)
         .map_err(|error| error.to_string())

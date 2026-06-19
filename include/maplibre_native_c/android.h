@@ -20,9 +20,10 @@ extern "C" {
  * rustls-platform-verifier Android component in the APK or AAB.
  *
  * `jni_env` must be a `JNIEnv*` valid for the calling thread. `context` must be
- * an Android `android.content.Context` object. Both pointers are borrowed for
- * the duration of the call; the implementation stores its own global
- * references when initialization succeeds.
+ * an Android `android.content.Context` object. Any Context subtype may be
+ * passed; the implementation resolves and stores the process application
+ * context when initialization succeeds. Both pointers are borrowed for the
+ * duration of the call.
  *
  * May be called from any thread that is attached to the JVM.
  *
