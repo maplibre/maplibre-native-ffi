@@ -1,4 +1,5 @@
 #include <array>
+#include <cmath>
 #include <string>
 
 #include <mbgl/platform/thread.hpp>
@@ -38,7 +39,7 @@ void makeThreadLowPriority() {
 }
 
 void setCurrentThreadPriority(double priority) {
-  if (priority < -20 || priority > 19) {
+  if (!std::isfinite(priority) || priority < -20 || priority > 19) {
     Log::Warning(Event::General, "Couldn't set thread priority");
     return;
   }

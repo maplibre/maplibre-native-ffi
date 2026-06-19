@@ -1,7 +1,11 @@
 use std::ffi::CString;
+use std::io::Cursor;
 use std::os::raw::c_char;
 use std::ptr;
 use std::slice;
+
+const MAX_IMAGE_DIMENSION: u32 = 16_384;
+const MAX_IMAGE_ALLOC_BYTES: u64 = 512 * 1024 * 1024;
 
 #[repr(C)]
 pub struct MlnRustDecodedImage {
@@ -51,7 +55,16 @@ pub unsafe extern "C" fn mln_rust_decoded_image_free(image: MlnRustDecodedImage)
 }
 
 fn decode_image(encoded: &[u8]) -> Result<MlnRustDecodedImage, String> {
-    let image = image::load_from_memory(encoded).map_err(|error| error.to_string())?;
+    let mut reader = image::ImageReader::new(Cursor::new(encoded))
+        .with_guessed_format()
+        .map_err(|error| error.to_string())?;
+    let mut limits = image::Limits::default();
+    limits.max_image_width = Some(MAX_IMAGE_DIMENSION);
+    limits.max_image_height = Some(MAX_IMAGE_DIMENSION);
+    limits.max_alloc = Some(MAX_IMAGE_ALLOC_BYTES);
+    reader.limits(limits);
+
+    let image = reader.decode().map_err(|error| error.to_string())?;
     let rgba = image.to_rgba8();
     let (width, height) = rgba.dimensions();
     let mut data = rgba.into_raw();
