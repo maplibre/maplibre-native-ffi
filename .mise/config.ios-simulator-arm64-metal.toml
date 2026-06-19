@@ -1,7 +1,7 @@
 [env]
 MLN_FFI_RENDER_BACKEND = "metal"
 MLN_FFI_BUILD_DIR = "{{config_root}}/build/ios-simulator-arm64-metal"
-MLN_FFI_ZIG_BUILD_ARGS = "-Dtarget=aarch64-ios-simulator -Dcmake-artifact-dir=\"{{env.MLN_FFI_BUILD_DIR}}\" -Drender-backend=metal -Dinclude-dir=\"{{env.MLN_FFI_INCLUDE_DIR}}\""
+MLN_FFI_ZIG_BUILD_ARGS = "-Dtarget=aarch64-ios-simulator"
 MLN_FFI_CMAKE_ARGS = """
 -DCMAKE_SYSTEM_NAME=iOS
 -DCMAKE_OSX_SYSROOT=iphonesimulator

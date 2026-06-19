@@ -5,7 +5,7 @@ const zigglgen = @import("zigglgen");
 const BuildOptions = struct {
     target: std.Build.ResolvedTarget,
     optimize: std.builtin.OptimizeMode,
-    cmake_artifact_dir: std.Build.LazyPath,
+    native_metadata_path: std.Build.LazyPath,
     include_dirs: []const std.Build.LazyPath,
     dependency_library_dirs: []const std.Build.LazyPath,
     render_backend: maplibre_build.RenderBackend,
@@ -15,10 +15,7 @@ fn maplibreNativeModule(b: *std.Build, options: BuildOptions) *std.Build.Module 
     return maplibre_build.maplibreNativeModule(b, .{
         .target = options.target,
         .optimize = options.optimize,
-        .cmake_artifact_dir = options.cmake_artifact_dir,
-        .include_dirs = options.include_dirs,
-        .render_backend = options.render_backend,
-        .dependency_library_dirs = options.dependency_library_dirs,
+        .native_metadata_path = options.native_metadata_path,
     });
 }
 
@@ -88,7 +85,7 @@ pub fn build(b: *std.Build) void {
     const options = BuildOptions{
         .target = target,
         .optimize = b.standardOptimizeOption(.{}),
-        .cmake_artifact_dir = maplibre_build.cmakeArtifactDir(b),
+        .native_metadata_path = maplibre_build.nativeMetadataPath(b),
         .include_dirs = maplibre_build.includeDirs(b),
         .dependency_library_dirs = maplibre_build.dependencyLibraryDirs(b),
         .render_backend = render_backend,

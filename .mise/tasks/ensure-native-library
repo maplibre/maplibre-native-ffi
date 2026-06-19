@@ -13,16 +13,16 @@ def validate_metadata(metadata_path: str) -> int:
     with open(metadata_path, encoding="utf-8") as metadata_file:
         metadata = json.load(metadata_file)
 
-    core_library_path = metadata.get("core_library_path")
-    if not core_library_path:
-        print(f"{metadata_path} is missing core_library_path", file=sys.stderr)
+    library_path = metadata.get("library_path")
+    if not library_path:
+        print(f"{metadata_path} is missing library_path", file=sys.stderr)
         return 1
-    if not os.path.isfile(core_library_path):
-        print(f"missing native core library: {core_library_path}", file=sys.stderr)
+    if not os.path.isfile(library_path):
+        print(f"missing native library: {library_path}", file=sys.stderr)
         return 1
 
-    import_library_path = metadata.get("windows_import_library_path")
-    if import_library_path and import_library_path != core_library_path:
+    import_library_path = metadata.get("import_library_path")
+    if import_library_path and import_library_path != library_path:
         if not os.path.isfile(import_library_path):
             print(f"missing Windows import library: {import_library_path}", file=sys.stderr)
             return 1
