@@ -28,3 +28,8 @@
   libpng/jpeg/webp dependencies.
 - Replaced the Android image stub with a C++ bridge to Rust decode output; Rust
   returns RGBA bytes, C++ copies them into `PremultipliedImage`.
+- Replaced the Android HTTP stub with a Rust-backed asynchronous
+  `HTTPFileSource` bridge using `minreq` + Rustls. C++ maps headers, cache
+  metadata, status codes, cancellation, and response delivery back to MapLibre
+  `Response`.
+- Renamed Android platform files from `*_stub.cpp` to implementation names.

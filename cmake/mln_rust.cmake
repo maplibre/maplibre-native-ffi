@@ -15,6 +15,7 @@ function(mln_link_rust_platform target)
 
   string(TOUPPER "${rust_target}" rust_target_env)
   string(REPLACE "-" "_" rust_target_env "${rust_target_env}")
+  string(TOLOWER "${rust_target_env}" rust_target_env_lower)
 
   add_custom_command(
     OUTPUT "${rust_library}"
@@ -22,6 +23,12 @@ function(mln_link_rust_platform target)
       ${CMAKE_COMMAND}
       -E
       env
+      "CC_${rust_target_env}=${CMAKE_C_COMPILER}"
+      "CXX_${rust_target_env}=${CMAKE_CXX_COMPILER}"
+      "AR_${rust_target_env}=${CMAKE_AR}"
+      "CC_${rust_target_env_lower}=${CMAKE_C_COMPILER}"
+      "CXX_${rust_target_env_lower}=${CMAKE_CXX_COMPILER}"
+      "AR_${rust_target_env_lower}=${CMAKE_AR}"
       "CARGO_TARGET_${rust_target_env}_LINKER=${CMAKE_CXX_COMPILER}"
       "CARGO_TARGET_${rust_target_env}_AR=${CMAKE_AR}"
       "${CARGO_EXECUTABLE}"

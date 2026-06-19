@@ -23,8 +23,8 @@ function(mln_configure_android_platform target)
     ${MLN_SOURCE_DIR}/platform/default/src/mbgl/util/timer.cpp)
 
   set(MLN_FFI_ANDROID_SOURCES
-      ${PROJECT_SOURCE_DIR}/src/platform/android/http_file_source_stub.cpp
-      ${PROJECT_SOURCE_DIR}/src/platform/android/image_stub.cpp
+      ${PROJECT_SOURCE_DIR}/src/platform/android/http_file_source.cpp
+      ${PROJECT_SOURCE_DIR}/src/platform/android/image.cpp
       ${PROJECT_SOURCE_DIR}/src/platform/android/thread.cpp)
 
   mln_target_vendor_sources(${target} ${MLN_FFI_VENDOR_ANDROID_SOURCES})
