@@ -30,41 +30,12 @@ if [[ "$state" != "Booted" ]]; then
   xcrun simctl bootstatus "$device" -b
 fi
 
-timeout_seconds() {
-  local timeout=$1
-  case "$timeout" in
-    *ms)
-      local milliseconds=${timeout%ms}
-      [[ "$milliseconds" =~ ^[0-9]+$ ]] || return 1
-      echo $(((milliseconds + 999) / 1000))
-      ;;
-    *s)
-      local seconds=${timeout%s}
-      [[ "$seconds" =~ ^[0-9]+$ ]] || return 1
-      echo "$seconds"
-      ;;
-    *m)
-      local minutes=${timeout%m}
-      [[ "$minutes" =~ ^[0-9]+$ ]] || return 1
-      echo $((minutes * 60))
-      ;;
-    *h)
-      local hours=${timeout%h}
-      [[ "$hours" =~ ^[0-9]+$ ]] || return 1
-      echo $((hours * 3600))
-      ;;
-    *)
-      [[ "$timeout" =~ ^[0-9]+$ ]] || return 1
-      echo "$timeout"
-      ;;
-  esac
-}
-
 if [[ -n "${MLN_FFI_TEST_TIMEOUT:-}" ]]; then
-  if ! seconds=$(timeout_seconds "$MLN_FFI_TEST_TIMEOUT"); then
+  if [[ ! "$MLN_FFI_TEST_TIMEOUT" =~ ^[0-9]+s?$ ]]; then
     echo "Invalid MLN_FFI_TEST_TIMEOUT: $MLN_FFI_TEST_TIMEOUT" >&2
     exit 2
   fi
+  seconds=${MLN_FFI_TEST_TIMEOUT%s}
   exec perl -e 'alarm shift; exec @ARGV' "$seconds" xcrun simctl spawn "$device" "$test_executable"
 fi
 
