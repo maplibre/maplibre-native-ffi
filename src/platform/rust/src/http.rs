@@ -10,7 +10,7 @@ use std::sync::{
 
 const HTTP_WORKER_THREADS: usize = 16;
 const HTTP_REQUEST_TIMEOUT_SECONDS: u64 = 30;
-const HTTP_MAX_308_REDIRECTS: usize = 100;
+const HTTP_MAX_REDIRECTS: usize = 100;
 
 #[repr(C)]
 pub struct MlnRustHttpHeader {
@@ -155,7 +155,7 @@ fn send_http_request(request: HttpRequest) -> MlnRustHttpResponse {
         .iter()
         .any(|(name, _)| name.eq_ignore_ascii_case("accept-encoding"));
 
-    for _ in 0..=HTTP_MAX_308_REDIRECTS {
+    for _ in 0..=HTTP_MAX_REDIRECTS {
         if is_https_url(&url) && !crate::android::tls_verifier_initialized() {
             return http_error(
                 HTTP_ERROR_OTHER,
@@ -178,6 +178,9 @@ fn send_http_request(request: HttpRequest) -> MlnRustHttpResponse {
                 let Some(location) = response.header("location") else {
                     return http_error(HTTP_ERROR_OTHER, "HTTP redirect missing Location header");
                 };
+                if location.is_empty() {
+                    return http_error(HTTP_ERROR_OTHER, "HTTP redirect Location header is empty");
+                }
                 url = match redirect_url(&url, location) {
                     Some(url) => url,
                     None => {
@@ -198,7 +201,7 @@ fn send_http_request(request: HttpRequest) -> MlnRustHttpResponse {
         }
     }
 
-    http_error(HTTP_ERROR_OTHER, "too many HTTP 308 redirects")
+    http_error(HTTP_ERROR_OTHER, "too many HTTP redirects")
 }
 
 fn is_https_url(url: &str) -> bool {
@@ -211,10 +214,6 @@ fn is_redirect_status(status_code: u16) -> bool {
 }
 
 fn redirect_url(current_url: &str, location: &str) -> Option<String> {
-    if location.is_empty() {
-        return Some(current_url.to_owned());
-    }
-
     if location
         .get(..7)
         .is_some_and(|url| url.eq_ignore_ascii_case("http://"))

@@ -188,16 +188,6 @@ runs:
           echo "CMAKE_CXX_COMPILER_LAUNCHER=sccache"
         } >> "$GITHUB_ENV"
 
-    - name: Diagnose EGL setup
-      if: ${{ runner.os == 'Linux' && !contains(env.MISE_ENV, 'ohos') }}
-      shell: bash
-      run: |
-        mise exec -- bash -euo pipefail -c '
-          env | sort | grep -E "^(EGL|LIBGL|MESA|LD_LIBRARY_PATH|__EGL|MLN_FFI|VK_)" || true
-          command -v eglinfo
-          EGL_LOG_LEVEL=debug LIBGL_DEBUG=verbose LD_DEBUG=libs eglinfo || true
-        '
-
     # The mise action may restore Rust metadata without all rustup-managed
     # component files. Repair the toolchain only when rustup cannot add the
     # configured components or the component binaries still cannot run.
