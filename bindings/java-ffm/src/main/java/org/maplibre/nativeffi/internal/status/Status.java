@@ -34,10 +34,12 @@ public final class Status {
         NativeValues.nativeCode(MaplibreStatus.INVALID_STATE), typeName + " is closing");
   }
 
-  public static InvalidStateException liveChildren(String typeName, int childCount) {
+  public static InvalidStateException liveChildren(
+      String typeName, int childCount, String childSummary) {
+    var suffix = childSummary.isEmpty() ? "" : ": " + childSummary;
     return new InvalidStateException(
         NativeValues.nativeCode(MaplibreStatus.INVALID_STATE),
-        typeName + " has " + childCount + " live child handle(s)");
+        typeName + " has " + childCount + " live child handle(s)" + suffix);
   }
 
   public static String captureDiagnostic() {

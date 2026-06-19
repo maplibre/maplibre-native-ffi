@@ -2,6 +2,8 @@ package org.maplibre.nativeffi.internal.lifecycle;
 
 import java.lang.foreign.MemorySegment;
 import java.lang.ref.Cleaner;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Objects;
 import org.maplibre.nativeffi.internal.memory.MemoryUtil;
 import org.maplibre.nativeffi.internal.status.Status;
@@ -21,6 +23,7 @@ public final class HandleState {
   private boolean released;
   private boolean releasing;
   private int liveChildren;
+  private final Map<String, Integer> liveChildCounts = new LinkedHashMap<>();
 
   public HandleState(String typeName, MemorySegment handle, Object... parents) {
     this.typeName = Objects.requireNonNull(typeName, "typeName");
@@ -59,6 +62,7 @@ public final class HandleState {
       throw Status.releasing(typeName);
     }
     liveChildren++;
+    liveChildCounts.merge(childTypeName, 1, Integer::sum);
     return new ChildRetention(this, childTypeName);
   }
 
@@ -78,7 +82,7 @@ public final class HandleState {
         throw Status.releasing(typeName);
       }
       if (liveChildren > 0) {
-        throw Status.liveChildren(typeName, liveChildren);
+        throw Status.liveChildren(typeName, liveChildren, liveChildSummary());
       }
       releasing = true;
     }
@@ -105,10 +109,20 @@ public final class HandleState {
     afterSuccess.run();
   }
 
-  private synchronized void releaseChild() {
+  private synchronized String liveChildSummary() {
+    return String.join(
+        ", ",
+        liveChildCounts.entrySet().stream()
+            .map(entry -> entry.getKey() + "=" + entry.getValue())
+            .toList());
+  }
+
+  private synchronized void releaseChild(String childTypeName) {
     if (liveChildren > 0) {
       liveChildren--;
     }
+    liveChildCounts.computeIfPresent(
+        childTypeName, (ignored, count) -> count > 1 ? count - 1 : null);
   }
 
   @FunctionalInterface
@@ -118,8 +132,6 @@ public final class HandleState {
 
   public static final class ChildRetention implements AutoCloseable {
     private final HandleState parent;
-
-    @SuppressWarnings("unused")
     private final String childTypeName;
 
     private boolean released;
@@ -135,7 +147,7 @@ public final class HandleState {
         return;
       }
       released = true;
-      parent.releaseChild();
+      parent.releaseChild(childTypeName);
     }
   }
 
