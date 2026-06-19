@@ -146,9 +146,13 @@ fn copy_http_request(
 }
 
 fn send_http_request(request: HttpRequest) -> MlnRustHttpResponse {
-    // TODO(android): Integrate Android platform TLS trust policy. The current
-    // Rustls path uses bundled WebPKI roots and does not honor Android Network
-    // Security Config, user-installed CAs, or certificate pinning.
+    if !crate::android::tls_verifier_initialized() {
+        return http_error(
+            HTTP_ERROR_OTHER,
+            "Android TLS verifier is not initialized; call mln_android_init before network requests",
+        );
+    }
+
     let mut minreq = minreq::get(request.url);
     for (name, value) in request.headers {
         minreq = minreq.with_header(name, value);

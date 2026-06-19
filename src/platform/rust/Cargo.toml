@@ -10,5 +10,9 @@ crate-type = ["staticlib"]
 
 [dependencies]
 image = { version = "0.25.8", default-features = false, features = ["jpeg", "png", "webp"] }
-minreq = { version = "3.0.0", default-features = false, features = ["https-rustls"] }
+minreq = { version = "3.0.0", default-features = false, features = ["https-rustls-probe"] }
 threadpool = "1.8.1"
+
+[target.'cfg(target_os = "android")'.dependencies]
+jni = { version = "0.21.1", default-features = false }
+rustls-platform-verifier = "0.6.2"
