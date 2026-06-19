@@ -18,6 +18,7 @@ esac
   --triplet "$MLN_FFI_VCPKG_TARGET_TRIPLET" \
   --host-triplet "$MLN_FFI_VCPKG_HOST_TRIPLET" \
   --overlay-triplets="$MLN_FFI_VCPKG_OVERLAY_TRIPLETS" \
+  --overlay-ports="$MLN_FFI_VCPKG_OVERLAY_PORTS" \
   --x-install-root="$MLN_FFI_ZIG_MAP_VCPKG_INSTALLED_DIR" \
   --clean-after-build
 '''

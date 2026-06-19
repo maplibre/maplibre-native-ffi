@@ -91,6 +91,7 @@ MLN_FFI_BUILD_DIR = { required = true }
 MLN_FFI_CMAKE_BUILD_TYPE = "{{env.MLN_FFI_CMAKE_BUILD_TYPE | default(value=\"RelWithDebInfo\")}}"
 MLN_FFI_VCPKG_ROOT = "{{config_root}}/third_party/vcpkg"
 MLN_FFI_VCPKG_OVERLAY_TRIPLETS = "{{config_root}}/cmake/vcpkg/triplets"
+MLN_FFI_VCPKG_OVERLAY_PORTS = "{{config_root}}/cmake/vcpkg/ports"
 MLN_FFI_VCPKG_TARGET_TRIPLET = { required = true }
 MLN_FFI_VCPKG_HOST_TRIPLET = "{% if os() == \"macos\" and arch() == \"arm64\" %}arm64-osx{% elif os() == \"linux\" and arch() == \"arm64\" %}arm64-linux{% elif os() == \"linux\" %}x64-linux{% elif os() == \"windows\" and arch() == \"arm64\" %}arm64-windows{% elif os() == \"windows\" %}x64-windows{% else %}{{ os() }}-{{ arch() }}{% endif %}"
 MLN_FFI_VCPKG_INSTALLED_DIR = { required = true }
@@ -145,6 +146,7 @@ run = [
     -DVCPKG_HOST_TRIPLET="$MLN_FFI_VCPKG_HOST_TRIPLET"
     -DVCPKG_INSTALLED_DIR="$MLN_FFI_VCPKG_INSTALLED_DIR"
     -DVCPKG_OVERLAY_TRIPLETS="$MLN_FFI_VCPKG_OVERLAY_TRIPLETS"
+    -DVCPKG_OVERLAY_PORTS="$MLN_FFI_VCPKG_OVERLAY_PORTS"
     -DMLN_FFI_RENDER_BACKEND="$MLN_FFI_RENDER_BACKEND"
     -DMLN_FFI_OPENGL_CONTEXT_PROVIDER="$MLN_FFI_OPENGL_CONTEXT_PROVIDER"
   )
@@ -239,6 +241,7 @@ esac
   --triplet "$MLN_FFI_VCPKG_TARGET_TRIPLET" \
   --host-triplet "$MLN_FFI_VCPKG_HOST_TRIPLET" \
   --overlay-triplets="$MLN_FFI_VCPKG_OVERLAY_TRIPLETS" \
+  --overlay-ports="$MLN_FFI_VCPKG_OVERLAY_PORTS" \
   --x-install-root="$MLN_FFI_VCPKG_INSTALLED_DIR" \
   --clean-after-build
 '''
