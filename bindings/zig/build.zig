@@ -81,6 +81,15 @@ pub const CMacro = struct {
     value: ?[]const u8 = null,
 };
 
+pub fn sdlTranslateCMacros(target: std.Build.ResolvedTarget) []const CMacro {
+    if (target.result.os.tag != .windows or target.result.abi != .msvc) return &.{};
+    return &.{
+        .{ .name = "SIZE_MAX", .value = "((size_t)-1)" },
+        .{ .name = "SDL_SINT64_C(c)", .value = "c##LL" },
+        .{ .name = "SDL_UINT64_C(c)", .value = "c##ULL" },
+    };
+}
+
 pub const TranslateCModuleOptions = struct {
     root_source_file: std.Build.LazyPath,
     target: std.Build.ResolvedTarget,

@@ -21,15 +21,6 @@ fn maplibreNativeModule(b: *std.Build, options: BuildOptions) *std.Build.Module 
     });
 }
 
-fn sdlTranslateCMacros(target: std.Build.ResolvedTarget) []const maplibre_build.CMacro {
-    if (target.result.os.tag != .windows or target.result.abi != .msvc) return &.{};
-    return &.{
-        .{ .name = "SIZE_MAX", .value = "((size_t)-1)" },
-        .{ .name = "SDL_SINT64_C(c)", .value = "c##LL" },
-        .{ .name = "SDL_UINT64_C(c)", .value = "c##ULL" },
-    };
-}
-
 fn addSdlTranslateC(b: *std.Build, module: *std.Build.Module, options: BuildOptions) void {
     if (options.render_backend == .opengl and options.target.result.os.tag == .windows) {
         module.addImport("sdl", maplibre_build.translateCModule(b, .{
@@ -37,7 +28,7 @@ fn addSdlTranslateC(b: *std.Build, module: *std.Build.Module, options: BuildOpti
             .target = options.target,
             .optimize = options.optimize,
             .include_dirs = options.include_dirs,
-            .c_macros = sdlTranslateCMacros(options.target),
+            .c_macros = maplibre_build.sdlTranslateCMacros(options.target),
         }));
     }
 }
