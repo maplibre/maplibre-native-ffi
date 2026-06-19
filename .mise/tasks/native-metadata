@@ -40,8 +40,10 @@ def load_artifact(metadata_path: Path) -> Artifact:
     with metadata_path.open(encoding="utf-8") as metadata_file:
         metadata = json.load(metadata_file)
 
-    library_path = metadata["library_path"]
+    library_path = metadata.get("library_path", "")
     import_library_path = metadata.get("import_library_path") or library_path
+    require_existing_file(library_path, "native library")
+    require_existing_file(import_library_path, "Windows import library")
     library_dirs = metadata.get("library_dirs", [])
     runtime_library_dirs = unique(
         [str(Path(library_path).parent), *metadata.get("rpaths", [])]
@@ -75,6 +77,13 @@ def runtime_dirs_from_library_dirs(library_dirs: list[str]) -> list[str]:
         if sibling.is_dir():
             result.append(str(sibling))
     return result
+
+
+def require_existing_file(path: str, label: str) -> None:
+    if not path:
+        raise SystemExit(f"native metadata is missing {label}")
+    if not Path(path).is_file():
+        raise SystemExit(f"missing {label}: {path}")
 
 
 def path_list(values: list[str]) -> str:

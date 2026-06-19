@@ -138,6 +138,10 @@ build_args=(
 
 cmake "${build_args[@]}"'''
 
+[tasks.ensure-native-library]
+depends = ["//:build"]
+run = { task = "//:native-metadata" }
+
 [tasks.clean]
 run = "rm -rf \"$MLN_FFI_BUILD_DIR\""
 

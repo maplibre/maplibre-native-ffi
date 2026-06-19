@@ -7,6 +7,7 @@ run = [
 ]
 
 [tasks."api:rust"]
+depends = ["//:ensure-native-library"]
 dir = "{{env.MLN_FFI_REPO_ROOT}}"
 run = [
   "rm -rf docs/public/reference/rust",
@@ -16,6 +17,7 @@ run = [
 ]
 
 [tasks."api:java-ffm"]
+depends = ["//:ensure-native-library"]
 dir = "{{env.MLN_FFI_REPO_ROOT}}"
 run = [
   "rm -rf docs/public/reference/java-ffm",
@@ -25,6 +27,7 @@ run = [
 ]
 
 [tasks."api:java-jni"]
+depends = ["//:ensure-native-library"]
 dir = "{{env.MLN_FFI_REPO_ROOT}}"
 run = [
   "rm -rf docs/public/reference/java-jni",
@@ -34,7 +37,10 @@ run = [
 ]
 
 [tasks."api:java"]
-depends = ["api:java-ffm", "api:java-jni"]
+run = [
+  { task = "api:java-ffm" },
+  { task = "api:java-jni" },
+]
 
 [tasks."api:zig"]
 dir = "{{env.MLN_FFI_REPO_ROOT}}/bindings/zig"
@@ -45,7 +51,12 @@ zig build docs -Dinclude-dir="{{env.MLN_FFI_INCLUDE_DIR}}" --prefix ../../docs/p
 '''
 
 [tasks.api]
-depends = ["api:c", "api:rust", "api:java", "api:zig"]
+run = [
+  { task = "api:c" },
+  { task = "api:rust" },
+  { task = "api:java" },
+  { task = "api:zig" },
+]
 
 [tasks.dev]
 depends = ["api"]
