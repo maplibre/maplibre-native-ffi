@@ -31,7 +31,7 @@ profile**. Implement a mobile example by reading **Shared baseline** and
 | Style, camera, map/runtime     | [Shared defaults](#shared-defaults)                     |
 | Module layout                  | [Architecture](#architecture)                           |
 | Startup and shutdown ordering  | [Lifecycle](#lifecycle)                                 |
-| Pump and render loop           | [Frame loop](#frame-loop)                               |
+| Host loop (pump and render)    | [Frame loop](#frame-loop)                               |
 | Extent and scale               | [Viewport](#viewport)                                   |
 | Runtime, map, render session   | [Map state](#map-state)                                 |
 | All render-target modes        | [Render-target modes](#render-target-modes)             |
@@ -223,32 +223,54 @@ On host termination or fatal error, close resources in order:
 
 ### Frame loop
 
+The C API treats runtime pumping and presentation as separate concerns.
+`run_once` advances native scheduler work and fills the event queue; it is not
+display-driven. `render_update` draws only when `render_pending` is true.
+
+`*-map` examples integrate both through a **display-paced host loop** on the
+owner thread: each iteration always pumps the runtime; it renders only when
+needed.
+
+#### Host loop iteration
+
 Each iteration has two phases: pump (always) and render (only when
 `render_pending` is true).
 
-Every example MUST run one pump iteration per display refresh tick. Subscribe
-through the host toolkit's display refresh mechanism (for example swapchain
-frame callbacks, `CADisplayLink`, or `Choreographer`).
-
-#### Pump (every iteration)
-
-Handle resize (reattach the render target when required) and input (may set
-`render_pending`).
+1. Handle input and resize (may set `render_pending`).
+2. Pump: call `run_once`, drain runtime events, run `finishFrame()`.
+3. Render: call `render_update` when `render_pending` is true.
 
 ```mermaid
 sequenceDiagram
-  participant EL as Event loop
+  participant EL as Host loop
   participant RT as Runtime
   participant BE as Backend
 
-  EL->>EL: Poll or receive window + input events
+  EL->>EL: Input and resize
   EL->>RT: run_once()
   EL->>RT: drain events → may set render_pending
   EL->>BE: finishFrame()
 ```
 
-`finishFrame()` runs every pump iteration: swapchain or surface upkeep, resize
+`finishFrame()` runs every iteration: swapchain or surface upkeep, resize
 handling, and present hooks as required by the host graphics API.
+
+#### Cadence
+
+While the map is visible and the example is active:
+
+- MUST run at least one host loop iteration per display refresh period.
+- MUST subscribe to the host toolkit's display refresh mechanism (for example
+  swapchain frame callbacks, `CADisplayLink`, or `Choreographer`) to pace the
+  loop.
+- Desktop examples MAY wake an additional iteration on input or resize before
+  the next display refresh.
+
+Display refresh paces the loop; it does not replace `run_once`. Each iteration
+MUST call `run_once` exactly once.
+
+When the profile stops the loop (for example mobile background), runtime
+progress stalls until the loop resumes.
 
 #### Render (`render_pending`)
 
@@ -271,7 +293,8 @@ sequenceDiagram
 
 Requirements:
 
-- MUST call runtime `run_once` once per loop iteration while the app is running.
+- MUST call runtime `run_once` once per host loop iteration while the loop is
+  running.
 - MUST drain runtime events each iteration and set `render_pending` when:
   - `map_render_update_available` targets this map (new map content to draw), or
   - `map_render_frame_finished` targets this map and `needs_repaint` is true
@@ -584,11 +607,11 @@ Mobile `*-map` examples add:
 Mobile examples keep map state alive across brief disappear and background
 transitions. They tear down only on view destruction or app termination.
 
-| Transition                          | Behavior                                                                           |
-| ----------------------------------- | ---------------------------------------------------------------------------------- |
-| View will appear / app foreground   | Start the display-refresh pump. Refresh viewport. Set `render_pending`.            |
-| View did disappear / app background | Stop the display-refresh pump. Keep runtime, map, and render-target handles alive. |
-| View destroyed / app termination    | Run [Shared shutdown](#shutdown).                                                  |
+| Transition                          | Behavior                                                                   |
+| ----------------------------------- | -------------------------------------------------------------------------- |
+| View will appear / app foreground   | Start the display-paced host loop. Refresh viewport. Set `render_pending`. |
+| View did disappear / app background | Stop the host loop. Keep runtime, map, and render-target handles alive.    |
+| View destroyed / app termination    | Run [Shared shutdown](#shutdown).                                          |
 
 If `render_update` returns `invalid_state` after resume, follow the existing
 reattach path for the active render target.

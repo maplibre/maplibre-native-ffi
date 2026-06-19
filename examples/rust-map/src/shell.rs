@@ -52,8 +52,8 @@ impl Shell {
 
 impl ApplicationHandler for Shell {
     fn new_events(&mut self, event_loop: &ActiveEventLoop, _cause: StartCause) {
-        // TODO(map-example-spec): Drive the pump from a display-refresh callback instead of
-        // a fixed timer. See Frame loop in the map example spec.
+        // TODO(map-example-spec): Replace fixed timer with a display-paced host loop
+        // (pace on display refresh; desktop may also wake on input). See Frame loop.
         event_loop.set_control_flow(ControlFlow::WaitUntil(
             Instant::now() + Duration::from_millis(4),
         ));

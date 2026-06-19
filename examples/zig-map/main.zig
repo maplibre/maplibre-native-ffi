@@ -79,8 +79,8 @@ pub fn main(init_args: std.process.Init) !void {
     var has_presented_frame = false;
     var render_pending = true;
     var input_controller = input.Controller{};
-    // TODO(map-example-spec): Drive the pump from a display-refresh callback instead of
-    // polling SDL events and sleeping when idle. See Frame loop in the map example spec.
+    // TODO(map-example-spec): Replace poll-and-sleep with a display-paced host loop
+    // (pace on display refresh; desktop may also wake on input). See Frame loop.
     while (running) {
         const pool = if (build_options.supports_metal) objc.AutoreleasePool.init() else {};
         defer if (build_options.supports_metal) pool.deinit();

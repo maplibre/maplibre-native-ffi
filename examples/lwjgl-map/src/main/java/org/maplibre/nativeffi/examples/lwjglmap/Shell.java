@@ -29,9 +29,8 @@ final class Shell {
         System.out.println("render target status: " + mode.status());
         InputController.printControls();
         installResizeCallbacks(graphics.window(), viewport);
-        // TODO(map-example-spec): Drive the pump from a display-refresh callback instead of
-        // polling GLFW events and waiting with a timeout when idle. See Frame loop in the
-        // map example spec.
+        // TODO(map-example-spec): Replace poll-and-wait with a display-paced host loop
+        // (pace on display refresh; desktop may also wake on input). See Frame loop.
         while (!glfwWindowShouldClose(graphics.window())) {
           glfwPollEvents();
           if (viewport.consumeChanged()) {
