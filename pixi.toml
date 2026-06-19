@@ -10,7 +10,7 @@ macos = "14.0"
 
 [dependencies]
 # Native support library used by binding generators.
-libclang = ">=19,<20"
+libclang = ">=22,<23"
 
 # Native libraries linked across all desktop platforms.
 sdl3 = ">=3.4,<4"

@@ -88,10 +88,6 @@ postinstall = [
   { task = "sync-submodules" },
   "hk install --mise --quiet",
   "pixi install --locked --quiet",
-  # conda-forge ships libclang-13.dll, but clang-sys on Windows searches for libclang.dll.
-  # https://github.com/KyleMayes/clang-sys/issues/213
-  # https://github.com/conda-forge/llvmdev-feedstock/issues/376
-  '{% if os() == "windows" %}libclang_bin="$(dirname "$MLN_FFI_DEPENDENCY_LIBRARY_DIR")/bin"; cp "$libclang_bin/libclang-13.dll" "$libclang_bin/libclang.dll"{% endif %}',
   "uv sync --locked --quiet",
   "pnpm install --frozen-lockfile --loglevel warn",
   "dotnet tool restore --tool-manifest dotnet-tools.json --verbosity quiet",
