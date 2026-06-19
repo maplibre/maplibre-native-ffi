@@ -454,9 +454,9 @@ fn load_egl_bindings(lib: &Library) -> std::result::Result<egl::Egl, Box<dyn Std
 
 #[cfg(target_os = "windows")]
 struct WglTestContext {
-    window: wgl::HWND,
-    device_context: wgl::HDC,
-    share_context: wgl::HGLRC,
+    window: wgl::Hwnd,
+    device_context: wgl::Hdc,
+    share_context: wgl::Hglrc,
 }
 
 #[cfg(target_os = "windows")]
@@ -471,7 +471,7 @@ impl WglTestContext {
             return Err("GetModuleHandleA returned null".into());
         }
 
-        let window_class = wgl::WNDCLASSA {
+        let window_class = wgl::WndClassA {
             style: wgl::CS_OWNDC,
             lpfnWndProc: Some(wgl_window_proc),
             cbClsExtra: 0,
@@ -515,8 +515,8 @@ impl WglTestContext {
             return Err("GetDC returned null".into());
         }
 
-        let pixel_format_descriptor = wgl::PIXELFORMATDESCRIPTOR {
-            nSize: std::mem::size_of::<wgl::PIXELFORMATDESCRIPTOR>() as u16,
+        let pixel_format_descriptor = wgl::PixelFormatDescriptor {
+            nSize: std::mem::size_of::<wgl::PixelFormatDescriptor>() as u16,
             nVersion: 1,
             dwFlags: wgl::PFD_DRAW_TO_WINDOW | wgl::PFD_SUPPORT_OPENGL | wgl::PFD_DOUBLEBUFFER,
             iPixelType: wgl::PFD_TYPE_RGBA,
@@ -627,7 +627,7 @@ fn is_valid_wgl_proc_address(proc: *mut c_void) -> bool {
 
 #[cfg(target_os = "windows")]
 unsafe extern "system" fn wgl_window_proc(
-    window: wgl::HWND,
+    window: wgl::Hwnd,
     message: u32,
     wparam: usize,
     lparam: isize,
@@ -642,10 +642,10 @@ static OPENGL_TEST_CONTEXT_CLASS_ID: AtomicUsize = AtomicUsize::new(1);
 mod wgl {
     use super::{c_char, c_void};
 
-    pub type HDC = *mut c_void;
-    pub type HGLRC = *mut c_void;
-    pub type HINSTANCE = *mut c_void;
-    pub type HWND = *mut c_void;
+    pub type Hdc = *mut c_void;
+    pub type Hglrc = *mut c_void;
+    pub type Hinstance = *mut c_void;
+    pub type Hwnd = *mut c_void;
 
     pub const CS_OWNDC: u32 = 0x0020;
     pub const PFD_DOUBLEBUFFER: u32 = 0x0000_0001;
@@ -658,12 +658,12 @@ mod wgl {
     #[repr(C)]
     #[derive(Default)]
     #[allow(non_snake_case)]
-    pub struct WNDCLASSA {
+    pub struct WndClassA {
         pub style: u32,
-        pub lpfnWndProc: Option<unsafe extern "system" fn(HWND, u32, usize, isize) -> isize>,
+        pub lpfnWndProc: Option<unsafe extern "system" fn(Hwnd, u32, usize, isize) -> isize>,
         pub cbClsExtra: i32,
         pub cbWndExtra: i32,
-        pub hInstance: HINSTANCE,
+        pub hInstance: Hinstance,
         pub hIcon: *mut c_void,
         pub hCursor: *mut c_void,
         pub hbrBackground: *mut c_void,
@@ -674,7 +674,7 @@ mod wgl {
     #[repr(C)]
     #[derive(Default)]
     #[allow(non_snake_case)]
-    pub struct PIXELFORMATDESCRIPTOR {
+    pub struct PixelFormatDescriptor {
         pub nSize: u16,
         pub nVersion: u16,
         pub dwFlags: u32,
@@ -705,14 +705,14 @@ mod wgl {
 
     #[link(name = "kernel32")]
     unsafe extern "system" {
-        pub fn GetModuleHandleA(module_name: *const c_char) -> HINSTANCE;
-        pub fn GetProcAddress(module: HINSTANCE, proc_name: *const c_char) -> *mut c_void;
-        pub fn LoadLibraryA(file_name: *const c_char) -> HINSTANCE;
+        pub fn GetModuleHandleA(module_name: *const c_char) -> Hinstance;
+        pub fn GetProcAddress(module: Hinstance, proc_name: *const c_char) -> *mut c_void;
+        pub fn LoadLibraryA(file_name: *const c_char) -> Hinstance;
     }
 
     #[link(name = "user32")]
     unsafe extern "system" {
-        pub fn RegisterClassA(window_class: *const WNDCLASSA) -> u16;
+        pub fn RegisterClassA(window_class: *const WndClassA) -> u16;
         pub fn CreateWindowExA(
             extended_style: u32,
             class_name: *const c_char,
@@ -722,36 +722,36 @@ mod wgl {
             y: i32,
             width: i32,
             height: i32,
-            parent: HWND,
+            parent: Hwnd,
             menu: *mut c_void,
-            instance: HINSTANCE,
+            instance: Hinstance,
             param: *mut c_void,
-        ) -> HWND;
-        pub fn DefWindowProcA(window: HWND, message: u32, wparam: usize, lparam: isize) -> isize;
-        pub fn DestroyWindow(window: HWND) -> i32;
-        pub fn GetDC(window: HWND) -> HDC;
-        pub fn ReleaseDC(window: HWND, device_context: HDC) -> i32;
+        ) -> Hwnd;
+        pub fn DefWindowProcA(window: Hwnd, message: u32, wparam: usize, lparam: isize) -> isize;
+        pub fn DestroyWindow(window: Hwnd) -> i32;
+        pub fn GetDC(window: Hwnd) -> Hdc;
+        pub fn ReleaseDC(window: Hwnd, device_context: Hdc) -> i32;
     }
 
     #[link(name = "gdi32")]
     unsafe extern "system" {
         pub fn ChoosePixelFormat(
-            device_context: HDC,
-            descriptor: *const PIXELFORMATDESCRIPTOR,
+            device_context: Hdc,
+            descriptor: *const PixelFormatDescriptor,
         ) -> i32;
         pub fn SetPixelFormat(
-            device_context: HDC,
+            device_context: Hdc,
             format: i32,
-            descriptor: *const PIXELFORMATDESCRIPTOR,
+            descriptor: *const PixelFormatDescriptor,
         ) -> i32;
     }
 
     #[link(name = "opengl32")]
     unsafe extern "system" {
-        pub fn wglCreateContext(device_context: HDC) -> HGLRC;
-        pub fn wglDeleteContext(context: HGLRC) -> i32;
+        pub fn wglCreateContext(device_context: Hdc) -> Hglrc;
+        pub fn wglDeleteContext(context: Hglrc) -> i32;
         pub fn wglGetProcAddress(name: *const c_char) -> *mut c_void;
-        pub fn wglMakeCurrent(device_context: HDC, context: HGLRC) -> i32;
+        pub fn wglMakeCurrent(device_context: Hdc, context: Hglrc) -> i32;
     }
 }
 
