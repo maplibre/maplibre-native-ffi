@@ -30,8 +30,14 @@ function(mln_add_c_api_library target)
       ${PROJECT_SOURCE_DIR}/src/style/style_value.cpp
       ${PROJECT_SOURCE_DIR}/src/runtime/runtime.cpp)
 
-  if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
-    # iOS packaging decides the final linkage shape; keep the core as an
+  set(MLN_FFI_IS_IOS_SIMULATOR FALSE)
+  if(CMAKE_SYSTEM_NAME STREQUAL "iOS"
+     AND CMAKE_OSX_SYSROOT MATCHES "[iI][pP]hone[Ss]imulator")
+    set(MLN_FFI_IS_IOS_SIMULATOR TRUE)
+  endif()
+
+  if(CMAKE_SYSTEM_NAME STREQUAL "iOS" AND NOT MLN_FFI_IS_IOS_SIMULATOR)
+    # iOS device packaging decides the final linkage shape; keep the core as an
     # archive until a framework/XCFramework packaging layer exists.
     add_library(${target} STATIC)
   else()

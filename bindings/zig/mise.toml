@@ -4,7 +4,7 @@ run = "zig build {{ env.MLN_FFI_ZIG_BUILD_ARGS }}"
 
 [tasks.test]
 depends = ["//:ensure-native-library"]
-run = "zig build test {{ env.MLN_FFI_ZIG_BUILD_ARGS }} --summary all --verbose"
+run = "zig build test {{ env.MLN_FFI_ZIG_BUILD_ARGS }} --test-timeout \"$MLN_FFI_TEST_TIMEOUT\" --summary all --verbose"
 
 [tasks.ci]
 depends = [":test"]

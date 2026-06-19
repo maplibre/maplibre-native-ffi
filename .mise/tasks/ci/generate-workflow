@@ -45,6 +45,7 @@ class VariantConfig(StrictManifestModel):
     os: NonEmptyString
     arch: NonEmptyString
     backend: NonEmptyString
+    supports_tests: bool = True
 
 
 class Variant(VariantConfig):
@@ -163,10 +164,7 @@ def load_commands(variants: list[Variant]) -> dict[str, list[str]]:
                 build_only_native = variant.os in {"android", "ios", "ohos"}
                 if is_native and not build_only_native and action_key == "build":
                     continue
-                # Temporary policy: mobile cross variants build only. When device
-                # or simulator test targets are wired, remove this branch and let
-                # subproject manifests opt into test actions.
-                if build_only_native and action_key == "test":
+                if action_key == "test" and not variant.supports_tests:
                     continue
                 commands[variant.name].append(f"mise run {task}")
 

@@ -236,6 +236,8 @@ jobs:
       - uses: ./.github/actions/setup-ci-deps
       - run: mise run configure
       - run: mise run build
+      - run: mise run test
+      - run: mise run //bindings/zig:ci
   variant-ohos-arm64-egl:
     name: variant / ohos-arm64-egl
     runs-on: ubuntu-latest
