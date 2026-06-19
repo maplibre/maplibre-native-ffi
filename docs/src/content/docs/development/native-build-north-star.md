@@ -106,8 +106,8 @@ The metadata should include:
 - C ABI version expected by generated or compiled bindings.
 
 The JSON metadata is an internal interchange format. Repository build scripts
-should transform it once, in `scripts/native-metadata.py`, into the simplest
-native input each consumer can use:
+should transform it once, in `//:native-metadata`, into the simplest native
+input each consumer can use:
 
 - `pkg-config` for consumers with first-class `pkg-config` support.
 - Gradle properties for JVM and Kotlin/Native builds.
