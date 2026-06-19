@@ -118,6 +118,10 @@ run = [
   )
 
   if [[ "$MLN_FFI_TARGET_TRIPLE" == android-* ]]; then
+    if [[ -z "${ANDROID_NDK_HOME:-}" ]]; then
+      echo "ANDROID_NDK_HOME is required for Android targets" >&2
+      exit 1
+    fi
     cmake_args+=("-DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake")
   fi
 

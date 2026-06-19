@@ -175,9 +175,9 @@ def variant_job_id(variant: Variant) -> str:
     return f"variant-{variant.name}"
 
 
-def setup_steps() -> list[dict[str, str]]:
+def setup_steps() -> list[dict[str, object]]:
     return [
-        {"uses": CHECKOUT_ACTION},
+        {"uses": CHECKOUT_ACTION, "with": {"persist-credentials": False}},
         {"uses": "./.github/actions/setup-ci-deps"},
     ]
 

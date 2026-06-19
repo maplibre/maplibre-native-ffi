@@ -183,21 +183,22 @@ class HTTPRequestState : public std::enable_shared_from_this<HTTPRequestState> {
   }
 
   void cancel() {
-    std::scoped_lock lock(mutex);
-    canceled = true;
-    callback = nullptr;
+    auto asyncToDestroy = std::unique_ptr<util::AsyncTask>{};
+    {
+      std::scoped_lock lock(mutex);
+      canceled = true;
+      callback = nullptr;
+      asyncToDestroy = std::move(async);
+    }
   }
 
   void complete(const MlnRustHttpResponse& rustResponse) {
-    {
-      std::scoped_lock lock(mutex);
-      if (canceled) {
-        return;
-      }
-
-      response = makeResponse(rustResponse);
+    std::scoped_lock lock(mutex);
+    if (canceled || async == nullptr) {
+      return;
     }
 
+    response = makeResponse(rustResponse);
     async->send();
   }
 

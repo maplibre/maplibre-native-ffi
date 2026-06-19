@@ -222,8 +222,15 @@ fn redirect_url(current_url: &str, location: &str) -> Option<String> {
         return Some(location.to_owned());
     }
 
+    if has_url_scheme(location) {
+        return None;
+    }
+
     let scheme_end = current_url.find("://")?;
     let scheme = &current_url[..scheme_end];
+    if !scheme.eq_ignore_ascii_case("http") && !scheme.eq_ignore_ascii_case("https") {
+        return None;
+    }
     if location.starts_with("//") {
         return Some(format!("{scheme}:{location}"));
     }
@@ -235,7 +242,8 @@ fn redirect_url(current_url: &str, location: &str) -> Option<String> {
     let origin_end = authority_start + authority_len;
     let origin = &current_url[..origin_end];
     if location.starts_with('/') {
-        return Some(format!("{origin}{location}"));
+        let (path, suffix) = split_url_path_suffix(location);
+        return Some(format!("{origin}{}{suffix}", normalize_url_path(path)));
     }
 
     if location.starts_with('?') {
@@ -249,15 +257,62 @@ fn redirect_url(current_url: &str, location: &str) -> Option<String> {
     }
 
     let path_end = current_url.find(['?', '#']).unwrap_or(current_url.len());
-    let path = &current_url[..path_end];
-    let directory = path
+    let current_path = &current_url[origin_end..path_end];
+    let directory_path = current_path
         .rfind('/')
-        .filter(|index| *index >= origin_end)
-        .map_or_else(
-            || format!("{origin}/"),
-            |index| current_url[..=index].to_owned(),
-        );
-    Some(format!("{directory}{location}"))
+        .map_or("/", |index| &current_path[..=index]);
+    let (path, suffix) = split_url_path_suffix(location);
+    Some(format!(
+        "{origin}{}{suffix}",
+        normalize_url_path(&format!("{directory_path}{path}"))
+    ))
+}
+
+fn has_url_scheme(value: &str) -> bool {
+    let scheme_end = value.find([':', '/', '?', '#']);
+    matches!(scheme_end, Some(index) if value.as_bytes()[index] == b':')
+}
+
+fn split_url_path_suffix(value: &str) -> (&str, &str) {
+    match value.find(['?', '#']) {
+        Some(index) => (&value[..index], &value[index..]),
+        None => (value, ""),
+    }
+}
+
+fn normalize_url_path(path: &str) -> String {
+    if !path
+        .split('/')
+        .any(|segment| segment == "." || segment == "..")
+    {
+        return path.to_owned();
+    }
+
+    let is_absolute = path.starts_with('/');
+    let has_trailing_slash = path.ends_with('/') || path.ends_with("/.") || path.ends_with("/..");
+    let mut segments = Vec::new();
+    for segment in path.split('/') {
+        match segment {
+            "" | "." => {}
+            ".." => {
+                segments.pop();
+            }
+            segment => segments.push(segment),
+        }
+    }
+
+    let mut normalized = String::new();
+    if is_absolute {
+        normalized.push('/');
+    }
+    normalized.push_str(&segments.join("/"));
+    if has_trailing_slash && !normalized.ends_with('/') {
+        normalized.push('/');
+    }
+    if normalized.is_empty() {
+        normalized.push('/');
+    }
+    normalized
 }
 
 fn http_response(response: minreq::Response) -> MlnRustHttpResponse {
