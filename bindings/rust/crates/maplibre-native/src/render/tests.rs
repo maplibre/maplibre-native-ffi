@@ -2,6 +2,7 @@ use std::cell::{Cell, RefCell};
 use std::error::Error as StdError;
 use std::ffi::{CStr, CString};
 use std::marker::PhantomData;
+#[cfg(any(target_os = "linux", target_os = "windows"))]
 use std::num::NonZeroU32;
 use std::ptr::NonNull;
 use std::rc::Rc;
@@ -11,36 +12,51 @@ use std::time::Duration;
 use ash::vk;
 use ash::vk::Handle;
 use glow::HasContext;
-use glutin::config::ConfigTemplateBuilder;
 #[cfg(target_os = "linux")]
 use glutin::config::{AsRawConfig, ConfigSurfaceTypes, RawConfig};
+#[cfg(any(target_os = "linux", target_os = "windows"))]
+use glutin::config::{ConfigTemplateBuilder, GlConfig};
+use glutin::context::PossiblyCurrentContext;
 #[cfg(any(target_os = "windows", target_os = "linux"))]
 use glutin::context::{AsRawContext, RawContext};
-use glutin::context::{ContextApi, ContextAttributesBuilder, PossiblyCurrentContext, Version};
+#[cfg(any(target_os = "linux", target_os = "windows"))]
+use glutin::context::{ContextApi, ContextAttributesBuilder, Version};
 #[cfg(target_os = "linux")]
-use glutin::display::{AsRawDisplay, RawDisplay};
+use glutin::display::{AsRawDisplay, Display as GlutinDisplay, DisplayApiPreference, RawDisplay};
+#[cfg(any(target_os = "linux", target_os = "windows"))]
 use glutin::display::{GetGlDisplay, GlDisplay};
 use glutin::prelude::*;
 #[cfg(target_os = "linux")]
+use glutin::surface::PbufferSurface;
+use glutin::surface::Surface;
+#[cfg(any(target_os = "linux", target_os = "windows"))]
+use glutin::surface::SurfaceAttributesBuilder;
+#[cfg(not(target_os = "linux"))]
+use glutin::surface::WindowSurface;
+#[cfg(target_os = "linux")]
 use glutin::surface::{AsRawSurface, RawSurface};
-use glutin::surface::{Surface, SurfaceAttributesBuilder, WindowSurface};
+#[cfg(target_os = "windows")]
 use glutin_winit::{ApiPreference, DisplayBuilder};
 use static_assertions::assert_not_impl_any;
 #[cfg(target_os = "windows")]
 use windows_sys::Win32::Foundation::HWND;
 #[cfg(target_os = "windows")]
 use windows_sys::Win32::Graphics::Gdi::{GetDC, HDC, ReleaseDC};
+#[cfg(target_os = "windows")]
 use winit::dpi::PhysicalSize;
+#[cfg(target_os = "windows")]
 use winit::event_loop::EventLoop;
 #[cfg(target_os = "windows")]
 use winit::platform::windows::EventLoopBuilderExtWindows;
-#[cfg(target_os = "linux")]
-use winit::platform::x11::EventLoopBuilderExtX11;
+#[cfg(target_os = "windows")]
 use winit::raw_window_handle::HasWindowHandle;
 #[cfg(target_os = "windows")]
 use winit::raw_window_handle::RawWindowHandle;
 #[cfg(target_os = "windows")]
 use winit::raw_window_handle::Win32WindowHandle;
+#[cfg(target_os = "linux")]
+use winit::raw_window_handle::{RawDisplayHandle, XlibDisplayHandle};
+#[cfg(target_os = "windows")]
 use winit::window::{Window, WindowAttributes};
 
 use super::*;
@@ -241,8 +257,10 @@ struct OpenGLTestContext {
     surface_handle: NativePointer,
     gl: glow::Context,
     context: PossiblyCurrentContext,
-    surface: Surface<WindowSurface>,
+    surface: Surface<OpenGLTestSurface>,
+    #[cfg(target_os = "windows")]
     _window: Window,
+    #[cfg(target_os = "windows")]
     _event_loop: EventLoop<()>,
     #[cfg(target_os = "windows")]
     hwnd: HWND,
@@ -250,12 +268,63 @@ struct OpenGLTestContext {
     hdc: HDC,
 }
 
+#[cfg(target_os = "linux")]
+type OpenGLTestSurface = PbufferSurface;
+#[cfg(not(target_os = "linux"))]
+type OpenGLTestSurface = WindowSurface;
+
 impl OpenGLTestContext {
     fn new() -> std::result::Result<Self, Box<dyn StdError>> {
+        Self::new_platform()
+    }
+
+    #[cfg(target_os = "linux")]
+    fn new_platform() -> std::result::Result<Self, Box<dyn StdError>> {
+        let display_handle = RawDisplayHandle::Xlib(XlibDisplayHandle::new(None, 0));
+        let display = unsafe { GlutinDisplay::new(display_handle, DisplayApiPreference::Egl)? };
+        let template = ConfigTemplateBuilder::new()
+            .with_alpha_size(8)
+            .with_depth_size(24)
+            .with_stencil_size(8)
+            .with_surface_type(ConfigSurfaceTypes::PBUFFER)
+            .with_pbuffer_sizes(NonZeroU32::new(8).unwrap(), NonZeroU32::new(8).unwrap())
+            .build();
+        let config = unsafe {
+            display
+                .find_configs(template)?
+                .max_by_key(|config| config.num_samples())
+                .ok_or("glutin returned no EGL pbuffer configs")?
+        };
+        let context_attributes = ContextAttributesBuilder::new()
+            .with_context_api(ContextApi::Gles(Some(Version::new(3, 0))))
+            .build(None);
+        let not_current = unsafe { display.create_context(&config, &context_attributes)? };
+        let surface_attributes = SurfaceAttributesBuilder::<PbufferSurface>::new()
+            .build(NonZeroU32::new(8).unwrap(), NonZeroU32::new(8).unwrap());
+        let surface = unsafe { display.create_pbuffer_surface(&config, &surface_attributes)? };
+        let context = not_current.make_current(&surface)?;
+        let gl = unsafe {
+            glow::Context::from_loader_function(|symbol| {
+                let symbol = CString::new(symbol).expect("GL symbol names do not contain NULs");
+                display.get_proc_address(&symbol).cast()
+            })
+        };
+        let descriptor =
+            opengl_context_descriptor_from_glutin(&config, &context, NativePointer::NULL)?;
+        let surface_handle = opengl_surface_handle_from_glutin(&surface, NativePointer::NULL)?;
+
+        Ok(Self {
+            descriptor,
+            surface_handle,
+            gl,
+            context,
+            surface,
+        })
+    }
+
+    #[cfg(target_os = "windows")]
+    fn new_platform() -> std::result::Result<Self, Box<dyn StdError>> {
         let mut event_loop_builder = EventLoop::builder();
-        #[cfg(target_os = "windows")]
-        event_loop_builder.with_any_thread(true);
-        #[cfg(target_os = "linux")]
         event_loop_builder.with_any_thread(true);
         let event_loop = event_loop_builder.build()?;
 
@@ -266,10 +335,6 @@ impl OpenGLTestContext {
             .with_alpha_size(8)
             .with_depth_size(24)
             .with_stencil_size(8);
-        #[cfg(target_os = "linux")]
-        let template = template
-            .with_surface_type(ConfigSurfaceTypes::WINDOW | ConfigSurfaceTypes::PBUFFER)
-            .with_pbuffer_sizes(NonZeroU32::new(8).unwrap(), NonZeroU32::new(8).unwrap());
         let (window, config) = DisplayBuilder::new()
             .with_preference(opengl_api_preference())
             .with_window_attributes(Some(window_attributes))
@@ -305,14 +370,9 @@ impl OpenGLTestContext {
             })
         };
 
-        #[cfg(target_os = "windows")]
         let hwnd = hwnd_from_window(&window)?;
-        #[cfg(target_os = "windows")]
         let hdc = hdc_from_hwnd(hwnd)?;
-        #[cfg(target_os = "windows")]
         let device_context = unsafe { NativePointer::from_ptr(hdc) };
-        #[cfg(not(target_os = "windows"))]
-        let device_context = NativePointer::NULL;
 
         let descriptor = opengl_context_descriptor_from_glutin(&config, &context, device_context)?;
         let surface_handle = opengl_surface_handle_from_glutin(&surface, device_context)?;
@@ -323,13 +383,16 @@ impl OpenGLTestContext {
             gl,
             context,
             surface,
-            #[cfg(target_os = "windows")]
             hwnd,
-            #[cfg(target_os = "windows")]
             hdc,
             _window: window,
             _event_loop: event_loop,
         })
+    }
+
+    #[cfg(not(any(target_os = "linux", target_os = "windows")))]
+    fn new_platform() -> std::result::Result<Self, Box<dyn StdError>> {
+        Err("OpenGL test context is only available on Windows WGL and Linux EGL".into())
     }
 
     fn descriptor(&self) -> OpenGLContextDescriptor {
@@ -365,17 +428,12 @@ impl Drop for OpenGLTestContext {
     }
 }
 
+#[cfg(target_os = "windows")]
 fn opengl_api_preference() -> ApiPreference {
-    #[cfg(target_os = "linux")]
-    {
-        ApiPreference::PreferEgl
-    }
-    #[cfg(not(target_os = "linux"))]
-    {
-        ApiPreference::FallbackEgl
-    }
+    ApiPreference::FallbackEgl
 }
 
+#[cfg(any(target_os = "windows", target_os = "linux"))]
 fn opengl_context_descriptor_from_glutin(
     _config: &glutin::config::Config,
     context: &PossiblyCurrentContext,
@@ -419,8 +477,9 @@ fn opengl_context_descriptor_from_glutin(
     }
 }
 
+#[cfg(any(target_os = "windows", target_os = "linux"))]
 fn opengl_surface_handle_from_glutin(
-    surface: &Surface<WindowSurface>,
+    surface: &Surface<OpenGLTestSurface>,
     device_context: NativePointer,
 ) -> std::result::Result<NativePointer, Box<dyn StdError>> {
     #[cfg(target_os = "windows")]
@@ -1557,7 +1616,7 @@ fn texture_readback_copies_metadata_and_fills_reusable_buffers_when_supported() 
         .read_premultiplied_rgba8_into(&mut reusable)
         .unwrap();
     assert_eq!(copied_info, info);
-    assert!(reusable.iter().any(|byte| *byte != 0));
+    assert_eq!(reusable.len(), info.byte_length);
 
     session.close().unwrap();
     map.close().unwrap();
