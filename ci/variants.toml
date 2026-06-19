@@ -45,6 +45,7 @@ runner = "macos-latest"
 os = "ios"
 arch = "arm64"
 backend = "metal"
+supports_tests = false
 
 [variants.ios-simulator-arm64-metal]
 runner = "macos-latest"

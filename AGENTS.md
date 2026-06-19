@@ -29,7 +29,7 @@ mise tasks --all
 # Build the native library (also runs configure)
 mise run build
 
-# Build and run C API + Zig binding tests (also runs build)
+# Build and run C API tests (also runs build)
 mise run test
 
 # Build and run Rust binding tests (also runs build)

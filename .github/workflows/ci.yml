@@ -188,6 +188,7 @@ jobs:
       - uses: ./.github/actions/setup-ci-deps
       - run: mise run configure
       - run: mise run build
+      - run: mise run test
   variant-windows-x64-vulkan:
     name: variant / windows-x64-vulkan
     runs-on: windows-2022

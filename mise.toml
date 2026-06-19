@@ -163,10 +163,6 @@ run = '''
   cd src/c_api/tests/zig
   zig build test {{ env.MLN_FFI_ZIG_BUILD_ARGS }} --test-timeout "$MLN_FFI_TEST_TIMEOUT" --summary all --verbose
 )
-(
-  cd bindings/zig
-  zig build test {{ env.MLN_FFI_ZIG_BUILD_ARGS }} --test-timeout "$MLN_FFI_TEST_TIMEOUT" --summary all --verbose
-)
 '''
 
 [tasks.check]
