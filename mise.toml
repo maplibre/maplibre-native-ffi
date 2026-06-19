@@ -117,6 +117,10 @@ run = [
     -DMLN_FFI_EGL_ROOT="$MLN_FFI_EGL_ROOT"
   )
 
+  if [[ "$MLN_FFI_TARGET_TRIPLE" == android-* ]]; then
+    cmake_args+=("-DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake")
+  fi
+
   while IFS= read -r cmake_arg; do
     [[ -n "$cmake_arg" ]] && cmake_args+=("$cmake_arg")
   done <<< "${MLN_FFI_CMAKE_ARGS:-}"

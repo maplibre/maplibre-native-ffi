@@ -18,6 +18,8 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+mise.local.toml
+mise.*.local.toml
 hs_err_pid*.log
 .gradle
 .kotlin
