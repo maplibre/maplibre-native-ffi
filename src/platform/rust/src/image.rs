@@ -65,6 +65,14 @@ fn decode_image(encoded: &[u8]) -> Result<MlnRustDecodedImage, String> {
     reader.limits(limits);
 
     let image = reader.decode().map_err(|error| error.to_string())?;
+    let expanded_len = u64::from(image.width())
+        .checked_mul(u64::from(image.height()))
+        .and_then(|pixels| pixels.checked_mul(4))
+        .ok_or_else(|| "decoded image is too large".to_owned())?;
+    if expanded_len > MAX_IMAGE_ALLOC_BYTES {
+        return Err("decoded image exceeds allocation limit".to_owned());
+    }
+
     let rgba = image.to_rgba8();
     let (width, height) = rgba.dimensions();
     let mut data = rgba.into_raw();

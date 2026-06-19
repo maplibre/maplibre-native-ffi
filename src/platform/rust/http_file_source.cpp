@@ -216,15 +216,19 @@ class HTTPRequestState : public std::enable_shared_from_this<HTTPRequestState> {
       result.modified = util::parseTimestamp(modified->c_str());
     }
 
+    auto cacheControlExpiration = std::optional<Timestamp>{};
     auto cacheControl = optionalCString(rustResponse.cache_control);
     if (cacheControl) {
       const auto parsed = http::CacheControl::parse(*cacheControl);
-      result.expires = parsed.toTimePoint();
+      cacheControlExpiration = parsed.toTimePoint();
+      if (cacheControlExpiration) {
+        result.expires = cacheControlExpiration;
+      }
       result.mustRevalidate = parsed.mustRevalidate;
     }
 
     auto expires = optionalCString(rustResponse.expires);
-    if (expires && !cacheControl) {
+    if (expires && !cacheControlExpiration) {
       result.expires = util::parseTimestamp(expires->c_str());
     }
 

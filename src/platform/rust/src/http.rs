@@ -163,7 +163,9 @@ fn send_http_request(request: HttpRequest) -> MlnRustHttpResponse {
             );
         }
 
-        let mut minreq = minreq::get(&url).with_timeout(HTTP_REQUEST_TIMEOUT_SECONDS);
+        let mut minreq = minreq::get(&url)
+            .with_timeout(HTTP_REQUEST_TIMEOUT_SECONDS)
+            .with_follow_redirects(false);
         for (name, value) in &request.headers {
             minreq = minreq.with_header(name, value);
         }
@@ -172,17 +174,14 @@ fn send_http_request(request: HttpRequest) -> MlnRustHttpResponse {
         }
 
         match minreq.send() {
-            Ok(response) if response.status_code == 308 => {
+            Ok(response) if is_redirect_status(response.status_code) => {
                 let Some(location) = response.header("location") else {
-                    return http_error(
-                        HTTP_ERROR_OTHER,
-                        "HTTP 308 redirect missing Location header",
-                    );
+                    return http_error(HTTP_ERROR_OTHER, "HTTP redirect missing Location header");
                 };
                 url = match redirect_url(&url, location) {
                     Some(url) => url,
                     None => {
-                        return http_error(HTTP_ERROR_OTHER, "unsupported HTTP 308 redirect URL");
+                        return http_error(HTTP_ERROR_OTHER, "unsupported HTTP redirect URL");
                     }
                 };
             }
@@ -205,6 +204,10 @@ fn send_http_request(request: HttpRequest) -> MlnRustHttpResponse {
 fn is_https_url(url: &str) -> bool {
     url.get(..8)
         .is_some_and(|scheme| scheme.eq_ignore_ascii_case("https://"))
+}
+
+fn is_redirect_status(status_code: u16) -> bool {
+    matches!(status_code, 301 | 302 | 303 | 307 | 308)
 }
 
 fn redirect_url(current_url: &str, location: &str) -> Option<String> {
