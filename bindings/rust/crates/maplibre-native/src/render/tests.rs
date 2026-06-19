@@ -1,11 +1,11 @@
 use std::cell::{Cell, RefCell};
 use std::error::Error as StdError;
-#[cfg(target_os = "linux")]
+#[cfg(target_os = "windows")]
+use std::ffi::c_char;
+#[cfg(any(target_os = "linux", target_os = "windows"))]
 use std::ffi::c_void;
 use std::ffi::{CStr, CString};
 use std::marker::PhantomData;
-#[cfg(target_os = "windows")]
-use std::num::NonZeroU32;
 use std::ptr::NonNull;
 use std::rc::Rc;
 use std::sync::atomic::{AtomicI32, AtomicUsize, Ordering};
@@ -14,49 +14,13 @@ use std::time::Duration;
 use ash::vk;
 use ash::vk::Handle;
 use glow::HasContext;
-#[cfg(target_os = "windows")]
-use glutin::config::{ConfigTemplateBuilder, GlConfig};
-#[cfg(target_os = "windows")]
-use glutin::context::PossiblyCurrentContext;
-#[cfg(target_os = "windows")]
-use glutin::context::{AsRawContext, RawContext};
-#[cfg(target_os = "windows")]
-use glutin::context::{ContextApi, ContextAttributesBuilder, Version};
-#[cfg(target_os = "windows")]
-use glutin::display::{GetGlDisplay, GlDisplay};
-#[cfg(target_os = "windows")]
-use glutin::prelude::*;
-#[cfg(target_os = "windows")]
-use glutin::surface::WindowSurface;
-#[cfg(target_os = "windows")]
-use glutin::surface::{Surface, SurfaceAttributesBuilder};
 #[cfg(target_os = "linux")]
 use glutin_egl_sys::egl;
 #[cfg(target_os = "linux")]
 use glutin_egl_sys::egl::types::{EGLConfig, EGLContext, EGLDisplay, EGLSurface, EGLint};
-#[cfg(target_os = "windows")]
-use glutin_winit::{ApiPreference, DisplayBuilder};
 #[cfg(target_os = "linux")]
 use libloading::Library;
 use static_assertions::assert_not_impl_any;
-#[cfg(target_os = "windows")]
-use windows_sys::Win32::Foundation::HWND;
-#[cfg(target_os = "windows")]
-use windows_sys::Win32::Graphics::Gdi::{GetDC, HDC, ReleaseDC};
-#[cfg(target_os = "windows")]
-use winit::dpi::PhysicalSize;
-#[cfg(target_os = "windows")]
-use winit::event_loop::EventLoop;
-#[cfg(target_os = "windows")]
-use winit::platform::windows::EventLoopBuilderExtWindows;
-#[cfg(target_os = "windows")]
-use winit::raw_window_handle::HasWindowHandle;
-#[cfg(target_os = "windows")]
-use winit::raw_window_handle::RawWindowHandle;
-#[cfg(target_os = "windows")]
-use winit::raw_window_handle::Win32WindowHandle;
-#[cfg(target_os = "windows")]
-use winit::window::{Window, WindowAttributes};
 
 use super::*;
 use crate::{
@@ -117,7 +81,7 @@ fn create_opengl_owned_texture_session(
     if !backends.contains(RenderBackendMask::OPENGL) {
         return Err("native library does not support OpenGL owned texture sessions".into());
     }
-    let context = OpenGLTestContext::new()?;
+    let context = OpenGLTestContext::new(extent.width, extent.height)?;
     let session = map.attach_opengl_owned_texture(&OpenGLOwnedTextureDescriptor::new(
         extent,
         context.descriptor(),
@@ -133,7 +97,7 @@ fn create_opengl_surface_session(
     if !backends.contains(RenderBackendMask::OPENGL) {
         return Err("native library does not support OpenGL surface sessions".into());
     }
-    let context = OpenGLTestContext::new()?;
+    let context = OpenGLTestContext::new(extent.width, extent.height)?;
     let session = map.attach_opengl_surface(&OpenGLSurfaceDescriptor::new(
         extent,
         context.descriptor(),
@@ -258,17 +222,7 @@ struct OpenGLTestContext {
     #[cfg(target_os = "linux")]
     platform: EglTestContext,
     #[cfg(target_os = "windows")]
-    context: PossiblyCurrentContext,
-    #[cfg(target_os = "windows")]
-    surface: Surface<WindowSurface>,
-    #[cfg(target_os = "windows")]
-    _window: Window,
-    #[cfg(target_os = "windows")]
-    _event_loop: EventLoop<()>,
-    #[cfg(target_os = "windows")]
-    hwnd: HWND,
-    #[cfg(target_os = "windows")]
-    hdc: HDC,
+    platform: WglTestContext,
 }
 
 #[cfg(target_os = "linux")]
@@ -498,13 +452,316 @@ fn load_egl_bindings(lib: &Library) -> std::result::Result<egl::Egl, Box<dyn Std
     Ok(egl)
 }
 
+#[cfg(target_os = "windows")]
+struct WglTestContext {
+    window: wgl::HWND,
+    device_context: wgl::HDC,
+    share_context: wgl::HGLRC,
+}
+
+#[cfg(target_os = "windows")]
+impl WglTestContext {
+    fn new(width: u32, height: u32) -> std::result::Result<Self, Box<dyn StdError>> {
+        let class_name = CString::new(format!(
+            "MaplibreNativeRustWglTest{}",
+            OPENGL_TEST_CONTEXT_CLASS_ID.fetch_add(1, Ordering::Relaxed)
+        ))?;
+        let module = unsafe { wgl::GetModuleHandleA(std::ptr::null()) };
+        if module.is_null() {
+            return Err("GetModuleHandleA returned null".into());
+        }
+
+        let window_class = wgl::WNDCLASSA {
+            style: wgl::CS_OWNDC,
+            lpfnWndProc: Some(wgl_window_proc),
+            cbClsExtra: 0,
+            cbWndExtra: 0,
+            hInstance: module,
+            hIcon: std::ptr::null_mut(),
+            hCursor: std::ptr::null_mut(),
+            hbrBackground: std::ptr::null_mut(),
+            lpszMenuName: std::ptr::null(),
+            lpszClassName: class_name.as_ptr(),
+        };
+        unsafe {
+            wgl::RegisterClassA(&window_class);
+        }
+
+        let window = unsafe {
+            wgl::CreateWindowExA(
+                0,
+                class_name.as_ptr(),
+                class_name.as_ptr(),
+                wgl::WS_OVERLAPPEDWINDOW,
+                0,
+                0,
+                width as i32,
+                height as i32,
+                std::ptr::null_mut(),
+                std::ptr::null_mut(),
+                module,
+                std::ptr::null_mut(),
+            )
+        };
+        if window.is_null() {
+            return Err("CreateWindowExA returned null".into());
+        }
+
+        let device_context = unsafe { wgl::GetDC(window) };
+        if device_context.is_null() {
+            unsafe {
+                wgl::DestroyWindow(window);
+            }
+            return Err("GetDC returned null".into());
+        }
+
+        let pixel_format_descriptor = wgl::PIXELFORMATDESCRIPTOR {
+            nSize: std::mem::size_of::<wgl::PIXELFORMATDESCRIPTOR>() as u16,
+            nVersion: 1,
+            dwFlags: wgl::PFD_DRAW_TO_WINDOW | wgl::PFD_SUPPORT_OPENGL | wgl::PFD_DOUBLEBUFFER,
+            iPixelType: wgl::PFD_TYPE_RGBA,
+            cColorBits: 32,
+            cDepthBits: 24,
+            cStencilBits: 8,
+            iLayerType: wgl::PFD_MAIN_PLANE,
+            ..Default::default()
+        };
+        let pixel_format =
+            unsafe { wgl::ChoosePixelFormat(device_context, &pixel_format_descriptor) };
+        if pixel_format == 0 {
+            unsafe {
+                wgl::ReleaseDC(window, device_context);
+                wgl::DestroyWindow(window);
+            }
+            return Err("ChoosePixelFormat returned zero".into());
+        }
+        if unsafe { wgl::SetPixelFormat(device_context, pixel_format, &pixel_format_descriptor) }
+            == 0
+        {
+            unsafe {
+                wgl::ReleaseDC(window, device_context);
+                wgl::DestroyWindow(window);
+            }
+            return Err("SetPixelFormat failed".into());
+        }
+
+        let share_context = unsafe { wgl::wglCreateContext(device_context) };
+        if share_context.is_null() {
+            unsafe {
+                wgl::ReleaseDC(window, device_context);
+                wgl::DestroyWindow(window);
+            }
+            return Err("wglCreateContext returned null".into());
+        }
+        if unsafe { wgl::wglMakeCurrent(device_context, share_context) } == 0 {
+            unsafe {
+                wgl::wglDeleteContext(share_context);
+                wgl::ReleaseDC(window, device_context);
+                wgl::DestroyWindow(window);
+            }
+            return Err("wglMakeCurrent failed".into());
+        }
+
+        Ok(Self {
+            window,
+            device_context,
+            share_context,
+        })
+    }
+
+    fn descriptor(&self) -> OpenGLContextDescriptor {
+        OpenGLContextDescriptor::Wgl(WglContextDescriptor::new(
+            unsafe { NativePointer::from_ptr(self.device_context) },
+            unsafe { NativePointer::from_ptr(self.share_context) },
+        ))
+    }
+
+    fn surface(&self) -> NativePointer {
+        unsafe { NativePointer::from_ptr(self.device_context) }
+    }
+
+    fn make_current(&self) -> std::result::Result<(), Box<dyn StdError>> {
+        if unsafe { wgl::wglMakeCurrent(self.device_context, self.share_context) } == 0 {
+            Err("wglMakeCurrent failed".into())
+        } else {
+            Ok(())
+        }
+    }
+
+    fn get_proc_address(&self, symbol: &CStr) -> *const c_void {
+        let proc = unsafe { wgl::wglGetProcAddress(symbol.as_ptr()) };
+        if is_valid_wgl_proc_address(proc) {
+            return proc.cast();
+        }
+
+        let module = unsafe { wgl::GetModuleHandleA(c"opengl32.dll".as_ptr()) };
+        let module = if module.is_null() {
+            unsafe { wgl::LoadLibraryA(c"opengl32.dll".as_ptr()) }
+        } else {
+            module
+        };
+        if module.is_null() {
+            return std::ptr::null();
+        }
+        unsafe { wgl::GetProcAddress(module, symbol.as_ptr()).cast() }
+    }
+}
+
+#[cfg(target_os = "windows")]
+impl Drop for WglTestContext {
+    fn drop(&mut self) {
+        unsafe {
+            wgl::wglMakeCurrent(std::ptr::null_mut(), std::ptr::null_mut());
+            wgl::wglDeleteContext(self.share_context);
+            wgl::ReleaseDC(self.window, self.device_context);
+            wgl::DestroyWindow(self.window);
+        }
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn is_valid_wgl_proc_address(proc: *mut c_void) -> bool {
+    let address = proc as usize;
+    !proc.is_null() && address > 3 && address != usize::MAX
+}
+
+#[cfg(target_os = "windows")]
+unsafe extern "system" fn wgl_window_proc(
+    window: wgl::HWND,
+    message: u32,
+    wparam: usize,
+    lparam: isize,
+) -> isize {
+    unsafe { wgl::DefWindowProcA(window, message, wparam, lparam) }
+}
+
+#[cfg(target_os = "windows")]
+static OPENGL_TEST_CONTEXT_CLASS_ID: AtomicUsize = AtomicUsize::new(1);
+
+#[cfg(target_os = "windows")]
+mod wgl {
+    use super::{c_char, c_void};
+
+    pub type HDC = *mut c_void;
+    pub type HGLRC = *mut c_void;
+    pub type HINSTANCE = *mut c_void;
+    pub type HWND = *mut c_void;
+
+    pub const CS_OWNDC: u32 = 0x0020;
+    pub const PFD_DOUBLEBUFFER: u32 = 0x0000_0001;
+    pub const PFD_DRAW_TO_WINDOW: u32 = 0x0000_0004;
+    pub const PFD_SUPPORT_OPENGL: u32 = 0x0000_0020;
+    pub const PFD_TYPE_RGBA: u8 = 0;
+    pub const PFD_MAIN_PLANE: u8 = 0;
+    pub const WS_OVERLAPPEDWINDOW: u32 = 0x00cf_0000;
+
+    #[repr(C)]
+    #[derive(Default)]
+    #[allow(non_snake_case)]
+    pub struct WNDCLASSA {
+        pub style: u32,
+        pub lpfnWndProc: Option<unsafe extern "system" fn(HWND, u32, usize, isize) -> isize>,
+        pub cbClsExtra: i32,
+        pub cbWndExtra: i32,
+        pub hInstance: HINSTANCE,
+        pub hIcon: *mut c_void,
+        pub hCursor: *mut c_void,
+        pub hbrBackground: *mut c_void,
+        pub lpszMenuName: *const c_char,
+        pub lpszClassName: *const c_char,
+    }
+
+    #[repr(C)]
+    #[derive(Default)]
+    #[allow(non_snake_case)]
+    pub struct PIXELFORMATDESCRIPTOR {
+        pub nSize: u16,
+        pub nVersion: u16,
+        pub dwFlags: u32,
+        pub iPixelType: u8,
+        pub cColorBits: u8,
+        pub cRedBits: u8,
+        pub cRedShift: u8,
+        pub cGreenBits: u8,
+        pub cGreenShift: u8,
+        pub cBlueBits: u8,
+        pub cBlueShift: u8,
+        pub cAlphaBits: u8,
+        pub cAlphaShift: u8,
+        pub cAccumBits: u8,
+        pub cAccumRedBits: u8,
+        pub cAccumGreenBits: u8,
+        pub cAccumBlueBits: u8,
+        pub cAccumAlphaBits: u8,
+        pub cDepthBits: u8,
+        pub cStencilBits: u8,
+        pub cAuxBuffers: u8,
+        pub iLayerType: u8,
+        pub bReserved: u8,
+        pub dwLayerMask: u32,
+        pub dwVisibleMask: u32,
+        pub dwDamageMask: u32,
+    }
+
+    #[link(name = "kernel32")]
+    unsafe extern "system" {
+        pub fn GetModuleHandleA(module_name: *const c_char) -> HINSTANCE;
+        pub fn GetProcAddress(module: HINSTANCE, proc_name: *const c_char) -> *mut c_void;
+        pub fn LoadLibraryA(file_name: *const c_char) -> HINSTANCE;
+    }
+
+    #[link(name = "user32")]
+    unsafe extern "system" {
+        pub fn RegisterClassA(window_class: *const WNDCLASSA) -> u16;
+        pub fn CreateWindowExA(
+            extended_style: u32,
+            class_name: *const c_char,
+            window_name: *const c_char,
+            style: u32,
+            x: i32,
+            y: i32,
+            width: i32,
+            height: i32,
+            parent: HWND,
+            menu: *mut c_void,
+            instance: HINSTANCE,
+            param: *mut c_void,
+        ) -> HWND;
+        pub fn DefWindowProcA(window: HWND, message: u32, wparam: usize, lparam: isize) -> isize;
+        pub fn DestroyWindow(window: HWND) -> i32;
+        pub fn GetDC(window: HWND) -> HDC;
+        pub fn ReleaseDC(window: HWND, device_context: HDC) -> i32;
+    }
+
+    #[link(name = "gdi32")]
+    unsafe extern "system" {
+        pub fn ChoosePixelFormat(
+            device_context: HDC,
+            descriptor: *const PIXELFORMATDESCRIPTOR,
+        ) -> i32;
+        pub fn SetPixelFormat(
+            device_context: HDC,
+            format: i32,
+            descriptor: *const PIXELFORMATDESCRIPTOR,
+        ) -> i32;
+    }
+
+    #[link(name = "opengl32")]
+    unsafe extern "system" {
+        pub fn wglCreateContext(device_context: HDC) -> HGLRC;
+        pub fn wglDeleteContext(context: HGLRC) -> i32;
+        pub fn wglGetProcAddress(name: *const c_char) -> *mut c_void;
+        pub fn wglMakeCurrent(device_context: HDC, context: HGLRC) -> i32;
+    }
+}
+
 impl OpenGLTestContext {
-    fn new() -> std::result::Result<Self, Box<dyn StdError>> {
-        Self::new_platform()
+    fn new(width: u32, height: u32) -> std::result::Result<Self, Box<dyn StdError>> {
+        Self::new_platform(width, height)
     }
 
     #[cfg(target_os = "linux")]
-    fn new_platform() -> std::result::Result<Self, Box<dyn StdError>> {
+    fn new_platform(_width: u32, _height: u32) -> std::result::Result<Self, Box<dyn StdError>> {
         let platform = EglTestContext::new()?;
         let gl = unsafe {
             glow::Context::from_loader_function(|symbol| {
@@ -524,75 +781,27 @@ impl OpenGLTestContext {
     }
 
     #[cfg(target_os = "windows")]
-    fn new_platform() -> std::result::Result<Self, Box<dyn StdError>> {
-        let mut event_loop_builder = EventLoop::builder();
-        event_loop_builder.with_any_thread(true);
-        let event_loop = event_loop_builder.build()?;
-
-        let window_attributes = WindowAttributes::default()
-            .with_visible(false)
-            .with_inner_size(PhysicalSize::new(8, 8));
-        let template = ConfigTemplateBuilder::new()
-            .with_alpha_size(8)
-            .with_depth_size(24)
-            .with_stencil_size(8);
-        let (window, config) = DisplayBuilder::new()
-            .with_preference(opengl_api_preference())
-            .with_window_attributes(Some(window_attributes))
-            .build(&event_loop, template, |configs| {
-                configs
-                    .max_by_key(|config| config.num_samples())
-                    .expect("glutin returned no OpenGL configs")
-            })?;
-        let window = window.ok_or("glutin did not create a test window")?;
-        let raw_window_handle = window.window_handle()?.as_raw();
-
-        let context_attributes = ContextAttributesBuilder::new()
-            .with_context_api(ContextApi::OpenGl(Some(Version::new(3, 0))))
-            .build(Some(raw_window_handle));
-        let display = config.display();
-        // SAFETY: raw_window_handle comes from a live winit window and config
-        // was selected from the same glutin display.
-        let not_current = unsafe { display.create_context(&config, &context_attributes)? };
-
-        let surface_attributes = SurfaceAttributesBuilder::<WindowSurface>::new().build(
-            raw_window_handle,
-            NonZeroU32::new(8).unwrap(),
-            NonZeroU32::new(8).unwrap(),
-        );
-        // SAFETY: raw_window_handle comes from a live winit window and the
-        // surface attributes were built for that window.
-        let surface = unsafe { display.create_window_surface(&config, &surface_attributes)? };
-        let context = not_current.make_current(&surface)?;
+    fn new_platform(width: u32, height: u32) -> std::result::Result<Self, Box<dyn StdError>> {
+        let platform = WglTestContext::new(width, height)?;
         let gl = unsafe {
             glow::Context::from_loader_function(|symbol| {
                 let symbol = CString::new(symbol).expect("GL symbol names do not contain NULs");
-                display.get_proc_address(&symbol).cast()
+                platform.get_proc_address(&symbol).cast()
             })
         };
-
-        let hwnd = hwnd_from_window(&window)?;
-        let hdc = hdc_from_hwnd(hwnd)?;
-        let device_context = unsafe { NativePointer::from_ptr(hdc) };
-
-        let descriptor = opengl_context_descriptor_from_glutin(&config, &context, device_context)?;
-        let surface_handle = opengl_surface_handle_from_glutin(&surface, device_context)?;
+        let descriptor = platform.descriptor();
+        let surface_handle = platform.surface();
 
         Ok(Self {
             descriptor,
             surface_handle,
             gl,
-            context,
-            surface,
-            hwnd,
-            hdc,
-            _window: window,
-            _event_loop: event_loop,
+            platform,
         })
     }
 
     #[cfg(not(any(target_os = "linux", target_os = "windows")))]
-    fn new_platform() -> std::result::Result<Self, Box<dyn StdError>> {
+    fn new_platform(_width: u32, _height: u32) -> std::result::Result<Self, Box<dyn StdError>> {
         Err("OpenGL test context is only available on Windows WGL and Linux EGL".into())
     }
 
@@ -612,7 +821,7 @@ impl OpenGLTestContext {
         }
         #[cfg(target_os = "windows")]
         {
-            self.context.make_current(&self.surface)?;
+            self.platform.make_current()?;
             Ok(())
         }
         #[cfg(not(any(target_os = "linux", target_os = "windows")))]
@@ -631,66 +840,6 @@ impl OpenGLTestContext {
     }
 }
 
-#[cfg(target_os = "windows")]
-impl Drop for OpenGLTestContext {
-    fn drop(&mut self) {
-        // SAFETY: hdc was acquired from this window with GetDC.
-        unsafe {
-            ReleaseDC(self.hwnd, self.hdc);
-        }
-    }
-}
-
-#[cfg(target_os = "windows")]
-fn opengl_api_preference() -> ApiPreference {
-    ApiPreference::FallbackEgl
-}
-
-#[cfg(target_os = "windows")]
-fn opengl_context_descriptor_from_glutin(
-    _config: &glutin::config::Config,
-    context: &PossiblyCurrentContext,
-    device_context: NativePointer,
-) -> std::result::Result<OpenGLContextDescriptor, Box<dyn StdError>> {
-    let RawContext::Wgl(raw_context) = context.raw_context() else {
-        return Err("glutin did not create a WGL context".into());
-    };
-    let share_context = unsafe { NativePointer::from_ptr(raw_context.cast_mut()) };
-    Ok(OpenGLContextDescriptor::Wgl(WglContextDescriptor::new(
-        device_context,
-        share_context,
-    )))
-}
-
-#[cfg(target_os = "windows")]
-fn opengl_surface_handle_from_glutin(
-    surface: &Surface<WindowSurface>,
-    device_context: NativePointer,
-) -> std::result::Result<NativePointer, Box<dyn StdError>> {
-    let _ = surface;
-    Ok(device_context)
-}
-
-#[cfg(target_os = "windows")]
-fn hdc_from_hwnd(hwnd: HWND) -> std::result::Result<HDC, Box<dyn StdError>> {
-    // SAFETY: hwnd comes from a live winit window.
-    let hdc = unsafe { GetDC(hwnd) };
-    if hdc.is_null() {
-        Err("GetDC returned null".into())
-    } else {
-        Ok(hdc)
-    }
-}
-
-#[cfg(target_os = "windows")]
-fn hwnd_from_window(window: &Window) -> std::result::Result<HWND, Box<dyn StdError>> {
-    let RawWindowHandle::Win32(Win32WindowHandle { hwnd, .. }) = window.window_handle()?.as_raw()
-    else {
-        return Err("winit did not return a Win32 window handle".into());
-    };
-    Ok(hwnd.get() as HWND)
-}
-
 struct OpenGLBorrowedTexture {
     context: OpenGLTestContext,
     texture: Option<glow::NativeTexture>,
@@ -700,7 +849,7 @@ struct OpenGLBorrowedTexture {
 
 impl OpenGLBorrowedTexture {
     fn new(width: u32, height: u32) -> std::result::Result<Self, Box<dyn StdError>> {
-        let context = OpenGLTestContext::new()?;
+        let context = OpenGLTestContext::new(width, height)?;
         context.make_current()?;
         let texture = unsafe {
             let texture = context.gl.create_texture()?;
