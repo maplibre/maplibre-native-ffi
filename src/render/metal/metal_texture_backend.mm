@@ -10,6 +10,7 @@
 #include <Metal/MTLCommandBuffer.hpp>
 #include <Metal/MTLCommandQueue.hpp>
 #include <Metal/MTLRenderPass.hpp>
+#include <TargetConditionals.h>
 
 #include "render/metal/metal_texture_backend.inc"
 

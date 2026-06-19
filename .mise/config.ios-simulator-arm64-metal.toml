@@ -1,0 +1,17 @@
+[env]
+MLN_FFI_VARIANT = "ios-simulator-arm64-metal"
+MLN_FFI_TARGET_TRIPLE = "ios-simulator-arm64"
+MLN_FFI_RENDER_BACKEND = "metal"
+MLN_FFI_BUILD_DIR = "{{config_root}}/build/ios-simulator-arm64-metal"
+MLN_FFI_ZIG_TARGET = "aarch64-ios-simulator"
+MLN_FFI_ZIG_BUILD_ARGS = "-Dtarget=aarch64-ios-simulator -Dcmake-artifact-dir=\"{{env.MLN_FFI_BUILD_DIR}}\" -Drender-backend=metal -Dinclude-dir=\"{{env.MLN_FFI_INCLUDE_DIR}}\""
+MLN_FFI_CMAKE_ARGS = """
+-DCMAKE_SYSTEM_NAME=iOS
+-DCMAKE_OSX_SYSROOT=iphonesimulator
+-DCMAKE_OSX_ARCHITECTURES=arm64
+-DCMAKE_OSX_DEPLOYMENT_TARGET=14.3
+"""
+MLN_FFI_SYSTEM_ROOT = "{% if os() == \"macos\" %}{{ exec(command='xcrun --sdk iphonesimulator --show-sdk-path', cache_key='iphonesimulator-sdk-path', cache_duration='1d') | trim }}{% endif %}"
+CMAKE_PREFIX_PATH = ""
+PKG_CONFIG_PATH = ""
+LIBCLANG_PATH = "{% if os() == \"macos\" %}{{ exec(command='dirname \"$(xcrun --find clang)\"', cache_key='xcode-clang-dir', cache_duration='1d') | trim }}{% endif %}"
