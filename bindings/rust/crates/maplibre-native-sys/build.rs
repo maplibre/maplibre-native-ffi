@@ -9,13 +9,16 @@ fn main() -> Result<(), Box<dyn Error>> {
     let manifest_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR")?);
     let repo_root = repo_root_from_manifest_dir(&manifest_dir)?;
     let header = repo_root.join("include/maplibre_native_c.h");
+
+    println!("cargo:rerun-if-env-changed=PKG_CONFIG_PATH");
+    print_rerun_if_pkg_config_file_changed();
+
     let library = pkg_config::Config::new().probe(LIBRARY_NAME).map_err(|error| {
         io::Error::other(format!(
             "could not find {LIBRARY_NAME} with pkg-config; run through mise or add the generated maplibre-native-c.pc directory to PKG_CONFIG_PATH: {error}"
         ))
     })?;
 
-    println!("cargo:rerun-if-env-changed=PKG_CONFIG_PATH");
     println!("cargo:rerun-if-env-changed=LIBCLANG_PATH");
     println!("cargo:rerun-if-env-changed=BINDGEN_EXTRA_CLANG_ARGS");
     print_rerun_if_changed(&repo_root.join("include"));
@@ -67,5 +70,18 @@ fn print_rerun_if_changed(path: &Path) {
     };
     for entry in entries.flatten() {
         print_rerun_if_changed(&entry.path());
+    }
+}
+
+fn print_rerun_if_pkg_config_file_changed() {
+    let Some(paths) = env::var_os("PKG_CONFIG_PATH") else {
+        return;
+    };
+
+    for path in env::split_paths(&paths) {
+        let pc_file = path.join(format!("{LIBRARY_NAME}.pc"));
+        if pc_file.is_file() {
+            println!("cargo:rerun-if-changed={}", pc_file.display());
+        }
     }
 }
