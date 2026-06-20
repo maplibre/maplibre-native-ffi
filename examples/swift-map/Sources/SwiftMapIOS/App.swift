@@ -19,7 +19,7 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
     installCAPILogging()
     validateMetalBackend()
 
-    let window = UIWindow(frame: .zero)
+    let window = UIWindow(frame: windowFrame(application))
     window.rootViewController = MapViewController()
     window.makeKeyAndVisible()
     self.window = window
@@ -42,6 +42,13 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
       fatalError("the loaded MapLibre native library does not support Metal")
     }
   }
+}
+
+@MainActor
+private func windowFrame(_ application: UIApplication) -> CGRect {
+  application.connectedScenes
+    .compactMap { ($0 as? UIWindowScene)?.screen.bounds }
+    .first ?? UIScreen.main.bounds
 }
 
 @MainActor
