@@ -75,7 +75,7 @@ val jextractArchive = layout.buildDirectory.file("jextract/openjdk-25-jextract.t
 val jextractInstallDir = layout.buildDirectory.dir("jextract/tool")
 val jextractExecutable = jextractInstallDir.map { dir ->
   dir
-    .file("jextract-25/bin/${if (hostOs.contains("windows")) "jextract.exe" else "jextract"}")
+    .file("jextract-25/bin/${if (hostOs.contains("windows")) "jextract.bat" else "jextract"}")
     .asFile
 }
 
