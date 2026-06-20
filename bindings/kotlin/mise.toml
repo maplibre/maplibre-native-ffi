@@ -1,39 +1,15 @@
 [tasks.build]
 depends = ["//:ensure-native-library"]
-run = """
-if [[ -z "${ANDROID_HOME:-}" && -d "$HOME/Library/Android/sdk" ]]; then
-  export ANDROID_HOME="$HOME/Library/Android/sdk"
-fi
-
-../../gradlew :bindings:kotlin:build
-"""
+run = "../../gradlew :bindings:kotlin:build"
 
 [tasks.jvmTest]
 depends = ["//:ensure-native-library"]
-run = """
-if [[ -z "${ANDROID_HOME:-}" && -d "$HOME/Library/Android/sdk" ]]; then
-  export ANDROID_HOME="$HOME/Library/Android/sdk"
-fi
-
-../../gradlew :bindings:kotlin:jvmTest
-"""
+run = "../../gradlew :bindings:kotlin:jvmTest"
 
 [tasks.nativeTest]
 depends = ["//:ensure-native-library"]
-run = """
-if [[ -z "${ANDROID_HOME:-}" && -d "$HOME/Library/Android/sdk" ]]; then
-  export ANDROID_HOME="$HOME/Library/Android/sdk"
-fi
-
-../../gradlew :bindings:kotlin:nativeTest
-"""
+run = "../../gradlew :bindings:kotlin:nativeTest"
 
 [tasks.androidBuild]
 depends = ["//:ensure-native-library"]
-run = """
-if [[ -z "${ANDROID_HOME:-}" && -d "$HOME/Library/Android/sdk" ]]; then
-  export ANDROID_HOME="$HOME/Library/Android/sdk"
-fi
-
-../../gradlew :bindings:kotlin:androidBuild
-"""
+run = "../../gradlew :bindings:kotlin:androidBuild"

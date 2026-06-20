@@ -1,0 +1,2 @@
+[env]
+ANDROID_HOME = "{% if env.ANDROID_HOME is defined %}{{ env.ANDROID_HOME }}{% elif os() == \"macos\" %}{{ env.HOME }}/Library/Android/sdk{% elif os() == \"linux\" %}{{ env.HOME }}/Android/Sdk{% elif os() == \"windows\" %}{{ env.LOCALAPPDATA }}/Android/Sdk{% endif %}"
