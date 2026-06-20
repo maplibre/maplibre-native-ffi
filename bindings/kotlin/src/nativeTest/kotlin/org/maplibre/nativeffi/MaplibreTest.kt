@@ -19,7 +19,7 @@ import org.maplibre.nativeffi.runtime.NetworkStatus
 import platform.posix.getenv
 
 @OptIn(ExperimentalForeignApi::class)
-class MaplibreTest {
+class MaplibreTest : org.maplibre.nativeffi.NativeTestBase() {
   @Test
   fun processGlobalNetworkStatusAndProjectionHelpersMatchNativeAbi() {
     Maplibre.loadNativeLibrary()

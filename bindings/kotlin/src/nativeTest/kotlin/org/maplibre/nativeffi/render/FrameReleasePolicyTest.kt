@@ -5,7 +5,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertSame
 
-class FrameReleasePolicyTest {
+class FrameReleasePolicyTest : org.maplibre.nativeffi.NativeTestBase() {
   @Test
   fun successfulReleaseClosesLocalState() {
     var released = false

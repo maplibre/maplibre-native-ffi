@@ -18,7 +18,7 @@ import org.maplibre.nativeffi.geo.Quaternion
 import org.maplibre.nativeffi.geo.Vec3
 import org.maplibre.nativeffi.runtime.RuntimeHandle
 
-class MapCameraControlsTest {
+class MapCameraControlsTest : org.maplibre.nativeffi.NativeTestBase() {
   // BND-102, BND-103: camera commands, transitions, viewport state, and projection helpers.
 
   @Test

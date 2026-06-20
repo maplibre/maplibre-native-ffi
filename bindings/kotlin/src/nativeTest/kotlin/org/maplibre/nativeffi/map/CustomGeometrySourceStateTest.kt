@@ -10,7 +10,7 @@ import org.maplibre.nativeffi.style.CustomGeometrySourceCallback
 import org.maplibre.nativeffi.style.CustomGeometrySourceOptions
 
 @OptIn(ExperimentalForeignApi::class)
-class CustomGeometrySourceStateTest {
+class CustomGeometrySourceStateTest : org.maplibre.nativeffi.NativeTestBase() {
   @Test
   fun callbacksCopyTileIdsContainHostFailuresAndStopAfterClose() {
     val received = mutableListOf<CanonicalTileId>()

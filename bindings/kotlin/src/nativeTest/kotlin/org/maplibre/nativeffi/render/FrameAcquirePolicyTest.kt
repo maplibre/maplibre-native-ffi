@@ -17,7 +17,7 @@ import org.maplibre.nativeffi.internal.c.mln_resource_transform_response_set_url
 import org.maplibre.nativeffi.internal.status.Status
 
 @OptIn(ExperimentalForeignApi::class)
-class FrameAcquirePolicyTest {
+class FrameAcquirePolicyTest : org.maplibre.nativeffi.NativeTestBase() {
   // BND-026, BND-167, BND-169, BND-172: frame-acquire cleanup preserves original failures.
 
   @Test

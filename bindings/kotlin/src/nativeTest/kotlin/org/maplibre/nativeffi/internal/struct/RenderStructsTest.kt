@@ -27,7 +27,7 @@ import org.maplibre.nativeffi.render.VulkanContextDescriptor
 import org.maplibre.nativeffi.render.VulkanSurfaceDescriptor
 
 @OptIn(ExperimentalForeignApi::class)
-class RenderStructsTest {
+class RenderStructsTest : org.maplibre.nativeffi.NativeTestBase() {
   @Test
   fun renderBackendMasksRoundTrip() {
     assertEquals(

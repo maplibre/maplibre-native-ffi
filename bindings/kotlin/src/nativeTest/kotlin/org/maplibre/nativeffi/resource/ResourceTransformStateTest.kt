@@ -15,7 +15,7 @@ import org.maplibre.nativeffi.internal.c.mln_resource_transform_response
 import org.maplibre.nativeffi.internal.callback.ResourceTransformState
 
 @OptIn(ExperimentalForeignApi::class)
-class ResourceTransformStateTest {
+class ResourceTransformStateTest : org.maplibre.nativeffi.NativeTestBase() {
   @Test
   fun transformCallbackCopiesRequestAndPreservesUnknownKindRawValue() {
     var copiedRequest: ResourceTransformRequest? = null

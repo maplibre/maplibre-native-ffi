@@ -38,7 +38,7 @@ import org.maplibre.nativeffi.style.TileSourceOptions
 import org.maplibre.nativeffi.style.VectorTileEncoding
 
 @OptIn(ExperimentalForeignApi::class)
-class StyleHandleTest {
+class StyleHandleTest : org.maplibre.nativeffi.NativeTestBase() {
   // BND-062: unknown output discriminators keep raw native values.
 
   @Test

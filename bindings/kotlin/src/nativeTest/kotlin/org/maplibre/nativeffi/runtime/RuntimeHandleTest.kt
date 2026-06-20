@@ -56,7 +56,7 @@ import platform.posix.pthread_tVar
 import platform.posix.usleep
 
 @OptIn(ExperimentalAtomicApi::class, ExperimentalForeignApi::class)
-class RuntimeHandleTest {
+class RuntimeHandleTest : org.maplibre.nativeffi.NativeTestBase() {
   // BND-001, BND-040, BND-041: runtime identity, release, and ABI guard behavior.
 
   @Test

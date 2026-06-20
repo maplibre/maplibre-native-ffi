@@ -9,7 +9,7 @@ import kotlinx.cinterop.ptr
 import org.maplibre.nativeffi.internal.c.mln_string_view
 
 @OptIn(ExperimentalForeignApi::class)
-class CoreStructsTest {
+class CoreStructsTest : org.maplibre.nativeffi.NativeTestBase() {
   // BND-063: borrowed native string views are copied using explicit lengths.
 
   @Test

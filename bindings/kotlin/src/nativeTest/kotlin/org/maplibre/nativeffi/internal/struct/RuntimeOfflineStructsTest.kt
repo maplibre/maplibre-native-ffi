@@ -44,7 +44,7 @@ import org.maplibre.nativeffi.runtime.OfflineOperationResultKind
 import org.maplibre.nativeffi.runtime.RuntimeEventPayload
 
 @OptIn(ExperimentalForeignApi::class)
-class RuntimeOfflineStructsTest {
+class RuntimeOfflineStructsTest : org.maplibre.nativeffi.NativeTestBase() {
   @Test
   fun offlineRegionDefinitionMaterializesTilePyramidAndGeometryVariants() {
     memScoped {

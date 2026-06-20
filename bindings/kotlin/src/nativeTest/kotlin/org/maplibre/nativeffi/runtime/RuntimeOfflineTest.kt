@@ -20,7 +20,7 @@ import org.maplibre.nativeffi.offline.OfflineRegionInfo
 import org.maplibre.nativeffi.offline.OfflineRegionStatus
 import platform.posix.usleep
 
-class RuntimeOfflineTest {
+class RuntimeOfflineTest : org.maplibre.nativeffi.NativeTestBase() {
   private val deferredEvents = ArrayDeque<RuntimeEvent>()
 
   @Test

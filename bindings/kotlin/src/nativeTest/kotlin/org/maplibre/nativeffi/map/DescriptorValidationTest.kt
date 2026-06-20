@@ -34,7 +34,7 @@ import org.maplibre.nativeffi.runtime.RuntimeHandle
 import org.maplibre.nativeffi.runtime.RuntimeOptions
 
 @OptIn(ExperimentalForeignApi::class)
-class DescriptorValidationTest {
+class DescriptorValidationTest : org.maplibre.nativeffi.NativeTestBase() {
   // BND-104: invalid map, projection, descriptor, and structured-value inputs report public errors.
 
   @Test

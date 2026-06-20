@@ -25,7 +25,7 @@ import platform.posix.pthread_join
 import platform.posix.pthread_tVar
 
 @OptIn(ExperimentalAtomicApi::class, ExperimentalForeignApi::class)
-class MapHandleTest {
+class MapHandleTest : org.maplibre.nativeffi.NativeTestBase() {
   // BND-042, BND-100, BND-190, BND-191: map creation, child lifetime, and owner-thread errors.
 
   @Test

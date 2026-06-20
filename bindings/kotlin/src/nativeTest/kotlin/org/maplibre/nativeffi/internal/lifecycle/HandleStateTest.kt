@@ -30,7 +30,7 @@ import platform.posix.pthread_tVar
 import platform.posix.usleep
 
 @OptIn(ExperimentalAtomicApi::class, ExperimentalForeignApi::class)
-class HandleStateTest {
+class HandleStateTest : org.maplibre.nativeffi.NativeTestBase() {
   // BND-040, BND-041, BND-046, BND-048: deterministic handle release seam coverage.
 
   @Test

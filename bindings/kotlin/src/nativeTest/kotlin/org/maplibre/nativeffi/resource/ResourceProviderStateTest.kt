@@ -40,7 +40,7 @@ import platform.posix.pthread_tVar
 import platform.posix.usleep
 
 @OptIn(ExperimentalAtomicApi::class, ExperimentalForeignApi::class)
-class ResourceProviderStateTest {
+class ResourceProviderStateTest : org.maplibre.nativeffi.NativeTestBase() {
   // BND-141, BND-069: request and response values are copied before user retention.
 
   @Test

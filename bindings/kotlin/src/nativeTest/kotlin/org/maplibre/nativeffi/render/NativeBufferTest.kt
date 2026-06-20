@@ -7,7 +7,7 @@ import kotlin.test.assertFailsWith
 import kotlinx.cinterop.ExperimentalForeignApi
 
 @OptIn(ExperimentalForeignApi::class)
-class NativeBufferTest {
+class NativeBufferTest : org.maplibre.nativeffi.NativeTestBase() {
   // BND-166: readback buffers expose bounded mutable storage and reject invalid lifetime use.
 
   @Test

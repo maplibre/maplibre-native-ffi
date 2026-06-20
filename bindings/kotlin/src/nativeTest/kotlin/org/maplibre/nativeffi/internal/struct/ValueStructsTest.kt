@@ -35,7 +35,7 @@ import org.maplibre.nativeffi.internal.c.mln_json_value
 import org.maplibre.nativeffi.json.JsonValue
 
 @OptIn(ExperimentalForeignApi::class)
-class ValueStructsTest {
+class ValueStructsTest : org.maplibre.nativeffi.NativeTestBase() {
   // BND-064, BND-065, BND-066, BND-067: value snapshots, GeoJSON, handle cleanup, and JSON shape.
 
   @Test
