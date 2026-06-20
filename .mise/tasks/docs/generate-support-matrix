@@ -1,0 +1,271 @@
+#!/usr/bin/env -S uv run --script
+# MISE description="Generate docs support matrix data from CI manifests."
+# /// script
+# dependencies = ["pydantic==2.13.4"]
+# ///
+
+import argparse
+import difflib
+import json
+import pathlib
+import sys
+from collections import defaultdict
+from typing import Any
+
+
+REPO_ROOT = pathlib.Path(__file__).resolve().parents[3]
+OUTPUT_PATH = REPO_ROOT / "docs" / "src" / "generated" / "support-matrix.json"
+sys.path.insert(0, str(REPO_ROOT))
+
+from ci.manifest import (  # noqa: E402
+    Variant,
+    load_subprojects,
+    load_variants,
+    subproject_matches_variant,
+)
+
+
+PLATFORM_LABELS = {
+    "android": "Android",
+    "ios": "iOS",
+    "linux": "Linux",
+    "macos": "macOS",
+    "ohos": "OpenHarmony",
+    "windows": "Windows",
+}
+
+ARCH_LABELS = {
+    "arm64": "arm64",
+    "x64": "x64",
+}
+
+BACKEND_LABELS = {
+    "metal": "Metal",
+    "opengl": "OpenGL",
+    "vulkan": "Vulkan",
+}
+
+SUBPROJECT_LABELS = {
+    "bindings-dotnet": "C#",
+    "bindings-java-ffm": "Java FFM",
+    "bindings-java-jni": "Java JNI",
+    "bindings-kotlin-native": "Kotlin/Native",
+    "bindings-rust": "Rust",
+    "bindings-swift": "Swift",
+    "bindings-zig": "Zig",
+    "examples-dotnet-map": "dotnet-map",
+    "examples-lwjgl-map": "lwjgl-map",
+    "examples-rust-map": "rust-map",
+    "examples-swift-map": "swift-map",
+    "examples-zig-map": "zig-map",
+    "examples-zig-readback": "zig-readback",
+}
+
+PLATFORM_ORDER = ["linux", "macos", "windows", "android", "ios", "ohos"]
+ARCH_ORDER = ["x64", "arm64"]
+BACKEND_ORDER = ["vulkan", "opengl", "metal"]
+
+
+def platform_sort_key(os_name: str) -> tuple[int, str]:
+    try:
+        return (PLATFORM_ORDER.index(os_name), os_name)
+    except ValueError:
+        return (len(PLATFORM_ORDER), os_name)
+
+
+def backend_sort_key(backend: str) -> tuple[int, str]:
+    try:
+        return (BACKEND_ORDER.index(backend), backend)
+    except ValueError:
+        return (len(BACKEND_ORDER), backend)
+
+
+def arch_sort_key(arch: str) -> tuple[int, str]:
+    try:
+        return (ARCH_ORDER.index(arch), arch)
+    except ValueError:
+        return (len(ARCH_ORDER), arch)
+
+
+def platform_label(os_name: str) -> str:
+    return PLATFORM_LABELS.get(os_name, os_name)
+
+
+def arch_label(arch: str) -> str:
+    return ARCH_LABELS.get(arch, arch)
+
+
+def backend_label(backend: str) -> str:
+    return BACKEND_LABELS.get(backend, backend)
+
+
+def variant_status(variant: Variant) -> str:
+    return "tested" if variant.supports_tests else "build-only"
+
+
+def subproject_status(actions: dict[str, str], variant: Variant) -> str:
+    if actions.get("run"):
+        return "run"
+    if actions.get("test") and variant.supports_tests:
+        return "tested"
+    return "build-only"
+
+
+def support_entry(variant: Variant, status: str) -> dict[str, str]:
+    return {
+        "backend": variant.backend,
+        "backendLabel": backend_label(variant.backend),
+        "status": status,
+        "variant": variant.name,
+    }
+
+
+def merge_backend_entries(entries: list[dict[str, str]]) -> list[dict[str, Any]]:
+    grouped: dict[str, list[dict[str, str]]] = defaultdict(list)
+    for entry in entries:
+        grouped[entry["backend"]].append(entry)
+
+    result = []
+    for backend in sorted(grouped, key=backend_sort_key):
+        backend_entries = grouped[backend]
+        statuses = {entry["status"] for entry in backend_entries}
+        status = (
+            "tested"
+            if "tested" in statuses
+            else "run"
+            if "run" in statuses
+            else "build-only"
+        )
+        result.append(
+            {
+                "backend": backend,
+                "backendLabel": backend_label(backend),
+                "status": status,
+                "variants": [
+                    {"name": entry["variant"], "status": entry["status"]}
+                    for entry in backend_entries
+                ],
+            }
+        )
+    return result
+
+
+def native_rows(variants: list[Variant]) -> list[dict[str, Any]]:
+    rows: dict[str, list[dict[str, str]]] = defaultdict(list)
+    row_arches: dict[str, set[str]] = defaultdict(set)
+    for variant in variants:
+        rows[variant.os].append(support_entry(variant, variant_status(variant)))
+        row_arches[variant.os].add(variant.arch)
+
+    return [
+        {
+            "platform": os_name,
+            "platformLabel": platform_label(os_name),
+            "architectures": sorted(row_arches[os_name], key=arch_sort_key),
+            "architectureLabels": [
+                arch_label(arch)
+                for arch in sorted(row_arches[os_name], key=arch_sort_key)
+            ],
+            "backends": merge_backend_entries(rows[os_name]),
+        }
+        for os_name in sorted(rows, key=platform_sort_key)
+    ]
+
+
+def subproject_rows(
+    variants: list[Variant], *, prefix: str, kind: str
+) -> list[dict[str, Any]]:
+    rows = []
+    for subproject in sorted(
+        load_subprojects(variants),
+        key=lambda subproject: (
+            SUBPROJECT_LABELS.get(subproject.name, subproject.name).casefold(),
+            subproject.name,
+        ),
+    ):
+        if not subproject.name.startswith(prefix):
+            continue
+
+        platform_entries: dict[str, list[dict[str, str]]] = defaultdict(list)
+        actions = subproject.manifest.ci.model_dump(exclude_none=True)
+        for variant in variants:
+            if not subproject_matches_variant(subproject, variant):
+                continue
+            platform_entries[variant.os].append(
+                support_entry(variant, subproject_status(actions, variant))
+            )
+
+        rows.append(
+            {
+                "id": subproject.name,
+                "kind": kind,
+                "label": SUBPROJECT_LABELS.get(subproject.name, subproject.name),
+                "source": str(subproject.path.relative_to(REPO_ROOT)),
+                "platforms": [
+                    {
+                        "platform": os_name,
+                        "platformLabel": platform_label(os_name),
+                        "backends": merge_backend_entries(platform_entries[os_name]),
+                    }
+                    for os_name in sorted(platform_entries, key=platform_sort_key)
+                ],
+            }
+        )
+    return rows
+
+
+def support_matrix() -> dict[str, Any]:
+    variants = load_variants()
+    native = native_rows(variants)
+    return {
+        "legend": {
+            "tested": "Built and tested in CI.",
+            "run": "Built and run in CI.",
+            "build-only": "Built in CI without tests for that variant.",
+        },
+        "platforms": [
+            {"platform": row["platform"], "platformLabel": row["platformLabel"]}
+            for row in native
+        ],
+        "native": native,
+        "bindings": subproject_rows(variants, prefix="bindings-", kind="binding"),
+        "examples": subproject_rows(variants, prefix="examples-", kind="example"),
+    }
+
+
+def render_json() -> str:
+    return json.dumps(support_matrix(), indent=2, sort_keys=False) + "\n"
+
+
+def check_output(expected: str) -> int:
+    actual = OUTPUT_PATH.read_text() if OUTPUT_PATH.exists() else ""
+    if actual == expected:
+        return 0
+    diff = difflib.unified_diff(
+        actual.splitlines(keepends=True),
+        expected.splitlines(keepends=True),
+        fromfile=str(OUTPUT_PATH),
+        tofile=f"{OUTPUT_PATH} (generated)",
+    )
+    sys.stderr.writelines(diff)
+    return 1
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--check", action="store_true", help="fail if support matrix data is stale"
+    )
+    args = parser.parse_args()
+
+    rendered = render_json()
+    if args.check:
+        return check_output(rendered)
+
+    OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
+    OUTPUT_PATH.write_text(rendered)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -3,6 +3,8 @@ title: MapLibre Native FFI
 description: Project overview.
 ---
 
+import SupportMatrix from "../../components/SupportMatrix.astro";
+
 MapLibre Native FFI provides an experimental C API for
 [MapLibre Native](https://github.com/maplibre/maplibre-native). It targets
 low-level language bindings and host integrations that need a C boundary instead
@@ -30,54 +32,4 @@ returns `0`.
 The C API covers most of the MapLibre Native API surface. Advanced extension
 APIs, including custom layers and shader registry access, are not yet included.
 
-Legend: 🟢 built and tested in CI; ❌ not yet implemented; `-` not applicable
-on that platform.
-
-| Platform | OpenGL            | Vulkan            | Metal             | WebGPU            |
-| -------- | ----------------- | ----------------- | ----------------- | ----------------- |
-| Linux    | 🟢 EGL            | 🟢                | -                 | ❌ [#37][issue-37] |
-| Android  | ❌ [#24][issue-24] | ❌ [#24][issue-24] | -                 | ❌ [#37][issue-37] |
-| macOS    | 🟢 EGL            | 🟢                | 🟢                | ❌ [#37][issue-37] |
-| iOS      | -                 | -                 | ❌ [#25][issue-25] | ❌ [#37][issue-37] |
-| Windows  | 🟢 WGL            | 🟢                | -                 | ❌ [#37][issue-37] |
-
-### Language bindings
-
-Legend: 🟢 present; 🟡 example without a binding yet; `-` not yet.
-
-| Language   | Binding                                                                           | Example                                                                                                                                                                                      | Package | Ecosystem |
-| ---------- | --------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- | --------- |
-| Zig        | [🟢](https://github.com/maplibre/maplibre-native-ffi/tree/main/bindings/zig)      | [🟢 zig-map](https://github.com/maplibre/maplibre-native-ffi/tree/main/examples/zig-map), [🟢 zig-readback](https://github.com/maplibre/maplibre-native-ffi/tree/main/examples/zig-readback) | -       | -         |
-| Rust       | [🟢](https://github.com/maplibre/maplibre-native-ffi/tree/main/bindings/rust)     | [🟢 rust-map](https://github.com/maplibre/maplibre-native-ffi/tree/main/examples/rust-map)                                                                                                   | -       | -         |
-| Java (FFM) | [🟢](https://github.com/maplibre/maplibre-native-ffi/tree/main/bindings/java-ffm) | [🟢 lwjgl-map](https://github.com/maplibre/maplibre-native-ffi/tree/main/examples/lwjgl-map)                                                                                                 | -       | -         |
-| Swift      | [🟢](https://github.com/maplibre/maplibre-native-ffi/tree/main/bindings/swift)    | [🟢 swift-map](https://github.com/maplibre/maplibre-native-ffi/tree/main/examples/swift-map)                                                                                                 | -       | -         |
-| Go         | [#43][issue-43]                                                                   | -                                                                                                                                                                                            | -       | -         |
-| Kotlin     | [#47][issue-47]                                                                   | -                                                                                                                                                                                            | -       | -         |
-| Python     | [#49][issue-49]                                                                   | -                                                                                                                                                                                            | -       | -         |
-| Node.js    | [#50][issue-50]                                                                   | -                                                                                                                                                                                            | -       | -         |
-| Dart       | [#51][issue-51]                                                                   | -                                                                                                                                                                                            | -       | -         |
-| C#         | [🟢](https://github.com/maplibre/maplibre-native-ffi/tree/main/bindings/dotnet)   | -                                                                                                                                                                                            | -       | -         |
-| Java (JNI) | [#46][issue-46]                                                                   | -                                                                                                                                                                                            | -       | -         |
-| Vala       | [#119][issue-119]                                                                 | -                                                                                                                                                                                            | -       | -         |
-
-[issue-24]: https://github.com/maplibre/maplibre-native-ffi/issues/24
-
-[issue-25]: https://github.com/maplibre/maplibre-native-ffi/issues/25
-
-[issue-37]: https://github.com/maplibre/maplibre-native-ffi/issues/37
-
-[issue-43]: https://github.com/maplibre/maplibre-native-ffi/issues/43
-
-[issue-44]: https://github.com/maplibre/maplibre-native-ffi/issues/44
-
-[issue-46]: https://github.com/maplibre/maplibre-native-ffi/issues/46
-
-[issue-47]: https://github.com/maplibre/maplibre-native-ffi/issues/47
-
-[issue-49]: https://github.com/maplibre/maplibre-native-ffi/issues/49
-
-[issue-50]: https://github.com/maplibre/maplibre-native-ffi/issues/50
-
-[issue-51]: https://github.com/maplibre/maplibre-native-ffi/issues/51
-
-[issue-119]: https://github.com/maplibre/maplibre-native-ffi/issues/119
+<SupportMatrix />

@@ -1,0 +1,181 @@
+---
+import supportMatrix from "../generated/support-matrix.json";
+import { Badge } from "@astrojs/starlight/components";
+
+type Status = keyof typeof supportMatrix.legend;
+type BadgeVariant = "default" | "note" | "success" | "caution";
+
+type Backend = {
+  backendLabel: string;
+  status: Status;
+  variants: { name: string; status: Status }[];
+};
+
+type PlatformSupport = {
+  platform: string;
+  platformLabel: string;
+  backends: Backend[];
+};
+
+type SubprojectSupport = {
+  label: string;
+  platforms: PlatformSupport[];
+};
+
+const platformColumns = supportMatrix.platforms.map((row) => ({
+  platform: row.platform,
+  label: row.platformLabel,
+}));
+
+function statusLabel(status: Status): string {
+  if (status === "build-only") {
+    return "build-only";
+  }
+  return status;
+}
+
+function badgeVariant(status: Status): BadgeVariant {
+  if (status === "tested" || status === "run") {
+    return "success";
+  }
+  if (status === "build-only") {
+    return "caution";
+  }
+  return "default";
+}
+
+function variantTitle(backend: Backend): string {
+  return backend.variants
+    .map((variant) => `${variant.name}: ${statusLabel(variant.status)}`)
+    .join("\n");
+}
+
+function platformSupport(
+  subproject: SubprojectSupport,
+  platform: string,
+): PlatformSupport | undefined {
+  return subproject.platforms.find((entry) => entry.platform === platform);
+}
+---
+
+<section class="support-matrix" aria-labelledby="support-native-heading">
+  <h3 id="support-native-heading">Native Platforms</h3>
+  <table>
+    <thead>
+      <tr>
+        <th scope="col">Platform</th>
+        <th scope="col">Architectures</th>
+        <th scope="col">Backends</th>
+      </tr>
+    </thead>
+    <tbody>
+      {supportMatrix.native.map((row) => (
+        <tr>
+          <th scope="row">{row.platformLabel}</th>
+          <td>{row.architectureLabels.join(", ")}</td>
+          <td>
+            <div class="support-badge-list">
+              {row.backends.map((backend) => (
+                <span class="support-backend" title={variantTitle(backend)}>
+                  <Badge
+                    text={backend.backendLabel}
+                    variant={badgeVariant(backend.status)}
+                    size="small"
+                  />
+                </span>
+              ))}
+            </div>
+          </td>
+        </tr>
+      ))}
+    </tbody>
+  </table>
+</section>
+
+<section class="support-matrix" aria-labelledby="support-bindings-heading">
+  <h3 id="support-bindings-heading">Language Bindings</h3>
+  <table>
+    <thead>
+      <tr>
+        <th scope="col">Binding</th>
+        {platformColumns.map((platform) => (
+          <th scope="col">{platform.label}</th>
+        ))}
+      </tr>
+    </thead>
+    <tbody>
+      {supportMatrix.bindings.map((binding) => (
+        <tr>
+          <th scope="row">{binding.label}</th>
+          {platformColumns.map((platform) => {
+            const support = platformSupport(binding, platform.platform);
+            return (
+              <td>
+                {support ? (
+                  <div class="support-badge-list">
+                    {support.backends.map((backend) => (
+                      <span
+                        class="support-backend"
+                        title={variantTitle(backend)}
+                      >
+                        <Badge
+                          text={backend.backendLabel}
+                          variant={badgeVariant(backend.status)}
+                          size="small"
+                        />
+                      </span>
+                    ))}
+                  </div>
+                ) : <span class="support-empty">-</span>}
+              </td>
+            );
+          })}
+        </tr>
+      ))}
+    </tbody>
+  </table>
+</section>
+
+<section class="support-matrix" aria-labelledby="support-examples-heading">
+  <h3 id="support-examples-heading">Examples</h3>
+  <table>
+    <thead>
+      <tr>
+        <th scope="col">Example</th>
+        {platformColumns.map((platform) => (
+          <th scope="col">{platform.label}</th>
+        ))}
+      </tr>
+    </thead>
+    <tbody>
+      {supportMatrix.examples.map((example) => (
+        <tr>
+          <th scope="row">{example.label}</th>
+          {platformColumns.map((platform) => {
+            const support = platformSupport(example, platform.platform);
+            return (
+              <td>
+                {support ? (
+                  <div class="support-badge-list">
+                    {support.backends.map((backend) => (
+                      <span
+                        class="support-backend"
+                        title={variantTitle(backend)}
+                      >
+                        <Badge
+                          text={backend.backendLabel}
+                          variant={badgeVariant(backend.status)}
+                          size="small"
+                        />
+                      </span>
+                    ))}
+                  </div>
+                ) : <span class="support-empty">-</span>}
+              </td>
+            );
+          })}
+        </tr>
+      ))}
+    </tbody>
+  </table>
+</section>
