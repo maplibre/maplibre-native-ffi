@@ -43,13 +43,13 @@ struct MlnRustHttpResponse {
 
 using MlnRustHttpCallback = void (*)(void*, MlnRustHttpResponse);
 
-auto mln_rust_http_request_start(
+auto mlnffi_rust_http_request_start(
   const char* url, const MlnRustHttpHeader* headers, std::size_t headerCount,
   MlnRustHttpCallback callback, void* userData
 ) -> void*;
-void mln_rust_http_request_cancel(void* handle);
-void mln_rust_http_request_free(void* handle);
-void mln_rust_http_response_free(MlnRustHttpResponse response);
+void mlnffi_rust_http_request_cancel(void* handle);
+void mlnffi_rust_http_request_free(void* handle);
+void mlnffi_rust_http_response_free(MlnRustHttpResponse response);
 
 }  // extern "C"
 
@@ -107,7 +107,7 @@ class RustHttpResponse {
   RustHttpResponse(RustHttpResponse&&) = delete;
   auto operator=(RustHttpResponse&&) -> RustHttpResponse& = delete;
 
-  ~RustHttpResponse() { mln_rust_http_response_free(response); }
+  ~RustHttpResponse() { mlnffi_rust_http_response_free(response); }
 
   [[nodiscard]] auto get() const -> const MlnRustHttpResponse& {
     return response;
@@ -128,8 +128,8 @@ class RustHttpRequestHandle {
 
   ~RustHttpRequestHandle() {
     if (handle != nullptr) {
-      mln_rust_http_request_cancel(handle);
-      mln_rust_http_request_free(handle);
+      mlnffi_rust_http_request_cancel(handle);
+      mlnffi_rust_http_request_free(handle);
     }
   }
 
@@ -330,7 +330,7 @@ class HTTPRequest : public AsyncRequest {
     // NOLINTNEXTLINE(cppcoreguidelines-owning-memory)
     auto* stateForCallback = new std::shared_ptr<HTTPRequestState>{state};
     handle =
-      std::make_unique<RustHttpRequestHandle>(mln_rust_http_request_start(
+      std::make_unique<RustHttpRequestHandle>(mlnffi_rust_http_request_start(
         url.c_str(), headers.data(), headers.size(), onComplete,
         stateForCallback
       ));

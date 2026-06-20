@@ -17,7 +17,7 @@ pub struct MlnRustDecodedImage {
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_rust_decode_image(
+pub unsafe extern "C" fn mlnffi_rust_decode_image(
     data: *const u8,
     data_len: usize,
 ) -> MlnRustDecodedImage {
@@ -34,9 +34,9 @@ pub unsafe extern "C" fn mln_rust_decode_image(
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_rust_decoded_image_free(image: MlnRustDecodedImage) {
+pub unsafe extern "C" fn mlnffi_rust_decoded_image_free(image: MlnRustDecodedImage) {
     if !image.data.is_null() && image.data_len > 0 {
-        // SAFETY: `mln_rust_decode_image` returns `data` from `Box<[u8]>`,
+        // SAFETY: `mlnffi_rust_decode_image` returns `data` from `Box<[u8]>`,
         // and ownership is transferred back here with the original length.
         unsafe {
             drop(Box::from_raw(slice::from_raw_parts_mut(

@@ -23,7 +23,7 @@ pub(crate) fn tls_verifier_initialized() -> bool {
 
 #[cfg(target_os = "android")]
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_rust_android_init_tls_verifier(
+pub unsafe extern "C" fn mlnffi_rust_android_init_tls_verifier(
     jni_env: *mut c_void,
     context: *mut c_void,
 ) -> *mut c_char {
@@ -53,7 +53,7 @@ pub unsafe extern "C" fn mln_rust_android_init_tls_verifier(
 
 #[cfg(not(target_os = "android"))]
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_rust_android_init_tls_verifier(
+pub unsafe extern "C" fn mlnffi_rust_android_init_tls_verifier(
     _jni_env: *mut c_void,
     _context: *mut c_void,
 ) -> *mut c_char {
@@ -85,7 +85,7 @@ fn init_tls_verifier(jni_env: *mut c_void, context: *mut c_void) -> Result<(), S
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_rust_android_error_free(error: *mut c_char) {
+pub unsafe extern "C" fn mlnffi_rust_android_error_free(error: *mut c_char) {
     if error.is_null() {
         return;
     }
