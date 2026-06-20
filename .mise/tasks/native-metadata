@@ -102,7 +102,13 @@ def properties_escape(value: str) -> str:
 
 
 def pc_escape(value: str) -> str:
-    return value.replace("\\", "\\\\").replace(" ", "\\ ").replace("\t", "\\\t")
+    return (
+        value.replace("\\", "\\\\")
+        .replace(" ", "\\ ")
+        .replace("\t", "\\\t")
+        .replace("#", "\\#")
+        .replace("$", "\\$")
+    )
 
 
 def linker_flags(artifact: Artifact) -> list[str]:

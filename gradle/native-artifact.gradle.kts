@@ -1,6 +1,7 @@
 import org.maplibre.nativeffi.gradle.MaplibreNativeCArtifact
 
 fun Project.maplibreNativeCPropertiesFile(): File {
+  // These binding builds consume a configured native artifact and are invoked through mise tasks.
   val buildDir =
     providers.environmentVariable("MLN_FFI_BUILD_DIR").orNull
       ?: throw GradleException(
