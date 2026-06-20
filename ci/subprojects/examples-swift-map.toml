@@ -1,6 +1,6 @@
 [requires]
 backend = ["metal"]
-os = ["macos"]
+os = ["macos", "ios"]
 
 [ci]
 build = "//examples/swift-map:build"
