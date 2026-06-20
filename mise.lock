@@ -865,34 +865,6 @@ conda_deps = [
 version = "10.0.203"
 backend = "core:dotnet"
 
-[[tools."github:cmakefmt/cmakefmt"]]
-version = "1.3.0"
-backend = "github:cmakefmt/cmakefmt"
-
-[tools."github:cmakefmt/cmakefmt"."platforms.linux-arm64"]
-checksum = "sha256:85363f90d90939dd846fdc6ef65feb9ba1b6777a5733118a2e83781c896564bb"
-url = "https://github.com/cmakefmt/cmakefmt/releases/download/v1.3.0/cmakefmt-1.3.0-aarch64-unknown-linux-gnu.tar.gz"
-url_api = "https://api.github.com/repos/cmakefmt/cmakefmt/releases/assets/405499421"
-provenance = "github-attestations"
-
-[tools."github:cmakefmt/cmakefmt"."platforms.linux-x64"]
-checksum = "sha256:c914aebe64d0b3d2cfb82bf91bf9c2a7df6a73f69b42f01cd659e634935c1cae"
-url = "https://github.com/cmakefmt/cmakefmt/releases/download/v1.3.0/cmakefmt-1.3.0-x86_64-unknown-linux-gnu.tar.gz"
-url_api = "https://api.github.com/repos/cmakefmt/cmakefmt/releases/assets/405499413"
-provenance = "github-attestations"
-
-[tools."github:cmakefmt/cmakefmt"."platforms.macos-arm64"]
-checksum = "sha256:7c87caaa045eca0fa748378cc42c60045106021eb8f65f54fccccdb318dcf8c8"
-url = "https://github.com/cmakefmt/cmakefmt/releases/download/v1.3.0/cmakefmt-1.3.0-aarch64-apple-darwin.tar.gz"
-url_api = "https://api.github.com/repos/cmakefmt/cmakefmt/releases/assets/405499422"
-provenance = "github-attestations"
-
-[tools."github:cmakefmt/cmakefmt"."platforms.windows-x64"]
-checksum = "sha256:f036bdf5c712ec0ad7e1842cadb9d7c509f45bd05ecb9de5f4de067bbaab6eb4"
-url = "https://github.com/cmakefmt/cmakefmt/releases/download/v1.3.0/cmakefmt-1.3.0-x86_64-pc-windows-msvc.zip"
-url_api = "https://api.github.com/repos/cmakefmt/cmakefmt/releases/assets/405499418"
-provenance = "github-attestations"
-
 [[tools."github:prefix-dev/pixi"]]
 version = "0.68.1"
 backend = "github:prefix-dev/pixi"

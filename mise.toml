@@ -46,7 +46,6 @@ config_roots = [".devcontainer", "bindings/*", "examples/*", "docs"]
 "conda:glslang" = { version = "16.3.0", os = ["linux", "macos", "windows/x64"] } # no Windows ARM64 conda package
 "conda:pkg-config" = { version = "0.29.2", os = ["linux", "macos", "windows/x64"] } # no Windows ARM64 conda package
 "conda:vulkan-tools" = { version = "1.4.341.0", os = ["linux", "macos", "windows/x64"] } # no Windows ARM64 conda package
-"github:cmakefmt/cmakefmt" = { version = "1.3.0", os = ["linux", "macos", "windows/x64"] } # no Windows ARM64 release asset
 "aqua:XcodesOrg/xcodes" = { version = "1.6.2", os = ["macos"] }
 
 # Node.js ecosystem

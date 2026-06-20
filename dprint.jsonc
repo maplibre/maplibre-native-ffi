@@ -43,14 +43,6 @@
   "exec": {
     "commands": [
       {
-        "command": "cmakefmt --line-width {{line_width}} --tab-size {{indent_width}} -",
-        "exts": ["cmake"],
-      },
-      {
-        "command": "cmakefmt --line-width {{line_width}} --tab-size {{indent_width}} -",
-        "fileNames": ["cmakelists.txt", "cmakelists.txt.in"],
-      },
-      {
         "command": "mise run _ktfmt --google-style - --stdin-name={{file_path}}",
         "exts": ["kt", "kts"],
       },
@@ -79,6 +71,7 @@
   },
   "plugins": [
     "https://plugins.dprint.dev/sargunv/dprint-clang-format-0.1.0.wasm",
+    "https://plugins.dprint.dev/sargunv/dprint-cmakefmt-0.1.0.wasm",
     "https://plugins.dprint.dev/exec-0.6.2.json@df98f54ffd3092b8a841aedd6d098a2651f16d0a796a40535774f1a8b4b9d463",
     "https://plugins.dprint.dev/ruff-0.7.0.wasm",
     "https://plugins.dprint.dev/oxc-0.20.0.wasm",
