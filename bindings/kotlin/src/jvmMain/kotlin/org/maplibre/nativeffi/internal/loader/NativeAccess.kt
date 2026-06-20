@@ -2530,6 +2530,7 @@ internal object NativeAccess {
   internal fun takeOfflineRegionStatusResult(
     runtime: MemorySegment,
     operationId: Long,
+    markTaken: () -> Unit,
   ): OfflineRegionStatus =
     Arena.ofConfined().use { arena ->
       val status = arena.allocate(OFFLINE_REGION_STATUS_SIZE)
@@ -2542,18 +2543,29 @@ internal object NativeAccess {
         runtimeOfflineRegionStatusTakeResultFunction()
           .invokeWithArguments(runtime, operationId, status) as Int
       )
-      offlineRegionStatus(status)
+      try {
+        offlineRegionStatus(status)
+      } finally {
+        markTaken()
+      }
     }
 
   internal fun takeCreateOfflineRegionResult(
     runtime: MemorySegment,
     operationId: Long,
+    markTaken: () -> Unit,
   ): OfflineRegionInfo =
-    takeOfflineRegionSnapshot(runtime, operationId, runtimeOfflineRegionCreateTakeResultFunction())
+    takeOfflineRegionSnapshot(
+      runtime,
+      operationId,
+      runtimeOfflineRegionCreateTakeResultFunction(),
+      markTaken,
+    )
 
   internal fun takeOfflineRegionResult(
     runtime: MemorySegment,
     operationId: Long,
+    markTaken: () -> Unit,
   ): OfflineRegionInfo? =
     Arena.ofConfined().use { arena ->
       val outSnapshot = arena.allocate(ValueLayout.ADDRESS)
@@ -2565,35 +2577,50 @@ internal object NativeAccess {
           .invokeWithArguments(runtime, operationId, outSnapshot, outFound) as Int
       )
       if (!outFound.get(ValueLayout.JAVA_BOOLEAN, 0)) {
+        markTaken()
         return@use null
       }
-      offlineRegionSnapshot(outSnapshot.get(ValueLayout.ADDRESS, 0))
+      try {
+        offlineRegionSnapshot(outSnapshot.get(ValueLayout.ADDRESS, 0))
+      } finally {
+        markTaken()
+      }
     }
 
   internal fun takeOfflineRegionsResult(
     runtime: MemorySegment,
     operationId: Long,
+    markTaken: () -> Unit,
   ): List<OfflineRegionInfo> =
-    takeOfflineRegionList(runtime, operationId, runtimeOfflineRegionsListTakeResultFunction())
+    takeOfflineRegionList(
+      runtime,
+      operationId,
+      runtimeOfflineRegionsListTakeResultFunction(),
+      markTaken,
+    )
 
   internal fun takeMergeOfflineRegionsDatabaseResult(
     runtime: MemorySegment,
     operationId: Long,
+    markTaken: () -> Unit,
   ): List<OfflineRegionInfo> =
     takeOfflineRegionList(
       runtime,
       operationId,
       runtimeOfflineRegionsMergeDatabaseTakeResultFunction(),
+      markTaken,
     )
 
   internal fun takeUpdateOfflineRegionMetadataResult(
     runtime: MemorySegment,
     operationId: Long,
+    markTaken: () -> Unit,
   ): OfflineRegionInfo =
     takeOfflineRegionSnapshot(
       runtime,
       operationId,
       runtimeOfflineRegionUpdateMetadataTakeResultFunction(),
+      markTaken,
     )
 
   internal fun pollRuntimeEvent(runtime: MemorySegment): NativeRuntimeEvent? =
@@ -4702,24 +4729,34 @@ internal object NativeAccess {
     runtime: MemorySegment,
     operationId: Long,
     function: MethodHandle,
+    markTaken: () -> Unit,
   ): OfflineRegionInfo =
     Arena.ofConfined().use { arena ->
       val outSnapshot = arena.allocate(ValueLayout.ADDRESS)
       outSnapshot.set(ValueLayout.ADDRESS, 0, MemorySegment.NULL)
       Status.check(function.invokeWithArguments(runtime, operationId, outSnapshot) as Int)
-      offlineRegionSnapshot(outSnapshot.get(ValueLayout.ADDRESS, 0))
+      try {
+        offlineRegionSnapshot(outSnapshot.get(ValueLayout.ADDRESS, 0))
+      } finally {
+        markTaken()
+      }
     }
 
   private fun takeOfflineRegionList(
     runtime: MemorySegment,
     operationId: Long,
     function: MethodHandle,
+    markTaken: () -> Unit,
   ): List<OfflineRegionInfo> =
     Arena.ofConfined().use { arena ->
       val outList = arena.allocate(ValueLayout.ADDRESS)
       outList.set(ValueLayout.ADDRESS, 0, MemorySegment.NULL)
       Status.check(function.invokeWithArguments(runtime, operationId, outList) as Int)
-      offlineRegionList(outList.get(ValueLayout.ADDRESS, 0))
+      try {
+        offlineRegionList(outList.get(ValueLayout.ADDRESS, 0))
+      } finally {
+        markTaken()
+      }
     }
 
   private fun offlineRegionInfo(info: MemorySegment): OfflineRegionInfo =

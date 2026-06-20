@@ -150,9 +150,11 @@ public actual class RuntimeHandle private constructor(private val handle: Memory
         OfflineOperationKind.REGION_CREATE,
         OfflineOperationResultKind.REGION,
       )
-    val region = NativeAccess.takeCreateOfflineRegionResult(requireLiveHandle(), operationId)
-    operation.markConsumed()
-    return region
+    return NativeAccess.takeCreateOfflineRegionResult(
+      requireLiveHandle(),
+      operationId,
+      operation::markConsumed,
+    )
   }
 
   public actual fun takeOfflineRegionResult(
@@ -164,9 +166,11 @@ public actual class RuntimeHandle private constructor(private val handle: Memory
         OfflineOperationKind.REGION_GET,
         OfflineOperationResultKind.OPTIONAL_REGION,
       )
-    val region = NativeAccess.takeOfflineRegionResult(requireLiveHandle(), operationId)
-    operation.markConsumed()
-    return region
+    return NativeAccess.takeOfflineRegionResult(
+      requireLiveHandle(),
+      operationId,
+      operation::markConsumed,
+    )
   }
 
   public actual fun takeOfflineRegionsResult(
@@ -178,9 +182,11 @@ public actual class RuntimeHandle private constructor(private val handle: Memory
         OfflineOperationKind.REGIONS_LIST,
         OfflineOperationResultKind.REGION_LIST,
       )
-    val regions = NativeAccess.takeOfflineRegionsResult(requireLiveHandle(), operationId)
-    operation.markConsumed()
-    return regions
+    return NativeAccess.takeOfflineRegionsResult(
+      requireLiveHandle(),
+      operationId,
+      operation::markConsumed,
+    )
   }
 
   public actual fun takeMergeOfflineRegionsDatabaseResult(
@@ -192,10 +198,11 @@ public actual class RuntimeHandle private constructor(private val handle: Memory
         OfflineOperationKind.REGIONS_MERGE_DATABASE,
         OfflineOperationResultKind.REGION_LIST,
       )
-    val regions =
-      NativeAccess.takeMergeOfflineRegionsDatabaseResult(requireLiveHandle(), operationId)
-    operation.markConsumed()
-    return regions
+    return NativeAccess.takeMergeOfflineRegionsDatabaseResult(
+      requireLiveHandle(),
+      operationId,
+      operation::markConsumed,
+    )
   }
 
   public actual fun takeUpdateOfflineRegionMetadataResult(
@@ -207,10 +214,11 @@ public actual class RuntimeHandle private constructor(private val handle: Memory
         OfflineOperationKind.REGION_UPDATE_METADATA,
         OfflineOperationResultKind.REGION,
       )
-    val region =
-      NativeAccess.takeUpdateOfflineRegionMetadataResult(requireLiveHandle(), operationId)
-    operation.markConsumed()
-    return region
+    return NativeAccess.takeUpdateOfflineRegionMetadataResult(
+      requireLiveHandle(),
+      operationId,
+      operation::markConsumed,
+    )
   }
 
   public actual fun takeOfflineRegionStatusResult(
@@ -222,9 +230,11 @@ public actual class RuntimeHandle private constructor(private val handle: Memory
         OfflineOperationKind.REGION_GET_STATUS,
         OfflineOperationResultKind.REGION_STATUS,
       )
-    val status = NativeAccess.takeOfflineRegionStatusResult(requireLiveHandle(), operationId)
-    operation.markConsumed()
-    return status
+    return NativeAccess.takeOfflineRegionStatusResult(
+      requireLiveHandle(),
+      operationId,
+      operation::markConsumed,
+    )
   }
 
   public actual fun setResourceProvider(callback: ResourceProviderCallback) {

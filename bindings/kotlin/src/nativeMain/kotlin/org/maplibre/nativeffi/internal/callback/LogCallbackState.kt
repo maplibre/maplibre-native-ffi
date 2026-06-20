@@ -47,6 +47,7 @@ internal class LogCallbackState private constructor(private val callback: LogCal
     private val registry = LogCallbackRegistry<LogCallbackState>()
 
     fun set(callback: LogCallback) {
+      registry.current()?.checkCanClose()
       registry.set(LogCallbackState(callback)) {
         mln_log_set_callback(staticCFunction(::logCallback), null)
       }
@@ -57,6 +58,7 @@ internal class LogCallbackState private constructor(private val callback: LogCal
       install: () -> Int,
       captureReplacement: (LogCallbackState) -> Unit,
     ) {
+      registry.current()?.checkCanClose()
       registry.set(LogCallbackState(callback).also(captureReplacement), install)
     }
 

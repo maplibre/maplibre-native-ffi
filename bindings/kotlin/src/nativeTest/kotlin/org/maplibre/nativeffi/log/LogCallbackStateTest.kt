@@ -170,6 +170,28 @@ class LogCallbackStateTest : org.maplibre.nativeffi.NativeTestBase() {
   }
 
   @Test
+  fun setDuringLogCallbackRejectsBeforeNativeInstall() {
+    var setError: Throwable? = null
+    lateinit var state: LogCallbackState
+    try {
+      Maplibre.setLogCallback(
+        LogCallback {
+          setError =
+            assertFailsWith<InvalidStateException> { Maplibre.setLogCallback(LogCallback { true }) }
+          true
+        }
+      )
+      state = requireNotNull(LogCallbackState.currentForTesting())
+
+      assertEquals(1U, state.invoke(1U, 3U, 7L, null))
+      assertTrue(setError is InvalidStateException)
+      assertTrue(LogCallbackState.currentForTesting() === state)
+    } finally {
+      Maplibre.clearLogCallback()
+    }
+  }
+
+  @Test
   fun concurrentCloseDuringLogCallbackAllowsEnteredCallbackAndSuppressesLaterUpcalls() {
     val phase = AtomicInt(LOG_PHASE_READY)
     val closeStarted = AtomicInt(0)
