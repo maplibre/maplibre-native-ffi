@@ -1,0 +1,2 @@
+[env]
+OHOS_SDK_NATIVE = "{% if env.OHOS_SDK_NATIVE is defined %}{{ env.OHOS_SDK_NATIVE }}{% elif os() == \"macos\" %}/Applications/DevEco-Studio.app/Contents/sdk/default/openharmony/native{% elif os() == \"linux\" %}{{ env.HOME }}/ohos-sdk/ohos-sdk/linux/native{% elif os() == \"windows\" %}{{ env.LOCALAPPDATA }}/Huawei/Sdk/default/openharmony/native{% endif %}"
