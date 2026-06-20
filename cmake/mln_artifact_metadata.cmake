@@ -72,7 +72,7 @@ function(mln_write_artifact_metadata target)
       mlt-cpp)
 
     if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
-      list(APPEND link_libraries objc sqlite3 z)
+      list(APPEND link_libraries c++ objc sqlite3 z)
       list(
         APPEND
         frameworks
