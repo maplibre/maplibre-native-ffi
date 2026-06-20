@@ -41,7 +41,6 @@ config_roots = [".devcontainer", "bindings/*", "examples/*", "docs"]
 "github:prefix-dev/pixi" = "0.68.1"
 "aqua:Kitware/CMake" = "4.3.3"
 "aqua:ninja-build/ninja" = "1.13.2"
-"conda:clang-format" = { version = "22.1.7", os = ["linux", "macos", "windows/x64"] } # no Windows ARM64 conda package
 "conda:clang-tools" = { version = "22.1.7", os = ["linux", "macos", "windows/x64"] } # no Windows ARM64 conda package
 "conda:doxygen" = { version = "1.13.2", os = ["linux", "macos", "windows/x64"] } # no Windows ARM64 conda package
 "conda:glslang" = { version = "16.3.0", os = ["linux", "macos", "windows/x64"] } # no Windows ARM64 conda package

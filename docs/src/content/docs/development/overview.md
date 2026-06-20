@@ -101,9 +101,9 @@ Mise also provides ecosystem entrypoints such as Pixi, Zig, Python, uv, Node,
 and pnpm.
 
 [`pixi`](https://pixi.sh/) installs the desktop native libraries used by local
-builds. CMake, Ninja, pkg-config, shader tools, Doxygen, clang-format, and
-clang-tidy are pinned by mise. Host platform toolchains provide C and C++
-compilers, and CMake builds the native C/C++ library.
+builds. CMake, Ninja, pkg-config, shader tools, Doxygen, and clang-tidy are
+pinned by mise. Host platform toolchains provide C and C++ compilers, and CMake
+builds the native C/C++ library.
 
 Language package managers own dependencies inside their ecosystems. For example,
 `uv` owns Python package dependencies, `pnpm` owns Node package dependencies,

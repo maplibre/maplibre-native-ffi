@@ -609,58 +609,6 @@ url = "https://github.com/rhysd/actionlint/releases/download/v1.7.8/actionlint_1
 checksum = "sha256:8cae2385eb69b93084ea2e6a4bce57233feb56ab16b3087bea25cbc0abadb0cc"
 url = "https://github.com/rhysd/actionlint/releases/download/v1.7.8/actionlint_1.7.8_windows_amd64.zip"
 
-[[tools."conda:clang-format"]]
-version = "22.1.7"
-backend = "conda:clang-format"
-
-[tools."conda:clang-format".options]
-channel = "conda-forge"
-
-[tools."conda:clang-format"."platforms.linux-arm64"]
-checksum = "sha256:98553bfe9cfb80699061944901ccdf2fcb3fef70c4153500b6d79ec53d080613"
-url = "https://conda.anaconda.org/conda-forge/linux-aarch64/clang-format-22.1.7-default_h2a92e99_1.conda"
-conda_deps = [
-    "clang-format-22-22.1.7-default_h2a92e99_1",
-    "libclang-cpp22.1-22.1.8-default_h2a92e99_2",
-    "libgcc-15.2.0-h8acb6b2_19",
-    "libstdcxx-15.2.0-hef695bb_19",
-    "libllvm22-22.1.8-hfd2ba90_1",
-    "libzlib-1.3.2-hdc9db2a_2",
-    "_openmp_mutex-4.5-20_gnu",
-    "libgomp-15.2.0-h8acb6b2_19",
-    "libxml2-2.15.3-h9ba8346_0",
-    "libxml2-16-2.15.3-h064b767_0",
-    "liblzma-5.8.3-he30d5cf_0",
-    "zstd-1.5.7-h85ac4a6_6",
-    "libiconv-1.18-h90929bb_2",
-]
-
-[tools."conda:clang-format"."platforms.macos-arm64"]
-checksum = "sha256:f60a39ccfc457b49bdc532c205d7f225ac5627997c73fbbec02377aa3c00a07d"
-url = "https://conda.anaconda.org/conda-forge/osx-arm64/clang-format-22.1.7-default_h8e162e0_1.conda"
-conda_deps = [
-    "clang-format-22-22.1.7-default_h8e162e0_1",
-    "libclang-cpp22.1-22.1.8-default_h8e162e0_2",
-    "libcxx-22.1.8-h55c6f16_0",
-    "libllvm22-22.1.8-h89af1be_1",
-    "libzlib-1.3.2-h8088a28_2",
-    "libxml2-2.15.3-heed7d32_0",
-    "libxml2-16-2.15.3-h6967ea9_0",
-    "liblzma-5.8.3-h8088a28_0",
-    "zstd-1.5.7-hbf9d68e_6",
-    "libiconv-1.18-h23cfdf5_2",
-]
-
-[tools."conda:clang-format"."platforms.windows-x64"]
-checksum = "sha256:2d2d460d55ca190c3e80c560de6d25559af38fb08e5c10d8c4efec5f88cbfbc7"
-url = "https://conda.anaconda.org/conda-forge/win-64/clang-format-22.1.7-default_hac490eb_1.conda"
-conda_deps = [
-    "ucrt-10.0.26100.0-h57928b3_0",
-    "vc-14.5-h1b7c187_39",
-    "vc14_runtime-14.51.36231-h1b9f54f_39",
-    "vcomp14-14.51.36231-h1b9f54f_39",
-]
-
 [[tools."conda:clang-tools"]]
 version = "22.1.7"
 backend = "conda:clang-tools"
