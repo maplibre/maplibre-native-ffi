@@ -4,3 +4,67 @@ run = [
   { task = ":jextract:update-includes" },
   "../../gradlew :bindings:java-ffm:build",
 ]
+
+[tasks."ci:jextract-diagnostics"]
+description = "Print macOS jextract diagnostics and stop CI before the full binding build."
+run = [
+  { task = "//:ensure-native-library" },
+  { task = ":jextract:update-includes" },
+  '''
+  set -x
+
+  echo "=== host ==="
+  uname -a
+  sw_vers || true
+  xcode-select -p || true
+  xcodebuild -version || true
+  xcrun --sdk macosx --show-sdk-path || true
+  xcrun --sdk macosx --show-sdk-version || true
+
+  echo "=== tools ==="
+  java -version
+  clang --version || true
+  xcrun clang --version || true
+  pkg-config --version || true
+  cmake --version || true
+
+  echo "=== environment ==="
+  env | sort | grep -E '^(CI|GITHUB_|JAVA_HOME|JDK_JAVA_OPTIONS|LIBCLANG_PATH|MLN_FFI_|PKG_CONFIG_PATH|SDKROOT|DEVELOPER_DIR|PATH)=' || true
+
+  echo "=== native metadata ==="
+  sed -n '1,200p' "$MLN_FFI_BUILD_DIR/maplibre-native-c.gradle.properties"
+  sed -n '1,200p' "$MLN_FFI_BUILD_DIR/maplibre-native-c.pc"
+
+  echo "=== jextract includes ==="
+  sed -n '1,200p' src/jextract/maplibre-native-c.includes
+
+  rm -rf build/generated/sources/jextract
+  ../../gradlew :bindings:java-ffm:generateMaplibreNativeCBindings --rerun-tasks --no-build-cache --no-configuration-cache --no-daemon --info
+
+  echo "=== jextract installation ==="
+  find ../../.gradle/jextract -path '*/bin/jextract' -type f -print -exec {} --version \;
+
+  generated_dir="build/generated/sources/jextract/java/maplibreNativeC/org/maplibre/nativeffi/internal/c"
+
+  echo "=== suspicious generated identifiers ==="
+  grep -RIn -F 'union (unnamed' "$generated_dir" || true
+
+  echo "=== generated union data references ==="
+  grep -RIn -F '.data.layout' "$generated_dir" || true
+
+  echo "=== generated files around known anonymous unions ==="
+  for generated_file in \
+    "$generated_dir/mln_feature_extension_result_info.java" \
+    "$generated_dir/mln_opengl_context_descriptor.java" \
+    "$generated_dir/mln_json_value.java" \
+    "$generated_dir/mln_json_value\$2.java"; do
+    if [[ -f "$generated_file" ]]; then
+      echo "--- $generated_file"
+      sed -n '1,220p' "$generated_file"
+    fi
+  done
+
+  echo "Stopping after jextract diagnostics by request."
+  exit 1
+  ''',
+]

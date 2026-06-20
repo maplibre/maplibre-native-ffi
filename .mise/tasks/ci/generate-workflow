@@ -31,6 +31,8 @@ WORKFLOW_PATH = REPO_ROOT / ".github" / "workflows" / "ci.yml"
 
 CHECKOUT_ACTION = "actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10"
 TASK_PATTERN = re.compile(r"^(?:[A-Za-z0-9_-]+|//[A-Za-z0-9_./-]+:[A-Za-z0-9_-]+)$")
+JEXTRACT_DIAGNOSTIC_VARIANTS = {"macos-arm64-metal", "macos-arm64-vulkan"}
+JEXTRACT_DIAGNOSTIC_COMMAND = "mise run //bindings/java-ffm:ci:jextract-diagnostics"
 
 NonEmptyString = Annotated[str, Field(min_length=1)]
 NonEmptyStringList = Annotated[list[NonEmptyString], Field(min_length=1)]
@@ -228,6 +230,10 @@ def render_workflow(variants: list[Variant], commands: dict[str, list[str]]) -> 
     }
 
     for variant in variants:
+        variant_commands = commands[variant.name]
+        if variant.name in JEXTRACT_DIAGNOSTIC_VARIANTS:
+            variant_commands = [JEXTRACT_DIAGNOSTIC_COMMAND]
+
         jobs[variant_job_id(variant)] = {
             "name": f"variant / {variant.name}",
             "runs-on": variant.runner,
@@ -236,7 +242,7 @@ def render_workflow(variants: list[Variant], commands: dict[str, list[str]]) -> 
             "steps": [
                 *setup_steps(),
                 {"run": "mise run configure"},
-                *({"run": command} for command in commands[variant.name]),
+                *({"run": command} for command in variant_commands),
             ],
         }
 

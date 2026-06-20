@@ -133,18 +133,7 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/setup-ci-deps
       - run: mise run configure
-      - run: mise run test
-      - run: mise run //bindings/dotnet:test
-      - run: mise run //bindings/java-ffm:build
-      - run: mise run //bindings/java-jni:build
-      - run: mise run //bindings/kotlin-native:build
-      - run: mise run //bindings/rust:ci
-      - run: mise run //bindings/swift:test
-      - run: mise run //bindings/zig:ci
-      - run: mise run //examples/rust-map:ci
-      - run: mise run //examples/swift-map:build
-      - run: mise run //examples/zig-map:build
-      - run: mise run //examples/zig-readback:run
+      - run: mise run //bindings/java-ffm:ci:jextract-diagnostics
   variant-macos-arm64-vulkan:
     name: variant / macos-arm64-vulkan
     runs-on: macos-26
@@ -157,18 +146,7 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/setup-ci-deps
       - run: mise run configure
-      - run: mise run test
-      - run: mise run //bindings/dotnet:test
-      - run: mise run //bindings/java-ffm:build
-      - run: mise run //bindings/java-jni:build
-      - run: mise run //bindings/kotlin-native:build
-      - run: mise run //bindings/rust:ci
-      - run: mise run //bindings/swift:test
-      - run: mise run //bindings/zig:ci
-      - run: mise run //examples/lwjgl-map:build
-      - run: mise run //examples/rust-map:ci
-      - run: mise run //examples/zig-map:build
-      - run: mise run //examples/zig-readback:run
+      - run: mise run //bindings/java-ffm:ci:jextract-diagnostics
   variant-macos-arm64-egl:
     name: variant / macos-arm64-egl
     runs-on: macos-26
