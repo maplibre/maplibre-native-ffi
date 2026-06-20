@@ -175,14 +175,14 @@ fn opengl_context_descriptor_to_native(
         OpenGLContextDescriptorFields::Wgl(wgl) => sys::mln_opengl_context_descriptor {
             size: std::mem::size_of::<sys::mln_opengl_context_descriptor>() as u32,
             platform: sys::MLN_OPENGL_CONTEXT_PLATFORM_WGL,
-            data: sys::mln_opengl_context_descriptor_mln_opengl_context_descriptor_data {
+            data: sys::mln_opengl_context_descriptor__bindgen_ty_1 {
                 wgl: wgl_context_descriptor_to_native(wgl),
             },
         },
         OpenGLContextDescriptorFields::Egl(egl) => sys::mln_opengl_context_descriptor {
             size: std::mem::size_of::<sys::mln_opengl_context_descriptor>() as u32,
             platform: sys::MLN_OPENGL_CONTEXT_PLATFORM_EGL,
-            data: sys::mln_opengl_context_descriptor_mln_opengl_context_descriptor_data {
+            data: sys::mln_opengl_context_descriptor__bindgen_ty_1 {
                 egl: egl_context_descriptor_to_native(egl),
             },
         },

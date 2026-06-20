@@ -117,7 +117,7 @@ impl NativeOfflineRegionDefinition {
             } => sys::mln_offline_region_definition {
                 size: std::mem::size_of::<sys::mln_offline_region_definition>() as u32,
                 type_: sys::MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID,
-                data: sys::mln_offline_region_definition_mln_offline_region_definition_data {
+                data: sys::mln_offline_region_definition__bindgen_ty_1 {
                     tile_pyramid: sys::mln_offline_tile_pyramid_region_definition {
                         size: std::mem::size_of::<sys::mln_offline_tile_pyramid_region_definition>()
                             as u32,
@@ -140,7 +140,7 @@ impl NativeOfflineRegionDefinition {
             } => sys::mln_offline_region_definition {
                 size: std::mem::size_of::<sys::mln_offline_region_definition>() as u32,
                 type_: sys::MLN_OFFLINE_REGION_DEFINITION_GEOMETRY,
-                data: sys::mln_offline_region_definition_mln_offline_region_definition_data {
+                data: sys::mln_offline_region_definition__bindgen_ty_1 {
                     geometry: sys::mln_offline_geometry_region_definition {
                         size: std::mem::size_of::<sys::mln_offline_geometry_region_definition>()
                             as u32,
@@ -170,7 +170,7 @@ pub fn empty_offline_region_info() -> sys::mln_offline_region_info {
         definition: sys::mln_offline_region_definition {
             size: std::mem::size_of::<sys::mln_offline_region_definition>() as u32,
             type_: 0,
-            data: sys::mln_offline_region_definition_mln_offline_region_definition_data {
+            data: sys::mln_offline_region_definition__bindgen_ty_1 {
                 tile_pyramid: sys::mln_offline_tile_pyramid_region_definition {
                     size: std::mem::size_of::<sys::mln_offline_tile_pyramid_region_definition>()
                         as u32,
@@ -492,7 +492,7 @@ mod tests {
             definition: sys::mln_offline_region_definition {
                 size: std::mem::size_of::<sys::mln_offline_region_definition>() as u32,
                 type_: sys::MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID,
-                data: sys::mln_offline_region_definition_mln_offline_region_definition_data {
+                data: sys::mln_offline_region_definition__bindgen_ty_1 {
                     tile_pyramid: sys::mln_offline_tile_pyramid_region_definition {
                         size: std::mem::size_of::<sys::mln_offline_tile_pyramid_region_definition>()
                             as u32,
@@ -544,7 +544,7 @@ mod tests {
             definition: sys::mln_offline_region_definition {
                 size: std::mem::size_of::<sys::mln_offline_region_definition>() as u32,
                 type_: sys::MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID,
-                data: sys::mln_offline_region_definition_mln_offline_region_definition_data {
+                data: sys::mln_offline_region_definition__bindgen_ty_1 {
                     tile_pyramid: sys::mln_offline_tile_pyramid_region_definition {
                         size: std::mem::size_of::<sys::mln_offline_tile_pyramid_region_definition>()
                             as u32,
@@ -579,7 +579,7 @@ mod tests {
         let raw = sys::mln_offline_region_definition {
             size: std::mem::size_of::<sys::mln_offline_region_definition>() as u32,
             type_: sys::MLN_OFFLINE_REGION_DEFINITION_GEOMETRY,
-            data: sys::mln_offline_region_definition_mln_offline_region_definition_data {
+            data: sys::mln_offline_region_definition__bindgen_ty_1 {
                 geometry: sys::mln_offline_geometry_region_definition {
                     size: std::mem::size_of::<sys::mln_offline_geometry_region_definition>() as u32,
                     style_url: style_url.as_ptr().cast(),

@@ -231,9 +231,7 @@ final class RenderStructsTest {
     assertEquals(
         MapLibreNativeC.MLN_OPENGL_CONTEXT_PLATFORM_WGL(),
         mln_opengl_context_descriptor.platform(segment));
-    var wgl =
-        mln_opengl_context_descriptor.mln_opengl_context_descriptor_data.wgl(
-            mln_opengl_context_descriptor.data(segment));
+    var wgl = mln_opengl_context_descriptor.data.wgl(mln_opengl_context_descriptor.data(segment));
     assertPointer(
         expected.deviceContext().address(), mln_wgl_context_descriptor.device_context(wgl));
     assertPointer(expected.shareContext().address(), mln_wgl_context_descriptor.share_context(wgl));
@@ -245,9 +243,7 @@ final class RenderStructsTest {
     assertEquals(
         MapLibreNativeC.MLN_OPENGL_CONTEXT_PLATFORM_EGL(),
         mln_opengl_context_descriptor.platform(segment));
-    var egl =
-        mln_opengl_context_descriptor.mln_opengl_context_descriptor_data.egl(
-            mln_opengl_context_descriptor.data(segment));
+    var egl = mln_opengl_context_descriptor.data.egl(mln_opengl_context_descriptor.data(segment));
     assertPointer(expected.display().address(), mln_egl_context_descriptor.display(egl));
     assertPointer(expected.config().address(), mln_egl_context_descriptor.config(egl));
     assertPointer(expected.shareContext().address(), mln_egl_context_descriptor.share_context(egl));

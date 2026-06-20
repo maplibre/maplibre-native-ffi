@@ -503,9 +503,7 @@ pub unsafe fn copy_feature_extension_result(
     let mut info = sys::mln_feature_extension_result_info {
         size: mem::size_of::<sys::mln_feature_extension_result_info>() as u32,
         type_: 0,
-        data: sys::mln_feature_extension_result_info_mln_feature_extension_result_info_data {
-            value: ptr::null(),
-        },
+        data: sys::mln_feature_extension_result_info__bindgen_ty_1 { value: ptr::null() },
     };
     // SAFETY: result is live and info points to initialized writable storage.
     crate::check(unsafe { sys::mln_feature_extension_result_get(result.as_ptr(), &mut info) })?;
@@ -567,7 +565,7 @@ fn empty_feature() -> sys::mln_feature {
         properties: ptr::null(),
         property_count: 0,
         identifier_type: sys::MLN_FEATURE_IDENTIFIER_TYPE_NULL,
-        identifier: sys::mln_feature_mln_feature_identifier { uint_value: 0 },
+        identifier: sys::mln_feature__bindgen_ty_1 { uint_value: 0 },
     }
 }
 

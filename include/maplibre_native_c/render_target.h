@@ -101,7 +101,7 @@ typedef struct mln_opengl_context_descriptor {
   uint32_t size;
   /** WGL or EGL context provider. */
   mln_opengl_context_platform platform;
-  union mln_opengl_context_descriptor_data {
+  union {
     mln_wgl_context_descriptor wgl;
     mln_egl_context_descriptor egl;
   } data;

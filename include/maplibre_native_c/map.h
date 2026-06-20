@@ -309,11 +309,11 @@ typedef struct mln_geometry_collection {
  * functions reject geometry collection children past depth 64 with
  * MLN_STATUS_INVALID_ARGUMENT.
  */
-struct mln_geometry {
+typedef struct mln_geometry {
   uint32_t size;
   /** One of mln_geometry_type. */
   uint32_t type;
-  union mln_geometry_data {
+  union {
     mln_lat_lng point;
     mln_coordinate_span line_string;
     mln_polygon_geometry polygon;
@@ -322,7 +322,7 @@ struct mln_geometry {
     mln_multi_polygon_geometry multi_polygon;
     mln_geometry_collection geometry_collection;
   } data;
-};
+} mln_geometry;
 
 /** JSON-like value variant tags used by mln_json_value. */
 typedef enum mln_json_value_type : uint32_t {
@@ -366,11 +366,11 @@ typedef struct mln_json_object {
  * functions reject array/object children past depth 64 with
  * MLN_STATUS_INVALID_ARGUMENT.
  */
-struct mln_json_value {
+typedef struct mln_json_value {
   uint32_t size;
   /** One of mln_json_value_type. */
   uint32_t type;
-  union mln_json_value_data {
+  union {
     bool bool_value;
     uint64_t uint_value;
     int64_t int_value;
@@ -379,7 +379,7 @@ struct mln_json_value {
     mln_json_array array_value;
     mln_json_object object_value;
   } data;
-};
+} mln_json_value;
 
 /** Optional fields for mln_feature_state_selector. */
 typedef enum mln_feature_state_selector_field : uint32_t {
@@ -425,7 +425,7 @@ typedef struct mln_feature {
   size_t property_count;
   /** One of mln_feature_identifier_type. */
   uint32_t identifier_type;
-  union mln_feature_identifier {
+  union {
     uint64_t uint_value;
     int64_t int_value;
     double double_value;
@@ -456,7 +456,7 @@ typedef struct mln_geojson {
   uint32_t size;
   /** One of mln_geojson_type. */
   uint32_t type;
-  union mln_geojson_data {
+  union {
     /**
      * Geometry descriptor selected by MLN_GEOJSON_TYPE_GEOMETRY. Must not be
      * null.
@@ -526,7 +526,7 @@ typedef struct mln_offline_region_definition {
   uint32_t size;
   /** One of mln_offline_region_definition_type. */
   uint32_t type;
-  union mln_offline_region_definition_data {
+  union {
     mln_offline_tile_pyramid_region_definition tile_pyramid;
     mln_offline_geometry_region_definition geometry;
   } data;

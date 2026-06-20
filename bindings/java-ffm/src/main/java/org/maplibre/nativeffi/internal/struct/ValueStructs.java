@@ -100,23 +100,23 @@ public final class ValueStructs {
       mln_json_value.type(segment, MapLibreNativeC.MLN_JSON_VALUE_TYPE_NULL());
     } else if (value instanceof JsonValue.Bool boolValue) {
       mln_json_value.type(segment, MapLibreNativeC.MLN_JSON_VALUE_TYPE_BOOL());
-      mln_json_value.mln_json_value_data.bool_value(data, boolValue.value());
+      mln_json_value.data.bool_value(data, boolValue.value());
     } else if (value instanceof JsonValue.UInt uintValue) {
       mln_json_value.type(segment, MapLibreNativeC.MLN_JSON_VALUE_TYPE_UINT());
-      mln_json_value.mln_json_value_data.uint_value(data, uintValue.value());
+      mln_json_value.data.uint_value(data, uintValue.value());
     } else if (value instanceof JsonValue.Int intValue) {
       mln_json_value.type(segment, MapLibreNativeC.MLN_JSON_VALUE_TYPE_INT());
-      mln_json_value.mln_json_value_data.int_value(data, intValue.value());
+      mln_json_value.data.int_value(data, intValue.value());
     } else if (value instanceof JsonValue.DoubleValue doubleValue) {
       mln_json_value.type(segment, MapLibreNativeC.MLN_JSON_VALUE_TYPE_DOUBLE());
-      mln_json_value.mln_json_value_data.double_value(data, doubleValue.value());
+      mln_json_value.data.double_value(data, doubleValue.value());
     } else if (value instanceof JsonValue.StringValue stringValue) {
       mln_json_value.type(segment, MapLibreNativeC.MLN_JSON_VALUE_TYPE_STRING());
-      mln_json_value.mln_json_value_data.string_value(data, stringView(stringValue.value(), arena));
+      mln_json_value.data.string_value(data, stringView(stringValue.value(), arena));
     } else if (value instanceof JsonValue.Array arrayValue) {
       mln_json_value.type(segment, MapLibreNativeC.MLN_JSON_VALUE_TYPE_ARRAY());
       var values = arrayValue.values();
-      var array = mln_json_value.mln_json_value_data.array_value(data);
+      var array = mln_json_value.data.array_value(data);
       if (!values.isEmpty()) {
         var nativeValues = mln_json_value.allocateArray(values.size(), arena);
         for (var index = 0; index < values.size(); index++) {
@@ -129,7 +129,7 @@ public final class ValueStructs {
     } else if (value instanceof JsonValue.ObjectValue objectValue) {
       mln_json_value.type(segment, MapLibreNativeC.MLN_JSON_VALUE_TYPE_OBJECT());
       var members = objectValue.members();
-      var object = mln_json_value.mln_json_value_data.object_value(data);
+      var object = mln_json_value.data.object_value(data);
       if (!members.isEmpty()) {
         mln_json_object.members(object, jsonMembers(members, arena, depth + 1));
       }
@@ -150,22 +150,22 @@ public final class ValueStructs {
       return JsonValue.nullValue();
     }
     if (type == MapLibreNativeC.MLN_JSON_VALUE_TYPE_BOOL()) {
-      return JsonValue.of(mln_json_value.mln_json_value_data.bool_value(data));
+      return JsonValue.of(mln_json_value.data.bool_value(data));
     }
     if (type == MapLibreNativeC.MLN_JSON_VALUE_TYPE_UINT()) {
-      return JsonValue.unsigned(mln_json_value.mln_json_value_data.uint_value(data));
+      return JsonValue.unsigned(mln_json_value.data.uint_value(data));
     }
     if (type == MapLibreNativeC.MLN_JSON_VALUE_TYPE_INT()) {
-      return JsonValue.of(mln_json_value.mln_json_value_data.int_value(data));
+      return JsonValue.of(mln_json_value.data.int_value(data));
     }
     if (type == MapLibreNativeC.MLN_JSON_VALUE_TYPE_DOUBLE()) {
-      return JsonValue.of(mln_json_value.mln_json_value_data.double_value(data));
+      return JsonValue.of(mln_json_value.data.double_value(data));
     }
     if (type == MapLibreNativeC.MLN_JSON_VALUE_TYPE_STRING()) {
-      return JsonValue.of(stringView(mln_json_value.mln_json_value_data.string_value(data)));
+      return JsonValue.of(stringView(mln_json_value.data.string_value(data)));
     }
     if (type == MapLibreNativeC.MLN_JSON_VALUE_TYPE_ARRAY()) {
-      var array = mln_json_value.mln_json_value_data.array_value(data);
+      var array = mln_json_value.data.array_value(data);
       var count = Math.toIntExact(mln_json_array.value_count(array));
       var values =
           sizedArray(
@@ -177,7 +177,7 @@ public final class ValueStructs {
       return JsonValue.array(copied);
     }
     if (type == MapLibreNativeC.MLN_JSON_VALUE_TYPE_OBJECT()) {
-      var object = mln_json_value.mln_json_value_data.object_value(data);
+      var object = mln_json_value.data.object_value(data);
       var count = Math.toIntExact(mln_json_object.member_count(object));
       return JsonValue.object(readJsonMembers(mln_json_object.members(object), count, depth + 1));
     }
@@ -223,29 +223,25 @@ public final class ValueStructs {
       mln_geometry.type(segment, MapLibreNativeC.MLN_GEOMETRY_TYPE_EMPTY());
     } else if (geometry instanceof Geometry.Point point) {
       mln_geometry.type(segment, MapLibreNativeC.MLN_GEOMETRY_TYPE_POINT());
-      mln_geometry.mln_geometry_data.point(data, latLng(point.coordinate(), arena));
+      mln_geometry.data.point(data, latLng(point.coordinate(), arena));
     } else if (geometry instanceof Geometry.LineString lineString) {
       mln_geometry.type(segment, MapLibreNativeC.MLN_GEOMETRY_TYPE_LINE_STRING());
-      mln_geometry.mln_geometry_data.line_string(
-          data, coordinateSpan(lineString.coordinates(), arena));
+      mln_geometry.data.line_string(data, coordinateSpan(lineString.coordinates(), arena));
     } else if (geometry instanceof Geometry.Polygon polygon) {
       mln_geometry.type(segment, MapLibreNativeC.MLN_GEOMETRY_TYPE_POLYGON());
-      mln_geometry.mln_geometry_data.polygon(data, polygonGeometry(polygon.rings(), arena));
+      mln_geometry.data.polygon(data, polygonGeometry(polygon.rings(), arena));
     } else if (geometry instanceof Geometry.MultiPoint multiPoint) {
       mln_geometry.type(segment, MapLibreNativeC.MLN_GEOMETRY_TYPE_MULTI_POINT());
-      mln_geometry.mln_geometry_data.multi_point(
-          data, coordinateSpan(multiPoint.coordinates(), arena));
+      mln_geometry.data.multi_point(data, coordinateSpan(multiPoint.coordinates(), arena));
     } else if (geometry instanceof Geometry.MultiLineString multiLineString) {
       mln_geometry.type(segment, MapLibreNativeC.MLN_GEOMETRY_TYPE_MULTI_LINE_STRING());
-      mln_geometry.mln_geometry_data.multi_line_string(
-          data, multiLineGeometry(multiLineString.lines(), arena));
+      mln_geometry.data.multi_line_string(data, multiLineGeometry(multiLineString.lines(), arena));
     } else if (geometry instanceof Geometry.MultiPolygon multiPolygon) {
       mln_geometry.type(segment, MapLibreNativeC.MLN_GEOMETRY_TYPE_MULTI_POLYGON());
-      mln_geometry.mln_geometry_data.multi_polygon(
-          data, multiPolygonGeometry(multiPolygon.polygons(), arena));
+      mln_geometry.data.multi_polygon(data, multiPolygonGeometry(multiPolygon.polygons(), arena));
     } else if (geometry instanceof Geometry.Collection collection) {
       mln_geometry.type(segment, MapLibreNativeC.MLN_GEOMETRY_TYPE_GEOMETRY_COLLECTION());
-      var nativeCollection = mln_geometry.mln_geometry_data.geometry_collection(data);
+      var nativeCollection = mln_geometry.data.geometry_collection(data);
       var geometries = collection.geometries();
       if (!geometries.isEmpty()) {
         var nativeGeometries = mln_geometry.allocateArray(geometries.size(), arena);
@@ -275,27 +271,25 @@ public final class ValueStructs {
       return Geometry.empty();
     }
     if (type == MapLibreNativeC.MLN_GEOMETRY_TYPE_POINT()) {
-      return Geometry.point(latLng(mln_geometry.mln_geometry_data.point(data)));
+      return Geometry.point(latLng(mln_geometry.data.point(data)));
     }
     if (type == MapLibreNativeC.MLN_GEOMETRY_TYPE_LINE_STRING()) {
-      return Geometry.lineString(coordinateSpan(mln_geometry.mln_geometry_data.line_string(data)));
+      return Geometry.lineString(coordinateSpan(mln_geometry.data.line_string(data)));
     }
     if (type == MapLibreNativeC.MLN_GEOMETRY_TYPE_POLYGON()) {
-      return Geometry.polygon(polygonGeometry(mln_geometry.mln_geometry_data.polygon(data)));
+      return Geometry.polygon(polygonGeometry(mln_geometry.data.polygon(data)));
     }
     if (type == MapLibreNativeC.MLN_GEOMETRY_TYPE_MULTI_POINT()) {
-      return Geometry.multiPoint(coordinateSpan(mln_geometry.mln_geometry_data.multi_point(data)));
+      return Geometry.multiPoint(coordinateSpan(mln_geometry.data.multi_point(data)));
     }
     if (type == MapLibreNativeC.MLN_GEOMETRY_TYPE_MULTI_LINE_STRING()) {
-      return Geometry.multiLineString(
-          multiLineGeometry(mln_geometry.mln_geometry_data.multi_line_string(data)));
+      return Geometry.multiLineString(multiLineGeometry(mln_geometry.data.multi_line_string(data)));
     }
     if (type == MapLibreNativeC.MLN_GEOMETRY_TYPE_MULTI_POLYGON()) {
-      return Geometry.multiPolygon(
-          multiPolygonGeometry(mln_geometry.mln_geometry_data.multi_polygon(data)));
+      return Geometry.multiPolygon(multiPolygonGeometry(mln_geometry.data.multi_polygon(data)));
     }
     if (type == MapLibreNativeC.MLN_GEOMETRY_TYPE_GEOMETRY_COLLECTION()) {
-      var collection = mln_geometry.mln_geometry_data.geometry_collection(data);
+      var collection = mln_geometry.data.geometry_collection(data);
       var count = Math.toIntExact(mln_geometry_collection.geometry_count(collection));
       var geometries =
           sizedArray(
@@ -448,16 +442,16 @@ public final class ValueStructs {
       mln_feature.identifier_type(segment, MapLibreNativeC.MLN_FEATURE_IDENTIFIER_TYPE_NULL());
     } else if (identifier instanceof FeatureIdentifier.UInt value) {
       mln_feature.identifier_type(segment, MapLibreNativeC.MLN_FEATURE_IDENTIFIER_TYPE_UINT());
-      mln_feature.mln_feature_identifier.uint_value(data, value.value());
+      mln_feature.identifier.uint_value(data, value.value());
     } else if (identifier instanceof FeatureIdentifier.Int value) {
       mln_feature.identifier_type(segment, MapLibreNativeC.MLN_FEATURE_IDENTIFIER_TYPE_INT());
-      mln_feature.mln_feature_identifier.int_value(data, value.value());
+      mln_feature.identifier.int_value(data, value.value());
     } else if (identifier instanceof FeatureIdentifier.DoubleValue value) {
       mln_feature.identifier_type(segment, MapLibreNativeC.MLN_FEATURE_IDENTIFIER_TYPE_DOUBLE());
-      mln_feature.mln_feature_identifier.double_value(data, value.value());
+      mln_feature.identifier.double_value(data, value.value());
     } else if (identifier instanceof FeatureIdentifier.StringValue value) {
       mln_feature.identifier_type(segment, MapLibreNativeC.MLN_FEATURE_IDENTIFIER_TYPE_STRING());
-      mln_feature.mln_feature_identifier.string_value(data, stringView(value.value(), arena));
+      mln_feature.identifier.string_value(data, stringView(value.value(), arena));
     } else {
       throw new IllegalArgumentException(
           "Unsupported feature identifier type: " + identifier.getClass().getName());
@@ -471,17 +465,16 @@ public final class ValueStructs {
       return FeatureIdentifier.nullValue();
     }
     if (type == MapLibreNativeC.MLN_FEATURE_IDENTIFIER_TYPE_UINT()) {
-      return FeatureIdentifier.unsigned(mln_feature.mln_feature_identifier.uint_value(data));
+      return FeatureIdentifier.unsigned(mln_feature.identifier.uint_value(data));
     }
     if (type == MapLibreNativeC.MLN_FEATURE_IDENTIFIER_TYPE_INT()) {
-      return FeatureIdentifier.of(mln_feature.mln_feature_identifier.int_value(data));
+      return FeatureIdentifier.of(mln_feature.identifier.int_value(data));
     }
     if (type == MapLibreNativeC.MLN_FEATURE_IDENTIFIER_TYPE_DOUBLE()) {
-      return FeatureIdentifier.of(mln_feature.mln_feature_identifier.double_value(data));
+      return FeatureIdentifier.of(mln_feature.identifier.double_value(data));
     }
     if (type == MapLibreNativeC.MLN_FEATURE_IDENTIFIER_TYPE_STRING()) {
-      return FeatureIdentifier.of(
-          stringView(mln_feature.mln_feature_identifier.string_value(data)));
+      return FeatureIdentifier.of(stringView(mln_feature.identifier.string_value(data)));
     }
     throw new IllegalArgumentException(
         "Unknown feature identifier type: " + Integer.toUnsignedLong(type));
@@ -492,14 +485,14 @@ public final class ValueStructs {
     var data = mln_geojson.data(segment);
     if (geoJson instanceof GeoJson.GeometryValue geometryValue) {
       mln_geojson.type(segment, MapLibreNativeC.MLN_GEOJSON_TYPE_GEOMETRY());
-      mln_geojson.mln_geojson_data.geometry(data, geometry(geometryValue.geometry(), arena));
+      mln_geojson.data.geometry(data, geometry(geometryValue.geometry(), arena));
     } else if (geoJson instanceof GeoJson.FeatureValue featureValue) {
       mln_geojson.type(segment, MapLibreNativeC.MLN_GEOJSON_TYPE_FEATURE());
-      mln_geojson.mln_geojson_data.feature(data, feature(featureValue.feature(), arena, 0));
+      mln_geojson.data.feature(data, feature(featureValue.feature(), arena, 0));
     } else if (geoJson instanceof GeoJson.FeatureCollection featureCollection) {
       mln_geojson.type(segment, MapLibreNativeC.MLN_GEOJSON_TYPE_FEATURE_COLLECTION());
       var features = featureCollection.features();
-      var nativeCollection = mln_geojson.mln_geojson_data.feature_collection(data);
+      var nativeCollection = mln_geojson.data.feature_collection(data);
       if (!features.isEmpty()) {
         var nativeFeatures = mln_feature.allocateArray(features.size(), arena);
         for (var index = 0; index < features.size(); index++) {
@@ -521,22 +514,17 @@ public final class ValueStructs {
       return GeoJson.geometry(
           readGeometry(
               sizedPointer(
-                  mln_geojson.mln_geojson_data.geometry(data),
-                  mln_geometry.sizeof(),
-                  "GeoJSON geometry"),
+                  mln_geojson.data.geometry(data), mln_geometry.sizeof(), "GeoJSON geometry"),
               0));
     }
     if (type == MapLibreNativeC.MLN_GEOJSON_TYPE_FEATURE()) {
       return GeoJson.feature(
           readFeature(
-              sizedPointer(
-                  mln_geojson.mln_geojson_data.feature(data),
-                  mln_feature.sizeof(),
-                  "GeoJSON feature"),
+              sizedPointer(mln_geojson.data.feature(data), mln_feature.sizeof(), "GeoJSON feature"),
               0));
     }
     if (type == MapLibreNativeC.MLN_GEOJSON_TYPE_FEATURE_COLLECTION()) {
-      var collection = mln_geojson.mln_geojson_data.feature_collection(data);
+      var collection = mln_geojson.data.feature_collection(data);
       var count = Math.toIntExact(mln_feature_collection.feature_count(collection));
       var features =
           sizedArray(
