@@ -630,13 +630,13 @@ with pinch or rotation.
 
 Implementations MUST provide the following touch interactions:
 
-| Interaction                      | Behavior                                                                                                                                                                                                |
-| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| One-finger drag                  | `move_by` with pointer delta in logical coordinates.                                                                                                                                                    |
-| Pinch                            | On begin, record `zoom₀`. On change, `jump_to` zoom `zoom₀ + log₂(S)` about the gesture centroid, where `S` is the scale recognizer's cumulative scale factor since the gesture began (`1.0` at begin). |
-| Two-finger rotate                | Adjust bearing by `−Δθ` degrees, where `Δθ` is the rotation recognizer's delta in degrees since the last update.                                                                                        |
-| Two-finger vertical drag (shove) | `pitch -= 0.1 × Δy` degrees (clamp to `[0, 60]`), where `Δy` is the change in average touch Y in logical coordinates since the last update.                                                             |
-| Double-tap                       | Zoom to `round(zoom₀) + 1.0` about the tap location with animation (~`160` ms).                                                                                                                         |
+| Interaction                      | Behavior                                                                                                                                                    |
+| -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| One-finger drag                  | `move_by` with pointer delta in logical coordinates.                                                                                                        |
+| Pinch                            | Zoom about the gesture centroid. Implementations MAY apply cumulative zoom as `zoom₀ + log₂(S)` or apply incremental `scale_by` deltas from the recognizer. |
+| Two-finger rotate                | Adjust bearing by `−Δθ` degrees, where `Δθ` is the rotation recognizer's delta in degrees since the last update.                                            |
+| Two-finger vertical drag (shove) | `pitch -= 0.1 × Δy` degrees (clamp to `[0, 60]`), where `Δy` is the change in average touch Y in logical coordinates since the last update.                 |
+| Double-tap                       | Zoom to `round(zoom₀) + 1.0` about the tap location with animation (~`160` ms).                                                                             |
 
 On any gesture begin, cancel in-flight camera transitions before applying
 deltas.

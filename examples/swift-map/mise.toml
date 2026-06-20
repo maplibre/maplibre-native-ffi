@@ -13,13 +13,17 @@ fi
 '''
 
 [tasks.run]
-usage = 'arg "render-target" default="native-surface"'
+usage = 'arg "[render-target]"'
 run = '''
 if [[ "$MISE_ENV" == ios-simulator-* ]]; then
   exec mise run run:ios-simulator
 fi
 if [[ "$MISE_ENV" == ios-* ]]; then
   echo "swift-map run is only supported for iOS simulator environments, not $MISE_ENV" >&2
+  exit 1
+fi
+if [[ -z "{{ usage.render_target }}" ]]; then
+  echo "Usage: mise run //examples/swift-map:run -- <render-target>" >&2
   exit 1
 fi
 mise run build

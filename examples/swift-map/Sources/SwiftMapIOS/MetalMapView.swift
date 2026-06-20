@@ -32,7 +32,6 @@ final class MetalMapView: UIView {
     super.init(frame: frame)
     backgroundColor = .black
     isMultipleTouchEnabled = true
-    contentScaleFactor = UIScreen.main.scale
     do {
       graphics = try MetalGraphicsContext(layer: metalLayer)
     } catch {
@@ -48,6 +47,14 @@ final class MetalMapView: UIView {
 
   deinit {
     NotificationCenter.default.removeObserver(self)
+    MainActor.assumeIsolated {
+      stopHostLoop()
+      do {
+        try mapState?.close()
+      } catch {
+        log.error("\(String(describing: error), privacy: .public)")
+      }
+    }
   }
 
   override func didMoveToWindow() {
@@ -126,8 +133,11 @@ final class MetalMapView: UIView {
     guard viewport != currentViewport else { return }
     viewport
       .log(currentViewport == nil ? "initial viewport" : "resized viewport")
-    currentViewport = viewport
-    guard !viewport.isEmpty else { return }
+    if viewport.isEmpty {
+      currentViewport = viewport
+      renderPending = false
+      return
+    }
 
     do {
       graphics.resize(viewport)
@@ -141,6 +151,7 @@ final class MetalMapView: UIView {
             "render target status: renders directly to the host view surface"
           )
       }
+      currentViewport = viewport
       renderPending = true
     } catch {
       showError(error)
@@ -312,6 +323,7 @@ final class MetalMapView: UIView {
 
   @objc private func handleDoubleTap(_ recognizer: UITapGestureRecognizer) {
     withMap { map in
+      try map.cancelTransitions()
       let location = recognizer.location(in: self)
       let camera = try map.camera()
       let zoom = camera.zoom ?? 0
