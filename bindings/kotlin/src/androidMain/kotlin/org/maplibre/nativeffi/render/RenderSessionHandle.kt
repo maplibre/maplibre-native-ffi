@@ -967,10 +967,12 @@ private class RenderedFeatureQueryOptionsScope(value: RenderedFeatureQueryOption
   val options: MaplibreNativeC.mln_rendered_feature_query_options? = value?.let {
     MaplibreNativeC.mln_rendered_feature_query_options_default().apply {
       var fields = 0
-      layerIds?.let { nativeLayerIds ->
+      it.layerIds?.let { layerIdValues ->
         fields = fields or MaplibreNativeC.MLN_RENDERED_FEATURE_QUERY_OPTION_LAYER_IDS
-        layer_ids(nativeLayerIds)
-        layer_id_count(it.layerIds?.size?.toLong() ?: 0L)
+        if (layerIds != null) {
+          layer_ids(layerIds)
+        }
+        layer_id_count(layerIdValues.size.toLong())
       }
       filter?.let { nativeFilter -> filter(nativeFilter.value) }
       fields(fields)
@@ -1006,10 +1008,12 @@ private class SourceFeatureQueryOptionsScope(value: SourceFeatureQueryOptions?) 
   val options: MaplibreNativeC.mln_source_feature_query_options? = value?.let {
     MaplibreNativeC.mln_source_feature_query_options_default().apply {
       var fields = 0
-      sourceLayerIds?.let { nativeSourceLayerIds ->
+      it.sourceLayerIds?.let { sourceLayerIdValues ->
         fields = fields or MaplibreNativeC.MLN_SOURCE_FEATURE_QUERY_OPTION_SOURCE_LAYER_IDS
-        source_layer_ids(nativeSourceLayerIds)
-        source_layer_id_count(it.sourceLayerIds?.size?.toLong() ?: 0L)
+        if (sourceLayerIds != null) {
+          source_layer_ids(sourceLayerIds)
+        }
+        source_layer_id_count(sourceLayerIdValues.size.toLong())
       }
       filter?.let { nativeFilter -> filter(nativeFilter.value) }
       fields(fields)

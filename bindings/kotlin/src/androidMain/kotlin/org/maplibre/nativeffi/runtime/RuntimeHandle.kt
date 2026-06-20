@@ -394,6 +394,8 @@ public actual class RuntimeHandle private constructor(private val handleAddress:
   }
 
   public actual override fun close() {
+    resourceProviderState?.checkCanClose()
+    resourceTransformState?.checkCanClose()
     core.closeOnce(
       destroy = { MaplibreNativeC.mln_runtime_destroy(runtime(handleAddress)) },
       afterSuccess = {

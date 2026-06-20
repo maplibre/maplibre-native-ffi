@@ -39,6 +39,8 @@ internal class LogCallbackState private constructor(private val callback: LogCal
 
   override fun close() = gate.close()
 
+  internal fun checkCanClose() = gate.checkCanClose()
+
   internal fun isClosedForTesting(): Boolean = gate.isClosedForTesting()
 
   internal companion object {
@@ -59,6 +61,7 @@ internal class LogCallbackState private constructor(private val callback: LogCal
     }
 
     fun clear() {
+      registry.current()?.checkCanClose()
       registry.clear(::mln_log_clear_callback)
     }
 

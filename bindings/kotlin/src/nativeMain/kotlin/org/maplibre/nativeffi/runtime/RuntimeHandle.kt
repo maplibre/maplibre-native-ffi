@@ -496,6 +496,8 @@ internal constructor(
   }
 
   public actual override fun close() {
+    resourceProviderState?.checkCanClose()
+    resourceTransformState?.checkCanClose()
     state.closeOnce(destroyer) {
       resourceProviderState?.close()
       resourceTransformState?.close()

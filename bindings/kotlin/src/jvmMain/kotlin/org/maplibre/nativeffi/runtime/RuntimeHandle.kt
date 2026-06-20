@@ -274,6 +274,8 @@ public actual class RuntimeHandle private constructor(private val handle: Memory
   }
 
   public actual override fun close() {
+    resourceProviderState?.checkCanClose()
+    resourceTransformState?.checkCanClose()
     core.closeOnce(
       destroy = { NativeAccess.destroyRuntime(handle) },
       afterSuccess = {

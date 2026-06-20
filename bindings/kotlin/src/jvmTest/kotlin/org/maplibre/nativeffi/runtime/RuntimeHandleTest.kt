@@ -22,6 +22,7 @@ import org.maplibre.nativeffi.resource.ResourceProviderCallback
 import org.maplibre.nativeffi.resource.ResourceProviderDecision
 import org.maplibre.nativeffi.resource.ResourceResponse
 import org.maplibre.nativeffi.resource.ResourceResponseStatus
+import org.maplibre.nativeffi.resource.ResourceTransformCallback
 
 class RuntimeHandleTest {
   @Test
@@ -148,6 +149,76 @@ class RuntimeHandleTest {
     }
   }
 
+  @Test
+  fun runtimeCloseDuringResourceProviderCallbackRejectsBeforeNativeDestroy() {
+    RuntimeHandle.create(RuntimeOptions()).use { runtime ->
+      val closeError = AtomicReference<Throwable?>(null)
+      runtime.setResourceProvider(
+        ResourceProviderCallback { request, _ ->
+          if (request.url == "custom://close-during-provider.json") {
+            closeError.set(assertFailsWith<InvalidStateException> { runtime.close() })
+          }
+          ResourceProviderDecision.PASS_THROUGH
+        }
+      )
+      val map =
+        MapHandle.create(
+          runtime,
+          MapOptions().apply {
+            width = 64
+            height = 64
+          },
+        )
+      try {
+        map.setStyleUrl("custom://close-during-provider.json")
+        assertTrue(
+          waitForCondition {
+            runtime.runOnce()
+            closeError.get() != null
+          }
+        )
+        assertFalse(runtime.isClosed)
+      } finally {
+        map.close()
+      }
+    }
+  }
+
+  @Test
+  fun runtimeCloseDuringResourceTransformCallbackRejectsBeforeNativeDestroy() {
+    RuntimeHandle.create(RuntimeOptions()).use { runtime ->
+      val closeError = AtomicReference<Throwable?>(null)
+      runtime.setResourceTransform(
+        ResourceTransformCallback { request ->
+          if (request.url == "http://example.invalid/close-during-transform.json") {
+            closeError.set(assertFailsWith<InvalidStateException> { runtime.close() })
+          }
+          null
+        }
+      )
+      val map =
+        MapHandle.create(
+          runtime,
+          MapOptions().apply {
+            width = 64
+            height = 64
+          },
+        )
+      try {
+        map.setStyleUrl("http://example.invalid/close-during-transform.json")
+        assertTrue(
+          waitForCondition {
+            runtime.runOnce()
+            closeError.get() != null
+          }
+        )
+        assertFalse(runtime.isClosed)
+      } finally {
+        map.close()
+      }
+    }
+  }
+
   private fun waitForOperation(
     runtime: RuntimeHandle,
     operation: OfflineOperationHandle<*>,
@@ -180,6 +251,14 @@ class RuntimeHandleTest {
         val event = runtime.pollEvent() ?: break
         if (event.type == type && event.mapSource == map) return true
       }
+      Thread.sleep(1)
+    }
+    return false
+  }
+
+  private fun waitForCondition(condition: () -> Boolean): Boolean {
+    repeat(10_000) {
+      if (condition()) return true
       Thread.sleep(1)
     }
     return false

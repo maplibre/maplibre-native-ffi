@@ -20,6 +20,7 @@ import kotlinx.cinterop.ptr
 import kotlinx.cinterop.staticCFunction
 import org.maplibre.nativeffi.Maplibre
 import org.maplibre.nativeffi.error.InvalidArgumentException
+import org.maplibre.nativeffi.error.InvalidStateException
 import org.maplibre.nativeffi.error.MaplibreException
 import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.internal.callback.LogCallbackState
@@ -142,6 +143,27 @@ class LogCallbackStateTest : org.maplibre.nativeffi.NativeTestBase() {
       assertEquals(1U, state.invoke(1U, 3U, 7L, null))
       assertEquals(1, accepted)
       assertEquals(0U, state.invoke(1U, 3U, 8L, null))
+    } finally {
+      Maplibre.clearLogCallback()
+    }
+  }
+
+  @Test
+  fun clearDuringLogCallbackRejectsBeforeNativeClear() {
+    var clearError: Throwable? = null
+    lateinit var state: LogCallbackState
+    try {
+      Maplibre.setLogCallback(
+        LogCallback {
+          clearError = assertFailsWith<InvalidStateException> { Maplibre.clearLogCallback() }
+          true
+        }
+      )
+      state = requireNotNull(LogCallbackState.currentForTesting())
+
+      assertEquals(1U, state.invoke(1U, 3U, 7L, null))
+      assertTrue(clearError is InvalidStateException)
+      assertTrue(LogCallbackState.currentForTesting() === state)
     } finally {
       Maplibre.clearLogCallback()
     }
