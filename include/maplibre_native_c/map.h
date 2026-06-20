@@ -250,6 +250,9 @@ typedef struct mln_string_view {
   size_t size;
 } mln_string_view;
 
+typedef struct mln_json_value mln_json_value;
+typedef struct mln_geometry mln_geometry;
+
 /** Geometry variant tags used by mln_geometry. */
 typedef enum mln_geometry_type : uint32_t {
   MLN_GEOMETRY_TYPE_EMPTY = 0,
@@ -293,7 +296,7 @@ typedef struct mln_multi_polygon_geometry {
 /** Geometry collection view. */
 typedef struct mln_geometry_collection {
   /** Child geometries. Null only when geometry_count is 0. */
-  const struct mln_geometry* geometries;
+  const mln_geometry* geometries;
   size_t geometry_count;
 } mln_geometry_collection;
 
@@ -306,7 +309,7 @@ typedef struct mln_geometry_collection {
  * functions reject geometry collection children past depth 64 with
  * MLN_STATUS_INVALID_ARGUMENT.
  */
-typedef struct mln_geometry {
+struct mln_geometry {
   uint32_t size;
   /** One of mln_geometry_type. */
   uint32_t type;
@@ -319,7 +322,7 @@ typedef struct mln_geometry {
     mln_multi_polygon_geometry multi_polygon;
     mln_geometry_collection geometry_collection;
   } data;
-} mln_geometry;
+};
 
 /** JSON-like value variant tags used by mln_json_value. */
 typedef enum mln_json_value_type : uint32_t {
@@ -336,7 +339,7 @@ typedef enum mln_json_value_type : uint32_t {
 /** JSON value array view. */
 typedef struct mln_json_array {
   /** Values. Null only when value_count is 0. */
-  const struct mln_json_value* values;
+  const mln_json_value* values;
   size_t value_count;
 } mln_json_array;
 
@@ -344,7 +347,7 @@ typedef struct mln_json_array {
 typedef struct mln_json_member {
   mln_string_view key;
   /** Value descriptor. Must not be null. */
-  const struct mln_json_value* value;
+  const mln_json_value* value;
 } mln_json_member;
 
 /** JSON object member array view. */
@@ -363,7 +366,7 @@ typedef struct mln_json_object {
  * functions reject array/object children past depth 64 with
  * MLN_STATUS_INVALID_ARGUMENT.
  */
-typedef struct mln_json_value {
+struct mln_json_value {
   uint32_t size;
   /** One of mln_json_value_type. */
   uint32_t type;
@@ -376,7 +379,7 @@ typedef struct mln_json_value {
     mln_json_array array_value;
     mln_json_object object_value;
   } data;
-} mln_json_value;
+};
 
 /** Optional fields for mln_feature_state_selector. */
 typedef enum mln_feature_state_selector_field : uint32_t {
