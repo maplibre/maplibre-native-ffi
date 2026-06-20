@@ -183,29 +183,29 @@ impl NativeGeometry {
             Geometry::Empty => {}
             Geometry::Point(point) => {
                 native.raw.type_ = sys::MLN_GEOMETRY_TYPE_POINT;
-                native.raw.data = sys::mln_geometry__bindgen_ty_1 {
+                native.raw.data = sys::mln_geometry_mln_geometry_data {
                     point: lat_lng_to_native(*point),
                 };
             }
             Geometry::LineString(points) => {
                 native.raw.type_ = sys::MLN_GEOMETRY_TYPE_LINE_STRING;
                 let span = native.coordinate_span(points);
-                native.raw.data = sys::mln_geometry__bindgen_ty_1 { line_string: span };
+                native.raw.data = sys::mln_geometry_mln_geometry_data { line_string: span };
             }
             Geometry::Polygon(rings) => {
                 native.raw.type_ = sys::MLN_GEOMETRY_TYPE_POLYGON;
                 let polygon = native.polygon_geometry(rings);
-                native.raw.data = sys::mln_geometry__bindgen_ty_1 { polygon };
+                native.raw.data = sys::mln_geometry_mln_geometry_data { polygon };
             }
             Geometry::MultiPoint(points) => {
                 native.raw.type_ = sys::MLN_GEOMETRY_TYPE_MULTI_POINT;
                 let span = native.coordinate_span(points);
-                native.raw.data = sys::mln_geometry__bindgen_ty_1 { multi_point: span };
+                native.raw.data = sys::mln_geometry_mln_geometry_data { multi_point: span };
             }
             Geometry::MultiLineString(lines) => {
                 native.raw.type_ = sys::MLN_GEOMETRY_TYPE_MULTI_LINE_STRING;
                 let line_spans = native.coordinate_spans(lines);
-                native.raw.data = sys::mln_geometry__bindgen_ty_1 {
+                native.raw.data = sys::mln_geometry_mln_geometry_data {
                     multi_line_string: sys::mln_multi_line_geometry {
                         lines: ptr_or_null(line_spans.as_ref()),
                         line_count: line_spans.len(),
@@ -220,7 +220,7 @@ impl NativeGeometry {
                     .map(|rings| native.polygon_geometry(rings))
                     .collect::<Vec<_>>()
                     .into_boxed_slice();
-                native.raw.data = sys::mln_geometry__bindgen_ty_1 {
+                native.raw.data = sys::mln_geometry_mln_geometry_data {
                     multi_polygon: sys::mln_multi_polygon_geometry {
                         polygons: ptr_or_null(polygon_values.as_ref()),
                         polygon_count: polygon_values.len(),
@@ -237,7 +237,7 @@ impl NativeGeometry {
                     .map(|child| child.raw)
                     .collect::<Vec<_>>()
                     .into_boxed_slice();
-                native.raw.data = sys::mln_geometry__bindgen_ty_1 {
+                native.raw.data = sys::mln_geometry_mln_geometry_data {
                     geometry_collection: sys::mln_geometry_collection {
                         geometries: ptr_or_null(raw_children.as_ref()),
                         geometry_count: raw_children.len(),
@@ -254,7 +254,7 @@ impl NativeGeometry {
             raw: sys::mln_geometry {
                 size: std::mem::size_of::<sys::mln_geometry>() as u32,
                 type_,
-                data: sys::mln_geometry__bindgen_ty_1 {
+                data: sys::mln_geometry_mln_geometry_data {
                     point: sys::mln_lat_lng {
                         latitude: 0.0,
                         longitude: 0.0,
@@ -454,7 +454,7 @@ mod tests {
         let raw = sys::mln_geometry {
             size: std::mem::size_of::<sys::mln_geometry>() as u32,
             type_: sys::MLN_GEOMETRY_TYPE_LINE_STRING,
-            data: sys::mln_geometry__bindgen_ty_1 {
+            data: sys::mln_geometry_mln_geometry_data {
                 line_string: sys::mln_coordinate_span {
                     coordinates: coordinates.as_ptr(),
                     coordinate_count: coordinates.len(),

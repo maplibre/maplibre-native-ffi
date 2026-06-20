@@ -207,7 +207,7 @@ impl NativeFeature {
                 properties: ptr::null(),
                 property_count: 0,
                 identifier_type: sys::MLN_FEATURE_IDENTIFIER_TYPE_NULL,
-                identifier: sys::mln_feature__bindgen_ty_1 { uint_value: 0 },
+                identifier: sys::mln_feature_mln_feature_identifier { uint_value: 0 },
             },
             _geometry: geometry,
             _geometry_raw: geometry_raw,
@@ -231,11 +231,12 @@ impl NativeFeature {
             }
             FeatureIdentifier::UInt(value) => {
                 self.raw.identifier_type = sys::MLN_FEATURE_IDENTIFIER_TYPE_UINT;
-                self.raw.identifier = sys::mln_feature__bindgen_ty_1 { uint_value: *value };
+                self.raw.identifier =
+                    sys::mln_feature_mln_feature_identifier { uint_value: *value };
             }
             FeatureIdentifier::Int(value) => {
                 self.raw.identifier_type = sys::MLN_FEATURE_IDENTIFIER_TYPE_INT;
-                self.raw.identifier = sys::mln_feature__bindgen_ty_1 { int_value: *value };
+                self.raw.identifier = sys::mln_feature_mln_feature_identifier { int_value: *value };
             }
             FeatureIdentifier::Double(value) => {
                 if !value.is_finite() {
@@ -244,7 +245,7 @@ impl NativeFeature {
                     ));
                 }
                 self.raw.identifier_type = sys::MLN_FEATURE_IDENTIFIER_TYPE_DOUBLE;
-                self.raw.identifier = sys::mln_feature__bindgen_ty_1 {
+                self.raw.identifier = sys::mln_feature_mln_feature_identifier {
                     double_value: *value,
                 };
             }
@@ -260,7 +261,8 @@ impl NativeFeature {
                 };
                 self.identifier_string = Some(bytes);
                 self.raw.identifier_type = sys::MLN_FEATURE_IDENTIFIER_TYPE_STRING;
-                self.raw.identifier = sys::mln_feature__bindgen_ty_1 { string_value: view };
+                self.raw.identifier =
+                    sys::mln_feature_mln_feature_identifier { string_value: view };
             }
         }
         Ok(())
@@ -291,7 +293,7 @@ impl NativeGeoJson {
                 let geometry = geometry_try_to_native(geometry)?;
                 let geometry_raw = Box::new(*geometry.as_ref());
                 native.raw.type_ = sys::MLN_GEOJSON_TYPE_GEOMETRY;
-                native.raw.data = sys::mln_geojson__bindgen_ty_1 {
+                native.raw.data = sys::mln_geojson_mln_geojson_data {
                     geometry: geometry_raw.as_ref(),
                 };
                 native.geometry = Some(geometry);
@@ -301,7 +303,7 @@ impl NativeGeoJson {
                 let feature = feature.try_to_native(0)?;
                 let feature_raw = Box::new(*feature.as_ref());
                 native.raw.type_ = sys::MLN_GEOJSON_TYPE_FEATURE;
-                native.raw.data = sys::mln_geojson__bindgen_ty_1 {
+                native.raw.data = sys::mln_geojson_mln_geojson_data {
                     feature: feature_raw.as_ref(),
                 };
                 native.feature = Some(feature);
@@ -319,7 +321,7 @@ impl NativeGeoJson {
                     .map(|feature| feature.raw)
                     .collect::<Vec<_>>()
                     .into_boxed_slice();
-                native.raw.data = sys::mln_geojson__bindgen_ty_1 {
+                native.raw.data = sys::mln_geojson_mln_geojson_data {
                     feature_collection: sys::mln_feature_collection {
                         features: ptr_or_null(raw_features.as_ref()),
                         feature_count: raw_features.len(),
@@ -336,7 +338,7 @@ impl NativeGeoJson {
             raw: sys::mln_geojson {
                 size: std::mem::size_of::<sys::mln_geojson>() as u32,
                 type_,
-                data: sys::mln_geojson__bindgen_ty_1 {
+                data: sys::mln_geojson_mln_geojson_data {
                     geometry: ptr::null(),
                 },
             },
@@ -462,7 +464,7 @@ mod tests {
         let geometry = sys::mln_geometry {
             size: std::mem::size_of::<sys::mln_geometry>() as u32,
             type_: sys::MLN_GEOMETRY_TYPE_POINT,
-            data: sys::mln_geometry__bindgen_ty_1 {
+            data: sys::mln_geometry_mln_geometry_data {
                 point: coordinates[0],
             },
         };
@@ -471,7 +473,7 @@ mod tests {
         let property_value = sys::mln_json_value {
             size: std::mem::size_of::<sys::mln_json_value>() as u32,
             type_: sys::MLN_JSON_VALUE_TYPE_STRING,
-            data: sys::mln_json_value__bindgen_ty_1 {
+            data: sys::mln_json_value_mln_json_value_data {
                 string_value: sys::mln_string_view {
                     data: value_bytes.as_ptr().cast::<c_char>(),
                     size: value_bytes.len(),
@@ -492,7 +494,7 @@ mod tests {
             properties: &property,
             property_count: 1,
             identifier_type: sys::MLN_FEATURE_IDENTIFIER_TYPE_STRING,
-            identifier: sys::mln_feature__bindgen_ty_1 {
+            identifier: sys::mln_feature_mln_feature_identifier {
                 string_value: sys::mln_string_view {
                     data: identifier.as_ptr().cast::<c_char>(),
                     size: identifier.len(),

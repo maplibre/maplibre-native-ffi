@@ -180,34 +180,34 @@ impl NativeJsonValue {
             JsonValue::Null => {}
             JsonValue::Bool(value) => {
                 native.raw.type_ = sys::MLN_JSON_VALUE_TYPE_BOOL;
-                native.raw.data = sys::mln_json_value__bindgen_ty_1 { bool_value: *value };
+                native.raw.data = sys::mln_json_value_mln_json_value_data { bool_value: *value };
             }
             JsonValue::UInt(value) => {
                 native.raw.type_ = sys::MLN_JSON_VALUE_TYPE_UINT;
-                native.raw.data = sys::mln_json_value__bindgen_ty_1 { uint_value: *value };
+                native.raw.data = sys::mln_json_value_mln_json_value_data { uint_value: *value };
             }
             JsonValue::Int(value) => {
                 native.raw.type_ = sys::MLN_JSON_VALUE_TYPE_INT;
-                native.raw.data = sys::mln_json_value__bindgen_ty_1 { int_value: *value };
+                native.raw.data = sys::mln_json_value_mln_json_value_data { int_value: *value };
             }
             JsonValue::Double(value) => {
                 if !value.is_finite() {
                     return Err(Error::invalid_argument("JSON double values must be finite"));
                 }
                 native.raw.type_ = sys::MLN_JSON_VALUE_TYPE_DOUBLE;
-                native.raw.data = sys::mln_json_value__bindgen_ty_1 {
+                native.raw.data = sys::mln_json_value_mln_json_value_data {
                     double_value: *value,
                 };
             }
             JsonValue::String(value) => {
                 native.raw.type_ = sys::MLN_JSON_VALUE_TYPE_STRING;
                 let view = native.store_string(value);
-                native.raw.data = sys::mln_json_value__bindgen_ty_1 { string_value: view };
+                native.raw.data = sys::mln_json_value_mln_json_value_data { string_value: view };
             }
             JsonValue::Array(values) => {
                 native.raw.type_ = sys::MLN_JSON_VALUE_TYPE_ARRAY;
                 let raw_values = native.store_child_values(values, depth + 1)?;
-                native.raw.data = sys::mln_json_value__bindgen_ty_1 {
+                native.raw.data = sys::mln_json_value_mln_json_value_data {
                     array_value: sys::mln_json_array {
                         values: ptr_or_null(raw_values.as_ref()),
                         value_count: raw_values.len(),
@@ -218,7 +218,7 @@ impl NativeJsonValue {
             JsonValue::Object(members) => {
                 native.raw.type_ = sys::MLN_JSON_VALUE_TYPE_OBJECT;
                 let native_members = native.store_members(members, depth + 1)?;
-                native.raw.data = sys::mln_json_value__bindgen_ty_1 {
+                native.raw.data = sys::mln_json_value_mln_json_value_data {
                     object_value: sys::mln_json_object {
                         members: ptr_or_null(native_members.as_ref()),
                         member_count: native_members.len(),
@@ -235,7 +235,7 @@ impl NativeJsonValue {
             raw: sys::mln_json_value {
                 size: std::mem::size_of::<sys::mln_json_value>() as u32,
                 type_,
-                data: sys::mln_json_value__bindgen_ty_1 { uint_value: 0 },
+                data: sys::mln_json_value_mln_json_value_data { uint_value: 0 },
             },
             strings: Vec::new(),
             values: Vec::new(),
@@ -495,7 +495,7 @@ mod tests {
         let value = sys::mln_json_value {
             size: std::mem::size_of::<sys::mln_json_value>() as u32,
             type_: sys::MLN_JSON_VALUE_TYPE_STRING,
-            data: sys::mln_json_value__bindgen_ty_1 {
+            data: sys::mln_json_value_mln_json_value_data {
                 string_value: sys::mln_string_view {
                     data: string.as_ptr().cast::<c_char>(),
                     size: string.len(),
@@ -512,7 +512,7 @@ mod tests {
         let raw = sys::mln_json_value {
             size: std::mem::size_of::<sys::mln_json_value>() as u32,
             type_: sys::MLN_JSON_VALUE_TYPE_OBJECT,
-            data: sys::mln_json_value__bindgen_ty_1 {
+            data: sys::mln_json_value_mln_json_value_data {
                 object_value: sys::mln_json_object {
                     members: &member,
                     member_count: 1,
