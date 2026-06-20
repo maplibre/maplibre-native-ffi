@@ -94,7 +94,8 @@ public final class RuntimeStructs {
     if (definition instanceof OfflineRegionDefinition.TilePyramid tilePyramid) {
       mln_offline_region_definition.type(
           segment, MapLibreNativeC.MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID());
-      var nativeTile = mln_offline_region_definition.data.tile_pyramid(data);
+      var nativeTile =
+          mln_offline_region_definition.mln_offline_region_definition_data.tile_pyramid(data);
       mln_offline_tile_pyramid_region_definition.size(
           nativeTile, (int) mln_offline_tile_pyramid_region_definition.sizeof());
       mln_offline_tile_pyramid_region_definition.style_url(
@@ -111,7 +112,8 @@ public final class RuntimeStructs {
     if (definition instanceof OfflineRegionDefinition.GeometryRegion geometryRegion) {
       mln_offline_region_definition.type(
           segment, MapLibreNativeC.MLN_OFFLINE_REGION_DEFINITION_GEOMETRY());
-      var nativeGeometry = mln_offline_region_definition.data.geometry(data);
+      var nativeGeometry =
+          mln_offline_region_definition.mln_offline_region_definition_data.geometry(data);
       mln_offline_geometry_region_definition.size(
           nativeGeometry, (int) mln_offline_geometry_region_definition.sizeof());
       mln_offline_geometry_region_definition.style_url(
@@ -153,7 +155,8 @@ public final class RuntimeStructs {
     var type = mln_offline_region_definition.type(segment);
     var data = mln_offline_region_definition.data(segment);
     if (type == MapLibreNativeC.MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID()) {
-      var tile = mln_offline_region_definition.data.tile_pyramid(data);
+      var tile =
+          mln_offline_region_definition.mln_offline_region_definition_data.tile_pyramid(data);
       return new OfflineRegionDefinition.TilePyramid(
           MemoryUtil.copyCString(mln_offline_tile_pyramid_region_definition.style_url(tile)),
           CoreStructs.latLngBounds(mln_offline_tile_pyramid_region_definition.bounds(tile)),
@@ -163,7 +166,8 @@ public final class RuntimeStructs {
           mln_offline_tile_pyramid_region_definition.include_ideographs(tile));
     }
     if (type == MapLibreNativeC.MLN_OFFLINE_REGION_DEFINITION_GEOMETRY()) {
-      var geometry = mln_offline_region_definition.data.geometry(data);
+      var geometry =
+          mln_offline_region_definition.mln_offline_region_definition_data.geometry(data);
       return new OfflineRegionDefinition.GeometryRegion(
           MemoryUtil.copyCString(mln_offline_geometry_region_definition.style_url(geometry)),
           ValueStructs.geometry(mln_offline_geometry_region_definition.geometry(geometry)),

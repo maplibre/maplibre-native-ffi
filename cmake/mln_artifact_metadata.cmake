@@ -1,6 +1,9 @@
 function(mln_json_escape out value)
   string(REPLACE "\\" "\\\\" escaped "${value}")
   string(REPLACE "\"" "\\\"" escaped "${escaped}")
+  string(REPLACE "\n" "\\n" escaped "${escaped}")
+  string(REPLACE "\r" "\\r" escaped "${escaped}")
+  string(REPLACE "\t" "\\t" escaped "${escaped}")
   set("${out}" "${escaped}" PARENT_SCOPE)
 endfunction()
 
@@ -45,7 +48,7 @@ function(mln_write_artifact_metadata target)
     list(APPEND library_dirs "${MLN_FFI_EGL_ROOT}")
   endif()
 
-  if(UNIX AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
+  if(UNIX AND MLN_FFI_ARTIFACT_SHAPE STREQUAL "shared-private")
     set(rpaths ${library_dirs})
     set(supports_linker_rpath true)
   endif()

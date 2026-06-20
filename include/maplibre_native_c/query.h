@@ -44,7 +44,7 @@ typedef struct mln_rendered_query_geometry {
   uint32_t size;
   /** One of mln_rendered_query_geometry_type. */
   uint32_t type;
-  union {
+  union mln_rendered_query_geometry_data {
     mln_screen_point point;
     mln_screen_box box;
     mln_screen_line_string line_string;
@@ -116,7 +116,7 @@ typedef struct mln_feature_extension_result_info {
   uint32_t size;
   /** One of mln_feature_extension_result_type. */
   uint32_t type;
-  union {
+  union mln_feature_extension_result_info_data {
     /** JSON-like value view selected by
      * MLN_FEATURE_EXTENSION_RESULT_TYPE_VALUE. */
     const mln_json_value* value;

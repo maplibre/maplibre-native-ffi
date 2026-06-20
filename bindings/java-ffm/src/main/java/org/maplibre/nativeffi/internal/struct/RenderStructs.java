@@ -200,12 +200,14 @@ public final class RenderStructs {
       case WglContextDescriptor wgl -> {
         mln_opengl_context_descriptor.platform(
             segment, MapLibreNativeC.MLN_OPENGL_CONTEXT_PLATFORM_WGL());
-        fillWglContext(mln_opengl_context_descriptor.data.wgl(data), wgl);
+        fillWglContext(
+            mln_opengl_context_descriptor.mln_opengl_context_descriptor_data.wgl(data), wgl);
       }
       case EglContextDescriptor egl -> {
         mln_opengl_context_descriptor.platform(
             segment, MapLibreNativeC.MLN_OPENGL_CONTEXT_PLATFORM_EGL());
-        fillEglContext(mln_opengl_context_descriptor.data.egl(data), egl);
+        fillEglContext(
+            mln_opengl_context_descriptor.mln_opengl_context_descriptor_data.egl(data), egl);
       }
     }
   }

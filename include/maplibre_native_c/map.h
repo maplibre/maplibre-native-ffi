@@ -313,7 +313,7 @@ typedef struct mln_geometry {
   uint32_t size;
   /** One of mln_geometry_type. */
   uint32_t type;
-  union {
+  union mln_geometry_data {
     mln_lat_lng point;
     mln_coordinate_span line_string;
     mln_polygon_geometry polygon;
@@ -370,7 +370,7 @@ typedef struct mln_json_value {
   uint32_t size;
   /** One of mln_json_value_type. */
   uint32_t type;
-  union {
+  union mln_json_value_data {
     bool bool_value;
     uint64_t uint_value;
     int64_t int_value;
@@ -425,7 +425,7 @@ typedef struct mln_feature {
   size_t property_count;
   /** One of mln_feature_identifier_type. */
   uint32_t identifier_type;
-  union {
+  union mln_feature_identifier {
     uint64_t uint_value;
     int64_t int_value;
     double double_value;
@@ -456,7 +456,7 @@ typedef struct mln_geojson {
   uint32_t size;
   /** One of mln_geojson_type. */
   uint32_t type;
-  union {
+  union mln_geojson_data {
     /**
      * Geometry descriptor selected by MLN_GEOJSON_TYPE_GEOMETRY. Must not be
      * null.
@@ -526,7 +526,7 @@ typedef struct mln_offline_region_definition {
   uint32_t size;
   /** One of mln_offline_region_definition_type. */
   uint32_t type;
-  union {
+  union mln_offline_region_definition_data {
     mln_offline_tile_pyramid_region_definition tile_pyramid;
     mln_offline_geometry_region_definition geometry;
   } data;

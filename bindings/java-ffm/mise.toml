@@ -1,3 +1,6 @@
 [tasks.build]
-depends = ["//:ensure-native-library", ":jextract:update-includes"]
-run = "../../gradlew :bindings:java-ffm:build"
+run = [
+  { task = "//:ensure-native-library" },
+  { task = ":jextract:update-includes" },
+  "../../gradlew :bindings:java-ffm:build",
+]

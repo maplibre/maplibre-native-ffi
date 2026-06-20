@@ -145,11 +145,15 @@ public final class QueryStructs {
       var data = mln_feature_extension_result_info.data(info);
       if (type == MapLibreNativeC.MLN_FEATURE_EXTENSION_RESULT_TYPE_VALUE()) {
         return new FeatureExtensionResult.Value(
-            ValueStructs.jsonValue(mln_feature_extension_result_info.data.value(data)));
+            ValueStructs.jsonValue(
+                mln_feature_extension_result_info.mln_feature_extension_result_info_data.value(
+                    data)));
       }
       if (type == MapLibreNativeC.MLN_FEATURE_EXTENSION_RESULT_TYPE_FEATURE_COLLECTION()) {
         return new FeatureExtensionResult.FeatureCollection(
-            featureCollection(mln_feature_extension_result_info.data.feature_collection(data)));
+            featureCollection(
+                mln_feature_extension_result_info.mln_feature_extension_result_info_data
+                    .feature_collection(data)));
       }
       return new FeatureExtensionResult.Unknown(type);
     } finally {
