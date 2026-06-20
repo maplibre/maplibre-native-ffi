@@ -40,6 +40,8 @@ private constructor(private val map: MapHandle, private val handleAddress: Long)
   public actual fun resize(width: Int, height: Int, scaleFactor: Double) {
     NativeAccess.ensureLoaded()
     activeFrame.ensureInactive("resize")
+    Status.requireArgument(width >= 0) { "width must be non-negative" }
+    Status.requireArgument(height >= 0) { "height must be non-negative" }
     Status.check(
       MaplibreNativeC.mln_render_session_resize(
         renderSession(requireLiveAddress()),

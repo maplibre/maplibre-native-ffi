@@ -12,6 +12,7 @@ import org.maplibre.nativeffi.camera.CameraFitOptions
 import org.maplibre.nativeffi.camera.CameraOptions
 import org.maplibre.nativeffi.camera.EdgeInsets
 import org.maplibre.nativeffi.camera.UnitBezier
+import org.maplibre.nativeffi.error.InvalidArgumentException
 import org.maplibre.nativeffi.error.InvalidStateException
 import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.error.UnsupportedFeatureException
@@ -44,6 +45,11 @@ import org.maplibre.nativeffi.style.TileSourceOptions
 import org.maplibre.nativeffi.style.VectorTileEncoding
 
 class MapHandleTest {
+  @Test
+  fun canonicalTileIdRejectsOutOfRangeInputs() {
+    assertFailsWith<InvalidArgumentException> { CanonicalTileId(0, UInt.MAX_VALUE.toLong() + 1, 0) }
+  }
+
   @Test
   fun mapCreateStyleAndCloseRetainsRuntime() {
     val runtime = RuntimeHandle.create(RuntimeOptions())

@@ -4,6 +4,7 @@ import java.lang.foreign.MemorySegment
 import org.maplibre.nativeffi.geo.Feature
 import org.maplibre.nativeffi.internal.lifecycle.HandleStateCore
 import org.maplibre.nativeffi.internal.loader.NativeAccess
+import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.json.JsonValue
 import org.maplibre.nativeffi.map.MapHandle
 import org.maplibre.nativeffi.query.FeatureExtensionResult
@@ -29,6 +30,8 @@ internal constructor(private val map: MapHandle, private val handle: MemorySegme
   public actual fun resize(width: Int, height: Int, scaleFactor: Double) {
     NativeAccess.ensureLoaded()
     activeFrame.ensureInactive("resize")
+    Status.requireArgument(width >= 0) { "width must be non-negative" }
+    Status.requireArgument(height >= 0) { "height must be non-negative" }
     NativeAccess.resizeRenderSession(requireLiveHandle(), width, height, scaleFactor)
   }
 

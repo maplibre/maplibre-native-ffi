@@ -16,6 +16,7 @@ import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.map.MapHandle
 import org.maplibre.nativeffi.map.MapOptions
 import org.maplibre.nativeffi.offline.OfflineRegionDefinition
+import org.maplibre.nativeffi.offline.OfflineRegionDownloadState
 import org.maplibre.nativeffi.resource.ResourceKind
 import org.maplibre.nativeffi.resource.ResourceProviderCallback
 import org.maplibre.nativeffi.resource.ResourceProviderDecision
@@ -58,12 +59,21 @@ class RuntimeHandleTest {
   }
 
   @Test
-  fun geometryOfflineRegionDefinitionReachesNativeValidation() {
+  fun offlineDownloadStateUnknownRawValueRejectsBeforeNativeCall() {
     RuntimeHandle.create(RuntimeOptions()).use { runtime ->
       assertFailsWith<InvalidArgumentException> {
+        runtime.startSetOfflineRegionDownloadState(1, OfflineRegionDownloadState(900))
+      }
+    }
+  }
+
+  @Test
+  fun geometryOfflineRegionDefinitionStartsOperation() {
+    RuntimeHandle.create(RuntimeOptions().apply { cachePath = ":memory:" }).use { runtime ->
+      val operation =
         runtime.startCreateOfflineRegion(
           OfflineRegionDefinition.GeometryRegion(
-            "asset://style.json",
+            "custom://style.json",
             Geometry.Point(LatLng(1.0, 2.0)),
             0.0,
             1.0,
@@ -72,7 +82,10 @@ class RuntimeHandleTest {
           ),
           ByteArray(0),
         )
-      }
+      assertEquals(OfflineOperationKind.REGION_CREATE, operation.kind)
+      assertEquals(OfflineOperationResultKind.REGION, operation.resultKind)
+      operation.close()
+      assertTrue(operation.isClosed)
     }
   }
 

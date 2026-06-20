@@ -4481,12 +4481,18 @@ internal object NativeAccess {
           arena,
         )
       }
-      is OfflineRegionDefinition.GeometryRegion ->
+      is OfflineRegionDefinition.GeometryRegion -> {
+        segment.set(
+          ValueLayout.JAVA_INT,
+          OFFLINE_REGION_DEFINITION_TYPE_OFFSET,
+          OFFLINE_REGION_DEFINITION_TYPE_GEOMETRY,
+        )
         offlineGeometryDefinition(
           value,
           segment.asSlice(OFFLINE_REGION_DEFINITION_DATA_OFFSET),
           arena,
         )
+      }
       is OfflineRegionDefinition.Unknown ->
         throw Status.invalidArgument("unknown offline region definitions cannot be used as input")
     }

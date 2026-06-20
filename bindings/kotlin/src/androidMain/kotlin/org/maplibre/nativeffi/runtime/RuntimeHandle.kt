@@ -9,6 +9,7 @@ import org.bytedeco.javacpp.PointerPointer
 import org.bytedeco.javacpp.SizeTPointer
 import org.maplibre.nativeffi.NativeAccess
 import org.maplibre.nativeffi.error.InvalidStateException
+import org.maplibre.nativeffi.geo.Geometry
 import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.LatLngBounds
 import org.maplibre.nativeffi.geo.TileId
@@ -176,6 +177,9 @@ public actual class RuntimeHandle private constructor(private val handleAddress:
     id: Long,
     downloadState: OfflineRegionDownloadState,
   ): OfflineOperationHandle<Unit> {
+    Status.requireArgument(downloadState.isKnown) {
+      "Unknown offline region download state cannot be used as input: ${downloadState.nativeValue}"
+    }
     val outOperationId = longArrayOf(0L)
     Status.check(
       MaplibreNativeC.mln_runtime_offline_region_set_download_state_start(
@@ -722,6 +726,8 @@ private fun offlineRegionDefinition(
   when (definition.type()) {
     MaplibreNativeC.MLN_OFFLINE_REGION_DEFINITION_TILE_PYRAMID ->
       offlineTilePyramidDefinition(definition.data_tile_pyramid())
+    MaplibreNativeC.MLN_OFFLINE_REGION_DEFINITION_GEOMETRY ->
+      offlineGeometryDefinition(definition.data_geometry())
     else -> OfflineRegionDefinition.Unknown(definition.type(), definition.size())
   }
 
@@ -737,11 +743,79 @@ private fun offlineTilePyramidDefinition(
     definition.include_ideographs(),
   )
 
+private fun offlineGeometryDefinition(
+  definition: MaplibreNativeC.mln_offline_geometry_region_definition
+): OfflineRegionDefinition.GeometryRegion =
+  OfflineRegionDefinition.GeometryRegion(
+    byteString(definition.style_url(), cStringLength(definition.style_url())),
+    geometry(definition.geometry()),
+    definition.min_zoom(),
+    definition.max_zoom(),
+    definition.pixel_ratio(),
+    definition.include_ideographs(),
+  )
+
+private fun geometry(value: MaplibreNativeC.mln_geometry): Geometry =
+  when (value.type()) {
+    MaplibreNativeC.MLN_GEOMETRY_TYPE_EMPTY -> Geometry.Empty
+    MaplibreNativeC.MLN_GEOMETRY_TYPE_POINT -> Geometry.Point(latLng(value.data_point()))
+    MaplibreNativeC.MLN_GEOMETRY_TYPE_LINE_STRING ->
+      Geometry.LineString(coordinateSpan(value.data_line_string()))
+    MaplibreNativeC.MLN_GEOMETRY_TYPE_POLYGON -> Geometry.Polygon(polygon(value.data_polygon()))
+    MaplibreNativeC.MLN_GEOMETRY_TYPE_MULTI_POINT ->
+      Geometry.MultiPoint(coordinateSpan(value.data_multi_point()))
+    MaplibreNativeC.MLN_GEOMETRY_TYPE_MULTI_LINE_STRING -> {
+      val native = value.data_multi_line_string()
+      val lines = native.lines()
+      Geometry.MultiLineString(
+        List(Math.toIntExact(native.line_count())) { index ->
+          coordinateSpan(lines.getPointer(index.toLong()))
+        }
+      )
+    }
+    MaplibreNativeC.MLN_GEOMETRY_TYPE_MULTI_POLYGON -> {
+      val native = value.data_multi_polygon()
+      val polygons = native.polygons()
+      Geometry.MultiPolygon(
+        List(Math.toIntExact(native.polygon_count())) { index ->
+          polygon(polygons.getPointer(index.toLong()))
+        }
+      )
+    }
+    MaplibreNativeC.MLN_GEOMETRY_TYPE_GEOMETRY_COLLECTION -> {
+      val native = value.data_geometry_collection()
+      val geometries = native.geometries()
+      Geometry.Collection(
+        List(Math.toIntExact(native.geometry_count())) { index ->
+          geometry(geometries.getPointer(index.toLong()))
+        }
+      )
+    }
+    else -> Geometry.Unknown(value.type(), value.size())
+  }
+
+private fun coordinateSpan(value: MaplibreNativeC.mln_coordinate_span): List<LatLng> {
+  val coordinates = value.coordinates()
+  return List(Math.toIntExact(value.coordinate_count())) { index ->
+    latLng(coordinates.getPointer(index.toLong()))
+  }
+}
+
+private fun polygon(value: MaplibreNativeC.mln_polygon_geometry): List<List<LatLng>> {
+  val rings = value.rings()
+  return List(Math.toIntExact(value.ring_count())) { index ->
+    coordinateSpan(rings.getPointer(index.toLong()))
+  }
+}
+
 private fun latLngBounds(bounds: MaplibreNativeC.mln_lat_lng_bounds): LatLngBounds =
   LatLngBounds(
     LatLng(bounds.southwest().latitude(), bounds.southwest().longitude()),
     LatLng(bounds.northeast().latitude(), bounds.northeast().longitude()),
   )
+
+private fun latLng(value: MaplibreNativeC.mln_lat_lng): LatLng =
+  LatLng(value.latitude(), value.longitude())
 
 private fun cStringLength(pointer: BytePointer?): Long {
   if (pointer == null || pointer.isNull) {

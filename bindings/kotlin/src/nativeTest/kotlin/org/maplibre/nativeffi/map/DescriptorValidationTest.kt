@@ -107,7 +107,7 @@ class DescriptorValidationTest {
 
   @Test
   fun canonicalTileMaterializationRejectsOverflow() {
-    assertFailsWith<IllegalArgumentException> {
+    assertFailsWith<InvalidArgumentException> {
       StyleStructs.canonicalTileId(CanonicalTileId(0, UInt.MAX_VALUE.toLong() + 1, 0))
     }
   }

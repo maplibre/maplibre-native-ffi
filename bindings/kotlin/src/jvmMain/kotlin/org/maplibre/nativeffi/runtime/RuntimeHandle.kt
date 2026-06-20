@@ -112,7 +112,10 @@ public actual class RuntimeHandle private constructor(private val handle: Memory
   public actual fun startSetOfflineRegionDownloadState(
     id: Long,
     downloadState: OfflineRegionDownloadState,
-  ): OfflineOperationHandle<Unit> =
+  ): OfflineOperationHandle<Unit> = run {
+    Status.requireArgument(downloadState.isKnown) {
+      "Unknown offline region download state cannot be used as input: ${downloadState.nativeValue}"
+    }
     offlineOperation(
       NativeAccess.startSetOfflineRegionDownloadState(
         requireLiveHandle(),
@@ -122,6 +125,7 @@ public actual class RuntimeHandle private constructor(private val handle: Memory
       OfflineOperationKind.REGION_SET_DOWNLOAD_STATE,
       OfflineOperationResultKind.NONE,
     )
+  }
 
   public actual fun startInvalidateOfflineRegion(id: Long): OfflineOperationHandle<Unit> =
     offlineOperation(
