@@ -1,6 +1,6 @@
 [requires]
 exclude = ["macos-arm64-egl"]
-os = ["macos"]
+os = ["macos", "ios"]
 
 [ci]
 test = "//bindings/swift:test"

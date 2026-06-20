@@ -12,15 +12,12 @@ if [[ ! -x "$test_executable" ]]; then
   exit 2
 fi
 
-device=${MLN_FFI_IOS_SIMULATOR_DEVICE:-}
+device=$(
+  xcrun simctl list devices available iOS |
+    awk -F '[()]' '/ iPhone / && /Shutdown|Booted/ { print $2; exit }'
+)
 if [[ -z "$device" ]]; then
-  # iPhone simulators are present on the CI images and cover the app runtime surface used by these tests.
-  device=$(xcrun simctl list devices available iOS |
-    awk -F '[()]' '/ iPhone / && /Shutdown|Booted/ { print $2; exit }')
-fi
-
-if [[ -z "$device" ]]; then
-  echo "No available iOS simulator device found. Set MLN_FFI_IOS_SIMULATOR_DEVICE to a simulator UDID." >&2
+  echo "No available iOS simulator device found." >&2
   exit 2
 fi
 

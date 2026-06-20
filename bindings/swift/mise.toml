@@ -1,10 +1,36 @@
 [tasks.build]
 depends = ["//:ensure-native-library"]
-run = 'swift build --scratch-path ".build/$MISE_ENV"'
+run = '''
+if [[ "$MISE_ENV" == ios-simulator-* ]]; then
+  sdk=${MLN_FFI_SYSTEM_ROOT:-}
+  if [[ -z "$sdk" ]]; then
+    sdk=$(xcrun --sdk iphonesimulator --show-sdk-path)
+  fi
+  testing_frameworks="$(xcode-select -p)/Platforms/iPhoneSimulator.platform/Developer/Library/Frameworks"
+
+  swift build \
+    --product MaplibreNativeIOSSimulatorTests \
+    --scratch-path ".build/$MISE_ENV" \
+    --sdk "$sdk" \
+    --triple "$MLN_FFI_SWIFT_TARGET_TRIPLE" \
+    -Xswiftc -enable-testing \
+    -Xlinker -rpath \
+    -Xlinker "$testing_frameworks"
+else
+  swift build --scratch-path ".build/$MISE_ENV"
+fi
+'''
 
 [tasks.test]
-depends = ["//:ensure-native-library"]
-run = 'swift test --scratch-path ".build/$MISE_ENV"'
+depends = [":build"]
+run = '''
+if [[ "$MISE_ENV" == ios-simulator-* ]]; then
+  bash "$MLN_FFI_REPO_ROOT/scripts/run-ios-simulator-test.sh" \
+    ".build/$MISE_ENV/$MLN_FFI_SWIFT_TARGET_BIN_DIR/debug/MaplibreNativeIOSSimulatorTests"
+else
+  swift test --scratch-path ".build/$MISE_ENV"
+fi
+'''
 
 [tasks.ci]
 depends = ["test"]
