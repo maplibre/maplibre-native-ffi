@@ -309,7 +309,7 @@ typedef struct mln_geometry_collection {
  * functions reject geometry collection children past depth 64 with
  * MLN_STATUS_INVALID_ARGUMENT.
  */
-typedef struct mln_geometry {
+struct mln_geometry {
   uint32_t size;
   /** One of mln_geometry_type. */
   uint32_t type;
@@ -322,7 +322,7 @@ typedef struct mln_geometry {
     mln_multi_polygon_geometry multi_polygon;
     mln_geometry_collection geometry_collection;
   } data;
-} mln_geometry;
+};
 
 /** JSON-like value variant tags used by mln_json_value. */
 typedef enum mln_json_value_type : uint32_t {
@@ -366,7 +366,7 @@ typedef struct mln_json_object {
  * functions reject array/object children past depth 64 with
  * MLN_STATUS_INVALID_ARGUMENT.
  */
-typedef struct mln_json_value {
+struct mln_json_value {
   uint32_t size;
   /** One of mln_json_value_type. */
   uint32_t type;
@@ -379,7 +379,7 @@ typedef struct mln_json_value {
     mln_json_array array_value;
     mln_json_object object_value;
   } data;
-} mln_json_value;
+};
 
 /** Optional fields for mln_feature_state_selector. */
 typedef enum mln_feature_state_selector_field : uint32_t {
