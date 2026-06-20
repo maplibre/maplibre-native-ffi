@@ -19,6 +19,7 @@ import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.ptr
 import kotlinx.cinterop.staticCFunction
 import org.maplibre.nativeffi.Maplibre
+import org.maplibre.nativeffi.error.InvalidArgumentException
 import org.maplibre.nativeffi.error.MaplibreException
 import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.internal.callback.LogCallbackState
@@ -149,6 +150,8 @@ class LogCallbackStateTest {
   @Test
   fun concurrentCloseDuringLogCallbackAllowsEnteredCallbackAndSuppressesLaterUpcalls() {
     val phase = AtomicInt(LOG_PHASE_READY)
+    val closeStarted = AtomicInt(0)
+    val closeReturned = AtomicInt(0)
     val error = AtomicReference<Throwable?>(null)
     val accepted = AtomicInt(0)
     lateinit var state: LogCallbackState
@@ -165,14 +168,25 @@ class LogCallbackStateTest {
 
       runLogInvokeOnNativeThread(ConcurrentLogInvoke(state, phase, error)) {
         waitForLogPhase(phase, LOG_PHASE_ENTERED)
-        state.close()
-
-        assertTrue(state.isClosedForTesting())
-        assertEquals(0U, state.invoke(1U, 3U, 8L, null))
+        runNativeAction(
+          NativeAction(error) {
+            closeStarted.store(1)
+            state.close()
+            closeReturned.store(1)
+          }
+        ) {
+          waitForAtomic(closeStarted, 1)
+          usleep(50_000U)
+          assertEquals(0, closeReturned.load())
+          assertEquals(0U, state.invoke(1U, 3U, 8L, null))
+          phase.store(LOG_PHASE_RELEASE)
+        }
       }
 
       error.load()?.let { throw it }
       assertEquals(1, accepted.load())
+      assertEquals(1, closeReturned.load())
+      assertTrue(state.isClosedForTesting())
     } finally {
       phase.store(LOG_PHASE_RELEASE)
       Maplibre.clearLogCallback()
@@ -182,20 +196,19 @@ class LogCallbackStateTest {
   @Test
   fun logSeverityMasksRejectUnknownInputs() {
     assertEquals(1 shl 1, LogSeverity.INFO.nativeMask)
-    kotlin.test.assertFailsWith<IllegalArgumentException> { LogSeverity(900).nativeMask }
+    kotlin.test.assertFailsWith<InvalidArgumentException> { LogSeverity(900).nativeMask }
   }
 
   private fun runLogInvokeOnNativeThread(invocation: ConcurrentLogInvoke, block: () -> Unit) {
+    runNativeAction(invocation, block)
+  }
+
+  private fun runNativeAction(action: NativeRunnable, block: () -> Unit) {
     memScoped {
-      val selfRef = StableRef.create(invocation)
+      val selfRef = StableRef.create(action)
       val thread = alloc<pthread_tVar>()
       val status =
-        pthread_create(
-          thread.ptr,
-          null,
-          staticCFunction(::invokeLogCallbackOnNativeThread),
-          selfRef.asCPointer(),
-        )
+        pthread_create(thread.ptr, null, staticCFunction(::runNativeRunnable), selfRef.asCPointer())
       if (status != 0) {
         selfRef.dispose()
         error("pthread_create failed with status $status")
@@ -203,7 +216,7 @@ class LogCallbackStateTest {
       try {
         block()
       } finally {
-        invocation.release()
+        action.release()
         pthread_join(thread.ptr[0], null)
       }
     }
@@ -215,8 +228,8 @@ private class ConcurrentLogInvoke(
   private val state: LogCallbackState,
   private val phase: AtomicInt,
   private val error: AtomicReference<Throwable?>,
-) {
-  fun run() {
+) : NativeRunnable {
+  override fun run() {
     try {
       val result = state.invoke(1U, 3U, 7L, null)
       if (result != 1U) error.store(AssertionError("expected entered log callback to return 1"))
@@ -227,14 +240,34 @@ private class ConcurrentLogInvoke(
     }
   }
 
-  fun release() {
+  override fun release() {
     phase.store(LOG_PHASE_RELEASE)
   }
 }
 
+@OptIn(ExperimentalAtomicApi::class)
+private class NativeAction(
+  private val error: AtomicReference<Throwable?>,
+  private val block: () -> Unit,
+) : NativeRunnable {
+  override fun run() {
+    try {
+      block()
+    } catch (throwable: Throwable) {
+      error.store(throwable)
+    }
+  }
+}
+
+private interface NativeRunnable {
+  fun run()
+
+  fun release() {}
+}
+
 @OptIn(ExperimentalForeignApi::class)
-private fun invokeLogCallbackOnNativeThread(raw: COpaquePointer?): COpaquePointer? {
-  val selfRef = requireNotNull(raw).asStableRef<ConcurrentLogInvoke>()
+private fun runNativeRunnable(raw: COpaquePointer?): COpaquePointer? {
+  val selfRef = requireNotNull(raw).asStableRef<NativeRunnable>()
   try {
     selfRef.get().run()
   } finally {
@@ -250,6 +283,15 @@ private fun waitForLogPhase(phase: AtomicInt, expected: Int) {
     usleep(1_000U)
   }
   error("timed out waiting for log callback phase $expected")
+}
+
+@OptIn(ExperimentalAtomicApi::class)
+private fun waitForAtomic(value: AtomicInt, expected: Int) {
+  repeat(10_000) {
+    if (value.load() == expected) return
+    usleep(1_000U)
+  }
+  error("timed out waiting for atomic value $expected")
 }
 
 private const val LOG_PHASE_READY = 0

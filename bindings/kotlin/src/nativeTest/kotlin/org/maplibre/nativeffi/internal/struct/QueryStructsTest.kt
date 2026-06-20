@@ -16,6 +16,7 @@ import kotlinx.cinterop.ptr
 import kotlinx.cinterop.reinterpret
 import kotlinx.cinterop.set
 import kotlinx.cinterop.sizeOf
+import org.maplibre.nativeffi.error.InvalidArgumentException
 import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.geo.FeatureIdentifier
 import org.maplibre.nativeffi.geo.Geometry
@@ -311,7 +312,7 @@ class QueryStructsTest {
 
   @Test
   fun featureStateSelectorKeepsStateKeyDependentOnFeatureId() {
-    assertFailsWith<IllegalStateException> { FeatureStateSelector("source").stateKey = "hover" }
+    assertFailsWith<InvalidArgumentException> { FeatureStateSelector("source").stateKey = "hover" }
 
     val selector =
       FeatureStateSelector("source").apply {

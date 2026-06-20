@@ -275,7 +275,7 @@ internal object RuntimeStructs {
         native.data.geometry.include_ideographs = value.includeIdeographs
       }
       is OfflineRegionDefinition.Unknown ->
-        throw IllegalArgumentException("unknown offline region definitions cannot be used as input")
+        throw Status.invalidArgument("unknown offline region definitions cannot be used as input")
     }
     return native.ptr
   }

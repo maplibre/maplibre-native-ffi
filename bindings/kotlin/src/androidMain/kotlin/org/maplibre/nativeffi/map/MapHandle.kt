@@ -2140,7 +2140,7 @@ private class JsonScope(value: JsonValue) : AutoCloseable {
   }
 
   private fun jsonValue(value: JsonValue, depth: Int = 0): MaplibreNativeC.mln_json_value {
-    require(depth <= JsonValue.MAX_DESCRIPTOR_DEPTH) {
+    Status.requireArgument(depth <= JsonValue.MAX_DESCRIPTOR_DEPTH) {
       "JSON descriptor depth exceeds ${JsonValue.MAX_DESCRIPTOR_DEPTH}"
     }
     val out = own(MaplibreNativeC.mln_json_value())
@@ -2190,7 +2190,7 @@ private class JsonScope(value: JsonValue) : AutoCloseable {
         out.data_object_value(obj)
       }
       is JsonValue.Unknown ->
-        throw IllegalArgumentException("unknown JSON values cannot be used as input")
+        throw Status.invalidArgument("unknown JSON values cannot be used as input")
     }
     return out
   }
@@ -2226,7 +2226,7 @@ private class GeoDescriptorScope : AutoCloseable {
   }
 
   fun geometry(value: Geometry, depth: Int): MaplibreNativeC.mln_geometry {
-    require(depth <= Geometry.MAX_COLLECTION_DEPTH) {
+    Status.requireArgument(depth <= Geometry.MAX_COLLECTION_DEPTH) {
       "Geometry collection depth exceeds ${Geometry.MAX_COLLECTION_DEPTH}"
     }
     val out = own(MaplibreNativeC.mln_geometry())
@@ -2260,7 +2260,7 @@ private class GeoDescriptorScope : AutoCloseable {
           .type(MaplibreNativeC.MLN_GEOMETRY_TYPE_GEOMETRY_COLLECTION)
           .data_geometry_collection(geometryCollection(value.geometries, depth + 1))
       is Geometry.Unknown ->
-        throw IllegalArgumentException("unknown geometries cannot be used as input")
+        throw Status.invalidArgument("unknown geometries cannot be used as input")
     }
     return out
   }
@@ -2431,7 +2431,7 @@ private class GeoDescriptorScope : AutoCloseable {
           .identifier_type(MaplibreNativeC.MLN_FEATURE_IDENTIFIER_TYPE_STRING)
           .identifier_string_value(string(value.value))
       is FeatureIdentifier.Unknown ->
-        throw IllegalArgumentException("unknown feature identifiers cannot be used as input")
+        throw Status.invalidArgument("unknown feature identifiers cannot be used as input")
     }
   }
 }
@@ -2597,17 +2597,23 @@ private class ViewportOptionsScope(value: ViewportOptions) : AutoCloseable {
   init {
     var fields = 0
     value.northOrientation?.let {
-      require(it.isKnown) { "Unknown north orientation cannot be used as input: ${it.nativeValue}" }
+      Status.requireArgument(it.isKnown) {
+        "Unknown north orientation cannot be used as input: ${it.nativeValue}"
+      }
       fields = fields or MaplibreNativeC.MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION
       options.north_orientation(it.nativeValue)
     }
     value.constrainMode?.let {
-      require(it.isKnown) { "Unknown constrain mode cannot be used as input: ${it.nativeValue}" }
+      Status.requireArgument(it.isKnown) {
+        "Unknown constrain mode cannot be used as input: ${it.nativeValue}"
+      }
       fields = fields or MaplibreNativeC.MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE
       options.constrain_mode(it.nativeValue)
     }
     value.viewportMode?.let {
-      require(it.isKnown) { "Unknown viewport mode cannot be used as input: ${it.nativeValue}" }
+      Status.requireArgument(it.isKnown) {
+        "Unknown viewport mode cannot be used as input: ${it.nativeValue}"
+      }
       fields = fields or MaplibreNativeC.MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE
       options.viewport_mode(it.nativeValue)
     }
@@ -2649,7 +2655,9 @@ private class TileOptionsScope(value: TileOptions) : AutoCloseable {
       options.lod_zoom_shift(it)
     }
     value.lodMode?.let {
-      require(it.isKnown) { "Unknown tile LOD mode cannot be used as input: ${it.nativeValue}" }
+      Status.requireArgument(it.isKnown) {
+        "Unknown tile LOD mode cannot be used as input: ${it.nativeValue}"
+      }
       fields = fields or MaplibreNativeC.MLN_MAP_TILE_OPTION_LOD_MODE
       options.lod_mode(it.nativeValue)
     }
@@ -2738,7 +2746,9 @@ private class MapOptionsScope(value: MapOptions) : AutoCloseable {
     value.height?.let { options.height(it) }
     value.scaleFactor?.let { options.scale_factor(it) }
     value.mapMode?.let {
-      require(it.isKnown) { "Unknown map mode cannot be used as input: ${it.nativeValue}" }
+      Status.requireArgument(it.isKnown) {
+        "Unknown map mode cannot be used as input: ${it.nativeValue}"
+      }
       options.map_mode(it.nativeValue)
     }
   }

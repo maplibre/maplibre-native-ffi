@@ -1,6 +1,7 @@
 package org.maplibre.nativeffi.style
 
 import org.maplibre.nativeffi.geo.LatLngBounds
+import org.maplibre.nativeffi.internal.status.Status
 
 /** Mutable descriptor for vector, raster, and raster DEM style tile sources. */
 public class TileSourceOptions {
@@ -16,7 +17,7 @@ public class TileSourceOptions {
 
   public var tileSize: Int? = null
     set(value) {
-      value?.let { require(it >= 0) { "tileSize must be non-negative" } }
+      value?.let { Status.requireArgument(it >= 0) { "tileSize must be non-negative" } }
       field = value
     }
 

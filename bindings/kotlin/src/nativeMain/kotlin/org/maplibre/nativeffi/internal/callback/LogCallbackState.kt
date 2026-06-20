@@ -1,7 +1,5 @@
 package org.maplibre.nativeffi.internal.callback
 
-import kotlin.concurrent.atomics.AtomicInt
-import kotlin.concurrent.atomics.ExperimentalAtomicApi
 import kotlinx.cinterop.ByteVar
 import kotlinx.cinterop.COpaquePointer
 import kotlinx.cinterop.CPointer
@@ -16,13 +14,13 @@ import org.maplibre.nativeffi.log.LogRecord
 import org.maplibre.nativeffi.log.LogSeverity
 
 /** Owns process-global logging callback state. */
-@OptIn(ExperimentalForeignApi::class, ExperimentalAtomicApi::class)
+@OptIn(ExperimentalForeignApi::class)
 internal class LogCallbackState private constructor(private val callback: LogCallback) :
   AutoCloseable {
-  private val closed = AtomicInt(0)
+  private val gate = CallbackGate("log callbacks")
 
   fun invoke(severity: UInt, event: UInt, code: Long, message: CPointer<ByteVar>?): UInt {
-    if (closed.load() != 0) return 0U
+    val lease = gate.enter() ?: return 0U
     return try {
       val record =
         LogRecord(
@@ -34,17 +32,14 @@ internal class LogCallbackState private constructor(private val callback: LogCal
       if (callback.log(record)) 1U else 0U
     } catch (_: Throwable) {
       0U
+    } finally {
+      lease.close()
     }
   }
 
-  override fun close() {
-    // Native logging can dispatch from worker threads. The C API stops future callbacks after
-    // replacement or clear, but it does not guarantee that an already-entered upcall has finished
-    // running. Keep callback state independent from user_data and gate dispatch instead.
-    closed.store(1)
-  }
+  override fun close() = gate.close()
 
-  internal fun isClosedForTesting(): Boolean = closed.load() != 0
+  internal fun isClosedForTesting(): Boolean = gate.isClosedForTesting()
 
   internal companion object {
     private val registry = LogCallbackRegistry<LogCallbackState>()

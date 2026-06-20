@@ -1,6 +1,7 @@
 package org.maplibre.nativeffi
 
 import android.content.Context
+import org.maplibre.nativeffi.internal.javacpp.AndroidNativeBridge
 import org.maplibre.nativeffi.internal.status.Status
 
 /** Android-only platform integration entry points. */
@@ -14,8 +15,6 @@ public object MaplibreAndroid {
   public fun initialize(context: Context) {
     NativeAccess.ensureLoaded()
     val appContext = context.applicationContext ?: context
-    Status.check(nativeInitialize(appContext))
+    Status.check(AndroidNativeBridge.initialize(appContext))
   }
-
-  private external fun nativeInitialize(context: Context): Int
 }

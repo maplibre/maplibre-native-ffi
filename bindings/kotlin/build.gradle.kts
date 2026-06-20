@@ -135,6 +135,8 @@ kotlin {
 
 androidComponents {
   onVariants { variant ->
+    // Android KMP does not currently expose a task-provider-backed generated Java source hook.
+    // Keep the explicit task dependencies below in sync with this static source directory.
     variant.sources.java?.addStaticSourceDirectory(
       generatedJavaCppSources.get().asFile.absolutePath
     )
@@ -143,6 +145,8 @@ androidComponents {
 
 data class JextractDistribution(val url: String, val sha256: String)
 
+// The de.infolektuell.jextract Gradle plugin applies Gradle's Java plugin, which is incompatible
+// with Kotlin Multiplatform projects.
 val jextractDistribution =
   when {
     hostOs.contains("mac") && (hostArch == "aarch64" || hostArch == "arm64") ->
@@ -225,7 +229,8 @@ tasks.named<KotlinJvmCompile>("compileKotlinJvm") {
 val compileJavaCppConfig =
   tasks.register<JavaCompile>("compileAndroidJavaCppConfig") {
     source(
-      "src/androidMain/java/org/maplibre/nativeffi/internal/javacpp/MaplibreNativeCConfig.java"
+      "src/androidMain/java/org/maplibre/nativeffi/internal/javacpp/MaplibreNativeCConfig.java",
+      "src/androidMain/java/org/maplibre/nativeffi/internal/javacpp/AndroidNativeBridge.java",
     )
     classpath = javaCppToolClasspath
     destinationDirectory = javaCppConfigClasses
@@ -247,9 +252,13 @@ val generateJavaCppBindings =
       generatedJavaCppSources.get().asFile.absolutePath,
       "-nogenerate",
       "org.maplibre.nativeffi.internal.javacpp.MaplibreNativeCConfig",
+      "org.maplibre.nativeffi.internal.javacpp.AndroidNativeBridge",
     )
     inputs.file(
       "src/androidMain/java/org/maplibre/nativeffi/internal/javacpp/MaplibreNativeCConfig.java"
+    )
+    inputs.file(
+      "src/androidMain/java/org/maplibre/nativeffi/internal/javacpp/AndroidNativeBridge.java"
     )
     inputs.files(maplibreNativeC.includeDirs).withPropertyName("maplibreNativeCIncludeDirs")
     outputs.file(

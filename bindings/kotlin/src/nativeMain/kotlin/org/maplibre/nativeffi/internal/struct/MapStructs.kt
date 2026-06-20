@@ -62,6 +62,7 @@ import org.maplibre.nativeffi.internal.c.mln_map_viewport_options
 import org.maplibre.nativeffi.internal.c.mln_map_viewport_options_default
 import org.maplibre.nativeffi.internal.c.mln_projection_mode
 import org.maplibre.nativeffi.internal.c.mln_projection_mode_default
+import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.map.ConstrainMode
 import org.maplibre.nativeffi.map.NorthOrientation
 import org.maplibre.nativeffi.map.ProjectionModeOptions
@@ -250,17 +251,23 @@ internal object MapStructs {
     val native = scope.alloc<mln_map_viewport_options>()
     mln_map_viewport_options_default().place(native.ptr)
     value.northOrientation?.let {
-      require(it.isKnown) { "Unknown north orientation cannot be used as input: ${it.nativeValue}" }
+      Status.requireArgument(it.isKnown) {
+        "Unknown north orientation cannot be used as input: ${it.nativeValue}"
+      }
       native.fields = native.fields or MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION
       native.north_orientation = it.nativeValue.toUInt()
     }
     value.constrainMode?.let {
-      require(it.isKnown) { "Unknown constrain mode cannot be used as input: ${it.nativeValue}" }
+      Status.requireArgument(it.isKnown) {
+        "Unknown constrain mode cannot be used as input: ${it.nativeValue}"
+      }
       native.fields = native.fields or MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE
       native.constrain_mode = it.nativeValue.toUInt()
     }
     value.viewportMode?.let {
-      require(it.isKnown) { "Unknown viewport mode cannot be used as input: ${it.nativeValue}" }
+      Status.requireArgument(it.isKnown) {
+        "Unknown viewport mode cannot be used as input: ${it.nativeValue}"
+      }
       native.fields = native.fields or MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE
       native.viewport_mode = it.nativeValue.toUInt()
     }
@@ -315,7 +322,9 @@ internal object MapStructs {
       native.lod_zoom_shift = it
     }
     value.lodMode?.let {
-      require(it.isKnown) { "Unknown tile LOD mode cannot be used as input: ${it.nativeValue}" }
+      Status.requireArgument(it.isKnown) {
+        "Unknown tile LOD mode cannot be used as input: ${it.nativeValue}"
+      }
       native.fields = native.fields or MLN_MAP_TILE_OPTION_LOD_MODE
       native.lod_mode = it.nativeValue.toUInt()
     }

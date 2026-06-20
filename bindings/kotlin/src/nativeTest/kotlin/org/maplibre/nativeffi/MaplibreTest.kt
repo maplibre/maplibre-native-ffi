@@ -10,6 +10,7 @@ import kotlinx.cinterop.set
 import kotlinx.cinterop.toKString
 import org.maplibre.nativeffi.camera.AnimationOptions
 import org.maplibre.nativeffi.error.AbiVersionMismatchException
+import org.maplibre.nativeffi.error.InvalidArgumentException
 import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.error.NativeErrorException
 import org.maplibre.nativeffi.geo.LatLng
@@ -80,7 +81,7 @@ class MaplibreTest {
 
   @Test
   fun unknownNetworkStatusIsOutputOnly() {
-    assertFailsWith<IllegalArgumentException> { Maplibre.setNetworkStatus(NetworkStatus(999)) }
+    assertFailsWith<InvalidArgumentException> { Maplibre.setNetworkStatus(NetworkStatus(999)) }
   }
 
   @Test

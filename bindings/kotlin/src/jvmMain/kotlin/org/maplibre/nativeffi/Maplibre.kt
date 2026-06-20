@@ -5,6 +5,7 @@ import org.maplibre.nativeffi.geo.LatLng
 import org.maplibre.nativeffi.geo.ProjectedMeters
 import org.maplibre.nativeffi.internal.callback.LogCallbackState
 import org.maplibre.nativeffi.internal.loader.NativeAccess
+import org.maplibre.nativeffi.internal.status.Status
 import org.maplibre.nativeffi.log.LogCallback
 import org.maplibre.nativeffi.log.LogSeverity
 import org.maplibre.nativeffi.render.OpenGLContextProvider
@@ -53,7 +54,7 @@ public actual object Maplibre {
 
   /** Sets Maplibre Native's process-global network status. */
   public actual fun setNetworkStatus(status: NetworkStatus) {
-    require(status.isKnown) {
+    Status.requireArgument(status.isKnown) {
       "Unknown network status cannot be used as input: ${status.nativeValue}"
     }
     NativeAccess.setNetworkStatus(status.nativeValue)

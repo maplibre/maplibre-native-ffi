@@ -39,6 +39,11 @@ internal object Status {
   fun invalidArgument(diagnostic: String): InvalidArgumentException =
     InvalidArgumentException(MaplibreStatus.INVALID_ARGUMENT.nativeCode, diagnostic)
 
+  /** Throws the public binding invalid-argument error when a caller input fails validation. */
+  inline fun requireArgument(condition: Boolean, diagnostic: () -> String) {
+    if (!condition) throw invalidArgument(diagnostic())
+  }
+
   /** Creates the binding-owned error for closing a callback owner from inside its callback. */
   fun callbackReentry(typeName: String): InvalidStateException =
     invalidState("$typeName callback cannot be closed from inside its callback")

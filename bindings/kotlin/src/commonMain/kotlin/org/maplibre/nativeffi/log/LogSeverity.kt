@@ -1,6 +1,7 @@
 package org.maplibre.nativeffi.log
 
 import kotlin.jvm.JvmInline
+import org.maplibre.nativeffi.internal.status.Status
 
 /** Severity for a Maplibre Native log record. */
 @JvmInline
@@ -17,7 +18,9 @@ public value class LogSeverity(public val nativeValue: Int) {
 
   public val nativeMask: Int
     get() {
-      require(isKnown) { "Unknown log severity cannot be used as an input: $nativeValue" }
+      Status.requireArgument(isKnown) {
+        "Unknown log severity cannot be used as an input: $nativeValue"
+      }
       return 1 shl nativeValue.toInt()
     }
 

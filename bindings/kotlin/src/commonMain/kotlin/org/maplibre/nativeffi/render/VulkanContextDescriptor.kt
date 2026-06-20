@@ -1,5 +1,7 @@
 package org.maplibre.nativeffi.render
 
+import org.maplibre.nativeffi.internal.status.Status
+
 /** Mutable Vulkan backend context descriptor. */
 public class VulkanContextDescriptor(
   instance: NativePointer,
@@ -24,11 +26,13 @@ public class VulkanContextDescriptor(
 
   public var graphicsQueueFamilyIndex: Int = graphicsQueueFamilyIndex
     set(value) {
-      require(value >= 0) { "graphicsQueueFamilyIndex must be non-negative" }
+      Status.requireArgument(value >= 0) { "graphicsQueueFamilyIndex must be non-negative" }
       field = value
     }
 
   init {
-    require(graphicsQueueFamilyIndex >= 0) { "graphicsQueueFamilyIndex must be non-negative" }
+    Status.requireArgument(graphicsQueueFamilyIndex >= 0) {
+      "graphicsQueueFamilyIndex must be non-negative"
+    }
   }
 }

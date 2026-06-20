@@ -172,12 +172,12 @@ internal object ValueStructs {
         CoreStructs.setStringView(native.identifier.string_value, identifier.value, scope)
       }
       is FeatureIdentifier.Unknown ->
-        throw IllegalArgumentException("unknown feature identifiers cannot be used as input")
+        throw Status.invalidArgument("unknown feature identifiers cannot be used as input")
     }
   }
 
   private fun writeJson(native: mln_json_value, value: JsonValue, scope: MemScope, depth: Int) {
-    require(depth <= JsonValue.MAX_DESCRIPTOR_DEPTH) {
+    Status.requireArgument(depth <= JsonValue.MAX_DESCRIPTOR_DEPTH) {
       "JSON descriptor depth exceeds ${JsonValue.MAX_DESCRIPTOR_DEPTH}"
     }
     native.size = sizeOf<mln_json_value>().toUInt()
@@ -230,12 +230,12 @@ internal object ValueStructs {
         native.data.object_value.member_count = value.members.size.toULong()
       }
       is JsonValue.Unknown ->
-        throw IllegalArgumentException("unknown JSON values cannot be used as input")
+        throw Status.invalidArgument("unknown JSON values cannot be used as input")
     }
   }
 
   private fun writeGeometry(native: mln_geometry, value: Geometry, scope: MemScope, depth: Int) {
-    require(depth <= Geometry.MAX_COLLECTION_DEPTH) {
+    Status.requireArgument(depth <= Geometry.MAX_COLLECTION_DEPTH) {
       "Geometry collection depth exceeds ${Geometry.MAX_COLLECTION_DEPTH}"
     }
     native.size = sizeOf<mln_geometry>().toUInt()
@@ -289,7 +289,7 @@ internal object ValueStructs {
         native.data.geometry_collection.geometry_count = value.geometries.size.toULong()
       }
       is Geometry.Unknown ->
-        throw IllegalArgumentException("unknown geometries cannot be used as input")
+        throw Status.invalidArgument("unknown geometries cannot be used as input")
     }
   }
 

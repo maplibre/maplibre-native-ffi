@@ -868,7 +868,7 @@ private class OfflineRegionDefinitionScope(value: OfflineRegionDefinition) : Aut
         definition.data_geometry(geometry(value))
       }
       is OfflineRegionDefinition.Unknown ->
-        throw IllegalArgumentException("unknown offline region definitions cannot be used as input")
+        throw Status.invalidArgument("unknown offline region definitions cannot be used as input")
     }
   }
 

@@ -13,6 +13,7 @@ import kotlinx.cinterop.ptr
 import kotlinx.cinterop.reinterpret
 import kotlinx.cinterop.set
 import kotlinx.cinterop.sizeOf
+import org.maplibre.nativeffi.error.InvalidArgumentException
 import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.geo.Feature
 import org.maplibre.nativeffi.geo.FeatureIdentifier
@@ -135,7 +136,7 @@ class ValueStructsTest {
   @Test
   fun unknownGeometryIsOutputOnly() {
     memScoped {
-      assertFailsWith<IllegalArgumentException> {
+      assertFailsWith<InvalidArgumentException> {
         ValueStructs.geometry(Geometry.Unknown(999, 8), this)
       }
     }
@@ -202,7 +203,7 @@ class ValueStructsTest {
   @Test
   fun unknownJsonValueIsOutputOnly() {
     memScoped {
-      assertFailsWith<IllegalArgumentException> {
+      assertFailsWith<InvalidArgumentException> {
         ValueStructs.jsonValue(JsonValue.Unknown(999, 8), this)
       }
     }
@@ -315,7 +316,7 @@ class ValueStructsTest {
   @Test
   fun unknownFeatureIdentifierIsOutputOnly() {
     memScoped {
-      assertFailsWith<IllegalArgumentException> {
+      assertFailsWith<InvalidArgumentException> {
         ValueStructs.feature(
           Feature(Geometry.Empty, emptyList(), FeatureIdentifier.Unknown(999)),
           this,

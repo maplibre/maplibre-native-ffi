@@ -1,5 +1,7 @@
 package org.maplibre.nativeffi.render
 
+import org.maplibre.nativeffi.internal.status.Status
+
 /** Caller-owned premultiplied RGBA8 pixels. */
 public class PremultipliedRgba8Image(
   public val width: Int,
@@ -13,12 +15,12 @@ public class PremultipliedRgba8Image(
     get() = pixelBytes.copyOf()
 
   init {
-    require(width > 0 && height > 0) { "width and height must be positive" }
-    require(stride >= 0) { "stride must be non-negative" }
+    Status.requireArgument(width > 0 && height > 0) { "width and height must be positive" }
+    Status.requireArgument(stride >= 0) { "stride must be non-negative" }
     val rowBytes = width.toLong() * 4L
-    require(stride.toLong() >= rowBytes) { "stride must be at least width * 4" }
+    Status.requireArgument(stride.toLong() >= rowBytes) { "stride must be at least width * 4" }
     val requiredBytes = if (height == 1) rowBytes else (height.toLong() - 1L) * stride + rowBytes
-    require(pixels.size.toLong() >= requiredBytes) {
+    Status.requireArgument(pixels.size.toLong() >= requiredBytes) {
       "pixels length must include every row's pixel bytes"
     }
   }

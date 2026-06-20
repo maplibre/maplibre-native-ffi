@@ -18,6 +18,7 @@ import kotlinx.cinterop.ptr
 import kotlinx.cinterop.reinterpret
 import kotlinx.cinterop.set
 import kotlinx.cinterop.sizeOf
+import org.maplibre.nativeffi.error.InvalidArgumentException
 import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.geo.Geometry
 import org.maplibre.nativeffi.geo.LatLng
@@ -114,7 +115,7 @@ class RuntimeOfflineStructsTest {
   @Test
   fun unknownOfflineRegionDefinitionIsOutputOnly() {
     memScoped {
-      assertFailsWith<IllegalArgumentException> {
+      assertFailsWith<InvalidArgumentException> {
         RuntimeStructs.offlineRegionDefinition(OfflineRegionDefinition.Unknown(999, 8), this)
       }
     }

@@ -78,8 +78,8 @@ private constructor(private val map: MapHandle, handle: CPointer<mln_render_sess
 
   public actual fun resize(width: Int, height: Int, scaleFactor: Double) {
     activeFrame.ensureInactive("resize")
-    require(width >= 0) { "width must be non-negative" }
-    require(height >= 0) { "height must be non-negative" }
+    Status.requireArgument(width >= 0) { "width must be non-negative" }
+    Status.requireArgument(height >= 0) { "height must be non-negative" }
     Status.check(
       mln_render_session_resize(state.requireLive(), width.toUInt(), height.toUInt(), scaleFactor)
     )

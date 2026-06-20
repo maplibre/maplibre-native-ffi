@@ -9,6 +9,7 @@ import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 import org.maplibre.nativeffi.Maplibre
+import org.maplibre.nativeffi.error.InvalidArgumentException
 import org.maplibre.nativeffi.error.MaplibreException
 import org.maplibre.nativeffi.error.MaplibreStatus
 import org.maplibre.nativeffi.geo.LatLng
@@ -39,7 +40,7 @@ class RuntimeOfflineTest {
   fun offlineDownloadStateUnknownRawValueRejectsBeforeNativeCall() {
     val runtime = RuntimeHandle.create(org.maplibre.nativeffi.runtime.RuntimeOptions())
     try {
-      assertFailsWith<IllegalArgumentException> {
+      assertFailsWith<InvalidArgumentException> {
         runtime.startSetOfflineRegionDownloadState(1, OfflineRegionDownloadState(900))
       }
     } finally {

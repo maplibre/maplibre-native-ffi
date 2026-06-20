@@ -1,5 +1,7 @@
 package org.maplibre.nativeffi.query
 
+import org.maplibre.nativeffi.internal.status.Status
+
 /** Mutable selector for render-session feature-state operations. */
 public class FeatureStateSelector(public val sourceId: String) {
   public var sourceLayerId: String? = null
@@ -12,7 +14,7 @@ public class FeatureStateSelector(public val sourceId: String) {
 
   public var stateKey: String? = null
     set(value) {
-      check(value == null || featureId != null) { "stateKey requires featureId" }
+      Status.requireArgument(value == null || featureId != null) { "stateKey requires featureId" }
       field = value
     }
 }

@@ -221,7 +221,7 @@ internal constructor(
     id: Long,
     downloadState: OfflineRegionDownloadState,
   ): OfflineOperationHandle<Unit> = memScoped {
-    require(downloadState.isKnown) {
+    Status.requireArgument(downloadState.isKnown) {
       "Unknown offline region download state cannot be used as input: ${downloadState.nativeValue}"
     }
     val outOperationId = alloc<ULongVar>()
@@ -590,7 +590,7 @@ internal constructor(
       options.assetPath?.let { nativeOptions.asset_path = MemoryUtil.cString(this, it) }
       options.cachePath?.let { nativeOptions.cache_path = MemoryUtil.cString(this, it) }
       options.maximumCacheSize?.let {
-        require(it >= 0) { "maximumCacheSize must be non-negative" }
+        Status.requireArgument(it >= 0) { "maximumCacheSize must be non-negative" }
         nativeOptions.flags = nativeOptions.flags or MLN_RUNTIME_OPTION_MAXIMUM_CACHE_SIZE
         nativeOptions.maximum_cache_size = it.toULong()
       }

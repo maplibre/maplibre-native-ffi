@@ -2606,8 +2606,9 @@ internal object NativeAccess {
       if (!hasEvent.get(ValueLayout.JAVA_BOOLEAN, 0)) {
         return@use null
       }
-      val payload = event.get(ValueLayout.ADDRESS, RUNTIME_EVENT_PAYLOAD_OFFSET)
       val payloadSize = event.get(ValueLayout.JAVA_LONG, RUNTIME_EVENT_PAYLOAD_SIZE_OFFSET)
+      val payload =
+        boundedAddress(event.get(ValueLayout.ADDRESS, RUNTIME_EVENT_PAYLOAD_OFFSET), payloadSize)
       val payloadType = event.get(ValueLayout.JAVA_INT, RUNTIME_EVENT_PAYLOAD_TYPE_OFFSET)
       val message = event.get(ValueLayout.ADDRESS, RUNTIME_EVENT_MESSAGE_OFFSET)
       val messageSize = event.get(ValueLayout.JAVA_LONG, RUNTIME_EVENT_MESSAGE_SIZE_OFFSET)
@@ -3070,17 +3071,23 @@ internal object NativeAccess {
     val segment = viewportOptionsDefault(arena)
     var fields = 0
     value.northOrientation?.let {
-      require(it.isKnown) { "Unknown north orientation cannot be used as input: ${it.nativeValue}" }
+      Status.requireArgument(it.isKnown) {
+        "Unknown north orientation cannot be used as input: ${it.nativeValue}"
+      }
       fields = fields or MapLibreNativeC.MLN_MAP_VIEWPORT_OPTION_NORTH_ORIENTATION()
       mln_map_viewport_options.north_orientation(segment, it.nativeValue)
     }
     value.constrainMode?.let {
-      require(it.isKnown) { "Unknown constrain mode cannot be used as input: ${it.nativeValue}" }
+      Status.requireArgument(it.isKnown) {
+        "Unknown constrain mode cannot be used as input: ${it.nativeValue}"
+      }
       fields = fields or MapLibreNativeC.MLN_MAP_VIEWPORT_OPTION_CONSTRAIN_MODE()
       mln_map_viewport_options.constrain_mode(segment, it.nativeValue)
     }
     value.viewportMode?.let {
-      require(it.isKnown) { "Unknown viewport mode cannot be used as input: ${it.nativeValue}" }
+      Status.requireArgument(it.isKnown) {
+        "Unknown viewport mode cannot be used as input: ${it.nativeValue}"
+      }
       fields = fields or MapLibreNativeC.MLN_MAP_VIEWPORT_OPTION_VIEWPORT_MODE()
       mln_map_viewport_options.viewport_mode(segment, it.nativeValue)
     }
@@ -3138,7 +3145,9 @@ internal object NativeAccess {
       mln_map_tile_options.lod_zoom_shift(segment, it)
     }
     value.lodMode?.let {
-      require(it.isKnown) { "Unknown tile LOD mode cannot be used as input: ${it.nativeValue}" }
+      Status.requireArgument(it.isKnown) {
+        "Unknown tile LOD mode cannot be used as input: ${it.nativeValue}"
+      }
       fields = fields or MapLibreNativeC.MLN_MAP_TILE_OPTION_LOD_MODE()
       mln_map_tile_options.lod_mode(segment, it.nativeValue)
     }
@@ -3455,7 +3464,7 @@ internal object NativeAccess {
   }
 
   private fun geometry(arena: Arena, value: Geometry, depth: Int): MemorySegment {
-    require(depth <= Geometry.MAX_COLLECTION_DEPTH) {
+    Status.requireArgument(depth <= Geometry.MAX_COLLECTION_DEPTH) {
       "Geometry collection depth exceeds ${Geometry.MAX_COLLECTION_DEPTH}"
     }
     val segment = arena.allocate(GEOMETRY_SIZE)
@@ -3464,7 +3473,7 @@ internal object NativeAccess {
   }
 
   private fun writeGeometry(segment: MemorySegment, value: Geometry, arena: Arena, depth: Int) {
-    require(depth <= Geometry.MAX_COLLECTION_DEPTH) {
+    Status.requireArgument(depth <= Geometry.MAX_COLLECTION_DEPTH) {
       "Geometry collection depth exceeds ${Geometry.MAX_COLLECTION_DEPTH}"
     }
     segment.set(ValueLayout.JAVA_INT, GEOMETRY_SIZE_OFFSET, GEOMETRY_SIZE.toInt())
@@ -3513,7 +3522,7 @@ internal object NativeAccess {
           .copyFrom(geometryCollection(arena, value.geometries, depth + 1))
       }
       is Geometry.Unknown ->
-        throw IllegalArgumentException("unknown geometries cannot be used as input")
+        throw Status.invalidArgument("unknown geometries cannot be used as input")
     }
   }
 
@@ -3608,7 +3617,7 @@ internal object NativeAccess {
   }
 
   private fun geometry(segment: MemorySegment, depth: Int = 0): Geometry {
-    require(depth <= Geometry.MAX_COLLECTION_DEPTH) {
+    Status.requireArgument(depth <= Geometry.MAX_COLLECTION_DEPTH) {
       "Geometry collection depth exceeds ${Geometry.MAX_COLLECTION_DEPTH}"
     }
     return when (val type = segment.get(ValueLayout.JAVA_INT, GEOMETRY_TYPE_OFFSET)) {
@@ -3747,7 +3756,7 @@ internal object NativeAccess {
           .copyFrom(stringView(arena, value.value))
       }
       is FeatureIdentifier.Unknown ->
-        throw IllegalArgumentException("unknown feature identifiers cannot be used as input")
+        throw Status.invalidArgument("unknown feature identifiers cannot be used as input")
     }
   }
 
@@ -3903,7 +3912,7 @@ internal object NativeAccess {
   }
 
   private fun writeJson(segment: MemorySegment, value: JsonValue, arena: Arena, depth: Int) {
-    require(depth <= JsonValue.MAX_DESCRIPTOR_DEPTH) {
+    Status.requireArgument(depth <= JsonValue.MAX_DESCRIPTOR_DEPTH) {
       "JSON descriptor depth exceeds ${JsonValue.MAX_DESCRIPTOR_DEPTH}"
     }
     segment.set(ValueLayout.JAVA_INT, JSON_VALUE_SIZE_OFFSET, JSON_VALUE_SIZE.toInt())
@@ -3962,7 +3971,7 @@ internal object NativeAccess {
         )
       }
       is JsonValue.Unknown ->
-        throw IllegalArgumentException("unknown JSON values cannot be used as input")
+        throw Status.invalidArgument("unknown JSON values cannot be used as input")
     }
   }
 
@@ -4079,7 +4088,7 @@ internal object NativeAccess {
   }
 
   private fun readJson(segment: MemorySegment, depth: Int): JsonValue {
-    require(depth <= JsonValue.MAX_DESCRIPTOR_DEPTH) {
+    Status.requireArgument(depth <= JsonValue.MAX_DESCRIPTOR_DEPTH) {
       "JSON descriptor depth exceeds ${JsonValue.MAX_DESCRIPTOR_DEPTH}"
     }
     return when (val type = segment.get(ValueLayout.JAVA_INT, JSON_VALUE_TYPE_OFFSET)) {
@@ -4287,6 +4296,13 @@ internal object NativeAccess {
   private fun copyString(address: MemorySegment, byteCount: Long): String =
     String(copyBytes(address, byteCount), StandardCharsets.UTF_8)
 
+  private fun boundedAddress(address: MemorySegment, byteCount: Long): MemorySegment {
+    if (address == MemorySegment.NULL || byteCount == 0L) {
+      return MemorySegment.NULL
+    }
+    return address.reinterpret(byteCount)
+  }
+
   private fun checkedInt(value: Long): Int {
     require(value <= Int.MAX_VALUE) { "native count exceeds Int.MAX_VALUE" }
     require(value >= 0L) { "native count must be non-negative" }
@@ -4410,16 +4426,18 @@ internal object NativeAccess {
   private fun mapOptions(options: MapOptions, arena: Arena): MemorySegment {
     val segment = MapLibreNativeC.mln_map_options_default(arena)
     options.width?.let {
-      require(it >= 0) { "width must be non-negative" }
+      Status.requireArgument(it >= 0) { "width must be non-negative" }
       mln_map_options.width(segment, it)
     }
     options.height?.let {
-      require(it >= 0) { "height must be non-negative" }
+      Status.requireArgument(it >= 0) { "height must be non-negative" }
       mln_map_options.height(segment, it)
     }
     options.scaleFactor?.let { mln_map_options.scale_factor(segment, it) }
     options.mapMode?.let {
-      require(it.isKnown) { "Unknown map mode cannot be used as input: ${it.nativeValue}" }
+      Status.requireArgument(it.isKnown) {
+        "Unknown map mode cannot be used as input: ${it.nativeValue}"
+      }
       mln_map_options.map_mode(segment, it.nativeValue)
     }
     return segment
@@ -4470,7 +4488,7 @@ internal object NativeAccess {
           arena,
         )
       is OfflineRegionDefinition.Unknown ->
-        throw IllegalArgumentException("unknown offline region definitions cannot be used as input")
+        throw Status.invalidArgument("unknown offline region definitions cannot be used as input")
     }
     return segment
   }

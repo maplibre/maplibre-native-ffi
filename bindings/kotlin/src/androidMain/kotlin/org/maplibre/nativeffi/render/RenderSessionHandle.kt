@@ -1076,7 +1076,7 @@ private class FeatureDescriptorScope : AutoCloseable {
   }
 
   private fun geometry(value: Geometry, depth: Int): MaplibreNativeC.mln_geometry {
-    require(depth <= Geometry.MAX_COLLECTION_DEPTH) {
+    Status.requireArgument(depth <= Geometry.MAX_COLLECTION_DEPTH) {
       "Geometry collection depth exceeds ${Geometry.MAX_COLLECTION_DEPTH}"
     }
     val out = own(MaplibreNativeC.mln_geometry())
@@ -1110,7 +1110,7 @@ private class FeatureDescriptorScope : AutoCloseable {
           .type(MaplibreNativeC.MLN_GEOMETRY_TYPE_GEOMETRY_COLLECTION)
           .data_geometry_collection(geometryCollection(value.geometries, depth + 1))
       is Geometry.Unknown ->
-        throw IllegalArgumentException("unknown geometries cannot be used as input")
+        throw Status.invalidArgument("unknown geometries cannot be used as input")
     }
     return out
   }
@@ -1215,7 +1215,7 @@ private class FeatureDescriptorScope : AutoCloseable {
           .identifier_type(MaplibreNativeC.MLN_FEATURE_IDENTIFIER_TYPE_STRING)
           .identifier_string_value(string(value.value))
       is FeatureIdentifier.Unknown ->
-        throw IllegalArgumentException("unknown feature identifiers cannot be used as input")
+        throw Status.invalidArgument("unknown feature identifiers cannot be used as input")
     }
   }
 
@@ -1298,7 +1298,7 @@ private class JsonScope(value: JsonValue) : AutoCloseable {
   }
 
   private fun jsonValue(value: JsonValue, depth: Int = 0): MaplibreNativeC.mln_json_value {
-    require(depth <= JsonValue.MAX_DESCRIPTOR_DEPTH) {
+    Status.requireArgument(depth <= JsonValue.MAX_DESCRIPTOR_DEPTH) {
       "JSON descriptor depth exceeds ${JsonValue.MAX_DESCRIPTOR_DEPTH}"
     }
     val out = own(MaplibreNativeC.mln_json_value())
@@ -1348,7 +1348,7 @@ private class JsonScope(value: JsonValue) : AutoCloseable {
         out.data_object_value(obj)
       }
       is JsonValue.Unknown ->
-        throw IllegalArgumentException("unknown JSON values cannot be used as input")
+        throw Status.invalidArgument("unknown JSON values cannot be used as input")
     }
     return out
   }

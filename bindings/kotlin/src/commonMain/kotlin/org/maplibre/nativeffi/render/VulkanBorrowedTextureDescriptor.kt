@@ -1,5 +1,7 @@
 package org.maplibre.nativeffi.render
 
+import org.maplibre.nativeffi.internal.status.Status
+
 /** Mutable descriptor for Vulkan caller-owned texture render targets. */
 public class VulkanBorrowedTextureDescriptor(
   extent: RenderTargetExtent,
@@ -19,24 +21,24 @@ public class VulkanBorrowedTextureDescriptor(
 
   public var format: Int = format
     set(value) {
-      require(value >= 0) { "format must be non-negative" }
+      Status.requireArgument(value >= 0) { "format must be non-negative" }
       field = value
     }
 
   public var initialLayout: Int = initialLayout
     set(value) {
-      require(value >= 0) { "initialLayout must be non-negative" }
+      Status.requireArgument(value >= 0) { "initialLayout must be non-negative" }
       field = value
     }
 
   public var finalLayout: Int? = null
     set(value) {
-      value?.let { require(it >= 0) { "finalLayout must be non-negative" } }
+      value?.let { Status.requireArgument(it >= 0) { "finalLayout must be non-negative" } }
       field = value
     }
 
   init {
-    require(format >= 0) { "format must be non-negative" }
-    require(initialLayout >= 0) { "initialLayout must be non-negative" }
+    Status.requireArgument(format >= 0) { "format must be non-negative" }
+    Status.requireArgument(initialLayout >= 0) { "initialLayout must be non-negative" }
   }
 }

@@ -67,7 +67,7 @@ public actual object Maplibre {
 
   /** Sets Maplibre Native's process-global network status. */
   public actual fun setNetworkStatus(status: NetworkStatus) {
-    require(status.isKnown) {
+    Status.requireArgument(status.isKnown) {
       "Unknown network status cannot be used as input: ${status.nativeValue}"
     }
     Status.check(mln_network_status_set(status.nativeValue.toUInt()))

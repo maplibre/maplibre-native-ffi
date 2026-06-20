@@ -39,28 +39,28 @@ class DescriptorValidationTest {
 
   @Test
   fun signedCarriersRejectNegativeUnsignedValues() {
-    assertFailsWith<IllegalArgumentException> {
+    assertFailsWith<InvalidArgumentException> {
       MapOptions().apply {
         width = -1
         height = 1
       }
     }
-    assertFailsWith<IllegalArgumentException> { TileOptions().prefetchZoomDelta = -1 }
-    assertFailsWith<IllegalArgumentException> { RuntimeOptions().maximumCacheSize = -1L }
+    assertFailsWith<InvalidArgumentException> { TileOptions().prefetchZoomDelta = -1 }
+    assertFailsWith<InvalidArgumentException> { RuntimeOptions().maximumCacheSize = -1L }
     assertFailsWith<IllegalArgumentException> { NativeBuffer.allocate(-1) }
     val nullPointer = NativePointer.NULL
-    assertFailsWith<IllegalArgumentException> { RenderTargetExtent(-1, 1, 1.0) }
-    assertFailsWith<IllegalArgumentException> { RenderTargetExtent(1, 1, 1.0).width = -1 }
-    assertFailsWith<IllegalArgumentException> {
+    assertFailsWith<InvalidArgumentException> { RenderTargetExtent(-1, 1, 1.0) }
+    assertFailsWith<InvalidArgumentException> { RenderTargetExtent(1, 1, 1.0).width = -1 }
+    assertFailsWith<InvalidArgumentException> {
       vulkanContext(nullPointer, graphicsQueueFamilyIndex = -1)
     }
-    assertFailsWith<IllegalArgumentException> {
+    assertFailsWith<InvalidArgumentException> {
       vulkanContext(nullPointer).graphicsQueueFamilyIndex = -1
     }
-    assertFailsWith<IllegalArgumentException> {
+    assertFailsWith<InvalidArgumentException> {
       vulkanBorrowedTextureDescriptor(nullPointer, format = -1)
     }
-    assertFailsWith<IllegalArgumentException> {
+    assertFailsWith<InvalidArgumentException> {
       vulkanBorrowedTextureDescriptor(nullPointer).format = -1
     }
   }
@@ -68,26 +68,26 @@ class DescriptorValidationTest {
   @Test
   fun enumInputsRejectUnknownSentinelsBeforeNativeCalls() {
     // BND-068: unknown enum values are rejected before they cross into C input APIs.
-    assertFailsWith<IllegalArgumentException> {
+    assertFailsWith<InvalidArgumentException> {
       MapHandle.mapOptionsForTesting(MapOptions().apply { mapMode = MapMode(900) }) {}
     }
     memScoped {
-      assertFailsWith<IllegalArgumentException> {
+      assertFailsWith<InvalidArgumentException> {
         MapStructs.tileOptions(TileOptions().apply { lodMode = TileLodMode(901) }, this)
       }
-      assertFailsWith<IllegalArgumentException> {
+      assertFailsWith<InvalidArgumentException> {
         MapStructs.viewportOptions(
           ViewportOptions().apply { northOrientation = NorthOrientation(902) },
           this,
         )
       }
-      assertFailsWith<IllegalArgumentException> {
+      assertFailsWith<InvalidArgumentException> {
         MapStructs.viewportOptions(
           ViewportOptions().apply { constrainMode = ConstrainMode(903) },
           this,
         )
       }
-      assertFailsWith<IllegalArgumentException> {
+      assertFailsWith<InvalidArgumentException> {
         MapStructs.viewportOptions(
           ViewportOptions().apply { viewportMode = ViewportMode(904) },
           this,

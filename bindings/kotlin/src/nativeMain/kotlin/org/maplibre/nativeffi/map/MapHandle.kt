@@ -1448,16 +1448,18 @@ private constructor(private val runtime: RuntimeHandle, handle: CPointer<mln_map
       val nativeOptions = scope.alloc<mln_map_options>()
       mln_map_options_default().place(nativeOptions.ptr)
       options.width?.let {
-        require(it >= 0) { "width must be non-negative" }
+        Status.requireArgument(it >= 0) { "width must be non-negative" }
         nativeOptions.width = it.toUInt()
       }
       options.height?.let {
-        require(it >= 0) { "height must be non-negative" }
+        Status.requireArgument(it >= 0) { "height must be non-negative" }
         nativeOptions.height = it.toUInt()
       }
       options.scaleFactor?.let { nativeOptions.scale_factor = it }
       options.mapMode?.let {
-        require(it.isKnown) { "Unknown map mode cannot be used as input: ${it.nativeValue}" }
+        Status.requireArgument(it.isKnown) {
+          "Unknown map mode cannot be used as input: ${it.nativeValue}"
+        }
         nativeOptions.map_mode = it.nativeValue.toUInt()
       }
       return nativeOptions.ptr
