@@ -81,7 +81,11 @@ function(mln_write_artifact_metadata target)
         CoreText
         Foundation
         ImageIO
+        Metal
         MetalKit)
+      if(MLN_FFI_RENDER_BACKEND STREQUAL "metal")
+        list(APPEND frameworks QuartzCore)
+      endif()
     endif()
   endif()
 
