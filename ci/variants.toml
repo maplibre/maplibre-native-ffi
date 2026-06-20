@@ -23,19 +23,19 @@ arch = "x64"
 backend = "vulkan"
 
 [variants.macos-arm64-metal]
-runner = "macos-latest"
+runner = "macos-26"
 os = "macos"
 arch = "arm64"
 backend = "metal"
 
 [variants.macos-arm64-vulkan]
-runner = "macos-latest"
+runner = "macos-26"
 os = "macos"
 arch = "arm64"
 backend = "vulkan"
 
 [variants.macos-arm64-egl]
-runner = "macos-latest"
+runner = "macos-26"
 os = "macos"
 arch = "arm64"
 backend = "opengl"
@@ -55,14 +55,14 @@ backend = "vulkan"
 supports_tests = false
 
 [variants.ios-arm64-metal]
-runner = "macos-latest"
+runner = "macos-26"
 os = "ios"
 arch = "arm64"
 backend = "metal"
 supports_tests = false
 
 [variants.ios-simulator-arm64-metal]
-runner = "macos-latest"
+runner = "macos-26"
 os = "ios"
 arch = "arm64"
 backend = "metal"
