@@ -24,12 +24,24 @@
   "markdown": { "textWrap": "always" },
   "oxc": { "experimentalSortImports": { "newlinesBetween": true } },
   "ruff": { "indentWidth": 4, "lineLength": 88 },
+  "clangFormat": {
+    "BasedOnStyle": "Google",
+    "ColumnLimit": 80,
+    "IndentWidth": 2,
+    "ContinuationIndentWidth": 2,
+    "UseCRLF": false,
+    "UseTab": "Never",
+    "AlignAfterOpenBracket": "BlockIndent",
+    "IncludeBlocks": "Regroup",
+    "IncludeCategories": [
+      { "Regex": "^<[a-zA-Z0-9_]+>$", "Priority": -100 },
+      { "Regex": "^<mbgl/.*>$", "Priority": -60 },
+      { "Regex": "^<.*>$", "Priority": -50 },
+      { "Regex": ".*", "Priority": 1 },
+    ],
+  },
   "exec": {
     "commands": [
-      {
-        "command": "clang-format --assume-filename={{file_path}}",
-        "exts": ["c", "cc", "cpp", "cxx", "h", "hh", "hpp", "hxx", "m", "mm"],
-      },
       {
         "command": "cmakefmt --line-width {{line_width}} --tab-size {{indent_width}} -",
         "exts": ["cmake"],
@@ -66,6 +78,7 @@
     ],
   },
   "plugins": [
+    "https://plugins.dprint.dev/sargunv/dprint-clang-format-0.1.0.wasm",
     "https://plugins.dprint.dev/exec-0.6.2.json@df98f54ffd3092b8a841aedd6d098a2651f16d0a796a40535774f1a8b4b9d463",
     "https://plugins.dprint.dev/ruff-0.7.0.wasm",
     "https://plugins.dprint.dev/oxc-0.20.0.wasm",
