@@ -1,11 +1,53 @@
+import java.net.URI
+import java.security.MessageDigest
+import org.gradle.api.DefaultTask
+import org.gradle.api.file.RegularFileProperty
+import org.gradle.api.provider.Property
+import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.JavaExec
+import org.gradle.api.tasks.OutputFile
 import org.gradle.api.tasks.Sync
+import org.gradle.api.tasks.TaskAction
 import org.gradle.api.tasks.compile.JavaCompile
 import org.gradle.api.tasks.testing.Test
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
 import org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile
 import org.maplibre.nativeffi.gradle.MaplibreNativeCArtifact
+
+abstract class DownloadJextractTask : DefaultTask() {
+  @get:Input abstract val url: Property<String>
+  @get:Input abstract val expectedSha256: Property<String>
+  @get:OutputFile abstract val archive: RegularFileProperty
+
+  @TaskAction
+  fun download() {
+    val archiveFile = archive.get().asFile
+    archiveFile.parentFile.mkdirs()
+    if (!archiveFile.isFile) {
+      URI(url.get()).toURL().openStream().use { input ->
+        archiveFile.outputStream().use { output -> input.copyTo(output) }
+      }
+    }
+    val actualSha256 = sha256(archiveFile)
+    check(actualSha256 == expectedSha256.get()) {
+      "Invalid jextract archive checksum for $archiveFile: expected ${expectedSha256.get()}, got $actualSha256"
+    }
+  }
+
+  private fun sha256(file: File): String {
+    val digest = MessageDigest.getInstance("SHA-256")
+    file.inputStream().use { input ->
+      val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+      while (true) {
+        val byteCount = input.read(buffer)
+        if (byteCount < 0) break
+        digest.update(buffer, 0, byteCount)
+      }
+    }
+    return digest.digest().joinToString("") { "%02x".format(it) }
+  }
+}
 
 plugins {
   kotlin("multiplatform")
@@ -132,22 +174,10 @@ val jextractDistribution =
   }
 
 val downloadJextract =
-  tasks.register<Exec>("downloadJextract") {
-    outputs.file(jextractArchive)
-    commandLine(
-      "sh",
-      "-c",
-      """
-      set -euo pipefail
-      archive="${jextractArchive.get().asFile.absolutePath}"
-      mkdir -p "$(dirname "${'$'}archive")"
-      if [ ! -f "${'$'}archive" ]; then
-        curl -fsSL "${jextractDistribution.url}" -o "${'$'}archive"
-      fi
-      printf '%s  %s\n' "${jextractDistribution.sha256}" "${'$'}archive" | shasum -a 256 -c -
-      """
-        .trimIndent(),
-    )
+  tasks.register<DownloadJextractTask>("downloadJextract") {
+    url = jextractDistribution.url
+    expectedSha256 = jextractDistribution.sha256
+    archive = jextractArchive
   }
 
 val extractJextract =
