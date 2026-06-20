@@ -16,9 +16,9 @@ struct MlnRustDecodedImage {
   char* error;
 };
 
-auto mln_rust_decode_image(const uint8_t* data, std::size_t dataLen)
+auto mlnffi_rust_decode_image(const uint8_t* data, std::size_t dataLen)
   -> MlnRustDecodedImage;
-void mln_rust_decoded_image_free(MlnRustDecodedImage image);
+void mlnffi_rust_decoded_image_free(MlnRustDecodedImage image);
 
 }  // extern "C"
 
@@ -32,7 +32,7 @@ class RustDecodedImage {
   RustDecodedImage(RustDecodedImage&&) = delete;
   auto operator=(RustDecodedImage&&) -> RustDecodedImage& = delete;
 
-  ~RustDecodedImage() { mln_rust_decoded_image_free(image); }
+  ~RustDecodedImage() { mlnffi_rust_decoded_image_free(image); }
 
   [[nodiscard]] auto get() const -> const MlnRustDecodedImage& { return image; }
 
@@ -48,7 +48,7 @@ auto decodeImage(const std::string& encoded) -> PremultipliedImage {
   // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast)
   const auto* data = reinterpret_cast<const uint8_t*>(encoded.data());
   auto decoded = RustDecodedImage{
-    mln_rust_decode_image(data, encoded.size()),
+    mlnffi_rust_decode_image(data, encoded.size()),
   };
 
   const auto& rustImage = decoded.get();

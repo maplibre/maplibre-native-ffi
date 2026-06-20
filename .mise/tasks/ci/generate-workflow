@@ -228,6 +228,8 @@ def render_workflow(variants: list[Variant], commands: dict[str, list[str]]) -> 
     }
 
     for variant in variants:
+        variant_commands = commands[variant.name]
+
         jobs[variant_job_id(variant)] = {
             "name": f"variant / {variant.name}",
             "runs-on": variant.runner,
@@ -236,7 +238,7 @@ def render_workflow(variants: list[Variant], commands: dict[str, list[str]]) -> 
             "steps": [
                 *setup_steps(),
                 {"run": "mise run configure"},
-                *({"run": command} for command in commands[variant.name]),
+                *({"run": command} for command in variant_commands),
             ],
         }
 

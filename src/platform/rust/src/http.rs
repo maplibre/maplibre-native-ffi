@@ -43,7 +43,7 @@ struct HttpRequestHandle {
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_rust_http_request_start(
+pub unsafe extern "C" fn mlnffi_rust_http_request_start(
     url: *const c_char,
     headers: *const MlnRustHttpHeader,
     header_count: usize,
@@ -86,23 +86,23 @@ fn http_thread_pool() -> &'static threadpool::ThreadPool {
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_rust_http_request_cancel(handle: *mut c_void) {
+pub unsafe extern "C" fn mlnffi_rust_http_request_cancel(handle: *mut c_void) {
     if handle.is_null() {
         return;
     }
 
-    // SAFETY: `handle` was created by `mln_rust_http_request_start`.
+    // SAFETY: `handle` was created by `mlnffi_rust_http_request_start`.
     let handle = unsafe { &*(handle as *mut HttpRequestHandle) };
     handle.canceled.store(true, Ordering::Release);
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_rust_http_request_free(handle: *mut c_void) {
+pub unsafe extern "C" fn mlnffi_rust_http_request_free(handle: *mut c_void) {
     if handle.is_null() {
         return;
     }
 
-    // SAFETY: `handle` was returned by `mln_rust_http_request_start` and is
+    // SAFETY: `handle` was returned by `mlnffi_rust_http_request_start` and is
     // freed exactly once by the C++ owner.
     unsafe {
         drop(Box::from_raw(handle as *mut HttpRequestHandle));
@@ -110,7 +110,7 @@ pub unsafe extern "C" fn mln_rust_http_request_free(handle: *mut c_void) {
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn mln_rust_http_response_free(response: MlnRustHttpResponse) {
+pub unsafe extern "C" fn mlnffi_rust_http_response_free(response: MlnRustHttpResponse) {
     free_http_response(response);
 }
 
