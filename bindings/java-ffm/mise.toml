@@ -6,11 +6,8 @@ run = [
 ]
 
 [tasks."ci:jextract-diagnostics"]
-description = "Print macOS jextract diagnostics and stop CI before the full binding build."
-run = [
-  { task = "//:ensure-native-library" },
-  { task = ":jextract:update-includes" },
-  '''
+description = "Print jextract diagnostics and stop CI before the full binding build."
+run = '''
   set -x
 
   echo "=== host ==="
@@ -29,42 +26,103 @@ run = [
   cmake --version || true
 
   echo "=== environment ==="
-  env | sort | grep -E '^(CI|GITHUB_|JAVA_HOME|JDK_JAVA_OPTIONS|LIBCLANG_PATH|MLN_FFI_|PKG_CONFIG_PATH|SDKROOT|DEVELOPER_DIR|PATH)=' || true
+  env | sort | grep -E '^(CI|DYLD_|GITHUB_|JAVA_HOME|JDK_JAVA_OPTIONS|JEXTRACT_|LIBCLANG_PATH|MLN_FFI_|PKG_CONFIG_PATH|SDKROOT|DEVELOPER_DIR|PATH)=' || true
 
-  echo "=== native metadata ==="
-  sed -n '1,200p' "$MLN_FFI_BUILD_DIR/maplibre-native-c.gradle.properties"
-  sed -n '1,200p' "$MLN_FFI_BUILD_DIR/maplibre-native-c.pc"
+  echo "=== dependency libclang ==="
+  dependency_library_dir="${MLN_FFI_DEPENDENCY_LIBRARY_DIR:-../../.pixi/envs/default/lib}"
+  if command -v cygpath >/dev/null 2>&1; then
+    dependency_library_dir="$(cygpath -u "$dependency_library_dir")"
+  fi
+  find "$dependency_library_dir" -maxdepth 1 \( -iname 'libclang*' -o -iname 'clang*.dll' -o -iname 'libLLVM*' \) -print -exec ls -l {} \; || true
+  if command -v otool >/dev/null 2>&1; then
+    find "$dependency_library_dir" -maxdepth 1 \( -name 'libclang*.dylib' -o -name 'libLLVM*.dylib' \) -print -exec otool -D {} \; -exec otool -L {} \; || true
+  fi
+  if command -v ldd >/dev/null 2>&1; then
+    find "$dependency_library_dir" -maxdepth 1 \( -name 'libclang*.so*' -o -name 'libLLVM*.so*' \) -print -exec ldd {} \; || true
+  fi
 
-  echo "=== jextract includes ==="
-  sed -n '1,200p' src/jextract/maplibre-native-c.includes
+  echo "=== install diagnostic jextract ==="
+  case "$(uname -s):$(uname -m)" in
+    Darwin:arm64 | Darwin:aarch64)
+      jextract_platform="macos-aarch64"
+      jextract_sha256="6783d2ba7f686ee636b9542525ee06b7bd096dfca294538613b877a4b5a057da"
+      ;;
+    Darwin:x86_64)
+      jextract_platform="macos-x64"
+      jextract_sha256="62fd0453349b8eb48f083d2fb9c5f2ab255f894eaa8c658221366f363c7e91b9"
+      ;;
+    Linux:aarch64 | Linux:arm64)
+      jextract_platform="linux-aarch64"
+      jextract_sha256="75a199a05e5edade798600a175f8897e711330338f7d8d2da5fff18d707d665e"
+      ;;
+    Linux:x86_64)
+      jextract_platform="linux-x64"
+      jextract_sha256="d826d366b5db8edbed9cfef3779e45e43ba496ca2166b8f70cdaf81ee90c0b1e"
+      ;;
+    MINGW*:x86_64 | MSYS*:x86_64 | CYGWIN*:x86_64)
+      jextract_platform="windows-x64"
+      jextract_sha256="22a853168512d5909c4dfccb1b9e8b2bffb1187b0cf98458aef989d41de995ac"
+      ;;
+    *)
+      echo "Unsupported diagnostic platform: $(uname -s)/$(uname -m)" >&2
+      exit 1
+      ;;
+  esac
 
-  rm -rf build/generated/sources/jextract
-  ../../gradlew :bindings:java-ffm:generateMaplibreNativeCBindings --rerun-tasks --no-build-cache --no-configuration-cache --no-daemon --info
+  jextract_root="../../.gradle/jextract/diagnostic"
+  jextract_archive="../../.gradle/jextract/downloads/openjdk-25-jextract+1-1_${jextract_platform}_bin.tar.gz"
+  jextract_url="https://download.java.net/java/early_access/jextract/25/1/openjdk-25-jextract+1-1_${jextract_platform}_bin.tar.gz"
+  mkdir -p "$(dirname "$jextract_archive")"
+  if [[ ! -f "$jextract_archive" ]]; then
+    curl --fail --location --output "$jextract_archive" "$jextract_url"
+  fi
+  echo "$jextract_sha256  $jextract_archive" | shasum --algorithm 256 --check
+  rm -rf "$jextract_root"
+  mkdir -p "$jextract_root"
+  tar -xzf "$jextract_archive" -C "$jextract_root"
 
-  echo "=== jextract installation ==="
-  find ../../.gradle/jextract -path '*/bin/jextract' -type f -print -exec {} --version \;
+  if [[ "$jextract_platform" == windows-* ]]; then
+    jextract_bin="$jextract_root/jextract-25/bin/jextract.bat"
+    jextract_java="$jextract_root/jextract-25/runtime/bin/java.exe"
+  else
+    jextract_bin="$jextract_root/jextract-25/bin/jextract"
+    jextract_java="$jextract_root/jextract-25/runtime/bin/java"
+  fi
 
-  generated_dir="build/generated/sources/jextract/java/maplibreNativeC/org/maplibre/nativeffi/internal/c"
+  echo "=== jextract files ==="
+  file "$jextract_bin" "$jextract_java" || true
+  sed -n '1,40p' "$jextract_bin" || true
+  find "$jextract_root/jextract-25/runtime" \( -iname 'libclang*' -o -iname 'clang*.dll' -o -iname 'libLLVM*' \) -print -exec ls -l {} \; || true
+  if command -v otool >/dev/null 2>&1; then
+    find "$jextract_root/jextract-25/runtime" \( -name 'libclang*.dylib' -o -name 'libLLVM*.dylib' \) -print -exec otool -D {} \; -exec otool -L {} \; || true
+    otool -L "$jextract_java" || true
+  fi
+  if command -v ldd >/dev/null 2>&1; then
+    find "$jextract_root/jextract-25/runtime" \( -name 'libclang*.so*' -o -name 'libLLVM*.so*' \) -print -exec ldd {} \; || true
+    ldd "$jextract_java" || true
+  fi
 
-  echo "=== suspicious generated identifiers ==="
-  grep -RIn -F 'union (unnamed' "$generated_dir" || true
+  echo "=== jextract shell version ==="
+  if [[ "$jextract_platform" == windows-* ]]; then
+    cmd.exe /c "$(cygpath -w "$jextract_bin") --version"
+  else
+    "$jextract_bin" --version
+  fi
 
-  echo "=== generated union data references ==="
-  grep -RIn -F '.data.layout' "$generated_dir" || true
+  echo "=== jextract shell library log ==="
+  if [[ "$jextract_platform" == windows-* ]]; then
+    JEXTRACT_JAVA_OPTIONS="-Xlog:library=debug" cmd.exe /c "$(cygpath -w "$jextract_bin") --version" 2>&1 | grep -E 'libclang|library|JDK version|LibClang version|clang version' || true
+  else
+    JEXTRACT_JAVA_OPTIONS="-Xlog:library=debug" "$jextract_bin" --version 2>&1 | grep -E 'libclang|library|JDK version|LibClang version|clang version' || true
+  fi
 
-  echo "=== generated files around known anonymous unions ==="
-  for generated_file in \
-    "$generated_dir/mln_feature_extension_result_info.java" \
-    "$generated_dir/mln_opengl_context_descriptor.java" \
-    "$generated_dir/mln_json_value.java" \
-    "$generated_dir/mln_json_value\$2.java"; do
-    if [[ -f "$generated_file" ]]; then
-      echo "--- $generated_file"
-      sed -n '1,220p' "$generated_file"
-    fi
-  done
+  echo "=== jextract runtime java library log ==="
+  if [[ "$jextract_platform" == windows-* ]]; then
+    cmd.exe /c "$(cygpath -w "$jextract_java") -Xlog:library=debug -m org.openjdk.jextract/org.openjdk.jextract.JextractTool --version" 2>&1 | grep -E 'libclang|library|JDK version|LibClang version|clang version' || true
+  else
+    "$jextract_java" -Xlog:library=debug -m org.openjdk.jextract/org.openjdk.jextract.JextractTool --version 2>&1 | grep -E 'libclang|library|JDK version|LibClang version|clang version' || true
+  fi
 
   echo "Stopping after jextract diagnostics by request."
   exit 1
-  ''',
-]
+'''
