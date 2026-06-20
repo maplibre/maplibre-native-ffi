@@ -19,7 +19,7 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
     installCAPILogging()
     validateMetalBackend()
 
-    let window = UIWindow(frame: UIScreen.main.bounds)
+    let window = UIWindow(frame: .zero)
     window.rootViewController = MapViewController()
     window.makeKeyAndVisible()
     self.window = window

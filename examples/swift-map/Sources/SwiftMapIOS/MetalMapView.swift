@@ -111,6 +111,7 @@ final class MetalMapView: UIView {
   private func refreshAndStartIfNeeded() {
     refreshViewport()
     if viewVisible, appForeground {
+      renderPending = true
       startHostLoop()
     }
   }
