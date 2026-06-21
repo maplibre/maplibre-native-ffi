@@ -34,8 +34,8 @@ function(mln_configure_windows_platform target)
 
   target_include_directories(
     ${target}
-    BEFORE
     SYSTEM
+    BEFORE
     PRIVATE ${MLN_SOURCE_DIR}/vendor/icu/include)
 
   target_include_directories(
