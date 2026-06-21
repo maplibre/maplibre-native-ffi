@@ -103,7 +103,10 @@ function supportLabel(
 function subprojectSupport(
   subprojects: SubprojectSupport[],
   environment: EnvironmentColumn & { backends: Backend[] },
-  labelFor: (subproject: SubprojectSupport, support: EnvironmentSupport) => string,
+  labelFor: (
+    subproject: SubprojectSupport,
+    support: EnvironmentSupport,
+  ) => string,
 ): { label: string; status: Status; url: string }[] {
   return subprojects.flatMap((subproject) => {
     const support = environmentSupport(subproject, environment.environment);
