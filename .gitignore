@@ -2,6 +2,7 @@
 build/
 target/
 bindings/*/bin/
+examples/*/bin/
 docs/doxygen/gen/
 docs/src/generated/
 docs/public/reference/

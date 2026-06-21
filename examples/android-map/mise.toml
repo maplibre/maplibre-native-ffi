@@ -1,8 +1,8 @@
 [tasks.ensure-environment]
 hide = true
 run = '''
-if [[ "$MISE_ENV" != android-* ]]; then
-  echo "Use an Android mise environment, for example:" >&2
+if [[ "$MISE_ENV" != android-arm64-egl ]]; then
+  echo "Use the Android OpenGL/EGL mise environment:" >&2
   echo "  mise -E android-arm64-egl run //examples/android-map:build" >&2
   exit 1
 fi
