@@ -77,8 +77,31 @@ function supportStatus(support: EnvironmentSupport): Status {
   return "tested";
 }
 
+function backendSignature(backends: Backend[]): string {
+  return backends
+    .map((backend) => backend.backendLabel)
+    .sort()
+    .join("|");
+}
+
+function supportLabel(
+  label: string,
+  environment: EnvironmentColumn & {
+    backends: Backend[];
+  },
+  support: EnvironmentSupport,
+): string {
+  if (
+    backendSignature(support.backends) ===
+    backendSignature(environment.backends)
+  ) {
+    return label;
+  }
+  return `${label} (${support.backends.map((backend) => backend.backendLabel).join(", ")})`;
+}
+
 function bindingSupport(
-  environment: EnvironmentColumn,
+  environment: EnvironmentColumn & { backends: Backend[] },
 ): { label: string; status: Status; url: string }[] {
   return supportMatrix.bindings.flatMap((binding) => {
     const support = environmentSupport(binding, environment.environment);
@@ -87,7 +110,7 @@ function bindingSupport(
     }
     return [
       {
-        label: binding.label,
+        label: supportLabel(binding.label, environment, support),
         status: supportStatus(support),
         url: sourceUrl(binding.sourceDirectory),
       },
@@ -176,6 +199,9 @@ function exampleSupport(
     })}
   </tbody>
 </table>
+<p>
+  OpenGL uses WGL on Windows and EGL on other platforms. macOS EGL uses ANGLE.
+</p>
 
 <style>
 .support-badge-link {

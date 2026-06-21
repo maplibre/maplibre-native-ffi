@@ -1,2 +1,3 @@
 [requires]
+exclude = ["macos-arm64-egl"]
 os = ["linux", "macos", "windows"]

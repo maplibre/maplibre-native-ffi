@@ -39,7 +39,7 @@ mise run //bindings/rust:test
 mise run //examples/zig-readback:run
 
 # GUI map app — use a brief timeout or run in background
-mise run //examples/zig-map:run
+mise run //examples/zig-map:run:owned-texture
 
 # Build and test for a different variant (override auto-detected env)
 mise -E linux-x64-egl run test
