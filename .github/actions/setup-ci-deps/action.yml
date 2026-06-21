@@ -209,6 +209,4 @@ runs:
     - name: Ensure Android Rust target
       if: ${{ startsWith(env.MISE_ENV, 'android-') }}
       shell: bash
-      run: |
-        android_rust_target="$(mise exec -- printenv CARGO_BUILD_TARGET)"
-        mise exec -- rustup target add "${android_rust_target}"
+      run: mise exec -- bash -c 'rustup target add "$CARGO_BUILD_TARGET"'
