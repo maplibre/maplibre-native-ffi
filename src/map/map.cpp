@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <array>
+#include <cassert>
 #include <chrono>
 #include <cmath>
 #include <cstddef>
@@ -1006,6 +1007,7 @@ auto to_c_render_mode(mbgl::MapObserver::RenderMode mode) -> uint32_t {
     case mbgl::MapObserver::RenderMode::Full:
       return MLN_RENDER_MODE_FULL;
   }
+  assert(false);
   return MLN_RENDER_MODE_PARTIAL;
 }
 
@@ -1300,7 +1302,9 @@ auto to_native_map_mode(uint32_t mode) -> mbgl::MapMode {
     case MLN_MAP_MODE_TILE:
       return mbgl::MapMode::Tile;
     case MLN_MAP_MODE_CONTINUOUS:
+      return mbgl::MapMode::Continuous;
     default:
+      assert(false);
       return mbgl::MapMode::Continuous;
   }
 }
@@ -2095,7 +2099,9 @@ auto to_native_north_orientation(uint32_t orientation)
     case MLN_NORTH_ORIENTATION_LEFT:
       return mbgl::NorthOrientation::Leftwards;
     case MLN_NORTH_ORIENTATION_UP:
+      return mbgl::NorthOrientation::Upwards;
     default:
+      assert(false);
       return mbgl::NorthOrientation::Upwards;
   }
 }
@@ -2110,9 +2116,10 @@ auto from_native_north_orientation(mbgl::NorthOrientation orientation)
     case mbgl::NorthOrientation::Leftwards:
       return MLN_NORTH_ORIENTATION_LEFT;
     case mbgl::NorthOrientation::Upwards:
-    default:
       return MLN_NORTH_ORIENTATION_UP;
   }
+  assert(false);
+  return MLN_NORTH_ORIENTATION_UP;
 }
 
 auto to_native_constrain_mode(uint32_t mode) -> mbgl::ConstrainMode {
@@ -2124,7 +2131,9 @@ auto to_native_constrain_mode(uint32_t mode) -> mbgl::ConstrainMode {
     case MLN_CONSTRAIN_MODE_SCREEN:
       return mbgl::ConstrainMode::Screen;
     case MLN_CONSTRAIN_MODE_HEIGHT_ONLY:
+      return mbgl::ConstrainMode::HeightOnly;
     default:
+      assert(false);
       return mbgl::ConstrainMode::HeightOnly;
   }
 }
@@ -2138,9 +2147,10 @@ auto from_native_constrain_mode(mbgl::ConstrainMode mode) -> uint32_t {
     case mbgl::ConstrainMode::Screen:
       return MLN_CONSTRAIN_MODE_SCREEN;
     case mbgl::ConstrainMode::HeightOnly:
-    default:
       return MLN_CONSTRAIN_MODE_HEIGHT_ONLY;
   }
+  assert(false);
+  return MLN_CONSTRAIN_MODE_HEIGHT_ONLY;
 }
 
 auto to_native_viewport_mode(uint32_t mode) -> mbgl::ViewportMode {
@@ -2148,7 +2158,9 @@ auto to_native_viewport_mode(uint32_t mode) -> mbgl::ViewportMode {
     case MLN_VIEWPORT_MODE_FLIPPED_Y:
       return mbgl::ViewportMode::FlippedY;
     case MLN_VIEWPORT_MODE_DEFAULT:
+      return mbgl::ViewportMode::Default;
     default:
+      assert(false);
       return mbgl::ViewportMode::Default;
   }
 }
@@ -2158,9 +2170,10 @@ auto from_native_viewport_mode(mbgl::ViewportMode mode) -> uint32_t {
     case mbgl::ViewportMode::FlippedY:
       return MLN_VIEWPORT_MODE_FLIPPED_Y;
     case mbgl::ViewportMode::Default:
-    default:
       return MLN_VIEWPORT_MODE_DEFAULT;
   }
+  assert(false);
+  return MLN_VIEWPORT_MODE_DEFAULT;
 }
 
 auto from_native_edge_insets(const mbgl::EdgeInsets& insets)
@@ -2178,7 +2191,9 @@ auto to_native_tile_lod_mode(uint32_t mode) -> mbgl::TileLodMode {
     case MLN_TILE_LOD_MODE_DISTANCE:
       return mbgl::TileLodMode::Distance;
     case MLN_TILE_LOD_MODE_DEFAULT:
+      return mbgl::TileLodMode::Default;
     default:
+      assert(false);
       return mbgl::TileLodMode::Default;
   }
 }
@@ -2188,9 +2203,10 @@ auto from_native_tile_lod_mode(mbgl::TileLodMode mode) -> uint32_t {
     case mbgl::TileLodMode::Distance:
       return MLN_TILE_LOD_MODE_DISTANCE;
     case mbgl::TileLodMode::Default:
-    default:
       return MLN_TILE_LOD_MODE_DEFAULT;
   }
+  assert(false);
+  return MLN_TILE_LOD_MODE_DEFAULT;
 }
 
 auto from_native_projection_mode(const mbgl::ProjectionMode& mode)

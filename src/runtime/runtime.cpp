@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <cassert>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -285,6 +286,7 @@ auto to_c_download_state(mbgl::OfflineRegionDownloadState state) -> uint32_t {
     case mbgl::OfflineRegionDownloadState::Active:
       return MLN_OFFLINE_REGION_DOWNLOAD_ACTIVE;
   }
+  assert(false);
   return MLN_OFFLINE_REGION_DOWNLOAD_INACTIVE;
 }
 
@@ -332,6 +334,7 @@ auto to_c_resource_error_reason(mbgl::Response::Error::Reason reason)
     case mbgl::Response::Error::Reason::Other:
       return MLN_RESOURCE_ERROR_REASON_OTHER;
   }
+  assert(false);
   return MLN_RESOURCE_ERROR_REASON_OTHER;
 }
 
@@ -856,9 +859,6 @@ namespace {
 
 auto database_source_for_runtime(mln_runtime* runtime)
   -> std::shared_ptr<mbgl::DatabaseFileSource> {
-  if (runtime == nullptr) {
-    return nullptr;
-  }
   if (runtime->database_source != nullptr) {
     return runtime->database_source;
   }
