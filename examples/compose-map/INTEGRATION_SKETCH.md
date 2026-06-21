@@ -331,17 +331,19 @@ model to the rest of the example:
 - a clear diagnostic when the expected Skiko internals are unavailable
 
 Reflection is acceptable for the proof path if it is fully contained inside
-`SkikoHost`. Native bridge code is expected for platform calls that Skiko does
-not expose through Kotlin APIs. The rest of the example should depend on
-capabilities rather than Skiko field names.
+`SkikoHost`. Platform graphics calls that Skiko does not expose through Kotlin
+APIs should be isolated in the bridge layer; the current macOS proof uses
+LWJGL's Objective-C runtime helpers rather than a Compose-specific native
+library. The rest of the example should depend on capabilities rather than Skiko
+field names.
 
 The current Compose 1.11.1 / Skiko 0.144.6 macOS path stores the active
 `SkiaLayer` as an anonymous `SkiaLayer` subclass inside
 `ComposeWindowPanel -> ComposeContainer -> WindowSkiaLayerComponent`. The lookup
 must use `SkiaLayer` assignability, not exact class-name equality.
-`MetalRedrawer._device.ptr` points at Skiko's Metal device wrapper; the native
-bridge can use that wrapper's `adapter` to allocate an `MTLTexture` on the same
-Metal device as Compose.
+`MetalRedrawer.contextHandler.device.ptr` points at Skiko's Metal device
+wrapper; the Metal bridge uses that wrapper's `adapter` property to allocate an
+`MTLTexture` on the same Metal device as Compose.
 
 Skiko 0.144.6's `BackendRenderTarget.makeMetal(width, height, ptr)` expects
 `ptr` to be a raw Objective-C `id<MTLTexture>` pointer encoded as a `Long`.
@@ -421,11 +423,12 @@ producer side.
 
 The example should live under `examples/compose-map`, use the existing Kotlin
 binding, and consume the native artifact metadata in the same spirit as
-`examples/lwjgl-map`. Native bridge code is likely required for platform handle
-extraction and import/export calls.
+`examples/lwjgl-map`. The macOS proof should use LWJGL for Objective-C runtime
+calls instead of adding a Compose-specific native component. Future bridge rows
+can add native code only when the platform interop cannot be expressed cleanly
+through the JVM toolchain.
 
-The build should keep the Kotlin/Compose app separate from per-OS bridge native
-code:
+The build should keep the Kotlin/Compose app separate from per-OS bridge code:
 
 - Kotlin owns the Compose application, MapLibre binding calls, frame loop, and
   bridge selection.
@@ -435,8 +438,8 @@ code:
   hangs AWT while constructing the first `JFrame`; the example should let
   Compose's AWT launcher run without that flag unless a future pinned runtime
   requires it.
-- A small native bridge library owns platform graphics interop calls that are
-  unavailable or brittle through pure Kotlin/JNA.
+- LWJGL supplies the Objective-C runtime bridge used by the macOS same-API Metal
+  implementation.
 - Runtime selection chooses one bridge row based on the default Skiko renderer,
   the selected MapLibre backend artifact, and extension/capability probes.
 
@@ -457,8 +460,8 @@ examples/compose-map/src/main/kotlin/.../map
   Example app wiring
 ```
 
-The `surface` package should avoid MapLibre imports. The native bridge should
-also use map-neutral names so it can move into a standalone library without
+The `surface` package should avoid MapLibre imports. Bridge helpers should also
+use map-neutral names so they can move into a standalone library without
 renaming exported symbols.
 
 ## Remaining Validation Targets
