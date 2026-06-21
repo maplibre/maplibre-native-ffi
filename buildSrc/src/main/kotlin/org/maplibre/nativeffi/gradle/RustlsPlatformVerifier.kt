@@ -10,7 +10,7 @@ object RustlsPlatformVerifier {
     project.providers
       .exec {
         workingDir = project.rootProject.projectDir
-        val androidTarget = System.getenv("CARGO_BUILD_TARGET") ?: "aarch64-linux-android"
+        val androidTarget = AndroidTarget.current().cargoTarget
         commandLine(
           "cargo",
           "metadata",
