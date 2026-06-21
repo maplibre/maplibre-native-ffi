@@ -42,7 +42,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     let backends = maplibre_native::supported_render_backends();
     println!("native render backends: {}", render_backend_label(backends));
     if !supports_usable_backend(backends) {
-        return Err("the loaded MapLibre native library does not support a backend usable by rust-map on this platform".into());
+        return Err(
+            "the loaded MapLibre native library does not support the backend required by rust-map"
+                .into(),
+        );
     }
     maplibre_native::set_log_callback(|record| {
         eprintln!(

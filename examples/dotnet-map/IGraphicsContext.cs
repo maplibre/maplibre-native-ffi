@@ -48,7 +48,7 @@ internal static class GraphicsContext
         }
 
         throw new InvalidOperationException(
-            "The loaded MapLibre native library does not support a backend usable by dotnet-map on this platform."
+            "The loaded MapLibre native library does not support a backend usable by dotnet-map."
         );
     }
 }

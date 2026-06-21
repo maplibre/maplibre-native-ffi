@@ -11,7 +11,7 @@ internal object Main {
     val backends = Maplibre.supportedRenderBackends()
     println("native render backends: $backends")
     check(supportsUsableBackend(backends)) {
-      "The loaded MapLibre native library does not support a backend usable by lwjgl-map on this platform"
+      "The loaded MapLibre native library does not support a backend usable by lwjgl-map"
     }
     Maplibre.setLogCallback { record ->
       System.err.printf(

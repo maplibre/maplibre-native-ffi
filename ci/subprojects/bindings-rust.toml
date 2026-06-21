@@ -1,5 +1,2 @@
 [requires]
-# The Rust binding tests use glutin_egl_sys for their test-only EGL context, and
-# that crate does not expose EGL on Apple platforms.
-exclude = ["macos-arm64-egl"]
 os = ["linux", "macos", "windows"]

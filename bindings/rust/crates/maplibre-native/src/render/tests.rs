@@ -73,6 +73,30 @@ fn has_opengl_backend() -> bool {
     crate::supported_render_backends().contains(RenderBackendMask::OPENGL)
 }
 
+fn has_opengl_test_context_backend() -> bool {
+    if !has_opengl_backend() {
+        return false;
+    }
+
+    let providers = crate::supported_opengl_context_providers();
+    #[cfg(target_os = "linux")]
+    {
+        providers.contains(OpenGLContextProviderMask::EGL)
+    }
+    #[cfg(target_os = "windows")]
+    {
+        providers.contains(OpenGLContextProviderMask::WGL)
+    }
+    #[cfg(not(any(target_os = "linux", target_os = "windows")))]
+    {
+        // The Rust test helper only implements Linux EGL and Windows WGL.
+        // macOS EGL remains covered by bindings that can create a test context
+        // and by the map examples until this helper grows a native EGL path.
+        let _ = providers;
+        false
+    }
+}
+
 fn create_opengl_owned_texture_session(
     map: &MapHandle,
     extent: RenderTargetExtent,
@@ -1308,7 +1332,7 @@ fn opengl_context_provider_mask_is_exposed_semantically() {
 #[test]
 // Spec coverage: BND-162.
 fn opengl_owned_texture_session_attaches_with_platform_context() {
-    if !has_opengl_backend() {
+    if !has_opengl_test_context_backend() {
         return;
     }
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
@@ -1348,7 +1372,7 @@ fn opengl_owned_texture_session_attaches_with_platform_context() {
 #[test]
 // Spec coverage: BND-162.
 fn opengl_surface_session_renders_with_platform_context() {
-    if !has_opengl_backend() {
+    if !has_opengl_test_context_backend() {
         return;
     }
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();
@@ -1373,7 +1397,7 @@ fn opengl_surface_session_renders_with_platform_context() {
 #[test]
 // Spec coverage: BND-162 and BND-171.
 fn opengl_borrowed_texture_session_renders_with_platform_context() {
-    if !has_opengl_backend() {
+    if !has_opengl_test_context_backend() {
         return;
     }
     let runtime = RuntimeHandle::with_options(&crate::RuntimeOptions::default()).unwrap();

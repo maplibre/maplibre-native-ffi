@@ -27,7 +27,7 @@ internal static class Program
             if (!SupportsUsableBackend(backends))
             {
                 Console.Error.WriteLine(
-                    "The loaded MapLibre native library does not support a backend usable by dotnet-map on this platform."
+                    "The loaded MapLibre native library does not support a backend usable by dotnet-map."
                 );
                 return 1;
             }

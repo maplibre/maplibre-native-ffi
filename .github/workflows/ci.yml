@@ -182,6 +182,7 @@ jobs:
       - run: mise run //bindings/dotnet:test
       - run: mise run //bindings/kotlin:jvmTest
       - run: mise run //bindings/kotlin:nativeTest
+      - run: mise run //bindings/rust:test
       - run: mise run //bindings/swift:test
       - run: mise run //bindings/zig:test
       - run: mise run //examples/lwjgl-map:build

@@ -156,8 +156,11 @@ Graphics API selection follows one of these patterns:
   matches the active native build variant (for example `zig-map`, `rust-map`,
   `swift-map`).
 - **Multi-context examples** ship a graphics context per targeted API and select
-  the active API at startup from `supportedRenderBackends()` and platform policy
-  (for example `lwjgl-map`, `dotnet-map`).
+  the active API at startup from `supportedRenderBackends()` (for example
+  `lwjgl-map`, `dotnet-map`).
+
+OpenGL examples that can run with multiple context providers select EGL or WGL
+from `supportedOpenGLContextProviders()`.
 
 Each process run uses one graphics API. Render-target mode selection follows the
 active profile ([Entry](#entry) or [Entry and shell](#entry-and-shell)).
