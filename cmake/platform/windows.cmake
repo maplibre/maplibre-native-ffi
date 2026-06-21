@@ -1,6 +1,5 @@
 function(mln_configure_windows_platform target)
   find_package(CURL REQUIRED)
-  find_package(dlfcn-win32 REQUIRED)
   find_package(ICU COMPONENTS i18n uc data REQUIRED)
   find_package(JPEG REQUIRED)
   find_package(libuv REQUIRED)
@@ -46,6 +45,11 @@ function(mln_configure_windows_platform target)
 
   target_include_directories(
     ${target}
+    BEFORE
+    PRIVATE ${PROJECT_SOURCE_DIR}/src/platform/windows/shims)
+
+  target_include_directories(
+    ${target}
     SYSTEM
     PRIVATE
       ${MLN_SOURCE_DIR}/platform/windows/include ${CURL_INCLUDE_DIRS}
@@ -59,7 +63,6 @@ function(mln_configure_windows_platform target)
     ${target}
     PRIVATE
       ${CURL_LIBRARIES}
-      dlfcn-win32::dl
       ${JPEG_LIBRARIES}
       WebP::webp
       $<IF:$<TARGET_EXISTS:libuv::uv_a>,libuv::uv_a,libuv::uv>

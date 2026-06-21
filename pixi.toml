@@ -40,7 +40,6 @@ moltenvk = ">=1.4.1,<2"
 [target.win-64.dependencies]
 icu = ">=78,<79"
 libcurl = ">=8,<8.20"
-dlfcn-win32 = ">=1.4,<2"
 libjpeg-turbo = ">=3.1,<4"
 libpng = ">=1.6,<2"
 libuv = ">=1,<2"
