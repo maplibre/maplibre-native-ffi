@@ -1,10 +1,8 @@
 function(mln_link_rust_platform target)
   find_program(CARGO_EXECUTABLE cargo REQUIRED)
 
-  if(DEFINED ENV{CARGO_BUILD_TARGET}
-     AND NOT "$ENV{CARGO_BUILD_TARGET}" STREQUAL "")
-    set(rust_target "$ENV{CARGO_BUILD_TARGET}")
-  else()
+  set(rust_target "$ENV{CARGO_BUILD_TARGET}")
+  if(rust_target STREQUAL "")
     message(
       FATAL_ERROR "CARGO_BUILD_TARGET must be set for Rust platform builds")
   endif()

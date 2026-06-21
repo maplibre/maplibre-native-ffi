@@ -4628,10 +4628,6 @@ auto map_move_style_layer(
   }
 
   auto layer = style.removeLayer(id);
-  if (!layer) {
-    set_thread_error("layer does not exist");
-    return MLN_STATUS_INVALID_ARGUMENT;
-  }
   style.addLayer(std::move(layer), before);
   return MLN_STATUS_OK;
 }

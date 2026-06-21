@@ -17,8 +17,6 @@ load_windows_msvc_environment() {
   if [[ -n "${VCTOOLSINSTALLDIR:-${VCToolsInstallDir:-}}" ]]; then
     return 0
   fi
-  command -v cmd.exe >/dev/null
-  command -v cygpath >/dev/null
 
   local original_path="$PATH"
   original_path="$(cygpath -u -p "$original_path")"
@@ -98,7 +96,6 @@ normalize_windows_msvc_path() {
     echo "VCToolsInstallDir is required after Visual Studio environment setup" >&2
     return 1
   }
-  command -v cygpath >/dev/null
 
   local host_arch="${VSCMD_ARG_HOST_ARCH:-x64}"
   local target_arch="${VSCMD_ARG_TGT_ARCH:-x64}"

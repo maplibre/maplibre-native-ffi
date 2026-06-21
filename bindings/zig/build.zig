@@ -144,7 +144,6 @@ fn parseNativeArtifactConfig(b: *std.Build, config_path: std.Build.LazyPath) Nat
     if (config.render_backend.len == 0 or config.artifact_shape.len == 0 or config.library_path.len == 0) {
         std.debug.panic("native artifact config is incomplete: {s}", .{config_path.getPath(b)});
     }
-    if (config.import_library_path.len == 0) config.import_library_path = config.library_path;
     return config;
 }
 
@@ -487,11 +486,8 @@ pub fn linkMaplibreNativeC(b: *std.Build, module_: *std.Build.Module, options: L
             addLibraryPaths(module_, link_dirs);
             linkSystemLibraries(module_, config.link_libraries);
             if (options.target.result.os.tag == .ios) {
-                if (b.graph.environ_map.get("MLN_FFI_SYSTEM_ROOT")) |system_root| {
-                    if (system_root.len != 0) {
-                        module_.addObjectFile(.{ .cwd_relative = b.pathJoin(&.{ system_root, "usr", "lib", "libc++.tbd" }) });
-                    }
-                }
+                const system_root = b.graph.environ_map.get("MLN_FFI_SYSTEM_ROOT").?;
+                module_.addObjectFile(.{ .cwd_relative = b.pathJoin(&.{ system_root, "usr", "lib", "libc++.tbd" }) });
             }
             linkFrameworks(module_, config.frameworks);
         },

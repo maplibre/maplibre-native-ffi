@@ -32,8 +32,37 @@ Headline: the anti-patterns concentrate in three places:
     try/catch stays.
   - **`src/map/map.cpp:435/440/447` tile scheme ternaries (F4):** idiomatic
     binary-enum converters gated by an upstream validator. Left as-is.
-- **Tier 2 — pending.** Not addressed in the initial PR.
-- **Tier 3 — pending / likely skip.** Stylistic; review case-by-case.
+- **Kotlin bindings:** the audit's Java-ffm/java-jni findings (F1–F5, J1–J7,
+  plus `closeQuietly`) were re-checked against the new
+  `bindings/kotlin/src/{jvmMain,androidMain}` sources after the Java ports were
+  moved to Kotlin. The redundant value-domain validation (dimension, scale,
+  cache-size, tile-size) did _not_ carry over — the Kotlin sources only have
+  binding-owned safety checks (`NativeBuffer` allocation size, offline-operation
+  id nonzero). The `closeQuietly` pattern is present in three files
+  (`MapHandle.kt`, `RuntimeHandle.kt`, `LogCallbackState.kt`, mirrored across
+  jvmMain and androidMain). All current usages are in legitimate cleanup paths
+  (replaced-state teardown after the C-level swap already succeeded,
+  failure-cleanup inside a `catch` that's already propagating, bulk child close
+  on parent close). Tightening them to report rather than swallow requires a
+  logging-design decision (logger, level, surface) and is deferred.
+
+## Still pending (Tier 2/3 items not yet resolved)
+
+- `src/map/map.cpp:2765-2794` (5 helpers) and
+  `src/render/render_session_common.cpp:901/969/1176/1240` — double null-checks
+  on `map_native` after `validate_map`/`validate_live_attached_render_session`.
+  Hot render path; removing both layers needs a careful call-site trace.
+- `src/map/map.cpp:155` — `to_c_source_type` returns `UNKNOWN` after exhaustive
+  switch. Defensible as a forward-compat catch-all; could go either way.
+- `src/render/vulkan/vulkan_texture_backend.cpp:362,428` — silent `{}` return on
+  Vulkan alloc/map failure loses the diagnostic. Throw instead (readback path
+  will convert) — needs verification of the catch path.
+- `.github/actions/setup-ci-deps/action.yml:183` — `MISE_ENV:-$(mise exec ...)`
+  fallback silently produces malformed sccache keys for non-build jobs. Needs
+  confirmation that sccache isn't intentionally best-effort there.
+- `examples/{lwjgl-map,dotnet-map}` VulkanContext — Wayland warn-and-return
+  contradicts the "targets Wayland" comment. Behavior change for examples.
+- Kotlin `closeQuietly` (see Java/Kotlin notes above).
 
 ## Tier 1 — high-value, low-risk
 

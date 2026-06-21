@@ -2479,17 +2479,15 @@ auto release_runtime_map(mln_runtime* runtime) noexcept -> void {
 auto resource_options_for_runtime(mln_runtime* runtime)
   -> mbgl::ResourceOptions {
   auto options = mbgl::ResourceOptions::Default();
-  if (runtime != nullptr) {
-    options.withPlatformContext(runtime);
-    if (!runtime->asset_path.empty()) {
-      options.withAssetPath(runtime->asset_path);
-    }
-    if (!runtime->cache_path.empty()) {
-      options.withCachePath(runtime->cache_path);
-    }
-    if (runtime->has_maximum_cache_size) {
-      options.withMaximumCacheSize(runtime->maximum_cache_size);
-    }
+  options.withPlatformContext(runtime);
+  if (!runtime->asset_path.empty()) {
+    options.withAssetPath(runtime->asset_path);
+  }
+  if (!runtime->cache_path.empty()) {
+    options.withCachePath(runtime->cache_path);
+  }
+  if (runtime->has_maximum_cache_size) {
+    options.withMaximumCacheSize(runtime->maximum_cache_size);
   }
   return options;
 }

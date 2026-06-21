@@ -29,13 +29,10 @@ fn sdlLibrary(b: *std.Build, options: BuildOptions) *std.Build.Step.Compile {
     });
     const library = sdl.artifact("SDL3");
     if (options.target.result.os.tag == .macos) {
-        if (b.graph.environ_map.get("MLN_FFI_SYSTEM_ROOT")) |system_root| {
-            if (system_root.len != 0) {
-                library.root_module.addSystemIncludePath(.{ .cwd_relative = b.pathJoin(&.{ system_root, "usr", "include" }) });
-                library.root_module.addLibraryPath(.{ .cwd_relative = b.pathJoin(&.{ system_root, "usr", "lib" }) });
-                library.root_module.addSystemFrameworkPath(.{ .cwd_relative = b.pathJoin(&.{ system_root, "System", "Library", "Frameworks" }) });
-            }
-        }
+        const system_root = b.graph.environ_map.get("MLN_FFI_SYSTEM_ROOT").?;
+        library.root_module.addSystemIncludePath(.{ .cwd_relative = b.pathJoin(&.{ system_root, "usr", "include" }) });
+        library.root_module.addLibraryPath(.{ .cwd_relative = b.pathJoin(&.{ system_root, "usr", "lib" }) });
+        library.root_module.addSystemFrameworkPath(.{ .cwd_relative = b.pathJoin(&.{ system_root, "System", "Library", "Frameworks" }) });
     }
     return library;
 }
