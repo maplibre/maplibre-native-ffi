@@ -83,24 +83,9 @@ function(mln_add_c_api_library target)
       $<$<AND:$<COMPILE_LANGUAGE:CXX>,$<CXX_COMPILER_ID:MSVC>>:/GR->
       $<$<COMPILE_LANGUAGE:OBJC,OBJCXX>:-fobjc-arc>)
 
-  set(MLN_FFI_HAS_PROVIDER_LIBRARY_DIR FALSE)
-  if(DEFINED ENV{MLN_FFI_DEPENDENCY_LIBRARY_DIR}
-     AND NOT "$ENV{MLN_FFI_DEPENDENCY_LIBRARY_DIR}" STREQUAL "")
-    set(MLN_FFI_HAS_PROVIDER_LIBRARY_DIR TRUE)
-  endif()
-
-  set(MLN_FFI_ENABLE_PROVIDER_RPATH FALSE)
-  if(UNIX)
-    if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
-      if(MLN_FFI_HAS_PROVIDER_LIBRARY_DIR)
-        set(MLN_FFI_ENABLE_PROVIDER_RPATH TRUE)
-      endif()
-    endif()
-  endif()
-
-  if(MLN_FFI_ENABLE_PROVIDER_RPATH)
-    # Build-tree binaries find provider-supplied shared libraries through
-    # embedded runtime search paths.
+  # Build-tree binaries find provider-supplied shared libraries through
+  # embedded runtime search paths. iOS images are bundled; skip rpath there.
+  if(UNIX AND NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
     set_property(
       TARGET ${target}
       APPEND

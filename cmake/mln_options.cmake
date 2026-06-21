@@ -15,17 +15,6 @@ function(mln_configure_options)
   set_property(CACHE MLN_FFI_OPENGL_CONTEXT_PROVIDER PROPERTY STRINGS egl wgl)
   set(MLN_FFI_EGL_ROOT "" CACHE PATH "Path to a local EGL/GLES package")
 
-  if(NOT MLN_FFI_RENDER_BACKEND)
-    if(APPLE)
-      set(MLN_FFI_RENDER_BACKEND "metal")
-    elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux"
-           OR CMAKE_SYSTEM_NAME STREQUAL "OHOS")
-      set(MLN_FFI_RENDER_BACKEND "vulkan")
-    elseif(CMAKE_SYSTEM_NAME STREQUAL "Android")
-      set(MLN_FFI_RENDER_BACKEND "vulkan")
-    endif()
-  endif()
-
   string(TOLOWER "${MLN_FFI_RENDER_BACKEND}" MLN_FFI_RENDER_BACKEND)
   string(TOLOWER "${MLN_FFI_OPENGL_CONTEXT_PROVIDER}"
          MLN_FFI_OPENGL_CONTEXT_PROVIDER)
