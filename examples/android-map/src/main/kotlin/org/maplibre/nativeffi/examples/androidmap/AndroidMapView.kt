@@ -18,6 +18,7 @@ internal class AndroidMapView(context: Context) :
   private var renderPending = true
   private var frameCallbackPosted = false
   private var closed = false
+  private val pendingDrawingFinished = ArrayDeque<Runnable>()
 
   init {
     holder.addCallback(this)
@@ -46,6 +47,7 @@ internal class AndroidMapView(context: Context) :
   fun enterBackground() {
     appForeground = false
     stopLoop()
+    finishPendingDrawing()
   }
 
   override fun surfaceCreated(holder: SurfaceHolder) {
@@ -65,8 +67,11 @@ internal class AndroidMapView(context: Context) :
   }
 
   override fun surfaceRedrawNeededAsync(holder: SurfaceHolder, drawingFinished: Runnable) {
+    pendingDrawingFinished += drawingFinished
     requestRender()
-    drawingFinished.run()
+    if (!canRenderFrame()) {
+      finishPendingDrawing()
+    }
   }
 
   override fun onTouchEvent(event: MotionEvent): Boolean = input.onTouchEvent(event)
@@ -80,6 +85,7 @@ internal class AndroidMapView(context: Context) :
       if (renderPending) {
         state.renderUpdate()
         renderPending = false
+        finishPendingDrawing()
       }
     } catch (error: RuntimeException) {
       Log.e(TAG, "frame failed", error)
@@ -109,6 +115,7 @@ internal class AndroidMapView(context: Context) :
       Viewport.fromView(width, height, resources.displayMetrics.density).also { it.log("surface") }
     if (nextViewport.isEmpty) {
       viewport = nextViewport
+      finishPendingDrawing()
       return
     }
     val nextGraphics = EglGraphicsContext.create(holder.surface)
@@ -128,21 +135,24 @@ internal class AndroidMapView(context: Context) :
     mapState?.detachRenderTarget()
     graphics?.close()
     graphics = null
+    finishPendingDrawing()
   }
 
   private fun startLoopIfReady() {
-    if (
-      closed ||
-        frameCallbackPosted ||
-        !viewVisible ||
-        !appForeground ||
-        graphics == null ||
-        mapState == null
-    ) {
+    if (frameCallbackPosted || !canRenderFrame()) {
       return
     }
     frameCallbackPosted = true
     Choreographer.getInstance().postFrameCallback(this)
+  }
+
+  private fun canRenderFrame(): Boolean =
+    !closed && viewVisible && appForeground && graphics != null && mapState != null
+
+  private fun finishPendingDrawing() {
+    while (pendingDrawingFinished.isNotEmpty()) {
+      pendingDrawingFinished.removeFirst().run()
+    }
   }
 
   private fun stopLoop() {

@@ -12,7 +12,7 @@ java-android-release = "17"
 
 [libraries]
 javacpp = { module = "org.bytedeco:javacpp", version.ref = "javacpp" }
-rustls-platform-verifier = { module = "rustls:rustls-platform-verifier", version = "latest.release" }
+rustls-platform-verifier = { module = "rustls:rustls-platform-verifier", version = "0.1.1" }
 
 lwjgl-bom = { module = "org.lwjgl:lwjgl-bom", version.ref = "lwjgl" }
 lwjgl = { module = "org.lwjgl:lwjgl" }
