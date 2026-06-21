@@ -2,6 +2,7 @@ package maplibre
 
 import (
 	"errors"
+	stdruntime "runtime"
 	"testing"
 )
 
@@ -194,6 +195,9 @@ func TestGeoJSONSourceDataDescriptors(t *testing.T) {
 	}
 }
 func TestAddStyleSourceJSONCopiesGoJSONDescriptor(t *testing.T) {
+	stdruntime.LockOSThread()
+	defer stdruntime.UnlockOSThread()
+
 	runtime, err := NewRuntime()
 	if err != nil {
 		t.Fatalf("NewRuntime(): %v", err)
