@@ -460,6 +460,7 @@ mod tests {
     use super::*;
 
     #[test]
+    // Spec coverage: BND-067.
     fn json_values_materialize_and_copy_back_preserving_order_duplicates_and_width() {
         let value = JsonValue::object(vec![
             JsonMember::new("null", JsonValue::Null),

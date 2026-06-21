@@ -1,0 +1,5 @@
+[requires]
+os = ["linux", "macos", "windows"]
+
+[ci]
+test = "//bindings/python:ci"

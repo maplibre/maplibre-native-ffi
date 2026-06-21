@@ -1,0 +1,210 @@
+---
+import supportMatrix from "../generated/support-matrix.json";
+import { Badge } from "@astrojs/starlight/components";
+
+type Status = "tested" | "build-only";
+type BadgeVariant = "default" | "note" | "success" | "caution";
+
+type Backend = {
+  backendLabel: string;
+  status: Status;
+};
+
+type EnvironmentSupport = {
+  environment: string;
+  environmentLabel: string;
+  backends: Backend[];
+};
+
+type SubprojectSupport = {
+  label: string;
+  sourceDirectory: string;
+  environments: EnvironmentSupport[];
+};
+
+type EnvironmentColumn = {
+  environment: string;
+  label: string;
+};
+
+type NativeEnvironment = {
+  environment: string;
+  environmentLabel: string;
+  backends: Backend[];
+};
+
+const environmentRows: (EnvironmentColumn & { backends: Backend[] })[] =
+  supportMatrix.native.map((row: NativeEnvironment) => ({
+    environment: row.environment,
+    label: row.environmentLabel,
+    backends: row.backends,
+  }));
+
+const statusBadges = supportMatrix.statuses.map((row) => ({
+  label: row.statusLabel,
+  status: row.status as Status,
+}));
+
+const sourceRoot = "https://github.com/maplibre/maplibre-native-ffi/tree/main";
+
+function sourceUrl(sourceDirectory: string): string {
+  return `${sourceRoot}/${sourceDirectory}`;
+}
+
+function badgeVariant(status: Status): BadgeVariant {
+  if (status === "tested") {
+    return "success";
+  }
+  if (status === "build-only") {
+    return "caution";
+  }
+  return "default";
+}
+
+function environmentSupport(
+  subproject: SubprojectSupport,
+  environment: string,
+): EnvironmentSupport | undefined {
+  return subproject.environments.find(
+    (entry) => entry.environment === environment,
+  );
+}
+
+function supportStatus(support: EnvironmentSupport): Status {
+  if (support.backends.some((backend) => backend.status === "build-only")) {
+    return "build-only";
+  }
+  return "tested";
+}
+
+function backendSignature(backends: Backend[]): string {
+  return backends
+    .map((backend) => backend.backendLabel)
+    .sort()
+    .join("|");
+}
+
+function supportLabel(
+  label: string,
+  environment: EnvironmentColumn & {
+    backends: Backend[];
+  },
+  support: EnvironmentSupport,
+): string {
+  if (
+    backendSignature(support.backends) ===
+    backendSignature(environment.backends)
+  ) {
+    return label;
+  }
+  return `${label} (${support.backends.map((backend) => backend.backendLabel).join(", ")})`;
+}
+
+function bindingSupport(
+  environment: EnvironmentColumn & { backends: Backend[] },
+): { label: string; status: Status; url: string }[] {
+  return supportMatrix.bindings.flatMap((binding) => {
+    const support = environmentSupport(binding, environment.environment);
+    if (!support) {
+      return [];
+    }
+    return [
+      {
+        label: supportLabel(binding.label, environment, support),
+        status: supportStatus(support),
+        url: sourceUrl(binding.sourceDirectory),
+      },
+    ];
+  });
+}
+
+function exampleSupport(
+  environment: EnvironmentColumn,
+): { label: string; url: string }[] {
+  return supportMatrix.examples.flatMap((example) =>
+    environmentSupport(example, environment.environment)
+      ? [{ label: example.label, url: sourceUrl(example.sourceDirectory) }]
+      : [],
+  );
+}
+---
+
+<p>
+  {statusBadges.map((status) => (
+    <span>
+      <Badge
+        text={status.label}
+        variant={badgeVariant(status.status)}
+        size="small"
+      />{" "}
+    </span>
+  ))}
+</p>
+
+<table>
+  <thead>
+    <tr>
+      <th scope="col">Environment</th>
+      <th scope="col">Backends</th>
+      <th scope="col">Bindings</th>
+      <th scope="col">Examples</th>
+    </tr>
+  </thead>
+  <tbody>
+    {environmentRows.map((environment) => {
+      const bindings = bindingSupport(environment);
+      const examples = exampleSupport(environment);
+      return (
+        <tr>
+          <th scope="row">{environment.label}</th>
+          <td>
+            {environment.backends.map((backend) => (
+              <span>
+                <Badge
+                  text={backend.backendLabel}
+                  variant={badgeVariant(backend.status)}
+                  size="small"
+                />{" "}
+              </span>
+            ))}
+          </td>
+          <td>
+            {bindings.length > 0 ? bindings.map((binding) => (
+              <span>
+                <a class="support-badge-link" href={binding.url}>
+                  <Badge
+                    text={binding.label}
+                    variant={badgeVariant(binding.status)}
+                    size="small"
+                  />
+                </a>{" "}
+              </span>
+            )) : "-"}
+          </td>
+          <td>
+            {examples.length > 0 ? examples.map((example) => (
+              <span>
+                <a class="support-badge-link" href={example.url}>
+                  <Badge
+                    text={example.label}
+                    variant="default"
+                    size="small"
+                  />
+                </a>{" "}
+              </span>
+            )) : "-"}
+          </td>
+        </tr>
+      );
+    })}
+  </tbody>
+</table>
+<p>
+  OpenGL uses WGL on Windows and EGL on other platforms. macOS EGL uses ANGLE.
+</p>
+
+<style>
+.support-badge-link {
+  text-decoration: none;
+}
+</style>

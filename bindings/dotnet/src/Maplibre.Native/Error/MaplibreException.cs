@@ -8,7 +8,7 @@ public class MaplibreException : Exception
         MaplibreStatus status,
         int? rawStatus,
         string diagnostic,
-        Exception? innerException = null
+        Exception? innerException
     )
         : base(MessageFor(status, rawStatus, diagnostic), innerException)
     {

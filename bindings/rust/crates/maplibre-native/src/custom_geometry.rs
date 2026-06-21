@@ -105,41 +105,6 @@ impl CustomGeometrySourceOptions {
         self.cancel_tile = Some(Box::new(cancel_tile));
         self
     }
-
-    pub fn with_min_zoom(mut self, min_zoom: f64) -> Self {
-        self.min_zoom = Some(min_zoom);
-        self
-    }
-
-    pub fn with_max_zoom(mut self, max_zoom: f64) -> Self {
-        self.max_zoom = Some(max_zoom);
-        self
-    }
-
-    pub fn with_tolerance(mut self, tolerance: f64) -> Self {
-        self.tolerance = Some(tolerance);
-        self
-    }
-
-    pub fn with_tile_size(mut self, tile_size: u32) -> Self {
-        self.tile_size = Some(tile_size);
-        self
-    }
-
-    pub fn with_buffer(mut self, buffer: u32) -> Self {
-        self.buffer = Some(buffer);
-        self
-    }
-
-    pub fn with_clip(mut self, clip: bool) -> Self {
-        self.clip = Some(clip);
-        self
-    }
-
-    pub fn with_wrap(mut self, wrap: bool) -> Self {
-        self.wrap = Some(wrap);
-        self
-    }
 }
 
 #[derive(Debug, Default)]
@@ -318,6 +283,7 @@ mod tests {
     }
 
     #[test]
+    // Spec coverage: BND-124.
     fn custom_geometry_callbacks_invoke_fetch_and_cancel_with_copied_tile_id() {
         let fetched = Arc::new(Mutex::new(Vec::new()));
         let cancelled = Arc::new(Mutex::new(Vec::new()));
@@ -349,6 +315,7 @@ mod tests {
     }
 
     #[test]
+    // Spec coverage: BND-121.
     fn custom_geometry_callbacks_contain_panics() {
         let cancel_called = Arc::new(AtomicBool::new(false));
         let cancel_called_callback = Arc::clone(&cancel_called);
@@ -371,6 +338,7 @@ mod tests {
     }
 
     #[test]
+    // Spec coverage: BND-124.
     fn custom_geometry_state_release_waits_for_active_upcalls() {
         let entered = Arc::new((Mutex::new(false), Condvar::new()));
         let release = Arc::new((Mutex::new(false), Condvar::new()));

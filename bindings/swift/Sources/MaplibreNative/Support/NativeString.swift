@@ -1,7 +1,7 @@
 internal import CMaplibreNativeC
 import Foundation
 
-struct NativeStringError: Error, Equatable, Sendable {
+struct NativeStringError: Error, Equatable {
   let message: String
 
   init(_ message: String) {
@@ -10,14 +10,20 @@ struct NativeStringError: Error, Equatable, Sendable {
 }
 
 enum NativeString {
-  static func copyUTF8(data: UnsafePointer<CChar>?, size: UInt) throws -> String {
+  static func copyUTF8(data: UnsafePointer<CChar>?,
+                       size: UInt) throws -> String
+  {
     try copyUTF8(data: data, size: Int(size))
   }
 
-  static func copyUTF8(data: UnsafePointer<CChar>?, size: Int) throws -> String {
+  static func copyUTF8(data: UnsafePointer<CChar>?,
+                       size: Int) throws -> String
+  {
     guard size > 0 else { return "" }
     guard let data else {
-      throw NativeStringError("UTF-8 string view has nil data with non-zero size")
+      throw NativeStringError(
+        "UTF-8 string view has nil data with non-zero size"
+      )
     }
     let bytes = UnsafeBufferPointer(
       start: UnsafeRawPointer(data).assumingMemoryBound(to: UInt8.self),
@@ -48,7 +54,9 @@ enum NativeString {
     _ body: (UnsafePointer<CChar>) throws -> Result
   ) throws -> Result {
     if text.utf8.contains(0) {
-      throw NativeStringError("C string inputs cannot contain embedded NUL bytes")
+      throw NativeStringError(
+        "C string inputs cannot contain embedded NUL bytes"
+      )
     }
     return try text.withCString(body)
   }
@@ -59,7 +67,8 @@ enum NativeString {
   ) throws -> Result {
     let bytes = Array(text.utf8)
     return try bytes.withUnsafeBufferPointer { buffer in
-      let pointer = buffer.baseAddress.map { UnsafeRawPointer($0).assumingMemoryBound(to: CChar.self) }
+      let pointer = buffer.baseAddress
+        .map { UnsafeRawPointer($0).assumingMemoryBound(to: CChar.self) }
       return try body(mln_string_view(data: pointer, size: buffer.count))
     }
   }

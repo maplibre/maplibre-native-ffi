@@ -6,8 +6,8 @@ function(mln_configure_linux_platform target)
   find_package(Threads REQUIRED)
   pkg_search_module(WEBP libwebp REQUIRED)
   pkg_search_module(LIBUV libuv REQUIRED)
-  pkg_search_module(ICUUC icu-uc REQUIRED)
-  pkg_search_module(ICUI18N icu-i18n REQUIRED)
+
+  include("${MLN_SOURCE_DIR}/vendor/icu.cmake")
 
   set(MLN_FFI_VENDOR_LINUX_SOURCES
       ${MLN_SOURCE_DIR}/platform/default/src/mbgl/i18n/collator.cpp
@@ -28,12 +28,22 @@ function(mln_configure_linux_platform target)
 
   mln_target_vendor_sources(${target} ${MLN_FFI_VENDOR_LINUX_SOURCES})
 
+  set_source_files_properties(
+    ${MLN_SOURCE_DIR}/platform/default/src/mbgl/i18n/number_format.cpp
+    PROPERTIES COMPILE_DEFINITIONS MBGL_USE_BUILTIN_ICU)
+
+  target_include_directories(
+    ${target}
+    SYSTEM
+    BEFORE
+    PRIVATE ${MLN_SOURCE_DIR}/vendor/icu/include)
+
   target_include_directories(
     ${target}
     SYSTEM
     PRIVATE
       ${CURL_INCLUDE_DIRS} ${JPEG_INCLUDE_DIRS} ${LIBUV_INCLUDE_DIRS}
-      ${WEBP_INCLUDE_DIRS} ${ICUUC_INCLUDE_DIRS} ${ICUI18N_INCLUDE_DIRS})
+      ${WEBP_INCLUDE_DIRS})
 
   target_link_libraries(
     ${target}
@@ -42,8 +52,7 @@ function(mln_configure_linux_platform target)
       ${JPEG_LIBRARIES}
       ${LIBUV_LIBRARIES}
       ${WEBP_LIBRARIES}
-      ${ICUUC_LIBRARIES}
-      ${ICUI18N_LIBRARIES}
+      mbgl-vendor-icu
       PNG::PNG
       Threads::Threads)
 endfunction()

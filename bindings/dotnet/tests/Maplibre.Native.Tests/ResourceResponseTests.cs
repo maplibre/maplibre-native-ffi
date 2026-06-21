@@ -7,11 +7,13 @@ namespace Maplibre.Native.Tests;
 
 public sealed unsafe class ResourceResponseTests
 {
+    // Support invariant for resource provider callbacks: response byte buffers
+    // are cloned at the binding boundary.
     [Fact]
     public void ResourceResponseClonesBytesAtBoundary()
     {
         var source = new byte[] { 1, 2, 3 };
-        var response = ResourceResponse.Ok(source);
+        var response = new ResourceResponse(ResourceResponseStatus.Ok) { Bytes = source };
         source[0] = 9;
         var copied = response.Bytes;
         copied[1] = 9;
@@ -19,6 +21,8 @@ public sealed unsafe class ResourceResponseTests
         Assert.Equal([1, 2, 3], response.Bytes);
     }
 
+    // Support invariant for resource provider callbacks: native response fields
+    // are materialized with binding-owned storage for the C callback window.
     [Fact]
     public void NativeResourceResponseCopiesOwnedFields()
     {

@@ -1,0 +1,9 @@
+label = "Kotlin/Native"
+source_directory = "bindings/kotlin"
+
+[requires]
+exclude = ["linux-arm64-egl", "linux-arm64-vulkan"]
+os = ["linux", "macos"]
+
+[ci]
+test = "//bindings/kotlin:nativeTest"

@@ -6,36 +6,54 @@ struct SwiftMapApp: App {
   @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
 
   var body: some Scene {
-    WindowGroup {
-      MapView()
-        .frame(minWidth: 640, minHeight: 420)
+    Settings {
+      EmptyView()
     }
-    .windowResizability(.contentMinSize)
   }
 }
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
-  static let willTerminateMapViews = Notification.Name("SwiftMapWillTerminateMapViews")
+  static let willTerminateMapViews = Notification
+    .Name("SwiftMapWillTerminateMapViews")
+  private var window: NSWindow?
 
-  func applicationDidFinishLaunching(_ notification: Notification) {
+  func applicationDidFinishLaunching(_: Notification) {
     NSApp.setActivationPolicy(.regular)
-    NSApp.activate(ignoringOtherApps: true)
     installCAPILogging()
-    logControls()
+    createWindow()
+    NSApp.activate(ignoringOtherApps: true)
   }
 
-  func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
-    NotificationCenter.default.post(name: Self.willTerminateMapViews, object: nil)
+  func applicationShouldTerminateAfterLastWindowClosed(_: NSApplication)
+    -> Bool
+  {
+    true
+  }
+
+  func applicationShouldTerminate(_: NSApplication) -> NSApplication
+    .TerminateReply
+  {
+    NotificationCenter.default.post(
+      name: Self.willTerminateMapViews,
+      object: nil
+    )
     clearCAPILogging()
     return .terminateNow
   }
-}
 
-struct MapView: NSViewRepresentable {
-  func makeNSView(context: Context) -> MetalMapView {
-    MetalMapView()
+  private func createWindow() {
+    let contentRect = NSRect(x: 0, y: 0, width: 960, height: 640)
+    let window = NSWindow(
+      contentRect: contentRect,
+      styleMask: [.titled, .closable, .miniaturizable, .resizable],
+      backing: .buffered,
+      defer: false
+    )
+    window.title = "MapLibre Swift Map"
+    window.contentView = MetalMapView(mode: swiftMapConfiguration.mode)
+    window.center()
+    window.makeKeyAndOrderFront(nil)
+    self.window = window
   }
-
-  func updateNSView(_ nsView: MetalMapView, context: Context) {}
 }

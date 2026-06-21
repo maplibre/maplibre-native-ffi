@@ -15,8 +15,10 @@ fn requestRepaintOnThread(map: *maplibre.MapHandle, out_error: *?anyerror) void 
 fn waitForEvent(runtime: *maplibre.RuntimeHandle, event_type: maplibre.RuntimeEventType) !bool {
     for (0..1000) |_| {
         try runtime.runOnce();
-        while (try runtime.pollEvent()) |event| {
-            if (std.meta.eql(event.event_type, event_type)) return true;
+        while (try runtime.pollEvent(testing.allocator)) |event| {
+            var owned_event = event;
+            defer owned_event.deinit();
+            if (std.meta.eql(owned_event.event_type, event_type)) return true;
         }
         try std.Thread.yield();
     }
@@ -24,7 +26,7 @@ fn waitForEvent(runtime: *maplibre.RuntimeHandle, event_type: maplibre.RuntimeEv
 }
 
 fn createRuntimeAndMap() !struct { runtime: maplibre.RuntimeHandle, map: maplibre.MapHandle } {
-    var runtime = try maplibre.RuntimeHandle.init(null);
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     errdefer runtime.close() catch @panic("runtime close failed");
     const map = try maplibre.MapHandle.create(&runtime, .{});
     return .{ .runtime = runtime, .map = map };
@@ -34,11 +36,11 @@ test "runtime and map vertical slice" {
     var diagnostics = maplibre.DiagnosticStore.init(testing.allocator);
     defer diagnostics.deinit();
 
-    var runtime = try maplibre.RuntimeHandle.init(&diagnostics);
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, &diagnostics);
     defer runtime.close() catch @panic("runtime close failed");
 
     try runtime.runOnce();
-    try testing.expectEqual(@as(?maplibre.RuntimeEvent, null), try runtime.pollEvent());
+    try testing.expectEqual(@as(?maplibre.OwnedRuntimeEvent, null), try runtime.pollEvent(testing.allocator));
 
     var map = try maplibre.MapHandle.create(&runtime, .{});
 
@@ -60,11 +62,32 @@ test "map can close after moving with its runtime" {
     try handles.runtime.close();
 }
 
+test "copied runtime and map handles share closed state" {
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
+    var runtime_alias = runtime;
+    var map = try maplibre.MapHandle.create(&runtime, .{});
+    var map_alias = map;
+    var projection = try maplibre.MapProjectionHandle.create(&map);
+    var projection_alias = projection;
+
+    try projection.close();
+    try projection_alias.close();
+    try testing.expectError(error.ClosedHandle, projection_alias.getCamera());
+
+    try map.close();
+    try map_alias.close();
+    try testing.expectError(error.ClosedHandle, map_alias.id());
+
+    try runtime.close();
+    try runtime_alias.close();
+    try testing.expectError(error.ClosedHandle, runtime_alias.runOnce());
+}
+
 test "successful close releases lifecycle handles" {
     var diagnostics = maplibre.DiagnosticStore.init(testing.allocator);
     defer diagnostics.deinit();
 
-    var runtime = try maplibre.RuntimeHandle.init(&diagnostics);
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, &diagnostics);
     var map = try maplibre.MapHandle.create(&runtime, .{});
     var projection = try maplibre.MapProjectionHandle.create(&map);
 
@@ -80,7 +103,7 @@ test "failed close remains retryable" {
     var diagnostics = maplibre.DiagnosticStore.init(testing.allocator);
     defer diagnostics.deinit();
 
-    var runtime = try maplibre.RuntimeHandle.init(&diagnostics);
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, &diagnostics);
     var map = try maplibre.MapHandle.create(&runtime, .{});
 
     try testing.expectError(error.InvalidState, runtime.close());
@@ -89,7 +112,7 @@ test "failed close remains retryable" {
 }
 
 test "map options validate through public binding" {
-    var runtime = try maplibre.RuntimeHandle.init(null);
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
 
     try testing.expectError(error.InvalidArgument, maplibre.MapHandle.create(&runtime, .{ .width = 0 }));
@@ -98,7 +121,7 @@ test "map options validate through public binding" {
 }
 
 test "continuous repaint request makes render update available" {
-    var runtime = try maplibre.RuntimeHandle.init(null);
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
     var map = try maplibre.MapHandle.create(&runtime, .{});
     defer map.close() catch @panic("map close failed");
@@ -111,7 +134,7 @@ test "wrong-thread map failures propagate diagnostics" {
     var diagnostics = maplibre.DiagnosticStore.init(testing.allocator);
     defer diagnostics.deinit();
 
-    var runtime = try maplibre.RuntimeHandle.init(&diagnostics);
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, &diagnostics);
     defer runtime.close() catch @panic("runtime close failed");
     var map = try maplibre.MapHandle.create(&runtime, .{});
     defer map.close() catch @panic("map close failed");
@@ -125,7 +148,7 @@ test "wrong-thread map failures propagate diagnostics" {
 }
 
 test "runtime supports multiple maps" {
-    var runtime = try maplibre.RuntimeHandle.init(null);
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
 
     var first = try maplibre.MapHandle.create(&runtime, .{});
@@ -137,10 +160,17 @@ test "runtime supports multiple maps" {
 }
 
 test "live map string methods reject embedded NUL before C calls" {
-    var runtime = try maplibre.RuntimeHandle.init(null);
+    var diagnostics = maplibre.DiagnosticStore.init(testing.allocator);
+    defer diagnostics.deinit();
+    try diagnostics.set(-5, "stale native diagnostic");
+
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, &diagnostics);
     defer runtime.close() catch @panic("runtime close failed");
     var map = try maplibre.MapHandle.create(&runtime, .{});
     defer map.close() catch @panic("map close failed");
 
     try testing.expectError(error.InvalidString, map.setStyleJson(testing.allocator, "{\x00}"));
+    const diagnostic = diagnostics.get().?;
+    try testing.expectEqual(@as(?i32, null), diagnostic.raw_status);
+    try testing.expectEqualStrings("style JSON contains embedded NUL", diagnostic.message);
 }

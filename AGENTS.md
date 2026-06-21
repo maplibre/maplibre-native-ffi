@@ -9,7 +9,7 @@ interop or the popular MapLibre Android/iOS SDKs.
 - `include/` — Public C API headers (the stable ABI surface).
 - `src/` — C++ implementation behind the C headers, plus render backend adapters
   (Vulkan, Metal, OpenGL) and the Zig test support shim.
-- `bindings/` — Language bindings (Zig, Rust, Java FFM, Java JNI) that wrap the
+- `bindings/` — Language bindings (Kotlin, Rust, Swift, Zig, .NET) that wrap the
   C API in idiomatic target-language interfaces.
 - `examples/` — Small demo apps per language/backend (`zig-map`, `rust-map`,
   `zig-readback`, `lwjgl-map`, `swift-map`).
@@ -29,17 +29,17 @@ mise tasks --all
 # Build the native library (also runs configure)
 mise run build
 
-# Build and run C API + Zig binding tests (also runs build)
+# Build and run C API tests (also runs build)
 mise run test
 
 # Build and run Rust binding tests (also runs build)
-mise run //bindings/rust:ci
+mise run //bindings/rust:test
 
 # Headless smoke test — no display needed
 mise run //examples/zig-readback:run
 
 # GUI map app — use a brief timeout or run in background
-mise run //examples/zig-map:run
+mise run //examples/zig-map:run:owned-texture
 
 # Build and test for a different variant (override auto-detected env)
 mise -E linux-x64-egl run test
@@ -52,15 +52,16 @@ hk fix [FILES...]
 ```
 
 Available mise envs: `linux-x64-vulkan`, `linux-x64-egl`, `linux-arm64-vulkan`,
-`linux-arm64-egl`, `macos-arm64-metal`, `macos-arm64-vulkan`,
+`linux-arm64-egl`, `macos-arm64-metal`, `macos-arm64-vulkan`, `macos-arm64-egl`,
 `windows-x64-vulkan`, `windows-x64-wgl`. The host-matching variant is selected
 automatically via `.miserc.toml`.
 
 Formatters and linters run automatically on pre-commit; you usually don't need
 to run them manually.
 
-The environment is managed by mise and pixi, so if you need to run a command
-that's not already a mise task, use `mise exec -- pixi run ...`.
+The environment is managed by mise. If you need to run a command that's not
+already a mise task, use `mise exec -- ...` so repository tools and dependency
+paths are available.
 
 ## Pull requests
 
@@ -74,7 +75,8 @@ the PR description if more detail is needed. More context:
 ### General
 
 - Campsite rules apply: leave anything you touch tidier than when you found it.
-- The environment is mostly defined by `mise` and `pixi`.
+- The environment is defined by `mise`; pixi is the current desktop native
+  library provider behind mise-managed paths.
 - The bindings are meant to be low level and broadly analogous to each other and
   to the C API, exposing MapLibre concepts directly, while following language
   conventions for memory and thread safety. Prioritize safety, similarity, and
@@ -100,7 +102,7 @@ safety rules, and hard boundaries.
 
 ### Specifications
 
-For [specification writing](docs/src/content/docs/development/specifications/):
+For specification writing:
 
 - Standalone and testable: each requirement should be checkable on its own,
   without pointing at an example or the current tree.
@@ -111,14 +113,13 @@ For [specification writing](docs/src/content/docs/development/specifications/):
 
 ### Testing
 
-- The Zig bindings tests are also the primary integration test suite for the
-  C/C++ layer.
-- For tests that _must_ reach below the bindings, there are dedicated tests in
-  src/c_api/tests.
-- Other bindings (Rust, Java, Swift, etc) should include useful integration
-  tests that validate binding behavior through the native C/C++ layer.
-  Incidental native coverage from those integration tests is acceptable; chasing
-  duplicate full C/C++ coverage in every binding is unnecessary.
+- The bindings tests include broad integration coverage for the C/C++ layer on
+  targets where they run.
+- For tests that _must_ reach below the bindings, there are dedicated Zig tests
+  in src/c_api/tests.
+- Each binding's test suite should stand on its own for the C API domains and
+  targets it supports, using public binding APIs to validate both native
+  workflows and binding-owned safety behavior.
 - Avoid trivial tests, tests that verify constants, tests that assert a negative
   (unless valuable), tests that simply test third party code; we want to keep
   our test suite robust and high-value.
@@ -130,8 +131,10 @@ For [specification writing](docs/src/content/docs/development/specifications/):
 
 Read these docs before changing related code:
 
-- [Specifications](docs/src/content/docs/development/specifications/) for
-  example and binding requirements.
+- [Binding Specification](docs/src/content/docs/development/binding-specification.md)
+  for binding requirements and language binding changes.
+- [Map Example Specification](docs/src/content/docs/development/map-example-specification.md)
+  for example requirements.
 - [Overview](docs/src/content/docs/development/overview.md) for project layout,
   workflow, and tooling.
 - [Concepts](docs/src/content/docs/concepts.md) for project scope, ownership,
@@ -139,10 +142,6 @@ Read these docs before changing related code:
 - [C API Conventions](docs/src/content/docs/development/c-conventions.md) before
   changing public C headers, C ABI behavior, callbacks, diagnostics, or render
   target contracts.
-- [Binding Conventions](docs/src/content/docs/development/bindings.md) and the
-  relevant language-specific binding note in
-  `docs/src/content/docs/development/bindings-*.md` before changing a language
-  binding or its generated reference docs.
 
 ## External Docs
 

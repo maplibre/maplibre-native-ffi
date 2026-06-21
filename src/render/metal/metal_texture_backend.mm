@@ -10,6 +10,7 @@
 #include <Metal/MTLCommandBuffer.hpp>
 #include <Metal/MTLCommandQueue.hpp>
 #include <Metal/MTLRenderPass.hpp>
+#include <TargetConditionals.h>
 
 #include "render/metal/metal_texture_backend.inc"
 
@@ -225,9 +226,7 @@ MetalTextureBackend::MetalTextureBackend(
 }
 
 MetalTextureBackend::~MetalTextureBackend() {
-  auto guard = mbgl::gfx::BackendScope{
-    *this, mbgl::gfx::BackendScope::ScopeType::Implicit
-  };
+  auto guard = mbgl::gfx::BackendScope{*this};
   resource.reset();
   context.reset();
 }

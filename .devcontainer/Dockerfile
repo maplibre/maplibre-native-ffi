@@ -7,13 +7,16 @@ SHELL ["/bin/bash", "-euo", "pipefail", "-c"]
 RUN apt-get update \
   && apt-get install --no-install-recommends --yes \
     bash \
+    build-essential \
     ca-certificates \
     curl \
     git \
     libegl-mesa0 \
     libgl1-mesa-dri \
     libicu72 \
+    libvulkan1 \
     mesa-utils \
+    mesa-vulkan-drivers \
     sudo \
   && rm -rf /var/lib/apt/lists/*
 

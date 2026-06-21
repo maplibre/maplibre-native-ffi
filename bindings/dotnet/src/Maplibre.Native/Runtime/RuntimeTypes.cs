@@ -137,5 +137,17 @@ public abstract record RuntimeEventPayload
         bool Found
     ) : RuntimeEventPayload;
 
-    public sealed record Unknown(uint RawPayloadType, nuint PayloadSize) : RuntimeEventPayload;
+    public sealed record Unknown : RuntimeEventPayload
+    {
+        private readonly byte[] payloadBytes;
+
+        public Unknown(uint RawPayloadType, byte[] PayloadBytes)
+        {
+            this.RawPayloadType = RawPayloadType;
+            payloadBytes = PayloadBytes is null ? [] : (byte[])PayloadBytes.Clone();
+        }
+
+        public uint RawPayloadType { get; }
+        public byte[] PayloadBytes => (byte[])payloadBytes.Clone();
+    }
 }

@@ -105,9 +105,7 @@ auto texture_read_premultiplied_rgba8(
     set_thread_error("texture session renderer backend is not available");
     return MLN_STATUS_INVALID_STATE;
   }
-  auto guard = mbgl::gfx::BackendScope{
-    *renderer_backend, mbgl::gfx::BackendScope::ScopeType::Implicit
-  };
+  auto guard = mbgl::gfx::BackendScope{*renderer_backend};
   auto image = texture->texture.backend->headless_backend().readStillImage();
   if (!image.valid()) {
     set_thread_error("texture readback did not produce an image");

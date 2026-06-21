@@ -1,0 +1,199 @@
+#!/usr/bin/env -S uv run --script
+# MISE description="Generate the GitHub Actions CI workflow from CI manifests."
+# /// script
+# dependencies = ["pydantic==2.13.4", "pyyaml==6.0.3"]
+# ///
+
+import argparse
+import difflib
+import pathlib
+import sys
+
+import yaml
+
+
+REPO_ROOT = pathlib.Path(__file__).resolve().parents[3]
+WORKFLOW_PATH = REPO_ROOT / ".github" / "workflows" / "ci.yml"
+sys.path.insert(0, str(REPO_ROOT))
+
+from ci.manifest import (  # noqa: E402
+    Variant,
+    load_subprojects,
+    load_variants,
+    subproject_matches_variant,
+)
+
+CHECKOUT_ACTION = "actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10"
+
+
+def load_commands(variants: list[Variant]) -> dict[str, list[str]]:
+    commands = {variant.name: [] for variant in variants}
+
+    for subproject in load_subprojects(variants):
+        tasks = subproject.manifest.ci.model_dump(exclude_none=True)
+
+        for variant in variants:
+            if not subproject_matches_variant(subproject, variant):
+                continue
+            for action_key, task in tasks.items():
+                if (
+                    action_key == "build"
+                    and tasks.get("test")
+                    and variant.supports_tests
+                ):
+                    continue
+                if action_key == "test" and not variant.supports_tests:
+                    continue
+                commands[variant.name].append(f"mise run {task}")
+
+    return commands
+
+
+def variant_job_id(variant: Variant) -> str:
+    return f"variant-{variant.name}"
+
+
+def checkout_step(*, persist_credentials: bool = False) -> dict[str, object]:
+    step: dict[str, object] = {"uses": CHECKOUT_ACTION}
+    if not persist_credentials:
+        step["with"] = {"persist-credentials": False}
+    return step
+
+
+def setup_steps(*, persist_credentials: bool = False) -> list[dict[str, object]]:
+    return [
+        checkout_step(persist_credentials=persist_credentials),
+        {"uses": "./.github/actions/setup-ci-deps"},
+    ]
+
+
+class LiteralString(str):
+    pass
+
+
+class WorkflowDumper(yaml.SafeDumper):
+    def increase_indent(self, flow: bool = False, indentless: bool = False) -> None:
+        return super().increase_indent(flow, False)
+
+
+def represent_literal_string(dumper: yaml.Dumper, data: LiteralString) -> yaml.Node:
+    return dumper.represent_scalar("tag:yaml.org,2002:str", data, style="|")
+
+
+WorkflowDumper.add_representer(LiteralString, represent_literal_string)
+
+
+def render_workflow(variants: list[Variant], commands: dict[str, list[str]]) -> str:
+    jobs = {
+        "hygiene": {
+            "name": "hygiene",
+            "runs-on": "ubuntu-latest",
+            "timeout-minutes": 30,
+            "steps": [
+                *setup_steps(),
+                {"run": "mise run ci:lint"},
+            ],
+        },
+        "docs": {
+            "name": "docs",
+            "runs-on": "ubuntu-latest",
+            "timeout-minutes": 60,
+            "steps": [
+                *setup_steps(),
+                {"run": "mise run //docs:build"},
+            ],
+        },
+    }
+
+    for variant in variants:
+        variant_commands = commands[variant.name]
+
+        jobs[variant_job_id(variant)] = {
+            "name": f"variant / {variant.name}",
+            "runs-on": variant.runner,
+            "timeout-minutes": 120,
+            "env": {"MISE_ENV": variant.name},
+            "steps": [
+                *setup_steps(),
+                {"run": "mise run configure"},
+                *({"run": command} for command in variant_commands),
+            ],
+        }
+
+    jobs["required"] = {
+        "name": "ci-required",
+        "runs-on": "ubuntu-latest",
+        "timeout-minutes": 5,
+        "if": "${{ always() }}",
+        "needs": [
+            "hygiene",
+            "docs",
+            *(variant_job_id(variant) for variant in variants),
+        ],
+        "steps": [
+            {
+                "name": "Fail if required jobs failed",
+                "if": "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || contains(needs.*.result, 'skipped') }}",
+                "run": LiteralString("echo '${{ toJSON(needs) }}'\nexit 1\n"),
+            },
+            {"run": "true"},
+        ],
+    }
+
+    workflow = {
+        "name": "CI",
+        "on": {
+            "push": {"branches": ["main"]},
+            "pull_request": {"branches": ["main"]},
+        },
+        "permissions": {"contents": "read"},
+        "concurrency": {
+            "group": "${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}",
+            "cancel-in-progress": "${{ github.event_name == 'pull_request' }}",
+        },
+        "jobs": jobs,
+    }
+    rendered = yaml.dump(
+        workflow,
+        Dumper=WorkflowDumper,
+        default_flow_style=False,
+        sort_keys=False,
+        width=4096,
+    )
+    return f"# Generated by `mise run ci:generate-workflow`. Do not edit directly.\n{rendered}"
+
+
+def check_workflow(expected: str) -> int:
+    actual = WORKFLOW_PATH.read_text() if WORKFLOW_PATH.exists() else ""
+    if actual == expected:
+        return 0
+    diff = difflib.unified_diff(
+        actual.splitlines(keepends=True),
+        expected.splitlines(keepends=True),
+        fromfile=str(WORKFLOW_PATH),
+        tofile=f"{WORKFLOW_PATH} (generated)",
+    )
+    sys.stderr.writelines(diff)
+    return 1
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--check", action="store_true", help="fail if the workflow is not up to date"
+    )
+    args = parser.parse_args()
+
+    variants = load_variants()
+    commands = load_commands(variants)
+    rendered = render_workflow(variants, commands)
+
+    if args.check:
+        return check_workflow(rendered)
+
+    WORKFLOW_PATH.write_text(rendered)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

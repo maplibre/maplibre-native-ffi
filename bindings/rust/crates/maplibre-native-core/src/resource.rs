@@ -151,31 +151,6 @@ impl ResourceResponse {
             ..Self::default()
         }
     }
-
-    pub fn with_must_revalidate(mut self, must_revalidate: bool) -> Self {
-        self.must_revalidate = must_revalidate;
-        self
-    }
-
-    pub fn with_modified_unix_ms(mut self, modified_unix_ms: i64) -> Self {
-        self.modified_unix_ms = Some(modified_unix_ms);
-        self
-    }
-
-    pub fn with_expires_unix_ms(mut self, expires_unix_ms: i64) -> Self {
-        self.expires_unix_ms = Some(expires_unix_ms);
-        self
-    }
-
-    pub fn with_etag(mut self, etag: impl Into<String>) -> Self {
-        self.etag = Some(etag.into());
-        self
-    }
-
-    pub fn with_retry_after_unix_ms(mut self, retry_after_unix_ms: i64) -> Self {
-        self.retry_after_unix_ms = Some(retry_after_unix_ms);
-        self
-    }
 }
 
 impl Default for ResourceResponse {
@@ -438,15 +413,16 @@ impl ResourceRequestHandleState {
             return Err(Error::invalid_argument("ResourceRequestHandle is closed"));
         }
 
-        // SAFETY: handle is live while not closed/released, and native response
-        // points to storage retained for this call. The C API copies contents.
-        crate::check(unsafe { (self.fns.complete)(Self::handle_ptr(&inner), native.as_ptr()) })?;
         inner.completed = true;
         inner.closed = true;
+        // SAFETY: handle is live while not closed/released, and native response
+        // points to storage retained for this call. The C API copies contents.
+        let status = unsafe { (self.fns.complete)(Self::handle_ptr(&inner), native.as_ptr()) };
+        let result = crate::check(status);
         if inner.decision_finalized && inner.provider_owned {
             self.release_if_owned_locked(&mut inner);
         }
-        Ok(())
+        result
     }
 
     pub fn is_cancelled(&self) -> Result<bool> {
@@ -580,20 +556,25 @@ pub unsafe fn copy_resource_transform_request(
 mod tests {
     use std::ffi::CString;
     use std::sync::Mutex as StdMutex;
-    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::atomic::{AtomicBool, AtomicI32, AtomicUsize, Ordering};
+    use std::time::{Duration, Instant};
 
     use super::*;
 
     static HANDLE_TEST_LOCK: StdMutex<()> = StdMutex::new(());
     static COMPLETE_COUNT: AtomicUsize = AtomicUsize::new(0);
     static RELEASE_COUNT: AtomicUsize = AtomicUsize::new(0);
+    static COMPLETE_STATUS: AtomicI32 = AtomicI32::new(sys::MLN_STATUS_OK);
+    static CANCELLED_SLEEP_MS: AtomicUsize = AtomicUsize::new(0);
+    static CANCELLED_STARTED: AtomicBool = AtomicBool::new(false);
+    static CANCELLED_FINISHED: AtomicBool = AtomicBool::new(false);
 
     unsafe extern "C" fn fake_complete(
         _handle: *mut sys::mln_resource_request_handle,
         _response: *const sys::mln_resource_response,
     ) -> sys::mln_status {
         COMPLETE_COUNT.fetch_add(1, Ordering::SeqCst);
-        sys::MLN_STATUS_OK
+        COMPLETE_STATUS.load(Ordering::SeqCst)
     }
 
     unsafe extern "C" fn fake_cancelled(
@@ -602,6 +583,12 @@ mod tests {
     ) -> sys::mln_status {
         if out_cancelled.is_null() {
             return sys::MLN_STATUS_INVALID_ARGUMENT;
+        }
+        let sleep_ms = CANCELLED_SLEEP_MS.load(Ordering::SeqCst);
+        if sleep_ms != 0 {
+            CANCELLED_STARTED.store(true, Ordering::SeqCst);
+            std::thread::sleep(Duration::from_millis(sleep_ms as u64));
+            CANCELLED_FINISHED.store(true, Ordering::SeqCst);
         }
         // SAFETY: out_cancelled is non-null and points to caller-owned output storage.
         unsafe { *out_cancelled = false };
@@ -620,6 +607,10 @@ mod tests {
     fn fake_state() -> Arc<ResourceRequestHandleState> {
         COMPLETE_COUNT.store(0, Ordering::SeqCst);
         RELEASE_COUNT.store(0, Ordering::SeqCst);
+        COMPLETE_STATUS.store(sys::MLN_STATUS_OK, Ordering::SeqCst);
+        CANCELLED_SLEEP_MS.store(0, Ordering::SeqCst);
+        CANCELLED_STARTED.store(false, Ordering::SeqCst);
+        CANCELLED_FINISHED.store(false, Ordering::SeqCst);
         // SAFETY: Non-null sentinel handle is used only by fake functions.
         unsafe {
             ResourceRequestHandleState::new(
@@ -702,12 +693,12 @@ mod tests {
 
     #[test]
     fn resource_response_materializes_error_and_cache_fields() {
-        let response = ResourceResponse::error(ResourceErrorReason::RateLimit, "slow down")
-            .with_must_revalidate(true)
-            .with_modified_unix_ms(10)
-            .with_expires_unix_ms(20)
-            .with_etag("v1")
-            .with_retry_after_unix_ms(30);
+        let mut response = ResourceResponse::error(ResourceErrorReason::RateLimit, "slow down");
+        response.must_revalidate = true;
+        response.modified_unix_ms = Some(10);
+        response.expires_unix_ms = Some(20);
+        response.etag = Some("v1".into());
+        response.retry_after_unix_ms = Some(30);
 
         let native = resource_response_to_native(&response).unwrap();
         let raw = native.as_ref();
@@ -764,6 +755,59 @@ mod tests {
 
         assert_eq!(error.kind(), ErrorKind::InvalidState);
         assert_eq!(COMPLETE_COUNT.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn request_handle_completion_that_reaches_c_is_terminal_on_error() {
+        let _guard = HANDLE_TEST_LOCK.lock().unwrap();
+        let state = fake_state();
+        assert_eq!(
+            state.finish_provider_decision(ResourceProviderDecision::Handle),
+            sys::MLN_RESOURCE_PROVIDER_DECISION_HANDLE
+        );
+        COMPLETE_STATUS.store(sys::MLN_STATUS_INVALID_STATE, Ordering::SeqCst);
+
+        let error = state
+            .complete(&ResourceResponse::ok([1, 2, 3]))
+            .unwrap_err();
+
+        assert_eq!(error.kind(), ErrorKind::InvalidState);
+        assert_eq!(COMPLETE_COUNT.load(Ordering::SeqCst), 1);
+        assert_eq!(RELEASE_COUNT.load(Ordering::SeqCst), 1);
+        let error = state
+            .complete(&ResourceResponse::ok([4, 5, 6]))
+            .unwrap_err();
+        assert_eq!(error.kind(), ErrorKind::InvalidState);
+        assert_eq!(COMPLETE_COUNT.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn request_release_waits_for_in_flight_cancellation_check() {
+        let _guard = HANDLE_TEST_LOCK.lock().unwrap();
+        let state = fake_state();
+        assert_eq!(
+            state.finish_provider_decision(ResourceProviderDecision::Handle),
+            sys::MLN_RESOURCE_PROVIDER_DECISION_HANDLE
+        );
+        CANCELLED_SLEEP_MS.store(50, Ordering::SeqCst);
+        let thread_state = Arc::clone(&state);
+        let thread = std::thread::spawn(move || {
+            thread_state.is_cancelled().unwrap();
+        });
+        let started_deadline = Instant::now() + Duration::from_secs(5);
+        while !CANCELLED_STARTED.load(Ordering::SeqCst) {
+            assert!(
+                Instant::now() < started_deadline,
+                "timed out waiting for cancellation check to start"
+            );
+            std::thread::yield_now();
+        }
+
+        state.close();
+
+        assert!(CANCELLED_FINISHED.load(Ordering::SeqCst));
+        assert_eq!(RELEASE_COUNT.load(Ordering::SeqCst), 1);
+        thread.join().unwrap();
     }
 
     #[test]

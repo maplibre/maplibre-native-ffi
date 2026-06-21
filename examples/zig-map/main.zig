@@ -12,7 +12,8 @@ const render = @import("render/mod.zig");
 const types = @import("types.zig");
 const viewport = @import("viewport.zig");
 
-const Backend = render.Backend;
+const RenderTarget = render.RenderTarget;
+const uses_egl = build_options.supports_opengl and (builtin.os.tag == .linux or builtin.os.tag == .macos);
 
 pub fn main(init_args: std.process.Init) !void {
     const target_mode = (try parseRenderTargetMode(init_args)) orelse return;
@@ -21,7 +22,7 @@ pub fn main(init_args: std.process.Init) !void {
     try maplibre.setLogCallback(.{ .handler = diagnostics.logRecord }, null);
     defer maplibre.clearLogCallback(null) catch {};
 
-    if (build_options.supports_opengl and builtin.os.tag == .linux) {
+    if (uses_egl) {
         _ = c.SDL_SetHint(c.SDL_HINT_VIDEO_FORCE_EGL, "1");
     }
 
@@ -31,7 +32,7 @@ pub fn main(init_args: std.process.Init) !void {
     }
     defer c.SDL_Quit();
 
-    if (build_options.supports_opengl and builtin.os.tag == .linux) {
+    if (uses_egl) {
         if (!c.SDL_GL_SetAttribute(c.SDL_GL_CONTEXT_PROFILE_MASK, c.SDL_GL_CONTEXT_PROFILE_ES) or
             !c.SDL_GL_SetAttribute(c.SDL_GL_CONTEXT_MAJOR_VERSION, 3) or
             !c.SDL_GL_SetAttribute(c.SDL_GL_CONTEXT_MINOR_VERSION, 0))
@@ -41,7 +42,7 @@ pub fn main(init_args: std.process.Init) !void {
         }
     }
 
-    const window_flags = Backend.window_flags |
+    const window_flags = RenderTarget.window_flags |
         c.SDL_WINDOW_RESIZABLE |
         c.SDL_WINDOW_HIGH_PIXEL_DENSITY;
     const window = c.SDL_CreateWindow(
@@ -57,6 +58,7 @@ pub fn main(init_args: std.process.Init) !void {
     defer c.SDL_DestroyWindow(window);
 
     const window_handle = window.?;
+    _ = c.SDL_RaiseWindow(window_handle);
     var current_viewport = viewport.get(window_handle);
     viewport.log("initial viewport", current_viewport);
 
@@ -64,12 +66,9 @@ pub fn main(init_args: std.process.Init) !void {
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
-    var backend = try Backend.init(allocator, window_handle, current_viewport, target_mode);
-    defer backend.deinit();
-
-    var map = try map_state.MapState.init(allocator, current_viewport, &backend);
+    var map = try map_state.MapState.init(allocator, window_handle, current_viewport, target_mode);
     defer map.deinit();
-    defer backend.finishFrame() catch |err| {
+    defer map.finishFrame() catch |err| {
         std.debug.print("failed to finish final frame: {s}\n", .{@errorName(err)});
     };
 
@@ -80,6 +79,7 @@ pub fn main(init_args: std.process.Init) !void {
     var has_presented_frame = false;
     var render_pending = true;
     var input_controller = input.Controller{};
+    // TODO(map-example-spec): Replace poll-and-sleep with a display-paced host loop. See Frame loop.
     while (running) {
         const pool = if (build_options.supports_metal) objc.AutoreleasePool.init() else {};
         defer if (build_options.supports_metal) pool.deinit();
@@ -97,10 +97,9 @@ pub fn main(init_args: std.process.Init) !void {
                 => {
                     current_viewport = viewport.get(window_handle);
                     viewport.log("resized viewport", current_viewport);
-                    if (backend.needsRenderTargetReattachOnResize()) {
-                        try map.resizeWithReattachedTarget(current_viewport, &backend);
+                    if (map.needsReattachOnResize()) {
+                        try map.resizeWithReattachedTarget(window_handle, current_viewport, target_mode);
                     } else {
-                        try backend.resize(current_viewport);
                         try map.resize(current_viewport);
                     }
                     render_pending = true;
@@ -122,21 +121,13 @@ pub fn main(init_args: std.process.Init) !void {
         render_pending = render_pending or render_update_available;
         did_work = did_work or render_update_available;
 
-        try backend.finishFrame();
+        try map.finishFrame();
 
         if (render_pending) {
-            if (try map.target.renderUpdate(map.diagnostic_store)) {
+            if (try map.renderUpdate(current_viewport)) {
                 render_pending = false;
                 did_work = true;
-                switch (map.target) {
-                    .none => {},
-                    .texture => |*texture| {
-                        if (try backend.drawTexture(texture, current_viewport)) {
-                            has_presented_frame = true;
-                        }
-                    },
-                    .surface => has_presented_frame = true,
-                }
+                has_presented_frame = true;
             }
         }
 

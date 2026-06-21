@@ -6,6 +6,12 @@ function(mln_configure_metal_backend target)
       ${PROJECT_SOURCE_DIR}/src/render/metal/metal_texture_backend.mm
       ${PROJECT_SOURCE_DIR}/src/render/metal/metal_surface_session.mm)
 
+  if(CMAKE_SYSTEM_NAME STREQUAL "iOS"
+     AND CMAKE_OSX_SYSROOT MATCHES "[iI][pP]hone[Ss]imulator")
+    list(APPEND MLN_FFI_METAL_SOURCES
+         ${PROJECT_SOURCE_DIR}/src/render/metal/ios_simulator_metal_symbols.m)
+  endif()
+
   mln_target_vendor_sources(${target} ${MLN_FFI_VENDOR_METAL_SOURCES})
   mln_target_project_sources(${target} ${MLN_FFI_METAL_SOURCES})
 

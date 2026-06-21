@@ -1,18 +1,36 @@
 using System.Runtime.InteropServices;
 using Maplibre.Native.Internal.C;
 using Maplibre.Native.Internal.Loader;
+using Maplibre.Native.Internal.Memory;
 using Maplibre.Native.Internal.Status;
 using Maplibre.Native.Log;
 
 namespace Maplibre.Native.Internal.Callback;
 
+internal unsafe delegate mln_status LogSetCallback(
+    delegate* unmanaged[Cdecl]<void*, uint, uint, long, sbyte*, uint> callback,
+    void* userData
+);
+
+internal delegate mln_status LogClearCallback();
+
 internal sealed unsafe class LogCallbackState : IDisposable
 {
+    private static readonly LogSetCallback DefaultSetCallback = static (callback, userData) =>
+        NativeMethods.mln_log_set_callback(callback, userData);
+    private static readonly LogClearCallback DefaultClearCallback = static () =>
+        NativeMethods.mln_log_clear_callback();
     private static readonly Lock Gate = new();
     private static readonly Lock RegistryGate = new();
     private static readonly Dictionary<nint, LogCallbackState> Registry = [];
     private static LogCallbackState? current;
     private static nint nextToken;
+
+    [ThreadStatic]
+    private static LogSetCallback? setCallbackForTest;
+
+    [ThreadStatic]
+    private static LogClearCallback? clearCallbackForTest;
 
     private readonly nint token;
     private readonly LogCallback callback;
@@ -42,9 +60,7 @@ internal sealed unsafe class LogCallbackState : IDisposable
         {
             try
             {
-                NativeStatus.Check(
-                    NativeMethods.mln_log_set_callback(&OnLog, replacement.UserData)
-                );
+                NativeStatus.Check(SetCallback(&OnLog, replacement.UserData));
                 var old = current;
                 current = replacement;
                 old?.Retire();
@@ -62,10 +78,57 @@ internal sealed unsafe class LogCallbackState : IDisposable
         NativeLibraryLoader.EnsureLoaded();
         lock (Gate)
         {
-            NativeStatus.Check(NativeMethods.mln_log_clear_callback());
+            NativeStatus.Check(ClearCallback());
             var old = current;
             current = null;
             old?.Retire();
+        }
+    }
+
+    internal static LogCallbackState? CurrentForTest => current;
+
+    internal bool IsRetiredForTest => retired;
+
+    internal static uint EmitForTest(uint severity, uint @event, long code, string message)
+    {
+        using var nativeMessage = NativeUtf8String.FromNullableString(message, nameof(message));
+        var state = current;
+        return state is null ? 0 : state.Invoke(severity, @event, code, nativeMessage.Pointer);
+    }
+
+    internal static LogCallbackState? StateForTokenForTest(nint token)
+    {
+        lock (RegistryGate)
+        {
+            return Registry.GetValueOrDefault(token);
+        }
+    }
+
+    internal static IDisposable UseCallbackMethodsForTest(
+        LogSetCallback setCallback,
+        LogClearCallback clearCallback
+    )
+    {
+        var previousSet = setCallbackForTest;
+        var previousClear = clearCallbackForTest;
+        setCallbackForTest = setCallback;
+        clearCallbackForTest = clearCallback;
+        return new RestoreCallbackMethods(previousSet, previousClear);
+    }
+
+    private static LogSetCallback SetCallback => setCallbackForTest ?? DefaultSetCallback;
+
+    private static LogClearCallback ClearCallback => clearCallbackForTest ?? DefaultClearCallback;
+
+    private sealed class RestoreCallbackMethods(
+        LogSetCallback? previousSet,
+        LogClearCallback? previousClear
+    ) : IDisposable
+    {
+        public void Dispose()
+        {
+            setCallbackForTest = previousSet;
+            clearCallbackForTest = previousClear;
         }
     }
 

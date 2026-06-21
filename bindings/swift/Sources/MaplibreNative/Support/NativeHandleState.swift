@@ -13,7 +13,10 @@ final class NativeHandleState: @unchecked Sendable {
 
   init(typeName: String, pointer: OpaquePointer?) throws {
     guard let pointer else {
-      throw NativeStatusFailure(rawStatus: 0, diagnostic: "\(typeName) native handle is null")
+      throw NativeStatusFailure(
+        rawStatus: 0,
+        diagnostic: "\(typeName) native handle is null"
+      )
     }
     self.typeName = typeName
     state = .live(pointer)
@@ -36,12 +39,18 @@ final class NativeHandleState: @unchecked Sendable {
   func requireLive() throws -> OpaquePointer {
     try lock.withLock {
       switch state {
-      case .live(let pointer):
+      case let .live(pointer):
         return pointer
       case .closing:
-        throw NativeStatusFailure(rawStatus: 0, diagnostic: "\(typeName) is closing")
+        throw NativeStatusFailure(
+          rawStatus: 0,
+          diagnostic: "\(typeName) is closing"
+        )
       case .closed:
-        throw NativeStatusFailure(rawStatus: 0, diagnostic: "\(typeName) is closed")
+        throw NativeStatusFailure(
+          rawStatus: 0,
+          diagnostic: "\(typeName) is closed"
+        )
       }
     }
   }
@@ -49,11 +58,14 @@ final class NativeHandleState: @unchecked Sendable {
   func closeOnce(_ destroy: (OpaquePointer) throws -> Void) throws {
     let livePointer: OpaquePointer? = try lock.withLock {
       switch state {
-      case .live(let pointer):
+      case let .live(pointer):
         state = .closing(pointer)
         return pointer
       case .closing:
-        throw NativeStatusFailure(rawStatus: 0, diagnostic: "\(typeName) is closing")
+        throw NativeStatusFailure(
+          rawStatus: 0,
+          diagnostic: "\(typeName) is closing"
+        )
       case .closed:
         return nil
       }
@@ -75,7 +87,7 @@ final class NativeHandleState: @unchecked Sendable {
 
   private var leakPointer: OpaquePointer? {
     switch state {
-    case .live(let pointer), .closing(let pointer):
+    case let .live(pointer), let .closing(pointer):
       pointer
     case .closed:
       nil

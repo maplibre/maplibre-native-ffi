@@ -1,0 +1,94 @@
+[variants.linux-arm64-egl]
+runner = "ubuntu-24.04-arm"
+os = "linux"
+arch = "arm64"
+backend = "opengl"
+
+[variants.linux-arm64-vulkan]
+runner = "ubuntu-24.04-arm"
+os = "linux"
+arch = "arm64"
+backend = "vulkan"
+
+[variants.linux-x64-egl]
+runner = "ubuntu-latest"
+os = "linux"
+arch = "x64"
+backend = "opengl"
+
+[variants.linux-x64-vulkan]
+runner = "ubuntu-latest"
+os = "linux"
+arch = "x64"
+backend = "vulkan"
+
+[variants.macos-arm64-metal]
+runner = "macos-26"
+os = "macos"
+arch = "arm64"
+backend = "metal"
+
+[variants.macos-arm64-vulkan]
+runner = "macos-26"
+os = "macos"
+arch = "arm64"
+backend = "vulkan"
+
+[variants.macos-arm64-egl]
+runner = "macos-26"
+os = "macos"
+arch = "arm64"
+backend = "opengl"
+
+[variants.android-arm64-egl]
+runner = "ubuntu-latest"
+os = "android"
+arch = "arm64"
+backend = "opengl"
+supports_tests = false
+
+[variants.android-arm64-vulkan]
+runner = "ubuntu-latest"
+os = "android"
+arch = "arm64"
+backend = "vulkan"
+supports_tests = false
+
+[variants.ios-arm64-metal]
+runner = "macos-26"
+os = "ios"
+arch = "arm64"
+backend = "metal"
+supports_tests = false
+
+[variants.ios-simulator-arm64-metal]
+runner = "macos-26"
+os = "ios"
+arch = "arm64"
+backend = "metal"
+
+[variants.ohos-arm64-egl]
+runner = "ubuntu-latest"
+os = "ohos"
+arch = "arm64"
+backend = "opengl"
+supports_tests = false
+
+[variants.ohos-arm64-vulkan]
+runner = "ubuntu-latest"
+os = "ohos"
+arch = "arm64"
+backend = "vulkan"
+supports_tests = false
+
+[variants.windows-x64-vulkan]
+runner = "windows-2022"
+os = "windows"
+arch = "x64"
+backend = "vulkan"
+
+[variants.windows-x64-wgl]
+runner = "windows-2022"
+os = "windows"
+arch = "x64"
+backend = "opengl"

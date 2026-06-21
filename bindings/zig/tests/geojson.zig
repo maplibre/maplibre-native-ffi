@@ -7,8 +7,10 @@ const support = @import("support.zig");
 fn waitForEvent(runtime: *maplibre.RuntimeHandle, event_type: maplibre.RuntimeEventType) !bool {
     for (0..1000) |_| {
         try runtime.runOnce();
-        while (try runtime.pollEvent()) |event| {
-            if (std.meta.eql(event.event_type, event_type)) return true;
+        while (try runtime.pollEvent(testing.allocator)) |event| {
+            var owned_event = event;
+            defer owned_event.deinit();
+            if (std.meta.eql(owned_event.event_type, event_type)) return true;
         }
         try std.Thread.yield();
     }
@@ -31,7 +33,7 @@ fn expectListContains(list: maplibre.StringList, expected: []const u8) !void {
 }
 
 test "GeoJSON descriptors add and update sources through public binding" {
-    var runtime = try maplibre.RuntimeHandle.init(null);
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
     var map = try createLoadedMap(&runtime);
     defer map.close() catch @panic("map close failed");
@@ -66,7 +68,7 @@ test "GeoJSON descriptors add and update sources through public binding" {
 }
 
 test "geometry descriptor graphs support nested collections" {
-    var runtime = try maplibre.RuntimeHandle.init(null);
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
     var map = try createLoadedMap(&runtime);
     defer map.close() catch @panic("map close failed");
@@ -92,7 +94,7 @@ test "geometry descriptor graphs support nested collections" {
 }
 
 test "GeoJSON descriptors reject invalid native values and pass explicit-length strings" {
-    var runtime = try maplibre.RuntimeHandle.init(null);
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
     var map = try createLoadedMap(&runtime);
     defer map.close() catch @panic("map close failed");
@@ -118,7 +120,7 @@ test "GeoJSON descriptors reject invalid native values and pass explicit-length 
 }
 
 test "geometry coordinate spans remain stable across nested materialization" {
-    var runtime = try maplibre.RuntimeHandle.init(null);
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
     var map = try createLoadedMap(&runtime);
     defer map.close() catch @panic("map close failed");

@@ -8,6 +8,19 @@ using Maplibre.Native.Query;
 
 namespace Maplibre.Native.Internal.Struct;
 
+internal unsafe delegate mln_status FeatureQueryResultCount(
+    mln_feature_query_result* result,
+    nuint* outCount
+);
+
+internal unsafe delegate mln_status FeatureQueryResultGet(
+    mln_feature_query_result* result,
+    nuint index,
+    mln_queried_feature* outFeature
+);
+
+internal unsafe delegate void FeatureQueryResultDestroy(mln_feature_query_result* result);
+
 internal sealed unsafe class NativeRenderedQueryGeometry : IDisposable
 {
     private nint points;
@@ -239,6 +252,27 @@ internal sealed unsafe class NativeSourceFeatureQueryOptions : IDisposable
 
 internal static unsafe class QueryStructs
 {
+    private static readonly FeatureQueryResultCount DefaultFeatureQueryResultCount = static (
+        result,
+        outCount
+    ) => NativeMethods.mln_feature_query_result_count(result, outCount);
+    private static readonly FeatureQueryResultGet DefaultFeatureQueryResultGet = static (
+        result,
+        index,
+        outFeature
+    ) => NativeMethods.mln_feature_query_result_get(result, index, outFeature);
+    private static readonly FeatureQueryResultDestroy DefaultFeatureQueryResultDestroy =
+        static result => NativeMethods.mln_feature_query_result_destroy(result);
+
+    [ThreadStatic]
+    private static FeatureQueryResultCount? featureQueryResultCountForTest;
+
+    [ThreadStatic]
+    private static FeatureQueryResultGet? featureQueryResultGetForTest;
+
+    [ThreadStatic]
+    private static FeatureQueryResultDestroy? featureQueryResultDestroyForTest;
+
     internal static IReadOnlyList<QueriedFeature> ReadFeatureQueryResult(
         mln_feature_query_result* result
     )
@@ -251,21 +285,57 @@ internal static unsafe class QueryStructs
         try
         {
             nuint count = 0;
-            NativeStatus.Check(NativeMethods.mln_feature_query_result_count(result, &count));
+            NativeStatus.Check(FeatureQueryCount(result, &count));
             var features = new QueriedFeature[checked((int)count)];
             for (nuint index = 0; index < count; index++)
             {
                 var feature = new mln_queried_feature { size = (uint)sizeof(mln_queried_feature) };
-                NativeStatus.Check(
-                    NativeMethods.mln_feature_query_result_get(result, index, &feature)
-                );
+                NativeStatus.Check(FeatureQueryGet(result, index, &feature));
                 features[(int)index] = ReadQueriedFeature(feature);
             }
             return features;
         }
         finally
         {
-            NativeMethods.mln_feature_query_result_destroy(result);
+            FeatureQueryDestroy(result);
+        }
+    }
+
+    internal static IDisposable UseFeatureQueryResultMethodsForTest(
+        FeatureQueryResultCount count,
+        FeatureQueryResultGet get,
+        FeatureQueryResultDestroy destroy
+    )
+    {
+        var previousCount = featureQueryResultCountForTest;
+        var previousGet = featureQueryResultGetForTest;
+        var previousDestroy = featureQueryResultDestroyForTest;
+        featureQueryResultCountForTest = count;
+        featureQueryResultGetForTest = get;
+        featureQueryResultDestroyForTest = destroy;
+        return new RestoreFeatureQueryResultMethods(previousCount, previousGet, previousDestroy);
+    }
+
+    private static FeatureQueryResultCount FeatureQueryCount =>
+        featureQueryResultCountForTest ?? DefaultFeatureQueryResultCount;
+
+    private static FeatureQueryResultGet FeatureQueryGet =>
+        featureQueryResultGetForTest ?? DefaultFeatureQueryResultGet;
+
+    private static FeatureQueryResultDestroy FeatureQueryDestroy =>
+        featureQueryResultDestroyForTest ?? DefaultFeatureQueryResultDestroy;
+
+    private sealed class RestoreFeatureQueryResultMethods(
+        FeatureQueryResultCount? previousCount,
+        FeatureQueryResultGet? previousGet,
+        FeatureQueryResultDestroy? previousDestroy
+    ) : IDisposable
+    {
+        public void Dispose()
+        {
+            featureQueryResultCountForTest = previousCount;
+            featureQueryResultGetForTest = previousGet;
+            featureQueryResultDestroyForTest = previousDestroy;
         }
     }
 

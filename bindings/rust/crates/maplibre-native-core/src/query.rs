@@ -51,19 +51,8 @@ impl FeatureStateSelector {
         self
     }
 
-    pub fn without_source_layer_id(mut self) -> Self {
-        self.source_layer_id = None;
-        self
-    }
-
     pub fn with_feature_id(mut self, feature_id: impl Into<String>) -> Self {
         self.feature_id = Some(feature_id.into());
-        self
-    }
-
-    pub fn without_feature_id(mut self) -> Self {
-        self.feature_id = None;
-        self.state_key = None;
         self
     }
 
@@ -75,11 +64,6 @@ impl FeatureStateSelector {
         }
         self.state_key = Some(state_key.into());
         Ok(self)
-    }
-
-    pub fn without_state_key(mut self) -> Self {
-        self.state_key = None;
-        self
     }
 }
 
@@ -268,32 +252,6 @@ pub struct RenderedFeatureQueryOptions {
     pub filter: Option<JsonValue>,
 }
 
-impl RenderedFeatureQueryOptions {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn with_layer_ids(mut self, layer_ids: Vec<String>) -> Self {
-        self.layer_ids = Some(layer_ids);
-        self
-    }
-
-    pub fn without_layer_ids(mut self) -> Self {
-        self.layer_ids = None;
-        self
-    }
-
-    pub fn with_filter(mut self, filter: JsonValue) -> Self {
-        self.filter = Some(filter);
-        self
-    }
-
-    pub fn without_filter(mut self) -> Self {
-        self.filter = None;
-        self
-    }
-}
-
 pub struct NativeRenderedFeatureQueryOptions<'a> {
     raw: sys::mln_rendered_feature_query_options,
     _layer_id_views: Vec<StringView<'a>>,
@@ -367,32 +325,6 @@ impl RenderedFeatureQueryOptionsNativeExt for RenderedFeatureQueryOptions {
 pub struct SourceFeatureQueryOptions {
     pub source_layer_ids: Option<Vec<String>>,
     pub filter: Option<JsonValue>,
-}
-
-impl SourceFeatureQueryOptions {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn with_source_layer_ids(mut self, source_layer_ids: Vec<String>) -> Self {
-        self.source_layer_ids = Some(source_layer_ids);
-        self
-    }
-
-    pub fn without_source_layer_ids(mut self) -> Self {
-        self.source_layer_ids = None;
-        self
-    }
-
-    pub fn with_filter(mut self, filter: JsonValue) -> Self {
-        self.filter = Some(filter);
-        self
-    }
-
-    pub fn without_filter(mut self) -> Self {
-        self.filter = None;
-        self
-    }
 }
 
 pub struct NativeSourceFeatureQueryOptions<'a> {
@@ -729,9 +661,10 @@ mod tests {
             "kind",
             JsonValue::String("park".into()),
         )]);
-        let rendered_options = RenderedFeatureQueryOptions::new()
-            .with_layer_ids(vec!["point-circle".into()])
-            .with_filter(filter.clone());
+        let rendered_options = RenderedFeatureQueryOptions {
+            layer_ids: Some(vec!["point-circle".into()]),
+            filter: Some(filter.clone()),
+        };
         let rendered = rendered_feature_query_options_to_native(&rendered_options).unwrap();
         let raw = rendered.as_ref();
         assert_eq!(raw.size as usize, std::mem::size_of_val(raw));
@@ -740,9 +673,10 @@ mod tests {
         assert!(!raw.layer_ids.is_null());
         assert!(!raw.filter.is_null());
 
-        let source_options = SourceFeatureQueryOptions::new()
-            .with_source_layer_ids(vec!["landuse".into()])
-            .with_filter(filter);
+        let source_options = SourceFeatureQueryOptions {
+            source_layer_ids: Some(vec!["landuse".into()]),
+            filter: Some(filter),
+        };
         let source = source_feature_query_options_to_native(&source_options).unwrap();
         let raw = source.as_ref();
         assert_eq!(raw.size as usize, std::mem::size_of_val(raw));

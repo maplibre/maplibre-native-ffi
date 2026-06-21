@@ -1,35 +1,36 @@
 use std::env;
 use std::error::Error;
+use std::io;
 use std::path::{Path, PathBuf};
+
+const LIBRARY_NAME: &str = "maplibre-native-c";
 
 fn main() -> Result<(), Box<dyn Error>> {
     let manifest_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR")?);
     let repo_root = repo_root_from_manifest_dir(&manifest_dir)?;
     let header = repo_root.join("include/maplibre_native_c.h");
-    let include_dir = repo_root.join("include");
-    let build_dir =
-        PathBuf::from(env::var_os("MLN_FFI_BUILD_DIR").ok_or("MLN_FFI_BUILD_DIR is required")?);
 
-    println!("cargo:rerun-if-env-changed=MLN_FFI_BUILD_DIR");
-    println!("cargo:rerun-if-env-changed=MLN_FFI_DEPENDENCY_LIBRARY_DIR");
+    println!("cargo:rerun-if-env-changed=PKG_CONFIG_PATH");
+    print_rerun_if_pkg_config_file_changed();
+
+    let library = pkg_config::Config::new().probe(LIBRARY_NAME).map_err(|error| {
+        io::Error::other(format!(
+            "could not find {LIBRARY_NAME} with pkg-config; run through mise or add the generated maplibre-native-c.pc directory to PKG_CONFIG_PATH: {error}"
+        ))
+    })?;
+
     println!("cargo:rerun-if-env-changed=LIBCLANG_PATH");
     println!("cargo:rerun-if-env-changed=BINDGEN_EXTRA_CLANG_ARGS");
     print_rerun_if_changed(&repo_root.join("include"));
 
-    println!("cargo:rustc-link-search=native={}", build_dir.display());
-    if let Some(dependency_library_dir) = dependency_library_dir() {
-        println!(
-            "cargo:rustc-link-search=native={}",
-            dependency_library_dir.display()
-        );
-    }
-    println!("cargo:rustc-link-lib=dylib=maplibre-native-c");
-
-    let bindings = bindgen::Builder::default()
+    let mut bindings = bindgen::Builder::default()
         .header(header.display().to_string())
         .clang_arg("-xc")
-        .clang_arg("-std=c23")
-        .clang_arg(format!("-I{}", include_dir.display()))
+        .clang_arg("-std=c23");
+    for include_path in &library.include_paths {
+        bindings = bindings.clang_arg(format!("-I{}", include_path.display()));
+    }
+    let bindings = bindings
         .allowlist_function("^mln_.*")
         .allowlist_type("^mln_.*")
         .allowlist_var("^MLN_.*")
@@ -42,10 +43,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     bindings.write_to_file(out_path.join("bindings.rs"))?;
 
     Ok(())
-}
-
-fn dependency_library_dir() -> Option<PathBuf> {
-    env::var_os("MLN_FFI_DEPENDENCY_LIBRARY_DIR").map(PathBuf::from)
 }
 
 fn repo_root_from_manifest_dir(manifest_dir: &Path) -> Result<PathBuf, Box<dyn Error>> {
@@ -73,5 +70,18 @@ fn print_rerun_if_changed(path: &Path) {
     };
     for entry in entries.flatten() {
         print_rerun_if_changed(&entry.path());
+    }
+}
+
+fn print_rerun_if_pkg_config_file_changed() {
+    let Some(paths) = env::var_os("PKG_CONFIG_PATH") else {
+        return;
+    };
+
+    for path in env::split_paths(&paths) {
+        let pc_file = path.join(format!("{LIBRARY_NAME}.pc"));
+        if pc_file.is_file() {
+            println!("cargo:rerun-if-changed={}", pc_file.display());
+        }
     }
 }

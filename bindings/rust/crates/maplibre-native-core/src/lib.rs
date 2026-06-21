@@ -5,6 +5,9 @@
 //! diagnostics, pointer checks, native string helpers, and short-lived native
 //! result guards. Public bindings layer their handle, lifetime, callback,
 //! threading, and host-runtime policies above these building blocks.
+//!
+//! This is an internal workspace crate, not the supported safe Rust binding.
+//! Rust applications should use the `maplibre-native` crate.
 
 #![deny(unsafe_op_in_unsafe_fn)]
 

@@ -10,6 +10,7 @@ namespace Maplibre.Native.Tests;
 
 public sealed unsafe class OfflineStructTests
 {
+    [BindingSpecTest("BND-060", "BND-061")]
     [Fact]
     public void OfflineRegionDefinitionsMaterializeNativeShape()
     {
@@ -63,6 +64,7 @@ public sealed unsafe class OfflineStructTests
         Assert.Equal(0, geometry.Value.data.geometry.include_ideographs);
     }
 
+    [BindingSpecTest("BND-063")]
     [Fact]
     public void OfflineRegionInfoCopiesDefinitionAndMetadata()
     {
@@ -106,6 +108,33 @@ public sealed unsafe class OfflineStructTests
         Assert.Equal(new LatLng(3, 4), definition.Bounds.Northeast);
     }
 
+    [BindingSpecTest("BND-069")]
+    [Fact]
+    public void OfflineRegionInfoSnapshotsMetadataAndReturnsCopies()
+    {
+        var source = new byte[] { 1, 2, 3 };
+        var info = new OfflineRegionInfo(
+            42,
+            new OfflineRegionDefinition.TilePyramid(
+                "maplibre://snapshot",
+                new LatLngBounds(new LatLng(1, 2), new LatLng(3, 4)),
+                5,
+                6,
+                2,
+                true
+            ),
+            source
+        );
+        source[0] = 9;
+
+        var first = info.Metadata;
+        Assert.Equal([1, 2, 3], first);
+        first[0] = 8;
+        Assert.Equal([1, 2, 3], info.Metadata);
+    }
+
+    // Support invariant for copied offline output: malformed native definition
+    // discriminants fail deterministically instead of fabricating public values.
     [Fact]
     public void UnknownOfflineRegionDefinitionTypeThrows()
     {
@@ -127,6 +156,41 @@ public sealed unsafe class OfflineStructTests
         Assert.Contains("999", error.Message, StringComparison.Ordinal);
     }
 
+    [BindingSpecTest("BND-066")]
+    [Fact]
+    public void OfflineRegionListIsDestroyedWhenCopyingItemFails()
+    {
+        var destroyCalls = 0;
+        using var methods = OfflineStructs.UseOfflineListMethodsForTest(
+            (_, count) =>
+            {
+                *count = 1;
+                return mln_status.MLN_STATUS_OK;
+            },
+            (_, _, info) =>
+            {
+                *info = new mln_offline_region_info
+                {
+                    size = (uint)sizeof(mln_offline_region_info),
+                    definition = new mln_offline_region_definition
+                    {
+                        size = (uint)sizeof(mln_offline_region_definition),
+                        type = 999,
+                    },
+                };
+                return mln_status.MLN_STATUS_OK;
+            },
+            _ => destroyCalls++
+        );
+
+        Assert.Throws<InvalidOperationException>(() =>
+            OfflineStructs.ReadList((mln_offline_region_list*)1234)
+        );
+
+        Assert.Equal(1, destroyCalls);
+    }
+
+    [BindingSpecTest("BND-060")]
     [Fact]
     public void OfflineRegionStatusCopiesNativeFields()
     {

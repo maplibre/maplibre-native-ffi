@@ -14,3 +14,6 @@ test = false
 maplibre-native-core = { path = "../rust/crates/maplibre-native-core" }
 maplibre-native-sys = { path = "../rust/crates/maplibre-native-sys" }
 pyo3 = "0.28.3"
+
+[build-dependencies]
+pkg-config = "0.3.33"

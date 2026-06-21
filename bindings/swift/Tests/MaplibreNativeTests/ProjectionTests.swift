@@ -1,6 +1,5 @@
-import Testing
-
 @testable import MaplibreNative
+import Testing
 
 @Test func projectedMetersRoundTrip() throws {
   let coordinate = LatLng(latitude: 45, longitude: -122)
@@ -12,14 +11,24 @@ import Testing
 }
 
 @Test func mapProjectionCameraAndCoordinateConversion() throws {
-  let runtime = try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
+  let runtime =
+    try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
   defer { try? runtime.close() }
-  let map = try MapHandle(runtime: runtime, options: MapOptions(width: 256, height: 256))
+  let map = try MapHandle(
+    runtime: runtime,
+    options: MapOptions(width: 256, height: 256)
+  )
   defer { try? map.close() }
-  try map.jump(to: CameraOptions(center: LatLng(latitude: 0, longitude: 0), zoom: 1))
+  try map.jump(to: CameraOptions(
+    center: LatLng(latitude: 0, longitude: 0),
+    zoom: 1
+  ))
 
   let projection = try MapProjectionHandle(map: map)
-  try projection.setCamera(CameraOptions(center: LatLng(latitude: 1, longitude: 2), zoom: 2))
+  try projection.setCamera(CameraOptions(
+    center: LatLng(latitude: 1, longitude: 2),
+    zoom: 2
+  ))
   let camera = try projection.camera()
   #expect(abs((camera.center?.latitude ?? 0) - 1) < 0.000001)
   #expect(abs((camera.center?.longitude ?? 0) - 2) < 0.000001)
@@ -33,10 +42,15 @@ import Testing
   #expect(projection.isClosed)
 }
 
-@Test func mapProjectionSetVisibleCoordinatesRejectsEmptyInputBeforeCallingC() throws {
-  let runtime = try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
+@Test func mapProjectionSetVisibleCoordinatesRejectsEmptyInputBeforeCallingC(
+) throws {
+  let runtime =
+    try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
   defer { try? runtime.close() }
-  let map = try MapHandle(runtime: runtime, options: MapOptions(width: 256, height: 256))
+  let map = try MapHandle(
+    runtime: runtime,
+    options: MapOptions(width: 256, height: 256)
+  )
   defer { try? map.close() }
   let projection = try MapProjectionHandle(map: map)
   defer { try? projection.close() }

@@ -178,7 +178,7 @@ impl VulkanTextureCompositor {
         Ok(())
     }
 
-    fn draw_image_view(&mut self, image_view: vk::ImageView) -> Result<(), vk::Result> {
+    pub(crate) fn draw_image_view(&mut self, image_view: vk::ImageView) -> Result<(), vk::Result> {
         unsafe {
             let device = &self.device;
             device.wait_for_fences(&[self.in_flight], true, u64::MAX)?;

@@ -1,0 +1,15 @@
+[env]
+MLN_FFI_RENDER_BACKEND = "metal"
+MLN_FFI_BUILD_DIR = "{{config_root}}/build/ios-arm64-metal"
+MLN_FFI_ZIG_BUILD_ARGS = "-Dtarget=aarch64-ios --libc {{env.MLN_FFI_BUILD_DIR}}/maplibre-native-c.zig-libc"
+MLN_FFI_SWIFT_TARGET_TRIPLE = "arm64-apple-ios14.3"
+MLN_FFI_CMAKE_ARGS = """
+-DCMAKE_SYSTEM_NAME=iOS
+-DCMAKE_OSX_SYSROOT=iphoneos
+-DCMAKE_OSX_ARCHITECTURES=arm64
+-DCMAKE_OSX_DEPLOYMENT_TARGET=14.3
+"""
+MLN_FFI_SYSTEM_ROOT = "{% if os() == \"macos\" %}{{ exec(command='xcrun --sdk iphoneos --show-sdk-path', cache_key='iphoneos-sdk-path', cache_duration='1d') | trim }}{% endif %}"
+CMAKE_PREFIX_PATH = ""
+PKG_CONFIG_PATH = ""
+LIBCLANG_PATH = "{% if os() == \"macos\" %}{{ exec(command='dirname \"$(xcrun --find clang)\"', cache_key='xcode-clang-dir', cache_duration='1d') | trim }}{% endif %}"

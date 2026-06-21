@@ -5,17 +5,13 @@ const maplibre = @import("maplibre_native");
 
 extern "c" fn MTLCreateSystemDefaultDevice() ?*anyopaque;
 
-const vk = if (build_options.supports_vulkan) @cImport({
-    @cInclude("vulkan/vulkan.h");
-}) else struct {};
+const vk = if (build_options.supports_vulkan) @import("vulkan") else struct {};
 
-const egl = if (build_options.supports_opengl and builtin.os.tag == .linux) @cImport({
-    @cInclude("EGL/egl.h");
-}) else struct {};
+const supports_egl = build_options.supports_opengl and (builtin.os.tag == .linux or builtin.os.tag == .macos);
 
-const sdl = if (build_options.supports_opengl and builtin.os.tag == .windows) @cImport({
-    @cInclude("SDL3/SDL.h");
-}) else struct {};
+const egl = if (supports_egl) @import("egl") else struct {};
+
+const sdl = if (build_options.supports_opengl and builtin.os.tag == .windows) @import("sdl") else struct {};
 
 const width = 512;
 const height = 512;
@@ -55,19 +51,20 @@ pub fn main(init_args: std.process.Init) !void {
     try setInitialCamera(&map);
     try map.setStyleUrl(allocator, style_url);
     try map.requestStillImage();
-    renderTexture(init_args.io, &runtime, &map, texture) catch |err| {
+    renderTexture(init_args.io, allocator, &runtime, &map, texture) catch |err| {
         logLatestDiagnostic(&diagnostic_store);
         return err;
     };
 
-    var image = texture.readPremultipliedRgba8(allocator) catch |err| {
+    const image_data = try allocator.alloc(u8, @as(usize, width) * @as(usize, height) * 4);
+    defer allocator.free(image_data);
+    const image_info = texture.readPremultipliedRgba8Into(image_data) catch |err| {
         logLatestDiagnostic(&diagnostic_store);
         return err;
     };
-    defer image.deinit();
 
-    try writePpm(init_args.io, allocator, output_path, image.data, image.info);
-    std.debug.print("wrote {s} ({d}x{d})\n", .{ output_path, image.info.width, image.info.height });
+    try writePpm(init_args.io, allocator, output_path, image_data, image_info);
+    std.debug.print("wrote {s} ({d}x{d})\n", .{ output_path, image_info.width, image_info.height });
 }
 
 fn logLatestDiagnostic(diagnostic_store: *const maplibre.DiagnosticStore) void {
@@ -120,7 +117,7 @@ const OwnedTextureContext = if (build_options.supports_opengl) OpenGLAttachConte
     fn deinit(_: *@This()) void {}
 
     fn descriptor(self: *const @This()) maplibre.MetalContextDescriptor {
-        return .{ .device = .{ .ptr = self.device } };
+        return .{ .device = maplibre.NativePointer.fromPtr(self.device) };
     }
 } else struct {};
 
@@ -173,7 +170,7 @@ const OpenGLAttachContext = if (build_options.supports_opengl and builtin.os.tag
     fn init() !OpenGLAttachContext {
         // WGL contexts need a Win32 device context with a selected pixel
         // format. SDL gives us a hidden helper window for that without showing
-        // UI, but this is not truly surfaceless like the Linux EGL pbuffer path.
+        // UI, but this is not truly surfaceless like the EGL pbuffer path.
         if (!sdl.SDL_Init(sdl.SDL_INIT_VIDEO)) return error.WglUnavailable;
         errdefer sdl.SDL_Quit();
 
@@ -213,12 +210,12 @@ const OpenGLAttachContext = if (build_options.supports_opengl and builtin.os.tag
 
     fn descriptor(self: *const OpenGLAttachContext) maplibre.OpenGLContextDescriptor {
         return .{ .wgl = .{
-            .device_context = .{ .ptr = @ptrCast(self.device_context) },
-            .share_context = .{ .ptr = @ptrCast(self.context) },
-            .get_proc_address = .{ .ptr = @ptrCast(@constCast(&sdl.SDL_GL_GetProcAddress)) },
+            .device_context = maplibre.NativePointer.fromPtr(@ptrCast(self.device_context)),
+            .share_context = maplibre.NativePointer.fromPtr(@ptrCast(self.context)),
+            .get_proc_address = maplibre.NativePointer.fromPtr(@ptrCast(@constCast(&sdl.SDL_GL_GetProcAddress))),
         } };
     }
-} else if (build_options.supports_opengl and builtin.os.tag == .linux) struct {
+} else if (supports_egl) struct {
     display: egl.EGLDisplay,
     config: egl.EGLConfig,
     surface: egl.EGLSurface,
@@ -283,6 +280,14 @@ const OpenGLAttachContext = if (build_options.supports_opengl and builtin.os.tag
     }
 
     fn initDisplay() !egl.EGLDisplay {
+        if (builtin.os.tag == .macos) {
+            const display_attributes = [_]egl.EGLint{
+                egl.EGL_PLATFORM_ANGLE_TYPE_ANGLE,        egl.EGL_PLATFORM_ANGLE_TYPE_METAL_ANGLE,
+                egl.EGL_PLATFORM_ANGLE_DEVICE_TYPE_ANGLE, egl.EGL_PLATFORM_ANGLE_DEVICE_TYPE_HARDWARE_ANGLE,
+                egl.EGL_NONE,
+            };
+            return initializeDisplay(egl.eglGetPlatformDisplayEXT(egl.EGL_PLATFORM_ANGLE_ANGLE, null, &display_attributes));
+        }
         return initializeDisplay(egl.eglGetDisplay(egl.EGL_DEFAULT_DISPLAY));
     }
 
@@ -297,9 +302,9 @@ const OpenGLAttachContext = if (build_options.supports_opengl and builtin.os.tag
 
     fn descriptor(self: *const @This()) maplibre.OpenGLContextDescriptor {
         return .{ .egl = .{
-            .display = .{ .ptr = @ptrCast(self.display.?) },
-            .config = .{ .ptr = @ptrCast(self.config.?) },
-            .share_context = .{ .ptr = @ptrCast(self.share_context.?) },
+            .display = maplibre.NativePointer.fromPtr(@ptrCast(self.display.?)),
+            .config = maplibre.NativePointer.fromPtr(@ptrCast(self.config.?)),
+            .share_context = maplibre.NativePointer.fromPtr(@ptrCast(self.share_context.?)),
             .get_proc_address = null,
         } };
     }
@@ -415,10 +420,10 @@ const VulkanAttachContext = if (build_options.supports_vulkan) struct {
 
     fn descriptor(self: *const VulkanAttachContext) maplibre.VulkanContextDescriptor {
         return .{
-            .instance = .{ .ptr = @ptrCast(self.instance.?) },
-            .physical_device = .{ .ptr = @ptrCast(self.physical_device.?) },
-            .device = .{ .ptr = @ptrCast(self.device.?) },
-            .graphics_queue = .{ .ptr = @ptrCast(self.queue.?) },
+            .instance = maplibre.NativePointer.fromPtr(@ptrCast(self.instance.?)),
+            .physical_device = maplibre.NativePointer.fromPtr(@ptrCast(self.physical_device.?)),
+            .device = maplibre.NativePointer.fromPtr(@ptrCast(self.device.?)),
+            .graphics_queue = maplibre.NativePointer.fromPtr(@ptrCast(self.queue.?)),
             .graphics_queue_family_index = self.queue_family_index,
             .get_instance_proc_addr = nativeFunctionPointer(self.dispatch.get_instance_proc_addr),
             .get_device_proc_addr = nativeFunctionPointer(self.dispatch.get_device_proc_addr),
@@ -463,7 +468,7 @@ const VulkanDispatch = if (build_options.supports_vulkan) struct {
 } else struct {};
 
 fn nativeFunctionPointer(function: anytype) maplibre.NativePointer {
-    return .{ .ptr = @ptrFromInt(@intFromPtr(function.?)) };
+    return maplibre.NativePointer.fromPtr(@ptrFromInt(@intFromPtr(function.?)));
 }
 
 fn hasDeviceExtension(dispatch: *const VulkanDispatch, physical_device: if (build_options.supports_vulkan) vk.VkPhysicalDevice else ?*anyopaque, name: [*c]const u8) !bool {
@@ -498,6 +503,7 @@ fn setInitialCamera(map: *maplibre.MapHandle) !void {
 
 fn renderTexture(
     io: std.Io,
+    allocator: std.mem.Allocator,
     runtime: *maplibre.RuntimeHandle,
     map: *maplibre.MapHandle,
     texture: *maplibre.RenderSessionHandle,
@@ -507,9 +513,11 @@ fn renderTexture(
     const started = std.Io.Clock.awake.now(io);
     while (started.durationTo(std.Io.Clock.awake.now(io)).toNanoseconds() < 5 * std.time.ns_per_s) {
         try runtime.runOnce();
-        while (try runtime.pollEvent()) |event| {
-            if (event.source_type != .map or event.source_id == null or !std.meta.eql(event.source_id.?, map_id)) continue;
-            switch (event.event_type) {
+        while (try runtime.pollEvent(allocator)) |event| {
+            var owned_event = event;
+            defer owned_event.deinit();
+            if (owned_event.source_type != .map or owned_event.source_id == null or !std.meta.eql(owned_event.source_id.?, map_id)) continue;
+            switch (owned_event.event_type) {
                 .map_render_update_available => {
                     texture.renderUpdate() catch |err| switch (err) {
                         error.InvalidState => continue,

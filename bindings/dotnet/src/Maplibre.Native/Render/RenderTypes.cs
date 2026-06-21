@@ -34,7 +34,20 @@ public readonly record struct TextureImageInfo(
     ulong ByteLength
 );
 
-public sealed record PremultipliedRgba8Image(byte[] Bytes, TextureImageInfo Info);
+public sealed record PremultipliedRgba8Image
+{
+    private readonly byte[] bytes;
+
+    public PremultipliedRgba8Image(byte[] Bytes, TextureImageInfo Info)
+    {
+        bytes = Bytes is null ? [] : (byte[])Bytes.Clone();
+        this.Info = Info;
+    }
+
+    public byte[] Bytes => (byte[])bytes.Clone();
+
+    public TextureImageInfo Info { get; }
+}
 
 public sealed class MetalContextDescriptor
 {

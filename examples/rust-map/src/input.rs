@@ -33,7 +33,7 @@ impl Controller {
         println!("  arrows or WASD: pan");
         println!("  + / -: zoom at center");
         println!("  Q / E: rotate");
-        println!("  PageUp / PageDown or [ / ]: pitch");
+        println!("  ] / [: pitch");
         println!("  0: reset pitch and bearing");
     }
 
@@ -73,7 +73,9 @@ impl Controller {
         if self.right_down || (self.left_down && self.modifiers.control_key()) {
             if dx != 0.0 {
                 let bearing = map.camera()?.bearing.unwrap_or(0.0) + dx * DRAG_ROTATE_FACTOR;
-                map.jump_to(&CameraOptions::new().with_bearing(bearing))?;
+                let mut camera = CameraOptions::default();
+                camera.bearing = Some(bearing);
+                map.jump_to(&camera)?;
             }
             if dy != 0.0 {
                 map.pitch_by(dy * DRAG_PITCH_FACTOR)?;
@@ -135,8 +137,10 @@ impl Controller {
         let PhysicalKey::Code(code) = physical_key else {
             return Ok(false);
         };
-        let animation = AnimationOptions::new().with_duration_ms(160.0);
-        let reset_animation = AnimationOptions::new().with_duration_ms(220.0);
+        let mut animation = AnimationOptions::default();
+        animation.duration_ms = Some(160.0);
+        let mut reset_animation = AnimationOptions::default();
+        reset_animation.duration_ms = Some(220.0);
         let center = Some(ScreenPoint::new(
             f64::from(viewport.logical_width) / 2.0,
             f64::from(viewport.logical_height) / 2.0,
@@ -162,16 +166,14 @@ impl Controller {
             }
             KeyCode::KeyQ => adjust_bearing(map, -KEYBOARD_BEARING, &animation)?,
             KeyCode::KeyE => adjust_bearing(map, KEYBOARD_BEARING, &animation)?,
-            KeyCode::PageUp | KeyCode::BracketRight => {
-                adjust_pitch(map, KEYBOARD_PITCH, &animation)?
+            KeyCode::BracketRight => adjust_pitch(map, KEYBOARD_PITCH, &animation)?,
+            KeyCode::BracketLeft => adjust_pitch(map, -KEYBOARD_PITCH, &animation)?,
+            KeyCode::Digit0 | KeyCode::Numpad0 => {
+                let mut camera = CameraOptions::default();
+                camera.bearing = Some(0.0);
+                camera.pitch = Some(0.0);
+                map.ease_to(&camera, Some(&reset_animation))?
             }
-            KeyCode::PageDown | KeyCode::BracketLeft => {
-                adjust_pitch(map, -KEYBOARD_PITCH, &animation)?
-            }
-            KeyCode::Digit0 | KeyCode::Numpad0 => map.ease_to(
-                &CameraOptions::new().with_bearing(0.0).with_pitch(0.0),
-                Some(&reset_animation),
-            )?,
             _ => return Ok(false),
         }
         Ok(true)
@@ -184,7 +186,9 @@ fn adjust_bearing(
     animation: &AnimationOptions,
 ) -> maplibre_native::Result<()> {
     let bearing = map.camera()?.bearing.unwrap_or(0.0) + delta;
-    map.ease_to(&CameraOptions::new().with_bearing(bearing), Some(animation))
+    let mut camera = CameraOptions::default();
+    camera.bearing = Some(bearing);
+    map.ease_to(&camera, Some(animation))
 }
 
 fn adjust_pitch(
@@ -193,5 +197,7 @@ fn adjust_pitch(
     animation: &AnimationOptions,
 ) -> maplibre_native::Result<()> {
     let pitch = (map.camera()?.pitch.unwrap_or(0.0) + delta).clamp(0.0, 60.0);
-    map.ease_to(&CameraOptions::new().with_pitch(pitch), Some(animation))
+    let mut camera = CameraOptions::default();
+    camera.pitch = Some(pitch);
+    map.ease_to(&camera, Some(animation))
 }

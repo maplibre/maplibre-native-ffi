@@ -20,7 +20,8 @@ internal static unsafe class RenderStructs
             throw new InvalidArgumentException(
                 MaplibreStatus.InvalidArgument,
                 null,
-                "Render target scale factor must be positive and finite."
+                "Render target scale factor must be positive and finite.",
+                null
             );
         }
 
@@ -92,7 +93,8 @@ internal static unsafe class RenderStructs
                 throw new InvalidArgumentException(
                     MaplibreStatus.InvalidArgument,
                     null,
-                    $"Unsupported OpenGL context descriptor type {context.GetType().Name}."
+                    $"Unsupported OpenGL context descriptor type {context.GetType().Name}.",
+                    null
                 );
         }
 
@@ -237,8 +239,8 @@ internal static unsafe class RenderStructs
             frame.height,
             frame.scale_factor,
             frame.frame_id,
-            new NativePointer((nint)frame.texture),
-            new NativePointer((nint)frame.device),
+            NativePointer.FromNativeAddress((nint)frame.texture),
+            NativePointer.FromNativeAddress((nint)frame.device),
             frame.pixel_format
         );
 
@@ -253,9 +255,9 @@ internal static unsafe class RenderStructs
             frame.height,
             frame.scale_factor,
             frame.frame_id,
-            new NativePointer((nint)frame.image),
-            new NativePointer((nint)frame.image_view),
-            new NativePointer((nint)frame.device),
+            NativePointer.FromNativeAddress((nint)frame.image),
+            NativePointer.FromNativeAddress((nint)frame.image_view),
+            NativePointer.FromNativeAddress((nint)frame.device),
             frame.format,
             frame.layout
         );

@@ -9,10 +9,16 @@ function(mln_configure_apple_toolchain_defaults)
     return()
   endif()
 
-  if(NOT CMAKE_OSX_DEPLOYMENT_TARGET
-     AND NOT DEFINED ENV{MACOSX_DEPLOYMENT_TARGET})
-    set(CMAKE_OSX_DEPLOYMENT_TARGET "14.3"
-        CACHE STRING "Minimum macOS deployment target" FORCE)
+  if(NOT CMAKE_OSX_DEPLOYMENT_TARGET)
+    if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+      # Match MapLibre Native's vendored CMake, which currently forces this
+      # value through maplibre-tile-spec even for iOS builds.
+      set(CMAKE_OSX_DEPLOYMENT_TARGET "14.3"
+          CACHE STRING "Minimum iOS deployment target" FORCE)
+    elseif(NOT DEFINED ENV{MACOSX_DEPLOYMENT_TARGET})
+      set(CMAKE_OSX_DEPLOYMENT_TARGET "14.3"
+          CACHE STRING "Minimum macOS deployment target" FORCE)
+    endif()
   endif()
 endfunction()
 
@@ -48,8 +54,10 @@ function(mln_configure_apple_platform target)
       "-framework CoreGraphics" "-framework CoreText" "-framework Foundation"
       "-framework ImageIO")
 
-  set_target_properties(
-    ${target}
-    PROPERTIES
-      BUILD_WITH_INSTALL_NAME_DIR YES INSTALL_NAME_DIR "${PROJECT_BINARY_DIR}")
+  if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
+    set_target_properties(
+      ${target}
+      PROPERTIES
+        BUILD_WITH_INSTALL_NAME_DIR YES INSTALL_NAME_DIR "${PROJECT_BINARY_DIR}")
+  endif()
 endfunction()

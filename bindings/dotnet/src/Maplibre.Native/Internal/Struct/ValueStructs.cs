@@ -8,8 +8,26 @@ using Maplibre.Native.Json;
 
 namespace Maplibre.Native.Internal.Struct;
 
+internal unsafe delegate mln_status JsonSnapshotGet(
+    mln_json_snapshot* snapshot,
+    mln_json_value** outValue
+);
+
+internal unsafe delegate void JsonSnapshotDestroy(mln_json_snapshot* snapshot);
+
 internal static unsafe class ValueStructs
 {
+    private static readonly JsonSnapshotGet DefaultJsonSnapshotGet = static (snapshot, outValue) =>
+        NativeMethods.mln_json_snapshot_get(snapshot, outValue);
+    private static readonly JsonSnapshotDestroy DefaultJsonSnapshotDestroy = static snapshot =>
+        NativeMethods.mln_json_snapshot_destroy(snapshot);
+
+    [ThreadStatic]
+    private static JsonSnapshotGet? jsonSnapshotGetForTest;
+
+    [ThreadStatic]
+    private static JsonSnapshotDestroy? jsonSnapshotDestroyForTest;
+
     internal static JsonValue? ReadJsonSnapshot(mln_json_snapshot* snapshot)
     {
         if (snapshot is null)
@@ -20,12 +38,42 @@ internal static unsafe class ValueStructs
         try
         {
             mln_json_value* value = null;
-            NativeStatus.Check(NativeMethods.mln_json_snapshot_get(snapshot, &value));
+            NativeStatus.Check(JsonSnapshotGet(snapshot, &value));
             return value is null ? null : ReadJsonValue(value);
         }
         finally
         {
-            NativeMethods.mln_json_snapshot_destroy(snapshot);
+            JsonSnapshotDestroy(snapshot);
+        }
+    }
+
+    internal static IDisposable UseJsonSnapshotMethodsForTest(
+        JsonSnapshotGet get,
+        JsonSnapshotDestroy destroy
+    )
+    {
+        var previousGet = jsonSnapshotGetForTest;
+        var previousDestroy = jsonSnapshotDestroyForTest;
+        jsonSnapshotGetForTest = get;
+        jsonSnapshotDestroyForTest = destroy;
+        return new RestoreJsonSnapshotMethods(previousGet, previousDestroy);
+    }
+
+    private static JsonSnapshotGet JsonSnapshotGet =>
+        jsonSnapshotGetForTest ?? DefaultJsonSnapshotGet;
+
+    private static JsonSnapshotDestroy JsonSnapshotDestroy =>
+        jsonSnapshotDestroyForTest ?? DefaultJsonSnapshotDestroy;
+
+    private sealed class RestoreJsonSnapshotMethods(
+        JsonSnapshotGet? previousGet,
+        JsonSnapshotDestroy? previousDestroy
+    ) : IDisposable
+    {
+        public void Dispose()
+        {
+            jsonSnapshotGetForTest = previousGet;
+            jsonSnapshotDestroyForTest = previousDestroy;
         }
     }
 
@@ -178,7 +226,8 @@ internal sealed unsafe class NativeJsonValue : IDisposable
             throw new InvalidArgumentException(
                 MaplibreStatus.InvalidArgument,
                 null,
-                $"JsonValue exceeds maximum depth {JsonValue.MaxDepth}."
+                $"JsonValue exceeds maximum depth {JsonValue.MaxDepth}.",
+                null
             );
         }
 
@@ -206,7 +255,8 @@ internal sealed unsafe class NativeJsonValue : IDisposable
                     throw new InvalidArgumentException(
                         MaplibreStatus.InvalidArgument,
                         null,
-                        "JsonValue.Double must be finite."
+                        "JsonValue.Double must be finite.",
+                        null
                     );
                 }
 
@@ -229,7 +279,8 @@ internal sealed unsafe class NativeJsonValue : IDisposable
                 throw new InvalidArgumentException(
                     MaplibreStatus.InvalidArgument,
                     null,
-                    $"Unsupported JsonValue type {value.GetType().Name}."
+                    $"Unsupported JsonValue type {value.GetType().Name}.",
+                    null
                 );
         }
     }

@@ -11,5 +11,9 @@ function(mln_configure_vulkan_backend target)
   mln_target_vendor_sources(${target} ${MLN_FFI_VENDOR_VULKAN_SOURCES})
   mln_target_project_sources(${target} ${MLN_FFI_VULKAN_SOURCES})
 
+  if(CMAKE_SYSTEM_NAME STREQUAL "OHOS")
+    target_compile_definitions(${target} PUBLIC VK_USE_PLATFORM_OHOS=1)
+  endif()
+
   target_link_libraries(${target} PRIVATE ${MLN_VULKAN_LOADER_LIBRARY})
 endfunction()

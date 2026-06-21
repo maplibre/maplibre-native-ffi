@@ -11,6 +11,7 @@ depends = [":develop"]
 run = "env -u VIRTUAL_ENV -u CONDA_PREFIX uv run --locked --group dev pytest"
 
 [tasks.typecheck]
+depends = ["//:ensure-native-library"]
 run = "env -u VIRTUAL_ENV -u CONDA_PREFIX uv run --locked --group dev ty check --ignore invalid-argument-type --ignore not-iterable --ignore not-subscriptable python"
 
 [tasks.ci]

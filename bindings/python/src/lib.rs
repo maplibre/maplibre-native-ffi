@@ -11,12 +11,11 @@ use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::types::{PyAny, PyBool, PyBytes, PyDict, PyList, PyTuple};
 use std::collections::{HashMap, VecDeque};
-use std::ffi::{CString, c_char, c_void};
+use std::ffi::{c_char, c_void};
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::ptr;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Condvar, Mutex, MutexGuard};
-use std::thread::ThreadId;
 
 mod py_errors {
     pyo3::import_exception!(maplibre_native.errors, InvalidArgumentError);
@@ -61,7 +60,6 @@ struct PyResourceTransformState {
     callback: Py<PyAny>,
     pending_callbacks: AtomicUsize,
     max_pending_callbacks: usize,
-    replacement_urls: Mutex<HashMap<ThreadId, CString>>,
 }
 
 #[pyclass(name = "_ResourceRequestHandle")]
@@ -3312,12 +3310,12 @@ impl RenderSessionHandle {
         let filter = (!filter.is_none())
             .then(|| json_value_from_py(filter))
             .transpose()?;
-        let mut options = maplibre_core::RenderedFeatureQueryOptions::new();
+        let mut options = maplibre_core::RenderedFeatureQueryOptions::default();
         if let Some(layer_ids) = layer_ids {
-            options = options.with_layer_ids(layer_ids);
+            options.layer_ids = Some(layer_ids);
         }
         if let Some(filter) = filter {
-            options = options.with_filter(filter);
+            options.filter = Some(filter);
         }
         let options = maplibre_core::query::rendered_feature_query_options_to_native(&options)
             .map_err(map_error)?;
@@ -3357,12 +3355,12 @@ impl RenderSessionHandle {
         let filter = (!filter.is_none())
             .then(|| json_value_from_py(filter))
             .transpose()?;
-        let mut options = maplibre_core::SourceFeatureQueryOptions::new();
+        let mut options = maplibre_core::SourceFeatureQueryOptions::default();
         if let Some(source_layer_ids) = source_layer_ids {
-            options = options.with_source_layer_ids(source_layer_ids);
+            options.source_layer_ids = Some(source_layer_ids);
         }
         if let Some(filter) = filter {
-            options = options.with_filter(filter);
+            options.filter = Some(filter);
         }
         let options = maplibre_core::query::source_feature_query_options_to_native(&options)
             .map_err(map_error)?;
@@ -3891,7 +3889,6 @@ impl PyResourceTransformState {
             callback,
             pending_callbacks: AtomicUsize::new(0),
             max_pending_callbacks,
-            replacement_urls: Mutex::new(HashMap::new()),
         }
     }
 
@@ -3940,22 +3937,17 @@ impl PyResourceTransformState {
         if replacement.is_empty() {
             return sys::MLN_STATUS_OK;
         }
-        let Ok(replacement) = CString::new(replacement) else {
-            return sys::MLN_STATUS_INVALID_ARGUMENT;
-        };
-        let replacement_ptr = replacement.as_ptr();
-        let mut replacements = match self.replacement_urls.lock() {
-            Ok(replacements) => replacements,
-            Err(_) => return sys::MLN_STATUS_NATIVE_ERROR,
-        };
-        replacements.insert(std::thread::current().id(), replacement);
-        // SAFETY: out_response was initialized above and is non-null. The CString
-        // is retained in replacement_urls until this thread's next callback or
-        // callback state teardown.
+        // SAFETY: out_response was initialized above and is non-null. The helper
+        // copies the temporary Rust string into C API-managed callback scratch
+        // storage that remains live while native copies it after this
+        // trampoline returns.
         unsafe {
-            (*out_response).url = replacement_ptr;
+            sys::mln_resource_transform_response_set_url(
+                out_response,
+                replacement.as_ptr().cast(),
+                replacement.len(),
+            )
         }
-        sys::MLN_STATUS_OK
     }
 }
 
@@ -4388,18 +4380,18 @@ fn tile_source_options_from_parts(
     vector_encoding: Option<u32>,
     raster_dem_encoding: Option<u32>,
 ) -> PyResult<maplibre_core::TileSourceOptions> {
-    let mut options = maplibre_core::TileSourceOptions::new();
+    let mut options = maplibre_core::TileSourceOptions::default();
     if let Some(min_zoom) = min_zoom {
-        options = options.with_min_zoom(min_zoom);
+        options.min_zoom = Some(min_zoom);
     }
     if let Some(max_zoom) = max_zoom {
-        options = options.with_max_zoom(max_zoom);
+        options.max_zoom = Some(max_zoom);
     }
     if let Some(attribution) = attribution {
-        options = options.with_attribution(attribution);
+        options.attribution = Some(attribution);
     }
     if let Some(scheme) = scheme {
-        options = options.with_scheme(match scheme {
+        options.scheme = Some(match scheme {
             sys::MLN_STYLE_TILE_SCHEME_XYZ => maplibre_core::TileScheme::Xyz,
             sys::MLN_STYLE_TILE_SCHEME_TMS => maplibre_core::TileScheme::Tms,
             raw => {
@@ -4414,16 +4406,16 @@ fn tile_source_options_from_parts(
         (northeast_latitude, northeast_longitude),
     )) = bounds
     {
-        options = options.with_bounds(maplibre_core::LatLngBounds::new(
+        options.bounds = Some(maplibre_core::LatLngBounds::new(
             maplibre_core::LatLng::new(southwest_latitude, southwest_longitude),
             maplibre_core::LatLng::new(northeast_latitude, northeast_longitude),
         ));
     }
     if let Some(tile_size) = tile_size {
-        options = options.with_tile_size(tile_size);
+        options.tile_size = Some(tile_size);
     }
     if let Some(vector_encoding) = vector_encoding {
-        options = options.with_vector_encoding(match vector_encoding {
+        options.vector_encoding = Some(match vector_encoding {
             sys::MLN_STYLE_VECTOR_TILE_ENCODING_MVT => maplibre_core::VectorTileEncoding::Mvt,
             sys::MLN_STYLE_VECTOR_TILE_ENCODING_MLT => maplibre_core::VectorTileEncoding::Mlt,
             raw => {
@@ -4434,7 +4426,7 @@ fn tile_source_options_from_parts(
         });
     }
     if let Some(raster_dem_encoding) = raster_dem_encoding {
-        options = options.with_raster_dem_encoding(match raster_dem_encoding {
+        options.raster_dem_encoding = Some(match raster_dem_encoding {
             sys::MLN_STYLE_RASTER_DEM_ENCODING_MAPBOX => maplibre_core::RasterDemEncoding::Mapbox,
             sys::MLN_STYLE_RASTER_DEM_ENCODING_TERRARIUM => {
                 maplibre_core::RasterDemEncoding::Terrarium
@@ -4455,7 +4447,7 @@ fn viewport_options_from_parts(
     viewport_mode: Option<u32>,
     frustum_offset: Option<(f64, f64, f64, f64)>,
 ) -> sys::mln_map_viewport_options {
-    let mut options = maplibre_core::MapViewportOptions::new();
+    let mut options = maplibre_core::MapViewportOptions::default();
     options.north_orientation = north_orientation.map(maplibre_core::NorthOrientation::from_raw);
     options.constrain_mode = constrain_mode.map(maplibre_core::ConstrainMode::from_raw);
     options.viewport_mode = viewport_mode.map(maplibre_core::ViewportMode::from_raw);
@@ -4472,7 +4464,7 @@ fn tile_options_from_parts(
     lod_zoom_shift: Option<f64>,
     lod_mode: Option<u32>,
 ) -> sys::mln_map_tile_options {
-    let mut options = maplibre_core::MapTileOptions::new();
+    let mut options = maplibre_core::MapTileOptions::default();
     options.prefetch_zoom_delta = prefetch_zoom_delta;
     options.lod_min_radius = lod_min_radius;
     options.lod_scale = lod_scale;
@@ -4505,7 +4497,7 @@ fn free_camera_options_from_parts(
     position: Option<(f64, f64, f64)>,
     orientation: Option<(f64, f64, f64, f64)>,
 ) -> sys::mln_free_camera_options {
-    let mut options = maplibre_core::FreeCameraOptions::new();
+    let mut options = maplibre_core::FreeCameraOptions::default();
     options.position = position.map(|(x, y, z)| maplibre_core::Vec3::new(x, y, z));
     options.orientation =
         orientation.map(|(x, y, z, w)| maplibre_core::Quaternion::new(x, y, z, w));
@@ -4517,7 +4509,7 @@ fn projection_mode_from_parts(
     x_skew: Option<f64>,
     y_skew: Option<f64>,
 ) -> sys::mln_projection_mode {
-    let mut mode = maplibre_core::ProjectionMode::new();
+    let mut mode = maplibre_core::ProjectionMode::default();
     mode.axonometric = axonometric;
     mode.x_skew = x_skew;
     mode.y_skew = y_skew;
@@ -4532,7 +4524,7 @@ fn animation_options_from_parts(
         Option<(f64, f64, f64, f64)>,
     ),
 ) -> sys::mln_animation_options {
-    let mut options = maplibre_core::AnimationOptions::new();
+    let mut options = maplibre_core::AnimationOptions::default();
     options.duration_ms = duration_ms;
     options.velocity = velocity;
     options.min_zoom = min_zoom;
@@ -4551,7 +4543,7 @@ fn camera_options_from_parts(
     roll: Option<f64>,
     field_of_view: Option<f64>,
 ) -> sys::mln_camera_options {
-    let mut camera = maplibre_core::CameraOptions::new();
+    let mut camera = maplibre_core::CameraOptions::default();
     camera.center =
         center.map(|(latitude, longitude)| maplibre_core::LatLng::new(latitude, longitude));
     camera.zoom = zoom;
@@ -4570,7 +4562,7 @@ fn camera_fit_options_from_parts(
     bearing: Option<f64>,
     pitch: Option<f64>,
 ) -> sys::mln_camera_fit_options {
-    let mut fit = maplibre_core::CameraFitOptions::new();
+    let mut fit = maplibre_core::CameraFitOptions::default();
     fit.padding = padding.map(edge_insets_core_from_tuple);
     fit.bearing = bearing;
     fit.pitch = pitch;
@@ -4584,7 +4576,7 @@ fn bound_options_from_parts(
     min_pitch: Option<f64>,
     max_pitch: Option<f64>,
 ) -> sys::mln_bound_options {
-    let mut options = maplibre_core::BoundOptions::new();
+    let mut options = maplibre_core::BoundOptions::default();
     options.bounds = bounds.map(lat_lng_bounds_core_from_tuple);
     options.min_zoom = min_zoom;
     options.max_zoom = max_zoom;
@@ -5046,7 +5038,9 @@ fn feature_from_wire(raw: &Bound<'_, PyAny>) -> PyResult<maplibre_core::Feature>
     let geometry = geometry_from_wire(&geometry_raw)?;
     let properties = json_members_from_py(&properties_raw)?;
     let identifier = feature_identifier_from_wire(&identifier_raw)?;
-    Ok(maplibre_core::Feature::new(geometry, properties).with_identifier(identifier))
+    let mut feature = maplibre_core::Feature::new(geometry, properties);
+    feature.identifier = identifier;
+    Ok(feature)
 }
 
 fn json_members_from_py(raw: &Bound<'_, PyAny>) -> PyResult<Vec<maplibre_core::JsonMember>> {
@@ -6624,15 +6618,15 @@ fn create_runtime(
     maximum_cache_size: Option<u64>,
 ) -> PyResult<RuntimeHandle> {
     maplibre_core::validate_abi_version().map_err(map_error)?;
-    let mut options = maplibre_core::RuntimeOptions::new();
+    let mut options = maplibre_core::RuntimeOptions::default();
     if let Some(asset_path) = asset_path {
-        options = options.with_asset_path(asset_path);
+        options.asset_path = Some(asset_path);
     }
     if let Some(cache_path) = cache_path {
-        options = options.with_cache_path(cache_path);
+        options.cache_path = Some(cache_path);
     }
     if let Some(maximum_cache_size) = maximum_cache_size {
-        options = options.with_maximum_cache_size(maximum_cache_size);
+        options.maximum_cache_size = Some(maximum_cache_size);
     }
     let native_options =
         maplibre_core::runtime::runtime_options_to_native(&options).map_err(map_error)?;
@@ -6670,7 +6664,8 @@ fn create_map(
             format!("unknown map mode: {map_mode}"),
         )));
     };
-    let options = maplibre_core::MapOptions::new(width, height, scale_factor).with_mode(mode);
+    let mut options = maplibre_core::MapOptions::new(width, height, scale_factor);
+    options.mode = mode;
     let raw_options = maplibre_core::options::map_options_to_native(&options);
     let runtime_state = runtime.state();
     let mut out = maplibre_core::ptr::OutPtr::<sys::mln_map>::new();

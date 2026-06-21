@@ -11,23 +11,223 @@ using Maplibre.Native.Query;
 
 namespace Maplibre.Native.Render;
 
+internal unsafe delegate mln_status OpenGLSurfaceAttach(
+    mln_map* map,
+    mln_opengl_surface_descriptor* descriptor,
+    mln_render_session** outSession
+);
+
+internal unsafe delegate mln_status OpenGLOwnedTextureAttach(
+    mln_map* map,
+    mln_opengl_owned_texture_descriptor* descriptor,
+    mln_render_session** outSession
+);
+
+internal unsafe delegate mln_status OpenGLBorrowedTextureAttach(
+    mln_map* map,
+    mln_opengl_borrowed_texture_descriptor* descriptor,
+    mln_render_session** outSession
+);
+
+internal unsafe delegate mln_status RenderSessionResize(
+    mln_render_session* session,
+    uint width,
+    uint height,
+    double scaleFactor
+);
+
+internal unsafe delegate mln_status RenderSessionRenderUpdate(mln_render_session* session);
+
+internal unsafe delegate mln_status MetalOwnedTextureAcquireFrame(
+    mln_render_session* session,
+    mln_metal_owned_texture_frame* frame
+);
+
+internal unsafe delegate mln_status MetalOwnedTextureReleaseFrame(
+    mln_render_session* session,
+    mln_metal_owned_texture_frame* frame
+);
+
 /// <summary>Owner-thread render session handle bound to a map.</summary>
 public sealed unsafe class RenderSessionHandle : IDisposable
 {
-    private readonly MapHandle map;
-    private readonly NativeHandleState<mln_render_session> state;
+    private static readonly OpenGLSurfaceAttach DefaultOpenGLSurfaceAttach = static (
+        map,
+        descriptor,
+        outSession
+    ) => NativeMethods.mln_opengl_surface_attach(map, descriptor, outSession);
+    private static readonly OpenGLOwnedTextureAttach DefaultOpenGLOwnedTextureAttach = static (
+        map,
+        descriptor,
+        outSession
+    ) => NativeMethods.mln_opengl_owned_texture_attach(map, descriptor, outSession);
+    private static readonly OpenGLBorrowedTextureAttach DefaultOpenGLBorrowedTextureAttach =
+        static (map, descriptor, outSession) =>
+            NativeMethods.mln_opengl_borrowed_texture_attach(map, descriptor, outSession);
+    private static readonly RenderSessionResize DefaultResize = static (
+        session,
+        width,
+        height,
+        scaleFactor
+    ) => NativeMethods.mln_render_session_resize(session, width, height, scaleFactor);
+    private static readonly RenderSessionRenderUpdate DefaultRenderUpdate = static session =>
+        NativeMethods.mln_render_session_render_update(session);
+    private static readonly TextureRead DefaultTextureRead = static (session, data, length, info) =>
+        NativeMethods.mln_texture_read_premultiplied_rgba8(session, data, length, info);
+    private static readonly StatusDestroy<mln_render_session> DefaultDestroy = static session =>
+        NativeMethods.mln_render_session_destroy(session);
+    private static readonly MetalOwnedTextureAcquireFrame DefaultAcquireMetalFrame = static (
+        session,
+        frame
+    ) => NativeMethods.mln_metal_owned_texture_acquire_frame(session, frame);
+    private static readonly MetalOwnedTextureReleaseFrame DefaultReleaseMetalFrame = static (
+        session,
+        frame
+    ) => NativeMethods.mln_metal_owned_texture_release_frame(session, frame);
+    private static readonly VulkanOwnedTextureAcquireFrame DefaultAcquireVulkanFrame = static (
+        session,
+        frame
+    ) => NativeMethods.mln_vulkan_owned_texture_acquire_frame(session, frame);
+    private static readonly OpenGLOwnedTextureAcquireFrame DefaultAcquireOpenGLFrame = static (
+        session,
+        frame
+    ) => NativeMethods.mln_opengl_owned_texture_acquire_frame(session, frame);
 
-    private RenderSessionHandle(MapHandle map, mln_render_session* handle)
+    [ThreadStatic]
+    private static OpenGLSurfaceAttach? openGLSurfaceAttachForTest;
+
+    [ThreadStatic]
+    private static OpenGLOwnedTextureAttach? openGLOwnedTextureAttachForTest;
+
+    [ThreadStatic]
+    private static OpenGLBorrowedTextureAttach? openGLBorrowedTextureAttachForTest;
+
+    [ThreadStatic]
+    private static RenderSessionResize? resizeForTest;
+
+    [ThreadStatic]
+    private static RenderSessionRenderUpdate? renderUpdateForTest;
+
+    [ThreadStatic]
+    private static TextureRead? textureReadForTest;
+
+    [ThreadStatic]
+    private static StatusDestroy<mln_render_session>? destroyForTest;
+
+    [ThreadStatic]
+    private static MetalOwnedTextureAcquireFrame? acquireMetalFrameForTest;
+
+    [ThreadStatic]
+    private static MetalOwnedTextureReleaseFrame? releaseMetalFrameForTest;
+
+    [ThreadStatic]
+    private static VulkanOwnedTextureAcquireFrame? acquireVulkanFrameForTest;
+
+    [ThreadStatic]
+    private static OpenGLOwnedTextureAcquireFrame? acquireOpenGLFrameForTest;
+
+    [ThreadStatic]
+    private static Func<
+        mln_metal_owned_texture_frame,
+        FrameScope,
+        MetalOwnedTextureFrame
+    >? readMetalFrameForTest;
+
+    private readonly object frameGate = new();
+    private readonly MapHandle? map;
+    private readonly NativeHandleState<mln_render_session> state;
+    private bool hasActiveTextureFrame;
+
+    private RenderSessionHandle(MapHandle? map, mln_render_session* handle)
+        : this(map, handle, DestroyNative) { }
+
+    private RenderSessionHandle(
+        MapHandle? map,
+        mln_render_session* handle,
+        StatusDestroy<mln_render_session> destroy
+    )
     {
-        this.map = map ?? throw new ArgumentNullException(nameof(map));
+        this.map = map;
         state = new NativeHandleState<mln_render_session>(
             handle,
-            static handle => NativeMethods.mln_render_session_destroy(handle),
+            destroy,
             nameof(RenderSessionHandle)
         );
     }
 
-    internal static RenderSessionHandle AttachMetalSurface(
+    internal static RenderSessionHandle CreateForTest(mln_render_session* handle) =>
+        new(null, handle, static _ => mln_status.MLN_STATUS_OK);
+
+    internal static IDisposable UseOpenGLAttachMethodsForTest(
+        OpenGLSurfaceAttach surfaceAttach,
+        OpenGLOwnedTextureAttach ownedTextureAttach,
+        OpenGLBorrowedTextureAttach borrowedTextureAttach
+    )
+    {
+        var previousSurface = openGLSurfaceAttachForTest;
+        var previousOwnedTexture = openGLOwnedTextureAttachForTest;
+        var previousBorrowedTexture = openGLBorrowedTextureAttachForTest;
+        openGLSurfaceAttachForTest = surfaceAttach;
+        openGLOwnedTextureAttachForTest = ownedTextureAttach;
+        openGLBorrowedTextureAttachForTest = borrowedTextureAttach;
+        return new RestoreOpenGLAttachMethods(
+            previousSurface,
+            previousOwnedTexture,
+            previousBorrowedTexture
+        );
+    }
+
+    internal static IDisposable UseSessionMethodsForTest(
+        RenderSessionResize resize,
+        RenderSessionRenderUpdate renderUpdate,
+        TextureRead textureRead,
+        StatusDestroy<mln_render_session> destroy
+    )
+    {
+        var previousResize = resizeForTest;
+        var previousRenderUpdate = renderUpdateForTest;
+        var previousTextureRead = textureReadForTest;
+        var previousDestroy = destroyForTest;
+        resizeForTest = resize;
+        renderUpdateForTest = renderUpdate;
+        textureReadForTest = textureRead;
+        destroyForTest = destroy;
+        return new RestoreSessionMethods(
+            previousResize,
+            previousRenderUpdate,
+            previousTextureRead,
+            previousDestroy
+        );
+    }
+
+    internal static IDisposable UseMetalFrameMethodsForTest(
+        MetalOwnedTextureAcquireFrame acquire,
+        MetalOwnedTextureReleaseFrame release,
+        Func<mln_metal_owned_texture_frame, FrameScope, MetalOwnedTextureFrame> readFrame
+    )
+    {
+        var previousAcquire = acquireMetalFrameForTest;
+        var previousRelease = releaseMetalFrameForTest;
+        var previousRead = readMetalFrameForTest;
+        acquireMetalFrameForTest = acquire;
+        releaseMetalFrameForTest = release;
+        readMetalFrameForTest = readFrame;
+        return new RestoreMetalFrameMethods(previousAcquire, previousRelease, previousRead);
+    }
+
+    internal static IDisposable UseTextureFrameAcquireMethodsForTest(
+        VulkanOwnedTextureAcquireFrame acquireVulkan,
+        OpenGLOwnedTextureAcquireFrame acquireOpenGL
+    )
+    {
+        var previousVulkan = acquireVulkanFrameForTest;
+        var previousOpenGL = acquireOpenGLFrameForTest;
+        acquireVulkanFrameForTest = acquireVulkan;
+        acquireOpenGLFrameForTest = acquireOpenGL;
+        return new RestoreTextureFrameAcquireMethods(previousVulkan, previousOpenGL);
+    }
+
+    public static RenderSessionHandle AttachMetalSurface(
         MapHandle map,
         MetalSurfaceDescriptor descriptor
     )
@@ -39,7 +239,7 @@ public sealed unsafe class RenderSessionHandle : IDisposable
         return new RenderSessionHandle(map, session);
     }
 
-    internal static RenderSessionHandle AttachVulkanSurface(
+    public static RenderSessionHandle AttachVulkanSurface(
         MapHandle map,
         VulkanSurfaceDescriptor descriptor
     )
@@ -51,7 +251,7 @@ public sealed unsafe class RenderSessionHandle : IDisposable
         return new RenderSessionHandle(map, session);
     }
 
-    internal static RenderSessionHandle AttachOpenGLSurface(
+    public static RenderSessionHandle AttachOpenGLSurface(
         MapHandle map,
         OpenGLSurfaceDescriptor descriptor
     )
@@ -59,11 +259,11 @@ public sealed unsafe class RenderSessionHandle : IDisposable
         ArgumentNullException.ThrowIfNull(map);
         var native = RenderStructs.ToNative(descriptor);
         mln_render_session* session = null;
-        NativeStatus.Check(NativeMethods.mln_opengl_surface_attach(map.Pointer, &native, &session));
+        NativeStatus.Check(OpenGLSurfaceAttachNative(map.Pointer, &native, &session));
         return new RenderSessionHandle(map, session);
     }
 
-    internal static RenderSessionHandle AttachMetalOwnedTexture(
+    public static RenderSessionHandle AttachMetalOwnedTexture(
         MapHandle map,
         MetalOwnedTextureDescriptor descriptor
     )
@@ -77,7 +277,7 @@ public sealed unsafe class RenderSessionHandle : IDisposable
         return new RenderSessionHandle(map, session);
     }
 
-    internal static RenderSessionHandle AttachMetalBorrowedTexture(
+    public static RenderSessionHandle AttachMetalBorrowedTexture(
         MapHandle map,
         MetalBorrowedTextureDescriptor descriptor
     )
@@ -91,7 +291,7 @@ public sealed unsafe class RenderSessionHandle : IDisposable
         return new RenderSessionHandle(map, session);
     }
 
-    internal static RenderSessionHandle AttachVulkanOwnedTexture(
+    public static RenderSessionHandle AttachVulkanOwnedTexture(
         MapHandle map,
         VulkanOwnedTextureDescriptor descriptor
     )
@@ -105,7 +305,7 @@ public sealed unsafe class RenderSessionHandle : IDisposable
         return new RenderSessionHandle(map, session);
     }
 
-    internal static RenderSessionHandle AttachVulkanBorrowedTexture(
+    public static RenderSessionHandle AttachVulkanBorrowedTexture(
         MapHandle map,
         VulkanBorrowedTextureDescriptor descriptor
     )
@@ -119,7 +319,7 @@ public sealed unsafe class RenderSessionHandle : IDisposable
         return new RenderSessionHandle(map, session);
     }
 
-    internal static RenderSessionHandle AttachOpenGLOwnedTexture(
+    public static RenderSessionHandle AttachOpenGLOwnedTexture(
         MapHandle map,
         OpenGLOwnedTextureDescriptor descriptor
     )
@@ -127,13 +327,11 @@ public sealed unsafe class RenderSessionHandle : IDisposable
         ArgumentNullException.ThrowIfNull(map);
         var native = RenderStructs.ToNative(descriptor);
         mln_render_session* session = null;
-        NativeStatus.Check(
-            NativeMethods.mln_opengl_owned_texture_attach(map.Pointer, &native, &session)
-        );
+        NativeStatus.Check(OpenGLOwnedTextureAttachNative(map.Pointer, &native, &session));
         return new RenderSessionHandle(map, session);
     }
 
-    internal static RenderSessionHandle AttachOpenGLBorrowedTexture(
+    public static RenderSessionHandle AttachOpenGLBorrowedTexture(
         MapHandle map,
         OpenGLBorrowedTextureDescriptor descriptor
     )
@@ -141,9 +339,7 @@ public sealed unsafe class RenderSessionHandle : IDisposable
         ArgumentNullException.ThrowIfNull(map);
         var native = RenderStructs.ToNative(descriptor);
         mln_render_session* session = null;
-        NativeStatus.Check(
-            NativeMethods.mln_opengl_borrowed_texture_attach(map.Pointer, &native, &session)
-        );
+        NativeStatus.Check(OpenGLBorrowedTextureAttachNative(map.Pointer, &native, &session));
         return new RenderSessionHandle(map, session);
     }
 
@@ -153,27 +349,29 @@ public sealed unsafe class RenderSessionHandle : IDisposable
 
     public void Resize(uint width, uint height, double scaleFactor)
     {
+        ThrowIfTextureFrameActive(nameof(Resize));
         if (!double.IsFinite(scaleFactor) || scaleFactor <= 0)
         {
             throw new InvalidArgumentException(
                 MaplibreStatus.InvalidArgument,
                 null,
-                "Render target scale factor must be positive and finite."
+                "Render target scale factor must be positive and finite.",
+                null
             );
         }
 
-        NativeStatus.Check(
-            NativeMethods.mln_render_session_resize(Pointer, width, height, scaleFactor)
-        );
+        NativeStatus.Check(ResizeNative(Pointer, width, height, scaleFactor));
     }
 
     public void RenderUpdate()
     {
-        NativeStatus.Check(NativeMethods.mln_render_session_render_update(Pointer));
+        ThrowIfTextureFrameActive(nameof(RenderUpdate));
+        NativeStatus.Check(RenderUpdateNative(Pointer));
     }
 
     public void Detach()
     {
+        ThrowIfTextureFrameActive(nameof(Detach));
         NativeStatus.Check(NativeMethods.mln_render_session_detach(Pointer));
     }
 
@@ -226,36 +424,22 @@ public sealed unsafe class RenderSessionHandle : IDisposable
         );
     }
 
-    public IReadOnlyList<QueriedFeature> QueryRenderedFeatures(RenderedQueryGeometry geometry) =>
-        QueryRenderedFeaturesCore(geometry, null);
-
     public IReadOnlyList<QueriedFeature> QueryRenderedFeatures(
         RenderedQueryGeometry geometry,
-        RenderedFeatureQueryOptions options
-    ) =>
-        QueryRenderedFeaturesCore(
-            geometry,
-            options ?? throw new ArgumentNullException(nameof(options))
-        );
-
-    public IReadOnlyList<QueriedFeature> QuerySourceFeatures(string sourceId) =>
-        QuerySourceFeaturesCore(sourceId, null);
+        RenderedFeatureQueryOptions? options
+    ) => QueryRenderedFeaturesCore(geometry, options);
 
     public IReadOnlyList<QueriedFeature> QuerySourceFeatures(
         string sourceId,
-        SourceFeatureQueryOptions options
-    ) =>
-        QuerySourceFeaturesCore(
-            sourceId,
-            options ?? throw new ArgumentNullException(nameof(options))
-        );
+        SourceFeatureQueryOptions? options
+    ) => QuerySourceFeaturesCore(sourceId, options);
 
     public FeatureExtensionResult QueryFeatureExtension(
         string sourceId,
         Feature feature,
         string extension,
         string extensionField,
-        JsonValue? arguments = null
+        JsonValue? arguments
     )
     {
         using var nativeSourceId = NativeStringView.From(sourceId, nameof(sourceId));
@@ -284,8 +468,9 @@ public sealed unsafe class RenderSessionHandle : IDisposable
 
     public TextureImageInfo TextureImageInfo()
     {
+        ThrowIfTextureFrameActive(nameof(TextureImageInfo));
         var info = new mln_texture_image_info { size = (uint)sizeof(mln_texture_image_info) };
-        var status = NativeMethods.mln_texture_read_premultiplied_rgba8(Pointer, null, 0, &info);
+        var status = TextureReadNative(Pointer, null, 0, &info);
         var copied = RenderStructs.FromNative(info);
         if (
             status == mln_status.MLN_STATUS_OK
@@ -302,14 +487,15 @@ public sealed unsafe class RenderSessionHandle : IDisposable
     public TextureImageInfo ReadPremultipliedRgba8(NativeBuffer buffer)
     {
         ArgumentNullException.ThrowIfNull(buffer);
+        ThrowIfTextureFrameActive(nameof(ReadPremultipliedRgba8));
         var info = new mln_texture_image_info { size = (uint)sizeof(mln_texture_image_info) };
         fixed (byte* data = buffer.Span)
         {
             NativeStatus.Check(
-                NativeMethods.mln_texture_read_premultiplied_rgba8(
+                TextureReadNative(
                     Pointer,
                     buffer.ByteLength == 0 ? null : data,
-                    buffer.ByteLength,
+                    (nuint)buffer.ByteLength,
                     &info
                 )
             );
@@ -317,30 +503,25 @@ public sealed unsafe class RenderSessionHandle : IDisposable
         return RenderStructs.FromNative(info);
     }
 
-    public PremultipliedRgba8Image ReadPremultipliedRgba8()
-    {
-        var info = TextureImageInfo();
-        using var buffer = new NativeBuffer((nuint)info.ByteLength);
-        var readInfo = ReadPremultipliedRgba8(buffer);
-        return new PremultipliedRgba8Image(buffer.Span.ToArray(), readInfo);
-    }
-
     public MetalOwnedTextureFrameHandle AcquireMetalOwnedTextureFrame()
     {
-        var pointer = (mln_metal_owned_texture_frame*)
-            NativeMemory.AllocZeroed((nuint)sizeof(mln_metal_owned_texture_frame));
-        pointer->size = (uint)sizeof(mln_metal_owned_texture_frame);
+        ReserveActiveTextureFrame();
+        mln_metal_owned_texture_frame* pointer = null;
         var acquired = false;
+        var reservationHeld = true;
         FrameScope? scope = null;
         try
         {
-            NativeStatus.Check(
-                NativeMethods.mln_metal_owned_texture_acquire_frame(Pointer, pointer)
-            );
+            pointer = (mln_metal_owned_texture_frame*)
+                NativeMemory.AllocZeroed((nuint)sizeof(mln_metal_owned_texture_frame));
+            pointer->size = (uint)sizeof(mln_metal_owned_texture_frame);
+            NativeStatus.Check(AcquireMetalFrameNative(Pointer, pointer));
             acquired = true;
             scope = new FrameScope(nameof(MetalOwnedTextureFrame));
-            var frame = RenderStructs.FromNative(*pointer, scope);
-            return new MetalOwnedTextureFrameHandle(this, pointer, scope, frame);
+            var frame = ReadMetalFrame(*pointer, scope);
+            var handle = new MetalOwnedTextureFrameHandle(this, pointer, scope, frame, true);
+            reservationHeld = false;
+            return handle;
         }
         catch
         {
@@ -353,27 +534,37 @@ public sealed unsafe class RenderSessionHandle : IDisposable
                 );
             }
             scope?.Dispose();
-            NativeMemory.Free(pointer);
+            if (pointer is not null)
+            {
+                NativeMemory.Free(pointer);
+            }
+            if (reservationHeld)
+            {
+                UnregisterActiveTextureFrame();
+            }
             throw;
         }
     }
 
     public VulkanOwnedTextureFrameHandle AcquireVulkanOwnedTextureFrame()
     {
-        var pointer = (mln_vulkan_owned_texture_frame*)
-            NativeMemory.AllocZeroed((nuint)sizeof(mln_vulkan_owned_texture_frame));
-        pointer->size = (uint)sizeof(mln_vulkan_owned_texture_frame);
+        ReserveActiveTextureFrame();
+        mln_vulkan_owned_texture_frame* pointer = null;
         var acquired = false;
+        var reservationHeld = true;
         FrameScope? scope = null;
         try
         {
-            NativeStatus.Check(
-                NativeMethods.mln_vulkan_owned_texture_acquire_frame(Pointer, pointer)
-            );
+            pointer = (mln_vulkan_owned_texture_frame*)
+                NativeMemory.AllocZeroed((nuint)sizeof(mln_vulkan_owned_texture_frame));
+            pointer->size = (uint)sizeof(mln_vulkan_owned_texture_frame);
+            NativeStatus.Check(AcquireVulkanFrameNative(Pointer, pointer));
             acquired = true;
             scope = new FrameScope(nameof(VulkanOwnedTextureFrame));
             var frame = RenderStructs.FromNative(*pointer, scope);
-            return new VulkanOwnedTextureFrameHandle(this, pointer, scope, frame);
+            var handle = new VulkanOwnedTextureFrameHandle(this, pointer, scope, frame, true);
+            reservationHeld = false;
+            return handle;
         }
         catch
         {
@@ -386,27 +577,37 @@ public sealed unsafe class RenderSessionHandle : IDisposable
                 );
             }
             scope?.Dispose();
-            NativeMemory.Free(pointer);
+            if (pointer is not null)
+            {
+                NativeMemory.Free(pointer);
+            }
+            if (reservationHeld)
+            {
+                UnregisterActiveTextureFrame();
+            }
             throw;
         }
     }
 
     public OpenGLOwnedTextureFrameHandle AcquireOpenGLOwnedTextureFrame()
     {
-        var pointer = (mln_opengl_owned_texture_frame*)
-            NativeMemory.AllocZeroed((nuint)sizeof(mln_opengl_owned_texture_frame));
-        pointer->size = (uint)sizeof(mln_opengl_owned_texture_frame);
+        ReserveActiveTextureFrame();
+        mln_opengl_owned_texture_frame* pointer = null;
         var acquired = false;
+        var reservationHeld = true;
         FrameScope? scope = null;
         try
         {
-            NativeStatus.Check(
-                NativeMethods.mln_opengl_owned_texture_acquire_frame(Pointer, pointer)
-            );
+            pointer = (mln_opengl_owned_texture_frame*)
+                NativeMemory.AllocZeroed((nuint)sizeof(mln_opengl_owned_texture_frame));
+            pointer->size = (uint)sizeof(mln_opengl_owned_texture_frame);
+            NativeStatus.Check(AcquireOpenGLFrameNative(Pointer, pointer));
             acquired = true;
             scope = new FrameScope(nameof(OpenGLOwnedTextureFrame));
             var frame = RenderStructs.FromNative(*pointer, scope);
-            return new OpenGLOwnedTextureFrameHandle(this, pointer, scope, frame);
+            var handle = new OpenGLOwnedTextureFrameHandle(this, pointer, scope, frame, true);
+            reservationHeld = false;
+            return handle;
         }
         catch
         {
@@ -419,13 +620,20 @@ public sealed unsafe class RenderSessionHandle : IDisposable
                 );
             }
             scope?.Dispose();
-            NativeMemory.Free(pointer);
+            if (pointer is not null)
+            {
+                NativeMemory.Free(pointer);
+            }
+            if (reservationHeld)
+            {
+                UnregisterActiveTextureFrame();
+            }
             throw;
         }
     }
 
     internal mln_status ReleaseMetalFrame(mln_metal_owned_texture_frame* frame) =>
-        NativeMethods.mln_metal_owned_texture_release_frame(Pointer, frame);
+        ReleaseMetalFrameNative(Pointer, frame);
 
     internal mln_status ReleaseVulkanFrame(mln_vulkan_owned_texture_frame* frame) =>
         NativeMethods.mln_vulkan_owned_texture_release_frame(Pointer, frame);
@@ -469,6 +677,101 @@ public sealed unsafe class RenderSessionHandle : IDisposable
                     $"Construction failed after acquiring {typeName} frame 0x{(nint)pointer:x}; cleanup threw {error.GetType().Name}: {error.Message}"
                 )
             );
+        }
+    }
+
+    private static OpenGLSurfaceAttach OpenGLSurfaceAttachNative =>
+        openGLSurfaceAttachForTest ?? DefaultOpenGLSurfaceAttach;
+
+    private static OpenGLOwnedTextureAttach OpenGLOwnedTextureAttachNative =>
+        openGLOwnedTextureAttachForTest ?? DefaultOpenGLOwnedTextureAttach;
+
+    private static OpenGLBorrowedTextureAttach OpenGLBorrowedTextureAttachNative =>
+        openGLBorrowedTextureAttachForTest ?? DefaultOpenGLBorrowedTextureAttach;
+
+    private static RenderSessionResize ResizeNative => resizeForTest ?? DefaultResize;
+
+    private static RenderSessionRenderUpdate RenderUpdateNative =>
+        renderUpdateForTest ?? DefaultRenderUpdate;
+
+    private static TextureRead TextureReadNative => textureReadForTest ?? DefaultTextureRead;
+
+    private static mln_status DestroyNative(mln_render_session* session) =>
+        (destroyForTest ?? DefaultDestroy)(session);
+
+    private static MetalOwnedTextureAcquireFrame AcquireMetalFrameNative =>
+        acquireMetalFrameForTest ?? DefaultAcquireMetalFrame;
+
+    private static MetalOwnedTextureReleaseFrame ReleaseMetalFrameNative =>
+        releaseMetalFrameForTest ?? DefaultReleaseMetalFrame;
+
+    private static VulkanOwnedTextureAcquireFrame AcquireVulkanFrameNative =>
+        acquireVulkanFrameForTest ?? DefaultAcquireVulkanFrame;
+
+    private static OpenGLOwnedTextureAcquireFrame AcquireOpenGLFrameNative =>
+        acquireOpenGLFrameForTest ?? DefaultAcquireOpenGLFrame;
+
+    private static MetalOwnedTextureFrame ReadMetalFrame(
+        mln_metal_owned_texture_frame frame,
+        FrameScope scope
+    ) =>
+        readMetalFrameForTest is { } reader
+            ? reader(frame, scope)
+            : RenderStructs.FromNative(frame, scope);
+
+    private sealed class RestoreOpenGLAttachMethods(
+        OpenGLSurfaceAttach? previousSurface,
+        OpenGLOwnedTextureAttach? previousOwnedTexture,
+        OpenGLBorrowedTextureAttach? previousBorrowedTexture
+    ) : IDisposable
+    {
+        public void Dispose()
+        {
+            openGLSurfaceAttachForTest = previousSurface;
+            openGLOwnedTextureAttachForTest = previousOwnedTexture;
+            openGLBorrowedTextureAttachForTest = previousBorrowedTexture;
+        }
+    }
+
+    private sealed class RestoreSessionMethods(
+        RenderSessionResize? previousResize,
+        RenderSessionRenderUpdate? previousRenderUpdate,
+        TextureRead? previousTextureRead,
+        StatusDestroy<mln_render_session>? previousDestroy
+    ) : IDisposable
+    {
+        public void Dispose()
+        {
+            resizeForTest = previousResize;
+            renderUpdateForTest = previousRenderUpdate;
+            textureReadForTest = previousTextureRead;
+            destroyForTest = previousDestroy;
+        }
+    }
+
+    private sealed class RestoreMetalFrameMethods(
+        MetalOwnedTextureAcquireFrame? previousAcquire,
+        MetalOwnedTextureReleaseFrame? previousRelease,
+        Func<mln_metal_owned_texture_frame, FrameScope, MetalOwnedTextureFrame>? previousRead
+    ) : IDisposable
+    {
+        public void Dispose()
+        {
+            acquireMetalFrameForTest = previousAcquire;
+            releaseMetalFrameForTest = previousRelease;
+            readMetalFrameForTest = previousRead;
+        }
+    }
+
+    private sealed class RestoreTextureFrameAcquireMethods(
+        VulkanOwnedTextureAcquireFrame? previousVulkan,
+        OpenGLOwnedTextureAcquireFrame? previousOpenGL
+    ) : IDisposable
+    {
+        public void Dispose()
+        {
+            acquireVulkanFrameForTest = previousVulkan;
+            acquireOpenGLFrameForTest = previousOpenGL;
         }
     }
 
@@ -548,19 +851,103 @@ public sealed unsafe class RenderSessionHandle : IDisposable
     /// <summary>Destroys the render session on the map owner thread.</summary>
     public void Close()
     {
+        ThrowIfTextureFrameActive(nameof(Close));
         state.Close();
     }
 
     /// <inheritdoc />
     public void Dispose()
     {
+        if (IsTextureFrameActive())
+        {
+            ReportDisposeWithActiveTextureFrame();
+            GC.KeepAlive(map);
+            return;
+        }
+
         state.TryClose();
         GC.KeepAlive(map);
+    }
+
+    private bool IsTextureFrameActive()
+    {
+        lock (frameGate)
+        {
+            return hasActiveTextureFrame;
+        }
+    }
+
+    private void ThrowIfTextureFrameActive(string operation)
+    {
+        if (!IsTextureFrameActive())
+        {
+            return;
+        }
+
+        throw new InvalidStateException(
+            MaplibreStatus.InvalidState,
+            null,
+            $"{operation} cannot run while a texture frame is active.",
+            null
+        );
+    }
+
+    private void ReportDisposeWithActiveTextureFrame()
+    {
+        NativeLeakReporter.Report(
+            new NativeLeakReport(
+                NativeLeakReportKind.DisposeFailed,
+                nameof(RenderSessionHandle),
+                (nint)Pointer,
+                null,
+                "Dispose could not close RenderSessionHandle while a texture frame is active. Release the frame on the owner thread, then call Close() to observe errors and retry."
+            )
+        );
+    }
+
+    internal void ReserveActiveTextureFrame()
+    {
+        lock (frameGate)
+        {
+            if (hasActiveTextureFrame)
+            {
+                throw new InvalidStateException(
+                    MaplibreStatus.InvalidState,
+                    null,
+                    "A texture frame is active already.",
+                    null
+                );
+            }
+
+            hasActiveTextureFrame = true;
+        }
+    }
+
+    internal void UnregisterActiveTextureFrame()
+    {
+        lock (frameGate)
+        {
+            hasActiveTextureFrame = false;
+        }
     }
 }
 
 internal unsafe delegate mln_status FrameRelease<T>(RenderSessionHandle session, T* frame)
     where T : unmanaged;
+internal unsafe delegate mln_status TextureRead(
+    mln_render_session* session,
+    byte* data,
+    nuint length,
+    mln_texture_image_info* info
+);
+internal unsafe delegate mln_status VulkanOwnedTextureAcquireFrame(
+    mln_render_session* session,
+    mln_vulkan_owned_texture_frame* frame
+);
+internal unsafe delegate mln_status OpenGLOwnedTextureAcquireFrame(
+    mln_render_session* session,
+    mln_opengl_owned_texture_frame* frame
+);
 
 internal sealed unsafe class TextureFrameState<T>
     where T : unmanaged
@@ -576,7 +963,8 @@ internal sealed unsafe class TextureFrameState<T>
         T* pointer,
         FrameScope scope,
         FrameRelease<T> release,
-        string typeName
+        string typeName,
+        bool activeFrameReserved = false
     )
     {
         this.session = session;
@@ -584,6 +972,10 @@ internal sealed unsafe class TextureFrameState<T>
         this.scope = scope;
         this.release = release;
         this.typeName = typeName;
+        if (!activeFrameReserved)
+        {
+            session.ReserveActiveTextureFrame();
+        }
     }
 
     internal bool IsClosed => pointer is null;
@@ -661,6 +1053,7 @@ internal sealed unsafe class TextureFrameState<T>
         pointer = null;
         scope.Dispose();
         NativeMemory.Free(current);
+        session.UnregisterActiveTextureFrame();
     }
 }
 
@@ -672,7 +1065,8 @@ public sealed unsafe class MetalOwnedTextureFrameHandle : IDisposable
         RenderSessionHandle session,
         mln_metal_owned_texture_frame* pointer,
         FrameScope scope,
-        MetalOwnedTextureFrame frame
+        MetalOwnedTextureFrame frame,
+        bool activeFrameReserved = false
     )
     {
         state = new TextureFrameState<mln_metal_owned_texture_frame>(
@@ -680,7 +1074,8 @@ public sealed unsafe class MetalOwnedTextureFrameHandle : IDisposable
             pointer,
             scope,
             static (session, frame) => session.ReleaseMetalFrame(frame),
-            nameof(MetalOwnedTextureFrameHandle)
+            nameof(MetalOwnedTextureFrameHandle),
+            activeFrameReserved
         );
         Frame = frame;
     }
@@ -702,7 +1097,8 @@ public sealed unsafe class VulkanOwnedTextureFrameHandle : IDisposable
         RenderSessionHandle session,
         mln_vulkan_owned_texture_frame* pointer,
         FrameScope scope,
-        VulkanOwnedTextureFrame frame
+        VulkanOwnedTextureFrame frame,
+        bool activeFrameReserved = false
     )
     {
         state = new TextureFrameState<mln_vulkan_owned_texture_frame>(
@@ -710,7 +1106,8 @@ public sealed unsafe class VulkanOwnedTextureFrameHandle : IDisposable
             pointer,
             scope,
             static (session, frame) => session.ReleaseVulkanFrame(frame),
-            nameof(VulkanOwnedTextureFrameHandle)
+            nameof(VulkanOwnedTextureFrameHandle),
+            activeFrameReserved
         );
         Frame = frame;
     }
@@ -732,7 +1129,8 @@ public sealed unsafe class OpenGLOwnedTextureFrameHandle : IDisposable
         RenderSessionHandle session,
         mln_opengl_owned_texture_frame* pointer,
         FrameScope scope,
-        OpenGLOwnedTextureFrame frame
+        OpenGLOwnedTextureFrame frame,
+        bool activeFrameReserved = false
     )
     {
         state = new TextureFrameState<mln_opengl_owned_texture_frame>(
@@ -740,7 +1138,8 @@ public sealed unsafe class OpenGLOwnedTextureFrameHandle : IDisposable
             pointer,
             scope,
             static (session, frame) => session.ReleaseOpenGLFrame(frame),
-            nameof(OpenGLOwnedTextureFrameHandle)
+            nameof(OpenGLOwnedTextureFrameHandle),
+            activeFrameReserved
         );
         Frame = frame;
     }

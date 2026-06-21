@@ -1,7 +1,7 @@
 internal import CMaplibreNativeC
 import Foundation
 
-struct NativeLatLngBounds: Equatable, Sendable {
+struct NativeLatLngBounds: Equatable {
   let southwest: NativeLatLng
   let northeast: NativeLatLng
 
@@ -20,7 +20,7 @@ struct NativeLatLngBounds: Equatable, Sendable {
   }
 }
 
-struct NativeStyleTileSourceOptions: Equatable, Sendable {
+struct NativeStyleTileSourceOptions: Equatable {
   var minZoom: Double?
   var maxZoom: Double?
   var attribution: String?
@@ -53,7 +53,8 @@ struct NativeStyleTileSourceOptions: Equatable, Sendable {
   func withNativeOptions<Result>(
     _ body: (UnsafePointer<mln_style_tile_source_options>?) throws -> Result
   ) throws -> Result {
-    if minZoom == nil, maxZoom == nil, attribution == nil, scheme == nil, bounds == nil, tileSize == nil,
+    if minZoom == nil, maxZoom == nil, attribution == nil, scheme == nil,
+       bounds == nil, tileSize == nil,
        vectorEncoding == nil, rasterEncoding == nil
     {
       return try body(nil)
@@ -96,7 +97,7 @@ struct NativeStyleTileSourceOptions: Equatable, Sendable {
   }
 }
 
-struct NativeCanonicalTileID: Equatable, Sendable {
+struct NativeCanonicalTileID: Equatable {
   let z: UInt32
   let x: UInt32
   let y: UInt32
@@ -118,18 +119,11 @@ struct NativeCanonicalTileID: Equatable, Sendable {
   }
 }
 
-struct NativePremultipliedRGBA8Image: Equatable, Sendable {
+struct NativePremultipliedRGBA8Image: Equatable {
   let width: UInt32
   let height: UInt32
   let stride: UInt32
   let pixels: [UInt8]
-
-  init(width: UInt32, height: UInt32, stride: UInt32, pixels: [UInt8]) {
-    self.width = width
-    self.height = height
-    self.stride = stride
-    self.pixels = pixels
-  }
 
   func withNativeImage<Result>(
     _ body: (UnsafePointer<mln_premultiplied_rgba8_image>) throws -> Result
@@ -146,7 +140,7 @@ struct NativePremultipliedRGBA8Image: Equatable, Sendable {
   }
 }
 
-struct NativeStyleImageOptions: Equatable, Sendable {
+struct NativeStyleImageOptions: Equatable {
   let pixelRatio: Float?
   let sdf: Bool?
 
@@ -231,7 +225,10 @@ final class NativeCustomGeometrySourceCallbacks: @unchecked Sendable {
 
   init(fetchTile: @escaping TileCallback, cancelTile: TileCallback? = nil) {
     retainedBox = Unmanaged.passRetained(
-      NativeCustomGeometrySourceCallbackBox(fetchTile: fetchTile, cancelTile: cancelTile)
+      NativeCustomGeometrySourceCallbackBox(
+        fetchTile: fetchTile,
+        cancelTile: cancelTile
+      )
     )
   }
 
@@ -249,24 +246,35 @@ final class NativeCustomGeometrySourceCallbacks: @unchecked Sendable {
     retainedBox = nil
   }
 
-  static func releaseAbandonedRetainedBoxForTesting(_ pointer: UnsafeMutableRawPointer) {
-    let retainedBox = Unmanaged<NativeCustomGeometrySourceCallbackBox>.fromOpaque(pointer)
+  static func releaseAbandonedRetainedBoxForTesting(
+    _ pointer: UnsafeMutableRawPointer
+  ) {
+    let retainedBox = Unmanaged<NativeCustomGeometrySourceCallbackBox>
+      .fromOpaque(pointer)
     retainedBox.takeUnretainedValue().retireAndWait()
     retainedBox.release()
   }
 }
 
-private func customGeometryFetchTileCallback(_ userData: UnsafeMutableRawPointer?, _ tileId: mln_canonical_tile_id) {
+private func customGeometryFetchTileCallback(
+  _ userData: UnsafeMutableRawPointer?,
+  _ tileId: mln_canonical_tile_id
+) {
   guard let userData else { return }
-  Unmanaged<NativeCustomGeometrySourceCallbackBox>.fromOpaque(userData).takeUnretainedValue().fetched(tileId)
+  Unmanaged<NativeCustomGeometrySourceCallbackBox>.fromOpaque(userData)
+    .takeUnretainedValue().fetched(tileId)
 }
 
-private func customGeometryCancelTileCallback(_ userData: UnsafeMutableRawPointer?, _ tileId: mln_canonical_tile_id) {
+private func customGeometryCancelTileCallback(
+  _ userData: UnsafeMutableRawPointer?,
+  _ tileId: mln_canonical_tile_id
+) {
   guard let userData else { return }
-  Unmanaged<NativeCustomGeometrySourceCallbackBox>.fromOpaque(userData).takeUnretainedValue().cancelled(tileId)
+  Unmanaged<NativeCustomGeometrySourceCallbackBox>.fromOpaque(userData)
+    .takeUnretainedValue().cancelled(tileId)
 }
 
-struct NativeCustomGeometrySourceOptions: Sendable {
+struct NativeCustomGeometrySourceOptions {
   let callbacks: NativeCustomGeometrySourceCallbacks
   var minZoom: Double?
   var maxZoom: Double?
@@ -335,7 +343,7 @@ struct NativeCustomGeometrySourceOptions: Sendable {
   }
 }
 
-struct NativeStyleImageInfo: Equatable, Sendable {
+struct NativeStyleImageInfo: Equatable {
   let width: UInt32
   let height: UInt32
   let stride: UInt32
@@ -353,7 +361,7 @@ struct NativeStyleImageInfo: Equatable, Sendable {
   }
 }
 
-struct NativeStyleSourceInfo: Equatable, Sendable {
+struct NativeStyleSourceInfo: Equatable {
   let type: UInt32
   let idSize: Int
   let isVolatile: Bool

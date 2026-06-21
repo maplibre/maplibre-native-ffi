@@ -7,8 +7,10 @@ const support = @import("support.zig");
 fn waitForEvent(runtime: *maplibre.RuntimeHandle, event_type: maplibre.RuntimeEventType) !bool {
     for (0..1000) |_| {
         try runtime.runOnce();
-        while (try runtime.pollEvent()) |event| {
-            if (std.meta.eql(event.event_type, event_type)) return true;
+        while (try runtime.pollEvent(testing.allocator)) |event| {
+            var owned_event = event;
+            defer owned_event.deinit();
+            if (std.meta.eql(owned_event.event_type, event_type)) return true;
         }
         try std.Thread.yield();
     }
@@ -24,7 +26,7 @@ fn createLoadedMap(runtime: *maplibre.RuntimeHandle) !maplibre.MapHandle {
 }
 
 test "style source JSON descriptors expose type info and copied attribution" {
-    var runtime = try maplibre.RuntimeHandle.init(null);
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
     var map = try createLoadedMap(&runtime);
     defer map.close() catch @panic("map close failed");
@@ -66,7 +68,7 @@ test "style source JSON descriptors expose type info and copied attribution" {
 }
 
 test "style source removal reports state and copies missing results" {
-    var runtime = try maplibre.RuntimeHandle.init(null);
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
     var map = try createLoadedMap(&runtime);
     defer map.close() catch @panic("map close failed");
@@ -82,7 +84,7 @@ test "style source removal reports state and copies missing results" {
 }
 
 test "tile source helpers add vector raster and raster DEM sources" {
-    var runtime = try maplibre.RuntimeHandle.init(null);
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
     var map = try createLoadedMap(&runtime);
     defer map.close() catch @panic("map close failed");
@@ -159,7 +161,7 @@ test "tile source helpers add vector raster and raster DEM sources" {
 }
 
 test "image source helpers add update and copy coordinates" {
-    var runtime = try maplibre.RuntimeHandle.init(null);
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
     var map = try createLoadedMap(&runtime);
     defer map.close() catch @panic("map close failed");
@@ -211,7 +213,7 @@ test "image source helpers add update and copy coordinates" {
 }
 
 test "style source JSON descriptors reject invalid source data and pass explicit-length IDs" {
-    var runtime = try maplibre.RuntimeHandle.init(null);
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
     var map = try createLoadedMap(&runtime);
     defer map.close() catch @panic("map close failed");
@@ -256,7 +258,7 @@ fn cancelCustomGeometryTile(context: ?*anyopaque, tile_id: maplibre.CanonicalTil
 }
 
 test "custom geometry source helpers add sources and accept tile updates" {
-    var runtime = try maplibre.RuntimeHandle.init(null);
+    var runtime = try maplibre.RuntimeHandle.create(testing.allocator, .{}, null);
     defer runtime.close() catch @panic("runtime close failed");
     var map = try createLoadedMap(&runtime);
     defer map.close() catch @panic("map close failed");

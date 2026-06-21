@@ -157,11 +157,6 @@ impl fmt::Debug for MapHandle {
 }
 
 impl MapHandle {
-    /// Creates a map with native default map options on the runtime owner thread.
-    pub fn new(runtime: &RuntimeHandle) -> Result<Self> {
-        Self::with_options(runtime, &MapOptions::default())
-    }
-
     /// Creates a map with explicit map options on the runtime owner thread.
     pub fn with_options(runtime: &RuntimeHandle, options: &MapOptions) -> Result<Self> {
         let runtime_ptr = runtime.inner.as_ptr()?;

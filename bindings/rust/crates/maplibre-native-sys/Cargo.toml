@@ -9,3 +9,4 @@ repository.workspace = true
 
 [build-dependencies]
 bindgen = "0.72.1"
+pkg-config = "0.3.33"
