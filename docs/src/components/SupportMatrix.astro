@@ -58,7 +58,7 @@ function platformSupport(
 }
 ---
 
-<section class="support-matrix" aria-labelledby="support-native-heading">
+<section aria-labelledby="support-native-heading">
   <h3 id="support-native-heading">Native Platforms</h3>
   <table>
     <thead>
@@ -74,17 +74,15 @@ function platformSupport(
           <th scope="row">{row.platformLabel}</th>
           <td>{row.architectureLabels.join(", ")}</td>
           <td>
-            <div class="support-badge-list">
-              {row.backends.map((backend) => (
-                <span class="support-backend" title={variantTitle(backend)}>
-                  <Badge
-                    text={backend.backendLabel}
-                    variant={badgeVariant(backend.status)}
-                    size="small"
-                  />
-                </span>
-              ))}
-            </div>
+            {row.backends.map((backend) => (
+              <span title={variantTitle(backend)}>
+                <Badge
+                  text={backend.backendLabel}
+                  variant={badgeVariant(backend.status)}
+                  size="small"
+                />{" "}
+              </span>
+            ))}
           </td>
         </tr>
       ))}
@@ -92,7 +90,7 @@ function platformSupport(
   </table>
 </section>
 
-<section class="support-matrix" aria-labelledby="support-bindings-heading">
+<section aria-labelledby="support-bindings-heading">
   <h3 id="support-bindings-heading">Language Bindings</h3>
   <table>
     <thead>
@@ -111,22 +109,15 @@ function platformSupport(
             const support = platformSupport(binding, platform.platform);
             return (
               <td>
-                {support ? (
-                  <div class="support-badge-list">
-                    {support.backends.map((backend) => (
-                      <span
-                        class="support-backend"
-                        title={variantTitle(backend)}
-                      >
-                        <Badge
-                          text={backend.backendLabel}
-                          variant={badgeVariant(backend.status)}
-                          size="small"
-                        />
-                      </span>
-                    ))}
-                  </div>
-                ) : <span class="support-empty">-</span>}
+                {support ? support.backends.map((backend) => (
+                  <span title={variantTitle(backend)}>
+                    <Badge
+                      text={backend.backendLabel}
+                      variant={badgeVariant(backend.status)}
+                      size="small"
+                    />{" "}
+                  </span>
+                )) : "-"}
               </td>
             );
           })}
@@ -136,7 +127,7 @@ function platformSupport(
   </table>
 </section>
 
-<section class="support-matrix" aria-labelledby="support-examples-heading">
+<section aria-labelledby="support-examples-heading">
   <h3 id="support-examples-heading">Examples</h3>
   <table>
     <thead>
@@ -155,22 +146,15 @@ function platformSupport(
             const support = platformSupport(example, platform.platform);
             return (
               <td>
-                {support ? (
-                  <div class="support-badge-list">
-                    {support.backends.map((backend) => (
-                      <span
-                        class="support-backend"
-                        title={variantTitle(backend)}
-                      >
-                        <Badge
-                          text={backend.backendLabel}
-                          variant={badgeVariant(backend.status)}
-                          size="small"
-                        />
-                      </span>
-                    ))}
-                  </div>
-                ) : <span class="support-empty">-</span>}
+                {support ? support.backends.map((backend) => (
+                  <span title={variantTitle(backend)}>
+                    <Badge
+                      text={backend.backendLabel}
+                      variant={badgeVariant(backend.status)}
+                      size="small"
+                    />{" "}
+                  </span>
+                )) : "-"}
               </td>
             );
           })}

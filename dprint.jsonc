@@ -10,7 +10,6 @@
   "excludes": [
     "third_party/**",
     ".github/workflows/ci.yml",
-    "docs/src/generated/support-matrix.json",
     "**/*-lock.yaml",
     "**/*.lock.yaml",
     "**/*-lock.yml",
