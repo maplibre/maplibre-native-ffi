@@ -220,6 +220,27 @@ def write_zig_config(artifact: Artifact, out_dir: Path) -> None:
     )
 
 
+def write_zig_libc_config(out_dir: Path) -> None:
+    path = out_dir / f"{LIBRARY_NAME}.zig-libc"
+    system_root = os.environ.get("MLN_FFI_SYSTEM_ROOT", "")
+    if not system_root:
+        path.unlink(missing_ok=True)
+        return
+
+    include_dir = str(Path(system_root) / "usr" / "include")
+    write_lines(
+        path,
+        [
+            f"include_dir={include_dir}",
+            f"sys_include_dir={include_dir}",
+            "crt_dir=",
+            "msvc_lib_dir=",
+            "kernel32_lib_dir=",
+            "gcc_dir=",
+        ],
+    )
+
+
 def generate(metadata_path: Path) -> None:
     out_dir = metadata_path.parent
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -230,6 +251,7 @@ def generate(metadata_path: Path) -> None:
     (out_dir / f"{LIBRARY_NAME}.env").unlink(missing_ok=True)
     write_swift_linker_flags(artifact, out_dir)
     write_zig_config(artifact, out_dir)
+    write_zig_libc_config(out_dir)
 
 
 def main() -> int:

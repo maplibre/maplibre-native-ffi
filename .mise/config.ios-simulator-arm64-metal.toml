@@ -1,7 +1,7 @@
 [env]
 MLN_FFI_RENDER_BACKEND = "metal"
 MLN_FFI_BUILD_DIR = "{{config_root}}/build/ios-simulator-arm64-metal"
-MLN_FFI_ZIG_BUILD_ARGS = "-Dtarget=aarch64-ios-simulator"
+MLN_FFI_ZIG_BUILD_ARGS = "-Dtarget=aarch64-ios-simulator --libc {{env.MLN_FFI_BUILD_DIR}}/maplibre-native-c.zig-libc"
 MLN_FFI_SWIFT_TARGET_TRIPLE = "arm64-apple-ios14.3-simulator"
 MLN_FFI_SWIFT_TARGET_BIN_DIR = "arm64-apple-ios-simulator"
 MLN_FFI_CMAKE_ARGS = """

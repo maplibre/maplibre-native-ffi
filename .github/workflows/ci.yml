@@ -221,7 +221,6 @@ jobs:
       - run: mise run configure
       - run: mise run build
       - run: mise run //bindings/swift:build
-      - run: mise run //bindings/zig:build
       - run: mise run //examples/swift-map:build
   variant-ios-simulator-arm64-metal:
     name: variant / ios-simulator-arm64-metal

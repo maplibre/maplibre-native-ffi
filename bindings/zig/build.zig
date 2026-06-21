@@ -364,9 +364,13 @@ pub fn isIosSimulator(target: std.Build.ResolvedTarget) bool {
     return target.result.os.tag == .ios and target.result.abi == .simulator;
 }
 
+pub fn isIos(target: std.Build.ResolvedTarget) bool {
+    return target.result.os.tag == .ios;
+}
+
 pub fn testOptimize(target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) std.builtin.OptimizeMode {
-    // Zig Debug iOS simulator tests hit Mach-O/debug-info linker limits in this dependency graph.
-    if (isIosSimulator(target) and optimize == .Debug) return .ReleaseSafe;
+    // Zig Debug iOS tests hit Mach-O/debug-info linker limits in this dependency graph.
+    if (isIos(target) and optimize == .Debug) return .ReleaseSafe;
     return optimize;
 }
 
@@ -550,9 +554,9 @@ fn addTestCompile(b: *std.Build, options: BuildOptions, root_source_file: std.Bu
             .target = options.target,
             .optimize = options.optimize,
         }),
-        .use_lld = if (isIosSimulator(options.target)) false else null,
+        .use_lld = if (isIos(options.target)) false else null,
     });
-    if (isIosSimulator(options.target)) {
+    if (isIos(options.target)) {
         tests.root_module.addCSourceFile(.{ .file = b.path("../../src/zig_test_support/ios_simulator_dyld_stub.m") });
     }
     linkMaplibreNativeC(b, tests.root_module, repoLinkOptions(options));
@@ -586,7 +590,7 @@ fn addBindingTests(b: *std.Build, options: BuildOptions, maplibre_native: *std.B
         }
     }
     if (options.render_backend == .metal) {
-        if (isIosSimulator(options.target)) {
+        if (options.target.result.os.tag == .ios) {
             tests.root_module.addCSourceFile(.{ .file = b.path("tests/metal_support_ios.m") });
             tests.root_module.linkSystemLibrary("objc", .{});
             tests.root_module.linkFramework("Foundation", .{});
