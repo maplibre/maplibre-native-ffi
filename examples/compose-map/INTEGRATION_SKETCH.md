@@ -3,18 +3,21 @@ title: Compose map integration sketch
 description: Working notes for a Compose Desktop map example built around Skiko texture sharing.
 ---
 
-This document sketches a Compose Desktop map example that demonstrates embedding
-MapLibre Native FFI inside a real Compose Multiplatform renderer. It is a
-working note, not a complete specification. The map example specification keeps
-the existing desktop and mobile profiles; this example follows the broad
-map/runtime/input lifecycle while using a renderer-integration architecture
-tailored to Skiko.
+This document sketches a Compose Desktop map example that demonstrates a
+general-purpose native rendering primitive for Compose Multiplatform. MapLibre
+Native FFI is the first client, but the reusable part should also fit engines,
+games, video renderers, and other native producers that need to present GPU
+content inside Compose Desktop. It is a working note, not a complete
+specification. The map example specification keeps the existing desktop and
+mobile profiles; this example follows the broad map/runtime/input lifecycle
+while using a renderer-integration architecture tailored to Skiko.
 
 ## Goal
 
-The example should prove that a Compose Desktop application can display a live
-MapLibre map through GPU texture sharing while keeping Compose on its natural
-Skiko renderer for each operating system.
+The example should prove that a Compose Desktop application can host a native
+GPU producer through texture sharing while keeping Compose on its natural Skiko
+renderer for each operating system. The map is the concrete proof, not the
+abstraction boundary.
 
 MapLibre does not have a Direct3D backend, so the Windows path should render
 with MapLibre's Vulkan backend and share the resulting image with Skiko's
@@ -29,24 +32,187 @@ examples/compose-map
   AppShell
     Compose window, lifecycle, frame pacing, input, and shutdown.
 
-  SkikoConsumer
+  ComposeNativeSurface
+    Map-neutral Compose primitive.
+    Owns the visual node, resize observation, invalidation, and drawing.
+
+  NativeSurfaceSession
+    Stable client-facing surface lifecycle.
+    Exposes capabilities and leases producer render targets.
+
+  SkikoHost
     Detects the active Skiko renderer.
     Exposes renderer handles needed by the selected bridge.
     Draws the shared texture into the Compose canvas.
 
-  MapLibreProducer
-    Owns runtime, map, and render session.
-    Attaches borrowed texture/image render targets only.
-    Pumps runtime events and calls render_update.
-
-  SharedTextureBridge
+  NativeSurfaceBridge
     One implementation per producer/consumer graphics API pair.
     Owns shared allocation, import/export handles, synchronization, and resize.
+
+  MapLibreSurfaceRenderer
+    Thin adapter from NativeSurfaceSession targets to MapLibre borrowed
+    descriptors.
+    Owns runtime, map, render session, events, and render_update.
 ```
 
-The bridge is the main example surface. It creates or imports a texture that
-both APIs can access, passes the producer-side handle into a MapLibre borrowed
-texture descriptor, and exposes the consumer-side handle to Skiko drawing code.
+The map-neutral surface layer is the main reusable surface. It creates or
+imports a texture that both APIs can access, leases the producer-side handle to
+client code, and exposes the consumer-side handle to Skiko drawing code.
+MapLibre-specific code should start at the point where a producer target is
+converted into a borrowed texture descriptor.
+
+## Reusable Surface Abstraction
+
+The reusable unit should feel closer to an Android `Surface` than to a MapLibre
+integration helper: Compose provides a rectangle in the UI tree, and native code
+gets a render target compatible with a selected producer API.
+
+The mature-toolkit lessons to carry forward:
+
+- The UI primitive should be small. Android `SurfaceView`, `TextureView`, and
+  Flutter `Texture` do not ask the producer to understand the host compositor.
+- The producer should receive short-lived render targets or buffers, not a
+  permanent texture it can mutate whenever it wants.
+- The surface layer should own resize, buffering, synchronization, and
+  presentation. Producers should only render when given a frame lease.
+- Backend details belong at the target edge. The common API should negotiate
+  backends, report capabilities, and then hand the producer a typed target.
+- Invalidation should be explicit. A video stream, game loop, and map renderer
+  should all be able to ask for another frame without coupling to Compose's
+  recomposition model.
+
+Public names:
+
+- `ComposeNativeSurface`: composable visual primitive.
+- `NativeSurfaceController`: imperative invalidation and diagnostics.
+- `NativeSurfaceRenderer`: client-owned producer implementation.
+- `NativeSurfaceSession`: selected backend and surface capabilities.
+- `NativeSurfaceFrame`: one render opportunity with a leased target.
+- `NativeSurfaceTarget`: backend-native target for the active frame.
+
+The public model should be map-neutral:
+
+```kotlin
+@Composable
+fun ComposeNativeSurface(
+  renderer: NativeSurfaceRenderer,
+  modifier: Modifier = Modifier,
+  controller: NativeSurfaceController? = null,
+)
+
+interface NativeSurfaceRenderer {
+  val supportedBackends: Set<ProducerBackend>
+
+  fun onSurfaceAvailable(session: NativeSurfaceSession) {}
+  fun onSurfaceChanged(extent: SurfaceExtent) {}
+  fun render(frame: NativeSurfaceFrame): NativeSurfaceRenderResult
+  fun onSurfaceLost() {}
+}
+
+interface NativeSurfaceSession {
+  val backend: ProducerBackend
+  val capabilities: NativeSurfaceCapabilities
+  fun requestFrame()
+}
+
+interface NativeSurfaceFrame {
+  val frameId: Long
+  val extent: SurfaceExtent
+  val target: NativeSurfaceTarget
+  val presentationTimeNanos: Long?
+}
+
+sealed interface NativeSurfaceRenderResult {
+  data object Rendered : NativeSurfaceRenderResult
+  data object Skipped : NativeSurfaceRenderResult
+}
+```
+
+The default rendering contract is synchronous: when `render(frame)` returns
+`Rendered`, producer writes are complete for that frame and the surface may hand
+off to the Skiko host. Engines or decoders that submit work asynchronously can
+be supported later with an explicit completion token, but the first public API
+should stay synchronous until a concrete async producer forces that shape.
+
+`NativeSurfaceController` should stay small:
+
+```kotlin
+@Composable
+fun rememberNativeSurfaceController(): NativeSurfaceController
+
+interface NativeSurfaceController {
+  val state: StateFlow<NativeSurfaceState>
+  fun requestFrame()
+  fun dispose()
+}
+```
+
+When `controller` is `null`, `ComposeNativeSurface` should create and remember
+an internal controller. Applications that need an external render loop,
+diagnostics, or explicit disposal can pass a remembered controller.
+
+`NativeSurfaceState` should be diagnostic state, not rendering state:
+
+- inactive: the composable is not attached or no bridge is selected.
+- ready: a backend was selected and frames can be requested.
+- unsupported: no bridge can satisfy the renderer's requested producer backends.
+- failed: bridge setup or rendering failed with a diagnostic.
+
+`NativeSurfaceTarget` is intentionally backend-specific at the edge. Targets are
+valid only during the `render(frame)` call.
+
+- `MetalTextureTarget`: `id<MTLTexture>` plus pixel format and extent.
+- `VulkanImageTarget`: `VkImage`, `VkImageView`, `VkFormat`, layouts, and queue
+  family requirements.
+- `OpenGlTextureTarget`: texture name, target, context provider, and format.
+
+Backend targets should use opaque native-handle wrappers instead of raw Kotlin
+`Long` values wherever possible:
+
+```kotlin
+@JvmInline value class NativeHandle(val address: Long)
+
+sealed interface NativeSurfaceTarget {
+  val backend: ProducerBackend
+  val extent: SurfaceExtent
+  val generation: Long
+}
+```
+
+The reusable layer owns Skiko reflection, consumer drawing, shared allocation,
+producer target import/export, synchronization, resize, and teardown. Client
+renderers own domain state and native rendering commands. A game should be able
+to render a frame, a video app should be able to upload or decode into the
+target, and the MapLibre example should be able to attach the target as a
+borrowed render target without knowing how Skiko was reached.
+
+The first implementation can be single-buffered because the current MapLibre
+borrowed texture path completes rendering before `render_update()` returns. The
+API should still use frame and target leases rather than a permanent texture
+field so double or triple buffering can be added without changing the client
+contract.
+
+## Map Adapter Shape
+
+MapLibre integration should be a small adapter over the reusable primitive:
+
+```text
+ComposeNativeSurface(renderer = MapLibreSurfaceRenderer(mapController))
+  -> NativeSurfaceFrame.target
+  -> MapLibre borrowed texture descriptor
+  -> render_update()
+  -> NativeSurfaceRenderResult.Rendered
+```
+
+`MapLibreSurfaceRenderer` should contain the only MapLibre-specific knowledge:
+
+- runtime and map lifecycle
+- render-pending state
+- borrowed descriptor creation from `NativeSurfaceTarget`
+- input and camera plumbing from Compose events
+
+It should not know about Skiko reflection fields, D3D12 shared handles,
+IOSurface, `dma_buf`, GL memory objects, or command queue synchronization.
 
 ## Bridge Matrix
 
@@ -71,22 +237,29 @@ extension, or shared-memory capability is unavailable.
 
 ## Frame Flow
 
+The exact scheduling must respect Compose/Skiko repaint rules. The reusable
+primitive's frame flow is:
+
 ```text
 Compose frame
-  -> read viewport and scale
-  -> bridge.ensureTexture(viewport)
-  -> producer.ensureBorrowedRenderTarget(bridge.producerTexture)
-  -> runtime.runOnce()
-  -> producer.drainEvents()
-  -> if render_pending:
-       producer.renderUpdate()
-       bridge.signalProducerComplete()
-  -> bridge.waitForConsumerAccess()
-  -> consumer.drawSharedTexture()
+  -> surface.observeExtent()
+  -> bridge.acquireFrame(extent)
+  -> renderer.onSurfaceChanged(extent) if the target size changed
+  -> result = renderer.render(frame)
+  -> if result == Rendered:
+       bridge.completeProducerAccess(frame)
+       bridge.waitForConsumerAccess(frame)
+       surface.draw(frame)
+     else:
+       surface.drawPreviousFrameIfAvailable()
+  -> bridge.releaseFrame(frame)
 ```
 
-The exact scheduling must respect Compose/Skiko repaint rules. The bridge owns
-GPU synchronization; MapLibre owns map rendering; Compose owns presentation.
+MapLibre's runtime/event pumping fits inside `renderer.render(frame)`. Other
+clients can use the same callback to drive an engine frame, copy a decoded video
+frame, or submit native drawing work. `Skipped` means the producer did not
+publish new content for this frame; the surface can keep presenting the most
+recent completed frame if one exists.
 
 ## Shared Texture Direction
 
@@ -116,8 +289,9 @@ is a second option for `dma_buf`-backed storage.
 
 ## Ownership Model
 
-The UI side should own the shared texture whenever practical. MapLibre should
-receive a borrowed producer-side view of that storage.
+The UI side should own the shared texture whenever practical. Client renderers
+should receive borrowed producer-side views of that storage through frame
+leases.
 
 The bridge owns:
 
@@ -128,14 +302,14 @@ The bridge owns:
 - resize recreation
 - teardown ordering
 
-The producer owns:
+The client renderer owns:
 
-- runtime
-- map
-- active borrowed render session
-- render-pending state
+- domain runtime and scene state
+- supported producer backend declaration
+- render-pending or frame-needed state
+- conversion from `NativeSurfaceTarget` to the producer's render target
 
-The consumer owns:
+The Skiko host owns:
 
 - Compose window
 - Skiko layer discovery
@@ -148,7 +322,7 @@ default, and Linux to OpenGL by default. Skiko exposes public Skia wrapper APIs
 for Metal, Direct3D, and OpenGL backend render targets, but the live Compose
 renderer's native device/context handles are internal implementation details.
 
-`SkikoConsumer` should isolate all Skiko coupling and expose a small capability
+`SkikoHost` should isolate all Skiko coupling and expose a small capability
 model to the rest of the example:
 
 - renderer kind: Metal, Direct3D 12, or OpenGL
@@ -157,8 +331,8 @@ model to the rest of the example:
 - a clear diagnostic when the expected Skiko internals are unavailable
 
 Reflection is acceptable for the proof path if it is fully contained inside
-`SkikoConsumer`. Native bridge code is expected for platform calls that Skiko
-does not expose through Kotlin APIs. The rest of the example should depend on
+`SkikoHost`. Native bridge code is expected for platform calls that Skiko does
+not expose through Kotlin APIs. The rest of the example should depend on
 capabilities rather than Skiko field names.
 
 Linux needs special care. Skiko's default Compose Desktop path is OpenGL, but it
@@ -197,6 +371,12 @@ Per bridge family:
 Bridge implementations should keep memory import/export, semaphore/fence
 creation, and resize teardown in one place so the frame loop does not learn
 backend-specific rules.
+
+The public surface should expose synchronization as a lifecycle contract, not as
+raw primitives by default. A renderer receives a frame whose target is ready for
+producer writes. When `render(frame)` returns `Rendered`, the renderer has
+completed its writes before returning. Advanced producer APIs can grow explicit
+completion tokens later without changing the Compose-facing primitive.
 
 ## C API Coverage
 
@@ -241,6 +421,27 @@ code:
 - Runtime selection chooses one bridge row based on the default Skiko renderer,
   the selected MapLibre backend artifact, and extension/capability probes.
 
+The code should be laid out so extraction is mechanical:
+
+```text
+examples/compose-map/src/main/kotlin/.../surface
+  ComposeNativeSurface
+  NativeSurfaceController
+  NativeSurfaceRenderer
+  NativeSurfaceTarget
+  SkikoHost
+  NativeSurfaceBridge implementations
+
+examples/compose-map/src/main/kotlin/.../map
+  MapLibreSurfaceRenderer
+  MapLibre input and camera adapters
+  Example app wiring
+```
+
+The `surface` package should avoid MapLibre imports. The native bridge should
+also use map-neutral names so it can move into a standalone library without
+renaming exported symbols.
+
 ## Remaining Validation Targets
 
 - Validate the exact IOSurface or CVPixelBuffer path for `opengl-metal`,
@@ -251,6 +452,9 @@ code:
   command submission.
 - Pin the Compose/Skiko version for the example and verify the reflection/native
   access points against that exact source.
+- Validate the proposed public Kotlin surface API against the MapLibre adapter
+  and at least one non-map producer shape, such as a simple animated native
+  renderer or decoded video frame source.
 - Probe real driver support for GL external memory and semaphore extensions on
   the Linux and Windows machines we expect developers or CI to use.
 - Treat `vulkan-metal` as the first bridge candidate because it exercises
