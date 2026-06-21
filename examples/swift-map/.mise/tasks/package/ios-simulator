@@ -17,6 +17,7 @@ rm -rf "$app_dir"
 mkdir -p "$app_dir"
 cp "$executable" "$app_dir/swift-map-ios"
 cp "$native_library" "$app_dir/libmaplibre-native-c.dylib"
+install_name_tool -delete_rpath "$MLN_FFI_BUILD_DIR" "$app_dir/swift-map-ios"
 install_name_tool -add_rpath "@executable_path" "$app_dir/swift-map-ios"
 
 /usr/libexec/PlistBuddy -c 'Clear dict' "$info_plist" 2>/dev/null || true
