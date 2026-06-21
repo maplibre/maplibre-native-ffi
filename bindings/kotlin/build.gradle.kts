@@ -67,6 +67,11 @@ val javaCppToolClasspath =
   configurations.detachedConfiguration(dependencies.create("org.bytedeco:javacpp:$javaCppVersion"))
 val generatedJavaCppSources =
   layout.buildDirectory.dir("generated/sources/javacpp/androidMain/java")
+val generatedJavaCppClasses = layout.buildDirectory.dir("classes/javacppGenerated")
+val generatedJavaCppNativeBuild =
+  layout.buildDirectory.dir("generated/sources/javacpp/androidMain/native")
+val generatedJavaCppNativeLibs = layout.buildDirectory.dir("generated/jniLibs/androidMain")
+val javaCppAndroidIncludes = layout.projectDirectory.dir("src/androidMain/javacpp")
 val generatedJextractSources = layout.buildDirectory.dir("generated/sources/jextract/jvmMain/java")
 val javaCppConfigClasses = layout.buildDirectory.dir("classes/javacppConfig")
 val hostOs = System.getProperty("os.name").lowercase()
@@ -127,7 +132,10 @@ kotlin {
   }
 
   sourceSets {
-    androidMain.dependencies { implementation("org.bytedeco:javacpp:$javaCppVersion") }
+    androidMain.dependencies {
+      implementation("org.bytedeco:javacpp:$javaCppVersion")
+      implementation("org.bytedeco:javacpp:$javaCppVersion:android-arm64")
+    }
 
     commonTest.dependencies { implementation(kotlin("test")) }
   }
@@ -139,6 +147,9 @@ androidComponents {
     // Keep the explicit task dependencies below in sync with this static source directory.
     variant.sources.java?.addStaticSourceDirectory(
       generatedJavaCppSources.get().asFile.absolutePath
+    )
+    variant.sources.jniLibs?.addStaticSourceDirectory(
+      generatedJavaCppNativeLibs.get().asFile.absolutePath
     )
   }
 }
@@ -261,11 +272,81 @@ val generateJavaCppBindings =
       "src/androidMain/java/org/maplibre/nativeffi/internal/javacpp/AndroidNativeBridge.java"
     )
     inputs.files(maplibreNativeC.includeDirs).withPropertyName("maplibreNativeCIncludeDirs")
+    inputs.dir(javaCppAndroidIncludes)
     outputs.file(
       generatedJavaCppSources.map {
         it.file("org/maplibre/nativeffi/internal/javacpp/MaplibreNativeC.java")
       }
     )
+  }
+
+val androidNdkHostTag =
+  when {
+    hostOs.contains("mac") -> "darwin-x86_64"
+    hostOs.contains("linux") && (hostArch == "aarch64" || hostArch == "arm64") -> "linux-aarch64"
+    hostOs.contains("linux") -> "linux-x86_64"
+    hostOs.contains("windows") -> "windows-x86_64"
+    else -> throw GradleException("Unsupported Android NDK host: $hostOs/$hostArch")
+  }
+val androidNdkHome =
+  providers
+    .environmentVariable("ANDROID_NDK_HOME")
+    .orElse(providers.environmentVariable("ANDROID_HOME").map { "$it/ndk/29.0.14033849" })
+val javaCppAndroidCompatHeader = javaCppAndroidIncludes.file("javacpp_android_compat.h")
+val compileGeneratedJavaCppBindings =
+  tasks.register<JavaCompile>("compileGeneratedAndroidJavaCppBindings") {
+    dependsOn(generateJavaCppBindings)
+    source(generatedJavaCppSources)
+    classpath = files(javaCppConfigClasses) + javaCppToolClasspath
+    destinationDirectory = generatedJavaCppClasses
+    options.release = 17
+  }
+
+val generateJavaCppNativeLibrary =
+  tasks.register<JavaExec>("generateAndroidJavaCppNativeLibrary") {
+    group = "build"
+    description = "Generates the Android JavaCPP JNI library for the MapLibre Native C ABI."
+    dependsOn(compileGeneratedJavaCppBindings)
+    classpath = files(generatedJavaCppClasses, javaCppConfigClasses) + javaCppToolClasspath
+    mainClass = "org.bytedeco.javacpp.tools.Builder"
+    args(
+      "-classpath",
+      classpath.asPath,
+      "-properties",
+      "android-arm64",
+      "-Dplatform.compiler=${androidNdkHome.get()}/toolchains/llvm/prebuilt/$androidNdkHostTag/bin/aarch64-linux-android24-clang++",
+      "-Dplatform.includepath=${(maplibreNativeC.includeDirs + javaCppAndroidIncludes.asFile).joinToString(File.pathSeparator)}",
+      "-Dplatform.linkpath=${maplibreNativeC.linkDirs.joinToString(File.pathSeparator)}",
+      "-clean",
+      "-d",
+      generatedJavaCppNativeBuild.get().asFile.absolutePath,
+      "-o",
+      "jniMaplibreNativeC",
+      "-Xcompiler",
+      "-include",
+      "-Xcompiler",
+      javaCppAndroidCompatHeader.asFile.absolutePath,
+      "org.maplibre.nativeffi.internal.javacpp.MaplibreNativeC",
+      "org.maplibre.nativeffi.internal.javacpp.AndroidNativeBridge",
+    )
+    inputs.file(
+      "src/androidMain/java/org/maplibre/nativeffi/internal/javacpp/MaplibreNativeCConfig.java"
+    )
+    inputs.file(
+      "src/androidMain/java/org/maplibre/nativeffi/internal/javacpp/AndroidNativeBridge.java"
+    )
+    inputs.dir(javaCppAndroidIncludes)
+    inputs.files(maplibreNativeC.includeDirs).withPropertyName("maplibreNativeCIncludeDirs")
+    inputs.files(maplibreNativeC.linkDirs).withPropertyName("maplibreNativeCLinkDirs")
+    inputs.file(maplibreNativeC.libraryPath).withPropertyName("maplibreNativeCLibrary")
+    outputs.file(generatedJavaCppNativeBuild.map { it.file("libjniMaplibreNativeC.so") })
+  }
+
+val packageJavaCppNativeLibrary =
+  tasks.register<Sync>("packageAndroidJavaCppNativeLibrary") {
+    dependsOn(generateJavaCppNativeLibrary)
+    from(generatedJavaCppNativeBuild.map { it.file("libjniMaplibreNativeC.so") })
+    into(generatedJavaCppNativeLibs.map { it.dir("arm64-v8a") })
   }
 
 tasks
@@ -275,6 +356,13 @@ tasks
 tasks
   .matching { it.name == "compileAndroidMain" || it.name == "extractAndroidMainAnnotations" }
   .configureEach { dependsOn(generateJavaCppBindings) }
+
+tasks
+  .matching { it.name == "preAndroidMainBuild" || it.name == "mergeAndroidMainJniLibFolders" }
+  .configureEach {
+    dependsOn(packageJavaCppNativeLibrary)
+    inputs.file(maplibreNativeC.libraryPath).withPropertyName("maplibreNativeCLibrary")
+  }
 
 tasks.withType<Test>().configureEach {
   if (name == "jvmTest") {
@@ -294,5 +382,5 @@ tasks.register("nativeTest") {
 tasks.register("androidBuild") {
   group = "build"
   description = "Builds the Android variant of the Kotlin Multiplatform binding."
-  dependsOn("assembleAndroidMain")
+  dependsOn(packageJavaCppNativeLibrary, "assembleAndroidMain")
 }

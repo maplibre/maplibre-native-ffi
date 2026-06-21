@@ -289,13 +289,11 @@ final class MetalMapView: UIView {
         return false
       }
       guard recognizer.state == .changed else { return false }
-      let deltaDegrees = Double(recognizer.rotation * 180.0 / .pi)
+      let deltaRadians = recognizer.rotation
       recognizer.rotation = 0
-      guard deltaDegrees != 0 else { return false }
-      let camera = try map.camera()
-      try map.jump(to: CameraOptions(
-        bearing: (camera.bearing ?? 0) - deltaDegrees
-      ))
+      guard deltaRadians != 0 else { return false }
+      let points = rotationPoints(deltaRadians: deltaRadians)
+      try map.rotateBy(first: points.first, second: points.second)
       return true
     }
   }
@@ -342,6 +340,20 @@ final class MetalMapView: UIView {
 
   private func screenPoint(_ point: CGPoint) -> ScreenPoint {
     ScreenPoint(x: point.x, y: point.y)
+  }
+
+  private func rotationPoints(deltaRadians: CGFloat) -> (
+    first: ScreenPoint,
+    second: ScreenPoint
+  ) {
+    let center = CGPoint(x: bounds.midX, y: bounds.midY)
+    let radius = max(min(bounds.width, bounds.height) * 0.35, 200)
+    let first = CGPoint(x: center.x, y: center.y - radius)
+    let second = CGPoint(
+      x: center.x + sin(deltaRadians) * radius,
+      y: center.y - cos(deltaRadians) * radius
+    )
+    return (screenPoint(first), screenPoint(second))
   }
 
   private func showError(_ error: Error) {
