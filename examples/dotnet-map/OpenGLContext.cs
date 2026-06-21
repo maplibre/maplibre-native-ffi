@@ -37,18 +37,19 @@ internal sealed unsafe class OpenGLContext : IGraphicsContext
 
     public static OpenGLContext Create(string title, int width, int height)
     {
-        if (OperatingSystem.IsLinux() || OperatingSystem.IsMacOS())
+        var providers = Maplibre.SupportedOpenGLContextProviders();
+        if (providers.HasFlag(OpenGLContextProvider.Egl))
         {
             return CreateEgl(title, width, height);
         }
 
-        if (OperatingSystem.IsWindows())
+        if (providers.HasFlag(OpenGLContextProvider.Wgl))
         {
             return CreateWgl(title, width, height);
         }
 
         throw new InvalidOperationException(
-            "dotnet-map OpenGL context creation is supported on Linux/EGL, macOS/EGL, and Windows/WGL."
+            "The loaded MapLibre native library does not support an OpenGL context provider usable by dotnet-map."
         );
     }
 

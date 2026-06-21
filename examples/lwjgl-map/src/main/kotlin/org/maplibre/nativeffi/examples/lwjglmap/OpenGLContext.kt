@@ -1,6 +1,5 @@
 package org.maplibre.nativeffi.examples.lwjglmap
 
-import java.util.Locale
 import org.lwjgl.glfw.GLFW.GLFW_CLIENT_API
 import org.lwjgl.glfw.GLFW.GLFW_CONTEXT_CREATION_API
 import org.lwjgl.glfw.GLFW.GLFW_CONTEXT_VERSION_MAJOR
@@ -104,12 +103,17 @@ internal class OpenGLContext private constructor(val isGles: Boolean, private va
   }
 
   internal companion object {
-    fun create(title: String, width: Int, height: Int): OpenGLContext =
-      when {
-        isLinux() || isMac() -> createEgl(title, width, height)
-        isWindows() -> createWgl(title, width, height)
-        else -> error("LWJGL OpenGL context is only supported on Linux, macOS, and Windows")
+    fun create(title: String, width: Int, height: Int): OpenGLContext {
+      val providers = Maplibre.supportedOpenGLContextProviders()
+      return when {
+        OpenGLContextProvider.EGL in providers -> createEgl(title, width, height)
+        OpenGLContextProvider.WGL in providers -> createWgl(title, width, height)
+        else ->
+          error(
+            "The loaded MapLibre native library does not support an OpenGL context provider usable by lwjgl-map"
+          )
       }
+    }
 
     private fun createEgl(title: String, width: Int, height: Int): OpenGLContext {
       check(OpenGLContextProvider.EGL in Maplibre.supportedOpenGLContextProviders()) {
@@ -183,15 +187,6 @@ internal class OpenGLContext private constructor(val isGles: Boolean, private va
         throw error
       }
     }
-
-    private fun isLinux(): Boolean =
-      System.getProperty("os.name").lowercase(Locale.ROOT).contains("linux")
-
-    private fun isMac(): Boolean =
-      System.getProperty("os.name").lowercase(Locale.ROOT).contains("mac")
-
-    private fun isWindows(): Boolean =
-      System.getProperty("os.name").lowercase(Locale.ROOT).contains("windows")
 
     private fun getDc(hwnd: Long): Long = User32.GetDC(hwnd)
 

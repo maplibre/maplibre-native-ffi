@@ -89,14 +89,9 @@ internal static class Program
 
     private static bool SupportsUsableBackend(RenderBackend backends)
     {
-        if (OperatingSystem.IsMacOS())
-        {
-            return backends.HasFlag(RenderBackend.Metal)
-                || backends.HasFlag(RenderBackend.OpenGL)
-                || backends.HasFlag(RenderBackend.Vulkan);
-        }
-
-        return backends.HasFlag(RenderBackend.OpenGL) || backends.HasFlag(RenderBackend.Vulkan);
+        return backends.HasFlag(RenderBackend.Metal)
+            || backends.HasFlag(RenderBackend.OpenGL)
+            || backends.HasFlag(RenderBackend.Vulkan);
     }
 
     private static bool PrintNativeLog(LogRecord record)

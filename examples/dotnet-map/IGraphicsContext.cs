@@ -32,7 +32,7 @@ internal static class GraphicsContext
         RenderBackend backends
     )
     {
-        if (OperatingSystem.IsMacOS() && backends.HasFlag(RenderBackend.Metal))
+        if (backends.HasFlag(RenderBackend.Metal))
         {
             return MetalContext.Create(title, width, height);
         }

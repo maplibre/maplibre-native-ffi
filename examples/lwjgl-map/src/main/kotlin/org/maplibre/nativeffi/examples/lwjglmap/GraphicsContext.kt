@@ -1,6 +1,5 @@
 package org.maplibre.nativeffi.examples.lwjglmap
 
-import java.util.Locale
 import org.maplibre.nativeffi.render.RenderBackend
 
 internal interface GraphicsContext : AutoCloseable {
@@ -20,7 +19,7 @@ internal interface GraphicsContext : AutoCloseable {
       height: Int,
       backends: Set<RenderBackend>,
     ): GraphicsContext {
-      if (isMac() && backends.contains(RenderBackend.METAL)) {
+      if (backends.contains(RenderBackend.METAL)) {
         return MetalContext.create(title, width, height)
       }
       if (backends.contains(RenderBackend.OPENGL)) {
@@ -33,8 +32,5 @@ internal interface GraphicsContext : AutoCloseable {
         "The loaded MapLibre native library does not support a backend usable by lwjgl-map on this platform"
       )
     }
-
-    @JvmStatic
-    fun isMac(): Boolean = System.getProperty("os.name").lowercase(Locale.ROOT).contains("mac")
   }
 }
