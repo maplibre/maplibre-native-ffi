@@ -2,7 +2,7 @@
 import supportMatrix from "../generated/support-matrix.json";
 import { Badge } from "@astrojs/starlight/components";
 
-type Status = "tested" | "run" | "build-only";
+type Status = "tested" | "build-only";
 type BadgeVariant = "default" | "note" | "success" | "caution";
 
 type Backend = {
@@ -18,16 +18,41 @@ type EnvironmentSupport = {
 
 type SubprojectSupport = {
   label: string;
+  sourceDirectory: string;
   environments: EnvironmentSupport[];
 };
 
-const environmentColumns = supportMatrix.environments.map((row) => ({
-  environment: row.environment,
-  label: row.environmentLabel,
+type EnvironmentColumn = {
+  environment: string;
+  label: string;
+};
+
+type NativeEnvironment = {
+  environment: string;
+  environmentLabel: string;
+  backends: Backend[];
+};
+
+const environmentRows: (EnvironmentColumn & { backends: Backend[] })[] =
+  supportMatrix.native.map((row: NativeEnvironment) => ({
+    environment: row.environment,
+    label: row.environmentLabel,
+    backends: row.backends,
+  }));
+
+const statusBadges = supportMatrix.statuses.map((row) => ({
+  label: row.statusLabel,
+  status: row.status as Status,
 }));
 
+const sourceRoot = "https://github.com/maplibre/maplibre-native-ffi/tree/main";
+
+function sourceUrl(sourceDirectory: string): string {
+  return `${sourceRoot}/${sourceDirectory}`;
+}
+
 function badgeVariant(status: Status): BadgeVariant {
-  if (status === "tested" || status === "run") {
+  if (status === "tested") {
     return "success";
   }
   if (status === "build-only") {
@@ -44,23 +69,73 @@ function environmentSupport(
     (entry) => entry.environment === environment,
   );
 }
+
+function supportStatus(support: EnvironmentSupport): Status {
+  if (support.backends.some((backend) => backend.status === "build-only")) {
+    return "build-only";
+  }
+  return "tested";
+}
+
+function bindingSupport(
+  environment: EnvironmentColumn,
+): { label: string; status: Status; url: string }[] {
+  return supportMatrix.bindings.flatMap((binding) => {
+    const support = environmentSupport(binding, environment.environment);
+    if (!support) {
+      return [];
+    }
+    return [
+      {
+        label: binding.label,
+        status: supportStatus(support),
+        url: sourceUrl(binding.sourceDirectory),
+      },
+    ];
+  });
+}
+
+function exampleSupport(
+  environment: EnvironmentColumn,
+): { label: string; url: string }[] {
+  return supportMatrix.examples.flatMap((example) =>
+    environmentSupport(example, environment.environment)
+      ? [{ label: example.label, url: sourceUrl(example.sourceDirectory) }]
+      : [],
+  );
+}
 ---
 
-<section aria-labelledby="support-native-heading">
-  <h3 id="support-native-heading">Native Platforms</h3>
-  <table>
-    <thead>
-      <tr>
-        <th scope="col">Environment</th>
-        <th scope="col">Backends</th>
-      </tr>
-    </thead>
-    <tbody>
-      {supportMatrix.native.map((row) => (
+<p>
+  {statusBadges.map((status) => (
+    <span>
+      <Badge
+        text={status.label}
+        variant={badgeVariant(status.status)}
+        size="small"
+      />{" "}
+    </span>
+  ))}
+</p>
+
+<table>
+  <thead>
+    <tr>
+      <th scope="col">Environment</th>
+      <th scope="col">Backends</th>
+      <th scope="col">Bindings</th>
+      <th scope="col">Examples</th>
+    </tr>
+  </thead>
+  <tbody>
+    {environmentRows.map((environment) => {
+      const bindings = bindingSupport(environment);
+      const examples = exampleSupport(environment);
+      return (
         <tr>
-          <th scope="row">{row.environmentLabel}</th>
+          <th scope="row">{environment.label}</th>
           <td>
-            {row.backends.map((backend) => (
+            {environment.backends.map((backend) => (
               <span>
                 <Badge
                   text={backend.backendLabel}
@@ -70,82 +145,40 @@ function environmentSupport(
               </span>
             ))}
           </td>
+          <td>
+            {bindings.length > 0 ? bindings.map((binding) => (
+              <span>
+                <a class="support-badge-link" href={binding.url}>
+                  <Badge
+                    text={binding.label}
+                    variant={badgeVariant(binding.status)}
+                    size="small"
+                  />
+                </a>{" "}
+              </span>
+            )) : "-"}
+          </td>
+          <td>
+            {examples.length > 0 ? examples.map((example) => (
+              <span>
+                <a class="support-badge-link" href={example.url}>
+                  <Badge
+                    text={example.label}
+                    variant="default"
+                    size="small"
+                  />
+                </a>{" "}
+              </span>
+            )) : "-"}
+          </td>
         </tr>
-      ))}
-    </tbody>
-  </table>
-</section>
+      );
+    })}
+  </tbody>
+</table>
 
-<section aria-labelledby="support-bindings-heading">
-  <h3 id="support-bindings-heading">Language Bindings</h3>
-  <table>
-    <thead>
-      <tr>
-        <th scope="col">Binding</th>
-        {environmentColumns.map((environment) => (
-          <th scope="col">{environment.label}</th>
-        ))}
-      </tr>
-    </thead>
-    <tbody>
-      {supportMatrix.bindings.map((binding) => (
-        <tr>
-          <th scope="row">{binding.label}</th>
-          {environmentColumns.map((environment) => {
-            const support = environmentSupport(binding, environment.environment);
-            return (
-              <td>
-                {support ? support.backends.map((backend) => (
-                  <span>
-                    <Badge
-                      text={backend.backendLabel}
-                      variant={badgeVariant(backend.status)}
-                      size="small"
-                    />{" "}
-                  </span>
-                )) : "-"}
-              </td>
-            );
-          })}
-        </tr>
-      ))}
-    </tbody>
-  </table>
-</section>
-
-<section aria-labelledby="support-examples-heading">
-  <h3 id="support-examples-heading">Examples</h3>
-  <table>
-    <thead>
-      <tr>
-        <th scope="col">Example</th>
-        {environmentColumns.map((environment) => (
-          <th scope="col">{environment.label}</th>
-        ))}
-      </tr>
-    </thead>
-    <tbody>
-      {supportMatrix.examples.map((example) => (
-        <tr>
-          <th scope="row">{example.label}</th>
-          {environmentColumns.map((environment) => {
-            const support = environmentSupport(example, environment.environment);
-            return (
-              <td>
-                {support ? support.backends.map((backend) => (
-                  <span>
-                    <Badge
-                      text={backend.backendLabel}
-                      variant={badgeVariant(backend.status)}
-                      size="small"
-                    />{" "}
-                  </span>
-                )) : "-"}
-              </td>
-            );
-          })}
-        </tr>
-      ))}
-    </tbody>
-  </table>
-</section>
+<style>
+.support-badge-link {
+  text-decoration: none;
+}
+</style>

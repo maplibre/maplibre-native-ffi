@@ -2,5 +2,12 @@
 run = [
   { task = "//:ensure-native-library" },
   { task = ":jextract:update-includes" },
-  "../../gradlew :bindings:java-ffm:build",
+  "../../gradlew :bindings:java-ffm:assemble",
+]
+
+[tasks.test]
+run = [
+  { task = "//:ensure-native-library" },
+  { task = ":jextract:update-includes" },
+  "../../gradlew :bindings:java-ffm:check",
 ]

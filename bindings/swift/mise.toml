@@ -30,8 +30,5 @@ if [[ "$MISE_ENV" == ios-simulator-* ]]; then
 else
   swift test --scratch-path ".build/$MISE_ENV"
 fi
+swift package describe --type json >/dev/null
 '''
-
-[tasks.ci]
-depends = ["test"]
-run = 'swift package describe --type json >/dev/null'

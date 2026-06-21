@@ -33,7 +33,7 @@ mise run build
 mise run test
 
 # Build and run Rust binding tests (also runs build)
-mise run //bindings/rust:ci
+mise run //bindings/rust:test
 
 # Headless smoke test — no display needed
 mise run //examples/zig-readback:run

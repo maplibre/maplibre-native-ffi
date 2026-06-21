@@ -24,6 +24,8 @@ from ci.manifest import (  # noqa: E402
     subproject_matches_variant,
 )
 
+Status = str
+
 
 PLATFORM_LABELS = {
     "android": "Android",
@@ -45,20 +47,11 @@ BACKEND_LABELS = {
     "vulkan": "Vulkan",
 }
 
-SUBPROJECT_LABELS = {
+SUBPROJECT_LABEL_OVERRIDES = {
     "bindings-dotnet": "C#",
     "bindings-java-ffm": "Java FFM",
     "bindings-java-jni": "Java JNI",
     "bindings-kotlin-native": "Kotlin/Native",
-    "bindings-rust": "Rust",
-    "bindings-swift": "Swift",
-    "bindings-zig": "Zig",
-    "examples-dotnet-map": "dotnet-map",
-    "examples-lwjgl-map": "lwjgl-map",
-    "examples-rust-map": "rust-map",
-    "examples-swift-map": "swift-map",
-    "examples-zig-map": "zig-map",
-    "examples-zig-readback": "zig-readback",
 }
 
 BACKEND_ORDER = ["vulkan", "opengl", "metal"]
@@ -72,6 +65,11 @@ ENVIRONMENT_ORDER = [
     "ios-simulator-arm64",
     "ohos-arm64",
 ]
+STATUS_LABELS = {
+    "tested": "Tested in CI",
+    "build-only": "Built only",
+}
+STATUS_ORDER = ["build-only", "tested"]
 
 
 def backend_sort_key(backend: str) -> tuple[int, str]:
@@ -100,6 +98,24 @@ def backend_label(backend: str) -> str:
     return BACKEND_LABELS.get(backend, backend)
 
 
+def status_label(status: str) -> str:
+    return STATUS_LABELS.get(status, status)
+
+
+def subproject_short_name(subproject_name: str) -> str:
+    parts = subproject_name.split("-", maxsplit=1)
+    return parts[1] if len(parts) == 2 else subproject_name
+
+
+def subproject_label(subproject_name: str) -> str:
+    if subproject_name in SUBPROJECT_LABEL_OVERRIDES:
+        return SUBPROJECT_LABEL_OVERRIDES[subproject_name]
+    short_name = subproject_short_name(subproject_name)
+    if subproject_name.startswith("examples-"):
+        return short_name
+    return short_name.capitalize()
+
+
 def environment_key(variant: Variant) -> str:
     if variant.os == "ios" and variant.name.startswith("ios-simulator-"):
         return f"ios-simulator-{variant.arch}"
@@ -119,12 +135,33 @@ def variant_status(variant: Variant) -> str:
     return "tested" if variant.supports_tests else "build-only"
 
 
-def subproject_status(actions: dict[str, str], variant: Variant) -> str:
+def subproject_status(actions: dict[str, str], variant: Variant) -> Status | None:
     if actions.get("run"):
-        return "run"
+        return "tested"
     if actions.get("test") and variant.supports_tests:
         return "tested"
-    return "build-only"
+    if actions.get("build"):
+        return "build-only"
+    return None
+
+
+def merged_status(statuses: set[str]) -> str:
+    for status in STATUS_ORDER:
+        if status in statuses:
+            return status
+    return sorted(statuses)[0]
+
+
+def status_rows() -> list[dict[str, str]]:
+    return [
+        {"status": status, "statusLabel": status_label(status)}
+        for status in ["tested", "build-only"]
+    ]
+
+
+def subproject_source_directory(subproject_name: str) -> str:
+    category, name = subproject_name.split("-", maxsplit=1)
+    return f"{category}/{name}"
 
 
 def support_entry(variant: Variant, status: str) -> dict[str, str]:
@@ -144,13 +181,7 @@ def merge_backend_entries(entries: list[dict[str, str]]) -> list[dict[str, Any]]
     for backend in sorted(grouped, key=backend_sort_key):
         backend_entries = grouped[backend]
         statuses = {entry["status"] for entry in backend_entries}
-        status = (
-            "tested"
-            if "tested" in statuses
-            else "run"
-            if "run" in statuses
-            else "build-only"
-        )
+        status = merged_status(statuses)
         result.append(
             {
                 "backend": backend,
@@ -190,7 +221,7 @@ def subproject_rows(
     for subproject in sorted(
         load_subprojects(variants),
         key=lambda subproject: (
-            SUBPROJECT_LABELS.get(subproject.name, subproject.name).casefold(),
+            subproject_label(subproject.name).casefold(),
             subproject.name,
         ),
     ):
@@ -203,18 +234,20 @@ def subproject_rows(
         for variant in variants:
             if not subproject_matches_variant(subproject, variant):
                 continue
+            status = subproject_status(actions, variant)
+            if status is None:
+                continue
             environment = environment_key(variant)
-            environment_entries[environment].append(
-                support_entry(variant, subproject_status(actions, variant))
-            )
+            environment_entries[environment].append(support_entry(variant, status))
             environment_variants[environment] = variant
 
         rows.append(
             {
                 "id": subproject.name,
                 "kind": kind,
-                "label": SUBPROJECT_LABELS.get(subproject.name, subproject.name),
+                "label": subproject_label(subproject.name),
                 "source": str(subproject.path.relative_to(REPO_ROOT)),
+                "sourceDirectory": subproject_source_directory(subproject.name),
                 "environments": [
                     {
                         "environment": environment,
@@ -244,6 +277,7 @@ def support_matrix() -> dict[str, Any]:
     variants = load_variants()
     native = native_rows(variants)
     return {
+        "statuses": status_rows(),
         "environments": [
             {
                 "environment": row["environment"],

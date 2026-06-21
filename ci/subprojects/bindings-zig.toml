@@ -1,5 +1,2 @@
 [requires]
 os = ["linux", "macos", "windows", "ios"]
-
-[ci]
-test = "//bindings/zig:ci"

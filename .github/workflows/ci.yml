@@ -47,11 +47,11 @@ jobs:
       - run: mise run configure
       - run: mise run test
       - run: mise run //bindings/dotnet:test
-      - run: mise run //bindings/java-ffm:build
-      - run: mise run //bindings/java-jni:build
-      - run: mise run //bindings/rust:ci
-      - run: mise run //bindings/zig:ci
-      - run: mise run //examples/rust-map:ci
+      - run: mise run //bindings/java-ffm:test
+      - run: mise run //bindings/java-jni:test
+      - run: mise run //bindings/rust:test
+      - run: mise run //bindings/zig:test
+      - run: mise run //examples/rust-map:test
       - run: mise run //examples/zig-map:build
       - run: mise run //examples/zig-readback:run
   variant-linux-arm64-vulkan:
@@ -68,12 +68,12 @@ jobs:
       - run: mise run configure
       - run: mise run test
       - run: mise run //bindings/dotnet:test
-      - run: mise run //bindings/java-ffm:build
-      - run: mise run //bindings/java-jni:build
-      - run: mise run //bindings/rust:ci
-      - run: mise run //bindings/zig:ci
+      - run: mise run //bindings/java-ffm:test
+      - run: mise run //bindings/java-jni:test
+      - run: mise run //bindings/rust:test
+      - run: mise run //bindings/zig:test
       - run: mise run //examples/lwjgl-map:build
-      - run: mise run //examples/rust-map:ci
+      - run: mise run //examples/rust-map:test
       - run: mise run //examples/zig-map:build
       - run: mise run //examples/zig-readback:run
   variant-linux-x64-egl:
@@ -90,12 +90,12 @@ jobs:
       - run: mise run configure
       - run: mise run test
       - run: mise run //bindings/dotnet:test
-      - run: mise run //bindings/java-ffm:build
-      - run: mise run //bindings/java-jni:build
-      - run: mise run //bindings/kotlin-native:build
-      - run: mise run //bindings/rust:ci
-      - run: mise run //bindings/zig:ci
-      - run: mise run //examples/rust-map:ci
+      - run: mise run //bindings/java-ffm:test
+      - run: mise run //bindings/java-jni:test
+      - run: mise run //bindings/kotlin-native:test
+      - run: mise run //bindings/rust:test
+      - run: mise run //bindings/zig:test
+      - run: mise run //examples/rust-map:test
       - run: mise run //examples/zig-map:build
       - run: mise run //examples/zig-readback:run
   variant-linux-x64-vulkan:
@@ -112,13 +112,13 @@ jobs:
       - run: mise run configure
       - run: mise run test
       - run: mise run //bindings/dotnet:test
-      - run: mise run //bindings/java-ffm:build
-      - run: mise run //bindings/java-jni:build
-      - run: mise run //bindings/kotlin-native:build
-      - run: mise run //bindings/rust:ci
-      - run: mise run //bindings/zig:ci
+      - run: mise run //bindings/java-ffm:test
+      - run: mise run //bindings/java-jni:test
+      - run: mise run //bindings/kotlin-native:test
+      - run: mise run //bindings/rust:test
+      - run: mise run //bindings/zig:test
       - run: mise run //examples/lwjgl-map:build
-      - run: mise run //examples/rust-map:ci
+      - run: mise run //examples/rust-map:test
       - run: mise run //examples/zig-map:build
       - run: mise run //examples/zig-readback:run
   variant-macos-arm64-metal:
@@ -135,13 +135,13 @@ jobs:
       - run: mise run configure
       - run: mise run test
       - run: mise run //bindings/dotnet:test
-      - run: mise run //bindings/java-ffm:build
-      - run: mise run //bindings/java-jni:build
-      - run: mise run //bindings/kotlin-native:build
-      - run: mise run //bindings/rust:ci
+      - run: mise run //bindings/java-ffm:test
+      - run: mise run //bindings/java-jni:test
+      - run: mise run //bindings/kotlin-native:test
+      - run: mise run //bindings/rust:test
       - run: mise run //bindings/swift:test
-      - run: mise run //bindings/zig:ci
-      - run: mise run //examples/rust-map:ci
+      - run: mise run //bindings/zig:test
+      - run: mise run //examples/rust-map:test
       - run: mise run //examples/swift-map:build
       - run: mise run //examples/zig-map:build
       - run: mise run //examples/zig-readback:run
@@ -159,14 +159,14 @@ jobs:
       - run: mise run configure
       - run: mise run test
       - run: mise run //bindings/dotnet:test
-      - run: mise run //bindings/java-ffm:build
-      - run: mise run //bindings/java-jni:build
-      - run: mise run //bindings/kotlin-native:build
-      - run: mise run //bindings/rust:ci
+      - run: mise run //bindings/java-ffm:test
+      - run: mise run //bindings/java-jni:test
+      - run: mise run //bindings/kotlin-native:test
+      - run: mise run //bindings/rust:test
       - run: mise run //bindings/swift:test
-      - run: mise run //bindings/zig:ci
+      - run: mise run //bindings/zig:test
       - run: mise run //examples/lwjgl-map:build
-      - run: mise run //examples/rust-map:ci
+      - run: mise run //examples/rust-map:test
       - run: mise run //examples/zig-map:build
       - run: mise run //examples/zig-readback:run
   variant-macos-arm64-egl:
@@ -182,7 +182,7 @@ jobs:
       - uses: ./.github/actions/setup-ci-deps
       - run: mise run configure
       - run: mise run test
-      - run: mise run //bindings/zig:ci
+      - run: mise run //bindings/zig:test
       - run: mise run //examples/zig-readback:run
   variant-android-arm64-egl:
     name: variant / android-arm64-egl
@@ -238,7 +238,7 @@ jobs:
       - run: mise run build
       - run: mise run test
       - run: mise run //bindings/swift:test
-      - run: mise run //bindings/zig:ci
+      - run: mise run //bindings/zig:test
   variant-ohos-arm64-egl:
     name: variant / ohos-arm64-egl
     runs-on: ubuntu-latest
@@ -279,12 +279,12 @@ jobs:
       - run: mise run configure
       - run: mise run test
       - run: mise run //bindings/dotnet:test
-      - run: mise run //bindings/java-ffm:build
-      - run: mise run //bindings/java-jni:build
-      - run: mise run //bindings/rust:ci
-      - run: mise run //bindings/zig:ci
+      - run: mise run //bindings/java-ffm:test
+      - run: mise run //bindings/java-jni:test
+      - run: mise run //bindings/rust:test
+      - run: mise run //bindings/zig:test
       - run: mise run //examples/lwjgl-map:build
-      - run: mise run //examples/rust-map:ci
+      - run: mise run //examples/rust-map:test
       - run: mise run //examples/zig-map:build
       - run: mise run //examples/zig-readback:run
   variant-windows-x64-wgl:
@@ -301,11 +301,11 @@ jobs:
       - run: mise run configure
       - run: mise run test
       - run: mise run //bindings/dotnet:test
-      - run: mise run //bindings/java-ffm:build
-      - run: mise run //bindings/java-jni:build
-      - run: mise run //bindings/rust:ci
-      - run: mise run //bindings/zig:ci
-      - run: mise run //examples/rust-map:ci
+      - run: mise run //bindings/java-ffm:test
+      - run: mise run //bindings/java-jni:test
+      - run: mise run //bindings/rust:test
+      - run: mise run //bindings/zig:test
+      - run: mise run //examples/rust-map:test
       - run: mise run //examples/zig-map:build
       - run: mise run //examples/zig-readback:run
   required:

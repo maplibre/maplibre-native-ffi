@@ -98,7 +98,7 @@ class CiConfig(StrictManifestModel):
 
 class SubprojectManifest(StrictManifestModel):
     requires: RequiresConfig = Field(default_factory=RequiresConfig)
-    ci: CiConfig
+    ci: CiConfig | None = None
 
 
 class Subproject(StrictManifestModel):
@@ -146,10 +146,32 @@ def load_subprojects(variants: list[Variant]) -> list[Subproject]:
         Subproject(
             name=path.stem,
             path=path,
-            manifest=parse_model(path, SubprojectManifest, context),
+            manifest=apply_default_ci(
+                path, parse_model(path, SubprojectManifest, context)
+            ),
         )
         for path in paths
     ]
+
+
+def default_ci(name: str) -> CiConfig | None:
+    if name.startswith("bindings-"):
+        return CiConfig(test=f"//bindings/{name.removeprefix('bindings-')}:test")
+    if name.startswith("examples-"):
+        return CiConfig(build=f"//examples/{name.removeprefix('examples-')}:build")
+    return None
+
+
+def apply_default_ci(
+    path: pathlib.Path, manifest: SubprojectManifest
+) -> SubprojectManifest:
+    if manifest.ci is not None:
+        return manifest
+
+    ci = default_ci(path.stem)
+    if ci is None:
+        raise SystemExit(f"error: {path}: [ci] is required")
+    return manifest.model_copy(update={"ci": ci})
 
 
 def matches(variant: Variant, requires: dict[str, list[str]]) -> bool:
