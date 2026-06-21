@@ -34,11 +34,16 @@ function(mln_configure_windows_platform target)
 
   target_include_directories(
     ${target}
+    BEFORE
+    SYSTEM
+    PRIVATE ${MLN_SOURCE_DIR}/vendor/icu/include)
+
+  target_include_directories(
+    ${target}
     SYSTEM
     PRIVATE
       ${MLN_SOURCE_DIR}/platform/windows/include ${CURL_INCLUDE_DIRS}
-      ${JPEG_INCLUDE_DIRS} ${WEBP_INCLUDE_DIRS}
-      ${MLN_SOURCE_DIR}/vendor/icu/include)
+      ${JPEG_INCLUDE_DIRS} ${WEBP_INCLUDE_DIRS})
 
   target_compile_definitions(
     ${target}

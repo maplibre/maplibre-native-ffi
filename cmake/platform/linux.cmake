@@ -34,10 +34,16 @@ function(mln_configure_linux_platform target)
 
   target_include_directories(
     ${target}
+    BEFORE
+    SYSTEM
+    PRIVATE ${MLN_SOURCE_DIR}/vendor/icu/include)
+
+  target_include_directories(
+    ${target}
     SYSTEM
     PRIVATE
       ${CURL_INCLUDE_DIRS} ${JPEG_INCLUDE_DIRS} ${LIBUV_INCLUDE_DIRS}
-      ${WEBP_INCLUDE_DIRS} ${MLN_SOURCE_DIR}/vendor/icu/include)
+      ${WEBP_INCLUDE_DIRS})
 
   target_link_libraries(
     ${target}
