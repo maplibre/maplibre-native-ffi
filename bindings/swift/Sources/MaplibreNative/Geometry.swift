@@ -52,7 +52,10 @@ public struct LatLngBounds: Equatable, Sendable {
   }
 
   var nativeInput: NativeLatLngBounds {
-    NativeLatLngBounds(southwest: southwest.nativeInput, northeast: northeast.nativeInput)
+    NativeLatLngBounds(
+      southwest: southwest.nativeInput,
+      northeast: northeast.nativeInput
+    )
   }
 }
 

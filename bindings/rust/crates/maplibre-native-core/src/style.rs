@@ -26,50 +26,6 @@ pub struct TileSourceOptions {
 }
 
 impl TileSourceOptions {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn with_min_zoom(mut self, min_zoom: f64) -> Self {
-        self.min_zoom = Some(min_zoom);
-        self
-    }
-
-    pub fn with_max_zoom(mut self, max_zoom: f64) -> Self {
-        self.max_zoom = Some(max_zoom);
-        self
-    }
-
-    pub fn with_attribution(mut self, attribution: impl Into<String>) -> Self {
-        self.attribution = Some(attribution.into());
-        self
-    }
-
-    pub fn with_scheme(mut self, scheme: TileScheme) -> Self {
-        self.scheme = Some(scheme);
-        self
-    }
-
-    pub fn with_bounds(mut self, bounds: LatLngBounds) -> Self {
-        self.bounds = Some(bounds);
-        self
-    }
-
-    pub fn with_tile_size(mut self, tile_size: u32) -> Self {
-        self.tile_size = Some(tile_size);
-        self
-    }
-
-    pub fn with_vector_encoding(mut self, vector_encoding: VectorTileEncoding) -> Self {
-        self.vector_encoding = Some(vector_encoding);
-        self
-    }
-
-    pub fn with_raster_dem_encoding(mut self, raster_dem_encoding: RasterDemEncoding) -> Self {
-        self.raster_dem_encoding = Some(raster_dem_encoding);
-        self
-    }
-
     fn to_native(&self) -> NativeTileSourceOptions<'_> {
         NativeTileSourceOptions::new(self)
     }
@@ -309,20 +265,6 @@ pub struct StyleImageOptions {
 }
 
 impl StyleImageOptions {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn with_pixel_ratio(mut self, pixel_ratio: f32) -> Self {
-        self.pixel_ratio = Some(pixel_ratio);
-        self
-    }
-
-    pub fn with_sdf(mut self, sdf: bool) -> Self {
-        self.sdf = Some(sdf);
-        self
-    }
-
     fn to_native(&self) -> sys::mln_style_image_options {
         let mut fields = 0;
         let mut pixel_ratio = 1.0;
@@ -419,18 +361,19 @@ mod tests {
 
     #[test]
     fn tile_source_options_materialize_masks_fields_and_views() {
-        let options = TileSourceOptions::new()
-            .with_min_zoom(1.0)
-            .with_max_zoom(22.0)
-            .with_attribution("© MapLibre")
-            .with_scheme(TileScheme::Tms)
-            .with_bounds(LatLngBounds::new(
+        let options = TileSourceOptions {
+            min_zoom: Some(1.0),
+            max_zoom: Some(22.0),
+            attribution: Some("© MapLibre".into()),
+            scheme: Some(TileScheme::Tms),
+            bounds: Some(LatLngBounds::new(
                 LatLng::new(1.0, 2.0),
                 LatLng::new(3.0, 4.0),
-            ))
-            .with_tile_size(512)
-            .with_vector_encoding(VectorTileEncoding::Mvt)
-            .with_raster_dem_encoding(RasterDemEncoding::Mapbox);
+            )),
+            tile_size: Some(512),
+            vector_encoding: Some(VectorTileEncoding::Mvt),
+            raster_dem_encoding: Some(RasterDemEncoding::Mapbox),
+        };
 
         let native = tile_source_options_to_native(&options);
         let raw = native.as_ref();
@@ -588,7 +531,7 @@ mod tests {
         assert_eq!(empty_info.pixel_ratio, 1.0);
         assert!(!empty_info.sdf);
 
-        let default_raw = style_image_options_to_native(&StyleImageOptions::new());
+        let default_raw = style_image_options_to_native(&StyleImageOptions::default());
         assert_eq!(
             default_raw.size,
             std::mem::size_of::<sys::mln_style_image_options>() as u32
@@ -597,11 +540,10 @@ mod tests {
         assert_eq!(default_raw.pixel_ratio, 1.0);
         assert!(!default_raw.sdf);
 
-        let raw = style_image_options_to_native(
-            &StyleImageOptions::new()
-                .with_pixel_ratio(2.0)
-                .with_sdf(true),
-        );
+        let raw = style_image_options_to_native(&StyleImageOptions {
+            pixel_ratio: Some(2.0),
+            sdf: Some(true),
+        });
         assert_eq!(
             raw.fields,
             sys::MLN_STYLE_IMAGE_OPTION_PIXEL_RATIO | sys::MLN_STYLE_IMAGE_OPTION_SDF

@@ -6,6 +6,9 @@ namespace Maplibre.Native.Internal.Status;
 
 internal static unsafe class NativeStatus
 {
+    [ThreadStatic]
+    private static Func<string>? diagnosticProviderForTest;
+
     internal static void Check(mln_status status)
     {
         Check((int)status);
@@ -29,18 +32,42 @@ internal static unsafe class NativeStatus
             MaplibreStatus.InvalidArgument => new InvalidArgumentException(
                 status,
                 rawStatus,
-                diagnostic
+                diagnostic,
+                null
             ),
-            MaplibreStatus.InvalidState => new InvalidStateException(status, rawStatus, diagnostic),
-            MaplibreStatus.WrongThread => new WrongThreadException(status, rawStatus, diagnostic),
+            MaplibreStatus.InvalidState => new InvalidStateException(
+                status,
+                rawStatus,
+                diagnostic,
+                null
+            ),
+            MaplibreStatus.WrongThread => new WrongThreadException(
+                status,
+                rawStatus,
+                diagnostic,
+                null
+            ),
             MaplibreStatus.Unsupported => new UnsupportedFeatureException(
                 status,
                 rawStatus,
-                diagnostic
+                diagnostic,
+                null
             ),
-            MaplibreStatus.NativeError => new NativeErrorException(status, rawStatus, diagnostic),
-            _ => new MaplibreException(status, rawStatus, diagnostic),
+            MaplibreStatus.NativeError => new NativeErrorException(
+                status,
+                rawStatus,
+                diagnostic,
+                null
+            ),
+            _ => new MaplibreException(status, rawStatus, diagnostic, null),
         };
+    }
+
+    internal static IDisposable UseDiagnosticProviderForTest(Func<string> provider)
+    {
+        var previous = diagnosticProviderForTest;
+        diagnosticProviderForTest = provider;
+        return new RestoreDiagnosticProvider(previous);
     }
 
     private static MaplibreStatus StatusFromRaw(int rawStatus) =>
@@ -57,6 +84,16 @@ internal static unsafe class NativeStatus
 
     private static string CaptureDiagnostic()
     {
+        if (diagnosticProviderForTest is { } provider)
+        {
+            return provider();
+        }
+
+        return CaptureNativeDiagnostic();
+    }
+
+    private static string CaptureNativeDiagnostic()
+    {
         try
         {
             var message = NativeMethods.mln_thread_last_error_message();
@@ -67,6 +104,14 @@ internal static unsafe class NativeStatus
         catch (DllNotFoundException)
         {
             return string.Empty;
+        }
+    }
+
+    private sealed class RestoreDiagnosticProvider(Func<string>? previous) : IDisposable
+    {
+        public void Dispose()
+        {
+            diagnosticProviderForTest = previous;
         }
     }
 }

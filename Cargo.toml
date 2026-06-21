@@ -5,6 +5,7 @@ members = [
   "bindings/rust/crates/maplibre-native-core",
   "bindings/rust/crates/maplibre-native-sys",
   "examples/rust-map",
+  "src/platform/rust",
 ]
 
 [workspace.package]

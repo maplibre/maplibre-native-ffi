@@ -12,7 +12,10 @@ final class NativeResultGuard: @unchecked Sendable {
     destroy: @escaping @Sendable (OpaquePointer) -> Void
   ) throws {
     guard let pointer else {
-      throw NativeStatusFailure(rawStatus: 0, diagnostic: "\(typeName) native result is null")
+      throw NativeStatusFailure(
+        rawStatus: 0,
+        diagnostic: "\(typeName) native result is null"
+      )
     }
     self.typeName = typeName
     self.pointer = pointer
@@ -26,7 +29,10 @@ final class NativeResultGuard: @unchecked Sendable {
   func requireLive() throws -> OpaquePointer {
     try lock.withLock {
       guard let pointer else {
-        throw NativeStatusFailure(rawStatus: 0, diagnostic: "\(typeName) is closed")
+        throw NativeStatusFailure(
+          rawStatus: 0,
+          diagnostic: "\(typeName) is closed"
+        )
       }
       return pointer
     }

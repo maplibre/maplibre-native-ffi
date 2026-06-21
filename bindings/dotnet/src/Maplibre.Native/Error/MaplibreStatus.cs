@@ -21,6 +21,9 @@ public enum MaplibreStatus
     /// <summary>A native MapLibre error or C++ exception was converted to status.</summary>
     NativeError = -5,
 
+    /// <summary>The loaded C ABI version is incompatible with this binding.</summary>
+    AbiMismatch = -1000,
+
     /// <summary>The native library returned a status unknown to this binding.</summary>
     Unknown = int.MinValue,
 }

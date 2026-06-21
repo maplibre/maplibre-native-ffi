@@ -1,8 +1,7 @@
 import CMaplibreNativeC
 import Foundation
-import Testing
-
 @testable import MaplibreNative
+import Testing
 
 private final class ResourceCounters: @unchecked Sendable {
   private let lock = NSLock()
@@ -54,7 +53,8 @@ private final class ResourceHandleStateCapture: @unchecked Sendable {
 }
 
 @Test func runtimeCreateRunPollAndClose() throws {
-  let runtime = try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
+  let runtime =
+    try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
   try runtime.runOnce()
   _ = try runtime.pollEvent()
   try runtime.close()
@@ -63,17 +63,22 @@ private final class ResourceHandleStateCapture: @unchecked Sendable {
 }
 
 @Test func runtimeResourceTransformCanInstallAndClear() throws {
-  let runtime = try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
+  let runtime =
+    try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
   defer { try? runtime.close() }
 
   try runtime.setResourceTransform { request in
-    request.url.replacingOccurrences(of: "example.test", with: "example.invalid")
+    request.url.replacingOccurrences(
+      of: "example.test",
+      with: "example.invalid"
+    )
   }
   try runtime.clearResourceTransform()
 }
 
 @Test func runtimeResourceProviderCanInstallPassThroughCallback() throws {
-  let runtime = try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
+  let runtime =
+    try RuntimeHandle(options: RuntimeOptions(cachePath: ":memory:"))
   defer { try? runtime.close() }
 
   try runtime.setResourceProvider { _, _ in
@@ -105,7 +110,7 @@ private final class ResourceHandleStateCapture: @unchecked Sendable {
   #expect(result.replacement == nil)
 }
 
-@Test func resourceProviderParseFailureFinalizesHandleState() throws {
+@Test func resourceProviderParseFailureFinalizesHandleState() {
   let counters = ResourceCounters()
   let functions = NativeResourceRequestHandleFunctions(
     complete: { _, _ in counters.completed() },
@@ -119,30 +124,44 @@ private final class ResourceHandleStateCapture: @unchecked Sendable {
 
   var request = mln_resource_request()
   request.size = UInt32(MemoryLayout<mln_resource_request>.size)
-  let decision = state.invokeForTesting(request: request, handle: OpaquePointer(bitPattern: 0x9))
+  let decision = state.invokeForTesting(
+    request: request,
+    handle: OpaquePointer(bitPattern: 0x9)
+  )
 
   #expect(decision == UInt32.max)
   #expect(counters.snapshot().release == 0)
 }
 
-@Test func resourceRequestHandleRejectsSecondCompletionBeforeCallingNative() throws {
+@Test func resourceRequestHandleRejectsSecondCompletionBeforeCallingNative(
+) throws {
   let counters = ResourceCounters()
   let functions = NativeResourceRequestHandleFunctions(
     complete: { _, _ in counters.completed() },
     cancelled: { _ in false },
     release: { _ in counters.released() }
   )
-  let state = try NativeResourceRequestHandleState(pointer: OpaquePointer(bitPattern: 0x5), functions: functions)
+  let state = try NativeResourceRequestHandleState(
+    pointer: OpaquePointer(bitPattern: 0x5),
+    functions: functions
+  )
 
-  try state.complete(NativeResourceResponseInput(status: ResourceResponseStatus.ok.rawValue, errorReason: ResourceErrorReason.none.rawValue))
+  try state.complete(NativeResourceResponseInput(
+    status: ResourceResponseStatus.ok.rawValue,
+    errorReason: ResourceErrorReason.none.rawValue
+  ))
   do {
-    try state.complete(NativeResourceResponseInput(status: ResourceResponseStatus.ok.rawValue, errorReason: ResourceErrorReason.none.rawValue))
+    try state.complete(NativeResourceResponseInput(
+      status: ResourceResponseStatus.ok.rawValue,
+      errorReason: ResourceErrorReason.none.rawValue
+    ))
     Issue.record("second completion should throw")
   } catch let failure as NativeStatusFailure {
     #expect(failure.diagnostic.contains("already completed"))
   }
 
-  _ = state.finishProviderDecision(MLN_RESOURCE_PROVIDER_DECISION_HANDLE.rawValue)
+  _ = state
+    .finishProviderDecision(MLN_RESOURCE_PROVIDER_DECISION_HANDLE.rawValue)
 
   #expect(counters.snapshot().complete == 1)
   #expect(counters.snapshot().release == 1)
@@ -153,27 +172,40 @@ private final class ResourceHandleStateCapture: @unchecked Sendable {
   let functions = NativeResourceRequestHandleFunctions(
     complete: { _, _ in
       counters.completed()
-      throw NativeStatusFailure(rawStatus: MLN_STATUS_INVALID_STATE.rawValue, diagnostic: "resource request can no longer accept a response")
+      throw NativeStatusFailure(
+        rawStatus: MLN_STATUS_INVALID_STATE.rawValue,
+        diagnostic: "resource request can no longer accept a response"
+      )
     },
     cancelled: { _ in false },
     release: { _ in counters.released() }
   )
-  let state = try NativeResourceRequestHandleState(pointer: OpaquePointer(bitPattern: 0x5), functions: functions)
+  let state = try NativeResourceRequestHandleState(
+    pointer: OpaquePointer(bitPattern: 0x5),
+    functions: functions
+  )
 
   do {
-    try state.complete(NativeResourceResponseInput(status: ResourceResponseStatus.ok.rawValue, errorReason: ResourceErrorReason.none.rawValue))
+    try state.complete(NativeResourceResponseInput(
+      status: ResourceResponseStatus.ok.rawValue,
+      errorReason: ResourceErrorReason.none.rawValue
+    ))
     Issue.record("failed native completion should throw")
   } catch let failure as NativeStatusFailure {
     #expect(failure.diagnostic.contains("no longer accept"))
   }
   do {
-    try state.complete(NativeResourceResponseInput(status: ResourceResponseStatus.ok.rawValue, errorReason: ResourceErrorReason.none.rawValue))
+    try state.complete(NativeResourceResponseInput(
+      status: ResourceResponseStatus.ok.rawValue,
+      errorReason: ResourceErrorReason.none.rawValue
+    ))
     Issue.record("second completion should throw before calling native")
   } catch let failure as NativeStatusFailure {
     #expect(failure.diagnostic.contains("already completed"))
   }
 
-  _ = state.finishProviderDecision(MLN_RESOURCE_PROVIDER_DECISION_HANDLE.rawValue)
+  _ = state
+    .finishProviderDecision(MLN_RESOURCE_PROVIDER_DECISION_HANDLE.rawValue)
 
   #expect(counters.snapshot().complete == 1)
   #expect(counters.snapshot().release == 1)
@@ -196,8 +228,12 @@ private final class ResourceHandleStateCapture: @unchecked Sendable {
     },
     release: { _ in counters.released() }
   )
-  let state = try NativeResourceRequestHandleState(pointer: OpaquePointer(bitPattern: 0x6), functions: functions)
-  _ = state.finishProviderDecision(MLN_RESOURCE_PROVIDER_DECISION_HANDLE.rawValue)
+  let state = try NativeResourceRequestHandleState(
+    pointer: OpaquePointer(bitPattern: 0x6),
+    functions: functions
+  )
+  _ = state
+    .finishProviderDecision(MLN_RESOURCE_PROVIDER_DECISION_HANDLE.rawValue)
 
   let cancellationResult = ResourceCancellationResult()
   Thread {
@@ -213,7 +249,8 @@ private final class ResourceHandleStateCapture: @unchecked Sendable {
   }.start()
 
   #expect(releaseStarted.wait(timeout: .now() + .seconds(5)) == .success)
-  #expect(releaseFinished.wait(timeout: .now() + .milliseconds(100)) == .timedOut)
+  #expect(releaseFinished
+    .wait(timeout: .now() + .milliseconds(100)) == .timedOut)
   #expect(counters.snapshot().release == 0)
 
   allowCancellationReturn.signal()
@@ -221,9 +258,9 @@ private final class ResourceHandleStateCapture: @unchecked Sendable {
   #expect(releaseFinished.wait(timeout: .now() + .seconds(5)) == .success)
 
   switch cancellationResult.load() {
-  case .success(let isCancelled):
+  case let .success(isCancelled):
     #expect(isCancelled)
-  case .failure(let error):
+  case let .failure(error):
     Issue.record("unexpected cancellation failure: \(error)")
   case nil:
     Issue.record("cancellation did not finish")
@@ -232,7 +269,8 @@ private final class ResourceHandleStateCapture: @unchecked Sendable {
   #expect(counters.snapshot().release == 1)
 }
 
-@Test func resourceProviderCallbackCopiesRequestAndCompletesHandledRequest() throws {
+@Test func resourceProviderCallbackCopiesRequestAndCompletesHandledRequest(
+) throws {
   let counters = ResourceCounters()
   let functions = NativeResourceRequestHandleFunctions(
     complete: { _, response in
@@ -243,45 +281,53 @@ private final class ResourceHandleStateCapture: @unchecked Sendable {
     cancelled: { _ in false },
     release: { _ in counters.released() }
   )
-  let state = NativeResourceProviderState(handleFunctions: functions) { nativeRequest, nativeHandle in
-    let request = ResourceRequest(native: nativeRequest)
-    #expect(request.url == "https://example.test/tile")
-    #expect(request.kind == .tile)
-    #expect(request.loadingMethod == .networkOnly)
-    #expect(request.priority == .low)
-    #expect(request.usage == .offline)
-    #expect(request.storagePolicy == .volatile)
-    #expect(request.range == ByteRange(start: 7, end: 11))
-    #expect(request.priorEtag == "etag")
-    #expect(request.priorData == Data([1, 2, 3]))
+  let state =
+    NativeResourceProviderState(handleFunctions: functions) { nativeRequest, nativeHandle in
+      let request = ResourceRequest(native: nativeRequest)
+      #expect(request.url == "https://example.test/tile")
+      #expect(request.kind == .tile)
+      #expect(request.loadingMethod == .networkOnly)
+      #expect(request.priority == .low)
+      #expect(request.usage == .offline)
+      #expect(request.storagePolicy == .volatile)
+      #expect(request.range == ByteRange(start: 7, end: 11))
+      #expect(request.priorEtag == "etag")
+      #expect(request.priorData == Data([1, 2, 3]))
 
-    let handle = ResourceRequestHandle(state: nativeHandle)
-    try? handle.complete(ResourceResponse(status: .ok, bytes: Data("ok".utf8)))
-    return 1
-  }
+      let handle = ResourceRequestHandle(state: nativeHandle)
+      try? handle.complete(ResourceResponse(
+        status: .ok,
+        bytes: Data("ok".utf8)
+      ))
+      return 1
+    }
 
   let priorData: [UInt8] = [1, 2, 3]
-  let decision = try NativeString.withCString("https://example.test/tile") { url in
-    try NativeString.withCString("etag") { etag in
-      priorData.withUnsafeBufferPointer { priorData in
-        var request = mln_resource_request()
-        request.size = UInt32(MemoryLayout<mln_resource_request>.size)
-        request.url = url
-        request.kind = 3
-        request.loading_method = 2
-        request.priority = 1
-        request.usage = 1
-        request.storage_policy = 1
-        request.has_range = true
-        request.range_start = 7
-        request.range_end = 11
-        request.prior_etag = etag
-        request.prior_data = priorData.baseAddress
-        request.prior_data_size = priorData.count
-        return state.invokeForTesting(request: request, handle: OpaquePointer(bitPattern: 0x4))
+  let decision = try NativeString
+    .withCString("https://example.test/tile") { url in
+      try NativeString.withCString("etag") { etag in
+        priorData.withUnsafeBufferPointer { priorData in
+          var request = mln_resource_request()
+          request.size = UInt32(MemoryLayout<mln_resource_request>.size)
+          request.url = url
+          request.kind = 3
+          request.loading_method = 2
+          request.priority = 1
+          request.usage = 1
+          request.storage_policy = 1
+          request.has_range = true
+          request.range_start = 7
+          request.range_end = 11
+          request.prior_etag = etag
+          request.prior_data = priorData.baseAddress
+          request.prior_data_size = priorData.count
+          return state.invokeForTesting(
+            request: request,
+            handle: OpaquePointer(bitPattern: 0x4)
+          )
+        }
       }
     }
-  }
 
   #expect(decision == 1)
   #expect(counters.snapshot().complete == 1)
@@ -296,21 +342,29 @@ private final class ResourceHandleStateCapture: @unchecked Sendable {
     release: { _ in counters.released() }
   )
   let escapedState = ResourceHandleStateCapture()
-  let state = NativeResourceProviderState(handleFunctions: functions) { _, nativeHandle in
-    escapedState.store(nativeHandle)
-    return MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH.rawValue
-  }
+  let state =
+    NativeResourceProviderState(handleFunctions: functions) { _, nativeHandle in
+      escapedState.store(nativeHandle)
+      return MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH.rawValue
+    }
 
-  let decision = try NativeString.withCString("https://example.test/tile") { url in
-    var request = mln_resource_request()
-    request.size = UInt32(MemoryLayout<mln_resource_request>.size)
-    request.url = url
-    return state.invokeForTesting(request: request, handle: OpaquePointer(bitPattern: 0x7))
-  }
+  let decision = try NativeString
+    .withCString("https://example.test/tile") { url in
+      var request = mln_resource_request()
+      request.size = UInt32(MemoryLayout<mln_resource_request>.size)
+      request.url = url
+      return state.invokeForTesting(
+        request: request,
+        handle: OpaquePointer(bitPattern: 0x7)
+      )
+    }
 
   #expect(decision == MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH.rawValue)
   do {
-    try escapedState.load()?.complete(NativeResourceResponseInput(status: ResourceResponseStatus.ok.rawValue, errorReason: ResourceErrorReason.none.rawValue))
+    try escapedState.load()?.complete(NativeResourceResponseInput(
+      status: ResourceResponseStatus.ok.rawValue,
+      errorReason: ResourceErrorReason.none.rawValue
+    ))
     Issue.record("pass-through handle should be closed")
   } catch let failure as NativeStatusFailure {
     #expect(failure.diagnostic.contains("closed"))
@@ -329,17 +383,25 @@ private final class ResourceHandleStateCapture: @unchecked Sendable {
     cancelled: { _ in false },
     release: { _ in counters.released() }
   )
-  let state = NativeResourceProviderState(handleFunctions: functions) { _, nativeHandle in
-    try? nativeHandle.complete(NativeResourceResponseInput(status: ResourceResponseStatus.ok.rawValue, errorReason: ResourceErrorReason.none.rawValue))
-    return MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH.rawValue
-  }
+  let state =
+    NativeResourceProviderState(handleFunctions: functions) { _, nativeHandle in
+      try? nativeHandle.complete(NativeResourceResponseInput(
+        status: ResourceResponseStatus.ok.rawValue,
+        errorReason: ResourceErrorReason.none.rawValue
+      ))
+      return MLN_RESOURCE_PROVIDER_DECISION_PASS_THROUGH.rawValue
+    }
 
-  let decision = try NativeString.withCString("https://example.test/tile") { url in
-    var request = mln_resource_request()
-    request.size = UInt32(MemoryLayout<mln_resource_request>.size)
-    request.url = url
-    return state.invokeForTesting(request: request, handle: OpaquePointer(bitPattern: 0x8))
-  }
+  let decision = try NativeString
+    .withCString("https://example.test/tile") { url in
+      var request = mln_resource_request()
+      request.size = UInt32(MemoryLayout<mln_resource_request>.size)
+      request.url = url
+      return state.invokeForTesting(
+        request: request,
+        handle: OpaquePointer(bitPattern: 0x8)
+      )
+    }
 
   #expect(decision == MLN_RESOURCE_PROVIDER_DECISION_HANDLE.rawValue)
   #expect(counters.snapshot().complete == 1)

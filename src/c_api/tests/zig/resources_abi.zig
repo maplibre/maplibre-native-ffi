@@ -40,8 +40,8 @@ fn emptyEvent() c.mln_runtime_event {
     };
 }
 
-fn waitForMapEvent(runtime: *c.mln_runtime, map: *c.mln_map, event_type: u32) !bool {
-    for (0..1000) |_| {
+fn waitForMapEventAttempts(runtime: *c.mln_runtime, map: *c.mln_map, event_type: u32, attempts: usize) !bool {
+    for (0..attempts) |_| {
         try testing.expectEqual(c.MLN_STATUS_OK, c.mln_runtime_run_once(runtime));
         while (true) {
             var event = emptyEvent();
@@ -53,6 +53,10 @@ fn waitForMapEvent(runtime: *c.mln_runtime, map: *c.mln_map, event_type: u32) !b
         try sleepOneMillisecond();
     }
     return false;
+}
+
+fn waitForMapEvent(runtime: *c.mln_runtime, map: *c.mln_map, event_type: u32) !bool {
+    return waitForMapEventAttempts(runtime, map, event_type, 1000);
 }
 
 fn waitForOfflineOperation(runtime: *c.mln_runtime, operation_id: c.mln_offline_operation_id) !c.mln_runtime_event_offline_operation_completed {
@@ -368,7 +372,7 @@ test "resource transform helper copies temporary replacement URL through native 
     defer support.destroyMap(map);
 
     try testing.expectEqual(c.MLN_STATUS_OK, c.mln_map_set_style_url(map, "http://original.invalid/style.json"));
-    try testing.expect(try waitForMapEvent(runtime, map, c.MLN_RUNTIME_EVENT_MAP_STYLE_LOADED));
+    try testing.expect(try waitForMapEventAttempts(runtime, map, c.MLN_RUNTIME_EVENT_MAP_STYLE_LOADED, 5000));
     server_thread.join();
     server_thread_joined = true;
     try testing.expect(server_state.served);

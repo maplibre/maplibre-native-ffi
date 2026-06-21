@@ -4,7 +4,7 @@ dir = "{{env.MLN_FFI_REPO_ROOT}}/bindings/vala"
 run = '''
 set -euo pipefail
 mkdir -p build/vapi build/include build/c
-valac \
+"{{env.MLN_FFI_REPO_ROOT}}/.pixi/envs/default/bin/valac" \
   --vapidir vapi \
   --pkg maplibre-native-c \
   --pkg glib-2.0 \
@@ -23,8 +23,8 @@ dir = "{{env.MLN_FFI_REPO_ROOT}}/bindings/vala"
 run = '''
 set -euo pipefail
 mkdir -p build
-export LD_LIBRARY_PATH="{{env.MLN_FFI_BUILD_DIR}}:$CONDA_PREFIX/lib:${LD_LIBRARY_PATH:-}"
-export DYLD_LIBRARY_PATH="{{env.MLN_FFI_BUILD_DIR}}:$CONDA_PREFIX/lib:${DYLD_LIBRARY_PATH:-}"
+export LD_LIBRARY_PATH="{{env.MLN_FFI_BUILD_DIR}}:{{env.MLN_FFI_DEPENDENCY_LIBRARY_DIR}}:${LD_LIBRARY_PATH:-}"
+export DYLD_LIBRARY_PATH="{{env.MLN_FFI_BUILD_DIR}}:{{env.MLN_FFI_DEPENDENCY_LIBRARY_DIR}}:${DYLD_LIBRARY_PATH:-}"
 metal_support_object="build/metal_support.o"
 metal_framework_args=()
 if [[ "$(uname -s)" == "Darwin" ]]; then
@@ -49,7 +49,7 @@ void mln_vala_metal_test_object_release(void* object) { (void)object; }
 STUB
   ${CC:-cc} -c build/metal_support_stub.c -o "$metal_support_object"
 fi
-valac \
+"{{env.MLN_FFI_REPO_ROOT}}/.pixi/envs/default/bin/valac" \
   --vapidir vapi \
   --pkg maplibre-native-c \
   --pkg glib-2.0 \
@@ -58,13 +58,13 @@ valac \
   -X -I"{{env.MLN_FFI_VULKAN_INCLUDE_DIR}}" \
   -X -Wno-unused-value \
   -X -L"{{env.MLN_FFI_BUILD_DIR}}" \
-  -X -L"$CONDA_PREFIX/lib" \
+  -X -L"{{env.MLN_FFI_DEPENDENCY_LIBRARY_DIR}}" \
   -X -lmaplibre-native-c \
   -X -lvulkan \
   "${metal_framework_args[@]}" \
   -X "$metal_support_object" \
   -X -Wl,-rpath,"{{env.MLN_FFI_BUILD_DIR}}" \
-  -X -Wl,-rpath,"$CONDA_PREFIX/lib" \
+  -X -Wl,-rpath,"{{env.MLN_FFI_DEPENDENCY_LIBRARY_DIR}}" \
   src/*.vala \
   tests/compile/minimal.vala \
   tests/compile/vulkan_support.c \

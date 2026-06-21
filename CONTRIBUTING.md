@@ -13,7 +13,7 @@ Read [concepts](https://maplibre.org/maplibre-native-ffi/concepts/) before
 changing behavior. Read the
 [C API Conventions](https://maplibre.org/maplibre-native-ffi/development/c-conventions/)
 before changing public C interfaces or C ABI behavior. Read the
-[Binding Conventions](https://maplibre.org/maplibre-native-ffi/development/bindings/)
+[Binding specification](https://maplibre.org/maplibre-native-ffi/development/binding-specification/)
 before changing language bindings or generated binding reference docs.
 
 Keep pull requests focused on one reviewable change. The reviewer should be able

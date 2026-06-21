@@ -1,7 +1,6 @@
 import Foundation
-import Testing
-
 @testable import MaplibreNative
+import Testing
 
 private final class LogRecords: @unchecked Sendable {
   private let lock = NSLock()
@@ -52,8 +51,18 @@ private final class LogRecords: @unchecked Sendable {
     ) == nil
   )
 
-  #expect(first.snapshot() == [LogRecord(severity: .info, event: .general, code: 7, message: "first")])
-  #expect(second.snapshot() == [LogRecord(severity: .warning, event: .parseStyle, code: 8, message: "second")])
+  #expect(first.snapshot() == [LogRecord(
+    severity: .info,
+    event: .general,
+    code: 7,
+    message: "first"
+  )])
+  #expect(second.snapshot() == [LogRecord(
+    severity: .warning,
+    event: .parseStyle,
+    code: 8,
+    message: "second"
+  )])
 }
 
 @Test func asyncLogSeverityMaskRejectsUnknownBitsBeforeCallingC() throws {

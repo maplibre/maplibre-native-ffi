@@ -71,11 +71,6 @@ pub fn set_async_log_severity_mask(mask: LogSeverityMask) -> Result<()> {
     maplibre_core::check(unsafe { sys::mln_log_set_async_severity_mask(mask.bits()) })
 }
 
-/// Restores MapLibre Native's default async log severity mask.
-pub fn restore_default_async_log_severity_mask() -> Result<()> {
-    set_async_log_severity_mask(LogSeverityMask::DEFAULT)
-}
-
 unsafe extern "C" fn log_callback_trampoline(
     user_data: *mut c_void,
     severity: u32,
@@ -152,10 +147,11 @@ mod tests {
 
     fn clear_logging_after_test() {
         let _ = clear_log_callback();
-        let _ = restore_default_async_log_severity_mask();
+        let _ = set_async_log_severity_mask(LogSeverityMask::DEFAULT);
     }
 
     #[test]
+    // Spec coverage: BND-120.
     fn log_callback_install_clear_and_trampoline_copy_record() {
         let _guard = LoggingTestGuard::new();
         let calls = Arc::new(AtomicUsize::new(0));
@@ -214,6 +210,50 @@ mod tests {
     }
 
     #[test]
+    // Spec coverage: BND-120.
+    fn log_callback_replacement_invokes_only_replacement() {
+        let _guard = LoggingTestGuard::new();
+        let first_calls = Arc::new(AtomicUsize::new(0));
+        let second_calls = Arc::new(AtomicUsize::new(0));
+        let first_callback_calls = Arc::clone(&first_calls);
+        set_log_callback(move |_| {
+            first_callback_calls.fetch_add(1, Ordering::SeqCst);
+            true
+        })
+        .unwrap();
+
+        let second_callback_calls = Arc::clone(&second_calls);
+        set_log_callback(move |_| {
+            second_callback_calls.fetch_add(1, Ordering::SeqCst);
+            true
+        })
+        .unwrap();
+
+        let current = {
+            let state = lock_log_callback_state();
+            state.as_ref().unwrap().clone()
+        };
+        let message = CString::new("replacement").unwrap();
+        assert_eq!(
+            invoke_callback(
+                &current,
+                sys::MLN_LOG_SEVERITY_INFO,
+                sys::MLN_LOG_EVENT_GENERAL,
+                7,
+                message.as_ptr(),
+            ),
+            1
+        );
+
+        assert_eq!(first_calls.load(Ordering::SeqCst), 0);
+        assert_eq!(second_calls.load(Ordering::SeqCst), 1);
+
+        clear_log_callback().unwrap();
+        assert!(lock_log_callback_state().is_none());
+    }
+
+    #[test]
+    // Spec coverage: BND-121.
     fn invalid_utf8_log_messages_are_not_consumed() {
         let _guard = LoggingTestGuard::new();
         set_log_callback(|_| true).unwrap();
@@ -238,6 +278,7 @@ mod tests {
     }
 
     #[test]
+    // Spec coverage: BND-121.
     fn log_callback_panics_are_not_consumed() {
         let _guard = LoggingTestGuard::new();
         set_log_callback(|_| panic!("contained panic")).unwrap();
@@ -263,6 +304,7 @@ mod tests {
     }
 
     #[test]
+    // Spec coverage: BND-020.
     fn async_log_severity_mask_status_propagates_invalid_bits() {
         let _guard = LoggingTestGuard::new();
         let invalid_mask = LogSeverityMask::from_bits_retain(1 << 31);
@@ -274,10 +316,11 @@ mod tests {
     }
 
     #[test]
+    // Spec coverage: BND-120.
     fn async_log_severity_mask_accepts_known_values() {
         let _guard = LoggingTestGuard::new();
 
         set_async_log_severity_mask(LogSeverityMask::INFO | LogSeverityMask::ERROR).unwrap();
-        restore_default_async_log_severity_mask().unwrap();
+        set_async_log_severity_mask(LogSeverityMask::DEFAULT).unwrap();
     }
 }

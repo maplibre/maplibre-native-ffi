@@ -1,0 +1,3 @@
+[requires]
+backend = ["metal"]
+os = ["macos", "ios"]

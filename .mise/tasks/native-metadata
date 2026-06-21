@@ -1,0 +1,267 @@
+#!/usr/bin/env python
+#MISE description="Generate binding build-system files from native artifact metadata."
+from dataclasses import dataclass
+import json
+import os
+from pathlib import Path
+import sys
+import xml.etree.ElementTree as ET
+
+
+LIBRARY_NAME = "maplibre-native-c"
+
+
+@dataclass(frozen=True)
+class Artifact:
+    render_backend: str
+    artifact_shape: str
+    library_path: str
+    import_library_path: str
+    include_dirs: list[str]
+    library_dirs: list[str]
+    link_dirs: list[str]
+    runtime_library_dirs: list[str]
+    loader_library_dirs: list[str]
+    link_libraries: list[str]
+    frameworks: list[str]
+
+
+def unique(values: list[str]) -> list[str]:
+    result = []
+    seen = set()
+    for value in values:
+        if value and value not in seen:
+            result.append(value)
+            seen.add(value)
+    return result
+
+
+def load_artifact(metadata_path: Path) -> Artifact:
+    with metadata_path.open(encoding="utf-8") as metadata_file:
+        metadata = json.load(metadata_file)
+
+    library_path = metadata.get("library_path", "")
+    import_library_path = metadata.get("import_library_path") or library_path
+    require_existing_file(library_path, "native library")
+    if import_library_path != library_path:
+        require_existing_file(import_library_path, "Windows import library")
+    library_dirs = metadata.get("library_dirs", [])
+    runtime_library_dirs = []
+    if metadata.get("supports_linker_rpath", False):
+        runtime_library_dirs = unique(
+            [str(Path(library_path).parent), *metadata.get("rpaths", [])]
+        )
+    loader_library_dirs = unique(
+        [
+            str(Path(library_path).parent),
+            *runtime_library_dirs,
+            *runtime_dirs_from_library_dirs(library_dirs),
+        ]
+    )
+
+    return Artifact(
+        render_backend=metadata.get("render_backend", ""),
+        artifact_shape=metadata.get("artifact_shape", ""),
+        library_path=library_path,
+        import_library_path=import_library_path,
+        include_dirs=unique(metadata.get("include_dirs", [])),
+        library_dirs=unique(library_dirs),
+        link_dirs=unique([str(Path(import_library_path).parent), *library_dirs]),
+        runtime_library_dirs=runtime_library_dirs,
+        loader_library_dirs=loader_library_dirs,
+        link_libraries=unique(metadata.get("link_libraries") or [LIBRARY_NAME]),
+        frameworks=unique(metadata.get("frameworks", [])),
+    )
+
+
+def runtime_dirs_from_library_dirs(library_dirs: list[str]) -> list[str]:
+    result = []
+    for library_dir in library_dirs:
+        path = Path(library_dir)
+        if path.is_dir():
+            result.append(str(path))
+        sibling = path.parent / "bin"
+        if sibling.is_dir():
+            result.append(str(sibling))
+    return result
+
+
+def require_existing_file(path: str, label: str) -> None:
+    if not path:
+        raise SystemExit(f"native metadata is missing {label}")
+    if not Path(path).is_file():
+        raise SystemExit(f"missing {label}: {path}")
+
+
+def path_list(values: list[str]) -> str:
+    return os.pathsep.join(values)
+
+
+def properties_escape(value: str) -> str:
+    return value.replace("\\", "\\\\").replace("\n", "\\n").replace("\r", "\\r")
+
+
+def pc_escape(value: str) -> str:
+    return (
+        value.replace("\\", "\\\\")
+        .replace(" ", "\\ ")
+        .replace("\t", "\\\t")
+        .replace("#", "\\#")
+        .replace("$", "\\$")
+    )
+
+
+def linker_flags(artifact: Artifact) -> list[str]:
+    flags = []
+    flags.extend(f"-L{link_dir}" for link_dir in artifact.link_dirs)
+    flags.extend(f"-l{link_library}" for link_library in artifact.link_libraries)
+    for framework in artifact.frameworks:
+        flags.extend(["-framework", framework])
+    for runtime_dir in artifact.runtime_library_dirs:
+        flags.extend(["-Xlinker", "-rpath", "-Xlinker", runtime_dir])
+    return flags
+
+
+def write_lines(path: Path, lines: list[str]) -> None:
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def write_pkg_config(artifact: Artifact, out_dir: Path) -> None:
+    libs = [
+        *(f"-L{pc_escape(link_dir)}" for link_dir in artifact.link_dirs),
+        *(f"-l{pc_escape(link_library)}" for link_library in artifact.link_libraries),
+        *(
+            f"-Wl,-rpath,{pc_escape(runtime_dir)}"
+            for runtime_dir in artifact.runtime_library_dirs
+        ),
+        *(
+            flag
+            for framework in artifact.frameworks
+            for flag in ("-framework", pc_escape(framework))
+        ),
+    ]
+    write_lines(
+        out_dir / f"{LIBRARY_NAME}.pc",
+        [
+            f"Name: {LIBRARY_NAME}",
+            "Description: MapLibre Native C development artifact",
+            "Version: 0",
+            "Cflags: "
+            + " ".join(f"-I{pc_escape(path)}" for path in artifact.include_dirs),
+            "Libs: " + " ".join(libs),
+        ],
+    )
+
+
+def write_gradle_properties(artifact: Artifact, out_dir: Path) -> None:
+    values = {
+        "maplibreNativeC.libraryPath": artifact.library_path,
+        "maplibreNativeC.includeDirs": path_list(artifact.include_dirs),
+        "maplibreNativeC.linkDirs": path_list(artifact.link_dirs),
+        "maplibreNativeC.runtimeLibraryDirs": path_list(artifact.runtime_library_dirs),
+        "maplibreNativeC.linkLibraries": path_list(artifact.link_libraries),
+        "maplibreNativeC.frameworks": path_list(artifact.frameworks),
+    }
+    write_lines(
+        out_dir / f"{LIBRARY_NAME}.gradle.properties",
+        [f"{key}={properties_escape(value)}" for key, value in values.items()],
+    )
+
+
+def write_msbuild_props(artifact: Artifact, out_dir: Path) -> None:
+    project = ET.Element("Project")
+    property_group = ET.SubElement(project, "PropertyGroup")
+    values = {
+        "MaplibreNativeCLibraryPath": artifact.library_path,
+        "MaplibreNativeCLoaderLibraryDirs": path_list(artifact.loader_library_dirs),
+    }
+    for key, value in values.items():
+        ET.SubElement(property_group, key).text = value
+
+    item_group = ET.SubElement(project, "ItemGroup")
+    ET.SubElement(
+        item_group,
+        "RuntimeHostConfigurationOption",
+        Include="Maplibre.Native.LibraryPath",
+        Value="$(MaplibreNativeCLibraryPath)",
+    )
+    ET.SubElement(
+        item_group,
+        "RuntimeHostConfigurationOption",
+        Include="Maplibre.Native.LibraryDirs",
+        Value="$(MaplibreNativeCLoaderLibraryDirs)",
+    )
+    ET.indent(project, space="  ")
+    (out_dir / "Maplibre.Native.C.props").write_text(
+        ET.tostring(project, encoding="unicode") + "\n", encoding="utf-8"
+    )
+
+
+def write_swift_linker_flags(artifact: Artifact, out_dir: Path) -> None:
+    write_lines(out_dir / f"{LIBRARY_NAME}.swift-linker-flags", linker_flags(artifact))
+
+
+def write_zig_config(artifact: Artifact, out_dir: Path) -> None:
+    values = {
+        "render_backend": artifact.render_backend,
+        "artifact_shape": artifact.artifact_shape,
+        "library_path": artifact.library_path,
+        "import_library_path": artifact.import_library_path,
+        "include_dirs": path_list(artifact.include_dirs),
+        "library_dirs": path_list(artifact.library_dirs),
+        "link_dirs": path_list(artifact.link_dirs),
+        "runtime_library_dirs": path_list(artifact.runtime_library_dirs),
+        "link_libraries": path_list(artifact.link_libraries),
+        "frameworks": path_list(artifact.frameworks),
+    }
+    write_lines(
+        out_dir / f"{LIBRARY_NAME}.zig-config",
+        [f"{key}={value}" for key, value in values.items()],
+    )
+
+
+def write_zig_libc_config(out_dir: Path) -> None:
+    path = out_dir / f"{LIBRARY_NAME}.zig-libc"
+    system_root = os.environ.get("MLN_FFI_SYSTEM_ROOT", "")
+    if not system_root:
+        path.unlink(missing_ok=True)
+        return
+
+    include_dir = str(Path(system_root) / "usr" / "include")
+    write_lines(
+        path,
+        [
+            f"include_dir={include_dir}",
+            f"sys_include_dir={include_dir}",
+            "crt_dir=",
+            "msvc_lib_dir=",
+            "kernel32_lib_dir=",
+            "gcc_dir=",
+        ],
+    )
+
+
+def generate(metadata_path: Path) -> None:
+    out_dir = metadata_path.parent
+    out_dir.mkdir(parents=True, exist_ok=True)
+    artifact = load_artifact(metadata_path)
+    write_pkg_config(artifact, out_dir)
+    write_gradle_properties(artifact, out_dir)
+    write_msbuild_props(artifact, out_dir)
+    (out_dir / f"{LIBRARY_NAME}.env").unlink(missing_ok=True)
+    write_swift_linker_flags(artifact, out_dir)
+    write_zig_config(artifact, out_dir)
+    write_zig_libc_config(out_dir)
+
+
+def main() -> int:
+    build_dir = os.environ.get("MLN_FFI_BUILD_DIR")
+    if not build_dir:
+        print("MLN_FFI_BUILD_DIR is required", file=sys.stderr)
+        return 1
+    generate(Path(build_dir) / f"{LIBRARY_NAME}.dev.json")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

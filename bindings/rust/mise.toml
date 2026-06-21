@@ -1,14 +1,14 @@
 [tasks.build]
 depends = ["//:ensure-native-library"]
 dir = "{{env.MLN_FFI_REPO_ROOT}}"
-run = "cargo build -p maplibre-native-sys -p maplibre-native-core -p maplibre-native"
+run = '''
+cargo build -p maplibre-native-sys -p maplibre-native-core -p maplibre-native
+'''
 
 [tasks.test]
 depends = ["//:ensure-native-library"]
 dir = "{{env.MLN_FFI_REPO_ROOT}}"
-run = "cargo test -p maplibre-native-sys -p maplibre-native-core -p maplibre-native -- --test-threads=1"
-
-[tasks.ci]
-depends = [":test"]
-dir = "{{env.MLN_FFI_REPO_ROOT}}"
-run = "cargo clippy -p maplibre-native-sys -p maplibre-native-core -p maplibre-native --all-targets -- -D warnings"
+run = '''
+cargo test -p maplibre-native-sys -p maplibre-native-core -p maplibre-native -- --test-threads=1
+cargo clippy -p maplibre-native-sys -p maplibre-native-core -p maplibre-native --all-targets -- -D warnings
+'''

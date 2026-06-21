@@ -85,7 +85,10 @@ internal static unsafe class RuntimeStructs
                 ReadOfflineOperationCompleted(
                     (mln_runtime_event_offline_operation_completed*)payload
                 ),
-            _ => new RuntimeEventPayload.Unknown(payloadType, payloadSize),
+            _ => new RuntimeEventPayload.Unknown(
+                payloadType,
+                CopyBytes((byte*)payload, payloadSize)
+            ),
         };
     }
 
@@ -185,6 +188,18 @@ internal static unsafe class RuntimeStructs
         }
 
         return Marshal.PtrToStringUTF8((nint)pointer, checked((int)byteLength)) ?? string.Empty;
+    }
+
+    private static byte[] CopyBytes(byte* pointer, nuint byteLength)
+    {
+        if (pointer is null || byteLength == 0)
+        {
+            return [];
+        }
+
+        var bytes = new byte[checked((int)byteLength)];
+        Marshal.Copy((nint)pointer, bytes, 0, bytes.Length);
+        return bytes;
     }
 
     internal static mln_runtime_event EmptyNativeEvent()

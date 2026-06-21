@@ -921,7 +921,6 @@ namespace MaplibreNative {
             }
             out_response->size = (uint32) sizeof (Raw.ResourceTransformResponse);
             out_response->url = null;
-            out_response->context = null;
             var replacement = resource_transform (resource_kind_from_raw (raw_kind), url);
             if (replacement != null && replacement.length > 0) {
                 return Raw.resource_transform_response_set_url (out_response, replacement, replacement.length);

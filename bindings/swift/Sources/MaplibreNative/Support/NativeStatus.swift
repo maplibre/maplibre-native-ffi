@@ -1,7 +1,7 @@
 internal import CMaplibreNativeC
 import Foundation
 
-struct NativeStatusFailure: Error, Equatable, Sendable {
+struct NativeStatusFailure: Error, Equatable {
   let rawStatus: Int32
   let diagnostic: String
   let isNativeStatus: Bool
@@ -13,11 +13,19 @@ struct NativeStatusFailure: Error, Equatable, Sendable {
   }
 
   static func swiftInvalidArgument(_ diagnostic: String) -> Self {
-    Self(rawStatus: MLN_STATUS_INVALID_ARGUMENT.rawValue, diagnostic: diagnostic, isNativeStatus: false)
+    Self(
+      rawStatus: MLN_STATUS_INVALID_ARGUMENT.rawValue,
+      diagnostic: diagnostic,
+      isNativeStatus: false
+    )
   }
 
   static func swiftNativeError(_ diagnostic: String) -> Self {
-    Self(rawStatus: MLN_STATUS_NATIVE_ERROR.rawValue, diagnostic: diagnostic, isNativeStatus: false)
+    Self(
+      rawStatus: MLN_STATUS_NATIVE_ERROR.rawValue,
+      diagnostic: diagnostic,
+      isNativeStatus: false
+    )
   }
 }
 
@@ -28,5 +36,8 @@ func captureThreadDiagnostic() -> String {
 
 func checkStatus(_ status: mln_status) throws {
   if status == MLN_STATUS_OK { return }
-  throw NativeStatusFailure(rawStatus: status.rawValue, diagnostic: captureThreadDiagnostic())
+  throw NativeStatusFailure(
+    rawStatus: status.rawValue,
+    diagnostic: captureThreadDiagnostic()
+  )
 }

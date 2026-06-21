@@ -1,11 +1,37 @@
+include(mln_artifact_metadata)
 include(mln_lint)
 include(mln_platform)
 include(mln_render_backend)
+
+function(mln_configure_shared_exports target)
+  if(MLN_FFI_ARTIFACT_SHAPE STREQUAL "static-monolithic")
+    return()
+  endif()
+
+  set(export_dir "${CMAKE_CURRENT_BINARY_DIR}/exports")
+  file(MAKE_DIRECTORY "${export_dir}")
+
+  if(APPLE)
+    set(export_file "${export_dir}/maplibre-native-c.exports")
+    file(WRITE "${export_file}" "_mln_*\n")
+    target_link_options(
+      ${target}
+      PRIVATE "LINKER:-exported_symbols_list,${export_file}")
+  elseif(UNIX)
+    set(export_file "${export_dir}/maplibre-native-c.version")
+    file(WRITE "${export_file}"
+         "{\n  global:\n    mln_*;\n  local:\n    *;\n};\n")
+    target_link_options(
+      ${target}
+      PRIVATE "LINKER:--version-script,${export_file}")
+  endif()
+endfunction()
 
 function(mln_add_c_api_library target)
   find_package(ZLIB REQUIRED)
 
   set(MLN_FFI_C_API_SOURCES
+      ${PROJECT_SOURCE_DIR}/src/c_api/android.cpp
       ${PROJECT_SOURCE_DIR}/src/c_api/diagnostics.cpp
       ${PROJECT_SOURCE_DIR}/src/c_api/logging.cpp
       ${PROJECT_SOURCE_DIR}/src/c_api/map.cpp
@@ -29,7 +55,11 @@ function(mln_add_c_api_library target)
       ${PROJECT_SOURCE_DIR}/src/style/style_value.cpp
       ${PROJECT_SOURCE_DIR}/src/runtime/runtime.cpp)
 
-  add_library(${target} SHARED)
+  if(MLN_FFI_ARTIFACT_SHAPE STREQUAL "static-monolithic")
+    add_library(${target} STATIC)
+  else()
+    add_library(${target} SHARED)
+  endif()
   mln_target_project_sources(${target} ${MLN_FFI_C_API_SOURCES})
 
   target_include_directories(
@@ -53,13 +83,28 @@ function(mln_add_c_api_library target)
       $<$<AND:$<COMPILE_LANGUAGE:CXX>,$<CXX_COMPILER_ID:MSVC>>:/GR->
       $<$<COMPILE_LANGUAGE:OBJC,OBJCXX>:-fobjc-arc>)
 
-  if(UNIX AND DEFINED ENV{CONDA_PREFIX})
-    # Build-tree binaries find Pixi-provided shared libraries through embedded
-    # runtime search paths.
+  set(MLN_FFI_HAS_PROVIDER_LIBRARY_DIR FALSE)
+  if(DEFINED ENV{MLN_FFI_DEPENDENCY_LIBRARY_DIR}
+     AND NOT "$ENV{MLN_FFI_DEPENDENCY_LIBRARY_DIR}" STREQUAL "")
+    set(MLN_FFI_HAS_PROVIDER_LIBRARY_DIR TRUE)
+  endif()
+
+  set(MLN_FFI_ENABLE_PROVIDER_RPATH FALSE)
+  if(UNIX)
+    if(NOT CMAKE_SYSTEM_NAME STREQUAL "iOS")
+      if(MLN_FFI_HAS_PROVIDER_LIBRARY_DIR)
+        set(MLN_FFI_ENABLE_PROVIDER_RPATH TRUE)
+      endif()
+    endif()
+  endif()
+
+  if(MLN_FFI_ENABLE_PROVIDER_RPATH)
+    # Build-tree binaries find provider-supplied shared libraries through
+    # embedded runtime search paths.
     set_property(
       TARGET ${target}
       APPEND
-      PROPERTY BUILD_RPATH "$ENV{CONDA_PREFIX}/lib")
+      PROPERTY BUILD_RPATH "$ENV{MLN_FFI_DEPENDENCY_LIBRARY_DIR}")
   endif()
 
   set_target_properties(
@@ -89,4 +134,6 @@ function(mln_add_c_api_library target)
   mln_configure_source_linting(${target})
   mln_configure_platform_support(${target})
   mln_configure_render_backend(${target})
+  mln_configure_shared_exports(${target})
+  mln_write_artifact_metadata(${target})
 endfunction()

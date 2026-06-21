@@ -1,16 +1,15 @@
 use maplibre_native::{
-    CameraOptions, LatLng, MapMode, MapOptions, RuntimeEventPayload, RuntimeEventSource,
+    CameraOptions, LatLng, MapHandle, MapMode, MapOptions, RuntimeEventPayload, RuntimeEventSource,
     RuntimeEventType, RuntimeHandle, RuntimeOptions,
 };
 use std::error::Error;
 use winit::event::WindowEvent;
-use winit::event_loop::EventLoopWindowTarget;
-use winit::window::Window;
+use winit::window::{Window, WindowId};
 
+use crate::graphics::GraphicsContext;
 use crate::input::Controller;
 use crate::render_target::{Mode, RenderTarget};
 use crate::viewport::Viewport;
-use crate::vulkan::VulkanContext;
 
 const STYLE_URL: &str = "https://tiles.openfreemap.org/styles/bright";
 
@@ -18,7 +17,7 @@ pub struct App {
     target: Option<RenderTarget>,
     map: Option<maplibre_native::MapHandle>,
     runtime: Option<RuntimeHandle>,
-    vulkan: VulkanContext,
+    graphics: GraphicsContext,
     window: Window,
     viewport: Viewport,
     input: Controller,
@@ -29,50 +28,40 @@ pub struct App {
 }
 
 impl App {
-    pub fn new(window: Window, mode: Mode) -> Result<Self, Box<dyn Error>> {
-        let vulkan = VulkanContext::new(&window)?;
+    pub fn new(
+        window: Window,
+        graphics: GraphicsContext,
+        mode: Mode,
+    ) -> Result<Self, Box<dyn Error>> {
         let viewport = Viewport::from_window(&window);
         if viewport.is_empty() {
             return Err("window has no drawable extent".into());
         }
 
-        let runtime =
-            match RuntimeHandle::with_options(&RuntimeOptions::new().with_cache_path(":memory:")) {
-                Ok(runtime) => runtime,
-                Err(error) => {
-                    return Err(startup_error(
-                        format!("runtime creation failed: {error}"),
-                        None,
-                        None,
-                        None,
-                    ));
-                }
-            };
-        let map_options = MapOptions::new(
+        let mut runtime_options = RuntimeOptions::default();
+        runtime_options.cache_path = Some(":memory:".into());
+        let runtime = match RuntimeHandle::with_options(&runtime_options) {
+            Ok(runtime) => runtime,
+            Err(error) => {
+                return Err(startup_error(
+                    format!("runtime creation failed: {error}"),
+                    None,
+                    None,
+                ));
+            }
+        };
+        let mut map_options = MapOptions::new(
             viewport.logical_width,
             viewport.logical_height,
             viewport.scale_factor,
-        )
-        .with_mode(MapMode::Continuous);
-        let map = match runtime.create_map_with_options(&map_options) {
+        );
+        map_options.mode = MapMode::Continuous;
+        let map = match MapHandle::with_options(&runtime, &map_options) {
             Ok(map) => map,
             Err(error) => {
                 return Err(startup_error(
                     format!("map creation failed: {error}"),
                     None,
-                    None,
-                    Some(runtime),
-                ));
-            }
-        };
-        viewport.log("initial viewport");
-        let target = match RenderTarget::attach(mode, &map, &vulkan, viewport) {
-            Ok(target) => target,
-            Err(error) => {
-                return Err(startup_error(
-                    format!("render target attachment failed: {error}"),
-                    None,
-                    Some(map),
                     Some(runtime),
                 ));
             }
@@ -80,17 +69,27 @@ impl App {
         if let Err(error) = configure_map(&map) {
             return Err(startup_error(
                 format!("map initialization failed: {error}"),
-                Some(target),
                 Some(map),
                 Some(runtime),
             ));
         }
+        viewport.log("initial viewport");
+        let target = match RenderTarget::attach(mode, &map, &graphics, viewport) {
+            Ok(target) => target,
+            Err(error) => {
+                return Err(startup_error(
+                    format!("render target attachment failed: {error}"),
+                    Some(map),
+                    Some(runtime),
+                ));
+            }
+        };
 
         Ok(Self {
             target: Some(target),
             map: Some(map),
             runtime: Some(runtime),
-            vulkan,
+            graphics,
             window,
             viewport,
             input: Controller::default(),
@@ -102,22 +101,21 @@ impl App {
     }
 
     pub fn print_status(&self) {
-        println!("MapLibre Rust Vulkan map example running. Close the window to exit.");
-        println!("rust-map render target: {}", self.mode.cli_name());
+        println!("render target: {}", self.mode.cli_name());
         println!("render target status: {}", self.mode.status());
         Controller::print_controls();
     }
 
-    pub fn handle_window_event(&mut self, event: WindowEvent, target: &EventLoopWindowTarget<()>) {
+    pub fn window_id(&self) -> WindowId {
+        self.window.id()
+    }
+
+    pub fn handle_window_event(&mut self, event: WindowEvent) {
         if self.closed {
-            if matches!(event, WindowEvent::CloseRequested) {
-                target.exit();
-            }
             return;
         }
 
         match event {
-            WindowEvent::CloseRequested => self.request_exit(target),
             WindowEvent::Resized(_) | WindowEvent::ScaleFactorChanged { .. } => self.queue_resize(),
             WindowEvent::RedrawRequested => self.render_or_exit(),
             event => match self.input.handle(
@@ -167,10 +165,28 @@ impl App {
             self.render_pending = false;
             return Ok(());
         }
-        self.target
-            .as_mut()
+        self.graphics.resize(next)?;
+        if self
+            .target
+            .as_ref()
             .expect("render target is open")
-            .resize(next)?;
+            .needs_reattach_on_resize()
+        {
+            let old_target = self.target.take().expect("render target is open");
+            old_target.close(&self.graphics)?;
+            let new_target = RenderTarget::attach(
+                self.mode,
+                self.map.as_ref().expect("map is open"),
+                &self.graphics,
+                next,
+            )?;
+            self.target = Some(new_target);
+        } else {
+            self.target
+                .as_mut()
+                .expect("render target is open")
+                .resize(next)?;
+        }
         self.map.as_ref().expect("map is open").request_repaint()?;
         self.render_pending = true;
         Ok(())
@@ -193,7 +209,12 @@ impl App {
                 {
                     self.render_pending = true;
                 }
-                RuntimeEventType::MapRenderFrameFinished => {
+                RuntimeEventType::MapRenderFrameFinished
+                    if event.source
+                        == RuntimeEventSource::Map(
+                            self.map.as_ref().expect("map is open").id(),
+                        ) =>
+                {
                     if let RuntimeEventPayload::RenderFrame(frame) = event.payload {
                         self.render_pending |= frame.needs_repaint;
                     }
@@ -215,13 +236,17 @@ impl App {
         if self.closed || self.viewport.is_empty() {
             return Ok(());
         }
-        self.pump_runtime()?;
         if self.render_pending {
-            self.target
+            match self
+                .target
                 .as_mut()
                 .expect("render target is open")
-                .render_update()?;
-            self.render_pending = false;
+                .render_update(&self.graphics)
+            {
+                Ok(()) => self.render_pending = false,
+                Err(error) if error.kind() == maplibre_native::ErrorKind::InvalidState => {}
+                Err(error) => return Err(error.into()),
+            }
         }
         Ok(())
     }
@@ -233,11 +258,6 @@ impl App {
         }
     }
 
-    fn request_exit(&mut self, target: &EventLoopWindowTarget<()>) {
-        self.close_or_abort();
-        target.exit();
-    }
-
     fn close_resources(&mut self) -> Result<(), Box<dyn Error>> {
         if self.closed {
             return Ok(());
@@ -246,14 +266,15 @@ impl App {
         self.render_pending = false;
         self.viewport_dirty = false;
 
-        let mut first_error = self
-            .vulkan
-            .wait_idle()
-            .err()
-            .map(|error| format!("Vulkan device wait idle failed: {error:?}"));
+        let mut first_error = self.graphics.wait_idle().err().map(|error| {
+            format!(
+                "{} device wait idle failed: {error}",
+                self.graphics.backend_name()
+            )
+        });
 
         if let Some(target) = self.target.take()
-            && let Err(error) = target.close()
+            && let Err(error) = target.close(&self.graphics)
         {
             append_error(&mut first_error, error.to_string());
         }
@@ -283,25 +304,20 @@ impl App {
 
 fn configure_map(map: &maplibre_native::MapHandle) -> maplibre_native::Result<()> {
     map.set_style_url(STYLE_URL)?;
-    map.jump_to(
-        &CameraOptions::new()
-            .with_center(LatLng::new(37.7749, -122.4194))
-            .with_zoom(13.0)
-            .with_bearing(12.0)
-            .with_pitch(30.0),
-    )?;
+    let mut camera = CameraOptions::default();
+    camera.center = Some(LatLng::new(37.7749, -122.4194));
+    camera.zoom = Some(13.0);
+    camera.bearing = Some(12.0);
+    camera.pitch = Some(30.0);
+    map.jump_to(&camera)?;
     map.request_repaint()
 }
 
 fn startup_error(
     mut message: String,
-    target: Option<RenderTarget>,
     map: Option<maplibre_native::MapHandle>,
     runtime: Option<RuntimeHandle>,
 ) -> Box<dyn Error> {
-    if let Some(target) = target {
-        append_cleanup_result(&mut message, "render target", target.close());
-    }
     if let Some(map) = map {
         append_cleanup_result(&mut message, "map", map.close());
     }

@@ -6,7 +6,11 @@ public struct RuntimeOptions: Equatable, Sendable {
   public var cachePath: String?
   public var maximumCacheSize: UInt64?
 
-  public init(assetPath: String? = nil, cachePath: String? = nil, maximumCacheSize: UInt64? = nil) {
+  public init(
+    assetPath: String? = nil,
+    cachePath: String? = nil,
+    maximumCacheSize: UInt64? = nil
+  ) {
     self.assetPath = assetPath
     self.cachePath = cachePath
     self.maximumCacheSize = maximumCacheSize
@@ -284,23 +288,32 @@ public enum RuntimeEventPayload: Equatable, Sendable {
     switch native {
     case .none:
       self = .none
-    case .renderFrame(let event):
+    case let .renderFrame(event):
       self = .renderFrame(RenderFrameEvent(native: event))
-    case .renderMap(let event):
+    case let .renderMap(event):
       self = .renderMap(RenderMapEvent(native: event))
-    case .styleImageMissing(let imageId):
+    case let .styleImageMissing(imageId):
       self = .styleImageMissing(imageId)
-    case .tileAction(let event):
+    case let .tileAction(event):
       self = .tileAction(TileActionEvent(native: event))
-    case .offlineRegionStatus(let event):
+    case let .offlineRegionStatus(event):
       self = .offlineRegionStatus(OfflineRegionStatusEvent(native: event))
-    case .offlineRegionResponseError(let event):
-      self = .offlineRegionResponseError(OfflineRegionResponseErrorEvent(native: event))
-    case .offlineRegionTileCountLimit(let event):
-      self = .offlineRegionTileCountLimit(OfflineRegionTileCountLimitEvent(native: event))
-    case .offlineOperationCompleted(let event):
-      self = .offlineOperationCompleted(OfflineOperationCompletedEvent(native: event))
-    case .unknown(let type, let byteCount):
+    case let .offlineRegionResponseError(event):
+      self =
+        .offlineRegionResponseError(
+          OfflineRegionResponseErrorEvent(native: event)
+        )
+    case let .offlineRegionTileCountLimit(event):
+      self =
+        .offlineRegionTileCountLimit(
+          OfflineRegionTileCountLimitEvent(native: event)
+        )
+    case let .offlineOperationCompleted(event):
+      self =
+        .offlineOperationCompleted(
+          OfflineOperationCompletedEvent(native: event)
+        )
+    case let .unknown(type, byteCount):
       self = .unknown(type: type, byteCount: byteCount)
     }
   }
@@ -357,16 +370,16 @@ public final class RuntimeHandle {
 
   public func runOnce() throws {
     try mapNativeFailure {
-      try checkStatus(mln_runtime_run_once(try handle.requireLive()))
+      try checkStatus(mln_runtime_run_once(handle.requireLive()))
     }
   }
 
   public func pollEvent() throws -> RuntimeEvent? {
     try mapNativeFailure {
-      guard let event = try NativeRuntime.pollEvent(try handle.requireLive()) else {
+      guard let event = try NativeRuntime.pollEvent(handle.requireLive()) else {
         return nil
       }
-      let runtimeEvent = RuntimeEvent(native: try NativeRuntimeEvent(event))
+      let runtimeEvent = try RuntimeEvent(native: NativeRuntimeEvent(event))
       MapHandle.handleRuntimeEvent(runtimeEvent)
       return runtimeEvent
     }
@@ -380,7 +393,10 @@ public final class RuntimeHandle {
     }
     try mapNativeFailure {
       try replacement.withDescriptor { descriptor in
-        try checkStatus(mln_runtime_set_resource_transform(try handle.requireLive(), descriptor))
+        try checkStatus(mln_runtime_set_resource_transform(
+          handle.requireLive(),
+          descriptor
+        ))
       }
     }
     resourceTransform = replacement
@@ -388,27 +404,33 @@ public final class RuntimeHandle {
 
   public func clearResourceTransform() throws {
     try mapNativeFailure {
-      try checkStatus(mln_runtime_clear_resource_transform(try handle.requireLive()))
+      try checkStatus(mln_runtime_clear_resource_transform(handle
+          .requireLive()))
     }
     resourceTransform = nil
   }
 
   public func setResourceProvider(
-    _ callback: @escaping @Sendable (ResourceRequest, ResourceRequestHandle) -> ResourceProviderDecision
+    _ callback: @escaping @Sendable (ResourceRequest, ResourceRequestHandle)
+      -> ResourceProviderDecision
   ) throws {
-    let replacement = NativeResourceProviderState { nativeRequest, nativeHandle in
-      let request = ResourceRequest(native: nativeRequest)
-      let handle = ResourceRequestHandle(state: nativeHandle)
-      switch callback(request, handle) {
-      case .passThrough:
-        return 0
-      case .handle:
-        return 1
+    let replacement =
+      NativeResourceProviderState { nativeRequest, nativeHandle in
+        let request = ResourceRequest(native: nativeRequest)
+        let handle = ResourceRequestHandle(state: nativeHandle)
+        switch callback(request, handle) {
+        case .passThrough:
+          return 0
+        case .handle:
+          return 1
+        }
       }
-    }
     try mapNativeFailure {
       try replacement.withDescriptor { descriptor in
-        try checkStatus(mln_runtime_set_resource_provider(try handle.requireLive(), descriptor))
+        try checkStatus(mln_runtime_set_resource_provider(
+          handle.requireLive(),
+          descriptor
+        ))
       }
     }
     resourceProvider = replacement

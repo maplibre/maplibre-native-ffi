@@ -1,8 +1,8 @@
 # Raw Zig C ABI tests
 
-These tests exercise `maplibre_native_c.h` directly through Zig `@cImport`. They
-stay below the public Zig binding so they can cover raw ABI behavior that the
-binding hides on purpose.
+These tests exercise `maplibre_native_c.h` directly through Zig's translated C
+module. They stay below the public Zig binding so they can cover raw ABI
+behavior that the binding hides on purpose.
 
 Keep tests here only when they need unsafe C ABI shapes that the binding cannot
 construct: null input or output pointers, undersized structs, unknown raw enum

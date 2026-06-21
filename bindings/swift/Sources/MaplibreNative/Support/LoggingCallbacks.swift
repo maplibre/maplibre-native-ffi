@@ -1,18 +1,11 @@
 internal import CMaplibreNativeC
 import Foundation
 
-struct NativeLogRecord: Equatable, Sendable {
+struct NativeLogRecord: Equatable {
   let severity: UInt32
   let event: UInt32
   let code: Int64
   let message: String
-
-  init(severity: UInt32, event: UInt32, code: Int64, message: String) {
-    self.severity = severity
-    self.event = event
-    self.code = code
-    self.message = message
-  }
 }
 
 private final class LogCallbackBox: @unchecked Sendable {
@@ -49,12 +42,17 @@ enum LoggingCallbackState {
   private static let lock = NSLock()
   private nonisolated(unsafe) static var retainedBox: Unmanaged<LogCallbackBox>?
 
-  static func set(_ callback: @escaping @Sendable (NativeLogRecord) -> Bool) throws {
+  static func set(_ callback: @escaping @Sendable (NativeLogRecord)
+    -> Bool) throws
+  {
     let replacement = Unmanaged.passRetained(LogCallbackBox(callback))
     var old: Unmanaged<LogCallbackBox>?
     do {
       try lock.withLock {
-        try checkStatus(mln_log_set_callback(logCallbackTrampoline, replacement.toOpaque()))
+        try checkStatus(mln_log_set_callback(
+          logCallbackTrampoline,
+          replacement.toOpaque()
+        ))
         old = retainedBox
         retainedBox = replacement
       }

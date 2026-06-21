@@ -104,6 +104,7 @@ mod tests {
     }
 
     #[test]
+    // Spec coverage: BND-040.
     fn close_is_internally_idempotent_after_success() {
         let _guard = DESTROY_TEST_LOCK.lock().unwrap();
         let mut value = 1u8;
@@ -117,6 +118,7 @@ mod tests {
     }
 
     #[test]
+    // Spec coverage: BND-041.
     fn failed_close_leaves_handle_live_for_later_close() {
         let _guard = DESTROY_TEST_LOCK.lock().unwrap();
         let mut value = 1u8;

@@ -1,6 +1,7 @@
+using System.Runtime.InteropServices;
+using Maplibre.Native.Error;
 using Maplibre.Native.Internal.C;
 using Maplibre.Native.Internal.Callback;
-using Maplibre.Native.Internal.Memory;
 using Maplibre.Native.Resource;
 using Maplibre.Native.Runtime;
 using Xunit;
@@ -9,6 +10,7 @@ namespace Maplibre.Native.Tests;
 
 public sealed class ResourceTransformTests
 {
+    [BindingSpecTest("BND-141")]
     [Fact]
     public void ResourceTransformCopiesRequestWhenKeepingOriginalUrl()
     {
@@ -32,6 +34,7 @@ public sealed class ResourceTransformTests
         Assert.Equal("https://example.test/tile", copiedRequest?.Url);
     }
 
+    [BindingSpecTest("BND-025")]
     [Fact]
     public void ResourceTransformEmbeddedNulReplacementMapsToInvalidArgument()
     {
@@ -48,6 +51,7 @@ public sealed class ResourceTransformTests
         Assert.Null(replacementUrl);
     }
 
+    [BindingSpecTest("BND-121")]
     [Fact]
     public void ResourceTransformExceptionMapsToNativeError()
     {
@@ -66,6 +70,7 @@ public sealed class ResourceTransformTests
         Assert.Null(replacementUrl);
     }
 
+    [BindingSpecTest("BND-123")]
     [Fact]
     public void ResourceTransformStateDisposeIsIdempotent()
     {
@@ -75,36 +80,46 @@ public sealed class ResourceTransformTests
         state.Dispose();
     }
 
+    [BindingSpecTest("BND-122")]
     [Fact]
-    public unsafe void ResourceTransformResponseHelperRequiresNativeCallbackContext()
+    public unsafe void ResourceTransformInstallFailurePreservesPreviousCallbackAndReleasesReplacement()
     {
-        NativeLibraryTestSupport.SkipUnlessNativeLibraryIsAvailable();
-        var response = new mln_resource_transform_response
-        {
-            size = (uint)sizeof(mln_resource_transform_response),
-            context = null,
-        };
-        using var replacementUrl = NativeUtf8String.FromNullableString(
-            "https://example.test/style.json",
-            "replacementUrl"
+        var failInstall = false;
+        ResourceTransformState? failedReplacement = null;
+        using var install = RuntimeHandle.UseResourceCallbackInstallMethodsForTest(
+            (_, _) => mln_status.MLN_STATUS_OK,
+            (_, transform) =>
+            {
+                if (!failInstall)
+                {
+                    return mln_status.MLN_STATUS_OK;
+                }
+
+                failedReplacement = (ResourceTransformState?)
+                    GCHandle.FromIntPtr((nint)transform->user_data).Target;
+                return mln_status.MLN_STATUS_INVALID_STATE;
+            }
+        );
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
+        runtime.SetResourceTransform(request => request.Url + "?first");
+        var previous = Assert.IsType<ResourceTransformState>(runtime.ResourceTransformStateForTest);
+
+        failInstall = true;
+        Assert.Throws<InvalidStateException>(() =>
+            runtime.SetResourceTransform(request => request.Url + "?second")
         );
 
-        Assert.Equal(
-            mln_status.MLN_STATUS_INVALID_STATE,
-            NativeMethods.mln_resource_transform_response_set_url(
-                &response,
-                replacementUrl.Pointer,
-                replacementUrl.ByteLength
-            )
-        );
-        Assert.Equal(nint.Zero, (nint)response.url);
+        Assert.Same(previous, runtime.ResourceTransformStateForTest);
+        Assert.True(previous.IsHandleAllocatedForTest);
+        Assert.NotNull(failedReplacement);
+        Assert.False(failedReplacement.IsHandleAllocatedForTest);
     }
 
+    [BindingSpecTest("BND-140")]
     [Fact]
     public void CanInstallReplaceAndClearResourceTransform()
     {
-        NativeLibraryTestSupport.SkipUnlessNativeLibraryIsAvailable();
-        using var runtime = RuntimeHandle.Create();
+        using var runtime = RuntimeHandle.Create(new RuntimeOptions());
 
         runtime.SetResourceTransform(request => request.Url + "?first");
         runtime.SetResourceTransform(request => request.Url + "?second");

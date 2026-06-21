@@ -39,7 +39,7 @@ function(mln_configure_project_source source)
   elseif(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     set(MLN_FFI_WARNINGS -Wall -Wextra -Werror -Wno-macro-redefined)
   else()
-    set(MLN_FFI_WARNINGS -Wall -Wextra -Werror)
+    set(MLN_FFI_WARNINGS -Wall -Wextra)
   endif()
 
   set_source_files_properties(

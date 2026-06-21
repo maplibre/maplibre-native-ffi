@@ -18,6 +18,13 @@ pub struct VulkanContext {
     graphics_queue_family_index: u32,
 }
 
+pub struct BorrowedImage {
+    device: ash::Device,
+    image: vk::Image,
+    memory: vk::DeviceMemory,
+    view: vk::ImageView,
+}
+
 impl VulkanContext {
     pub fn new(window: &Window) -> Result<Self, Box<dyn Error>> {
         let entry = load_vulkan_entry()?;
@@ -204,6 +211,128 @@ impl Drop for VulkanContext {
     }
 }
 
+impl BorrowedImage {
+    pub fn new(
+        context: &VulkanContext,
+        viewport: crate::viewport::Viewport,
+    ) -> Result<Self, vk::Result> {
+        let device = context.device().clone();
+        let image_info = vk::ImageCreateInfo::default()
+            .image_type(vk::ImageType::TYPE_2D)
+            .format(vk::Format::R8G8B8A8_UNORM)
+            .extent(vk::Extent3D {
+                width: viewport.physical_width,
+                height: viewport.physical_height,
+                depth: 1,
+            })
+            .mip_levels(1)
+            .array_layers(1)
+            .samples(vk::SampleCountFlags::TYPE_1)
+            .tiling(vk::ImageTiling::OPTIMAL)
+            .usage(vk::ImageUsageFlags::COLOR_ATTACHMENT | vk::ImageUsageFlags::SAMPLED)
+            .sharing_mode(vk::SharingMode::EXCLUSIVE)
+            .initial_layout(vk::ImageLayout::UNDEFINED);
+        // SAFETY: image_info is fully initialized and the device is live.
+        let image = unsafe { device.create_image(&image_info, None)? };
+        let memory_requirements = unsafe { device.get_image_memory_requirements(image) };
+        let memory_type_index = match find_memory_type(
+            context.instance(),
+            context.physical_device(),
+            memory_requirements.memory_type_bits,
+            vk::MemoryPropertyFlags::DEVICE_LOCAL,
+        ) {
+            Ok(index) => index,
+            Err(error) => {
+                // SAFETY: image was created above and has not been bound to memory.
+                unsafe { device.destroy_image(image, None) };
+                return Err(error);
+            }
+        };
+        let allocate_info = vk::MemoryAllocateInfo::default()
+            .allocation_size(memory_requirements.size)
+            .memory_type_index(memory_type_index);
+        // SAFETY: allocation size/type came from the image memory requirements.
+        let memory = match unsafe { device.allocate_memory(&allocate_info, None) } {
+            Ok(memory) => memory,
+            Err(error) => {
+                // SAFETY: image was created above and no child objects exist.
+                unsafe { device.destroy_image(image, None) };
+                return Err(error);
+            }
+        };
+        if let Err(error) = unsafe { device.bind_image_memory(image, memory, 0) } {
+            // SAFETY: image and memory were created above and no image view exists yet.
+            unsafe {
+                device.free_memory(memory, None);
+                device.destroy_image(image, None);
+            }
+            return Err(error);
+        }
+
+        let view_info = vk::ImageViewCreateInfo::default()
+            .image(image)
+            .view_type(vk::ImageViewType::TYPE_2D)
+            .format(vk::Format::R8G8B8A8_UNORM)
+            .subresource_range(
+                vk::ImageSubresourceRange::default()
+                    .aspect_mask(vk::ImageAspectFlags::COLOR)
+                    .level_count(1)
+                    .layer_count(1),
+            );
+        // SAFETY: image is live and view_info describes its color subresource.
+        let view = match unsafe { device.create_image_view(&view_info, None) } {
+            Ok(view) => view,
+            Err(error) => {
+                // SAFETY: image and memory were created above and no view exists.
+                unsafe {
+                    device.free_memory(memory, None);
+                    device.destroy_image(image, None);
+                }
+                return Err(error);
+            }
+        };
+
+        Ok(Self {
+            device,
+            image,
+            memory,
+            view,
+        })
+    }
+
+    pub fn view(&self) -> vk::ImageView {
+        self.view
+    }
+
+    pub fn image_pointer(&self) -> NativePointer {
+        // SAFETY: The Vulkan image is live while the borrowed texture session is live.
+        unsafe { NativePointer::from_address(self.image.as_raw() as usize) }
+    }
+
+    pub fn view_pointer(&self) -> NativePointer {
+        // SAFETY: The Vulkan image view is live while the borrowed texture session is live.
+        unsafe { NativePointer::from_address(self.view.as_raw() as usize) }
+    }
+}
+
+impl Drop for BorrowedImage {
+    fn drop(&mut self) {
+        // SAFETY: The image view, image, and memory were created from this live
+        // device and are destroyed in reverse dependency order.
+        unsafe {
+            if self.view != vk::ImageView::null() {
+                self.device.destroy_image_view(self.view, None);
+            }
+            if self.image != vk::Image::null() {
+                self.device.destroy_image(self.image, None);
+            }
+            if self.memory != vk::DeviceMemory::null() {
+                self.device.free_memory(self.memory, None);
+            }
+        }
+    }
+}
+
 fn load_vulkan_entry() -> Result<ash::Entry, Box<dyn Error>> {
     // SAFETY: Loading the Vulkan loader is delegated to ash. Repository tasks
     // run through Pixi and expose the native library directory to this process.
@@ -261,4 +390,25 @@ fn pick_physical_device(
         }
     }
     Err("no Vulkan physical device has a graphics queue that can present to the window".into())
+}
+
+fn find_memory_type(
+    instance: &ash::Instance,
+    physical_device: vk::PhysicalDevice,
+    type_bits: u32,
+    properties: vk::MemoryPropertyFlags,
+) -> Result<u32, vk::Result> {
+    // SAFETY: physical_device came from this live instance.
+    let memory_properties =
+        unsafe { instance.get_physical_device_memory_properties(physical_device) };
+    for index in 0..memory_properties.memory_type_count {
+        let type_supported = (type_bits & (1 << index)) != 0;
+        let has_properties = memory_properties.memory_types[index as usize]
+            .property_flags
+            .contains(properties);
+        if type_supported && has_properties {
+            return Ok(index);
+        }
+    }
+    Err(vk::Result::ERROR_FEATURE_NOT_PRESENT)
 }

@@ -33,7 +33,7 @@ reference, and contributor notes.
 - [Usage guides](https://maplibre.org/maplibre-native-ffi/guides/installation/)
 - [Reference](https://maplibre.org/maplibre-native-ffi/reference/c/)
 - [Development overview](https://maplibre.org/maplibre-native-ffi/development/overview/)
-- [Binding conventions](https://maplibre.org/maplibre-native-ffi/development/bindings/)
+- [Binding specification](https://maplibre.org/maplibre-native-ffi/development/binding-specification/)
 
 ## Status
 

@@ -3,7 +3,7 @@ hide = true
 run = '''
 set -euo pipefail
 
-if [[ "${MLN_FFI_RENDER_BACKEND:-}" == "vulkan" ]]; then
+if [[ "$MLN_FFI_RENDER_BACKEND" == "vulkan" ]]; then
   glslangValidator -V render/vulkan/shaders/fullscreen.vert -o render/vulkan/shaders/fullscreen.vert.spv
   glslangValidator -V render/vulkan/shaders/sample.frag -o render/vulkan/shaders/sample.frag.spv
 fi
@@ -11,27 +11,18 @@ fi
 
 [tasks.build]
 depends = ["//:ensure-native-library", ":compile-shaders"]
-run = '''
-zig build -Dtarget="$MLN_FFI_ZIG_TARGET" -Dcmake-artifact-dir="$MLN_FFI_BUILD_DIR" -Dinclude-dir="$MLN_FFI_INCLUDE_DIR" -Dinclude-dir="$MLN_FFI_DEPENDENCY_INCLUDE_DIR" -Dinclude-dir="$MLN_FFI_VULKAN_INCLUDE_DIR" -Ddependency-library-dir="$MLN_FFI_DEPENDENCY_LIBRARY_DIR" -Drender-backend="$MLN_FFI_RENDER_BACKEND"
-'''
+run = "zig build {{ env.MLN_FFI_ZIG_BUILD_ARGS }} -Dnative-config=\"$MLN_FFI_BUILD_DIR/maplibre-native-c.zig-config\""
 
 [tasks.run]
 depends = ["//:ensure-native-library", ":compile-shaders"]
-run = '''
-zig build run -Dtarget="$MLN_FFI_ZIG_TARGET" -Dcmake-artifact-dir="$MLN_FFI_BUILD_DIR" -Dinclude-dir="$MLN_FFI_INCLUDE_DIR" -Dinclude-dir="$MLN_FFI_DEPENDENCY_INCLUDE_DIR" -Dinclude-dir="$MLN_FFI_VULKAN_INCLUDE_DIR" -Ddependency-library-dir="$MLN_FFI_DEPENDENCY_LIBRARY_DIR" -Drender-backend="$MLN_FFI_RENDER_BACKEND" -- owned-texture
-'''
+usage = 'arg "render-target"'
+run = 'zig build run {{ env.MLN_FFI_ZIG_BUILD_ARGS }} -Dnative-config="$MLN_FFI_BUILD_DIR/maplibre-native-c.zig-config" -- "{{ usage.render_target }}"'
 
 [tasks."run:owned-texture"]
-run = [{ task = "run", args = [] }]
+run = [{ task = "run", args = ["owned-texture"] }]
 
 [tasks."run:borrowed-texture"]
-depends = ["//:ensure-native-library", ":compile-shaders"]
-run = '''
-zig build run -Dtarget="$MLN_FFI_ZIG_TARGET" -Dcmake-artifact-dir="$MLN_FFI_BUILD_DIR" -Dinclude-dir="$MLN_FFI_INCLUDE_DIR" -Dinclude-dir="$MLN_FFI_DEPENDENCY_INCLUDE_DIR" -Dinclude-dir="$MLN_FFI_VULKAN_INCLUDE_DIR" -Ddependency-library-dir="$MLN_FFI_DEPENDENCY_LIBRARY_DIR" -Drender-backend="$MLN_FFI_RENDER_BACKEND" -- borrowed-texture
-'''
+run = [{ task = "run", args = ["borrowed-texture"] }]
 
 [tasks."run:native-surface"]
-depends = ["//:ensure-native-library", ":compile-shaders"]
-run = '''
-zig build run -Dtarget="$MLN_FFI_ZIG_TARGET" -Dcmake-artifact-dir="$MLN_FFI_BUILD_DIR" -Dinclude-dir="$MLN_FFI_INCLUDE_DIR" -Dinclude-dir="$MLN_FFI_DEPENDENCY_INCLUDE_DIR" -Dinclude-dir="$MLN_FFI_VULKAN_INCLUDE_DIR" -Ddependency-library-dir="$MLN_FFI_DEPENDENCY_LIBRARY_DIR" -Drender-backend="$MLN_FFI_RENDER_BACKEND" -- native-surface
-'''
+run = [{ task = "run", args = ["native-surface"] }]

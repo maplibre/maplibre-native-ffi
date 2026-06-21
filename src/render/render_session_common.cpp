@@ -50,9 +50,9 @@ struct OwnedQueriedFeatureDescriptor {
 };
 
 auto opengl_supported_context_provider_mask() noexcept -> uint32_t {
-#if defined(MLN_RENDER_BACKEND_OPENGL) && defined(_WIN32)
+#if defined(MLN_RENDER_BACKEND_OPENGL) && defined(MLN_FFI_OPENGL_PROVIDER_WGL)
   return MLN_OPENGL_CONTEXT_PROVIDER_FLAG_WGL;
-#elif defined(MLN_RENDER_BACKEND_OPENGL) && defined(__linux__)
+#elif defined(MLN_RENDER_BACKEND_OPENGL) && defined(MLN_FFI_OPENGL_PROVIDER_EGL)
   return MLN_OPENGL_CONTEXT_PROVIDER_FLAG_EGL;
 #else
   return 0;
@@ -66,7 +66,7 @@ auto opengl_context_descriptor_default() noexcept
     .platform = MLN_OPENGL_CONTEXT_PLATFORM_UNSPECIFIED,
     .data = {},
   };
-#if defined(_WIN32)
+#if defined(MLN_FFI_OPENGL_PROVIDER_WGL)
   result.platform = MLN_OPENGL_CONTEXT_PLATFORM_WGL;
   result.data.wgl = mln_wgl_context_descriptor{
     .size = sizeof(mln_wgl_context_descriptor),
@@ -74,7 +74,7 @@ auto opengl_context_descriptor_default() noexcept
     .share_context = nullptr,
     .get_proc_address = nullptr,
   };
-#elif defined(__linux__)
+#elif defined(MLN_FFI_OPENGL_PROVIDER_EGL)
   result.platform = MLN_OPENGL_CONTEXT_PLATFORM_EGL;
   result.data.egl = mln_egl_context_descriptor{
     .size = sizeof(mln_egl_context_descriptor),
@@ -1006,9 +1006,7 @@ auto render_session_render_update(mln_render_session* session) -> mln_status {
     set_thread_error("render session renderer backend is not available");
     return MLN_STATUS_INVALID_STATE;
   }
-  auto guard = mbgl::gfx::BackendScope{
-    *backend, mbgl::gfx::BackendScope::ScopeType::Implicit
-  };
+  auto guard = mbgl::gfx::BackendScope{*backend};
   map_run_render_jobs(session->map);
   if (session->renderer == nullptr) {
     try {
@@ -1099,9 +1097,7 @@ auto render_session_reduce_memory_use(mln_render_session* session)
   if (backend == nullptr) {
     return MLN_STATUS_INVALID_STATE;
   }
-  auto guard = mbgl::gfx::BackendScope{
-    *backend, mbgl::gfx::BackendScope::ScopeType::Implicit
-  };
+  auto guard = mbgl::gfx::BackendScope{*backend};
   session->renderer->reduceMemoryUse();
   return MLN_STATUS_OK;
 }
@@ -1115,9 +1111,7 @@ auto render_session_clear_data(mln_render_session* session) -> mln_status {
   if (backend == nullptr) {
     return MLN_STATUS_INVALID_STATE;
   }
-  auto guard = mbgl::gfx::BackendScope{
-    *backend, mbgl::gfx::BackendScope::ScopeType::Implicit
-  };
+  auto guard = mbgl::gfx::BackendScope{*backend};
   session->renderer->clearData();
   return MLN_STATUS_OK;
 }
@@ -1131,9 +1125,7 @@ auto render_session_dump_debug_logs(mln_render_session* session) -> mln_status {
   if (backend == nullptr) {
     return MLN_STATUS_INVALID_STATE;
   }
-  auto guard = mbgl::gfx::BackendScope{
-    *backend, mbgl::gfx::BackendScope::ScopeType::Implicit
-  };
+  auto guard = mbgl::gfx::BackendScope{*backend};
   session->renderer->dumpDebugLogs();
   return MLN_STATUS_OK;
 }
@@ -1165,9 +1157,7 @@ auto render_session_set_feature_state(
     return MLN_STATUS_INVALID_ARGUMENT;
   }
 
-  auto guard = mbgl::gfx::BackendScope{
-    *backend, mbgl::gfx::BackendScope::ScopeType::Implicit
-  };
+  auto guard = mbgl::gfx::BackendScope{*backend};
   session->renderer->setFeatureState(
     string_from_view(selector->source_id),
     feature_state_source_layer(*selector),
@@ -1197,9 +1187,7 @@ auto render_session_get_feature_state(
   }
 
   auto state = mbgl::FeatureState{};
-  auto guard = mbgl::gfx::BackendScope{
-    *backend, mbgl::gfx::BackendScope::ScopeType::Implicit
-  };
+  auto guard = mbgl::gfx::BackendScope{*backend};
   session->renderer->getFeatureState(
     state, string_from_view(selector->source_id),
     feature_state_source_layer(*selector),
@@ -1224,9 +1212,7 @@ auto render_session_remove_feature_state(
     return MLN_STATUS_INVALID_STATE;
   }
 
-  auto guard = mbgl::gfx::BackendScope{
-    *backend, mbgl::gfx::BackendScope::ScopeType::Implicit
-  };
+  auto guard = mbgl::gfx::BackendScope{*backend};
   session->renderer->removeFeatureState(
     string_from_view(selector->source_id),
     feature_state_source_layer(*selector),
@@ -1299,9 +1285,7 @@ auto render_session_query_rendered_features(
     return MLN_STATUS_INVALID_STATE;
   }
 
-  auto guard = mbgl::gfx::BackendScope{
-    *backend, mbgl::gfx::BackendScope::ScopeType::Implicit
-  };
+  auto guard = mbgl::gfx::BackendScope{*backend};
   auto features = std::vector<mbgl::Feature>{};
   switch (geometry->type) {
     case MLN_RENDERED_QUERY_GEOMETRY_TYPE_POINT:
@@ -1362,9 +1346,7 @@ auto render_session_query_source_features(
   }
 
   auto native_source_id = string_from_view(source_id);
-  auto guard = mbgl::gfx::BackendScope{
-    *backend, mbgl::gfx::BackendScope::ScopeType::Implicit
-  };
+  auto guard = mbgl::gfx::BackendScope{*backend};
   auto features =
     session->renderer->querySourceFeatures(native_source_id, *native_options);
   return create_feature_query_result(
@@ -1407,9 +1389,7 @@ auto render_session_query_feature_extensions(
   }
 
   auto query_feature = mbgl::Feature{std::move(*native_feature)};
-  auto guard = mbgl::gfx::BackendScope{
-    *backend, mbgl::gfx::BackendScope::ScopeType::Implicit
-  };
+  auto guard = mbgl::gfx::BackendScope{*backend};
   auto result = session->renderer->queryFeatureExtensions(
     string_from_view(source_id), query_feature, string_from_view(extension),
     string_from_view(extension_field), std::move(*native_arguments)

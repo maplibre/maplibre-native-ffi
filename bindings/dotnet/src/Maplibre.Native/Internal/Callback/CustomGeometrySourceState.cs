@@ -94,7 +94,8 @@ internal sealed unsafe class CustomGeometrySourceState : IDisposable
             throw new InvalidArgumentException(
                 MaplibreStatus.InvalidArgument,
                 null,
-                "Custom geometry source buffer must be non-negative."
+                "Custom geometry source buffer must be non-negative.",
+                null
             );
         }
     }

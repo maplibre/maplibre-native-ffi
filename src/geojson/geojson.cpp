@@ -36,6 +36,9 @@ struct Overloaded : Ts... {
   using Ts::operator()...;
 };
 
+template <class... Ts>
+Overloaded(Ts...) -> Overloaded<Ts...>;
+
 using GeometryDescriptorPtr =
   std::unique_ptr<mln::core::OwnedGeometryDescriptor>;
 using JsonDescriptorPtr = std::unique_ptr<mln::core::OwnedJsonDescriptor>;

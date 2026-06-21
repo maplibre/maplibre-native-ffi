@@ -1,0 +1,6 @@
+[requires]
+backend = ["opengl"]
+os = ["android"]
+
+[ci]
+build = "//examples/android-map:build"

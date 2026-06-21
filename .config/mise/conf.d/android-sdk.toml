@@ -1,0 +1,7 @@
+[env]
+_.path = [
+  "{% if env.ANDROID_HOME is defined %}{{ env.ANDROID_HOME }}{% elif os() == \"macos\" %}{{ env.HOME }}/Library/Android/sdk{% elif os() == \"linux\" %}{{ env.HOME }}/Android/Sdk{% elif os() == \"windows\" %}{{ env.LOCALAPPDATA }}/Android/Sdk{% endif %}/emulator",
+  "{% if env.ANDROID_HOME is defined %}{{ env.ANDROID_HOME }}{% elif os() == \"macos\" %}{{ env.HOME }}/Library/Android/sdk{% elif os() == \"linux\" %}{{ env.HOME }}/Android/Sdk{% elif os() == \"windows\" %}{{ env.LOCALAPPDATA }}/Android/Sdk{% endif %}/platform-tools",
+]
+ANDROID_HOME = "{% if env.ANDROID_HOME is defined %}{{ env.ANDROID_HOME }}{% elif os() == \"macos\" %}{{ env.HOME }}/Library/Android/sdk{% elif os() == \"linux\" %}{{ env.HOME }}/Android/Sdk{% elif os() == \"windows\" %}{{ env.LOCALAPPDATA }}/Android/Sdk{% endif %}"
+ANDROID_NDK_HOME = "{% if env.ANDROID_NDK_HOME is defined %}{{ env.ANDROID_NDK_HOME }}{% else %}{{ env.ANDROID_HOME }}/ndk/29.0.14033849{% endif %}"

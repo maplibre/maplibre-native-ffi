@@ -1,10 +1,13 @@
 internal import CMaplibreNativeC
 
 enum NativeRuntime {
-  static func create(_ options: UnsafePointer<mln_runtime_options>) throws -> OpaquePointer {
-    try NativeHandleFactory.create(nullDiagnostic: "mln_runtime_create returned a null runtime") { runtime in
-      try checkStatus(mln_runtime_create(options, runtime))
-    }
+  static func create(_ options: UnsafePointer<mln_runtime_options>) throws
+    -> OpaquePointer
+  {
+    try NativeHandleFactory
+      .create(nullDiagnostic: "mln_runtime_create returned a null runtime") { runtime in
+        try checkStatus(mln_runtime_create(options, runtime))
+      }
   }
 
   static func pollEvent(_ runtime: OpaquePointer) throws -> mln_runtime_event? {

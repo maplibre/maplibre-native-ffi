@@ -7,7 +7,7 @@ public sealed class InvalidStateException : MaplibreException
         MaplibreStatus status,
         int? rawStatus,
         string diagnostic,
-        Exception? innerException = null
+        Exception? innerException
     )
         : base(status, rawStatus, diagnostic, innerException) { }
 }
