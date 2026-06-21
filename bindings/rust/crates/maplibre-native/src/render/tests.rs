@@ -78,21 +78,19 @@ fn has_opengl_test_context_backend() -> bool {
         return false;
     }
 
-    let providers = crate::supported_opengl_context_providers();
     #[cfg(target_os = "linux")]
     {
-        providers.contains(OpenGLContextProviderMask::EGL)
+        crate::supported_opengl_context_providers().contains(OpenGLContextProviderMask::EGL)
     }
     #[cfg(target_os = "windows")]
     {
-        providers.contains(OpenGLContextProviderMask::WGL)
+        crate::supported_opengl_context_providers().contains(OpenGLContextProviderMask::WGL)
     }
     #[cfg(not(any(target_os = "linux", target_os = "windows")))]
     {
         // The Rust test helper only implements Linux EGL and Windows WGL.
         // macOS EGL remains covered by bindings that can create a test context
         // and by the map examples until this helper grows a native EGL path.
-        let _ = providers;
         false
     }
 }
