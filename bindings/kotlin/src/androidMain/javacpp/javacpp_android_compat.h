@@ -5,6 +5,10 @@
 
 namespace std {
 
+// JavaCPP's generated Android JNI glue uses std::basic_string<unsigned short>
+// for UTF-16 string handling, but Android NDK libc++ does not provide this
+// specialization. Force-including this header keeps the generated source
+// buildable without carrying a patched JavaCPP runtime.
 template <>
 struct char_traits<unsigned short> {
   using char_type = unsigned short;
