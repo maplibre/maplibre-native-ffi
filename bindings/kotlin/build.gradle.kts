@@ -70,7 +70,7 @@ val generatedJavaCppSources =
 val generatedJavaCppClasses = layout.buildDirectory.dir("classes/javacppGenerated")
 val generatedJavaCppNativeBuild =
   layout.buildDirectory.dir("generated/sources/javacpp/androidMain/native")
-val generatedJavaCppNativeLibs = layout.buildDirectory.dir("generated/jniLibs/androidMain")
+val packagedAndroidNativeLibs = layout.buildDirectory.dir("generated/jniLibs/androidMain")
 val javaCppAndroidIncludes = layout.projectDirectory.dir("src/androidMain/javacpp")
 val generatedJextractSources = layout.buildDirectory.dir("generated/sources/jextract/jvmMain/java")
 val javaCppConfigClasses = layout.buildDirectory.dir("classes/javacppConfig")
@@ -134,7 +134,7 @@ kotlin {
   sourceSets {
     androidMain.dependencies {
       implementation("org.bytedeco:javacpp:$javaCppVersion")
-      implementation("org.bytedeco:javacpp:$javaCppVersion:android-arm64")
+      implementation("rustls:rustls-platform-verifier:latest.release")
     }
 
     commonTest.dependencies { implementation(kotlin("test")) }
@@ -149,7 +149,7 @@ androidComponents {
       generatedJavaCppSources.get().asFile.absolutePath
     )
     variant.sources.jniLibs?.addStaticSourceDirectory(
-      generatedJavaCppNativeLibs.get().asFile.absolutePath
+      packagedAndroidNativeLibs.get().asFile.absolutePath
     )
   }
 }
@@ -342,11 +342,12 @@ val generateJavaCppNativeLibrary =
     outputs.file(generatedJavaCppNativeBuild.map { it.file("libjniMaplibreNativeC.so") })
   }
 
-val packageJavaCppNativeLibrary =
-  tasks.register<Sync>("packageAndroidJavaCppNativeLibrary") {
+val packageAndroidNativeLibraries =
+  tasks.register<Sync>("packageAndroidNativeLibraries") {
     dependsOn(generateJavaCppNativeLibrary)
     from(generatedJavaCppNativeBuild.map { it.file("libjniMaplibreNativeC.so") })
-    into(generatedJavaCppNativeLibs.map { it.dir("arm64-v8a") })
+    from(maplibreNativeC.libraryPath)
+    into(packagedAndroidNativeLibs.map { it.dir("arm64-v8a") })
   }
 
 tasks
@@ -360,7 +361,7 @@ tasks
 tasks
   .matching { it.name == "preAndroidMainBuild" || it.name == "mergeAndroidMainJniLibFolders" }
   .configureEach {
-    dependsOn(packageJavaCppNativeLibrary)
+    dependsOn(packageAndroidNativeLibraries)
     inputs.file(maplibreNativeC.libraryPath).withPropertyName("maplibreNativeCLibrary")
   }
 
@@ -382,5 +383,5 @@ tasks.register("nativeTest") {
 tasks.register("androidBuild") {
   group = "build"
   description = "Builds the Android variant of the Kotlin Multiplatform binding."
-  dependsOn(packageJavaCppNativeLibrary, "assembleAndroidMain")
+  dependsOn(packageAndroidNativeLibraries, "assembleAndroidMain")
 }

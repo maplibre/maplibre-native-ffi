@@ -1,10 +1,22 @@
 [tasks.build]
-depends = ["//:ensure-native-library"]
-run = "../../gradlew :examples:android-map:assembleDebug"
+run = '''
+if [[ "$MISE_ENV" != android-* ]]; then
+  echo "Use an Android mise environment, for example:" >&2
+  echo "  mise -E android-arm64-egl run //examples/android-map:build" >&2
+  exit 1
+fi
+mise run //:ensure-native-library
+../../gradlew :examples:android-map:assembleDebug
+'''
 
 [tasks.run]
-depends = ["//:ensure-native-library"]
 run = '''
+if [[ "$MISE_ENV" != android-* ]]; then
+  echo "Use an Android mise environment, for example:" >&2
+  echo "  mise -E android-arm64-egl run //examples/android-map:run" >&2
+  exit 1
+fi
+mise run //:ensure-native-library
 ../../gradlew :examples:android-map:installDebug
 adb shell am start -S -n org.maplibre.nativeffi.examples.androidmap/.MainActivity
 '''
