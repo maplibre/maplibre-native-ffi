@@ -140,7 +140,7 @@ def subproject_status(actions: dict[str, str], variant: Variant) -> Status | Non
         return "tested"
     if actions.get("test") and variant.supports_tests:
         return "tested"
-    if actions.get("build"):
+    if actions.get("build") or actions.get("lint"):
         return "build-only"
     return None
 
