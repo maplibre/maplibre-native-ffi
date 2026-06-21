@@ -12,3 +12,7 @@ MLN_FFI_CMAKE_ARGS = """
 """
 MLN_FFI_ZIG_BUILD_ARGS = "-Dtarget=x86_64-linux-android"
 CARGO_BUILD_TARGET = "x86_64-linux-android"
+
+# Keep version/profile/components in sync with core:rust in mise.toml.
+[tools]
+"core:rust" = { version = "1.95.0", profile = "minimal", components = "rustfmt,clippy", targets = "{{ env.CARGO_BUILD_TARGET }}" }
