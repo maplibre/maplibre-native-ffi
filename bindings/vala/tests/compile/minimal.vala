@@ -58,6 +58,9 @@ extern bool vulkan_test_borrowed_image_create(ref VulkanTestContext context, uin
 [CCode(cname = "mln_vala_vulkan_test_borrowed_image_destroy")]
 extern void vulkan_test_borrowed_image_destroy(ref VulkanTestContext context, ref VulkanBorrowedImage image);
 
+[CCode(cname = "mln_vala_vulkan_test_surface_supported")]
+extern bool vulkan_test_surface_supported();
+
 [CCode(cname = "mln_vala_vulkan_test_surface_create")]
 extern bool vulkan_test_surface_create(ref VulkanTestContext context, void* metal_layer, out void* surface);
 
@@ -907,25 +910,27 @@ int main() {
           vulkan_test_borrowed_image_destroy(ref vulkan_context_storage, ref vulkan_borrowed_storage);
         }
 
-        MetalWindowLayer vulkan_surface_layer;
-        assert(metal_test_window_layer_create(32, 16, out vulkan_surface_layer));
-        assert(vulkan_surface_layer.window != null);
-        void* vulkan_surface = null;
-        try {
-          assert(vulkan_test_surface_create(ref vulkan_context_storage, vulkan_surface_layer.layer, out vulkan_surface));
-          var vulkan_surface_descriptor = new MaplibreNative.VulkanSurfaceDescriptor(vulkan_context, MaplibreNative.NativePointer((size_t) vulkan_surface));
-          vulkan_surface_descriptor.width = 32;
-          vulkan_surface_descriptor.height = 16;
-          vulkan_surface_descriptor.scale_factor = 1.0;
-          var vulkan_surface_session = map.attach_vulkan_surface(vulkan_surface_descriptor);
-          vulkan_surface_session.resize(32, 16, 1.0);
-          vulkan_surface_session.detach();
-          vulkan_surface_session.close();
-        } finally {
-          if (vulkan_surface != null) {
-            vulkan_test_surface_destroy(ref vulkan_context_storage, vulkan_surface);
+        if (vulkan_test_surface_supported()) {
+          MetalWindowLayer vulkan_surface_layer;
+          assert(metal_test_window_layer_create(32, 16, out vulkan_surface_layer));
+          assert(vulkan_surface_layer.window != null);
+          void* vulkan_surface = null;
+          try {
+            assert(vulkan_test_surface_create(ref vulkan_context_storage, vulkan_surface_layer.layer, out vulkan_surface));
+            var vulkan_surface_descriptor = new MaplibreNative.VulkanSurfaceDescriptor(vulkan_context, MaplibreNative.NativePointer((size_t) vulkan_surface));
+            vulkan_surface_descriptor.width = 32;
+            vulkan_surface_descriptor.height = 16;
+            vulkan_surface_descriptor.scale_factor = 1.0;
+            var vulkan_surface_session = map.attach_vulkan_surface(vulkan_surface_descriptor);
+            vulkan_surface_session.resize(32, 16, 1.0);
+            vulkan_surface_session.detach();
+            vulkan_surface_session.close();
+          } finally {
+            if (vulkan_surface != null) {
+              vulkan_test_surface_destroy(ref vulkan_context_storage, vulkan_surface);
+            }
+            metal_test_window_layer_destroy(ref vulkan_surface_layer);
           }
-          metal_test_window_layer_destroy(ref vulkan_surface_layer);
         }
       } finally {
         vulkan_test_context_destroy(ref vulkan_context_storage);

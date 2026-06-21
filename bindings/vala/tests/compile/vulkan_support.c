@@ -394,6 +394,19 @@ void mln_vala_vulkan_test_borrowed_image_destroy(
   }
 }
 
+bool mln_vala_vulkan_test_surface_supported(void) {
+#ifdef __APPLE__
+#ifdef VK_EXT_METAL_SURFACE_EXTENSION_NAME
+  return has_instance_extension(VK_KHR_SURFACE_EXTENSION_NAME) &&
+         has_instance_extension(VK_EXT_METAL_SURFACE_EXTENSION_NAME);
+#else
+  return false;
+#endif
+#else
+  return false;
+#endif
+}
+
 bool mln_vala_vulkan_test_surface_create(
   MlnValaVulkanTestContext* context, void* metal_layer, void** out_surface
 ) {
