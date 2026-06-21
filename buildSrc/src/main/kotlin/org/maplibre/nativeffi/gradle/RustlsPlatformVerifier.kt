@@ -13,7 +13,7 @@ object RustlsPlatformVerifier {
         commandLine(
           "cargo",
           "metadata",
-          "--frozen",
+          "--locked",
           "--format-version",
           "1",
           "--filter-platform",
