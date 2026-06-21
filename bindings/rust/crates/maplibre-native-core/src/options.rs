@@ -44,7 +44,7 @@ impl Default for MapOptions {
             width: raw.width,
             height: raw.height,
             scale_factor: raw.scale_factor,
-            mode: MapMode::from_raw(raw.map_mode).unwrap_or(MapMode::Continuous),
+            mode: MapMode::from_raw(raw.map_mode),
         }
     }
 }

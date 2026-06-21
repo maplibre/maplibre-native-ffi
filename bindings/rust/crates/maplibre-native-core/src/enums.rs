@@ -297,15 +297,16 @@ pub enum MapMode {
     Continuous,
     Static,
     Tile,
+    Unknown(u32),
 }
 
 impl MapMode {
-    pub fn from_raw(raw: u32) -> Option<Self> {
+    pub fn from_raw(raw: u32) -> Self {
         match raw {
-            sys::MLN_MAP_MODE_CONTINUOUS => Some(Self::Continuous),
-            sys::MLN_MAP_MODE_STATIC => Some(Self::Static),
-            sys::MLN_MAP_MODE_TILE => Some(Self::Tile),
-            _ => None,
+            sys::MLN_MAP_MODE_CONTINUOUS => Self::Continuous,
+            sys::MLN_MAP_MODE_STATIC => Self::Static,
+            sys::MLN_MAP_MODE_TILE => Self::Tile,
+            _ => Self::Unknown(raw),
         }
     }
 
@@ -314,6 +315,7 @@ impl MapMode {
             Self::Continuous => sys::MLN_MAP_MODE_CONTINUOUS,
             Self::Static => sys::MLN_MAP_MODE_STATIC,
             Self::Tile => sys::MLN_MAP_MODE_TILE,
+            Self::Unknown(raw) => raw,
         }
     }
 }
@@ -1010,12 +1012,10 @@ mod tests {
 
     #[test]
     fn map_option_enums_map_raw_values_and_preserve_unknowns() {
-        assert_eq!(
-            MapMode::from_raw(sys::MLN_MAP_MODE_TILE),
-            Some(MapMode::Tile)
-        );
+        assert_eq!(MapMode::from_raw(sys::MLN_MAP_MODE_TILE), MapMode::Tile);
         assert_eq!(MapMode::Tile.as_raw(), sys::MLN_MAP_MODE_TILE);
-        assert_eq!(MapMode::from_raw(999_030), None);
+        assert_eq!(MapMode::from_raw(999_030), MapMode::Unknown(999_030));
+        assert_eq!(MapMode::Unknown(999_030).as_raw(), 999_030);
 
         assert_eq!(
             NorthOrientation::from_raw(sys::MLN_NORTH_ORIENTATION_LEFT),

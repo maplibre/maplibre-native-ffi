@@ -242,7 +242,7 @@ public struct OfflineRegionResponseErrorEvent: Equatable, Sendable {
 
   init(native: NativeOfflineRegionResponseErrorEvent) {
     regionId = native.regionId
-    reason = ResourceErrorReason(rawValue: native.reason) ?? .other
+    reason = ResourceErrorReason.fromNative(native.reason)
   }
 }
 
