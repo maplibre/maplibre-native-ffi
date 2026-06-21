@@ -65,7 +65,7 @@ config_roots = [".devcontainer", "bindings/*", "examples/*", "docs"]
 swiftformat = { version = "0.61.1", backend = "github:nicklockwood/SwiftFormat", no_app = true, rename_exe = "swiftformat" }
 
 # Other ecosystems
-"core:rust" = { version = "1.95.0", profile = "minimal", components = "rustfmt,clippy" }
+"core:rust" = { version = "1.95.0", profile = "minimal", components = "rustfmt,clippy", targets = "aarch64-linux-android,x86_64-linux-android" }
 "core:zig" = "0.16.0"
 "core:go" = "1.26.3"
 "core:dotnet" = "10.0.203"
