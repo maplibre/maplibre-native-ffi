@@ -4,10 +4,19 @@ import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.application
 import org.maplibre.nativeffi.Maplibre
 import org.maplibre.nativeffi.examples.composemap.app.ComposeMapApp
+import org.maplibre.nativeffi.examples.composemap.map.MapLibreSurfaceRenderer
+import org.maplibre.nativeffi.examples.composemap.surface.SkikoHost
 
 internal object Main {
   @JvmStatic
   fun main(args: Array<String>) {
+    val renderer = MapLibreSurfaceRenderer()
+    val shutdownHook = Thread {
+      renderer.close()
+      SkikoHost.close()
+      Maplibre.clearLogCallback()
+    }
+    Runtime.getRuntime().addShutdownHook(shutdownHook)
     Maplibre.setLogCallback { record ->
       System.err.printf(
         "MapLibre %s %s %d: %s%n",
@@ -21,15 +30,48 @@ internal object Main {
     System.getProperty("org.maplibre.nativeffi.library.path")?.let {
       println("MapLibre native library: $it")
     }
+    println("native render backends: ${Maplibre.supportedRenderBackends().joinToString()}")
+    println("render target: compose-borrowed-texture")
+    println(
+      "render target status: renders into a host-owned texture, then samples it into the Compose/Skiko surface"
+    )
+    printControls()
 
     try {
       application {
-        Window(onCloseRequest = ::exitApplication, title = "MapLibre Compose Map") {
-          ComposeMapApp()
+        Window(
+          onCloseRequest = {
+            renderer.close()
+            SkikoHost.close()
+            exitApplication()
+          },
+          title = "MapLibre Compose Map",
+        ) {
+          ComposeMapApp(renderer)
         }
       }
     } finally {
+      renderer.close()
+      SkikoHost.close()
       Maplibre.clearLogCallback()
+      runCatching { Runtime.getRuntime().removeShutdownHook(shutdownHook) }
     }
+  }
+
+  private fun printControls() {
+    println(
+      """
+      Controls:
+        left drag: pan
+        right drag or Ctrl+left drag: rotate with X, pitch with Y
+        scroll: zoom at cursor
+        arrows or WASD: pan
+        + / -: zoom at center
+        Q / E: rotate
+        ] / [: pitch
+        0: reset pitch and bearing
+      """
+        .trimIndent()
+    )
   }
 }

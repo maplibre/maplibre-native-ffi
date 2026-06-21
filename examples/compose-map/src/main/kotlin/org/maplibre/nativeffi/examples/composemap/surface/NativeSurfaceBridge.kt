@@ -142,8 +142,7 @@ private class MacMetalBridge : PlaceholderBridge(ProducerBackend.METAL, Consumer
     if (target !is MetalTextureTarget || target.texture.address == 0L) {
       return false
     }
-    SkikoHost.drawMetalTexture(scope, target)
-    return true
+    return SkikoHost.drawMetalTexture(scope, target)
   }
 
   override fun close() {
@@ -160,8 +159,8 @@ private class MacMetalBridge : PlaceholderBridge(ProducerBackend.METAL, Consumer
       MacMetalBridgeNative.createMetalTexture(
         metalDevice = metalDevice.ptr,
         oldTexture = texture.address,
-        width = extent.width,
-        height = extent.height,
+        width = extent.physicalWidth,
+        height = extent.physicalHeight,
       )
     texture = NativeHandle(textureAddress)
     pixelFormat = MacMetalBridgeNative.texturePixelFormat(textureAddress)
@@ -169,6 +168,7 @@ private class MacMetalBridge : PlaceholderBridge(ProducerBackend.METAL, Consumer
 
   private fun disposeTexture() {
     if (texture.address != 0L) {
+      SkikoHost.forgetMetalTexture(texture)
       MacMetalBridgeNative.disposeMetalTexture(texture.address)
       texture = NativeHandle(0)
       pixelFormat = 0

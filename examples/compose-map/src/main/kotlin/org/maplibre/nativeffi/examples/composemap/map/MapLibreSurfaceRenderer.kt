@@ -1,5 +1,8 @@
 package org.maplibre.nativeffi.examples.composemap.map
 
+import kotlin.math.max
+import kotlin.math.min
+import org.maplibre.nativeffi.camera.AnimationOptions
 import org.maplibre.nativeffi.camera.CameraOptions
 import org.maplibre.nativeffi.error.InvalidStateException
 import org.maplibre.nativeffi.examples.composemap.surface.MetalTextureTarget
@@ -35,6 +38,7 @@ internal class MapLibreSurfaceRenderer : NativeSurfaceRenderer, AutoCloseable {
   private var runtime: RuntimeHandle? = null
   private var map: MapHandle? = null
   private var renderSession: AttachedRenderSession? = null
+  private var currentExtent = SurfaceExtent.Empty
   private var renderPending = true
   private var closed = false
 
@@ -49,6 +53,7 @@ internal class MapLibreSurfaceRenderer : NativeSurfaceRenderer, AutoCloseable {
     if (closed || extent.isEmpty) {
       return
     }
+    currentExtent = extent
     renderPending = true
     surfaceSession?.requestFrame()
   }
@@ -73,9 +78,6 @@ internal class MapLibreSurfaceRenderer : NativeSurfaceRenderer, AutoCloseable {
     return try {
       attached.session.renderUpdate()
       renderPending = false
-      currentRuntime.runOnce()
-      drainEvents(currentRuntime, currentMap)
-      surfaceSession?.requestFrame()
       NativeSurfaceRenderResult.Rendered
     } catch (_: InvalidStateException) {
       renderPending = true
@@ -107,6 +109,63 @@ internal class MapLibreSurfaceRenderer : NativeSurfaceRenderer, AutoCloseable {
     requestRender()
   }
 
+  fun moveByAnimated(deltaX: Double, deltaY: Double) {
+    map?.moveByAnimated(deltaX, deltaY, KEYBOARD_ANIMATION)
+    requestRender()
+  }
+
+  fun scaleByAnimated(scale: Double) {
+    map?.scaleByAnimated(scale, viewportCenter(), KEYBOARD_ANIMATION)
+    requestRender()
+  }
+
+  fun rotateAndPitchBy(deltaX: Double, deltaY: Double) {
+    val currentMap = map ?: return
+    val camera = currentMap.camera
+    currentMap.jumpTo(
+      CameraOptions().apply {
+        bearing = (camera.bearing ?: 0.0) + deltaX * DRAG_ROTATE_FACTOR
+        pitch = ((camera.pitch ?: 0.0) - deltaY * DRAG_PITCH_FACTOR).clampPitch()
+      }
+    )
+    requestRender()
+  }
+
+  fun rotateBy(deltaDegrees: Double) {
+    val currentMap = map ?: return
+    currentMap.easeTo(
+      CameraOptions().apply { bearing = (currentMap.camera.bearing ?: 0.0) + deltaDegrees },
+      KEYBOARD_ANIMATION,
+    )
+    requestRender()
+  }
+
+  fun pitchBy(deltaDegrees: Double) {
+    val currentMap = map ?: return
+    currentMap.easeTo(
+      CameraOptions().apply {
+        pitch = ((currentMap.camera.pitch ?: 0.0) + deltaDegrees).clampPitch()
+      },
+      KEYBOARD_ANIMATION,
+    )
+    requestRender()
+  }
+
+  fun resetPitchAndBearing() {
+    map?.easeTo(
+      CameraOptions().apply {
+        bearing = 0.0
+        pitch = 0.0
+      },
+      RESET_ANIMATION,
+    )
+    requestRender()
+  }
+
+  fun cancelTransitions() {
+    map?.cancelTransitions()
+  }
+
   override fun close() {
     if (closed) {
       return
@@ -135,12 +194,12 @@ internal class MapLibreSurfaceRenderer : NativeSurfaceRenderer, AutoCloseable {
         MapOptions().apply {
           width = extent.width
           height = extent.height
-          scaleFactor = DEFAULT_SCALE_FACTOR
+          scaleFactor = extent.scaleFactor
           mapMode = MapMode.CONTINUOUS
         },
       )
     try {
-      createdMap.setStyleJson(SMOKE_STYLE_JSON)
+      createdMap.setStyleUrl(STYLE_URL)
       createdMap.jumpTo(
         CameraOptions().apply {
           center = LatLng(37.7749, -122.4194)
@@ -192,7 +251,7 @@ internal class MapLibreSurfaceRenderer : NativeSurfaceRenderer, AutoCloseable {
     extent: SurfaceExtent,
   ): BorrowedDescriptor =
     BorrowedDescriptor(
-      key = TargetKey(target.backend, target.generation, extent.width, extent.height),
+      key = targetKey(target.backend, target.generation, extent),
       attach = { map ->
         map.attachMetalBorrowedTexture(
           MetalBorrowedTextureDescriptor(extent.toRenderTargetExtent(), target.texture.toPointer())
@@ -205,7 +264,7 @@ internal class MapLibreSurfaceRenderer : NativeSurfaceRenderer, AutoCloseable {
     extent: SurfaceExtent,
   ): BorrowedDescriptor =
     BorrowedDescriptor(
-      key = TargetKey(target.backend, target.generation, extent.width, extent.height),
+      key = targetKey(target.backend, target.generation, extent),
       attach = {
         // TODO(surface): VulkanImageTarget must expose the producer Vulkan context handles
         // required
@@ -222,7 +281,7 @@ internal class MapLibreSurfaceRenderer : NativeSurfaceRenderer, AutoCloseable {
     extent: SurfaceExtent,
   ): BorrowedDescriptor =
     BorrowedDescriptor(
-      key = TargetKey(target.backend, target.generation, extent.width, extent.height),
+      key = targetKey(target.backend, target.generation, extent),
       attach = {
         // TODO(surface): OpenGlTextureTarget must expose a producer EGL/WGL context descriptor
         // compatible with MapLibre's OpenGL borrowed texture API. Keep Skiko context discovery,
@@ -256,6 +315,24 @@ internal class MapLibreSurfaceRenderer : NativeSurfaceRenderer, AutoCloseable {
     closing?.session?.close()
   }
 
+  private fun viewportCenter(): ScreenPoint =
+    ScreenPoint(currentExtent.width / 2.0, currentExtent.height / 2.0)
+
+  private fun targetKey(
+    backend: ProducerBackend,
+    generation: Long,
+    extent: SurfaceExtent,
+  ): TargetKey =
+    TargetKey(
+      backend = backend,
+      generation = generation,
+      width = extent.width,
+      height = extent.height,
+      scaleFactor = extent.scaleFactor,
+      physicalWidth = extent.physicalWidth,
+      physicalHeight = extent.physicalHeight,
+    )
+
   private data class AttachedRenderSession(val key: TargetKey, val session: RenderSessionHandle)
 
   private data class TargetKey(
@@ -263,6 +340,9 @@ internal class MapLibreSurfaceRenderer : NativeSurfaceRenderer, AutoCloseable {
     val generation: Long,
     val width: Int,
     val height: Int,
+    val scaleFactor: Double,
+    val physicalWidth: Int,
+    val physicalHeight: Int,
   )
 
   private class BorrowedDescriptor(
@@ -271,40 +351,17 @@ internal class MapLibreSurfaceRenderer : NativeSurfaceRenderer, AutoCloseable {
   )
 
   private companion object {
-    private const val DEFAULT_SCALE_FACTOR = 1.0
-    private val SMOKE_STYLE_JSON =
-      """
-      {
-        "version": 8,
-        "sources": {
-          "point": {
-            "type": "geojson",
-            "data": {
-              "type": "FeatureCollection",
-              "features": [
-                {
-                  "type": "Feature",
-                  "geometry": {"type": "Point", "coordinates": [-122.4194, 37.7749]},
-                  "properties": {}
-                }
-              ]
-            }
-          }
-        },
-        "layers": [
-          {"id": "background", "type": "background", "paint": {"background-color": "#d8f1ff"}},
-          {"id": "point-circle", "type": "circle", "source": "point", "paint": {"circle-color": "#f97316", "circle-radius": 18}}
-        ]
-      }
-      """
-        .trimIndent()
+    private const val STYLE_URL = "https://tiles.openfreemap.org/styles/bright"
+    private const val DRAG_ROTATE_FACTOR = 0.5
+    private const val DRAG_PITCH_FACTOR = 0.5
+    private val KEYBOARD_ANIMATION = AnimationOptions().apply { durationMs = 160.0 }
+    private val RESET_ANIMATION = AnimationOptions().apply { durationMs = 160.0 }
   }
 }
 
 private fun SurfaceExtent.toRenderTargetExtent(): RenderTargetExtent =
-  // TODO(surface): carry the Compose density/content scale through SurfaceExtent so MapLibre gets
-  // logical dimensions and scale factor instead of treating the surface extent as 1x logical
-  // pixels.
-  RenderTargetExtent(width, height, 1.0)
+  RenderTargetExtent(width, height, scaleFactor)
+
+private fun Double.clampPitch(): Double = max(0.0, min(60.0, this))
 
 private fun NativeHandle.toPointer(): NativePointer = NativePointer.ofAddress(address)

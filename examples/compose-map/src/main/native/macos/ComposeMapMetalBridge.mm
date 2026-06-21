@@ -32,6 +32,7 @@ Java_org_maplibre_nativeffi_examples_composemap_surface_MacMetalBridgeNative_cre
                                   height:height
                                mipmapped:NO];
     descriptor.usage = MTLTextureUsageRenderTarget | MTLTextureUsageShaderRead;
+    descriptor.storageMode = MTLStorageModePrivate;
     id<MTLTexture> texture =
       [skikoDevice.adapter newTextureWithDescriptor:descriptor];
     return (jlong)(__bridge_retained void*)texture;

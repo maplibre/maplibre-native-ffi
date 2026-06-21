@@ -13,6 +13,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -25,11 +26,11 @@ public fun ComposeNativeSurface(
   val internalController = rememberNativeSurfaceControllerImpl()
   val activeController = controller ?: internalController
   val controllerImpl = activeController as? NativeSurfaceControllerImpl
+  val density = LocalDensity.current
+  val drawState = remember { NativeSurfaceDrawState() }
   var extent by remember { mutableStateOf(SurfaceExtent.Empty) }
   var frameRequest by remember { mutableLongStateOf(0L) }
-  var nextFrameId by remember { mutableLongStateOf(1L) }
-  var lastRenderedFrame by remember { mutableLongStateOf(0L) }
-  var lastRenderedTarget by remember { mutableStateOf<NativeSurfaceTarget?>(null) }
+  val frameSignal = frameRequest
   val bridge =
     remember(renderer.supportedBackends) { NativeSurfaceBridge.select(renderer.supportedBackends) }
   val session =
@@ -69,7 +70,9 @@ public fun ComposeNativeSurface(
   LaunchedEffect(extent, bridge, renderer) {
     if (!extent.isEmpty && bridge != null) {
       try {
+        extent.log("compose viewport")
         bridge.resize(extent)
+        drawState.resetForExtent(extent)
         renderer.onSurfaceChanged(extent)
         session?.requestFrame()
       } catch (error: Throwable) {
@@ -85,68 +88,72 @@ public fun ComposeNativeSurface(
     }
   }
 
-  LaunchedEffect(frameRequest, extent, bridge, session, renderer) {
-    if (extent.isEmpty || bridge == null || session == null) {
-      return@LaunchedEffect
-    }
-    val frameId = nextFrameId++
-    val frame =
-      try {
-        bridge.acquireFrame(frameId, extent, System.nanoTime())
-      } catch (error: Throwable) {
-        error.printStackTrace()
-        controllerImpl?.setState(
-          NativeSurfaceState.Failed(
-            message = "Native surface bridge failed to acquire frame $frameId: ${error.message}",
-            cause = error,
-          )
-        )
-        return@LaunchedEffect
-      }
-    try {
-      when (renderer.render(frame)) {
-        NativeSurfaceRenderResult.Rendered -> {
-          bridge.completeProducerAccess(frame)
-          lastRenderedFrame = frameId
-          lastRenderedTarget = frame.target
-        }
-        NativeSurfaceRenderResult.Skipped -> Unit
-      }
-    } catch (error: Throwable) {
-      error.printStackTrace()
-      controllerImpl?.setState(
-        NativeSurfaceState.Failed(
-          message = "Native surface renderer failed for frame $frameId: ${error.message}",
-          cause = error,
-        )
-      )
-    } finally {
-      bridge.releaseFrame(frame)
-    }
-  }
-
   Canvas(
     modifier =
       modifier.fillMaxSize().onSizeChanged { size ->
-        extent = SurfaceExtent(size.width, size.height)
+        extent = SurfaceExtent.fromPhysical(size.width, size.height, density.density.toDouble())
       }
   ) {
-    val target = lastRenderedTarget
-    val drew =
-      if (lastRenderedFrame == 0L || bridge == null || target == null) {
-        false
-      } else {
+    frameSignal
+    var drew = false
+    if (!extent.isEmpty && bridge != null && session != null) {
+      val frameId = drawState.nextFrameId()
+      val frame =
         try {
-          bridge.draw(this, target)
+          bridge.acquireFrame(frameId, extent, System.nanoTime())
         } catch (error: Throwable) {
           error.printStackTrace()
-          false
+          controllerImpl?.setState(
+            NativeSurfaceState.Failed(
+              message = "Native surface bridge failed to acquire frame $frameId: ${error.message}",
+              cause = error,
+            )
+          )
+          null
+        }
+      if (frame != null) {
+        try {
+          when (renderer.render(frame)) {
+            NativeSurfaceRenderResult.Rendered -> {
+              bridge.completeProducerAccess(frame)
+              drawState.lastRenderedTarget = frame.target
+            }
+            NativeSurfaceRenderResult.Skipped -> Unit
+          }
+          drawState.lastRenderedTarget?.let { target -> drew = bridge.draw(this, target) }
+        } catch (error: Throwable) {
+          error.printStackTrace()
+          controllerImpl?.setState(
+            NativeSurfaceState.Failed(
+              message = "Native surface renderer failed for frame $frameId: ${error.message}",
+              cause = error,
+            )
+          )
+        } finally {
+          bridge.releaseFrame(frame)
         }
       }
+    }
     if (!drew) {
       drawRect(Color(0xFF101418))
     }
   }
+}
+
+private class NativeSurfaceDrawState {
+  private var extent = SurfaceExtent.Empty
+  private var nextFrameId = 1L
+
+  var lastRenderedTarget: NativeSurfaceTarget? = null
+
+  fun resetForExtent(next: SurfaceExtent) {
+    if (next != extent) {
+      extent = next
+      lastRenderedTarget = null
+    }
+  }
+
+  fun nextFrameId(): Long = nextFrameId++
 }
 
 @Composable

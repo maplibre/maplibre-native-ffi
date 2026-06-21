@@ -8,18 +8,22 @@ import java.awt.Container
 import java.awt.Window
 import javax.swing.SwingUtilities
 import org.jetbrains.skia.BackendRenderTarget
-import org.jetbrains.skia.ColorSpace
+import org.jetbrains.skia.ContentChangeMode
 import org.jetbrains.skia.DirectContext
-import org.jetbrains.skia.PixelGeometry
+import org.jetbrains.skia.Image
+import org.jetbrains.skia.Rect
+import org.jetbrains.skia.SamplingMode
 import org.jetbrains.skia.Surface
 import org.jetbrains.skia.SurfaceColorFormat
 import org.jetbrains.skia.SurfaceOrigin
-import org.jetbrains.skia.SurfaceProps
 
 internal object SkikoHost {
   private const val SKIA_LAYER_CLASS = "org.jetbrains.skiko.SkiaLayer"
   private const val COMPOSE_WINDOW_CLASS = "androidx.compose.ui.awt.ComposeWindow"
   private const val METAL_REDRAWER_CLASS = "org.jetbrains.skiko.redrawer.MetalRedrawer"
+  private const val RETAINED_IMAGE_COUNT = 8
+
+  private val metalPresenters = mutableMapOf<Long, MetalTexturePresenter>()
 
   fun requireMetalDevice(): SkikoMetalDevice = onEdt {
     val layer =
@@ -44,45 +48,29 @@ internal object SkikoHost {
     SkikoMetalDevice(ptr)
   }
 
-  fun drawMetalTexture(scope: DrawScope, target: MetalTextureTarget) {
+  fun drawMetalTexture(scope: DrawScope, target: MetalTextureTarget): Boolean {
+    var drew = false
     scope.drawIntoCanvas { composeCanvas ->
-      val nativeCanvas = composeCanvas.skiaCanvas
-      val context = requireMetalContext()
-      BackendRenderTarget.makeMetal(
-          target.extent.width,
-          target.extent.height,
-          target.texture.address,
-        )
-        .use { renderTarget ->
-          val surface =
-            Surface.makeFromBackendRenderTarget(
-              context,
-              renderTarget,
-              SurfaceOrigin.TOP_LEFT,
-              SurfaceColorFormat.BGRA_8888,
-              ColorSpace.sRGB,
-              SurfaceProps(pixelGeometry = PixelGeometry.UNKNOWN),
-            )
-              ?: throw NativeSurfaceBridgeException(
-                "Skia could not wrap Metal texture ${target.texture.address} as a render target"
-              )
-          surface.use {
-            val saveCount = nativeCanvas.save()
-            try {
-              nativeCanvas.scale(
-                scope.size.width / target.extent.width.toFloat(),
-                scope.size.height / target.extent.height.toFloat(),
-              )
-              it.draw(nativeCanvas, 0, 0, null)
-            } finally {
-              nativeCanvas.restoreToCount(saveCount)
-            }
-          }
-        }
+      val context = findMetalContext() ?: return@drawIntoCanvas
+      val presenter =
+        metalPresenters.getOrPut(target.texture.address) { MetalTexturePresenter(target.texture) }
+      presenter.draw(composeCanvas.skiaCanvas, context, target, scope.size.width, scope.size.height)
+      drew = true
     }
+    return drew
   }
 
-  private fun requireMetalContext(): DirectContext = onEdt {
+  fun forgetMetalTexture(texture: NativeHandle) {
+    metalPresenters.remove(texture.address)?.close()
+  }
+
+  fun close() {
+    val presenters = metalPresenters.values.toList()
+    metalPresenters.clear()
+    presenters.forEach { it.close() }
+  }
+
+  private fun findMetalContext(): DirectContext? = onEdt {
     val layer =
       findSkiaLayer()
         ?: throw NativeSurfaceBridgeException("SkikoHost could not find a live $SKIA_LAYER_CLASS")
@@ -90,10 +78,11 @@ internal object SkikoHost {
     val contextHandler =
       redrawer.getField("contextHandler")
         ?: throw NativeSurfaceBridgeException("$METAL_REDRAWER_CLASS.contextHandler was null")
-    contextHandler.invokeDeclaredNoArg("getContext") as? DirectContext
-      ?: throw NativeSurfaceBridgeException(
-        "${contextHandler.javaClass.name}.getContext() did not return a Skia DirectContext"
-      )
+    (contextHandler.invokeDeclaredNoArg("getContext") as? DirectContext)
+      ?: run {
+        contextHandler.invokeDeclaredNoArg("initContext")
+        contextHandler.invokeDeclaredNoArg("getContext") as? DirectContext
+      }
   }
 
   private fun requireMetalRedrawer(layer: Any): Any {
@@ -213,6 +202,97 @@ internal object SkikoHost {
     var result: Result<T>? = null
     SwingUtilities.invokeAndWait { result = runCatching(block) }
     return result!!.getOrThrow()
+  }
+
+  private class MetalTexturePresenter(private val texture: NativeHandle) : AutoCloseable {
+    private var contextIdentity = 0
+    private var extent = SurfaceExtent.Empty
+    private var renderTarget: BackendRenderTarget? = null
+    private var surface: Surface? = null
+    private val retainedImages = ArrayDeque<Image>()
+
+    fun draw(
+      canvas: org.jetbrains.skia.Canvas,
+      context: DirectContext,
+      target: MetalTextureTarget,
+      destinationWidth: Float,
+      destinationHeight: Float,
+    ) {
+      ensureSurface(context, target)
+      val currentSurface =
+        surface
+          ?: throw NativeSurfaceBridgeException(
+            "Skia could not wrap Metal texture ${target.texture.address}"
+          )
+      currentSurface.notifyContentWillChange(ContentChangeMode.DISCARD)
+      val image = currentSurface.makeImageSnapshot()
+      retainImageForRecordedFrame(image)
+      canvas.drawImageRect(
+        image = image,
+        src = Rect.makeWH(image.width.toFloat(), image.height.toFloat()),
+        dst = Rect.makeWH(destinationWidth, destinationHeight),
+        samplingMode = SamplingMode.LINEAR,
+        paint = null,
+        strict = true,
+      )
+    }
+
+    private fun ensureSurface(context: DirectContext, target: MetalTextureTarget) {
+      val nextContextIdentity = System.identityHashCode(context)
+      if (
+        surface != null &&
+          renderTarget != null &&
+          contextIdentity == nextContextIdentity &&
+          extent == target.extent
+      ) {
+        return
+      }
+
+      closeGpuResources()
+      contextIdentity = nextContextIdentity
+      extent = target.extent
+      renderTarget =
+        BackendRenderTarget.makeMetal(
+          width = target.extent.physicalWidth,
+          height = target.extent.physicalHeight,
+          texturePtr = texture.address,
+        )
+      surface =
+        Surface.makeFromBackendRenderTarget(
+          context = context,
+          rt = checkNotNull(renderTarget),
+          origin = SurfaceOrigin.TOP_LEFT,
+          colorFormat = SurfaceColorFormat.BGRA_8888,
+          colorSpace = null,
+          surfaceProps = null,
+        )
+          ?: throw NativeSurfaceBridgeException(
+            "Skia could not wrap Metal texture ${target.texture.address} as a render target"
+          )
+    }
+
+    private fun retainImageForRecordedFrame(image: Image) {
+      retainedImages.addLast(image)
+      while (retainedImages.size > RETAINED_IMAGE_COUNT) {
+        retainedImages.removeFirst().close()
+      }
+    }
+
+    override fun close() {
+      closeGpuResources()
+      contextIdentity = 0
+      extent = SurfaceExtent.Empty
+    }
+
+    private fun closeGpuResources() {
+      while (retainedImages.isNotEmpty()) {
+        retainedImages.removeFirst().close()
+      }
+      surface?.close()
+      surface = null
+      renderTarget?.close()
+      renderTarget = null
+    }
   }
 }
 

@@ -1,6 +1,8 @@
 package org.maplibre.nativeffi.examples.composemap.surface
 
 import androidx.compose.runtime.Composable
+import kotlin.math.ceil
+import kotlin.math.max
 import kotlinx.coroutines.flow.StateFlow
 
 @Composable
@@ -100,14 +102,46 @@ public enum class NativeSurfaceOperatingSystem {
   UNSUPPORTED,
 }
 
-public data class SurfaceExtent(public val width: Int, public val height: Int) {
+public data class SurfaceExtent(
+  public val width: Int,
+  public val height: Int,
+  public val scaleFactor: Double,
+  public val physicalWidth: Int = physicalDimension(width, scaleFactor),
+  public val physicalHeight: Int = physicalDimension(height, scaleFactor),
+) {
   public val isEmpty: Boolean
-    get() = width <= 0 || height <= 0
+    get() =
+      width <= 0 ||
+        height <= 0 ||
+        physicalWidth <= 0 ||
+        physicalHeight <= 0 ||
+        !(scaleFactor > 0.0) ||
+        !scaleFactor.isFinite()
+
+  public fun log(label: String) {
+    println(
+      "$label: logical=${width}x${height} physical=${physicalWidth}x${physicalHeight} scale=${"%.2f".format(scaleFactor)}"
+    )
+  }
 
   public companion object {
-    public val Empty: SurfaceExtent = SurfaceExtent(0, 0)
+    public val Empty: SurfaceExtent = SurfaceExtent(0, 0, 1.0, 0, 0)
+
+    public fun fromPhysical(
+      physicalWidth: Int,
+      physicalHeight: Int,
+      scaleFactor: Double,
+    ): SurfaceExtent {
+      val scale = if (scaleFactor > 0.0 && scaleFactor.isFinite()) scaleFactor else 1.0
+      val logicalWidth = max(1, ceil(physicalWidth.coerceAtLeast(1) / scale).toInt())
+      val logicalHeight = max(1, ceil(physicalHeight.coerceAtLeast(1) / scale).toInt())
+      return SurfaceExtent(logicalWidth, logicalHeight, scale)
+    }
   }
 }
+
+private fun physicalDimension(logicalSize: Int, scaleFactor: Double): Int =
+  max(1, ceil(logicalSize.coerceAtLeast(1) * scaleFactor).toInt())
 
 @JvmInline public value class NativeHandle(public val address: Long)
 
