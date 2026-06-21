@@ -335,6 +335,22 @@ Reflection is acceptable for the proof path if it is fully contained inside
 not expose through Kotlin APIs. The rest of the example should depend on
 capabilities rather than Skiko field names.
 
+The current Compose 1.11.1 / Skiko 0.144.6 macOS path stores the active
+`SkiaLayer` as an anonymous `SkiaLayer` subclass inside
+`ComposeWindowPanel -> ComposeContainer -> WindowSkiaLayerComponent`. The lookup
+must use `SkiaLayer` assignability, not exact class-name equality.
+`MetalRedrawer._device.ptr` points at Skiko's Metal device wrapper; the native
+bridge can use that wrapper's `adapter` to allocate an `MTLTexture` on the same
+Metal device as Compose.
+
+Skiko 0.144.6's `BackendRenderTarget.makeMetal(width, height, ptr)` expects
+`ptr` to be a raw Objective-C `id<MTLTexture>` pointer encoded as a `Long`.
+Skiko constructs the internal Metal backend-info structure and retains the
+texture when it creates the backend render target. The bridge must keep its own
+retained `MTLTexture` alive until resize or close, and it must keep the
+`BackendRenderTarget` alive for the full lifetime of any `Surface` created from
+it.
+
 Linux needs special care. Skiko's default Compose Desktop path is OpenGL, but it
 does not imply an EGL context that MapLibre can share directly. The current C
 API supports WGL and EGL context providers for OpenGL, not GLX. Therefore the
@@ -414,8 +430,11 @@ code:
 - Kotlin owns the Compose application, MapLibre binding calls, frame loop, and
   bridge selection.
 - Gradle mirrors `examples/lwjgl-map` for the native C artifact metadata,
-  `org.maplibre.nativeffi.library.path`, JVM target, and macOS
-  `-XstartOnFirstThread` behavior.
+  `org.maplibre.nativeffi.library.path`, JVM target, and Compose Desktop JVM
+  launch behavior. On the current macOS/JDK 25 toolchain, `-XstartOnFirstThread`
+  hangs AWT while constructing the first `JFrame`; the example should let
+  Compose's AWT launcher run without that flag unless a future pinned runtime
+  requires it.
 - A small native bridge library owns platform graphics interop calls that are
   unavailable or brittle through pure Kotlin/JNA.
 - Runtime selection chooses one bridge row based on the default Skiko renderer,
@@ -452,6 +471,8 @@ renaming exported symbols.
   command submission.
 - Pin the Compose/Skiko version for the example and verify the reflection/native
   access points against that exact source.
+- Validate same-device identity, context timing, and texture format/usage for
+  the macOS same-API Metal draw path.
 - Validate the proposed public Kotlin surface API against the MapLibre adapter
   and at least one non-map producer shape, such as a simple animated native
   renderer or decoded video frame source.
