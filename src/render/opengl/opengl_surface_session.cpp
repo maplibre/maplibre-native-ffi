@@ -150,9 +150,7 @@ class OpenGLSurfaceBackend final : public mbgl::gl::RendererBackend,
       context.reset();
     };
     if (has_native_context()) {
-      auto guard = mbgl::gfx::BackendScope{
-        *this, mbgl::gfx::BackendScope::ScopeType::Implicit
-      };
+      auto guard = mbgl::gfx::BackendScope{*this};
       cleanup();
     } else {
       cleanup();

@@ -311,9 +311,7 @@ VulkanTextureBackend::VulkanTextureBackend(
 }
 
 VulkanTextureBackend::~VulkanTextureBackend() {
-  auto guard = mbgl::gfx::BackendScope{
-    *this, mbgl::gfx::BackendScope::ScopeType::Implicit
-  };
+  auto guard = mbgl::gfx::BackendScope{*this};
   resource.reset();
   getThreadPool().runRenderJobs(true);
 }

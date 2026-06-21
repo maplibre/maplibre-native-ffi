@@ -1,3 +1,6 @@
+import groovy.json.JsonSlurper
+import org.gradle.api.artifacts.dsl.RepositoryHandler
+import org.gradle.api.artifacts.repositories.MavenArtifactRepository
 import org.maplibre.nativeffi.gradle.MaplibreNativeCArtifact
 
 plugins { id("com.android.application") }
@@ -7,6 +10,7 @@ apply(from = rootProject.file("gradle/native-artifact.gradle.kts"))
 repositories {
   google()
   mavenCentral()
+  rustlsPlatformVerifier()
 }
 
 val maplibreNativeC = extensions.getByType<MaplibreNativeCArtifact>()
@@ -39,7 +43,42 @@ androidComponents {
   }
 }
 
-dependencies { implementation(project(":bindings:kotlin")) }
+dependencies {
+  implementation(project(":bindings:kotlin"))
+  implementation("rustls:rustls-platform-verifier:latest.release")
+}
+
+fun RepositoryHandler.rustlsPlatformVerifier(): MavenArtifactRepository {
+  @Suppress("UnstableApiUsage")
+  val metadata =
+    providers
+      .exec {
+        workingDir = rootProject.projectDir
+        commandLine(
+          "cargo",
+          "metadata",
+          "--format-version",
+          "1",
+          "--filter-platform",
+          "aarch64-linux-android",
+          "--manifest-path",
+          "src/platform/rust/Cargo.toml",
+        )
+      }
+      .standardOutput
+      .asText
+      .get()
+
+  @Suppress("UNCHECKED_CAST")
+  val packages =
+    (JsonSlurper().parseText(metadata) as Map<String, Any>)["packages"] as List<Map<String, Any>>
+  val manifestPath =
+    packages.first { it["name"] == "rustls-platform-verifier-android" }["manifest_path"] as String
+  return maven {
+    url = uri(File(File(manifestPath).parentFile, "maven"))
+    metadataSources.artifact()
+  }
+}
 
 tasks
   .matching { it.name == "preBuild" }

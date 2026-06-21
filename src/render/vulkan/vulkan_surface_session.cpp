@@ -328,9 +328,7 @@ class VulkanSurfaceBackend final : public mbgl::vulkan::RendererBackend,
   auto operator=(VulkanSurfaceBackend&&) -> VulkanSurfaceBackend& = delete;
 
   ~VulkanSurfaceBackend() override {
-    auto guard = mbgl::gfx::BackendScope{
-      *this, mbgl::gfx::BackendScope::ScopeType::Implicit
-    };
+    auto guard = mbgl::gfx::BackendScope{*this};
     resource.reset();
     getThreadPool().runRenderJobs(true);
   }
